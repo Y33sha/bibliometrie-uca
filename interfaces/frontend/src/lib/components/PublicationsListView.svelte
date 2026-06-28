@@ -192,6 +192,37 @@
 		onFilterChange();
 	}
 
+	// Lien vers le tableau de bord, pendant inverse du bouton « Voir les publications ». Transmet les
+	// filtres que le tableau de bord sait représenter (les facettes propres à la liste — accès, pays,
+	// sources, statut HAL, correspondance, périmètre — n'y ont pas d'équivalent). Masqué quand la
+	// route fixe une dimension hors de sa portée (personne, sujet).
+	const showStatsLink = $derived(!externalFilters?.personId && !externalFilters?.subjectId);
+	const statsUrl = $derived.by(() => {
+		const p = new URLSearchParams();
+		if (selectedYears.length) p.set('year', selectedYears.join(','));
+		if (selectedDocTypes.length) p.set('doc_type', selectedDocTypes.join(','));
+		if (selectedOa.length) p.set('oa_status', selectedOa.join(','));
+		if (selectedApc.length) p.set('has_apc', selectedApc.join(','));
+		// Laboratoire : fixé par la route ou choisi en facette (« aucun labo » n'a pas de sens côté stats).
+		const labId =
+			externalFilters?.labId != null
+				? String(externalFilters.labId)
+				: selectedLabs.filter((v) => v !== 'none').join(',');
+		if (labId) p.set('lab_id', labId);
+		// Éditeur / revue : id + libellé, pour restaurer la facette du tableau de bord sans relecture.
+		const publisherId = externalFilters?.publisherId != null ? String(externalFilters.publisherId) : filterPublisherId;
+		if (publisherId) {
+			p.set('publisher_id', publisherId);
+			if (filterPublisherName) p.set('publisher_name', filterPublisherName);
+		}
+		const journalId = externalFilters?.journalId != null ? String(externalFilters.journalId) : filterJournalId;
+		if (journalId) {
+			p.set('journal_id', journalId);
+			if (filterJournalName) p.set('journal_name', filterJournalName);
+		}
+		return base + '/stats?' + p.toString();
+	});
+
 	// Sort display
 	const yearSortArrow = $derived(currentSort === 'year_asc' ? '▲' : currentSort === 'year_desc' ? '▼' : '');
 	const titleSortArrow = $derived(currentSort === 'title' ? '▲' : currentSort === 'title_desc' ? '▼' : '');
@@ -435,24 +466,29 @@
 	<div class="filter-banner">Filtre actif : {subjectBannerText}</div>
 {/if}
 
-<div class="toolbar toolbar-card toolbar-sticky">
-	<input type="search" placeholder="Rechercher par titre..." bind:value={search} use:autofocus onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }} oninput={onSearchInput} />
-	<span class="facets-label">Filtrer par&nbsp;:</span>
-	{#if col('type')}<FacetDropdown label="Types" options={facets.options.docTypes} groups={docTypeFamilies.map((f) => ({ label: f.label, values: f.types }))} bind:selected={selectedDocTypes} onchange={onFilterChange} />{/if}
-	{#if col('year')}<FacetDropdown label="Années" options={facets.options.years} bind:selected={selectedYears} onchange={onFilterChange} />{/if}
-	{#if !externalFilters?.journalId}<EntityFilter label="Revue" endpoint="/api/publications/facets/entities" kind="journal" buildParams={buildFilterParams} selected={journalSelection} onchange={onJournalFilter} />{/if}
-	{#if !externalFilters?.publisherId}<EntityFilter label="Éditeur" endpoint="/api/publications/facets/entities" kind="publisher" buildParams={buildFilterParams} selected={publisherSelection} onchange={onPublisherFilter} />{/if}
-	{#if !hasFixedLab && col('labs')}<FacetDropdown label="Laboratoires" options={facets.options.labs} searchable bind:selected={selectedLabs} onchange={onLabChange} />{/if}
-	{#if col('oa')}<FacetDropdown label="Accès" options={facets.options.access} bind:selected={selectedAccess} onchange={onFilterChange} />{/if}
-	{#if col('oa_status')}<FacetDropdown label="Voies OA" options={facets.options.oa} bind:selected={selectedOa} onchange={onFilterChange} />{/if}
-	{#if showHalStatusColumn && col('hal_status')}<FacetDropdown label="Statut HAL" options={facets.options.halStatus} bind:selected={selectedHalStatus} onchange={onFilterChange} />{/if}
-	{#if showCorrespondingColumn && col('corr') && facets.options.corresponding.length}<FacetDropdown label="Corresp." options={facets.options.corresponding} bind:selected={selectedCorr} onchange={onFilterChange} />{/if}
-	{#if showPerimeterFacet && facets.options.perimeter.length}<FacetDropdown label="UCA" options={facets.options.perimeter} bind:selected={selectedPerimeter} onchange={onFilterChange} />{/if}
-	{#if col('apc')}<FacetDropdown label="APC" options={facets.options.apc} bind:selected={selectedApc} onchange={onFilterChange} tooltip="Pas d'info après 2024<br>Sans APC = ou APC non documentés" />{/if}
-	<FacetDropdown label="Pays" options={facets.options.countries} searchable bind:selected={selectedCountries} onchange={onFilterChange} />
-	<PresenceFilterToggle label="Sources" items={SOURCE_ITEMS} bind:states={sourceStates} counts={facets.sourceCounts} onchange={onFilterChange} />
-	<span class="count">{pubs.total} publication{pubs.total > 1 ? 's' : ''}</span>
-	<a href={exportCsvUrl()} class="export-btn" download>Export CSV</a>
+<div class="toolbar-card toolbar-sticky pub-toolbar">
+	<div class="toolbar pub-toolbar-main">
+		<input type="search" class="pub-search" placeholder="Rechercher par titre..." bind:value={search} use:autofocus onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }} oninput={onSearchInput} />
+		<span class="count">{pubs.total} publication{pubs.total > 1 ? 's' : ''}</span>
+		<a href={exportCsvUrl()} class="export-btn" download>Export CSV</a>
+		{#if showStatsLink}<a href={statsUrl} class="pub-link">Statistiques &rarr;</a>{/if}
+	</div>
+	<div class="toolbar pub-toolbar-facets">
+		<span class="facets-label">Filtrer par&nbsp;:</span>
+		{#if col('type')}<FacetDropdown label="Types" options={facets.options.docTypes} groups={docTypeFamilies.map((f) => ({ label: f.label, values: f.types }))} bind:selected={selectedDocTypes} onchange={onFilterChange} />{/if}
+		{#if col('year')}<FacetDropdown label="Années" options={facets.options.years} bind:selected={selectedYears} onchange={onFilterChange} />{/if}
+		{#if !externalFilters?.journalId}<EntityFilter label="Revue" endpoint="/api/publications/facets/entities" kind="journal" buildParams={buildFilterParams} selected={journalSelection} onchange={onJournalFilter} />{/if}
+		{#if !externalFilters?.publisherId}<EntityFilter label="Éditeur" endpoint="/api/publications/facets/entities" kind="publisher" buildParams={buildFilterParams} selected={publisherSelection} onchange={onPublisherFilter} />{/if}
+		{#if !hasFixedLab && col('labs')}<FacetDropdown label="Laboratoires" options={facets.options.labs} searchable bind:selected={selectedLabs} onchange={onLabChange} />{/if}
+		{#if col('oa')}<FacetDropdown label="Accès" options={facets.options.access} bind:selected={selectedAccess} onchange={onFilterChange} />{/if}
+		{#if col('oa_status')}<FacetDropdown label="Voies OA" options={facets.options.oa} bind:selected={selectedOa} onchange={onFilterChange} />{/if}
+		{#if showHalStatusColumn && col('hal_status')}<FacetDropdown label="Statut HAL" options={facets.options.halStatus} bind:selected={selectedHalStatus} onchange={onFilterChange} />{/if}
+		{#if showCorrespondingColumn && col('corr') && facets.options.corresponding.length}<FacetDropdown label="Corresp." options={facets.options.corresponding} bind:selected={selectedCorr} onchange={onFilterChange} />{/if}
+		{#if showPerimeterFacet && facets.options.perimeter.length}<FacetDropdown label="UCA" options={facets.options.perimeter} bind:selected={selectedPerimeter} onchange={onFilterChange} />{/if}
+		{#if col('apc')}<FacetDropdown label="APC" options={facets.options.apc} bind:selected={selectedApc} onchange={onFilterChange} tooltip="Pas d'info après 2024<br>Sans APC = ou APC non documentés" />{/if}
+		<FacetDropdown label="Pays" options={facets.options.countries} searchable bind:selected={selectedCountries} onchange={onFilterChange} />
+		<PresenceFilterToggle label="Sources" items={SOURCE_ITEMS} bind:states={sourceStates} counts={facets.sourceCounts} onchange={onFilterChange} />
+	</div>
 </div>
 
 <div class="table-scroll">
@@ -645,7 +681,24 @@
 		font-size: 0.95rem;
 		color: #2c3e50;
 	}
-	.toolbar input[type='search'] { width: 280px; }
+	/* Deux lignes : commandes (recherche extensible, compte, exports, lien stats) puis facettes. */
+	.pub-toolbar { display: flex; flex-direction: column; gap: 8px; }
+	.pub-toolbar .toolbar { margin-bottom: 0; }
+	.pub-search { flex: 1; min-width: 220px; }
+	.pub-link {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+		padding: 6px 12px;
+		background: var(--accent);
+		color: white;
+		text-decoration: none;
+		border-radius: 5px;
+		font-size: 0.9rem;
+		font-weight: 500;
+		white-space: nowrap;
+	}
+	.pub-link:hover { opacity: 0.9; }
 	.facets-label { font-size: 0.9rem; color: var(--muted); white-space: nowrap; }
 	.pub-table {
 		width: 100%;
