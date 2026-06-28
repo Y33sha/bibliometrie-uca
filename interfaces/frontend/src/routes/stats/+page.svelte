@@ -270,8 +270,54 @@
 		}));
 		legendItems = datasets.map((d) => ({ label: d.label, color: d.backgroundColor }));
 
-		// Mode « part » : aplatir chaque colonne (abscisse) à 100 % en remplaçant les comptes par leur
-		// proportion. N'a de sens qu'avec un empilement ; sans comparaison, on reste en absolu.
+		// Mode « part » sans comparaison : un camembert des parts de chaque catégorie du groupement
+		// primaire (l'empilement à 100 % d'une barre unique, déroulé en secteurs lisibles).
+		if (chartMode === 'part' && !stackDim) {
+			const values = datasets[0].data as number[];
+			const colors = cats.map((cv, i) => dimColor(xDim, cv, i, cs));
+			legendItems = cats.map((cv, i) => ({ label: dimLabel(xDim, cv), color: colors[i] }));
+			const sliceTotal = (ctx: { dataset: { data: unknown[] } }) =>
+				(ctx.dataset.data as number[]).reduce((s, v) => s + (v || 0), 0);
+			yearChart = new Chart(chartCanvas, {
+				type: 'pie',
+				plugins: [whiteBgPlugin],
+				data: { labels, datasets: [{ data: values, backgroundColor: colors, borderColor: '#fff', borderWidth: 1 }] },
+				options: {
+					responsive: true,
+					maintainAspectRatio: false,
+					plugins: {
+						legend: { display: false },
+						tooltip: {
+							bodyFont: { size: 14 },
+							callbacks: {
+								label: (ctx) => {
+									const val = ctx.raw as number;
+									const total = sliceTotal(ctx);
+									const pct = total ? ((val / total) * 100).toFixed(1) : '0.0';
+									return `${ctx.label} : ${val} (${pct}%)`;
+								}
+							}
+						},
+						datalabels: {
+							color: '#fff',
+							font: { size: 13, weight: 'bold' },
+							formatter: (val: number, ctx) => {
+								const total = sliceTotal(ctx);
+								const pct = total ? (val / total) * 100 : 0;
+								return pct >= 5 ? Math.round(pct) + '%' : '';
+							},
+							anchor: 'center' as const,
+							align: 'center' as const,
+							listeners: {}
+						}
+					}
+				}
+			});
+			return;
+		}
+
+		// Mode « part » avec comparaison : aplatir chaque colonne (abscisse) à 100 % en remplaçant les
+		// comptes par leur proportion.
 		const part = chartMode === 'part' && !!stackDim;
 		if (part) {
 			const totals = labels.map((_, ci) => datasets.reduce((s, d) => s + ((d.data[ci] as number) || 0), 0));
@@ -453,7 +499,7 @@
 			</label>
 		{/key}
 	{/if}
-	{#if groupBy && groupBy !== primaryBy}
+	{#if pivotSchema}
 		<label class="groupby">
 			<input type="checkbox" checked={chartMode === 'part'} onchange={(e) => { chartMode = e.currentTarget.checked ? 'part' : 'absolu'; syncUrl(); loadChart(); }} />
 			Part&nbsp;(%)
