@@ -10,42 +10,6 @@ from typing import Literal, Protocol
 from pydantic import BaseModel
 
 
-class OaCounts(BaseModel):
-    """Agrégats communs aux lignes de stats (éditeurs, revues, labos).
-
-    `apc_uca` est toujours numérique (coalescé à 0 côté SQL).
-    """
-
-    pub_count: int
-    apc_uca: float
-    gold: int
-    diamond: int
-    hybrid: int
-    bronze: int
-    green: int
-    embargoed: int
-    closed: int
-    unknown: int
-
-
-class JournalStatsRow(OaCounts):
-    journal_id: int
-    journal_title: str
-    issn: str | None
-    eissn: str | None
-    publisher_name: str | None
-    is_predatory: bool
-    apc_amount: float | None
-
-
-class JournalStatsResponse(BaseModel):
-    total: int
-    page: int
-    per_page: int
-    pages: int
-    journals: list[JournalStatsRow]
-
-
 class YearStatsRow(BaseModel):
     """Ventilation d'une année : pub_count + détail OA."""
 
@@ -148,22 +112,6 @@ class StatsQueries(Protocol):
         has_apc: str,
         doc_types: list[str],
     ) -> PivotResponse: ...
-
-    def journal_stats(
-        self,
-        *,
-        apc_structure_ids: list[int],
-        lab_ids: list[int],
-        years: list[int],
-        publisher_id: int | None,
-        oa_status: str,
-        has_apc: str,
-        doc_types: list[str],
-        search: str,
-        page: int,
-        per_page: int,
-        sort: str,
-    ) -> JournalStatsResponse: ...
 
     def stats_by_year(
         self,
