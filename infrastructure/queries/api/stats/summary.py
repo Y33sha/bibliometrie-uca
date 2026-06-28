@@ -27,15 +27,19 @@ _BASE_CLAUSES = " AND ".join(
 
 
 def _publisher_journal_clauses(
-    publisher_id: int | None, journal_id: int | None
+    publisher_ids: list[int], journal_ids: list[int]
 ) -> list[WhereClause | None]:
     out: list[WhereClause | None] = []
-    if publisher_id:
+    if publisher_ids:
         out.append(
-            WhereClause("j.publisher_id = :flt_publisher_id", {"flt_publisher_id": publisher_id})
+            WhereClause(
+                "j.publisher_id = ANY(:flt_publisher_ids)", {"flt_publisher_ids": publisher_ids}
+            )
         )
-    if journal_id:
-        out.append(WhereClause("p.journal_id = :flt_journal_id", {"flt_journal_id": journal_id}))
+    if journal_ids:
+        out.append(
+            WhereClause("p.journal_id = ANY(:flt_journal_ids)", {"flt_journal_ids": journal_ids})
+        )
     return out
 
 
@@ -44,25 +48,25 @@ def _common_clauses(
     apc_structure_ids: list[int],
     lab_ids: list[int],
     years: list[int],
-    publisher_id: int | None,
-    journal_id: int | None,
+    publisher_ids: list[int],
+    journal_ids: list[int],
     oa_status: str,
     has_apc: str,
     doc_types: list[str],
     skip: str = "",
 ) -> list[WhereClause | None]:
-    """Construit les filtres communs aux endpoints stats summary / facets.
+    """Construit les filtres communs aux facettes croisées.
 
     `skip` permet d'omettre un filtre pour les facettes croisées ("year",
-    "lab", "oa", "apc", "doc_type"). Les filtres publisher/journal sont toujours
-    appliqués (jamais facettés).
+    "lab", "oa", "apc", "doc_type"). Les filtres éditeur/revue sont toujours
+    appliqués (jamais facettés via cette barre — ils passent par la recherche serveur).
     """
     out: list[WhereClause | None] = []
     if skip != "year":
         out.append(year_clause(years))
     if skip != "lab":
         out.append(lab_clause(lab_ids))
-    out.extend(_publisher_journal_clauses(publisher_id, journal_id))
+    out.extend(_publisher_journal_clauses(publisher_ids, journal_ids))
     if skip != "oa":
         out.append(oa_clause(oa_status))
     if skip != "apc":
@@ -91,8 +95,8 @@ def _facets_sqls(
     apc_structure_ids: list[int],
     lab_ids: list[int],
     years: list[int],
-    publisher_id: int | None,
-    journal_id: int | None,
+    publisher_ids: list[int],
+    journal_ids: list[int],
     oa_status: str,
     has_apc: str,
     doc_types: list[str],
@@ -104,8 +108,8 @@ def _facets_sqls(
             apc_structure_ids=apc_structure_ids,
             lab_ids=lab_ids,
             years=years,
-            publisher_id=publisher_id,
-            journal_id=journal_id,
+            publisher_ids=publisher_ids,
+            journal_ids=journal_ids,
             oa_status=oa_status,
             has_apc=has_apc,
             doc_types=doc_types,
@@ -197,8 +201,8 @@ def stats_facets(
     apc_structure_ids: list[int],
     lab_ids: list[int],
     years: list[int],
-    publisher_id: int | None,
-    journal_id: int | None,
+    publisher_ids: list[int],
+    journal_ids: list[int],
     oa_status: str,
     has_apc: str,
     doc_types: list[str],
@@ -209,8 +213,8 @@ def stats_facets(
         apc_structure_ids=apc_structure_ids,
         lab_ids=lab_ids,
         years=years,
-        publisher_id=publisher_id,
-        journal_id=journal_id,
+        publisher_ids=publisher_ids,
+        journal_ids=journal_ids,
         oa_status=oa_status,
         has_apc=has_apc,
         doc_types=doc_types,
