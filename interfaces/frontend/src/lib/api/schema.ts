@@ -5014,6 +5014,8 @@ export interface components {
             journal_id: number | null;
             /** Publisher */
             publisher: string | null;
+            /** Publisher Id */
+            publisher_id: number | null;
             /** Hal Id */
             hal_id: string | null;
             /** Openalex Id */

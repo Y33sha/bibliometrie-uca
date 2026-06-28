@@ -100,6 +100,7 @@ class PublicationListItem(BaseModel):
     journal: str | None
     journal_id: int | None
     publisher: str | None
+    publisher_id: int | None
     hal_id: str | None
     openalex_id: str | None
     scanr_id: str | None

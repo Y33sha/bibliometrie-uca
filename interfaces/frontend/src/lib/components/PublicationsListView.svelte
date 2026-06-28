@@ -124,6 +124,7 @@
 		{ key: 'year',       label: 'Année' },
 		{ key: 'title',      label: 'Titre',      fixed: true },
 		{ key: 'journal',    label: 'Revue' },
+		{ key: 'publisher',  label: 'Éditeur' },
 		// svelte-ignore state_referenced_locally
 		...(hasFixedLab ? [] : [{ key: 'labs', label: 'Labo(s)' }]),
 		// svelte-ignore state_referenced_locally
@@ -135,7 +136,7 @@
 		...(showHalStatusColumn ? [{ key: 'hal_status', label: 'Statut HAL' }] : []),
 		{ key: 'links',      label: 'Liens',      fixed: true },
 	];
-	const initialHidden = ['apc', 'oa_status'];
+	const initialHidden = ['apc', 'oa_status', 'publisher'];
 	// svelte-ignore state_referenced_locally
 	if (showHalStatusColumn) initialHidden.push('hal_status');
 	const cv = useColumnVisibility(columnDefs, initialHidden);
@@ -471,6 +472,7 @@
 				Titre <span class="sort-arrow">{titleSortArrow}</span>
 			</th>
 			{#if col('journal')}<th class="pub-col-journal">Revue</th>{/if}
+			{#if col('publisher')}<th class="pub-col-journal">Éditeur</th>{/if}
 			{#if !hasFixedLab && col('labs')}<th style="width:80px">Labo(s)</th>{/if}
 			{#if showCorrespondingColumn && col('corr')}<th style="width:30px" title="Auteur correspondant">&#9993;</th>{/if}
 			{#if col('apc')}<th style="width:60px" class="sortable" class:active={apcSortActive} onclick={toggleSortApc}>
@@ -512,6 +514,13 @@
 							<a href="{base}/journals/{p.journal_id}">{p.journal}</a>
 						{:else}
 							{p.journal || ''}
+						{/if}
+					</td>{/if}
+					{#if col('publisher')}<td class="journal-cell pub-col-journal">
+						{#if p.publisher_id}
+							<a href="{base}/publishers/{p.publisher_id}">{p.publisher}</a>
+						{:else}
+							{p.publisher || ''}
 						{/if}
 					</td>{/if}
 					{#if !hasFixedLab && col('labs')}<td>
