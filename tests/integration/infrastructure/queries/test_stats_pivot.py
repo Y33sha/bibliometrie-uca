@@ -44,15 +44,16 @@ class TestPivotEngine:
         by_access = {r["oa_access"]: r["value"] for r in res["rows"]}
         assert by_access == {"ouvert": 2, "ferme": 1}
 
-    def test_doc_type_family_grouping(self, sa_sync_conn):
-        # Le découpage par type se fait au grain « famille » (lisible), pas par type fin.
-        _pub(sa_sync_conn, oa_status="gold", sources="{hal}", doc_type="article")  # publications
-        _pub(sa_sync_conn, oa_status="gold", sources="{hal}", doc_type="book")  # publications
-        _pub(sa_sync_conn, oa_status="closed", sources="{hal}", doc_type="thesis")  # theses
+    def test_doc_type_grouped_expands_publications(self, sa_sync_conn):
+        # Les publications au sens strict se ventilent par type fin ; les autres familles restent
+        # agrégées sous leur clé de famille.
+        _pub(sa_sync_conn, oa_status="gold", sources="{hal}", doc_type="article")  # → article
+        _pub(sa_sync_conn, oa_status="gold", sources="{hal}", doc_type="book")  # → book
+        _pub(sa_sync_conn, oa_status="closed", sources="{hal}", doc_type="thesis")  # → theses
 
-        res = _piv(sa_sync_conn, "pub_count", ["doc_type_family"], doc_types=())
-        by_family = {r["doc_type_family"]: r["value"] for r in res["rows"]}
-        assert by_family == {"publications": 2, "theses": 1}
+        res = _piv(sa_sync_conn, "pub_count", ["doc_type_grouped"], doc_types=())
+        by_type = {r["doc_type_grouped"]: r["value"] for r in res["rows"]}
+        assert by_type == {"article": 1, "book": 1, "theses": 1}
 
     def test_group_by_lab_executes(self, sa_sync_conn):
         # Le groupement par laboratoire compose une requête valide (jointures de rattachement).

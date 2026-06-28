@@ -88,8 +88,8 @@
 	function dimLabel(dim: string, value: string): string {
 		if (dim === 'oa_access') return OA_ACCESS_LABELS[value] ?? value;
 		if (dim === 'oa_voie') return oaLabelsMap[value] ?? value;
-		if (dim === 'doc_type_family')
-			return docTypeFamilies.find((f) => f.key === value)?.label ?? value;
+		if (dim === 'doc_type_grouped')
+			return docTypePlural[value] ?? docTypeFamilies.find((f) => f.key === value)?.label ?? value;
 		return value;
 	}
 	function dimColor(dim: string, value: string, idx: number, cs: CSSStyleDeclaration): string {
@@ -102,8 +102,11 @@
 		if (dim === 'year') return [...new Set(present)].sort((a, b) => Number(a) - Number(b));
 		if (dim === 'oa_access') return OA_ACCESS_ORDER.filter((v) => present.includes(v));
 		if (dim === 'oa_voie') return OA_VOIE_ORDER.filter((v) => present.includes(v));
-		if (dim === 'doc_type_family')
-			return docTypeFamilies.map((f) => f.key).filter((k) => present.includes(k));
+		if (dim === 'doc_type_grouped') {
+			// Famille « publications » éclatée en types fins, autres familles agrégées sous leur clé.
+			const order = docTypeFamilies.flatMap((f) => (f.key === 'publications' ? f.types : [f.key]));
+			return order.filter((k) => present.includes(k));
+		}
 		// Sinon : valeurs distinctes triées par total décroissant.
 		const totals = new Map<string, number>();
 		for (const r of rows) {
