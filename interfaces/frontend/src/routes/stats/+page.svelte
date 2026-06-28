@@ -468,10 +468,10 @@
 		<FacetDropdown label="Types" options={facets.options.docTypes} groups={docTypeFamilies.map((f) => ({ label: f.label, values: f.types }))} bind:selected={selectedDocTypes} onchange={onFilterChange} />
 	{/if}
 	{#if facetKeys.has('journal')}
-		<EntityFilter label="Revue" endpoint="/api/journals" itemsKey="journals" labelField="title" selected={selectedJournal} onchange={onJournalFilter} />
+		<EntityFilter label="Revue" endpoint="/api/stats/facets/entities" kind="journal" buildParams={chartParams} selected={selectedJournal} onchange={onJournalFilter} />
 	{/if}
 	{#if facetKeys.has('publisher')}
-		<EntityFilter label="Éditeur" endpoint="/api/publishers" itemsKey="publishers" labelField="name" selected={selectedPublisher} onchange={onPublisherFilter} />
+		<EntityFilter label="Éditeur" endpoint="/api/stats/facets/entities" kind="publisher" buildParams={chartParams} selected={selectedPublisher} onchange={onPublisherFilter} />
 	{/if}
 	{#if facetKeys.has('apc')}
 		<FacetDropdown label="APC" options={facets.options.apc} bind:selected={selectedApc} onchange={onFilterChange} tooltip="Pas d'info après 2024<br>Sans APC = ou APC non documentés" />

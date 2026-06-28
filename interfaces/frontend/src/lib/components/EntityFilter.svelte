@@ -2,42 +2,49 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { api } from '$lib/api';
 
-	/** Facette à forte cardinalité (éditeur, revue) : recherche serveur, sélection d'une entité.
-	 *  Évite de charger des milliers d'options ; ne retient que l'entité choisie (id + libellé). */
+	/** Facette d'entité à forte cardinalité (éditeur, revue) : recherche serveur **contextuelle**.
+	 *  Le parent fournit `buildParams` (les filtres actifs du contexte) ; le composant y ajoute le
+	 *  `kind` et le terme de recherche, appelle l'endpoint de facette, et n'affiche que les N
+	 *  premières entités sous ces filtres, avec leur décompte. Ne retient que l'entité choisie. */
 	export interface Entity {
 		value: string; // identifiant
-		text: string; // libellé affiché
+		text: string; // libellé
 	}
 
 	interface Props {
 		label: string;
-		/** Endpoint de liste paginée, acceptant `search`, `with_pubs`, `sort` (ex. /api/publishers). */
+		/** Endpoint de facette-entité (ex. /api/stats/facets/entities). */
 		endpoint: string;
-		/** Clé du tableau dans la réponse (ex. 'publishers', 'journals'). */
-		itemsKey: string;
-		/** Champ libellé d'un élément (ex. 'name', 'title'). */
-		labelField: string;
+		kind: 'publisher' | 'journal';
+		/** Filtres actifs du contexte (l'endpoint saute de lui-même celui de `kind`). */
+		buildParams: () => URLSearchParams;
 		selected?: Entity | null;
 		onchange?: (selected: Entity | null) => void;
 	}
 
-	let { label, endpoint, itemsKey, labelField, selected = null, onchange }: Props = $props();
+	let { label, endpoint, kind, buildParams, selected = null, onchange }: Props = $props();
+
+	interface Result extends Entity {
+		count: number;
+	}
 
 	let open = $state(false);
 	let query = $state('');
-	let results = $state<Entity[]>([]);
+	let results = $state<Result[]>([]);
 	let loading = $state(false);
 	let debounce: ReturnType<typeof setTimeout>;
 	const instanceId = Symbol();
 
 	async function search() {
 		loading = true;
-		const p = new URLSearchParams({ with_pubs: 'true', sort: '-pubs', per_page: '20' });
-		if (query.trim().length >= 2) p.set('search', query.trim());
+		const p = buildParams();
+		p.set('kind', kind);
+		if (query.trim().length >= 2) p.set('entity_search', query.trim());
 		try {
-			const data = await api<Record<string, unknown>>(`${endpoint}?${p}`);
-			const items = (data[itemsKey] as Record<string, unknown>[]) ?? [];
-			results = items.map((it) => ({ value: String(it.id), text: String(it[labelField] ?? '') }));
+			const data = await api<{ entities: { id: number; label: string; count: number }[] }>(
+				endpoint + '?' + p,
+			);
+			results = data.entities.map((e) => ({ value: String(e.id), text: e.label, count: e.count }));
 		} catch {
 			results = [];
 		}
@@ -100,7 +107,7 @@
 				{#each results as e (e.value)}
 					<label>
 						<input type="radio" checked={selected?.value === e.value} onchange={() => pick(e)} />
-						{e.text}
+						<span class="facet-name">{e.text}</span><span class="facet-count">{e.count}</span>
 					</label>
 				{/each}
 				{#if !loading && results.length === 0}
@@ -153,7 +160,7 @@
 		position: absolute;
 		top: calc(100% + 4px);
 		left: 0;
-		min-width: 240px;
+		min-width: 260px;
 		max-height: 320px;
 		overflow-y: auto;
 		background: var(--card);
@@ -185,6 +192,18 @@
 	}
 	.facet-options input[type='radio'] {
 		margin: 0;
+		flex-shrink: 0;
+	}
+	.facet-name {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.facet-count {
+		font-size: 0.8rem;
+		color: #888;
+		margin-left: auto;
+		padding-left: 12px;
 		flex-shrink: 0;
 	}
 	.facet-empty {
