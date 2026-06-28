@@ -1,13 +1,41 @@
 """Tests des règles métier sur les métadonnées de publication (best_oa_status, absorb_oa_status, clean_publication_title, has_minimal_publication_metadata)."""
 
+from types import SimpleNamespace
+
 from domain.publications.metadata import (
     OA_RANK,
     absorb_oa_status,
     best_oa_status,
     clean_publication_title,
     has_minimal_publication_metadata,
+    has_open_archive_deposit,
     normalized_title,
 )
+
+
+def _src(source: str, oa_status: str | None):
+    return SimpleNamespace(source=source, oa_status=oa_status)
+
+
+class TestHasOpenArchiveDeposit:
+    def test_hal_green_is_a_deposit(self):
+        # HAL green = fichier déposé : prime sur un closed d'Unpaywall.
+        assert has_open_archive_deposit([_src("hal", "green")]) is True
+
+    def test_hal_hybrid_is_not_a_deposit(self):
+        # hybrid = lien éditeur relayé, pas un fichier déposé.
+        assert has_open_archive_deposit([_src("hal", "hybrid")]) is False
+
+    def test_non_archive_green_is_not_a_deposit(self):
+        # green hors archive ouverte (ex. estimation OpenAlex) ne déclenche pas le plancher.
+        assert has_open_archive_deposit([_src("openalex", "green")]) is False
+
+    def test_mix_detects_the_hal_green(self):
+        sources = [_src("openalex", "closed"), _src("scanr", "green"), _src("hal", "green")]
+        assert has_open_archive_deposit(sources) is True
+
+    def test_no_deposit(self):
+        assert has_open_archive_deposit([_src("hal", "closed"), _src("openalex", "gold")]) is False
 
 
 class TestNormalizedTitle:

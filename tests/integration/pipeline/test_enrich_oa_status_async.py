@@ -57,7 +57,7 @@ def _route(doi: str, *, status: str | None = None, http_status: int = 200):
 class _FakeQueries:
     def __init__(
         self,
-        pubs: list[tuple[int, str, str | None]],
+        pubs: list[tuple[int, str, str | None, bool]],
         *,
         stale_total: int | None = None,
         oa_distribution: dict[str, int] | None = None,
@@ -98,7 +98,11 @@ def logger() -> logging.Logger:
 @pytest.mark.asyncio
 @respx.mock
 async def test_happy_path_updates_each_pub(logger):
-    pubs = [(1, "10.1/a", "closed"), (2, "10.1/b", None), (3, "10.1/c", "bronze")]
+    pubs = [
+        (1, "10.1/a", "closed", False),
+        (2, "10.1/b", None, False),
+        (3, "10.1/c", "bronze", False),
+    ]
     _route("10.1/a", status="gold")
     _route("10.1/b", status="green")
     _route("10.1/c", status="bronze")
@@ -131,7 +135,7 @@ async def test_happy_path_updates_each_pub(logger):
 @pytest.mark.asyncio
 @respx.mock
 async def test_404_marks_as_not_found(logger):
-    pubs = [(1, "10.1/x", "closed")]
+    pubs = [(1, "10.1/x", "closed", False)]
     _route("10.1/x", http_status=404)
 
     repo = _FakeRepo()
@@ -150,7 +154,7 @@ async def test_404_marks_as_not_found(logger):
 @respx.mock
 async def test_diamond_not_replaced_by_gold(logger):
     """Diamond OA n'est pas connu d'Unpaywall : ne pas écraser par 'gold'."""
-    pubs = [(1, "10.1/diamond", "diamond")]
+    pubs = [(1, "10.1/diamond", "diamond", False)]
     _route("10.1/diamond", status="gold")
 
     repo = _FakeRepo()
@@ -168,7 +172,7 @@ async def test_diamond_not_replaced_by_gold(logger):
 @respx.mock
 async def test_diamond_replaced_by_other_status(logger):
     """Diamond → bronze/green/closed : on accepte l'update (seul gold est filtré)."""
-    pubs = [(1, "10.1/diamond", "diamond")]
+    pubs = [(1, "10.1/diamond", "diamond", False)]
     _route("10.1/diamond", status="bronze")
 
     repo = _FakeRepo()
@@ -187,7 +191,7 @@ async def test_diamond_replaced_by_other_status(logger):
 async def test_embargoed_not_downgraded_to_closed(logger):
     """Embargo connu (HAL) : Unpaywall voit le fichier non encore accessible et
     renvoie 'closed' — on ne rétrograde pas vers closed/unknown."""
-    pubs = [(1, "10.1/emb", "embargoed")]
+    pubs = [(1, "10.1/emb", "embargoed", False)]
     _route("10.1/emb", status="closed")
 
     repo = _FakeRepo()
@@ -205,7 +209,7 @@ async def test_embargoed_not_downgraded_to_closed(logger):
 @respx.mock
 async def test_embargoed_replaced_by_open_status(logger):
     """Embargo → green/gold : un statut réellement plus ouvert (trouvé ailleurs) écrase bien."""
-    pubs = [(1, "10.1/emb", "embargoed")]
+    pubs = [(1, "10.1/emb", "embargoed", False)]
     _route("10.1/emb", status="green")
 
     repo = _FakeRepo()
@@ -221,8 +225,47 @@ async def test_embargoed_replaced_by_open_status(logger):
 
 @pytest.mark.asyncio
 @respx.mock
+async def test_open_archive_deposit_not_downgraded_to_closed(logger):
+    """Une archive ouverte détient le fichier (HAL green, `has_open_deposit=True`) : Unpaywall ne le
+    voit pas sous le DOI et renvoie 'closed' — on ne referme pas le dépôt, mais on marque vérifié."""
+    pubs = [(1, "10.1/deposit", "green", True)]
+    _route("10.1/deposit", status="closed")
+
+    repo = _FakeRepo()
+    await module.run_enrich_oa_status(
+        MagicMock(),
+        _FakeQueries(pubs),
+        logger,
+        pub_repo=repo,
+        fetcher=_make_fetcher(logger),
+    )
+    assert repo.updates == []
+    assert repo.checked == [1]
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_open_archive_deposit_upgraded_by_unpaywall(logger):
+    """Le garde-fou ne bloque que les rétrogradations : un statut plus ouvert (gold) écrase bien,
+    même avec un dépôt-archive."""
+    pubs = [(1, "10.1/deposit", "green", True)]
+    _route("10.1/deposit", status="gold")
+
+    repo = _FakeRepo()
+    await module.run_enrich_oa_status(
+        MagicMock(),
+        _FakeQueries(pubs),
+        logger,
+        pub_repo=repo,
+        fetcher=_make_fetcher(logger),
+    )
+    assert repo.updates == [(1, "gold")]
+
+
+@pytest.mark.asyncio
+@respx.mock
 async def test_unchanged_status_skipped(logger):
-    pubs = [(1, "10.1/same", "gold")]
+    pubs = [(1, "10.1/same", "gold", False)]
     _route("10.1/same", status="gold")
 
     repo = _FakeRepo()
@@ -240,7 +283,7 @@ async def test_unchanged_status_skipped(logger):
 @pytest.mark.asyncio
 @respx.mock
 async def test_dry_run_skips_db_writes(logger):
-    pubs = [(1, "10.1/a", "closed"), (2, "10.1/b", "closed")]
+    pubs = [(1, "10.1/a", "closed", False), (2, "10.1/b", "closed", False)]
     _route("10.1/a", status="gold")
     _route("10.1/b", status="green")
 
@@ -270,7 +313,7 @@ async def test_429_retries_transparently(logger):
     repo = _FakeRepo()
     await module.run_enrich_oa_status(
         MagicMock(),
-        _FakeQueries([(1, "10.1/r", "closed")]),
+        _FakeQueries([(1, "10.1/r", "closed", False)]),
         logger,
         pub_repo=repo,
         fetcher=_make_fetcher(logger),
@@ -297,7 +340,7 @@ async def test_semaphore_caps_concurrent_fetches(logger):
         finally:
             in_flight -= 1
 
-    pubs = [(i, f"10.1/{i}", "closed") for i in range(10)]
+    pubs = [(i, f"10.1/{i}", "closed", False) for i in range(10)]
     await module.run_enrich_oa_status(
         MagicMock(),
         _FakeQueries(pubs),

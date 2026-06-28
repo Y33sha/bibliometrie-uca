@@ -21,12 +21,23 @@ class JournalIssnRow(NamedTuple):
     issnl: str | None
 
 
+class PublicationOaCheck(NamedTuple):
+    """Une publication à (re)vérifier sur Unpaywall : son `id`, son `doi`, son statut OA courant, et
+    `has_open_deposit` — vrai si une archive ouverte en détient le fichier (HAL `green`). Ce dépôt
+    interdit à Unpaywall de refermer le statut (garde-fou de la phase oa_status)."""
+
+    id: int
+    doi: str
+    oa_status: str | None
+    has_open_deposit: bool
+
+
 class EnrichQueries(Protocol):
     """Opérations SQL pour les scripts d'enrichissement pipeline."""
 
     def fetch_publications_with_doi(
         self, conn: Connection, *, limit: int | None = None, staleness_days: int = 30
-    ) -> list[tuple[int, str, str | None]]: ...
+    ) -> list[PublicationOaCheck]: ...
 
     def count_stale_publications(self, conn: Connection, *, staleness_days: int = 30) -> int:
         """Nombre de publications avec DOI à (re)vérifier (même prédicat que `fetch_publications_with_doi`, sans cap) — le backlog de staleness OA, avant plafonnement du run."""
