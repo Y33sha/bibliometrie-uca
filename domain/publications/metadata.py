@@ -9,6 +9,7 @@ dans son propre module.
 
 import re
 from collections.abc import Iterable
+from typing import Protocol
 
 from domain.normalize import normalize_text
 
@@ -51,6 +52,30 @@ STABLE_OA_STATUSES: frozenset[str] = frozenset({"gold", "diamond", "hybrid"})
 
 STABLE_OA_STATUSES_SQL: str = "(" + ", ".join(f"'{s}'" for s in sorted(STABLE_OA_STATUSES)) + ")"
 """Forme SQL ``('diamond', 'gold', 'hybrid')`` pour la clause ``NOT IN``."""
+
+# Sources qui sont des archives ouvertes : quand l'une déclare `green`, elle atteste un FICHIER
+# déposé et lisible (pas une estimation à distance). Ce dépôt est un fait — un `closed` d'Unpaywall,
+# qui ne voit pas ce fichier sous le DOI, ne peut pas le refermer (cf. `has_open_archive_deposit`,
+# le garde-fou de la phase oa_status et le plancher de `refresh_from_sources`). HAL pour l'instant ;
+# le `green` HAL vient d'un dépôt effectif ou d'un lien arXiv/PMC (cf. `derive_hal_oa_status`).
+OPEN_ARCHIVE_SOURCES: frozenset[str] = frozenset({"hal"})
+
+
+class _OaSignalSource(Protocol):
+    """Forme minimale lue par `has_open_archive_deposit` : la provenance et le statut OA d'une
+    `source_publication`."""
+
+    source: str
+    oa_status: str | None
+
+
+def has_open_archive_deposit(sources: Iterable[_OaSignalSource]) -> bool:
+    """Vrai si une archive ouverte (`OPEN_ARCHIVE_SOURCES`) atteste un dépôt avec fichier (`green`).
+
+    Un tel dépôt est un fait : il prime sur un `closed`/`unknown` d'Unpaywall (lequel ne voit pas le
+    fichier sous le DOI). Le `hybrid` ne compte pas — c'est un lien éditeur relayé par l'archive,
+    sans fichier déposé."""
+    return any(s.source in OPEN_ARCHIVE_SOURCES and s.oa_status == "green" for s in sources)
 
 
 def best_oa_status(statuses: Iterable[str | None]) -> str | None:

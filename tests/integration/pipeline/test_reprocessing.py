@@ -190,3 +190,36 @@ class TestHalReprocessingUpdatesOaStatus:
         _refresh_stale_publications(sa_sync_conn)
 
         assert _get_pub_oa_status(sa_sync_conn, hal_id) == "closed"
+
+    def test_deposit_floor_reopens_frozen_closed(self, sa_sync_conn):
+        """Plancher dépôt-archive : Unpaywall a gelé la publication en closed (via le DOI, sans voir
+        le dépôt), mais HAL détient le fichier (green) → la phase publications rouvre en green malgré
+        `unpaywall_checked_at` posé."""
+        hal_id = HAL_DOC_CLOSED["halId_s"]
+        open_doc = copy.deepcopy(HAL_DOC_CLOSED)
+        open_doc["openAccess_bool"] = True
+        open_doc["fileMain_s"] = "https://hal.science/tel-99990001/document"
+        _insert_hal_staging(sa_sync_conn, open_doc)
+        _run_normalize_hal(sa_sync_conn)
+        create_all_publications(sa_sync_conn)
+        assert _get_pub_oa_status(sa_sync_conn, hal_id) == "green"
+
+        # Unpaywall referme et gèle (il ne voit pas le dépôt HAL sous le DOI).
+        sa_sync_conn.execute(
+            text("""
+                UPDATE publications SET oa_status = 'closed', unpaywall_checked_at = now()
+                WHERE id = (
+                    SELECT publication_id FROM source_publications
+                    WHERE source = 'hal' AND source_id = :hid
+                )
+            """),
+            {"hid": hal_id},
+        )
+        assert _get_pub_oa_status(sa_sync_conn, hal_id) == "closed"
+
+        # Re-dirty la SP et rejouer la seule phase publications : le plancher rouvre.
+        _insert_hal_staging(sa_sync_conn, open_doc)
+        _run_normalize_hal(sa_sync_conn)
+        _refresh_stale_publications(sa_sync_conn)
+
+        assert _get_pub_oa_status(sa_sync_conn, hal_id) == "green"

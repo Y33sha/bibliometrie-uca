@@ -120,7 +120,9 @@ async def run_enrich_oa_status(
 
     async with httpx.AsyncClient() as client:
 
-        async def process_one(pub_id: int, doi: str, current_status: str | None) -> None:
+        async def process_one(
+            pub_id: int, doi: str, current_status: str | None, has_open_deposit: bool
+        ) -> None:
             async with sem:
                 status = await fetcher(client, doi)
 
@@ -135,6 +137,10 @@ async def run_enrich_oa_status(
                 progress["skipped"] += 1
             elif current_status == "embargoed" and status in ("closed", "unknown"):
                 # embargo connu (HAL) : pas de rétrogradation vers closed/unknown.
+                progress["skipped"] += 1
+            elif has_open_deposit and status in ("closed", "unknown"):
+                # Une archive ouverte détient le fichier (HAL green) : Unpaywall ne le voit pas sous
+                # le DOI, il ne peut pas refermer le dépôt. On marque vérifié sans rétrograder.
                 progress["skipped"] += 1
             else:
                 new_status = status
@@ -161,7 +167,12 @@ async def run_enrich_oa_status(
                     f"{progress['not_found']} non trouvés"
                 )
 
-        await asyncio.gather(*(process_one(pid, doi, cur) for pid, doi, cur in pubs))
+        await asyncio.gather(
+            *(
+                process_one(pid, doi, current, has_deposit)
+                for pid, doi, current, has_deposit in pubs
+            )
+        )
 
     if not dry_run:
         conn.commit()

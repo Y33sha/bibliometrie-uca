@@ -10,14 +10,18 @@ from datetime import datetime
 
 from sqlalchemy import Connection, text
 
-from application.ports.pipeline.enrich import EnrichQueries, JournalIssnRow
-from domain.publications.metadata import STABLE_OA_STATUSES_SQL
+from application.ports.pipeline.enrich import (
+    EnrichQueries,
+    JournalIssnRow,
+    PublicationOaCheck,
+)
+from domain.publications.metadata import OPEN_ARCHIVE_SOURCES, STABLE_OA_STATUSES_SQL
 
 
 def fetch_publications_with_doi(
     conn: Connection, *, limit: int | None = None, staleness_days: int = 30
-) -> list[tuple[int, str, str | None]]:
-    """Liste `(id, doi, oa_status)` des publications à (re)vérifier sur Unpaywall.
+) -> list[PublicationOaCheck]:
+    """`PublicationOaCheck` des publications à (re)vérifier sur Unpaywall.
 
     Incrémental : ne renvoie que les publications **jamais vérifiées**
     (`unpaywall_checked_at IS NULL` — y compris gold/diamond/hybrid, vérifiés une
@@ -25,10 +29,20 @@ def fetch_publications_with_doi(
     (hors `STABLE_OA_STATUSES`) et **périmé** (> `staleness_days`). Triées
     jamais-vérifiées d'abord puis les plus périmées ; `limit` cape le run pour
     lisser la charge (le backlog s'écoule sur plusieurs runs).
+
+    `has_open_deposit` signale qu'une archive ouverte détient le fichier (`OPEN_ARCHIVE_SOURCES`
+    avec `green`) : la phase oa_status s'en sert pour ne pas refermer un dépôt sur un `closed`
+    d'Unpaywall.
     """
     rows = conn.execute(
         text(f"""
-            SELECT id, doi, oa_status::text AS oa_status
+            SELECT id, doi, oa_status::text AS oa_status,
+                   EXISTS (
+                       SELECT 1 FROM source_publications s
+                       WHERE s.publication_id = publications.id
+                         AND s.source::text = ANY(:open_archive_sources)
+                         AND s.oa_status::text = 'green'
+                   ) AS has_open_deposit
             FROM publications
             WHERE doi IS NOT NULL
               AND (
@@ -39,9 +53,13 @@ def fetch_publications_with_doi(
             ORDER BY unpaywall_checked_at ASC NULLS FIRST
             LIMIT :lim
         """),
-        {"stale": staleness_days, "lim": limit or None},
+        {
+            "stale": staleness_days,
+            "lim": limit or None,
+            "open_archive_sources": list(OPEN_ARCHIVE_SOURCES),
+        },
     ).all()
-    return [(r.id, r.doi, r.oa_status) for r in rows]
+    return [PublicationOaCheck(r.id, r.doi, r.oa_status, r.has_open_deposit) for r in rows]
 
 
 def count_stale_publications(conn: Connection, *, staleness_days: int = 30) -> int:
@@ -144,7 +162,7 @@ class PgEnrichQueries(EnrichQueries):
 
     def fetch_publications_with_doi(
         self, conn: Connection, *, limit: int | None = None, staleness_days: int = 30
-    ) -> list[tuple[int, str, str | None]]:
+    ) -> list[PublicationOaCheck]:
         return fetch_publications_with_doi(conn, limit=limit, staleness_days=staleness_days)
 
     def count_stale_publications(self, conn: Connection, *, staleness_days: int = 30) -> int:

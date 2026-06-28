@@ -18,7 +18,12 @@ from typing import Any
 
 from domain.normalize import normalize_text
 from domain.publications.identifiers import DOI
-from domain.publications.metadata import OA_STATUS_UNKNOWN_DEFAULT, best_oa_status
+from domain.publications.metadata import (
+    OA_CLOSED_STATUSES,
+    OA_STATUS_UNKNOWN_DEFAULT,
+    best_oa_status,
+    has_open_archive_deposit,
+)
 from domain.publications.publication import Publication
 from domain.source_publications.doc_types import ARTICLE_SUBTYPES
 from domain.source_publications.source_publication import SourcePublication
@@ -61,6 +66,14 @@ def refresh_from_sources(
     # écraserait la correction Unpaywall — et, la date étant posée, elle ne serait
     # jamais re-vérifiée (perte permanente sur un statut stable-open).
     if pub.unpaywall_checked_at is None:
+        pub.oa_status = (
+            best_oa_status(s.oa_status for s in sorted_sources) or OA_STATUS_UNKNOWN_DEFAULT
+        )
+    elif pub.oa_status in OA_CLOSED_STATUSES and has_open_archive_deposit(sorted_sources):
+        # Plancher dépôt-archive : Unpaywall a refermé (`closed`/`unknown`) une publication dont
+        # une archive ouverte détient le fichier (HAL `green`). Le fichier est un fait qu'Unpaywall
+        # ne voit pas sous le DOI — on rouvre depuis les sources. Hors ce cas, Unpaywall garde son
+        # autorité (il arbitre les prétentions d'ouverture sans dépôt).
         pub.oa_status = (
             best_oa_status(s.oa_status for s in sorted_sources) or OA_STATUS_UNKNOWN_DEFAULT
         )
