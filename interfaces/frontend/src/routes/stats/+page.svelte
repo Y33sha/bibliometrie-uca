@@ -16,14 +16,13 @@
 
 	// --- Types ---
 	import type { components } from '$lib/api/schema';
-	type PublisherRow = components['schemas']['PublisherStatsRow'];
 	type JournalRow = components['schemas']['JournalStatsRow'];
-	// Ligne partagée par les onglets éditeurs/revues pour la ventilation OA (mêmes champs OaCounts).
-	type OaRow = PublisherRow | JournalRow;
+	// Ligne de la table des revues pour la ventilation OA (champs OaCounts).
+	type OaRow = JournalRow;
 
 	// --- State ---
-	type View = 'top' | 'publisher_detail' | 'journal_detail';
-	type Tab = 'oa' | 'publishers' | 'journals';
+	type View = 'top' | 'journal_detail';
+	type Tab = 'oa' | 'journals';
 
 	let view: View = $state('top');
 	let tab: Tab = $state('oa');
@@ -33,11 +32,8 @@
 	let selectedApc: string[] = $state([]);
 	let selectedDocTypes: string[] = $state([]); // défaut = famille « Publications » (cf. onMount)
 	let search = $state('');
-	let publisherId: number | null = $state(null);
-	let publisherName = $state('');
 	let journalId: number | null = $state(null);
 	let journalName = $state('');
-	let pubSort = $state('-pubs');
 	let journalSort = $state('-pubs');
 
 	function toggleSort(current: string, field: string): string {
@@ -160,25 +156,11 @@
 		if (selectedOa.length) p.set('oa_status', selectedOa.join(','));
 		if (selectedApc.length) p.set('has_apc', selectedApc.join(','));
 		if (selectedDocTypes.length) p.set('doc_type', selectedDocTypes.join(','));
-		if (publisherId) p.set('publisher_id', String(publisherId));
 		if (journalId) p.set('journal_id', String(journalId));
 		return p;
 	}
 
 	// --- Composables: paginated tables ---
-	const pubFetch = usePaginatedFetch<PublisherRow>({
-		endpoint: '/api/stats/publishers',
-		itemsKey: 'publishers',
-		perPage: 50,
-		apiKey: 'stats-publishers',
-		buildParams: () => {
-			const p = chartParams();
-			if (search.trim()) p.set('search', search.trim());
-			p.set('sort', pubSort);
-			return p;
-		},
-	});
-
 	const journalFetch = usePaginatedFetch<JournalRow>({
 		endpoint: '/api/stats/journals',
 		itemsKey: 'journals',
@@ -217,14 +199,12 @@
 			selectedOa: { type: 'string_array', urlKey: 'oa_status' },
 			selectedApc: { type: 'string_array', urlKey: 'has_apc' },
 			selectedDocTypes: { type: 'string_array', urlKey: 'doc_type' },
-			publisherId: { type: 'single', urlKey: 'publisher_id' },
 				journalId: { type: 'single', urlKey: 'journal_id' },
 				search: { type: 'single', urlKey: 'search' },
 			primaryBy: { type: 'single', urlKey: 'axis', defaultValue: 'oa_access' },
 				groupBy: { type: 'single', urlKey: 'group_by', defaultValue: 'year' },
 				chartMode: { type: 'single', urlKey: 'mode', defaultValue: 'absolu' },
 				chartPage: { type: 'page', urlKey: 'chart_page' },
-			page: { type: 'page', urlKey: 'page' },
 		},
 	});
 
@@ -237,14 +217,12 @@
 			selectedOa,
 			selectedApc,
 			selectedDocTypes,
-			publisherId: publisherId ? String(publisherId) : '',
 			journalId: journalId ? String(journalId) : '',
 			search,
 			primaryBy,
 			groupBy,
 			chartMode,
 			chartPage,
-			page: pubFetch.page,
 		}));
 	}
 
@@ -255,7 +233,6 @@
 		if (selectedYears.length) p.set('year', selectedYears.join(','));
 		if (selectedOa.length) p.set('oa_status', selectedOa.join(','));
 		if (selectedApc.length) p.set('has_apc', selectedApc.join(','));
-		if (publisherId) { p.set('publisher_id', String(publisherId)); }
 		if (journalId) { p.set('journal_id', String(journalId)); }
 		if (selectedDocTypes.length) p.set('doc_type', selectedDocTypes.join(','));
 		return base + '/publications?' + p.toString();
@@ -263,25 +240,15 @@
 
 	// --- Navigation ---
 	function goTo(newView: View, opts?: { id?: number; name?: string }) {
-		const wasPublisherDetail = view === 'publisher_detail';
 		if (yearChart) { yearChart.destroy(); yearChart = null; }
 		view = newView;
 		tab = 'oa';
-		pubFetch.page = 1;
 		search = '';
 		if (newView === 'top') {
-			publisherId = null; publisherName = '';
-			journalId = null; journalName = '';
-		} else if (newView === 'publisher_detail') {
-			publisherId = opts?.id ?? null;
-			publisherName = opts?.name ?? '';
 			journalId = null; journalName = '';
 		} else if (newView === 'journal_detail') {
 			journalId = opts?.id ?? null;
 			journalName = opts?.name ?? '';
-			if (!wasPublisherDetail) {
-				publisherId = null; publisherName = '';
-			}
 		}
 		syncUrl();
 		refresh();
@@ -291,9 +258,7 @@
 		if (yearChart) { yearChart.destroy(); yearChart = null; }
 		view = 'top';
 		tab = defaultTab;
-		publisherId = null; publisherName = '';
 		journalId = null; journalName = '';
-		pubFetch.page = 1;
 		search = '';
 		syncUrl();
 		refresh();
@@ -305,7 +270,6 @@
 			yearChart = null;
 		}
 		tab = newTab;
-		pubFetch.page = 1;
 		search = '';
 		syncUrl();
 		await loadTabContent();
@@ -320,8 +284,6 @@
 		if (tab === 'oa') {
 			await tick();
 			await loadChart();
-		} else if (tab === 'publishers') {
-			await pubFetch.load();
 		} else if (tab === 'journals') {
 			await journalFetch.load();
 		}
@@ -469,13 +431,13 @@
 	};
 
 	function onFilterChange() {
-		pubFetch.page = 1;
+		journalFetch.page = 1;
 		syncUrl();
 		refresh();
 	}
 
 	const onSearchInput = urlFilters.debouncedSearch(() => {
-		pubFetch.page = 1;
+		journalFetch.page = 1;
 		syncUrl();
 		loadTabContent();
 	});
@@ -490,24 +452,17 @@
 		const restored = urlFilters.restoreFromUrl(u);
 		if (restored.view) {
 			const v = restored.view as string;
-			if (v === 'publisher_detail' || v === 'journal_detail') view = v;
+			if (v === 'journal_detail') view = v;
 		}
 		if (restored.tab) {
 			const t = restored.tab as string;
-			if (t === 'oa' || t === 'publishers' || t === 'journals') tab = t;
+			if (t === 'oa' || t === 'journals') tab = t;
 		}
 		if (restored.selectedYears) selectedYears = restored.selectedYears as string[];
 		if (restored.selectedLabs) selectedLabs = restored.selectedLabs as string[];
 		if (restored.selectedOa) selectedOa = restored.selectedOa as string[];
 		if (restored.selectedApc) selectedApc = restored.selectedApc as string[];
 		if (restored.selectedDocTypes) selectedDocTypes = restored.selectedDocTypes as string[];
-		if (restored.publisherId) {
-			publisherId = parseInt(restored.publisherId as string);
-			try {
-				const pub = await api<{id: number, name: string}>(`/api/publishers/${publisherId}`);
-				publisherName = pub.name;
-			} catch { publisherName = `#${publisherId}`; }
-		}
 		if (restored.journalId) {
 			journalId = parseInt(restored.journalId as string);
 			try {
@@ -520,7 +475,6 @@
 		if (restored.groupBy !== undefined) groupBy = restored.groupBy as string;
 		if (restored.chartMode !== undefined) chartMode = restored.chartMode as 'absolu' | 'part';
 		if (restored.chartPage) chartPage = restored.chartPage as number;
-		if (restored.page) pubFetch.page = restored.page as number;
 
 		// Vocabulaire du pivot : dimensions graphables (faible cardinalité, hors l'axe année)
 		// proposées au sélecteur de découpage. Ajouter une dimension au registre l'y fait apparaître.
@@ -569,19 +523,7 @@
 <!-- Breadcrumb for detail views -->
 {#if view !== 'top'}
 	<div class="breadcrumb">
-		{#if publisherId}
-			<!-- svelte-ignore a11y_missing_attribute -->
-			<a onclick={() => goToTop('publishers')}>Éditeurs</a>
-			<span class="sep">›</span>
-			{#if view === 'publisher_detail'}
-				{publisherName}
-			{:else}
-				<!-- svelte-ignore a11y_missing_attribute -->
-				<a onclick={() => goTo('publisher_detail', { id: publisherId ?? undefined, name: publisherName })}>{publisherName}</a>
-				<span class="sep">›</span>
-				{journalName}
-			{/if}
-		{:else if journalId}
+		{#if journalId}
 			<!-- svelte-ignore a11y_missing_attribute -->
 			<a onclick={() => goToTop('journals')}>Revues</a>
 			<span class="sep">›</span>
@@ -620,21 +562,14 @@
 	<div class="tab-group">
 		<button class="tab-btn" class:active={tab === 'oa'} onclick={() => switchTab('oa')}>Open Access</button>
 		{#if view === 'top'}
-			<button class="tab-btn" class:active={tab === 'publishers'} onclick={() => switchTab('publishers')}>Éditeurs</button>
-		{/if}
-		{#if view === 'top' || view === 'publisher_detail'}
 			<button class="tab-btn" class:active={tab === 'journals'} onclick={() => switchTab('journals')}>Revues</button>
 		{/if}
 	</div>
-	{#if tab === 'publishers' || tab === 'journals'}
+	{#if tab === 'journals'}
 		<input type="search" placeholder="Rechercher..." bind:value={search} use:autofocus onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }} oninput={onSearchInput} />
 	{/if}
 	{#if tab !== 'oa'}
-		<span class="count">
-			{#if tab === 'publishers'}{pubFetch.total} éditeur{pubFetch.total > 1 ? 's' : ''}
-			{:else if tab === 'journals'}{journalFetch.total} revue{journalFetch.total > 1 ? 's' : ''}
-			{/if}
-		</span>
+		<span class="count">{journalFetch.total} revue{journalFetch.total > 1 ? 's' : ''}</span>
 	{/if}
 	<a class="pub-link" href={pubsUrl}>Voir les publications &rarr;</a>
 </div>
@@ -680,43 +615,13 @@
 	{/if}
 {/if}
 
-<!-- Tab: Publishers -->
-{#if tab === 'publishers'}
-	<table class="data-table">
-		<thead>
-			<tr>
-				<th class="sortable" class:active={pubSort === 'name' || pubSort === '-name'} onclick={() => { pubSort = toggleSort(pubSort, 'name'); pubFetch.page = 1; pubFetch.load(); }}>Éditeur {pubSort === 'name' ? '▲' : pubSort === '-name' ? '▼' : ''}</th>
-				<th class="num">Revues</th>
-				<th class="num sortable" class:active={pubSort === 'pubs' || pubSort === '-pubs'} onclick={() => { pubSort = toggleSort(pubSort, 'pubs'); pubFetch.page = 1; pubFetch.load(); }}>Articles {pubSort === 'pubs' ? '▲' : pubSort === '-pubs' ? '▼' : ''}</th>
-				<th class="num sortable" class:active={pubSort === 'apc' || pubSort === '-apc'} onclick={() => { pubSort = toggleSort(pubSort, 'apc'); pubFetch.page = 1; pubFetch.load(); }}>APC UCA {pubSort === 'apc' ? '▲' : pubSort === '-apc' ? '▼' : ''}</th>
-				<th style="min-width:100px">OA</th>
-			</tr>
-		</thead>
-		<tbody>
-			{#each pubFetch.items as r (r.publisher_id)}
-				<tr>
-					<td class="name-cell">
-						<!-- svelte-ignore a11y_missing_attribute -->
-						<a onclick={() => goTo('publisher_detail', { id: r.publisher_id, name: r.publisher_name })}>{r.publisher_name}</a>
-					</td>
-					<td class="num num-small">{r.journal_count}</td>
-					<td class="num">{r.pub_count}</td>
-					<td class="num apc-cell">{r.apc_uca > 0 ? Math.round(r.apc_uca).toLocaleString('fr-FR') + ' €' : ''}</td>
-					{@render oaBreakdownCells(r)}
-				</tr>
-			{/each}
-		</tbody>
-	</table>
-	<Pagination page={pubFetch.page} pages={pubFetch.pages} onchange={(p) => { pubFetch.goToPage(p); syncUrl(); }} />
-{/if}
-
 <!-- Tab: Journals -->
 {#if tab === 'journals'}
 	<table class="data-table">
 		<thead>
 			<tr>
 				<th class="sortable" class:active={journalSort === 'name' || journalSort === '-name'} onclick={() => { journalSort = toggleSort(journalSort, 'name'); journalFetch.page = 1; journalFetch.load(); }}>Revue {journalSort === 'name' ? '▲' : journalSort === '-name' ? '▼' : ''}</th>
-				{#if !publisherId}<th>Éditeur</th>{/if}
+				<th>Éditeur</th>
 				<th class="num sortable" class:active={journalSort === 'pubs' || journalSort === '-pubs'} onclick={() => { journalSort = toggleSort(journalSort, 'pubs'); journalFetch.page = 1; journalFetch.load(); }}>Articles {journalSort === 'pubs' ? '▲' : journalSort === '-pubs' ? '▼' : ''}</th>
 				<th class="num sortable" class:active={journalSort === 'apc' || journalSort === '-apc'} onclick={() => { journalSort = toggleSort(journalSort, 'apc'); journalFetch.page = 1; journalFetch.load(); }}>APC UCA {journalSort === 'apc' ? '▲' : journalSort === '-apc' ? '▼' : ''}</th>
 				<th style="min-width:100px">OA</th>
@@ -729,9 +634,7 @@
 						<!-- svelte-ignore a11y_missing_attribute -->
 						<a onclick={() => goTo('journal_detail', { id: r.journal_id, name: r.journal_title })}>{r.journal_title}</a>
 					</td>
-					{#if !publisherId}
-						<td class="name-cell num-small">{r.publisher_name || ''}</td>
-					{/if}
+					<td class="name-cell num-small">{r.publisher_name || ''}</td>
 					<td class="num">{r.pub_count}</td>
 					<td class="num apc-cell">{r.apc_uca > 0 ? Math.round(r.apc_uca).toLocaleString('fr-FR') + ' €' : ''}</td>
 					{@render oaBreakdownCells(r)}
