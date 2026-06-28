@@ -616,7 +616,7 @@ th.sorted .sort-arrow {
 }
 
 .oa-lock-open .oa-lock-label {
-	color: #4caf50;
+	color: var(--open);
 }
 
 .oa-lock-closed .oa-lock-label {

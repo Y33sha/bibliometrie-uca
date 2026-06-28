@@ -156,6 +156,7 @@
     --hybrid: #8e6bbf;
     --bronze: #b8733e;
     --green: #2a7d4f;
+    --open: #4caf50; /* vert « accès ouvert » (indicateur générique), plus clair que la voie green */
     --embargoed: #b08900;
     --closed: #555;
     --unknown: #bbb;
