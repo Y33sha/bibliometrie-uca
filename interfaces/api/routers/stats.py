@@ -9,7 +9,6 @@ from application.ports.api.stats_queries import (
     PivotSchemaResponse,
     StatsFacetsResponse,
     StatsQueries,
-    YearStatsRow,
 )
 from interfaces.api.deps import (
     get_apc_structure_ids_sync,
@@ -19,30 +18,6 @@ from interfaces.api.filters import parse_int_csv, parse_str_csv
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-
-
-@router.get("/api/stats/by-year", response_model=list[YearStatsRow])
-def stats_by_year(
-    lab_id: str = Query(""),
-    year: str = Query(""),
-    publisher_id: int | None = Query(None),
-    journal_id: int | None = Query(None),
-    oa_status: str = Query(""),
-    has_apc: str = Query(""),
-    doc_type: str = Query(""),
-    queries: StatsQueries = Depends(stats_queries_sync),
-) -> list[YearStatsRow]:
-    """Ventilation par année (pour les graphiques)."""
-    return queries.stats_by_year(
-        apc_structure_ids=get_apc_structure_ids_sync(),
-        lab_ids=parse_int_csv(lab_id),
-        years=parse_int_csv(year),
-        publisher_id=publisher_id,
-        journal_id=journal_id,
-        oa_status=oa_status,
-        has_apc=has_apc,
-        doc_types=parse_str_csv(doc_type),
-    )
 
 
 @router.get("/api/stats/years", response_model=list[int])
