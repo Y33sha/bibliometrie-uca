@@ -109,7 +109,13 @@ DIMENSIONS: dict[str, Dimension] = {
         multiplies=True,
         groupable=True,
         filterable=True,
-    ),  # forte cardinalité : axe de comparaison (top N + « Autres »), pas de groupement primaire
+    ),  # forte cardinalité : axe de comparaison (paginé), pas de groupement primaire
+    "publisher": Dimension(
+        "publisher", "Éditeur", "high", ordinal=False, multiplies=False, groupable=True, filterable=False
+    ),  # forte cardinalité : comparaison (nombre de publications par éditeur)
+    "journal": Dimension(
+        "journal", "Revue", "high", ordinal=False, multiplies=False, groupable=True, filterable=False
+    ),  # forte cardinalité : comparaison (nombre de publications par revue)
     "apc": Dimension(
         "apc", "APC", "low", ordinal=False, multiplies=False, groupable=False, filterable=True
     ),

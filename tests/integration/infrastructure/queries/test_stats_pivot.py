@@ -63,6 +63,14 @@ class TestPivotEngine:
         assert "rows" in res
         assert res["groups"] == ["lab"]
 
+    def test_group_by_publisher_and_journal_execute(self, sa_sync_conn):
+        # Éditeur et revue composent des requêtes valides (jointures internes). Smoke test : la
+        # requête s'exécute et renvoie la forme attendue, sans dépendre de données peuplées.
+        _pub(sa_sync_conn, oa_status="gold", sources="{hal}")
+        for dim in ("publisher", "journal"):
+            res = _piv(sa_sync_conn, "pub_count", [dim])
+            assert res["groups"] == [dim]
+
     def test_zero_groups_returns_single_total(self, sa_sync_conn):
         _pub(sa_sync_conn, oa_status="gold", sources="{hal}")
         _pub(sa_sync_conn, oa_status="closed", sources="{hal}")
