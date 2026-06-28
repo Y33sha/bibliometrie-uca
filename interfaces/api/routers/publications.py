@@ -1,9 +1,11 @@
 """Router /api/publications/* — délègue au port `PublicationsQueries`."""
 
 import logging
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 
+from application.ports.api.entity_facet import EntityFacetResponse
 from application.ports.api.publications_queries import (
     FacetFilters,
     ListFilters,
@@ -75,6 +77,61 @@ def publications_facets(
     )
     return queries.publications_facets(
         filters=filters, apc_structure_ids=get_apc_structure_ids_sync()
+    )
+
+
+@router.get("/api/publications/facets/entities", response_model=EntityFacetResponse)
+def publications_entity_facet(
+    kind: Literal["publisher", "journal"] = Query(...),
+    entity_search: str = Query(""),
+    year: str = Query(""),
+    lab_id: str = Query(""),
+    doc_type: str = Query(""),
+    excluded_doc_type: str = Query(""),
+    access: str = Query(""),
+    oa_status: str = Query(""),
+    source_filter: str = Query(""),
+    publisher_id: int | None = Query(None),
+    journal_id: int | None = Query(None),
+    person_id: int | None = Query(None),
+    is_corresponding: str = Query(""),
+    has_apc: str = Query(""),
+    country: str = Query(""),
+    hal_status: str = Query(""),
+    in_perimeter: str = Query(""),
+    subject_id: int | None = Query(None),
+    search: str = Query(""),
+    queries: PublicationsQueries = Depends(publications_queries_sync),
+) -> EntityFacetResponse:
+    """Facette éditeur/revue contextuelle de la liste : N premières entités sous les filtres actifs
+    (corrélées entre elles), avec décompte. `entity_search` recherche dans les noms d'entités ;
+    `search` reste le filtre titre/sujet des publications."""
+    lab_ids, lab_none = _parse_lab_id(lab_id)
+    filters = FacetFilters(
+        years=parse_int_csv(year),
+        lab_ids=lab_ids,
+        lab_none=lab_none,
+        doc_types=parse_str_csv(doc_type),
+        excluded_types=parse_str_csv(excluded_doc_type),
+        access=access,
+        oa_status=oa_status,
+        source_values=parse_str_csv(source_filter),
+        publisher_id=publisher_id,
+        journal_id=journal_id,
+        person_id=person_id,
+        is_corresponding=is_corresponding,
+        has_apc=has_apc,
+        country_values=parse_str_csv(country),
+        hal_status_values=parse_str_csv(hal_status),
+        in_perimeter=in_perimeter,
+        subject_id=subject_id,
+        search=search,
+    )
+    return queries.publications_entity_facet(
+        kind=kind,
+        search=entity_search,
+        filters=filters,
+        apc_structure_ids=get_apc_structure_ids_sync(),
     )
 
 

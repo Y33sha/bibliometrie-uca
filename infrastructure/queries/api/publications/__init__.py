@@ -21,6 +21,7 @@ from __future__ import annotations
 
 from sqlalchemy import Connection
 
+from application.ports.api.entity_facet import EntityFacetItem, EntityFacetResponse
 from application.ports.api.publications_queries import (
     FacetFilters,
     ListFilters,
@@ -33,6 +34,7 @@ from infrastructure.queries.api.publications.detail import (
     get_publication_detail as _get_publication_detail,
 )
 from infrastructure.queries.api.publications.facets import (
+    publications_entity_facet as _publications_entity_facet,
     publications_facets as _publications_facets,
 )
 from infrastructure.queries.api.publications.list import (
@@ -74,6 +76,23 @@ class PgPublicationsQueries(PublicationsQueries):
             self._conn, filters=filters, apc_structure_ids=apc_structure_ids
         )
         return PublicationsFacetsResponse.model_validate(data)
+
+    def publications_entity_facet(
+        self,
+        *,
+        kind: str,
+        search: str,
+        filters: FacetFilters,
+        apc_structure_ids: list[int],
+    ) -> EntityFacetResponse:
+        rows = _publications_entity_facet(
+            self._conn,
+            kind=kind,
+            search=search,
+            filters=filters,
+            apc_structure_ids=apc_structure_ids,
+        )
+        return EntityFacetResponse(entities=[EntityFacetItem(**r) for r in rows])
 
     def export_publications_csv(
         self,

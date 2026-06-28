@@ -1,9 +1,11 @@
 """Router /api/stats/* — délègue les requêtes au port StatsQueries."""
 
 import logging
+from typing import Literal
 
 from fastapi import APIRouter, Depends, Query
 
+from application.ports.api.entity_facet import EntityFacetResponse
 from application.ports.api.stats_queries import (
     PivotResponse,
     PivotSchemaResponse,
@@ -41,6 +43,35 @@ def stats_facets(
 ) -> StatsFacetsResponse:
     """Facettes dynamiques : années, labos, oa_status, apc."""
     return queries.stats_facets(
+        apc_structure_ids=get_apc_structure_ids_sync(),
+        lab_ids=parse_int_csv(lab_id),
+        years=parse_int_csv(year),
+        publisher_ids=parse_int_csv(publisher_id),
+        journal_ids=parse_int_csv(journal_id),
+        oa_status=oa_status,
+        has_apc=has_apc,
+        doc_types=parse_str_csv(doc_type),
+    )
+
+
+@router.get("/api/stats/facets/entities", response_model=EntityFacetResponse)
+def stats_entity_facet(
+    kind: Literal["publisher", "journal"] = Query(...),
+    entity_search: str = Query(""),
+    lab_id: str = Query(""),
+    year: str = Query(""),
+    publisher_id: str = Query(""),
+    journal_id: str = Query(""),
+    oa_status: str = Query(""),
+    has_apc: str = Query(""),
+    doc_type: str = Query(""),
+    queries: StatsQueries = Depends(stats_queries_sync),
+) -> EntityFacetResponse:
+    """Facette éditeur/revue contextuelle : N premières entités sous les filtres actifs (corrélées
+    entre elles), avec décompte. `entity_search` recherche dans les noms d'entités."""
+    return queries.stats_entity_facet(
+        kind=kind,
+        search=entity_search,
         apc_structure_ids=get_apc_structure_ids_sync(),
         lab_ids=parse_int_csv(lab_id),
         years=parse_int_csv(year),

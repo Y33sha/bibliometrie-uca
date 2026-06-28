@@ -105,8 +105,10 @@ class _PublicationFacetsBuilder:
             clauses.append(source_clause(f.source_values))
         if skip != "apc":
             clauses.append(apc_clause(f.has_apc, self.apc_structure_ids, f.lab_ids))
-        clauses.append(publisher_id_clause(f.publisher_id))
-        clauses.append(journal_id_clause(f.journal_id))
+        if skip != "publisher":
+            clauses.append(publisher_id_clause(f.publisher_id))
+        if skip != "journal":
+            clauses.append(journal_id_clause(f.journal_id))
         if skip != "country":
             clauses.append(country_clause(f.country_values))
         if skip != "hal_status":
@@ -518,3 +520,56 @@ def publications_facets(
 
     labs, no_lab_count = results.pop("labs")
     return {"labs": labs, "no_lab_count": no_lab_count, **results}
+
+
+# Liaison SQL des facettes-entités à forte cardinalité (recherche serveur). La revue sort
+# directement de `publications.journal_id` ; l'éditeur passe par une jointure un-à-un vers
+# `publishers` (qui exclut les publications sans éditeur).
+_ENTITY_SQL: dict[str, dict[str, str]] = {
+    "journal": {"id": "j.id", "label": "j.title", "join": ""},
+    "publisher": {
+        "id": "pub.id",
+        "label": "pub.name",
+        "join": "JOIN publishers pub ON pub.id = j.publisher_id",
+    },
+}
+
+
+def publications_entity_facet(
+    conn: Connection,
+    *,
+    kind: str,
+    search: str,
+    filters: FacetFilters,
+    apc_structure_ids: list[int],
+    limit: int = 20,
+) -> list[dict[str, Any]]:
+    """Facette éditeur/revue contextuelle de la liste : N premières entités sous les filtres actifs,
+    en sautant le filtre de la dimension demandée (les autres, dont l'autre entité, restent
+    appliqués → corrélation). Décompte par `COUNT(*)` (filtres scalaires ou `EXISTS`, sans
+    démultiplication). Recherche serveur par nom."""
+    builder = _PublicationFacetsBuilder(conn, filters, apc_structure_ids)
+    builder._preload_lab_hal_col()
+    where_sql, binds = builder._clauses_skipping(kind)
+
+    sp = _ENTITY_SQL[kind]
+    name_filter = ""
+    if len(search.strip()) >= 2:
+        name_filter = f" AND unaccent({sp['label']}) ILIKE unaccent(:q)"
+        binds["q"] = f"%{search.strip()}%"
+    binds["lim"] = limit
+
+    conn.execute(text("SET LOCAL jit = off"))
+    rows = conn.execute(
+        text(f"""
+            SELECT {sp["id"]} AS id, {sp["label"]} AS label, COUNT(*) AS count
+            FROM publications p
+            LEFT JOIN journals j ON j.id = p.journal_id {sp["join"]}
+            WHERE {where_sql} AND {sp["id"]} IS NOT NULL{name_filter}
+            GROUP BY {sp["id"]}, {sp["label"]}
+            ORDER BY count DESC, label
+            LIMIT :lim
+        """),
+        binds,
+    ).all()
+    return [{"id": r.id, "label": r.label, "count": r.count} for r in rows]
