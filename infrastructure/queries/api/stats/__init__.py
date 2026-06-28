@@ -2,7 +2,7 @@
 
 Le package est organisé par thème d'agrégat :
 - `pivot` : `run_pivot` (agrégation générique) et le schéma du registre
-- `summary` : `stats_by_year`, `available_years`, `stats_facets`
+- `summary` : `available_years`, `stats_facets`
 - `_shared` : filtre APC partagé par les agrégats.
 
 `PgStatsQueries` agrège ces fonctions sous le port `application.ports.stats_queries.StatsQueries`. Les fonctions libres retournent des dicts conformes au shape des DTOs ; la conversion vers Pydantic est faite ici à la sortie, pour garder les fonctions libres réutilisables hors API.
@@ -22,13 +22,11 @@ from application.ports.api.stats_queries import (
     StatsFacetsResponse,
     StatsQueries,
     YearFacet,
-    YearStatsRow,
 )
 from domain.stats.pivot import DIMENSIONS, MEASURES
 from infrastructure.queries.api.stats.pivot import run_pivot as _run_pivot
 from infrastructure.queries.api.stats.summary import (
     available_years as _available_years,
-    stats_by_year as _stats_by_year,
     stats_facets as _stats_facets,
 )
 
@@ -38,32 +36,6 @@ class PgStatsQueries(StatsQueries):
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
-
-    def stats_by_year(
-        self,
-        *,
-        apc_structure_ids: list[int],
-        lab_ids: list[int],
-        years: list[int],
-        publisher_id: int | None,
-        journal_id: int | None,
-        oa_status: str,
-        has_apc: str,
-        doc_types: list[str],
-    ) -> list[YearStatsRow]:
-        rows = _stats_by_year(
-            self._conn,
-            apc_structure_ids=apc_structure_ids,
-            lab_ids=lab_ids,
-            years=years,
-            publisher_id=publisher_id,
-            journal_id=journal_id,
-            oa_status=oa_status,
-            has_apc=has_apc,
-            doc_types=doc_types,
-        )
-        return [YearStatsRow(**r) for r in rows]
-
 
     def available_years(self) -> list[int]:
         return _available_years(self._conn)

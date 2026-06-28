@@ -117,26 +117,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/stats/by-year": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Stats By Year
-         * @description Ventilation par année (pour les graphiques).
-         */
-        get: operations["stats_by_year_api_stats_by_year_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/stats/years": {
         parameters: {
             query?: never;
@@ -5866,32 +5846,6 @@ export interface components {
             /** Count */
             count: number;
         };
-        /**
-         * YearStatsRow
-         * @description Ventilation d'une année : pub_count + détail OA.
-         */
-        YearStatsRow: {
-            /** Pub Year */
-            pub_year: number;
-            /** Pub Count */
-            pub_count: number;
-            /** Gold */
-            gold: number;
-            /** Diamond */
-            diamond: number;
-            /** Hybrid */
-            hybrid: number;
-            /** Bronze */
-            bronze: number;
-            /** Green */
-            green: number;
-            /** Embargoed */
-            embargoed: number;
-            /** Closed */
-            closed: number;
-            /** Unknown */
-            unknown: number;
-        };
         /** YesNoCount */
         YesNoCount: {
             /** Yes */
@@ -6129,43 +6083,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OkResponse"];
-                };
-            };
-        };
-    };
-    stats_by_year_api_stats_by_year_get: {
-        parameters: {
-            query?: {
-                lab_id?: string;
-                year?: string;
-                publisher_id?: number | null;
-                journal_id?: number | null;
-                oa_status?: string;
-                has_apc?: string;
-                doc_type?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["YearStatsRow"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

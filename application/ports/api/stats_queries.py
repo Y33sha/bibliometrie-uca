@@ -10,21 +10,6 @@ from typing import Literal, Protocol
 from pydantic import BaseModel
 
 
-class YearStatsRow(BaseModel):
-    """Ventilation d'une année : pub_count + détail OA."""
-
-    pub_year: int
-    pub_count: int
-    gold: int
-    diamond: int
-    hybrid: int
-    bronze: int
-    green: int
-    embargoed: int
-    closed: int
-    unknown: int
-
-
 class YearFacet(BaseModel):
     value: int
     count: int
@@ -114,19 +99,6 @@ class StatsQueries(Protocol):
         has_apc: str,
         doc_types: list[str],
     ) -> PivotResponse: ...
-
-    def stats_by_year(
-        self,
-        *,
-        apc_structure_ids: list[int],
-        lab_ids: list[int],
-        years: list[int],
-        publisher_id: int | None,
-        journal_id: int | None,
-        oa_status: str,
-        has_apc: str,
-        doc_types: list[str],
-    ) -> list[YearStatsRow]: ...
 
     def available_years(self) -> list[int]: ...
 

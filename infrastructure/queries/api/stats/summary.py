@@ -1,4 +1,4 @@
-"""Résumé global, ventilation annuelle, années disponibles, facettes croisées."""
+"""Années disponibles et facettes croisées des statistiques."""
 
 from collections.abc import Sequence
 from typing import Any
@@ -7,7 +7,6 @@ from sqlalchemy import Connection, Row, text
 
 from infrastructure.queries.api.stats._shared import stats_apc_clause
 from infrastructure.queries.filters import (
-    OA_BREAKDOWN_COLS_SQL,
     PUBLICATION_IS_IN_PERIMETER,
     WhereClause,
     assemble_where,
@@ -71,71 +70,6 @@ def _common_clauses(
     if skip != "doc_type":
         out.append(doc_type_clause(doc_types))
     return out
-
-
-def _by_year_sql(
-    *,
-    apc_structure_ids: list[int],
-    lab_ids: list[int],
-    years: list[int],
-    publisher_id: int | None,
-    journal_id: int | None,
-    oa_status: str,
-    has_apc: str,
-    doc_types: list[str],
-) -> tuple[str, dict[str, Any]]:
-    dyn_where, binds = assemble_where(
-        _common_clauses(
-            apc_structure_ids=apc_structure_ids,
-            lab_ids=lab_ids,
-            years=years,
-            publisher_id=publisher_id,
-            journal_id=journal_id,
-            oa_status=oa_status,
-            has_apc=has_apc,
-            doc_types=doc_types,
-        )
-    )
-    sql = f"""
-        SELECT
-            p.pub_year,
-            COUNT(DISTINCT p.id) AS pub_count,
-            {OA_BREAKDOWN_COLS_SQL}
-        FROM publications p
-        LEFT JOIN journals j ON j.id = p.journal_id
-        WHERE {_BASE_CLAUSES} AND {dyn_where}
-        GROUP BY p.pub_year
-        ORDER BY p.pub_year
-    """
-    return sql, binds
-
-
-def stats_by_year(
-    conn: Connection,
-    *,
-    apc_structure_ids: list[int],
-    lab_ids: list[int],
-    years: list[int],
-    publisher_id: int | None,
-    journal_id: int | None,
-    oa_status: str,
-    has_apc: str,
-    doc_types: list[str],
-) -> list[dict[str, Any]]:
-    """Ventilation par année."""
-    conn.execute(text("SET LOCAL jit = off"))
-    sql, binds = _by_year_sql(
-        apc_structure_ids=apc_structure_ids,
-        lab_ids=lab_ids,
-        years=years,
-        publisher_id=publisher_id,
-        journal_id=journal_id,
-        oa_status=oa_status,
-        has_apc=has_apc,
-        doc_types=doc_types,
-    )
-    rows = conn.execute(text(sql), binds).all()
-    return [dict(r._mapping) for r in rows]
 
 
 _AVAILABLE_YEARS_SQL = f"""
