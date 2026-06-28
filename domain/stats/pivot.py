@@ -38,9 +38,15 @@ Cardinality = Literal["low", "high"]
 
 @dataclass(frozen=True, slots=True)
 class Dimension:
-    """Un attribut d'une publication. `groupable` : peut servir d'axe de ventilation ;
-    `filterable` : peut servir de facette. La plupart sont les deux ; certaines sont filtrables
-    seules (APC : utile à filtrer, sans intérêt comme axe)."""
+    """Un attribut d'une publication et ses rôles possibles :
+
+    - `groupable` : axe de ventilation (la catégorie empilée dans chaque barre) ;
+    - `comparable` : axe de comparaison (l'abscisse, ce qu'on compare d'une valeur à l'autre —
+      l'année, les laboratoires, les éditeurs, les revues). L'accès et la voie d'accès se groupent
+      (empilent) mais ne se comparent pas ; un axe comparable est toujours groupable (le moteur
+      ventile par lui) ;
+    - `filterable` : facette. Certaines dimensions sont filtrables seules (APC : utile à filtrer,
+      sans intérêt comme axe)."""
 
     key: str
     label: str
@@ -48,6 +54,7 @@ class Dimension:
     ordinal: bool
     multiplies: bool
     groupable: bool
+    comparable: bool
     filterable: bool
 
 
@@ -63,63 +70,47 @@ class Measure:
 
 DIMENSIONS: dict[str, Dimension] = {
     "year": Dimension(
-        "year", "Année", "low", ordinal=True, multiplies=False, groupable=True, filterable=True
+        "year", "Année", "low",
+        ordinal=True, multiplies=False, groupable=True, comparable=True, filterable=True,
     ),
     "oa_access": Dimension(
-        "oa_access",
-        "Accès",
-        "low",
-        ordinal=False,
-        multiplies=False,
-        groupable=True,
-        filterable=False,
+        "oa_access", "Accès", "low",
+        ordinal=False, multiplies=False, groupable=True, comparable=False, filterable=False,
     ),
     "oa_voie": Dimension(
-        "oa_voie",
-        "Voie d'accès ouvert",
-        "low",
-        ordinal=False,
-        multiplies=False,
-        groupable=True,
-        filterable=True,
+        "oa_voie", "Voie d'accès ouvert", "low",
+        ordinal=False, multiplies=False, groupable=True, comparable=False, filterable=True,
     ),
     "doc_type": Dimension(
-        "doc_type",
-        "Type de document",
-        "low",
-        ordinal=False,
-        multiplies=False,
-        groupable=False,
-        filterable=True,
+        "doc_type", "Type de document", "low",
+        ordinal=False, multiplies=False, groupable=False, comparable=False, filterable=True,
     ),
     "doc_type_family": Dimension(
-        "doc_type_family",
-        "Type de document",
-        "low",
-        ordinal=False,
-        multiplies=False,
-        groupable=True,
-        filterable=False,
+        "doc_type_family", "Type de document", "low",
+        ordinal=False, multiplies=False, groupable=True, comparable=True, filterable=False,
     ),
     "lab": Dimension(
-        "lab",
-        "Laboratoire",
-        "high",
-        ordinal=False,
-        multiplies=True,
-        groupable=True,
-        filterable=True,
-    ),  # forte cardinalité : axe de comparaison (paginé), pas de groupement primaire
+        "lab", "Laboratoire", "high",
+        ordinal=False, multiplies=True, groupable=True, comparable=True, filterable=True,
+    ),  # forte cardinalité : comparaison paginée, pas de groupement primaire
     "publisher": Dimension(
-        "publisher", "Éditeur", "high", ordinal=False, multiplies=False, groupable=True, filterable=False
+        "publisher", "Éditeur", "high",
+        ordinal=False, multiplies=False, groupable=True, comparable=True, filterable=False,
     ),  # forte cardinalité : comparaison (nombre de publications par éditeur)
     "journal": Dimension(
-        "journal", "Revue", "high", ordinal=False, multiplies=False, groupable=True, filterable=False
+        "journal", "Revue", "high",
+        ordinal=False, multiplies=False, groupable=True, comparable=True, filterable=False,
     ),  # forte cardinalité : comparaison (nombre de publications par revue)
     "apc": Dimension(
-        "apc", "APC", "low", ordinal=False, multiplies=False, groupable=False, filterable=True
+        "apc", "APC", "low",
+        ordinal=False, multiplies=False, groupable=False, comparable=False, filterable=True,
     ),
 }
+
+# Un axe de comparaison est toujours groupable : le moteur ventile par lui (groups).
+assert all(d.groupable for d in DIMENSIONS.values() if d.comparable), (
+    "une dimension comparable doit être groupable"
+)
 
 MEASURES: dict[str, Measure] = {
     "pub_count": Measure("pub_count", "Nombre de publications"),

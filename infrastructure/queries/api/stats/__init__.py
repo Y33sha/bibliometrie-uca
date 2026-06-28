@@ -77,6 +77,7 @@ class PgStatsQueries(StatsQueries):
                     cardinality=d.cardinality,
                     ordinal=d.ordinal,
                     groupable=d.groupable,
+                    comparable=d.comparable,
                     filterable=d.filterable,
                 )
                 for d in DIMENSIONS.values()
