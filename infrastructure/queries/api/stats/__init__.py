@@ -1,7 +1,6 @@
 """Query services pour /api/stats/* (router stats).
 
 Le package est organisé par thème d'agrégat :
-- `publishers` : `publisher_stats`
 - `journals` : `journal_stats`
 - `pivot` : `run_pivot` (agrégation générique) et le schéma du registre
 - `summary` : `stats_by_year`, `available_years`, `stats_facets`
@@ -23,8 +22,6 @@ from application.ports.api.stats_queries import (
     PivotMeasureOut,
     PivotResponse,
     PivotSchemaResponse,
-    PublisherStatsResponse,
-    PublisherStatsRow,
     StatsFacetsResponse,
     StatsQueries,
     YearFacet,
@@ -33,7 +30,6 @@ from application.ports.api.stats_queries import (
 from domain.stats.pivot import DIMENSIONS, MEASURES
 from infrastructure.queries.api.stats.journals import journal_stats as _journal_stats
 from infrastructure.queries.api.stats.pivot import run_pivot as _run_pivot
-from infrastructure.queries.api.stats.publishers import publisher_stats as _publisher_stats
 from infrastructure.queries.api.stats.summary import (
     available_years as _available_years,
     stats_by_year as _stats_by_year,
@@ -46,41 +42,6 @@ class PgStatsQueries(StatsQueries):
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
-
-    def publisher_stats(
-        self,
-        *,
-        apc_structure_ids: list[int],
-        lab_ids: list[int],
-        years: list[int],
-        oa_status: str,
-        has_apc: str,
-        doc_types: list[str],
-        search: str,
-        page: int,
-        per_page: int,
-        sort: str,
-    ) -> PublisherStatsResponse:
-        data = _publisher_stats(
-            self._conn,
-            apc_structure_ids=apc_structure_ids,
-            lab_ids=lab_ids,
-            years=years,
-            oa_status=oa_status,
-            has_apc=has_apc,
-            doc_types=doc_types,
-            search=search,
-            page=page,
-            per_page=per_page,
-            sort=sort,
-        )
-        return PublisherStatsResponse(
-            total=data["total"],
-            page=data["page"],
-            per_page=data["per_page"],
-            pages=data["pages"],
-            publishers=[PublisherStatsRow(**r) for r in data["publishers"]],
-        )
 
     def journal_stats(
         self,

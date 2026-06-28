@@ -117,28 +117,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/stats/publishers": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Publisher Stats
-         * @description Classement des éditeurs par volume de publications filtrées.
-         *
-         *     `lab_id`, `year` : listes CSV d'entiers. `oa_status` : valeur unique (`gold`/`green`/`hybrid`/`bronze`/`closed`/`unknown`). `has_apc=yes|no|""` : filtre sur la présence d'un paiement APC connu.
-         */
-        get: operations["publisher_stats_api_stats_publishers_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/stats/journals": {
         parameters: {
             query?: never;
@@ -5282,48 +5260,6 @@ export interface components {
             /** Publishers */
             publishers: components["schemas"]["PublisherListItem"][];
         };
-        /** PublisherStatsResponse */
-        PublisherStatsResponse: {
-            /** Total */
-            total: number;
-            /** Page */
-            page: number;
-            /** Per Page */
-            per_page: number;
-            /** Pages */
-            pages: number;
-            /** Publishers */
-            publishers: components["schemas"]["PublisherStatsRow"][];
-        };
-        /** PublisherStatsRow */
-        PublisherStatsRow: {
-            /** Pub Count */
-            pub_count: number;
-            /** Apc Uca */
-            apc_uca: number;
-            /** Gold */
-            gold: number;
-            /** Diamond */
-            diamond: number;
-            /** Hybrid */
-            hybrid: number;
-            /** Bronze */
-            bronze: number;
-            /** Green */
-            green: number;
-            /** Embargoed */
-            embargoed: number;
-            /** Closed */
-            closed: number;
-            /** Unknown */
-            unknown: number;
-            /** Publisher Id */
-            publisher_id: number;
-            /** Publisher Name */
-            publisher_name: string;
-            /** Journal Count */
-            journal_count: number;
-        };
         /** PublisherUpdate */
         PublisherUpdate: {
             /** Name */
@@ -6260,45 +6196,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OkResponse"];
-                };
-            };
-        };
-    };
-    publisher_stats_api_stats_publishers_get: {
-        parameters: {
-            query?: {
-                lab_id?: string;
-                year?: string;
-                oa_status?: string;
-                has_apc?: string;
-                doc_type?: string;
-                page?: number;
-                per_page?: number;
-                search?: string;
-                sort?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PublisherStatsResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

@@ -8,7 +8,6 @@ from application.ports.api.stats_queries import (
     JournalStatsResponse,
     PivotResponse,
     PivotSchemaResponse,
-    PublisherStatsResponse,
     StatsFacetsResponse,
     StatsQueries,
     YearStatsRow,
@@ -21,37 +20,6 @@ from interfaces.api.filters import parse_int_csv, parse_str_csv
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-
-
-@router.get("/api/stats/publishers", response_model=PublisherStatsResponse)
-def publisher_stats(
-    lab_id: str = Query(""),
-    year: str = Query(""),
-    oa_status: str = Query(""),
-    has_apc: str = Query(""),
-    doc_type: str = Query(""),
-    page: int = Query(1, ge=1),
-    per_page: int = Query(50, ge=10, le=200),
-    search: str = Query(""),
-    sort: str = Query("-pubs"),
-    queries: StatsQueries = Depends(stats_queries_sync),
-) -> PublisherStatsResponse:
-    """Classement des éditeurs par volume de publications filtrées.
-
-    `lab_id`, `year` : listes CSV d'entiers. `oa_status` : valeur unique (`gold`/`green`/`hybrid`/`bronze`/`closed`/`unknown`). `has_apc=yes|no|""` : filtre sur la présence d'un paiement APC connu.
-    """
-    return queries.publisher_stats(
-        apc_structure_ids=get_apc_structure_ids_sync(),
-        lab_ids=parse_int_csv(lab_id),
-        years=parse_int_csv(year),
-        oa_status=oa_status,
-        has_apc=has_apc,
-        doc_types=parse_str_csv(doc_type),
-        search=search,
-        page=page,
-        per_page=per_page,
-        sort=sort,
-    )
 
 
 @router.get("/api/stats/journals", response_model=JournalStatsResponse)

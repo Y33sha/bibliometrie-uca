@@ -28,12 +28,6 @@ class OaCounts(BaseModel):
     unknown: int
 
 
-class PublisherStatsRow(OaCounts):
-    publisher_id: int
-    publisher_name: str
-    journal_count: int
-
-
 class JournalStatsRow(OaCounts):
     journal_id: int
     journal_title: str
@@ -42,14 +36,6 @@ class JournalStatsRow(OaCounts):
     publisher_name: str | None
     is_predatory: bool
     apc_amount: float | None
-
-
-class PublisherStatsResponse(BaseModel):
-    total: int
-    page: int
-    per_page: int
-    pages: int
-    publishers: list[PublisherStatsRow]
 
 
 class JournalStatsResponse(BaseModel):
@@ -162,21 +148,6 @@ class StatsQueries(Protocol):
         has_apc: str,
         doc_types: list[str],
     ) -> PivotResponse: ...
-
-    def publisher_stats(
-        self,
-        *,
-        apc_structure_ids: list[int],
-        lab_ids: list[int],
-        years: list[int],
-        oa_status: str,
-        has_apc: str,
-        doc_types: list[str],
-        search: str,
-        page: int,
-        per_page: int,
-        sort: str,
-    ) -> PublisherStatsResponse: ...
 
     def journal_stats(
         self,
