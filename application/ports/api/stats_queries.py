@@ -9,7 +9,7 @@ from typing import Literal, Protocol
 
 from pydantic import BaseModel
 
-from application.ports.api.entity_facet import EntityFacetResponse
+from application.ports.api.entity_facet import EntityFacetResponse, EntityLabelResponse
 
 
 class YearFacet(BaseModel):
@@ -118,6 +118,10 @@ class StatsQueries(Protocol):
         has_apc: str,
         doc_types: list[str],
     ) -> EntityFacetResponse: ...
+
+    def resolve_entity_label(
+        self, *, kind: Literal["publisher", "journal"], entity_id: int
+    ) -> EntityLabelResponse: ...
 
     def stats_facets(
         self,

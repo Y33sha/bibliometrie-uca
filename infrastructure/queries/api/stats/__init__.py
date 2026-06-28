@@ -12,7 +12,11 @@ from typing import Literal
 
 from sqlalchemy import Connection
 
-from application.ports.api.entity_facet import EntityFacetItem, EntityFacetResponse
+from application.ports.api.entity_facet import (
+    EntityFacetItem,
+    EntityFacetResponse,
+    EntityLabelResponse,
+)
 from application.ports.api.stats_queries import (
     ApcFacet,
     DocTypeFacet,
@@ -27,6 +31,7 @@ from application.ports.api.stats_queries import (
     YearFacet,
 )
 from domain.stats.pivot import DIMENSIONS, MEASURES
+from infrastructure.queries.api.entity_labels import entity_label as _entity_label
 from infrastructure.queries.api.stats.entity_facets import stats_entity_facet as _stats_entity_facet
 from infrastructure.queries.api.stats.pivot import run_pivot as _run_pivot
 from infrastructure.queries.api.stats.summary import (
@@ -119,6 +124,11 @@ class PgStatsQueries(StatsQueries):
             doc_types=doc_types,
         )
         return EntityFacetResponse(entities=[EntityFacetItem(**r) for r in rows])
+
+    def resolve_entity_label(
+        self, *, kind: Literal["publisher", "journal"], entity_id: int
+    ) -> EntityLabelResponse:
+        return EntityLabelResponse(label=_entity_label(self._conn, kind=kind, entity_id=entity_id))
 
     def stats_facets(
         self,

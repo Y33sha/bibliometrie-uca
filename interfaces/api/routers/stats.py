@@ -5,7 +5,7 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, Query
 
-from application.ports.api.entity_facet import EntityFacetResponse
+from application.ports.api.entity_facet import EntityFacetResponse, EntityLabelResponse
 from application.ports.api.stats_queries import (
     PivotResponse,
     PivotSchemaResponse,
@@ -81,6 +81,17 @@ def stats_entity_facet(
         has_apc=has_apc,
         doc_types=parse_str_csv(doc_type),
     )
+
+
+@router.get("/api/stats/facets/entity-label", response_model=EntityLabelResponse)
+def stats_entity_label(
+    kind: Literal["publisher", "journal"] = Query(...),
+    entity_id: int = Query(...),
+    queries: StatsQueries = Depends(stats_queries_sync),
+) -> EntityLabelResponse:
+    """Libellé d'une entité (revue/éditeur) par id, pour réafficher une pastille de facette restaurée
+    depuis l'URL (qui ne porte que l'id, état canonique de la sélection)."""
+    return queries.resolve_entity_label(kind=kind, entity_id=entity_id)
 
 
 @router.get("/api/stats/pivot/schema", response_model=PivotSchemaResponse)
