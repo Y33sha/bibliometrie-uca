@@ -40,6 +40,8 @@ _DIM_EXPR: dict[str, str] = {
     "oa_voie": "p.oa_status::text",
     "doc_type_family": doc_type_family_sql("p.doc_type"),
     "lab": "COALESCE(ls.acronym, ls.name)",
+    "publisher": "pub.name",
+    "journal": "jt.title",
 }
 # Jointures supplémentaires par dimension qui sort de `publications`. Le laboratoire passe par les
 # rattachements (une publication compte dans chacun de ses laboratoires). Alias dédiés (`la`/`las`/
@@ -50,6 +52,9 @@ _DIM_JOIN: dict[str, str] = {
         "JOIN authorship_structures las ON las.authorship_id = la.id "
         "JOIN structures ls ON ls.id = las.structure_id AND ls.structure_type = 'labo'"
     ),
+    # Éditeur / revue : jointures internes (excluent les publications sans revue / sans éditeur).
+    "publisher": "JOIN publishers pub ON pub.id = j.publisher_id",
+    "journal": "JOIN journals jt ON jt.id = p.journal_id",
 }
 _MEASURE_AGG: dict[str, str] = {
     "pub_count": "COUNT(DISTINCT p.id)",
