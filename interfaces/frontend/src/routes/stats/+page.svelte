@@ -83,7 +83,7 @@
 		ouvert: 'Ouvert', embargo: 'Sous embargo', ferme: 'Fermé', indetermine: 'Indéterminé',
 	};
 	const OA_ACCESS_VAR: Record<string, string> = {
-		ouvert: '--green', embargo: '--embargoed', ferme: '--closed', indetermine: '--unknown',
+		ouvert: '--open', embargo: '--embargoed', ferme: '--closed', indetermine: '--unknown',
 	};
 	const PALETTE = ['#4e79a7', '#f28e2b', '#59a14f', '#e15759', '#b07aa1', '#76b7b2', '#ff9da7', '#9c755f', '#bab0ac', '#edc948'];
 
