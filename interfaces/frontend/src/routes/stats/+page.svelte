@@ -46,7 +46,12 @@
 	// type). L'année ne se groupe pas (elle se compare) ; le laboratoire non plus (forte cardinalité).
 	const groupingDims = $derived(
 		pivotSchema
-			? pivotSchema.dimensions.filter((d) => d.groupable && d.cardinality === 'low' && !d.ordinal)
+			? pivotSchema.dimensions
+					.filter((d) => d.groupable && d.cardinality === 'low' && !d.ordinal)
+					// Le type de production est l'indicateur le plus parlant : on le place en tête.
+					.sort((a, b) =>
+						a.key === 'doc_type_grouped' ? -1 : b.key === 'doc_type_grouped' ? 1 : 0
+					)
 			: []
 	);
 	// Comparaison : les dimensions déclarées `comparable` (année, type, et les entités à forte
@@ -427,7 +432,7 @@
 <div class="toolbar controls-row">
 	{#if pivotSchema}
 		<label class="groupby">
-			Grouper par&nbsp;:
+			Indicateur&nbsp;:
 			<select bind:value={primaryBy} onchange={onPrimaryChange}>
 				{#each groupingDims as d (d.key)}
 					<option value={d.key}>{d.label}</option>
