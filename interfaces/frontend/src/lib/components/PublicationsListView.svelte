@@ -5,6 +5,7 @@
 	import { base } from '$app/paths';
 	import { sanitizeTitle, halDocUrl, scanrPubUrl } from '$lib/utils';
 	import FacetDropdown from '$lib/components/FacetDropdown.svelte';
+	import EntityFilter from '$lib/components/EntityFilter.svelte';
 	import PresenceFilterToggle from '$lib/components/PresenceFilterToggle.svelte';
 	import { SOURCE_ITEMS } from '$lib/filterItems';
 	import Pagination from '$lib/components/Pagination.svelte';
@@ -163,32 +164,33 @@
 	let filterPublisherName: string | null = $state(null);
 	let filterJournalName: string | null = $state(null);
 
-	const hasExternalFilter = $derived(
-		!!filterPublisherId || !!filterJournalId || !!externalFilters?.subjectId,
+	// Éditeur et revue sont des facettes (recherche serveur) ; leur sélection libre vit dans
+	// `filterPublisherId`/`filterJournalId` (+ libellés). Le bandeau ne signale plus que le sujet,
+	// contexte fixé par la route (sans facette propre ici).
+	const subjectBannerText = $derived(
+		externalFilters?.subjectId
+			? 'sujet = ' + (externalFilters.subjectLabel ?? `#${externalFilters.subjectId}`)
+			: '',
 	);
 
-	const filterBannerText = $derived.by(() => {
-		const parts: string[] = [];
-		if (filterPublisherName) parts.push('éditeur = ' + filterPublisherName);
-		else if (filterPublisherId) parts.push('éditeur #' + filterPublisherId);
-		if (filterJournalName) parts.push('revue = ' + filterJournalName);
-		else if (filterJournalId) parts.push('revue #' + filterJournalId);
-		if (externalFilters?.subjectId) {
-			const lbl = externalFilters.subjectLabel ?? `#${externalFilters.subjectId}`;
-			parts.push(`sujet = ${lbl}`);
-		}
-		return parts.join(', ');
-	});
+	// Sélection courante des facettes éditeur / revue (id + libellé restaurés de l'URL).
+	const publisherSelection = $derived(
+		filterPublisherId ? { value: filterPublisherId, text: filterPublisherName ?? filterPublisherId } : null,
+	);
+	const journalSelection = $derived(
+		filterJournalId ? { value: filterJournalId, text: filterJournalName ?? filterJournalId } : null,
+	);
 
-	const cleanFilterUrl = $derived.by(() => {
-		const keep = new URLSearchParams($page.url.search);
-		keep.delete('publisher_id');
-		keep.delete('journal_id');
-		keep.delete('publisher_name');
-		keep.delete('journal_name');
-		const qs = keep.toString();
-		return base + basePath + (qs ? '?' + qs : '');
-	});
+	function onPublisherFilter(e: { value: string; text: string } | null) {
+		filterPublisherId = e?.value ?? null;
+		filterPublisherName = e?.text ?? null;
+		onFilterChange();
+	}
+	function onJournalFilter(e: { value: string; text: string } | null) {
+		filterJournalId = e?.value ?? null;
+		filterJournalName = e?.text ?? null;
+		onFilterChange();
+	}
 
 	// Sort display
 	const yearSortArrow = $derived(currentSort === 'year_asc' ? '▲' : currentSort === 'year_desc' ? '▼' : '');
@@ -429,23 +431,16 @@
 	});
 </script>
 
-{#if showFilterBanner && hasExternalFilter}
-	<div class="filter-banner">
-		Filtre actif : {filterBannerText} — <a href={cleanFilterUrl} onclick={(e) => {
-			e.preventDefault();
-			filterPublisherId = null;
-			filterJournalId = null;
-			filterPublisherName = null;
-			filterJournalName = null;
-			onFilterChange();
-		}}>Supprimer le filtre</a>
-	</div>
+{#if showFilterBanner && subjectBannerText}
+	<div class="filter-banner">Filtre actif : {subjectBannerText}</div>
 {/if}
 
 <div class="toolbar toolbar-card toolbar-sticky">
 	<input type="search" placeholder="Rechercher par titre..." bind:value={search} use:autofocus onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }} oninput={onSearchInput} />
 	{#if col('type')}<FacetDropdown label="Types" options={facets.options.docTypes} groups={docTypeFamilies.map((f) => ({ label: f.label, values: f.types }))} bind:selected={selectedDocTypes} onchange={onFilterChange} />{/if}
 	{#if col('year')}<FacetDropdown label="Années" options={facets.options.years} bind:selected={selectedYears} onchange={onFilterChange} />{/if}
+	{#if !externalFilters?.publisherId}<EntityFilter label="Éditeur" endpoint="/api/publishers" itemsKey="publishers" labelField="name" selected={publisherSelection} onchange={onPublisherFilter} />{/if}
+	{#if !externalFilters?.journalId}<EntityFilter label="Revue" endpoint="/api/journals" itemsKey="journals" labelField="title" selected={journalSelection} onchange={onJournalFilter} />{/if}
 	{#if !hasFixedLab && col('labs')}<FacetDropdown label="Laboratoires" options={facets.options.labs} searchable bind:selected={selectedLabs} onchange={onLabChange} />{/if}
 	{#if col('oa')}<FacetDropdown label="Accès" options={facets.options.access} bind:selected={selectedAccess} onchange={onFilterChange} />{/if}
 	{#if col('oa_status')}<FacetDropdown label="Voies OA" options={facets.options.oa} bind:selected={selectedOa} onchange={onFilterChange} />{/if}
@@ -649,7 +644,6 @@
 		font-size: 0.95rem;
 		color: #2c3e50;
 	}
-	.filter-banner a { color: var(--accent); }
 	.toolbar input[type='search'] { width: 280px; }
 	.pub-table {
 		width: 100%;
