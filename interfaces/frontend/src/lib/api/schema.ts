@@ -4763,7 +4763,8 @@ export interface components {
         /**
          * PivotDimensionOut
          * @description Métadonnée d'une dimension, lue par les sélecteurs de l'interface : `groupable` pilote le
-         *     choix de ventilation, `filterable` la barre de facettes (dérivée par soustraction).
+         *     choix de ventilation, `comparable` celui de la comparaison (abscisse), `filterable` la barre de
+         *     facettes (dérivée par soustraction).
          */
         PivotDimensionOut: {
             /** Key */
@@ -4779,6 +4780,8 @@ export interface components {
             ordinal: boolean;
             /** Groupable */
             groupable: boolean;
+            /** Comparable */
+            comparable: boolean;
             /** Filterable */
             filterable: boolean;
         };

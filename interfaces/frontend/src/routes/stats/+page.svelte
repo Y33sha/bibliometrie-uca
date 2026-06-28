@@ -45,10 +45,11 @@
 			? pivotSchema.dimensions.filter((d) => d.groupable && d.cardinality === 'low' && !d.ordinal)
 			: []
 	);
-	// Comparaison : toute dimension groupable (l'année, les catégories, le laboratoire à forte
-	// cardinalité), moins celle déjà prise comme groupement primaire.
+	// Comparaison : les dimensions déclarées `comparable` (année, type, et les entités à forte
+	// cardinalité — labo, éditeur, revue ; pas l'accès ni la voie, qui s'empilent), moins celle déjà
+	// prise comme groupement primaire.
 	const comparableDims = $derived(
-		pivotSchema ? pivotSchema.dimensions.filter((d) => d.groupable && d.key !== primaryBy) : []
+		pivotSchema ? pivotSchema.dimensions.filter((d) => d.comparable && d.key !== primaryBy) : []
 	);
 
 	// Barre de facettes dérivée du registre (cf. domain `applicable_facets`) : ensemble des dimensions
