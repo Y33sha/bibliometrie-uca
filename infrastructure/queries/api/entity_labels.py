@@ -6,20 +6,18 @@ connue — typiquement au rechargement d'une page dont l'URL ne porte que l'id. 
 sélection est l'id ; le libellé en est dérivé et relu ici à la demande.
 """
 
-from typing import Literal
-
 from sqlalchemy import Connection, text
 
-EntityKind = Literal["publisher", "journal"]
-
-# Table et colonne de libellé par type d'entité (valeurs figées, aucune injection).
+# Table et colonne de libellé par type d'entité (valeurs figées, aucune injection). `kind` est borné
+# aux deux clés par les routers (Query Literal) ; le typer `str` ici accepte les deux contextes
+# appelants (stats `Literal`, publications `str`) sans élargir le contrat de surface.
 _LABEL_SQL: dict[str, tuple[str, str]] = {
     "journal": ("journals", "title"),
     "publisher": ("publishers", "name"),
 }
 
 
-def entity_label(conn: Connection, *, kind: EntityKind, entity_id: int) -> str | None:
+def entity_label(conn: Connection, *, kind: str, entity_id: int) -> str | None:
     """Libellé de l'entité `entity_id` (revue ou éditeur), ou None si l'id est inconnu."""
     table, col = _LABEL_SQL[kind]
     row = conn.execute(
