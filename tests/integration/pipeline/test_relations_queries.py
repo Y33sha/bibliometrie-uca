@@ -6,6 +6,8 @@ Valide sur vraie base `fetch_erratum_title_matches` (suffixe de titre) et
 Le parent est désigné par son `publication_id` ; son DOI peut être absent (cible au corpus sans DOI).
 """
 
+from sqlalchemy import text
+
 from infrastructure.queries.pipeline.relations import (
     fetch_erratum_title_matches,
     fetch_preprint_title_matches,
@@ -170,3 +172,33 @@ class TestFetchPreprintTitleMatches:
             pub_year=2024,
         )
         assert fetch_preprint_title_matches(sa_sync_conn) == []
+
+
+class TestRelationTargetDeletionCascades:
+    """Régression : supprimer la publication cible d'une relation rapprochée par titre (cible au
+    corpus sans DOI) supprime la relation via `ON DELETE CASCADE`, au lieu de nuller sa cible — ce
+    qui la laissait sans cible, violant le CHECK `target_present` et faisant planter la dissolution
+    d'orphelins et le merge."""
+
+    def test_repo_delete_of_target_removes_relation(self, sa_sync_conn):
+        parent = _pub(sa_sync_conn, doc_type="article", title_normalized=PARENT_TITLE, doi=None)
+        child = _pub(
+            sa_sync_conn, doc_type="preprint", title_normalized=PARENT_TITLE, doi="10.1/child"
+        )
+        sa_sync_conn.execute(
+            text("""
+                INSERT INTO publication_relations
+                    (from_publication_id, relation_type, target_publication_id, target_doi, source)
+                VALUES (:child, 'is_preprint_of', :parent, NULL, 'title_match')
+            """),
+            {"child": child, "parent": parent},
+        )
+
+        # Le chemin qui plantait : refresh_from_sources → repo.delete sur la cible orpheline.
+        publication_repository(sa_sync_conn).delete(parent)
+
+        remaining = sa_sync_conn.execute(
+            text("SELECT count(*) FROM publication_relations WHERE from_publication_id = :c"),
+            {"c": child},
+        ).scalar_one()
+        assert remaining == 0
