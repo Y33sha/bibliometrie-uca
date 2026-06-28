@@ -157,6 +157,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/stats/facets/entities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Stats Entity Facet
+         * @description Facette éditeur/revue contextuelle : N premières entités sous les filtres actifs (corrélées
+         *     entre elles), avec décompte. `entity_search` recherche dans les noms d'entités.
+         */
+        get: operations["stats_entity_facet_api_stats_facets_entities_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/stats/pivot/schema": {
         parameters: {
             query?: never;
@@ -210,6 +231,28 @@ export interface paths {
          * @description Facettes dynamiques pour la page publications.
          */
         get: operations["publications_facets_api_publications_facets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/publications/facets/entities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Publications Entity Facet
+         * @description Facette éditeur/revue contextuelle de la liste : N premières entités sous les filtres actifs
+         *     (corrélées entre elles), avec décompte. `entity_search` recherche dans les noms d'entités ;
+         *     `search` reste le filtre titre/sujet des publications.
+         */
+        get: operations["publications_entity_facet_api_publications_facets_entities_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3155,6 +3198,20 @@ export interface components {
             ppn?: string | null;
         } & {
             [key: string]: unknown;
+        };
+        /** EntityFacetItem */
+        EntityFacetItem: {
+            /** Id */
+            id: number;
+            /** Label */
+            label: string;
+            /** Count */
+            count: number;
+        };
+        /** EntityFacetResponse */
+        EntityFacetResponse: {
+            /** Entities */
+            entities: components["schemas"]["EntityFacetItem"][];
         };
         /**
          * EnumOption
@@ -6146,6 +6203,45 @@ export interface operations {
             };
         };
     };
+    stats_entity_facet_api_stats_facets_entities_get: {
+        parameters: {
+            query: {
+                kind: "publisher" | "journal";
+                entity_search?: string;
+                lab_id?: string;
+                year?: string;
+                publisher_id?: string;
+                journal_id?: string;
+                oa_status?: string;
+                has_apc?: string;
+                doc_type?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EntityFacetResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     pivot_schema_api_stats_pivot_schema_get: {
         parameters: {
             query?: never;
@@ -6240,6 +6336,55 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PublicationsFacetsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    publications_entity_facet_api_publications_facets_entities_get: {
+        parameters: {
+            query: {
+                kind: "publisher" | "journal";
+                entity_search?: string;
+                year?: string;
+                lab_id?: string;
+                doc_type?: string;
+                excluded_doc_type?: string;
+                access?: string;
+                oa_status?: string;
+                source_filter?: string;
+                publisher_id?: number | null;
+                journal_id?: number | null;
+                person_id?: number | null;
+                is_corresponding?: string;
+                has_apc?: string;
+                country?: string;
+                hal_status?: string;
+                in_perimeter?: string;
+                subject_id?: number | null;
+                search?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EntityFacetResponse"];
                 };
             };
             /** @description Validation Error */

@@ -9,6 +9,8 @@ from typing import Literal, Protocol
 
 from pydantic import BaseModel
 
+from application.ports.api.entity_facet import EntityFacetResponse
+
 
 class YearFacet(BaseModel):
     value: int
@@ -101,6 +103,21 @@ class StatsQueries(Protocol):
     ) -> PivotResponse: ...
 
     def available_years(self) -> list[int]: ...
+
+    def stats_entity_facet(
+        self,
+        *,
+        kind: Literal["publisher", "journal"],
+        search: str,
+        apc_structure_ids: list[int],
+        lab_ids: list[int],
+        years: list[int],
+        publisher_ids: list[int],
+        journal_ids: list[int],
+        oa_status: str,
+        has_apc: str,
+        doc_types: list[str],
+    ) -> EntityFacetResponse: ...
 
     def stats_facets(
         self,

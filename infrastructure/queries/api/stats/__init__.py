@@ -8,8 +8,11 @@ Le package est organisé par thème d'agrégat :
 `PgStatsQueries` agrège ces fonctions sous le port `application.ports.stats_queries.StatsQueries`. Les fonctions libres retournent des dicts conformes au shape des DTOs ; la conversion vers Pydantic est faite ici à la sortie, pour garder les fonctions libres réutilisables hors API.
 """
 
+from typing import Literal
+
 from sqlalchemy import Connection
 
+from application.ports.api.entity_facet import EntityFacetItem, EntityFacetResponse
 from application.ports.api.stats_queries import (
     ApcFacet,
     DocTypeFacet,
@@ -24,6 +27,7 @@ from application.ports.api.stats_queries import (
     YearFacet,
 )
 from domain.stats.pivot import DIMENSIONS, MEASURES
+from infrastructure.queries.api.stats.entity_facets import stats_entity_facet as _stats_entity_facet
 from infrastructure.queries.api.stats.pivot import run_pivot as _run_pivot
 from infrastructure.queries.api.stats.summary import (
     available_years as _available_years,
@@ -86,6 +90,35 @@ class PgStatsQueries(StatsQueries):
                 doc_types=doc_types,
             )
         )
+
+    def stats_entity_facet(
+        self,
+        *,
+        kind: Literal["publisher", "journal"],
+        search: str,
+        apc_structure_ids: list[int],
+        lab_ids: list[int],
+        years: list[int],
+        publisher_ids: list[int],
+        journal_ids: list[int],
+        oa_status: str,
+        has_apc: str,
+        doc_types: list[str],
+    ) -> EntityFacetResponse:
+        rows = _stats_entity_facet(
+            self._conn,
+            kind=kind,
+            search=search,
+            apc_structure_ids=apc_structure_ids,
+            lab_ids=lab_ids,
+            years=years,
+            publisher_ids=publisher_ids,
+            journal_ids=journal_ids,
+            oa_status=oa_status,
+            has_apc=has_apc,
+            doc_types=doc_types,
+        )
+        return EntityFacetResponse(entities=[EntityFacetItem(**r) for r in rows])
 
     def stats_facets(
         self,

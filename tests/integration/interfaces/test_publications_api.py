@@ -131,6 +131,19 @@ class TestPublicationsFacets:
         )
         assert r.status_code == 200
 
+    def test_entity_facet_journal(self, client):
+        r = client.get("/api/publications/facets/entities", params={"kind": "journal"})
+        assert r.status_code == 200
+        assert "entities" in r.json()
+
+    def test_entity_facet_publisher_contextual(self, client):
+        # Facette éditeur sous filtres + recherche de nom + corrélation (revue sélectionnée).
+        r = client.get(
+            "/api/publications/facets/entities",
+            params={"kind": "publisher", "entity_search": "els", "year": "2024", "journal_id": "1"},
+        )
+        assert r.status_code == 200
+
 
 class TestPublicationsExports:
     """Exports CSV/JSON — génèrent des réponses non-JSON."""
