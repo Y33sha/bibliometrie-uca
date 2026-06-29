@@ -9,19 +9,29 @@
 * [ ] analyser les diff de payload pour voir si on peut diminuer le nombre d'UPSERT en filtrant les champs importés
 ## Suite du traitement
 * [ ] `publishers_journals`: paralléliser crossref/datacite
+* [ ] CLI `seed_journals_doi_prefix`: intégrer au pipeline?
 * [ ] vérifier qu'il ne manque pas des `ANALYZE` en cours de pipeline pour éviter un *seq scan* sur des millions de lignes lors d'un premier run depuis une base vide.
 * [ ] `persons`: voir si on peut généraliser le matching par identifiants forts aux authorships hors périmètre (à réserver aux identifiants `confirmed` / et/ou corroboration par nom?)
 
 # Données
-* [ ] détection d'incohérences `doi_prefix`/`publisher_id`/`journal_id`: auditer d'abord, classifier les cas de divergence selon leur cause
 * [ ] distinguer conference_paper et conférence
 * [ ] DUMAS: comment distinguer mémoires et thèses d'exercice?
+## Corrections
+* [ ] détection d'incohérences `doi_prefix`/`publisher_id`/`journal_id`: auditer d'abord, classifier les cas de divergence selon leur cause
+* [ ] créer circuit pour correction automatisée du `journal_type` (titre terminé par ` eBooks` => plateforme d'ebooks)
+* [ ] recensions: "Comptes rendus :", "Compte rendu :"; type = article + titre contient "(dir.)"
+* [ ] typage data_paper automatisé par journal (ex. *Scientific Data*; créer un journal_type dédié?); chercher aussi "dataset" dans les titres
+* [ ] règle à créer: si DOI de forme ISBN + _n => conference_paper ou chapitre / si forme ISBN: proceedings ou book (trancher selon type du "journal")
+* [ ] 107270 et 869915 Computing Pivot-Minors: un article faussement typé preprint par openalex; + question des arxiv_id (déduire le DOI et vice-versa)
+* [ ] noms de containers OpenAlex aberrants ("SPIRE - Sciences Po Institutional REpository") => faire quelque chose; de manière générale il faut interroger la pertinence du champ container relativement au journal_id
+* [ ] doc_types souvent suspects, à investiguer: "preprint", "autre" (voir aussi si le type "article" peut être affiné selon des critères objectifs)
 ## Explorer autres sources possibles
 * [ ] Dimensions?; ArXiv, PMC, Pubmed; Sudoc? (liens personnes-thèses plus complets que theses.fr, j'ai l'impression); Cairn, Persée pour augmenter couverture SHS?
 * [ ] OpenAPC: j'ai utilisé les données sur les APC UCA, mais il faudrait partir du dump complet et matcher tous les DOI des publis UCA pour voir quels établissements ont payé les APC quand ce n'est pas l'UCA
 
 # UI
 ## Admin
+* [ ] page logs: paginer
 * [ ] Clarifier la section "périmètres" (grouper affiliation/publications; séparer persons + UI)
 * [ ] fusion / dé-fusion manuelle de publications: circuit à créer (interface de gestion du référentiel de publications, sur le modèle de admin/persons; avec requêtes pour repérer doublons probables et fusions suspectes; supprimer `admin/duplicates`)
 * [ ] signaler visuellement les structures qui ne font partie d'aucun périmètre (pages liste et détail), ajouter filtre périmètre dans la page liste
@@ -49,6 +59,7 @@
 * [ ] 182637 et 182636: vérifier si DataCite indique relation
 * [ ] ignorer pièces d'un dataset? (le parent suffit)
 * [ ] nettoyer les faux NNT (OAI:*)
+* [ ] 133990: NNT non dédupliqué?!
 
 # Idées pour plus tard, éventuellement
 * stats en compte fractionnaire vs compte entier
