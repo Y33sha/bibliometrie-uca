@@ -21,7 +21,6 @@ class CorrectionUpdate(NamedTuple):
 
     id: int
     doc_type: str | None
-    journal_id: int | None
     oa_status: str | None
     external_ids: dict[str, JsonValue]
     raw_metadata: dict[str, JsonValue]

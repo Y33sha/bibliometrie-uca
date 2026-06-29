@@ -145,7 +145,6 @@ def persist_corrections(conn: Connection, updates: list[CorrectionUpdate]) -> in
     stmt = text("""
         UPDATE source_publications
         SET doc_type = :doc_type,
-            journal_id = :journal_id,
             oa_status = :oa_status,
             external_ids = :external_ids,
             raw_metadata = :raw_metadata,
