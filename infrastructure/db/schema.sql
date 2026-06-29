@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict WiVReXdQuwPJEGSSSPxbClZlkEkTlMY4NDSUOmWOF4hw433xAswHXO94J3mtxxa
+\restrict oRh6t9VLzRpINWSTYijVFbAA0DPpMPeUHBbS2CFUIk532h0U237648N7FrOrgDB
 
--- Dumped from database version 18.4
--- Dumped by pg_dump version 18.4
+-- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg22.04+1)
+-- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg22.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -2754,7 +2754,7 @@ CREATE INDEX idx_sa_authorship ON public.source_authorships USING btree (authors
 -- Name: idx_sa_countries_dirty; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_sa_countries_dirty ON public.source_authorships USING btree (source) WHERE countries_dirty;
+CREATE INDEX idx_sa_countries_dirty ON public.source_authorships USING btree (source_publication_id) WHERE countries_dirty;
 
 
 --
@@ -3207,7 +3207,7 @@ ALTER TABLE ONLY public.publication_relations
 --
 
 ALTER TABLE ONLY public.publication_relations
-    ADD CONSTRAINT publication_relations_target_publication_id_fkey FOREIGN KEY (target_publication_id) REFERENCES public.publications(id) ON DELETE SET NULL;
+    ADD CONSTRAINT publication_relations_target_publication_id_fkey FOREIGN KEY (target_publication_id) REFERENCES public.publications(id) ON DELETE CASCADE;
 
 
 --
@@ -3358,5 +3358,5 @@ ALTER TABLE ONLY public.structure_relations
 -- PostgreSQL database dump complete
 --
 
-\unrestrict WiVReXdQuwPJEGSSSPxbClZlkEkTlMY4NDSUOmWOF4hw433xAswHXO94J3mtxxa
+\unrestrict oRh6t9VLzRpINWSTYijVFbAA0DPpMPeUHBbS2CFUIk532h0U237648N7FrOrgDB
 

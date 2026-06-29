@@ -3,8 +3,8 @@
 --
 
 
--- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg22.04+1)
--- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg22.04+1)
+-- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg22.04+1)
+-- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg22.04+1)
 
 -- Les SET de session pg_dump (statement_timeout, search_path vide, etc.)
 -- sont volontairement retirés ici : ils interfèrent avec Alembic, qui
@@ -68,7 +68,18 @@ CREATE TYPE public.doc_type AS ENUM (
     'retraction',
     'book_review',
     'data_paper',
-    'proceedings'
+    'proceedings',
+    'media'
+);
+
+
+--
+-- Name: identifier_origin; Type: TYPE; Schema: public; Owner: -
+--
+
+CREATE TYPE public.identifier_origin AS ENUM (
+    'manual',
+    'auto'
 );
 
 
@@ -84,6 +95,22 @@ CREATE TYPE public.identifier_status AS ENUM (
 
 
 --
+-- Name: journal_type; Type: TYPE; Schema: public; Owner: -
+--
+
+CREATE TYPE public.journal_type AS ENUM (
+    'journal',
+    'proceedings',
+    'repository',
+    'book_series',
+    'preprint_server',
+    'media',
+    'ebook_platform',
+    'unknown'
+);
+
+
+--
 -- Name: oa_type; Type: TYPE; Schema: public; Owner: -
 --
 
@@ -94,7 +121,47 @@ CREATE TYPE public.oa_type AS ENUM (
     'green',
     'closed',
     'unknown',
-    'diamond'
+    'diamond',
+    'embargoed'
+);
+
+
+--
+-- Name: publisher_type; Type: TYPE; Schema: public; Owner: -
+--
+
+CREATE TYPE public.publisher_type AS ENUM (
+    'commercial',
+    'learned_society',
+    'academic_institution',
+    'repository',
+    'aggregator',
+    'unknown'
+);
+
+
+--
+-- Name: relation_type; Type: TYPE; Schema: public; Owner: -
+--
+
+CREATE TYPE public.relation_type AS ENUM (
+    'is_preprint_of',
+    'has_preprint',
+    'is_supplement_to',
+    'has_supplement',
+    'is_part_of',
+    'has_part',
+    'is_correction_of',
+    'has_correction',
+    'is_retraction_of',
+    'has_retraction',
+    'is_concern_about',
+    'has_concern',
+    'is_translation_of',
+    'has_translation',
+    'describes',
+    'is_described_by',
+    'is_related_to'
 );
 
 
@@ -108,7 +175,8 @@ CREATE TYPE public.source_type AS ENUM (
     'wos',
     'scanr',
     'theses',
-    'crossref'
+    'crossref',
+    'datacite'
 );
 
 
@@ -118,7 +186,6 @@ CREATE TYPE public.source_type AS ENUM (
 
 CREATE TYPE public.structure_type AS ENUM (
     'universite',
-    '__epst_deprecated',
     'chu',
     'ecole',
     'labo',
@@ -133,18 +200,63 @@ CREATE TYPE public.structure_type AS ENUM (
 -- Name: normalize_name_form(text); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.normalize_name_form(text) RETURNS text
-    LANGUAGE sql IMMUTABLE
+CREATE FUNCTION public.normalize_name_form(input text) RETURNS text
+    LANGUAGE plpgsql IMMUTABLE
     SET search_path TO 'public', 'pg_temp'
-    AS $_$
-  SELECT trim(regexp_replace(
-    unaccent(lower(trim(
-      translate($1,
-        E'\u2010\u2011\u2012\u2013\u2014\u2015\u00AD\u2018\u2019\u201A\u2032\u201C\u201D',
-        E'---------\x27\x27\x27\x27""')
-    ))),
-    '[^a-z0-9]+', ' ', 'g'));
-$_$;
+    AS $$
+DECLARE
+    s text := input;
+BEGIN
+    IF s IS NULL THEN
+        RETURN NULL;
+    END IF;
+
+    -- Retrait des balises MathML/HTML (<i>, <sub>, <mml:*> …) en entier.
+    -- Premier caractère = lettre ou '/' : préserve les indices de Miller
+    -- <111>/<110> (cristallographie), qui sont du contenu, pas du markup.
+    s := regexp_replace(s, '</?[A-Za-z][^>]*>', ' ', 'g');
+
+    -- I turc avec point : PG lower()+unaccent le perd ("İstanbul" → "stanbul").
+    s := replace(s, E'İ', 'i');
+
+    -- Fractions vulgaires → chiffres espacés (comme "1/4" tapé à la main).
+    s := replace(s, E'¼', '1 4');
+    s := replace(s, E'½', '1 2');
+    s := replace(s, E'¾', '3 4');
+    s := replace(s, E'⅐', '1 7');
+    s := replace(s, E'⅑', '1 9');
+    s := replace(s, E'⅒', '1 10');
+    s := replace(s, E'⅓', '1 3');
+    s := replace(s, E'⅔', '2 3');
+    s := replace(s, E'⅕', '1 5');
+    s := replace(s, E'⅖', '2 5');
+    s := replace(s, E'⅗', '3 5');
+    s := replace(s, E'⅘', '4 5');
+    s := replace(s, E'⅙', '1 6');
+    s := replace(s, E'⅚', '5 6');
+    s := replace(s, E'⅛', '1 8');
+    s := replace(s, E'⅜', '3 8');
+    s := replace(s, E'⅝', '5 8');
+    s := replace(s, E'⅞', '7 8');
+
+    s := translate(s,
+        E'‐‑‒–—―­‘’‚′“”',
+        E'-------\x27\x27\x27\x27""'
+    );
+
+    -- Chiffres exposants/indices → chiffres ASCII (attachés). L'exposant moins
+    -- `⁻` n'est plus listé : il tombe dans le passage [^a-z0-9] → espace.
+    s := translate(s,
+        E'⁰¹²³⁴⁵⁶⁷⁸⁹₀₁₂₃₄₅₆₇₈₉',
+        '01234567890123456789'
+    );
+
+    RETURN trim(regexp_replace(
+        unaccent(lower(trim(s))),
+        '[^a-z0-9]+', ' ', 'g'
+    ));
+END;
+$$;
 
 
 SET default_tablespace = '';
@@ -191,12 +303,12 @@ ALTER SEQUENCE public.address_structures_id_seq OWNED BY public.address_structur
 CREATE TABLE public.addresses (
     id integer NOT NULL,
     raw_text text NOT NULL,
-    normalized_text text CONSTRAINT addresses_raw_text_normalized_not_null NOT NULL,
+    normalized_text text NOT NULL,
     created_at timestamp with time zone DEFAULT now(),
     pub_count integer DEFAULT 0,
     countries character(2)[],
     suggested_countries character(2)[],
-    resolved_at timestamp with time zone
+    countries_dirty boolean DEFAULT false NOT NULL
 );
 
 
@@ -218,6 +330,8 @@ CREATE SEQUENCE public.addresses_id_seq
 --
 
 ALTER SEQUENCE public.addresses_id_seq OWNED BY public.addresses.id;
+
+
 
 
 --
@@ -352,6 +466,107 @@ ALTER SEQUENCE public.audit_log_id_seq OWNED BY public.audit_log.id;
 
 
 --
+-- Name: config; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.config (
+    key text NOT NULL,
+    value jsonb NOT NULL,
+    description text,
+    created_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: perimeter_structures; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.perimeter_structures (
+    perimeter_id integer NOT NULL,
+    structure_id integer NOT NULL
+);
+
+
+--
+-- Name: perimeters; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.perimeters (
+    id integer NOT NULL,
+    code text NOT NULL,
+    name text NOT NULL,
+    description text,
+    created_at timestamp with time zone DEFAULT now(),
+    structure_ids integer[] DEFAULT '{}'::integer[] NOT NULL
+);
+
+
+--
+-- Name: source_authorship_addresses; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.source_authorship_addresses (
+    id integer NOT NULL,
+    source_authorship_id integer NOT NULL,
+    address_id integer NOT NULL
+);
+
+
+--
+-- Name: source_authorship_structures; Type: MATERIALIZED VIEW; Schema: public; Owner: -
+--
+
+CREATE MATERIALIZED VIEW public.source_authorship_structures AS
+ SELECT DISTINCT saa.source_authorship_id,
+    ps.structure_id
+   FROM ((public.source_authorship_addresses saa
+     JOIN public.address_structures ast ON ((ast.address_id = saa.address_id)))
+     JOIN public.perimeter_structures ps ON ((ps.structure_id = ast.structure_id)))
+  WHERE ((ast.is_confirmed IS DISTINCT FROM false) AND (ps.perimeter_id = ( SELECT perimeters.id
+           FROM public.perimeters
+          WHERE (perimeters.code = ( SELECT (config.value #>> '{}'::text[])
+                   FROM public.config
+                  WHERE (config.key = 'perimeter_affiliations'::text))))))
+  WITH NO DATA;
+
+
+--
+-- Name: source_authorships; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.source_authorships (
+    id integer NOT NULL,
+    source public.source_type NOT NULL,
+    source_publication_id integer NOT NULL,
+    author_position smallint,
+    in_perimeter boolean DEFAULT false,
+    countries text[],
+    person_id integer,
+    author_name_normalized text,
+    is_corresponding boolean DEFAULT false,
+    roles text[] DEFAULT ARRAY['author'::text],
+    authorship_id integer,
+    raw_author_name text,
+    person_identifiers jsonb,
+    created_at timestamp with time zone DEFAULT now(),
+    countries_dirty boolean DEFAULT true NOT NULL
+);
+
+
+--
+-- Name: authorship_structures; Type: MATERIALIZED VIEW; Schema: public; Owner: -
+--
+
+CREATE MATERIALIZED VIEW public.authorship_structures AS
+ SELECT DISTINCT sa.authorship_id,
+    sas.structure_id
+   FROM (public.source_authorship_structures sas
+     JOIN public.source_authorships sa ON ((sa.id = sas.source_authorship_id)))
+  WHERE (sa.authorship_id IS NOT NULL)
+  WITH NO DATA;
+
+
+--
 -- Name: authorships; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -361,12 +576,7 @@ CREATE TABLE public.authorships (
     person_id integer,
     author_position smallint,
     in_perimeter boolean DEFAULT false,
-    source_manual boolean DEFAULT false,
-    excluded boolean DEFAULT false,
-    notes text,
     created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now(),
-    structure_ids integer[],
     is_corresponding boolean,
     roles text[]
 );
@@ -393,15 +603,115 @@ ALTER SEQUENCE public.authorships_id_seq OWNED BY public.authorships.id;
 
 
 --
--- Name: config; Type: TABLE; Schema: public; Owner: -
+-- Name: publication_relations; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.config (
-    key text NOT NULL,
-    value jsonb NOT NULL,
-    description text,
-    updated_at timestamp with time zone DEFAULT now()
+CREATE TABLE public.publication_relations (
+    from_publication_id integer NOT NULL,
+    relation_type public.relation_type NOT NULL,
+    target_doi text,
+    target_publication_id integer,
+    source text NOT NULL,
+    id bigint NOT NULL,
+    CONSTRAINT publication_relations_target_present CHECK (((target_publication_id IS NOT NULL) OR (target_doi IS NOT NULL)))
 );
+
+
+--
+-- Name: source_publications; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.source_publications (
+    id integer NOT NULL,
+    source public.source_type NOT NULL,
+    source_id text NOT NULL,
+    doi text,
+    title text NOT NULL,
+    pub_year smallint,
+    doc_type text,
+    publication_id integer,
+    staging_id integer,
+    created_at timestamp with time zone DEFAULT now(),
+    countries text[],
+    hal_collections text[],
+    external_ids jsonb DEFAULT '{}'::jsonb NOT NULL,
+    urls text[],
+    cited_by_count integer,
+    journal_id integer,
+    oa_status text,
+    language text,
+    container_title text,
+    is_retracted boolean,
+    abstract text,
+    keywords text[],
+    topics jsonb,
+    biblio jsonb,
+    meta jsonb,
+    updated_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
+    raw_metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    title_normalized text,
+    keys_dirty boolean DEFAULT true NOT NULL,
+    embargo_until date,
+    CONSTRAINT source_publications_external_ids_is_object CHECK ((jsonb_typeof(external_ids) = 'object'::text)),
+    CONSTRAINT source_publications_raw_metadata_is_object CHECK ((jsonb_typeof(raw_metadata) = 'object'::text))
+);
+
+
+--
+-- Name: staging; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.staging (
+    id integer NOT NULL,
+    source public.source_type NOT NULL,
+    source_id text NOT NULL,
+    doi text,
+    raw_data jsonb NOT NULL,
+    processed boolean DEFAULT false,
+    imported_at timestamp with time zone DEFAULT now(),
+    raw_hash text,
+    last_seen_at timestamp with time zone DEFAULT now(),
+    not_found_at timestamp with time zone,
+    disappeared_at timestamp with time zone,
+    authors_truncated boolean DEFAULT false NOT NULL,
+    entry_mode text DEFAULT 'bulk'::text NOT NULL,
+    CONSTRAINT staging_entry_mode_check CHECK ((entry_mode = ANY (ARRAY['bulk'::text, 'cross_import_doi'::text, 'cross_import_hal'::text]))),
+    CONSTRAINT staging_not_found_at_implies_processed CHECK (((not_found_at IS NULL) OR processed))
+);
+
+
+--
+-- Name: COLUMN staging.raw_hash; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.staging.raw_hash IS 'Empreinte md5 du payload tel qu''extrait de la source bulk. Sert de clé de détection de changement à l''UPSERT (et d''empreinte d''intégrité pour le chantier DATA_raw-data-store). Cas particulier OpenAlex : `refetch_truncated` n''écrit PAS `raw_hash` quand il complète les authorships d''une publication tronquée à 100 — la ligne garde le hash du payload bulk pour que le bulk suivant ne déclenche pas de réécriture inutile. L''invariant `raw_hash = md5(raw_data)` est donc volontairement rompu sur les lignes OpenAlex refetchées.';
+
+
+--
+-- Name: candidate_dois; Type: VIEW; Schema: public; Owner: -
+--
+
+CREATE VIEW public.candidate_dois AS
+ SELECT s.doi,
+    s.source
+   FROM public.staging s
+  WHERE (s.doi IS NOT NULL)
+UNION
+ SELECT d.value AS doi,
+    sp.source
+   FROM (public.source_publications sp
+     CROSS JOIN LATERAL jsonb_array_elements_text((sp.external_ids -> 'related_dois'::text)) d(value))
+  WHERE (jsonb_typeof((sp.external_ids -> 'related_dois'::text)) = 'array'::text)
+UNION
+ SELECT pr.target_doi AS doi,
+    NULL::public.source_type AS source
+   FROM public.publication_relations pr
+  WHERE (pr.target_doi IS NOT NULL)
+UNION
+ SELECT ('10.48550/arxiv.'::text || lower((sp.external_ids ->> 'arxiv_id'::text))) AS doi,
+    sp.source
+   FROM public.source_publications sp
+  WHERE ((sp.external_ids ->> 'arxiv_id'::text) IS NOT NULL);
 
 
 --
@@ -412,38 +722,6 @@ CREATE TABLE public.countries (
     code character(2) NOT NULL,
     name text NOT NULL
 );
-
-
---
--- Name: country_name_forms; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.country_name_forms (
-    id integer NOT NULL,
-    iso_code text NOT NULL,
-    form_normalized text NOT NULL,
-    created_at timestamp with time zone DEFAULT now()
-);
-
-
---
--- Name: country_name_forms_id_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE public.country_name_forms_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: country_name_forms_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
---
-
-ALTER SEQUENCE public.country_name_forms_id_seq OWNED BY public.country_name_forms.id;
 
 
 --
@@ -513,6 +791,37 @@ ALTER SEQUENCE public.distinct_publications_id_seq OWNED BY public.distinct_publ
 
 
 --
+-- Name: doi_lookups; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.doi_lookups (
+    source public.source_type NOT NULL,
+    doi text NOT NULL,
+    not_found_at timestamp with time zone NOT NULL,
+    next_retry timestamp with time zone NOT NULL
+);
+
+
+--
+-- Name: doi_prefixes; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.doi_prefixes (
+    prefix text NOT NULL,
+    ra text NOT NULL,
+    publisher_id integer,
+    publisher_name_raw text,
+    publisher_name_normalized text,
+    crossref_member_id integer,
+    fetched_at timestamp with time zone DEFAULT now() NOT NULL,
+    client_name_raw text,
+    client_name_normalized text,
+    datacite_client_symbol text,
+    publisher_checked_at timestamp with time zone
+);
+
+
+--
 -- Name: journal_name_forms; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -563,12 +872,13 @@ CREATE TABLE public.journals (
     apc_amount numeric(10,2),
     apc_currency text DEFAULT 'EUR'::text,
     oa_model text,
-    notes text,
     created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now(),
-    journal_type text DEFAULT 'journal'::text,
+    journal_type public.journal_type DEFAULT 'unknown'::public.journal_type,
     is_academic boolean DEFAULT true,
-    doi_prefix text
+    doi_prefix text,
+    doaj_payload jsonb,
+    doaj_imported_at timestamp with time zone,
+    pub_count integer DEFAULT 0 NOT NULL
 );
 
 
@@ -593,20 +903,6 @@ ALTER SEQUENCE public.journals_id_seq OWNED BY public.journals.id;
 
 
 --
--- Name: perimeters; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.perimeters (
-    id integer NOT NULL,
-    code text NOT NULL,
-    name text NOT NULL,
-    description text,
-    created_at timestamp with time zone DEFAULT now(),
-    structure_ids integer[] DEFAULT '{}'::integer[] NOT NULL
-);
-
-
---
 -- Name: perimeters_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
@@ -627,6 +923,20 @@ ALTER SEQUENCE public.perimeters_id_seq OWNED BY public.perimeters.id;
 
 
 --
+-- Name: person_identifier_keys; Type: MATERIALIZED VIEW; Schema: public; Owner: -
+--
+
+CREATE MATERIALIZED VIEW public.person_identifier_keys AS
+ SELECT DISTINCT sa.person_id,
+    k.k AS id_type,
+    (sa.person_identifiers ->> k.k) AS id_value
+   FROM (public.source_authorships sa
+     CROSS JOIN unnest(ARRAY['orcid'::text, 'idref'::text, 'hal_person_id'::text, 'idhal'::text]) k(k))
+  WHERE ((sa.person_id IS NOT NULL) AND (sa.person_identifiers ? k.k) AND ((sa.person_identifiers ->> k.k) !~~ '%_dubious'::text))
+  WITH NO DATA;
+
+
+--
 -- Name: person_identifiers; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -635,7 +945,7 @@ CREATE TABLE public.person_identifiers (
     person_id integer NOT NULL,
     id_type text NOT NULL,
     id_value text NOT NULL,
-    source text,
+    source public.identifier_origin NOT NULL,
     created_at timestamp with time zone DEFAULT now(),
     status public.identifier_status DEFAULT 'pending'::public.identifier_status NOT NULL
 );
@@ -666,33 +976,12 @@ ALTER SEQUENCE public.person_identifiers_id_seq OWNED BY public.person_identifie
 --
 
 CREATE TABLE public.person_name_forms (
-    id integer NOT NULL,
     name_form text NOT NULL,
-    person_ids integer[] NOT NULL,
+    person_id integer NOT NULL,
+    sources text[] DEFAULT '{}'::text[] NOT NULL,
     created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now(),
-    sources text[]
+    status public.identifier_status DEFAULT 'pending'::public.identifier_status NOT NULL
 );
-
-
---
--- Name: person_name_forms_id_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE public.person_name_forms_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: person_name_forms_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
---
-
-ALTER SEQUENCE public.person_name_forms_id_seq OWNED BY public.person_name_forms.id;
 
 
 --
@@ -706,7 +995,6 @@ CREATE TABLE public.persons (
     last_name_normalized text NOT NULL,
     first_name_normalized text NOT NULL,
     created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now(),
     rejected boolean DEFAULT false
 );
 
@@ -745,8 +1033,7 @@ CREATE TABLE public.persons_rh (
     start_date date,
     end_date date,
     hr_export_date date,
-    created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now()
+    created_at timestamp with time zone DEFAULT now()
 );
 
 
@@ -771,6 +1058,144 @@ ALTER SEQUENCE public.persons_rh_id_seq OWNED BY public.persons_rh.id;
 
 
 --
+-- Name: pipeline_phase_executions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.pipeline_phase_executions (
+    id bigint NOT NULL,
+    run_id bigint NOT NULL,
+    phase text NOT NULL,
+    started_at timestamp with time zone NOT NULL,
+    ended_at timestamp with time zone NOT NULL,
+    mode text NOT NULL,
+    sources text[] DEFAULT '{}'::text[] NOT NULL,
+    status text NOT NULL,
+    signals jsonb DEFAULT '[]'::jsonb NOT NULL,
+    metrics jsonb DEFAULT '{}'::jsonb NOT NULL,
+    details jsonb DEFAULT '{}'::jsonb NOT NULL,
+    CONSTRAINT pipeline_phase_executions_status_check CHECK ((status = ANY (ARRAY['ok'::text, 'warning'::text, 'error'::text])))
+);
+
+
+--
+-- Name: pipeline_phase_executions_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.pipeline_phase_executions ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME public.pipeline_phase_executions_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: pipeline_run_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.pipeline_run_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: pipeline_run_snapshots; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.pipeline_run_snapshots (
+    id integer CONSTRAINT pipeline_check_snapshots_id_not_null NOT NULL,
+    ran_at timestamp with time zone DEFAULT now() CONSTRAINT pipeline_check_snapshots_ran_at_not_null NOT NULL,
+    mode text CONSTRAINT pipeline_check_snapshots_mode_not_null NOT NULL,
+    payload jsonb CONSTRAINT pipeline_check_snapshots_payload_not_null NOT NULL
+);
+
+
+--
+-- Name: pipeline_run_snapshots_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.pipeline_run_snapshots_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: pipeline_run_snapshots_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.pipeline_run_snapshots_id_seq OWNED BY public.pipeline_run_snapshots.id;
+
+
+--
+-- Name: place_name_forms; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.place_name_forms (
+    id integer CONSTRAINT country_name_forms_id_not_null NOT NULL,
+    iso_code text CONSTRAINT country_name_forms_iso_code_not_null NOT NULL,
+    form_normalized text CONSTRAINT country_name_forms_form_normalized_not_null NOT NULL,
+    created_at timestamp with time zone DEFAULT now(),
+    kind text DEFAULT 'country'::text NOT NULL,
+    CONSTRAINT place_name_forms_kind_check CHECK ((kind = ANY (ARRAY['country'::text, 'institution'::text, 'city'::text])))
+);
+
+
+--
+-- Name: place_name_forms_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.place_name_forms_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: place_name_forms_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.place_name_forms_id_seq OWNED BY public.place_name_forms.id;
+
+
+--
+-- Name: publication_relations_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.publication_relations ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME public.publication_relations_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: publication_structures; Type: MATERIALIZED VIEW; Schema: public; Owner: -
+--
+
+CREATE MATERIALIZED VIEW public.publication_structures AS
+ SELECT DISTINCT a.publication_id,
+    aus.structure_id
+   FROM (public.authorships a
+     JOIN public.authorship_structures aus ON ((aus.authorship_id = a.id)))
+  WITH NO DATA;
+
+
+--
 -- Name: publication_subjects; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -779,7 +1204,8 @@ CREATE TABLE public.publication_subjects (
     subject_id integer NOT NULL,
     source public.source_type NOT NULL,
     score real,
-    created_at timestamp with time zone DEFAULT now()
+    created_at timestamp with time zone DEFAULT now(),
+    rejected boolean DEFAULT false NOT NULL
 );
 
 
@@ -798,13 +1224,23 @@ CREATE TABLE public.publications (
     journal_id integer,
     container_title text,
     language text,
-    notes text,
     created_at timestamp with time zone DEFAULT now(),
     updated_at timestamp with time zone DEFAULT now(),
     countries text[],
     sources public.source_type[] DEFAULT '{}'::public.source_type[] NOT NULL,
     meta jsonb,
     is_retracted boolean DEFAULT false NOT NULL,
+    in_perimeter boolean DEFAULT false NOT NULL,
+    unpaywall_checked_at timestamp with time zone
+);
+
+
+--
+-- Name: publications_detail; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.publications_detail (
+    publication_id integer NOT NULL,
     abstract text,
     keywords text[],
     topics jsonb,
@@ -875,10 +1311,10 @@ CREATE TABLE public.publishers (
     openalex_id text,
     country text,
     is_predatory boolean DEFAULT false,
-    notes text,
     created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now(),
-    doi_prefix text
+    publisher_type public.publisher_type DEFAULT 'unknown'::public.publisher_type NOT NULL,
+    ror text,
+    pub_count integer DEFAULT 0 NOT NULL
 );
 
 
@@ -903,23 +1339,13 @@ ALTER SEQUENCE public.publishers_id_seq OWNED BY public.publishers.id;
 
 
 --
--- Name: schema_migrations; Type: TABLE; Schema: public; Owner: -
+-- Name: rejected_authorships; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.schema_migrations (
-    version text NOT NULL,
-    applied_at timestamp with time zone DEFAULT now()
-);
-
-
---
--- Name: source_authorship_addresses; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.source_authorship_addresses (
-    id integer NOT NULL,
-    source_authorship_id integer NOT NULL,
-    address_id integer NOT NULL
+CREATE TABLE public.rejected_authorships (
+    publication_id integer NOT NULL,
+    person_id integer NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -944,32 +1370,6 @@ ALTER SEQUENCE public.source_authorship_addresses_id_seq OWNED BY public.source_
 
 
 --
--- Name: source_authorships; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.source_authorships (
-    id integer NOT NULL,
-    source text NOT NULL,
-    source_publication_id integer NOT NULL,
-    source_person_id integer,
-    author_position smallint,
-    in_perimeter boolean DEFAULT false,
-    excluded boolean DEFAULT false,
-    structure_ids integer[],
-    source_struct_ids integer[],
-    countries text[],
-    person_id integer,
-    author_name_normalized text,
-    is_corresponding boolean DEFAULT false,
-    roles text[] DEFAULT ARRAY['author'::text],
-    source_data jsonb,
-    authorship_id integer,
-    raw_author_name text,
-    identifiers jsonb
-);
-
-
---
 -- Name: source_authorships_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
@@ -990,76 +1390,6 @@ ALTER SEQUENCE public.source_authorships_id_seq OWNED BY public.source_authorshi
 
 
 --
--- Name: source_persons; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.source_persons (
-    id integer NOT NULL,
-    source text NOT NULL,
-    source_id text NOT NULL,
-    full_name text NOT NULL,
-    orcid text,
-    idref text,
-    person_id integer,
-    source_ids jsonb,
-    created_at timestamp with time zone DEFAULT now()
-);
-
-
---
--- Name: source_persons_id_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE public.source_persons_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: source_persons_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
---
-
-ALTER SEQUENCE public.source_persons_id_seq OWNED BY public.source_persons.id;
-
-
---
--- Name: source_publications; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.source_publications (
-    id integer NOT NULL,
-    source text NOT NULL,
-    source_id text NOT NULL,
-    doi text,
-    title text NOT NULL,
-    pub_year smallint,
-    doc_type text,
-    publication_id integer,
-    staging_id integer,
-    created_at timestamp with time zone DEFAULT now(),
-    countries text[],
-    hal_collections text[],
-    external_ids jsonb,
-    urls text[],
-    cited_by_count integer,
-    journal_id integer,
-    oa_status text,
-    language text,
-    container_title text,
-    is_retracted boolean,
-    abstract text,
-    keywords text[],
-    topics jsonb,
-    biblio jsonb,
-    meta jsonb
-);
-
-
---
 -- Name: source_publications_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
@@ -1077,63 +1407,6 @@ CREATE SEQUENCE public.source_publications_id_seq
 --
 
 ALTER SEQUENCE public.source_publications_id_seq OWNED BY public.source_publications.id;
-
-
---
--- Name: source_structures; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.source_structures (
-    id integer NOT NULL,
-    source text NOT NULL,
-    source_id text NOT NULL,
-    name text NOT NULL,
-    country text,
-    ror_id text,
-    structure_id integer,
-    source_data jsonb,
-    created_at timestamp with time zone DEFAULT now()
-);
-
-
---
--- Name: source_structures_id_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE public.source_structures_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: source_structures_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
---
-
-ALTER SEQUENCE public.source_structures_id_seq OWNED BY public.source_structures.id;
-
-
---
--- Name: staging; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.staging (
-    id integer NOT NULL,
-    source text NOT NULL,
-    source_id text NOT NULL,
-    doi text,
-    raw_data jsonb NOT NULL,
-    processed boolean DEFAULT false,
-    imported_at timestamp with time zone DEFAULT now(),
-    raw_hash text,
-    last_seen_at timestamp with time zone DEFAULT now(),
-    meta_hash text,
-    not_found boolean DEFAULT false,
-    hal_collections text[]
-);
 
 
 --
@@ -1161,9 +1434,9 @@ ALTER SEQUENCE public.staging_id_seq OWNED BY public.staging.id;
 --
 
 CREATE TABLE public.structure_name_forms (
-    id integer CONSTRAINT name_forms_id_not_null NOT NULL,
-    structure_id integer CONSTRAINT name_forms_structure_id_not_null NOT NULL,
-    form_text text CONSTRAINT name_forms_form_text_not_null NOT NULL,
+    id integer NOT NULL,
+    structure_id integer NOT NULL,
+    form_text text NOT NULL,
     created_at timestamp with time zone DEFAULT now(),
     is_word_boundary boolean DEFAULT false NOT NULL,
     requires_context_of integer[],
@@ -1199,7 +1472,9 @@ CREATE TABLE public.structure_relations (
     id integer NOT NULL,
     parent_id integer NOT NULL,
     child_id integer NOT NULL,
-    relation_type text NOT NULL
+    relation_type text NOT NULL,
+    created_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT structure_relations_no_self_reference CHECK ((parent_id <> child_id))
 );
 
 
@@ -1262,15 +1537,19 @@ ALTER SEQUENCE public.structures_id_seq OWNED BY public.structures.id;
 
 
 --
--- Name: subject_cooccurrences; Type: TABLE; Schema: public; Owner: -
+-- Name: subject_cooccurrences; Type: MATERIALIZED VIEW; Schema: public; Owner: -
 --
 
-CREATE TABLE public.subject_cooccurrences (
-    subject_a_id integer NOT NULL,
-    subject_b_id integer NOT NULL,
-    count integer NOT NULL,
-    CONSTRAINT subject_cooccurrences_ordered CHECK ((subject_a_id < subject_b_id))
-);
+CREATE MATERIALIZED VIEW public.subject_cooccurrences AS
+ SELECT ps1.subject_id AS subject_a_id,
+    ps2.subject_id AS subject_b_id,
+    (count(DISTINCT ps1.publication_id))::integer AS count
+   FROM (public.publication_subjects ps1
+     JOIN public.publication_subjects ps2 ON (((ps1.publication_id = ps2.publication_id) AND (ps1.subject_id < ps2.subject_id))))
+  WHERE ((NOT ps1.rejected) AND (NOT ps2.rejected))
+  GROUP BY ps1.subject_id, ps2.subject_id
+ HAVING (count(DISTINCT ps1.publication_id) >= 2)
+  WITH NO DATA;
 
 
 --
@@ -1308,16 +1587,6 @@ ALTER SEQUENCE public.subjects_id_seq OWNED BY public.subjects.id;
 
 
 --
--- Name: v_active_publications; Type: VIEW; Schema: public; Owner: -
---
-
-CREATE VIEW public.v_active_publications AS
- SELECT id
-   FROM public.publications
-  WHERE (doc_type <> ALL (ARRAY['peer_review'::public.doc_type, 'memoir'::public.doc_type]));
-
-
---
 -- Name: address_structures id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -1350,13 +1619,6 @@ ALTER TABLE ONLY public.audit_log ALTER COLUMN id SET DEFAULT nextval('public.au
 --
 
 ALTER TABLE ONLY public.authorships ALTER COLUMN id SET DEFAULT nextval('public.authorships_id_seq'::regclass);
-
-
---
--- Name: country_name_forms id; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.country_name_forms ALTER COLUMN id SET DEFAULT nextval('public.country_name_forms_id_seq'::regclass);
 
 
 --
@@ -1402,13 +1664,6 @@ ALTER TABLE ONLY public.person_identifiers ALTER COLUMN id SET DEFAULT nextval('
 
 
 --
--- Name: person_name_forms id; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.person_name_forms ALTER COLUMN id SET DEFAULT nextval('public.person_name_forms_id_seq'::regclass);
-
-
---
 -- Name: persons id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -1420,6 +1675,20 @@ ALTER TABLE ONLY public.persons ALTER COLUMN id SET DEFAULT nextval('public.pers
 --
 
 ALTER TABLE ONLY public.persons_rh ALTER COLUMN id SET DEFAULT nextval('public.persons_rh_id_seq'::regclass);
+
+
+--
+-- Name: pipeline_run_snapshots id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.pipeline_run_snapshots ALTER COLUMN id SET DEFAULT nextval('public.pipeline_run_snapshots_id_seq'::regclass);
+
+
+--
+-- Name: place_name_forms id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.place_name_forms ALTER COLUMN id SET DEFAULT nextval('public.place_name_forms_id_seq'::regclass);
 
 
 --
@@ -1458,24 +1727,10 @@ ALTER TABLE ONLY public.source_authorships ALTER COLUMN id SET DEFAULT nextval('
 
 
 --
--- Name: source_persons id; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.source_persons ALTER COLUMN id SET DEFAULT nextval('public.source_persons_id_seq'::regclass);
-
-
---
 -- Name: source_publications id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.source_publications ALTER COLUMN id SET DEFAULT nextval('public.source_publications_id_seq'::regclass);
-
-
---
--- Name: source_structures id; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.source_structures ALTER COLUMN id SET DEFAULT nextval('public.source_structures_id_seq'::regclass);
 
 
 --
@@ -1537,6 +1792,8 @@ ALTER TABLE ONLY public.addresses
     ADD CONSTRAINT addresses_pkey PRIMARY KEY (id);
 
 
+
+
 --
 -- Name: apc_payments apc_payments_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
@@ -1586,22 +1843,6 @@ ALTER TABLE ONLY public.countries
 
 
 --
--- Name: country_name_forms country_name_forms_form_normalized_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.country_name_forms
-    ADD CONSTRAINT country_name_forms_form_normalized_key UNIQUE (form_normalized);
-
-
---
--- Name: country_name_forms country_name_forms_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.country_name_forms
-    ADD CONSTRAINT country_name_forms_pkey PRIMARY KEY (id);
-
-
---
 -- Name: distinct_persons distinct_persons_person_id_a_person_id_b_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1634,6 +1875,22 @@ ALTER TABLE ONLY public.distinct_publications
 
 
 --
+-- Name: doi_lookups doi_lookups_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.doi_lookups
+    ADD CONSTRAINT doi_lookups_pkey PRIMARY KEY (source, doi);
+
+
+--
+-- Name: doi_prefixes doi_prefixes_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.doi_prefixes
+    ADD CONSTRAINT doi_prefixes_pkey PRIMARY KEY (prefix);
+
+
+--
 -- Name: journal_name_forms journal_name_forms_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1658,11 +1915,11 @@ ALTER TABLE ONLY public.journals
 
 
 --
--- Name: structure_name_forms name_forms_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: perimeter_structures perimeter_structures_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.structure_name_forms
-    ADD CONSTRAINT name_forms_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.perimeter_structures
+    ADD CONSTRAINT perimeter_structures_pkey PRIMARY KEY (perimeter_id, structure_id);
 
 
 --
@@ -1698,19 +1955,11 @@ ALTER TABLE ONLY public.person_identifiers
 
 
 --
--- Name: person_name_forms person_name_forms_name_form_uq; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.person_name_forms
-    ADD CONSTRAINT person_name_forms_name_form_uq UNIQUE (name_form);
-
-
---
 -- Name: person_name_forms person_name_forms_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.person_name_forms
-    ADD CONSTRAINT person_name_forms_pkey PRIMARY KEY (id);
+    ADD CONSTRAINT person_name_forms_pkey PRIMARY KEY (name_form, person_id);
 
 
 --
@@ -1738,11 +1987,67 @@ ALTER TABLE ONLY public.persons_rh
 
 
 --
+-- Name: pipeline_run_snapshots pipeline_check_snapshots_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.pipeline_run_snapshots
+    ADD CONSTRAINT pipeline_check_snapshots_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: pipeline_phase_executions pipeline_phase_executions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.pipeline_phase_executions
+    ADD CONSTRAINT pipeline_phase_executions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: place_name_forms place_name_forms_form_normalized_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.place_name_forms
+    ADD CONSTRAINT place_name_forms_form_normalized_key UNIQUE (form_normalized);
+
+
+--
+-- Name: place_name_forms place_name_forms_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.place_name_forms
+    ADD CONSTRAINT place_name_forms_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: publication_relations publication_relations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.publication_relations
+    ADD CONSTRAINT publication_relations_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: publication_relations publication_relations_uq; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.publication_relations
+    ADD CONSTRAINT publication_relations_uq UNIQUE NULLS NOT DISTINCT (from_publication_id, relation_type, target_publication_id, target_doi);
+
+
+--
 -- Name: publication_subjects publication_subjects_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.publication_subjects
     ADD CONSTRAINT publication_subjects_pkey PRIMARY KEY (publication_id, subject_id, source);
+
+
+--
+-- Name: publications_detail publications_detail_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.publications_detail
+    ADD CONSTRAINT publications_detail_pkey PRIMARY KEY (publication_id);
 
 
 --
@@ -1786,11 +2091,11 @@ ALTER TABLE ONLY public.publishers
 
 
 --
--- Name: schema_migrations schema_migrations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: rejected_authorships rejected_authorships_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.schema_migrations
-    ADD CONSTRAINT schema_migrations_pkey PRIMARY KEY (version);
+ALTER TABLE ONLY public.rejected_authorships
+    ADD CONSTRAINT rejected_authorships_pkey PRIMARY KEY (publication_id, person_id);
 
 
 --
@@ -1818,27 +2123,11 @@ ALTER TABLE ONLY public.source_authorships
 
 
 --
--- Name: source_authorships source_authorships_pub_person_pos_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: source_authorships source_authorships_pub_pos_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.source_authorships
-    ADD CONSTRAINT source_authorships_pub_person_pos_key UNIQUE (source_publication_id, source_person_id, author_position);
-
-
---
--- Name: source_persons source_persons_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.source_persons
-    ADD CONSTRAINT source_persons_pkey PRIMARY KEY (id);
-
-
---
--- Name: source_persons source_persons_source_source_id_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.source_persons
-    ADD CONSTRAINT source_persons_source_source_id_key UNIQUE (source, source_id);
+    ADD CONSTRAINT source_authorships_pub_pos_key UNIQUE (source_publication_id, author_position);
 
 
 --
@@ -1858,22 +2147,6 @@ ALTER TABLE ONLY public.source_publications
 
 
 --
--- Name: source_structures source_structures_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.source_structures
-    ADD CONSTRAINT source_structures_pkey PRIMARY KEY (id);
-
-
---
--- Name: source_structures source_structures_source_source_id_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.source_structures
-    ADD CONSTRAINT source_structures_source_source_id_key UNIQUE (source, source_id);
-
-
---
 -- Name: staging staging_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1887,6 +2160,14 @@ ALTER TABLE ONLY public.staging
 
 ALTER TABLE ONLY public.staging
     ADD CONSTRAINT staging_source_source_id_key UNIQUE (source, source_id);
+
+
+--
+-- Name: structure_name_forms structure_name_forms_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.structure_name_forms
+    ADD CONSTRAINT structure_name_forms_pkey PRIMARY KEY (id);
 
 
 --
@@ -1919,14 +2200,6 @@ ALTER TABLE ONLY public.structures
 
 ALTER TABLE ONLY public.structures
     ADD CONSTRAINT structures_pkey PRIMARY KEY (id);
-
-
---
--- Name: subject_cooccurrences subject_cooccurrences_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.subject_cooccurrences
-    ADD CONSTRAINT subject_cooccurrences_pkey PRIMARY KEY (subject_a_id, subject_b_id);
 
 
 --
@@ -1982,6 +2255,13 @@ CREATE INDEX audit_log_event_type_idx ON public.audit_log USING btree (event_typ
 
 
 --
+-- Name: authorship_structures_pkey; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX authorship_structures_pkey ON public.authorship_structures USING btree (authorship_id, structure_id);
+
+
+--
 -- Name: idx_addr_struct_address; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2014,6 +2294,20 @@ CREATE INDEX idx_addr_sug_countries ON public.addresses USING gin (suggested_cou
 --
 
 CREATE INDEX idx_addresses_countries ON public.addresses USING gin (countries) WHERE (countries IS NOT NULL);
+
+
+--
+-- Name: idx_addresses_countries_dirty; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_addresses_countries_dirty ON public.addresses USING btree (id) WHERE countries_dirty;
+
+
+--
+-- Name: idx_addresses_normalized_text; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_addresses_normalized_text ON public.addresses USING btree (normalized_text);
 
 
 --
@@ -2066,6 +2360,13 @@ CREATE INDEX idx_apc_pub ON public.apc_payments USING btree (publication_id) WHE
 
 
 --
+-- Name: idx_authorship_structures_structure_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_authorship_structures_structure_id ON public.authorship_structures USING btree (structure_id);
+
+
+--
 -- Name: idx_authorships_corresponding_uca; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2094,24 +2395,10 @@ CREATE INDEX idx_authorships_pub_uca ON public.authorships USING btree (publicat
 
 
 --
--- Name: idx_authorships_structs; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_authorships_structs ON public.authorships USING gin (structure_ids) WHERE (structure_ids IS NOT NULL);
-
-
---
 -- Name: idx_authorships_uca; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_authorships_uca ON public.authorships USING btree (in_perimeter) WHERE (in_perimeter = true);
-
-
---
--- Name: idx_cnf_iso; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_cnf_iso ON public.country_name_forms USING btree (iso_code);
 
 
 --
@@ -2126,6 +2413,48 @@ CREATE INDEX idx_distinct_pubs_a ON public.distinct_publications USING btree (pu
 --
 
 CREATE INDEX idx_distinct_pubs_b ON public.distinct_publications USING btree (pub_id_b);
+
+
+--
+-- Name: idx_doi_prefixes_client_name_normalized; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_doi_prefixes_client_name_normalized ON public.doi_prefixes USING btree (client_name_normalized) WHERE (client_name_normalized IS NOT NULL);
+
+
+--
+-- Name: idx_doi_prefixes_datacite_client_symbol; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_doi_prefixes_datacite_client_symbol ON public.doi_prefixes USING btree (datacite_client_symbol) WHERE (datacite_client_symbol IS NOT NULL);
+
+
+--
+-- Name: idx_doi_prefixes_publisher; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_doi_prefixes_publisher ON public.doi_prefixes USING btree (publisher_id) WHERE (publisher_id IS NOT NULL);
+
+
+--
+-- Name: idx_doi_prefixes_publisher_name_normalized; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_doi_prefixes_publisher_name_normalized ON public.doi_prefixes USING btree (publisher_name_normalized) WHERE (publisher_id IS NULL);
+
+
+--
+-- Name: idx_doi_prefixes_publisher_pending; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_doi_prefixes_publisher_pending ON public.doi_prefixes USING btree (prefix) WHERE ((publisher_id IS NULL) AND (publisher_checked_at IS NULL));
+
+
+--
+-- Name: idx_doi_prefixes_ra; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_doi_prefixes_ra ON public.doi_prefixes USING btree (ra);
 
 
 --
@@ -2178,6 +2507,20 @@ CREATE INDEX idx_journals_titlenorm ON public.journals USING btree (title_normal
 
 
 --
+-- Name: idx_person_identifier_keys_uq; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_person_identifier_keys_uq ON public.person_identifier_keys USING btree (person_id, id_type, id_value);
+
+
+--
+-- Name: idx_person_identifier_keys_value; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_person_identifier_keys_value ON public.person_identifier_keys USING btree (id_type, id_value);
+
+
+--
 -- Name: idx_person_ids_lookup; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2213,10 +2556,52 @@ CREATE INDEX idx_persons_rh_person_id ON public.persons_rh USING btree (person_i
 
 
 --
--- Name: idx_pnf_person_ids; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_phase_exec_phase; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_pnf_person_ids ON public.person_name_forms USING gin (person_ids);
+CREATE INDEX idx_phase_exec_phase ON public.pipeline_phase_executions USING btree (phase);
+
+
+--
+-- Name: idx_phase_exec_run_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_phase_exec_run_id ON public.pipeline_phase_executions USING btree (run_id);
+
+
+--
+-- Name: idx_phase_exec_started_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_phase_exec_started_at ON public.pipeline_phase_executions USING btree (started_at DESC);
+
+
+--
+-- Name: idx_pipeline_run_snapshots_mode_ran_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_pipeline_run_snapshots_mode_ran_at ON public.pipeline_run_snapshots USING btree (mode, ran_at DESC);
+
+
+--
+-- Name: idx_pnf_iso; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_pnf_iso ON public.place_name_forms USING btree (iso_code);
+
+
+--
+-- Name: idx_pnf_person_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_pnf_person_id ON public.person_name_forms USING btree (person_id);
+
+
+--
+-- Name: idx_ps_structure_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ps_structure_id ON public.perimeter_structures USING btree (structure_id);
 
 
 --
@@ -2238,6 +2623,48 @@ CREATE INDEX idx_pub_nf_publisher ON public.publisher_name_forms USING btree (pu
 --
 
 CREATE INDEX idx_pub_title_trgm ON public.publications USING gin (title_normalized public.gin_trgm_ops);
+
+
+--
+-- Name: idx_pub_unpaywall_checked; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_pub_unpaywall_checked ON public.publications USING btree (unpaywall_checked_at NULLS FIRST) WHERE (doi IS NOT NULL);
+
+
+--
+-- Name: idx_publication_relations_target_doi; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_publication_relations_target_doi ON public.publication_relations USING btree (target_doi);
+
+
+--
+-- Name: idx_publication_relations_target_pub; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_publication_relations_target_pub ON public.publication_relations USING btree (target_publication_id) WHERE (target_publication_id IS NOT NULL);
+
+
+--
+-- Name: idx_publication_structures_structure; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_publication_structures_structure ON public.publication_structures USING btree (structure_id);
+
+
+--
+-- Name: idx_publications_in_perimeter_journal; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_publications_in_perimeter_journal ON public.publications USING btree (journal_id) WHERE in_perimeter;
+
+
+--
+-- Name: idx_publications_in_perimeter_year; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_publications_in_perimeter_year ON public.publications USING btree (pub_year DESC) WHERE in_perimeter;
 
 
 --
@@ -2283,13 +2710,6 @@ CREATE INDEX idx_publications_year_type ON public.publications USING btree (pub_
 
 
 --
--- Name: idx_publishers_doi_prefix; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_publishers_doi_prefix ON public.publishers USING btree (doi_prefix) WHERE (doi_prefix IS NOT NULL);
-
-
---
 -- Name: idx_publishers_name_norm; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2311,24 +2731,17 @@ CREATE INDEX idx_sa_authorship ON public.source_authorships USING btree (authors
 
 
 --
--- Name: idx_sa_excluded; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_sa_countries_dirty; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_sa_excluded ON public.source_authorships USING btree (excluded) WHERE (excluded = true);
-
-
---
--- Name: idx_sa_nonhal_outscope; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_sa_nonhal_outscope ON public.source_authorships USING btree (source_publication_id, author_position) WHERE ((source <> 'hal'::text) AND (in_perimeter = false));
+CREATE INDEX idx_sa_countries_dirty ON public.source_authorships USING btree (source_publication_id) WHERE countries_dirty;
 
 
 --
--- Name: idx_sa_orphan_perimeter; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_sa_in_perimeter; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_sa_orphan_perimeter ON public.source_authorships USING btree (source_publication_id, source_person_id) WHERE ((person_id IS NULL) AND (in_perimeter = true));
+CREATE INDEX idx_sa_in_perimeter ON public.source_authorships USING btree (source_publication_id) WHERE (in_perimeter = true);
 
 
 --
@@ -2339,10 +2752,10 @@ CREATE INDEX idx_sa_person ON public.source_authorships USING btree (person_id) 
 
 
 --
--- Name: idx_sa_source_person; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_sa_pub_person; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_sa_source_person ON public.source_authorships USING btree (source_person_id);
+CREATE INDEX idx_sa_pub_person ON public.source_authorships USING btree (source_publication_id, person_id) WHERE (person_id IS NOT NULL);
 
 
 --
@@ -2353,24 +2766,10 @@ CREATE INDEX idx_saa_address ON public.source_authorship_addresses USING btree (
 
 
 --
--- Name: idx_source_persons_idref; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_source_authorship_structures_structure_id; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_source_persons_idref ON public.source_persons USING btree (idref) WHERE (idref IS NOT NULL);
-
-
---
--- Name: idx_source_persons_orcid; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_source_persons_orcid ON public.source_persons USING btree (orcid) WHERE (orcid IS NOT NULL);
-
-
---
--- Name: idx_source_persons_person; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_source_persons_person ON public.source_persons USING btree (person_id) WHERE (person_id IS NOT NULL);
+CREATE INDEX idx_source_authorship_structures_structure_id ON public.source_authorship_structures USING btree (structure_id);
 
 
 --
@@ -2391,7 +2790,7 @@ CREATE INDEX idx_source_pubs_doi ON public.source_publications USING btree (doi)
 -- Name: idx_source_pubs_external_ids; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_source_pubs_external_ids ON public.source_publications USING gin (external_ids) WHERE (external_ids IS NOT NULL);
+CREATE INDEX idx_source_pubs_external_ids ON public.source_publications USING gin (external_ids) WHERE (external_ids <> '{}'::jsonb);
 
 
 --
@@ -2399,6 +2798,41 @@ CREATE INDEX idx_source_pubs_external_ids ON public.source_publications USING gi
 --
 
 CREATE INDEX idx_source_pubs_hal_collections ON public.source_publications USING gin (hal_collections) WHERE (hal_collections IS NOT NULL);
+
+
+--
+-- Name: idx_source_pubs_hal_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_source_pubs_hal_id ON public.source_publications USING gin (((external_ids -> 'hal_id'::text)));
+
+
+--
+-- Name: idx_source_pubs_keys_dirty; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_source_pubs_keys_dirty ON public.source_publications USING btree (keys_dirty) WHERE keys_dirty;
+
+
+--
+-- Name: idx_source_pubs_metadata_block; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_source_pubs_metadata_block ON public.source_publications USING btree (title_normalized, pub_year, doc_type);
+
+
+--
+-- Name: idx_source_pubs_nnt; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_source_pubs_nnt ON public.source_publications USING btree (((external_ids ->> 'nnt'::text))) WHERE ((external_ids ->> 'nnt'::text) IS NOT NULL);
+
+
+--
+-- Name: idx_source_pubs_pmid; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_source_pubs_pmid ON public.source_publications USING btree (((external_ids ->> 'pmid'::text))) WHERE ((external_ids ->> 'pmid'::text) IS NOT NULL);
 
 
 --
@@ -2416,31 +2850,10 @@ CREATE INDEX idx_source_pubs_staging ON public.source_publications USING btree (
 
 
 --
--- Name: idx_source_structs_name; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_source_pubs_title_normalized_trgm; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_source_structs_name ON public.source_structures USING gin (name public.gin_trgm_ops);
-
-
---
--- Name: idx_source_structs_ror; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_source_structs_ror ON public.source_structures USING btree (ror_id) WHERE (ror_id IS NOT NULL);
-
-
---
--- Name: idx_source_structs_source; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_source_structs_source ON public.source_structures USING btree (source);
-
-
---
--- Name: idx_source_structs_structure; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_source_structs_structure ON public.source_structures USING btree (structure_id) WHERE (structure_id IS NOT NULL);
+CREATE INDEX idx_source_pubs_title_normalized_trgm ON public.source_publications USING gin (title_normalized public.gin_trgm_ops);
 
 
 --
@@ -2448,13 +2861,6 @@ CREATE INDEX idx_source_structs_structure ON public.source_structures USING btre
 --
 
 CREATE INDEX idx_staging_doi ON public.staging USING btree (doi) WHERE (doi IS NOT NULL);
-
-
---
--- Name: idx_staging_not_found; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_staging_not_found ON public.staging USING btree (source, source_id) WHERE (not_found = true);
 
 
 --
@@ -2500,6 +2906,20 @@ CREATE INDEX idx_structures_type ON public.structures USING btree (structure_typ
 
 
 --
+-- Name: idx_subjects_oa_label_lower; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_subjects_oa_label_lower ON public.subjects USING btree (lower(label)) WHERE (ontologies ? 'openalex_topic'::text);
+
+
+--
+-- Name: publication_structures_pub_struct; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX publication_structures_pub_struct ON public.publication_structures USING btree (publication_id, structure_id);
+
+
+--
 -- Name: publication_subjects_subject_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2514,6 +2934,13 @@ CREATE UNIQUE INDEX publications_doi_lower_key ON public.publications USING btre
 
 
 --
+-- Name: source_authorship_structures_pkey; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX source_authorship_structures_pkey ON public.source_authorship_structures USING btree (source_authorship_id, structure_id);
+
+
+--
 -- Name: subject_cooccurrences_b_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2525,6 +2952,13 @@ CREATE INDEX subject_cooccurrences_b_idx ON public.subject_cooccurrences USING b
 --
 
 CREATE INDEX subject_cooccurrences_count_idx ON public.subject_cooccurrences USING btree (count DESC);
+
+
+--
+-- Name: subject_cooccurrences_pkey; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX subject_cooccurrences_pkey ON public.subject_cooccurrences USING btree (subject_a_id, subject_b_id);
 
 
 --
@@ -2661,6 +3095,14 @@ ALTER TABLE ONLY public.distinct_publications
 
 
 --
+-- Name: doi_prefixes doi_prefixes_publisher_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.doi_prefixes
+    ADD CONSTRAINT doi_prefixes_publisher_id_fkey FOREIGN KEY (publisher_id) REFERENCES public.publishers(id) ON DELETE SET NULL;
+
+
+--
 -- Name: journal_name_forms journal_name_forms_journal_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2685,11 +3127,19 @@ ALTER TABLE ONLY public.journals
 
 
 --
--- Name: structure_name_forms name_forms_structure_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: perimeter_structures perimeter_structures_perimeter_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.structure_name_forms
-    ADD CONSTRAINT name_forms_structure_id_fkey FOREIGN KEY (structure_id) REFERENCES public.structures(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.perimeter_structures
+    ADD CONSTRAINT perimeter_structures_perimeter_id_fkey FOREIGN KEY (perimeter_id) REFERENCES public.perimeters(id) ON DELETE CASCADE;
+
+
+--
+-- Name: perimeter_structures perimeter_structures_structure_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.perimeter_structures
+    ADD CONSTRAINT perimeter_structures_structure_id_fkey FOREIGN KEY (structure_id) REFERENCES public.structures(id) ON DELETE CASCADE;
 
 
 --
@@ -2698,6 +3148,14 @@ ALTER TABLE ONLY public.structure_name_forms
 
 ALTER TABLE ONLY public.person_identifiers
     ADD CONSTRAINT person_identifiers_person_id_fkey FOREIGN KEY (person_id) REFERENCES public.persons(id) ON DELETE CASCADE;
+
+
+--
+-- Name: person_name_forms person_name_forms_person_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.person_name_forms
+    ADD CONSTRAINT person_name_forms_person_id_fkey FOREIGN KEY (person_id) REFERENCES public.persons(id) ON DELETE CASCADE;
 
 
 --
@@ -2717,6 +3175,22 @@ ALTER TABLE ONLY public.persons_rh
 
 
 --
+-- Name: publication_relations publication_relations_from_publication_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.publication_relations
+    ADD CONSTRAINT publication_relations_from_publication_id_fkey FOREIGN KEY (from_publication_id) REFERENCES public.publications(id) ON DELETE CASCADE;
+
+
+--
+-- Name: publication_relations publication_relations_target_publication_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.publication_relations
+    ADD CONSTRAINT publication_relations_target_publication_id_fkey FOREIGN KEY (target_publication_id) REFERENCES public.publications(id) ON DELETE CASCADE;
+
+
+--
 -- Name: publication_subjects publication_subjects_publication_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2733,6 +3207,14 @@ ALTER TABLE ONLY public.publication_subjects
 
 
 --
+-- Name: publications_detail publications_detail_publication_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.publications_detail
+    ADD CONSTRAINT publications_detail_publication_id_fkey FOREIGN KEY (publication_id) REFERENCES public.publications(id) ON DELETE CASCADE;
+
+
+--
 -- Name: publications publications_journal_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2746,6 +3228,22 @@ ALTER TABLE ONLY public.publications
 
 ALTER TABLE ONLY public.publisher_name_forms
     ADD CONSTRAINT publisher_name_forms_publisher_id_fkey FOREIGN KEY (publisher_id) REFERENCES public.publishers(id) ON DELETE CASCADE;
+
+
+--
+-- Name: rejected_authorships rejected_authorships_person_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.rejected_authorships
+    ADD CONSTRAINT rejected_authorships_person_id_fkey FOREIGN KEY (person_id) REFERENCES public.persons(id) ON DELETE CASCADE;
+
+
+--
+-- Name: rejected_authorships rejected_authorships_publication_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.rejected_authorships
+    ADD CONSTRAINT rejected_authorships_publication_id_fkey FOREIGN KEY (publication_id) REFERENCES public.publications(id) ON DELETE CASCADE;
 
 
 --
@@ -2781,27 +3279,11 @@ ALTER TABLE ONLY public.source_authorships
 
 
 --
--- Name: source_authorships source_authorships_source_person_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.source_authorships
-    ADD CONSTRAINT source_authorships_source_person_id_fkey FOREIGN KEY (source_person_id) REFERENCES public.source_persons(id) ON DELETE SET NULL;
-
-
---
 -- Name: source_authorships source_authorships_source_publication_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.source_authorships
     ADD CONSTRAINT source_authorships_source_publication_id_fkey FOREIGN KEY (source_publication_id) REFERENCES public.source_publications(id) ON DELETE CASCADE;
-
-
---
--- Name: source_persons source_persons_person_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.source_persons
-    ADD CONSTRAINT source_persons_person_id_fkey FOREIGN KEY (person_id) REFERENCES public.persons(id) ON DELETE SET NULL;
 
 
 --
@@ -2829,11 +3311,11 @@ ALTER TABLE ONLY public.source_publications
 
 
 --
--- Name: source_structures source_structures_structure_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: structure_name_forms structure_name_forms_structure_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.source_structures
-    ADD CONSTRAINT source_structures_structure_id_fkey FOREIGN KEY (structure_id) REFERENCES public.structures(id) ON DELETE SET NULL;
+ALTER TABLE ONLY public.structure_name_forms
+    ADD CONSTRAINT structure_name_forms_structure_id_fkey FOREIGN KEY (structure_id) REFERENCES public.structures(id) ON DELETE CASCADE;
 
 
 --
@@ -2853,21 +3335,15 @@ ALTER TABLE ONLY public.structure_relations
 
 
 --
--- Name: subject_cooccurrences subject_cooccurrences_subject_a_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.subject_cooccurrences
-    ADD CONSTRAINT subject_cooccurrences_subject_a_id_fkey FOREIGN KEY (subject_a_id) REFERENCES public.subjects(id) ON DELETE CASCADE;
-
-
---
--- Name: subject_cooccurrences subject_cooccurrences_subject_b_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.subject_cooccurrences
-    ADD CONSTRAINT subject_cooccurrences_subject_b_id_fkey FOREIGN KEY (subject_b_id) REFERENCES public.subjects(id) ON DELETE CASCADE;
-
-
---
 -- PostgreSQL database dump complete
 --
+
+--
+-- Peuplement initial des vues matérialisées (cf. WITH NO DATA)
+--
+
+REFRESH MATERIALIZED VIEW public.source_authorship_structures;
+REFRESH MATERIALIZED VIEW public.authorship_structures;
+REFRESH MATERIALIZED VIEW public.person_identifier_keys;
+REFRESH MATERIALIZED VIEW public.publication_structures;
+REFRESH MATERIALIZED VIEW public.subject_cooccurrences;
