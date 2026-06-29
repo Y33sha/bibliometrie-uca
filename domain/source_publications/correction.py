@@ -88,6 +88,7 @@ class MetadataCorrectionRule(StrEnum):
     TITLE_SYSTEMATIC_REVIEW_TO_REVIEW = "TITLE_SYSTEMATIC_REVIEW_TO_REVIEW"
     TITLE_ISBN_TO_BOOK_REVIEW = "TITLE_ISBN_TO_BOOK_REVIEW"
     TITLE_YEAR_PAGES_END_TO_BOOK_REVIEW = "TITLE_YEAR_PAGES_END_TO_BOOK_REVIEW"
+    TITLE_RECENSION_TO_BOOK_REVIEW = "TITLE_RECENSION_TO_BOOK_REVIEW"
     DOI_FIGSHARE_COLLECTION_TO_DATASET = "DOI_FIGSHARE_COLLECTION_TO_DATASET"
     EMBARGO_EXPIRED_TO_GREEN = "EMBARGO_EXPIRED_TO_GREEN"
 
@@ -159,6 +160,8 @@ _ISBN_PATTERN = re.compile(r"\bisbn\b|\b97[89][-\s0-9]{10,17}\b", re.IGNORECASE)
 _YEAR_PAGES_END_PATTERN = re.compile(
     r"(19|20)\d{2}[\s,.]+\d{1,4}\s*(pp|pages?|p)\.?\s*$", re.IGNORECASE
 )
+# `_RECENSION_TITLE_PATTERN` : titre commençant par « Recension » (« Recension : … », « Recension de … », « Recensions »), ou par « Compte(s) rendu(s) : » avec deux-points immédiat. Marqueurs univoques de recension d'ouvrage en usage académique français, souvent typés article/other/preprint par les sources. Le deux-points immédiat après « compte(s) rendu(s) » écarte les rapports (« Compte rendu de mission : … », « Compte rendu de la soutenance d'HDR … ») qui ne sont pas des recensions.
+_RECENSION_TITLE_PATTERN = re.compile(r"^\s*(recension|comptes?\s+rendus?\s*:)", re.IGNORECASE)
 
 # Préfixes DOI des registres de thèses : un DOI émis par ces registres est le DOI *propre* de la
 # thèse, pas celui d'une version publiée. `10.70675` = ABES (Agence Bibliographique de
@@ -372,6 +375,14 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
         "applies_to": {
             "doc_type": frozenset({"article", "review", "other"}),
             "title_regex": _YEAR_PAGES_END_PATTERN,
+        },
+        "applies_correction": {"doc_type": "book_review"},
+    },
+    # Titre commençant par « Recension » ou « Compte(s) rendu(s) : » ⇒ `book_review`. Marqueurs univoques en usage académique français ; `preprint` inclus dans la whitelist (typage OpenAlex fréquent). `book`/`book_chapter` épargnés : la recension est l'article, pas l'ouvrage recensé.
+    MetadataCorrectionRule.TITLE_RECENSION_TO_BOOK_REVIEW: {
+        "applies_to": {
+            "doc_type": frozenset({"article", "review", "other", "preprint"}),
+            "title_regex": _RECENSION_TITLE_PATTERN,
         },
         "applies_correction": {"doc_type": "book_review"},
     },
