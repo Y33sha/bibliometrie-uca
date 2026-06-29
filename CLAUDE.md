@@ -26,6 +26,27 @@
 
 - Gérer les commits git. Faire un commit à chaque changement cohérent (au minimum une fois par phase de chantier, voire à chaque item d'une phase)
 
+## Phases du pipeline
+
+A jour au 2026-06-29
+
+`extract` — Extraction HAL/OpenAlex/WoS/ScanR/theses
+`resolve_ra` — Résolution Registration Agency des DOI
+`cross_imports` — Rattrapage cross-source (hal-id, NNT, DOI)
+`refresh_stale` — Rafraîchissement des docs stale
+`refetch_truncated` — Re-fetch OpenAlex tronqués (100 auteurs)
+`normalize` — Normalisation staging → source_publications, source_authorships, addresses
+`affiliations` — Résolution adresses → structures UCA
+`publishers_journals` — Enrichissement journals (DOI, APC, DOAJ)
+`metadata_correction` — Corrections métadonnées
+`publications` — Création/rattachement publications
+`relations` — Relations sémantiques entre pubs
+`persons` — Création personnes
+`authorships` — Construction table de vérité
+`countries` — Détection pays
+`subjects` — Sujets/mots-clés
+`oa_status` — Statut open access
+
 ## Conventions du projet
 
 - Nom de la base: `bibliometrie`
