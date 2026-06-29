@@ -201,14 +201,20 @@ class TestAddIdentifier:
     def test_reassigns_if_rejected(self, sa_sync_conn, repo):
         p1 = _insert_person(sa_sync_conn, "A", "A")
         p2 = _insert_person(sa_sync_conn, "B", "B")
-        add_identifier(p1, "orcid", "0000-0001", repo=repo)
+        add_identifier(p1, "orcid", "0000-0001-2345-6789", repo=repo)
         sa_sync_conn.execute(
-            text("UPDATE person_identifiers SET status='rejected' WHERE id_value='0000-0001'")
+            text(
+                "UPDATE person_identifiers SET status='rejected' "
+                "WHERE id_value='0000-0001-2345-6789'"
+            )
         )
-        add_identifier(p2, "orcid", "0000-0001", repo=repo)
+        add_identifier(p2, "orcid", "0000-0001-2345-6789", repo=repo)
 
         row = sa_sync_conn.execute(
-            text("SELECT person_id, status FROM person_identifiers WHERE id_value='0000-0001'")
+            text(
+                "SELECT person_id, status FROM person_identifiers "
+                "WHERE id_value='0000-0001-2345-6789'"
+            )
         ).one()
         assert row.person_id == p2
         assert row.status == "pending"
@@ -223,16 +229,16 @@ class TestAddIdentifier:
 
         p1 = _insert_person(sa_sync_conn, "A", "A")
         p2 = _insert_person(sa_sync_conn, "B", "B")
-        add_identifier(p1, "orcid", "0000-0001", repo=repo)
+        add_identifier(p1, "orcid", "0000-0001-2345-6789", repo=repo)
 
         with pytest.raises(CannotAttributeConflict):
-            add_identifier(p2, "orcid", "0000-0001", repo=repo)
+            add_identifier(p2, "orcid", "0000-0001-2345-6789", repo=repo)
 
         # L'identifiant reste rattaché à p1.
         assert (
             _scalar(
                 sa_sync_conn,
-                "SELECT person_id FROM person_identifiers WHERE id_value='0000-0001'",
+                "SELECT person_id FROM person_identifiers WHERE id_value='0000-0001-2345-6789'",
             )
             == p1
         )
@@ -240,11 +246,14 @@ class TestAddIdentifier:
     def test_idempotent_on_same_person(self, sa_sync_conn, repo):
         """Réappliquer add_identifier sur la même personne ne change rien."""
         p = _insert_person(sa_sync_conn)
-        add_identifier(p, "orcid", "0000-0001", repo=repo)
-        add_identifier(p, "orcid", "0000-0001", repo=repo)  # no-op
+        add_identifier(p, "orcid", "0000-0001-2345-6789", repo=repo)
+        add_identifier(p, "orcid", "0000-0001-2345-6789", repo=repo)  # no-op
 
         row = sa_sync_conn.execute(
-            text("SELECT person_id, status FROM person_identifiers WHERE id_value='0000-0001'")
+            text(
+                "SELECT person_id, status FROM person_identifiers "
+                "WHERE id_value='0000-0001-2345-6789'"
+            )
         ).one()
         assert row.person_id == p
         assert row.status == "pending"
@@ -676,8 +685,8 @@ class TestAddIdentifiersFromAuthorships:
     def test_adds_orcid_idhal_idref_once(self, sa_sync_conn, repo):
         person_id = _insert_person(sa_sync_conn)
         authorships = [
-            {"source": "hal", "orcid": "0000-0001", "idhal": "jdupont"},
-            {"source": "scanr", "orcid": "0000-0001", "idref": "123456"},
+            {"source": "hal", "orcid": "0000-0001-2345-6789", "idhal": "jdupont"},
+            {"source": "scanr", "orcid": "0000-0001-2345-6789", "idref": "252404955"},
         ]
         add_identifiers_from_authorships(person_id, authorships, repo=repo)
 
@@ -690,6 +699,21 @@ class TestAddIdentifiersFromAuthorships:
         ).all()
         id_types = [r.id_type for r in rows]
         assert id_types == ["idhal", "idref", "orcid"]
+
+    def test_skips_malformed_and_keeps_valid(self, sa_sync_conn, repo):
+        """Un identifiant source mal formé est ignoré (log, pas d'exception) ; la
+        promotion continue pour les identifiants valides du même lot."""
+        person_id = _insert_person(sa_sync_conn)
+        authorships = [
+            {"source": "hal", "orcid": "pas-un-orcid", "idhal": "jdupont"},
+        ]
+        add_identifiers_from_authorships(person_id, authorships, repo=repo)
+
+        rows = sa_sync_conn.execute(
+            text("SELECT id_type FROM person_identifiers WHERE person_id = :pid ORDER BY id_type"),
+            {"pid": person_id},
+        ).all()
+        assert [r.id_type for r in rows] == ["idhal"]
 
 
 # ── update_name_form_status ────────────────────────────────────────

@@ -15,8 +15,12 @@ from application.ports.repositories.person_repository import (
     NameFormStatusRow,
     PersonRepository,
 )
-from domain.errors import CannotAttributeConflict, NotFoundError
-from domain.persons.identifiers import PERSON_IDENTIFIER_TYPES, AttributionStatus
+from domain.errors import CannotAttributeConflict, NotFoundError, ValidationError
+from domain.persons.identifiers import (
+    PERSON_IDENTIFIER_TYPES,
+    AttributionStatus,
+    normalized_identifier_value,
+)
 from domain.persons.name_forms import compute_person_name_forms
 from domain.persons.person_identifier import PersonIdentifier
 from domain.sources.registry import ALL_SOURCES_SET
@@ -165,7 +169,12 @@ def add_identifier(
       lève `CannotAttributeConflict`. Pour réattribuer, le statut
       existant doit d'abord être passé à `rejected` (via
       `update_identifier_status` ou `reassign_identifier`).
+
+    La valeur est validée et normalisée via le value object du type
+    (`normalized_identifier_value`) avant lookup et écriture, de sorte que la même
+    forme canonique sert aux deux. Lève `ValidationError` si elle est malformée.
     """
+    id_value = normalized_identifier_value(id_type, id_value)
     existing = repo.find_identifier(id_type, id_value)
 
     if existing is None:
@@ -265,7 +274,7 @@ def add_identifiers_from_authorships(
 ) -> None:
     """Promotion canonique en batch : pour chaque authorship source, extrait les identifiants observés (orcid/idhal/idref/hal_person_id) et délègue à `add_identifier` qui dispatche selon l'état existant en base.
 
-    Path batch tolérant : un `CannotAttributeConflict` sur un identifiant donné (ORCID déjà attribué en pending/confirmed à une autre personne) est loggé en warning et la promotion continue pour les autres identifiants. Le path strict reste `add_identifier` (singulier) que l'API admin utilise directement.
+    Path batch tolérant : un `CannotAttributeConflict` (ORCID déjà attribué en pending/confirmed à une autre personne) ou un `ValidationError` (identifiant source mal formé) sur un identifiant donné est loggé en warning et la promotion continue pour les autres. Le path strict reste `add_identifier` (singulier) que l'API admin utilise directement.
 
     Couvre les 4 id_types acceptés en base (`PERSON_IDENTIFIER_TYPES`) : `orcid`, `idhal`, `idref`, `hal_person_id`. Les 3 premiers sont visibles UI ; `hal_person_id` est interne (filtré côté lecture par `PUBLIC_PERSON_IDENTIFIER_TYPES`).
 
@@ -289,6 +298,8 @@ def add_identifiers_from_authorships(
                 add_identifier(person_id, id_type, value, repo=repo)
             except CannotAttributeConflict as exc:
                 logger.warning("%s", exc)
+            except ValidationError:
+                logger.warning("Identifiant mal formé ignoré : %s=%r", id_type, value)
 
 
 # ── Formes de noms ──

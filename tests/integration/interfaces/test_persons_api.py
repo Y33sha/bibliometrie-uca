@@ -306,6 +306,23 @@ class TestAddIdentifier:
         assert body["added"] is True
         assert body["id_value"] == "0000-0001-2222-3333"
 
+    def test_idhal_is_normalized(self, auth_client):
+        pid = _seed_person()
+        r = auth_client.post(
+            f"/api/persons/{pid}/identifiers",
+            json={"id_type": "idhal", "id_value": "  Jean-Dupont  "},
+        )
+        assert r.status_code == 200
+        assert r.json()["id_value"] == "jean-dupont"
+
+    def test_invalid_idref_rejected(self, auth_client):
+        pid = _seed_person()
+        r = auth_client.post(
+            f"/api/persons/{pid}/identifiers",
+            json={"id_type": "idref", "id_value": "123456"},
+        )
+        assert r.status_code == 400
+
     def test_person_not_found(self, auth_client):
         r = auth_client.post(
             "/api/persons/999999999/identifiers",

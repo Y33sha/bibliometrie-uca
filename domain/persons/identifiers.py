@@ -217,6 +217,73 @@ class IdRef:
         return self.value
 
 
+# ── hal_person_id (identifiant interne HAL) ───────────────────────
+
+# `personId` HAL : entier positif. Conservé pour la déduplication cross-source,
+# jamais exposé en UI (cf. PUBLIC_PERSON_IDENTIFIER_TYPES).
+_HAL_PERSON_ID_CANONICAL = re.compile(r"^[1-9][0-9]*$")
+
+
+def _normalize_hal_person_id(raw: str | None) -> str | None:
+    """Normalise un hal_person_id : entier positif sous forme de chaîne."""
+    if not raw:
+        return None
+    s = str(raw).strip()
+    if not _HAL_PERSON_ID_CANONICAL.match(s):
+        return None
+    return s
+
+
+@dataclass(frozen=True)
+class HalPersonId:
+    """Identifiant interne de personne HAL (`personId`), entier positif."""
+
+    value: str
+
+    def __post_init__(self) -> None:
+        cleaned = _normalize_hal_person_id(self.value)
+        if not cleaned:
+            raise ValidationError(f"hal_person_id invalide : {self.value!r}")
+        object.__setattr__(self, "value", cleaned)
+
+    @classmethod
+    def try_parse(cls, raw: str | None) -> "HalPersonId | None":
+        if not raw:
+            return None
+        try:
+            return cls(raw)
+        except ValidationError:
+            return None
+
+    def __str__(self) -> str:
+        return self.value
+
+
+# ── Validation d'un identifiant par type ──────────────────────────
+
+_IDENTIFIER_VALUE_OBJECTS: dict[str, type[ORCID | IdHAL | IdRef | HalPersonId]] = {
+    "orcid": ORCID,
+    "idhal": IdHAL,
+    "idref": IdRef,
+    "hal_person_id": HalPersonId,
+}
+
+
+def normalized_identifier_value(id_type: str, raw: str) -> str:
+    """Valide et normalise la valeur d'un identifiant via le value object de son type.
+
+    Point d'entrée unique de validation avant écriture : délègue au VO auto-validé
+    du type et renvoie la forme canonique stockée en base. Couvre les quatre types
+    de `PERSON_IDENTIFIER_TYPES`. Lève ``ValidationError`` si le type est inconnu ou
+    si la valeur est malformée — à l'appelant de décider (rejet 4xx côté API, log et
+    poursuite côté pipeline).
+    """
+    value_object = _IDENTIFIER_VALUE_OBJECTS.get(id_type)
+    if value_object is None:
+        raise ValidationError(f"Type d'identifiant inconnu : {id_type!r}")
+    return value_object(raw).value
+
+
 # ── Construction du dict JSONB `source_authorships.person_identifiers` ────
 
 
