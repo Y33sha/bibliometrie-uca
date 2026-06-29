@@ -85,16 +85,6 @@ Aucune règle ne consomme un brut qu'une autre est censée avoir corrigé avant 
 - [x] Correction appliquée par un passage de `metadata_correction` puis `publications` (le sous-step scanne toutes les orphelines à DOI, pas de re-dirty préalable).
 - [x] Effet mesuré : **7 145 source_publications rattachées** (5 272 in_perimeter), **+1 541 SP** basculées en `doc_type=media` et **+274 publications canoniques** retypées `media`. Idempotence confirmée en réel (re-simulation : 0 rattachable restant). Résiduel : ~24 000 orphelines in_perimeter sans préfixe-journal correspondant, hors de portée par construction.
 
-## Items TODO liés (à traiter en passant ou recaser dans un autre chantier)
-* [ ] faux preprints: retyper en fonction du DOI (theConversation => media)
-* [ ] détection d'incohérences `doi_prefix`/`publisher_id`/`journal_id`: auditer d'abord, classifier les cas de divergence selon leur cause
-* [ ] créer circuit pour correction automatisée du `journal_type` (titre terminé par ` eBooks` => plateforme d'ebooks)
-* [ ] recensions: "Comptes rendus :", "Compte rendu :"; type = article + titre contient "(dir.)"
-* [ ] typage data_paper automatisé par journal (ex. *Scientific Data*; créer un journal_type dédié?); chercher aussi "dataset" dans les titres
-* [ ] règle à créer: si DOI de forme ISBN + _n => conference_paper ou chapitre / si forme ISBN: proceedings ou book (trancher selon type du "journal")
-* [ ] 107270 et 869915 Computing Pivot-Minors: un article faussement typé preprint par openalex; + question des arxiv_id (déduire le DOI et vice-versa)
-* [ ] noms de containers OpenAlex aberrants ("SPIRE - Sciences Po Institutional REpository") => faire quelque chose; de manière générale il faut interroger la pertinence du champ container relativement au journal_id
-
 ## Questions ouvertes
 
 - **Rafraîchissement du `doi_prefix`** : la valeur est un instantané figé (291 → 1035 journaux après le re-seed à seuil 5). Laisser en oneshot rejoué à la demande, ou promouvoir en étape pipeline idempotente ? Décision d'architecture distincte de ce chantier, non bloquante : `journal_by_doi` tourne sur le stock figé.
