@@ -22,7 +22,7 @@ La phase `metadata_correction` corrige les champs d'une `source_publication` —
 
 `journals.doi_prefix` n'est pas le registrant nu (`10.5194`, partagé par tout un éditeur) mais le **namespace propre au journal**, sous-chemin inclus (`10.5194/acp`, `10.64628/aak`). C'est ce qui rend le préfixe quasi univoque : sur les journaux qui en portent un, l'écrasante majorité ne désigne qu'un seul journal, une poignée seulement étant partagée. Le rapprochement se fait donc par « le DOI de la publication commence par le `doi_prefix` du journal », et les éditeurs multi-journaux sont désambiguïsés par le sous-chemin.
 
-L'origine exacte de la valeur de `journals.doi_prefix` n'est pas tracée dans ce chantier (point d'écriture non localisé) ; elle paraît dérivée des DOI des publications déjà rattachées au journal, ce qui fonderait la déduction (les publications non rattachées partagent le namespace des rattachées). À objectiver.
+La valeur est dérivée des DOI des publications déjà rattachées : le script `interfaces/cli/oneshot/seed_journals_doi_prefix.py` calcule leur plus long préfixe commun, retire la queue variable, et n'écrit que les cas sans ambiguïté (filtrage preprint, garde ISBN, refus du publisher-only). Aucune phase du pipeline ne la produit ; elle est donc un **instantané figé**, complété au besoin par édition manuelle. Aucune API externe ne résout un préfixe vers un journal (Crossref/DataCite ne donnent que le publisher), donc cette dérivation par préfixe commun est la seule méthode généralisable. À ne pas confondre avec la table `doi_prefixes` (registrant nu → Registration Agency → publisher).
 
 ### Le croisement journal_id → doc_type
 
@@ -52,9 +52,9 @@ Ces orientations sont proposées et restent à confirmer ou amender ; seul le co
 
 ### Phase 0 — Cadrer la dérivation de `journals.doi_prefix`
 
-- [ ] Localiser le point d'écriture de `journals.doi_prefix` et sa logique (dérivé des DOI des publications rattachées, ou d'une autre source).
-- [ ] Évaluer la robustesse : comportement pour un journal à faible volume rattaché, mise à jour à mesure que des publications s'attachent, risque de préfixe trompeur.
-- [ ] Statuer sur le périmètre de préfixes retenus (uniquement les préfixes à un seul journal, ou aussi les partagés avec une règle de départage).
+- [x] Point d'écriture localisé : oneshot `seed_journals_doi_prefix.py` (LCP des DOI rattachés), plus édition manuelle ; aucune phase pipeline. Cf. Contexte.
+- [x] Robustesse cadrée : instantané figé, jamais rafraîchi ; seul risque la sous-couverture, pas le préfixe trompeur (la LCP sur un sous-ensemble est toujours plus spécifique, donc sous-rattache au pire). Seuil de publications abaissé de 10 à 5 (couverture 291 → 1035 journaux) : en deçà, les préfixes deviennent trop spécifiques par accident d'échantillon pour un gain de rattachement négligeable (journaux à très faible volume). Seed rejoué sur le stock après l'abaissement.
+- [x] Périmètre retenu : uniquement les préfixes désignant un seul journal — la cible étant des publications sans aucun signal de départage, un préfixe partagé serait indécidable pour elles.
 
 ### Phase 1 — Sous-step de rattachement par préfixe
 
@@ -79,6 +79,7 @@ Ces orientations sont proposées et restent à confirmer ou amender ; seul le co
 * [ ] typage data_paper automatisé par journal (ex. *Scientific Data*; créer un journal_type dédié?); chercher aussi "dataset" dans les titres
 * [ ] créer circuit pour correction automatisée du `journal_type` (titre terminé par ` eBooks` => plateforme d'ebooks)
 * [ ] `metadata_correction`: en cas de corrections de champs multiples sur un même doc, les règles s'appliquent indépendamment à partir du brut; étudier les scénarios de corrections multiples où l'output d'une règle pourrait intersecter l'input des suivantes, voir s'il est pertinent de les chaîner ensemble
+* [ ] détection d'incohérences `doi_prefix`/`publisher_id`/`journal_id`: auditer d'abord, classifier les cas de divergence selon leur cause
 * [ ] noms de containers OpenAlex aberrants ("SPIRE - Sciences Po Institutional REpository") => faire quelque chose; de manière générale il faut interroger la pertinence du champ container relativement au journal_id
 * [ ] règle à créer: si DOI de forme ISBN + _n => conference_paper ou chapitre / si forme ISBN: proceedings ou book (trancher selon type du "journal")
 * [ ] 107270 et 869915 Computing Pivot-Minors: un article faussement typé preprint par openalex; + question des arxiv_id (déduire le DOI et vice-versa)
