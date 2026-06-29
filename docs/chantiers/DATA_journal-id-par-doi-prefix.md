@@ -32,21 +32,33 @@ Faire du `journal_id` un champ réellement corrigé change cela : plusieurs règ
 
 ### Nature de la correction
 
-Le rapprochement par préfixe n'est pas un prédicat sur une `source_publication` isolée : c'est une **recherche inverse** (« quel journal a un `doi_prefix` qui préfixe ce DOI »), donc une jointure contre la table journals. Il ne relève pas du mini-DSL des règles unaires (prédicats purs sur la vue d'une source), mais d'un traitement à jointure — comparable aux corrections relationnelles par cluster de DOI, qui vivent déjà à part dans la phase.
+Le rapprochement par DOI n'est pas un prédicat sur une `source_publication` isolée : c'est une **recherche inverse** (« quel journal a un `doi_prefix` qui préfixe ce DOI »), donc une jointure contre la table journals. Il ne relève pas du mini-DSL des règles unaires (prédicats purs sur la vue d'une source, à cible **constante**), mais d'un traitement à jointure à cible **data-dépendante** — comparable aux corrections relationnelles par cluster de DOI, qui vivent déjà à part dans la phase.
 
 ## Décisions
 
-Ces orientations sont proposées et restent à confirmer ou amender ; seul le contexte ci-dessus est factuel.
+1. **La correction vit dans `metadata_correction`, en sous-step `journal_by_doi`.** Correction d'un journal_id manquant, de même nature que celles déjà portées par la phase, qui dépend des données du journal comme les règles `JOURNAL_TYPE_*`. La normalisation ne convient pas (le `doi_prefix` est construit après elle) ; `publishers_journals` ne convient pas (elle n'écrit ni publications ni journal_id de source).
 
-1. **La correction vit dans `metadata_correction`.** C'est une correction d'un journal_id manquant, de même nature que les corrections déjà portées par la phase, qui dépend des données du journal comme les règles `JOURNAL_TYPE_*`, et dont la tuyauterie d'écriture du journal_id existe déjà. La normalisation ne convient pas (le `doi_prefix` est construit plus tard, après la normalisation) ; `publishers_journals` ne convient pas (elle n'écrit ni publications ni journal_id de source).
+2. **Un sous-step à jointure, hors DSL unaire.** Le rapprochement se code comme un traitement à part (jointure `source_publications` × `journals` sur « DOI commence par doi_prefix »), à la manière du sous-step cluster, et non comme une entrée du dictionnaire de règles : le DSL unaire ne porte que des cibles constantes, ici la cible est le journal résolu par recherche inverse. Il ne se fond pas non plus dans le sous-step cluster, qui groupe les SP **entre elles** par DOI partagé alors que `journal_by_doi` **joint chaque SP à un journal**.
 
-2. **Un sous-step à jointure, hors DSL unaire.** Le rapprochement par préfixe se code comme un traitement à part (jointure `source_publications` × `journals` sur « DOI commence par doi_prefix »), à la manière de la correction relationnelle existante, et non comme une entrée du dictionnaire de règles.
+3. **`journal_by_doi` possède `journal_id`, qui sort de l'unaire.** Le sous-step unaire revendique `journal_id` (dans `_UNARY_FIELDS`) mais ne le corrige jamais : `effective_metadata` n'appelle pas `_correct_field` dessus, et aucune règle ne le produit — tuyauterie morte (`CorrectedFields.journal_id`, `_AppliesCorrection.journal_id`, branche `journal_id` de `compute_update`, écriture de la colonne dans `persist_corrections`). Laissée en place, elle clobberait le rattachement : l'unaire reconstruit `journal_id` depuis le brut, strippe `raw_metadata.journal_id` et réécrit la colonne. La correction propre transfère la propriété de `journal_id` à `journal_by_doi` (et retire le mort de l'unaire), exactement comme `doi` appartient au sous-step cluster.
 
-3. **Ne corriger que les journal_id manquants, et sans ambiguïté.** N'agir que lorsque la `source_publication` n'a pas de journal_id, et seulement quand le préfixe désigne un unique journal. Ne pas écraser un journal résolu par la normalisation.
+4. **Ne corriger que les journal_id manquants, et sans ambiguïté.** N'agir que lorsque la `source_publication` n'a pas de journal_id, et seulement quand le préfixe désigne un **unique** journal (le plus spécifique en cas de préfixes emboîtés). Ne pas écraser un journal résolu par la normalisation.
 
-4. **Tracer comme toute correction.** Stasher le brut écrasé et la provenance dans `raw_metadata.journal_id.corrected_by`, sous un identifiant de règle dédié, pour la réversibilité et l'audit.
+5. **Tracer comme toute correction.** Stasher le brut écrasé et la provenance dans `raw_metadata.journal_id.corrected_by`, sous un identifiant de règle dédié, pour la réversibilité, l'audit et l'auto-cicatrisation (re-dérivation du brut à chaque run, restauration du NULL si le préfixe ne matche plus).
 
-5. **Traiter le croisement journal_id → doc_type par la convergence sur deux runs, en première intention.** Le journal_id corrigé à un run est relu au run suivant (la phase repart du brut, avec le journal_id désormais persisté et son `journal_type` joint), où la règle de doc_type se déclenche. Cela respecte le caractère auto-cicatrisant de la phase, sans introduire de feed-forward. Un ordonnancement intra-phase ou un feed-forward explicite ne sont à envisager que si la convergence différée se révèle gênante.
+6. **Ordre des sous-steps : `journal_by_doi` → unaire → cluster ; convergence en un seul run.** `journal_by_doi` commit le `journal_id` ; l'unaire re-fetch frais, joint `journal_type` depuis la colonne vivante, et `JOURNAL_TYPE_MEDIA_TO_MEDIA` reclasse `doc_type` (The Conversation : `preprint` → `media`) le même run ; le cluster suit, lisant le `doc_type` canonique. Le croisement inter-champ se résout par l'**ordre**, pas par un feed-forward dans la fonction pure : le canal de feed est la colonne committée qu'un sous-step aval re-lit. `effective_metadata` reste sans feed-forward interne.
+
+### Vérification : aucun conflit de règle sur un brut censé être corrigé
+
+Croisement, pour chaque champ corrigible, des règles qui le **lisent** en prédicat et du sous-step qui le **corrige**, selon l'ordre :
+
+- **`journal_id` / `journal_type`** (corrigé par `journal_by_doi`, en premier) : lu par l'unaire (`journal_id_present`, `journal_type`) — qui voit donc la valeur corrigée.
+- **`doc_type`** (corrigé par l'unaire) : lu par l'unaire (cascade first-match, whitelists quasi-disjointes, design acté) et par le cluster (canonique, après l'unaire).
+- **`doi`** (corrigé par le cluster, en dernier) : lu en brut par l'unaire (`doi_contains`, `doi_prefix_not_in`) et par `journal_by_doi` — mais le brut **est** le signal voulu (marqueur figshare, préfixe registre-thèse, namespace journal) ; la substitution cluster est une dédup en aval, orthogonale.
+- **`oa_status`** : lecteur unique = correcteur unique (embargo).
+- **`external_ids`** : aucun lecteur.
+
+Aucune règle ne consomme un brut qu'une autre est censée avoir corrigé avant elle. Le feed-forward explicite est donc enterré. Cas-limite bénin connu : un `book_chapter` orphelin portant le DOI de son ouvrage peut se voir rattacher le journal de l'ouvrage (`journal_by_doi` tourne avant le nullage cluster du DOI) — rare, hors cible, et défendable.
 
 ## Phasage
 
@@ -56,39 +68,37 @@ Ces orientations sont proposées et restent à confirmer ou amender ; seul le co
 - [x] Robustesse cadrée : instantané figé, jamais rafraîchi ; seul risque la sous-couverture, pas le préfixe trompeur (la LCP sur un sous-ensemble est toujours plus spécifique, donc sous-rattache au pire). Seuil de publications abaissé de 10 à 5 (couverture 291 → 1035 journaux) : en deçà, les préfixes deviennent trop spécifiques par accident d'échantillon pour un gain de rattachement négligeable (journaux à très faible volume). Seed rejoué sur le stock après l'abaissement.
 - [x] Périmètre retenu : uniquement les préfixes désignant un seul journal — la cible étant des publications sans aucun signal de départage, un préfixe partagé serait indécidable pour elles.
 
-### Phase 1 — Sous-step de rattachement par préfixe
+### Phase 1 — Sortir `journal_id` de l'unaire
 
-- [ ] Implémenter le traitement à jointure : pour chaque `source_publication` à DOI sans journal_id, rattacher le journal dont le `doi_prefix` préfixe le DOI, si et seulement s'il est unique.
-- [ ] Gérer le cas d'un préfixe qui en préfixe un autre (registrant nu vs namespace) par le rapprochement le plus spécifique.
-- [ ] Stasher brut et provenance dans `raw_metadata.journal_id`.
-- [ ] Couvrir par des tests (rattachement déductible, abstention sur préfixe partagé, non-écrasement d'un journal_id existant, idempotence).
+- [ ] Retirer la tuyauterie morte `journal_id` de l'unaire : `_UNARY_FIELDS`, écriture de la colonne dans `persist_corrections` et `CorrectionUpdate`, `CorrectedFields.journal_id`, `_AppliesCorrection.journal_id`, branche `journal_id` de `compute_update`.
+- [ ] Vérifier la non-régression (l'unaire ne touchait déjà plus `journal_id` en pratique ; le mort retiré ne change aucun comportement).
 
-### Phase 2 — Croisement journal_id → doc_type
+### Phase 2 — Sous-step `journal_by_doi`
 
-- [ ] Vérifier que la convergence sur deux runs produit bien la reclassification attendue (The Conversation : `preprint` → `media`).
-- [ ] Trancher si la convergence différée suffit, ou s'il faut ordonner les sous-steps de la phase, ou introduire un feed-forward.
+- [ ] Fonction domaine pure : longest-unique-prefix match d'un DOI contre la carte `doi_prefix` → `journal_id` (chargée en mémoire), abstention si non unique.
+- [ ] Orchestrateur : fetch des `source_publications` à DOI sans journal_id, application de la décision domaine, stash du brut et de la provenance dans `raw_metadata.journal_id`, persistance dédiée (possède `journal_id` + `raw_metadata.journal_id`).
+- [ ] Câbler l'ordre `journal_by_doi` → unaire → cluster dans l'orchestration de la phase.
+- [ ] Tests : rattachement déductible, abstention sur préfixe partagé, plus-spécifique sur préfixes emboîtés, non-écrasement d'un journal_id existant, idempotence et auto-cicatrisation, reclassification `doc_type` en un run (The Conversation `preprint` → `media`).
 
 ### Phase 3 — Application au stock
 
-- [ ] Appliquer la correction au stock existant par la re-passe la plus légère atteignant la phase `metadata_correction` (re-marquer les `source_publications` concernées et rejouer la phase), sans réimport.
+- [ ] Appliquer la correction au stock existant par la re-passe la plus légère atteignant `metadata_correction` (re-marquer les `source_publications` concernées et rejouer la phase), sans réimport.
 - [ ] Mesurer l'effet : journal_id rattachés, publications reclassées, résiduel.
 
 ## Items TODO liés (à traiter en passant ou recaser dans un autre chantier)
 * [ ] faux preprints: retyper en fonction du DOI (theConversation => media)
-* [ ] recensions: "Comptes rendus :", "Compte rendu :"; type = article + titre contient "(dir.)"
-* [ ] typage data_paper automatisé par journal (ex. *Scientific Data*; créer un journal_type dédié?); chercher aussi "dataset" dans les titres
-* [ ] créer circuit pour correction automatisée du `journal_type` (titre terminé par ` eBooks` => plateforme d'ebooks)
 * [ ] `metadata_correction`: en cas de corrections de champs multiples sur un même doc, les règles s'appliquent indépendamment à partir du brut; étudier les scénarios de corrections multiples où l'output d'une règle pourrait intersecter l'input des suivantes, voir s'il est pertinent de les chaîner ensemble
 * [ ] détection d'incohérences `doi_prefix`/`publisher_id`/`journal_id`: auditer d'abord, classifier les cas de divergence selon leur cause
-* [ ] noms de containers OpenAlex aberrants ("SPIRE - Sciences Po Institutional REpository") => faire quelque chose; de manière générale il faut interroger la pertinence du champ container relativement au journal_id
+* [ ] créer circuit pour correction automatisée du `journal_type` (titre terminé par ` eBooks` => plateforme d'ebooks)
+* [ ] recensions: "Comptes rendus :", "Compte rendu :"; type = article + titre contient "(dir.)"
+* [ ] typage data_paper automatisé par journal (ex. *Scientific Data*; créer un journal_type dédié?); chercher aussi "dataset" dans les titres
 * [ ] règle à créer: si DOI de forme ISBN + _n => conference_paper ou chapitre / si forme ISBN: proceedings ou book (trancher selon type du "journal")
 * [ ] 107270 et 869915 Computing Pivot-Minors: un article faussement typé preprint par openalex; + question des arxiv_id (déduire le DOI et vice-versa)
+* [ ] noms de containers OpenAlex aberrants ("SPIRE - Sciences Po Institutional REpository") => faire quelque chose; de manière générale il faut interroger la pertinence du champ container relativement au journal_id
 
 ## Questions ouvertes
 
-- **Dérivation de `doi_prefix`** : d'où vient la valeur, et tient-elle pour les journaux à faible volume ? C'est le socle de la fiabilité du rapprochement.
-- **Préfixes partagés** : faut-il traiter les rares préfixes désignant plusieurs journaux, et selon quel signal de départage (ISSN, titre de conteneur de la source) ? Ou les laisser hors périmètre ?
-- **Stratégie de chaînage** : convergence sur deux runs, ordonnancement intra-phase, ou feed-forward explicite ? Cette décision dépasse ce seul cas : c'est le premier croisement inter-champ du moteur de correction, et le choix fait ici sert de précédent. Vaut-il mieux un mécanisme général de chaînage, ou rester sur le cas par cas tant qu'un seul croisement existe ?
+- **Rafraîchissement du `doi_prefix`** : la valeur est un instantané figé (291 → 1035 journaux après le re-seed à seuil 5). Laisser en oneshot rejoué à la demande, ou promouvoir en étape pipeline idempotente ? Décision d'architecture distincte de ce chantier, non bloquante : `journal_by_doi` tourne sur le stock figé.
 - **Périmètre des publications** : restreindre au périmètre, ou rattacher aussi hors périmètre (même logique, mais volume et utilité différents) ?
 - **Typage de Preprints.org** : la plateforme est typée `journal` plutôt que `preprint_server` ; ses publications restent `preprint`, donc neutre ici, mais c'est un défaut de typage à corriger à part. Dans ce chantier ou ailleurs ?
 - **Place du sous-step** : adjoindre au traitement relationnel existant (corrections par cluster de DOI) ou en faire un sous-step de résolution de journal distinct ?
