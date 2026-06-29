@@ -1,4 +1,3 @@
-oneshot:  python interfaces/cli/maintenance/redirty_publications.py; python run_pipeline.py --only publications
 # Pipeline
 ## Extraction
 ### Couverture
@@ -11,17 +10,12 @@ oneshot:  python interfaces/cli/maintenance/redirty_publications.py; python run_
 ## Suite du traitement
 * [ ] `publishers_journals`: paralléliser crossref/datacite
 * [ ] vérifier qu'il ne manque pas des `ANALYZE` en cours de pipeline pour éviter un *seq scan* sur des millions de lignes lors d'un premier run depuis une base vide.
-### Correction
-* [ ] créer circuit pour correction automatisée du `journal_type` (titre terminé par ` eBooks` => plateforme d'ebooks)
-* [ ] `metadata_correction`: en cas de corrections de champs multiples sur un même doc, les règles s'appliquent indépendamment à partir du brut; étudier les scénarios de corrections multiples où l'output d'une règle pourrait intersecter l'input des suivantes, voir s'il est pertinent de les chaîner ensemble
 * [ ] `persons`: voir si on peut généraliser le matching par identifiants forts aux authorships hors périmètre (à réserver aux identifiants `confirmed` / et/ou corroboration par nom?)
 
 # Données
 * [ ] détection d'incohérences `doi_prefix`/`publisher_id`/`journal_id`: auditer d'abord, classifier les cas de divergence selon leur cause
 * [ ] distinguer conference_paper et conférence
-## Problèmes dans les sources
 * [ ] DUMAS: comment distinguer mémoires et thèses d'exercice?
-* [ ] noms de containers OpenAlex aberrants ("SPIRE - Sciences Po Institutional REpository") => faire quelque chose
 ## Explorer autres sources possibles
 * [ ] Dimensions?; ArXiv, PMC, Pubmed; Sudoc? (liens personnes-thèses plus complets que theses.fr, j'ai l'impression); Cairn, Persée pour augmenter couverture SHS?
 * [ ] OpenAPC: j'ai utilisé les données sur les APC UCA, mais il faudrait partir du dump complet et matcher tous les DOI des publis UCA pour voir quels établissements ont payé les APC quand ce n'est pas l'UCA
@@ -46,17 +40,15 @@ oneshot:  python interfaces/cli/maintenance/redirty_publications.py; python run_
 * [ ] Collab internationales: affichage carte?
 * [ ] Montants APC (à envisager une fois que les problèmes de données seront résolus)
 * [ ] codes couleurs (types de documents): fixer le mapping type-couleur
+* [ ] adapter la hauteur au viewport
 
 # Cas particuliers, bizarreries à élucider
 * [ ] 164107: pourquoi type autre?
 * [ ] 165068 type "commmentary"; 86931 type "meeting report" => comment prendre en compte ces types (et empêcher openalex d'imposer le type article); réfléchir au type "report"
 * [ ] 30172 un recueil de proceedings fusionné avec tous ses chapitres
 * [ ] 182637 et 182636: vérifier si DataCite indique relation
-* [ ] règle à créer: si DOI de forme ISBN + _n => conference_paper ou chapitre / si forme ISBN: proceedings ou book (trancher selon type du "journal")
-* [ ] 107270 et 869915 Computing Pivot-Minors: un article faussement typé preprint par openalex; + question des arxiv_id (déduire le DOI et vice-versa)
-* [ ] faux preprints: retyper en fonction du DOI (theConversation => media)
-* [ ] recensions: "Comptes rendus :", "Compte rendu :"; type = article + titre contient "(dir.)"
-* [ ] typage data_paper automatisé par journal (ex. *Scientific Data*; créer un journal_type dédié?); chercher aussi "dataset" dans les titres
+* [ ] ignorer pièces d'un dataset? (le parent suffit)
+* [ ] nettoyer les faux NNT (OAI:*)
 
 # Idées pour plus tard, éventuellement
 * stats en compte fractionnaire vs compte entier

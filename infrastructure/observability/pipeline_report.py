@@ -9,22 +9,6 @@ LOGS_ROOT = PROJECT_ROOT / "logs"
 REPORTS_DIR = LOGS_ROOT / "reports"
 
 
-def get_last_report_date() -> datetime.date | None:
-    """Date (YYYY-MM-DD) du plus récent rapport de pipeline, ou None.
-
-    Les rapports sont nommés `YYYY-MM-DD_HHMMSS.md` (cf. `generate_report`).
-    """
-    if not REPORTS_DIR.exists():
-        return None
-    dates = []
-    for f in REPORTS_DIR.glob("*.md"):
-        try:
-            dates.append(datetime.date.fromisoformat(f.name[:10]))
-        except ValueError:
-            continue
-    return max(dates) if dates else None
-
-
 # Fichiers log à exclure de la capture (sortie orchestrateur, loggers parasites)
 _EXCLUDED_LOGS = {"cron.log", "zenodo.log"}
 

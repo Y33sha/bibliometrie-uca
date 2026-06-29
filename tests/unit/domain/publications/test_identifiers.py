@@ -198,6 +198,11 @@ class TestNNT:
             "",  # vide
             "   ",  # whitespace seul
             "2021-CLFA-0030",  # non alphanumérique
+            # Identifiants OAI-PMH exposés par OpenAlex dans primary_location.id :
+            # ce ne sont pas des NNT, le garde doit les rejeter (sinon lien theses.fr mort).
+            "oai:HAL:hal-04677016v1",
+            "doi:10.5281/zenodo.17854170",
+            "ark:/13030/qt2sv083h3",
         ],
     )
     def test_raises_on_invalid(self, raw):
