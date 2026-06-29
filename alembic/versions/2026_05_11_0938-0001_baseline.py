@@ -1,14 +1,23 @@
 """baseline
 
-Squash des 23 migrations historiques (`infrastructure/db/migrations/001_*.sql`
-à `023_*.sql`) en une migration unique. Le SQL appliqué provient d'un
-`pg_dump --schema-only` figé dans `0001_baseline.sql`, à côté de ce
-fichier (couvre tables, vues, enums, fonctions, contraintes,
-exhaustif — la MetaData seule ne le serait pas).
+Point de départ du chaînage Alembic : le schéma complet de la base, figé
+via `pg_dump --schema-only` dans `0001_baseline.sql`, à côté de ce fichier
+(tables, vues, enums, fonctions, vues matérialisées, index, contraintes —
+exhaustif, là où la MetaData seule ne le serait pas).
 
-Cette migration n'est rejouée que sur une base vierge (tests, nouvel
-env). Sur une base déjà au schéma actuel (prod, dev), on la marque
-appliquée via `alembic stamp head`.
+Cette migration n'est rejouée que sur une base vierge (tests, nouvel env).
+Sur une base déjà au schéma courant (prod, dev), on la marque appliquée via
+`alembic stamp 0001`.
+
+Régénération (consolidation des migrations accumulées) : rejouer la chaîne
+sur une base vierge ou dumper une base au schéma courant via
+`python -m infrastructure.db.dump_schema`, puis dériver le SQL en retirant
+le préambule de session pg_dump (`SET statement_timeout`, `search_path`,
+directives `\\restrict`/`\\unrestrict`) et la table `alembic_version`, qu'Alembic
+gère lui-même. Les vues matérialisées, dumpées `WITH NO DATA`, sont peuplées
+par un `REFRESH MATERIALIZED VIEW` en fin de fichier (dans l'ordre d'émission
+du dump, qui respecte les dépendances) : non peuplées, elles lèveraient une
+erreur à l'interrogation.
 
 Revision ID: 0001
 Revises:
