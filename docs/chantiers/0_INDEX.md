@@ -2,17 +2,21 @@
 
 ## Chantiers non archivés
 
+### En cours
+
+
+
 ### En pause
 
 - [Observabilité du pipeline](CODE_observabilite-pipeline.md)
-- [Qualité et cohérence des sujets](METIER_sujets-qualite.md)
+- [Gestion et dédoublonnage assistés de la base personnes](DATA_personnes-dedoublonnage-assiste.md)
 
 ### Non commencé
 
-- [Gestion et dédoublonnage assistés de la base personnes](DATA_personnes-dedoublonnage-assiste.md)
-- [Signatures institutionnelles (qualité et outillage)](METIER_signatures-institutionnelles.md)
-- [Scinder `source_authorships` (identité ⊥ liaison)](DATA_scinder-source-authorships.md)
 - [Brancher le domaine riche orphelin](CODE_domaine-riche-orphelin.md)
+- [Scinder `source_authorships` (identité ⊥ liaison)](DATA_scinder-source-authorships.md)
+- [Qualité et cohérence des sujets](METIER_sujets-qualite.md)
+- [Signatures institutionnelles](METIER_signatures-institutionnelles.md)
 
 ## Chantiers archivés
 

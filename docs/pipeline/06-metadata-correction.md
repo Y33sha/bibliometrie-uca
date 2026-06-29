@@ -14,6 +14,3 @@ Regroupe les `source_publications` partageant un même DOI et déduit, pour chaq
 
 1. **Convergence** — un entrepôt comme Zenodo attribue un DOI distinct à chaque version d'un dépôt, plus un **DOI concept** stable qui couvre toutes les versions. Le DOI concept est lu dans les métadonnées DataCite du dépôt (relation « est une version de ») et appliqué à toutes les `source_publications` portant un DOI de version : concept et versions convergent ainsi vers une seule publication.
 2. **Divergence** — un DOI partagé par des documents en réalité distincts (un chapitre qui porte le DOI de l'ouvrage qui le contient ; des chapitres de titres différents portant le DOI de leur ouvrage hôte) est neutralisé sur le ou les mauvais documents, afin qu'ils cessent d'être rapprochés.
-
-> **Évolution envisagée**
-> - Élargir les cas par grappe (par exemple une thèse classée à tort comme article au sein d'une grappe).
