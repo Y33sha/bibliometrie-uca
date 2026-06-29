@@ -23,6 +23,7 @@ Le motif de fond : la couche domaine offre des contrats stricts (VOs auto-valid�
 - [x] Dispatch `normalized_identifier_value(id_type, raw)` branché dans l'entonnoir d'écriture unique `add_identifier`, qui valide et normalise avant lookup et insertion. Couvre l'ajout manuel (API admin) et la promotion canonique (pipeline) sans duplication.
 - [x] Validation ad hoc du router supprimée (regex ORCID locale, strip d'URL partiel) ; `ValidationError → 400`.
 - [x] Politique par appelant : strict côté API (4xx) ; tolérant côté pipeline (`add_identifiers_from_authorships` loggue « identifiant mal formé » et poursuit).
+- [ ] Réduire la duplication résiduelle : le router refait son propre lookup `person_identifiers` (réponses `already_exists` / conflit / `reassigned`) en parallèle de la logique de `add_identifier`. Faire porter ces réponses par `add_identifier` pour un seul site de décision.
 
 ### Vocabulaire canonique des rôles d'authorship
 
