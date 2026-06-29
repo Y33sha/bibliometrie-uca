@@ -7,8 +7,7 @@ Les fichiers qui jouent ce rôle :
 - `interfaces/api/app.py` — entry point FastAPI (startup, lifespan, middlewares, montage des routers)
 - `interfaces/api/deps.py` — factories partagées par les routers : `db_conn_sync` (Connection SA), query services et repositories câblés sur cette Connection
 - `run_pipeline.py` — orchestrateur pipeline complet
-- `interfaces/cli/pipeline/*` — entry points CLI pour chaque phase
-- `interfaces/cli/*` — scripts one-shot
+- `interfaces/cli/*` — scripts CLI
 
 **Seuls** ces fichiers importent `infrastructure.repositories`, `infrastructure.queries.*` ou toute classe `Pg*` concrète.
 

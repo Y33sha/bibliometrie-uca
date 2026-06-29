@@ -31,18 +31,17 @@ Le projet suit une architecture **hexagonale (DDD)**. Le cœur du système est `
 
 1. **Noyau pur.** `domain/` contient zéro I/O, zéro import externe hormis `stdlib`. Testable sans DB, sans HTTP, sans mock, en millisecondes.
 
-2. **Les ports sont une zone neutre.** `application/ports/*` ne contient que des `Protocol`, pas d'implémentation. L'arborescence interne (`repositories/` pour les agrégats, `api/` / `pipeline/` pour les query services) sert à grouper visuellement, pas à porter des règles d'import distinctes.
+2. **Les ports sont une zone neutre.** `application/ports/*` ne contient que des `Protocol`, pas d'implémentation.
 
-3. **Use-cases indépendants des adapters sortants.** `application/` ne peut pas importer `infrastructure/`. Les services applicatifs reçoivent leurs dépendances (repositories, query services) via les **ports** (`Protocol`) définis dans `application/ports/` — c'est `infrastructure/` qui implémente les ports, pas l'inverse. Contrôlé par `import-linter` (contrat `layered` dans `pyproject.toml`).
+3. **Use-cases indépendants des adapters sortants.** `application/` ne peut pas importer `infrastructure/`. Les services applicatifs reçoivent leurs dépendances (repositories, query services) via les **ports** (`Protocol`) définis dans `application/ports/` — c'est `infrastructure/` qui implémente les ports, pas l'inverse. Contrôlé par `import-linter` (contrat `layers` dans `pyproject.toml`).
 
-4. **Routers ⊥ adapters sortants.** Les routers FastAPI (`interfaces/api/routers/*`) reçoivent leurs dépendances via `Depends(...)` (factories dans `interfaces.api.deps`) ; ils n'instancient pas eux-mêmes les `Pg*` concrets. Verrouillé par un contrat `import-linter`. Les exceptions assumées (deux modules qui importent un utilitaire non-DB) sont déclarées dans le `pyproject.toml`, pas ici. Les scripts CLI ne sont pas concernés : ils sont leur propre composition root (cf. règle 5).
+4. **Routers ⊥ adapters sortants.** Les routers FastAPI (`interfaces/api/routers/*`) reçoivent leurs dépendances via `Depends(...)` (factories dans `interfaces.api.deps`) ; ils n'instancient pas eux-mêmes les `Pg*` concrets. Verrouillé par un contrat `import-linter`. Les scripts CLI ne sont pas concernés : ils sont leur propre composition root (cf. règle 5).
 
 5. **Le composition root est un endroit précis.** L'instanciation concrète des adapters et leur câblage aux use-cases se fait dans **un petit ensemble nommé de fichiers** :
 
    - `interfaces/api/app.py` + `interfaces/api/deps.py` — API HTTP
    - `run_pipeline.py` — pipeline complet
-   - `interfaces/cli/pipeline/*` — phases pipeline isolées
-   - `interfaces/cli/*` — scripts one-shot
+   - `interfaces/cli/*` — scripts CLI
 
    Ces fichiers sont les **seuls** qui ont légitimement le droit d'importer `infrastructure.repositories`, `infrastructure.queries.*` ou toute classe `Pg*` concrète. Partout ailleurs, on passe par un port.
 

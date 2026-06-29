@@ -6,7 +6,7 @@ Commencé le 2026-05-16.
 
 Le pipeline se lance rarement d'un bloc : extraction sur une plage d'années custom, `cross_imports` interrompu s'il est trop long, reprise en `--from normalize`. L'observabilité doit suivre cet usage. Le système en place ne produit un instantané que pour un **run complet** (gardé par `not args.only and not args.from_phase` dans `run_pipeline.py`), agrégeant l'état global de la base et les métriques de toutes les phases dans un seul payload `pipeline_run_snapshots`. Les runs partiels — le cas courant — ne produisent rien. La page admin associée (onglets Snapshots / Rapports, composant monolithique) est inadaptée à cet usage.
 
-Besoin primaire : **savoir d'un coup d'œil si un run s'est bien passé**, phase par phase, y compris pour un run partiel ou automatisé — vert quand il n'y a rien à regarder, rouge quand une phase échoue sur exception, ambre quand quelque chose est à signaler (interruption contrôlée par l'utilisateur, source indisponible, arrêt après une série de 429, conflit d'identité). Avoir aussi une idée du temps pris et repérer une phase anormalement lente. Besoin secondaire : suivre l'évolution des volumes dans la durée.
+Besoin primaire : **savoir d'un coup d'œil si un run s'est bien passé**, phase par phase, y compris pour un run partiel ou automatisé — vert quand il n'y a rien à regarder, rouge quand une phase échoue sur exception, ambre quand quelque chose est à signaler (interruption contrôlée par l'utilisateur, source indisponible, arrêt après une série de 429). Avoir aussi une idée du temps pris et repérer une phase anormalement lente. Besoin secondaire : suivre l'évolution des volumes dans la durée.
 
 ## Décisions
 

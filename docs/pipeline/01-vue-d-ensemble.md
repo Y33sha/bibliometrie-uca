@@ -22,7 +22,7 @@ Le peuplement de la base s'effectue via un *pipeline* composé des étapes suiva
 
 ## Enrichissement des référentiels publishers et journals
 
-- [Publishers & journals](05-publishers-journals.md) : enrichit les référentiels de revues et d'éditeurs à partir de sources externes — préfixes DOI (sources: Crossref + DataCite), montant d'APC et type des revues (sources: OpenAlex Sources, DOAJ), pays et ROR des éditeurs (sources: OpenAlex Publishers, fallback Crossref Members), type d'éditeur  (commercial, académique, société savante…) (source: ROR).
+- [Publishers & journals](05-publishers-journals.md) : enrichit les référentiels de revues et d'éditeurs à partir de sources externes — préfixes DOI (sources: Crossref + DataCite), montant d'APC et type des revues (sources: OpenAlex Sources, DOAJ).
 
 ## Correction des métadonnées
 
