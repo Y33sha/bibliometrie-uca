@@ -67,6 +67,7 @@ if TYPE_CHECKING:
 from application.pipeline.graph import PHASE_ORDER, watched_tables
 from application.pipeline.metadata_correction.correct_by_cluster import ClusterCorrectionStats
 from application.pipeline.metadata_correction.correct_unary import UnaryCorrectionStats
+from application.pipeline.metadata_correction.journal_by_doi import JournalByDoiStats
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.modes import MODE_NAMES, MODES
 from application.pipeline.normalize.base import NormalizeStats
@@ -580,20 +581,28 @@ def phase_metadata_correction(**kw: Any) -> PhaseMetrics:
 
     Tourne après `publishers_journals` (journaux typés, donc les règles
     journal-dépendantes ont leurs entrées fraîches) et avant `publications`
-    (le matching lit les colonnes corrigées). Deux sous-étapes : unaire
+    (le matching lit les colonnes corrigées). Trois sous-steps, dans l'ordre :
+    journal_by_doi (rattachement du journal manquant par préfixe DOI), puis unaire
     (per-record : mapping + règles de correction), puis cluster (group-by-DOI :
     substitution version→concept DataCite, nullage des DOI erronés ouvrage/chapitre).
+
+    journal_by_doi en premier : le `journal_id` qu'il commit est joint par l'unaire
+    (`journal_type` depuis la colonne vivante), de sorte que la reclassification
+    `doc_type` journal-dépendante a lieu dans le même run, sans feed-forward.
     """
+    journal_by_doi = _run_journal_by_doi()
     unary = _run_correct_metadata_unary()
     cluster = _run_correct_by_cluster()
     metrics = PhaseMetrics()
     metrics.add(
-        total=unary.examined + cluster.examined,
-        updated=unary.corrected + cluster.corrected,
+        total=journal_by_doi.examined + unary.examined + cluster.examined,
+        updated=journal_by_doi.attached + unary.corrected + cluster.corrected,
     )
     # Chiffres plats : `{mode}_{examined,corrected}`. Le frontend les arrange en
     # matrice (mode × examinées/corrigées) — pur agencement de présentation.
     metrics.details["summary"] = {
+        "journal_by_doi_examined": journal_by_doi.examined,
+        "journal_by_doi_corrected": journal_by_doi.attached,
         "unary_examined": unary.examined,
         "unary_corrected": unary.corrected,
         "cluster_examined": cluster.examined,
@@ -737,6 +746,22 @@ def phase_subjects(**kw: Any) -> Any:
     """
     _run_ingest_subjects()
     _run_cooccurrences()
+
+
+def _run_journal_by_doi() -> JournalByDoiStats:
+    from application.pipeline.metadata_correction.journal_by_doi import run
+    from infrastructure.db.engine import get_sync_engine
+    from infrastructure.queries.pipeline.metadata_correction import PgMetadataCorrectionQueries
+
+    log.info("▶ metadata_correction (journal_by_doi)")
+    t0 = time.time()
+    conn = get_sync_engine().connect()
+    try:
+        stats = run(conn, PgMetadataCorrectionQueries(), log)
+    finally:
+        conn.close()
+    log.info("✓ metadata_correction (journal_by_doi) terminé en %.1fs", time.time() - t0)
+    return stats
 
 
 def _run_correct_metadata_unary() -> UnaryCorrectionStats:

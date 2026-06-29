@@ -70,15 +70,15 @@ Aucune règle ne consomme un brut qu'une autre est censée avoir corrigé avant 
 
 ### Phase 1 — Sortir `journal_id` de l'unaire
 
-- [ ] Retirer la tuyauterie morte `journal_id` de l'unaire : `_UNARY_FIELDS`, écriture de la colonne dans `persist_corrections` et `CorrectionUpdate`, `CorrectedFields.journal_id`, `_AppliesCorrection.journal_id`, branche `journal_id` de `compute_update`.
-- [ ] Vérifier la non-régression (l'unaire ne touchait déjà plus `journal_id` en pratique ; le mort retiré ne change aucun comportement).
+- [x] Tuyauterie morte `journal_id` retirée de l'unaire : `_UNARY_FIELDS`, colonne de `persist_corrections`, `CorrectionUpdate`, `CorrectedFields.journal_id`, `_AppliesCorrection.journal_id`, branche `compute_update`.
+- [x] Non-régression vérifiée (tests unaires + intégration `metadata_correction` verts ; comportement inchangé, l'unaire ne touchait déjà plus `journal_id`).
 
 ### Phase 2 — Sous-step `journal_by_doi`
 
-- [ ] Fonction domaine pure : longest-unique-prefix match d'un DOI contre la carte `doi_prefix` → `journal_id` (chargée en mémoire), abstention si non unique.
-- [ ] Orchestrateur : fetch des `source_publications` à DOI sans journal_id, application de la décision domaine, stash du brut et de la provenance dans `raw_metadata.journal_id`, persistance dédiée (possède `journal_id` + `raw_metadata.journal_id`).
-- [ ] Câbler l'ordre `journal_by_doi` → unaire → cluster dans l'orchestration de la phase.
-- [ ] Tests : rattachement déductible, abstention sur préfixe partagé, plus-spécifique sur préfixes emboîtés, non-écrasement d'un journal_id existant, idempotence et auto-cicatrisation, reclassification `doc_type` en un run (The Conversation `preprint` → `media`).
+- [x] Fonction domaine pure `resolve_journal_by_doi` : longest-unique-prefix match d'un DOI contre la carte `doi_prefix` → `journal_id` (chargée en mémoire), abstention si non unique.
+- [x] Orchestrateur `journal_by_doi.py` : fetch des orphelines à DOI (+ déjà rattachées, pour l'auto-cicatrisation), décision domaine, stash du brut et de la provenance dans `raw_metadata.journal_id`, persistance dédiée (possède `journal_id` + `raw_metadata.journal_id`, marque `keys_dirty` pour propager au canonique via la réconciliation).
+- [x] Ordre `journal_by_doi` → unaire → cluster câblé dans `phase_metadata_correction`.
+- [x] Tests : déductible, abstention sur partagé, plus-spécifique sur emboîtés, non-écrasement, idempotence et auto-cicatrisation (unitaires), reclassification `doc_type` en un run et auto-cicatrisation (intégration).
 
 ### Phase 3 — Application au stock
 
@@ -87,7 +87,6 @@ Aucune règle ne consomme un brut qu'une autre est censée avoir corrigé avant 
 
 ## Items TODO liés (à traiter en passant ou recaser dans un autre chantier)
 * [ ] faux preprints: retyper en fonction du DOI (theConversation => media)
-* [ ] `metadata_correction`: en cas de corrections de champs multiples sur un même doc, les règles s'appliquent indépendamment à partir du brut; étudier les scénarios de corrections multiples où l'output d'une règle pourrait intersecter l'input des suivantes, voir s'il est pertinent de les chaîner ensemble
 * [ ] détection d'incohérences `doi_prefix`/`publisher_id`/`journal_id`: auditer d'abord, classifier les cas de divergence selon leur cause
 * [ ] créer circuit pour correction automatisée du `journal_type` (titre terminé par ` eBooks` => plateforme d'ebooks)
 * [ ] recensions: "Comptes rendus :", "Compte rendu :"; type = article + titre contient "(dir.)"

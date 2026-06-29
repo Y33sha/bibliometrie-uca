@@ -11,6 +11,8 @@ from application.ports.pipeline.metadata_correction import (
     CorrectionUpdate,
     DoiClusterRow,
     DoiCorrectionUpdate,
+    JournalByDoiRow,
+    JournalCorrectionUpdate,
     MetadataCorrectionQueries,
 )
 from domain.source_publications.correction import SourcePublicationForCorrection
@@ -48,6 +50,46 @@ def fetch_for_unary_correction_by_journal(
     """Les `source_publications` d'un journal (`journal_id = :jid`) — recompute ciblé."""
     rows = conn.execute(text(_SELECT + " WHERE sp.journal_id = :jid"), {"jid": journal_id}).all()
     return [SourcePublicationForCorrection(*row) for row in rows]
+
+
+def fetch_journal_doi_prefixes(conn: Connection) -> list[tuple[str, int]]:
+    """`(doi_prefix, journal_id)` de tous les journaux portant un `doi_prefix`."""
+    rows = conn.execute(
+        text("SELECT doi_prefix, id FROM journals WHERE doi_prefix IS NOT NULL")
+    ).all()
+    return [(row.doi_prefix, row.id) for row in rows]
+
+
+def fetch_journal_by_doi_candidates(conn: Connection) -> list[JournalByDoiRow]:
+    """SP orphelines à DOI, plus celles déjà rattachées par préfixe (auto-cicatrisation)."""
+    rows = conn.execute(
+        text("""
+            SELECT id, doi, journal_id, raw_metadata
+            FROM source_publications
+            WHERE (journal_id IS NULL AND doi IS NOT NULL)
+               OR raw_metadata ? 'journal_id'
+        """)
+    ).all()
+    return [JournalByDoiRow(*row) for row in rows]
+
+
+def persist_journal_corrections(conn: Connection, updates: list[JournalCorrectionUpdate]) -> int:
+    """UPDATE en lot de la colonne `journal_id` + `raw_metadata`, bump `updated_at`, marque
+    `keys_dirty` : `journal_id` n'est pas une clé de matching, mais la réconciliation est le
+    seul chemin vers `refresh_from_sources`, donc le rattachement doit la déclencher pour
+    propager au `journal_id` canonique."""
+    if not updates:
+        return 0
+    stmt = text("""
+        UPDATE source_publications
+        SET journal_id = :journal_id,
+            raw_metadata = :raw_metadata,
+            keys_dirty = true,
+            updated_at = clock_timestamp()
+        WHERE id = :id
+    """).bindparams(bindparam("raw_metadata", type_=JSONB))
+    conn.execute(stmt, [u._asdict() for u in updates])
+    return len(updates)
 
 
 def fetch_doi_cluster_candidates(conn: Connection) -> list[DoiClusterRow]:
@@ -169,6 +211,17 @@ class PgMetadataCorrectionQueries(MetadataCorrectionQueries):
 
     def persist_corrections(self, conn: Connection, updates: list[CorrectionUpdate]) -> int:
         return persist_corrections(conn, updates)
+
+    def fetch_journal_doi_prefixes(self, conn: Connection) -> list[tuple[str, int]]:
+        return fetch_journal_doi_prefixes(conn)
+
+    def fetch_journal_by_doi_candidates(self, conn: Connection) -> list[JournalByDoiRow]:
+        return fetch_journal_by_doi_candidates(conn)
+
+    def persist_journal_corrections(
+        self, conn: Connection, updates: list[JournalCorrectionUpdate]
+    ) -> int:
+        return persist_journal_corrections(conn, updates)
 
     def fetch_doi_cluster_candidates(self, conn: Connection) -> list[DoiClusterRow]:
         return fetch_doi_cluster_candidates(conn)

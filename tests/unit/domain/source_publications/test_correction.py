@@ -5,7 +5,33 @@ from domain.source_publications.correction import (
     MetadataCorrectionRule,
     SourcePublicationForCorrection,
     effective_metadata,
+    resolve_journal_by_doi,
 )
+
+
+class TestResolveJournalByDoi:
+    def test_unique_prefix_matches(self):
+        prefixes = [("10.64628/aak", 7)]
+        assert resolve_journal_by_doi("10.64628/aak.abc123", prefixes) == 7
+
+    def test_no_prefix_matches(self):
+        prefixes = [("10.64628/aak", 7)]
+        assert resolve_journal_by_doi("10.1016/j.ex.2020.01", prefixes) is None
+
+    def test_nested_prefixes_pick_most_specific(self):
+        # Registrant nu (un journal) et namespace propre (un autre) : le plus long gagne.
+        prefixes = [("10.5194", 1), ("10.5194/acp", 2)]
+        assert resolve_journal_by_doi("10.5194/acp.123", prefixes) == 2
+
+    def test_shared_prefix_abstains(self):
+        # Deux journaux portent le même doi_prefix : ambigu → abstention.
+        prefixes = [("10.5194/x", 1), ("10.5194/x", 2)]
+        assert resolve_journal_by_doi("10.5194/x.123", prefixes) is None
+
+    def test_same_journal_twice_still_matches(self):
+        # Même journal listé deux fois (préfixe dupliqué) : non ambigu.
+        prefixes = [("10.5194/acp", 2), ("10.5194/acp", 2)]
+        assert resolve_journal_by_doi("10.5194/acp.123", prefixes) == 2
 
 
 def _view(**overrides: object) -> SourcePublicationForCorrection:
