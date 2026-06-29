@@ -82,8 +82,8 @@ Aucune règle ne consomme un brut qu'une autre est censée avoir corrigé avant 
 
 ### Phase 3 — Application au stock
 
-- [ ] Appliquer la correction au stock existant par la re-passe la plus légère atteignant `metadata_correction` (re-marquer les `source_publications` concernées et rejouer la phase), sans réimport.
-- [ ] Mesurer l'effet : journal_id rattachés, publications reclassées, résiduel.
+- [x] Correction appliquée par un passage de `metadata_correction` puis `publications` (le sous-step scanne toutes les orphelines à DOI, pas de re-dirty préalable).
+- [x] Effet mesuré : **7 145 source_publications rattachées** (5 272 in_perimeter), **+1 541 SP** basculées en `doc_type=media` et **+274 publications canoniques** retypées `media`. Idempotence confirmée en réel (re-simulation : 0 rattachable restant). Résiduel : ~24 000 orphelines in_perimeter sans préfixe-journal correspondant, hors de portée par construction.
 
 ## Items TODO liés (à traiter en passant ou recaser dans un autre chantier)
 * [ ] faux preprints: retyper en fonction du DOI (theConversation => media)
