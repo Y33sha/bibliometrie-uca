@@ -722,6 +722,60 @@ class TestTitleYearPagesEndBookReviewRule:
         assert effective_metadata(view).doc_type is None
 
 
+class TestTitleRecensionBookReviewRule:
+    def test_recension_prefix_corrects(self):
+        view = _view(
+            doc_type="article", title="Recension de Stéphane Toussaint, La Liberté d'esprit"
+        )
+        corrected = effective_metadata(view).doc_type
+        assert corrected is not None
+        assert corrected.value == "book_review"
+        assert corrected.rule == MetadataCorrectionRule.TITLE_RECENSION_TO_BOOK_REVIEW
+
+    def test_recension_colon_form_corrects(self):
+        view = _view(doc_type="other", title="Recension : Shakespeare and Authority")
+        corrected = effective_metadata(view).doc_type
+        assert corrected is not None and corrected.value == "book_review"
+
+    def test_recensions_plural_corrects(self):
+        view = _view(doc_type="preprint", title="Recensions")
+        corrected = effective_metadata(view).doc_type
+        assert corrected is not None and corrected.value == "book_review"
+
+    def test_comptes_rendus_colon_corrects(self):
+        view = _view(
+            doc_type="article", title="Comptes rendus : « Philippe Antoine (dir.), La Littérature »"
+        )
+        corrected = effective_metadata(view).doc_type
+        assert corrected is not None and corrected.value == "book_review"
+
+    def test_compte_rendu_singular_colon_corrects(self):
+        view = _view(doc_type="preprint", title="Compte rendu : Plotin, Traité 30")
+        corrected = effective_metadata(view).doc_type
+        assert corrected is not None and corrected.value == "book_review"
+
+    def test_compte_rendu_de_mission_is_not_a_recension(self):
+        # Le deux-points immédiat est requis : un « Compte rendu de mission : … » est un
+        # rapport, pas une recension — pas de correction.
+        view = _view(doc_type="other", title="Compte rendu de mission : Ile de Santiago (Cap-Vert)")
+        assert effective_metadata(view).doc_type is None
+
+    def test_compte_rendu_de_soutenance_is_not_a_recension(self):
+        view = _view(
+            doc_type="other", title="Compte rendu de la soutenance d'HDR de Carole Christen"
+        )
+        assert effective_metadata(view).doc_type is None
+
+    def test_book_is_spared(self):
+        # `book`/`book_chapter` hors whitelist : la recension est l'article, pas l'ouvrage.
+        view = _view(doc_type="book", title="Recension de cet ouvrage")
+        assert effective_metadata(view).doc_type is None
+
+    def test_unrelated_title_no_correction(self):
+        view = _view(doc_type="article", title="Recent advances in soil science")
+        assert effective_metadata(view).doc_type is None
+
+
 class TestDoiFigshareCollectionRule:
     COLL = "10.6084/m9.figshare.c.7654321"
     ITEM = "10.6084/m9.figshare.1234567"
