@@ -21,7 +21,7 @@ erreur à l'interrogation.
 
 Revision ID: 0001
 Revises:
-Create Date: 2026-05-11 09:38:26.630196
+Create Date: 2026-06-29 09:34
 """
 
 from collections.abc import Sequence
