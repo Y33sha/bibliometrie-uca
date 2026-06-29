@@ -78,6 +78,41 @@ def persist_phase_execution(conn: Connection, execution: PhaseExecution) -> None
     )
 
 
+def last_extract_date(conn: Connection, source: str) -> datetime.date | None:
+    """Jour (UTC) de la dernière phase `extract` ayant inclus `source`, hors échec.
+
+    Sert de borne « depuis » à l'extraction incrémentale : on repart de la dernière
+    extraction réussie de cette source, pas d'un run quelconque — un run partiel sans
+    phase `extract` ne fait donc pas avancer le curseur. L'ancrage au jour de début
+    (`started_at`) ménage un léger recouvrement plutôt qu'un trou, l'upsert staging
+    étant idempotent. `status <> 'error'` écarte les extractions échouées.
+    """
+    last = conn.execute(
+        text(
+            """
+            SELECT max(started_at)
+            FROM pipeline_phase_executions
+            WHERE phase = 'extract'
+              AND :source = ANY(sources)
+              AND status <> 'error'
+            """
+        ),
+        {"source": source},
+    ).scalar()
+    return last.date() if last is not None else None
+
+
+def get_last_extract_date(source: str) -> datetime.date | None:
+    """Variante best-effort ouvrant sa propre connexion ; renvoie None (→ fallback de
+    l'appelant) si la lecture échoue (table absente, connexion impossible)."""
+    try:
+        with get_sync_engine().connect() as conn:
+            return last_extract_date(conn, source)
+    except Exception as exc:
+        log.warning("Lecture de la dernière extraction %s échouée : %s", source, exc)
+        return None
+
+
 class PhaseExecutionRecorder:
     """Capture par phase, best-effort. Désactivé quand `conn` est `None`."""
 
