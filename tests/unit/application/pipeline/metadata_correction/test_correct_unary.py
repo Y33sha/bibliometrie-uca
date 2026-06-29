@@ -14,13 +14,12 @@ def test_tally_corrections_exclut_le_mapping_doc_type():
     updates = [
         # mapping de vocabulaire seul → pas une correction
         CorrectionUpdate(
-            1, "article", None, None, {}, {"doc_type": stash_entry("ART", DOC_TYPE_MAP_MARKER)}
+            1, "article", None, {}, {"doc_type": stash_entry("ART", DOC_TYPE_MAP_MARKER)}
         ),
         # règle réelle sur doc_type
         CorrectionUpdate(
             2,
             "thesis",
-            None,
             None,
             {},
             {"doc_type": stash_entry("article", "THESIS_WITH_JOURNAL_TO_ARTICLE")},
@@ -28,12 +27,11 @@ def test_tally_corrections_exclut_le_mapping_doc_type():
         # deux champs corrigés sur une même SP → 1 SP, 2 déclenchements
         CorrectionUpdate(
             3,
-            None,
-            5,
+            "media",
             "green",
             {},
             {
-                "journal_id": stash_entry(None, "JOURNAL_TYPE_MEDIA_TO_MEDIA"),
+                "doc_type": stash_entry("article", "JOURNAL_TYPE_MEDIA_TO_MEDIA"),
                 "oa_status": stash_entry("closed", "EMBARGO_EXPIRED_TO_GREEN"),
             },
         ),

@@ -10,7 +10,7 @@ Architecture : chaque règle est une entrée du dict `_RULES`, mappant un membre
 
 Le moteur `_check_predicate` interprète chaque clé d'`applies_to` selon une convention fixe (voir le TypedDict `_AppliesTo` pour la liste exhaustive). `_correct_field(sp, "doc_type")` parcourt les règles dans l'ordre du dict et retourne la première qui (a) corrige le champ demandé et (b) dont tous les prédicats matchent.
 
-Cascade entre champs (ordre des dépendances) : `journal_id` → `doc_type` → `oa_status`. La provenance (le membre `MetadataCorrectionRule` ayant produit la correction) est tracée par le caller, à un emplacement propre à chaque niveau : une `source_publication` la stashe dans `raw_metadata.<champ>.corrected_by`, **avec la valeur brute écrasée** (réversibilité, la colonne est mutée en place) ; une publication canonique l'inscrit dans `meta.corrections.<champ>` (provenance seule — le canonique est recalculé à chaque refresh, sans brut à préserver).
+Champs corrigés : `doc_type` et `oa_status` (le rattachement du `journal_id` manquant vit dans un sous-step distinct de la phase, pas dans ce moteur de règles). La provenance (le membre `MetadataCorrectionRule` ayant produit la correction) est tracée par le caller, à un emplacement propre à chaque niveau : une `source_publication` la stashe dans `raw_metadata.<champ>.corrected_by`, **avec la valeur brute écrasée** (réversibilité, la colonne est mutée en place) ; une publication canonique l'inscrit dans `meta.corrections.<champ>` (provenance seule — le canonique est recalculé à chaque refresh, sans brut à préserver).
 """
 
 import re
@@ -102,16 +102,15 @@ class Correction[T](NamedTuple):
 class CorrectedFields(NamedTuple):
     """Résultat de `effective_metadata` : pour chaque champ, soit `None` (pas de correction), soit un `Correction` (valeur corrigée + règle d'origine).
 
-    Ordre des champs aligné sur la cascade interne (journal_id d'abord, oa_status en dernier).
+    Ordre des champs aligné sur la cascade interne (doc_type puis oa_status).
     """
 
-    journal_id: Correction[int] | None = None
     doc_type: Correction[str] | None = None
     oa_status: Correction[str] | None = None
 
     def is_empty(self) -> bool:
         """True si aucune correction n'est portée — la fast-path des callers pour la majorité des SPs en régime."""
-        return self.journal_id is None and self.doc_type is None and self.oa_status is None
+        return self.doc_type is None and self.oa_status is None
 
 
 # ── Constantes (préfixes, patterns) référencées par les règles ──────────
@@ -212,7 +211,6 @@ class _AppliesCorrection(TypedDict, total=False):
 
     doc_type: str
     oa_status: str
-    journal_id: int
 
 
 class _RuleDefinition(TypedDict):
@@ -450,16 +448,12 @@ def _correct_field(sp: SourcePublicationForCorrection, field: str) -> Correction
     return None
 
 
-# TODO: corrections indépendantes par champ — pas de feed-forward d'un champ corrigé vers les
-# règles des champs suivants. Une vraie cascade (journal_id → doc_type → oa_status alimentés au
-# fil de l'eau) serait plus logique et pourrait changer le résultat quand des règles se croisent.
-# Hors scope tant qu'aucune règle ne dépend d'un autre champ déjà corrigé.
 def effective_metadata(sp: SourcePublicationForCorrection) -> CorrectedFields:
-    """Applique la cascade de corrections sur les champs d'une `SourcePublicationForCorrection`. Retourne un `CorrectedFields` (vide si aucune règle ne s'applique).
+    """Applique les corrections sur les champs d'une `SourcePublicationForCorrection`. Retourne un `CorrectedFields` (vide si aucune règle ne s'applique).
 
     Fonction pure : aucune I/O, aucun effet de bord. Les données journal/publisher consommées par les règles arrivent par la vue (champs joints à la lecture), pas via des entités passées en paramètre — c'est ce qui permet à la fonction de servir aussi bien la dédup (sur la SP entrante) que le refresh (sur les sources d'une publication).
 
-    Cascade dans l'ordre des dépendances (`journal_id` → `doc_type` → `oa_status`). Chaque champ est corrigé **indépendamment** depuis la même vue d'entrée (pas de feed-forward d'un champ corrigé vers un autre) ; `doc_type` et `oa_status` (promotion d'embargo) portent des règles.
+    `doc_type` et `oa_status` sont corrigés **indépendamment** depuis la même vue : aucune règle de l'un ne lit la valeur corrigée de l'autre (`oa_status` est la promotion d'embargo, orthogonale au `doc_type`). Les dépendances inter-champ — un type corrigé selon le `journal_type` du journal rattaché — se résolvent par l'**ordre des sous-steps** de la phase (chacun re-lit l'état persisté du précédent), pas par un feed-forward intra-fonction.
     """
     return CorrectedFields(
         doc_type=_correct_field(sp, "doc_type"),

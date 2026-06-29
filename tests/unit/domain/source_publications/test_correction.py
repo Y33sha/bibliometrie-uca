@@ -783,8 +783,9 @@ class TestEffectiveMetadataScope:
         assert effective_metadata(_view()).is_empty()
 
     def test_only_doc_type_is_touched(self):
-        # journal_id n'a aucune règle ; oa_status n'a que la règle embargo, ici non déclenchée
-        # (gold non expiré). Seul doc_type pourrait être corrigé sur cette vue.
+        # oa_status n'a que la règle embargo, ici non déclenchée (gold non expiré).
+        # Seul doc_type pourrait être corrigé sur cette vue (journal_id n'est plus un
+        # champ corrigé par ce moteur : il relève du sous-step `journal_by_doi`).
         view = _view(
             doc_type="article",
             urls=("https://theses.fr/s1",),
@@ -792,5 +793,4 @@ class TestEffectiveMetadataScope:
             oa_status="gold",
         )
         fields = effective_metadata(view)
-        assert fields.journal_id is None
         assert fields.oa_status is None
