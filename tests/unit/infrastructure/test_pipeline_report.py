@@ -109,36 +109,3 @@ class TestGenerateReport:
         assert "extract (12.5s)" in content
         assert "<details>" in content  # logs détaillés inclus pour extract
         assert "normalize (3.0s)" in content
-
-
-class TestGetLastReportDate:
-    def test_none_when_dir_missing(self, tmp_path, monkeypatch):
-        pm = _fresh_module(tmp_path, monkeypatch)
-        assert pm.get_last_report_date() is None
-
-    def test_none_when_no_reports(self, tmp_path, monkeypatch):
-        pm = _fresh_module(tmp_path, monkeypatch)
-        (tmp_path / "logs" / "reports").mkdir(parents=True)
-        assert pm.get_last_report_date() is None
-
-    def test_returns_max_date_across_reports(self, tmp_path, monkeypatch):
-        import datetime
-
-        pm = _fresh_module(tmp_path, monkeypatch)
-        reports = tmp_path / "logs" / "reports"
-        reports.mkdir(parents=True)
-        (reports / "2026-03-01_101010.md").write_text("")
-        (reports / "2026-04-15_200000.md").write_text("")
-        (reports / "2026-04-15_091500.md").write_text("")
-        assert pm.get_last_report_date() == datetime.date(2026, 4, 15)
-
-    def test_ignores_unparseable_filenames(self, tmp_path, monkeypatch):
-        import datetime
-
-        pm = _fresh_module(tmp_path, monkeypatch)
-        reports = tmp_path / "logs" / "reports"
-        reports.mkdir(parents=True)
-        (reports / "2026-02-10_000000.md").write_text("")
-        (reports / "README.md").write_text("")
-        (reports / "bogus-name.md").write_text("")
-        assert pm.get_last_report_date() == datetime.date(2026, 2, 10)

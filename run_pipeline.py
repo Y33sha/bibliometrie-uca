@@ -143,18 +143,20 @@ def phase_extract(
         }
 
     if policy.year_selection == "since_last":
-        # HAL uniquement, depuis le dernier rapport de pipeline (à 00:00).
+        # HAL uniquement, depuis la dernière extraction HAL réussie (à 00:00). On se
+        # cale sur la dernière phase `extract` ayant inclus HAL, pas sur le dernier run
+        # quelconque : un run partiel (sans extract) ne doit pas avancer le curseur.
         # OpenAlex n'a pas d'équivalent (filtre `from_updated_date` payant ;
         # changefiles non filtrables par institution).
-        from infrastructure.observability.pipeline_report import get_last_report_date
+        from infrastructure.observability.phase_executions import get_last_extract_date
 
-        last = get_last_report_date()
+        last = get_last_extract_date("hal")
         if last is not None:
             since = last.isoformat()
-            log.info("Mode quotidien : HAL depuis %s (dernier rapport)", since)
+            log.info("Mode quotidien : HAL depuis %s (dernière extraction HAL)", since)
         else:
             since = (datetime.date.today() - datetime.timedelta(days=30)).isoformat()
-            log.info("Mode quotidien : HAL depuis %s (fallback, aucun rapport)", since)
+            log.info("Mode quotidien : HAL depuis %s (fallback, aucune extraction HAL)", since)
         if "hal" in effective:
             hal_metrics, hal_duration = _timed_metrics(partial(_run_extract_hal, since=since))
             metrics.merge(hal_metrics)

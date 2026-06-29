@@ -73,6 +73,16 @@ Ces orientations sont proposées et restent à confirmer ou amender ; seul le co
 - [ ] Appliquer la correction au stock existant par la re-passe la plus légère atteignant la phase `metadata_correction` (re-marquer les `source_publications` concernées et rejouer la phase), sans réimport.
 - [ ] Mesurer l'effet : journal_id rattachés, publications reclassées, résiduel.
 
+## Items TODO liés (à traiter en passant ou recaser dans un autre chantier)
+* [ ] faux preprints: retyper en fonction du DOI (theConversation => media)
+* [ ] recensions: "Comptes rendus :", "Compte rendu :"; type = article + titre contient "(dir.)"
+* [ ] typage data_paper automatisé par journal (ex. *Scientific Data*; créer un journal_type dédié?); chercher aussi "dataset" dans les titres
+* [ ] créer circuit pour correction automatisée du `journal_type` (titre terminé par ` eBooks` => plateforme d'ebooks)
+* [ ] `metadata_correction`: en cas de corrections de champs multiples sur un même doc, les règles s'appliquent indépendamment à partir du brut; étudier les scénarios de corrections multiples où l'output d'une règle pourrait intersecter l'input des suivantes, voir s'il est pertinent de les chaîner ensemble
+* [ ] noms de containers OpenAlex aberrants ("SPIRE - Sciences Po Institutional REpository") => faire quelque chose; de manière générale il faut interroger la pertinence du champ container relativement au journal_id
+* [ ] règle à créer: si DOI de forme ISBN + _n => conference_paper ou chapitre / si forme ISBN: proceedings ou book (trancher selon type du "journal")
+* [ ] 107270 et 869915 Computing Pivot-Minors: un article faussement typé preprint par openalex; + question des arxiv_id (déduire le DOI et vice-versa)
+
 ## Questions ouvertes
 
 - **Dérivation de `doi_prefix`** : d'où vient la valeur, et tient-elle pour les journaux à faible volume ? C'est le socle de la fiabilité du rapprochement.
