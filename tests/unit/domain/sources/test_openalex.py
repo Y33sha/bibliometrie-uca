@@ -250,3 +250,9 @@ class TestExtractNntFromLocation:
         assert extract_nnt_from_location(_loc()) is None
         assert extract_nnt_from_location(_loc(location_id="oai:HAL:hal-1")) is None
         assert extract_nnt_from_location(_loc(landing_page_url="https://example.com/")) is None
+
+    def test_pmh_wrapping_an_oai_id_is_not_a_nnt(self):
+        # Cas réel : un dépôt HAL moissonné en OAI-PMH a un location.id
+        # « pmh:oai:HAL:hal-04677016v1 ». Les deux-points cassent le motif
+        # alphanumérique → pas de NNT (sinon lien theses.fr mort sur la fiche).
+        assert extract_nnt_from_location(_loc(location_id="pmh:oai:HAL:hal-04677016v1")) is None

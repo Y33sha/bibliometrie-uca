@@ -211,13 +211,19 @@ class HALId:
 # ── NNT (Numéro National de Thèse) ─────────────────────────────────
 
 
+_NNT_RE = re.compile(r"[0-9A-Z]+")
+
+
 def _normalize_nnt(raw: str | None) -> str | None:
     """Normalise un NNT : uppercase + strip. Format historiquement variable,
-    on se contente d'exiger une valeur alphanumérique non vide."""
+    on exige une valeur strictement alphanumérique ASCII (chiffres et lettres
+    non accentuées). Ce garde rejette les identifiants OAI-PMH (`oai:HAL:…`,
+    `doi:…`, `ark:/…`) qu'OpenAlex expose dans `primary_location.id` et qui ne
+    sont pas des NNT — sans lui, ces valeurs alimenteraient un lien theses.fr mort."""
     if not raw:
         return None
     s = raw.strip().upper()
-    if not s or not s.isalnum():
+    if not _NNT_RE.fullmatch(s):
         return None
     return s
 
