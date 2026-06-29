@@ -80,7 +80,7 @@ _TRIM_SEPARATORS_RE = re.compile(r"[.\-_]+$")
 _ISBN_PREFIX_RE = re.compile(r"^97[89]")
 
 MIN_CHARS_AFTER_SLASH = 1
-MIN_PUBS_PER_JOURNAL = 10
+MIN_PUBS_PER_JOURNAL = 5
 
 # Préfixes ou sous-préfixes des serveurs de preprints et aggregateurs publics.
 # Un DOI commençant par l'un de ces motifs est retiré avant calcul de la LCP.
