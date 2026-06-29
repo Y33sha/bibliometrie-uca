@@ -5,10 +5,12 @@ import pytest
 from domain.errors import ValidationError
 from domain.persons.identifiers import (
     ORCID,
+    HalPersonId,
     IdHAL,
     IdRef,
     compact_identifiers,
     mark_shared_identifiers_dubious,
+    normalized_identifier_value,
 )
 
 # ── ORCID ──────────────────────────────────────────────────────────
@@ -123,6 +125,60 @@ class TestIdRef:
     def test_raises_on_invalid(self, raw):
         with pytest.raises(ValidationError):
             IdRef(raw)
+
+
+# ── HalPersonId ─────────────────────────────────────────────────────
+
+
+class TestHalPersonId:
+    @pytest.mark.parametrize(
+        ("raw", "expected"),
+        [
+            ("123456", "123456"),  # entier positif
+            ("  42  ", "42"),  # strip whitespace
+        ],
+    )
+    def test_normalizes(self, raw, expected):
+        assert HalPersonId(raw).value == expected
+
+    @pytest.mark.parametrize(
+        "raw",
+        [
+            "",  # vide
+            "0",  # zéro (sentinelle, pas un id valide)
+            "-5",  # négatif
+            "12a45",  # non numérique
+            "abc",  # forme invalide
+        ],
+    )
+    def test_raises_on_invalid(self, raw):
+        with pytest.raises(ValidationError):
+            HalPersonId(raw)
+
+
+# ── normalized_identifier_value (dispatch par type) ─────────────────
+
+
+class TestNormalizedIdentifierValue:
+    @pytest.mark.parametrize(
+        ("id_type", "raw", "expected"),
+        [
+            ("orcid", "https://orcid.org/0000-0001-2345-6789", "0000-0001-2345-6789"),
+            ("idhal", "Jean-Dupont", "jean-dupont"),
+            ("idref", "05547854x", "05547854X"),
+            ("hal_person_id", " 42 ", "42"),
+        ],
+    )
+    def test_dispatches_and_normalizes(self, id_type, raw, expected):
+        assert normalized_identifier_value(id_type, raw) == expected
+
+    def test_unknown_type_raises(self):
+        with pytest.raises(ValidationError):
+            normalized_identifier_value("researcher_id", "ABC-1234")
+
+    def test_malformed_value_raises(self):
+        with pytest.raises(ValidationError):
+            normalized_identifier_value("orcid", "not-an-orcid")
 
 
 # ── compact_identifiers ─────────────────────────────────────────────

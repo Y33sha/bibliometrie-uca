@@ -4,7 +4,6 @@ Toutes les mutations sur personnes. Les opérations sur les authorships en tant 
 """
 
 import logging
-import re
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import Connection, text
@@ -23,7 +22,11 @@ from application.ports.api.persons_queries import (
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.authorship_repository import AuthorshipRepository
 from application.ports.repositories.person_repository import PersonRepository
-from domain.persons.identifiers import PUBLIC_PERSON_IDENTIFIER_TYPES
+from domain.errors import ValidationError
+from domain.persons.identifiers import (
+    PUBLIC_PERSON_IDENTIFIER_TYPES,
+    normalized_identifier_value,
+)
 from interfaces.api.deps import (
     audit_repo_sync,
     authorship_repo_sync,
@@ -55,8 +58,6 @@ from interfaces.api.models import (
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-ORCID_RE = re.compile(r"^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$")
-
 
 # ── Gestion des identifiants ─────────────────────────────────────
 
@@ -69,25 +70,17 @@ def add_person_identifier(
     queries: PersonsQueries = Depends(persons_queries_sync),
     repo: PersonRepository = Depends(person_repo_sync),
 ) -> AddIdentifierResponse:
-    """Ajoute manuellement un identifiant (ORCID ou idHAL) à une personne."""
+    """Ajoute manuellement un identifiant (ORCID, idHAL ou IdRef) à une personne."""
     if data.id_type not in PUBLIC_PERSON_IDENTIFIER_TYPES:
         raise HTTPException(
             status_code=400,
             detail=f"id_type doit être l'un de {PUBLIC_PERSON_IDENTIFIER_TYPES}",
         )
 
-    id_value = data.id_value.strip()
-    if data.id_type == "orcid":
-        id_value = (
-            id_value.replace("https://orcid.org/", "").replace("http://orcid.org/", "").strip()
-        )
-        if not ORCID_RE.match(id_value):
-            raise HTTPException(
-                status_code=400,
-                detail=f"Format ORCID invalide : '{id_value}'. Attendu : 0000-0000-0000-000X",
-            )
-    if not id_value:
-        raise HTTPException(status_code=400, detail="Valeur vide")
+    try:
+        id_value = normalized_identifier_value(data.id_type, data.id_value)
+    except ValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     if not queries.person_exists(person_id):
         raise HTTPException(status_code=404, detail="Personne introuvable")
