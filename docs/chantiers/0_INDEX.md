@@ -17,6 +17,7 @@
 - [Visualisations dynamiques (pivot listes ↔ tableaux de bord)](METIER_visualisations-pivot.md)
 - [Signatures institutionnelles (qualité et outillage)](METIER_signatures-institutionnelles.md)
 - [Scinder `source_authorships` (identité ⊥ liaison)](DATA_scinder-source-authorships.md)
+- [Brancher le domaine riche orphelin](CODE_domaine-riche-orphelin.md)
 
 ## Chantiers archivés
 
