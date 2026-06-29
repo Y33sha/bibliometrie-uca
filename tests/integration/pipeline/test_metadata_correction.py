@@ -2,35 +2,54 @@
 
 from sqlalchemy import text
 
+from application.pipeline.metadata_correction import journal_by_doi
 from application.pipeline.metadata_correction.correct_by_cluster import compute_updates
 from application.pipeline.metadata_correction.correct_unary import compute_update
 from infrastructure.queries.pipeline.metadata_correction import (
     fetch_doi_cluster_candidates,
     fetch_for_unary_correction,
+    fetch_journal_by_doi_candidates,
+    fetch_journal_doi_prefixes,
     persist_corrections,
     persist_doi_corrections,
+    persist_journal_corrections,
 )
 
 
-def _seed_journal(conn, journal_type: str) -> int:
+def _seed_journal(conn, journal_type: str, doi_prefix: str | None = None) -> int:
     return conn.execute(
         text(
-            "INSERT INTO journals (title, title_normalized, journal_type) "
-            "VALUES ('J', 'j', :jt) RETURNING id"
+            "INSERT INTO journals (title, title_normalized, journal_type, doi_prefix) "
+            "VALUES ('J', 'j', :jt, :dp) RETURNING id"
         ),
-        {"jt": journal_type},
+        {"jt": journal_type, "dp": doi_prefix},
     ).scalar_one()
 
 
 def _seed_sp(
-    conn, *, source_id: str, doc_type: str | None, source="openalex", journal_id=None, urls=None
+    conn,
+    *,
+    source_id: str,
+    doc_type: str | None,
+    source="openalex",
+    journal_id=None,
+    urls=None,
+    doi=None,
 ) -> int:
     return conn.execute(
         text(
-            "INSERT INTO source_publications (source, source_id, title, doc_type, journal_id, urls) "
-            "VALUES (:src, :sid, 'Un titre', :dt, :jid, :urls) RETURNING id"
+            "INSERT INTO source_publications "
+            "(source, source_id, title, doc_type, journal_id, urls, doi) "
+            "VALUES (:src, :sid, 'Un titre', :dt, :jid, :urls, :doi) RETURNING id"
         ),
-        {"src": source, "sid": source_id, "dt": doc_type, "jid": journal_id, "urls": urls},
+        {
+            "src": source,
+            "sid": source_id,
+            "dt": doc_type,
+            "jid": journal_id,
+            "urls": urls,
+            "doi": doi,
+        },
     ).scalar_one()
 
 
@@ -39,6 +58,55 @@ def _apply(conn) -> int:
     rows = fetch_for_unary_correction(conn)
     updates = [u for r in rows if (u := compute_update(r)) is not None]
     return persist_corrections(conn, updates)
+
+
+def _apply_journal_by_doi(conn) -> int:
+    """Joue le sous-step journal_by_doi sans committer."""
+    prefixes = fetch_journal_doi_prefixes(conn)
+    rows = fetch_journal_by_doi_candidates(conn)
+    return persist_journal_corrections(conn, journal_by_doi.compute_updates(rows, prefixes))
+
+
+def test_journal_by_doi_attaches_then_doc_type_converges_same_run(sa_sync_conn):
+    # The Conversation : DOI préfixé par un journal media, sans journal_id. journal_by_doi pose
+    # le journal ; l'unaire qui suit (même run) le joint et reclasse preprint → media.
+    conn = sa_sync_conn
+    media_journal = _seed_journal(conn, "media", doi_prefix="10.64628/aak")
+    sp = _seed_sp(conn, source_id="W_tc", doc_type="preprint", doi="10.64628/aak.xyz")
+
+    assert _apply_journal_by_doi(conn) == 1
+    jid, raw = conn.execute(
+        text("SELECT journal_id, raw_metadata FROM source_publications WHERE id = :id"),
+        {"id": sp},
+    ).one()
+    assert jid == media_journal
+    assert raw == {"journal_id": {"raw": None, "corrected_by": "JOURNAL_BY_DOI_PREFIX"}}
+
+    _apply(conn)
+    doc_type, raw2 = _state(conn, sp)
+    assert doc_type == "media"
+    assert raw2["doc_type"] == {"raw": "preprint", "corrected_by": "JOURNAL_TYPE_MEDIA_TO_MEDIA"}
+    # Le sous-step unaire préserve la clé possédée par journal_by_doi.
+    assert raw2["journal_id"] == {"raw": None, "corrected_by": "JOURNAL_BY_DOI_PREFIX"}
+
+
+def test_journal_by_doi_idempotent_and_self_heals(sa_sync_conn):
+    conn = sa_sync_conn
+    journal = _seed_journal(conn, "journal", doi_prefix="10.5194/acp")
+    sp = _seed_sp(conn, source_id="W_acp", doc_type="article", doi="10.5194/acp.2020.1")
+
+    assert _apply_journal_by_doi(conn) == 1
+    assert _apply_journal_by_doi(conn) == 0  # second run : rien ne change
+
+    # Le doi_prefix du journal disparaît → restauration NULL, stash retiré.
+    conn.execute(text("UPDATE journals SET doi_prefix = NULL WHERE id = :id"), {"id": journal})
+    assert _apply_journal_by_doi(conn) == 1
+    jid, raw = conn.execute(
+        text("SELECT journal_id, raw_metadata FROM source_publications WHERE id = :id"),
+        {"id": sp},
+    ).one()
+    assert jid is None
+    assert raw == {}
 
 
 def _state(conn, sp_id: int) -> tuple:
