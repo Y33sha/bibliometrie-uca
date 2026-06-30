@@ -231,6 +231,12 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
       },
     ],
   },
+  authorships: {
+    summary: [
+      { key: "created", label: "Authorships créées" },
+      { key: "pruned", label: "Orphelines supprimées" },
+    ],
+  },
   countries: {
     summary: [
       { key: "addresses_total", label: "Adresses (pub_count > 0)" },

@@ -691,7 +691,7 @@ def phase_persons(**kw: Any) -> PhaseMetrics:
     return metrics
 
 
-def phase_authorships(**kw: Any) -> Any:
+def phase_authorships(**kw: Any) -> PhaseMetrics:
     """Construction de la table de verite authorships.
 
     Consolide les source_authorships en authorships canoniques
@@ -713,9 +713,10 @@ def phase_authorships(**kw: Any) -> Any:
     cf. `purge_orphan_publications`) puis on rafraîchit les `pub_count` (journals +
     publishers) qui dérivent de `in_perimeter`.
     """
-    _run_build_authorships()
+    metrics = _run_build_authorships()
     _run_purge_orphan_publications()
     _run_refresh_pub_counts()
+    return metrics
 
 
 def phase_countries(mode: Any = "full", **kw: Any) -> PhaseMetrics:
@@ -917,7 +918,7 @@ def _run_create_persons() -> PhaseMetrics:
     return metrics
 
 
-def _run_build_authorships() -> None:
+def _run_build_authorships() -> PhaseMetrics:
     from application.pipeline.authorships.build_authorships import build
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.queries.pipeline.authorships_build import PgAuthorshipsBuildQueries
@@ -926,11 +927,12 @@ def _run_build_authorships() -> None:
     t0 = time.time()
     conn = get_sync_engine().connect()
     try:
-        build(conn, PgAuthorshipsBuildQueries(), log)
+        metrics = build(conn, PgAuthorshipsBuildQueries(), log)
         conn.commit()
     finally:
         conn.close()
     log.info("✓ build_authorships terminé en %.1fs", time.time() - t0)
+    return metrics
 
 
 # Taille de chunk du DELETE de purge : un commit par chunk étale le WAL et rend
