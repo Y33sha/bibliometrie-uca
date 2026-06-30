@@ -83,7 +83,3 @@ class PublicationRepository(Protocol):
         pub_id_a: int,
         pub_id_b: int,
     ) -> tuple[int, int] | None: ...
-
-    def are_distinct(self, pub_id_a: int, pub_id_b: int) -> bool:
-        """True si la paire est inscrite dans `distinct_publications`."""
-        ...

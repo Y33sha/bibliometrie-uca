@@ -1,42 +1,8 @@
 """Adapter PostgreSQL sync pour les authorships et source_authorships."""
 
 from datetime import datetime
-from typing import NamedTuple
 
 from sqlalchemy import Connection, text
-
-from domain.publications.authorship import Authorship
-
-
-class _AuthorshipRow(NamedTuple):
-    """Projection SQL `find_by_publication_id` sur `authorships` (avec `structure_ids` agrégé depuis `authorship_structures`)."""
-
-    id: int
-    publication_id: int
-    person_id: int | None
-    author_position: int | None
-    in_perimeter: bool | None
-    is_corresponding: bool | None
-    roles: list[str] | None
-    structure_ids: list[int]
-
-
-def _authorship_from_row(row: _AuthorshipRow) -> Authorship:
-    """Mapping d'une row `authorships` SQL vers l'entité fille `Authorship`.
-
-    La colonne nullable avec DEFAULT côté DB (`in_perimeter`) est coercée
-    vers son default si NULL, pour préserver la sémantique de l'aggregate.
-    """
-    return Authorship(
-        id=row.id,
-        publication_id=row.publication_id,
-        person_id=row.person_id,
-        author_position=row.author_position,
-        in_perimeter=row.in_perimeter if row.in_perimeter is not None else False,
-        is_corresponding=row.is_corresponding,
-        roles=tuple(row.roles or ()),
-        structure_ids=tuple(row.structure_ids or ()),
-    )
 
 
 class PgAuthorshipRepository:
@@ -44,29 +10,6 @@ class PgAuthorshipRepository:
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
-
-    # ── Chargement des entités filles ──────────────────────────────
-
-    def find_by_publication_id(self, publication_id: int) -> tuple[Authorship, ...]:
-        """Charge toutes les `Authorship` d'une publication (ordonnées
-        par `author_position`). Retourne un tuple vide si aucune."""
-        result = self._conn.execute(
-            text("""
-                SELECT a.id, a.publication_id, a.person_id, a.author_position,
-                       a.in_perimeter, a.is_corresponding, a.roles,
-                       COALESCE(
-                           (SELECT array_agg(structure_id ORDER BY structure_id)
-                            FROM authorship_structures aus
-                            WHERE aus.authorship_id = a.id),
-                           '{}'::int[]
-                       ) AS structure_ids
-                FROM authorships a
-                WHERE a.publication_id = :pub_id
-                ORDER BY a.author_position NULLS LAST, a.id
-            """),
-            {"pub_id": publication_id},
-        )
-        return tuple(_authorship_from_row(_AuthorshipRow(*row)) for row in result)
 
     # ── authorships ────────────────────────────────────────────────
 
