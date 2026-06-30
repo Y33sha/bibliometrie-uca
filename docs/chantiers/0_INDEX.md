@@ -13,13 +13,13 @@
 
 ### Non commencé
 
-- [Brancher le domaine riche orphelin](CODE_domaine-riche-orphelin.md)
 - [Scinder `source_authorships` (identité ⊥ liaison)](DATA_scinder-source-authorships.md)
 - [Qualité et cohérence des sujets](METIER_sujets-qualite.md)
 - [Signatures institutionnelles](METIER_signatures-institutionnelles.md)
 
 ## Chantiers archivés
 
+- 2026-06-30 — [Brancher le domaine riche orphelin](archived/2026-06-30_CODE_domaine-riche-orphelin.md)
 - 2026-06-29 — [Déduire le journal_id manquant par préfixe DOI](archived/2026-06-29_DATA_journal-id-par-doi-prefix.md)
 - 2026-06-28 — [Visualisations dynamiques (pivot listes ↔ tableaux de bord)](archived/2026-06-28_METIER_visualisations-pivot.md)
 - 2026-06-26 — [Relations entre publications](archived/2026-06-26_METIER_relations-publications.md)
