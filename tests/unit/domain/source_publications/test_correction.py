@@ -1,7 +1,6 @@
 """Tests de `effective_metadata` (correction des métadonnées canoniques)."""
 
 from domain.source_publications.correction import (
-    CorrectedFields,
     MetadataCorrectionRule,
     SourcePublicationForCorrection,
     effective_metadata,
@@ -58,15 +57,6 @@ def _view(**overrides: object) -> SourcePublicationForCorrection:
     }
     defaults.update(overrides)
     return SourcePublicationForCorrection(**defaults)  # type: ignore[arg-type]
-
-
-class TestCorrectedFields:
-    def test_is_empty_on_default(self):
-        assert CorrectedFields().is_empty()
-
-    def test_is_not_empty_with_a_correction(self):
-        fields = effective_metadata(_view(urls=("https://theses.fr/2024XYZ",)))
-        assert not fields.is_empty()
 
 
 class TestThesesFrRule:
@@ -860,7 +850,8 @@ class TestPreprintRelationRule:
 
 class TestEffectiveMetadataScope:
     def test_no_signals_no_correction(self):
-        assert effective_metadata(_view()).is_empty()
+        corrected = effective_metadata(_view())
+        assert corrected.doc_type is None and corrected.oa_status is None
 
     def test_only_doc_type_is_touched(self):
         # oa_status n'a que la règle embargo, ici non déclenchée (gold non expiré).

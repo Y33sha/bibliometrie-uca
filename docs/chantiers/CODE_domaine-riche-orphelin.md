@@ -55,7 +55,7 @@ Le motif de fond : la couche domaine offre des contrats stricts (VOs auto-valid�
 ### Invariants, projections et helpers orphelins
 
 - [x] `Publication.has_minimal_metadata` : retiré. L'aggregate n'est hydraté qu'en lecture ; titre et année sont déjà garantis en amont (les normalizers refusent un record sans année ou sans titre, `pub_year` est `NOT NULL`). Une contrainte `NOT NULL` sur le titre s'ajoutera si le besoin se concrétise.
-- [ ] `CorrectedFields.is_empty` (`domain/source_publications/correction.py`) : trouver le site d'appel pertinent ou retirer.
+- [x] `CorrectedFields.is_empty` : retiré. Annoncé comme « fast-path des callers », mais aucun caller ne l'utilise ni n'a de fast-path nette (ils inspectent des champs précis et font du travail spécifique même sans correction).
 - [ ] `parse_locations` (`domain/sources/openalex.py`) : brancher pour la détection open access multi-locations, ou retirer (le sibling `parse_primary_location` reste utilisé).
 - [ ] `applicable_facets` (`domain/stats/pivot.py`) : confirmer que la barre de facettes s'en dérive — sinon réconcilier avec la logique dupliquée côté frontend — ou retirer.
 - [ ] `hal_domain_path` (`domain/sources/hal_domains.py`) : brancher pour l'affichage hiérarchique des domaines, ou retirer (penser au gabarit `FOOTER` du générateur `refresh_hal_domain_labels.py`, qui le régénérerait).
