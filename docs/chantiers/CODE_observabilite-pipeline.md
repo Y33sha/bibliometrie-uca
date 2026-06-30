@@ -99,7 +99,7 @@ Revue phase par phase, dans l'ordre du pipeline. Helper transverse : `scoped_log
 - [x] `refresh_stale` : fetch DOI séquentiel par source (annoncé, scopé via `run_async`) ; le marquage des rows stale sans DOI est désormais annoncé avant l'UPDATE et logué même à 0 (plus de silence).
 - [ ] `refetch_truncated`.
 - [x] `normalize` : VACUUM déjà annoncé au début, gagne son log de fin (timing, `▶`/`✓`) ; les normaliseurs (séquentiels, enveloppés `▶`/`✓`) nomment la source dans « rien à traiter » et « Normalisation X terminée ». `summary_stats()` inexploité → renvoyé à l'étape 3 (métriques).
-- [ ] Phases aval (`affiliations`, `publications`, `persons`…) : audit de complétude.
+- [x] Phases aval (`affiliations`, `publishers_journals`, `metadata_correction`, `publications`, `relations`, `persons`, `authorships`, `countries`, `subjects`, `oa_status`) : déjà exemplaires — chaque sous-étape est enveloppée `▶ X` / `✓ X terminé en Xs` (timing), mono-canal, sans trou ni enjeu source-dépendant. Aucun changement.
 
 ### 3. Métriques et signaux
 
