@@ -84,10 +84,10 @@ Phases A à E livrées (capture par phase, lecture, API, interface en ruban). Le
 
 ### 1. Clôture — retrait de l'ancien système (par run)
 
-- [ ] Suppression du système par run : writer `infrastructure/observability/pipeline_runs.py` (build / persist / render snapshot), queries `infrastructure/queries/api/pipeline_runs.py` et port `application/ports/api/pipeline_runs_queries.py`, value objects `application/ports/pipeline/runs.py`, router `interfaces/api/routers/admin/pipeline_runs.py` et son wiring (`app.py`, `deps.py`), tests associés.
-- [ ] `generate_report` et les rapports markdown retirés — tout `infrastructure/observability/pipeline_report.py` part (la capture de logs par phase ne servait qu'au rapport, format offset-fichier inadapté à une consultation par phase). Hook snapshot run-complet et machinerie de rapport retirés de `run_pipeline.py`.
-- [ ] Migration de drop de la table `pipeline_run_snapshots` (la séquence `pipeline_run_id_seq` reste : la table des exécutions de phase s'en sert).
-- [ ] Régénération de `schema.ts` après retrait des endpoints.
+- [x] Suppression du système par run : writer `infrastructure/observability/pipeline_runs.py` (build / persist / render snapshot), queries `infrastructure/queries/api/pipeline_runs.py` et port `application/ports/api/pipeline_runs_queries.py`, value objects `application/ports/pipeline/runs.py`, router `interfaces/api/routers/admin/pipeline_runs.py` et son wiring (`app.py`, `deps.py`), tests associés.
+- [x] `generate_report` et les rapports markdown retirés — tout `infrastructure/observability/pipeline_report.py` part (la capture de logs par phase ne servait qu'au rapport, format offset-fichier inadapté à une consultation par phase). Hook snapshot run-complet et machinerie de rapport retirés de `run_pipeline.py` (le récapitulatif des durées par phase en fin de run reste).
+- [x] Migration de drop de la table `pipeline_run_snapshots` (`4477146f78cf` ; la séquence `pipeline_run_id_seq` reste : la table des exécutions de phase s'en sert). À appliquer sur dev/prod, puis régénérer `infrastructure/db/schema.sql`.
+- [x] Régénération de `schema.ts` après retrait des endpoints (les `/api/admin/pipeline-runs` à tiret disparaissent ; l'UI utilise les `/api/admin/pipeline/runs` à slash).
 
 ### 2. Audit et harmonisation du logging
 

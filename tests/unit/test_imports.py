@@ -41,7 +41,6 @@ MODULES = [
     "domain.source_publications.doc_types",
     "domain.sources",
     "infrastructure.sources.config",
-    "infrastructure.observability.pipeline_report",
 ]
 
 

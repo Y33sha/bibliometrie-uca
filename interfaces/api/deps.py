@@ -29,7 +29,6 @@ from application.ports.api.laboratories_queries import LaboratoriesQueries
 from application.ports.api.perimeters_queries import PerimetersAdminQueries
 from application.ports.api.persons_queries import PersonsQueries
 from application.ports.api.pipeline_phase_executions_queries import PhaseExecutionsQueries
-from application.ports.api.pipeline_runs_queries import PipelineRunsQueries
 from application.ports.api.publication_duplicates_queries import PublicationDuplicatesQueries
 from application.ports.api.publications_queries import PublicationsQueries
 from application.ports.api.publishers_queries import PublisherQueries
@@ -57,7 +56,6 @@ from infrastructure.queries.api.journals import PgJournalQueries
 from infrastructure.queries.api.laboratories import PgLaboratoriesQueries
 from infrastructure.queries.api.persons import PgPersonsQueries
 from infrastructure.queries.api.pipeline_phase_executions import PgPhaseExecutionsQueries
-from infrastructure.queries.api.pipeline_runs import PgPipelineRunsQueries
 from infrastructure.queries.api.publication_duplicates import PgPublicationDuplicatesQueries
 from infrastructure.queries.api.publications import PgPublicationsQueries
 from infrastructure.queries.api.publishers import PgPublisherQueries
@@ -304,12 +302,6 @@ def address_repo_sync(conn: Connection = Depends(db_conn_sync)) -> AddressReposi
 
 def persons_queries_sync(conn: Connection = Depends(db_conn_sync)) -> PersonsQueries:
     return PgPersonsQueries(conn)
-
-
-def pipeline_runs_queries_sync(
-    conn: Connection = Depends(db_conn_sync),
-) -> PipelineRunsQueries:
-    return PgPipelineRunsQueries(conn)
 
 
 def pipeline_phase_executions_queries_sync(
