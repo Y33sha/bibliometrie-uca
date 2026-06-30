@@ -21,6 +21,7 @@ import time
 
 from sqlalchemy import Connection
 
+from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.authorships_build import AuthorshipsBuildQueries
 
 
@@ -30,7 +31,7 @@ def build(
     logger: logging.Logger,
     *,
     rebuild_full: bool = False,
-) -> None:
+) -> PhaseMetrics:
     """Reconstruit la table `authorships` depuis les `source_authorships`.
 
     Le build est idempotent et convergent : appel répété sans `rebuild_full`
@@ -99,3 +100,8 @@ def build(
 
     elapsed = time.perf_counter() - t0
     logger.info(f"\nTerminé en {elapsed:.1f}s")
+
+    metrics = PhaseMetrics()
+    metrics.add(new=inserted)
+    metrics.details["summary"] = {"created": inserted, "pruned": pruned}
+    return metrics
