@@ -31,7 +31,7 @@ Le motif de fond : la couche domaine offre des contrats stricts (VOs auto-valid�
 
 `AUTHORSHIP_ROLES` (`domain/publications/authorship_roles.py`) est le vocabulaire canonique, mais rien ne garantit que les mappings par source (`_HAL_MAP`, `_WOS_MAP`, `_SCANR_MAP`, `THESES_FIELD_ROLES`) ne produisent que des valeurs de cet ensemble.
 
-- [ ] Garde-fou validant que tout rôle produit par les mappings appartient à `AUTHORSHIP_ROLES` (test, ou assertion au chargement du module).
+- [x] Garde-fou : assertion au chargement du module vérifiant que tout rôle produit par les mappings (`_SOURCE_MAPS`, `THESES_FIELD_ROLES`) appartient à `AUTHORSHIP_ROLES`. Une faute de frappe dans un mapping fait échouer l'import.
 - [ ] Aligner sur un éventuel enum / contrainte `CHECK` en base pour `authorships.roles` (aujourd'hui `text[]` sans contrainte).
 
 ### Type de document canonique HAL
