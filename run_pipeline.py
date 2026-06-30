@@ -326,21 +326,21 @@ def phase_refresh_stale(sources: Any = None, include_wos: bool = False, **kw: An
     log.info("▶ refresh_stale : marquage des rows stale sans DOI…")
     conn = get_sync_engine().connect()
     try:
-        n_undiscoverable = mark_undiscoverable_stale_disappeared(conn)
+        undiscoverable_by_source = mark_undiscoverable_stale_disappeared(conn)
         conn.commit()
     finally:
         conn.close()
+    n_undiscoverable = sum(undiscoverable_by_source.values())
     log.info("✓ refresh_stale : %d rows sans DOI marquées disparues", n_undiscoverable)
-    if n_undiscoverable:
-        # Rows stale sans DOI (non refetchables) marquées disparues : un canal
-        # distinct des refetchs par source, agrégé toutes sources confondues.
-        by_source["sans DOI"] = {
-            "interrogated": 0,
-            "refreshed": 0,
-            "disappeared": n_undiscoverable,
-            "duration_s": 0,
-        }
     metrics.add(disappeared=n_undiscoverable)
+
+    # Disparitions détectées par staleness (rows sans DOI) : rattachées à leur
+    # source, fondues dans la même colonne `disappeared` que les 404 par DOI.
+    for source, n in undiscoverable_by_source.items():
+        row = by_source.setdefault(
+            source, {"interrogated": 0, "refreshed": 0, "disappeared": 0, "duration_s": 0}
+        )
+        row["disappeared"] += n
 
     if by_source:
         metrics.details["table"] = {

@@ -27,7 +27,7 @@ def _called_targets(stack) -> list[str]:
     stack.enter_context(
         patch(
             "infrastructure.sources.common.mark_undiscoverable_stale_disappeared",
-            return_value=0,
+            return_value={},
         )
     )
     return doi

@@ -242,11 +242,15 @@ _SET_DISAPPEARED_SQL = text(
 
 _MARK_UNDISCOVERABLE_STALE_SQL = text(
     """
-    UPDATE staging SET disappeared_at = now()
-    WHERE doi IS NULL
-      AND not_found_at IS NULL
-      AND disappeared_at IS NULL
-      AND last_seen_at < now() - make_interval(days => :days)
+    WITH marked AS (
+        UPDATE staging SET disappeared_at = now()
+        WHERE doi IS NULL
+          AND not_found_at IS NULL
+          AND disappeared_at IS NULL
+          AND last_seen_at < now() - make_interval(days => :days)
+        RETURNING source
+    )
+    SELECT source, count(*) AS n FROM marked GROUP BY source
     """
 )
 
@@ -276,16 +280,17 @@ def set_disappeared_by_doi(conn: Connection, source: str, doi: str) -> None:
     conn.execute(_SET_DISAPPEARED_SQL, {"source": source, "doi": doi})
 
 
-def mark_undiscoverable_stale_disappeared(conn: Connection) -> int:
-    """Marque disparues les rows stale **sans DOI** (non refetchables).
+def mark_undiscoverable_stale_disappeared(conn: Connection) -> dict[str, int]:
+    """Marque disparues les rows stale **sans DOI**, et retourne le décompte par source.
 
-    Ces rows ne peuvent pas être refetchées par DOI ; comme leur source est
-    re-moissonnée par le bulk, rester stale > STALE_REFRESH_AFTER_DAYS signifie
-    qu'elles ont vraiment disparu. Retourne le nombre de rows marquées.
-    Ne commit pas — l'appelant s'en charge.
+    Ces rows ne sont pas refetchées par DOI ; comme leur source est re-moissonnée
+    par le bulk, rester stale > STALE_REFRESH_AFTER_DAYS signifie qu'elles ont
+    disparu. Le décompte est ventilé par source : ces rows ont bien une source
+    (`staging.source`), la disparition se rattache donc à elle, pas à un canal
+    « sans DOI » fictif. Ne commit pas — l'appelant s'en charge.
     """
-    result = conn.execute(_MARK_UNDISCOVERABLE_STALE_SQL, {"days": STALE_REFRESH_AFTER_DAYS})
-    return result.rowcount
+    rows = conn.execute(_MARK_UNDISCOVERABLE_STALE_SQL, {"days": STALE_REFRESH_AFTER_DAYS}).all()
+    return {row.source: row.n for row in rows}
 
 
 def get_cross_import_dois(conn: Connection, target: str) -> list[str]:
