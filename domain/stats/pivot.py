@@ -16,8 +16,8 @@ Propriétés portées par le registre :
   (une publication rattachée à plusieurs laboratoires compte dans chacun). Dès qu'un groupement
   démultiplie, la mesure doit compter les publications de façon distincte.
 - **`groupable` / `filterable`** — rôles d'une dimension : axe de ventilation et/ou facette. La
-  barre de facettes se *dérive* de l'ensemble des dimensions filtrables (`applicable_facets`), sans
-  table de combinaisons (mesure, groupement).
+  barre de facettes se *dérive* de l'ensemble des dimensions filtrables (côté présentation : on retire
+  un groupement catégoriel déjà visible), sans table de combinaisons (mesure, groupement).
 
 La grandeur affichée est toujours un compte de publications (`COUNT(DISTINCT publication_id)`). Le
 taux d'accès ouvert n'est pas une mesure à part : il se lit en comparant par accès puis en aplatissant
@@ -192,27 +192,6 @@ def validate_pivot(measure: str, groups: Sequence[str]) -> tuple[Measure, list[D
         seen.add(key)
         dims.append(DIMENSIONS[key])
     return MEASURES[measure], dims
-
-
-def applicable_facets(measure_key: str, group_keys: Sequence[str]) -> list[str]:
-    """Facettes applicables à une vue, par soustraction d'un ensemble universel (cf. registre).
-
-    Part de toutes les dimensions `filterable`, puis retire — **règle G** — un groupement *catégoriel*
-    (un axe de ventilation déjà visible ; un groupement *ordinal* comme l'année reste filtrable en plage).
-
-    Aucune table de combinaisons : un ensemble unique moins ce que les groupements consomment.
-    """
-    if measure_key not in MEASURES:
-        raise ValidationError(f"Mesure inconnue : {measure_key!r}")
-    grouped = set(group_keys)
-    out: list[str] = []
-    for dim in DIMENSIONS.values():
-        if not dim.filterable:
-            continue
-        if dim.key in grouped and not dim.ordinal:
-            continue
-        out.append(dim.key)
-    return out
 
 
 def grain_multiplies(dims: Sequence[Dimension]) -> bool:

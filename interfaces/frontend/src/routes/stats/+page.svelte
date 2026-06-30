@@ -62,8 +62,8 @@
 		pivotSchema ? pivotSchema.dimensions.filter((d) => d.comparable && d.key !== primaryBy) : []
 	);
 
-	// Barre de facettes dérivée du registre (cf. domain `applicable_facets`) : ensemble des dimensions
-	// filtrables, moins un groupement catégoriel (l'année, ordinale, reste filtrable). Miroir TS de la règle G.
+	// Barre de facettes dérivée du registre `pivotSchema` : ensemble des dimensions filtrables, moins
+	// un groupement catégoriel déjà visible (l'année, ordinale, reste filtrable). Règle de présentation.
 	const facetKeys = $derived.by(() => {
 		if (!pivotSchema) return new Set(['year', 'lab', 'oa_voie', 'apc']);
 		const grouped = new Set([primaryBy, groupBy].filter(Boolean));
@@ -500,7 +500,7 @@
 	{/if}
 	<a class="pub-link" href={pubsUrl}>Voir les publications &rarr;</a>
 </div>
-<!-- Ligne 2 : filtres à facettes, dérivés du registre (cf. domain `applicable_facets`, règle G). -->
+<!-- Ligne 2 : filtres à facettes, dérivés du registre `pivotSchema` (cf. `facetKeys`). -->
 <div class="toolbar facets-row">
 	<span class="facets-label">Filtrer par&nbsp;:</span>
 	{#if facetKeys.has('year')}
