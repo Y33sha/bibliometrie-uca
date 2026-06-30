@@ -85,8 +85,8 @@ def build(
     updated = queries.propagate_authorship_attributes(conn)
     logger.info(f"  {updated} authorships mises à jour")
 
-    total_uca = queries.count_authorships_in_perimeter(conn)
-    logger.info(f"  Total authorships in_perimeter=TRUE : {total_uca}")
+    total_in_perimeter = queries.count_authorships_in_perimeter(conn)
+    logger.info(f"  Total authorships in_perimeter=TRUE : {total_in_perimeter}")
 
     # Étape 3bis : rollup vers publications.in_perimeter (flag matérialisé que les
     # filtres de liste UCA lisent au lieu d'un EXISTS sur authorships à chaque appel).
@@ -103,5 +103,9 @@ def build(
 
     metrics = PhaseMetrics()
     metrics.add(new=inserted)
-    metrics.details["summary"] = {"created": inserted, "pruned": pruned}
+    metrics.details["summary"] = {
+        "created": inserted,
+        "pruned": pruned,
+        "total_in_perimeter": total_in_perimeter,
+    }
     return metrics
