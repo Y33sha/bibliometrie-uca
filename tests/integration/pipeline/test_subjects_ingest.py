@@ -392,13 +392,13 @@ class TestRunOrchestrator:
         logger = logging.getLogger("test")
 
         # Jamais ingérée → ingérée.
-        n1 = run(sa_sync_conn, queries, logger)
-        assert n1 == 1
+        m1 = run(sa_sync_conn, queries, logger)
+        assert m1.new == 1
         assert len(_subjects_of(sa_sync_conn, pub)) == 1
 
         # Sans changement : updated_at <= created_at des liens → ignorée.
-        n2 = run(sa_sync_conn, queries, logger)
-        assert n2 == 0
+        m2 = run(sa_sync_conn, queries, logger)
+        assert m2.new == 0
         assert len(_subjects_of(sa_sync_conn, pub)) == 1
 
     def test_reingests_on_content_change(self, sa_sync_conn, queries):
@@ -419,8 +419,8 @@ class TestRunOrchestrator:
             text("UPDATE publications SET updated_at = clock_timestamp() WHERE id = :id"),
             {"id": pub},
         )
-        n2 = run(sa_sync_conn, queries, logger)
-        assert n2 == 1
+        m2 = run(sa_sync_conn, queries, logger)
+        assert m2.new == 1
         rows = _subjects_of(sa_sync_conn, pub)
         assert len(rows) == 1
         assert rows[0].label == "replaced"
