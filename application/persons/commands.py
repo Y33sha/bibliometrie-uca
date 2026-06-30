@@ -15,7 +15,7 @@ Couvre les tables de l'agrégat : `persons`, `person_identifiers`,
 from sqlalchemy import Connection
 
 from application.persons import core as persons_service
-from application.persons.core import AuthorshipRef, DetachResult
+from application.persons.core import AddIdentifierResult, AuthorshipRef, DetachResult
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.authorship_repository import AuthorshipRepository
 from application.ports.repositories.person_repository import (
@@ -35,10 +35,11 @@ def add_identifier(
     *,
     source: str = "manual",
     repo: PersonRepository,
-) -> None:
-    """Ajoute un identifiant (ORCID/idHAL) à une personne."""
-    persons_service.add_identifier(person_id, id_type, id_value, source=source, repo=repo)
+) -> AddIdentifierResult:
+    """Ajoute un identifiant (ORCID/idHAL) à une personne. Retourne l'issue de la cascade."""
+    result = persons_service.add_identifier(person_id, id_type, id_value, source=source, repo=repo)
     conn.commit()
+    return result
 
 
 def remove_identifier(

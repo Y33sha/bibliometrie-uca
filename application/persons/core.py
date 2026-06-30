@@ -4,7 +4,8 @@ Gère aussi le rattachement/détachement des authorships sources (`source_author
 """
 
 import logging
-from typing import TypedDict, cast
+from enum import StrEnum
+from typing import NamedTuple, TypedDict, cast
 
 from application.audit import emit_event
 from application.authorships.core import reject_pair
@@ -148,6 +149,27 @@ def unlink_authorship(
 # ── Identifiants ──
 
 
+class AddIdentifierOutcome(StrEnum):
+    """Issue de la cascade de décision d'`add_identifier`.
+
+    Porte le résultat au lieu de le laisser l'appelant le redéduire : un seul
+    site de décision, l'appelant (API) se contente de traduire l'issue en réponse.
+    Le cas conflit n'est pas une issue mais une levée de `CannotAttributeConflict`.
+    """
+
+    ADDED = "added"  # insertion en `pending`
+    ALREADY_EXISTS = "already_exists"  # déjà porté par cette personne (no-op)
+    REASSIGNED = "reassigned"  # repris d'une autre personne (était `rejected`)
+
+
+class AddIdentifierResult(NamedTuple):
+    """Retour d'`add_identifier` : l'issue de la cascade et la valeur canonique
+    normalisée (que l'appelant ré-affiche sans re-normaliser)."""
+
+    outcome: AddIdentifierOutcome
+    id_value: str
+
+
 def add_identifier(
     person_id: int,
     id_type: str,
@@ -155,16 +177,16 @@ def add_identifier(
     *,
     source: str = "auto",
     repo: PersonRepository,
-) -> None:
+) -> AddIdentifierResult:
     """Ajoute un identifiant (ORCID, idHAL, IdRef...) à une personne.
 
     Charge l'éventuel `PersonIdentifier` existant pour `(id_type, id_value)`
-    et dispatche :
+    et dispatche, en renvoyant l'issue (`AddIdentifierResult`) :
 
-    - **absent** → insertion en `pending`
-    - **existant sur cette personne** → idempotent (no-op)
+    - **absent** → insertion en `pending` (`ADDED`)
+    - **existant sur cette personne** → idempotent, no-op (`ALREADY_EXISTS`)
     - **existant sur autre personne en `rejected`** → réattribution
-      (statut → `pending`, via `PersonIdentifier.reattribute_to`)
+      (statut → `pending`, via `PersonIdentifier.reattribute_to` ; `REASSIGNED`)
     - **existant sur autre personne en `pending` ou `confirmed`** →
       lève `CannotAttributeConflict`. Pour réattribuer, le statut
       existant doit d'abord être passé à `rejected` (via
@@ -172,7 +194,8 @@ def add_identifier(
 
     La valeur est validée et normalisée via le value object du type
     (`normalized_identifier_value`) avant lookup et écriture, de sorte que la même
-    forme canonique sert aux deux. Lève `ValidationError` si elle est malformée.
+    forme canonique sert aux deux et soit renvoyée dans le résultat. Lève
+    `ValidationError` si elle est malformée.
     """
     id_value = normalized_identifier_value(id_type, id_value)
     existing = repo.find_identifier(id_type, id_value)
@@ -187,15 +210,15 @@ def add_identifier(
             source=source,
         )
         repo.insert_identifier(ident)
-        return
+        return AddIdentifierResult(AddIdentifierOutcome.ADDED, id_value)
 
     if existing.person_id == person_id:
-        return  # idempotent
+        return AddIdentifierResult(AddIdentifierOutcome.ALREADY_EXISTS, id_value)
 
     if existing.status is AttributionStatus.REJECTED:
         existing.reattribute_to(person_id, source=source)
         repo.update_identifier(existing)
-        return
+        return AddIdentifierResult(AddIdentifierOutcome.REASSIGNED, id_value)
 
     raise CannotAttributeConflict(
         f"Identifiant {id_type}={id_value!r} déjà attribué à person_id={existing.person_id} "

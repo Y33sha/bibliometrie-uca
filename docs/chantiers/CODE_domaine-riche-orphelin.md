@@ -1,5 +1,7 @@
 # Brancher le domaine riche orphelin
 
+Commencé le 2026-06-29
+
 ## Contexte
 
 Un audit du code non appelé (vulture + vérification manuelle de chaque candidat) révèle que la quasi-totalité des symboles « morts » ne sont pas inutiles : ce sont des constructions de domaine riche (value objects, aggregate, invariants métier) et des mappings canoniques qui encodent une intention de modélisation mais qu'aucune couche applicative ni infrastructure n'appelle.
@@ -23,7 +25,7 @@ Le motif de fond : la couche domaine offre des contrats stricts (VOs auto-valid�
 - [x] Dispatch `normalized_identifier_value(id_type, raw)` branché dans l'entonnoir d'écriture unique `add_identifier`, qui valide et normalise avant lookup et insertion. Couvre l'ajout manuel (API admin) et la promotion canonique (pipeline) sans duplication.
 - [x] Validation ad hoc du router supprimée (regex ORCID locale, strip d'URL partiel) ; `ValidationError → 400`.
 - [x] Politique par appelant : strict côté API (4xx) ; tolérant côté pipeline (`add_identifiers_from_authorships` loggue « identifiant mal formé » et poursuit).
-- [ ] Réduire la duplication résiduelle : le router refait son propre lookup `person_identifiers` (réponses `already_exists` / conflit / `reassigned`) en parallèle de la logique de `add_identifier`. Faire porter ces réponses par `add_identifier` pour un seul site de décision.
+- [x] Réduire la duplication résiduelle : `add_identifier` porte l'issue de sa cascade (`AddIdentifierResult`) ; le router traduit l'issue en réponse sans refaire ni lookup ni décision. Le SQL brut disparaît entièrement du router (la route de fusion passe aussi par `person_exists`).
 
 ### Vocabulaire canonique des rôles d'authorship
 
