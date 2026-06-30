@@ -119,8 +119,9 @@ def extract_pub_metadata(doc: dict, journal_id: int | None) -> dict:
     Retourne un dict utilisable par ``insert_hal_document``. Toutes les
     valeurs sont brutes — pas de transformation de cohérence. ``doc_type``
     est le concat brut ``docType_s_docSubType_s`` (ex. ``ART_review-article``),
-    pas le mapping canonique de ``derive_hal_doc_type`` (qui relève du
-    canonique, pas du brut stocké dans ``source_publications``).
+    pas la valeur canonique : la résolution source→enum (``map_doc_type``)
+    relève de la phase ``metadata_correction``, pas du brut stocké dans
+    ``source_publications``.
     """
     title = get_title(doc)
     raw_type = doc.get("docType_s") or ""

@@ -7,34 +7,6 @@ pour le reste du pipeline.
 
 from datetime import date
 
-from domain.source_publications.doc_types import map_doc_type
-
-
-def derive_hal_doc_type(doc_type: str | None, sub_type: str | None) -> str:
-    """Mapping HAL (docType_s, docSubType_s) → enum doc_type canonique.
-
-    HAL est la seule source qui sépare type/sous-type. Cascade :
-    1. Si sub_type présent, tente le mapping de la clé combinée
-       `{doc_type}_{sub_type}` (ex. `ART_ARTREV` → `review`).
-    2. Si la clé combinée ne mappe pas (résultat `'other'`), fallback
-       sur le type seul (ex. `ART` → `article`).
-
-    La table de mapping HAL dans `domain/doc_types._SOURCE_MAPS["hal"]`
-    contient les deux formats — cette fonction encode la cascade de
-    tentatives.
-
-    Conserve le défaut historique `'OTHER'` quand `doc_type` est None
-    pour compatibilité avec le call site (HAL renvoie rarement un
-    docType_s vide, mais on évite l'erreur silencieuse).
-    """
-    raw = doc_type or "OTHER"
-    if sub_type:
-        result = map_doc_type(f"{raw}_{sub_type}", "hal")
-        if result != "other":
-            return result
-    return map_doc_type(raw, "hal")
-
-
 # Repositories ouverts reconnus par HAL via `linkExtId_s` qu'on traite
 # comme green OA (= dépôt en archive ouverte).
 #
