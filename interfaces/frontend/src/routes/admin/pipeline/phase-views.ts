@@ -196,6 +196,16 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
       },
     ],
   },
+  relations: {
+    tables: [
+      {
+        source: "table",
+        firstColumnLabel: "Type de relation",
+        columns: [{ key: "count", label: "Nombre", pct: true }],
+        total: true,
+      },
+    ],
+  },
   countries: {
     summary: [
       { key: "addresses_total", label: "Adresses (pub_count > 0)" },

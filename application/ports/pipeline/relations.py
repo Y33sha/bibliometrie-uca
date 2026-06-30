@@ -109,3 +109,7 @@ class PublicationRelationsQueries(Protocol):
         """Remplace les relations rapprochées par titre (`source` title_match) par `edges`, avec la
         même résolution/dédup que `replace_declared_relations`."""
         ...
+
+    def count_by_relation_type(self, conn: Connection) -> list[tuple[str, int]]:
+        """`(relation_type, nombre)` par type, décroissant — distribution de `publication_relations`."""
+        ...
