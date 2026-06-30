@@ -64,7 +64,7 @@ if TYPE_CHECKING:
     from application.ports.pipeline.extract.fetch_missing_doi import AsyncFetchMissingDoiAdapter
     from infrastructure.queries.pipeline.countries import AddressCountryStatus
 
-from application.pipeline.graph import PHASE_ORDER, watched_tables
+from application.pipeline.graph import PHASE_ORDER
 from application.pipeline.metadata_correction.correct_by_cluster import ClusterCorrectionStats
 from application.pipeline.metadata_correction.correct_unary import UnaryCorrectionStats
 from application.pipeline.metadata_correction.journal_by_doi import JournalByDoiStats
@@ -745,7 +745,7 @@ def phase_countries(mode: Any = "full", **kw: Any) -> PhaseMetrics:
     return metrics
 
 
-def phase_subjects(**kw: Any) -> Any:
+def phase_subjects(**kw: Any) -> PhaseMetrics:
     """Sujets / mots-clés : ingestion + recalcul des co-occurrences.
 
     Deux étapes enchaînées, indissociables :
@@ -770,8 +770,9 @@ def phase_subjects(**kw: Any) -> Any:
     `publication_subjects` non rejetés : toutes les publications redeviennent
     « jamais ingérées ».
     """
-    _run_ingest_subjects()
+    metrics = _run_ingest_subjects()
     _run_cooccurrences()
+    return metrics
 
 
 def _run_journal_by_doi() -> JournalByDoiStats:
@@ -1448,7 +1449,7 @@ def _run_refresh_publication_countries() -> None:
     log.info("✓ refresh_publication_countries terminé en %.1fs", time.time() - t0)
 
 
-def _run_ingest_subjects() -> None:
+def _run_ingest_subjects() -> PhaseMetrics:
     from application.pipeline.subjects.run import run
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.queries.subjects import PgSubjectsQueries
@@ -1457,11 +1458,12 @@ def _run_ingest_subjects() -> None:
     t0 = time.time()
     conn = get_sync_engine().connect()
     try:
-        run(conn, PgSubjectsQueries(), log)
+        metrics = run(conn, PgSubjectsQueries(), log)
         conn.commit()
     finally:
         conn.close()
     log.info("✓ subjects terminé en %.1fs", time.time() - t0)
+    return metrics
 
 
 def _run_cooccurrences() -> None:
@@ -2086,7 +2088,6 @@ def main() -> None:  # noqa: C901 — orchestrateur CLI : refactor en helpers s�
         )
 
         phase_started_at = datetime.datetime.now(datetime.UTC)
-        before_volumes = recorder.before_volumes(watched_tables(name))
         t0_phase = time.time()
         try:
             result = fn(
@@ -2113,7 +2114,6 @@ def main() -> None:  # noqa: C901 — orchestrateur CLI : refactor en helpers s�
                     }
                 ],
                 details={},
-                before_volumes=before_volumes,
             )
             phase_results.append((name + " (INTERROMPU)", time.time() - t0_phase))
             clear_status()
@@ -2128,7 +2128,6 @@ def main() -> None:  # noqa: C901 — orchestrateur CLI : refactor en helpers s�
                 metrics=PhaseMetrics().to_payload(time.time() - t0_phase),
                 signals=[{"level": "error", "code": "exception", "message": str(e)}],
                 details={},
-                before_volumes=before_volumes,
             )
             phase_results.append((name + " (ERREUR)", time.time() - t0_phase))
             clear_status()
@@ -2146,7 +2145,6 @@ def main() -> None:  # noqa: C901 — orchestrateur CLI : refactor en helpers s�
             metrics=metrics.to_payload(duration),
             signals=metrics.signals,
             details=metrics.details,
-            before_volumes=before_volumes,
         )
 
     elapsed_total = time.time() - t0_total

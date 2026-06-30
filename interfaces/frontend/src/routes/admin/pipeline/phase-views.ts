@@ -15,8 +15,8 @@
  *   (chaque ligne porte une `key`, premier en-tête de colonne). Un tableau s'ajuste
  *   à son contenu plutôt que d'occuper toute la largeur.
  *
- * Une phase sans entrée ici retombe sur l'affichage générique (compteurs
- * `PhaseMetrics` + volumes avant/après des tables produites).
+ * Une phase sans entrée ici retombe sur l'affichage générique des compteurs
+ * `PhaseMetrics` (total / new / updated / unchanged / errors / extras).
  */
 
 export type SummaryItem = { key: string; label: string };
@@ -53,8 +53,6 @@ export type PhaseView = {
   lines?: string[];
   matrix?: MatrixView;
   tables?: TableView[];
-  // Masque les volumes avant/après auto-relevés (quand le résumé porte déjà le total).
-  hideVolumes?: boolean;
 };
 
 export const PHASE_VIEWS: Record<string, PhaseView> = {
@@ -152,7 +150,6 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
     ],
   },
   publications: {
-    hideVolumes: true,
     lines: [
       "{processed} source_publications examinées, résolues en {publications} publications (dont {existing} déjà existantes)",
       "{created} nouvelles publications, dont {splits} par scission",
@@ -235,10 +232,10 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
     summary: [
       { key: "created", label: "Authorships créées" },
       { key: "pruned", label: "Orphelines supprimées" },
+      { key: "total_in_perimeter", label: "Total dans le périmètre" },
     ],
   },
   countries: {
-    hideVolumes: true,
     lines: [
       "{total} adresses",
       "{without_initial} sans pays ({without_pct} %)",
@@ -246,10 +243,16 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
       "Reste {remaining}, dont {with_suggestion} avec suggestion",
     ],
   },
+  subjects: {
+    lines: [
+      "{subjects_added} sujets ajoutés (nouveau total : {subjects_total})",
+      "{publications_updated} publications réingérées",
+    ],
+  },
   oa_status: {
     summary: [
       { key: "stale", label: "Publications à vérifier" },
-      { key: "checked", label: "Vérifiées (cap 10 000)" },
+      { key: "checked", label: "Vérifiées (max 10 000)" },
       { key: "updated", label: "Mises à jour" },
       { key: "unchanged", label: "Inchangées" },
       { key: "not_found", label: "Non trouvées" },

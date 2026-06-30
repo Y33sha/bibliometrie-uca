@@ -5,10 +5,8 @@ circulent entre la capture (orchestrateur `run_pipeline.py`), la persistance
 (`infrastructure/observability/`) et la lecture (API). Placées en zone neutre
 `application/ports/` : ni I/O ni dépendance framework.
 
-L'observable d'entrée est capturé au début de la phase, l'observable de sortie à
-sa fin ; leur rapport, calculé à la lecture, donne le rendement (cf. graphe des
-phases). Le statut et les signaux portent la santé du run : `error` est décidé
-par l'orchestrateur sur exception, `warning` et les signaux sont remontés par la
+Le statut et les signaux portent la santé du run : `error` est décidé par
+l'orchestrateur sur exception, `warning` et les signaux sont remontés par la
 phase elle-même (source indisponible, série de 429, conflit d'identité…).
 """
 
@@ -46,11 +44,6 @@ class PhaseMetricsPayload(TypedDict):
     duration_s: float
 
 
-# Observable = volume par table (clé = nom de table). Les distributions par phase
-# pourront enrichir cette forme ultérieurement (cf. questions ouvertes du chantier).
-ObservableVolumes = dict[str, int]
-
-
 @dataclass
 class PhaseExecution:
     """Une exécution de phase, prête à persister et relue depuis la base."""
@@ -64,7 +57,6 @@ class PhaseExecution:
     status: PhaseStatus
     metrics: PhaseMetricsPayload
     signals: list[Signal] = field(default_factory=list)
-    # Indicateurs sur-mesure de la phase. `details["tables"]` = volumes avant/après
-    # des tables consommées/produites (auto) ; les phases enrichissent librement
-    # (ex. `details["by_source"]`).
+    # Indicateurs sur-mesure remontés par la phase (conventions `summary`, `table`,
+    # `lines`, `matrix` ; cf. `interfaces/frontend/.../phase-views.ts`).
     details: dict[str, object] = field(default_factory=dict)
