@@ -1,7 +1,7 @@
 """Tests des helpers de `domain/sources/hal_domains.py` et du parser
 `interfaces/cli/dev/refresh_hal_domain_labels.parse_label_s`."""
 
-from domain.sources.hal_domains import HAL_DOMAINS, hal_domain_label, hal_domain_path
+from domain.sources.hal_domains import HAL_DOMAINS, hal_domain_label
 from interfaces.cli.dev.refresh_hal_domain_labels import parse_label_s
 
 
@@ -16,23 +16,6 @@ class TestHalDomainLabel:
     def test_leaf_label_only(self):
         # `info.info-bi` → "Bio-informatique" (feuille), PAS le chemin complet.
         assert hal_domain_label("info.info-bi") == "Bio-informatique"
-
-
-class TestHalDomainPath:
-    def test_root_returns_label(self):
-        assert hal_domain_path("chim") == "Chimie"
-
-    def test_two_levels(self):
-        # Reconstitue depuis le code : chim → Chimie, chim.anal → Chimie analytique.
-        assert hal_domain_path("chim.anal") == "Chimie / Chimie analytique"
-
-    def test_three_levels(self):
-        # phys → phys.astr → phys.astr.co
-        assert hal_domain_path("phys.astr.co").startswith("Physique / Astrophysique / ")
-
-    def test_unknown_segment_falls_back_to_code(self):
-        # Si un préfixe est inconnu, il apparaît tel quel dans le path.
-        assert hal_domain_path("zzz.unknown") == "zzz / zzz.unknown"
 
 
 class TestParseLabelS:

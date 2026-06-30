@@ -14,9 +14,8 @@ stockée explicitement : elle se reconstitue à partir du code lui-même
 (séparateur `.`), évitant la duplication de l'arborescence.
 
 Usage :
-    from domain.sources.hal_domains import hal_domain_label, hal_domain_path
+    from domain.sources.hal_domains import hal_domain_label
     hal_domain_label("chim.anal")   # -> "Chimie analytique"
-    hal_domain_path("chim.anal")    # -> "Chimie / Chimie analytique"
 
 Si un code est inconnu (HAL a ajouté un domaine entre deux régénérations
 du fichier), les helpers retournent le code tel quel — le pipeline reste
@@ -428,20 +427,3 @@ def hal_domain_label(code: str) -> str:
     Fallback sur le code lui-même si inconnu.
     """
     return HAL_DOMAINS.get(code, code)
-
-
-def hal_domain_path(code: str) -> str:
-    """Chemin hiérarchique reconstruit depuis le code.
-
-    Splitte le code par `.` pour obtenir les ancêtres et compose le chemin
-    `parent / ... / feuille` en mappant chaque préfixe via `HAL_DOMAINS`.
-    Fallback sur le code lui-même pour les segments inconnus.
-    """
-    parts = code.split(".")
-    if not parts:
-        return code
-    labels = []
-    for i in range(1, len(parts) + 1):
-        prefix = ".".join(parts[:i])
-        labels.append(HAL_DOMAINS.get(prefix, prefix))
-    return " / ".join(labels)
