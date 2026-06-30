@@ -91,7 +91,10 @@ Phases A à E livrées (capture par phase, lecture, API, interface en ruban). Le
 
 ### 2. Audit et harmonisation du logging
 
-- [ ] Audit de complétude et de cohérence inter-phases : chaque phase loggue l'essentiel, dans une forme homogène. Mené une fois la machinerie de rapport retirée.
+- [x] Extraction : préfixe `[source · scope]` mutualisé sur toutes les lignes intermédiaires, via `scoped_logger` (helper du base class `SourceExtractor`). Chaque ligne porte la source et le scope (année, `depuis …`, PPN) ; formats d'en-tête et de progression alignés entre les 5 sources ; theses gagne son bilan par PPN, absent jusque-là.
+- [ ] Normalisation : revue de cohérence des logs (en-tête, progression par batch).
+- [ ] Trous intra-phase : annoncer le VACUUM en fin de `normalize` et les sous-étapes de `cross_imports` (hal-id/NNT → DOI) — silences actuels pendant les opérations longues.
+- [ ] Audit de complétude inter-phases restant (chaque phase loggue l'essentiel, dans une forme homogène).
 
 ### 3. Métriques et signaux
 

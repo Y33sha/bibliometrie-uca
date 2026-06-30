@@ -13,7 +13,12 @@ import time
 
 from sqlalchemy import Connection
 
-from application.pipeline.extract.base import ExtractionConfigError, SourceExtractor
+from application.pipeline.extract.base import (
+    ExtractionConfigError,
+    ExtractLogger,
+    SourceExtractor,
+    scoped_logger,
+)
 from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.extract.wos import WosExtractAdapter, WosExtractConfig
 
@@ -29,22 +34,22 @@ def extract_year(
     conn: Connection,
     year: int,
     affiliations: list[str],
-    logger: logging.Logger,
+    logger: ExtractLogger,
     *,
     dry_run: bool = False,
 ) -> tuple[int, int, int]:
     """Extrait toutes les publications d'une année.
 
     Retourne `(new, updated, unchanged)`."""
-    logger.info(f"Requête WoS : {adapter.build_query(year, affiliations)}")
+    logger.info(f"requête : {adapter.build_query(year, affiliations)}")
 
     data = adapter.fetch_page(year, 1, affiliations)
     if not data:
-        logger.error(f"Impossible d'exécuter la requête pour {year}")
+        logger.error("requête impossible")
         return 0, 0, 0
 
     total_count = adapter.get_records_found(data)
-    logger.info(f"Année {year} : {total_count} records trouvés")
+    logger.info(f"{total_count} records trouvés")
 
     if dry_run or total_count == 0:
         return 0, 0, 0
@@ -64,10 +69,7 @@ def extract_year(
         if not records:
             consecutive_failures += 1
             if consecutive_failures >= 3:
-                logger.error(
-                    f"3 pages vides consécutives à firstRecord={first_record}, "
-                    f"arrêt de l'année {year}"
-                )
+                logger.error(f"3 pages vides consécutives à firstRecord={first_record}, arrêt")
                 break
             logger.warning(
                 f"Page vide à firstRecord={first_record}, nouvelle tentative après pause..."
@@ -86,7 +88,7 @@ def extract_year(
             total_unchanged += counts.unchanged
 
         logger.info(
-            f"  Page {page_num} : {len(records)} records, "
+            f"page {page_num} : {len(records)} records, "
             f"{counts.new} nouveaux, {counts.updated} mis à jour, {counts.unchanged} inchangés "
             f"({min(first_record + len(records) - 1, total_count)}/{total_count})"
         )
@@ -95,7 +97,7 @@ def extract_year(
 
         # Pause longue toutes les N pages pour laisser l'API souffler
         if page_num % _BREATHER_EVERY == 0 and first_record <= total_count:
-            logger.info(f"  Pause de {_BREATHER_SECS}s (toutes les {_BREATHER_EVERY} pages)...")
+            logger.info(f"pause de {_BREATHER_SECS}s (toutes les {_BREATHER_EVERY} pages)…")
             time.sleep(_BREATHER_SECS)
 
         if first_record > _WOS_FIRST_RECORD_LIMIT:
@@ -106,7 +108,7 @@ def extract_year(
             break
 
     logger.info(
-        f"Année {year} terminée : {total_new} nouveaux, {total_updated} mis à jour, "
+        f"terminé : {total_new} nouveaux, {total_updated} mis à jour, "
         f"{total_unchanged} inchangés sur {total_count} trouvés"
     )
     return total_new, total_updated, total_unchanged
@@ -168,18 +170,19 @@ class WosExtractor(SourceExtractor[WosExtractConfig]):
                     "WoS à bout (429/5xx répétés) — années restantes sautées (retry au prochain run)"
                 )
                 break
+            slog = scoped_logger(self.logger, self.SOURCE, str(year))
             try:
                 new, updated, unchanged = extract_year(
                     self._adapter,
                     self.conn,
                     year,
                     config.affiliations,
-                    self.logger,
+                    slog,
                     dry_run=args.dry_run,
                 )
                 stats.add(new=new, updated=updated, unchanged=unchanged)
             except Exception as e:
-                self.logger.error(f"Erreur sur l'année {year} : {e} — passage à la suivante")
+                slog.error(f"erreur : {e} — passage à la suivante")
             # Pas de pause si le breaker vient de tripper : la boucle s'arrête au tour suivant.
             if i < len(years) - 1 and not self._breaker_tripped():
                 self.logger.info("Pause de 30s avant l'année suivante...")

@@ -20,7 +20,7 @@ from collections.abc import Callable
 
 from sqlalchemy import Connection
 
-from application.pipeline.extract.base import SourceExtractor
+from application.pipeline.extract.base import ExtractLogger, SourceExtractor, scoped_logger
 from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.extract.hal import HalExtractAdapter, HalExtractConfig
 
@@ -29,9 +29,8 @@ def extract_union(
     adapter: HalExtractAdapter,
     config: HalExtractConfig,
     conn: Connection,
-    logger: logging.Logger,
+    logger: ExtractLogger,
     *,
-    scope_label: str,
     years: list[int] | None = None,
     since: str | None = None,
     dry_run: bool = False,
@@ -42,7 +41,7 @@ def extract_union(
     Construit `q` (années/`since`) et `fq=collCode_s:(…)` sur toutes les
     collections de `config.all_collections`, puis paginate en `cursorMark`
     jusqu'à stabilisation du marqueur. Chaque document est upserté une fois.
-    `scope_label` (ex. `« 2024 »`, `« depuis 2026-05-01 »`) étiquette les logs ;
+    `logger` est le logger scopé (`[hal · <scope>]`) construit par `extract_all` ;
     le log par page reporte le débit (docs/s) pour calibrer `HAL_PER_PAGE`.
     Retourne `PhaseMetrics(new, updated, unchanged, total)`.
 
@@ -59,18 +58,18 @@ def extract_union(
         data = adapter.fetch_page_cursor(query, fq, "*")
         total = int(data.get("response", {}).get("numFound", 0))
         metrics.add(total=total)
-        logger.info(f"  {scope_label} : {total} docs (dry-run)")
+        logger.info(f"{total} docs (dry-run)")
         return metrics
 
     page_size = adapter.per_page_for(None)
-    logger.info(f"  {scope_label} : interrogation HAL…")
+    logger.info("interrogation HAL…")
     cursor = "*"
     page = 0
     total_pages: int | None = None
     while True:
         if breaker_tripped():
             logger.warning(
-                "HAL à bout (429/5xx répétés) — pagination interrompue (retry au prochain run)"
+                "à bout (429/5xx répétés) — pagination interrompue (retry au prochain run)"
             )
             break
         page_started = time.monotonic()
@@ -84,9 +83,7 @@ def extract_union(
         if total_pages is None:
             num_found = int(resp.get("numFound", 0))
             total_pages = (num_found + page_size - 1) // page_size if num_found else 0
-            logger.info(
-                f"  {scope_label} : {num_found} documents → ~{total_pages} pages de {page_size}"
-            )
+            logger.info(f"{num_found} documents → ~{total_pages} pages de {page_size}")
 
         write_started = time.monotonic()
         for doc in docs:
@@ -111,7 +108,7 @@ def extract_union(
         if docs:
             page += 1
             logger.info(
-                f"  {scope_label} page {page}/{total_pages} — {len(docs)} docs : "
+                f"page {page}/{total_pages} — {len(docs)} docs : "
                 f"fetch {fetch_s:.1f}s, écriture {write_s:.1f}s — cumul {metrics.total} "
                 f"({metrics.new} nouveaux, {metrics.updated} mis à jour, "
                 f"{metrics.unchanged} inchangés)"
@@ -184,8 +181,7 @@ class HalExtractor(SourceExtractor[HalExtractConfig]):
                 self._adapter,
                 config,
                 self.conn,
-                self.logger,
-                scope_label=f"depuis {args.since}",
+                scoped_logger(self.logger, self.SOURCE, f"depuis {args.since}"),
                 since=args.since,
                 dry_run=args.dry_run,
                 breaker_tripped=self._breaker_tripped,
@@ -202,20 +198,20 @@ class HalExtractor(SourceExtractor[HalExtractConfig]):
                     " (retry au prochain run)"
                 )
                 break
+            slog = scoped_logger(self.logger, self.SOURCE, str(year))
             year_metrics = extract_union(
                 self._adapter,
                 config,
                 self.conn,
-                self.logger,
-                scope_label=str(year),
+                slog,
                 years=[year],
                 dry_run=args.dry_run,
                 breaker_tripped=self._breaker_tripped,
             )
             metrics.merge(year_metrics)
             if not args.dry_run:
-                self.logger.info(
-                    f"  {year} terminé : {year_metrics.new} nouveaux, "
+                slog.info(
+                    f"terminé : {year_metrics.new} nouveaux, "
                     f"{year_metrics.updated} mis à jour, {year_metrics.unchanged} inchangés"
                 )
         return metrics

@@ -21,13 +21,42 @@ import argparse
 import logging
 import sys
 from abc import ABC, abstractmethod
-from typing import ClassVar
+from collections.abc import MutableMapping
+from typing import Any, ClassVar
 
 import requests
 from sqlalchemy import Connection
 
 from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.circuit_breaker import CircuitBreaker
+
+
+class _ScopedLogger(logging.LoggerAdapter[logging.Logger]):
+    """Logger préfixant chaque ligne d'un `[source · scope]`.
+
+    Situe toute ligne intermédiaire d'extraction dans un run multi-sources et
+    multi-scopes : on sait d'un coup quelle source et quel périmètre (année, plage
+    `depuis …`, PPN d'établissement…) produit la ligne, sans la répéter à la main.
+    """
+
+    def __init__(self, logger: logging.Logger, prefix: str) -> None:
+        super().__init__(logger, {})
+        self._prefix = prefix
+
+    def process(
+        self, msg: str, kwargs: MutableMapping[str, Any]
+    ) -> tuple[str, MutableMapping[str, Any]]:
+        return f"{self._prefix} {msg}", kwargs
+
+
+def scoped_logger(logger: logging.Logger, source: str, scope: str) -> _ScopedLogger:
+    """Adaptateur préfixant les logs d'extraction d'un `[source · scope]` homogène."""
+    return _ScopedLogger(logger, f"[{source} · {scope}]")
+
+
+# Les fonctions d'extraction acceptent indifféremment un logger nu ou un logger
+# scopé (`scoped_logger`) — c'est `extract_all` qui décide du scope et le pose.
+type ExtractLogger = logging.Logger | logging.LoggerAdapter[logging.Logger]
 
 
 class ExtractionConfigError(Exception):
