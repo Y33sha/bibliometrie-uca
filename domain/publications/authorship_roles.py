@@ -154,6 +154,20 @@ _SOURCE_MAPS = {
 }
 
 
+# Garde-fou : les mappings ne produisent que des rôles du vocabulaire canonique.
+# Sans cela, une faute de frappe dans un mapping écrirait un rôle hors-vocabulaire
+# dans `authorships.roles` sans rien pour l'arrêter.
+assert all(
+    role in AUTHORSHIP_ROLES
+    for mapping in _SOURCE_MAPS.values()
+    for roles, _ in mapping.values()
+    for role in roles
+), "un mapping source produit un rôle hors de AUTHORSHIP_ROLES"
+assert all(
+    role in AUTHORSHIP_ROLES for roles in THESES_FIELD_ROLES.values() for role in roles
+), "THESES_FIELD_ROLES produit un rôle hors de AUTHORSHIP_ROLES"
+
+
 # ═══════════════════════════════════════════════════════════════════
 # API publique
 # ═══════════════════════════════════════════════════════════════════
