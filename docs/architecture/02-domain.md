@@ -10,7 +10,6 @@ Contenu, organisé par concept métier :
   - `Journal` — `domain/journals/`
   - `Publisher` — `domain/publishers/`
   - `Perimeter` — `domain/perimeters/`
-  - `AddressAffiliation` (+ VO interne `StructureLink`) — `domain/addresses/`
 - **Value objects** (immuables, identité par contenu) :
   - Identifiants publication : `DOI`, `HALId`, `NNT` (`domain/publications/identifiers.py`)
   - Identifiants personne : `ORCID`, `IdHAL`, `IdRef` (`domain/persons/identifiers.py`)

@@ -4,10 +4,10 @@ L'adresse en tant qu'objet métier est définie par son texte
 normalisé : c'est sa clé naturelle, et deux adresses au même texte
 normalisé sont la même adresse. VO immuable, égalité par valeur.
 
-Le pendant « état de résolution » de l'adresse (rattachement à des
-structures, statut de confirmation, pays détectés, date de
-résolution) est porté par l'aggregate `AddressAffiliation` dans
-`domain/addresses/affiliation.py`.
+L'état de résolution de l'adresse (rattachement aux structures avec
+statut de confirmation, pays détectés) vit en base (`addresses`,
+`address_structures`) et est manipulé par la couche infrastructure /
+application, pas par un objet de domaine.
 """
 
 from dataclasses import dataclass
