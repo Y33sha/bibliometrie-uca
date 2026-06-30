@@ -54,7 +54,7 @@ Le motif de fond : la couche domaine offre des contrats stricts (VOs auto-valid�
 
 ### Invariants, projections et helpers orphelins
 
-- [ ] `Publication.has_minimal_metadata` : brancher comme garde d'admissibilité d'une publication, ou retirer.
+- [x] `Publication.has_minimal_metadata` : retiré. L'aggregate n'est hydraté qu'en lecture ; titre et année sont déjà garantis en amont (les normalizers refusent un record sans année ou sans titre, `pub_year` est `NOT NULL`). Une contrainte `NOT NULL` sur le titre s'ajoutera si le besoin se concrétise.
 - [ ] `CorrectedFields.is_empty` (`domain/source_publications/correction.py`) : trouver le site d'appel pertinent ou retirer.
 - [ ] `parse_locations` (`domain/sources/openalex.py`) : brancher pour la détection open access multi-locations, ou retirer (le sibling `parse_primary_location` reste utilisé).
 - [ ] `applicable_facets` (`domain/stats/pivot.py`) : confirmer que la barre de facettes s'en dérive — sinon réconcilier avec la logique dupliquée côté frontend — ou retirer.
