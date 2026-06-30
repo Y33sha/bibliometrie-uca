@@ -35,18 +35,6 @@ class TestPublicationConstruction:
         assert pub.authorships == (a1, a2)
 
 
-class TestPublicationHasMinimalMetadata:
-    def test_true_when_title_and_year(self):
-        assert Publication(id=None, title="t", pub_year=2024).has_minimal_metadata() is True
-
-    def test_false_when_empty_title(self):
-        assert Publication(id=None, title="", pub_year=2024).has_minimal_metadata() is False
-
-    def test_false_when_year_zero(self):
-        """Convention : pub_year=0 → cas pathologique, considéré absent."""
-        assert Publication(id=None, title="t", pub_year=0).has_minimal_metadata() is False
-
-
 class TestPublicationAbsorb:
     def test_target_keeps_existing_doi(self):
         target = _pub(id=1, doi=DOI("10.1/keep"))

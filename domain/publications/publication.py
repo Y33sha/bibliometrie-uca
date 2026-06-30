@@ -47,13 +47,6 @@ class Publication:
     # ré-écrit pas (cf. `aggregation.recompute`).
     unpaywall_checked_at: datetime | None = None
 
-    def has_minimal_metadata(self) -> bool:
-        """Indique si la publication a les métadonnées minimales requises pour exister en base (titre non vide ET année renseignée).
-
-        Une `pub_year` à 0 est considérée comme absente (`bool(0) is False`).
-        """
-        return bool(self.title) and bool(self.pub_year)
-
     def absorb(self, other: "Publication") -> None:
         """Absorbe la publication `other` dans `self` (typiquement après une collision DOI ou une fusion explicite). `self` survit et conserve son `id` ; `other` est destinée à être supprimée par l'appelant (côté infrastructure).
 
