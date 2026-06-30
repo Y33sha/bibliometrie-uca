@@ -19,7 +19,10 @@ Phase `affiliations` : trois sous-étapes enchaînées.
 
 2. **`resolve_addresses`** — rapproche chaque adresse normalisée des structures connues, en cherchant leurs formes de nom (`structure_name_forms`) dans le texte de l'adresse. Le résultat est écrit dans `address_structures`, avec `matched_form_id` pour la traçabilité (quelle forme a déclenché la détection). Code : `application/pipeline/affiliations/resolve_addresses.py`.
 
-   Le rapprochement cherche les formes de nom comme sous-chaînes du texte de l'adresse, en un seul balayage par adresse quel que soit le nombre de formes. Trois garde-fous limitent les faux positifs : une forme courte ou marquée « mot entier » ne compte que si elle est délimitée par des non-lettres ; une forme « excluante » retire au contraire sa structure du résultat ; une forme « à contexte requis » n'est retenue que si une autre forme de sa structure de rattachement est elle aussi présente dans l'adresse.
+   Le rapprochement cherche les formes de nom comme sous-chaînes du texte de l'adresse, à l'aide d'un [automate d'Aho-Corasick](https://tryalgo.org/fr/strings/2024/09/11/aho-corasick/). Trois garde-fous limitent les faux positifs :
+   - une forme courte ou marquée « mot entier » ne compte que si elle est délimitée par des non-lettres ;
+   - une forme « excluante » retire au contraire sa structure du résultat ;
+   - une forme « à contexte requis » n'est retenue que si une autre structure (en général sa structure de tutelle) est elle aussi reconnue dans l'adresse.
 
 3. **`populate_affiliations`** — pose `in_perimeter` sur les `source_authorships` : une signature est `in_perimeter` dès qu'une de ses adresses est rattachée à une structure du périmètre. La liaison fine d'une signature à ses structures n'est pas recopiée sur `source_authorships` ; elle reste disponible via la vue matérialisée `source_authorship_structures`, qui joint les adresses résolues au périmètre. Code : `application/pipeline/affiliations/populate_affiliations.py`.
 
