@@ -323,14 +323,15 @@ def phase_refresh_stale(sources: Any = None, include_wos: bool = False, **kw: An
             "duration_s": round(duration, 1),
         }
 
+    log.info("▶ refresh_stale : marquage des rows stale sans DOI…")
     conn = get_sync_engine().connect()
     try:
         n_undiscoverable = mark_undiscoverable_stale_disappeared(conn)
         conn.commit()
     finally:
         conn.close()
+    log.info("✓ refresh_stale : %d rows sans DOI marquées disparues", n_undiscoverable)
     if n_undiscoverable:
-        log.info("✓ refresh_stale : %d rows sans DOI marquées disparues", n_undiscoverable)
         # Rows stale sans DOI (non refetchables) marquées disparues : un canal
         # distinct des refetchs par source, agrégé toutes sources confondues.
         by_source["sans DOI"] = {

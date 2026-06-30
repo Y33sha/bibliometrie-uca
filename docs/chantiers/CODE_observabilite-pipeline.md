@@ -96,7 +96,7 @@ Revue phase par phase, dans l'ordre du pipeline. Helper transverse : `scoped_log
 - [x] `extract` : préfixe `[source · scope]` mutualisé sur toutes les lignes intermédiaires. En-têtes et progression alignés entre les 5 sources ; theses gagne son bilan par PPN.
 - [x] `resolve_ra` : déjà sain (début/fin, ligne par préfixe, mono-source) ; allégé du préfixe redondant et de l'indentation.
 - [x] `cross_imports` : fetch DOI parallèle scopé `[source]` (`run_async`, partagé avec `refresh_stale`) — les deux lignes sans source réglées ; sous-étapes hal-id/NNT et DOI déjà annoncées (`▶`) ; `fetch_missing_hal_id` déjà bien logué. Logs 429/erreurs vérifiés : la source est préfixée via le circuit-breaker (helpers retry sync et async).
-- [ ] `refresh_stale` (le fetch DOI hérite du scope de `run_async` ; reste le marquage des disparues sans DOI).
+- [x] `refresh_stale` : fetch DOI séquentiel par source (annoncé, scopé via `run_async`) ; le marquage des rows stale sans DOI est désormais annoncé avant l'UPDATE et logué même à 0 (plus de silence).
 - [ ] `refetch_truncated`.
 - [ ] `normalize` (+ annonce du VACUUM en fin de phase — silence actuel).
 - [ ] Phases aval (`affiliations`, `publications`, `persons`…) : audit de complétude.
