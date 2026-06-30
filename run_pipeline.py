@@ -402,12 +402,11 @@ def phase_normalize(**kw: Any) -> PhaseMetrics:
     if "wos" in sources:
         rows.append(_run_normalize_wos())
     # Libérer l'espace TOAST du staging (raw_data vidé après normalisation)
-    if policy.vacuum_full:
-        log.info("VACUUM FULL staging...")
-        _vacuum_staging(full=True)
-    else:
-        log.info("VACUUM staging...")
-        _vacuum_staging(full=False)
+    vacuum_label = "VACUUM FULL" if policy.vacuum_full else "VACUUM"
+    log.info("▶ %s staging…", vacuum_label)
+    t0_vacuum = time.time()
+    _vacuum_staging(full=policy.vacuum_full)
+    log.info("✓ %s staging terminé en %.1fs", vacuum_label, time.time() - t0_vacuum)
     metrics = PhaseMetrics()
     metrics.add(total=sum(cast("int", r["processed"]) for r in rows))
     metrics.details["table"] = {"rows": rows}

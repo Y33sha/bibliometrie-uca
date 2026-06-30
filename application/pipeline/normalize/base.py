@@ -154,7 +154,7 @@ class SourceNormalizer(ABC):
             total = self._count_pending(self.conn)
             self.logger.info(f"=== Normalisation {self.SOURCE} : {total} works à traiter ===")
             if total == 0:
-                self.logger.info("Rien à faire.")
+                self.logger.info(f"{self.SOURCE} : rien à traiter")
                 return NormalizeStats(0, 0, 0)
 
             limit = min(args.limit or total, total)
@@ -196,7 +196,7 @@ class SourceNormalizer(ABC):
             self.conn.commit()
             self.cleanup()
 
-            self.logger.info("\n=== Terminé ===")
+            self.logger.info(f"\n=== Normalisation {self.SOURCE} terminée ===")
             self.logger.info(f"Traités avec succès : {processed}")
             if skipped:
                 self.logger.info(f"Ignorés : {skipped}")
