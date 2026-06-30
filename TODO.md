@@ -1,5 +1,7 @@
 # Pipeline
 ## Extraction
+* [ ] refetch_stale: utiliser les identifiants natifs de chaque source, pas DOI
+* [ ] stocker l'année requêtée dans une colonne du staging pour pouvoir coupler la phase `refresh_stale` à l'année de départ du run en cours
 ### Couverture
 * [ ] extraction par ORCID: vérifier pertinence (tester différentes sources, auditer le gain)
 * [ ] bioRxiv, medRxiv: identifiants différents de arxiv? cf publi 2757 (voir si on moissonne ces identifiants; possibilité de récupérer les DOI à partir des identifiants comme dans ArXiv)
@@ -31,7 +33,6 @@
 
 # UI
 ## Admin
-* [ ] page logs: paginer
 * [ ] Clarifier la section "périmètres" (grouper affiliation/publications; séparer persons + UI)
 * [ ] fusion / dé-fusion manuelle de publications: circuit à créer (interface de gestion du référentiel de publications, sur le modèle de admin/persons; avec requêtes pour repérer doublons probables et fusions suspectes; supprimer `admin/duplicates`)
 * [ ] signaler visuellement les structures qui ne font partie d'aucun périmètre (pages liste et détail), ajouter filtre périmètre dans la page liste
@@ -58,7 +59,6 @@
 * [ ] 30172 un recueil de proceedings fusionné avec tous ses chapitres
 * [ ] 182637 et 182636: vérifier si DataCite indique relation
 * [ ] ignorer pièces d'un dataset? (le parent suffit)
-* [ ] nettoyer les faux NNT (OAI:*)
 * [ ] 133990: NNT non dédupliqué?!
 
 # Idées pour plus tard, éventuellement

@@ -1,6 +1,6 @@
 # Brancher le domaine riche orphelin
 
-Commencé le 2026-06-29
+Commencé le 2026-06-29 - Terminé le 2026-06-30
 
 ## Contexte
 

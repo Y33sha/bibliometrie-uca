@@ -1,12 +1,6 @@
 # Publications
 
-Référentiel dédupliqué. Hiérarchie de déduplication :
-
-1. **DOI identique** (case-insensitive) → même publication (sauf cas particuliers)
-2. **NNT identique** (pour les thèses)
-3. **hal-id identique** (OpenAlex ou ScanR citant HAL comme source)
-4. **Métadonnées** : rien en place pour l'instant, algorithme à mettre en place <!--TODO: algo de déduplication par identité de métadonnées-->
-5. Interface de dédoublonnage manuel `admin/duplicates` <!--TODO: améliorer l'interface de déduplication ; à terme, autoriser un user à signaler un doublon-->
+Référentiel dédupliqué des productions de recherche. Cf [doc pipeline](../pipeline/07-publications.md) pour la logique de déduplication.
 
 ```mermaid
 flowchart LR
