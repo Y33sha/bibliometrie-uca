@@ -23,6 +23,7 @@ import requests
 from sqlalchemy import Connection
 
 from application.journals.core import update_journal_apc
+from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.enrich import EnrichQueries
 from application.ports.repositories.journal_repository import (
     JournalRepository,
@@ -143,7 +144,7 @@ def run_enrich_journals_from_openalex(
     limit: int = 0,
     dry_run: bool = False,
     rate_delay: float = 0.1,
-) -> None:
+) -> PhaseMetrics:
     try:
         journals = queries.fetch_journals_of_unknown_type(conn, limit=limit or None)
         total = len(journals)
@@ -151,7 +152,7 @@ def run_enrich_journals_from_openalex(
 
         if total == 0:
             logger.info("Rien à faire.")
-            return
+            return PhaseMetrics()
 
         updated = 0
         with_apc = 0
@@ -185,7 +186,7 @@ def run_enrich_journals_from_openalex(
                         processed,
                         total,
                     )
-                    return
+                    return PhaseMetrics(seen=total, updated=updated)
                 continue  # budget peut-être ponctuel : on saute ce batch, on retente le suivant
             strikes = 0  # succès (ou skip réseau) → on remet le compteur à zéro
             time.sleep(rate_delay)
@@ -242,6 +243,7 @@ def run_enrich_journals_from_openalex(
         if raw_type_counter:
             distrib = ", ".join(f"{t}={n}" for t, n in raw_type_counter.most_common())
             logger.info(f"Distribution OpenAlex `type` : {distrib}")
+        return PhaseMetrics(seen=total, updated=updated)
 
     except KeyboardInterrupt:
         # Ctrl+C peut frapper en plein execute (transaction avortée → `commit()`
