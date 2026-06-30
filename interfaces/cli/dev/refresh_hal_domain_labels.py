@@ -71,6 +71,14 @@ def fetch_domains() -> list[tuple[str, str]]:
 
 HEADER = '''"""Référentiel des domaines HAL : code stable → libellé human-readable.
 
+HAL est la seule source pour laquelle on stocke en dur un référentiel
+de sujets côté domaine. Raison : les codes CCSD que HAL expose
+(`info`, `chim.anal`, `sdv.bbm.bm`…) sont opaques et exigent un
+lookup pour produire un libellé affichable. Les autres sources
+(OpenAlex, WoS, ScanR, theses.fr) exposent directement leurs sujets
+sous forme de libellés dans leurs payloads, donc pas besoin de
+table de correspondance en mémoire.
+
 Le dict `HAL_DOMAINS` est généré depuis l'API officielle CCSD via
 `interfaces/cli/dev/refresh_hal_domain_labels.py`. La hiérarchie n'est pas
 stockée explicitement : elle se reconstitue à partir du code lui-même
