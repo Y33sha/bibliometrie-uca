@@ -676,7 +676,7 @@ def phase_relations(**kw: Any) -> PhaseMetrics:
     return _run_populate_relations()
 
 
-def phase_persons(**kw: Any) -> Any:
+def phase_persons(**kw: Any) -> PhaseMetrics:
     """Creation et rattachement des personnes.
 
     Cree des personnes a partir des source_authorships in_perimeter non rattachees,
@@ -685,9 +685,10 @@ def phase_persons(**kw: Any) -> Any:
     ni creation par nom). Exclut les publications hors-scope doc_type
     (cf domain/publications/scope).
     """
-    _run_create_persons()
+    metrics = _run_create_persons()
     _run_populate_person_name_forms()
     _run_refresh_person_identifier_keys()
+    return metrics
 
 
 def phase_authorships(**kw: Any) -> Any:
@@ -893,7 +894,7 @@ def _run_populate_relations() -> PhaseMetrics:
     return metrics
 
 
-def _run_create_persons() -> None:
+def _run_create_persons() -> PhaseMetrics:
     from application.pipeline.persons.create_persons_from_source_authorships import run
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.queries.pipeline.persons_create import PgPersonsCreateQueries
@@ -903,7 +904,7 @@ def _run_create_persons() -> None:
     t0 = time.time()
     conn = get_sync_engine().connect()
     try:
-        run(
+        metrics = run(
             conn,
             PgPersonsCreateQueries(),
             log,
@@ -913,6 +914,7 @@ def _run_create_persons() -> None:
     finally:
         conn.close()
     log.info("✓ create_persons_from_source_authorships terminé en %.1fs", time.time() - t0)
+    return metrics
 
 
 def _run_build_authorships() -> None:

@@ -209,7 +209,7 @@
                       <tbody>
                         {#each drows as r (r.key)}
                           <tr>
-                            <td>{r.key}</td>
+                            <td>{t.rowLabels?.[r.key] ?? r.key}</td>
                             {#each t.columns as c (c.key)}
                               <td class="num">{fmtCell(r[c.key], c, colTotal(drows, c.key))}</td>
                             {/each}

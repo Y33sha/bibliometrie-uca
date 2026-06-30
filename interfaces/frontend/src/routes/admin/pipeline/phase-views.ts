@@ -35,6 +35,9 @@ export type TableView = {
   // En-tête de la première colonne (les `key` des lignes). Vide pour une matrice
   // dont les lignes sont elles-mêmes des en-têtes.
   firstColumnLabel: string;
+  // Libellés d'affichage des `key` techniques des lignes. Clé absente → `key` brute.
+  // Garde la donnée en base neutre tout en présentant des intitulés lisibles.
+  rowLabels?: Record<string, string>;
   columns: TableColumn[];
   total?: boolean;
 };
@@ -202,6 +205,28 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
         source: "table",
         firstColumnLabel: "Type de relation",
         columns: [{ key: "count", label: "Nombre", pct: true }],
+        total: true,
+      },
+    ],
+  },
+  persons: {
+    summary: [
+      { key: "created", label: "Personnes créées" },
+      { key: "skipped_ambiguous", label: "Ignorées (nom ambigu)" },
+      { key: "corroboration_rejected", label: "Rejets par corroboration de nom" },
+    ],
+    tables: [
+      {
+        source: "table",
+        firstColumnLabel: "Méthode de rattachement",
+        rowLabels: {
+          orcid: "ORCID",
+          hal_person_id: "Compte HAL",
+          idref: "IdRef",
+          cross_source: "Cross-source",
+          single_name: "Forme de nom",
+        },
+        columns: [{ key: "count", label: "Rattachées", pct: true }],
         total: true,
       },
     ],
