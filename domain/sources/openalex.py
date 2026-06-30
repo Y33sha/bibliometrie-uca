@@ -36,9 +36,8 @@ class OpenalexLocation:
       document (incluant typiquement la primary en `locations[0]`).
 
     Cette dataclass représente une location quelconque, indépendamment
-    de son rôle primary/secondaire — le caller distingue via les
-    parsers `parse_primary_location` (singulier) vs `parse_locations`
-    (toutes).
+    de son rôle primary/secondaire ; `parse_primary_location` en
+    construit la vue depuis `work.primary_location`.
 
     Tous les champs sont nullable car OpenAlex peut retourner une
     location partielle (publi sans landing page, source non
@@ -70,15 +69,6 @@ def _parse_one_location(loc: dict[str, Any] | None) -> OpenalexLocation | None:
 def parse_primary_location(work: dict[str, Any]) -> OpenalexLocation | None:
     """Vue structurée de `work.primary_location`. None si absent."""
     return _parse_one_location(work.get("primary_location"))
-
-
-def parse_locations(work: dict[str, Any]) -> list[OpenalexLocation]:
-    """Vue structurée de toutes les `work.locations`. Inclut la primary."""
-    return [
-        parsed
-        for loc in (work.get("locations") or [])
-        if (parsed := _parse_one_location(loc)) is not None
-    ]
 
 
 # =============================================================
