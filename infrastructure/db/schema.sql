@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict oRh6t9VLzRpINWSTYijVFbAA0DPpMPeUHBbS2CFUIk532h0U237648N7FrOrgDB
+\restrict ALMUiivFWmqqyLZhjhGfj0i33krMKxFusImiW1b1q9MEHxg79qmbNx1jZsVB9ZQ
 
 -- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg22.04+1)
 -- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg22.04+1)
@@ -1118,38 +1118,6 @@ CREATE SEQUENCE public.pipeline_run_id_seq
 
 
 --
--- Name: pipeline_run_snapshots; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.pipeline_run_snapshots (
-    id integer CONSTRAINT pipeline_check_snapshots_id_not_null NOT NULL,
-    ran_at timestamp with time zone DEFAULT now() CONSTRAINT pipeline_check_snapshots_ran_at_not_null NOT NULL,
-    mode text CONSTRAINT pipeline_check_snapshots_mode_not_null NOT NULL,
-    payload jsonb CONSTRAINT pipeline_check_snapshots_payload_not_null NOT NULL
-);
-
-
---
--- Name: pipeline_run_snapshots_id_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE public.pipeline_run_snapshots_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: pipeline_run_snapshots_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
---
-
-ALTER SEQUENCE public.pipeline_run_snapshots_id_seq OWNED BY public.pipeline_run_snapshots.id;
-
-
---
 -- Name: place_name_forms; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1692,13 +1660,6 @@ ALTER TABLE ONLY public.persons_rh ALTER COLUMN id SET DEFAULT nextval('public.p
 
 
 --
--- Name: pipeline_run_snapshots id; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.pipeline_run_snapshots ALTER COLUMN id SET DEFAULT nextval('public.pipeline_run_snapshots_id_seq'::regclass);
-
-
---
 -- Name: place_name_forms id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -2004,14 +1965,6 @@ ALTER TABLE ONLY public.persons_rh
 
 ALTER TABLE ONLY public.persons_rh
     ADD CONSTRAINT persons_rh_pkey PRIMARY KEY (id);
-
-
---
--- Name: pipeline_run_snapshots pipeline_check_snapshots_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.pipeline_run_snapshots
-    ADD CONSTRAINT pipeline_check_snapshots_pkey PRIMARY KEY (id);
 
 
 --
@@ -2594,13 +2547,6 @@ CREATE INDEX idx_phase_exec_run_id ON public.pipeline_phase_executions USING btr
 --
 
 CREATE INDEX idx_phase_exec_started_at ON public.pipeline_phase_executions USING btree (started_at DESC);
-
-
---
--- Name: idx_pipeline_run_snapshots_mode_ran_at; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_pipeline_run_snapshots_mode_ran_at ON public.pipeline_run_snapshots USING btree (mode, ran_at DESC);
 
 
 --
@@ -3358,5 +3304,5 @@ ALTER TABLE ONLY public.structure_relations
 -- PostgreSQL database dump complete
 --
 
-\unrestrict oRh6t9VLzRpINWSTYijVFbAA0DPpMPeUHBbS2CFUIk532h0U237648N7FrOrgDB
+\unrestrict ALMUiivFWmqqyLZhjhGfj0i33krMKxFusImiW1b1q9MEHxg79qmbNx1jZsVB9ZQ
 

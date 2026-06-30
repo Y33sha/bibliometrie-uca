@@ -35,21 +35,23 @@ Légende:
 flowchart LR
     subgraph sources
     direction LR
-        source_authorships---source_publications
+        source_publications-->source_authorships
+        source_authorships-->addresses
     end
     subgraph vérité
         direction LR
         publications---authorships
         persons---authorships
-        authorships---structures
+        structures---authorships
     end
     source_publications--->publications
     source_authorships--->persons
+    addresses---structures
 
     classDef manuel  fill:#8e5,stroke:#5a3
     classDef auto fill:#adf,stroke:#58c
     class structures manuel;
-    class source_authorships,source_publications,publications,authorships,persons auto
+    class source_authorships,source_publications,publications,authorships,persons,addresses auto
 ```
 
 > **Pourquoi pas de symétrie sources/vérité ?**

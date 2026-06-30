@@ -8,7 +8,7 @@
 - Si une modification touche plusieurs endroits dupliqués, signaler la duplication comme un problème à résoudre *avant* de modifier.
 - Si des tests échouent ou si des problèmes sont détectés en passant, sans rapport avec le chantier en cours: au prochain commit, interrompre le chantier et traiter le problème. S'il est trop gros pour être traité en passant, le signaler comme chantier à planifier.
 
-### Documentation et commentaires
+### Documentation, docstrings et commentaires
 
 - Toujours utiliser le présent intemporel: ne jamais supposer connu l'état antérieur du code. Bannir tout vocabulaire ancré temporellement (`nouveau`, `désormais`, `ne plus`...). Ne jamais renvoyer à des fichiers transitoires (todo, roadmaps).
 - Ecrire d'une manière qui reste intelligible en dehors du contexte des conversations; éviter le jargon interne au projet et les abréviations maison (`SP` pour source_publication, `pub` pour publication...). Les anglicismes sont permis s'ils sont usuels dans le domaine.

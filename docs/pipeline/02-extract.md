@@ -28,11 +28,11 @@ flowchart LR
 
 Phase `resolve_ra`, enchaînée entre le moissonnage initial et les imports croisés. Elle résout la Registration Agency (Crossref ou DataCite) des préfixes DOI, pour que l'[import croisé par DOI](#cross-imports) route chaque DOI vers la bonne API au lieu de l'interroger contre les deux.
 
-Crossref et DataCite gèrent des ensembles de DOI disjoints. Sans la RA du préfixe, chaque DOI candidat devrait être tenté contre les deux API, dont l'une répond systématiquement 404 : coûteux, et inutilement violent pour DataCite (sur un premier run à base vide, cela représente des dizaines de milliers d'appels DataCite voués à l'échec).
+Crossref et DataCite gèrent des ensembles de DOI disjoints. Sans la RA du préfixe, chaque DOI candidat devrait être tenté contre les deux API, générant 50% d'erreurs 404.
 
 Pour chaque préfixe pas encore résolu, interroge `doi.org/ra` et enregistre la RA dans `doi_prefixes` (`unknown` quand elle n'est pas classée). Auto-bornée : seuls les préfixes absents de `doi_prefixes` sont traités, donc la phase converge. Le pool de DOI candidats est défini une seule fois par la vue `candidate_dois` — union du *staging*, des DOI liés (`related_dois`) des `source_publications`, des cibles de `publication_relations` et des DOI DataCite dérivés d'arXiv —, consommée à l'identique ici et par l'import croisé, qui ne peuvent donc pas diverger.
 
-Une row `doi_prefixes` naît ici avec sa seule RA ; le [volet éditeur](05-publishers-journals.md) la complète ensuite (nom et `publisher_id` via les API `/prefixes`), une fois que `normalize` a créé les éditeurs mentionnés par les sources. Les appels à `doi.org/ra` sont sous circuit-breaker, qui coupe la source plutôt que de la marteler lorsqu'elle est à bout de budget (429/5xx répétés).
+Une row `doi_prefixes` naît ici avec sa seule RA ; le [volet éditeur](05-publishers-journals.md) la complète ensuite (nom et `publisher_id` via les API `/prefixes`), une fois que `normalize` a créé les éditeurs mentionnés par les sources.
 
 ## Imports croisés {#cross-imports}
 
