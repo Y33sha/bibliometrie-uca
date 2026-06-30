@@ -165,7 +165,7 @@ async def fetch_missing_hal_ids(
     missing = _dedup_halid_refs(hal_refs_oa + hal_refs_scanr)
     log.info(f"  {len(missing)} halIds manquants au total (après déduplication)")
 
-    metrics = PhaseMetrics(total=len(missing) + len(nnt_refs))
+    metrics = PhaseMetrics(seen=len(missing) + len(nnt_refs))
 
     if stats_only:
         log.info("--- Statistiques ---")

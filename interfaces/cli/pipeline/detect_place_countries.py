@@ -77,7 +77,7 @@ def detect_place_countries(conn: Connection, *, direct: bool = True) -> PhaseMet
     write_countries(conn, matched, target_column="countries" if direct else "suggested_countries")
     conn.commit()
 
-    return PhaseMetrics(total=len(rows), new=len(matched), extras={"conflicts": conflicts})
+    return PhaseMetrics(seen=len(rows), new=len(matched), extras={"conflicts": conflicts})
 
 
 def main() -> None:

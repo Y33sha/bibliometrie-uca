@@ -17,12 +17,19 @@ from application.ports.pipeline.phase_executions import PhaseMetricsPayload, Sig
 class PhaseMetrics:
     """Compteurs d'une exécution de phase pipeline.
 
-    `new`, `updated`, `unchanged`, `total`, `errors` couvrent les cas
-    standards. `updated` = contenu réécrit (hash changé) ; `unchanged` =
-    re-vu à contenu identique (seul `last_seen_at` bumpé). `extras` accueille
-    les compteurs spécifiques à une phase quand ils ne rentrent pas dans le
-    cadre générique : `already_complete` pour `refetch_truncated`, `tagged`
-    pour `extract_hal`, `not_found` pour les fetchers HAL, etc.
+    `new`, `updated`, `unchanged`, `errors` couvrent les cas standards.
+    `updated` = contenu réécrit (hash changé) ; `unchanged` = re-vu à contenu
+    identique (seul `last_seen_at` bumpé). `extras` accueille les compteurs
+    spécifiques à une phase quand ils ne rentrent pas dans le cadre générique :
+    `already_complete` pour `refetch_truncated`, `tagged` pour `extract_hal`,
+    `not_found` pour les fetchers HAL, etc.
+
+    `total` (items traités) est **dérivé** : `max(seen, new+updated+unchanged)`.
+    Il vaut le dénominateur explicite `seen` (items interrogés/vus, alimenté par
+    `add(total=…)`) dès qu'il dépasse les catégorisés, sinon la somme catégorisée.
+    Garanti `≥ new+updated+unchanged` par construction — impossible de le
+    désynchroniser comme le faisait un compteur saisi à la main (un extracteur qui
+    catégorise sans incrémenter le total fausserait l'affichage).
 
     `details` porte les indicateurs sur-mesure d'observabilité (conventions
     `summary`, `table`, lues par l'interface) et `signals` les faits notables
@@ -33,11 +40,16 @@ class PhaseMetrics:
     new: int = 0
     updated: int = 0
     unchanged: int = 0
-    total: int = 0
+    seen: int = 0
     errors: int = 0
     extras: dict[str, int] = field(default_factory=dict)
     details: dict[str, object] = field(default_factory=dict)
     signals: list[Signal] = field(default_factory=list)
+
+    @property
+    def total(self) -> int:
+        """Items traités : dénominateur explicite `seen`, ou somme catégorisée si plus grande."""
+        return max(self.seen, self.new + self.updated + self.unchanged)
 
     def add(
         self,
@@ -49,11 +61,11 @@ class PhaseMetrics:
         errors: int = 0,
         **extras: int,
     ) -> None:
-        """Incrémente les compteurs en place."""
+        """Incrémente les compteurs en place. `total=` alimente le dénominateur `seen`."""
         self.new += new
         self.updated += updated
         self.unchanged += unchanged
-        self.total += total
+        self.seen += total
         self.errors += errors
         for k, v in extras.items():
             self.extras[k] = self.extras.get(k, 0) + v
@@ -67,7 +79,7 @@ class PhaseMetrics:
         self.new += other.new
         self.updated += other.updated
         self.unchanged += other.unchanged
-        self.total += other.total
+        self.seen += other.seen
         self.errors += other.errors
         for k, v in other.extras.items():
             self.extras[k] = self.extras.get(k, 0) + v

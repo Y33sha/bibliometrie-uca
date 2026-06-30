@@ -93,7 +93,7 @@ class TestRunAsyncOrchestrator:
             logging.getLogger("test"),
             cross_import_dois_reader=_reader(["10.1/a", "10.1/b", "10.1/c"]),
         )
-        assert result == PhaseMetrics(total=3, new=3, extras={"fetched": 3, "not_found": 0})
+        assert result == PhaseMetrics(seen=3, new=3, extras={"fetched": 3, "not_found": 0})
         assert len(adapter.inserted_records) == 3
 
     @pytest.mark.asyncio
@@ -124,7 +124,7 @@ class TestRunAsyncOrchestrator:
             cross_import_dois_reader=_reader(["10.1/a", "10.1/b"]),
             dry_run=True,
         )
-        assert result == PhaseMetrics(total=2)
+        assert result == PhaseMetrics(seen=2)
         assert adapter.inserted_records == []
 
     @pytest.mark.asyncio

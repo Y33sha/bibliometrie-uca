@@ -39,7 +39,7 @@ class _FakeExtractor(SourceExtractor):
     ) -> None:
         super().__init__(conn, logger)
         self._config = config or {"affiliations": ["UCA"]}
-        self._metrics = metrics or PhaseMetrics(new=42, total=42)
+        self._metrics = metrics or PhaseMetrics(new=42)
         self._raise_in_extract = raise_in_extract
         self.load_config_calls = 0
         self.extract_all_calls: list[dict[str, Any]] = []
@@ -218,14 +218,14 @@ class _MinimalExtractor(SourceExtractor):
         return {}
 
     def extract_all(self, args, config):  # type: ignore[no-untyped-def]
-        return PhaseMetrics(new=3, total=3)
+        return PhaseMetrics(new=3)
 
 
 class TestLogSummaryDefault:
     def test_default_logs_terminé_message(self, conn, caplog):
         logger = logging.getLogger("test_log_summary_default")
         ext = _MinimalExtractor(conn, logger)
-        metrics = PhaseMetrics(new=3, total=3)
+        metrics = PhaseMetrics(new=3)
 
         with caplog.at_level(logging.INFO, logger=logger.name):
             ext.log_summary(metrics, argparse.Namespace(dry_run=False))
