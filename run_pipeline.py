@@ -730,12 +730,17 @@ def phase_countries(mode: Any = "full", **kw: Any) -> PhaseMetrics:
     )
     _run_refresh_publication_countries()
     final = _log_countries_summary("Bilan final")
+    # Entonnoir : du manque initial (adresses sans pays avant la détection du run) aux
+    # pays rattachés par le run, puis au reste (dont une part porte une suggestion).
+    total = final.total
+    without_initial = total - initial.with_country
     metrics.details["summary"] = {
-        "addresses_total": final.total,
-        "with_country_before": initial.with_country,
-        "with_country_after": final.with_country,
+        "total": total,
+        "without_initial": without_initial,
+        "without_pct": round(100 * without_initial / total, 1) if total else 0,
+        "newly_attached": final.with_country - initial.with_country,
+        "remaining": total - final.with_country,
         "with_suggestion": final.with_suggestion,
-        "without_country": final.none,
     }
     return metrics
 

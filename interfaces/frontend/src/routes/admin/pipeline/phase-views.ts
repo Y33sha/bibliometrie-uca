@@ -238,12 +238,12 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
     ],
   },
   countries: {
-    summary: [
-      { key: "addresses_total", label: "Adresses (pub_count > 0)" },
-      { key: "with_country_before", label: "Avec pays (avant)" },
-      { key: "with_country_after", label: "Avec pays (après)" },
-      { key: "with_suggestion", label: "Avec suggestion" },
-      { key: "without_country", label: "Sans pays ni suggestion" },
+    hideVolumes: true,
+    lines: [
+      "{total} adresses",
+      "{without_initial} sans pays ({without_pct} %)",
+      "{newly_attached} pays nouvellement rattachés",
+      "Reste {remaining}, dont {with_suggestion} avec suggestion",
     ],
   },
   oa_status: {
