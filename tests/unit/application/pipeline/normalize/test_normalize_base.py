@@ -134,7 +134,7 @@ class TestRunNoWork:
             norm.run(argv=[])
         # Pas de preload sur total=0 (sortie avant).
         assert norm.preload_called is False
-        assert "Rien à faire" in caplog.text
+        assert "rien à traiter" in caplog.text
 
 
 # ── Happy path ────────────────────────────────────────────────────
