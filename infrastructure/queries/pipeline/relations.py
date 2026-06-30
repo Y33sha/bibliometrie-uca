@@ -214,6 +214,17 @@ def replace_title_match_relations(conn: Connection, edges: list[RelationEdge]) -
     return _insert_relation_edges(conn, edges)
 
 
+def count_by_relation_type(conn: Connection) -> list[tuple[str, int]]:
+    """`(relation_type, nombre)` par type, décroissant — distribution de `publication_relations`."""
+    rows = conn.execute(
+        text(
+            "SELECT relation_type::text AS t, count(*) AS n FROM publication_relations "
+            "GROUP BY relation_type ORDER BY n DESC"
+        )
+    ).all()
+    return [(r.t, r.n) for r in rows]
+
+
 class PgPublicationRelationsQueries(PublicationRelationsQueries):
     """Adapter PostgreSQL pour `application.ports.pipeline.relations.PublicationRelationsQueries`."""
 
@@ -240,3 +251,6 @@ class PgPublicationRelationsQueries(PublicationRelationsQueries):
 
     def replace_title_match_relations(self, conn: Connection, edges: list[RelationEdge]) -> int:
         return replace_title_match_relations(conn, edges)
+
+    def count_by_relation_type(self, conn: Connection) -> list[tuple[str, int]]:
+        return count_by_relation_type(conn)

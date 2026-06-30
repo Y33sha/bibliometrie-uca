@@ -664,7 +664,7 @@ def phase_publications(**kw: Any) -> PhaseMetrics:
     return metrics
 
 
-def phase_relations(**kw: Any) -> Any:
+def phase_relations(**kw: Any) -> PhaseMetrics:
     """Population des relations sémantiques entre publications distinctes.
 
     Tourne après `publications` : les `source_publications` sont rattachées et les DOI
@@ -673,7 +673,7 @@ def phase_relations(**kw: Any) -> Any:
     `meta.relation`). Les relations même-œuvre (versions, variantes, pièces) relèvent de
     la déduplication (`metadata_correction`), pas d'ici.
     """
-    _run_populate_relations()
+    return _run_populate_relations()
 
 
 def phase_persons(**kw: Any) -> Any:
@@ -871,19 +871,26 @@ def _run_reconcile_components() -> PhaseMetrics:
     return metrics
 
 
-def _run_populate_relations() -> None:
+def _run_populate_relations() -> PhaseMetrics:
     from application.pipeline.relations.populate_relations import run
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.queries.pipeline.relations import PgPublicationRelationsQueries
 
     log.info("▶ populate_relations")
     t0 = time.time()
+    queries = PgPublicationRelationsQueries()
     conn = get_sync_engine().connect()
     try:
-        run(conn, PgPublicationRelationsQueries(), log)
+        run(conn, queries, log)
+        by_type = queries.count_by_relation_type(conn)
     finally:
         conn.close()
     log.info("✓ populate_relations terminé en %.1fs", time.time() - t0)
+    metrics = PhaseMetrics()
+    metrics.details["table"] = {
+        "rows": [{"key": relation_type, "count": count} for relation_type, count in by_type]
+    }
+    return metrics
 
 
 def _run_create_persons() -> None:
