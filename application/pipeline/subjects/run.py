@@ -26,6 +26,7 @@ from typing import Protocol
 
 from sqlalchemy import Connection
 
+from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.subjects import (
     ingest_crossref,
     ingest_hal,
@@ -64,18 +65,29 @@ INGESTORS: dict[str, SubjectIngestor] = {
 _LOG_EVERY = 2000
 
 
-def run(conn: Connection, queries: SubjectsQueries, logger: logging.Logger) -> int:
+def run(conn: Connection, queries: SubjectsQueries, logger: logging.Logger) -> PhaseMetrics:
     """Ré-ingère les sujets des publications modifiées depuis la dernière passe.
 
-    Retourne le nombre total de liens créés.
+    `metrics.new` porte le nombre de liens publication↔sujet créés ; le résumé
+    sur-mesure expose les sujets ajoutés (évolution nette du référentiel, ingestion
+    moins purge des orphelins), le nouveau total du vocabulaire et le nombre de
+    publications ré-ingérées.
     """
     t_run = time.perf_counter()
+    subjects_before = queries.count_subjects(conn)
 
     pub_ids = queries.select_publications_to_reingest(conn)
     if not pub_ids:
         n_purged = queries.purge_orphan_subjects(conn)
         logger.info("subjects : rien à ré-ingérer ; %d sujets orphelins purgés", n_purged)
-        return 0
+        subjects_after = queries.count_subjects(conn)
+        metrics = PhaseMetrics()
+        metrics.details["summary"] = {
+            "subjects_added": subjects_after - subjects_before,
+            "subjects_total": subjects_after,
+            "publications_updated": 0,
+        }
+        return metrics
 
     n_cleared = queries.clear_publication_subjects_for_pubs(conn, publication_ids=pub_ids)
     rows = queries.select_source_publications_for_pubs(conn, publication_ids=pub_ids)
@@ -120,4 +132,13 @@ def run(conn: Connection, queries: SubjectsQueries, logger: logging.Logger) -> i
         n_purged,
         time.perf_counter() - t_run,
     )
-    return n_links
+    subjects_after = queries.count_subjects(conn)
+
+    metrics = PhaseMetrics()
+    metrics.add(new=n_links, total=len(rows))
+    metrics.details["summary"] = {
+        "subjects_added": subjects_after - subjects_before,
+        "subjects_total": subjects_after,
+        "publications_updated": len(pub_ids),
+    }
+    return metrics

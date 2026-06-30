@@ -271,6 +271,11 @@ def purge_orphan_subjects(conn: Connection) -> int:
     ).rowcount
 
 
+def count_subjects(conn: Connection) -> int:
+    """Nombre total de sujets du référentiel."""
+    return conn.execute(text("SELECT COUNT(*) FROM subjects")).scalar_one()
+
+
 # ── Co-occurrences ───────────────────────────────────────────────
 
 
@@ -451,6 +456,9 @@ class PgSubjectsQueries(SubjectsQueries):
 
     def purge_orphan_subjects(self, conn: Connection) -> int:
         return purge_orphan_subjects(conn)
+
+    def count_subjects(self, conn: Connection) -> int:
+        return count_subjects(conn)
 
     def recompute_usage_counts(self, conn: Connection) -> int:
         return recompute_usage_counts(conn)

@@ -93,6 +93,10 @@ class SubjectsQueries(Protocol):
         statuts). Retourne le nombre supprimé."""
         ...
 
+    def count_subjects(self, conn: Connection) -> int:
+        """Nombre total de sujets du référentiel (`COUNT(*)` sur `subjects`)."""
+        ...
+
     def recompute_usage_counts(self, conn: Connection) -> int:
         """Recalcule `subjects.usage_count` depuis `publication_subjects`."""
         ...
