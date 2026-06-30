@@ -60,8 +60,6 @@ Les dépendances input → output sont statiques et connues. La colonne vertébr
 
 - [x] `run_id` (séquence) généré au lancement ; chaque phase relève les volumes avant/après de ses tables (`details["tables"]`) et persiste métriques, statut, signaux et indicateurs sur-mesure (`infrastructure/observability/phase_executions.py`). Statut `error` sur exception, `warning` sur interruption utilisateur (action contrôlée) ou si la phase remonte des signaux. Capture best-effort : une défaillance d'observabilité (migration non appliquée, etc.) est loggée sans interrompre le run. Fonctionne pour `--only` et `--from`. L'orchestrateur fait dériver son ordre d'exécution de `PHASE_ORDER` (graphe), supprimant la duplication de l'ordre.
 - [x] Indicateurs sur-mesure : `PhaseMetrics` gagne `details` et `signals`. `details` ne porte que des **données neutres** (clés techniques, chiffres, valeurs métier comme les noms de Registration Agency ou les statuts OA) ; les **libellés et la mise en forme** vivent dans une config par phase côté frontend (`interfaces/frontend/src/routes/admin/pipeline/phase-views.ts`), donc modifiables sans relancer le pipeline (rétroactifs sur les anciens runs). Conventions de `details` : `summary` (dict clé → nombre), `table` (lignes à `key` métier + champs numériques, rendues en colonnes configurables avec % / signe / durée / ligne TOTAL), `tables` (avant/après, posé automatiquement). Le « par source » passe par la convention `table` (colonnes propres à chaque phase). `extract` remonte une table par source (trouvés / nouveaux / màj / inchangés / durée) et `normalize` de même (traités / ignorés / erreurs / durée) ; `resolve_ra` une table par Registration Agency (DOI et préfixes distincts, préfixes ajoutés par le run ; la part `unknown` inclut les préfixes malformés `doi:`) ; `oa_status` une synthèse (backlog stale, vérifiées, ventilation) et une table par statut OA avec le delta du run ; `metadata_correction` une synthèse (SP examinées/corrigées par sous-étape unaire et cluster) et une ventilation des corrections par règle (le mapping de vocabulaire `DOC_TYPE_MAP` n'y compte pas, ce n'est pas une correction) ; `publications` une synthèse de réconciliation (SP traitées, publications créées dont par scission, existantes conservées, doublons fusionnés) en tête du facteur de dédup global (source_publications in-périmètre / publications).
-- [ ] Indicateurs sur-mesure des autres phases, du plus simple au plus complexe (cross_imports / refresh_stale par source, signaux persons / extract…).
-- [ ] Émission des signaux dans les phases : le canal est en place (remontés via `PhaseMetrics.signals`, affichés en ambre) ; reste à détecter et remonter les cas dans `extract` (source indisponible, série de 429) et `persons` (`CannotAttributeConflict`).
 - [x] Récapitulatif par phase (durées) en fin d'invocation, en plus du résumé par phase existant ; pas d'email.
 
 ### Phase C — Lecture : écart de durée
@@ -80,10 +78,30 @@ Les dépendances input → output sont statiques et connues. La colonne vertébr
 - [x] Drill-down : durée totale + durée par élément (secondes/élément). La comparaison au médian historique (calculée côté lecture) n'est pas surfacée pour l'instant — peu pertinente quand les durées sont courtes ; à réintroduire si besoin.
 - [x] Statut live (run en cours) reconduit. La page ne surface pas les logs (le `cron.log` était toujours vide) ; une consultation des logs par phase, si elle est mise en place, sera un mécanisme distinct.
 
-### Phase F — Clôture
+## Travaux restants (réordonnés)
 
-- [ ] Retrait de l'ancien système : table `pipeline_run_snapshots` (migration de drop), value objects `application/ports/pipeline/runs.py`, hook gardé par run complet, anciens endpoints, queries et UI, `generate_report` et les rapports markdown.
-- [ ] Toilettage final des logs si besoin (audit complétude et cohérence inter-phases) — point de clôture, non bloquant.
+Phases A à E livrées (capture par phase, lecture, API, interface en ruban). Le reste s'ordonne en quatre étapes.
+
+### 1. Clôture — retrait de l'ancien système (par run)
+
+- [ ] Suppression du système par run : writer `infrastructure/observability/pipeline_runs.py` (build / persist / render snapshot), queries `infrastructure/queries/api/pipeline_runs.py` et port `application/ports/api/pipeline_runs_queries.py`, value objects `application/ports/pipeline/runs.py`, router `interfaces/api/routers/admin/pipeline_runs.py` et son wiring (`app.py`, `deps.py`), tests associés.
+- [ ] `generate_report` et les rapports markdown retirés — tout `infrastructure/observability/pipeline_report.py` part (la capture de logs par phase ne servait qu'au rapport, format offset-fichier inadapté à une consultation par phase). Hook snapshot run-complet et machinerie de rapport retirés de `run_pipeline.py`.
+- [ ] Migration de drop de la table `pipeline_run_snapshots` (la séquence `pipeline_run_id_seq` reste : la table des exécutions de phase s'en sert).
+- [ ] Régénération de `schema.ts` après retrait des endpoints.
+
+### 2. Audit et harmonisation du logging
+
+- [ ] Audit de complétude et de cohérence inter-phases : chaque phase loggue l'essentiel, dans une forme homogène. Mené une fois la machinerie de rapport retirée.
+
+### 3. Métriques et signaux
+
+- [ ] Indicateurs sur-mesure des phases restantes, du plus simple au plus complexe (cross_imports / refresh_stale par source…).
+- [ ] Émission des signaux dans les phases : le canal est en place (remontés via `PhaseMetrics.signals`, affichés en ambre) ; reste à détecter et remonter `extract` (source indisponible, série de 429) et `persons` (`CannotAttributeConflict`).
+
+### 4. Peaufinage UI
+
+- [ ] Pagination de la liste des runs.
+- [ ] Liens vers les logs par phase — mécanisme distinct de l'ancienne capture couplée au rapport, à concevoir.
 
 ## Questions ouvertes
 
