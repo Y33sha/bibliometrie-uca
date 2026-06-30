@@ -79,10 +79,8 @@ from infrastructure.pipeline_lock import PipelineAlreadyRunningError, acquire_pi
 BASE = Path(__file__).resolve().parent
 
 # `setup_logger` (au lieu d'un simple `getLogger`) attache un FileHandler
-# sur `logs/pipeline.log` quand `LOG_TO_FILE=true`. Indispensable pour
-# que `read_new_logs` (cf. `infrastructure/pipeline_metrics.py`) capture
-# les logs des phases qui réutilisent ce logger parent (subjects,
-# cooccurrences, enrich) et les remonte dans /admin/pipeline.
+# sur `logs/pipeline.log` quand `LOG_TO_FILE=true` : les logs des phases qui
+# réutilisent ce logger parent (subjects, cooccurrences, enrich) sont persistés.
 log = setup_logger("pipeline", str(BASE / "logs"))
 
 
@@ -2024,14 +2022,8 @@ def main() -> None:  # noqa: C901 — orchestrateur CLI : refactor en helpers s�
 
     # Métriques pipeline
     from infrastructure.observability.phase_executions import start_run
-    from infrastructure.observability.pipeline_report import (
-        capture_log_offsets,
-        generate_report,
-        read_new_logs,
-    )
 
-    phase_results = []  # [(name, duration, logs)]
-    phase_metrics: dict[str, PhaseMetrics] = {}  # collecté pour Volet B (dashboard)
+    phase_results = []  # [(name, duration)] — pour le récapitulatif de fin
 
     # Observabilité par phase : run_id de séquence, capture entrée/sortie + statut.
     recorder = start_run(mode=args.mode, sources=effective_sources)
@@ -2053,7 +2045,6 @@ def main() -> None:  # noqa: C901 — orchestrateur CLI : refactor en helpers s�
             phases_total=len(phases_to_run),
         )
 
-        log_offsets = capture_log_offsets()
         phase_started_at = datetime.datetime.now(datetime.UTC)
         before_volumes = recorder.before_volumes(watched_tables(name))
         t0_phase = time.time()
@@ -2084,10 +2075,7 @@ def main() -> None:  # noqa: C901 — orchestrateur CLI : refactor en helpers s�
                 details={},
                 before_volumes=before_volumes,
             )
-            phase_logs = read_new_logs(log_offsets)
-            phase_results.append((name + " (INTERROMPU)", time.time() - t0_phase, phase_logs))
-            report_path = generate_report(args.mode, sources, phase_results, time.time() - t0_total)
-            log.info("Rapport partiel : %s", report_path)
+            phase_results.append((name + " (INTERROMPU)", time.time() - t0_phase))
             clear_status()
             sys.exit(130)
         except RuntimeError as e:
@@ -2102,19 +2090,14 @@ def main() -> None:  # noqa: C901 — orchestrateur CLI : refactor en helpers s�
                 details={},
                 before_volumes=before_volumes,
             )
-            phase_logs = read_new_logs(log_offsets)
-            phase_results.append((name + " (ERREUR)", time.time() - t0_phase, phase_logs))
-            report_path = generate_report(args.mode, sources, phase_results, time.time() - t0_total)
-            log.info("Rapport partiel : %s", report_path)
+            phase_results.append((name + " (ERREUR)", time.time() - t0_phase))
             clear_status()
             sys.exit(1)
 
         duration = time.time() - t0_phase
-        phase_logs = read_new_logs(log_offsets)
-        phase_results.append((name, duration, phase_logs))
+        phase_results.append((name, duration))
         metrics = result if isinstance(result, PhaseMetrics) else PhaseMetrics()
         if isinstance(result, PhaseMetrics):
-            phase_metrics[name] = result
             log.info("Total phase %s : %s", name, result.as_summary())
         recorder.record(
             phase=name,
@@ -2128,57 +2111,6 @@ def main() -> None:  # noqa: C901 — orchestrateur CLI : refactor en helpers s�
 
     elapsed_total = time.time() - t0_total
 
-    # Générer le rapport
-    report_path = generate_report(args.mode, sources, phase_results, elapsed_total)
-    log.info("Rapport : %s", report_path)
-
-    # Snapshot post-pipeline (uniquement sur run complet : pas --only / --from).
-    # Capture la forme attendue des données + les métriques d'exécution ; les
-    # observations suspectes sont signalées dans le résumé console, sans exit
-    # code non-zéro.
-    if not args.only and not args.from_phase:
-        try:
-            from application.ports.pipeline.runs import PhaseMetricsPayload
-            from infrastructure.db.engine import get_sync_engine
-            from infrastructure.observability.pipeline_runs import (
-                build_run_snapshot,
-                persist_snapshot,
-                render_summary,
-            )
-
-            metrics_payload: dict[str, PhaseMetricsPayload] = {}
-            for name, duration, _ in phase_results:
-                pm = phase_metrics.get(name)
-                if pm is None:
-                    continue
-                metrics_payload[name] = {
-                    "new": pm.new,
-                    "updated": pm.updated,
-                    "unchanged": pm.unchanged,
-                    "total": pm.total,
-                    "errors": pm.errors,
-                    "extras": dict(pm.extras),
-                    "duration_s": duration,
-                }
-
-            conn = get_sync_engine().connect()
-            try:
-                snapshot = build_run_snapshot(
-                    conn,
-                    mode=args.mode,
-                    metrics_per_phase=metrics_payload,
-                    sources=sorted(sources),
-                    phases_run=[n for n, _ in phases_to_run],
-                    total_duration_s=elapsed_total,
-                )
-                persist_snapshot(conn, snapshot)
-                for line in render_summary(snapshot).splitlines():
-                    log.info(line)
-            finally:
-                conn.close()
-        except Exception as e:
-            log.warning("Échec du snapshot post-pipeline : %s", e)
-
     recorder.close()
 
     clear_status()
@@ -2186,7 +2118,7 @@ def main() -> None:  # noqa: C901 — orchestrateur CLI : refactor en helpers s�
     log.info("PIPELINE TERMINÉ en %.0fs (%.1f min)", elapsed_total, elapsed_total / 60)
     if recorder.run_id is not None:
         log.info("Run #%d — récapitulatif par phase :", recorder.run_id)
-        for phase_name, phase_duration, _ in phase_results:
+        for phase_name, phase_duration in phase_results:
             log.info("  %-22s %7.1fs", phase_name, phase_duration)
     log.info("=" * 60)
 
