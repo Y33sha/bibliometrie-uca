@@ -154,9 +154,9 @@
             <div class="expand">
               {#if view?.lines}
                 {@const dsummary = detailSummary(p.details)}
-                <div class="summary">
+                <div class="detail-lines">
                   {#each view.lines as tpl, i (i)}
-                    <div class="expand-line">{fillTemplate(tpl, dsummary)}</div>
+                    <div>{fillTemplate(tpl, dsummary)}</div>
                   {/each}
                 </div>
               {:else if lines.length}
@@ -386,6 +386,13 @@
   }
   .summary-line .sv {
     font-family: "JetBrains Mono", monospace;
+  }
+  .detail-lines {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 0.82rem;
+    margin-bottom: 6px;
   }
   .expand-line {
     display: grid;
