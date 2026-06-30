@@ -379,7 +379,7 @@ class TestDisappearedMarking:
             sa_sync_conn, "openalex", "W3", "10.1/a", seen_days_ago=100
         )  # stale, has doi
         n = mark_undiscoverable_stale_disappeared(sa_sync_conn)
-        assert n == 1
+        assert n == {"openalex": 1}
         gone = (
             sa_sync_conn.execute(
                 text(
