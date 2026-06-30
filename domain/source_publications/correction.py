@@ -109,10 +109,6 @@ class CorrectedFields(NamedTuple):
     doc_type: Correction[str] | None = None
     oa_status: Correction[str] | None = None
 
-    def is_empty(self) -> bool:
-        """True si aucune correction n'est portée — la fast-path des callers pour la majorité des SPs en régime."""
-        return self.doc_type is None and self.oa_status is None
-
 
 # ── Constantes (préfixes, patterns) référencées par les règles ──────────
 
