@@ -27,25 +27,6 @@ class TestPersonIdentifierConstruction:
         assert ident.source is None
 
 
-class TestConfirm:
-    def test_transitions_pending_to_confirmed(self):
-        ident = _make(status=AttributionStatus.PENDING)
-        ident.confirm()
-        assert ident.status is AttributionStatus.CONFIRMED
-
-    def test_idempotent_on_confirmed(self):
-        ident = _make(status=AttributionStatus.CONFIRMED)
-        ident.confirm()
-        assert ident.status is AttributionStatus.CONFIRMED
-
-
-class TestReject:
-    def test_transitions_to_rejected(self):
-        ident = _make(status=AttributionStatus.CONFIRMED)
-        ident.reject()
-        assert ident.status is AttributionStatus.REJECTED
-
-
 class TestReattributeTo:
     def test_moves_to_new_person_from_rejected(self):
         ident = _make(status=AttributionStatus.REJECTED)

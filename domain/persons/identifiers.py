@@ -26,10 +26,13 @@ class AttributionStatus(StrEnum):
     Mappe sur l'enum Postgres `identifier_status`. `StrEnum` (PEP 663) garde
     la valeur sérialisable telle quelle vers SQL et API.
 
-    Transitions valides (cf. `domain/persons/person_identifier.py`) :
+    Transitions valides :
     - `PENDING → CONFIRMED` (validation) ou `→ REJECTED` (rejet)
     - `CONFIRMED → REJECTED` (rejet d'une attribution validée)
     - `REJECTED → PENDING` lors d'une réattribution à une autre personne
+      (seule transition portée par une méthode du domaine,
+      `PersonIdentifier.reattribute_to` ; les autres passent par
+      `update_identifier_status`, validées par l'enum Postgres).
     """
 
     PENDING = "pending"
