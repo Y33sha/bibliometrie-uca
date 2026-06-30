@@ -9,8 +9,6 @@
 
   type TableBlock = { rows?: Record<string, string | number>[] };
   type Details = {
-    // Volumes avant/après relevés par le recorder (clé réservée).
-    tables?: Record<string, { before: number; after: number }>;
     summary?: Record<string, number>;
     // Tableaux sur-mesure, chacun sous sa propre clé (cf. `TableView.source`).
     [source: string]: unknown;
@@ -47,11 +45,6 @@
   function tableRows(d: unknown, source: string): Record<string, string | number>[] {
     const block = asDetails(d)[source] as TableBlock | undefined;
     return block?.rows ?? [];
-  }
-  function changedTables(d: unknown): [string, { before: number; after: number }][] {
-    // Seules les tables dont le volume change : un « 59841 ⇒ 59841 (+0) » pour une
-    // phase d'enrichissement en place n'apprend rien.
-    return Object.entries(asDetails(d).tables ?? {}).filter(([, v]) => v.before !== v.after);
   }
 
   function colTotal(rows: Record<string, string | number>[], key: string): number {
@@ -226,13 +219,6 @@
                       </tbody>
                     </table>
                   {/if}
-                {/each}
-              {:else}
-                {#each view?.hideVolumes ? [] : changedTables(p.details) as [tbl, v] (tbl)}
-                  <div class="expand-line">
-                    <span class="k">{tbl}</span>
-                    <span>{v.before} ⇒ {v.after} ({fmtSigned(v.after - v.before)})</span>
-                  </div>
                 {/each}
               {/if}
 

@@ -1,17 +1,15 @@
 """Capture et persistance des exécutions de phase du pipeline.
 
 `PhaseExecutionRecorder` est l'API offerte à l'orchestrateur : il génère le
-`run_id` au lancement, relève les volumes des tables touchées par chaque phase
-(avant / après) et persiste une ligne dans `pipeline_phase_executions`. Tout est
-best-effort — une défaillance d'observabilité est loggée sans jamais interrompre
-le pipeline, et un recorder désactivé (connexion impossible, par exemple migration
-non appliquée) laisse le run tourner sans le tracer.
+`run_id` au lancement et persiste une ligne dans `pipeline_phase_executions` par
+phase jouée. Tout est best-effort — une défaillance d'observabilité est loggée
+sans jamais interrompre le pipeline, et un recorder désactivé (connexion
+impossible, par exemple migration non appliquée) laisse le run tourner sans le
+tracer.
 
-La colonne `details` rassemble les indicateurs : `details["tables"]` porte le
-volume avant / après des tables consommées et produites (relevé ici), et les
-phases y ajoutent leurs indicateurs sur-mesure (conventions `summary`, `table`)
-via leur `PhaseMetrics`. La connexion est utilisée en autocommit : chaque relevé
-voit les données committées par les phases précédentes, chaque écriture est immédiate.
+La colonne `details` rassemble les indicateurs sur-mesure que chaque phase
+remonte via son `PhaseMetrics` (conventions `summary`, `table`, `lines`,
+`matrix`). La connexion est utilisée en autocommit : chaque écriture est immédiate.
 """
 
 from __future__ import annotations
@@ -23,7 +21,6 @@ import logging
 from sqlalchemy import Connection, text
 
 from application.ports.pipeline.phase_executions import (
-    ObservableVolumes,
     PhaseExecution,
     PhaseMetricsPayload,
     PhaseStatus,
@@ -37,17 +34,6 @@ log = logging.getLogger(__name__)
 def next_run_id(conn: Connection) -> int:
     """Identifiant de run, issu de la séquence dédiée."""
     return int(conn.execute(text("SELECT nextval('pipeline_run_id_seq')")).scalar_one())
-
-
-def snapshot_volumes(conn: Connection, tables: tuple[str, ...]) -> ObservableVolumes:
-    """Volume (`COUNT(*)`) de chaque table. Les noms de tables proviennent du graphe
-    des phases (constantes internes), jamais d'une entrée externe : l'interpolation
-    de l'identifiant dans la requête est sûre (un identifiant ne se paramètre pas)."""
-    volumes: ObservableVolumes = {}
-    for table in tables:
-        count = conn.execute(text(f"SELECT COUNT(*) FROM {table}")).scalar()  # noqa: S608
-        volumes[table] = int(count) if count is not None else 0
-    return volumes
 
 
 def persist_phase_execution(conn: Connection, execution: PhaseExecution) -> None:
@@ -133,17 +119,6 @@ class PhaseExecutionRecorder:
     def run_id(self) -> int | None:
         return self._run_id
 
-    def before_volumes(self, tables: tuple[str, ...]) -> ObservableVolumes | None:
-        """Volume des `tables` touchées par la phase, relevé avant son exécution. Les tables
-        proviennent du graphe des phases, fourni par l'orchestrateur (couche application)."""
-        if self._conn is None:
-            return None
-        try:
-            return snapshot_volumes(self._conn, tables)
-        except Exception as exc:
-            log.warning("Relevé d'avant-phase échoué : %s", exc)
-            return None
-
     def record(
         self,
         *,
@@ -153,29 +128,12 @@ class PhaseExecutionRecorder:
         metrics: PhaseMetricsPayload,
         signals: list[Signal],
         details: dict[str, object],
-        before_volumes: ObservableVolumes | None,
     ) -> None:
-        """Relève les volumes après exécution et persiste l'exécution de la phase.
-
-        `details` = indicateurs sur-mesure remontés par la phase ; on y ajoute
-        `tables` (volumes avant/après) sans écraser ce que la phase a fourni.
-        """
+        """Persiste l'exécution de la phase. `details` = indicateurs sur-mesure
+        remontés par la phase via son `PhaseMetrics`."""
         if self._conn is None or self._run_id is None:
             return
         try:
-            full_details: dict[str, object] = dict(details)
-            if before_volumes is not None:
-                try:
-                    after = snapshot_volumes(self._conn, tuple(before_volumes))
-                    full_details["tables"] = {
-                        table: {
-                            "before": before_volumes.get(table, 0),
-                            "after": after.get(table, 0),
-                        }
-                        for table in before_volumes
-                    }
-                except Exception as exc:
-                    log.warning("Relevé d'après-phase %s échoué : %s", phase, exc)
             persist_phase_execution(
                 self._conn,
                 PhaseExecution(
@@ -188,7 +146,7 @@ class PhaseExecutionRecorder:
                     status=status,
                     metrics=metrics,
                     signals=signals,
-                    details=full_details,
+                    details=details,
                 ),
             )
         except Exception as exc:
