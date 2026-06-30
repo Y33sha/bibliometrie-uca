@@ -24,6 +24,8 @@ export type TableColumn = {
   key: string;
   label: string;
   pct?: boolean;
+  // Valeur déjà exprimée en pourcentage (rendue « n % », pas de ligne de total).
+  percent?: boolean;
   sign?: boolean;
   duration?: boolean;
 };
@@ -110,6 +112,10 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
     ],
   },
   affiliations: {
+    summary: [
+      { key: "adresses", label: "Adresses traitées" },
+      { key: "in_perimeter", label: "Adresses dans le périmètre" },
+    ],
     tables: [
       {
         source: "table",
@@ -117,7 +123,7 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
         columns: [
           { key: "total", label: "source_authorships" },
           { key: "in_perimeter", label: "Dans le périmètre" },
-          { key: "with_structs", label: "Avec structures" },
+          { key: "pct", label: "%", percent: true },
         ],
         total: true,
       },

@@ -284,28 +284,33 @@ class TestRunResolution:
 
 
 class TestProcessAddresses:
-    def test_in_perimeter_counts_uca(self, logger):
-        """Une adresse qui matche une structure du périmètre incrémente uca_count."""
+    def test_in_perimeter_counted(self, logger):
+        """Une adresse qui matche une structure du périmètre incrémente in_perimeter."""
         matcher = AddressMatcher([_form(1, "limos", form_id=10)])
         queries = _FakeQueries(addresses=[(101, "lab limos clermont")])
         conn = _FakeConn()
 
-        uca_count, affil_count = process_addresses(conn, queries, matcher, {1}, logger)
+        processed, in_perimeter, affil_count = process_addresses(
+            conn, queries, matcher, {1}, logger
+        )
 
-        assert uca_count == 1
+        assert processed == 1
+        assert in_perimeter == 1
         assert affil_count == 1
         assert queries.upserts == [(101, 1, 10)]
         assert conn.commits == 1
 
-    def test_out_of_perimeter_doesnt_count_uca(self, logger):
-        """Match hors périmètre : affiliations créées mais uca_count reste à 0."""
+    def test_out_of_perimeter_not_counted(self, logger):
+        """Match hors périmètre : affiliations créées mais in_perimeter reste à 0."""
         matcher = AddressMatcher([_form(1, "limos", form_id=10)])
         queries = _FakeQueries(addresses=[(101, "lab limos clermont")])
         conn = _FakeConn()
 
-        uca_count, affil_count = process_addresses(conn, queries, matcher, set(), logger)
+        processed, in_perimeter, affil_count = process_addresses(
+            conn, queries, matcher, set(), logger
+        )
 
-        assert uca_count == 0
+        assert in_perimeter == 0
         assert affil_count == 1
 
     def test_no_match_still_syncs(self, logger):
@@ -314,9 +319,11 @@ class TestProcessAddresses:
         queries = _FakeQueries(addresses=[(101, "univ paris saclay")])
         conn = _FakeConn()
 
-        uca_count, affil_count = process_addresses(conn, queries, matcher, {1}, logger)
+        processed, in_perimeter, affil_count = process_addresses(
+            conn, queries, matcher, {1}, logger
+        )
 
-        assert uca_count == 0
+        assert in_perimeter == 0
         assert affil_count == 0
         assert queries.upserts == []
         # delete bulk toujours appelé (kept_pairs vide) pour retirer d'anciennes détections.
