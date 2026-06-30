@@ -50,7 +50,7 @@ def run_resolve_ra(
     """
     metrics = PhaseMetrics()
     prefixes = repo.get_unresolved_prefixes_with_samples(n_samples_per_prefix=n_samples)
-    log.info("resolve_ra — %d préfixes à résoudre", len(prefixes))
+    log.info("%d préfixes à résoudre", len(prefixes))
 
     if limit is not None:
         prefixes = prefixes[:limit]
@@ -64,7 +64,7 @@ def run_resolve_ra(
     new_by_ra: dict[str, int] = {}
     for prefix, samples in prefixes:
         if breaker is not None and breaker.tripped:
-            log.warning("resolve_ra : circuit-breaker tripé, arrêt (doi.org indisponible)")
+            log.warning("circuit-breaker tripé, arrêt (doi.org indisponible)")
             break
         metrics.add(total=1)
         ra = _resolve_ra_with_retry(prefix, samples, resolve_ra_fn, log)
@@ -76,7 +76,7 @@ def run_resolve_ra(
         if repo.insert_ra(prefix=prefix, ra=ra):
             metrics.add(new=1)
             new_by_ra[ra] = new_by_ra.get(ra, 0) + 1
-        log.info("  %s → %s", prefix, ra)
+        log.info("%s → %s", prefix, ra)
 
     # Indicateurs sur-mesure : synthèse du run + tableau par Registration Agency
     # (Crossref / DataCite / unknown) avec DOI candidats et préfixes. La part `unknown`
@@ -249,6 +249,6 @@ def _resolve_ra_with_retry(
         ra = resolve_ra_fn(doi)
         if ra is not None:
             return ra
-        log.debug("  %s : sample %s non résoluble, tente le suivant", prefix, doi)
-    log.warning("  %s : tous les samples ont échoué (%d) → unknown", prefix, len(samples))
+        log.debug("%s : sample %s non résoluble, tente le suivant", prefix, doi)
+    log.warning("%s : tous les samples ont échoué (%d) → unknown", prefix, len(samples))
     return None
