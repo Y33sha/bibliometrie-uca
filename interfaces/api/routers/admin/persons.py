@@ -6,9 +6,10 @@ Toutes les mutations sur personnes. Les opérations sur les authorships en tant 
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import Connection, text
+from sqlalchemy import Connection
 
 from application.persons import commands as person_commands
+from application.persons.core import AddIdentifierOutcome
 from application.ports.api.persons_queries import (
     AmbiguousNameFormsResponse,
     DetachableIntrudersResponse,
@@ -22,11 +23,7 @@ from application.ports.api.persons_queries import (
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.authorship_repository import AuthorshipRepository
 from application.ports.repositories.person_repository import PersonRepository
-from domain.errors import ValidationError
-from domain.persons.identifiers import (
-    PUBLIC_PERSON_IDENTIFIER_TYPES,
-    normalized_identifier_value,
-)
+from domain.persons.identifiers import PUBLIC_PERSON_IDENTIFIER_TYPES
 from interfaces.api.deps import (
     audit_repo_sync,
     authorship_repo_sync,
@@ -70,49 +67,33 @@ def add_person_identifier(
     queries: PersonsQueries = Depends(persons_queries_sync),
     repo: PersonRepository = Depends(person_repo_sync),
 ) -> AddIdentifierResponse:
-    """Ajoute manuellement un identifiant (ORCID, idHAL ou IdRef) à une personne."""
+    """Ajoute manuellement un identifiant (ORCID, idHAL ou IdRef) à une personne.
+
+    La cascade de décision (insertion / idempotence / réattribution / conflit) est
+    portée par `add_identifier` ; le router se contente d'appliquer la politique
+    d'interface (type visible UI, existence de la personne) et de traduire l'issue
+    en réponse. Le conflit remonte en `CannotAttributeConflict` → 409 (handler global) ;
+    la valeur malformée en `ValidationError` → 400 (handler global).
+    """
     if data.id_type not in PUBLIC_PERSON_IDENTIFIER_TYPES:
         raise HTTPException(
             status_code=400,
             detail=f"id_type doit être l'un de {PUBLIC_PERSON_IDENTIFIER_TYPES}",
         )
 
-    try:
-        id_value = normalized_identifier_value(data.id_type, data.id_value)
-    except ValidationError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
     if not queries.person_exists(person_id):
         raise HTTPException(status_code=404, detail="Personne introuvable")
 
-    existing_row = conn.execute(
-        text(
-            "SELECT id, person_id, status::text AS status "
-            "FROM person_identifiers WHERE id_type = :tp AND id_value = :val"
-        ),
-        {"tp": data.id_type, "val": id_value},
-    ).one_or_none()
-    was_reassigned = False
-    if existing_row:
-        if existing_row.person_id == person_id:
-            return AddIdentifierResponse(added=False, reason="already_exists")
-        if existing_row.status != "rejected":
-            raise HTTPException(
-                status_code=409,
-                detail=(
-                    f"Cet identifiant est déjà attribué à la personne #{existing_row.person_id}"
-                ),
-            )
-        was_reassigned = True
-
-    person_commands.add_identifier(
-        conn, person_id, data.id_type, id_value, source="manual", repo=repo
+    result = person_commands.add_identifier(
+        conn, person_id, data.id_type, data.id_value, source="manual", repo=repo
     )
+    if result.outcome is AddIdentifierOutcome.ALREADY_EXISTS:
+        return AddIdentifierResponse(added=False, reason="already_exists")
     return AddIdentifierResponse(
         added=True,
         id_type=data.id_type,
-        id_value=id_value,
-        reassigned=True if was_reassigned else None,
+        id_value=result.id_value,
+        reassigned=True if result.outcome is AddIdentifierOutcome.REASSIGNED else None,
     )
 
 
@@ -205,6 +186,7 @@ def merge_persons(
     person_id: int,
     body: MergePersons,
     conn: Connection = Depends(db_conn_sync),
+    queries: PersonsQueries = Depends(persons_queries_sync),
     repo: PersonRepository = Depends(person_repo_sync),
     audit: AuditRepository = Depends(audit_repo_sync),
 ) -> MergeResponse:
@@ -213,14 +195,9 @@ def merge_persons(
     if source_id == person_id:
         raise HTTPException(status_code=400, detail="source_id invalide")
 
-    result = conn.execute(
-        text("SELECT id FROM persons WHERE id IN (:p, :s)"),
-        {"p": person_id, "s": source_id},
-    )
-    found = {row.id for row in result}
-    if person_id not in found:
+    if not queries.person_exists(person_id):
         raise HTTPException(status_code=404, detail="Personne cible introuvable")
-    if source_id not in found:
+    if not queries.person_exists(source_id):
         raise HTTPException(status_code=404, detail="Personne source introuvable")
 
     person_commands.merge_person(conn, person_id, source_id, repo=repo, audit_repo=audit)

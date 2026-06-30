@@ -17,6 +17,7 @@ from application.authorships.assign_orphans import (
     batch_assign_orphan_authorships,
 )
 from application.persons.core import (
+    AddIdentifierOutcome,
     add_identifier,
     add_identifiers_from_authorships,
     create_person,
@@ -190,7 +191,9 @@ class TestUnlinkAuthorship:
 class TestAddIdentifier:
     def test_inserts_new(self, sa_sync_conn, repo):
         person_id = _insert_person(sa_sync_conn)
-        add_identifier(person_id, "orcid", "0000-0001-2345-6789", repo=repo)
+        result = add_identifier(person_id, "orcid", "0000-0001-2345-6789", repo=repo)
+        assert result.outcome is AddIdentifierOutcome.ADDED
+        assert result.id_value == "0000-0001-2345-6789"
         status = _scalar(
             sa_sync_conn,
             "SELECT status FROM person_identifiers WHERE id_type='orcid' AND id_value=:v",
@@ -208,7 +211,8 @@ class TestAddIdentifier:
                 "WHERE id_value='0000-0001-2345-6789'"
             )
         )
-        add_identifier(p2, "orcid", "0000-0001-2345-6789", repo=repo)
+        result = add_identifier(p2, "orcid", "0000-0001-2345-6789", repo=repo)
+        assert result.outcome is AddIdentifierOutcome.REASSIGNED
 
         row = sa_sync_conn.execute(
             text(
@@ -247,7 +251,8 @@ class TestAddIdentifier:
         """Réappliquer add_identifier sur la même personne ne change rien."""
         p = _insert_person(sa_sync_conn)
         add_identifier(p, "orcid", "0000-0001-2345-6789", repo=repo)
-        add_identifier(p, "orcid", "0000-0001-2345-6789", repo=repo)  # no-op
+        result = add_identifier(p, "orcid", "0000-0001-2345-6789", repo=repo)  # no-op
+        assert result.outcome is AddIdentifierOutcome.ALREADY_EXISTS
 
         row = sa_sync_conn.execute(
             text(
