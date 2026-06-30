@@ -64,4 +64,4 @@ Le motif de fond : la couche domaine offre des contrats stricts (VOs auto-valid�
 
 ### Complétude de convention
 
-- [ ] `DOI_SEARCHABLE_SOURCES_SET` (`domain/sources/registry.py`) : l'utiliser pour un test d'appartenance existant (cohérent avec `ALL_SOURCES_SET` / `STRUCTURE_API_SOURCES_SET`), ou acter qu'il complète seulement la convention `*_SET`.
+- [x] `DOI_SEARCHABLE_SOURCES_SET` retiré : aucun consommateur (les usages de la liste sont des sets de travail mutables et de l'itération ordonnée, pas des tests d'appartenance). Pas d'abstraction spéculative ; une constante `*_SEARCHABLE_SOURCES_SET` par famille d'identifiants se rétablira si le cross-import se généralise (arXiv, PMID…).

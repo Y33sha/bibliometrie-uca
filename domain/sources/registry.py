@@ -17,7 +17,6 @@ ALL_SOURCES_SET = frozenset(ALL_SOURCES)
 # Sources interrogeables par DOI pour le cross-import (`fetch_missing_doi`).
 # Theses absent car son API ne se requête pas par DOI mais par NNT.
 DOI_SEARCHABLE_SOURCES = ("hal", "openalex", "wos", "scanr", "crossref", "datacite")
-DOI_SEARCHABLE_SOURCES_SET = frozenset(DOI_SEARCHABLE_SOURCES)
 
 
 def _to_sql(sources: tuple[str, ...]) -> str:
