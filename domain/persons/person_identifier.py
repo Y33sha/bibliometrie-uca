@@ -45,14 +45,6 @@ class PersonIdentifier:
     status: AttributionStatus = AttributionStatus.PENDING
     source: str | None = None
 
-    def confirm(self) -> None:
-        """Marque l'attribution comme validée par l'utilisateur."""
-        self.status = AttributionStatus.CONFIRMED
-
-    def reject(self) -> None:
-        """Marque l'attribution comme rejetée par l'utilisateur."""
-        self.status = AttributionStatus.REJECTED
-
     def reattribute_to(self, new_person_id: int, *, source: str) -> None:
         """Déplace l'attribution vers une autre personne.
 
