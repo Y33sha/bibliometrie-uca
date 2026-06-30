@@ -97,12 +97,13 @@ Revue phase par phase, dans l'ordre du pipeline. Helper transverse : `scoped_log
 - [x] `resolve_ra` : déjà sain (début/fin, ligne par préfixe, mono-source) ; allégé du préfixe redondant et de l'indentation.
 - [x] `cross_imports` : fetch DOI parallèle scopé `[source]` (`run_async`, partagé avec `refresh_stale`) — les deux lignes sans source réglées ; sous-étapes hal-id/NNT et DOI déjà annoncées (`▶`) ; `fetch_missing_hal_id` déjà bien logué. Logs 429/erreurs vérifiés : la source est préfixée via le circuit-breaker (helpers retry sync et async).
 - [x] `refresh_stale` : fetch DOI séquentiel par source (annoncé, scopé via `run_async`) ; le marquage des rows stale sans DOI est désormais annoncé avant l'UPDATE et logué même à 0 (plus de silence).
-- [ ] `refetch_truncated`.
+- [x] `refetch_truncated`.
 - [x] `normalize` : VACUUM déjà annoncé au début, gagne son log de fin (timing, `▶`/`✓`) ; les normaliseurs (séquentiels, enveloppés `▶`/`✓`) nomment la source dans « rien à traiter » et « Normalisation X terminée ». `summary_stats()` inexploité → renvoyé à l'étape 3 (métriques).
 - [x] Phases aval (`affiliations`, `publishers_journals`, `metadata_correction`, `publications`, `relations`, `persons`, `authorships`, `countries`, `subjects`, `oa_status`) : déjà exemplaires — chaque sous-étape est enveloppée `▶ X` / `✓ X terminé en Xs` (timing), mono-canal, sans trou ni enjeu source-dépendant. Aucun changement.
 
 ### 3. Métriques et signaux
 
+- [x] Correction de fond : `PhaseMetrics.total` était un compteur saisi à la main, désynchronisé (OpenAlex et WoS catégorisaient sans l'incrémenter → `total < new+updated+unchanged` affiché). `total` devient une **propriété dérivée** `max(seen, new+updated+unchanged)` — toujours ≥ la ventilation, impossible à re-désynchroniser ; `seen` (dénominateur explicite : interrogés/vus) alimenté par `add(total=…)`.
 - [ ] Indicateurs sur-mesure des phases restantes, du plus simple au plus complexe (cross_imports / refresh_stale par source…).
 - [ ] Émission des signaux dans les phases : le canal est en place (remontés via `PhaseMetrics.signals`, affichés en ambre) ; reste à détecter et remonter `extract` (source indisponible, série de 429) et `persons` (`CannotAttributeConflict`).
 

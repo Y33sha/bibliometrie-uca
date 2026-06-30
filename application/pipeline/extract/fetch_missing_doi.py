@@ -94,7 +94,7 @@ async def run_async(
 
     if dry_run:
         slog.info("dry-run — rien inséré")
-        return PhaseMetrics(total=len(dois))
+        return PhaseMetrics(seen=len(dois))
 
     total = len(dois)
     if total == 0:
@@ -186,7 +186,7 @@ async def run_async(
         progress["not_found"],
     )
     return PhaseMetrics(
-        total=total,
+        seen=total,
         new=progress["inserted"],
         extras={"fetched": progress["fetched"], "not_found": progress["not_found"]},
     )

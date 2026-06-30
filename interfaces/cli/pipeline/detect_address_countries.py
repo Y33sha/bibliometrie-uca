@@ -114,7 +114,7 @@ def detect_countries(
         for form, cnt in unknown.most_common(20):
             logger.info(f"  {cnt:>5}  {form}")
         logger.info("\nDry-run — ajouter --apply pour appliquer.")
-        return PhaseMetrics(total=len(rows), extras={"unmatched": unmatched})
+        return PhaseMetrics(seen=len(rows), extras={"unmatched": unmatched})
 
     target_column = "countries" if direct else "suggested_countries"
     # Écriture bulk ; en mode `countries`, `write_countries` pose aussi
@@ -125,7 +125,7 @@ def detect_countries(
     conn.commit()
 
     logger.info(f"{len(matched)} adresses mises à jour ({target_column})")
-    return PhaseMetrics(total=len(rows), new=len(matched), extras={"unmatched": unmatched})
+    return PhaseMetrics(seen=len(rows), new=len(matched), extras={"unmatched": unmatched})
 
 
 def main() -> None:

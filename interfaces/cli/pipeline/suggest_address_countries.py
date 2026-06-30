@@ -112,7 +112,7 @@ def suggest_countries(
 
     elapsed = time.time() - t0
     logger.info(f"\nTerminé : {processed} traitées, {found} avec suggestion, en {elapsed:.0f}s")
-    return PhaseMetrics(total=processed, new=found)
+    return PhaseMetrics(seen=processed, new=found)
 
 
 def main() -> None:

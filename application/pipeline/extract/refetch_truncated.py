@@ -56,7 +56,7 @@ async def refetch(
     truncated = adapter.find_truncated(conn, limit=limit)
     log.info(f"{len(truncated)} works marqués tronqués (à vérifier/compléter)")
 
-    metrics = PhaseMetrics(total=len(truncated))
+    metrics = PhaseMetrics(seen=len(truncated))
     if not truncated or dry_run:
         return metrics
 
