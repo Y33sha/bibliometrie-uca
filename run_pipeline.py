@@ -849,22 +849,24 @@ def _run_reconcile_components() -> PhaseMetrics:
             pub_repo=publication_repository(conn),
             audit_repo=audit_repository(conn),
         )
-        sp_in_perimeter, publications = queries.count_dedup_inputs(conn)
+        _sp_in_perimeter, pub_total = queries.count_dedup_inputs(conn)
     finally:
         conn.close()
     log.info("✓ reconcile_components terminé en %.1fs", time.time() - t0)
 
     metrics = PhaseMetrics()
     metrics.add(total=stats.processed if stats else 0, new=stats.created if stats else 0)
+    # Chiffres du run (SP dirty examinées → publications d'arrivée, mouvements) + le
+    # total global des publications (`pub_total`) en « nouveau total ». Le frontend
+    # les compose en lignes de texte ; les volumes avant/après auto sont masqués.
     metrics.details["summary"] = {
-        "sp_in_perimeter": sp_in_perimeter,
-        "publications": publications,
-        "dedup_factor": round(sp_in_perimeter / publications, 3) if publications else 0,
         "processed": stats.processed if stats else 0,
+        "publications": stats.publications if stats else 0,
+        "existing": stats.existing if stats else 0,
         "created": stats.created if stats else 0,
         "splits": stats.splits if stats else 0,
-        "existing": stats.existing if stats else 0,
         "merges": stats.merges if stats else 0,
+        "pub_total": pub_total,
     }
     return metrics
 
