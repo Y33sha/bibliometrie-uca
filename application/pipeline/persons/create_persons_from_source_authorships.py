@@ -65,6 +65,7 @@ from application.persons.core import (
     create_person,
     link_authorships as link_to_person,
 )
+from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.persons_create import (
     BareUnlinkedAuthorship,
     PersonsCreateQueries,
@@ -208,7 +209,7 @@ def run(
     *,
     person_repo: PersonRepository,
     dry_run: bool = False,
-) -> None:
+) -> PhaseMetrics:
     in_perimeter_authorships = get_all_unlinked_authorships(conn, queries)
     out_of_perimeter_authorships = get_out_of_perimeter_candidates(conn, queries)
     all_authorships = in_perimeter_authorships + out_of_perimeter_authorships
@@ -220,7 +221,7 @@ def run(
 
     if not all_authorships:
         logger.info("Rien à faire.")
-        return
+        return PhaseMetrics()
 
     # Prefetch global des 4 lookups (1 round-trip chacun, partagés sur toute la boucle).
     logger.info("Prefetch des lookups...")
@@ -409,3 +410,20 @@ def run(
     # Commit/rollback laissés au caller (le CLI commit / rollback selon
     # `--dry-run`, les tests d'intégration restent dans leur transaction
     # rollbackée).
+
+    metrics = PhaseMetrics()
+    metrics.add(total=total, new=created, updated=linked_total)
+    # Tableau « méthode de rattachement » : clés techniques (libellés portés par le
+    # frontend), ordre par fiabilité décroissante de la cascade.
+    metrics.details["table"] = {
+        "rows": [
+            {"key": method, "count": matched_counts[method]}
+            for method in ("orcid", "hal_person_id", "idref", "cross_source", "single_name")
+        ]
+    }
+    metrics.details["summary"] = {
+        "created": created,
+        "skipped_ambiguous": skipped_counts["ambiguous_name_form"],
+        "corroboration_rejected": corroboration_rejected,
+    }
+    return metrics
