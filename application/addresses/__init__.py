@@ -1,4 +1,4 @@
-"""Services applicatifs autour de l'aggregate Address / AddressAffiliation.
+"""Services applicatifs autour des adresses (VO `Address`) et de leur résolution vers les structures.
 
 Sous-modules :
 - ``countries`` : résolution des pays depuis les adresses normalisées.
