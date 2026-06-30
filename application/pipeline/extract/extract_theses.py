@@ -15,7 +15,12 @@ import logging
 
 from sqlalchemy import Connection
 
-from application.pipeline.extract.base import ExtractionConfigError, SourceExtractor
+from application.pipeline.extract.base import (
+    ExtractionConfigError,
+    ExtractLogger,
+    SourceExtractor,
+    scoped_logger,
+)
 from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.extract.theses import (
     ThesesExtractAdapter,
@@ -27,7 +32,7 @@ def extract_ppn(
     adapter: ThesesExtractAdapter,
     conn: Connection,
     ppn: str,
-    logger: logging.Logger,
+    logger: ExtractLogger,
     *,
     year: int | None = None,
     dry_run: bool = False,
@@ -42,7 +47,7 @@ def extract_ppn(
 
     data = adapter.fetch_page(query, debut=0, nombre=1)
     total = data["totalHits"]
-    logger.info(f"  PPN {ppn} : {total} thèses")
+    logger.info(f"{total} thèses")
 
     if dry_run or total == 0:
         return total, 0, 0, 0
@@ -80,7 +85,7 @@ def extract_ppn(
 
         if debut % 1000 == 0 or debut >= total:
             logger.info(
-                f"    {debut}/{total} traités "
+                f"{debut}/{total} traités "
                 f"({inserted} nouveaux, {updated} mis à jour, {unchanged} inchangés)"
             )
 
@@ -132,15 +137,20 @@ class ThesesExtractor(SourceExtractor[ThesesExtractConfig]):
                     " (retry au prochain run)"
                 )
                 break
+            slog = scoped_logger(self.logger, self.SOURCE, f"PPN {ppn}")
             total, inserted, updated, unchanged = extract_ppn(
                 self._adapter,
                 self.conn,
                 ppn,
-                self.logger,
+                slog,
                 year=args.year,
                 dry_run=args.dry_run,
             )
             stats.add(new=inserted, updated=updated, unchanged=unchanged, total=total)
+            if not args.dry_run:
+                slog.info(
+                    f"terminé : {inserted} nouveaux, {updated} mis à jour, {unchanged} inchangés"
+                )
         return stats
 
     # log_summary : on hérite du défaut de SourceExtractor (`=== Terminé : as_summary ===`).

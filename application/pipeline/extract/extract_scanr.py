@@ -11,7 +11,12 @@ import logging
 
 from sqlalchemy import Connection
 
-from application.pipeline.extract.base import ExtractionConfigError, SourceExtractor
+from application.pipeline.extract.base import (
+    ExtractionConfigError,
+    ExtractLogger,
+    SourceExtractor,
+    scoped_logger,
+)
 from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.extract.scanr import ScanrExtractAdapter, ScanrExtractConfig
 
@@ -21,7 +26,7 @@ def extract_year(
     conn: Connection,
     year: int,
     affiliation_ids: list[str],
-    logger: logging.Logger,
+    logger: ExtractLogger,
     *,
     dry_run: bool = False,
 ) -> tuple[int, int, int, int]:
@@ -42,7 +47,7 @@ def extract_year(
 
         if first_page:
             total = data["hits"]["total"]["value"]
-            logger.info(f"  {year} : {total} publications")
+            logger.info(f"{total} publications")
             if dry_run:
                 return total, 0, 0, 0
 
@@ -70,7 +75,7 @@ def extract_year(
         if seen % 500 == 0:
             conn.commit()
             logger.info(
-                f"    {seen}/{total} traités "
+                f"{seen}/{total} traités "
                 f"({inserted} nouveaux, {updated} mis à jour, {unchanged} inchangés)"
             )
 
@@ -111,7 +116,7 @@ class ScanrExtractor(SourceExtractor[ScanrExtractConfig]):
         return config
 
     def setup_logging(self, args: argparse.Namespace, config: ScanrExtractConfig) -> None:
-        self.logger.info(f"=== Extraction ScanR : {len(config.affiliation_ids)} structures ===")
+        self.logger.info(f"Structures : {len(config.affiliation_ids)}")
 
     def extract_all(self, args: argparse.Namespace, config: ScanrExtractConfig) -> PhaseMetrics:
         config_years = self._adapter.get_years(self.conn, start_year=args.start_year)
@@ -125,19 +130,17 @@ class ScanrExtractor(SourceExtractor[ScanrExtractConfig]):
                     " (retry au prochain run)"
                 )
                 break
+            slog = scoped_logger(self.logger, self.SOURCE, str(year))
             total, inserted, updated, unchanged = extract_year(
                 self._adapter,
                 self.conn,
                 year,
                 config.affiliation_ids,
-                self.logger,
+                slog,
                 dry_run=args.dry_run,
             )
             stats.add(new=inserted, updated=updated, unchanged=unchanged, total=total)
-            self.logger.info(
-                f"  {year} terminé : {inserted} nouveaux, {updated} mis à jour, "
-                f"{unchanged} inchangés"
-            )
+            slog.info(f"terminé : {inserted} nouveaux, {updated} mis à jour, {unchanged} inchangés")
         return stats
 
     # log_summary : on hérite du défaut de SourceExtractor (`=== Terminé : as_summary ===`)
