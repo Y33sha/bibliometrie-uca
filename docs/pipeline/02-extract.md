@@ -1,5 +1,7 @@
 # Moissonnage
 
+*À jour le 2026-06-30.*
+
 Récupère les données brutes depuis les API et les stocke en JSONB dans le *staging*.
 
 ```mermaid

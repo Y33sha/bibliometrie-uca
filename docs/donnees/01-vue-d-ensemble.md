@@ -1,6 +1,6 @@
 # Vue d'ensemble
 
-*Document à jour au 2026-05-11.*
+*À jour le 2026-06-30.*
 
 ## Entités principales et relations
 
@@ -75,8 +75,6 @@ flowchart LR
 >
 > Le *matching* avec les structures et personnes canoniques s'effectue dans les phases "affiliations" et "personnes" du pipeline.
 
-TODO: Ajouter ER-diagram du schéma entier
-
 ## Suite
 
 Détail par domaine fonctionnel :
@@ -85,3 +83,5 @@ Détail par domaine fonctionnel :
 - [Publications](03-publications.md) — référentiel dédupliqué + journals + publishers + APC + sujets
 - [Personnes](04-personnes.md) — référentiel dédupliqué + identifiants + name forms + données RH
 - [Authorships et sources](05-authorships-et-sources.md) — table de liaison + tables source + staging
+- [Données dérivées](06-donnees-derivees.md) — vues matérialisées, tables et colonnes dérivées, et leur fraîcheur (incrémental ou recalcul complet)
+- [Index des tables](07-index-des-tables.md) — vue macro du schéma et catalogue complet des tables et vues matérialisées

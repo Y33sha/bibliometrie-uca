@@ -1,5 +1,7 @@
 #  Matching et création de personnes
 
+*À jour le 2026-06-30.*
+
 ```mermaid
 flowchart LR
     A@{ shape: procs, label: "source_authorships"}-->B[persons]

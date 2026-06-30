@@ -1,5 +1,7 @@
 #  Enrichissements
 
+*À jour le 2026-06-30.*
+
 ## Pays des adresses {#countries}
 
 Phase `countries`: Associe des pays aux adresses pour permettre l'analyse des collaborations internationales. Quatre étapes enchaînées :

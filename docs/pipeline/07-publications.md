@@ -1,5 +1,7 @@
 #  Création et dédoublonnage des publications
 
+*À jour le 2026-06-30.*
+
 ```mermaid
 flowchart LR
     A@{ shape: procs, label: "source_publications"}-->B[publications]

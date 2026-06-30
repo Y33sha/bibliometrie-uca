@@ -1,8 +1,38 @@
 # Vue d'ensemble
 
-*Document à jour au 2026-05-21.*
+*À jour le 2026-06-30.*
+
+Le système se lit selon deux axes complémentaires : **deux runtimes** couplés par la base de données (vue d'exécution), et **quatre couches** organisant le code à l'intérieur de chaque runtime (vue logicielle).
+
+## Deux runtimes, une base
+
+Le code héberge deux programmes de natures différentes, qui ne s'appellent jamais directement : ils ne communiquent qu'à travers la base PostgreSQL, laquelle constitue leur **contrat d'intégration**.
+
+- **Le service en ligne** (`interfaces/api/` + `interfaces/frontend/`) : un processus FastAPI long, piloté par les requêtes des utilisateurs. Il est essentiellement une **couche de lecture** sur des données pré-calculées (projections plates, agrégations, facettes), avec une surface d'écriture restreinte à la **curation humaine**.
+- **Le pipeline** (`run_pipeline.py` + `application/pipeline/`) : un traitement par lots, déclenché par un ordonnanceur. Il **dérive** le référentiel : moissonnage des sources, normalisation, déduplication, rapprochement, enrichissements.
+
+```
+  sources externes (HAL, OpenAlex, WoS, ScanR, theses.fr)
+        │
+        ▼  moissonnage
+  ┌──────────────┐                ┌──────────────────────────┐               ┌───────────────┐
+  │   pipeline   │ ── écrit ────► │        PostgreSQL        │ ── lit ─────► │  service en   │ ◄── utilisateurs
+  │   (batch)    │   (dérive)     │  (contrat d'intégration) │               │  ligne (API   │
+  │              │ ◄── relit ──── │                          │ ◄── écrit ─── │  + frontend)  │
+  └──────────────┘   la curation  └──────────────────────────┘   curation    └───────────────┘
+```
+
+Les extracteurs du pipeline sont le point d'entrée des données dans le système : le pipeline moissonne les sources, en dérive le référentiel qu'il écrit dans PostgreSQL, d'où le service en ligne lit. Seule la curation remonte ce courant — de l'API vers la base, puis relue par le pipeline.
+
+La curation forme une **boucle fermée** : les corrections saisies via l'API — données de référence (structures, périmètre, configuration) et décisions de séparation (*cannot-link* entre personnes ou entre publications) — deviennent des **entrées** que le pipeline relit et **préserve** à chaque passe. Ses traitements étant idempotents, une re-dérivation n'écrase jamais une décision humaine.
+
+Il en découle une frontière de **propriété des données**, transverse aux couches : certaines tables sont dérivées par le pipeline (recalculables, l'API ne fait que les lire), d'autres sont saisies par l'humain (l'API les écrit, le pipeline les respecte sans jamais les écraser). Cette frontière conditionne toute reprise du système et se décline table par table dans [le modèle de données](../donnees/).
+
+## Vue par couches
 
 Le projet suit une architecture **hexagonale (DDD)**. Le cœur du système est `application/` (use-cases et orchestrateurs), qui dépend de `domain/` (noyau pur). Autour de ce cœur, deux bandes périphériques d'**adapters frères** qui ne se connaissent pas : `interfaces/` (adapters entrants — HTTP, CLI) et `infrastructure/` (adapters sortants — DB, APIs externes, logs). La neutralité entre ces deux bandes repose sur les **ports** (`Protocol`) définis dans `application/ports/`, qui forment une zone neutre dont dépendent tous les autres modules.
+
+Cette vue par couches se superpose à la vue par runtime : `application/` et `infrastructure/` sont chacune scindées entre un versant lecture (consommé par le service en ligne) et un versant pipeline, tandis que `domain/` reste commun aux deux.
 
 ```
                   ┌─────────────────────────────┐

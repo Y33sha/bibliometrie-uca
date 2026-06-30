@@ -1,5 +1,7 @@
 # Relations entre publications
 
+*À jour le 2026-06-30.*
+
 Phase `relations` : peuple la table `publication_relations`, qui relie des publications **distinctes** — et non des doublons, ceux-là étant déjà fusionnés en amont. Une relation rattache une publication à une œuvre apparentée : un preprint à sa version publiée, un supplément de données à son article, un chapitre à son ouvrage, un erratum à l'article qu'il corrige, un data paper au jeu de données qu'il décrit.
 
 La phase tourne après `publications` : les `source_publications` sont rattachées à leur publication canonique, ce qui permet de résoudre les cibles vers des publications du référentiel.

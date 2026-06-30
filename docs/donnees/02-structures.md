@@ -1,5 +1,7 @@
 # Structures
 
+*À jour le 2026-06-30.*
+
 Référentiel institutionnel maintenu manuellement. Contient l'UCA, ses laboratoires, les co-tutelles (CNRS, INRAE…), d'autres établissements partenaires (INP, VetAgro Sup, le CHU), etc.
 
 Colonnes notables de `structures` :
@@ -43,9 +45,10 @@ Légende :
 
 - **`perimeters`** : un périmètre est un ensemble de structures, incluant récursivement les sous-structures. Actuellement deux périmètres sont définis : **UCA** et **UCA élargi** (UCA + CHU + INP). Impacte :
   - les critères d'affiliation utilisés en paramètre des requêtes API ;
-  - les authorships sources dont les affiliations résolues (table de jointure `source_authorship_structures`) sont peuplées par la phase `affiliations` du pipeline, et qui sont candidates au matching `publications` et `personnes`.
+  - les authorships sources dont les affiliations résolues (matview `source_authorship_structures`) sont rafraîchies par la phase `affiliations` du pipeline, et qui sont candidates au matching `publications` et `personnes`.
+- **`perimeter_structures`** : appartenance au périmètre **matérialisée** — pour chaque périmètre, la liste des structures incluses après clôture récursive des tutelles. Rematérialisée en début de phase `affiliations` (`refresh_perimeter_structures`) ; sert de base de jointure aux résolutions d'affiliation et aux vues matérialisées `*_structures` (cf. [données dérivées](06-donnees-derivees.md)).
 - **`structure_relations`** : définit les relations entre structures. Deux relations existent : **tutelle** (asymétrique), **partenariat** (symétrique, non transitif). La relation "partenariat" est purement informative (elle réplique l'information présente dans le [référentiel ROR](../glossaire.md#ror)) ; la relation "tutelle" a une conséquence sur les **structures incluses dans un périmètre** donné.
-- **`structure_name_forms`** : formes de noms pour la détection automatique des structures dans les adresses liées aux publications. Le champ `requires_context_of` (= liste d'id structures) permet de rendre une forme de nom *conditionnellement* valide. Exemple : `LMV` reconnaît le labo *Magmas et Volcans* seulement si `uca` ou `site_clermont` reconnus dans l'adresse. Sinon : probablement *Laboratoire de mathématiques de Versailles*. Cette table est utilisée dans la phase `affiliations` du [pipeline](../pipeline/01-vue-d-ensemble.md) pour peupler la table de liaison `address_structures`.
+- **`structure_name_forms`** : formes de noms pour la détection automatique des structures dans les adresses liées aux publications. Le champ `requires_context_of` (= liste d'id structures) permet de rendre une forme de nom *conditionnellement* valide. Cette table est utilisée dans la phase `affiliations` du [pipeline](../pipeline/04-affiliations.md) pour peupler la table de liaison `address_structures`.
 - **`address_structures`** : table de liaison. Les adresses proviennent des authorships sources (peuplées via `source_authorship_addresses` lors de la phase `normalize`, exploitées lors de la phase `affiliations`). Les structures identifiées sont ensuite propagées aux authorships sources.
 - **`apc_payments`** : données provenant d'un import CSV, voir [doc sources](../sources/10-imports-manuels.md#donnees-apc).
 
@@ -56,14 +59,17 @@ Légende :
 
 ## Services propriétaires
 
-| Table | Propriétaire |
-|---|---|
-| `structures` | `application/structures.py` (admin / API) |
-| `structure_relations` | `application/structures.py` (admin / API) |
-| `structure_name_forms` | `application/structures.py` (admin / API) |
-| `perimeters` | `application/config.py` (admin / API) |
-| `config` | `application/config.py` (admin / API) |
-| `addresses` | `application/pipeline/affiliations/resolve_addresses.py` (création), `application/addresses_*.py` (édition admin) |
-| `address_structures` | `application/pipeline/affiliations/resolve_addresses.py` + `application/addresses_structures.py` (confirmation manuelle) |
-| `apc_payments` | import APC (CSV) |
-| `countries`, `country_name_forms` | référentiel statique (seed) |
+**Autorité** : *pipeline* (recalculée à chaque run), *admin* (saisie via l'interface admin, préservée — le pipeline ne l'écrase jamais), *mixte* (selon la colonne), *import* (chargement externe), *référence* (seed).
+
+| Table | Autorité | Écrit par |
+|---|---|---|
+| `structures` | admin | `application/structures/core.py` |
+| `structure_relations` | admin | `application/structures/core.py` |
+| `structure_name_forms` | admin | `application/structures/core.py` |
+| `perimeters` | admin | `application/config/core.py` |
+| `config` | admin | `application/config/core.py` |
+| `perimeter_structures` | pipeline | rematérialisée par la phase `affiliations` (`refresh_perimeter_structures`) |
+| `addresses` | mixte | créées par le pipeline (`resolve_addresses.py`) ; colonne `country` éditable en admin (`addresses/commands.py`) |
+| `address_structures` | mixte | liens posés par le pipeline (`resolve_addresses.py`) ; colonne `is_confirmed` posée en admin (`addresses/commands.py`) |
+| `apc_payments` | import | `interfaces/cli/imports/import_apc.py`, `import_openapc.py` |
+| `countries`, `place_name_forms` | référence | `seed.sql` |

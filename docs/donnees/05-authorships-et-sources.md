@@ -1,5 +1,7 @@
 # Authorships et tables sources
 
+*À jour le 2026-06-30.*
+
 ## `authorships` — table de vérité des contributions
 
 Table de liaison recensant les contributions individuelles aux publications. Chaque entrée référence **1 personne**, **1 publication**, *n* structures (via la matview `authorship_structures`). Construite par `application/pipeline/authorships/build_authorships.py` à partir des *authorships* sources.
@@ -14,7 +16,7 @@ Colonnes notables :
 - `is_corresponding` : auteur correspondant
 - `roles` (text[]) : rôles (auteur, directeur, rapporteur — pour theses.fr)
 
-`authorship_structures (authorship_id, structure_id)` porte les affiliations résolues. C'est une **`MATERIALIZED VIEW`** (pas une table) : union des `source_authorship_structures` des `source_authorships` reliées à l'authorship, rafraîchie (`REFRESH … CONCURRENTLY`) **uniquement par le pipeline** (fin de phase `authorships`). Les actions admin (review adresse↔structure, assign orphelin) recalculent `in_perimeter` en direct mais ne rafraîchissent plus cette matview : l'agrégation des structures dérivées reste sur l'état du dernier run (staleness bornée, cf. `../chantiers/CODE_background-jobs.md`). Index unique `(authorship_id, structure_id)` + index `(structure_id)` ; pas de FK (le nettoyage d'une authorship supprimée se fait au refresh).
+`authorship_structures (authorship_id, structure_id)` porte les affiliations résolues. C'est une **`MATERIALIZED VIEW`** (pas une table) : union des `source_authorship_structures` des `source_authorships` reliées à l'authorship, rafraîchie (`REFRESH … CONCURRENTLY`) **uniquement par le pipeline** (fin de phase `authorships`). Les actions admin (review adresse↔structure, assign orphelin) recalculent `in_perimeter` en direct mais ne rafraîchissent plus cette matview : l'agrégation des structures dérivées reste sur l'état du dernier run (staleness bornée). Index unique `(authorship_id, structure_id)` + index `(structure_id)` ; pas de FK (le nettoyage d'une authorship supprimée se fait au refresh).
 
 **Cohérence avec les sources** : la table est **entièrement dérivée** des `source_authorships` — `in_perimeter`, les liens via `authorship_structures`, `is_corresponding`, `author_position`, `roles` sont des consolidations (union ou priorité par source) des authorships sources. Le build (`application/pipeline/authorships/build_authorships.py`) est idempotent en mode incrémental ; le mode pipeline `full` exécute en plus une purge complète + rebuild from scratch (TRUNCATE + reset des FK), pour garantir la convergence absolue à intervalle mensuel. Aucun état natif sur la table : le rejet manuel d'une paire (« cette personne n'est pas l'auteur ») vit dans le store `rejected_authorships`, lu en anti-join par les sites de création pour ne jamais recréer la paire.
 
@@ -27,7 +29,7 @@ Store univoque `(publication_id, person_id, created_at)`, PK composite, FK `ON D
 Toutes les sources partagent les mêmes tables, discriminées par la colonne `source` (enum `source_type` : hal, openalex, wos, scanr, theses, crossref).
 
 - **`source_publications`** : un enregistrement par document par source. Relié à `publications` via `publication_id` (peut être NULL si pas encore rattaché). Contient les métadonnées (doc_type non mappé, oa_status, abstract, keywords, topics, biblio, meta). Le champ `hal_collections` (text[]) est spécifique à HAL.
-- **`source_authorships`** : contribution d'un auteur source à un document source. Porte `person_id` (rattachement à une personne canonique), `authorship_id` (FK vers l'authorship canonique), `in_perimeter`, `source_structures` (ARRAY[TEXT] des IDs natifs des structures côté source : numérique HAL, `I****` OpenAlex, noms d'institutions WoS, etc.), `raw_author_name`, `author_name_normalized`, `person_identifiers` (JSONB : `orcid`, `idhal`, `idref`, `hal_person_id`, `researcher_id`), `countries` (ARRAY[CHAR(2)]), `roles`. Les affiliations canoniques résolues sont reliées via la table de jointure `source_authorship_structures (source_authorship_id, structure_id)` (FK ON DELETE CASCADE des deux côtés, PK composite). Les affiliations textuelles brutes sont reliées via `source_authorship_addresses` → `addresses.raw_text`.
+- **`source_authorships`** : contribution d'un auteur source à un document source. Porte `person_id` (rattachement à une personne canonique), `authorship_id` (FK vers l'authorship canonique), `in_perimeter`, `source_structures` (ARRAY[TEXT] des IDs natifs des structures côté source : numérique HAL, `I****` OpenAlex, noms d'institutions WoS, etc.), `raw_author_name`, `author_name_normalized`, `person_identifiers` (JSONB : `orcid`, `idhal`, `idref`, `hal_person_id`, `researcher_id`), `countries` (ARRAY[CHAR(2)]), `roles`. Les affiliations canoniques résolues sont exposées par la matview `source_authorship_structures (source_authorship_id, structure_id)`, dérivée des `source_authorship_addresses` via les liens `address_structures` confirmés du périmètre actif. Les affiliations textuelles brutes sont reliées via `source_authorship_addresses` → `addresses.raw_text`.
 - **`source_authorship_addresses`** : table de liaison `source_authorships ↔ addresses`. Permet aux normalizers de partager une même chaîne d'adresse normalisée (`addresses.raw_text` → `addresses.normalized_text`) entre plusieurs authorships, et alimente la résolution structure ↔ adresse de la phase `affiliations`.
 
 ## `staging` — ingestion par source
@@ -47,7 +49,7 @@ Transitions valides :
 
 `not_found_at` ne porte que les miss **natifs** — un identifiant natif qui ne résout pas (hal-id 404, DOI 404 chez Crossref), toujours définitif. Les miss **cross-import** (un DOI absent d'une source non native) ne créent pas de row `staging` : ils vont dans `doi_lookups` avec backoff (cf. ci-dessous).
 
-`raw_data` vidé après normalisation pour libérer l'espace TOAST (le payload brut sera ré-introduit hors DB par le chantier `DATA_raw-data-store.md`). `last_seen_at` est mis à jour à chaque fois qu'un doc est re-vu (extraction bulk ou refetch).
+`raw_data` vidé après normalisation pour libérer l'espace TOAST. `last_seen_at` est mis à jour à chaque fois qu'un doc est re-vu (extraction bulk ou refetch).
 
 `disappeared_at` marque une row dont la source ne renvoie plus le document. Posé par la phase `refresh_stale` (à chaque run) : les rows à `last_seen_at` ancien (`> STALE_REFRESH_AFTER_DAYS`, 90 j) sont refetchées par id ; un 404 confirmé → `disappeared_at`, sinon `last_seen_at` est bumpé. Les rows stale **sans DOI** (non refetchables mais re-moissonnées par le bulk) sont marquées directement. Conservateur : on **marque seulement**, aucun effet aval (exclusion / suppression / propagation) pour l'instant.
 
@@ -59,11 +61,14 @@ Cache des tentatives négatives de cross-import DOI sur les sources **non native
 
 ## Services propriétaires
 
-| Table | Propriétaire | Notes |
+**Autorité** : *pipeline* (recalculée à chaque run), *admin* (saisie via l'interface admin, préservée — le pipeline ne l'écrase jamais), *mixte* (selon la colonne), *import* (chargement externe), *référence* (seed).
+
+| Table | Autorité | Écrit par |
 |---|---|---|
-| `staging` | extracteurs (`infrastructure/sources/*/extract_*.py`, cross-imports) | table unique pour toutes les sources |
-| `doi_lookups` | cross-imports DOI (`infrastructure/sources/*/fetch_missing_doi.py`) | backoff des miss sur sources non natives |
-| `source_publications` | `application/pipeline/normalize/normalize_*.py` | un fichier par source |
-| `source_authorships` | `application/pipeline/normalize/normalize_*.py` | `person_id` écrit par `application/persons.py` et `application/authorships/assign_orphans.py` (rattachement) ; `in_perimeter` et `source_authorship_structures` écrits par `application/pipeline/affiliations/populate_affiliations.py` |
-| `source_authorship_addresses` | `application/pipeline/normalize/normalize_*.py` (via `infrastructure.repositories.address_linker.PgAddressLinker`) | — |
-| `authorships` | `application/pipeline/authorships/build_authorships.py` + `application/authorships/core.py` + `application/authorships/assign_orphans.py` | dédupliqué (person_id, publication_id), consolide `in_perimeter` depuis les sources ; structures rattachées via la matview `authorship_structures` |
+| `staging` | pipeline | extracteurs (`infrastructure/sources/*/extract_*.py`, cross-imports) |
+| `doi_lookups` | pipeline | cross-imports DOI (`infrastructure/sources/*/fetch_missing_doi.py`) |
+| `source_publications` | pipeline | `application/pipeline/normalize/normalize_*.py` |
+| `source_authorships` | mixte | `normalize_*.py` (pipeline) ; `in_perimeter` par la phase `affiliations`, `authorship_id` par la phase `authorships` ; `person_id` par le pipeline ou en admin (orphan-assign) |
+| `source_authorship_addresses` | pipeline | `normalize_*.py` (via `PgAddressLinker`) |
+| `authorships` | pipeline | `build_authorships.py` (dédupliquée, dérivée des sources) |
+| `rejected_authorships` | admin | exclusion d'une paire (`PATCH /api/authorships/{id}/exclude`) |

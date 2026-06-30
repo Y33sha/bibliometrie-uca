@@ -1,6 +1,8 @@
 # Personnes
 
-Référentiel des individus. Une ligne = une personne physique. Alimenté par le script `create_persons_from_source_authorships.py` (création automatique depuis les authorships) et complété par les exports RH (données dans la table satellite `persons_rh`).
+*À jour le 2026-06-30.*
+
+Référentiel des individus. Une ligne = une personne physique. Alimenté par le script `create_persons_from_source_authorships.py` (création automatique depuis les authorships) ou par l'import RH, qui renseigne aussi la table satellite `persons_rh`.
 
 **Périmètre** : `persons` couvre les personnes ayant cosigné au moins une publication UCA — pas un référentiel mondial des co-auteurs. Miroir conceptuel de `structures` (limitées au périmètre UCA / co-tutelles / partenaires). Conséquence : les co-auteurs externes des publications UCA n'ont pas de `person_id` ; leurs signatures restent uniquement dans `source_authorships`.
 
@@ -38,10 +40,12 @@ Légende :
 
 ## Services propriétaires
 
-| Table | Propriétaire | Notes |
+**Autorité** : *pipeline* (recalculée à chaque run), *admin* (saisie via l'interface admin, préservée — le pipeline ne l'écrase jamais), *mixte* (selon la colonne), *import* (chargement externe), *référence* (seed).
+
+| Table | Autorité | Écrit par |
 |---|---|---|
-| `persons` | `application/persons.py` | import RH écrit aussi (toléré) |
-| `persons_rh` | import RH (CSV — `interfaces/cli/imports/import_persons.py`) | table satellite |
-| `person_identifiers` | `application/persons.py` | ORCID, idHAL, IdRef |
-| `person_name_forms` | `application/persons.py` | recalcul bulk par `interfaces/cli/pipeline/populate_person_name_forms.py` |
-| `distinct_persons` | `application/persons.py` (endpoint admin) | paires marquées distinctes |
+| `persons` | mixte | créées par le pipeline (`create_persons_from_source_authorships.py`) ou par l'import RH (`import_persons.py`) ; fusions, renommage et rejet en admin (`application/persons/commands.py`) |
+| `person_identifiers` | mixte | moissonnés par le pipeline ; ajout manuel et statut en admin (`application/persons/commands.py`) |
+| `person_name_forms` | mixte | peuplées par le pipeline (`populate_person_name_forms.py`) ; statut en admin |
+| `distinct_persons` | admin | `application/persons/commands.py` |
+| `persons_rh` | import | `interfaces/cli/imports/import_persons.py` |

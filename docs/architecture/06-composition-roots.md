@@ -1,5 +1,7 @@
 # Composition roots
 
+*À jour le 2026-06-30.*
+
 Le composition root est l'endroit où les adapters concrets sont **instanciés** et **câblés** aux use-cases. Il a, par nature, le droit d'importer `infrastructure.*` directement — c'est son rôle. Partout ailleurs, on reçoit un port en paramètre.
 
 Les fichiers qui jouent ce rôle :

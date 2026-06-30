@@ -1,5 +1,7 @@
 # Infrastructure — adapters sortants
 
+*À jour le 2026-06-30.*
+
 Contenu :
 
 - **`db/`** — bas niveau DB (engine, schéma, MetaData) :
@@ -10,7 +12,8 @@ Contenu :
 - **`repositories/`** — adapters PostgreSQL implémentant les ports `application/ports/repositories/*` : `person_repository/`, `publication_repository.py`, `journal_repository.py`, `structure_repository.py`, `authorship_repository.py`, `address_repository.py`, `publisher_repository.py`, `perimeter_repository.py`, `audit_repository.py`. Factories exposées dans `__init__.py` (`person_repository(conn)`, `publication_repository(conn)`, …). Orienté **écriture + invariants** : hydrate des agrégats riches (`Publication`, `Person`, …) avec leurs VOs et règles métier, garantit la cohérence à l'écriture. Signatures en termes métier (`find_by_doi`, `merge_into`, `save`).
 - **`jsonb_models/`** — modèles Pydantic des colonnes JSONB (`publications.external_ids`, `structures.api_ids`, …). Validation + normalisation à l'écriture, parsing typé à la lecture. Pas de dépendance SQLAlchemy : c'est de la modélisation de données, juste rangée côté infra parce que la forme est dictée par le schéma DB.
 - **`sources/`** — adapters HTTP/SQL des sources externes (HAL, OpenAlex, WoS, ScanR, theses.fr, Crossref, DataCite). Pour les sources moissonnées (HAL, OpenAlex, WoS, ScanR, theses.fr), chaque source expose un `Pg<Source>ExtractAdapter` qui implémente le port `application.ports.pipeline.extract.<source>.<Source>ExtractAdapter` ; l'orchestrateur (qui hérite du `SourceExtractor` de `application/pipeline/extract/base.py`) vit côté application. Crossref et DataCite sont interrogées par DOI (`fetch_missing_doi`), sans moissonnage.
-- **Divers** : `log.py` (JSON structuré), `settings.py` (pydantic-settings), `perimeter.py`, `addresses.py`, `api_retry.py`, `api_limits.py`, `pipeline_metrics.py`, `pipeline_status.py`, `app_config.py`, `db/dump_schema.py`.
+- **`observability/`** — logging JSON structuré (`log.py`), statut courant et historique d'exécution des phases du pipeline (`pipeline_status.py`, `phase_executions.py`).
+- **Divers** à la racine : `settings.py` (pydantic-settings), `pipeline_lock.py` (verrou d'exécution concurrente du pipeline), `db/dump_schema.py` (régénération du snapshot `schema.sql`).
 
 ## Discipline transactionnelle
 
@@ -26,6 +29,6 @@ Le projet suit la règle Cosmic Python : **les repositories ne commitent jamais*
 
 ### Exceptions assumées
 
-- **Batch commits dans les pipelines** (`create_publications.py`, `enrich_journal_apc.py`, `normalize/base.py`, `resolve_addresses.py`, `refetch_truncated.py`) : commit toutes les N opérations pour qu'un crash sur un batch de 100k+ items ne perde pas tout. Suppose des phases idempotentes (vrai par construction).
+- **Batch commits dans les pipelines** (par exemple `normalize/base.py`, `affiliations/resolve_addresses.py`, `extract/refetch_truncated.py`) : commit toutes les N opérations pour qu'un crash sur un batch de 100k+ items ne perde pas tout. Suppose des phases idempotentes (vrai par construction).
 
 - **Commits dans `infrastructure/sources/*`** : extracteurs API qui commitent page-par-page. Adapters batch, pas repositories — les appels HTTP sont coûteux, les pages déjà fetchées doivent survivre.

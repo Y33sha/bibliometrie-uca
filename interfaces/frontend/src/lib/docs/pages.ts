@@ -19,9 +19,9 @@ export function isSection(node: NavNode): node is Section {
 export const NAV: NavNode[] = [
 	{ section: 'exploitation', title: 'Guide d’exploitation' },
 	{ section: 'guide-utilisateur', title: 'Guide d’utilisation' },
-	{ section: 'sources', title: 'Sources de données' },
-	{ section: 'pipeline', title: 'Pipeline de traitement' },
-	{ section: 'donnees', title: 'Schéma de données' },
 	{ section: 'architecture', title: 'Architecture logicielle' },
+	{ section: 'donnees', title: 'Schéma de données' },
+	{ section: 'pipeline', title: 'Pipeline de traitement' },
+	{ section: 'sources', title: 'Sources de données' },
 	{ slug: 'glossaire' }
 ];

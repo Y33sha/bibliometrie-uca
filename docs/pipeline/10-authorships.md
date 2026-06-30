@@ -1,5 +1,7 @@
 #  Authorships
 
+*À jour le 2026-06-30.*
+
 ```mermaid
 flowchart LR
     F@{shape: procs, label: "source_authorships"}---E

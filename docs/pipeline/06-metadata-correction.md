@@ -1,5 +1,7 @@
 # Correction des métadonnées
 
+*À jour le 2026-06-30.*
+
 La phase `metadata_correction` tourne après [`publishers_journals`](05-publishers-journals.md) — les revues sont typées, donc les règles dépendantes de la revue disposent de données fraîches — et juste avant le [rattachement des publications](07-publications.md), qui lit les colonnes corrigées. Elle prépare les `source_publications` pour que le matching s'appuie sur des valeurs propres et cohérentes.
 
 Les corrections sont écrites sur les colonnes des `source_publications` ; la valeur source d'origine est conservée (dans `raw_metadata`) et chaque correction est recalculée à partir d'elle à chaque run — la passe est ainsi idempotente et se corrige d'elle-même, sans état à entretenir (un re-moissonnage ou un changement de type de revue est rattrapé au run suivant). Deux sous-étapes.

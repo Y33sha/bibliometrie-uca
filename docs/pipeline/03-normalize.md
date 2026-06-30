@@ -1,5 +1,7 @@
 #  Normalisation
 
+*À jour le 2026-06-30.*
+
 ```mermaid
 flowchart LR
     B[staging]-->|normalize_*|G
