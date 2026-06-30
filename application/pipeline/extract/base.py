@@ -32,11 +32,12 @@ from application.ports.pipeline.circuit_breaker import CircuitBreaker
 
 
 class _ScopedLogger(logging.LoggerAdapter[logging.Logger]):
-    """Logger préfixant chaque ligne d'un `[source · scope]`.
+    """Logger préfixant chaque ligne d'un `[source · scope]` (ou `[source]`).
 
-    Situe toute ligne intermédiaire d'extraction dans un run multi-sources et
-    multi-scopes : on sait d'un coup quelle source et quel périmètre (année, plage
-    `depuis …`, PPN d'établissement…) produit la ligne, sans la répéter à la main.
+    Situe toute ligne intermédiaire dans un run multi-sources : on sait d'un coup
+    quelle source — et le cas échéant quel périmètre (année, plage `depuis …`, PPN
+    d'établissement) — produit la ligne, sans le répéter à la main. Indispensable
+    quand les sources tournent en parallèle (fetch DOI) et que les logs s'entrelacent.
     """
 
     def __init__(self, logger: logging.Logger, prefix: str) -> None:
@@ -49,13 +50,14 @@ class _ScopedLogger(logging.LoggerAdapter[logging.Logger]):
         return f"{self._prefix} {msg}", kwargs
 
 
-def scoped_logger(logger: logging.Logger, source: str, scope: str) -> _ScopedLogger:
-    """Adaptateur préfixant les logs d'extraction d'un `[source · scope]` homogène."""
-    return _ScopedLogger(logger, f"[{source} · {scope}]")
+def scoped_logger(logger: logging.Logger, source: str, scope: str | None = None) -> _ScopedLogger:
+    """Adaptateur préfixant les logs d'un `[source · scope]`, ou `[source]` sans scope."""
+    prefix = f"[{source} · {scope}]" if scope else f"[{source}]"
+    return _ScopedLogger(logger, prefix)
 
 
-# Les fonctions d'extraction acceptent indifféremment un logger nu ou un logger
-# scopé (`scoped_logger`) — c'est `extract_all` qui décide du scope et le pose.
+# Les fonctions d'extraction / cross-import acceptent indifféremment un logger nu ou
+# un logger scopé (`scoped_logger`) — c'est l'orchestrateur qui décide du scope.
 type ExtractLogger = logging.Logger | logging.LoggerAdapter[logging.Logger]
 
 
