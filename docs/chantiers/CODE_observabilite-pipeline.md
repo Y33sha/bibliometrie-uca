@@ -91,10 +91,15 @@ Phases A à E livrées (capture par phase, lecture, API, interface en ruban). Le
 
 ### 2. Audit et harmonisation du logging
 
-- [x] Extraction : préfixe `[source · scope]` mutualisé sur toutes les lignes intermédiaires, via `scoped_logger` (helper du base class `SourceExtractor`). Chaque ligne porte la source et le scope (année, `depuis …`, PPN) ; formats d'en-tête et de progression alignés entre les 5 sources ; theses gagne son bilan par PPN, absent jusque-là.
-- [ ] Normalisation : revue de cohérence des logs (en-tête, progression par batch).
-- [ ] Trous intra-phase : annoncer le VACUUM en fin de `normalize` et les sous-étapes de `cross_imports` (hal-id/NNT → DOI) — silences actuels pendant les opérations longues.
-- [ ] Audit de complétude inter-phases restant (chaque phase loggue l'essentiel, dans une forme homogène).
+Revue phase par phase, dans l'ordre du pipeline. Helper transverse : `scoped_logger` (base class `SourceExtractor`) → préfixe `[source · scope]`, ou `[source]` sans scope ; indispensable quand les sources tournent en parallèle.
+
+- [x] `extract` : préfixe `[source · scope]` mutualisé sur toutes les lignes intermédiaires. En-têtes et progression alignés entre les 5 sources ; theses gagne son bilan par PPN.
+- [x] `resolve_ra` : déjà sain (début/fin, ligne par préfixe, mono-source) ; allégé du préfixe redondant et de l'indentation.
+- [x] `cross_imports` : fetch DOI parallèle scopé `[source]` (`run_async`, partagé avec `refresh_stale`) — les deux lignes sans source réglées ; sous-étapes hal-id/NNT et DOI déjà annoncées (`▶`) ; `fetch_missing_hal_id` déjà bien logué. Logs 429/erreurs vérifiés : la source est préfixée via le circuit-breaker (helpers retry sync et async).
+- [ ] `refresh_stale` (le fetch DOI hérite du scope de `run_async` ; reste le marquage des disparues sans DOI).
+- [ ] `refetch_truncated`.
+- [ ] `normalize` (+ annonce du VACUUM en fin de phase — silence actuel).
+- [ ] Phases aval (`affiliations`, `publications`, `persons`…) : audit de complétude.
 
 ### 3. Métriques et signaux
 

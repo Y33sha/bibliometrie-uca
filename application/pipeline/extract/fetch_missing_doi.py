@@ -26,6 +26,7 @@ from collections.abc import Callable
 import httpx
 from sqlalchemy import Connection
 
+from application.pipeline.extract.base import scoped_logger
 from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.circuit_breaker import CircuitBreaker
 from application.ports.pipeline.extract.fetch_missing_doi import (
@@ -82,16 +83,17 @@ async def run_async(
         = DOI confirmés absents (backoff enregistré).
     """
     adapter.configure(conn)
+    slog = scoped_logger(log, adapter.source_key)
 
     dois = cross_import_dois_reader(conn, adapter.source_key)
-    log.info("%d DOI manquants pour %s", len(dois), adapter.source_key)
+    slog.info("%d DOI manquants", len(dois))
 
     if limit:
         dois = dois[:limit]
-        log.info("Limité à %d DOI", len(dois))
+        slog.info("limité à %d DOI", len(dois))
 
     if dry_run:
-        log.info("Dry-run — rien inséré.")
+        slog.info("dry-run — rien inséré")
         return PhaseMetrics(total=len(dois))
 
     total = len(dois)
@@ -128,7 +130,7 @@ async def run_async(
                     # abandon silencieux, le log unique vient après le gather.
                     if breaker is not None and breaker.tripped:
                         return
-                    log.error("Erreur sur lot %d (%d DOI) : %s", batch_idx, len(batch), e)
+                    slog.error("erreur sur lot %d (%d DOI) : %s", batch_idx, len(batch), e)
                     records = []
                 if request_delay:
                     await asyncio.sleep(request_delay)
@@ -149,14 +151,13 @@ async def run_async(
                                 if inserted_one:
                                     progress["inserted"] += 1
                     except Exception as e:
-                        log.warning("Erreur insertion (%s) : %s", adapter.source_key, e)
+                        slog.warning("erreur insertion : %s", e)
 
                 progress["processed"] += len(batch)
                 if progress["processed"] % 100 == 0 or progress["processed"] >= total:
                     duplicates = progress["fetched"] - progress["inserted"]
-                    log.info(
-                        "  %s %d/%d — %d records (%d nouveaux, %d doublons, %d not-found)",
-                        adapter.source_key,
+                    slog.info(
+                        "%d/%d — %d records (%d nouveaux, %d doublons, %d not-found)",
                         progress["processed"],
                         total,
                         progress["fetched"],
@@ -168,19 +169,16 @@ async def run_async(
         await asyncio.gather(*(worker() for _ in range(adapter.max_concurrent)))
 
     if breaker is not None and breaker.tripped:
-        log.warning(
-            "Source %s indisponible (429/5xx répétés) — abandon, %d/%d DOI traités,"
-            " reste au prochain run",
-            adapter.source_key,
+        slog.warning(
+            "indisponible (429/5xx répétés) — abandon, %d/%d DOI traités, reste au prochain run",
             progress["processed"],
             total,
         )
 
     duplicates = progress["fetched"] - progress["inserted"]
-    log.info(
-        "Terminé %s : %d DOI interrogés, %d records (%d nouveaux, %d doublons déjà en staging),"
+    slog.info(
+        "terminé : %d DOI interrogés, %d records (%d nouveaux, %d doublons déjà en staging),"
         " %d not-found (backoff)",
-        adapter.source_key,
         total,
         progress["fetched"],
         progress["inserted"],
