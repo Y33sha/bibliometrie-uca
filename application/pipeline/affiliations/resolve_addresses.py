@@ -1,5 +1,5 @@
 """
-Résolution des adresses : identification UCA + rattachement structures.
+Résolution des adresses : rattachement aux structures + détection du périmètre.
 
 Lit les formes de noms depuis la table structure_name_forms,
 et enregistre dans address_structures avec matched_form_id pour
@@ -114,15 +114,18 @@ def run_resolution(
     queries: AddressResolutionQueries,
     perimeter_ids: set[int],
     logger: logging.Logger,
-) -> None:
-    """Recalcul complet idempotent des affiliations. `conn` nécessaire pour commit batch."""
+) -> tuple[int, int, int]:
+    """Recalcul complet idempotent des affiliations. `conn` nécessaire pour commit batch.
+
+    Retourne `(adresses traitées, adresses in_perimeter, affiliations détectées)`.
+    """
     logger.info("Chargement des structures et formes...")
     forms = queries.load_name_forms(conn)
     logger.info(f"  {len(forms)} formes chargées")
     matcher = AddressMatcher(forms)
     logger.info(f"  {len(perimeter_ids)} structures dans le périmètre")
 
-    process_addresses(conn, queries, matcher, perimeter_ids, logger)
+    return process_addresses(conn, queries, matcher, perimeter_ids, logger)
 
 
 def process_addresses(
@@ -133,7 +136,7 @@ def process_addresses(
     logger: logging.Logger,
     *,
     chunk_size: int = CHUNK_SIZE,
-) -> tuple[int, int]:
+) -> tuple[int, int, int]:
     """Résout toutes les adresses par tranches (keyset) : matching mémoire + écritures en bloc.
 
     Chaque tranche est lue (`normalized_text`, déjà normalisé en base — aucun
@@ -144,7 +147,7 @@ def process_addresses(
     """
     t_start = time.perf_counter()
     processed = 0
-    uca_count = 0
+    in_perimeter_count = 0
     affil_count = 0
     removed_count = 0
     after_id = 0
@@ -162,7 +165,7 @@ def process_addresses(
             addr_ids.append(addr_id)
             matches = matcher.resolve(normalized_text)
             if any(sid in perimeter for sid, _ in matches):
-                uca_count += 1
+                in_perimeter_count += 1
             for structure_id, form_id in matches:
                 detections.append((addr_id, structure_id, form_id))
                 kept_pairs.append((addr_id, structure_id))
@@ -177,7 +180,7 @@ def process_addresses(
         elapsed = time.perf_counter() - t_start
         logger.info(
             f"  {processed} traitées "
-            f"({uca_count} UCA, {affil_count} affiliations, "
+            f"({in_perimeter_count} in_perimeter, {affil_count} affiliations, "
             f"{removed_count} obsolètes supprimés) "
             f"— {processed / elapsed:.0f} addr/s"
         )
@@ -186,8 +189,11 @@ def process_addresses(
     if processed > 0:
         logger.info(f"\n=== Terminé en {elapsed:.1f}s ===")
         logger.info(f"  Adresses traitées    : {processed}")
-        logger.info(f"  UCA                  : {uca_count} ({100 * uca_count / processed:.1f}%)")
+        logger.info(
+            f"  in_perimeter         : {in_perimeter_count} "
+            f"({100 * in_perimeter_count / processed:.1f}%)"
+        )
         logger.info(f"  Affiliations créées  : {affil_count}")
         logger.info(f"  Obsolètes supprimés  : {removed_count}")
 
-    return uca_count, affil_count
+    return processed, in_perimeter_count, affil_count

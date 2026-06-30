@@ -67,11 +67,12 @@
     const n = Number(value) || 0;
     if (col.duration) return fmtDuration(n);
     if (col.sign) return fmtSigned(n);
+    if (col.percent) return `${n} %`;
     if (col.pct) return `${n} (${fmtPct(n, total)})`;
     return `${n}`;
   }
   function fmtTotalCell(sum: number, col: TableColumn): string {
-    if (col.duration) return "";
+    if (col.duration || col.percent) return "";
     return col.sign ? fmtSigned(sum) : `${sum}`;
   }
 

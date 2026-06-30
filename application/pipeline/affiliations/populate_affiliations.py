@@ -27,10 +27,8 @@ def show_stats(conn: Connection, queries: AffiliationsQueries, logger: logging.L
         ("ScanR", "scanr"),
         ("theses.fr", "theses"),
     ]:
-        total, uca, with_structs = queries.count_source_authorships_stats(conn, source_value)
-        logger.info(
-            f"  {source_name:10s} : {total} total, {uca} in_perimeter, {with_structs} avec structure_ids"
-        )
+        total, in_perimeter = queries.count_source_authorships_stats(conn, source_value)
+        logger.info(f"  {source_name:10s} : {total} total, {in_perimeter} in_perimeter")
 
 
 def run_populate(
