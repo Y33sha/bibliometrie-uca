@@ -1,5 +1,7 @@
 # Résolution des affiliations
 
+*À jour le 2026-06-30.*
+
 ```mermaid
 flowchart LR
     A[source_authorships]-->B[addresses]

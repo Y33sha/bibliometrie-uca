@@ -1,5 +1,7 @@
 # Vue d'ensemble
 
+*À jour le 2026-06-30.*
+
 Ce fichier présente la logique du pipeline de traitement. Pour les modalités d'exécution, voir [Guide d'exploitation](../exploitation/04-pipeline.md).
 
 Le peuplement de la base s'effectue via un *pipeline* composé des étapes suivantes :

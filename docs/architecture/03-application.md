@@ -1,72 +1,22 @@
 # Application — services et orchestrateurs
 
+*À jour le 2026-06-30.*
+
 Contenu :
 
-- **Services métier** : `persons.py`, `publications.py`, `journals.py`, `authorships/core.py`, `authorships/assign_orphans.py`, `structures.py`, `addresses_countries.py`, `addresses_structures.py`, `audit.py`, `config.py`, `publishers.py`. Ces services reçoivent leurs dépendances par injection (kwarg `repo=`, `audit_repo=`, `queries=`).
-- **Orchestrateurs pipeline** dans `application/pipeline/` :
-  - `extract/` — tous les pilotes d'ingestion → staging :
-    - `extract_<source>.py` — extraction de masse par source (HAL, OpenAlex, WoS, ScanR, theses.fr) ; pilote la pagination
-    - `fetch_missing_doi.py` — fetch cross-source par DOI
-    - `fetch_missing_hal_id.py` — fetch HAL par halId / NNT depuis les références d'autres sources
-    - `refetch_truncated.py` — re-fetch OpenAlex des works tronqués à 100 auteurs
-
-    Chaque pilote délègue HTTP + SQL à un adapter via un Port (`application/ports/pipeline/extract/<nom>.py`).
-  - `normalize/` — staging → tables sources (un module par source)
-  - `affiliations/` — propagation adresses ↔ structures vers `source_authorships.in_perimeter` et la table de jointure `source_authorship_structures`
-  - `publications/` — création/merge publications canoniques
-  - `persons/` — création personnes + formes de noms
-  - `authorships/` — reconstruction de la table de vérité
-  - `countries/` — recalcul pays publications
-  - `subjects/` — ingestion sujets/mots-clés
-  - `cooccurrences/` — recalcul co-occurrences sujets
-  - `enrich/` — Unpaywall, APC
+- **Services métier**, un sous-package par agrégat exposant un module `core.py` : `persons/core.py`, `publications/core.py`, `journals/core.py`, `structures/core.py`, `publishers/core.py`, `config/core.py`, auxquels s'ajoutent `authorships/core.py` et `authorships/assign_orphans.py`, `addresses/countries.py`, et `audit.py` (module plat). Ces services reçoivent leurs dépendances par injection (kwarg `repo=`, `audit_repo=`, `queries=`).
+- **Orchestrateurs pipeline** dans `application/pipeline/` : un sous-package par phase. Chaque orchestrateur séquence sa phase et délègue HTTP et SQL à des adapters via des ports (`application/ports/pipeline/*`), sans jamais importer `infrastructure/` directement. L'inventaire phase par phase, avec entrées et sorties, vit dans la [documentation du pipeline](../pipeline/01-vue-d-ensemble.md).
 - **Ports** (`application/ports/*`) : interfaces Protocol pour les query services (adapters dans `infrastructure/queries/*`) et pour les repositories d'agrégats (`application/ports/repositories/*`, implémentés dans `infrastructure/repositories/*`).
 
 Interdiction : **`application/` ne peut pas importer `infrastructure/`**. Toute nouvelle dépendance doit passer par un port. Vérifié par le contrat `layered` d'`import-linter`.
 
 ## Patterns d'injection
 
-### Services applicatifs ↔ repositories
+Toute dépendance vers un adapter sortant passe par un port, instancié uniquement aux composition roots (cf. [06-composition-roots.md](06-composition-roots.md)). Deux styles cohabitent :
 
-Les services acceptent leur repo (et autres dépendances : audit_repo, queries, …) en kwarg keyword-only :
-
-```python
-def set_rejected(
-    person_id: int,
-    rejected: bool,
-    *,
-    repo: PersonRepository,
-    audit_repo: AuditRepository | None = None,
-) -> None:
-    repo.set_rejected(person_id, rejected)
-    emit_event(audit_repo, "person.rejected", ...)
-```
-
-Les callers directs (routers, tests, scripts CLI) créent l'instance via la factory :
-
-```python
-from infrastructure.repositories import person_repository
-set_rejected(person_id, True, repo=person_repository(conn))
-```
-
-### Orchestrateurs pipeline ↔ query services + repositories
-
-Les orchestrateurs dans `application/pipeline/*` ne peuvent pas importer `infrastructure.*` directement. Deux mécanismes :
-
-1. **Query services** (SQL de la phase) : passés en paramètre typés par un port `application/ports/*`. L'entry point (`run_pipeline.py` ou `interfaces/cli/pipeline/*`) instancie les adapters `Pg*Queries` concrets.
-
-2. **Repositories** (ex. `PublicationRepository`) : quand un orchestrateur a besoin d'un repo, on passe un **factory callable** `repo_factory: Callable[[Connection], XRepository]` au constructeur. L'orchestrateur appelle `self._repo = self._repo_factory(conn)` dans `preload_caches()` ou au début de `run()`.
-
-Exemple depuis `run_pipeline.py` :
-
-```python
-from infrastructure.queries.pipeline.persons_create import PgPersonsCreateQueries
-from infrastructure.repositories import person_repository
-
-PgPersonsCreateQueries()        # adapter query service
-person_repository(conn)         # factory repository
-```
+- **Services applicatifs** : ils reçoivent leurs dépendances (repository, query service, audit) en arguments keyword-only ; le caller (router, test, script CLI) les instancie via les factories de `infrastructure/repositories`.
+- **Orchestrateurs pipeline** : les query services sont passés en paramètre, typés par un port `application/ports/*`. Pour un repository, dont la `Connection` n'est pas connue à la construction, on injecte un *factory callable* `Callable[[Connection], XRepository]` que l'orchestrateur appelle une fois la connexion ouverte.
 
 ### Batch commits dans le pipeline
 
-La règle générale est que les use-cases commitent (cf. [discipline transactionnelle](04-infrastructure.md#discipline-transactionnelle)). Côté pipeline, les phases qui traitent des dizaines de milliers d'items commitent **par batch** (toutes les N opérations) pour qu'un crash ne perde pas tout le travail déjà fait. Concerné : `create_publications.py`, `enrich_journal_apc.py`, `normalize/base.py`, `resolve_addresses.py`, `refetch_truncated.py`. Suppose des phases idempotentes (vrai par construction).
+La règle générale est que les use-cases commitent (cf. [discipline transactionnelle](04-infrastructure.md#discipline-transactionnelle)). Côté pipeline, les phases qui traitent des dizaines de milliers d'items commitent **par batch** (toutes les N opérations) pour qu'un crash ne perde pas tout le travail déjà fait ; cela suppose des phases idempotentes (vrai par construction). Les phases concernées sont listées dans la discipline transactionnelle de l'infrastructure (cf. [04-infrastructure.md](04-infrastructure.md#discipline-transactionnelle)).

@@ -4,11 +4,10 @@
 
 ### En cours
 
-
+- [Observabilité du pipeline](CODE_observabilite-pipeline.md)
 
 ### En pause
 
-- [Observabilité du pipeline](CODE_observabilite-pipeline.md)
 - [Gestion et dédoublonnage assistés de la base personnes](DATA_personnes-dedoublonnage-assiste.md)
 
 ### Non commencé

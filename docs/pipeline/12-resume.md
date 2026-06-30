@@ -1,5 +1,7 @@
 # Résumé : peuplement des tables canoniques
 
+*À jour le 2026-06-30.*
+
 1. Les **structures** préexistent au pipeline. Elles sont reconnues dans les adresses liées aux publications, et permettent de repérer les authorships (et indirectement les publications) du périmètre.
 
 ```mermaid

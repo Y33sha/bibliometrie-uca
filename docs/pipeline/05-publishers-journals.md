@@ -1,5 +1,7 @@
 # Enrichissement des référentiels publishers et journals
 
+*À jour le 2026-06-30.*
+
 Phase `publishers_journals` : enrichit le référentiel `journals` (revues) à partir de sources externes, après sa création initiale en phase [normalize](03-normalize.md).
 
 Trois sous-étapes. `resolve_publishers` s'exécute à chaque lancement du pipeline ; les deux enrichissements journaux ne tournent que lorsque l'enrichissement des référentiels est activé pour le mode courant (drapeau de politique `run_journal_enrichment`, vrai en mode `full`).
