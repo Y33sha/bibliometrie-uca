@@ -6,7 +6,6 @@ from domain.sources.openalex import (
     is_repository_location,
     is_theses_fr_location,
     map_openalex_oa_status,
-    parse_locations,
     parse_primary_location,
     should_skip_publisher_journal,
 )
@@ -132,24 +131,6 @@ class TestParsePrimaryLocation:
         assert loc is not None
         assert loc.landing_page_url == "https://example.com"
         assert loc.source_type is None
-
-
-class TestParseLocations:
-    def test_multiple_locations(self):
-        work = {
-            "locations": [
-                {"landing_page_url": "https://hal.science/hal-1"},
-                {"landing_page_url": "https://example.com/article"},
-            ]
-        }
-        locs = parse_locations(work)
-        assert len(locs) == 2
-        assert locs[0].landing_page_url == "https://hal.science/hal-1"
-
-    def test_empty_locations(self):
-        assert parse_locations({}) == []
-        assert parse_locations({"locations": []}) == []
-        assert parse_locations({"locations": None}) == []
 
 
 class TestIsThesesFrLocation:
