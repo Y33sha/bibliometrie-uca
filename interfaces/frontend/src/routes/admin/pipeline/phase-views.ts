@@ -111,6 +111,20 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
       },
     ],
   },
+  publishers_journals: {
+    summary: [{ key: "doaj_matched", label: "DOAJ — journaux taggés" }],
+    tables: [
+      {
+        source: "table",
+        firstColumnLabel: "Sous-étape",
+        columns: [
+          { key: "traités", label: "Traités" },
+          { key: "identifiés", label: "Identifiés" },
+          { key: "créés", label: "Créés" },
+        ],
+      },
+    ],
+  },
   affiliations: {
     summary: [
       { key: "adresses", label: "Adresses traitées" },

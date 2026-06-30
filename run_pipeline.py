@@ -472,9 +472,29 @@ def phase_publishers_journals(**kw: Any) -> PhaseMetrics:
     nouveaux DOIs via `fetch_missing_hal_id`, (b) `normalize` crée les
     `publishers`/`journals` qu'on veut enrichir.
     """
-    metrics = _run_resolve_publishers()
-    _run_enrich_journals_from_openalex()
-    _run_enrich_journals_from_doaj()
+    publishers = _run_resolve_publishers()
+    openalex = _run_enrich_journals_from_openalex()
+    doaj = _run_enrich_journals_from_doaj()
+
+    metrics = PhaseMetrics()
+    metrics.details["table"] = {
+        "rows": [
+            {
+                "key": "préfixes DOI → publishers",
+                "traités": publishers.total,
+                "identifiés": publishers.extras.get("publisher_matched", 0),
+                "créés": publishers.extras.get("publisher_created", 0),
+            },
+            {
+                "key": "revues OpenAlex",
+                "traités": openalex.total,
+                "identifiés": openalex.updated,
+                "créés": 0,
+            },
+        ]
+    }
+    # DOAJ : ligne à part (sous-étape conditionnelle, métrique propre).
+    metrics.details["summary"] = {"doaj_matched": doaj.extras.get("matched", 0)}
     return metrics
 
 
@@ -1287,7 +1307,7 @@ def _run_enrich_oa_status() -> PhaseMetrics:
     return metrics
 
 
-def _run_enrich_journals_from_openalex() -> None:
+def _run_enrich_journals_from_openalex() -> PhaseMetrics:
     from application.pipeline.publishers_journals.enrich_journals_from_openalex import (
         run_enrich_journals_from_openalex,
     )
@@ -1305,7 +1325,7 @@ def _run_enrich_journals_from_openalex() -> None:
     t0 = time.time()
     conn = get_sync_engine().connect()
     try:
-        run_enrich_journals_from_openalex(
+        metrics = run_enrich_journals_from_openalex(
             conn,
             PgEnrichQueries(),
             log,
@@ -1318,6 +1338,7 @@ def _run_enrich_journals_from_openalex() -> None:
     finally:
         conn.close()
     log.info("✓ enrich_journals_from_openalex terminé en %.1fs", time.time() - t0)
+    return metrics
 
 
 # DOAJ : le dump CSV (source de vérité) est ré-importé au plus une fois tous les
@@ -1326,7 +1347,7 @@ _DOAJ_STALE_DAYS = 30
 _DOAJ_DUMP_PATH = Path(__file__).parent / "data" / "doaj" / "doaj_dump.csv"
 
 
-def _run_enrich_journals_from_doaj() -> None:
+def _run_enrich_journals_from_doaj() -> PhaseMetrics:
     from application.pipeline.publishers_journals.import_journals_from_doaj_dump import (
         run_import_doaj_dump,
     )
@@ -1353,12 +1374,12 @@ def _run_enrich_journals_from_doaj() -> None:
                 _DOAJ_STALE_DAYS,
                 last.date(),
             )
-            return
+            return PhaseMetrics(extras={"skipped": 1})
 
         _DOAJ_DUMP_PATH.parent.mkdir(parents=True, exist_ok=True)
         user_agent = build_doaj_user_agent(get_polite_pool_email(conn))
         fetch_doaj_dump(str(_DOAJ_DUMP_PATH), user_agent=user_agent, logger=log)
-        run_import_doaj_dump(
+        stats = run_import_doaj_dump(
             conn,
             queries,
             log,
@@ -1368,6 +1389,7 @@ def _run_enrich_journals_from_doaj() -> None:
     finally:
         conn.close()
     log.info("✓ enrich_journals_from_doaj terminé en %.1fs", time.time() - t0)
+    return PhaseMetrics(extras={"matched": stats.matched})
 
 
 def _run_resolve_addresses() -> PhaseMetrics:
