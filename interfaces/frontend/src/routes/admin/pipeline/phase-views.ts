@@ -45,8 +45,13 @@ export type MatrixView = {
 };
 export type PhaseView = {
   summary?: SummaryItem[];
+  // Lignes de texte libres ; chaque `{clé}` est remplacé par `summary[clé]`. Pour les
+  // phases dont le résumé se lit mieux en phrases qu'en couples libellé/valeur.
+  lines?: string[];
   matrix?: MatrixView;
   tables?: TableView[];
+  // Masque les volumes avant/après auto-relevés (quand le résumé porte déjà le total).
+  hideVolumes?: boolean;
 };
 
 export const PHASE_VIEWS: Record<string, PhaseView> = {
@@ -144,15 +149,12 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
     ],
   },
   publications: {
-    summary: [
-      { key: "sp_in_perimeter", label: "source_publications (in-périmètre)" },
-      { key: "publications", label: "Publications" },
-      { key: "dedup_factor", label: "Facteur de dédup (SP/pub)" },
-      { key: "processed", label: "SP traitées (ce run)" },
-      { key: "created", label: "Publications créées" },
-      { key: "splits", label: "dont par scission" },
-      { key: "existing", label: "Existantes conservées" },
-      { key: "merges", label: "Doublons fusionnés" },
+    hideVolumes: true,
+    lines: [
+      "{processed} source_publications examinées, résolues en {publications} publications (dont {existing} déjà existantes)",
+      "{created} nouvelles publications, dont {splits} par scission",
+      "{merges} doublons fusionnés",
+      "nouveau total : {pub_total} publications",
     ],
   },
   resolve_ra: {

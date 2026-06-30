@@ -75,6 +75,9 @@
     if (col.duration || col.percent) return "";
     return col.sign ? fmtSigned(sum) : `${sum}`;
   }
+  function fillTemplate(tpl: string, dsummary: Record<string, number>): string {
+    return tpl.replace(/\{(\w+)\}/g, (_, k) => `${dsummary[k] ?? "—"}`);
+  }
 
   function fmtDurationLabel(p: PhaseExecutionDetail): string {
     const base = fmtDuration(p.duration_s);
@@ -149,7 +152,14 @@
         <tr class="expand-row">
           <td colspan="4">
             <div class="expand">
-              {#if lines.length}
+              {#if view?.lines}
+                {@const dsummary = detailSummary(p.details)}
+                <div class="summary">
+                  {#each view.lines as tpl, i (i)}
+                    <div class="expand-line">{fillTemplate(tpl, dsummary)}</div>
+                  {/each}
+                </div>
+              {:else if lines.length}
                 <div class="summary">
                   {#each lines as [label, value] (label)}
                     <div class="summary-line">
@@ -218,7 +228,7 @@
                   {/if}
                 {/each}
               {:else}
-                {#each changedTables(p.details) as [tbl, v] (tbl)}
+                {#each view?.hideVolumes ? [] : changedTables(p.details) as [tbl, v] (tbl)}
                   <div class="expand-line">
                     <span class="k">{tbl}</span>
                     <span>{v.before} ⇒ {v.after} ({fmtSigned(v.after - v.before)})</span>
