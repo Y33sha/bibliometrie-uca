@@ -89,8 +89,8 @@ DOI.org (résolution des Registration Agencies) et DOAJ sont des API publiques s
 
 ### Phase 5 — Enrichissements : email requis, gate harmonisé
 
-- [ ] `run_pipeline.py` : `enrich_journals_from_openalex` (openalex), `resolve_doi_prefixes` (crossref/datacite) et `oa_status` (unpaywall) sautent proprement quand `source_credentials_missing` renvoie un motif, au lieu de lever sur email absent. `get_polite_pool_email` (levant) est remplacé par le gate dans ces chemins.
-- [ ] Tests : enrichissement sauté sur email absent, exécuté sinon.
+- [x] `run_pipeline.py` : `enrich_journals_from_openalex` (openalex), `resolve_publishers` (crossref/datacite) et `oa_status` (unpaywall) sautent proprement quand `source_credentials_missing` renvoie un motif, au lieu de lever sur email absent. Les accès publics `resolve_ra` (doi.org) et DOAJ tolèrent l'absence d'email au lieu de lever. Plus aucun `get_polite_pool_email` levant dans les chemins pipeline.
+- [x] Tests : enrichissement sauté sur email absent, exécuté sinon.
 
 ## Questions ouvertes
 
