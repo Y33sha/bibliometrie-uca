@@ -104,9 +104,9 @@ export const docTypeGroupedColors: Record<string, string> = {
 	conference_paper: '#b18fcf',
 	book: '#ffa93b',
 	book_chapter: '#f4c430',
-	data_paper: '#2ecc71',
+	data_paper: '#66bb6a',
 	theses: '#c0392b',
-	data: '#1abc9c',
+	data: '#43a047',
 	misc: '#cfd3d6'
 };
 
