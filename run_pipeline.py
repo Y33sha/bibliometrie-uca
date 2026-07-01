@@ -498,6 +498,23 @@ def phase_publishers_journals(**kw: Any) -> PhaseMetrics:
     return metrics
 
 
+def _signal_if_tripped(metrics: PhaseMetrics, breaker: Any) -> None:
+    """Quand un circuit-breaker source a coupé (série de 429/5xx), marque la phase en
+    avertissement : son point passe ambre et le motif s'affiche au drill-down. Les items
+    non traités sont repris au run suivant (phases de rattrapage idempotentes)."""
+    if breaker.tripped:
+        metrics.signals.append(
+            {
+                "level": "warning",
+                "code": "source_unavailable",
+                "message": (
+                    f"{breaker.source} : arrêt après une série d'échecs (429/5xx), "
+                    "items reportés au prochain run"
+                ),
+            }
+        )
+
+
 def _run_resolve_ra() -> PhaseMetrics:
     from application.pipeline.publishers_journals.resolve_doi_prefixes import run_resolve_ra
     from infrastructure.db.engine import get_sync_engine
@@ -530,6 +547,7 @@ def _run_resolve_ra() -> PhaseMetrics:
         reset_current_breaker(token)
         conn.close()
     log.info("✓ resolve_ra terminé en %.1fs — %s", time.time() - t0, metrics.as_summary())
+    _signal_if_tripped(metrics, breaker)
     return metrics
 
 
@@ -575,6 +593,7 @@ def _run_resolve_publishers() -> PhaseMetrics:
         reset_current_breaker(token)
         conn.close()
     log.info("✓ resolve_publishers terminé en %.1fs — %s", time.time() - t0, metrics.as_summary())
+    _signal_if_tripped(metrics, breaker)
     return metrics
 
 
@@ -1514,9 +1533,11 @@ def _run_extractor(extractor: Any, args: Any) -> PhaseMetrics:
     breaker = SourceCircuitBreaker(extractor.SOURCE, threshold=5)
     token = set_current_breaker(breaker)
     try:
-        return extractor.run_as_phase(args, breaker=breaker)
+        metrics = extractor.run_as_phase(args, breaker=breaker)
     finally:
         reset_current_breaker(token)
+    _signal_if_tripped(metrics, breaker)
+    return metrics
 
 
 def _run_extract_hal(
@@ -1763,6 +1784,7 @@ def _run_fetch_missing_doi(target: str) -> PhaseMetrics:
         time.time() - t0,
         metrics.as_summary(),
     )
+    _signal_if_tripped(metrics, breaker)
     return metrics
 
 
@@ -1812,6 +1834,7 @@ def _run_refresh_stale_doi(target: str) -> PhaseMetrics:
         time.time() - t0,
         metrics.as_summary(),
     )
+    _signal_if_tripped(metrics, breaker)
     return metrics
 
 

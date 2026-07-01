@@ -125,7 +125,6 @@
       <th>Phase</th>
       <th>Statut</th>
       <th class="num">Durée</th>
-      <th class="num">Signaux</th>
     </tr>
   </thead>
   <tbody>
@@ -137,13 +136,12 @@
           {STATUS_LABEL[p.status as Status]}
         </td>
         <td class="num">{fmtDuration(p.duration_s)}</td>
-        <td class="num">{p.signals.length || "—"}</td>
       </tr>
       {#if expanded === p.phase}
         {@const view = PHASE_VIEWS[p.phase]}
         {@const lines = summaryLines(view, detailSummary(p.details))}
         <tr class="expand-row">
-          <td colspan="4">
+          <td colspan="3">
             <div class="expand">
               {#if view?.lines}
                 {@const dsummary = detailSummary(p.details)}
@@ -227,7 +225,7 @@
               </div>
               {#if p.signals.length}
                 <div class="expand-line">
-                  <span class="k">Signaux</span>
+                  <span class="k">Motif</span>
                   <span class="signals">
                     {#each p.signals as s, i (i)}
                       <span class="signal" style="border-color:{CELL_COLOR[s.level as Status]}"
