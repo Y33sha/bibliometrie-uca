@@ -467,6 +467,7 @@
 	<title>Statistiques — Bibliométrie UCA</title>
 </svelte:head>
 
+<div class="stats-page">
 <!-- Ligne 1 : contrôles du pivot + onglets -->
 <div class="toolbar controls-row">
 	{#if pivotSchema}
@@ -545,6 +546,7 @@
 		onchange={(p) => { chartPage = p; syncUrl(); loadChart(); }}
 	/>
 {/if}
+</div>
 
 
 <style>
@@ -602,6 +604,15 @@
 		vertical-align: middle;
 	}
 
+	/* Colonne pleine hauteur : barres d'outils, légende et pagination gardent
+	   leur hauteur naturelle, le diagramme occupe l'espace restant du viewport.
+	   Hauteur = viewport moins l'en-tête fixe et le padding vertical du conteneur. */
+	.stats-page {
+		display: flex;
+		flex-direction: column;
+		height: calc(100vh - var(--header-height) - 48px);
+	}
+
 	.chart-area {
 		background: var(--card);
 		border: 1px solid var(--border);
@@ -609,7 +620,8 @@
 		padding: 16px;
 		margin-bottom: 16px;
 		position: relative;
-		height: 550px;
+		flex: 1 1 auto;
+		min-height: 360px;
 	}
 	.chart-export {
 		position: absolute;
