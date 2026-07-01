@@ -71,9 +71,9 @@ La documentation d'initialisation cesse de renvoyer aux placeholders et explique
 
 ### Phase 3 — Seed sans placeholders
 
-- [ ] `interfaces/cli/dev/generate_seed.py` : credentials → NULL.
-- [ ] Régénérer `infrastructure/db/seed.sql`.
-- [ ] Docs : retirer la section placeholders / `UPDATE config` de `docs/exploitation/02-initialisation-base.md` ; documenter le skip des sources aux credentials NULL et le renseignement direct.
+- [x] `interfaces/cli/dev/generate_seed.py` : credentials → NULL.
+- [x] Régénérer `infrastructure/db/seed.sql`.
+- [x] Docs : retirer la section placeholders / `UPDATE config` de `docs/exploitation/02-initialisation-base.md` ; documenter le skip des sources aux credentials NULL et le renseignement direct.
 
 ### Phase 4 — Tests
 
