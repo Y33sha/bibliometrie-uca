@@ -119,7 +119,7 @@ Revue phase par phase, dans l'ordre du pipeline. Helper transverse : `scoped_log
 
 - [x] Pagination de la liste des runs : chargement incrémental (50 runs, bouton « charger les plus anciens » via `offset`, masqué en fin d'historique) ; colonne liste sticky à hauteur du viewport, défilement interne pendant que le détail défile avec la page.
 - [x] Statut pipeline en cours dynamique : le bandeau interroge `logs/status.json` en poll adaptatif (1 s tant qu'un run tourne — phase courante et avancement `phases_done`/`phases_total` à la seconde ; 10 s à l'arrêt). À la transition fin de run (fin naturelle, exception ou interruption — `status.json` nettoyé, statut vu `null`), la liste des runs et le détail sélectionné sont rechargés, le ruban fraîchement enregistré apparaissant sans rechargement de page.
-- [ ] Liens vers les logs par phase — mécanisme distinct de l'ancienne capture couplée au rapport, à concevoir.
+- [x] Log par phase au drill-down : un bouton « log » à droite de chaque ligne de phase déroule le log de la phase (au lieu de ses métriques). Le log est découpé à la lecture de `logs/pipeline.log` sur les marqueurs `Run pipeline #<id>` / `PHASE : <nom>` / `PIPELINE TERMINÉ` (`infrastructure/observability/phase_logs.py`), sans capture dédiée ni stockage en base ; endpoint `/api/admin/pipeline/runs/{run_id}/phases/{phase}/log`. Disponible quand `LOG_TO_FILE=true` ; sinon la vue signale le log indisponible. Le détail multi-source d'`extract` vit dans les fichiers par source (`hal.log`…), hors de ce périmètre. Les endpoints morts hérités des rapports markdown (`/reports`, `/reports/{filename}`, `/logs` sur `cron.log`) et leurs modèles sont retirés au passage.
 
 ## Questions ouvertes
 
