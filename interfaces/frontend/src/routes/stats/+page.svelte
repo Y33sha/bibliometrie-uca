@@ -7,7 +7,7 @@
 	import Pagination from '$lib/components/Pagination.svelte';
 	import FacetDropdown from '$lib/components/FacetDropdown.svelte';
 	import EntityFilter from '$lib/components/EntityFilter.svelte';
-	import { oaLabelsMap, docTypePlural, docTypeFamilies } from '$lib/labels';
+	import { oaLabelsMap, docTypePlural, docTypeFamilies, docTypeGroupedColors } from '$lib/labels';
 	import { useFacets } from '$lib/composables/useFacets.svelte';
 	import { useUrlFilters } from '$lib/composables/useUrlFilters.svelte';
 
@@ -107,6 +107,7 @@
 	function dimColor(dim: string, value: string, idx: number, cs: CSSStyleDeclaration): string {
 		if (dim === 'oa_voie') return cs.getPropertyValue('--' + value).trim() || PALETTE[idx % PALETTE.length];
 		if (dim === 'oa_access') return cs.getPropertyValue(OA_ACCESS_VAR[value] ?? '').trim() || PALETTE[idx % PALETTE.length];
+		if (dim === 'doc_type_grouped') return docTypeGroupedColors[value] ?? PALETTE[idx % PALETTE.length];
 		return PALETTE[idx % PALETTE.length];
 	}
 	function orderedValues(dim: string, rows: Record<string, unknown>[]): string[] {
