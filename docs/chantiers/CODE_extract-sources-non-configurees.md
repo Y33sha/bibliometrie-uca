@@ -83,9 +83,9 @@ DOI.org (résolution des Registration Agencies) et DOAJ sont des API publiques s
 
 ### Phase 4 — Cross-imports et refresh stale : gate harmonisé
 
-- [ ] `run_pipeline.py` : avant de tirer une requête, `phase_cross_imports` (cibles `fetch_missing_doi`) et `phase_refresh_stale` sautent une source dont `source_credentials_missing` renvoie un motif → signal `source_unconfigured`, poursuite.
-- [ ] Adapter ScanR `fetch_missing_doi` : ne plus avaler un 401 en résultat vide (le gate amont supprime le cas « sans credentials » ; une erreur d'authentification credentials présents redevient dure, comme pour WoS).
-- [ ] Tests : cible non configurée sautée, cibles configurées interrogées.
+- [x] `run_pipeline.py` : avant de tirer une requête, `phase_cross_imports` (cibles `fetch_missing_doi`) et `phase_refresh_stale` sautent une source dont `source_credentials_missing` renvoie un motif → signal `source_unconfigured`, poursuite.
+- [x] Adapter ScanR `fetch_missing_doi` : ne plus avaler un 401 en résultat vide (le gate amont supprime le cas « sans credentials » ; une erreur d'authentification credentials présents redevient dure, comme pour WoS).
+- [x] Tests : cible non configurée sautée, cibles configurées interrogées.
 
 ### Phase 5 — Enrichissements : email requis, gate harmonisé
 

@@ -125,6 +125,27 @@ def _signal_source_unconfigured(
     )
 
 
+def _configured_api_targets(targets: list[str], metrics: PhaseMetrics, *, phase: str) -> list[str]:
+    """Filtre les sources dont les credentials d'API manquent avant toute requête.
+
+    Chaque source non configurée est sautée avec un signal `source_unconfigured`
+    (même canal que l'extraction) ; seules les sources configurées sont retournées.
+    Ouvre une connexion courte pour consulter le détecteur central. Utilisé par les
+    phases qui interrogent une API par identifiant (cross-import, refresh stale)."""
+    from infrastructure.db.engine import get_sync_engine
+    from infrastructure.sources.config import source_credentials_missing
+
+    configured: list[str] = []
+    with get_sync_engine().connect() as conn:
+        for target in targets:
+            reason = source_credentials_missing(conn, target)
+            if reason:
+                _signal_source_unconfigured(metrics, target, reason, phase=phase)
+            else:
+                configured.append(target)
+    return configured
+
+
 def _extract_source_summary(source_metrics: PhaseMetrics, duration_s: float) -> dict[str, float]:
     """Récapitulatif par source pour la table de la phase `extract`."""
     return {
@@ -299,6 +320,7 @@ def phase_cross_imports(
     effective = (set(sources) if sources else set(targets)) & targets
 
     doi_targets = [t for t in DOI_SEARCHABLE_SOURCES if t in effective]
+    doi_targets = _configured_api_targets(doi_targets, metrics, phase="cross_imports")
     if doi_targets:
         # Cross-imports par DOI en parallèle (comme les extracteurs) : chaque
         # `_run_fetch_missing_doi` ouvre sa propre connexion, frappe une API
@@ -356,6 +378,7 @@ def phase_refresh_stale(sources: Any = None, include_wos: bool = False, **kw: An
         allowed -= {"wos"}
     effective = (set(sources) if sources else allowed) & allowed
     targets = [t for t in DOI_SEARCHABLE_SOURCES if t in effective]
+    targets = _configured_api_targets(targets, metrics, phase="refresh_stale")
     for target in targets:
         source_metrics, duration = _timed_metrics(partial(_run_refresh_stale_doi, target))
         metrics.merge(source_metrics)
