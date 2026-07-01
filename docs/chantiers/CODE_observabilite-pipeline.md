@@ -16,7 +16,7 @@ Besoin primaire : **savoir d'un coup d'œil si un run s'est bien passé**, phase
 
 **Pas de table de runs.** Un `run_id` (entier de séquence, généré au lancement) est une colonne de la table des exécutions de phase. Tout ce qui est « par run » est dérivable par agrégation (`début = min`, `fin = max`, mode et sources communs, statut global = le pire des statuts de phase) ; une table parente ne répèterait que du dérivable.
 
-**Statut et signaux.** `status = error` est décidé par l'orchestrateur lorsqu'une phase remonte une exception. Une interruption par l'utilisateur est un `status = warning` (action contrôlée — écourter un import n'est pas un échec), pas une erreur. `status = warning` et les signaux (source indisponible, arrêt après une série de 429, `CannotAttributeConflict` pendant `persons`…) sont aussi **remontés par la phase elle-même** : ils enrichissent sa valeur de retour, là où ils ne partent aujourd'hui qu'en log et sont perdus. C'est la part de plumbing la plus lourde du chantier, concentrée dans `extract` et `persons`.
+**Statut et motif.** `status = error` est décidé par l'orchestrateur lorsqu'une phase remonte une exception. Une interruption par l'utilisateur est un `status = warning` (action contrôlée — écourter un import n'est pas un échec), pas une erreur. Un `status = warning` est aussi **remonté par la phase elle-même** quand elle finit dégradée : un circuit-breaker source qui coupe après une série de 429/5xx attache un signal (le motif) à sa valeur de retour, là où l'événement ne partait qu'en log. La couleur du point porte l'alerte (ambre) ; le motif l'explicite en vue détaillée, sans colonne dédiée. Un fait de fonctionnement normal (une authorship dont l'identifiant est déjà porté par une autre personne, prévention de contamination pendant `persons`) n'est pas un motif : rien à signaler.
 
 ### Indicateurs sur-mesure par phase : affichés, non jugés
 
@@ -113,16 +113,15 @@ Revue phase par phase, dans l'ordre du pipeline. Helper transverse : `scoped_log
   - [x] `authorships` : résumé de la table de vérité — créées, orphelines supprimées, et total dans le périmètre (compté par la phase, `count_authorships_in_perimeter`, jusque-là seulement loggé). Les compteurs internes de convergence (liens posés, attributs recomposés) restent hors affichage.
   - [x] `countries` : résumé en entonnoir (mode `lines`) — total d'adresses, manque initial (sans pays, nombre et %), pays rattachés par le run, reste à résoudre dont la part portant une suggestion.
   - [x] `subjects` : la phase compte son référentiel avant/après (`count_subjects`) → sujets ajoutés (évolution nette : ingestion moins purge des orphelins), nouveau total du vocabulaire, et publications réingérées (mode `lines`). Le nombre de liens publication↔sujet, sans intérêt, n'est pas surfacé.
-- [ ] Émission des signaux dans les phases : le canal est en place (remontés via `PhaseMetrics.signals`, affichés en ambre) ; reste à détecter et remonter `extract` (source indisponible, série de 429) et `persons` (`CannotAttributeConflict`).
+- [x] Statut dégradé remonté par la phase : un trip de circuit-breaker source (série de 429/5xx) attache un signal `warning` à `PhaseMetrics` (`_signal_if_tripped`) → point ambre et motif au drill-down, câblé aux cinq points de fetch (`extract`, `resolve_ra`, `publishers_journals`, `cross_imports`, `refresh_stale`). La colonne « Signaux » du tableau, redondante avec la couleur du point, est retirée ; le motif s'affiche sous « Motif » en vue détaillée. `CannotAttributeConflict` écarté (fonctionnement normal, rien à signaler).
 
 ### 4. Peaufinage UI
 
-- [ ] Pagination de la liste des runs.
+- [x] Pagination de la liste des runs : chargement incrémental (50 runs, bouton « charger les plus anciens » via `offset`, masqué en fin d'historique) ; colonne liste sticky à hauteur du viewport, défilement interne pendant que le détail défile avec la page.
 - [ ] Statut pipeline en cours: possible qu'il soit dynamique?
 - [ ] Liens vers les logs par phase — mécanisme distinct de l'ancienne capture couplée au rapport, à concevoir.
 
 ## Questions ouvertes
 
 - **Indicateurs pertinents par phase** : le choix exact par phase est le cœur du chantier (section 3), affiné phase par phase à partir des cas réels. Pas de mécanisme uniforme : chaque phase ne surface que ce qui l'éclaire (compteurs, distributions, totaux de ses tables quand ils parlent).
-- **`CannotAttributeConflict` comme signal** : pendant `persons`, un identifiant d'une authorship rattachée à P déjà porté par Q (en pending ou confirmed) est un indice fort que P et Q sont la même personne. Aujourd'hui en warning perdu ; à capturer comme signal de la phase `persons`.
 - **Page admin et observabilité DSI** : si la DSI met en place sa propre stack (logs centralisés, Grafana) à la transmission, la page admin peut devenir secondaire — le JSON en base reste exploitable par tout outil externe.

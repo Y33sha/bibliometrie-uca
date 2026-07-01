@@ -4,27 +4,28 @@
 
 ### Code
 
-- Privilégier les solutions architecturalement propres même si elles impliquent plus de fichiers modifiés. Avant d'appliquer un fix local, toujours vérifier si le problème est structurel.
-- Si une modification touche plusieurs endroits dupliqués, signaler la duplication comme un problème à résoudre *avant* de modifier.
+- Privilégier les solutions **architecturalement propres** même si elles impliquent plus de fichiers modifiés. Avant d'appliquer un fix local, toujours vérifier si le problème est structurel.
+- **Don't Repeat Yourself.** Si une modification touche plusieurs endroits dupliqués, signaler la duplication comme un problème à résoudre *avant* de modifier.
 - Si des tests échouent ou si des problèmes sont détectés en passant, sans rapport avec le chantier en cours: au prochain commit, interrompre le chantier et traiter le problème. S'il est trop gros pour être traité en passant, le signaler comme chantier à planifier.
 
 ### Documentation, docstrings et commentaires
 
-- Toujours utiliser le présent intemporel: ne jamais supposer connu l'état antérieur du code. Bannir tout vocabulaire ancré temporellement (`nouveau`, `désormais`, `ne plus`...). Ne jamais renvoyer à des fichiers transitoires (todo, roadmaps).
-- Ecrire d'une manière qui reste intelligible en dehors du contexte des conversations; éviter le jargon interne au projet et les abréviations maison (`SP` pour source_publication, `pub` pour publication...). Les anglicismes sont permis s'ils sont usuels dans le domaine.
-- Au fil des réécritures, lorsqu'un point devient non pertinent, corriger en supprimant le point plutôt qu'en soulignant sa non-pertinence.
+- Utiliser le **présent intemporel**: ne jamais supposer connu l'état antérieur du code. Bannir tout vocabulaire ancré temporellement (`nouveau`, `désormais`, `ne plus`...). Ne jamais renvoyer à des fichiers transitoires (todo, roadmaps).
+- Ecrire d'une manière qui reste intelligible en dehors du contexte des conversations; **éviter le jargon** interne au projet et les abréviations maison (`SP` pour source_publication, `pub` pour publication...). Les anglicismes sont permis s'ils sont usuels dans le domaine.
+- Au fil des réécritures, lorsqu'un point devient non pertinent, **corriger en supprimant** le point plutôt qu'en soulignant sa non-pertinence.
 - Respecter l'accentuation du français.
 - Eviter les retours à la ligne non sémantiques (i.e. hors titres, listes et sauts de paragraphe).
 
 ### Savoir-vivre
 
-- En fin de message, proposer des pistes pour la suite ou attendre des instructions. Ne pas suggérer de s'arrêter là, de faire une pause ou demander si l'utilisatrice veut continuer.
-- Pour les décisions structurantes (impact sur le schéma de données ou la logique du pipeline), toujours attendre la décision de l'utilisatrice avant de commencer à coder.
-- Ne pas faire tourner la suite pytest plusieurs fois juste pour récupérer le résumé. Si c'est vert la première fois, c'est bon. Si tu veux le résumé, débrouille-toi pour le récupérer du premier coup, au lieu de tronquer l'output sans nécessité.
+- En fin de message, **proposer des pistes pour la suite** ou **attendre des instructions**. Ne pas suggérer de s'arrêter là, de faire une pause ou demander si l'utilisatrice veut continuer.
+- Pour les décisions structurantes (impact sur le schéma de données ou la logique du pipeline), toujours **attendre la décision** de l'utilisatrice avant de commencer à coder.
+- Vérifier avant d'affirmer.
 
 ### Workflow
 
 - Gérer les commits git. Faire un commit à chaque changement cohérent (au minimum une fois par phase de chantier, voire à chaque item d'une phase)
+- Ne pas faire tourner la suite pytest plusieurs fois juste pour récupérer le résumé. Si c'est vert la première fois, c'est bon. Si tu veux le résumé, débrouille-toi pour le récupérer du premier coup, au lieu de tronquer l'output sans nécessité.
 
 ## Phases du pipeline
 
