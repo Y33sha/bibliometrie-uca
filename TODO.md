@@ -13,8 +13,7 @@
 ## Suite du traitement
 * [ ] `publishers_journals`: paralléliser crossref/datacite
 * [ ] CLI `seed_journals_doi_prefix`: intégrer au pipeline?
-* [ ] vérifier qu'il ne manque pas des `ANALYZE` en cours de pipeline pour éviter un *seq scan* sur des millions de lignes lors d'un premier run depuis une base vide.
-* [ ] `persons`: voir si on peut généraliser le matching par identifiants forts aux authorships hors périmètre (à réserver aux identifiants `confirmed` / et/ou corroboration par nom?)
+* [ ] trouver moyen de fusionner les pièces d'un même dataset (garder le parent)
 * [ ] person_identifiers: les formes WOS et OpenAlex sont déjà inopérantes pour le matching; voir si je continue de les moissonner ou pas.
 
 # Données
@@ -22,12 +21,10 @@
 * [ ] DUMAS: comment distinguer mémoires et thèses d'exercice?
 ## Corrections
 * [ ] détection d'incohérences `doi_prefix`/`publisher_id`/`journal_id`: auditer d'abord, classifier les cas de divergence selon leur cause
-* [ ] créer circuit pour correction automatisée du `journal_type` (titre terminé par ` eBooks` => plateforme d'ebooks)
-* [ ] recensions: "Comptes rendus :", "Compte rendu :"; type = article + titre contient "(dir.)"
+* [ ] créer circuit pour correction automatisée du `journal_type` (titre terminé par ` eBooks` => plateforme d'ebooks; titre contenant `International Conference` ou `International Symposium` => proceedings)
 * [ ] typage data_paper automatisé par journal (ex. *Scientific Data*; créer un journal_type dédié?); chercher aussi "dataset" dans les titres
 * [ ] règle à créer: si DOI de forme ISBN + _n => conference_paper ou chapitre / si forme ISBN: proceedings ou book (trancher selon type du "journal")
-* [ ] 107270 et 869915 Computing Pivot-Minors: un article faussement typé preprint par openalex; + question des arxiv_id (déduire le DOI et vice-versa)
-* [ ] noms de containers OpenAlex aberrants ("SPIRE - Sciences Po Institutional REpository") => faire quelque chose; de manière générale il faut interroger la pertinence du champ container relativement au journal_id
+* [ ] noms de containers OpenAlex aberrants ("SPIRE - Sciences Po Institutional REpository") => faire quelque chose; de manière générale il faut interroger la valeur ajoutée du champ `container` par rapport au `journal_id`: trouver comment exploiter la colonne, sinon supprimer.
 * [ ] doc_types souvent suspects, à investiguer: "preprint", "autre" (voir aussi si le type "article" peut être affiné selon des critères objectifs)
 ## Explorer autres sources possibles
 * [ ] Dimensions?; ArXiv, PMC, Pubmed; Sudoc? (liens personnes-thèses plus complets que theses.fr, j'ai l'impression); Cairn, Persée pour augmenter couverture SHS?
@@ -49,19 +46,16 @@
 * [ ] page structures: facette par tutelle, par institut (intégrer les instituts)
 ## Page statistiques:
 * [ ] Conserver l'échelle entre pages sur les graphiques paginés (ou option d'augmenter ponctuellement le max?)
-* [ ] Option pour choisir l'ordre
 * [ ] Collab internationales: affichage carte?
 * [ ] Montants APC (à envisager une fois que les problèmes de données seront résolus)
-* [ ] codes couleurs (types de documents): fixer le mapping type-couleur
-* [ ] adapter la hauteur au viewport
 
 # Cas particuliers, bizarreries à élucider
 * [ ] 164107: pourquoi type autre?
 * [ ] 165068 type "commmentary"; 86931 type "meeting report" => comment prendre en compte ces types (et empêcher openalex d'imposer le type article); réfléchir au type "report"
 * [ ] 30172 un recueil de proceedings fusionné avec tous ses chapitres
 * [ ] 182637 et 182636: vérifier si DataCite indique relation
-* [ ] ignorer pièces d'un dataset? (le parent suffit)
 * [ ] 133990: NNT non dédupliqué?!
+* [ ] 107270 et 869915 Computing Pivot-Minors: un article faussement typé preprint par openalex; + question des arxiv_id (déduire le DOI et vice-versa)
 
 # Idées pour plus tard, éventuellement
 * projets ANR, projets européens
