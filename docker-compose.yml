@@ -49,9 +49,17 @@ services:
     working_dir: /repo/interfaces/frontend
     # Monte tout le repo (pas seulement le frontend) : la route /docs lit les
     # markdown de `docs/` via un glob Vite remontant à la racine du repo.
+    #
+    # Le conteneur tourne en root et écrirait ses dossiers générés sur le
+    # disque hôte en root (via le bind mount `.:/repo`). Les volumes anonymes
+    # ci-dessous gardent ces dossiers (`node_modules` du conteneur, sorties
+    # SvelteKit) à l'intérieur du conteneur, hors du bind mount, pour ne pas
+    # polluer l'arbre hôte avec des fichiers root.
     volumes:
       - .:/repo
-      - /repo/interfaces/frontend/node_modules   # garde les node_modules du conteneur
+      - /repo/interfaces/frontend/node_modules
+      - /repo/interfaces/frontend/.svelte-kit
+      - /repo/interfaces/frontend/build
     ports:
       - "5176:5173"
     environment:
