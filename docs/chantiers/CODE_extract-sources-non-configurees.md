@@ -22,6 +22,12 @@ La politique de skip appartient à l'**orchestrateur** (`run_pipeline.py`), pas 
 Seule l'**absence de configuration** (`ExtractionConfigError`) est skipée.
 Les erreurs réseau/HTTP (DNS, 401, 5xx) restent des échecs durs et bruyants : un credential absent est un fait de configuration, une panne réseau n'en est pas un.
 
+### Signalement d'une source sautée
+
+Une source sautée remonte par le **canal des signaux** de `PhaseMetrics` (celui qu'emprunte déjà le circuit-breaker via `_signal_if_tripped`), pas par une représentation ad hoc : l'`except ExtractionConfigError` de `phase_extract` attache à la `PhaseMetrics` de la phase un `Signal` de niveau `warning` (`code = "source_unconfigured"`, message « <source> non configurée — sautée »). Le point de la phase passe en **ambre** et le motif s'affiche au drill-down.
+Warning et non erreur : le rouge est réservé à une phase interrompue par une exception (le run s'arrête là), et « source indisponible » relève de l'ambre dans la légende du ruban. Une source sautée n'interrompt pas le run — la phase se termine avec les sources configurées. La dérivation `status = warning if signals else ok` fait passer la phase en ambre sans logique de statut supplémentaire.
+La table par source ne liste que les sources ayant tourné : une source sautée n'y produit aucune ligne, ce qui la distingue d'une source à zéro résultat (ligne de table à zéros).
+
 ### Configuration requise par source
 
 | Source | Requis pour extraire | Lève déjà `ExtractionConfigError` | À ajouter |
@@ -61,7 +67,7 @@ La documentation d'initialisation cesse de renvoyer aux placeholders et explique
 ### Phase B — Skip propre dans l'orchestrateur
 
 - [ ] `run_pipeline.py` : importer `ExtractionConfigError` ; rattraper autour de `future.result()` (branche parallèle) et de l'appel HAL (mode daily) → avertissement + source « non configurée » + poursuite.
-- [ ] Représentation « non configurée » dans le récap de phase (`metrics.details["table"]`), distincte d'une source à zéro résultat.
+- [ ] Signal `warning` (`code = "source_unconfigured"`) attaché à la `PhaseMetrics` de `extract` pour chaque source sautée, dans l'`except ExtractionConfigError` de `phase_extract` → point ambre + motif au drill-down. La table par source ne liste que les sources ayant tourné.
 
 ### Phase C — Seed sans placeholders
 
@@ -73,7 +79,3 @@ La documentation d'initialisation cesse de renvoyer aux placeholders et explique
 
 - [ ] Test de non-régression : run `extract` avec des sources non configurées → celles-ci skipées, les configurées aboutissent.
 - [ ] Test par source du contrat de configuration (OpenAlex tolérant clé ou email ; WoS et ScanR credentials requis ; HAL collections requises).
-
-## Questions ouvertes
-
-- Représentation exacte de « non configurée » dans le récap de phase (colonne statut de la table par source, ou ligne dédiée) — à trancher à l'implémentation, en cohérence avec le chantier [Observabilité du pipeline](CODE_observabilite-pipeline.md).

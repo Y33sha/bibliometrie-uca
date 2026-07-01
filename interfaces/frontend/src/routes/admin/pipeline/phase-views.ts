@@ -246,7 +246,7 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
   subjects: {
     lines: [
       "{subjects_added} sujets ajoutés (nouveau total : {subjects_total})",
-      "{publications_updated} publications réingérées",
+      "{publications_updated} publications mises à jour",
     ],
   },
   oa_status: {

@@ -2,9 +2,9 @@
 ## Extraction
 * [ ] refetch_stale: utiliser les identifiants natifs de chaque source, pas DOI
 * [ ] stocker l'année requêtée dans une colonne du staging pour pouvoir coupler la phase `refresh_stale` à l'année de départ du run en cours
-* nommage incohérent: fetch_missing_hal_id cherche nnt
+* [ ] nommage incohérent: fetch_missing_hal_id cherche nnt
 ### Couverture
-* [ ] extraction par ORCID: vérifier pertinence (tester différentes sources, auditer le gain)
+* [ ] ajouter extraction par ORCID: vérifier pertinence (tester différentes sources, auditer le gain)
 * [ ] bioRxiv, medRxiv: identifiants différents de arxiv? cf publi 2757 (voir si on moissonne ces identifiants; possibilité de récupérer les DOI à partir des identifiants comme dans ArXiv)
 * [ ] chercher dans ScanR par hal-id? (généraliser cross-import à tous les identifiants et toutes les sources)
 ### Performance
@@ -64,6 +64,7 @@
 * [ ] 133990: NNT non dédupliqué?!
 
 # Idées pour plus tard, éventuellement
+* projets ANR, projets européens
 * stats en compte fractionnaire vs compte entier
 * collaborations nationales et internationales: identification des structures partenaires; évolution des collaborations dans le temps (graphes de collaboration par labo, avec visualisation animée par année)
 * citation count
