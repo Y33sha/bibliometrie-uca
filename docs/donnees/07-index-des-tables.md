@@ -8,8 +8,6 @@ Cette page donne deux entrées dans le schéma : une **vue macro** (les tables p
 
 Vue globale du schéma : l'ingestion par source en haut, les référentiels canoniques au centre, et les satellites rattachés à leur entité-pivot. Sont omis ici : la curation (`distinct_*`, `rejected_authorships`), les caches et référentiels statiques (`doi_prefixes`, `doi_lookups`, `countries`, `place_name_forms`) et les tables techniques — tous présents dans l'index ci-dessous.
 
-`authorships` est la clé de voûte : elle relie les trois entités canoniques — `publications` et `persons` par lien direct, `structures` via la vue matérialisée `authorship_structures` (trait pointillé). Les référentiels `journals` et `publishers` sont partagés en amont : les `source_publications` les portent dès la normalisation (ils sont enrichis avant le rattachement des publications), et les `publications` canoniques les portent à leur tour.
-
 ```mermaid
 flowchart TB
     subgraph ingestion["Ingestion — tables sources (par source)"]
