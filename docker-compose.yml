@@ -52,14 +52,16 @@ services:
     #
     # Le conteneur tourne en root et écrirait ses dossiers générés sur le
     # disque hôte en root (via le bind mount `.:/repo`). Les volumes anonymes
-    # ci-dessous gardent ces dossiers (`node_modules` du conteneur, sorties
-    # SvelteKit) à l'intérieur du conteneur, hors du bind mount, pour ne pas
-    # polluer l'arbre hôte avec des fichiers root.
+    # ci-dessous gardent ces dossiers générés (dépendances installées, sorties
+    # de build, assets recopiés par les scripts `predev`/`prebuild`) à
+    # l'intérieur du conteneur, hors du bind mount, pour ne pas polluer l'arbre
+    # hôte avec des fichiers root.
     volumes:
       - .:/repo
       - /repo/interfaces/frontend/node_modules
       - /repo/interfaces/frontend/.svelte-kit
       - /repo/interfaces/frontend/build
+      - /repo/interfaces/frontend/static/docs-screenshots
     ports:
       - "5176:5173"
     environment:
