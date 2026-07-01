@@ -26,7 +26,7 @@ Les extracteurs du pipeline sont le point d'entrée des données dans le systèm
 
 La curation forme une **boucle fermée** : les corrections saisies via l'API — données de référence (structures, périmètre, configuration) et décisions de séparation (*cannot-link* entre personnes ou entre publications) — deviennent des **entrées** que le pipeline relit et **préserve** à chaque passe. Ses traitements étant idempotents, une re-dérivation n'écrase jamais une décision humaine.
 
-Il en découle une frontière de **propriété des données**, transverse aux couches : certaines tables sont dérivées par le pipeline (recalculables, l'API ne fait que les lire), d'autres sont saisies par l'humain (l'API les écrit, le pipeline les respecte sans jamais les écraser). Cette frontière conditionne toute reprise du système et se décline table par table dans [le modèle de données](../donnees/).
+Il en découle une frontière de **propriété des données**, transverse aux couches : certaines tables sont dérivées par le pipeline (recalculables, l'API ne fait que les lire), d'autres sont saisies par l'humain (l'API les écrit, le pipeline les respecte sans jamais les écraser). Cette frontière conditionne toute reprise du système et se décline table par table dans [le modèle de données](../donnees/01-vue-d-ensemble.md).
 
 ## Vue par couches
 
