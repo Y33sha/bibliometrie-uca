@@ -66,8 +66,8 @@ La documentation d'initialisation cesse de renvoyer aux placeholders et explique
 
 ### Phase 2 — Skip propre dans l'orchestrateur
 
-- [ ] `run_pipeline.py` : importer `ExtractionConfigError` ; rattraper autour de `future.result()` (branche parallèle) et de l'appel HAL (mode daily) → avertissement + source « non configurée » + poursuite.
-- [ ] Signal `warning` (`code = "source_unconfigured"`) attaché à la `PhaseMetrics` de `extract` pour chaque source sautée, dans l'`except ExtractionConfigError` de `phase_extract` → point ambre + motif au drill-down. La table par source ne liste que les sources ayant tourné.
+- [x] `run_pipeline.py` : importer `ExtractionConfigError` ; rattraper autour de `future.result()` (branche parallèle) et de l'appel HAL (mode daily) → avertissement + source « non configurée » + poursuite.
+- [x] Signal `warning` (`code = "source_unconfigured"`) attaché à la `PhaseMetrics` de `extract` pour chaque source sautée, dans l'`except ExtractionConfigError` de `phase_extract` → point ambre + motif au drill-down. La table par source ne liste que les sources ayant tourné.
 
 ### Phase 3 — Seed sans placeholders
 

@@ -105,6 +105,64 @@ def _timed_metrics(fn: Callable[[], PhaseMetrics]) -> tuple[PhaseMetrics, float]
     return result, time.time() - started
 
 
+def _signal_source_unconfigured(metrics: PhaseMetrics, source: str, exc: Exception) -> None:
+    """Marque une source d'extraction non configurée comme sautée (avertissement).
+
+    Une source dont la configuration d'extraction est absente (identifiants de
+    structure ou credentials manquants) n'interrompt pas le run : la phase se
+    termine avec les sources configurées, son point passe en ambre et le motif
+    s'affiche au drill-down. Même canal de signaux que le circuit-breaker."""
+    log.warning("extract : source %s non configurée — sautée (%s)", source, exc)
+    metrics.signals.append(
+        {
+            "level": "warning",
+            "code": "source_unconfigured",
+            "message": f"{source} non configurée — sautée",
+        }
+    )
+
+
+def _extract_source_summary(source_metrics: PhaseMetrics, duration_s: float) -> dict[str, float]:
+    """Récapitulatif par source pour la table de la phase `extract`."""
+    return {
+        "found": source_metrics.total,
+        "new": source_metrics.new,
+        "updated": source_metrics.updated,
+        "unchanged": source_metrics.unchanged,
+        "errors": source_metrics.errors,
+        "duration_s": round(duration_s, 1),
+    }
+
+
+def _run_parallel_extractors(
+    tasks: list[tuple[str, Callable[[], PhaseMetrics]]], metrics: PhaseMetrics
+) -> dict[str, dict[str, float]]:
+    """Exécute les extracteurs en parallèle et agrège leurs métriques.
+
+    Chaque `_run_extract_*` ouvre sa propre connexion DB et écrit dans des tables
+    `staging.*` distinctes : aucun état partagé, parallélisme thread-safe. La merge
+    des `PhaseMetrics` reste séquentielle (non thread-safe) dans le thread principal.
+    Une source non configurée (`ExtractionConfigError`) est sautée avec un
+    avertissement, les autres aboutissent. Retourne le récap par source ; une source
+    sautée n'y produit aucune ligne (distincte d'une source à zéro résultat)."""
+    from application.pipeline.extract.base import ExtractionConfigError
+
+    by_source: dict[str, dict[str, float]] = {}
+    log.info("▶ extracteurs en parallèle (%d) : %s", len(tasks), ", ".join(n for n, _ in tasks))
+    with ThreadPoolExecutor(max_workers=len(tasks)) as pool:
+        futures = {pool.submit(_timed_metrics, fn): name for name, fn in tasks}
+        for future in as_completed(futures):
+            source = futures[future]
+            try:
+                source_metrics, duration = future.result()
+            except ExtractionConfigError as exc:
+                _signal_source_unconfigured(metrics, source, exc)
+                continue
+            metrics.merge(source_metrics)
+            by_source[source] = _extract_source_summary(source_metrics, duration)
+    return by_source
+
+
 def phase_extract(
     mode: Any = "full",
     sources: Any = None,
@@ -125,21 +183,13 @@ def phase_extract(
     doit voir aussi les works ramenés par cross_imports et refresh_stale avant
     que normalize ne les consomme.
     """
+    from application.pipeline.extract.base import ExtractionConfigError
+
     policy = MODES[mode]
     allowed = set(policy.extract_sources) | ({"wos"} if include_wos else set())
     effective = (set(sources) if sources else allowed) & allowed
     metrics = PhaseMetrics()
     by_source: dict[str, dict[str, float]] = {}
-
-    def _summary(source_metrics: PhaseMetrics, duration_s: float) -> dict[str, float]:
-        return {
-            "found": source_metrics.total,
-            "new": source_metrics.new,
-            "updated": source_metrics.updated,
-            "unchanged": source_metrics.unchanged,
-            "errors": source_metrics.errors,
-            "duration_s": round(duration_s, 1),
-        }
 
     if policy.year_selection == "since_last":
         # HAL uniquement, depuis la dernière extraction HAL réussie (à 00:00). On se
@@ -157,9 +207,13 @@ def phase_extract(
             since = (datetime.date.today() - datetime.timedelta(days=30)).isoformat()
             log.info("Mode quotidien : HAL depuis %s (fallback, aucune extraction HAL)", since)
         if "hal" in effective:
-            hal_metrics, hal_duration = _timed_metrics(partial(_run_extract_hal, since=since))
-            metrics.merge(hal_metrics)
-            by_source["hal"] = _summary(hal_metrics, hal_duration)
+            try:
+                hal_metrics, hal_duration = _timed_metrics(partial(_run_extract_hal, since=since))
+            except ExtractionConfigError as exc:
+                _signal_source_unconfigured(metrics, "hal", exc)
+            else:
+                metrics.merge(hal_metrics)
+                by_source["hal"] = _extract_source_summary(hal_metrics, hal_duration)
     else:
         tasks: list[tuple[str, Callable[[], PhaseMetrics]]] = []
         if "openalex" in effective:
@@ -175,20 +229,7 @@ def phase_extract(
         if "theses" in effective:
             tasks.append(("theses", partial(_run_extract_theses, year=year)))
         if tasks:
-            # Les helpers `_run_extract_*` ouvrent chacun leur propre connexion DB
-            # et écrivent dans des tables `staging.*` distinctes : aucun état
-            # partagé, parallélisme thread-safe. La merge des PhaseMetrics est
-            # effectuée séquentiellement dans le thread principal (PhaseMetrics
-            # n'est pas thread-safe).
-            log.info(
-                "▶ extracteurs en parallèle (%d) : %s", len(tasks), ", ".join(n for n, _ in tasks)
-            )
-            with ThreadPoolExecutor(max_workers=len(tasks)) as pool:
-                futures = {pool.submit(_timed_metrics, fn): name for name, fn in tasks}
-                for future in as_completed(futures):
-                    source_metrics, duration = future.result()
-                    metrics.merge(source_metrics)
-                    by_source[futures[future]] = _summary(source_metrics, duration)
+            by_source = _run_parallel_extractors(tasks, metrics)
 
     if by_source:
         metrics.details["table"] = {
