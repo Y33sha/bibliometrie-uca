@@ -118,7 +118,7 @@ Revue phase par phase, dans l'ordre du pipeline. Helper transverse : `scoped_log
 ### 4. Peaufinage UI
 
 - [x] Pagination de la liste des runs : chargement incrémental (50 runs, bouton « charger les plus anciens » via `offset`, masqué en fin d'historique) ; colonne liste sticky à hauteur du viewport, défilement interne pendant que le détail défile avec la page.
-- [ ] Statut pipeline en cours: possible qu'il soit dynamique?
+- [x] Statut pipeline en cours dynamique : le bandeau interroge `logs/status.json` en poll adaptatif (1 s tant qu'un run tourne — phase courante et avancement `phases_done`/`phases_total` à la seconde ; 10 s à l'arrêt). À la transition fin de run (fin naturelle, exception ou interruption — `status.json` nettoyé, statut vu `null`), la liste des runs et le détail sélectionné sont rechargés, le ruban fraîchement enregistré apparaissant sans rechargement de page.
 - [ ] Liens vers les logs par phase — mécanisme distinct de l'ancienne capture couplée au rapport, à concevoir.
 
 ## Questions ouvertes

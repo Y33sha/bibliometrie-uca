@@ -10,9 +10,14 @@
   type RunDetailT = components["schemas"]["RunDetail"];
 
   let pipelineStatus = $state<PipelineStatus | null>(null);
-  let statusInterval: ReturnType<typeof setInterval> | null = null;
+  let statusTimer: ReturnType<typeof setTimeout> | null = null;
+  let wasRunning = false;
 
   const PAGE_SIZE = 50;
+  // Cadence de suivi : serrée tant qu'un run tourne (phase courante et
+  // avancement à la seconde), relâchée à l'arrêt (rien à observer).
+  const STATUS_POLL_RUNNING_MS = 1000;
+  const STATUS_POLL_IDLE_MS = 10000;
 
   let allPhases = $state<string[]>([]);
   let runs = $state<RunSummary[]>([]);
@@ -28,6 +33,22 @@
     } catch {
       pipelineStatus = null;
     }
+    const running = pipelineStatus?.running ?? false;
+    // Transition fin de run (naturelle, exception ou interruption) : le ruban
+    // fraîchement enregistré n'apparaît qu'au rechargement de la liste.
+    if (wasRunning && !running) {
+      await loadRuns();
+      if (selectedRunId !== null) await selectRun(selectedRunId);
+    }
+    wasRunning = running;
+  }
+
+  function scheduleStatus() {
+    const delay = pipelineStatus?.running ? STATUS_POLL_RUNNING_MS : STATUS_POLL_IDLE_MS;
+    statusTimer = setTimeout(async () => {
+      await pollStatus();
+      scheduleStatus();
+    }, delay);
   }
 
   async function loadRuns() {
@@ -71,14 +92,14 @@
   }
 
   onMount(async () => {
-    pollStatus();
-    statusInterval = setInterval(pollStatus, 10000);
+    await pollStatus();
+    scheduleStatus();
     allPhases = await api<string[]>("/api/admin/pipeline/phases");
     await loadRuns();
   });
 
   onDestroy(() => {
-    if (statusInterval) clearInterval(statusInterval);
+    if (statusTimer) clearTimeout(statusTimer);
   });
 </script>
 
