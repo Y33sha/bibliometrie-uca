@@ -80,9 +80,11 @@ class PgScanrExtractAdapter(ScanrExtractAdapter):
 
     def load_config(self, conn: Connection) -> ScanrExtractConfig:
         affiliation_ids = get_extraction_api_ids(conn, "scanr")
+        user, password = self._auth
         return ScanrExtractConfig(
             base_url=self._url,
             affiliation_ids=affiliation_ids,
+            has_credentials=bool(user and password),
         )
 
     def get_years(self, conn: Connection, *, start_year: int | None = None) -> list[int]:

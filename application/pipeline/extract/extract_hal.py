@@ -20,7 +20,12 @@ from collections.abc import Callable
 
 from sqlalchemy import Connection
 
-from application.pipeline.extract.base import ExtractLogger, SourceExtractor, scoped_logger
+from application.pipeline.extract.base import (
+    ExtractionConfigError,
+    ExtractLogger,
+    SourceExtractor,
+    scoped_logger,
+)
 from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.extract.hal import HalExtractAdapter, HalExtractConfig
 
@@ -155,7 +160,13 @@ class HalExtractor(SourceExtractor[HalExtractConfig]):
         )
 
     def load_config(self, conn: Connection) -> HalExtractConfig:
-        return self._adapter.load_config(conn)
+        config = self._adapter.load_config(conn)
+        if not config.all_collections:
+            raise ExtractionConfigError(
+                "aucune collection HAL configurée "
+                "(aucune structure du périmètre d'extraction n'a de hal_collection)"
+            )
+        return config
 
     def setup_logging(self, args: argparse.Namespace, config: HalExtractConfig) -> None:
         if args.since:

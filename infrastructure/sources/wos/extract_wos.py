@@ -37,6 +37,7 @@ class PgWosExtractAdapter(WosExtractAdapter):
 
     def __init__(self, base_url: str, api_key: str) -> None:
         self._url = base_url
+        self._api_key = api_key
         self._headers = {"X-ApiKey": api_key, "Accept": "application/json"}
         self._last_request_at: float | None = None
 
@@ -74,6 +75,7 @@ class PgWosExtractAdapter(WosExtractAdapter):
         return WosExtractConfig(
             base_url=self._url,
             affiliations=affiliations,
+            has_api_key=bool(self._api_key),
         )
 
     def get_years(self, conn: Connection, *, start_year: int | None = None) -> list[int]:

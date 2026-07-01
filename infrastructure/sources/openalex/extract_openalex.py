@@ -24,7 +24,7 @@ from infrastructure.sources.common import upsert_staging
 from infrastructure.sources.config import (
     get_extraction_api_ids,
     get_openalex_api_key,
-    get_polite_pool_email,
+    get_polite_pool_email_optional,
     get_years,
 )
 from infrastructure.sources.http_retry import http_request_with_retry
@@ -93,10 +93,14 @@ class PgOpenalexExtractAdapter(OpenalexExtractAdapter):
 
     def load_config(self, conn: Connection) -> OpenalexExtractConfig:
         institution_ids = get_extraction_api_ids(conn, "openalex")
-        init_auth(api_key=get_openalex_api_key(conn), email=get_polite_pool_email(conn))
+        api_key = get_openalex_api_key(conn)
+        email = get_polite_pool_email_optional(conn)
+        init_auth(api_key=api_key, email=email or "")
         return OpenalexExtractConfig(
             base_url=self._url,
             institution_ids=institution_ids,
+            has_api_key=bool(api_key),
+            has_polite_email=bool(email),
         )
 
     def get_years(self, conn: Connection, *, start_year: int | None = None) -> list[int]:
