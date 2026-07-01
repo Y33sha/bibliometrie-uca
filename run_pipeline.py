@@ -539,11 +539,21 @@ def phase_publishers_journals(**kw: Any) -> PhaseMetrics:
     nouveaux DOIs via `fetch_missing_hal_id`, (b) `normalize` crée les
     `publishers`/`journals` qu'on veut enrichir.
     """
-    publishers = _run_resolve_publishers()
-    openalex = _run_enrich_journals_from_openalex()
+    metrics = PhaseMetrics()
+
+    # resolve_publishers interroge Crossref et DataCite (email polite pool requis) ;
+    # enrich_journals_from_openalex interroge OpenAlex (clé ou email). Chaque accès
+    # non configuré est sauté ; DOAJ (dump public) tourne toujours.
+    publishers = PhaseMetrics()
+    if _configured_api_targets(["crossref", "datacite"], metrics, phase="publishers_journals"):
+        publishers = _run_resolve_publishers()
+
+    openalex = PhaseMetrics()
+    if _configured_api_targets(["openalex"], metrics, phase="publishers_journals"):
+        openalex = _run_enrich_journals_from_openalex()
+
     doaj = _run_enrich_journals_from_doaj()
 
-    metrics = PhaseMetrics()
     metrics.details["table"] = {
         "rows": [
             {
@@ -591,7 +601,7 @@ def _run_resolve_ra() -> PhaseMetrics:
         reset_current_breaker,
         set_current_breaker,
     )
-    from infrastructure.sources.config import get_polite_pool_email
+    from infrastructure.sources.config import get_polite_pool_email_optional
     from infrastructure.sources.doi_prefixes.clients import build_user_agent, resolve_ra
 
     log.info("▶ resolve_ra")
@@ -602,7 +612,9 @@ def _run_resolve_ra() -> PhaseMetrics:
     breaker = SourceCircuitBreaker("doi.org/ra")
     token = set_current_breaker(breaker)
     try:
-        user_agent = build_user_agent(get_polite_pool_email(conn))
+        # doi.org/ra est une API publique (aucun credential) : l'email polite pool
+        # est facultatif, on ne saute pas la résolution s'il manque.
+        user_agent = build_user_agent(get_polite_pool_email_optional(conn) or "")
         metrics = run_resolve_ra(
             log,
             repo=doi_prefix_repository(conn),
@@ -629,7 +641,7 @@ def _run_resolve_publishers() -> PhaseMetrics:
         reset_current_breaker,
         set_current_breaker,
     )
-    from infrastructure.sources.config import get_polite_pool_email
+    from infrastructure.sources.config import get_polite_pool_email_optional
     from infrastructure.sources.doi_prefixes.clients import (
         build_user_agent,
         fetch_crossref_prefix,
@@ -642,7 +654,7 @@ def _run_resolve_publishers() -> PhaseMetrics:
     breaker = SourceCircuitBreaker("crossref/datacite prefixes")
     token = set_current_breaker(breaker)
     try:
-        user_agent = build_user_agent(get_polite_pool_email(conn))
+        user_agent = build_user_agent(get_polite_pool_email_optional(conn) or "")
         metrics = run_resolve_publishers(
             log,
             repo=doi_prefix_repository(conn),
@@ -1384,7 +1396,7 @@ def _run_enrich_oa_status() -> PhaseMetrics:
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.queries.pipeline.enrich import PgEnrichQueries
     from infrastructure.repositories import publication_repository
-    from infrastructure.sources.config import get_api_base_urls, get_polite_pool_email
+    from infrastructure.sources.config import get_api_base_urls, get_polite_pool_email_optional
     from infrastructure.sources.unpaywall import fetch_oa_status
 
     log.info("▶ enrich_oa_status")
@@ -1392,7 +1404,7 @@ def _run_enrich_oa_status() -> PhaseMetrics:
     conn = get_sync_engine().connect()
     try:
         base_url = get_api_base_urls()["unpaywall"]
-        email = get_polite_pool_email(conn)
+        email = get_polite_pool_email_optional(conn) or ""
 
         async def fetcher(client: httpx.AsyncClient, doi: str) -> str | None:
             return await fetch_oa_status(client, doi, base_url=base_url, email=email, logger=log)
@@ -1423,7 +1435,7 @@ def _run_enrich_journals_from_openalex() -> PhaseMetrics:
     from infrastructure.sources.config import (
         get_api_base_urls,
         get_openalex_api_key,
-        get_polite_pool_email,
+        get_polite_pool_email_optional,
     )
 
     log.info("▶ enrich_journals_from_openalex")
@@ -1436,7 +1448,7 @@ def _run_enrich_journals_from_openalex() -> PhaseMetrics:
             log,
             journal_repo=journal_repository(conn),
             api_key=get_openalex_api_key(conn),
-            mailto=get_polite_pool_email(conn),
+            mailto=get_polite_pool_email_optional(conn) or "",
             openalex_sources_api=get_api_base_urls()["openalex_sources"],
             rate_delay=DOAJ_DELAY,
         )
@@ -1459,7 +1471,7 @@ def _run_enrich_journals_from_doaj() -> PhaseMetrics:
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.queries.pipeline.enrich import PgEnrichQueries
     from infrastructure.repositories import journal_repository
-    from infrastructure.sources.config import get_polite_pool_email
+    from infrastructure.sources.config import get_polite_pool_email_optional
     from infrastructure.sources.doaj import (
         build_doaj_user_agent,
         fetch_doaj_dump,
@@ -1482,7 +1494,8 @@ def _run_enrich_journals_from_doaj() -> PhaseMetrics:
             return PhaseMetrics(extras={"skipped": 1})
 
         _DOAJ_DUMP_PATH.parent.mkdir(parents=True, exist_ok=True)
-        user_agent = build_doaj_user_agent(get_polite_pool_email(conn))
+        # DOAJ : dump CSV public (aucun credential) ; l'email polite pool est facultatif.
+        user_agent = build_doaj_user_agent(get_polite_pool_email_optional(conn) or "")
         fetch_doaj_dump(str(_DOAJ_DUMP_PATH), user_agent=user_agent, logger=log)
         stats = run_import_doaj_dump(
             conn,
@@ -1988,8 +2001,13 @@ def phase_oa_status(**kw: Any) -> PhaseMetrics:
 
     Incrémentale et auto-bornée (staleness + cap `MAX_PER_RUN`) : le backlog des
     jamais-vérifiées s'écoule run après run. Tourne dans tous les modes.
+
+    Unpaywall exige l'email polite pool : sans lui, la phase est sautée proprement.
     """
-    return _run_enrich_oa_status()
+    metrics = PhaseMetrics()
+    if _configured_api_targets(["unpaywall"], metrics, phase="oa_status"):
+        metrics.merge(_run_enrich_oa_status())
+    return metrics
 
 
 # Registre des phases : l'implémentation de chacune. L'ordre d'exécution vient du
