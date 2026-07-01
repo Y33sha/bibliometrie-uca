@@ -163,9 +163,9 @@ assert all(
     for roles, _ in mapping.values()
     for role in roles
 ), "un mapping source produit un rôle hors de AUTHORSHIP_ROLES"
-assert all(
-    role in AUTHORSHIP_ROLES for roles in THESES_FIELD_ROLES.values() for role in roles
-), "THESES_FIELD_ROLES produit un rôle hors de AUTHORSHIP_ROLES"
+assert all(role in AUTHORSHIP_ROLES for roles in THESES_FIELD_ROLES.values() for role in roles), (
+    "THESES_FIELD_ROLES produit un rôle hors de AUTHORSHIP_ROLES"
+)
 
 
 # ═══════════════════════════════════════════════════════════════════
