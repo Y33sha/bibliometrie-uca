@@ -358,6 +358,10 @@
     }
     .site-nav.open {
       display: flex;
+      /* Sur écran court, le menu déplié peut dépasser le bas du viewport :
+         on borne sa hauteur et on le rend défilable pour atteindre le bas. */
+      max-height: calc(100vh - var(--header-height));
+      overflow-y: auto;
     }
     .nav-link {
       height: auto;
