@@ -18,8 +18,6 @@ Le pipeline n'interroge CrossRef que pour les DOI déjà découverts par les aut
 
 **Prefixes API** (`https://api.crossref.org/prefixes/{prefix}`) — identification du Crossref Member (= éditeur déposant) associé à un préfixe DOI. Consommée par le sub-step `resolve_publishers` de la phase [`publishers_journals`](../pipeline/05-publishers-journals.md), qui complète la table `doi_prefixes` (préfixe → `crossref_member_id` + nom du déposant) une fois sa Registration Agency résolue en amont par [`resolve_ra`](../pipeline/02-extract.md#resolve-ra).
 
-**Members API** (`https://api.crossref.org/members/{id}`) — récupération du record complet d'un Crossref Member (notamment son champ `location` au format `"City, State, Country"`). Consommée par le sub-step `enrich_publishers_from_crossref_members` (fallback `publishers.country` quand OpenAlex Publishers n'a pas matché). Couverture mesurée à l'audit : ~95 % des publishers candidats gagnent un pays via ce fallback.
-
 ## Données récupérées
 
 - **Publications** : DOI, titre, type, langue, journal (titre, ISSN, eISSN, éditeur), année (extraite via [`extract_crossref_pub_year`](https://github.com/Y33sha/bibliometrie-uca/blob/master/domain/sources/crossref.py)), résumé (nettoyé du JATS XML), mots-clés (depuis `subject`), citations (`is-referenced-by-count`), biblio (volume/numéro/pages/n° d'article), identifiants externes (ISSN, ISBN), métadonnées éditoriales (license, funders, dates `issued`/`published-print`/`published-online`/`created`)
@@ -73,7 +71,11 @@ Document `10.1063/5.0056957` (2 auteurs en mécanique). Champs non consommés re
 
 ## Particularités
 
-### Affiliations partielles
+### Relations entre publications
+
+*TODO: à remplir*
+
+### Affiliations mal renseignées
 
 ~29 % seulement des auteurs CrossRef portent une affiliation (sondage sur 1 000 payloads, à confirmer sur base complète), et elles sont génériques (tutelle, sans labo). Elles sont néanmoins routées vers `addresses` / `source_authorship_addresses` via `AddressLinker`, comme HAL/OpenAlex/ScanR/theses.fr : la phase `affiliations` y détecte `in_perimeter`, ce qui fait entrer les `source_authorships` CrossRef dans la cascade de matching personnes (et CrossRef figure désormais dans `build_authorships.all_sources`). Couverture partielle, mais strictement mieux que rien. Cette même pauvreté condamne en revanche la *discovery* par affiliation — trouver de nouvelles publis via la query affiliation, un usage distinct (cf. Statut).
 
@@ -89,16 +91,3 @@ CrossRef n'expose pas un statut OA fiable. `oa_status` reste NULL côté CrossRe
 
 CrossRef expose plusieurs dates (`issued`, `published-print`, `published-online`, `created`). [`extract_crossref_pub_year`](https://github.com/Y33sha/bibliometrie-uca/blob/master/domain/sources/crossref.py) choisit la plus pertinente avec un plafond `current_year + 1` (les éditeurs déposent parfois des années farfelues).
 
-## Statut
-
-CrossRef est intégré en **DOI-driven uniquement** ; le périmètre est arrêté là (sujet clos le 2026-05-30). Voir la fiche chantier [`METIER_crossref`](https://github.com/Y33sha/bibliometrie-uca/blob/master/docs/chantiers/METIER_crossref.md).
-
-**En place** :
-- Ingestion DOI-driven (`fetch_missing_doi` + `normalize_crossref`)
-- Arbitrage du `doc_type` contre les sous-types HAL/OpenAlex (`arbitrate_doc_type_with_article_subtype`)
-
-**Écarté** (décisions 2026-05-30) :
-- **Discovery par affiliation** : évaluée sur dump prod via `query.affiliation=Clermont Auvergne` (2 tokens, sans le bruit « université » qui faussait le spike initial). Recall faible (~26 % des publis DOI-Crossref UCA déjà connues — CrossRef n'indexe l'affiliation que pour une minorité de ses dépôts) **et** précision faible (~14-34 % des nouveaux candidats réellement UCA, le reste = bruit de token : « Clermont » aux USA, « Auvergne » comme région ⇒ Lyon/Grenoble). Pas d'extracteur affiliation-driven.
-- **Promotion d'ORCID `pending → confirmed`** : abandonnée (action admin manuelle, sans impact pipeline).
-- **Discovery par ORCID confirmé** : sortie du chantier (non spécifique à CrossRef, éventuel chantier multi-source).
-- **Relations entre publications** (preprint-of, version-of, etc.) : hors scope → chantier `METIER_relations-publications`.
