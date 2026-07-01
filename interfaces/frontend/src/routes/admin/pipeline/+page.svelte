@@ -163,6 +163,9 @@
     top: 1rem;
     max-height: calc(100vh - 2rem);
     overflow-y: auto;
+    /* Gouttière pour que la scrollbar ne se superpose pas aux cartes de run. */
+    padding-right: 8px;
+    scrollbar-gutter: stable;
   }
   .col-detail {
     min-width: 0;
