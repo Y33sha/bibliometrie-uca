@@ -143,11 +143,10 @@ class WosExtractor(SourceExtractor[WosExtractConfig]):
         config = self._adapter.load_config(conn)
         if not config.affiliations:
             raise ExtractionConfigError(
-                "aucune affiliation WoS configurée "
-                "(structures.api_ids->'wos' vide pour le périmètre d'extraction)"
+                "aucune affiliation (api_ids->'wos' vide pour le périmètre d'extraction)"
             )
-        if not config.has_api_key:
-            raise ExtractionConfigError("aucune clé API WoS configurée (config.wos_api_key)")
+        if config.credentials_missing:
+            raise ExtractionConfigError(config.credentials_missing)
         return config
 
     def setup_logging(self, args: argparse.Namespace, config: WosExtractConfig) -> None:

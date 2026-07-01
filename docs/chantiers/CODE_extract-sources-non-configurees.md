@@ -1,81 +1,97 @@
-# Chantier — Skip propre des sources d'extraction non configurées
+# Chantier — Skip propre des sources d'API tierces non configurées
 
 ## Contexte
 
-Lancer le pipeline dans Docker fonctionne (invocation, connexion à la base, exécution des phases). En revanche, une source d'extraction non configurée fait remonter `ExtractionConfigError` jusqu'à `main()` et **tue tout le run**, au lieu de sauter cette seule source et de poursuivre avec les sources configurées.
-Sur une base fraîchement seedée, le cas est systématique : `structures.api_ids` est vide (aucun identifiant de structure par source) et les credentials sont des placeholders.
+Le pipeline interroge plusieurs API tierces, à plusieurs phases : extraction bulk (HAL, OpenAlex, WoS, ScanR, theses.fr), cross-imports par DOI et hal-id, rafraîchissement des documents stale, enrichissements (journaux OpenAlex, préfixes DOI Crossref/DataCite, statut open access Unpaywall). Chacun de ces accès dépend d'une configuration : credentials d'API (clé, basic auth, email polite pool) et, pour l'extraction bulk seulement, un périmètre d'interrogation (collections HAL, identifiants d'institution ou d'affiliation, PPN d'établissement).
 
-Deux problèmes distincts se combinent :
+Sur une base fraîchement seedée, une partie de cette configuration manque : les credentials valent `NULL` tant que l'exploitant ne les renseigne pas. Le comportement attendu est **uniforme** : un accès dont la configuration manque est **sauté avec un avertissement**, sans interrompre le run, quelle que soit la phase. Les accès configurés aboutissent.
 
-1. **Absence de mode d'échec propre.** `run_as_phase` laisse volontairement remonter les exceptions à l'orchestrateur (`application/pipeline/extract/base.py`), mais `phase_extract` ne les rattrape pas : `future.result()` re-lève et interrompt la phase entière (`run_pipeline.py`). Une source non configurée devrait être ignorée, pas fatale.
-2. **Placeholders de credentials contre-productifs.** `generate_seed` masque les credentials par des chaînes `VOTRE_...` / `votre@email.fr`. Une clé bidon non vide empêche OpenAlex de basculer en polite pool (elle est envoyée à l'API comme une vraie clé), et un faux email polite part vers de vraies API (proscrit : risque de blacklist côté serveur).
+Deux écarts à corriger par rapport à cet objectif :
+
+1. **Traitement hétérogène selon la phase.** L'extraction bulk sait sauter une source non configurée, mais les autres phases ne le font pas : le cross-import ScanR tire une requête sans credentials puis avale le 401 en résultat vide, et les enrichissements Crossref/DataCite/Unpaywall/OpenAlex lèvent une exception dure sur email absent. Le même fait (« source non configurée ») produit trois comportements différents.
+2. **Placeholders de credentials contre-productifs dans le seed.** Une clé bidon non vide est envoyée à l'API comme une vraie clé (échec d'authentification), et un faux email polite pool part vers de vraies API (risque de blacklist côté serveur).
 
 ## Décisions
 
-### Politique de skip
+### Skip propre, harmonisé sur toutes les phases
 
-Une source non configurée est **ignorée avec un avertissement**, apparaît « non configurée » au récap de phase, et les sources configurées continuent.
-La politique de skip appartient à l'**orchestrateur** (`run_pipeline.py`), pas aux extracteurs : le CLI standalone d'une source continue, lui, de sortir en erreur (`exit 2`) si on lui demande explicitement une source non configurée.
+Un accès à une API tierce dont la configuration manque est **ignoré avec un avertissement** ; les accès configurés continuent. La règle vaut pour toutes les phases qui interrogent une API : extraction, cross-imports, refresh stale, enrichissements. Le CLI standalone d'une source garde, lui, sa sortie en erreur (`exit 2`) quand on lui demande explicitement une source non configurée.
+
+### Détecteur central de configuration (source unique de vérité)
+
+La connaissance « credentials présents pour la source X » vit à **un seul endroit**, en couche `infrastructure` (`infrastructure/sources/config.py`) : une fonction `source_credentials_missing(conn, source) -> str | None` renvoie le motif d'absence (message lisible) ou `None` si la source est utilisable. Tous les appelants la consultent ; aucune logique de présence de credentials n'est dupliquée par phase.
+
+### Périmètre d'interrogation ⊥ credentials
+
+L'extraction bulk exige **en plus** un périmètre d'interrogation (collections HAL, `institution_ids` OpenAlex, `affiliations` WoS/ScanR, PPN theses) : ce contrôle reste propre à l'extraction. Le cross-import et les enrichissements interrogent par identifiant (DOI, hal-id) sans périmètre : ils ne vérifient que les credentials.
+
+### Email polite pool = credential
+
+`polite_pool_email` est traité comme un credential : son absence **saute** les accès qui en dépendent (Crossref, DataCite, Unpaywall, et OpenAlex quand aucune clé API n'est configurée), au lieu de lever une exception dure. Renseigner un email ne coûte rien et rend tous ces accès disponibles ; ne pas en avoir n'empêche pas le run d'aboutir.
 
 ### Skip vs échec dur
 
-Seule l'**absence de configuration** (`ExtractionConfigError`) est skipée.
-Les erreurs réseau/HTTP (DNS, 401, 5xx) restent des échecs durs et bruyants : un credential absent est un fait de configuration, une panne réseau n'en est pas un.
+Seule l'**absence de configuration** est sautée. Une erreur réseau/HTTP survenant alors que les credentials **sont** présents (401 sur clé invalide, 5xx, DNS) reste un échec dur et bruyant : un credential absent est un fait de configuration détecté en amont, une panne ou un credential erroné n'en est pas un. Le gate en amont supprime le cas « requête tirée sans credentials » ; le rattrapage d'erreur HTTP des adapters ne couvre plus que le transitoire.
 
-### Signalement d'une source sautée
+### Signalement d'un accès sauté
 
-Une source sautée remonte par le **canal des signaux** de `PhaseMetrics` (celui qu'emprunte déjà le circuit-breaker via `_signal_if_tripped`), pas par une représentation ad hoc : l'`except ExtractionConfigError` de `phase_extract` attache à la `PhaseMetrics` de la phase un `Signal` de niveau `warning` (`code = "source_unconfigured"`, message « <source> non configurée — sautée »). Le point de la phase passe en **ambre** et le motif s'affiche au drill-down.
-Warning et non erreur : le rouge est réservé à une phase interrompue par une exception (le run s'arrête là), et « source indisponible » relève de l'ambre dans la légende du ruban. Une source sautée n'interrompt pas le run — la phase se termine avec les sources configurées. La dérivation `status = warning if signals else ok` fait passer la phase en ambre sans logique de statut supplémentaire.
-La table par source ne liste que les sources ayant tourné : une source sautée n'y produit aucune ligne, ce qui la distingue d'une source à zéro résultat (ligne de table à zéros).
-
-### Configuration requise par source
-
-| Source | Requis pour extraire | Lève déjà `ExtractionConfigError` | À ajouter |
-|---|---|---|---|
-| HAL | ≥1 collection (`hal_collection` du périmètre) | non | lever si 0 collection (cohérence) |
-| theses | ≥1 PPN (`api_ids->'theses'`) | oui | rien |
-| OpenAlex | `institution_ids` **et** (clé API **ou** email polite) | sur `institution_ids` seul | lever si ni clé ni email ; ne plus exiger l'email quand une clé est présente |
-| WoS | `affiliations` **et** clé API | sur `affiliations` seul | lever si clé absente |
-| ScanR | `affiliation_ids` **et** (username + password) | sur `affiliation_ids` seul | lever si credentials absents |
-
-OpenAlex est le seul extracteur à consommer l'email polite ; HAL, theses, WoS et ScanR ne l'utilisent pas.
-`get_polite_pool_email` conserve son comportement levant pour les autres consommateurs (Crossref, DataCite, Unpaywall).
+Un accès sauté remonte par le **canal des signaux** de `PhaseMetrics` (celui du circuit-breaker) : un `Signal` de niveau `warning`, `code = "source_unconfigured"`, attaché à la `PhaseMetrics` de la phase. Le point de la phase passe en **ambre** (dérivation `status = warning if signals else ok`) et le motif s'affiche au détail. Le rouge reste réservé à une phase interrompue par une exception. La table par source ne liste que les accès ayant tourné.
 
 ### Contrainte d'architecture
 
-`ExtractionConfigError` vit en couche `application` ; les getters de credentials (`get_wos_api_key`…) en couche `infrastructure`.
-Les adapters ne peuvent pas importer `application` (règle DDD verrouillée par import-linter).
-Les checks credentials restent donc en couche application (`application/pipeline/extract/extract_*.py`), là où vivent déjà les checks d'identifiants de structure, en exposant la présence des credentials via l'objet config renvoyé par l'adapter (comme `affiliations` / `institution_ids` le sont déjà).
+`ExtractionConfigError` et les orchestrateurs d'extraction vivent en couche `application`, qui ne peut pas importer `infrastructure` (règle DDD verrouillée). L'extraction consulte donc le détecteur central **via l'adapter** : l'adapter (infrastructure) appelle `source_credentials_missing` et expose le motif dans l'objet config renvoyé ; l'orchestrateur (application) lève `ExtractionConfigError` sur ce motif. Le cross-import, le refresh stale et les enrichissements sont orchestrés dans `run_pipeline.py` — composition root, qui importe librement l'infrastructure — et appellent le détecteur directement.
+
+### Configuration requise par source
+
+| Source | Credentials (tous accès) | Périmètre (extraction bulk seulement) |
+|---|---|---|
+| HAL | aucun (API publique) | ≥1 collection (`hal_collection` du périmètre) |
+| theses.fr | aucun (API publique) | ≥1 PPN (`api_ids->'theses'`) |
+| OpenAlex | clé API **ou** email polite pool | `institution_ids` |
+| WoS | clé API | `affiliations` |
+| ScanR | username + password | `affiliation_ids` |
+| Crossref | email polite pool | — |
+| DataCite | email polite pool | — |
+| Unpaywall | email polite pool | — |
+
+DOI.org (résolution des Registration Agencies) et DOAJ sont des API publiques sans credential : aucun gate.
 
 ### Seed sans placeholders
 
-`generate_seed` pose **NULL** au lieu des placeholders pour les credentials.
-NULL est honnête (pas de clé plutôt qu'une clé bidon), permet le polite pool OpenAlex, et évite d'envoyer un faux email à de vraies API.
-La documentation d'initialisation cesse de renvoyer aux placeholders et explique le renseignement direct des credentials.
+`generate_seed` pose `NULL` au lieu des placeholders pour les credentials. `NULL` est honnête (pas de clé plutôt qu'une clé bidon), permet le polite pool OpenAlex par email, et évite d'envoyer un faux email à de vraies API. La documentation d'initialisation explique le renseignement direct des credentials et le skip des sources laissées à `NULL`.
 
 ## Phasage
 
-### Phase 1 — Contrat « source configurée » par extracteur
+### Phase 1 — Extraction : contrat de configuration et skip propre
 
-- [x] `infrastructure/sources/config.py` : getter email non-levant pour OpenAlex (le levant reste pour Crossref/DataCite/Unpaywall).
-- [x] Adapters openalex/wos/scanr : exposer la présence clé/credentials dans `*ExtractConfig` ; OpenAlex n'exige plus l'email quand une clé est présente.
-- [x] `application/pipeline/extract/extract_openalex.py` : lever `ExtractionConfigError` si ni clé ni email.
-- [x] `application/pipeline/extract/extract_wos.py` : lever si clé absente.
-- [x] `application/pipeline/extract/extract_scanr.py` : lever si credentials absents.
-- [x] HAL : lever `ExtractionConfigError` si aucune collection.
+- [x] `infrastructure/sources/config.py` : getter email non-levant pour OpenAlex (le levant reste, à ce stade, pour Crossref/DataCite/Unpaywall).
+- [x] Adapters openalex/wos/scanr : exposer la présence des credentials dans `*ExtractConfig` ; OpenAlex n'exige plus l'email quand une clé est présente.
+- [x] Orchestrateurs openalex/wos/scanr/hal : lever `ExtractionConfigError` sur credentials ou périmètre absents.
+- [x] `run_pipeline.py` : rattraper `ExtractionConfigError` (branche parallèle et branche HAL incrémentale) → signal `source_unconfigured`, source sautée, poursuite.
+- [x] Tests : skip d'une source non configurée (les configurées aboutissent) ; contrat par source.
 
-### Phase 2 — Skip propre dans l'orchestrateur
+### Phase 2 — Seed sans placeholders
 
-- [x] `run_pipeline.py` : importer `ExtractionConfigError` ; rattraper autour de `future.result()` (branche parallèle) et de l'appel HAL (mode daily) → avertissement + source « non configurée » + poursuite.
-- [x] Signal `warning` (`code = "source_unconfigured"`) attaché à la `PhaseMetrics` de `extract` pour chaque source sautée, dans l'`except ExtractionConfigError` de `phase_extract` → point ambre + motif au drill-down. La table par source ne liste que les sources ayant tourné.
-
-### Phase 3 — Seed sans placeholders
-
-- [x] `interfaces/cli/dev/generate_seed.py` : credentials → NULL.
+- [x] `interfaces/cli/dev/generate_seed.py` : credentials → `NULL`.
 - [x] Régénérer `infrastructure/db/seed.sql`.
-- [x] Docs : retirer la section placeholders / `UPDATE config` de `docs/exploitation/02-initialisation-base.md` ; documenter le skip des sources aux credentials NULL et le renseignement direct.
+- [x] Docs : `docs/exploitation/02-initialisation-base.md` documente le skip des sources aux credentials `NULL` et le renseignement direct.
 
-### Phase 4 — Tests
+### Phase 3 — Détecteur central de configuration par source (DRY)
 
-- [x] Test de non-régression : run `extract` avec des sources non configurées → celles-ci skipées, les configurées aboutissent.
-- [x] Test par source du contrat de configuration (OpenAlex tolérant clé ou email ; WoS et ScanR credentials requis ; HAL collections requises).
+- [x] `infrastructure/sources/config.py` : `source_credentials_missing(conn, source) -> str | None`, seule source de vérité de la présence des credentials par source (openalex : clé ou email ; wos : clé ; scanr : user+pwd ; crossref/datacite/unpaywall : email ; hal/theses : aucun).
+- [x] Basculer les adapters d'extraction dessus : `*ExtractConfig` porte le motif d'absence (remplace les booléens `has_api_key` / `has_polite_email` / `has_credentials`) ; les orchestrateurs lèvent `ExtractionConfigError` sur ce motif (le contrôle de périmètre leur reste propre).
+
+### Phase 4 — Cross-imports et refresh stale : gate harmonisé
+
+- [ ] `run_pipeline.py` : avant de tirer une requête, `phase_cross_imports` (cibles `fetch_missing_doi`) et `phase_refresh_stale` sautent une source dont `source_credentials_missing` renvoie un motif → signal `source_unconfigured`, poursuite.
+- [ ] Adapter ScanR `fetch_missing_doi` : ne plus avaler un 401 en résultat vide (le gate amont supprime le cas « sans credentials » ; une erreur d'authentification credentials présents redevient dure, comme pour WoS).
+- [ ] Tests : cible non configurée sautée, cibles configurées interrogées.
+
+### Phase 5 — Enrichissements : email requis, gate harmonisé
+
+- [ ] `run_pipeline.py` : `enrich_journals_from_openalex` (openalex), `resolve_doi_prefixes` (crossref/datacite) et `oa_status` (unpaywall) sautent proprement quand `source_credentials_missing` renvoie un motif, au lieu de lever sur email absent. `get_polite_pool_email` (levant) est remplacé par le gate dans ces chemins.
+- [ ] Tests : enrichissement sauté sur email absent, exécuté sinon.
+
+## Questions ouvertes
+
+- **`get_polite_pool_email` (levant) résiduel.** Une fois les phases pipeline basculées sur le gate, ne restent appelants levants que des CLI oneshot/maintenance (hors pipeline), où une sortie en erreur est acceptable. À confirmer au cas par cas plutôt qu'en masse.

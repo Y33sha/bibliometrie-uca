@@ -23,10 +23,10 @@ class OpenalexExtractConfig:
 
     base_url: str
     institution_ids: list[str]
-    # Le polite pool OpenAlex s'obtient par clé API ou, à défaut, par email : l'un
-    # des deux suffit. L'orchestrateur exige la présence d'au moins l'un pour extraire.
-    has_api_key: bool
-    has_polite_email: bool
+    # Motif d'absence des credentials (clé API ou email polite pool), ou None si
+    # présents. Renseigné par l'adapter via le détecteur central ; l'orchestrateur
+    # lève ExtractionConfigError dessus. Le périmètre (institution_ids) est distinct.
+    credentials_missing: str | None
 
 
 class OpenalexExtractAdapter(Protocol):

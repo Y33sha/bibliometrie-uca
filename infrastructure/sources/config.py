@@ -221,3 +221,37 @@ def get_scanr_credentials(conn: Connection) -> tuple[str, str]:
     if isinstance(user, str) and isinstance(pwd, str) and user and pwd:
         return user, pwd
     return "", ""
+
+
+def source_credentials_missing(conn: Connection, source: str) -> str | None:
+    """Motif d'absence des credentials d'API d'une source, ou `None` si utilisable.
+
+    Source unique de vérité de la présence des credentials par source, consultée
+    par toutes les phases qui interrogent une API tierce (extraction, cross-import,
+    refresh stale, enrichissements) : un accès dont cette fonction renvoie un motif
+    est sauté proprement. HAL, theses.fr, DOI.org et DOAJ sont des API publiques
+    sans credential (jamais de motif). L'email polite pool est traité comme un
+    credential : Crossref, DataCite et Unpaywall en dépendent, et OpenAlex l'accepte
+    à défaut de clé API. Le périmètre d'interrogation (collections, identifiants de
+    structure, PPN) est un contrôle distinct, propre à l'extraction bulk.
+    """
+    if source in ("hal", "theses"):
+        return None
+    if source == "openalex":
+        if get_openalex_api_key(conn) or get_polite_pool_email_optional(conn):
+            return None
+        return (
+            "ni clé API ni email polite pool (config.openalex_api_key / config.polite_pool_email)"
+        )
+    if source == "wos":
+        return None if get_wos_api_key(conn) else "clé API absente (config.wos_api_key)"
+    if source == "scanr":
+        user, password = get_scanr_credentials(conn)
+        if user and password:
+            return None
+        return "credentials absents (config.scanr_username / config.scanr_password)"
+    if source in ("crossref", "datacite", "unpaywall"):
+        if get_polite_pool_email_optional(conn):
+            return None
+        return "email polite pool absent (config.polite_pool_email)"
+    return None
