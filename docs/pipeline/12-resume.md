@@ -9,11 +9,11 @@ flowchart TD
     subgraph vérité
     structures
     end
-    subgraph sources 
+    subgraph sources
     SP@{ shape: procs, label: "source_publications"}---SA@{ shape: procs, label: "source_authorships"}
     SA---addresses
     end
-    
+
     structures--->addresses
     classDef valid  fill:#af5
     class structures valid;
@@ -27,16 +27,16 @@ flowchart LR
         direction TD
         publications
         structures
-    
+
     end
-    
+
     subgraph sources
         direction TD
         SA---structures
         SP@{ shape: procs, label: "source_publications"}---SA@{ shape: procs, label: "source_authorships"}
-        
+
     end
-    
+
     SP-->publications
     classDef valid  fill:#af5
     class structures,publications valid;
@@ -56,8 +56,8 @@ flowchart LR
         direction TD
         SP@{ shape: procs, label: "source_publications"}---SA@{ shape: procs, label: "source_authorships"}
     end
-    
-    SP-->publications
+
+    SP---publications
     SA-->persons
     SA---structures
     classDef valid  fill:#af5
@@ -79,11 +79,10 @@ flowchart LR
         direction TD
         SP@{ shape: procs, label: "source_publications"}---SA@{ shape: procs, label: "source_authorships"}
     end
-    
-    SP-->publications
-    SA-->persons
+
+    SP---publications
+    SA---persons
     SA---structures
     classDef valid  fill:#af5
     class structures,publications,persons,authorships valid;
 ```
-
