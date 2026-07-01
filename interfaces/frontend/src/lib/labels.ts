@@ -97,6 +97,25 @@ export const docTypeFamilyOf: Record<string, string> = Object.fromEntries(
 	docTypeFamilies.flatMap((f) => f.types.map((t) => [t, f.key]))
 );
 
+/** Couleur fixe par valeur de la dimension `doc_type_grouped` (types fins de la famille
+ * « publications », clés de famille pour les autres). Mapping stable — indépendant de l'ordre
+ * d'affichage — pour que la couleur d'un type ne change pas d'une vue à l'autre.
+ * Cohérences voulues : article et article de synthèse en bleus voisins ; prépublication en bleu
+ * très atténué ; ouvrage et chapitre en bruns voisins (ouvrage plus sombre) ; conference paper en
+ * gris neutre. */
+export const docTypeGroupedColors: Record<string, string> = {
+	article: '#3f6f9f',
+	review: '#6f9bc4',
+	preprints: '#bcd0e4',
+	conference_paper: '#9aa1a8',
+	book: '#7a4a2b',
+	book_chapter: '#b8814f',
+	data_paper: '#4f9d6b',
+	theses: '#8e6bbf',
+	data: '#2fa3b8',
+	misc: '#c9a24e'
+};
+
 /** Libellés FR des types de relation entre publications, lus depuis la publication courante
  * (sujet). Miroir de l'enum PG `relation_type` / `RelationType` du domain backend. */
 export const relationTypeLabel: Record<string, string> = {
