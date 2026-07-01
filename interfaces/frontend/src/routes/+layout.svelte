@@ -151,6 +151,7 @@
     --muted: #6b7280;
     --accent: #3b6b9e;
     --border: #e5e5e0;
+    --hover: #efede6; /* fond de survol des éléments cliquables (lignes, items de liste) */
     --gold: #d4a017;
     --diamond: #0288a8;
     --hybrid: #8e6bbf;

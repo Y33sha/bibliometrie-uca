@@ -2515,7 +2515,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/admin/pipeline/logs": {
+    "/api/admin/pipeline/runs/{run_id}/phases/{phase}/log": {
         parameters: {
             query?: never;
             header?: never;
@@ -2523,50 +2523,13 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Pipeline Logs
-         * @description Retourne les N dernières lignes du cron.log.
+         * Phase Log
+         * @description Log d'une phase, découpé depuis ``logs/pipeline.log``.
+         *
+         *     `available` est faux (et `content` vide) quand le fichier est absent
+         *     (``LOG_TO_FILE`` désactivé) ou quand la section est introuvable (log purgé).
          */
-        get: operations["pipeline_logs_api_admin_pipeline_logs_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/pipeline/reports": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List Reports
-         * @description Liste les rapports pipeline disponibles (plus récent en premier).
-         */
-        get: operations["list_reports_api_admin_pipeline_reports_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/pipeline/reports/{filename}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Report
-         * @description Retourne le contenu d'un rapport pipeline.
-         */
-        get: operations["get_report_api_admin_pipeline_reports__filename__get"];
+        get: operations["phase_log_api_admin_pipeline_runs__run_id__phases__phase__log_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2604,7 +2567,8 @@ export interface paths {
         };
         /**
          * List Runs
-         * @description N derniers runs (agrégés par `run_id`), plus récent en premier.
+         * @description Fenêtre de runs (agrégés par `run_id`), plus récent en premier ; `offset` pour
+         *     le chargement incrémental.
          */
         get: operations["list_runs_api_admin_pipeline_runs_get"];
         put?: never;
@@ -4710,24 +4674,19 @@ export interface components {
             /** Duration S */
             duration_s: number;
         };
-        /** PipelineLogsResponse */
-        PipelineLogsResponse: {
+        /**
+         * PipelinePhaseLog
+         * @description Log d'une phase, découpé depuis logs/pipeline.log.
+         *
+         *     `available` est faux quand le fichier est absent (LOG_TO_FILE désactivé) ou
+         *     quand la section de la phase est introuvable (log purgé) ; `content` est
+         *     alors vide.
+         */
+        PipelinePhaseLog: {
+            /** Available */
+            available: boolean;
             /** Content */
             content: string;
-        };
-        /** PipelineReportContent */
-        PipelineReportContent: {
-            /** Filename */
-            filename: string;
-            /** Content */
-            content: string;
-        };
-        /** PipelineReportItem */
-        PipelineReportItem: {
-            /** Filename */
-            filename: string;
-            /** Label */
-            label: string;
         };
         /**
          * PipelineStatus
@@ -9773,63 +9732,13 @@ export interface operations {
             };
         };
     };
-    pipeline_logs_api_admin_pipeline_logs_get: {
-        parameters: {
-            query?: {
-                lines?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PipelineLogsResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_reports_api_admin_pipeline_reports_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PipelineReportItem"][];
-                };
-            };
-        };
-    };
-    get_report_api_admin_pipeline_reports__filename__get: {
+    phase_log_api_admin_pipeline_runs__run_id__phases__phase__log_get: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                filename: string;
+                run_id: number;
+                phase: string;
             };
             cookie?: never;
         };
@@ -9841,7 +9750,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PipelineReportContent"];
+                    "application/json": components["schemas"]["PipelinePhaseLog"];
                 };
             };
             /** @description Validation Error */
@@ -9879,6 +9788,7 @@ export interface operations {
         parameters: {
             query?: {
                 limit?: number;
+                offset?: number;
             };
             header?: never;
             path?: never;

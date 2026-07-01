@@ -68,9 +68,7 @@ from interfaces.api.models.admin.pipeline_config import (
     HalCollectionsResponse,
 )
 from interfaces.api.models.admin.pipeline_logs import (
-    PipelineLogsResponse,
-    PipelineReportContent,
-    PipelineReportItem,
+    PipelinePhaseLog,
     PipelineStatus,
 )
 from interfaces.api.models.admin.publication_duplicates import (
@@ -134,9 +132,7 @@ __all__ = [
     "OrphanBatchAssignResponse",
     "PerimeterCreate",
     "PerimeterUpdate",
-    "PipelineLogsResponse",
-    "PipelineReportContent",
-    "PipelineReportItem",
+    "PipelinePhaseLog",
     "PipelineStatus",
     "PubMergeResponse",
     "PubYearCount",

@@ -1,4 +1,4 @@
-"""Modèles Pydantic pour la page admin pipeline (status + logs + reports)."""
+"""Modèles Pydantic pour la page admin pipeline (statut en cours + log par phase)."""
 
 from pydantic import BaseModel
 
@@ -15,15 +15,13 @@ class PipelineStatus(BaseModel):
     phases_total: int
 
 
-class PipelineLogsResponse(BaseModel):
-    content: str
+class PipelinePhaseLog(BaseModel):
+    """Log d'une phase, découpé depuis logs/pipeline.log.
 
+    `available` est faux quand le fichier est absent (LOG_TO_FILE désactivé) ou
+    quand la section de la phase est introuvable (log purgé) ; `content` est
+    alors vide.
+    """
 
-class PipelineReportItem(BaseModel):
-    filename: str
-    label: str
-
-
-class PipelineReportContent(BaseModel):
-    filename: str
+    available: bool
     content: str
