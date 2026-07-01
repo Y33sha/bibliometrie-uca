@@ -57,14 +57,15 @@ def build(
     pruned = queries.prune_orphan_authorships(conn)
     logger.info(f"  {pruned} authorships orphelines supprimées")
 
-    # En rebuild_full, authorships est purgée puis réinsérée depuis zéro : ANALYZE
-    # pour que les étapes suivantes voient la table reconstruite au lieu de stats
-    # périmées (sinon Nested Loop sur estimate rows=1). En nominal, la table garde
-    # ses lignes et ses stats ; c'est source_authorships, massivement écrite à
-    # l'étape 2, qui exige le ANALYZE ci-dessous.
-    if rebuild_full:
-        logger.info("  ANALYZE authorships (stats fraîches pour le planner)")
-        queries.analyze_authorships(conn)
+    # ANALYZE authorships : l'étape 3 (`propagate_authorship_attributes`) fait un
+    # UPDATE joignant les lignes fraîchement insérées à l'étape 1. Deux cas exigent
+    # des stats fraîches, sinon le planner estime la table à rows=1 et part en Nested
+    # Loop : le premier build depuis une base vide (table à 0 ligne committée puis
+    # ~100 k insertions non committées) et le mode rebuild_full (purge puis réinsertion
+    # depuis zéro). En régime incrémental la table garde ses lignes et ses stats, mais
+    # l'ANALYZE y est inoffensif (coût sub-seconde, échantillon fixe) : inconditionnel.
+    logger.info("  ANALYZE authorships (stats fraîches pour le planner)")
+    queries.analyze_authorships(conn)
 
     logger.info("Étape 2 : peuplement des FK (source_authorships → authorships)...")
     linked = queries.link_source_authorships_to_authorships(conn)
