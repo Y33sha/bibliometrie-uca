@@ -68,7 +68,7 @@ flowchart LR
 >   - confusion d'homonymes dans le même identifiant (OpenAlex souvent),
 >   - entités hétérogènes au sein d'une même source (HAL: personnes fiables avec `personId` *vs* auteurs réduits à une chaîne de caractères quand ils n'ont pas pu être matchés à un compte HAL) (cf [documentation sources](../sources/01-vue-d-ensemble.md)).
 >
-> Il a donc été décidé de ne pas conserver de tables `source_persons` et `source_structures`. Les informations servant au matching des personnes et des structures sont regroupées dans `source_authorships`:
+> Il a donc été décidé de ne pas conserver de tables `source_persons` et `source_structures`. Les informations servant au matching des personnes et des structures sont extraites des `source_authorships`:
 >
 > - pour les personnes: formes de nom brute et normalisée + identifiants présents dans la source (ORCID, idhal, idref, selon source);
 > - pour les structures: [adresses](../glossaire.md#adresse) (= *raw affiliation strings*).
