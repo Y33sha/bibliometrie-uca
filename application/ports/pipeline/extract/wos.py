@@ -22,6 +22,8 @@ class WosExtractConfig:
 
     base_url: str
     affiliations: list[str]
+    # L'API WoS Expanded exige une clé (header `X-ApiKey`) : sans elle, pas d'extraction.
+    has_api_key: bool
 
 
 class WosExtractAdapter(Protocol):

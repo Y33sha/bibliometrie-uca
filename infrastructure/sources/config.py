@@ -179,17 +179,30 @@ def get_extraction_api_ids(conn: Connection, source: str) -> list[str]:
         return []
 
 
-def get_polite_pool_email(conn: Connection) -> str:
-    """Retourne l'email envoyé en polite pool aux APIs externes (OpenAlex, HAL, Crossref, DataCite, Unpaywall, …).
+def get_polite_pool_email_optional(conn: Connection) -> str | None:
+    """Retourne l'email polite pool, ou `None` si non configuré (sans lever).
 
-    Raise si la row `polite_pool_email` n'est pas configurée : un email invalide envoyé à l'API peut entraîner un blacklist côté serveur, donc on force la config explicite plutôt que de fallback sur un email inventé.
+    Pour les consommateurs qui traitent l'email comme facultatif : OpenAlex, dont
+    l'accès au polite pool peut aussi passer par une clé API. Les consommateurs qui
+    exigent l'email utilisent `get_polite_pool_email`.
     """
     val = _get_from_db(conn, "polite_pool_email")
     if val and isinstance(val, str):
         return val
+    return None
+
+
+def get_polite_pool_email(conn: Connection) -> str:
+    """Retourne l'email envoyé en polite pool aux APIs externes (Crossref, DataCite, Unpaywall, …).
+
+    Raise si la row `polite_pool_email` n'est pas configurée : un email invalide envoyé à l'API peut entraîner un blacklist côté serveur, donc on force la config explicite plutôt que de fallback sur un email inventé.
+    """
+    email = get_polite_pool_email_optional(conn)
+    if email is not None:
+        return email
     raise RuntimeError(
         "polite_pool_email manquant dans la table `config` — requis pour le polite pool "
-        "des APIs (OpenAlex, HAL, Crossref, DataCite, Unpaywall, etc.)."
+        "des APIs (Crossref, DataCite, Unpaywall, etc.)."
     )
 
 

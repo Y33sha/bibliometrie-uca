@@ -55,27 +55,27 @@ La documentation d'initialisation cesse de renvoyer aux placeholders et explique
 
 ## Phasage
 
-### Phase A — Contrat « source configurée » par extracteur
+### Phase 1 — Contrat « source configurée » par extracteur
 
-- [ ] `infrastructure/sources/config.py` : getter email non-levant pour OpenAlex (le levant reste pour Crossref/DataCite/Unpaywall).
-- [ ] Adapters openalex/wos/scanr : exposer la présence clé/credentials dans `*ExtractConfig` ; OpenAlex n'exige plus l'email quand une clé est présente.
-- [ ] `application/pipeline/extract/extract_openalex.py` : lever `ExtractionConfigError` si ni clé ni email.
-- [ ] `application/pipeline/extract/extract_wos.py` : lever si clé absente.
-- [ ] `application/pipeline/extract/extract_scanr.py` : lever si credentials absents.
-- [ ] HAL : lever `ExtractionConfigError` si aucune collection.
+- [x] `infrastructure/sources/config.py` : getter email non-levant pour OpenAlex (le levant reste pour Crossref/DataCite/Unpaywall).
+- [x] Adapters openalex/wos/scanr : exposer la présence clé/credentials dans `*ExtractConfig` ; OpenAlex n'exige plus l'email quand une clé est présente.
+- [x] `application/pipeline/extract/extract_openalex.py` : lever `ExtractionConfigError` si ni clé ni email.
+- [x] `application/pipeline/extract/extract_wos.py` : lever si clé absente.
+- [x] `application/pipeline/extract/extract_scanr.py` : lever si credentials absents.
+- [x] HAL : lever `ExtractionConfigError` si aucune collection.
 
-### Phase B — Skip propre dans l'orchestrateur
+### Phase 2 — Skip propre dans l'orchestrateur
 
 - [ ] `run_pipeline.py` : importer `ExtractionConfigError` ; rattraper autour de `future.result()` (branche parallèle) et de l'appel HAL (mode daily) → avertissement + source « non configurée » + poursuite.
 - [ ] Signal `warning` (`code = "source_unconfigured"`) attaché à la `PhaseMetrics` de `extract` pour chaque source sautée, dans l'`except ExtractionConfigError` de `phase_extract` → point ambre + motif au drill-down. La table par source ne liste que les sources ayant tourné.
 
-### Phase C — Seed sans placeholders
+### Phase 3 — Seed sans placeholders
 
 - [ ] `interfaces/cli/dev/generate_seed.py` : credentials → NULL.
 - [ ] Régénérer `infrastructure/db/seed.sql`.
 - [ ] Docs : retirer la section placeholders / `UPDATE config` de `docs/exploitation/02-initialisation-base.md` ; documenter le skip des sources aux credentials NULL et le renseignement direct.
 
-### Phase D — Tests
+### Phase 4 — Tests
 
 - [ ] Test de non-régression : run `extract` avec des sources non configurées → celles-ci skipées, les configurées aboutissent.
 - [ ] Test par source du contrat de configuration (OpenAlex tolérant clé ou email ; WoS et ScanR credentials requis ; HAL collections requises).

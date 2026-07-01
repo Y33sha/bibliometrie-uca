@@ -127,6 +127,11 @@ class OpenalexExtractor(SourceExtractor[OpenalexExtractConfig]):
                 "aucun institution_id OpenAlex configuré "
                 "(structures.api_ids->'openalex' vide pour le périmètre d'extraction)"
             )
+        if not (config.has_api_key or config.has_polite_email):
+            raise ExtractionConfigError(
+                "aucune authentification OpenAlex : ni clé API (config.openalex_api_key) "
+                "ni email polite pool (config.polite_pool_email) configuré"
+            )
         return config
 
     def setup_logging(self, args: argparse.Namespace, config: OpenalexExtractConfig) -> None:
