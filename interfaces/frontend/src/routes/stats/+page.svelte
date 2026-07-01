@@ -7,6 +7,7 @@
 	import Pagination from '$lib/components/Pagination.svelte';
 	import FacetDropdown from '$lib/components/FacetDropdown.svelte';
 	import EntityFilter from '$lib/components/EntityFilter.svelte';
+	import { paramsToQuery } from '$lib/utils';
 	import {
 		oaLabelsMap,
 		docTypePlural,
@@ -261,7 +262,7 @@
 		// On ne transmet que l'id (état canonique) ; la liste résout elle-même le libellé de la pastille.
 		if (selectedPublisherId) p.set('publisher_id', selectedPublisherId);
 		if (selectedJournalId) p.set('journal_id', selectedJournalId);
-		return base + '/publications?' + p.toString();
+		return base + '/publications?' + paramsToQuery(p);
 	});
 
 	// --- Data loading ---

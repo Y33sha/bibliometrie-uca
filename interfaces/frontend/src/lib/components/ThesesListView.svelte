@@ -11,6 +11,7 @@
 	import { usePaginatedFetch } from '$lib/composables/usePaginatedFetch.svelte';
 	import { useFacets } from '$lib/composables/useFacets.svelte';
 	import { useUrlFilters } from '$lib/composables/useUrlFilters.svelte';
+	import { paramsToQuery } from '$lib/utils';
 
 	// Vue-liste des thèses réutilisable. Utilisée par :
 	// - `/theses` (mode autonome avec sync URL)
@@ -152,7 +153,7 @@
 	}
 
 	function exportCsvUrl(): string {
-		return `${base}/api/publications/export-theses.csv?${buildFilterParams()}`;
+		return `${base}/api/publications/export-theses.csv?${paramsToQuery(buildFilterParams())}`;
 	}
 
 	onMount(async () => {

@@ -6,7 +6,8 @@ import {
 	formatDate,
 	halDocUrl,
 	scanrPubUrl,
-	deriveStructDetectionStatus
+	deriveStructDetectionStatus,
+	paramsToQuery
 } from './utils';
 
 // ── esc (HTML escaping) ────────────────────────────────────────
@@ -17,6 +18,26 @@ describe('esc', () => {
 	it('retourne une chaîne vide pour null/undefined', () => {
 		expect(esc(null)).toBe('');
 		expect(esc(undefined)).toBe('');
+	});
+});
+
+// ── paramsToQuery ──────────────────────────────────────────────
+
+describe('paramsToQuery', () => {
+	it('restaure les virgules littérales dans les valeurs de liste', () => {
+		const p = new URLSearchParams();
+		p.set('year', '2024,2023');
+		expect(paramsToQuery(p)).toBe('year=2024,2023');
+	});
+
+	it('laisse les autres caractères percent-encodés intacts', () => {
+		const p = new URLSearchParams();
+		p.set('q', 'a b&c');
+		expect(paramsToQuery(p)).toBe('q=a+b%26c');
+	});
+
+	it('retourne une chaîne vide sans paramètre', () => {
+		expect(paramsToQuery(new URLSearchParams())).toBe('');
 	});
 });
 

@@ -1,5 +1,6 @@
 import { goto } from '$app/navigation';
 import { base } from '$app/paths';
+import { paramsToQuery } from '$lib/utils';
 
 /**
  * Composable pour la synchronisation des filtres avec l'URL.
@@ -104,7 +105,7 @@ export function useUrlFilters(config: UrlFiltersConfig) {
 			}
 		}
 
-		const qs = p.toString();
+		const qs = paramsToQuery(p);
 		const targetPath =
 			base + (typeof config.basePath === 'function' ? config.basePath() : config.basePath);
 		// Garde anti-navigation parasite : `syncUrl` est parfois appelé après un
