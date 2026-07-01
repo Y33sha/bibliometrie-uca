@@ -2,6 +2,7 @@
 ## Extraction
 * [ ] refetch_stale: utiliser les identifiants natifs de chaque source, pas DOI
 * [ ] stocker l'année requêtée dans une colonne du staging pour pouvoir coupler la phase `refresh_stale` à l'année de départ du run en cours
+* nommage incohérent: fetch_missing_hal_id cherche nnt
 ### Couverture
 * [ ] extraction par ORCID: vérifier pertinence (tester différentes sources, auditer le gain)
 * [ ] bioRxiv, medRxiv: identifiants différents de arxiv? cf publi 2757 (voir si on moissonne ces identifiants; possibilité de récupérer les DOI à partir des identifiants comme dans ArXiv)
@@ -14,6 +15,7 @@
 * [ ] CLI `seed_journals_doi_prefix`: intégrer au pipeline?
 * [ ] vérifier qu'il ne manque pas des `ANALYZE` en cours de pipeline pour éviter un *seq scan* sur des millions de lignes lors d'un premier run depuis une base vide.
 * [ ] `persons`: voir si on peut généraliser le matching par identifiants forts aux authorships hors périmètre (à réserver aux identifiants `confirmed` / et/ou corroboration par nom?)
+* [ ] person_identifiers: les formes WOS et OpenAlex sont déjà inopérantes pour le matching; voir si je continue de les moissonner ou pas.
 
 # Données
 * [ ] distinguer conference_paper et conférence
