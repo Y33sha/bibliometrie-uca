@@ -15,10 +15,10 @@ _(aucun)_
 - [Scinder `source_authorships` (identité ⊥ liaison)](DATA_scinder-source-authorships.md)
 - [Qualité et cohérence des sujets](METIER_sujets-qualite.md)
 - [Signatures institutionnelles](METIER_signatures-institutionnelles.md)
-- [Skip propre des sources d'extraction non configurées](CODE_extract-sources-non-configurees.md)
 
 ## Chantiers archivés
 
+- 2026-07-01 — [Skip propre des sources d'API tierces non configurées](archived/2026-07-01_CODE_extract-sources-non-configurees.md)
 - 2026-07-01 — [Observabilité du pipeline](archived/2026-07-01_CODE_observabilite-pipeline.md)
 - 2026-06-30 — [Brancher le domaine riche orphelin](archived/2026-06-30_CODE_domaine-riche-orphelin.md)
 - 2026-06-29 — [Déduire le journal_id manquant par préfixe DOI](archived/2026-06-29_DATA_journal-id-par-doi-prefix.md)
