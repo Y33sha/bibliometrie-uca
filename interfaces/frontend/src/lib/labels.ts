@@ -100,20 +100,20 @@ export const docTypeFamilyOf: Record<string, string> = Object.fromEntries(
 /** Couleur fixe par valeur de la dimension `doc_type_grouped` (types fins de la famille
  * « publications », clés de famille pour les autres). Mapping stable — indépendant de l'ordre
  * d'affichage — pour que la couleur d'un type ne change pas d'une vue à l'autre.
- * Cohérences voulues : article et article de synthèse en bleus voisins ; prépublication en bleu
- * très atténué ; ouvrage et chapitre en bruns voisins (ouvrage plus sombre) ; conference paper en
- * gris neutre. */
+ * Cohérences voulues : article et article de synthèse en bleus voisins, l'article de synthèse plus
+ * foncé (type plus prestigieux) ; prépublication en bleu très atténué ; ouvrage et chapitre en
+ * orange et safran voisins ; thèses en rouge. */
 export const docTypeGroupedColors: Record<string, string> = {
 	article: '#2f7ed8',
-	review: '#56b4e9',
+	review: '#1f5c9e',
 	preprints: '#b3d9f5',
-	conference_paper: '#9aa1a8',
-	book: '#c0392b',
-	book_chapter: '#ef8354',
+	conference_paper: '#b18fcf',
+	book: '#ffa93b',
+	book_chapter: '#f4c430',
 	data_paper: '#2ecc71',
-	theses: '#8e44ad',
+	theses: '#c0392b',
 	data: '#1abc9c',
-	misc: '#e84393'
+	misc: '#cfd3d6'
 };
 
 /** Libellés FR des types de relation entre publications, lus depuis la publication courante
