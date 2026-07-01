@@ -37,6 +37,12 @@
 	let chartMode = $state<'absolu' | 'part'>('absolu'); // part = empilement aplati à 100 %
 	let chartPage = $state(1); // page de l'axe de comparaison à forte cardinalité (laboratoires)
 	let chartCatTotal = $state(0); // total des valeurs sur cet axe (0 si faible cardinalité)
+	// Tri de l'axe de comparaison. '' = ordre par défaut (total décroissant) ; sinon la valeur d'une
+	// série empilée (p. ex. 'ouvert') : les catégories sont classées par la part de cette série.
+	let chartSort = $state('');
+	let chartSortDir = $state<'desc' | 'asc'>('desc');
+	// Séries proposées au sélecteur de tri, dérivées de l'empilement courant (mises à jour au tracé).
+	let sortableSeries = $state<{ value: string; label: string }[]>([]);
 	const CHART_PAGE_SIZE = 10;
 	let legendItems: { label: string; color: string }[] = $state([]);
 	// Le graphe par année est toujours le simple compte de publications (barres empilées). Le taux
@@ -122,6 +128,33 @@
 		return [...totals.entries()].sort((a, b) => b[1] - a[1]).map(([v]) => v);
 	}
 
+	// Ordonne les catégories de l'axe `dim` par la part de la série `seriesValue` (lue sur `stackDim`)
+	// dans chaque catégorie : numérateur = valeur de cette série, dénominateur = total de la catégorie.
+	// Trier sur la part (et non la valeur brute) donne le classement « du plus au moins <série> »
+	// indépendamment de la taille de la catégorie, cohérent avec la vue en pourcentage.
+	function orderBySeriesShare(
+		dim: string,
+		stackDim: string,
+		seriesValue: string,
+		dir: 'desc' | 'asc',
+		rows: Record<string, unknown>[],
+	): string[] {
+		const num = new Map<string, number>();
+		const den = new Map<string, number>();
+		for (const r of rows) {
+			const cat = String(r[dim]);
+			const val = Number(r.value ?? 0);
+			den.set(cat, (den.get(cat) ?? 0) + val);
+			if (String(r[stackDim]) === seriesValue) num.set(cat, (num.get(cat) ?? 0) + val);
+		}
+		const share = (cat: string) => {
+			const d = den.get(cat) ?? 0;
+			return d ? (num.get(cat) ?? 0) / d : 0;
+		};
+		const sign = dir === 'desc' ? -1 : 1;
+		return [...den.keys()].sort((a, b) => sign * (share(a) - share(b)));
+	}
+
 	function onPrimaryChange() {
 		// Le groupement primaire ne peut pas être aussi la comparaison.
 		if (groupBy === primaryBy) groupBy = '';
@@ -185,6 +218,8 @@
 				groupBy: { type: 'single', urlKey: 'group_by', defaultValue: 'year' },
 				chartMode: { type: 'single', urlKey: 'mode', defaultValue: 'absolu' },
 				chartPage: { type: 'page', urlKey: 'chart_page' },
+				chartSort: { type: 'single', urlKey: 'sort', defaultValue: '' },
+				chartSortDir: { type: 'single', urlKey: 'sort_dir', defaultValue: 'desc' },
 		},
 	});
 
@@ -201,6 +236,8 @@
 			groupBy,
 			chartMode,
 			chartPage,
+			chartSort,
+			chartSortDir,
 		}));
 	}
 
@@ -242,10 +279,24 @@
 		const stackDim = comparison ? primaryBy : '';
 		const cs = getComputedStyle(document.documentElement);
 
-		// Abscisse : à forte cardinalité (laboratoire), on pagine les valeurs (triées par total
-		// décroissant) au lieu de les tronquer — l'axe reste lisible, le détail reste atteignable.
+		const stackValues = stackDim ? orderedValues(stackDim, rows) : [];
+
+		// Tri par part d'une série : n'a de sens que sur un axe entité à forte cardinalité (labo,
+		// éditeur, revue) avec un empilement. L'axe année reste chronologique, les axes à faible
+		// cardinalité gardent leur ordre métier. Le sélecteur n'apparaît que dans ce cas, et une clé
+		// devenue caduque (changement d'empilement ou d'axe) est réinitialisée.
 		const highCard = dimCard(xDim) === 'high';
-		const allCats = orderedValues(xDim, rows);
+		const canSort = highCard && !!stackDim;
+		sortableSeries = canSort ? stackValues.map((sv) => ({ value: sv, label: dimLabel(stackDim, sv) })) : [];
+		if (chartSort && (!canSort || !stackValues.includes(chartSort))) chartSort = '';
+
+		// Abscisse : à forte cardinalité, on pagine les valeurs au lieu de les tronquer — l'axe reste
+		// lisible, le détail reste atteignable. Ordre par défaut : total décroissant ; si une clé de tri
+		// est choisie, on classe par la part de la série correspondante.
+		const allCats =
+			chartSort && canSort
+				? orderBySeriesShare(xDim, stackDim, chartSort, chartSortDir, rows)
+				: orderedValues(xDim, rows);
 		chartCatTotal = highCard ? allCats.length : 0;
 		if (highCard && (chartPage - 1) * CHART_PAGE_SIZE >= allCats.length) chartPage = 1;
 		const cats = highCard
@@ -257,7 +308,7 @@
 			const row = rows.find((r) => String(r[xDim]) === cv && (!stackDim || String(r[stackDim]) === sv));
 			return row ? Number(row.value) : 0;
 		};
-		const series = stackDim ? orderedValues(stackDim, rows) : ['__all__'];
+		const series = stackDim ? stackValues : ['__all__'];
 		const datasets = series.map((sv, i) => ({
 			label: stackDim ? dimLabel(stackDim, sv) : 'Publications',
 			data: cats.map((cv) => cell(cv, sv)),
@@ -438,6 +489,8 @@
 		if (restored.groupBy !== undefined) groupBy = restored.groupBy as string;
 		if (restored.chartMode !== undefined) chartMode = restored.chartMode as 'absolu' | 'part';
 		if (restored.chartPage) chartPage = restored.chartPage as number;
+		if (restored.chartSort !== undefined) chartSort = restored.chartSort as string;
+		if (restored.chartSortDir !== undefined) chartSortDir = restored.chartSortDir as 'desc' | 'asc';
 
 		// Vocabulaire du pivot : dimensions graphables (faible cardinalité, hors l'axe année)
 		// proposées au sélecteur de découpage. Ajouter une dimension au registre l'y fait apparaître.
@@ -479,6 +532,7 @@
 				{/each}
 			</select>
 		</label>
+		<span class="sep" aria-hidden="true"></span>
 		<!-- {#key primaryBy} : recrée le select quand le groupement change, pour que sa valeur
 		     affichée reste synchronisée avec `groupBy` malgré le recalcul des options. -->
 		{#key primaryBy}
@@ -492,12 +546,30 @@
 				</select>
 			</label>
 		{/key}
-	{/if}
+			<span class="sep" aria-hidden="true"></span>
+		{/if}
 	{#if pivotSchema}
 		<label class="groupby">
 			<input type="checkbox" checked={chartMode === 'part'} onchange={(e) => { chartMode = e.currentTarget.checked ? 'part' : 'absolu'; syncUrl(); loadChart(); }} />
 			Part&nbsp;(%)
 		</label>
+	{/if}
+	{#if sortableSeries.length}
+		<span class="sep" aria-hidden="true"></span>
+		<label class="groupby">
+			Trier&nbsp;:
+			<select bind:value={chartSort} onchange={() => { chartPage = 1; syncUrl(); loadChart(); }}>
+				<option value="">Total</option>
+				{#each sortableSeries as s (s.value)}
+					<option value={s.value}>% {s.label}</option>
+				{/each}
+			</select>
+		</label>
+		{#if chartSort}
+			<button type="button" class="sort-dir" title="Sens du tri" onclick={() => { chartSortDir = chartSortDir === 'desc' ? 'asc' : 'desc'; chartPage = 1; syncUrl(); loadChart(); }}>
+				{chartSortDir === 'desc' ? '↓' : '↑'}
+			</button>
+		{/if}
 	{/if}
 	<a class="pub-link" href={pubsUrl}>Voir les publications &rarr;</a>
 </div>
@@ -586,6 +658,27 @@
 		border: 1px solid var(--border);
 		border-radius: 4px;
 		background: white;
+	}
+	/* Séparateur vertical léger entre les groupes de contrôles du pivot. */
+	.sep {
+		width: 1px;
+		align-self: stretch;
+		min-height: 20px;
+		background: var(--border);
+	}
+	.sort-dir {
+		font-family: inherit;
+		font-size: 1rem;
+		line-height: 1;
+		padding: 5px 9px;
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		background: white;
+		color: var(--muted);
+		cursor: pointer;
+	}
+	.sort-dir:hover {
+		background: var(--hover);
 	}
 	.legend {
 		display: flex;
