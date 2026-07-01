@@ -40,7 +40,7 @@ describe('useUrlFilters', () => {
 			});
 			f.syncUrl(() => ({ years: ['2024', '2023'] }));
 			expect(gotoSpy).toHaveBeenCalledWith(
-				'/bibliometrie/publications?year=2024%2C2023',
+				'/bibliometrie/publications?year=2024,2023',
 				GOTO_OPTS,
 			);
 		});
@@ -72,7 +72,7 @@ describe('useUrlFilters', () => {
 			// `any` est ignoré (ni yes ni no)
 			expect(gotoSpy).toHaveBeenCalled();
 			const call = gotoSpy.mock.calls[0][0] as string;
-			expect(call).toContain('sf=hal_yes%2Coa_no');
+			expect(call).toContain('sf=hal_yes,oa_no');
 			expect(call).not.toContain('any');
 		});
 

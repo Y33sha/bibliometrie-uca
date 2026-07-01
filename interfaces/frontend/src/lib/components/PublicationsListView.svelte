@@ -24,6 +24,7 @@
 	import { useUrlFilters } from '$lib/composables/useUrlFilters.svelte';
 	import { useColumnVisibility } from '$lib/composables/useColumnVisibility.svelte';
 	import ColumnMenu from '$lib/components/ColumnMenu.svelte';
+	import { paramsToQuery } from '$lib/utils';
 
 	import type { components } from '$lib/api/schema';
 	type Publication = components['schemas']['PublicationListItem'] & {
@@ -208,7 +209,7 @@
 		if (publisherId) p.set('publisher_id', publisherId);
 		const journalId = externalFilters?.journalId != null ? String(externalFilters.journalId) : filterJournalId;
 		if (journalId) p.set('journal_id', journalId);
-		return base + '/stats?' + p.toString();
+		return base + '/stats?' + paramsToQuery(p);
 	});
 
 	// Sort display
@@ -391,7 +392,7 @@
 		if (q) params.set('search', q);
 		// Colonnes visibles → le CSV reflète le tableau affiché.
 		params.set('columns', cv.visibleColumns.join(','));
-		return `${base}/api/publications/export.csv?${params}`;
+		return `${base}/api/publications/export.csv?${paramsToQuery(params)}`;
 	}
 
 	async function onExcludeClick(p: Publication) {

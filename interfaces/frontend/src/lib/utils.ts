@@ -1,5 +1,13 @@
 import katex from 'katex';
 
+/** Sérialise des paramètres en query string en gardant les virgules littérales.
+ * `URLSearchParams.toString()` percent-encode la virgule en `%2C` ; or elle est
+ * licite dans une query (RFC 3986) et sépare nos listes de valeurs — on la restaure
+ * pour des URL lisibles. Retourne la chaîne sans le `?` initial (vide si aucun paramètre). */
+export function paramsToQuery(params: URLSearchParams): string {
+	return params.toString().replace(/%2C/g, ',');
+}
+
 export function esc(s: string | null | undefined): string {
 	if (!s) return '';
 	const d = document.createElement('div');
