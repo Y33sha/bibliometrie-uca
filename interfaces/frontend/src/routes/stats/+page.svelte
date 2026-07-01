@@ -7,7 +7,15 @@
 	import Pagination from '$lib/components/Pagination.svelte';
 	import FacetDropdown from '$lib/components/FacetDropdown.svelte';
 	import EntityFilter from '$lib/components/EntityFilter.svelte';
-	import { oaLabelsMap, docTypePlural, docTypeFamilies, docTypeGroupedColors } from '$lib/labels';
+	import {
+		oaLabelsMap,
+		docTypePlural,
+		docTypeFamilies,
+		docTypeGroupedColors,
+		publicationsDocTypes,
+		docTypeFilterToken,
+		docTypeFilterFromToken,
+	} from '$lib/labels';
 	import { useFacets } from '$lib/composables/useFacets.svelte';
 	import { useUrlFilters } from '$lib/composables/useUrlFilters.svelte';
 
@@ -212,7 +220,7 @@
 			selectedLabs: { type: 'string_array', urlKey: 'lab_id' },
 			selectedOa: { type: 'string_array', urlKey: 'oa_status' },
 			selectedApc: { type: 'string_array', urlKey: 'has_apc' },
-			selectedDocTypes: { type: 'string_array', urlKey: 'doc_type' },
+			selectedDocTypes: { type: 'single', urlKey: 'doc_type', defaultValue: publicationsDocTypes.join(',') },
 			publisherId: { type: 'single', urlKey: 'publisher_id' },
 			journalId: { type: 'single', urlKey: 'journal_id' },
 			primaryBy: { type: 'single', urlKey: 'axis', defaultValue: 'doc_type_grouped' },
@@ -230,7 +238,7 @@
 			selectedLabs,
 			selectedOa,
 			selectedApc,
-			selectedDocTypes,
+			selectedDocTypes: docTypeFilterToken(selectedDocTypes),
 			publisherId: selectedPublisherId ?? '',
 			journalId: selectedJournalId ?? '',
 			primaryBy,
@@ -249,7 +257,7 @@
 		if (selectedYears.length) p.set('year', selectedYears.join(','));
 		if (selectedOa.length) p.set('oa_status', selectedOa.join(','));
 		if (selectedApc.length) p.set('has_apc', selectedApc.join(','));
-		if (selectedDocTypes.length) p.set('doc_type', selectedDocTypes.join(','));
+		p.set('doc_type', docTypeFilterToken(selectedDocTypes));
 		// On ne transmet que l'id (état canonique) ; la liste résout elle-même le libellé de la pastille.
 		if (selectedPublisherId) p.set('publisher_id', selectedPublisherId);
 		if (selectedJournalId) p.set('journal_id', selectedJournalId);
@@ -483,7 +491,8 @@
 		if (restored.selectedLabs) selectedLabs = restored.selectedLabs as string[];
 		if (restored.selectedOa) selectedOa = restored.selectedOa as string[];
 		if (restored.selectedApc) selectedApc = restored.selectedApc as string[];
-		if (restored.selectedDocTypes) selectedDocTypes = restored.selectedDocTypes as string[];
+		if (restored.selectedDocTypes != null)
+			selectedDocTypes = docTypeFilterFromToken(restored.selectedDocTypes as string);
 		if (restored.publisherId) selectedPublisherId = restored.publisherId as string;
 		if (restored.journalId) selectedJournalId = restored.journalId as string;
 		if (restored.primaryBy !== undefined) primaryBy = restored.primaryBy as string;
@@ -499,10 +508,10 @@
 			pivotSchema = await api<components['schemas']['PivotSchemaResponse']>('/api/stats/pivot/schema');
 		} catch { pivotSchema = null; }
 
-		// Défaut du type de document : la famille « Publications » (même base que la liste des
-		// publications), sauf si l'URL en a restauré une sélection.
-		if (selectedDocTypes.length === 0) {
-			selectedDocTypes = [...(docTypeFamilies.find((f) => f.key === 'publications')?.types ?? [])];
+		// Défaut du type de document : la famille « Publications ». Appliqué uniquement quand l'URL ne
+		// porte pas de filtre de types ; le token `all` (sélection « Tous » explicite) le laisse vide.
+		if (!u.has('doc_type')) {
+			selectedDocTypes = [...publicationsDocTypes];
 		}
 
 		// Load facets first, then apply default years if needed, then full refresh

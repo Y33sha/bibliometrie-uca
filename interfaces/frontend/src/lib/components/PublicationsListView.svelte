@@ -10,7 +10,14 @@
 	import { SOURCE_ITEMS } from '$lib/filterItems';
 	import Pagination from '$lib/components/Pagination.svelte';
 	import { oaLabelsMap } from '$lib/labels';
-	import { docTypeSingular, docTypePlural, docTypeFamilies } from '$lib/labels';
+	import {
+		docTypeSingular,
+		docTypePlural,
+		docTypeFamilies,
+		publicationsDocTypes,
+		docTypeFilterToken,
+		docTypeFilterFromToken,
+	} from '$lib/labels';
 	import { usePaginatedFetch } from '$lib/composables/usePaginatedFetch.svelte';
 	import TableStatusRow from '$lib/components/TableStatusRow.svelte';
 	import { useFacets } from '$lib/composables/useFacets.svelte';
@@ -187,7 +194,7 @@
 	const statsUrl = $derived.by(() => {
 		const p = new URLSearchParams();
 		if (selectedYears.length) p.set('year', selectedYears.join(','));
-		if (selectedDocTypes.length) p.set('doc_type', selectedDocTypes.join(','));
+		p.set('doc_type', docTypeFilterToken(selectedDocTypes));
 		if (selectedOa.length) p.set('oa_status', selectedOa.join(','));
 		if (selectedApc.length) p.set('has_apc', selectedApc.join(','));
 		// Laboratoire : fixé par la route ou choisi en facette (« aucun labo » n'a pas de sens côté stats).
@@ -309,7 +316,7 @@
 			selectedYears:     { type: 'string_array',  urlKey: 'year' },
 			selectedLabs:      { type: 'string_array',  urlKey: 'lab_id' },
 			sourceStates:      { type: 'source_states', urlKey: 'source_filter' },
-			selectedDocTypes:  { type: 'string_array',  urlKey: 'doc_type' },
+			selectedDocTypes:  { type: 'single',        urlKey: 'doc_type', defaultValue: publicationsDocTypes.join(',') },
 			selectedAccess:    { type: 'string_array',  urlKey: 'access' },
 			selectedOa:        { type: 'string_array',  urlKey: 'oa_status' },
 			selectedApc:       { type: 'string_array',  urlKey: 'has_apc' },
@@ -329,7 +336,8 @@
 	function syncUrl() {
 		if (!urlSync) return;
 		url.syncUrl(() => ({
-			selectedYears, selectedLabs, sourceStates, selectedDocTypes,
+			selectedYears, selectedLabs, sourceStates,
+			selectedDocTypes: docTypeFilterToken(selectedDocTypes),
 			selectedAccess, selectedOa, selectedApc, selectedCountries,
 			selectedHalStatus, selectedCorr, selectedPerimeter,
 			search, currentSort,
@@ -401,7 +409,8 @@
 			if (restored.selectedYears) selectedYears = restored.selectedYears as string[];
 			if (restored.selectedLabs) selectedLabs = restored.selectedLabs as string[];
 			if (restored.sourceStates) sourceStates = restored.sourceStates as Record<string, 'all' | 'yes' | 'no'>;
-			if (restored.selectedDocTypes) selectedDocTypes = restored.selectedDocTypes as string[];
+			if (restored.selectedDocTypes != null)
+				selectedDocTypes = docTypeFilterFromToken(restored.selectedDocTypes as string);
 			if (restored.selectedAccess) selectedAccess = restored.selectedAccess as string[];
 			if (restored.selectedOa) selectedOa = restored.selectedOa as string[];
 			if (restored.selectedApc) selectedApc = restored.selectedApc as string[];
@@ -419,9 +428,9 @@
 		// Défaut « Publications » (liste générale uniquement) : sans filtre de type explicite dans
 		// l'URL, on pré-sélectionne la famille Publications. La sélection est réelle (et non un
 		// filtre caché), donc la facet « Types » la reflète ; cocher d'autres types ou « Tous »
-		// l'élargit.
-		if (restrictToPublications && selectedDocTypes.length === 0) {
-			selectedDocTypes = [...(docTypeFamilies.find((f) => f.key === 'publications')?.types ?? [])];
+		// l'élargit. Le token `all` dans l'URL (« Tous » explicite) laisse la sélection vide.
+		if (restrictToPublications && !(urlSync && $page.url.searchParams.has('doc_type'))) {
+			selectedDocTypes = [...publicationsDocTypes];
 		}
 
 		// Forcer l'affichage des colonnes liées aux filtres actifs

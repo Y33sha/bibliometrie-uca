@@ -97,6 +97,24 @@ export const docTypeFamilyOf: Record<string, string> = Object.fromEntries(
 	docTypeFamilies.flatMap((f) => f.types.map((t) => [t, f.key]))
 );
 
+/** Types de la famille « publications » stricte : défaut du filtre de types sur les listes générales
+ * (statistiques et publications), appliqué quand l'URL ne porte pas de filtre de types explicite. */
+export const publicationsDocTypes: string[] =
+	docTypeFamilies.find((f) => f.key === 'publications')?.types ?? [];
+
+/**
+ * Sérialisation du filtre de types dans l'URL. Une sélection vide signifie « tous les types »
+ * (aucun filtre) : on l'écrit avec le token `all` pour la distinguer de l'absence de filtre (qui,
+ * elle, déclenche le défaut « publications »). Même convention que le filtre `has_rh` de l'annuaire.
+ */
+export const DOC_TYPE_FILTER_ALL = 'all';
+export function docTypeFilterToken(selected: string[]): string {
+	return selected.length ? selected.join(',') : DOC_TYPE_FILTER_ALL;
+}
+export function docTypeFilterFromToken(raw: string): string[] {
+	return raw === DOC_TYPE_FILTER_ALL ? [] : raw.split(',');
+}
+
 export const docTypeGroupedColors: Record<string, string> = {
 	article: '#2f7ed8',
 	review: '#1f5c9e',
