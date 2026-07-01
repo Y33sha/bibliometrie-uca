@@ -4,7 +4,7 @@
 
 ### En cours
 
-- [Observabilité du pipeline](CODE_observabilite-pipeline.md)
+_(aucun)_
 
 ### En pause
 
@@ -19,6 +19,7 @@
 
 ## Chantiers archivés
 
+- 2026-07-01 — [Observabilité du pipeline](archived/2026-07-01_CODE_observabilite-pipeline.md)
 - 2026-06-30 — [Brancher le domaine riche orphelin](archived/2026-06-30_CODE_domaine-riche-orphelin.md)
 - 2026-06-29 — [Déduire le journal_id manquant par préfixe DOI](archived/2026-06-29_DATA_journal-id-par-doi-prefix.md)
 - 2026-06-28 — [Visualisations dynamiques (pivot listes ↔ tableaux de bord)](archived/2026-06-28_METIER_visualisations-pivot.md)

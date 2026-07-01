@@ -1,6 +1,6 @@
 # Chantier — Observabilité du pipeline
 
-Commencé le 2026-05-16.
+Commencé le 2026-05-16 - Terminé le 2026-07-01
 
 ## Contexte
 
