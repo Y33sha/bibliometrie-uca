@@ -86,6 +86,8 @@ Pour chaque revue candidate, essai successif `issn` → `eissn` → `issnl` (dou
 
 ## <span id="ror"></span>ROR
 
+*Pas à jour: sorti du pipeline, relégué dans un script CLI*
+
 https://ror.org/ — Research Organization Registry
 
 Documentation API : https://ror.readme.io/

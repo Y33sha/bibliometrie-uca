@@ -15,6 +15,7 @@
 - [Scinder `source_authorships` (identité ⊥ liaison)](DATA_scinder-source-authorships.md)
 - [Qualité et cohérence des sujets](METIER_sujets-qualite.md)
 - [Signatures institutionnelles](METIER_signatures-institutionnelles.md)
+- [Skip propre des sources d'extraction non configurées](CODE_extract-sources-non-configurees.md)
 
 ## Chantiers archivés
 
