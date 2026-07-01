@@ -30,10 +30,12 @@ def list_phases() -> list[str]:
 @router.get("/api/admin/pipeline/runs", response_model=list[RunSummary])
 def list_runs(
     limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
     queries: PhaseExecutionsQueries = Depends(pipeline_phase_executions_queries_sync),
 ) -> list[RunSummary]:
-    """N derniers runs (agrégés par `run_id`), plus récent en premier."""
-    return queries.list_runs(limit=limit)
+    """Fenêtre de runs (agrégés par `run_id`), plus récent en premier ; `offset` pour
+    le chargement incrémental."""
+    return queries.list_runs(limit=limit, offset=offset)
 
 
 @router.get("/api/admin/pipeline/runs/{run_id}", response_model=RunDetail)

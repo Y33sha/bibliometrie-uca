@@ -10,11 +10,17 @@
     allPhases,
     selectedRunId,
     onSelect,
+    hasMore,
+    loadingMore,
+    onLoadMore,
   }: {
     runs: RunSummary[];
     allPhases: string[];
     selectedRunId: number | null;
     onSelect: (runId: number) => void;
+    hasMore: boolean;
+    loadingMore: boolean;
+    onLoadMore: () => void;
   } = $props();
 
   function statusMap(run: RunSummary): Record<string, Status> {
@@ -56,6 +62,11 @@
         </div>
       </button>
     {/each}
+    {#if hasMore}
+      <button class="load-more" onclick={onLoadMore} disabled={loadingMore}>
+        {loadingMore ? "Chargement…" : "Charger les runs plus anciens"}
+      </button>
+    {/if}
   {/if}
 </div>
 
@@ -64,7 +75,25 @@
     display: flex;
     flex-direction: column;
     gap: 6px;
-    overflow-y: auto;
+  }
+  .load-more {
+    padding: 8px 12px;
+    margin-top: 2px;
+    border: 1px dashed var(--border);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.82rem;
+  }
+  .load-more:hover:not(:disabled) {
+    background: var(--hover);
+    color: inherit;
+  }
+  .load-more:disabled {
+    cursor: default;
+    opacity: 0.6;
   }
   .run-item {
     display: flex;
