@@ -1,4 +1,6 @@
-# Nettoyer la qualité éditoriale : journals et publishers
+# Nettoyer les tables journals et publishers
+
+*A revoir pour automatiser le maximum d'opérations*
 
 Procédure de diagnostic et de remédiation des défauts récurrents sur les tables `journals`, `publishers`, `doi_prefixes` et leurs relations.
 
