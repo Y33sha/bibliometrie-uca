@@ -1,4 +1,4 @@
-# Ajouter une règle de correction de métadonnée canonique
+# Ajouter une règle de correction de métadonnées
 
 Procédure d'écriture, branchement et déploiement d'une règle dans `domain/source_publications/correction.py`.
 

@@ -1,5 +1,7 @@
 # Ajouter une règle de déduplication des publications
 
+*Obsolète, à réécrire*
+
 Procédure d'écriture, validation et déploiement d'une règle de rapprochement de `source_publications`.
 
 Ce playbook est le *comment*. Le cadre conceptuel et le catalogue des décisions par type vivent dans la fiche [DATA_dedup-pairwise-gated](../chantiers/DATA_dedup-pairwise-gated.md).

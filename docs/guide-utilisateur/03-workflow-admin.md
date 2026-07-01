@@ -1,6 +1,6 @@
 # Workflow admin
 
-*A compléter.*
+*A compléter et mettre à jour.*
 
 ## En amont du pipeline
 

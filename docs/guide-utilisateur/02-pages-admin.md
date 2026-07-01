@@ -1,6 +1,6 @@
 # Pages d'administration
 
-*A compléter.*
+*A compléter et mettre à jour.*
 
 ## Pipeline
 
