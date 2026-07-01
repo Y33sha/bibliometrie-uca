@@ -118,8 +118,7 @@ class ThesesExtractor(SourceExtractor[ThesesExtractConfig]):
         config = self._adapter.load_config(conn)
         if not config.ppns:
             raise ExtractionConfigError(
-                "aucun PPN d'établissement theses.fr configuré "
-                "(structures.api_ids->'theses' vide pour le périmètre d'extraction)"
+                "aucun PPN d'établissement (api_ids->'theses' vide pour le périmètre d'extraction)"
             )
         return config
 

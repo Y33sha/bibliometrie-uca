@@ -163,8 +163,7 @@ class HalExtractor(SourceExtractor[HalExtractConfig]):
         config = self._adapter.load_config(conn)
         if not config.all_collections:
             raise ExtractionConfigError(
-                "aucune collection HAL configurée "
-                "(aucune structure du périmètre d'extraction n'a de hal_collection)"
+                "aucune collection HAL (aucune structure du périmètre d'extraction n'a de hal_collection)"
             )
         return config
 

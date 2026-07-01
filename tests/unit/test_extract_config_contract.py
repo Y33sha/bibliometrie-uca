@@ -1,10 +1,11 @@
-"""Contrat de configuration par source d'extraction (couche application).
+"""Contrat de configuration par orchestrateur d'extraction (couche application).
 
 Chaque orchestrateur lève `ExtractionConfigError` quand la source n'est pas
-configurée pour extraire : identifiants de structure absents, ou credentials
-manquants (clé WoS, credentials ScanR, ni clé ni email pour OpenAlex, aucune
-collection HAL). Pour OpenAlex, la clé API ou l'email polite pool suffit — l'un
-des deux.
+extractible : périmètre d'interrogation absent (contrôle propre à l'extraction :
+collections HAL, institution_ids, affiliations, PPN) ou credentials absents
+(motif porté par `*ExtractConfig.credentials_missing`, renseigné par l'adapter via
+le détecteur central `source_credentials_missing`). La règle de présence des
+credentials elle-même est testée dans `test_source_credentials_missing`.
 """
 
 import logging
@@ -23,6 +24,7 @@ from application.ports.pipeline.extract.scanr import ScanrExtractConfig
 from application.ports.pipeline.extract.wos import WosExtractConfig
 
 _LOG = logging.getLogger("test.extract.contract")
+_MISSING = "credentials absents (motif)"
 
 
 def _extractor(cls, config):
@@ -31,111 +33,107 @@ def _extractor(cls, config):
     return cls(None, _LOG, adapter)
 
 
-def _openalex_config(*, institution_ids, has_api_key, has_polite_email):
-    return OpenalexExtractConfig(
-        base_url="u",
-        institution_ids=institution_ids,
-        has_api_key=has_api_key,
-        has_polite_email=has_polite_email,
-    )
+# ── OpenAlex ────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.parametrize(
-    ("has_api_key", "has_polite_email"),
-    [(True, False), (False, True), (True, True)],
-)
-def test_openalex_accepts_key_or_email(has_api_key, has_polite_email):
-    extractor = _extractor(
+def _openalex(*, institution_ids, credentials_missing):
+    return _extractor(
         OpenalexExtractor,
-        _openalex_config(
-            institution_ids=["I1"], has_api_key=has_api_key, has_polite_email=has_polite_email
+        OpenalexExtractConfig(
+            base_url="u", institution_ids=institution_ids, credentials_missing=credentials_missing
         ),
     )
-    assert extractor.load_config(None).institution_ids == ["I1"]
-
-
-def test_openalex_requires_auth():
-    extractor = _extractor(
-        OpenalexExtractor,
-        _openalex_config(institution_ids=["I1"], has_api_key=False, has_polite_email=False),
-    )
-    with pytest.raises(ExtractionConfigError):
-        extractor.load_config(None)
 
 
 def test_openalex_requires_institution_ids():
-    extractor = _extractor(
-        OpenalexExtractor,
-        _openalex_config(institution_ids=[], has_api_key=True, has_polite_email=True),
-    )
     with pytest.raises(ExtractionConfigError):
-        extractor.load_config(None)
+        _openalex(institution_ids=[], credentials_missing=None).load_config(None)
 
 
-def test_wos_requires_api_key():
-    extractor = _extractor(
-        WosExtractor, WosExtractConfig(base_url="u", affiliations=["A"], has_api_key=False)
-    )
+def test_openalex_raises_on_missing_credentials():
     with pytest.raises(ExtractionConfigError):
-        extractor.load_config(None)
+        _openalex(institution_ids=["I1"], credentials_missing=_MISSING).load_config(None)
+
+
+def test_openalex_ok():
+    config = _openalex(institution_ids=["I1"], credentials_missing=None).load_config(None)
+    assert config.institution_ids == ["I1"]
+
+
+# ── WoS ─────────────────────────────────────────────────────────────────────
+
+
+def _wos(*, affiliations, credentials_missing):
+    return _extractor(
+        WosExtractor,
+        WosExtractConfig(
+            base_url="u", affiliations=affiliations, credentials_missing=credentials_missing
+        ),
+    )
 
 
 def test_wos_requires_affiliations():
-    extractor = _extractor(
-        WosExtractor, WosExtractConfig(base_url="u", affiliations=[], has_api_key=True)
-    )
     with pytest.raises(ExtractionConfigError):
-        extractor.load_config(None)
+        _wos(affiliations=[], credentials_missing=None).load_config(None)
 
 
-def test_wos_ok_with_key_and_affiliations():
-    extractor = _extractor(
-        WosExtractor, WosExtractConfig(base_url="u", affiliations=["A"], has_api_key=True)
-    )
-    assert extractor.load_config(None).affiliations == ["A"]
+def test_wos_raises_on_missing_credentials():
+    with pytest.raises(ExtractionConfigError):
+        _wos(affiliations=["A"], credentials_missing=_MISSING).load_config(None)
 
 
-def test_scanr_requires_credentials():
-    extractor = _extractor(
+def test_wos_ok():
+    assert _wos(affiliations=["A"], credentials_missing=None).load_config(None).affiliations == [
+        "A"
+    ]
+
+
+# ── ScanR ───────────────────────────────────────────────────────────────────
+
+
+def _scanr(*, affiliation_ids, credentials_missing):
+    return _extractor(
         ScanrExtractor,
-        ScanrExtractConfig(base_url="u", affiliation_ids=["A"], has_credentials=False),
+        ScanrExtractConfig(
+            base_url="u", affiliation_ids=affiliation_ids, credentials_missing=credentials_missing
+        ),
     )
-    with pytest.raises(ExtractionConfigError):
-        extractor.load_config(None)
 
 
 def test_scanr_requires_affiliation_ids():
-    extractor = _extractor(
-        ScanrExtractor,
-        ScanrExtractConfig(base_url="u", affiliation_ids=[], has_credentials=True),
-    )
     with pytest.raises(ExtractionConfigError):
-        extractor.load_config(None)
+        _scanr(affiliation_ids=[], credentials_missing=None).load_config(None)
 
 
-def test_scanr_ok_with_credentials_and_affiliations():
-    extractor = _extractor(
-        ScanrExtractor,
-        ScanrExtractConfig(base_url="u", affiliation_ids=["A"], has_credentials=True),
-    )
-    assert extractor.load_config(None).affiliation_ids == ["A"]
+def test_scanr_raises_on_missing_credentials():
+    with pytest.raises(ExtractionConfigError):
+        _scanr(affiliation_ids=["A"], credentials_missing=_MISSING).load_config(None)
 
 
-def _hal_config(all_collections):
-    return HalExtractConfig(
-        base_url="u",
-        all_collections=all_collections,
-        n_collections=len(all_collections),
-        n_extra=0,
+def test_scanr_ok():
+    config = _scanr(affiliation_ids=["A"], credentials_missing=None).load_config(None)
+    assert config.affiliation_ids == ["A"]
+
+
+# ── HAL (API publique : périmètre seul) ─────────────────────────────────────
+
+
+def _hal(all_collections):
+    return _extractor(
+        HalExtractor,
+        HalExtractConfig(
+            base_url="u",
+            all_collections=all_collections,
+            n_collections=len(all_collections),
+            n_extra=0,
+        ),
     )
 
 
 def test_hal_requires_collections():
-    extractor = _extractor(HalExtractor, _hal_config({}))
     with pytest.raises(ExtractionConfigError):
-        extractor.load_config(None)
+        _hal({}).load_config(None)
 
 
 def test_hal_ok_with_collections():
-    extractor = _extractor(HalExtractor, _hal_config({"C": "lab"}))
-    assert extractor.load_config(None).all_collections == {"C": "lab"}
+    assert _hal({"C": "lab"}).load_config(None).all_collections == {"C": "lab"}

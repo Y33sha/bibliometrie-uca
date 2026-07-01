@@ -20,9 +20,10 @@ class ScanrExtractConfig:
 
     base_url: str
     affiliation_ids: list[str]
-    # L'API ScanR (Elasticsearch) exige une basic auth (username + password) : sans
-    # credentials, pas d'extraction.
-    has_credentials: bool
+    # Motif d'absence des credentials ScanR (username + password), ou None si présents.
+    # Renseigné par l'adapter via le détecteur central ; l'orchestrateur lève
+    # ExtractionConfigError dessus.
+    credentials_missing: str | None
 
 
 class ScanrExtractAdapter(Protocol):

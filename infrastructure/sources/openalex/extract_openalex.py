@@ -26,6 +26,7 @@ from infrastructure.sources.config import (
     get_openalex_api_key,
     get_polite_pool_email_optional,
     get_years,
+    source_credentials_missing,
 )
 from infrastructure.sources.http_retry import http_request_with_retry
 from infrastructure.sources.openalex import SELECT_FIELDS, auth_params, init_auth
@@ -93,14 +94,13 @@ class PgOpenalexExtractAdapter(OpenalexExtractAdapter):
 
     def load_config(self, conn: Connection) -> OpenalexExtractConfig:
         institution_ids = get_extraction_api_ids(conn, "openalex")
-        api_key = get_openalex_api_key(conn)
-        email = get_polite_pool_email_optional(conn)
-        init_auth(api_key=api_key, email=email or "")
+        init_auth(
+            api_key=get_openalex_api_key(conn), email=get_polite_pool_email_optional(conn) or ""
+        )
         return OpenalexExtractConfig(
             base_url=self._url,
             institution_ids=institution_ids,
-            has_api_key=bool(api_key),
-            has_polite_email=bool(email),
+            credentials_missing=source_credentials_missing(conn, "openalex"),
         )
 
     def get_years(self, conn: Connection, *, start_year: int | None = None) -> list[int]:

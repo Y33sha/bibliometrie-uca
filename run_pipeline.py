@@ -105,19 +105,22 @@ def _timed_metrics(fn: Callable[[], PhaseMetrics]) -> tuple[PhaseMetrics, float]
     return result, time.time() - started
 
 
-def _signal_source_unconfigured(metrics: PhaseMetrics, source: str, exc: Exception) -> None:
-    """Marque une source d'extraction non configurée comme sautée (avertissement).
+def _signal_source_unconfigured(
+    metrics: PhaseMetrics, source: str, reason: str, *, phase: str = "extract"
+) -> None:
+    """Marque un accès à une API tierce non configuré comme sauté (avertissement).
 
-    Une source dont la configuration d'extraction est absente (identifiants de
-    structure ou credentials manquants) n'interrompt pas le run : la phase se
-    termine avec les sources configurées, son point passe en ambre et le motif
-    s'affiche au drill-down. Même canal de signaux que le circuit-breaker."""
-    log.warning("extract : source %s non configurée — sautée (%s)", source, exc)
+    Un accès dont la configuration manque (credentials, ou pour l'extraction bulk le
+    périmètre d'interrogation) n'interrompt pas le run : la phase se termine avec les
+    accès configurés, son point passe en ambre et le motif s'affiche au détail. Même
+    canal de signaux que le circuit-breaker. `reason` est le motif d'absence, `phase`
+    le contexte pour le log (extract, cross_imports, refresh_stale, oa_status…)."""
+    log.warning("%s : source %s non configurée — sautée : %s", phase, source, reason)
     metrics.signals.append(
         {
             "level": "warning",
             "code": "source_unconfigured",
-            "message": f"{source} non configurée — sautée",
+            "message": f"{source} non configurée — sautée : {reason}",
         }
     )
 
@@ -156,7 +159,7 @@ def _run_parallel_extractors(
             try:
                 source_metrics, duration = future.result()
             except ExtractionConfigError as exc:
-                _signal_source_unconfigured(metrics, source, exc)
+                _signal_source_unconfigured(metrics, source, str(exc))
                 continue
             metrics.merge(source_metrics)
             by_source[source] = _extract_source_summary(source_metrics, duration)
@@ -210,7 +213,7 @@ def phase_extract(
             try:
                 hal_metrics, hal_duration = _timed_metrics(partial(_run_extract_hal, since=since))
             except ExtractionConfigError as exc:
-                _signal_source_unconfigured(metrics, "hal", exc)
+                _signal_source_unconfigured(metrics, "hal", str(exc))
             else:
                 metrics.merge(hal_metrics)
                 by_source["hal"] = _extract_source_summary(hal_metrics, hal_duration)

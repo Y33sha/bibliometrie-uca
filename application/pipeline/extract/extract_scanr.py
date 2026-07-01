@@ -110,13 +110,10 @@ class ScanrExtractor(SourceExtractor[ScanrExtractConfig]):
         config = self._adapter.load_config(conn)
         if not config.affiliation_ids:
             raise ExtractionConfigError(
-                "aucun affiliation_id ScanR configuré "
-                "(structures.api_ids->'scanr' vide pour le périmètre d'extraction)"
+                "aucun affiliation_id (api_ids->'scanr' vide pour le périmètre d'extraction)"
             )
-        if not config.has_credentials:
-            raise ExtractionConfigError(
-                "aucun credential ScanR configuré (config.scanr_username / config.scanr_password)"
-            )
+        if config.credentials_missing:
+            raise ExtractionConfigError(config.credentials_missing)
         return config
 
     def setup_logging(self, args: argparse.Namespace, config: ScanrExtractConfig) -> None:
