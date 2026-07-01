@@ -77,5 +77,5 @@ La documentation d'initialisation cesse de renvoyer aux placeholders et explique
 
 ### Phase 4 — Tests
 
-- [ ] Test de non-régression : run `extract` avec des sources non configurées → celles-ci skipées, les configurées aboutissent.
-- [ ] Test par source du contrat de configuration (OpenAlex tolérant clé ou email ; WoS et ScanR credentials requis ; HAL collections requises).
+- [x] Test de non-régression : run `extract` avec des sources non configurées → celles-ci skipées, les configurées aboutissent.
+- [x] Test par source du contrat de configuration (OpenAlex tolérant clé ou email ; WoS et ScanR credentials requis ; HAL collections requises).
