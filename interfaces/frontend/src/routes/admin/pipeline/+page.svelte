@@ -12,8 +12,12 @@
   let pipelineStatus = $state<PipelineStatus | null>(null);
   let statusInterval: ReturnType<typeof setInterval> | null = null;
 
+  const PAGE_SIZE = 50;
+
   let allPhases = $state<string[]>([]);
   let runs = $state<RunSummary[]>([]);
+  let hasMore = $state(false);
+  let loadingMore = $state(false);
   let selectedRunId = $state<number | null>(null);
   let runDetail = $state<RunDetailT | null>(null);
   let runLoading = $state(false);
@@ -27,9 +31,25 @@
   }
 
   async function loadRuns() {
-    runs = await api<RunSummary[]>("/api/admin/pipeline/runs?limit=100");
+    const page = await api<RunSummary[]>(`/api/admin/pipeline/runs?limit=${PAGE_SIZE}`);
+    runs = page;
+    hasMore = page.length === PAGE_SIZE;
     if (runs.length > 0 && selectedRunId === null) {
       await selectRun(runs[0].run_id);
+    }
+  }
+
+  async function loadMore() {
+    if (loadingMore || !hasMore) return;
+    loadingMore = true;
+    try {
+      const page = await api<RunSummary[]>(
+        `/api/admin/pipeline/runs?limit=${PAGE_SIZE}&offset=${runs.length}`,
+      );
+      runs = [...runs, ...page];
+      hasMore = page.length === PAGE_SIZE;
+    } finally {
+      loadingMore = false;
     }
   }
 
@@ -80,7 +100,15 @@
 
 <div class="layout">
   <div class="col-list">
-    <RunList {runs} {allPhases} {selectedRunId} onSelect={selectRun} />
+    <RunList
+      {runs}
+      {allPhases}
+      {selectedRunId}
+      onSelect={selectRun}
+      {hasMore}
+      {loadingMore}
+      onLoadMore={loadMore}
+    />
   </div>
   <div class="col-detail">
     {#if runLoading}
@@ -129,6 +157,12 @@
     grid-template-columns: 360px 1fr;
     gap: 20px;
     align-items: start;
+  }
+  .col-list {
+    position: sticky;
+    top: 1rem;
+    max-height: calc(100vh - 2rem);
+    overflow-y: auto;
   }
   .col-detail {
     min-width: 0;

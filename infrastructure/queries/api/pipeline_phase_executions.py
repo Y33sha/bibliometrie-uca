@@ -47,9 +47,10 @@ class PgPhaseExecutionsQueries(PhaseExecutionsQueries):
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
 
-    def list_runs(self, limit: int = 50) -> list[RunSummary]:
-        """N derniers runs, plus récent en premier. Statut global = le pire des
-        statuts de phase ; mode et sources pris sur la première phase du run."""
+    def list_runs(self, limit: int = 50, offset: int = 0) -> list[RunSummary]:
+        """Fenêtre de runs, plus récent en premier (`offset` runs sautés pour le
+        chargement incrémental). Statut global = le pire des statuts de phase ; mode
+        et sources pris sur la première phase du run."""
         rows = self._conn.execute(
             text(
                 """
@@ -77,10 +78,10 @@ class PgPhaseExecutionsQueries(PhaseExecutionsQueries):
                     WHERE p.run_id = a.run_id ORDER BY id LIMIT 1
                 ) r ON true
                 ORDER BY a.run_id DESC
-                LIMIT :limit
+                LIMIT :limit OFFSET :offset
                 """
             ),
-            {"limit": limit},
+            {"limit": limit, "offset": offset},
         ).all()
         return [
             RunSummary(
