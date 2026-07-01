@@ -30,6 +30,16 @@ def _called_targets(stack) -> list[str]:
             return_value={},
         )
     )
+    # Neutralise le gate de configuration (testé ailleurs) : ici on vérifie la
+    # sélection des sources (opt-in WoS, filtre `sources`), pas la présence des
+    # credentials — le passthrough laisse passer toutes les cibles.
+    stack.enter_context(
+        patch.object(
+            run_pipeline,
+            "_configured_api_targets",
+            side_effect=lambda targets, metrics, *, phase: targets,
+        )
+    )
     return doi
 
 
