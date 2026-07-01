@@ -1,78 +1,84 @@
 # Chantier — Scinder `source_authorships` (identité ⊥ liaison)
 
-Étudier la décomposition de `source_authorships` en deux tables : une table des **éléments d'identification** des auteurs (formes de nom et identifiants, dédupliqués), et une table de **liaison** pure entre authorships sources et publications (position, rôles, correspondant, pays issus des adresses). L'enjeu n'est pas tant le gain de place — réel mais modéré — que la possibilité de ramener le matching personnes et les diagnostics de dédoublonnage à l'échelle des identités distinctes (centaines de milliers) plutôt qu'à celle des lignes (dizaines de millions). Gros impact sur le pipeline, donc à instruire avant de décider.
+Décomposer `source_authorships` en deux tables, **à comportement strictement constant** : une table des **identités d'auteur** (forme de nom normalisée + identifiants, dédupliquées) et la table de **liaison** allégée (une FK vers l'identité en remplacement des colonnes déménagées). C'est une pure correction de forme normale : les colonnes d'identification dépendent de *qui est l'auteur*, pas de la clé de liaison `(source, source_publication_id, author_position)` ; les stocker sur la liaison est une dépendance partielle, d'où une répétition d'un facteur ≈ 25. La cible restaure une symétrie déjà à demi-écrite dans le schéma : `addresses` est la table d'identités-source des structures (dédup de chaînes brutes alimentant le matching) ; les personnes n'ont pas d'équivalent, leur identité étant diluée dans la liaison.
+
+Le périmètre se limite au **déplacement des colonnes** : aucun changement de logique de matching, de valeur produite, ni de contrat de lecture (au résultat près, identique). Les gains de performance et les nouveaux diagnostics que la table débloque sont listés en **Suites possibles** et relèvent de chantiers ultérieurs, sur base stable.
 
 ## Contexte
 
 ### La table et sa redondance
 
-`source_authorships` porte une ligne par authorship source : la relation (`source`, `source_publication_id`, `author_position`, `in_perimeter`, `is_corresponding`, `roles`, `countries`, `authorship_id`) et l'identification de l'auteur (`person_id`, `author_name_normalized`, `raw_author_name`, `person_identifiers`). Les colonnes d'identification sont massivement répétées : une même personne y figure en moyenne une cinquantaine de fois, autant que de signatures qu'elle a déposées.
+`source_authorships` porte une ligne par authorship source : la relation (`source`, `source_publication_id`, `author_position`, `in_perimeter`, `is_corresponding`, `roles`, `countries`, `authorship_id`, `person_id`) et l'identification de l'auteur (`author_name_normalized`, `raw_author_name`, `person_identifiers`). Les colonnes d'identification sont massivement répétées : une même personne y figure en moyenne une cinquantaine de fois, autant que de signatures qu'elle a déposées.
 
 ### Mesures sur une base de travail (≈ 16,75 M lignes ; ≈ 19 M en production)
 
-La table pèse environ 3,3 Go : ≈ 2,58 Go de heap et ≈ 0,74 Go d'index, dont la clé primaire (≈ 0,36 Go) et l'unique `(source_publication_id, author_position)` (≈ 0,36 Go) à eux seuls. Les identités distinctes au sens `(author_name_normalized, person_identifiers)` sont ≈ 645 000 (≈ 657 000 en ajoutant `person_id` à la clé), soit un facteur de répétition d'environ 25. Le `person_id` est `NULL` sur ≈ 95 % des lignes (≈ 764 000 lignes liées, ≈ 16 500 personnes distinctes). Le `person_identifiers` est `NULL` sur ≈ 64 % des lignes ; ≈ 218 000 identités distinctes portent un identifiant fort.
-
-### Ce que mesure la cascade de matching
-
-La résolution personne enchaîne, du plus fiable au moins fiable : ORCID déposé par l'auteur, `hal_person_id`, IdRef (chacun corroboré par compatibilité de nom), puis cross-source par `(publication_id, author_position)`, puis forme de nom (match unique / ambigu / création). Deux régimes s'en dégagent. Les barreaux **sans contexte** — identifiants forts corroborés par le nom, forme de nom unique, création — ne dépendent que de la signature `(nom, identifiants)` : ils sont calculables une fois par identité distincte. Les barreaux **contextuels** — cross-source, et la garde de rejet d'une paire personne × publication — dépendent de la publication et de la position, irréductibles à l'identité seule. Les variantes `_dubious` d'identifiants (identifiant porté par deux positions d'auteur d'un même enregistrement, donc corruption) ne sont jamais signal : invisibles au matching dès la normalisation.
+La table pèse environ 3,3 Go : ≈ 2,58 Go de heap et ≈ 0,74 Go d'index, dont la clé primaire (≈ 0,36 Go) et l'unique `(source_publication_id, author_position)` (≈ 0,36 Go) à eux seuls. Les identités distinctes au sens `(author_name_normalized, person_identifiers)` sont ≈ 645 000, soit un facteur de répétition d'environ 25. Le `person_identifiers` est `NULL` sur ≈ 64 % des lignes.
 
 ## Décisions
 
-Ces décisions sont des orientations proposées, à confirmer ou amender ; seul le contexte ci-dessus est factuel.
+1. **Deux tables.** `author_identifying_keys` (`id`, `author_name_normalized`, `person_identifiers`) dédupliquée, unique sur `(author_name_normalized, person_identifiers)`. `source_authorships` perd `author_name_normalized` et `person_identifiers`, gagne `identity_id` (FK NOT NULL → `author_identifying_keys`), et garde tout le reste inchangé (`raw_author_name`, `person_id`, `authorship_id`, `in_perimeter`, `author_position`, `is_corresponding`, `roles`, `countries`, `source_structures`).
 
-1. **Modèle à deux niveaux.** Une table `author_identifying_keys` des identités distinctes `(formes de nom, identifiants)`, indépendante du contexte ; une table `source_authorships` allégée portant la liaison (publication, position, rôles, correspondant, pays, périmètre) et une référence vers l'identité.
+2. **Clé d'identité = `(author_name_normalized, person_identifiers)`.** Le nom **normalisé** déménage ; le **`raw_author_name` reste sur la liaison** (trace brute par signature). La dédup se fait sur le nom normalisé (déjà le grain du matching) : deux `raw` distincts qui normalisent pareil et portent les mêmes identifiants collapsent en une identité. Le marquage `_dubious` fait partie de la clé (deux valeurs d'identifiant distinctes = deux identités), donc reste invisible au matching comme aujourd'hui.
 
-2. **Le `person_id` de la table d'identités est un index de matching recalculable, pas la donnée autoritaire.** L'autorité reste sur `source_authorships` (puis `authorships`). La table d'identités matérialise le verdict des barreaux sans contexte pour accélérer et factoriser leur calcul ; elle est recalculable depuis les statuts d'identifiants et les formes de nom.
+3. **Relation N:1 : une FK, pas de table de liaison.** Une signature porte exactement une identité — simple FK. Plus simple que le cas des adresses (N:M, via `source_authorship_addresses`), où une signature peut porter plusieurs affiliations.
 
-3. **Une colonne `matched_by` trace la provenance du verdict** et sert de clé d'invalidation : ses valeurs reprennent les raisons de la cascade calculables au niveau identité (`orcid`, `hal_person_id`, `idref`, `single_name`, `new`). Le `cross_source` et la garde de rejet par publication restent au niveau de la liaison, contextuels.
+4. **Pas de `person_id` sur l'identité.** À comportement constant, le matching reste par signature et écrit `person_id` sur la liaison, au même endroit et au même moment. Une colonne `person_id` sur l'identité serait morte : elle n'apparaît qu'avec l'optimisation du matching (Suites possibles), pas ici.
 
-4. **Invalidation maîtrisée, sans écrasement.** Le rejet d'un identifiant invalide les identités résolues par cet identifiant (recalcul, repli sur le signal suivant). L'ajout d'une personne sur une forme de nom déjà résolue rend la forme ambiguë et annule le verdict des identités résolues par cette forme. Dans tous les cas, le `NULL` d'une identité ne redescend jamais sur le `person_id` déjà posé sur `source_authorships` : les rattachements existants (souvent confirmés) ne sont révisés que par le mécanisme de rejet, pas par une simple ré-ambiguïsation.
+## Gains et coûts
 
-5. **Vue matérialisée d'abord, migration ensuite.** Avant toute migration structurelle, une vue matérialisée en lecture seule `(author_name_normalized, person_identifiers, person_id)` rafraîchie à la demande donne l'essentiel du bénéfice diagnostique pour le dédoublonnage, sans toucher au write-path ni installer de machinerie d'invalidation, et entièrement réversible. La décomposition permanente n'est tranchée que si le pipeline lui-même y gagne assez — calculer le matching par identifiant et par nom une fois par identité distincte plutôt qu'une fois par ligne.
+**Gains**
+- **Place** : ≈ 1 Go (≈ 30 %) une fois la table réécrite/repackée — les colonnes creuses (identifiants absents sur 64 % des lignes) cessent d'être répétées. Modéré mais réel sur une table de cette taille.
+- **Lisibilité du schéma** : l'identité d'auteur devient une entité nommée, symétrique d'`addresses` ; la liaison n'est plus qu'une liaison.
+- **Débloque la suite** : la table dédupliquée est le préalable au matching par identité et aux diagnostics de dédoublonnage (cf. Suites possibles).
 
-## Gains attendus et limites
+**Coûts et risques** (hors charge de travail)
+- **Complexité payée maintenant, bénéfice différé.** Le refactor seul ajoute des pièces mobiles (deux tables, FK, contrainte d'unicité, GC des identités orphelines, jointures chez tous les lecteurs) pour un retour immédiat modeste (place + lisibilité de schéma). Le gros du bénéfice (perf du matching, diagnostics) n'arrive qu'aux chantiers suivants. Fait sens comme fondation qu'on **construira**, moins comme fin en soi.
+- **Jointure partout sur le read-path.** Chaque lecture de `author_name_normalized` / `person_identifiers` gagne un `JOIN author_identifying_keys` : SQL plus verbeux (contrepoids partiel au gain de lisibilité) et coût de jointure sur les chemins chauds (refresh de matview, audits, fetch du matching). Jointure vers une table de ~645 k lignes : hash join bon marché, mais non nul.
+- **Migration lourde et sensible.** Backfill dédupliqué de 17-19 M lignes vers ~645 k identités + pose de la FK, puis `DROP` des deux colonnes (métadonnée immédiate, mais espace récupéré seulement au `VACUUM FULL`/repack). Un bug de dédup ou de gestion du NULL fausserait le grain des identités. Ponctuel, testable sur branche, mais réel.
+- **Un invariant de plus à tenir.** Toute écriture de `source_authorships` doit poser `identity_id` ; toute identité sans référent doit être ramassée. Le modèle mono-table actuel a moins de points de défaillance futurs.
+- **Une signature n'est plus un enregistrement autonome.** Débogage et SQL ad hoc joignent deux tables au lieu de lire une ligne.
 
-- **Place : ≈ 1 Go (≈ 30 %), pas le facteur 25 que suggère le ratio de lignes.** Les deux plus gros index (clé primaire et unique `(source_publication_id, author_position)`, ≈ 0,72 Go) indexent des colonnes qui restent sur la liaison et ne rétrécissent pas ; la liaison garde ses 16-19 M de lignes avec leur surcoût de tuple ; les données déplacées sont creuses (identifiants absents sur 64 % des lignes, `person_id` sur 95 %).
-- **Matching : un gain de coût de calcul.** Les barreaux sans contexte (identifiants forts corroborés, forme de nom, création) se calculent une fois par identité distincte (≈ 645 000 au total, ≈ 218 000 portant un identifiant fort) au lieu d'une fois par ligne (16-19 M). C'est le coût du calcul qui chute, pas le nombre de rattachements. Le résiduel ambigu, seul cas réellement à l'échelle de la liaison, est isolé et traité au niveau contextuel.
-- **Diagnostics de dédoublonnage : accélération et bon grain.** Le grain « lignes par personne » mélange auteur prolifique et sur-agglomération (jusqu'à plusieurs milliers de lignes pour une personne), là où le grain « identités distinctes par personne » isole le suspect (quelques dizaines au plus). Les diagnostics « même identifiant porté par plusieurs personnes » et « variantes `_dubious` corroborées par un jumeau non-dubious » deviennent des requêtes triviales sur une table de quelques centaines de milliers de lignes.
-- **Limites.** La remédiation (lever en masse des `_dubious`, re-lier des paires) réécrit toujours la liaison à grande échelle : seule la détection rétrécit. Le `matched_by` n'est pas stocké aujourd'hui ; le persister est une modification de schéma, et c'est là que vit la complexité d'invalidation. Les diagnostics cités ci-dessus, eux, n'en ont pas besoin : ils portent sur les faits `(nom, identifiant, person_id)` seuls, d'où l'intérêt de la vue matérialisée comme première étape.
+Aucun **coût comportemental** : à migration correcte, les mêmes lignes produisent les mêmes `person_id` et les mêmes lectures (au résultat près, identiques).
 
 ## Phasage
 
-### Phase 0 — Vue matérialisée diagnostique (réversible, sans write-path)
-
-- [ ] Vue matérialisée `(author_name_normalized, person_identifiers, person_id)` avec index sur `person_id`, rafraîchie à la demande.
-- [ ] Valider sur cette vue les diagnostics de dédoublonnage (identités par personne, identifiant partagé entre personnes, `_dubious` corroborables).
-
 ### Phase 1 — Instruction de l'impact
 
-- [ ] Tracer exhaustivement producteurs et consommateurs de `source_authorships` (normalisation qui écrit, phase personnes, interfaces API et frontend, scripts ponctuels).
-- [ ] Chiffrer le coût de migration et confirmer le gain de place sur le volume de production.
+- [ ] Tracer exhaustivement les lecteurs/écrivains de `author_name_normalized` et `person_identifiers` (matching, matview `person_identifier_keys`, API/admin, `name_forms.py`, oneshots d'audit/remédiation, frontend — largement insulé, il lit la table canonique `person_identifiers`). Chaque lecture devient une jointure.
+- [ ] Trancher les détails de modélisation : NULL des identifiants (`NULLS NOT DISTINCT` sur l'unique, ou stocker `'{}'`) ; stratégie de GC des identités orphelines (patron `addresses`).
 
-### Phase 2 — Schéma
+### Phase 2 — Schéma et migration
 
-- [ ] Table `author_identifying_keys` (formes de nom, identifiants, `person_id`, `matched_by`) et référence depuis `source_authorships` allégée.
-- [ ] Migration des données existantes vers le modèle à deux niveaux.
+- [ ] Table `author_identifying_keys` + unique sur la clé d'identité.
+- [ ] `source_authorships` : colonne `identity_id` (nullable), backfill dédupliqué batché, passage NOT NULL + FK, `DROP` de `author_name_normalized` et `person_identifiers`.
 
-### Phase 3 — Réécriture de la résolution
+### Phase 3 — Bascule normalize
 
-- [ ] Résoudre les barreaux sans contexte au niveau identité (identifiants forts corroborés, forme de nom, création) puis propager vers la liaison.
-- [ ] Conserver `cross_source` et la garde de rejet par publication au niveau de la liaison.
+- [ ] `normalize` : upsert de l'identité (dédup par clé) + pose de `identity_id`, sur le patron déjà éprouvé de la dédup `addresses` (`md5(raw_text)` → `source_authorship_addresses`).
 
-### Phase 4 — Invalidation
+### Phase 4 — Réécriture des lecteurs
 
-- [ ] Recalcul des identités sur rejet d'identifiant et sur ambiguïsation d'une forme de nom, sans écraser les `person_id` posés sur `source_authorships`.
+- [ ] Matching (fetch de la phase persons) : joindre l'identité, cascade Python inchangée.
+- [ ] Matview `person_identifier_keys` : reconstruite en `source_authorships` (⟶ `person_id`) ⋈ `author_identifying_keys` (⟶ identifiants).
+- [ ] API / admin / oneshots / `name_forms.py` : jointure à la place de la lecture inline.
+- [ ] Tests de non-régression : mêmes rattachements, mêmes lectures qu'avant.
+
+## Suites possibles (hors périmètre, chantiers ultérieurs)
+
+Ce que la table d'identités débloque, une fois le refactor stable :
+
+- **Matching par identité** : calculer les barreaux sans contexte une fois par identité distincte (~645 k) au lieu d'une fois par signature (17-19 M).
+- **Double autorité du `person_id`** : verdict recalculable sur l'identité + autorité sur la liaison (le `cross_source` et le rejet restant contextuels).
+- **Diagnostics de dédoublonnage** : divergence entre verdict par identifiant et verdict par nom ; identifiant partagé entre personnes (déjà couvert par `person_identifier_keys`).
+- **Résolution nominale ordre-indépendante** : traiter la compatibilité initiale/plein (« J. Martin » / « Jean Martin ») en batch sur l'ensemble des identités, corrigeant une source de doublons sensible à l'ordre d'arrivée.
 
 ## Questions ouvertes
 
-- **`raw_author_name` : sur l'identité ou sur la liaison ?** L'inclure dans la clé d'identité fait passer le décompte de ≈ 645 000 à ≈ 743 000 ; à arbitrer selon qu'on veut conserver toutes les formes brutes par identité.
-- **`person_id` dérivé ou matérialisé ?** Le propager et le matérialiser sur `source_authorships` garde le contrat de lecture inchangé pour les consommateurs (aucune jointure imposée) ; la dérivation au read-time par jointure évite la redondance mais impose la jointure partout. Recommandation : matérialiser, la table d'identités restant un accélérateur interne.
-- **Gain de place réel en production** (≈ 19 M de lignes) à mesurer avant décision.
-- **Périmètre de la Phase 0** : la vue matérialisée suffit-elle à valider le bénéfice, ou faut-il aller jusqu'au `matched_by` matérialisé pour certains diagnostics ?
+- **Gain de place réel en production** (≈ 19 M de lignes) à mesurer avant migration.
 
 ## Liens
 
 - Tables : `source_authorships`, `source_authorship_addresses`, `authorships`, `persons`, `person_name_forms`, `person_identifiers`.
 - Phase personnes : `application/pipeline/persons/create_persons_from_source_authorships.py`.
-- Règles de matching : `domain/persons/matching.py`, `domain/persons/identifiers.py`.
+- Analogie structure : phase `affiliations`, `addresses` → `address_structures`.
 - Chantier lié : [DATA_personnes-dedoublonnage-assiste](DATA_personnes-dedoublonnage-assiste.md).

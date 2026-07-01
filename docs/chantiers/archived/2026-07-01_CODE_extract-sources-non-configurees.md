@@ -1,5 +1,7 @@
 # Chantier — Skip propre des sources d'API tierces non configurées
 
+Commencé et terminé le 2026-07-01
+
 ## Contexte
 
 Le pipeline interroge plusieurs API tierces, à plusieurs phases : extraction bulk (HAL, OpenAlex, WoS, ScanR, theses.fr), cross-imports par DOI et hal-id, rafraîchissement des documents stale, enrichissements (journaux OpenAlex, préfixes DOI Crossref/DataCite, statut open access Unpaywall). Chacun de ces accès dépend d'une configuration : credentials d'API (clé, basic auth, email polite pool) et, pour l'extraction bulk seulement, un périmètre d'interrogation (collections HAL, identifiants d'institution ou d'affiliation, PPN d'établissement).
