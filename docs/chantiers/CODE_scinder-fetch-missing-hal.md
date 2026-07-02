@@ -21,7 +21,7 @@ Ce sont donc deux opérations distinctes : le renommage seul masquerait la cause
 
 ## Phasage
 
-- [ ] Renommer les 4 modules `fetch_missing_hal_id` → `fetch_missing_hal` (git mv) et mettre à jour les imports.
-- [ ] Orchestrateur : runner async générique + `fetch_missing_hal_by_id` / `fetch_missing_hal_by_nnt`.
-- [ ] Câblage : `_run_fetch_missing_hal_by_id` / `_run_fetch_missing_hal_by_nnt`, deux canaux dans `cross_imports` ; CLI appelant les deux orchestrateurs.
-- [ ] Tests et docstrings : chemins de modules, non-régression sur les deux chemins.
+- [x] Renommer les 4 modules `fetch_missing_hal_id` → `fetch_missing_hal` (git mv) et mettre à jour les imports.
+- [x] Orchestrateur : runner async générique + `fetch_missing_hal_by_id` / `fetch_missing_hal_by_nnt`.
+- [x] Câblage : `_run_fetch_missing_hal_by_id` / `_run_fetch_missing_hal_by_nnt`, deux canaux dans `cross_imports` ; CLI appelant les deux orchestrateurs.
+- [x] Tests et docstrings : chemins de modules mis à jour, non-régression sur les deux chemins (imports + intégration `find_hal_ids_from_scanr`).
