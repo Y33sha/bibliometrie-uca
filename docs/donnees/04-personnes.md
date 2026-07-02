@@ -2,9 +2,9 @@
 
 *À jour le 2026-06-30.*
 
-Référentiel des individus. Une ligne = une personne physique. Alimenté par le script `create_persons_from_source_authorships.py` (création automatique depuis les authorships) ou par l'import RH, qui renseigne aussi la table satellite `persons_rh`.
+Référentiel des individus.
 
-**Périmètre** : `persons` couvre les personnes ayant cosigné au moins une publication UCA — pas un référentiel mondial des co-auteurs. Miroir conceptuel de `structures` (limitées au périmètre UCA / co-tutelles / partenaires). Conséquence : les co-auteurs externes des publications UCA n'ont pas de `person_id` ; leurs signatures restent uniquement dans `source_authorships`.
+**Périmètre** : `persons` couvre les personnes ayant cosigné au moins une publication UCA — pas un référentiel mondial des co-auteurs. Conséquence : les co-auteurs externes des publications UCA n'ont pas de `person_id` ; leurs signatures restent uniquement dans `source_authorships`.
 
 ```mermaid
 flowchart LR
