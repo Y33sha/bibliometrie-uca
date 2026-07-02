@@ -54,12 +54,10 @@ class ScanrFetchMissingDoiAdapter:
                 timeout=30,
                 label=f"batch {len(dois)} DOI",
             )
-        except httpx.RequestError:
-            # Erreur réseau transitoire (DNS, timeout) après retries : lot ignoré,
-            # repris au prochain run (l'absence d'un DOI n'est pas prouvée). Une
-            # erreur HTTP (401 sur credentials rejetés, 4xx/5xx persistant) n'est
-            # pas rattrapée : échec dur et bruyant, à corriger, pas à masquer — le
-            # cas « sans credentials » est écarté en amont par le gate de la phase.
+        except (httpx.RequestError, httpx.HTTPStatusError):
+            # Erreur réseau ou HTTP (401 sur credentials rejetés, 429/5xx après
+            # retries, 4xx) : lot ignoré, repris au prochain run (l'absence d'un DOI
+            # n'est pas prouvée). Comportement uniforme à toutes les sources.
             return []
         records = [hit["_source"] for hit in data.get("hits", {}).get("hits", [])]
         # Diff requêtés / trouvés : les DOI du lot sans hit sont confirmés

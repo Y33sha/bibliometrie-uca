@@ -96,7 +96,12 @@ class WosFetchMissingDoiAdapter:
                 if e.response.status_code == 400:
                     log.warning("WoS 400 rec %d, lot ignoré", first_record)
                     break
-                raise
+                # Toute autre erreur HTTP (401/403/5xx après retries) : lot non
+                # fiable, on rend ce qu'on a sans calculer de not-found (uniforme
+                # aux autres sources). Le circuit-breaker (SourceUnavailableError,
+                # non-HTTP) reste propagé et géré par l'orchestrateur.
+                complete = False
+                break
             except httpx.RequestError:
                 complete = False
                 break
