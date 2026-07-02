@@ -5,17 +5,16 @@
 1. Les **structures** préexistent au pipeline. Elles sont reconnues dans les adresses liées aux publications, et permettent de repérer les authorships (et indirectement les publications) du périmètre.
 
 ```mermaid
-flowchart TD
+flowchart TB
     subgraph vérité
     structures
     end
     subgraph sources
     SP@{ shape: procs, label: "source_publications"}---SA@{ shape: procs, label: "source_authorships"}
     SA---addresses
-    structures--->addresses
     end
 
-    
+    structures--->addresses
     classDef valid  fill:#af5
     class structures valid;
 ```
@@ -25,20 +24,20 @@ flowchart TD
 ```mermaid
 flowchart LR
     subgraph vérité
-        direction TD
+        direction TB
         publications
         structures
 
     end
 
     subgraph sources
-        direction TD
+        direction TB
         SA---structures
         SP@{ shape: procs, label: "source_publications"}---SA@{ shape: procs, label: "source_authorships"}
-        SP-->publications
+
     end
 
-    
+    SP-->publications
     classDef valid  fill:#af5
     class structures,publications valid;
 ```
@@ -48,20 +47,19 @@ flowchart LR
 ```mermaid
 flowchart LR
     subgraph vérité
-        direction TD
+        direction TB
         publications
         structures
         persons
     end
     subgraph sources
-        direction TD
+        direction TB
         SP@{ shape: procs, label: "source_publications"}---SA@{ shape: procs, label: "source_authorships"}
-        SP---publications
-        SA-->persons
-        SA---structures
     end
 
-    
+    SP---publications
+    SA-->persons
+    SA---structures
     classDef valid  fill:#af5
     class structures,publications,persons valid;
 ```
@@ -72,21 +70,19 @@ flowchart LR
 ```mermaid
 flowchart LR
     subgraph vérité
-        direction TD
+        direction TB
         publications---authorships
         persons---authorships
         structures---authorships
     end
     subgraph sources
-        direction TD
+        direction TB
         SP@{ shape: procs, label: "source_publications"}---SA@{ shape: procs, label: "source_authorships"}
-        SP---publications
-        SA---persons
-        SA---structures
     end
 
-    
-    
+    SP---publications
+    SA---persons
+    SA---structures
     classDef valid  fill:#af5
     class structures,publications,persons,authorships valid;
 ```
