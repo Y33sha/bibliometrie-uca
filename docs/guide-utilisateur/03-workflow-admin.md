@@ -8,7 +8,7 @@
 
 `admin/structures`
 
-- Le moissonnage nécessite des **structures**. Pour les sources bibliographiques où les structures sont désignées par des identifiants ([OpenAlex](../glossaire#openalex), [ScanR](../glossaire#scanr)) ou des formes de nom standardisées ([WoS](../glossaire.md#wos), intitulés de [collection HAL](../glossaire#collection-hal)), il faut connaître les identifiants en question et les ajouter aux structures qu'on souhaite moissonner.
+- Le moissonnage nécessite des **structures**. Pour les sources bibliographiques où les structures sont désignées par des identifiants ([OpenAlex](../glossaire#openalex), [ScanR](../glossaire#scanr)) ou des formes de nom standardisées ([WoS](../glossaire.md#web-of-science-wos), intitulés de [collection HAL](../glossaire#collection-hal)), il faut connaître les identifiants en question et les ajouter aux structures qu'on souhaite moissonner.
 
 ![Informations Structure](../screenshots/admin_structures_id_modifier.png)
 
@@ -36,11 +36,11 @@
 
 Tout se passe dans `admin/config`.
 
-#### Credentials {#credentials}
+#### Credentials
 
 Certaines sources requièrent une clé API ([WoS](../sources/04-wos.md)) ou un couple d'identifiants ([ScanR](../sources/05-scanr.md)). D'autres requièrent une adresse mail pour le polite pool ([OpenAlex](../sources/03-openalex.md), [Crossref](../sources/06-crossref.md)). Voir la doc de chaque source pour l'obtention des *credentials*.
 
-#### Années {#years}
+#### Années
 
 Le pipeline a [deux modes](../pipeline/01-vue-d-ensemble.md): *daily* et *full*.
 
@@ -48,7 +48,7 @@ Le mode *full* interroge les sources depuis une année de début jusqu'à l'ann�
 
 L'année de début est l'argument `--start-year` ; à défaut, la valeur configurée dans `admin/config` (par défaut 2017).
 
-#### Périmètres {#perimeters}
+#### Périmètres
 
 *A compléter.*
 
@@ -96,7 +96,7 @@ Quand on repère une publication attribuée au mauvais auteur, on peut détacher
 
 ![Détacher authorships](../screenshots/admin_persons_detacher.png)
 
-Pour réattribuer les authorships en question: cf [Authorships orphelines](#orphan-authorships)
+Pour réattribuer les authorships en question: cf [Authorships orphelines](#authorships-orphelines)
 
 #### Vérification des identifiants de personne
 
@@ -112,7 +112,7 @@ Les PIDs sont stockés dans la table [`person_identifiers`](../donnees/04-person
 
 > **Pourquoi un statut *rejected* ?**
 >
-> Certaines sources (OpenAlex, WOS) rattachent des PIDs à des publications de manière algorithmique, via leur propre référentiel auteurs. (Cf doc [sources](../sources/01-vue-d-ensemble.md#entites-auteurs)) Certaines attributions sont erronées (homonymes, initiale du prénom identique…)
+> Certaines sources (OpenAlex, WOS) rattachent des PIDs à des publications de manière algorithmique, via leur propre référentiel auteurs. (Cf doc [sources](../sources/01-vue-d-ensemble.md#entités-auteurs)) Certaines attributions sont erronées (homonymes, initiale du prénom identique…)
 >
 > Conserver les PIDs rejetés garantit que s'ils réapparaissent dans les sources lors des prochains runs du pipeline, ils ne seront pas réaffectés à la même personne.
 >
@@ -122,7 +122,7 @@ Les PIDs sont stockés dans la table [`person_identifiers`](../donnees/04-person
 
 La page `admin/persons` permet de corriger le nom et prénom si ceux issus des sources sont incorrects. C'est souvent le cas des patronymes composés: le parsing des sources a tendance à mettre la première partie du patronyme dans le prénom. Ex. : Alain Le Grand => prénom: "Alain Le", nom: "Grand". On constate aussi parfois des inversions nom-prénom.
 
-#### Authorships orphelines: rattachement à une personne existante ou création de personne {#orphan-authorships}
+#### Authorships orphelines
 
 La page `admin/orphan-authorships` donne accès aux [authorships](../glossaire.md#authorship) orphelines, c'est-à-dire:
 - relevant du périmètre (signature UCA en l'occurrence)

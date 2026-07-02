@@ -27,17 +27,17 @@ Le système intègre 7 sources bibliographiques principales, complétées par de
 > * brevets: INPI
 > * divers (enrichissement des entités personnes): ORCID, IdRef
 
-### Gestion des affiliations {#sources-affiliations}
+### Gestion des affiliations
 
 *A compléter*
 
 - **OpenAlex** et **WoS**: [affiliations](../glossaire.md#affiliation) résolues de manière algorithmique à partir des [adresses](../glossaire.md#adresse) liées aux publications. Beaucoup d'erreurs causées par des similitudes de noms (dans OpenAlex principalement). Mais la donnée-source (*raw affiliation string*) est présente et exploitable. On ignore les affiliations résolues par les sources et **on reconstruit l'affiliation à partir des adresses brutes**. ([Phase `affiliations`](../pipeline/04-affiliations.md) du pipeline.)
 
-- **HAL**: affiliation basée sur celle renseignée dans le compte HAL des auteurs au moment du dépôt (Cf [doc HAL](https://doc.hal.science/depot-fonctionnement-de-l-affiliation-automatique/#)), éventuellement complétés manuellement par le déposant. Les métadonnées de HAL ne contiennent pas les adresses brutes présentes dans les publications. On récupère donc les affiliations telles qu'elles sont renseignées dans HAL : les noms de structures sont traités fictivement comme des adresses par l'algo de résolution d'affiliation. Les erreurs d'affiliation dans HAL sont détectées *a posteriori* (pages [hal-problems](../guide-utilisateur/01-pages-publiques.md#problemes-hal)).
+- **HAL**: affiliation basée sur celle renseignée dans le compte HAL des auteurs au moment du dépôt (Cf [doc HAL](https://doc.hal.science/depot-fonctionnement-de-l-affiliation-automatique/#)), éventuellement complétés manuellement par le déposant. Les métadonnées de HAL ne contiennent pas les adresses brutes présentes dans les publications. On récupère donc les affiliations telles qu'elles sont renseignées dans HAL : les noms de structures sont traités fictivement comme des adresses par l'algo de résolution d'affiliation. Les erreurs d'affiliation dans HAL sont détectées *a posteriori* (pages [hal-problems](../guide-utilisateur/01-pages-publiques.md#problèmes-hal)).
 
 <!--TODO: Compléter avec les autres sources-->
 
-### Nature des entités auteurs {#entites-auteurs}
+### Entités auteurs
 
 Deux cas de figure:
 
@@ -71,5 +71,5 @@ Vu l'hétérogénéité des entités personnes selon les sources, il a été dé
 | [Unpaywall](09-sources-supplementaires.md#unpaywall) | Enrichissement OA | Statut Open Access par DOI | REST (gratuit, 100k req/jour) | *polite pool* via *mailto* |
 | [DOAJ](09-sources-supplementaires.md#doaj) | Annuaire des revues OA certifiées | Métadonnées qualifiées par revue (licence, APC, sujets…), interrogée par ISSN | REST + dump CSV bootstrap | *polite pool* via *mailto* |
 | [ROR](09-sources-supplementaires.md#ror) | Registry des organismes de recherche | Typage canonique des éditeurs (`publisher_type`) via le champ `types` du record ROR | REST v2 | *polite pool* via *mailto* |
-| [Base RH](10-imports-manuels.md#donnees-rh) | Import manuel | Personnel UCA (noms, départements, rôles) | Fichier CSV | |
-| [Données APC](10-imports-manuels.md#donnees-apc) | Import manuel | Paiements APC (montants, éditeurs) | Fichier CSV | |
+| [Base RH](10-imports-manuels.md#extraction-rh) | Import manuel | Personnel UCA (noms, départements, rôles) | Fichier CSV | |
+| [Données APC](10-imports-manuels.md#données-apc) | Import manuel | Paiements APC (montants, éditeurs) | Fichier CSV | |

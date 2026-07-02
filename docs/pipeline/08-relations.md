@@ -20,7 +20,7 @@ Chaque relation est orientée et porte un type qui en exprime le sens (« est le
 
 ## Rapatriement des cibles
 
-Les DOI cibles encore absents du corpus rejoignent l'ensemble interrogé par les [imports croisés](02-extract.md#cross-imports) : une œuvre liée accessible dans une source finit par entrer, et la relation se résout alors vers sa publication.
+Les DOI cibles encore absents du corpus rejoignent l'ensemble interrogé par les [imports croisés](02-extract.md#imports-croisés) : une œuvre liée accessible dans une source finit par entrer, et la relation se résout alors vers sa publication.
 
 > **Évolutions envisagées**
 > - Rapprocher par le titre les œuvres dépendantes (erratum, rétractation, données, preprint) restées sans relation, lorsqu'aucune clé ni relation déclarée ne les rattache à leur publication d'origine.

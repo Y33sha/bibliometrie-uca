@@ -8,7 +8,7 @@ Documentation API :
 
 DataCite est l'agence d'enregistrement des DOI des données de la recherche : jeux de données, logiciels, *preprints*, thèses, et plus largement tout ce que déposent les entrepôts institutionnels et disciplinaires (Zenodo, figshare, recherche-data-gouv, theses.fr, NAKALA…). Chaque préfixe DOI est rattaché à un *provider* (l'organisation déposante) et à un *client* (l'entrepôt précis).
 
-Le pipeline interroge DataCite pour les DOI déjà découverts par les autres sources, via [`fetch_missing_doi`](../pipeline/02-extract.md#cross-imports) (pas de moissonnage par institution+année comme pour HAL/OpenAlex/WoS/ScanR). Le pool de DOI candidats est filtré par agence d'enregistrement : seuls les DOI rattachés à DataCite sont soumis, ce qui évite les requêtes sans réponse sur des DOI Crossref. DataCite sert d'autorité sur les métadonnées déposées au moment de l'enregistrement du DOI.
+Le pipeline interroge DataCite pour les DOI déjà découverts par les autres sources, via [`fetch_missing_doi`](../pipeline/02-extract.md#imports-croisés) (pas de moissonnage par institution+année comme pour HAL/OpenAlex/WoS/ScanR). Le pool de DOI candidats est filtré par agence d'enregistrement : seuls les DOI rattachés à DataCite sont soumis, ce qui évite les requêtes sans réponse sur des DOI Crossref. DataCite sert d'autorité sur les métadonnées déposées au moment de l'enregistrement du DOI.
 
 ## API utilisée
 
@@ -18,7 +18,7 @@ Le pipeline interroge DataCite pour les DOI déjà découverts par les autres so
 - Pas de quota contractuel. L'adapter reste conservateur (`max_concurrent=3`, `request_delay_s=0.2`) pour ne pas se faire limiter
 - Les 404 sont matérialisés dans `staging` avec `not_found=TRUE` + `processed=TRUE` pour ne pas être réinterrogés à chaque run
 
-**Prefixes API** (`https://api.datacite.org/prefixes/{prefix}`) — identification du *provider* et du *client* (l'entrepôt) rattachés à un préfixe DOI. Consommée par le sub-step `resolve_publishers` de la phase [`publishers_journals`](../pipeline/05-publishers-journals.md), qui complète la table `doi_prefixes` (préfixe → entrepôt + provider) une fois sa Registration Agency résolue en amont par [`resolve_ra`](../pipeline/02-extract.md#resolve-ra).
+**Prefixes API** (`https://api.datacite.org/prefixes/{prefix}`) — identification du *provider* et du *client* (l'entrepôt) rattachés à un préfixe DOI. Consommée par le sub-step `resolve_publishers` de la phase [`publishers_journals`](../pipeline/05-publishers-journals.md), qui complète la table `doi_prefixes` (préfixe → entrepôt + provider) une fois sa Registration Agency résolue en amont par [`resolve_ra`](../pipeline/02-extract.md#agences-denregistrement-doi).
 
 ## Données récupérées
 

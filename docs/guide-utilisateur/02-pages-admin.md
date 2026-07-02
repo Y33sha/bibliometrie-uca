@@ -4,7 +4,7 @@
 
 ## Pipeline
 
-### Configuration {#admin-config}
+### Configuration
 
 `/admin/config`
 
@@ -22,7 +22,7 @@ TODO: à compléter
 
 ## Référentiels
 
-### Structures {#admin-structures}
+### Structures
 
 #### Liste `/admin/structures`
 

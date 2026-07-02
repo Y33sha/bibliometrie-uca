@@ -2,7 +2,7 @@
 
 Sources externes interrogées pour **enrichir** les entités du référentiel (publications, revues, éditeurs). Différence avec les sources principales : elles ne moissonnent pas, n'alimentent pas la table `staging`, et n'ont pas de `source_publications.source=...` dédié. Les données récupérées sont écrites directement sur les tables canoniques via le repository concerné.
 
-## <span id="unpaywall"></span>Unpaywall
+## Unpaywall
 
 https://unpaywall.org/
 
@@ -22,7 +22,7 @@ Source d'enrichissement consultée par DOI pour affiner `publications.oa_status`
 
 Une seule donnée consommée : le `oa_status` du payload Unpaywall, mappé sur l'enum canonique : `gold`, `hybrid`, `bronze`, `green`, `closed`.
 
-Consommée par la phase pipeline [`oa_status`](../pipeline/11-enrichissements.md#oa_status).
+Consommée par la phase pipeline [`oa_status`](../pipeline/11-enrichissements.md#statut-open-access).
 
 ### Particularités
 
@@ -30,7 +30,7 @@ Consommée par la phase pipeline [`oa_status`](../pipeline/11-enrichissements.md
 
 <!--TODO: possibilité d'utiliser pour le dédoublonnage publis? + récupérer un lien OA pour chaque publi?-->
 
-## <span id="doaj"></span>DOAJ
+## DOAJ
 
 https://doaj.org/ — Directory of Open Access Journals
 
@@ -84,7 +84,7 @@ Pour chaque revue candidate, essai successif `issn` → `eissn` → `issnl` (dou
 
 **Bootstrap CSV** — Le script `interfaces/cli/imports/import_doaj_csv.py` reste utilisable pour seeder rapidement depuis un dump complet téléchargé sur https://doaj.org/csv (~21 k revues, plus rapide qu'un fetch unitaire). Même format de stockage → pas de conflit avec le sub-step API.
 
-## <span id="ror"></span>ROR
+## ROR
 
 *Pas à jour: sorti du pipeline, relégué dans un script CLI*
 

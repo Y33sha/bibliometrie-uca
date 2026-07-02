@@ -6,7 +6,7 @@ Documentation API:
 - https://www.crossref.org/documentation/retrieve-metadata/rest-api/
 - https://api.crossref.org/swagger-ui/index.html
 
-Le pipeline n'interroge CrossRef que pour les DOI déjà découverts par les autres sources, via [`fetch_missing_doi`](../pipeline/02-extract.md#cross-imports) (pas de moissonnage par institution+année comme pour HAL/OpenAlex/WoS/ScanR). CrossRef sert d'autorité sur les métadonnées éditeur déposées au moment de l'enregistrement du DOI.
+Le pipeline n'interroge CrossRef que pour les DOI déjà découverts par les autres sources, via [`fetch_missing_doi`](../pipeline/02-extract.md#imports-croisés) (pas de moissonnage par institution+année comme pour HAL/OpenAlex/WoS/ScanR). CrossRef sert d'autorité sur les métadonnées éditeur déposées au moment de l'enregistrement du DOI.
 
 ## API utilisée
 
@@ -16,7 +16,7 @@ Le pipeline n'interroge CrossRef que pour les DOI déjà découverts par les aut
 - Limites du polite pool CrossRef : 10 req/s + 3 concurrentes. L'adapter colle exactement à ces limites (`max_concurrent=3`, `request_delay_s=0.1`)
 - Les 404 sont matérialisés dans `staging` avec `not_found=TRUE` + `processed=TRUE` pour ne pas être réinterrogés à chaque run
 
-**Prefixes API** (`https://api.crossref.org/prefixes/{prefix}`) — identification du Crossref Member (= éditeur déposant) associé à un préfixe DOI. Consommée par le sub-step `resolve_publishers` de la phase [`publishers_journals`](../pipeline/05-publishers-journals.md), qui complète la table `doi_prefixes` (préfixe → `crossref_member_id` + nom du déposant) une fois sa Registration Agency résolue en amont par [`resolve_ra`](../pipeline/02-extract.md#resolve-ra).
+**Prefixes API** (`https://api.crossref.org/prefixes/{prefix}`) — identification du Crossref Member (= éditeur déposant) associé à un préfixe DOI. Consommée par le sub-step `resolve_publishers` de la phase [`publishers_journals`](../pipeline/05-publishers-journals.md), qui complète la table `doi_prefixes` (préfixe → `crossref_member_id` + nom du déposant) une fois sa Registration Agency résolue en amont par [`resolve_ra`](../pipeline/02-extract.md#agences-denregistrement-doi).
 
 ## Données récupérées
 
