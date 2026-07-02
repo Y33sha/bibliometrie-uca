@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import argparse
 import logging
-import time
 from collections.abc import Callable
 
 from sqlalchemy import Connection
@@ -46,8 +45,7 @@ def extract_union(
     Construit `q` (années/`since`) et `fq=collCode_s:(…)` sur toutes les
     collections de `config.all_collections`, puis paginate en `cursorMark`
     jusqu'à stabilisation du marqueur. Chaque document est upserté une fois.
-    `logger` est le logger scopé (`[hal · <scope>]`) construit par `extract_all` ;
-    le log par page reporte le débit (docs/s) pour calibrer `HAL_PER_PAGE`.
+    `logger` est le logger scopé (`[hal · <scope>]`) construit par `extract_all`.
     Retourne `PhaseMetrics(new, updated, unchanged, total)`.
 
     En `dry_run`, une seule page est tirée pour lire `numFound` (volume du
@@ -70,6 +68,7 @@ def extract_union(
     logger.info("interrogation HAL…")
     cursor = "*"
     page = 0
+    num_found = 0
     total_pages: int | None = None
     while True:
         if breaker_tripped():
@@ -77,9 +76,7 @@ def extract_union(
                 "à bout (429/5xx répétés) — pagination interrompue (retry au prochain run)"
             )
             break
-        page_started = time.monotonic()
         data = adapter.fetch_page_cursor(query, fq, cursor)
-        fetch_s = time.monotonic() - page_started
         resp = data.get("response", {})
         docs = resp.get("docs", [])
 
@@ -90,7 +87,6 @@ def extract_union(
             total_pages = (num_found + page_size - 1) // page_size if num_found else 0
             logger.info(f"{num_found} documents → ~{total_pages} pages de {page_size}")
 
-        write_started = time.monotonic()
         for doc in docs:
             hal_id = adapter.extract_id(doc)
             if not hal_id:
@@ -104,19 +100,16 @@ def extract_union(
             else:
                 metrics.add(unchanged=1, total=1)
         conn.commit()
-        write_s = time.monotonic() - write_started
 
-        # Un log par page (pages lourdes : ~rows docs TEI + autant d'upserts unitaires)
-        # pour un signe de vie régulier. `fetch` = réponse HAL, `écriture` = upserts
-        # row-par-row + commit : sépare les deux coûts pour calibrer page_size / batch.
-        # La page de confirmation vide finale n'est pas loguée.
+        # Un log par page pour un signe de vie régulier (pages lourdes : ~rows docs
+        # TEI + autant d'upserts unitaires). La page de confirmation vide finale
+        # n'est pas loguée.
         if docs:
             page += 1
             logger.info(
-                f"page {page}/{total_pages} — {len(docs)} docs : "
-                f"fetch {fetch_s:.1f}s, écriture {write_s:.1f}s — cumul {metrics.total} "
-                f"({metrics.new} nouveaux, {metrics.updated} mis à jour, "
-                f"{metrics.unchanged} inchangés)"
+                f"page {page}/{total_pages} : {len(docs)} docs — "
+                f"{metrics.new} nouveaux, {metrics.updated} mis à jour, "
+                f"{metrics.unchanged} inchangés ({metrics.total}/{num_found})"
             )
 
         # Fin de pagination cursorMark : Solr renvoie le même marqueur que celui
