@@ -1,11 +1,11 @@
-"""Adapter HAL pour `application.pipeline.extract.fetch_missing_hal_id`.
+"""Adapter HAL pour `application.pipeline.extract.fetch_missing_hal`.
 
 Implémente les lookups SQL (depuis OpenAlex, ScanR, NNT theses),
 les fetchs HTTP async (par halId et par NNT) et les inserts staging.
 
 L'orchestration (combinaison des refs, dedup, boucles async, commits
 intermédiaires) vit côté
-`application.pipeline.extract.fetch_missing_hal_id`.
+`application.pipeline.extract.fetch_missing_hal`.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from typing import Any
 import httpx
 from sqlalchemy import Connection, text
 
-from application.ports.pipeline.extract.fetch_missing_hal_id import (
+from application.ports.pipeline.extract.fetch_missing_hal import (
     HalFetchMissingAdapter,
     HalIdRef,
     NntRef,
@@ -114,7 +114,7 @@ def find_hal_ids_from_scanr(conn: Connection) -> list[dict[str, Any]]:
     Retourne `[{source: "scanr", hal_id, scanr_id}, ...]`.
 
     Conservé comme fonction libre pour permettre des tests d'intégration
-    ciblés (cf. `tests/integration/infrastructure/sources/hal/test_fetch_missing_hal_id.py`).
+    ciblés (cf. `tests/integration/infrastructure/sources/hal/test_fetch_missing_hal.py`).
     """
     rows = conn.execute(
         text(

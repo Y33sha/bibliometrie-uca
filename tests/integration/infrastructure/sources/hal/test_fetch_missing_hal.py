@@ -1,9 +1,9 @@
-"""Tests d'intégration pour `infrastructure.sources.hal.fetch_missing_hal_id`."""
+"""Tests d'intégration pour `infrastructure.sources.hal.fetch_missing_hal`."""
 
 from sqlalchemy import bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
-from infrastructure.sources.hal.fetch_missing_hal_id import find_hal_ids_from_scanr
+from infrastructure.sources.hal.fetch_missing_hal import find_hal_ids_from_scanr
 
 _INSERT_SCANR_STAGING_SQL = text(
     "INSERT INTO staging (source, source_id, raw_data) VALUES ('scanr', :sid, :raw_data)"

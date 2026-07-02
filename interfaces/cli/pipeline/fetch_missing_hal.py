@@ -6,12 +6,15 @@ import argparse
 import asyncio
 import os
 
-from application.pipeline.extract.fetch_missing_hal_id import fetch_missing_hal_ids
+from application.pipeline.extract.fetch_missing_hal import (
+    fetch_missing_hal_by_id,
+    fetch_missing_hal_by_nnt,
+)
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from infrastructure.sources.hal.fetch_missing_hal_id import PgHalFetchMissingAdapter
+from infrastructure.sources.hal.fetch_missing_hal import PgHalFetchMissingAdapter
 
-logger = setup_logger("fetch_missing_hal_id", os.path.join(os.path.dirname(__file__), "logs"))
+logger = setup_logger("fetch_missing_hal", os.path.join(os.path.dirname(__file__), "logs"))
 
 
 async def _main_async() -> None:
@@ -31,14 +34,16 @@ async def _main_async() -> None:
     conn = get_sync_engine().connect()
     adapter = PgHalFetchMissingAdapter()
     try:
-        await fetch_missing_hal_ids(
-            conn,
-            adapter,
-            logger,
-            mode=args.mode,
-            dry_run=args.dry_run,
-            stats_only=args.stats,
+        await fetch_missing_hal_by_id(
+            conn, adapter, logger, dry_run=args.dry_run, stats_only=args.stats
         )
+        # NNT trop volumineux pour un run incrémental : réservé au mode full.
+        if args.mode == "full":
+            await fetch_missing_hal_by_nnt(
+                conn, adapter, logger, dry_run=args.dry_run, stats_only=args.stats
+            )
+        else:
+            logger.info("NNT ignoré en mode %s", args.mode)
     finally:
         conn.close()
 
