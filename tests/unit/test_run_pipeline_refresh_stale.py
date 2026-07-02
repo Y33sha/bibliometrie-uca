@@ -1,4 +1,4 @@
-"""Régressions sur `phase_refresh_stale` / `_run_refresh_stale_doi`.
+"""Régressions sur `phase_refresh_stale` / `_run_refresh_stale`.
 
 1. WoS est opt-in (`--include-wos`) : exclu par défaut du refresh, comme
    `extract` et `cross_imports`.
@@ -18,17 +18,10 @@ from infrastructure.sources.circuit_breaker import (
 )
 
 
-def _called_targets(stack) -> list[str]:
-    """Patche les I/O de `phase_refresh_stale` et retourne les sources refetch."""
-    doi = stack.enter_context(
-        patch.object(run_pipeline, "_run_refresh_stale_doi", return_value=PhaseMetrics())
-    )
-    stack.enter_context(patch("infrastructure.db.engine.get_sync_engine", return_value=MagicMock()))
-    stack.enter_context(
-        patch(
-            "infrastructure.sources.common.mark_undiscoverable_stale_disappeared",
-            return_value={},
-        )
+def _called_targets(stack) -> MagicMock:
+    """Patche les I/O de `phase_refresh_stale` et retourne le mock des sources refetch."""
+    run_one = stack.enter_context(
+        patch.object(run_pipeline, "_run_refresh_stale", return_value=PhaseMetrics())
     )
     # Neutralise le gate de configuration (testé ailleurs) : ici on vérifie la
     # sélection des sources (opt-in WoS, filtre `sources`), pas la présence des
@@ -40,38 +33,47 @@ def _called_targets(stack) -> list[str]:
             side_effect=lambda targets, metrics, *, phase: targets,
         )
     )
-    return doi
+    return run_one
 
 
 def test_refresh_stale_excludes_wos_by_default():
     with ExitStack() as stack:
-        doi = _called_targets(stack)
+        run_one = _called_targets(stack)
         run_pipeline.phase_refresh_stale()
-    targets = [c.args[0] for c in doi.call_args_list]
+    targets = [c.args[0] for c in run_one.call_args_list]
     assert "wos" not in targets
     assert targets  # d'autres sources sont bien refetch
 
 
 def test_refresh_stale_includes_wos_when_opted_in():
     with ExitStack() as stack:
-        doi = _called_targets(stack)
+        run_one = _called_targets(stack)
         run_pipeline.phase_refresh_stale(include_wos=True)
-    targets = [c.args[0] for c in doi.call_args_list]
+    targets = [c.args[0] for c in run_one.call_args_list]
     assert "wos" in targets
+
+
+def test_refresh_stale_covers_theses():
+    # theses entre dans le refresh (refetch par id natif), contrairement au
+    # cross-import par DOI qui l'excluait.
+    with ExitStack() as stack:
+        run_one = _called_targets(stack)
+        run_pipeline.phase_refresh_stale()
+    assert "theses" in [c.args[0] for c in run_one.call_args_list]
 
 
 def test_refresh_stale_respects_sources_filter():
     with ExitStack() as stack:
-        doi = _called_targets(stack)
+        run_one = _called_targets(stack)
         run_pipeline.phase_refresh_stale(sources={"hal"}, include_wos=True)
-    assert [c.args[0] for c in doi.call_args_list] == ["hal"]
+    assert [c.args[0] for c in run_one.call_args_list] == ["hal"]
 
 
-def test_refresh_stale_doi_installs_circuit_breaker():
+def test_run_refresh_stale_installs_circuit_breaker():
     with ExitStack() as stack:
-        run_async = stack.enter_context(
+        refresh = stack.enter_context(
             patch(
-                "application.pipeline.extract.fetch_missing_doi.run_async",
+                "application.pipeline.extract.refresh_stale.refresh",
                 new=AsyncMock(return_value=PhaseMetrics()),
             )
         )
@@ -79,11 +81,11 @@ def test_refresh_stale_doi_installs_circuit_breaker():
             patch("infrastructure.db.engine.get_sync_engine", return_value=MagicMock())
         )
         stack.enter_context(
-            patch.object(run_pipeline, "_make_fetch_missing_doi_adapter", return_value=MagicMock())
+            patch.object(run_pipeline, "_make_refresh_stale_adapter", return_value=MagicMock())
         )
-        run_pipeline._run_refresh_stale_doi("hal")
+        run_pipeline._run_refresh_stale("hal")
 
-    breaker = run_async.call_args.kwargs["breaker"]
+    breaker = refresh.call_args.kwargs["breaker"]
     assert isinstance(breaker, SourceCircuitBreaker)
     # La ContextVar est restaurée en sortie (pas de fuite de breaker).
     assert get_current_breaker() is None
