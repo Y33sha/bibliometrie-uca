@@ -10,8 +10,9 @@ psycopg.
 
 Consommé par le writer partagé `write_source_authorships` ; le `clear` en
 amont (DELETE, qui cascade sur le pivot) garantit qu'aucune authorship ni lien
-ne préexiste — d'où l'absence d'`ON CONFLICT` sur ces deux INSERT (seul
-`addresses`, table partagée non vidée, le conserve).
+ne préexiste — d'où l'absence d'`ON CONFLICT` sur l'INSERT des `source_authorships`
+et du pivot. L'upsert des identités (`author_identifying_keys`, table partagée non
+vidée) et celui des `addresses` conservent leur `ON CONFLICT`.
 """
 
 import hashlib
@@ -36,12 +37,23 @@ def upsert_source_authorships_batch(
 ) -> None:
     """Batch UPSERT de `source_authorships` (toutes sources, `source` par ligne).
 
-    Une **seule** requête : le batch est transmis en JSONB et étendu côté
-    serveur via `jsonb_to_recordset` (vs un `executemany` qui partirait en N
-    allers-retours séquentiels côté psycopg). `source`/`source_publication_id`
-    sont invariants au sein d'un document (le writer est appelé par document),
-    donc hoistés hors du recordset. Le nom normalisé est fourni pré-calculé
-    (`author_name_normalized`, via `normalize_name_form` côté Python).
+    L'identité de l'auteur (`author_name_normalized`, `person_identifiers`) vit sur
+    la table dédupliquée `author_identifying_keys` ; la signature ne porte qu'une
+    FK `identity_id`. Deux requêtes dans la transaction du writer :
+
+    1. **Upsert des identités du lot** — `INSERT … SELECT DISTINCT … ON CONFLICT
+       DO NOTHING` : les identités du document, dédupliquées, sans churn (un
+       `DO UPDATE` récrirait chaque identité récurrente à chaque document).
+    2. **Insert des signatures** — `identity_id` résolu par `key_hash` (colonne
+       générée, index dédié), rapprochement indexé et NULL-safe. Le batch est
+       transmis en JSONB et étendu via `jsonb_to_recordset` (vs un `executemany`
+       en N allers-retours). `source`/`source_publication_id` sont invariants au
+       sein d'un document, donc hoistés. Le nom normalisé est fourni pré-calculé
+       (`author_name_normalized`, via `normalize_name_form` côté Python).
+
+    Les deux requêtes sont séquentielles et non fusionnables : une CTE modifiant
+    `author_identifying_keys` ne rendrait pas ses lignes visibles au JOIN de la
+    même requête (même snapshot). La seconde requête voit celles de la première.
     """
     if not values:
         return
@@ -56,22 +68,36 @@ def upsert_source_authorships_batch(
         }
         for v in values
     ]
-    # Pas d'ON CONFLICT : le writer DELETE avant d'insérer (clear) et déduplique
-    # par position, donc la clé (source_publication_id, author_position) ne peut
-    # pas entrer en collision. Un INSERT nu est plus rapide (pas de sonde
-    # d'unicité spéculative).
-    stmt = text("""
+    # 1. Upsert des identités du lot (dédup par clé, sans churn).
+    conn.execute(
+        text("""
+            INSERT INTO author_identifying_keys (author_name_normalized, person_identifiers)
+            SELECT DISTINCT t.author_name_normalized, t.person_identifiers
+            FROM jsonb_to_recordset(:payload) AS t(
+                author_name_normalized text, person_identifiers jsonb)
+            ON CONFLICT (author_name_normalized, person_identifiers) DO NOTHING
+        """).bindparams(bindparam("payload", type_=JSONB)),
+        {"payload": payload},
+    )
+    # 2. Insert des signatures. Pas d'ON CONFLICT : le writer DELETE avant d'insérer
+    # (clear) et déduplique par position, donc (source_publication_id, author_position)
+    # ne peut pas entrer en collision. `identity_id` résolu par `key_hash` : md5 de la
+    # clé d'identité, mêmes sentinelles que la colonne générée (E'\x01' pour NULL,
+    # E'\x1f' séparateur) — lookup indexé, NULL-safe.
+    stmt = text(r"""
         INSERT INTO source_authorships
             (source, source_publication_id, author_position,
-             author_name_normalized, is_corresponding, roles,
-             raw_author_name, person_identifiers)
+             is_corresponding, roles, raw_author_name, identity_id)
         SELECT :source, :spid, t.author_position,
-               t.author_name_normalized, t.is_corresponding, t.roles,
-               t.raw_author_name, t.person_identifiers
+               t.is_corresponding, t.roles, t.raw_author_name, aik.id
         FROM jsonb_to_recordset(:payload) AS t(
             author_position smallint, author_name_normalized text,
             is_corresponding boolean, roles text[],
             raw_author_name text, person_identifiers jsonb)
+        JOIN author_identifying_keys aik
+          ON aik.key_hash = md5(
+                 coalesce(t.author_name_normalized, E'\x01') || E'\x1f'
+                 || coalesce(t.person_identifiers::text, E'\x01'))
     """).bindparams(bindparam("payload", type_=JSONB))
     conn.execute(
         stmt,

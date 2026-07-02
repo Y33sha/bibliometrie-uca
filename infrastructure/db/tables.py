@@ -22,6 +22,7 @@ from sqlalchemy import (
     Boolean,
     CheckConstraint,
     Column,
+    Computed,
     Date,
     DateTime,
     Index,
@@ -607,12 +608,26 @@ author_identifying_keys = Table(
     Column("id", Integer, primary_key=True),
     Column("author_name_normalized", Text),
     Column("person_identifiers", JSONB),
+    # Hash de la clé d'identité, chemin de lookup indexé et NULL-safe (un `=` ne
+    # matche pas les NULL, un `IS NOT DISTINCT FROM` n'est pas indexable). Les
+    # sentinelles E'\x01' (NULL) et E'\x1f' (séparateur) sont impossibles dans un
+    # nom normalisé ou un jsonb::text. Respecte le NULLS NOT DISTINCT de l'unique.
+    Column(
+        "key_hash",
+        Text,
+        Computed(
+            r"md5(coalesce(author_name_normalized, E'\x01') || E'\x1f' "
+            r"|| coalesce(person_identifiers::text, E'\x01'))",
+            persisted=True,
+        ),
+    ),
     UniqueConstraint(
         "author_name_normalized",
         "person_identifiers",
         name="author_identifying_keys_key",
         postgresql_nulls_not_distinct=True,
     ),
+    Index("author_identifying_keys_key_hash_idx", "key_hash"),
 )
 
 

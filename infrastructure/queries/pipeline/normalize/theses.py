@@ -102,37 +102,52 @@ def upsert_theses_source_authorship(
     author_position: int | None,
     roles: list[str],
     raw_author_name: str,
+    author_name_normalized: str,
     person_identifiers: JsonValue,
 ) -> int:
     """UPSERT d'une `source_authorships` theses.fr. `author_position` NULL pour les non-auteurs.
 
-    Les identifiants (PPN/idref) vivent sur `person_identifiers` (JSONB).
+    L'identité de l'auteur (`author_name_normalized`, `person_identifiers`, où vivent les
+    PPN/idref) est portée par la table dédupliquée `author_identifying_keys` ; la signature
+    n'a qu'une FK `identity_id`. Le nom normalisé est fourni pré-calculé côté Python
+    (`normalize_name_form`), comme les autres sources. Deux requêtes : upsert de l'identité
+    (dédup par clé, sans churn), puis upsert de la signature avec `identity_id` résolu par
+    `key_hash` (colonne générée indexée, NULL-safe).
     """
-    stmt = text("""
+    params = {
+        "spid": source_publication_id,
+        "pos": author_position,
+        "roles": roles,
+        "raw_author_name": raw_author_name,
+        "name_norm": author_name_normalized,
+        "person_identifiers": person_identifiers,
+    }
+    # 1. Upsert de l'identité (dédup par clé, sans churn).
+    conn.execute(
+        text("""
+            INSERT INTO author_identifying_keys (author_name_normalized, person_identifiers)
+            VALUES (:name_norm, :person_identifiers)
+            ON CONFLICT (author_name_normalized, person_identifiers) DO NOTHING
+        """).bindparams(bindparam("person_identifiers", type_=JSONB)),
+        params,
+    )
+    # 2. Upsert de la signature, `identity_id` résolu par `key_hash` (mêmes sentinelles
+    # que la colonne générée : E'\x01' pour NULL, E'\x1f' séparateur).
+    stmt = text(r"""
         INSERT INTO source_authorships
-            (source, source_publication_id, author_position,
-             author_name_normalized, roles,
-             raw_author_name, person_identifiers)
-        VALUES ('theses', :spid, :pos,
-                normalize_name_form(:raw_author_name), :roles,
-                :raw_author_name, :person_identifiers)
+            (source, source_publication_id, author_position, roles, raw_author_name, identity_id)
+        VALUES ('theses', :spid, :pos, :roles, :raw_author_name,
+                (SELECT id FROM author_identifying_keys
+                 WHERE key_hash = md5(
+                     coalesce(:name_norm, E'\x01') || E'\x1f'
+                     || coalesce((:person_identifiers)::text, E'\x01'))))
         ON CONFLICT (source_publication_id, author_position) DO UPDATE SET
             roles = EXCLUDED.roles,
-            author_name_normalized = EXCLUDED.author_name_normalized,
             raw_author_name = EXCLUDED.raw_author_name,
-            person_identifiers = EXCLUDED.person_identifiers
+            identity_id = EXCLUDED.identity_id
         RETURNING id
     """).bindparams(bindparam("person_identifiers", type_=JSONB))
-    row = conn.execute(
-        stmt,
-        {
-            "spid": source_publication_id,
-            "pos": author_position,
-            "roles": roles,
-            "raw_author_name": raw_author_name,
-            "person_identifiers": person_identifiers,
-        },
-    ).one()
+    row = conn.execute(stmt, params).one()
     return row.id
 
 
@@ -198,6 +213,7 @@ class PgThesesNormalizeQueries(ThesesNormalizeQueries):
         author_position: int | None,
         roles: list[str],
         raw_author_name: str,
+        author_name_normalized: str,
         person_identifiers: JsonValue,
     ) -> int:
         return upsert_theses_source_authorship(
@@ -206,6 +222,7 @@ class PgThesesNormalizeQueries(ThesesNormalizeQueries):
             author_position=author_position,
             roles=roles,
             raw_author_name=raw_author_name,
+            author_name_normalized=author_name_normalized,
             person_identifiers=person_identifiers,
         )
 
