@@ -706,26 +706,30 @@ COMMENT ON COLUMN public.staging.raw_hash IS 'Empreinte md5 du payload tel qu''e
 --
 
 CREATE VIEW public.candidate_dois AS
- SELECT s.doi,
-    s.source
-   FROM public.staging s
-  WHERE (s.doi IS NOT NULL)
+ SELECT sp.doi,
+    sp.source
+   FROM (public.source_publications sp
+     JOIN public.publications p ON ((p.id = sp.publication_id)))
+  WHERE (p.in_perimeter AND (sp.doi IS NOT NULL))
 UNION
  SELECT d.value AS doi,
     sp.source
-   FROM (public.source_publications sp
+   FROM ((public.source_publications sp
+     JOIN public.publications p ON ((p.id = sp.publication_id)))
      CROSS JOIN LATERAL jsonb_array_elements_text((sp.external_ids -> 'related_dois'::text)) d(value))
-  WHERE (jsonb_typeof((sp.external_ids -> 'related_dois'::text)) = 'array'::text)
+  WHERE (p.in_perimeter AND (jsonb_typeof((sp.external_ids -> 'related_dois'::text)) = 'array'::text))
 UNION
  SELECT pr.target_doi AS doi,
     NULL::public.source_type AS source
-   FROM public.publication_relations pr
-  WHERE (pr.target_doi IS NOT NULL)
+   FROM (public.publication_relations pr
+     JOIN public.publications p ON ((p.id = pr.from_publication_id)))
+  WHERE (p.in_perimeter AND (pr.target_doi IS NOT NULL))
 UNION
  SELECT ('10.48550/arxiv.'::text || lower((sp.external_ids ->> 'arxiv_id'::text))) AS doi,
     sp.source
-   FROM public.source_publications sp
-  WHERE ((sp.external_ids ->> 'arxiv_id'::text) IS NOT NULL);
+   FROM (public.source_publications sp
+     JOIN public.publications p ON ((p.id = sp.publication_id)))
+  WHERE (p.in_perimeter AND ((sp.external_ids ->> 'arxiv_id'::text) IS NOT NULL));
 
 
 --
