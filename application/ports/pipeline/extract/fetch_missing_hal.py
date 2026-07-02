@@ -1,11 +1,11 @@
 """Port : adapter HAL pour le fetch des entrées HAL manquantes.
 
 Implémenté par
-`infrastructure.sources.hal.fetch_missing_hal_id.PgHalFetchMissingAdapter`.
+`infrastructure.sources.hal.fetch_missing_hal.PgHalFetchMissingAdapter`.
 
-L'orchestrateur (`application.pipeline.extract.fetch_missing_hal_id`)
-combine les références remontées par les trois lookups SQL (OpenAlex,
-ScanR, NNT theses) et pilote la boucle async de fetch.
+Les orchestrateurs (`application.pipeline.extract.fetch_missing_hal`) consomment
+ce Protocol : `fetch_missing_hal_by_id` pour les références hal-id (OpenAlex,
+ScanR) et `fetch_missing_hal_by_nnt` pour les NNT (theses).
 """
 
 from __future__ import annotations
@@ -36,7 +36,7 @@ class NntRef:
 
 
 class HalFetchMissingAdapter(Protocol):
-    """Port fetch_missing_hal_id : config, lookups SQL, HTTP, inserts SQL."""
+    """Port fetch_missing_hal : config, lookups SQL, HTTP, inserts SQL."""
 
     max_concurrent: int  # plafond asyncio.Semaphore
     delay_s: float  # pause par worker après chaque fetch

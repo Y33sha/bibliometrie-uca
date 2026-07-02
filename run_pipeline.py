@@ -281,12 +281,12 @@ def phase_cross_imports(
 
     Deux mécanismes complémentaires, exécutés dans cet ordre :
 
-    1. **Cross-import par hal-id / NNT** (`fetch_missing_hal_id`).
-       Pour chaque hal-id ou NNT mentionné dans une autre source mais
-       absent du staging HAL, on télécharge le document via l'API HAL.
-       Auto-bornée : les hal-ids/NNT introuvables sont marqués
-       `not_found_at` dans staging et ne sont jamais re-interrogés.
-       Tourne systématiquement (daily/weekly/full).
+    1. **Cross-import HAL** (`fetch_missing_hal`), en deux pistes distinctes :
+       par hal-id (repéré dans OpenAlex/ScanR, tourne systématiquement) et par
+       NNT (thèses soutenues sans HAL, mode `full` uniquement — volume trop large
+       en incrémental). Pour chaque référence absente du staging HAL, on télécharge
+       le document via l'API HAL. Auto-bornée : les hal-ids/NNT introuvables sont
+       marqués `not_found_at` dans staging et ne sont jamais re-interrogés.
 
     2. **Cross-import par DOI** (`fetch_missing_doi`).
        Pour chaque source cible, on cherche les DOI vus dans les autres
@@ -308,11 +308,17 @@ def phase_cross_imports(
             "duration_s": round(duration_s, 1),
         }
 
-    # Étape 1 : par hal-id / NNT
+    # Étape 1 : cross-import HAL, deux pistes distinctes (hal-id, NNT).
     if not sources or "hal" in sources:
-        hal_metrics, hal_duration = _timed_metrics(partial(_run_fetch_missing_hal_id, mode=mode))
-        metrics.merge(hal_metrics)
-        by_channel["hal-id / NNT"] = _summary(hal_metrics, hal_duration)
+        id_metrics, id_duration = _timed_metrics(_run_fetch_missing_hal_by_id)
+        metrics.merge(id_metrics)
+        by_channel["hal-id"] = _summary(id_metrics, id_duration)
+
+        # NNT trop volumineux pour un run incrémental : réservé au mode full.
+        if mode == "full":
+            nnt_metrics, nnt_duration = _timed_metrics(_run_fetch_missing_hal_by_nnt)
+            metrics.merge(nnt_metrics)
+            by_channel["NNT"] = _summary(nnt_metrics, nnt_duration)
 
     # Étape 2 : par DOI. WoS opt-in (cf. docstring).
     targets = set(DOI_SEARCHABLE_SOURCES)
@@ -542,7 +548,7 @@ def phase_publishers_journals(**kw: Any) -> PhaseMetrics:
     `interfaces/cli/maintenance/enrich_publishers.py`.
 
     Placée **après normalize** : (a) `cross_imports` (en amont) peut introduire de
-    nouveaux DOIs via `fetch_missing_hal_id`, (b) `normalize` crée les
+    nouveaux DOIs via `fetch_missing_hal`, (b) `normalize` crée les
     `publishers`/`journals` qu'on veut enrichir.
     """
     metrics = PhaseMetrics()
@@ -1783,21 +1789,44 @@ def _run_refetch_truncated() -> PhaseMetrics:
     return metrics
 
 
-def _run_fetch_missing_hal_id(*, mode: str = "full") -> PhaseMetrics:
-    from application.pipeline.extract.fetch_missing_hal_id import fetch_missing_hal_ids
+def _run_fetch_missing_hal_by_id() -> PhaseMetrics:
+    """Cross-import HAL par hal-id (OpenAlex/ScanR) : documents absents du staging."""
+    from application.pipeline.extract.fetch_missing_hal import fetch_missing_hal_by_id
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.sources.hal.fetch_missing_hal_id import PgHalFetchMissingAdapter
+    from infrastructure.sources.hal.fetch_missing_hal import PgHalFetchMissingAdapter
 
-    log.info("▶ fetch_missing_hal_id --mode %s", mode)
+    log.info("▶ fetch_missing_hal (par hal-id)")
     t0 = time.time()
     conn = get_sync_engine().connect()
     adapter = PgHalFetchMissingAdapter()
     try:
-        metrics = asyncio.run(fetch_missing_hal_ids(conn, adapter, log, mode=mode))
+        metrics = asyncio.run(fetch_missing_hal_by_id(conn, adapter, log))
     finally:
         conn.close()
     log.info(
-        "✓ fetch_missing_hal_id terminé en %.1fs — %s",
+        "✓ fetch_missing_hal (par hal-id) terminé en %.1fs — %s",
+        time.time() - t0,
+        metrics.as_summary(),
+    )
+    return metrics
+
+
+def _run_fetch_missing_hal_by_nnt() -> PhaseMetrics:
+    """Cross-import HAL par NNT (theses.fr) : thèses soutenues sans document HAL."""
+    from application.pipeline.extract.fetch_missing_hal import fetch_missing_hal_by_nnt
+    from infrastructure.db.engine import get_sync_engine
+    from infrastructure.sources.hal.fetch_missing_hal import PgHalFetchMissingAdapter
+
+    log.info("▶ fetch_missing_hal (par NNT)")
+    t0 = time.time()
+    conn = get_sync_engine().connect()
+    adapter = PgHalFetchMissingAdapter()
+    try:
+        metrics = asyncio.run(fetch_missing_hal_by_nnt(conn, adapter, log))
+    finally:
+        conn.close()
+    log.info(
+        "✓ fetch_missing_hal (par NNT) terminé en %.1fs — %s",
         time.time() - t0,
         metrics.as_summary(),
     )
