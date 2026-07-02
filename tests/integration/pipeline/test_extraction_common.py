@@ -8,10 +8,9 @@ from infrastructure.sources.common import (
     compute_hash,
     get_cross_import_dois,
     get_existing_ids,
-    get_stale_dois,
-    mark_undiscoverable_stale_disappeared,
+    get_stale_rows,
     record_doi_not_found,
-    set_disappeared_by_doi,
+    set_disappeared_by_source_id,
 )
 
 # ── compute_hash ─────────────────────────────────────────────────
@@ -336,15 +335,15 @@ def _insert_staging(conn, source, sid, doi, *, seen_days_ago, not_found=False, d
     )
 
 
-class TestGetStaleDois:
-    def test_returns_only_old_with_doi(self, sa_sync_conn):
+class TestGetStaleRows:
+    def test_returns_old_rows_with_and_without_doi(self, sa_sync_conn):
+        # Le refetch par id natif ne dépend pas du DOI : la row sans DOI est
+        # sélectionnée au même titre que celle qui en a un.
         _insert_staging(sa_sync_conn, "openalex", "W1", "10.1/old", seen_days_ago=100)
-        _insert_staging(sa_sync_conn, "openalex", "W2", "10.1/recent", seen_days_ago=10)
-        assert get_stale_dois(sa_sync_conn, "openalex") == ["10.1/old"]
-
-    def test_excludes_null_doi(self, sa_sync_conn):
-        _insert_staging(sa_sync_conn, "openalex", "W1", None, seen_days_ago=100)
-        assert get_stale_dois(sa_sync_conn, "openalex") == []
+        _insert_staging(sa_sync_conn, "openalex", "W2", None, seen_days_ago=100)
+        _insert_staging(sa_sync_conn, "openalex", "W3", "10.1/recent", seen_days_ago=10)
+        rows = get_stale_rows(sa_sync_conn, "openalex")
+        assert sorted(src_id for _, src_id in rows) == ["W1", "W2"]
 
     def test_excludes_not_found_and_disappeared(self, sa_sync_conn):
         _insert_staging(
@@ -353,18 +352,18 @@ class TestGetStaleDois:
         _insert_staging(
             sa_sync_conn, "openalex", "W2", "10.1/gone", seen_days_ago=100, disappeared=True
         )
-        assert get_stale_dois(sa_sync_conn, "openalex") == []
+        assert get_stale_rows(sa_sync_conn, "openalex") == []
 
     def test_scoped_to_source(self, sa_sync_conn):
         _insert_staging(sa_sync_conn, "openalex", "W1", "10.1/a", seen_days_ago=100)
         _insert_staging(sa_sync_conn, "scanr", "S1", "10.1/b", seen_days_ago=100)
-        assert get_stale_dois(sa_sync_conn, "openalex") == ["10.1/a"]
+        assert [src_id for _, src_id in get_stale_rows(sa_sync_conn, "openalex")] == ["W1"]
 
 
 class TestDisappearedMarking:
-    def test_set_disappeared_by_doi(self, sa_sync_conn):
-        _insert_staging(sa_sync_conn, "openalex", "W1", "10.1/gone", seen_days_ago=100)
-        set_disappeared_by_doi(sa_sync_conn, "openalex", "10.1/gone")
+    def test_set_disappeared_by_source_id(self, sa_sync_conn):
+        _insert_staging(sa_sync_conn, "openalex", "W1", None, seen_days_ago=100)
+        set_disappeared_by_source_id(sa_sync_conn, "openalex", "W1")
         marked = sa_sync_conn.execute(
             text(
                 "SELECT disappeared_at IS NOT NULL FROM staging WHERE source='openalex' AND source_id='W1'"
@@ -372,24 +371,16 @@ class TestDisappearedMarking:
         ).scalar()
         assert marked is True
 
-    def test_mark_undiscoverable_targets_stale_null_doi_only(self, sa_sync_conn):
-        _insert_staging(sa_sync_conn, "openalex", "W1", None, seen_days_ago=100)  # stale, no doi
-        _insert_staging(sa_sync_conn, "openalex", "W2", None, seen_days_ago=10)  # recent, no doi
-        _insert_staging(
-            sa_sync_conn, "openalex", "W3", "10.1/a", seen_days_ago=100
-        )  # stale, has doi
-        n = mark_undiscoverable_stale_disappeared(sa_sync_conn)
-        assert n == {"openalex": 1}
-        gone = (
-            sa_sync_conn.execute(
-                text(
-                    "SELECT source_id FROM staging WHERE disappeared_at IS NOT NULL ORDER BY source_id"
-                )
+    def test_set_disappeared_skips_not_found_stub(self, sa_sync_conn):
+        # Une row déjà marquée not_found (stub cross-import) n'est pas re-marquée.
+        _insert_staging(sa_sync_conn, "openalex", "W1", None, seen_days_ago=100, not_found=True)
+        set_disappeared_by_source_id(sa_sync_conn, "openalex", "W1")
+        marked = sa_sync_conn.execute(
+            text(
+                "SELECT disappeared_at IS NULL FROM staging WHERE source='openalex' AND source_id='W1'"
             )
-            .scalars()
-            .all()
-        )
-        assert gone == ["W1"]
+        ).scalar()
+        assert marked is True
 
 
 class TestGetUnresolvedPrefixes:

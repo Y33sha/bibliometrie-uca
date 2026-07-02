@@ -219,78 +219,52 @@ def record_doi_not_found(conn: Connection, source: str, doi: str) -> None:
     )
 
 
-_STALE_DOIS_SQL = text(
+_STALE_ROWS_SQL = text(
     """
-    SELECT DISTINCT doi
+    SELECT id, source_id
     FROM staging
     WHERE source = CAST(:source AS source_type)
-      AND doi IS NOT NULL
       AND not_found_at IS NULL
       AND disappeared_at IS NULL
       AND last_seen_at < now() - make_interval(days => :days)
-    ORDER BY doi
+    ORDER BY id
     """
 )
 
-_SET_DISAPPEARED_SQL = text(
+_SET_DISAPPEARED_BY_SOURCE_ID_SQL = text(
     """
     UPDATE staging SET disappeared_at = now()
-    WHERE source = CAST(:source AS source_type) AND doi = :doi
+    WHERE source = CAST(:source AS source_type) AND source_id = :source_id
       AND disappeared_at IS NULL AND not_found_at IS NULL
     """
 )
 
-_MARK_UNDISCOVERABLE_STALE_SQL = text(
-    """
-    WITH marked AS (
-        UPDATE staging SET disappeared_at = now()
-        WHERE doi IS NULL
-          AND not_found_at IS NULL
-          AND disappeared_at IS NULL
-          AND last_seen_at < now() - make_interval(days => :days)
-        RETURNING source
-    )
-    SELECT source, count(*) AS n FROM marked GROUP BY source
-    """
-)
 
+def get_stale_rows(conn: Connection, source: str) -> list[tuple[int, str]]:
+    """Rows `(id, source_id)` de `source` à `last_seen_at` ancien (> STALE_REFRESH_AFTER_DAYS).
 
-def get_stale_dois(conn: Connection, source: str) -> list[str]:
-    """DOI des rows `source` à `last_seen_at` ancien (> STALE_REFRESH_AFTER_DAYS).
-
-    Sert de `reader` à `run_async` pour la phase refresh : ces DOI seront
-    refetchés par l'adapter de la source. Exclut les stubs not-found et les
-    rows déjà marquées disparues.
+    Alimente la phase refresh : chaque row est refetchée par son `source_id`
+    natif. Toute row a un `source_id` (`NOT NULL`), donc la sélection ne dépend
+    pas de la présence d'un DOI. Exclut les stubs not-found et les rows déjà
+    marquées disparues.
     """
     if source not in VALID_SOURCES:
         raise ValueError(f"Source inconnue : {source}. Valides : {', '.join(VALID_SOURCES)}")
-    return list(
-        conn.execute(
-            _STALE_DOIS_SQL, {"source": source, "days": STALE_REFRESH_AFTER_DAYS}
-        ).scalars()
-    )
+    return [
+        (row.id, row.source_id)
+        for row in conn.execute(
+            _STALE_ROWS_SQL, {"source": source, "days": STALE_REFRESH_AFTER_DAYS}
+        )
+    ]
 
 
-def set_disappeared_by_doi(conn: Connection, source: str, doi: str) -> None:
-    """Marque `disappeared_at` sur la row `(source, doi)` confirmée absente.
+def set_disappeared_by_source_id(conn: Connection, source: str, source_id: str) -> None:
+    """Marque `disappeared_at` sur la row `(source, source_id)` confirmée absente.
 
-    Appelé par la phase refresh quand le refetch d'un DOI stale renvoie un
-    404 confirmé (sentinelle). Ne commit pas — l'appelant s'en charge.
+    Appelé par la phase refresh quand le refetch par id natif renvoie une absence
+    confirmée (réponse valide, zéro record). Ne commit pas — l'appelant s'en charge.
     """
-    conn.execute(_SET_DISAPPEARED_SQL, {"source": source, "doi": doi})
-
-
-def mark_undiscoverable_stale_disappeared(conn: Connection) -> dict[str, int]:
-    """Marque disparues les rows stale **sans DOI**, et retourne le décompte par source.
-
-    Ces rows ne sont pas refetchées par DOI ; comme leur source est re-moissonnée
-    par le bulk, rester stale > STALE_REFRESH_AFTER_DAYS signifie qu'elles ont
-    disparu. Le décompte est ventilé par source : ces rows ont bien une source
-    (`staging.source`), la disparition se rattache donc à elle, pas à un canal
-    « sans DOI » fictif. Ne commit pas — l'appelant s'en charge.
-    """
-    rows = conn.execute(_MARK_UNDISCOVERABLE_STALE_SQL, {"days": STALE_REFRESH_AFTER_DAYS}).all()
-    return {row.source: row.n for row in rows}
+    conn.execute(_SET_DISAPPEARED_BY_SOURCE_ID_SQL, {"source": source, "source_id": source_id})
 
 
 def get_cross_import_dois(conn: Connection, target: str) -> list[str]:
