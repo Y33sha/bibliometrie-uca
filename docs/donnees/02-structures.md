@@ -2,7 +2,7 @@
 
 *À jour le 2026-06-30.*
 
-Référentiel institutionnel maintenu manuellement. Contient l'UCA, ses laboratoires, les co-tutelles (CNRS, INRAE…), d'autres établissements partenaires (INP, VetAgro Sup, le CHU), etc.
+Référentiel de structures maintenu manuellement.
 
 Colonnes notables de `structures` :
 
