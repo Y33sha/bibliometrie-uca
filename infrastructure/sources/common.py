@@ -219,17 +219,23 @@ def record_doi_not_found(conn: Connection, source: str, doi: str) -> None:
     )
 
 
-_STALE_ROWS_SQL = text(
-    """
-    SELECT id, source_id
-    FROM staging
-    WHERE source = CAST(:source AS source_type)
-      AND not_found_at IS NULL
-      AND disappeared_at IS NULL
-      AND last_seen_at < now() - make_interval(days => :days)
-    ORDER BY id
-    """
-)
+# Filtre optionnel sur l'année de publication (`{year_clause}`) : la fenêtre
+# d'années du run courant est jointe depuis `source_publications.pub_year`
+# (année normalisée, déjà présente pour toute row stale — normalisée à un run
+# antérieur). Les rows sans ligne `source_publications` (jamais normalisées, cas
+# anormal) gardent `pub_year` NULL et sont conservées par le LEFT JOIN.
+_STALE_ROWS_SQL_TEMPLATE = """
+    SELECT s.id, s.source_id
+    FROM staging s
+    LEFT JOIN source_publications sp
+      ON sp.source = s.source AND sp.source_id = s.source_id
+    WHERE s.source = CAST(:source AS source_type)
+      AND s.not_found_at IS NULL
+      AND s.disappeared_at IS NULL
+      AND s.last_seen_at < now() - make_interval(days => :days)
+      {year_clause}
+    ORDER BY s.id
+"""
 
 _SET_DISAPPEARED_BY_SOURCE_ID_SQL = text(
     """
@@ -240,22 +246,31 @@ _SET_DISAPPEARED_BY_SOURCE_ID_SQL = text(
 )
 
 
-def get_stale_rows(conn: Connection, source: str) -> list[tuple[int, str]]:
+def get_stale_rows(
+    conn: Connection, source: str, years: list[int] | None = None
+) -> list[tuple[int, str]]:
     """Rows `(id, source_id)` de `source` à `last_seen_at` ancien (> STALE_REFRESH_AFTER_DAYS).
 
     Alimente la phase refresh : chaque row est refetchée par son `source_id`
     natif. Toute row a un `source_id` (`NOT NULL`), donc la sélection ne dépend
     pas de la présence d'un DOI. Exclut les stubs not-found et les rows déjà
     marquées disparues.
+
+    `years` borne la sélection à la fenêtre d'années du run courant, jointe depuis
+    `source_publications.pub_year` : un run sur une période glissante ne refetche
+    ainsi que le stale de ses propres années, sans requêtes unitaires inutiles sur
+    des années qu'il ne moissonne plus en bulk. `None` = aucune borne (tout le
+    stale de la source).
     """
     if source not in VALID_SOURCES:
         raise ValueError(f"Source inconnue : {source}. Valides : {', '.join(VALID_SOURCES)}")
-    return [
-        (row.id, row.source_id)
-        for row in conn.execute(
-            _STALE_ROWS_SQL, {"source": source, "days": STALE_REFRESH_AFTER_DAYS}
-        )
-    ]
+    params: dict[str, Any] = {"source": source, "days": STALE_REFRESH_AFTER_DAYS}
+    year_clause = ""
+    if years is not None:
+        year_clause = "AND (sp.pub_year IS NULL OR sp.pub_year = ANY(:years))"
+        params["years"] = list(years)
+    sql = text(_STALE_ROWS_SQL_TEMPLATE.format(year_clause=year_clause))
+    return [(row.id, row.source_id) for row in conn.execute(sql, params)]
 
 
 def set_disappeared_by_source_id(conn: Connection, source: str, source_id: str) -> None:

@@ -335,6 +335,16 @@ def _insert_staging(conn, source, sid, doi, *, seen_days_ago, not_found=False, d
     )
 
 
+def _insert_source_pub(conn, source, sid, pub_year):
+    conn.execute(
+        text(
+            "INSERT INTO source_publications (source, source_id, title, pub_year) "
+            "VALUES (CAST(:s AS source_type), :sid, 'T', :y)"
+        ),
+        {"s": source, "sid": sid, "y": pub_year},
+    )
+
+
 class TestGetStaleRows:
     def test_returns_old_rows_with_and_without_doi(self, sa_sync_conn):
         # Le refetch par id natif ne dépend pas du DOI : la row sans DOI est
@@ -357,6 +367,21 @@ class TestGetStaleRows:
     def test_scoped_to_source(self, sa_sync_conn):
         _insert_staging(sa_sync_conn, "openalex", "W1", "10.1/a", seen_days_ago=100)
         _insert_staging(sa_sync_conn, "scanr", "S1", "10.1/b", seen_days_ago=100)
+        assert [src_id for _, src_id in get_stale_rows(sa_sync_conn, "openalex")] == ["W1"]
+
+    def test_year_filter_scopes_to_window_and_keeps_null(self, sa_sync_conn):
+        # W1 hors fenêtre (exclue), W2 dans la fenêtre (gardée), W3 sans
+        # source_publications → pub_year NULL, conservée (LEFT JOIN conservateur).
+        for sid in ("W1", "W2", "W3"):
+            _insert_staging(sa_sync_conn, "openalex", sid, None, seen_days_ago=100)
+        _insert_source_pub(sa_sync_conn, "openalex", "W1", 2020)
+        _insert_source_pub(sa_sync_conn, "openalex", "W2", 2023)
+        rows = get_stale_rows(sa_sync_conn, "openalex", [2023, 2024])
+        assert sorted(src_id for _, src_id in rows) == ["W2", "W3"]
+
+    def test_no_year_filter_returns_all(self, sa_sync_conn):
+        _insert_staging(sa_sync_conn, "openalex", "W1", None, seen_days_ago=100)
+        _insert_source_pub(sa_sync_conn, "openalex", "W1", 2010)
         assert [src_id for _, src_id in get_stale_rows(sa_sync_conn, "openalex")] == ["W1"]
 
 

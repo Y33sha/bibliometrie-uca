@@ -1,5 +1,7 @@
 # Refresh stale par identifiants natifs
 
+Commencé et terminé le 2026-07-02
+
 ## Contexte
 
 La phase `refresh_stale` refetche les rows `staging` dont `last_seen_at` a dépassé `STALE_REFRESH_AFTER_DAYS`, pour rafraîchir leur `raw_data` ou constater leur disparition.
@@ -17,6 +19,7 @@ Le refetch propre interroge chaque source par `source_id` : hal-id, id OpenAlex,
 - Trois issues par row : record trouvé → refresh `raw_data` + bump `last_seen_at` ; absence confirmée (réponse valide, zéro record) → `disappeared_at` ; échec transitoire (réseau, 429, réponse malformée) → no-op, retry au run suivant.
 - Suppression de l'heuristique « stale sans DOI → disparu » : `disappeared_at` ne se pose plus que sur une absence confirmée par la source.
 - `wos` reste opt-in (`--include-wos`), comme pour `extract` et `cross_imports`.
+- Couplage du refresh à la fenêtre d'années du run, **sans colonne dédiée** : l'année de publication vit déjà dans `source_publications.pub_year` (déjà présente pour toute row stale, normalisée à un run antérieur). `get_stale_rows` joint `staging → source_publications` et borne sur cette année, plutôt que de matérialiser et maintenir une année dans `staging` (duplication, parsing par source, ou backfill différé). `theses` suit sa sémantique d'extraction : tout l'historique par défaut (aucune borne), `--year` mis à part.
 
 ## Phasage
 
@@ -36,11 +39,12 @@ Le refetch propre interroge chaque source par `source_id` : hal-id, id OpenAlex,
 
 - [x] `phase_refresh_stale` / `_run_refresh_stale` sur le mécanisme par id natif ; cible = toutes les sources (wos opt-in).
 
-### Phase 4 — Tests et documentation
+### Phase 4 — Couplage à la fenêtre d'années du run
 
-- [x] Tests d'unité orchestrateur (routage des trois issues) + sélection des cibles ; tests d'intégration `get_stale_rows` / `set_disappeared_by_source_id`.
+- [x] `get_stale_rows(source, years)` : LEFT JOIN `source_publications.pub_year`, borne optionnelle sur les années du run (NULL conservé).
+- [x] `find_stale` / orchestrateur `refresh` / `_run_refresh_stale` propagent `years` ; `phase_refresh_stale` calcule la fenêtre via le même `get_years()` que l'extraction (theses exemptée de la borne large).
+
+### Phase 5 — Tests et documentation
+
+- [x] Tests d'unité orchestrateur (routage des trois issues) + sélection des cibles + couplage année par source ; tests d'intégration `get_stale_rows` (avec/sans borne année) / `set_disappeared_by_source_id`.
 - [x] Mise à jour docstrings.
-
-## Questions ouvertes
-
-- Item lié du TODO : « stocker l'année requêtée dans une colonne du staging pour coupler `refresh_stale` à l'année de départ du run ». À reprendre après cet item.
