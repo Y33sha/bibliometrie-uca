@@ -20,9 +20,9 @@ Phases (dans l'ordre d'execution):
     cross_imports       Rattrapage cross-source : (1) docs HAL manquants par hal-id/NNT
                         (auto-borné, tourne toujours), puis (2) par DOI dans chaque source
                         cible (auto-borné par le backoff doi_lookups)
-    refresh_stale       Refetch des rows à last_seen_at ancien (> STALE_REFRESH_AFTER_DAYS) :
-                        trouvé -> bump last_seen_at + refresh ; 404 / sans DOI -> disappeared_at.
-                        Marque seulement, aucun effet aval.
+    refresh_stale       Refetch par identifiant natif des rows à last_seen_at ancien
+                        (> STALE_REFRESH_AFTER_DAYS) : trouvé -> bump last_seen_at + refresh ;
+                        absence confirmée -> disappeared_at. Marque seulement, aucun effet aval.
     refetch_truncated   Re-fetch des works OpenAlex tronqués à 100 auteurs, avant que
                         normalize ne les consomme.
     normalize           Normalisation staging -> tables sources (source_publications,
@@ -62,6 +62,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from application.ports.pipeline.extract.fetch_missing_doi import AsyncFetchMissingDoiAdapter
+    from application.ports.pipeline.extract.refresh_stale import RefreshStaleAdapter
     from infrastructure.queries.pipeline.countries import AddressCountryStatus
 
 from application.pipeline.graph import PHASE_ORDER
@@ -71,7 +72,7 @@ from application.pipeline.metadata_correction.journal_by_doi import JournalByDoi
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.modes import MODE_NAMES, MODES
 from application.pipeline.normalize.base import NormalizeStats
-from domain.sources.registry import ALL_SOURCES_SET, DOI_SEARCHABLE_SOURCES
+from domain.sources.registry import ALL_SOURCES, ALL_SOURCES_SET, DOI_SEARCHABLE_SOURCES
 from infrastructure.observability.log import setup_logger
 from infrastructure.observability.pipeline_status import clear_status, read_status, write_status
 from infrastructure.pipeline_lock import PipelineAlreadyRunningError, acquire_pipeline_lock
@@ -357,57 +358,35 @@ def phase_refresh_stale(sources: Any = None, include_wos: bool = False, **kw: An
     Tourne à **chaque run** : le seuil `STALE_REFRESH_AFTER_DAYS` étale la
     charge (chaque passe ne ramasse que ce qui vient de franchir le délai).
 
-    Pour chaque source DOI-queryable (`DOI_SEARCHABLE_SOURCES`),
-    refetch des DOI stale → trouvé : bump `last_seen_at` + refresh `raw_data` ;
-    404 confirmé : `disappeared_at`. Puis marque disparues les rows stale
-    **sans DOI** (non refetchables, mais re-moissonnées par le bulk → rester
-    stale signifie disparu). WoS est opt-in (`--include-wos`) : exclu par
-    défaut, comme `extract` et `cross_imports`.
+    Pour chaque source, refetch des rows stale **par leur identifiant natif**
+    (`staging.source_id`, jamais NULL) : trouvé → bump `last_seen_at` + refresh
+    `raw_data` ; absence confirmée par la source → `disappeared_at` ; échec
+    transitoire → no-op. Toute row est ainsi re-vérifiée directement, avec ou
+    sans DOI. WoS est opt-in (`--include-wos`) : exclu par défaut, comme
+    `extract` et `cross_imports`.
 
     Conservateur : on **marque seulement** (`disappeared_at`), aucun effet
     aval. Placée après `cross_imports` (qui a fini de peupler `staging` et
     `last_seen_at`) et avant `normalize` (qui consomme le `raw_data` rafraîchi).
     """
-    from infrastructure.db.engine import get_sync_engine
-    from infrastructure.sources.common import mark_undiscoverable_stale_disappeared
-
     metrics = PhaseMetrics()
     by_source: dict[str, dict[str, float]] = {}
-    allowed = set(DOI_SEARCHABLE_SOURCES)
+    allowed = set(ALL_SOURCES)
     if not include_wos:
         allowed -= {"wos"}
     effective = (set(sources) if sources else allowed) & allowed
-    targets = [t for t in DOI_SEARCHABLE_SOURCES if t in effective]
+    targets = [t for t in ALL_SOURCES if t in effective]
     targets = _configured_api_targets(targets, metrics, phase="refresh_stale")
     for target in targets:
-        source_metrics, duration = _timed_metrics(partial(_run_refresh_stale_doi, target))
+        source_metrics, duration = _timed_metrics(partial(_run_refresh_stale, target))
         metrics.merge(source_metrics)
         by_source[target] = {
             "interrogated": source_metrics.total,
-            "refreshed": source_metrics.new,
-            # 404 confirmé sur un DOI stale → `disappeared_at` (via marker_handler).
-            "disappeared": source_metrics.extras.get("not_found", 0),
+            "refreshed": source_metrics.updated,
+            "unchanged": source_metrics.unchanged,
+            "disappeared": source_metrics.extras.get("disappeared", 0),
             "duration_s": round(duration, 1),
         }
-
-    log.info("▶ refresh_stale : marquage des rows stale sans DOI…")
-    conn = get_sync_engine().connect()
-    try:
-        undiscoverable_by_source = mark_undiscoverable_stale_disappeared(conn)
-        conn.commit()
-    finally:
-        conn.close()
-    n_undiscoverable = sum(undiscoverable_by_source.values())
-    log.info("✓ refresh_stale : %d rows sans DOI marquées disparues", n_undiscoverable)
-    metrics.add(disappeared=n_undiscoverable)
-
-    # Disparitions détectées par staleness (rows sans DOI) : rattachées à leur
-    # source, fondues dans la même colonne `disappeared` que les 404 par DOI.
-    for source, n in undiscoverable_by_source.items():
-        row = by_source.setdefault(
-            source, {"interrogated": 0, "refreshed": 0, "disappeared": 0, "duration_s": 0}
-        )
-        row["disappeared"] += n
 
     if by_source:
         metrics.details["table"] = {
@@ -553,6 +532,13 @@ def phase_publishers_journals(**kw: Any) -> PhaseMetrics:
         openalex = _run_enrich_journals_from_openalex()
 
     doaj = _run_enrich_journals_from_doaj()
+
+    # Les compteurs et signaux des sous-étapes remontent à la phase : sans ce merge,
+    # `as_summary()` (log) et `to_payload()` (observabilité) rapporteraient « no-op »
+    # malgré le travail effectué, et un circuit-breaker tripé ne passerait pas la
+    # phase en avertissement. Les `details` sur-mesure sont posés juste après.
+    for sub in (publishers, openalex, doaj):
+        metrics.merge(sub)
 
     metrics.details["table"] = {
         "rows": [
@@ -1794,8 +1780,7 @@ def _run_fetch_missing_hal_id(*, mode: str = "full") -> PhaseMetrics:
 def _make_fetch_missing_doi_adapter(target: str) -> "AsyncFetchMissingDoiAdapter":
     """Construit l'adapter `fetch_missing_doi` d'une source cible.
 
-    Partagé par le cross-import (`_run_fetch_missing_doi`) et le refresh
-    (`_run_refresh_stale_doi`), qui consomment les mêmes adapters.
+    Consommé par le cross-import (`_run_fetch_missing_doi`).
     """
     from typing import cast
 
@@ -1868,43 +1853,56 @@ def _run_fetch_missing_doi(target: str) -> PhaseMetrics:
     return metrics
 
 
-def _run_refresh_stale_doi(target: str) -> PhaseMetrics:
-    """Refetch des DOI stale d'une source : trouvé → bump, 404 → disappeared_at."""
-    from application.pipeline.extract.fetch_missing_doi import run_async
+def _make_refresh_stale_adapter(source: str) -> "RefreshStaleAdapter":
+    """Construit l'adapter `refresh_stale` d'une source (refetch par id natif)."""
+    from infrastructure.sources.crossref.refresh_stale import CrossrefRefreshStaleAdapter
+    from infrastructure.sources.datacite.refresh_stale import DataciteRefreshStaleAdapter
+    from infrastructure.sources.hal.refresh_stale import HalRefreshStaleAdapter
+    from infrastructure.sources.openalex.refresh_stale import OpenalexRefreshStaleAdapter
+    from infrastructure.sources.scanr.refresh_stale import ScanrRefreshStaleAdapter
+    from infrastructure.sources.theses.refresh_stale import ThesesRefreshStaleAdapter
+    from infrastructure.sources.wos.refresh_stale import WosRefreshStaleAdapter
+
+    # Cast : mypy ne reconnaît pas la conformité structurelle d'une classe concrète
+    # à un Protocol via `type[Protocol]` (cf. `_make_fetch_missing_doi_adapter`).
+    adapter_classes: dict[str, type[RefreshStaleAdapter]] = cast(
+        "dict[str, type[RefreshStaleAdapter]]",
+        {
+            "hal": HalRefreshStaleAdapter,
+            "openalex": OpenalexRefreshStaleAdapter,
+            "wos": WosRefreshStaleAdapter,
+            "scanr": ScanrRefreshStaleAdapter,
+            "theses": ThesesRefreshStaleAdapter,
+            "crossref": CrossrefRefreshStaleAdapter,
+            "datacite": DataciteRefreshStaleAdapter,
+        },
+    )
+    return adapter_classes[source]()
+
+
+def _run_refresh_stale(target: str) -> PhaseMetrics:
+    """Refetch par id natif des rows stale d'une source : trouvé → bump, absence → disappeared."""
+    from application.pipeline.extract.refresh_stale import refresh
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.sources.circuit_breaker import (
         SourceCircuitBreaker,
         reset_current_breaker,
         set_current_breaker,
     )
-    from infrastructure.sources.common import get_stale_dois, set_disappeared_by_doi
 
-    adapter = _make_fetch_missing_doi_adapter(target)
-
-    def _mark_disappeared(conn: Any, doi: str) -> None:
-        set_disappeared_by_doi(conn, target, doi)
-        conn.commit()
+    adapter = _make_refresh_stale_adapter(target)
 
     log.info("▶ refresh_stale --target %s", target)
     t0 = time.time()
     conn = get_sync_engine().connect()
     # Circuit-breaker par source (cf. `_run_fetch_missing_doi`) : coupe le refetch
     # d'une source à bout de budget (429 répétés) au lieu de la marteler. La
-    # ContextVar est posée ici, le helper HTTP infra la lit, run_async ne consulte
-    # que `breaker.tripped`.
+    # ContextVar est posée ici, le helper HTTP infra la lit, l'orchestrateur ne
+    # consulte que `breaker.tripped`.
     breaker = SourceCircuitBreaker(target)
     token = set_current_breaker(breaker)
     try:
-        metrics = asyncio.run(
-            run_async(
-                conn,
-                adapter,
-                log,
-                cross_import_dois_reader=get_stale_dois,
-                marker_handler=_mark_disappeared,
-                breaker=breaker,
-            )
-        )
+        metrics = asyncio.run(refresh(conn, adapter, log, breaker=breaker))
     finally:
         reset_current_breaker(token)
         conn.close()
