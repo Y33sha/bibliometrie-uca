@@ -216,13 +216,15 @@ def replace_title_match_relations(conn: Connection, edges: list[RelationEdge]) -
 
 def count_by_relation_type(conn: Connection) -> list[tuple[str, int]]:
     """`(relation_type, nombre)` par type, décroissant — distribution de `publication_relations`."""
+    # Alias `rel_type` / `cnt` : `t` entrerait en collision avec l'attribut déprécié
+    # `Row.t` de SQLAlchemy, `r.t` renverrait alors la Row entière au lieu de la valeur.
     rows = conn.execute(
         text(
-            "SELECT relation_type::text AS t, count(*) AS n FROM publication_relations "
-            "GROUP BY relation_type ORDER BY n DESC"
+            "SELECT relation_type::text AS rel_type, count(*) AS cnt FROM publication_relations "
+            "GROUP BY relation_type ORDER BY cnt DESC"
         )
     ).all()
-    return [(r.t, r.n) for r in rows]
+    return [(r.rel_type, r.cnt) for r in rows]
 
 
 class PgPublicationRelationsQueries(PublicationRelationsQueries):

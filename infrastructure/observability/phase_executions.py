@@ -57,9 +57,12 @@ def persist_phase_execution(conn: Connection, execution: PhaseExecution) -> None
             "mode": execution.mode,
             "sources": execution.sources,
             "status": execution.status,
-            "signals": json.dumps(execution.signals),
-            "metrics": json.dumps(execution.metrics),
-            "details": json.dumps(execution.details),
+            # `default=str` : une valeur récalcitrante (ex. objet non-JSON glissé dans
+            # `details`) est stringifiée au lieu de faire échouer l'INSERT et perdre
+            # toute la ligne d'exécution de phase (l'observabilité est best-effort).
+            "signals": json.dumps(execution.signals, default=str),
+            "metrics": json.dumps(execution.metrics, default=str),
+            "details": json.dumps(execution.details, default=str),
         },
     )
 
