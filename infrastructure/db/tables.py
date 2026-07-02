@@ -596,6 +596,26 @@ rejected_authorships = Table(
 )
 
 
+# Identités d'auteur dédupliquées : la clé `(author_name_normalized,
+# person_identifiers)` est extraite des signatures `source_authorships` (une
+# identité pour ~25 signatures). L'unique est `NULLS NOT DISTINCT` : les
+# signatures sans identifiant collapsent sur leur seul nom normalisé, sans
+# recourir à un sentinel `'{}'`.
+author_identifying_keys = Table(
+    "author_identifying_keys",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("author_name_normalized", Text),
+    Column("person_identifiers", JSONB),
+    UniqueConstraint(
+        "author_name_normalized",
+        "person_identifiers",
+        name="author_identifying_keys_key",
+        postgresql_nulls_not_distinct=True,
+    ),
+)
+
+
 source_authorships = Table(
     "source_authorships",
     metadata,
@@ -620,6 +640,11 @@ source_authorships = Table(
     # (référentiel personne) qui est alimentée par promotion via le
     # pipeline personnes (`add_identifiers_from_authorships`).
     Column("person_identifiers", JSONB),
+    # FK vers `author_identifying_keys` (identité dédupliquée). Nullable
+    # pendant la migration expand/contract ; passe NOT NULL + FK une fois les
+    # écrivains basculés. La contrainte FK n'est pas modélisée ici (pattern du
+    # projet : les FK vivent en DB, pas dans la MetaData).
+    Column("identity_id", Integer),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     UniqueConstraint(
         "source_publication_id",
