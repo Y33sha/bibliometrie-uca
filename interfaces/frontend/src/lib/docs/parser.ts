@@ -39,6 +39,28 @@ function makeAnchorDedupe(): (baseAnchor: string) => string {
 	};
 }
 
+/**
+ * Ancres effectives d'un document, dans l'ordre du rendu : chaque titre (tous
+ * niveaux) produit son slug auto-généré, dédupliqué comme dans le HTML rendu.
+ * Sert au contrôle d'intégrité des liens internes de la doc.
+ */
+export function documentAnchors(content: string): string[] {
+	const dedupe = makeAnchorDedupe();
+	const anchors: string[] = [];
+	let inCodeBlock = false;
+	for (const line of content.split(/\r?\n/)) {
+		if (/^```/.test(line)) {
+			inCodeBlock = !inCodeBlock;
+			continue;
+		}
+		if (inCodeBlock) continue;
+		const m = /^#{1,6}\s+(.+)$/.exec(line);
+		if (!m) continue;
+		anchors.push(dedupe(makeAnchor(m[1].trim())));
+	}
+	return anchors;
+}
+
 function extractHeadings(content: string): { title: string; toc: TocEntry[] } {
 	const inlineMarked = new Marked();
 	const toc: TocEntry[] = [];
