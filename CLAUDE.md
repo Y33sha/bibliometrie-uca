@@ -20,10 +20,12 @@
 
 - En fin de message, **proposer des pistes pour la suite** ou **attendre des instructions**. Ne pas suggérer de s'arrêter là, de faire une pause ou demander si l'utilisatrice veut continuer.
 - Pour les décisions structurantes (impact sur le schéma de données ou la logique du pipeline), toujours **attendre la décision** de l'utilisatrice avant de commencer à coder.
-- Vérifier avant d'affirmer.
+- Pas de mur de texte dans la conversation. Si tu dois cartographier le code avant de répondre, garde l'analyse pour toi, ou propose de générer un bilan au format *.md.
+- Vérifie avant d'affirmer.
 
 ### Workflow
 
+- Pose tes questions en texte libre. Pas de QCM à choix limités.
 - Gérer les commits git. Faire un commit à chaque changement cohérent (au minimum une fois par phase de chantier, voire à chaque item d'une phase)
 - Ne pas faire tourner la suite pytest plusieurs fois juste pour récupérer le résumé. Si c'est vert la première fois, c'est bon. Si tu veux le résumé, débrouille-toi pour le récupérer du premier coup, au lieu de tronquer l'output sans nécessité.
 

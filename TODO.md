@@ -1,8 +1,5 @@
 # Pipeline
 ## Extraction
-* [ ] refetch_stale: utiliser les identifiants natifs de chaque source, pas DOI
-* [ ] stocker l'année requêtée dans une colonne du staging pour pouvoir coupler la phase `refresh_stale` à l'année de départ du run en cours
-* [ ] nommage incohérent: fetch_missing_hal_id cherche nnt
 ### Couverture
 * [ ] ajouter extraction par ORCID: vérifier pertinence (tester différentes sources, auditer le gain)
 * [ ] bioRxiv, medRxiv: identifiants différents de arxiv? cf publi 2757 (voir si on moissonne ces identifiants; possibilité de récupérer les DOI à partir des identifiants comme dans ArXiv)
@@ -36,7 +33,7 @@
 * [ ] fusion / dé-fusion manuelle de publications: circuit à créer (interface de gestion du référentiel de publications, sur le modèle de admin/persons; avec requêtes pour repérer doublons probables et fusions suspectes; supprimer `admin/duplicates`)
 * [ ] signaler visuellement les structures qui ne font partie d'aucun périmètre (pages liste et détail), ajouter filtre périmètre dans la page liste
 * [ ] page persons: le nombre de publications liées à une forme de nom ne se met pas à jour dans le drawer quand on les détache de l'auteur
-* [ ] créer des catégories de personnes (personnel UCA, chercheurs associés, anciens doctorants, méga-collab de physique des particules) => et pouvoir configurer la visibilité des groupes dans l'UI publique (beaucoup d'adresses UCA dans les collaborations ALICE/ATLAS sont décalées dans les sources, ce qui pourrit la base avec des milliers de fausses "personnes UCA")
+* [ ] créer des catégories de personnes (personnel UCA, chercheurs associés, anciens doctorants, méga-collab de physique des particules) => et pouvoir configurer la visibilité des groupes dans l'UI publique (beaucoup d'adresses UCA dans les collaborations ALICE/ATLAS sont décalées dans les sources, ce qui pourrit la base avec des milliers de fausses "personnes UCA") | ou alors un simple BOOL "visible dans l'UI"?
 ## Publique
 * [ ] page "affiliations suspectes hal": requête incorrecte, capture trop de publis + problème de perf
 * [ ] Filtres supplémentaires possibles: langue; `has_doi` (crossref, datacite, other, none); `corresponding_is_in_perimeter`; `peer_reviewed`? (suppose de posséder la donnée ou de pouvoir la déduire des sources); licence
@@ -58,11 +55,11 @@
 * [ ] 107270 et 869915 Computing Pivot-Minors: un article faussement typé preprint par openalex; + question des arxiv_id (déduire le DOI et vice-versa)
 
 # Idées pour plus tard, éventuellement
-* projets ANR, projets européens
+* financements (projets ANR, projets européens)
 * stats en compte fractionnaire vs compte entier
 * collaborations nationales et internationales: identification des structures partenaires; évolution des collaborations dans le temps (graphes de collaboration par labo, avec visualisation animée par année)
-* citation count
 * définir des groupes de pays (UE, continents) pour la facette "pays des co-auteurs"
+* citation count
 * règles de correction de métadonnées et règles de déduplication de publications: actuellement logées dans le code; possibilité de les stocker en base et de les rendre configurables via l'UI?
 * audit trail: uniformiser les types d'action qui génèrent un log ou pas + interface pour les consulter
 * rendre les extracteurs interruptibles avec ctrl+C sous Windows
