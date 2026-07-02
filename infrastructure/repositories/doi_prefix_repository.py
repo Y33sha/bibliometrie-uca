@@ -17,7 +17,7 @@ class PgDoiPrefixRepository:
     def get_unresolved_prefixes_with_samples(
         self, *, n_samples_per_prefix: int
     ) -> list[tuple[str, list[str]]]:
-        """Renvoie `[(prefix, [doi1, doi2, ...]), ...]` pour chaque préfixe DOI absent de `doi_prefixes`. Les DOI proviennent de la vue `candidate_dois` — le même pool que le cross-import par DOI (staging, related_dois, cibles de relations, arXiv-dérivés), pour que tout préfixe interrogé par cross-import soit résolu ici. Au plus `n_samples_per_prefix` DOIs par préfixe, ordonnés par longueur croissante pour minimiser la complexité d'encodage URL côté client doi.org/ra."""
+        """Renvoie `[(prefix, [doi1, doi2, ...]), ...]` pour chaque préfixe DOI absent de `doi_prefixes`. Les DOI proviennent de la vue `candidate_dois` — le même pool que le cross-import par DOI (DOI primaires des source_publications in-périmètre, related_dois, cibles de relations, arXiv-dérivés), pour que tout préfixe interrogé par cross-import soit résolu ici. Au plus `n_samples_per_prefix` DOIs par préfixe, ordonnés par longueur croissante pour minimiser la complexité d'encodage URL côté client doi.org/ra."""
         result = self._conn.execute(
             text(
                 """

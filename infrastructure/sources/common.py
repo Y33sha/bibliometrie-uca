@@ -285,17 +285,19 @@ def set_disappeared_by_source_id(conn: Connection, source: str, source_id: str) 
 def get_cross_import_dois(conn: Connection, target: str) -> list[str]:
     """Retourne les DOI présents dans les autres sources mais absents de la cible.
 
-    Pool = `staging.doi` (DOI primaire) ∪ `source_publications.external_ids.related_dois`
-    (DOI secondaires : preprint/dépôt/édition) ∪ `publication_relations.target_doi`
-    (cibles des relations entre publications : preprint/supplément/data paper… à rapatrier)
-    ∪ DOI DataCite déduits de `source_publications.external_ids.arxiv_id` (préfixe
-    `10.48550/arXiv.<id>` : tout dépôt arXiv expose ce DOI DataCite, modernes comme anciens
-    identifiants). Les related_dois, les relations et les arxiv_id proviennent des runs
-    précédents (source_publications normalisés, phase `relations`) : ceux d'un record
-    fraîchement ingéré sont rattrapés au run suivant — bénin (le pipeline est convergent).
+    Pool (vue `candidate_dois`) restreint aux publications **in-périmètre** :
+    `source_publications.doi` (DOI primaire) ∪ `external_ids.related_dois` (DOI
+    secondaires : preprint/dépôt/édition) ∪ `publication_relations.target_doi`
+    (cibles des relations : preprint/supplément/data paper… à rapatrier) ∪ DOI
+    DataCite déduits de `external_ids.arxiv_id` (préfixe `10.48550/arXiv.<id>` :
+    tout dépôt arXiv expose ce DOI DataCite). Le périmètre (`publications.in_perimeter`)
+    est celui matérialisé au run précédent : ne cross-importer que des DOI de
+    publications confirmées UCA coupe la propagation de cross-imports hors-périmètre.
+    Les DOI de records fraîchement ingérés sont donc rattrapés au run suivant —
+    bénin (le pipeline est convergent).
 
-    Le SQL compare les `doi` par égalité directe, pour s'appuyer sur l'index
-    btree `idx_staging_doi`. Les candidats retenus sont normalisés via `clean_doi`
+    Le SQL compare les `doi` par égalité directe. Les candidats retenus sont
+    normalisés via `clean_doi`
     et dédoublonnés avant d'être renvoyés : les appels HTTP par DOI en aval
     reçoivent une forme canonique, quelle que soit la propreté de la valeur source.
 
@@ -320,12 +322,12 @@ def get_cross_import_dois(conn: Connection, target: str) -> list[str]:
     join_clause = (
         "LEFT JOIN doi_prefixes dp ON dp.prefix = split_part(c.doi, '/', 1)" if target_ra else ""
     )
-    # Pool de DOI candidats centralisé dans la vue `candidate_dois` : staging +
-    # related_dois + cibles de relations (source NULL) + arXiv-dérivés. La même
-    # vue alimente la résolution de RA des préfixes — tout DOI interrogé ici a donc
-    # son préfixe résolu en amont. L'exclusion du target se fait via
-    # `source IS DISTINCT FROM` (les relations à source NULL restent candidates
-    # pour toutes les cibles) et le `NOT IN (staging du target)` final.
+    # Pool de DOI candidats centralisé dans la vue `candidate_dois` (in-périmètre) :
+    # DOI primaires des SP + related_dois + cibles de relations (source NULL) +
+    # arXiv-dérivés. La même vue alimente la résolution de RA des préfixes — tout
+    # DOI interrogé ici a donc son préfixe résolu en amont. L'exclusion du target se
+    # fait via `source IS DISTINCT FROM` (les relations à source NULL restent
+    # candidates pour toutes les cibles) et le `NOT IN (staging du target)` final.
     if isinstance(conn, Connection):
         prefix_filter = " AND (dp.ra = :target_ra OR dp.ra IS NULL)" if target_ra else ""
         query = f"""
