@@ -42,6 +42,7 @@ class ThesesNormalizeQueries(Protocol):
         author_position: int | None,
         roles: list[str],
         raw_author_name: str,
+        author_name_normalized: str,
         person_identifiers: JsonValue,
     ) -> int: ...
 

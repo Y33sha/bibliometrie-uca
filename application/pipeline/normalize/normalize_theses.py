@@ -32,6 +32,7 @@ from application.ports.pipeline.normalize.theses import ThesesNormalizeQueries
 from application.ports.pipeline.staging import StagingQueries, StagingRow
 from application.ports.repositories.publication_repository import PublicationRepository
 from domain.dates import french_date_to_iso
+from domain.normalize import normalize_name_form
 from domain.publications.identifiers import clean_doi, normalize_nnt
 from domain.sources.theses import (
     aggregate_thesis_persons,
@@ -205,6 +206,7 @@ def process_persons(
             author_position=a.author_position,
             roles=a.roles,
             raw_author_name=a.raw_author_name,
+            author_name_normalized=normalize_name_form(a.raw_author_name),
             person_identifiers=a.person_identifiers if a.person_identifiers else None,
         )
         if addr_parts:
