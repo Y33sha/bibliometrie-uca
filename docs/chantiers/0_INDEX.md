@@ -18,6 +18,7 @@ _(aucun)_
 
 ## Chantiers archivés
 
+- 2026-07-02 — [Refresh stale par identifiants natifs](archived/2026-07-02_DATA_refresh-stale-identifiants-natifs.md)
 - 2026-07-01 — [Skip propre des sources d'API tierces non configurées](archived/2026-07-01_CODE_extract-sources-non-configurees.md)
 - 2026-07-01 — [Observabilité du pipeline](archived/2026-07-01_CODE_observabilite-pipeline.md)
 - 2026-06-30 — [Brancher le domaine riche orphelin](archived/2026-06-30_CODE_domaine-riche-orphelin.md)
