@@ -326,6 +326,18 @@ class TestOpenalexFetchAsync:
             records = list(await adapter.fetch_async(client, ["10.1/net-error"]))
         assert records == []
 
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_fetch_async_http_error_returns_empty(self):
+        """Erreur HTTP (401/4xx/5xx) → [] sans propager (uniforme aux autres sources)."""
+        respx.get("https://api.openalex.org/works").mock(return_value=httpx.Response(401))
+        adapter = OpenalexFetchMissingDoiAdapter()
+        adapter.base_url = "https://api.openalex.org/works"
+
+        async with httpx.AsyncClient() as client:
+            records = list(await adapter.fetch_async(client, ["10.1/a"]))
+        assert records == []
+
 
 # ── adapter HAL : fetch_async via respx ──────────────────────────
 
@@ -558,6 +570,20 @@ class TestWosFetchAsync:
         assert len(records) == 1
         assert is_not_found_marker(records[0])
         assert records[0]["_doi"] == "10.1/a"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_fetch_async_http_error_returns_empty(self):
+        """Erreur HTTP non-400 (401/403/5xx) = lot non fiable : [] sans faux
+        not_found ni exception propagée (uniforme aux autres sources)."""
+        respx.get("https://api.clarivate.com/api/wos").mock(return_value=httpx.Response(401))
+        adapter = WosFetchMissingDoiAdapter()
+        adapter.base_url = "https://api.clarivate.com/api/wos"
+        adapter.headers = {"X-ApiKey": "k", "Accept": "application/json"}
+
+        async with httpx.AsyncClient() as client:
+            records = list(await adapter.fetch_async(client, ["10.1/a"]))
+        assert records == []
 
     @pytest.mark.asyncio
     @respx.mock

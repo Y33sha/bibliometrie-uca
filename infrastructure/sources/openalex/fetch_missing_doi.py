@@ -66,7 +66,9 @@ class OpenalexFetchMissingDoiAdapter:
                 timeout=30,
                 label=f"DOI {doi}",
             )
-        except httpx.RequestError:
+        except (httpx.RequestError, httpx.HTTPStatusError):
+            # Erreur réseau ou HTTP (429/5xx après retries, 4xx) : lot ignoré, les
+            # DOI restent candidats au prochain run (leur absence n'est pas prouvée).
             return []
         results = data.get("results", [])
         if not results:
