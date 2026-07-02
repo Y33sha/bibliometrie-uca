@@ -4,7 +4,7 @@
 
 Procédure de diagnostic et de remédiation des défauts récurrents sur les tables `journals`, `publishers`, `doi_prefixes` et leurs relations.
 
-Le chantier [METIER_publishers-journals](../chantiers/METIER_publishers-journals.md) explique le *pourquoi* (typage, dédup, Phase 4a cohérence DOI ↔ journal). Ce playbook est le *comment*, à appliquer **en prod**.
+Le chantier [METIER_publishers-journals](../chantiers/archived/2026-05-29_METIER_publishers-journals.md) explique le *pourquoi* (typage, dédup, Phase 4a cohérence DOI ↔ journal). Ce playbook est le *comment*, à appliquer **en prod**.
 
 ## Quand utiliser ce playbook
 
@@ -202,6 +202,6 @@ Re-lancer ensuite la query Cas 5 pour mesurer la baisse d'incohérences.
 
 ## Liens
 
-- [METIER_publishers-journals](../chantiers/METIER_publishers-journals.md) — fiche chantier (Phase 4a, contexte global).
-- [METIER_doi-ra-datacite](../chantiers/METIER_doi-ra-datacite.md) — table `doi_prefixes` (préfixes ↔ Registration Agency ↔ publisher).
+- [METIER_publishers-journals](../chantiers/archived/2026-05-29_METIER_publishers-journals.md) — fiche chantier (Phase 4a, contexte global).
+- [METIER_doi-ra-datacite](../chantiers/archived/2026-06-20_METIER_doi-ra-datacite.md) — table `doi_prefixes` (préfixes ↔ Registration Agency ↔ publisher).
 - `interfaces/cli/oneshot/seed_journals_doi_prefix.py` — script de seed des `journals.doi_prefix`.
