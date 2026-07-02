@@ -9,10 +9,10 @@ Le peuplement de la base s'effectue via un *pipeline* composé des étapes suiva
 ## Moissonnage
 
 - [Moissonnage initial](02-extract.md) : récupère les données brutes depuis les API et les stocke en JSONB dans la table de *staging*.
-- [Identification des agences d'enregistrement des DOI](02-extract.md#resolve-ra) : résout l'agence d'enregistrement ([Crossref](../glossaire.md#crossref) ou [DataCite](../glossaire.md#datacite)) des préfixes [DOI](../glossaire.md#doi), pour que l'étape suivante route chaque DOI vers la bonne API plutôt que de l'interroger contre les deux.
-- [Imports croisés](02-extract.md#cross-imports) : deux mécanismes de rattrapage cross-source enchaînés — (1) docs HAL manquants repérés par hal-id ou NNT dans d'autres sources, (2) recherche par DOI des documents absents d'une source mais présents dans une autre.
-- [Refresh & disparitions](02-extract.md#refresh-stale) : refetch des documents à `last_seen_at` ancien (> 90 j) — rafraîchit les métadonnées vieillissantes et marque (`disappeared_at`) ceux qui ont disparu de leur source.
-- [Works OpenAlex tronqués à 100 auteurs](02-extract.md#refetch-truncated) : re-télécharge un par un les works OpenAlex de 100 auteurs, suspects d'avoir été tronqués par le plafond de l'API.
+- [Identification des agences d'enregistrement des DOI](02-extract.md#agences-denregistrement-doi) : résout l'agence d'enregistrement ([Crossref](../glossaire.md#crossref) ou [DataCite](../glossaire.md#datacite)) des préfixes [DOI](../glossaire.md#doi), pour que l'étape suivante route chaque DOI vers la bonne API plutôt que de l'interroger contre les deux.
+- [Imports croisés](02-extract.md#imports-croisés) : deux mécanismes de rattrapage cross-source enchaînés — (1) docs HAL manquants repérés par hal-id ou NNT dans d'autres sources, (2) recherche par DOI des documents absents d'une source mais présents dans une autre.
+- [Refresh & disparitions](02-extract.md#refresh-disparitions) : refetch des documents à `last_seen_at` ancien (> 90 j) — rafraîchit les métadonnées vieillissantes et marque (`disappeared_at`) ceux qui ont disparu de leur source.
+- [Works OpenAlex tronqués à 100 auteurs](02-extract.md#works-openalex-tronqués) : re-télécharge un par un les works OpenAlex de 100 auteurs, suspects d'avoir été tronqués par le plafond de l'API.
 
 ## Normalisation
 
@@ -37,5 +37,5 @@ Le peuplement de la base s'effectue via un *pipeline* composé des étapes suiva
 ## Compléments: pays, sujets, statut *open access*
 
 - [Pays](11-enrichissements.md) : détection automatisée des pays des adresses. Sert à interroger les collaborations internationales.
-- [Sujets](11-enrichissements.md#subjects) : deux étapes enchaînées — (1) ingestion des sujets/mots-clés des `source_publications` vers les tables canoniques `subjects` et `publication_subjects`, (2) recalcul de `subjects.usage_count` + table `subject_cooccurrences` (paires de sujets co-présents sur une même publication).
-- [Statut open access](11-enrichissements.md#oa_status) : statut OA par publication via Unpaywall (souvent plus à jour que les sources).
+- [Sujets](11-enrichissements.md#sujets) : deux étapes enchaînées — (1) ingestion des sujets/mots-clés des `source_publications` vers les tables canoniques `subjects` et `publication_subjects`, (2) recalcul de `subjects.usage_count` + table `subject_cooccurrences` (paires de sujets co-présents sur une même publication).
+- [Statut open access](11-enrichissements.md#statut-open-access) : statut OA par publication via Unpaywall (souvent plus à jour que les sources).

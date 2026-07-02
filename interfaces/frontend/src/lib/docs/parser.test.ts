@@ -80,68 +80,22 @@ describe('parseMarkdown — table des matières', () => {
 	});
 });
 
-// ── parseMarkdown / ancres custom (Pandoc {#slug}) ─────────────
+// ── parseMarkdown / ancres = slug auto (pas de marqueur custom) ─
 
-describe('parseMarkdown — ancres custom Pandoc {#slug}', () => {
-	it('utilise le slug Pandoc comme ancre prioritaire', () => {
-		const md = '## Mon titre {#mon-slug}';
-		const { toc, html } = parseMarkdown(md, BASE, 'test');
-		expect(toc[0].anchor).toBe('mon-slug');
-		expect(html).toContain('<h2 id="mon-slug">');
+describe('parseMarkdown — ancres dérivées du texte (parité GitHub)', () => {
+	it('dérive toujours l\'ancre du texte du titre', () => {
+		const { toc, html } = parseMarkdown('## Mon titre', BASE, 'test');
+		expect(toc[0].anchor).toBe('mon-titre');
+		expect(html).toContain('<h2 id="mon-titre">');
 	});
 
-	it('strippe le marqueur {#…} du texte affiché', () => {
-		const md = '## Texte visible {#x}';
-		const { toc, html } = parseMarkdown(md, BASE, 'test');
-		expect(toc[0].html).toBe('Texte visible');
-		expect(html).toContain('>Texte visible</h2>');
-		expect(html).not.toContain('{#');
-	});
-
-	it('le marqueur doit être en fin de heading', () => {
-		// Si {#x} est en milieu, ce n'est pas reconnu et l'ancre est auto-générée
-		const md = '## Foo {#x} bar';
-		const { toc } = parseMarkdown(md, BASE, 'test');
-		expect(toc[0].anchor).not.toBe('x');
-	});
-});
-
-// ── parseMarkdown / ancres custom (<span id="...">) ────────────
-
-describe('parseMarkdown — ancres custom via <span id>', () => {
-	it('utilise l\'id du span comme ancre prioritaire', () => {
-		const md = '## <span id="extract"></span>`extract` : Moissonnage';
-		const { toc, html } = parseMarkdown(md, BASE, 'test');
-		expect(toc[0].anchor).toBe('extract');
-		expect(html).toContain('<h2 id="extract">');
-	});
-
-	it('strippe le <span> du texte affiché dans la TOC', () => {
-		const md = '## <span id="x"></span>Texte visible';
-		const { toc } = parseMarkdown(md, BASE, 'test');
-		expect(toc[0].html).not.toContain('<span');
-		expect(toc[0].html).toContain('Texte visible');
-	});
-
-	it('strippe le <span> du HTML rendu', () => {
-		const md = '## <span id="x"></span>Texte';
-		const { html } = parseMarkdown(md, BASE, 'test');
-		expect(html).toContain('<h2 id="x">');
-		expect(html).not.toContain('<span');
-	});
-
-	it('gère un <span> au milieu du heading', () => {
-		const md = "## Résumé: <span id='tables'></span>Tables canoniques";
-		const { toc, html } = parseMarkdown(md, BASE, 'test');
-		expect(toc[0].anchor).toBe('tables');
-		expect(html).toContain('<h2 id="tables">');
-		expect(html).not.toContain('<span');
-	});
-
-	it('tolère apostrophes simples ou doubles', () => {
-		const md = "## <span id='abc'></span>Foo";
-		const { toc } = parseMarkdown(md, BASE, 'test');
-		expect(toc[0].anchor).toBe('abc');
+	it('traite un marqueur {#…} comme du texte littéral, sans ancre custom', () => {
+		// Comme sur GitHub : `{#slug}` n'est pas une syntaxe d'ancre, il est
+		// rendu tel quel et compte dans le slug auto-généré.
+		const { toc, html } = parseMarkdown('## Foo {#bar}', BASE, 'test');
+		expect(toc[0].anchor).toBe('foo-bar');
+		expect(html).toContain('<h2 id="foo-bar">');
+		expect(html).toContain('{#bar}');
 	});
 });
 
@@ -171,13 +125,6 @@ describe('parseMarkdown — dédup ancres', () => {
 		]);
 	});
 
-	it('respecte le compteur en présence d\'ancres custom Pandoc', () => {
-		const md = '## Foo {#bar}\n## Foo';
-		const { toc } = parseMarkdown(md, BASE, 'test');
-		// La première a l'ancre custom `bar` ; la seconde collision sur `foo` n'est
-		// pas en conflit avec `bar` donc n'est pas suffixée.
-		expect(toc.map((t) => t.anchor)).toEqual(['bar', 'foo']);
-	});
 });
 
 // ── parseMarkdown / syntaxe glossaire [[…]] ────────────────────

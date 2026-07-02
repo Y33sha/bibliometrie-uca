@@ -7,7 +7,7 @@
 `/stats`
 
 Tableaux de bord :
-- répartition par [voie *open access*](../glossaire.md#oa_status) par année (graphique exportable en png);
+- répartition par [voie *open access*](../glossaire.md#voies-open-access) par année (graphique exportable en png);
 - répartition par éditeur (liste);
 - répartition par revue (liste).
 
@@ -32,7 +32,7 @@ Liste des publications filtrable par :
 - année de publication,
 - laboratoires,
 - accès (ouvert/fermé),
-- [voie *open access*](../glossaire.md#oa_status),
+- [voie *open access*](../glossaire.md#voies-open-access),
 - paiement d'[APC](../glossaire.md#apc),
 - pays des co-auteurs,
 - sources.
@@ -67,7 +67,7 @@ TODO: à compléter
 
 Liste des personnes avec leurs identifiants (ORCID, idHAL) et affiliations.
 Filtrable par:
-- présence ou non dans la [base RH](../sources/10-imports-manuels.md#donnees-rh),
+- présence ou non dans la [base RH](../sources/10-imports-manuels.md#extraction-rh),
 - données RH (rôle, affiliation),
 - identifiants (ORCID, idHAL).
 
@@ -135,7 +135,7 @@ Vue détaillée d'un éditeur. Onglets : Dashboard, Revues, Publications.
 ### Détails `/subjects/{id}`
 
 
-## Problèmes HAL {#problemes-hal}
+## Problèmes HAL
 
 `/hal-problems/*`
 

@@ -43,8 +43,8 @@ describe('resolveDocLink — depuis une page racine', () => {
 	});
 
 	it('résout un chemin imbriqué vers une section', () => {
-		expect(resolveDocLink('sources/imports-manuels#donnees-rh', BASE, FROM)).toBe(
-			'/bibliometrie/docs/sources/imports-manuels#donnees-rh'
+		expect(resolveDocLink('sources/imports-manuels#extraction-rh', BASE, FROM)).toBe(
+			'/bibliometrie/docs/sources/imports-manuels#extraction-rh'
 		);
 	});
 });

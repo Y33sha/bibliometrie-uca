@@ -1,6 +1,6 @@
 # Imports manuels
 
-## <span id="donnees-rh"></span>Base RH (personnel UCA)
+## Extraction RH
 
 Fichier CSV importé via [interfaces/cli/imports/import_persons.py](https://github.com/Y33sha/bibliometrie-uca/blob/master/interfaces/cli/imports/import_persons.py) → table `persons_rh`.
 - Contient : email, nom, prénom, département, rôle, dates de début/fin;
@@ -16,7 +16,7 @@ La FK sur la table `person_rh` permet:
 - d'enrichir les données sur les personnes;
 - d'empêcher la suppression de ces personnes lors de fusions de doublons.
 
-## <span id="donnees-apc"></span>Données APC
+## Données APC
 
 Données datées du 11/03/2026.
 
@@ -30,7 +30,7 @@ Complété par une extraction des [raw data](https://github.com/OpenAPC/openapc-
 
 https://treemaps.openapc.net/apcdata/clermont-u/
 
-## <span id="doaj"></span>DOAJ — bootstrap CSV
+## DOAJ — bootstrap CSV
 
 Le flux régulier passe par l'API DOAJ (cf. [09-sources-supplementaires.md#doaj](09-sources-supplementaires.md#doaj)). L'import CSV reste utilisable pour un bootstrap rapide depuis un dump complet (~21 k revues, plus rapide qu'un fetch unitaire).
 

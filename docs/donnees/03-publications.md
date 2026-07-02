@@ -38,7 +38,7 @@ Légende :
 - **`journal_name_forms`** : formes de noms normalisées pour le matching journaux (parallèle à `person_name_forms` et `structure_name_forms`).
 - **`publishers`** : référentiel des éditeurs.
 - **`publisher_name_forms`** : formes de noms normalisées pour le matching éditeurs.
-- **`apc_payments`** : données issues d'un import CSV (cf. [doc sources](../sources/10-imports-manuels.md#donnees-apc)).
+- **`apc_payments`** : données issues d'un import CSV (cf. [doc sources](../sources/10-imports-manuels.md#données-apc)).
 - **`distinct_publications`** : paires de publications marquées comme **distinctes malgré un titre identique**, évite de les re-suggérer dans l'interface de dédoublonnage `admin/duplicates`.
 - **`publications_detail`** : satellite 1:1 de `publications` portant les métadonnées volumineuses (`abstract`, `keywords`, `topics`, `biblio`), séparées de la table principale pour la garder légère en lecture.
 - **`publication_relations`** : relations sémantiques entre publications distinctes mais apparentées (preprint ↔ version publiée, supplément ↔ article, erratum ↔ article corrigé…). Peuplée par la phase `relations`.

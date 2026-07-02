@@ -50,12 +50,12 @@ Légende :
 - **`structure_relations`** : définit les relations entre structures. Deux relations existent : **tutelle** (asymétrique), **partenariat** (symétrique, non transitif). La relation "partenariat" est purement informative (elle réplique l'information présente dans le [référentiel ROR](../glossaire.md#ror)) ; la relation "tutelle" a une conséquence sur les **structures incluses ou non dans un périmètre** donné.
 - **`structure_name_forms`** : formes de noms pour la détection automatique des structures dans les adresses liées aux publications. Le champ `requires_context_of` (= liste d'id structures) permet de rendre une forme de nom *conditionnellement* valide. Cette table est utilisée dans la phase `affiliations` du [pipeline](../pipeline/04-affiliations.md) pour peupler la table de liaison `address_structures`.
 - **`address_structures`** : table de liaison. Les adresses proviennent des authorships sources (peuplées via `source_authorship_addresses` lors de la phase `normalize`, exploitées lors de la phase `affiliations`). Les structures identifiées sont ensuite propagées aux authorships sources.
-- **`apc_payments`** : données de paiement d'APC, reliées aux publications concernées, provenant d'un import CSV, voir [doc sources](../sources/10-imports-manuels.md#donnees-apc).
+- **`apc_payments`** : données de paiement d'APC, reliées aux publications concernées, provenant d'un import CSV, voir [doc sources](../sources/10-imports-manuels.md#données-apc).
 
 ## Pages admin associées
 
-- [**admin/structures**](../guide-utilisateur/02-pages-admin.md#admin-structures) : CRUD des structures + relations + formes de noms.
-- [**admin/config**](../guide-utilisateur/02-pages-admin.md#admin-config) : CRUD des périmètres et choix du périmètre actif aux différentes étapes du pipeline.
+- [**admin/structures**](../guide-utilisateur/02-pages-admin.md#structures) : CRUD des structures + relations + formes de noms.
+- [**admin/config**](../guide-utilisateur/02-pages-admin.md#configuration) : CRUD des périmètres et choix du périmètre actif aux différentes étapes du pipeline.
 
 ## Services propriétaires
 

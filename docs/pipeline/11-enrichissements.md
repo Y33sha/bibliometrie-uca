@@ -2,7 +2,7 @@
 
 *À jour le 2026-06-30.*
 
-## Pays des adresses {#countries}
+## Pays des adresses
 
 Phase `countries`: Associe des pays aux adresses pour permettre l'analyse des collaborations internationales. Quatre étapes enchaînées :
 
@@ -14,7 +14,7 @@ Phase `countries`: Associe des pays aux adresses pour permettre l'analyse des co
 
 4. **`interfaces/cli/pipeline/refresh_publication_countries.py`** : recalcule `publications.countries` comme union des `source_publications.countries` de toutes les sources rattachées à chaque publication canonique.
 
-## Sujets associés aux publications {#subjects}
+## Sujets
 
 Phase `subjects`: deux étapes enchaînées :
 
@@ -30,7 +30,7 @@ Recalcule depuis `publication_subjects` (en excluant les liens `rejected`) :
 
 Idempotent : le résultat ne dépend que de l'état courant de `publication_subjects`.
 
-##  Statut open access {#oa_status}
+## Statut open access
 
 Phase `oa_status`: interroge [Unpaywall](../glossaire.md#unpaywall) par DOI pour rafraîchir `publications.oa_status` — souvent plus à jour que le statut renseigné dans les sources. Préserve `diamond` qu'Unpaywall ne distingue pas du `gold`.
 

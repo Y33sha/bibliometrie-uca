@@ -14,8 +14,10 @@ export interface ParsedDoc {
 }
 
 /**
- * Calcule l'ancre d'un titre : lowercase, ponctuation supprimée, espaces → tirets.
- * Doit rester déterministe et identique à la convention utilisée côté backend.
+ * Calcule l'ancre d'un titre à partir de son texte, selon la convention GitHub :
+ * lowercase, ponctuation supprimée (lettres accentuées et underscores conservés),
+ * espaces → tirets. Une ancre ainsi dérivée du texte fonctionne à l'identique dans
+ * l'UI et sur GitHub, sans marqueur d'ancre explicite dans le Markdown source.
  */
 export function makeAnchor(text: string): string {
 	return text
@@ -23,31 +25,6 @@ export function makeAnchor(text: string): string {
 		.replace(/[^\p{L}\p{N}\s_-]/gu, '')
 		.replace(/\s+/g, '-')
 		.replace(/^-+|-+$/g, '');
-}
-
-/**
- * Détecte une ancre custom dans une ligne de heading. Deux conventions reconnues :
- *
- * 1. **Pandoc** : `## Mon titre {#mon-ancre}` à la fin du heading. Convention
- *    préférée pour les .md écrits à la main (concise, lisible).
- * 2. **`<span id="..."></span>`** n'importe où dans le heading. Convention
- *    legacy supportée pour compatibilité avec les .md existants.
- *
- * Si une ancre custom est trouvée, elle remplace l'ancre auto-générée (et le
- * marqueur est strippé du texte affiché).
- */
-function extractCustomAnchor(text: string): { anchor: string | null; cleaned: string } {
-	const pandoc = /\s*\{#([\w-]+)\}\s*$/.exec(text);
-	if (pandoc) {
-		const cleaned = text.slice(0, pandoc.index).trim();
-		return { anchor: pandoc[1], cleaned };
-	}
-	const span = /<span\s+id=['"]([^'"]+)['"]\s*>\s*<\/span>\s*/.exec(text);
-	if (span) {
-		const cleaned = (text.slice(0, span.index) + text.slice(span.index + span[0].length)).trim();
-		return { anchor: span[1], cleaned };
-	}
-	return { anchor: null, cleaned: text };
 }
 
 /**
@@ -77,8 +54,8 @@ function extractHeadings(content: string): { title: string; toc: TocEntry[] } {
 		const m = /^(#{1,3})\s+(.+)$/.exec(line);
 		if (!m) continue;
 		const level = m[1].length;
-		const { anchor: customAnchor, cleaned } = extractCustomAnchor(m[2].trim());
-		const anchor = dedupe(customAnchor ?? makeAnchor(cleaned));
+		const cleaned = m[2].trim();
+		const anchor = dedupe(makeAnchor(cleaned));
 		if (level === 1 && !title) {
 			title = cleaned;
 		} else if (level === 2 || level === 3) {
@@ -170,11 +147,8 @@ export function parseMarkdown(content: string, base: string, currentSlug: string
 	const renderer: RendererObject = {
 		heading({ tokens, depth }) {
 			const inner = this.parser.parseInline(tokens);
-			const { anchor: customAnchor, cleaned } = extractCustomAnchor(inner);
-			const baseAnchor =
-				customAnchor ?? makeAnchor(tokens.map((t) => ('text' in t ? t.text : '')).join(''));
-			const anchor = renderDedupe(baseAnchor);
-			return `<h${depth} id="${anchor}">${cleaned}</h${depth}>`;
+			const anchor = renderDedupe(makeAnchor(tokens.map((t) => ('text' in t ? t.text : '')).join('')));
+			return `<h${depth} id="${anchor}">${inner}</h${depth}>`;
 		},
 		link({ href, title: linkTitle, tokens }) {
 			const resolved = resolveDocLink(href, base, currentSlug);

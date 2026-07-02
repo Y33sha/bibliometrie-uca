@@ -8,7 +8,7 @@ Trois sous-étapes. `resolve_publishers` s'exécute à chaque lancement du pipel
 
 | Sous-étape | Source externe | Ce qu'elle renseigne | Quand |
 |---|---|---|---|
-| `resolve_publishers` | Crossref `/prefixes/{prefix}` + DataCite `/dois?prefix=` | `doi_prefixes` : pour chaque préfixe DOI déjà routé vers sa Registration Agency par la phase [resolve_ra](02-extract.md#resolve-ra), l'éditeur (Crossref) ou l'entrepôt (DataCite) qui le détient, et le `publisher_id` rattaché | toujours |
+| `resolve_publishers` | Crossref `/prefixes/{prefix}` + DataCite `/dois?prefix=` | `doi_prefixes` : pour chaque préfixe DOI déjà routé vers sa Registration Agency par la phase [resolve_ra](02-extract.md#agences-denregistrement-doi), l'éditeur (Crossref) ou l'entrepôt (DataCite) qui le détient, et le `publisher_id` rattaché | toujours |
 | `enrich_journals_from_openalex` | [OpenAlex Sources](../sources/03-openalex.md) | `journals` : type de revue, montant et devise des frais de publication (APC) | mode `full` |
 | `enrich_journals_from_doaj` | export CSV du [DOAJ](../sources/09-sources-supplementaires.md#doaj) | `journals` : fiche DOAJ complète (`doaj_payload`) et appartenance au DOAJ (`is_in_doaj`) | mode `full` |
 
