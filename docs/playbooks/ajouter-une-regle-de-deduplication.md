@@ -4,7 +4,7 @@
 
 Procédure d'écriture, validation et déploiement d'une règle de rapprochement de `source_publications`.
 
-Ce playbook est le *comment*. Le cadre conceptuel et le catalogue des décisions par type vivent dans la fiche [DATA_dedup-pairwise-gated](../chantiers/DATA_dedup-pairwise-gated.md).
+Ce playbook est le *comment*. Le cadre conceptuel et le catalogue des décisions par type vivent dans la fiche [DATA_dedup-pairwise-gated](../chantiers/archived/2026-06-26_DATA_dedup-pairwise-gated.md).
 
 ## Modèle : clustering par tokens de confirmation
 
