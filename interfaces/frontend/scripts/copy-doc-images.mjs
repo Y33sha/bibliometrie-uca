@@ -1,9 +1,9 @@
 // Copie les images de doc (source unique, lisibles sur GitHub) vers
 // `interfaces/frontend/static/`, servies par SvelteKit sous `/<base>/docs-<dossier>/`.
-// Deux sources : `docs/img/` (captures et illustrations) et `docs/graphs/`
-// (diagrammes générés ; seules les images sont copiées, la source du générateur
-// reste côté `docs/graphs/`). Lancé en `predev` et `prebuild`. Chaque destination
-// est nettoyée à chaque exécution pour propager les suppressions côté source.
+// Deux sources sous `docs/img/` : `screenshots/` (captures et illustrations) et
+// `graphs/` (diagrammes générés ; seules les images sont copiées, la source du
+// générateur reste côté `graphs/`). Lancé en `predev` et `prebuild`. Chaque
+// destination est nettoyée à chaque exécution pour propager les suppressions côté source.
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -13,8 +13,8 @@ const IMAGE_EXT = new Set(['.png', '.svg', '.jpg', '.jpeg', '.gif', '.webp']);
 
 // `dossier docs` -> `dossier static servi`.
 const FOLDERS = [
-	{ src: '../../../docs/img', dest: '../static/docs-img' },
-	{ src: '../../../docs/graphs', dest: '../static/docs-graphs' }
+	{ src: '../../../docs/img/screenshots', dest: '../static/docs-screenshots' },
+	{ src: '../../../docs/img/graphs', dest: '../static/docs-graphs' }
 ];
 
 async function copyImages(srcRel, destRel) {

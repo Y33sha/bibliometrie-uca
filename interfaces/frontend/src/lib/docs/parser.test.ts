@@ -218,24 +218,24 @@ describe('parseMarkdown — liens markdown `[…](glossaire#slug)` traités comm
 
 // ── parseMarkdown / images de doc ──────────────────────────────
 
-describe('parseMarkdown — images de doc (réécriture vers /docs-img/ et /docs-graphs/)', () => {
-	it('réécrit `![](../img/foo.png)` depuis une page de section', () => {
+describe('parseMarkdown — images de doc (réécriture vers /docs-screenshots/ et /docs-graphs/)', () => {
+	it('réécrit `![](../img/screenshots/foo.png)` depuis une page de section', () => {
 		const { html } = parseMarkdown(
-			'![Stats](../img/stats_oa_status.png)',
+			'![Stats](../img/screenshots/stats_oa_status.png)',
 			BASE,
 			'guide-utilisateur/pages-publiques'
 		);
-		expect(html).toContain('<img src="/bibliometrie/docs-img/stats_oa_status.png"');
+		expect(html).toContain('<img src="/bibliometrie/docs-screenshots/stats_oa_status.png"');
 		expect(html).toContain('alt="Stats"');
 	});
 
-	it('réécrit `![](img/foo.png)` depuis une page racine', () => {
-		const { html } = parseMarkdown('![](img/foo.png)', BASE, 'test');
-		expect(html).toContain('<img src="/bibliometrie/docs-img/foo.png"');
+	it('réécrit `![](screenshots/foo.png)` depuis une page racine', () => {
+		const { html } = parseMarkdown('![](screenshots/foo.png)', BASE, 'test');
+		expect(html).toContain('<img src="/bibliometrie/docs-screenshots/foo.png"');
 	});
 
-	it('réécrit `![](../graphs/foo.png)` vers /docs-graphs/', () => {
-		const { html } = parseMarkdown('![G](../graphs/reconciliation.png)', BASE, 'pipeline/publications');
+	it('réécrit `![](../img/graphs/foo.png)` vers /docs-graphs/', () => {
+		const { html } = parseMarkdown('![G](../img/graphs/reconciliation.png)', BASE, 'pipeline/publications');
 		expect(html).toContain('<img src="/bibliometrie/docs-graphs/reconciliation.png"');
 	});
 
@@ -246,7 +246,7 @@ describe('parseMarkdown — images de doc (réécriture vers /docs-img/ et /docs
 		expect(abs).toContain('src="/static/x.png"');
 	});
 
-	it('laisse intacts les chemins relatifs hors `img/` et `graphs/`', () => {
+	it('laisse intacts les chemins relatifs hors `screenshots/` et `graphs/`', () => {
 		const { html } = parseMarkdown('![other](../assets/icon.svg)', BASE, 'sources/hal');
 		expect(html).toContain('src="../assets/icon.svg"');
 	});

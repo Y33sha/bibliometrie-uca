@@ -12,6 +12,7 @@ _(aucun)_
 
 ### Non commencé
 
+- [Résolution des personnes par record linkage incrémental](DATA_persons-record-linkage.md)
 - [Scinder `source_authorships` (identité ⊥ liaison)](DATA_scinder-source-authorships.md)
 - [Qualité et cohérence des sujets](METIER_sujets-qualite.md)
 - [Signatures institutionnelles](METIER_signatures-institutionnelles.md)
