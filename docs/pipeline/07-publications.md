@@ -37,6 +37,10 @@ Fusion et scission découlent du même regroupement :
 - **Fusion** : si une partition réunit plusieurs publications existantes (par exemple deux publications créées séparément qu'une clé partagée relie ensuite), une seule est conservée et les autres sont absorbées. Les données curatées qui pointaient sur une publication absorbée (`distinct_publications`, `apc_payments`) sont reportées sur la publication survivante avant que la publication vidée ne soit supprimée.
 - **Scission** : si une publication existante se retrouve à cheval sur plusieurs partitions (par exemple parce qu'elle agrégeait à tort deux DOI distincts), les partitions perdantes reçoivent chacune une nouvelle publication.
 
+![Graphe de réconciliation : source_publications reliées par clés partagées, partitionnées puis rattachées à des publications](../graphs/reconciliation.png)
+
+*Chaque nœud est une `source_publication`, chaque arête pleine relie deux `source_publications` qui partagent une clé de confirmation, chaque ligne en pointillés rattache une `source_publication` à sa publication (boîtes).*
+
 ## Traitement incrémental
 
 Recalculer tout le graphe à chaque run serait inutilement coûteux. Une `source_publication` modifiée (insérée, re-normalisée, corrigée) est marquée *à recalculer*, et la phase ne traite que le **voisinage direct** de ces `source_publications` — elles et celles avec lesquelles elles partagent une clé. C'est suffisant puisque toute nouvelle relation a forcément une extrémité parmi les `source_publications` modifiées.

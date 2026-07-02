@@ -92,13 +92,13 @@ function extractHeadings(content: string): { title: string; toc: TocEntry[] } {
  * Réécrit les URLs d'images de la doc :
  *
  * - Liens externes (`http://`, `https://`, `//`) ou absolus (`/`) : inchangés.
- * - Liens relatifs pointant vers `[…/]screenshots/<nom>` (peu importe la profondeur de `../` en amont) : réécrits en `${base}/docs-screenshots/<nom>`. Côté source on garde la convention markdown standard (lisible sur GitHub) ; côté doc déployée, SvelteKit sert les fichiers depuis `static/docs-screenshots/` (copie alimentée par `scripts/copy-doc-screenshots.mjs`).
+ * - Liens relatifs pointant vers `[…/]img/<nom>` ou `[…/]graphs/<nom>` (peu importe la profondeur de `../` en amont) : réécrits en `${base}/docs-img/<nom>` ou `${base}/docs-graphs/<nom>`. `img/` porte les captures et illustrations, `graphs/` les diagrammes générés (dont la source vit à côté). Côté source on garde la convention markdown standard (lisible sur GitHub) ; côté doc déployée, SvelteKit sert les fichiers depuis `static/docs-img/` et `static/docs-graphs/` (copie alimentée par `scripts/copy-doc-images.mjs`).
  * - Tout autre lien relatif : inchangé.
  */
 function resolveImageHref(href: string, base: string): string {
 	if (/^(https?:|\/\/|\/)/.test(href)) return href;
-	const m = /(?:^|\/)screenshots\/([\w.-]+)$/.exec(href);
-	if (m) return `${base}/docs-screenshots/${m[1]}`;
+	const m = /(?:^|\/)(img|graphs)\/([\w.-]+)$/.exec(href);
+	if (m) return `${base}/docs-${m[1]}/${m[2]}`;
 	return href;
 }
 

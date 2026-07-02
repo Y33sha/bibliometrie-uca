@@ -10,11 +10,11 @@
 
 - Le moissonnage nécessite des **structures**. Pour les sources bibliographiques où les structures sont désignées par des identifiants ([OpenAlex](../glossaire#openalex), [ScanR](../glossaire#scanr)) ou des formes de nom standardisées ([WoS](../glossaire.md#web-of-science-wos), intitulés de [collection HAL](../glossaire#collection-hal)), il faut connaître les identifiants en question et les ajouter aux structures qu'on souhaite moissonner.
 
-![Informations Structure](../screenshots/admin_structures_id_modifier.png)
+![Informations Structure](../img/admin_structures_id_modifier.png)
 
 - Le repérage des affiliations (étape [affiliations](../pipeline/04-affiliations.md) du pipeline) nécessite des **formes de nom** à détecter dans les [adresses](../glossaire.md#adresse) des publications. On peut commencer par indiquer les plus évidentes (nom complet, acronyme, numéro d'UMR). Les contrôles post-pipeline permettent d'affiner en fonction des formes effectivement présentes dans les adresses liées aux publications.
 
-![Formes de nom](../screenshots/admin_structures_id_nameforms_lmv.png)
+![Formes de nom](../img/admin_structures_id_nameforms_lmv.png)
 
 > Pour les formes susceptibles d'être **ambiguës** (acronymes, numéros d'UMR non-uniques), il est possible d'ajouter une contrainte de contexte: la forme identifiera la structure seulement si une autre structure (parmi une liste spécifiée) est détectée indépendamment.
 >
@@ -24,7 +24,7 @@
 >
 > ```LMV - Laboratoire de Mathématiques de Versailles (Bâtiment Fermat - UFR de sciences 45 avenue des Etats-Unis 78035 VERSAILLES - France)``` => Pas d'identification
 
-![Formes de nom excluantes](../screenshots/admin_structures_id_forme_exclue.png)
+![Formes de nom excluantes](../img/admin_structures_id_forme_exclue.png)
 
 > Si une forme de nom reste trop permissive, on peut **exclure** certaines expressions contenant une forme reconnue.
 >
@@ -64,11 +64,11 @@ Facultatif, mais permet d'affiner la liste des formes de nom par structure, pour
 
 - Validation/rejet manuel des liens adresse-structure détectés par le script, individuellement ou par batch;
 
-![Contrôle affiliations](../screenshots/admin_adresses_affiliation.png)
+![Contrôle affiliations](../img/admin_adresses_affiliation.png)
 
 - Contrôle qualité: visualiser les divergences entre détection automatisée et contrôle manuel => permet de repérer les formes de nom non détectées (à ajouter dans `admin/structures`) ou trop permissives (à supprimer, ou ajouter contexte plus contraignant).
 
-![Contrôle qualité](../screenshots/admin_adresses_qualite.png)
+![Contrôle qualité](../img/admin_adresses_qualite.png)
 
 Les ajouts ou suppressions de formes de noms deviennent effectifs au *run* suivant du pipeline, y compris pour les adresses déjà présentes en base. En cas de contradiction entre détection automatique et classement manuel, l'action manuelle fait autorité. Les actions manuelles ne sont jamais écrasées par un *re-run* du pipeline.
 
@@ -94,7 +94,7 @@ Des scripts en ligne de commande permettent d'accélérer le travail:
 
 Quand on repère une publication attribuée au mauvais auteur, on peut détacher le lien depuis `admin/persons`. Circuit: trouver la personne; cliquer sur la ou les formes de nom concernées; sélectionner les publications liées et cliquer sur "Détacher *n* authorships".
 
-![Détacher authorships](../screenshots/admin_persons_detacher.png)
+![Détacher authorships](../img/admin_persons_detacher.png)
 
 Pour réattribuer les authorships en question: cf [Authorships orphelines](#authorships-orphelines)
 
@@ -134,7 +134,7 @@ Il y a deux raisons possibles à cela:
 
 La page `admin/orphan-authorships` permet de rattacher les authorships en question, individuellement ou par batch, soit à une personne existante, soit à une nouvelle personne créée manuellement.
 
-![Authorships orphelines](../screenshots/admin_orphan_authorships.png)
+![Authorships orphelines](../img/admin_orphan_authorships.png)
 
 ### Gestion des référentiels d'éditeurs et de revues
 
