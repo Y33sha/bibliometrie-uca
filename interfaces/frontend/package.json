@@ -4,9 +4,9 @@
 	"version": "0.0.1",
 	"type": "module",
 	"scripts": {
-		"predev": "node scripts/copy-doc-screenshots.mjs",
+		"predev": "node scripts/copy-doc-images.mjs",
 		"dev": "vite dev",
-		"prebuild": "node scripts/copy-doc-screenshots.mjs",
+		"prebuild": "node scripts/copy-doc-images.mjs",
 		"build": "vite build",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",

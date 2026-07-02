@@ -61,7 +61,8 @@ services:
       - /repo/interfaces/frontend/node_modules
       - /repo/interfaces/frontend/.svelte-kit
       - /repo/interfaces/frontend/build
-      - /repo/interfaces/frontend/static/docs-screenshots
+      - /repo/interfaces/frontend/static/docs-img
+      - /repo/interfaces/frontend/static/docs-graphs
     ports:
       - "5176:5173"
     environment:
