@@ -24,14 +24,12 @@ flowchart TB
 ```mermaid
 flowchart LR
     subgraph vérité
-        direction TB
         publications
         structures
 
     end
 
     subgraph sources
-        direction TB
         SA---structures
         SP@{ shape: procs, label: "source_publications"}---SA@{ shape: procs, label: "source_authorships"}
 
@@ -47,13 +45,11 @@ flowchart LR
 ```mermaid
 flowchart LR
     subgraph vérité
-        direction TB
         publications
         structures
         persons
     end
     subgraph sources
-        direction TB
         SP@{ shape: procs, label: "source_publications"}---SA@{ shape: procs, label: "source_authorships"}
     end
 
@@ -70,13 +66,11 @@ flowchart LR
 ```mermaid
 flowchart LR
     subgraph vérité
-        direction TB
         publications---authorships
         persons---authorships
         structures---authorships
     end
     subgraph sources
-        direction TB
         SP@{ shape: procs, label: "source_publications"}---SA@{ shape: procs, label: "source_authorships"}
     end
 
