@@ -30,7 +30,7 @@ class _FakeAdapter:
     def configure(self, conn) -> None:
         pass
 
-    def find_stale(self, conn) -> list[StaleRow]:
+    def find_stale(self, conn, years) -> list[StaleRow]:
         return [StaleRow(staging_id=i, source_id=sid) for i, sid in enumerate(self._outcomes)]
 
     async def fetch_by_native_id(self, client, source_id):

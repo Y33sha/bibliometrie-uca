@@ -43,10 +43,10 @@ class BaseRefreshStaleAdapter(ABC):
         self, client: httpx.AsyncClient, source_id: str
     ) -> FetchOutcome: ...
 
-    def find_stale(self, conn: Connection) -> list[StaleRow]:
+    def find_stale(self, conn: Connection, years: list[int] | None) -> list[StaleRow]:
         return [
             StaleRow(staging_id=sid, source_id=src_id)
-            for sid, src_id in get_stale_rows(conn, self.source_key)
+            for sid, src_id in get_stale_rows(conn, self.source_key, years)
         ]
 
     def save_refreshed(self, conn: Connection, source_id: str, record: FetchedRecord) -> bool:

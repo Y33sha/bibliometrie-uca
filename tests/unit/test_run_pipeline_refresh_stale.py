@@ -33,6 +33,9 @@ def _called_targets(stack) -> MagicMock:
             side_effect=lambda targets, metrics, *, phase: targets,
         )
     )
+    # Fenêtre d'années : évite tout accès base (get_years lit la config).
+    stack.enter_context(patch("infrastructure.db.engine.get_sync_engine", return_value=MagicMock()))
+    stack.enter_context(patch("infrastructure.sources.config.get_years", return_value=[2024]))
     return run_one
 
 
@@ -62,6 +65,26 @@ def test_refresh_stale_covers_theses():
     assert "theses" in [c.args[0] for c in run_one.call_args_list]
 
 
+def test_refresh_stale_couples_years_per_source():
+    # theses ramène tout l'historique (borne None) ; les autres suivent la fenêtre du run.
+    with ExitStack() as stack:
+        run_one = _called_targets(stack)
+        run_pipeline.phase_refresh_stale()
+    by_target = {c.args[0]: c.args[1] for c in run_one.call_args_list}
+    assert by_target["theses"] is None
+    assert by_target["hal"] == [2024]
+
+
+def test_refresh_stale_year_narrows_all_including_theses():
+    # `--year` cible une seule année pour toutes les sources, theses comprise.
+    with ExitStack() as stack:
+        run_one = _called_targets(stack)
+        run_pipeline.phase_refresh_stale(year=2023)
+    by_target = {c.args[0]: c.args[1] for c in run_one.call_args_list}
+    assert by_target["theses"] == [2023]
+    assert by_target["hal"] == [2023]
+
+
 def test_refresh_stale_respects_sources_filter():
     with ExitStack() as stack:
         run_one = _called_targets(stack)
@@ -83,7 +106,7 @@ def test_run_refresh_stale_installs_circuit_breaker():
         stack.enter_context(
             patch.object(run_pipeline, "_make_refresh_stale_adapter", return_value=MagicMock())
         )
-        run_pipeline._run_refresh_stale("hal")
+        run_pipeline._run_refresh_stale("hal", None)
 
     breaker = refresh.call_args.kwargs["breaker"]
     assert isinstance(breaker, SourceCircuitBreaker)

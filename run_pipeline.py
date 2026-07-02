@@ -352,7 +352,13 @@ def phase_cross_imports(
     return metrics
 
 
-def phase_refresh_stale(sources: Any = None, include_wos: bool = False, **kw: Any) -> PhaseMetrics:
+def phase_refresh_stale(
+    sources: Any = None,
+    include_wos: bool = False,
+    start_year: Any = None,
+    year: Any = None,
+    **kw: Any,
+) -> PhaseMetrics:
     """Rafraîchit les rows à `last_seen_at` ancien et marque les disparues.
 
     Tourne à **chaque run** : le seuil `STALE_REFRESH_AFTER_DAYS` étale la
@@ -365,10 +371,19 @@ def phase_refresh_stale(sources: Any = None, include_wos: bool = False, **kw: An
     sans DOI. WoS est opt-in (`--include-wos`) : exclu par défaut, comme
     `extract` et `cross_imports`.
 
+    Le refresh est **couplé à la fenêtre d'années du run** (`start_year`/`year`,
+    via `source_publications.pub_year`) : un run sur une période glissante ne
+    refetche que le stale de ses propres années, sans requêtes unitaires inutiles
+    sur des années qu'il ne moissonne plus en bulk. `theses` fait exception, comme
+    à l'extraction : elle ramène tout l'historique (aucune borne), sauf `--year`.
+
     Conservateur : on **marque seulement** (`disappeared_at`), aucun effet
     aval. Placée après `cross_imports` (qui a fini de peupler `staging` et
     `last_seen_at`) et avant `normalize` (qui consomme le `raw_data` rafraîchi).
     """
+    from infrastructure.db.engine import get_sync_engine
+    from infrastructure.sources.config import get_years
+
     metrics = PhaseMetrics()
     by_source: dict[str, dict[str, float]] = {}
     allowed = set(ALL_SOURCES)
@@ -377,8 +392,20 @@ def phase_refresh_stale(sources: Any = None, include_wos: bool = False, **kw: An
     effective = (set(sources) if sources else allowed) & allowed
     targets = [t for t in ALL_SOURCES if t in effective]
     targets = _configured_api_targets(targets, metrics, phase="refresh_stale")
+
+    # Fenêtre d'années du run, alignée sur l'extraction : `--year` cible une seule
+    # année, sinon `[start_year … courante]` (défaut config). `theses` ignore la
+    # borne large (elle moissonne tout l'historique), mais suit `--year` s'il est posé.
+    if year:
+        years_default: list[int] | None = [int(year)]
+    else:
+        with get_sync_engine().connect() as conn:
+            years_default = get_years(conn, start_year)
+    years_theses = [int(year)] if year else None
+
     for target in targets:
-        source_metrics, duration = _timed_metrics(partial(_run_refresh_stale, target))
+        row_years = years_theses if target == "theses" else years_default
+        source_metrics, duration = _timed_metrics(partial(_run_refresh_stale, target, row_years))
         metrics.merge(source_metrics)
         by_source[target] = {
             "interrogated": source_metrics.total,
@@ -1880,8 +1907,11 @@ def _make_refresh_stale_adapter(source: str) -> "RefreshStaleAdapter":
     return adapter_classes[source]()
 
 
-def _run_refresh_stale(target: str) -> PhaseMetrics:
-    """Refetch par id natif des rows stale d'une source : trouvé → bump, absence → disappeared."""
+def _run_refresh_stale(target: str, years: list[int] | None) -> PhaseMetrics:
+    """Refetch par id natif des rows stale d'une source : trouvé → bump, absence → disappeared.
+
+    `years` borne le refresh à la fenêtre d'années du run (None = tout le stale).
+    """
     from application.pipeline.extract.refresh_stale import refresh
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.sources.circuit_breaker import (
@@ -1902,7 +1932,7 @@ def _run_refresh_stale(target: str) -> PhaseMetrics:
     breaker = SourceCircuitBreaker(target)
     token = set_current_breaker(breaker)
     try:
-        metrics = asyncio.run(refresh(conn, adapter, log, breaker=breaker))
+        metrics = asyncio.run(refresh(conn, adapter, log, years=years, breaker=breaker))
     finally:
         reset_current_breaker(token)
         conn.close()

@@ -44,11 +44,15 @@ async def refresh(
     adapter: RefreshStaleAdapter,
     log: logging.Logger,
     *,
+    years: list[int] | None = None,
     dry_run: bool = False,
     limit: int | None = None,
     breaker: CircuitBreaker | None = None,
 ) -> PhaseMetrics:
     """Refetche par id natif les rows stale de la source de l'adapter.
+
+    `years` borne le refresh à la fenêtre d'années du run courant (via
+    `source_publications.pub_year`) ; `None` = tout le stale de la source.
 
     Ne ferme pas la connexion (responsabilité du caller). `updated` = `raw_data`
     réécrit (hash changé) ; `unchanged` = re-vu identique (seul `last_seen_at`
@@ -58,7 +62,7 @@ async def refresh(
     adapter.configure(conn)
     slog = scoped_logger(log, adapter.source_key)
 
-    stale = adapter.find_stale(conn)
+    stale = adapter.find_stale(conn, years)
     if limit:
         stale = stale[:limit]
     total = len(stale)

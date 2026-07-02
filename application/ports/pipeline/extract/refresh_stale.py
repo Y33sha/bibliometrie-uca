@@ -68,8 +68,12 @@ class RefreshStaleAdapter(Protocol):
     def configure(self, conn: Connection) -> None:
         """Lit la config (URL, auth) depuis la base avant la boucle."""
 
-    def find_stale(self, conn: Connection) -> list[StaleRow]:
-        """SELECT des rows staging de la source dont `last_seen_at` a expiré."""
+    def find_stale(self, conn: Connection, years: list[int] | None) -> list[StaleRow]:
+        """SELECT des rows staging de la source dont `last_seen_at` a expiré.
+
+        `years` borne la sélection à la fenêtre d'années du run (via
+        `source_publications.pub_year`) ; `None` = tout le stale de la source.
+        """
 
     async def fetch_by_native_id(self, client: httpx.AsyncClient, source_id: str) -> FetchOutcome:
         """Refetch le record d'une row par son `source_id` natif."""
