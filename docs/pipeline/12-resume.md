@@ -12,9 +12,10 @@ flowchart TD
     subgraph sources
     SP@{ shape: procs, label: "source_publications"}---SA@{ shape: procs, label: "source_authorships"}
     SA---addresses
+    structures--->addresses
     end
 
-    structures--->addresses
+    
     classDef valid  fill:#af5
     class structures valid;
 ```
@@ -34,10 +35,10 @@ flowchart LR
         direction TD
         SA---structures
         SP@{ shape: procs, label: "source_publications"}---SA@{ shape: procs, label: "source_authorships"}
-
+        SP-->publications
     end
 
-    SP-->publications
+    
     classDef valid  fill:#af5
     class structures,publications valid;
 ```
@@ -55,11 +56,12 @@ flowchart LR
     subgraph sources
         direction TD
         SP@{ shape: procs, label: "source_publications"}---SA@{ shape: procs, label: "source_authorships"}
+        SP---publications
+        SA-->persons
+        SA---structures
     end
 
-    SP---publications
-    SA-->persons
-    SA---structures
+    
     classDef valid  fill:#af5
     class structures,publications,persons valid;
 ```
@@ -78,11 +80,13 @@ flowchart LR
     subgraph sources
         direction TD
         SP@{ shape: procs, label: "source_publications"}---SA@{ shape: procs, label: "source_authorships"}
+        SP---publications
+        SA---persons
+        SA---structures
     end
 
-    SP---publications
-    SA---persons
-    SA---structures
+    
+    
     classDef valid  fill:#af5
     class structures,publications,persons,authorships valid;
 ```
