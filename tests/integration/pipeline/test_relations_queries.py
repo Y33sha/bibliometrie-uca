@@ -6,9 +6,12 @@ Valide sur vraie base `fetch_erratum_title_matches` (suffixe de titre) et
 Le parent est désigné par son `publication_id` ; son DOI peut être absent (cible au corpus sans DOI).
 """
 
+import json
+
 from sqlalchemy import text
 
 from infrastructure.queries.pipeline.relations import (
+    count_by_relation_type,
     fetch_erratum_title_matches,
     fetch_preprint_title_matches,
 )
@@ -202,3 +205,34 @@ class TestRelationTargetDeletionCascades:
             {"c": child},
         ).scalar_one()
         assert remaining == 0
+
+
+class TestCountByRelationType:
+    """Distribution par type, exposée en `details` de la phase `relations`.
+
+    Régression : l'alias SQL `t` entrait en collision avec l'attribut déprécié
+    `Row.t` de SQLAlchemy, si bien que `r.t` renvoyait la Row entière. Ce `Row`
+    atterrissait dans `details["table"]` et rendait le payload non sérialisable en
+    JSON — l'INSERT de l'exécution de phase (best-effort) échouait silencieusement
+    et la phase `relations` disparaissait de l'observabilité.
+    """
+
+    def test_returns_json_serializable_str_int_pairs(self, sa_sync_conn):
+        parent = _pub(sa_sync_conn, doc_type="article", title_normalized=PARENT_TITLE, doi="10.1/a")
+        sa_sync_conn.execute(
+            text("""
+                INSERT INTO publication_relations
+                    (from_publication_id, relation_type, target_doi, source)
+                VALUES (:p, 'is_preprint_of', '10.9/x', 'crossref'),
+                       (:p, 'is_preprint_of', '10.9/y', 'crossref'),
+                       (:p, 'has_part', '10.9/z', 'datacite')
+            """),
+            {"p": parent},
+        )
+
+        result = count_by_relation_type(sa_sync_conn)
+
+        # Types natifs (pas de Row) → sérialisable, condition de l'enregistrement.
+        assert all(isinstance(t, str) and isinstance(n, int) for t, n in result)
+        json.dumps(result)  # ne doit pas lever
+        assert dict(result) == {"is_preprint_of": 2, "has_part": 1}
