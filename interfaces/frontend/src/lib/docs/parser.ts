@@ -92,12 +92,12 @@ function extractHeadings(content: string): { title: string; toc: TocEntry[] } {
  * Réécrit les URLs d'images de la doc :
  *
  * - Liens externes (`http://`, `https://`, `//`) ou absolus (`/`) : inchangés.
- * - Liens relatifs pointant vers `[…/]img/<nom>` ou `[…/]graphs/<nom>` (peu importe la profondeur de `../` en amont) : réécrits en `${base}/docs-img/<nom>` ou `${base}/docs-graphs/<nom>`. `img/` porte les captures et illustrations, `graphs/` les diagrammes générés (dont la source vit à côté). Côté source on garde la convention markdown standard (lisible sur GitHub) ; côté doc déployée, SvelteKit sert les fichiers depuis `static/docs-img/` et `static/docs-graphs/` (copie alimentée par `scripts/copy-doc-images.mjs`).
+ * - Liens relatifs pointant vers `[…/]screenshots/<nom>` ou `[…/]graphs/<nom>` (peu importe la profondeur de `../` en amont) : réécrits en `${base}/docs-screenshots/<nom>` ou `${base}/docs-graphs/<nom>`. Sous `docs/img/`, `screenshots/` porte les captures et illustrations, `graphs/` les diagrammes générés (dont la source vit à côté). Côté source on garde la convention markdown standard (lisible sur GitHub) ; côté doc déployée, SvelteKit sert les fichiers depuis `static/docs-screenshots/` et `static/docs-graphs/` (copie alimentée par `scripts/copy-doc-images.mjs`).
  * - Tout autre lien relatif : inchangé.
  */
 function resolveImageHref(href: string, base: string): string {
 	if (/^(https?:|\/\/|\/)/.test(href)) return href;
-	const m = /(?:^|\/)(img|graphs)\/([\w.-]+)$/.exec(href);
+	const m = /(?:^|\/)(screenshots|graphs)\/([\w.-]+)$/.exec(href);
 	if (m) return `${base}/docs-${m[1]}/${m[2]}`;
 	return href;
 }
@@ -189,10 +189,10 @@ export function parseMarkdown(content: string, base: string, currentSlug: string
 			return `<a href="${escapeHtmlAttr(resolved)}"${titleAttr}>${text}</a>`;
 		},
 		image({ href, title, text }) {
-			// Images de doc : source unique sous `docs/screenshots/`, lisible
-			// sur GitHub via chemin relatif (`![](../screenshots/foo.png)` depuis
+			// Images de doc : source unique sous `docs/img/screenshots/`, lisible
+			// sur GitHub via chemin relatif (`![](../img/screenshots/foo.png)` depuis
 			// une page de section). Côté doc déployée, le script
-			// `scripts/copy-doc-screenshots.mjs` copie ces fichiers vers
+			// `scripts/copy-doc-images.mjs` copie ces fichiers vers
 			// `static/docs-screenshots/`, et on réécrit ici l'URL relative en
 			// URL absolue préfixée par `${base}/docs-screenshots/`.
 			const resolved = resolveImageHref(href, base);

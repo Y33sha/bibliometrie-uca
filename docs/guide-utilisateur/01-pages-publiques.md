@@ -19,9 +19,9 @@ Filtrable par:
 
 Restreint aux publications de type article et *review*.<!--TODO: glossaire? et voir si d'autres types sont pertinents--> Quels que soient les filtres en place, un bouton "Voir les publications" donne accès à la liste complète des publications concernées.
 
-![OA Stats](../img/stats_oa_status.png)
+![OA Stats](../img/screenshots/stats_oa_status.png)
 
-![Journal Stats](../img/stats_journals.png)
+![Journal Stats](../img/screenshots/stats_journals.png)
 
 ## Publications
 
@@ -43,7 +43,7 @@ Export csv.
 
 Certaines colonnes+facettes sont masquées par défaut: un bouton permet de choisir les colonnes affichées.
 
-![Publications](../img/publications.png)
+![Publications](../img/screenshots/publications.png)
 
 ### Détails `/publications/{id}`
 
@@ -57,7 +57,7 @@ Vue alignée des auteurs par source pour détecter d'éventuelles incohérences.
 
 TODO: à compléter
 
-![Theses](../img/theses.png)
+![Theses](../img/screenshots/theses.png)
 
 (La page "détails thèse" est la même que "détails publication".)
 
@@ -71,7 +71,7 @@ Filtrable par:
 - données RH (rôle, affiliation),
 - identifiants (ORCID, idHAL).
 
-![Persons](../img/persons.png)
+![Persons](../img/screenshots/persons.png)
 
 
 ### Détails `/persons/{id}`
@@ -85,7 +85,7 @@ Vue détaillée d'un chercheur. Identifiants, données RH si existent.
 <!-- TODO: Distinguer les onglets visibles selon rôle utilisateur: les onglets "identités" et "adresses" sont des outils internes, sans intérêt pour le chercheur -->
 <!-- TODO: Onglet adresses des pages personnes/id et laboratoire/id: afficher nombre de publications liées à chaque adresse; créer possibilité de consulter la liste?; normaliser adresses pour diminuer le nombre de variantes liées à des différences de ponctuation? -->
 
-![Person Details](../img/persons_id_theses.png)
+![Person Details](../img/screenshots/persons_id_theses.png)
 
 ## Laboratoires
 
@@ -93,7 +93,7 @@ Vue détaillée d'un chercheur. Identifiants, données RH si existent.
 
 Liste des laboratoires avec tutelles, identifiant ROR et lien vers collection HAL.
 
-![Laboratories](../img/laboratories.png)
+![Laboratories](../img/screenshots/laboratories.png)
 
 ### Détails `/laboratories/{id}`
 
@@ -106,7 +106,7 @@ Onglets:
 - Personnes: affiche les personnes liées à ce laboratoire via une publication (ne repose pas sur l'affiliation renseignée dans la base RH);
 - Adresses (adresses ayant permis la détection de ce laboratoire dans les publications).
 
-![Laboratory Details](../img/laboratories_id_dashboard.png)
+![Laboratory Details](../img/screenshots/laboratories_id_dashboard.png)
 
 ## Revues
 

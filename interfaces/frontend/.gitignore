@@ -22,7 +22,7 @@ Thumbs.db
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 
-# Images de doc copiées depuis docs/img/ et docs/graphs/ par scripts/copy-doc-images.mjs
+# Images de doc copiées depuis docs/img/screenshots/ et docs/img/graphs/ par scripts/copy-doc-images.mjs
 # (sources versionnées dans docs/, copies servies par SvelteKit).
-/static/docs-img/
+/static/docs-screenshots/
 /static/docs-graphs/

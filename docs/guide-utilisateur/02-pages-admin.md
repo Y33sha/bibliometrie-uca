@@ -8,7 +8,7 @@
 
 `/admin/config`
 
-![Formes de nom](../img/admin_config.png)
+![Formes de nom](../img/screenshots/admin_config.png)
 
 Configuration du [moissonnage](../pipeline/02-extract.md) :
 - email (*polite pool*);
