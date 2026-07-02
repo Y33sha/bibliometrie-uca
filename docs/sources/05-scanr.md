@@ -116,7 +116,7 @@ Document `doi10.1001/jama.2021.7683` (2 auteurs JAMA). `summary` tronqué, `topi
 
 ## Particularités
 
-### Identifiant ScanR : `<source><id natif>` collés
+### Identifiants ScanR
 
 L'`id` ScanR concatène le préfixe de source et l'identifiant natif de la publication dans cette source, sans séparateur. Sondage sur 10 000 documents UCA :
 
