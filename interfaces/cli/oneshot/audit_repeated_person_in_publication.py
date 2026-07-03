@@ -61,11 +61,12 @@ _OCCURRENCES_SQL = text("""
            sa.person_id,
            sa.source::text AS source,
            sa.raw_author_name AS name,
-           sa.author_name_normalized AS norm
+           aik.author_name_normalized AS norm
     FROM source_authorships sa
+    JOIN author_identifying_keys aik ON aik.id = sa.identity_id
     WHERE sa.source_publication_id = ANY(:spids)
       AND sa.person_id IS NOT NULL
-      AND sa.author_name_normalized IS NOT NULL
+      AND aik.author_name_normalized IS NOT NULL
 """).bindparams(bindparam("spids"))
 
 

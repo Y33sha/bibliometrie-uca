@@ -114,8 +114,9 @@ def name_form_authorships(conn: Connection, person_id: int, name_form: str) -> d
             SELECT sa.source, sa.id AS authorship_id,
                    sd.publication_id AS pub_id, sd.title, sd.pub_year, sd.doi
             FROM source_authorships sa
+            JOIN author_identifying_keys aik ON aik.id = sa.identity_id
             JOIN source_publications sd ON sd.id = sa.source_publication_id
-            WHERE sa.person_id = :pid AND sa.author_name_normalized = :nf
+            WHERE sa.person_id = :pid AND aik.author_name_normalized = :nf
               AND sa.source IN {AUTHOR_SOURCES_SQL}
             ORDER BY sd.pub_year DESC, sd.title
         """),
@@ -335,12 +336,13 @@ _REPEATED_CANDIDATES_SQL = text("""
 _REPEATED_OCCURRENCES_SQL = text("""
     SELECT sa.source_publication_id AS spid, sa.person_id,
            sa.source::text AS source, sa.raw_author_name AS name,
-           sa.author_name_normalized AS norm, sa.person_identifiers AS identifiers
+           aik.author_name_normalized AS norm, aik.person_identifiers AS identifiers
     FROM source_authorships sa
+    JOIN author_identifying_keys aik ON aik.id = sa.identity_id
     WHERE (sa.source_publication_id, sa.person_id) IN (
         SELECT spid, pid FROM unnest(CAST(:spids AS bigint[]), CAST(:pids AS bigint[])) AS t(spid, pid)
     )
-      AND sa.author_name_normalized IS NOT NULL
+      AND aik.author_name_normalized IS NOT NULL
 """).bindparams(bindparam("spids"), bindparam("pids"))
 
 _CONFIRMED_FORMS_SQL = text("""

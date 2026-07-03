@@ -60,14 +60,15 @@ def audit_rates(conn: Connection, maps: dict[str, dict[str, tuple[int, str, str]
         text("""
             SELECT sa.source::text AS source,
                    sa.raw_author_name AS name,
-                   sa.person_identifiers->>'orcid' AS orcid,
-                   sa.person_identifiers->>'idref' AS idref,
-                   sa.person_identifiers->>'hal_person_id' AS hal_person_id
+                   aik.person_identifiers->>'orcid' AS orcid,
+                   aik.person_identifiers->>'idref' AS idref,
+                   aik.person_identifiers->>'hal_person_id' AS hal_person_id
             FROM source_authorships sa
+            JOIN author_identifying_keys aik ON aik.id = sa.identity_id
             WHERE sa.raw_author_name IS NOT NULL
-              AND (sa.person_identifiers ? 'orcid'
-                   OR sa.person_identifiers ? 'idref'
-                   OR sa.person_identifiers ? 'hal_person_id')
+              AND (aik.person_identifiers ? 'orcid'
+                   OR aik.person_identifiers ? 'idref'
+                   OR aik.person_identifiers ? 'hal_person_id')
         """)
     )
     n = 0
@@ -124,11 +125,12 @@ def audit_double_occurrence(
                    sa.person_id,
                    sa.source::text AS source,
                    sa.raw_author_name AS name,
-                   sa.person_identifiers->>'orcid' AS orcid,
-                   sa.person_identifiers->>'idref' AS idref,
-                   sa.person_identifiers->>'hal_person_id' AS hal_person_id,
+                   aik.person_identifiers->>'orcid' AS orcid,
+                   aik.person_identifiers->>'idref' AS idref,
+                   aik.person_identifiers->>'hal_person_id' AS hal_person_id,
                    p.last_name_normalized AS pln, p.first_name_normalized AS pfn
             FROM source_authorships sa
+            JOIN author_identifying_keys aik ON aik.id = sa.identity_id
             JOIN persons p ON p.id = sa.person_id
             WHERE sa.person_id IS NOT NULL
               AND sa.raw_author_name IS NOT NULL

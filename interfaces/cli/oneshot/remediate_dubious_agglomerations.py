@@ -46,12 +46,13 @@ _MAX_PUB_SQL = text("SELECT max(source_publication_id) FROM source_authorships")
 
 # Signatures liées (person_id non nul) à identifiants (objet JSONB) de la fenêtre courante.
 _LINKED_SQL = text("""
-    SELECT id, person_identifiers
-    FROM source_authorships
-    WHERE source_publication_id > :last
-      AND source_publication_id <= :hi
-      AND person_id IS NOT NULL
-      AND jsonb_typeof(person_identifiers) = 'object'
+    SELECT sa.id, aik.person_identifiers
+    FROM source_authorships sa
+    JOIN author_identifying_keys aik ON aik.id = sa.identity_id
+    WHERE sa.source_publication_id > :last
+      AND sa.source_publication_id <= :hi
+      AND sa.person_id IS NOT NULL
+      AND jsonb_typeof(aik.person_identifiers) = 'object'
 """)
 
 _NULL_SQL = text("UPDATE source_authorships SET person_id = NULL WHERE id = ANY(:ids)")
@@ -63,8 +64,9 @@ _PURGE_SQL = text("""
     WHERE pi.status = 'pending'
       AND NOT EXISTS (
           SELECT 1 FROM source_authorships sa
+          JOIN author_identifying_keys aik ON aik.id = sa.identity_id
           WHERE sa.person_id = pi.person_id
-            AND sa.person_identifiers ->> (pi.id_type)::text = pi.id_value
+            AND aik.person_identifiers ->> (pi.id_type)::text = pi.id_value
       )
 """)
 
@@ -105,8 +107,9 @@ def main() -> int:
                 text(
                     "SELECT count(*) FROM person_identifiers pi WHERE pi.status='pending' "
                     "AND NOT EXISTS (SELECT 1 FROM source_authorships sa "
+                    "JOIN author_identifying_keys aik ON aik.id = sa.identity_id "
                     "WHERE sa.person_id=pi.person_id "
-                    "AND sa.person_identifiers->>(pi.id_type)::text = pi.id_value)"
+                    "AND aik.person_identifiers->>(pi.id_type)::text = pi.id_value)"
                 )
             ).scalar()
             log.info("2/3 — %d person_identifiers pending orphelins (à supprimer)", n_purge)

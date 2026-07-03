@@ -61,10 +61,11 @@ _ORPHANS_CTE = """
         SELECT DISTINCT ON (sa.authorship_id)
                sa.authorship_id,
                sa.raw_author_name AS ref_raw,
-               sa.author_name_normalized AS ref_norm
+               aik.author_name_normalized AS ref_norm
         FROM source_authorships sa
+        JOIN author_identifying_keys aik ON aik.id = sa.identity_id
         WHERE sa.authorship_id IS NOT NULL
-          AND sa.author_name_normalized IS NOT NULL
+          AND aik.author_name_normalized IS NOT NULL
         ORDER BY sa.authorship_id, sa.source, sa.id
     ),
     orphans AS (
@@ -75,7 +76,7 @@ _ORPHANS_CTE = """
                other_sa.id AS orphan_sa_id,
                other_sa.source AS missing_source,
                other_sa.raw_author_name AS orphan_raw,
-               other_sa.author_name_normalized AS orphan_norm,
+               other_aik.author_name_normalized AS orphan_norm,
                ref.ref_raw,
                ref.ref_norm,
                pub_max_authors.max_authors AS pub_max_authors
@@ -87,6 +88,7 @@ _ORPHANS_CTE = """
            AND other_sa.author_position = linked.author_position
            AND other_sa.person_id IS NULL
            AND other_sa.raw_author_name IS NOT NULL
+        JOIN author_identifying_keys other_aik ON other_aik.id = other_sa.identity_id
         JOIN reference_name ref ON ref.authorship_id = linked.authorship_id
     )
 """

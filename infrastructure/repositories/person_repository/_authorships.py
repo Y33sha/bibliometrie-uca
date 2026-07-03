@@ -42,9 +42,11 @@ def assign_orphan_sa(
     """
     row = conn.execute(
         text("""
-            UPDATE source_authorships SET person_id = :pid
-            WHERE id = :aid AND source = :src AND person_id IS NULL
-            RETURNING author_name_normalized
+            UPDATE source_authorships sa SET person_id = :pid
+            FROM author_identifying_keys aik
+            WHERE sa.id = :aid AND sa.source = :src AND sa.person_id IS NULL
+              AND aik.id = sa.identity_id
+            RETURNING aik.author_name_normalized
         """),
         {"pid": person_id, "aid": authorship_id, "src": source},
     ).first()
@@ -155,10 +157,11 @@ def get_distinct_name_forms_from_source_authorships(
         return []
     rows = conn.execute(
         text("""
-            SELECT DISTINCT author_name_normalized
-            FROM source_authorships
-            WHERE id = ANY(:ids)
-              AND author_name_normalized IS NOT NULL
+            SELECT DISTINCT aik.author_name_normalized
+            FROM source_authorships sa
+            JOIN author_identifying_keys aik ON aik.id = sa.identity_id
+            WHERE sa.id = ANY(:ids)
+              AND aik.author_name_normalized IS NOT NULL
         """),
         {"ids": sa_ids},
     ).all()
@@ -187,8 +190,10 @@ def null_person_id_for_name_form(conn: Connection, person_id: int, name_form: st
     la personne. Retourne le nombre de signatures détachées."""
     return conn.execute(
         text(
-            "UPDATE source_authorships SET person_id = NULL "
-            "WHERE person_id = :pid AND author_name_normalized = :nf"
+            "UPDATE source_authorships sa SET person_id = NULL "
+            "FROM author_identifying_keys aik "
+            "WHERE sa.person_id = :pid AND aik.id = sa.identity_id "
+            "AND aik.author_name_normalized = :nf"
         ),
         {"pid": person_id, "nf": name_form},
     ).rowcount

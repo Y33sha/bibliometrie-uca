@@ -71,22 +71,25 @@ _BASE_CTE = """
     ),
     groups AS (
         SELECT orphan.id AS orphan_sa_id,
-               orphan.person_identifiers AS orphan_identifiers,
+               aik_o.person_identifiers AS orphan_identifiers,
                linked.publication_id,
                linked.author_position,
-               orphan.author_name_normalized AS norm,
+               aik_o.author_name_normalized AS norm,
                linked.person_id,
                linked.authorship_id
         FROM source_authorships orphan
+        JOIN author_identifying_keys aik_o ON aik_o.id = orphan.identity_id
         JOIN source_publications sp ON sp.id = orphan.source_publication_id
         JOIN linked
             ON linked.publication_id = sp.publication_id
            AND linked.author_position = orphan.author_position
         JOIN source_authorships linked_sa
             ON linked_sa.authorship_id = linked.authorship_id
-           AND linked_sa.author_name_normalized = orphan.author_name_normalized
+        JOIN author_identifying_keys aik_l
+            ON aik_l.id = linked_sa.identity_id
+           AND aik_l.author_name_normalized = aik_o.author_name_normalized
         WHERE orphan.person_id IS NULL
-          AND orphan.author_name_normalized IS NOT NULL
+          AND aik_o.author_name_normalized IS NOT NULL
     ),
     unambig_keys AS (
         SELECT publication_id, author_position, norm

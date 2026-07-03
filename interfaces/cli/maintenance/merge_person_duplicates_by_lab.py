@@ -146,10 +146,11 @@ def get_person_details(conn: Connection, person_ids: list[int]) -> list[dict[str
                     FROM person_identifiers pi
                     WHERE pi.person_id = p.id AND pi.status != 'rejected') AS identifiers,
                    -- HAL : comptes HAL identifiés (distinguer par hal_person_id JSONB)
-                   (SELECT COUNT(DISTINCT sa3.person_identifiers->>'hal_person_id')
+                   (SELECT COUNT(DISTINCT aik.person_identifiers->>'hal_person_id')
                     FROM source_authorships sa3
+                    JOIN author_identifying_keys aik ON aik.id = sa3.identity_id
                     WHERE sa3.source = 'hal' AND sa3.person_id = p.id
-                      AND sa3.person_identifiers->>'hal_person_id' IS NOT NULL) AS hal_authors,
+                      AND aik.person_identifiers->>'hal_person_id' IS NOT NULL) AS hal_authors,
                    -- OA : pas d'identité auteur côté source, on distingue par raw_author_name
                    (SELECT COUNT(DISTINCT sa4.raw_author_name) FROM source_authorships sa4 WHERE sa4.source = 'openalex' AND sa4.person_id = p.id) AS oa_authors
             FROM persons p

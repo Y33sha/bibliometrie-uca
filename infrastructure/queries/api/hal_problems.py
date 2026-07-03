@@ -84,11 +84,12 @@ class PgHalProblemsQueries(HalProblemsQueries):
                 SELECT COUNT(*) AS total FROM (
                     SELECT sa.person_id
                     FROM source_authorships sa
+                    JOIN author_identifying_keys aik ON aik.id = sa.identity_id
                     WHERE sa.source = 'hal'
                       AND sa.person_id IS NOT NULL
-                      AND sa.person_identifiers->>'hal_person_id' IS NOT NULL
+                      AND aik.person_identifiers->>'hal_person_id' IS NOT NULL
                     GROUP BY sa.person_id
-                    HAVING COUNT(DISTINCT sa.person_identifiers->>'hal_person_id') >= 2
+                    HAVING COUNT(DISTINCT aik.person_identifiers->>'hal_person_id') >= 2
                 ) sub
             """)
         ).one()
@@ -99,17 +100,18 @@ class PgHalProblemsQueries(HalProblemsQueries):
                 WITH hal_accounts AS (
                     SELECT
                         sa.person_id,
-                        (sa.person_identifiers->>'hal_person_id')::int AS hal_person_id,
+                        (aik.person_identifiers->>'hal_person_id')::int AS hal_person_id,
                         MIN(sa.raw_author_name) AS full_name,
-                        MIN(sa.person_identifiers->>'orcid') AS orcid,
-                        MIN(sa.person_identifiers->>'idhal') AS idhal,
-                        MIN(sa.person_identifiers->>'idref') AS idref,
+                        MIN(aik.person_identifiers->>'orcid') AS orcid,
+                        MIN(aik.person_identifiers->>'idhal') AS idhal,
+                        MIN(aik.person_identifiers->>'idref') AS idref,
                         COUNT(*) AS pub_count
                     FROM source_authorships sa
+                    JOIN author_identifying_keys aik ON aik.id = sa.identity_id
                     WHERE sa.source = 'hal'
                       AND sa.person_id IS NOT NULL
-                      AND sa.person_identifiers->>'hal_person_id' IS NOT NULL
-                    GROUP BY sa.person_id, sa.person_identifiers->>'hal_person_id'
+                      AND aik.person_identifiers->>'hal_person_id' IS NOT NULL
+                    GROUP BY sa.person_id, aik.person_identifiers->>'hal_person_id'
                 ),
                 duplicates AS (
                     SELECT person_id
