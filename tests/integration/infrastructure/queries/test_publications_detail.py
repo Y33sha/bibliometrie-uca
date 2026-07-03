@@ -8,6 +8,7 @@ from infrastructure.queries.api.publications.detail import (
     get_publication_detail,
     get_publication_subjects,
 )
+from tests.integration.helpers.authorships import upsert_identity
 from tests.integration.helpers.structures import add_authorship_structure
 
 
@@ -59,14 +60,15 @@ class TestGetPublicationDetail:
             {"pub": pub, "pid": pid},
         ).one()
         auth_id = auth_row.id
+        identity_id = upsert_identity(sa_sync_conn)
         sa_sync_conn.execute(
             text("""
                 INSERT INTO source_authorships
                     (source, source_publication_id, author_position,
-                     person_id, authorship_id)
-                VALUES ('hal', :sd, 0, :pid, :auth)
+                     person_id, authorship_id, identity_id)
+                VALUES ('hal', :sd, 0, :pid, :auth, :iid)
             """),
-            {"sd": sd, "pid": pid, "auth": auth_id},
+            {"sd": sd, "pid": pid, "auth": auth_id, "iid": identity_id},
         )
 
         detail = get_publication_detail(sa_sync_conn, pub)
@@ -140,10 +142,10 @@ class TestGetPublicationDetail:
         sa_sync_conn.execute(
             text("""
                 INSERT INTO source_authorships
-                    (source, source_publication_id, author_position, raw_author_name)
-                VALUES ('openalex', :sd, 0, 'Alice')
+                    (source, source_publication_id, author_position, raw_author_name, identity_id)
+                VALUES ('openalex', :sd, 0, 'Alice', :iid)
             """),
-            {"sd": sd_old},
+            {"sd": sd_old, "iid": upsert_identity(sa_sync_conn)},
         )
         # Row OpenAlex la plus récente, avec 1 auteur "Bob"
         sd_new = _create_sd(sa_sync_conn, pub, source="openalex", source_id="W2-NEW")
@@ -157,10 +159,10 @@ class TestGetPublicationDetail:
         sa_sync_conn.execute(
             text("""
                 INSERT INTO source_authorships
-                    (source, source_publication_id, author_position, raw_author_name)
-                VALUES ('openalex', :sd, 0, 'Bob')
+                    (source, source_publication_id, author_position, raw_author_name, identity_id)
+                VALUES ('openalex', :sd, 0, 'Bob', :iid)
             """),
-            {"sd": sd_new},
+            {"sd": sd_new, "iid": upsert_identity(sa_sync_conn)},
         )
 
         detail = get_publication_detail(sa_sync_conn, pub)

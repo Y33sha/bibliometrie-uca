@@ -4,9 +4,10 @@ Appelé par ``application/pipeline/normalize/normalize_datacite.py``.
 UPSERT sur ``source_publications`` (source='datacite').
 
 Particularité DataCite, comme CrossRef : pas d'identifiant stable côté auteur
-(les ORCID éventuels vivent sur ``source_authorships.person_identifiers``). La
-déduplication vers les ``persons`` canoniques est faite plus tard par le
-pipeline ``personnes`` (source-agnostique).
+(les ORCID éventuels vivent sur l'identité de la signature,
+``author_identifying_keys.person_identifiers``). La déduplication vers les
+``persons`` canoniques est faite plus tard par le pipeline ``personnes``
+(source-agnostique).
 """
 
 from sqlalchemy import Connection, bindparam, text

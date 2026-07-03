@@ -9,8 +9,8 @@ Tables peuplées :
     source_publications                     (lien staging ↔ publication, source='crossref')
     source_authorships                      (lien document × auteur, source='crossref')
 
-L'ORCID éventuel d'un auteur CrossRef vit sur
-``source_authorships.person_identifiers`` (pas d'identifiant stable
+L'ORCID éventuel d'un auteur CrossRef vit sur l'identité de la signature
+(``author_identifying_keys.person_identifiers``, pas d'identifiant stable
 côté auteur).
 
 Particularités CrossRef :

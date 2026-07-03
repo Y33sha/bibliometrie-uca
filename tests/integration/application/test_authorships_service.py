@@ -18,6 +18,7 @@ from application.authorships.core import (
 from domain.errors import NotFoundError
 from infrastructure.queries.perimeter import PgPerimeterQueries
 from infrastructure.repositories import authorship_repository
+from tests.integration.helpers.authorships import upsert_identity
 from tests.integration.helpers.structures import refresh_structure_matviews
 
 
@@ -83,12 +84,13 @@ def _create_source_authorship(
     authorship_id=None,
     in_perimeter=False,
 ):
+    identity_id = upsert_identity(conn)
     row = conn.execute(
         text(
             "INSERT INTO source_authorships (source, source_publication_id, "
             "                                author_position, person_id, "
-            "                                authorship_id, in_perimeter) "
-            "VALUES (:s, :spid, :pos, :pid, :aid, :ip) RETURNING id"
+            "                                authorship_id, in_perimeter, identity_id) "
+            "VALUES (:s, :spid, :pos, :pid, :aid, :ip, :iid) RETURNING id"
         ),
         {
             "s": source,
@@ -97,6 +99,7 @@ def _create_source_authorship(
             "pid": person_id,
             "aid": authorship_id,
             "ip": in_perimeter,
+            "iid": identity_id,
         },
     ).one()
     return row.id

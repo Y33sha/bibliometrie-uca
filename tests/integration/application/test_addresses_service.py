@@ -20,6 +20,7 @@ from application.addresses.structures import (
 from domain.errors import ValidationError
 from infrastructure.queries.perimeter import PgPerimeterQueries
 from infrastructure.repositories import address_repository, authorship_repository
+from tests.integration.helpers.authorships import upsert_identity
 
 
 @pytest.fixture
@@ -414,13 +415,14 @@ class TestPropagateCountriesToPublications:
             ),
             {"pid": pub_id},
         ).scalar_one()
+        identity_id = upsert_identity(sa_sync_conn)
         sa_id = sa_sync_conn.execute(
             text(
                 "INSERT INTO source_authorships "
-                "(source, source_publication_id, author_position) "
-                "VALUES ('hal', :sp, 0) RETURNING id"
+                "(source, source_publication_id, author_position, identity_id) "
+                "VALUES ('hal', :sp, 0, :iid) RETURNING id"
             ),
-            {"sp": sp_id},
+            {"sp": sp_id, "iid": identity_id},
         ).scalar_one()
         addr = _create_address(sa_sync_conn)
         sa_sync_conn.execute(

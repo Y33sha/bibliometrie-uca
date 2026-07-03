@@ -9,6 +9,7 @@ from application.ports.api.addresses_queries import (
     TextPredicate,
 )
 from infrastructure.queries.api.addresses import PgAddressesQueries
+from tests.integration.helpers.authorships import upsert_identity
 
 
 def _q(conn) -> PgAddressesQueries:
@@ -313,13 +314,14 @@ class TestGetAddressPublications:
             {"p": pub},
         ).one()
         sd = sd_row.id
+        identity_id = upsert_identity(sa_sync_conn)
         sa_row = sa_sync_conn.execute(
             text("""
                 INSERT INTO source_authorships
-                    (source, source_publication_id, author_position)
-                VALUES ('hal', :sd, 0) RETURNING id
+                    (source, source_publication_id, author_position, identity_id)
+                VALUES ('hal', :sd, 0, :iid) RETURNING id
             """),
-            {"sd": sd},
+            {"sd": sd, "iid": identity_id},
         ).one()
         sa_id = sa_row.id
         addr = _create_address(sa_sync_conn, raw_text="rue X")

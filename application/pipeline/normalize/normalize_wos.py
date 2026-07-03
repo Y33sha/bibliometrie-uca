@@ -460,7 +460,8 @@ def insert_wos_document(
 # =============================================================
 # Le `daisng_id` (entité algorithmique WoS non fiable) n'est pas
 # conservé. Le `researcher_id` (ResearcherID Clarivate) — identifiant
-# cross-source — vit sur source_authorships.person_identifiers.
+# cross-source — vit sur l'identité de la signature
+# (author_identifying_keys.person_identifiers).
 
 
 def build_wos_author_records(rec: dict, logger: logging.Logger) -> list[AuthorRecord]:

@@ -1,5 +1,7 @@
 # Chantier — Scinder `source_authorships` (identité ⊥ liaison)
 
+Terminé le 2026-07-03
+
 Décomposer `source_authorships` en deux tables, **à comportement strictement constant** : une table des **identités d'auteur** (forme de nom normalisée + identifiants, dédupliquées) et la table de **liaison** allégée (une FK vers l'identité en remplacement des colonnes déménagées). C'est une pure correction de forme normale : les colonnes d'identification dépendent de *qui est l'auteur*, pas de la clé de liaison `(source, source_publication_id, author_position)` ; les stocker sur la liaison est une dépendance partielle, d'où une répétition d'un facteur ≈ 25. La cible restaure une symétrie déjà à demi-écrite dans le schéma : `addresses` est la table d'identités-source des structures (dédup de chaînes brutes alimentant le matching) ; les personnes n'ont pas d'équivalent, leur identité étant diluée dans la liaison.
 
 Le périmètre se limite au **déplacement des colonnes** : aucun changement de logique de matching, de valeur produite, ni de contrat de lecture (au résultat près, identique). Les gains de performance et les nouveaux diagnostics que la table débloque sont listés en **Suites possibles** et relèvent de chantiers ultérieurs, sur base stable.
@@ -50,14 +52,14 @@ Traçage exhaustif des lecteurs et écrivains des deux colonnes. Règle généra
 - **Lecteurs — matching / phase `persons`.** `infrastructure/queries/pipeline/persons_create.py` (projections `fetch_unlinked_authorships`, candidats hors-périmètre, branche identifiant) ; `infrastructure/queries/pipeline/name_forms.py` (`sync_from_raw_forms`) ; `infrastructure/repositories/person_repository/_authorships.py` (`assign_orphan_sa` RETURNING, `get_distinct_name_forms_from_source_authorships`, `null_person_id_for_name_form`) et `_name_forms.py` (`delete_orphan_name_forms_for_person`). Les orchestrateurs Python (`create_persons_from_source_authorships.py`, `assign_orphans.py`, `persons/core.py`) consomment le DTO projeté, pas la colonne : inchangés tant que la projection ramène les mêmes champs.
 - **Matview `person_identifier_keys` → supprimée.** Elle matérialisait `(person_id, id_type, id_value)` en lisant `sa.person_identifiers ->> k`. Son unique consommateur (la file « conflits d'identifiant » du hub admin) réévalue désormais cette projection à la volée par un CTE inline, adossé à l'index couvrant `idx_sa_person (person_id, identity_id)` : la matview, son `REFRESH` du pipeline et sa machinerie `REFRESH CONCURRENTLY` disparaissent (cf. Phase 4).
 - **API / admin.** `infrastructure/queries/api/persons/admin.py` (`name_form_authorships`, `_REPEATED_OCCURRENCES_SQL` — lit le jsonb entier), `hal_problems.py`, `persons/detail.py`, `persons/list.py` (filtre par forme). `persons/facets.py` et `filters.py` ne touchent que la table homonyme : inchangés.
-- **CLI.** Maintenance : `link_source_authorships_by_name.py`, `merge_person_duplicates_by_lab.py`. Oneshots en lecture : `audit_{identifier_linked_person_pairs,identifier_name_corroboration,repeated_person_in_publication,authorships_cross_source,dedup_author_overlap,dedup_overmerge_examples}.py`, `remediate_{rejected_name_forms,identifier_name_incompatible,dubious_agglomerations}.py`. Oneshots qui **mutent** le jsonb (`backfill_dubious_{hal,shared}_identifiers.py`) : deviennent un re-pointage d'identité (cf. point relevé ci-dessous).
+- **CLI.** Maintenance : `link_source_authorships_by_name.py`, `merge_person_duplicates_by_lab.py`. Oneshots en lecture : `audit_{identifier_linked_person_pairs,identifier_name_corroboration,repeated_person_in_publication,authorships_cross_source,dedup_author_overlap,dedup_overmerge_examples}.py`, `remediate_{rejected_name_forms,identifier_name_incompatible,dubious_agglomerations}.py`. Les oneshots qui **mutaient** le jsonb (`backfill_dubious_{hal,shared}_identifiers.py`) sont supprimés : leur marquage `_dubious` du stock est un backfill daté déjà appliqué, et le flux courant est couvert par `normalize` (qui pose `_dubious` à l'ingestion, désormais partie de la clé d'identité).
 - **Frontend.** Aucune lecture directe : il consomme l'API JSON et hérite des changements côté requêtes. Rien à modifier.
 - **Tests.** Une vingtaine de fichiers d'intégration à adapter (fixtures `author_identifying_keys` + `identity_id`, jointures) ; les tests unitaires des normalizers restent valides tant que le DTO ne change pas.
 
 Points relevés par le traçage :
 
 - **Aligner le chemin thèses sur la normalisation Python du nom.** Le writer batch calcule `author_name_normalized` en Python (`normalize_name_form`, alias de `normalize_text`) ; l'upsert des thèses le calcule encore en SQL (`normalize_name_form(:raw)`), dans son chemin d'upsert distinct — reliquat de l'unification antérieure qui avait migré HAL mais pas les thèses. Les deux implémentations sont délibérément alignées et gardées par un test, donc les valeurs ne divergent pas ; mais l'upsert d'identité doit calculer la clé de dédup par une seule voie, donc les thèses passent en Python comme les autres sources. La fonction SQL `normalize_name_form` reste — indispensable aux normalisations en SQL (index trigram `subjects`, sync `person_name_forms`, formes de noms journaux/éditeurs).
-- **Oneshots `_dubious`.** Le marquage `_dubious` fait partie de la clé d'identité (Décision 2) : renommer une clé en `<clé>_dubious` change l'identité. Ces oneshots deviennent donc un **re-pointage** de `identity_id` (upsert de l'identité corrigée puis repointage de la signature), pas une mutation en place du jsonb.
+- **Oneshots `_dubious` supprimés.** Le marquage `_dubious` fait partie de la clé d'identité (Décision 2) : renommer une clé en `<clé>_dubious` changerait l'identité, donc une mutation en place du jsonb n'a plus de sens. Ces backfills de stock datés ont déjà été appliqués, et `normalize` pose `_dubious` à l'ingestion (l'identité `<clé>_dubious` est créée directement) : ils sont retirés plutôt que convertis en re-pointage.
 - **Bénéfice de performance collatéral.** La jointure par identifiant, aujourd'hui `sa.person_identifiers ->> 'orcid' = pi.id_value` non indexable sur le jsonb, devient une égalité sur une colonne de `author_identifying_keys`, indexable.
 
 ## Phasage
@@ -90,9 +92,9 @@ Les Phases 3 et 4 sont livrées **ensemble**, en un seul déploiement — pas de
 
 ### Phase 5 — Contract : verrouiller et nettoyer
 
-- [ ] `identity_id` : passage NOT NULL + FK vers `author_identifying_keys` (après bascule des écrivains).
-- [ ] `DROP` de `author_name_normalized` et `person_identifiers` (après bascule des lecteurs) ; espace récupéré au `VACUUM FULL`/repack.
-- [ ] Régénérer `infrastructure/db/schema.sql` (`python -m infrastructure.db.dump_schema`).
+- [x] `identity_id` : passage NOT NULL + FK vers `author_identifying_keys`. (`f1a7c8b2e4d6`)
+- [x] `DROP` de `author_name_normalized` et `person_identifiers` ; espace récupéré au `VACUUM FULL`/repack. (`f1a7c8b2e4d6`)
+- [x] Régénérer `infrastructure/db/schema.sql` (`python -m infrastructure.db.dump_schema`).
 
 ## Suites possibles (hors périmètre, chantiers ultérieurs)
 

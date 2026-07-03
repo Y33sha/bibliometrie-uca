@@ -12,6 +12,8 @@ import itertools
 
 from sqlalchemy import text
 
+from tests.integration.helpers.authorships import upsert_identity
+
 _seq = itertools.count(1)
 
 
@@ -38,13 +40,14 @@ def add_authorship_structure(conn, authorship_id: int, structure_id: int) -> Non
         ),
         {"sid": f"as-test-{n}"},
     ).scalar_one()
+    identity_id = upsert_identity(conn)
     sa_id = conn.execute(
         text(
             "INSERT INTO source_authorships "
-            "(source, source_publication_id, author_position, authorship_id) "
-            "VALUES ('hal', :sp, 0, :aid) RETURNING id"
+            "(source, source_publication_id, author_position, authorship_id, identity_id) "
+            "VALUES ('hal', :sp, 0, :aid, :iid) RETURNING id"
         ),
-        {"sp": sp_id, "aid": authorship_id},
+        {"sp": sp_id, "aid": authorship_id, "iid": identity_id},
     ).scalar_one()
     addr_id = conn.execute(
         text("INSERT INTO addresses (raw_text, normalized_text) VALUES (:t, :t) RETURNING id"),

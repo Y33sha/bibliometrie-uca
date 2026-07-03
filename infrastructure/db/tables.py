@@ -645,21 +645,15 @@ source_authorships = Table(
     # changée), remis à False par le refresh.
     Column("countries_dirty", Boolean, nullable=False, server_default="true"),
     Column("person_id", Integer),
-    Column("author_name_normalized", Text),
     Column("is_corresponding", Boolean, server_default="false"),
     Column("roles", ARRAY(Text), server_default="{author}"),
     Column("authorship_id", Integer),
     Column("raw_author_name", Text),
-    # Identifiants observés sur cette signature (orcid, idhal, idref,
-    # hal_person_id). Distinct de la table canonique `person_identifiers`
-    # (référentiel personne) qui est alimentée par promotion via le
-    # pipeline personnes (`add_identifiers_from_authorships`).
-    Column("person_identifiers", JSONB),
-    # FK vers `author_identifying_keys` (identité dédupliquée). Nullable
-    # pendant la migration expand/contract ; passe NOT NULL + FK une fois les
-    # écrivains basculés. La contrainte FK n'est pas modélisée ici (pattern du
-    # projet : les FK vivent en DB, pas dans la MetaData).
-    Column("identity_id", Integer),
+    # FK vers `author_identifying_keys` (identité dédupliquée : nom normalisé +
+    # identifiants observés de la signature). La contrainte FK n'est pas
+    # modélisée ici (pattern du projet : les FK vivent en DB, pas dans la
+    # MetaData).
+    Column("identity_id", Integer, nullable=False),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     UniqueConstraint(
         "source_publication_id",

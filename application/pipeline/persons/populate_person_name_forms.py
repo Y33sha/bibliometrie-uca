@@ -10,7 +10,8 @@ Sources :
 1. ``persons.last_name`` + ``persons.first_name`` (source: ``'persons'``)
    — inclut les ``rejected = TRUE`` pour préserver l'ancre de matching
    des entités douteuses.
-2. ``source_authorships.author_name_normalized`` (toutes sources biblio).
+2. le nom normalisé de l'identité des signatures
+   (``author_identifying_keys.author_name_normalized``, toutes sources biblio).
 
 L'orchestrateur produit les formes "persons" en Python via
 ``compute_person_name_forms`` (variantes prénom/nom/initiales) et les

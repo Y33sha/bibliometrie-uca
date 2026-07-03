@@ -17,6 +17,7 @@ from infrastructure.queries.pipeline.publications_reconciliation import (
     mark_keys_dirty,
 )
 from infrastructure.repositories import publication_repository
+from tests.integration.helpers.authorships import upsert_identity
 
 logger = logging.getLogger("test_reconcile_components")
 
@@ -524,10 +525,10 @@ class TestExternalDoiCarrier:
         # planterait sur publications_doi_lower_key ; avec, il s'ancre sur la pub existante.
         conn.execute(
             text(
-                "INSERT INTO source_authorships (source, source_publication_id, in_perimeter) "
-                "VALUES ('openalex', :sp, true)"
+                "INSERT INTO source_authorships (source, source_publication_id, in_perimeter, identity_id) "
+                "VALUES ('openalex', :sp, true, :iid)"
             ),
-            {"sp": sp1},
+            {"sp": sp1, "iid": upsert_identity(conn)},
         )
 
         reconcile(
