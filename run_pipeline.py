@@ -480,6 +480,10 @@ def phase_normalize(**kw: Any) -> PhaseMetrics:
         rows.append(_run_normalize_openalex())
     if "wos" in sources:
         rows.append(_run_normalize_wos())
+    # Balayage des identités orphelines : les writers ont pu re-pointer des
+    # signatures vers d'autres identités, laissant des `author_identifying_keys`
+    # que plus aucune signature ne référence.
+    _run_cleanup_orphan_identities()
     # Libérer l'espace TOAST du staging (raw_data vidé après normalisation)
     vacuum_label = "VACUUM FULL" if policy.vacuum_full else "VACUUM"
     log.info("▶ %s staging…", vacuum_label)
@@ -490,6 +494,21 @@ def phase_normalize(**kw: Any) -> PhaseMetrics:
     metrics.add(total=sum(cast("int", r["processed"]) for r in rows))
     metrics.details["table"] = {"rows": rows}
     return metrics
+
+
+def _run_cleanup_orphan_identities() -> None:
+    from infrastructure.db.engine import get_sync_engine
+    from infrastructure.queries.pipeline.normalize.authorships import delete_orphan_identities
+
+    log.info("▶ nettoyage des identités orphelines")
+    t0 = time.time()
+    conn = get_sync_engine().connect()
+    try:
+        n = delete_orphan_identities(conn)
+        conn.commit()
+    finally:
+        conn.close()
+    log.info("✓ %d identités orphelines supprimées en %.1fs", n, time.time() - t0)
 
 
 def _run_recompute_address_pub_count() -> None:
