@@ -680,7 +680,14 @@ source_authorships = Table(
         "identity_id",
         postgresql_where=text("person_id IS NOT NULL"),
     ),
+    Index(
+        "idx_sa_pub_person",
+        "source_publication_id",
+        "person_id",
+        postgresql_where=text("person_id IS NOT NULL"),
+    ),
     Index("idx_sa_identity", "identity_id"),
+    Index("idx_sa_countries_dirty", "source", postgresql_where=text("countries_dirty")),
 )
 
 
