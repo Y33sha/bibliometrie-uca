@@ -1,11 +1,10 @@
 # STATUS: oneshot (2026-06-22)
 """Remédiation des personnes agglomérées par un identifiant empoisonné (corruption source).
 
-À lancer **après** `backfill_dubious_shared_identifiers` (qui a requalifié `_dubious` les
-identifiants partagés sur le stock). Ce backfill rend les identifiants empoisonnés invisibles
-au matching *futur*, mais les `person_id` déjà posés (les personnes « Frankenstein » comme
-12913, qui a agrégé des centaines de signatures distinctes) restent en place. La phase persons
-étant **incrémentale** (`WHERE person_id IS NULL`), elle ne les ré-évalue pas d'elle-même.
+Le `normalize` suffixe `_dubious` aux identifiants partagés de façon suspecte, ce qui les rend
+invisibles au matching *futur* — mais les `person_id` déjà posés (les personnes « Frankenstein »
+comme 12913, qui a agrégé des centaines de signatures distinctes) restent en place. La phase
+persons étant **incrémentale** (`WHERE person_id IS NULL`), elle ne les ré-évalue pas d'elle-même.
 
 Séquence :
 

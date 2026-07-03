@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict ALMUiivFWmqqyLZhjhGfj0i33krMKxFusImiW1b1q9MEHxg79qmbNx1jZsVB9ZQ
+\restrict cgSQF9jUFyfyCDOWYFyJ7huwFKFjU3Jx7AarRIXOGl9h3o0L9orAhkUuBrOz4vu
 
--- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg22.04+1)
--- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg22.04+1)
+-- Dumped from database version 18.4
+-- Dumped by pg_dump version 18.4
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -480,6 +480,38 @@ ALTER SEQUENCE public.audit_log_id_seq OWNED BY public.audit_log.id;
 
 
 --
+-- Name: author_identifying_keys; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.author_identifying_keys (
+    id integer NOT NULL,
+    author_name_normalized text,
+    person_identifiers jsonb,
+    key_hash text GENERATED ALWAYS AS (md5(((COALESCE(author_name_normalized, ''::text) || ''::text) || COALESCE((person_identifiers)::text, ''::text)))) STORED
+);
+
+
+--
+-- Name: author_identifying_keys_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.author_identifying_keys_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: author_identifying_keys_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.author_identifying_keys_id_seq OWNED BY public.author_identifying_keys.id;
+
+
+--
 -- Name: config; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -556,14 +588,13 @@ CREATE TABLE public.source_authorships (
     in_perimeter boolean DEFAULT false,
     countries text[],
     person_id integer,
-    author_name_normalized text,
     is_corresponding boolean DEFAULT false,
     roles text[] DEFAULT ARRAY['author'::text],
     authorship_id integer,
     raw_author_name text,
-    person_identifiers jsonb,
     created_at timestamp with time zone DEFAULT now(),
-    countries_dirty boolean DEFAULT true NOT NULL
+    countries_dirty boolean DEFAULT true NOT NULL,
+    identity_id integer NOT NULL
 );
 
 
@@ -632,6 +663,32 @@ CREATE TABLE public.publication_relations (
 
 
 --
+-- Name: publications; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.publications (
+    id integer NOT NULL,
+    title text NOT NULL,
+    title_normalized text,
+    doc_type public.doc_type DEFAULT 'other'::public.doc_type,
+    pub_year smallint NOT NULL,
+    doi text,
+    oa_status public.oa_type DEFAULT 'unknown'::public.oa_type,
+    journal_id integer,
+    container_title text,
+    language text,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    countries text[],
+    sources public.source_type[] DEFAULT '{}'::public.source_type[] NOT NULL,
+    meta jsonb,
+    is_retracted boolean DEFAULT false NOT NULL,
+    in_perimeter boolean DEFAULT false NOT NULL,
+    unpaywall_checked_at timestamp with time zone
+);
+
+
+--
 -- Name: source_publications; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -669,36 +726,6 @@ CREATE TABLE public.source_publications (
     CONSTRAINT source_publications_external_ids_is_object CHECK ((jsonb_typeof(external_ids) = 'object'::text)),
     CONSTRAINT source_publications_raw_metadata_is_object CHECK ((jsonb_typeof(raw_metadata) = 'object'::text))
 );
-
-
---
--- Name: staging; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.staging (
-    id integer NOT NULL,
-    source public.source_type NOT NULL,
-    source_id text NOT NULL,
-    doi text,
-    raw_data jsonb NOT NULL,
-    processed boolean DEFAULT false,
-    imported_at timestamp with time zone DEFAULT now(),
-    raw_hash text,
-    last_seen_at timestamp with time zone DEFAULT now(),
-    not_found_at timestamp with time zone,
-    disappeared_at timestamp with time zone,
-    authors_truncated boolean DEFAULT false NOT NULL,
-    entry_mode text DEFAULT 'bulk'::text NOT NULL,
-    CONSTRAINT staging_entry_mode_check CHECK ((entry_mode = ANY (ARRAY['bulk'::text, 'cross_import_doi'::text, 'cross_import_hal'::text]))),
-    CONSTRAINT staging_not_found_at_implies_processed CHECK (((not_found_at IS NULL) OR processed))
-);
-
-
---
--- Name: COLUMN staging.raw_hash; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON COLUMN public.staging.raw_hash IS 'Empreinte md5 du payload tel qu''extrait de la source bulk. Sert de clé de détection de changement à l''UPSERT (et d''empreinte d''intégrité pour le chantier DATA_raw-data-store). Cas particulier OpenAlex : `refetch_truncated` n''écrit PAS `raw_hash` quand il complète les authorships d''une publication tronquée à 100 — la ligne garde le hash du payload bulk pour que le bulk suivant ne déclenche pas de réécriture inutile. L''invariant `raw_hash = md5(raw_data)` est donc volontairement rompu sur les lignes OpenAlex refetchées.';
 
 
 --
@@ -938,20 +965,6 @@ CREATE SEQUENCE public.perimeters_id_seq
 --
 
 ALTER SEQUENCE public.perimeters_id_seq OWNED BY public.perimeters.id;
-
-
---
--- Name: person_identifier_keys; Type: MATERIALIZED VIEW; Schema: public; Owner: -
---
-
-CREATE MATERIALIZED VIEW public.person_identifier_keys AS
- SELECT DISTINCT sa.person_id,
-    k.k AS id_type,
-    (sa.person_identifiers ->> k.k) AS id_value
-   FROM (public.source_authorships sa
-     CROSS JOIN unnest(ARRAY['orcid'::text, 'idref'::text, 'hal_person_id'::text, 'idhal'::text]) k(k))
-  WHERE ((sa.person_id IS NOT NULL) AND (sa.person_identifiers ? k.k) AND ((sa.person_identifiers ->> k.k) !~~ '%_dubious'::text))
-  WITH NO DATA;
 
 
 --
@@ -1196,32 +1209,6 @@ CREATE TABLE public.publication_subjects (
 
 
 --
--- Name: publications; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.publications (
-    id integer NOT NULL,
-    title text NOT NULL,
-    title_normalized text,
-    doc_type public.doc_type DEFAULT 'other'::public.doc_type,
-    pub_year smallint NOT NULL,
-    doi text,
-    oa_status public.oa_type DEFAULT 'unknown'::public.oa_type,
-    journal_id integer,
-    container_title text,
-    language text,
-    created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now(),
-    countries text[],
-    sources public.source_type[] DEFAULT '{}'::public.source_type[] NOT NULL,
-    meta jsonb,
-    is_retracted boolean DEFAULT false NOT NULL,
-    in_perimeter boolean DEFAULT false NOT NULL,
-    unpaywall_checked_at timestamp with time zone
-);
-
-
---
 -- Name: publications_detail; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1393,6 +1380,36 @@ CREATE SEQUENCE public.source_publications_id_seq
 --
 
 ALTER SEQUENCE public.source_publications_id_seq OWNED BY public.source_publications.id;
+
+
+--
+-- Name: staging; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.staging (
+    id integer NOT NULL,
+    source public.source_type NOT NULL,
+    source_id text NOT NULL,
+    doi text,
+    raw_data jsonb NOT NULL,
+    processed boolean DEFAULT false,
+    imported_at timestamp with time zone DEFAULT now(),
+    raw_hash text,
+    last_seen_at timestamp with time zone DEFAULT now(),
+    not_found_at timestamp with time zone,
+    disappeared_at timestamp with time zone,
+    authors_truncated boolean DEFAULT false NOT NULL,
+    entry_mode text DEFAULT 'bulk'::text NOT NULL,
+    CONSTRAINT staging_entry_mode_check CHECK ((entry_mode = ANY (ARRAY['bulk'::text, 'cross_import_doi'::text, 'cross_import_hal'::text]))),
+    CONSTRAINT staging_not_found_at_implies_processed CHECK (((not_found_at IS NULL) OR processed))
+);
+
+
+--
+-- Name: COLUMN staging.raw_hash; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.staging.raw_hash IS 'Empreinte md5 du payload tel qu''extrait de la source bulk. Sert de clé de détection de changement à l''UPSERT (et d''empreinte d''intégrité pour le chantier DATA_raw-data-store). Cas particulier OpenAlex : `refetch_truncated` n''écrit PAS `raw_hash` quand il complète les authorships d''une publication tronquée à 100 — la ligne garde le hash du payload bulk pour que le bulk suivant ne déclenche pas de réécriture inutile. L''invariant `raw_hash = md5(raw_data)` est donc volontairement rompu sur les lignes OpenAlex refetchées.';
 
 
 --
@@ -1601,6 +1618,13 @@ ALTER TABLE ONLY public.audit_log ALTER COLUMN id SET DEFAULT nextval('public.au
 
 
 --
+-- Name: author_identifying_keys id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.author_identifying_keys ALTER COLUMN id SET DEFAULT nextval('public.author_identifying_keys_id_seq'::regclass);
+
+
+--
 -- Name: authorships id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -1793,6 +1817,22 @@ ALTER TABLE ONLY public.apc_payments
 
 ALTER TABLE ONLY public.audit_log
     ADD CONSTRAINT audit_log_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: author_identifying_keys author_identifying_keys_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.author_identifying_keys
+    ADD CONSTRAINT author_identifying_keys_key UNIQUE NULLS NOT DISTINCT (author_name_normalized, person_identifiers);
+
+
+--
+-- Name: author_identifying_keys author_identifying_keys_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.author_identifying_keys
+    ADD CONSTRAINT author_identifying_keys_pkey PRIMARY KEY (id);
 
 
 --
@@ -2232,6 +2272,13 @@ CREATE INDEX audit_log_event_type_idx ON public.audit_log USING btree (event_typ
 
 
 --
+-- Name: author_identifying_keys_key_hash_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX author_identifying_keys_key_hash_idx ON public.author_identifying_keys USING btree (key_hash);
+
+
+--
 -- Name: authorship_structures_pkey; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2484,20 +2531,6 @@ CREATE INDEX idx_journals_titlenorm ON public.journals USING btree (title_normal
 
 
 --
--- Name: idx_person_identifier_keys_uq; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX idx_person_identifier_keys_uq ON public.person_identifier_keys USING btree (person_id, id_type, id_value);
-
-
---
--- Name: idx_person_identifier_keys_value; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_person_identifier_keys_value ON public.person_identifier_keys USING btree (id_type, id_value);
-
-
---
 -- Name: idx_person_ids_lookup; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2704,7 +2737,14 @@ CREATE INDEX idx_sa_authorship ON public.source_authorships USING btree (authors
 -- Name: idx_sa_countries_dirty; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_sa_countries_dirty ON public.source_authorships USING btree (source_publication_id) WHERE countries_dirty;
+CREATE INDEX idx_sa_countries_dirty ON public.source_authorships USING btree (source) WHERE countries_dirty;
+
+
+--
+-- Name: idx_sa_identity; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_sa_identity ON public.source_authorships USING btree (identity_id);
 
 
 --
@@ -2718,7 +2758,7 @@ CREATE INDEX idx_sa_in_perimeter ON public.source_authorships USING btree (sourc
 -- Name: idx_sa_person; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_sa_person ON public.source_authorships USING btree (person_id) WHERE (person_id IS NOT NULL);
+CREATE INDEX idx_sa_person ON public.source_authorships USING btree (person_id, identity_id) WHERE (person_id IS NOT NULL);
 
 
 --
@@ -3241,6 +3281,14 @@ ALTER TABLE ONLY public.source_authorships
 
 
 --
+-- Name: source_authorships source_authorships_identity_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.source_authorships
+    ADD CONSTRAINT source_authorships_identity_id_fkey FOREIGN KEY (identity_id) REFERENCES public.author_identifying_keys(id);
+
+
+--
 -- Name: source_authorships source_authorships_person_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3308,5 +3356,5 @@ ALTER TABLE ONLY public.structure_relations
 -- PostgreSQL database dump complete
 --
 
-\unrestrict ALMUiivFWmqqyLZhjhGfj0i33krMKxFusImiW1b1q9MEHxg79qmbNx1jZsVB9ZQ
+\unrestrict cgSQF9jUFyfyCDOWYFyJ7huwFKFjU3Jx7AarRIXOGl9h3o0L9orAhkUuBrOz4vu
 

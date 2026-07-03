@@ -363,8 +363,8 @@ def insert_openalex_document(
 # OPENALEX AUTHORS — identifiants sur source_authorships
 # =============================================================
 # Les entités auteurs OA sont algorithmiques et non fiables, on garde
-# uniquement l'ORCID quand présent, directement sur
-# source_authorships.person_identifiers.
+# uniquement l'ORCID quand présent, sur l'identité de la signature
+# (author_identifying_keys.person_identifiers).
 
 
 def _extract_openalex_orcid(authorship: dict) -> str | None:

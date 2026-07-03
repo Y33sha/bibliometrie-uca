@@ -3,6 +3,7 @@
 from sqlalchemy import text
 
 from infrastructure.repositories.address_linker import PgAddressLinker, recompute_pub_count
+from tests.integration.helpers.authorships import upsert_identity
 
 
 def _create_authorship_stub(conn):
@@ -24,10 +25,10 @@ def _create_authorship_stub(conn):
     return conn.execute(
         text("""
             INSERT INTO source_authorships
-                (source, source_publication_id, author_position)
-            VALUES ('hal', :sd_id, 0) RETURNING id
+                (source, source_publication_id, author_position, identity_id)
+            VALUES ('hal', :sd_id, 0, :iid) RETURNING id
         """),
-        {"sd_id": sd_id},
+        {"sd_id": sd_id, "iid": upsert_identity(conn)},
     ).scalar_one()
 
 
@@ -124,10 +125,10 @@ def _sa_for_pub(conn, pub_id, source_id):
     ).scalar_one()
     return conn.execute(
         text(
-            "INSERT INTO source_authorships (source, source_publication_id, author_position) "
-            "VALUES ('hal', :sd_id, 0) RETURNING id"
+            "INSERT INTO source_authorships (source, source_publication_id, author_position, identity_id) "
+            "VALUES ('hal', :sd_id, 0, :iid) RETURNING id"
         ),
-        {"sd_id": sd_id},
+        {"sd_id": sd_id, "iid": upsert_identity(conn)},
     ).scalar_one()
 
 
@@ -178,10 +179,10 @@ class TestRecomputePubCount:
         ).scalar_one()
         sa_id = sa_sync_conn.execute(
             text(
-                "INSERT INTO source_authorships (source, source_publication_id, author_position) "
-                "VALUES ('hal', :sd, 0) RETURNING id"
+                "INSERT INTO source_authorships (source, source_publication_id, author_position, identity_id) "
+                "VALUES ('hal', :sd, 0, :iid) RETURNING id"
             ),
-            {"sd": sd_id},
+            {"sd": sd_id, "iid": upsert_identity(sa_sync_conn)},
         ).scalar_one()
         PgAddressLinker().link(sa_sync_conn, sa_id, ["Orphan Address"])
 

@@ -192,8 +192,9 @@ def _create_source_authorship(conn, source, sd_id, position, *, in_perimeter, au
     row = conn.execute(
         text("""
             INSERT INTO source_authorships
-                (source, source_publication_id, author_position, in_perimeter, authorship_id)
-            VALUES (:src, :sd, :pos, :inp, :aid) RETURNING id
+                (source, source_publication_id, author_position, in_perimeter, authorship_id,
+                 identity_id)
+            VALUES (:src, :sd, :pos, :inp, :aid, :iid) RETURNING id
         """),
         {
             "src": source,
@@ -201,6 +202,7 @@ def _create_source_authorship(conn, source, sd_id, position, *, in_perimeter, au
             "pos": position,
             "inp": in_perimeter,
             "aid": authorship_id,
+            "iid": upsert_identity(conn),
         },
     ).one()
     return row.id

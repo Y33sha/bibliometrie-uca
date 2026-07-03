@@ -80,7 +80,7 @@ def person_profile(conn: Connection, person_id: int) -> dict[str, Any] | None:
     oa_authors = [dict(r._mapping) for r in oa_rows]
 
     # WoS : group by raw_author_name comme OpenAlex. ORCID lu depuis
-    # source_authorships.person_identifiers.
+    # l'identité de la signature (`author_identifying_keys.person_identifiers`).
     wos_rows = conn.execute(
         text("""
             SELECT MIN(sa.id) AS id,

@@ -135,9 +135,8 @@ _UPDATE_SQL = (
 
 
 def _identifier_dict(orphan_identifiers: dict | None) -> dict[str, JsonValue]:
-    """Adapte le jsonb `source_authorships.person_identifiers` au format
-    dict attendu par `add_identifiers_from_authorships` (clé `id_type` =
-    valeur)."""
+    """Adapte le jsonb `person_identifiers` de l'identité au format dict
+    attendu par `add_identifiers_from_authorships` (clé `id_type` = valeur)."""
     if not orphan_identifiers:
         return {}
     return {

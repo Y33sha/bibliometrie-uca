@@ -12,6 +12,7 @@ from infrastructure.queries.pipeline.countries import (
     refresh_sa_countries,
     write_countries,
 )
+from tests.integration.helpers.authorships import upsert_identity
 
 
 def _create_pub(conn, title="X"):
@@ -35,13 +36,14 @@ def _create_sd(conn, pub_id, source, source_id, countries=None):
 
 
 def _create_sa(conn, sd_id, source, author_position=0):
+    identity_id = upsert_identity(conn)
     return conn.execute(
         text("""
             INSERT INTO source_authorships
-                (source, source_publication_id, author_position)
-            VALUES (:source, :sd, :pos) RETURNING id
+                (source, source_publication_id, author_position, identity_id)
+            VALUES (:source, :sd, :pos, :iid) RETURNING id
         """),
-        {"source": source, "sd": sd_id, "pos": author_position},
+        {"source": source, "sd": sd_id, "pos": author_position, "iid": identity_id},
     ).scalar_one()
 
 
