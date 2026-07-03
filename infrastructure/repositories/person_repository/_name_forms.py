@@ -109,8 +109,9 @@ def delete_orphan_name_forms_for_person(conn: Connection, person_id: int) -> int
               AND NOT ('persons' = ANY(pnf.sources))
               AND NOT EXISTS (
                   SELECT 1 FROM source_authorships sa
+                  JOIN author_identifying_keys aik ON aik.id = sa.identity_id
                   WHERE sa.person_id = :pid
-                    AND sa.author_name_normalized = pnf.name_form
+                    AND aik.author_name_normalized = pnf.name_form
                     AND sa.source IN {AUTHOR_SOURCES_SQL}
               )
         """),

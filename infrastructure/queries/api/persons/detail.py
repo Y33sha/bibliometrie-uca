@@ -48,16 +48,17 @@ def person_profile(conn: Connection, person_id: int) -> dict[str, Any] | None:
             SELECT MIN(sa.id) AS id,
                    'hal' AS source,
                    MIN(sa.raw_author_name) AS full_name,
-                   MIN(sa.person_identifiers->>'orcid') AS orcid,
-                   MIN(sa.person_identifiers->>'idhal') AS idhal,
-                   (sa.person_identifiers->>'hal_person_id')::int AS hal_person_id,
+                   MIN(aik.person_identifiers->>'orcid') AS orcid,
+                   MIN(aik.person_identifiers->>'idhal') AS idhal,
+                   (aik.person_identifiers->>'hal_person_id')::int AS hal_person_id,
                    NULL::text AS openalex_id,
                    COUNT(*) FILTER (WHERE sa.in_perimeter = TRUE) AS uca_pub_count
             FROM source_authorships sa
+            JOIN author_identifying_keys aik ON aik.id = sa.identity_id
             WHERE sa.source = 'hal'
               AND sa.person_id = :pid
-              AND sa.person_identifiers->>'hal_person_id' IS NOT NULL
-            GROUP BY sa.person_identifiers->>'hal_person_id'
+              AND aik.person_identifiers->>'hal_person_id' IS NOT NULL
+            GROUP BY aik.person_identifiers->>'hal_person_id'
         """),
         {"pid": person_id},
     ).all()
@@ -85,10 +86,11 @@ def person_profile(conn: Connection, person_id: int) -> dict[str, Any] | None:
             SELECT MIN(sa.id) AS id,
                    sa.raw_author_name AS full_name,
                    'wos' AS source,
-                   MAX(sa.person_identifiers->>'orcid') AS orcid,
+                   MAX(aik.person_identifiers->>'orcid') AS orcid,
                    NULL::text AS idhal, NULL::text AS openalex_id,
                    COUNT(*) FILTER (WHERE sa.in_perimeter = TRUE) AS uca_pub_count
             FROM source_authorships sa
+            JOIN author_identifying_keys aik ON aik.id = sa.identity_id
             WHERE sa.source = 'wos' AND sa.person_id = :pid
             GROUP BY sa.raw_author_name
         """),

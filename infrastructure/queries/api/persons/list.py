@@ -278,9 +278,10 @@ def _attach_identifiers_and_name_forms(
                        'pub_count', (
                            SELECT COUNT(DISTINCT sd.publication_id)
                            FROM source_authorships sa
+                           JOIN author_identifying_keys aik ON aik.id = sa.identity_id
                            JOIN source_publications sd ON sd.id = sa.source_publication_id
                            WHERE sa.person_id = pnf.person_id
-                             AND sa.author_name_normalized = pnf.name_form
+                             AND aik.author_name_normalized = pnf.name_form
                              AND sa.source IN {AUTHOR_SOURCES_SQL}
                        )
                    ) ORDER BY pnf.name_form) AS name_forms

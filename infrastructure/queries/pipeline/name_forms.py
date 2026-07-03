@@ -97,12 +97,13 @@ def sync_from_raw_forms(conn: Connection) -> tuple[int, int, int]:
                 FROM _raw_forms
                 WHERE trim(raw_text) != ''
                 UNION
-                SELECT sa.author_name_normalized AS name_form,
+                SELECT aik.author_name_normalized AS name_form,
                        sa.person_id, sa.source::text AS source
                 FROM source_authorships sa
+                JOIN author_identifying_keys aik ON aik.id = sa.identity_id
                 WHERE sa.person_id IS NOT NULL
-                  AND sa.author_name_normalized IS NOT NULL
-                  AND sa.author_name_normalized != ''
+                  AND aik.author_name_normalized IS NOT NULL
+                  AND aik.author_name_normalized != ''
             )
             SELECT name_form, person_id,
                    array_agg(DISTINCT source ORDER BY source) AS sources

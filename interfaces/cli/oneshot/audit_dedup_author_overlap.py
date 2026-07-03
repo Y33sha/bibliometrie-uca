@@ -23,10 +23,12 @@ _DOI_SQL = text("""
         GROUP BY doi HAVING count(*) = 2
     )
     SELECT sp.doi AS grp, sp.source::text AS source,
-           array_remove(array_agg(sa.author_name_normalized), NULL) AS authors
+           array_remove(array_agg(aik.author_name_normalized), NULL) AS authors
     FROM source_publications sp JOIN g ON g.doi = sp.doi
     LEFT JOIN source_authorships sa
-        ON sa.source_publication_id = sp.id AND sa.author_name_normalized <> ''
+        ON sa.source_publication_id = sp.id
+    LEFT JOIN author_identifying_keys aik
+        ON aik.id = sa.identity_id AND aik.author_name_normalized <> ''
     GROUP BY sp.doi, sp.id, sp.source
 """)
 
@@ -39,10 +41,12 @@ _MD_SQL = text("""
     )
     SELECT (sp.doc_type || '|' || sp.title_normalized || '|' || sp.pub_year) AS grp,
            sp.source::text AS source,
-           array_remove(array_agg(sa.author_name_normalized), NULL) AS authors
+           array_remove(array_agg(aik.author_name_normalized), NULL) AS authors
     FROM source_publications sp JOIN g USING (doc_type, title_normalized, pub_year)
     LEFT JOIN source_authorships sa
-        ON sa.source_publication_id = sp.id AND sa.author_name_normalized <> ''
+        ON sa.source_publication_id = sp.id
+    LEFT JOIN author_identifying_keys aik
+        ON aik.id = sa.identity_id AND aik.author_name_normalized <> ''
     WHERE sp.doi IS NULL
     GROUP BY sp.doc_type, sp.title_normalized, sp.pub_year, sp.id, sp.source
 """)

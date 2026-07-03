@@ -20,7 +20,7 @@ def fetch_unlinked_authorships(conn: Connection) -> list[BareUnlinkedAuthorship]
 
     Colonnes :
 
-    - `orcid`, `hal_person_id`, `idref` : lus directement depuis `person_identifiers` (JSONB), sans filtre par source. `hal_person_id` n'est porté que par les authorships HAL. La restriction de l'ORCID aux sources fiables (cf. `ORCID_MATCH_SOURCES`) est appliquée côté cascade de matching, pas ici.
+    - `orcid`, `hal_person_id`, `idref` : lus sur les identifiants de l'identité (`author_identifying_keys`, jointe par `identity_id`), sans filtre par source. `hal_person_id` n'est porté que par les authorships HAL. La restriction de l'ORCID aux sources fiables (cf. `ORCID_MATCH_SOURCES`) est appliquée côté cascade de matching, pas ici.
     - `roles` : remonté tel quel ; en pratique non vide uniquement pour theses (distingue auteur vs directeur).
 
     Le nom (last/first) est parsé côté caller via `parse_raw_author_name(full_name)`.
@@ -32,15 +32,16 @@ def fetch_unlinked_authorships(conn: Connection) -> list[BareUnlinkedAuthorship]
             SELECT sa_auth.id AS authorship_id,
                    sa_auth.source::text AS source,
                    sa_auth.raw_author_name AS full_name,
-                   sa_auth.author_name_normalized,
-                   sa_auth.person_identifiers->>'orcid' AS orcid,
-                   sa_auth.person_identifiers->>'hal_person_id' AS hal_person_id,
-                   sa_auth.person_identifiers->>'idref' AS idref,
+                   aik.author_name_normalized,
+                   aik.person_identifiers->>'orcid' AS orcid,
+                   aik.person_identifiers->>'hal_person_id' AS hal_person_id,
+                   aik.person_identifiers->>'idref' AS idref,
                    sa_auth.roles,
                    sd.publication_id,
                    sa_auth.author_position,
                    TRUE AS in_perimeter
             FROM source_authorships sa_auth
+            JOIN author_identifying_keys aik ON aik.id = sa_auth.identity_id
             JOIN source_publications sd ON sd.id = sa_auth.source_publication_id
             JOIN publications pub ON pub.id = sd.publication_id
             WHERE sa_auth.person_id IS NULL
@@ -74,10 +75,10 @@ _OOP_PROJECTION = """
     sa_auth.id AS authorship_id,
     sa_auth.source::text AS source,
     sa_auth.raw_author_name AS full_name,
-    sa_auth.author_name_normalized,
-    sa_auth.person_identifiers->>'orcid' AS orcid,
-    sa_auth.person_identifiers->>'hal_person_id' AS hal_person_id,
-    sa_auth.person_identifiers->>'idref' AS idref,
+    aik.author_name_normalized,
+    aik.person_identifiers->>'orcid' AS orcid,
+    aik.person_identifiers->>'hal_person_id' AS hal_person_id,
+    aik.person_identifiers->>'idref' AS idref,
     sa_auth.roles,
     sd.publication_id,
     sa_auth.author_position,
@@ -99,24 +100,25 @@ def _oop_identifier_branch(id_type: str, *, source_filter: str = "") -> str:
     """Branche « identifiant-ancré » : SA hors-périmètre dont l'identifiant
     `id_type` (jsonb) est déjà porté par une personne connue (non rejetée).
 
-    Jointure `person_identifiers` ↔ `source_authorships` sur la valeur jsonb.
-    Pas d'index d'expression : le planner ne sait pas sonder par valeur sur un
-    jsonb (testé : JOIN / `= ANY` / LATERAL aboutissent tous à un seq scan des
-    SA orphelines), il scanne donc l'espace orphelin. Coût assumé (cf. fiche
-    `METIER_authorships-cross-source-matching`) en attendant la refonte ER
-    set-based. `person_identifiers ? '{id_type}'` et la restriction de source
-    ORCID sont des filtres de correction, pas d'optimisation.
+    Le rapprochement par valeur jsonb (`->>'{id_type}' = pi.id_value`) se fait
+    sur `author_identifying_keys` (~645 k identités) et non plus sur les 19 M
+    signatures : la valeur jsonb reste non indexable, mais scannée sur la table
+    d'identités, 25× plus petite. On rejoint ensuite les signatures par
+    `identity_id` (index `idx_sa_identity`). `person_identifiers ? '{id_type}'`
+    et la restriction de source ORCID sont des filtres de correction, pas
+    d'optimisation.
     """
     return f"""
         SELECT {_OOP_PROJECTION}
         FROM person_identifiers pi
-        JOIN source_authorships sa_auth
-            ON sa_auth.person_identifiers->>'{id_type}' = pi.id_value
+        JOIN author_identifying_keys aik
+            ON aik.person_identifiers->>'{id_type}' = pi.id_value
+        JOIN source_authorships sa_auth ON sa_auth.identity_id = aik.id
         JOIN source_publications sd ON sd.id = sa_auth.source_publication_id
         JOIN publications pub ON pub.id = sd.publication_id
         WHERE pi.id_type = '{id_type}'
           AND pi.status <> 'rejected'
-          AND sa_auth.person_identifiers ? '{id_type}'
+          AND aik.person_identifiers ? '{id_type}'
           {source_filter}
           AND {_OOP_COMMON_WHERE}
     """
@@ -137,6 +139,7 @@ _OOP_CROSS_SOURCE_BRANCH = f"""
     JOIN source_authorships sa_auth
         ON sa_auth.source_publication_id = sd.id
        AND sa_auth.author_position = linked.author_position
+    JOIN author_identifying_keys aik ON aik.id = sa_auth.identity_id
     JOIN publications pub ON pub.id = sd.publication_id
     WHERE linked.person_id IS NOT NULL
       AND linked.author_position IS NOT NULL

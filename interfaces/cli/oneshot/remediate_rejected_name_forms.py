@@ -33,9 +33,10 @@ log = setup_logger("remediate_rejected_name_forms", os.path.dirname(__file__))
 
 _NULL_SQL = text("""
     UPDATE source_authorships sa SET person_id = NULL
-    FROM person_name_forms pnf
-    WHERE pnf.person_id = sa.person_id
-      AND pnf.name_form = sa.author_name_normalized
+    FROM person_name_forms pnf, author_identifying_keys aik
+    WHERE aik.id = sa.identity_id
+      AND pnf.person_id = sa.person_id
+      AND pnf.name_form = aik.author_name_normalized
       AND pnf.status = 'rejected'
 """)
 
@@ -67,9 +68,10 @@ def main() -> int:
         n_sa = conn.execute(
             text("""
                 SELECT count(*) FROM source_authorships sa
+                JOIN author_identifying_keys aik ON aik.id = sa.identity_id
                 JOIN person_name_forms pnf
                   ON pnf.person_id = sa.person_id
-                 AND pnf.name_form = sa.author_name_normalized
+                 AND pnf.name_form = aik.author_name_normalized
                  AND pnf.status = 'rejected'
             """)
         ).scalar_one()
