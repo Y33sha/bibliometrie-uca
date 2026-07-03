@@ -823,7 +823,6 @@ def phase_persons(**kw: Any) -> PhaseMetrics:
     """
     metrics = _run_create_persons()
     _run_populate_person_name_forms()
-    _run_refresh_person_identifier_keys()
     return metrics
 
 
@@ -1178,21 +1177,6 @@ def _run_populate_affiliations() -> PhaseMetrics:
     metrics = PhaseMetrics()
     metrics.details["table"] = {"rows": rows}
     return metrics
-
-
-def _run_refresh_person_identifier_keys() -> None:
-    """Rafraîchit la matview `person_identifier_keys` (substrat de la file « conflits
-    d'identifiant » du hub admin). En CONCURRENTLY (index unique sur la clé) : pas de verrou
-    exclusif. Hors transaction, donc connexion en autocommit."""
-    from sqlalchemy import text
-
-    from infrastructure.db.engine import get_sync_engine
-
-    log.info("▶ refresh person_identifier_keys")
-    t0 = time.time()
-    with get_sync_engine().connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
-        conn.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY person_identifier_keys"))
-    log.info("✓ person_identifier_keys rafraîchie en %.1fs", time.time() - t0)
 
 
 def _run_populate_person_name_forms() -> None:
