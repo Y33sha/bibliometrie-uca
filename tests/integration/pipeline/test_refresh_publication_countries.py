@@ -16,6 +16,7 @@ from sqlalchemy import text
 
 from application.pipeline.countries.refresh_publication_countries import refresh
 from infrastructure.queries.pipeline.countries import PgCountryQueries
+from tests.integration.helpers.authorships import upsert_identity
 
 
 def _insert_publication(conn, title: str = "Test pub", year: int = 2024) -> int:
@@ -48,12 +49,16 @@ def _insert_source_authorship(
     position: int = 0,
     countries: list[str] | None = None,
 ) -> int:
+    normalized = conn.execute(
+        text("SELECT normalize_name_form(:name)"), {"name": raw_author_name}
+    ).scalar_one()
+    identity_id = upsert_identity(conn, author_name_normalized=normalized)
     return conn.execute(
         text("""
             INSERT INTO source_authorships
                 (source, source_publication_id, author_position, in_perimeter,
-                 raw_author_name, author_name_normalized, countries)
-            VALUES (:src, :sp, :pos, TRUE, :name, normalize_name_form(:name), :countries)
+                 raw_author_name, identity_id, countries)
+            VALUES (:src, :sp, :pos, TRUE, :name, :iid, :countries)
             RETURNING id
         """),
         {
@@ -61,6 +66,7 @@ def _insert_source_authorship(
             "sp": source_publication_id,
             "pos": position,
             "name": raw_author_name,
+            "iid": identity_id,
             "countries": countries,
         },
     ).scalar_one()

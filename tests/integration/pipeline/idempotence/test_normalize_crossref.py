@@ -191,10 +191,11 @@ class TestNormalizeCrossrefIdempotence:
 
         rows = sa_sync_conn.execute(
             text("""
-                SELECT raw_author_name, person_identifiers
-                FROM source_authorships
-                WHERE source = 'crossref'
-                ORDER BY author_position
+                SELECT sa.raw_author_name, aik.person_identifiers
+                FROM source_authorships sa
+                JOIN author_identifying_keys aik ON aik.id = sa.identity_id
+                WHERE sa.source = 'crossref'
+                ORDER BY sa.author_position
             """)
         ).all()
         assert len(rows) == 2

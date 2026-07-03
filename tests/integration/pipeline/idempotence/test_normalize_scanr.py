@@ -248,18 +248,20 @@ class TestNormalizeScanrIdempotence:
 
         cnt = sa_sync_conn.execute(
             text(
-                "SELECT count(*) AS cnt FROM source_authorships "
-                "WHERE source = 'scanr' AND person_identifiers->>'idref' = '000000001'"
+                "SELECT count(*) AS cnt FROM source_authorships sa "
+                "JOIN author_identifying_keys aik ON aik.id = sa.identity_id "
+                "WHERE sa.source = 'scanr' AND aik.person_identifiers->>'idref' = '000000001'"
             )
         ).scalar_one()
         assert cnt == 2, "Alice devrait avoir 2 authorships (article + chapitre)"
 
     def test_author_without_idref(self, sa_sync_conn):
-        """Un auteur sans idref : authorship sans clé `idref` dans person_identifiers.
+        """Un auteur sans idref : son identité ne porte pas de clé `idref`.
 
-        Charlie Noid et Diana Durand n'ont pas d'idref ; ils apparaissent
-        dans `source_authorships` sans `idref` dans `person_identifiers`.
-        L'identité sera reconstruite au pipeline `personnes` via les name_forms.
+        Charlie Noid et Diana Durand n'ont pas d'idref ; leur signature pointe
+        vers une identité (`author_identifying_keys`) sans `idref` dans
+        `person_identifiers`. La personne sera reconstruite au pipeline
+        `personnes` via les name_forms.
         """
         from sqlalchemy import text
 
@@ -268,10 +270,11 @@ class TestNormalizeScanrIdempotence:
 
         cnt = sa_sync_conn.execute(
             text("""
-                SELECT count(*) AS cnt FROM source_authorships
-                WHERE source = 'scanr'
-                  AND (person_identifiers->>'idref') IS NULL
-                  AND raw_author_name IN ('Charlie Noid', 'Diana Durand')
+                SELECT count(*) AS cnt FROM source_authorships sa
+                JOIN author_identifying_keys aik ON aik.id = sa.identity_id
+                WHERE sa.source = 'scanr'
+                  AND (aik.person_identifiers->>'idref') IS NULL
+                  AND sa.raw_author_name IN ('Charlie Noid', 'Diana Durand')
             """)
         ).scalar_one()
         assert cnt == 2

@@ -1,7 +1,5 @@
 """Tests d'intégration pour `infrastructure.queries.api.persons.admin`."""
 
-import json
-
 from sqlalchemy import text
 
 from infrastructure.queries.api.persons.admin import (
@@ -16,6 +14,7 @@ from infrastructure.queries.api.persons.admin import (
     orphan_authorships_count,
     person_exists,
 )
+from tests.integration.helpers.authorships import upsert_identity
 
 
 def _create_authorship(conn, pub_id, person_id):
@@ -74,13 +73,14 @@ def _create_sa(
     raw_author_name="X",
     roles=None,
 ):
+    identity_id = upsert_identity(conn, author_name_normalized=author_name_normalized)
     row = conn.execute(
         text("""
             INSERT INTO source_authorships
                 (source, source_publication_id, author_position,
-                 person_id, in_perimeter, author_name_normalized, raw_author_name,
+                 person_id, in_perimeter, identity_id, raw_author_name,
                  roles)
-            VALUES (:src, :sd, :pos, :pid, :inp, :anf, :raw,
+            VALUES (:src, :sd, :pos, :pid, :inp, :iid, :raw,
                     COALESCE(:roles, ARRAY['author']::text[]))
             RETURNING id
         """),
@@ -90,7 +90,7 @@ def _create_sa(
             "pos": author_position,
             "pid": person_id,
             "inp": in_perimeter,
-            "anf": author_name_normalized,
+            "iid": identity_id,
             "raw": raw_author_name,
             "roles": roles,
         },
@@ -199,20 +199,24 @@ class TestNameFormAuthorships:
 
 
 def _sa_with_identifiers(conn, sd, position, person_id, identifiers):
+    """Signature portant `identifiers` : l'identité (nom normalisé absent + identifiants) est
+    upsertée dans `author_identifying_keys`, la signature la référence par `identity_id`."""
+    identity_id = upsert_identity(conn, person_identifiers=identifiers)
     conn.execute(
         text("""
             INSERT INTO source_authorships
                 (source, source_publication_id, author_position, person_id,
-                 raw_author_name, person_identifiers)
-            VALUES ('hal', :sd, :pos, :pid, 'X', CAST(:ids AS jsonb))
+                 raw_author_name, identity_id)
+            VALUES ('hal', :sd, :pos, :pid, 'X', :iid)
         """),
-        {"sd": sd, "pos": position, "pid": person_id, "ids": json.dumps(identifiers)},
+        {"sd": sd, "pos": position, "pid": person_id, "iid": identity_id},
     )
 
 
 class TestIdentifierConflicts:
-    """La détection lit la matview `person_identifier_keys` : on la rafraîchit (non concurrent,
-    donc transactionnel) après le seed, dans la transaction rollbackée du fixture."""
+    """La détection projette `(person_id, id_type, id_value)` à la volée depuis
+    `source_authorships` ⋈ `author_identifying_keys` : rien à rafraîchir, la lecture voit
+    directement le seed de la transaction rollbackée du fixture."""
 
     def test_pair_sharing_orcid(self, sa_sync_conn):
         p1 = _create_person(sa_sync_conn, last="Smith", first="John")
@@ -220,7 +224,6 @@ class TestIdentifierConflicts:
         sd = _create_sd(sa_sync_conn, _create_pub(sa_sync_conn))
         _sa_with_identifiers(sa_sync_conn, sd, 0, p1, {"orcid": "0000-0001-2345-6789"})
         _sa_with_identifiers(sa_sync_conn, sd, 1, p2, {"orcid": "0000-0001-2345-6789"})
-        sa_sync_conn.execute(text("REFRESH MATERIALIZED VIEW person_identifier_keys"))
 
         assert identifier_conflicts_count(sa_sync_conn) == 1
         res = identifier_conflicts(sa_sync_conn, page=1, per_page=50)
@@ -237,7 +240,6 @@ class TestIdentifierConflicts:
         sd = _create_sd(sa_sync_conn, _create_pub(sa_sync_conn))
         _sa_with_identifiers(sa_sync_conn, sd, 0, p1, {"orcid": "0000-0009-9999-9999_dubious"})
         _sa_with_identifiers(sa_sync_conn, sd, 1, p2, {"orcid": "0000-0009-9999-9999_dubious"})
-        sa_sync_conn.execute(text("REFRESH MATERIALIZED VIEW person_identifier_keys"))
 
         assert identifier_conflicts_count(sa_sync_conn) == 0
 

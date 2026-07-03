@@ -41,14 +41,30 @@ def _uniq(prefix: str) -> str:
     return f"{prefix}_{uuid.uuid4().hex[:8]}"
 
 
+def _upsert_identity(cur, raw_author_name: str) -> int:
+    """Upsert de l'identité (nom normalisé `lower(raw)`, sans identifiants) et
+    renvoi de son id, sur le curseur psycopg du seed."""
+    cur.execute(
+        "INSERT INTO author_identifying_keys (author_name_normalized, person_identifiers) "
+        "VALUES (lower(%s), NULL) ON CONFLICT DO NOTHING",
+        (raw_author_name,),
+    )
+    cur.execute(
+        "SELECT id FROM author_identifying_keys "
+        "WHERE author_name_normalized IS NOT DISTINCT FROM lower(%s) AND person_identifiers IS NULL",
+        (raw_author_name,),
+    )
+    return cur.fetchone()["id"]
+
+
 @pytest.fixture(scope="module", autouse=True)
 def _cleanup_after_module():
     """Truncate à la fin pour ne pas polluer les suites suivantes."""
     yield
     with _pool() as cur:
         cur.execute(
-            "TRUNCATE TABLE authorships, source_authorships, source_publications, "
-            "publications, persons, audit_log RESTART IDENTITY CASCADE"
+            "TRUNCATE TABLE authorships, source_authorships, author_identifying_keys, "
+            "source_publications, publications, persons, audit_log RESTART IDENTITY CASCADE"
         )
 
 
@@ -101,11 +117,12 @@ def _seed_source_authorship(
 ) -> int:
     sp = source_pub_id or _seed_source_publication(source=source)
     with _pool() as cur:
+        iid = _upsert_identity(cur, raw_author_name)
         cur.execute(
             "INSERT INTO source_authorships (source, source_publication_id, author_position, "
-            "person_id, in_perimeter, raw_author_name, author_name_normalized) "
-            "VALUES (%s, %s, 0, %s, true, %s, lower(%s)) RETURNING id",
-            (source, sp, person_id, raw_author_name, raw_author_name),
+            "person_id, in_perimeter, raw_author_name, identity_id) "
+            "VALUES (%s, %s, 0, %s, true, %s, %s) RETURNING id",
+            (source, sp, person_id, raw_author_name, iid),
         )
         return cur.fetchone()["id"]
 
@@ -121,11 +138,12 @@ def _seed_orphan_authorship(raw_author_name: str) -> int:
         )
         sp_id = cur.fetchone()["id"]
     with _pool() as cur:
+        iid = _upsert_identity(cur, raw_author_name)
         cur.execute(
             "INSERT INTO source_authorships (source, source_publication_id, author_position, "
-            "person_id, in_perimeter, raw_author_name, author_name_normalized) "
-            "VALUES ('hal', %s, 0, NULL, TRUE, %s, lower(%s)) RETURNING id",
-            (sp_id, raw_author_name, raw_author_name),
+            "person_id, in_perimeter, raw_author_name, identity_id) "
+            "VALUES ('hal', %s, 0, NULL, TRUE, %s, %s) RETURNING id",
+            (sp_id, raw_author_name, iid),
         )
         return cur.fetchone()["id"]
 

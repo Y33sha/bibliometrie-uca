@@ -38,6 +38,7 @@ from infrastructure.repositories import (
     authorship_repository,
     person_repository,
 )
+from tests.integration.helpers.authorships import upsert_identity
 
 
 @pytest.fixture
@@ -90,19 +91,19 @@ def _insert_source_authorship(
     person_id=None,
     author_name_normalized="jean dupont",
 ):
+    identity_id = upsert_identity(conn, author_name_normalized=author_name_normalized)
     return conn.execute(
         text(
             "INSERT INTO source_authorships (source, source_publication_id, "
-            "                                author_position, person_id, "
-            "                                author_name_normalized) "
-            "VALUES (:s, :spid, :pos, :pid, :anf) RETURNING id"
+            "                                author_position, person_id, identity_id) "
+            "VALUES (:s, :spid, :pos, :pid, :iid) RETURNING id"
         ),
         {
             "s": source,
             "spid": source_publication_id,
             "pos": author_position,
             "pid": person_id,
-            "anf": author_name_normalized,
+            "iid": identity_id,
         },
     ).scalar_one()
 

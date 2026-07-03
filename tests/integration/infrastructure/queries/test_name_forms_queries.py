@@ -9,6 +9,7 @@ from infrastructure.queries.pipeline.name_forms import (
     insert_raw_forms_batch,
     sync_from_raw_forms,
 )
+from tests.integration.helpers.authorships import upsert_identity
 
 
 def _create_person(conn, last="Dupont", first="Jean", rejected=False):
@@ -41,19 +42,20 @@ def _create_sa(
     author_name_normalized=None,
     source="hal",
 ):
+    identity_id = upsert_identity(conn, author_name_normalized=author_name_normalized)
     return conn.execute(
         text("""
             INSERT INTO source_authorships
                 (source, source_publication_id, author_position,
-                 person_id, author_name_normalized)
-            VALUES (:source, :sd, :pos, :person_id, :anf) RETURNING id
+                 person_id, identity_id)
+            VALUES (:source, :sd, :pos, :person_id, :iid) RETURNING id
         """),
         {
             "source": source,
             "sd": sd,
             "pos": author_position,
             "person_id": person_id,
-            "anf": author_name_normalized,
+            "iid": identity_id,
         },
     ).scalar_one()
 

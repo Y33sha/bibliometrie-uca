@@ -12,6 +12,8 @@ def _setup_affiliations_test_data(conn):
     """
     from sqlalchemy import text
 
+    from tests.integration.helpers.authorships import upsert_identity
+
     conn.execute(
         text("""
             INSERT INTO config (key, value) VALUES
@@ -60,22 +62,25 @@ def _setup_affiliations_test_data(conn):
         """)
     )
 
+    alice = upsert_identity(conn, "alice dupont")
     conn.execute(
         text("""
             INSERT INTO source_authorships
                 (id, source, source_publication_id, author_position,
-                 in_perimeter, author_name_normalized)
-            VALUES (80001, 'hal', 80001, 0, FALSE, 'alice dupont')
-        """)
+                 in_perimeter, identity_id)
+            VALUES (80001, 'hal', 80001, 0, FALSE, :iid)
+        """),
+        {"iid": alice},
     )
 
     conn.execute(
         text("""
             INSERT INTO source_authorships
                 (id, source, source_publication_id, author_position,
-                 in_perimeter, author_name_normalized)
-            VALUES (80002, 'openalex', 80002, 0, FALSE, 'alice dupont')
-        """)
+                 in_perimeter, identity_id)
+            VALUES (80002, 'openalex', 80002, 0, FALSE, :iid)
+        """),
+        {"iid": alice},
     )
 
     conn.execute(
@@ -227,13 +232,17 @@ class TestPopulateAffiliationsTheses:
                 VALUES (80003, 'theses', '2024UCFA0001', 'Thèse Test', 2024, 'thesis', 80001)
             """)
         )
+        from tests.integration.helpers.authorships import upsert_identity
+
+        alice = upsert_identity(sa_sync_conn, "alice dupont")
         sa_sync_conn.execute(
             text("""
                 INSERT INTO source_authorships
                     (id, source, source_publication_id, author_position,
-                     in_perimeter, author_name_normalized, roles)
-                VALUES (80003, 'theses', 80003, 0, FALSE, 'alice dupont', ARRAY['author'])
-            """)
+                     in_perimeter, identity_id, roles)
+                VALUES (80003, 'theses', 80003, 0, FALSE, :iid, ARRAY['author'])
+            """),
+            {"iid": alice},
         )
         sa_sync_conn.execute(
             text("""
