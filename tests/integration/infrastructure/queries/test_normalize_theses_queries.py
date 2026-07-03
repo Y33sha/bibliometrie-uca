@@ -113,6 +113,7 @@ class TestUpsertThesesSourceAuthorship:
             author_position=0,
             roles=["author"],
             raw_author_name="A",
+            author_name_normalized="a",
             person_identifiers=None,
         )
         sa_2 = upsert_theses_source_authorship(
@@ -121,6 +122,7 @@ class TestUpsertThesesSourceAuthorship:
             author_position=0,
             roles=["author", "thesis_director"],
             raw_author_name="A",
+            author_name_normalized="a",
             person_identifiers=None,
         )
         assert sa_1 == sa_2

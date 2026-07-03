@@ -18,13 +18,13 @@ Périmètre des scénarios :
 
 import logging
 
-from sqlalchemy import bindparam, text
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import text
 
 from application.persons.core import add_name_form, create_person
 from application.pipeline.persons.create_persons_from_source_authorships import run
 from infrastructure.queries.pipeline.persons_create import PgPersonsCreateQueries
 from infrastructure.repositories import person_repository
+from tests.integration.helpers.authorships import upsert_identity
 
 _queries = PgPersonsCreateQueries()
 _logger = logging.getLogger("test")
@@ -107,22 +107,24 @@ def _insert_authorship(
 ):
     """Insère une source_authorship.
 
-    `identifiers` est un dict pour `person_identifiers` (JSONB) :
+    `identifiers` est un dict d'identifiants observés porté par l'identité
+    (`author_identifying_keys.person_identifiers`, JSONB) :
     ex. `{"orcid": "0000-...", "idref": "...", "hal_person_id": 42, ...}`.
     """
-    stmt = text("""
-        INSERT INTO source_authorships
-            (source, source_publication_id, author_position,
-             in_perimeter, person_id, raw_author_name, person_identifiers,
-             author_name_normalized)
-        VALUES (:src, :sd, :pos, :in_perim, :person_id,
-                :raw, :person_identifiers, normalize_name_form(:raw))
-        RETURNING id
-    """).bindparams(
-        bindparam("person_identifiers", type_=JSONB),
+    normalized = conn.execute(
+        text("SELECT normalize_name_form(:raw)"), {"raw": raw_author_name}
+    ).scalar_one()
+    identity_id = upsert_identity(
+        conn, author_name_normalized=normalized, person_identifiers=identifiers
     )
     return conn.execute(
-        stmt,
+        text("""
+            INSERT INTO source_authorships
+                (source, source_publication_id, author_position,
+                 in_perimeter, person_id, raw_author_name, identity_id)
+            VALUES (:src, :sd, :pos, :in_perim, :person_id, :raw, :iid)
+            RETURNING id
+        """),
         {
             "src": source,
             "sd": source_publication_id,
@@ -130,7 +132,7 @@ def _insert_authorship(
             "in_perim": in_perimeter,
             "person_id": person_id,
             "raw": raw_author_name,
-            "person_identifiers": identifiers,
+            "iid": identity_id,
         },
     ).scalar_one()
 

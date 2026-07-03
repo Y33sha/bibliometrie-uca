@@ -1,10 +1,9 @@
 """Tests d'intégration pour `infrastructure.queries.api.hal_problems`."""
 
-import json
-
 from sqlalchemy import text
 
 from infrastructure.queries.api.hal_problems import PgHalProblemsQueries
+from tests.integration.helpers.authorships import upsert_identity
 from tests.integration.helpers.structures import add_authorship_structure
 
 
@@ -70,22 +69,18 @@ def _create_person(conn, last="A", first="Z"):
 def _create_hal_sa_with_hal_id(
     conn, *, person_id, hal_person_id, source_id="h-acc", raw_author_name="X"
 ):
-    """Crée un sa HAL avec `hal_person_id` dans `person_identifiers` JSONB."""
+    """Crée un sa HAL portant `hal_person_id` sur son identité."""
     pub = _create_pub(conn, title=f"P-{source_id}", title_normalized=f"p-{source_id}")
     sd = _create_hal_sd(conn, pub, source_id=source_id)
+    identity_id = upsert_identity(conn, person_identifiers={"hal_person_id": hal_person_id})
     conn.execute(
         text("""
             INSERT INTO source_authorships
                 (source, source_publication_id, author_position, person_id,
-                 raw_author_name, person_identifiers)
-            VALUES ('hal', :sd, 0, :pid, :raw, CAST(:idents AS jsonb))
+                 raw_author_name, identity_id)
+            VALUES ('hal', :sd, 0, :pid, :raw, :iid)
         """),
-        {
-            "sd": sd,
-            "pid": person_id,
-            "raw": raw_author_name,
-            "idents": json.dumps({"hal_person_id": hal_person_id}),
-        },
+        {"sd": sd, "pid": person_id, "raw": raw_author_name, "iid": identity_id},
     )
 
 

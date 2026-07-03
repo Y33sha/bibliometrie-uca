@@ -7,6 +7,8 @@ def setup_persons_test_data(conn):
     """
     from sqlalchemy import text
 
+    from tests.integration.helpers.authorships import upsert_identity
+
     # Publications
     conn.execute(
         text("""
@@ -25,24 +27,28 @@ def setup_persons_test_data(conn):
         """)
     )
 
-    # HAL authorships — `person_identifiers` porte orcid + hal_person_id par
-    # observation. Eve Leroy (hal_person_id=900001, orcid renseigné) apparaît
-    # sur les 2 pubs. Frank Moreau (hal_person_id=900002) sur la pub 90001.
-    # Grace Petit (sans identifiant) sur la pub 90002.
+    # HAL authorships — les identifiants observés (orcid + hal_person_id) vivent
+    # sur l'identité. Eve Leroy (hal_person_id=900001, orcid renseigné) apparaît
+    # sur les 2 pubs et partage donc une seule identité. Frank Moreau
+    # (hal_person_id=900002) sur la pub 90001. Grace Petit (sans identifiant) sur
+    # la pub 90002.
+    eve = upsert_identity(
+        conn, "eve leroy", {"orcid": "0000-0001-9999-0001", "hal_person_id": 900001}
+    )
+    frank = upsert_identity(conn, "frank moreau", {"hal_person_id": 900002})
+    grace = upsert_identity(conn, "grace petit", None)
     conn.execute(
         text("""
             INSERT INTO source_authorships
                 (id, source, source_publication_id, author_position, in_perimeter,
-                 person_id, author_name_normalized, raw_author_name, person_identifiers)
+                 person_id, raw_author_name, identity_id)
             VALUES
-                (90001, 'hal', 90001, 0, TRUE, NULL, 'eve leroy', 'Eve Leroy',
-                 '{"orcid": "0000-0001-9999-0001", "hal_person_id": 900001}'),
-                (90002, 'hal', 90001, 1, TRUE, NULL, 'frank moreau', 'Frank Moreau',
-                 '{"hal_person_id": 900002}'),
-                (90003, 'hal', 90002, 0, TRUE, NULL, 'eve leroy', 'Eve Leroy',
-                 '{"orcid": "0000-0001-9999-0001", "hal_person_id": 900001}'),
-                (90004, 'hal', 90002, 1, TRUE, NULL, 'grace petit', 'Grace Petit', NULL)
-        """)
+                (90001, 'hal', 90001, 0, TRUE, NULL, 'Eve Leroy', :eve),
+                (90002, 'hal', 90001, 1, TRUE, NULL, 'Frank Moreau', :frank),
+                (90003, 'hal', 90002, 0, TRUE, NULL, 'Eve Leroy', :eve),
+                (90004, 'hal', 90002, 1, TRUE, NULL, 'Grace Petit', :grace)
+        """),
+        {"eve": eve, "frank": frank, "grace": grace},
     )
 
 
@@ -121,10 +127,11 @@ class TestCreatePersonsIdempotence:
         # Eve Leroy (hal_person_id=900001) apparaît sur 2 documents
         rows = sa_sync_conn.execute(
             text("""
-                SELECT DISTINCT person_id FROM source_authorships
-                WHERE source = 'hal'
-                  AND person_identifiers->>'hal_person_id' = '900001'
-                  AND person_id IS NOT NULL
+                SELECT DISTINCT sa.person_id FROM source_authorships sa
+                JOIN author_identifying_keys aik ON aik.id = sa.identity_id
+                WHERE sa.source = 'hal'
+                  AND aik.person_identifiers->>'hal_person_id' = '900001'
+                  AND sa.person_id IS NOT NULL
             """)
         ).all()
         assert len(rows) == 1, "Eve Leroy devrait être une seule personne"
