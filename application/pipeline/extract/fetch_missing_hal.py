@@ -21,7 +21,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Awaitable, Callable, Sequence
-from typing import Any, TypeVar
+from typing import Any
 
 import httpx
 from sqlalchemy import Connection
@@ -37,8 +37,6 @@ __all__ = ["fetch_missing_hal_by_id", "fetch_missing_hal_by_nnt"]
 
 _COMMIT_EVERY = 50
 
-_Ref = TypeVar("_Ref")
-
 
 def _dedup_halid_refs(refs: list[HalIdRef]) -> list[HalIdRef]:
     """Garde la première occurrence de chaque hal_id (ordre OA → ScanR)."""
@@ -51,15 +49,15 @@ def _dedup_halid_refs(refs: list[HalIdRef]) -> list[HalIdRef]:
     return out
 
 
-async def _fetch_refs_async(
-    refs: Sequence[_Ref],
+async def _fetch_refs_async[Ref](
+    refs: Sequence[Ref],
     conn: Connection,
     log: logging.Logger,
     *,
     max_concurrent: int,
     delay_s: float,
-    fetch_one: Callable[[httpx.AsyncClient, _Ref], Awaitable[dict[str, Any] | None]],
-    insert_one: Callable[[Connection, _Ref, dict[str, Any] | None], tuple[int, int]],
+    fetch_one: Callable[[httpx.AsyncClient, Ref], Awaitable[dict[str, Any] | None]],
+    insert_one: Callable[[Connection, Ref, dict[str, Any] | None], tuple[int, int]],
 ) -> tuple[int, int]:
     """Boucle async partagée : fetch concurrent par ref, puis insert sérialisé.
 
@@ -74,7 +72,7 @@ async def _fetch_refs_async(
 
     async with httpx.AsyncClient() as client:
 
-        async def process_one(ref: _Ref) -> None:
+        async def process_one(ref: Ref) -> None:
             async with sem:
                 doc = await fetch_one(client, ref)
                 if delay_s:
