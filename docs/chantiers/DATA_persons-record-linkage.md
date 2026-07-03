@@ -93,6 +93,6 @@ La garde de contexte est plus robuste sur des co-auteurs déjà résolus en pers
 
 - Phase personnes : `application/pipeline/persons/create_persons_from_source_authorships.py`, `domain/persons/matching.py`, `application/pipeline/persons/populate_person_name_forms.py`.
 - Modèle de référence : phase publications, `domain/publications/reconciliation.py`, `domain/entity_resolution.py`, `docs/pipeline/07-publications.md`.
-- Dépendance amont : [DATA_scinder-source-authorships](DATA_scinder-source-authorships.md).
+- Dépendance amont : [DATA_scinder-source-authorships](archived/2026-07-03_DATA_scinder-source-authorships.md) (terminé).
 - Chantier lié : [DATA_personnes-dedoublonnage-assiste](DATA_personnes-dedoublonnage-assiste.md).
 - Cadre token / garde pairwise : [archived/2026-06-26_DATA_dedup-pairwise-gated](archived/2026-06-26_DATA_dedup-pairwise-gated.md).

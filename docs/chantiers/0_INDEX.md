@@ -13,12 +13,12 @@ _(aucun)_
 ### Non commencé
 
 - [Résolution des personnes par record linkage incrémental](DATA_persons-record-linkage.md)
-- [Scinder `source_authorships` (identité ⊥ liaison)](DATA_scinder-source-authorships.md)
 - [Qualité et cohérence des sujets](METIER_sujets-qualite.md)
 - [Signatures institutionnelles](METIER_signatures-institutionnelles.md)
 
 ## Chantiers archivés
 
+- 2026-07-03 — [Scinder `source_authorships` (identité ⊥ liaison)](archived/2026-07-03_DATA_scinder-source-authorships.md)
 - 2026-07-02 — [Refresh stale par identifiants natifs](archived/2026-07-02_DATA_refresh-stale-identifiants-natifs.md)
 - 2026-07-01 — [Skip propre des sources d'API tierces non configurées](archived/2026-07-01_CODE_extract-sources-non-configurees.md)
 - 2026-07-01 — [Observabilité du pipeline](archived/2026-07-01_CODE_observabilite-pipeline.md)
