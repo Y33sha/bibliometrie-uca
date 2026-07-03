@@ -238,6 +238,11 @@ omit = [
     "infrastructure/sources/wos/extract_wos.py",
     "infrastructure/sources/wos/fetch_missing_doi.py",
     "infrastructure/sources/crossref/fetch_missing_doi.py",
+    # Refetch des documents stale par source : même nature d'adapter HTTP
+    # (httpx + pagination + impl du port refresh_stale) que l'extraction
+    # ci-dessus ; la logique utile de sélection vit côté queries/domain.
+    "infrastructure/sources/refresh_stale_base.py",
+    "infrastructure/sources/*/refresh_stale.py",
     # Orchestrateurs CLI du pipeline d'extraction : wiring async
     # (httpx + Semaphore + Lock) + branches mode/dry_run/stats_only.
     # Même logique d'exclusion que les adapters HTTP ci-dessus.
