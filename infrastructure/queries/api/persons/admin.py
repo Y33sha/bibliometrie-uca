@@ -221,12 +221,24 @@ def ambiguous_name_forms(conn: Connection, *, page: int, per_page: int) -> dict[
 
 # ── Conflits d'identifiant (file de triage du hub) ───────────────
 
-# Paires de personnes distinctes portant la même valeur brute d'identifiant, lues sur la matview
-# `person_identifier_keys` (déjà au grain identité, hors `_dubious`). Le self-join sur
-# (id_type, id_value) est instantané, contrairement au scan de `source_authorships`. Exclut les
+# Paires de personnes distinctes portant la même valeur brute d'identifiant. Le CTE
+# `person_identifier_keys` projette les triplets `(person_id, id_type, id_value)` observés sur les
+# signatures rattachées, en lisant les identifiants via `author_identifying_keys` (grain identité,
+# hors `_dubious`). Référencé deux fois, il est matérialisé une fois par PostgreSQL : le parcours
+# de `source_authorships` est un index-only scan couvert par `idx_sa_person` (person_id, identity_id),
+# et le self-join sur (id_type, id_value) porte sur les seules ~24 k lignes projetées. Exclut les
 # paires déjà marquées distinctes.
 _IDENTIFIER_CONFLICT_PAIRS = """
-    WITH pairs AS (
+    WITH person_identifier_keys AS (
+        SELECT DISTINCT sa.person_id, k.k AS id_type, (aik.person_identifiers ->> k.k) AS id_value
+        FROM source_authorships sa
+        JOIN author_identifying_keys aik ON aik.id = sa.identity_id
+        CROSS JOIN unnest(ARRAY['orcid', 'idref', 'hal_person_id', 'idhal']) k(k)
+        WHERE sa.person_id IS NOT NULL
+          AND aik.person_identifiers ? k.k
+          AND (aik.person_identifiers ->> k.k) NOT LIKE '%_dubious'
+    ),
+    pairs AS (
         SELECT k1.id_type, k1.id_value, k1.person_id AS id_a, k2.person_id AS id_b
         FROM person_identifier_keys k1
         JOIN person_identifier_keys k2

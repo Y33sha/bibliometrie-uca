@@ -676,7 +676,16 @@ source_authorships = Table(
         "source_publication_id",
         postgresql_where=text("in_perimeter = TRUE"),
     ),
-    Index("idx_sa_person", "person_id", postgresql_where=text("person_id IS NOT NULL")),
+    # Index couvrant : `person_id` en tête sert les recherches par personne ;
+    # `identity_id` en colonne incluse permet l'index-only scan de la projection
+    # `(person_id, identifiants)` de la file « conflits d'identifiant » (admin),
+    # qui rejoint `author_identifying_keys` sur `identity_id`.
+    Index(
+        "idx_sa_person",
+        "person_id",
+        "identity_id",
+        postgresql_where=text("person_id IS NOT NULL"),
+    ),
     Index("idx_sa_identity", "identity_id"),
 )
 
