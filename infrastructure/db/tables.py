@@ -677,6 +677,7 @@ source_authorships = Table(
         postgresql_where=text("in_perimeter = TRUE"),
     ),
     Index("idx_sa_person", "person_id", postgresql_where=text("person_id IS NOT NULL")),
+    Index("idx_sa_identity", "identity_id"),
 )
 
 

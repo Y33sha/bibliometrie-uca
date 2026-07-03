@@ -105,6 +105,24 @@ def upsert_source_authorships_batch(
     )
 
 
+def delete_orphan_identities(conn: Connection) -> int:
+    """Supprime les identités de `author_identifying_keys` que plus aucune signature ne référence.
+
+    Une identité devient orpheline quand la dernière `source_authorships` qui la portait change
+    de clé (nom ou identifiants corrigés) et bascule vers une autre identité. Balayage ensembliste
+    appuyé sur l'index `idx_sa_identity`. Idempotent (no-op si rien n'est orphelin). Retourne le
+    nombre d'identités supprimées.
+    """
+    return conn.execute(
+        text("""
+            DELETE FROM author_identifying_keys aik
+            WHERE NOT EXISTS (
+                SELECT 1 FROM source_authorships sa WHERE sa.identity_id = aik.id
+            )
+        """)
+    ).rowcount
+
+
 def fetch_source_authorship_ids_by_position(
     conn: Connection, *, source: str, source_publication_id: int, positions: list[int]
 ) -> dict[int, int]:
