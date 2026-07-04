@@ -80,6 +80,31 @@ def load_cannot_link(conn: Connection) -> set[frozenset[int]]:
     return {frozenset((r.person_id_a, r.person_id_b)) for r in rows}
 
 
+def load_identity_create_eligibility(conn: Connection) -> dict[int, bool]:
+    """{identity_id: une signature autorise-t-elle la création d'une personne ?}.
+
+    Une composante ne peut incarner une **nouvelle** personne que si au moins une de ses
+    signatures y est éligible : in-périmètre (un nom hors-périmètre ne crée jamais) **et**
+    autorisée par `allow_person_creation` — laquelle exclut les rôles non-auteur des thèses
+    (jurys, directeurs, rapporteurs : matchables mais jamais créés). Le prédicat SQL reprend
+    exactement cette règle (`domain.persons.creation.allow_person_creation`).
+    """
+    rows = conn.execute(
+        text("""
+            SELECT identity_id,
+                   bool_or(
+                       in_perimeter
+                       AND NOT (source = 'theses'
+                                AND NOT ('author' = ANY(COALESCE(roles, ARRAY['author']))))
+                   ) AS eligible
+            FROM source_authorships
+            WHERE identity_id IS NOT NULL
+            GROUP BY identity_id
+        """)
+    ).all()
+    return {r.identity_id: bool(r.eligible) for r in rows}
+
+
 def _label(pid: int, labels: dict[int, str]) -> str:
     return f"{labels.get(pid, f'#{pid}')} (#{pid})"
 
@@ -107,6 +132,7 @@ def main() -> None:
         identity_to_pids, pid_to_identities = load_current_mapping(conn)
         labels = load_person_labels(conn)
         cannot_link = load_cannot_link(conn)
+        create_eligible = load_identity_create_eligibility(conn)
 
         # Index identité -> composante, pour détecter les éclatements.
         component_of: dict[int, int] = {}
@@ -119,7 +145,12 @@ def main() -> None:
         fusions: list = []
         noyau_conflicts: list = []
         cannot_link_protected: list = []
-        new_incarnations = 0
+        # Composantes sans aucune signature rattachée aujourd'hui, selon qu'elles
+        # pourraient ou non incarner une **nouvelle** personne (in-périmètre + création
+        # autorisée). Les autres — co-auteurs externes, rôles non-auteur des thèses —
+        # restent orphelines : jamais de fiche créée, elles ne polluent pas le référentiel.
+        incarnation_candidates = 0
+        never_incarnated = 0
         stable = 0
         multi_identity_components = 0
 
@@ -141,8 +172,10 @@ def main() -> None:
                     fusions.append((comp, cur))
             elif len(cur) == 1:
                 stable += 1
+            elif any(create_eligible.get(iid) for iid in comp.identity_ids):
+                incarnation_candidates += 1
             else:
-                new_incarnations += 1
+                never_incarnated += 1
 
         # ── Éclatements : personnes réparties sur ≥2 composantes ───
         scissions: list[tuple[int, set[int]]] = []
@@ -173,7 +206,12 @@ def main() -> None:
         w(f"- **Protégés par cannot-link** : **{len(cannot_link_protected)}**")
         w(f"- **Éclatements (scissions)** : **{len(scissions)}**")
         w(
-            f"- Incarnations nouvelles (aucune signature rattachée aujourd'hui) : **{new_incarnations}**\n"
+            f"- Incarnations candidates (in-périmètre + création autorisée, aucune signature "
+            f"rattachée aujourd'hui) : **{incarnation_candidates}**"
+        )
+        w(
+            f"- Non rattachées jamais incarnées (co-auteurs externes, rôles non-auteur des "
+            f"thèses) : **{never_incarnated}** — restent orphelines, hors référentiel\n"
         )
 
         def fusion_size_hist(bucket: list) -> str:
