@@ -20,9 +20,9 @@ restent hors champ. Chaque composante d'identités est confrontée à l'ensemble
 - **Protégé par cannot-link** : fusion que `distinct_persons` empêche.
 - **Éclatement (scission)** : une personne dont les identités identifiant-ancrées se
   répartissent sur ≥2 composantes, que le graphe séparerait. Qualifié en *vraie
-  séparation* (noms incompatibles entre composantes — personne composite à séparer) ou
-  *sur-séparation* (formes compatibles d'une même personne, que le matching par nom
-  recollera).
+  séparation* (noms vraiment différents entre composantes — personne composite à séparer)
+  ou *variante d'écriture* (coquille, translittération, accent, espacement d'une même
+  personne, que le matching par nom recollera).
 - **Incarnation candidate** : composante sans signature rattachée aujourd'hui dont au moins
   une signature autorise la création (in-périmètre + `allow_person_creation`). Les autres
   — co-auteurs externes, rôles non-auteur des thèses — restent orphelines, hors référentiel.
@@ -35,6 +35,7 @@ import os
 import sys
 import tempfile
 from collections import defaultdict
+from difflib import SequenceMatcher
 from itertools import combinations
 
 from sqlalchemy import Connection, text
@@ -114,23 +115,39 @@ def _label(pid: int, labels: dict[int, str]) -> str:
     return f"{labels.get(pid, f'#{pid}')} (#{pid})"
 
 
-def _components_compatible(forms_a: list[str], forms_b: list[str]) -> bool:
-    """Deux composantes portent-elles des noms compatibles ? Vrai dès qu'une forme de l'une
-    est compatible avec une forme de l'autre (même convention que le canal identifiant :
-    la forme entière tient lieu de nom de famille, prénom vide)."""
-    return any(names_compatible(a, "", b, "") for a in forms_a for b in forms_b)
+VARIANT_SIMILARITY = 0.82
+"""Au-dessus de ce ratio de similarité caractère à caractère (`difflib`), deux formes que
+la comparaison par tokens juge incompatibles sont tenues pour une **variante d'écriture**
+d'un même nom (coquille, translittération, accent, espacement) plutôt que pour deux
+personnes distinctes. Seuil de tri du rapport, sans incidence sur le matcher du modèle."""
 
 
-def _is_true_split(form_sets: list[list[str]]) -> bool:
-    """Vraie séparation ssi deux composantes de la personne ont des noms mutuellement
-    incompatibles : le graphe démêle des signatures qui n'appartiennent pas à la même
-    personne. Sinon la scission est une sur-séparation (variante/coquille d'une même
-    personne), que le matching par nom recollera."""
-    for i in range(len(form_sets)):
-        for j in range(i + 1, len(form_sets)):
-            if not _components_compatible(form_sets[i], form_sets[j]):
-                return True
-    return False
+def _form_similarity(a: str, b: str) -> float:
+    """Similarité de deux formes : 1.0 si compatibles par tokens (initiales, ordre), sinon
+    ratio caractère à caractère hors espaces. Sépare la coquille (proche) de la personne
+    distincte (éloignée) là où la comparaison par tokens seule échoue."""
+    if names_compatible(a, "", b, ""):
+        return 1.0
+    return SequenceMatcher(None, a.replace(" ", ""), b.replace(" ", "")).ratio()
+
+
+def _cross_best_similarity(forms_a: list[str], forms_b: list[str]) -> float:
+    """Meilleure similarité entre une forme de l'une et une forme de l'autre composante."""
+    return max((_form_similarity(a, b) for a in forms_a for b in forms_b), default=0.0)
+
+
+def _split_dissimilarity(form_sets: list[list[str]]) -> float:
+    """Plus faible similarité entre deux composantes de la personne. Basse = au moins deux
+    composantes portent des noms vraiment différents (personne composite à séparer) ; haute
+    = tout se ramène à des variantes d'écriture d'un même nom."""
+    return min(
+        (
+            _cross_best_similarity(form_sets[i], form_sets[j])
+            for i in range(len(form_sets))
+            for j in range(i + 1, len(form_sets))
+        ),
+        default=1.0,
+    )
 
 
 def main() -> None:
@@ -204,8 +221,8 @@ def main() -> None:
         # ── Éclatements : personnes réparties sur ≥2 composantes ───
         # Chaque entrée : (person_id, [formes de la personne par composante]). Qualifiée
         # en vraie séparation (noms incompatibles entre composantes) ou sur-séparation.
-        true_splits: list[tuple[int, list[list[str]]]] = []
-        resorbable_splits: list[tuple[int, list[list[str]]]] = []
+        true_splits: list[tuple[int, list[list[str]], float]] = []
+        resorbable_splits: list[tuple[int, list[list[str]], float]] = []
         for pid, identities in pid_to_identities.items():
             comps_touched = sorted({component_of[iid] for iid in identities if iid in component_of})
             if len(comps_touched) < 2:
@@ -220,8 +237,9 @@ def main() -> None:
                 )
                 for c in comps_touched
             ]
-            bucket = true_splits if _is_true_split(form_sets) else resorbable_splits
-            bucket.append((pid, form_sets))
+            dissimilarity = _split_dissimilarity(form_sets)
+            bucket = true_splits if dissimilarity < VARIANT_SIMILARITY else resorbable_splits
+            bucket.append((pid, form_sets, dissimilarity))
 
         # ── Rapport markdown ───────────────────────────────────────
         lines: list[str] = []
@@ -245,7 +263,7 @@ def main() -> None:
         w(f"- **Protégés par cannot-link** : **{len(cannot_link_protected)}**")
         w(
             f"- **Éclatements (scissions)** : **{len(true_splits) + len(resorbable_splits)}** "
-            f"(vraies séparations {len(true_splits)}, sur-séparations {len(resorbable_splits)})"
+            f"(vraies séparations {len(true_splits)}, variantes d'écriture {len(resorbable_splits)})"
         )
         w(
             f"- Incarnations candidates (in-périmètre + création autorisée, aucune signature "
@@ -299,8 +317,8 @@ def main() -> None:
             w(f"- {names}")
         w("")
 
-        def render_splits(bucket: list[tuple[int, list[list[str]]]]) -> None:
-            for pid, form_sets in sorted(bucket, key=lambda x: -len(x[1]))[:SAMPLE_LIMIT]:
+        def render_splits(bucket: list[tuple[int, list[list[str]], float]], key) -> None:
+            for pid, form_sets, _dissim in sorted(bucket, key=key)[:SAMPLE_LIMIT]:
                 groups = " vs ".join("{" + ", ".join(fs) + "}" for fs in form_sets)
                 w(f"- {_label(pid, labels)} → {groups}")
             w("")
@@ -308,21 +326,21 @@ def main() -> None:
         w("## Éclatements — vraies séparations\n")
         w(
             "Personnes dont les identités identifiant-ancrées se répartissent sur ≥2 "
-            "composantes aux noms **mutuellement incompatibles** : une fiche a absorbé les "
-            "signatures (et souvent les identifiants) d'un homonyme ou d'un co-auteur, que "
-            "les identifiants démêlent. Liste directement exploitable — chaque cas est une "
-            "personne composite à séparer.\n"
+            "composantes aux noms **vraiment différents** (dissimilarité de forme au-delà des "
+            "coquilles/variantes) : une fiche a absorbé les signatures — et souvent les "
+            "identifiants — d'un homonyme ou d'un co-auteur, que les identifiants démêlent. "
+            "Triées de la plus tranchée à la plus douteuse.\n"
         )
-        render_splits(true_splits)
+        render_splits(true_splits, key=lambda e: e[2])
 
-        w("## Éclatements — sur-séparations résorbables\n")
+        w("## Éclatements — variantes d'écriture\n")
         w(
-            "Même personne dont les formes ne partagent aucune valeur d'identifiant pontante "
-            "(variante, coquille, translittération) mais restent **compatibles entre elles** : "
-            "le canal identifiant seul les sépare, le matching par nom les recolle. À ignorer "
-            "tant que le canal nominal n'est pas branché.\n"
+            "Même personne dont les formes diffèrent par une coquille, une translittération, "
+            "un accent ou un espacement (compatibles par tokens, ou proches caractère à "
+            "caractère) : le canal identifiant seul les sépare, le matching par nom les "
+            "recolle. À ignorer tant que le canal nominal n'est pas branché.\n"
         )
-        render_splits(resorbable_splits)
+        render_splits(resorbable_splits, key=lambda e: -len(e[1]))
 
         report = "\n".join(lines)
         with open(out_path, "w", encoding="utf-8") as f:
