@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Orchestrateur du pipeline bibliométrique UCA.
+Orchestrateur du pipeline bibliométrique.
 
 Usage:
     python run_pipeline.py                    # Pipeline complet
@@ -2138,7 +2138,7 @@ def main() -> None:  # noqa: C901 — orchestrateur CLI : refactor en helpers s�
     # laissé par un run précédent — sinon le prochain lecteur verrait un
     # statut fantôme jusqu'à notre premier write_status() de phase.
     read_status()
-    parser = argparse.ArgumentParser(description="Orchestrateur pipeline bibliométrique UCA")
+    parser = argparse.ArgumentParser(description="Orchestrateur pipeline bibliométrique")
     parser.add_argument(
         "--from", dest="from_phase", metavar="PHASE", help="Reprendre depuis cette phase"
     )
@@ -2214,7 +2214,7 @@ def main() -> None:  # noqa: C901 — orchestrateur CLI : refactor en helpers s�
         phases_to_run = PHASES
 
     log.info("=" * 60)
-    log.info("PIPELINE BIBLIOMÉTRIQUE UCA — mode %s", args.mode)
+    log.info("PIPELINE BIBLIOMÉTRIQUE — mode %s", args.mode)
     log.info("Phases : %s", " → ".join(n for n, _ in phases_to_run))
     log.info("=" * 60)
 
