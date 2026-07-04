@@ -9,6 +9,8 @@ import type { components } from "$lib/api/schema";
 
 // ── Types API (générés) ──
 export type Structure = components["schemas"]["StructureOut"];
+export type StructureListItem = components["schemas"]["StructureListItem"];
+export type Perimeter = components["schemas"]["PerimeterOut"];
 export type RelatedStructure = components["schemas"]["RelatedStructureOut"];
 export type NameForm = components["schemas"]["NameFormOut"];
 export type StructureDetail = components["schemas"]["StructureDetailResponse"];

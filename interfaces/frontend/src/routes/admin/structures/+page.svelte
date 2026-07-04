@@ -5,12 +5,15 @@
   import { goto } from "$app/navigation";
   import { api, ApiError, structures as structuresApi } from "$lib/api";
   import { toast } from "$lib/dialogs.svelte";
-  import { API_SOURCES, type Structure } from "./types";
+  import { API_SOURCES, type StructureListItem, type Perimeter } from "./types";
   import StructureFormModal from "./StructureFormModal.svelte";
 
-  let structures: Structure[] = $state([]);
+  let structures: StructureListItem[] = $state([]);
+  let perimeters: Perimeter[] = $state([]);
   let search = $state("");
   let typeFilter = $state("");
+  // "" = tous ; "none" = hors périmètre ; sinon id de périmètre (en chaîne).
+  let perimeterFilter = $state("");
   let searchTimeout: ReturnType<typeof setTimeout> | null = null;
 
   // Affichage trié par acronyme (les structures sans acronyme retombent sur le nom),
@@ -22,6 +25,14 @@
       }),
     ),
   );
+
+  // Filtre d'appartenance à un périmètre, appliqué côté client sur la liste déjà chargée.
+  const displayed = $derived.by(() => {
+    if (perimeterFilter === "") return sorted;
+    if (perimeterFilter === "none") return sorted.filter((s) => s.perimeter_ids.length === 0);
+    const pid = Number(perimeterFilter);
+    return sorted.filter((s) => s.perimeter_ids.includes(pid));
+  });
 
   // Création modal
   let createModalOpen = $state(false);
@@ -37,7 +48,7 @@
     const params = new URLSearchParams();
     if (typeFilter) params.set("type", typeFilter);
     if (search) params.set("search", search);
-    structures = await api<Structure[]>("/api/structures?" + params);
+    structures = await api<StructureListItem[]>("/api/structures?" + params);
   }
 
   function handleSearch() {
@@ -112,7 +123,10 @@
     }
   }
 
-  onMount(loadList);
+  onMount(async () => {
+    await loadList();
+    perimeters = await api<Perimeter[]>("/api/perimeters");
+  });
 </script>
 
 <svelte:head>
@@ -132,16 +146,27 @@
     <option value="ecole">Écoles</option>
     <option value="site">Sites</option>
   </select>
-  <span class="count">{structures.length} structures</span>
+  <select bind:value={perimeterFilter}>
+    <option value="">Tous périmètres</option>
+    <option value="none">— Hors périmètre —</option>
+    {#each perimeters as p (p.id)}
+      <option value={String(p.id)}>{p.name}</option>
+    {/each}
+  </select>
+  <span class="count">{displayed.length} structures</span>
   <button class="btn btn-primary btn-sm" onclick={openCreateModal}>+ Nouvelle</button>
 </div>
 
 <div class="list">
-  {#if structures.length === 0}
+  {#if displayed.length === 0}
     <div class="empty">Aucune structure</div>
   {:else}
-    {#each sorted as s (s.id)}
-      <a class="struct-item" href="{base}/admin/structures/{s.id}">
+    {#each displayed as s (s.id)}
+      <a
+        class="struct-item"
+        class:orphan={s.perimeter_ids.length === 0}
+        href="{base}/admin/structures/{s.id}"
+      >
         <span class="type-badge type-{s.type}">{s.type}</span>
         <span class="name">
           {#if s.acronym}<strong>{s.acronym}</strong> · {s.name}{:else}{s.name}{/if}
@@ -221,6 +246,13 @@
   }
   .struct-item:hover {
     background: var(--surface-hover);
+  }
+  /* Structures n'appartenant à aucun périmètre : légèrement estompées. */
+  .struct-item.orphan {
+    opacity: 0.55;
+  }
+  .struct-item.orphan:hover {
+    opacity: 1;
   }
   .struct-item .name {
     font-size: 0.95rem;
