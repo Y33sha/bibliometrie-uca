@@ -19,9 +19,13 @@ restent hors champ. Chaque composante d'identités est confrontée à l'ensemble
   fusionner d'office.
 - **Protégé par cannot-link** : fusion que `distinct_persons` empêche.
 - **Éclatement (scission)** : une personne dont les identités identifiant-ancrées se
-  répartissent sur ≥2 composantes, que le graphe séparerait.
-- **Incarnation nouvelle** : composante dont aucune signature n'est rattachée
-  aujourd'hui — un rattachement que la cascade n'a pas encore fait.
+  répartissent sur ≥2 composantes, que le graphe séparerait. Qualifié en *vraie
+  séparation* (noms incompatibles entre composantes — personne composite à séparer) ou
+  *sur-séparation* (formes compatibles d'une même personne, que le matching par nom
+  recollera).
+- **Incarnation candidate** : composante sans signature rattachée aujourd'hui dont au moins
+  une signature autorise la création (in-périmètre + `allow_person_creation`). Les autres
+  — co-auteurs externes, rôles non-auteur des thèses — restent orphelines, hors référentiel.
 
 Le rapport est écrit en markdown (chemin en argument, défaut sous le répertoire temp).
 Rien n'est écrit en base.
@@ -36,6 +40,7 @@ from itertools import combinations
 from sqlalchemy import Connection, text
 
 from domain.persons.identifier_graph import cluster_by_identifier
+from domain.persons.name_matching import names_compatible
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.queries.pipeline.persons_identifier_graph import (
     fetch_identifier_candidates,
@@ -109,6 +114,25 @@ def _label(pid: int, labels: dict[int, str]) -> str:
     return f"{labels.get(pid, f'#{pid}')} (#{pid})"
 
 
+def _components_compatible(forms_a: list[str], forms_b: list[str]) -> bool:
+    """Deux composantes portent-elles des noms compatibles ? Vrai dès qu'une forme de l'une
+    est compatible avec une forme de l'autre (même convention que le canal identifiant :
+    la forme entière tient lieu de nom de famille, prénom vide)."""
+    return any(names_compatible(a, "", b, "") for a in forms_a for b in forms_b)
+
+
+def _is_true_split(form_sets: list[list[str]]) -> bool:
+    """Vraie séparation ssi deux composantes de la personne ont des noms mutuellement
+    incompatibles : le graphe démêle des signatures qui n'appartiennent pas à la même
+    personne. Sinon la scission est une sur-séparation (variante/coquille d'une même
+    personne), que le matching par nom recollera."""
+    for i in range(len(form_sets)):
+        for j in range(i + 1, len(form_sets)):
+            if not _components_compatible(form_sets[i], form_sets[j]):
+                return True
+    return False
+
+
 def main() -> None:
     sys.stdout.reconfigure(encoding="utf-8")  # type: ignore[union-attr]
     out_path = (
@@ -178,11 +202,26 @@ def main() -> None:
                 never_incarnated += 1
 
         # ── Éclatements : personnes réparties sur ≥2 composantes ───
-        scissions: list[tuple[int, set[int]]] = []
+        # Chaque entrée : (person_id, [formes de la personne par composante]). Qualifiée
+        # en vraie séparation (noms incompatibles entre composantes) ou sur-séparation.
+        true_splits: list[tuple[int, list[list[str]]]] = []
+        resorbable_splits: list[tuple[int, list[list[str]]]] = []
         for pid, identities in pid_to_identities.items():
-            comps_touched = {component_of[iid] for iid in identities if iid in component_of}
-            if len(comps_touched) >= 2:
-                scissions.append((pid, comps_touched))
+            comps_touched = sorted({component_of[iid] for iid in identities if iid in component_of})
+            if len(comps_touched) < 2:
+                continue
+            form_sets = [
+                sorted(
+                    {
+                        identity_name.get(i, "?")
+                        for i in components[c].identity_ids
+                        if i in identities
+                    }
+                )
+                for c in comps_touched
+            ]
+            bucket = true_splits if _is_true_split(form_sets) else resorbable_splits
+            bucket.append((pid, form_sets))
 
         # ── Rapport markdown ───────────────────────────────────────
         lines: list[str] = []
@@ -204,7 +243,10 @@ def main() -> None:
         w(f"- **Regroupements (fusions)** : **{len(fusions)}**")
         w(f"- **Conflits noyau** (≥2 personnes ancrées pontées) : **{len(noyau_conflicts)}**")
         w(f"- **Protégés par cannot-link** : **{len(cannot_link_protected)}**")
-        w(f"- **Éclatements (scissions)** : **{len(scissions)}**")
+        w(
+            f"- **Éclatements (scissions)** : **{len(true_splits) + len(resorbable_splits)}** "
+            f"(vraies séparations {len(true_splits)}, sur-séparations {len(resorbable_splits)})"
+        )
         w(
             f"- Incarnations candidates (in-périmètre + création autorisée, aucune signature "
             f"rattachée aujourd'hui) : **{incarnation_candidates}**"
@@ -257,28 +299,30 @@ def main() -> None:
             w(f"- {names}")
         w("")
 
-        w("## Éclatements (scissions)\n")
+        def render_splits(bucket: list[tuple[int, list[list[str]]]]) -> None:
+            for pid, form_sets in sorted(bucket, key=lambda x: -len(x[1]))[:SAMPLE_LIMIT]:
+                groups = " vs ".join("{" + ", ".join(fs) + "}" for fs in form_sets)
+                w(f"- {_label(pid, labels)} → {groups}")
+            w("")
+
+        w("## Éclatements — vraies séparations\n")
         w(
             "Personnes dont les identités identifiant-ancrées se répartissent sur ≥2 "
-            "composantes : le graphe les séparerait. Deux cas se mêlent — une fiche ayant "
-            "absorbé les signatures (et souvent les identifiants) d'un homonyme ou d'un "
-            "co-auteur, que les identifiants démêlent (vraie séparation) ; ou une même "
-            "personne dont les formes ne partagent aucune valeur d'identifiant pontante "
-            "(variante, coquille), que le matching par nom rejoindra plus tard (sur-séparation "
-            "propre au canal identifiant seul).\n"
+            "composantes aux noms **mutuellement incompatibles** : une fiche a absorbé les "
+            "signatures (et souvent les identifiants) d'un homonyme ou d'un co-auteur, que "
+            "les identifiants démêlent. Liste directement exploitable — chaque cas est une "
+            "personne composite à séparer.\n"
         )
-        person_identities = {pid: ids for pid, ids in pid_to_identities.items()}
-        for pid, comps_touched in sorted(scissions, key=lambda x: -len(x[1]))[:SAMPLE_LIMIT]:
-            own = person_identities[pid]
-            groups = []
-            for cidx in sorted(comps_touched):
-                # Les identités de cette personne présentes dans la composante.
-                forms = sorted(
-                    {identity_name.get(i, "?") for i in components[cidx].identity_ids if i in own}
-                )
-                groups.append("{" + ", ".join(forms) + "}")
-            w(f"- {_label(pid, labels)} → {' vs '.join(groups)}")
-        w("")
+        render_splits(true_splits)
+
+        w("## Éclatements — sur-séparations résorbables\n")
+        w(
+            "Même personne dont les formes ne partagent aucune valeur d'identifiant pontante "
+            "(variante, coquille, translittération) mais restent **compatibles entre elles** : "
+            "le canal identifiant seul les sépare, le matching par nom les recolle. À ignorer "
+            "tant que le canal nominal n'est pas branché.\n"
+        )
+        render_splits(resorbable_splits)
 
         report = "\n".join(lines)
         with open(out_path, "w", encoding="utf-8") as f:
