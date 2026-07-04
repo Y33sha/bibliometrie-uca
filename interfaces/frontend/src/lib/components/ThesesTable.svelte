@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { base } from '$app/paths';
-	import { sanitizeTitle, halDocUrl, scanrPubUrl } from '$lib/utils';
+	import { sanitizeTitle, halDocUrl, scanrPubUrl, titleCase } from '$lib/utils';
 	import TableStatusRow from '$lib/components/TableStatusRow.svelte';
 
 	export type ThesisRow = {
@@ -103,9 +103,9 @@
 				</td>
 				<td class="col-author">
 					{#if t.thesis_author_person_id}
-						<a href="{base}/persons/{t.thesis_author_person_id}">{t.thesis_author_name}</a>
+						<a href="{base}/persons/{t.thesis_author_person_id}">{titleCase(t.thesis_author_name)}</a>
 					{:else if t.thesis_author_name}
-						{t.thesis_author_name}
+						{titleCase(t.thesis_author_name)}
 					{/if}
 				</td>
 				<td class="col-title">
