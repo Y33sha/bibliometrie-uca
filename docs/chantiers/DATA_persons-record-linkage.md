@@ -28,66 +28,70 @@ Le nom-autorité comparé lors de la corroboration d'un match par identifiant es
 
 ## Décisions
 
-### Modèle cible
+### Deux couches
 
-Deux couches, séparées par la force de garde de leurs signaux.
+- **Noyau non négociable** (figé) : lien RH, identifiant `confirmed`, forme de nom `confirmed`, `distinct_persons`, paires `(publication, personne)` rejetées. Le modèle retire l'auto-`confirmed` des formes dérivées du nom canonique et remet le stock déjà auto-confirmé à `pending` (leur appartenance au nom canonique se lit dans `sources`, `'persons' = ANY(sources)`) : `status='confirmed'` désigne alors sans ambiguïté une validation humaine. Les lecteurs qui distinguaient « appartient au nom canonique » lisent `'persons' = ANY(sources)`.
+- **Couche fluide** (recalculable) : le moissonné. Arêtes fortes (identifiant, garde légère de nom déjà codée dans la corroboration) + arêtes faibles (nom, gardées par contexte). Clustering en composantes connexes ; cannot-link du noyau en partition.
 
-**Noyau non négociable — figé, jamais remis en cause par le recalcul.** Personnes liées à un export RH, identifiants au statut `confirmed` par action admin, verdicts admin sur les formes de nom (`confirmed`/`rejected`), paires `distinct_persons` (cannot-link entre deux personnes), paires `(publication, personne)` rejetées (cannot-link contextuel). Seul ce qui a été décidé par un humain ou issu des ressources humaines épingle une identité. La confirmation automatique des formes `source='persons'` n'en fait pas partie : elle est régénérable et suit le nom canonique.
+### Grain et support
 
-**Couche fluide — dérivée, recalculable.** Tout ce qui est moissonné des sources. Les identités d'auteur en sont les nœuds ; les arêtes sont de deux forces. Les identifiants forts moissonnés forment des arêtes à fort a priori (garde légère : compatibilité de nom, ou consensus). Les formes de nom forment des arêtes à faible a priori, armées seulement sur corroboration de contexte. Les deux alimentent un même clustering en composantes connexes. Le cannot-link (`distinct_persons` et paires rejetées) partitionne les composantes, comme le DOI partitionne les publications.
+- Identité (`author_identifying_keys`, ~645 k, produite par la scission de `source_authorships` — **dépendance amont**) = grain du **canal identifiant**, où la résolution est fonctionnelle (identité identifiant-ancrée → une personne). **Pas** fonctionnel pour le nominal : un nom nu (« j smith ») porté par deux homonymes appartient à plusieurs personnes.
+- Support d'appartenance = `source_authorships.person_id`, grain **signature** : seul à porter des affectations divergentes d'une identité nominale et les détachements contextuels. Un `person_id` sur l'identité ne vaut qu'en optimisation du canal identifiant, pas comme support du modèle.
 
-### Grain de nœud : l'identité d'auteur
+### Incarnation conservatrice
 
-La résolution opère sur les **identités d'auteur** dédupliquées (environ 645 000), non sur les signatures (15,57 M). C'est ce grain qui rend le canal d'arête gardée abordable. Il est produit par le chantier de séparation de `source_authorships` en table d'identités et table de liaison, qui est donc une **dépendance amont** de ce chantier et non un préalable optionnel.
+Asymétrie avec les publications : un chemin de rattachement manuel existe (authorships orphelines). Donc une arête cassée ou une partition douteuse **reste orpheline** (`person_id` NULL) au lieu de s'incarner en personne — la création est conservatrice, jamais l'issue du doute. Restent orphelins : forme partagée sans critère pour trancher entre homonymes ; match identifiant cassé par corroboration (pas de retombée en création nominale — corrige une source directe du sur-éclatement mesuré).
 
-### Canal d'arête gardée pour les noms
+### Réconciliation avec l'existant
 
-Le nom n'est jamais une arête d'égalité. Le blocage par forme de nom (lossy, sur-groupe les homonymes) génère les candidats ; une **garde pairwise** tranche dans le bloc en armant ou non l'arête, sur preuve de contexte : co-signataires déjà résolus à la même personne, structure partagée, proximité d'une composante déjà ancrée par un identifiant, compatibilité de nom avec expansion d'initiale. Une signature nominale n'est jamais nue : elle porte sa publication, ses co-auteurs et son affiliation, que la garde compare. Ce canal généralise le signal cross-source déjà présent (même publication, même position, nom compatible), qui en est un cas particulier.
+- **Cannot-link** (`distinct_persons`, rejets) : partition **post-clustering**, composante recoupée selon le `person_id` courant, comme le DOI partitionne une publication (robuste à la transitivité).
+- **Noyau** : must-link / cannot-link en entrée du clustering (une passe, pas de réparation après coup). Forme validée admin > consensus pour le nom canonique.
+- **Stabilité `person_id`** : composante incarnée = id de la pluralité ; personne du noyau garde son id même minoritaire. Fusion vide l'id perdant (signatures repointées, personne vide supprimée), scission laisse l'id au plus gros. Deux personnes du noyau dans une composante ne fusionnent pas (signal d'erreur admin à remonter, pas à trancher).
 
 ### Filet contre la sur-fusion
 
-La fermeture transitive du clustering mord dès que la garde est trop permissive. Deux protections : une garde calibrée conservatrice, et un **contrôle de cohérence de composante** — une composante qui se scinde en sous-groupes de noms mutuellement incompatibles est suspecte, et l'élément aberrant est éjecté (son arête faible est coupée) plutôt que d'entraîner la fusion. Ce même contrôle répond au défaut d'autorité au premier arrivé : dans une composante ancrée par un identifiant, le nom canonique se décide par la **pluralité** des signatures, pas par la première ; une signature au nom minoritaire est l'aberration à éjecter, pas l'autorité.
+Contrôle de cohérence de composante : des sous-groupes de noms incompatibles → éjection de l'aberrant (arête faible coupée), pas fusion. Vaut aussi pour l'autorité de nom, décidée à la pluralité et non au premier arrivé.
 
-### Machinerie à bâtir
+### Trois canaux, par sûreté croissante
 
-La phase publications marque à recalculer les `source_publications` qui changent — jamais la publication dérivée — et la réconciliation traite leur voisinage, rafraîchissant les publications concernées (recompose depuis les sources, supprime les publications vidées) ; un primitif fusion/scission complète l'ensemble. La phase personnes n'a aucun équivalent. Par symétrie, le marquage à recalculer porte sur les **records d'entrée** — les signatures `source_authorships`, ou les identités d'auteur une fois `source_authorships` scindée —, jamais sur la personne : le pipeline ne sait pas a priori qu'une personne a changé, il sait qu'une signature a été insérée, re-normalisée ou ré-identifiée, ou qu'une action admin a touché son voisinage. Le recalcul en déduit les personnes à rafraîchir : recomposer depuis les identités membres (nom canonique par consensus), ou supprimer si vidées. À construire donc : ce marquage sur les records d'entrée, un rafraîchissement qui **préserve le noyau non négociable** (le nom canonique confirmé par admin prime sur le consensus ; les cannot-link sont respectés), et le primitif fusion/scission. La contrainte de préservation est plus forte que côté publications, où les métadonnées d'une publication sont une pure agrégation sans décision humaine à ménager.
+La cascade actuelle (priorité + premier match) n'est pas un graphe ; le passage en graphe change le comportement (sur-fusion transitive), assumé car recalculable — une sur-fusion se résorbe au resserrement des gardes.
 
-### Ordonnancement et convergence
+1. **Identifiant → graphe d'abord** : arête forte, fermeture transitive légitime sous la garde de nom déjà codée. La machinerie s'y bâtit et se valide (composantes, cannot-link en partition, ancrage noyau, marquage, fusion/scission, incarnation conservatrice).
+2. **Nom → arête gardée ensuite** : blocage par forme au grain identité, garde de contexte pairwise (forme ouverte, cf. Questions).
+3. **Cross-source → passe de réconciliation ensembliste** : au grain signature (même publication × position, nom compatible, hors méga-papers > 50), il **fusionne des composantes** après clustering plutôt que d'entrer dans le graphe de nœuds. Le rejet contextuel reste un détachement de signature sur `sa.person_id`.
 
-La garde de contexte est plus robuste sur des co-auteurs déjà résolus en personnes, or c'est précisément ce que la phase calcule : dépendance circulaire. La réponse tient dans la machinerie de recalcul : garde sur noms bruts au premier passage, puis marquage à recalculer et convergence au run suivant à mesure que l'identité se fige. Une œuvre peut rester sous-résolue jusqu'au run n+1 ; c'est le compromis simplicité contre immédiateté déjà retenu ailleurs dans le pipeline.
+### Machinerie incrémentale
+
+Marquage à recalculer sur les **records d'entrée** (signatures/identités), jamais la personne : le pipeline sait qu'une signature a bougé, pas qu'une personne a changé. Le recalcul recompose `sa.person_id` depuis les composantes, incarne les franches, laisse orphelines les douteuses, supprime les personnes vidées, et **préserve le noyau** (nom validé prioritaire, cannot-link respectés). Convergence multi-run : garde sur noms bruts au premier passage, resserrement et re-résolution ensuite (une œuvre peut rester sous-résolue jusqu'au run n+1).
 
 ## Phasage
 
-### Phase 1 — Corriger le défaut d'ancrage, indépendamment de la refonte
+### Phase 1 — Regroupement par identifiant
 
-- [ ] Autorité au premier arrivé : documenter le mécanisme et son empreinte, mesurer le sur-éclatement induit (personnes nominales créées faute d'avoir pu récupérer un identifiant capté).
+- [x] Prérequis : retirer l'auto-`confirmed` des formes `persons` (les lecteurs lisent `'persons' = ANY(sources)`) + remise à `pending` du stock déjà auto-confirmé, pour que `status='confirmed'` désigne sans ambiguïté une validation humaine. (`af2c6e28`, migration `b2f5c9d8a41e`)
+- [ ] Arêtes : paires d'identités partageant une valeur d'identifiant fort, gardées par compatibilité de nom (corroboration existante réutilisée).
+- [ ] Clustering en composantes connexes (`connected_components`), recoupé par cannot-link (`distinct_persons`, rejets) selon le `person_id` courant.
+- [ ] Affectation : chaque composante franche prend un `person_id` (pluralité, priorité au noyau), les douteuses restent orphelines ; nom canonique par consensus, forme validée admin prioritaire ; fusion (vider l'id perdant) / scission (id au plus gros).
+- [ ] Écrire `sa.person_id` depuis les composantes, moins les détachements contextuels.
+- [ ] Substituer ce graphe aux barreaux identifiant de `decide_person_match` (nom et cross-source inchangés à ce stade).
+- [ ] Tests : indépendance à l'ordre d'ingestion, non-régression des rattachements par identifiant, cannot-link et noyau respectés.
 
-### Phase 2 — Couche identifiée en graphe recalculable
+### Phase 2 — Regroupement par le nom
 
-- [ ] Nœuds = identités d'auteur (dépend du chantier de séparation de `source_authorships`).
-- [ ] Arêtes par identifiant fort moissonné, clustering en composantes connexes, cannot-link `distinct_persons` en contrainte de partition.
-- [ ] Nom canonique par consensus des signatures, nom validé en admin prioritaire.
-- [ ] Ancrage des composantes sur le noyau non négociable.
+- [ ] Candidats par blocage sur forme de nom, tranchés par une garde de contexte pairwise (co-auteurs déjà résolus, labo partagé, proximité d'une composante identifiant-ancrée, compatibilité initiale/plein).
+- [ ] Contrôle de cohérence de composante : éjecter l'élément aberrant plutôt que fusionner.
 
-### Phase 3 — Canal nominal par arête gardée
+### Phase 3 — Recalcul incrémental
 
-- [ ] Blocage par forme de nom sur les identités.
-- [ ] Garde de contexte pairwise (co-signataires résolus, structure, proximité d'ancre, compatibilité initiale/plein).
-- [ ] Contrôle de cohérence de composante et éjection d'aberrant.
-
-### Phase 4 — Machinerie incrémentale et contrôles
-
-- [ ] Marquage à recalculer sur les records d'entrée (signatures ou identités), rafraîchissement des personnes concernées préservant le noyau non négociable, primitif fusion/scission.
+- [ ] Marquage à recalculer sur les signatures/identités (jamais la personne), rafraîchissement préservant le noyau, primitif fusion/scission.
 - [ ] Convergence multi-run.
-- [ ] Détecteur de fusions et scissions suspectes pour contrôle admin a posteriori.
+- [ ] Repérage des fusions/scissions douteuses pour contrôle admin.
 
 ## Questions ouvertes
 
 - **Forme exacte de la garde nominale** : quels signaux de contexte, quels seuils, quelle combinaison. Le matching de noms sous-jacent (compatibilité avec initiales, noms composés, translittération, accents) reste heuristique et devient ici porteur ; il conditionne la précision du canal nominal pour un tiers du référentiel.
 - **Règle d'éjection d'aberrant** : à partir de quel écart une signature est-elle jugée aberrante dans sa composante, et que devient son arête faible coupée (orpheline, ou re-candidate à un autre bloc).
 - **Nom canonique en l'absence de validation admin et de consensus clair** : départage quand les signatures se répartissent sans majorité.
-- **Ordonnancement** : convergence au run n+1 (simple, différée) contre seconde passe immédiate après la phase personnes (cohérence immédiate, coût d'une passe supplémentaire).
-- **Empreinte du sur-éclatement** : non mesurée à ce stade ; conditionne l'urgence de la Phase 1.
 
 ## Liens
 
