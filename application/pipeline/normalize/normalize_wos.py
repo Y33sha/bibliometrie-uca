@@ -41,7 +41,6 @@ from application.publishers.core import find_or_create_publisher
 from domain.persons.identifiers import (
     compact_identifiers,
     mark_shared_identifiers_dubious,
-    normalize_orcid,
 )
 from domain.publications.authorship_roles import map_role
 from domain.publications.identifiers import clean_doi
@@ -122,14 +121,11 @@ def _parse_api_authors(static: dict, dynamic: dict) -> list[dict]:
             daisng_id = str(daisng_id)
         researcher_id = name_obj.get("r_id")
 
-        # ORCID depuis data-item-ids
-        orcid = None
-        di_ids = name_obj.get("data-item-ids", {})
-        di_list = _safe_list(di_ids.get("data-item-id"))
-        for di in di_list:
-            if isinstance(di, dict) and di.get("id-type") == "PreferredORCID":
-                orcid = normalize_orcid(di.get("content"))
-                break
+        # L'ORCID WoS (`PreferredORCID`) n'est pas moissonné : attribué par le matching
+        # algorithmique interne de Web of Science, il est trop peu fiable pour figurer
+        # sur l'identité d'auteur (où sa source serait perdue et où il deviendrait un
+        # faux signal de matching). Les ORCID fiables viennent des sources à dépôt auteur
+        # (Crossref, OpenAlex `raw_orcid`, HAL).
 
         is_corresponding = name_obj.get("reprint") == "Y"
 
@@ -161,7 +157,6 @@ def _parse_api_authors(static: dict, dynamic: dict) -> list[dict]:
                 "full_name": full_name.strip(),
                 "last_name": last_name,
                 "first_name": first_name,
-                "orcid": orcid,
                 "researcher_id": researcher_id,
                 "daisng_id": daisng_id,
                 "is_corresponding": is_corresponding,
@@ -470,8 +465,9 @@ def build_wos_author_records(rec: dict, logger: logging.Logger) -> list[AuthorRe
     Filtre les auteurs via `is_wos_author_exploitable` ; si aucun n'est
     exploitable alors que le record en porte, logge un warning (détecte une
     dérive éventuelle de l'API WoS — perte silencieuse de records sinon).
-    Chaque auteur porte `person_identifiers` (orcid + researcher_id) et ses
-    adresses brutes. La dédup par position est faite par le writer.
+    Chaque auteur porte `person_identifiers` (researcher_id ; l'ORCID WoS n'est pas
+    moissonné, cf. extraction) et ses adresses brutes. La dédup par position est faite
+    par le writer.
     """
     raw_authors = rec.get("authors", [])
     authors_kept = [a for a in raw_authors if is_wos_author_exploitable(a)]
@@ -485,15 +481,9 @@ def build_wos_author_records(rec: dict, logger: logging.Logger) -> list[AuthorRe
             )
         return []
 
-    # Identifiant (orcid/researcher_id) partagé entre ≥2 signatures du record → `_dubious`.
+    # Identifiant (researcher_id) partagé entre ≥2 signatures du record → `_dubious`.
     ids_by_position = mark_shared_identifiers_dubious(
-        [
-            compact_identifiers(
-                orcid=a.get("orcid"),
-                researcher_id=a.get("researcher_id"),
-            )
-            for a in authors_kept
-        ]
+        [compact_identifiers(researcher_id=a.get("researcher_id")) for a in authors_kept]
     )
 
     records: list[AuthorRecord] = []
