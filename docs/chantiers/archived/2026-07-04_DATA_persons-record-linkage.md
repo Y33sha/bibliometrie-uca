@@ -1,5 +1,7 @@
 # Chantier — Résolution des personnes par record linkage incrémental
 
+Abandonné le 2026-07-04: mauvaise idée. Remplacé par [Cascade personnes : ordre-indépendance et consensus d'attribution](../DATA_persons-cascade-ordre-independante.md)
+
 Aligner la résolution des personnes sur le modèle de la phase publications : une appartenance dérivée, recalculable à chaque passe, où fusions et scissions découlent d'un même primitif de clustering, et où seules les décisions humaines constituent un noyau non négociable. Aujourd'hui la phase personnes procède par cascade monotone : elle rattache ou crée, jamais ne remet en jeu une entité existante, ne fusionne ni ne scinde. L'identité d'ancrage est implicite et dépend de l'ordre d'arrivée des signatures.
 
 ## Contexte
