@@ -13,6 +13,16 @@
   let typeFilter = $state("");
   let searchTimeout: ReturnType<typeof setTimeout> | null = null;
 
+  // Affichage trié par acronyme (les structures sans acronyme retombent sur le nom),
+  // comme la liste publique des laboratoires.
+  const sorted = $derived(
+    [...structures].sort((a, b) =>
+      (a.acronym || a.name || "").localeCompare(b.acronym || b.name || "", "fr", {
+        sensitivity: "base",
+      }),
+    ),
+  );
+
   // Création modal
   let createModalOpen = $state(false);
   let mCode = $state("");
@@ -130,7 +140,7 @@
   {#if structures.length === 0}
     <div class="empty">Aucune structure</div>
   {:else}
-    {#each structures as s (s.id)}
+    {#each sorted as s (s.id)}
       <a class="struct-item" href="{base}/admin/structures/{s.id}">
         <span class="type-badge type-{s.type}">{s.type}</span>
         <span class="name">
