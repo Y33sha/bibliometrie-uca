@@ -197,6 +197,11 @@
   .source-row:hover {
     background: var(--surface-hover);
   }
+  /* Le lien couvre toute la ligne : l'icône gonfle au survol de la ligne entière,
+     pas seulement au survol de l'icône. */
+  .source-row:hover :global(.source-tag) {
+    transform: scale(1.15);
+  }
   .source-id {
     font-size: 0.82rem;
     color: var(--text);
