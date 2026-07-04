@@ -214,7 +214,7 @@ def run(
     out_of_perimeter_authorships = get_out_of_perimeter_candidates(conn, queries)
     all_authorships = in_perimeter_authorships + out_of_perimeter_authorships
     logger.info(
-        f"{len(in_perimeter_authorships)} authorships UCA non rattachées "
+        f"{len(in_perimeter_authorships)} authorships du périmètre non rattachées "
         f"+ {len(out_of_perimeter_authorships)} candidats hors-périmètre "
         f"(identifiant fort / cross-source)"
     )
@@ -399,10 +399,10 @@ def run(
     logger.info(f"  Créées                   : {created}")
     logger.info(f"  Rejets corroboration nom : {corroboration_rejected} matchs identifiant refusés")
     logger.info(
-        f"  Skippées (périmètre UCA) : ambiguës={skipped_counts['ambiguous_name_form']}, "
+        f"  Skippées (in-perimeter)  : ambiguës={skipped_counts['ambiguous_name_form']}, "
         f"create interdit={skipped_counts['creation_not_allowed']}"
     )
-    logger.info(f"  Non résolues (UCA)       : {in_perimeter_unlinked}")
+    logger.info(f"  Non résolues (in-perimeter): {in_perimeter_unlinked}")
     logger.info(
         f"  Hors-périmètre           : {out_of_perimeter_matched}/{out_of_perimeter_total} "
         f"candidats rattachés (identifiant fort / cross-source)"
