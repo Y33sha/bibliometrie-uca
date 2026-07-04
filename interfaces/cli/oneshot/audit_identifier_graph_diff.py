@@ -260,8 +260,12 @@ def main() -> None:
         w("## Éclatements (scissions)\n")
         w(
             "Personnes dont les identités identifiant-ancrées se répartissent sur ≥2 "
-            "composantes : le graphe les séparerait. Souvent une fiche agglomérant à tort "
-            "deux personnes via le canal nominal, que les identifiants distinguent.\n"
+            "composantes : le graphe les séparerait. Deux cas se mêlent — une fiche ayant "
+            "absorbé les signatures (et souvent les identifiants) d'un homonyme ou d'un "
+            "co-auteur, que les identifiants démêlent (vraie séparation) ; ou une même "
+            "personne dont les formes ne partagent aucune valeur d'identifiant pontante "
+            "(variante, coquille), que le matching par nom rejoindra plus tard (sur-séparation "
+            "propre au canal identifiant seul).\n"
         )
         person_identities = {pid: ids for pid, ids in pid_to_identities.items()}
         for pid, comps_touched in sorted(scissions, key=lambda x: -len(x[1]))[:SAMPLE_LIMIT]:
