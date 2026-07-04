@@ -128,13 +128,13 @@ def sync_from_raw_forms(conn: Connection) -> tuple[int, int, int]:
         """)
     ).rowcount
 
-    # Une forme nouvelle dérivée du nom/prénom (source `'persons'`) est confirmée
-    # d'office ; sinon `pending` (forme bibliographique non vérifiée).
+    # Une forme nouvelle entre en `pending` : seule une action admin la confirme ou
+    # la rejette. L'appartenance d'une forme au nom canonique se lit dans `sources`
+    # (`'persons'`), pas dans le statut.
     inserted = conn.execute(
         text("""
             INSERT INTO person_name_forms (name_form, person_id, sources, status)
-            SELECT e.name_form, e.person_id, e.sources,
-                   CASE WHEN 'persons' = ANY(e.sources) THEN 'confirmed' ELSE 'pending' END::identifier_status
+            SELECT e.name_form, e.person_id, e.sources, 'pending'::identifier_status
             FROM _expected_pnf e
             WHERE NOT EXISTS (
                 SELECT 1 FROM person_name_forms p
@@ -143,17 +143,12 @@ def sync_from_raw_forms(conn: Connection) -> tuple[int, int, int]:
         """)
     ).rowcount
 
-    # `'persons'` ⇒ `confirmed` vaut aussi quand une forme bibliographique gagne la
-    # source `'persons'` (le nom de la personne produit désormais cette forme) ; un
-    # verdict sur une forme non-`'persons'` est préservé.
+    # Resynchronise les seules `sources` ; le statut (verdict admin ou `pending`) est
+    # préservé.
     updated = conn.execute(
         text("""
             UPDATE person_name_forms p
-            SET sources = e.sources,
-                status = CASE
-                    WHEN 'persons' = ANY(e.sources) THEN 'confirmed'::identifier_status
-                    ELSE p.status
-                END
+            SET sources = e.sources
             FROM _expected_pnf e
             WHERE p.name_form = e.name_form AND p.person_id = e.person_id
               AND p.sources IS DISTINCT FROM e.sources

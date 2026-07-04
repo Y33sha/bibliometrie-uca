@@ -274,19 +274,24 @@ def fetch_name_form_map(conn: Connection) -> dict[str, list[int]]:
 
 
 def fetch_name_form_status_map(conn: Connection) -> dict[tuple[str, int], str]:
-    """Charge les verdicts de lien forme↔personne : `{(name_form, person_id): status}`.
+    """Charge les verdicts de lien forme↔personne : `{(name_form, person_id): verdict}`.
 
-    Restreint aux statuts décisifs (`confirmed` / `rejected`, pas `pending`) : sert à
-    la corroboration du matching par identifiant. Quand un identifiant résout vers une
-    personne, le statut du couple (forme de la signature, personne) tranche sans test
-    de compatibilité de nom — `confirmed` corrobore le match, `rejected` le refuse ;
-    en l'absence de verdict, on retombe sur la comparaison par tokens.
+    Sert à la corroboration du matching par identifiant : quand un identifiant résout
+    vers une personne, le verdict du couple (forme de la signature, personne) tranche
+    sans test de compatibilité de nom — `confirmed` corrobore, `rejected` refuse ; en
+    l'absence de verdict, on retombe sur la comparaison par tokens.
+
+    Le verdict combine le statut admin et l'appartenance au nom canonique : un rejet
+    admin l'emporte ; une confirmation admin (`status = 'confirmed'`) ou une forme
+    dérivée du nom canonique (`'persons' ∈ sources`) corrobore. Les formes seulement
+    `pending` et non canoniques sont omises.
     """
     rows = conn.execute(
         text("""
-            SELECT name_form, person_id, status::text AS status
+            SELECT name_form, person_id,
+                   CASE WHEN status = 'rejected' THEN 'rejected' ELSE 'confirmed' END AS status
             FROM person_name_forms
-            WHERE status <> 'pending'
+            WHERE status = 'rejected' OR status = 'confirmed' OR 'persons' = ANY(sources)
         """)
     ).all()
     return {(r.name_form, r.person_id): r.status for r in rows}
