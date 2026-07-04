@@ -77,10 +77,16 @@ def load_person_labels(conn: Connection) -> dict[Any, str]:
 
 
 def load_confirmed_forms(conn: Connection) -> dict[Any, list[Any]]:
-    """{person_id: [forme confirmée, …]} — la base du départage (verrou de l'étape 2)."""
+    """{person_id: [forme validée, …]} — la base du départage (verrou de l'étape 2).
+
+    Forme validée = confirmée par admin (`status = 'confirmed'`) ou dérivée du nom
+    canonique de la personne (`'persons' ∈ sources`)."""
     forms: dict[Any, list[Any]] = defaultdict(list)
     rows = conn.execute(
-        text("SELECT person_id, name_form FROM person_name_forms WHERE status = 'confirmed'")
+        text(
+            "SELECT person_id, name_form FROM person_name_forms "
+            "WHERE status = 'confirmed' OR 'persons' = ANY(sources)"
+        )
     ).all()
     for r in rows:
         forms[r.person_id].append(r.name_form)

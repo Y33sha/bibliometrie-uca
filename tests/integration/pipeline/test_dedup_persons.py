@@ -253,17 +253,21 @@ class TestCascadeRun:
 
         assert _get_person_id(sa_sync_conn, hal_as) != person_id
 
-    def test_persons_name_forms_confirmed_on_create(self, sa_sync_conn):
-        """Les formes dérivées du nom/prénom (source 'persons') sont confirmées d'office."""
+    def test_persons_name_forms_pending_with_persons_source_on_create(self, sa_sync_conn):
+        """Les formes dérivées du nom/prénom entrent `pending` avec la source 'persons' :
+        l'appartenance au nom canonique se lit dans `sources`, pas dans un statut confirmé
+        d'office (seule une action admin confirme)."""
         person_id = create_person("Brindacier", "Fifi", repo=person_repository(sa_sync_conn))
         rows = sa_sync_conn.execute(
             text(
-                "SELECT name_form, status::text AS status FROM person_name_forms WHERE person_id = :pid"
+                "SELECT name_form, status::text AS status, sources "
+                "FROM person_name_forms WHERE person_id = :pid"
             ),
             {"pid": person_id},
         ).all()
         assert rows
-        assert all(r.status == "confirmed" for r in rows)
+        assert all(r.status == "pending" for r in rows)
+        assert all("persons" in r.sources for r in rows)
         forms = {r.name_form for r in rows}
         assert "fifi brindacier" in forms
         assert "brindacier fifi" in forms

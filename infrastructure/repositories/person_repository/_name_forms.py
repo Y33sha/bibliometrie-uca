@@ -130,29 +130,22 @@ def add_person_source(
     source dans le tableau existant — déduplication + tri stable
     via ``array_agg(DISTINCT ... ORDER BY ...)``.
 
-    Statut : une forme dérivée du nom/prénom (source ``'persons'``) est ``confirmed``
-    — le nom canonique de la personne ne se discute pas —, ``pending`` sinon. La règle
-    vaut aussi sur conflit : ajouter la source ``'persons'`` à une row existante la passe
-    ``confirmed``. Une fusion non-``'persons'`` (forme bibliographique) ne touche pas le
-    statut : un verdict (``confirmed``/``rejected``) est préservé.
+    Statut : toute forme entre en ``pending`` ; seule une action admin la confirme ou
+    la rejette. L'appartenance d'une forme au nom canonique (source ``'persons'``) se
+    lit dans ``sources``, pas dans le statut. Une fusion préserve le verdict existant.
     """
     new_sources = [source] if source else []
-    status = "confirmed" if source == "persons" else "pending"
     conn.execute(
         text("""
             INSERT INTO person_name_forms (name_form, person_id, sources, status)
-            VALUES (:nf, :pid, :new_sources, CAST(:status AS identifier_status))
+            VALUES (:nf, :pid, :new_sources, 'pending'::identifier_status)
             ON CONFLICT (name_form, person_id) DO UPDATE SET
                 sources = (
                     SELECT COALESCE(array_agg(DISTINCT s ORDER BY s), '{}'::text[])
                     FROM unnest(person_name_forms.sources || EXCLUDED.sources) AS s
-                ),
-                status = CASE
-                    WHEN :status = 'confirmed' THEN 'confirmed'::identifier_status
-                    ELSE person_name_forms.status
-                END
+                )
         """),
-        {"nf": name_form, "pid": person_id, "new_sources": new_sources, "status": status},
+        {"nf": name_form, "pid": person_id, "new_sources": new_sources},
     )
 
 

@@ -357,9 +357,11 @@ _REPEATED_OCCURRENCES_SQL = text("""
       AND aik.author_name_normalized IS NOT NULL
 """).bindparams(bindparam("spids"), bindparam("pids"))
 
+# Formes qui font ancre : confirmées par admin, ou dérivées du nom canonique de la
+# personne (`'persons' ∈ sources`, appartenance qui ne se lit plus dans le statut).
 _CONFIRMED_FORMS_SQL = text("""
     SELECT person_id, name_form FROM person_name_forms
-    WHERE status = 'confirmed' AND person_id = ANY(:pids)
+    WHERE (status = 'confirmed' OR 'persons' = ANY(sources)) AND person_id = ANY(:pids)
 """).bindparams(bindparam("pids"))
 
 _IDENTIFIER_KEYS = ("orcid", "idref", "hal_person_id", "idhal")
