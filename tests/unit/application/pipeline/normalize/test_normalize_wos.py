@@ -4,7 +4,7 @@ Couvre :
 - Helpers purs (`_safe_list`, `_get_api_title`, `_parse_api_authors`, `_get_api_doi`, `_get_api_issn`).
 - `extract_from_api` : extraction depuis la structure WoS Expanded API (static_data/dynamic_data imbriqués) avec ses nombreuses branches (dict vs list, doctypes, biblio, abstract, keywords, topics, citations).
 - `extract_pub_metadata`, `upsert_publisher`, `upsert_journal`, `insert_wos_document` : wiring + propagation des champs.
-- `build_wos_author_records` : filtre `is_wos_author_exploitable`, construction des `AuthorRecord` (orcid+researcher_id, adresses), warning si tout rejeté. L'écriture (clear + batch) passe par le writer partagé, testée séparément.
+- `build_wos_author_records` : filtre `is_wos_author_exploitable`, construction des `AuthorRecord` (researcher_id, adresses ; l'ORCID WoS n'est pas moissonné), warning si tout rejeté. L'écriture (clear + batch) passe par le writer partagé, testée séparément.
 - `process_record` : orchestration (cascade publisher → journal → document → authorships), staging mark_done.
 - `WosNormalizer.preload_caches` / `process_work` : wiring de la classe.
 
@@ -251,13 +251,14 @@ class TestParseApiAuthors:
         authors = _parse_api_authors(static, {})
         assert authors[0]["full_name"] == "Doe, J."
 
-    def test_orcid_extracted_from_data_item_ids(self):
+    def test_orcid_not_harvested_from_data_item_ids(self):
+        """L'ORCID WoS (`PreferredORCID`) n'est pas moissonné (source trop peu fiable)."""
         static = {
             "summary": {"names": {"name": [_make_author_name(orcid="0000-0001-2345-6789")]}},
             "fullrecord_metadata": {"addresses": {}},
         }
         authors = _parse_api_authors(static, {})
-        assert authors[0]["orcid"] == "0000-0001-2345-6789"
+        assert "orcid" not in authors[0]
 
     def test_daisng_id_coerced_to_str(self):
         static = {
@@ -878,7 +879,8 @@ class TestBuildWosAuthorRecords:
         assert rec0.raw_name == "Jane Doe"
         assert rec0.is_corresponding is True
         assert rec0.roles == ["author"]
-        assert rec0.person_identifiers  # orcid + researcher_id, dict non vide
+        # `researcher_id` porté ; l'ORCID WoS en entrée est ignoré (non moissonné).
+        assert rec0.person_identifiers == {"researcher_id": "R-1"}
         assert [a.text for a in rec0.addresses] == ["addr-X"]
 
     def test_no_organizations_no_addresses(self, logger):
