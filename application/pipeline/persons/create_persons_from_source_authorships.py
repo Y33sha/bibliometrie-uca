@@ -81,6 +81,7 @@ from domain.persons.matching import (
     decide_name_form_outcome,
     decide_person_match,
 )
+from domain.persons.name_forms import compute_person_name_forms
 from domain.persons.name_matching import parse_raw_author_name
 
 
@@ -355,29 +356,27 @@ def run(
         elif decision.action == "create":
             last = a.last_name or a.full_name or "?"
             first = a.first_name or ""
-            # On pré-popule la map en mémoire avec les deux ordres normalisés
-            # pour qu'une autre authorship du même run avec l'ordre inverse
-            # match cette personne nouvellement créée. La forme déjà
-            # cherchée (norm) est forcément l'un des deux ordres.
-            cache_forms = [
-                f
-                for f in [
-                    f"{a.first_norm} {a.last_norm}".strip(),
-                    f"{a.last_norm} {a.first_norm}".strip(),
-                ]
-                if f
-            ]
             if not dry_run:
                 pid = create_person(last, first, repo=person_repo)
                 a_dict = a._asdict()
                 link_to_person(pid, [a_dict], repo=person_repo)
                 add_identifiers(pid, [a_dict], repo=person_repo)
                 add_name_form(pid, a.full_name, repo=person_repo)
-                for form in cache_forms:
-                    name_form_map[form] = [pid]
+                marker = pid
             else:
-                for form in cache_forms:
-                    name_form_map[form] = [-1]
+                marker = -1
+            # Rendre la personne créée matchable dans le même run par toutes ses
+            # formes — ordres ET initiales — via le générateur qui sert au
+            # peuplement de `person_name_forms`, plutôt que les deux seuls ordres.
+            # Sans les initiales, une signature « J Martin » du même run ne
+            # rattrape pas la « Jean Martin » qu'on vient de créer. On fusionne
+            # dans les listes de candidats existantes plutôt que d'écraser : une
+            # forme déjà portée par d'autres personnes reste ambiguë (donc non
+            # matchée en aveugle), au lieu d'être détournée vers la dernière créée.
+            for form in compute_person_name_forms(last, first):
+                candidates = name_form_map.setdefault(form, [])
+                if marker not in candidates:
+                    candidates.append(marker)
             created += 1
 
         else:  # skip

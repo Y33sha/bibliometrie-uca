@@ -49,6 +49,7 @@ def fetch_unlinked_authorships(conn: Connection) -> list[BareUnlinkedAuthorship]
               AND sd.publication_id IS NOT NULL
               AND sa_auth.raw_author_name IS NOT NULL
               AND pub.doc_type NOT IN {OUT_OF_SCOPE_DOC_TYPES_SQL}
+            ORDER BY sa_auth.id
         """)
     ).all()
     return [_to_bare(r) for r in rows]
