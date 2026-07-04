@@ -19,6 +19,8 @@ class StructureListItem(BaseModel):
     name: str
     acronym: str | None
     type: str
+    perimeter_ids: list[int]
+    """Périmètres auxquels la structure appartient (clôture transitive). Vide = hors périmètre."""
 
 
 class StructureOut(BaseModel):

@@ -43,9 +43,15 @@ def _list_structures_sql(*, type_filter: str | None, search: str) -> tuple[str, 
         binds["search"] = f"%{search}%"
     where = " AND ".join(parts) if parts else "TRUE"
     sql = f"""
-        SELECT s.id, s.code, s.name, s.acronym, s.structure_type::text AS type
+        SELECT s.id, s.code, s.name, s.acronym, s.structure_type::text AS type,
+               COALESCE(
+                   array_agg(ps.perimeter_id) FILTER (WHERE ps.perimeter_id IS NOT NULL),
+                   '{{}}'
+               ) AS perimeter_ids
         FROM structures s
+        LEFT JOIN perimeter_structures ps ON ps.structure_id = s.id
         WHERE {where}
+        GROUP BY s.id, s.code, s.name, s.acronym, s.structure_type
         {_LIST_ORDER_BY}
     """
     return sql, binds
@@ -89,7 +95,14 @@ class PgStructuresQueries(StructuresQueries):
         sql, binds = _list_structures_sql(type_filter=type_filter, search=search)
         rows = self._conn.execute(text(sql), binds).all()
         return [
-            StructureListItem(id=r.id, code=r.code, name=r.name, acronym=r.acronym, type=r.type)
+            StructureListItem(
+                id=r.id,
+                code=r.code,
+                name=r.name,
+                acronym=r.acronym,
+                type=r.type,
+                perimeter_ids=list(r.perimeter_ids),
+            )
             for r in rows
         ]
 

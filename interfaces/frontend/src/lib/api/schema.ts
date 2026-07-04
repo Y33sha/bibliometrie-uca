@@ -5512,6 +5512,8 @@ export interface components {
             acronym: string | null;
             /** Type */
             type: string;
+            /** Perimeter Ids */
+            perimeter_ids: number[];
         };
         /**
          * StructureOut
