@@ -48,6 +48,10 @@ class PublicationRepository(Protocol):
 
     def get_source_publications(self, pub_id: int) -> list[SourcePublication]: ...
 
+    def get_converged_secondary_ids(self, pub_id: int) -> frozenset[int]:
+        """Ids des `source_publications` de `pub_id` dont le DOI a été substitué par une correction de convergence (forme secondaire : version, variante, pièce d'un dataset). L'agrégation les déprioris pour que les scalaires descriptifs viennent de l'enregistrement canonique."""
+        ...
+
     def get_journal_type(self, journal_id: int) -> str | None:
         """`journal_type` d'un journal, pour la re-correction canonique journal-dépendante dans `refresh_from_sources`. None si le journal n'existe pas ou son type n'est pas posé."""
         ...

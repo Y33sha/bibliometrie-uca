@@ -539,6 +539,19 @@ class DoiClusterCase(StrEnum):
     CHAPITRES_TITRES_DIFFERENTS = "CHAPITRES_TITRES_DIFFERENTS"
 
 
+# Cas de **convergence** : le DOI du membre est substitué par celui de l'œuvre canonique (le
+# membre décrit une forme secondaire — version, variante, pièce). À l'opposé des cas de
+# divergence (ouvrage/chapitre), qui nullent le DOI. L'agrégation canonique relègue ces membres
+# en fin de priorité pour que le titre vienne de l'enregistrement canonique, pas d'une pièce.
+CONVERGENCE_CASES: frozenset[str] = frozenset(
+    {
+        DoiClusterCase.DATACITE_VERSION_TO_CONCEPT,
+        DoiClusterCase.DATACITE_VARIANT_TO_PRIMARY,
+        DoiClusterCase.DATACITE_PACKAGE_PIECE,
+    }
+)
+
+
 class DoiClusterMember(NamedTuple):
     """Un membre d'un groupe de SP partageant un DOI : son id, son `doc_type` **canonique**
     (corrigé par la passe unaire) et son `title_normalized` (matérialisé). `canonical_doi` est

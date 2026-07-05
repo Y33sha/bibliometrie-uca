@@ -15,6 +15,7 @@ from sqlalchemy import Connection, text
 from application.ports.repositories.publication_repository import PubByDoi
 from domain.publications.identifiers import DOI
 from domain.publications.publication import Publication
+from domain.source_publications.correction import CONVERGENCE_CASES
 from domain.source_publications.source_publication import SourcePublication
 
 
@@ -271,6 +272,20 @@ class PgPublicationRepository:
             {"id": pub_id},
         )
         return [_view_from_row(_SourcePublicationViewRow(*row)) for row in result]
+
+    def get_converged_secondary_ids(self, pub_id: int) -> frozenset[int]:
+        """Ids des `source_publications` de `pub_id` dont le DOI a été substitué par une
+        correction de convergence (`raw_metadata.doi.corrected_by` ∈ `CONVERGENCE_CASES`). Ces
+        formes secondaires (version, variante, pièce) sont dépriorisées à l'agrégation."""
+        result = self._conn.execute(
+            text("""
+                SELECT id FROM source_publications
+                WHERE publication_id = :id
+                  AND raw_metadata->'doi'->>'corrected_by' = ANY(:cases)
+            """),
+            {"id": pub_id, "cases": list(CONVERGENCE_CASES)},
+        )
+        return frozenset(row.id for row in result)
 
     def get_journal_type(self, journal_id: int) -> str | None:
         """`journal_type` d'un journal (cast text). None si le journal n'existe pas ou son type est NULL."""
