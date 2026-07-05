@@ -66,18 +66,20 @@
           target={r.publication_id ? undefined : "_blank"}
           rel={r.publication_id ? undefined : "noopener"}
         >
-          {#if tier === "danger" || tier === "warning"}
-            <svg class="rel-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-              <line x1="12" y1="9" x2="12" y2="13" />
-              <line x1="12" y1="17" x2="12.01" y2="17" />
-            </svg>
-          {:else}
-            <svg class="rel-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M9 17H7A5 5 0 0 1 7 7h2M15 7h2a5 5 0 0 1 0 10h-2M8 12h8" />
-            </svg>
-          {/if}
-          <span class="rel-kind">{relationTypeLabel[r.relation_type] ?? r.relation_type}</span>
+          <span class="rel-label">
+            {#if tier === "danger" || tier === "warning"}
+              <svg class="rel-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                <line x1="12" y1="9" x2="12" y2="13" />
+                <line x1="12" y1="17" x2="12.01" y2="17" />
+              </svg>
+            {:else}
+              <svg class="rel-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M9 17H7A5 5 0 0 1 7 7h2M15 7h2a5 5 0 0 1 0 10h-2M8 12h8" />
+              </svg>
+            {/if}
+            <span class="rel-kind">{relationTypeLabel[r.relation_type] ?? r.relation_type}</span>
+          </span>
           <span class="rel-title">{@html sanitizeTitle(r.title ?? r.doi ?? "")}</span>
         </a>
       {/each}
@@ -146,11 +148,19 @@
     border-radius: 4px;
     text-decoration: none;
   }
+  /* Icône + type de relation forment un bloc « libellé » centré ensemble ; il s'aligne sur la
+     première ligne du titre (via `align-items: baseline` du `.rel-item`) et ne dérive plus au
+     milieu du bloc quand le titre passe sur plusieurs lignes. */
+  .rel-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    flex: none;
+  }
   .rel-icon {
     width: 16px;
     height: 16px;
     flex: none;
-    align-self: center;
   }
   .rel-kind {
     text-transform: uppercase;
