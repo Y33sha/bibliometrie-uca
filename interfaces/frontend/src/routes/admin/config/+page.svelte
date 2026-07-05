@@ -4,12 +4,33 @@
   import { api, ApiError, config as configApi, perimeters as perimetersApi } from "$lib/api";
   import { confirmDialog, toast } from '$lib/dialogs.svelte';
   import Modal from '$lib/components/Modal.svelte';
+  import Tooltip from '$lib/components/Tooltip.svelte';
   import { autofocus } from "$lib/actions/focus";
   import type { components } from "$lib/api/schema";
 
   type StructureListItem = components["schemas"]["StructureListItem"];
 
   type ConfigItem = components["schemas"]["ConfigItem"];
+
+  // Rôles des périmètres : quel périmètre pilote chaque phase. Descriptions en langage
+  // utilisateur (schéma masqué), affichées en infobulle au survol du libellé.
+  const PERIMETER_ROLES = [
+    {
+      key: "perimeter_extraction",
+      label: "Extraction",
+      hint: "Structures dont on va chercher les publications auprès des sources (HAL, OpenAlex, Web of Science, thèses…).",
+    },
+    {
+      key: "perimeter_affiliations",
+      label: "Affiliations",
+      hint: "Structures reconnues dans les affiliations des auteurs : une adresse rattachée à l'une d'elles est identifiée comme telle.",
+    },
+    {
+      key: "perimeter_persons",
+      label: "Publications et personnes",
+      hint: "Une publication est retenue, et ses auteurs créés comme personnes, dès qu'au moins un auteur est affilié à l'une de ces structures.",
+    },
+  ];
   type PerimeterStructure = components["schemas"]["PerimeterStructureItem"];
   type Perimeter = components["schemas"]["PerimeterOut"];
   type HalCollections = components["schemas"]["HalCollectionsResponse"];
@@ -286,32 +307,43 @@
 <button class="btn btn-sm" style="margin: 0 auto; display:block; max-width:800px;" onclick={openPerimCreate}>+ Nouveau périmètre</button>
 
 <h4 class="subsection-title">Rôle des périmètres</h4>
-<div class="config-grid">
-  {#each [{ key: "perimeter_extraction", label: "Phase extraction", hint: "Structures interrogées par les API (identifiants dans api_ids + collections HAL)" }, { key: "perimeter_affiliations", label: "Phase affiliations", hint: "Résolution structure_ids sur les authorships sources" }, { key: "perimeter_persons", label: "Phases publications + persons", hint: "Détermine in_perimeter : seuls les documents avec au moins une authorship in_perimeter génèrent des publications et des personnes" }] as role}
-    {@const item = configByKey(role.key)}
-    {#if item}
-      <div class="config-row" style="flex-wrap: wrap;">
-        <span class="config-label">{role.label}</span>
-        <select
-          class="config-select"
-          value={item.value}
-          onchange={async (e) => {
-            const target = e.target as HTMLSelectElement;
-            try {
-              await configApi.setValue(role.key, target.value);
-              await load();
-            } catch {}
-          }}
-        >
-          {#each perimeters as p (p.id)}
-            <option value={p.code}>{p.name} ({p.code})</option>
-          {/each}
-        </select>
-        <span class="config-hint" style="width: 100%;">{role.hint}</span>
-      </div>
-    {/if}
-  {/each}
-</div>
+<table class="perimeters-table">
+  <thead>
+    <tr>
+      <th>Phase</th>
+      <th>Périmètre</th>
+    </tr>
+  </thead>
+  <tbody>
+    {#each PERIMETER_ROLES as role (role.key)}
+      {@const item = configByKey(role.key)}
+      {#if item}
+        <tr>
+          <td>
+            <Tooltip text={role.hint}><span class="role-phase">{role.label}</span></Tooltip>
+          </td>
+          <td>
+            <select
+              class="config-select"
+              value={item.value}
+              onchange={async (e) => {
+                const target = e.target as HTMLSelectElement;
+                try {
+                  await configApi.setValue(role.key, target.value);
+                  await load();
+                } catch {}
+              }}
+            >
+              {#each perimeters as p (p.id)}
+                <option value={p.code}>{p.name} ({p.code})</option>
+              {/each}
+            </select>
+          </td>
+        </tr>
+      {/if}
+    {/each}
+  </tbody>
+</table>
 
 <!-- ═══ HAL ═══ -->
 <h3 class="section-title">HAL : Collections à moissonner</h3>
@@ -598,6 +630,11 @@
     font-family: inherit;
     border: 1px solid var(--border);
     border-radius: 3px;
+  }
+  /* Libellé de phase : le pointillé + le curseur d'aide signalent l'infobulle de description. */
+  .role-phase {
+    border-bottom: 1px dotted var(--muted);
+    cursor: help;
   }
   .config-hint a {
     color: var(--accent);
