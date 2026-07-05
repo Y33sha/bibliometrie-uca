@@ -505,8 +505,8 @@ def strip_dissertation_keys(external_ids: dict[str, JsonValue]) -> dict[str, Jso
 # - **convergence (même œuvre)** : une forme secondaire DataCite converge sur le DOI de
 #   l'œuvre canonique, exposé par un `relatedIdentifiers` → substitution `doi = canonique`.
 #   Trois cas : version → concept (`IsVersionOf`) ; forme variante, ex. copie repository →
-#   version publiée (`IsVariantFormOf`) ; fichier d'un dépôt → dépôt parent (`IsPartOf` dont
-#   le DOI porteur est le DOI parent suivi d'un suffixe) ;
+#   version publiée (`IsVariantFormOf`) ; pièce d'un dataset → dataset parent (`IsPartOf` vers
+#   un DOI présent en base comme dataset — forme du DOI indifférente) ;
 # - **divergence (œuvres distinctes)** : un DOI partagé par des œuvres en réalité distinctes
 #   (ouvrage/chapitre, chapitres de titres différents) est erroné sur le ou les mauvais
 #   côtés → nullage du DOI, sinon le matching les fusionnerait à tort.
@@ -526,7 +526,7 @@ class DoiClusterCase(StrEnum):
         "DATACITE_VARIANT_TO_PRIMARY"  # copie repository → version publiée (IsVariantFormOf)
     )
     DATACITE_PACKAGE_PIECE = (
-        "DATACITE_PACKAGE_PIECE"  # fichier d'un dépôt → dépôt parent (IsPartOf)
+        "DATACITE_PACKAGE_PIECE"  # pièce d'un dataset → dataset parent présent (IsPartOf)
     )
 
     # Ouvrage et chapitre partageant un DOI : le DOI appartient à l'ouvrage (`book`), le
