@@ -5425,6 +5425,8 @@ export interface components {
             hal_collections: string[] | null;
             /** Countries */
             countries: string[] | null;
+            /** Is Secondary */
+            is_secondary: boolean;
         };
         /** StatsFacetsResponse */
         StatsFacetsResponse: {
