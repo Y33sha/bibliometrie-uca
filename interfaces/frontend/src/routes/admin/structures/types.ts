@@ -25,20 +25,6 @@ export interface EditFormState {
 
 // ── Constantes ──
 
-// Source unique des types de structure (valeur enum + libellé), pour le formulaire d'édition et
-// le filtre de la liste. Aligné sur l'enum Postgres `structure_type` / `StructureType` (domaine).
-export const STRUCTURE_TYPES: readonly { value: string; label: string }[] = [
-  { value: "labo", label: "Laboratoire" },
-  { value: "equipe", label: "Équipe" },
-  { value: "universite", label: "Université" },
-  { value: "ecole", label: "École" },
-  { value: "chu", label: "CHU" },
-  { value: "onr", label: "ONR" },
-  { value: "site", label: "Site" },
-  { value: "admin", label: "Administration" },
-  { value: "autre", label: "Autre" },
-];
-
 export const API_SOURCES = ["openalex", "wos", "scanr", "theses"] as const;
 
 export const API_SOURCE_LABELS: Record<string, string> = {

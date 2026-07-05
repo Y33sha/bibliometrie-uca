@@ -42,9 +42,12 @@ class PgLaboratoriesQueries(LaboratoriesQueries):
     def list_laboratories(self) -> list[LaboratoryListItem]:
         """Liste des labos du périmètre, avec toutes leurs tutelles.
 
-        Résout en interne le périmètre `persons` (ids des structures) avant de filtrer.
+        Résout en interne le périmètre `persons` (ids des structures) avant de filtrer. Les
+        types de structure affichés sont configurables (clé `laboratories_display_types`,
+        défaut `['labo']`).
         """
         perimeter_ids = get_persons_structure_ids_list(self._conn)
+        display_types = self._laboratories_display_types()
         rows = self._conn.execute(
             text("""
                 SELECT s.id, s.code, s.name, s.acronym,
@@ -59,11 +62,11 @@ class PgLaboratoriesQueries(LaboratoriesQueries):
                           AND sr.relation_type = 'est_tutelle_de'
                        ) AS tutelles
                 FROM structures s
-                WHERE s.structure_type = 'labo'
+                WHERE s.structure_type::text = ANY(:display_types)
                   AND s.id = ANY(:perimeter_ids)
                 ORDER BY s.name
             """),
-            {"perimeter_ids": perimeter_ids},
+            {"perimeter_ids": perimeter_ids, "display_types": display_types},
         ).all()
         return [
             LaboratoryListItem(
@@ -77,6 +80,16 @@ class PgLaboratoriesQueries(LaboratoriesQueries):
             )
             for r in rows
         ]
+
+    def _laboratories_display_types(self) -> list[str]:
+        """Types de structure affichés sur la page publique des laboratoires. Lit la clé de
+        config `laboratories_display_types` (liste) ; défaut `['labo']` si absente ou malformée.
+        Une liste vide est respectée (page vide) : la config fait foi."""
+        row = self._conn.execute(
+            text("SELECT value FROM config WHERE key = 'laboratories_display_types'")
+        ).one_or_none()
+        value = row.value if row else None
+        return value if isinstance(value, list) else ["labo"]
 
     def get_laboratory(self, lab_id: int) -> LaboratoryDetailResponse | None:
         """Profil public d'un laboratoire (None si absent)."""

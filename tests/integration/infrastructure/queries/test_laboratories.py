@@ -93,6 +93,29 @@ class TestListLaboratories:
         tutelles_ids = [t.id for t in (lab_row.tutelles or [])]
         assert root in tutelles_ids
 
+    def test_display_types_configurable(self, sa_sync_conn):
+        # Les types affichés suivent la config `laboratories_display_types`.
+        conn = sa_sync_conn
+        lab = _create_structure(conn, code="LAB-D", type_="labo")
+        team = _create_structure(conn, code="TEAM-D", type_="equipe")
+        _setup_perimeter(conn, [lab, team])
+        q = PgLaboratoriesQueries(conn)
+
+        # Défaut (posé par la migration) : ['labo'] → seul le labo apparaît.
+        ids = {row.id for row in q.list_laboratories()}
+        assert lab in ids
+        assert team not in ids
+
+        # Ajouter 'equipe' à la config → l'équipe apparaît.
+        conn.execute(
+            text(
+                'UPDATE config SET value = \'["labo", "equipe"]\' '
+                "WHERE key = 'laboratories_display_types'"
+            )
+        )
+        ids2 = {row.id for row in q.list_laboratories()}
+        assert {lab, team} <= ids2
+
 
 class TestGetLaboratory:
     def test_returns_none_for_missing(self, sa_sync_conn):
