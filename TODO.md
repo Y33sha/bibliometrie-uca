@@ -38,10 +38,7 @@ python -m interfaces.cli.oneshot.backfill_clean_dois --apply
 * [ ] Filtres supplémentaires possibles: langue; `has_doi` (crossref, datacite, other, none); `corresponding_is_in_perimeter`; `peer_reviewed`? (suppose de posséder la donnée ou de pouvoir la déduire des sources); licence
 * [ ] premier/dernier auteur (sur l'onglet publications de la page personne)
 * [ ] thèses d'autres établissements liés à nos labos: enlever de la page thèses (ajouter filtre implicite sur "établissement de soutenance" / ou le faire en amont dès le pipeline?)
-## Page statistiques:
-* [ ] Conserver l'échelle entre pages sur les graphiques paginés (ou option d'augmenter ponctuellement le max?)
-* [ ] Collab internationales: affichage carte?
-* [ ] Montants APC (à envisager une fois que les problèmes de données seront résolus)
+* [ ] Montants APC consultables via /stats (à envisager une fois que les problèmes de données seront résolus)
 
 # Cas particuliers, bizarreries à élucider
 * [ ] 164107: pourquoi type autre?
