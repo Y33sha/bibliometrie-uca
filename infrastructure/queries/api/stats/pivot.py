@@ -16,17 +16,8 @@ from sqlalchemy import Connection, text
 
 from domain.publications.doc_type_families import doc_type_grouped_sql
 from domain.stats.pivot import DIMENSIONS, MEASURES, Dimension, validate_pivot
-from infrastructure.queries.api.stats._shared import stats_apc_clause
-from infrastructure.queries.filters import (
-    OA_OPEN_SQL,
-    PUBLICATION_IS_IN_PERIMETER,
-    WhereClause,
-    assemble_where,
-    doc_type_clause,
-    lab_clause,
-    oa_clause,
-    year_clause,
-)
+from infrastructure.queries.api.stats._shared import STATS_BASE, stats_filter_clauses
+from infrastructure.queries.filters import OA_OPEN_SQL, assemble_where
 
 # Liaison SQL par clé de dimension : expression de groupement et jointure éventuelle.
 _DIM_EXPR: dict[str, str] = {
@@ -67,41 +58,6 @@ _GROUPABLE = {key for key, dim in DIMENSIONS.items() if dim.groupable}
 assert set(_DIM_EXPR) == _GROUPABLE, "liaison SQL des dimensions désynchronisée du registre"
 assert set(_MEASURE_AGG) == set(MEASURES), "liaison SQL des mesures désynchronisée du registre"
 
-# Périmètre du moteur : corpus in-perimeter, hors revues-dépôts (serveurs de preprint). Le type de
-# document n'est PAS figé ici — c'est un filtre comme un autre (cf. `doc_type_clause`).
-_BASE = " AND ".join([PUBLICATION_IS_IN_PERIMETER, "(j.oa_model IS DISTINCT FROM 'repository')"])
-
-
-def _filter_clauses(
-    *,
-    apc_structure_ids: list[int],
-    lab_ids: list[int],
-    years: list[int],
-    publisher_ids: list[int],
-    journal_ids: list[int],
-    oa_status: str,
-    has_apc: str,
-    doc_types: list[str],
-) -> list[WhereClause | None]:
-    out: list[WhereClause | None] = [
-        year_clause(years),
-        lab_clause(lab_ids),
-        oa_clause(oa_status),
-        stats_apc_clause(has_apc, apc_structure_ids),
-        doc_type_clause(doc_types),
-    ]
-    if publisher_ids:
-        out.append(
-            WhereClause(
-                "j.publisher_id = ANY(:flt_publisher_ids)", {"flt_publisher_ids": publisher_ids}
-            )
-        )
-    if journal_ids:
-        out.append(
-            WhereClause("p.journal_id = ANY(:flt_journal_ids)", {"flt_journal_ids": journal_ids})
-        )
-    return out
-
 
 def _order_by(dims: list[Dimension]) -> str:
     """Dimensions ordinales d'abord (ASC, lecture chronologique), puis par la mesure décroissante."""
@@ -128,7 +84,7 @@ def run_pivot(
     validées contre le registre (`validate_pivot`) avant toute composition SQL."""
     m, dims = validate_pivot(measure, groups)
     where, binds = assemble_where(
-        _filter_clauses(
+        stats_filter_clauses(
             apc_structure_ids=apc_structure_ids,
             lab_ids=lab_ids,
             years=years,
@@ -146,7 +102,7 @@ def run_pivot(
     sql = (
         f"SELECT {select} FROM publications p "
         f"LEFT JOIN journals j ON j.id = p.journal_id {joins} "
-        f"WHERE {_BASE} AND {where}"
+        f"WHERE {STATS_BASE} AND {where}"
     )
     if dims:
         group_by = ", ".join(_DIM_EXPR[d.key] for d in dims)

@@ -2,8 +2,9 @@
 
 Le package est organisé par thème d'agrégat :
 - `pivot` : `run_pivot` (agrégation générique) et le schéma du registre
+- `collaborations` : `run_collaborations` (décompte des pays étrangers co-affiliés)
 - `summary` : `available_years`, `stats_facets`
-- `_shared` : filtre APC partagé par les agrégats.
+- `_shared` : périmètre de base, assemblage des filtres et filtre APC partagés par les agrégats.
 
 `PgStatsQueries` agrège ces fonctions sous le port `application.ports.stats_queries.StatsQueries`. Les fonctions libres retournent des dicts conformes au shape des DTOs ; la conversion vers Pydantic est faite ici à la sortie, pour garder les fonctions libres réutilisables hors API.
 """
@@ -19,6 +20,8 @@ from application.ports.api.entity_facet import (
 )
 from application.ports.api.stats_queries import (
     ApcFacet,
+    CollaborationsResponse,
+    CountryCollaboration,
     DocTypeFacet,
     LabFacet,
     OaFacet,
@@ -32,6 +35,9 @@ from application.ports.api.stats_queries import (
 )
 from domain.stats.pivot import DIMENSIONS, MEASURES
 from infrastructure.queries.api.entity_labels import entity_label as _entity_label
+from infrastructure.queries.api.stats.collaborations import (
+    run_collaborations as _run_collaborations,
+)
 from infrastructure.queries.api.stats.entity_facets import stats_entity_facet as _stats_entity_facet
 from infrastructure.queries.api.stats.pivot import run_pivot as _run_pivot
 from infrastructure.queries.api.stats.summary import (
@@ -48,6 +54,31 @@ class PgStatsQueries(StatsQueries):
 
     def available_years(self) -> list[int]:
         return _available_years(self._conn)
+
+    def collaborations(
+        self,
+        *,
+        apc_structure_ids: list[int],
+        lab_ids: list[int],
+        years: list[int],
+        publisher_ids: list[int],
+        journal_ids: list[int],
+        oa_status: str,
+        has_apc: str,
+        doc_types: list[str],
+    ) -> CollaborationsResponse:
+        data = _run_collaborations(
+            self._conn,
+            apc_structure_ids=apc_structure_ids,
+            lab_ids=lab_ids,
+            years=years,
+            publisher_ids=publisher_ids,
+            journal_ids=journal_ids,
+            oa_status=oa_status,
+            has_apc=has_apc,
+            doc_types=doc_types,
+        )
+        return CollaborationsResponse(rows=[CountryCollaboration(**r) for r in data["rows"]])
 
     def pivot_schema(self) -> PivotSchemaResponse:
         return PivotSchemaResponse(

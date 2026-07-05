@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, Query
 
 from application.ports.api.entity_facet import EntityFacetResponse, EntityLabelResponse
 from application.ports.api.stats_queries import (
+    CollaborationsResponse,
     PivotResponse,
     PivotSchemaResponse,
     StatsFacetsResponse,
@@ -92,6 +93,31 @@ def stats_entity_label(
     """Libellé d'une entité (revue/éditeur) par id, pour réafficher une pastille de facette restaurée
     depuis l'URL (qui ne porte que l'id, état canonique de la sélection)."""
     return queries.resolve_entity_label(kind=kind, entity_id=entity_id)
+
+
+@router.get("/api/stats/collaborations", response_model=CollaborationsResponse)
+def collaborations(
+    lab_id: str = Query(""),
+    year: str = Query(""),
+    publisher_id: str = Query(""),
+    journal_id: str = Query(""),
+    oa_status: str = Query(""),
+    has_apc: str = Query(""),
+    doc_type: str = Query(""),
+    queries: StatsQueries = Depends(stats_queries_sync),
+) -> CollaborationsResponse:
+    """Collaborations internationales : nombre de publications co-affiliées à chaque pays étranger,
+    sous les filtres actifs. Source : la colonne `countries` des publications, hors pays domestique."""
+    return queries.collaborations(
+        apc_structure_ids=get_apc_structure_ids_sync(),
+        lab_ids=parse_int_csv(lab_id),
+        years=parse_int_csv(year),
+        publisher_ids=parse_int_csv(publisher_id),
+        journal_ids=parse_int_csv(journal_id),
+        oa_status=oa_status,
+        has_apc=has_apc,
+        doc_types=parse_str_csv(doc_type),
+    )
 
 
 @router.get("/api/stats/pivot/schema", response_model=PivotSchemaResponse)
