@@ -85,7 +85,7 @@ TABLES: list[dict[str, Any]] = [
     },
     {
         "table": "perimeters",
-        "columns": ["id", "code", "name", "description", "structure_ids"],
+        "columns": ["id", "code", "name", "structure_ids"],
         "order": "id",
     },
     {

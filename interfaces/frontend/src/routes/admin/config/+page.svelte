@@ -27,7 +27,6 @@
     id: number | null;
     code: string;
     name: string;
-    description: string;
     structSearch: string;
     structResults: any[];
     structure_ids: number[];
@@ -35,7 +34,7 @@
   } | null = $state(null);
 
   function openPerimCreate() {
-    perimModal = { mode: "create", id: null, code: "", name: "", description: "", structSearch: "", structResults: [], structure_ids: [], structures: [] };
+    perimModal = { mode: "create", id: null, code: "", name: "", structSearch: "", structResults: [], structure_ids: [], structures: [] };
   }
 
   function openPerimEdit(p: Perimeter) {
@@ -44,7 +43,6 @@
       id: p.id,
       code: p.code,
       name: p.name,
-      description: p.description || "",
       structSearch: "",
       structResults: [],
       structure_ids: [...p.structure_ids],
@@ -67,7 +65,6 @@
         const { id } = await perimetersApi.create({
           code: perimModal.code,
           name: perimModal.name,
-          description: perimModal.description,
         });
         for (const sid of perimModal.structure_ids) {
           await perimetersApi.addStructure(id, sid);
@@ -75,7 +72,6 @@
       } else {
         await perimetersApi.update(perimModal.id!, {
           name: perimModal.name,
-          description: perimModal.description,
           structure_ids: perimModal.structure_ids,
         });
       }
@@ -256,27 +252,37 @@
 
 <h4 class="subsection-title">Définition des périmètres</h4>
 <p class="help-text">Chaque périmètre est défini par une liste de structures racines. Les sous-structures en tutelle sont incluses récursivement.</p>
-{#each perimeters as perim (perim.id)}
-  <div class="perimeter-card">
-    <div class="perimeter-header">
-      <strong>{perim.name}</strong>
-      <span class="perimeter-code">{perim.code}</span>
-      <span class="perimeter-count">{perim.structure_count} structures</span>
-      <span style="margin-left:auto; display:flex; gap:4px;">
-        <button class="btn btn-sm" onclick={() => openPerimEdit(perim)}>Modifier</button>
-        <button class="btn btn-sm btn-danger" onclick={() => deletePerimeter(perim.id)}>Supprimer</button>
-      </span>
-    </div>
-    {#if perim.description}
-      <p class="perimeter-desc">{perim.description}</p>
-    {/if}
-    <div class="perimeter-rules">
-      {#each perim.structures as struct (struct.id)}
-        <span class="tag">{struct.acronym || struct.name}</span>
-      {/each}
-    </div>
-  </div>
-{/each}
+<table class="perimeters-table">
+  <thead>
+    <tr>
+      <th>Code</th>
+      <th>Nom</th>
+      <th class="num">Total</th>
+      <th>Structures racines</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {#each perimeters as perim (perim.id)}
+      <tr>
+        <td class="perim-code">{perim.code}</td>
+        <td class="perim-name">{perim.name}</td>
+        <td class="num">{perim.structure_count}</td>
+        <td>
+          <div class="perimeter-rules">
+            {#each perim.structures as struct (struct.id)}
+              <span class="tag">{struct.acronym || struct.name}</span>
+            {/each}
+          </div>
+        </td>
+        <td class="perim-actions">
+          <button class="btn btn-sm" onclick={() => openPerimEdit(perim)}>Modifier</button>
+          <button class="btn btn-sm btn-danger" onclick={() => deletePerimeter(perim.id)}>Supprimer</button>
+        </td>
+      </tr>
+    {/each}
+  </tbody>
+</table>
 <button class="btn btn-sm" style="margin: 0 auto; display:block; max-width:800px;" onclick={openPerimCreate}>+ Nouveau périmètre</button>
 
 <h4 class="subsection-title">Rôle des périmètres</h4>
@@ -346,7 +352,6 @@
   >
       <label>Code <input bind:value={perimModal.code} disabled={perimModal.mode === "edit"} placeholder="ex: uca_wide" /></label>
       <label>Nom <input bind:value={perimModal.name} placeholder="ex: UCA large" /></label>
-      <label>Description <input bind:value={perimModal.description} /></label>
       <label for="perim-struct-search">Structures racines</label>
       <div class="perimeter-rules" style="margin: 4px 0 8px;">
         {#each perimModal.structures as struct (struct.id)}
@@ -476,33 +481,58 @@
     color: #555;
   }
 
-  .perimeter-card {
+  .perimeters-table {
+    width: 100%;
+    max-width: 800px;
+    margin: 0 auto 10px;
+    border-collapse: collapse;
     background: var(--card);
     border: 1px solid var(--border);
     border-radius: 6px;
-    padding: 12px 16px;
-    margin: 0 auto 10px;
-    max-width: 800px;
+    overflow: hidden;
   }
-  .perimeter-header {
-    display: flex;
-    align-items: center;
-    gap: 10px;
+  .perimeters-table th,
+  .perimeters-table td {
+    padding: 7px 12px;
+    text-align: left;
+    vertical-align: middle;
+    border-bottom: 1px solid var(--border-subtle);
   }
-  .perimeter-code {
-    font-size: 0.75rem;
+  .perimeters-table thead th {
+    background: var(--surface);
+    font-size: 0.72rem;
+    font-weight: 600;
     color: var(--muted);
-    font-family: monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
   }
-  .perimeter-count {
-    font-size: 0.8rem;
+  .perimeters-table tbody tr:last-child td {
+    border-bottom: none;
+  }
+  .perimeters-table .num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
     color: var(--accent);
-    margin-left: auto;
+    white-space: nowrap;
   }
-  .perimeter-desc {
-    font-size: 0.85rem;
+  .perimeters-table .perimeter-rules {
+    margin: 0;
+  }
+  .perim-code {
+    font-family: monospace;
+    font-size: 0.8rem;
     color: var(--muted);
-    margin: 4px 0 8px;
+    white-space: nowrap;
+  }
+  .perim-name {
+    font-weight: 600;
+  }
+  .perim-actions {
+    text-align: right;
+    white-space: nowrap;
+  }
+  .perim-actions .btn {
+    margin-left: 4px;
   }
   .perimeter-rules {
     display: flex;

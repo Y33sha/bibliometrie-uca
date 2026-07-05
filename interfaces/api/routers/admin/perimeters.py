@@ -53,12 +53,10 @@ def create_perimeter(
     """Crée un nouveau périmètre."""
     code = body.code.strip()
     name = body.name.strip()
-    description = (body.description or "").strip() or None
     pid = perimeter_commands.create_perimeter(
         conn,
         code=code,
         name=name,
-        description=description,
         repo=repo,
     )
     return CreatedIdResponse(id=pid)
@@ -71,13 +69,10 @@ def update_perimeter(
     conn: Connection = Depends(db_conn_sync),
     repo: PerimeterRepository = Depends(perimeter_repo_sync),
 ) -> OkResponse:
-    """Met à jour un périmètre (nom, description, structures)."""
+    """Met à jour un périmètre (nom, structures)."""
     fields = body.model_dump(exclude_unset=True)
-    # Nettoyer : strip des strings et description vide → None
     if "name" in fields and isinstance(fields["name"], str):
         fields["name"] = fields["name"].strip()
-    if "description" in fields and isinstance(fields["description"], str):
-        fields["description"] = fields["description"].strip() or None
     perimeter_commands.update_perimeter(conn, perimeter_id, fields=fields, repo=repo)
     return OkResponse()
 

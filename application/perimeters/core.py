@@ -63,7 +63,6 @@ def create_perimeter(
     *,
     code: str,
     name: str,
-    description: str | None = None,
     repo: PerimeterRepository,
 ) -> int:
     """Crée un nouveau périmètre. Retourne l'id créé.
@@ -76,7 +75,7 @@ def create_perimeter(
 
     if repo.perimeter_code_exists(code):
         raise ConflictError(f"Le code '{code}' existe déjà")
-    return repo.create_perimeter(code=code, name=name, description=description)
+    return repo.create_perimeter(code=code, name=name)
 
 
 def update_perimeter(
@@ -85,7 +84,7 @@ def update_perimeter(
     fields: dict[str, JsonValue],
     repo: PerimeterRepository,
 ) -> None:
-    """Met à jour un périmètre (name, description, structure_ids).
+    """Met à jour un périmètre (name, structure_ids).
 
     Lève NotFoundError si le périmètre n'existe pas.
     Lève ValidationError si `fields` est vide ou ne contient aucun champ valide.
@@ -93,7 +92,7 @@ def update_perimeter(
     if not repo.perimeter_exists(perimeter_id):
         raise NotFoundError(f"Périmètre {perimeter_id} introuvable")
 
-    allowed = {"name", "description", "structure_ids"}
+    allowed = {"name", "structure_ids"}
     clean = cast(PerimeterUpdateFields, {k: v for k, v in fields.items() if k in allowed})
     if not clean:
         raise ValidationError("Aucun champ à mettre à jour")

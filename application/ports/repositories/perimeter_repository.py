@@ -12,7 +12,6 @@ class PerimeterUpdateFields(TypedDict, total=False):
     """Partial update sur la table `perimeters` (clés optionnelles)."""
 
     name: str
-    description: str | None
     structure_ids: list[int]
 
 
@@ -23,9 +22,9 @@ class PerimeterRepository(Protocol):
 
     def find_by_id(self, perimeter_id: int) -> Perimeter | None:
         """Hydrate l'aggregate `Perimeter` complet (code, name,
-        description, `structure_ids`). Retourne None si le perimeter
-        n'existe pas. `structure_ids` reste sous forme d'ids (références
-        par id à l'aggregate Structure)."""
+        `structure_ids`). Retourne None si le perimeter n'existe pas.
+        `structure_ids` reste sous forme d'ids (références par id à
+        l'aggregate Structure)."""
         ...
 
     # ── Liens structure ↔ perimeter ────────────────────────────────
@@ -53,7 +52,6 @@ class PerimeterRepository(Protocol):
         *,
         code: str,
         name: str,
-        description: str | None,
     ) -> int: ...
 
     def update_perimeter_fields(self, perimeter_id: int, fields: PerimeterUpdateFields) -> None: ...

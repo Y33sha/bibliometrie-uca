@@ -2013,7 +2013,7 @@ export interface paths {
         get?: never;
         /**
          * Update Perimeter
-         * @description Met à jour un périmètre (nom, description, structures).
+         * @description Met à jour un périmètre (nom, structures).
          */
         put: operations["update_perimeter_api_perimeters__perimeter_id__put"];
         post?: never;
@@ -4285,8 +4285,6 @@ export interface components {
             code: string;
             /** Name */
             name: string;
-            /** Description */
-            description?: string | null;
         };
         /**
          * PerimeterOut
@@ -4299,8 +4297,6 @@ export interface components {
             code: string;
             /** Name */
             name: string;
-            /** Description */
-            description: string | null;
             /** Structure Ids */
             structure_ids: number[];
             /** Structures */
@@ -4323,8 +4319,6 @@ export interface components {
         PerimeterUpdate: {
             /** Name */
             name?: string | null;
-            /** Description */
-            description?: string | null;
             /** Structure Ids */
             structure_ids?: number[] | null;
         };

@@ -22,13 +22,10 @@ def create_perimeter(
     *,
     code: str,
     name: str,
-    description: str | None,
     repo: PerimeterRepository,
 ) -> int:
     """Crée un périmètre. Retourne l'id créé."""
-    pid = perimeters_service.create_perimeter(
-        code=code, name=name, description=description, repo=repo
-    )
+    pid = perimeters_service.create_perimeter(code=code, name=name, repo=repo)
     conn.commit()
     return pid
 
@@ -40,7 +37,7 @@ def update_perimeter(
     fields: dict[str, JsonValue],
     repo: PerimeterRepository,
 ) -> None:
-    """Met à jour un périmètre (champs sélectifs : name, description, structure_ids)."""
+    """Met à jour un périmètre (champs sélectifs : name, structure_ids)."""
     perimeters_service.update_perimeter(perimeter_id, fields=fields, repo=repo)
     conn.commit()
 

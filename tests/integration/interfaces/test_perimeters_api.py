@@ -114,36 +114,29 @@ class TestCreatePerimeter:
         code = _uniq("create")
         r = auth_client.post(
             "/api/perimeters",
-            json={"code": code, "name": "Created", "description": "desc"},
+            json={"code": code, "name": "Created"},
         )
         assert r.status_code == 200
         body = r.json()
         assert "id" in body
         with _pool() as cur:
-            cur.execute(
-                "SELECT code, name, description FROM perimeters WHERE id = %s", (body["id"],)
-            )
+            cur.execute("SELECT code, name FROM perimeters WHERE id = %s", (body["id"],))
             row = cur.fetchone()
             assert row["code"] == code
             assert row["name"] == "Created"
-            assert row["description"] == "desc"
 
-    def test_strips_whitespace_and_empty_description(self, auth_client):
-        # `description` vide après strip → None côté repo.
+    def test_strips_whitespace(self, auth_client):
         code = _uniq("strip")
         r = auth_client.post(
             "/api/perimeters",
-            json={"code": f"  {code}  ", "name": "  TrimMe  ", "description": "   "},
+            json={"code": f"  {code}  ", "name": "  TrimMe  "},
         )
         assert r.status_code == 200
         with _pool() as cur:
-            cur.execute(
-                "SELECT code, name, description FROM perimeters WHERE id = %s", (r.json()["id"],)
-            )
+            cur.execute("SELECT code, name FROM perimeters WHERE id = %s", (r.json()["id"],))
             row = cur.fetchone()
             assert row["code"] == code
             assert row["name"] == "TrimMe"
-            assert row["description"] is None
 
 
 class TestUpdatePerimeter:
@@ -151,19 +144,18 @@ class TestUpdatePerimeter:
         r = client.put("/api/perimeters/1", json={"name": "X"})
         assert r.status_code == 401
 
-    def test_partial_update_strips_and_clears(self, auth_client):
+    def test_partial_update_strips_name(self, auth_client):
         pid = _seed_perimeter()
         r = auth_client.put(
             f"/api/perimeters/{pid}",
-            json={"name": "  NewName  ", "description": "   "},
+            json={"name": "  NewName  "},
         )
         assert r.status_code == 200
         assert r.json() == {"ok": True}
         with _pool() as cur:
-            cur.execute("SELECT name, description FROM perimeters WHERE id = %s", (pid,))
+            cur.execute("SELECT name FROM perimeters WHERE id = %s", (pid,))
             row = cur.fetchone()
             assert row["name"] == "NewName"
-            assert row["description"] is None
 
     def test_update_structure_ids(self, auth_client):
         s1 = _seed_structure()

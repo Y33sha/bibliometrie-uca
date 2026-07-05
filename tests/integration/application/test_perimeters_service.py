@@ -79,7 +79,6 @@ class TestPerimeterFindById:
         assert p.id == pid
         assert p.code == "P1"
         assert p.name == "Périmètre 1"
-        assert p.description is None
         assert p.structure_ids == ()
 
     def test_hydrates_with_structure_ids(self, sa_sync_conn, repo):
@@ -143,9 +142,7 @@ class TestRemovePerimeterStructure:
 
 class TestCreatePerimeter:
     def test_creates(self, sa_sync_conn, repo):
-        pid = create_perimeter(
-            code="new_perim", name="New Perimeter", description="desc", repo=repo
-        )
+        pid = create_perimeter(code="new_perim", name="New Perimeter", repo=repo)
         assert pid is not None
         result = sa_sync_conn.execute(
             text("SELECT code, name FROM perimeters WHERE id = :pid"), {"pid": pid}
@@ -180,20 +177,16 @@ class TestUpdatePerimeter:
             update_perimeter(p, fields={}, repo=repo)
 
     def test_raises_if_no_valid_field(self, sa_sync_conn, repo):
-        """Seules name, description, structure_ids sont permises."""
+        """Seules name, structure_ids sont permises."""
         p = _insert_perimeter_sync(sa_sync_conn)
         with pytest.raises(ValidationError):
             update_perimeter(p, fields={"code": "other"}, repo=repo)
 
-    def test_updates_name_and_description(self, sa_sync_conn, repo):
+    def test_updates_name(self, sa_sync_conn, repo):
         p = _insert_perimeter_sync(sa_sync_conn, name="Old")
-        update_perimeter(p, fields={"name": "New", "description": "D"}, repo=repo)
-        result = sa_sync_conn.execute(
-            text("SELECT name, description FROM perimeters WHERE id = :p"), {"p": p}
-        )
-        row = result.one()
-        assert row.name == "New"
-        assert row.description == "D"
+        update_perimeter(p, fields={"name": "New"}, repo=repo)
+        result = sa_sync_conn.execute(text("SELECT name FROM perimeters WHERE id = :p"), {"p": p})
+        assert result.scalar_one() == "New"
 
     def test_updates_structure_ids(self, sa_sync_conn, repo):
         p = _insert_perimeter_sync(sa_sync_conn, structure_ids=[1])

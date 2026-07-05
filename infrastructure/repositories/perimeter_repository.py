@@ -15,7 +15,6 @@ class _PerimeterRow(NamedTuple):
     id: int
     code: str
     name: str
-    description: str | None
     structure_ids: list[int]
 
 
@@ -25,7 +24,6 @@ def _perimeter_from_row(row: _PerimeterRow) -> Perimeter:
         id=row.id,
         code=row.code,
         name=row.name,
-        description=row.description,
         structure_ids=tuple(row.structure_ids or ()),
     )
 
@@ -44,7 +42,6 @@ class PgPerimeterRepository:
                 perimeters.c.id,
                 perimeters.c.code,
                 perimeters.c.name,
-                perimeters.c.description,
                 perimeters.c.structure_ids,
             ).where(perimeters.c.id == perimeter_id)
         ).first()
@@ -90,11 +87,10 @@ class PgPerimeterRepository:
         *,
         code: str,
         name: str,
-        description: str | None,
     ) -> int:
         stmt = (
             perimeters.insert()
-            .values(code=code, name=name, description=description, structure_ids=[])
+            .values(code=code, name=name, structure_ids=[])
             .returning(perimeters.c.id)
         )
         result = self._conn.execute(stmt)
