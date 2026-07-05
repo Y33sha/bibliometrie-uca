@@ -130,13 +130,13 @@
 				{#if selectedId && !results.some((r) => r.value === selectedId)}
 					<label>
 						<input type="radio" checked onchange={() => (open = false)} />
-						<span class="facet-name">{selectedLabel ?? selectedId}</span>
+						<span class="facet-name" title={selectedLabel ?? selectedId}>{selectedLabel ?? selectedId}</span>
 					</label>
 				{/if}
 				{#each results as e (e.value)}
 					<label>
 						<input type="radio" checked={selectedId === e.value} onchange={() => pick(e)} />
-						<span class="facet-name">{e.text}</span><span class="facet-count">{e.count}</span>
+						<span class="facet-name" title={e.text}>{e.text}</span><span class="facet-count">{e.count}</span>
 					</label>
 				{/each}
 				{#if !loading && results.length === 0}
@@ -190,6 +190,7 @@
 		top: calc(100% + 4px);
 		left: 0;
 		min-width: 260px;
+		max-width: 360px;
 		max-height: 320px;
 		overflow-y: auto;
 		background: var(--card);
@@ -227,6 +228,9 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+		/* Indispensable pour que l'ellipse s'applique à un enfant flex (sinon min-width: auto
+		   empêche le rétrécissement et le panneau s'élargit au plus long nom). */
+		min-width: 0;
 	}
 	.facet-count {
 		font-size: 0.8rem;
