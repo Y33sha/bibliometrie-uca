@@ -319,6 +319,14 @@
 			return row ? Number(row.value) : 0;
 		};
 		const series = stackDim ? stackValues : ['__all__'];
+
+		// Échelle partagée entre pages : le maximum de l'axe des valeurs couvre toutes les catégories
+		// (pas seulement la page affichée), afin que l'échelle reste stable d'une page à l'autre et que
+		// les exports PNG soient comparables. `suggestedMax` laisse Chart.js arrondir les graduations ;
+		// comme ce maximum domine celui de chaque page, l'arrondi est identique partout.
+		const catTotal = (cv: string) => series.reduce((s, sv) => s + cell(cv, sv), 0);
+		const valueMax = Math.max(0, ...allCats.map(catTotal));
+
 		const datasets = series.map((sv, i) => ({
 			label: stackDim ? dimLabel(stackDim, sv) : 'Publications',
 			data: cats.map((cv) => cell(cv, sv)),
@@ -437,7 +445,7 @@
 					[highCard ? 'y' : 'x']: { stacked: true, grid: { display: false }, ticks: { font: { size: highCard ? 12 : 14 }, callback: (_v: string | number, i: number) => { const l = labels[i] ?? ''; return l.length > 30 ? l.slice(0, 30) + '…' : l; } } },
 					[highCard ? 'x' : 'y']: part
 						? { stacked: true, min: 0, max: 100, ticks: { font: { size: 13 }, callback: (v: string | number) => v + ' %' } }
-						: { stacked: true, beginAtZero: true, ticks: { font: { size: 13 }, precision: 0 } }
+						: { stacked: true, beginAtZero: true, suggestedMax: valueMax, ticks: { font: { size: 13 }, precision: 0 } }
 				}
 			}
 		});
