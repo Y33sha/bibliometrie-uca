@@ -2,9 +2,9 @@
   import { onMount } from "svelte";
   import { base } from "$app/paths";
   import { api, ApiError, config as configApi, perimeters as perimetersApi } from "$lib/api";
-  import { confirmDialog, toast } from '$lib/dialogs.svelte';
-  import Modal from '$lib/components/Modal.svelte';
-  import Tooltip from '$lib/components/Tooltip.svelte';
+  import { confirmDialog, toast } from "$lib/dialogs.svelte";
+  import Modal from "$lib/components/Modal.svelte";
+  import Tooltip from "$lib/components/Tooltip.svelte";
   import { autofocus } from "$lib/actions/focus";
   import type { components } from "$lib/api/schema";
 
@@ -18,12 +18,7 @@
     {
       key: "perimeter_extraction",
       label: "Extraction",
-      hint: "Structures dont on va chercher les publications auprès des sources (HAL, OpenAlex, Web of Science, thèses…).",
-    },
-    {
-      key: "perimeter_affiliations",
-      label: "Affiliations",
-      hint: "Structures reconnues dans les affiliations des auteurs : une adresse rattachée à l'une d'elles est identifiée comme telle.",
+      hint: "Structures dont on moissonne les publications et qu'on reconnaît dans les affiliations des auteurs.",
     },
     {
       key: "perimeter_persons",
@@ -99,7 +94,7 @@
       perimModal = null;
       await load();
     } catch (e) {
-      toast(extractDetail(e), 'error');
+      toast(extractDetail(e), "error");
     }
   }
 
@@ -109,7 +104,7 @@
       await perimetersApi.remove(id);
       await load();
     } catch (e) {
-      toast(extractDetail(e), 'error');
+      toast(extractDetail(e), "error");
     }
   }
 
@@ -188,7 +183,7 @@
       editingKey = null;
       await load();
     } catch (e) {
-      toast("Erreur : " + extractDetail(e), 'error');
+      toast("Erreur : " + extractDetail(e), "error");
     }
     saving = false;
   }
@@ -204,12 +199,7 @@
 <!-- Éditeur inline partagé par toutes les valeurs de configuration scalaires :
      focus + sélection à l'ouverture, Entrée valide, Échap annule. -->
 {#snippet inlineEdit(key: string)}
-  <input
-    class="config-editor-inline"
-    bind:value={editValue}
-    use:autofocus={{ select: true }}
-    onkeydown={(e) => editKeydown(e, key)}
-  />
+  <input class="config-editor-inline" bind:value={editValue} use:autofocus={{ select: true }} onkeydown={(e) => editKeydown(e, key)} />
   <span class="config-actions-inline">
     <button class="btn btn-sm btn-primary" onclick={() => save(key)} disabled={saving}>OK</button>
     <button class="btn btn-sm" onclick={cancelEdit}>Annuler</button>
@@ -258,9 +248,7 @@
         {#if editingKey === key}
           {@render inlineEdit(key)}
         {:else}
-          <span class="config-value-inline"
-            >{typeof item.value === "number" ? yearsLabel(item.value) : item.value}</span
-          >
+          <span class="config-value-inline">{typeof item.value === "number" ? yearsLabel(item.value) : item.value}</span>
           <button class="btn btn-sm" onclick={() => startEdit(key)}>Modifier</button>
         {/if}
       </div>
@@ -377,38 +365,34 @@
 </div>
 
 {#if perimModal}
-  <Modal
-    title={perimModal.mode === "create" ? "Nouveau périmètre" : "Modifier le périmètre"}
-    maxWidth="460px"
-    onclose={() => (perimModal = null)}
-  >
-      <label>Code <input bind:value={perimModal.code} disabled={perimModal.mode === "edit"} placeholder="ex: uca_wide" /></label>
-      <label>Nom <input bind:value={perimModal.name} placeholder="ex: UCA large" /></label>
-      <label for="perim-struct-search">Structures racines</label>
-      <div class="perimeter-rules" style="margin: 4px 0 8px;">
-        {#each perimModal.structures as struct (struct.id)}
-          <span class="tag">
-            {struct.acronym || struct.name}
-            <button class="remove" onclick={() => perimRemoveStruct(struct.id)}>x</button>
-          </span>
+  <Modal title={perimModal.mode === "create" ? "Nouveau périmètre" : "Modifier le périmètre"} maxWidth="460px" onclose={() => (perimModal = null)}>
+    <label>Code <input bind:value={perimModal.code} disabled={perimModal.mode === "edit"} placeholder="ex: uca_wide" /></label>
+    <label>Nom <input bind:value={perimModal.name} placeholder="ex: UCA large" /></label>
+    <label for="perim-struct-search">Structures racines</label>
+    <div class="perimeter-rules" style="margin: 4px 0 8px;">
+      {#each perimModal.structures as struct (struct.id)}
+        <span class="tag">
+          {struct.acronym || struct.name}
+          <button class="remove" onclick={() => perimRemoveStruct(struct.id)}>x</button>
+        </span>
+      {/each}
+    </div>
+    <input id="perim-struct-search" type="search" placeholder="Rechercher une structure..." bind:value={perimModal.structSearch} oninput={perimSearchStructures} autocomplete="off" />
+    {#if perimModal.structResults.length > 0}
+      <div class="perim-search-results">
+        {#each perimModal.structResults.slice(0, 8) as s (s.id)}
+          <button class="picker-item" onclick={() => perimAddStruct(s)}>
+            {s.acronym ? s.acronym + " — " : ""}{s.name}
+          </button>
         {/each}
       </div>
-      <input id="perim-struct-search" type="search" placeholder="Rechercher une structure..." bind:value={perimModal.structSearch} oninput={perimSearchStructures} autocomplete="off" />
-      {#if perimModal.structResults.length > 0}
-        <div class="perim-search-results">
-          {#each perimModal.structResults.slice(0, 8) as s (s.id)}
-            <button class="picker-item" onclick={() => perimAddStruct(s)}>
-              {s.acronym ? s.acronym + " — " : ""}{s.name}
-            </button>
-          {/each}
-        </div>
-      {/if}
-      {#snippet actions()}
-        <button class="btn" onclick={() => (perimModal = null)}>Annuler</button>
-        <button class="btn btn-primary" onclick={savePerimeter}>
-          {perimModal?.mode === "create" ? "Créer" : "Enregistrer"}
-        </button>
-      {/snippet}
+    {/if}
+    {#snippet actions()}
+      <button class="btn" onclick={() => (perimModal = null)}>Annuler</button>
+      <button class="btn btn-primary" onclick={savePerimeter}>
+        {perimModal?.mode === "create" ? "Créer" : "Enregistrer"}
+      </button>
+    {/snippet}
   </Modal>
 {/if}
 
