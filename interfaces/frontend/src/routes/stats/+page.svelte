@@ -37,6 +37,9 @@
 
 	let chartCanvas: HTMLCanvasElement | undefined = $state();
 	let yearChart: Chart | null = null;
+	// Dernières lignes du pivot renvoyées par l'API : source du tracé, réutilisée par les contrôles
+	// d'affichage (mode, tri, page) qui re-tracent sans re-solliciter le serveur.
+	let pivotRows: Record<string, unknown>[] = [];
 	let initialYearsApplied = false;
 
 	// --- Pivot : axes de l'histogramme. Groupement primaire (abscisse) + comparaison empilée (facultative). ---
@@ -270,6 +273,9 @@
 		await Promise.all([loadChart(), facets.load()]);
 	}
 
+	// Récupère les lignes du pivot depuis l'API, puis délègue le tracé. La requête ne dépend que des
+	// filtres, du groupement primaire et de la comparaison ; les contrôles d'affichage (mode, tri, page)
+	// re-tracent depuis ce cache sans nouvel appel réseau (voir `renderChart`).
 	async function loadChart() {
 		const p = chartParams();
 		p.set('measure', measure);
@@ -277,10 +283,18 @@
 		const comparison = groupBy && groupBy !== primaryBy ? groupBy : '';
 		if (comparison) p.set('group2', comparison);
 		const res = await api<{ rows: Record<string, unknown>[] }>('/api/stats/pivot?' + p);
+		pivotRows = res.rows;
 		await tick();
+		renderChart();
+	}
+
+	// Trace le graphe à partir des dernières lignes récupérées (`pivotRows`). Purement client : appelé
+	// après chaque récupération, mais aussi seul quand seul l'affichage change (mode, tri, sens, page).
+	function renderChart() {
 		if (yearChart) yearChart.destroy();
-		const rows = res.rows;
+		const rows = pivotRows;
 		if (!rows.length || !chartCanvas) { yearChart = null; legendItems = []; return; }
+		const comparison = groupBy && groupBy !== primaryBy ? groupBy : '';
 
 		// La comparaison occupe l'abscisse (on compare le long de l'axe des x ; l'année y va
 		// naturellement) ; le groupement est l'empilement (la catégorie lue dans chaque barre). Sans
@@ -569,7 +583,7 @@
 		{/if}
 	{#if pivotSchema}
 		<label class="groupby">
-			<input type="checkbox" checked={chartMode === 'part'} onchange={(e) => { chartMode = e.currentTarget.checked ? 'part' : 'absolu'; syncUrl(); loadChart(); }} />
+			<input type="checkbox" checked={chartMode === 'part'} onchange={(e) => { chartMode = e.currentTarget.checked ? 'part' : 'absolu'; syncUrl(); renderChart(); }} />
 			Part&nbsp;(%)
 		</label>
 	{/if}
@@ -577,7 +591,7 @@
 		<span class="sep" aria-hidden="true"></span>
 		<label class="groupby">
 			Trier&nbsp;:
-			<select bind:value={chartSort} onchange={() => { chartPage = 1; syncUrl(); loadChart(); }}>
+			<select bind:value={chartSort} onchange={() => { chartPage = 1; syncUrl(); renderChart(); }}>
 				<option value="">Total</option>
 				{#each sortableSeries as s (s.value)}
 					<option value={s.value}>% {s.label}</option>
@@ -585,7 +599,7 @@
 			</select>
 		</label>
 		{#if chartSort}
-			<button type="button" class="sort-dir" title="Sens du tri" onclick={() => { chartSortDir = chartSortDir === 'desc' ? 'asc' : 'desc'; chartPage = 1; syncUrl(); loadChart(); }}>
+			<button type="button" class="sort-dir" title="Sens du tri" onclick={() => { chartSortDir = chartSortDir === 'desc' ? 'asc' : 'desc'; chartPage = 1; syncUrl(); renderChart(); }}>
 				{chartSortDir === 'desc' ? '↓' : '↑'}
 			</button>
 		{/if}
@@ -634,7 +648,7 @@
 	<Pagination
 		page={chartPage}
 		pages={Math.ceil(chartCatTotal / CHART_PAGE_SIZE)}
-		onchange={(p) => { chartPage = p; syncUrl(); loadChart(); }}
+		onchange={(p) => { chartPage = p; syncUrl(); renderChart(); }}
 	/>
 {/if}
 </div>
