@@ -30,10 +30,7 @@ from application.ports.api.laboratories_queries import (
 from application.ports.api.subjects_queries import SubjectFrequency
 from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES_SQL
 from infrastructure.queries.filters import OA_DASHBOARD_COLS_SQL
-from infrastructure.queries.perimeter import (
-    get_persons_perimeter_root_ids,
-    get_persons_structure_ids_list,
-)
+from infrastructure.queries.perimeter import get_persons_structure_ids_list
 
 
 class PgLaboratoriesQueries(LaboratoriesQueries):
@@ -43,13 +40,11 @@ class PgLaboratoriesQueries(LaboratoriesQueries):
         self._conn = conn
 
     def list_laboratories(self) -> list[LaboratoryListItem]:
-        """Liste des labos du périmètre, avec leurs tutelles (hors racines du périmètre).
+        """Liste des labos du périmètre, avec toutes leurs tutelles.
 
-        Résout en interne le périmètre `persons` (ids des structures + racines)
-        avant de filtrer.
+        Résout en interne le périmètre `persons` (ids des structures) avant de filtrer.
         """
         perimeter_ids = get_persons_structure_ids_list(self._conn)
-        root_ids = get_persons_perimeter_root_ids(self._conn)
         rows = self._conn.execute(
             text("""
                 SELECT s.id, s.code, s.name, s.acronym,
@@ -62,14 +57,13 @@ class PgLaboratoriesQueries(LaboratoriesQueries):
                         JOIN structures sp ON sp.id = sr.parent_id
                         WHERE sr.child_id = s.id
                           AND sr.relation_type = 'est_tutelle_de'
-                          AND NOT (sp.id = ANY(:root_ids))
                        ) AS tutelles
                 FROM structures s
                 WHERE s.structure_type = 'labo'
                   AND s.id = ANY(:perimeter_ids)
                 ORDER BY s.name
             """),
-            {"root_ids": root_ids, "perimeter_ids": perimeter_ids},
+            {"perimeter_ids": perimeter_ids},
         ).all()
         return [
             LaboratoryListItem(
