@@ -608,9 +608,9 @@ class TestPropagateUcaForAddresses:
     explicitement les matviews via `refresh_structure_matviews`."""
 
     def _setup_uca(self, conn):
-        """Monte un périmètre UCA minimal + config perimeter_persons/affiliations.
+        """Monte un périmètre UCA minimal + config perimeter_persons/extraction.
 
-        `perimeter_affiliations` + `perimeter_structures` sont requis pour que la
+        `perimeter_extraction` + `perimeter_structures` sont requis pour que la
         matview `source_authorship_structures` rattache les structures du périmètre.
         """
         from infrastructure.queries.perimeter import refresh_perimeter_structures
@@ -618,7 +618,7 @@ class TestPropagateUcaForAddresses:
         uca_id = _create_structure(conn, code="UCA", name="UCA")
         _create_perimeter(conn, "uca", "UCA", [uca_id])
         _set_config(conn, "perimeter_persons", "uca")
-        _set_config(conn, "perimeter_affiliations", "uca")
+        _set_config(conn, "perimeter_extraction", "uca")
         refresh_perimeter_structures(conn)
         return uca_id
 

@@ -3,7 +3,7 @@
 Lit les périmètres depuis la table `perimeters` (colonne `structure_ids`). Chaque structure racine inclut récursivement ses sous-structures (via `est_tutelle_de` dans `structure_relations`).
 
 L'association phase → périmètre est lue depuis la table `config` :
-- `perimeter_affiliations` : périmètre pour la résolution des affiliations
+- `perimeter_extraction` : structures interrogées à l'extraction et reconnues dans les affiliations
 - `perimeter_persons` : périmètre pour la création des personnes
 
 Expose :

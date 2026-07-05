@@ -67,21 +67,21 @@ def add_authorship_structure(conn, authorship_id: int, structure_id: int) -> Non
         ),
         {"a": addr_id, "s": structure_id},
     )
-    # La matview SAS filtre sur le périmètre d'affiliation : garantir qu'un
-    # périmètre d'affiliation existe (config + ligne perimeters) et y rattacher
+    # La matview SAS filtre sur le périmètre d'extraction : garantir qu'un
+    # périmètre d'extraction existe (config + ligne perimeters) et y rattacher
     # la structure pour que le lien apparaisse. Coopère avec les tests qui
-    # configurent déjà `perimeter_affiliations` (ON CONFLICT DO NOTHING).
+    # configurent déjà `perimeter_extraction` (ON CONFLICT DO NOTHING).
     conn.execute(
         text(
-            "INSERT INTO config (key, value) VALUES ('perimeter_affiliations', '\"uca_wide\"') "
+            "INSERT INTO config (key, value) VALUES ('perimeter_extraction', '\"uca_wide\"') "
             "ON CONFLICT (key) DO NOTHING"
         )
     )
     perim_id = conn.execute(
         text("""
             INSERT INTO perimeters (code, name)
-            SELECT value #>> '{}', 'test affiliation perimeter'
-            FROM config WHERE key = 'perimeter_affiliations'
+            SELECT value #>> '{}', 'test extraction perimeter'
+            FROM config WHERE key = 'perimeter_extraction'
             ON CONFLICT (code) DO UPDATE SET code = EXCLUDED.code
             RETURNING id
         """)
