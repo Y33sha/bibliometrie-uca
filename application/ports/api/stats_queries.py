@@ -91,9 +91,14 @@ class CountryCollaboration(BaseModel):
 
 
 class CollaborationsResponse(BaseModel):
-    """Collaborations internationales ventilées par pays étranger (source `publications.countries`)."""
+    """Collaborations internationales ventilées par pays étranger (source `publications.countries`).
+
+    `international_count` = publications avec au moins un pays étranger ; `total_count` = corpus filtré.
+    Leur rapport donne la part de publications en collaboration internationale."""
 
     rows: list[CountryCollaboration]
+    international_count: int
+    total_count: int
 
 
 class StatsQueries(Protocol):

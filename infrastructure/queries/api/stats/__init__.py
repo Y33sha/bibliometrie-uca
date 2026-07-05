@@ -78,7 +78,11 @@ class PgStatsQueries(StatsQueries):
             has_apc=has_apc,
             doc_types=doc_types,
         )
-        return CollaborationsResponse(rows=[CountryCollaboration(**r) for r in data["rows"]])
+        return CollaborationsResponse(
+            rows=[CountryCollaboration(**r) for r in data["rows"]],
+            international_count=data["international_count"],
+            total_count=data["total_count"],
+        )
 
     def pivot_schema(self) -> PivotSchemaResponse:
         return PivotSchemaResponse(
