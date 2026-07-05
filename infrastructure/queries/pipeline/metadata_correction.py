@@ -98,13 +98,21 @@ def fetch_doi_cluster_candidates(conn: Connection) -> list[DoiClusterRow]:
     `same_work` dérive le mapping forme secondaire DataCite → DOI de l'œuvre canonique depuis
     les `meta.related_identifiers` des SP `datacite` (clé = DOI **brut** reconstruit, stable
     après substitution) : version → concept (`IsVersionOf`), forme variante → version publiée
-    (`IsVariantFormOf`), et fichier d'un dépôt → dépôt parent (`IsPartOf` dont le DOI porteur
-    est le DOI parent suivi d'un suffixe). `candidate_dois` réunit les DOI à examiner : formes
-    secondaires, portés par un `book`/`book_chapter`, ou déjà corrigés (`raw_metadata.doi`, pour
-    l'auto-cicatrisation). On renvoie **tous** les membres de ces DOI (toutes sources)."""
+    (`IsVariantFormOf`), et pièce d'un dataset → dataset parent (`IsPartOf` vers un DOI présent
+    en base **comme dataset** — le parent doit être moissonné pour absorber ses pièces, ce qui
+    écarte aussi bien un parent article qu'un parent absent ; la forme du DOI est indifférente).
+    `candidate_dois` réunit les DOI à examiner : formes secondaires, portés par un
+    `book`/`book_chapter`, ou déjà corrigés (`raw_metadata.doi`, pour l'auto-cicatrisation).
+    On renvoie **tous** les membres de ces DOI (toutes sources)."""
     rows = conn.execute(
         text("""
-            WITH same_work AS (
+            WITH dataset_dois AS (
+                SELECT DISTINCT lower(COALESCE(raw_metadata->'doi'->>'raw', doi)) AS d
+                FROM source_publications
+                WHERE doc_type = 'dataset'
+                  AND COALESCE(raw_metadata->'doi'->>'raw', doi) IS NOT NULL
+            ),
+            same_work AS (
                 SELECT DISTINCT ON (secondary_doi) secondary_doi, canonical_doi, same_work_case
                 FROM (
                     SELECT
@@ -122,6 +130,11 @@ def fetch_doi_cluster_candidates(conn: Connection) -> list[DoiClusterRow]:
                       AND lower(rel->>'doi')
                           <> lower(COALESCE(sp.raw_metadata->'doi'->>'raw', sp.doi))
                     UNION ALL
+                    -- Pièce d'un dataset → dataset parent : le parent doit être présent en base
+                    -- comme dataset pour absorber ses pièces (`IN dataset_dois`). Ça exclut le
+                    -- parent article (un dataset supplémentaire d'un article ne s'y fond pas) et
+                    -- le parent absent (les pièces attendent son moissonnage). La forme du DOI
+                    -- n'intervient pas : les pièces portent souvent un DOI frère, pas suffixé.
                     SELECT
                         lower(COALESCE(sp.raw_metadata->'doi'->>'raw', sp.doi)) AS secondary_doi,
                         lower(rel->>'doi') AS canonical_doi,
@@ -132,8 +145,9 @@ def fetch_doi_cluster_candidates(conn: Connection) -> list[DoiClusterRow]:
                       AND sp.doc_type = 'dataset'
                       AND rel->>'relation_type' = 'IsPartOf'
                       AND rel->>'doi' IS NOT NULL
-                      AND lower(COALESCE(sp.raw_metadata->'doi'->>'raw', sp.doi))
-                          LIKE lower(rel->>'doi') || '/%'
+                      AND lower(rel->>'doi')
+                          <> lower(COALESCE(sp.raw_metadata->'doi'->>'raw', sp.doi))
+                      AND lower(rel->>'doi') IN (SELECT d FROM dataset_dois)
                 ) s
                 ORDER BY secondary_doi
             ),

@@ -5,7 +5,7 @@ un DOI, le DOI effectif de chaque membre. Deux familles de cas (extensibles) :
 
 - **convergence (même œuvre)** : une forme secondaire DataCite converge sur le DOI de l'œuvre
   canonique — version → concept (`IsVersionOf`), forme variante / copie repository → version
-  publiée (`IsVariantFormOf`), fichier d'un dépôt → dépôt parent (`IsPartOf`) ;
+  publiée (`IsVariantFormOf`), pièce d'un dataset → dataset parent présent (`IsPartOf`) ;
 - **divergence** : un DOI partagé par des œuvres distinctes (ouvrage/chapitre, chapitres de
   titres différents) est nullé sur le ou les mauvais côtés, sinon le matching les fusionnerait.
 

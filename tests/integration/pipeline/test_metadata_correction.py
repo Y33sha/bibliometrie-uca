@@ -116,6 +116,12 @@ def _state(conn, sp_id: int) -> tuple:
     ).one()
 
 
+def _doi(conn, sp_id: int) -> str | None:
+    return conn.execute(
+        text("SELECT doi FROM source_publications WHERE id = :id"), {"id": sp_id}
+    ).scalar_one()
+
+
 def test_journal_media_and_theses_url_corrected_plain_untouched(sa_sync_conn):
     conn = sa_sync_conn
     media_journal = _seed_journal(conn, "media")
@@ -401,3 +407,87 @@ def test_chapters_number_prefix_same_chapter_untouched(sa_sync_conn):
         title_normalized="les limnosystemes",
     )
     assert _apply_cluster(conn) == 0
+
+
+# ── Sous-étape cluster : pièce d'un dataset → dataset parent (IsPartOf) ──
+
+
+def _seed_datacite_piece(conn, *, source_id, doi, parent_doi, doc_type="dataset", title="Piece"):
+    """SP DataCite déclarant une relation `IsPartOf` vers `parent_doi` dans son `meta`."""
+    return conn.execute(
+        text(
+            "INSERT INTO source_publications "
+            "(source, source_id, title, title_normalized, doc_type, doi, meta) "
+            "VALUES ('datacite', :sid, :title, 'piece', :dt, :doi, "
+            "jsonb_build_object('related_identifiers', jsonb_build_array("
+            "jsonb_build_object('relation_type', 'IsPartOf', 'doi', CAST(:pdoi AS text))))) RETURNING id"
+        ),
+        {"sid": source_id, "dt": doc_type, "doi": doi, "title": title, "pdoi": parent_doi},
+    ).scalar_one()
+
+
+def test_dataset_piece_converges_to_present_dataset_parent(sa_sync_conn):
+    # Le parent dataset est moissonné ; la pièce (DOI frère, non suffixé) et son doublon
+    # cross-source basculent tous deux sur le DOI parent.
+    conn = sa_sync_conn
+    parent = _seed_typed_sp(conn, source_id="d-parent", doc_type="dataset", doi="10.parent/set")
+    piece = _seed_datacite_piece(
+        conn, source_id="d-piece", doi="10.piece/file1", parent_doi="10.parent/set"
+    )
+    # Doublon OpenAlex de la pièce : même DOI, sans la relation ; il doit converger aussi.
+    sibling = _seed_typed_sp(conn, source_id="oa-piece", doc_type="dataset", doi="10.piece/file1")
+
+    assert _apply_cluster(conn) == 2  # la pièce DataCite + son doublon OpenAlex
+
+    assert _doi(conn, parent) == "10.parent/set"  # le parent garde son DOI
+    for sp in (piece, sibling):
+        row = conn.execute(
+            text("SELECT doi, raw_metadata FROM source_publications WHERE id = :id"), {"id": sp}
+        ).one()
+        assert row.doi == "10.parent/set"
+        assert row.raw_metadata["doi"] == {
+            "raw": "10.piece/file1",
+            "corrected_by": "DATACITE_PACKAGE_PIECE",
+        }
+
+
+def test_dataset_piece_not_merged_when_parent_is_article(sa_sync_conn):
+    # Parent moissonné mais typé `article` (dataset supplémentaire d'un article) : pas de fusion.
+    conn = sa_sync_conn
+    _seed_typed_sp(conn, source_id="art", doc_type="article", doi="10.art/paper")
+    piece = _seed_datacite_piece(
+        conn, source_id="d-piece", doi="10.piece/data", parent_doi="10.art/paper"
+    )
+    assert _apply_cluster(conn) == 0
+    assert _doi(conn, piece) == "10.piece/data"
+
+
+def test_dataset_piece_not_merged_when_parent_absent(sa_sync_conn):
+    # Parent non moissonné : rien à absorber, la pièce attend un run ultérieur.
+    conn = sa_sync_conn
+    piece = _seed_datacite_piece(
+        conn, source_id="d-piece", doi="10.piece/data", parent_doi="10.absent/set"
+    )
+    assert _apply_cluster(conn) == 0
+    assert _doi(conn, piece) == "10.piece/data"
+
+
+def test_dataset_piece_idempotent_and_self_heals_when_parent_retyped(sa_sync_conn):
+    conn = sa_sync_conn
+    parent = _seed_typed_sp(conn, source_id="d-parent", doc_type="dataset", doi="10.parent/set")
+    piece = _seed_datacite_piece(
+        conn, source_id="d-piece", doi="10.piece/file1", parent_doi="10.parent/set"
+    )
+    assert _apply_cluster(conn) == 1
+    assert _apply_cluster(conn) == 0  # idempotent
+
+    # Le parent n'est plus un dataset : la pièce récupère son DOI d'origine.
+    conn.execute(
+        text("UPDATE source_publications SET doc_type = 'article' WHERE id = :id"), {"id": parent}
+    )
+    assert _apply_cluster(conn) == 1
+    row = conn.execute(
+        text("SELECT doi, raw_metadata FROM source_publications WHERE id = :id"), {"id": piece}
+    ).one()
+    assert row.doi == "10.piece/file1"
+    assert row.raw_metadata == {}
