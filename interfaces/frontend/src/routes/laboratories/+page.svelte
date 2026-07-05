@@ -260,6 +260,7 @@
 	}
 	.tutelles-col {
 		width: 1%;
+		min-width: 150px;
 		white-space: nowrap;
 	}
 	.tutelles {
