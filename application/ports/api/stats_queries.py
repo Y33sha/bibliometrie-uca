@@ -82,6 +82,20 @@ class PivotResponse(BaseModel):
     rows: list[dict[str, str | int | float | None]]
 
 
+class CountryCollaboration(BaseModel):
+    """Décompte de collaborations pour un pays : code ISO 3166-1 alpha-2 (minuscule) et nombre de
+    publications co-affiliées à ce pays."""
+
+    code: str
+    value: int
+
+
+class CollaborationsResponse(BaseModel):
+    """Collaborations internationales ventilées par pays étranger (source `publications.countries`)."""
+
+    rows: list[CountryCollaboration]
+
+
 class StatsQueries(Protocol):
     """Lectures pour /api/stats/*."""
 
@@ -103,6 +117,19 @@ class StatsQueries(Protocol):
     ) -> PivotResponse: ...
 
     def available_years(self) -> list[int]: ...
+
+    def collaborations(
+        self,
+        *,
+        apc_structure_ids: list[int],
+        lab_ids: list[int],
+        years: list[int],
+        publisher_ids: list[int],
+        journal_ids: list[int],
+        oa_status: str,
+        has_apc: str,
+        doc_types: list[str],
+    ) -> CollaborationsResponse: ...
 
     def stats_entity_facet(
         self,
