@@ -17,7 +17,7 @@
 	// Fraction du corpus filtré à laquelle l'échelle de couleur sature (teinte la plus foncée). En
 	// indexant le maximum sur la taille du corpus plutôt que sur le pays le plus collaborateur, les
 	// collaborations d'un ensemble peu ouvert restent claires au lieu de saturer. À régler ici.
-	const SCALE_MAX_SHARE = 0.2;
+	const SCALE_MAX_SHARE = 0.5;
 
 	let { params = '' }: { params?: string } = $props();
 
