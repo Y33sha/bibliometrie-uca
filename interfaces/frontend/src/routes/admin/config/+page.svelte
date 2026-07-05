@@ -253,10 +253,7 @@
 </div>
 
 <!-- ═══ PÉRIMÈTRES ═══ -->
-<div class="perim-head">
-  <h3 class="section-title">Périmètres</h3>
-  <button class="btn btn-sm" onclick={openPerimCreate}>+ Nouveau périmètre</button>
-</div>
+<h3 class="section-title">Périmètres</h3>
 
 <h4 class="subsection-title">Définition des périmètres</h4>
 <p class="help-text">Chaque périmètre est défini par une liste de structures racines. Les sous-structures en tutelle sont incluses récursivement.</p>
@@ -291,6 +288,9 @@
     {/each}
   </tbody>
 </table>
+<div class="perim-new">
+  <button class="btn btn-sm" onclick={openPerimCreate}>+ Nouveau périmètre</button>
+</div>
 
 <h4 class="subsection-title">Rôle des périmètres</h4>
 <table class="perimeters-table">
@@ -388,23 +388,10 @@
     border-bottom: 2px solid #5b9ea0;
     max-width: 800px;
   }
-  /* Titre « Périmètres » + bouton « Nouveau périmètre » sur une ligne : le bouton à droite,
-     le filet du titre couvre toute la largeur (porté par la ligne, pas par le h3). */
-  .perim-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
+  /* Bouton « Nouveau périmètre » sous la table, aligné à gauche de la colonne centrée. */
+  .perim-new {
     max-width: 800px;
-    margin: 24px auto 8px;
-    padding: 0 10px 4px;
-    border-bottom: 2px solid #5b9ea0;
-  }
-  .perim-head .section-title {
-    margin: 0;
-    padding: 0;
-    max-width: none;
-    border-bottom: none;
+    margin: 8px auto 0;
   }
   .help-text {
     background: var(--accent-light);
