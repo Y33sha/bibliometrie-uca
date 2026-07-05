@@ -4,24 +4,48 @@
 	import { base } from "$app/paths";
 	import { api } from "$lib/api";
 	import { rorShortId, rorFullUrl } from "$lib/utils";
+	import FacetDropdown from "$lib/components/FacetDropdown.svelte";
 
 	import type { components } from "$lib/api/schema";
 	type Lab = components["schemas"]["LaboratoryListItem"];
 
 	let labs: Lab[] = $state([]);
 	let search = $state("");
+	let selectedTutelles = $state<string[]>([]);
 	let sortCol: "acronym" | "name" | "tutelles" = $state("acronym");
 	let sortAsc = $state(true);
+
+	// Options de la facette « tutelles » : tutelles distinctes de tous les labos, avec le nombre de
+	// labos rattachés, triées par fréquence décroissante.
+	const tutelleOptions = $derived.by(() => {
+		const byId = new Map<string, { text: string; count: number }>();
+		for (const lab of labs) {
+			for (const t of lab.tutelles || []) {
+				const key = String(t.id);
+				const entry = byId.get(key) ?? { text: t.acronym || t.name || key, count: 0 };
+				entry.count++;
+				byId.set(key, entry);
+			}
+		}
+		return [...byId.entries()]
+			.map(([value, { text, count }]) => ({ value, text, count }))
+			.sort((a, b) => b.count - a.count || a.text.localeCompare(b.text));
+	});
 
 	const filtered = $derived.by(() => {
 		const q = search.trim().toLowerCase();
 		let result = labs;
 		if (q) {
-			result = labs.filter(
+			result = result.filter(
 				(l) =>
 					l.name?.toLowerCase().includes(q) ||
 					l.acronym?.toLowerCase().includes(q) ||
 					l.code?.toLowerCase().includes(q),
+			);
+		}
+		if (selectedTutelles.length) {
+			result = result.filter((l) =>
+				(l.tutelles || []).some((t) => selectedTutelles.includes(String(t.id))),
 			);
 		}
 		result = [...result].sort((a, b) => {
@@ -75,6 +99,7 @@
 		use:autofocus
 		onkeydown={(e) => { if (e.key === 'Escape') { search = ''; } }}
 	/>
+	<FacetDropdown label="Tutelles" options={tutelleOptions} searchable bind:selected={selectedTutelles} />
 	<span class="count"
 		>{filtered.length} laboratoire{filtered.length > 1 ? "s" : ""}</span
 	>
@@ -106,7 +131,7 @@
 				class:sorted={sortCol === "tutelles"}
 				onclick={() => toggleSort("tutelles")}
 			>
-				Co-tutelles
+				Tutelles
 				<span class="sort-arrow"
 					>{sortCol === "tutelles"
 						? sortAsc

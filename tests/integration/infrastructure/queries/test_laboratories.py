@@ -84,15 +84,14 @@ class TestListLaboratories:
         ids = [lab_.id for lab_ in labs]
         assert lab in ids
 
-    def test_excludes_root_as_tutelle(self, sa_sync_conn):
+    def test_includes_root_as_tutelle(self, sa_sync_conn):
+        # La racine de périmètre (université) n'est plus masquée : elle figure dans les tutelles.
         lab = _create_structure(sa_sync_conn, code="LAB-2")
         root = _setup_perimeter(sa_sync_conn, [lab])
         labs = PgLaboratoriesQueries(sa_sync_conn).list_laboratories()
-        for lab_ in labs:
-            if lab_.id == lab:
-                # La racine est filtrée des tutelles
-                tutelles_ids = [t.id for t in (lab_.tutelles or [])]
-                assert root not in tutelles_ids
+        lab_row = next(lab_ for lab_ in labs if lab_.id == lab)
+        tutelles_ids = [t.id for t in (lab_row.tutelles or [])]
+        assert root in tutelles_ids
 
 
 class TestGetLaboratory:
