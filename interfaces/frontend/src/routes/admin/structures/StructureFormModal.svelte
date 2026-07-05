@@ -1,6 +1,6 @@
 <script lang="ts">
   import Modal from "$lib/components/Modal.svelte";
-  import { API_SOURCES, API_SOURCE_LABELS } from "./types";
+  import { API_SOURCES, API_SOURCE_LABELS, STRUCTURE_TYPES } from "./types";
 
   let {
     editMode,
@@ -37,13 +37,9 @@
     <label>Nom complet <input placeholder="ex: Laboratoire de Physique de Clermont" bind:value={name} /></label>
     <label>Acronyme <input placeholder="ex: LPC" bind:value={acronym} /></label>
     <label>Type <select bind:value={type}>
-      <option value="labo">Laboratoire</option>
-      <option value="universite">Université</option>
-      <option value="onr">ONR</option>
-      <option value="chu">CHU</option>
-      <option value="ecole">École</option>
-      <option value="site">Site</option>
-      <option value="autre">Autre</option>
+      {#each STRUCTURE_TYPES as t (t.value)}
+        <option value={t.value}>{t.label}</option>
+      {/each}
     </select></label>
     <label>ROR ID <input placeholder="0xxxxxxxxx" bind:value={ror} /></label>
     <label>Collection HAL <input placeholder="ex: INSTITUT_PASCAL" bind:value={hal} /></label>
