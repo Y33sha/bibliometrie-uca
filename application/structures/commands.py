@@ -14,6 +14,7 @@ Couvre les trois tables du domaine : `structures`, `structure_relations`,
 from sqlalchemy import Connection
 
 from application.ports.repositories.audit_repository import AuditRepository
+from application.ports.repositories.perimeter_repository import PerimeterRepository
 from application.ports.repositories.structure_repository import (
     StructureNameFormRow,
     StructureRelationRow,
@@ -92,15 +93,18 @@ def create_relation(
     child_id: int,
     relation_type: str,
     repo: StructureRepository,
+    perimeter_repo: PerimeterRepository,
 ) -> StructureRelationRow | None:
     """Crée une relation parent-enfant. Retourne la ligne insérée, ou None si
-    elle existait déjà."""
+    elle existait déjà. Rafraîchit la clôture matérialisée des périmètres : une
+    relation `est_tutelle_de` en modifie la descente récursive."""
     row = structures_service.create_relation(
         parent_id=parent_id,
         child_id=child_id,
         relation_type=relation_type,
         repo=repo,
     )
+    perimeter_repo.refresh_structures()
     conn.commit()
     return row
 
@@ -110,10 +114,13 @@ def delete_relation(
     relation_id: int,
     *,
     repo: StructureRepository,
+    perimeter_repo: PerimeterRepository,
     audit_repo: AuditRepository,
 ) -> None:
-    """Supprime une relation structure."""
+    """Supprime une relation structure. Rafraîchit la clôture matérialisée des
+    périmètres (la descente `est_tutelle_de` peut changer)."""
     structures_service.delete_relation(relation_id, repo=repo, audit_repo=audit_repo)
+    perimeter_repo.refresh_structures()
     conn.commit()
 
 

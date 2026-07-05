@@ -7,6 +7,7 @@ from sqlalchemy import Connection, delete, func, select, update
 from application.ports.repositories.perimeter_repository import PerimeterUpdateFields
 from domain.perimeters.perimeter import Perimeter
 from infrastructure.db.tables import perimeters
+from infrastructure.queries.perimeter import refresh_perimeter_structures
 
 
 class _PerimeterRow(NamedTuple):
@@ -108,3 +109,10 @@ class PgPerimeterRepository:
 
     def delete_perimeter(self, perimeter_id: int) -> None:
         self._conn.execute(delete(perimeters).where(perimeters.c.id == perimeter_id))
+
+    # ── Matérialisation ────────────────────────────────────────────
+
+    def refresh_structures(self) -> None:
+        """Reconstruit `perimeter_structures` (clôture récursive des racines de tous les
+        périmètres). Commit laissé au caller (command handler)."""
+        refresh_perimeter_structures(self._conn)

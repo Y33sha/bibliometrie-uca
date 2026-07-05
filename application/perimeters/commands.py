@@ -39,6 +39,7 @@ def update_perimeter(
 ) -> None:
     """Met à jour un périmètre (champs sélectifs : name, structure_ids)."""
     perimeters_service.update_perimeter(perimeter_id, fields=fields, repo=repo)
+    repo.refresh_structures()
     conn.commit()
 
 
@@ -66,6 +67,7 @@ def add_perimeter_structure(
 ) -> str:
     """Ajoute une structure racine au périmètre. Retourne "added"/"already_present"."""
     status = perimeters_service.add_perimeter_structure(perimeter_id, structure_id, repo=repo)
+    repo.refresh_structures()
     conn.commit()
     return status
 
@@ -79,4 +81,5 @@ def remove_perimeter_structure(
 ) -> None:
     """Retire une structure racine du périmètre."""
     perimeters_service.remove_perimeter_structure(perimeter_id, structure_id, repo=repo)
+    repo.refresh_structures()
     conn.commit()

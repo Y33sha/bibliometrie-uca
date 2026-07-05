@@ -219,6 +219,45 @@ class TestAddPerimeterStructure:
         assert r.json() == {"status": "already_present"}
 
 
+def _perimeter_structure_ids(perimeter_id: int) -> set[int]:
+    with _pool() as cur:
+        cur.execute(
+            "SELECT structure_id FROM perimeter_structures WHERE perimeter_id = %s",
+            (perimeter_id,),
+        )
+        return {row["structure_id"] for row in cur.fetchall()}
+
+
+class TestMaterializedPerimeterStructures:
+    """La table matérialisée `perimeter_structures` est rafraîchie à chaque édition admin,
+    sans attendre le pipeline (racine + descendants `est_tutelle_de`)."""
+
+    def test_adding_root_materializes_closure(self, auth_client):
+        root = _seed_structure()
+        lab = _seed_structure(type_="labo")
+        with _pool() as cur:
+            cur.execute(
+                "INSERT INTO structure_relations (parent_id, child_id, relation_type) "
+                "VALUES (%s, %s, 'est_tutelle_de')",
+                (root, lab),
+            )
+        pid = _seed_perimeter()
+        r = auth_client.post(f"/api/perimeters/{pid}/structures", json={"structure_id": root})
+        assert r.status_code == 200
+        assert _perimeter_structure_ids(pid) == {root, lab}
+
+    def test_creating_tutelle_relation_materializes_new_descendant(self, auth_client):
+        root = _seed_structure()
+        lab = _seed_structure(type_="labo")
+        pid = _seed_perimeter(structure_ids=[root])
+        r = auth_client.post(
+            "/api/structure-relations",
+            json={"parent_id": root, "child_id": lab, "relation_type": "est_tutelle_de"},
+        )
+        assert r.status_code == 200
+        assert _perimeter_structure_ids(pid) == {root, lab}
+
+
 class TestRemovePerimeterStructure:
     def test_requires_admin(self, client):
         r = client.delete("/api/perimeters/1/structures/1")
