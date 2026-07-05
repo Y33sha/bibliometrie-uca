@@ -5,7 +5,8 @@
   import { goto } from "$app/navigation";
   import { api, ApiError, structures as structuresApi } from "$lib/api";
   import { toast } from "$lib/dialogs.svelte";
-  import { API_SOURCES, STRUCTURE_TYPES, type StructureListItem, type Perimeter } from "./types";
+  import { API_SOURCES, type StructureListItem, type Perimeter } from "./types";
+  import { STRUCTURE_TYPES } from "$lib/structureTypes";
   import StructureFormModal from "./StructureFormModal.svelte";
 
   let structures: StructureListItem[] = $state([]);
