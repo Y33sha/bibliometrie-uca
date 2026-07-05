@@ -446,7 +446,8 @@
     });
     detachModal = null;
     loadStats();
-    loadTable();
+    await loadTable();
+    await refreshSelected();
   }
 
   async function setNameFormStatus(personId: number, nameForm: string, status: string) {
