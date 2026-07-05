@@ -310,8 +310,8 @@
 <table class="perimeters-table">
   <thead>
     <tr>
-      <th>Phase</th>
-      <th>Périmètre</th>
+      <th class="role-phase-col">Phase</th>
+      <th class="role-perimeter-col">Périmètre</th>
     </tr>
   </thead>
   <tbody>
@@ -319,10 +319,10 @@
       {@const item = configByKey(role.key)}
       {#if item}
         <tr>
-          <td>
+          <td class="role-phase-col">
             <Tooltip text={role.hint}><span class="role-phase">{role.label}</span></Tooltip>
           </td>
-          <td>
+          <td class="role-perimeter-col">
             <select
               class="config-select"
               value={item.value}
@@ -635,6 +635,14 @@
   .role-phase {
     border-bottom: 1px dotted var(--muted);
     cursor: help;
+  }
+  /* La colonne Phase absorbe la largeur : le sélecteur de périmètre se colle au bord droit. */
+  .perimeters-table .role-phase-col {
+    width: 100%;
+  }
+  .perimeters-table .role-perimeter-col {
+    text-align: right;
+    white-space: nowrap;
   }
   .config-hint a {
     color: var(--accent);
