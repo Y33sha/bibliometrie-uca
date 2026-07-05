@@ -125,7 +125,6 @@ def _hal(all_collections):
             base_url="u",
             all_collections=all_collections,
             n_collections=len(all_collections),
-            n_extra=0,
         ),
     )
 

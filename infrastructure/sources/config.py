@@ -91,14 +91,6 @@ def get_hal_collections(conn: Connection) -> dict[str, str]:
     return {}
 
 
-def get_hal_extra_collections(conn: Connection) -> list[str]:
-    """Retourne les collections HAL supplémentaires (hors structures du périmètre)."""
-    val = _get_from_db(conn, "hal_extra_collections")
-    if val and isinstance(val, list):
-        return val
-    return []
-
-
 def get_openalex_api_key(conn: Connection) -> str | None:
     """Retourne la clé API OpenAlex (None si non configurée)."""
     val = _get_from_db(conn, "openalex_api_key")

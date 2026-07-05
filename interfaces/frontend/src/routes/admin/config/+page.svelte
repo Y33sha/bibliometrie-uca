@@ -1,6 +1,5 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { base } from "$app/paths";
   import { api, ApiError, config as configApi, perimeters as perimetersApi } from "$lib/api";
   import { confirmDialog, toast } from "$lib/dialogs.svelte";
   import Modal from "$lib/components/Modal.svelte";
@@ -28,11 +27,9 @@
   ];
   type PerimeterStructure = components["schemas"]["PerimeterStructureItem"];
   type Perimeter = components["schemas"]["PerimeterOut"];
-  type HalCollections = components["schemas"]["HalCollectionsResponse"];
 
   let configs: ConfigItem[] = $state([]);
   let perimeters: Perimeter[] = $state([]);
-  let halCollections: HalCollections = $state({ collections: {}, count: 0 });
   let editingKey: string | null = $state(null);
   let editValue = $state("");
   let saving = $state(false);
@@ -141,7 +138,6 @@
   async function load() {
     configs = await api<ConfigItem[]>("/api/config");
     perimeters = await api<Perimeter[]>("/api/perimeters");
-    halCollections = await api<HalCollections>("/api/config/hal-collections");
   }
 
   function startEdit(key: string) {
@@ -333,37 +329,6 @@
   </tbody>
 </table>
 
-<!-- ═══ HAL ═══ -->
-<h3 class="section-title">HAL : Collections à moissonner</h3>
-<div class="config-grid">
-  {#each [{ key: "hal_extra_collections", label: "Collections supplémentaires" }] as field}
-    {@const item = configByKey(field.key)}
-    {#if item}
-      <div class="config-row">
-        <span class="config-label">{field.label}</span>
-        {#if editingKey === field.key}
-          {@render inlineEdit(field.key)}
-        {:else}
-          <span class="config-value-inline">{Array.isArray(item.value) && item.value.length ? item.value.join(", ") : "(aucune)"}</span>
-          <button class="btn btn-sm" onclick={() => startEdit(field.key)}>Modifier</button>
-        {/if}
-      </div>
-    {/if}
-  {/each}
-  <div class="config-row" style="flex-wrap: wrap;">
-    <span class="config-label">Collections (périmètre)</span>
-    <div class="hal-coll-list">
-      {#each Object.entries(halCollections.collections) as [code, label]}
-        <span class="hal-coll-tag">{code} <span class="hal-coll-label">({label})</span></span>
-      {/each}
-      {#if Object.keys(halCollections.collections).length === 0}
-        <span class="none-text">Aucune collection</span>
-      {/if}
-    </div>
-    <span class="config-hint">Dérivées des structures du périmètre ayant un champ "Collection HAL" renseigné (<a href="{base}/admin/structures">structures</a>).</span>
-  </div>
-</div>
-
 {#if perimModal}
   <Modal title={perimModal.mode === "create" ? "Nouveau périmètre" : "Modifier le périmètre"} maxWidth="460px" onclose={() => (perimModal = null)}>
     <label>Code <input bind:value={perimModal.code} disabled={perimModal.mode === "edit"} placeholder="ex: uca_wide" /></label>
@@ -480,22 +445,6 @@
     margin-left: auto;
   }
 
-  .hal-coll-list {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-    margin-bottom: 8px;
-  }
-  .hal-coll-tag {
-    font-size: 0.8rem;
-    padding: 2px 8px;
-    background: #e8f0e8;
-    color: #2e6b2e;
-    border-radius: 10px;
-  }
-  .hal-coll-label {
-    color: #555;
-  }
 
   .perimeters-table {
     width: 100%;
@@ -602,12 +551,6 @@
   .picker-item:hover {
     background: var(--accent-light);
   }
-  .config-hint {
-    font-size: 0.8rem;
-    color: var(--muted);
-    width: 100%;
-    margin-top: 4px;
-  }
   .config-select {
     padding: 3px 6px;
     font-size: 0.9rem;
@@ -627,12 +570,5 @@
   .perimeters-table .role-perimeter-col {
     text-align: right;
     white-space: nowrap;
-  }
-  .config-hint a {
-    color: var(--accent);
-  }
-  .none-text {
-    font-size: 0.85rem;
-    color: var(--muted);
   }
 </style>

@@ -1935,26 +1935,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/config/hal-collections": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Hal Collections
-         * @description Retourne les collections HAL dérivées des structures du périmètre.
-         */
-        get: operations["get_hal_collections_api_config_hal_collections_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/config/{key}": {
         parameters: {
             query?: never;
@@ -3394,18 +3374,6 @@ export interface components {
             name: string;
             /** Hal Collection */
             hal_collection: string;
-        };
-        /**
-         * HalCollectionsResponse
-         * @description GET /api/config/hal-collections.
-         */
-        HalCollectionsResponse: {
-            /** Collections */
-            collections: {
-                [key: string]: string;
-            };
-            /** Count */
-            count: number;
         };
         /**
          * HalDocSummary
@@ -8894,26 +8862,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ConfigItem"][];
-                };
-            };
-        };
-    };
-    get_hal_collections_api_config_hal_collections_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HalCollectionsResponse"];
                 };
             };
         };

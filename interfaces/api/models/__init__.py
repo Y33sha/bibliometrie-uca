@@ -63,10 +63,7 @@ from interfaces.api.models.admin.persons import (
     UpdateNameFormStatus,
     UpdatePersonName,
 )
-from interfaces.api.models.admin.pipeline_config import (
-    ConfigValueUpdate,
-    HalCollectionsResponse,
-)
+from interfaces.api.models.admin.pipeline_config import ConfigValueUpdate
 from interfaces.api.models.admin.pipeline_logs import (
     PipelinePhaseLog,
     PipelineStatus,
@@ -112,7 +109,6 @@ __all__ = [
     "EnumOption",
     "FacetValueCount",
     "FeedbackStructuresResponse",
-    "HalCollectionsResponse",
     "IdentifierReassignResponse",
     "IdentifierStatusResponse",
     "JournalTypeChangeImpact",
