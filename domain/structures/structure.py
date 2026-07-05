@@ -34,6 +34,10 @@ class StructureType(StrEnum):
     EQUIPE = "equipe"
     SITE = "site"
     ONR = "onr"
+    # Structure administrative : service (direction des systèmes d'information, bibliothèque
+    # universitaire) ou structure fédérative intermédiaire (institut, sous tutelle de l'université
+    # et tutelle de laboratoires).
+    ADMIN = "admin"
     AUTRE = "autre"
 
 

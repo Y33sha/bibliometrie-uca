@@ -5,7 +5,7 @@
   import { goto } from "$app/navigation";
   import { api, ApiError, structures as structuresApi } from "$lib/api";
   import { toast } from "$lib/dialogs.svelte";
-  import { API_SOURCES, type StructureListItem, type Perimeter } from "./types";
+  import { API_SOURCES, STRUCTURE_TYPES, type StructureListItem, type Perimeter } from "./types";
   import StructureFormModal from "./StructureFormModal.svelte";
 
   let structures: StructureListItem[] = $state([]);
@@ -139,12 +139,9 @@
   <input type="search" placeholder="Rechercher..." bind:value={search} use:autofocus onkeydown={(e) => { if (e.key === 'Escape') { search = ''; loadList(); } }} oninput={handleSearch} />
   <select bind:value={typeFilter} onchange={loadList}>
     <option value="">Tous types</option>
-    <option value="labo">Laboratoires</option>
-    <option value="universite">Universités</option>
-    <option value="onr">ONR</option>
-    <option value="chu">CHU</option>
-    <option value="ecole">Écoles</option>
-    <option value="site">Sites</option>
+    {#each STRUCTURE_TYPES as t (t.value)}
+      <option value={t.value}>{t.label}</option>
+    {/each}
   </select>
   <select bind:value={perimeterFilter}>
     <option value="">Tous périmètres</option>
@@ -289,6 +286,14 @@
   :global(.type-site) {
     background: var(--success-light);
     color: var(--success);
+  }
+  :global(.type-equipe) {
+    background: #d4f0ec;
+    color: #2e8a7d;
+  }
+  :global(.type-admin) {
+    background: #dde3ea;
+    color: #3d5266;
   }
   :global(.type-autre) {
     background: #f0f0f0;
