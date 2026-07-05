@@ -199,6 +199,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/stats/collaborations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Collaborations
+         * @description Collaborations internationales : nombre de publications co-affiliées à chaque pays étranger,
+         *     sous les filtres actifs. Source : la colonne `countries` des publications, hors pays domestique.
+         */
+        get: operations["collaborations_api_stats_collaborations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/stats/pivot/schema": {
         parameters: {
             query?: never;
@@ -2950,6 +2971,21 @@ export interface components {
             updated: number;
         };
         /**
+         * CollaborationsResponse
+         * @description Collaborations internationales ventilées par pays étranger (source `publications.countries`).
+         *
+         *     `international_count` = publications avec au moins un pays étranger ; `total_count` = corpus filtré.
+         *     Leur rapport donne la part de publications en collaboration internationale.
+         */
+        CollaborationsResponse: {
+            /** Rows */
+            rows: components["schemas"]["CountryCollaboration"][];
+            /** International Count */
+            international_count: number;
+            /** Total Count */
+            total_count: number;
+        };
+        /**
          * ConfigItem
          * @description Ligne de la table `config` (paramètres applicatifs clé/valeur).
          */
@@ -2998,6 +3034,17 @@ export interface components {
             first_name: string;
             /** Has Rh */
             has_rh: boolean;
+        };
+        /**
+         * CountryCollaboration
+         * @description Décompte de collaborations pour un pays : code ISO 3166-1 alpha-2 (minuscule) et nombre de
+         *     publications co-affiliées à ce pays.
+         */
+        CountryCollaboration: {
+            /** Code */
+            code: string;
+            /** Value */
+            value: number;
         };
         /** CountryOut */
         CountryOut: {
@@ -6070,6 +6117,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EntityLabelResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    collaborations_api_stats_collaborations_get: {
+        parameters: {
+            query?: {
+                lab_id?: string;
+                year?: string;
+                publisher_id?: string;
+                journal_id?: string;
+                oa_status?: string;
+                has_apc?: string;
+                doc_type?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CollaborationsResponse"];
                 };
             };
             /** @description Validation Error */

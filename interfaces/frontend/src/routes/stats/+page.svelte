@@ -7,6 +7,7 @@
 	import Pagination from '$lib/components/Pagination.svelte';
 	import FacetDropdown from '$lib/components/FacetDropdown.svelte';
 	import EntityFilter from '$lib/components/EntityFilter.svelte';
+	import CollaborationMap from './CollaborationMap.svelte';
 	import { paramsToQuery } from '$lib/utils';
 	import {
 		oaLabelsMap,
@@ -61,6 +62,11 @@
 	// d'accès ouvert n'est pas une mesure : il se lit via le découpage par accès. Pas de sélecteur de mesure.
 	const measure = 'pub_count';
 
+	// Entrée spéciale du sélecteur d'indicateur : remplace l'histogramme par la carte des
+	// collaborations internationales. Ce n'est pas une dimension du pivot, d'où les gardes dédiées.
+	const COLLAB_VIEW = 'collaborations';
+	const isCollab = $derived(primaryBy === COLLAB_VIEW);
+
 	// Groupement primaire : catégories à analyser, faible cardinalité, non ordinales (accès, voie,
 	// type). L'année ne se groupe pas (elle se compare) ; le laboratoire non plus (forte cardinalité).
 	const groupingDims = $derived(
@@ -84,7 +90,8 @@
 	// un groupement catégoriel déjà visible (l'année, ordinale, reste filtrable). Règle de présentation.
 	const facetKeys = $derived.by(() => {
 		if (!pivotSchema) return new Set(['year', 'lab', 'oa_voie', 'apc']);
-		const grouped = new Set([primaryBy, groupBy].filter(Boolean));
+		// La carte des collaborations ne groupe sur rien : toutes les facettes filtrables restent offertes.
+		const grouped = isCollab ? new Set<string>() : new Set([primaryBy, groupBy].filter(Boolean));
 		const out = new Set<string>();
 		for (const d of pivotSchema.dimensions) {
 			if (!d.filterable) continue;
@@ -268,6 +275,10 @@
 		return base + '/publications?' + paramsToQuery(p);
 	});
 
+	// Filtres courants sérialisés : pilotent la carte des collaborations, qui suit les mêmes filtres
+	// que le graphe mais ignore l'axe, le mode et la pagination.
+	const collabParams = $derived(chartParams().toString());
+
 	// --- Data loading ---
 	async function refresh() {
 		await Promise.all([loadChart(), facets.load()]);
@@ -277,6 +288,16 @@
 	// filtres, du groupement primaire et de la comparaison ; les contrôles d'affichage (mode, tri, page)
 	// re-tracent depuis ce cache sans nouvel appel réseau (voir `renderChart`).
 	async function loadChart() {
+		// Vue Collaborations : la carte se dessine seule (composant dédié). On détruit l'histogramme
+		// éventuel et on n'interroge pas le pivot (`collaborations` n'est pas une dimension valide).
+		if (isCollab) {
+			if (yearChart) {
+				yearChart.destroy();
+				yearChart = null;
+			}
+			legendItems = [];
+			return;
+		}
 		const p = chartParams();
 		p.set('measure', measure);
 		p.set('group', primaryBy);
@@ -563,8 +584,10 @@
 				{#each groupingDims as d (d.key)}
 					<option value={d.key}>{d.label}</option>
 				{/each}
+				<option value={COLLAB_VIEW}>Collaborations internationales</option>
 			</select>
 		</label>
+		{#if !isCollab}
 		<span class="sep" aria-hidden="true"></span>
 		<!-- {#key primaryBy} : recrée le select quand le groupement change, pour que sa valeur
 		     affichée reste synchronisée avec `groupBy` malgré le recalcul des options. -->
@@ -580,14 +603,15 @@
 			</label>
 		{/key}
 			<span class="sep" aria-hidden="true"></span>
+			{/if}
 		{/if}
-	{#if pivotSchema}
+	{#if pivotSchema && !isCollab}
 		<label class="groupby">
 			<input type="checkbox" checked={chartMode === 'part'} onchange={(e) => { chartMode = e.currentTarget.checked ? 'part' : 'absolu'; syncUrl(); renderChart(); }} />
 			Part&nbsp;(%)
 		</label>
 	{/if}
-	{#if sortableSeries.length}
+	{#if !isCollab && sortableSeries.length}
 		<span class="sep" aria-hidden="true"></span>
 		<label class="groupby">
 			Trier&nbsp;:
@@ -632,6 +656,12 @@
 	{/if}
 </div>
 
+{#if isCollab}
+<!-- Carte des collaborations internationales -->
+<section class="collab-section">
+	<CollaborationMap params={collabParams} />
+</section>
+{:else}
 <!-- Histogramme du pivot -->
 {#if legendItems.length > 1}
 	<div class="legend">
@@ -651,10 +681,17 @@
 		onchange={(p) => { chartPage = p; syncUrl(); renderChart(); }}
 	/>
 {/if}
+{/if}
 </div>
 
 
 <style>
+	.collab-section {
+		flex: 1 1 auto;
+		display: flex;
+		flex-direction: column;
+		min-height: 0;
+	}
 	.pub-link {
 		margin-left: auto;
 		display: inline-flex;
