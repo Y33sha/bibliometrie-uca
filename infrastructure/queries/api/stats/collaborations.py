@@ -32,8 +32,10 @@ def run_collaborations(
     has_apc: str,
     doc_types: list[str],
 ) -> dict[str, Any]:
-    """Nombre de publications co-affiliées à chaque pays étranger, sous les filtres. Retourne des
-    lignes `{code, value}` triées par décompte décroissant."""
+    """Collaborations internationales sous les filtres. Retourne les lignes `{code, value}` (un pays
+    étranger, nombre de publications co-affiliées) triées par décompte décroissant, ainsi que le
+    nombre de publications en collaboration internationale (au moins un pays étranger) et le total du
+    corpus filtré — de quoi exprimer une part."""
     where, binds = assemble_where(
         stats_filter_clauses(
             apc_structure_ids=apc_structure_ids,
@@ -47,7 +49,9 @@ def run_collaborations(
         )
     )
     binds["domestic_country"] = _DOMESTIC_COUNTRY
-    sql = (
+    conn.execute(text("SET LOCAL jit = off"))
+
+    per_country = (
         "SELECT country AS code, COUNT(DISTINCT p.id) AS value "
         "FROM publications p "
         "LEFT JOIN journals j ON j.id = p.journal_id "
@@ -55,6 +59,22 @@ def run_collaborations(
         f"WHERE {STATS_BASE} AND {where} AND country <> :domestic_country "
         "GROUP BY country ORDER BY value DESC"
     )
-    conn.execute(text("SET LOCAL jit = off"))
-    rows = conn.execute(text(sql), binds).all()
-    return {"rows": [dict(r._mapping) for r in rows]}
+    rows = conn.execute(text(per_country), binds).all()
+
+    # Numérateur (publications avec au moins un pays étranger) et dénominateur (corpus filtré), au grain
+    # publication : `array_remove` retire le pays domestique ; un reste non vide signale l'international.
+    totals = (
+        "SELECT COUNT(DISTINCT p.id) AS total, "
+        "COUNT(DISTINCT p.id) FILTER "
+        "(WHERE cardinality(array_remove(p.countries, :domestic_country)) > 0) AS international "
+        "FROM publications p "
+        "LEFT JOIN journals j ON j.id = p.journal_id "
+        f"WHERE {STATS_BASE} AND {where}"
+    )
+    agg = conn.execute(text(totals), binds).one()
+
+    return {
+        "rows": [dict(r._mapping) for r in rows],
+        "international_count": agg.international or 0,
+        "total_count": agg.total or 0,
+    }
