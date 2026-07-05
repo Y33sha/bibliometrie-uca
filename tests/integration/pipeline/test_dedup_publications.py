@@ -107,6 +107,36 @@ class TestRefreshFromSources:
         oa = _scalar(sa_sync_conn, "SELECT oa_status FROM publications WHERE id = :id", id=id1)
         assert oa == "diamond"
 
+    def test_converged_piece_title_deferred_to_parent(self, sa_sync_conn):
+        """Pièce convergée (`corrected_by = DATACITE_PACKAGE_PIECE`) : le titre vient du parent
+        dataset, pas de la pièce — même quand la pièce précède le parent et partage sa source."""
+        conn = sa_sync_conn
+        pub = _insert_pub(conn, doi="10.parent/set", doc_type="dataset", title="obsolète")
+        # Pièce convergée, insérée en premier : sans dépriorisation son titre gagnerait.
+        conn.execute(
+            text(
+                "INSERT INTO source_publications "
+                "(source, source_id, title, pub_year, publication_id, doc_type, doi, raw_metadata) "
+                "VALUES ('datacite', 'dc-piece', 'README_data.txt', 2024, :pid, 'dataset', "
+                "'10.parent/set', "
+                '\'{"doi": {"raw": "10.piece/file", "corrected_by": "DATACITE_PACKAGE_PIECE"}}\'::jsonb)'
+            ),
+            {"pid": pub},
+        )
+        # Parent dataset, DOI non corrigé.
+        conn.execute(
+            text(
+                "INSERT INTO source_publications "
+                "(source, source_id, title, pub_year, publication_id, doc_type, doi) "
+                "VALUES ('datacite', 'dc-parent', 'Jeu de données phénotypiques', 2024, :pid, "
+                "'dataset', '10.parent/set')"
+            ),
+            {"pid": pub},
+        )
+        refresh_from_sources(pub, repo=publication_repository(conn))
+        title = _scalar(conn, "SELECT title FROM publications WHERE id = :id", id=pub)
+        assert title == "Jeu de données phénotypiques"
+
     def test_unpaywall_verified_oa_status_preserved(self, sa_sync_conn):
         """Une publi vérifiée par Unpaywall (`unpaywall_checked_at` posé) conserve son
         `oa_status` à refresh — pas de ré-agrégation depuis les sources (Unpaywall fait

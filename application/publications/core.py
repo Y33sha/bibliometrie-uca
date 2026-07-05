@@ -81,7 +81,8 @@ def refresh_from_sources(
     # des valeurs corrigées. Mais l'arbitrage choisit `doc_type` et `journal_id` indépendamment :
     # une correction journal-dépendante appliquée à la SP qui a résolu le journal ne suit pas le
     # `journal_id` canonique — on la rejoue sur le canonique après agrégation.
-    _refresh_aggregate(pub, sources, source_priority=SOURCE_PRIORITY)
+    secondary_ids = repo.get_converged_secondary_ids(pub_id)
+    _refresh_aggregate(pub, sources, source_priority=SOURCE_PRIORITY, secondary_ids=secondary_ids)
     _apply_canonical_doc_type_correction(pub, repo=repo)
     repo.save(pub)
     repo.update_sources(pub_id)

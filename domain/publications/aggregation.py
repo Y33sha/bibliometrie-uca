@@ -11,6 +11,8 @@ Règles d'agrégation par type de champ :
 - **JSONB `topics`** : composite par source — chaque source garde sa forme native sous sa propre clé (`{"openalex": [...], "scanr": ..., "theses": {...}}`).
 - **`doc_type`** : premier non-null avec arbitrage des sous-types d'article (CrossRef renvoie `journal-article` indistinctement pour review / book_review / data_paper / etc. — si une source moins prioritaire propose un sous-type plus précis, on le préfère pour ne pas perdre l'information). Les valeurs lues sont déjà canoniques et corrigées (mapping + corrections persistés en amont sur la `source_publication`).
 
+Priorité d'ordre : les enregistrements canoniques passent avant les formes secondaires convergées (`secondary_ids` — pièce, version ou variante dont le DOI a été substitué par celui de l'œuvre canonique), afin que les scalaires descriptifs (titre en tête) viennent de l'enregistrement qui porte nativement le DOI, pas d'une pièce. La priorité de source départage à l'intérieur de chaque groupe.
+
 `title_normalized` est recalculé à partir du `title` agrégé, pas pris d'une source (les sources ne fournissent pas ce champ).
 """
 
@@ -35,10 +37,13 @@ def refresh_from_sources(
     sources: list[SourcePublication],
     *,
     source_priority: tuple[str, ...],
+    secondary_ids: frozenset[int] = frozenset(),
 ) -> None:
     """Recalcule l'état canonique de `pub` (DOI, oa_status, méta, etc.) par agrégation de ses `sources`. Mute `pub` en place ; persistance via `repo.save(pub)` côté caller.
 
     Règles d'agrégation : premier non-null par `source_priority` pour les scalaires nullable, statut OA le plus ouvert toutes sources confondues, union dédupliquée des listes, fusion shallow par clé des JSONB, `topics` indexés par source.
+
+    `secondary_ids` liste les `source_publications` qui décrivent une **forme secondaire** de l'œuvre — une pièce, une version ou une variante dont le DOI a été substitué par le DOI de l'œuvre canonique (correction de convergence). Elles sont reléguées en fin de priorité, sous les enregistrements canoniques, pour que les scalaires descriptifs (titre en tête) proviennent de l'enregistrement qui porte nativement le DOI, et non d'une pièce prise au hasard (un `README.txt`, un fichier de données). Les listes restent unionnées toutes sources confondues : une pièce peut porter un mot-clé légitime.
 
     Précondition : `sources` non vide. Le cas orphelin (aucune source) est une décision métier qui doit être traitée par le caller avant d'appeler cette fonction (suppression de la publication via `repo.delete`).
     """
@@ -48,7 +53,7 @@ def refresh_from_sources(
         )
 
     rank = {s: i for i, s in enumerate(source_priority)}
-    sorted_sources = sorted(sources, key=lambda s: rank.get(s.source, 99))
+    sorted_sources = sorted(sources, key=lambda s: (s.id in secondary_ids, rank.get(s.source, 99)))
 
     new_title = first_non_null(sorted_sources, "title")
     pub.title = new_title if new_title is not None else pub.title
