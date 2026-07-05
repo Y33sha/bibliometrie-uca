@@ -32,11 +32,21 @@ class TestDOIConstruction:
             ("http://doi.org/10.1234/test", "10.1234/test"),  # strip http
             ("https://dx.doi.org/10.1234/test", "10.1234/test"),  # strip dx.doi.org
             ("http://dx.doi.org/10.1234/test", "10.1234/test"),  # strip http dx.doi.org
+            ("doi:10.1234/test", "10.1234/test"),  # préfixe de schéma doi:
+            ("DOI:10.1234/TEST", "10.1234/test"),  # schéma doi: + lowercase
+            (
+                "doi:10.6084/m9.figshare.31023197.v1",
+                "10.6084/m9.figshare.31023197",
+            ),  # schéma + suffixe vN
             ("  10.1234/test  ", "10.1234/test"),  # strip whitespace
             ("10.6084/m9.figshare.31023197.v1", "10.6084/m9.figshare.31023197"),  # suffixe .vN
             ("10.36227/techrxiv.19754971.v2", "10.36227/techrxiv.19754971"),  # suffixe .v2
             ("10.1234/test/pdf", "10.1234/test"),  # suffixe /pdf
             ("https://doi.org/10.1234/test/PDF", "10.1234/test"),  # /PDF + strip url
+            (
+                "10.1234/test/pdf.v1",
+                "10.1234/test",
+            ),  # .vN ré-expose /pdf : résolu par le point fixe
             ("10.24072/pcjournal.308/", "10.24072/pcjournal.308"),  # slash final parasite
             ("https://doi.org/10.1234/test/", "10.1234/test"),  # slash final + strip url
             ("10.36227/techrxiv.19754971.v2/", "10.36227/techrxiv.19754971"),  # slash + suffixe vN
@@ -76,6 +86,20 @@ class TestDOIConstruction:
     def test_does_not_strip_v_not_followed_by_digit(self):
         """Un .v suivi de non-chiffre ne doit pas être strippé."""
         assert DOI("10.1234/journal.v12.issue3").value == "10.1234/journal.v12.issue3"
+
+    @pytest.mark.parametrize(
+        "raw",
+        [
+            "10.1234/test/pdf.v1",  # une étape de fin ré-expose du travail de début
+            "doi:10.1234/TEST.v2",  # schéma + version + casse
+            "10.1140/epjc%252fs10052-021-09192-8",  # double encodage pourcent
+            "10.1002/casp.2572>)",  # ponctuation + parenthèse non appariée
+        ],
+    )
+    def test_idempotent(self, raw):
+        """Normaliser un DOI déjà normalisé le laisse inchangé (point fixe)."""
+        once = DOI(raw).value
+        assert DOI(once).value == once
 
     @pytest.mark.parametrize(
         "raw",

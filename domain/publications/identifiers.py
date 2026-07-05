@@ -43,64 +43,73 @@ _DASH_TRANSLATION = {ord(c): "-" for c in "‐‑‒–—―−﹘﹣－"}
 
 
 def _normalize_doi(raw: str | None) -> str | None:
-    """Normalise un DOI brut (préfixe URL, encodage, casse, ponctuation, suffixes).
+    """Normalise un DOI brut vers sa forme canonique : minuscule, sans préfixe URL ni schéma,
+    sans artefact de copier-coller, ramené sur son concept (suffixe de version retiré).
 
-    Lowercase systématique : la spec DOI Handbook précise que le préfixe
-    `10.xxxx` est insensible à la casse, et CrossRef (registre officiel)
-    traite l'ensemble du DOI en case-insensitive. Stocker tout en minuscules
-    évite les faux doublons lors des comparaisons cross-sources.
+    Lowercase systématique : la spec DOI Handbook précise que le préfixe `10.xxxx` est
+    insensible à la casse, et CrossRef (registre officiel) traite l'ensemble du DOI en
+    case-insensitive. Stocker tout en minuscules évite les faux doublons cross-sources.
 
-    Décode l'encodage pourcent (`%2f` → `/`), ramène les tirets typographiques
-    Unicode sur le `-` ASCII, retire une éventuelle query string (`?utm_…`),
-    ne garde que le premier DOI d'une liste concaténée au point-virgule, et
-    retire la ponctuation/markup parasite de fin (`. , ; : < >`, parenthèse non
-    appariée) — autant d'artefacts de copier-coller, de fragment HTML scrapé ou
-    de parsing d'URL qui produiraient des faux doublons ou des DOI irrésolubles.
-    Idempotent.
+    Idempotent par construction : une passe (`_normalize_doi_step`) est réappliquée jusqu'au
+    point fixe. Chaque transformation retire des caractères ou est un remplacement idempotent
+    (minuscule, tirets Unicode) — aucune n'en ajoute — donc l'itération converge, et un DOI
+    déjà normalisé est renvoyé inchangé. L'itération est nécessaire parce qu'une étape de fin
+    (suffixe `.vN`) peut ré-exposer du travail pour une étape de début (slash ou `/pdf` final),
+    résidu qu'une passe unique laisserait.
     """
     if not raw:
         return None
     s = raw.strip().lower()
+    while s:
+        reduced = _normalize_doi_step(s)
+        if reduced == s:
+            break
+        s = reduced
+    return s or None
+
+
+def _normalize_doi_step(s: str) -> str:
+    """Une passe de normalisation d'un DOI déjà minuscule. Retire, dans l'ordre : le préfixe de
+    schéma `doi:`, un préfixe URL (`https://doi.org/`…), l'encodage pourcent (`%2f` → `/`), les
+    tirets typographiques Unicode (ramenés sur `-`), une query string (`?utm_…`), les DOI
+    surnuméraires d'une liste au point-virgule (le premier est gardé), le slash final, la
+    ponctuation/markup de fin (`. , ; : < >` et parenthèse non appariée — les parenthèses
+    appariées de `10.1007/jhep07(2020)108` sont conservées), puis les suffixes `/pdf` et `.vN`.
+
+    Ne converge pas seule : c'est `_normalize_doi` qui la réitère jusqu'au point fixe."""
+    if s.startswith("doi:"):
+        # Préfixe de schéma (relatedIdentifier DataCite, location.id OAI-PMH côté OpenAlex) :
+        # sinon `doi:10.x` ≠ `10.x` (faux doublon, cible de correction irrésoluble en base).
+        s = s[len("doi:") :]
     for prefix in _DOI_URL_PREFIXES:
         if s.startswith(prefix):
             s = s[len(prefix) :]
             break
     s = s.strip()
-    if not s:
-        return None
-    # Décodage pourcent (DOI tiré d'une URL : `%2f` = `/`, `%28` = `(`…). En boucle
-    # jusqu'à stabilité pour rester idempotent même sur un double encodage (`%252f`).
-    while "%" in s:
-        decoded = unquote(s)
-        if decoded == s:
-            break
-        s = decoded
+    # Décodage pourcent (DOI tiré d'une URL : `%2f` = `/`, `%28` = `(`…). Une seule passe ici ;
+    # le double encodage (`%252f`) est résorbé par l'itération externe.
+    if "%" in s:
+        s = unquote(s)
     # Tirets typographiques Unicode → `-` ASCII.
     s = s.translate(_DASH_TRANSLATION)
     # Query string parasite (paramètres de tracking accolés à un DOI tiré d'une URL).
     s = s.split("?", 1)[0]
-    # Liste de DOI concaténés au point-virgule : on garde le premier (l'œuvre ; les
-    # suivants sont des formes liées — versions, rapports de relecture — qui ont leur
-    # propre DOI et vivent ailleurs).
+    # Liste de DOI concaténés au point-virgule : on garde le premier (l'œuvre ; les suivants
+    # sont des formes liées — versions, rapports de relecture — qui ont leur propre DOI).
     s = s.split(";", 1)[0].strip()
     # Slash final parasite (artefact d'URL) : `10.x/abc/` ≠ `10.x/abc` sinon, faux doublon.
-    # Strippé avant les suffixes ci-dessous, qui sont ancrés en fin (`v2/`, `/pdf/` matchent alors).
     s = s.rstrip("/")
     # Ponctuation/markup final parasite (copier-coller, fragment HTML, parsing d'URL) : un DOI ne
     # se termine pas par `. , ; : < >` ; une parenthèse finale n'est retirée que si elle est non
     # appariée — les DOI type `10.1007/jhep07(2020)108` portent des parenthèses légitimes.
-    while True:
-        before = s
-        s = s.rstrip(".,;:<>")
-        if s.endswith(")") and s.count(")") > s.count("("):
-            s = s[:-1]
-        if s.endswith("(") and s.count("(") > s.count(")"):
-            s = s[:-1]
-        if s == before:
-            break
+    s = s.rstrip(".,;:<>")
+    if s.endswith(")") and s.count(")") > s.count("("):
+        s = s[:-1]
+    if s.endswith("(") and s.count("(") > s.count(")"):
+        s = s[:-1]
     s = _DOI_PDF_SUFFIX.sub("", s)
     s = _DOI_VERSION_SUFFIX.sub("", s)
-    return s or None
+    return s
 
 
 @dataclass(frozen=True)
