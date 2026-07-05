@@ -7,7 +7,7 @@
 Les trois principales entités métier sont matérialisées dans trois tables: `publications`, `persons`, `structures`.
 
 Une quatrième table `authorships` matérialise la relation entre les trois. Une `authorship` représente la contribution d'**un** auteur à **une** publication. Elle porte différents attributs:
-- rôle auteur (surtout pertinent pour les thèses: `rapporteur`, `president_jury`, etc.),
+- rôle (surtout pertinent pour les thèses: `rapporteur`, `president_jury`, etc.),
 - auteur [correspondant](../glossaire.md#auteur-correspondant) ou non,
 - position auteur (= ordre dans la liste, pour les publications multi-auteurs),
 - et l'information d'[affiliation](../glossaire.md#affiliation) à **une ou plusieurs** structures.

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict cgSQF9jUFyfyCDOWYFyJ7huwFKFjU3Jx7AarRIXOGl9h3o0L9orAhkUuBrOz4vu
+\restrict Wjy0VxHaNJS41hd91d39JjcCIlIuUms2ifeYGg0Ms7KbOLcPSRYft7w6GpetAEN
 
 -- Dumped from database version 18.4
 -- Dumped by pg_dump version 18.4
@@ -199,7 +199,8 @@ CREATE TYPE public.structure_type AS ENUM (
     'equipe',
     'site',
     'autre',
-    'onr'
+    'onr',
+    'admin'
 );
 
 
@@ -541,7 +542,6 @@ CREATE TABLE public.perimeters (
     id integer NOT NULL,
     code text NOT NULL,
     name text NOT NULL,
-    description text,
     created_at timestamp with time zone DEFAULT now(),
     structure_ids integer[] DEFAULT '{}'::integer[] NOT NULL
 );
@@ -3356,5 +3356,5 @@ ALTER TABLE ONLY public.structure_relations
 -- PostgreSQL database dump complete
 --
 
-\unrestrict cgSQF9jUFyfyCDOWYFyJ7huwFKFjU3Jx7AarRIXOGl9h3o0L9orAhkUuBrOz4vu
+\unrestrict Wjy0VxHaNJS41hd91d39JjcCIlIuUms2ifeYGg0Ms7KbOLcPSRYft7w6GpetAEN
 
