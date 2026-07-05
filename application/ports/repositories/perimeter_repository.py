@@ -59,3 +59,11 @@ class PerimeterRepository(Protocol):
     def get_perimeter_code(self, perimeter_id: int) -> str | None: ...
 
     def delete_perimeter(self, perimeter_id: int) -> None: ...
+
+    # ── Matérialisation ────────────────────────────────────────────
+
+    def refresh_structures(self) -> None:
+        """Recompute la table matérialisée `perimeter_structures` (clôture récursive
+        `est_tutelle_de` de chaque `perimeters.structure_ids`). À rejouer après toute
+        édition des racines d'un périmètre ou d'une relation `structure_relations`."""
+        ...

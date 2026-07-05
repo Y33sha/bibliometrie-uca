@@ -16,11 +16,13 @@ from application.ports.api.structures_queries import (
     StructuresQueries,
 )
 from application.ports.repositories.audit_repository import AuditRepository
+from application.ports.repositories.perimeter_repository import PerimeterRepository
 from application.ports.repositories.structure_repository import StructureRepository
 from application.structures import commands as structure_commands
 from interfaces.api.deps import (
     audit_repo_sync,
     db_conn_sync,
+    perimeter_repo_sync,
     structure_repo_sync,
     structures_queries_sync,
 )
@@ -126,6 +128,7 @@ def create_relation(
     data: RelationCreate,
     conn: Connection = Depends(db_conn_sync),
     repo: StructureRepository = Depends(structure_repo_sync),
+    perimeter_repo: PerimeterRepository = Depends(perimeter_repo_sync),
 ) -> StructureRelationCreateResponse:
     """Crée une relation parent-enfant entre deux structures.
 
@@ -137,6 +140,7 @@ def create_relation(
         child_id=data.child_id,
         relation_type=data.relation_type,
         repo=repo,
+        perimeter_repo=perimeter_repo,
     )
     if row is None:
         return StructureRelationCreateResponse.model_validate({"status": "already_exists"})
@@ -148,10 +152,13 @@ def delete_relation(
     relation_id: int,
     conn: Connection = Depends(db_conn_sync),
     repo: StructureRepository = Depends(structure_repo_sync),
+    perimeter_repo: PerimeterRepository = Depends(perimeter_repo_sync),
     audit: AuditRepository = Depends(audit_repo_sync),
 ) -> DeletedResponse:
     """Supprime une relation structure. 404 si l'id n'existe pas."""
-    structure_commands.delete_relation(conn, relation_id, repo=repo, audit_repo=audit)
+    structure_commands.delete_relation(
+        conn, relation_id, repo=repo, perimeter_repo=perimeter_repo, audit_repo=audit
+    )
     return DeletedResponse()
 
 
