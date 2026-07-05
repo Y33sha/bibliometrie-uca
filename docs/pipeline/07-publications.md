@@ -34,7 +34,7 @@ Pour chaque partition, l'assignation choisit la publication cible :
 
 Fusion et scission découlent du même regroupement :
 
-- **Fusion** : si une partition réunit plusieurs publications existantes (par exemple deux publications créées séparément qu'une clé partagée relie ensuite), une seule est conservée et les autres sont absorbées. Les données curatées qui pointaient sur une publication absorbée (`distinct_publications`, `apc_payments`) sont reportées sur la publication survivante avant que la publication vidée ne soit supprimée.
+- **Fusion** : si une partition réunit plusieurs publications existantes, une seule est conservée et les autres sont absorbées. Les données curatées qui pointaient sur une publication absorbée (`distinct_publications`, `apc_payments`) sont reportées sur la publication survivante avant que la publication vidée ne soit supprimée.
 - **Scission** : si une publication existante se retrouve à cheval sur plusieurs partitions (par exemple parce qu'elle agrégeait à tort deux DOI distincts), les partitions perdantes reçoivent chacune une nouvelle publication.
 
 ![Graphe de réconciliation : source_publications reliées par clés partagées, partitionnées puis rattachées à des publications](../img/graphs/reconciliation.png)

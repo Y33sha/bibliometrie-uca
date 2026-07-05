@@ -1,5 +1,7 @@
 # Chantier — Cascade personnes : ordre-indépendance et consensus d'attribution
 
+Commencé le 2026-07-04
+
 Rendre le résultat de la phase personnes indépendant de l'ordre d'ingestion, sans changer la nature de la cascade ni son lookup en égalité de chaîne. Deux corrections ciblées : une fusion rétroactive qui rattrape les doublons qu'un ordre défavorable a créés, et un départage par consensus de l'attribution des identifiants, révisable quand une majorité postérieure contredit une attribution initiale.
 
 ## Contexte
@@ -8,16 +10,13 @@ Rendre le résultat de la phase personnes indépendant de l'ordre d'ingestion, s
 
 La cascade rattache ou crée, sans jamais reconsidérer une entité existante. Le résultat dépend donc de l'ordre d'arrivée des signatures. Le cas résiduel tient à l'asymétrie du matching par forme de nom : une personne créée à partir d'une forme initiale (« J Martin ») ne peut pas engendrer la forme pleine (« Jean Martin »), alors qu'une personne créée en forme pleine engendre l'initiale. Selon l'ordre, deux signatures d'une même personne aboutissent donc à une ou deux fiches.
 
-La moitié intra-run de ce défaut est levée : la création alimente la map de matching via le même générateur de formes que le peuplement de `person_name_forms` (ordres et initiales), et `fetch_unlinked_authorships` traite les signatures dans un ordre déterministe. Reste le cas « initiale puis pleine », que la génération de formes ne peut pas résoudre — une initiale ne se déplie pas en prénom.
-
 ### Problème 2 — attribution d'identifiant au premier arrivé
 
 Une valeur d'identifiant est captée par la première signature qui la porte : la personne alors créée en devient le détenteur, figé par la contrainte `UNIQUE (id_type, id_value)`. Si cette première signature est erronée (identifiant recopié sur le mauvais co-auteur par une source), les signatures correctes ultérieures voient leur match refusé par corroboration de nom et retombent en création — l'identifiant reste collé à la mauvaise personne, les bonnes signatures s'éparpillent en doublons. Aucune majorité postérieure ne peut contester l'attribution initiale.
 
 ## Décisions
 
-- **La cascade est conservée.** Pas de graphe de clustering : le matching par nom, faible et non transitif, y sur-fusionne. Le lookup reste en égalité de chaîne, hors de tout coût sur le chemin critique.
-- **Ordre-indépendance par fusion rétroactive**, pas par un matching plus lourd au lookup. Quand une évidence postérieure montre que deux fiches n'en sont qu'une (une forme plus complète relie l'initiale et le plein), on fusionne après coup. La correction se fait hors du chemin chaud.
+- **Ordre-indépendance par fusion rétroactive**. Quand une évidence postérieure montre que deux fiches n'en sont qu'une (une forme plus complète relie l'initiale et le plein), on fusionne après coup. La correction se fait hors du chemin chaud.
 - **Attribution d'identifiant par consensus**, recalculable : le détenteur d'une valeur est celui que soutient la majorité des signatures qui la portent, pas le premier arrivé. Une majorité postérieure peut contester une attribution initiale devenue minoritaire.
 - **Le noyau humain reste intangible** : identifiant `confirmed`, forme de nom `confirmed`/`rejected`, `distinct_persons`, paires `(publication, personne)` rejetées. Ni la fusion rétroactive ni le consensus ne passent outre.
 
