@@ -14,7 +14,20 @@
 
 	type CollaborationsResponse = components['schemas']['CollaborationsResponse'];
 
+	// Fraction du corpus filtré à laquelle l'échelle de couleur sature (teinte la plus foncée). En
+	// indexant le maximum sur la taille du corpus plutôt que sur le pays le plus collaborateur, les
+	// collaborations d'un ensemble peu ouvert restent claires au lieu de saturer. À régler ici.
+	const SCALE_MAX_SHARE = 0.2;
+
 	let { params = '' }: { params?: string } = $props();
+
+	// Arrondit un maximum d'échelle à une borne lisible : centaine supérieure au-delà de 100, dizaine
+	// supérieure en deçà. Plancher à 10 pour un corpus minuscule.
+	function niceCeil(value: number): number {
+		if (value <= 10) return 10;
+		const step = value < 100 ? 10 : 100;
+		return Math.ceil(value / step) * step;
+	}
 
 	let canvas: HTMLCanvasElement | undefined = $state();
 	let chart: Chart | null = null;
@@ -54,11 +67,9 @@
 				})
 			: '0';
 
-		// Échelle de couleur : départ à 0, graduations entières. Le maximum suit le pays le plus
-		// collaborateur (les lignes sont triées par décompte décroissant) mais reste plancher à 10, pour
-		// qu'un corpus filtré étroit ne fasse pas ressortir 2-3 collaborations en teinte foncée.
-		const dataMax = res.rows.length ? res.rows[0].value : 0;
-		const colorMax = Math.max(10, dataMax);
+		// Échelle de couleur : départ à 0, graduations entières, maximum proportionnel à la taille du
+		// corpus filtré et arrondi à une borne lisible.
+		const colorMax = niceCeil(res.total_count * SCALE_MAX_SHARE);
 
 		const labels = features.map((f) => frenchName(String(f.id), f.properties.name));
 		// Les pays sans collaboration reçoivent `null` : la couleur « missing » (neutre) les distingue
