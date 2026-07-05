@@ -27,7 +27,6 @@ def _config(collections: Mapping[str, str]) -> HalExtractConfig:
         base_url="https://example/",
         all_collections=dict(collections),
         n_collections=len(collections),
-        n_extra=0,
     )
 
 

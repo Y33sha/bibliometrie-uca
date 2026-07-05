@@ -166,10 +166,7 @@ class HalExtractor(SourceExtractor[HalExtractConfig]):
         else:
             years = [args.year] if args.year else None  # recalculé dans extract_all
             self.logger.info(f"Année(s) : {years or 'toutes (config)'}")
-        self.logger.info(
-            f"Collections : {len(config.all_collections)} "
-            f"({config.n_collections} structures du périmètre + {config.n_extra} extra)"
-        )
+        self.logger.info(f"Collections : {config.n_collections} structures du périmètre")
 
     def extract_all(self, args: argparse.Namespace, config: HalExtractConfig) -> PhaseMetrics:
         """Extraction de l'union des collections, périmètre temporel par périmètre.

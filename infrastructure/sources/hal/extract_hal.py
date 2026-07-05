@@ -20,7 +20,6 @@ from infrastructure.sources.common import upsert_staging
 from infrastructure.sources.config import (
     get_api_base_urls,
     get_hal_collections,
-    get_hal_extra_collections,
     get_years,
 )
 from infrastructure.sources.hal.fields import HAL_FIELDS
@@ -79,16 +78,10 @@ class PgHalExtractAdapter(HalExtractAdapter):
 
     def load_config(self, conn: Connection) -> HalExtractConfig:
         collections = get_hal_collections(conn)
-        extra_collections = get_hal_extra_collections(conn)
-        all_collections = dict(collections)
-        for code in extra_collections:
-            if code not in all_collections:
-                all_collections[code] = code
         return HalExtractConfig(
             base_url=get_api_base_urls()["hal"],
-            all_collections=all_collections,
+            all_collections=dict(collections),
             n_collections=len(collections),
-            n_extra=len(extra_collections),
         )
 
     def get_years(self, conn: Connection, *, start_year: int | None = None) -> list[int]:

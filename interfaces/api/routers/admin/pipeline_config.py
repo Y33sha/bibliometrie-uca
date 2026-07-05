@@ -12,7 +12,7 @@ from application.config import commands as config_commands
 from application.ports.api.config_queries import ConfigItem, ConfigQueries
 from application.ports.config import ConfigStore
 from interfaces.api.deps import config_queries_sync, config_store_sync, db_conn_sync
-from interfaces.api.models import ConfigValueUpdate, HalCollectionsResponse
+from interfaces.api.models import ConfigValueUpdate
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -27,15 +27,6 @@ def list_config(
     Retourne la table `config` triée par clé. Les valeurs sont renvoyées telles quelles (jsonb) — la sémantique de chaque clé est documentée dans `docs/exploitation.md`.
     """
     return queries.list_config()
-
-
-@router.get("/api/config/hal-collections", response_model=HalCollectionsResponse)
-def get_hal_collections(
-    queries: ConfigQueries = Depends(config_queries_sync),
-) -> HalCollectionsResponse:
-    """Retourne les collections HAL dérivées des structures du périmètre."""
-    collections = queries.get_hal_collections()
-    return HalCollectionsResponse(collections=collections, count=len(collections))
 
 
 @router.put("/api/config/{key}", response_model=ConfigItem)
