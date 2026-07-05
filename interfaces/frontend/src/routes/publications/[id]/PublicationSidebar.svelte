@@ -32,6 +32,11 @@
     ...sources.filter((s) => !SOURCE_ORDER.includes(s.source)),
   ]);
 
+  // Les formes secondaires convergées (pièces d'un jeu de données, versions, variantes) sont
+  // repliées : un jeu de données rattachant chacun de ses fichiers en aligne des dizaines.
+  const primarySources = $derived(orderedSources.filter((s) => !s.is_secondary));
+  const secondarySources = $derived(orderedSources.filter((s) => s.is_secondary));
+
   const access = $derived(accessTag(pub.oa_status));
 
   // Lien d'accès, dérivé (pas de champ URL unique en base) :
@@ -82,21 +87,25 @@
     </div>
   {/if}
 
+  {#snippet sourceRow(s: Source)}
+    <a
+      href={sourceExternalUrl(s.source, s.source_id, pub.oa_status)}
+      target="_blank"
+      rel="noopener"
+      class="source-row"
+      title="{sourceLabel(s.source)} : {s.source_id}"
+    >
+      <SourceTag source={s.source} />
+      <span class="source-id">{s.source_id}</span>
+    </a>
+  {/snippet}
+
   {#if orderedSources.length > 0 || externalIds.length > 0}
     <div class="sidebar-block">
       <div class="detail-sublabel">Sources</div>
       <div class="sidebar-sources">
-        {#each orderedSources as s}
-          <a
-            href={sourceExternalUrl(s.source, s.source_id, pub.oa_status)}
-            target="_blank"
-            rel="noopener"
-            class="source-row"
-            title="{sourceLabel(s.source)} : {s.source_id}"
-          >
-            <SourceTag source={s.source} />
-            <span class="source-id">{s.source_id}</span>
-          </a>
+        {#each primarySources as s (s.source + s.source_id)}
+          {@render sourceRow(s)}
         {/each}
         {#each externalIds as e (e.type + e.value)}
           <a
@@ -115,6 +124,16 @@
           </a>
         {/each}
       </div>
+      {#if secondarySources.length}
+        <details class="secondary-sources">
+          <summary>{secondarySources.length} sources secondaires (pièces, versions)</summary>
+          <div class="sidebar-sources">
+            {#each secondarySources as s (s.source + s.source_id)}
+              {@render sourceRow(s)}
+            {/each}
+          </div>
+        </details>
+      {/if}
     </div>
   {/if}
 </aside>
@@ -208,5 +227,23 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+  /* Groupe replié des sources secondaires (pièces / versions convergées) : discret, fermé par
+     défaut, mêmes lignes que les sources primaires une fois déplié. */
+  .secondary-sources {
+    margin-top: 6px;
+  }
+  .secondary-sources > summary {
+    font-size: 0.78rem;
+    color: var(--muted);
+    cursor: pointer;
+    padding: 3px 4px;
+    user-select: none;
+  }
+  .secondary-sources > summary:hover {
+    color: var(--text);
+  }
+  .secondary-sources[open] > summary {
+    margin-bottom: 6px;
   }
 </style>

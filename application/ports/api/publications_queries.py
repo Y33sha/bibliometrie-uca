@@ -214,6 +214,9 @@ class SourcePublicationOut(BaseModel):
     doi: str | None
     hal_collections: list[str] | None
     countries: list[str] | None
+    # Forme secondaire convergée (pièce, version ou variante dont le DOI a été substitué par
+    # celui de l'œuvre canonique). La fiche replie ces sources sous un groupe dépliable.
+    is_secondary: bool
 
 
 class ExternalIdentifierOut(BaseModel):

@@ -79,6 +79,36 @@ class TestGetPublicationDetail:
         assert len(detail["authorships"]) == 1
         assert detail["authorships"][0]["source_hal"] is True
 
+    def test_sources_flagged_secondary_only_for_convergence(self, sa_sync_conn):
+        # `is_secondary` marque les formes convergées (pièce, version, variante), pas les
+        # enregistrements non corrigés ni les divergences (ouvrage/chapitre, DOI nullé).
+        pub = _create_pub(sa_sync_conn, doi="10.parent/set")
+        _create_sd(sa_sync_conn, pub, source="datacite", source_id="dc-parent")
+        for source_id, corrected_by in (
+            ("oa-piece", "DATACITE_PACKAGE_PIECE"),
+            ("oa-chapter", "OUVRAGE_VS_CHAPITRE"),
+        ):
+            sa_sync_conn.execute(
+                text(
+                    "INSERT INTO source_publications "
+                    "(source, source_id, title, publication_id, raw_metadata) "
+                    "VALUES ('openalex', :sid, 'X', :pub, CAST(:rm AS jsonb))"
+                ),
+                {
+                    "sid": source_id,
+                    "pub": pub,
+                    "rm": json.dumps({"doi": {"raw": "10.x/orig", "corrected_by": corrected_by}}),
+                },
+            )
+        detail = get_publication_detail(sa_sync_conn, pub)
+        assert detail is not None
+        secondary_by_id = {s["source_id"]: s["is_secondary"] for s in detail["sources"]}
+        assert secondary_by_id == {
+            "dc-parent": False,
+            "oa-piece": True,
+            "oa-chapter": False,
+        }
+
     def test_thesis_meta_populated_for_thesis(self, sa_sync_conn):
         pub = _create_pub(sa_sync_conn, title="Thèse", doc_type="thesis")
         sa_sync_conn.execute(

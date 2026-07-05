@@ -5,6 +5,7 @@ from typing import Any
 from sqlalchemy import Connection, text
 
 from domain.publications.relations import RelationType, inverse_relation
+from domain.source_publications.correction import CONVERGENCE_CASES
 
 
 def get_publication_relations(conn: Connection, pub_id: int) -> list[dict[str, Any]]:
@@ -139,12 +140,14 @@ def get_publication_detail(conn: Connection, pub_id: int) -> dict[str, Any] | No
 
     sources_rows = conn.execute(
         text("""
-            SELECT sd.source, sd.source_id, sd.doi, sd.hal_collections, sd.countries
+            SELECT sd.source, sd.source_id, sd.doi, sd.hal_collections, sd.countries,
+                   COALESCE(sd.raw_metadata->'doi'->>'corrected_by' = ANY(:convergence_cases),
+                            false) AS is_secondary
             FROM source_publications sd
             WHERE sd.publication_id = :pid
             ORDER BY sd.created_at DESC
         """),
-        {"pid": pub_id},
+        {"pid": pub_id, "convergence_cases": list(CONVERGENCE_CASES)},
     ).all()
     sources = [dict(r._mapping) for r in sources_rows]
 
