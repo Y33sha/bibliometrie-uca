@@ -16,6 +16,15 @@
     ),
   );
 
+  // Un jeu de données rattachant chacune de ses pièces génère une longue liste de relations. On
+  // n'en affiche que les premières (les plus graves, le tri les remonte) et on plie le reste
+  // derrière une bascule pour garder le header lisible.
+  const RELATION_CAP = 5;
+  let showAllRelations = $state(false);
+  const visibleRelations = $derived(
+    showAllRelations ? sortedRelations : sortedRelations.slice(0, RELATION_CAP),
+  );
+
   // Lien vers l'œuvre liée : interne si elle est au corpus, sinon vers doi.org.
   function relHref(r: RelatedPublication): string {
     return r.publication_id ? `${base}/publications/${r.publication_id}` : `https://doi.org/${r.doi}`;
@@ -49,7 +58,7 @@
 
   {#if sortedRelations.length}
     <div class="rel-banner">
-      {#each sortedRelations as r (r.relation_type + (r.publication_id ?? r.doi))}
+      {#each visibleRelations as r (r.relation_type + (r.publication_id ?? r.doi))}
         {@const tier = relationTier[r.relation_type] ?? "secondary"}
         <a
           class="rel-item tier-{tier}"
@@ -72,6 +81,13 @@
           <span class="rel-title">{@html sanitizeTitle(r.title ?? r.doi ?? "")}</span>
         </a>
       {/each}
+      {#if sortedRelations.length > RELATION_CAP}
+        <button type="button" class="rel-toggle" onclick={() => (showAllRelations = !showAllRelations)}>
+          {showAllRelations
+            ? "Afficher moins"
+            : `Afficher les ${sortedRelations.length - RELATION_CAP} autres`}
+        </button>
+      {/if}
     </div>
   {/if}
 
@@ -150,6 +166,22 @@
     min-width: 0;
   }
   .rel-item:hover .rel-title {
+    text-decoration: underline;
+  }
+  /* Bascule « afficher plus / moins » du bandeau : discrète, alignée à gauche comme un lien. */
+  .rel-toggle {
+    align-self: flex-start;
+    margin-top: 2px;
+    padding: 4px 6px;
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .rel-toggle:hover {
+    color: var(--text);
     text-decoration: underline;
   }
   /* Niveaux : la couleur porte sur le filet, l'icône et le libellé ; le titre reste lisible. */
