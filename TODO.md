@@ -1,3 +1,11 @@
+# Oneshots à lancer à la prochaine occasion:
+python -m interfaces.cli.oneshot.backfill_author_identities
+python -m interfaces.cli.oneshot.backfill_remove_wos_only_orcid
+python -m interfaces.cli.oneshot.backfill_remove_numeric_idhal
+python -m interfaces.cli.oneshot.backfill_clean_dois --apply
+* ajouter Clermont Auvergne aux name_forms de site_clermont
+* ajouter les instituts
+
 # Pipeline
 ## Extraction
 ### Couverture
@@ -9,8 +17,6 @@
 ## Suite du traitement
 * [ ] `publishers_journals`: paralléliser crossref/datacite
 * [ ] CLI `seed_journals_doi_prefix`: intégrer au pipeline?
-* [ ] trouver moyen de fusionner les pièces d'un même dataset (garder le parent)
-* [ ] person_identifiers: les formes WOS et OpenAlex sont déjà inopérantes pour le matching; voir si je continue de les moissonner ou pas.
 
 # Données
 * [ ] distinguer conference_paper et conférence
@@ -20,17 +26,15 @@
 * [ ] créer circuit pour correction automatisée du `journal_type` (titre terminé par ` eBooks` => plateforme d'ebooks; titre contenant `International Conference` ou `International Symposium` => proceedings)
 * [ ] typage data_paper automatisé par journal (ex. *Scientific Data*; créer un journal_type dédié?); chercher aussi "dataset" dans les titres
 * [ ] règle à créer: si DOI de forme ISBN + _n => conference_paper ou chapitre / si forme ISBN: proceedings ou book (trancher selon type du "journal")
-* [ ] noms de containers OpenAlex aberrants ("SPIRE - Sciences Po Institutional REpository") => faire quelque chose; de manière générale il faut interroger la valeur ajoutée du champ `container` par rapport au `journal_id`: trouver comment exploiter la colonne, sinon supprimer.
+* [ ] noms de containers OpenAlex aberrants ("SPIRE - Sciences Po Institutional REpository") => faire quelque chose; quelle valeur ajoutée du champ `container` par rapport au `journal_id`? trouver comment exploiter la colonne, sinon supprimer.
 * [ ] doc_types souvent suspects, à investiguer: "preprint", "autre" (voir aussi si le type "article" peut être affiné selon des critères objectifs)
 ## Explorer autres sources possibles
 * [ ] Dimensions?; ArXiv, PMC, Pubmed; Sudoc? (liens personnes-thèses plus complets que theses.fr, j'ai l'impression); Cairn, Persée pour augmenter couverture SHS?
-* [ ] OpenAPC: j'ai utilisé les données sur les APC UCA, mais il faudrait partir du dump complet et matcher tous les DOI des publis UCA pour voir quels établissements ont payé les APC quand ce n'est pas l'UCA
 
 # UI
 ## Admin
 * [ ] Clarifier la section "périmètres" (grouper affiliation/publications; séparer persons + UI)
 * [ ] fusion / dé-fusion manuelle de publications: circuit à créer (interface de gestion du référentiel de publications, sur le modèle de admin/persons; avec requêtes pour repérer doublons probables et fusions suspectes; supprimer `admin/duplicates`)
-* [ ] signaler visuellement les structures qui ne font partie d'aucun périmètre (pages liste et détail), ajouter filtre périmètre dans la page liste
 * [ ] page persons: le nombre de publications liées à une forme de nom ne se met pas à jour dans le drawer quand on les détache de l'auteur
 * [ ] créer des catégories de personnes (personnel UCA, chercheurs associés, anciens doctorants, méga-collab de physique des particules) => et pouvoir configurer la visibilité des groupes dans l'UI publique (beaucoup d'adresses UCA dans les collaborations ALICE/ATLAS sont décalées dans les sources, ce qui pourrit la base avec des milliers de fausses "personnes UCA") | ou alors un simple BOOL "visible dans l'UI"?
 ## Publique
@@ -38,8 +42,6 @@
 * [ ] Filtres supplémentaires possibles: langue; `has_doi` (crossref, datacite, other, none); `corresponding_is_in_perimeter`; `peer_reviewed`? (suppose de posséder la donnée ou de pouvoir la déduire des sources); licence
 * [ ] premier/dernier auteur (sur l'onglet publications de la page personne)
 * [ ] thèses d'autres établissements liés à nos labos: enlever de la page thèses (ajouter filtre implicite sur "établissement de soutenance" / ou le faire en amont dès le pipeline?)
-* [ ] onglet thèses: les noms d'auteur apparaissent bruts (certains en capitales)
-* [ ] page structures: facette par tutelle, par institut (intégrer les instituts)
 ## Page statistiques:
 * [ ] Conserver l'échelle entre pages sur les graphiques paginés (ou option d'augmenter ponctuellement le max?)
 * [ ] Collab internationales: affichage carte?
@@ -63,6 +65,7 @@
 * audit trail: uniformiser les types d'action qui génèrent un log ou pas + interface pour les consulter
 * rendre les extracteurs interruptibles avec ctrl+C sous Windows
 * mettre en place des slugs pour les URL?
+* [ ] OpenAPC: j'ai utilisé les données sur les APC UCA, mais il faudrait partir du dump complet et matcher tous les DOI des publis UCA pour voir quels établissements ont payé les APC quand ce n'est pas l'UCA
 
 # Pas nécessaire de le régler, du moment qu'on le documente quelque part
 * [ ] re-tester le circuit des imports RH => pas urgent, pas d'imports csv à terme en prod

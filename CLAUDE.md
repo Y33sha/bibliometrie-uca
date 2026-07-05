@@ -55,6 +55,7 @@ A jour au 2026-06-29
 - Nom de la base: `bibliometrie`
 - Dépendances et contrats d'import: `pyproject.toml`
 - Pre-commit hooks: `.pre-commit-config.yaml`
+- CI: `.github/workflows/ci.yml`
 - Documentation du projet: `/docs/`
 - Chantiers en cours: `/docs/chantiers/`; chantiers archivés dans `/docs/chantiers/archived`. Structure: Contexte / Décisions / Phasage / Questions ouvertes. Phasage = sous-titres par phase et listes d'items à cocher.
 - Architecture en couches DDD : `domain/` (règles et value objects, zéro I/O), `application/` (orchestrateurs métier, incluant `application/pipeline/`), `infrastructure/` (adapters SQL, APIs sources, settings), `interfaces/` (adapters entrants : `interfaces/api/` pour FastAPI, `interfaces/frontend/` pour SvelteKit, `interfaces/cli/` pour les scripts). Entry points CLI : `run_pipeline.py` à la racine.

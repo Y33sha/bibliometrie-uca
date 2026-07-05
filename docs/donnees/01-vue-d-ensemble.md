@@ -37,6 +37,7 @@ flowchart LR
     direction LR
         source_publications-->source_authorships
         source_authorships-->addresses
+        source_authorships-->author_identifiying_keys
     end
     subgraph vérité
         direction LR
@@ -45,35 +46,34 @@ flowchart LR
         structures---authorships
     end
     source_publications--->publications
-    source_authorships--->persons
+    author_identifiying_keys--->persons
     addresses---structures
 
     classDef manuel  fill:#8e5,stroke:#5a3
     classDef auto fill:#adf,stroke:#58c
     class structures manuel;
-    class source_authorships,source_publications,publications,authorships,persons,addresses auto
+    class source_authorships,source_publications,publications,authorships,persons,addresses,author_identifiying_keys auto
 ```
-
-> **Pourquoi pas de symétrie sources/vérité ?**
+> **Pourquoi pas de symétrie dans le nommage des tables source *vs* vérité**
 >
 > Les `source_publications` ont une relation *many-to-one* avec les `publications` canoniques. Une publication présente dans 3 sources = 3 lignes `source_publications` et 1 ligne `publications`.
 >
-> Les entités "personnes" et "structures" présentes dans les sources ne peuvent pas être mappées de la même manière aux entités "personnes" et "structures" canoniques, pour deux raisons:
+> Les sources contiennent généralement des entités "personnes" et "structures" dotées d'identifiants internes. Tenter d'établir une correspondance entre ces entités et les entités "personnes" et "structures" canoniques serait infructueux pour deux raisons:
 >
 > - fiabilité variable des affiliations selon les sources:
 >   - soit pauvres (WoS: affiliations résolues au niveau établissement mais pas toujours au niveau laboratoire),
->   - soit erratiques (OpenAlex: l'algorithme d'affiliation produit beaucoup de faux rattachements);
+>   - soit erratiques (OpenAlex: l'algorithme de résolution des affiliations produit beaucoup de fausses identifications de structures);
 > - entités "personnes" peu fiables:
 >   - identifiants multiples pour la même personne (WoS, OpenAlex),
 >   - confusion d'homonymes dans le même identifiant (OpenAlex souvent),
->   - entités hétérogènes au sein d'une même source (HAL: personnes fiables avec `personId` *vs* auteurs réduits à une chaîne de caractères quand ils n'ont pas pu être matchés à un compte HAL) (cf [documentation sources](../sources/01-vue-d-ensemble.md)).
+>   - entités hétérogènes au sein d'une même source (HAL: des personnes fiables avec `personId` coexistent avec des auteurs réduits à une chaîne de caractères quand ils n'ont pas pu être matchés à un compte HAL) (cf [documentation sources](../sources/01-vue-d-ensemble.md#entités-auteurs)).
 >
 > Il a donc été décidé de ne pas conserver de tables `source_persons` et `source_structures`. Les informations servant au matching des personnes et des structures sont extraites des `source_authorships`:
 >
-> - pour les personnes: formes de nom brute et normalisée + identifiants présents dans la source (ORCID, idhal, idref, selon source);
-> - pour les structures: [adresses](../glossaire.md#adresse) (= *raw affiliation strings*).
+> - pour les personnes (table `author_identifying_keys`): nom normalisé + PIDs éventuellement présents dans la source (ORCID, idhal, idref, selon source);
+> - pour les structures (table `addresses`): [signatures institutionnelles](../glossaire.md#adresse) (= *raw affiliation strings*).
 >
-> Le *matching* avec les structures et personnes canoniques s'effectue dans les phases "affiliations" et "personnes" du pipeline.
+> La résolution des structures et des personnes  s'effectue au cours des phases ["affiliations"](../pipeline/04-affiliations.md) et ["persons"](../pipeline/09-persons.md) du pipeline.
 
 ## Suite
 

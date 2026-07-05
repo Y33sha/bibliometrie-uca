@@ -30,9 +30,10 @@ flowchart LR
     end
 
     subgraph sources
-        SA---structures
-        SP@{ shape: procs, label: "source_publications"}---SA@{ shape: procs, label: "source_authorships"}
 
+
+        SP@{ shape: procs, label: "source_publications"}---SA@{ shape: procs, label: "source_authorships"}
+        SA---structures
     end
 
     SP-->publications

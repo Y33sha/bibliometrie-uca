@@ -1,11 +1,4 @@
 """Règles pures de matching d'authorships à des personnes.
-
-Module pensé pour accueillir progressivement la cascade contractuelle
-de matching (compte HAL → cross-source → IdRef/ORCID → name forms),
-aujourd'hui dispersée dans
-``application/pipeline/persons/create_persons_from_source_authorships.py``.
-On commence par la brique la plus simple : la résolution d'un
-identifiant unique vers une ``person_id``.
 """
 
 from collections.abc import Mapping
