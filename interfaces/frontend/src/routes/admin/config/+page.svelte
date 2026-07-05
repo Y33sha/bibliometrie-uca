@@ -289,7 +289,7 @@
   </tbody>
 </table>
 <div class="perim-new">
-  <button class="btn btn-sm" onclick={openPerimCreate}>+ Nouveau périmètre</button>
+  <button class="btn btn-sm btn-primary" onclick={openPerimCreate}>+ Nouveau périmètre</button>
 </div>
 
 <h4 class="subsection-title">Rôle des périmètres</h4>
