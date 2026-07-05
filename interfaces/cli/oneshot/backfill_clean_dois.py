@@ -1,11 +1,11 @@
-# STATUS: oneshot (2026-06-24)
+# STATUS: oneshot (2026-07-05)
 """Backfill : normalise les DOI du stock et purge les négatifs de lookup périmés.
 
-`clean_doi` est désormais appliqué à toutes les écritures de DOI et avant chaque
-appel HTTP par DOI ; il a aussi été durci (encodage pourcent, tirets Unicode,
-markup de fin, listes au point-virgule). Le stock déjà en base porte encore des
-formes non normalisées (legacy). Ce one-shot les rattrape sans re-fetcher les
-sources. Idempotent (`clean_doi` l'est).
+`clean_doi` est appliqué à toutes les écritures de DOI et avant chaque appel HTTP
+par DOI ; il a aussi été durci (encodage pourcent, tirets Unicode, markup de fin,
+listes au point-virgule, préfixe de schéma `doi:`, idempotence par point fixe). Le
+stock déjà en base porte encore des formes non normalisées (legacy). Ce one-shot
+les rattrape sans re-fetcher les sources. Idempotent (`clean_doi` l'est).
 
 Deux opérations :
 
@@ -23,7 +23,10 @@ Deux opérations :
      confirmation, sa correction doit re-déclencher la réconciliation de
      composante (c'est elle qui fusionnera les publications devenues doublons une
      fois leurs DOI identiques) ;
-   - `source_publications.external_ids.related_dois` (nettoyage + dédoublonnage).
+   - `source_publications.external_ids.related_dois` (nettoyage + dédoublonnage) ;
+   - `source_publications.meta.related_identifiers` (DOI des relations DataCite lues
+     par la sous-étape cluster de `metadata_correction` pour faire converger versions,
+     variantes et pièces de datasets sur l'œuvre canonique).
 
 Les colonnes **dérivées** ne sont pas écrites ici : `publications.doi` (contrainte
 UNIQUE, recomposé par `refresh_from_sources`) et `publication_relations.target_doi`
@@ -31,8 +34,9 @@ UNIQUE, recomposé par `refresh_from_sources`) et `publication_relations.target_
 des phases `publications` (réconciliation), `relations` et le refresh — leur volume
 encore sale est seulement journalisé.
 
-Après ce backfill, relancer les phases `publications` / `relations` (ou un run
-complet) pour propager aux dérivées et matérialiser les fusions.
+Après ce backfill, relancer les phases `metadata_correction` / `publications` /
+`relations` (ou un run complet) pour propager aux dérivées et matérialiser les
+fusions (dont les pièces de datasets absorbées par leur parent).
 
 Usage :
     python -m interfaces.cli.oneshot.backfill_clean_dois            # dry-run (rapport)
@@ -149,6 +153,52 @@ def _clean_related_dois(conn: Connection, apply: bool) -> None:
         )
 
 
+def _clean_related_identifiers_meta(conn: Connection, apply: bool) -> None:
+    """Normalise le `doi` de chaque entrée `meta.related_identifiers` (relations DataCite).
+
+    C'est la forme lue par la sous-étape cluster de `metadata_correction` pour faire converger
+    versions, variantes et pièces de datasets. Une entrée dont le `doi` devient inutilisable
+    (`clean_doi` → None) est retirée. Pas de `keys_dirty` : `metadata_correction` re-scanne
+    `meta.related_identifiers` à chaque run, donc la convergence — et le `keys_dirty` qu'elle
+    pose sur les pièces — suit au prochain passage."""
+    rows = conn.execute(
+        text(
+            "SELECT id, meta FROM source_publications "
+            "WHERE jsonb_typeof(meta -> 'related_identifiers') = 'array'"
+        )
+    ).all()
+    upd: list[dict] = []
+    for r in rows:
+        new_rels: list = []
+        changed = False
+        for el in r.meta["related_identifiers"]:
+            doi = el.get("doi") if isinstance(el, dict) else None
+            cleaned = clean_doi(doi) if doi is not None else None
+            if isinstance(el, dict) and cleaned != doi:
+                changed = True
+                if cleaned is None:
+                    continue  # relation sans DOI exploitable → retirée
+                new_rels.append({**el, "doi": cleaned})
+            else:
+                new_rels.append(el)
+        if not changed:
+            continue
+        meta = dict(r.meta)
+        if new_rels:
+            meta["related_identifiers"] = new_rels
+        else:
+            meta.pop("related_identifiers", None)
+        upd.append({"id": r.id, "meta": json.dumps(meta)})
+    log.info(
+        "source_publications.meta.related_identifiers à normaliser : %d / %d", len(upd), len(rows)
+    )
+    if apply and upd:
+        conn.execute(
+            text("UPDATE source_publications SET meta = CAST(:meta AS jsonb) WHERE id = :id"),
+            upd,
+        )
+
+
 def _report_derived(conn: Connection) -> None:
     """Journalise le volume des colonnes dérivées encore sales (non écrites ici)."""
     pubs = conn.execute(text("SELECT doi FROM publications WHERE doi IS NOT NULL")).all()
@@ -181,6 +231,7 @@ def main() -> int:
         _clean_staging_doi(conn, args.apply)
         _clean_source_publication_doi(conn, args.apply)
         _clean_related_dois(conn, args.apply)
+        _clean_related_identifiers_meta(conn, args.apply)
         _report_derived(conn)
         if args.apply:
             conn.commit()
