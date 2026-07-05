@@ -4,22 +4,20 @@ python -m interfaces.cli.oneshot.backfill_remove_wos_only_orcid
 python -m interfaces.cli.oneshot.backfill_remove_numeric_idhal
 python -m interfaces.cli.oneshot.backfill_clean_dois --apply
 * ajouter Clermont Auvergne aux name_forms de site_clermont
-* ajouter les instituts
+* ajouter les instituts + établissements Alliance UCA
+* forme de nom "unh unite de nutrition humaine" à ajouter
 
 # Pipeline
 ## Extraction
-### Couverture
 * [ ] ajouter extraction par ORCID: vérifier pertinence (tester différentes sources, auditer le gain)
 * [ ] bioRxiv, medRxiv: identifiants différents de arxiv? cf publi 2757 (voir si on moissonne ces identifiants; possibilité de récupérer les DOI à partir des identifiants comme dans ArXiv)
 * [ ] chercher dans ScanR par hal-id? (généraliser cross-import à tous les identifiants et toutes les sources)
-### Performance
 * [ ] analyser les diff de payload pour voir si on peut diminuer le nombre d'UPSERT en filtrant les champs importés
 ## Suite du traitement
-* [ ] `publishers_journals`: paralléliser crossref/datacite
-* [ ] CLI `seed_journals_doi_prefix`: intégrer au pipeline?
+* [ ] CLI `seed_journals_doi_prefix`: intégrer au pipeline? + recalculer les anciens pour tenir compte des nouveaux (chaque doi_prefix doit être unique et aussi précis que possible)
 
 # Données
-* [ ] distinguer conference_paper et conférence
+* [ ] distinguer conference_paper et conférence (présence d'un journal_id?)
 * [ ] DUMAS: comment distinguer mémoires et thèses d'exercice?
 ## Corrections
 * [ ] détection d'incohérences `doi_prefix`/`publisher_id`/`journal_id`: auditer d'abord, classifier les cas de divergence selon leur cause
@@ -33,9 +31,7 @@ python -m interfaces.cli.oneshot.backfill_clean_dois --apply
 
 # UI
 ## Admin
-* [ ] Clarifier la section "périmètres" (grouper affiliation/publications; séparer persons + UI)
 * [ ] fusion / dé-fusion manuelle de publications: circuit à créer (interface de gestion du référentiel de publications, sur le modèle de admin/persons; avec requêtes pour repérer doublons probables et fusions suspectes; supprimer `admin/duplicates`)
-* [ ] page persons: le nombre de publications liées à une forme de nom ne se met pas à jour dans le drawer quand on les détache de l'auteur
 * [ ] créer des catégories de personnes (personnel UCA, chercheurs associés, anciens doctorants, méga-collab de physique des particules) => et pouvoir configurer la visibilité des groupes dans l'UI publique (beaucoup d'adresses UCA dans les collaborations ALICE/ATLAS sont décalées dans les sources, ce qui pourrit la base avec des milliers de fausses "personnes UCA") | ou alors un simple BOOL "visible dans l'UI"?
 ## Publique
 * [ ] page "affiliations suspectes hal": requête incorrecte, capture trop de publis + problème de perf
@@ -54,6 +50,7 @@ python -m interfaces.cli.oneshot.backfill_clean_dois --apply
 * [ ] 182637 et 182636: vérifier si DataCite indique relation
 * [ ] 133990: NNT non dédupliqué?!
 * [ ] 107270 et 869915 Computing Pivot-Minors: un article faussement typé preprint par openalex; + question des arxiv_id (déduire le DOI et vice-versa)
+* [ ] fusion entre article et conference_paper: 12362
 
 # Idées pour plus tard, éventuellement
 * financements (projets ANR, projets européens)
