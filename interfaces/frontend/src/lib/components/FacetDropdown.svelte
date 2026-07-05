@@ -105,7 +105,7 @@
 {#snippet optionRow(opt: FacetOption)}
 	<label>
 		<input type="checkbox" checked={isChecked(opt.value)} onchange={() => toggle(opt.value)} />
-		{opt.text}{#if opt.count != null}<span class="facet-count">{opt.count}</span>{/if}
+		<span class="facet-opt-text" title={opt.text}>{opt.text}</span>{#if opt.count != null}<span class="facet-count">{opt.count}</span>{/if}
 	</label>
 {/snippet}
 
@@ -263,6 +263,7 @@
 		top: calc(100% + 4px);
 		left: 0;
 		min-width: 200px;
+		max-width: 360px;
 		max-height: 320px;
 		overflow-y: auto;
 		background: var(--card);
@@ -300,6 +301,14 @@
 	}
 	.facet-options label:hover {
 		background: #f5f5f2;
+	}
+	/* Le texte de l'option tronque au lieu d'élargir le panneau (min-width: 0 pour autoriser le
+	   rétrécissement dans le flex ; le titre complet reste en `title` au survol). */
+	.facet-opt-text {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		min-width: 0;
 	}
 	.facet-options input[type='checkbox'] {
 		margin: 0;
