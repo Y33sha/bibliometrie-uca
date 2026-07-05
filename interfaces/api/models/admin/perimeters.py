@@ -15,10 +15,8 @@ class AddPerimeterStructure(BaseModel):
 class PerimeterCreate(BaseModel):
     code: str
     name: str
-    description: str | None = None
 
 
 class PerimeterUpdate(BaseModel):
     name: str | None = None
-    description: str | None = None
     structure_ids: list[int] | None = None

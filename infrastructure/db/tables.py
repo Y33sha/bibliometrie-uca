@@ -121,7 +121,6 @@ perimeters = Table(
     Column("id", Integer, primary_key=True),
     Column("code", Text, nullable=False),
     Column("name", Text, nullable=False),
-    Column("description", Text),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     Column(
         "structure_ids",

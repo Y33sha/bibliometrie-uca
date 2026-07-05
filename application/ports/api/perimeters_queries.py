@@ -28,7 +28,6 @@ class PerimeterOut(BaseModel):
     id: int
     code: str
     name: str
-    description: str | None
     structure_ids: list[int]
     structures: list[PerimeterStructureItem]
     structure_count: int

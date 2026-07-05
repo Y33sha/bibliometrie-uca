@@ -24,5 +24,4 @@ class Perimeter:
     id: int | None
     code: str
     name: str
-    description: str | None = None
     structure_ids: tuple[int, ...] = field(default=())
