@@ -257,8 +257,8 @@
     <tr>
       <th>Code</th>
       <th>Nom</th>
+      <th class="perim-structs">Structures racines</th>
       <th class="num">Total</th>
-      <th>Structures racines</th>
       <th></th>
     </tr>
   </thead>
@@ -267,14 +267,14 @@
       <tr>
         <td class="perim-code">{perim.code}</td>
         <td class="perim-name">{perim.name}</td>
-        <td class="num">{perim.structure_count}</td>
-        <td>
+        <td class="perim-structs">
           <div class="perimeter-rules">
             {#each perim.structures as struct (struct.id)}
               <span class="tag">{struct.acronym || struct.name}</span>
             {/each}
           </div>
         </td>
+        <td class="num">{perim.structure_count}</td>
         <td class="perim-actions">
           <button class="btn btn-sm" onclick={() => openPerimEdit(perim)}>Modifier</button>
           <button class="btn btn-sm btn-danger" onclick={() => deletePerimeter(perim.id)}>Supprimer</button>
@@ -514,6 +514,11 @@
     font-variant-numeric: tabular-nums;
     color: var(--accent);
     white-space: nowrap;
+  }
+  /* La colonne des structures racines absorbe la largeur disponible : les colonnes suivantes
+     (Total, actions) se réduisent à leur contenu et se collent au bord droit. */
+  .perimeters-table .perim-structs {
+    width: 100%;
   }
   .perimeters-table .perimeter-rules {
     margin: 0;
