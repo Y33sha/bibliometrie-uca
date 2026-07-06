@@ -108,6 +108,58 @@ def update_identifier_status(conn: Connection, ident_id: int, status: str) -> Id
     return cast(IdentifierStatusRow, dict(row._mapping))
 
 
+def begin_authenticated_orcid_import(conn: Connection) -> None:
+    """Ouvre, pour la transaction courante, le droit d'écrire le statut `authenticated`.
+
+    Pose le paramètre de session lu par le trigger `protect_authenticated_identifier`.
+    À réserver à l'import des ORCID authentifiés — l'unique contexte autorisé à poser ce
+    statut. `SET LOCAL` : l'effet est borné à la transaction et disparaît au commit/rollback.
+    """
+    conn.execute(text("SET LOCAL app.orcid_authenticated_import = 'on'"))
+
+
+def authenticate_orcid(conn: Connection, person_id: int, orcid: str) -> str:
+    """Pose le statut `authenticated` sur l'ORCID `orcid`, rattaché à `person_id`.
+
+    Requiert `begin_authenticated_orcid_import` dans la même transaction, sinon le trigger
+    rejette l'écriture. Idempotent. `orcid` est supposé déjà normalisé. Retourne l'issue :
+
+    - `inserted` — l'ORCID n'existait pas, créé authentifié (source `manual`) ;
+    - `upgraded` — déjà rattaché à cette personne, statut renforcé en `authenticated` ;
+    - `reassigned` — déplacé depuis une autre personne (l'authentification fait autorité
+      sur l'identité), puis authentifié ;
+    - `noop` — déjà `authenticated` sur cette personne.
+    """
+    existing = conn.execute(
+        text(
+            "SELECT id, person_id, CAST(status AS text) AS status "
+            "FROM person_identifiers WHERE id_type = 'orcid' AND id_value = :v"
+        ),
+        {"v": orcid},
+    ).first()
+    if existing is None:
+        conn.execute(
+            text(
+                "INSERT INTO person_identifiers (person_id, id_type, id_value, source, status) "
+                "VALUES (:pid, 'orcid', :v, 'manual', 'authenticated')"
+            ),
+            {"pid": person_id, "v": orcid},
+        )
+        return "inserted"
+    if existing.person_id == person_id and existing.status == "authenticated":
+        return "noop"
+    outcome = "reassigned" if existing.person_id != person_id else "upgraded"
+    conn.execute(
+        text(
+            "UPDATE person_identifiers "
+            "SET person_id = :pid, status = 'authenticated', source = 'manual' "
+            "WHERE id = :id"
+        ),
+        {"pid": person_id, "id": existing.id},
+    )
+    return outcome
+
+
 def reassign_identifier(conn: Connection, ident_id: int, target_person_id: int) -> None:
     """Réattribue un identifiant à une autre personne (statut → pending)."""
     result = conn.execute(

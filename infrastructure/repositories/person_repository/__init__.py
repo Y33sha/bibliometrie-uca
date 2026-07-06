@@ -83,6 +83,12 @@ class PgPersonRepository:
     def reassign_identifier(self, ident_id: int, target_person_id: int) -> None:
         _identifiers.reassign_identifier(self._conn, ident_id, target_person_id)
 
+    def begin_authenticated_orcid_import(self) -> None:
+        _identifiers.begin_authenticated_orcid_import(self._conn)
+
+    def authenticate_orcid(self, person_id: int, orcid: str) -> str:
+        return _identifiers.authenticate_orcid(self._conn, person_id, orcid)
+
     # ── source_authorships (liens personne ↔ authorship source) ────
 
     def link_authorship(

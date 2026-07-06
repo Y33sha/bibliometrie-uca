@@ -4,6 +4,7 @@ Gère aussi le rattachement/détachement des authorships sources (`source_author
 """
 
 import logging
+from collections import Counter
 from enum import StrEnum
 from typing import NamedTuple, TypedDict, cast
 
@@ -60,6 +61,7 @@ __all__ = [
     "remove_identifier",
     "update_identifier_status",
     "reassign_identifier",
+    "import_authenticated_orcids",
     "update_name_form_status",
     "detach_authorships",
     "mark_distinct",
@@ -290,6 +292,27 @@ def reassign_identifier(
         target_person_id,
         {"ident_id": ident_id},
     )
+
+
+def import_authenticated_orcids(
+    entries: list[tuple[int, str]], *, repo: PersonRepository
+) -> dict[str, int]:
+    """Applique le statut `authenticated` à des paires `(person_id, orcid)` déjà résolues.
+
+    Ouvre une fois le contexte d'écriture protégé pour la transaction courante
+    (`begin_authenticated_orcid_import`), puis délègue chaque paire à `authenticate_orcid`.
+    Les valeurs ORCID sont supposées déjà normalisées et les personnes déjà résolues :
+    le point d'entrée qui lit le fichier des ORCID authentifiés porte cette préparation.
+
+    Retourne le décompte des issues (`inserted`/`upgraded`/`reassigned`/`noop`). C'est
+    l'unique chemin d'écriture autorisé pour ce statut ; en dehors de lui, le trigger
+    `protect_authenticated_identifier` rejette toute écriture de `authenticated`.
+    """
+    repo.begin_authenticated_orcid_import()
+    outcomes: Counter[str] = Counter()
+    for person_id, orcid in entries:
+        outcomes[repo.authenticate_orcid(person_id, orcid)] += 1
+    return dict(outcomes)
 
 
 def add_identifiers_from_authorships(
