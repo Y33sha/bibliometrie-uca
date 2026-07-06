@@ -144,17 +144,32 @@ def oa_clause(oa_status: str | None) -> WhereClause | None:
 
 
 def access_clause(access: str | None) -> WhereClause | None:
+    """Filtre par bucket d'accès. `access` est une liste de buckets séparés par des
+    virgules (`open`, `embargo`, `closed`), combinés en OR. Un bucket inconnu est ignoré.
+    """
     if not access:
         return None
-    if access == "open":
-        return WhereClause(
-            "p.oa_status::text = ANY(:flt_oa_open)", {"flt_oa_open": list(OA_OPEN_STATUSES)}
-        )
-    if access == "embargo":
-        return WhereClause("p.oa_status::text = 'embargoed'", {})
-    if access == "closed":
-        return WhereClause(f"(p.oa_status::text IN {OA_CLOSED_SQL} OR p.oa_status IS NULL)", {})
-    return None
+    buckets = {v.strip() for v in access.split(",") if v.strip()}
+    statuses: set[str] = set()
+    include_null = False
+    if "open" in buckets:
+        statuses.update(OA_OPEN_STATUSES)
+    if "embargo" in buckets:
+        statuses.add("embargoed")
+    if "closed" in buckets:
+        statuses.update(OA_CLOSED_STATUSES)
+        include_null = True
+    if not statuses and not include_null:
+        return None
+    conditions: list[str] = []
+    binds: dict[str, Any] = {}
+    if statuses:
+        conditions.append("p.oa_status::text = ANY(:flt_access_statuses)")
+        binds["flt_access_statuses"] = sorted(statuses)
+    if include_null:
+        conditions.append("p.oa_status IS NULL")
+    sql = conditions[0] if len(conditions) == 1 else "(" + " OR ".join(conditions) + ")"
+    return WhereClause(sql, binds)
 
 
 def doc_type_clause(doc_types: list[str]) -> WhereClause | None:
