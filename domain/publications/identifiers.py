@@ -157,6 +157,11 @@ class DOI:
 # `rwth-2020`) ou un PURL (`gro-2`) ne ressemble plus à un hal_id.
 _HAL_DOC_BASE = re.compile(r"([a-z][a-z0-9]*-\d{8,})", re.IGNORECASE)
 
+# Autorité d'un identifiant OAI-PMH `[<préfixe>:]oai:<autorité>:<id local>`. Les works OpenAlex
+# exposent la source structurée de leurs locations sous cette forme : `oai:HAL:hal-04123456v1` pour
+# HAL, mais aussi `oai:pure.rug.nl:openaire/<uuid>` pour des dépôts institutionnels quelconques.
+_OAI_AUTHORITY = re.compile(r"(?:^|:)oai:([^:]+):", re.IGNORECASE)
+
 
 def _is_hal_host(host: str) -> bool:
     """True si l'hôte est un portail HAL : `hal.science` et ses sous-portails, l'infrastructure
@@ -171,18 +176,28 @@ def _is_hal_host(host: str) -> bool:
 def _normalize_hal_id(raw: str | None) -> str | None:
     """Extrait le HAL ID canonique d'une chaîne ou URL.
 
-    Accepte une URL (hal.science, tel.archives-ouvertes.fr, …) ou un HAL ID brut avec éventuel
-    suffixe de version (v1, v2). Retourne l'ID sans version (concept HAL).
+    Accepte une URL (hal.science, tel.archives-ouvertes.fr, …), un identifiant OAI-PMH HAL
+    (`oai:HAL:hal-04123456v1`) ou un HAL ID brut avec éventuel suffixe de version (v1, v2).
+    Retourne l'ID sans version (concept HAL).
 
-    Une URL dont l'hôte n'est pas un portail HAL ne porte pas de hal_id : on l'écarte avant le
-    regex, car un fragment `mot-chiffres` d'un DOI ou d'un PURL étranger le tromperait. Un token nu
-    (sans hôte) reste accepté tel quel.
+    Le regex de docid (`mot-chiffres`) est appliqué en dernier recours et attrape n'importe quel
+    fragment ; deux garde-fous en amont écartent les sources qui n'en portent pas :
+
+    - une URL dont l'hôte n'est pas un portail HAL (fragment d'un DOI ou d'un PURL étranger) ;
+    - un identifiant OAI-PMH dont l'autorité n'est pas HAL (un UUID de dépôt institutionnel comme
+      `oai:pure.rug.nl:openaire/1b9c53c2-4cfa-49c4-b454-3339841149ee` piégerait sinon le regex sur
+      `b454-3339841149`).
+
+    Un token nu (sans hôte ni autorité OAI) reste accepté tel quel.
     """
     if not raw:
         return None
     s = raw.strip().lower()
     host = urlparse(s).hostname
-    if host and not _is_hal_host(host):
+    if host:
+        if not _is_hal_host(host):
+            return None
+    elif (oai := _OAI_AUTHORITY.search(s)) and oai.group(1) != "hal":
         return None
     m = _HAL_DOC_BASE.search(s)
     return m.group(1) if m else None
