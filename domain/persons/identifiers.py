@@ -64,6 +64,13 @@ class AttributionStatus(StrEnum):
 PERSON_IDENTIFIER_TYPES: tuple[str, ...] = ("orcid", "idhal", "idref", "hal_person_id")
 PUBLIC_PERSON_IDENTIFIER_TYPES: tuple[str, ...] = ("orcid", "idhal", "idref")
 
+# Fragment SQL `IN (...)` des types publics, pour les prédicats de lecture qui
+# restreignent aux identifiants visibles en UI (interpolation de constantes,
+# pas d'input utilisateur).
+PUBLIC_PERSON_IDENTIFIER_TYPES_SQL: str = (
+    "(" + ", ".join(f"'{t}'" for t in PUBLIC_PERSON_IDENTIFIER_TYPES) + ")"
+)
+
 # ── ORCID ──────────────────────────────────────────────────────────
 
 _ORCID_URL_PREFIXES = ("https://orcid.org/", "http://orcid.org/", "orcid.org/")

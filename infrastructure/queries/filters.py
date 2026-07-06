@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from domain.normalize import normalize_text
+from domain.persons.identifiers import PUBLIC_PERSON_IDENTIFIER_TYPES_SQL
 from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES_SQL
 
 OA_OPEN_STATUSES = ("gold", "hybrid", "bronze", "green", "diamond")
@@ -484,7 +485,11 @@ def person_has_pending_name_forms_clause(value: str) -> WhereClause | None:
 
 
 def person_has_pending_identifiers_clause(value: str) -> WhereClause | None:
-    """Personnes ayant ≥1 identifiant au statut `pending` (à confirmer). `value` = yes/no."""
+    """Personnes ayant ≥1 identifiant **public** au statut `pending` (à confirmer). `value` = yes/no.
+
+    Restreint aux types exposés en UI (`PUBLIC_PERSON_IDENTIFIER_TYPES`) : un
+    `hal_person_id` en attente est interne et jamais présenté à l'arbitrage, il ne
+    doit donc pas faire remonter la personne dans la file « à confirmer »."""
     if value not in ("yes", "no"):
         return None
     negate = "NOT " if value == "no" else ""
@@ -492,6 +497,7 @@ def person_has_pending_identifiers_clause(value: str) -> WhereClause | None:
         f"""{negate}EXISTS (
             SELECT 1 FROM person_identifiers pi
             WHERE pi.person_id = p.id AND pi.status = 'pending'
+              AND pi.id_type IN {PUBLIC_PERSON_IDENTIFIER_TYPES_SQL}
         )""",
         {},
     )
