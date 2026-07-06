@@ -8,6 +8,7 @@ Tous les fichiers .log sont consolidés sous ``PROJECT_ROOT/logs/``, en
 reproduisant l'arborescence du caller (voir ``_rebase_log_dir``).
 """
 
+import contextvars
 import io
 import json
 import logging
@@ -17,6 +18,40 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from infrastructure import PROJECT_ROOT as _PROJECT_ROOT
+
+# Phase pipeline courante, injectée comme nom de logger dans chaque record émis
+# pendant la phase (voir `_PhaseNameFilter`). Posée par l'orchestrateur
+# (`run_pipeline`) ; jamais renseignée hors run pipeline (API, scripts CLI).
+_log_phase: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "pipeline_log_phase", default=None
+)
+
+
+def set_log_phase(phase: str | None) -> contextvars.Token[str | None]:
+    """Définit la phase pipeline courante. Retourne un token à passer à
+    `reset_log_phase` pour restaurer la valeur précédente."""
+    return _log_phase.set(phase)
+
+
+def reset_log_phase(token: contextvars.Token[str | None]) -> None:
+    """Restaure la phase pipeline précédant `set_log_phase`."""
+    _log_phase.reset(token)
+
+
+class _PhaseNameFilter(logging.Filter):
+    """Réécrit `record.name` avec la phase pipeline courante quand elle est posée.
+
+    Rend chaque ligne auto-située — `normalize:` plutôt que `pipeline:` — sans câbler
+    un logger par phase à travers tout l'orchestrateur. Sans phase active (API,
+    scripts), le nom du logger d'origine est conservé.
+    """
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        phase = _log_phase.get()
+        if phase:
+            record.name = phase
+        return True
+
 
 # Attributs internes de logging.LogRecord à ne PAS inclure dans la sortie JSON
 # (ils sont soit déjà couverts, soit trop verbeux).
@@ -129,6 +164,7 @@ def setup_logger(name: str, log_dir: str) -> logging.Logger:
     utf8_stream.close = lambda: None  # type: ignore[method-assign]  # Empêcher la fermeture de stdout.buffer
     console = logging.StreamHandler(stream=utf8_stream)
     console.setFormatter(fmt)
+    console.addFilter(_PhaseNameFilter())
     logger.addHandler(console)
 
     if os.environ.get("LOG_TO_FILE", "").lower() == "true":
@@ -136,6 +172,7 @@ def setup_logger(name: str, log_dir: str) -> logging.Logger:
         target_dir.mkdir(parents=True, exist_ok=True)
         file_handler = logging.FileHandler(str(target_dir / f"{name}.log"), encoding="utf-8")
         file_handler.setFormatter(fmt)
+        file_handler.addFilter(_PhaseNameFilter())
         logger.addHandler(file_handler)
 
     return logger
@@ -161,4 +198,5 @@ def configure_root_logging(level: int = logging.INFO) -> None:
         return
     handler = logging.StreamHandler(stream=sys.stdout)
     handler.setFormatter(_make_formatter())
+    handler.addFilter(_PhaseNameFilter())
     root.addHandler(handler)

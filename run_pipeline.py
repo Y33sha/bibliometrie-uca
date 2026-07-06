@@ -50,6 +50,7 @@ Phases (dans l'ordre d'execution):
 import argparse
 import asyncio
 import atexit
+import contextvars
 import datetime
 import signal
 import sys
@@ -73,7 +74,7 @@ from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.modes import MODE_NAMES, MODES
 from application.pipeline.normalize.base import NormalizeStats
 from domain.sources.registry import ALL_SOURCES, ALL_SOURCES_SET, DOI_SEARCHABLE_SOURCES
-from infrastructure.observability.log import setup_logger
+from infrastructure.observability.log import reset_log_phase, set_log_phase, setup_logger
 from infrastructure.observability.pipeline_status import clear_status, read_status, write_status
 from infrastructure.pipeline_lock import PipelineAlreadyRunningError, acquire_pipeline_lock
 
@@ -174,8 +175,15 @@ def _run_parallel_extractors(
 
     by_source: dict[str, dict[str, float]] = {}
     log.info("▶ extracteurs en parallèle (%d) : %s", len(tasks), ", ".join(n for n, _ in tasks))
+    # Les threads n'héritent pas de la ContextVar de phase : chaque worker rejoue sa
+    # tâche dans une copie du contexte courant (phase `extract`), pour que ses logs
+    # restent estampillés `extract:` et non du nom du logger source. Une copie par
+    # worker — un même Context ne peut pas être entré par deux threads à la fois.
     with ThreadPoolExecutor(max_workers=len(tasks)) as pool:
-        futures = {pool.submit(_timed_metrics, fn): name for name, fn in tasks}
+        futures = {
+            pool.submit(contextvars.copy_context().run, _timed_metrics, fn): name
+            for name, fn in tasks
+        }
         for future in as_completed(futures):
             source = futures[future]
             try:
@@ -2243,77 +2251,84 @@ def main() -> None:  # noqa: C901 — orchestrateur CLI : refactor en helpers s�
     t0_total = time.time()
     pipeline_started_at = datetime.datetime.now().isoformat(timespec="seconds")
     for i, (name, fn) in enumerate(phases_to_run):
-        log.info("─" * 40)
-        log.info("PHASE : %s", name)
-        log.info("─" * 40)
-
-        write_status(
-            mode=args.mode,
-            phase=name,
-            started_at=pipeline_started_at,
-            phases_done=i,
-            phases_total=len(phases_to_run),
-        )
-
-        phase_started_at = datetime.datetime.now(datetime.UTC)
-        t0_phase = time.time()
+        # Injecte le nom de phase dans tous les records émis pendant `fn` (nom de
+        # logger `normalize:` plutôt que `pipeline:`), y compris depuis les
+        # extracteurs threadés qui héritent du contexte via `copy_context`.
+        phase_token = set_log_phase(name)
         try:
-            result = fn(
-                mode=args.mode,
-                sources=sources,
-                year=args.year,
-                start_year=args.start_year,
-                include_wos=args.include_wos,
-                rebuild_publications=args.rebuild_publications,
-            )
-        except KeyboardInterrupt:
-            log.warning("Pipeline interrompu par l'utilisateur à la phase '%s'", name)
-            log.info("Pour reprendre : python run_pipeline.py --from %s", name)
-            recorder.record(
-                phase=name,
-                started_at=phase_started_at,
-                status="warning",
-                metrics=PhaseMetrics().to_payload(time.time() - t0_phase),
-                signals=[
-                    {
-                        "level": "warning",
-                        "code": "interrupted",
-                        "message": "Interrompu par l'utilisateur (action contrôlée)",
-                    }
-                ],
-                details={},
-            )
-            phase_results.append((name + " (INTERROMPU)", time.time() - t0_phase))
-            clear_status()
-            sys.exit(130)
-        except RuntimeError as e:
-            log.error("Pipeline interrompu à la phase '%s' : %s", name, e)
-            log.error("Pour reprendre : python run_pipeline.py --from %s", name)
-            recorder.record(
-                phase=name,
-                started_at=phase_started_at,
-                status="error",
-                metrics=PhaseMetrics().to_payload(time.time() - t0_phase),
-                signals=[{"level": "error", "code": "exception", "message": str(e)}],
-                details={},
-            )
-            phase_results.append((name + " (ERREUR)", time.time() - t0_phase))
-            clear_status()
-            sys.exit(1)
+            log.info("─" * 40)
+            log.info("PHASE : %s", name)
+            log.info("─" * 40)
 
-        duration = time.time() - t0_phase
-        phase_results.append((name, duration))
-        metrics = result if isinstance(result, PhaseMetrics) else PhaseMetrics()
-        if isinstance(result, PhaseMetrics):
-            log.info("Total phase %s : %s", name, result.as_summary())
-        recorder.record(
-            phase=name,
-            started_at=phase_started_at,
-            status="warning" if metrics.signals else "ok",
-            metrics=metrics.to_payload(duration),
-            signals=metrics.signals,
-            details=metrics.details,
-        )
+            write_status(
+                mode=args.mode,
+                phase=name,
+                started_at=pipeline_started_at,
+                phases_done=i,
+                phases_total=len(phases_to_run),
+            )
+
+            phase_started_at = datetime.datetime.now(datetime.UTC)
+            t0_phase = time.time()
+            try:
+                result = fn(
+                    mode=args.mode,
+                    sources=sources,
+                    year=args.year,
+                    start_year=args.start_year,
+                    include_wos=args.include_wos,
+                    rebuild_publications=args.rebuild_publications,
+                )
+            except KeyboardInterrupt:
+                log.warning("Pipeline interrompu par l'utilisateur à la phase '%s'", name)
+                log.info("Pour reprendre : python run_pipeline.py --from %s", name)
+                recorder.record(
+                    phase=name,
+                    started_at=phase_started_at,
+                    status="warning",
+                    metrics=PhaseMetrics().to_payload(time.time() - t0_phase),
+                    signals=[
+                        {
+                            "level": "warning",
+                            "code": "interrupted",
+                            "message": "Interrompu par l'utilisateur (action contrôlée)",
+                        }
+                    ],
+                    details={},
+                )
+                phase_results.append((name + " (INTERROMPU)", time.time() - t0_phase))
+                clear_status()
+                sys.exit(130)
+            except RuntimeError as e:
+                log.error("Pipeline interrompu à la phase '%s' : %s", name, e)
+                log.error("Pour reprendre : python run_pipeline.py --from %s", name)
+                recorder.record(
+                    phase=name,
+                    started_at=phase_started_at,
+                    status="error",
+                    metrics=PhaseMetrics().to_payload(time.time() - t0_phase),
+                    signals=[{"level": "error", "code": "exception", "message": str(e)}],
+                    details={},
+                )
+                phase_results.append((name + " (ERREUR)", time.time() - t0_phase))
+                clear_status()
+                sys.exit(1)
+
+            duration = time.time() - t0_phase
+            phase_results.append((name, duration))
+            metrics = result if isinstance(result, PhaseMetrics) else PhaseMetrics()
+            if isinstance(result, PhaseMetrics):
+                log.info("Total phase %s : %s", name, result.as_summary())
+            recorder.record(
+                phase=name,
+                started_at=phase_started_at,
+                status="warning" if metrics.signals else "ok",
+                metrics=metrics.to_payload(duration),
+                signals=metrics.signals,
+                details=metrics.details,
+            )
+        finally:
+            reset_log_phase(phase_token)
 
     elapsed_total = time.time() - t0_total
 

@@ -337,6 +337,7 @@ exclude = [
 [[tool.mypy.overrides]]
 module = [
     "application.pipeline.extract.*",
+    "application.pipeline.logging_scope",
     "application.pipeline.normalize.*",
     "application.pipeline.oa_status.*",
     "application.pipeline.publishers_journals.*",

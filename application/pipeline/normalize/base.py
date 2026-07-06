@@ -24,6 +24,7 @@ from typing import ClassVar, NamedTuple
 from sqlalchemy import Connection
 
 from application.pipeline._savepoint import savepoint
+from application.pipeline.logging_scope import scoped_logger
 from application.ports.pipeline.staging import StagingQueries, StagingRow
 
 
@@ -144,21 +145,25 @@ class SourceNormalizer(ABC):
         args = self.parse_args(argv)
         self.conn.rollback()
 
+        # Préfixe `[source]` sur les lignes propres à la boucle (progression, bilan) :
+        # dans un run multi-sources, chaque batch reste situé sans remonter au bandeau.
+        slog = scoped_logger(self.logger, self.SOURCE)
+
         try:
             if args.reset:
                 count = self._reset(self.conn)
                 self.conn.commit()
-                self.logger.info(f"Reset : {count} works remis à processed=FALSE")
+                slog.info(f"Reset : {count} works remis à processed=FALSE")
                 return NormalizeStats(0, 0, 0)
 
             total = self._count_pending(self.conn)
-            self.logger.info(f"=== Normalisation {self.SOURCE} : {total} works à traiter ===")
+            slog.info(f"=== Normalisation : {total} works à traiter ===")
             if total == 0:
-                self.logger.info(f"{self.SOURCE} : rien à traiter")
+                slog.info("rien à traiter")
                 return NormalizeStats(0, 0, 0)
 
             limit = min(args.limit or total, total)
-            self.logger.info(f"Traitement de {limit} works (batch size: {args.batch_size})")
+            slog.info(f"Traitement de {limit} works (batch size: {args.batch_size})")
 
             self.preload_caches(self.conn)
 
@@ -191,18 +196,18 @@ class SourceNormalizer(ABC):
                         parts.append(f"{skipped} ignorés")
                     if errors:
                         parts.append(f"{errors} erreurs")
-                    self.logger.info(f"  {', '.join(parts)}")
+                    slog.info(f"  {', '.join(parts)}")
 
             self.conn.commit()
             self.cleanup()
 
-            self.logger.info(f"\n=== Normalisation {self.SOURCE} terminée ===")
-            self.logger.info(f"Traités avec succès : {processed}")
+            slog.info("\n=== Normalisation terminée ===")
+            slog.info(f"Traités avec succès : {processed}")
             if skipped:
-                self.logger.info(f"Ignorés : {skipped}")
-            self.logger.info(f"Erreurs : {errors}")
+                slog.info(f"Ignorés : {skipped}")
+            slog.info(f"Erreurs : {errors}")
             for line in self.summary_stats(self.conn):
-                self.logger.info(line)
+                slog.info(line)
 
             return NormalizeStats(processed, skipped, errors)
 
@@ -215,11 +220,11 @@ class SourceNormalizer(ABC):
             # exit 130). Sans le `raise`, la phase « réussirait » et le pipeline
             # enchaînerait sur la source suivante.
             self.conn.rollback()
-            self.logger.warning("Interruption — batches déjà committés conservés.")
+            slog.warning("Interruption — batches déjà committés conservés.")
             raise
         except Exception as e:
             self.conn.rollback()
-            self.logger.error(f"Erreur fatale : {e}")
+            slog.error(f"Erreur fatale : {e}")
             raise
         finally:
             self.conn.close()
