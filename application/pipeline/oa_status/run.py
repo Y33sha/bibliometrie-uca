@@ -46,8 +46,12 @@ MAX_CONCURRENT = 5
 MAX_PER_RUN = 10_000
 """Cap de DOI vérifiés par run : lisse la charge (le backlog des jamais-vérifiés
 s'écoule sur plusieurs runs au lieu d'un pic de ~100k)."""
-STALENESS_DAYS = 30
-"""Au-delà, un statut OA changeable (hors STABLE_OA_STATUSES) est re-vérifié."""
+STALENESS_DAYS = 15
+"""Au-delà, un statut OA changeable (hors STABLE_OA_STATUSES) est re-vérifié.
+
+Borne le décalage entre une bascule OA côté Unpaywall (qui peut rétrodater une
+`oa_date` sans notifier) et sa prise en compte : au pire, un statut périmé
+survit une fenêtre avant re-vérification."""
 
 
 async def run_enrich_oa_status(
