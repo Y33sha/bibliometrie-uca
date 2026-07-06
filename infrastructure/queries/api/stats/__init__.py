@@ -63,8 +63,8 @@ class PgStatsQueries(StatsQueries):
         years: list[int],
         publisher_ids: list[int],
         journal_ids: list[int],
-        oa_status: str,
-        has_apc: str,
+        oa_status: list[str],
+        has_apc: list[str],
         doc_types: list[str],
     ) -> CollaborationsResponse:
         data = _run_collaborations(
@@ -111,8 +111,8 @@ class PgStatsQueries(StatsQueries):
         years: list[int],
         publisher_ids: list[int],
         journal_ids: list[int],
-        oa_status: str,
-        has_apc: str,
+        oa_status: list[str],
+        has_apc: list[str],
         doc_types: list[str],
     ) -> PivotResponse:
         return PivotResponse.model_validate(
@@ -141,8 +141,8 @@ class PgStatsQueries(StatsQueries):
         years: list[int],
         publisher_ids: list[int],
         journal_ids: list[int],
-        oa_status: str,
-        has_apc: str,
+        oa_status: list[str],
+        has_apc: list[str],
         doc_types: list[str],
     ) -> EntityFacetResponse:
         rows = _stats_entity_facet(
@@ -173,8 +173,8 @@ class PgStatsQueries(StatsQueries):
         years: list[int],
         publisher_ids: list[int],
         journal_ids: list[int],
-        oa_status: str,
-        has_apc: str,
+        oa_status: list[str],
+        has_apc: list[str],
         doc_types: list[str],
     ) -> StatsFacetsResponse:
         data = _stats_facets(

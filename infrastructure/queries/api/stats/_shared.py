@@ -26,8 +26,8 @@ def stats_filter_clauses(
     years: list[int],
     publisher_ids: list[int],
     journal_ids: list[int],
-    oa_status: str,
-    has_apc: str,
+    oa_status: list[str],
+    has_apc: list[str],
     doc_types: list[str],
 ) -> list[WhereClause | None]:
     """Clauses de filtrage communes aux agrégats stats (années, labos, accès, APC, types, éditeur,
@@ -66,7 +66,7 @@ _APC_NOT_EXISTS_SA = (
 )
 
 
-def stats_apc_clause(has_apc: str, apc_structure_ids: list[int]) -> WhereClause | None:
+def stats_apc_clause(has_apc: list[str], apc_structure_ids: list[int]) -> WhereClause | None:
     """Filtre APC pour les endpoints stats (supporte multi-sélection).
 
     `apc_structure_ids` = structures considérées comme "internes" pour la
@@ -76,10 +76,9 @@ def stats_apc_clause(has_apc: str, apc_structure_ids: list[int]) -> WhereClause 
     """
     if not has_apc:
         return None
-    values = [v.strip() for v in has_apc.split(",") if v.strip()]
     parts: list[str] = []
     needs_root = False
-    for v in values:
+    for v in has_apc:
         if v == "uca":
             parts.append(_APC_EXISTS_SA)
             needs_root = True

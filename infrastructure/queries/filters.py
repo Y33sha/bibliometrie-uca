@@ -125,14 +125,11 @@ def lab_clause(lab_ids: list[int]) -> WhereClause | None:
     )
 
 
-def oa_clause(oa_status: str | None) -> WhereClause | None:
+def oa_clause(oa_status: list[str]) -> WhereClause | None:
     if not oa_status:
         return None
-    values = [v.strip() for v in oa_status.split(",") if v.strip()]
-    if not values:
-        return None
     expanded: list[str] = []
-    for v in values:
+    for v in oa_status:
         if v == "oa":
             expanded.extend(OA_OPEN_STATUSES)
         else:
@@ -143,13 +140,13 @@ def oa_clause(oa_status: str | None) -> WhereClause | None:
     return WhereClause("p.oa_status::text = ANY(:flt_oa_status)", {"flt_oa_status": expanded})
 
 
-def access_clause(access: str | None) -> WhereClause | None:
-    """Filtre par bucket d'accès. `access` est une liste de buckets séparés par des
-    virgules (`open`, `embargo`, `closed`), combinés en OR. Un bucket inconnu est ignoré.
+def access_clause(access: list[str]) -> WhereClause | None:
+    """Filtre par bucket d'accès. `access` est une liste de buckets (`open`,
+    `embargo`, `closed`), combinés en OR. Un bucket inconnu est ignoré.
     """
     if not access:
         return None
-    buckets = {v.strip() for v in access.split(",") if v.strip()}
+    buckets = set(access)
     statuses: set[str] = set()
     include_null = False
     if "open" in buckets:
@@ -258,16 +255,14 @@ def person_clause(person_id: int) -> WhereClause:
 
 
 def _person_toggle_clause(
-    filter_str: str, exists_sql: str, binds: dict[str, Any]
+    values: list[str], exists_sql: str, binds: dict[str, Any]
 ) -> WhereClause | None:
     """Facette binaire `yes`/`no` sur un prédicat EXISTS lié à une personne.
 
-    `filter_str` est une liste `yes`/`no` séparée par des virgules (multi-sélection
-    côté front) : `yes` retient les publications vérifiant `exists_sql`, `no` les
-    autres, combinés en OR. Cocher les deux ne pose donc aucune contrainte.
-    Une valeur inconnue est ignorée.
+    `values` est une liste `yes`/`no` (multi-sélection côté front) : `yes` retient
+    les publications vérifiant `exists_sql`, `no` les autres, combinés en OR. Cocher
+    les deux ne pose donc aucune contrainte. Une valeur inconnue est ignorée.
     """
-    values = {v.strip() for v in filter_str.split(",") if v.strip()}
     parts: list[str] = []
     if "yes" in values:
         parts.append(exists_sql)
@@ -279,7 +274,7 @@ def _person_toggle_clause(
     return WhereClause(sql, binds)
 
 
-def corresponding_clause(person_id: int, corr_filter: str) -> WhereClause | None:
+def corresponding_clause(person_id: int, corr_filter: list[str]) -> WhereClause | None:
     if not corr_filter or not person_id:
         return None
     return _person_toggle_clause(
@@ -345,7 +340,7 @@ def hal_status_clause(values: list[str], lab_hal_col: str | None) -> WhereClause
 
 
 def apc_clause(
-    has_apc: str, apc_structure_ids: list[int], lab_ids: list[int] | None = None
+    has_apc: list[str], apc_structure_ids: list[int], lab_ids: list[int] | None = None
 ) -> WhereClause | None:
     """Filtre des publications par origine du paiement APC.
 
@@ -364,7 +359,7 @@ def apc_clause(
     parts: list[str] = []
     needs_root = False
     needs_lab = False
-    for v in [x.strip() for x in has_apc.split(",") if x.strip()]:
+    for v in has_apc:
         if v == "uca":
             parts.append(
                 "EXISTS (SELECT 1 FROM apc_payments ap "
@@ -414,7 +409,9 @@ def apc_clause(
     return WhereClause("(" + " OR ".join(parts) + ")", binds)
 
 
-def in_perimeter_person_clause(in_perimeter: str, person_id: int | None) -> WhereClause | None:
+def in_perimeter_person_clause(
+    in_perimeter: list[str], person_id: int | None
+) -> WhereClause | None:
     if not in_perimeter or not person_id:
         return None
     return _person_toggle_clause(

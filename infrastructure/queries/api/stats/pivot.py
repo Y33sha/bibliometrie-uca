@@ -76,8 +76,8 @@ def run_pivot(
     years: list[int],
     publisher_ids: list[int],
     journal_ids: list[int],
-    oa_status: str,
-    has_apc: str,
+    oa_status: list[str],
+    has_apc: list[str],
     doc_types: list[str],
 ) -> dict[str, Any]:
     """Exécute une agrégation : `mesure` ventilée selon `groups`, sous les filtres. Les clés sont

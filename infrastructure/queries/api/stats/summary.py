@@ -50,8 +50,8 @@ def _common_clauses(
     years: list[int],
     publisher_ids: list[int],
     journal_ids: list[int],
-    oa_status: str,
-    has_apc: str,
+    oa_status: list[str],
+    has_apc: list[str],
     doc_types: list[str],
     skip: str = "",
 ) -> list[WhereClause | None]:
@@ -97,8 +97,8 @@ def _facets_sqls(
     years: list[int],
     publisher_ids: list[int],
     journal_ids: list[int],
-    oa_status: str,
-    has_apc: str,
+    oa_status: list[str],
+    has_apc: list[str],
     doc_types: list[str],
 ) -> dict[str, tuple[str, dict[str, Any]]]:
     """Retourne {facet_name: (sql, binds)} pour les 4 sous-requêtes facettes."""
@@ -203,8 +203,8 @@ def stats_facets(
     years: list[int],
     publisher_ids: list[int],
     journal_ids: list[int],
-    oa_status: str,
-    has_apc: str,
+    oa_status: list[str],
+    has_apc: list[str],
     doc_types: list[str],
 ) -> dict[str, list[dict[str, Any]]]:
     """Facettes dynamiques."""
