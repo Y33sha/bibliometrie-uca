@@ -51,6 +51,7 @@ def test_refetch_not_called_in_normalize():
     with ExitStack() as stack:
         _patch_all(stack, _NORMALIZERS)
         stack.enter_context(patch.object(run_pipeline, "_vacuum_staging"))
+        stack.enter_context(patch.object(run_pipeline, "_run_cleanup_orphan_identities"))
         refetch = stack.enter_context(
             patch.object(run_pipeline, "_run_refetch_truncated", return_value=PhaseMetrics())
         )
