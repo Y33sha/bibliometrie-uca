@@ -31,7 +31,7 @@
 * [ ] thèses d'autres établissements liés à nos labos: enlever de la page thèses (ajouter filtre implicite sur "établissement de soutenance" / ou le faire en amont dès le pipeline?)
 * [ ] Montants APC consultables via /stats (à envisager une fois que les problèmes de données seront résolus)
 * [ ] Publications: facette sujets?
-* [ ] Facettes: étudier l'option "caché par défaut" / + harmoniser singulier/pluriel
+* [ ] Facettes: tester l'option "caché par défaut" / + harmoniser singulier/pluriel
 
 # Cas particuliers, bizarreries à élucider
 * [ ] 164107: pourquoi type autre?
