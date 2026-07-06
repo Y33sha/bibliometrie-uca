@@ -17,7 +17,7 @@ def _setup_affiliations_test_data(conn):
     conn.execute(
         text("""
             INSERT INTO config (key, value) VALUES
-                ('perimeter_extraction', '"uca_wide"'),
+                ('perimeter_extraction', '"alliance_uca"'),
                 ('perimeter_persons', '"uca"')
             ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
         """)
@@ -27,7 +27,7 @@ def _setup_affiliations_test_data(conn):
         text("""
             INSERT INTO perimeters (code, name, structure_ids) VALUES
                 ('uca', 'UCA restreint', ARRAY[80000]),
-                ('uca_wide', 'UCA large', ARRAY[80000])
+                ('alliance_uca', 'UCA large', ARRAY[80000])
             ON CONFLICT (code) DO UPDATE SET structure_ids = EXCLUDED.structure_ids
         """)
     )

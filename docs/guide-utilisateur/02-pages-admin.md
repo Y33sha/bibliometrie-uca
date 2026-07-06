@@ -14,7 +14,7 @@ Configuration du [moissonnage](../pipeline/02-extract.md) :
 - email (*polite pool*);
 - clés API;
 - années interrogées (modes *weekly* et *full*);
-- définition et CRUD des périmètres (`uca`, `uca_wide`);
+- définition et CRUD des périmètres (`uca`, `alliance_uca`);
 - périmètre utilisé à différentes étapes du pipeline (extraction, détection des affiliations, création de personnes).
 
 ## Logs

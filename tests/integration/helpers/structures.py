@@ -73,7 +73,7 @@ def add_authorship_structure(conn, authorship_id: int, structure_id: int) -> Non
     # configurent déjà `perimeter_extraction` (ON CONFLICT DO NOTHING).
     conn.execute(
         text(
-            "INSERT INTO config (key, value) VALUES ('perimeter_extraction', '\"uca_wide\"') "
+            "INSERT INTO config (key, value) VALUES ('perimeter_extraction', '\"alliance_uca\"') "
             "ON CONFLICT (key) DO NOTHING"
         )
     )
