@@ -1,5 +1,4 @@
-"""Règles pures de matching d'authorships à des personnes.
-"""
+"""Règles pures de matching d'authorships à des personnes."""
 
 from collections.abc import Mapping
 from dataclasses import dataclass

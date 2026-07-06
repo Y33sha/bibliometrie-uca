@@ -374,9 +374,9 @@ def run(
             # forme déjà portée par d'autres personnes reste ambiguë (donc non
             # matchée en aveugle), au lieu d'être détournée vers la dernière créée.
             for form in compute_person_name_forms(last, first):
-                candidates = name_form_map.setdefault(form, [])
-                if marker not in candidates:
-                    candidates.append(marker)
+                form_person_ids = name_form_map.setdefault(form, [])
+                if marker not in form_person_ids:
+                    form_person_ids.append(marker)
             created += 1
 
         else:  # skip
