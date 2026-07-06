@@ -33,7 +33,7 @@ Le blocage par nom au grain **identité** (`author_identifying_keys`, ~645 k lig
 
 ## Décisions
 
-- **Identité = état dérivé recalculable, en deux couches.** Le *noyau non négociable* (figé) : lien RH, identifiant `confirmed`, forme de nom `confirmed`/`rejected`, `distinct_persons`, paires `(publication, personne)` rejetées. La *couche fluide* (recalculable) : tout le moissonné, résolu par clustering et réattribuable à chaque passe. `status='confirmed'` sur une forme de nom désigne sans ambiguïté une validation humaine ; l'appartenance d'une forme au nom canonique se lit `'persons' = ANY(sources)`.
+- **Identité = état dérivé recalculable, en deux couches.** Le *noyau non négociable* (figé) : lien RH, identifiant `confirmed`, forme de nom `confirmed`/`rejected`, `distinct_persons`, paires `(publication, personne)` rejetées. La *couche fluide* (recalculable) : tout le moissonné, résolu par recalcul depuis le snapshot — graphe transitif pour le canal identifiant, recherche par bloc pour le canal nominal — et réattribuable à chaque passe. `status='confirmed'` sur une forme de nom désigne sans ambiguïté une validation humaine ; l'appartenance d'une forme au nom canonique se lit `'persons' = ANY(sources)`.
 - **Le canal identifiant est le moteur.** Les identités partageant une valeur d'identifiant fort, gardées par compatibilité de nom, forment les composantes connexes d'un graphe ; chaque composante est recoupée par le cannot-link du noyau, puis incarnée en une personne. Regroupements et séparations sont des issues de ce recalcul, pas des opérations dédiées.
 - **Attribution par consensus, pas par premier arrivé.** Le détenteur d'une valeur d'identifiant et le nom canonique d'une composante sont ceux que soutient la pluralité des signatures, une forme validée admin l'emportant sur la pluralité. Une majorité postérieure peut renverser une attribution devenue minoritaire, sans jamais déloger une attribution `confirmed`.
 - **Le canal nominal est conservateur.** Une forme de nom qui ne matche qu'une seule personne se rattache ; une forme qui matche deux personnes distinctes ou plus laisse la signature **orpheline** (`person_id` NULL) et signalée pour contrôle admin, jamais un rattachement deviné. Aucune garde de contexte ni départage automatique n'entre dans le chemin du pipeline. Un chemin de rattachement manuel existant (authorships orphelines) absorbe ces cas.
@@ -67,7 +67,7 @@ Livre l'exécution incrémentale bornée et sa convergence.
 
 - [ ] Marquage à recalculer porté par les signatures et identités, jamais par la personne.
 - [ ] Recalcul limité au composant touché (clé de blocage = nom de famille normalisé) : recomposition de `source_authorships.person_id`, incarnation des composantes franches, orphelinage des douteuses, suppression des personnes vidées, préservation du noyau.
-- [ ] Repérage des fusions, défusions et orphelinages pour contrôle admin.
+- [ ] Repérage des changements de regroupement (regroupements, séparations, orphelinages) pour contrôle admin.
 - [ ] Vérification de la convergence multi-run (une œuvre peut rester sous-résolue jusqu'à la passe suivante).
 
 ## Questions ouvertes
