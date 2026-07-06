@@ -5,6 +5,7 @@ from sqlalchemy import text
 
 from domain.publications.identifiers import clean_doi
 from infrastructure.sources.common import (
+    change_detection_hash,
     compute_hash,
     get_cross_import_dois,
     get_existing_ids,
@@ -12,6 +13,7 @@ from infrastructure.sources.common import (
     record_doi_not_found,
     set_disappeared_by_source_id,
 )
+from infrastructure.sources.hal.hash_normalize import strip_volatile_for_hash
 
 # ── compute_hash ─────────────────────────────────────────────────
 
@@ -45,6 +47,61 @@ class TestComputeHash:
 
     def test_empty_dict(self):
         assert compute_hash({}) == compute_hash({})
+
+
+# ── change_detection_hash / normalisation HAL ────────────────────
+
+
+def _tei(*, when, not_before="2025-01-01"):
+    """Fragment TEI HAL minimal : horodatage de génération (`@when`, volatil) et
+    date d'embargo (`@notBefore`, bibliographique)."""
+    return (
+        '<TEI xmlns="http://www.tei-c.org/ns/1.0"><teiHeader><fileDesc>'
+        f'<publicationStmt><date when="{when}"/></publicationStmt></fileDesc></teiHeader>'
+        f'<text><body><ref type="file"><date notBefore="{not_before}"/></ref>'
+        "</body></text></TEI>"
+    )
+
+
+class TestChangeDetectionHash:
+    def test_hal_generation_timestamp_ignored(self):
+        """Deux moissonnages HAL ne différant que par l'horodatage de génération du
+        TEI produisent le même hash : ni UPSERT ni re-normalisation parasites."""
+        a = {"halId_s": "hal-1", "label_xml": _tei(when="2026-05-28T15:21:36+02:00")}
+        b = {"halId_s": "hal-1", "label_xml": _tei(when="2026-06-16T20:30:49+02:00")}
+        assert change_detection_hash("hal", a) == change_detection_hash("hal", b)
+
+    def test_hal_real_content_change_detected(self):
+        """Un champ métier qui change reste détecté malgré la neutralisation."""
+        base = _tei(when="2026-05-28T15:21:36+02:00")
+        a = {"label_xml": base, "title_s": ["Étude A"]}
+        b = {"label_xml": base, "title_s": ["Étude B"]}
+        assert change_detection_hash("hal", a) != change_detection_hash("hal", b)
+
+    def test_hal_embargo_change_detected(self):
+        """Une date d'embargo (`@notBefore`) qui change reste détectée : seul `@when`
+        est neutralisé."""
+        a = {"label_xml": _tei(when="2026-01-01T00:00:00+02:00", not_before="2025-01-01")}
+        b = {"label_xml": _tei(when="2026-01-01T00:00:00+02:00", not_before="2026-06-01")}
+        assert change_detection_hash("hal", a) != change_detection_hash("hal", b)
+
+    def test_non_hal_source_hashes_faithful_payload(self):
+        """Sans normaliseur, l'empreinte est celle du payload fidèle — la
+        neutralisation est propre à la source, pas au champ."""
+        payload = {"id": "W1", "label_xml": _tei(when="2026-01-01T00:00:00+02:00")}
+        assert change_detection_hash("openalex", payload) == compute_hash(payload)
+
+
+class TestStripVolatileForHash:
+    def test_does_not_mutate_input(self):
+        original = _tei(when="2026-01-01T00:00:00+02:00")
+        payload = {"label_xml": original}
+        strip_volatile_for_hash(payload)
+        assert payload["label_xml"] == original
+
+    def test_returns_input_when_no_label_xml(self):
+        payload = {"halId_s": "hal-1"}
+        assert strip_volatile_for_hash(payload) is payload
 
 
 # ── clean_doi ────────────────────────────────────────────────────

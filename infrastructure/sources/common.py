@@ -4,6 +4,7 @@ Fonctions partagées par les scripts d'extraction (OpenAlex, HAL, WoS, ScanR).
 
 import hashlib
 import json
+from collections.abc import Callable
 from typing import Any
 
 from sqlalchemy import Connection, bindparam, text
@@ -14,6 +15,7 @@ from domain.sources.registry import ALL_SOURCES_SET as VALID_SOURCES
 from infrastructure.observability.log import (
     setup_logger,  # noqa: F401 — réexporté pour les scripts d'extraction
 )
+from infrastructure.sources.hal.hash_normalize import strip_volatile_for_hash
 
 
 def canonical_json_bytes(raw_data: dict) -> bytes:
@@ -21,7 +23,7 @@ def canonical_json_bytes(raw_data: dict) -> bytes:
 
     Forme unique partagée par `compute_hash` (empreinte du payload) et le raw
     store (contenu écrit) : garantit `md5(canonical_json_bytes(d)) ==
-    compute_hash(d)`, donc le hash du contenu raw store égale `staging.raw_hash`.
+    compute_hash(d)`.
     """
     return json.dumps(raw_data, sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode(
         "utf-8"
@@ -31,6 +33,31 @@ def canonical_json_bytes(raw_data: dict) -> bytes:
 def compute_hash(raw_data: dict) -> str:
     """Calcule le hash MD5 du JSON canonique (clés triées, compact)."""
     return hashlib.md5(canonical_json_bytes(raw_data)).hexdigest()
+
+
+# Neutralisation, par source, du bruit volatil avant calcul du hash de détection
+# de changement. Une source absente n'est pas normalisée (hash sur le payload
+# fidèle). HAL : horodatage de génération enfoui dans le TEI `label_xml`.
+_HASH_NORMALIZERS: dict[str, Callable[[dict], dict]] = {
+    "hal": strip_volatile_for_hash,
+}
+
+
+def change_detection_hash(source: str, raw_data: dict) -> str:
+    """Hash pilotant l'UPSERT `staging` (réécriture `raw_data` + `processed`).
+
+    Calculé sur une copie du payload dont le bruit volatil propre à la source est
+    neutralisé (cf. `_HASH_NORMALIZERS`), pour qu'un champ réémis à l'identique
+    métier ne déclenche ni réécriture ni re-normalisation. Le payload stocké
+    (`staging.raw_data`, raw store) reste, lui, fidèle à la source.
+
+    Point d'entrée unique du hash de détection : partagé par l'UPSERT d'extraction
+    et la réhydratation depuis le raw store, pour qu'ils s'accordent (une ligne
+    réhydratée ne re-diverge pas au moissonnage suivant). Pour les sources sans
+    normaliseur, égale `compute_hash(raw_data)`.
+    """
+    normalize = _HASH_NORMALIZERS.get(source)
+    return compute_hash(normalize(raw_data) if normalize else raw_data)
 
 
 _UPSERT_STAGING_SQL = text(
@@ -89,7 +116,8 @@ def upsert_staging(
     réécrit `raw_data` (et repasse `processed=FALSE`) seulement si le hash a changé,
     bumpe toujours `last_seen_at`, et renseigne `doi` s'il manquait (jamais d'écrasement).
     Un `raw_hash=null` en base force le re-import (`NULL IS DISTINCT FROM <hash>`).
-    Le hash est calculé ici via `compute_hash`.
+    Le hash est calculé via `change_detection_hash`, qui neutralise le bruit volatil
+    propre à la source avant l'empreinte (le payload stocké reste, lui, fidèle).
 
     `authors_truncated` (OpenAlex : payload bulk plafonné à 100 auteurs) suit la même
     logique que `processed` — (re)posé seulement quand le hash change, sinon préservé
@@ -111,7 +139,7 @@ def upsert_staging(
             "source_id": source_id,
             "doi": clean_doi(doi),
             "raw_data": raw_data,
-            "raw_hash": compute_hash(raw_data),
+            "raw_hash": change_detection_hash(source, raw_data),
             "authors_truncated": authors_truncated,
             "entry_mode": entry_mode,
         },

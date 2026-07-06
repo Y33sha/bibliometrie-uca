@@ -1089,15 +1089,15 @@ staging = Table(
         "raw_hash",
         Text,
         comment=(
-            "Empreinte md5 du payload tel qu'extrait de la source bulk. "
-            "Sert de clé de détection de changement à l'UPSERT (et "
-            "d'empreinte d'intégrité pour le chantier DATA_raw-data-store). "
-            "Cas particulier OpenAlex : `refetch_truncated` n'écrit PAS "
-            "`raw_hash` quand il complète les authorships d'une publication "
-            "tronquée à 100 — la ligne garde le hash du payload bulk pour "
-            "que le bulk suivant ne déclenche pas de réécriture inutile. "
-            "L'invariant `raw_hash = md5(raw_data)` est donc volontairement "
-            "rompu sur les lignes OpenAlex refetchées."
+            "Empreinte md5 servant de clé de détection de changement à l'UPSERT. "
+            "Calculée via `change_detection_hash`, qui neutralise le bruit volatil "
+            "propre à la source avant l'empreinte (HAL : horodatage de génération "
+            "du TEI `label_xml`) — le payload stocké reste, lui, fidèle à la source. "
+            "L'empreinte ne coïncide donc pas avec `md5(raw_data)` pour les sources "
+            "normalisées. Cas particulier OpenAlex : `refetch_truncated` n'écrit PAS "
+            "`raw_hash` quand il complète les authorships d'une publication tronquée "
+            "à 100 — la ligne garde le hash du payload bulk pour que le bulk suivant "
+            "ne déclenche pas de réécriture inutile."
         ),
     ),
     Column("last_seen_at", DateTime(timezone=True), server_default=func.now()),
