@@ -295,15 +295,12 @@ def list_publications(
 # ── Export CSV ────────────────────────────────────────────────────
 
 
-def _export_oa_clause(oa_status: str) -> WhereClause | None:
+def _export_oa_clause(oa_status: list[str]) -> WhereClause | None:
     """Variante simplifiée du filtre oa_status pour l'export."""
     if not oa_status:
         return None
-    oa_values = [v.strip() for v in oa_status.split(",") if v.strip()]
-    if not oa_values:
-        return None
     expanded: list[str] = []
-    for v in oa_values:
+    for v in oa_status:
         if v == "oa":
             expanded.extend(OA_OPEN_STATUSES)
         else:

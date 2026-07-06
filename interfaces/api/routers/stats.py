@@ -49,8 +49,8 @@ def stats_facets(
         years=parse_int_csv(year),
         publisher_ids=parse_int_csv(publisher_id),
         journal_ids=parse_int_csv(journal_id),
-        oa_status=oa_status,
-        has_apc=has_apc,
+        oa_status=parse_str_csv(oa_status),
+        has_apc=parse_str_csv(has_apc),
         doc_types=parse_str_csv(doc_type),
     )
 
@@ -78,8 +78,8 @@ def stats_entity_facet(
         years=parse_int_csv(year),
         publisher_ids=parse_int_csv(publisher_id),
         journal_ids=parse_int_csv(journal_id),
-        oa_status=oa_status,
-        has_apc=has_apc,
+        oa_status=parse_str_csv(oa_status),
+        has_apc=parse_str_csv(has_apc),
         doc_types=parse_str_csv(doc_type),
     )
 
@@ -114,8 +114,8 @@ def collaborations(
         years=parse_int_csv(year),
         publisher_ids=parse_int_csv(publisher_id),
         journal_ids=parse_int_csv(journal_id),
-        oa_status=oa_status,
-        has_apc=has_apc,
+        oa_status=parse_str_csv(oa_status),
+        has_apc=parse_str_csv(has_apc),
         doc_types=parse_str_csv(doc_type),
     )
 
@@ -153,7 +153,7 @@ def pivot(
         years=parse_int_csv(year),
         publisher_ids=parse_int_csv(publisher_id),
         journal_ids=parse_int_csv(journal_id),
-        oa_status=oa_status,
-        has_apc=has_apc,
+        oa_status=parse_str_csv(oa_status),
+        has_apc=parse_str_csv(has_apc),
         doc_types=parse_str_csv(doc_type),
     )

@@ -51,8 +51,8 @@ def stats_entity_facet(
     years: list[int],
     publisher_ids: list[int],
     journal_ids: list[int],
-    oa_status: str,
-    has_apc: str,
+    oa_status: list[str],
+    has_apc: list[str],
     doc_types: list[str],
     limit: int = 20,
 ) -> list[dict[str, Any]]:

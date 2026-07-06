@@ -116,8 +116,8 @@ class StatsQueries(Protocol):
         years: list[int],
         publisher_ids: list[int],
         journal_ids: list[int],
-        oa_status: str,
-        has_apc: str,
+        oa_status: list[str],
+        has_apc: list[str],
         doc_types: list[str],
     ) -> PivotResponse: ...
 
@@ -131,8 +131,8 @@ class StatsQueries(Protocol):
         years: list[int],
         publisher_ids: list[int],
         journal_ids: list[int],
-        oa_status: str,
-        has_apc: str,
+        oa_status: list[str],
+        has_apc: list[str],
         doc_types: list[str],
     ) -> CollaborationsResponse: ...
 
@@ -146,8 +146,8 @@ class StatsQueries(Protocol):
         years: list[int],
         publisher_ids: list[int],
         journal_ids: list[int],
-        oa_status: str,
-        has_apc: str,
+        oa_status: list[str],
+        has_apc: list[str],
         doc_types: list[str],
     ) -> EntityFacetResponse: ...
 
@@ -163,7 +163,7 @@ class StatsQueries(Protocol):
         years: list[int],
         publisher_ids: list[int],
         journal_ids: list[int],
-        oa_status: str,
-        has_apc: str,
+        oa_status: list[str],
+        has_apc: list[str],
         doc_types: list[str],
     ) -> StatsFacetsResponse: ...

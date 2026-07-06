@@ -30,17 +30,17 @@ class ListFilters:
     years: list[int] = field(default_factory=list)
     publisher_id: int | None = None
     journal_id: int | None = None
-    access: str = ""
-    oa_status: str = ""
+    access: list[str] = field(default_factory=list)
+    oa_status: list[str] = field(default_factory=list)
     source_values: list[str] = field(default_factory=list)
     doc_types: list[str] = field(default_factory=list)
     excluded_types: list[str] = field(default_factory=list)
     person_id: int | None = None
-    is_corresponding: str = ""
-    has_apc: str = ""
+    is_corresponding: list[str] = field(default_factory=list)
+    has_apc: list[str] = field(default_factory=list)
     country_values: list[str] = field(default_factory=list)
     hal_status_values: list[str] = field(default_factory=list)
-    in_perimeter: str = ""
+    in_perimeter: list[str] = field(default_factory=list)
     subject_id: int | None = None
 
 
@@ -54,17 +54,17 @@ class FacetFilters:
     lab_none: bool = False
     doc_types: list[str] = field(default_factory=list)
     excluded_types: list[str] = field(default_factory=list)
-    access: str = ""
-    oa_status: str = ""
+    access: list[str] = field(default_factory=list)
+    oa_status: list[str] = field(default_factory=list)
     source_values: list[str] = field(default_factory=list)
     publisher_id: int | None = None
     journal_id: int | None = None
     person_id: int | None = None
-    is_corresponding: str = ""
-    has_apc: str = ""
+    is_corresponding: list[str] = field(default_factory=list)
+    has_apc: list[str] = field(default_factory=list)
     country_values: list[str] = field(default_factory=list)
     hal_status_values: list[str] = field(default_factory=list)
-    in_perimeter: str = ""
+    in_perimeter: list[str] = field(default_factory=list)
     subject_id: int | None = None
     search: str = ""
 
