@@ -194,7 +194,11 @@
     height: var(--header-height);
     position: sticky;
     top: 0;
-    z-index: 100;
+    /* Au-dessus des dropdowns de page (facettes, filtres d'entité… tous à z-index 100) :
+       la navigation globale reste toujours visible, y compris quand un panneau déployé
+       recouvre la zone d'en-tête sur un viewport scrollable. Les surcouches modales
+       (dialogues, tooltips, lightbox) restent volontairement au-dessus (z-index ≥ 1000). */
+    z-index: 300;
   }
   .site-header.admin {
     background: #3d7a7c;
