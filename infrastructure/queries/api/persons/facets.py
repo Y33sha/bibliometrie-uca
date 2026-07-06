@@ -5,6 +5,7 @@ from typing import Any
 from sqlalchemy import Connection, text
 
 from application.ports.api.persons_queries import FacetFilters
+from domain.persons.identifiers import PUBLIC_PERSON_IDENTIFIER_TYPES_SQL
 from infrastructure.queries.filters import (
     WhereClause,
     assemble_where,
@@ -163,7 +164,8 @@ def persons_facets(conn: Connection, *, filters: FacetFilters) -> dict[str, Any]
         binds,
     ).one()
 
-    # IDENTIFIANTS À CONFIRMER (≥1 identifiant `pending`)
+    # IDENTIFIANTS À CONFIRMER (≥1 identifiant public `pending`) — mêmes types
+    # que la cellule d'affichage, un `hal_person_id` en attente est interne.
     where_sql, binds = assemble_where(base_clauses(skip="pending_identifiers"))
     pending_identifiers = conn.execute(
         text(f"""
@@ -171,10 +173,12 @@ def persons_facets(conn: Connection, *, filters: FacetFilters) -> dict[str, Any]
                 COUNT(*) FILTER (WHERE EXISTS (
                     SELECT 1 FROM person_identifiers pi
                     WHERE pi.person_id = p.id AND pi.status = 'pending'
+                      AND pi.id_type IN {PUBLIC_PERSON_IDENTIFIER_TYPES_SQL}
                 )) AS yes,
                 COUNT(*) FILTER (WHERE NOT EXISTS (
                     SELECT 1 FROM person_identifiers pi
                     WHERE pi.person_id = p.id AND pi.status = 'pending'
+                      AND pi.id_type IN {PUBLIC_PERSON_IDENTIFIER_TYPES_SQL}
                 )) AS no
             FROM {_BASE_FROM} WHERE {where_sql}
         """),
