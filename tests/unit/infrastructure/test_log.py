@@ -1,6 +1,67 @@
 """Tests de la consolidation des logs (infrastructure/log.py)."""
 
-from infrastructure.observability.log import _PROJECT_ROOT, _rebase_log_dir
+import logging
+
+from infrastructure.observability.log import (
+    _PROJECT_ROOT,
+    _PhaseNameFilter,
+    _rebase_log_dir,
+    reset_log_phase,
+    set_log_phase,
+)
+
+
+def _record(name: str = "pipeline") -> logging.LogRecord:
+    return logging.LogRecord(
+        name=name, level=logging.INFO, pathname="", lineno=0, msg="m", args=None, exc_info=None
+    )
+
+
+class TestPhaseNameFilter:
+    """`_PhaseNameFilter` réécrit `record.name` avec la phase courante, pour que
+    chaque ligne soit estampillée `normalize:` plutôt que `pipeline:`."""
+
+    def test_no_phase_keeps_logger_name(self):
+        record = _record("pipeline")
+        _PhaseNameFilter().filter(record)
+        assert record.name == "pipeline"
+
+    def test_phase_overrides_logger_name(self):
+        token = set_log_phase("normalize")
+        try:
+            record = _record("pipeline")
+            _PhaseNameFilter().filter(record)
+            assert record.name == "normalize"
+        finally:
+            reset_log_phase(token)
+
+    def test_reset_restores_previous_phase(self):
+        token = set_log_phase("extract")
+        reset_log_phase(token)
+        record = _record("scanr")
+        _PhaseNameFilter().filter(record)
+        assert record.name == "scanr"
+
+    def test_phase_propagates_to_worker_thread(self):
+        """Un worker qui rejoue sa tâche dans une copie du contexte hérite de la
+        phase — indispensable aux extracteurs threadés (`copy_context().run`)."""
+        import contextvars
+        from concurrent.futures import ThreadPoolExecutor
+
+        seen: list[str] = []
+
+        def work() -> None:
+            record = _record("scanr")
+            _PhaseNameFilter().filter(record)
+            seen.append(record.name)
+
+        token = set_log_phase("extract")
+        try:
+            with ThreadPoolExecutor(max_workers=1) as pool:
+                pool.submit(contextvars.copy_context().run, work).result()
+        finally:
+            reset_log_phase(token)
+        assert seen == ["extract"]
 
 
 class TestRebaseLogDir:
