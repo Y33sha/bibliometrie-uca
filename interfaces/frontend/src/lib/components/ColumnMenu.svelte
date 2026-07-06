@@ -11,16 +11,30 @@
 	}
 
 	let { columns, visibleColumns, showMenu, onToggle, onClose, onOpen }: Props = $props();
+
+	// Le tableau vit dans un conteneur `.table-scroll` en `overflow-x: auto` : son
+	// `overflow-y` calculé vaut `auto`, ce qui rognerait un dropdown en position
+	// absolue. On l'ancre donc en position fixe sur le bouton (recalculée à chaque
+	// ouverture), pour qu'il déborde librement sous le tableau.
+	let btnEl: HTMLButtonElement | undefined = $state();
+	let menuPos = $state({ top: 0, right: 0 });
+
+	$effect(() => {
+		if (showMenu && btnEl) {
+			const r = btnEl.getBoundingClientRect();
+			menuPos = { top: r.bottom + 4, right: window.innerWidth - r.right };
+		}
+	});
 </script>
 
 <div class="col-menu-inner">
 	<span>Liens</span>
 	<div class="column-menu-wrapper">
-		<button class="column-menu-btn" onclick={onOpen} title="Colonnes affichées">⋯</button>
+		<button bind:this={btnEl} class="column-menu-btn" onclick={onOpen} title="Colonnes affichées">⋯</button>
 		{#if showMenu}
 			<!-- svelte-ignore a11y_no_static_element_interactions a11y_click_events_have_key_events -->
 			<div class="column-menu-backdrop" onclick={onClose}></div>
-			<div class="column-menu">
+			<div class="column-menu" style="top: {menuPos.top}px; right: {menuPos.right}px;">
 				{#each columns as c}
 					<label class:disabled={c.fixed}>
 						<input type="checkbox" checked={visibleColumns.includes(c.key)}
@@ -45,7 +59,7 @@
 	.column-menu-btn:hover { background: var(--hover); color: var(--fg); }
 	.column-menu-backdrop { position: fixed; inset: 0; z-index: 9; }
 	.column-menu {
-		position: absolute; right: 0; top: 100%; margin-top: 4px;
+		position: fixed;
 		background: var(--card); border: 1px solid var(--border); border-radius: 6px;
 		box-shadow: 0 4px 12px rgba(0,0,0,0.1); padding: 6px 0; z-index: 11;
 		min-width: 150px;
