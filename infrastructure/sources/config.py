@@ -67,7 +67,7 @@ def get_hal_collections(conn: Connection) -> dict[str, str]:
         from infrastructure.queries.perimeter import get_perimeter_structure_ids
 
         raw_perim = _get_from_db(conn, "perimeter_extraction")
-        perim_code = raw_perim if isinstance(raw_perim, str) and raw_perim else "uca_wide"
+        perim_code = raw_perim if isinstance(raw_perim, str) and raw_perim else "alliance_uca"
         perimeter_ids = get_perimeter_structure_ids(conn, perim_code)
         if perimeter_ids:
             rows = conn.execute(

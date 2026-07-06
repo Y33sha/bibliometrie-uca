@@ -1,12 +1,3 @@
-# Oneshots à lancer à la prochaine occasion:
-python -m interfaces.cli.oneshot.backfill_author_identities
-python -m interfaces.cli.oneshot.backfill_remove_wos_only_orcid
-python -m interfaces.cli.oneshot.backfill_remove_numeric_idhal
-python -m interfaces.cli.oneshot.backfill_clean_dois --apply
-* ajouter Clermont Auvergne aux name_forms de site_clermont
-* ajouter les instituts + établissements Alliance UCA
-* forme de nom "unh unite de nutrition humaine" à ajouter
-
 # Pipeline
 ## Extraction
 * [ ] ajouter extraction par ORCID: vérifier pertinence (tester différentes sources, auditer le gain)

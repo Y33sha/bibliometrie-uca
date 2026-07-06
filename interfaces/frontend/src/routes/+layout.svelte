@@ -13,17 +13,10 @@
   const isAdmin = $derived($page.url.pathname.startsWith(base + "/admin"));
   const isPipeline = $derived($page.url.pathname === base + "/admin/pipeline" || $page.url.pathname === base + "/admin/config");
   const isAddresses = $derived($page.url.pathname === base + "/admin/addresses" || $page.url.pathname === base + "/admin/feedback" || $page.url.pathname === base + "/admin/countries");
-  const isReferentiels = $derived(
-    isActive("/admin/structures") ||
-      isActive("/admin/persons") ||
-      isActive("/admin/publishers") ||
-      isActive("/admin/journals"),
-  );
+  const isReferentiels = $derived(isActive("/admin/structures") || isActive("/admin/persons") || isActive("/admin/publishers") || isActive("/admin/journals"));
   const isDuplicates = $derived($page.url.pathname === base + "/admin/duplicates");
   const isHalProblems = $derived($page.url.pathname.startsWith(base + "/hal-problems"));
-  const isPublicReferentiels = $derived(
-    isActive("/publishers") || isActive("/journals") || isActive("/subjects"),
-  );
+  const isPublicReferentiels = $derived(isActive("/publishers") || isActive("/journals") || isActive("/subjects"));
 
   let mobileNavOpen = $state(false);
   // Referme le menu mobile après chaque navigation.
@@ -77,9 +70,7 @@
           <a href="{base}/admin/countries" class:active={isActive("/admin/countries")}>Pays</a>
         </div>
       </div>
-      <a href="{base}/admin/duplicates" class="nav-link" class:active={isDuplicates}
-        >Dédoublonnage</a
-      >
+      <a href="{base}/admin/duplicates" class="nav-link" class:active={isDuplicates}>Dédoublonnage</a>
       <a href="{base}/stats" class="nav-link nav-switch-link">Public</a>
       <button class="nav-link nav-switch-link" onclick={logout}>Déconnexion</button>
     </nav>
@@ -119,11 +110,7 @@
       <a href="{base}/admin/pipeline" class="nav-link nav-switch-link">Admin</a>
     </nav>
   {/if}
-  <button
-    class="nav-toggle"
-    aria-label="Menu"
-    aria-expanded={mobileNavOpen}
-    onclick={() => (mobileNavOpen = !mobileNavOpen)}>&#9776;</button>
+  <button class="nav-toggle" aria-label="Menu" aria-expanded={mobileNavOpen} onclick={() => (mobileNavOpen = !mobileNavOpen)}>&#9776;</button>
 </div>
 
 <div class="container">
@@ -152,11 +139,11 @@
     --accent: #3b6b9e;
     --border: #e5e5e0;
     --hover: #efede6; /* fond de survol des éléments cliquables (lignes, items de liste) */
-    --gold: #d4a017;
-    --diamond: #0288a8;
-    --hybrid: #8e6bbf;
-    --bronze: #b8733e;
-    --green: #2a7d4f;
+    --gold: #ffd700;
+    --diamond: #a2a8f8;
+    --hybrid: #ab5010;
+    --bronze: #cd7f32;
+    --green: #4c9030;
     --open: #4caf50; /* vert « accès ouvert » (indicateur générique), plus clair que la voie green */
     --embargoed: #b08900;
     --closed: #555;

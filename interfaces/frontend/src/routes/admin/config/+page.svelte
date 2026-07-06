@@ -143,9 +143,7 @@
   });
 
   async function toggleLabType(type: string) {
-    const next = labDisplayTypes.includes(type)
-      ? labDisplayTypes.filter((t) => t !== type)
-      : [...labDisplayTypes, type];
+    const next = labDisplayTypes.includes(type) ? labDisplayTypes.filter((t) => t !== type) : [...labDisplayTypes, type];
     await configApi.setValue("laboratories_display_types", next);
     await load();
   }
@@ -364,7 +362,7 @@
 
 {#if perimModal}
   <Modal title={perimModal.mode === "create" ? "Nouveau périmètre" : "Modifier le périmètre"} maxWidth="460px" onclose={() => (perimModal = null)}>
-    <label>Code <input bind:value={perimModal.code} disabled={perimModal.mode === "edit"} placeholder="ex: uca_wide" /></label>
+    <label>Code <input bind:value={perimModal.code} disabled={perimModal.mode === "edit"} placeholder="ex: alliance_uca" /></label>
     <label>Nom <input bind:value={perimModal.name} placeholder="ex: UCA large" /></label>
     <label for="perim-struct-search">Structures racines</label>
     <div class="perimeter-rules" style="margin: 4px 0 8px;">
@@ -482,7 +480,6 @@
     gap: 4px;
     margin-left: auto;
   }
-
 
   .perimeters-table {
     width: 100%;

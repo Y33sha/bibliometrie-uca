@@ -80,7 +80,7 @@ Vs aujourd'hui `WHERE a.in_perimeter = TRUE` (index lookup direct).
 
 Audit du 2026-06-04, EXPLAIN ANALYZE sur la base réelle (109 308 authorships, 9 472 136 source_authorships, 2 périmètres).
 
-- [x] Équivalence sémantique vérifiée : `authorships.in_perimeter = TRUE` ⟺ `EXISTS(authorship_structures ⋈ perimeter_structures, perimeter_id = uca)` — diff symétrique nulle (106 842 = 106 842). Le remplacement par JOIN est correct (le périmètre restreint `uca`, pas `uca_wide` qui sert aux affiliations).
+- [x] Équivalence sémantique vérifiée : `authorships.in_perimeter = TRUE` ⟺ `EXISTS(authorship_structures ⋈ perimeter_structures, perimeter_id = uca)` — diff symétrique nulle (106 842 = 106 842). Le remplacement par JOIN est correct (le périmètre restreint `uca`, pas `alliance_uca` qui sert aux affiliations).
 - [x] Colonne générée : **impossible**. Une colonne `GENERATED` Postgres doit être immuable et ne référencer que des colonnes de la même row (ni sous-requête ni JOIN). `in_perimeter` dépend d'un JOIN vers `perimeter_structures` → exclu d'office.
 - [x] Benchmarks (warm cache, médiane) :
   - Count plein du périmètre : `in_perimeter` ~60 ms vs JOIN ~115 ms (**+90 %**).
@@ -105,5 +105,5 @@ Non justifiée : la Phase 2 conclut au maintien de `in_perimeter` (régression �
 ## Questions ouvertes
 
 - **Trigger ou refresh explicite ?** Trigger sur `perimeters` + `structure_relations` = automatique mais ajoute une couche d'invisible (debug compliqué). Refresh explicite = plus prévisible mais expose à l'oubli côté admin. **Reco initiale : refresh explicite côté repo perimeter (à chaque écriture sur les tables concernées) + sanity check en début de pipeline.**
-- **Plusieurs périmètres ?** Aujourd'hui le projet a 2 périmètres (`uca`, `uca_wide`). La table matérialisée prévoit le multi-perimeter dès le départ.
+- **Plusieurs périmètres ?** Aujourd'hui le projet a 2 périmètres (`uca`, `alliance_uca`). La table matérialisée prévoit le multi-perimeter dès le départ.
 - **Quand attaquer ?** Le chantier M2M (`DATA_jointures-many-to-many.md`) est terminé (`authorship_structures` et `source_authorship_structures` en place) — le verrou de séquencement est levé, la Phase 1 est activable.
