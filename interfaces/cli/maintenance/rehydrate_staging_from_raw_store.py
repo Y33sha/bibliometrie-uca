@@ -8,9 +8,10 @@ nouvelle passe de normalisation.
 
 Pour chaque source demandée, parcourt les clés du raw store
 (`data/raw_store/{source}/{source_id}.json.gz`), lit chaque payload et
-réhydrate la ligne `(source, source_id)` : `raw_data = <payload>`, `raw_hash =
-md5(canonique)` (recalculé depuis le payload, préservant l'invariant `raw_hash =
-md5(canonical_json_bytes(raw_data))`), `processed = FALSE`.
+réhydrate la ligne `(source, source_id)` : `raw_data = <payload>`, `raw_hash`
+recalculé via `change_detection_hash` (même empreinte que l'UPSERT d'extraction,
+pour qu'une ligne réhydratée ne re-diverge pas au moissonnage suivant),
+`processed = FALSE`.
 
 Deux modes :
 
@@ -47,7 +48,7 @@ from domain.sources.registry import ALL_SOURCES_SET
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from infrastructure.raw_store import get_raw_store
-from infrastructure.sources.common import compute_hash
+from infrastructure.sources.common import change_detection_hash
 from infrastructure.sources.hal.extract_hal import extract_doi as hal_extract_doi
 from infrastructure.sources.openalex.parsing import extract_doi as openalex_extract_doi
 from infrastructure.sources.scanr.extract_scanr import extract_doi as scanr_extract_doi
@@ -155,7 +156,7 @@ def main() -> None:
                 raw_data = json.loads(store.get(source, source_id))
                 params = {
                     "raw_data": raw_data,
-                    "raw_hash": compute_hash(raw_data),
+                    "raw_hash": change_detection_hash(source, raw_data),
                     "source": source,
                     "source_id": source_id,
                 }
