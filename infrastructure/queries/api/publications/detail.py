@@ -275,22 +275,30 @@ _EXTERNAL_IDENTIFIER_KEYS = (
 
 def get_publication_external_identifiers(conn: Connection, pub_id: int) -> list[dict[str, Any]]:
     """Identifiants externes (arXiv, PMID, PMCID, NNT) agrégés depuis les `external_ids` des
-    `source_publications` de la publication, dédupliqués, dans l'ordre `_EXTERNAL_IDENTIFIER_KEYS`."""
+    `source_publications` de la publication, dédupliqués, dans l'ordre `_EXTERNAL_IDENTIFIER_KEYS`.
+
+    Un NNT déjà porté par une source `theses` est omis : le `source_id` de cette source *est* le
+    NNT, et son lien theses.fr couvre déjà l'identifiant (même raison que l'exclusion de `hal_id`,
+    couvert par le lien source HAL)."""
     rows = conn.execute(
         text("""
-            SELECT sp.external_ids FROM source_publications sp
+            SELECT sp.source::text, sp.source_id, sp.external_ids FROM source_publications sp
             WHERE sp.publication_id = :pid AND sp.external_ids IS NOT NULL
         """),
         {"pid": pub_id},
     ).all()
+    nnt_covered_by_theses = {source_id for source, source_id, _ in rows if source == "theses"}
     out: list[dict[str, Any]] = []
     for id_type, key in _EXTERNAL_IDENTIFIER_KEYS:
         seen: set[str] = set()
-        for (external_ids,) in rows:
+        for _source, _source_id, external_ids in rows:
             value = external_ids.get(key)
-            if isinstance(value, str) and value and value not in seen:
-                seen.add(value)
-                out.append({"type": id_type, "value": value})
+            if not (isinstance(value, str) and value) or value in seen:
+                continue
+            if id_type == "nnt" and value in nnt_covered_by_theses:
+                continue
+            seen.add(value)
+            out.append({"type": id_type, "value": value})
     return out
 
 
