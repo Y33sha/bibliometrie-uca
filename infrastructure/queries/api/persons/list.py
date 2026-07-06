@@ -78,15 +78,15 @@ def persons_directory(
                  WHERE a.person_id = p.id AND a.roles && ARRAY['author']::text[]
                  {pub_count_lab_filter}
                 ) AS pub_count,
-                (SELECT json_agg(json_build_object('value', pi.id_value, 'confirmed', (pi.status = 'confirmed')))
+                (SELECT json_agg(json_build_object('value', pi.id_value, 'confirmed', (pi.status IN ('confirmed', 'authenticated'))))
                  FROM person_identifiers pi
                  WHERE pi.person_id = p.id AND pi.id_type = 'orcid' AND pi.status != 'rejected'
                 ) AS orcids,
-                (SELECT json_agg(json_build_object('value', pi.id_value, 'confirmed', (pi.status = 'confirmed')))
+                (SELECT json_agg(json_build_object('value', pi.id_value, 'confirmed', (pi.status IN ('confirmed', 'authenticated'))))
                  FROM person_identifiers pi
                  WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND pi.status != 'rejected'
                 ) AS idhals,
-                (SELECT json_agg(json_build_object('value', pi.id_value, 'confirmed', (pi.status = 'confirmed')))
+                (SELECT json_agg(json_build_object('value', pi.id_value, 'confirmed', (pi.status IN ('confirmed', 'authenticated'))))
                  FROM person_identifiers pi
                  WHERE pi.person_id = p.id AND pi.id_type = 'idref' AND pi.status != 'rejected'
                 ) AS idrefs

@@ -33,11 +33,19 @@ class AttributionStatus(StrEnum):
       (seule transition portée par une méthode du domaine,
       `PersonIdentifier.reattribute_to` ; les autres passent par
       `update_identifier_status`, validées par l'enum Postgres).
+
+    `AUTHENTICATED` est un statut à part : il atteste que le chercheur a
+    lui-même authentifié son ORCID en se connectant à son compte. Seul un
+    ORCID peut le porter. C'est le statut le plus fort et le seul immuable :
+    un trigger Postgres interdit d'en sortir (aucune dégradation, même par
+    l'admin) et de le poser hors de l'import dédié des ORCID authentifiés.
+    Il ne participe donc à aucune transition applicative.
     """
 
     PENDING = "pending"
     CONFIRMED = "confirmed"
     REJECTED = "rejected"
+    AUTHENTICATED = "authenticated"
 
 
 # ── Types d'identifiants côté référentiel personnes ───────────────

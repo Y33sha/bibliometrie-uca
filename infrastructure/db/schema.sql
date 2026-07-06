@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict Wjy0VxHaNJS41hd91d39JjcCIlIuUms2ifeYGg0Ms7KbOLcPSRYft7w6GpetAEN
+\restrict rLBbpQPAcsUW0dRSxQxbBK7RAmypJLcdaZKyRjULJ9Rp9pMrE0hGIz6xaEstgZL
 
--- Dumped from database version 18.4
--- Dumped by pg_dump version 18.4
+-- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg22.04+1)
+-- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg22.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -97,7 +97,8 @@ CREATE TYPE public.identifier_origin AS ENUM (
 CREATE TYPE public.identifier_status AS ENUM (
     'pending',
     'confirmed',
-    'rejected'
+    'rejected',
+    'authenticated'
 );
 
 
@@ -265,6 +266,30 @@ BEGIN
     ));
 END;
 $$;
+
+
+--
+-- Name: protect_authenticated_identifier(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.protect_authenticated_identifier() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+        BEGIN
+            IF NEW.status = 'authenticated'
+               AND current_setting('app.orcid_authenticated_import', true) IS DISTINCT FROM 'on' THEN
+                RAISE EXCEPTION
+                    'le statut authenticated ne peut etre pose que par l''import des ORCID authentifies';
+            END IF;
+            IF TG_OP = 'UPDATE'
+               AND OLD.status = 'authenticated'
+               AND NEW.status <> 'authenticated' THEN
+                RAISE EXCEPTION
+                    'le statut authenticated est immuable : degradation interdite (id=%)', OLD.id;
+            END IF;
+            RETURN NEW;
+        END;
+        $$;
 
 
 SET default_tablespace = '';
@@ -572,7 +597,7 @@ CREATE MATERIALIZED VIEW public.source_authorship_structures AS
            FROM public.perimeters
           WHERE (perimeters.code = ( SELECT (config.value #>> '{}'::text[])
                    FROM public.config
-                  WHERE (config.key = 'perimeter_affiliations'::text))))))
+                  WHERE (config.key = 'perimeter_extraction'::text))))))
   WITH NO DATA;
 
 
@@ -2737,7 +2762,7 @@ CREATE INDEX idx_sa_authorship ON public.source_authorships USING btree (authors
 -- Name: idx_sa_countries_dirty; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_sa_countries_dirty ON public.source_authorships USING btree (source) WHERE countries_dirty;
+CREATE INDEX idx_sa_countries_dirty ON public.source_authorships USING btree (source_publication_id) WHERE countries_dirty;
 
 
 --
@@ -2990,6 +3015,13 @@ CREATE INDEX subjects_label_norm_trgm_idx ON public.subjects USING gin (public.n
 --
 
 CREATE INDEX subjects_usage_count_idx ON public.subjects USING btree (usage_count DESC);
+
+
+--
+-- Name: person_identifiers trg_protect_authenticated_identifier; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_protect_authenticated_identifier BEFORE INSERT OR UPDATE ON public.person_identifiers FOR EACH ROW EXECUTE FUNCTION public.protect_authenticated_identifier();
 
 
 --
@@ -3356,5 +3388,5 @@ ALTER TABLE ONLY public.structure_relations
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Wjy0VxHaNJS41hd91d39JjcCIlIuUms2ifeYGg0Ms7KbOLcPSRYft7w6GpetAEN
+\unrestrict rLBbpQPAcsUW0dRSxQxbBK7RAmypJLcdaZKyRjULJ9Rp9pMrE0hGIz6xaEstgZL
 

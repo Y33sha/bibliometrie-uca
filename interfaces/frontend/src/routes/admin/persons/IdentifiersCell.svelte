@@ -22,9 +22,11 @@
     const label =
       ident.status === "rejected"
         ? "rejeté"
-        : ident.status === "confirmed"
-          ? "confirmé"
-          : "en attente";
+        : ident.status === "authenticated"
+          ? "authentifié par le chercheur"
+          : ident.status === "confirmed"
+            ? "confirmé"
+            : "en attente";
     return `${ident.id_type} (${ident.source}) — ${label}`;
   }
 </script>
@@ -33,27 +35,59 @@
   <div class="identifiers-row">
     {#each person.identifiers as ident}
       <div class="chip-row">
-        <span class="chip-controls">
-          <button
-            class="toggle-btn confirm"
-            class:active={ident.status === "confirmed"}
-            title={ident.status === "confirmed" ? "Retirer la confirmation" : "Confirmer"}
-            onclick={() =>
-              onsetStatus(ident.id, ident.status === "confirmed" ? "pending" : "confirmed")}
-            >&#x2713;</button
-          >
-          <button
-            class="toggle-btn reject"
-            class:active={ident.status === "rejected"}
-            title={ident.status === "rejected" ? "Retirer le rejet" : "Rejeter"}
-            onclick={() =>
-              onsetStatus(ident.id, ident.status === "rejected" ? "pending" : "rejected")}
-            >&#x2717;</button
-          >
-        </span>
+        {#if ident.status === "authenticated"}
+          <span class="chip-controls">
+            <span
+              class="authenticated-badge"
+              title="Authentifié par le chercheur — statut protégé, non modifiable"
+              aria-label="Authentifié par le chercheur"
+            >
+              <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
+                <path
+                  d="M12 2 4 5v6c0 4.5 3.1 7.9 8 9 4.9-1.1 8-4.5 8-9V5l-8-3Z"
+                  fill="currentColor"
+                  opacity="0.15"
+                />
+                <path
+                  d="M12 2 4 5v6c0 4.5 3.1 7.9 8 9 4.9-1.1 8-4.5 8-9V5l-8-3Z"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                />
+                <path
+                  d="m8.5 11.8 2.4 2.4 4.6-4.9"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </span>
+          </span>
+        {:else}
+          <span class="chip-controls">
+            <button
+              class="toggle-btn confirm"
+              class:active={ident.status === "confirmed"}
+              title={ident.status === "confirmed" ? "Retirer la confirmation" : "Confirmer"}
+              onclick={() =>
+                onsetStatus(ident.id, ident.status === "confirmed" ? "pending" : "confirmed")}
+              >&#x2713;</button
+            >
+            <button
+              class="toggle-btn reject"
+              class:active={ident.status === "rejected"}
+              title={ident.status === "rejected" ? "Retirer le rejet" : "Rejeter"}
+              onclick={() =>
+                onsetStatus(ident.id, ident.status === "rejected" ? "pending" : "rejected")}
+              >&#x2717;</button
+            >
+          </span>
+        {/if}
         <span
           class="status-chip identifier-chip"
-          class:confirmed={ident.status === "confirmed"}
+          class:confirmed={ident.status === "confirmed" || ident.status === "authenticated"}
           class:rejected={ident.status === "rejected"}
           title={identifierTitle(ident)}
         >
@@ -62,7 +96,7 @@
         <IdentifierLink
           id_type={ident.id_type}
           id_value={ident.id_value}
-          confirmed={ident.status === "confirmed"}
+          confirmed={ident.status === "confirmed" || ident.status === "authenticated"}
         />
       </div>
     {/each}
@@ -125,6 +159,14 @@
   .identifier-chip {
     font-family: "SF Mono", SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
     font-size: 0.72rem;
+  }
+  /* Identifiant authentifié par le chercheur : statut protégé, aucune action —
+     le bouclier remplace les boutons confirmer/rejeter. */
+  .authenticated-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--success);
   }
   .btn-add-id {
     padding: 2px 8px;

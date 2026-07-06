@@ -82,7 +82,7 @@ class PersonIdentifierOut(BaseModel):
     id_type: str
     id_value: str
     source: str
-    status: Literal["pending", "confirmed", "rejected"]
+    status: Literal["pending", "confirmed", "rejected", "authenticated"]
 
 
 class NameFormSummaryOut(BaseModel):

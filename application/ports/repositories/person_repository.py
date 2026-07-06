@@ -73,6 +73,10 @@ class PersonRepository(Protocol):
 
     def reassign_identifier(self, ident_id: int, target_person_id: int) -> None: ...
 
+    def begin_authenticated_orcid_import(self) -> None: ...
+
+    def authenticate_orcid(self, person_id: int, orcid: str) -> str: ...
+
     # ── source_authorships (liens personne ↔ authorship source) ────
 
     def link_authorship(

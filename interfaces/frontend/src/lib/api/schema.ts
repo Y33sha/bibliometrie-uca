@@ -4428,7 +4428,7 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "pending" | "confirmed" | "rejected";
+            status: "pending" | "confirmed" | "rejected" | "authenticated";
         };
         /** PersonListResponse */
         PersonListResponse: {

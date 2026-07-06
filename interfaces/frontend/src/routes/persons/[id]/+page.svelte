@@ -78,7 +78,7 @@
 	const allOrcids = $derived(() => {
 		const map = new Map<string, boolean>();
 		identifiers.filter((i) => i.id_type === 'orcid' && i.status !== 'rejected').forEach((i) => {
-			map.set(i.id_value, map.get(i.id_value) || i.status === 'confirmed');
+			map.set(i.id_value, map.get(i.id_value) || i.status === 'confirmed' || i.status === 'authenticated');
 		});
 		return Array.from(map, ([value, confirmed]) => ({ value, confirmed }));
 	});
@@ -90,7 +90,7 @@
 		// numérique mal interprété en idhal).
 		const map = new Map<string, boolean>();
 		identifiers.filter((i) => i.id_type === 'idhal' && i.status !== 'rejected').forEach((i) => {
-			map.set(i.id_value, map.get(i.id_value) || i.status === 'confirmed');
+			map.set(i.id_value, map.get(i.id_value) || i.status === 'confirmed' || i.status === 'authenticated');
 		});
 		return Array.from(map, ([value, confirmed]) => ({ value, confirmed }));
 	});
@@ -98,7 +98,7 @@
 	const allIdrefs = $derived(() => {
 		const map = new Map<string, boolean>();
 		identifiers.filter((i) => i.id_type === 'idref' && i.status !== 'rejected').forEach((i) => {
-			map.set(i.id_value, map.get(i.id_value) || i.status === 'confirmed');
+			map.set(i.id_value, map.get(i.id_value) || i.status === 'confirmed' || i.status === 'authenticated');
 		});
 		return Array.from(map, ([value, confirmed]) => ({ value, confirmed }));
 	});
