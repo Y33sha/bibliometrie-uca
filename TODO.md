@@ -3,9 +3,8 @@
 * [ ] ajouter extraction par ORCID: vérifier pertinence (tester différentes sources, auditer le gain)
 * [ ] bioRxiv, medRxiv: identifiants différents de arxiv? cf publi 2757 (voir si on moissonne ces identifiants; possibilité de récupérer les DOI à partir des identifiants comme dans ArXiv)
 * [ ] chercher dans ScanR par hal-id? (généraliser cross-import à tous les identifiants et toutes les sources)
-* [ ] analyser les diff de payload pour voir si on peut diminuer le nombre d'UPSERT en filtrant les champs importés
 ## Suite du traitement
-* [ ] CLI `seed_journals_doi_prefix`: intégrer au pipeline? + recalculer les anciens pour tenir compte des nouveaux (chaque doi_prefix doit être unique et aussi précis que possible)
+* [ ] CLI `seed_journals_doi_prefix`: intégrer au pipeline? + recalculer les anciens pour tenir compte des nouveaux (chaque doi_prefix de journal doit être unique et aussi précis que possible)
 
 # Données
 * [ ] distinguer conference_paper et conférence (présence d'un journal_id?)
@@ -24,6 +23,7 @@
 ## Admin
 * [ ] fusion / dé-fusion manuelle de publications: circuit à créer (interface de gestion du référentiel de publications, sur le modèle de admin/persons; avec requêtes pour repérer doublons probables et fusions suspectes; supprimer `admin/duplicates`)
 * [ ] créer des catégories de personnes (personnel UCA, chercheurs associés, anciens doctorants, méga-collab de physique des particules) => et pouvoir configurer la visibilité des groupes dans l'UI publique (beaucoup d'adresses UCA dans les collaborations ALICE/ATLAS sont décalées dans les sources, ce qui pourrit la base avec des milliers de fausses "personnes UCA") | ou alors un simple BOOL "visible dans l'UI"?
+* [ ] admin/persons, facette "à confirmer": décomptes aberrants
 ## Publique
 * [ ] page "affiliations suspectes hal": requête incorrecte, capture trop de publis + problème de perf
 * [ ] Filtres supplémentaires possibles: langue; `has_doi` (crossref, datacite, other, none); `corresponding_is_in_perimeter`; `peer_reviewed`? (suppose de posséder la donnée ou de pouvoir la déduire des sources); licence
@@ -36,9 +36,9 @@
 * [ ] 165068 type "commmentary"; 86931 type "meeting report" => comment prendre en compte ces types (et empêcher openalex d'imposer le type article); réfléchir au type "report"
 * [ ] 30172 un recueil de proceedings fusionné avec tous ses chapitres
 * [ ] 182637 et 182636: vérifier si DataCite indique relation
-* [ ] 133990: NNT non dédupliqué?!
 * [ ] 107270 et 869915 Computing Pivot-Minors: un article faussement typé preprint par openalex; + question des arxiv_id (déduire le DOI et vice-versa)
 * [ ] fusion entre article et conference_paper: 12362
+* [ ] 205492 et 205499: pourquoi pas de fusion? (lesdeux résolvent vers le même DOI)
 
 # Idées pour plus tard, éventuellement
 * financements (projets ANR, projets européens)
