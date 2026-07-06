@@ -257,24 +257,38 @@ def person_clause(person_id: int) -> WhereClause:
     )
 
 
+def _person_toggle_clause(
+    filter_str: str, exists_sql: str, binds: dict[str, Any]
+) -> WhereClause | None:
+    """Facette binaire `yes`/`no` sur un prédicat EXISTS lié à une personne.
+
+    `filter_str` est une liste `yes`/`no` séparée par des virgules (multi-sélection
+    côté front) : `yes` retient les publications vérifiant `exists_sql`, `no` les
+    autres, combinés en OR. Cocher les deux ne pose donc aucune contrainte.
+    Une valeur inconnue est ignorée.
+    """
+    values = {v.strip() for v in filter_str.split(",") if v.strip()}
+    parts: list[str] = []
+    if "yes" in values:
+        parts.append(exists_sql)
+    if "no" in values:
+        parts.append(f"NOT {exists_sql}")
+    if not parts:
+        return None
+    sql = parts[0] if len(parts) == 1 else "(" + " OR ".join(parts) + ")"
+    return WhereClause(sql, binds)
+
+
 def corresponding_clause(person_id: int, corr_filter: str) -> WhereClause | None:
     if not corr_filter or not person_id:
         return None
-    if corr_filter == "yes":
-        return WhereClause(
-            """EXISTS (SELECT 1 FROM authorships a
-                    WHERE a.publication_id = p.id AND a.person_id = :flt_corr_person
-                      AND a.is_corresponding = TRUE)""",
-            {"flt_corr_person": person_id},
-        )
-    if corr_filter == "no":
-        return WhereClause(
-            """NOT EXISTS (SELECT 1 FROM authorships a
-                    WHERE a.publication_id = p.id AND a.person_id = :flt_corr_person
-                      AND a.is_corresponding = TRUE)""",
-            {"flt_corr_person": person_id},
-        )
-    return None
+    return _person_toggle_clause(
+        corr_filter,
+        """EXISTS (SELECT 1 FROM authorships a
+                WHERE a.publication_id = p.id AND a.person_id = :flt_corr_person
+                  AND a.is_corresponding = TRUE)""",
+        {"flt_corr_person": person_id},
+    )
 
 
 _SQL_HAS_HAL_SA = (
@@ -403,9 +417,9 @@ def apc_clause(
 def in_perimeter_person_clause(in_perimeter: str, person_id: int | None) -> WhereClause | None:
     if not in_perimeter or not person_id:
         return None
-    negate = "" if in_perimeter == "yes" else "NOT "
-    return WhereClause(
-        f"""{negate}EXISTS (SELECT 1 FROM authorships a
+    return _person_toggle_clause(
+        in_perimeter,
+        """EXISTS (SELECT 1 FROM authorships a
                 WHERE a.publication_id = p.id AND a.person_id = :flt_in_per_person
                   AND a.in_perimeter = TRUE)""",
         {"flt_in_per_person": person_id},
