@@ -171,6 +171,9 @@ class TestHALIdConstruction:
             ("https://hal.science/hal-04123456", "hal-04123456"),  # strip URL
             ("https://hal.science/hal-04123456v2", "hal-04123456"),  # URL + version
             ("https://tel.archives-ouvertes.fr/tel-02345678", "tel-02345678"),  # URL autre portail
+            # Identifiant OAI-PMH HAL exposé par OpenAlex dans location.id (source structurée,
+            # présente même quand la landing page est une page éditeur).
+            ("pmh:oai:HAL:cea-01736955v1", "cea-01736955"),
         ],
     )
     def test_normalizes(self, raw, expected):
@@ -184,6 +187,10 @@ class TestHALIdConstruction:
             "1234",  # aucun préfixe
             "gsi-2021",  # moins de 8 chiffres : fragment de DOI, pas un docid HAL
             "https://doi.org/10.3204/pubdb-2020-00553",  # hôte non-HAL
+            # Identifiants OAI-PMH de dépôts institutionnels : l'autorité n'est pas HAL, le regex
+            # de docid attraperait sinon un fragment d'UUID (b454-3339841149, f-2861829395).
+            "pmh:oai:pure.rug.nl:openaire/1b9c53c2-4cfa-49c4-b454-3339841149ee",
+            "pmh:oai:pure.atira.dk:openaire_cris_publications/c9b1b138-2601-400d-855f-2861829395c5",
         ],
     )
     def test_raises_on_invalid(self, raw):
