@@ -48,7 +48,7 @@ Le blocage par nom au grain **identité** (`author_identifying_keys`, ~645 k lig
 
 Livre l'ordre-indépendance et le consensus d'attribution pour les personnes ancrées par identifiant.
 
-- [ ] Table `confirmed_authorships` (`source_authorship_id` en clé primaire → `person_id`) : must-link écrit par le rattachement manuel, backfillé depuis le journal d'audit ; le recalcul la charge comme épinglage dur. Préalable à toute réécriture de `source_authorships.person_id`.
+- [ ] Table `confirmed_authorships` (`source_authorship_id` en clé primaire → `person_id`) : must-link écrit par le rattachement manuel ; le recalcul la charge comme épinglage dur. Préalable à toute réécriture de `source_authorships.person_id`.
 - [ ] Arêtes : paires d'identités (`author_identifying_keys`) partageant une valeur d'identifiant fort, gardées par la compatibilité de nom déjà codée dans la corroboration.
 - [ ] Clustering en composantes connexes, recoupé par le cannot-link du noyau (`distinct_persons`, paires rejetées) selon le `person_id` courant.
 - [ ] Attribution : chaque composante franche prend un `person_id` par pluralité, priorité au noyau ; nom canonique = forme validée admin sinon pluralité ; une composante douteuse reste orpheline.
@@ -76,7 +76,6 @@ Livre l'exécution incrémentale bornée et sa convergence.
 
 - **Clé de blocage nominale.** Le nom de famille normalisé suffit-il, ou faut-il absorber les variantes (translittération, noms composés, accents) ? Une clé trop fine rate des rapprochements (conservateur, acceptable) ; trop large, elle gonfle le coût de comparaison.
 - **Matérialisation du résultat identifiant.** Faut-il porter le `person_id` résolu sur `author_identifying_keys` (colonne à créer) pour optimiser le canal identifiant, ou le support signature suffit-il ? À trancher au moment de la Phase 1.
-- **Fidélité du backfill des épinglages.** Les rattachements manuels passés n'ont laissé aucune trace durable (forme de nom `pending`, pas de marqueur d'origine) : peut-on reconstituer `confirmed_authorships` depuis le journal d'audit des assignations, et avec quelle complétude ? À défaut, la première passe recalculée écraserait le travail admin antérieur.
 
 ## Liens
 
