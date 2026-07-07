@@ -53,16 +53,16 @@ class TestReattributeTo:
 class TestTransferTo:
     def test_moves_to_new_person_from_pending(self):
         ident = _make(status=AttributionStatus.PENDING)
-        ident.transfer_to(99, source="matching_cascade")
+        ident.transfer_to(99, source="auto")
         assert ident.person_id == 99
         assert ident.status is AttributionStatus.PENDING
-        assert ident.source == "matching_cascade"
+        assert ident.source == "auto"
 
     def test_raises_on_confirmed(self):
         # Attribution verrouillée admin : jamais transférée automatiquement.
         ident = _make(status=AttributionStatus.CONFIRMED)
         with pytest.raises(CannotAttributeConflict):
-            ident.transfer_to(99, source="matching_cascade")
+            ident.transfer_to(99, source="auto")
         assert ident.person_id == 10
         assert ident.status is AttributionStatus.CONFIRMED
 
@@ -70,6 +70,6 @@ class TestTransferTo:
         # Le rejeté relève de reattribute_to, pas du transfert par consensus.
         ident = _make(status=AttributionStatus.REJECTED)
         with pytest.raises(CannotAttributeConflict):
-            ident.transfer_to(99, source="matching_cascade")
+            ident.transfer_to(99, source="auto")
         assert ident.person_id == 10
         assert ident.status is AttributionStatus.REJECTED

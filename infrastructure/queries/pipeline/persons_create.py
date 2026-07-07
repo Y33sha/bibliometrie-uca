@@ -316,6 +316,71 @@ def fetch_rejected_person_ids_by_pub(conn: Connection) -> dict[int, frozenset[in
     return {r.publication_id: frozenset(r.person_ids) for r in rows}
 
 
+def fetch_identifier_consensus(conn: Connection, id_type: str, values: list[str]) -> dict[str, str]:
+    """Nom-autorité consensuel des valeurs d'identifiant fournies.
+
+    Pour chaque valeur, l'`author_name_normalized` porté par le plus de **signatures**
+    (poids en signatures, pas en identités — 99 correctes l'emportent sur 1 corrompue).
+    Query ciblée sur les seules valeurs demandées : on part des identités portant l'une
+    d'elles (`author_identifying_keys`, filtré par `person_identifiers->>id_type`), jointes
+    aux `source_authorships` (index `identity_id`) pour le comptage — jamais de scan
+    complet. Pour l'ORCID, seules les sources à dépôt auteur comptent, comme au matching.
+    """
+    if not values:
+        return {}
+    source_filter = "AND sa.source IN ('crossref', 'openalex', 'hal')" if id_type == "orcid" else ""
+    rows = conn.execute(
+        text(f"""
+            SELECT DISTINCT ON (id_value) id_value, author_name_normalized
+            FROM (
+                SELECT aik.person_identifiers->>:id_type AS id_value,
+                       aik.author_name_normalized,
+                       count(*) AS n
+                FROM author_identifying_keys aik
+                JOIN source_authorships sa ON sa.identity_id = aik.id
+                WHERE aik.person_identifiers->>:id_type = ANY(:values)
+                  AND aik.author_name_normalized IS NOT NULL
+                  {source_filter}
+                GROUP BY 1, 2
+            ) t
+            ORDER BY id_value, n DESC, author_name_normalized
+        """),
+        {"id_type": id_type, "values": list(values)},
+    ).all()
+    return {r.id_value: r.author_name_normalized for r in rows}
+
+
+def fetch_person_name_forms(
+    conn: Connection, person_ids: list[int]
+) -> dict[int, tuple[str, str, list[str]]]:
+    """`{person_id: (nom_normalisé, prénom_normalisé, [formes confirmées])}`.
+
+    Les formes `confirmed` accompagnent le nom-prénom canonique pour l'arbitrage des
+    transferts (`form_matches_person`) : une personne peut matcher le consensus par une
+    forme validée que le canonique ne recouvre pas (changement de nom). Les formes
+    `pending` — vecteur de contamination des captures — sont exclues.
+    """
+    if not person_ids:
+        return {}
+    rows = conn.execute(
+        text("""
+            SELECT p.id,
+                   p.last_name_normalized AS ln,
+                   p.first_name_normalized AS fn,
+                   COALESCE(
+                       array_agg(nf.name_form) FILTER (WHERE nf.status = 'confirmed'),
+                       ARRAY[]::text[]
+                   ) AS confirmed_forms
+            FROM persons p
+            LEFT JOIN person_name_forms nf ON nf.person_id = p.id
+            WHERE p.id = ANY(:ids)
+            GROUP BY p.id, p.last_name_normalized, p.first_name_normalized
+        """),
+        {"ids": list(person_ids)},
+    ).all()
+    return {r.id: (r.ln or "", r.fn or "", list(r.confirmed_forms)) for r in rows}
+
+
 class PgPersonsCreateQueries(PersonsCreateQueries):
     """Adapter PostgreSQL pour `application.ports.persons_create.PersonsCreateQueries`."""
 
@@ -345,3 +410,13 @@ class PgPersonsCreateQueries(PersonsCreateQueries):
 
     def fetch_rejected_person_ids_by_pub(self, conn: Connection) -> dict[int, frozenset[int]]:
         return fetch_rejected_person_ids_by_pub(conn)
+
+    def fetch_identifier_consensus(
+        self, conn: Connection, id_type: str, values: list[str]
+    ) -> dict[str, str]:
+        return fetch_identifier_consensus(conn, id_type, values)
+
+    def fetch_person_name_forms(
+        self, conn: Connection, person_ids: list[int]
+    ) -> dict[int, tuple[str, str, list[str]]]:
+        return fetch_person_name_forms(conn, person_ids)
