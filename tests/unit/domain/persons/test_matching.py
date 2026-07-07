@@ -7,30 +7,28 @@ from domain.persons.matching import (
     decide_match_by_identifier,
     decide_name_form_outcome,
     decide_person_match,
-    should_transfer_identifier,
+    form_matches_person,
 )
 
 
-class TestShouldTransferIdentifier:
-    def test_capture_transfers_to_consensus(self):
-        # IdRef captée par « hervé chanal » ; les porteurs disent « hélène chanal ».
-        assert should_transfer_identifier("chanal", "helene", "chanal", "herve", "chanal", "helene")
+class TestFormMatchesPerson:
+    def test_matches_canonical_name(self):
+        assert form_matches_person("helene chanal", "chanal", "helene")
 
-    def test_foreign_bearer_kept_on_owner(self):
-        # Le propriétaire est le consensus ; le candidat est un porteur étranger.
-        assert not should_transfer_identifier(
-            "dupont", "pierre", "chanal", "herve", "chanal", "herve"
+    def test_matches_via_confirmed_form(self):
+        # Le consensus colle à une forme confirmée, que le nom-prénom canonique ne recouvre pas.
+        assert form_matches_person(
+            "pierre michel llorca", "llorca", "pm", confirmed_forms=["pierre michel llorca"]
         )
 
-    def test_both_are_consensus_variants_no_transfer(self):
-        # Variantes de graphie de la même personne : on ne fracture pas.
-        assert not should_transfer_identifier(
-            "gannoun", "abdelmouhcine", "gannoun", "abdel mouhcine", "gannoun", "abdelmouhcine"
-        )
+    def test_homonym_does_not_match(self):
+        # Même patronyme, prénoms distincts : « hervé » ≠ « hélène ».
+        assert not form_matches_person("herve chanal", "chanal", "helene")
 
-    def test_neither_is_consensus_keeps(self):
-        # Le consensus ne désigne ni le candidat ni le propriétaire.
-        assert not should_transfer_identifier("martin", "jean", "dupont", "paul", "durand", "marie")
+    def test_unrelated_confirmed_form_does_not_match(self):
+        assert not form_matches_person(
+            "helene chanal", "chanal", "herve", confirmed_forms=["herve chanal"]
+        )
 
 
 class TestDecideCrossSourceMatch:

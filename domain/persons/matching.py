@@ -1,10 +1,10 @@
 """Règles pures de matching d'authorships à des personnes."""
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from typing import Literal
 
-from domain.persons.name_matching import names_compatible, same_person_name
+from domain.persons.name_matching import names_compatible
 
 ORCID_MATCH_SOURCES = frozenset({"crossref", "openalex", "hal"})
 """Sources dont l'ORCID porté par une authorship est déposé par l'auteur,
@@ -213,41 +213,28 @@ def decide_match_by_identifier(
     return IdentifierMatch(rejection=(person_id, f"{target_fn} {target_ln}".strip()))
 
 
-def should_transfer_identifier(
-    candidate_ln: str,
-    candidate_fn: str,
-    owner_ln: str,
-    owner_fn: str,
-    consensus_ln: str,
-    consensus_fn: str,
+def form_matches_person(
+    form: str,
+    last_name: str,
+    first_name: str,
+    confirmed_forms: Iterable[str] = (),
 ) -> bool:
-    """Arbitre un conflit d'attribution d'identifiant par le consensus des porteurs.
+    """La forme de nom ``form`` désigne-t-elle la personne ?
 
-    Contexte : une valeur d'identifiant est déjà attribuée à ``owner`` ; une signature
-    rattachée à ``candidate`` porte la même valeur. Faut-il transférer l'identifiant de
-    ``owner`` vers ``candidate`` ?
+    Vrai si ``form`` est compatible (``names_compatible``, comparaison par tokens) avec le
+    nom-prénom de la personne, ou avec l'une de ses formes de nom **confirmées** (un nom
+    validé par un humain que le nom-prénom canonique ne recouvre pas, changement de nom
+    inclus).
 
-    Le juge est le ``consensus`` — le nom majoritaire des signatures portant la valeur,
-    calculé côté caller. On transfère si, et seulement si, le candidat *est* la personne
-    du consensus et que le propriétaire actuel ne l'est pas (au sens ``same_person_name``,
-    tolérant aux variantes de graphie) :
-
-    - candidat = consensus, propriétaire ≠ consensus → **transfert** (le propriétaire a
-      capté la valeur, le candidat est le porteur légitime) ;
-    - propriétaire = consensus, candidat ≠ consensus → **garder** (le candidat est un
-      porteur étranger — un co-auteur dont une source a traîné l'identifiant) ;
-    - les deux = consensus (variantes de graphie d'une même personne), ou aucun des deux
-      → **garder** (rien à trancher, ou consensus qui ne désigne ni l'un ni l'autre : on
-      attend une signature du consensus).
-
-    Pure : le consensus étant un agrégat de tous les porteurs, la décision est indépendante
-    de l'ordre d'ingestion.
+    Sert à arbitrer un conflit d'attribution d'identifiant : la forme majoritaire des
+    signatures portant une valeur (le *consensus*, agrégat ordre-indépendant fourni par le
+    caller) est confrontée au propriétaire actuel et au candidat en conflit — l'identifiant
+    se transfère vers le candidat si, et seulement si, le consensus le désigne, lui et pas
+    le propriétaire.
     """
-    candidate_is_consensus = same_person_name(
-        candidate_ln, candidate_fn, consensus_ln, consensus_fn
-    )
-    owner_is_consensus = same_person_name(owner_ln, owner_fn, consensus_ln, consensus_fn)
-    return candidate_is_consensus and not owner_is_consensus
+    if names_compatible(form, "", last_name, first_name):
+        return True
+    return any(names_compatible(form, "", cf, "") for cf in confirmed_forms)
 
 
 @dataclass(frozen=True)
