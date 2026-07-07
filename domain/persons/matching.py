@@ -4,7 +4,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Literal
 
-from domain.persons.name_matching import names_compatible
+from domain.persons.name_matching import names_compatible, same_person_name
 
 ORCID_MATCH_SOURCES = frozenset({"crossref", "openalex", "hal"})
 """Sources dont l'ORCID porté par une authorship est déposé par l'auteur,
@@ -211,6 +211,43 @@ def decide_match_by_identifier(
     if names_compatible(signature, "", target_ln, target_fn):
         return IdentifierMatch(person_id=person_id)
     return IdentifierMatch(rejection=(person_id, f"{target_fn} {target_ln}".strip()))
+
+
+def should_transfer_identifier(
+    candidate_ln: str,
+    candidate_fn: str,
+    owner_ln: str,
+    owner_fn: str,
+    consensus_ln: str,
+    consensus_fn: str,
+) -> bool:
+    """Arbitre un conflit d'attribution d'identifiant par le consensus des porteurs.
+
+    Contexte : une valeur d'identifiant est déjà attribuée à ``owner`` ; une signature
+    rattachée à ``candidate`` porte la même valeur. Faut-il transférer l'identifiant de
+    ``owner`` vers ``candidate`` ?
+
+    Le juge est le ``consensus`` — le nom majoritaire des signatures portant la valeur,
+    calculé côté caller. On transfère si, et seulement si, le candidat *est* la personne
+    du consensus et que le propriétaire actuel ne l'est pas (au sens ``same_person_name``,
+    tolérant aux variantes de graphie) :
+
+    - candidat = consensus, propriétaire ≠ consensus → **transfert** (le propriétaire a
+      capté la valeur, le candidat est le porteur légitime) ;
+    - propriétaire = consensus, candidat ≠ consensus → **garder** (le candidat est un
+      porteur étranger — un co-auteur dont une source a traîné l'identifiant) ;
+    - les deux = consensus (variantes de graphie d'une même personne), ou aucun des deux
+      → **garder** (rien à trancher, ou consensus qui ne désigne ni l'un ni l'autre : on
+      attend une signature du consensus).
+
+    Pure : le consensus étant un agrégat de tous les porteurs, la décision est indépendante
+    de l'ordre d'ingestion.
+    """
+    candidate_is_consensus = same_person_name(
+        candidate_ln, candidate_fn, consensus_ln, consensus_fn
+    )
+    owner_is_consensus = same_person_name(owner_ln, owner_fn, consensus_ln, consensus_fn)
+    return candidate_is_consensus and not owner_is_consensus
 
 
 @dataclass(frozen=True)
