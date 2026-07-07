@@ -435,8 +435,12 @@ def update_name_form_status(
     row = repo.update_name_form_status(person_id, name_form, status)
     if status == "rejected":
         detached = repo.null_person_id_for_name_form(person_id, name_form)
-        if detached and authorship_repo is not None:
-            authorship_repo.delete_orphan_authorships_for_person(person_id)
+        if authorship_repo is not None:
+            # Le rejet de forme détache : retirer aussi l'épinglage éventuel des
+            # signatures concernées, sinon le pipeline les réattacherait.
+            authorship_repo.unpin_authorships_for_name_form(person_id, name_form)
+            if detached:
+                authorship_repo.delete_orphan_authorships_for_person(person_id)
     emit_event(
         audit_repo,
         "person_name_form.status_changed",

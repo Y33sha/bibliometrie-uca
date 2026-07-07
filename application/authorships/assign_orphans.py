@@ -101,6 +101,10 @@ def assign_orphan_authorship(
     if not row:
         return False
 
+    # Épingler la résolution admin (must-link grain signature) : le pipeline la
+    # relira comme entrée fixe et ne re-dérivera jamais cette signature.
+    authorship_repo.pin_authorships([authorship_id], person_id)
+
     # Ajouter la forme de nom
     if row["author_name_normalized"]:
         repo.add_name_form(person_id, row["author_name_normalized"], source=source)
@@ -145,6 +149,7 @@ def batch_assign_orphan_authorships(
     )
 
     assigned = repo.assign_orphan_source_authorships_to_person(person_id, sa_ids)
+    authorship_repo.pin_authorships(sa_ids, person_id)
     repo.create_authorships_from_sources(person_id, sa_ids, SOURCE_PRIORITY)
     repo.link_source_authorships_to_authorships(person_id, sa_ids)
 

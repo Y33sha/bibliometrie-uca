@@ -47,6 +47,7 @@ def reject_pair(
     """
     repo.reject_authorship(publication_id, person_id)
     detached = repo.unlink_all_source_authorships_for_pair(publication_id, person_id)
+    repo.unpin_authorships_for_pair(publication_id, person_id)
     deleted = repo.delete_orphan_authorships_for_person(person_id)
 
     emit_event(
