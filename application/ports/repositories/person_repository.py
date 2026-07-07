@@ -84,6 +84,7 @@ class PersonRepository(Protocol):
         person_id: int,
         source: str,
         authorship_id: int,
+        resolution_mode: str,
     ) -> None: ...
 
     def unlink_authorship(

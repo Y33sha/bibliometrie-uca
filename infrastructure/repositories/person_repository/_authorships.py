@@ -10,15 +10,21 @@ def link_authorship(
     person_id: int,
     source: str,
     authorship_id: int,
+    resolution_mode: str,
 ) -> None:
-    """Rattache une authorship source à une personne.
+    """Rattache une authorship source à une personne, en marquant le canal de résolution.
 
-    Le matching par idhal/hal_person_id agrégé sera réintroduit dans
-    le chantier `METIER_decide-person-match`.
+    `resolution_mode` (`identifier` / `name` / `cross_source`) enregistre par quel canal
+    le `person_id` a été posé ; il porte les réinitialisations ordre-indépendantes de la
+    phase personnes.
     """
     conn.execute(
-        text("UPDATE source_authorships SET person_id = :pid WHERE id = :aid AND source = :src"),
-        {"pid": person_id, "aid": authorship_id, "src": source},
+        text(
+            "UPDATE source_authorships SET person_id = :pid, "
+            "resolution_mode = CAST(:mode AS resolution_mode) "
+            "WHERE id = :aid AND source = :src"
+        ),
+        {"pid": person_id, "aid": authorship_id, "src": source, "mode": resolution_mode},
     )
 
 

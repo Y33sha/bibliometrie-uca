@@ -77,6 +77,7 @@ from domain.normalize import normalize_name
 from domain.persons.creation import allow_person_creation
 from domain.persons.matching import (
     ORCID_MATCH_SOURCES,
+    RESOLUTION_MODE_BY_REASON,
     NameFormDecision,
     decide_cross_source_match,
     decide_match_by_identifier,
@@ -342,7 +343,12 @@ def run(
                 # historique de `application.persons`) : on convertit l'EnrichedAuthorship
                 # via `_asdict()` au boundary. Le typage strict reste interne au pipeline.
                 a_dict = a._asdict()
-                link_to_person(pid, [a_dict], repo=person_repo)
+                link_to_person(
+                    pid,
+                    [a_dict],
+                    repo=person_repo,
+                    resolution_mode=RESOLUTION_MODE_BY_REASON[decision.reason],
+                )
                 add_name_form(pid, a.full_name, repo=person_repo)
                 # Identifiants ajoutés en statut `pending` quelle que soit la
                 # source du match (cross-source/idref/orcid/name_form) —
@@ -362,7 +368,7 @@ def run(
             if not dry_run:
                 pid = create_person(last, first, repo=person_repo)
                 a_dict = a._asdict()
-                link_to_person(pid, [a_dict], repo=person_repo)
+                link_to_person(pid, [a_dict], repo=person_repo, resolution_mode="name")
                 add_identifiers(pid, [a_dict], repo=person_repo, conflicts=conflicts)
                 add_name_form(pid, a.full_name, repo=person_repo)
                 marker = pid

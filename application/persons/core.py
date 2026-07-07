@@ -118,19 +118,26 @@ def link_authorship(
     authorship_id: int,
     *,
     repo: PersonRepository,
+    resolution_mode: str,
 ) -> None:
-    """Rattache une authorship source à une personne (pipeline)."""
+    """Rattache une authorship source à une personne (pipeline), en marquant le canal."""
     if source not in ALL_SOURCES_SET:
         return
-    repo.link_authorship(person_id, source, authorship_id)
+    repo.link_authorship(person_id, source, authorship_id, resolution_mode)
 
 
 def link_authorships(
-    person_id: int, authorships: list[dict[str, JsonValue]], *, repo: PersonRepository
+    person_id: int,
+    authorships: list[dict[str, JsonValue]],
+    *,
+    repo: PersonRepository,
+    resolution_mode: str,
 ) -> None:
     """Rattache un groupe d'authorships à une personne (pipeline).
 
-    Chaque dict doit avoir 'source' et 'authorship_id'.
+    Chaque dict doit avoir 'source' et 'authorship_id'. `resolution_mode`
+    (`identifier` / `name` / `cross_source`) est le canal par lequel la cascade
+    a résolu le rattachement.
     """
     for a in authorships:
         link_authorship(
@@ -138,6 +145,7 @@ def link_authorships(
             cast(str, a["source"]),
             cast(int, a["authorship_id"]),
             repo=repo,
+            resolution_mode=resolution_mode,
         )
 
 
