@@ -96,6 +96,61 @@ class PgAuthorshipRepository:
         )
         return result.rowcount
 
+    # ── confirmed_authorships (épinglage admin, must-link grain signature) ──
+
+    def pin_authorships(self, source_authorship_ids: list[int], person_id: int) -> None:
+        if not source_authorship_ids:
+            return
+        self._conn.execute(
+            text("""
+                INSERT INTO confirmed_authorships (source_authorship_id, person_id)
+                SELECT unnest(CAST(:ids AS integer[])), :pid
+                ON CONFLICT (source_authorship_id)
+                    DO UPDATE SET person_id = EXCLUDED.person_id
+            """),
+            {"ids": source_authorship_ids, "pid": person_id},
+        )
+
+    def unpin_authorships_for_pair(self, publication_id: int, person_id: int) -> int:
+        result = self._conn.execute(
+            text("""
+                DELETE FROM confirmed_authorships ca
+                USING source_authorships sa, source_publications sp
+                WHERE ca.source_authorship_id = sa.id
+                  AND sa.source_publication_id = sp.id
+                  AND sp.publication_id = :pub
+                  AND ca.person_id = :pid
+            """),
+            {"pub": publication_id, "pid": person_id},
+        )
+        return result.rowcount
+
+    def unpin_authorships_for_name_form(self, person_id: int, name_form: str) -> int:
+        result = self._conn.execute(
+            text("""
+                DELETE FROM confirmed_authorships ca
+                USING source_authorships sa, author_identifying_keys aik
+                WHERE ca.source_authorship_id = sa.id
+                  AND sa.identity_id = aik.id
+                  AND ca.person_id = :pid
+                  AND aik.author_name_normalized = :form
+            """),
+            {"pid": person_id, "form": name_form},
+        )
+        return result.rowcount
+
+    def enforce_confirmed_authorships(self) -> int:
+        result = self._conn.execute(
+            text("""
+                UPDATE source_authorships sa
+                SET person_id = ca.person_id
+                FROM confirmed_authorships ca
+                WHERE ca.source_authorship_id = sa.id
+                  AND sa.person_id IS DISTINCT FROM ca.person_id
+            """)
+        )
+        return result.rowcount
+
     # ── Propagation périmètre UCA depuis les adresses ──────────────
 
     def find_source_authorships_by_addresses(

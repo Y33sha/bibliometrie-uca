@@ -7,7 +7,7 @@ from application.pipeline.persons.create_persons_from_source_authorships import 
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from infrastructure.queries.pipeline.persons_create import PgPersonsCreateQueries
-from infrastructure.repositories import person_repository
+from infrastructure.repositories import authorship_repository, person_repository
 
 logger = setup_logger("create_persons", os.path.join(os.path.dirname(__file__), "logs"))
 
@@ -21,6 +21,13 @@ def main() -> None:
 
     conn = get_sync_engine().connect()
     try:
+        # Réapplique les épinglages admin (must-link) avant la cascade : une
+        # signature épinglée (`confirmed_authorships`) reste sur sa personne, le
+        # pipeline ne la re-dérive pas.
+        n_enforced = authorship_repository(conn).enforce_confirmed_authorships()
+        if n_enforced:
+            logger.info("Épinglages réappliqués : %d signatures recalées", n_enforced)
+
         run(
             conn,
             PgPersonsCreateQueries(),
