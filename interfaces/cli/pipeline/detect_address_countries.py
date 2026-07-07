@@ -6,16 +6,15 @@ sans pays et le matche contre les noms de pays de `place_name_forms`
 (`kind = 'country'`). Les noms de pays sont détectés en fin de segment ;
 les villes/institutions (`kind = 'place'`) relèvent d'une passe dédiée.
 
-Deux modes :
-  - suggest : peuple addresses.suggested_countries (validation manuelle)
-  - apply   : peuple directement addresses.countries (confiance élevée)
+Deux colonnes cibles :
+  - défaut   : peuple addresses.suggested_countries (validation manuelle)
+  - --direct : peuple directement addresses.countries (confiance élevée)
 
 Usage:
-    python interfaces/cli/pipeline/detect_address_countries.py                  # suggest (dry-run)
-    python interfaces/cli/pipeline/detect_address_countries.py --apply          # appliquer les suggestions
-    python interfaces/cli/pipeline/detect_address_countries.py --direct         # écrire directement dans countries
-    python interfaces/cli/pipeline/detect_address_countries.py --direct --apply # appliquer direct
-    python interfaces/cli/pipeline/detect_address_countries.py --stats          # statistiques uniquement
+    python interfaces/cli/pipeline/detect_address_countries.py                   # écrit suggested_countries
+    python interfaces/cli/pipeline/detect_address_countries.py --direct          # écrit directement countries
+    python interfaces/cli/pipeline/detect_address_countries.py --dry-run         # aperçu, n'écrit rien
+    python interfaces/cli/pipeline/detect_address_countries.py --stats           # statistiques uniquement
 """
 
 import argparse
@@ -113,7 +112,7 @@ def detect_countries(
         logger.info("\nTop 20 formes non reconnues :")
         for form, cnt in unknown.most_common(20):
             logger.info(f"  {cnt:>5}  {form}")
-        logger.info("\nDry-run — ajouter --apply pour appliquer.")
+        logger.info("\nDry-run — retirer --dry-run pour appliquer.")
         return PhaseMetrics(seen=len(rows), extras={"unmatched": unmatched})
 
     target_column = "countries" if direct else "suggested_countries"
@@ -130,7 +129,7 @@ def detect_countries(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Détection pays des adresses")
-    parser.add_argument("--apply", action="store_true", help="Appliquer (sinon dry-run)")
+    parser.add_argument("--dry-run", action="store_true", help="Aperçu : n'écrit rien")
     parser.add_argument(
         "--direct", action="store_true", help="Écrire dans countries au lieu de suggested_countries"
     )
@@ -138,7 +137,7 @@ def main() -> None:
     args = parser.parse_args()
 
     with get_sync_engine().connect() as conn:
-        detect_countries(conn, apply=args.apply, direct=args.direct, stats_only=args.stats)
+        detect_countries(conn, apply=not args.dry_run, direct=args.direct, stats_only=args.stats)
 
 
 if __name__ == "__main__":

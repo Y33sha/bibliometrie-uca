@@ -7,8 +7,8 @@ quand on n'a pas de session HTTP (terminal non auth) ou pour scripter un
 nettoyage en lot.
 
 Usage :
-    python -m interfaces.cli.maintenance.merge_publications <target_id> <source_id>           # dry-run
-    python -m interfaces.cli.maintenance.merge_publications <target_id> <source_id> --apply
+    python -m interfaces.cli.maintenance.merge_publications <target_id> <source_id>              # applique
+    python -m interfaces.cli.maintenance.merge_publications <target_id> <source_id> --dry-run    # aperçu
 """
 
 import argparse
@@ -43,7 +43,7 @@ def main() -> int:
     parser.add_argument(
         "source_id", type=int, help="ID de la publication absorbée (supprimée à la fin)."
     )
-    parser.add_argument("--apply", action="store_true", help="Appliquer (sinon dry-run).")
+    parser.add_argument("--dry-run", action="store_true", help="Aperçu : n'exécute pas la fusion.")
     args = parser.parse_args()
 
     if args.target_id == args.source_id:
@@ -78,8 +78,8 @@ def main() -> int:
         )
         log.info("        title=%s", (source["title"] or "")[:120])
 
-        if not args.apply:
-            log.info("[dry-run] ajouter --apply pour exécuter la fusion")
+        if args.dry_run:
+            log.info("[dry-run] fusion non exécutée ; retirer --dry-run pour l'appliquer")
             return 0
 
         repo = publication_repository(conn)
