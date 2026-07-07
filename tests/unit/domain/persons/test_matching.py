@@ -7,7 +7,30 @@ from domain.persons.matching import (
     decide_match_by_identifier,
     decide_name_form_outcome,
     decide_person_match,
+    should_transfer_identifier,
 )
+
+
+class TestShouldTransferIdentifier:
+    def test_capture_transfers_to_consensus(self):
+        # IdRef captée par « hervé chanal » ; les porteurs disent « hélène chanal ».
+        assert should_transfer_identifier("chanal", "helene", "chanal", "herve", "chanal", "helene")
+
+    def test_foreign_bearer_kept_on_owner(self):
+        # Le propriétaire est le consensus ; le candidat est un porteur étranger.
+        assert not should_transfer_identifier(
+            "dupont", "pierre", "chanal", "herve", "chanal", "herve"
+        )
+
+    def test_both_are_consensus_variants_no_transfer(self):
+        # Variantes de graphie de la même personne : on ne fracture pas.
+        assert not should_transfer_identifier(
+            "gannoun", "abdelmouhcine", "gannoun", "abdel mouhcine", "gannoun", "abdelmouhcine"
+        )
+
+    def test_neither_is_consensus_keeps(self):
+        # Le consensus ne désigne ni le candidat ni le propriétaire.
+        assert not should_transfer_identifier("martin", "jean", "dupont", "paul", "durand", "marie")
 
 
 class TestDecideCrossSourceMatch:
