@@ -14,8 +14,8 @@ Les formes `kind = 'country'` sont exclues (matchées en fin de segment, pas par
 sous-chaîne — un nom de pays peut être utile sans apparaître au milieu d'une adresse).
 
 Usage :
-    python -m interfaces.cli.oneshot.prune_place_names            # dry-run (comptes)
-    python -m interfaces.cli.oneshot.prune_place_names --apply    # supprime
+    python -m interfaces.cli.oneshot.prune_place_names             # supprime
+    python -m interfaces.cli.oneshot.prune_place_names --dry-run   # comptes seuls
 """
 
 import argparse
@@ -33,7 +33,7 @@ BATCH = 10000
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--apply", action="store_true", help="Supprimer (sinon dry-run)")
+    parser.add_argument("--dry-run", action="store_true", help="Comptes seuls : ne supprime pas")
     args = parser.parse_args()
 
     with get_sync_engine().connect() as conn:
@@ -71,8 +71,8 @@ def main() -> None:
         unused = [f for f in forms if f not in used]
         logger.info(f"{len(unused)} formes à supprimer (0 occurrence)")
 
-        if not args.apply:
-            logger.info("Dry-run — ajouter --apply pour supprimer.")
+        if args.dry_run:
+            logger.info("Dry-run — retirer --dry-run pour supprimer.")
             return
 
         for i in range(0, len(unused), BATCH):

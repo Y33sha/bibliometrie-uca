@@ -14,7 +14,7 @@ sans pays, ~4400 perdues sur conflit).
 Liste **curée à la main** (`GENERIC_FORMS`) à partir des formes les plus
 matchantes et les plus présentes dans les conflits — éditable.
 
-Effets (`--apply`) :
+Effets :
   1. NULL `countries` + `suggested_countries` des adresses contenant (au mot près)
      l'une de ces formes → à recalculer "à propre" par la phase `countries`.
   2. Suppression des formes de `place_name_forms`.

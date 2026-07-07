@@ -15,8 +15,8 @@ des personnes qui **existent déjà** :
   polluée, sans créer d'autre personne) → **no-op**, rien à réattribuer ;
 - un consensus qui désigne le propriétaire → on garde.
 
-Réutilise exactement la décision du forward (`resolve_identifier_transfers`). Sans `--apply`,
-la transaction est annulée après coup (dry-run : les compteurs sont réels, rien n'est écrit).
+Réutilise exactement la décision du forward (`resolve_identifier_transfers`). Committe par
+défaut ; `--dry-run` annule la transaction après coup (les compteurs sont réels, rien n'est écrit).
 """
 
 import argparse
@@ -87,7 +87,9 @@ def build_stock_conflicts(conn: Connection) -> list[IdentifierConflict]:
 def main() -> None:
     sys.stdout.reconfigure(encoding="utf-8")  # type: ignore[union-attr]
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--apply", action="store_true", help="Committe les réattributions.")
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Annule la transaction : compte sans écrire."
+    )
     args = parser.parse_args()
 
     with get_sync_engine().connect() as conn:
@@ -104,12 +106,12 @@ def main() -> None:
             f"({result['pending']} sur propriétaire pending)"
         )
         print(f"Identifiants réattribués par consensus : {result['transferred']}")
-        if args.apply:
+        if args.dry_run:
+            conn.rollback()
+            print("\nDry-run : transaction annulée, rien écrit.")
+        else:
             conn.commit()
             print("\n✓ Réattributions committées.")
-        else:
-            conn.rollback()
-            print("\nDry-run : transaction annulée, rien écrit. Relancer avec --apply.")
 
 
 if __name__ == "__main__":

@@ -16,8 +16,8 @@ Le seuil par défaut (part du pays assigné < 50 %) exige qu'une forme autoritai
 ait son pays assigné au moins majoritaire parmi ses occurrences réelles.
 
 Usage :
-    python -m interfaces.cli.oneshot.validate_place_names            # dry-run (comptes)
-    python -m interfaces.cli.oneshot.validate_place_names --apply    # supprime
+    python -m interfaces.cli.oneshot.validate_place_names             # supprime
+    python -m interfaces.cli.oneshot.validate_place_names --dry-run   # comptes seuls
 """
 
 import argparse
@@ -39,7 +39,7 @@ DELETE_BATCH = 10000
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--apply", action="store_true", help="Supprimer (sinon dry-run)")
+    parser.add_argument("--dry-run", action="store_true", help="Comptes seuls : ne supprime pas")
     parser.add_argument("--min-support", type=int, default=MIN_SUPPORT)
     parser.add_argument("--max-share", type=float, default=MAX_SHARE)
     args = parser.parse_args()
@@ -91,8 +91,8 @@ def main() -> None:
             f"(support >= {args.min_support}, part du pays assigné < {args.max_share:.0%})"
         )
 
-        if not args.apply:
-            logger.info("Dry-run — ajouter --apply pour supprimer.")
+        if args.dry_run:
+            logger.info("Dry-run — retirer --dry-run pour supprimer.")
             return
 
         for i in range(0, len(parasites), DELETE_BATCH):

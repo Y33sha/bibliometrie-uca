@@ -39,8 +39,8 @@ Après ce backfill, relancer les phases `metadata_correction` / `publications` /
 fusions (dont les pièces de datasets absorbées par leur parent).
 
 Usage :
-    python -m interfaces.cli.oneshot.backfill_clean_dois            # dry-run (rapport)
-    python -m interfaces.cli.oneshot.backfill_clean_dois --apply    # exécution
+    python -m interfaces.cli.oneshot.backfill_clean_dois            # exécution
+    python -m interfaces.cli.oneshot.backfill_clean_dois --dry-run  # rapport seul
 """
 
 from __future__ import annotations
@@ -218,22 +218,23 @@ def _report_derived(conn: Connection) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--apply", action="store_true", help="Applique les écritures (défaut : dry-run / rapport)."
+        "--dry-run", action="store_true", help="Rapport seul : n'écrit rien (défaut : applique)."
     )
     args = parser.parse_args()
+    apply = not args.dry_run
 
-    if not args.apply:
-        log.info("DRY-RUN (rapport seul) — relancer avec --apply pour écrire")
+    if not apply:
+        log.info("DRY-RUN (rapport seul) — retirer --dry-run pour écrire")
 
     engine = get_sync_engine()
     with engine.connect() as conn:
-        _purge_dirty_negatives(conn, args.apply)
-        _clean_staging_doi(conn, args.apply)
-        _clean_source_publication_doi(conn, args.apply)
-        _clean_related_dois(conn, args.apply)
-        _clean_related_identifiers_meta(conn, args.apply)
+        _purge_dirty_negatives(conn, apply)
+        _clean_staging_doi(conn, apply)
+        _clean_source_publication_doi(conn, apply)
+        _clean_related_dois(conn, apply)
+        _clean_related_identifiers_meta(conn, apply)
         _report_derived(conn)
-        if args.apply:
+        if apply:
             conn.commit()
             log.info("✓ backfill appliqué")
         else:
