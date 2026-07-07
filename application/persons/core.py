@@ -51,6 +51,7 @@ __all__ = [
     "merge_person",
     "add_identifier",
     "add_identifiers_from_authorships",
+    "IdentifierConflict",
     "add_name_form",
     "link_authorship",
     "link_authorships",
@@ -225,6 +226,10 @@ def add_identifier(
     raise CannotAttributeConflict(
         f"Identifiant {id_type}={id_value!r} déjà attribué à person_id={existing.person_id} "
         f"avec statut {existing.status.value!r} ; impossible d'attribuer à person_id={person_id}.",
+        id_type=id_type,
+        id_value=id_value,
+        existing_person_id=existing.person_id,
+        existing_status=existing.status.value,
     )
 
 
@@ -315,12 +320,32 @@ def import_authenticated_orcids(
     return dict(outcomes)
 
 
+class IdentifierConflict(NamedTuple):
+    """Conflit d'attribution collecté par le path batch : une valeur d'identifiant
+    portée par une signature du candidat est déjà attribuée à un autre propriétaire.
+
+    Arbitré après la cascade par le consensus des porteurs (canal identifiant
+    ordre-indépendant) : la valeur est transférée au candidat si le consensus le
+    désigne, lui et pas le propriétaire. `owner_status` distingue le `pending`
+    (transférable) du `confirmed` (verrou admin, jamais transféré)."""
+
+    id_type: str
+    id_value: str
+    candidate_person_id: int
+    owner_person_id: int
+    owner_status: str
+
+
 def add_identifiers_from_authorships(
-    person_id: int, authorships: list[dict[str, JsonValue]], *, repo: PersonRepository
+    person_id: int,
+    authorships: list[dict[str, JsonValue]],
+    *,
+    repo: PersonRepository,
+    conflicts: list[IdentifierConflict] | None = None,
 ) -> None:
     """Promotion canonique en batch : pour chaque authorship source, extrait les identifiants observés (orcid/idhal/idref/hal_person_id) et délègue à `add_identifier` qui dispatche selon l'état existant en base.
 
-    Path batch tolérant : un `CannotAttributeConflict` (ORCID déjà attribué en pending/confirmed à une autre personne) ou un `ValidationError` (identifiant source mal formé) sur un identifiant donné est loggé en warning et la promotion continue pour les autres. Le path strict reste `add_identifier` (singulier) que l'API admin utilise directement.
+    Path batch tolérant : un `ValidationError` (identifiant source mal formé) est loggé et la promotion continue. Un `CannotAttributeConflict` (valeur déjà attribuée en pending/confirmed à une autre personne) est collecté dans `conflicts` (comme `IdentifierConflict`) si un collecteur est fourni — pour arbitrage ultérieur par consensus (transfert vers le candidat s'il est la personne majoritaire) —, sinon loggé en warning. Le path strict reste `add_identifier` (singulier) que l'API admin utilise directement.
 
     Couvre les 4 id_types acceptés en base (`PERSON_IDENTIFIER_TYPES`) : `orcid`, `idhal`, `idref`, `hal_person_id`. Les 3 premiers sont visibles UI ; `hal_person_id` est interne (filtré côté lecture par `PUBLIC_PERSON_IDENTIFIER_TYPES`).
 
@@ -343,7 +368,18 @@ def add_identifiers_from_authorships(
             try:
                 add_identifier(person_id, id_type, value, repo=repo)
             except CannotAttributeConflict as exc:
-                logger.warning("%s", exc)
+                if conflicts is not None and exc.existing_person_id is not None:
+                    conflicts.append(
+                        IdentifierConflict(
+                            id_type,
+                            value,
+                            person_id,
+                            exc.existing_person_id,
+                            exc.existing_status or "",
+                        )
+                    )
+                else:
+                    logger.warning("%s", exc)
             except ValidationError:
                 logger.warning("Identifiant mal formé ignoré : %s=%r", id_type, value)
 
