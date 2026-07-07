@@ -4,7 +4,11 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from typing import Literal
 
-from domain.persons.name_matching import names_compatible
+from domain.persons.name_matching import (
+    names_compatible,
+    parse_raw_author_name,
+    same_person_name,
+)
 
 ORCID_MATCH_SOURCES = frozenset({"crossref", "openalex", "hal"})
 """Sources dont l'ORCID porté par une authorship est déposé par l'auteur,
@@ -188,10 +192,13 @@ def decide_match_by_identifier(
        sans test (la forme appartient à la personne, y compris un changement de nom),
        ``rejected`` le refuse sans test.
     2. À défaut de verdict (``pending`` ou forme inconnue), on teste la compatibilité
-       par tokens (``names_compatible``) : un identifiant porté par une signature
-       étrangère (corruption éparse : un ORCID recopié sur le mauvais co-auteur) est
-       refusé. Une signature trop pauvre (réduite au nom de famille) reste compatible
-       (sous-ensemble de tokens) et n'est donc pas refusée.
+       via ``same_person_name`` : un identifiant porté par une signature étrangère
+       (corruption éparse : un ORCID recopié sur le mauvais co-auteur) ou par un
+       homonyme de patronyme est refusé, mais une **variante de graphie du propriétaire
+       lui-même** (« abdelmouhcine » pour « abdel mouhcine ») corrobore et se rattache —
+       ce qui évite de la rejeter puis d'en créer un doublon au canal nominal. Une
+       signature trop pauvre (réduite au nom de famille) reste compatible (sous-ensemble
+       de tokens) et n'est donc pas refusée.
 
     Un refus est matérialisé dans ``rejection`` pour journalisation.
     """
@@ -208,7 +215,8 @@ def decide_match_by_identifier(
     if verdict == "rejected":
         return IdentifierMatch(rejection=(person_id, f"{target_fn} {target_ln}".strip()))
 
-    if names_compatible(signature, "", target_ln, target_fn):
+    sig_last, sig_first = parse_raw_author_name(signature)
+    if same_person_name(sig_last, sig_first, target_ln, target_fn):
         return IdentifierMatch(person_id=person_id)
     return IdentifierMatch(rejection=(person_id, f"{target_fn} {target_ln}".strip()))
 
