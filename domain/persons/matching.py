@@ -41,6 +41,23 @@ divergent fréquemment entre HAL/OpenAlex/WoS — on récolterait
 surtout des faux conflits ou des faux matchings."""
 
 
+# Canal de résolution par lequel la cascade a posé le `person_id` d'une signature,
+# indexé par le `reason` de `decide_person_match`. Enregistré dans
+# `source_authorships.resolution_mode`, il porte les réinitialisations ordre-indépendantes
+# de la phase : re-null ciblé des `identifier` transférés, re-orphelinage des `name` à forme
+# devenue ambiguë, recompute en bloc des `cross_source`. La création par nom vaut `name`
+# (elle ancre une personne sur sa forme).
+ResolutionMode = Literal["identifier", "name", "cross_source"]
+
+RESOLUTION_MODE_BY_REASON: dict[str, ResolutionMode] = {
+    "orcid": "identifier",
+    "hal_person_id": "identifier",
+    "idref": "identifier",
+    "cross_source": "cross_source",
+    "single_name": "name",
+}
+
+
 def decide_cross_source_match(
     authorship_source: str,
     last_norm: str,

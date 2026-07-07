@@ -137,7 +137,7 @@ def _scalar(conn, sql_text: str, **params):
 class TestLinkAuthorship:
     def test_ignores_invalid_source(self, sa_sync_conn, repo):
         """Source inconnue → no-op silencieux (pas d'exception)."""
-        link_authorship(1, "invalid", 1, repo=repo)
+        link_authorship(1, "invalid", 1, repo=repo, resolution_mode="name")
 
     def test_sets_person_id_on_source_authorship(self, sa_sync_conn, repo):
         person_id = _insert_person(sa_sync_conn)
@@ -145,11 +145,19 @@ class TestLinkAuthorship:
         sp_id = _insert_source_publication(sa_sync_conn, pub_id)
         sa_id = _insert_source_authorship(sa_sync_conn, sp_id)
 
-        link_authorship(person_id, "hal", sa_id, repo=repo)
+        link_authorship(person_id, "hal", sa_id, repo=repo, resolution_mode="name")
 
         assert (
             _scalar(sa_sync_conn, "SELECT person_id FROM source_authorships WHERE id = :i", i=sa_id)
             == person_id
+        )
+        assert (
+            _scalar(
+                sa_sync_conn,
+                "SELECT resolution_mode FROM source_authorships WHERE id = :i",
+                i=sa_id,
+            )
+            == "name"
         )
 
 
