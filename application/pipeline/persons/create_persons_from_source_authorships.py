@@ -60,12 +60,14 @@ from typing import NamedTuple
 from sqlalchemy import Connection
 
 from application.persons.core import (
+    IdentifierConflict,
     add_identifiers_from_authorships as add_identifiers,
     add_name_form,
     create_person,
     link_authorships as link_to_person,
 )
 from application.pipeline.metrics import PhaseMetrics
+from application.pipeline.persons.resolve_identifier_transfers import resolve_identifier_transfers
 from application.ports.pipeline.persons_create import (
     BareUnlinkedAuthorship,
     PersonsCreateQueries,
@@ -240,6 +242,7 @@ def run(
     created = 0
     out_of_perimeter_matched = 0
     corroboration_rejected = 0
+    conflicts: list[IdentifierConflict] = []
 
     total = len(all_authorships)
     for i, a in enumerate(all_authorships):
@@ -344,7 +347,7 @@ def run(
                 # Identifiants ajoutés en statut `pending` quelle que soit la
                 # source du match (cross-source/idref/orcid/name_form) —
                 # vérifiables manuellement via l'admin si erronés.
-                add_identifiers(pid, [a_dict], repo=person_repo)
+                add_identifiers(pid, [a_dict], repo=person_repo, conflicts=conflicts)
             matched_counts[decision.reason] += 1
             if not a.in_perimeter:
                 out_of_perimeter_matched += 1
@@ -360,7 +363,7 @@ def run(
                 pid = create_person(last, first, repo=person_repo)
                 a_dict = a._asdict()
                 link_to_person(pid, [a_dict], repo=person_repo)
-                add_identifiers(pid, [a_dict], repo=person_repo)
+                add_identifiers(pid, [a_dict], repo=person_repo, conflicts=conflicts)
                 add_name_form(pid, a.full_name, repo=person_repo)
                 marker = pid
             else:
@@ -382,6 +385,15 @@ def run(
         else:  # skip
             skipped_counts[decision.reason] += 1
 
+    # ── Arbitrage des conflits d'attribution par consensus ─────────
+    # Les valeurs d'identifiant captées par un premier arrivé sont transférées à la
+    # personne que soutient la majorité des porteurs (cf. resolve_identifier_transfers).
+    transferred = 0
+    if not dry_run:
+        transferred = resolve_identifier_transfers(
+            conn, conflicts, queries=queries, repo=person_repo, logger=logger
+        )["transferred"]
+
     # ── Résumé ─────────────────────────────────────────────────────
     linked_total = sum(matched_counts.values())
     in_perimeter_total = len(in_perimeter_authorships)
@@ -397,6 +409,7 @@ def run(
     logger.info(f"  Name form (single match) : {matched_counts['single_name']} rattachées")
     logger.info(f"  Créées                   : {created}")
     logger.info(f"  Rejets corroboration nom : {corroboration_rejected} matchs identifiant refusés")
+    logger.info(f"  Identifiants transférés  : {transferred} (conflit résolu par consensus)")
     logger.info(
         f"  Skippées (in-perimeter)  : ambiguës={skipped_counts['ambiguous_name_form']}, "
         f"create interdit={skipped_counts['creation_not_allowed']}"
@@ -424,5 +437,6 @@ def run(
         "created": created,
         "skipped_ambiguous": skipped_counts["ambiguous_name_form"],
         "corroboration_rejected": corroboration_rejected,
+        "identifiers_transferred": transferred,
     }
     return metrics
