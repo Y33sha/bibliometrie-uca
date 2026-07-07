@@ -29,7 +29,27 @@ class ConflictError(DomainError):
 class CannotAttributeConflict(ConflictError):
     """Tentative d'attribution d'un identifiant déjà attribué à une autre
     personne avec un statut `pending` ou `confirmed`. Pour réattribuer,
-    le statut existant doit d'abord être passé à `rejected`."""
+    le statut existant doit d'abord être passé à `rejected`.
+
+    Porte, quand ils sont disponibles, les champs structurés du conflit (type et
+    valeur de l'identifiant, personne détentrice et son statut) : le path batch de la
+    cascade personnes les collecte pour arbitrer un transfert par consensus au lieu de
+    refuser en bloc. Le chemin admin unitaire les ignore (refus strict → 409)."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        id_type: str | None = None,
+        id_value: str | None = None,
+        existing_person_id: int | None = None,
+        existing_status: str | None = None,
+    ) -> None:
+        self.id_type = id_type
+        self.id_value = id_value
+        self.existing_person_id = existing_person_id
+        self.existing_status = existing_status
+        super().__init__(message)
 
 
 class BlockingJournal(TypedDict):
