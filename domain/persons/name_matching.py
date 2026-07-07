@@ -76,3 +76,70 @@ def names_compatible(ln1: str, fn1: str, ln2: str, fn2: str) -> bool:
     une chaîne vide en `fn`.
     """
     return _tokens_compatible(_clean_name_tokens(ln1, fn1), _clean_name_tokens(ln2, fn2))
+
+
+def _edit_distance(a: str, b: str) -> int:
+    """Distance d'édition avec transposition adjacente (Damerau-Levenshtein
+    restreinte, dite « optimal string alignment ») : insertion, suppression,
+    substitution et échange de deux lettres voisines comptent chacun 1. La
+    transposition couvre les coquilles fréquentes sur les noms (« doit » / « diot »).
+    """
+    if a == b:
+        return 0
+    la, lb = len(a), len(b)
+    d = [[0] * (lb + 1) for _ in range(la + 1)]
+    for i in range(la + 1):
+        d[i][0] = i
+    for j in range(lb + 1):
+        d[0][j] = j
+    for i in range(1, la + 1):
+        for j in range(1, lb + 1):
+            cost = 0 if a[i - 1] == b[j - 1] else 1
+            d[i][j] = min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost)
+            if i > 1 and j > 1 and a[i - 1] == b[j - 2] and a[i - 2] == b[j - 1]:
+                d[i][j] = min(d[i][j], d[i - 2][j - 2] + 1)
+    return d[la][lb]
+
+
+def _concat_name(part: str) -> str:
+    """Fragment de nom normalisé, tokens accolés dans l'ordre (chiffres retirés)."""
+    return re.sub(r"\d+", "", normalize_name(part)).replace(" ", "")
+
+
+def _part_close(a: str, b: str) -> bool:
+    """Deux fragments de nom (nom **ou** prénom) proches à la graphie près : même jeu
+    de tokens (ordre indifférent), concaténation égale (« abdel mouhcine » /
+    « abdelmouhcine », « st paul » / « stpaul »), ou distance d'édition ≤ 1 sur la
+    concaténation (typo, translittération). Les fragments réduits à une seule lettre
+    (initiales) sont exclus du volet distance — « b » et « x » ne sont pas proches.
+    """
+    ta, tb = _clean_name_tokens(a), _clean_name_tokens(b)
+    if not ta or not tb:
+        return False
+    if ta == tb:
+        return True
+    ca, cb = _concat_name(a), _concat_name(b)
+    if ca == cb:
+        return True
+    return len(ca) >= 2 and len(cb) >= 2 and _edit_distance(ca, cb) <= 1
+
+
+def same_person_name(ln1: str, fn1: str, ln2: str, fn2: str) -> bool:
+    """Vrai si deux noms désignent la même personne, à une variation de graphie près.
+
+    Sur-ensemble de `names_compatible` (qui gère déjà l'inversion nom/prénom et les
+    initiales) : ajoute la tolérance aux variantes orthographiques d'une même
+    personne — concaténation (« abdel mouhcine » / « abdelmouhcine »), particule
+    accolée (« st paul » / « stpaul », « le roy » / « leroy »), typo ou
+    translittération (« eric » / « erick », « toufik » / « toufic ») —, en exigeant
+    que le nom **et** le prénom soient chacun proches. Un homonyme de patronyme au
+    prénom franchement autre (« hervé chanal » / « hélène chanal ») ou deux initiales
+    différentes (« b zhang » / « x zhang ») restent distincts.
+
+    Sert de corroboration tolérante au matching par identifiant : reconnaître qu'une
+    signature est la variante de graphie du propriétaire de l'identifiant évite de la
+    rejeter puis d'en créer un doublon au canal nominal.
+    """
+    if names_compatible(ln1, fn1, ln2, fn2):
+        return True
+    return _part_close(ln1, ln2) and _part_close(fn1, fn2)

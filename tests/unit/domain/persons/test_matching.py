@@ -265,6 +265,24 @@ class TestDecideMatchByIdentifier:
         )
         assert result.person_id == 7
 
+    def test_graphie_variant_corroborates(self):
+        """Variante de graphie du propriétaire (concaténation) : corrobore et se
+        rattache, au lieu d'être rejetée puis dédoublée au canal nominal."""
+        idref_map = {"x": (42, "gannoun", "abdel mouhcine")}
+        result = decide_match_by_identifier(
+            "x", idref_map, "Abdelmouhcine Gannoun", "abdelmouhcine gannoun", {}
+        )
+        assert result.person_id == 42
+        assert result.rejection is None
+
+    def test_surname_homonym_still_rejected(self):
+        """Même patronyme, prénom franchement autre : reste rejeté (pas de fausse
+        corroboration par graphie)."""
+        idref_map = {"x": (42, "chanal", "helene")}
+        result = decide_match_by_identifier("x", idref_map, "Herve Chanal", "herve chanal", {})
+        assert result.person_id is None
+        assert result.rejection == (42, "helene chanal")
+
 
 class TestDecidePersonMatch:
     """Cascade unifiée : ordre orcid > hal_person_id > idref > cross_source > name_form."""
