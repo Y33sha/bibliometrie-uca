@@ -866,7 +866,7 @@ def phase_countries(mode: Any = "full", **kw: Any) -> PhaseMetrics:
     metrics = PhaseMetrics()
     initial = _log_countries_summary("Bilan initial")
     metrics.merge(_run_detect_by_country_name())
-    metrics.merge(_run_detect_place_countries())
+    metrics.merge(_run_detect_by_place_name())
     metrics.merge(
         _run_suggest_address_countries(retry_empty=MODES[mode].retry_empty_country_suggestions)
     )
@@ -2015,19 +2015,21 @@ def _log_countries_summary(label: str) -> "AddressCountryStatus":
     return s
 
 
-def _run_detect_place_countries() -> PhaseMetrics:
+def _run_detect_by_place_name() -> PhaseMetrics:
+    from application.pipeline.countries.detect_by_place_name import run
     from infrastructure.db.engine import get_sync_engine
-    from interfaces.cli.pipeline.detect_place_countries import detect_place_countries
+    from infrastructure.queries.pipeline.countries import PgCountryQueries
 
-    log.info("▶ detect_place_countries")
+    log.info("▶ detect_by_place_name")
     t0 = time.time()
     conn = get_sync_engine().connect()
     try:
-        metrics = detect_place_countries(conn, direct=True)
+        metrics = run(conn, PgCountryQueries(), log)
+        conn.commit()
     finally:
         conn.close()
     log.info(
-        "✓ detect_place_countries terminé en %.1fs — %s",
+        "✓ detect_by_place_name terminé en %.1fs — %s",
         time.time() - t0,
         metrics.as_summary(),
     )
