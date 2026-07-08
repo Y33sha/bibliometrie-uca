@@ -4,9 +4,18 @@ Implémenté par `infrastructure.queries.pipeline.countries.PgCountryQueries`.
 Utilisé par les orchestrateurs de `application.pipeline.countries`.
 """
 
-from typing import Protocol
+from typing import NamedTuple, Protocol
 
 from sqlalchemy import Connection
+
+
+class SuggestEligibleCounts(NamedTuple):
+    """Compteurs des adresses sans pays, pour le log de la passe de suggestion."""
+
+    eligible: int  # pas encore tentées (suggested_countries IS NULL) — toujours traitées
+    has_suggestion: int
+    empty_attempted: int  # tentées sans match (`= []`) — retraitées en mode retry_empty
+    too_short: int
 
 
 class CountryQueries(Protocol):
@@ -39,6 +48,16 @@ class CountryQueries(Protocol):
     def fetch_addresses_missing_country_normalized(
         self, conn: Connection
     ) -> list[tuple[int, str]]: ...
+
+    # ── Suggestion floue (sous-chaîne dans le pool des adresses avec pays) ──
+
+    def count_suggest_eligible(self, conn: Connection) -> SuggestEligibleCounts: ...
+
+    def fetch_suggest_targets_chunk(
+        self, conn: Connection, *, after_id: int, limit: int, retry_empty: bool = False
+    ) -> list[tuple[int, str]]: ...
+
+    def load_country_pool(self, conn: Connection) -> list[tuple[str, list[str]]]: ...
 
     # ── Écriture des pays détectés / suggérés ──────────────────────
 

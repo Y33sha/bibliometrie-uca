@@ -2037,14 +2037,16 @@ def _run_detect_by_place_name() -> PhaseMetrics:
 
 
 def _run_suggest_address_countries(*, retry_empty: bool = False) -> PhaseMetrics:
+    from application.pipeline.countries.suggest_countries import run
     from infrastructure.db.engine import get_sync_engine
-    from interfaces.cli.pipeline.suggest_address_countries import suggest_countries
+    from infrastructure.queries.pipeline.countries import PgCountryQueries
 
     log.info("▶ suggest_address_countries%s", " (retry-vides)" if retry_empty else "")
     t0 = time.time()
     conn = get_sync_engine().connect()
     try:
-        metrics = suggest_countries(conn, retry_empty=retry_empty)
+        # `run` commite par batch (progression durable, WAL borné) : pas de commit final ici.
+        metrics = run(conn, PgCountryQueries(), log, retry_empty=retry_empty)
     finally:
         conn.close()
     log.info(
