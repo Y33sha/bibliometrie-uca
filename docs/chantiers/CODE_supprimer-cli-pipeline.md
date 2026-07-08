@@ -32,9 +32,9 @@ La documentation décrit ces CLI comme un pattern délibéré (composition roots
 
 ### Phase 2 — Suppression du dossier
 
-- [ ] Supprimer les 30 modules et `__init__.py` de `interfaces/cli/pipeline/`.
-- [ ] Retirer de `tests/unit/test_imports.py` les entrées `interfaces.cli.pipeline.extract_hal` et `interfaces.cli.pipeline.fetch_missing_doi`.
-- [ ] Vérifier qu'aucun import résiduel ne pointe vers `interfaces.cli.pipeline` (hors fiches archivées).
+- [x] Supprimer les 30 modules et `__init__.py` de `interfaces/cli/pipeline/` (3 countries supprimés à l'extraction, 27 coquilles ensuite).
+- [x] Retirer de `tests/unit/test_imports.py` les entrées `interfaces.cli.pipeline.*` ; ajouter les trois orchestrateurs countries.
+- [x] Vérifier qu'aucun import résiduel ne pointe vers `interfaces.cli.pipeline` (hors fiches archivées) : seul restait un commentaire dans `run_pipeline`, corrigé.
 
 ### Phase 3 — Documentation
 
