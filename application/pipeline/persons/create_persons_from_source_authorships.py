@@ -214,6 +214,18 @@ def run(
     person_repo: PersonRepository,
     dry_run: bool = False,
 ) -> PhaseMetrics:
+    # Réinitialisation nominale (canal ordre-indépendant), avant de recharger les
+    # non-rattachées : une signature dont la forme de nom est devenue ambiguë repasse
+    # à NULL et repart dans la cascade. La personne réduite ainsi vidée est supprimée
+    # après la boucle (GC), ce qui désambiguïse sa forme au run suivant.
+    reorphaned = 0
+    if not dry_run:
+        reorphaned = queries.reorphan_ambiguous_nominal(conn)
+        if reorphaned:
+            logger.info(
+                "Re-orphelinage nominal : %d signatures à forme ambiguë détachées", reorphaned
+            )
+
     in_perimeter_authorships = get_all_unlinked_authorships(conn, queries)
     out_of_perimeter_authorships = get_out_of_perimeter_candidates(conn, queries)
     all_authorships = in_perimeter_authorships + out_of_perimeter_authorships
@@ -400,6 +412,16 @@ def run(
             conn, conflicts, queries=queries, repo=person_repo, logger=logger
         )["transferred"]
 
+    # ── GC des personnes vidées ────────────────────────────────────
+    # Une personne réduite dont les signatures ont été re-orphelinées (puis rejointes à
+    # la forme pleine, ou laissées orphelines) n'a plus de signature : la supprimer retire
+    # sa forme canonique et désambiguïse pour le run suivant.
+    deleted_persons = 0
+    if not dry_run:
+        deleted_persons = queries.delete_empty_persons(conn)
+        if deleted_persons:
+            logger.info("GC : %d personnes vidées supprimées", deleted_persons)
+
     # ── Résumé ─────────────────────────────────────────────────────
     linked_total = sum(matched_counts.values())
     in_perimeter_total = len(in_perimeter_authorships)
@@ -416,6 +438,8 @@ def run(
     logger.info(f"  Créées                   : {created}")
     logger.info(f"  Rejets corroboration nom : {corroboration_rejected} matchs identifiant refusés")
     logger.info(f"  Identifiants transférés  : {transferred} (conflit résolu par consensus)")
+    logger.info(f"  Re-orphelinées (nominal) : {reorphaned} (forme devenue ambiguë)")
+    logger.info(f"  Personnes vidées (GC)    : {deleted_persons}")
     logger.info(
         f"  Skippées (in-perimeter)  : ambiguës={skipped_counts['ambiguous_name_form']}, "
         f"create interdit={skipped_counts['creation_not_allowed']}"
@@ -444,5 +468,7 @@ def run(
         "skipped_ambiguous": skipped_counts["ambiguous_name_form"],
         "corroboration_rejected": corroboration_rejected,
         "identifiers_transferred": transferred,
+        "reorphaned_nominal": reorphaned,
+        "deleted_empty_persons": deleted_persons,
     }
     return metrics

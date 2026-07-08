@@ -1,8 +1,10 @@
-"""Query service : lectures pour `create_persons_from_source_authorships`.
+"""Lectures et réinitialisations pour `create_persons_from_source_authorships`.
 
-Appelé par `application/pipeline/create/create_persons_from_source_authorships.py`.
-Regroupe les SELECT nécessaires aux 4 passes de rattachement
-(comptes HAL, cross-source, IdRef/ORCID connus, lookup `person_name_forms`).
+Appelé par `application/pipeline/persons/create_persons_from_source_authorships.py`.
+Regroupe les SELECT du rattachement (comptes HAL, cross-source, IdRef/ORCID connus,
+lookup `person_name_forms`) et les réinitialisations ordre-indépendantes de la phase :
+re-orphelinage des signatures nominales à forme devenue ambiguë, suppression des
+personnes vidées.
 """
 
 from sqlalchemy import Connection, Row, text
@@ -381,6 +383,58 @@ def fetch_person_name_forms(
     return {r.id: (r.ln or "", r.fn or "", list(r.confirmed_forms)) for r in rows}
 
 
+def reorphan_ambiguous_nominal(conn: Connection) -> int:
+    """Re-orpheline les signatures nominales dont la forme de nom est devenue ambiguë.
+
+    Réinitialisation ordre-indépendante du canal nominal : une signature résolue par
+    forme de nom (`resolution_mode = 'name'`), non épinglée par l'admin
+    (`confirmed_authorships`), dont l'`author_name_normalized` désigne au moins deux
+    personnes dans `person_name_forms` (hors `rejected`), repasse à NULL — `person_id` et
+    mode. Le sur-regroupement (une forme réduite collée au seul candidat présent avant
+    l'arrivée de l'homonyme qui la départage) se défait ainsi dès que l'homonyme coexiste,
+    quel que soit l'ordre d'ingestion. Retourne le nombre de signatures re-orphelinées.
+    """
+    return conn.execute(
+        text("""
+            UPDATE source_authorships sa
+            SET person_id = NULL, resolution_mode = NULL
+            FROM author_identifying_keys aik
+            WHERE sa.identity_id = aik.id
+              AND sa.resolution_mode = 'name'
+              AND NOT EXISTS (
+                  SELECT 1 FROM confirmed_authorships ca WHERE ca.source_authorship_id = sa.id
+              )
+              AND aik.author_name_normalized IN (
+                  SELECT name_form
+                  FROM person_name_forms
+                  WHERE status <> 'rejected'
+                  GROUP BY name_form
+                  HAVING count(DISTINCT person_id) >= 2
+              )
+        """)
+    ).rowcount
+
+
+def delete_empty_persons(conn: Connection) -> int:
+    """Supprime les personnes vidées de toute signature, hors référentiel RH.
+
+    Après le re-orphelinage, une personne purement nominale peut se retrouver sans aucune
+    `source_authorships` — typiquement une forme réduite dont les signatures ont rejoint la
+    forme pleine. La supprimer retire ses formes de nom canoniques (FK `CASCADE`), ce qui
+    désambiguïse la forme réduite et laisse les orphelines se re-attacher au run suivant.
+    Une personne vide est nécessairement non curée (la curation ne vit que sur des personnes
+    à publications) ; les notices RH sont protégées, personnes légitimes sans publication
+    dans le corpus. Retourne le nombre de personnes supprimées.
+    """
+    return conn.execute(
+        text("""
+            DELETE FROM persons p
+            WHERE NOT EXISTS (SELECT 1 FROM source_authorships sa WHERE sa.person_id = p.id)
+              AND NOT EXISTS (SELECT 1 FROM persons_rh rh WHERE rh.person_id = p.id)
+        """)
+    ).rowcount
+
+
 class PgPersonsCreateQueries(PersonsCreateQueries):
     """Adapter PostgreSQL pour `application.ports.persons_create.PersonsCreateQueries`."""
 
@@ -420,3 +474,9 @@ class PgPersonsCreateQueries(PersonsCreateQueries):
         self, conn: Connection, person_ids: list[int]
     ) -> dict[int, tuple[str, str, list[str]]]:
         return fetch_person_name_forms(conn, person_ids)
+
+    def reorphan_ambiguous_nominal(self, conn: Connection) -> int:
+        return reorphan_ambiguous_nominal(conn)
+
+    def delete_empty_persons(self, conn: Connection) -> int:
+        return delete_empty_persons(conn)
