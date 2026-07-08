@@ -296,14 +296,19 @@ def decide_person_match(
     2. **`hal_person_id`** (``hal_match``) — compte HAL de l'auteur,
        attaché à la signature dans le TEI HAL.
     3. **IdRef** (``idref_match``).
-    4. **Cross-source** (``cross_source_match``) — match par
+    4. **Match par `person_name_forms`** (``name_form_outcome`` d'action
+       ``match``) — nom normalisé désignant une seule personne. Placé
+       avant le cross-source pour maximiser les ancres fermes que ce
+       dernier exploite.
+    5. **Cross-source** (``cross_source_match``) — match par
        ``(publication_id, author_position)`` avec une authorship d'une
-       autre source et nom compatible. En dernier recours parmi les
-       signaux non-nominaux : inopérant au bootstrap (suppose des
-       matchings préexistants), il vient donc après les identifiants.
-    5. **`person_name_forms`** (``name_form_outcome``) — délègue au
-       résultat de ``decide_name_form_outcome`` (match / create / skip
-       selon ambiguïté et politique de création).
+       autre source et nom compatible. Inopérant au bootstrap (suppose
+       des matchings préexistants).
+    6. **Création par `person_name_forms`** (``name_form_outcome``
+       d'action ``create``) — nom inconnu, en dernier recours. La
+       création est différée en fin de cascade côté orchestrateur : une
+       signature à créer peut encore rejoindre une ancre cross-source
+       posée par une signature traitée plus loin.
 
     ``rejected_person_ids`` : personnes déjà rejetées pour la publication
     de l'authorship (store ``rejected_authorships``). Un match d'identifiant
@@ -322,15 +327,15 @@ def decide_person_match(
         return PersonMatchDecision(action="match", person_id=hal_match, reason="hal_person_id")
     if idref_match is not None and idref_match not in rejected_person_ids:
         return PersonMatchDecision(action="match", person_id=idref_match, reason="idref")
-    if cross_source_match is not None and cross_source_match not in rejected_person_ids:
-        return PersonMatchDecision(
-            action="match", person_id=cross_source_match, reason="cross_source"
-        )
     if name_form_outcome.action == "match":
         return PersonMatchDecision(
             action="match",
             person_id=name_form_outcome.person_id,
             reason="single_name",
+        )
+    if cross_source_match is not None and cross_source_match not in rejected_person_ids:
+        return PersonMatchDecision(
+            action="match", person_id=cross_source_match, reason="cross_source"
         )
     if name_form_outcome.action == "create":
         return PersonMatchDecision(action="create", reason="new")
