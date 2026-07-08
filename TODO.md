@@ -1,3 +1,6 @@
+# oneshots à lancer sur base de prod
+* python interfaces/cli/oneshot/remediate_identifier_captures.py
+* faire un oneshot pour purger les name_forms "pending" incompatibles avec le nom canonique, et toutes les SA liées
 # Pipeline
 ## Extraction
 * [ ] ajouter extraction par ORCID: vérifier pertinence (tester différentes sources, auditer le gain)
@@ -5,6 +8,7 @@
 * [ ] chercher dans ScanR par hal-id? (généraliser cross-import à tous les identifiants et toutes les sources)
 ## Suite du traitement
 * [ ] CLI `seed_journals_doi_prefix`: intégrer au pipeline? + recalculer les anciens pour tenir compte des nouveaux (chaque doi_prefix de journal doit être unique et aussi précis que possible)
+* tester la nouvelle logique de matching personnes: faire une copie de la base, vider les `persons`, `person_name_forms` et `person_identifiers`, relancer le pipeline, comparer le résultat à la base canonique; étudier le diff, retravailler la logique, itérer jusqu'à convergence.
 
 # Données
 * [ ] distinguer conference_paper et conférence (présence d'un journal_id?)

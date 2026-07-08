@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict rLBbpQPAcsUW0dRSxQxbBK7RAmypJLcdaZKyRjULJ9Rp9pMrE0hGIz6xaEstgZL
+\restrict idpZxpzexfgdywbfnkKoegKvccOG5aBacNnAt630kgT7Bx4L4USMsiXkPbExsWh
 
--- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg22.04+1)
--- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg22.04+1)
+-- Dumped from database version 18.4
+-- Dumped by pg_dump version 18.4
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -170,6 +170,17 @@ CREATE TYPE public.relation_type AS ENUM (
     'describes',
     'is_described_by',
     'is_related_to'
+);
+
+
+--
+-- Name: resolution_mode; Type: TYPE; Schema: public; Owner: -
+--
+
+CREATE TYPE public.resolution_mode AS ENUM (
+    'identifier',
+    'name',
+    'cross_source'
 );
 
 
@@ -619,7 +630,8 @@ CREATE TABLE public.source_authorships (
     raw_author_name text,
     created_at timestamp with time zone DEFAULT now(),
     countries_dirty boolean DEFAULT true NOT NULL,
-    identity_id integer NOT NULL
+    identity_id integer NOT NULL,
+    resolution_mode public.resolution_mode
 );
 
 
@@ -782,6 +794,17 @@ UNION
    FROM (public.source_publications sp
      JOIN public.publications p ON ((p.id = sp.publication_id)))
   WHERE (p.in_perimeter AND ((sp.external_ids ->> 'arxiv_id'::text) IS NOT NULL));
+
+
+--
+-- Name: confirmed_authorships; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.confirmed_authorships (
+    source_authorship_id integer NOT NULL,
+    person_id integer NOT NULL,
+    created_at timestamp with time zone DEFAULT now()
+);
 
 
 --
@@ -1885,6 +1908,14 @@ ALTER TABLE ONLY public.config
 
 
 --
+-- Name: confirmed_authorships confirmed_authorships_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.confirmed_authorships
+    ADD CONSTRAINT confirmed_authorships_pkey PRIMARY KEY (source_authorship_id);
+
+
+--
 -- Name: countries countries_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2451,6 +2482,13 @@ CREATE INDEX idx_authorships_uca ON public.authorships USING btree (in_perimeter
 
 
 --
+-- Name: idx_confirmed_authorships_person; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_confirmed_authorships_person ON public.confirmed_authorships USING btree (person_id);
+
+
+--
 -- Name: idx_distinct_pubs_a; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2762,7 +2800,7 @@ CREATE INDEX idx_sa_authorship ON public.source_authorships USING btree (authors
 -- Name: idx_sa_countries_dirty; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_sa_countries_dirty ON public.source_authorships USING btree (source_publication_id) WHERE countries_dirty;
+CREATE INDEX idx_sa_countries_dirty ON public.source_authorships USING btree (source) WHERE countries_dirty;
 
 
 --
@@ -3105,6 +3143,22 @@ ALTER TABLE ONLY public.authorships
 
 
 --
+-- Name: confirmed_authorships confirmed_authorships_person_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.confirmed_authorships
+    ADD CONSTRAINT confirmed_authorships_person_id_fkey FOREIGN KEY (person_id) REFERENCES public.persons(id) ON DELETE CASCADE;
+
+
+--
+-- Name: confirmed_authorships confirmed_authorships_source_authorship_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.confirmed_authorships
+    ADD CONSTRAINT confirmed_authorships_source_authorship_id_fkey FOREIGN KEY (source_authorship_id) REFERENCES public.source_authorships(id) ON DELETE CASCADE;
+
+
+--
 -- Name: distinct_persons distinct_persons_person_id_a_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3388,5 +3442,5 @@ ALTER TABLE ONLY public.structure_relations
 -- PostgreSQL database dump complete
 --
 
-\unrestrict rLBbpQPAcsUW0dRSxQxbBK7RAmypJLcdaZKyRjULJ9Rp9pMrE0hGIz6xaEstgZL
+\unrestrict idpZxpzexfgdywbfnkKoegKvccOG5aBacNnAt630kgT7Bx4L4USMsiXkPbExsWh
 
