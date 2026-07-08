@@ -38,7 +38,8 @@ La documentation décrit ces CLI comme un pattern délibéré (composition roots
 
 ### Phase 3 — Documentation
 
-- [ ] `docs/architecture/06-composition-roots.md` : le composition root d'une phase est le wrapper `_run_*` de `run_pipeline`, pas un script CLI.
-- [ ] `CONTRIBUTING.md` : réécrire les sections « ajouter une source / une phase » qui prennent les CLI comme modèle.
-- [ ] `docs/pipeline/11-enrichissements.md` : chemins des modules countries pointant vers `application/pipeline/countries/`.
-- [ ] `docs/exploitation/04-pipeline.md` : arborescence des logs sans `logs/interfaces/cli/pipeline/`.
+- [x] `docs/architecture/06-composition-roots.md` : le composition root d'une phase est le wrapper `_run_*` de `run_pipeline`, pas un script CLI.
+- [x] `CONTRIBUTING.md` : sections « ajouter une source / une phase » — le branchement se fait dans `run_pipeline`, plus de script d'entrée dédié.
+- [x] `docs/pipeline/11-enrichissements.md` : chemins des modules countries pointant vers `application/pipeline/countries/` ; référence CLI `oa_status` retirée.
+- [x] `docs/exploitation/04-pipeline.md` : exemple d'arborescence des logs sans `logs/interfaces/cli/pipeline/`.
+- [x] Docstrings des orchestrateurs `application/pipeline/…` : « point d'entrée CLI dans `interfaces/cli/pipeline/…` » remplacé par « appelé par `run_pipeline` » (12 modules).

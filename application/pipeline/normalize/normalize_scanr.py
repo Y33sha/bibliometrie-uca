@@ -2,8 +2,7 @@
 Normalisation des données ScanR : staging → tables structurées.
 
 L'orchestrateur (classe `ScanrNormalizer`) dépend des ports
-`StagingQueries` + `ScanrNormalizeQueries`. Le point d'entrée CLI est
-dans `interfaces/cli/pipeline/normalize_scanr.py`.
+`StagingQueries` + `ScanrNormalizeQueries` ; il est appelé par `run_pipeline`.
 
 Tables peuplées :
     publishers, journals, publications      (tables de vérité — partagées)

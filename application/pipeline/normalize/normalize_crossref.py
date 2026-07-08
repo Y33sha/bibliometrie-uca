@@ -1,8 +1,7 @@
 """Normalisation des données CrossRef : staging → tables structurées.
 
 L'orchestrateur (classe ``CrossrefNormalizer``) dépend des ports
-``StagingQueries`` + ``CrossrefNormalizeQueries``. Le point d'entrée
-CLI est dans ``interfaces/cli/pipeline/normalize_crossref.py``.
+``StagingQueries`` + ``CrossrefNormalizeQueries`` ; il est appelé par ``run_pipeline``.
 
 Tables peuplées :
     publishers, journals, publications      (tables de vérité — partagées)

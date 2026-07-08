@@ -6,8 +6,8 @@ Pose in_perimeter sur source_authorships via les adresses résolues
 source_authorship_structures (dérivée des adresses + perimeter_structures, sur
 le périmètre d'affiliation).
 
-L'orchestrateur dépend du port `AffiliationsQueries`. Le point d'entrée CLI
-est dans `interfaces/cli/pipeline/populate_affiliations.py`.
+L'orchestrateur dépend du port `AffiliationsQueries` ; il est appelé par
+`run_pipeline`.
 """
 
 import logging

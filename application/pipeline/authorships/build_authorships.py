@@ -12,8 +12,7 @@ Le build est **source-agnostique** : il consolide l'ensemble des
 `source_authorships` indépendamment des sources couvertes par le run courant
 (seules les phases amont — extract, cross-import, refresh-stale, normalize —
 sont source-dépendantes). L'orchestrateur dépend du port
-`AuthorshipsBuildQueries`. Le point d'entrée CLI est dans
-`interfaces/cli/pipeline/build_authorships.py`.
+`AuthorshipsBuildQueries` ; il est appelé par `run_pipeline`.
 """
 
 import logging
