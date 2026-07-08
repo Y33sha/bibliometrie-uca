@@ -415,6 +415,27 @@ def reorphan_ambiguous_nominal(conn: Connection) -> int:
     ).rowcount
 
 
+def reset_cross_source(conn: Connection) -> int:
+    """Détache toutes les signatures résolues en cross-source, non épinglées.
+
+    Le cross-source est un opérateur d'ensemble par (publication, position) : le résultat
+    ne dépend que de l'état ferme (identifiant/nom) du snapshot, jamais de la séquence.
+    Le recalculer complètement à chaque run — plutôt que de suivre la fraîcheur des ancres —
+    est le plus simple et suffit : `person_id` et mode repassent à NULL, la cascade
+    re-résout contre l'état ferme courant. Retourne le nombre de signatures détachées.
+    """
+    return conn.execute(
+        text("""
+            UPDATE source_authorships sa
+            SET person_id = NULL, resolution_mode = NULL
+            WHERE sa.resolution_mode = 'cross_source'
+              AND NOT EXISTS (
+                  SELECT 1 FROM confirmed_authorships ca WHERE ca.source_authorship_id = sa.id
+              )
+        """)
+    ).rowcount
+
+
 def delete_empty_persons(conn: Connection) -> int:
     """Supprime les personnes vidées de toute signature, hors référentiel RH.
 
@@ -477,6 +498,9 @@ class PgPersonsCreateQueries(PersonsCreateQueries):
 
     def reorphan_ambiguous_nominal(self, conn: Connection) -> int:
         return reorphan_ambiguous_nominal(conn)
+
+    def reset_cross_source(self, conn: Connection) -> int:
+        return reset_cross_source(conn)
 
     def delete_empty_persons(self, conn: Connection) -> int:
         return delete_empty_persons(conn)
