@@ -317,6 +317,20 @@ def write_countries(
     )
 
 
+def load_country_forms(conn: Connection) -> dict[str, str]:
+    """Noms de pays (`place_name_forms`, `kind = 'country'`) : `{form_normalized: iso_code}`."""
+    rows = conn.execute(
+        text("SELECT form_normalized, iso_code FROM place_name_forms WHERE kind = 'country'")
+    ).all()
+    return {r.form_normalized: r.iso_code for r in rows}
+
+
+def fetch_addresses_missing_country_raw(conn: Connection) -> list[tuple[int, str]]:
+    """`(id, raw_text)` des adresses sans pays, pour la détection par nom de pays."""
+    rows = conn.execute(text("SELECT id, raw_text FROM addresses WHERE countries IS NULL")).all()
+    return [(r.id, r.raw_text) for r in rows]
+
+
 class PgCountryQueries(CountryQueries):
     """Adapter PostgreSQL implémentant `application.ports.countries.CountryQueries`."""
 
@@ -331,3 +345,18 @@ class PgCountryQueries(CountryQueries):
 
     def clear_countries_dirty(self, conn: Connection) -> None:
         clear_countries_dirty(conn)
+
+    def load_country_forms(self, conn: Connection) -> dict[str, str]:
+        return load_country_forms(conn)
+
+    def fetch_addresses_missing_country_raw(self, conn: Connection) -> list[tuple[int, str]]:
+        return fetch_addresses_missing_country_raw(conn)
+
+    def write_countries(
+        self,
+        conn: Connection,
+        rows: list[tuple[int, list[str]]],
+        *,
+        target_column: str = "suggested_countries",
+    ) -> None:
+        write_countries(conn, rows, target_column=target_column)

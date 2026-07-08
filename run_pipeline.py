@@ -865,7 +865,7 @@ def phase_countries(mode: Any = "full", **kw: Any) -> PhaseMetrics:
     """Detection des pays des adresses et recalcul sur les publications."""
     metrics = PhaseMetrics()
     initial = _log_countries_summary("Bilan initial")
-    metrics.merge(_run_detect_address_countries())
+    metrics.merge(_run_detect_by_country_name())
     metrics.merge(_run_detect_place_countries())
     metrics.merge(
         _run_suggest_address_countries(retry_empty=MODES[mode].retry_empty_country_suggestions)
@@ -1973,19 +1973,21 @@ def _run_refresh_stale(target: str, years: list[int] | None) -> PhaseMetrics:
     return metrics
 
 
-def _run_detect_address_countries() -> PhaseMetrics:
+def _run_detect_by_country_name() -> PhaseMetrics:
+    from application.pipeline.countries.detect_by_country_name import run
     from infrastructure.db.engine import get_sync_engine
-    from interfaces.cli.pipeline.detect_address_countries import detect_countries
+    from infrastructure.queries.pipeline.countries import PgCountryQueries
 
-    log.info("▶ detect_address_countries --direct --apply")
+    log.info("▶ detect_by_country_name")
     t0 = time.time()
     conn = get_sync_engine().connect()
     try:
-        metrics = detect_countries(conn, apply=True, direct=True)
+        metrics = run(conn, PgCountryQueries(), log)
+        conn.commit()
     finally:
         conn.close()
     log.info(
-        "✓ detect_address_countries terminé en %.1fs — %s",
+        "✓ detect_by_country_name terminé en %.1fs — %s",
         time.time() - t0,
         metrics.as_summary(),
     )

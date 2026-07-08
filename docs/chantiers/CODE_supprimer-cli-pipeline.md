@@ -17,16 +17,17 @@ La documentation décrit ces CLI comme un pattern délibéré (composition roots
 
 - Extraire les trois fonctions d'orchestration countries vers `application/pipeline/countries/`, rediriger les imports de `run_pipeline`, puis supprimer l'intégralité de `interfaces/cli/pipeline/`.
 - `run_pipeline` (ses wrappers `_run_*`) devient le composition root unique des phases du pipeline. La révision de `06-composition-roots.md` acte ce déplacement : le composition root d'une phase n'est plus un script CLI mais le wrapper `_run_*` correspondant.
-- Placement des orchestrateurs extraits, par symétrie avec `refresh_publication_countries.py::refresh` (un module d'orchestration par étape) : `application/pipeline/countries/detect_address_countries.py`, `application/pipeline/countries/detect_place_countries.py`, et l'orchestrateur de suggestion ajouté dans le module existant `suggest_countries.py`, à côté de `CountrySuggester`.
+- Chaque orchestrateur extrait est une fonction `run(...)`, par uniformité avec les orchestrateurs de phase récents.
+- Les deux étapes de détection détectent le pays d'une adresse ; leur signal les distingue. Renommage en conséquence, par symétrie avec `refresh_publication_countries.py::refresh` (un module d'orchestration par étape) : détection par **nom de pays** (segment final de l'adresse) → `application/pipeline/countries/detect_by_country_name.py`, détection par **nom de lieu** (institution ou ville, dans le corps de l'adresse) → `detect_by_place_name.py`. L'orchestration de suggestion est ajoutée au module existant `suggest_countries.py`, à côté de `CountrySuggester`.
 - Le dossier `interfaces/cli/oneshot/` (remédiations ponctuelles) est hors périmètre : ce ne sont pas des phases du pipeline.
 
 ## Phasage
 
 ### Phase 1 — Extraction de l'orchestration countries
 
-- [ ] `detect_address_countries` : déplacer la fonction et ses helpers (`load_country_forms`, `extract_last_segment`, `show_stats`, les `select()` inline) vers `application/pipeline/countries/detect_address_countries.py`. Rediriger l'import de `run_pipeline` (ligne 1978) vers `application/`.
-- [ ] `detect_place_countries` : déplacer l'orchestration (chargement des formes, boucle, décision de conflit) vers `application/pipeline/countries/detect_place_countries.py`, en réutilisant `PlaceNameDetector`. Rediriger l'import (ligne 2018).
-- [ ] `suggest_address_countries` : déplacer la boucle de batch/pagination et les métriques dans `suggest_countries.py`, en réutilisant `CountrySuggester`. Rediriger l'import (ligne 2037).
+- [x] Détection par nom de pays : orchestration déplacée vers `application/pipeline/countries/detect_by_country_name.py::run` (dépend du port `CountryQueries`) ; les `select()` inline deviennent des méthodes du port (`load_country_forms`, `fetch_addresses_missing_country_raw`, `write_countries`). Wrapper `run_pipeline` renommé `_run_detect_by_country_name` (commit au caller). Module CLI supprimé.
+- [ ] Détection par nom de lieu : déplacer l'orchestration (chargement des formes, boucle, décision de conflit) vers `application/pipeline/countries/detect_by_place_name.py::run`, en réutilisant `PlaceNameDetector`. Rediriger l'import (ligne 2018) et renommer le wrapper `_run_detect_place_countries` → `_run_detect_by_place_name`.
+- [ ] Suggestion : déplacer la boucle de batch/pagination et les métriques dans `suggest_countries.py::run`, en réutilisant `CountrySuggester`. Rediriger l'import (ligne 2037).
 - [ ] Vérifier que la phase `countries` de `run_pipeline` tourne à l'identique (mêmes compteurs, mêmes écritures) après redirection.
 
 ### Phase 2 — Suppression du dossier
@@ -41,8 +42,3 @@ La documentation décrit ces CLI comme un pattern délibéré (composition roots
 - [ ] `CONTRIBUTING.md` : réécrire les sections « ajouter une source / une phase » qui prennent les CLI comme modèle.
 - [ ] `docs/pipeline/11-enrichissements.md` : chemins des modules countries pointant vers `application/pipeline/countries/`.
 - [ ] `docs/exploitation/04-pipeline.md` : arborescence des logs sans `logs/interfaces/cli/pipeline/`.
-
-## Questions ouvertes
-
-- Noms des fonctions extraites : uniformiser en `run(...)` (comme les orchestrateurs de phase récents) ou garder des noms descriptifs proches de l'existant (`detect_countries`, etc.) ? Le module `refresh_publication_countries.py` utilise le nom court `refresh`.
-- `detect_address_countries` et `detect_place_countries` : deux modules distincts (proposé) ou un seul module `detect.py` regroupant les deux étapes de détection ?
