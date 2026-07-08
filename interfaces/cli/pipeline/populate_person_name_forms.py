@@ -14,6 +14,7 @@ def main() -> None:
     conn = get_sync_engine().connect()
     try:
         populate(conn, PgNameFormsQueries(), logger)
+        conn.commit()
     finally:
         conn.close()
 

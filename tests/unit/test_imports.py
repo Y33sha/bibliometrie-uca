@@ -33,6 +33,7 @@ MODULES = [
     "application.pipeline.persons.reset",
     "application.pipeline.persons.cascade",
     "application.pipeline.persons.purge",
+    "application.pipeline.persons.phase",
     "application.pipeline.authorships.build_authorships",
     "application.pipeline.affiliations.populate_affiliations",
     "application.pipeline.persons.populate_person_name_forms",

@@ -1,6 +1,6 @@
 """Tests unitaires de `populate_person_name_forms.populate`.
 
-Mocks : port `NameFormsQueries`, `Connection` (commit), logger. Pas de DB.
+Mocks : port `NameFormsQueries`, `Connection`, logger. Pas de DB.
 
 L'orchestrateur calcule les formes de noms en Python via `compute_person_name_forms` (déjà testé côté domain) puis insère par batches dans une table temp avant un sync SQL final.
 """
@@ -44,11 +44,7 @@ class _FakeQueries:
 
 
 class _FakeConn:
-    def __init__(self) -> None:
-        self.committed = False
-
-    def commit(self) -> None:
-        self.committed = True
+    """Connexion factice : `populate` ne fait que la passer aux queries (mockées), sans committer — le commit revient au caller."""
 
 
 @pytest.fixture
@@ -67,7 +63,6 @@ def test_empty_persons_still_creates_temp_and_syncs(logger):
     assert queries.batches == []
     assert queries.sync_called is True
     assert queries.drop_temp_called is True
-    assert conn.committed is True
 
 
 def test_single_person_single_batch(logger):
@@ -90,7 +85,6 @@ def test_single_person_single_batch(logger):
     assert all(set(r.keys()) == {"raw_text", "person_id", "source"} for r in rows)
     assert all(r["source"] == "persons" for r in rows)
     assert {r["person_id"] for r in rows} == {1, 2}
-    assert conn.committed is True
 
 
 def test_strips_whitespace_in_names(logger):

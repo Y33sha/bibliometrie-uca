@@ -56,7 +56,6 @@ def populate(conn: Connection, queries: NameFormsQueries, logger: logging.Logger
     logger.info("Synchronisation person_name_forms (agrégation + diff SQL)...")
     inserted, updated, deleted = queries.sync_from_raw_forms(conn)
     queries.drop_temp_raw_forms_table(conn)
-    conn.commit()
 
     logger.info(
         "Terminé : %d ajoutés, %d mis à jour, %d supprimés",
