@@ -62,5 +62,5 @@ def run_populate(
     elapsed = time.perf_counter() - t0
     logger.info(f"\nTerminé en {elapsed:.1f}s")
     # Commit laissé au caller (CLI commit, tests d'intégration restent dans
-    # leur transaction rollbackée). Pattern cohérent avec
-    # create_persons_from_source_authorships.run().
+    # leur transaction rollbackée). Pattern cohérent avec la cascade personnes
+    # (application/pipeline/persons/cascade.py).
