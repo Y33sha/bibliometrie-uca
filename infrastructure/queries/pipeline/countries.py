@@ -24,7 +24,7 @@ from typing import NamedTuple
 
 from sqlalchemy import Connection, text
 
-from application.ports.pipeline.countries import CountryQueries
+from application.ports.pipeline.countries import CountryQueries, SuggestEligibleCounts
 
 # CTE des sa à recalculer : nouveaux (`sa.countries_dirty`, posé par normalize)
 # OU liés à une adresse dont `countries` a changé (`addresses.countries_dirty`,
@@ -204,15 +204,6 @@ def count_address_country_status(conn: Connection) -> AddressCountryStatus:
     return AddressCountryStatus(row.total, row.with_country, row.with_suggestion, row.none)
 
 
-class SuggestEligibleCounts(NamedTuple):
-    """Compteurs des adresses sans pays, pour le log de la passe suggest."""
-
-    eligible: int  # pas encore tentées (suggested_countries IS NULL) — toujours traitées
-    has_suggestion: int
-    empty_attempted: int  # tentées sans match (`= []`) — retraitées en mode retry_empty
-    too_short: int
-
-
 def count_suggest_eligible(conn: Connection) -> SuggestEligibleCounts:
     """Compteurs des adresses sans pays (éligibles, déjà suggérées, tentées sans match, trop courtes)."""
     row = conn.execute(
@@ -381,6 +372,19 @@ class PgCountryQueries(CountryQueries):
         self, conn: Connection
     ) -> list[tuple[int, str]]:
         return fetch_addresses_missing_country_normalized(conn)
+
+    def count_suggest_eligible(self, conn: Connection) -> SuggestEligibleCounts:
+        return count_suggest_eligible(conn)
+
+    def fetch_suggest_targets_chunk(
+        self, conn: Connection, *, after_id: int, limit: int, retry_empty: bool = False
+    ) -> list[tuple[int, str]]:
+        return fetch_suggest_targets_chunk(
+            conn, after_id=after_id, limit=limit, retry_empty=retry_empty
+        )
+
+    def load_country_pool(self, conn: Connection) -> list[tuple[str, list[str]]]:
+        return load_country_pool(conn)
 
     def write_countries(
         self,
