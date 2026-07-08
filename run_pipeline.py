@@ -831,6 +831,9 @@ def phase_persons(**kw: Any) -> PhaseMetrics:
     """
     metrics = _run_create_persons()
     _run_populate_person_name_forms()
+    # Purge après le peuplement : c'est là que les formes canoniques régénérées rendent une
+    # forme réduite ambiguë. Le re-orphelinage la détache, le GC supprime la personne vidée.
+    _run_purge_persons()
     return metrics
 
 
@@ -1200,6 +1203,22 @@ def _run_populate_person_name_forms() -> None:
     finally:
         conn.close()
     log.info("✓ populate_person_name_forms terminé en %.1fs", time.time() - t0)
+
+
+def _run_purge_persons() -> None:
+    from application.pipeline.persons.purge import purge
+    from infrastructure.db.engine import get_sync_engine
+    from infrastructure.queries.pipeline.persons_create import PgPersonsCreateQueries
+
+    log.info("▶ purge_persons")
+    t0 = time.time()
+    conn = get_sync_engine().connect()
+    try:
+        purge(conn, PgPersonsCreateQueries(), log)
+        conn.commit()
+    finally:
+        conn.close()
+    log.info("✓ purge_persons terminé en %.1fs", time.time() - t0)
 
 
 def _normalize_row(source: str, stats: NormalizeStats, duration_s: float) -> dict[str, object]:
