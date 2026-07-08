@@ -1,5 +1,7 @@
 # Supprimer le dossier `interfaces/cli/pipeline/`
 
+Commencé et terminé le 2026-07-08
+
 ## Contexte
 
 Les modules de `interfaces/cli/pipeline/` sont des points d'entrée en ligne de commande, un par phase ou par sous-étape du pipeline. Chacun ouvre une connexion, construit les adapters (queries, repos), appelle un orchestrateur de `application/pipeline/…`, puis commite. Ils dupliquent le rôle des wrappers `_run_*` de `run_pipeline.py`, qui font exactement le même câblage : ce sont deux composition roots parallèles pour les mêmes orchestrateurs. Le pipeline se lance en pratique via `run_pipeline` (`--only`, `--from`), jamais par ces CLI.
