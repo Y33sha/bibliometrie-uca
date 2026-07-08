@@ -320,13 +320,26 @@ class TestDecidePersonMatch:
         )
         assert decision == PersonMatchDecision(action="match", person_id=17, reason="idref")
 
-    def test_cross_source_wins_when_no_identifier(self):
+    def test_name_match_wins_over_cross_source(self):
+        # Le match par nom passe avant le cross-source (il maximise les ancres fermes).
         decision = decide_person_match(
             orcid_match=None,
             hal_match=None,
             idref_match=None,
             cross_source_match=42,
             name_form_outcome=NameFormDecision(action="match", person_id=7),
+        )
+        assert decision == PersonMatchDecision(action="match", person_id=7, reason="single_name")
+
+    def test_cross_source_wins_over_name_creation(self):
+        # Le cross-source passe avant la création : une signature à créer préfère rejoindre
+        # une ancre de même publication × position.
+        decision = decide_person_match(
+            orcid_match=None,
+            hal_match=None,
+            idref_match=None,
+            cross_source_match=42,
+            name_form_outcome=NameFormDecision(action="create"),
         )
         assert decision == PersonMatchDecision(action="match", person_id=42, reason="cross_source")
 

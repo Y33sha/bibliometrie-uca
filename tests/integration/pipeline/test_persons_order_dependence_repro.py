@@ -60,6 +60,47 @@ def _seed_signature(conn, *, pub_id, raw_name, name_norm):
     )
 
 
+def _seed_cross_source_pair(conn, *, pub_id, sa1_id, raw1, norm1, sa2_id, raw2, norm2):
+    """Une publication vue par HAL et OpenAlex, même auteur en position 0 mais deux graphies.
+    Deux signatures non rattachées, à créer."""
+    conn.execute(
+        text("""
+            INSERT INTO publications (id, title, title_normalized, doc_type, pub_year)
+            VALUES (:p, :t, :t, 'article', 2024)
+        """),
+        {"p": pub_id, "t": f"pub {pub_id}"},
+    )
+    for sp_id, source in ((sa1_id, "hal"), (sa2_id, "openalex")):
+        conn.execute(
+            text("""
+                INSERT INTO source_publications
+                    (id, source, source_id, title, pub_year, doc_type, publication_id)
+                VALUES (:sp, :src, :sid, :t, 2024, 'ART', :p)
+            """),
+            {
+                "sp": sp_id,
+                "src": source,
+                "sid": f"{source}-{sp_id}",
+                "t": f"pub {pub_id}",
+                "p": pub_id,
+            },
+        )
+    for sa_id, source, raw, norm in (
+        (sa1_id, "hal", raw1, norm1),
+        (sa2_id, "openalex", raw2, norm2),
+    ):
+        identity = upsert_identity(conn, norm, None)
+        conn.execute(
+            text("""
+                INSERT INTO source_authorships
+                    (id, source, source_publication_id, author_position, in_perimeter,
+                     person_id, raw_author_name, identity_id)
+                VALUES (:p, :src, :p, 0, TRUE, NULL, :raw, :iid)
+            """),
+            {"p": sa_id, "src": source, "raw": raw, "iid": identity},
+        )
+
+
 def _run_create(conn):
     run(conn, PgPersonsCreateQueries(), _LOG, person_repo=person_repository(conn))
 
@@ -161,3 +202,33 @@ def test_ambiguous_form_reorphaned_when_homonym_appears(sa_sync_conn):
     _run_create(conn)  # « h chanal » devenue ambiguë → re-orphelinage de « H Chanal »
 
     assert _person_of(conn, 95011) is None  # orpheline, plus collée à Hervé
+
+
+def test_cross_source_pair_merges_via_deferred_creation(sa_sync_conn):
+    """« Jean Martin » (HAL) et « J-P Martin » (OpenAlex), même publication × position, sont le
+    même auteur pour le cross-source (`names_compatible`), mais leurs formes de nom sont
+    disjointes — le matching par nom ne les réunit pas. Traitée en premier, « Jean Martin » est
+    différée puis créée ; « J-P Martin » la rejoint par cross-source au lieu de créer un doublon.
+    Une seule personne."""
+    conn = sa_sync_conn
+    _seed_cross_source_pair(
+        conn,
+        pub_id=95020,
+        sa1_id=95021,
+        raw1="Jean Martin",
+        norm1="jean martin",
+        sa2_id=95022,
+        raw2="J-P Martin",
+        norm2="j p martin",
+    )
+    _run_create(conn)
+
+    assert _martin_count(conn) == 1
+    persons_on = (
+        conn.execute(
+            text("SELECT DISTINCT person_id FROM source_authorships WHERE id IN (95021, 95022)")
+        )
+        .scalars()
+        .all()
+    )
+    assert len(persons_on) == 1 and persons_on[0] is not None  # les deux sur la même personne

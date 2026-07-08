@@ -16,9 +16,8 @@ La garde `in_perimeter` conditionne donc le seul barreau nominal : enregistrer
 ce qu'une personne confirmée-par-identifiant a signé (link, name form,
 identifiants) n'en dépend pas.
 
-Cascade unifiée — une seule boucle qui interroge 5 signaux en parallèle puis
-délègue la décision à `domain.persons.matching.decide_person_match`, du plus
-fiable au moins fiable :
+Cascade en deux temps, la décision déléguée à `domain.persons.matching.decide_person_match`,
+du signal le plus fiable au moins fiable :
 
 1. **ORCID** présent en base (status != rejected), utilisé comme signal
    uniquement quand l'authorship vient d'une source à ORCID déposé par
@@ -27,10 +26,16 @@ fiable au moins fiable :
 2. **`hal_person_id`** présent en base (status != rejected) — compte HAL,
    porté uniquement par les authorships HAL.
 3. **IdRef** présent en base (status != rejected).
-4. **Cross-source** par `(publication_id, author_position)` avec nom
-   compatible — après les identifiants (inopérant au bootstrap).
-5. **Lookup `person_name_forms`** : match unique / ambigu (skip) /
-   inconnu (création si `allow_create`, skip sinon).
+4. **Match par `person_name_forms`** : nom normalisé désignant une seule personne.
+   Avant le cross-source, pour maximiser les ancres fermes qu'il exploite.
+5. **Cross-source** par `(publication_id, author_position)` avec nom compatible —
+   inopérant au bootstrap (suppose des rattachements préexistants).
+6. **Création par `person_name_forms`** : nom inconnu. **Différée à une seconde passe**,
+   une fois tous les matchs posés. Une signature à créer peut encore rejoindre par
+   cross-source une ancre d'une autre source de la même publication, traitée plus loin :
+   sans ce report, deux graphies du même auteur aux formes disjointes (« Jean Martin » /
+   « J-P Martin ») créeraient deux personnes selon l'ordre. La passe 2 re-juge chaque
+   différée contre l'index complet ; ne restent créées que les vraies inconnues.
 
 Garde de rejet : les personnes rejetées pour la publication (store
 `rejected_authorships`, préfetché par publication) sont éliminées des
@@ -38,15 +43,15 @@ candidats à chaque signal — un match ne peut pas recréer une paire
 rejetée, et l'élimination peut désambiguïser un name form (2 candidats
 dont 1 rejeté → match univoque).
 
-L'effet est appliqué selon l'action de la décision :
-- Match (orcid / hal_person_id / idref / cross-source / name_form) → `link + add_name_form
+L'effet suit l'action de la décision :
+- Match (orcid / hal_person_id / idref / name_form / cross-source) → `link + add_name_form
   + add_identifiers`. Les identifiants sont ajoutés en statut `pending`
   (cf. `application.persons.add_identifier`), vérifiables manuellement
   via l'admin si le matching par nom s'avère faux. Cohérent avec le
   bootstrap d'une base vide : sans cet ajout, aucun identifier ne
   serait jamais inséré quand la même personne arrive depuis plusieurs
   sources successivement.
-- Création → `create + link + add_identifiers + add_name_form`.
+- Création (passe 2) → `create + link + add_identifiers + add_name_form`.
 - Skip → rien (ambiguïté ou création interdite, cf. `allow_person_creation`).
 
 L'orchestrateur dépend du port `PersonsCreateQueries`. Le point d'entrée CLI
@@ -275,29 +280,46 @@ def run(
     out_of_perimeter_matched = 0
     corroboration_rejected = 0
 
-    total = len(all_authorships)
-    for i, a in enumerate(all_authorships):
-        if i and i % 5000 == 0:
-            logger.info("  %d/%d authorships traitées...", i, total)
-
-        # ── Sous-décisions ─────────────────────────────────────────
+    # ── Décision et effets, extraits pour être rejoués en création différée ──
+    # `_cross_and_name` dépend des index vivants (linked_index, name_form_map) et se recalcule
+    # à chaque appel ; `_decide` y ajoute les identifiants (inchangés d'une passe à l'autre) et
+    # journalise la corroboration une seule fois, en passe 1.
+    def _cross_and_name(a: EnrichedAuthorship):
         cross_source_match: int | None = None
-        pub_id = a.publication_id
-        position = a.author_position
-        if pub_id is not None:
-            candidates = linked_index.get((pub_id, position), [])
+        if a.publication_id is not None:
+            candidates = linked_index.get((a.publication_id, a.author_position), [])
             if candidates:
                 cross_source_match = decide_cross_source_match(
                     authorship_source=a.source,
                     last_norm=a.last_norm,
                     first_norm=a.first_norm,
                     candidates=candidates,
-                    total_author_count=pub_max_authors.get(pub_id),
+                    total_author_count=pub_max_authors.get(a.publication_id),
                 )
+        rejected_for_pub = (
+            rejected_by_pub.get(a.publication_id, frozenset())
+            if a.publication_id is not None
+            else frozenset()
+        )
+        # Barreau name_form réservé au périmètre UCA : hors-périmètre, un nom seul ne peut ni
+        # attacher ni créer (on n'a que des candidats ancrés sur identifiant ou position).
+        if a.in_perimeter:
+            norm = a.author_name_normalized
+            name_form_outcome = decide_name_form_outcome(
+                name_form_map.get(norm) if norm else None,
+                a.allow_create,
+                rejected_person_ids=rejected_for_pub,
+            )
+        else:
+            name_form_outcome = NameFormDecision(action="skip", reason="out_of_perimeter")
+        return cross_source_match, name_form_outcome, rejected_for_pub
 
-        # Résolution corroborée par le nom : un match identifiant dont le nom de la
-        # personne ciblée est incompatible avec la signature est refusé (corruption
-        # éparse — un identifiant recopié sur le mauvais co-auteur) et journalisé.
+    def _decide(a: EnrichedAuthorship):
+        nonlocal corroboration_rejected
+        cross_source_match, name_form_outcome, rejected_for_pub = _cross_and_name(a)
+        # Résolution corroborée par le nom : un match identifiant dont le nom de la personne
+        # ciblée est incompatible avec la signature est refusé (identifiant recopié sur le
+        # mauvais co-auteur) et journalisé.
         form = a.author_name_normalized
         idref_decision = decide_match_by_identifier(
             a.idref, idref_map, a.full_name, form, name_form_status
@@ -305,15 +327,13 @@ def run(
         hal_decision = decide_match_by_identifier(
             a.hal_person_id, hal_account_map, a.full_name, form, name_form_status
         )
-        # ORCID utilisé comme signal de matching uniquement quand il est
-        # déposé par l'auteur (crossref / openalex raw_orcid / hal TEI) ;
-        # l'ORCID WoS, attribué algorithmiquement, est ignoré ici (il reste
-        # enregistré sur person_identifiers via add_identifiers).
+        # ORCID comme signal uniquement quand il est déposé par l'auteur (crossref / openalex
+        # raw_orcid / hal TEI) ; l'ORCID WoS, algorithmique, est ignoré ici (mais enregistré
+        # sur person_identifiers via add_identifiers).
         orcid_signal = a.orcid if a.source in ORCID_MATCH_SOURCES else None
         orcid_decision = decide_match_by_identifier(
             orcid_signal, orcid_map, a.full_name, form, name_form_status
         )
-
         for id_type, id_value, id_decision in (
             ("orcid", orcid_signal, orcid_decision),
             ("hal_person_id", a.hal_person_id, hal_decision),
@@ -330,97 +350,101 @@ def run(
                     target_name,
                 )
                 corroboration_rejected += 1
-
-        idref_match = idref_decision.person_id
-        hal_match = hal_decision.person_id
-        orcid_match = orcid_decision.person_id
-
-        # Garde de rejet : personnes rejetées pour cette publication, à
-        # éliminer des candidats (matchs annulés, name form désambiguïsé).
-        rejected_for_pub = (
-            rejected_by_pub.get(pub_id, frozenset()) if pub_id is not None else frozenset()
-        )
-
-        # Barreau name_form réservé au périmètre UCA : hors-périmètre, un nom
-        # seul ne peut ni attacher ni créer une personne (on n'a que des
-        # candidats ancrés sur un identifiant fort ou une position cross-source).
-        if a.in_perimeter:
-            norm = a.author_name_normalized
-            name_form_outcome = decide_name_form_outcome(
-                name_form_map.get(norm) if norm else None,
-                a.allow_create,
-                rejected_person_ids=rejected_for_pub,
-            )
-        else:
-            name_form_outcome = NameFormDecision(action="skip", reason="out_of_perimeter")
-
-        # ── Décision unifiée ────────────────────────────────────────
-        decision = decide_person_match(
-            orcid_match=orcid_match,
-            hal_match=hal_match,
-            idref_match=idref_match,
+        return decide_person_match(
+            orcid_match=orcid_decision.person_id,
+            hal_match=hal_decision.person_id,
+            idref_match=idref_decision.person_id,
             cross_source_match=cross_source_match,
             name_form_outcome=name_form_outcome,
             rejected_person_ids=rejected_for_pub,
         )
 
-        # ── Effets ─────────────────────────────────────────────────
+    def _apply_match(a: EnrichedAuthorship, pid: int | None, reason: str) -> None:
+        nonlocal out_of_perimeter_matched
+        assert pid is not None  # garanti par decide_person_match action=match
+        if not dry_run:
+            # `link_to_person` et `add_identifiers` consomment des dicts (API historique de
+            # `application.persons`) : conversion via `_asdict()` au boundary.
+            a_dict = a._asdict()
+            link_to_person(
+                pid, [a_dict], repo=person_repo, resolution_mode=RESOLUTION_MODE_BY_REASON[reason]
+            )
+            add_name_form(pid, a.full_name, repo=person_repo)
+            # Identifiants ajoutés en `pending` quelle que soit la source du match.
+            add_identifiers(pid, [a_dict], repo=person_repo)
+        matched_counts[reason] += 1
+        if not a.in_perimeter:
+            out_of_perimeter_matched += 1
+        # Un membre ferme (identifiant, nom, création) ancre le cross-source de sa position ;
+        # un résultat cross-source, jamais — il n'ancre pas un autre cross-source.
+        if a.publication_id is not None and reason != "cross_source":
+            linked_index[(a.publication_id, a.author_position)].append(
+                (pid, a.last_norm, a.first_norm, a.source)
+            )
+
+    def _apply_create(a: EnrichedAuthorship) -> None:
+        nonlocal created
+        last = a.last_name or a.full_name or "?"
+        first = a.first_name or ""
+        marker = -1
+        if not dry_run:
+            marker = create_person(last, first, repo=person_repo)
+            a_dict = a._asdict()
+            link_to_person(marker, [a_dict], repo=person_repo, resolution_mode="name")
+            add_identifiers(marker, [a_dict], repo=person_repo)
+            add_name_form(marker, a.full_name, repo=person_repo)
+        # Rendre la personne créée matchable dans le même run par toutes ses formes — ordres
+        # ET initiales — via le générateur qui sert au peuplement de `person_name_forms`. On
+        # fusionne dans les listes existantes : une forme déjà portée reste ambiguë (donc non
+        # matchée en aveugle), au lieu d'être détournée vers la dernière créée.
+        for f in compute_person_name_forms(last, first):
+            form_person_ids = name_form_map.setdefault(f, [])
+            if marker not in form_person_ids:
+                form_person_ids.append(marker)
+        # La personne créée ancre aussi le cross-source de sa position, pour ses co-signatures.
+        if a.publication_id is not None and not dry_run:
+            linked_index[(a.publication_id, a.author_position)].append(
+                (marker, a.last_norm, a.first_norm, a.source)
+            )
+        created += 1
+
+    # ── Passe 1 : rattachements ; la création est différée ─────────
+    total = len(all_authorships)
+    held: list[EnrichedAuthorship] = []
+    for i, a in enumerate(all_authorships):
+        if i and i % 5000 == 0:
+            logger.info("  %d/%d authorships (passe 1)...", i, total)
+        decision = _decide(a)
         if decision.action == "match":
-            pid = decision.person_id
-            assert pid is not None  # garanti par decide_person_match action=match
-            if not dry_run:
-                # `link_to_person` et `add_identifiers` consomment des dicts (API
-                # historique de `application.persons`) : on convertit l'EnrichedAuthorship
-                # via `_asdict()` au boundary. Le typage strict reste interne au pipeline.
-                a_dict = a._asdict()
-                link_to_person(
-                    pid,
-                    [a_dict],
-                    repo=person_repo,
-                    resolution_mode=RESOLUTION_MODE_BY_REASON[decision.reason],
-                )
-                add_name_form(pid, a.full_name, repo=person_repo)
-                # Identifiants ajoutés en statut `pending` quelle que soit la
-                # source du match (cross-source/idref/orcid/name_form) —
-                # vérifiables manuellement via l'admin si erronés.
-                add_identifiers(pid, [a_dict], repo=person_repo)
-            matched_counts[decision.reason] += 1
-            if not a.in_perimeter:
-                out_of_perimeter_matched += 1
-            # Mettre à jour linked_index pour que les authorships suivantes sur la même
-            # (pub_id, position) puissent matcher en cross-source. Un résultat cross-source
-            # n'y entre jamais : il n'ancre pas un autre cross-source (chaîne ordre-dépendante) —
-            # à une position, l'ancre est toujours un membre ferme (identifiant/nom).
-            if pub_id is not None and decision.reason != "cross_source":
-                linked_index[(pub_id, position)].append((pid, a.last_norm, a.first_norm, a.source))
-
+            _apply_match(a, decision.person_id, decision.reason)
         elif decision.action == "create":
-            last = a.last_name or a.full_name or "?"
-            first = a.first_name or ""
-            if not dry_run:
-                pid = create_person(last, first, repo=person_repo)
-                a_dict = a._asdict()
-                link_to_person(pid, [a_dict], repo=person_repo, resolution_mode="name")
-                add_identifiers(pid, [a_dict], repo=person_repo)
-                add_name_form(pid, a.full_name, repo=person_repo)
-                marker = pid
-            else:
-                marker = -1
-            # Rendre la personne créée matchable dans le même run par toutes ses
-            # formes — ordres ET initiales — via le générateur qui sert au
-            # peuplement de `person_name_forms`, plutôt que les deux seuls ordres.
-            # Sans les initiales, une signature « J Martin » du même run ne
-            # rattrape pas la « Jean Martin » qu'on vient de créer. On fusionne
-            # dans les listes de candidats existantes plutôt que d'écraser : une
-            # forme déjà portée par d'autres personnes reste ambiguë (donc non
-            # matchée en aveugle), au lieu d'être détournée vers la dernière créée.
-            for form in compute_person_name_forms(last, first):
-                form_person_ids = name_form_map.setdefault(form, [])
-                if marker not in form_person_ids:
-                    form_person_ids.append(marker)
-            created += 1
+            held.append(a)  # création différée : voir passe 2
+        else:
+            skipped_counts[decision.reason] += 1
 
-        else:  # skip
+    # ── Passe 2 : créations différées, cross-source rejoué ─────────
+    # Chaque signature sans match en passe 1 est re-jugée contre l'index désormais complet
+    # (toutes les ancres fermes posées) : une co-signature d'une même publication × position
+    # rejoint son ancre plutôt que de créer un doublon. Ne restent créées que les inconnues.
+    if held:
+        logger.info(
+            "Création différée : %d signatures re-jugées (cross-source rejoué)...", len(held)
+        )
+    for a in held:
+        cross_source_match, name_form_outcome, rejected_for_pub = _cross_and_name(a)
+        decision = decide_person_match(
+            orcid_match=None,
+            hal_match=None,
+            idref_match=None,
+            cross_source_match=cross_source_match,
+            name_form_outcome=name_form_outcome,
+            rejected_person_ids=rejected_for_pub,
+        )
+        if decision.action == "match":
+            _apply_match(a, decision.person_id, decision.reason)
+        elif decision.action == "create":
+            _apply_create(a)
+        else:
             skipped_counts[decision.reason] += 1
 
     # ── GC des personnes vidées ────────────────────────────────────
