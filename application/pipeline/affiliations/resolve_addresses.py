@@ -5,9 +5,8 @@ Lit les formes de noms depuis la table structure_name_forms,
 et enregistre dans address_structures avec matched_form_id pour
 la traçabilité (boucle de rétroaction).
 
-L'orchestration dépend du port `AddressResolutionQueries` ; le point
-d'entrée CLI est dans
-`interfaces/cli/pipeline/resolve_addresses.py` (composition root).
+L'orchestration dépend du port `AddressResolutionQueries`, injecté par le
+composition root `run_pipeline`.
 
 Schéma v2 :
   - address_structures (address_id, structure_id, matched_form_id, is_confirmed)

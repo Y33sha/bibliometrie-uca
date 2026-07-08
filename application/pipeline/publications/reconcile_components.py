@@ -10,7 +10,7 @@ Les `authorships` canoniques sont laissées à la phase `authorships` (`insert_m
 
 Voisinage 1-hop, pas de fermeture transitive : l'invariant *dirty* garantit que toute arête neuve a une extrémité dirty (raisonnement détaillé dans `domain/publications/reconciliation.py`).
 
-L'orchestrateur dépend du port `PublicationsReconciliationQueries`. Le point d'entrée CLI est dans `interfaces/cli/pipeline/reconcile_components.py`.
+L'orchestrateur dépend du port `PublicationsReconciliationQueries` ; il est appelé par `run_pipeline`.
 """
 
 import logging

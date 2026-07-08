@@ -8,10 +8,10 @@ Les fichiers qui jouent ce rôle :
 
 - `interfaces/api/app.py` — entry point FastAPI (startup, lifespan, middlewares, montage des routers)
 - `interfaces/api/deps.py` — factories partagées par les routers : `db_conn_sync` (Connection SA), query services et repositories câblés sur cette Connection
-- `run_pipeline.py` — orchestrateur pipeline complet
-- `interfaces/cli/*` — scripts CLI
+- `run_pipeline.py` — orchestrateur pipeline complet ; ses wrappers `_run_*` sont les composition roots de chaque phase (ouverture de connexion, instanciation des adapters, appel de l'orchestrateur applicatif)
+- `interfaces/cli/oneshot/*` — scripts de remédiation ponctuelle
 
 **Seuls** ces fichiers importent `infrastructure.repositories`, `infrastructure.queries.*` ou toute classe `Pg*` concrète.
 
 - **Côté API** : `app.py` / `deps.py` sont les composition roots ; les routers individuels (`interfaces/api/routers/*`) reçoivent leurs dépendances via `Depends(...)` et **n'importent pas** `infrastructure.*` directement. Verrouillé par le contrat `import-linter` "Routers : pas d'import direct de infrastructure".
-- **Côté CLI** : chaque script (`interfaces/cli/*`, y compris `interfaces/cli/pipeline/*`) **est** son propre composition root. Il importe les adapters concrets, instancie les factories, et appelle un use case applicatif en lui passant tout en kwargs. Pas de séparation construct/appel comme côté API ; cohérent avec la nature one-shot des scripts. Pas de contrat `import-linter` côté CLI, la discipline reste manuelle : `application/` et `domain/` ne doivent jamais importer `infrastructure/`, et le script CLI doit rester un thin wrapper (imports + instanciations + appel d'un use case ; pas de logique métier dans le script).
+- **Côté pipeline** : chaque phase est câblée par son wrapper `_run_*` dans `run_pipeline.py`, qui ouvre la connexion, instancie les adapters concrets et appelle l'orchestrateur applicatif de la phase. Les scripts de remédiation ponctuelle (`interfaces/cli/oneshot/*`) suivent le même principe, chacun **étant** son propre composition root. Pas de séparation construct/appel comme côté API ; cohérent avec leur nature one-shot. Pas de contrat `import-linter` sur ces entry points, la discipline reste manuelle : `application/` et `domain/` ne doivent jamais importer `infrastructure/`, et un entry point doit rester un thin wrapper (imports + instanciations + appel d'un use case ; pas de logique métier).

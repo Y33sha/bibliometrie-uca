@@ -40,13 +40,14 @@ Côté base, ajouter la valeur à l'enum Postgres `source_type` via une migratio
 
 ### 2. Extractor : API → `staging`
 
-L'extraction suit le pattern hexagonal en 5 morceaux :
+L'extraction suit le pattern hexagonal en 4 morceaux :
 
 - `domain/sources/<source>_extract.py` — constantes + helpers purs (parsing, requête, rate-limit)
 - `application/ports/pipeline/extract/<source>.py` — `Protocol` `<Source>ExtractAdapter` + dataclass `<Source>ExtractConfig`
 - `application/pipeline/extract/extract_<source>.py` — orchestrateur (`<Source>Extractor` héritant de `SourceExtractor` de [`application/pipeline/extract/base.py`](application/pipeline/extract/base.py))
 - `infrastructure/sources/<source>/extract_<source>.py` — adapter Postgres (`Pg<Source>ExtractAdapter`) qui implémente le port (HTTP + SQL)
-- `interfaces/cli/pipeline/extract_<source>.py` — entry point CLI (thin wrapper)
+
+Le branchement se fait directement dans `run_pipeline.py` (cf. étape 5), qui instancie l'adapter et appelle l'orchestrateur — pas de script d'entrée dédié.
 
 ```python
 # application/pipeline/extract/extract_ma_source.py
@@ -74,17 +75,15 @@ Modèles à copier : [`application/pipeline/extract/extract_theses.py`](applicat
 
 ### 3. Fetch missing DOI : hydratation cross-source
 
-Adapter `infrastructure/sources/<source>/fetch_missing_doi.py` qui, pour chaque DOI présent dans d'autres sources mais absent de la nôtre, va chercher les métadonnées et les ajoute en staging. Le dispatcher CLI unique [`interfaces/cli/pipeline/fetch_missing_doi.py`](interfaces/cli/pipeline/fetch_missing_doi.py) appelle l'adapter de la source demandée.
+Adapter `infrastructure/sources/<source>/fetch_missing_doi.py` qui, pour chaque DOI présent dans d'autres sources mais absent de la nôtre, va chercher les métadonnées et les ajoute en staging. Le dispatcher unique vit dans `run_pipeline.py` (phase de rattrapage cross-source), qui sélectionne l'adapter de la source demandée.
 
 S'inspirer de [`infrastructure/sources/openalex/fetch_missing_doi.py`](infrastructure/sources/openalex/fetch_missing_doi.py).
 
 ### 4. Normalizer : staging → tables structurées
 
-Créer `application/pipeline/normalize/normalize_<source>.py` héritant de `SourceNormalizer` (cf. [`application/pipeline/normalize/base.py`](application/pipeline/normalize/base.py)). Override de `process_work(cur, row)` qui insère dans `source_publications` et `source_authorships`.
+Créer `application/pipeline/normalize/normalize_<source>.py` héritant de `SourceNormalizer` (cf. [`application/pipeline/normalize/base.py`](application/pipeline/normalize/base.py)). Override de `process_work(cur, row)` qui insère dans `source_publications` et `source_authorships`. Le normalizer reçoit `StagingQueries` (port défini dans [`application/ports/pipeline/staging.py`](application/ports/pipeline/staging.py)), injecté par `run_pipeline.py` à l'étape suivante.
 
-Point d'entrée CLI dans `interfaces/cli/pipeline/normalize_<source>.py` : charge la connexion, injecte `StagingQueries` (port défini dans [`application/ports/pipeline/staging.py`](application/ports/pipeline/staging.py)), instancie le normalizer.
-
-Modèle : [`interfaces/cli/pipeline/normalize_theses.py`](interfaces/cli/pipeline/normalize_theses.py).
+Modèle : [`application/pipeline/normalize/normalize_theses.py`](application/pipeline/normalize/normalize_theses.py).
 
 ### 5. Brancher dans le pipeline
 
@@ -114,20 +113,31 @@ Si la phase fait du SQL non trivial :
 - Adapter `infrastructure/queries/<phase>.py` qui l'implémente.
 - Le port est injecté par le composition root (le CLI one-shot, l'orchestrateur `run_pipeline.py`, ou les dépendances FastAPI), jamais instancié dans la couche application.
 
-### 3. Entry-point CLI
+### 3. Brancher dans `run_pipeline.py`
 
-`interfaces/cli/pipeline/<nouvelle_phase>.py` : ouvre une `Connection` SA via `get_sync_engine().connect()` (ou `.begin()` si la phase doit committer en bloc), instancie l'adapter SQL, appelle la fonction `run(...)`, commit, close.
-
-Utile pour rejouer la phase à la main sans relancer tout le pipeline.
-
-### 4. Brancher dans `run_pipeline.py`
+`run_pipeline.py` est le composition root des phases — il n'y a pas de script d'entrée dédié. Pour chaque phase, un wrapper `_run_<name>()` ouvre une `Connection` SA via `get_sync_engine().connect()`, instancie l'adapter SQL, appelle l'orchestrateur `run(...)`, commit, close. La fonction `phase_<name>()` enchaîne les wrappers `_run_*()` et est déclarée dans `PHASES`.
 
 ```python
-def phase_<name>(**kw: Any) -> Any:
-    log.info("▶ phase <name>")
+def _run_<name>() -> PhaseMetrics:
+    from application.pipeline.<catégorie>.<script> import run
+    from infrastructure.db.engine import get_sync_engine
+    from infrastructure.queries.pipeline.<phase> import Pg<Phase>Queries
+
+    log.info("▶ <name>")
     t0 = time.time()
-    # Appels aux helpers _run_*() ou run_python(<script CLI>)
-    log.info("✓ <name> terminée en %.1fs", time.time() - t0)
+    conn = get_sync_engine().connect()
+    try:
+        metrics = run(conn, Pg<Phase>Queries(), log)
+        conn.commit()
+    finally:
+        conn.close()
+    log.info("✓ <name> terminé en %.1fs", time.time() - t0)
+    return metrics
+
+
+def phase_<name>(**kw: Any) -> PhaseMetrics:
+    return _run_<name>()
+
 
 PHASES = [
     ...,
@@ -137,7 +147,7 @@ PHASES = [
 
 Respecter l'ordre : une phase dépend en général des sorties de la précédente (ex. `persons` a besoin que `affiliations` soit terminée).
 
-### 5. Documenter
+### 4. Documenter
 
 Ajouter une entrée dans [`docs/pipeline.md`](docs/pipeline.md) qui décrit : ce que la phase fait, ses prérequis, ses sorties, les idempotences à préserver.
 

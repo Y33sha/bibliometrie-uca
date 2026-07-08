@@ -17,8 +17,8 @@ enrichissent aussi).
 L'orchestrateur dépend du port `EnrichQueries` et reçoit en injection
 un `OaStatusFetcher` (le fetcher concret vit dans
 `infrastructure/sources/unpaywall.py` pour respecter l'étanchéité DDD).
-Le point d'entrée CLI (argparse + connexion + `asyncio.run`) est dans
-`interfaces/cli/pipeline/enrich_oa_status.py`.
+Appelé par `run_pipeline` (phase `oa_status`), qui gère la connexion et
+`asyncio.run`.
 
 Implémentation async : `httpx.AsyncClient` partagé +
 `asyncio.Semaphore(5)` sous le seuil Unpaywall (~10 req/s recommandé).

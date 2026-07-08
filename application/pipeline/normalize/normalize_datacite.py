@@ -1,8 +1,7 @@
 """Normalisation des données DataCite : staging → tables structurées.
 
 L'orchestrateur (classe ``DataciteNormalizer``) dépend des ports
-``StagingQueries`` + ``DataciteNormalizeQueries``. Le point d'entrée CLI est
-dans ``interfaces/cli/pipeline/normalize_datacite.py``.
+``StagingQueries`` + ``DataciteNormalizeQueries`` ; il est appelé par ``run_pipeline``.
 
 Tables peuplées :
     publishers, journals, publications      (tables de vérité — partagées)

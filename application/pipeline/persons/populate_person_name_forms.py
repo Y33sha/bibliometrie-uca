@@ -20,8 +20,8 @@ synchronisation se font ensuite côté SQL via ``sync_from_raw_forms``
 (GROUP BY (name_form, person_id), agrégation des sources, diff
 INSERT/UPDATE/DELETE).
 
-L'orchestrateur dépend du port `NameFormsQueries`. Le point d'entrée
-CLI est dans `interfaces/cli/pipeline/populate_person_name_forms.py`.
+L'orchestrateur dépend du port `NameFormsQueries` ; il est appelé par
+`run_pipeline`.
 """
 
 import logging

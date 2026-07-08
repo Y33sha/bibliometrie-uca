@@ -7,9 +7,8 @@ Trois caches dénormalisés orchestrés via le port `CountryQueries` :
      (toutes sources passent par les adresses, circuit unifié)
   3. source_publications.countries → publications.countries
 
-Cet orchestrateur ne dépend que du domaine et de son port ; le point
-d'entrée CLI (argparse + connexion + instanciation de l'adapter) est
-dans `interfaces/cli/pipeline/refresh_publication_countries.py`.
+Cet orchestrateur ne dépend que du domaine et de son port ; il est appelé
+par `run_pipeline` (phase `countries`).
 """
 
 import logging

@@ -9,7 +9,7 @@ Capture le boilerplate commun aux 6 normalizers existants :
 - logs de progression et summary
 
 L'accès au staging passe par le port `StagingQueries` (injecté par le
-point d'entrée CLI dans `interfaces/cli/pipeline/`). Chaque source hérite
+composition root `run_pipeline`). Chaque source hérite
 et implémente `process_work()`.
 """
 
