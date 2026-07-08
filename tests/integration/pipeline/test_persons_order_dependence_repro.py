@@ -21,6 +21,7 @@ import logging
 from sqlalchemy import text
 
 from application.pipeline.persons.create_persons_from_source_authorships import run
+from application.pipeline.persons.purge import purge
 from domain.persons.name_forms import compute_person_name_forms
 from infrastructure.queries.pipeline.persons_create import PgPersonsCreateQueries
 from infrastructure.repositories import person_repository
@@ -120,6 +121,16 @@ def _populate_canonical_forms(conn):
             )
 
 
+def _run_phase(conn):
+    """Run complet de la phase personnes : rattachement/création, peuplement des formes, purge.
+
+    Le peuplement est simulé (`populate` committe, incompatible avec le rollback de la fixture),
+    la purge appelée directement — l'ordre reproduit `phase_persons`."""
+    _run_create(conn)
+    _populate_canonical_forms(conn)
+    purge(conn, PgPersonsCreateQueries(), _LOG)
+
+
 def _martin_count(conn) -> int:
     return conn.execute(
         text("SELECT COUNT(*) FROM persons WHERE last_name_normalized = 'martin'")
@@ -154,23 +165,19 @@ def test_initial_then_full_splits_in_a_single_run(sa_sync_conn):
 
 
 def test_initial_then_full_converges_over_runs(sa_sync_conn):
-    """Le résidu « initiale puis pleine » se résorbe sur plusieurs runs. Une fois « Jean
-    Martin » doté de sa forme initiale « j martin » (peuplement canonique), celle-ci devient
-    ambiguë : la signature « J Martin » de la personne réduite est re-orphelinée, la personne
-    réduite vidée est supprimée (GC), et « J Martin » rejoint « Jean Martin » au run suivant."""
+    """Le résidu « initiale puis pleine » se résorbe en deux runs complets. Le premier crée
+    « J Martin » et « Jean Martin » séparément ; le peuplement rend « j martin » ambiguë (c'est
+    l'initiale de « Jean Martin »), et la purge supprime la personne réduite vidée. Au run
+    suivant, « j martin » redevenue univoque, la signature libérée rejoint « Jean Martin »."""
     conn = sa_sync_conn
     _seed_signature(conn, pub_id=95003, raw_name="J Martin", name_norm="j martin")
     _seed_signature(conn, pub_id=95004, raw_name="Jean Martin", name_norm="jean martin")
 
-    _run_create(conn)
-    assert _martin_count(conn) == 2  # un run isolé sépare encore
+    _run_phase(conn)  # crée A + B, peuple, purge la réduite
+    assert _martin_count(conn) == 1  # la personne réduite a fondu dès ce run
+    assert _person_of(conn, 95003) is None  # sa signature reste orpheline le temps d'un run
 
-    _populate_canonical_forms(conn)
-    _run_create(conn)  # « j martin » ambiguë → re-orphelinage puis GC de la personne réduite
-    assert _martin_count(conn) == 1
-
-    _populate_canonical_forms(conn)
-    _run_create(conn)  # « j martin » redevient univoque → la signature se rattache
+    _run_phase(conn)  # « j martin » univoque → la signature rejoint « Jean Martin »
     remaining = conn.execute(
         text("SELECT id, first_name_normalized FROM persons WHERE last_name_normalized = 'martin'")
     ).one()
@@ -192,14 +199,11 @@ def test_ambiguous_form_reorphaned_when_homonym_appears(sa_sync_conn):
     conn = sa_sync_conn
     _seed_signature(conn, pub_id=95010, raw_name="Hervé Chanal", name_norm="herve chanal")
     _seed_signature(conn, pub_id=95011, raw_name="H Chanal", name_norm="h chanal")
-    _run_create(conn)
+    _run_phase(conn)
     assert _person_of(conn, 95011) is not None  # rattachée à l'unique candidat
 
-    _populate_canonical_forms(conn)
     _seed_signature(conn, pub_id=95012, raw_name="Hélène Chanal", name_norm="helene chanal")
-    _run_create(conn)  # crée « Hélène Chanal »
-    _populate_canonical_forms(conn)
-    _run_create(conn)  # « h chanal » devenue ambiguë → re-orphelinage de « H Chanal »
+    _run_phase(conn)  # crée « Hélène Chanal » ; « h chanal » devient ambiguë → re-orphelinage
 
     assert _person_of(conn, 95011) is None  # orpheline, plus collée à Hervé
 
