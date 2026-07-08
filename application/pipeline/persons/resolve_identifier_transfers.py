@@ -25,7 +25,38 @@ from application.persons.core import IdentifierConflict
 from application.ports.pipeline.persons_create import PersonsCreateQueries
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.person_repository import PersonRepository
-from domain.persons.matching import form_matches_person
+from domain.persons.matching import ORCID_MATCH_SOURCES, form_matches_person
+
+# Types d'identifiant forts soumis à l'arbitrage de conflit.
+_CONFLICT_ID_TYPES = ("orcid", "idref", "hal_person_id")
+
+
+def build_identifier_conflicts(
+    conn: Connection, queries: PersonsCreateQueries
+) -> list[IdentifierConflict]:
+    """Balaye le snapshot pour tous les conflits d'attribution d'identifiant.
+
+    Chaque personne qui détient des signatures d'une valeur d'identifiant sans en être le
+    propriétaire attribué est un conflit. Lecture d'agrégat — le résultat ne dépend pas de la
+    séquence de la cascade —, à confier ensuite à `resolve_identifier_transfers` qui tranche
+    par consensus. Partagé par le pipeline (balayage frontal) et la remédiation du stock.
+    """
+    conflicts: list[IdentifierConflict] = []
+    for id_type in _CONFLICT_ID_TYPES:
+        owners = queries.fetch_identifier_owners(conn, id_type)
+        if not owners:
+            continue
+        sources = tuple(ORCID_MATCH_SOURCES) if id_type == "orcid" else None
+        for id_value, bearer_person_id in queries.fetch_identifier_bearer_persons(
+            conn, id_type, sources
+        ):
+            owner = owners.get(id_value)
+            if owner is None or bearer_person_id == owner[0]:
+                continue
+            conflicts.append(
+                IdentifierConflict(id_type, id_value, bearer_person_id, owner[0], owner[1])
+            )
+    return conflicts
 
 
 def resolve_identifier_transfers(

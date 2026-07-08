@@ -383,6 +383,51 @@ def fetch_person_name_forms(
     return {r.id: (r.ln or "", r.fn or "", list(r.confirmed_forms)) for r in rows}
 
 
+def fetch_identifier_owners(conn: Connection, id_type: str) -> dict[str, tuple[int, str]]:
+    """`{id_value: (person_id, status)}` — propriétaires non rejetés d'un type d'identifiant.
+
+    Sert au balayage frontal des conflits d'attribution : le propriétaire attribué d'une
+    valeur, à confronter aux personnes qui en portent des signatures.
+    """
+    rows = conn.execute(
+        text("""
+            SELECT id_value, person_id, status
+            FROM person_identifiers
+            WHERE id_type = :t AND status <> 'rejected'
+        """),
+        {"t": id_type},
+    ).all()
+    return {r.id_value: (r.person_id, r.status) for r in rows}
+
+
+def fetch_identifier_bearer_persons(
+    conn: Connection, id_type: str, sources: tuple[str, ...] | None = None
+) -> list[tuple[str, int]]:
+    """Couples `(id_value, person_id)` : les personnes portant des signatures d'une valeur.
+
+    Agrégat sur les signatures rattachées dont l'identité porte le type d'identifiant.
+    `sources` restreint aux sources fiables (ORCID déposé par l'auteur, cf.
+    `ORCID_MATCH_SOURCES`) ; absent, toutes sources.
+    """
+    source_filter = "AND sa.source = ANY(:sources)" if sources else ""
+    params: dict[str, object] = {"id_type": id_type}
+    if sources:
+        params["sources"] = list(sources)
+    rows = conn.execute(
+        text(f"""
+            SELECT aik.person_identifiers->>:id_type AS id_value, sa.person_id
+            FROM source_authorships sa
+            JOIN author_identifying_keys aik ON aik.id = sa.identity_id
+            WHERE aik.person_identifiers ? :id_type
+              AND sa.person_id IS NOT NULL
+              {source_filter}
+            GROUP BY 1, 2
+        """),
+        params,
+    ).all()
+    return [(r.id_value, r.person_id) for r in rows]
+
+
 def reorphan_ambiguous_nominal(conn: Connection) -> int:
     """Re-orpheline les signatures nominales dont la forme de nom est devenue ambiguë.
 
@@ -495,6 +540,14 @@ class PgPersonsCreateQueries(PersonsCreateQueries):
         self, conn: Connection, person_ids: list[int]
     ) -> dict[int, tuple[str, str, list[str]]]:
         return fetch_person_name_forms(conn, person_ids)
+
+    def fetch_identifier_owners(self, conn: Connection, id_type: str) -> dict[str, tuple[int, str]]:
+        return fetch_identifier_owners(conn, id_type)
+
+    def fetch_identifier_bearer_persons(
+        self, conn: Connection, id_type: str, sources: tuple[str, ...] | None = None
+    ) -> list[tuple[str, int]]:
+        return fetch_identifier_bearer_persons(conn, id_type, sources)
 
     def reorphan_ambiguous_nominal(self, conn: Connection) -> int:
         return reorphan_ambiguous_nominal(conn)
