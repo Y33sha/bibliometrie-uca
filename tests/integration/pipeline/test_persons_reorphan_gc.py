@@ -7,6 +7,7 @@ from sqlalchemy import text
 from infrastructure.queries.pipeline.persons_create import (
     delete_empty_persons,
     reorphan_ambiguous_nominal,
+    reset_cross_source,
 )
 from tests.integration.helpers.authorships import upsert_identity
 
@@ -91,6 +92,24 @@ def test_reorphan_only_ambiguous_unpinned_nominal(sa_sync_conn):
     assert _row(conn, unambiguous).person_id == b  # forme non ambiguë
     assert _row(conn, pinned).person_id == a  # épinglé par l'admin
     assert _row(conn, by_identifier).person_id == a  # résolu par identifiant
+
+
+def test_reset_cross_source_detaches_only_cross_source(sa_sync_conn):
+    conn = sa_sync_conn
+    p = _person(conn, "Zhang", "Wei")
+    cross = _signature(conn, form="wei zhang", person_id=p, mode="cross_source")
+    nominal = _signature(conn, form="wei zhang", person_id=p, mode="name")
+    pinned_cross = _signature(conn, form="wei zhang", person_id=p, mode="cross_source")
+    conn.execute(
+        text("INSERT INTO confirmed_authorships (source_authorship_id, person_id) VALUES (:s, :p)"),
+        {"s": pinned_cross, "p": p},
+    )
+
+    assert reset_cross_source(conn) == 1
+
+    assert _row(conn, cross) == (None, None)  # recompute complet
+    assert _row(conn, nominal).person_id == p  # canal nominal intact
+    assert _row(conn, pinned_cross).person_id == p  # épinglé admin
 
 
 def test_delete_empty_persons_spares_signed_and_rh(sa_sync_conn):

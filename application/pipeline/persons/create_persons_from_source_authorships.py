@@ -219,11 +219,19 @@ def run(
     # à NULL et repart dans la cascade. La personne réduite ainsi vidée est supprimée
     # après la boucle (GC), ce qui désambiguïse sa forme au run suivant.
     reorphaned = 0
+    reset_cross = 0
     if not dry_run:
         reorphaned = queries.reorphan_ambiguous_nominal(conn)
         if reorphaned:
             logger.info(
                 "Re-orphelinage nominal : %d signatures à forme ambiguë détachées", reorphaned
+            )
+        # Le cross-source est recalculé en bloc : toutes ses signatures repassent à NULL,
+        # la cascade les re-résout contre l'état ferme (identifiant/nom) du snapshot.
+        reset_cross = queries.reset_cross_source(conn)
+        if reset_cross:
+            logger.info(
+                "Reset cross-source : %d signatures détachées (recompute complet)", reset_cross
             )
 
     in_perimeter_authorships = get_all_unlinked_authorships(conn, queries)
@@ -369,9 +377,11 @@ def run(
             matched_counts[decision.reason] += 1
             if not a.in_perimeter:
                 out_of_perimeter_matched += 1
-            # Mettre à jour linked_index pour que les authorships suivantes
-            # sur la même (pub_id, position) puissent matcher en cross-source.
-            if pub_id is not None:
+            # Mettre à jour linked_index pour que les authorships suivantes sur la même
+            # (pub_id, position) puissent matcher en cross-source. Un résultat cross-source
+            # n'y entre jamais : il n'ancre pas un autre cross-source (chaîne ordre-dépendante) —
+            # à une position, l'ancre est toujours un membre ferme (identifiant/nom).
+            if pub_id is not None and decision.reason != "cross_source":
                 linked_index[(pub_id, position)].append((pid, a.last_norm, a.first_norm, a.source))
 
         elif decision.action == "create":
@@ -439,6 +449,7 @@ def run(
     logger.info(f"  Rejets corroboration nom : {corroboration_rejected} matchs identifiant refusés")
     logger.info(f"  Identifiants transférés  : {transferred} (conflit résolu par consensus)")
     logger.info(f"  Re-orphelinées (nominal) : {reorphaned} (forme devenue ambiguë)")
+    logger.info(f"  Reset cross-source       : {reset_cross} (recompute complet)")
     logger.info(f"  Personnes vidées (GC)    : {deleted_persons}")
     logger.info(
         f"  Skippées (in-perimeter)  : ambiguës={skipped_counts['ambiguous_name_form']}, "
@@ -469,6 +480,7 @@ def run(
         "corroboration_rejected": corroboration_rejected,
         "identifiers_transferred": transferred,
         "reorphaned_nominal": reorphaned,
+        "reset_cross_source": reset_cross,
         "deleted_empty_persons": deleted_persons,
     }
     return metrics
