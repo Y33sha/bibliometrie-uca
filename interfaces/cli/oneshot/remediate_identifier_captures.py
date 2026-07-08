@@ -23,65 +23,16 @@ import argparse
 import os
 import sys
 
-from sqlalchemy import Connection, text
-
-from application.persons.core import IdentifierConflict
-from application.pipeline.persons.resolve_identifier_transfers import resolve_identifier_transfers
+from application.pipeline.persons.resolve_identifier_transfers import (
+    build_identifier_conflicts,
+    resolve_identifier_transfers,
+)
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from infrastructure.queries.pipeline.persons_create import PgPersonsCreateQueries
 from infrastructure.repositories import person_repository
 
-ID_TYPES = ("orcid", "idref", "hal_person_id")
 log = setup_logger("remediate_identifier_captures", os.path.dirname(__file__))
-
-
-def _owner_map(conn: Connection, id_type: str) -> dict[str, tuple[int, str]]:
-    """`{id_value: (person_id, status)}` — propriétaires non rejetés."""
-    rows = conn.execute(
-        text("""
-            SELECT id_value, person_id, status
-            FROM person_identifiers
-            WHERE id_type = :t AND status <> 'rejected'
-        """),
-        {"t": id_type},
-    ).all()
-    return {r.id_value: (r.person_id, r.status) for r in rows}
-
-
-def build_stock_conflicts(conn: Connection) -> list[IdentifierConflict]:
-    """Conflits du stock : chaque personne qui détient des signatures d'une valeur sans en
-    être le propriétaire attribué. `resolve_identifier_transfers` tranchera par consensus."""
-    conflicts: list[IdentifierConflict] = []
-    for id_type in ID_TYPES:
-        owners = _owner_map(conn, id_type)
-        if not owners:
-            continue
-        source_filter = (
-            "AND sa.source IN ('crossref', 'openalex', 'hal')" if id_type == "orcid" else ""
-        )
-        rows = conn.execute(
-            text(f"""
-                SELECT aik.person_identifiers->>:id_type AS id_value, sa.person_id
-                FROM source_authorships sa
-                JOIN author_identifying_keys aik ON aik.id = sa.identity_id
-                WHERE aik.person_identifiers ? :id_type
-                  AND sa.person_id IS NOT NULL
-                  {source_filter}
-                GROUP BY 1, 2
-            """),
-            {"id_type": id_type},
-        ).all()
-        for r in rows:
-            owner = owners.get(r.id_value)
-            if owner is None:
-                continue
-            owner_pid, status = owner
-            if r.person_id != owner_pid:
-                conflicts.append(
-                    IdentifierConflict(id_type, r.id_value, r.person_id, owner_pid, status)
-                )
-    return conflicts
 
 
 def main() -> None:
@@ -93,11 +44,12 @@ def main() -> None:
     args = parser.parse_args()
 
     with get_sync_engine().connect() as conn:
-        conflicts = build_stock_conflicts(conn)
+        queries = PgPersonsCreateQueries()
+        conflicts = build_identifier_conflicts(conn, queries)
         result = resolve_identifier_transfers(
             conn,
             conflicts,
-            queries=PgPersonsCreateQueries(),
+            queries=queries,
             repo=person_repository(conn),
             logger=log,
         )
