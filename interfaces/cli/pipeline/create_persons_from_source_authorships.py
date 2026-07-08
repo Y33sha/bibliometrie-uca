@@ -3,7 +3,8 @@
 import argparse
 import os
 
-from application.pipeline.persons.create_persons_from_source_authorships import run
+from application.pipeline.persons.cascade import create, match
+from application.pipeline.persons.reset import reset
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from infrastructure.queries.pipeline.persons_create import PgPersonsCreateQueries
@@ -28,13 +29,10 @@ def main() -> None:
         if n_enforced:
             logger.info("Épinglages réappliqués : %d signatures recalées", n_enforced)
 
-        run(
-            conn,
-            PgPersonsCreateQueries(),
-            logger,
-            person_repo=person_repository(conn),
-            dry_run=args.dry_run,
-        )
+        q, repo = PgPersonsCreateQueries(), person_repository(conn)
+        reset(conn, q, logger, person_repo=repo)
+        match(conn, q, logger, person_repo=repo, dry_run=args.dry_run)
+        create(conn, q, logger, person_repo=repo, dry_run=args.dry_run)
         if args.dry_run:
             conn.rollback()
             logger.info("(dry-run — rien n'a été modifié)")

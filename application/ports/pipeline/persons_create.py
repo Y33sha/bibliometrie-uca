@@ -1,4 +1,4 @@
-"""Port : lectures pour `create_persons_from_source_authorships`.
+"""Port : lectures et réinitialisations de la phase personnes (reset, match, create, purge).
 
 Implémenté par `infrastructure.queries.pipeline.persons_create.PgPersonsCreateQueries`.
 """

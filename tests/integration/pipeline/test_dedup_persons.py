@@ -1,4 +1,4 @@
-"""Tests d'intégration — cascade unifiée `create_persons_from_source_authorships.run`.
+"""Tests d'intégration — cascade de rattachement des personnes (`match` puis `create`).
 
 Vérifie le câblage complet (prefetch → décision → effets DB) sur une vraie base
 PostgreSQL. La logique pure des sous-décisions est testée hors BDD dans
@@ -21,7 +21,8 @@ import logging
 from sqlalchemy import text
 
 from application.persons.core import add_name_form, create_person
-from application.pipeline.persons.create_persons_from_source_authorships import run
+from application.pipeline.persons.cascade import create, match
+from application.pipeline.persons.reset import reset
 from infrastructure.queries.pipeline.persons_create import PgPersonsCreateQueries
 from infrastructure.repositories import person_repository
 from tests.integration.helpers.authorships import upsert_identity
@@ -153,7 +154,10 @@ def _get_person_identifiers(conn, person_id):
 
 
 def _run_cascade(conn):
-    run(conn, _queries, _logger, person_repo=person_repository(conn))
+    repo = person_repository(conn)
+    reset(conn, _queries, _logger, person_repo=repo)
+    match(conn, _queries, _logger, person_repo=repo)
+    create(conn, _queries, _logger, person_repo=repo)
 
 
 # ── Scénarios ────────────────────────────────────────────────────

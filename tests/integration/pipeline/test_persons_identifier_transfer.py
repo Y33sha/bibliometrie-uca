@@ -14,7 +14,8 @@ import logging
 
 from sqlalchemy import text
 
-from application.pipeline.persons.create_persons_from_source_authorships import run
+from application.pipeline.persons.cascade import create, match
+from application.pipeline.persons.reset import reset
 from infrastructure.queries.pipeline.persons_create import PgPersonsCreateQueries
 from infrastructure.repositories import person_repository
 from tests.integration.helpers.authorships import upsert_identity
@@ -54,7 +55,11 @@ def _seed(conn, *, sa_id, raw_name, name_norm, idref):
 
 
 def _run(conn):
-    run(conn, PgPersonsCreateQueries(), _LOG, person_repo=person_repository(conn))
+    """La cascade : reset (transfert d'identifiant par consensus), match, create."""
+    q, repo = PgPersonsCreateQueries(), person_repository(conn)
+    reset(conn, q, _LOG, person_repo=repo)
+    match(conn, q, _LOG, person_repo=repo)
+    create(conn, q, _LOG, person_repo=repo)
 
 
 def _idref_owner_name(conn, idref):
