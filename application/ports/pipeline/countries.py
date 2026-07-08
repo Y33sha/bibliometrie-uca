@@ -32,6 +32,14 @@ class CountryQueries(Protocol):
         self, conn: Connection
     ) -> list[tuple[int, str]]: ...
 
+    # ── Détection par nom de lieu (institution, ville) ─────────────
+
+    def load_place_forms(self, conn: Connection) -> dict[str, str]: ...
+
+    def fetch_addresses_missing_country_normalized(
+        self, conn: Connection
+    ) -> list[tuple[int, str]]: ...
+
     # ── Écriture des pays détectés / suggérés ──────────────────────
 
     def write_countries(

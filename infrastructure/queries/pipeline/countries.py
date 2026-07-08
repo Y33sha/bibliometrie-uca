@@ -331,6 +331,28 @@ def fetch_addresses_missing_country_raw(conn: Connection) -> list[tuple[int, str
     return [(r.id, r.raw_text) for r in rows]
 
 
+def load_place_forms(conn: Connection) -> dict[str, str]:
+    """Noms de lieux (`place_name_forms`, `kind IN ('institution', 'city')`) : `{form_normalized: iso_code}`."""
+    rows = conn.execute(
+        text(
+            "SELECT form_normalized, iso_code FROM place_name_forms "
+            "WHERE kind IN ('institution', 'city')"
+        )
+    ).all()
+    return {r.form_normalized: r.iso_code for r in rows}
+
+
+def fetch_addresses_missing_country_normalized(conn: Connection) -> list[tuple[int, str]]:
+    """`(id, normalized_text)` des adresses sans pays (texte >= 5 caractères), pour la détection par nom de lieu."""
+    rows = conn.execute(
+        text(
+            "SELECT id, normalized_text FROM addresses "
+            "WHERE countries IS NULL AND length(normalized_text) >= 5"
+        )
+    ).all()
+    return [(r.id, r.normalized_text) for r in rows]
+
+
 class PgCountryQueries(CountryQueries):
     """Adapter PostgreSQL implémentant `application.ports.countries.CountryQueries`."""
 
@@ -351,6 +373,14 @@ class PgCountryQueries(CountryQueries):
 
     def fetch_addresses_missing_country_raw(self, conn: Connection) -> list[tuple[int, str]]:
         return fetch_addresses_missing_country_raw(conn)
+
+    def load_place_forms(self, conn: Connection) -> dict[str, str]:
+        return load_place_forms(conn)
+
+    def fetch_addresses_missing_country_normalized(
+        self, conn: Connection
+    ) -> list[tuple[int, str]]:
+        return fetch_addresses_missing_country_normalized(conn)
 
     def write_countries(
         self,

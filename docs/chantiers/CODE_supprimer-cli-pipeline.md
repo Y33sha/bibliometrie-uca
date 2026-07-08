@@ -26,7 +26,7 @@ La documentation décrit ces CLI comme un pattern délibéré (composition roots
 ### Phase 1 — Extraction de l'orchestration countries
 
 - [x] Détection par nom de pays : orchestration déplacée vers `application/pipeline/countries/detect_by_country_name.py::run` (dépend du port `CountryQueries`) ; les `select()` inline deviennent des méthodes du port (`load_country_forms`, `fetch_addresses_missing_country_raw`, `write_countries`). Wrapper `run_pipeline` renommé `_run_detect_by_country_name` (commit au caller). Module CLI supprimé.
-- [ ] Détection par nom de lieu : déplacer l'orchestration (chargement des formes, boucle, décision de conflit) vers `application/pipeline/countries/detect_by_place_name.py::run`, en réutilisant `PlaceNameDetector`. Rediriger l'import (ligne 2018) et renommer le wrapper `_run_detect_place_countries` → `_run_detect_by_place_name`.
+- [x] Détection par nom de lieu : orchestration déplacée vers `application/pipeline/countries/detect_by_place_name.py::run` (réutilise `PlaceNameDetector`) ; `load_place_forms` et `fetch_addresses_missing_country_normalized` passent par le port. Wrapper renommé `_run_detect_by_place_name` (commit au caller). Module CLI supprimé.
 - [ ] Suggestion : déplacer la boucle de batch/pagination et les métriques dans `suggest_countries.py::run`, en réutilisant `CountrySuggester`. Rediriger l'import (ligne 2037).
 - [ ] Vérifier que la phase `countries` de `run_pipeline` tourne à l'identique (mêmes compteurs, mêmes écritures) après redirection.
 
