@@ -226,6 +226,7 @@ def run(
         # Canal identifiant : arbitrage frontal des conflits d'attribution. Le balayage du
         # snapshot (ordre-indépendant) trouve tous les conflits, le consensus tranche, la valeur
         # est transférée et les signatures affectées repassent à NULL.
+        logger.info("Canal identifiant : balayage des conflits d'attribution...")
         conflicts = build_identifier_conflicts(conn, queries)
         transferred = resolve_identifier_transfers(
             conn, conflicts, queries=queries, repo=person_repo, logger=logger
@@ -234,19 +235,15 @@ def run(
         # Canal nominal : une signature dont la forme de nom est devenue ambiguë repasse à NULL
         # et repart dans la cascade ; la personne réduite ainsi vidée est supprimée après la
         # boucle (GC), ce qui désambiguïse sa forme au run suivant.
+        logger.info("Canal nominal : re-orphelinage des formes devenues ambiguës...")
         reorphaned = queries.reorphan_ambiguous_nominal(conn)
-        if reorphaned:
-            logger.info(
-                "Re-orphelinage nominal : %d signatures à forme ambiguë détachées", reorphaned
-            )
+        logger.info("  → %d signatures détachées", reorphaned)
 
         # Cross-source recalculé en bloc : toutes ses signatures repassent à NULL, la cascade
         # les re-résout contre l'état ferme (identifiant/nom) du snapshot.
+        logger.info("Cross-source : recompute complet...")
         reset_cross = queries.reset_cross_source(conn)
-        if reset_cross:
-            logger.info(
-                "Reset cross-source : %d signatures détachées (recompute complet)", reset_cross
-            )
+        logger.info("  → %d signatures détachées", reset_cross)
 
     in_perimeter_authorships = get_all_unlinked_authorships(conn, queries)
     out_of_perimeter_authorships = get_out_of_perimeter_candidates(conn, queries)
@@ -432,9 +429,9 @@ def run(
     # sa forme canonique et désambiguïse pour le run suivant.
     deleted_persons = 0
     if not dry_run:
+        logger.info("GC des personnes vidées...")
         deleted_persons = queries.delete_empty_persons(conn)
-        if deleted_persons:
-            logger.info("GC : %d personnes vidées supprimées", deleted_persons)
+        logger.info("  → %d personnes supprimées", deleted_persons)
 
     # ── Résumé ─────────────────────────────────────────────────────
     linked_total = sum(matched_counts.values())
