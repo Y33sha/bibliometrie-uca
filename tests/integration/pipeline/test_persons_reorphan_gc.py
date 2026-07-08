@@ -6,6 +6,7 @@ from sqlalchemy import text
 
 from infrastructure.queries.pipeline.persons_create import (
     delete_empty_persons,
+    null_identifier_signatures,
     reorphan_ambiguous_nominal,
     reset_cross_source,
 )
@@ -32,7 +33,7 @@ def _name_form(conn, form, person_id, status="pending"):
     )
 
 
-def _signature(conn, *, form, person_id, mode):
+def _signature(conn, *, form, person_id, mode, identifiers=None):
     pub = conn.execute(
         text("INSERT INTO publications (title, pub_year) VALUES ('t', 2024) RETURNING id")
     ).scalar_one()
@@ -43,7 +44,7 @@ def _signature(conn, *, form, person_id, mode):
         ),
         {"sid": f"hal-{pub}", "p": pub},
     ).scalar_one()
-    identity = upsert_identity(conn, form, None)
+    identity = upsert_identity(conn, form, identifiers)
     return conn.execute(
         text(
             "INSERT INTO source_authorships (source, source_publication_id, author_position, "
@@ -110,6 +111,36 @@ def test_reset_cross_source_detaches_only_cross_source(sa_sync_conn):
     assert _row(conn, cross) == (None, None)  # recompute complet
     assert _row(conn, nominal).person_id == p  # canal nominal intact
     assert _row(conn, pinned_cross).person_id == p  # épinglé admin
+
+
+def test_null_identifier_signatures_targets_old_owner_only(sa_sync_conn):
+    conn = sa_sync_conn
+    old = _person(conn, "Martin", "Jean")
+    other = _person(conn, "Dupont", "Marie")
+    ids = {"idref": "111"}
+    affected = _signature(
+        conn, form="jean martin", person_id=old, mode="identifier", identifiers=ids
+    )
+    nominal = _signature(conn, form="jean martin", person_id=old, mode="name", identifiers=ids)
+    pinned = _signature(conn, form="jean martin", person_id=old, mode="identifier", identifiers=ids)
+    conn.execute(
+        text("INSERT INTO confirmed_authorships (source_authorship_id, person_id) VALUES (:s, :p)"),
+        {"s": pinned, "p": old},
+    )
+    other_owner = _signature(
+        conn, form="marie dupont", person_id=other, mode="identifier", identifiers=ids
+    )
+    other_value = _signature(
+        conn, form="jean martin", person_id=old, mode="identifier", identifiers={"idref": "222"}
+    )
+
+    assert null_identifier_signatures(conn, "idref", "111", old) == 1
+
+    assert _row(conn, affected) == (None, None)  # portée sur l'ancien propriétaire, identifiant
+    assert _row(conn, nominal).person_id == old  # nominale : ne dépend pas de la valeur
+    assert _row(conn, pinned).person_id == old  # épinglée admin
+    assert _row(conn, other_owner).person_id == other  # autre propriétaire
+    assert _row(conn, other_value).person_id == old  # autre valeur
 
 
 def test_delete_empty_persons_spares_signed_and_rh(sa_sync_conn):

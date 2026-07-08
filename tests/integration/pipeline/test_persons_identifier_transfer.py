@@ -1,8 +1,10 @@
 """Transfert d'identifiant par consensus — canal identifiant ordre-indépendant.
 
-Une valeur d'identifiant captée par un premier arrivé au nom minoritaire est recalée,
-après la cascade, sur la personne que soutient la majorité des porteurs ; un porteur
-étranger minoritaire, lui, ne vole pas l'identifiant du propriétaire majoritaire.
+Une valeur d'identifiant captée par un premier arrivé au nom minoritaire est recalée, par le
+**balayage frontal des conflits** en tête de phase, sur la personne que soutient la majorité
+des porteurs ; un porteur étranger minoritaire, lui, ne vole pas l'identifiant du propriétaire
+majoritaire. Le balayage lit le snapshot du run précédent : la capture se forme au run 1,
+elle est recalée au run 2 (convergence multi-run).
 
 Ces tests n'appellent que `run()` (pas `populate`, qui committe et casserait le rollback
 de la fixture) : l'isolation transactionnelle est préservée.
@@ -70,7 +72,8 @@ def _idref_owner_name(conn, idref):
 
 def test_captured_identifier_recales_on_majority(sa_sync_conn):
     """Capture : « hervé chanal » (id bas, traité en premier) capte l'IdRef ; trois « hélène
-    chanal » suivent. Après la cascade, l'IdRef est transféré à la personne majoritaire."""
+    chanal » suivent. Le run 1 forme la capture (IdRef sur hervé) ; le run 2, par balayage
+    frontal du snapshot, transfère l'IdRef à la personne majoritaire."""
     _seed(
         sa_sync_conn, sa_id=96001, raw_name="Herve Chanal", name_norm="herve chanal", idref=_IDREF
     )
@@ -82,7 +85,8 @@ def test_captured_identifier_recales_on_majority(sa_sync_conn):
             name_norm="helene chanal",
             idref=_IDREF,
         )
-    _run(sa_sync_conn)
+    _run(sa_sync_conn)  # capture : IdRef sur « hervé chanal »
+    _run(sa_sync_conn)  # balayage frontal : recalage sur la majorité
     owner = _idref_owner_name(sa_sync_conn, _IDREF)
     assert (owner.ln, owner.fn) == ("chanal", "helene")
 
@@ -99,5 +103,6 @@ def test_foreign_bearer_does_not_steal(sa_sync_conn):
         sa_sync_conn, sa_id=96014, raw_name="Pierre Dupont", name_norm="pierre dupont", idref=_IDREF
     )
     _run(sa_sync_conn)
+    _run(sa_sync_conn)  # deux passes : le balayage frontal confirme le propriétaire
     owner = _idref_owner_name(sa_sync_conn, _IDREF)
     assert (owner.ln, owner.fn) == ("martin", "jean")
