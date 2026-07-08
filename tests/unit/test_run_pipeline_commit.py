@@ -1,30 +1,32 @@
-"""Régression : les wrappers de phases du pipeline commitent avant de fermer la conn.
+"""Régression : le wrapper de la phase personnes commite avant de fermer la conn.
 
-Les orchestrateurs de la cascade personnes (`match`, `create`, …) laissent « Commit/rollback
-au caller ». Le commit `a6a81f8` (migration SQLAlchemy) avait silencieusement retiré le
-`conn.commit()` final, et aucun caller ne reprenait la responsabilité — résultat : 5 semaines
-de runs `persons` qui matchaient en mémoire puis rollback à la fermeture de connexion.
+L'orchestrateur de la phase personnes (`application.pipeline.persons.phase.run`) laisse
+« commit/rollback au caller ». Le commit `a6a81f8` (migration SQLAlchemy) avait silencieusement
+retiré le `conn.commit()` final, et aucun caller ne reprenait la responsabilité — résultat :
+5 semaines de runs `persons` qui matchaient en mémoire puis rollback à la fermeture de connexion.
 """
 
 from unittest.mock import MagicMock, patch
 
 
-def test_run_create_persons_commits_before_close():
+def test_run_persons_phase_commits_before_close():
     fake_conn = MagicMock(name="conn")
     fake_engine = MagicMock(name="engine")
     fake_engine.connect.return_value = fake_conn
 
     with (
         patch("infrastructure.db.engine.get_sync_engine", return_value=fake_engine),
-        patch("application.pipeline.persons.cascade.create") as mock_create,
+        patch("application.pipeline.persons.phase.run") as mock_run,
         patch("infrastructure.queries.pipeline.persons_create.PgPersonsCreateQueries"),
+        patch("infrastructure.queries.pipeline.name_forms.PgNameFormsQueries"),
         patch("infrastructure.repositories.person_repository"),
+        patch("infrastructure.repositories.authorship_repository"),
     ):
-        from run_pipeline import _run_create_persons
+        from run_pipeline import _run_persons_phase
 
-        _run_create_persons()
+        _run_persons_phase()
 
-    mock_create.assert_called_once()
+    mock_run.assert_called_once()
     fake_conn.commit.assert_called_once()
     fake_conn.close.assert_called_once()
 

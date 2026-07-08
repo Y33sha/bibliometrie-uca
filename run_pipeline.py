@@ -821,31 +821,16 @@ def phase_relations(**kw: Any) -> PhaseMetrics:
 
 
 def phase_persons(**kw: Any) -> PhaseMetrics:
-    """Rattachement et création des personnes, en cinq étapes.
+    """Rattachement et création des personnes, phase ordre-indépendante.
 
-    `reset` réinitialise les attributions dérivées (arbitrage des conflits d'identifiant,
-    recompute cross-source) ; `match` rattache aux personnes existantes ou déjà résolues sans
-    créer ; `create` crée pour les signatures restées non liées (cross-source rejoué d'abord) ;
-    `populate` régénère les formes de nom ; `purge` re-orpheline les formes devenues ambiguës et
-    supprime les personnes vidées. Exclut les publications hors-scope (cf domain/publications/scope).
+    L'orchestrateur enchaîne, sur une seule transaction : `enforce` (réapplique les épinglages
+    admin), `reset` (réinitialise les attributions dérivées — arbitrage des conflits d'identifiant,
+    recompute cross-source), `match` (rattache sans créer), `create` (crée les signatures restées
+    non liées, cross-source rejoué d'abord), `populate` (régénère les formes de nom canoniques),
+    `purge` (re-orpheline les formes devenues ambiguës et supprime les personnes vidées). Exclut les
+    publications hors-scope (cf domain/publications/scope).
     """
-    from application.pipeline.persons.cascade import build_metrics
-
-    reset_counts = _run_reset_persons()
-    match_result = _run_match_persons()
-    create_result = _run_create_persons()
-    _run_populate_person_name_forms()
-    # Purge après le peuplement : c'est là que les formes canoniques régénérées rendent une forme
-    # réduite ambiguë. Le re-orphelinage la détache, le GC supprime la personne vidée.
-    purge_counts = _run_purge_persons()
-    return build_metrics(
-        match_result,
-        create_result,
-        transferred=reset_counts["transferred"],
-        reset_cross=reset_counts["reset_cross"],
-        reorphaned=purge_counts["reorphaned"],
-        deleted_persons=purge_counts["deleted_persons"],
-    )
+    return _run_persons_phase()
 
 
 def phase_authorships(**kw: Any) -> PhaseMetrics:
@@ -1058,58 +1043,30 @@ def _run_populate_relations() -> PhaseMetrics:
     return metrics
 
 
-def _run_reset_persons() -> dict[str, int]:
-    from application.pipeline.persons.reset import reset
+def _run_persons_phase() -> PhaseMetrics:
+    from application.pipeline.persons.phase import run
     from infrastructure.db.engine import get_sync_engine
+    from infrastructure.queries.pipeline.name_forms import PgNameFormsQueries
     from infrastructure.queries.pipeline.persons_create import PgPersonsCreateQueries
-    from infrastructure.repositories import person_repository
+    from infrastructure.repositories import authorship_repository, person_repository
 
-    log.info("▶ reset_persons")
+    log.info("▶ persons")
     t0 = time.time()
     conn = get_sync_engine().connect()
     try:
-        counts = reset(conn, PgPersonsCreateQueries(), log, person_repo=person_repository(conn))
+        metrics = run(
+            conn,
+            PgPersonsCreateQueries(),
+            PgNameFormsQueries(),
+            log,
+            person_repo=person_repository(conn),
+            authorship_repo=authorship_repository(conn),
+        )
         conn.commit()
     finally:
         conn.close()
-    log.info("✓ reset_persons terminé en %.1fs", time.time() - t0)
-    return counts
-
-
-def _run_match_persons() -> Any:
-    from application.pipeline.persons.cascade import match
-    from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.pipeline.persons_create import PgPersonsCreateQueries
-    from infrastructure.repositories import person_repository
-
-    log.info("▶ match_persons")
-    t0 = time.time()
-    conn = get_sync_engine().connect()
-    try:
-        result = match(conn, PgPersonsCreateQueries(), log, person_repo=person_repository(conn))
-        conn.commit()
-    finally:
-        conn.close()
-    log.info("✓ match_persons terminé en %.1fs", time.time() - t0)
-    return result
-
-
-def _run_create_persons() -> Any:
-    from application.pipeline.persons.cascade import create
-    from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.pipeline.persons_create import PgPersonsCreateQueries
-    from infrastructure.repositories import person_repository
-
-    log.info("▶ create_persons")
-    t0 = time.time()
-    conn = get_sync_engine().connect()
-    try:
-        result = create(conn, PgPersonsCreateQueries(), log, person_repo=person_repository(conn))
-        conn.commit()
-    finally:
-        conn.close()
-    log.info("✓ create_persons terminé en %.1fs", time.time() - t0)
-    return result
+    log.info("✓ persons terminé en %.1fs", time.time() - t0)
+    return metrics
 
 
 def _run_build_authorships() -> PhaseMetrics:
@@ -1230,38 +1187,6 @@ def _run_populate_affiliations() -> PhaseMetrics:
     metrics = PhaseMetrics()
     metrics.details["table"] = {"rows": rows}
     return metrics
-
-
-def _run_populate_person_name_forms() -> None:
-    from application.pipeline.persons.populate_person_name_forms import populate
-    from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.pipeline.name_forms import PgNameFormsQueries
-
-    log.info("▶ populate_person_name_forms")
-    t0 = time.time()
-    conn = get_sync_engine().connect()
-    try:
-        populate(conn, PgNameFormsQueries(), log)
-    finally:
-        conn.close()
-    log.info("✓ populate_person_name_forms terminé en %.1fs", time.time() - t0)
-
-
-def _run_purge_persons() -> dict[str, int]:
-    from application.pipeline.persons.purge import purge
-    from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.pipeline.persons_create import PgPersonsCreateQueries
-
-    log.info("▶ purge_persons")
-    t0 = time.time()
-    conn = get_sync_engine().connect()
-    try:
-        counts = purge(conn, PgPersonsCreateQueries(), log)
-        conn.commit()
-    finally:
-        conn.close()
-    log.info("✓ purge_persons terminé en %.1fs", time.time() - t0)
-    return counts
 
 
 def _normalize_row(source: str, stats: NormalizeStats, duration_s: float) -> dict[str, object]:

@@ -122,6 +122,7 @@ def main() -> int:
 
         log.info("3/3 — recalcul person_name_forms…")
         populate(conn, PgNameFormsQueries(), log)
+        conn.commit()
 
     log.info("Terminé. Relancer le pipeline (phase persons) pour la ré-attribution.")
     return 0
