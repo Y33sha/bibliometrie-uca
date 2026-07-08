@@ -1,4 +1,4 @@
-"""Idempotence : phase `create_persons_from_source_authorships`."""
+"""Idempotence : phase personnes (reset / match / create)."""
 
 
 def setup_persons_test_data(conn):

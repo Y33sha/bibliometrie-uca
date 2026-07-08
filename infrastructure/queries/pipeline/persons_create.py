@@ -1,6 +1,6 @@
-"""Lectures et réinitialisations pour `create_persons_from_source_authorships`.
+"""Lectures et réinitialisations pour la phase personnes.
 
-Appelé par `application/pipeline/persons/create_persons_from_source_authorships.py`.
+Appelé par les orchestrateurs `application/pipeline/persons/{reset,cascade,purge}.py`.
 Regroupe les SELECT du rattachement (comptes HAL, cross-source, IdRef/ORCID connus,
 lookup `person_name_forms`) et les réinitialisations ordre-indépendantes de la phase :
 re-orphelinage des signatures nominales à forme devenue ambiguë, suppression des

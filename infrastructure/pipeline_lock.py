@@ -1,6 +1,6 @@
 """Lock fichier pour empêcher deux pipelines simultanés.
 
-Un seul `run_pipeline.py` peut tourner à la fois sur la base. Sans ça, deux pipelines en parallèle (typiquement cron + lancement manuel) déclenchent des deadlocks Postgres et risquent des états applicatifs incohérents (deux `create_persons_from_source_authorships` qui fusionnent différemment, etc.).
+Un seul `run_pipeline.py` peut tourner à la fois sur la base. Sans ça, deux pipelines en parallèle (typiquement cron + lancement manuel) déclenchent des deadlocks Postgres et risquent des états applicatifs incohérents (deux phases personnes qui fusionnent différemment, etc.).
 
 Le lock est un fichier `logs/pipeline.lock` qui contient le PID du process actuel.
 
