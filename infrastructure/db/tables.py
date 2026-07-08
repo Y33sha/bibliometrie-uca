@@ -422,6 +422,14 @@ oa_type_enum = PgEnum(
     create_type=False,
 )
 
+resolution_mode_enum = PgEnum(
+    "identifier",
+    "name",
+    "cross_source",
+    name="resolution_mode",
+    create_type=False,
+)
+
 doc_type_enum = PgEnum(
     "article",
     "conference_paper",
@@ -644,6 +652,10 @@ source_authorships = Table(
     # changée), remis à False par le refresh.
     Column("countries_dirty", Boolean, nullable=False, server_default="true"),
     Column("person_id", Integer),
+    # Canal ayant posé `person_id` (NULL si orpheline ou non résolue) : identifiant
+    # fort, forme de nom, ou ancrage cross-source. Partitionne les réinitialisations
+    # de la phase personnes.
+    Column("resolution_mode", resolution_mode_enum),
     Column("is_corresponding", Boolean, server_default="false"),
     Column("roles", ARRAY(Text), server_default="{author}"),
     Column("authorship_id", Integer),
