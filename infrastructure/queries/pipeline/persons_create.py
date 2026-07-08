@@ -428,6 +428,35 @@ def fetch_identifier_bearer_persons(
     return [(r.id_value, r.person_id) for r in rows]
 
 
+def null_identifier_signatures(
+    conn: Connection, id_type: str, id_value: str, old_owner_person_id: int
+) -> int:
+    """Détache les signatures affectées par le transfert d'une valeur d'identifiant.
+
+    Après réattribution d'une valeur de l'ancien propriétaire vers la personne du consensus,
+    les signatures portées sur l'ancien propriétaire, résolues **par identifiant**
+    (`resolution_mode = 'identifier'`), dont l'identité porte cette valeur et non épinglées,
+    repassent à NULL : la cascade les re-résout contre la carte corrigée. Les signatures
+    nominales portant la valeur ne bougent pas (leur `person_id` ne dépend pas d'elle).
+    Retourne le nombre de signatures détachées.
+    """
+    return conn.execute(
+        text("""
+            UPDATE source_authorships sa
+            SET person_id = NULL, resolution_mode = NULL
+            FROM author_identifying_keys aik
+            WHERE sa.identity_id = aik.id
+              AND sa.person_id = :old_owner
+              AND sa.resolution_mode = 'identifier'
+              AND aik.person_identifiers->>:id_type = :id_value
+              AND NOT EXISTS (
+                  SELECT 1 FROM confirmed_authorships ca WHERE ca.source_authorship_id = sa.id
+              )
+        """),
+        {"old_owner": old_owner_person_id, "id_type": id_type, "id_value": id_value},
+    ).rowcount
+
+
 def reorphan_ambiguous_nominal(conn: Connection) -> int:
     """Re-orpheline les signatures nominales dont la forme de nom est devenue ambiguë.
 
@@ -548,6 +577,11 @@ class PgPersonsCreateQueries(PersonsCreateQueries):
         self, conn: Connection, id_type: str, sources: tuple[str, ...] | None = None
     ) -> list[tuple[str, int]]:
         return fetch_identifier_bearer_persons(conn, id_type, sources)
+
+    def null_identifier_signatures(
+        self, conn: Connection, id_type: str, id_value: str, old_owner_person_id: int
+    ) -> int:
+        return null_identifier_signatures(conn, id_type, id_value, old_owner_person_id)
 
     def reorphan_ambiguous_nominal(self, conn: Connection) -> int:
         return reorphan_ambiguous_nominal(conn)

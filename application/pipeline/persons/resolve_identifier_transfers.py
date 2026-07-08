@@ -123,6 +123,18 @@ def resolve_identifier_transfers(
             continue  # l'état a changé entre la collecte et la résolution
         ident.transfer_to(target, source="auto")
         repo.update_identifier(ident)
+        # Les signatures affectées, restées sur l'ancien propriétaire et résolues par
+        # identifiant, repassent à NULL : la cascade les re-résout vers le nouveau propriétaire.
+        detached = queries.null_identifier_signatures(conn, id_type, id_value, owner_id)
+        logger.info(
+            "Transfert %s=%s : personne %d → %d (consensus %r), %d signature(s) détachée(s)",
+            id_type,
+            id_value,
+            owner_id,
+            target,
+            cons,
+            detached,
+        )
         emit_event(
             audit_repo,
             "person_identifier.transferred",

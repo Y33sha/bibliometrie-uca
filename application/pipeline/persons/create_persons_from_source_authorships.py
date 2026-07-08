@@ -60,14 +60,16 @@ from typing import NamedTuple
 from sqlalchemy import Connection
 
 from application.persons.core import (
-    IdentifierConflict,
     add_identifiers_from_authorships as add_identifiers,
     add_name_form,
     create_person,
     link_authorships as link_to_person,
 )
 from application.pipeline.metrics import PhaseMetrics
-from application.pipeline.persons.resolve_identifier_transfers import resolve_identifier_transfers
+from application.pipeline.persons.resolve_identifier_transfers import (
+    build_identifier_conflicts,
+    resolve_identifier_transfers,
+)
 from application.ports.pipeline.persons_create import (
     BareUnlinkedAuthorship,
     PersonsCreateQueries,
@@ -214,20 +216,32 @@ def run(
     person_repo: PersonRepository,
     dry_run: bool = False,
 ) -> PhaseMetrics:
-    # Réinitialisation nominale (canal ordre-indépendant), avant de recharger les
-    # non-rattachées : une signature dont la forme de nom est devenue ambiguë repasse
-    # à NULL et repart dans la cascade. La personne réduite ainsi vidée est supprimée
-    # après la boucle (GC), ce qui désambiguïse sa forme au run suivant.
+    # Réinitialisations ordre-indépendantes, avant de recharger les non-rattachées : chaque
+    # canal remet ses attributions dérivées à NULL, la cascade les re-résout ensuite depuis
+    # l'état ferme du snapshot.
+    transferred = 0
     reorphaned = 0
     reset_cross = 0
     if not dry_run:
+        # Canal identifiant : arbitrage frontal des conflits d'attribution. Le balayage du
+        # snapshot (ordre-indépendant) trouve tous les conflits, le consensus tranche, la valeur
+        # est transférée et les signatures affectées repassent à NULL.
+        conflicts = build_identifier_conflicts(conn, queries)
+        transferred = resolve_identifier_transfers(
+            conn, conflicts, queries=queries, repo=person_repo, logger=logger
+        )["transferred"]
+
+        # Canal nominal : une signature dont la forme de nom est devenue ambiguë repasse à NULL
+        # et repart dans la cascade ; la personne réduite ainsi vidée est supprimée après la
+        # boucle (GC), ce qui désambiguïse sa forme au run suivant.
         reorphaned = queries.reorphan_ambiguous_nominal(conn)
         if reorphaned:
             logger.info(
                 "Re-orphelinage nominal : %d signatures à forme ambiguë détachées", reorphaned
             )
-        # Le cross-source est recalculé en bloc : toutes ses signatures repassent à NULL,
-        # la cascade les re-résout contre l'état ferme (identifiant/nom) du snapshot.
+
+        # Cross-source recalculé en bloc : toutes ses signatures repassent à NULL, la cascade
+        # les re-résout contre l'état ferme (identifiant/nom) du snapshot.
         reset_cross = queries.reset_cross_source(conn)
         if reset_cross:
             logger.info(
@@ -263,7 +277,6 @@ def run(
     created = 0
     out_of_perimeter_matched = 0
     corroboration_rejected = 0
-    conflicts: list[IdentifierConflict] = []
 
     total = len(all_authorships)
     for i, a in enumerate(all_authorships):
@@ -373,7 +386,7 @@ def run(
                 # Identifiants ajoutés en statut `pending` quelle que soit la
                 # source du match (cross-source/idref/orcid/name_form) —
                 # vérifiables manuellement via l'admin si erronés.
-                add_identifiers(pid, [a_dict], repo=person_repo, conflicts=conflicts)
+                add_identifiers(pid, [a_dict], repo=person_repo)
             matched_counts[decision.reason] += 1
             if not a.in_perimeter:
                 out_of_perimeter_matched += 1
@@ -391,7 +404,7 @@ def run(
                 pid = create_person(last, first, repo=person_repo)
                 a_dict = a._asdict()
                 link_to_person(pid, [a_dict], repo=person_repo, resolution_mode="name")
-                add_identifiers(pid, [a_dict], repo=person_repo, conflicts=conflicts)
+                add_identifiers(pid, [a_dict], repo=person_repo)
                 add_name_form(pid, a.full_name, repo=person_repo)
                 marker = pid
             else:
@@ -412,15 +425,6 @@ def run(
 
         else:  # skip
             skipped_counts[decision.reason] += 1
-
-    # ── Arbitrage des conflits d'attribution par consensus ─────────
-    # Les valeurs d'identifiant captées par un premier arrivé sont transférées à la
-    # personne que soutient la majorité des porteurs (cf. resolve_identifier_transfers).
-    transferred = 0
-    if not dry_run:
-        transferred = resolve_identifier_transfers(
-            conn, conflicts, queries=queries, repo=person_repo, logger=logger
-        )["transferred"]
 
     # ── GC des personnes vidées ────────────────────────────────────
     # Une personne réduite dont les signatures ont été re-orphelinées (puis rejointes à

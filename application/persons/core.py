@@ -349,11 +349,10 @@ def add_identifiers_from_authorships(
     authorships: list[dict[str, JsonValue]],
     *,
     repo: PersonRepository,
-    conflicts: list[IdentifierConflict] | None = None,
 ) -> None:
     """Promotion canonique en batch : pour chaque authorship source, extrait les identifiants observés (orcid/idhal/idref/hal_person_id) et délègue à `add_identifier` qui dispatche selon l'état existant en base.
 
-    Path batch tolérant : un `ValidationError` (identifiant source mal formé) est loggé et la promotion continue. Un `CannotAttributeConflict` (valeur déjà attribuée en pending/confirmed à une autre personne) est collecté dans `conflicts` (comme `IdentifierConflict`) si un collecteur est fourni — pour arbitrage ultérieur par consensus (transfert vers le candidat s'il est la personne majoritaire) —, sinon loggé en warning. Le path strict reste `add_identifier` (singulier) que l'API admin utilise directement.
+    Path batch tolérant : un `ValidationError` (identifiant source mal formé) est loggé et la promotion continue. Un `CannotAttributeConflict` (valeur déjà attribuée en pending/confirmed à une autre personne) est loggé en warning et la valeur n'est pas écrasée — l'arbitrage par consensus du balayage frontal de la phase (`build_identifier_conflicts`) le tranche au run suivant. Le path strict reste `add_identifier` (singulier) que l'API admin utilise directement.
 
     Couvre les 4 id_types acceptés en base (`PERSON_IDENTIFIER_TYPES`) : `orcid`, `idhal`, `idref`, `hal_person_id`. Les 3 premiers sont visibles UI ; `hal_person_id` est interne (filtré côté lecture par `PUBLIC_PERSON_IDENTIFIER_TYPES`).
 
@@ -376,18 +375,10 @@ def add_identifiers_from_authorships(
             try:
                 add_identifier(person_id, id_type, value, repo=repo)
             except CannotAttributeConflict as exc:
-                if conflicts is not None and exc.existing_person_id is not None:
-                    conflicts.append(
-                        IdentifierConflict(
-                            id_type,
-                            value,
-                            person_id,
-                            exc.existing_person_id,
-                            exc.existing_status or "",
-                        )
-                    )
-                else:
-                    logger.warning("%s", exc)
+                # Valeur déjà prise par une autre personne : on n'écrase pas. Le conflit est
+                # tranché par le balayage frontal de la phase (arbitrage par consensus) au run
+                # suivant — inutile de le collecter ici.
+                logger.warning("%s", exc)
             except ValidationError:
                 logger.warning("Identifiant mal formé ignoré : %s=%r", id_type, value)
 
