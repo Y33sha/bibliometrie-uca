@@ -1849,8 +1849,7 @@ def _make_fetch_missing_doi_adapter(target: str) -> "AsyncFetchMissingDoiAdapter
     from infrastructure.sources.wos.fetch_missing_doi import WosFetchMissingDoiAdapter
 
     # Cast : mypy ne reconnaît pas la conformité structurelle d'une classe
-    # concrète à un Protocol via `type[Protocol]` (cf. même pattern dans
-    # interfaces/cli/pipeline/fetch_missing_doi.py).
+    # concrète à un Protocol via `type[Protocol]`.
     adapter_classes: dict[str, type[AsyncFetchMissingDoiAdapter]] = cast(
         "dict[str, type[AsyncFetchMissingDoiAdapter]]",
         {
