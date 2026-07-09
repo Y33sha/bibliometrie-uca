@@ -817,7 +817,11 @@ def phase_relations(**kw: Any) -> PhaseMetrics:
     `meta.relation`). Les relations même-œuvre (versions, variantes, pièces) relèvent de
     la déduplication (`metadata_correction`), pas d'ici.
     """
-    return _run_populate_relations()
+    from application.pipeline.relations.populate_relations import run
+    from infrastructure.db.engine import get_sync_engine
+    from infrastructure.queries.pipeline.relations import PgPublicationRelationsQueries
+
+    return run(get_sync_engine().begin, PgPublicationRelationsQueries(), log)
 
 
 def phase_persons(**kw: Any) -> PhaseMetrics:
@@ -1017,28 +1021,6 @@ def _run_reconcile_components() -> PhaseMetrics:
         "splits": stats.splits if stats else 0,
         "merges": stats.merges if stats else 0,
         "pub_total": pub_total,
-    }
-    return metrics
-
-
-def _run_populate_relations() -> PhaseMetrics:
-    from application.pipeline.relations.populate_relations import run
-    from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.pipeline.relations import PgPublicationRelationsQueries
-
-    log.info("▶ populate_relations")
-    t0 = time.time()
-    queries = PgPublicationRelationsQueries()
-    conn = get_sync_engine().connect()
-    try:
-        run(conn, queries, log)
-        by_type = queries.count_by_relation_type(conn)
-    finally:
-        conn.close()
-    log.info("✓ populate_relations terminé en %.1fs", time.time() - t0)
-    metrics = PhaseMetrics()
-    metrics.details["table"] = {
-        "rows": [{"key": relation_type, "count": count} for relation_type, count in by_type]
     }
     return metrics
 
