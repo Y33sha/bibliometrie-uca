@@ -33,6 +33,14 @@ class ReconcileRow(NamedTuple):
 class PublicationsReconciliationQueries(Protocol):
     """Opérations SQL de la réconciliation des composantes."""
 
+    def mark_keys_dirty(self, conn: Connection) -> int:
+        """Pose `keys_dirty = true` sur toutes les `source_publications` (rebuild complet).
+
+        Retourne le nombre de lignes marquées. Force la réconciliation à dégénérer en
+        cluster-then-materialize global (après une évolution des règles de clés).
+        """
+        ...
+
     def fetch_dirty_source_publication_ids(self, conn: Connection) -> list[int]:
         """Les `source_publications` `keys_dirty` (**orphelines comprises** : la réconciliation est
         aussi l'assignation). Seeds à réconcilier puis à nettoyer (`clear_keys_dirty`)."""

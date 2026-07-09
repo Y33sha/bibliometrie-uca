@@ -5,6 +5,7 @@ Crée les adresses et les liens `source_authorship_addresses` au moment de l'INS
 
 from sqlalchemy import Connection, text
 
+from application.ports.pipeline.address_pub_count import AddressPubCountQueries
 from domain.normalize import normalize_text, sanitize_raw_text
 
 
@@ -13,12 +14,10 @@ def recompute_pub_count(conn: Connection) -> int:
     liées à l'adresse via `source_authorship_addresses`.
 
     Recompute global idempotent (guard `IS DISTINCT FROM`) couvrant **toutes**
-    les adresses : celles qui ont perdu tous leurs liens repassent à 0. Lancé
-    en fin de phase `normalize`, dès que `source_authorship_addresses` est
-    peuplée — un run `--only normalize` suffit à tenir le décompte à jour, sans
-    attendre une phase ultérieure. Reflète les publications déjà rattachées
-    (`publication_id` posé par bulk-link sur les existantes) ; les publications
-    créées en phase `publications` convergent au prochain `normalize`.
+    les adresses : celles qui ont perdu tous leurs liens repassent à 0. Lancé en
+    fin de phase `publications`, une fois les publications créées et fusionnées —
+    il n'y a rien à compter au stade `normalize`. Un run `--only publications`
+    suffit à tenir le décompte à jour.
 
     Ne committe pas (le caller orchestre). Retourne le nombre de rows modifiées.
     """
@@ -42,6 +41,13 @@ def recompute_pub_count(conn: Connection) -> int:
               AND a.pub_count IS DISTINCT FROM COALESCE(sub.cnt, 0)
         """)
     ).rowcount
+
+
+class PgAddressPubCountQueries(AddressPubCountQueries):
+    """Adapter PostgreSQL pour le port `AddressPubCountQueries`."""
+
+    def recompute_pub_count(self, conn: Connection) -> int:
+        return recompute_pub_count(conn)
 
 
 class PgAddressLinker:

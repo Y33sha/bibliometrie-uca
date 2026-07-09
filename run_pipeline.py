@@ -524,21 +524,6 @@ def _run_cleanup_orphan_identities() -> None:
     log.info("✓ %d identités orphelines supprimées en %.1fs", n, time.time() - t0)
 
 
-def _run_recompute_address_pub_count() -> None:
-    from infrastructure.db.engine import get_sync_engine
-    from infrastructure.repositories.address_linker import recompute_pub_count
-
-    log.info("▶ recompute addresses.pub_count")
-    t0 = time.time()
-    conn = get_sync_engine().connect()
-    try:
-        n = recompute_pub_count(conn)
-        conn.commit()
-    finally:
-        conn.close()
-    log.info("✓ addresses.pub_count : %d rows mises à jour en %.1fs", n, time.time() - t0)
-
-
 def _vacuum_staging(full: bool = False) -> Any:
     """VACUUM sur staging. FULL en mode full/monthly, simple sinon.
 
@@ -777,15 +762,25 @@ def phase_publications(**kw: Any) -> PhaseMetrics:
     `--rebuild-publications` re-dirtie tout le stock avant la réconciliation : celle-ci
     dégénère alors en cluster-then-materialize global (à lancer après une évolution des
     règles de clés, pour matérialiser les fusions/scissions qu'elles impliquent).
+
+    Séquence, transactions et métriques dans `application/pipeline/publications/phase.py`.
     """
-    if kw.get("rebuild_publications"):
-        _run_redirty_all_publications()
-    metrics = _run_reconcile_components()
-    # `addresses.pub_count` compte les publications par adresse : recalcul ici,
-    # une fois les publications créées et fusionnées — il n'y a rien à compter
-    # au stade `normalize`. Un run `--only publications` suffit à le tenir à jour.
-    _run_recompute_address_pub_count()
-    return metrics
+    from application.pipeline.publications.phase import run
+    from infrastructure.queries.pipeline.publications_reconciliation import (
+        PgPublicationsReconciliationQueries,
+    )
+    from infrastructure.repositories import audit_repository, publication_repository
+    from infrastructure.repositories.address_linker import PgAddressPubCountQueries
+
+    return run(
+        _open_tx,
+        PgPublicationsReconciliationQueries(),
+        PgAddressPubCountQueries(),
+        log,
+        pub_repo_factory=publication_repository,
+        audit_repo_factory=audit_repository,
+        rebuild_publications=bool(kw.get("rebuild_publications")),
+    )
 
 
 def phase_relations(**kw: Any) -> PhaseMetrics:
@@ -894,62 +889,6 @@ def phase_subjects(**kw: Any) -> PhaseMetrics:
     """
     metrics = _run_ingest_subjects()
     _run_cooccurrences()
-    return metrics
-
-
-def _run_redirty_all_publications() -> None:
-    from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.pipeline.publications_reconciliation import mark_keys_dirty
-
-    log.info("▶ rebuild publications : re-dirty de tout le stock")
-    conn = get_sync_engine().connect()
-    try:
-        n = mark_keys_dirty(conn)
-        conn.commit()
-    finally:
-        conn.close()
-    log.info("✓ %d source_publications marquées keys_dirty (rebuild complet)", n)
-
-
-def _run_reconcile_components() -> PhaseMetrics:
-    from application.pipeline.publications.reconcile_components import run
-    from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.pipeline.publications_reconciliation import (
-        PgPublicationsReconciliationQueries,
-    )
-    from infrastructure.repositories import audit_repository, publication_repository
-
-    log.info("▶ reconcile_components")
-    t0 = time.time()
-    queries = PgPublicationsReconciliationQueries()
-    conn = get_sync_engine().connect()
-    try:
-        stats = run(
-            conn,
-            queries,
-            log,
-            pub_repo=publication_repository(conn),
-            audit_repo=audit_repository(conn),
-        )
-        _sp_in_perimeter, pub_total = queries.count_dedup_inputs(conn)
-    finally:
-        conn.close()
-    log.info("✓ reconcile_components terminé en %.1fs", time.time() - t0)
-
-    metrics = PhaseMetrics()
-    metrics.add(total=stats.processed if stats else 0, new=stats.created if stats else 0)
-    # Chiffres du run (SP dirty examinées → publications d'arrivée, mouvements) + le
-    # total global des publications (`pub_total`) en « nouveau total ». Le frontend
-    # les compose en lignes de texte ; les volumes avant/après auto sont masqués.
-    metrics.details["summary"] = {
-        "processed": stats.processed if stats else 0,
-        "publications": stats.publications if stats else 0,
-        "existing": stats.existing if stats else 0,
-        "created": stats.created if stats else 0,
-        "splits": stats.splits if stats else 0,
-        "merges": stats.merges if stats else 0,
-        "pub_total": pub_total,
-    }
     return metrics
 
 

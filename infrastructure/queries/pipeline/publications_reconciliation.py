@@ -198,6 +198,9 @@ def count_dedup_inputs(conn: Connection) -> tuple[int, int]:
 class PgPublicationsReconciliationQueries(PublicationsReconciliationQueries):
     """Adapter PostgreSQL pour `PublicationsReconciliationQueries`."""
 
+    def mark_keys_dirty(self, conn: Connection) -> int:
+        return mark_keys_dirty(conn)
+
     def fetch_dirty_source_publication_ids(self, conn: Connection) -> list[int]:
         return fetch_dirty_source_publication_ids(conn)
 
