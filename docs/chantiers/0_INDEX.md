@@ -12,6 +12,7 @@ _(aucun)_
 
 ### Non commencé
 
+- [run_pipeline : réduire à la coquille CLI](CODE_run-pipeline-coquille-cli.md)
 - [Qualité et cohérence des sujets](METIER_sujets-qualite.md)
 - [Signatures institutionnelles](METIER_signatures-institutionnelles.md)
 
