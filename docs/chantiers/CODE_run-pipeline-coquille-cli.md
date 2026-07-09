@@ -12,23 +12,27 @@ La logique métier n'a pas fui vers l'orchestrateur : le SQL brut ne subsiste qu
 
 ### La contrainte de couches
 
-Le contrat import-linter « Couches DDD » pose `interfaces > (infrastructure | application) > domain` : `application/` **n'importe pas** `infrastructure`. Or le câblage instancie les `Pg*` (`infrastructure.queries`, `infrastructure.repositories`) et ouvre la connexion via `get_sync_engine` (`infrastructure.db.engine`). Les orchestrateurs applicatifs reçoivent déjà une `Connection` injectée — `application/` n'importe jamais `get_sync_engine`.
+L'architecture est hexagonale (`docs/architecture/01-vue-d-ensemble.md`) : le cœur est `application/` (avec `domain/`), entouré de deux bandes d'adapters frères qui ne se connaissent pas — `interfaces/` (entrants) et `infrastructure/` (sortants). Règle 3 : `application/` n'importe pas `infrastructure/` ; c'est `infrastructure/` qui implémente les ports d'`application/ports/`, jamais l'inverse. Vérifié : `application/` n'importe jamais `get_sync_engine`, les orchestrateurs reçoivent une `Connection` injectée.
 
-Conséquence : l'instanciation des adapters et la frontière transactionnelle ne peuvent pas descendre dans `application/pipeline/<phase>/` sans violer le contrat. Elles appartiennent à la racine de composition, au niveau entrée/`interfaces`. Ce qui peut être factorisé, c'est le patron transverse ; ce qui peut être déplacé, c'est l'emplacement du câblage — pas sa couche.
+Or le câblage instancie les `Pg*` (`infrastructure.queries`, `infrastructure.repositories`) et ouvre la connexion via `get_sync_engine` (`infrastructure.db.engine`). Il ne peut donc pas descendre dans `application/pipeline/<phase>/`. Sa place est la racine de composition — et règle 5 : un script CLI est son propre composition root. run_pipeline est donc le composition root du pipeline ; le câblage y reste. Ce qui se factorise, c'est le patron transverse répété.
 
 ## Décisions
 
 - **Factoriser le patron transverse.** Un helper unique porte la frontière transactionnelle (connect / commit / rollback / close) et le chrono `▶`/`✓`. Chaque `_run_*` tombe à trois ou quatre lignes ; le patron n'existe plus qu'une fois. Sans effet sur les couches.
 - **Extraire le SQL brut résiduel** (`_run_recompute_address_pub_count`, poche de `_run_parallel_extractors`) vers `infrastructure/`, appelé par un orchestrateur applicatif.
 
-### À trancher
+### Emplacement : tranché — reste dans run_pipeline
 
-- **Emplacement de la racine de composition, une fois dédupliquée.**
-  1. *En place* — les `_run_*` allégés restent dans `run_pipeline.py`.
-  2. *Module dédié* — les `_run_*` migrent vers `interfaces/cli/pipeline/` (composition-root, autorisé à importer `infrastructure`), laissant `run_pipeline.py` réduit à la coquille CLI.
-  3. *Registre déclaratif* — une table `phase → (orchestrateur applicatif, fabriques d'adapters)` pilotée par un runner générique, réduisant les 45 fonctions à de la donnée.
-- **Granularité transactionnelle.** Le cas général est une connexion et un `commit` par phase, mais certaines phases committent par lots (purge batchée, `reconcile_components`). Le helper doit accepter les deux : commit final si la phase ne l'a pas fait, ou exposition de la `Connection` pour que la phase gère ses propres commits. À cadrer pour ne pas casser les phases à commits multiples.
-- **Objet injecté.** Le helper reçoit-il l'`Engine` (il gère alors l'unit-of-work de bout en bout) ou une `Connection` déjà ouverte en amont (la gestion remonte au dispatcher) ? Le premier concentre la frontière transactionnelle dans le helper ; le second la laisse au point d'appel.
+Le câblage n'est pas dupliqué entre run_pipeline et `application/` : l'orchestrateur applicatif reçoit ses adapters déjà instanciés (injection), il ne les assemble pas. Assembler ces outils — choisir les `Pg*` concrets, ouvrir la connexion — est le propre du composition-root, et le contrat de couches l'interdit dans `application/`. run_pipeline étant son propre composition-root, le câblage y reste. La duplication à résoudre est **interne** : le même patron copié 45 fois. On l'écrit donc une fois (un helper) et on le rappelle — sans rien déplacer. (`interfaces/cli/pipeline/` a été supprimé volontairement ; pas de résurrection.)
+
+### Forme de la déduplication : à trancher
+
+- **Helper (recommandé).** Une fonction porte « ouvrir / exécuter le travail de la phase / commit / fermer / chrono `▶`/`✓` ». Chaque phase reste une fonction nommée de trois lignes qui l'appelle. *Pour* : changement minimal ; chaque phase reste trouvable et garde ses particularités (argument en plus, second commit) ; traces d'erreur lisibles ; risque faible. *Contre* : il subsiste ~45 petites fonctions (mais de trois lignes).
+- **Registre déclaratif.** Les 45 fonctions deviennent une table `phase → (orchestrateur, fabriques d'adapters)` lue par un runner unique. *Pour* : toute la liste des phases tient en un coup d'œil, concision maximale. *Contre* : suppose les phases uniformes, ce qu'elles ne sont pas (extract parallèle, purge et reconcile à commits par lots, affiliations et publications enchaînant plusieurs sous-étapes, résumés sur mesure). Chaque exception force un échappatoire ; la table se remplit de cas particuliers et le runner de `if`. Débogage plus opaque.
+
+### Frontière transactionnelle
+
+Cas général : une connexion, un `commit` en fin de phase. Quelques phases committent par lots (purge par tranches, `reconcile_components`). Un helper en *context-manager* qui commite en sortie si succès couvre les deux : les phases par lots committent au fil de l'eau, le commit final vide le reliquat. Seul arbitrage résiduel, ergonomique : le helper rend-il la `Connection` (la phase peut committer tôt) ou possède-t-il seul le commit. Recommandé : il ouvre/ferme et fait un commit-sur-succès, tout en passant la `Connection` pour autoriser les commits précoces.
 
 ## Phasage
 
