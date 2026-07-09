@@ -8,7 +8,6 @@ Appelé par `application/pipeline/build/build_authorships.py`. Regroupe les
 from sqlalchemy import Connection, text
 
 from application.ports.pipeline.authorships_build import AuthorshipsBuildQueries
-from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES_SQL
 from domain.sources.registry import SOURCE_PRIORITY, source_case_sql
 
 
@@ -21,14 +20,13 @@ def insert_missing_authorships(conn: Connection) -> int:
     (anti-join sur `rejected_authorships`). Retourne le rowcount.
     """
     return conn.execute(
-        text(f"""
+        text("""
             WITH all_pairs AS (
                 SELECT DISTINCT sd.publication_id, sa.person_id
                 FROM source_authorships sa
                 JOIN source_publications sd ON sd.id = sa.source_publication_id
                 JOIN publications pub ON pub.id = sd.publication_id
                 WHERE sa.person_id IS NOT NULL
-                  AND pub.doc_type NOT IN {OUT_OF_SCOPE_DOC_TYPES_SQL}
             )
             INSERT INTO authorships (publication_id, person_id)
             SELECT ap.publication_id, ap.person_id

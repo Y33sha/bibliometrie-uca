@@ -11,7 +11,6 @@ from sqlalchemy import Connection, text
 
 from application.ports.api.publications_queries import ListFilters
 from domain.normalize import normalize_text, strip_markup
-from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES_SQL
 from infrastructure.queries.filters import (
     OA_OPEN_STATUSES,
     PUBLICATION_IS_IN_PERIMETER,
@@ -53,7 +52,6 @@ def _initial_clauses(filters: ListFilters) -> list[WhereClause]:
 def _inline_clauses(filters: ListFilters) -> list[WhereClause | None]:
     """Filtres simples partagés entre list/export."""
     out: list[WhereClause | None] = [
-        WhereClause(f"p.doc_type NOT IN {OUT_OF_SCOPE_DOC_TYPES_SQL}", {}),
         excluded_doc_type_clause(filters.excluded_types),
         search_clause(filters.search),
         year_clause(filters.years),

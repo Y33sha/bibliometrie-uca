@@ -13,7 +13,6 @@ from typing import Any
 
 from domain.normalize import normalize_text
 from domain.persons.identifiers import PUBLIC_PERSON_IDENTIFIER_TYPES_SQL
-from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES_SQL
 
 OA_OPEN_STATUSES = ("gold", "hybrid", "bronze", "green", "diamond")
 OA_CLOSED_STATUSES = ("closed", "unknown")
@@ -59,7 +58,7 @@ OA_DASHBOARD_COLS_SQL = f"""
 
 def publication_in_perimeter(alias: str = "p") -> str:
     """Filtre SQL : la publication (table `publications` aliasée `alias`) est dans
-    le périmètre et a un doc_type in-scope.
+    le périmètre.
 
     Lit le flag matérialisé `publications.in_perimeter` (= au moins un authorship
     in-perimeter d'une personne non rejetée), maintenu en phase `authorships`
@@ -67,10 +66,7 @@ def publication_in_perimeter(alias: str = "p") -> str:
     Filtre **par requête** : seules les listes scopées UCA l'appliquent ; les vues
     par personne montrent tout. `alias` paramètre l'alias appelant — nécessaire
     quand `p` est déjà pris (ex. le publisher dans `publishers.py`)."""
-    return f"""(
-    {alias}.in_perimeter
-    AND {alias}.doc_type NOT IN {OUT_OF_SCOPE_DOC_TYPES_SQL}
-)"""
+    return f"({alias}.in_perimeter)"
 
 
 # La plupart des requêtes aliasent les publications `p` : constante de commodité.

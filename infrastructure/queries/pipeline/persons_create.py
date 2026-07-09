@@ -14,7 +14,6 @@ from application.ports.pipeline.persons_create import (
     LinkedAuthorshipRow,
     PersonsCreateQueries,
 )
-from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES_SQL
 
 
 def fetch_unlinked_authorships(conn: Connection) -> list[BareUnlinkedAuthorship]:
@@ -30,7 +29,7 @@ def fetch_unlinked_authorships(conn: Connection) -> list[BareUnlinkedAuthorship]
     Les lignes sans `raw_author_name` sont exclues toutes sources confondues (sans nom, l'authorship est inexploitable pour le matching personnes).
     """
     rows = conn.execute(
-        text(f"""
+        text("""
             SELECT sa_auth.id AS authorship_id,
                    sa_auth.source::text AS source,
                    sa_auth.raw_author_name AS full_name,
@@ -50,7 +49,6 @@ def fetch_unlinked_authorships(conn: Connection) -> list[BareUnlinkedAuthorship]
               AND sa_auth.in_perimeter = TRUE
               AND sd.publication_id IS NOT NULL
               AND sa_auth.raw_author_name IS NOT NULL
-              AND pub.doc_type NOT IN {OUT_OF_SCOPE_DOC_TYPES_SQL}
             ORDER BY sa_auth.id
         """)
     ).all()
@@ -89,13 +87,12 @@ _OOP_PROJECTION = """
 """
 
 # Conditions communes à toutes les branches : SA orpheline hors-périmètre,
-# rattachée à une publication active dans le scope métier, avec un nom.
-_OOP_COMMON_WHERE = f"""
+# rattachée à une publication active (les hors périmètre ne sont pas matérialisées), avec un nom.
+_OOP_COMMON_WHERE = """
     sa_auth.person_id IS NULL
     AND sa_auth.in_perimeter = FALSE
     AND sd.publication_id IS NOT NULL
     AND sa_auth.raw_author_name IS NOT NULL
-    AND pub.doc_type NOT IN {OUT_OF_SCOPE_DOC_TYPES_SQL}
 """
 
 

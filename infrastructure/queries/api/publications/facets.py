@@ -12,7 +12,6 @@ from typing import Any
 from sqlalchemy import Connection, text
 
 from application.ports.api.publications_queries import FacetFilters
-from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES_SQL
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.queries.filters import (
     OA_CLOSED_SQL,
@@ -72,7 +71,6 @@ class _PublicationFacetsBuilder:
         f = self.filters
         out: list[WhereClause | None] = []
         if f.person_id:
-            out.append(WhereClause(f"p.doc_type NOT IN {OUT_OF_SCOPE_DOC_TYPES_SQL}", {}))
             out.append(person_clause(f.person_id))
         else:
             out.append(WhereClause(PUBLICATION_IS_IN_PERIMETER, {}))

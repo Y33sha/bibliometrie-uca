@@ -10,19 +10,16 @@ recalcule que les lignes touchées). Tous idempotents (`IS DISTINCT FROM`).
 
 from sqlalchemy import Connection, text
 
-from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES_SQL
-
 
 def refresh_pub_counts(conn: Connection) -> tuple[int, int]:
     """Recalcule tous les `pub_count` (journals puis publishers). Retourne les
     nombres de lignes modifiées."""
     n_journals = conn.execute(
-        text(f"""
+        text("""
             WITH counts AS (
                 SELECT journal_id, COUNT(*) AS n
                 FROM publications
                 WHERE in_perimeter
-                  AND doc_type NOT IN {OUT_OF_SCOPE_DOC_TYPES_SQL}
                   AND journal_id IS NOT NULL
                 GROUP BY journal_id
             )
@@ -58,11 +55,10 @@ def _refresh_all_publishers(conn: Connection) -> int:
 def refresh_journal_pub_count(conn: Connection, journal_id: int) -> None:
     """Recalcule le `pub_count` d'une seule revue (fusion admin)."""
     conn.execute(
-        text(f"""
+        text("""
             UPDATE journals j SET pub_count = COALESCE((
                 SELECT COUNT(*) FROM publications p
                 WHERE p.journal_id = j.id AND p.in_perimeter
-                  AND p.doc_type NOT IN {OUT_OF_SCOPE_DOC_TYPES_SQL}
             ), 0)
             WHERE j.id = :jid
         """),
