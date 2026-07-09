@@ -11,6 +11,7 @@ la décision d'assignation + réconciliation est testée à l'unité
 la vraie passe pipeline (`tests/integration/pipeline/test_reprocessing.py`).
 """
 
+import pytest
 from sqlalchemy import text
 
 from application.publications.core import refresh_from_sources
@@ -199,6 +200,51 @@ class TestRefreshFromSources:
 
         dt = _scalar(sa_sync_conn, "SELECT doc_type FROM publications WHERE id = :id", id=id1)
         assert dt == "thesis"
+
+    @pytest.mark.parametrize("out_of_scope_type", ["peer_review", "memoir"])
+    def test_out_of_scope_doc_type_dematerializes(self, sa_sync_conn, out_of_scope_type):
+        """Un type résolu hors périmètre supprime la publication ; ses source_publications
+        sont détachées (FK ON DELETE SET NULL), pas supprimées."""
+        conn = sa_sync_conn
+        pid = _insert_pub(conn, doc_type="article", pub_year=2024)
+        self._insert_sd(conn, pid, "openalex", doc_type=out_of_scope_type)
+        refresh_from_sources(pid, repo=publication_repository(conn))
+
+        assert _scalar(conn, "SELECT count(*) FROM publications WHERE id = :id", id=pid) == 0
+        sp_pub = _scalar(
+            conn,
+            "SELECT publication_id FROM source_publications WHERE source_id = :sid",
+            sid=f"openalex-{pid}-",
+        )
+        assert sp_pub is None
+
+    def test_out_of_scope_deletion_cascades_authorships(self, sa_sync_conn):
+        """La suppression hors périmètre emporte les authorships canoniques (FK ON DELETE
+        CASCADE) ; la personne, elle, survit."""
+        conn = sa_sync_conn
+        pid = _insert_pub(conn, doc_type="article", pub_year=2024)
+        self._insert_sd(conn, pid, "openalex", doc_type="peer_review")
+        person_id = conn.execute(
+            text(
+                "INSERT INTO persons (last_name, first_name, last_name_normalized, "
+                "first_name_normalized) VALUES ('Testauthor', 'A', 'testauthor', 'a') RETURNING id"
+            )
+        ).scalar_one()
+        conn.execute(
+            text(
+                "INSERT INTO authorships (publication_id, person_id, author_position) "
+                "VALUES (:p, :pe, 1)"
+            ),
+            {"p": pid, "pe": person_id},
+        )
+        refresh_from_sources(pid, repo=publication_repository(conn))
+
+        assert _scalar(conn, "SELECT count(*) FROM publications WHERE id = :id", id=pid) == 0
+        assert (
+            _scalar(conn, "SELECT count(*) FROM authorships WHERE publication_id = :id", id=pid)
+            == 0
+        )
+        assert _scalar(conn, "SELECT count(*) FROM persons WHERE id = :id", id=person_id) == 1
 
     def test_keywords_merged(self, sa_sync_conn):
         """Les keywords sont fusionnés sans doublons."""
