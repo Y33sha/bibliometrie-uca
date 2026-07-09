@@ -25,9 +25,9 @@ Reconstruction complète à chaque run (table dérivée) : chaque signal purge s
 """
 
 import logging
+import time
 
-from sqlalchemy import Connection
-
+from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.relations import (
     DeclaredRelationSource,
     PublicationRelationsQueries,
@@ -35,6 +35,7 @@ from application.ports.pipeline.relations import (
     SharedKeyPair,
     TitleMatch,
 )
+from application.ports.pipeline.transaction import OpenTransaction
 from domain.publications.identifiers import clean_doi
 from domain.publications.relations import (
     RelationType,
@@ -106,27 +107,35 @@ def _build_title_match_edges(
     ]
 
 
-def run(conn: Connection, queries: PublicationRelationsQueries, logger: logging.Logger) -> None:
-    sources = queries.fetch_declared_relation_sources(conn)
-    declared_edges = _build_declared_edges(sources)
-    written_declared = queries.replace_declared_relations(conn, declared_edges)
+def run(
+    open_tx: OpenTransaction, queries: PublicationRelationsQueries, logger: logging.Logger
+) -> PhaseMetrics:
+    """Reconstruit `publication_relations` depuis les trois signaux, en une transaction, et
+    retourne les compteurs de la phase (répartition par type de relation dans `details`)."""
+    logger.info("▶ relations")
+    t0 = time.perf_counter()
+    with open_tx() as conn:
+        sources = queries.fetch_declared_relation_sources(conn)
+        declared_edges = _build_declared_edges(sources)
+        written_declared = queries.replace_declared_relations(conn, declared_edges)
 
-    pairs = queries.fetch_shared_key_pairs(conn)
-    declared_pairs = queries.fetch_declared_related_pairs(conn)
-    shared_edges = _build_shared_key_edges(pairs, declared_pairs)
-    written_shared = queries.replace_shared_key_relations(conn, shared_edges)
+        pairs = queries.fetch_shared_key_pairs(conn)
+        declared_pairs = queries.fetch_declared_related_pairs(conn)
+        shared_edges = _build_shared_key_edges(pairs, declared_pairs)
+        written_shared = queries.replace_shared_key_relations(conn, shared_edges)
 
-    erratum_matches = queries.fetch_erratum_title_matches(conn)
-    preprint_matches = queries.fetch_preprint_title_matches(conn)
-    title_edges = _build_title_match_edges(
-        erratum_matches, RelationType.IS_CORRECTION_OF
-    ) + _build_title_match_edges(preprint_matches, RelationType.IS_PREPRINT_OF)
-    written_title = queries.replace_title_match_relations(conn, title_edges)
+        erratum_matches = queries.fetch_erratum_title_matches(conn)
+        preprint_matches = queries.fetch_preprint_title_matches(conn)
+        title_edges = _build_title_match_edges(
+            erratum_matches, RelationType.IS_CORRECTION_OF
+        ) + _build_title_match_edges(preprint_matches, RelationType.IS_PREPRINT_OF)
+        written_title = queries.replace_title_match_relations(conn, title_edges)
 
-    conn.commit()
+        by_type = queries.count_by_relation_type(conn)
+
     logger.info(
         "✓ relations : déclarées %d (%d arêtes / %d source_publications) ; "
-        "clés partagées %d (%d paires) ; par titre %d (%d erratums, %d preprints)",
+        "clés partagées %d (%d paires) ; par titre %d (%d erratums, %d preprints) — en %.1fs",
         written_declared,
         len(declared_edges),
         len(sources),
@@ -135,4 +144,10 @@ def run(conn: Connection, queries: PublicationRelationsQueries, logger: logging.
         written_title,
         len(erratum_matches),
         len(preprint_matches),
+        time.perf_counter() - t0,
     )
+    metrics = PhaseMetrics()
+    metrics.details["table"] = {
+        "rows": [{"key": relation_type, "count": count} for relation_type, count in by_type]
+    }
+    return metrics
