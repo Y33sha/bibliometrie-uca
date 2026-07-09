@@ -61,6 +61,7 @@ from domain.persons.matching import (
     ORCID_MATCH_SOURCES,
     RESOLUTION_MODE_BY_REASON,
     NameFormDecision,
+    PersonMatchDecision,
     decide_cross_source_match,
     decide_match_by_identifier,
     decide_name_form_outcome,
@@ -243,7 +244,9 @@ class _Cascade:
         self.out_of_perimeter_matched = 0
         self.corroboration_rejected = 0
 
-    def _cross_and_name(self, a: EnrichedAuthorship):
+    def _cross_and_name(
+        self, a: EnrichedAuthorship
+    ) -> tuple[int | None, NameFormDecision, frozenset[int]]:
         """Décision cross-source + forme de nom, contre les index vivants."""
         cross_source_match: int | None = None
         if a.publication_id is not None:
@@ -274,7 +277,7 @@ class _Cascade:
             name_form_outcome = NameFormDecision(action="skip", reason="out_of_perimeter")
         return cross_source_match, name_form_outcome, rejected_for_pub
 
-    def decide_full(self, a: EnrichedAuthorship):
+    def decide_full(self, a: EnrichedAuthorship) -> PersonMatchDecision:
         """Décision complète, identifiants compris ; journalise la corroboration. Pour `match`."""
         cross_source_match, name_form_outcome, rejected_for_pub = self._cross_and_name(a)
         form = a.author_name_normalized
@@ -316,7 +319,7 @@ class _Cascade:
             rejected_person_ids=rejected_for_pub,
         )
 
-    def decide_cross_and_name(self, a: EnrichedAuthorship):
+    def decide_cross_and_name(self, a: EnrichedAuthorship) -> PersonMatchDecision:
         """Décision cross-source + nom seulement (sans identifiant). Pour `create` : les restantes
         n'ont aucun match identifiant, sinon `match` les aurait prises."""
         cross_source_match, name_form_outcome, rejected_for_pub = self._cross_and_name(a)
