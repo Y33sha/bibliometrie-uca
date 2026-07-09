@@ -51,8 +51,8 @@ Un orchestrateur `application/pipeline/<phase>/phase.py` par phase : séquence, 
 - [x] `affiliations` — port `PerimeterQueries.refresh_perimeter_structures` ajouté (`c133c07d`)
 - [x] `countries` — port `CountryQueries.count_address_country_status` ajouté, type `AddressCountryStatus` déplacé vers le port (`10227fbf`)
 - [x] `authorships` — ports neufs `PurgeOrphanPublicationsQueries`, `PubCountsQueries`. Le `VACUUM ANALYZE` (maintenance physique, autocommit) sort du périmètre de l'invariant « connexion injectée » : l'adapter de purge ouvre sa propre connexion autocommit, l'orchestrateur ne voit pas l'autocommit (`5b574748`)
-- [x] `publications` — port neuf `AddressPubCountQueries` (recompute `addresses.pub_count`), `mark_keys_dirty` ajouté à `PublicationsReconciliationQueries` ; repos injectés en factories
-- [ ] `persons` (déjà un orchestrateur `phase.py` prenant `conn` : passer à `open_tx`)
+- [x] `publications` — port neuf `AddressPubCountQueries` (recompute `addresses.pub_count`), `mark_keys_dirty` ajouté à `PublicationsReconciliationQueries` ; repos injectés en factories (`5cf1514e`)
+- [x] `persons` — mono-transaction : `run(open_tx, …)` possède sa transaction, repos en factories, `dry_run` mort retiré. Le test de non-régression « commit avant close » est remplacé par un test de `managed_transaction` (commit-sur-succès / rollback / commits par lots) qui garde la propriété pour toutes les phases
 - [ ] `subjects`
 - [ ] `cross_imports`, `publishers_journals` — cas durs (parallélisme, circuit-breaker par `ContextVar`, détection de config API) traités en dernier, gabarit rodé
 
@@ -68,3 +68,4 @@ Un orchestrateur `application/pipeline/<phase>/phase.py` par phase : séquence, 
 ## Questions ouvertes
 
 - **Partage éventuel du unit of work avec l'API.** Le pilote retient l'appelable `OpenTransaction`. Un objet `UnitOfWork` réifié partagé entre le pipeline et l'API — dont les command handlers exposent déjà un unit of work fonctionnel — relèverait, s'il devenait souhaitable, d'un chantier séparé touchant `interfaces/api/`.
+- **`dry_run` mort dans les orchestrateurs de phase.** `run_pipeline` ne passe jamais `dry_run` (son `--dry-run` court-circuite en tête de `main()` sans exécuter les phases), et aucune CLI n'appelle `reconcile_components.run` ni `correct_unary.run` avec `dry_run` : ces paramètres sont vestigiaux. Retrait prévu dans un chantier de nettoyage final (celui de `persons` est déjà retiré, incompatible avec le commit-sur-succès).

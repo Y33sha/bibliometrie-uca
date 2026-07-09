@@ -807,8 +807,22 @@ def phase_persons(**kw: Any) -> PhaseMetrics:
     non liées, cross-source rejoué d'abord), `populate` (régénère les formes de nom canoniques),
     `purge` (re-orpheline les formes devenues ambiguës et supprime les personnes vidées). Exclut les
     publications hors-scope (cf domain/publications/scope).
+
+    Séquence, transaction et métriques dans `application/pipeline/persons/phase.py`.
     """
-    return _run_persons_phase()
+    from application.pipeline.persons.phase import run
+    from infrastructure.queries.pipeline.name_forms import PgNameFormsQueries
+    from infrastructure.queries.pipeline.persons_create import PgPersonsCreateQueries
+    from infrastructure.repositories import authorship_repository, person_repository
+
+    return run(
+        _open_tx,
+        PgPersonsCreateQueries(),
+        PgNameFormsQueries(),
+        log,
+        person_repo_factory=person_repository,
+        authorship_repo_factory=authorship_repository,
+    )
 
 
 def phase_authorships(**kw: Any) -> PhaseMetrics:
@@ -889,32 +903,6 @@ def phase_subjects(**kw: Any) -> PhaseMetrics:
     """
     metrics = _run_ingest_subjects()
     _run_cooccurrences()
-    return metrics
-
-
-def _run_persons_phase() -> PhaseMetrics:
-    from application.pipeline.persons.phase import run
-    from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.pipeline.name_forms import PgNameFormsQueries
-    from infrastructure.queries.pipeline.persons_create import PgPersonsCreateQueries
-    from infrastructure.repositories import authorship_repository, person_repository
-
-    log.info("▶ persons")
-    t0 = time.time()
-    conn = get_sync_engine().connect()
-    try:
-        metrics = run(
-            conn,
-            PgPersonsCreateQueries(),
-            PgNameFormsQueries(),
-            log,
-            person_repo=person_repository(conn),
-            authorship_repo=authorship_repository(conn),
-        )
-        conn.commit()
-    finally:
-        conn.close()
-    log.info("✓ persons terminé en %.1fs", time.time() - t0)
     return metrics
 
 
