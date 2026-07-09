@@ -26,12 +26,12 @@ La création (`fetch_unlinked_authorships`) comme l'attache hors-périmètre (`_
 
 ## Phasage
 
-### Phase 1 — Dé-matérialisation dans la phase publications
+### Phase 1 — Dé-matérialisation dans `refresh_from_sources`
 
-- [ ] Porter le `doc_type` (ou un booléen hors périmètre dérivé) dans `ReconcileMember`.
-- [ ] `_claim` / `plan_reconciliation` : une partition hors périmètre ne revendique ni ne crée de publication ; ses SP sont détachées et toute publication existante qu'elle occupait est dissoute.
-- [ ] Décider du sort des dépendants curatés d'une publication hors périmètre à dissoudre (pas de successeur, l'œuvre disparaît) — cf. questions ouvertes.
-- [ ] Tests : création refusée sur type hors périmètre ; bascule cross-run qui dé-matérialise ; SP détachées ; pas de re-pointage vers un successeur inexistant.
+Le `doc_type` canonique est arbitré par priorité de source dans `refresh_from_sources` ; le gate hors périmètre y vit donc, en frère du cas orphelin, plutôt que dans le planificateur pur `plan_reconciliation` qui devrait sinon dupliquer l'arbitrage de type. Les FK portent le reste : `source_publications.publication_id` (ON DELETE SET NULL) détache les SP, `authorships.publication_id` (ON DELETE CASCADE) emporte les authorships.
+
+- [x] `refresh_from_sources` : après arbitrage du `doc_type`, si le type résolu est dans `OUT_OF_SCOPE_DOC_TYPES`, supprimer la publication (`repo.delete` + event `publication.deleted_out_of_scope`). Couvre la création (publication neuve raffinée puis supprimée) comme la bascule cross-run (survivant retypé).
+- [ ] Tests : création d'une œuvre hors périmètre → aucune publication subsistante, SP orphelines ; bascule d'un type in-scope vers hors périmètre → publication supprimée, SP re-orphelinées, authorships purgées.
 
 ### Phase 2 — Retrait des filtres devenus morts
 
@@ -45,6 +45,6 @@ La création (`fetch_unlinked_authorships`) comme l'attache hors-périmètre (`_
 
 ## Questions ouvertes
 
-- **Dépendants curatés d'une publication hors périmètre.** Une publication hors périmètre ne devrait porter ni `distinct_publications`, ni `apc_payments`, ni épinglage ; le stock peut en avoir. Faut-il refuser la dissolution et signaler, ou dé-pointer avant suppression ?
+- **Dépendants curatés d'une publication hors périmètre.** Une publication hors périmètre ne devrait porter ni `distinct_publications`, ni `apc_payments`, ni épinglage ; le stock peut en avoir. À la suppression, les FK décident en silence : `distinct_publications` part en cascade, `apc_payments` est détaché (SET NULL). Acceptable, ou faut-il un garde qui signale une suppression hors périmètre portant de la curation, avant de l'appliquer au stock ?
 - **Garde-fou transitoire.** Le temps de valider la dé-matérialisation, une assertion ou un log en fin de phase publications (« aucune publication hors périmètre ne subsiste ») sécuriserait le retrait des filtres aval.
 - **`memoir`.** La décision garde la liste telle quelle ; `memoir` suit donc `peer_review` et cesse d'être matérialisé, sauf retrait explicite de la liste.

@@ -14,6 +14,7 @@ from domain.publications.aggregation import (
 )
 from domain.publications.identifiers import DOI
 from domain.publications.publication import Publication
+from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES
 from domain.source_publications.correction import (
     SourcePublicationForCorrection,
     effective_metadata,
@@ -40,6 +41,8 @@ def refresh_from_sources(
     Recalcul complet (pas de COALESCE incrémental qui figerait les valeurs au premier arrivé) : lit TOUS les `source_publications` attachés, applique l'algorithme d'agrégation `refresh_from_sources` (domain) qui mute l'entité Publication en place, et persiste via `repo.save`. Peut corriger des métadonnées obsolètes (ex: `ongoing_thesis` → `thesis` après soutenance).
 
     **Cas orphelin** : si la publication n'a aucune source rattachée, la règle métier dicte qu'elle ne doit pas exister. Court-circuit : suppression via `repo.delete` + audit event `publication.deleted_orphan`, sans appel à l'agrégation.
+
+    **Cas hors périmètre** : si le `doc_type` canonique résolu appartient à `OUT_OF_SCOPE_DOC_TYPES`, la publication ne doit pas non plus exister (invariant « hors périmètre = jamais matérialisé »). Suppression via `repo.delete` + audit event `publication.deleted_out_of_scope`, après l'arbitrage du type. Les `source_publications` sont détachées (FK ON DELETE SET NULL) et les `authorships` canoniques emportées en cascade.
 
     Auto-fusion sur conflit DOI : si la promotion du DOI agrégé entre en collision avec une autre publication qui occupe déjà ce DOI, cette dernière est absorbée dans `pub_id` avant le save — au lieu de laisser remonter une violation de la contrainte unique. `pub_id` reste vivant pour le caller. La fusion est tracée via l'audit event `publication.merged`.
 
@@ -84,6 +87,25 @@ def refresh_from_sources(
     secondary_ids = repo.get_converged_secondary_ids(pub_id)
     _refresh_aggregate(pub, sources, source_priority=SOURCE_PRIORITY, secondary_ids=secondary_ids)
     _apply_canonical_doc_type_correction(pub, repo=repo)
+
+    # Une publication dont le type résolu est hors périmètre ne doit pas exister — même
+    # verdict que le cas orphelin, appliqué au seul endroit qui arbitre le `doc_type`
+    # canonique. La suppression détache ses `source_publications` (FK ON DELETE SET NULL) :
+    # elles redeviennent orphelines et ne génèrent ni personne ni authorship (les deux
+    # chemins exigent une publication) ; les authorships canoniques déjà bâties partent en
+    # cascade (FK ON DELETE CASCADE). C'est ce qui rend l'exclusion `doc_type` en aval
+    # redondante : hors périmètre ne se matérialise jamais.
+    if pub.doc_type in OUT_OF_SCOPE_DOC_TYPES:
+        repo.delete(pub_id)
+        emit_event(
+            audit_repo,
+            "publication.deleted_out_of_scope",
+            "publication",
+            pub_id,
+            {"doc_type": pub.doc_type},
+        )
+        return
+
     repo.save(pub)
     repo.update_sources(pub_id)
 
