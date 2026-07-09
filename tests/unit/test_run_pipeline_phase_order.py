@@ -1,31 +1,39 @@
-"""Régression : `addresses.pub_count` est recalculé en phase `publications`.
+"""Régression : `addresses.pub_count` est recalculé en phase `publications`, pas `normalize`.
 
-`recompute_pub_count` compte les publications par adresse. Le placer en fin de
-`normalize` (état antérieur) opérait sur des publications inexistantes à ce
-stade (elles ne sont créées qu'en phase `publications`). Le recalcul doit donc
-tourner après `publications`, pas après `normalize`.
+`recompute_pub_count` compte les publications par adresse. Le placer en fin de `normalize`
+(état antérieur) opérait sur des publications inexistantes à ce stade (elles ne sont créées qu'en
+phase `publications`). Le recalcul tourne donc dans l'orchestrateur `publications`, après la
+réconciliation — jamais dans `normalize`, dont l'orchestration n'y a aucun accès.
 """
 
-from unittest.mock import patch
+import logging
+from contextlib import contextmanager
+from unittest.mock import MagicMock, patch
 
 import run_pipeline
+from application.pipeline.publications import phase as publications_phase
 
 
-def test_recompute_addresses_runs_in_publications_not_normalize():
-    with (
-        patch.object(run_pipeline, "_run_normalize"),
-        patch.object(run_pipeline, "_vacuum_staging"),
-        patch.object(run_pipeline, "_run_cleanup_orphan_identities"),
-        patch.object(run_pipeline, "_run_reconcile_components"),
-        patch.object(run_pipeline, "_run_recompute_address_pub_count") as recompute,
-    ):
-        run_pipeline.phase_normalize()
-        assert recompute.call_count == 0, (
-            "recompute_pub_count ne doit pas tourner en normalize (pas de publications)"
+@contextmanager
+def _fake_tx():
+    yield MagicMock()
+
+
+def test_recompute_addresses_runs_in_publications_phase():
+    reconciliation = MagicMock()
+    reconciliation.count_dedup_inputs.return_value = (0, 0)
+    address_pub_count = MagicMock()
+    # La réconciliation est hors sujet ici : on la neutralise pour isoler le recompute.
+    with patch.object(publications_phase, "reconcile_run", return_value=None):
+        publications_phase.run(
+            _fake_tx,
+            reconciliation,
+            address_pub_count,
+            logging.getLogger("test"),
+            pub_repo_factory=lambda conn: MagicMock(),
+            audit_repo_factory=lambda conn: MagicMock(),
         )
-
-        run_pipeline.phase_publications()
-        assert recompute.call_count == 1, "recompute_pub_count doit tourner en publications"
+    address_pub_count.recompute_pub_count.assert_called_once()
 
 
 def test_resolve_ra_runs_after_extract_before_cross_imports():
