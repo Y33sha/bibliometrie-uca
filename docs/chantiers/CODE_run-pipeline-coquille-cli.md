@@ -38,8 +38,8 @@ La logique métier n'a pas fui vers le composition-root : le SQL brut ne subsist
 
 ### Phase 2 — Familles par source
 
-- [ ] `normalize` : registre `source → (Normalizer, PgQueries)` et orchestrateur paramétré unique dans `application/pipeline/normalize/` ; retirer les 7 copies de `run_pipeline`.
-- [ ] `extract` : même geste ; retirer les 5 copies.
+- [x] `normalize` : registre ordonné `source → constructeur` (`_normalize_builders`) + runner unique (`_run_normalize`) ; les 7 copies retirées, `phase_normalize` itère le registre. Validé e2e (`--only normalize`). Le câblage des `Pg*` reste au composition-root (contrainte de couches) — le registre y vit, pas dans `application/`.
+- [x] `extract` : registre `source → constructeur d'extracteur` (`_extractors`) + runner unique (`_run_extract`) ; les 5 copies retirées, `phase_extract` construit ses tâches via un helper `task` préservant args par source et parallélisme. Validé par types + tests unitaires ; e2e par la prochaine extraction réelle (APIs externes).
 
 ### Phase 3 — Phases multi-étapes
 
