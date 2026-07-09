@@ -131,6 +131,9 @@ class PgPerimeterQueries(PerimeterQueries):
     def get_persons_structure_ids_list(self, conn: Connection) -> list[int]:
         return get_persons_structure_ids_list(conn)
 
+    def refresh_perimeter_structures(self, conn: Connection) -> int:
+        return refresh_perimeter_structures(conn)
+
 
 class PgPerimetersAdminQueries(PerimetersAdminQueries):
     """Adapter SA pour `application.ports.api.perimeters_queries.PerimetersAdminQueries`."""

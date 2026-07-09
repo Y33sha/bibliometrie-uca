@@ -731,18 +731,20 @@ def _run_resolve_publishers() -> PhaseMetrics:
 def phase_affiliations(**kw: Any) -> PhaseMetrics:
     """Résolution des affiliations UCA sur les source_authorships.
 
-    1. refresh_perimeter_structures : rematérialise le périmètre (clôture des tutelles)
-    2. resolve_addresses : matche les adresses vers les structures connues
-    3. populate_affiliations : pose in_perimeter sur les source_authorships
-
-    Phase source-agnostique : `--sources` n'est pas propagé. Sinon des
-    source_authorships d'une source non listée garderaient un `in_perimeter`
-    périmé après la résolution d'une nouvelle adresse.
+    Séquence, transactions et métriques dans `application/pipeline/affiliations/phase.py`.
     """
-    _run_refresh_perimeter_structures()
-    metrics = _run_resolve_addresses()
-    metrics.merge(_run_populate_affiliations())
-    return metrics
+    from application.pipeline.affiliations.phase import run
+    from infrastructure.queries.perimeter import PgPerimeterQueries
+    from infrastructure.queries.pipeline.address_resolution import PgAddressResolutionQueries
+    from infrastructure.queries.pipeline.affiliations import PgAffiliationsQueries
+
+    return run(
+        _open_tx,
+        PgAddressResolutionQueries(),
+        PgAffiliationsQueries(),
+        PgPerimeterQueries(),
+        log,
+    )
 
 
 def phase_metadata_correction(**kw: Any) -> PhaseMetrics:
@@ -1058,49 +1060,6 @@ def _run_refresh_pub_counts() -> None:
     )
 
 
-def _run_refresh_perimeter_structures() -> None:
-    from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.perimeter import refresh_perimeter_structures
-
-    log.info("▶ refresh perimeter_structures")
-    t0 = time.time()
-    conn = get_sync_engine().connect()
-    try:
-        n = refresh_perimeter_structures(conn)
-        conn.commit()
-    finally:
-        conn.close()
-    log.info("✓ perimeter_structures : %d liens en %.1fs", n, time.time() - t0)
-
-
-def _run_populate_affiliations() -> PhaseMetrics:
-    from application.pipeline.affiliations.populate_affiliations import run_populate
-    from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.perimeter import get_persons_structure_ids
-    from infrastructure.queries.pipeline.affiliations import PgAffiliationsQueries
-
-    log.info("▶ populate_affiliations")
-    t0 = time.time()
-    queries = PgAffiliationsQueries()
-    conn = get_sync_engine().connect()
-    rows: list[dict[str, object]] = []
-    try:
-        perimeter_ids = get_persons_structure_ids(conn)
-        run_populate(conn, queries, log, perimeter_ids)
-        conn.commit()
-        # Bilan in_perimeter par source, une fois la propagation committée.
-        for source in ("hal", "openalex", "wos", "scanr", "theses"):
-            total, in_perimeter = queries.count_source_authorships_stats(conn, source)
-            pct = round(100 * in_perimeter / total, 1) if total else 0.0
-            rows.append({"key": source, "total": total, "in_perimeter": in_perimeter, "pct": pct})
-    finally:
-        conn.close()
-    log.info("✓ populate_affiliations terminé en %.1fs", time.time() - t0)
-    metrics = PhaseMetrics()
-    metrics.details["table"] = {"rows": rows}
-    return metrics
-
-
 def _normalize_row(source: str, stats: NormalizeStats, duration_s: float) -> dict[str, object]:
     """Ligne « par source » de la table d'observabilité de la phase normalize."""
     return {
@@ -1306,28 +1265,6 @@ def _run_enrich_journals_from_doaj() -> PhaseMetrics:
         conn.close()
     log.info("✓ enrich_journals_from_doaj terminé en %.1fs", time.time() - t0)
     return PhaseMetrics(extras={"matched": stats.matched})
-
-
-def _run_resolve_addresses() -> PhaseMetrics:
-    from application.pipeline.affiliations.resolve_addresses import run_resolution
-    from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.perimeter import get_persons_structure_ids
-    from infrastructure.queries.pipeline.address_resolution import PgAddressResolutionQueries
-
-    log.info("▶ resolve_addresses")
-    t0 = time.time()
-    conn = get_sync_engine().connect()
-    try:
-        perimeter_ids = get_persons_structure_ids(conn)
-        processed, in_perimeter, _affil = run_resolution(
-            conn, PgAddressResolutionQueries(), perimeter_ids, log
-        )
-    finally:
-        conn.close()
-    log.info("✓ resolve_addresses terminé en %.1fs", time.time() - t0)
-    metrics = PhaseMetrics()
-    metrics.details["summary"] = {"adresses": processed, "in_perimeter": in_perimeter}
-    return metrics
 
 
 def _run_refresh_publication_countries() -> None:
