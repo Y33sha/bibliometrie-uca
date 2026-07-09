@@ -368,9 +368,7 @@ class PgCountryQueries(CountryQueries):
     def load_place_forms(self, conn: Connection) -> dict[str, str]:
         return load_place_forms(conn)
 
-    def fetch_addresses_missing_country_normalized(
-        self, conn: Connection
-    ) -> list[tuple[int, str]]:
+    def fetch_addresses_missing_country_normalized(self, conn: Connection) -> list[tuple[int, str]]:
         return fetch_addresses_missing_country_normalized(conn)
 
     def count_suggest_eligible(self, conn: Connection) -> SuggestEligibleCounts:
