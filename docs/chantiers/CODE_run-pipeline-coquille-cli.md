@@ -1,75 +1,62 @@
 # Chantier — run_pipeline : réduire à la coquille CLI
 
-`run_pipeline.py` fait 2340 lignes et porte, inline et répété, tout le câblage de composition de chaque phase. Ce chantier le ramène à une coquille CLI (parsing des arguments, graphe des phases, `main`, signaux) en factorisant le patron transverse commun et en clarifiant où vit la racine de composition.
+`run_pipeline.py` (2340 lignes) porte l'orchestration de chaque phase — séquence des sous-étapes, frontière transactionnelle, logging de progression, assemblage des métriques — alors que cette orchestration relève de la couche applicative. Ce chantier la rapatrie dans `application/pipeline/<phase>/` et réduit `run_pipeline.py` à une coquille de composition : câblage des adapters, graphe des phases, dispatch séquentiel, signaux.
 
 ## Contexte
 
-### Ce qui gonfle le fichier
+### Ce que porte run_pipeline
 
-Le fichier compte 16 phases (`phase_*`, dispatchées par `--only`) mais **45 fonctions `_run_*`** : ces dernières ne sont pas des phases, ce sont les sous-étapes que chaque phase enchaîne. Toutes répètent le même patron (~15-20 lignes) : imports paresseux de l'orchestrateur applicatif et des adapters `Pg*`, ouverture d'une connexion, appel de l'orchestrateur, `commit`, fermeture, logs `▶`/`✓` chronométrés. Seule ligne utile par fonction : l'appel de l'orchestrateur.
+16 phases (`phase_*`, dispatchées par `--only`) mais 45 fonctions `_run_*` : ces dernières ne sont pas des phases, ce sont les sous-étapes que chaque phase enchaîne. Chaque `_run_*` répète le même patron : imports de l'orchestrateur applicatif et des adapters `Pg*`, ouverture d'une connexion, appel de l'orchestrateur, `commit`, fermeture, logs `▶`/`✓` chronométrés.
 
-Deux causes distinctes à ce nombre :
+Deux natures s'y mélangent :
 
-- **Copies par source (~12).** `normalize` se déploie en 7 fonctions (hal, wos, openalex, scanr, theses, crossref, datacite) et `extract` en 5 — quasi identiques, ne différant que par trois tokens : la classe `XxxNormalizer`/extracteur, le `PgXxx…Queries`, le nom de source. Ce ne sont pas des étapes distinctes mais la **même** étape répétée par source.
-- **Vraies sous-étapes (~le reste).** Les phases multi-étapes (countries 4, authorships 3, publishers_journals 3, metadata_correction 3…) enchaînent des opérations réellement distinctes, chacune avec ses adapters et sa transaction. Pas de duplication de logique, seulement le patron transverse.
+- **Câblage** — instancier les `Pg*`, ouvrir la connexion. Légitimement au composition-root : l'architecture est hexagonale (`docs/architecture/01-vue-d-ensemble.md`), `application/` n'importe pas `infrastructure/`, et un script CLI est son propre composition-root (règle 5).
+- **Orchestration** — séquence des sous-étapes, frontière transactionnelle, logging de progression, métriques. Du ressort applicatif : c'est la logique du use-case « phase ». Le logging *détaillé* vit d'ailleurs déjà dans les orchestrateurs (`build_authorships` logue ses étapes) ; seules l'enveloppe et la séquence restent échouées au composition-root.
 
-La logique métier n'a pas fui vers l'orchestrateur : le SQL brut ne subsiste que dans deux poches (`_run_recompute_address_pub_count`, un fragment de `_run_parallel_extractors`) ; tout le reste délègue déjà à `infrastructure/`. Le problème est donc du **câblage dupliqué** — par source, et transversalement.
+### Deux causes au nombre de sous-étapes
 
-### La contrainte de couches
+- **Copies par source (~12).** `normalize` se déploie en 7 fonctions (hal, wos, openalex, scanr, theses, crossref, datacite) et `extract` en 5, quasi identiques à trois tokens près (classe, `PgQueries`, nom de source). Même étape répétée par source.
+- **Vraies sous-étapes (le reste).** Les phases multi-étapes (countries, authorships, publishers_journals, metadata_correction, affiliations…) enchaînent des opérations distinctes, chacune avec ses adapters et sa transaction.
 
-L'architecture est hexagonale (`docs/architecture/01-vue-d-ensemble.md`) : le cœur est `application/` (avec `domain/`), entouré de deux bandes d'adapters frères qui ne se connaissent pas — `interfaces/` (entrants) et `infrastructure/` (sortants). Règle 3 : `application/` n'importe pas `infrastructure/` ; c'est `infrastructure/` qui implémente les ports d'`application/ports/`, jamais l'inverse. Vérifié : `application/` n'importe jamais `get_sync_engine`, les orchestrateurs reçoivent une `Connection` injectée.
+### Le SQL brut résiduel
 
-Or le câblage instancie les `Pg*` (`infrastructure.queries`, `infrastructure.repositories`) et ouvre la connexion via `get_sync_engine` (`infrastructure.db.engine`). Il ne peut donc pas descendre dans `application/pipeline/<phase>/`. Sa place est la racine de composition — et règle 5 : un script CLI est son propre composition root. run_pipeline est donc le composition root du pipeline ; le câblage y reste. Ce qui se factorise, c'est le patron transverse répété.
+La logique métier n'a pas fui vers le composition-root : le SQL brut ne subsiste que dans deux poches (`_run_recompute_address_pub_count`, un fragment de `_run_parallel_extractors`), à déplacer vers `infrastructure/`.
 
 ## Décisions
 
-- **Factoriser le patron transverse.** Un helper unique porte la frontière transactionnelle (connect / commit / rollback / close) et le chrono `▶`/`✓`. Chaque `_run_*` tombe à trois ou quatre lignes ; le patron n'existe plus qu'une fois. Sans effet sur les couches.
-- **Extraire le SQL brut résiduel** (`_run_recompute_address_pub_count`, poche de `_run_parallel_extractors`) vers `infrastructure/`, appelé par un orchestrateur applicatif.
-
-### Emplacement : tranché — reste dans run_pipeline
-
-Le câblage n'est pas dupliqué entre run_pipeline et `application/` : l'orchestrateur applicatif reçoit ses adapters déjà instanciés (injection), il ne les assemble pas. Assembler ces outils — choisir les `Pg*` concrets, ouvrir la connexion — est le propre du composition-root, et le contrat de couches l'interdit dans `application/`. run_pipeline étant son propre composition-root, le câblage y reste. La duplication à résoudre est **interne** ; on l'écrit une fois et on la rappelle, sans rien déplacer. (`interfaces/cli/pipeline/` a été supprimé volontairement ; pas de résurrection.)
-
-### Forme de la déduplication : hybride
-
-Les deux causes de gonflement appellent deux gestes **complémentaires**, pas un choix exclusif.
-
-- **Registre par source pour les familles homogènes.** `normalize` et `extract` : une table `source → (classe, queries)` et une fonction paramétrée unique par famille (`_run_normalize(source)`, `_run_extract(source)`). ~12 fonctions → 2, avec deux petits registres ; ~180 lignes de copier-coller supprimées. Le registre est pertinent **ici** parce que les étapes sont réellement uniformes.
-- **Helper transverse pour les sous-étapes hétérogènes.** Le reste (build_authorships, reconcile, purge, countries…) garde une fonction nommée par étape, réduite à trois lignes appelant un helper d'unit-of-work + chrono `▶`/`✓`. Chaque étape reste trouvable, garde ses particularités, et les traces d'erreur restent lisibles.
-
-À éviter : un registre déclaratif **global** couvrant toutes les phases — elles ne sont pas uniformes (extract parallèle, commits par lots, sous-étapes chaînées, résumés sur mesure), et chaque exception forcerait un échappatoire qui ruinerait la table.
-
-### Frontière transactionnelle
-
-Cas général : une connexion, un `commit` en fin de phase. Quelques phases committent par lots (purge par tranches, `reconcile_components`). Un helper en *context-manager* qui commite en sortie si succès couvre les deux : les phases par lots committent au fil de l'eau, le commit final vide le reliquat. Seul arbitrage résiduel, ergonomique : le helper rend-il la `Connection` (la phase peut committer tôt) ou possède-t-il seul le commit. Recommandé : il ouvre/ferme et fait un commit-sur-succès, tout en passant la `Connection` pour autoriser les commits précoces.
+- **Orchestration en application, run_pipeline en coquille.** Chaque phase devient un orchestrateur `application/pipeline/<phase>/` qui séquence ses sous-étapes, ouvre ses transactions, logue sa progression et retourne ses métriques. `run_pipeline.py` se réduit au parsing des arguments, au graphe des phases, au câblage des adapters par phase, au dispatch séquentiel et aux signaux.
+- **Frontière transactionnelle injectée.** Pour ouvrir ses transactions sans importer `infrastructure/`, l'orchestrateur de phase reçoit de quoi ouvrir une transaction gérée (connect / commit-sur-succès / rollback / close), fourni par le composition-root. La forme — appelable-fabrique ou objet `UnitOfWork` réifié — est tranchée par ce chantier sur ses mérites, sur la phase pilote, en prenant la plus propre. Aucun choix d'un chantier antérieur ne la contraint.
+- **Familles par source collapsées.** `normalize` et `extract` : un registre `source → (classe, queries)` et un orchestrateur paramétré unique par famille, dans `application/pipeline/normalize/` et `application/pipeline/extract/`. Les ~12 copies deviennent 2 orchestrateurs.
+- **SQL brut déplacé** vers `infrastructure/`, appelé par l'orchestrateur applicatif concerné.
 
 ## Phasage
 
-### Phase 1 — Helper transverse
+### Phase 1 — Fabrique de transaction et phase pilote
 
-- [ ] Helper d'unit-of-work + timing au composition-root (connect / commit / rollback / close, logs `▶`/`✓`, chrono).
-- [ ] Migrer deux ou trois `_run_*` simples en pilote, figer le format et le contrat d'injection.
+- [ ] Fabrique de transaction injectable (connect / commit-sur-succès / rollback / close, chrono `▶`/`✓`), fournie par le composition-root.
+- [ ] Migrer une phase mono-étape (`oa_status` ou `relations`) : l'orchestrateur applicatif reçoit la fabrique et ses adapters, séquence, logue, retourne ses métriques. Valider le format et le e2e.
 
 ### Phase 2 — Familles par source
 
-- [ ] `normalize` : registre `source → (Normalizer, PgQueries)` + `_run_normalize(source)` unique ; supprimer les 7 copies.
-- [ ] `extract` : même geste ; supprimer les 5 copies.
+- [ ] `normalize` : registre `source → (Normalizer, PgQueries)` et orchestrateur paramétré unique dans `application/pipeline/normalize/` ; retirer les 7 copies de `run_pipeline`.
+- [ ] `extract` : même geste ; retirer les 5 copies.
 
-### Phase 3 — Sous-étapes hétérogènes
+### Phase 3 — Phases multi-étapes
 
-- [ ] Convertir les `_run_*` restants (one-off) au helper.
-- [ ] Traiter à part les étapes à commits multiples (purge, reconcile) : variante du helper ou passage de la `Connection` nue.
+- [ ] Rapatrier la séquence, le logging et les métriques de chaque phase multi-étapes (countries, authorships, publishers_journals, metadata_correction, affiliations, publications, cross_imports) dans son orchestrateur applicatif.
+- [ ] Préserver à l'identique les frontières transactionnelles existantes, en particulier les phases à commits par lots (purge par tranches, `reconcile_components`) ; test e2e vert avant de passer à la suivante.
 
 ### Phase 4 — SQL brut résiduel
 
 - [ ] Déplacer `_run_recompute_address_pub_count` et la poche SQL de `_run_parallel_extractors` vers `infrastructure/`.
 
-### Phase 5 — Coquille CLI
+### Phase 5 — Coquille
 
-- [ ] Découper `main()` en helpers pour lever son `# noqa: C901`.
-- [ ] `run_pipeline.py` réduit à : parsing, graphe des phases, dispatch, signaux.
+- [ ] `run_pipeline.py` réduit à : parsing, graphe des phases, câblage par phase, dispatch séquentiel, signaux.
+- [ ] Découper `main()` pour lever son `# noqa: C901`.
 
 ## Questions ouvertes
 
-- **Registre déclaratif (option 3).** Concision réelle, ou indirection qui nuit à la lisibilité du graphe des phases ? À évaluer sur un échantillon avant de généraliser.
-- **Résumés de phase.** Les assembleurs de dictionnaires de métriques (`_extract_source_summary`, `_normalize_row`, `_summary`) sont de la présentation : les regrouper dans un module de reporting, ou les laisser près de leur phase ?
+- **Objet injecté : fabrique de transaction ou `Engine` nu.** L'orchestrateur peut recevoir une fabrique (appelable rendant une connexion gérée, un point d'injection propre) ou directement l'`Engine` sqlalchemy — déjà connu d'`application/` via le type `Connection` — et faire `with engine.begin() as conn`. La fabrique abstrait la frontière ; l'`Engine` est plus direct mais couple davantage à sqlalchemy. À trancher sur la phase pilote.
+- **Forme du unit of work : fabrique ou objet réifié.** Tranchée par ce chantier sur la phase pilote, au mérite : un appelable-fabrique suffit si l'orchestrateur ne fait qu'ouvrir des transactions indépendantes ; un objet `UnitOfWork` réifié se justifie s'il gagne à porter la connexion et les adapters d'une phase. Si la version propre conduit à un UoW réifié qu'on veut **partager** avec l'API (dont les command handlers exposent déjà un unit of work fonctionnel), cette unification côté `interfaces/api/` fait l'objet d'un **chantier séparé** — question de périmètre, pas de contrainte de conception.
+- **Phases à commits multiples.** La fabrique « commit-sur-succès en fin de bloc » couvre le cas simple ; les phases qui committent au fil de l'eau (durabilité, étalement du WAL) doivent garder ce comportement. La fabrique doit passer la `Connection` pour autoriser les commits précoces sans double-commit parasite.
