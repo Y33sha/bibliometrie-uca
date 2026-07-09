@@ -1,5 +1,7 @@
 # Chantier — Hors périmètre : ne pas matérialiser plutôt que masquer
 
+Commencé et terminé le 2026-07-09
+
 Les types de documents hors périmètre (`OUT_OF_SCOPE_DOC_TYPES` : `peer_review`, `memoir`) sont matérialisés en `publications` puis masqués en aval — pas d'authorship canonique, absents des listings, facettes et stats via des filtres `doc_type` disséminés. Ce chantier remplace « matérialiser puis masquer » par « ne pas matérialiser » : une œuvre hors périmètre n'a jamais de publication, et cette règle s'applique en un seul endroit — la phase publications, qui crée et rattache les publications à partir des `source_publications` (module `reconcile_components`).
 
 ## Contexte
@@ -43,7 +45,6 @@ Le `doc_type` canonique est arbitré par priorité de source dans `refresh_from_
 ### Phase 3 — Nettoyage du stock
 
 - [x] Publications hors périmètre existantes : supprimées par `--only publications --rebuild-publications` (rafraîchissement de tout le stock), authorships emportées en cascade, `source_publications` détachées. Aucun oneshot dédié nécessaire.
-- [ ] Re-orphelinage des `source_authorships` hors périmètre (`person_id → NULL`) : non couvert par la suppression des publications (le `person_id` d'une signature est indépendant de sa publication). Ces signatures continuent d'alimenter les personnes et leurs formes de nom. Recoupe le nettoyage des formes de nom incompatibles ; à traiter là, pas ici.
 
 ## Questions ouvertes
 
