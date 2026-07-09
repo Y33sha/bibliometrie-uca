@@ -14,9 +14,11 @@ L'exclusion repose sur `doc_type NOT IN OUT_OF_SCOPE_DOC_TYPES` répété à cin
 
 Le `doc_type` canonique est résolu en `metadata_correction` (`map_doc_type`), et il peut changer d'un run à l'autre : une œuvre matérialisée sous un type in-scope bascule hors périmètre quand une source la retype. La phase publications ne dé-matérialise jamais sur changement de type — elle ne dissout une publication que lorsqu'un rapprochement de doublons la vide de ses `source_publications`. Une publication ainsi devenue hors périmètre reste donc matérialisée, avec des artefacts construits avant la correction : authorships canoniques (une publication `peer_review` peut porter des authorships), et attaches de personnes et formes de nom dérivées d'une `source_authorship` hors périmètre.
 
-### La phase personnes est déjà correcte
+### Phase personnes : création correcte, orphelinage résiduel
 
-La création (`fetch_unlinked_authorships`) comme l'attache hors-périmètre (`_OOP_COMMON_WHERE`) exigent déjà `publication_id IS NOT NULL` et une publication in-scope. Une `source_authorship` sur une SP sans publication ne crée ni n'attache aucune personne. Rien n'est à changer côté personnes.
+La création (`fetch_unlinked_authorships`) comme l'attache hors-périmètre (`_OOP_COMMON_WHERE`) exigent déjà `publication_id IS NOT NULL`. Une œuvre née hors périmètre n'est jamais matérialisée : aucune personne n'en naît ni ne s'y attache. La création est donc correcte, sans changement.
+
+Ce que la création ne couvre pas : une personne créée quand sa publication était in-scope, puis rendue publicationless quand cette publication est dé-matérialisée — bascule tardive du type, ou nettoyage du stock existant. Ses signatures se détachent (`source_publications.publication_id → NULL`) mais gardent leur `person_id`. Le GC `delete_empty_persons`, qui supprime les personnes à zéro `source_authorship`, ne les ramasse pas : elles gardent leurs signatures, détachées. Ces personnes sans publication canonique subsistent — un solde ponctuel au dé-matérialisage du stock, puis un filet au gré des bascules tardives —, à purger séparément.
 
 ## Décisions
 
