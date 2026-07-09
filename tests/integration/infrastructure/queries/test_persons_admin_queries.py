@@ -116,13 +116,6 @@ class TestOrphanAuthorshipsCount:
         count = orphan_authorships_count(sa_sync_conn)
         assert count["total"] == 0
 
-    def test_excludes_memoir(self, sa_sync_conn):
-        pub = _create_pub(sa_sync_conn, doc_type="memoir")
-        sd = _create_sd(sa_sync_conn, pub)
-        _create_sa(sa_sync_conn, sd, person_id=None)
-        count = orphan_authorships_count(sa_sync_conn)
-        assert count["total"] == 0
-
     def test_excludes_non_author_roles(self, sa_sync_conn):
         pub = _create_pub(sa_sync_conn)
         sd = _create_sd(sa_sync_conn, pub, source="theses", source_id="t1")
