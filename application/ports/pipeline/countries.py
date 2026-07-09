@@ -18,10 +18,23 @@ class SuggestEligibleCounts(NamedTuple):
     too_short: int
 
 
+class AddressCountryStatus(NamedTuple):
+    """Bilan de l'état pays des adresses (restreint à `pub_count > 0`)."""
+
+    total: int
+    with_country: int
+    with_suggestion: int
+    none: int
+
+
 class CountryQueries(Protocol):
     """Opérations SQL de la phase countries : détection du pays des adresses (par
     nom de pays ou de lieu), suggestion floue, et recalcul en cascade des caches
     dénormalisés (sa, sp, publications) à partir de `addresses.countries`."""
+
+    # ── Bilan (début / fin de phase) ───────────────────────────────
+
+    def count_address_country_status(self, conn: Connection) -> AddressCountryStatus: ...
 
     # ── Recalcul des caches dénormalisés ───────────────────────────
 

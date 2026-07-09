@@ -20,11 +20,14 @@ Fonctions module-level pour compat avec le code existant ;
 """
 
 import json
-from typing import NamedTuple
 
 from sqlalchemy import Connection, text
 
-from application.ports.pipeline.countries import CountryQueries, SuggestEligibleCounts
+from application.ports.pipeline.countries import (
+    AddressCountryStatus,
+    CountryQueries,
+    SuggestEligibleCounts,
+)
 
 # CTE des sa à recalculer : nouveaux (`sa.countries_dirty`, posé par normalize)
 # OU liés à une adresse dont `countries` a changé (`addresses.countries_dirty`,
@@ -169,15 +172,6 @@ def clear_countries_dirty(conn: Connection) -> None:
         text("UPDATE source_authorships SET countries_dirty = false WHERE countries_dirty")
     )
     conn.execute(text("UPDATE addresses SET countries_dirty = false WHERE countries_dirty"))
-
-
-class AddressCountryStatus(NamedTuple):
-    """Bilan de l'état pays des adresses (restreint à `pub_count > 0`)."""
-
-    total: int
-    with_country: int
-    with_suggestion: int
-    none: int
 
 
 def count_address_country_status(conn: Connection) -> AddressCountryStatus:
@@ -346,6 +340,9 @@ def fetch_addresses_missing_country_normalized(conn: Connection) -> list[tuple[i
 
 class PgCountryQueries(CountryQueries):
     """Adapter PostgreSQL implémentant `application.ports.countries.CountryQueries`."""
+
+    def count_address_country_status(self, conn: Connection) -> AddressCountryStatus:
+        return count_address_country_status(conn)
 
     def refresh_sa_countries(self, conn: Connection) -> int:
         return refresh_sa_countries(conn)

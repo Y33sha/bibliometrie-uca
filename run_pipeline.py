@@ -68,7 +68,6 @@ if TYPE_CHECKING:
 
     from application.ports.pipeline.extract.fetch_missing_doi import AsyncFetchMissingDoiAdapter
     from application.ports.pipeline.extract.refresh_stale import RefreshStaleAdapter
-    from infrastructure.queries.pipeline.countries import AddressCountryStatus
 
 from application.pipeline.graph import PHASE_ORDER
 from application.pipeline.metrics import PhaseMetrics
@@ -846,29 +845,19 @@ def phase_authorships(**kw: Any) -> PhaseMetrics:
 
 
 def phase_countries(mode: Any = "full", **kw: Any) -> PhaseMetrics:
-    """Detection des pays des adresses et recalcul sur les publications."""
-    metrics = PhaseMetrics()
-    initial = _log_countries_summary("Bilan initial")
-    metrics.merge(_run_detect_by_country_name())
-    metrics.merge(_run_detect_by_place_name())
-    metrics.merge(
-        _run_suggest_address_countries(retry_empty=MODES[mode].retry_empty_country_suggestions)
+    """Detection des pays des adresses et recalcul sur les publications.
+
+    Séquence, transactions et métriques dans `application/pipeline/countries/phase.py`.
+    """
+    from application.pipeline.countries.phase import run
+    from infrastructure.queries.pipeline.countries import PgCountryQueries
+
+    return run(
+        _open_tx,
+        PgCountryQueries(),
+        log,
+        retry_empty=MODES[mode].retry_empty_country_suggestions,
     )
-    _run_refresh_publication_countries()
-    final = _log_countries_summary("Bilan final")
-    # Entonnoir : du manque initial (adresses sans pays avant la détection du run) aux
-    # pays rattachés par le run, puis au reste (dont une part porte une suggestion).
-    total = final.total
-    without_initial = total - initial.with_country
-    metrics.details["summary"] = {
-        "total": total,
-        "without_initial": without_initial,
-        "without_pct": round(100 * without_initial / total, 1) if total else 0,
-        "newly_attached": final.with_country - initial.with_country,
-        "remaining": total - final.with_country,
-        "with_suggestion": final.with_suggestion,
-    }
-    return metrics
 
 
 def phase_subjects(**kw: Any) -> PhaseMetrics:
@@ -1267,22 +1256,6 @@ def _run_enrich_journals_from_doaj() -> PhaseMetrics:
     return PhaseMetrics(extras={"matched": stats.matched})
 
 
-def _run_refresh_publication_countries() -> None:
-    from application.pipeline.countries.refresh_publication_countries import refresh
-    from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.pipeline.countries import PgCountryQueries
-
-    log.info("▶ refresh_publication_countries")
-    t0 = time.time()
-    conn = get_sync_engine().connect()
-    try:
-        refresh(conn, PgCountryQueries(), log)
-        conn.commit()
-    finally:
-        conn.close()
-    log.info("✓ refresh_publication_countries terminé en %.1fs", time.time() - t0)
-
-
 def _run_ingest_subjects() -> PhaseMetrics:
     from application.pipeline.subjects.run import run
     from infrastructure.db.engine import get_sync_engine
@@ -1625,90 +1598,6 @@ def _run_refresh_stale(target: str, years: list[int] | None) -> PhaseMetrics:
         metrics.as_summary(),
     )
     _signal_if_tripped(metrics, breaker)
-    return metrics
-
-
-def _run_detect_by_country_name() -> PhaseMetrics:
-    from application.pipeline.countries.detect_by_country_name import run
-    from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.pipeline.countries import PgCountryQueries
-
-    log.info("▶ detect_by_country_name")
-    t0 = time.time()
-    conn = get_sync_engine().connect()
-    try:
-        metrics = run(conn, PgCountryQueries(), log)
-        conn.commit()
-    finally:
-        conn.close()
-    log.info(
-        "✓ detect_by_country_name terminé en %.1fs — %s",
-        time.time() - t0,
-        metrics.as_summary(),
-    )
-    return metrics
-
-
-def _log_countries_summary(label: str) -> "AddressCountryStatus":
-    """Bilan global de l'état pays des adresses, en début et fin de phase countries."""
-    from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.pipeline.countries import count_address_country_status
-
-    conn = get_sync_engine().connect()
-    try:
-        s = count_address_country_status(conn)
-    finally:
-        conn.close()
-    log.info(
-        "%s — adresses (pub_count > 0) : %d total | %d avec pays | %d avec suggestion | %d sans rien",
-        label,
-        s.total,
-        s.with_country,
-        s.with_suggestion,
-        s.none,
-    )
-    return s
-
-
-def _run_detect_by_place_name() -> PhaseMetrics:
-    from application.pipeline.countries.detect_by_place_name import run
-    from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.pipeline.countries import PgCountryQueries
-
-    log.info("▶ detect_by_place_name")
-    t0 = time.time()
-    conn = get_sync_engine().connect()
-    try:
-        metrics = run(conn, PgCountryQueries(), log)
-        conn.commit()
-    finally:
-        conn.close()
-    log.info(
-        "✓ detect_by_place_name terminé en %.1fs — %s",
-        time.time() - t0,
-        metrics.as_summary(),
-    )
-    return metrics
-
-
-def _run_suggest_address_countries(*, retry_empty: bool = False) -> PhaseMetrics:
-    from application.pipeline.countries.suggest_countries import run
-    from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.pipeline.countries import PgCountryQueries
-
-    log.info("▶ suggest_address_countries%s", " (retry-vides)" if retry_empty else "")
-    t0 = time.time()
-    conn = get_sync_engine().connect()
-    try:
-        # `run` commite par batch (progression durable, WAL borné) : pas de commit final ici.
-        metrics = run(conn, PgCountryQueries(), log, retry_empty=retry_empty)
-    finally:
-        conn.close()
-    log.info(
-        "✓ suggest_address_countries terminé en %.1fs — %s",
-        time.time() - t0,
-        metrics.as_summary(),
-    )
     return metrics
 
 
