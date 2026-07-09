@@ -52,8 +52,8 @@ Un orchestrateur `application/pipeline/<phase>/phase.py` par phase : séquence, 
 - [x] `countries` — port `CountryQueries.count_address_country_status` ajouté, type `AddressCountryStatus` déplacé vers le port (`10227fbf`)
 - [x] `authorships` — ports neufs `PurgeOrphanPublicationsQueries`, `PubCountsQueries`. Le `VACUUM ANALYZE` (maintenance physique, autocommit) sort du périmètre de l'invariant « connexion injectée » : l'adapter de purge ouvre sa propre connexion autocommit, l'orchestrateur ne voit pas l'autocommit (`5b574748`)
 - [x] `publications` — port neuf `AddressPubCountQueries` (recompute `addresses.pub_count`), `mark_keys_dirty` ajouté à `PublicationsReconciliationQueries` ; repos injectés en factories (`5cf1514e`)
-- [x] `persons` — mono-transaction : `run(open_tx, …)` possède sa transaction, repos en factories, `dry_run` mort retiré. Le test de non-régression « commit avant close » est remplacé par un test de `managed_transaction` (commit-sur-succès / rollback / commits par lots) qui garde la propriété pour toutes les phases
-- [ ] `subjects`
+- [x] `persons` — mono-transaction : `run(open_tx, …)` possède sa transaction, repos en factories, `dry_run` mort retiré. Le test de non-régression « commit avant close » est remplacé par un test de `managed_transaction` (commit-sur-succès / rollback / commits par lots) qui garde la propriété pour toutes les phases (`28c9ef87`)
+- [x] `subjects` — deux sous-étapes (ingestion, co-occurrences) sur le port existant `SubjectsQueries`, sans opération orpheline
 - [ ] `cross_imports`, `publishers_journals` — cas durs (parallélisme, circuit-breaker par `ContextVar`, détection de config API) traités en dernier, gabarit rodé
 
 ### Phase 4 — SQL brut résiduel
