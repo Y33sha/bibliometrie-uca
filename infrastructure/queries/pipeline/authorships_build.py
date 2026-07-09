@@ -46,7 +46,7 @@ def insert_missing_authorships(conn: Connection) -> int:
 
 
 def prune_orphan_authorships(conn: Connection) -> int:
-    """Étape 1bis : supprime les `authorships` que plus aucune source n'atteste.
+    """Prune : supprime les `authorships` que plus aucune source n'atteste.
 
     Inverse exact d'`insert_missing_authorships` : une authorship `(publication_id,
     person_id)` dont la paire n'existe plus dans `source_authorships` (auteur retiré

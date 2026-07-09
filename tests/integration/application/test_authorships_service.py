@@ -433,7 +433,7 @@ class TestDeleteOrphanAuthorships:
 
 
 class TestPruneOrphanAuthorships:
-    """`prune_orphan_authorships` (étape 1bis du build) supprime, toutes
+    """`prune_orphan_authorships` (prune de l'étape 1 du build) supprime, toutes
     personnes confondues, les authorships canoniques que plus aucune
     source_authorship n'atteste — inverse d'`insert_missing_authorships`."""
 
