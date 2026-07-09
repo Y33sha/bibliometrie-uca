@@ -26,6 +26,8 @@ La logique métier n'a pas fui vers le composition-root : le SQL brut ne subsist
 
 - **Orchestration en application, run_pipeline en coquille.** Chaque phase devient un orchestrateur `application/pipeline/<phase>/` qui séquence ses sous-étapes, ouvre ses transactions, logue sa progression et retourne ses métriques. `run_pipeline.py` se réduit au parsing des arguments, au graphe des phases, au câblage des adapters par phase, au dispatch séquentiel et aux signaux.
 - **Frontière transactionnelle injectée.** Pour ouvrir ses transactions sans importer `infrastructure/`, l'orchestrateur de phase reçoit un `OpenTransaction` (`application/ports/pipeline/transaction.py`) : un appelable rendant une transaction gérée (commit-sur-succès / rollback / close), fourni par le composition-root et satisfait par `managed_transaction` (`infrastructure/db/transaction.py`). Ce satisfier **tolère les commits par lots** émis dans le bloc — indispensable aux phases à progression durable (résolution d'adresses, purge par tranches, réconciliation, suggestion de pays) ; `Engine.begin` lève `InvalidRequestError` en sortie de bloc dès qu'un commit précoce a fermé sa transaction. Forme retenue : appelable, pas d'objet `UnitOfWork` réifié — une phase enchaîne des transactions indépendantes hétérogènes qu'un UoW (transaction + registry de repos) épouserait mal, et les gateways de requêtes (`Pg*Queries`, sans état, prenant `conn` par appel) n'y auraient pas leur place ; les adapters d'une phase sont injectés à côté.
+- **Opérations infra auxiliaires derrière des ports.** Les opérations qu'une phase enchaîne autour de son étape principale (rematérialisation du périmètre, purge des publications orphelines, refresh des `pub_count`, bilan pays…) deviennent des méthodes de port injectées, au même titre que les gateways de requêtes — jamais un appel direct à une fonction libre `infrastructure/` depuis `application/`. Une opération sans port d'accueil reçoit un petit port neuf (pub_counts, purge) plutôt qu'un appelable ad hoc : chaque dépendance d'un orchestrateur est ainsi un objet nommé et mockable.
+- **Convention de nommage.** L'orchestrateur d'une phase multi-étapes vit dans `application/pipeline/<phase>/phase.py` (modèle `persons/phase.py`) ; `phase_<nom>` de `run_pipeline` s'y réduit au câblage.
 - **Familles par source collapsées.** `normalize` et `extract` : un registre `source → (classe, queries)` et un orchestrateur paramétré unique par famille, dans `application/pipeline/normalize/` et `application/pipeline/extract/`. Les ~12 copies deviennent 2 orchestrateurs.
 - **SQL brut déplacé** vers `infrastructure/`, appelé par l'orchestrateur applicatif concerné.
 
@@ -43,8 +45,16 @@ La logique métier n'a pas fui vers le composition-root : le SQL brut ne subsist
 
 ### Phase 3 — Phases multi-étapes
 
-- [ ] Rapatrier la séquence, le logging et les métriques de chaque phase multi-étapes (countries, authorships, publishers_journals, metadata_correction, affiliations, publications, cross_imports) dans son orchestrateur applicatif.
-- [ ] Préserver à l'identique les frontières transactionnelles existantes, en particulier les phases à commits par lots (purge par tranches, `reconcile_components`) ; test e2e vert avant de passer à la suivante.
+Un orchestrateur `application/pipeline/<phase>/phase.py` par phase : séquence, transactions (`open_tx`), logging `▶`/`✓` et assemblage des métriques rapatriés ; opérations infra auxiliaires passées en ports injectés. Frontières transactionnelles préservées à l'identique (commits par lots des phases à progression durable) ; test e2e vert avant la phase suivante. Du plus simple au plus dur :
+
+- [x] `metadata_correction` (`3a8d583b`)
+- [x] `affiliations` — port `PerimeterQueries.refresh_perimeter_structures` ajouté
+- [ ] `countries`
+- [ ] `authorships`
+- [ ] `publications`
+- [ ] `persons` (déjà un orchestrateur `phase.py` prenant `conn` : passer à `open_tx`)
+- [ ] `subjects`
+- [ ] `cross_imports`, `publishers_journals` — cas durs (parallélisme, circuit-breaker par `ContextVar`, détection de config API) traités en dernier, gabarit rodé
 
 ### Phase 4 — SQL brut résiduel
 
