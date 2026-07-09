@@ -10,7 +10,7 @@ Rendre le résultat de la phase personnes indépendant de l'ordre d'ingestion. L
 
 La phase personnes parcourt les `source_authorships` sans `person_id` et tranche chaque rattachement à l'arrivée. Une entité créée n'est jamais remise en jeu. Deux symptômes en découlent :
 
-- **Regroupement nominal dépendant de l'ordre.** Une forme réduite (« j martin ») arrivée avant sa forme pleine crée sa propre personne ; « jean martin » rencontrée ensuite en crée une seconde (sous-regroupement). Une forme ambiguë (« h chanal ») arrivée avant l'homonyme qui la départage se colle au seul candidat présent, et rien ne revient dessus (sur-regroupement). Une même personne aboutit à une ou deux fiches selon la séquence.
+- **Regroupement nominal dépendant de l'ordre.** Une forme réduite (« j martin ») arrivée avant sa forme pleine crée sa propre personne ; « jean martin » rencontrée ensuite en crée une seconde (sous-regroupement). Une forme ambiguë (« h chanal ») arrivée avant un homonyme qui la partage se colle au seul candidat présent, et rien ne revient dessus (sur-regroupement). Une même personne aboutit à une ou deux fiches selon la séquence.
 - **Capture d'identifiant (premier arrivé).** La première signature portant une valeur d'identifiant fort en fixe l'attribution, figée par `UNIQUE (id_type, id_value)`. Si cette première est corrompue (identifiant recopié sur le mauvais co-auteur), les signatures correctes suivantes échouent à la corroboration de nom et s'éparpillent en doublons ; l'identifiant reste collé à la mauvaise personne.
 
 ### Deux canaux de nature opposée

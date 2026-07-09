@@ -1,6 +1,6 @@
-# oneshots à lancer sur base de prod
-* python interfaces/cli/oneshot/remediate_identifier_captures.py
-* faire un oneshot pour purger les name_forms "pending" incompatibles avec le nom canonique, et toutes les SA liées
+* voir pourquoi run_pipeline est aussi énorme: il devrait orchestrer la logique du pipeline, pas la contenir
+* publi 106296: gérer les adresses résultant d'une erreur de parsing (à quel niveau: exclure adresses? exclure source_authorships? - gestion manuelle, détection automatisée)
+
 # Pipeline
 ## Extraction
 * [ ] ajouter extraction par ORCID: vérifier pertinence (tester différentes sources, auditer le gain)
@@ -8,7 +8,7 @@
 * [ ] chercher dans ScanR par hal-id? (généraliser cross-import à tous les identifiants et toutes les sources)
 ## Suite du traitement
 * [ ] CLI `seed_journals_doi_prefix`: intégrer au pipeline? + recalculer les anciens pour tenir compte des nouveaux (chaque doi_prefix de journal doit être unique et aussi précis que possible)
-* tester la nouvelle logique de matching personnes: faire une copie de la base, vider les `persons`, `person_name_forms` et `person_identifiers`, relancer le pipeline, comparer le résultat à la base canonique; étudier le diff, retravailler la logique, itérer jusqu'à convergence.
+* [ ] tester la nouvelle logique de matching personnes: faire une copie de la base, vider les `persons`, `person_name_forms` et `person_identifiers`, relancer le pipeline, comparer le résultat à la base canonique; étudier le diff, retravailler la logique, itérer jusqu'à convergence.
 
 # Données
 * [ ] distinguer conference_paper et conférence (présence d'un journal_id?)
@@ -28,6 +28,7 @@
 * [ ] fusion / dé-fusion manuelle de publications: circuit à créer (interface de gestion du référentiel de publications, sur le modèle de admin/persons; avec requêtes pour repérer doublons probables et fusions suspectes; supprimer `admin/duplicates`)
 * [ ] créer des catégories de personnes (personnel UCA, chercheurs associés, anciens doctorants, méga-collab de physique des particules) => et pouvoir configurer la visibilité des groupes dans l'UI publique (beaucoup d'adresses UCA dans les collaborations ALICE/ATLAS sont décalées dans les sources, ce qui pourrit la base avec des milliers de fausses "personnes UCA") | ou alors un simple BOOL "visible dans l'UI"?
 * [ ] admin/persons, facette "à confirmer": décomptes aberrants
+* [ ] recherche personnes par nom+prénom: interroger les 2 colonnes
 ## Publique
 * [ ] page "affiliations suspectes hal": requête incorrecte, capture trop de publis + problème de perf
 * [ ] Filtres supplémentaires possibles: langue; `has_doi` (crossref, datacite, other, none); `corresponding_is_in_perimeter`; `peer_reviewed`? (suppose de posséder la donnée ou de pouvoir la déduire des sources); licence
@@ -45,6 +46,7 @@
 * [ ] 107270 et 869915 Computing Pivot-Minors: un article faussement typé preprint par openalex; + question des arxiv_id (déduire le DOI et vice-versa)
 * [ ] fusion entre article et conference_paper: 12362
 * [ ] 205492 et 205499: pourquoi pas de fusion? (lesdeux résolvent vers le même DOI)
+* [ ] 165425: fusion d'un article et d'un dataset
 
 # Idées pour plus tard, éventuellement
 * financements (projets ANR, projets européens)
