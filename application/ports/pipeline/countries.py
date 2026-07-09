@@ -37,9 +37,7 @@ class CountryQueries(Protocol):
 
     def load_country_forms(self, conn: Connection) -> dict[str, str]: ...
 
-    def fetch_addresses_missing_country_raw(
-        self, conn: Connection
-    ) -> list[tuple[int, str]]: ...
+    def fetch_addresses_missing_country_raw(self, conn: Connection) -> list[tuple[int, str]]: ...
 
     # ── Détection par nom de lieu (institution, ville) ─────────────
 
