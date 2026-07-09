@@ -6,7 +6,6 @@ from typing import Any
 from sqlalchemy import Connection, text
 
 from domain.persons.identifiers import PUBLIC_PERSON_IDENTIFIER_TYPES
-from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES_SQL
 from infrastructure.queries.filters import OA_DASHBOARD_COLS_SQL
 
 
@@ -271,7 +270,7 @@ def person_subjects(conn: Connection, person_id: int, *, limit: int = 30) -> lis
     Exclut les sujets trop génériques (`subjects.usage_count` > 5000).
     """
     rows = conn.execute(
-        text(f"""
+        text("""
             SELECT s.id, s.label, s.ontologies, COUNT(DISTINCT p.id) AS count
             FROM authorships a
             JOIN publications p ON p.id = a.publication_id
@@ -279,7 +278,6 @@ def person_subjects(conn: Connection, person_id: int, *, limit: int = 30) -> lis
             JOIN subjects s ON s.id = ps.subject_id
             WHERE a.person_id = :pid
               AND a.roles && ARRAY['author']::text[]
-              AND p.doc_type NOT IN {OUT_OF_SCOPE_DOC_TYPES_SQL}
               AND s.usage_count <= 5000
             GROUP BY s.id, s.label, s.ontologies
             ORDER BY count DESC, lower(s.label)

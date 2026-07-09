@@ -28,7 +28,6 @@ from application.ports.api.laboratories_queries import (
     LabTutelle,
 )
 from application.ports.api.subjects_queries import SubjectFrequency
-from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES_SQL
 from infrastructure.queries.filters import OA_DASHBOARD_COLS_SQL
 from infrastructure.queries.perimeter import get_persons_structure_ids_list
 
@@ -227,13 +226,12 @@ class PgLaboratoriesQueries(LaboratoriesQueries):
         # nécessaire car publication_subjects peut avoir plusieurs rows par
         # (pub_id, subject_id) (sources différentes).
         rows = self._conn.execute(
-            text(f"""
+            text("""
                 SELECT s.id, s.label, s.ontologies, COUNT(DISTINCT p.id) AS n
                 FROM publication_subjects ps
                 JOIN publications p ON p.id = ps.publication_id
                 JOIN subjects s ON s.id = ps.subject_id
-                WHERE p.doc_type NOT IN {OUT_OF_SCOPE_DOC_TYPES_SQL}
-                  AND s.usage_count <= 5000
+                WHERE s.usage_count <= 5000
                   AND EXISTS (
                       SELECT 1 FROM authorships a
                       WHERE a.publication_id = p.id

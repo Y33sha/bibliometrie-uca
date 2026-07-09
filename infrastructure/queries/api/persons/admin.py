@@ -7,17 +7,14 @@ from typing import Any
 from sqlalchemy import Connection, bindparam, text
 
 from domain.persons.name_matching import names_compatible, parse_raw_author_name
-from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES_SQL
 from domain.sources.registry import AUTHOR_SOURCES_SQL
 
 # ── Orphan authorships ───────────────────────────────────────────
 
-# Filtre commun : in_perimeter, sans person_id, sources principales,
-# hors doc_types out-of-scope
+# Filtre commun : in_perimeter, sans person_id, sources principales
 _ORPHAN_BASE = f"""
     sa.person_id IS NULL AND sa.in_perimeter = TRUE
     AND sa.source IN {AUTHOR_SOURCES_SQL}
-    AND p.doc_type NOT IN {OUT_OF_SCOPE_DOC_TYPES_SQL}
     AND 'author' = ANY(sa.roles)
 """
 
