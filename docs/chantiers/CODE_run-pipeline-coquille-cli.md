@@ -25,7 +25,7 @@ La logique métier n'a pas fui vers le composition-root : le SQL brut ne subsist
 ## Décisions
 
 - **Orchestration en application, run_pipeline en coquille.** Chaque phase devient un orchestrateur `application/pipeline/<phase>/` qui séquence ses sous-étapes, ouvre ses transactions, logue sa progression et retourne ses métriques. `run_pipeline.py` se réduit au parsing des arguments, au graphe des phases, au câblage des adapters par phase, au dispatch séquentiel et aux signaux.
-- **Frontière transactionnelle injectée.** Pour ouvrir ses transactions sans importer `infrastructure/`, l'orchestrateur de phase reçoit un `OpenTransaction` (`application/ports/pipeline/transaction.py`) : un appelable rendant une transaction gérée (commit-sur-succès / rollback / close), fourni par le composition-root et satisfait par `Engine.begin`. Forme retenue sur la phase pilote : appelable, pas d'objet `UnitOfWork` réifié — les transactions d'une phase sont indépendantes et ses adapters injectés à côté, un registry de repos n'apporterait rien.
+- **Frontière transactionnelle injectée.** Pour ouvrir ses transactions sans importer `infrastructure/`, l'orchestrateur de phase reçoit un `OpenTransaction` (`application/ports/pipeline/transaction.py`) : un appelable rendant une transaction gérée (commit-sur-succès / rollback / close), fourni par le composition-root et satisfait par `managed_transaction` (`infrastructure/db/transaction.py`). Ce satisfier **tolère les commits par lots** émis dans le bloc — indispensable aux phases à progression durable (résolution d'adresses, purge par tranches, réconciliation, suggestion de pays) ; `Engine.begin` lève `InvalidRequestError` en sortie de bloc dès qu'un commit précoce a fermé sa transaction. Forme retenue : appelable, pas d'objet `UnitOfWork` réifié — une phase enchaîne des transactions indépendantes hétérogènes qu'un UoW (transaction + registry de repos) épouserait mal, et les gateways de requêtes (`Pg*Queries`, sans état, prenant `conn` par appel) n'y auraient pas leur place ; les adapters d'une phase sont injectés à côté.
 - **Familles par source collapsées.** `normalize` et `extract` : un registre `source → (classe, queries)` et un orchestrateur paramétré unique par famille, dans `application/pipeline/normalize/` et `application/pipeline/extract/`. Les ~12 copies deviennent 2 orchestrateurs.
 - **SQL brut déplacé** vers `infrastructure/`, appelé par l'orchestrateur applicatif concerné.
 
@@ -33,7 +33,7 @@ La logique métier n'a pas fui vers le composition-root : le SQL brut ne subsist
 
 ### Phase 1 — Fabrique de transaction et phase pilote
 
-- [x] Port `application/ports/pipeline/transaction.py` : `OpenTransaction`, appelable rendant une transaction gérée (commit-sur-succès / rollback / close). Satisfait tel quel par `Engine.begin`, fourni par le composition-root — pas d'objet `UnitOfWork` réifié (transactions indépendantes, adapters injectés à côté).
+- [x] Port `application/ports/pipeline/transaction.py` : `OpenTransaction`, appelable rendant une transaction gérée (commit-sur-succès / rollback / close). Satisfait par `managed_transaction` (`infrastructure/db/transaction.py`), qui tolère les commits par lots, fourni par le composition-root — pas d'objet `UnitOfWork` réifié (transactions indépendantes, adapters injectés à côté).
 - [x] Phase pilote `relations` migrée : `populate_relations.run(open_tx, queries, log)` possède sa transaction, son logging `▶`/`✓` et l'assemblage de `PhaseMetrics` ; `phase_relations` se réduit au câblage, `_run_populate_relations` supprimé. Validé e2e (`--only relations`) et par les hooks. La durée par phase reste captée par le dispatcher pour l'observabilité.
 
 ### Phase 2 — Familles par source
@@ -58,4 +58,3 @@ La logique métier n'a pas fui vers le composition-root : le SQL brut ne subsist
 ## Questions ouvertes
 
 - **Partage éventuel du unit of work avec l'API.** Le pilote retient l'appelable `OpenTransaction`. Un objet `UnitOfWork` réifié partagé entre le pipeline et l'API — dont les command handlers exposent déjà un unit of work fonctionnel — relèverait, s'il devenait souhaitable, d'un chantier séparé touchant `interfaces/api/`.
-- **Phases à commits multiples.** La fabrique « commit-sur-succès en fin de bloc » couvre le cas simple ; les phases qui committent au fil de l'eau (durabilité, étalement du WAL) doivent garder ce comportement. La fabrique doit passer la `Connection` pour autoriser les commits précoces sans double-commit parasite.
