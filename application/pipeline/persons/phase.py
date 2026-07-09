@@ -1,7 +1,7 @@
 """Orchestrateur unique de la phase personnes.
 
-Enchaîne, sur une seule transaction, les étapes qui rattachent les `source_authorships` aux
-personnes de façon ordre-indépendante :
+Phase mono-transaction : les six étapes tournent sur **une seule** transaction gérée (ouverte via
+`open_tx`), et rattachent les `source_authorships` aux personnes de façon ordre-indépendante :
 
 1. **enforce** — réapplique les épinglages admin (`confirmed_authorships`, must-link) : entrée
    fixe reposée avant toute dérivation.
@@ -14,11 +14,13 @@ personnes de façon ordre-indépendante :
 6. **purge** — re-orpheline les formes devenues ambiguës après régénération et supprime les
    personnes vidées.
 
-Le commit est laissé au caller : `run_pipeline` (une connexion, un commit) et la CLI (commit,
-ou rollback en dry-run) sont deux coquilles qui appellent cet orchestrateur.
+Le commit est porté par `open_tx` : `managed_transaction` commite en sortie de bloc si succès,
+rollback sinon. `phase_persons` de `run_pipeline` s'y réduit au câblage.
 """
 
 import logging
+import time
+from collections.abc import Callable
 
 from sqlalchemy import Connection
 
@@ -29,39 +31,44 @@ from application.pipeline.persons.purge import purge
 from application.pipeline.persons.reset import reset
 from application.ports.pipeline.name_forms import NameFormsQueries
 from application.ports.pipeline.persons_create import PersonsCreateQueries
+from application.ports.pipeline.transaction import OpenTransaction
 from application.ports.repositories.authorship_repository import AuthorshipRepository
 from application.ports.repositories.person_repository import PersonRepository
 
 
 def run(
-    conn: Connection,
+    open_tx: OpenTransaction,
     persons_queries: PersonsCreateQueries,
     name_forms_queries: NameFormsQueries,
     logger: logging.Logger,
     *,
-    person_repo: PersonRepository,
-    authorship_repo: AuthorshipRepository,
-    dry_run: bool = False,
+    person_repo_factory: Callable[[Connection], PersonRepository],
+    authorship_repo_factory: Callable[[Connection], AuthorshipRepository],
 ) -> PhaseMetrics:
-    """Exécute la phase personnes de bout en bout et rend ses métriques.
+    """Exécute la phase personnes de bout en bout, sur une transaction gérée, et rend ses métriques."""
+    logger.info("▶ persons")
+    t0 = time.perf_counter()
+    with open_tx() as conn:
+        person_repo = person_repo_factory(conn)
+        authorship_repo = authorship_repo_factory(conn)
 
-    Le commit (ou le rollback en dry-run) est laissé au caller.
-    """
-    n_enforced = authorship_repo.enforce_confirmed_authorships()
-    if n_enforced:
-        logger.info("Épinglages réappliqués : %d signatures recalées", n_enforced)
+        n_enforced = authorship_repo.enforce_confirmed_authorships()
+        if n_enforced:
+            logger.info("Épinglages réappliqués : %d signatures recalées", n_enforced)
 
-    reset_counts = reset(conn, persons_queries, logger, person_repo=person_repo)
-    match_result = match(conn, persons_queries, logger, person_repo=person_repo, dry_run=dry_run)
-    create_result = create(conn, persons_queries, logger, person_repo=person_repo, dry_run=dry_run)
-    populate(conn, name_forms_queries, logger)
-    purge_counts = purge(conn, persons_queries, logger)
+        reset_counts = reset(conn, persons_queries, logger, person_repo=person_repo)
+        match_result = match(conn, persons_queries, logger, person_repo=person_repo)
+        create_result = create(conn, persons_queries, logger, person_repo=person_repo)
+        populate(conn, name_forms_queries, logger)
+        purge_counts = purge(conn, persons_queries, logger)
 
-    return build_metrics(
-        match_result,
-        create_result,
-        transferred=reset_counts["transferred"],
-        reset_cross=reset_counts["reset_cross"],
-        reorphaned=purge_counts["reorphaned"],
-        deleted_persons=purge_counts["deleted_persons"],
-    )
+        metrics = build_metrics(
+            match_result,
+            create_result,
+            transferred=reset_counts["transferred"],
+            reset_cross=reset_counts["reset_cross"],
+            reorphaned=purge_counts["reorphaned"],
+            deleted_persons=purge_counts["deleted_persons"],
+        )
+    logger.info("✓ persons terminé en %.1fs", time.perf_counter() - t0)
+    return metrics
