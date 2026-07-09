@@ -474,20 +474,9 @@ def phase_normalize(**kw: Any) -> PhaseMetrics:
     # n'écrasent pas les métadonnées déjà posées par les précédentes
     # lors de `refresh_from_sources`.
     rows: list[dict[str, object]] = []
-    if "theses" in sources:
-        rows.append(_run_normalize_theses())
-    if "crossref" in sources:
-        rows.append(_run_normalize_crossref())
-    if "datacite" in sources:
-        rows.append(_run_normalize_datacite())
-    if "scanr" in sources:
-        rows.append(_run_normalize_scanr())
-    if "hal" in sources:
-        rows.append(_run_normalize_hal())
-    if "openalex" in sources:
-        rows.append(_run_normalize_openalex())
-    if "wos" in sources:
-        rows.append(_run_normalize_wos())
+    for source, build in _normalize_builders().items():
+        if source in sources:
+            rows.append(_run_normalize(source, build))
     # Balayage des identités orphelines : les writers ont pu re-pointer des
     # signatures vers d'autres identités, laissant des `author_identifying_keys`
     # que plus aucune signature ne référence.
@@ -1182,40 +1171,25 @@ def _normalize_row(source: str, stats: NormalizeStats, duration_s: float) -> dic
     }
 
 
-def _run_normalize_hal() -> dict[str, object]:
+def _normalize_builders() -> dict[str, Callable[[Any], Any]]:
+    """Constructeur du normalizer par source, dans l'ordre de priorité (source la plus
+    autoritative en premier — cf. SOURCE_PRIORITY) : les suivantes n'écrasent pas les
+    métadonnées déjà posées. Les six sources bibliographiques partagent le câblage
+    `_biblio` ; `theses` a le sien (`address_linker`, sans repos journal/publisher)."""
+    from application.pipeline.normalize.normalize_crossref import CrossrefNormalizer
+    from application.pipeline.normalize.normalize_datacite import DataciteNormalizer
     from application.pipeline.normalize.normalize_hal import HalNormalizer
-    from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.pipeline.normalize.authorships import PgAuthorshipsBatchQueries
-    from infrastructure.queries.pipeline.normalize.hal import PgHalNormalizeQueries
-    from infrastructure.queries.pipeline.staging import PgStagingQueries
-    from infrastructure.repositories import (
-        journal_repository,
-        publication_repository,
-        publisher_repository,
-    )
-
-    log.info("▶ normalize_hal")
-    t0 = time.time()
-    conn = get_sync_engine().connect()
-    stats = HalNormalizer(
-        conn,
-        log,
-        PgStagingQueries(),
-        PgHalNormalizeQueries(),
-        journal_repo_factory=journal_repository,
-        publisher_repo_factory=publisher_repository,
-        pub_repo_factory=publication_repository,
-        authorship_queries=PgAuthorshipsBatchQueries(),
-    ).run([])
-    duration = time.time() - t0
-    log.info("✓ normalize_hal terminé en %.1fs", duration)
-    return _normalize_row("hal", stats, duration)
-
-
-def _run_normalize_wos() -> dict[str, object]:
+    from application.pipeline.normalize.normalize_openalex import OpenalexNormalizer
+    from application.pipeline.normalize.normalize_scanr import ScanrNormalizer
+    from application.pipeline.normalize.normalize_theses import ThesesNormalizer
     from application.pipeline.normalize.normalize_wos import WosNormalizer
-    from infrastructure.db.engine import get_sync_engine
     from infrastructure.queries.pipeline.normalize.authorships import PgAuthorshipsBatchQueries
+    from infrastructure.queries.pipeline.normalize.crossref import PgCrossrefNormalizeQueries
+    from infrastructure.queries.pipeline.normalize.datacite import PgDataciteNormalizeQueries
+    from infrastructure.queries.pipeline.normalize.hal import PgHalNormalizeQueries
+    from infrastructure.queries.pipeline.normalize.openalex import PgOpenalexNormalizeQueries
+    from infrastructure.queries.pipeline.normalize.scanr import PgScanrNormalizeQueries
+    from infrastructure.queries.pipeline.normalize.theses import PgThesesNormalizeQueries
     from infrastructure.queries.pipeline.normalize.wos import PgWosNormalizeQueries
     from infrastructure.queries.pipeline.staging import PgStagingQueries
     from infrastructure.repositories import (
@@ -1223,167 +1197,51 @@ def _run_normalize_wos() -> dict[str, object]:
         publication_repository,
         publisher_repository,
     )
-
-    log.info("▶ normalize_wos")
-    t0 = time.time()
-    conn = get_sync_engine().connect()
-    stats = WosNormalizer(
-        conn,
-        log,
-        PgStagingQueries(),
-        PgWosNormalizeQueries(),
-        journal_repo_factory=journal_repository,
-        publisher_repo_factory=publisher_repository,
-        pub_repo_factory=publication_repository,
-        authorship_queries=PgAuthorshipsBatchQueries(),
-    ).run([])
-    duration = time.time() - t0
-    log.info("✓ normalize_wos terminé en %.1fs", duration)
-    return _normalize_row("wos", stats, duration)
-
-
-def _run_normalize_openalex() -> dict[str, object]:
-    from application.pipeline.normalize.normalize_openalex import OpenalexNormalizer
-    from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.pipeline.normalize.authorships import PgAuthorshipsBatchQueries
-    from infrastructure.queries.pipeline.normalize.openalex import PgOpenalexNormalizeQueries
-    from infrastructure.queries.pipeline.staging import PgStagingQueries
-    from infrastructure.repositories import (
-        journal_repository,
-        publication_repository,
-        publisher_repository,
-    )
-
-    log.info("▶ normalize_openalex")
-    t0 = time.time()
-    conn = get_sync_engine().connect()
-    stats = OpenalexNormalizer(
-        conn,
-        log,
-        PgStagingQueries(),
-        PgOpenalexNormalizeQueries(),
-        journal_repo_factory=journal_repository,
-        publisher_repo_factory=publisher_repository,
-        pub_repo_factory=publication_repository,
-        authorship_queries=PgAuthorshipsBatchQueries(),
-    ).run([])
-    duration = time.time() - t0
-    log.info("✓ normalize_openalex terminé en %.1fs", duration)
-    return _normalize_row("openalex", stats, duration)
-
-
-def _run_normalize_scanr() -> dict[str, object]:
-    from application.pipeline.normalize.normalize_scanr import ScanrNormalizer
-    from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.pipeline.normalize.authorships import PgAuthorshipsBatchQueries
-    from infrastructure.queries.pipeline.normalize.scanr import PgScanrNormalizeQueries
-    from infrastructure.queries.pipeline.staging import PgStagingQueries
-    from infrastructure.repositories import (
-        journal_repository,
-        publication_repository,
-        publisher_repository,
-    )
-
-    log.info("▶ normalize_scanr")
-    t0 = time.time()
-    conn = get_sync_engine().connect()
-    stats = ScanrNormalizer(
-        conn,
-        log,
-        PgStagingQueries(),
-        PgScanrNormalizeQueries(),
-        journal_repo_factory=journal_repository,
-        publisher_repo_factory=publisher_repository,
-        pub_repo_factory=publication_repository,
-        authorship_queries=PgAuthorshipsBatchQueries(),
-    ).run([])
-    duration = time.time() - t0
-    log.info("✓ normalize_scanr terminé en %.1fs", duration)
-    return _normalize_row("scanr", stats, duration)
-
-
-def _run_normalize_theses() -> dict[str, object]:
-    from application.pipeline.normalize.normalize_theses import ThesesNormalizer
-    from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.pipeline.normalize.theses import PgThesesNormalizeQueries
-    from infrastructure.queries.pipeline.staging import PgStagingQueries
-    from infrastructure.repositories import publication_repository
     from infrastructure.repositories.address_linker import PgAddressLinker
 
-    log.info("▶ normalize_theses")
-    t0 = time.time()
-    conn = get_sync_engine().connect()
-    stats = ThesesNormalizer(
-        conn,
-        log,
-        PgStagingQueries(),
-        PgThesesNormalizeQueries(),
-        pub_repo_factory=publication_repository,
-        address_linker=PgAddressLinker(),
-    ).run([])
-    duration = time.time() - t0
-    log.info("✓ normalize_theses terminé en %.1fs", duration)
-    return _normalize_row("theses", stats, duration)
+    def _biblio(cls: Any, queries_cls: Any) -> Callable[[Any], Any]:
+        return lambda conn: cls(
+            conn,
+            log,
+            PgStagingQueries(),
+            queries_cls(),
+            journal_repo_factory=journal_repository,
+            publisher_repo_factory=publisher_repository,
+            pub_repo_factory=publication_repository,
+            authorship_queries=PgAuthorshipsBatchQueries(),
+        )
+
+    return {
+        "theses": lambda conn: ThesesNormalizer(
+            conn,
+            log,
+            PgStagingQueries(),
+            PgThesesNormalizeQueries(),
+            pub_repo_factory=publication_repository,
+            address_linker=PgAddressLinker(),
+        ),
+        "crossref": _biblio(CrossrefNormalizer, PgCrossrefNormalizeQueries),
+        "datacite": _biblio(DataciteNormalizer, PgDataciteNormalizeQueries),
+        "scanr": _biblio(ScanrNormalizer, PgScanrNormalizeQueries),
+        "hal": _biblio(HalNormalizer, PgHalNormalizeQueries),
+        "openalex": _biblio(OpenalexNormalizer, PgOpenalexNormalizeQueries),
+        "wos": _biblio(WosNormalizer, PgWosNormalizeQueries),
+    }
 
 
-def _run_normalize_crossref() -> dict[str, object]:
-    from application.pipeline.normalize.normalize_crossref import CrossrefNormalizer
+def _run_normalize(source: str, build: Callable[[Any], Any]) -> dict[str, object]:
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.pipeline.normalize.authorships import PgAuthorshipsBatchQueries
-    from infrastructure.queries.pipeline.normalize.crossref import PgCrossrefNormalizeQueries
-    from infrastructure.queries.pipeline.staging import PgStagingQueries
-    from infrastructure.repositories import (
-        journal_repository,
-        publication_repository,
-        publisher_repository,
-    )
 
-    log.info("▶ normalize_crossref")
+    log.info("▶ normalize_%s", source)
     t0 = time.time()
     conn = get_sync_engine().connect()
-    stats = CrossrefNormalizer(
-        conn,
-        log,
-        PgStagingQueries(),
-        PgCrossrefNormalizeQueries(),
-        journal_repo_factory=journal_repository,
-        publisher_repo_factory=publisher_repository,
-        pub_repo_factory=publication_repository,
-        authorship_queries=PgAuthorshipsBatchQueries(),
-    ).run([])
+    try:
+        stats = build(conn).run([])
+    finally:
+        conn.close()
     duration = time.time() - t0
-    log.info("✓ normalize_crossref terminé en %.1fs", duration)
-    return _normalize_row("crossref", stats, duration)
-
-
-def _run_normalize_datacite() -> dict[str, object]:
-    from application.pipeline.normalize.normalize_datacite import DataciteNormalizer
-    from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.pipeline.normalize.authorships import PgAuthorshipsBatchQueries
-    from infrastructure.queries.pipeline.normalize.datacite import PgDataciteNormalizeQueries
-    from infrastructure.queries.pipeline.staging import PgStagingQueries
-    from infrastructure.repositories import (
-        journal_repository,
-        publication_repository,
-        publisher_repository,
-    )
-
-    log.info("▶ normalize_datacite")
-    t0 = time.time()
-    conn = get_sync_engine().connect()
-    stats = DataciteNormalizer(
-        conn,
-        log,
-        PgStagingQueries(),
-        PgDataciteNormalizeQueries(),
-        journal_repo_factory=journal_repository,
-        publisher_repo_factory=publisher_repository,
-        pub_repo_factory=publication_repository,
-        authorship_queries=PgAuthorshipsBatchQueries(),
-    ).run([])
-    duration = time.time() - t0
-    log.info("✓ normalize_datacite terminé en %.1fs", duration)
-    return _normalize_row("datacite", stats, duration)
+    log.info("✓ normalize_%s terminé en %.1fs", source, duration)
+    return _normalize_row(source, stats, duration)
 
 
 def _run_enrich_oa_status() -> PhaseMetrics:

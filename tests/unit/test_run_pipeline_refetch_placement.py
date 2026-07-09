@@ -21,14 +21,6 @@ _EXTRACTORS = (
     "_run_extract_scanr",
     "_run_extract_theses",
 )
-_NORMALIZERS = (
-    "_run_normalize_theses",
-    "_run_normalize_crossref",
-    "_run_normalize_scanr",
-    "_run_normalize_hal",
-    "_run_normalize_openalex",
-    "_run_normalize_wos",
-)
 
 
 def _patch_all(stack, names, *, returns_metrics=False):
@@ -49,7 +41,7 @@ def test_refetch_not_called_in_extract():
 
 def test_refetch_not_called_in_normalize():
     with ExitStack() as stack:
-        _patch_all(stack, _NORMALIZERS)
+        stack.enter_context(patch.object(run_pipeline, "_run_normalize"))
         stack.enter_context(patch.object(run_pipeline, "_vacuum_staging"))
         stack.enter_context(patch.object(run_pipeline, "_run_cleanup_orphan_identities"))
         refetch = stack.enter_context(
