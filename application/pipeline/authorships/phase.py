@@ -1,0 +1,91 @@
+"""Orchestrateur de la phase `authorships` : construction de la table de vérité authorships.
+
+Trois sous-étapes :
+
+1. **build_authorships** — consolide les `source_authorships` en authorships canoniques (une entrée
+   par couple publication × personne), avec `in_perimeter` consolidé ; les structures dérivent de la
+   matview `authorship_structures`. Le build pose `publications.in_perimeter` (rollup).
+2. **purge des orphelines** — supprime les publications restées à zéro authorship (hors-périmètre,
+   inatteignables), par lots avec commit par chunk (WAL borné, progression durable), puis récupère
+   l'espace churné (maintenance physique, hors transaction).
+3. **refresh des `pub_count`** — recalcule les compteurs `journals` + `publishers` qui dérivent de
+   `in_perimeter`.
+
+Phase source-agnostique : `--sources` n'est pas propagé. Une `source_authorship` peut être touchée
+par d'autres voies que sa propre normalisation (re-population d'affiliations, `refresh_from_sources`)
+— toutes les sources sont reconsolidées à chaque run. Build incrémental et convergent (add + prune +
+recompute en une passe) ; la purge complète reste en récupération manuelle via la CLI
+`build_authorships --rebuild-full`.
+"""
+
+import logging
+import time
+
+from application.pipeline.authorships.build_authorships import build
+from application.pipeline.metrics import PhaseMetrics
+from application.ports.pipeline.authorships_build import AuthorshipsBuildQueries
+from application.ports.pipeline.pub_counts import PubCountsQueries
+from application.ports.pipeline.purge_orphan_publications import PurgeOrphanPublicationsQueries
+from application.ports.pipeline.transaction import OpenTransaction
+
+# Taille de chunk du DELETE de purge : un commit par chunk étale le WAL et rend la progression
+# durable si le run est interrompu (le premier run, ou un full rebuild, peut supprimer ~118k
+# publications d'un coup).
+_PURGE_BATCH_SIZE = 5000
+
+
+def run(
+    open_tx: OpenTransaction,
+    build_queries: AuthorshipsBuildQueries,
+    purge_queries: PurgeOrphanPublicationsQueries,
+    pub_counts_queries: PubCountsQueries,
+    logger: logging.Logger,
+) -> PhaseMetrics:
+    """Enchaîne build → purge → refresh pub_count et retourne les métriques du build."""
+    logger.info("▶ build_authorships")
+    t0 = time.perf_counter()
+    with open_tx() as conn:
+        metrics = build(conn, build_queries, logger)
+    logger.info("✓ build_authorships terminé en %.1fs", time.perf_counter() - t0)
+
+    _purge_orphan_publications(open_tx, purge_queries, logger)
+    _refresh_pub_counts(open_tx, pub_counts_queries, logger)
+    return metrics
+
+
+def _purge_orphan_publications(
+    open_tx: OpenTransaction, purge_queries: PurgeOrphanPublicationsQueries, logger: logging.Logger
+) -> None:
+    """Purge par lots (commit par chunk) puis récupération de l'espace churné."""
+    logger.info("▶ purge publications orphelines (zéro authorship)")
+    t0 = time.perf_counter()
+    n = 0
+    with open_tx() as conn:
+        while True:
+            deleted = purge_queries.purge_orphan_publications(conn, limit=_PURGE_BATCH_SIZE)
+            if deleted == 0:
+                break
+            conn.commit()
+            n += deleted
+    # Reclaim : maintenance physique hors transaction, encapsulée dans l'adapter.
+    purge_queries.vacuum_analyze_churned()
+    logger.info(
+        "✓ purge : %d publication(s) supprimée(s) + VACUUM ANALYZE en %.1fs",
+        n,
+        time.perf_counter() - t0,
+    )
+
+
+def _refresh_pub_counts(
+    open_tx: OpenTransaction, pub_counts_queries: PubCountsQueries, logger: logging.Logger
+) -> None:
+    logger.info("▶ refresh pub_count (journals + publishers)")
+    t0 = time.perf_counter()
+    with open_tx() as conn:
+        n_journals, n_publishers = pub_counts_queries.refresh_pub_counts(conn)
+    logger.info(
+        "✓ pub_count : %d revues, %d éditeurs mis à jour en %.1fs",
+        n_journals,
+        n_publishers,
+        time.perf_counter() - t0,
+    )

@@ -25,6 +25,9 @@ chaque run pour rien.
 
 from sqlalchemy import Connection, text
 
+from application.ports.pipeline.purge_orphan_publications import PurgeOrphanPublicationsQueries
+from infrastructure.db.engine import get_sync_engine
+
 # Tables churnées par la purge et la re-création du run suivant, d'après les
 # `ON DELETE` des FK vers `publications` : la table elle-même, son détail
 # (CASCADE) et les `source_publications` dont le `publication_id` repasse à NULL
@@ -43,9 +46,9 @@ def purge_orphan_publications(conn: Connection, *, limit: int | None = None) -> 
 
     `limit` borne le nombre de publications supprimées par appel (un chunk) ;
     `None` = tout en une fois. Le batching — boucler sur des chunks avec un commit
-    entre chaque — est orchestré par le caller (cf. `run_pipeline`) : il étale le
-    WAL (le premier run cascade ~1,4M `publication_subjects` legacy) et rend la
-    progression durable face à une interruption, sans bloquer les lectures (un
+    entre chaque — est orchestré par l'orchestrateur de la phase authorships : il
+    étale le WAL (le premier run cascade ~1,4M `publication_subjects` legacy) et rend
+    la progression durable face à une interruption, sans bloquer les lectures (un
     DELETE prend `ROW EXCLUSIVE`, pas de conflit avec les SELECT).
     """
     limit_clause = "LIMIT :lim" if limit is not None else ""
@@ -74,3 +77,16 @@ def vacuum_analyze_churned(conn: Connection) -> None:
     """
     for table in CHURNED_TABLES:
         conn.execute(text(f"VACUUM ANALYZE {table}"))
+
+
+class PgPurgeOrphanPublicationsQueries(PurgeOrphanPublicationsQueries):
+    """Adapter PostgreSQL pour le port `PurgeOrphanPublicationsQueries`."""
+
+    def purge_orphan_publications(self, conn: Connection, *, limit: int | None = None) -> int:
+        return purge_orphan_publications(conn, limit=limit)
+
+    def vacuum_analyze_churned(self) -> None:
+        # Maintenance physique hors transaction : l'adapter ouvre sa propre connexion
+        # autocommit, le `VACUUM` ne pouvant rejoindre la transaction de l'appelant.
+        with get_sync_engine().connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+            vacuum_analyze_churned(conn)

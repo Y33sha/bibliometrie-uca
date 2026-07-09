@@ -833,15 +833,22 @@ def phase_authorships(**kw: Any) -> PhaseMetrics:
     La purge complète reste disponible en récupération manuelle via la CLI
     `build_authorships --rebuild-full`.
 
-    `build_authorships` pose `publications.in_perimeter` (rollup) ; on purge
-    ensuite les publications restées à zéro authorship (orphelines hors-périmètre,
-    cf. `purge_orphan_publications`) puis on rafraîchit les `pub_count` (journals +
-    publishers) qui dérivent de `in_perimeter`.
+    Séquence, transactions et métriques dans `application/pipeline/authorships/phase.py`.
     """
-    metrics = _run_build_authorships()
-    _run_purge_orphan_publications()
-    _run_refresh_pub_counts()
-    return metrics
+    from application.pipeline.authorships.phase import run
+    from infrastructure.queries.pipeline.authorships_build import PgAuthorshipsBuildQueries
+    from infrastructure.queries.pipeline.pub_counts import PgPubCountsQueries
+    from infrastructure.queries.pipeline.purge_orphan_publications import (
+        PgPurgeOrphanPublicationsQueries,
+    )
+
+    return run(
+        _open_tx,
+        PgAuthorshipsBuildQueries(),
+        PgPurgeOrphanPublicationsQueries(),
+        PgPubCountsQueries(),
+        log,
+    )
 
 
 def phase_countries(mode: Any = "full", **kw: Any) -> PhaseMetrics:
@@ -970,83 +977,6 @@ def _run_persons_phase() -> PhaseMetrics:
         conn.close()
     log.info("✓ persons terminé en %.1fs", time.time() - t0)
     return metrics
-
-
-def _run_build_authorships() -> PhaseMetrics:
-    from application.pipeline.authorships.build_authorships import build
-    from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.pipeline.authorships_build import PgAuthorshipsBuildQueries
-
-    log.info("▶ build_authorships")
-    t0 = time.time()
-    conn = get_sync_engine().connect()
-    try:
-        metrics = build(conn, PgAuthorshipsBuildQueries(), log)
-        conn.commit()
-    finally:
-        conn.close()
-    log.info("✓ build_authorships terminé en %.1fs", time.time() - t0)
-    return metrics
-
-
-# Taille de chunk du DELETE de purge : un commit par chunk étale le WAL et rend
-# la progression durable si le run est interrompu (le premier run, ou un full
-# rebuild, peut supprimer ~118k publications d'un coup).
-_PURGE_BATCH_SIZE = 5000
-
-
-def _run_purge_orphan_publications() -> None:
-    from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.pipeline.purge_orphan_publications import (
-        purge_orphan_publications,
-        vacuum_analyze_churned,
-    )
-
-    log.info("▶ purge publications orphelines (zéro authorship)")
-    t0 = time.time()
-    conn = get_sync_engine().connect()
-    n = 0
-    try:
-        while True:
-            deleted = purge_orphan_publications(conn, limit=_PURGE_BATCH_SIZE)
-            if deleted == 0:
-                break
-            conn.commit()
-            n += deleted
-    finally:
-        conn.close()
-    # VACUUM hors transaction (autocommit) : récupère l'espace des tuples morts
-    # pour réutilisation au run suivant (pas de FULL — cf. module).
-    vac = get_sync_engine().connect().execution_options(isolation_level="AUTOCOMMIT")
-    try:
-        vacuum_analyze_churned(vac)
-    finally:
-        vac.close()
-    log.info(
-        "✓ purge : %d publication(s) supprimée(s) + VACUUM ANALYZE en %.1fs",
-        n,
-        time.time() - t0,
-    )
-
-
-def _run_refresh_pub_counts() -> None:
-    from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.pipeline.pub_counts import refresh_pub_counts
-
-    log.info("▶ refresh pub_count (journals + publishers)")
-    t0 = time.time()
-    conn = get_sync_engine().connect()
-    try:
-        n_journals, n_publishers = refresh_pub_counts(conn)
-        conn.commit()
-    finally:
-        conn.close()
-    log.info(
-        "✓ pub_count : %d revues, %d éditeurs mis à jour en %.1fs",
-        n_journals,
-        n_publishers,
-        time.time() - t0,
-    )
 
 
 def _normalize_row(source: str, stats: NormalizeStats, duration_s: float) -> dict[str, object]:
