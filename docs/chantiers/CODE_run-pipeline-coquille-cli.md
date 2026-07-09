@@ -48,8 +48,8 @@ La logique métier n'a pas fui vers le composition-root : le SQL brut ne subsist
 Un orchestrateur `application/pipeline/<phase>/phase.py` par phase : séquence, transactions (`open_tx`), logging `▶`/`✓` et assemblage des métriques rapatriés ; opérations infra auxiliaires passées en ports injectés. Frontières transactionnelles préservées à l'identique (commits par lots des phases à progression durable) ; test e2e vert avant la phase suivante. Du plus simple au plus dur :
 
 - [x] `metadata_correction` (`3a8d583b`)
-- [x] `affiliations` — port `PerimeterQueries.refresh_perimeter_structures` ajouté
-- [ ] `countries`
+- [x] `affiliations` — port `PerimeterQueries.refresh_perimeter_structures` ajouté (`c133c07d`)
+- [x] `countries` — port `CountryQueries.count_address_country_status` ajouté, type `AddressCountryStatus` déplacé vers le port
 - [ ] `authorships`
 - [ ] `publications`
 - [ ] `persons` (déjà un orchestrateur `phase.py` prenant `conn` : passer à `open_tx`)
