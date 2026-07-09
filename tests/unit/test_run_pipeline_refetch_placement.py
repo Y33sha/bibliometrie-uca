@@ -14,24 +14,10 @@ from unittest.mock import patch
 import run_pipeline
 from application.pipeline.metrics import PhaseMetrics
 
-_EXTRACTORS = (
-    "_run_extract_openalex",
-    "_run_extract_hal",
-    "_run_extract_wos",
-    "_run_extract_scanr",
-    "_run_extract_theses",
-)
-
-
-def _patch_all(stack, names, *, returns_metrics=False):
-    for name in names:
-        kw = {"return_value": PhaseMetrics()} if returns_metrics else {}
-        stack.enter_context(patch.object(run_pipeline, name, **kw))
-
 
 def test_refetch_not_called_in_extract():
     with ExitStack() as stack:
-        _patch_all(stack, _EXTRACTORS, returns_metrics=True)
+        stack.enter_context(patch.object(run_pipeline, "_run_extract", return_value=PhaseMetrics()))
         refetch = stack.enter_context(
             patch.object(run_pipeline, "_run_refetch_truncated", return_value=PhaseMetrics())
         )
