@@ -31,7 +31,8 @@ La création (`fetch_unlinked_authorships`) comme l'attache hors-périmètre (`_
 Le `doc_type` canonique est arbitré par priorité de source dans `refresh_from_sources` ; le gate hors périmètre y vit donc, en frère du cas orphelin, plutôt que dans le planificateur pur `plan_reconciliation` qui devrait sinon dupliquer l'arbitrage de type. Les FK portent le reste : `source_publications.publication_id` (ON DELETE SET NULL) détache les SP, `authorships.publication_id` (ON DELETE CASCADE) emporte les authorships.
 
 - [x] `refresh_from_sources` : après arbitrage du `doc_type`, si le type résolu est dans `OUT_OF_SCOPE_DOC_TYPES`, supprimer la publication (`repo.delete` + event `publication.deleted_out_of_scope`). Couvre la création (publication neuve raffinée puis supprimée) comme la bascule cross-run (survivant retypé).
-- [ ] Tests : création d'une œuvre hors périmètre → aucune publication subsistante, SP orphelines ; bascule d'un type in-scope vers hors périmètre → publication supprimée, SP re-orphelinées, authorships purgées.
+- [x] Tests d'intégration : type hors périmètre → publication supprimée et `source_publications` détachées (SET NULL, non supprimées) ; suppression qui emporte les authorships canoniques en cascade.
+- [x] Validation sur données réelles : `--only publications --rebuild-publications` re-dirtie et rafraîchit tout le stock ; contrôle `SELECT count(*) FROM publications WHERE doc_type IN OUT_OF_SCOPE_DOC_TYPES` = 0.
 
 ### Phase 2 — Retrait des filtres devenus morts
 
@@ -41,10 +42,10 @@ Le `doc_type` canonique est arbitré par priorité de source dans `refresh_from_
 
 ### Phase 3 — Nettoyage du stock
 
-- [ ] Oneshot : supprimer les publications hors périmètre existantes et leurs authorships, détacher leurs `source_publications` (`publication_id → NULL`) et re-orpheliner leurs `source_authorships` (`person_id → NULL`). Le re-orphelinage retire aussi leur contribution aux formes de nom des personnes.
+- [x] Publications hors périmètre existantes : supprimées par `--only publications --rebuild-publications` (rafraîchissement de tout le stock), authorships emportées en cascade, `source_publications` détachées. Aucun oneshot dédié nécessaire.
+- [ ] Re-orphelinage des `source_authorships` hors périmètre (`person_id → NULL`) : non couvert par la suppression des publications (le `person_id` d'une signature est indépendant de sa publication). Ces signatures continuent d'alimenter les personnes et leurs formes de nom. Recoupe le nettoyage des formes de nom incompatibles ; à traiter là, pas ici.
 
 ## Questions ouvertes
 
 - **Dépendants curatés d'une publication hors périmètre.** Une publication hors périmètre ne devrait porter ni `distinct_publications`, ni `apc_payments`, ni épinglage ; le stock peut en avoir. À la suppression, les FK décident en silence : `distinct_publications` part en cascade, `apc_payments` est détaché (SET NULL). Acceptable, ou faut-il un garde qui signale une suppression hors périmètre portant de la curation, avant de l'appliquer au stock ?
-- **Garde-fou transitoire.** Le temps de valider la dé-matérialisation, une assertion ou un log en fin de phase publications (« aucune publication hors périmètre ne subsiste ») sécuriserait le retrait des filtres aval.
 - **`memoir`.** La décision garde la liste telle quelle ; `memoir` suit donc `peer_review` et cesse d'être matérialisé, sauf retrait explicite de la liste.
