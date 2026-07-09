@@ -50,15 +50,15 @@ Un orchestrateur `application/pipeline/<phase>/phase.py` par phase : séquence, 
 - [x] `metadata_correction` (`3a8d583b`)
 - [x] `affiliations` — port `PerimeterQueries.refresh_perimeter_structures` ajouté (`c133c07d`)
 - [x] `countries` — port `CountryQueries.count_address_country_status` ajouté, type `AddressCountryStatus` déplacé vers le port (`10227fbf`)
-- [x] `authorships` — ports neufs `PurgeOrphanPublicationsQueries`, `PubCountsQueries`. Le `VACUUM ANALYZE` (maintenance physique, autocommit) sort du périmètre de l'invariant « connexion injectée » : l'adapter de purge ouvre sa propre connexion autocommit, l'orchestrateur ne voit pas l'autocommit
-- [ ] `publications`
+- [x] `authorships` — ports neufs `PurgeOrphanPublicationsQueries`, `PubCountsQueries`. Le `VACUUM ANALYZE` (maintenance physique, autocommit) sort du périmètre de l'invariant « connexion injectée » : l'adapter de purge ouvre sa propre connexion autocommit, l'orchestrateur ne voit pas l'autocommit (`5b574748`)
+- [x] `publications` — port neuf `AddressPubCountQueries` (recompute `addresses.pub_count`), `mark_keys_dirty` ajouté à `PublicationsReconciliationQueries` ; repos injectés en factories
 - [ ] `persons` (déjà un orchestrateur `phase.py` prenant `conn` : passer à `open_tx`)
 - [ ] `subjects`
 - [ ] `cross_imports`, `publishers_journals` — cas durs (parallélisme, circuit-breaker par `ContextVar`, détection de config API) traités en dernier, gabarit rodé
 
 ### Phase 4 — SQL brut résiduel
 
-- [ ] Déplacer `_run_recompute_address_pub_count` et la poche SQL de `_run_parallel_extractors` vers `infrastructure/`.
+- [ ] Déplacer la poche SQL de `_run_parallel_extractors` vers `infrastructure/`. (Le recompute de `addresses.pub_count` est déjà injecté via `AddressPubCountQueries`, traité avec `publications`.)
 
 ### Phase 5 — Coquille
 
