@@ -223,6 +223,7 @@ def phase_extract(
     effective = (set(sources) if sources else allowed) & allowed
     metrics = PhaseMetrics()
     by_source: dict[str, dict[str, float]] = {}
+    extractors = _extractors()
 
     if policy.year_selection == "since_last":
         # HAL uniquement, depuis la dernière extraction HAL réussie (à 00:00). On se
@@ -241,7 +242,9 @@ def phase_extract(
             log.info("Mode quotidien : HAL depuis %s (fallback, aucune extraction HAL)", since)
         if "hal" in effective:
             try:
-                hal_metrics, hal_duration = _timed_metrics(partial(_run_extract_hal, since=since))
+                hal_metrics, hal_duration = _timed_metrics(
+                    partial(_run_extract, "hal", extractors["hal"], _extractor_args(since=since))
+                )
             except ExtractionConfigError as exc:
                 _signal_source_unconfigured(metrics, "hal", str(exc))
             else:
@@ -249,18 +252,21 @@ def phase_extract(
                 by_source["hal"] = _extract_source_summary(hal_metrics, hal_duration)
     else:
         tasks: list[tuple[str, Callable[[], PhaseMetrics]]] = []
+
+        def task(source: str, **arg_kwargs: Any) -> tuple[str, Callable[[], PhaseMetrics]]:
+            fn = partial(_run_extract, source, extractors[source], _extractor_args(**arg_kwargs))
+            return (source, fn)
+
         if "openalex" in effective:
-            tasks.append(
-                ("openalex", partial(_run_extract_openalex, start_year=start_year, year=year))
-            )
+            tasks.append(task("openalex", start_year=start_year, year=year))
         if "hal" in effective:
-            tasks.append(("hal", partial(_run_extract_hal, start_year=start_year, year=year)))
+            tasks.append(task("hal", start_year=start_year, year=year))
         if "wos" in effective:
-            tasks.append(("wos", partial(_run_extract_wos, start_year=start_year, year=year)))
+            tasks.append(task("wos", start_year=start_year, year=year))
         if "scanr" in effective:
-            tasks.append(("scanr", partial(_run_extract_scanr, start_year=start_year, year=year)))
+            tasks.append(task("scanr", start_year=start_year, year=year))
         if "theses" in effective:
-            tasks.append(("theses", partial(_run_extract_theses, year=year)))
+            tasks.append(task("theses", year=year))
         if tasks:
             by_source = _run_parallel_extractors(tasks, metrics)
 
@@ -1477,134 +1483,72 @@ def _run_extractor(extractor: Any, args: Any) -> PhaseMetrics:
     return metrics
 
 
-def _run_extract_hal(
-    *, start_year: int | None = None, year: int | None = None, since: str | None = None
-) -> PhaseMetrics:
+def _extractors() -> dict[str, Callable[[Any, Any], Any]]:
+    """Constructeur de l'extracteur par source : `(conn, source_log)` → extracteur câblé.
+
+    `wos` et `scanr` ouvrent une connexion d'amorçage pour lire leur clé / identifiants
+    avant l'extraction ; les autres n'ont besoin que de l'URL de base (lue en config)."""
     from application.pipeline.extract.extract_hal import HalExtractor
-    from infrastructure.db.engine import get_sync_engine
-    from infrastructure.sources.config import get_api_base_urls
-    from infrastructure.sources.hal.extract_hal import PgHalExtractAdapter
-
-    log.info("▶ extract_hal")
-    t0 = time.time()
-    source_log = setup_logger("hal", str(BASE / "logs"))
-    engine = get_sync_engine()
-    hal_url = get_api_base_urls()["hal"]
-    conn = engine.connect()
-    adapter = PgHalExtractAdapter(base_url=hal_url)
-    try:
-        metrics = _run_extractor(
-            HalExtractor(conn, source_log, adapter),
-            _extractor_args(start_year=start_year, year=year, since=since),
-        )
-    finally:
-        conn.close()
-    log.info("✓ extract_hal terminé en %.1fs — %s", time.time() - t0, metrics.as_summary())
-    return metrics
-
-
-def _run_extract_openalex(
-    *, start_year: int | None = None, year: int | None = None, since: str | None = None
-) -> PhaseMetrics:
     from application.pipeline.extract.extract_openalex import OpenalexExtractor
-    from infrastructure.db.engine import get_sync_engine
-    from infrastructure.sources.config import get_api_base_urls
-    from infrastructure.sources.openalex.extract_openalex import PgOpenalexExtractAdapter
-
-    log.info("▶ extract_openalex")
-    t0 = time.time()
-    source_log = setup_logger("openalex", str(BASE / "logs"))
-    engine = get_sync_engine()
-    base_url = get_api_base_urls()["openalex"]
-    conn = engine.connect()
-    adapter = PgOpenalexExtractAdapter(base_url=base_url)
-    try:
-        metrics = _run_extractor(
-            OpenalexExtractor(conn, source_log, adapter),
-            _extractor_args(start_year=start_year, year=year, since=since),
-        )
-    finally:
-        conn.close()
-    log.info("✓ extract_openalex terminé en %.1fs — %s", time.time() - t0, metrics.as_summary())
-    return metrics
-
-
-def _run_extract_wos(*, start_year: int | None = None, year: int | None = None) -> PhaseMetrics:
+    from application.pipeline.extract.extract_scanr import ScanrExtractor
+    from application.pipeline.extract.extract_theses import ThesesExtractor
     from application.pipeline.extract.extract_wos import WosExtractor
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.sources.config import get_api_base_urls, get_wos_api_key
-    from infrastructure.sources.wos.extract_wos import PgWosExtractAdapter
-
-    log.info("▶ extract_wos")
-    t0 = time.time()
-    source_log = setup_logger("wos", str(BASE / "logs"))
-    engine = get_sync_engine()
-    with engine.connect() as bootstrap:
-        base_url = get_api_base_urls()["wos"]
-        api_key = get_wos_api_key(bootstrap)
-    conn = engine.connect()
-    adapter = PgWosExtractAdapter(base_url=base_url, api_key=api_key)
-    try:
-        metrics = _run_extractor(
-            WosExtractor(conn, source_log, adapter),
-            _extractor_args(start_year=start_year, year=year),
-        )
-    finally:
-        conn.close()
-    log.info("✓ extract_wos terminé en %.1fs — %s", time.time() - t0, metrics.as_summary())
-    return metrics
-
-
-def _run_extract_scanr(*, start_year: int | None = None, year: int | None = None) -> PhaseMetrics:
-    from application.pipeline.extract.extract_scanr import ScanrExtractor
-    from infrastructure.db.engine import get_sync_engine
-    from infrastructure.sources.config import get_api_base_urls
+    from infrastructure.sources.hal.extract_hal import PgHalExtractAdapter
+    from infrastructure.sources.openalex.extract_openalex import PgOpenalexExtractAdapter
     from infrastructure.sources.scanr.extract_scanr import (
         PgScanrExtractAdapter,
         get_scanr_credentials_from_db,
     )
-
-    log.info("▶ extract_scanr")
-    t0 = time.time()
-    source_log = setup_logger("scanr", str(BASE / "logs"))
-    engine = get_sync_engine()
-    with engine.connect() as bootstrap:
-        base_url = get_api_base_urls()["scanr"]
-        credentials = get_scanr_credentials_from_db(bootstrap)
-    conn = engine.connect()
-    adapter = PgScanrExtractAdapter(base_url=base_url, credentials=credentials)
-    try:
-        metrics = _run_extractor(
-            ScanrExtractor(conn, source_log, adapter),
-            _extractor_args(start_year=start_year, year=year),
-        )
-    finally:
-        conn.close()
-    log.info("✓ extract_scanr terminé en %.1fs — %s", time.time() - t0, metrics.as_summary())
-    return metrics
-
-
-def _run_extract_theses(*, year: int | None = None) -> PhaseMetrics:
-    from application.pipeline.extract.extract_theses import ThesesExtractor
-    from infrastructure.db.engine import get_sync_engine
-    from infrastructure.sources.config import get_api_base_urls
     from infrastructure.sources.theses.extract_theses import PgThesesExtractAdapter
+    from infrastructure.sources.wos.extract_wos import PgWosExtractAdapter
 
-    log.info("▶ extract_theses")
-    t0 = time.time()
-    source_log = setup_logger("theses", str(BASE / "logs"))
-    engine = get_sync_engine()
-    base_url = get_api_base_urls()["theses"]
-    conn = engine.connect()
-    adapter = PgThesesExtractAdapter(base_url=base_url)
-    try:
-        metrics = _run_extractor(
-            ThesesExtractor(conn, source_log, adapter),
-            _extractor_args(year=year),
+    def hal(conn: Any, source_log: Any) -> Any:
+        adapter = PgHalExtractAdapter(base_url=get_api_base_urls()["hal"])
+        return HalExtractor(conn, source_log, adapter)
+
+    def openalex(conn: Any, source_log: Any) -> Any:
+        adapter = PgOpenalexExtractAdapter(base_url=get_api_base_urls()["openalex"])
+        return OpenalexExtractor(conn, source_log, adapter)
+
+    def wos(conn: Any, source_log: Any) -> Any:
+        with get_sync_engine().connect() as bootstrap:
+            api_key = get_wos_api_key(bootstrap)
+        adapter = PgWosExtractAdapter(base_url=get_api_base_urls()["wos"], api_key=api_key)
+        return WosExtractor(conn, source_log, adapter)
+
+    def scanr(conn: Any, source_log: Any) -> Any:
+        with get_sync_engine().connect() as bootstrap:
+            credentials = get_scanr_credentials_from_db(bootstrap)
+        adapter = PgScanrExtractAdapter(
+            base_url=get_api_base_urls()["scanr"], credentials=credentials
         )
+        return ScanrExtractor(conn, source_log, adapter)
+
+    def theses(conn: Any, source_log: Any) -> Any:
+        adapter = PgThesesExtractAdapter(base_url=get_api_base_urls()["theses"])
+        return ThesesExtractor(conn, source_log, adapter)
+
+    return {"hal": hal, "openalex": openalex, "wos": wos, "scanr": scanr, "theses": theses}
+
+
+def _run_extract(
+    source: str, make_extractor: Callable[[Any, Any], Any], args: argparse.Namespace
+) -> PhaseMetrics:
+    """Squelette commun d'une extraction : logs `▶`/`✓`, connexion, circuit-breaker
+    (`_run_extractor`), fermeture. Le câblage propre à la source vit dans `make_extractor`."""
+    from infrastructure.db.engine import get_sync_engine
+
+    log.info("▶ extract_%s", source)
+    t0 = time.time()
+    source_log = setup_logger(source, str(BASE / "logs"))
+    conn = get_sync_engine().connect()
+    try:
+        metrics = _run_extractor(make_extractor(conn, source_log), args)
     finally:
         conn.close()
-    log.info("✓ extract_theses terminé en %.1fs — %s", time.time() - t0, metrics.as_summary())
+    log.info("✓ extract_%s terminé en %.1fs — %s", source, time.time() - t0, metrics.as_summary())
     return metrics
 
 
