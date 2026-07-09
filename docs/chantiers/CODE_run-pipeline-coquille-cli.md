@@ -6,9 +6,14 @@
 
 ### Ce qui gonfle le fichier
 
-45 fonctions `_run_*` répètent le même patron (~15-20 lignes chacune, ~800 lignes au total) : imports paresseux de l'orchestrateur applicatif et des adapters `Pg*`, ouverture d'une connexion, appel de l'orchestrateur, `commit`, fermeture, logs `▶`/`✓` chronométrés. Mesuré : 43 `get_sync_engine().connect()`, 45 logs de phase, 61 fonctions au total. Seule ligne utile par fonction : l'appel de l'orchestrateur.
+Le fichier compte 16 phases (`phase_*`, dispatchées par `--only`) mais **45 fonctions `_run_*`** : ces dernières ne sont pas des phases, ce sont les sous-étapes que chaque phase enchaîne. Toutes répètent le même patron (~15-20 lignes) : imports paresseux de l'orchestrateur applicatif et des adapters `Pg*`, ouverture d'une connexion, appel de l'orchestrateur, `commit`, fermeture, logs `▶`/`✓` chronométrés. Seule ligne utile par fonction : l'appel de l'orchestrateur.
 
-La logique métier n'a pas fui vers l'orchestrateur : le SQL brut ne subsiste que dans deux poches (`_run_recompute_address_pub_count`, un fragment de `_run_parallel_extractors`) ; tout le reste délègue déjà à `infrastructure/`. Le problème est donc du **câblage dupliqué**, pas de la logique égarée.
+Deux causes distinctes à ce nombre :
+
+- **Copies par source (~12).** `normalize` se déploie en 7 fonctions (hal, wos, openalex, scanr, theses, crossref, datacite) et `extract` en 5 — quasi identiques, ne différant que par trois tokens : la classe `XxxNormalizer`/extracteur, le `PgXxx…Queries`, le nom de source. Ce ne sont pas des étapes distinctes mais la **même** étape répétée par source.
+- **Vraies sous-étapes (~le reste).** Les phases multi-étapes (countries 4, authorships 3, publishers_journals 3, metadata_correction 3…) enchaînent des opérations réellement distinctes, chacune avec ses adapters et sa transaction. Pas de duplication de logique, seulement le patron transverse.
+
+La logique métier n'a pas fui vers l'orchestrateur : le SQL brut ne subsiste que dans deux poches (`_run_recompute_address_pub_count`, un fragment de `_run_parallel_extractors`) ; tout le reste délègue déjà à `infrastructure/`. Le problème est donc du **câblage dupliqué** — par source, et transversalement.
 
 ### La contrainte de couches
 
@@ -23,12 +28,16 @@ Or le câblage instancie les `Pg*` (`infrastructure.queries`, `infrastructure.re
 
 ### Emplacement : tranché — reste dans run_pipeline
 
-Le câblage n'est pas dupliqué entre run_pipeline et `application/` : l'orchestrateur applicatif reçoit ses adapters déjà instanciés (injection), il ne les assemble pas. Assembler ces outils — choisir les `Pg*` concrets, ouvrir la connexion — est le propre du composition-root, et le contrat de couches l'interdit dans `application/`. run_pipeline étant son propre composition-root, le câblage y reste. La duplication à résoudre est **interne** : le même patron copié 45 fois. On l'écrit donc une fois (un helper) et on le rappelle — sans rien déplacer. (`interfaces/cli/pipeline/` a été supprimé volontairement ; pas de résurrection.)
+Le câblage n'est pas dupliqué entre run_pipeline et `application/` : l'orchestrateur applicatif reçoit ses adapters déjà instanciés (injection), il ne les assemble pas. Assembler ces outils — choisir les `Pg*` concrets, ouvrir la connexion — est le propre du composition-root, et le contrat de couches l'interdit dans `application/`. run_pipeline étant son propre composition-root, le câblage y reste. La duplication à résoudre est **interne** ; on l'écrit une fois et on la rappelle, sans rien déplacer. (`interfaces/cli/pipeline/` a été supprimé volontairement ; pas de résurrection.)
 
-### Forme de la déduplication : à trancher
+### Forme de la déduplication : hybride
 
-- **Helper (recommandé).** Une fonction porte « ouvrir / exécuter le travail de la phase / commit / fermer / chrono `▶`/`✓` ». Chaque phase reste une fonction nommée de trois lignes qui l'appelle. *Pour* : changement minimal ; chaque phase reste trouvable et garde ses particularités (argument en plus, second commit) ; traces d'erreur lisibles ; risque faible. *Contre* : il subsiste ~45 petites fonctions (mais de trois lignes).
-- **Registre déclaratif.** Les 45 fonctions deviennent une table `phase → (orchestrateur, fabriques d'adapters)` lue par un runner unique. *Pour* : toute la liste des phases tient en un coup d'œil, concision maximale. *Contre* : suppose les phases uniformes, ce qu'elles ne sont pas (extract parallèle, purge et reconcile à commits par lots, affiliations et publications enchaînant plusieurs sous-étapes, résumés sur mesure). Chaque exception force un échappatoire ; la table se remplit de cas particuliers et le runner de `if`. Débogage plus opaque.
+Les deux causes de gonflement appellent deux gestes **complémentaires**, pas un choix exclusif.
+
+- **Registre par source pour les familles homogènes.** `normalize` et `extract` : une table `source → (classe, queries)` et une fonction paramétrée unique par famille (`_run_normalize(source)`, `_run_extract(source)`). ~12 fonctions → 2, avec deux petits registres ; ~180 lignes de copier-coller supprimées. Le registre est pertinent **ici** parce que les étapes sont réellement uniformes.
+- **Helper transverse pour les sous-étapes hétérogènes.** Le reste (build_authorships, reconcile, purge, countries…) garde une fonction nommée par étape, réduite à trois lignes appelant un helper d'unit-of-work + chrono `▶`/`✓`. Chaque étape reste trouvable, garde ses particularités, et les traces d'erreur restent lisibles.
+
+À éviter : un registre déclaratif **global** couvrant toutes les phases — elles ne sont pas uniformes (extract parallèle, commits par lots, sous-étapes chaînées, résumés sur mesure), et chaque exception forcerait un échappatoire qui ruinerait la table.
 
 ### Frontière transactionnelle
 
@@ -41,19 +50,24 @@ Cas général : une connexion, un `commit` en fin de phase. Quelques phases comm
 - [ ] Helper d'unit-of-work + timing au composition-root (connect / commit / rollback / close, logs `▶`/`✓`, chrono).
 - [ ] Migrer deux ou trois `_run_*` simples en pilote, figer le format et le contrat d'injection.
 
-### Phase 2 — Migration en masse
+### Phase 2 — Familles par source
 
-- [ ] Convertir les 45 `_run_*` au helper.
-- [ ] Traiter à part les phases à commits multiples (purge, reconcile) : variante du helper ou passage de la `Connection` nue.
+- [ ] `normalize` : registre `source → (Normalizer, PgQueries)` + `_run_normalize(source)` unique ; supprimer les 7 copies.
+- [ ] `extract` : même geste ; supprimer les 5 copies.
 
-### Phase 3 — SQL brut résiduel
+### Phase 3 — Sous-étapes hétérogènes
+
+- [ ] Convertir les `_run_*` restants (one-off) au helper.
+- [ ] Traiter à part les étapes à commits multiples (purge, reconcile) : variante du helper ou passage de la `Connection` nue.
+
+### Phase 4 — SQL brut résiduel
 
 - [ ] Déplacer `_run_recompute_address_pub_count` et la poche SQL de `_run_parallel_extractors` vers `infrastructure/`.
 
-### Phase 4 — Emplacement final et coquille
+### Phase 5 — Coquille CLI
 
-- [ ] Selon la décision d'emplacement, extraire les runners vers `interfaces/cli/pipeline/` ou les garder allégés en place.
 - [ ] Découper `main()` en helpers pour lever son `# noqa: C901`.
+- [ ] `run_pipeline.py` réduit à : parsing, graphe des phases, dispatch, signaux.
 
 ## Questions ouvertes
 
