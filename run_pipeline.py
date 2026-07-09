@@ -62,6 +62,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
+    from contextlib import AbstractContextManager
+
+    from sqlalchemy import Connection
+
     from application.ports.pipeline.extract.fetch_missing_doi import AsyncFetchMissingDoiAdapter
     from application.ports.pipeline.extract.refresh_stale import RefreshStaleAdapter
     from infrastructure.queries.pipeline.countries import AddressCountryStatus
@@ -93,6 +97,16 @@ atexit.register(clear_status)
 # ---------------------------------------------------------------------------
 # Définition des phases
 # ---------------------------------------------------------------------------
+
+
+def _open_tx() -> "AbstractContextManager[Connection]":
+    """Fabrique de transaction gérée (port `OpenTransaction`) injectée aux orchestrateurs de
+    phase : commit-sur-succès / rollback / close, tolérant les commits par lots. Concentrée au
+    composition-root pour que `application/` reste sans dépendance à l'engine."""
+    from infrastructure.db.engine import get_sync_engine
+    from infrastructure.db.transaction import managed_transaction
+
+    return managed_transaction(get_sync_engine())
 
 
 def _timed_metrics(fn: Callable[[], PhaseMetrics]) -> tuple[PhaseMetrics, float]:
@@ -813,10 +827,9 @@ def phase_relations(**kw: Any) -> PhaseMetrics:
     la déduplication (`metadata_correction`), pas d'ici.
     """
     from application.pipeline.relations.populate_relations import run
-    from infrastructure.db.engine import get_sync_engine
     from infrastructure.queries.pipeline.relations import PgPublicationRelationsQueries
 
-    return run(get_sync_engine().begin, PgPublicationRelationsQueries(), log)
+    return run(_open_tx, PgPublicationRelationsQueries(), log)
 
 
 def phase_persons(**kw: Any) -> PhaseMetrics:
