@@ -1,12 +1,13 @@
 """
 Construit la table authorships (table de vérité) à partir des authorships sources.
 
-Étape 1 : Insérer les authorships manquantes (paires publication_id, person_id)
-Étape 1bis : Pruner les authorships orphelines (paires que plus aucune source n'atteste)
+Étape 1 : Insérer les authorships manquantes puis pruner les orphelines
+          (paires publication_id, person_id que plus aucune source n'atteste)
 Étape 2 : Peupler les FK (source_authorships.authorship_id → authorships.id)
 Étape 3 : Recomposer les attributs en une passe convergente (author_position,
           is_corresponding, in_perimeter, roles)
-Étape 4 : Rafraîchir la matview authorship_structures (union dérivée des sources)
+Étape 4 : Matérialiser publications.in_perimeter (rollup depuis authorships)
+Étape 5 : Rafraîchir les matviews authorship_structures + publication_structures
 
 Le build est **source-agnostique** : il consolide l'ensemble des
 `source_authorships` indépendamment des sources couvertes par le run courant
@@ -35,7 +36,7 @@ def build(
 
     Le build est idempotent et convergent : appel répété sans `rebuild_full`
     converge vers le même résultat (l'étape 3 réécrit tout attribut divergent,
-    l'étape 1bis supprime les orphelines). Le flag `rebuild_full=True` purge
+    le prune supprime les orphelines). Le flag `rebuild_full=True` purge
     d'abord la table — filet anti-divergence précautionnel du mode pipeline
     `full`, désormais superflu en régime nominal.
     """
@@ -50,7 +51,7 @@ def build(
     inserted = queries.insert_missing_authorships(conn)
     logger.info(f"  {inserted} authorships créées")
 
-    # Étape 1bis : prune des orphelines (paires que plus aucune source n'atteste).
+    # Prune des orphelines (paires que plus aucune source n'atteste).
     # Le build incrémental est add-only ; sans ce prune une authorship dont l'auteur
     # a été retiré de toutes les sources survivrait jusqu'au rebuild `full`.
     pruned = queries.prune_orphan_authorships(conn)
@@ -88,13 +89,13 @@ def build(
     total_in_perimeter = queries.count_authorships_in_perimeter(conn)
     logger.info(f"  Total authorships in_perimeter=TRUE : {total_in_perimeter}")
 
-    # Étape 3bis : rollup vers publications.in_perimeter (flag matérialisé que les
+    # Étape 4 : rollup vers publications.in_perimeter (flag matérialisé que les
     # filtres de liste UCA lisent au lieu d'un EXISTS sur authorships à chaque appel).
-    logger.info("Étape 3bis : matérialisation de publications.in_perimeter...")
+    logger.info("Étape 4 : matérialisation de publications.in_perimeter...")
     pubs_updated = queries.refresh_publications_in_perimeter(conn)
     logger.info(f"  {pubs_updated} publications mises à jour (flag in_perimeter)")
 
-    logger.info("Étape 4 : refresh matviews authorship_structures + publication_structures...")
+    logger.info("Étape 5 : refresh matviews authorship_structures + publication_structures...")
     queries.refresh_authorship_structures(conn)
     queries.refresh_publication_structures(conn)
 
