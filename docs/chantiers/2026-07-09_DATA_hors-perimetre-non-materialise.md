@@ -36,9 +36,9 @@ Le `doc_type` canonique est arbitré par priorité de source dans `refresh_from_
 
 ### Phase 2 — Retrait des filtres devenus morts
 
-- [ ] Retirer `doc_type NOT IN OUT_OF_SCOPE_DOC_TYPES` de `fetch_unlinked_authorships`, `_OOP_COMMON_WHERE`, `authorships_build`.
-- [ ] Retirer le filtre de `list.py` et `facets.py`.
-- [ ] Statuer sur `OUT_OF_SCOPE_DOC_TYPES_SQL`, les familles `doc_type` et les libellés frontend : ce qui reste utile après suppression de la matérialisation.
+- [x] Entrées de pipeline : `doc_type NOT IN …` retiré de `authorships_build`, `fetch_unlinked_authorships` et du canal hors-périmètre (`_OOP_COMMON_WHERE`). L'exigence `publication_id IS NOT NULL` suffit désormais, la publication hors périmètre n'existant pas.
+- [x] Lectures API : filtre retiré de `list.py`, `facets.py`, `filters.py` (`publication_in_perimeter`), `laboratories.py`, `persons/detail.py`, `persons/admin.py`, `pub_counts.py`.
+- [x] `OUT_OF_SCOPE_DOC_TYPES_SQL` devenu inutilisé : supprimé de `scope.py`. Le frozenset `OUT_OF_SCOPE_DOC_TYPES` reste, consommé par le seul gate. Les familles `doc_type` et les libellés frontend sont des défauts d'affichage indépendants de la matérialisation : inchangés.
 
 ### Phase 3 — Nettoyage du stock
 
