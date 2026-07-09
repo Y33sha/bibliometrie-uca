@@ -900,10 +900,13 @@ def phase_subjects(**kw: Any) -> PhaseMetrics:
     Idempotente. Pour forcer une ré-ingestion complète (récupération), vider
     `publication_subjects` non rejetés : toutes les publications redeviennent
     « jamais ingérées ».
+
+    Séquence, transactions et métriques dans `application/pipeline/subjects/phase.py`.
     """
-    metrics = _run_ingest_subjects()
-    _run_cooccurrences()
-    return metrics
+    from application.pipeline.subjects.phase import run
+    from infrastructure.queries.subjects import PgSubjectsQueries
+
+    return run(_open_tx, PgSubjectsQueries(), log)
 
 
 def _normalize_row(source: str, stats: NormalizeStats, duration_s: float) -> dict[str, object]:
@@ -1111,39 +1114,6 @@ def _run_enrich_journals_from_doaj() -> PhaseMetrics:
         conn.close()
     log.info("✓ enrich_journals_from_doaj terminé en %.1fs", time.time() - t0)
     return PhaseMetrics(extras={"matched": stats.matched})
-
-
-def _run_ingest_subjects() -> PhaseMetrics:
-    from application.pipeline.subjects.run import run
-    from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.subjects import PgSubjectsQueries
-
-    log.info("▶ subjects")
-    t0 = time.time()
-    conn = get_sync_engine().connect()
-    try:
-        metrics = run(conn, PgSubjectsQueries(), log)
-        conn.commit()
-    finally:
-        conn.close()
-    log.info("✓ subjects terminé en %.1fs", time.time() - t0)
-    return metrics
-
-
-def _run_cooccurrences() -> None:
-    from application.pipeline.cooccurrences.run import run
-    from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.subjects import PgSubjectsQueries
-
-    log.info("▶ cooccurrences")
-    t0 = time.time()
-    conn = get_sync_engine().connect()
-    try:
-        run(conn, PgSubjectsQueries(), log)
-        conn.commit()
-    finally:
-        conn.close()
-    log.info("✓ cooccurrences terminé en %.1fs", time.time() - t0)
 
 
 # ── Extracteurs sources (Volet 0 — sweep subprocess → imports) ──
