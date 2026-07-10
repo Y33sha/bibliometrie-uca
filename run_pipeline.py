@@ -331,32 +331,27 @@ def phase_normalize(**kw: Any) -> PhaseMetrics:
     topics, biblio, etc.) sur source_publications. Vide le raw_data du staging
     apres traitement. Pour HAL : enrichit les structures et extrait ORCID/IdRef
     depuis le TEI.
+
+    Séquence, nettoyage et VACUUM dans `application/pipeline/normalize/phase.py`.
     """
-    sources = kw.get("sources", set(ALL_SOURCES_SET))
-    mode = kw.get("mode", "full")
-    policy = MODES[mode]
-    # Ordre d'exécution : source la plus autoritative en premier
-    # (cf. SOURCE_PRIORITY dans domain/sources.py). Les sources suivantes
-    # n'écrasent pas les métadonnées déjà posées par les précédentes
-    # lors de `refresh_from_sources`.
-    rows: list[dict[str, object]] = []
-    for source, build in _normalize_builders().items():
-        if source in sources:
-            rows.append(_run_normalize(source, build))
-    # Balayage des identités orphelines : les writers ont pu re-pointer des
-    # signatures vers d'autres identités, laissant des `author_identifying_keys`
-    # que plus aucune signature ne référence.
-    _run_cleanup_orphan_identities()
-    # Libérer l'espace TOAST du staging (raw_data vidé après normalisation)
-    vacuum_label = "VACUUM FULL" if policy.vacuum_full else "VACUUM"
-    log.info("▶ %s staging…", vacuum_label)
-    t0_vacuum = time.time()
-    _vacuum_staging(full=policy.vacuum_full)
-    log.info("✓ %s staging terminé en %.1fs", vacuum_label, time.time() - t0_vacuum)
-    metrics = PhaseMetrics()
-    metrics.add(total=sum(cast("int", r["processed"]) for r in rows))
-    metrics.details["table"] = {"rows": rows}
-    return metrics
+    from application.pipeline.normalize.phase import run
+
+    # Ordre d'exécution : source la plus autoritative en premier (cf. SOURCE_PRIORITY).
+    # Les suivantes n'écrasent pas les métadonnées déjà posées lors de `refresh_from_sources`.
+    registry = _normalize_builders()
+
+    def normalize_one(source: str) -> dict[str, object]:
+        return _run_normalize(source, registry[source])
+
+    return run(
+        sources=kw.get("sources", set(ALL_SOURCES_SET)),
+        mode=kw.get("mode", "full"),
+        ordered_sources=list(registry),
+        normalize_one=normalize_one,
+        cleanup_orphan_identities=_run_cleanup_orphan_identities,
+        vacuum_staging=_vacuum_staging,
+        logger=log,
+    )
 
 
 def _run_cleanup_orphan_identities() -> None:
