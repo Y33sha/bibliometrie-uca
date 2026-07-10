@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 
 import httpx
 from sqlalchemy import Connection
@@ -51,6 +52,8 @@ async def refetch(
     ré-écrits ; `already_complete` (extras) ceux qui avaient pile 100
     auteurs (genuine, flag effacé) ; `errors` les fetchs échoués.
     """
+    log.info("▶ refetch_truncated")
+    t0 = time.perf_counter()
     adapter.configure(conn)
 
     truncated = adapter.find_truncated(conn, limit=limit)
@@ -58,6 +61,11 @@ async def refetch(
 
     metrics = PhaseMetrics(seen=len(truncated))
     if not truncated or dry_run:
+        log.info(
+            "✓ refetch_truncated terminé en %.1fs — %s",
+            time.perf_counter() - t0,
+            metrics.as_summary(),
+        )
         return metrics
 
     sem = asyncio.Semaphore(adapter.max_concurrent)
@@ -104,6 +112,9 @@ async def refetch(
         f"Terminé : {metrics.updated} works mis à jour avec authorships complètes, "
         f"{metrics.extras.get('already_complete', 0)} déjà complets, "
         f"{metrics.errors} erreurs"
+    )
+    log.info(
+        "✓ refetch_truncated terminé en %.1fs — %s", time.perf_counter() - t0, metrics.as_summary()
     )
     return metrics
 

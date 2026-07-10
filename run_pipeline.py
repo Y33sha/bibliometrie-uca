@@ -184,8 +184,41 @@ def phase_resolve_ra(**kw: Any) -> PhaseMetrics:
     run courant, au lieu de tenter chaque DOI contre les deux APIs (ensembles disjoints).
     Le volet publisher (phase `publishers_journals`) complète ensuite les rows via les
     API `/prefixes`.
+
+    Séquence et métriques dans `run_resolve_ra` ; ici, le câblage (connexion, breaker, user-agent).
     """
-    return _run_resolve_ra()
+    from application.pipeline.publishers_journals.resolve_doi_prefixes import run_resolve_ra
+    from infrastructure.db.engine import get_sync_engine
+    from infrastructure.repositories import doi_prefix_repository
+    from infrastructure.sources.circuit_breaker import (
+        SourceCircuitBreaker,
+        reset_current_breaker,
+        set_current_breaker,
+    )
+    from infrastructure.sources.config import get_polite_pool_email_optional
+    from infrastructure.sources.doi_prefixes.clients import build_user_agent, resolve_ra
+
+    conn = get_sync_engine().connect()
+    # Circuit-breaker sur doi.org/ra : la ContextVar est lue par le helper HTTP,
+    # `run_resolve_ra` consulte `breaker.tripped` pour s'arrêter proprement.
+    breaker = SourceCircuitBreaker("doi.org/ra")
+    token = set_current_breaker(breaker)
+    try:
+        # doi.org/ra est une API publique (aucun credential) : l'email polite pool
+        # est facultatif, on ne saute pas la résolution s'il manque.
+        user_agent = build_user_agent(get_polite_pool_email_optional(conn) or "")
+        metrics = run_resolve_ra(
+            log,
+            repo=doi_prefix_repository(conn),
+            resolve_ra_fn=lambda doi: resolve_ra(doi, user_agent=user_agent),
+            breaker=breaker,
+        )
+        conn.commit()
+    finally:
+        reset_current_breaker(token)
+        conn.close()
+    _signal_if_tripped(metrics, breaker)
+    return metrics
 
 
 def phase_cross_imports(
@@ -352,14 +385,25 @@ def phase_refetch_truncated(**kw: Any) -> PhaseMetrics:
     Placée après `refresh_stale` (pour capter aussi les works tronqués ramenés
     par `cross_imports` et `refresh_stale`) et avant `normalize` (qui passe les
     lignes à `processed=TRUE`, après quoi elles sont invisibles à la détection).
+
+    Séquence et métriques dans `application/pipeline/extract/refetch_truncated.py`.
     """
+    import asyncio
+
+    from application.pipeline.extract.refetch_truncated import refetch
+    from infrastructure.db.engine import get_sync_engine
+    from infrastructure.sources.openalex.refetch_truncated import PgOpenalexRefetchAdapter
+
     sources = kw.get("sources", set(ALL_SOURCES_SET))
-    metrics = PhaseMetrics()
     # Toujours actif (incrémental : ne repère que les lignes openalex processed=FALSE
     # à 100 auteurs) ; ne dépend que de la présence d'openalex dans les sources.
-    if "openalex" in sources:
-        metrics.merge(_run_refetch_truncated())
-    return metrics
+    if "openalex" not in sources:
+        return PhaseMetrics()
+    conn = get_sync_engine().connect()
+    try:
+        return asyncio.run(refetch(conn, PgOpenalexRefetchAdapter(), log))
+    finally:
+        conn.close()
 
 
 def phase_normalize(**kw: Any) -> PhaseMetrics:
@@ -516,44 +560,6 @@ def _signal_if_tripped(metrics: PhaseMetrics, breaker: Any) -> None:
                 ),
             }
         )
-
-
-def _run_resolve_ra() -> PhaseMetrics:
-    from application.pipeline.publishers_journals.resolve_doi_prefixes import run_resolve_ra
-    from infrastructure.db.engine import get_sync_engine
-    from infrastructure.repositories import doi_prefix_repository
-    from infrastructure.sources.circuit_breaker import (
-        SourceCircuitBreaker,
-        reset_current_breaker,
-        set_current_breaker,
-    )
-    from infrastructure.sources.config import get_polite_pool_email_optional
-    from infrastructure.sources.doi_prefixes.clients import build_user_agent, resolve_ra
-
-    log.info("▶ resolve_ra")
-    t0 = time.time()
-    conn = get_sync_engine().connect()
-    # Circuit-breaker sur doi.org/ra : la ContextVar est lue par le helper HTTP,
-    # `run_resolve_ra` consulte `breaker.tripped` pour s'arrêter proprement.
-    breaker = SourceCircuitBreaker("doi.org/ra")
-    token = set_current_breaker(breaker)
-    try:
-        # doi.org/ra est une API publique (aucun credential) : l'email polite pool
-        # est facultatif, on ne saute pas la résolution s'il manque.
-        user_agent = build_user_agent(get_polite_pool_email_optional(conn) or "")
-        metrics = run_resolve_ra(
-            log,
-            repo=doi_prefix_repository(conn),
-            resolve_ra_fn=lambda doi: resolve_ra(doi, user_agent=user_agent),
-            breaker=breaker,
-        )
-        conn.commit()
-    finally:
-        reset_current_breaker(token)
-        conn.close()
-    log.info("✓ resolve_ra terminé en %.1fs — %s", time.time() - t0, metrics.as_summary())
-    _signal_if_tripped(metrics, breaker)
-    return metrics
 
 
 def _run_resolve_publishers() -> PhaseMetrics:
@@ -883,43 +889,6 @@ def _run_normalize(source: str, build: Callable[[Any], Any]) -> dict[str, object
     return _normalize_row(source, stats, duration)
 
 
-def _run_enrich_oa_status() -> PhaseMetrics:
-    import asyncio
-
-    import httpx
-
-    from application.pipeline.oa_status.run import run_enrich_oa_status
-    from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.pipeline.enrich import PgEnrichQueries
-    from infrastructure.repositories import publication_repository
-    from infrastructure.sources.config import get_api_base_urls, get_polite_pool_email_optional
-    from infrastructure.sources.unpaywall import fetch_oa_status
-
-    log.info("▶ enrich_oa_status")
-    t0 = time.time()
-    conn = get_sync_engine().connect()
-    try:
-        base_url = get_api_base_urls()["unpaywall"]
-        email = get_polite_pool_email_optional(conn) or ""
-
-        async def fetcher(client: httpx.AsyncClient, doi: str) -> str | None:
-            return await fetch_oa_status(client, doi, base_url=base_url, email=email, logger=log)
-
-        metrics = asyncio.run(
-            run_enrich_oa_status(
-                conn,
-                PgEnrichQueries(),
-                log,
-                pub_repo=publication_repository(conn),
-                fetcher=fetcher,
-            )
-        )
-    finally:
-        conn.close()
-    log.info("✓ enrich_oa_status terminé en %.1fs", time.time() - t0)
-    return metrics
-
-
 def _run_enrich_journals_from_openalex() -> PhaseMetrics:
     from application.pipeline.publishers_journals.enrich_journals_from_openalex import (
         run_enrich_journals_from_openalex,
@@ -1099,25 +1068,6 @@ def _run_extract(
     finally:
         conn.close()
     log.info("✓ extract_%s terminé en %.1fs — %s", source, time.time() - t0, metrics.as_summary())
-    return metrics
-
-
-def _run_refetch_truncated() -> PhaseMetrics:
-    import asyncio
-
-    from application.pipeline.extract.refetch_truncated import refetch
-    from infrastructure.db.engine import get_sync_engine
-    from infrastructure.sources.openalex.refetch_truncated import PgOpenalexRefetchAdapter
-
-    log.info("▶ refetch_truncated")
-    t0 = time.time()
-    conn = get_sync_engine().connect()
-    adapter = PgOpenalexRefetchAdapter()
-    try:
-        metrics = asyncio.run(refetch(conn, adapter, log))
-    finally:
-        conn.close()
-    log.info("✓ refetch_truncated terminé en %.1fs — %s", time.time() - t0, metrics.as_summary())
     return metrics
 
 
@@ -1313,10 +1263,45 @@ def phase_oa_status(**kw: Any) -> PhaseMetrics:
     jamais-vérifiées s'écoule run après run. Tourne dans tous les modes.
 
     Unpaywall exige l'email polite pool : sans lui, la phase est sautée proprement.
+
+    Séquence et métriques dans `application/pipeline/oa_status/run.py` ; ici, le câblage.
     """
+    import asyncio
+
+    import httpx
+
+    from application.pipeline.oa_status.run import run_enrich_oa_status
+    from infrastructure.db.engine import get_sync_engine
+    from infrastructure.queries.pipeline.enrich import PgEnrichQueries
+    from infrastructure.repositories import publication_repository
+    from infrastructure.sources.config import get_api_base_urls, get_polite_pool_email_optional
+    from infrastructure.sources.unpaywall import fetch_oa_status
+
     metrics = PhaseMetrics()
-    if _configured_api_targets(["unpaywall"], metrics, phase="oa_status"):
-        metrics.merge(_run_enrich_oa_status())
+    if not _configured_api_targets(["unpaywall"], metrics, phase="oa_status"):
+        return metrics
+
+    conn = get_sync_engine().connect()
+    try:
+        base_url = get_api_base_urls()["unpaywall"]
+        email = get_polite_pool_email_optional(conn) or ""
+
+        async def fetcher(client: httpx.AsyncClient, doi: str) -> str | None:
+            return await fetch_oa_status(client, doi, base_url=base_url, email=email, logger=log)
+
+        metrics.merge(
+            asyncio.run(
+                run_enrich_oa_status(
+                    conn,
+                    PgEnrichQueries(),
+                    log,
+                    pub_repo=publication_repository(conn),
+                    fetcher=fetcher,
+                )
+            )
+        )
+    finally:
+        conn.close()
     return metrics
 
 
