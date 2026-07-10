@@ -11,7 +11,7 @@ from application.ports.api.publication_duplicates_queries import (
 )
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.publication_repository import PublicationRepository
-from application.publications import commands as publication_commands
+from application.services.publications import commands as publication_commands
 from interfaces.api.deps import (
     audit_repo_sync,
     db_conn_sync,

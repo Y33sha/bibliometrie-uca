@@ -16,7 +16,7 @@ from application.ports.pipeline.metadata_correction import MetadataCorrectionQue
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.journal_repository import JournalRepository, JournalUpdateFields
 from application.ports.repositories.publication_repository import PublicationRepository
-from application.publications.core import refresh_from_sources
+from application.services.publications.core import refresh_from_sources
 from domain.errors import ConflictError, NotFoundError, ValidationError
 from domain.normalize import normalize_text
 from domain.types import JsonValue

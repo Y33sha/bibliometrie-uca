@@ -7,7 +7,7 @@ import pytest
 from sqlalchemy import bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
-from application.publications.core import (
+from application.services.publications.core import (
     find_by_doi,
     mark_distinct,
     merge_publications,

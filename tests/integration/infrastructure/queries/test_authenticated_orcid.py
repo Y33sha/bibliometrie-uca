@@ -146,7 +146,7 @@ class TestAuthenticateOrcid:
         assert repo.authenticate_orcid(person, _ORCID) == "noop"
 
     def test_import_is_idempotent(self, sa_sync_conn):
-        from application.persons.core import import_authenticated_orcids
+        from application.services.persons.core import import_authenticated_orcids
 
         p1 = _create_person(sa_sync_conn, last="One")
         p2 = _create_person(sa_sync_conn, last="Two")

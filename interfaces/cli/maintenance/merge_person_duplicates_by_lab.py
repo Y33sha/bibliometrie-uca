@@ -21,7 +21,7 @@ from typing import Any
 
 from sqlalchemy import Connection, text
 
-from application.persons.core import merge_person
+from application.services.persons.core import merge_person
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.repositories import person_repository
 

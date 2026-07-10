@@ -20,9 +20,9 @@ import logging
 
 from sqlalchemy import text
 
-from application.persons.core import add_name_form, create_person
 from application.pipeline.persons.cascade import create, match
 from application.pipeline.persons.reset import reset
+from application.services.persons.core import add_name_form, create_person
 from infrastructure.queries.pipeline.persons_create import PgPersonsCreateQueries
 from infrastructure.repositories import person_repository
 from tests.integration.helpers.authorships import upsert_identity
@@ -37,7 +37,7 @@ _logger = logging.getLogger("test")
 def _seed_identifier(conn, person_id, id_type, id_value, status, source="auto"):
     """Seed direct d'un person_identifiers avec statut arbitraire.
 
-    `application.persons.core.add_identifier` ne prend plus de `status` en paramètre
+    `application.services.persons.core.add_identifier` ne prend plus de `status` en paramètre
     (toujours `pending` à l'insertion). Pour préparer un état `confirmed` ou
     `rejected` en début de test, on passe par SQL.
     """

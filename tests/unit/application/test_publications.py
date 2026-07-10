@@ -6,7 +6,7 @@ Couvre le découplage de l'arbitrage : `doc_type` et `journal_id` canoniques peu
 pas le `journal_id` canonique. La re-correction la rejoue sur le journal réellement résolu.
 """
 
-from application.publications.core import _apply_canonical_doc_type_correction
+from application.services.publications.core import _apply_canonical_doc_type_correction
 from domain.publications.identifiers import DOI
 from domain.publications.publication import Publication
 

@@ -8,8 +8,6 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import Connection
 
-from application.persons import commands as person_commands
-from application.persons.core import AddIdentifierOutcome
 from application.ports.api.persons_queries import (
     AmbiguousNameFormsResponse,
     DetachableIntrudersResponse,
@@ -23,6 +21,8 @@ from application.ports.api.persons_queries import (
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.authorship_repository import AuthorshipRepository
 from application.ports.repositories.person_repository import PersonRepository
+from application.services.persons import commands as person_commands
+from application.services.persons.core import AddIdentifierOutcome
 from domain.persons.identifiers import PUBLIC_PERSON_IDENTIFIER_TYPES
 from interfaces.api.deps import (
     audit_repo_sync,

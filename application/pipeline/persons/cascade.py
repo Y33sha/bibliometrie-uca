@@ -43,18 +43,18 @@ from typing import NamedTuple
 
 from sqlalchemy import Connection
 
-from application.persons.core import (
-    add_identifiers_from_authorships as add_identifiers,
-    add_name_form,
-    create_person,
-    link_authorships as link_to_person,
-)
 from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.persons_create import (
     BareUnlinkedAuthorship,
     PersonsCreateQueries,
 )
 from application.ports.repositories.person_repository import PersonRepository
+from application.services.persons.core import (
+    add_identifiers_from_authorships as add_identifiers,
+    add_name_form,
+    create_person,
+    link_authorships as link_to_person,
+)
 from domain.normalize import normalize_name
 from domain.persons.creation import allow_person_creation
 from domain.persons.matching import (
@@ -333,7 +333,7 @@ class _Cascade:
     def apply_match(self, a: EnrichedAuthorship, pid: int | None, reason: str) -> None:
         assert pid is not None  # garanti par decide_person_match action=match
         # `link_to_person` et `add_identifiers` consomment des dicts (API historique de
-        # `application.persons`) : conversion via `_asdict()` au boundary.
+        # `application.services.persons`) : conversion via `_asdict()` au boundary.
         a_dict = a._asdict()
         link_to_person(
             pid,

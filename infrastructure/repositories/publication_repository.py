@@ -348,7 +348,7 @@ class PgPublicationRepository:
         3. Repointage des paires `distinct_publications` de source vers target (la distinction est préservée, pas perdue).
         4. Suppression de la ligne `publications` source.
 
-        L'enrichissement des métadonnées canoniques (doi, oa_status, countries, etc.) est porté par `Publication.absorb(other)` côté domaine et persisté par `repo.save(target)` côté application — pas par cette méthode. Le caller (`application.publications.merge_publications`) orchestre : absorb → save → merge_into → update_sources.
+        L'enrichissement des métadonnées canoniques (doi, oa_status, countries, etc.) est porté par `Publication.absorb(other)` côté domaine et persisté par `repo.save(target)` côté application — pas par cette méthode. Le caller (`application.services.publications.merge_publications`) orchestre : absorb → save → merge_into → update_sources.
         """
         # 1. Transférer les source_publications
         self._conn.execute(

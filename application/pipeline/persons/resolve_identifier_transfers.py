@@ -21,10 +21,10 @@ from collections import defaultdict
 from sqlalchemy import Connection
 
 from application.audit import emit_event
-from application.persons.core import IdentifierConflict
 from application.ports.pipeline.persons_create import PersonsCreateQueries
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.person_repository import PersonRepository
+from application.services.persons.core import IdentifierConflict
 from domain.persons.matching import ORCID_MATCH_SOURCES, form_matches_person
 
 # Types d'identifiant forts soumis à l'arbitrage de conflit.

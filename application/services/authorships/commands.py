@@ -15,11 +15,11 @@ dans une seule transaction.
 
 from sqlalchemy import Connection
 
-from application.authorships import assign_orphans, core as authorships_service
-from application.persons import core as persons_service
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.authorship_repository import AuthorshipRepository
 from application.ports.repositories.person_repository import PersonRepository
+from application.services.authorships import assign_orphans, core as authorships_service
+from application.services.persons import core as persons_service
 
 
 def exclude_authorship(

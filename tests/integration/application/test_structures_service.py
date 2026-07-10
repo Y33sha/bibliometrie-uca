@@ -7,7 +7,7 @@ structure_name_forms.
 import pytest
 from sqlalchemy import text
 
-from application.structures.core import (
+from application.services.structures.core import (
     create_name_form,
     create_relation,
     create_structure,

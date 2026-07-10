@@ -21,7 +21,7 @@ from application.ports.repositories.structure_repository import (
     StructureRepository,
     StructureRow,
 )
-from application.structures import core as structures_service
+from application.services.structures import core as structures_service
 from domain.types import JsonValue
 
 # ── structures ────────────────────────────────────────────────────

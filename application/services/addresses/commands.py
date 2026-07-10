@@ -17,8 +17,11 @@ puisque le commit précède leur exécution).
 
 from sqlalchemy import Connection
 
-from application.addresses import countries as countries_service, structures as structures_service
 from application.ports.repositories.address_repository import AddressRepository
+from application.services.addresses import (
+    countries as countries_service,
+    structures as structures_service,
+)
 
 
 def review_structure_link(

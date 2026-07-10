@@ -5,8 +5,6 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import Connection
 
-from application.journals import commands as journal_commands
-from application.journals.core import requalify_publications_for_journal
 from application.ports.api.journals_queries import (
     JournalDashboardResponse,
     JournalDetailResponse,
@@ -19,6 +17,8 @@ from application.ports.pipeline.metadata_correction import MetadataCorrectionQue
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.journal_repository import JournalRepository
 from application.ports.repositories.publication_repository import PublicationRepository
+from application.services.journals import commands as journal_commands
+from application.services.journals.core import requalify_publications_for_journal
 from domain.journals.journal import (
     JOURNAL_TYPE_LABELS_FR,
     JOURNAL_TYPES,

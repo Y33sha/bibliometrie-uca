@@ -18,7 +18,7 @@ from application.ports.api.structures_queries import (
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.perimeter_repository import PerimeterRepository
 from application.ports.repositories.structure_repository import StructureRepository
-from application.structures import commands as structure_commands
+from application.services.structures import commands as structure_commands
 from interfaces.api.deps import (
     audit_repo_sync,
     db_conn_sync,

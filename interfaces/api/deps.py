@@ -354,7 +354,7 @@ def bg_propagate_countries_sync(address_ids: list[int]) -> None:
     """
     import logging
 
-    from application.addresses import countries as countries_service
+    from application.services.addresses import countries as countries_service
 
     logger = logging.getLogger(__name__)
     try:
@@ -377,7 +377,7 @@ def bg_propagate_in_perimeter_sync(address_ids: list[int]) -> None:
     """
     import logging
 
-    from application.authorships.core import propagate_in_perimeter_for_addresses
+    from application.services.authorships.core import propagate_in_perimeter_for_addresses
 
     logger = logging.getLogger(__name__)
     try:

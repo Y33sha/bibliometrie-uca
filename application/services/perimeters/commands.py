@@ -10,10 +10,10 @@ command handler commit.
 
 from sqlalchemy import Connection
 
-from application.perimeters import core as perimeters_service
 from application.ports.config import ConfigStore
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.perimeter_repository import PerimeterRepository
+from application.services.perimeters import core as perimeters_service
 from domain.types import JsonValue
 
 
