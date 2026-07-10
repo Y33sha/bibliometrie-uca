@@ -12,6 +12,7 @@ Les clients HTTP (doi.org/ra, api.crossref.org/prefixes, api.datacite.org/prefix
 from __future__ import annotations
 
 import logging
+import time
 from collections.abc import Callable
 
 from application.pipeline.metrics import PhaseMetrics
@@ -48,6 +49,8 @@ def run_resolve_ra(
     `total` = préfixes traités ; `new` = rows insérées ; `extras` = `resolved` / `unresolved`.
     S'arrête si le `breaker` a tripé (doi.org à bout de budget).
     """
+    log.info("▶ resolve_ra")
+    t0 = time.perf_counter()
     metrics = PhaseMetrics()
     prefixes = repo.get_unresolved_prefixes_with_samples(n_samples_per_prefix=n_samples)
     log.info("%d préfixes à résoudre", len(prefixes))
@@ -92,6 +95,7 @@ def run_resolve_ra(
             for ra, dois, n_prefixes in repo.breakdown_by_registration_agency()
         ]
     }
+    log.info("✓ resolve_ra terminé en %.1fs — %s", time.perf_counter() - t0, metrics.as_summary())
     return metrics
 
 

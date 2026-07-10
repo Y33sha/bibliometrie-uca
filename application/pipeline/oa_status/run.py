@@ -26,6 +26,7 @@ Implémentation async : `httpx.AsyncClient` partagé +
 
 import asyncio
 import logging
+import time
 from collections.abc import Awaitable, Callable
 
 import httpx
@@ -65,6 +66,8 @@ async def run_enrich_oa_status(
     dry_run: bool = False,
     max_concurrent: int = MAX_CONCURRENT,
 ) -> PhaseMetrics:
+    logger.info("▶ enrich_oa_status")
+    t0 = time.perf_counter()
     metrics = PhaseMetrics()
     pubs = queries.fetch_publications_with_doi(
         conn, limit=limit or MAX_PER_RUN, staleness_days=STALENESS_DAYS
@@ -112,6 +115,11 @@ async def run_enrich_oa_status(
                 for s in statuses
             ]
         }
+        logger.info(
+            "✓ enrich_oa_status terminé en %.1fs — %s",
+            time.perf_counter() - t0,
+            metrics.as_summary(),
+        )
         return metrics
 
     if not total:
