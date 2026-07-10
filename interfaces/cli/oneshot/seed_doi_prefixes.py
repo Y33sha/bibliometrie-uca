@@ -10,7 +10,7 @@ noms d'éditeurs via `normalize_text`, matche contre
 un `publisher_id` quand un éditeur existe déjà, et insère le tout.
 
 Idempotent : `ON CONFLICT (prefix) DO NOTHING`. Évite ~900 appels API
-inutiles au premier run de la phase `resolve_doi_prefixes` en prod.
+inutiles au premier run de la phase `resolve_ra` en prod.
 
 Usage :
     python -m interfaces.cli.oneshot.seed_doi_prefixes [--dry-run]

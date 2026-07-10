@@ -1,6 +1,6 @@
 """Clients HTTP pour la résolution préfixe DOI → RA + éditeur Crossref / repository DataCite.
 
-Trois endpoints, appelés depuis la phase pipeline `resolve_doi_prefixes` :
+Trois endpoints, appelés par la résolution des préfixes DOI (`doi.org/ra` par la phase `resolve_ra` ; les `/prefixes` par `publishers_journals`) :
 
 - `doi.org/ra/<doi>` : Registration Agency d'un DOI donné. Une RA est permanente à l'échelle d'un préfixe (un préfixe = un registrant = une RA), donc un seul appel par préfixe suffit côté pipeline — mais en pratique on essaie plusieurs DOI samples par préfixe pour se prémunir d'un DOI erroné dans le staging.
 - `api.crossref.org/prefixes/<prefix>` : nom du publisher + ID member Crossref. Appelé uniquement quand la RA résolue précédemment est `'Crossref'`.

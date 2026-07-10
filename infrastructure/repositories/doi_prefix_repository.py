@@ -1,6 +1,6 @@
 """Adapter PostgreSQL pour la table `doi_prefixes`.
 
-Implémente `DoiPrefixRepository`. Sert la phase pipeline `resolve_doi_prefixes` : lecture des préfixes à résoudre + insertion des préfixes résolus (Crossref ou DataCite).
+Implémente `DoiPrefixRepository`. Sert la phase `resolve_ra` (lecture des préfixes à résoudre, insertion de leur Registration Agency) et le volet publisher de `publishers_journals` (attache de l'éditeur Crossref / repository DataCite).
 """
 
 from sqlalchemy import Connection, text

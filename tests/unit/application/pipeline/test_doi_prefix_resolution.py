@@ -9,10 +9,8 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 
-from application.pipeline.publishers_journals.resolve_doi_prefixes import (
-    run_resolve_publishers,
-    run_resolve_ra,
-)
+from application.pipeline.publishers_journals.resolve_publishers import run_resolve_publishers
+from application.pipeline.resolve_ra.run import run_resolve_ra
 from application.ports.repositories.doi_prefix_repository import PendingPublisherPrefix
 
 
