@@ -282,25 +282,6 @@ async def test_unchanged_status_skipped(logger):
 
 @pytest.mark.asyncio
 @respx.mock
-async def test_dry_run_skips_db_writes(logger):
-    pubs = [(1, "10.1/a", "closed", False), (2, "10.1/b", "closed", False)]
-    _route("10.1/a", status="gold")
-    _route("10.1/b", status="green")
-
-    repo = _FakeRepo()
-    await module.run_enrich_oa_status(
-        MagicMock(),
-        _FakeQueries(pubs),
-        logger,
-        pub_repo=repo,
-        fetcher=_make_fetcher(logger),
-        dry_run=True,
-    )
-    assert repo.updates == []
-
-
-@pytest.mark.asyncio
-@respx.mock
 async def test_429_retries_transparently(logger):
     """Un 429 puis 200 : `http_request_with_retry_async` re-essaie en interne."""
     respx.get(f"{UNPAYWALL_BASE}/10.1/r").mock(

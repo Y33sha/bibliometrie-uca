@@ -45,7 +45,6 @@ async def run_async(
     *,
     cross_import_dois_reader: CrossImportDoisReader,
     marker_handler: Callable[[Connection, str], None] | None = None,
-    dry_run: bool = False,
     limit: int | None = None,
     breaker: CircuitBreaker | None = None,
 ) -> PhaseMetrics:
@@ -74,7 +73,6 @@ async def run_async(
         marker_handler: optionnel ; si fourni, les sentinelles not-found y
             sont routées (`(conn, doi)`, charge de committer) au lieu de
             passer par `insert()`.
-        dry_run: compte et log sans fetch ni insert.
         limit: nombre max de DOI à traiter.
 
     Returns:
@@ -91,10 +89,6 @@ async def run_async(
     if limit:
         dois = dois[:limit]
         slog.info("limité à %d DOI", len(dois))
-
-    if dry_run:
-        slog.info("dry-run — rien inséré")
-        return PhaseMetrics(seen=len(dois))
 
     total = len(dois)
     if total == 0:

@@ -40,7 +40,6 @@ def run_resolve_ra(
     repo: DoiPrefixRepository,
     resolve_ra_fn: ResolveRaFn,
     n_samples: int = 3,
-    dry_run: bool = False,
     limit: int | None = None,
     breaker: CircuitBreaker | None = None,
 ) -> PhaseMetrics:
@@ -58,11 +57,6 @@ def run_resolve_ra(
     if limit is not None:
         prefixes = prefixes[:limit]
         log.info("Limité à %d préfixes", len(prefixes))
-
-    if dry_run:
-        log.info("Dry-run — aucun appel doi.org/ra, aucun insert")
-        metrics.add(total=len(prefixes))
-        return metrics
 
     new_by_ra: dict[str, int] = {}
     for prefix, samples in prefixes:
@@ -106,7 +100,6 @@ def run_resolve_publishers(
     publisher_repo: PublisherRepository,
     fetch_crossref_prefix_fn: FetchCrossrefPrefixFn,
     fetch_datacite_prefix_fn: FetchDataCitePrefixFn,
-    dry_run: bool = False,
     breaker: CircuitBreaker | None = None,
 ) -> PhaseMetrics:
     """Détermine et attache le publisher des préfixes en attente via `/prefixes`.
@@ -117,11 +110,6 @@ def run_resolve_publishers(
     metrics = PhaseMetrics()
     rows = repo.get_prefixes_pending_publisher()
     log.info("resolve_publishers — %d préfixes en attente de publisher", len(rows))
-
-    if dry_run:
-        log.info("Dry-run — aucun appel /prefixes, aucun UPDATE")
-        metrics.add(total=len(rows))
-        return metrics
 
     for row in rows:
         if breaker is not None and breaker.tripped:

@@ -194,27 +194,8 @@ def run(
     *,
     pub_repo: PublicationRepository,
     audit_repo: AuditRepository | None = None,
-    dry_run: bool = False,
 ) -> ReconcileStats | None:
     try:
-        if dry_run:
-            dirty_ids = queries.fetch_dirty_source_publication_ids(conn)
-            logger.info("Réconciliation (dry-run) : %d source_publications dirty", len(dirty_ids))
-            if dirty_ids:
-                plan = plan_reconciliation(
-                    (_member(row) for row in queries.fetch_reconciliation_universe(conn)),
-                    existing_pub_by_doi=queries.fetch_publication_ids_by_doi(conn),
-                )
-                created = sum(1 for g in plan.groups if g.target_publication_id is None)
-                logger.info(
-                    "  → rattachées à %d publications (%d créées), %d doublons à fusionner",
-                    len(plan.groups),
-                    created,
-                    len(plan.dissolved),
-                )
-            conn.rollback()
-            return None
-
         stats = reconcile(conn, queries, pub_repo=pub_repo, audit_repo=audit_repo, logger=logger)
         if stats is None:
             logger.info("Réconciliation : aucune source_publication dirty")

@@ -63,7 +63,6 @@ async def run_enrich_oa_status(
     pub_repo: PublicationRepository,
     fetcher: OaStatusFetcher,
     limit: int = 0,
-    dry_run: bool = False,
     max_concurrent: int = MAX_CONCURRENT,
 ) -> PhaseMetrics:
     logger.info("▶ enrich_oa_status")
@@ -157,21 +156,17 @@ async def run_enrich_oa_status(
             else:
                 new_status = status
                 progress["updated"] += 1
-                if dry_run:
-                    logger.info(f"  [DRY] {doi} : {current_status} → {status}")
 
-            if not dry_run:
-                async with db_lock:
-                    if new_status is not None:
-                        await asyncio.to_thread(pub_repo.update_oa_status, pub_id, new_status)
-                    else:
-                        await asyncio.to_thread(pub_repo.mark_unpaywall_checked, pub_id)
+            async with db_lock:
+                if new_status is not None:
+                    await asyncio.to_thread(pub_repo.update_oa_status, pub_id, new_status)
+                else:
+                    await asyncio.to_thread(pub_repo.mark_unpaywall_checked, pub_id)
 
             progress["processed"] += 1
             if progress["processed"] % BATCH_SIZE == 0:
-                if not dry_run:
-                    async with db_lock:
-                        await asyncio.to_thread(conn.commit)
+                async with db_lock:
+                    await asyncio.to_thread(conn.commit)
                 logger.info(
                     f"  {progress['processed']}/{total} — "
                     f"{progress['updated']} mis à jour, "
@@ -186,8 +181,7 @@ async def run_enrich_oa_status(
             )
         )
 
-    if not dry_run:
-        conn.commit()
+    conn.commit()
 
     logger.info(
         f"Terminé : {progress['updated']} mis à jour, {progress['skipped']} inchangés, "
