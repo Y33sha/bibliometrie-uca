@@ -65,14 +65,22 @@ Restent les phases qui parlent à une API, encore orchestrées au composition-ro
 - **Circuit-breaker** — `SourceCircuitBreaker` posé dans une `ContextVar` lue par la couche HTTP infra ; l'orchestrateur ne consulte que `breaker.tripped`.
 - **Détection de config API** — `_configured_api_targets` ouvre une connexion, lit les credentials, émet les signaux `source_unconfigured`.
 
-**Découpage proposé (à trancher avant de coder).**
+**Découpage retenu — descendre l'orchestration en `application/`** (plutôt que la laisser au composition-root sous prétexte qu'elle est mince et intriquée avec l'exécution) : cohérence avec les 8 phases DB, et une frontière hétérogène se paierait à la reprise DSI. `run_pipeline` vise la coquille stricte.
 
 - *Descend en `application/pipeline/<phase>/phase.py`* : la séquence des sous-étapes, l'itération par source/canal, la lecture de la policy de mode (`modes.py`, déjà en application), l'assemblage des métriques et signaux (tables par source, entonnoirs, `source_unconfigured` / `source_unavailable`).
 - *Reste au composition-root* : la construction des adapters `Pg*` et leurs registres (`_extractors`, `_make_*_adapter`) — contrainte de couches.
-- *Injecté en ports/callables* : (a) un primitif de parallélisme `run_parallel(tasks)` — l'application ordonne « lance ces N tâches » sans importer `ThreadPoolExecutor` ; (b) une requête `configured_targets` pour la détection de config ; (c) le circuit-breaker, l'orchestrateur recevant des runners déjà breakerisés et ne lisant que `tripped`.
-- La poche SQL résiduelle de `_run_parallel_extractors` descend en `infrastructure/` au passage. (Le recompute de `addresses.pub_count` est déjà injecté via `AddressPubCountQueries`, traité avec `publications`.)
+- *Injecté en ports/callables* : (a) `run_parallel` — port `RunParallel`, impl `infrastructure/concurrency.py` (thread pool + copie de `contextvars`), l'application ordonne « lance ces N thunks » sans importer `ThreadPoolExecutor` ; (b) une requête `configured_targets` pour la détection de config ; (c) le circuit-breaker, l'orchestrateur recevant des runners déjà breakerisés (métriques portant l'éventuel `source_unavailable`).
 
-**Réserve.** Le contenu use-case de ces phases est mince : l'essentiel est de l'infra (threading, breaker, HTTP). Le gain d'un orchestrateur applicatif dédié est plus faible que pour les phases DB, et la surface d'injection large (3-4 callables par phase). Alternative à peser : assumer que `run_pipeline` est à la fois composition-root **et** hôte d'exécution de ces phases parallèles, et se contenter d'y factoriser proprement (registres + runners déjà en place), sans descendre l'orchestration. Le choix conditionne si `run_pipeline` atteint la coquille stricte ou reste l'hôte assumé des phases parallèles.
+Phases :
+
+- [x] `extract` — orchestrateur `application/pipeline/extract/phase.py` ; injectés : `extract_one` (conn + adapter + breaker), `run_parallel`, `get_last_extract_date`. Helpers partagés `timed_metrics` / `signal_source_unconfigured` remontés en `application/pipeline/signals.py`. Validé par types + tests unitaires ; e2e à la prochaine extraction réelle.
+- [ ] `resolve_ra`
+- [ ] `cross_imports`
+- [ ] `refresh_stale`
+- [ ] `refetch_truncated`
+- [ ] `publishers_journals`
+- [ ] `oa_status`
+- [ ] enveloppe `normalize` (itération du registre, VACUUM, nettoyage des identités orphelines)
 
 ### Phase 5 — Coquille
 

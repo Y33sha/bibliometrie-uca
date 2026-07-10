@@ -19,25 +19,6 @@ def _table_keys(metrics: PhaseMetrics) -> set[str]:
     return {row["key"] for row in rows}
 
 
-def test_parallel_extractors_skip_unconfigured():
-    def _ok() -> PhaseMetrics:
-        return PhaseMetrics(new=3)
-
-    def _unconfigured() -> PhaseMetrics:
-        raise ExtractionConfigError("aucune clé")
-
-    metrics = PhaseMetrics()
-    by_source = run_pipeline._run_parallel_extractors(
-        [("openalex", _unconfigured), ("theses", _ok)], metrics
-    )
-
-    assert "openalex" not in by_source  # source sautée : aucune ligne
-    assert by_source["theses"]["new"] == 3
-    assert metrics.new == 3  # la source configurée est bien mergée
-    assert [s["code"] for s in metrics.signals] == ["source_unconfigured"]
-    assert metrics.signals[0]["level"] == "warning"
-
-
 def test_phase_extract_full_skips_unconfigured_source():
     def _extract(source, _make, _args):
         if source == "openalex":
