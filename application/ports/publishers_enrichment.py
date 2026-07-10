@@ -1,7 +1,7 @@
 """Port : lectures pour l'enrichissement (cosmétique) des éditeurs.
 
 Implémenté par `infrastructure.queries.publishers_enrichment.PgPublisherEnrichmentQueries`.
-Consommé par les orchestrateurs `application.publishers_enrichment` et le CLI de
+Consommé par les orchestrateurs `application.services.publishers.enrichment` et le CLI de
 maintenance `interfaces/cli/maintenance/enrich_publishers.py`.
 
 L'enrichissement éditeurs (pays, ROR, type) est purement cosmétique (affichage) —

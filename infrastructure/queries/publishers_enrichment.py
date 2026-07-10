@@ -1,7 +1,7 @@
 """Query service : sélection des éditeurs à enrichir (pays, ROR, type).
 
 Implémente `application.ports.publishers_enrichment.PublisherEnrichmentQueries`.
-Alimente les orchestrateurs `application.publishers_enrichment` (lancés par le CLI
+Alimente les orchestrateurs `application.services.publishers.enrichment` (lancés par le CLI
 de maintenance, hors pipeline — l'enrichissement éditeurs est cosmétique).
 """
 

@@ -6,12 +6,17 @@ trois orchestrateurs dans l'ordre (OpenAlex pose `country`+`ror` ; Crossref Memb
 rattrape les `country` manquants ; ROR dérive `publisher_type` depuis le `ror`).
 """
 
-from application.publishers_enrichment.from_crossref_members import (
+from application.services.publishers.enrichment.from_crossref_members import (
     CrossrefMemberFetcher,
     run_enrich_publishers_from_crossref_members,
 )
-from application.publishers_enrichment.from_openalex import run_enrich_publishers_from_openalex
-from application.publishers_enrichment.from_ror import RorFetcher, run_enrich_publishers_from_ror
+from application.services.publishers.enrichment.from_openalex import (
+    run_enrich_publishers_from_openalex,
+)
+from application.services.publishers.enrichment.from_ror import (
+    RorFetcher,
+    run_enrich_publishers_from_ror,
+)
 
 __all__ = [
     "CrossrefMemberFetcher",
