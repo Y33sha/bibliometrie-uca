@@ -73,14 +73,13 @@ Restent les phases qui parlent à une API, encore orchestrées au composition-ro
 
 Phases :
 
-- [x] `extract` — orchestrateur `application/pipeline/extract/phase.py` ; injectés : `extract_one` (conn + adapter + breaker), `run_parallel`, `get_last_extract_date`. Helpers partagés `timed_metrics` / `signal_source_unconfigured` remontés en `application/pipeline/signals.py`. Validé par types + tests unitaires ; e2e à la prochaine extraction réelle.
-- [ ] `resolve_ra`
-- [ ] `cross_imports`
-- [ ] `refresh_stale`
-- [ ] `refetch_truncated`
-- [ ] `publishers_journals`
-- [ ] `oa_status`
-- [ ] enveloppe `normalize` (itération du registre, VACUUM, nettoyage des identités orphelines)
+- [x] `extract` — orchestrateur `application/pipeline/extract/phase.py` ; injectés : `extract_one` (conn + adapter + breaker), `run_parallel` (port `RunParallel`, impl `infrastructure/concurrency.py`), `get_last_extract_date`. Helpers partagés `timed_metrics` / `signal_source_unconfigured` remontés en `application/pipeline/signals.py`.
+- [x] `resolve_ra`, `refetch_truncated`, `oa_status` — mono-étape : l'orchestrateur applicatif existait déjà, on y a remonté l'enveloppe `▶`/`✓`, `phase_*` réduit au câblage. Le signal `source_unavailable` reste au câblage (le port breaker n'expose que `tripped`).
+- [x] `refresh_stale` — orchestrateur `run_phase` (boucle par source, fenêtre d'années) ; injectés : `refresh_one`, `credentials_missing`, `get_years_for_window`.
+- [x] `cross_imports` — orchestrateur `application/pipeline/cross_imports/phase.py` (canaux HAL séquentiels + DOI parallèle via `RunParallel`).
+- [x] `publishers_journals` — orchestrateur `application/pipeline/publishers_journals/phase.py` (3 sous-étapes, gardes de config).
+- [x] enveloppe `normalize` — orchestrateur `application/pipeline/normalize/phase.py` (boucle registre, nettoyage identités orphelines, VACUUM encapsulé en infra).
+- [x] Détection de config factorisée en `application.pipeline.signals.filter_configured` (boucle `credentials_missing` injectée + signaux) ; `_configured_api_targets` supprimé du root.
 
 ### Phase 5 — Coquille
 

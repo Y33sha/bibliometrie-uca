@@ -1255,12 +1255,8 @@ def _install_sigterm_handler() -> None:
     signal.signal(signal.SIGTERM, _sigterm_raises_keyboard_interrupt)
 
 
-def main() -> None:  # noqa: C901 — orchestrateur CLI : refactor en helpers séparé du scope actuel
-    _install_sigterm_handler()
-    # Nettoie un status.json orphelin (PID mort : SIGKILL, crash, OOM)
-    # laissé par un run précédent — sinon le prochain lecteur verrait un
-    # statut fantôme jusqu'à notre premier write_status() de phase.
-    read_status()
+def _build_arg_parser() -> argparse.ArgumentParser:
+    """Parseur des arguments de la CLI pipeline."""
     parser = argparse.ArgumentParser(description="Orchestrateur pipeline bibliométrique")
     parser.add_argument(
         "--from", dest="from_phase", metavar="PHASE", help="Reprendre depuis cette phase"
@@ -1269,10 +1265,7 @@ def main() -> None:  # noqa: C901 — orchestrateur CLI : refactor en helpers s�
     parser.add_argument("--list", action="store_true", help="Lister les phases disponibles")
     parser.add_argument("--dry-run", action="store_true", help="Afficher les étapes sans exécuter")
     parser.add_argument(
-        "--mode",
-        choices=list(MODE_NAMES),
-        default="full",
-        help="Mode d'exécution (défaut: full)",
+        "--mode", choices=list(MODE_NAMES), default="full", help="Mode d'exécution (défaut: full)"
     )
     parser.add_argument(
         "--sources",
@@ -1305,13 +1298,187 @@ def main() -> None:  # noqa: C901 — orchestrateur CLI : refactor en helpers s�
         help="Avant la phase publications, re-dirtie tout le stock (rebuild complet : "
         "cluster-then-materialize global). À utiliser après une évolution des règles de clés.",
     )
-    args = parser.parse_args()
+    return parser
+
+
+def _print_phase_list() -> None:
+    """Affiche les phases disponibles (`--list`)."""
+    print("Phases disponibles :")
+    for i, (name, fn) in enumerate(PHASES, 1):
+        doc = fn.__doc__.strip().split("\n")[0] if fn.__doc__ else ""
+        print(f"  {i}. {name:15s} — {doc}")
+
+
+def _select_phases_to_run(
+    args: argparse.Namespace,
+) -> list[tuple[str, Callable[..., PhaseMetrics]]]:
+    """Phases à exécuter selon `--only` / `--from` (sinon toutes). Sort en erreur sur phase inconnue."""
+    if args.only:
+        if args.only not in PHASE_NAMES:
+            print(f"Phase inconnue : {args.only}. Phases : {', '.join(PHASE_NAMES)}")
+            sys.exit(1)
+        return [(n, fn) for n, fn in PHASES if n == args.only]
+    if args.from_phase:
+        if args.from_phase not in PHASE_NAMES:
+            print(f"Phase inconnue : {args.from_phase}. Phases : {', '.join(PHASE_NAMES)}")
+            sys.exit(1)
+        return PHASES[PHASE_NAMES.index(args.from_phase) :]
+    return list(PHASES)
+
+
+def _print_dry_run(phases_to_run: list[tuple[str, Callable[..., PhaseMetrics]]]) -> None:
+    """Affiche les phases qui seraient exécutées (`--dry-run`), sans rien lancer."""
+    for name, fn in phases_to_run:
+        doc = fn.__doc__.strip().split("\n")[0] if fn.__doc__ else ""
+        print(f"  [{name}] {doc}")
+    print("\n(dry-run : rien n'a été exécuté)")
+
+
+def _run_one_phase(
+    name: str,
+    fn: Callable[..., PhaseMetrics],
+    *,
+    index: int,
+    total: int,
+    args: argparse.Namespace,
+    sources: set[str],
+    recorder: Any,
+    pipeline_started_at: str,
+) -> tuple[str, float]:
+    """Exécute une phase : statut, appel, capture d'observabilité. Rend `(nom, durée)`.
+
+    Une interruption utilisateur ou une `RuntimeError` est enregistrée puis termine le process
+    (reprise possible via `--from <phase>`)."""
+    # Injecte le nom de phase dans tous les records émis pendant `fn` (logger `normalize:` plutôt
+    # que `pipeline:`), y compris depuis les extracteurs threadés qui héritent du contexte.
+    phase_token = set_log_phase(name)
+    try:
+        log.info("─" * 40)
+        log.info("PHASE : %s", name)
+        log.info("─" * 40)
+        write_status(
+            mode=args.mode,
+            phase=name,
+            started_at=pipeline_started_at,
+            phases_done=index,
+            phases_total=total,
+        )
+
+        phase_started_at = datetime.datetime.now(datetime.UTC)
+        t0_phase = time.time()
+        try:
+            result = fn(
+                mode=args.mode,
+                sources=sources,
+                year=args.year,
+                start_year=args.start_year,
+                include_wos=args.include_wos,
+                rebuild_publications=args.rebuild_publications,
+            )
+        except KeyboardInterrupt:
+            log.warning("Pipeline interrompu par l'utilisateur à la phase '%s'", name)
+            log.info("Pour reprendre : python run_pipeline.py --from %s", name)
+            recorder.record(
+                phase=name,
+                started_at=phase_started_at,
+                status="warning",
+                metrics=PhaseMetrics().to_payload(time.time() - t0_phase),
+                signals=[
+                    {
+                        "level": "warning",
+                        "code": "interrupted",
+                        "message": "Interrompu par l'utilisateur (action contrôlée)",
+                    }
+                ],
+                details={},
+            )
+            clear_status()
+            sys.exit(130)
+        except RuntimeError as e:
+            log.error("Pipeline interrompu à la phase '%s' : %s", name, e)
+            log.error("Pour reprendre : python run_pipeline.py --from %s", name)
+            recorder.record(
+                phase=name,
+                started_at=phase_started_at,
+                status="error",
+                metrics=PhaseMetrics().to_payload(time.time() - t0_phase),
+                signals=[{"level": "error", "code": "exception", "message": str(e)}],
+                details={},
+            )
+            clear_status()
+            sys.exit(1)
+
+        duration = time.time() - t0_phase
+        metrics = result if isinstance(result, PhaseMetrics) else PhaseMetrics()
+        if isinstance(result, PhaseMetrics):
+            log.info("Total phase %s : %s", name, result.as_summary())
+        recorder.record(
+            phase=name,
+            started_at=phase_started_at,
+            status="warning" if metrics.signals else "ok",
+            metrics=metrics.to_payload(duration),
+            signals=metrics.signals,
+            details=metrics.details,
+        )
+        return (name, duration)
+    finally:
+        reset_log_phase(phase_token)
+
+
+def _execute_phases(
+    args: argparse.Namespace, phases_to_run: list[tuple[str, Callable[..., PhaseMetrics]]]
+) -> None:
+    """Déroule la séquence des phases avec observabilité par run, puis le récapitulatif de fin."""
+    from infrastructure.observability.phase_executions import start_run
+
+    sources = {s.strip() for s in args.sources.split(",") if s.strip()}
+    # Sources effectivement interrogées : wos est opt-in (`--include-wos`).
+    effective_sources = sorted(sources - {"wos"}) if not args.include_wos else sorted(sources)
+    log.info("Sources : %s", ", ".join(effective_sources))
+
+    # Observabilité par phase : run_id de séquence, capture entrée/sortie + statut.
+    recorder = start_run(mode=args.mode, sources=effective_sources)
+    if recorder.run_id is not None:
+        log.info("Run pipeline #%d", recorder.run_id)
+
+    t0_total = time.time()
+    pipeline_started_at = datetime.datetime.now().isoformat(timespec="seconds")
+    total = len(phases_to_run)
+    phase_results = [
+        _run_one_phase(
+            name,
+            fn,
+            index=i,
+            total=total,
+            args=args,
+            sources=sources,
+            recorder=recorder,
+            pipeline_started_at=pipeline_started_at,
+        )
+        for i, (name, fn) in enumerate(phases_to_run)
+    ]
+
+    elapsed_total = time.time() - t0_total
+    recorder.close()
+    clear_status()
+    log.info("=" * 60)
+    log.info("PIPELINE TERMINÉ en %.0fs (%.1f min)", elapsed_total, elapsed_total / 60)
+    if recorder.run_id is not None:
+        log.info("Run #%d — récapitulatif par phase :", recorder.run_id)
+        for phase_name, phase_duration in phase_results:
+            log.info("  %-22s %7.1fs", phase_name, phase_duration)
+    log.info("=" * 60)
+
+
+def main() -> None:
+    _install_sigterm_handler()
+    # Nettoie un status.json orphelin (PID mort : SIGKILL, crash, OOM) laissé par un run précédent —
+    # sinon le prochain lecteur verrait un statut fantôme jusqu'à notre premier write_status().
+    read_status()
+    args = _build_arg_parser().parse_args()
 
     if args.list:
-        print("Phases disponibles :")
-        for i, (name, fn) in enumerate(PHASES, 1):
-            doc = fn.__doc__.strip().split("\n")[0] if fn.__doc__ else ""
-            print(f"  {i}. {name:15s} — {doc}")
+        _print_phase_list()
         return
 
     # Mutex pipeline (évite deadlocks cron vs lancement manuel).
@@ -1321,142 +1488,17 @@ def main() -> None:  # noqa: C901 — orchestrateur CLI : refactor en helpers s�
         print(str(exc), file=sys.stderr)
         sys.exit(1)
 
-    # Déterminer les phases à exécuter
-    if args.only:
-        if args.only not in PHASE_NAMES:
-            print(f"Phase inconnue : {args.only}. Phases : {', '.join(PHASE_NAMES)}")
-            sys.exit(1)
-        phases_to_run = [(n, fn) for n, fn in PHASES if n == args.only]
-    elif args.from_phase:
-        if args.from_phase not in PHASE_NAMES:
-            print(f"Phase inconnue : {args.from_phase}. Phases : {', '.join(PHASE_NAMES)}")
-            sys.exit(1)
-        idx = PHASE_NAMES.index(args.from_phase)
-        phases_to_run = PHASES[idx:]
-    else:
-        phases_to_run = PHASES
-
+    phases_to_run = _select_phases_to_run(args)
     log.info("=" * 60)
     log.info("PIPELINE BIBLIOMÉTRIQUE — mode %s", args.mode)
     log.info("Phases : %s", " → ".join(n for n, _ in phases_to_run))
     log.info("=" * 60)
 
     if args.dry_run:
-        for name, fn in phases_to_run:
-            doc = fn.__doc__.strip().split("\n")[0] if fn.__doc__ else ""
-            print(f"  [{name}] {doc}")
-        print("\n(dry-run : rien n'a été exécuté)")
+        _print_dry_run(phases_to_run)
         return
 
-    sources = set(s.strip() for s in args.sources.split(",") if s.strip())
-    # Sources effectivement interrogées : wos est opt-in (`--include-wos`).
-    effective_sources = sorted(sources - {"wos"}) if not args.include_wos else sorted(sources)
-    log.info("Sources : %s", ", ".join(effective_sources))
-
-    # Métriques pipeline
-    from infrastructure.observability.phase_executions import start_run
-
-    phase_results = []  # [(name, duration)] — pour le récapitulatif de fin
-
-    # Observabilité par phase : run_id de séquence, capture entrée/sortie + statut.
-    recorder = start_run(mode=args.mode, sources=effective_sources)
-    if recorder.run_id is not None:
-        log.info("Run pipeline #%d", recorder.run_id)
-
-    t0_total = time.time()
-    pipeline_started_at = datetime.datetime.now().isoformat(timespec="seconds")
-    for i, (name, fn) in enumerate(phases_to_run):
-        # Injecte le nom de phase dans tous les records émis pendant `fn` (nom de
-        # logger `normalize:` plutôt que `pipeline:`), y compris depuis les
-        # extracteurs threadés qui héritent du contexte via `copy_context`.
-        phase_token = set_log_phase(name)
-        try:
-            log.info("─" * 40)
-            log.info("PHASE : %s", name)
-            log.info("─" * 40)
-
-            write_status(
-                mode=args.mode,
-                phase=name,
-                started_at=pipeline_started_at,
-                phases_done=i,
-                phases_total=len(phases_to_run),
-            )
-
-            phase_started_at = datetime.datetime.now(datetime.UTC)
-            t0_phase = time.time()
-            try:
-                result = fn(
-                    mode=args.mode,
-                    sources=sources,
-                    year=args.year,
-                    start_year=args.start_year,
-                    include_wos=args.include_wos,
-                    rebuild_publications=args.rebuild_publications,
-                )
-            except KeyboardInterrupt:
-                log.warning("Pipeline interrompu par l'utilisateur à la phase '%s'", name)
-                log.info("Pour reprendre : python run_pipeline.py --from %s", name)
-                recorder.record(
-                    phase=name,
-                    started_at=phase_started_at,
-                    status="warning",
-                    metrics=PhaseMetrics().to_payload(time.time() - t0_phase),
-                    signals=[
-                        {
-                            "level": "warning",
-                            "code": "interrupted",
-                            "message": "Interrompu par l'utilisateur (action contrôlée)",
-                        }
-                    ],
-                    details={},
-                )
-                phase_results.append((name + " (INTERROMPU)", time.time() - t0_phase))
-                clear_status()
-                sys.exit(130)
-            except RuntimeError as e:
-                log.error("Pipeline interrompu à la phase '%s' : %s", name, e)
-                log.error("Pour reprendre : python run_pipeline.py --from %s", name)
-                recorder.record(
-                    phase=name,
-                    started_at=phase_started_at,
-                    status="error",
-                    metrics=PhaseMetrics().to_payload(time.time() - t0_phase),
-                    signals=[{"level": "error", "code": "exception", "message": str(e)}],
-                    details={},
-                )
-                phase_results.append((name + " (ERREUR)", time.time() - t0_phase))
-                clear_status()
-                sys.exit(1)
-
-            duration = time.time() - t0_phase
-            phase_results.append((name, duration))
-            metrics = result if isinstance(result, PhaseMetrics) else PhaseMetrics()
-            if isinstance(result, PhaseMetrics):
-                log.info("Total phase %s : %s", name, result.as_summary())
-            recorder.record(
-                phase=name,
-                started_at=phase_started_at,
-                status="warning" if metrics.signals else "ok",
-                metrics=metrics.to_payload(duration),
-                signals=metrics.signals,
-                details=metrics.details,
-            )
-        finally:
-            reset_log_phase(phase_token)
-
-    elapsed_total = time.time() - t0_total
-
-    recorder.close()
-
-    clear_status()
-    log.info("=" * 60)
-    log.info("PIPELINE TERMINÉ en %.0fs (%.1f min)", elapsed_total, elapsed_total / 60)
-    if recorder.run_id is not None:
-        log.info("Run #%d — récapitulatif par phase :", recorder.run_id)
-        for phase_name, phase_duration in phase_results:
-            log.info("  %-22s %7.1fs", phase_name, phase_duration)
-    log.info("=" * 60)
+    _execute_phases(args, phases_to_run)
 
 
 if __name__ == "__main__":
