@@ -1,17 +1,8 @@
-"""
-Résolution des adresses : rattachement aux structures + détection du périmètre.
+"""Résolution des adresses : rattachement aux structures et détection du périmètre.
 
-Lit les formes de noms depuis la table structure_name_forms,
-et enregistre dans address_structures avec matched_form_id pour
-la traçabilité (boucle de rétroaction).
+Lit les formes de noms depuis `structure_name_forms` et enregistre dans `address_structures` avec `matched_form_id` pour la traçabilité (boucle de rétroaction).
 
-L'orchestration dépend du port `AddressResolutionQueries`, injecté par le
-composition root `run_pipeline`.
-
-Schéma v2 :
-  - address_structures (address_id, structure_id, matched_form_id, is_confirmed)
-  - matched_form_id IS NOT NULL = détection auto
-  - matched_form_id IS NULL + is_confirmed = assignation manuelle
+L'orchestration dépend du port `AddressResolutionQueries`, injecté par le composition-root `run_pipeline`.
 """
 
 import logging
@@ -34,16 +25,9 @@ CHUNK_SIZE = 10000
 class AddressMatcher:
     """Matche les formes de structures dans une adresse via un automate Aho-Corasick.
 
-    L'automate, construit une fois sur les 453 formes, détecte en un seul
-    passage par adresse toutes les formes présentes (coût indépendant du
-    nombre de formes), là où une recherche forme par forme relisait chaque
-    adresse autant de fois qu'elle contenait de formes.
+    L'automate, construit une fois sur l'ensemble des formes, détecte en un seul passage par adresse toutes les formes présentes (coût indépendant du nombre de formes).
 
-    Une forme matche si son `form_text` est présent comme sous-chaîne ; les
-    formes `is_word_boundary` ou de longueur <= 6 exigent en plus un mot entier
-    (caractères adjacents hors [a-z0-9]). Les formes excluantes retirent leur
-    structure des résultats ; les formes à contexte (`requires_context_of`)
-    n'aboutissent que si une forme d'une des structures de contexte matche aussi.
+    Une forme matche si son `form_text` est présent comme sous-chaîne ; les formes `is_word_boundary` ou de longueur <= 6 exigent en plus un mot entier (caractères adjacents hors [a-z0-9]). Les formes excluantes retirent leur structure des résultats ; les formes à contexte (`requires_context_of`) n'aboutissent que si une forme d'une des structures de contexte matche aussi.
     """
 
     def __init__(self, forms: list[StructureNameForm]) -> None:
@@ -138,11 +122,7 @@ def process_addresses(
 ) -> tuple[int, int, int]:
     """Résout toutes les adresses par tranches (keyset) : matching mémoire + écritures en bloc.
 
-    Chaque tranche est lue (`normalized_text`, déjà normalisé en base — aucun
-    recalcul), matchée en mémoire, puis synchronisée en trois requêtes
-    ensemblistes (delete obsolètes / unflag / upsert idempotent des détections)
-    avant commit. Seules les détections qui changent sont écrites ; mémoire et
-    allers-retours SQL bornés par `chunk_size`.
+    Chaque tranche est lue (`normalized_text`, déjà normalisé en base — aucun recalcul), matchée en mémoire, puis synchronisée en trois requêtes ensemblistes (delete obsolètes / unflag / upsert idempotent des détections) avant commit. Seules les détections qui changent sont écrites ; mémoire et allers-retours SQL bornés par `chunk_size`.
     """
     t_start = time.perf_counter()
     processed = 0
