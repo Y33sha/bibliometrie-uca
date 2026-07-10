@@ -136,18 +136,6 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
       { key: "adresses", label: "Adresses traitées" },
       { key: "in_perimeter", label: "Adresses dans le périmètre" },
     ],
-    tables: [
-      {
-        source: "table",
-        firstColumnLabel: "Source",
-        columns: [
-          { key: "total", label: "source_authorships" },
-          { key: "in_perimeter", label: "Dans le périmètre" },
-          { key: "pct", label: "%", percent: true },
-        ],
-        total: true,
-      },
-    ],
   },
   publications: {
     lines: [
