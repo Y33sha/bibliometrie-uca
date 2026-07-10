@@ -50,7 +50,6 @@ Phases (dans l'ordre d'execution):
 import argparse
 import asyncio
 import atexit
-import contextvars
 import datetime
 import signal
 import sys
@@ -139,54 +138,6 @@ def _configured_api_targets(targets: list[str], metrics: PhaseMetrics, *, phase:
     return configured
 
 
-def _extract_source_summary(source_metrics: PhaseMetrics, duration_s: float) -> dict[str, float]:
-    """Récapitulatif par source pour la table de la phase `extract`."""
-    return {
-        "found": source_metrics.total,
-        "new": source_metrics.new,
-        "updated": source_metrics.updated,
-        "unchanged": source_metrics.unchanged,
-        "errors": source_metrics.errors,
-        "duration_s": round(duration_s, 1),
-    }
-
-
-def _run_parallel_extractors(
-    tasks: list[tuple[str, Callable[[], PhaseMetrics]]], metrics: PhaseMetrics
-) -> dict[str, dict[str, float]]:
-    """Exécute les extracteurs en parallèle et agrège leurs métriques.
-
-    Chaque `_run_extract_*` ouvre sa propre connexion DB et écrit dans des tables
-    `staging.*` distinctes : aucun état partagé, parallélisme thread-safe. La merge
-    des `PhaseMetrics` reste séquentielle (non thread-safe) dans le thread principal.
-    Une source non configurée (`ExtractionConfigError`) est sautée avec un
-    avertissement, les autres aboutissent. Retourne le récap par source ; une source
-    sautée n'y produit aucune ligne (distincte d'une source à zéro résultat)."""
-    from application.pipeline.extract.base import ExtractionConfigError
-
-    by_source: dict[str, dict[str, float]] = {}
-    log.info("▶ extracteurs en parallèle (%d) : %s", len(tasks), ", ".join(n for n, _ in tasks))
-    # Les threads n'héritent pas de la ContextVar de phase : chaque worker rejoue sa
-    # tâche dans une copie du contexte courant (phase `extract`), pour que ses logs
-    # restent estampillés `extract:` et non du nom du logger source. Une copie par
-    # worker — un même Context ne peut pas être entré par deux threads à la fois.
-    with ThreadPoolExecutor(max_workers=len(tasks)) as pool:
-        futures = {
-            pool.submit(contextvars.copy_context().run, _timed_metrics, fn): name
-            for name, fn in tasks
-        }
-        for future in as_completed(futures):
-            source = futures[future]
-            try:
-                source_metrics, duration = future.result()
-            except ExtractionConfigError as exc:
-                _signal_source_unconfigured(metrics, source, str(exc))
-                continue
-            metrics.merge(source_metrics)
-            by_source[source] = _extract_source_summary(source_metrics, duration)
-    return by_source
-
-
 def phase_extract(
     mode: Any = "full",
     sources: Any = None,
@@ -197,75 +148,33 @@ def phase_extract(
 ) -> PhaseMetrics:
     """Phase 1 : Extraction des sources vers staging.
 
-    La policy du mode (sources, stratégie d'années) vit dans
-    `application/pipeline/modes.py`. Le mode `full` extrait la plage
-    `[start_year … courante]` (défaut config `pipeline_start_year_full`) ; le mode
-    `daily` extrait HAL en incrémental par date. WoS est opt-in (`--include-wos`).
+    La policy du mode (sources, stratégie d'années) vit dans `application/pipeline/modes.py`.
+    Le refetch des works OpenAlex tronqués est une phase distincte (`refetch_truncated`), placée
+    après `refresh_stale` et avant `normalize`.
 
-    Le refetch des works OpenAlex tronqués est une phase distincte
-    (`refetch_truncated`), placée après `refresh_stale` et avant `normalize` : il
-    doit voir aussi les works ramenés par cross_imports et refresh_stale avant
-    que normalize ne les consomme.
+    Séquence, parallélisme et métriques dans `application/pipeline/extract/phase.py` ; ici, le
+    câblage : registre des adapters, primitif de parallélisme, lecture de la dernière extraction.
     """
-    from application.pipeline.extract.base import ExtractionConfigError
+    from application.pipeline.extract.phase import run
+    from infrastructure.concurrency import run_parallel
+    from infrastructure.observability.phase_executions import get_last_extract_date
 
-    policy = MODES[mode]
-    allowed = set(policy.extract_sources) | ({"wos"} if include_wos else set())
-    effective = (set(sources) if sources else allowed) & allowed
-    metrics = PhaseMetrics()
-    by_source: dict[str, dict[str, float]] = {}
-    extractors = _extractors()
+    registry = _extractors()
 
-    if policy.year_selection == "since_last":
-        # HAL uniquement, depuis la dernière extraction HAL réussie (à 00:00). On se
-        # cale sur la dernière phase `extract` ayant inclus HAL, pas sur le dernier run
-        # quelconque : un run partiel (sans extract) ne doit pas avancer le curseur.
-        # OpenAlex n'a pas d'équivalent (filtre `from_updated_date` payant ;
-        # changefiles non filtrables par institution).
-        from infrastructure.observability.phase_executions import get_last_extract_date
+    def extract_one(source: str, args: argparse.Namespace) -> PhaseMetrics:
+        return _run_extract(source, registry[source], args)
 
-        last = get_last_extract_date("hal")
-        if last is not None:
-            since = last.isoformat()
-            log.info("Mode quotidien : HAL depuis %s (dernière extraction HAL)", since)
-        else:
-            since = (datetime.date.today() - datetime.timedelta(days=30)).isoformat()
-            log.info("Mode quotidien : HAL depuis %s (fallback, aucune extraction HAL)", since)
-        if "hal" in effective:
-            try:
-                hal_metrics, hal_duration = _timed_metrics(
-                    partial(_run_extract, "hal", extractors["hal"], _extractor_args(since=since))
-                )
-            except ExtractionConfigError as exc:
-                _signal_source_unconfigured(metrics, "hal", str(exc))
-            else:
-                metrics.merge(hal_metrics)
-                by_source["hal"] = _extract_source_summary(hal_metrics, hal_duration)
-    else:
-        tasks: list[tuple[str, Callable[[], PhaseMetrics]]] = []
-
-        def task(source: str, **arg_kwargs: Any) -> tuple[str, Callable[[], PhaseMetrics]]:
-            fn = partial(_run_extract, source, extractors[source], _extractor_args(**arg_kwargs))
-            return (source, fn)
-
-        if "openalex" in effective:
-            tasks.append(task("openalex", start_year=start_year, year=year))
-        if "hal" in effective:
-            tasks.append(task("hal", start_year=start_year, year=year))
-        if "wos" in effective:
-            tasks.append(task("wos", start_year=start_year, year=year))
-        if "scanr" in effective:
-            tasks.append(task("scanr", start_year=start_year, year=year))
-        if "theses" in effective:
-            tasks.append(task("theses", year=year))
-        if tasks:
-            by_source = _run_parallel_extractors(tasks, metrics)
-
-    if by_source:
-        metrics.details["table"] = {
-            "rows": [{"key": source, **summary} for source, summary in by_source.items()]
-        }
-    return metrics
+    return run(
+        mode=mode,
+        sources=set(sources) if sources else None,
+        year=year,
+        start_year=start_year,
+        include_wos=include_wos,
+        extract_one=extract_one,
+        run_parallel=run_parallel,
+        get_last_extract_date=get_last_extract_date,
+        logger=log,
+    )
 
 
 def phase_resolve_ra(**kw: Any) -> PhaseMetrics:
@@ -1098,18 +1007,6 @@ def _run_enrich_journals_from_doaj() -> PhaseMetrics:
 
 
 # ── Extracteurs sources (Volet 0 — sweep subprocess → imports) ──
-
-
-def _extractor_args(
-    *, start_year: int | None = None, year: int | None = None, since: str | None = None
-) -> argparse.Namespace:
-    """Construit le Namespace `args` consommé par `SourceExtractor.run_as_phase`.
-
-    Les extracteurs lisent `dry_run, start_year, year, since`. HAL et OpenAlex
-    exploitent `since` (incrémental) ; theses ignore `start_year` (ramène tout
-    l'historique des PPN).
-    """
-    return argparse.Namespace(dry_run=False, start_year=start_year, year=year, since=since)
 
 
 def _run_extractor(extractor: Any, args: Any) -> PhaseMetrics:
