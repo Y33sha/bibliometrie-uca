@@ -11,7 +11,7 @@ opérations atomiques du port qui recomposent une authorship pour une
 paire (publication, person) depuis ses source_authorships.
 """
 
-from application.audit import emit_event
+from application.audit_log import emit_event
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.authorship_repository import AuthorshipRepository
 from application.ports.repositories.person_repository import PersonRepository

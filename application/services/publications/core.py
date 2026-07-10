@@ -4,7 +4,7 @@ Service Publications — accès exclusif en écriture à la table `publications`
 Toute création, mise à jour ou recherche de publication passe par ce module. Les scripts de normalisation (HAL, OpenAlex, WoS, ScanR) et les autres traitements appellent ces fonctions au lieu de faire du SQL direct.
 """
 
-from application.audit import emit_event
+from application.audit_log import emit_event
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.publication_repository import PubByDoi, PublicationRepository
 from domain.errors import DistinctDoiError, NotFoundError

@@ -11,7 +11,7 @@ from typing import cast
 
 from sqlalchemy import Connection
 
-from application.audit import emit_event
+from application.audit_log import emit_event
 from application.ports.pipeline.metadata_correction import MetadataCorrectionQueries
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.journal_repository import JournalRepository

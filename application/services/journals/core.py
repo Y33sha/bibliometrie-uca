@@ -10,7 +10,7 @@ from typing import cast
 
 from sqlalchemy import Connection
 
-from application.audit import emit_event
+from application.audit_log import emit_event
 from application.pipeline.metadata_correction.correct_unary import correct_for_journal
 from application.ports.pipeline.metadata_correction import MetadataCorrectionQueries
 from application.ports.repositories.audit_repository import AuditRepository

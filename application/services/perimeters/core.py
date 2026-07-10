@@ -6,7 +6,7 @@ Le SQL vit dans `infrastructure/repositories/perimeter_repository.py`. Les route
 
 from typing import cast
 
-from application.audit import emit_event
+from application.audit_log import emit_event
 from application.ports.config import ConfigStore
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.perimeter_repository import (
