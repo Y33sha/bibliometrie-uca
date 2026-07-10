@@ -20,7 +20,6 @@ ajoute l'enveloppe transactionnelle, le chronométrage et l'assemblage des métr
 import logging
 import time
 from collections.abc import Callable
-from typing import TypeVar
 
 from sqlalchemy import Connection
 
@@ -31,10 +30,8 @@ from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.metadata_correction import MetadataCorrectionQueries
 from application.ports.pipeline.transaction import OpenTransaction
 
-T = TypeVar("T")
 
-
-def _step(
+def _step[T](
     open_tx: OpenTransaction, label: str, step: Callable[[Connection], T], logger: logging.Logger
 ) -> T:
     """Exécute une sous-étape dans sa propre transaction, encadrée d'un chronométrage `▶`/`✓`."""

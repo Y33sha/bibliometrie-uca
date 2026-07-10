@@ -1,4 +1,3 @@
-* voir pourquoi run_pipeline est aussi énorme: il devrait orchestrer la logique du pipeline, pas la contenir
 * publi 106296: gérer les adresses résultant d'une erreur de parsing (à quel niveau: exclure adresses? exclure source_authorships? - gestion manuelle, détection automatisée)
 
 # Pipeline
