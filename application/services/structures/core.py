@@ -8,7 +8,7 @@ Les routers passent par ces fonctions pour toute écriture. Les lectures restent
 
 from typing import cast
 
-from application.audit import emit_event
+from application.audit_log import emit_event
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.structure_repository import (
     StructureNameFormRow,

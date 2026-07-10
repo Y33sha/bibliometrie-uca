@@ -20,7 +20,7 @@ from collections import defaultdict
 
 from sqlalchemy import Connection
 
-from application.audit import emit_event
+from application.audit_log import emit_event
 from application.ports.pipeline.persons_create import PersonsCreateQueries
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.person_repository import PersonRepository

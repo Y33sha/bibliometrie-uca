@@ -7,7 +7,7 @@ Vérifie deux comportements essentiels :
 
 from sqlalchemy import text
 
-from application.audit import (
+from application.audit_log import (
     emit_event,
     get_current_user,
     reset_current_user,

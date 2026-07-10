@@ -8,7 +8,7 @@ from collections import Counter
 from enum import StrEnum
 from typing import NamedTuple, TypedDict, cast
 
-from application.audit import emit_event
+from application.audit_log import emit_event
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.authorship_repository import AuthorshipRepository
 from application.ports.repositories.person_repository import (
