@@ -20,7 +20,7 @@ Phases (toutes par défaut, dans l'ordre) :
                          résolus en base (`doi_prefixes.ra='DataCite'`). Cible : voir si
                          on peut récupérer un client/repository par préfixe (analogue
                          CrossRef → publisher) et envisager l'intégration dans la phase
-                         pipeline `resolve_doi_prefixes`.
+                         pipeline `publishers_journals`.
 
 Outputs : docs/chantiers/doi-prefixes-spike-data/*.json (gitignored).
 La note de synthèse `docs/chantiers/doi-prefixes-spike.md` est rédigée
@@ -408,7 +408,7 @@ def phase_prefixes_datacite(conn: Connection, user_agent: str) -> dict[str, Any]
     theses.fr, dépôt institutionnel…) ainsi que le *provider* (consortium
     ou organisme parent). Cible : évaluer s'il y a un mapping propre
     préfixe → client utilisable comme analogue du `name`/`member`
-    Crossref dans `resolve_doi_prefixes`.
+    Crossref dans `publishers_journals`.
     """
     log.info("▶ prefixes-datacite : api.datacite.org/prefixes/{p} pour préfixes DataCite en base")
 

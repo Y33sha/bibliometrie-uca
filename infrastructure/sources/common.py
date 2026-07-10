@@ -183,7 +183,7 @@ def upsert_not_found_stub(
 # on filtre les DOIs candidats sur leur préfixe : un DOI non-Crossref n'a rien
 # à faire dans un appel API Crossref (404 garanti, pollution `not_found_at`).
 # La valeur NULL côté `doi_prefixes.ra` est acceptée — préfixe pas encore
-# résolu par la phase `resolve_doi_prefixes`, on tente quand même en best-effort.
+# résolu par la phase `resolve_ra`, on tente quand même en best-effort.
 # Sources absentes du mapping (hal, openalex, wos, scanr) : aucun filtre RA,
 # ces APIs cherchent par DOI sans contrainte de registrar.
 _TARGET_RA: dict[str, str] = {

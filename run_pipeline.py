@@ -151,7 +151,7 @@ def phase_resolve_ra(**kw: Any) -> PhaseMetrics:
 
     Séquence et métriques dans `run_resolve_ra` ; ici, le câblage (connexion, breaker, user-agent).
     """
-    from application.pipeline.publishers_journals.resolve_doi_prefixes import run_resolve_ra
+    from application.pipeline.resolve_ra.run import run_resolve_ra
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.repositories import doi_prefix_repository
     from infrastructure.sources.circuit_breaker import (
@@ -393,9 +393,9 @@ def phase_publishers_journals(**kw: Any) -> PhaseMetrics:
     """Enrichissement du référentiel `journals`, positionné entre `affiliations`
     et `metadata_correction`. Trois sous-étapes, toutes incrémentales :
 
-    1. `resolve_doi_prefixes` : préfixe DOI → Registration Agency + éditeur
-       Crossref / repository DataCite. Ne traite que les préfixes absents de
-       `doi_prefixes` (préfixe non résoluble → sentinelle `'unknown'`).
+    1. `resolve_publishers` : préfixe DOI → éditeur Crossref / repository DataCite
+       via `/prefixes`. Ne traite que les rows en attente de publisher ; la
+       Registration Agency est posée en amont par la phase `resolve_ra`.
     2. `enrich_journals_from_openalex` : OpenAlex Sources → APC + journal_type.
        Ne traite que les revues à `journal_type='unknown'` (converge à zéro,
        OpenAlex typant ses sources).
@@ -444,7 +444,7 @@ def _signal_if_tripped(metrics: PhaseMetrics, breaker: Any) -> None:
 
 
 def _run_resolve_publishers() -> PhaseMetrics:
-    from application.pipeline.publishers_journals.resolve_doi_prefixes import (
+    from application.pipeline.publishers_journals.resolve_publishers import (
         run_resolve_publishers,
     )
     from infrastructure.db.engine import get_sync_engine
