@@ -1,6 +1,6 @@
 """Client API Crossref Members — `GET /members/{id}`.
 
-Consommé par `application.publishers_enrichment.from_crossref_members`
+Consommé par `application.services.publishers.enrichment.from_crossref_members`
 (fallback `country` quand OpenAlex Publishers n'a pas de match) et par
 l'audit `audit_crossref_member_countries`.
 

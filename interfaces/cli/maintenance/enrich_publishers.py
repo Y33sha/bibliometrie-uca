@@ -21,7 +21,7 @@ from __future__ import annotations
 import argparse
 import os
 
-from application.publishers_enrichment import (
+from application.services.publishers.enrichment import (
     CrossrefMemberFetcher,
     RorFetcher,
     run_enrich_publishers_from_crossref_members,

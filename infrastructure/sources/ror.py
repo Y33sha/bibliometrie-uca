@@ -4,7 +4,7 @@ Endpoint unique consommé pour l'instant : `GET /v2/organizations/{ror}`,
 qui retourne le record ROR complet. ROR n'expose pas de bulk endpoint
 par liste d'IDs — chaque ROR doit être fetché individuellement.
 
-Consommateurs : `application.publishers_enrichment.from_ror` (maintenance) +
+Consommateurs : `application.services.publishers.enrichment.from_ror` (maintenance) +
 oneshot `audit_ror_types_for_publishers`.
 
 URL de base configurable via `_API_BASE_URLS_DEFAULTS["ror"]` (cf.
