@@ -43,9 +43,9 @@ La logique métier n'a pas fui vers le composition-root : le SQL brut ne subsist
 - [x] `normalize` : registre ordonné `source → constructeur` (`_normalize_builders`) + runner unique (`_run_normalize`) ; les 7 copies retirées, `phase_normalize` itère le registre. Validé e2e (`--only normalize`). Le câblage des `Pg*` reste au composition-root (contrainte de couches) — le registre y vit, pas dans `application/`.
 - [x] `extract` : registre `source → constructeur d'extracteur` (`_extractors`) + runner unique (`_run_extract`) ; les 5 copies retirées, `phase_extract` construit ses tâches via un helper `task` préservant args par source et parallélisme. Validé par types + tests unitaires ; e2e par la prochaine extraction réelle (APIs externes).
 
-### Phase 3 — Phases multi-étapes
+### Phase 3 — Phases multi-étapes DB (fait)
 
-Un orchestrateur `application/pipeline/<phase>/phase.py` par phase : séquence, transactions (`open_tx`), logging `▶`/`✓` et assemblage des métriques rapatriés ; opérations infra auxiliaires passées en ports injectés. Frontières transactionnelles préservées à l'identique (commits par lots des phases à progression durable) ; test e2e vert avant la phase suivante. Du plus simple au plus dur :
+Un orchestrateur `application/pipeline/<phase>/phase.py` par phase : séquence, transactions (`open_tx`), logging `▶`/`✓` et assemblage des métriques rapatriés ; opérations infra auxiliaires passées en ports injectés. Frontières transactionnelles préservées à l'identique (commits par lots des phases à progression durable) ; chaque phase validée e2e. Les phases à interrogation externe sont traitées à part (phase 4).
 
 - [x] `metadata_correction` (`3a8d583b`)
 - [x] `affiliations` — port `PerimeterQueries.refresh_perimeter_structures` ajouté (`c133c07d`)
@@ -53,12 +53,26 @@ Un orchestrateur `application/pipeline/<phase>/phase.py` par phase : séquence, 
 - [x] `authorships` — ports neufs `PurgeOrphanPublicationsQueries`, `PubCountsQueries`. Le `VACUUM ANALYZE` (maintenance physique, autocommit) sort du périmètre de l'invariant « connexion injectée » : l'adapter de purge ouvre sa propre connexion autocommit, l'orchestrateur ne voit pas l'autocommit (`5b574748`)
 - [x] `publications` — port neuf `AddressPubCountQueries` (recompute `addresses.pub_count`), `mark_keys_dirty` ajouté à `PublicationsReconciliationQueries` ; repos injectés en factories (`5cf1514e`)
 - [x] `persons` — mono-transaction : `run(open_tx, …)` possède sa transaction, repos en factories, `dry_run` mort retiré. Le test de non-régression « commit avant close » est remplacé par un test de `managed_transaction` (commit-sur-succès / rollback / commits par lots) qui garde la propriété pour toutes les phases (`28c9ef87`)
-- [x] `subjects` — deux sous-étapes (ingestion, co-occurrences) sur le port existant `SubjectsQueries`, sans opération orpheline
-- [ ] `cross_imports`, `publishers_journals` — cas durs (parallélisme, circuit-breaker par `ContextVar`, détection de config API) traités en dernier, gabarit rodé
+- [x] `subjects` — deux sous-étapes (ingestion, co-occurrences) sur le port existant `SubjectsQueries`, sans opération orpheline (`fced0c12`)
 
-### Phase 4 — SQL brut résiduel
+### Phase 4 — Phases à interrogation externe
 
-- [ ] Déplacer la poche SQL de `_run_parallel_extractors` vers `infrastructure/`. (Le recompute de `addresses.pub_count` est déjà injecté via `AddressPubCountQueries`, traité avec `publications`.)
+Restent les phases qui parlent à une API, encore orchestrées au composition-root : `extract`, `resolve_ra`, `cross_imports`, `refresh_stale`, `refetch_truncated`, `publishers_journals`, `oa_status` — plus l'enveloppe de `normalize` (registre collapsé en phase 2, mais itération, VACUUM et nettoyage des identités orphelines restent au root).
+
+**Pourquoi elles sont restées.** Trois préoccupations d'exécution/infra, absentes des phases DB :
+
+- **Parallélisme** — `ThreadPoolExecutor` + `contextvars.copy_context` (`extract`, `cross_imports`).
+- **Circuit-breaker** — `SourceCircuitBreaker` posé dans une `ContextVar` lue par la couche HTTP infra ; l'orchestrateur ne consulte que `breaker.tripped`.
+- **Détection de config API** — `_configured_api_targets` ouvre une connexion, lit les credentials, émet les signaux `source_unconfigured`.
+
+**Découpage proposé (à trancher avant de coder).**
+
+- *Descend en `application/pipeline/<phase>/phase.py`* : la séquence des sous-étapes, l'itération par source/canal, la lecture de la policy de mode (`modes.py`, déjà en application), l'assemblage des métriques et signaux (tables par source, entonnoirs, `source_unconfigured` / `source_unavailable`).
+- *Reste au composition-root* : la construction des adapters `Pg*` et leurs registres (`_extractors`, `_make_*_adapter`) — contrainte de couches.
+- *Injecté en ports/callables* : (a) un primitif de parallélisme `run_parallel(tasks)` — l'application ordonne « lance ces N tâches » sans importer `ThreadPoolExecutor` ; (b) une requête `configured_targets` pour la détection de config ; (c) le circuit-breaker, l'orchestrateur recevant des runners déjà breakerisés et ne lisant que `tripped`.
+- La poche SQL résiduelle de `_run_parallel_extractors` descend en `infrastructure/` au passage. (Le recompute de `addresses.pub_count` est déjà injecté via `AddressPubCountQueries`, traité avec `publications`.)
+
+**Réserve.** Le contenu use-case de ces phases est mince : l'essentiel est de l'infra (threading, breaker, HTTP). Le gain d'un orchestrateur applicatif dédié est plus faible que pour les phases DB, et la surface d'injection large (3-4 callables par phase). Alternative à peser : assumer que `run_pipeline` est à la fois composition-root **et** hôte d'exécution de ces phases parallèles, et se contenter d'y factoriser proprement (registres + runners déjà en place), sans descendre l'orchestration. Le choix conditionne si `run_pipeline` atteint la coquille stricte ou reste l'hôte assumé des phases parallèles.
 
 ### Phase 5 — Coquille
 

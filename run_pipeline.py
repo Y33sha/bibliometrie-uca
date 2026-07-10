@@ -73,6 +73,8 @@ from application.pipeline.graph import PHASE_ORDER
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.modes import MODE_NAMES, MODES
 from application.pipeline.normalize.base import NormalizeStats
+from application.pipeline.signals import signal_source_unconfigured
+from application.pipeline.signals import timed_metrics as _timed_metrics
 from domain.sources.registry import ALL_SOURCES, ALL_SOURCES_SET, DOI_SEARCHABLE_SOURCES
 from infrastructure.observability.log import reset_log_phase, set_log_phase, setup_logger
 from infrastructure.observability.pipeline_status import clear_status, read_status, write_status
@@ -105,36 +107,15 @@ def _open_tx() -> "AbstractContextManager[Connection]":
     return managed_transaction(get_sync_engine())
 
 
-def _timed_metrics(fn: Callable[[], PhaseMetrics]) -> tuple[PhaseMetrics, float]:
-    """Exécute `fn` et renvoie ses métriques avec sa durée d'exécution (s).
-
-    Partagé par les phases qui ventilent leurs indicateurs par source / canal
-    (`extract`, `cross_imports`, `refresh_stale`) et ont besoin d'une durée par
-    sous-tâche, distincte de la durée totale de la phase.
-    """
-    started = time.time()
-    result = fn()
-    return result, time.time() - started
-
-
 def _signal_source_unconfigured(
     metrics: PhaseMetrics, source: str, reason: str, *, phase: str = "extract"
 ) -> None:
-    """Marque un accès à une API tierce non configuré comme sauté (avertissement).
+    """Adaptateur au composition-root de `signal_source_unconfigured` (injecte `log`).
 
-    Un accès dont la configuration manque (credentials, ou pour l'extraction bulk le
-    périmètre d'interrogation) n'interrompt pas le run : la phase se termine avec les
-    accès configurés, son point passe en ambre et le motif s'affiche au détail. Même
-    canal de signaux que le circuit-breaker. `reason` est le motif d'absence, `phase`
-    le contexte pour le log (extract, cross_imports, refresh_stale, oa_status…)."""
-    log.warning("%s : source %s non configurée — sautée : %s", phase, source, reason)
-    metrics.signals.append(
-        {
-            "level": "warning",
-            "code": "source_unconfigured",
-            "message": f"{source} non configurée — sautée : {reason}",
-        }
-    )
+    Conservé pour les phases API encore orchestrées ici (`cross_imports`, `refresh_stale`,
+    `oa_status`, `publishers_journals`) ; l'orchestrateur `extract` migré utilise directement
+    l'helper d'`application.pipeline.signals`."""
+    signal_source_unconfigured(metrics, source, reason, logger=log, phase=phase)
 
 
 def _configured_api_targets(targets: list[str], metrics: PhaseMetrics, *, phase: str) -> list[str]:
