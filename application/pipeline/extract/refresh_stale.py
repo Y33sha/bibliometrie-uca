@@ -21,22 +21,90 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Callable
+from functools import partial
 
 import httpx
 from sqlalchemy import Connection
 
 from application.pipeline.extract.base import scoped_logger
 from application.pipeline.metrics import PhaseMetrics
+from application.pipeline.signals import signal_source_unconfigured, timed_metrics
 from application.ports.pipeline.circuit_breaker import CircuitBreaker
 from application.ports.pipeline.extract.refresh_stale import (
     NOT_FOUND,
     FetchedRecord,
     RefreshStaleAdapter,
 )
+from domain.sources.registry import ALL_SOURCES
 
-__all__ = ["refresh"]
+__all__ = ["refresh", "run_phase"]
 
 COMMIT_EVERY = 50
+
+# Dépendances techniques du phasage, injectées par le composition-root.
+RefreshOne = Callable[[str, "list[int] | None"], PhaseMetrics]
+"""Refetch stale d'une source (conn + adapter + breaker), bornée à `years`. Rend des métriques
+portant déjà l'éventuel signal `source_unavailable`."""
+CredentialsMissing = Callable[[str], "str | None"]
+"""`(source) -> motif d'absence de credentials | None si configurée`."""
+GetYearsForWindow = Callable[["int | None"], "list[int] | None"]
+"""`(start_year) -> années de la fenêtre du run | None (tout l'historique)`."""
+
+
+def run_phase(
+    *,
+    sources: set[str] | None,
+    include_wos: bool,
+    year: int | None,
+    start_year: int | None,
+    refresh_one: RefreshOne,
+    credentials_missing: CredentialsMissing,
+    get_years_for_window: GetYearsForWindow,
+    logger: logging.Logger,
+) -> PhaseMetrics:
+    """Rafraîchit le stale de chaque source configurée, bornée à la fenêtre d'années du run.
+
+    WoS est opt-in (`--include-wos`). Fenêtre d'années : `--year` cible une seule année, sinon
+    `[start_year … courante]` ; `theses` ignore la borne large (tout l'historique des PPN), mais
+    suit `--year`. Les sources non configurées sont sautées avec un signal `source_unconfigured`.
+    """
+    metrics = PhaseMetrics()
+    allowed = set(ALL_SOURCES) - ({"wos"} if not include_wos else set())
+    effective = (set(sources) if sources else allowed) & allowed
+    targets = [t for t in ALL_SOURCES if t in effective]
+
+    configured: list[str] = []
+    for target in targets:
+        reason = credentials_missing(target)
+        if reason:
+            signal_source_unconfigured(
+                metrics, target, reason, logger=logger, phase="refresh_stale"
+            )
+        else:
+            configured.append(target)
+
+    years_default = [int(year)] if year else get_years_for_window(start_year)
+    years_theses = [int(year)] if year else None
+
+    by_source: dict[str, dict[str, float]] = {}
+    for target in configured:
+        row_years = years_theses if target == "theses" else years_default
+        source_metrics, duration = timed_metrics(partial(refresh_one, target, row_years))
+        metrics.merge(source_metrics)
+        by_source[target] = {
+            "interrogated": source_metrics.total,
+            "refreshed": source_metrics.updated,
+            "unchanged": source_metrics.unchanged,
+            "disappeared": source_metrics.extras.get("disappeared", 0),
+            "duration_s": round(duration, 1),
+        }
+
+    if by_source:
+        metrics.details["table"] = {
+            "rows": [{"key": source, **summary} for source, summary in by_source.items()]
+        }
+    return metrics
 
 
 async def refresh(
