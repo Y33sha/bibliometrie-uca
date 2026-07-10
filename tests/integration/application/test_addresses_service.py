@@ -6,14 +6,14 @@ import json
 import pytest
 from sqlalchemy import text
 
-from application.addresses.countries import (
+from application.services.addresses.countries import (
     batch_set_country_by_filter,
     batch_set_country_by_ids,
     propagate_countries_to_publications,
     propagate_countries_to_similar,
     set_country,
 )
-from application.addresses.structures import (
+from application.services.addresses.structures import (
     batch_review_structure_link,
     review_structure_link,
 )

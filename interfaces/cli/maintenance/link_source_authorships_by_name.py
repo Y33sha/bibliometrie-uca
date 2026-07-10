@@ -48,7 +48,7 @@ import os
 
 from sqlalchemy import text
 
-from application.persons.core import add_identifiers_from_authorships
+from application.services.persons.core import add_identifiers_from_authorships
 from domain.types import JsonValue
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger

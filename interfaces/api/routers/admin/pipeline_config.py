@@ -8,9 +8,9 @@ import logging
 from fastapi import APIRouter, Depends
 from sqlalchemy import Connection
 
-from application.config import commands as config_commands
 from application.ports.api.config_queries import ConfigItem, ConfigQueries
 from application.ports.config import ConfigStore
+from application.services.config import commands as config_commands
 from interfaces.api.deps import config_queries_sync, config_store_sync, db_conn_sync
 from interfaces.api.models import ConfigValueUpdate
 

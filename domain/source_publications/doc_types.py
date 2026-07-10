@@ -274,7 +274,7 @@ _SOURCE_MAPS: dict[str, dict[str, str]] = {
 # CrossRef ne distingue pas ces sous-types (tout est "journal-article") ;
 # HAL fait la distinction via ses combinaisons type_sous-type
 # ("art_artrev" → "review", "art_bookreview" → "book_review", etc.).
-# Cette logique d'arbitrage vit dans `application.publications._first_doc_type`.
+# Cette logique d'arbitrage vit dans `application.services.publications._first_doc_type`.
 ARTICLE_SUBTYPES: frozenset[str] = frozenset(
     {
         "review",

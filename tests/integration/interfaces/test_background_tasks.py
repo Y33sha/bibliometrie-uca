@@ -9,8 +9,8 @@ On vérifie le contrat de bout en bout : quand la propagation interne lève, la 
 task n'escalade pas l'erreur **et** rend sa connexion au pool (aucune fuite).
 """
 
-import application.addresses.countries as countries_service
-import application.authorships.core as authorships_core
+import application.services.addresses.countries as countries_service
+import application.services.authorships.core as authorships_core
 from infrastructure.db.engine import get_sync_engine
 from interfaces.api.deps import bg_propagate_countries_sync, bg_propagate_in_perimeter_sync
 

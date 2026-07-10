@@ -22,13 +22,13 @@ from collections import Counter
 import requests
 from sqlalchemy import Connection
 
-from application.journals.core import update_journal_apc
 from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.enrich import EnrichQueries
 from application.ports.repositories.journal_repository import (
     JournalRepository,
     JournalUpdateFields,
 )
+from application.services.journals.core import update_journal_apc
 from domain.journals.journal import map_openalex_source_type
 
 OPENALEX_PREFIX = "https://openalex.org/"

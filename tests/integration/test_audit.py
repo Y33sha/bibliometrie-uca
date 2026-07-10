@@ -142,7 +142,7 @@ class TestEndToEndServiceIntegration:
         ).one()
 
     def test_set_rejected_emits_event(self, sa_sync_conn):
-        from application.persons.core import set_rejected
+        from application.services.persons.core import set_rejected
         from infrastructure.repositories import person_repository
 
         person_id = self._create_person(sa_sync_conn)
@@ -171,7 +171,7 @@ class TestEndToEndServiceIntegration:
     def test_set_rejected_without_context_no_event(self, sa_sync_conn):
         """Confirme que hors contexte (pipeline, script), rien n'est audité
         même quand un service destructif est appelé."""
-        from application.persons.core import set_rejected
+        from application.services.persons.core import set_rejected
         from infrastructure.repositories import person_repository
 
         person_id = self._create_person(sa_sync_conn)
@@ -188,7 +188,7 @@ class TestEndToEndServiceIntegration:
     def test_mark_distinct_emits_only_on_actual_insert(self, sa_sync_conn):
         """mark_distinct est idempotent : un appel sur une paire déjà
         marquée ne doit pas générer d'événement supplémentaire."""
-        from application.persons.core import mark_distinct
+        from application.services.persons.core import mark_distinct
         from infrastructure.repositories import person_repository
 
         def _mk(last):
@@ -219,7 +219,7 @@ class TestEndToEndServiceIntegration:
         assert n == 1
 
     def test_merge_person_emits_event(self, sa_sync_conn):
-        from application.persons.core import merge_person
+        from application.services.persons.core import merge_person
         from infrastructure.repositories import person_repository
 
         target = self._create_person(sa_sync_conn, last="A")
@@ -242,7 +242,7 @@ class TestEndToEndServiceIntegration:
         assert row.user_id == "admin"
 
     def test_name_form_confirm_emits_event(self, sa_sync_conn):
-        from application.persons.core import update_name_form_status
+        from application.services.persons.core import update_name_form_status
         from infrastructure.repositories import person_repository
 
         person_id = self._create_person(sa_sync_conn)
@@ -272,7 +272,7 @@ class TestEndToEndServiceIntegration:
 
     def test_name_form_reject_emits_event(self, sa_sync_conn):
         """Le rejet d'une forme (action « détacher l'intrus ») émet l'événement."""
-        from application.persons.core import update_name_form_status
+        from application.services.persons.core import update_name_form_status
         from infrastructure.repositories import person_repository
 
         person_id = self._create_person(sa_sync_conn)
@@ -301,7 +301,7 @@ class TestEndToEndServiceIntegration:
 
     def test_reject_pair_emits_event(self, sa_sync_conn):
         """Le détachement d'une paire (publication, personne) émet l'événement."""
-        from application.authorships.core import reject_pair
+        from application.services.authorships.core import reject_pair
         from infrastructure.repositories import authorship_repository
 
         person_id = self._create_person(sa_sync_conn)

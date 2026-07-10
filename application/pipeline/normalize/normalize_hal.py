@@ -26,7 +26,6 @@ from datetime import date
 
 from sqlalchemy import Connection
 
-from application.journals.core import find_or_create_journal
 from application.pipeline.normalize._authorships_batch import (
     AddressRecord,
     AuthorRecord,
@@ -39,7 +38,8 @@ from application.ports.pipeline.staging import StagingQueries, StagingRow
 from application.ports.repositories.journal_repository import JournalRepository
 from application.ports.repositories.publication_repository import PublicationRepository
 from application.ports.repositories.publisher_repository import PublisherRepository
-from application.publishers.core import find_or_create_publisher
+from application.services.journals.core import find_or_create_journal
+from application.services.publishers.core import find_or_create_publisher
 from domain.persons.identifiers import (
     compact_identifiers,
     mark_shared_identifiers_dubious,

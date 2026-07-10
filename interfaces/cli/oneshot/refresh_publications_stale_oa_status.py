@@ -16,7 +16,7 @@ import os
 
 from sqlalchemy import Connection, text
 
-from application.publications.core import refresh_from_sources
+from application.services.publications.core import refresh_from_sources
 from domain.publications.metadata import OA_RANK
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger

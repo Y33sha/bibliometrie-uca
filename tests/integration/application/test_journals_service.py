@@ -9,14 +9,14 @@ merge_*).
 import pytest
 from sqlalchemy import text
 
-from application.journals.core import (
+from application.services.journals.core import (
     find_or_create_journal,
     merge_journals,
     requalify_publications_for_journal,
     update_journal,
     update_journal_apc,
 )
-from application.publishers.core import (
+from application.services.publishers.core import (
     find_or_create_publisher,
     merge_publishers,
     update_publisher,

@@ -5,7 +5,7 @@ import json
 import pytest
 from sqlalchemy import text
 
-from application.config.core import update_config_value
+from application.services.config.core import update_config_value
 from domain.errors import NotFoundError
 from infrastructure.repositories import config_store
 

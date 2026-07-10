@@ -12,7 +12,6 @@ from typing import cast
 from sqlalchemy import Connection
 
 from application.audit import emit_event
-from application.journals.core import merge_journals
 from application.ports.pipeline.metadata_correction import MetadataCorrectionQueries
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.journal_repository import JournalRepository
@@ -21,6 +20,7 @@ from application.ports.repositories.publisher_repository import (
     PublisherRepository,
     PublisherUpdateFields,
 )
+from application.services.journals.core import merge_journals
 from domain.errors import (
     BlockingJournal,
     ConflictError,

@@ -9,7 +9,6 @@ from enum import StrEnum
 from typing import NamedTuple, TypedDict, cast
 
 from application.audit import emit_event
-from application.authorships.core import reject_pair
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.authorship_repository import AuthorshipRepository
 from application.ports.repositories.person_repository import (
@@ -17,6 +16,7 @@ from application.ports.repositories.person_repository import (
     NameFormStatusRow,
     PersonRepository,
 )
+from application.services.authorships.core import reject_pair
 from domain.errors import CannotAttributeConflict, NotFoundError, ValidationError
 from domain.persons.identifiers import (
     PERSON_IDENTIFIER_TYPES,

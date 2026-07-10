@@ -14,8 +14,6 @@ Couvre les tables de l'agrégat : `persons`, `person_identifiers`,
 
 from sqlalchemy import Connection
 
-from application.persons import core as persons_service
-from application.persons.core import AddIdentifierResult, AuthorshipRef, DetachResult
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.authorship_repository import AuthorshipRepository
 from application.ports.repositories.person_repository import (
@@ -23,6 +21,8 @@ from application.ports.repositories.person_repository import (
     NameFormStatusRow,
     PersonRepository,
 )
+from application.services.persons import core as persons_service
+from application.services.persons.core import AddIdentifierResult, AuthorshipRef, DetachResult
 
 # ── Identifiants ──────────────────────────────────────────────────
 

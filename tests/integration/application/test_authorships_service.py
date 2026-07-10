@@ -9,7 +9,7 @@ import json
 import pytest
 from sqlalchemy import text
 
-from application.authorships.core import (
+from application.services.authorships.core import (
     delete_orphan_authorships,
     exclude_authorship,
     propagate_in_perimeter_for_addresses,

@@ -6,7 +6,7 @@ import json
 import pytest
 from sqlalchemy import text
 
-from application.perimeters.core import (
+from application.services.perimeters.core import (
     add_perimeter_structure,
     create_perimeter,
     delete_perimeter,

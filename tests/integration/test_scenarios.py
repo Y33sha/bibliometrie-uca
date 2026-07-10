@@ -4,8 +4,8 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
-from application.persons.core import merge_person
-from application.publications.core import refresh_from_sources
+from application.services.persons.core import merge_person
+from application.services.publications.core import refresh_from_sources
 from domain.errors import ConflictError
 from infrastructure.repositories import person_repository, publication_repository
 

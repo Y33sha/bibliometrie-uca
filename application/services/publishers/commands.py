@@ -1,11 +1,6 @@
 """Command handlers des écritures API sur les éditeurs : la frontière transactionnelle.
 
-Une écriture API est une commande (intention courte d'un acteur). Chaque handler
-reçoit la connexion de la requête, compose les briques agnostiques de
-`core.py` et `conn.commit()` au succès — pour que la donnée soit persistée
-avant l'envoi de la réponse (cf. `docs/chantiers/CODE_commit-avant-reponse.md`).
-Les briques composées restent transaction-agnostiques (réutilisées par le
-pipeline et les CLI) ; seul le command handler commit.
+Une écriture API est une commande (intention courte d'un acteur). Chaque handler reçoit la connexion de la requête, compose les briques agnostiques de `core.py` et `conn.commit()` au succès — pour que la donnée soit persistée avant l'envoi de la réponse (cf. `docs/chantiers/CODE_commit-avant-reponse.md`). Les briques composées restent transaction-agnostiques (réutilisées par le pipeline et les CLI) ; seul le command handler commit.
 """
 
 from sqlalchemy import Connection
@@ -15,7 +10,7 @@ from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.journal_repository import JournalRepository
 from application.ports.repositories.publication_repository import PublicationRepository
 from application.ports.repositories.publisher_repository import PublisherRepository
-from application.publishers import core as publishers
+from application.services.publishers import core as publishers
 from domain.types import JsonValue
 
 

@@ -10,11 +10,11 @@ pipeline et les CLI) ; seul le command handler commit.
 
 from sqlalchemy import Connection
 
-from application.journals import core as journals
 from application.ports.pipeline.metadata_correction import MetadataCorrectionQueries
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.journal_repository import JournalRepository
 from application.ports.repositories.publication_repository import PublicationRepository
+from application.services.journals import core as journals
 from domain.types import JsonValue
 
 

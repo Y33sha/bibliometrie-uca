@@ -26,7 +26,7 @@ import os
 
 from sqlalchemy import text
 
-from application.persons.core import import_authenticated_orcids
+from application.services.persons.core import import_authenticated_orcids
 from domain.persons.identifiers import normalize_orcid
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger

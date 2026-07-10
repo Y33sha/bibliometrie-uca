@@ -12,11 +12,11 @@ import json
 import pytest
 from sqlalchemy import text
 
-from application.authorships.assign_orphans import (
+from application.services.authorships.assign_orphans import (
     assign_orphan_authorship,
     batch_assign_orphan_authorships,
 )
-from application.persons.core import (
+from application.services.persons.core import (
     AddIdentifierOutcome,
     add_identifier,
     add_identifiers_from_authorships,

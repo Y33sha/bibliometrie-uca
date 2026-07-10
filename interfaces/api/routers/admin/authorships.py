@@ -9,7 +9,6 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import Connection
 
-from application.authorships import commands as authorship_commands
 from application.ports.api.persons_queries import (
     OrphanAuthorshipsResponse,
     OrphanCountResponse,
@@ -18,6 +17,7 @@ from application.ports.api.persons_queries import (
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.authorship_repository import AuthorshipRepository
 from application.ports.repositories.person_repository import PersonRepository
+from application.services.authorships import commands as authorship_commands
 from domain.sources.registry import ALL_SOURCES_SET
 from interfaces.api.deps import (
     audit_repo_sync,

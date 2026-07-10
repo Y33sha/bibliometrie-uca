@@ -8,8 +8,8 @@ réponse (cf. `docs/chantiers/CODE_commit-avant-reponse.md`).
 
 from sqlalchemy import Connection
 
-from application.config import core as config_service
 from application.ports.config import ConfigStore
+from application.services.config import core as config_service
 from domain.types import JsonValue
 
 

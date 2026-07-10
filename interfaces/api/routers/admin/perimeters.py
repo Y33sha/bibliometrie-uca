@@ -8,11 +8,11 @@ import logging
 from fastapi import APIRouter, Depends
 from sqlalchemy import Connection
 
-from application.perimeters import commands as perimeter_commands
 from application.ports.api.perimeters_queries import PerimeterOut, PerimetersAdminQueries
 from application.ports.config import ConfigStore
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.perimeter_repository import PerimeterRepository
+from application.services.perimeters import commands as perimeter_commands
 from interfaces.api.deps import (
     audit_repo_sync,
     config_store_sync,

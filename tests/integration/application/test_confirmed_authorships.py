@@ -4,8 +4,8 @@ réapplication (enforce) côté pipeline.
 
 from sqlalchemy import text
 
-from application.authorships.assign_orphans import assign_orphan_authorship
-from application.authorships.core import reject_pair
+from application.services.authorships.assign_orphans import assign_orphan_authorship
+from application.services.authorships.core import reject_pair
 from infrastructure.repositories import authorship_repository, person_repository
 from tests.integration.helpers.authorships import upsert_identity
 

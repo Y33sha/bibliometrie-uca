@@ -1,7 +1,7 @@
 """Router /api/addresses/* et /api/countries.
 
 Lectures : port `AddressesQueries`. Écritures : command handlers de
-`application.addresses.commands` (frontière transactionnelle : ils committent
+`application.services.addresses.commands` (frontière transactionnelle : ils committent
 avant que le routeur ne rende la main).
 """
 
@@ -10,7 +10,6 @@ import logging
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy import Connection
 
-from application.addresses import commands as address_commands
 from application.ports.api.addresses_queries import (
     AddressCountriesFilters,
     AddressesCountriesResponse,
@@ -24,6 +23,7 @@ from application.ports.api.addresses_queries import (
     TextPredicate,
 )
 from application.ports.repositories.address_repository import AddressRepository
+from application.services.addresses import commands as address_commands
 from interfaces.api.deps import (
     address_repo_sync,
     addresses_queries_sync,

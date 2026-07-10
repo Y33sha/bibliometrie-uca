@@ -12,7 +12,7 @@ from sqlalchemy import Connection
 
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.publication_repository import PublicationRepository
-from application.publications import core as publications_service
+from application.services.publications import core as publications_service
 
 
 def merge_publications(
