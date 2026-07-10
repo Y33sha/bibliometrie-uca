@@ -17,8 +17,8 @@ Aucun filtre périmètre : la phase `authorships` a purgé en amont les publicat
 import logging
 import time
 
-from application.pipeline.cooccurrences.run import run as run_cooccurrences
 from application.pipeline.metrics import PhaseMetrics
+from application.pipeline.subjects.cooccurrences import run as run_cooccurrences
 from application.pipeline.subjects.run import run as run_ingest
 from application.ports.pipeline.subjects import SubjectsQueries
 from application.ports.pipeline.transaction import OpenTransaction

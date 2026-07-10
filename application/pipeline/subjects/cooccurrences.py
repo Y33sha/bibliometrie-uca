@@ -1,15 +1,9 @@
-"""Orchestrateur de la phase `cooccurrences`.
+"""Seconde sous-étape de la phase `subjects`, après l'ingestion qui peuple `publication_subjects`. Recalcule deux caches dérivés :
 
-Doit tourner après la phase `subjects` (qui peuple `publication_subjects`).
-Recalcule deux choses :
-  1. `subjects.usage_count` — nombre de publications distinctes par sujet
-     (colonne maintenue par UPDATE).
-  2. `subject_cooccurrences` — matview des paires de sujets co-présents
-     sur une même publication, avec leur effectif. Seuil `count >= 2`
-     figé dans la définition de la matview, pour borner la cardinalité.
+1. `subjects.usage_count` — nombre de publications distinctes par sujet (colonne maintenue par UPDATE).
+2. `subject_cooccurrences` — matview des paires de sujets co-présents sur une même publication, avec leur effectif. Seuil `count >= 2` figé dans la définition de la matview, pour borner la cardinalité.
 
-Idempotent : le résultat ne dépend que de l'état courant de
-`publication_subjects`.
+Idempotent : le résultat ne dépend que de l'état courant de `publication_subjects`.
 """
 
 import logging

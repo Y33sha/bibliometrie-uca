@@ -1,16 +1,10 @@
-"""Orchestrateur de la phase `affiliations` : résolution des affiliations UCA sur les
-`source_authorships`.
+"""Orchestrateur de la phase `affiliations` : résolution des affiliations sur les `source_authorships`.
 
 Trois sous-étapes, chacune dans sa propre transaction :
 
-1. **refresh_perimeter_structures** — rematérialise le périmètre (clôture des tutelles), amont des
-   deux étapes suivantes qui lisent le périmètre.
+1. **refresh_perimeter_structures** — rematérialise le périmètre (clôture des tutelles), amont des deux étapes suivantes qui lisent le périmètre.
 2. **resolve_addresses** — matche les adresses vers les structures connues (commits par lots).
-3. **populate_affiliations** — pose `in_perimeter` sur les `source_authorships` depuis les adresses
-   résolues, puis dresse le bilan par source.
-
-Phase source-agnostique : `--sources` n'est pas propagé. Sinon des `source_authorships` d'une
-source non listée garderaient un `in_perimeter` périmé après la résolution d'une nouvelle adresse.
+3. **populate_affiliations** — pose `in_perimeter` sur les `source_authorships` depuis les adresses résolues, puis dresse le bilan par source.
 """
 
 import logging
