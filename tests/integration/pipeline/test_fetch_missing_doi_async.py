@@ -115,19 +115,6 @@ class TestRunAsyncOrchestrator:
         assert max(in_flight) == 3
 
     @pytest.mark.asyncio
-    async def test_dry_run_skips_fetch(self):
-        adapter = _FakeAdapter()
-        result = await run_async(
-            MagicMock(),
-            adapter,
-            logging.getLogger("test"),
-            cross_import_dois_reader=_reader(["10.1/a", "10.1/b"]),
-            dry_run=True,
-        )
-        assert result == PhaseMetrics(seen=2)
-        assert adapter.inserted_records == []
-
-    @pytest.mark.asyncio
     async def test_limit_truncates_dois(self):
         adapter = _FakeAdapter()
         result = await run_async(

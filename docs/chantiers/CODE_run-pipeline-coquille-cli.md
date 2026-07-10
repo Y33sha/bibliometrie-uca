@@ -83,8 +83,8 @@ Phases :
 
 ### Phase 5 — Coquille
 
-- [ ] `run_pipeline.py` réduit à : parsing, graphe des phases, câblage par phase, dispatch séquentiel, signaux.
-- [ ] Découper `main()` pour lever son `# noqa: C901`.
+- [x] `run_pipeline.py` réduit à : parsing, graphe des phases, câblage par phase (construction des adapters `Pg*` et injection dans les orchestrateurs applicatifs), dispatch séquentiel, signaux.
+- [x] `main()` découpé en helpers (`_build_arg_parser`, `_select_phases_to_run`, `_run_one_phase`, `_execute_phases`…), `# noqa: C901` levé.
 
 ## Questions ouvertes
 

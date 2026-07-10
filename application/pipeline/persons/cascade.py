@@ -217,11 +217,9 @@ class _Cascade:
         logger: logging.Logger,
         *,
         person_repo: PersonRepository,
-        dry_run: bool,
     ) -> None:
         self._logger = logger
         self._person_repo = person_repo
-        self._dry_run = dry_run
 
         in_perimeter = get_all_unlinked_authorships(conn, queries)
         out_of_perimeter = get_out_of_perimeter_candidates(conn, queries)
@@ -334,19 +332,18 @@ class _Cascade:
 
     def apply_match(self, a: EnrichedAuthorship, pid: int | None, reason: str) -> None:
         assert pid is not None  # garanti par decide_person_match action=match
-        if not self._dry_run:
-            # `link_to_person` et `add_identifiers` consomment des dicts (API historique de
-            # `application.persons`) : conversion via `_asdict()` au boundary.
-            a_dict = a._asdict()
-            link_to_person(
-                pid,
-                [a_dict],
-                repo=self._person_repo,
-                resolution_mode=RESOLUTION_MODE_BY_REASON[reason],
-            )
-            add_name_form(pid, a.full_name, repo=self._person_repo)
-            # Identifiants ajoutés en `pending` quelle que soit la source du match.
-            add_identifiers(pid, [a_dict], repo=self._person_repo)
+        # `link_to_person` et `add_identifiers` consomment des dicts (API historique de
+        # `application.persons`) : conversion via `_asdict()` au boundary.
+        a_dict = a._asdict()
+        link_to_person(
+            pid,
+            [a_dict],
+            repo=self._person_repo,
+            resolution_mode=RESOLUTION_MODE_BY_REASON[reason],
+        )
+        add_name_form(pid, a.full_name, repo=self._person_repo)
+        # Identifiants ajoutés en `pending` quelle que soit la source du match.
+        add_identifiers(pid, [a_dict], repo=self._person_repo)
         self.matched_counts[reason] += 1
         if not a.in_perimeter:
             self.out_of_perimeter_matched += 1
@@ -360,13 +357,11 @@ class _Cascade:
     def apply_create(self, a: EnrichedAuthorship) -> None:
         last = a.last_name or a.full_name or "?"
         first = a.first_name or ""
-        marker = -1
-        if not self._dry_run:
-            marker = create_person(last, first, repo=self._person_repo)
-            a_dict = a._asdict()
-            link_to_person(marker, [a_dict], repo=self._person_repo, resolution_mode="name")
-            add_identifiers(marker, [a_dict], repo=self._person_repo)
-            add_name_form(marker, a.full_name, repo=self._person_repo)
+        marker = create_person(last, first, repo=self._person_repo)
+        a_dict = a._asdict()
+        link_to_person(marker, [a_dict], repo=self._person_repo, resolution_mode="name")
+        add_identifiers(marker, [a_dict], repo=self._person_repo)
+        add_name_form(marker, a.full_name, repo=self._person_repo)
         # Rendre la personne créée matchable dans la même passe par toutes ses formes — ordres ET
         # initiales — via le générateur qui sert au peuplement de `person_name_forms`. On fusionne
         # dans les listes existantes : une forme déjà portée reste ambiguë (donc non matchée en
@@ -376,7 +371,7 @@ class _Cascade:
             if marker not in form_person_ids:
                 form_person_ids.append(marker)
         # La personne créée ancre aussi le cross-source de sa position, pour ses co-signatures.
-        if a.publication_id is not None and not self._dry_run:
+        if a.publication_id is not None:
             self._linked_index[(a.publication_id, a.author_position)].append(
                 (marker, a.last_norm, a.first_norm, a.source)
             )
@@ -400,10 +395,9 @@ def match(
     logger: logging.Logger,
     *,
     person_repo: PersonRepository,
-    dry_run: bool = False,
 ) -> CascadeResult:
     """Rattache les signatures non liées aux personnes existantes ou déjà résolues, sans créer."""
-    c = _Cascade(conn, queries, logger, person_repo=person_repo, dry_run=dry_run)
+    c = _Cascade(conn, queries, logger, person_repo=person_repo)
     total = len(c.authorships)
     for i, a in enumerate(c.authorships):
         if i and i % 5000 == 0:
@@ -424,10 +418,9 @@ def create(
     logger: logging.Logger,
     *,
     person_repo: PersonRepository,
-    dry_run: bool = False,
 ) -> CascadeResult:
     """Reprend les signatures non liées : cross-source rejoué contre l'état ferme, puis création."""
-    c = _Cascade(conn, queries, logger, person_repo=person_repo, dry_run=dry_run)
+    c = _Cascade(conn, queries, logger, person_repo=person_repo)
     total = len(c.authorships)
     for i, a in enumerate(c.authorships):
         if i and i % 5000 == 0:

@@ -142,7 +142,6 @@ def run_enrich_journals_from_openalex(
     mailto: str,
     openalex_sources_api: str,
     limit: int = 0,
-    dry_run: bool = False,
     rate_delay: float = 0.1,
 ) -> PhaseMetrics:
     try:
@@ -177,8 +176,7 @@ def run_enrich_journals_from_openalex(
             except _OpenAlexRateLimited:
                 strikes += 1
                 if strikes >= RATE_LIMIT_STRIKES_MAX:
-                    if not dry_run:
-                        conn.commit()
+                    conn.commit()
                     logger.warning(
                         "⚡ Coupe-circuit OpenAlex (429 sur %d batches consécutifs) : "
                         "enrichissement revues interrompu à %d/%d. Reste retenté au prochain run.",
@@ -203,38 +201,36 @@ def run_enrich_journals_from_openalex(
                 if raw_type:
                     raw_type_counter[raw_type] += 1
 
-                if not dry_run:
-                    update_journal_apc(
+                update_journal_apc(
+                    journal_id,
+                    apc_amount=apc_amount,
+                    apc_currency=apc_currency,
+                    repo=journal_repo,
+                )
+                # journal_type : on ne traite que les revues `unknown`
+                # (cf. `fetch_journals_of_unknown_type`). On écrit dès que le mapping
+                # OpenAlex renvoie une valeur ; sinon la revue reste `unknown`
+                # (re-tentée au prochain run — cas `metadata`/`other`).
+                if mapped_type is not None:
+                    journal_repo.update_journal_fields(
                         journal_id,
-                        apc_amount=apc_amount,
-                        apc_currency=apc_currency,
-                        repo=journal_repo,
+                        JournalUpdateFields(journal_type=mapped_type),
                     )
-                    # journal_type : on ne traite que les revues `unknown`
-                    # (cf. `fetch_journals_of_unknown_type`). On écrit dès que le
-                    # mapping OpenAlex renvoie une valeur ; sinon la revue reste
-                    # `unknown` (re-tentée au prochain run — cas `metadata`/`other`).
-                    if mapped_type is not None:
-                        journal_repo.update_journal_fields(
-                            journal_id,
-                            JournalUpdateFields(journal_type=mapped_type),
-                        )
-                        type_written += 1
+                    type_written += 1
 
                 updated += 1
                 if apc_amount is not None:
                     with_apc += 1
                 processed += 1
 
-            if not dry_run and processed % COMMIT_EVERY < BATCH_SIZE:
+            if processed % COMMIT_EVERY < BATCH_SIZE:
                 conn.commit()
 
             logger.info(
                 f"  {min(i + BATCH_SIZE, total)}/{total} — {with_apc} avec APC, {type_written} types écrits"
             )
 
-        if not dry_run:
-            conn.commit()
+        conn.commit()
 
         logger.info(
             f"Terminé : {updated}/{total} revues mises à jour, "

@@ -215,12 +215,9 @@ def test_resolve_ra_first_sample_fails_second_succeeds():
     assert repo.rows["10.1038"].ra == "DataCite"
 
 
-def test_resolve_ra_limit_and_dry_run():
+def test_resolve_ra_limit():
     repo = FakeDoiPrefixRepo(unresolved=[("10.a", ["10.a/x"]), ("10.b", ["10.b/x"])])
     ra = StubResolveRa(answers={"10.a/x": "Crossref", "10.b/x": "Crossref"})
-
-    metrics = _run_ra(repo, ra, dry_run=True)
-    assert ra.calls == [] and repo.rows == {} and metrics.total == 2
 
     metrics = _run_ra(repo, ra, limit=1)
     assert len(repo.rows) == 1 and metrics.total == 1
@@ -372,14 +369,3 @@ def test_publishers_dedup_same_name_one_creation():
     assert repo.rows["10.bbbb"].publisher_id == cid
     assert metrics.extras.get("publisher_created") == 1
     assert metrics.extras.get("publisher_matched") == 1
-
-
-def test_publishers_dry_run():
-    repo = FakeDoiPrefixRepo(rows={"10.1038": _Row("10.1038", "Crossref")})
-    pubrepo = FakePublisherRepo()
-    cr = StubCrossref(answers={"10.1038": ("Nature", None)})
-
-    metrics = _run_pub(repo, pubrepo, cr, dry_run=True)
-
-    assert cr.calls == [] and repo.rows["10.1038"].publisher_id is None
-    assert metrics.total == 1

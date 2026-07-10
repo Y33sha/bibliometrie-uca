@@ -169,8 +169,6 @@ def run(
     conn: Connection,
     queries: MetadataCorrectionQueries,
     logger: logging.Logger,
-    *,
-    dry_run: bool = False,
 ) -> UnaryCorrectionStats:
     """Passe unaire : corrige et persiste l'effective sur toutes les `source_publications`."""
     rows = queries.fetch_for_unary_correction(conn)
@@ -179,11 +177,6 @@ def run(
     updates = [u for row in rows if (u := compute_update(row)) is not None]
     logger.info("  %d corrections à appliquer", len(updates))
     corrected, rule_counts = tally_corrections(updates)
-
-    if dry_run:
-        conn.rollback()
-        logger.info("DRY-RUN : aucune écriture")
-        return UnaryCorrectionStats(len(rows), corrected, rule_counts)
 
     total = 0
     for start in range(0, len(updates), _PERSIST_BATCH):
