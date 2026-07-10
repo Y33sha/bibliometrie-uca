@@ -73,22 +73,6 @@ def refresh_source_authorship_structures(conn: Connection) -> None:
     conn.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY source_authorship_structures"))
 
 
-def count_source_authorships_stats(conn: Connection, source: str) -> tuple[int, int]:
-    """Retourne `(total, in_perimeter)` pour une source."""
-    total = conn.execute(
-        text("SELECT COUNT(*) AS n FROM source_authorships WHERE source = :source"),
-        {"source": source},
-    ).scalar_one()
-    in_perimeter = conn.execute(
-        text(
-            "SELECT COUNT(*) AS n FROM source_authorships "
-            "WHERE source = :source AND in_perimeter = TRUE"
-        ),
-        {"source": source},
-    ).scalar_one()
-    return total, in_perimeter
-
-
 class PgAffiliationsQueries(AffiliationsQueries):
     """Adapter PostgreSQL pour `application.ports.pipeline.affiliations.AffiliationsQueries`."""
 
@@ -97,6 +81,3 @@ class PgAffiliationsQueries(AffiliationsQueries):
 
     def refresh_source_authorship_structures(self, conn: Connection) -> None:
         refresh_source_authorship_structures(conn)
-
-    def count_source_authorships_stats(self, conn: Connection, source: str) -> tuple[int, int]:
-        return count_source_authorships_stats(conn, source)

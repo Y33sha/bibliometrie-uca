@@ -18,8 +18,6 @@ from application.ports.pipeline.affiliations import AffiliationsQueries
 from application.ports.pipeline.perimeter import PerimeterQueries
 from application.ports.pipeline.transaction import OpenTransaction
 
-_SOURCES = ("hal", "openalex", "wos", "scanr", "theses")
-
 
 def run(
     open_tx: OpenTransaction,
@@ -48,22 +46,9 @@ def run(
 
     logger.info("▶ populate_affiliations")
     t0 = time.perf_counter()
-    rows: list[dict[str, object]] = []
     with open_tx() as conn:
         perimeter_ids = set(perimeter_queries.get_persons_structure_ids_list(conn))
         run_populate(conn, affiliations_queries, logger, perimeter_ids)
-        # Bilan in_perimeter par source, lu dans la même transaction que la propagation.
-        for source in _SOURCES:
-            total, source_in_perimeter = affiliations_queries.count_source_authorships_stats(
-                conn, source
-            )
-            pct = round(100 * source_in_perimeter / total, 1) if total else 0.0
-            rows.append(
-                {"key": source, "total": total, "in_perimeter": source_in_perimeter, "pct": pct}
-            )
     logger.info("✓ populate_affiliations terminé en %.1fs", time.perf_counter() - t0)
 
-    populate_metrics = PhaseMetrics()
-    populate_metrics.details["table"] = {"rows": rows}
-    metrics.merge(populate_metrics)
     return metrics
