@@ -70,7 +70,6 @@ from application.pipeline.graph import PHASE_ORDER
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.modes import MODE_NAMES, MODES
 from application.pipeline.normalize.base import NormalizeStats
-from application.pipeline.signals import signal_source_unconfigured
 from domain.sources.registry import ALL_SOURCES_SET
 from infrastructure.observability.log import reset_log_phase, set_log_phase, setup_logger
 from infrastructure.observability.pipeline_status import clear_status, read_status, write_status
@@ -101,38 +100,6 @@ def _open_tx() -> "AbstractContextManager[Connection]":
     from infrastructure.db.transaction import managed_transaction
 
     return managed_transaction(get_sync_engine())
-
-
-def _signal_source_unconfigured(
-    metrics: PhaseMetrics, source: str, reason: str, *, phase: str = "extract"
-) -> None:
-    """Adaptateur au composition-root de `signal_source_unconfigured` (injecte `log`).
-
-    Conservé pour les phases API encore orchestrées ici (`cross_imports`, `refresh_stale`,
-    `oa_status`, `publishers_journals`) ; l'orchestrateur `extract` migré utilise directement
-    l'helper d'`application.pipeline.signals`."""
-    signal_source_unconfigured(metrics, source, reason, logger=log, phase=phase)
-
-
-def _configured_api_targets(targets: list[str], metrics: PhaseMetrics, *, phase: str) -> list[str]:
-    """Filtre les sources dont les credentials d'API manquent avant toute requête.
-
-    Chaque source non configurée est sautée avec un signal `source_unconfigured`
-    (même canal que l'extraction) ; seules les sources configurées sont retournées.
-    Ouvre une connexion courte pour consulter le détecteur central. Utilisé par les
-    phases qui interrogent une API par identifiant (cross-import, refresh stale)."""
-    from infrastructure.db.engine import get_sync_engine
-    from infrastructure.sources.config import source_credentials_missing
-
-    configured: list[str] = []
-    with get_sync_engine().connect() as conn:
-        for target in targets:
-            reason = source_credentials_missing(conn, target)
-            if reason:
-                _signal_source_unconfigured(metrics, target, reason, phase=phase)
-            else:
-                configured.append(target)
-    return configured
 
 
 def phase_extract(
@@ -450,48 +417,18 @@ def phase_publishers_journals(**kw: Any) -> PhaseMetrics:
     Placée **après normalize** : (a) `cross_imports` (en amont) peut introduire de
     nouveaux DOIs via `fetch_missing_hal`, (b) `normalize` crée les
     `publishers`/`journals` qu'on veut enrichir.
+
+    Séquence, gardes de config et métriques dans `application/pipeline/publishers_journals/phase.py`.
     """
-    metrics = PhaseMetrics()
+    from application.pipeline.publishers_journals.phase import run
 
-    # resolve_publishers interroge Crossref et DataCite (email polite pool requis) ;
-    # enrich_journals_from_openalex interroge OpenAlex (clé ou email). Chaque accès
-    # non configuré est sauté ; DOAJ (dump public) tourne toujours.
-    publishers = PhaseMetrics()
-    if _configured_api_targets(["crossref", "datacite"], metrics, phase="publishers_journals"):
-        publishers = _run_resolve_publishers()
-
-    openalex = PhaseMetrics()
-    if _configured_api_targets(["openalex"], metrics, phase="publishers_journals"):
-        openalex = _run_enrich_journals_from_openalex()
-
-    doaj = _run_enrich_journals_from_doaj()
-
-    # Les compteurs et signaux des sous-étapes remontent à la phase : sans ce merge,
-    # `as_summary()` (log) et `to_payload()` (observabilité) rapporteraient « no-op »
-    # malgré le travail effectué, et un circuit-breaker tripé ne passerait pas la
-    # phase en avertissement. Les `details` sur-mesure sont posés juste après.
-    for sub in (publishers, openalex, doaj):
-        metrics.merge(sub)
-
-    metrics.details["table"] = {
-        "rows": [
-            {
-                "key": "préfixes DOI → publishers",
-                "traités": publishers.total,
-                "identifiés": publishers.extras.get("publisher_matched", 0),
-                "créés": publishers.extras.get("publisher_created", 0),
-            },
-            {
-                "key": "revues OpenAlex",
-                "traités": openalex.total,
-                "identifiés": openalex.updated,
-                "créés": 0,
-            },
-        ]
-    }
-    # DOAJ : ligne à part (sous-étape conditionnelle, métrique propre).
-    metrics.details["summary"] = {"doaj_matched": doaj.extras.get("matched", 0)}
-    return metrics
+    return run(
+        resolve_publishers=_run_resolve_publishers,
+        enrich_from_openalex=_run_enrich_journals_from_openalex,
+        enrich_from_doaj=_run_enrich_journals_from_doaj,
+        credentials_missing=_credentials_missing,
+        logger=log,
+    )
 
 
 def _signal_if_tripped(metrics: PhaseMetrics, breaker: Any) -> None:
@@ -1220,6 +1157,7 @@ def phase_oa_status(**kw: Any) -> PhaseMetrics:
     import httpx
 
     from application.pipeline.oa_status.run import run_enrich_oa_status
+    from application.pipeline.signals import filter_configured
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.queries.pipeline.enrich import PgEnrichQueries
     from infrastructure.repositories import publication_repository
@@ -1227,7 +1165,13 @@ def phase_oa_status(**kw: Any) -> PhaseMetrics:
     from infrastructure.sources.unpaywall import fetch_oa_status
 
     metrics = PhaseMetrics()
-    if not _configured_api_targets(["unpaywall"], metrics, phase="oa_status"):
+    if not filter_configured(
+        ["unpaywall"],
+        metrics,
+        credentials_missing=_credentials_missing,
+        logger=log,
+        phase="oa_status",
+    ):
         return metrics
 
     conn = get_sync_engine().connect()

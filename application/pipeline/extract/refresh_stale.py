@@ -29,7 +29,7 @@ from sqlalchemy import Connection
 
 from application.pipeline.extract.base import scoped_logger
 from application.pipeline.metrics import PhaseMetrics
-from application.pipeline.signals import signal_source_unconfigured, timed_metrics
+from application.pipeline.signals import filter_configured, timed_metrics
 from application.ports.pipeline.circuit_breaker import CircuitBreaker
 from application.ports.pipeline.extract.refresh_stale import (
     NOT_FOUND,
@@ -73,16 +73,13 @@ def run_phase(
     allowed = set(ALL_SOURCES) - ({"wos"} if not include_wos else set())
     effective = (set(sources) if sources else allowed) & allowed
     targets = [t for t in ALL_SOURCES if t in effective]
-
-    configured: list[str] = []
-    for target in targets:
-        reason = credentials_missing(target)
-        if reason:
-            signal_source_unconfigured(
-                metrics, target, reason, logger=logger, phase="refresh_stale"
-            )
-        else:
-            configured.append(target)
+    configured = filter_configured(
+        targets,
+        metrics,
+        credentials_missing=credentials_missing,
+        logger=logger,
+        phase="refresh_stale",
+    )
 
     years_default = [int(year)] if year else get_years_for_window(start_year)
     years_theses = [int(year)] if year else None

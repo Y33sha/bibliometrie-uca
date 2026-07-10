@@ -42,3 +42,27 @@ def signal_source_unconfigured(
             "message": f"{source} non configurée — sautée : {reason}",
         }
     )
+
+
+def filter_configured(
+    targets: list[str],
+    metrics: PhaseMetrics,
+    *,
+    credentials_missing: Callable[[str], str | None],
+    logger: logging.Logger,
+    phase: str,
+) -> list[str]:
+    """Garde les sources configurées, signale les autres (`source_unconfigured`).
+
+    `credentials_missing(source)` rend le motif d'absence de credentials, ou `None` si la source
+    est configurée. La détection (lecture des credentials) est injectée par le composition-root ;
+    l'assemblage des signaux vit ici, côté application.
+    """
+    configured: list[str] = []
+    for target in targets:
+        reason = credentials_missing(target)
+        if reason:
+            signal_source_unconfigured(metrics, target, reason, logger=logger, phase=phase)
+        else:
+            configured.append(target)
+    return configured
