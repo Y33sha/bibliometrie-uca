@@ -17,6 +17,7 @@ composition-root ; ici, la séquence, la sélection/l'ordre des sources et l'ass
 import logging
 import time
 from collections.abc import Callable
+from typing import cast
 
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.modes import MODES
@@ -50,6 +51,6 @@ def run(
     logger.info("✓ %s staging terminé en %.1fs", label, time.perf_counter() - t0)
 
     metrics = PhaseMetrics()
-    metrics.add(total=sum(int(row["processed"]) for row in rows))  # type: ignore[arg-type]
+    metrics.add(total=sum(cast("int", row["processed"]) for row in rows))
     metrics.details["table"] = {"rows": rows}
     return metrics

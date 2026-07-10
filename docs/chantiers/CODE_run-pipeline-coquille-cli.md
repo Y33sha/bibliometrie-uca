@@ -89,4 +89,3 @@ Phases :
 ## Questions ouvertes
 
 - **Partage éventuel du unit of work avec l'API.** Le pilote retient l'appelable `OpenTransaction`. Un objet `UnitOfWork` réifié partagé entre le pipeline et l'API — dont les command handlers exposent déjà un unit of work fonctionnel — relèverait, s'il devenait souhaitable, d'un chantier séparé touchant `interfaces/api/`.
-- **`dry_run` mort dans les orchestrateurs de phase.** `run_pipeline` ne passe jamais `dry_run` (son `--dry-run` court-circuite en tête de `main()` sans exécuter les phases), et aucune CLI n'appelle `reconcile_components.run` ni `correct_unary.run` avec `dry_run` : ces paramètres sont vestigiaux. Retrait prévu dans un chantier de nettoyage final (celui de `persons` est déjà retiré, incompatible avec le commit-sur-succès).
