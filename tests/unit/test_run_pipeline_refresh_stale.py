@@ -25,14 +25,8 @@ def _called_targets(stack) -> MagicMock:
     )
     # Neutralise le gate de configuration (testé ailleurs) : ici on vérifie la
     # sélection des sources (opt-in WoS, filtre `sources`), pas la présence des
-    # credentials — le passthrough laisse passer toutes les cibles.
-    stack.enter_context(
-        patch.object(
-            run_pipeline,
-            "_configured_api_targets",
-            side_effect=lambda targets, metrics, *, phase: targets,
-        )
-    )
+    # credentials — toutes les cibles sont réputées configurées.
+    stack.enter_context(patch.object(run_pipeline, "_credentials_missing", return_value=None))
     # Fenêtre d'années : évite tout accès base (get_years lit la config).
     stack.enter_context(patch("infrastructure.db.engine.get_sync_engine", return_value=MagicMock()))
     stack.enter_context(patch("infrastructure.sources.config.get_years", return_value=[2024]))

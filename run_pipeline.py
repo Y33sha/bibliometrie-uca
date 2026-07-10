@@ -333,46 +333,41 @@ def phase_refresh_stale(
     Conservateur : on **marque seulement** (`disappeared_at`), aucun effet
     aval. Placée après `cross_imports` (qui a fini de peupler `staging` et
     `last_seen_at`) et avant `normalize` (qui consomme le `raw_data` rafraîchi).
+
+    Séquence et métriques dans `application/pipeline/extract/refresh_stale.py::run_phase`.
     """
+    from application.pipeline.extract.refresh_stale import run_phase
+
+    return run_phase(
+        sources=set(sources) if sources else None,
+        include_wos=include_wos,
+        year=year,
+        start_year=start_year,
+        refresh_one=_run_refresh_stale,
+        credentials_missing=_credentials_missing,
+        get_years_for_window=_get_years_for_window,
+        logger=log,
+    )
+
+
+def _credentials_missing(source: str) -> str | None:
+    """Motif d'absence de credentials d'une source (None si configurée). Ouvre une connexion
+    courte pour consulter le détecteur central. Injecté aux orchestrateurs des phases API."""
+    from infrastructure.db.engine import get_sync_engine
+    from infrastructure.sources.config import source_credentials_missing
+
+    with get_sync_engine().connect() as conn:
+        return source_credentials_missing(conn, source)
+
+
+def _get_years_for_window(start_year: int | None) -> list[int] | None:
+    """Années de la fenêtre du run `[start_year … courante]` (défaut config). Injecté aux
+    orchestrateurs qui bornent leurs requêtes par année."""
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.sources.config import get_years
 
-    metrics = PhaseMetrics()
-    by_source: dict[str, dict[str, float]] = {}
-    allowed = set(ALL_SOURCES)
-    if not include_wos:
-        allowed -= {"wos"}
-    effective = (set(sources) if sources else allowed) & allowed
-    targets = [t for t in ALL_SOURCES if t in effective]
-    targets = _configured_api_targets(targets, metrics, phase="refresh_stale")
-
-    # Fenêtre d'années du run, alignée sur l'extraction : `--year` cible une seule
-    # année, sinon `[start_year … courante]` (défaut config). `theses` ignore la
-    # borne large (elle moissonne tout l'historique), mais suit `--year` s'il est posé.
-    if year:
-        years_default: list[int] | None = [int(year)]
-    else:
-        with get_sync_engine().connect() as conn:
-            years_default = get_years(conn, start_year)
-    years_theses = [int(year)] if year else None
-
-    for target in targets:
-        row_years = years_theses if target == "theses" else years_default
-        source_metrics, duration = _timed_metrics(partial(_run_refresh_stale, target, row_years))
-        metrics.merge(source_metrics)
-        by_source[target] = {
-            "interrogated": source_metrics.total,
-            "refreshed": source_metrics.updated,
-            "unchanged": source_metrics.unchanged,
-            "disappeared": source_metrics.extras.get("disappeared", 0),
-            "duration_s": round(duration, 1),
-        }
-
-    if by_source:
-        metrics.details["table"] = {
-            "rows": [{"key": source, **summary} for source, summary in by_source.items()]
-        }
-    return metrics
+    with get_sync_engine().connect() as conn:
+        return get_years(conn, start_year)
 
 
 def phase_refetch_truncated(**kw: Any) -> PhaseMetrics:
