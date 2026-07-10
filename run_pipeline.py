@@ -55,8 +55,6 @@ import signal
 import sys
 import time
 from collections.abc import Callable
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
@@ -73,8 +71,7 @@ from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.modes import MODE_NAMES, MODES
 from application.pipeline.normalize.base import NormalizeStats
 from application.pipeline.signals import signal_source_unconfigured
-from application.pipeline.signals import timed_metrics as _timed_metrics
-from domain.sources.registry import ALL_SOURCES, ALL_SOURCES_SET, DOI_SEARCHABLE_SOURCES
+from domain.sources.registry import ALL_SOURCES_SET
 from infrastructure.observability.log import reset_log_phase, set_log_phase, setup_logger
 from infrastructure.observability.pipeline_status import clear_status, read_status, write_status
 from infrastructure.pipeline_lock import PipelineAlreadyRunningError, acquire_pipeline_lock
@@ -243,66 +240,23 @@ def phase_cross_imports(
        native reçoivent un backoff dans `doi_lookups` (re-tenté après
        `DOI_LOOKUP_RETRY_DAYS`), ceux absents de Crossref (source native) un stub
        `staging` définitif.
+
+    Séquence, parallélisme et métriques dans `application/pipeline/cross_imports/phase.py`.
     """
-    metrics = PhaseMetrics()
-    by_channel: dict[str, dict[str, float]] = {}
+    from application.pipeline.cross_imports.phase import run
+    from infrastructure.concurrency import run_parallel
 
-    def _summary(channel_metrics: PhaseMetrics, duration_s: float) -> dict[str, float]:
-        return {
-            "interrogated": channel_metrics.total,
-            "new": channel_metrics.new,
-            "not_found": channel_metrics.extras.get("not_found", 0),
-            "duration_s": round(duration_s, 1),
-        }
-
-    # Étape 1 : cross-import HAL, deux pistes distinctes (hal-id, NNT).
-    if not sources or "hal" in sources:
-        id_metrics, id_duration = _timed_metrics(_run_fetch_missing_hal_by_id)
-        metrics.merge(id_metrics)
-        by_channel["hal-id"] = _summary(id_metrics, id_duration)
-
-        # NNT trop volumineux pour un run incrémental : réservé au mode full.
-        if mode == "full":
-            nnt_metrics, nnt_duration = _timed_metrics(_run_fetch_missing_hal_by_nnt)
-            metrics.merge(nnt_metrics)
-            by_channel["NNT"] = _summary(nnt_metrics, nnt_duration)
-
-    # Étape 2 : par DOI. WoS opt-in (cf. docstring).
-    targets = set(DOI_SEARCHABLE_SOURCES)
-    if not include_wos:
-        targets -= {"wos"}
-    effective = (set(sources) if sources else set(targets)) & targets
-
-    doi_targets = [t for t in DOI_SEARCHABLE_SOURCES if t in effective]
-    doi_targets = _configured_api_targets(doi_targets, metrics, phase="cross_imports")
-    if doi_targets:
-        # Cross-imports par DOI en parallèle (comme les extracteurs) : chaque
-        # `_run_fetch_missing_doi` ouvre sa propre connexion, frappe une API
-        # distincte et écrit dans le staging de sa source — aucun état partagé.
-        # La merge des PhaseMetrics reste séquentielle (non thread-safe).
-        # Conséquence assumée : une propagation cross-source d'un DOI fraîchement
-        # importé peut glisser au run suivant (phase de rattrapage idempotente et
-        # auto-bornée), au lieu de l'ordre séquentiel hal→openalex→…
-        log.info(
-            "▶ cross-imports par DOI en parallèle (%d) : %s",
-            len(doi_targets),
-            ", ".join(doi_targets),
-        )
-        with ThreadPoolExecutor(max_workers=len(doi_targets)) as pool:
-            futures = {
-                pool.submit(_timed_metrics, partial(_run_fetch_missing_doi, t)): t
-                for t in doi_targets
-            }
-            for future in as_completed(futures):
-                channel_metrics, duration = future.result()
-                metrics.merge(channel_metrics)
-                by_channel[futures[future]] = _summary(channel_metrics, duration)
-
-    if by_channel:
-        metrics.details["table"] = {
-            "rows": [{"key": channel, **summary} for channel, summary in by_channel.items()]
-        }
-    return metrics
+    return run(
+        mode=mode,
+        sources=set(sources) if sources else None,
+        include_wos=include_wos,
+        fetch_hal_by_id=_run_fetch_missing_hal_by_id,
+        fetch_hal_by_nnt=_run_fetch_missing_hal_by_nnt,
+        fetch_doi_one=_run_fetch_missing_doi,
+        run_parallel=run_parallel,
+        credentials_missing=_credentials_missing,
+        logger=log,
+    )
 
 
 def phase_refresh_stale(
