@@ -16,7 +16,7 @@ from collections.abc import Callable
 from functools import partial
 
 from application.pipeline.metrics import PhaseMetrics
-from application.pipeline.signals import signal_source_unconfigured, timed_metrics
+from application.pipeline.signals import filter_configured, timed_metrics
 from application.ports.pipeline.parallel import RunParallel
 from domain.sources.registry import DOI_SEARCHABLE_SOURCES
 
@@ -70,16 +70,13 @@ def run(
     targets = set(DOI_SEARCHABLE_SOURCES) - ({"wos"} if not include_wos else set())
     effective = (set(sources) if sources else set(targets)) & targets
     doi_targets = [t for t in DOI_SEARCHABLE_SOURCES if t in effective]
-
-    configured: list[str] = []
-    for target in doi_targets:
-        reason = credentials_missing(target)
-        if reason:
-            signal_source_unconfigured(
-                metrics, target, reason, logger=logger, phase="cross_imports"
-            )
-        else:
-            configured.append(target)
+    configured = filter_configured(
+        doi_targets,
+        metrics,
+        credentials_missing=credentials_missing,
+        logger=logger,
+        phase="cross_imports",
+    )
 
     if configured:
         # Chaque source frappe une API distincte et écrit dans son propre staging — aucun état

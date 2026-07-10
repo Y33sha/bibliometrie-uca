@@ -1,35 +1,35 @@
-"""Gate de configuration partagé par les phases qui interrogent une API par
-identifiant (cross-import, refresh stale).
+"""Gate de configuration partagé par les phases qui interrogent une API.
 
-`_configured_api_targets` saute les sources dont les credentials manquent (signal
-`source_unconfigured`) avant toute requête, et ne retourne que les configurées.
+`filter_configured` saute les sources dont les credentials manquent (signal
+`source_unconfigured`) avant toute requête, et ne retourne que les configurées ;
+`phase_oa_status` s'en sert comme garde d'entrée.
 """
 
+import logging
 from unittest.mock import AsyncMock, patch
 
 import run_pipeline
 from application.pipeline.metrics import PhaseMetrics
+from application.pipeline.signals import filter_configured
 
 _RUN_ENRICH = "application.pipeline.oa_status.run.run_enrich_oa_status"
+_LOG = logging.getLogger("test")
 
 
-def test_configured_api_targets_filters_and_signals():
+def test_filter_configured_filters_and_signals():
     reasons = {
         "scanr": "credentials absents (config.scanr_username / config.scanr_password)",
         "openalex": None,
         "crossref": "email polite pool absent (config.polite_pool_email)",
     }
     metrics = PhaseMetrics()
-    with (
-        patch("infrastructure.db.engine.get_sync_engine"),
-        patch(
-            "infrastructure.sources.config.source_credentials_missing",
-            side_effect=lambda conn, source: reasons[source],
-        ),
-    ):
-        kept = run_pipeline._configured_api_targets(
-            ["scanr", "openalex", "crossref"], metrics, phase="cross_imports"
-        )
+    kept = filter_configured(
+        ["scanr", "openalex", "crossref"],
+        metrics,
+        credentials_missing=lambda source: reasons[source],
+        logger=_LOG,
+        phase="cross_imports",
+    )
 
     assert kept == ["openalex"]  # seule la source configurée est retournée
     assert [s["code"] for s in metrics.signals] == ["source_unconfigured", "source_unconfigured"]
@@ -37,18 +37,15 @@ def test_configured_api_targets_filters_and_signals():
     assert skipped == ["crossref", "scanr"]
 
 
-def test_configured_api_targets_all_configured_no_signal():
+def test_filter_configured_all_configured_no_signal():
     metrics = PhaseMetrics()
-    with (
-        patch("infrastructure.db.engine.get_sync_engine"),
-        patch(
-            "infrastructure.sources.config.source_credentials_missing",
-            side_effect=lambda conn, source: None,
-        ),
-    ):
-        kept = run_pipeline._configured_api_targets(
-            ["hal", "openalex"], metrics, phase="refresh_stale"
-        )
+    kept = filter_configured(
+        ["hal", "openalex"],
+        metrics,
+        credentials_missing=lambda source: None,
+        logger=_LOG,
+        phase="refresh_stale",
+    )
 
     assert kept == ["hal", "openalex"]
     assert metrics.signals == []
