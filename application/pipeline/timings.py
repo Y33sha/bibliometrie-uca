@@ -3,8 +3,7 @@
 import logging
 import time
 
-# Seuil au-delà duquel un document est jugé « lent » et loggé (par toutes les
-# sources via `StepTimer.log_if_slow`).
+# Seuil au-delà duquel un document est jugé « lent » et loggé (via `StepTimer.log_if_slow`).
 SLOW_DOC_THRESHOLD_S = 0.5
 
 

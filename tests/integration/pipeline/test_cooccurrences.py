@@ -1,11 +1,11 @@
-"""Tests d'intégration de la phase `cooccurrences` (recompute usage_count
-+ refresh matview subject_cooccurrences)."""
+"""Tests d'intégration de la sous-étape cooccurrences de la phase `subjects` (recompute
+usage_count + refresh matview subject_cooccurrences)."""
 
 import logging
 
 from sqlalchemy import text
 
-from application.pipeline.cooccurrences.run import run
+from application.pipeline.subjects.cooccurrences import run
 from infrastructure.queries.subjects import (
     PgSubjectsQueries,
     recompute_usage_counts,
