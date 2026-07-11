@@ -1,19 +1,10 @@
-"""Orchestrateur de la phase `publications` : assignation des `source_publications` aux
-publications, en une seule passe.
+"""Orchestrateur de la phase `publications` : assignation des `source_publications` aux publications, en une seule passe.
 
-`reconcile_components` clusterise le voisinage des SP dirty par composante connexe des clés de
-confirmation (DOI/NNT/hal_id/PMID + token thèse `title+year`) et assigne chaque SP au pub-ancre de
-sa partition `(composante ∩ DOI)`. Assignation (match/create/skip d'un orphelin) et réconciliation
-(merge/split de publications matérialisées) sont des facettes du même primitif.
+`reconcile_components` clusterise le voisinage des SP dirty par composante connexe des clés de confirmation (DOI/NNT/hal_id/PMID + token thèse `title+year`) et assigne chaque SP au pub-ancre de sa partition `(composante ∩ DOI)`. Assignation (match/create/skip d'un orphelin) et réconciliation (merge/split de publications matérialisées) sont des facettes du même primitif.
 
-`--rebuild-publications` re-dirtie tout le stock avant la réconciliation : celle-ci dégénère alors
-en cluster-then-materialize global (après une évolution des règles de clés).
+`--rebuild-publications` re-dirtie tout le stock avant la réconciliation : celle-ci dégénère alors en cluster-then-materialize global (après une évolution des règles de clés).
 
-En fin de phase, `addresses.pub_count` (nombre de publications par adresse) est recalculé, une fois
-les publications créées et fusionnées.
-
-Prérequis : `metadata_correction` (en amont) a substitué en colonne le DOI concept des versions
-DataCite, de sorte que le matching regroupe sur le concept.
+En fin de phase, `addresses.pub_count` (nombre de publications par adresse) est recalculé, une fois les publications créées et fusionnées.
 """
 
 import logging
@@ -86,9 +77,7 @@ def _reconcile(
 
     metrics = PhaseMetrics()
     metrics.add(total=stats.processed if stats else 0, new=stats.created if stats else 0)
-    # Chiffres du run (SP dirty examinées → publications d'arrivée, mouvements) + le total
-    # global des publications (`pub_total`) en « nouveau total ». Le frontend les compose en
-    # lignes de texte ; les volumes avant/après auto sont masqués.
+    # Chiffres du run (SP dirty examinées → publications d'arrivée, mouvements) + le total global des publications (`pub_total`) en « nouveau total ». Le frontend les compose en lignes de texte ; les volumes avant/après auto sont masqués.
     metrics.details["summary"] = {
         "processed": stats.processed if stats else 0,
         "publications": stats.publications if stats else 0,

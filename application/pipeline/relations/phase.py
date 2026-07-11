@@ -1,27 +1,16 @@
 """Phase `relations` — population de `publication_relations` depuis les relations déclarées.
 
-Tourne après `publications` : les `source_publications` sont rattachées à leur publication
-canonique, et les DOI cibles sont résolus en `publication_id` quand ils sont au corpus.
+Tourne après `publications` : les `source_publications` sont rattachées à leur publication canonique, et les DOI cibles sont résolus en `publication_id` quand ils sont au corpus.
 
 Trois signaux peuplent la table :
 
-- **Signal #1 — relations déclarées par les sources** : DataCite `meta.related_identifiers` et
-  Crossref `meta.relation`, converties vers le vocabulaire canonique par
-  `domain.publications.relations`.
-- **Signal #2 — clés de confirmation partagées** : deux publications distinctes (DOI distincts)
-  qui partagent une clé (hal_id, arXiv, PMID, NNT) sans avoir fusionné sont apparentées ; le type
-  se déduit de leur couple de `doc_type` (`infer_shared_key_relation`).
-- **Signal #3 — rapprochement par titre** : une publication dépendante sans relation déclarée ni
-  clé partagée est reliée à l'œuvre dont elle dépend par le titre — un erratum à l'article qu'il
-  corrige (`is_correction_of`, titre parent en suffixe après « Erratum: »…), un preprint à sa
-  version publiée (`is_preprint_of`, titre identique). Sous garde d'ambiguïté (un seul parent
-  substantiel au même titre). La sélection (avec sa garde) vit dans le SQL du port.
+- **Signal #1 — relations déclarées par les sources** : DataCite `meta.related_identifiers` et Crossref `meta.relation`, converties vers le vocabulaire canonique par `domain.publications.relations`.
+- **Signal #2 — clés de confirmation partagées** : deux publications distinctes (DOI distincts) qui partagent une clé (hal_id, arXiv, PMID, NNT) sans avoir fusionné sont apparentées ; le type se déduit de leur couple de `doc_type` (`infer_shared_key_relation`).
+- **Signal #3 — rapprochement par titre** : une publication dépendante sans relation déclarée ni clé partagée est reliée à l'œuvre dont elle dépend par le titre — un erratum à l'article qu'il corrige (`is_correction_of`, titre parent en suffixe après « Erratum: »…), un preprint à sa version publiée (`is_preprint_of`, titre identique). Sous garde d'ambiguïté (un seul parent substantiel au même titre). La sélection (avec sa garde) vit dans le SQL du port.
 
-Les relations même-œuvre (versions, formes variantes, pièces de package) sont absentes des trois
-signaux : elles sont traitées en déduplication à la phase `metadata_correction`, en amont.
+Les relations même-œuvre (versions, formes variantes, pièces de package) sont absentes des trois signaux : elles sont traitées en déduplication à la phase `metadata_correction`, en amont.
 
-Reconstruction complète à chaque run (table dérivée) : chaque signal purge ses propres relations
-(par `source`) puis les réécrit, donc idempotent et sans dérive.
+Reconstruction complète à chaque run (table dérivée) : chaque signal purge ses propres relations (par `source`) puis les réécrit, donc idempotent et sans dérive.
 """
 
 import logging
@@ -64,10 +53,7 @@ def _build_declared_edges(sources: list[DeclaredRelationSource]) -> list[Relatio
 def _build_shared_key_edges(
     pairs: list[SharedKeyPair], declared_pairs: set[frozenset[int]]
 ) -> list[RelationEdge]:
-    """Une arête dirigée par paire partageant une clé. `infer_shared_key_relation` donne le type et
-    le sujet (`"a"`, `"b"`, ou `"sym"` symétrique — orienté depuis A, le plus petit id). Les paires
-    hors scope (peer-review) sont écartées, ainsi que les `is_related_to` (type vague « à qualifier »)
-    sur une paire déjà typée précisément par le signal #1 — sinon doublon redondant."""
+    """Une arête dirigée par paire partageant une clé. `infer_shared_key_relation` donne le type et le sujet (`"a"`, `"b"`, ou `"sym"` symétrique — orienté depuis A, le plus petit id). Les paires hors scope (peer-review) sont écartées, ainsi que les `is_related_to` (type vague « à qualifier ») sur une paire déjà typée précisément par le signal #1 — sinon doublon redondant."""
     edges: list[RelationEdge] = []
     for pair in pairs:
         inferred = infer_shared_key_relation(pair.a_doc_type, pair.b_doc_type)
@@ -92,9 +78,7 @@ def _build_shared_key_edges(
 def _build_title_match_edges(
     matches: list[TitleMatch], relation_type: RelationType
 ) -> list[RelationEdge]:
-    """Une arête `enfant relation_type parent` par rapprochement de titre. La cible est désignée par
-    le `publication_id` du parent (au corpus), avec son DOI quand il en a un — l'unicité dédoublonne
-    alors contre une éventuelle relation déjà posée vers ce même parent par un autre signal."""
+    """Une arête `enfant relation_type parent` par rapprochement de titre. La cible est désignée par le `publication_id` du parent (au corpus), avec son DOI quand il en a un — l'unicité dédoublonne alors contre une éventuelle relation déjà posée vers ce même parent par un autre signal."""
     return [
         RelationEdge(
             match.child_id,
@@ -110,8 +94,7 @@ def _build_title_match_edges(
 def run(
     open_tx: OpenTransaction, queries: PublicationRelationsQueries, logger: logging.Logger
 ) -> PhaseMetrics:
-    """Reconstruit `publication_relations` depuis les trois signaux, en une transaction, et
-    retourne les compteurs de la phase (répartition par type de relation dans `details`)."""
+    """Reconstruit `publication_relations` depuis les trois signaux, en une transaction, et retourne les compteurs de la phase (répartition par type de relation dans `details`)."""
     logger.info("▶ relations")
     t0 = time.perf_counter()
     with open_tx() as conn:
