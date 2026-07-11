@@ -1,6 +1,7 @@
 <script lang="ts">
   import Picker from "$lib/components/Picker.svelte";
   import type { NameForm, Structure } from "./types";
+  import { SHORT_FORM_MAX_LENGTH } from "./types";
 
   let {
     structureId,
@@ -106,7 +107,7 @@
             {#if f.is_excluding}<span class="match-badge excluding" title="Excluante"
                 >excluante</span
               >
-            {:else if f.is_word_boundary || f.form_text.length <= 6}<span
+            {:else if f.is_word_boundary || f.form_text.length <= SHORT_FORM_MAX_LENGTH}<span
                 class="match-badge word"
                 title="Mot entier">mot entier</span
               >

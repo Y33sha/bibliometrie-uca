@@ -91,8 +91,8 @@ class TestListAddresses:
         # Form pour matched_form_id
         form_row = sa_sync_conn.execute(
             text(
-                "INSERT INTO structure_name_forms (structure_id, form_text) "
-                "VALUES (:s, 'x') RETURNING id"
+                "INSERT INTO structure_name_forms (structure_id, form_text, is_word_boundary) "
+                "VALUES (:s, 'x', true) RETURNING id"
             ),
             {"s": struct},
         ).one()
@@ -117,8 +117,8 @@ class TestListAddresses:
         struct = _create_structure(sa_sync_conn)
         form_row = sa_sync_conn.execute(
             text(
-                "INSERT INTO structure_name_forms (structure_id, form_text) "
-                "VALUES (:s, 'x') RETURNING id"
+                "INSERT INTO structure_name_forms (structure_id, form_text, is_word_boundary) "
+                "VALUES (:s, 'x', true) RETURNING id"
             ),
             {"s": struct},
         ).one()
@@ -138,8 +138,8 @@ class TestListAddresses:
         struct = _create_structure(sa_sync_conn)
         form_row = sa_sync_conn.execute(
             text(
-                "INSERT INTO structure_name_forms (structure_id, form_text) "
-                "VALUES (:s, 'x') RETURNING id"
+                "INSERT INTO structure_name_forms (structure_id, form_text, is_word_boundary) "
+                "VALUES (:s, 'x', true) RETURNING id"
             ),
             {"s": struct},
         ).one()
@@ -192,8 +192,8 @@ class TestStructurePredicates:
         return (
             conn.execute(
                 text(
-                    "INSERT INTO structure_name_forms (structure_id, form_text) "
-                    "VALUES (:s, 'f') RETURNING id"
+                    "INSERT INTO structure_name_forms (structure_id, form_text, is_word_boundary) "
+                    "VALUES (:s, 'f', true) RETURNING id"
                 ),
                 {"s": struct_id},
             )

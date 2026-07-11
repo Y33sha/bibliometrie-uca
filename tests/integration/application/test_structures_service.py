@@ -333,6 +333,13 @@ class TestCreateNameForm:
         assert form["is_word_boundary"] is True
         assert form["requires_context_of"] == [s["id"]]
 
+    def test_forces_word_boundary_for_short_form(self, sa_sync_conn, repo):
+        s = create_structure(code="X", name="X", type="labo", repo=repo)
+        # Forme normalisée courte (<= 6) : is_word_boundary forcé même non demandé.
+        form = create_name_form(structure_id=s["id"], form_text="INRAE", repo=repo)
+        assert form["form_text"] == "inrae"
+        assert form["is_word_boundary"] is True
+
 
 class TestUpdateNameForm:
     def test_raises_not_found(self, sa_sync_conn, repo):
@@ -361,6 +368,13 @@ class TestUpdateNameForm:
         )
         assert updated["is_word_boundary"] is True
         assert updated["is_excluding"] is True
+
+    def test_forces_word_boundary_when_shortened(self, sa_sync_conn, repo):
+        s = create_structure(code="X", name="X", type="labo", repo=repo)
+        form = create_name_form(structure_id=s["id"], form_text="Institut Recherche", repo=repo)
+        assert form["is_word_boundary"] is False  # forme longue
+        updated = update_name_form(form["id"], fields={"form_text": "IGCNC"}, repo=repo)
+        assert updated["is_word_boundary"] is True  # raccourcie → forcé
 
 
 class TestDeleteNameForm:

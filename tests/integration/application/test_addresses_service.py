@@ -159,8 +159,8 @@ class TestReviewStructureLink:
         addr = _create_address(sa_sync_conn)
         form_id = sa_sync_conn.execute(
             text(
-                "INSERT INTO structure_name_forms (structure_id, form_text) "
-                "VALUES (:sid, 'uca') RETURNING id"
+                "INSERT INTO structure_name_forms (structure_id, form_text, is_word_boundary) "
+                "VALUES (:sid, 'uca', true) RETURNING id"
             ),
             {"sid": uca},
         ).scalar_one()
@@ -472,8 +472,8 @@ class TestPropagationSkipsNoOp:
         # Lien auto-détecté, is_confirmed=NULL (cas reproducteur du bug initial)
         form_id = sa_sync_conn.execute(
             text(
-                "INSERT INTO structure_name_forms (structure_id, form_text) "
-                "VALUES (:sid, 'uca') RETURNING id"
+                "INSERT INTO structure_name_forms (structure_id, form_text, is_word_boundary) "
+                "VALUES (:sid, 'uca', true) RETURNING id"
             ),
             {"sid": uca},
         ).scalar_one()
@@ -549,8 +549,8 @@ class TestPropagationSkipsNoOp:
         a3 = _create_address(sa_sync_conn, raw_text="a3")
         form_id = sa_sync_conn.execute(
             text(
-                "INSERT INTO structure_name_forms (structure_id, form_text) "
-                "VALUES (:sid, 'uca2') RETURNING id"
+                "INSERT INTO structure_name_forms (structure_id, form_text, is_word_boundary) "
+                "VALUES (:sid, 'uca2', true) RETURNING id"
             ),
             {"sid": uca},
         ).scalar_one()
