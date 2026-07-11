@@ -21,7 +21,7 @@ MODULES = [
     "infrastructure.sources.scanr.extract_scanr",
     "infrastructure.sources.scanr.fetch_missing_doi",
     "infrastructure.sources.theses.extract_theses",
-    "application.pipeline.extract.fetch_missing_doi",
+    "application.pipeline.cross_imports.fetch_missing_doi",
     "application.pipeline.normalize.normalize_hal",
     "application.pipeline.normalize.normalize_openalex",
     "application.pipeline.normalize.normalize_wos",

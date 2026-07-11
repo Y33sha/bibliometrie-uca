@@ -3,7 +3,7 @@
 Implémenté par `infrastructure.sources.<source>.fetch_missing_doi`
 (hal, openalex, wos, scanr, crossref).
 
-L'orchestrateur (`application.pipeline.extract.fetch_missing_doi.run_async`)
+L'orchestrateur (`application.pipeline.cross_imports.fetch_missing_doi.run_async`)
 consomme ce Protocol pour piloter une boucle async commune à toutes les
 sources.
 """

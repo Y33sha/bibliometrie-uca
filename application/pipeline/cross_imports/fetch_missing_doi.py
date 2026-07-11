@@ -6,7 +6,7 @@ interroge l'API de la cible et insère le record dans staging.
 Le comportement spécifique à chaque source (endpoint, auth, format de
 requête/réponse, SQL d'insertion) est délégué à un adapter qui
 implémente `AsyncFetchMissingDoiAdapter`
-(`application/ports/pipeline/extract/fetch_missing_doi.py`).
+(`application/ports/pipeline/cross_imports/fetch_missing_doi.py`).
 
 Implémentation async (`httpx.AsyncClient` + pool de `max_concurrent`
 workers par source) pour saturer les rate-limits autorisés. Sur OpenAlex
@@ -26,10 +26,10 @@ from collections.abc import Callable
 import httpx
 from sqlalchemy import Connection
 
-from application.pipeline.extract.base import scoped_logger
+from application.pipeline.logging_scope import scoped_logger
 from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.circuit_breaker import CircuitBreaker
-from application.ports.pipeline.extract.fetch_missing_doi import (
+from application.ports.pipeline.cross_imports.fetch_missing_doi import (
     AsyncFetchMissingDoiAdapter,
     CrossImportDoisReader,
     is_not_found_marker,

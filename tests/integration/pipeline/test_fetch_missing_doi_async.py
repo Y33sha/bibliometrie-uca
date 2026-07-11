@@ -1,4 +1,4 @@
-"""Tests pour `application.pipeline.extract.fetch_missing_doi.run_async`.
+"""Tests pour `application.pipeline.cross_imports.fetch_missing_doi.run_async`.
 
 Deux angles :
 1. **Orchestrateur** : via un fake adapter, vérifie la parallélisation
@@ -19,9 +19,9 @@ import httpx
 import pytest
 import respx
 
-from application.pipeline.extract.fetch_missing_doi import run_async
+from application.pipeline.cross_imports.fetch_missing_doi import run_async
 from application.pipeline.metrics import PhaseMetrics
-from application.ports.pipeline.extract.fetch_missing_doi import (
+from application.ports.pipeline.cross_imports.fetch_missing_doi import (
     is_not_found_marker,
     not_found_marker,
 )

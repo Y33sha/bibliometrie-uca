@@ -1,11 +1,11 @@
-"""Adapter HAL pour `application.pipeline.extract.fetch_missing_hal`.
+"""Adapter HAL pour `application.pipeline.cross_imports.fetch_missing_hal`.
 
 Implémente les lookups SQL (depuis OpenAlex, ScanR, NNT theses),
 les fetchs HTTP async (par halId et par NNT) et les inserts staging.
 
 L'orchestration (combinaison des refs, dedup, boucles async, commits
 intermédiaires) vit côté
-`application.pipeline.extract.fetch_missing_hal`.
+`application.pipeline.cross_imports.fetch_missing_hal`.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from typing import Any
 import httpx
 from sqlalchemy import Connection, text
 
-from application.ports.pipeline.extract.fetch_missing_hal import (
+from application.ports.pipeline.cross_imports.fetch_missing_hal import (
     HalFetchMissingAdapter,
     HalIdRef,
     NntRef,

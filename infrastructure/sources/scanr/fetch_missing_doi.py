@@ -1,4 +1,4 @@
-"""Adapter ScanR pour `application.pipeline.extract.fetch_missing_doi`.
+"""Adapter ScanR pour `application.pipeline.cross_imports.fetch_missing_doi`.
 
 API ElasticSearch — requête `terms` sur `externalIds.id.keyword` pour un
 lot de 50 DOI en un seul appel. Authentification basic.
@@ -16,7 +16,7 @@ from collections.abc import Iterable
 import httpx
 from sqlalchemy import Connection
 
-from application.ports.pipeline.extract.fetch_missing_doi import (
+from application.ports.pipeline.cross_imports.fetch_missing_doi import (
     is_not_found_marker,
     not_found_marker,
 )

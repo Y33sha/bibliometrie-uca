@@ -336,6 +336,7 @@ exclude = [
 #   d'options hétérogènes (`Any` délibéré).
 [[tool.mypy.overrides]]
 module = [
+    "application.pipeline.cross_imports.*",
     "application.pipeline.extract.*",
     "application.pipeline.logging_scope",
     "application.pipeline.normalize.*",
@@ -344,6 +345,7 @@ module = [
     "application.pipeline.subjects._common",
     "application.services.publishers.enrichment.*",
     "application.ports.api.*",
+    "application.ports.pipeline.cross_imports.*",
     "application.ports.pipeline.extract.*",
     "application.ports.pipeline.staging",
     "application.ports.pipeline.subjects",
