@@ -1,6 +1,6 @@
 """Port : SQL du normaliseur DataCite.
 
-Implémenté par ``infrastructure.queries.pipeline.normalize.datacite.PgDataciteNormalizeQueries``.
+Implémenté par `infrastructure.queries.pipeline.normalize.datacite.PgDataciteNormalizeQueries`.
 """
 
 from typing import Protocol

@@ -35,7 +35,7 @@ def fetch_crossref_member(
 ) -> dict[str, Any] | None:
     """GET sur `api.crossref.org/members/{id}`.
 
-    Retourne le bloc `message` (= record du member) ou ``None`` sur 404
+    Retourne le bloc `message` (= record du member) ou `None` sur 404
     / erreur réseau persistante.
 
     Retry + backoff exponentiel (`_INITIAL_BACKOFF_S * 2^attempt`) sur 429 et sur

@@ -1,4 +1,4 @@
-"""Aggregate root ``Structure`` — entité métier d'une structure de
+"""Aggregate root `Structure` — entité métier d'une structure de
 recherche / d'enseignement (laboratoire, école doctorale, université,
 hôpital, …).
 

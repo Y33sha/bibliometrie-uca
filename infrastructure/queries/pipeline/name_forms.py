@@ -23,8 +23,8 @@ from application.ports.pipeline.name_forms import (
 def fetch_persons_names(conn: Connection) -> list[PersonNameRow]:
     """`(id, first_name, last_name)` de toutes les personnes avec un nom.
 
-    Inclut les ``rejected = TRUE`` : leurs name_forms doivent rester
-    présentes dans ``person_name_forms`` pour servir d'ancre au matching
+    Inclut les `rejected = TRUE` : leurs name_forms doivent rester
+    présentes dans `person_name_forms` pour servir d'ancre au matching
     et empêcher la re-création en boucle des entités douteuses
     (artefacts de parsing source, noms d'organisations, etc.) à chaque
     run pipeline.

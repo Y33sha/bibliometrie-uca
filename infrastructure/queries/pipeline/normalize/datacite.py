@@ -1,12 +1,12 @@
 """Query service : SQL du normaliseur DataCite.
 
-Appelé par ``application/pipeline/normalize/normalize_datacite.py``.
-UPSERT sur ``source_publications`` (source='datacite').
+Appelé par `application/pipeline/normalize/normalize_datacite.py`.
+UPSERT sur `source_publications` (source='datacite').
 
 Particularité DataCite, comme CrossRef : pas d'identifiant stable côté auteur
 (les ORCID éventuels vivent sur l'identité de la signature,
-``author_identifying_keys.person_identifiers``). La déduplication vers les
-``persons`` canoniques est faite plus tard par le pipeline ``personnes``
+`author_identifying_keys.person_identifiers`). La déduplication vers les
+`persons` canoniques est faite plus tard par le pipeline `personnes`
 (source-agnostique).
 """
 
@@ -38,7 +38,7 @@ def upsert_datacite_source_publication(
     biblio: JsonValue,
     meta: JsonValue,
 ) -> int:
-    """UPSERT d'une publication DataCite dans ``source_publications``. Retourne l'id."""
+    """UPSERT d'une publication DataCite dans `source_publications`. Retourne l'id."""
     if external_ids is None:
         external_ids = {}
     stmt = text("""
@@ -102,7 +102,7 @@ def upsert_datacite_source_publication(
 
 
 class PgDataciteNormalizeQueries(DataciteNormalizeQueries):
-    """Adapter PostgreSQL pour ``application.ports.pipeline.normalize.datacite.DataciteNormalizeQueries``."""
+    """Adapter PostgreSQL pour `application.ports.pipeline.normalize.datacite.DataciteNormalizeQueries`."""
 
     def upsert_datacite_source_publication(
         self,

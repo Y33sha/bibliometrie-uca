@@ -1,9 +1,9 @@
 """Endpoints admin adossés aux fichiers du pipeline : statut en cours et log par phase.
 
-Le statut vient de ``logs/status.json`` (écrit par l'orchestrateur), le log
-d'une phase est découpé de ``logs/pipeline.log`` (cf.
-``infrastructure.observability.phase_logs``). L'observabilité structurée par run
-et par phase, elle, est servie par le router ``pipeline_phase_executions``.
+Le statut vient de `logs/status.json` (écrit par l'orchestrateur), le log
+d'une phase est découpé de `logs/pipeline.log` (cf.
+`infrastructure.observability.phase_logs`). L'observabilité structurée par run
+et par phase, elle, est servie par le router `pipeline_phase_executions`.
 """
 
 import logging
@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 def pipeline_status() -> PipelineStatus | None:
     """Retourne le statut du pipeline en cours, ou null si aucun ne tourne.
 
-    Un status.json orphelin (PID mort) est traité comme "inactif" et nettoyé par ``read_status``.
+    Un status.json orphelin (PID mort) est traité comme "inactif" et nettoyé par `read_status`.
     """
     status = read_status()
     return PipelineStatus.model_validate(status) if status else None
@@ -33,10 +33,10 @@ def pipeline_status() -> PipelineStatus | None:
     response_model=PipelinePhaseLog,
 )
 def phase_log(run_id: int, phase: str) -> PipelinePhaseLog:
-    """Log d'une phase, découpé depuis ``logs/pipeline.log``.
+    """Log d'une phase, découpé depuis `logs/pipeline.log`.
 
     `available` est faux (et `content` vide) quand le fichier est absent
-    (``LOG_TO_FILE`` désactivé) ou quand la section est introuvable (log purgé).
+    (`LOG_TO_FILE` désactivé) ou quand la section est introuvable (log purgé).
     """
     content = read_phase_log(run_id, phase)
     if content is None:

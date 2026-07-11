@@ -1,4 +1,4 @@
-"""Aggregate root ``Publication`` — référence biblio canonique.
+"""Aggregate root `Publication` — référence biblio canonique.
 
 Une `Publication` est la vue UCA d'un document scientifique, agrégée depuis une ou plusieurs `SourcePublication`. Identité = `id` (clé surrogate). Identifiant naturel principal : `doi` (quand renseigné ; les autres identifiants — HALId, NNT — vivent côté `source_publications.external_ids`).
 

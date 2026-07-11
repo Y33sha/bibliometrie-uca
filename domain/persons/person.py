@@ -1,4 +1,4 @@
-"""Aggregate root ``Person`` — référentiel chercheur unifié multi-sources.
+"""Aggregate root `Person` — référentiel chercheur unifié multi-sources.
 
 Une `Person` est la vue UCA d'un chercheur, agrégeant les signatures
 remontées par les sources externes (HAL, OpenAlex, WoS, …). Identité =

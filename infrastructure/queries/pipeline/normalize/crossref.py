@@ -1,12 +1,12 @@
 """Query service : SQL du normaliseur CrossRef.
 
-Appelé par ``application/pipeline/normalize/normalize_crossref.py``.
-Regroupe les UPSERT sur ``source_publications`` et ``source_authorships``
+Appelé par `application/pipeline/normalize/normalize_crossref.py`.
+Regroupe les UPSERT sur `source_publications` et `source_authorships`
 ainsi que la lecture d'idempotence.
 
 Particularité CrossRef : pas d'identifiant stable côté auteur. La
-déduplication vers les ``persons`` canoniques est faite plus tard par
-le pipeline ``personnes`` (source-agnostique).
+déduplication vers les `persons` canoniques est faite plus tard par
+le pipeline `personnes` (source-agnostique).
 """
 
 from sqlalchemy import Connection, bindparam, text
@@ -37,7 +37,7 @@ def upsert_crossref_source_publication(
     biblio: JsonValue,
     meta: JsonValue,
 ) -> int:
-    """UPSERT d'une publication CrossRef dans ``source_publications``. Retourne l'id."""
+    """UPSERT d'une publication CrossRef dans `source_publications`. Retourne l'id."""
     # cf. note dans normalize_openalex : `external_ids` non-null en colonne,
     # on substitue None → {} avant binding.
     if external_ids is None:
@@ -103,7 +103,7 @@ def upsert_crossref_source_publication(
 
 
 class PgCrossrefNormalizeQueries(CrossrefNormalizeQueries):
-    """Adapter PostgreSQL pour ``application.ports.normalize_crossref.CrossrefNormalizeQueries``."""
+    """Adapter PostgreSQL pour `application.ports.normalize_crossref.CrossrefNormalizeQueries`."""
 
     def upsert_crossref_source_publication(
         self,

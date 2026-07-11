@@ -1,4 +1,4 @@
-"""Aggregate root ``PersonIdentifier`` — relation Personne ↔ identifiant
+"""Aggregate root `PersonIdentifier` — relation Personne ↔ identifiant
 externe avec statut.
 
 `PersonIdentifier` est un aggregate à part, pas un VO ni une entité
@@ -33,7 +33,7 @@ class PersonIdentifier:
     """Attribution d'un identifiant externe (ORCID, idHAL, IdRef,
     hal_person_id) à une personne, avec statut.
 
-    `id_type` ∈ ``PERSON_IDENTIFIER_TYPES``. `id_value` est la valeur
+    `id_type` ∈ `PERSON_IDENTIFIER_TYPES`. `id_value` est la valeur
     canonique stockée en base (déjà normalisée par les VOs ORCID/IdHAL/
     IdRef à la construction ; `hal_person_id` est stocké tel quel).
     """

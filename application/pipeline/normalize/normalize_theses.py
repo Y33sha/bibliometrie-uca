@@ -109,7 +109,7 @@ def insert_source_document(
 ) -> int:
     """Crée/retrouve l'entrée source_publications pour theses.fr.
 
-    Les métadonnées canoniques (titre, doc_type, pub_year, doi, nnt, journal, oa_status, language, container_title) viennent toutes de ``pub_meta``, construit en amont par ``extract_pub_metadata``. ``these`` ne sert ici que pour les champs propres aux thèses (sujets, sujetsRameau, discipline, écoles doctorales, partenaires, dates).
+    Les métadonnées canoniques (titre, doc_type, pub_year, doi, nnt, journal, oa_status, language, container_title) viennent toutes de `pub_meta`, construit en amont par `extract_pub_metadata`. `these` ne sert ici que pour les champs propres aux thèses (sujets, sujetsRameau, discipline, écoles doctorales, partenaires, dates).
     """
     nnt = pub_meta["nnt"]
     external_ids = {"nnt": nnt} if nnt else None
@@ -166,7 +166,7 @@ def process_authorships(
     *,
     address_linker: AddressLinker,
 ) -> None:
-    """Traite tous les rôles d'une thèse (auteurs, directeurs, rapporteurs, jury, président) en consommant ``aggregate_thesis_persons`` côté domain pour la déduplication multi-rôles + fusion + assignation de position."""
+    """Traite tous les rôles d'une thèse (auteurs, directeurs, rapporteurs, jury, président) en consommant `aggregate_thesis_persons` côté domain pour la déduplication multi-rôles + fusion + assignation de position."""
     queries.clear_source_authorships_for_publication(conn, source_publication_id)
 
     authorships = aggregate_thesis_persons(these)

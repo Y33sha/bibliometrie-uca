@@ -358,7 +358,7 @@ def add_identifiers_from_authorships(
 
     Spécificité `hal_person_id` : la valeur arrive en `int` depuis la query (cf. `fetch_unlinked_authorships`), on convertit en str pour la table `person_identifiers`.
 
-    La ``source`` enregistrée sur ``person_identifiers`` reste à sa valeur par défaut (``'auto'``) : tracer la source d'origine n'apporte rien d'exploitable (la valeur n'est pas mise à jour quand une autre source confirme plus tard l'identifiant) et la priorité Crossref pour les ORCID se gérera côté cascade de matching, pas via ce champ.
+    La `source` enregistrée sur `person_identifiers` reste à sa valeur par défaut (`'auto'`) : tracer la source d'origine n'apporte rien d'exploitable (la valeur n'est pas mise à jour quand une autre source confirme plus tard l'identifiant) et la priorité Crossref pour les ORCID se gérera côté cascade de matching, pas via ce champ.
     """
     seen: set[tuple[str, str]] = set()
     for a in authorships:

@@ -9,11 +9,11 @@ from sqlalchemy import Connection, text
 
 
 def clear_source_authorships_for_publication(conn: Connection, source_publication_id: int) -> None:
-    """Supprime toutes les ``source_authorships`` d'une ``source_publication``.
+    """Supprime toutes les `source_authorships` d'une `source_publication`.
 
     Appelé en pré-normalisation pour que le re-traitement d'un document
     ne laisse pas de rows fantômes (auteurs retirés, positions abandonnées
-    après un shift, etc.). ``source_publications.id`` étant unique pour
+    après un shift, etc.). `source_publications.id` étant unique pour
     un couple (source, source_id), seuls les authorships de la source
     concernée sont touchés.
     """

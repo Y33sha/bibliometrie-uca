@@ -6,7 +6,7 @@ pour le reste du pipeline.
 
 Les `dict[str, Any]` ici sont des payloads JSON bruts de l'API
 theses.fr (frontière dynamique avec une source externe, schéma non
-typé). Le champ `person` du dataclass ``ThesisAuthorship`` transmet
+typé). Le champ `person` du dataclass `ThesisAuthorship` transmet
 tel quel le sous-objet personne au caller (notamment pour extraire
 les identifiants et le `raw_author_name` portés sur la `source_authorship`).
 """
@@ -33,10 +33,10 @@ def derive_theses_doc_type(date_soutenance: str | None) -> str:
 class ThesisAuthorship:
     """Une personne d'une thèse, avec ses rôles fusionnés.
 
-    Produite par ``aggregate_thesis_persons`` à partir du dict ``these``
-    de l'API theses.fr. ``person`` est le dict brut, transmis tel quel
+    Produite par `aggregate_thesis_persons` à partir du dict `these`
+    de l'API theses.fr. `person` est le dict brut, transmis tel quel
     au caller pour les effets (extraction d'identifiants, écriture sur
-    ``source_authorships``).
+    `source_authorships`).
     """
 
     person: dict[str, Any]
@@ -48,22 +48,22 @@ class ThesisAuthorship:
 
 
 def aggregate_thesis_persons(these: dict[str, Any]) -> list[ThesisAuthorship]:
-    """Agrège les personnes d'une thèse depuis ``these`` (API theses.fr).
+    """Agrège les personnes d'une thèse depuis `these` (API theses.fr).
 
-    Itère sur les champs ``auteurs``, ``directeurs``, ``rapporteurs``,
-    ``examinateurs``, ``president`` (cf. ``THESES_FIELD_ROLES``). Une
+    Itère sur les champs `auteurs`, `directeurs`, `rapporteurs`,
+    `examinateurs`, `president` (cf. `THESES_FIELD_ROLES`). Une
     personne qui apparaît dans plusieurs champs est dédupliquée (clé :
-    PPN si présent, sinon ``(nom, prenom)``) et ses rôles sont fusionnés
-    via ``merge_roles``.
+    PPN si présent, sinon `(nom, prenom)`) et ses rôles sont fusionnés
+    via `merge_roles`.
 
     En pratique, le cas multi-rôles concerne presque exclusivement le
     président du jury qui est aussi rapporteur (~1 % des authorships
     theses au 2026-05-08).
 
-    ``author_position`` est incrémenté seulement pour les personnes dont
-    les rôles fusionnés contiennent ``'author'`` ; ``None`` pour les
+    `author_position` est incrémenté seulement pour les personnes dont
+    les rôles fusionnés contiennent `'author'` ; `None` pour les
     autres rôles (directeurs/rapporteurs/jury/président). Ordre des
-    auteurs : celui de la liste ``these["auteurs"]``.
+    auteurs : celui de la liste `these["auteurs"]`.
     """
     person_roles: dict[str, dict[str, Any]] = {}
 

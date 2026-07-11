@@ -1,4 +1,4 @@
-"""Tests de l'aggregate ``PersonIdentifier`` (scaffolding Phase 1)."""
+"""Tests de l'aggregate `PersonIdentifier` (scaffolding Phase 1)."""
 
 import pytest
 

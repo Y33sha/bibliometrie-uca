@@ -98,7 +98,7 @@ def upsert_journal(
 def extract_pub_metadata(doc: dict, journal_id: int | None) -> dict:
     """Extrait les métadonnées de publication d'un document HAL.
 
-    Retourne un dict utilisable par ``insert_hal_document``. Toutes les valeurs sont brutes — pas de transformation de cohérence. ``doc_type`` est le concat brut ``docType_s_docSubType_s`` (ex. ``ART_review-article``), pas la valeur canonique : la résolution source→enum (``map_doc_type``) relève de la phase ``metadata_correction``, pas du brut stocké dans ``source_publications``.
+    Retourne un dict utilisable par `insert_hal_document`. Toutes les valeurs sont brutes — pas de transformation de cohérence. `doc_type` est le concat brut `docType_s_docSubType_s` (ex. `ART_review-article`), pas la valeur canonique : la résolution source→enum (`map_doc_type`) relève de la phase `metadata_correction`, pas du brut stocké dans `source_publications`.
     """
     title = get_title(doc)
     raw_type = doc.get("docType_s") or ""
@@ -172,7 +172,7 @@ def insert_hal_document(
 
     Les métadonnées canoniques (doi, title, pub_year, doc_type, nnt,
     journal_id, oa_status, language, container_title) viennent toutes de
-    ``pub_meta``, construit en amont par ``extract_pub_metadata``. ``doc``
+    `pub_meta`, construit en amont par `extract_pub_metadata`. `doc`
     ne sert ici que pour les extras HAL-spécifiques (collections, abstract,
     keywords, domaines, biblio, urls).
     """
@@ -292,9 +292,9 @@ def active_embargo_until(label_xml: str | None, today: date) -> date | None:
 def parse_tei_author_identifiers(label_xml: str | None) -> list[dict[str, str]]:
     """Extrait les identifiants par position d'auteur depuis le TEI HAL.
 
-    L'API search HAL ne fournit pas de champ Solr aligné positionnellement pour ORCID/IdRef (les listes ``authORCIDIdExt_s``/``authIdRefIdExt_s`` sont compactées). Seul le TEI (``label_xml``) attache proprement chaque identifiant à son auteur.
+    L'API search HAL ne fournit pas de champ Solr aligné positionnellement pour ORCID/IdRef (les listes `authORCIDIdExt_s`/`authIdRefIdExt_s` sont compactées). Seul le TEI (`label_xml`) attache proprement chaque identifiant à son auteur.
 
-    Retourne une liste indexée sur la position d'auteur ; chaque entrée est un dict pouvant contenir ``orcid``, ``idref``, ``idhal`` (formes normalisées : préfixes d'URL strippés). Renvoie ``[]`` si ``label_xml`` est absent ou mal formé.
+    Retourne une liste indexée sur la position d'auteur ; chaque entrée est un dict pouvant contenir `orcid`, `idref`, `idhal` (formes normalisées : préfixes d'URL strippés). Renvoie `[]` si `label_xml` est absent ou mal formé.
     """
     if not label_xml:
         return []

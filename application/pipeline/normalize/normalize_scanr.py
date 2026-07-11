@@ -92,7 +92,7 @@ def upsert_journal(
 def extract_pub_metadata(doc: dict, journal_id: int | None, scanr_id: str | None = None) -> dict:
     """Extrait les métadonnées de publication d'un document ScanR.
 
-    Retourne un dict utilisable par ``insert_scanr_document``. Toutes les valeurs sont brutes — pas de fallback (le brut de ``source_publications.doc_type`` est nullable text) ni de transformation de cohérence. ``language`` est posé à ``None`` : l'API ScanR ne l'expose pas.
+    Retourne un dict utilisable par `insert_scanr_document`. Toutes les valeurs sont brutes — pas de fallback (le brut de `source_publications.doc_type` est nullable text) ni de transformation de cohérence. `language` est posé à `None` : l'API ScanR ne l'expose pas.
     """
     title = get_title(doc)
     container_title = None
@@ -128,7 +128,7 @@ def insert_scanr_document(
 ) -> int:
     """Crée/retrouve l'entrée source_publications pour ScanR.
 
-    Les métadonnées canoniques (doi, title, pub_year, doc_type, nnt, journal_id, oa_status, language, container_title) viennent toutes de ``pub_meta``, construit en amont par ``extract_pub_metadata``. ``doc`` ne sert ici que pour les champs propres à ScanR (hal_id, pmid, abstract, biblio, keywords, topics, urls).
+    Les métadonnées canoniques (doi, title, pub_year, doc_type, nnt, journal_id, oa_status, language, container_title) viennent toutes de `pub_meta`, construit en amont par `extract_pub_metadata`. `doc` ne sert ici que pour les champs propres à ScanR (hal_id, pmid, abstract, biblio, keywords, topics, urls).
     """
     ext: dict[str, JsonValue] = {}
     if nnt := pub_meta["nnt"]:

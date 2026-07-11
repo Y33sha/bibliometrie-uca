@@ -17,7 +17,7 @@ import httpx
 from sqlalchemy import Connection
 
 CrossImportDoisReader = Callable[[Any, str], list[str]]
-"""Signature : ``(conn, target) -> list[doi]``.
+"""Signature : `(conn, target) -> list[doi]`.
 
 Injecté dans `run_async` pour respecter l'étanchéité DDD : la couche
 application ne doit pas importer infrastructure pour lire la liste des

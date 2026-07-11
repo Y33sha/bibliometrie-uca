@@ -1,4 +1,4 @@
-"""Entité ``Authorship`` — entité fille de l'aggregate ``Publication``.
+"""Entité `Authorship` — entité fille de l'aggregate `Publication`.
 
 Une `Authorship` représente une signature d'auteur sur une publication
 canonique. Au sens DDD strict, c'est une entité fille (lifecycle lié au

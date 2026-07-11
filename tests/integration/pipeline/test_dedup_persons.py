@@ -63,7 +63,7 @@ def _reject_pair(conn, publication_id, person_id):
 
 
 def _set_name_form_status(conn, person_id, raw_name, status):
-    """Force le statut du lien `(forme de `raw_name`, person_id)` dans `person_name_forms`."""
+    """Force le statut du lien (forme de `raw_name`, person_id) dans `person_name_forms`."""
     conn.execute(
         text("""
             UPDATE person_name_forms SET status = CAST(:st AS identifier_status)

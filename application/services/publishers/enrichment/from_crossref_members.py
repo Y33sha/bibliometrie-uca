@@ -44,7 +44,7 @@ from domain.normalize import normalize_text
 from domain.publishers.crossref_location import parse_country_segment
 
 type CrossrefMemberFetcher = Callable[[int], dict[str, Any] | None]
-"""Signature : ``(member_id) → record `message` ou None (404 / erreur)``."""
+"""Signature : `(member_id) → record message ou None (404 / erreur)`."""
 
 COMMIT_EVERY = 50
 

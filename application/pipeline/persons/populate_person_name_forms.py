@@ -7,16 +7,16 @@ source_authorships), puis synchronise la table par diff
 (insert/update/delete).
 
 Sources :
-1. ``persons.last_name`` + ``persons.first_name`` (source: ``'persons'``)
-   — inclut les ``rejected = TRUE`` pour préserver l'ancre de matching
+1. `persons.last_name` + `persons.first_name` (source: `'persons'`)
+   — inclut les `rejected = TRUE` pour préserver l'ancre de matching
    des entités douteuses.
 2. le nom normalisé de l'identité des signatures
-   (``author_identifying_keys.author_name_normalized``, toutes sources biblio).
+   (`author_identifying_keys.author_name_normalized`, toutes sources biblio).
 
 L'orchestrateur produit les formes "persons" en Python via
-``compute_person_name_forms`` (variantes prénom/nom/initiales) et les
-charge dans la table temp ``_raw_forms``. La fusion et la
-synchronisation se font ensuite côté SQL via ``sync_from_raw_forms``
+`compute_person_name_forms` (variantes prénom/nom/initiales) et les
+charge dans la table temp `_raw_forms`. La fusion et la
+synchronisation se font ensuite côté SQL via `sync_from_raw_forms`
 (GROUP BY (name_form, person_id), agrégation des sources, diff
 INSERT/UPDATE/DELETE).
 

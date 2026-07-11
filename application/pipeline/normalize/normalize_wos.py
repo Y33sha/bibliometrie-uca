@@ -367,7 +367,7 @@ def upsert_journal(
 def extract_pub_metadata(rec: dict, journal_id: int | None) -> dict:
     """Extrait les métadonnées de publication d'un record WoS.
 
-    Retourne un dict utilisable par ``insert_wos_document``.
+    Retourne un dict utilisable par `insert_wos_document`.
     """
     title = rec["title"]
     container_title = rec.get("journal_title") if not journal_id else None
@@ -400,8 +400,8 @@ def insert_wos_document(
     """Crée/retrouve l'entrée source_publications pour WoS.
 
     Les métadonnées canoniques (doi, title, pub_year, doc_type, journal_id,
-    oa_status, language, container_title) viennent toutes de ``pub_meta``,
-    construit en amont par ``extract_pub_metadata``. ``rec`` ne sert ici
+    oa_status, language, container_title) viennent toutes de `pub_meta`,
+    construit en amont par `extract_pub_metadata`. `rec` ne sert ici
     que pour les extras WoS-spécifiques (abstract, cited_by_count, biblio,
     keywords, topics, urls, external_ids non canoniques).
     """

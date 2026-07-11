@@ -1,4 +1,4 @@
-"""Aggregate root ``Journal`` — entité métier d'un journal/conférence/etc.
+"""Aggregate root `Journal` — entité métier d'un journal/conférence/etc.
 
 Identité = `id` (clé surrogate). Identifiant naturel : `title`
 (via la normalisation côté `journal_name_forms`). Les ISSN sont
@@ -87,7 +87,7 @@ _OPENALEX_SOURCE_TYPE_MAP: dict[str, JournalType] = {
 def map_openalex_source_type(raw: str | None) -> JournalType | None:
     """Mappe un champ OpenAlex Sources `type` vers notre enum `journal_type`.
 
-    Renvoie ``None`` pour les types sans signal exploitable (`metadata`,
+    Renvoie `None` pour les types sans signal exploitable (`metadata`,
     `other`) ou inconnus — le caller doit alors ne pas écrire.
     """
     if not raw:
