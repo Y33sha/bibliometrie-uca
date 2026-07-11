@@ -2,8 +2,6 @@
 
 1. **Cross-import HAL** — deux canaux séquentiels : par hal-id (repéré dans OpenAlex/ScanR) et par NNT (thèses sans document HAL).
 2. **Cross-import par DOI** — pour chaque source cible configurée, en parallèle : cherche les DOI vus ailleurs mais absents de la source et les fetche.
-
-Les dépendances techniques sont injectées : les runners par canal / par source (connexion, adapter, circuit-breaker), le primitif de parallélisme, et la détection de config.
 """
 
 import logging

@@ -1,20 +1,10 @@
 """Suggestion de pays par adresse via un automate Aho-Corasick inversé.
 
-Pour les adresses sans pays, on cherche dans le pool des adresses *avec* pays
-celles dont le `normalized_text` contient la cible comme sous-chaîne, et on
-retient le ou les pays les plus fréquents parmi elles.
+Pour les adresses sans pays, on cherche dans le pool des adresses *avec* pays celles dont le `normalized_text` contient la cible comme sous-chaîne, et on retient le ou les pays les plus fréquents parmi elles.
 
-Au lieu d'une recherche trigram par cible (une requête SQL par adresse, lente),
-on **inverse la boucle** : les cibles deviennent les motifs d'un automate
-Aho-Corasick, le pool devient les textes. Un seul passage sur le pool ressort,
-pour chaque adresse-pool, toutes les cibles qu'elle contient — coût indépendant
-du nombre de cibles. L'automate est construit par batch de cibles pour borner
-la mémoire ; le pool est rescanné à chaque batch.
+Au lieu d'une recherche trigram par cible (une requête SQL par adresse, lente), on **inverse la boucle** : les cibles deviennent les motifs d'un automate Aho-Corasick, le pool devient les textes. Un seul passage sur le pool ressort, pour chaque adresse-pool, toutes les cibles qu'elle contient — coût indépendant du nombre de cibles. L'automate est construit par batch de cibles pour borner la mémoire ; le pool est rescanné à chaque batch.
 
-L'orchestrateur `run` alimente `addresses.suggested_countries` (confirmation manuelle attendue) ;
-il ne dépend que du port `CountryQueries` et de l'automate ci-dessous. Il commite par batch : la
-progression est ainsi durable si le run est interrompu, et le WAL borné (le stock complet se traite
-en ~1-2 min, en plusieurs batches).
+L'orchestrateur `run` alimente `addresses.suggested_countries` (confirmation manuelle attendue) ; il ne dépend que du port `CountryQueries` et de l'automate ci-dessous. Il commite par batch : la progression est ainsi durable si le run est interrompu, et le journal de transactions (WAL) borné (le stock complet se traite en ~1-2 min, en plusieurs batches).
 """
 
 import logging
@@ -34,10 +24,7 @@ BATCH_SIZE = 50000
 class CountrySuggester:
     """Suggère un pays par cible (match sous-chaîne) via un automate sur un batch de cibles.
 
-    `targets` : `(address_id, normalized_text)` des adresses sans pays à suggérer.
-    Plusieurs adresses peuvent partager le même `normalized_text` (dédoublonnage
-    par md5(raw_text), pas par texte normalisé) : chaque motif porte la liste des
-    ids concernés.
+    `targets` : `(address_id, normalized_text)` des adresses sans pays à suggérer. Plusieurs adresses peuvent partager le même `normalized_text` (dédoublonnage par md5(raw_text), pas par texte normalisé) : chaque motif porte la liste des ids concernés.
     """
 
     def __init__(self, targets: list[tuple[int, str]]) -> None:
@@ -55,11 +42,7 @@ class CountrySuggester:
     def suggest(self, pool: Iterable[tuple[str, Sequence[str] | None]]) -> dict[int, list[str]]:
         """Balaie le pool `(normalized_text, countries)` et rend `{target_id: [pays]}`.
 
-        Par cible matchée : le ou les pays les plus fréquents (ex-aequo triés)
-        parmi les adresses-pool qui la contiennent comme sous-chaîne. Une adresse
-        sans aucun match est absente du résultat (le caller lui pose un array vide).
-        Chaque adresse-pool ne compte qu'une fois par cible, quelles que soient
-        les positions du match.
+        Par cible matchée : le ou les pays les plus fréquents (ex-aequo triés) parmi les adresses-pool qui la contiennent comme sous-chaîne. Une adresse sans aucun match est absente du résultat (le caller lui pose un array vide). Chaque adresse-pool ne compte qu'une fois par cible, quelles que soient les positions du match.
         """
         counts: dict[int, Counter[str]] = defaultdict(Counter)
         if not self._empty:
@@ -92,10 +75,7 @@ def run(
 ) -> PhaseMetrics:
     """Suggère un pays pour les adresses sans pays, dans `addresses.suggested_countries`.
 
-    `retry_empty` (mode `full`) : traite les nouvelles **+ les vides** (échecs précédents `= []`),
-    pour réessayer au cas où le pool aurait grossi, sans recalculer les suggestions positives (qui
-    changent rarement et coûtent cher). Sinon (incrémental) : seulement les nouvelles
-    (`suggested_countries IS NULL`). `seen` = adresses traitées, `new` = adresses avec suggestion.
+    `retry_empty` (mode `full`) : traite les nouvelles **+ les vides** (échecs précédents `= []`), pour réessayer au cas où le pool aurait grossi, sans recalculer les suggestions positives (qui changent rarement et coûtent cher). Sinon (incrémental) : seulement les nouvelles (`suggested_countries IS NULL`). `seen` = adresses traitées, `new` = adresses avec suggestion.
     """
     counts = queries.count_suggest_eligible(conn)
     total = counts.eligible + (counts.empty_attempted if retry_empty else 0)

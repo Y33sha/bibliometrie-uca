@@ -1,10 +1,6 @@
 """Détection du pays d'une adresse par **nom de lieu** (institution, ville).
 
-Pour les adresses restées sans pays après la détection par nom de pays, cherche dans tout le
-texte normalisé — pas seulement le dernier segment — les noms d'institutions et de villes connus
-(`place_name_forms`, `kind IN ('institution', 'city')`), chacun rattaché à un pays, via un automate
-Aho-Corasick (`PlaceNameDetector`). Le pays n'est écrit (`addresses.countries`, autoritaire) que si
-les lieux trouvés désignent un pays unique ; un conflit (pays multiples) est laissé à la suggestion.
+Pour les adresses restées sans pays après la détection par nom de pays, cherche dans tout le texte normalisé — pas seulement le dernier segment — les noms d'institutions et de villes connus (`place_name_forms`, `kind IN ('institution', 'city')`), chacun rattaché à un pays, via un automate Aho-Corasick (`PlaceNameDetector`). Le pays n'est écrit (`addresses.countries`, autoritaire) que si les lieux trouvés désignent un pays unique ; un conflit (pays multiples) est laissé à la suggestion.
 
 Ne dépend que du port `CountryQueries` et du domaine ; le commit est laissé au caller.
 """
