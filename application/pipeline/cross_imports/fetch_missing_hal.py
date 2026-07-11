@@ -3,9 +3,7 @@
 Deux pistes distinctes, chacune son orchestrateur, partageant un runner async :
 
 - `fetch_missing_hal_by_id` : hal-ids repérés par OpenAlex et ScanR (absents du staging HAL), requête Solr `halId_s`.
-- `fetch_missing_hal_by_nnt` : NNT de thèses soutenues sans document HAL (theses.fr), requête Solr `nntId_s`. Réservé au mode `full` — le gate de mode vit chez le caller (`run_pipeline`).
-
-Les documents ramenés sont marqués `collection = NULL` (hors périmètre UCA), ce qui les distingue des entrées issues du portail ou des collections labo.
+- `fetch_missing_hal_by_nnt` : NNT de thèses soutenues sans document HAL (theses.fr), requête Solr `nntId_s`. Réservé au mode `full`.
 
 Fetch HTTP async (httpx + `asyncio.Semaphore(adapter.max_concurrent)`) ; inserts DB sync sérialisés (`asyncio.Lock` + `asyncio.to_thread`, la `Connection` SA sync n'étant pas thread-safe) ; commits intermédiaires tous les `_COMMIT_EVERY`.
 """
@@ -95,7 +93,7 @@ async def fetch_missing_hal_by_id(
 ) -> PhaseMetrics:
     """Fetch des documents HAL repérés par hal-id (OpenAlex/ScanR) et absents du staging.
 
-    Phase importable depuis `run_pipeline.py` ; la connexion n'est pas fermée (responsabilité du caller). `new` = documents insérés ; `extras["not_found"]` = hal-ids introuvables côté HAL (marqués `not_found_at`). `total` = hal-ids manquants à traiter (dédupliqués OA + ScanR).
+    `new` = documents insérés ; `extras["not_found"]` = hal-ids introuvables côté HAL (marqués `not_found_at`). `total` = hal-ids manquants à traiter (dédupliqués OA + ScanR).
     """
     adapter.configure(conn)
 
@@ -147,7 +145,7 @@ async def fetch_missing_hal_by_nnt(
 ) -> PhaseMetrics:
     """Fetch des documents HAL de thèses soutenues repérées par NNT (theses.fr).
 
-    Phase importable depuis `run_pipeline.py` ; la connexion n'est pas fermée. `new` = documents insérés ; `extras["not_found"]` = NNT absents de HAL. `total` = NNT (thèses soutenues) sans document HAL.
+    `new` = documents insérés ; `extras["not_found"]` = NNT absents de HAL. `total` = NNT (thèses soutenues) sans document HAL.
     """
     adapter.configure(conn)
 
