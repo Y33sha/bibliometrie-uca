@@ -38,10 +38,7 @@ class ExtractionConfigError(Exception):
 class SourceExtractor[ConfigT](ABC):
     """Template pour l'extraction API → staging.
 
-    `ConfigT` (paramètre PEP 695) = type de la config chargée par `load_config`,
-    propre à chaque source. Permet aux sous-classes de retourner une dataclass
-    typée plutôt qu'un `dict` opaque. Le base class ne consomme jamais le contenu
-    de la config — il la passe à `extract_all` qui sait l'interpréter.
+    `ConfigT` (paramètre PEP 695) = type de la config chargée par `load_config`, propre à chaque source. Permet aux sous-classes de retourner une dataclass typée plutôt qu'un `dict` opaque. Le base class ne consomme jamais le contenu de la config — il la passe à `extract_all` qui sait l'interpréter.
 
     Points d'override obligatoires :
     - `SOURCE` : identifiant source (ex: "hal", "openalex")
@@ -50,7 +47,6 @@ class SourceExtractor[ConfigT](ABC):
 
     Points d'override optionnels :
     - `setup_logging(args, config)` : logs de header personnalisés
-    - `log_summary(stats, args)` : logs de summary personnalisés
     """
 
     SOURCE: ClassVar[str] = ""
@@ -62,14 +58,11 @@ class SourceExtractor[ConfigT](ABC):
     ) -> None:
         self.conn = conn
         self.logger = logger
-        # Circuit-breaker de la source (posé par `run`) : les boucles
-        # `extract_all` consultent `_breaker_tripped()` pour s'arrêter quand la
-        # source est à bout de budget / en panne.
+        # Circuit-breaker de la source (posé par `run`) : les boucles `extract_all` consultent `_breaker_tripped()` pour s'arrêter quand la source est à bout de budget / en panne.
         self._breaker: CircuitBreaker | None = None
 
     def _breaker_tripped(self) -> bool:
-        """`True` si le circuit-breaker de la source a tripé (à consulter dans les
-        boucles d'`extract_all` pour stopper la source)."""
+        """`True` si le circuit-breaker de la source a tripé (à consulter dans les boucles d'`extract_all` pour stopper la source)."""
         return self._breaker is not None and self._breaker.tripped
 
     # ── Hooks métier ────────────────────────────────────────────
@@ -87,10 +80,6 @@ class SourceExtractor[ConfigT](ABC):
     ) -> None:
         """Logs de header personnalisés (ex: affiliations, collections, années)."""
 
-    def log_summary(self, metrics: PhaseMetrics, args: argparse.Namespace) -> None:
-        """Logs de summary. Défaut : `=== Terminé : <as_summary> ===`."""
-        self.logger.info(f"=== Terminé : {metrics.as_summary()} ===")
-
     # ── Entry point ─────────────────────────────────────────────
 
     def run(
@@ -99,7 +88,7 @@ class SourceExtractor[ConfigT](ABC):
         *,
         breaker: CircuitBreaker | None = None,
     ) -> PhaseMetrics:
-        """Exécute l'extraction : `load_config` → `setup_logging` → `extract_all` → `log_summary`.
+        """Exécute l'extraction : `load_config` → `setup_logging` → `extract_all`, puis loggue le résumé.
 
         Invoqué par `run_pipeline.py`. Les exceptions (`ExtractionConfigError`, HTTP, `KeyboardInterrupt`) remontent à l'orchestrateur, qui décide quoi en faire (rapport partiel, exit code).
 
@@ -112,5 +101,5 @@ class SourceExtractor[ConfigT](ABC):
         self.logger.info(f"=== Extraction {self.SOURCE} démarrée ===")
         self.setup_logging(args, config)
         metrics = self.extract_all(args, config)
-        self.log_summary(metrics, args)
+        self.logger.info(f"=== Terminé : {metrics.as_summary()} ===")
         return metrics

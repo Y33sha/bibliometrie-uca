@@ -177,9 +177,6 @@ class WosExtractor(SourceExtractor[WosExtractConfig]):
                 time.sleep(30)
         return stats
 
-    def log_summary(self, stats: PhaseMetrics, args: argparse.Namespace) -> None:
-        self.logger.info(f"=== Terminé : {stats.as_summary()} ===")
-
 
 __all__ = [
     "WosExtractor",
