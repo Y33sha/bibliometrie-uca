@@ -1,20 +1,12 @@
 """Orchestrateur du fetch des DOI manquants dans une source cible.
 
-Pour chaque DOI présent dans d'autres sources mais absent de la cible,
-interroge l'API de la cible et insère le record dans staging.
+Pour chaque DOI présent dans d'autres sources mais absent de la cible, interroge l'API de la cible et insère le record dans staging.
 
-Le comportement spécifique à chaque source (endpoint, auth, format de
-requête/réponse, SQL d'insertion) est délégué à un adapter qui
-implémente `AsyncFetchMissingDoiAdapter`
-(`application/ports/pipeline/cross_imports/fetch_missing_doi.py`).
+Le comportement spécifique à chaque source (endpoint, auth, format de requête/réponse, SQL d'insertion) est délégué à un adapter qui implémente `AsyncFetchMissingDoiAdapter` (`application/ports/pipeline/cross_imports/fetch_missing_doi.py`).
 
-Implémentation async (`httpx.AsyncClient` + pool de `max_concurrent`
-workers par source) pour saturer les rate-limits autorisés. Sur OpenAlex
-on mesure environ 18 req/s, soit ×3-4 par rapport à un appel séquentiel
-respectant le même quota.
+Implémentation async (`httpx.AsyncClient` + pool de `max_concurrent` workers par source) pour saturer les rate-limits autorisés. Sur OpenAlex on mesure environ 18 req/s, soit ×3-4 par rapport à un appel séquentiel respectant le même quota.
 
-Utilisé par la phase `cross_imports` du pipeline, une fois par source
-cible (hal, openalex, wos, scanr, crossref).
+Utilisé par la phase `cross_imports` du pipeline, une fois par source cible (hal, openalex, wos, scanr, crossref).
 """
 
 from __future__ import annotations
@@ -50,35 +42,23 @@ async def run_async(
 ) -> PhaseMetrics:
     """Boucle principale : DOIs → fetch async → insert.
 
-    Lance les fetchs HTTP en parallèle via `asyncio.gather`, bornés par
-    un sémaphore `adapter.max_concurrent` pour respecter le rate-limit
-    de l'API. Les inserts DB restent sync, délégués au threadpool via
-    `asyncio.to_thread` et sérialisés par un `asyncio.Lock` (la
-    `Connection` SA sync n'est pas thread-safe).
+    Lance les fetchs HTTP en parallèle via `asyncio.gather`, bornés par un sémaphore `adapter.max_concurrent` pour respecter le rate-limit de l'API. Les inserts DB restent sync, délégués au threadpool via `asyncio.to_thread` et sérialisés par un `asyncio.Lock` (la `Connection` SA sync n'est pas thread-safe).
 
-    Un DOI confirmé absent par la source (réponse vide / 404) revient
-    sous forme de sentinelle `not_found_marker`. Routage de la sentinelle :
-    - sans `marker_handler` (cross-import) : `insert()` la route vers le
-      backoff (`doi_lookups` / stub `staging` Crossref) ;
-    - avec `marker_handler` (refresh stale) : appelé `(conn, doi)` pour
-      marquer la disparition au lieu d'insérer.
-    Ces sentinelles sont comptées séparément (`not_found`) et exclues de
-    `fetched`.
+    Un DOI confirmé absent par la source (réponse vide / 404) revient sous forme de sentinelle `not_found_marker`. Routage de la sentinelle :
+    - sans `marker_handler` (cross-import) : `insert()` la route vers le backoff (`doi_lookups` / stub `staging` Crossref) ;
+    - avec `marker_handler` (refresh stale) : appelé `(conn, doi)` pour marquer la disparition au lieu d'insérer.
+    Ces sentinelles sont comptées séparément (`not_found`) et exclues de `fetched`.
 
     Args:
         conn: `Connection` SA ouverte.
         adapter: instance source-spécifique async.
         log: logger.
         cross_import_dois_reader: callable `(conn, source) -> list[doi]`.
-        marker_handler: optionnel ; si fourni, les sentinelles not-found y
-            sont routées (`(conn, doi)`, charge de committer) au lieu de
-            passer par `insert()`.
+        marker_handler: optionnel ; si fourni, les sentinelles not-found y sont routées (`(conn, doi)`, charge de committer) au lieu de passer par `insert()`.
         limit: nombre max de DOI à traiter.
 
     Returns:
-        `PhaseMetrics` : `total` = DOI traités, `new` = inserts effectifs,
-        `extras["fetched"]` = records reçus de l'API, `extras["not_found"]`
-        = DOI confirmés absents (backoff enregistré).
+        `PhaseMetrics` : `total` = DOI traités, `new` = inserts effectifs, `extras["fetched"]` = records reçus de l'API, `extras["not_found"]` = DOI confirmés absents (backoff enregistré).
     """
     adapter.configure(conn)
     slog = scoped_logger(log, adapter.source_key)
@@ -96,8 +76,7 @@ async def run_async(
 
     batches = [dois[i : i + adapter.batch_size] for i in range(0, total, adapter.batch_size)]
 
-    # Sérialise les inserts : la `Connection` SA sync n'est pas thread-safe,
-    # or `asyncio.to_thread` exécute dans un ThreadPoolExecutor partagé.
+    # Sérialise les inserts : la `Connection` SA sync n'est pas thread-safe, or `asyncio.to_thread` exécute dans un ThreadPoolExecutor partagé.
     db_lock = asyncio.Lock()
     progress = {"processed": 0, "fetched": 0, "inserted": 0, "not_found": 0}
 
@@ -120,8 +99,7 @@ async def run_async(
                 try:
                     records = list(await adapter.fetch_async(client, batch))
                 except Exception as e:
-                    # Breaker tripé pendant le fetch (source indisponible) :
-                    # abandon silencieux, le log unique vient après le gather.
+                    # Breaker tripé pendant le fetch (source indisponible) : abandon silencieux, le log unique vient après le gather.
                     if breaker is not None and breaker.tripped:
                         return
                     slog.error("erreur sur lot %d (%d DOI) : %s", batch_idx, len(batch), e)
@@ -129,9 +107,7 @@ async def run_async(
                 if request_delay:
                     await asyncio.sleep(request_delay)
 
-                # Les sentinelles `not_found` ne sont pas des records API : on les
-                # compte à part, mais on les `insert()` quand même (l'adapter les
-                # route vers le backoff `doi_lookups` / le stub `staging`).
+                # Les sentinelles `not_found` ne sont pas des records API : on les compte à part, mais on les `insert()` quand même (l'adapter les route vers le backoff `doi_lookups` / le stub `staging`).
                 real = [r for r in records if not is_not_found_marker(r)]
                 progress["fetched"] += len(real)
                 progress["not_found"] += len(records) - len(real)

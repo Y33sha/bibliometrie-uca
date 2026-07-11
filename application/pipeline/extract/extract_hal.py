@@ -1,14 +1,8 @@
 """Orchestrateur d'extraction HAL.
 
-Interroge l'**union** des collections configurées en une seule requête Solr
-(`fq=collCode_s:(C1 OR … OR Cn)`), paginée en `cursorMark`. Solr dédoublonne
-l'union côté serveur : chaque document est récupéré une fois, quel que soit le
-nombre de collections du périmètre auxquelles il appartient. Le détail HTTP/SQL
-est délégué à `HalExtractAdapter`.
+Interroge l'**union** des collections configurées en une seule requête Solr (`fq=collCode_s:(C1 OR … OR Cn)`), paginée en `cursorMark`. Solr dédoublonne l'union côté serveur : chaque document est récupéré une fois, quel que soit le nombre de collections du périmètre auxquelles il appartient. Le détail HTTP/SQL est délégué à `HalExtractAdapter`.
 
-Le routage new/updated/unchanged vient du `(inserted, changed)` de l'upsert
-staging piloté par `raw_hash` : un `raw_hash=null` en base force le re-import
-(re-fetch → hash recalculé → contenu réécrit + `processed=FALSE`).
+Le routage new/updated/unchanged vient du `(inserted, changed)` de l'upsert staging piloté par `raw_hash` : un `raw_hash=null` en base force le re-import (re-fetch → hash recalculé → contenu réécrit + `processed=FALSE`).
 """
 
 from __future__ import annotations
@@ -42,14 +36,9 @@ def extract_union(
 ) -> PhaseMetrics:
     """Extrait l'union des collections configurées pour un périmètre temporel.
 
-    Construit `q` (années/`since`) et `fq=collCode_s:(…)` sur toutes les
-    collections de `config.all_collections`, puis paginate en `cursorMark`
-    jusqu'à stabilisation du marqueur. Chaque document est upserté une fois.
-    `logger` est le logger scopé (`[hal · <scope>]`) construit par `extract_all`.
-    Retourne `PhaseMetrics(new, updated, unchanged, total)`.
+    Construit `q` (années/`since`) et `fq=collCode_s:(…)` sur toutes les collections de `config.all_collections`, puis paginate en `cursorMark` jusqu'à stabilisation du marqueur. Chaque document est upserté une fois. `logger` est le logger scopé (`[hal · <scope>]`) construit par `extract_all`. Retourne `PhaseMetrics(new, updated, unchanged, total)`.
 
-    En `dry_run`, une seule page est tirée pour lire `numFound` (volume du
-    périmètre) sans rien écrire.
+    En `dry_run`, une seule page est tirée pour lire `numFound` (volume du périmètre) sans rien écrire.
     """
     codes = list(config.all_collections.keys())
     query = adapter.build_query(years=years, since=since)
@@ -80,8 +69,7 @@ def extract_union(
         resp = data.get("response", {})
         docs = resp.get("docs", [])
 
-        # `numFound` n'est connu qu'à la première réponse cursorMark : on logue
-        # alors le volume du périmètre et le nombre de pages attendu.
+        # `numFound` n'est connu qu'à la première réponse cursorMark : on logue alors le volume du périmètre et le nombre de pages attendu.
         if total_pages is None:
             num_found = int(resp.get("numFound", 0))
             total_pages = (num_found + page_size - 1) // page_size if num_found else 0

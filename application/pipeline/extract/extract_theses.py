@@ -1,11 +1,8 @@
 """Orchestrateur d'extraction theses.fr.
 
-Pilote l'extraction par PPN d'établissement × statut (soutenue / enCours).
-Le détail HTTP/SQL est délégué à `ThesesExtractAdapter`.
+Pilote l'extraction par PPN d'établissement × statut (soutenue / enCours). Le détail HTTP/SQL est délégué à `ThesesExtractAdapter`.
 
-Asymétrie avec les autres extracteurs : ne consomme pas la liste
-``years_full`` / ``years_weekly`` de la config DB. Sans le flag CLI
-``--year YYYY``, ramène tout l'historique theses.fr des PPN configurés.
+Asymétrie avec les autres extracteurs : ne consomme pas la liste `years_full` / `years_weekly` de la config DB. Sans `--year YYYY` fourni, ramène tout l'historique theses.fr des PPN configurés.
 """
 
 from __future__ import annotations

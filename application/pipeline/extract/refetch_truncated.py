@@ -1,22 +1,10 @@
 """Orchestrateur du re-fetch des works OpenAlex tronqués à 100 auteurs.
 
-L'API OpenAlex bulk retourne max 100 authorships par work. Cet
-orchestrateur détecte les works avec exactement 100 auteurs dans le
-staging et les re-fetche individuellement via l'API
-(qui retourne alors tous les auteurs).
+L'API OpenAlex bulk retourne max 100 authorships par work. Cet orchestrateur détecte les works avec exactement 100 auteurs dans le staging et les re-fetche individuellement via l'API (qui retourne alors tous les auteurs).
 
-Implémentation async : `httpx.AsyncClient` partagé +
-`asyncio.Semaphore(adapter.max_concurrent)` pour respecter le plafond
-OpenAlex (~10 req/s, cf. fetch_missing_doi).
+Implémentation async : `httpx.AsyncClient` partagé + `asyncio.Semaphore(adapter.max_concurrent)` pour respecter le plafond OpenAlex (~10 req/s, cf. `fetch_missing_doi`).
 
-**Préservation des authorships complètes.** Le refetch ne recalcule
-**pas** `raw_hash` (cf. adapter `update_raw_data`) : la ligne refetchée
-garde le hash du payload bulk initial. Tant que le bulk renvoie le
-même payload tronqué, son hash matchera celui en base et l'UPSERT bulk
-ne touchera pas `raw_data` (qui contient pourtant les auteurs complets).
-Un changement bulk (raw_hash différent) écrasera raw_data avec la
-version tronquée, et le prochain passage du refetch dans le même run
-pipeline (count repassé à 100) ré-amorcera le cycle.
+**Préservation des authorships complètes.** Le refetch ne recalcule **pas** `raw_hash` (cf. adapter `update_raw_data`) : la ligne refetchée garde le hash du payload bulk initial. Tant que le bulk renvoie le même payload tronqué, son hash matchera celui en base et l'UPSERT bulk ne touchera pas `raw_data` (qui contient pourtant les auteurs complets). Un changement bulk (raw_hash différent) écrasera raw_data avec la version tronquée, et le prochain passage du refetch dans le même run pipeline (count repassé à 100) ré-amorcera le cycle.
 """
 
 from __future__ import annotations
@@ -47,10 +35,7 @@ async def refetch(
 ) -> PhaseMetrics:
     """Re-fetch les works OpenAlex marqués `staging.authors_truncated`.
 
-    Phase importable depuis `run_pipeline.py` ; ne ferme pas la
-    connexion (responsabilité du caller). `updated` compte les works
-    ré-écrits ; `already_complete` (extras) ceux qui avaient pile 100
-    auteurs (genuine, flag effacé) ; `errors` les fetchs échoués.
+    Phase importable depuis `run_pipeline.py` ; ne ferme pas la connexion (responsabilité du caller). `updated` compte les works ré-écrits ; `already_complete` (extras) ceux qui avaient pile 100 auteurs (genuine, flag effacé) ; `errors` les fetchs échoués.
     """
     log.info("▶ refetch_truncated")
     t0 = time.perf_counter()
@@ -69,8 +54,7 @@ async def refetch(
         return metrics
 
     sem = asyncio.Semaphore(adapter.max_concurrent)
-    # La `Connection` SA sync n'est pas thread-safe ; tous les writes
-    # (UPDATE, commit) passent par `to_thread` sous ce lock.
+    # La `Connection` SA sync n'est pas thread-safe ; tous les writes (UPDATE, commit) passent par `to_thread` sous ce lock.
     db_lock = asyncio.Lock()
     progress = {"processed": 0}
 
@@ -81,12 +65,10 @@ async def refetch(
                 work = await adapter.fetch_work(client, ref.openalex_id)
 
             if not work:
-                # Fetch échoué : on garde le flag → retry au prochain run (robuste à
-                # une indisponibilité OpenAlex / un 429).
+                # Fetch échoué : on garde le flag → retry au prochain run (robuste à une indisponibilité OpenAlex / un 429).
                 metrics.add(errors=1)
             elif len(work.get("authorships", [])) <= 100:
-                # Genuine 100 (ou moins) : pas tronqué → on efface juste le flag,
-                # sans réécrire raw_data ni forcer une re-normalisation.
+                # Genuine 100 (ou moins) : pas tronqué → on efface juste le flag, sans réécrire raw_data ni forcer une re-normalisation.
                 async with db_lock:
                     await asyncio.to_thread(adapter.clear_truncated, conn, ref.staging_id)
                 metrics.add(already_complete=1)

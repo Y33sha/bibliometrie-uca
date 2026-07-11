@@ -173,8 +173,7 @@ def _run_parallel_sources(
 def _extraction_thunk(
     extract_one: ExtractOne, source: str, args: argparse.Namespace
 ) -> Callable[[], _SourceOutcome]:
-    """Enveloppe une extraction en thunk : chronométrée, la non-configuration rendue en valeur
-    (jamais levée hors du thread) pour que le primitif de parallélisme n'ait pas à la connaître."""
+    """Enveloppe une extraction en thunk : chronométrée, la non-configuration rendue en valeur (jamais levée hors du thread) pour que le primitif de parallélisme n'ait pas à la connaître."""
 
     def thunk() -> _SourceOutcome:
         try:

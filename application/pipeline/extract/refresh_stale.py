@@ -1,20 +1,14 @@
 """Orchestrateur du refresh des rows staging stale d'une source.
 
-Sélectionne les rows dont `last_seen_at` a dépassé `STALE_REFRESH_AFTER_DAYS`
-et les refetche **par leur identifiant natif** (`staging.source_id`) — pas par
-DOI. Toute row a un `source_id`, donc toute row est refetchable, avec ou sans DOI.
+Sélectionne les rows dont `last_seen_at` a dépassé `STALE_REFRESH_AFTER_DAYS` et les refetche **par leur identifiant natif** (`staging.source_id`) — pas par DOI. Toute row a un `source_id`, donc toute row est refetchable, avec ou sans DOI.
 
 Trois issues par row (cf. `application.ports.pipeline.extract.refresh_stale`) :
 
-- record trouvé → UPSERT (`raw_data` rafraîchi si le hash change, `last_seen_at`
-  toujours bumpé) ;
+- record trouvé → UPSERT (`raw_data` rafraîchi si le hash change, `last_seen_at` toujours bumpé) ;
 - absence confirmée (réponse valide, zéro record) → `disappeared_at` ;
 - échec transitoire (réseau, 429, réponse malformée) → no-op, retry au run suivant.
 
-Le comportement spécifique à chaque source (endpoint, auth, requête/réponse) est
-délégué à un adapter `RefreshStaleAdapter`. Implémentation async (`httpx.AsyncClient`
-+ pool de `max_concurrent` workers) avec circuit-breaker par source, sur le modèle
-de `application.pipeline.cross_imports.fetch_missing_doi.run_async`.
+Le comportement spécifique à chaque source (endpoint, auth, requête/réponse) est délégué à un adapter `RefreshStaleAdapter`. Implémentation async (`httpx.AsyncClient` + pool de `max_concurrent` workers) avec circuit-breaker par source, sur le modèle de `application.pipeline.cross_imports.fetch_missing_doi.run_async`.
 """
 
 from __future__ import annotations
@@ -65,9 +59,7 @@ def run_phase(
 ) -> PhaseMetrics:
     """Rafraîchit le stale de chaque source configurée, bornée à la fenêtre d'années du run.
 
-    WoS est opt-in (`--include-wos`). Fenêtre d'années : `--year` cible une seule année, sinon
-    `[start_year … courante]` ; `theses` ignore la borne large (tout l'historique des PPN), mais
-    suit `--year`. Les sources non configurées sont sautées avec un signal `source_unconfigured`.
+    WoS est opt-in (`--include-wos`). Fenêtre d'années : `--year` cible une seule année, sinon `[start_year … courante]` ; `theses` ignore la borne large (tout l'historique des PPN), mais suit `--year`. Les sources non configurées sont sautées avec un signal `source_unconfigured`.
     """
     metrics = PhaseMetrics()
     allowed = set(ALL_SOURCES) - ({"wos"} if not include_wos else set())
@@ -116,13 +108,9 @@ async def refresh(
 ) -> PhaseMetrics:
     """Refetche par id natif les rows stale de la source de l'adapter.
 
-    `years` borne le refresh à la fenêtre d'années du run courant (via
-    `source_publications.pub_year`) ; `None` = tout le stale de la source.
+    `years` borne le refresh à la fenêtre d'années du run courant (via `source_publications.pub_year`) ; `None` = tout le stale de la source.
 
-    Ne ferme pas la connexion (responsabilité du caller). `updated` = `raw_data`
-    réécrit (hash changé) ; `unchanged` = re-vu identique (seul `last_seen_at`
-    bumpé) ; `errors` = fetchs transitoires échoués ; `extras["disappeared"]` =
-    absences confirmées marquées `disappeared_at`.
+    Ne ferme pas la connexion (responsabilité du caller). `updated` = `raw_data` réécrit (hash changé) ; `unchanged` = re-vu identique (seul `last_seen_at` bumpé) ; `errors` = fetchs transitoires échoués ; `extras["disappeared"]` = absences confirmées marquées `disappeared_at`.
     """
     adapter.configure(conn)
     slog = scoped_logger(log, adapter.source_key)
@@ -136,8 +124,7 @@ async def refresh(
     if dry_run or total == 0:
         return PhaseMetrics(seen=total)
 
-    # Sérialise les writes : la `Connection` SA sync n'est pas thread-safe, or
-    # `asyncio.to_thread` exécute dans un ThreadPoolExecutor partagé.
+    # Sérialise les writes : la `Connection` SA sync n'est pas thread-safe, or `asyncio.to_thread` exécute dans un ThreadPoolExecutor partagé.
     db_lock = asyncio.Lock()
     progress = {"processed": 0}
     metrics = PhaseMetrics(seen=total)

@@ -1,7 +1,6 @@
 """Orchestrateur d'extraction ScanR.
 
-Pilote l'extraction par année via la pagination `search_after`
-(Elasticsearch). Le détail HTTP/SQL est délégué à `ScanrExtractAdapter`.
+Pilote l'extraction par année via la pagination `search_after` (Elasticsearch). Le détail HTTP/SQL est délégué à `ScanrExtractAdapter`.
 """
 
 from __future__ import annotations

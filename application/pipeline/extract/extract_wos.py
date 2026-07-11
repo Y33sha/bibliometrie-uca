@@ -1,8 +1,6 @@
 """Orchestrateur d'extraction WoS.
 
-Pilote l'extraction par année via la pagination `firstRecord` (queryId
-non fiable côté Clarivate). Le détail HTTP/SQL est délégué à
-`WosExtractAdapter`.
+Pilote l'extraction par année via la pagination `firstRecord` (queryId non fiable côté Clarivate). Le détail HTTP/SQL est délégué à `WosExtractAdapter`.
 """
 
 from __future__ import annotations

@@ -1,8 +1,6 @@
 """Orchestrateur d'extraction OpenAlex.
 
-Pilote l'extraction par année (ou par `since` en mode incrémental) via
-le cursor OpenAlex. Le détail HTTP/SQL est délégué à
-`OpenalexExtractAdapter`.
+Pilote l'extraction par année (ou par `since` en mode incrémental) via le cursor OpenAlex. Le détail HTTP/SQL est délégué à `OpenalexExtractAdapter`.
 """
 
 from __future__ import annotations
@@ -37,8 +35,7 @@ def extract_year(
 ) -> tuple[int, int, int]:
     """Extrait des publications OpenAlex par année ou par date de modification.
 
-    Retourne (nouveaux, mis_a_jour, inchangés) — ventilation calculée par
-    l'adapter via `xmax` (insert) + comparaison de hash (changed).
+    Retourne (nouveaux, mis_a_jour, inchangés) — ventilation calculée par l'adapter via `xmax` (insert) + comparaison de hash (changed).
     """
     cursor = "*"
     total_fetched = 0
