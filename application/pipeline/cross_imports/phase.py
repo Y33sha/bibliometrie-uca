@@ -71,10 +71,6 @@ def run(
     )
 
     if configured:
-        # Chaque source frappe une API distincte et écrit dans son propre staging — aucun état
-        # partagé. La merge des métriques reste séquentielle (thread principal). Conséquence
-        # assumée : la propagation cross-source d'un DOI fraîchement importé peut glisser au run
-        # suivant (phase idempotente et auto-bornée).
         logger.info(
             "▶ cross-imports par DOI en parallèle (%d) : %s", len(configured), ", ".join(configured)
         )

@@ -1,6 +1,6 @@
 """Orchestrateur du fetch des DOI manquants dans une source cible.
 
-Pour chaque DOI présent dans d'autres sources mais absent de la cible, interroge l'API de la cible et insère le record dans `staging .
+Pour chaque DOI présent dans d'autres sources mais absent de la cible, interroge l'API de la cible et insère le record dans `staging`.
 
 Le comportement spécifique à chaque source (endpoint, auth, format de requête/réponse, SQL d'insertion) est délégué à un adapter qui implémente `AsyncFetchMissingDoiAdapter` (`application/ports/pipeline/cross_imports/fetch_missing_doi.py`).
 
@@ -94,7 +94,6 @@ async def run_async(
                 if request_delay:
                     await asyncio.sleep(request_delay)
 
-                # Les sentinelles `not_found` ne sont pas des records API : on les compte à part, mais on les `insert()` quand même (l'adapter les mémorise dans `doi_lookups`).
                 real = [r for r in records if not is_not_found_marker(r)]
                 progress["fetched"] += len(real)
                 progress["not_found"] += len(records) - len(real)
