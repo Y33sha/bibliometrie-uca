@@ -198,73 +198,7 @@ class PgAddressRepository:
         )
         return [row.id for row in result]
 
-    # ── Propagation vers source_authorships, source_publications et publications ──
-
-    def refresh_sa_countries_for_addresses(
-        self,
-        address_ids: list[int],
-    ) -> int:
-        """Recalcule `source_authorships.countries` pour les sa pointant vers
-        ces adresses (cascade ciblée après modification manuelle).
-
-        Deux passes (mêmes principes que `refresh_sa_countries` global) :
-
-        1. Recalcule depuis les adresses utiles pour les sa concernées
-           — un sa peut avoir d'autres adresses dont les pays n'ont pas
-           changé, donc on agrège sur l'ensemble.
-        2. Met à NULL les sa concernées qui n'ont plus aucune adresse
-           avec pays (cas où on a retiré le seul pays porteur).
-        """
-        if not address_ids:
-            return 0
-        pass_1 = self._conn.execute(
-            text("""
-                WITH affected_sa AS (
-                    SELECT DISTINCT source_authorship_id AS sa_id
-                    FROM source_authorship_addresses
-                    WHERE address_id = ANY(:ids)
-                ),
-                expanded AS (
-                    SELECT DISTINCT asa.sa_id, c::text AS country_code
-                    FROM affected_sa asa
-                    JOIN source_authorship_addresses saa ON saa.source_authorship_id = asa.sa_id
-                    JOIN addresses a ON a.id = saa.address_id,
-                    LATERAL unnest(a.countries) AS c
-                    WHERE a.countries IS NOT NULL
-                ),
-                sa_new AS (
-                    SELECT sa_id, array_agg(country_code ORDER BY country_code) AS new_countries
-                    FROM expanded
-                    GROUP BY sa_id
-                )
-                UPDATE source_authorships sa
-                SET countries = sn.new_countries
-                FROM sa_new sn
-                WHERE sa.id = sn.sa_id
-                  AND sa.countries IS DISTINCT FROM sn.new_countries
-            """),
-            {"ids": address_ids},
-        ).rowcount
-        pass_2 = self._conn.execute(
-            text("""
-                UPDATE source_authorships sa
-                SET countries = NULL
-                WHERE sa.countries IS NOT NULL
-                  AND sa.id IN (
-                      SELECT source_authorship_id
-                      FROM source_authorship_addresses
-                      WHERE address_id = ANY(:ids)
-                  )
-                  AND NOT EXISTS (
-                      SELECT 1 FROM source_authorship_addresses saa
-                      JOIN addresses a ON a.id = saa.address_id
-                      WHERE saa.source_authorship_id = sa.id
-                        AND a.countries IS NOT NULL
-                  )
-            """),
-            {"ids": address_ids},
-        ).rowcount
-        return pass_1 + pass_2
+    # ── Propagation vers source_publications et publications ──
 
     def refresh_source_publications_countries(
         self,

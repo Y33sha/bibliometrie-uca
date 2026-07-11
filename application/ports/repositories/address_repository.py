@@ -76,12 +76,7 @@ class AddressRepository(Protocol):
         """Propage `countries` depuis les adresses `source_ids` vers les autres adresses qui partagent leur `normalized_text` et qui ont un `countries` différent (ou NULL). Retourne les IDs propagés. `source_ids` doit être non vide ; sinon retourne `[]` immédiatement."""
         ...
 
-    # ── Propagation vers source_authorships, source_publications et publications ──
-
-    def refresh_sa_countries_for_addresses(
-        self,
-        address_ids: list[int],
-    ) -> int: ...
+    # ── Propagation vers source_publications et publications ──
 
     def refresh_source_publications_countries(
         self,

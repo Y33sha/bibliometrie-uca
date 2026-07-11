@@ -1,10 +1,8 @@
 """Tests d'intégration pour `application.pipeline.countries.refresh_publication_countries`.
 
-Cascade complète :
-1. `addresses.countries` → `source_authorships.countries` (par source)
-2. cleanup des sa polluées (countries non-NULL sans adresses utiles)
-3. `source_authorships.countries` → `source_publications.countries`
-4. `source_publications.countries` → `publications.countries`
+Recalcul des caches pays depuis `addresses.countries` :
+1. `source_publications.countries` — union des pays des adresses des source_authorships du document.
+2. `publications.countries` — union des `source_publications.countries` de même publication_id.
 """
 
 from __future__ import annotations
@@ -47,7 +45,6 @@ def _insert_source_authorship(
     source: str = "openalex",
     raw_author_name: str = "Jane Doe",
     position: int = 0,
-    countries: list[str] | None = None,
 ) -> int:
     normalized = conn.execute(
         text("SELECT normalize_name_form(:name)"), {"name": raw_author_name}
@@ -57,8 +54,8 @@ def _insert_source_authorship(
         text("""
             INSERT INTO source_authorships
                 (source, source_publication_id, author_position, in_perimeter,
-                 raw_author_name, identity_id, countries)
-            VALUES (:src, :sp, :pos, TRUE, :name, :iid, :countries)
+                 raw_author_name, identity_id)
+            VALUES (:src, :sp, :pos, TRUE, :name, :iid)
             RETURNING id
         """),
         {
@@ -67,7 +64,6 @@ def _insert_source_authorship(
             "pos": position,
             "name": raw_author_name,
             "iid": identity_id,
-            "countries": countries,
         },
     ).scalar_one()
 
@@ -104,12 +100,6 @@ def _get_sp_countries(conn, sp_id: int) -> list[str] | None:
     ).scalar_one()
 
 
-def _get_sa_countries(conn, sa_id: int) -> list[str] | None:
-    return conn.execute(
-        text("SELECT countries FROM source_authorships WHERE id = :id"), {"id": sa_id}
-    ).scalar_one()
-
-
 @pytest.fixture
 def queries() -> PgCountryQueries:
     return PgCountryQueries()
@@ -131,7 +121,6 @@ class TestCascade:
         updated = refresh(sa_sync_conn, queries, log)
 
         assert updated == 1
-        assert _get_sa_countries(sa_sync_conn, sa) == ["fr"]
         assert _get_sp_countries(sa_sync_conn, sp) == ["fr"]
         assert _get_pub_countries(sa_sync_conn, pub) == ["fr"]
 
@@ -147,7 +136,7 @@ class TestCascade:
 
         refresh(sa_sync_conn, queries, log)
 
-        assert _get_sa_countries(sa_sync_conn, sa) == ["fr", "us"]
+        assert _get_sp_countries(sa_sync_conn, sp) == ["fr", "us"]
         assert _get_pub_countries(sa_sync_conn, pub) == ["fr", "us"]
 
     def test_multiple_sources_union_at_publication_level(self, sa_sync_conn, queries, log):
@@ -199,27 +188,19 @@ class TestIdempotence:
 
 
 class TestCleanup:
-    def test_resets_sa_countries_when_address_lost_country(self, sa_sync_conn, queries, log):
-        # sa avec `countries=['fr']` déjà persistées (par exemple par un
-        # ancien run), mais maintenant son adresse n'a plus `countries`
-        # (NULL) → la pass cleanup remet sa.countries à NULL.
+    def test_resets_source_countries_when_address_lost_country(self, sa_sync_conn, queries, log):
+        # source_publications.countries=['fr'] déjà persistées, mais l'adresse du sa
+        # n'a plus de `countries` (NULL) → le LEFT JOIN remet sp.countries à NULL.
         pub = _insert_publication(sa_sync_conn)
         sp = _insert_source_publication(sa_sync_conn, pub)
-        sa = _insert_source_authorship(sa_sync_conn, sp, countries=["fr"])
+        sa = _insert_source_authorship(sa_sync_conn, sp)
+        sa_sync_conn.execute(
+            text("UPDATE source_publications SET countries = ARRAY['fr'] WHERE id = :id"),
+            {"id": sp},
+        )
         addr = _insert_address(sa_sync_conn, "addr no country", countries=None)
         _link_sa_address(sa_sync_conn, sa, addr)
 
         refresh(sa_sync_conn, queries, log)
 
-        assert _get_sa_countries(sa_sync_conn, sa) is None
-
-    def test_resets_sa_countries_when_no_address(self, sa_sync_conn, queries, log):
-        # sa avec `countries=['fr']` mais aucune saa du tout (cas pathologique
-        # mais possible si une saa a été supprimée manuellement) → reset.
-        pub = _insert_publication(sa_sync_conn)
-        sp = _insert_source_publication(sa_sync_conn, pub)
-        sa = _insert_source_authorship(sa_sync_conn, sp, countries=["fr"])
-
-        refresh(sa_sync_conn, queries, log)
-
-        assert _get_sa_countries(sa_sync_conn, sa) is None
+        assert _get_sp_countries(sa_sync_conn, sp) is None

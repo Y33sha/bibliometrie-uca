@@ -4,13 +4,10 @@ Quatre sous-étapes, chacune dans sa propre transaction, encadrées d'un bilan i
 
 1. **detect_by_country_name** — pays déduit du dernier segment de l'adresse (nom de pays).
 2. **detect_by_place_name** — pays déduit d'un nom de lieu (institution, ville).
-3. **suggest_address_countries** — suggestion floue (commits par lots). `retry_empty` (mode `full`)
-   réessaie les adresses tentées sans match.
-4. **refresh_publication_countries** — recalcul en cascade des caches dénormalisés (sa, sp,
-   publications) depuis `addresses.countries`.
+3. **suggest_address_countries** — suggestion floue (commits par lots). `retry_empty` (mode `full`) réessaie les adresses tentées sans match.
+4. **refresh_publication_countries** — recalcul des caches dénormalisés (source_publications, publications) depuis `addresses.countries`.
 
-Le bilan (initial/final) trace l'entonnoir : du manque initial en pays aux pays rattachés par le
-run, puis au reste (dont une part porte une suggestion).
+Le bilan (initial/final) trace l'entonnoir : du manque initial en pays aux pays rattachés par le run, puis au reste (dont une part porte une suggestion).
 """
 
 import logging
@@ -108,8 +105,7 @@ def run(
     logger.info("✓ refresh_publication_countries terminé en %.1fs", time.perf_counter() - t0)
 
     final = _bilan(open_tx, queries, logger, "Bilan final")
-    # Entonnoir : du manque initial (adresses sans pays avant la détection du run) aux
-    # pays rattachés par le run, puis au reste (dont une part porte une suggestion).
+    # Entonnoir : du manque initial (adresses sans pays avant la détection du run) aux pays rattachés par le run, puis au reste (dont une part porte une suggestion).
     total = final.total
     without_initial = total - initial.with_country
     metrics.details["summary"] = {

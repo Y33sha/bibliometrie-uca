@@ -1,22 +1,13 @@
 """Query service : recalcul des pays sur les caches dénormalisés.
 
-Trois caches en cascade, alimentés à partir des `addresses.countries`
-(seule source de vérité) :
+Deux caches matérialisés depuis `addresses.countries` (seule source de vérité), chacun calculé directement depuis les adresses :
 
-1. `source_authorships.countries` ← agrégat des `addresses.countries`
-   liées via `source_authorship_addresses`
-2. `source_publications.countries` ← union des `sa.countries` du doc
-3. `publications.countries` ← union des `sp.countries` du même
-   publication_id
+1. `source_publications.countries` ← union des pays des adresses des `source_authorships` du document.
+2. `publications.countries` ← union des `source_publications.countries` de même `publication_id`.
 
-Appelées par l'orchestrateur pipeline
-`application/pipeline/countries/refresh_publication_countries.py` pour
-le refresh global, et par `application/addresses_countries.py:propagate_countries_to_publications`
-(via le repo) pour le refresh ciblé après une modification manuelle.
+Le recalcul est borné aux lignes concernées par un `countries_dirty` (cf. `_DIRTY_SA`). Appelées par l'orchestrateur pipeline `application/pipeline/countries/refresh_publication_countries.py` pour le refresh global, et par `application/services/addresses/countries.py:propagate_countries_to_publications` (via le repo) pour le refresh ciblé après une modification manuelle.
 
-Fonctions module-level pour compat avec le code existant ;
-`PgCountryQueries` est l'adapter qui implémente
-`application.ports.countries.CountryQueries`.
+Fonctions module-level ; `PgCountryQueries` est l'adapter qui implémente `application.ports.pipeline.countries.CountryQueries`.
 """
 
 import json
@@ -43,44 +34,6 @@ _DIRTY_SA = """
         WHERE a.countries_dirty
     )
 """
-
-
-def refresh_sa_countries(conn: Connection) -> int:
-    """Recalcule `source_authorships.countries` pour les sa dirty (cf. `_DIRTY_SA`).
-
-    `countries` = union des pays des adresses du sa, ou NULL si aucune adresse
-    utile — le LEFT JOIN couvre l'orphelin (un sa qui perd ses pays repasse à
-    NULL), ce qui rend l'ancienne passe de cleanup inutile. Idempotent
-    (`IS DISTINCT FROM`) ; les flags sont purgés en fin de cascade.
-
-    Retourne le nombre de sa mis à jour.
-    """
-    return conn.execute(
-        text(
-            _DIRTY_SA
-            + """,
-            expanded AS (
-                SELECT saa.source_authorship_id AS sa_id, c::text AS country_code
-                FROM source_authorship_addresses saa
-                JOIN dirty_sa d ON d.id = saa.source_authorship_id
-                JOIN addresses a ON a.id = saa.address_id
-                CROSS JOIN LATERAL unnest(a.countries) AS c
-                WHERE a.countries IS NOT NULL
-            ),
-            agg AS (
-                SELECT sa_id, array_agg(DISTINCT country_code ORDER BY country_code) AS new_countries
-                FROM expanded
-                GROUP BY sa_id
-            )
-            UPDATE source_authorships sa
-            SET countries = agg.new_countries
-            FROM dirty_sa d
-            LEFT JOIN agg ON agg.sa_id = d.id
-            WHERE sa.id = d.id
-              AND sa.countries IS DISTINCT FROM agg.new_countries
-        """
-        )
-    ).rowcount
 
 
 def refresh_address_source_countries(conn: Connection) -> int:
@@ -343,9 +296,6 @@ class PgCountryQueries(CountryQueries):
 
     def count_address_country_status(self, conn: Connection) -> AddressCountryStatus:
         return count_address_country_status(conn)
-
-    def refresh_sa_countries(self, conn: Connection) -> int:
-        return refresh_sa_countries(conn)
 
     def refresh_address_source_countries(self, conn: Connection) -> int:
         return refresh_address_source_countries(conn)

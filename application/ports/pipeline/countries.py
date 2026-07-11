@@ -29,16 +29,14 @@ class AddressCountryStatus(NamedTuple):
 
 class CountryQueries(Protocol):
     """Opérations SQL de la phase countries : détection du pays des adresses (par
-    nom de pays ou de lieu), suggestion floue, et recalcul en cascade des caches
-    dénormalisés (sa, sp, publications) à partir de `addresses.countries`."""
+    nom de pays ou de lieu), suggestion floue, et recalcul des caches dénormalisés
+    (source_publications, publications) à partir de `addresses.countries`."""
 
     # ── Bilan (début / fin de phase) ───────────────────────────────
 
     def count_address_country_status(self, conn: Connection) -> AddressCountryStatus: ...
 
     # ── Recalcul des caches dénormalisés ───────────────────────────
-
-    def refresh_sa_countries(self, conn: Connection) -> int: ...
 
     def refresh_address_source_countries(self, conn: Connection) -> int: ...
 
