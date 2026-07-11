@@ -134,8 +134,7 @@ class ScanrExtractor(SourceExtractor[ScanrExtractConfig]):
             slog.info(f"terminé : {inserted} nouveaux, {updated} mis à jour, {unchanged} inchangés")
         return stats
 
-    # log_summary : on hérite du défaut de SourceExtractor (`=== Terminé : as_summary ===`)
-    # — format harmonisé entre tous les extracteurs.
+    # log_summary : on hérite du défaut de SourceExtractor (`=== Terminé : as_summary ===`) — format harmonisé entre tous les extracteurs.
 
 
 __all__ = [

@@ -38,8 +38,7 @@ COMMIT_EVERY = 50
 
 # Dépendances techniques du phasage, injectées par le composition-root.
 RefreshOne = Callable[[str, "list[int] | None"], PhaseMetrics]
-"""Refetch stale d'une source (conn + adapter + breaker), bornée à `years`. Rend des métriques
-portant déjà l'éventuel signal `source_unavailable`."""
+"""Refetch stale d'une source (conn + adapter + breaker), bornée à `years`. Rend des métriques portant déjà l'éventuel signal `source_unavailable`."""
 CredentialsMissing = Callable[[str], "str | None"]
 """`(source) -> motif d'absence de credentials | None si configurée`."""
 GetYearsForWindow = Callable[["int | None"], "list[int] | None"]
@@ -110,7 +109,7 @@ async def refresh(
 
     `years` borne le refresh à la fenêtre d'années du run courant (via `source_publications.pub_year`) ; `None` = tout le stale de la source.
 
-    Ne ferme pas la connexion (responsabilité du caller). `updated` = `raw_data` réécrit (hash changé) ; `unchanged` = re-vu identique (seul `last_seen_at` bumpé) ; `errors` = fetchs transitoires échoués ; `extras["disappeared"]` = absences confirmées marquées `disappeared_at`.
+    `updated` = `raw_data` réécrit (hash changé) ; `unchanged` = re-vu identique (seul `last_seen_at` bumpé) ; `errors` = fetchs transitoires échoués ; `extras["disappeared"]` = absences confirmées marquées `disappeared_at`.
     """
     adapter.configure(conn)
     slog = scoped_logger(log, adapter.source_key)
@@ -129,10 +128,7 @@ async def refresh(
     progress = {"processed": 0}
     metrics = PhaseMetrics(seen=total)
 
-    # Pool de `max_concurrent` workers tirant les rows d'un itérateur partagé
-    # (cf. `fetch_missing_doi.run_async`). `next()` est atomique en asyncio
-    # mono-thread ; le breaker se vérifie avant chaque tirage → dès qu'il trip,
-    # chaque worker finit sa row en vol puis s'arrête.
+    # Pool de `max_concurrent` workers tirant les rows d'un itérateur partagé (cf. `fetch_missing_doi.run_async`). `next()` est atomique en asyncio mono-thread ; le breaker se vérifie avant chaque tirage → dès qu'il trip, chaque worker finit sa row en vol puis s'arrête.
     row_iter = iter(stale)
 
     async with httpx.AsyncClient() as client:

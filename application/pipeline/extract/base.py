@@ -21,9 +21,7 @@ from application.ports.pipeline.circuit_breaker import CircuitBreaker
 __all__ = ["ExtractLogger", "ExtractionConfigError", "SourceExtractor", "scoped_logger"]
 
 
-# Le préfixage `[source · scope]` est partagé avec la phase de normalisation : sa
-# définition vit dans `application.pipeline.logging_scope`. Ré-exporté ici pour les
-# sous-modules d'extraction qui l'importent historiquement depuis `.base`.
+# Le préfixage `[source · scope]` est partagé avec la phase de normalisation : sa définition vit dans `application.pipeline.logging_scope`. Ré-exporté ici pour les sous-modules d'extraction qui l'importent historiquement depuis `.base`.
 ExtractLogger = ScopedOrPlainLogger
 
 

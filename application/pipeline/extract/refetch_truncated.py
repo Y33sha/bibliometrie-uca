@@ -4,7 +4,7 @@ L'API OpenAlex bulk retourne max 100 authorships par work. Cet orchestrateur dé
 
 Implémentation async : `httpx.AsyncClient` partagé + `asyncio.Semaphore(adapter.max_concurrent)` pour respecter le plafond OpenAlex (~10 req/s, cf. `fetch_missing_doi`).
 
-**Préservation des authorships complètes.** Le refetch ne recalcule **pas** `raw_hash` (cf. adapter `update_raw_data`) : la ligne refetchée garde le hash du payload bulk initial. Tant que le bulk renvoie le même payload tronqué, son hash matchera celui en base et l'UPSERT bulk ne touchera pas `raw_data` (qui contient pourtant les auteurs complets). Un changement bulk (raw_hash différent) écrasera raw_data avec la version tronquée, et le prochain passage du refetch dans le même run pipeline (count repassé à 100) ré-amorcera le cycle.
+**Préservation des authorships complètes.** Le refetch ne recalcule **pas** `raw_hash` (cf. adapter `update_raw_data`) : la ligne refetchée garde le hash du payload bulk initial. Tant que le bulk renvoie le même payload tronqué, son hash matchera celui en base et le document ne sera pas réimporté. Un changement bulk (raw_hash différent) écrasera raw_data avec la version tronquée, et le prochain passage du refetch dans le même run pipeline réimportera le document complet.
 """
 
 from __future__ import annotations
@@ -35,7 +35,7 @@ async def refetch(
 ) -> PhaseMetrics:
     """Re-fetch les works OpenAlex marqués `staging.authors_truncated`.
 
-    Phase importable depuis `run_pipeline.py` ; ne ferme pas la connexion (responsabilité du caller). `updated` compte les works ré-écrits ; `already_complete` (extras) ceux qui avaient pile 100 auteurs (genuine, flag effacé) ; `errors` les fetchs échoués.
+    `updated` compte les works ré-écrits ; `already_complete` (extras) ceux qui avaient pile 100 auteurs (genuine, flag effacé) ; `errors` les fetchs échoués.
     """
     log.info("▶ refetch_truncated")
     t0 = time.perf_counter()

@@ -4,15 +4,12 @@ Workflow (sans I/O ni threads : ceux-ci sont injectés) :
 
 - lit la policy du mode (`modes.py`) : sources autorisées et stratégie d'années ;
 - mode `since_last` (quotidien) : HAL en incrémental depuis la dernière extraction HAL réussie ;
-- sinon : toutes les sources retenues en parallèle, sur la plage `[start_year … courante]` (ou
-  `--year`) ; `theses` ignore la borne large (tout l'historique des PPN, sauf `--year`) ;
+- sinon : toutes les sources retenues en parallèle, sur la plage `[start_year … courante]` (ou `--year`) ; `theses` ignore la borne large (tout l'historique des PPN, sauf `--year`) ;
 - assemble les métriques par source et signale les sources non configurées.
 
 Les trois dépendances techniques sont injectées par le composition-root :
 
-- `extract_one(source, args)` : ouvre la connexion, câble l'adapter, exécute l'extraction sous
-  circuit-breaker (les métriques rendues portent déjà l'éventuel signal `source_unavailable`), et
-  lève `ExtractionConfigError` si la source n'est pas configurée ;
+- `extract_one(source, args)` : ouvre la connexion, câble l'adapter, exécute l'extraction sous circuit-breaker (les métriques rendues portent déjà l'éventuel signal `source_unavailable`), et lève `ExtractionConfigError` si la source n'est pas configurée ;
 - `run_parallel` : le primitif de parallélisme (thread pool) ;
 - `get_last_extract_date` : la date de la dernière extraction d'une source (branche incrémentale).
 """
