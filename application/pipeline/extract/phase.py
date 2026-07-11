@@ -41,8 +41,7 @@ _YEAR_BOUNDED_SOURCES = frozenset({"openalex", "hal", "wos", "scanr"})
 def _extractor_args(
     *, start_year: int | None = None, year: int | None = None, since: str | None = None
 ) -> argparse.Namespace:
-    """Construit le `args` consommé par `SourceExtractor.run_as_phase` (dry_run, start_year, year,
-    since). HAL et OpenAlex exploitent `since` (incrémental)."""
+    """Construit le `args` consommé par `SourceExtractor.run` (dry_run, start_year, year, since). HAL et OpenAlex exploitent `since` (incrémental)."""
     return argparse.Namespace(dry_run=False, start_year=start_year, year=year, since=since)
 
 

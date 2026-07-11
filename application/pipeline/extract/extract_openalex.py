@@ -95,7 +95,6 @@ class OpenalexExtractor(SourceExtractor[OpenalexExtractConfig]):
     """Extraction OpenAlex — orchestrateur applicatif."""
 
     SOURCE = "openalex"
-    DESCRIPTION = "Extraction OpenAlex → staging"
 
     def __init__(
         self,
@@ -105,20 +104,6 @@ class OpenalexExtractor(SourceExtractor[OpenalexExtractConfig]):
     ) -> None:
         super().__init__(conn, logger)
         self._adapter = adapter
-
-    def add_cli_args(self, parser: argparse.ArgumentParser) -> None:
-        parser.add_argument(
-            "--year", type=int, help="Année spécifique (sinon le range depuis l'ancre)"
-        )
-        parser.add_argument(
-            "--start-year",
-            type=int,
-            help="Année de début du range (défaut: config pipeline_start_year_full)",
-        )
-        parser.add_argument(
-            "--since",
-            help="Date ISO (YYYY-MM-DD) : ne récupérer que les documents modifiés depuis cette date",
-        )
 
     def load_config(self, conn: Connection) -> OpenalexExtractConfig:
         config = self._adapter.load_config(conn)

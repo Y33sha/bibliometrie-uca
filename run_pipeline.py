@@ -856,9 +856,9 @@ def _run_extractor(extractor: Any, args: Any) -> PhaseMetrics:
     """Exécute un extracteur avec un circuit-breaker de source (seuil 5).
 
     Pose le breaker dans la ContextVar (lu par le helper HTTP sync) et le passe à
-    `run_as_phase` (consulté par les boucles `extract_all` pour stopper une source
-    à bout de budget). Seuil 5 : extracteurs séquentiels, pas de batch concurrent
-    comme le cross-import (qui est à 10).
+    `run` (consulté par les boucles `extract_all` pour stopper une source à bout de
+    budget). Seuil 5 : extracteurs séquentiels, pas de batch concurrent comme le
+    cross-import (qui est à 10).
     """
     from infrastructure.sources.circuit_breaker import (
         SourceCircuitBreaker,
@@ -869,7 +869,7 @@ def _run_extractor(extractor: Any, args: Any) -> PhaseMetrics:
     breaker = SourceCircuitBreaker(extractor.SOURCE, threshold=5)
     token = set_current_breaker(breaker)
     try:
-        metrics = extractor.run_as_phase(args, breaker=breaker)
+        metrics = extractor.run(args, breaker=breaker)
     finally:
         reset_current_breaker(token)
     _signal_if_tripped(metrics, breaker)

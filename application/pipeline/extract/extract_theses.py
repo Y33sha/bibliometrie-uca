@@ -96,7 +96,6 @@ class ThesesExtractor(SourceExtractor[ThesesExtractConfig]):
     """Extraction theses.fr — orchestrateur applicatif."""
 
     SOURCE = "theses"
-    DESCRIPTION = "Extraction theses.fr → staging"
 
     def __init__(
         self,
@@ -106,13 +105,6 @@ class ThesesExtractor(SourceExtractor[ThesesExtractConfig]):
     ) -> None:
         super().__init__(conn, logger)
         self._adapter = adapter
-
-    def add_cli_args(self, parser: argparse.ArgumentParser) -> None:
-        parser.add_argument(
-            "--year",
-            type=int,
-            help="Filtre post-fetch par année (NNT préfixé YYYY ; ne ramène que les soutenues)",
-        )
 
     def load_config(self, conn: Connection) -> ThesesExtractConfig:
         config = self._adapter.load_config(conn)
