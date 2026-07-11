@@ -1,23 +1,4 @@
-"""
-Normalisation des données WoS : staging → tables normalisées.
-
-Usage:
-    python normalize_wos.py              # traiter tous les works non traités
-    python normalize_wos.py --limit 100  # traiter N works (pour test)
-    python normalize_wos.py --reset      # remettre tous les works à processed=FALSE
-
-Tables peuplées :
-    publishers, journals, publications      (tables de vérité — partagées)
-    source_publications                     (lien staging ↔ publication, source='wos')
-    source_authorships                      (lien document × auteur, source='wos',
-                                             avec `person_identifiers` JSONB)
-
-Format raw_data : structure WoS Expanded API (static_data, dynamic_data
-imbriqués). L'ancien format TSV (fichiers téléchargés, clés 2 lettres
-TI/AU/AF/SO/PU) n'est plus supporté.
-
-Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
-"""
+"""Normalisation des données WoS : staging → tables normalisées."""
 
 import logging
 from collections.abc import Callable
@@ -30,6 +11,7 @@ from application.pipeline.normalize._authorships_batch import (
     write_source_authorships,
 )
 from application.pipeline.normalize.base import SourceNormalizer
+from application.pipeline.timings import StepTimer
 from application.ports.pipeline.normalize.authorships import AuthorshipsBatchQueries
 from application.ports.pipeline.normalize.wos import WosNormalizeQueries
 from application.ports.pipeline.staging import StagingQueries, StagingRow
@@ -121,11 +103,8 @@ def _parse_api_authors(static: dict, dynamic: dict) -> list[dict]:
             daisng_id = str(daisng_id)
         researcher_id = name_obj.get("r_id")
 
-        # L'ORCID WoS (`PreferredORCID`) n'est pas moissonné : attribué par le matching
-        # algorithmique interne de Web of Science, il est trop peu fiable pour figurer
-        # sur l'identité d'auteur (où sa source serait perdue et où il deviendrait un
-        # faux signal de matching). Les ORCID fiables viennent des sources à dépôt auteur
-        # (Crossref, OpenAlex `raw_orcid`, HAL).
+        # L'ORCID WoS (`PreferredORCID`) n'est pas moissonné : attribué par le matching algorithmique interne de Web of Science, il est trop peu fiable pour figurer sur l'identité d'auteur (où sa source serait perdue et où il deviendrait un faux signal de matching).
+        # Les ORCID fiables viennent des sources à dépôt auteur (Crossref, OpenAlex `raw_orcid`, HAL).
 
         is_corresponding = name_obj.get("reprint") == "Y"
 
@@ -266,8 +245,7 @@ def extract_from_api(raw: dict, staging_doi: str | None) -> dict:
         if page.get("end"):
             biblio["last_page"] = str(page["end"])
 
-    # Publisher + journal bruts (traçabilité du nom tel que vu par WoS, en
-    # parallèle des publishers/journals créés via find_or_create_*).
+    # Publisher + journal bruts (traçabilité du nom tel que vu par WoS, en parallèle des publishers/journals créés via find_or_create_*).
     issn_val = _get_api_issn(dynamic, "issn")
     eissn_val = _get_api_issn(dynamic, "eissn")
     if publisher_name:
@@ -354,7 +332,7 @@ def extract_from_api(raw: dict, staging_doi: str | None) -> dict:
 
 
 # =============================================================
-# PUBLISHERS & JOURNALS (via services/journals.py)
+# PUBLISHERS & JOURNALS
 # =============================================================
 
 
@@ -382,14 +360,14 @@ def upsert_journal(
 
 
 # =============================================================
-# PUBLICATIONS (via services/publications.py)
+# PUBLICATIONS
 # =============================================================
 
 
 def extract_pub_metadata(rec: dict, journal_id: int | None) -> dict:
     """Extrait les métadonnées de publication d'un record WoS.
 
-    Retourne un dict utilisable par find_or_create_publication.
+    Retourne un dict utilisable par ``insert_wos_document``.
     """
     title = rec["title"]
     container_title = rec.get("journal_title") if not journal_id else None
@@ -453,21 +431,14 @@ def insert_wos_document(
 # =============================================================
 # WOS AUTHORSHIPS — identifiants sur source_authorships
 # =============================================================
-# Le `daisng_id` (entité algorithmique WoS non fiable) n'est pas
-# conservé. Le `researcher_id` (ResearcherID Clarivate) — identifiant
-# cross-source — vit sur l'identité de la signature
-# (author_identifying_keys.person_identifiers).
+# Le `daisng_id` (entité algorithmique WoS non fiable) n'est pas conservé.
+# Le `researcher_id` (ResearcherID Clarivate) — identifiant cross-source — vit sur l'identité de la signature (author_identifying_keys.person_identifiers).
 
 
 def build_wos_author_records(rec: dict, logger: logging.Logger) -> list[AuthorRecord]:
     """Parse les authorships d'un record WoS en `AuthorRecord` (sans I/O).
 
-    Filtre les auteurs via `is_wos_author_exploitable` ; si aucun n'est
-    exploitable alors que le record en porte, logge un warning (détecte une
-    dérive éventuelle de l'API WoS — perte silencieuse de records sinon).
-    Chaque auteur porte `person_identifiers` (researcher_id ; l'ORCID WoS n'est pas
-    moissonné, cf. extraction) et ses adresses brutes. La dédup par position est faite
-    par le writer.
+    Filtre les auteurs via `is_wos_author_exploitable` ; si aucun n'est exploitable alors que le record en porte, logge un warning (détecte une dérive éventuelle de l'API WoS — perte silencieuse de records sinon). Chaque auteur porte `person_identifiers` (researcher_id ; l'ORCID WoS n'est pas moissonné, cf. extraction) et ses adresses brutes. La déduplication par position est faite par le writer.
     """
     raw_authors = rec.get("authors", [])
     authors_kept = [a for a in raw_authors if is_wos_author_exploitable(a)]
@@ -532,45 +503,37 @@ def process_record(
     authorship_queries: AuthorshipsBatchQueries,
 ) -> bool:
     """Traite un record du staging WoS. Retourne True si succès."""
-    from application.pipeline.timings import StepTimer
-
     staging_id = staging_row.id
     ut = staging_row.source_id
     staging_doi = staging_row.doi
     raw_data = staging_row.raw_data
 
-    try:
-        t = StepTimer()
-        rec = extract_from_api(raw_data, staging_doi)
+    t = StepTimer()
+    rec = extract_from_api(raw_data, staging_doi)
 
-        if not rec["ut"]:
-            rec["ut"] = ut
+    if not rec["ut"]:
+        rec["ut"] = ut
 
-        publisher_id = upsert_publisher(rec.get("publisher_name"), publisher_repo=publisher_repo)
-        journal_id = upsert_journal(rec, publisher_id, journal_repo=journal_repo)
-        t.mark("publisher+journal")
+    publisher_id = upsert_publisher(rec.get("publisher_name"), publisher_repo=publisher_repo)
+    journal_id = upsert_journal(rec, publisher_id, journal_repo=journal_repo)
+    t.mark("publisher+journal")
 
-        pub_meta = extract_pub_metadata(rec, journal_id)
+    pub_meta = extract_pub_metadata(rec, journal_id)
 
-        source_publication_id = insert_wos_document(conn, queries, rec, staging_id, None, pub_meta)
-        t.mark("wos_doc")
+    source_publication_id = insert_wos_document(conn, queries, rec, staging_id, None, pub_meta)
+    t.mark("wos_doc")
 
-        process_authorships(conn, authorship_queries, logger, rec, source_publication_id)
-        t.mark("authors")
+    process_authorships(conn, authorship_queries, logger, rec, source_publication_id)
+    t.mark("authors")
 
-        staging_queries.mark_done(conn, staging_id)
-        t.log_if_slow(ut, logger)
-        return True
-
-    except Exception as e:
-        logger.error(f"Erreur sur {ut}: {e}")
-        raise
+    staging_queries.mark_done(conn, staging_id)
+    t.log_if_slow(ut, logger)
+    return True
 
 
 class WosNormalizer(SourceNormalizer):
     SOURCE = "wos"
     DEFAULT_BATCH_SIZE = 500
-    USE_SAVEPOINT = True
 
     def __init__(
         self,

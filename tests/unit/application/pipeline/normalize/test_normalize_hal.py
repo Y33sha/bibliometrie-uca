@@ -575,7 +575,7 @@ class TestBuildHalAuthorRecords:
 class TestProcessAuthors:
     def test_clears_then_writes_even_when_empty(self):
         authorship_queries = _FakeAuthorshipQueries()
-        normalize_hal.process_authors(MagicMock(), authorship_queries, {}, 10)
+        normalize_hal.process_authorships(MagicMock(), authorship_queries, {}, 10)
         # Le writer clear toujours, même sans auteur (re-traitement → table blanche).
         assert authorship_queries.cleared_for == [10]
 
@@ -588,7 +588,7 @@ def stub_orchestration_deps(monkeypatch):
     """Stub les helpers internes pour ne tester que la boucle process_work."""
     monkeypatch.setattr(normalize_hal, "extract_pub_metadata", lambda d, j: {"journal_id": j})
     monkeypatch.setattr(normalize_hal, "insert_hal_document", lambda *a, **kw: 555)
-    monkeypatch.setattr(normalize_hal, "process_authors", lambda *a, **kw: None)
+    monkeypatch.setattr(normalize_hal, "process_authorships", lambda *a, **kw: None)
     monkeypatch.setattr(normalize_hal, "upsert_publisher", lambda name, **kw: 1)
     monkeypatch.setattr(normalize_hal, "upsert_journal", lambda d, p, **kw: 2)
 
@@ -618,11 +618,26 @@ class TestProcessWork:
         assert sq.marked_done == [1]
 
     def test_missing_minimal_metadata_returns_false(self, stub_orchestration_deps, caplog):
-        row = _staging_row(raw={"title_s": []})  # pas de titre / pas d'année
+        sq = _FakeStagingQueries()
+        row = _staging_row(staging_id=1, raw={"title_s": []})  # pas de titre / pas d'année
         with caplog.at_level(logging.WARNING):
-            result = process_work(MagicMock(), staging_row=row, **self._kwargs())
+            result = process_work(MagicMock(), staging_row=row, **self._kwargs(staging_queries=sq))
         assert result is False
         assert "manquant" in caplog.text
+        # Marqué traité : un doc sans titre ni année n'a aucune chance d'aboutir.
+        assert sq.marked_done == [1]
+
+    def test_missing_author_field_marks_done(self, stub_orchestration_deps, caplog):
+        sq = _FakeStagingQueries()
+        # Métadonnées minimales OK mais champ auteurs absent → doc inexploitable.
+        row = _staging_row(
+            staging_id=2, hal_id="hal-2", raw={"title_s": ["T"], "producedDateY_i": 2024}
+        )
+        with caplog.at_level(logging.ERROR):
+            result = process_work(MagicMock(), staging_row=row, **self._kwargs(staging_queries=sq))
+        assert result is False
+        assert "inexploitable" in caplog.text
+        assert sq.marked_done == [2]
 
     def test_no_publisher_name_no_upsert(self, monkeypatch):
         """Si ni journalPublisher_s ni publisher_s n'est présent, upsert_publisher n'est pas appelé."""
@@ -636,7 +651,7 @@ class TestProcessWork:
         monkeypatch.setattr(normalize_hal, "upsert_journal", lambda d, p, **kw: 2)
         monkeypatch.setattr(normalize_hal, "extract_pub_metadata", lambda d, j: {"journal_id": j})
         monkeypatch.setattr(normalize_hal, "insert_hal_document", lambda *a, **kw: 555)
-        monkeypatch.setattr(normalize_hal, "process_authors", lambda *a, **kw: None)
+        monkeypatch.setattr(normalize_hal, "process_authorships", lambda *a, **kw: None)
 
         raw = {
             "title_s": ["T"],
@@ -647,7 +662,9 @@ class TestProcessWork:
         process_work(MagicMock(), staging_row=row, **self._kwargs())
         assert captured["called"] is False
 
-    def test_exception_propagated_and_logged(self, monkeypatch, caplog):
+    def test_exception_propagated(self, monkeypatch):
+        """process_work laisse remonter l'exception ; le log incombe à la boucle de base."""
+
         def boom(*args, **kw):
             raise RuntimeError("kaboom")
 
@@ -661,9 +678,8 @@ class TestProcessWork:
             "authFullNameFormIDPersonIDIDHal_fs": ["T_FacetSep_0-0_FacetSep_"],
         }
         row = _staging_row(hal_id="hal-x", raw=raw)
-        with caplog.at_level(logging.ERROR), pytest.raises(RuntimeError):
+        with pytest.raises(RuntimeError, match="kaboom"):
             process_work(MagicMock(), staging_row=row, **self._kwargs())
-        assert "hal-x" in caplog.text and "kaboom" in caplog.text
 
 
 # ── HalNormalizer (classe) ───────────────────────────────────────

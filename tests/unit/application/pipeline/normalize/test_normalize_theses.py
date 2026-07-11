@@ -1,6 +1,6 @@
 """Tests unitaires de `application.pipeline.normalize.normalize_theses`.
 
-Couvre `extract_pub_metadata` (cascade pub_year soutenance/inscription, NNT, doc_type), `_build_source_meta` (date_soutenance, date_inscription, discipline, écoles doctorales, partenaires), `insert_source_document` (keywords sujets, topics discipline+rameau, NNT external_ids), `process_persons` (aggregate_thesis_persons, partenaires → addr_parts), `process_work` (skip sans titre, happy path, exception), et la classe `ThesesNormalizer` (preload, _row_factory, process_work wrapper, cleanup, on_error, summary_stats).
+Couvre `extract_pub_metadata` (cascade pub_year soutenance/inscription, NNT, doc_type), `_build_source_meta` (date_soutenance, date_inscription, discipline, écoles doctorales, partenaires), `insert_source_document` (keywords sujets, topics discipline+rameau, NNT external_ids), `process_authorships` (aggregate_thesis_persons, partenaires → addr_parts), `process_work` (skip sans titre, happy path, exception), et la classe `ThesesNormalizer` (preload, _row_factory, process_work wrapper, cleanup, on_error, summary_stats).
 
 Pattern : `_FakeQueries` + `_FakeAddressLinker` + `MagicMock`, pas de DB.
 """
@@ -19,7 +19,7 @@ from application.pipeline.normalize.normalize_theses import (
     _build_source_meta,
     extract_pub_metadata,
     insert_source_document,
-    process_persons,
+    process_authorships,
     process_work,
 )
 from application.ports.pipeline.staging import StagingRow
@@ -255,14 +255,14 @@ class TestInsertSourceDocument:
         assert captured["title"] == ""
 
 
-# ── process_persons ──────────────────────────────────────────────
+# ── process_authorships ──────────────────────────────────────────────
 
 
 class TestProcessPersons:
     def test_no_authors_no_upsert(self, monkeypatch):
         monkeypatch.setattr(normalize_theses, "aggregate_thesis_persons", lambda these: [])
         queries = _FakeQueries()
-        process_persons(MagicMock(), queries, {}, 10, address_linker=_FakeAddressLinker())
+        process_authorships(MagicMock(), queries, {}, 10, address_linker=_FakeAddressLinker())
         assert queries.cleared_for == [10]
         assert queries.upserted_authorships == []
 
@@ -284,7 +284,7 @@ class TestProcessPersons:
             ],
         )
         queries = _FakeQueries()
-        process_persons(MagicMock(), queries, {}, 10, address_linker=_FakeAddressLinker())
+        process_authorships(MagicMock(), queries, {}, 10, address_linker=_FakeAddressLinker())
         assert len(queries.upserted_authorships) == 2
         assert queries.upserted_authorships[0]["person_identifiers"] == {"idref": "123"}
         # `None` quand l'aggregate n'a pas d'identifiants.
@@ -301,7 +301,7 @@ class TestProcessPersons:
         queries = _FakeQueries()
         linker = _FakeAddressLinker()
         these = {"partenairesDeRecherche": [{"nom": "LIMOS"}, {"nom": "LRL"}, {}]}
-        process_persons(MagicMock(), queries, these, 10, address_linker=linker)
+        process_authorships(MagicMock(), queries, these, 10, address_linker=linker)
         assert linker.links == [(101, ["LIMOS", "LRL"])]
 
     def test_etablissement_appended_to_addr_parts(self, monkeypatch):
@@ -318,7 +318,7 @@ class TestProcessPersons:
             "partenairesDeRecherche": [{"nom": "LIMOS"}],
             "etabSoutenanceN": "Université Clermont Auvergne (2021-...)",
         }
-        process_persons(MagicMock(), queries, these, 10, address_linker=linker)
+        process_authorships(MagicMock(), queries, these, 10, address_linker=linker)
         assert linker.links == [(101, ["LIMOS", "Université Clermont Auvergne (2021-...)"])]
 
     def test_etablissement_alone_creates_link(self, monkeypatch):
@@ -335,7 +335,7 @@ class TestProcessPersons:
         queries = _FakeQueries()
         linker = _FakeAddressLinker()
         these = {"etabSoutenanceN": "Université Clermont Auvergne (2021-...)"}
-        process_persons(MagicMock(), queries, these, 10, address_linker=linker)
+        process_authorships(MagicMock(), queries, these, 10, address_linker=linker)
         assert linker.links == [(101, ["Université Clermont Auvergne (2021-...)"])]
 
     def test_no_partenaires_no_link(self, monkeypatch):
@@ -348,7 +348,7 @@ class TestProcessPersons:
         monkeypatch.setattr(normalize_theses, "aggregate_thesis_persons", lambda these: [_A()])
         queries = _FakeQueries()
         linker = _FakeAddressLinker()
-        process_persons(MagicMock(), queries, {}, 10, address_linker=linker)
+        process_authorships(MagicMock(), queries, {}, 10, address_linker=linker)
         assert linker.links == []
 
 
@@ -366,29 +366,33 @@ class TestProcessWork:
         }
 
     def test_skip_when_no_title(self, caplog):
-        row = _staging_row(theses_id="2024CLFAC001", raw={})
+        sq = _FakeStagingQueries()
+        row = _staging_row(staging_id=7, theses_id="2024CLFAC001", raw={})
         with caplog.at_level(logging.WARNING):
-            result = process_work(MagicMock(), row=row, **self._kwargs())
+            result = process_work(MagicMock(), staging_row=row, **self._kwargs(staging_queries=sq))
         assert result is False
         assert "sans titre" in caplog.text
+        # Marquée traitée pour ne pas retenter indéfiniment une thèse sans titre.
+        assert sq.marked_done == [7]
 
     def test_happy_path(self, monkeypatch):
         monkeypatch.setattr(normalize_theses, "aggregate_thesis_persons", lambda these: [])
         sq = _FakeStagingQueries()
         row = _staging_row(staging_id=42, raw={"titrePrincipal": "T"})
-        result = process_work(MagicMock(), row=row, **self._kwargs(staging_queries=sq))
+        result = process_work(MagicMock(), staging_row=row, **self._kwargs(staging_queries=sq))
         assert result is True
         assert sq.marked_done == [42]
 
-    def test_exception_propagated_and_logged(self, monkeypatch, caplog):
+    def test_exception_propagated(self, monkeypatch):
+        """process_work laisse remonter l'exception ; le log incombe à la boucle de base."""
+
         def boom(*args, **kw):
             raise RuntimeError("kaboom")
 
         monkeypatch.setattr(normalize_theses, "insert_source_document", boom)
         row = _staging_row(theses_id="hal-x", raw={"titrePrincipal": "T"})
-        with caplog.at_level(logging.ERROR), pytest.raises(RuntimeError):
-            process_work(MagicMock(), row=row, **self._kwargs())
-        assert "hal-x" in caplog.text and "kaboom" in caplog.text
+        with pytest.raises(RuntimeError, match="kaboom"):
+            process_work(MagicMock(), staging_row=row, **self._kwargs())
 
 
 # ── ThesesNormalizer (classe) ────────────────────────────────────

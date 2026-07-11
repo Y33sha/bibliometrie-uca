@@ -1,29 +1,11 @@
 """Normalisation des données DataCite : staging → tables structurées.
 
-L'orchestrateur (classe ``DataciteNormalizer``) dépend des ports
-``StagingQueries`` + ``DataciteNormalizeQueries`` ; il est appelé par ``run_pipeline``.
-
-Tables peuplées :
-    publishers, journals, publications      (tables de vérité — partagées)
-    source_publications                     (lien staging ↔ publication, source='datacite')
-    source_authorships                      (lien document × auteur, source='datacite')
-
 Particularités DataCite :
-- Le staging stocke le nœud JSON:API ``data`` ; les métadonnées sont dans
-  ``data.attributes``.
-- ``creators`` : nom + ORCID éventuel (``nameIdentifiers`` scheme ORCID) +
-  affiliations textuelles. Les creators ``Organizational`` (institutions comme
-  auteur) sont ignorés — ce ne sont pas des personnes. Affiliations routées vers
-  ``addresses`` via le writer batch partagé, comme HAL / OpenAlex / CrossRef.
-- ``doc_type`` : token brut issu de ``types`` (cf.
-  ``domain.sources.datacite.extract_datacite_doc_type_token``) ; le mapping vers
-  l'enum canonique vit dans ``_SOURCE_MAPS["datacite"]`` et est appliqué au refresh.
-- ``relatedIdentifiers`` (type DOI) → ``external_ids.related_dois`` (cross-import
-  + relations) et ``meta.related_identifiers`` (avec ``relationType``, pour la
-  résolution concept/version et les relations entre publications).
-- ``oa_status`` non dérivé de DataCite ; laissé à NULL pour arbitrage aval.
-
-Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
+- Le staging stocke le nœud JSON:API `data` ; les métadonnées sont dans `data.attributes`.
+- `creators` : nom + ORCID éventuel (`nameIdentifiers` scheme ORCID) + affiliations textuelles. Les creators `Organizational` (institutions comme auteur) sont ignorés — ce ne sont pas des personnes. Affiliations routées vers `addresses` via le writer batch partagé, comme HAL / OpenAlex / CrossRef.
+- `doc_type` : token brut issu de `types` (cf. `domain.sources.datacite.extract_datacite_doc_type_token`) ; le mapping vers l'enum canonique vit dans `_SOURCE_MAPS["datacite"]` et est appliqué au refresh.
+- `relatedIdentifiers` (type DOI) → `external_ids.related_dois` (cross-import + relations) et `meta.related_identifiers` (avec `relationType`, pour la résolution concept/version et les relations entre publications).
+- `oa_status` non dérivé de DataCite ; laissé à NULL pour arbitrage aval.
 """
 
 from __future__ import annotations
@@ -41,6 +23,7 @@ from application.pipeline.normalize._authorships_batch import (
     write_source_authorships,
 )
 from application.pipeline.normalize.base import SourceNormalizer
+from application.pipeline.timings import StepTimer
 from application.ports.pipeline.normalize.authorships import AuthorshipsBatchQueries
 from application.ports.pipeline.normalize.datacite import DataciteNormalizeQueries
 from application.ports.pipeline.staging import StagingQueries, StagingRow
@@ -105,8 +88,7 @@ def upsert_journal(
 def get_biblio(attributes: dict) -> dict | None:
     """Volume / issue / pages depuis `container` + publisher/journal bruts.
 
-    Trace le nom de l'éditeur et de la revue tels que vus par DataCite, en
-    parallèle des publishers/journals créés via `find_or_create_*`.
+    Trace le nom de l'éditeur et de la revue tels que vus par DataCite, en parallèle des publishers/journals créés via `find_or_create_*`.
     """
     biblio: dict[str, JsonValue] = {}
     container = attributes.get("container")
@@ -162,8 +144,7 @@ def _creator_orcid(creator: dict) -> str | None:
 
 
 def _creator_affiliation_strings(creator: dict) -> list[str]:
-    """Affiliations textuelles. `affiliation` est une liste de chaînes ou
-    d'objets `{name, affiliationIdentifier, ...}` (ROR non exploité ici)."""
+    """Affiliations textuelles. `affiliation` est une liste de chaînes ou d'objets `{name, affiliationIdentifier, ...}` (ROR non exploité ici)."""
     out: list[str] = []
     for aff in creator.get("affiliation") or []:
         if isinstance(aff, str) and aff.strip():
@@ -178,9 +159,7 @@ def _creator_affiliation_strings(creator: dict) -> list[str]:
 def build_datacite_author_records(attributes: dict) -> list[AuthorRecord]:
     """Parse les `creators` DataCite en `AuthorRecord` (sans I/O).
 
-    Ignore les creators `Organizational` (institutions comme auteur). ORCID sur
-    `person_identifiers`, affiliations brutes → adresses (sans pays),
-    `roles=['author']` explicite.
+    Ignore les creators `Organizational` (institutions comme auteur). ORCID sur `person_identifiers`, affiliations brutes → adresses (sans pays), `roles=['author']` explicite.
     """
     creators = attributes.get("creators") or []
     if not isinstance(creators, list):
@@ -218,7 +197,7 @@ def build_datacite_author_records(attributes: dict) -> list[AuthorRecord]:
     return records
 
 
-def process_authors(
+def process_authorships(
     conn: Connection,
     authorship_queries: AuthorshipsBatchQueries,
     attributes: dict,
@@ -252,29 +231,26 @@ def process_work(
         staging_queries.mark_done(conn, staging_id)
         return None
 
-    # Le staging stocke le nœud JSON:API `data` ; les métadonnées sont dans
-    # `attributes`.
+    # Le staging stocke le nœud JSON:API `data` ; les métadonnées sont dans `attributes`.
     attributes = raw.get("attributes")
     if not isinstance(attributes, dict):
-        logger.warning(f"DataCite staging {staging_id} sans attributes — skip")
+        logger.warning(f"DataCite staging {staging_id} sans attributes")
         staging_queries.mark_done(conn, staging_id)
-        return None
+        return False
 
     doi = clean_doi(attributes.get("doi")) or staging_row.doi
     if not doi:
-        logger.warning(f"DataCite staging {staging_id} sans DOI exploitable — skip")
+        logger.warning(f"DataCite staging {staging_id} sans DOI exploitable")
         staging_queries.mark_done(conn, staging_id)
-        return None
+        return False
 
     title = get_title(attributes)
     pub_year = extract_datacite_pub_year(attributes, max_year=datetime.date.today().year + 1)
     if not has_minimal_publication_metadata(title, pub_year):
-        logger.warning(f"DataCite {doi} : titre ou année manquant — ignoré")
+        logger.warning(f"DataCite {doi} : titre ou année manquant")
         staging_queries.mark_done(conn, staging_id)
-        return None
+        return False
     assert isinstance(title, str) and isinstance(pub_year, int)  # narrowing
-
-    from application.pipeline.timings import StepTimer
 
     t = StepTimer()
     publisher_id = upsert_publisher(attributes, publisher_repo=publisher_repo)
@@ -308,7 +284,7 @@ def process_work(
     )
     t.mark("datacite_doc")
 
-    process_authors(conn, authorship_queries, attributes, source_publication_id)
+    process_authorships(conn, authorship_queries, attributes, source_publication_id)
     t.mark("authors")
 
     staging_queries.mark_done(conn, staging_id)
