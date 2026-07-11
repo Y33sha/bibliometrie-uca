@@ -2,17 +2,12 @@
 
 Deux pistes distinctes, chacune son orchestrateur, partageant un runner async :
 
-- `fetch_missing_hal_by_id` : hal-ids repérés par OpenAlex et ScanR (absents du
-  staging HAL), requête Solr `halId_s`.
-- `fetch_missing_hal_by_nnt` : NNT de thèses soutenues sans document HAL
-  (theses.fr), requête Solr `nntId_s`. Réservé au mode `full` — le gate de mode vit chez le caller (`run_pipeline`).
+- `fetch_missing_hal_by_id` : hal-ids repérés par OpenAlex et ScanR (absents du staging HAL), requête Solr `halId_s`.
+- `fetch_missing_hal_by_nnt` : NNT de thèses soutenues sans document HAL (theses.fr), requête Solr `nntId_s`. Réservé au mode `full` — le gate de mode vit chez le caller (`run_pipeline`).
 
-Les documents ramenés sont marqués `collection = NULL` (hors périmètre UCA), ce
-qui les distingue des entrées issues du portail ou des collections labo.
+Les documents ramenés sont marqués `collection = NULL` (hors périmètre UCA), ce qui les distingue des entrées issues du portail ou des collections labo.
 
-Fetch HTTP async (httpx + `asyncio.Semaphore(adapter.max_concurrent)`) ; inserts
-DB sync sérialisés (`asyncio.Lock` + `asyncio.to_thread`, la `Connection` SA sync
-n'étant pas thread-safe) ; commits intermédiaires tous les `_COMMIT_EVERY`.
+Fetch HTTP async (httpx + `asyncio.Semaphore(adapter.max_concurrent)`) ; inserts DB sync sérialisés (`asyncio.Lock` + `asyncio.to_thread`, la `Connection` SA sync n'étant pas thread-safe) ; commits intermédiaires tous les `_COMMIT_EVERY`.
 """
 
 from __future__ import annotations
@@ -60,9 +55,7 @@ async def _fetch_refs_async[Ref](
 ) -> tuple[int, int]:
     """Boucle async partagée : fetch concurrent par ref, puis insert sérialisé.
 
-    `insert_one` retourne `(fetched, not_found)` en incréments (0/1) : la
-    sémantique de comptage propre à chaque piste vit dans la closure appelante.
-    Retourne les totaux `(fetched, not_found)`.
+    `insert_one` retourne `(fetched, not_found)` en incréments (0/1) : la sémantique de comptage propre à chaque piste vit dans la closure appelante. Retourne les totaux `(fetched, not_found)`.
     """
     sem = asyncio.Semaphore(max_concurrent)
     db_lock = asyncio.Lock()
@@ -102,10 +95,7 @@ async def fetch_missing_hal_by_id(
 ) -> PhaseMetrics:
     """Fetch des documents HAL repérés par hal-id (OpenAlex/ScanR) et absents du staging.
 
-    Phase importable depuis `run_pipeline.py` ; la connexion n'est pas fermée
-    (responsabilité du caller). `new` = documents insérés ; `extras["not_found"]`
-    = hal-ids introuvables côté HAL (marqués `not_found_at`). `total` = hal-ids
-    manquants à traiter (dédupliqués OA + ScanR).
+    Phase importable depuis `run_pipeline.py` ; la connexion n'est pas fermée (responsabilité du caller). `new` = documents insérés ; `extras["not_found"]` = hal-ids introuvables côté HAL (marqués `not_found_at`). `total` = hal-ids manquants à traiter (dédupliqués OA + ScanR).
     """
     adapter.configure(conn)
 
@@ -157,9 +147,7 @@ async def fetch_missing_hal_by_nnt(
 ) -> PhaseMetrics:
     """Fetch des documents HAL de thèses soutenues repérées par NNT (theses.fr).
 
-    Phase importable depuis `run_pipeline.py` ; la connexion n'est pas fermée.
-    `new` = documents insérés ; `extras["not_found"]` = NNT absents de HAL.
-    `total` = NNT (thèses soutenues) sans document HAL.
+    Phase importable depuis `run_pipeline.py` ; la connexion n'est pas fermée. `new` = documents insérés ; `extras["not_found"]` = NNT absents de HAL. `total` = NNT (thèses soutenues) sans document HAL.
     """
     adapter.configure(conn)
 
