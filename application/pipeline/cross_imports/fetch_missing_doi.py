@@ -1,19 +1,18 @@
 """Orchestrateur du fetch des DOI manquants dans une source cible.
 
-Pour chaque DOI présent dans d'autres sources mais absent de la cible, interroge l'API de la cible et insère le record dans staging.
+Pour chaque DOI présent dans d'autres sources mais absent de la cible, interroge l'API de la cible et insère le record dans `staging .
 
 Le comportement spécifique à chaque source (endpoint, auth, format de requête/réponse, SQL d'insertion) est délégué à un adapter qui implémente `AsyncFetchMissingDoiAdapter` (`application/ports/pipeline/cross_imports/fetch_missing_doi.py`).
 
 Implémentation async (`httpx.AsyncClient` + pool de `max_concurrent` workers par source) pour saturer les rate-limits autorisés.
 
-Utilisé par la phase `cross_imports` du pipeline, une fois par source cible (hal, openalex, wos, scanr, crossref).
+Utilisé par la phase `cross_imports` du pipeline, une fois par source cible.
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Callable
 
 import httpx
 from sqlalchemy import Connection
@@ -36,7 +35,6 @@ async def run_async(
     log: logging.Logger,
     *,
     cross_import_dois_reader: CrossImportDoisReader,
-    marker_handler: Callable[[Connection, str], None] | None = None,
     limit: int | None = None,
     breaker: CircuitBreaker | None = None,
 ) -> PhaseMetrics:
@@ -44,17 +42,13 @@ async def run_async(
 
     Lance les fetchs HTTP en parallèle via `asyncio.gather`, bornés par un sémaphore `adapter.max_concurrent` pour respecter le rate-limit de l'API. Les inserts DB restent sync, délégués au threadpool via `asyncio.to_thread` et sérialisés par un `asyncio.Lock` (la `Connection` SA sync n'est pas thread-safe).
 
-    Un DOI confirmé absent par la source (réponse vide / 404) revient sous forme de sentinelle `not_found_marker`. Routage de la sentinelle :
-    - sans `marker_handler` (cross-import) : `insert()` la route vers le backoff (`doi_lookups` / stub `staging` Crossref) ;
-    - avec `marker_handler` (refresh stale) : appelé `(conn, doi)` pour marquer la disparition au lieu d'insérer.
-    Ces sentinelles sont comptées séparément (`not_found`) et exclues de `fetched`.
+    Un DOI confirmé absent par la source (réponse vide / 404) revient en sentinelle `not_found_marker` : comptée à part (`not_found`, exclue de `fetched`) et passée à `adapter.insert()`, qui la route vers le backoff (`doi_lookups`, ou stub `staging` pour Crossref).
 
     Args:
         conn: `Connection` SA ouverte.
         adapter: instance source-spécifique async.
         log: logger.
         cross_import_dois_reader: callable `(conn, source) -> list[doi]`.
-        marker_handler: optionnel ; si fourni, les sentinelles not-found y sont routées (`(conn, doi)`, charge de committer) au lieu de passer par `insert()`.
         limit: nombre max de DOI à traiter.
 
     Returns:
@@ -80,13 +74,6 @@ async def run_async(
     db_lock = asyncio.Lock()
     progress = {"processed": 0, "fetched": 0, "inserted": 0, "not_found": 0}
 
-    # Pool de `max_concurrent` workers tirant les lots d'un itérateur partagé,
-    # plutôt qu'un fan-out de toutes les coroutines d'un coup. `next()` est
-    # atomique en asyncio mono-thread (aucun `await` entre deux tirages) : pas de
-    # lot dupliqué ni sauté. Le breaker se vérifie *avant chaque tirage* → dès
-    # qu'il trip, chaque worker finit son lot en vol puis s'arrête sans tirer les
-    # suivants. C'est le « on sort de la boucle » d'un vrai circuit-breaker : pas
-    # de log d'erreur par lot restant, un seul log d'abandon après le gather.
     batch_iter = iter(enumerate(batches))
 
     async with httpx.AsyncClient() as client:
@@ -114,12 +101,9 @@ async def run_async(
                 for record in records:
                     try:
                         async with db_lock:
-                            if marker_handler is not None and is_not_found_marker(record):
-                                await asyncio.to_thread(marker_handler, conn, record["_doi"])
-                            else:
-                                inserted_one = await asyncio.to_thread(adapter.insert, conn, record)
-                                if inserted_one:
-                                    progress["inserted"] += 1
+                            inserted_one = await asyncio.to_thread(adapter.insert, conn, record)
+                            if inserted_one:
+                                progress["inserted"] += 1
                     except Exception as e:
                         slog.warning("erreur insertion : %s", e)
 

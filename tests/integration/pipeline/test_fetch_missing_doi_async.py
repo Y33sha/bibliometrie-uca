@@ -23,7 +23,6 @@ from application.pipeline.cross_imports.fetch_missing_doi import run_async
 from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.cross_imports.fetch_missing_doi import (
     is_not_found_marker,
-    not_found_marker,
 )
 from infrastructure.sources.datacite.fetch_missing_doi import DataciteFetchMissingDoiAdapter
 from infrastructure.sources.hal.fetch_missing_doi import HalFetchMissingDoiAdapter
@@ -136,29 +135,6 @@ class TestRunAsyncOrchestrator:
             cross_import_dois_reader=_reader([]),
         )
         assert result == PhaseMetrics()
-
-    @pytest.mark.asyncio
-    async def test_marker_handler_routes_not_found(self):
-        """Avec `marker_handler`, les sentinelles not-found y sont routées au
-        lieu de passer par `insert()` (chemin refresh → disappeared_at)."""
-
-        class _MarkerAdapter(_FakeAdapter):
-            async def fetch_async(self, client, dois):  # noqa: ARG002
-                return [not_found_marker(dois[0])]
-
-        handled: list[str] = []
-        adapter = _MarkerAdapter()
-        result = await run_async(
-            MagicMock(),
-            adapter,
-            logging.getLogger("test"),
-            cross_import_dois_reader=_reader(["10.1/gone"]),
-            marker_handler=lambda conn, doi: handled.append(doi),  # noqa: ARG005
-        )
-        assert handled == ["10.1/gone"]
-        assert adapter.inserted_records == []  # insert non appelé pour la sentinelle
-        assert result.extras["not_found"] == 1
-        assert result.extras["fetched"] == 0
 
     @pytest.mark.asyncio
     async def test_fetch_error_continues_other_dois(self):
