@@ -1,17 +1,11 @@
 """Phase `metadata_correction` — sous-étape **cluster** (corrections de DOI par groupe).
 
-Group-by-DOI sur les `source_publications` : le domaine déduit, pour chaque groupe partageant
-un DOI, le DOI effectif de chaque membre. Deux familles de cas (extensibles) :
+Corrige le DOI de certaines source_publications afin de provoquer leur fusion en phase `publications` (versions d'un même document avec DOI distincts) ou de l'empêcher (DOI identiques sur publications différentes). Deux familles de cas (extensibles) :
 
-- **convergence (même œuvre)** : une forme secondaire DataCite converge sur le DOI de l'œuvre
-  canonique — version → concept (`IsVersionOf`), forme variante / copie repository → version
-  publiée (`IsVariantFormOf`), pièce d'un dataset → dataset parent présent (`IsPartOf`) ;
-- **divergence** : un DOI partagé par des œuvres distinctes (ouvrage/chapitre, chapitres de
-  titres différents) est nullé sur le ou les mauvais côtés, sinon le matching les fusionnerait.
+- **convergence** : une forme secondaire DataCite converge sur le DOI de l'œuvre canonique — version → concept (`IsVersionOf`), forme variante / copie repository → version publiée (`IsVariantFormOf`), pièce d'un dataset → dataset parent présent (`IsPartOf`) ;
+- **divergence** : un DOI partagé par des œuvres distinctes (ouvrage/chapitre, chapitres de titres différents) est nullé sur le ou les mauvais côtés, sinon le matching les fusionnerait.
 
-`doc_type` lus = **canoniques** (la sous-étape unaire a déjà tourné). Idempotent et
-auto-cicatrisant : on repart du **DOI brut reconstruit** (`raw_metadata.doi`), donc une SP
-dont la relation/le conflit a disparu récupère son DOI source au run suivant.
+`doc_type` lus = **canoniques** (la sous-étape unaire a déjà tourné). Idempotent et auto-cicatrisant : on repart du **DOI brut reconstruit** (`raw_metadata.doi`), donc une `source_publication` dont la relation/le conflit a disparu récupère son DOI source au run suivant.
 """
 
 import logging
@@ -38,10 +32,7 @@ _PERSIST_BATCH = 5000
 def _compute_update(
     row: DoiClusterRow, decision: DoiClusterDecision | None
 ) -> DoiCorrectionUpdate | None:
-    """État cible d'une SP : selon la décision du domaine, DOI nullé (`target_doi=None`) ou
-    substitué (concept), le brut stashé sous la provenance du cas ; sans décision, ou si la
-    cible égale le brut (dépôt non versionné), le DOI brut est restauré. Retourne `None` si
-    rien ne change (idempotence / auto-cicatrisation). La *décision* vient du domaine."""
+    """État cible d'une `source_publication` : selon la décision du domaine, DOI nullé (`target_doi=None`) ou substitué (concept), le brut stashé sous la provenance du cas ; sans décision, ou si la cible égale le brut (dépôt non versionné), le DOI brut est restauré. Retourne `None` si rien ne change (idempotence / auto-cicatrisation). La *décision* vient du domaine."""
     raw_doi = raw_value(row.raw_metadata, "doi", row.doi)
     raw_metadata = {k: v for k, v in row.raw_metadata.items() if k != "doi"}
 
@@ -57,11 +48,9 @@ def _compute_update(
 
 
 def compute_updates(rows: list[DoiClusterRow]) -> list[DoiCorrectionUpdate]:
-    """Regroupe par DOI brut, demande au domaine le DOI cible de chaque membre, renvoie les
-    mises à jour.
+    """Regroupe par DOI brut, demande au domaine le DOI cible de chaque membre, renvoie les mises à jour.
 
-    Pur (hors I/O) et sans décision métier : la règle vit dans
-    `resolve_cluster_doi_corrections` ; ici on ne fait que regrouper et persister l'état cible."""
+    Pur (hors I/O) et sans décision métier : la règle vit dans `resolve_cluster_doi_corrections` ; ici on ne fait que regrouper et persister l'état cible."""
     groups: dict[str, list[DoiClusterRow]] = defaultdict(list)
     for row in rows:
         groups[row.raw_doi].append(row)
@@ -88,9 +77,7 @@ def compute_updates(rows: list[DoiClusterRow]) -> list[DoiCorrectionUpdate]:
 
 @dataclass
 class ClusterCorrectionStats:
-    """Bilan de la passe cluster : SP examinées, DOI corrigés, et nombre de corrections
-    par cas (`DoiClusterCase` : version → concept, variante → primaire, fichier → dépôt,
-    ouvrage/chapitre, chapitres distincts)."""
+    """Bilan de la passe cluster : `source_publications` examinées, DOI corrigés, et nombre de corrections par cas (`DoiClusterCase` : version → concept, variante → primaire, fichier → dépôt, ouvrage/chapitre, chapitres distincts)."""
 
     examined: int
     corrected: int
@@ -111,11 +98,9 @@ def tally_doi_corrections(updates: list[DoiCorrectionUpdate]) -> dict[str, int]:
 def run(
     conn: Connection, queries: MetadataCorrectionQueries, logger: logging.Logger
 ) -> ClusterCorrectionStats:
-    """Passe cluster : fait converger les formes secondaires DataCite sur l'œuvre canonique
-    (version → concept, variante → version publiée, fichier → dépôt parent) et nulle le DOI
-    des chapitres portant le DOI de l'ouvrage."""
+    """Passe cluster : fait converger les formes secondaires DataCite sur l'œuvre canonique (version → concept, variante → version publiée, fichier → dépôt parent) et nulle le DOI des chapitres portant le DOI de l'ouvrage."""
     rows = queries.fetch_doi_cluster_candidates(conn)
-    logger.info("metadata_correction (cluster) : %d SP examinées", len(rows))
+    logger.info("metadata_correction (cluster) : %d source_publications examinées", len(rows))
 
     updates = compute_updates(rows)
     logger.info("  %d corrections de DOI à appliquer", len(updates))

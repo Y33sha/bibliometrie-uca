@@ -1,24 +1,12 @@
 """Phase `metadata_correction` — sous-étape unaire (corrections per-record).
 
-Pour chaque `source_publication` : reconstruit le brut normalisé (via
-`raw_metadata`), **mappe** le `doc_type` source vers le canonique (`map_doc_type`),
-puis applique les règles de correction `effective_metadata` (per-record + journal-
-dépendantes — les journaux sont typés à ce stade, la phase tourne après
-`publishers_journals`) sur les valeurs canoniques. Écrit l'effective **en place** dans
-les colonnes typées et stashe le brut source écrasé dans `raw_metadata`.
+Pour chaque `source_publication` : reconstruit le brut normalisé (via `raw_metadata`), **mappe** le `doc_type` source vers le canonique (`map_doc_type`), puis applique les règles de correction `effective_metadata` (per-record + journal-dépendantes — les journaux sont typés à ce stade, la phase tourne après `publishers_journals`) sur les valeurs canoniques. Écrit les métadonnées corrigées dans les colonnes typées et stashe le brut source dans `raw_metadata`.
 
-Le mapping avant la correction est ce qui rend les règles gatées sur `doc_type`
-opérantes pour toutes les sources : sans lui, une SP HAL porte `ART` (≠ `article`),
-et aucune règle canonique ne matche.
+Le mapping avant la correction est ce qui rend les règles gatées sur `doc_type` opérantes pour toutes les sources : sans lui, une `source_publication` HAL porte `ART` (≠ `article`), et aucune règle canonique ne matche.
 
-Idempotent et auto-cicatrisant : la correction repart toujours du **brut
-reconstruit**, jamais de la valeur déjà corrigée. Un re-normalize qui réécrit le
-brut, ou un changement de `journal_type` qui (dé)clenche une règle, est rattrapé
-au run suivant sans état à entretenir.
+Idempotent et auto-cicatrisant : la correction repart toujours du **brut reconstruit**, jamais de la valeur déjà corrigée. Un re-normalize qui réécrit le brut, ou un changement de `journal_type` qui (dé)clenche une règle, est rattrapé au run suivant sans état à entretenir.
 
-Les sous-étapes de la phase écrivent `raw_metadata` sur des clés disjointes (unaire :
-`doc_type`/`oa_status`/`external_ids` ; cluster : `doi` ; `journal_by_doi` :
-`journal_id`) ; chaque passe préserve donc les clés qu'elle ne gère pas.
+Les sous-étapes de la phase écrivent `raw_metadata` sur des clés disjointes (unaire : `doc_type`/`oa_status`/`external_ids` ; cluster : `doi` ; `journal_by_doi` : `journal_id`) ; chaque passe préserve donc les clés qu'elle ne gère pas.
 """
 
 import logging
@@ -45,33 +33,24 @@ from domain.source_publications.raw_metadata import (
 )
 
 # Champs corrigeables gérés par la sous-étape unaire (clés de `raw_metadata` qu'elle (re)pose).
-# Les autres (`doi`, géré par la sous-étape cluster ; `journal_id`, par le sous-step
-# `journal_by_doi`) sont préservées.
+# Les autres (`doi`, géré par la sous-étape cluster ; `journal_id`, par le sous-step `journal_by_doi`) sont préservées.
 _UNARY_FIELDS = ("doc_type", "oa_status", "external_ids")
 
-# Provenance inscrite dans `raw_metadata.<champ>.corrected_by` quand seul le mapping
-# source→canonique a changé la valeur (aucune règle de correction n'a firé).
+# Provenance inscrite dans `raw_metadata.<champ>.corrected_by` quand seul le mapping source→canonique a changé la valeur (aucune règle de correction n'a firé).
 DOC_TYPE_MAP_MARKER = "DOC_TYPE_MAP"
 
 _PERSIST_BATCH = 5000
 
 
 def compute_update(row: SourcePublicationForCorrection) -> CorrectionUpdate | None:
-    """Recalcule l'effective d'une SP depuis son brut reconstruit. Retourne la mise à
-    jour à persister, ou `None` si rien ne change (colonnes + `raw_metadata` identiques).
+    """Recalcule les métadonnées corrigées d'une `source_publication` depuis son brut reconstruit. Retourne la mise à jour à persister, ou `None` si rien ne change (colonnes + `raw_metadata` identiques).
 
-    `doc_type` subit deux transformations enchaînées : **mapping** source→canonique
-    (`map_doc_type`) puis **correction** (`effective_metadata`, dont les whitelists sont
-    canoniques). `oa_status` n'a que la correction (pas de mapping). Le `raw` stashé est
-    toujours la valeur **source d'origine** ; `corrected_by` porte la règle, ou
-    `DOC_TYPE_MAP` quand seul le mapping a changé la valeur.
+    `doc_type` subit deux transformations enchaînées : **mapping** source→canonique (`map_doc_type`) puis **correction** (`effective_metadata`, dont les whitelists sont canoniques). `oa_status` n'a que la correction (pas de mapping). Le `raw` stashé est toujours la valeur **source d'origine** ; `corrected_by` porte la règle, ou `DOC_TYPE_MAP` quand seul le mapping a changé la valeur.
 
-    Pure : ne fait pas d'I/O. Préserve les clés de `raw_metadata` hors `_UNARY_FIELDS`
-    (la sous-étape cluster gère `doi`, le sous-step `journal_by_doi` gère `journal_id`)."""
+    Pure : ne fait pas d'I/O. Préserve les clés de `raw_metadata` hors `_UNARY_FIELDS` (la sous-étape cluster gère `doi`, le sous-step `journal_by_doi` gère `journal_id`)."""
     raw = hydrate_raw_view(row, row.raw_metadata)
 
-    # doc_type : mapping d'abord (None laissé tel quel — pas de représentation à traduire),
-    # puis correction sur la valeur canonique.
+    # doc_type : mapping d'abord (None laissé tel quel — pas de représentation à traduire), puis correction sur la valeur canonique.
     raw_doc_type = raw.doc_type
     mapped_doc_type = map_doc_type(raw_doc_type, row.source) if raw_doc_type is not None else None
     corrected = effective_metadata(replace(raw, doc_type=mapped_doc_type))
@@ -86,8 +65,7 @@ def compute_update(row: SourcePublicationForCorrection) -> CorrectionUpdate | No
 
     new_oa_status = raw.oa_status
 
-    # external_ids : déconfliction des clés-thèse quand la correction thèse→article a firé
-    # (conflation). On repart du brut reconstruit, donc auto-cicatrisant.
+    # external_ids : déconfliction des clés-thèse quand la correction thèse→article a firé (conflation). On repart du brut reconstruit, donc auto-cicatrisant.
     raw_external_ids = raw_value(row.raw_metadata, "external_ids", row.external_ids)
     new_external_ids = raw_external_ids
     thesis_to_article = (
@@ -121,25 +99,9 @@ def compute_update(row: SourcePublicationForCorrection) -> CorrectionUpdate | No
     return CorrectionUpdate(row.id, new_doc_type, new_oa_status, new_external_ids, raw_metadata)
 
 
-def correct_for_journal(
-    conn: Connection, queries: MetadataCorrectionQueries, journal_id: int
-) -> int:
-    """Recompute+persiste les corrections unaires des `source_publications` d'un journal,
-    après un changement de son `journal_type` (hook admin). Retourne le nombre de SP corrigées.
-
-    À enchaîner avec `refresh_from_sources` des publications du journal côté caller : la
-    colonne SP rafraîchie ici est ce que le refresh (et plus tard le matcher) liront —
-    sans ce recompute, `refresh_from_sources` repartirait de la correction périmée."""
-    rows = queries.fetch_for_unary_correction_by_journal(conn, journal_id)
-    updates = [u for row in rows if (u := compute_update(row)) is not None]
-    return queries.persist_corrections(conn, updates)
-
-
 @dataclass
 class UnaryCorrectionStats:
-    """Bilan de la passe unaire : SP examinées, SP réellement corrigées (au moins une
-    règle de correction, hors simple mapping de vocabulaire `DOC_TYPE_MAP`), et nombre
-    de déclenchements par règle."""
+    """Bilan de la passe unaire : `source_publications` examinées, `source_publications` réellement corrigées (au moins une règle de correction, hors simple mapping de vocabulaire `DOC_TYPE_MAP`), et nombre de déclenchements par règle."""
 
     examined: int
     corrected: int
@@ -147,9 +109,7 @@ class UnaryCorrectionStats:
 
 
 def tally_corrections(updates: list[CorrectionUpdate]) -> tuple[int, dict[str, int]]:
-    """`(SP réellement corrigées, déclenchements par règle)` à partir des `corrected_by`
-    des champs unaires. Le mapping de vocabulaire `DOC_TYPE_MAP` n'est pas une correction :
-    il ne compte ni dans les SP corrigées ni dans la ventilation."""
+    """`(source_publications réellement corrigées, déclenchements par règle)` à partir des `corrected_by` des champs unaires. Le mapping de vocabulaire `DOC_TYPE_MAP` n'est pas une correction : il ne compte ni dans les `source_publications` corrigées ni dans la ventilation."""
     rule_counts: dict[str, int] = {}
     corrected = 0
     for update in updates:
@@ -170,7 +130,7 @@ def run(
     queries: MetadataCorrectionQueries,
     logger: logging.Logger,
 ) -> UnaryCorrectionStats:
-    """Passe unaire : corrige et persiste l'effective sur toutes les `source_publications`."""
+    """Passe unaire : corrige et persiste les métadonnées corrigées sur toutes les `source_publications`."""
     rows = queries.fetch_for_unary_correction(conn)
     logger.info("metadata_correction (unaire) : %d source_publications examinées", len(rows))
 

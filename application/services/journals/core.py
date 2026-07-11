@@ -11,7 +11,7 @@ from typing import cast
 from sqlalchemy import Connection
 
 from application.audit_log import emit_event
-from application.pipeline.metadata_correction.correct_unary import correct_for_journal
+from application.pipeline.metadata_correction.correct_unary import compute_update
 from application.ports.pipeline.metadata_correction import MetadataCorrectionQueries
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.journal_repository import JournalRepository, JournalUpdateFields
@@ -148,6 +148,17 @@ def update_journal_apc(
     )
 
 
+def _correct_for_journal(
+    conn: Connection, queries: MetadataCorrectionQueries, journal_id: int
+) -> int:
+    """Recompute+persiste les corrections unaires des `source_publications` d'un journal, après un changement de son `journal_type`. Retourne le nombre de `source_publications` corrigées.
+
+    À enchaîner avec `refresh_from_sources` des publications du journal : la colonne `source_publication` rafraîchie ici est ce que le refresh (et plus tard le matcher) liront — sans ce recompute, `refresh_from_sources` repartirait de la correction périmée."""
+    rows = queries.fetch_for_unary_correction_by_journal(conn, journal_id)
+    updates = [u for row in rows if (u := compute_update(row)) is not None]
+    return queries.persist_corrections(conn, updates)
+
+
 def merge_journals(
     target_id: int,
     source_id: int,
@@ -163,7 +174,7 @@ def merge_journals(
     Les `source_publications` et publications du journal absorbé sont repointées vers
     la cible (`merge_journal_into`), puis **requalifiées** contre le `journal_type` de
     la cible : on recompute en place les corrections des SP de la cible
-    (`correct_for_journal`, qui voit désormais les SP absorbées via le `journal_id`
+    (`_correct_for_journal`, qui voit désormais les SP absorbées via le `journal_id`
     repointé), puis on rafraîchit les publications absorbées. Fusionner une revue dans
     un média retype donc ses publications en `media`.
     """
@@ -178,7 +189,7 @@ def merge_journals(
     # Les SP absorbées portent désormais `journal_id = target` : recompute en place leurs
     # corrections (le `journal_type` lu par la correction est celui de la cible), puis
     # refresh des publications absorbées (qui lisent les colonnes SP fraîchement corrigées).
-    correct_for_journal(conn, correction_queries, target_id)
+    _correct_for_journal(conn, correction_queries, target_id)
     for pub_id in absorbed_pub_ids:
         refresh_from_sources(pub_id, repo=pub_repo, audit_repo=audit_repo)
 
@@ -201,7 +212,7 @@ def requalify_publications_for_journal(
     Précondition : le `journal.journal_type` a déjà été mis à jour par le caller (dans la
     même transaction qu'un `update_journal`). Deux temps :
 
-    1. `correct_for_journal` recompute **en place** les corrections des `source_publications`
+    1. `_correct_for_journal` recompute **en place** les corrections des `source_publications`
        du journal — indispensable car `refresh_from_sources` repart de la colonne SP corrigée
        (pas du brut), donc sans ce recompute il figerait la publication sur l'ancienne
        correction journal-dépendante.
@@ -219,7 +230,7 @@ def requalify_publications_for_journal(
     if not pub_ids:
         return 0
 
-    correct_for_journal(conn, correction_queries, journal_id)
+    _correct_for_journal(conn, correction_queries, journal_id)
 
     changed = 0
     for pub_id in pub_ids:
