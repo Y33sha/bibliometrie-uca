@@ -125,7 +125,7 @@ Dans [`tests/unit/domain/source_publications/test_correction.py`](../../tests/un
 
 Si la règle consomme un champ que l'admin modifie en base via l'UI (`journal.journal_type`, `journal.oa_model`) :
 
-1. **Recompute des corrections** : `correct_for_journal` (`correct_unary.py`) recompute et persiste les corrections des SP du journal, à enchaîner avec `refresh_from_sources` des publications impactées.
+1. **Recompute des corrections** : `_correct_for_journal` (`application/services/journals/core.py`) recompute et persiste les corrections des source_publications du journal, à enchaîner avec `refresh_from_sources` des publications impactées.
 2. **Service de requalification** dans `application/<table>.py`, modèle [`requalify_publications_for_journal`](../../application/journals.py) (mode `dry_run` pour le preview, mode apply qui recompute + refresh + audit).
 3. **Repo** : `PublicationRepository.find_ids_by_<key>` (lecture de `publications` par le repo publications — discipline ISP).
 4. **Endpoints API** : `GET /api/<table>/{id}/<field>-change-impact?new_<field>=X` → `{count: N}` (preview, `dry_run=True`) ; `PUT /api/<table>/{id}` détecte le changement et déclenche la requalification synchrone dans la même transaction.

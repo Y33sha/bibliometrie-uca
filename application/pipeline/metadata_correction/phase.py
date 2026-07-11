@@ -1,20 +1,10 @@
-"""Orchestrateur de la phase `metadata_correction` : persistance des corrections de métadonnées
-sur les `source_publications`.
+"""Orchestrateur de la phase `metadata_correction` : persistance des corrections de métadonnées sur les `source_publications`.
 
 Trois sous-étapes, chacune dans sa propre transaction, dans cet ordre :
 
-1. **journal_by_doi** — rattache le journal manquant quand le préfixe DOI désigne un unique journal.
-   En premier : le `journal_id` qu'il commit est joint par l'unaire (`journal_type` depuis la
-   colonne vivante), de sorte que la reclassification `doc_type` journal-dépendante a lieu dans le
-   même run, sans feed-forward.
-2. **unaire** (per-record) — mapping `doc_type` source→canonique puis règles de correction
-   `effective_metadata`.
-3. **cluster** (group-by-DOI) — substitution version→concept DataCite, nullage des DOI erronés
-   ouvrage/chapitre.
-
-Tourne après `publishers_journals` (journaux typés) et avant `publications` (le matching lit les
-colonnes corrigées). Chaque sous-étape commit par lots (progression durable) ; l'orchestrateur
-ajoute l'enveloppe transactionnelle, le chronométrage et l'assemblage des métriques de phase.
+1. **journal_by_doi** — rattache le journal manquant quand le préfixe DOI correspond à un unique journal possible. En premier : le `journal_id` qu'il commit est consommé par l'étape suivante (`journal_type` depuis la colonne vivante), de sorte que la reclassification `doc_type` journal-dépendante a lieu dans le même run, sans feed-forward.
+2. **unaire** (per-record) — mapping `doc_type` source→canonique puis règles de correction `effective_metadata`.
+3. **cluster** (group-by-DOI) — substitution version→concept DataCite, nullage des DOI erronés ouvrage/chapitre.
 """
 
 import logging
@@ -58,8 +48,7 @@ def run(
         total=journal_by_doi.examined + unary.examined + cluster.examined,
         updated=journal_by_doi.attached + unary.corrected + cluster.corrected,
     )
-    # Chiffres plats : `{mode}_{examined,corrected}`. Le frontend les arrange en matrice
-    # (mode × examinées/corrigées) — pur agencement de présentation.
+    # Chiffres plats : `{mode}_{examined,corrected}`. Le frontend les arrange en matrice (mode × examinées/corrigées) — pur agencement de présentation.
     metrics.details["summary"] = {
         "journal_by_doi_examined": journal_by_doi.examined,
         "journal_by_doi_corrected": journal_by_doi.attached,
