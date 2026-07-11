@@ -1,6 +1,6 @@
 """Phase `resolve_ra` : résolution préfixe DOI → Registration Agency, avant `cross_imports`.
 
-Pour chaque préfixe du pool `candidate_dois` absent de `doi_prefixes`, récupère quelques DOI samples, interroge `doi.org/ra` (le premier sample qui répond) et insère `(prefix, ra)`. Un préfixe que `doi.org/ra` ne classe pas est inséré avec `ra='unknown'` : le volet publisher de `publishers_journals` tentera `/prefixes` pour le rattraper. Aucun appel `/prefixes`, aucun publisher ici — c'est tout ce dont `cross_imports` a besoin pour router les fetches par Registration Agency.
+Pour chaque préfixe du pool `candidate_dois` absent de `doi_prefixes`, récupère quelques DOI samples, interroge `doi.org/ra` (le premier sample qui répond) et insère `(prefix, ra)`. Un préfixe que `doi.org/ra` ne classe pas est inséré avec `ra='unknown'` : le volet publisher de `publishers_journals` tentera `/prefixes` pour le rattraper.
 
 Le client HTTP (`doi.org/ra`) est injecté en callable, pour la testabilité et l'étanchéité DDD (`application` ne dépend pas d'`infrastructure`).
 """
@@ -19,7 +19,7 @@ ResolveRaFn = Callable[[str], str | None]
 """Signature : `(doi) -> ra_name | None`. `None` = DOI inexistant ou erreur HTTP."""
 
 
-def run_resolve_ra(
+def run(
     log: logging.Logger,
     *,
     repo: DoiPrefixRepository,
@@ -60,10 +60,7 @@ def run_resolve_ra(
             new_by_ra[ra] = new_by_ra.get(ra, 0) + 1
         log.info("%s → %s", prefix, ra)
 
-    # Indicateurs sur-mesure : synthèse du run + tableau par Registration Agency
-    # (Crossref / DataCite / unknown) avec DOI candidats et préfixes. La part `unknown`
-    # inclut les préfixes que doi.org/ra ne classe pas et les préfixes malformés (DOI à
-    # scheme « doi: » non nettoyé), ce qui la rend lisible comme signal de qualité.
+    # Indicateurs sur-mesure : synthèse du run + tableau par Registration Agency (Crossref / DataCite / unknown) avec DOI candidats et préfixes. La part `unknown` inclut les préfixes que doi.org/ra ne classe pas et les préfixes malformés (DOI à scheme « doi: » non nettoyé), ce qui la rend lisible comme signal de qualité.
     metrics.details["summary"] = {
         "new_prefixes": metrics.new,
         "resolved": metrics.extras.get("resolved", 0),
@@ -84,8 +81,7 @@ def _resolve_ra_with_retry(
     resolve_ra_fn: ResolveRaFn,
     log: logging.Logger,
 ) -> str | None:
-    """Tente chaque DOI sample jusqu'à obtenir une RA valide. Renvoie None si tous
-    les samples échouent (le préfixe sera marqué `unknown`, repris par le volet publisher)."""
+    """Tente chaque DOI sample jusqu'à obtenir une RA valide. Renvoie None si tous les samples échouent (le préfixe sera marqué `unknown`)."""
     for doi in samples:
         ra = resolve_ra_fn(doi)
         if ra is not None:

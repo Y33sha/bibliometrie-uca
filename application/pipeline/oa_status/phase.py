@@ -1,24 +1,11 @@
 """
 Phase pipeline `oa_status` — enrichit `publications.oa_status` via Unpaywall.
 
-Pour les publications ayant un DOI, interroge Unpaywall et met à jour
-le statut OA. Écrase les valeurs existantes, SAUF : (1) ne remplace jamais
-'diamond' par 'gold' (Unpaywall ne connaît pas le diamond OA) ; (2) ne
-rétrograde jamais 'embargoed' vers 'closed'/'unknown' (l'embargo est connu
-côté HAL, Unpaywall voit juste le fichier non encore accessible) — un statut
-plus ouvert (green+) écrase bien.
-
-Cette phase ne contient qu'un seul sub-step (Unpaywall). Elle s'appelait
-`enrich` avant 2026-05-26, rebaptisée après l'extraction de la phase
-`publishers_journals` qui a absorbé `enrich_journal_apc`. Le nom `enrich`
-était devenu un misnomer (countries/subjects/publishers_journals
-enrichissent aussi).
+Pour les publications ayant un DOI, interroge Unpaywall et met à jour le statut OA. Écrase les valeurs existantes, SAUF : (1) ne remplace jamais 'diamond' par 'gold' (Unpaywall ne connaît pas le diamond OA) ; (2) ne rétrograde jamais 'embargoed' vers 'closed'/'unknown' (l'embargo est connu côté HAL, Unpaywall voit juste le fichier non encore accessible) — un statut plus ouvert (green+) écrase bien.
 
 L'orchestrateur dépend du port `EnrichQueries` et reçoit en injection
-un `OaStatusFetcher` (le fetcher concret vit dans
-`infrastructure/sources/unpaywall.py` pour respecter l'étanchéité DDD).
-Appelé par `run_pipeline` (phase `oa_status`), qui gère la connexion et
-`asyncio.run`.
+un `OaStatusFetcher` (le fetcher concret vit dans `infrastructure/sources/unpaywall.py` pour respecter l'étanchéité DDD).
+Appelé par `run_pipeline` (phase `oa_status`), qui gère la connexion et `asyncio.run`.
 
 Implémentation async : `httpx.AsyncClient` partagé +
 `asyncio.Semaphore(5)` sous le seuil Unpaywall (~10 req/s recommandé).
@@ -37,25 +24,21 @@ from application.ports.pipeline.enrich import EnrichQueries
 from application.ports.repositories.publication_repository import PublicationRepository
 
 type OaStatusFetcher = Callable[[httpx.AsyncClient, str], Awaitable[str | None]]
-"""Signature : ``(client, doi) → statut OA mappé (str) | None``."""
+"""Signature : `(client, doi) → statut OA mappé (str) | None`."""
 
 BATCH_SIZE = 50
 MAX_CONCURRENT = 5
 
-# Constantes opérationnelles (pas métier — la règle métier des statuts stables est
-# dans domain/publications/metadata.STABLE_OA_STATUSES).
+# Constantes opérationnelles (pas métier — la règle métier des statuts stables est dans domain/publications/metadata.STABLE_OA_STATUSES).
 MAX_PER_RUN = 10_000
-"""Cap de DOI vérifiés par run : lisse la charge (le backlog des jamais-vérifiés
-s'écoule sur plusieurs runs au lieu d'un pic de ~100k)."""
+"""Cap de DOI vérifiés par run : lisse la charge (le backlog des jamais-vérifiés s'écoule sur plusieurs runs au lieu d'un pic de ~100k)."""
 STALENESS_DAYS = 15
 """Au-delà, un statut OA changeable (hors STABLE_OA_STATUSES) est re-vérifié.
 
-Borne le décalage entre une bascule OA côté Unpaywall (qui peut rétrodater une
-`oa_date` sans notifier) et sa prise en compte : au pire, un statut périmé
-survit une fenêtre avant re-vérification."""
+Borne le décalage entre une bascule OA côté Unpaywall et sa prise en compte : au pire, un statut périmé survit une fenêtre avant re-vérification."""
 
 
-async def run_enrich_oa_status(
+async def run(
     conn: Connection,
     queries: EnrichQueries,
     logger: logging.Logger,
@@ -82,8 +65,7 @@ async def run_enrich_oa_status(
     progress = {"processed": 0, "updated": 0, "skipped": 0, "not_found": 0}
 
     def _result() -> PhaseMetrics:
-        # Indicateurs : synthèse du run (backlog, vérifiées, ventilation) puis répartition
-        # des publications par statut OA avec le delta du run (avant → après).
+        # Indicateurs : synthèse du run (backlog, vérifiées, ventilation) puis répartition des publications par statut OA avec le delta du run (avant → après).
         metrics.add(
             total=total,
             updated=progress["updated"],
@@ -125,8 +107,7 @@ async def run_enrich_oa_status(
         return _result()
 
     sem = asyncio.Semaphore(max_concurrent)
-    # La `Connection` SA sync n'est pas thread-safe ; tous les writes
-    # (update, commit) passent par `to_thread` sous ce lock.
+    # La `Connection` SA sync n'est pas thread-safe ; tous les writes (update, commit) passent par `to_thread` sous ce lock.
     db_lock = asyncio.Lock()
 
     async with httpx.AsyncClient() as client:
@@ -137,9 +118,7 @@ async def run_enrich_oa_status(
             async with sem:
                 status = await fetcher(client, doi)
 
-            # `new_status` non None = on écrit un nouveau statut ; sinon on pose juste
-            # `unpaywall_checked_at` (vérifié, rien à changer) pour ne pas re-tirer ce
-            # DOI au run suivant.
+            # `new_status` non None = on écrit un nouveau statut ; sinon on pose juste `unpaywall_checked_at` (vérifié, rien à changer) pour ne pas re-tirer ce DOI au run suivant.
             new_status: str | None = None
             if status is None:
                 progress["not_found"] += 1
@@ -150,8 +129,7 @@ async def run_enrich_oa_status(
                 # embargo connu (HAL) : pas de rétrogradation vers closed/unknown.
                 progress["skipped"] += 1
             elif has_open_deposit and status in ("closed", "unknown"):
-                # Une archive ouverte détient le fichier (HAL green) : Unpaywall ne le voit pas sous
-                # le DOI, il ne peut pas refermer le dépôt. On marque vérifié sans rétrograder.
+                # Une archive ouverte détient le fichier (HAL green) : Unpaywall ne le voit pas sous le DOI. On n'écrase pas.
                 progress["skipped"] += 1
             else:
                 new_status = status

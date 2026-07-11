@@ -1,6 +1,6 @@
 """Query service : SQL de la phase `relations`.
 
-Appelé par `application/pipeline/relations/populate_relations.py`. Implémente le port
+Appelé par `application/pipeline/relations/phase.py`. Implémente le port
 `application.ports.pipeline.relations.PublicationRelationsQueries`.
 """
 

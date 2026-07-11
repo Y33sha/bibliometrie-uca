@@ -16,7 +16,7 @@ from application.pipeline.subjects import (
     ingest_wos,
 )
 from application.pipeline.subjects._common import SubjectCache
-from application.pipeline.subjects.run import run
+from application.pipeline.subjects.ingestion import run
 from infrastructure.queries.subjects import PgSubjectsQueries
 
 
