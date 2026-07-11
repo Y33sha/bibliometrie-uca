@@ -63,7 +63,9 @@ if TYPE_CHECKING:
 
     from sqlalchemy import Connection
 
-    from application.ports.pipeline.extract.fetch_missing_doi import AsyncFetchMissingDoiAdapter
+    from application.ports.pipeline.cross_imports.fetch_missing_doi import (
+        AsyncFetchMissingDoiAdapter,
+    )
     from application.ports.pipeline.extract.refresh_stale import RefreshStaleAdapter
 
 from application.pipeline.graph import PHASE_ORDER
@@ -947,7 +949,7 @@ def _run_extract(
 
 def _run_fetch_missing_hal_by_id() -> PhaseMetrics:
     """Cross-import HAL par hal-id (OpenAlex/ScanR) : documents absents du staging."""
-    from application.pipeline.extract.fetch_missing_hal import fetch_missing_hal_by_id
+    from application.pipeline.cross_imports.fetch_missing_hal import fetch_missing_hal_by_id
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.sources.hal.fetch_missing_hal import PgHalFetchMissingAdapter
 
@@ -969,7 +971,7 @@ def _run_fetch_missing_hal_by_id() -> PhaseMetrics:
 
 def _run_fetch_missing_hal_by_nnt() -> PhaseMetrics:
     """Cross-import HAL par NNT (theses.fr) : thèses soutenues sans document HAL."""
-    from application.pipeline.extract.fetch_missing_hal import fetch_missing_hal_by_nnt
+    from application.pipeline.cross_imports.fetch_missing_hal import fetch_missing_hal_by_nnt
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.sources.hal.fetch_missing_hal import PgHalFetchMissingAdapter
 
@@ -996,7 +998,7 @@ def _make_fetch_missing_doi_adapter(target: str) -> "AsyncFetchMissingDoiAdapter
     """
     from typing import cast
 
-    from application.ports.pipeline.extract.fetch_missing_doi import (
+    from application.ports.pipeline.cross_imports.fetch_missing_doi import (
         AsyncFetchMissingDoiAdapter,
     )
     from infrastructure.sources.crossref.fetch_missing_doi import CrossrefFetchMissingDoiAdapter
@@ -1023,7 +1025,7 @@ def _make_fetch_missing_doi_adapter(target: str) -> "AsyncFetchMissingDoiAdapter
 
 
 def _run_fetch_missing_doi(target: str) -> PhaseMetrics:
-    from application.pipeline.extract.fetch_missing_doi import run_async
+    from application.pipeline.cross_imports.fetch_missing_doi import run_async
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.sources.circuit_breaker import (
         SourceCircuitBreaker,

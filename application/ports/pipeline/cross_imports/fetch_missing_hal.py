@@ -3,7 +3,7 @@
 Implémenté par
 `infrastructure.sources.hal.fetch_missing_hal.PgHalFetchMissingAdapter`.
 
-Les orchestrateurs (`application.pipeline.extract.fetch_missing_hal`) consomment
+Les orchestrateurs (`application.pipeline.cross_imports.fetch_missing_hal`) consomment
 ce Protocol : `fetch_missing_hal_by_id` pour les références hal-id (OpenAlex,
 ScanR) et `fetch_missing_hal_by_nnt` pour les NNT (theses).
 """

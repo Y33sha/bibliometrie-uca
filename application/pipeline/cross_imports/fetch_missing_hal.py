@@ -5,8 +5,7 @@ Deux pistes distinctes, chacune son orchestrateur, partageant un runner async :
 - `fetch_missing_hal_by_id` : hal-ids repérés par OpenAlex et ScanR (absents du
   staging HAL), requête Solr `halId_s`.
 - `fetch_missing_hal_by_nnt` : NNT de thèses soutenues sans document HAL
-  (theses.fr), requête Solr `nntId_s`. Réservé au mode `full` (volume trop large
-  en incrémental) — le gate de mode vit chez le caller (`run_pipeline`).
+  (theses.fr), requête Solr `nntId_s`. Réservé au mode `full` — le gate de mode vit chez le caller (`run_pipeline`).
 
 Les documents ramenés sont marqués `collection = NULL` (hors périmètre UCA), ce
 qui les distingue des entrées issues du portail ou des collections labo.
@@ -27,7 +26,7 @@ import httpx
 from sqlalchemy import Connection
 
 from application.pipeline.metrics import PhaseMetrics
-from application.ports.pipeline.extract.fetch_missing_hal import (
+from application.ports.pipeline.cross_imports.fetch_missing_hal import (
     HalFetchMissingAdapter,
     HalIdRef,
     NntRef,

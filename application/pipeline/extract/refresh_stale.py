@@ -14,7 +14,7 @@ Trois issues par row (cf. `application.ports.pipeline.extract.refresh_stale`) :
 Le comportement spécifique à chaque source (endpoint, auth, requête/réponse) est
 délégué à un adapter `RefreshStaleAdapter`. Implémentation async (`httpx.AsyncClient`
 + pool de `max_concurrent` workers) avec circuit-breaker par source, sur le modèle
-de `application.pipeline.extract.fetch_missing_doi.run_async`.
+de `application.pipeline.cross_imports.fetch_missing_doi.run_async`.
 """
 
 from __future__ import annotations
