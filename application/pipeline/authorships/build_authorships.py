@@ -1,19 +1,10 @@
-"""
-Construit la table authorships (table de vérité) à partir des authorships sources.
+"""Construit la table `authorships` (table de vérité) à partir des `source_authorships`.
 
-Étape 1 : Insérer les authorships manquantes puis pruner les orphelines
-          (paires publication_id, person_id que plus aucune source n'atteste)
-Étape 2 : Peupler les FK (source_authorships.authorship_id → authorships.id)
-Étape 3 : Recomposer les attributs en une passe convergente (author_position,
-          is_corresponding, in_perimeter, roles)
-Étape 4 : Matérialiser publications.in_perimeter (rollup depuis authorships)
-Étape 5 : Rafraîchir les matviews authorship_structures + publication_structures
-
-Le build est **source-agnostique** : il consolide l'ensemble des
-`source_authorships` indépendamment des sources couvertes par le run courant
-(seules les phases amont — extract, cross-import, refresh-stale, normalize —
-sont source-dépendantes). L'orchestrateur dépend du port
-`AuthorshipsBuildQueries` ; il est appelé par `run_pipeline`.
+Étape 1 : insérer les authorships manquantes puis pruner les orphelines (paires `publication_id, person_id` que plus aucune source n'atteste).
+Étape 2 : peupler les FK (`source_authorships.authorship_id` → `authorships.id`).
+Étape 3 : recomposer les attributs en une passe convergente (`author_position`, `is_corresponding`, `in_perimeter`, `roles`).
+Étape 4 : matérialiser `publications.in_perimeter` (rollup depuis authorships).
+Étape 5 : rafraîchir les matviews `authorship_structures` + `publication_structures`.
 """
 
 import logging
@@ -34,11 +25,7 @@ def build(
 ) -> PhaseMetrics:
     """Reconstruit la table `authorships` depuis les `source_authorships`.
 
-    Le build est idempotent et convergent : appel répété sans `rebuild_full`
-    converge vers le même résultat (l'étape 3 réécrit tout attribut divergent,
-    le prune supprime les orphelines). Le flag `rebuild_full=True` purge
-    d'abord la table — filet anti-divergence précautionnel du mode pipeline
-    `full`, désormais superflu en régime nominal.
+    Le build est idempotent et convergent : un appel répété sans `rebuild_full` converge vers le même résultat (l'étape 3 réécrit tout attribut divergent, le prune supprime les orphelines). `rebuild_full=True` purge d'abord la table puis la reconstruit depuis zéro — reconstruction complète de récupération, exposée par `run_pipeline --rebuild-authorships`.
     """
     t0 = time.perf_counter()
 

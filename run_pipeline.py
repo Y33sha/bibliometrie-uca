@@ -603,21 +603,13 @@ def phase_persons(**kw: Any) -> PhaseMetrics:
 
 
 def phase_authorships(**kw: Any) -> PhaseMetrics:
-    """Construction de la table de verite authorships.
+    """Construction de la table de vérité `authorships`.
 
-    Consolide les source_authorships en authorships canoniques
-    (une entree par couple publication x personne), avec in_perimeter
-    consolide ; les structures derivent de la matview authorship_structures.
+    Consolide les `source_authorships` en authorships canoniques (une entrée par couple publication × personne), avec `in_perimeter` consolidé ; les structures dérivent de la matview `authorship_structures`.
 
-    Phase source-agnostique : `--sources` n'est pas propagé. Une
-    source_authorship peut etre touchee par d'autres voies que sa propre
-    normalisation (re-population d'affiliations, refresh_from_sources,
-    etc.) — toutes les sources doivent etre reconsolidees a chaque run.
+    Phase source-agnostique : `--sources` n'est pas propagé. Une source_authorship peut être touchée par d'autres voies que sa propre normalisation (re-population d'affiliations, refresh_from_sources, etc.) — toutes les sources doivent être reconsolidées à chaque run.
 
-    Le build est incrémental et convergent dans tous les modes (add +
-    prune + recompute des attributs en une passe) : aucune purge routinière.
-    La purge complète reste disponible en récupération manuelle via la CLI
-    `build_authorships --rebuild-full`.
+    Le build est incrémental et convergent dans tous les modes (add + prune + recompute des attributs en une passe) : aucune purge routinière. La purge complète de la table est disponible en récupération via `run_pipeline --rebuild-authorships`.
 
     Séquence, transactions et métriques dans `application/pipeline/authorships/phase.py`.
     """
@@ -634,6 +626,7 @@ def phase_authorships(**kw: Any) -> PhaseMetrics:
         PgPurgeOrphanPublicationsQueries(),
         PgPubCountsQueries(),
         log,
+        rebuild_authorships=bool(kw.get("rebuild_authorships")),
     )
 
 
@@ -1298,6 +1291,12 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         help="Avant la phase publications, re-dirtie tout le stock (rebuild complet : "
         "cluster-then-materialize global). À utiliser après une évolution des règles de clés.",
     )
+    parser.add_argument(
+        "--rebuild-authorships",
+        action="store_true",
+        help="Avant la phase authorships, purge complète de la table puis reconstruction "
+        "depuis zéro (filet anti-divergence, en récupération).",
+    )
     return parser
 
 
@@ -1374,6 +1373,7 @@ def _run_one_phase(
                 start_year=args.start_year,
                 include_wos=args.include_wos,
                 rebuild_publications=args.rebuild_publications,
+                rebuild_authorships=args.rebuild_authorships,
             )
         except KeyboardInterrupt:
             log.warning("Pipeline interrompu par l'utilisateur à la phase '%s'", name)
