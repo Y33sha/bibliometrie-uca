@@ -12,10 +12,9 @@ Deux opérations :
 1. **Purge des négatifs de lookup périmés.** Un DOI « non trouvé » mémorisé sous
    une forme sale n'a jamais été interrogé sous sa forme propre : le négatif est
    invalide. On le supprime pour que la forme propre soit re-tentée au prochain
-   run (les candidats cross-import sont maintenant nettoyés en amont).
-   - `staging` : stubs not-found DOI-natifs (crossref/datacite) à `doi` sale ;
-   - `doi_lookups` : misses cross-import (hal/openalex/wos/scanr) à `doi` sale.
-   Les négatifs déjà propres sont conservés (vrai miss).
+   run (les candidats cross-import sont maintenant nettoyés en amont). Ne concerne que
+   `doi_lookups`, où vivent tous les négatifs de cross-import par DOI. Les négatifs déjà
+   propres sont conservés (vrai miss).
 
 2. **Normalisation en place des colonnes source de vérité :**
    - `staging.doi` (records réels) ;
@@ -59,22 +58,8 @@ log = setup_logger("backfill_clean_dois", os.path.dirname(__file__))
 
 
 def _purge_dirty_negatives(conn: Connection, apply: bool) -> None:
-    """Supprime les négatifs de lookup (stubs `staging` not-found + `doi_lookups`)
-    dont le `doi` n'est pas déjà sous forme canonique."""
-    stubs = conn.execute(
-        text(
-            "SELECT source::text AS source, source_id, doi FROM staging "
-            "WHERE not_found_at IS NOT NULL AND doi IS NOT NULL"
-        )
-    ).all()
-    stub_del = [{"s": r.source, "sid": r.source_id} for r in stubs if clean_doi(r.doi) != r.doi]
-    log.info("staging stubs not-found à doi sale : %d / %d", len(stub_del), len(stubs))
-    if apply and stub_del:
-        conn.execute(
-            text("DELETE FROM staging WHERE source = CAST(:s AS source_type) AND source_id = :sid"),
-            stub_del,
-        )
-
+    """Supprime les négatifs de `doi_lookups` dont le `doi` n'est pas déjà sous forme
+    canonique — jamais interrogés sous leur forme propre, donc invalides."""
     lookups = conn.execute(text("SELECT source::text AS source, doi FROM doi_lookups")).all()
     lk_del = [{"s": r.source, "d": r.doi} for r in lookups if clean_doi(r.doi) != r.doi]
     log.info("doi_lookups à doi sale : %d / %d", len(lk_del), len(lookups))

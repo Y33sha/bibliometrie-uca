@@ -1131,18 +1131,19 @@ staging = Table(
 )
 
 
-# Cache des tentatives négatives de cross-import DOI sur les sources non
-# natives (hal, openalex, wos, scanr) : un DOI absent d'une de ces sources
-# n'y est pas définitivement absent, on le re-tente après `next_retry`. Tient
-# le pool `get_cross_import_dois` auto-borné. Distinct de `staging` : ce ne
-# sont pas des documents (pas de payload, pas de cycle de normalisation).
+# Cache des tentatives négatives de cross-import par DOI. `next_retry` NULL = miss
+# définitif (crossref, datacite : le DOI est leur identifiant natif, un 404 est sans
+# appel) ; `next_retry` daté = miss transitoire d'une source non native (hal, openalex,
+# wos, scanr), re-tenté après le délai. Tient le pool `get_cross_import_dois` auto-borné.
+# Distinct de `staging` : ce ne sont pas des documents (pas de payload, pas de cycle de
+# normalisation).
 doi_lookups = Table(
     "doi_lookups",
     metadata,
     Column("source", source_type_enum, nullable=False),
     Column("doi", Text, nullable=False),
     Column("not_found_at", DateTime(timezone=True), nullable=False),
-    Column("next_retry", DateTime(timezone=True), nullable=False),
+    Column("next_retry", DateTime(timezone=True), nullable=True),
     PrimaryKeyConstraint("source", "doi"),
 )
 

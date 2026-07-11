@@ -33,9 +33,10 @@ def not_found_marker(doi: str) -> dict[str, Any]:
     Un adapter émet ce marqueur (au lieu d'un record API) pour un DOI que
     la source a **confirmé** absent (réponse vide ou 404), par opposition à
     une erreur transitoire (réseau, timeout) où il retourne `[]` sans rien
-    émettre. `insert()` route le marqueur vers le backoff `doi_lookups`
-    (sources non natives) ou un stub `staging` (Crossref, source native).
-    L'orchestrateur l'exclut du compteur `fetched`.
+    émettre. `insert()` mémorise le marqueur dans `doi_lookups` : `next_retry`
+    daté (backoff) pour les sources non natives, `next_retry` NULL (définitif)
+    pour les sources dont le DOI est l'identifiant natif. L'orchestrateur
+    l'exclut du compteur `fetched`.
     """
     return {"_status": _NOT_FOUND_STATUS, "_doi": doi}
 

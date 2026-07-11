@@ -328,6 +328,17 @@ class TestGetCrossImportDois:
         assert get_cross_import_dois(db.connection, "hal") == []
         assert get_cross_import_dois(db.connection, "openalex") == ["10.1234/a"]
 
+    def test_excludes_dois_with_permanent_miss(self, db):
+        """Un DOI avec un miss définitif (`next_retry NULL`) sort du pool pour toujours."""
+        _add_inperim_sp(db, "openalex", "W1", doi="10.1234/a")
+        _add_inperim_sp(db, "openalex", "W2", doi="10.1234/b")
+        db.execute(
+            "INSERT INTO doi_lookups (source, doi, not_found_at, next_retry) "
+            "VALUES ('hal', '10.1234/a', now(), NULL)"
+        )
+        result = get_cross_import_dois(db.connection, "hal")
+        assert result == ["10.1234/b"]
+
 
 class TestRecordDoiNotFound:
     def test_inserts_pending_backoff_row(self, sa_sync_conn):
@@ -347,6 +358,16 @@ class TestRecordDoiNotFound:
             text("SELECT count(*) FROM doi_lookups WHERE source = 'hal' AND doi = '10.1234/x'")
         ).scalar()
         assert count == 1
+
+    def test_permanent_sets_null_next_retry(self, sa_sync_conn):
+        """`permanent=True` (source native du DOI) : `next_retry NULL`, jamais retenté."""
+        record_doi_not_found(sa_sync_conn, "crossref", "10.1234/x", permanent=True)
+        next_retry = sa_sync_conn.execute(
+            text(
+                "SELECT next_retry FROM doi_lookups WHERE source = 'crossref' AND doi = '10.1234/x'"
+            )
+        ).scalar_one()
+        assert next_retry is None
 
 
 def _insert_staging(conn, source, sid, doi, *, seen_days_ago, not_found=False, disappeared=False):
