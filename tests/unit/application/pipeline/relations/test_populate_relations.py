@@ -1,6 +1,6 @@
 """Tests de l'assemblage des arêtes des signaux #2 (clés partagées) et #3 (rapprochement par titre)."""
 
-from application.pipeline.relations.populate_relations import (
+from application.pipeline.relations.phase import (
     _build_shared_key_edges,
     _build_title_match_edges,
 )

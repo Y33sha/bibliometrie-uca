@@ -1,4 +1,4 @@
-"""Orchestrateur de la phase `subjects` du pipeline.
+"""Ingestion des sujets d'une publication — première étape de la phase `subjects` (avant les co-occurrences).
 
 Incrémental et publication-centré :
   1. Sélectionne les publications dont le contenu canonique a changé depuis la

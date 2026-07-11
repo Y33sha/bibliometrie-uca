@@ -151,9 +151,9 @@ def phase_resolve_ra(**kw: Any) -> PhaseMetrics:
     Le volet publisher (phase `publishers_journals`) complète ensuite les rows via les
     API `/prefixes`.
 
-    Séquence et métriques dans `run_resolve_ra` ; ici, le câblage (connexion, breaker, user-agent).
+    Séquence et métriques dans `run` ; ici, le câblage (connexion, breaker, user-agent).
     """
-    from application.pipeline.resolve_ra.run import run_resolve_ra
+    from application.pipeline.resolve_ra.phase import run
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.repositories import doi_prefix_repository
     from infrastructure.sources.circuit_breaker import (
@@ -166,14 +166,14 @@ def phase_resolve_ra(**kw: Any) -> PhaseMetrics:
 
     conn = get_sync_engine().connect()
     # Circuit-breaker sur doi.org/ra : la ContextVar est lue par le helper HTTP,
-    # `run_resolve_ra` consulte `breaker.tripped` pour s'arrêter proprement.
+    # `run` consulte `breaker.tripped` pour s'arrêter proprement.
     breaker = SourceCircuitBreaker("doi.org/ra")
     token = set_current_breaker(breaker)
     try:
         # doi.org/ra est une API publique (aucun credential) : l'email polite pool
         # est facultatif, on ne saute pas la résolution s'il manque.
         user_agent = build_user_agent(get_polite_pool_email_optional(conn) or "")
-        metrics = run_resolve_ra(
+        metrics = run(
             log,
             repo=doi_prefix_repository(conn),
             resolve_ra_fn=lambda doi: resolve_ra(doi, user_agent=user_agent),
@@ -571,7 +571,7 @@ def phase_relations(**kw: Any) -> PhaseMetrics:
     `meta.relation`). Les relations même-œuvre (versions, variantes, pièces) relèvent de
     la déduplication (`metadata_correction`), pas d'ici.
     """
-    from application.pipeline.relations.populate_relations import run
+    from application.pipeline.relations.phase import run
     from infrastructure.queries.pipeline.relations import PgPublicationRelationsQueries
 
     return run(_open_tx, PgPublicationRelationsQueries(), log)
@@ -658,7 +658,7 @@ def phase_subjects(**kw: Any) -> PhaseMetrics:
        canonique a changé depuis leur dernière ingestion (`publications.updated_at`
        > `max(publication_subjects.created_at)`), à partir des `keywords` /
        `topics` de leurs `source_publications`. Purge en fin les sujets devenus
-       orphelins (plus aucun lien). Cf. `application/pipeline/subjects/run.py`.
+       orphelins (plus aucun lien). Cf. `application/pipeline/subjects/ingestion.py`.
 
     2. **Co-occurrences** (`subjects.usage_count` + matview `subject_cooccurrences`)
        — recalcule l'usage de chaque sujet et rafraîchit la matview des
@@ -1140,13 +1140,13 @@ def phase_oa_status(**kw: Any) -> PhaseMetrics:
 
     Unpaywall exige l'email polite pool : sans lui, la phase est sautée proprement.
 
-    Séquence et métriques dans `application/pipeline/oa_status/run.py` ; ici, le câblage.
+    Séquence et métriques dans `application/pipeline/oa_status/phase.py` ; ici, le câblage.
     """
     import asyncio
 
     import httpx
 
-    from application.pipeline.oa_status.run import run_enrich_oa_status
+    from application.pipeline.oa_status.phase import run
     from application.pipeline.signals import filter_configured
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.queries.pipeline.enrich import PgEnrichQueries
@@ -1174,7 +1174,7 @@ def phase_oa_status(**kw: Any) -> PhaseMetrics:
 
         metrics.merge(
             asyncio.run(
-                run_enrich_oa_status(
+                run(
                     conn,
                     PgEnrichQueries(),
                     log,

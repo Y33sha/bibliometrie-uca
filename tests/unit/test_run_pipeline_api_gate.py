@@ -12,7 +12,7 @@ import run_pipeline
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.signals import filter_configured
 
-_RUN_ENRICH = "application.pipeline.oa_status.run.run_enrich_oa_status"
+_RUN_ENRICH = "application.pipeline.oa_status.phase.run"
 _LOG = logging.getLogger("test")
 
 
