@@ -2,11 +2,11 @@
 
 Trois sous-étapes :
 
-1. **build_authorships** — consolide les `source_authorships` en authorships canoniques (une entrée par couple publication × personne), avec `in_perimeter` consolidé ; les structures dérivent de la matview `authorship_structures`. Le build pose `publications.in_perimeter` (rollup).
-2. **purge des orphelines** — supprime les publications restées à zéro authorship (hors-périmètre, inatteignables), par lots avec commit par chunk (WAL borné, progression durable), puis récupère l'espace churné (maintenance physique, hors transaction).
+1. **build_authorships** — consolide les `source_authorships` en authorships canoniques (une entrée par couple publication × personne), avec `in_perimeter` consolidé.
+2. **purge des orphelines** — supprime les publications restées à zéro authorship, puis récupère l'espace churné (maintenance physique, hors transaction).
 3. **refresh des `pub_count`** — recalcule les compteurs `journals` + `publishers` qui dérivent de `in_perimeter`.
 
-Le build est incrémental et convergent (add + prune + recompute en une passe) ; la purge complète de la table est disponible en récupération via `run_pipeline --rebuild-authorships`.
+Le build est incrémental et convergent (add + prune + recompute en une passe) ; le recalcul complet de la table est possible via `run_pipeline --rebuild-authorships`.
 """
 
 import logging
@@ -19,7 +19,7 @@ from application.ports.pipeline.pub_counts import PubCountsQueries
 from application.ports.pipeline.purge_orphan_publications import PurgeOrphanPublicationsQueries
 from application.ports.pipeline.transaction import OpenTransaction
 
-# Taille de chunk du DELETE de purge : un commit par chunk étale le WAL et rend la progression durable si le run est interrompu.
+# Taille des lots du DELETE de purge (un commit par lot).
 _PURGE_BATCH_SIZE = 5000
 
 
