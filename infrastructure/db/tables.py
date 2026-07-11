@@ -646,10 +646,10 @@ source_authorships = Table(
     Column("source_publication_id", Integer, nullable=False),
     Column("author_position", SmallInteger),
     Column("in_perimeter", Boolean, server_default="false"),
-    Column("countries", ARRAY(Text)),
-    # Refresh pays incrémental : True = `countries` à (re)calculer depuis les
-    # adresses. Posé par normalize (nouveaux sa) et detect/institution (adresse
-    # changée), remis à False par le refresh.
+    # Refresh pays incrémental : True = les pays dérivés (source_publications,
+    # publications) sont à recalculer depuis les adresses de ce source_authorship.
+    # Posé par normalize (nouveaux sa) et la détection (adresse changée), remis à
+    # False par le refresh.
     Column("countries_dirty", Boolean, nullable=False, server_default="true"),
     Column("person_id", Integer),
     # Canal ayant posé `person_id` (NULL si orpheline ou non résolue) : identifiant

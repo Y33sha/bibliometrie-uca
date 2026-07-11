@@ -9,7 +9,6 @@ from infrastructure.queries.pipeline.countries import (
     load_country_pool,
     refresh_address_source_countries,
     refresh_publication_countries,
-    refresh_sa_countries,
     write_countries,
 )
 from tests.integration.helpers.authorships import upsert_identity
@@ -141,9 +140,9 @@ class TestRefreshPublicationCountries:
         assert updated == 0
 
 
-def _sa_countries(conn, sa_id):
+def _sp_countries(conn, sp_id):
     return conn.execute(
-        text("SELECT countries FROM source_authorships WHERE id = :i"), {"i": sa_id}
+        text("SELECT countries FROM source_publications WHERE id = :i"), {"i": sp_id}
     ).scalar_one()
 
 
@@ -169,40 +168,39 @@ def _link_sa_address(conn, sa_id, addr_id):
     )
 
 
-class TestDirtyDrivenSaCountries:
-    """Refresh `sa.countries` borné aux sa dirty : `sa.countries_dirty` (nouveaux sa)
-    OU liés à une adresse `countries_dirty` (pays changé). + orphelin, flag adresse, clear."""
+class TestDirtyDrivenSourceCountries:
+    """Refresh `source_publications.countries` borné aux documents dont un source_authorship
+    est dirty : `source_authorships.countries_dirty` (nouveaux sa) OU lié à une adresse
+    `countries_dirty` (pays changé). + orphelin (LEFT JOIN), flag adresse, clear."""
 
-    def test_only_dirty_sa_recomputed(self, sa_sync_conn):
+    def test_only_dirty_sources_recomputed(self, sa_sync_conn):
         pub = _create_pub(sa_sync_conn)
-        sd = _create_sd(sa_sync_conn, pub, "openalex", "oa-d")
-        dirty_sa = _create_sa(sa_sync_conn, sd, "openalex")  # dirty par défaut
-        clean_sa = _create_sa(sa_sync_conn, sd, "openalex", author_position=1)
+        dirty_sd = _create_sd(sa_sync_conn, pub, "openalex", "oa-dirty")
+        clean_sd = _create_sd(sa_sync_conn, pub, "hal", "hal-clean")
+        dirty_sa = _create_sa(sa_sync_conn, dirty_sd, "openalex")  # dirty par défaut
+        clean_sa = _create_sa(sa_sync_conn, clean_sd, "hal")
         sa_sync_conn.execute(
             text("UPDATE source_authorships SET countries_dirty = false WHERE id = :i"),
             {"i": clean_sa},
         )
-        addr = _create_address(sa_sync_conn, "Lyon", ["FR"])
-        _link_sa_address(sa_sync_conn, dirty_sa, addr)
-        _link_sa_address(sa_sync_conn, clean_sa, addr)
+        _link_sa_address(sa_sync_conn, dirty_sa, _create_address(sa_sync_conn, "Lyon", ["FR"]))
+        _link_sa_address(sa_sync_conn, clean_sa, _create_address(sa_sync_conn, "Boston", ["US"]))
 
-        refresh_sa_countries(sa_sync_conn)
-        assert _sa_countries(sa_sync_conn, dirty_sa) == ["FR"]
-        assert _sa_countries(sa_sync_conn, clean_sa) is None  # non dirty → pas recalculé
+        refresh_address_source_countries(sa_sync_conn)
+        assert _sp_countries(sa_sync_conn, dirty_sd) == ["FR"]
+        assert _sp_countries(sa_sync_conn, clean_sd) is None  # aucun sa dirty → pas recalculé
 
-    def test_orphan_dirty_sa_reset_to_null(self, sa_sync_conn):
+    def test_orphan_dirty_source_reset_to_null(self, sa_sync_conn):
         pub = _create_pub(sa_sync_conn)
-        sd = _create_sd(sa_sync_conn, pub, "openalex", "oa-o")
-        sa = _create_sa(sa_sync_conn, sd, "openalex")  # dirty, sans adresse utile
-        sa_sync_conn.execute(
-            text("UPDATE source_authorships SET countries = ARRAY['FR']::char(2)[] WHERE id = :i"),
-            {"i": sa},
-        )
-        refresh_sa_countries(sa_sync_conn)
-        assert _sa_countries(sa_sync_conn, sa) is None  # orphelin → NULL
+        sd = _create_sd(sa_sync_conn, pub, "openalex", "oa-o", countries=["FR"])
+        sa = _create_sa(sa_sync_conn, sd, "openalex")  # dirty, adresse sans pays
+        _link_sa_address(sa_sync_conn, sa, _create_address(sa_sync_conn, "X", None))
 
-    def test_dirty_address_drives_sa_recompute(self, sa_sync_conn):
-        # Un sa NON dirty est recalculé parce que son adresse est devenue dirty.
+        refresh_address_source_countries(sa_sync_conn)
+        assert _sp_countries(sa_sync_conn, sd) is None  # orphelin → NULL
+
+    def test_dirty_address_drives_source_recompute(self, sa_sync_conn):
+        # Un document NON dirty est recalculé parce que l'adresse de son sa devient dirty.
         pub = _create_pub(sa_sync_conn)
         sd = _create_sd(sa_sync_conn, pub, "openalex", "oa-m")
         sa = _create_sa(sa_sync_conn, sd, "openalex")
@@ -215,8 +213,8 @@ class TestDirtyDrivenSaCountries:
         # write_countries(countries) pose addresses.countries_dirty sur la ligne changée.
         write_countries(sa_sync_conn, [(addr, ["FR"])], target_column="countries")
         assert _addr_dirty(sa_sync_conn, addr) is True
-        refresh_sa_countries(sa_sync_conn)
-        assert _sa_countries(sa_sync_conn, sa) == ["FR"]  # sa recalculé via l'adresse dirty
+        refresh_address_source_countries(sa_sync_conn)
+        assert _sp_countries(sa_sync_conn, sd) == ["FR"]  # recalculé via l'adresse dirty
 
     def test_clear_dirty_clears_both_flags(self, sa_sync_conn):
         pub = _create_pub(sa_sync_conn)

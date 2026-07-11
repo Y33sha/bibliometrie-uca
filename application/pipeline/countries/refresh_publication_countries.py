@@ -1,14 +1,8 @@
-"""
-Recalcule publications.countries en cascade depuis les addresses.countries.
+"""Recalcule `publications.countries` depuis `addresses.countries`.
 
-Trois caches dénormalisés orchestrés via le port `CountryQueries` :
-  1. addresses.countries → source_authorships.countries
-  2. source_authorships.countries → source_publications.countries
-     (toutes sources passent par les adresses, circuit unifié)
-  3. source_publications.countries → publications.countries
-
-Cet orchestrateur ne dépend que du domaine et de son port ; il est appelé
-par `run_pipeline` (phase `countries`).
+Deux caches dénormalisés orchestrés via le port `CountryQueries`, chacun recalculé directement depuis les adresses, borné aux lignes `countries_dirty` :
+  1. `source_publications.countries` — union des pays des adresses des source_authorships du document.
+  2. `publications.countries` — union des `source_publications.countries` de même publication_id.
 """
 
 import logging
@@ -20,26 +14,17 @@ from application.ports.pipeline.countries import CountryQueries
 
 
 def refresh(conn: Connection, queries: CountryQueries, logger: logging.Logger) -> int:
+    """Recalcule les caches pays (source_publications → publications), scopé aux `countries_dirty`, puis purge les flags. Retourne le nombre de publications mises à jour."""
     t0 = time.perf_counter()
 
-    # Étape 1 : sa.countries — uniquement les sa `countries_dirty`, en une seule
-    # requête (plus de split par source : le LEFT JOIN orphelin absorbe le
-    # cleanup, et le dirty-scoping borne le volume → pas de spill à éviter).
-    t_sa = time.perf_counter()
-    n_sa = queries.refresh_sa_countries(conn)
-    logger.info(
-        f"source_authorships.countries : {n_sa} mis à jour en {time.perf_counter() - t_sa:.1f}s"
-    )
+    # Étape 1 : source_publications.countries (documents dont un source_authorship est dirty)
+    sp_updated = queries.refresh_address_source_countries(conn)
+    logger.info(f"source_publications.countries : {sp_updated} mis à jour")
 
-    # Étape 2 : sp.countries (documents dont un sa est dirty)
-    addr_updated = queries.refresh_address_source_countries(conn)
-    logger.info(f"source_publications.countries : {addr_updated} mis à jour")
-
-    # Étape 3 : publications.countries (dont un sp a un sa dirty)
+    # Étape 2 : publications.countries (dont un source_publication a un source_authorship dirty)
     updated = queries.refresh_publication_countries(conn)
 
-    # Les flags `countries_dirty` (sa + adresses) ont borné la portée des 3
-    # étapes : on les purge.
+    # Les flags `countries_dirty` (source_authorships + adresses) ont borné la portée des deux étapes : on les purge.
     queries.clear_countries_dirty(conn)
 
     elapsed = time.perf_counter() - t0
