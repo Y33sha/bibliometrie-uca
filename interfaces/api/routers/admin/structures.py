@@ -116,10 +116,13 @@ def delete_structure(
     structure_id: int,
     conn: Connection = Depends(db_conn_sync),
     repo: StructureRepository = Depends(structure_repo_sync),
+    perimeter_repo: PerimeterRepository = Depends(perimeter_repo_sync),
     audit: AuditRepository = Depends(audit_repo_sync),
 ) -> DeletedResponse:
     """Supprime une structure. Cascade sur les relations et formes de noms liées. 404 si inconnue."""
-    structure_commands.delete_structure(conn, structure_id, repo=repo, audit_repo=audit)
+    structure_commands.delete_structure(
+        conn, structure_id, repo=repo, perimeter_repo=perimeter_repo, audit_repo=audit
+    )
     return DeletedResponse()
 
 
