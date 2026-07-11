@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict idpZxpzexfgdywbfnkKoegKvccOG5aBacNnAt630kgT7Bx4L4USMsiXkPbExsWh
+\restrict gswOtQsaldK4VrpNBSaVF5MS0dTG1yshNVnTinqPPjcdLbFKI379YKAfOf0QM0R
 
 -- Dumped from database version 18.4
 -- Dumped by pg_dump version 18.4
@@ -1491,7 +1491,8 @@ CREATE TABLE public.structure_name_forms (
     created_at timestamp with time zone DEFAULT now(),
     is_word_boundary boolean DEFAULT false NOT NULL,
     requires_context_of integer[],
-    is_excluding boolean DEFAULT false NOT NULL
+    is_excluding boolean DEFAULT false NOT NULL,
+    CONSTRAINT ck_structure_name_forms_short_word_boundary CHECK (((char_length(form_text) > 6) OR is_word_boundary))
 );
 
 
@@ -3442,5 +3443,5 @@ ALTER TABLE ONLY public.structure_relations
 -- PostgreSQL database dump complete
 --
 
-\unrestrict idpZxpzexfgdywbfnkKoegKvccOG5aBacNnAt630kgT7Bx4L4USMsiXkPbExsWh
+\unrestrict gswOtQsaldK4VrpNBSaVF5MS0dTG1yshNVnTinqPPjcdLbFKI379YKAfOf0QM0R
 
