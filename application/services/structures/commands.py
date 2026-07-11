@@ -76,10 +76,13 @@ def delete_structure(
     structure_id: int,
     *,
     repo: StructureRepository,
+    perimeter_repo: PerimeterRepository,
     audit_repo: AuditRepository,
 ) -> None:
-    """Supprime une structure (cascade relations + formes de noms)."""
+    """Supprime une structure (cascade relations + formes de noms). Rafraîchit la clôture
+    matérialisée des périmètres : la cascade sur les tutelles peut en modifier la descente."""
     structures_service.delete_structure(structure_id, repo=repo, audit_repo=audit_repo)
+    perimeter_repo.refresh_structures()
     conn.commit()
 
 
