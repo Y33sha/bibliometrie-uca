@@ -21,17 +21,13 @@ class StructureNameForm(NamedTuple):
     is_word_boundary: bool
     requires_context_of: list[int] | None
     is_excluding: bool
-    struct_code: str | None
-    struct_type: str
 
 
 class AddressResolutionQueries(Protocol):
     """Opérations SQL pour résoudre les adresses → structures.
 
-    Chaque run est un recalcul complet idempotent : toutes les adresses sont
-    traitées par tranches (keyset par `id`), et seules les détections
-    `address_structures` qui changent sont écrites. Mémoire et allers-retours
-    SQL bornés par la taille de tranche, pas par le total.
+    Chaque run est un recalcul complet idempotent : toutes les adresses sont traitées par tranches (keyset par `id`), et seules les détections
+    `address_structures` qui changent sont écrites. Mémoire et allers-retours SQL bornés par la taille de tranche, pas par le total.
     """
 
     def load_name_forms(self, conn: Connection) -> list[StructureNameForm]: ...

@@ -1,6 +1,6 @@
 """Query service : SQL du pipeline de résolution d'adresses.
 
-Appelé par `application/pipeline/addresses/resolve_addresses.py`.
+Appelé par `application/pipeline/affiliations/resolve_addresses.py`.
 Regroupe les opérations SQL de la boucle de matching adresses → structures
 (détection automatique via `structure_name_forms`).
 
@@ -21,11 +21,8 @@ def load_name_forms(conn: Connection) -> list[StructureNameForm]:
     rows = conn.execute(
         text("""
             SELECT nf.id, nf.structure_id, nf.form_text,
-                   nf.is_word_boundary, nf.requires_context_of,
-                   nf.is_excluding,
-                   s.code AS struct_code, s.structure_type::text AS struct_type
+                   nf.is_word_boundary, nf.requires_context_of, nf.is_excluding
             FROM structure_name_forms nf
-            JOIN structures s ON s.id = nf.structure_id
             ORDER BY nf.id
         """)
     ).all()
@@ -37,8 +34,6 @@ def load_name_forms(conn: Connection) -> list[StructureNameForm]:
             is_word_boundary=r.is_word_boundary,
             requires_context_of=r.requires_context_of,
             is_excluding=r.is_excluding,
-            struct_code=r.struct_code,
-            struct_type=r.struct_type,
         )
         for r in rows
     ]

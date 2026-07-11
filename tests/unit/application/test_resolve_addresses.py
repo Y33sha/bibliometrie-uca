@@ -36,8 +36,6 @@ def _form(
         is_word_boundary=is_word_boundary or is_short_form(normalized),
         is_excluding=is_excluding,
         requires_context_of=requires_context_of,
-        struct_code=None,
-        struct_type="laboratory",
     )
 
 
