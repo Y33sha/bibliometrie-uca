@@ -1,27 +1,14 @@
-"""
-Peuplement de `person_name_forms` à partir des sources existantes.
+"""Peuplement de `person_name_forms` à partir des sources existantes.
 
-Mode incrémental : à chaque run, recalcule l'ensemble des couples
-attendus `(name_form, person_id, sources)` depuis les sources (persons +
-source_authorships), puis synchronise la table par diff
-(insert/update/delete).
+Mode incrémental : à chaque run, recalcule l'ensemble des couples attendus `(name_form, person_id, sources)` depuis les sources (persons + source_authorships), puis synchronise la table par diff (insert/update/delete).
 
 Sources :
-1. `persons.last_name` + `persons.first_name` (source: `'persons'`)
-   — inclut les `rejected = TRUE` pour préserver l'ancre de matching
-   des entités douteuses.
-2. le nom normalisé de l'identité des signatures
-   (`author_identifying_keys.author_name_normalized`, toutes sources biblio).
+1. `persons.last_name` + `persons.first_name` (source: `'persons'`) — inclut les `rejected = TRUE` pour préserver l'ancre de matching des entités douteuses.
+2. le nom normalisé de l'identité des signatures (`author_identifying_keys.author_name_normalized`, toutes sources biblio).
 
-L'orchestrateur produit les formes "persons" en Python via
-`compute_person_name_forms` (variantes prénom/nom/initiales) et les
-charge dans la table temp `_raw_forms`. La fusion et la
-synchronisation se font ensuite côté SQL via `sync_from_raw_forms`
-(GROUP BY (name_form, person_id), agrégation des sources, diff
-INSERT/UPDATE/DELETE).
+L'orchestrateur produit les formes "persons" en Python via `compute_person_name_forms` (variantes prénom/nom/initiales) et les charge dans la table temp `_raw_forms`. La fusion et la synchronisation se font ensuite côté SQL via `sync_from_raw_forms` (GROUP BY (name_form, person_id), agrégation des sources, diff INSERT/UPDATE/DELETE).
 
-L'orchestrateur dépend du port `NameFormsQueries` ; il est appelé par
-`run_pipeline`.
+L'orchestrateur dépend du port `NameFormsQueries` ; il est appelé par `run_pipeline`.
 """
 
 import logging

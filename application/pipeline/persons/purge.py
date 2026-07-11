@@ -1,16 +1,8 @@
-"""Purge de la phase personnes : re-orphelinage des formes de nom devenues ambiguës,
-puis suppression des personnes vidées.
+"""Purge de la phase personnes : re-orphelinage des formes de nom devenues ambiguës, puis suppression des personnes vidées.
 
-Tourne **après `populate_person_name_forms`**, qui régénère les formes canoniques : c'est
-seulement là qu'une forme réduite (« j martin »), partagée par une personne réduite et par la
-forme pleine dont elle est l'initiale, devient ambiguë. Le re-orphelinage détache alors les
-signatures nominales à forme ambiguë, non épinglées ; le GC supprime les personnes ainsi
-vidées (hors référentiel RH), ce qui retire leurs formes canoniques et désambiguïse. La
-signature libérée rejoint la forme pleine au `match` du run suivant.
+Tourne **après `populate_person_name_forms`**, qui régénère les formes canoniques : c'est seulement là qu'une forme réduite (« j martin »), partagée par une personne réduite et par la forme pleine dont elle est l'initiale, devient ambiguë. Le re-orphelinage détache alors les signatures nominales à forme ambiguë, non épinglées ; le GC supprime les personnes ainsi vidées (hors référentiel RH), ce qui retire leurs formes canoniques et désambiguïse. La signature libérée rejoint la forme pleine au `match` du run suivant.
 
-Placer la purge après le peuplement — et non en tête de phase — évite qu'elle lise les formes
-d'un run de retard : elle voit l'ambiguïté née des créations du run courant, et la convergence
-se fait en deux runs au lieu de trois.
+Placer la purge après le peuplement — et non en tête de phase — évite qu'elle lise les formes d'un run de retard : elle voit l'ambiguïté née des créations du run courant, et la convergence se fait en deux runs au lieu de trois.
 """
 
 import logging

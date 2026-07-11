@@ -2,15 +2,10 @@
 
 Deux canaux, ordre-indépendants par lecture d'agrégat sur le snapshot :
 
-- **Identifiant** : arbitrage frontal des conflits d'attribution. `build_identifier_conflicts`
-  balaye le snapshot pour toutes les valeurs d'identifiant qu'au moins deux personnes se
-  disputent ; `resolve_identifier_transfers` tranche par consensus des porteurs, transfère la
-  valeur captée à son propriétaire légitime et re-nulle les signatures affectées.
-- **Cross-source** : recompute complet — toutes les signatures résolues en cross-source
-  repassent à NULL, le cross-source étant un opérateur d'ensemble qu'on recalcule en bloc.
+- **Identifiant** : arbitrage frontal des conflits d'attribution. `build_identifier_conflicts` balaye le snapshot pour toutes les valeurs d'identifiant qu'au moins deux personnes se disputent ; `resolve_identifier_transfers` tranche par consensus des porteurs, transfère la valeur captée à son propriétaire légitime et remet à NULL les signatures affectées.
+- **Cross-source** : recompute complet — toutes les signatures résolues en cross-source repassent à NULL, le cross-source étant un opérateur d'ensemble qu'on recalcule en bloc.
 
-Les signatures ainsi détachées sont re-résolues par `match` puis `create` contre l'état ferme
-du snapshot ; le résultat ne dépend pas de l'ordre d'ingestion des sources.
+Les signatures ainsi détachées sont re-résolues par `match` puis `create` contre l'état ferme du snapshot ; le résultat ne dépend pas de l'ordre d'ingestion des sources.
 """
 
 import logging
