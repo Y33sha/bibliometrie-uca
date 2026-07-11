@@ -50,15 +50,9 @@ def _member(row: ReconcileRow) -> ReconcileMember:
 def _create_new_publication(
     group: WorkGroup, rows_by_sp: dict[int, ReconcileRow], pub_repo: PublicationRepository
 ) -> int:
-    """Crée le pub d'un groupe sans ancre existante (split, ou création depuis orphelins),
-    semé depuis sa plus petite SP portant une année (`pub_year`, seule colonne NOT NULL de
-    `publications` ici). Les métadonnées définitives sont posées juste après par
-    `refresh_from_sources`.
+    """Crée le pub d'un groupe sans ancre existante (split, ou création depuis orphelins), semé depuis sa plus petite SP portant une année (`pub_year`, seule colonne NOT NULL de `publications` ici). Les métadonnées définitives sont posées juste après par `refresh_from_sources`.
 
-    Un groupe `target=None` est soit une partition d'orphelins ayant passé le gate
-    `has_minimal_publication_metadata` (≥1 membre titre + année), soit une partition split
-    perdante (membres matérialisés, qui portaient déjà une année) — dans les deux cas ≥1
-    membre a une année."""
+    Un groupe `target=None` est soit une partition d'orphelins ayant passé le gate `has_minimal_publication_metadata` (≥1 membre titre + année), soit une partition split perdante (membres matérialisés, qui portaient déjà une année) — dans les deux cas ≥1 membre a une année."""
     seed = min(
         (rows_by_sp[sp] for sp in group.source_publication_ids if rows_by_sp[sp].pub_year),
         key=lambda r: r.id,
@@ -80,11 +74,7 @@ def _create_new_publication(
 class ReconcileStats(NamedTuple):
     """Bilan d'une passe de réconciliation, en vocabulaire lisible (pour le log de `run`).
 
-    `processed` = SP dirty traitées ; `publications` = publications résultantes (auxquelles des
-    SP sont rattachées) ; `created` = parmi elles, nouvellement créées (orphelins matérialisés
-    **et** spin-offs de scission) ; `existing` = déjà existantes conservées ; `merges` =
-    publications redondantes absorbées dans une autre et supprimées ; `splits` = nouvelles
-    publications issues d'une scission (un DOI distinct détaché d'une publication existante).
+    `processed` = SP dirty traitées ; `publications` = publications résultantes (auxquelles des SP sont rattachées) ; `created` = parmi elles, nouvellement créées (orphelins matérialisés **et** spin-offs de scission) ; `existing` = déjà existantes conservées ; `merges` = publications redondantes absorbées dans une autre et supprimées ; `splits` = nouvelles publications issues d'une scission (un DOI distinct détaché d'une publication existante).
     """
 
     processed: int
@@ -104,13 +94,9 @@ def reconcile(
     audit_repo: AuditRepository | None = None,
     logger: logging.Logger | None = None,
 ) -> ReconcileStats | None:
-    """Planifie et applique la réconciliation du voisinage dirty, **sans `commit`** (à la charge
-    du caller). Retourne `None` si aucune SP n'est dirty, sinon le bilan.
+    """Planifie et applique la réconciliation du voisinage dirty, **sans `commit`** (à la charge du caller). Retourne `None` si aucune SP n'est dirty, sinon le bilan.
 
-    Primitif partagé par le `run` du pipeline (qui commit) et le helper de tests d'intégration
-    (qui rollback en fin de fixture) — d'où l'absence de `commit` ici. `logger` (optionnel) émet
-    la progression : sur un full rerun, le rafraîchissement des survivants domine le temps, d'où
-    le compteur `i/total`.
+    Primitif partagé par le `run` du pipeline (qui commit) et le helper de tests d'intégration (qui rollback en fin de fixture) — d'où l'absence de `commit` ici. `logger` (optionnel) émet la progression : sur un full rerun, le rafraîchissement des survivants domine le temps, d'où le compteur `i/total`.
     """
     dirty_ids = queries.fetch_dirty_source_publication_ids(conn)
     if not dirty_ids:
@@ -139,8 +125,7 @@ def reconcile(
     created = 0
     splits = 0
 
-    # 1. Groupes : rattacher chaque SP à son ancre (ou à un nouveau pub — orphelins in-périmètre,
-    #    ou partition perdante d'un split = scission d'une publication existante).
+    # 1. Groupes : rattacher chaque SP à son ancre (ou à un nouveau pub — orphelins in-périmètre, ou partition perdante d'un split = scission d'une publication existante).
     for group in plan.groups:
         target = group.target_publication_id
         if target is None:
@@ -154,10 +139,7 @@ def reconcile(
         queries.repoint_source_publications(conn, list(group.source_publication_ids), target)
         survivors.add(target)
 
-    # 2. Dissolutions d'abord : sauver les dépendants curatés vers le successeur, puis
-    #    `refresh_from_sources` supprime la pub vidée (cas orphelin). Avant les survivants,
-    #    pour libérer le DOI dupliqué (sinon l'auto-merge-sur-collision-DOI du refresh
-    #    survivant retomberait dessus).
+    # 2. Dissolutions d'abord : sauver les dépendants curatés vers le successeur, puis `refresh_from_sources` supprime la pub vidée (cas orphelin). Avant les survivants, pour libérer le DOI dupliqué (sinon l'auto-merge-sur-collision-DOI du refresh survivant retomberait dessus).
     for dissolved in plan.dissolved:
         queries.repoint_dependents(
             conn, dissolved.publication_id, dissolved.successor_publication_id
@@ -165,8 +147,7 @@ def reconcile(
         with savepoint(conn, "reconcile_dissolve"):
             refresh_from_sources(dissolved.publication_id, repo=pub_repo, audit_repo=audit_repo)
 
-    # 3. Rafraîchir les survivants : métadonnées canoniques recomputées. Phase la plus longue sur
-    #    un gros run → progression tous les 5000.
+    # 3. Rafraîchir les survivants : métadonnées canoniques recomputées. Phase la plus longue sur un gros run → progression tous les 5000.
     survivor_ids = sorted(survivors)
     total = len(survivor_ids)
     for i, pub_id in enumerate(survivor_ids, 1):
