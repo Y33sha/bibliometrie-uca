@@ -66,9 +66,9 @@ def _seed_name_form(structure_id: int, form_text: str | None = None) -> int:
     form_text = form_text or _uniq("form")
     with _pool() as cur:
         cur.execute(
-            "INSERT INTO structure_name_forms (structure_id, form_text) "
-            "VALUES (%s, %s) RETURNING id",
-            (structure_id, form_text),
+            "INSERT INTO structure_name_forms (structure_id, form_text, is_word_boundary) "
+            "VALUES (%s, %s, char_length(%s) <= 6) RETURNING id",
+            (structure_id, form_text, form_text),
         )
         return cur.fetchone()["id"]
 

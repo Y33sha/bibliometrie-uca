@@ -34,6 +34,11 @@ export const API_SOURCE_LABELS: Record<string, string> = {
   theses: "theses.fr (PPN IdRef)",
 };
 
+// Longueur (caractères) au-dessous de laquelle une forme de nom exige une frontière de mot.
+// Alignée sur `domain.structures.name_forms.SHORT_FORM_MAX_LENGTH` (invariant verrouillé
+// côté base par une contrainte CHECK).
+export const SHORT_FORM_MAX_LENGTH = 6;
+
 // ── Helpers ──
 export function halCollectionUrl(code: string): string {
   return `https://hal.science/search/index/?qa%5BcollCode_s%5D%5B%5D=${code}`;

@@ -8,6 +8,7 @@
   import { confirmDialog, toast } from "$lib/dialogs.svelte";
   import {
     API_SOURCES,
+    SHORT_FORM_MAX_LENGTH,
     halCollectionUrl,
     type EditFormState,
     type NameForm,
@@ -200,7 +201,7 @@
       await nameForms.create({
         structure_id: structId,
         form_text: text,
-        is_word_boundary: addFormWordBoundary || text.length <= 6,
+        is_word_boundary: addFormWordBoundary || text.length <= SHORT_FORM_MAX_LENGTH,
         is_excluding: addFormExcluding,
         requires_context_of: ctx,
       });
@@ -246,7 +247,7 @@
     const text = editFormModal.form_text.trim();
     await nameForms.update(editFormModal.id, {
       form_text: text,
-      is_word_boundary: editFormModal.is_word_boundary || text.length <= 6,
+      is_word_boundary: editFormModal.is_word_boundary || text.length <= SHORT_FORM_MAX_LENGTH,
       is_excluding: editFormModal.is_excluding,
     });
     editFormModal = null;

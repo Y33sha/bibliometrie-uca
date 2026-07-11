@@ -10,6 +10,7 @@ from application.pipeline.affiliations.resolve_addresses import (
     run_resolution,
 )
 from application.ports.pipeline.address_resolution import StructureNameForm
+from domain.structures.name_forms import is_short_form
 
 # ── Helpers pour construire des formes de test ───────────────────
 
@@ -23,12 +24,16 @@ def _form(
     is_word_boundary=False,
     is_excluding=False,
 ):
-    """Construit un StructureNameForm pour les tests."""
+    """Construit un StructureNameForm pour les tests.
+
+    Reproduit l'invariant garanti en base : une forme courte a toujours `is_word_boundary`.
+    """
+    normalized = form_normalized or form_text.lower()
     return StructureNameForm(
         id=form_id or structure_id * 100,
         structure_id=structure_id,
-        form_text=form_normalized or form_text.lower(),
-        is_word_boundary=is_word_boundary,
+        form_text=normalized,
+        is_word_boundary=is_word_boundary or is_short_form(normalized),
         is_excluding=is_excluding,
         requires_context_of=requires_context_of,
         struct_code=None,

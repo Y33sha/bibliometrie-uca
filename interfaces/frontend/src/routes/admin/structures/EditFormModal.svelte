@@ -1,6 +1,7 @@
 <script lang="ts">
   import Modal from "$lib/components/Modal.svelte";
   import type { EditFormState } from "./types";
+  import { SHORT_FORM_MAX_LENGTH } from "./types";
 
   let {
     state = $bindable(),
@@ -19,8 +20,8 @@
       <label class="checkbox-label">
         <input
           type="checkbox"
-          checked={state.is_word_boundary || state.form_text.length <= 6}
-          disabled={state.form_text.length <= 6}
+          checked={state.is_word_boundary || state.form_text.length <= SHORT_FORM_MAX_LENGTH}
+          disabled={state.form_text.length <= SHORT_FORM_MAX_LENGTH}
           onchange={(e) => {
             state.is_word_boundary = (e.target as HTMLInputElement).checked;
           }}

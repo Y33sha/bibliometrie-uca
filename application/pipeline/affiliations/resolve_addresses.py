@@ -1,8 +1,6 @@
 """Résolution des adresses : rattachement aux structures et détection du périmètre.
 
-Lit les formes de noms depuis `structure_name_forms` et enregistre dans `address_structures` avec `matched_form_id` pour la traçabilité (boucle de rétroaction).
-
-L'orchestration dépend du port `AddressResolutionQueries`, injecté par le composition-root `run_pipeline`.
+Lit les formes de noms depuis `structure_name_forms` et enregistre dans `address_structures` la forme à l'origine de chaque détection (`matched_form_id`).
 """
 
 import logging
@@ -16,6 +14,7 @@ from application.ports.pipeline.address_resolution import (
     StructureNameForm,
 )
 
+# Taille des tranches (pagination keyset) : borne la mémoire et les allers-retours SQL par batch.
 CHUNK_SIZE = 10000
 
 
@@ -26,8 +25,6 @@ class AddressMatcher:
     """Matche les formes de structures dans une adresse via un automate Aho-Corasick.
 
     L'automate, construit une fois sur l'ensemble des formes, détecte en un seul passage par adresse toutes les formes présentes (coût indépendant du nombre de formes).
-
-    Une forme matche si son `form_text` est présent comme sous-chaîne ; les formes `is_word_boundary` ou de longueur <= 6 exigent en plus un mot entier (caractères adjacents hors [a-z0-9]). Les formes excluantes retirent leur structure des résultats ; les formes à contexte (`requires_context_of`) n'aboutissent que si une forme d'une des structures de contexte matche aussi.
     """
 
     def __init__(self, forms: list[StructureNameForm]) -> None:
@@ -53,7 +50,7 @@ class AddressMatcher:
             for f in forms_here:
                 if f.id in matched:
                     continue
-                if f.is_word_boundary or len(f.form_text) <= 6:
+                if f.is_word_boundary:
                     start = end - len(f.form_text) + 1
                     before_ok = start == 0 or not text_normalized[start - 1].isalnum()
                     after_ok = end + 1 >= n or not text_normalized[end + 1].isalnum()

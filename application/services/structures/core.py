@@ -21,6 +21,7 @@ from application.ports.repositories.structure_repository import (
 from domain.errors import NotFoundError, ValidationError
 from domain.normalize import normalize_text
 from domain.structures.identifiers import RorId
+from domain.structures.name_forms import is_short_form
 from domain.structures.relations import check_can_create_relation
 from domain.types import JsonValue
 
@@ -210,10 +211,12 @@ def create_name_form(
     repo: StructureRepository,
 ) -> StructureNameFormRow:
     """Crée une forme de nom. Retourne la ligne insérée."""
+    form_text_normalized = normalize_text(form_text)
     return repo.create_name_form(
         structure_id=structure_id,
-        form_text_normalized=normalize_text(form_text),
-        is_word_boundary=is_word_boundary,
+        form_text_normalized=form_text_normalized,
+        # Forme courte ⇒ frontière de mot forcée (invariant verrouillé par une CHECK).
+        is_word_boundary=is_word_boundary or is_short_form(form_text_normalized),
         is_excluding=is_excluding,
         requires_context_of=requires_context_of,
     )
@@ -244,6 +247,11 @@ def update_name_form(
     requires_context_of = fields.get("requires_context_of")
     if isinstance(requires_context_of, list):
         update_fields["requires_context_of"] = cast("list[int]", requires_context_of) or None
+
+    # Forme courte ⇒ frontière de mot forcée (invariant verrouillé par une CHECK).
+    new_form_text = update_fields.get("form_text")
+    if isinstance(new_form_text, str) and is_short_form(new_form_text):
+        update_fields["is_word_boundary"] = True
 
     if not update_fields:
         raise ValidationError("Aucun champ à mettre à jour")

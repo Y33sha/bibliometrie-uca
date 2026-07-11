@@ -24,8 +24,8 @@ def _create_structure(conn, code="X"):
 def _create_form(conn, struct_id, form_text="uca"):
     return conn.execute(
         text(
-            "INSERT INTO structure_name_forms (structure_id, form_text) "
-            "VALUES (:struct_id, :form_text) RETURNING id"
+            "INSERT INTO structure_name_forms (structure_id, form_text, is_word_boundary) "
+            "VALUES (:struct_id, :form_text, char_length(:form_text) <= 6) RETURNING id"
         ),
         {"struct_id": struct_id, "form_text": form_text},
     ).scalar_one()

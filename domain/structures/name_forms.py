@@ -44,3 +44,15 @@ class StructureNameForm:
 
     def __str__(self) -> str:
         return self.form_text
+
+
+# En dessous de ce seuil (caractères, sur le texte normalisé), une forme doit exiger une
+# frontière de mot : matchée en sous-chaîne, une forme courte produit trop de faux positifs
+# (« ica » dans « africa »). L'invariant « forme courte ⇒ is_word_boundary » est verrouillé
+# par une contrainte CHECK sur `structure_name_forms`, appliquée à l'écriture.
+SHORT_FORM_MAX_LENGTH = 6
+
+
+def is_short_form(form_text: str) -> bool:
+    """Vrai si une forme de ce texte normalisé doit exiger une frontière de mot."""
+    return len(form_text) <= SHORT_FORM_MAX_LENGTH
