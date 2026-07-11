@@ -1,12 +1,8 @@
 """Context manager `savepoint` pour le pipeline.
 
-Réservé aux modules `application/pipeline/*` qui ont besoin
-d'encadrer un traitement unitaire dans un SAVEPOINT (rollback fin
-sans abandonner toute la transaction de batch).
+Réservé aux modules `application/pipeline/*` qui ont besoin d'encadrer un traitement unitaire dans un SAVEPOINT (rollback fin sans abandonner toute la transaction de batch).
 
-Vit dans `application/` plutôt que `infrastructure/db_helpers.py`
-parce que la règle DDD `application ⊥ infrastructure` interdit
-l'import inverse — et seuls les pipelines en ont l'usage.
+Vit dans `application/` plutôt que `infrastructure/db_helpers.py` parce que la règle DDD `application ⊥ infrastructure` interdit l'import inverse — et seuls les pipelines en ont l'usage.
 """
 
 from collections.abc import Callable, Iterator
