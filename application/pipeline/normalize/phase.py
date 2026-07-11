@@ -1,17 +1,12 @@
 """Orchestrateur de la phase `normalize` : normalisation staging → tables sources.
 
-Enchaîne, dans l'ordre de priorité des sources (la plus autoritative en premier, pour que les
-suivantes n'écrasent pas les métadonnées déjà posées) :
+Enchaîne, dans l'ordre de priorité des sources (la plus fiable en premier, pour que les suivantes n'écrasent pas les métadonnées déjà posées) :
 
-1. la normalisation de chaque source retenue (staging → `source_publications`, adresses, ORCID/IdRef
-   pour HAL) ;
-2. le nettoyage des identités d'auteur orphelines (les writers ont pu re-pointer des signatures,
-   laissant des `author_identifying_keys` que plus aucune signature ne référence) ;
-3. le `VACUUM` du staging (`raw_data` vidé après normalisation) — `VACUUM FULL` en mode full/monthly,
-   simple sinon.
+1. la normalisation de chaque source retenue (staging → `source_publications`, adresses, ORCID/IdRef pour HAL) ;
+2. le nettoyage des identités d'auteur orphelines (la normalisation a pu réassigner des signatures, laissant des `author_identifying_keys` que plus aucune signature ne référence) ;
+3. le `VACUUM` du staging (`raw_data` vidé après normalisation) — `VACUUM FULL` en mode full, simple sinon.
 
-Les runners par source, le nettoyage et le VACUUM (maintenance physique) sont injectés par le
-composition-root ; ici, la séquence, la sélection/l'ordre des sources et l'assemblage des métriques.
+Les runners par source, le nettoyage et le VACUUM (maintenance physique) sont injectés par le composition-root ; ici, la séquence, la sélection/l'ordre des sources et l'assemblage des métriques.
 """
 
 import logging
@@ -23,7 +18,7 @@ from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.modes import MODES
 
 NormalizeOne = Callable[[str], dict[str, object]]
-"""Normalise une source (connexion + normalizer câblé) et rend sa ligne d'observabilité."""
+"""Normalise une source (connexion + normaliseur câblé) et rend sa ligne d'observabilité."""
 VacuumStaging = Callable[[bool], None]
 """`VACUUM` du staging (maintenance physique, autocommit) ; `full=True` réécrit la table."""
 

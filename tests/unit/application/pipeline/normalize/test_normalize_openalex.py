@@ -628,7 +628,9 @@ class TestBuildOpenalexAuthorRecords:
 @pytest.fixture
 def stub_orchestration_deps(monkeypatch):
     """Stub les helpers internes pour ne tester que la boucle process_work."""
-    monkeypatch.setattr(normalize_openalex, "extract_pub_metadata", lambda w, j: {"journal_id": j})
+    monkeypatch.setattr(
+        normalize_openalex, "extract_pub_metadata", lambda w, j, primary=None: {"journal_id": j}
+    )
     monkeypatch.setattr(
         normalize_openalex,
         "insert_openalex_document",
@@ -669,7 +671,7 @@ class TestProcessWork:
         monkeypatch.setattr(normalize_openalex, "upsert_publisher", lambda w, **kw: 1)
         monkeypatch.setattr(normalize_openalex, "upsert_journal", lambda w, p, **kw: 2)
         monkeypatch.setattr(
-            normalize_openalex, "extract_pub_metadata", lambda w, j: {"journal_id": j}
+            normalize_openalex, "extract_pub_metadata", lambda w, j, primary=None: {"journal_id": j}
         )
         monkeypatch.setattr(normalize_openalex, "insert_openalex_document", lambda *a, **kw: 555)
         monkeypatch.setattr(normalize_openalex, "process_authorships", lambda *a, **kw: None)
@@ -678,17 +680,16 @@ class TestProcessWork:
         result = process_work(MagicMock(), staging_row=row, **self._kwargs())
         assert result is True
 
-    def test_exception_propagated_and_logged(self, monkeypatch, caplog):
-        """Toute exception dans le pipeline est loggée et relevée."""
+    def test_exception_propagated(self, monkeypatch):
+        """process_work laisse remonter l'exception ; le log incombe à la boucle de base."""
         monkeypatch.setattr(
             normalize_openalex,
             "parse_primary_location",
             lambda w: (_ for _ in ()).throw(RuntimeError("boom")),
         )
         row = _staging_row(staging_id=1, source_id="W1")
-        with caplog.at_level(logging.ERROR), pytest.raises(RuntimeError):
+        with pytest.raises(RuntimeError, match="boom"):
             process_work(MagicMock(), staging_row=row, **self._kwargs())
-        assert "W1" in caplog.text and "boom" in caplog.text
 
 
 # ── OpenalexNormalizer (classe) ──────────────────────────────────

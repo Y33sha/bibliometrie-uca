@@ -1,16 +1,14 @@
 """Base class pour les normaliseurs de sources.
 
-Capture le boilerplate commun aux 6 normalizers existants :
+Capture le code commun aux normaliseurs :
 - parsing CLI (--limit, --reset, --batch-size)
-- gestion du cycle connexion (open, commit, close)
+- commit périodique et rollback sur la connexion injectée (ouverte et fermée par l'appelant)
 - --reset : UPDATE processed=FALSE
 - comptage + chargement des work_ids à traiter
-- boucle avec `try/rollback/continue` + commit périodique
-- logs de progression et summary
+- boucle : un SAVEPOINT par work (une erreur isolée sans perdre le batch en cours), commit périodique
+- logs de progression et bilan
 
-L'accès au staging passe par le port `StagingQueries` (injecté par le
-composition root `run_pipeline`). Chaque source hérite
-et implémente `process_work()`.
+L'accès au staging passe par le port `StagingQueries` (injecté par le composition root `run_pipeline`). Chaque source hérite et implémente `process_work()`.
 """
 
 from __future__ import annotations
@@ -29,8 +27,7 @@ from application.ports.pipeline.staging import StagingQueries, StagingRow
 
 
 class NormalizeStats(NamedTuple):
-    """Bilan d'une normalisation de source : works normalisés, ignorés (rien à
-    écrire / non pertinents), en erreur."""
+    """Bilan d'une normalisation de source : works normalisés, ignorés (rien à écrire / non pertinents), en erreur."""
 
     processed: int
     skipped: int
@@ -42,24 +39,19 @@ class SourceNormalizer(ABC):
 
     Le port `StagingQueries` retourne `list[StagingRow]` pour toutes les sources.
 
-    Override points :
+    Points d'override :
     - `SOURCE` : identifiant source (obligatoire, ex: "hal", "openalex")
     - `DEFAULT_BATCH_SIZE` : taille de commit (défaut 500)
-    - `USE_SAVEPOINT` : `True` pour encadrer chaque `process_work` dans un SAVEPOINT
-    - `FETCH_SUB_BATCH` : taille des sous-lots de fetch staging (défaut 50). À ajuster source par source si nécessaire ; charger d'un coup n'est pas supporté.
-    - `process_work(conn, row) -> bool | None` : abstract, logique métier
+    - `FETCH_SUB_BATCH` : taille des sous-lots de fetch staging (défaut 50)
+    - `process_work(conn, row) -> bool | None` : abstrait, logique métier
     - `preload_caches(conn)` : pré-chargement optionnel
-    - `summary_stats(conn) -> list[str]` : lignes log additionnelles
+    - `summary_stats(conn) -> list[str]` : lignes de log additionnelles
     - `cleanup()` : libération des caches après commit final
     """
 
     SOURCE: ClassVar[str] = ""
     DEFAULT_BATCH_SIZE: ClassVar[int] = 500
-    USE_SAVEPOINT: ClassVar[bool] = False
-    # Taille des sous-lots de fetch staging. Charger tous les staging d'un
-    # coup fait exploser la RAM côté Python (JSONB désérialisés en dicts
-    # imbriqués, overhead ~3-5× la taille brute). 50 est la valeur retenue
-    # pour toutes les sources.
+    # Taille des sous-lots de fetch staging : charger tous les staging d'un coup fait exploser la RAM côté Python (JSONB désérialisés, overhead ~3-5× la taille brute).
     FETCH_SUB_BATCH: ClassVar[int] = 50
 
     def __init__(
@@ -88,10 +80,7 @@ class SourceNormalizer(ABC):
     def on_error(self) -> None:  # noqa: B027 (hook optionnel)
         """Appelé après chaque rollback (SAVEPOINT ou complet).
 
-        Les caches qui référencent des IDs générés dans la transaction
-        rollbackée doivent être invalidés ici — sinon ils pointent vers
-        des lignes qui n'existent plus, provoquant des FK violations sur
-        les works suivants. Exemple typique : `PgAddressLinker._cache`.
+        Les caches qui référencent des IDs générés dans la transaction annulée doivent être invalidés ici — sinon ils pointent vers des lignes qui n'existent plus, provoquant des violations de clé étrangère sur les works suivants. Exemple typique : `PgAddressLinker._cache`.
         """
 
     # ── Template method ────────────────────────────────────────
@@ -126,9 +115,7 @@ class SourceNormalizer(ABC):
             yield from self._staging.fetch_staging_by_ids(conn, batch_ids, source=self.SOURCE)
 
     def _process_one(self, conn: Connection, row: StagingRow) -> bool | None:
-        """Enveloppe process_work avec SAVEPOINT optionnel."""
-        if not self.USE_SAVEPOINT:
-            return self.process_work(conn, row)
+        """Enveloppe process_work dans un SAVEPOINT : un work en erreur est annulé sans abandonner le batch en cours."""
         try:
             with savepoint(
                 conn,
@@ -141,12 +128,11 @@ class SourceNormalizer(ABC):
             raise
 
     def run(self, argv: list[str] | None = None) -> NormalizeStats:
-        """Entry point : parse args, drive the normalization loop."""
+        """Entry point : parse les arguments, pilote la boucle de normalisation."""
         args = self.parse_args(argv)
         self.conn.rollback()
 
-        # Préfixe `[source]` sur les lignes propres à la boucle (progression, bilan) :
-        # dans un run multi-sources, chaque batch reste situé sans remonter au bandeau.
+        # Préfixe `[source]` sur les lignes de la boucle (progression, bilan) : dans un run multi-sources, chaque batch reste rattaché à sa source sans remonter au bandeau.
         slog = scoped_logger(self.logger, self.SOURCE)
 
         try:
@@ -174,10 +160,8 @@ class SourceNormalizer(ABC):
             for row in self._iter_rows(self.conn, limit):
                 try:
                     result = self._process_one(self.conn, row)
-                except Exception:
-                    if not self.USE_SAVEPOINT:
-                        self.conn.rollback()
-                        self.on_error()
+                except Exception as e:
+                    slog.error(f"Erreur sur {row.source_id}: {e}")
                     errors += 1
                     continue
 
@@ -212,13 +196,9 @@ class SourceNormalizer(ABC):
             return NormalizeStats(processed, skipped, errors)
 
         except KeyboardInterrupt:
-            # Ctrl+C frappe souvent en plein `conn.execute()` : la transaction est
-            # alors avortée et `commit()` lèverait `PendingRollbackError`. On
-            # rollback (le batch en cours, incomplet, est jeté ; les batches
-            # committés tous les `batch_size` sont durables) puis on re-raise pour
-            # laisser `run_pipeline.main()` faire l'arrêt propre (rapport partiel +
-            # exit 130). Sans le `raise`, la phase « réussirait » et le pipeline
-            # enchaînerait sur la source suivante.
+            # Ctrl+C frappe souvent en plein `conn.execute()` : la transaction est alors avortée et `commit()` lèverait `PendingRollbackError`.
+            # On rollback (le batch en cours, incomplet, est jeté ; les batches committés tous les `batch_size` sont durables) puis on re-raise pour laisser `run_pipeline.main()` faire l'arrêt propre (rapport partiel + exit 130).
+            # Sans le `raise`, la phase « réussirait » et le pipeline enchaînerait sur la source suivante.
             self.conn.rollback()
             slog.warning("Interruption — batches déjà committés conservés.")
             raise
@@ -226,5 +206,3 @@ class SourceNormalizer(ABC):
             self.conn.rollback()
             slog.error(f"Erreur fatale : {e}")
             raise
-        finally:
-            self.conn.close()

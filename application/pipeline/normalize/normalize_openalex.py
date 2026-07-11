@@ -1,19 +1,4 @@
-"""
-Normalisation des données OpenAlex : staging → tables structurées.
-
-Usage:
-    python normalize_openalex.py              # traiter tous les works non traités
-    python normalize_openalex.py --limit 100  # traiter N works (pour test)
-    python normalize_openalex.py --reset      # remettre tous les works à processed=FALSE
-
-Tables peuplées :
-    publishers, journals, publications      (tables de vérité — partagées)
-    source_publications                     (lien staging ↔ publication, source='openalex')
-    source_authorships                      (lien document × auteur, source='openalex',
-                                             avec `person_identifiers` JSONB)
-
-Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
-"""
+"""Normalisation des données OpenAlex : staging → tables structurées."""
 
 import logging
 from collections.abc import Callable
@@ -26,6 +11,7 @@ from application.pipeline.normalize._authorships_batch import (
     write_source_authorships,
 )
 from application.pipeline.normalize.base import SourceNormalizer
+from application.pipeline.timings import StepTimer
 from application.ports.pipeline.normalize.authorships import AuthorshipsBatchQueries
 from application.ports.pipeline.normalize.openalex import OpenalexNormalizeQueries
 from application.ports.pipeline.staging import StagingQueries, StagingRow
@@ -41,6 +27,7 @@ from domain.persons.identifiers import (
 )
 from domain.publications.identifiers import clean_doi, extract_doi_from_url, extract_hal_id_from_url
 from domain.sources.openalex import (
+    OpenalexLocation,
     extract_external_ids_from_urls,
     extract_nnt_from_location,
     is_theses_fr_location,
@@ -49,11 +36,6 @@ from domain.sources.openalex import (
     should_skip_publisher_journal,
 )
 from domain.types import JsonValue
-
-# =============================================================
-# MAPPINGS
-# =============================================================
-
 
 # =============================================================
 # UTILITAIRES
@@ -65,14 +47,9 @@ def extract_locations_data(work: dict) -> tuple[list[str], dict]:
 
     Retourne (urls, external_ids) où :
       - urls : liste dédupliquée de landing_page_url et pdf_url
-      - external_ids : dict d'identifiants (nnt, pmid, pmcid, arxiv_id scalaires ;
-        hal_id et related_dois **listes**)
+      - external_ids : dict d'identifiants (nnt, pmid, pmcid, arxiv_id scalaires ; hal_id et related_dois **listes**)
 
-    hal_id et related_dois sont collectés depuis les URLs **et** depuis
-    `location.id` (formes OAI-PMH `pmh:oai:HAL:<halid>` et `doi:<doi>`), source
-    structurée présente même quand la landing page est une page éditeur.
-    related_dois contient ici **tous** les DOI des locations ; l'appelant en
-    retire le DOI primaire (top-level) de la publication.
+    hal_id et related_dois sont collectés depuis les URLs **et** depuis `location.id` (formes OAI-PMH `pmh:oai:HAL:<halid>` et `doi:<doi>`), source structurée présente même quand la landing page est une page éditeur. related_dois contient ici **tous** les DOI des locations ; l'appelant en retire le DOI primaire (top-level) de la publication.
     """
     urls = []
     seen = set()
@@ -87,8 +64,7 @@ def extract_locations_data(work: dict) -> tuple[list[str], dict]:
             location_ids.append(loc_id)
 
     external_ids = extract_external_ids_from_urls(urls)
-    # hal_id et related_dois sont multivalués et apparaissent aussi dans les
-    # location.id (absents des URLs quand la landing page est une page éditeur).
+    # hal_id et related_dois sont multivalués et apparaissent aussi dans les location.id (absents des URLs quand la landing page est une page éditeur).
     # On balaie URLs + location.id en une passe.
     hal_ids: list[str] = list(external_ids.get("hal_id") or [])
     related_dois: list[str] = []
@@ -147,7 +123,7 @@ def extract_short_id(url: str, prefix: str = "https://openalex.org/") -> str:
 
 
 # =============================================================
-# PUBLISHERS & JOURNALS (via services/journals.py)
+# PUBLISHERS & JOURNALS
 # =============================================================
 
 
@@ -206,11 +182,13 @@ def upsert_journal(
 
 
 # =============================================================
-# PUBLICATIONS (inchangé — table de vérité)
+# PUBLICATIONS
 # =============================================================
 
 
-def extract_pub_metadata(work: dict, journal_id: int | None) -> dict:
+def extract_pub_metadata(
+    work: dict, journal_id: int | None, primary: OpenalexLocation | None = None
+) -> dict:
     """Extrait les métadonnées de publication d'un work OpenAlex.
 
     Retourne un dict utilisable par ``insert_openalex_document``. Toutes les
@@ -219,7 +197,8 @@ def extract_pub_metadata(work: dict, journal_id: int | None) -> dict:
     ``map_doc_type(source="openalex")``).
     """
     title = work.get("title") or work.get("display_name") or ""
-    primary = parse_primary_location(work)
+    if primary is None:
+        primary = parse_primary_location(work)
     theses_fr = primary is not None and is_theses_fr_location(primary)
     nnt = extract_nnt_from_location(primary) if theses_fr and primary else None
     oa_info = work.get("open_access") or {}
@@ -250,6 +229,7 @@ def insert_openalex_document(
     staging_id: int,
     publication_id: int | None,
     pub_meta: dict,
+    primary: OpenalexLocation | None = None,
 ) -> int:
     """Crée/retrouve l'entrée source_publications pour OpenAlex.
 
@@ -261,7 +241,8 @@ def insert_openalex_document(
     abstract, keywords, topics, location_ids).
     """
     openalex_id = extract_short_id(work["id"])
-    primary = parse_primary_location(work)
+    if primary is None:
+        primary = parse_primary_location(work)
 
     # URLs et identifiants extraits des locations
     urls, external_ids = extract_locations_data(work)
@@ -289,10 +270,8 @@ def insert_openalex_document(
         if raw_biblio.get(k)
     }
 
-    # Publisher + journal bruts (traçabilité du nom tel que vu par OpenAlex,
-    # en parallèle des publishers/journals créés via find_or_create_*).
-    # Skip pour les primary locations qui ne représentent pas un éditeur
-    # (HAL, theses.fr, Zenodo, etc.) — même critère que la création.
+    # Publisher + journal bruts (traçabilité du nom tel que vu par OpenAlex, en parallèle des publishers/journals créés via find_or_create_*).
+    # Ignoré pour les primary locations qui ne représentent pas un éditeur (HAL, theses.fr, Zenodo, etc.) — même critère que la création.
     if not should_skip_publisher_journal(primary):
         location = work.get("primary_location") or {}
         source = location.get("source") or {}
@@ -362,9 +341,7 @@ def insert_openalex_document(
 # =============================================================
 # OPENALEX AUTHORS — identifiants sur source_authorships
 # =============================================================
-# Les entités auteurs OA sont algorithmiques et non fiables, on garde
-# uniquement l'ORCID quand présent, sur l'identité de la signature
-# (author_identifying_keys.person_identifiers).
+# Les entités auteurs OpenAlex sont algorithmiques et non fiables, on garde uniquement l'ORCID quand présent, sur l'identité de la signature (author_identifying_keys.person_identifiers).
 
 
 def _extract_openalex_orcid(authorship: dict) -> str | None:
@@ -372,14 +349,8 @@ def _extract_openalex_orcid(authorship: dict) -> str | None:
 
     OpenAlex porte deux ORCID par authorship, de provenances opposées :
 
-    - ``raw_orcid`` (niveau authorship) : recopié tel quel de la métadonnée
-      brute du work telle qu'ingérée par OpenAlex depuis sa source amont
-      (Crossref pour l'essentiel des articles à éditeur). C'est l'ORCID
-      déposé par l'auteur à la soumission — fiable au même titre qu'un
-      ORCID Crossref.
-    - ``author.orcid`` (niveau entité auteur OpenAlex) : ORCID de l'entité
-      désambiguïsée par le clustering nom × affiliation d'OpenAlex,
-      régulièrement fautif.
+    - ``raw_orcid`` (niveau authorship) : recopié tel quel de la métadonnée brute du work telle qu'ingérée par OpenAlex depuis sa source amont (Crossref pour l'essentiel des articles à éditeur). C'est l'ORCID déposé par l'auteur à la soumission — fiable au même titre qu'un ORCID Crossref.
+    - ``author.orcid`` (niveau entité auteur OpenAlex) : ORCID de l'entité désambiguïsée par le clustering nom × affiliation d'OpenAlex, régulièrement fautif.
 
     On retient ``raw_orcid`` et on ignore ``author.orcid``.
     """
@@ -396,16 +367,11 @@ def build_openalex_author_records(work: dict) -> list[AuthorRecord]:
 
     - nom brut (`raw_author_name`, fiable contrairement à `author.display_name`) ;
     - ORCID déposé (`raw_orcid`) sur `person_identifiers` ;
-    - `country_code` OpenAlex (rattaché à la structure désambiguïsée,
-      algorithmique et faillible) en `suggested_countries` (à valider), jamais
-      en `countries` (autorité) ;
-    - `roles=['author']` explicite (OpenAlex ne distingue pas les rôles ; on
-      reproduit l'ancien défaut DB `ARRAY['author']`).
+    - `country_code` OpenAlex (rattaché à la structure désambiguïsée, algorithmique et faillible) en `suggested_countries` (à valider), jamais en `countries` (autorité) ;
+    - `roles=['author']` explicite (OpenAlex ne distingue pas les rôles).
     """
     authorships = work.get("authorships") or []
-    # ORCID requalifié `_dubious` s'il est partagé entre ≥2 signatures du work : sur les
-    # méga-papers, OpenAlex hérite de crossref l'ORCID du premier auteur recopié sur tous
-    # les co-auteurs — invisibilise-le alors au matching.
+    # ORCID requalifié `_dubious` s'il est partagé entre ≥2 signatures du work : sur les méga-papers, OpenAlex hérite de crossref l'ORCID du premier auteur recopié sur tous les co-auteurs — invisibilise-le alors au matching.
     ids_by_position = mark_shared_identifiers_dubious(
         [compact_identifiers(orcid=_extract_openalex_orcid(a)) for a in authorships]
     )
@@ -478,37 +444,30 @@ def process_work(
     openalex_id = staging_row.source_id
     work = staging_row.raw_data
 
-    try:
-        from application.pipeline.timings import StepTimer
+    t = StepTimer()
+    primary = parse_primary_location(work)
 
-        t = StepTimer()
-        primary = parse_primary_location(work)
+    if should_skip_publisher_journal(primary):
+        publisher_id = None
+        journal_id = None
+    else:
+        publisher_id = upsert_publisher(work, publisher_repo=publisher_repo)
+        journal_id = upsert_journal(work, publisher_id, journal_repo=journal_repo)
+    t.mark("publisher+journal")
 
-        if should_skip_publisher_journal(primary):
-            publisher_id = None
-            journal_id = None
-        else:
-            publisher_id = upsert_publisher(work, publisher_repo=publisher_repo)
-            journal_id = upsert_journal(work, publisher_id, journal_repo=journal_repo)
-        t.mark("publisher+journal")
+    pub_meta = extract_pub_metadata(work, journal_id, primary)
 
-        pub_meta = extract_pub_metadata(work, journal_id)
+    source_publication_id = insert_openalex_document(
+        conn, queries, work, staging_id, None, pub_meta, primary
+    )
+    t.mark("oa_doc")
 
-        source_publication_id = insert_openalex_document(
-            conn, queries, work, staging_id, None, pub_meta
-        )
-        t.mark("oa_doc")
+    process_authorships(conn, authorship_queries, work, source_publication_id)
+    t.mark("authors")
 
-        process_authorships(conn, authorship_queries, work, source_publication_id)
-        t.mark("authors")
-
-        staging_queries.mark_done(conn, staging_id)
-        t.log_if_slow(openalex_id, logger)
-        return True
-
-    except Exception as e:
-        logger.error(f"Erreur sur {openalex_id}: {e}")
-        raise
+    staging_queries.mark_done(conn, staging_id)
+    t.log_if_slow(openalex_id, logger)
+    return True
 
 
 class OpenalexNormalizer(SourceNormalizer):

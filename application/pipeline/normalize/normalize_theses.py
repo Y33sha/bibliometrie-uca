@@ -1,24 +1,10 @@
-"""
-Normalisation des données theses.fr : staging → tables structurées.
-
-Usage:
-    python normalize_theses.py              # traiter tous les works non traités
-    python normalize_theses.py --limit 100  # traiter N works (pour test)
-    python normalize_theses.py --reset      # remettre tous les works à processed=FALSE
-
-Tables peuplées :
-    publications                (table de vérité)
-    source_publications            (source='theses')
-    source_authorships          (source='theses', avec roles)
+"""Normalisation des données theses.fr : staging → tables structurées.
 
 Particularités theses.fr :
-- Pas de journal (les thèses ne sont pas publiées dans des revues)
-- Les rôles sont structurels : auteurs, directeurs, rapporteurs, examinateurs, president
-- Le PPN IdRef sert de clé de dédup pour les auteurs
-- Le NNT sert de DOI-équivalent pour les thèses soutenues
+- Les personnes liées aux thèses peuvent avoir différent rôles : auteur, directeur, rapporteur, examinateur, président de jury
+- Le PPN IdRef sert de clé de déduplication pour les auteurs
+- Le NNT sert d'identifiant pour les thèses soutenues
 - Les thèses en cours n'ont ni NNT ni DOI
-
-Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
 """
 
 import logging
@@ -27,6 +13,7 @@ from collections.abc import Callable
 from sqlalchemy import Connection
 
 from application.pipeline.normalize.base import SourceNormalizer
+from application.pipeline.timings import StepTimer
 from application.ports.pipeline.address_linker import AddressLinker
 from application.ports.pipeline.normalize.theses import ThesesNormalizeQueries
 from application.ports.pipeline.staging import StagingQueries, StagingRow
@@ -122,16 +109,12 @@ def insert_source_document(
 ) -> int:
     """Crée/retrouve l'entrée source_publications pour theses.fr.
 
-    Les métadonnées canoniques (titre, doc_type, pub_year, doi, nnt, journal,
-    oa_status, language, container_title) viennent toutes de ``pub_meta``,
-    construit en amont par ``extract_pub_metadata``. ``these`` ne sert ici
-    que pour les extras theses-spécifiques (sujets, sujetsRameau, discipline,
-    écoles doctorales, partenaires, dates).
+    Les métadonnées canoniques (titre, doc_type, pub_year, doi, nnt, journal, oa_status, language, container_title) viennent toutes de ``pub_meta``, construit en amont par ``extract_pub_metadata``. ``these`` ne sert ici que pour les champs propres aux thèses (sujets, sujetsRameau, discipline, écoles doctorales, partenaires, dates).
     """
     nnt = pub_meta["nnt"]
     external_ids = {"nnt": nnt} if nnt else None
 
-    # Keywords : sujets (mots-cles auteur)
+    # Keywords : sujets (mots-clés auteur)
     sujets = these.get("sujets") or []
     keywords = [s.get("libelle") for s in sujets if s.get("libelle")] or None
 
@@ -175,7 +158,7 @@ def insert_source_document(
 # =============================================================
 
 
-def process_persons(
+def process_authorships(
     conn: Connection,
     queries: ThesesNormalizeQueries,
     these: dict,
@@ -183,17 +166,13 @@ def process_persons(
     *,
     address_linker: AddressLinker,
 ) -> None:
-    """Traite tous les rôles d'une thèse (auteurs, directeurs, rapporteurs,
-    jury, président) en consommant ``aggregate_thesis_persons`` côté domain
-    pour la dédup multi-rôles + fusion + assignation de position."""
+    """Traite tous les rôles d'une thèse (auteurs, directeurs, rapporteurs, jury, président) en consommant ``aggregate_thesis_persons`` côté domain pour la déduplication multi-rôles + fusion + assignation de position."""
     queries.clear_source_authorships_for_publication(conn, source_publication_id)
 
     authorships = aggregate_thesis_persons(these)
 
-    # Adresses partagées par toutes les personnes du document : labos
-    # partenaires + établissement de soutenance. Ce dernier (UCA) rattache la
-    # thèse au périmètre — theses.fr ne porte pas d'adresses, et les labos
-    # partenaires ne sont pas toujours des structures du périmètre.
+    # Adresses partagées par toutes les personnes du document : laboratoires partenaires + établissement de soutenance.
+    # Ce dernier rattache la thèse au périmètre — theses.fr ne porte pas d'adresses, et les laboratoires partenaires ne sont pas toujours des structures du périmètre.
     partenaires = these.get("partenairesDeRecherche") or []
     addr_parts = [p["nom"] for p in partenaires if p.get("nom")]
     if etablissement := these.get("etabSoutenanceN"):
@@ -222,44 +201,38 @@ def process_work(
     conn: Connection,
     queries: ThesesNormalizeQueries,
     logger: logging.Logger,
-    row: StagingRow,
+    staging_row: StagingRow,
     *,
     pub_repo: PublicationRepository,
     staging_queries: StagingQueries,
     address_linker: AddressLinker,
 ) -> bool:
     """Traite une thèse du staging."""
-    staging_id = row.id
-    theses_id = row.source_id
-    these = row.raw_data
+    staging_id = staging_row.id
+    theses_id = staging_row.source_id
+    these = staging_row.raw_data
 
-    try:
-        from application.pipeline.timings import StepTimer
-
-        title = these.get("titrePrincipal")
-        if not title:
-            logger.warning(f"Thèse {theses_id} sans titre — skip")
-            return False
-
-        t = StepTimer()
-        pub_meta = extract_pub_metadata(these)
-
-        source_publication_id = insert_source_document(
-            conn, queries, these, staging_id, theses_id, None, pub_meta
-        )
-        t.mark("theses_doc")
-
-        process_persons(conn, queries, these, source_publication_id, address_linker=address_linker)
-        t.mark("persons")
-
+    title = these.get("titrePrincipal")
+    if not title:
+        logger.warning(f"Thèse {theses_id} sans titre — ignorée")
         staging_queries.mark_done(conn, staging_id)
-        t.log_if_slow(theses_id, logger)
+        return False
 
-        return True
+    t = StepTimer()
+    pub_meta = extract_pub_metadata(these)
 
-    except Exception as e:
-        logger.error(f"Erreur sur {theses_id}: {e}")
-        raise
+    source_publication_id = insert_source_document(
+        conn, queries, these, staging_id, theses_id, None, pub_meta
+    )
+    t.mark("theses_doc")
+
+    process_authorships(conn, queries, these, source_publication_id, address_linker=address_linker)
+    t.mark("authorships")
+
+    staging_queries.mark_done(conn, staging_id)
+    t.log_if_slow(theses_id, logger)
+
+    return True
 
 
 class ThesesNormalizer(SourceNormalizer):
@@ -300,9 +273,7 @@ class ThesesNormalizer(SourceNormalizer):
         self._address_linker.clear_cache()
 
     def on_error(self) -> None:
-        # Le cache peut contenir des address_id insérés dans la transaction
-        # qui vient d'être rollbackée — invalide-le pour éviter les FK
-        # violations sur les works suivants.
+        # Le cache peut contenir des address_id insérés dans la transaction qui vient d'être annulée — invalide-le pour éviter les violations de clé étrangère sur les works suivants.
         self._address_linker.clear_cache()
 
     def summary_stats(self, conn: Connection) -> list[str]:

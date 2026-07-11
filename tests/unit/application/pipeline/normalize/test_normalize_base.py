@@ -4,7 +4,7 @@ Couvre la template method `run()` et ses chemins :
 - mode `--reset` (commit + sortie immédiate)
 - `total == 0` (rien à faire)
 - happy path (success / skip / error mélangés, batch commit, summary)
-- exception dans `process_work` sans SAVEPOINT (rollback + on_error)
+- exception dans `process_work` (log de l'échec + rollback au SAVEPOINT + on_error)
 - `KeyboardInterrupt` (rollback du batch en cours + re-raise pour arrêt propre)
 - exception fatale en dehors de la boucle (rollback + relève)
 - `_iter_rows` mode `FETCH_SUB_BATCH` (chargement par sous-lots)
@@ -211,19 +211,21 @@ class TestRunHappyPath:
         assert [r.source_id for r in norm.processed_rows] == ["a"]
 
 
-# ── Exception sans SAVEPOINT ──────────────────────────────────────
+# ── Exception dans un work ────────────────────────────────────────
 
 
-class TestRunExceptionWithoutSavepoint:
-    def test_rollback_and_on_error_called(self, caplog):
+class TestRunWorkException:
+    def test_savepoint_rollback_and_on_error_called(self, caplog):
         staging = _FakeStaging()
         staging.count_returns = 2
         staging.pending_rows = [_row("a"), _row("b")]
         norm = _Norm(staging, results=[True, True], raises_on={"a"})
         with caplog.at_level(logging.INFO):
             norm.run(argv=[])
-        # USE_SAVEPOINT=False par défaut → conn.rollback + on_error appelés
+        # Le work en échec est annulé au SAVEPOINT et on_error est appelé.
         assert norm.on_error_called == 1
+        # Le work en échec est loggé par la boucle (les process_work ne loggent pas eux-mêmes).
+        assert "Erreur sur a" in caplog.text
         # Le 2e row est quand même traité après le rollback du 1er.
         assert "b" in [r.source_id for r in norm.processed_rows]
         assert "Erreurs : 1" in caplog.text
@@ -251,7 +253,6 @@ class TestRunKeyboardInterrupt:
         # restent durables).
         assert "Interruption" in caplog.text
         norm.conn.rollback.assert_called()
-        norm.conn.close.assert_called()
 
 
 # ── Exception fatale ──────────────────────────────────────────────

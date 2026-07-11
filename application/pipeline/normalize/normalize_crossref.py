@@ -1,36 +1,8 @@
 """Normalisation des données CrossRef : staging → tables structurées.
 
-L'orchestrateur (classe ``CrossrefNormalizer``) dépend des ports
-``StagingQueries`` + ``CrossrefNormalizeQueries`` ; il est appelé par ``run_pipeline``.
-
-Tables peuplées :
-    publishers, journals, publications      (tables de vérité — partagées)
-    source_publications                     (lien staging ↔ publication, source='crossref')
-    source_authorships                      (lien document × auteur, source='crossref')
-
-L'ORCID éventuel d'un auteur CrossRef vit sur l'identité de la signature
-(``author_identifying_keys.person_identifiers``, pas d'identifiant stable
-côté auteur).
-
 Particularités CrossRef :
-- Affiliations purement textuelles et génériques (tutelles), sans
-  structures détaillées. Elles sont routées vers ``addresses`` /
-  ``source_authorship_addresses`` via le writer batch partagé
-  ``write_source_authorships`` (comme HAL / OpenAlex / ScanR) : la phase ``affiliations`` peut alors
-  poser ``in_perimeter`` sur les SA crossref, qui entrent ainsi dans la
-  cascade de matching personnes. Couverture partielle (~29 % des auteurs
-  CrossRef portent une affiliation), mais strictement mieux que rien.
-- ``doc_type`` stocké tel quel depuis ``msg["type"]`` ; le mapping
-  taxonomie CrossRef → enum canonique vit dans
-  ``domain.source_publications.doc_types._SOURCE_MAPS["crossref"]`` et est
-  appliqué par ``arbitrate_doc_type_with_article_subtype`` au moment
-  du refresh. Le cas ``journal-article`` indistinct est arbitré contre
-  les sous-types plus précis exposés par HAL/OA (review, conference_paper,
-  etc.) — cf. ``ARTICLE_SUBTYPES``.
-- ``oa_status`` non dérivé de CrossRef (pas fiable) ; laissé à NULL
-  pour que les autres sources arbitrent via ``refresh_from_sources``.
-
-Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
+- `doc_type` stocké tel quel depuis `msg["type"]` ; le mapping taxonomie CrossRef → enum canonique vit dans `domain.source_publications.doc_types._SOURCE_MAPS["crossref"]` et est appliqué par `arbitrate_doc_type_with_article_subtype` au moment du refresh. Le cas `journal-article` indistinct est arbitré contre les sous-types plus précis exposés par HAL/OA (review, conference_paper, etc.) — cf. `ARTICLE_SUBTYPES`.
+- `oa_status` non dérivé de CrossRef (pas fiable) ; laissé à NULL pour que les autres sources arbitrent via `refresh_from_sources`.
 """
 
 from __future__ import annotations
@@ -47,6 +19,7 @@ from application.pipeline.normalize._authorships_batch import (
     write_source_authorships,
 )
 from application.pipeline.normalize.base import SourceNormalizer
+from application.pipeline.timings import StepTimer
 from application.ports.pipeline.normalize.authorships import AuthorshipsBatchQueries
 from application.ports.pipeline.normalize.crossref import CrossrefNormalizeQueries
 from application.ports.pipeline.staging import StagingQueries, StagingRow
@@ -160,8 +133,7 @@ def get_external_ids(msg: dict) -> dict | None:
 def get_biblio(msg: dict) -> dict | None:
     """Volume, issue, page, article-number + publisher/journal bruts.
 
-    `publisher` et `journal` (object) tracent le nom tel que vu par CrossRef
-    en parallèle des publishers/journals créés via `find_or_create_*`.
+    `publisher` et `journal` (object) tracent le nom tel que vu par CrossRef en parallèle des publishers/journals créés via `find_or_create_*`.
     """
     biblio: dict[str, JsonValue] = {}
     for src_key, dest_key in (
@@ -254,18 +226,14 @@ def build_crossref_author_records(msg: dict) -> list[AuthorRecord]:
 
     - nom reconstruit via `_author_full_name` ;
     - ORCID (seul identifiant exploitable côté CrossRef) sur `person_identifiers` ;
-    - affiliations brutes → adresses (sans pays) — c'est ce qui permet à la phase
-      `affiliations` de poser `in_perimeter` sur les SA crossref ;
-    - `roles=['author']` explicite (Crossref ne distingue pas les rôles ; on
-      reproduit l'ancien défaut DB `ARRAY['author']`).
+    - affiliations brutes → adresses (sans pays) — c'est ce qui permet à la phase `affiliations` de poser `in_perimeter` sur les source_authorships crossref ;
+    - `roles=['author']` explicite (Crossref ne distingue pas les rôles).
     """
     authors = msg.get("author") or []
     if not isinstance(authors, list):
         return []
 
-    # ORCID requalifié `_dubious` s'il est partagé entre ≥2 signatures du message :
-    # le dépôt crossref des méga-papers (collaborations) recopie souvent l'ORCID du
-    # premier auteur sur tous les co-auteurs — invisibilise-le alors au matching.
+    # ORCID requalifié `_dubious` s'il est partagé entre ≥2 signatures du message : le dépôt crossref des méga-papers (collaborations) recopie souvent l'ORCID du premier auteur sur tous les co-auteurs — invisibilise-le alors au matching.
     ids_by_position = mark_shared_identifiers_dubious(
         [
             compact_identifiers(orcid=normalize_orcid(a.get("ORCID")))
@@ -297,7 +265,7 @@ def build_crossref_author_records(msg: dict) -> list[AuthorRecord]:
     return records
 
 
-def process_authors(
+def process_authorships(
     conn: Connection,
     authorship_queries: AuthorshipsBatchQueries,
     msg: dict,
@@ -328,27 +296,24 @@ def process_work(
     staging_id = staging_row.id
     raw = staging_row.raw_data
     if not raw:
-        # Stub not_found ou payload vide — devrait déjà être processed=TRUE,
-        # par sécurité on marque processed et on passe.
+        # Stub not_found ou payload vide — devrait déjà être processed=TRUE, par sécurité on marque processed et on passe.
         staging_queries.mark_done(conn, staging_id)
         return None
 
     msg = raw  # CrossRef stocke directement le 'message'
     doi = get_doi(msg)
     if not doi:
-        logger.warning(f"CrossRef staging {staging_id} sans DOI exploitable — skip")
+        logger.warning(f"CrossRef staging {staging_id} sans DOI exploitable")
         staging_queries.mark_done(conn, staging_id)
-        return None
+        return False
 
     title = get_title(msg)
     pub_year = get_pub_year(msg)
     if not has_minimal_publication_metadata(title, pub_year):
-        logger.warning(f"CrossRef {doi} : titre ou année manquant — ignoré")
+        logger.warning(f"CrossRef {doi} : titre ou année manquant")
         staging_queries.mark_done(conn, staging_id)
-        return None
+        return False
     assert isinstance(title, str) and isinstance(pub_year, int)  # narrowing
-
-    from application.pipeline.timings import StepTimer
 
     t = StepTimer()
     publisher_id = upsert_publisher(msg, publisher_repo=publisher_repo)
@@ -380,7 +345,7 @@ def process_work(
     )
     t.mark("crossref_doc")
 
-    process_authors(conn, authorship_queries, msg, source_publication_id)
+    process_authorships(conn, authorship_queries, msg, source_publication_id)
     t.mark("authors")
 
     staging_queries.mark_done(conn, staging_id)

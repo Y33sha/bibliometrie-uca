@@ -1,23 +1,4 @@
-"""
-Normalisation des données HAL : staging → tables structurées.
-
-Usage:
-    python normalize_hal.py              # traiter tous les works non traités
-    python normalize_hal.py --limit 100  # traiter N works (pour test)
-    python normalize_hal.py --reset      # remettre tous les works à processed=FALSE
-
-Tables peuplées :
-    publishers, journals, publications      (tables de vérité — partagées)
-    source_publications                     (lien staging ↔ publication, source='hal')
-    source_authorships                      (lien document × auteur, source='hal',
-                                             avec `person_identifiers` JSONB)
-
-La résolution UCA (source_authorships.structure_ids, in_perimeter) se fait en
-post-traitement via populate_affiliations.py, pas ici. Les structures affiliées
-(authIdHasPrimaryStructure_fs) sont résolues en noms et stockées comme adresses.
-
-Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
-"""
+"""Normalisation des données HAL : staging → tables structurées."""
 
 import logging
 import xml.etree.ElementTree as ET
@@ -32,6 +13,7 @@ from application.pipeline.normalize._authorships_batch import (
     write_source_authorships,
 )
 from application.pipeline.normalize.base import SourceNormalizer
+from application.pipeline.timings import StepTimer
 from application.ports.pipeline.normalize.authorships import AuthorshipsBatchQueries
 from application.ports.pipeline.normalize.hal import HalNormalizeQueries
 from application.ports.pipeline.staging import StagingQueries, StagingRow
@@ -83,7 +65,7 @@ def get_title(doc: dict) -> str:
 
 
 # =============================================================
-# PUBLISHERS & JOURNALS (via services/journals.py)
+# PUBLISHERS & JOURNALS
 # =============================================================
 
 
@@ -109,19 +91,14 @@ def upsert_journal(
 
 
 # =============================================================
-# PUBLICATIONS (via services/publications.py)
+# PUBLICATIONS
 # =============================================================
 
 
 def extract_pub_metadata(doc: dict, journal_id: int | None) -> dict:
-    """Extrait les metadonnees de publication d'un document HAL.
+    """Extrait les métadonnées de publication d'un document HAL.
 
-    Retourne un dict utilisable par ``insert_hal_document``. Toutes les
-    valeurs sont brutes — pas de transformation de cohérence. ``doc_type``
-    est le concat brut ``docType_s_docSubType_s`` (ex. ``ART_review-article``),
-    pas la valeur canonique : la résolution source→enum (``map_doc_type``)
-    relève de la phase ``metadata_correction``, pas du brut stocké dans
-    ``source_publications``.
+    Retourne un dict utilisable par ``insert_hal_document``. Toutes les valeurs sont brutes — pas de transformation de cohérence. ``doc_type`` est le concat brut ``docType_s_docSubType_s`` (ex. ``ART_review-article``), pas la valeur canonique : la résolution source→enum (``map_doc_type``) relève de la phase ``metadata_correction``, pas du brut stocké dans ``source_publications``.
     """
     title = get_title(doc)
     raw_type = doc.get("docType_s") or ""
@@ -162,14 +139,9 @@ def extract_pub_metadata(doc: dict, journal_id: int | None) -> dict:
 
 
 def build_hal_external_ids(doc: dict, hal_id: str, nnt: str | None) -> dict[str, JsonValue]:
-    """Construit `external_ids` (clés de dédup cross-source) pour un doc HAL.
+    """Construit `external_ids` (clés de déduplication cross-source) pour un doc HAL.
 
-    `hal_id` est redondant avec `source_id` côté identité, mais on le pose
-    aussi ici pour qu'il devienne un **token de confirmation** (cf.
-    `domain.source_publications.keys`) et que HAL soit clusterisé comme les autres
-    sources — symétrie avec ce que theses fait déjà pour NNT.
-    `pmid` vient du champ `pubmedid_s` ; `pmcid`/`arxiv_id` des liens externes
-    (`linkExtUrl_s`).
+    `hal_id` est redondant avec `source_id` côté identité, mais on le pose aussi ici pour qu'il devienne un **token de confirmation** (cf. `domain.source_publications.keys`) et que HAL soit clusterisé comme les autres sources — symétrie avec ce que theses fait déjà pour NNT. `pmid` vient du champ `pubmedid_s` ; `pmcid`/`arxiv_id` des liens externes (`linkExtUrl_s`).
     """
     external_ids: dict[str, JsonValue] = {"hal_id": [hal_id]}
     if nnt:
@@ -235,8 +207,7 @@ def insert_hal_document(
     if page:
         biblio["pages"] = page
 
-    # Publisher + journal bruts (traçabilité du nom tel que vu par HAL, en
-    # parallèle de publishers/journals créés via find_or_create_*).
+    # Publisher + journal bruts (traçabilité du nom tel que vu par HAL, en parallèle de publishers/journals créés via find_or_create_*).
     publisher_raw = as_str(doc.get("journalPublisher_s")) or as_str(doc.get("publisher_s"))
     if publisher_raw:
         biblio["publisher"] = publisher_raw
@@ -291,12 +262,7 @@ _TEI_NS = {"tei": "http://www.tei-c.org/ns/1.0"}
 def active_embargo_until(label_xml: str | None, today: date) -> date | None:
     """Date de fin d'un embargo HAL **encore actif** (future), sinon None.
 
-    Lit `ref[@type='file']/date/@notBefore` du TEI (`label_xml`) : la date à laquelle
-    le fichier déposé devient accessible. Plusieurs refs `type='file'` (page + document) :
-    on retient la plus tardive. Une date déjà échue (fichier accessible) renvoie None —
-    pas d'embargo actif, on ne stocke pas d'historique. La levée à l'échéance d'une date
-    future stockée est portée par une règle de correction `oa_status`, sans dépendre d'un
-    ré-import HAL.
+    Lit `ref[@type='file']/date/@notBefore` du TEI (`label_xml`) : la date à laquelle le fichier déposé devient accessible. Plusieurs refs `type='file'` (page + document) : on retient la plus tardive. Une date déjà échue (fichier accessible) renvoie None — pas d'embargo actif, on ne stocke pas d'historique. La levée à l'échéance d'une date future stockée est portée par une règle de correction `oa_status`, sans dépendre d'un ré-import HAL.
     """
     if not label_xml:
         return None
@@ -326,15 +292,9 @@ def active_embargo_until(label_xml: str | None, today: date) -> date | None:
 def parse_tei_author_identifiers(label_xml: str | None) -> list[dict[str, str]]:
     """Extrait les identifiants par position d'auteur depuis le TEI HAL.
 
-    L'API search HAL ne fournit pas de champ Solr aligné positionnellement
-    pour ORCID/IdRef (les listes ``authORCIDIdExt_s``/``authIdRefIdExt_s``
-    sont compactées). Seul le TEI (``label_xml``) attache proprement chaque
-    identifiant à son auteur.
+    L'API search HAL ne fournit pas de champ Solr aligné positionnellement pour ORCID/IdRef (les listes ``authORCIDIdExt_s``/``authIdRefIdExt_s`` sont compactées). Seul le TEI (``label_xml``) attache proprement chaque identifiant à son auteur.
 
-    Retourne une liste indexée sur la position d'auteur ; chaque entrée est
-    un dict pouvant contenir ``orcid``, ``idref``, ``idhal`` (formes
-    normalisées : préfixes d'URL strippés). Renvoie ``[]`` si ``label_xml``
-    est absent ou mal formé.
+    Retourne une liste indexée sur la position d'auteur ; chaque entrée est un dict pouvant contenir ``orcid``, ``idref``, ``idhal`` (formes normalisées : préfixes d'URL strippés). Renvoie ``[]`` si ``label_xml`` est absent ou mal formé.
     """
     if not label_xml:
         return []
@@ -361,11 +321,8 @@ def parse_tei_author_identifiers(label_xml: str | None) -> list[dict[str, str]]:
             elif typ == "IDREF":
                 ids["idref"] = val.rsplit("/", 1)[-1].strip()
             elif typ == "IDHAL":
-                # HAL emet souvent deux <idno type="idhal"> par auteur,
-                # distingués par notation="string" (slug `prenom-nom`, le vrai
-                # idhal) et notation="numeric" (le hal_person_id ré-étiqueté
-                # idhal). Seul le slug nous intéresse ici — le hal_person_id
-                # est capturé via le composite Solr.
+                # HAL émet souvent deux <idno type="idhal"> par auteur, distingués par notation="string" (slug `prenom-nom`, le vrai idhal) et notation="numeric" (le hal_person_id ré-étiqueté idhal).
+                # Seul le slug nous intéresse ici — le hal_person_id est capturé via le composite Solr.
                 if notation != "string":
                     continue
                 ids["idhal"] = val
@@ -382,21 +339,13 @@ def parse_author_structures(
     doc: dict,
     struct_name_by_hal_id: dict[str, str] | None = None,
 ) -> dict[int, set[str]]:
-    """
-    Parse les structures d'affiliation pour extraire le mapping
-    `form_id → {halId_s natifs (text)}`.
+    """Parse les structures d'affiliation pour extraire le mapping `form_id → {halId_s natifs (text)}`.
 
     Format : "formId-personId_FacetSep_Nom_JoinSep_structId_FacetSep_StructNom"
 
-    Préfère `authIdHasPrimaryStructure_fs` (uniquement la/les structure(s)
-    primaire(s), càd labos feuilles), avec fallback sur `authIdHasStructure_fs`
-    qui aplatit aussi l'arbre des tutelles. Évite de polluer la table `addresses`
-    avec une entrée par tutelle parente alors que la résolution
-    structure→tutelle se fait déjà via `structures_parents`.
+    Préfère `authIdHasPrimaryStructure_fs` (uniquement la/les structure(s) primaire(s), c'est-à-dire les laboratoires feuilles), avec fallback sur `authIdHasStructure_fs` qui aplatit aussi l'arbre des tutelles. Évite de polluer la table `addresses` avec une entrée par tutelle parente alors que la résolution structure→tutelle se fait déjà via `structures_parents`.
 
-    Si `struct_name_by_hal_id` est fourni, est rempli avec le mapping
-    `halId_s → nom_structure` parsé depuis le document (utile pour
-    construire les adresses).
+    Si `struct_name_by_hal_id` est fourni, est rempli avec le mapping `halId_s → nom_structure` parsé depuis le document (utile pour construire les adresses).
     """
     entries = doc.get("authIdHasPrimaryStructure_fs") or doc.get("authIdHasStructure_fs") or []
     form_structs: dict[int, set[str]] = {}
@@ -440,27 +389,19 @@ def build_hal_author_records(doc: dict) -> list[AuthorRecord]:
 
     - Parse les champs alignés pour extraire hal_person_id, idhal et form_id
     - Parse authIdHasPrimaryStructure_fs pour les affiliations (clé = form_id)
-    - Produit pour chaque auteur les `person_identifiers`
-      (orcid/idref/idhal/hal_person_id quand présents) et `addresses` (noms de
-      structures).
+    - Produit pour chaque auteur les `person_identifiers` (orcid/idref/idhal/hal_person_id quand présents) et `addresses` (noms de structures).
 
-    Un `hal_person_id` listé sur plusieurs auteurs du même dépôt (erreur de saisie
-    HAL) rend toute l'identité de ces signatures douteuse : tous les identifiants
-    (hal_person_id/idref/idhal/orcid, attachés au compte HAL) sont alors rangés sous
-    une clé suffixée `_dubious` — valeur conservée mais écartée du matching personnes.
+    Un `hal_person_id` listé sur plusieurs auteurs du même dépôt (erreur de saisie HAL) rend toute l'identité de ces signatures douteuse : tous les identifiants (hal_person_id/idref/idhal/orcid, attachés au compte HAL) sont alors rangés sous une clé suffixée `_dubious` — valeur conservée mais écartée du matching personnes.
     """
     qualities = doc.get("authQuality_s") or []
-    # ORCID et IdRef par auteur : parsés depuis le TEI (label_xml), seul
-    # champ HAL qui les attache proprement à chaque position d'auteur.
+    # ORCID et IdRef par auteur : parsés depuis le TEI (label_xml), seul champ HAL qui les attache proprement à chaque position d'auteur.
     tei_ids = parse_tei_author_identifiers(doc.get("label_xml"))
 
     # authFullNameFormIDPersonIDIDHal_fs :
     #   "Nom_FacetSep_formId-personId_FacetSep_idhal" — aligné par position.
     # Présence validée par le caller ; on en extrait nom, form_id, person_id.
-    # Le 3e segment (idhal) est IGNORÉ : non fiable — quand l'auteur n'a pas de
-    # slug, HAL y recopie le person_id numérique, ce qui injectait de faux idhal
-    # numériques (== hal_person_id). L'idhal vient du seul TEI
-    # (`parse_tei_author_identifiers`, qui ne garde que notation="string").
+    # Le 3e segment (idhal) est IGNORÉ : non fiable — quand l'auteur n'a pas de slug, HAL y recopie le person_id numérique, ce qui injecterait de faux idhal numériques (== hal_person_id).
+    # L'idhal vient du seul TEI (`parse_tei_author_identifiers`, qui ne garde que notation="string").
     composite = doc.get("authFullNameFormIDPersonIDIDHal_fs") or []
     names = [entry.split("_FacetSep_", 1)[0] for entry in composite]
     form_id_by_pos: dict[int, int | None] = {}
@@ -483,16 +424,11 @@ def build_hal_author_records(doc: dict) -> list[AuthorRecord]:
                 except ValueError:
                     pass
 
-    # authIdHasPrimaryStructure_fs → {form_id: set of halId_s natifs (text)}
-    # + mapping {halId_s: nom} local au document (pour construire les
-    # adresses).
+    # authIdHasPrimaryStructure_fs → {form_id: ensemble de halId_s natifs (text)} + mapping {halId_s: nom} local au document (pour construire les adresses).
     struct_name_by_hal_id: dict[str, str] = {}
     form_struct_map = parse_author_structures(doc, struct_name_by_hal_id=struct_name_by_hal_id)
 
-    # Identifiants normalisés par position, puis requalification des partagés : un même
-    # identifiant (compte HAL, ORCID, idref…) porté par ≥2 signatures du *même dépôt* est
-    # une corruption de saisie (un identifiant ne peut pas désigner deux signatures dans un
-    # même document) → suffixé `_dubious`, conservé mais invisible au matching personnes.
+    # Identifiants normalisés par position, puis requalification des partagés : un même identifiant (compte HAL, ORCID, idref…) porté par ≥2 signatures du *même dépôt* est une corruption de saisie (un identifiant ne peut pas désigner deux signatures dans un même document) → suffixé `_dubious`, conservé mais invisible au matching personnes.
     ids_by_position = mark_shared_identifiers_dubious(
         [
             compact_identifiers(
@@ -519,8 +455,7 @@ def build_hal_author_records(doc: dict) -> list[AuthorRecord]:
 
         identifiers = ids_by_position[position]
 
-        # Noms des structures affiliées à cet auteur (par form_id), utilisés
-        # comme adresses brutes.
+        # Noms des structures affiliées à cet auteur (par form_id), utilisés comme adresses brutes.
         addr_parts: list[str] = []
         if form_id and form_id in form_struct_map:
             addr_parts = [
@@ -543,7 +478,7 @@ def build_hal_author_records(doc: dict) -> list[AuthorRecord]:
     return records
 
 
-def process_authors(
+def process_authorships(
     conn: Connection,
     authorship_queries: AuthorshipsBatchQueries,
     doc: dict,
@@ -572,67 +507,58 @@ def process_work(
     authorship_queries: AuthorshipsBatchQueries,
 ) -> bool | None:
     """Traite un work du staging HAL."""
-    from application.pipeline.timings import StepTimer
-
     staging_id = staging_row.id
     hal_id = staging_row.source_id
-    raw_data = staging_row.raw_data
-    doc = raw_data
+    doc = staging_row.raw_data
 
-    try:
-        t = StepTimer()
-        title = get_title(doc)
-        pub_year = doc.get("producedDateY_i")
-        if not has_minimal_publication_metadata(title, pub_year):
-            logger.warning(f"Impossible d'insérer {hal_id} — titre ou année manquant")
-            return False
-
-        if not doc.get("authFullNameFormIDPersonIDIDHal_fs"):
-            logger.error(
-                f"{hal_id} : champ authFullNameFormIDPersonIDIDHal_fs absent du payload "
-                "— doc HAL inutilisable, staging laissé processed=FALSE"
-            )
-            return False
-
-        publisher_name = as_str(doc.get("journalPublisher_s")) or as_str(doc.get("publisher_s"))
-        publisher_id = (
-            upsert_publisher(publisher_name, publisher_repo=publisher_repo)
-            if publisher_name
-            else None
-        )
-        journal_id = upsert_journal(doc, publisher_id, journal_repo=journal_repo)
-        t.mark("publisher+journal")
-
-        pub_meta = extract_pub_metadata(doc, journal_id)
-
-        source_publication_id = insert_hal_document(
-            conn,
-            queries,
-            doc,
-            staging_id,
-            hal_id,
-            None,
-            pub_meta,
-        )
-        t.mark("hal_doc")
-
-        process_authors(conn, authorship_queries, doc, source_publication_id)
-        t.mark("authors")
-
+    t = StepTimer()
+    title = get_title(doc)
+    pub_year = doc.get("producedDateY_i")
+    if not has_minimal_publication_metadata(title, pub_year):
+        logger.warning(f"Impossible d'insérer {hal_id} — titre ou année manquant")
         staging_queries.mark_done(conn, staging_id)
-        t.log_if_slow(hal_id, logger)
+        return False
 
-        return True
+    if not doc.get("authFullNameFormIDPersonIDIDHal_fs"):
+        logger.error(
+            f"{hal_id} : champ authFullNameFormIDPersonIDIDHal_fs absent du payload "
+            "— doc HAL inexploitable, marqué traité"
+        )
+        staging_queries.mark_done(conn, staging_id)
+        return False
 
-    except Exception as e:
-        logger.error(f"Erreur sur {hal_id}: {e}")
-        raise
+    publisher_name = as_str(doc.get("journalPublisher_s")) or as_str(doc.get("publisher_s"))
+    publisher_id = (
+        upsert_publisher(publisher_name, publisher_repo=publisher_repo) if publisher_name else None
+    )
+    journal_id = upsert_journal(doc, publisher_id, journal_repo=journal_repo)
+    t.mark("publisher+journal")
+
+    pub_meta = extract_pub_metadata(doc, journal_id)
+
+    source_publication_id = insert_hal_document(
+        conn,
+        queries,
+        doc,
+        staging_id,
+        hal_id,
+        None,
+        pub_meta,
+    )
+    t.mark("hal_doc")
+
+    process_authorships(conn, authorship_queries, doc, source_publication_id)
+    t.mark("authors")
+
+    staging_queries.mark_done(conn, staging_id)
+    t.log_if_slow(hal_id, logger)
+
+    return True
 
 
 class HalNormalizer(SourceNormalizer):
     SOURCE = "hal"
     DEFAULT_BATCH_SIZE = 500
-    USE_SAVEPOINT = True
 
     def __init__(
         self,

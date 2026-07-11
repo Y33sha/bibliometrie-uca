@@ -1,17 +1,4 @@
-"""
-Normalisation des données ScanR : staging → tables structurées.
-
-L'orchestrateur (classe `ScanrNormalizer`) dépend des ports
-`StagingQueries` + `ScanrNormalizeQueries` ; il est appelé par `run_pipeline`.
-
-Tables peuplées :
-    publishers, journals, publications      (tables de vérité — partagées)
-    source_publications                     (lien staging ↔ publication, source='scanr')
-    source_authorships                      (lien document × auteur, source='scanr',
-                                             avec `person_identifiers` JSONB pour idref/orcid)
-
-Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
-"""
+"""Normalisation des données ScanR : staging → tables structurées."""
 
 import logging
 from collections.abc import Callable
@@ -24,6 +11,7 @@ from application.pipeline.normalize._authorships_batch import (
     write_source_authorships,
 )
 from application.pipeline.normalize.base import SourceNormalizer
+from application.pipeline.timings import StepTimer
 from application.ports.pipeline.normalize.authorships import AuthorshipsBatchQueries
 from application.ports.pipeline.normalize.scanr import ScanrNormalizeQueries
 from application.ports.pipeline.staging import StagingQueries, StagingRow
@@ -76,9 +64,7 @@ def upsert_publisher(doc: dict, *, publisher_repo: PublisherRepository) -> int |
 def _extract_journal_issns(source: dict) -> tuple[str | None, str | None]:
     """Extrait (issn, eissn) depuis `source.journalIssns` (array ScanR).
 
-    Heuristique : 1er = print/issn, 2e = electronic/eissn. Les éventuelles
-    entrées supplémentaires (alias, ISSN-L, variantes historiques) sont
-    ignorées. Cohérent avec ce qu'on fait pour OpenAlex.
+    Heuristique : 1er = print/issn, 2e = electronic/eissn. Les éventuelles entrées supplémentaires (alias, ISSN-L, variantes historiques) sont ignorées. Cohérent avec ce qu'on fait pour OpenAlex.
     """
     issns = source.get("journalIssns") or []
     issn = issns[0] if len(issns) >= 1 else None
@@ -106,11 +92,7 @@ def upsert_journal(
 def extract_pub_metadata(doc: dict, journal_id: int | None, scanr_id: str | None = None) -> dict:
     """Extrait les métadonnées de publication d'un document ScanR.
 
-    Retourne un dict utilisable par ``insert_scanr_document``. Toutes les
-    valeurs sont brutes — pas de fallback (le brut de
-    ``source_publications.doc_type`` est nullable text) ni de transformation
-    de cohérence. ``language`` est posé à ``None`` : l'API ScanR ne l'expose
-    pas.
+    Retourne un dict utilisable par ``insert_scanr_document``. Toutes les valeurs sont brutes — pas de fallback (le brut de ``source_publications.doc_type`` est nullable text) ni de transformation de cohérence. ``language`` est posé à ``None`` : l'API ScanR ne l'expose pas.
     """
     title = get_title(doc)
     container_title = None
@@ -146,17 +128,12 @@ def insert_scanr_document(
 ) -> int:
     """Crée/retrouve l'entrée source_publications pour ScanR.
 
-    Les métadonnées canoniques (doi, title, pub_year, doc_type, nnt,
-    journal_id, oa_status, language, container_title) viennent toutes de
-    ``pub_meta``, construit en amont par ``extract_pub_metadata``. ``doc``
-    ne sert ici que pour les extras ScanR-spécifiques (hal_id, pmid,
-    abstract, biblio, keywords, topics, urls).
+    Les métadonnées canoniques (doi, title, pub_year, doc_type, nnt, journal_id, oa_status, language, container_title) viennent toutes de ``pub_meta``, construit en amont par ``extract_pub_metadata``. ``doc`` ne sert ici que pour les champs propres à ScanR (hal_id, pmid, abstract, biblio, keywords, topics, urls).
     """
     ext: dict[str, JsonValue] = {}
     if nnt := pub_meta["nnt"]:
         ext["nnt"] = nnt
-    # hal_id et related_dois multivalués : un document ScanR peut référencer
-    # plusieurs dépôts HAL et plusieurs DOI (preprint/dépôt/édition).
+    # hal_id et related_dois multivalués : un document ScanR peut référencer plusieurs dépôts HAL et plusieurs DOI (preprint/dépôt/édition).
     hal_ids: list[str] = []
     dois: list[str] = []
     for eid in doc.get("externalIds") or []:
@@ -213,8 +190,7 @@ def insert_scanr_document(
             seen.add(u)
             urls.append(u)
 
-    # Publisher + journal bruts (traçabilité du nom tel que vu par ScanR,
-    # en parallèle des publishers/journals créés via find_or_create_*).
+    # Publisher + journal bruts (traçabilité du nom tel que vu par ScanR, en parallèle des publishers/journals créés via find_or_create_*).
     source = doc.get("source") or {}
     biblio: dict[str, JsonValue] = {}
     if publisher_raw := source.get("publisher"):
@@ -255,11 +231,6 @@ def insert_scanr_document(
 
 
 # =============================================================
-# SCANR AUTHORS
-# =============================================================
-
-
-# =============================================================
 # SCANR AUTHORSHIPS
 # =============================================================
 
@@ -269,8 +240,7 @@ def build_scanr_author_records(doc: dict) -> list[AuthorRecord]:
 
     - identifiants `orcid`/`idref` (sous `denormalized`) ;
     - `roles` via `map_role('scanr', role)` ;
-    - affiliations feuilles → adresses, avec `detected_countries` en `countries`
-      (pays d'autorité détectés dans le texte de l'affiliation).
+    - affiliations feuilles → adresses, avec `detected_countries` en `countries` (pays d'autorité détectés dans le texte de l'affiliation).
     """
     authors = doc.get("authors") or []
     # Identifiant (orcid/idref) partagé entre ≥2 signatures du doc → `_dubious`.
@@ -314,7 +284,7 @@ def build_scanr_author_records(doc: dict) -> list[AuthorRecord]:
     return records
 
 
-def process_authors(
+def process_authorships(
     conn: Connection,
     authorship_queries: AuthorshipsBatchQueries,
     doc: dict,
@@ -344,43 +314,34 @@ def process_work(
 ) -> bool:
     staging_id = staging_row.id
     scanr_id = staging_row.source_id
-    raw_data = staging_row.raw_data
-    doc = raw_data
+    doc = staging_row.raw_data
 
-    try:
-        from application.pipeline.timings import StepTimer
-
-        title = get_title(doc)
-        pub_year = doc.get("year")
-        if not has_minimal_publication_metadata(title, pub_year):
-            logger.warning(f"Impossible d'insérer {scanr_id} — titre ou année manquant")
-            return False
-
-        t = StepTimer()
-        publisher_id = upsert_publisher(doc, publisher_repo=publisher_repo)
-        journal_id = upsert_journal(doc, publisher_id, journal_repo=journal_repo)
-        t.mark("publisher+journal")
-
-        pub_meta = extract_pub_metadata(doc, journal_id, scanr_id)
-
-        source_publication_id = insert_scanr_document(
-            conn, queries, doc, staging_id, scanr_id, None, pub_meta
-        )
-        t.mark("scanr_doc")
-
-        process_authors(conn, authorship_queries, doc, source_publication_id)
-        t.mark("authors")
-
+    title = get_title(doc)
+    pub_year = doc.get("year")
+    if not has_minimal_publication_metadata(title, pub_year):
+        logger.warning(f"Impossible d'insérer {scanr_id} — titre ou année manquant")
         staging_queries.mark_done(conn, staging_id)
-        t.log_if_slow(scanr_id, logger)
+        return False
 
-        return True
+    t = StepTimer()
+    publisher_id = upsert_publisher(doc, publisher_repo=publisher_repo)
+    journal_id = upsert_journal(doc, publisher_id, journal_repo=journal_repo)
+    t.mark("publisher+journal")
 
-    except Exception as e:
-        import traceback
+    pub_meta = extract_pub_metadata(doc, journal_id, scanr_id)
 
-        logger.error(f"Erreur sur {scanr_id}: {e}\n{traceback.format_exc()}")
-        raise
+    source_publication_id = insert_scanr_document(
+        conn, queries, doc, staging_id, scanr_id, None, pub_meta
+    )
+    t.mark("scanr_doc")
+
+    process_authorships(conn, authorship_queries, doc, source_publication_id)
+    t.mark("authors")
+
+    staging_queries.mark_done(conn, staging_id)
+    t.log_if_slow(scanr_id, logger)
+
+    return True
 
 
 class ScanrNormalizer(SourceNormalizer):

@@ -1013,7 +1013,8 @@ class TestProcessRecord:
 
         assert captured["ut"] == "WOS:fallback"
 
-    def test_exception_logs_and_reraises(self, logger, monkeypatch, caplog):
+    def test_exception_reraises(self, logger, monkeypatch):
+        """process_record laisse remonter l'exception ; le log incombe à la boucle de base."""
         monkeypatch.setattr(
             normalize_wos,
             "extract_from_api",
@@ -1021,21 +1022,18 @@ class TestProcessRecord:
         )
 
         row = _staging_row(staging_id=1, ut="WOS:err", doi=None)
-        with caplog.at_level(logging.ERROR, logger=logger.name):
-            with pytest.raises(ValueError, match="boom"):
-                process_record(
-                    None,
-                    MagicMock(),
-                    logger,
-                    row,
-                    journal_repo=MagicMock(),
-                    publisher_repo=MagicMock(),
-                    pub_repo=MagicMock(),
-                    staging_queries=MagicMock(),
-                    authorship_queries=MagicMock(),
-                )
-
-        assert any("Erreur sur WOS:err" in r.getMessage() for r in caplog.records)
+        with pytest.raises(ValueError, match="boom"):
+            process_record(
+                None,
+                MagicMock(),
+                logger,
+                row,
+                journal_repo=MagicMock(),
+                publisher_repo=MagicMock(),
+                pub_repo=MagicMock(),
+                staging_queries=MagicMock(),
+                authorship_queries=MagicMock(),
+            )
 
 
 # ── WosNormalizer ────────────────────────────────────────────────

@@ -1,13 +1,8 @@
 """Writer batch partagé pour les `source_authorships` (toutes sources).
 
-Ce qui diffère entre sources est uniquement le *parsing* du payload
-(HAL : TEI + composites Solr ; OpenAlex : tableau authorships ; etc.). Les
-étapes d'*écriture* sont communes — les tables `source_authorships` /
-`addresses` / `source_authorship_addresses` sont partagées. Chaque normalizer
-parse son payload en `list[AuthorRecord]` puis délègue ici.
+Ce qui diffère entre sources est uniquement le *parsing* du payload (HAL : TEI + composites Solr ; OpenAlex : tableau authorships ; etc.). Les étapes d'*écriture* sont communes — les tables `source_publications` / `source_authorships` / `addresses` / `source_authorship_addresses` sont partagées. Chaque normaliseur parse son payload en `list[AuthorRecord]` puis délègue ici.
 
-Coût : O(1) round-trips Python↔PG par document (vs N+1 par auteur avec
-l'écriture séquentielle adresse-par-adresse).
+Coût : O(1) round-trips Python↔PG par document (vs N+1 par auteur avec l'écriture séquentielle adresse-par-adresse).
 """
 
 from __future__ import annotations
@@ -31,9 +26,7 @@ class AddressRecord:
     """Une affiliation textuelle d'un auteur, avec pays optionnels.
 
     `countries` : codes pays d'autorité (ScanR, détectés dans le texte).
-    `suggested_countries` : suggestion à valider (OpenAlex, `country_code`
-    de structure désambiguïsée — faillible). Tous deux propagés sur la row
-    `addresses` partagée, jamais écrasés.
+    `suggested_countries` : suggestion à valider (OpenAlex, `country_code` de structure désambiguïsée — faillible). Tous deux propagés sur la row `addresses` partagée, jamais écrasés.
     """
 
     text: str
@@ -45,8 +38,7 @@ class AddressRecord:
 class AuthorRecord:
     """DTO auteur partagé : sortie du parsing source, entrée du writer.
 
-    `roles` à `None` stocke `NULL` (les sources qui veulent le défaut
-    `{author}` le posent explicitement).
+    `roles` à `None` stocke `NULL` (les sources qui veulent le défaut `{author}` le posent explicitement).
     """
 
     position: int
@@ -77,8 +69,7 @@ def write_source_authorships(
     if not records:
         return
 
-    # Dédup défensive par position (première occurrence gagne) : la clé
-    # (source_publication_id, author_position) interdit les doublons.
+    # Dédup défensive par position (première occurrence gagne) : la clé (source_publication_id, author_position) interdit les doublons.
     by_position: dict[int, AuthorRecord] = {}
     for rec in records:
         by_position.setdefault(rec.position, rec)
