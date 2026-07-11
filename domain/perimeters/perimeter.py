@@ -1,4 +1,4 @@
-"""Aggregate root ``Perimeter`` — entité métier d'un périmètre
+"""Aggregate root `Perimeter` — entité métier d'un périmètre
 d'établissement (ensemble de structures considérées comme « in
 perimeter » pour la bibliométrie).
 

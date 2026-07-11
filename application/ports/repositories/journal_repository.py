@@ -124,7 +124,7 @@ class JournalRepository(Protocol):
         """Pose `doaj_payload`, `doaj_imported_at` et `is_in_doaj` en bloc.
 
         Utilisé par l'import du dump DOAJ (`import_journals_from_doaj_dump`) pour
-        les revues matchées (``is_in_doaj=True`` + payload). Le cas « absente du
+        les revues matchées (`is_in_doaj=True` + payload). Le cas « absente du
         dump » est traité en bloc par `reset_is_in_doaj` (FALSE global avant
         re-pose).
         """

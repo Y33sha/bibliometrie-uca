@@ -1,16 +1,16 @@
-"""Adapter CrossRef pour ``application.pipeline.cross_imports.fetch_missing_doi``.
+"""Adapter CrossRef pour `application.pipeline.cross_imports.fetch_missing_doi`.
 
 CrossRef est ingérée DOI-driven : pour chaque DOI présent dans une autre
 source mais absent du staging CrossRef, on interroge l'endpoint
-``GET /works/{doi}`` et on insère le ``message`` dans ``staging`` avec
-``source='crossref'``.
+`GET /works/{doi}` et on insère le `message` dans `staging` avec
+`source='crossref'`.
 
-Polite pool obtenu via le header ``User-Agent`` qui inclut un mailto.
+Polite pool obtenu via le header `User-Agent` qui inclut un mailto.
 Doc CrossRef : polite = 10 req/s + 3 concurrentes. On colle exactement à
 ces limites (max_concurrent=3, request_delay=0.1 s) pour éviter les 429.
 
 Crossref est la source native du DOI : un 404 est définitif (DOI erroné ou non
-Crossref). Le miss est mémorisé dans ``doi_lookups`` avec ``next_retry = NULL``
+Crossref). Le miss est mémorisé dans `doi_lookups` avec `next_retry = NULL`
 (jamais retenté), ce qui l'exclut définitivement du pool de cross-import.
 """
 
@@ -35,7 +35,7 @@ _USER_AGENT_TEMPLATE = "BibliometrieUCA-pipeline/1.0 (mailto:{email})"
 
 
 class CrossrefFetchMissingDoiAdapter:
-    """Adapter async conforme au ``AsyncFetchMissingDoiAdapter`` Protocol."""
+    """Adapter async conforme au `AsyncFetchMissingDoiAdapter` Protocol."""
 
     source_key = "crossref"
     batch_size = 1

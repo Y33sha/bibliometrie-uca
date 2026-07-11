@@ -1,6 +1,6 @@
 """Tests des règles d'attendus journal ↔ publication.
 
-Cf. ``domain/journals/expected.py``.
+Cf. `domain/journals/expected.py`.
 """
 
 from domain.journals.expected import (

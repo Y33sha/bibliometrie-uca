@@ -191,10 +191,10 @@ def extract_pub_metadata(
 ) -> dict:
     """Extrait les métadonnées de publication d'un work OpenAlex.
 
-    Retourne un dict utilisable par ``insert_openalex_document``. Toutes les
-    valeurs sont brutes — pas de transformation de cohérence. ``doc_type``
-    est le ``work["type"]`` brut OpenAlex (mapping canonique en aval, dans
-    ``map_doc_type(source="openalex")``).
+    Retourne un dict utilisable par `insert_openalex_document`. Toutes les
+    valeurs sont brutes — pas de transformation de cohérence. `doc_type`
+    est le `work["type"]` brut OpenAlex (mapping canonique en aval, dans
+    `map_doc_type(source="openalex")`).
     """
     title = work.get("title") or work.get("display_name") or ""
     if primary is None:
@@ -235,7 +235,7 @@ def insert_openalex_document(
 
     Les métadonnées canoniques (doi, title, pub_year, doc_type, nnt,
     journal_id, oa_status, language, container_title) viennent toutes de
-    ``pub_meta``, construit en amont par ``extract_pub_metadata``. ``work``
+    `pub_meta`, construit en amont par `extract_pub_metadata`. `work`
     ne sert ici que pour les extras OpenAlex-spécifiques (urls,
     cited_by_count, is_retracted, biblio, publisher/journal bruts,
     abstract, keywords, topics, location_ids).
@@ -349,10 +349,10 @@ def _extract_openalex_orcid(authorship: dict) -> str | None:
 
     OpenAlex porte deux ORCID par authorship, de provenances opposées :
 
-    - ``raw_orcid`` (niveau authorship) : recopié tel quel de la métadonnée brute du work telle qu'ingérée par OpenAlex depuis sa source amont (Crossref pour l'essentiel des articles à éditeur). C'est l'ORCID déposé par l'auteur à la soumission — fiable au même titre qu'un ORCID Crossref.
-    - ``author.orcid`` (niveau entité auteur OpenAlex) : ORCID de l'entité désambiguïsée par le clustering nom × affiliation d'OpenAlex, régulièrement fautif.
+    - `raw_orcid` (niveau authorship) : recopié tel quel de la métadonnée brute du work telle qu'ingérée par OpenAlex depuis sa source amont (Crossref pour l'essentiel des articles à éditeur). C'est l'ORCID déposé par l'auteur à la soumission — fiable au même titre qu'un ORCID Crossref.
+    - `author.orcid` (niveau entité auteur OpenAlex) : ORCID de l'entité désambiguïsée par le clustering nom × affiliation d'OpenAlex, régulièrement fautif.
 
-    On retient ``raw_orcid`` et on ignore ``author.orcid``.
+    On retient `raw_orcid` et on ignore `author.orcid`.
     """
     return normalize_orcid(authorship.get("raw_orcid"))
 

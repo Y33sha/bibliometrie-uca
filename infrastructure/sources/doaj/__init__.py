@@ -69,7 +69,7 @@ DOAJ_TOC_URL = "https://doaj.org/toc/{id}"
 def build_doaj_toc_url(doaj_id: str | None) -> str | None:
     """Reconstruit l'URL de la fiche DOAJ à partir d'un `DOAJ id`.
 
-    Retourne ``None`` si l'id est absent — cas d'un payload sans `DOAJ id`
+    Retourne `None` si l'id est absent — cas d'un payload sans `DOAJ id`
     (le dump CSV stocke l'URL toute faite sous `URL in DOAJ`).
     """
     if not doaj_id:
@@ -80,8 +80,8 @@ def build_doaj_toc_url(doaj_id: str | None) -> str | None:
 def resolve_doaj_url(payload_url: str | None, doaj_id: str | None) -> str | None:
     """URL de fiche DOAJ à partir d'un payload, quelle que soit sa provenance.
 
-    Le dump CSV stocke l'URL toute faite sous ``'URL in DOAJ'`` ; d'anciens
-    payloads issus de l'API ne portaient que ``'DOAJ id'``. On privilégie l'URL
-    CSV et on reconstruit depuis l'id sinon. ``None`` si ni l'un ni l'autre.
+    Le dump CSV stocke l'URL toute faite sous `'URL in DOAJ'` ; d'anciens
+    payloads issus de l'API ne portaient que `'DOAJ id'`. On privilégie l'URL
+    CSV et on reconstruit depuis l'id sinon. `None` si ni l'un ni l'autre.
     """
     return payload_url or build_doaj_toc_url(doaj_id)

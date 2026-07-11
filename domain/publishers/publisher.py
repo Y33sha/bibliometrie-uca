@@ -1,4 +1,4 @@
-"""Aggregate root ``Publisher`` — entité métier d'un éditeur.
+"""Aggregate root `Publisher` — entité métier d'un éditeur.
 
 Identité = `id` (clé surrogate). Identifiant naturel : `name`
 (via la normalisation côté `publisher_name_forms`).
@@ -72,7 +72,7 @@ _ROR_TYPE_TO_PUBLISHER_TYPE: list[tuple[str, PublisherType]] = [
 def map_ror_types(ror_types: list[str]) -> PublisherType | None:
     """Mappe une liste de ROR `types` vers notre enum `publisher_type`.
 
-    Renvoie ``None`` quand aucun ROR type de la liste n'a de mapping
+    Renvoie `None` quand aucun ROR type de la liste n'a de mapping
     défini (`government`, `facility`, `other`, `healthcare`, ou
     seulement `funder`) — le caller doit alors ne pas écrire.
     """

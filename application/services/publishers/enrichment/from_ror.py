@@ -42,7 +42,7 @@ from application.ports.repositories.publisher_repository import (
 from domain.publishers.publisher import map_ror_types
 
 type RorFetcher = Callable[[str], dict[str, Any] | None]
-"""Signature : ``(ror) → record JSON ou None (404 / erreur)``."""
+"""Signature : `(ror) → record JSON ou None (404 / erreur)`."""
 
 COMMIT_EVERY = 50
 MAX_WORKERS = 8

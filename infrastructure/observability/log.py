@@ -4,8 +4,8 @@ Par défaut, les logs sont émis au format JSON (une ligne = un record) pour
 permettre leur agrégation par un collecteur externe (Loki, ELK, stdout→fluentd).
 Pour revenir au format texte lisible en dev : `export LOG_FORMAT=text`.
 
-Tous les fichiers .log sont consolidés sous ``PROJECT_ROOT/logs/``, en
-reproduisant l'arborescence du caller (voir ``_rebase_log_dir``).
+Tous les fichiers .log sont consolidés sous `PROJECT_ROOT/logs/`, en
+reproduisant l'arborescence du caller (voir `_rebase_log_dir`).
 """
 
 import contextvars
@@ -113,12 +113,12 @@ def _make_formatter() -> logging.Formatter:
 
 
 def _rebase_log_dir(log_dir: str) -> Path:
-    """Rebase ``log_dir`` vers ``PROJECT_ROOT/logs/<relpath>/``.
+    """Rebase `log_dir` vers `PROJECT_ROOT/logs/<relpath>/`.
 
     Le relpath est calculé à partir du chemin du caller relatif à la racine
-    du projet. Un suffixe ``logs`` final est éliminé pour éviter une
-    imbrication redondante ``logs/.../logs/``. Un chemin hors projet est
-    replié sous ``PROJECT_ROOT/logs/`` en préservant ses segments nommés.
+    du projet. Un suffixe `logs` final est éliminé pour éviter une
+    imbrication redondante `logs/.../logs/`. Un chemin hors projet est
+    replié sous `PROJECT_ROOT/logs/` en préservant ses segments nommés.
     """
     p = Path(log_dir)
     if not p.is_absolute():
@@ -136,14 +136,14 @@ def _rebase_log_dir(log_dir: str) -> Path:
 def setup_logger(name: str, log_dir: str) -> logging.Logger:
     """Configure un logger avec sortie console, et fichier optionnel.
 
-    Le FileHandler est **opt-in** via ``LOG_TO_FILE=true`` (12-factor :
+    Le FileHandler est **opt-in** via `LOG_TO_FILE=true` (12-factor :
     par défaut, l'app n'écrit pas sur disque — c'est à l'orchestrateur
     qui tourne autour de décider quoi faire de stdout). Activer en dev
     local pour garder un historique sans avoir à rediriger à la main.
 
-    Quand activé, le ``log_dir`` passé par le caller est rebasé vers
-    ``PROJECT_ROOT/logs/<relpath>/`` (voir ``_rebase_log_dir``) afin que
-    tous les fichiers ``.log`` soient regroupés sous une arborescence
+    Quand activé, le `log_dir` passé par le caller est rebasé vers
+    `PROJECT_ROOT/logs/<relpath>/` (voir `_rebase_log_dir`) afin que
+    tous les fichiers `.log` soient regroupés sous une arborescence
     unique. Crée le répertoire si nécessaire.
 
     Configure uniquement le logger nommé (pas le root logger).

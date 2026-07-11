@@ -188,20 +188,20 @@ def map_openalex_oa_status(raw: str | None) -> str | None:
 def extract_external_ids_from_urls(urls: list[str]) -> dict[str, str | list[str]]:
     """Extrait les identifiants exposés dans une liste d'URLs.
 
-    Reconnait HAL (préfixes ``hal-``/``tel-``/``halshs-``…), NNT
-    (URLs ``theses.fr/<NNT>``), PMID (PubMed), PMCID et arXiv.
+    Reconnait HAL (préfixes `hal-`/`tel-`/`halshs-`…), NNT
+    (URLs `theses.fr/<NNT>`), PMID (PubMed), PMCID et arXiv.
 
-    ``hal_id`` est **multivalué** : une œuvre peut référencer plusieurs
+    `hal_id` est **multivalué** : une œuvre peut référencer plusieurs
     dépôts HAL (chapitres, versions, doublons), tous collectés (liste
     dédupliquée, ordre d'apparition). Les autres clés sont 1:1 avec un
     document → premier match gagnant (l'ordre des URLs est significatif :
     le caller choisit typiquement landing_page_url avant pdf_url).
 
     Les extracteurs d'ID par URL (PMID/PMCID/arXiv/HAL) vivent dans
-    ``domain.publications.identifiers`` (neutres, réutilisés par HAL).
+    `domain.publications.identifiers` (neutres, réutilisés par HAL).
 
     Pas de normalisation du NNT ici (à l'inverse de
-    ``extract_nnt_from_location``) — extracteur opportuniste depuis une
+    `extract_nnt_from_location`) — extracteur opportuniste depuis une
     URL, la normalisation est laissée au caller.
     """
     external_ids: dict[str, str | list[str]] = {}

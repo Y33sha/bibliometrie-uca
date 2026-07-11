@@ -6,6 +6,6 @@ Un sujet est un libellé observé sur des publications, dédupliqué sur
 discipline, ScanR domain).
 
 Sous-modules :
-- ``subject`` : constantes d'ontologies + helpers de normalisation
+- `subject` : constantes d'ontologies + helpers de normalisation
   des libellés.
 """

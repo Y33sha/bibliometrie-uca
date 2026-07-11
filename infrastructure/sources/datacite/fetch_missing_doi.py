@@ -1,23 +1,23 @@
-"""Adapter DataCite pour ``application.pipeline.cross_imports.fetch_missing_doi``.
+"""Adapter DataCite pour `application.pipeline.cross_imports.fetch_missing_doi`.
 
 DataCite est ingérée DOI-driven : pour les DOI présents dans une autre source
-mais absents du staging DataCite, on interroge l'endpoint ``GET /dois`` en
-**batch** via ``query=doi:"a" OR doi:"b" …`` (réponse JSON:API, liste de nœuds
-``data``) et on insère chaque nœud (id + ``attributes`` + ``relationships``)
-dans ``staging`` avec ``source='datacite'``.
+mais absents du staging DataCite, on interroge l'endpoint `GET /dois` en
+**batch** via `query=doi:"a" OR doi:"b" …` (réponse JSON:API, liste de nœuds
+`data`) et on insère chaque nœud (id + `attributes` + `relationships`)
+dans `staging` avec `source='datacite'`.
 
-Batch de ``batch_size`` DOI par requête : la latence DataCite a une falaise nette
-au-delà d'une dizaine de clauses ``OR`` (mesuré : ~0,3 s à 10 DOI, ~2,6 s à 20),
+Batch de `batch_size` DOI par requête : la latence DataCite a une falaise nette
+au-delà d'une dizaine de clauses `OR` (mesuré : ~0,3 s à 10 DOI, ~2,6 s à 20),
 donc on reste à 10 — coût par DOI minimal, et c'est alors le rate-limit qui borne.
 Les DOI absents de la réponse d'un batch sont les introuvables (cf. ci-dessous).
 
-Le pool de DOI candidats est filtré en amont par ``get_cross_import_dois`` :
-seuls les DOI dont le préfixe résout à la RA ``DataCite`` (ou pas encore résolu)
+Le pool de DOI candidats est filtré en amont par `get_cross_import_dois` :
+seuls les DOI dont le préfixe résout à la RA `DataCite` (ou pas encore résolu)
 sont soumis, ce qui évite les 404 systématiques sur les DOI Crossref.
 
 DataCite est la source native du DOI pour ses préfixes : un miss (DOI absent de la
 réponse du batch) est définitif (DOI erroné ou non DataCite). Il est mémorisé dans
-``doi_lookups`` avec ``next_retry = NULL`` (jamais retenté).
+`doi_lookups` avec `next_retry = NULL` (jamais retenté).
 """
 
 from __future__ import annotations
@@ -52,7 +52,7 @@ def _record_doi(record: dict) -> str | None:
 
 
 class DataciteFetchMissingDoiAdapter:
-    """Adapter async conforme au ``AsyncFetchMissingDoiAdapter`` Protocol."""
+    """Adapter async conforme au `AsyncFetchMissingDoiAdapter` Protocol."""
 
     source_key = "datacite"
     batch_size = 10

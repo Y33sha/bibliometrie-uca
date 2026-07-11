@@ -1,12 +1,12 @@
 """Value objects et helpers de normalisation des identifiants personne.
 
 ORCID, IdHAL (login HAL en forme slug), IdRef (PPN SUDOC). Trois VOs
-immuables et auto-validés au même contrat que ``domain/publication.py`` :
+immuables et auto-validés au même contrat que `domain/publication.py` :
 
-- ``X("...")`` strict : lève ``ValidationError`` si malformé
-- ``X.try_parse(...)`` tolérant : renvoie None si malformé
+- `X("...")` strict : lève `ValidationError` si malformé
+- `X.try_parse(...)` tolérant : renvoie None si malformé
 
-Les helpers ``normalize_*`` sont exposés indépendamment pour les call
+Les helpers `normalize_*` sont exposés indépendamment pour les call
 sites qui veulent juste normaliser sans construire un VO (typiquement
 les normalizers de pipeline qui stockent la forme texte en base).
 """
@@ -292,7 +292,7 @@ def normalized_identifier_value(id_type: str, raw: str) -> str:
 
     Point d'entrée unique de validation avant écriture : délègue au VO auto-validé
     du type et renvoie la forme canonique stockée en base. Couvre les quatre types
-    de `PERSON_IDENTIFIER_TYPES`. Lève ``ValidationError`` si le type est inconnu ou
+    de `PERSON_IDENTIFIER_TYPES`. Lève `ValidationError` si le type est inconnu ou
     si la valeur est malformée — à l'appelant de décider (rejet 4xx côté API, log et
     poursuite côté pipeline).
     """
@@ -306,7 +306,7 @@ def normalized_identifier_value(id_type: str, raw: str) -> str:
 
 
 def compact_identifiers(**ids: JsonValue) -> dict[str, JsonValue] | None:
-    """Construit le dict d'identifiants pour ``source_authorships.person_identifiers``.
+    """Construit le dict d'identifiants pour `source_authorships.person_identifiers`.
 
     Convention : valeur falsy (None, 0, "", …) → clé absente du dict,
     dict vide → None.

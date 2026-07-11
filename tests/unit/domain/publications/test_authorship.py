@@ -1,4 +1,4 @@
-"""Tests de l'entité fille ``Authorship`` (scaffolding Phase 1)."""
+"""Tests de l'entité fille `Authorship` (scaffolding Phase 1)."""
 
 from domain.publications.authorship import Authorship
 

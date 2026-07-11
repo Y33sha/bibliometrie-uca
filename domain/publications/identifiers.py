@@ -2,13 +2,13 @@
 
 DOI, HALId (document HAL), NNT (Numéro National de Thèse), PMID (PubMed),
 PMCID (PubMed Central), ArxivId (arXiv). VOs immuables et auto-validés au
-même contrat que ``domain/persons/identifiers.py`` :
+même contrat que `domain/persons/identifiers.py` :
 
-- ``X("...")`` strict : lève ``ValidationError`` si malformé
-- ``X.try_parse(...)`` tolérant : renvoie None si malformé
+- `X("...")` strict : lève `ValidationError` si malformé
+- `X.try_parse(...)` tolérant : renvoie None si malformé
 
-Les helpers ``clean_doi``, ``normalize_nnt``, ``extract_hal_id_from_url``,
-``normalize_pmid``, ``normalize_pmcid``, ``normalize_arxiv_id`` sont exposés
+Les helpers `clean_doi`, `normalize_nnt`, `extract_hal_id_from_url`,
+`normalize_pmid`, `normalize_pmcid`, `normalize_arxiv_id` sont exposés
 indépendamment pour les call sites qui veulent juste normaliser sans
 construire un VO (typiquement les normalizers de pipeline qui stockent la
 forme texte en base). Ils acceptent une URL (location OpenAlex, lien externe

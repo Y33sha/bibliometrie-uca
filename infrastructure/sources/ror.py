@@ -27,7 +27,7 @@ def fetch_ror_record(
 ) -> dict[str, Any] | None:
     """GET sur l'API ROR v2 pour un ROR ID donné.
 
-    Retourne le record JSON ou ``None`` sur 404 / erreur réseau. Pas de
+    Retourne le record JSON ou `None` sur 404 / erreur réseau. Pas de
     retry élaboré — les consommateurs sont tolérants à un fetch
     occasionnellement raté (skip la ligne et continue).
     """

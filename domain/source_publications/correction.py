@@ -177,17 +177,17 @@ class _AppliesTo(TypedDict, total=False):
 
     Toutes les clés présentes sont AND-ées. Les clés absentes sont ignorées (pas de prédicat sur ce champ).
 
-    - ``doc_type`` : `str` (équivalence après lowercase) ou `frozenset[str]` (appartenance après lowercase). Whitelist : limite la règle aux types bruts plausibles, épargne les types-référents (thesis, book, …).
-    - ``journal_type`` : `str` — équivalence sur `sp.journal_type` (champ joint depuis `journals`).
-    - ``url_contains`` : `str` — substring présente dans au moins une des `sp.urls`.
-    - ``doi_contains`` : `str` — substring présente dans `sp.doi` (DOIs stockés en minuscules).
-    - ``title_prefix_normalized`` : `tuple[str, ...]` — `normalize_text(sp.title)` commence par au moins un préfixe du tuple.
-    - ``title_regex`` : `re.Pattern[str]` — `pattern.search(sp.title)` matche.
-    - ``journal_id_present`` : `bool` — `(sp.journal_id is not None)` vaut la valeur attendue. Signal « la SP est rattachée à un journal » (donc un article, pas une thèse).
-    - ``doi_prefix_not_in`` : `tuple[str, ...]` — la SP porte un DOI **et** son préfixe (`doi.split('/')[0]`) n'appartient à aucun préfixe du tuple. Faux si pas de DOI (le prédicat affirme quelque chose *sur* le DOI). Sert à exclure des registrants connus par préfixe (ex. registres de thèses).
-    - ``oa_status`` : `str` — équivalence sur `sp.oa_status` (le statut d'entrée, ex. `embargoed`).
-    - ``embargo_expired`` : `bool` — `sp.embargo_expired` (calculé au fetch : `embargo_until <= current_date`) vaut la valeur attendue.
-    - ``declares_preprint`` : `bool` — `sp.declares_preprint` (calculé au fetch : la SP déclare une relation `is-preprint-of`) vaut la valeur attendue.
+    - `doc_type` : `str` (équivalence après lowercase) ou `frozenset[str]` (appartenance après lowercase). Whitelist : limite la règle aux types bruts plausibles, épargne les types-référents (thesis, book, …).
+    - `journal_type` : `str` — équivalence sur `sp.journal_type` (champ joint depuis `journals`).
+    - `url_contains` : `str` — substring présente dans au moins une des `sp.urls`.
+    - `doi_contains` : `str` — substring présente dans `sp.doi` (DOIs stockés en minuscules).
+    - `title_prefix_normalized` : `tuple[str, ...]` — `normalize_text(sp.title)` commence par au moins un préfixe du tuple.
+    - `title_regex` : `re.Pattern[str]` — `pattern.search(sp.title)` matche.
+    - `journal_id_present` : `bool` — `(sp.journal_id is not None)` vaut la valeur attendue. Signal « la SP est rattachée à un journal » (donc un article, pas une thèse).
+    - `doi_prefix_not_in` : `tuple[str, ...]` — la SP porte un DOI **et** son préfixe (`doi.split('/')[0]`) n'appartient à aucun préfixe du tuple. Faux si pas de DOI (le prédicat affirme quelque chose *sur* le DOI). Sert à exclure des registrants connus par préfixe (ex. registres de thèses).
+    - `oa_status` : `str` — équivalence sur `sp.oa_status` (le statut d'entrée, ex. `embargoed`).
+    - `embargo_expired` : `bool` — `sp.embargo_expired` (calculé au fetch : `embargo_until <= current_date`) vaut la valeur attendue.
+    - `declares_preprint` : `bool` — `sp.declares_preprint` (calculé au fetch : la SP déclare une relation `is-preprint-of`) vaut la valeur attendue.
 
     Ajouter un nouveau type de prédicat = ajouter une clé ici + une branche dans `_check_predicate`.
     """

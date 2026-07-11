@@ -1,4 +1,4 @@
-"""Tests de l'aggregate root ``Publication``."""
+"""Tests de l'aggregate root `Publication`."""
 
 import pytest
 

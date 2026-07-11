@@ -28,7 +28,7 @@ ExtractLogger = ScopedOrPlainLogger
 class ExtractionConfigError(Exception):
     """Configuration d'extraction incomplète (IDs/affiliations manquants).
 
-    Levée par ``load_config`` d'un extracteur quand un paramètre API
+    Levée par `load_config` d'un extracteur quand un paramètre API
     indispensable (IDs institution, affiliations, PPN…) n'est pas
     disponible. Interrompt l'extraction proprement avec un message
     explicite au lieu d'un 400 API opaque.

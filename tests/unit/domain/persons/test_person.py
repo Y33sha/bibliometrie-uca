@@ -1,4 +1,4 @@
-"""Tests de l'aggregate root ``Person`` (scaffolding Phase 1)."""
+"""Tests de l'aggregate root `Person` (scaffolding Phase 1)."""
 
 import pytest
 

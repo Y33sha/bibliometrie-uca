@@ -4,7 +4,7 @@ Table dénormalisée `(name_form, person_id, sources text[])` avec PK
 composite `(name_form, person_id)`. Toutes les opérations s'expriment
 en INSERT/UPDATE/DELETE directs : pas de JSONB à manipuler en mémoire,
 pas de représentation in-memory du mapping. Les noms historiques
-``add_person_source`` / ``remove_person_source`` / ``is_ambiguous``
+`add_person_source` / `remove_person_source` / `is_ambiguous`
 sont conservés ici comme opérations SQL (ils manipulaient le JSONB
 auparavant — leur sémantique métier survit, leur implémentation est
 DB).
@@ -21,11 +21,11 @@ from domain.sources.registry import AUTHOR_SOURCES_SQL
 
 
 def refresh_name_forms(conn: Connection, person_id: int, forms: set[str]) -> None:
-    """Recalcule les formes de nom source ``'persons'`` d'une personne.
+    """Recalcule les formes de nom source `'persons'` d'une personne.
 
-    Retire ``'persons'`` des sources de toutes les rows de cette
+    Retire `'persons'` des sources de toutes les rows de cette
     personne, supprime les rows devenues sans source, puis pose les
-    nouvelles formes (avec source ``'persons'``) via un UPSERT qui
+    nouvelles formes (avec source `'persons'`) via un UPSERT qui
     fusionne avec les sources existantes (cross-source).
 
     `forms` : l'ensemble des formes normalisées calculées par le
@@ -52,8 +52,8 @@ def add_name_form(
 ) -> None:
     """Ajoute une forme de nom (normalisée) à une personne, idempotent.
 
-    Normalise `full_name`, puis pose le couple ``(name_form,
-    person_id)`` avec ``sources = [source]`` (vide si `source` est None).
+    Normalise `full_name`, puis pose le couple `(name_form,
+    person_id)` avec `sources = [source]` (vide si `source` est None).
     Sur conflit, fusionne avec les sources existantes.
     """
     if not full_name or not full_name.strip():
@@ -93,11 +93,11 @@ def delete_orphan_name_forms_for_person(conn: Connection, person_id: int) -> int
 
     Appelé après un rejet de contribution : détacher les sources d'une paire
     peut laisser une forme de nom que plus aucune source n'atteste. Les formes
-    calculées à partir du nom de la personne (source ``'persons'``) sont
+    calculées à partir du nom de la personne (source `'persons'`) sont
     conservées : elles ne dépendent pas des sources.
 
-    Ne touche que les formes ``pending`` : un verdict ``confirmed``/``rejected`` est
-    préservé même devenu orphelin — supprimer une forme ``rejected`` détruirait le
+    Ne touche que les formes `pending` : un verdict `confirmed`/`rejected` est
+    préservé même devenu orphelin — supprimer une forme `rejected` détruirait le
     blocage de non-retour qu'elle matérialise.
 
     Retourne le nombre de formes supprimées."""
@@ -123,16 +123,16 @@ def delete_orphan_name_forms_for_person(conn: Connection, person_id: int) -> int
 def add_person_source(
     conn: Connection, *, name_form: str, person_id: int, source: str | None
 ) -> None:
-    """Ajoute une source au couple ``(name_form, person_id)``, idempotent.
+    """Ajoute une source au couple `(name_form, person_id)`, idempotent.
 
     Crée la row si elle n'existe pas (avec `sources = [source]` ou
     `sources = []` si `source is None`). Sur conflit, fusionne la
     source dans le tableau existant — déduplication + tri stable
-    via ``array_agg(DISTINCT ... ORDER BY ...)``.
+    via `array_agg(DISTINCT ... ORDER BY ...)`.
 
-    Statut : toute forme entre en ``pending`` ; seule une action admin la confirme ou
-    la rejette. L'appartenance d'une forme au nom canonique (source ``'persons'``) se
-    lit dans ``sources``, pas dans le statut. Une fusion préserve le verdict existant.
+    Statut : toute forme entre en `pending` ; seule une action admin la confirme ou
+    la rejette. L'appartenance d'une forme au nom canonique (source `'persons'`) se
+    lit dans `sources`, pas dans le statut. Une fusion préserve le verdict existant.
     """
     new_sources = [source] if source else []
     conn.execute(
@@ -150,7 +150,7 @@ def add_person_source(
 
 
 def remove_person_source(conn: Connection, *, name_form: str, person_id: int, source: str) -> None:
-    """Retire une source du couple ``(name_form, person_id)``.
+    """Retire une source du couple `(name_form, person_id)`.
 
     Si la liste devient vide, supprime la row (le couple disparaît).
     No-op si la row n'existe pas ou si la source n'y figure pas.
