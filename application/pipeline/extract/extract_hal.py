@@ -127,7 +127,6 @@ class HalExtractor(SourceExtractor[HalExtractConfig]):
     """Extraction HAL — orchestrateur applicatif."""
 
     SOURCE = "hal"
-    DESCRIPTION = "Extraction HAL → staging"
 
     def __init__(
         self,
@@ -137,20 +136,6 @@ class HalExtractor(SourceExtractor[HalExtractConfig]):
     ) -> None:
         super().__init__(conn, logger)
         self._adapter = adapter
-
-    def add_cli_args(self, parser: argparse.ArgumentParser) -> None:
-        parser.add_argument(
-            "--year", type=int, help="Année spécifique (sinon le range depuis l'ancre)"
-        )
-        parser.add_argument(
-            "--start-year",
-            type=int,
-            help="Année de début du range (défaut: config pipeline_start_year_full)",
-        )
-        parser.add_argument(
-            "--since",
-            help="Date ISO (YYYY-MM-DD) : ne récupérer que les documents soumis depuis cette date",
-        )
 
     def load_config(self, conn: Connection) -> HalExtractConfig:
         config = self._adapter.load_config(conn)

@@ -87,7 +87,6 @@ class ScanrExtractor(SourceExtractor[ScanrExtractConfig]):
     """Extraction ScanR — orchestrateur applicatif."""
 
     SOURCE = "scanr"
-    DESCRIPTION = "Extraction ScanR → staging"
 
     def __init__(
         self,
@@ -97,14 +96,6 @@ class ScanrExtractor(SourceExtractor[ScanrExtractConfig]):
     ) -> None:
         super().__init__(conn, logger)
         self._adapter = adapter
-
-    def add_cli_args(self, parser: argparse.ArgumentParser) -> None:
-        parser.add_argument("--year", type=int, help="Année unique")
-        parser.add_argument(
-            "--start-year",
-            type=int,
-            help="Année de début du range (défaut: config pipeline_start_year_full)",
-        )
 
     def load_config(self, conn: Connection) -> ScanrExtractConfig:
         config = self._adapter.load_config(conn)
