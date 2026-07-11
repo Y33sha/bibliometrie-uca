@@ -42,7 +42,7 @@ async def run_async(
 
     Lance les fetchs HTTP en parallèle via `asyncio.gather`, bornés par un sémaphore `adapter.max_concurrent` pour respecter le rate-limit de l'API. Les inserts DB restent sync, délégués au threadpool via `asyncio.to_thread` et sérialisés par un `asyncio.Lock` (la `Connection` SA sync n'est pas thread-safe).
 
-    Un DOI confirmé absent par la source (réponse vide / 404) revient en sentinelle `not_found_marker` : comptée à part (`not_found`, exclue de `fetched`) et passée à `adapter.insert()`, qui la route vers le backoff (`doi_lookups`, ou stub `staging` pour Crossref).
+    Quand la source confirme l'absence d'un DOI (réponse vide / 404), `fetch_async` renvoie une sentinelle `not_found_marker` au lieu d'un record : comptée à part (`not_found`, exclue de `fetched`) et passée à `adapter.insert()`, qui la mémorise dans `doi_lookups`.
 
     Args:
         conn: `Connection` SA ouverte.
@@ -94,7 +94,7 @@ async def run_async(
                 if request_delay:
                     await asyncio.sleep(request_delay)
 
-                # Les sentinelles `not_found` ne sont pas des records API : on les compte à part, mais on les `insert()` quand même (l'adapter les route vers le backoff `doi_lookups` / le stub `staging`).
+                # Les sentinelles `not_found` ne sont pas des records API : on les compte à part, mais on les `insert()` quand même (l'adapter les mémorise dans `doi_lookups`).
                 real = [r for r in records if not is_not_found_marker(r)]
                 progress["fetched"] += len(real)
                 progress["not_found"] += len(records) - len(real)

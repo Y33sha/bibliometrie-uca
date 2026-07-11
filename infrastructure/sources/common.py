@@ -147,14 +147,12 @@ def upsert_staging(
     return (bool(row.inserted), bool(row.changed))
 
 
-_NOT_FOUND_STUB_TEMPLATE = """
+_NOT_FOUND_STUB_SQL = text(
+    """
     INSERT INTO staging (source, source_id, doi, raw_data, not_found_at, processed, entry_mode)
     VALUES (:source, :source_id, :doi, '{}'::jsonb, now(), TRUE, :entry_mode)
-    ON CONFLICT (source, source_id) DO __ON_CONFLICT__
-"""
-_NOT_FOUND_STUB_DO_NOTHING = text(_NOT_FOUND_STUB_TEMPLATE.replace("__ON_CONFLICT__", "NOTHING"))
-_NOT_FOUND_STUB_REARM = text(
-    _NOT_FOUND_STUB_TEMPLATE.replace("__ON_CONFLICT__", "UPDATE SET not_found_at = now()")
+    ON CONFLICT (source, source_id) DO UPDATE SET not_found_at = now()
+    """
 )
 
 
@@ -165,17 +163,17 @@ def upsert_not_found_stub(
     source_id: str,
     doi: str | None = None,
     entry_mode: str,
-    rearm: bool = False,
 ) -> None:
     """Pose un stub `staging` « introuvable » (raw_data vide, `not_found_at`, `processed`).
 
-    Partagé par les cross-imports (crossref/datacite par DOI, HAL par hal-id/NNT).
-    `rearm=True` : ré-arme `not_found_at` sur conflit (miss retriable, HAL) ; sinon
-    `DO NOTHING` (miss définitif d'une source native du DOI). Ne commit pas.
+    Utilisé par le cross-import HAL (hal-id / NNT), dont l'identifiant natif est le hal-id :
+    le stub est keyé par `(source, source_id)` et ré-arme `not_found_at` sur conflit (le miss
+    est retriable — HAL peut publier le document plus tard). Ne commit pas. Les misses par
+    DOI, eux, vivent dans `doi_lookups` (cf. `record_doi_not_found`).
     """
-    sql = _NOT_FOUND_STUB_REARM if rearm else _NOT_FOUND_STUB_DO_NOTHING
     conn.execute(
-        sql, {"source": source, "source_id": source_id, "doi": doi, "entry_mode": entry_mode}
+        _NOT_FOUND_STUB_SQL,
+        {"source": source, "source_id": source_id, "doi": doi, "entry_mode": entry_mode},
     )
 
 
@@ -221,29 +219,34 @@ pas une règle métier — d'où sa place ici et non dans `domain/`.
 _RECORD_DOI_NOT_FOUND_SQL = text(
     """
     INSERT INTO doi_lookups (source, doi, not_found_at, next_retry)
-    VALUES (CAST(:source AS source_type), :doi, now(), now() + make_interval(days => :days))
+    VALUES (
+        CAST(:source AS source_type), :doi, now(),
+        CASE WHEN :permanent THEN NULL ELSE now() + make_interval(days => :days) END
+    )
     ON CONFLICT (source, doi) DO UPDATE SET
         not_found_at = now(),
-        next_retry = now() + make_interval(days => :days)
+        next_retry = CASE WHEN :permanent THEN NULL ELSE now() + make_interval(days => :days) END
     """
 )
 
 
-def record_doi_not_found(conn: Connection, source: str, doi: str) -> None:
-    """Mémorise (ou ré-arme) un miss cross-import dans `doi_lookups`.
+def record_doi_not_found(
+    conn: Connection, source: str, doi: str, *, permanent: bool = False
+) -> None:
+    """Mémorise (ou ré-arme) un miss de cross-import par DOI dans `doi_lookups`.
 
-    Appelé par les adapters `fetch_missing_doi` non natifs (hal, openalex,
-    wos, scanr) quand un DOI cherché est absent de la source. Le miss est
-    temporaire : `next_retry` repousse la prochaine tentative de
-    `DOI_LOOKUP_RETRY_DAYS` jours. Ne commit pas — l'appelant s'en charge.
+    Appelé par les adapters `fetch_missing_doi` quand un DOI cherché est absent de la source. `permanent=False` (hal, openalex, wos, scanr) : miss temporaire, `next_retry` repousse la prochaine tentative de `DOI_LOOKUP_RETRY_DAYS` jours — ces sources peuvent indexer le DOI plus tard. `permanent=True` (crossref, datacite, dont le DOI est l'identifiant natif) : `next_retry = NULL`, miss définitif jamais retenté. Ne commit pas — l'appelant s'en charge.
 
-    Le DOI est normalisé par `clean_doi` avant écriture : `doi_lookups.doi`
-    sert de clé d'exclusion comparée à des DOI déjà normalisés (cf.
-    `get_cross_import_dois`) — toute forme non canonique manquerait le backoff.
+    Le DOI est normalisé par `clean_doi` avant écriture : `doi_lookups.doi` sert de clé d'exclusion comparée à des DOI déjà normalisés (cf. `get_cross_import_dois`) — toute forme non canonique manquerait l'exclusion.
     """
     conn.execute(
         _RECORD_DOI_NOT_FOUND_SQL,
-        {"source": source, "doi": clean_doi(doi), "days": DOI_LOOKUP_RETRY_DAYS},
+        {
+            "source": source,
+            "doi": clean_doi(doi),
+            "days": DOI_LOOKUP_RETRY_DAYS,
+            "permanent": permanent,
+        },
     )
 
 
@@ -368,7 +371,8 @@ def get_cross_import_dois(conn: Connection, target: str) -> list[str]:
                   ){prefix_filter}
               AND NOT EXISTS (
                   SELECT 1 FROM doi_lookups l
-                  WHERE l.source = :target AND l.doi = c.doi AND l.next_retry > now()
+                  WHERE l.source = :target AND l.doi = c.doi
+                    AND (l.next_retry IS NULL OR l.next_retry > now())
               )
             ORDER BY c.doi
         """
@@ -393,7 +397,8 @@ def get_cross_import_dois(conn: Connection, target: str) -> list[str]:
               ){pg_prefix_filter}
           AND NOT EXISTS (
               SELECT 1 FROM doi_lookups l
-              WHERE l.source = %(target)s AND l.doi = c.doi AND l.next_retry > now()
+              WHERE l.source = %(target)s AND l.doi = c.doi
+                AND (l.next_retry IS NULL OR l.next_retry > now())
           )
         ORDER BY c.doi
     """

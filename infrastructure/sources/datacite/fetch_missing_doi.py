@@ -15,11 +15,9 @@ Le pool de DOI candidats est filtré en amont par ``get_cross_import_dois`` :
 seuls les DOI dont le préfixe résout à la RA ``DataCite`` (ou pas encore résolu)
 sont soumis, ce qui évite les 404 systématiques sur les DOI Crossref.
 
-Les DOI introuvables (absents de la réponse du batch) sont stockés avec
-``not_found_at`` et ``processed=TRUE`` pour ne pas être réinterrogés à chaque
-run. DataCite est la source native du DOI pour ses préfixes : un miss est
-définitif (DOI erroné ou non DataCite), donc le stub reste dans ``staging``
-(pas de backoff).
+DataCite est la source native du DOI pour ses préfixes : un miss (DOI absent de la
+réponse du batch) est définitif (DOI erroné ou non DataCite). Il est mémorisé dans
+``doi_lookups`` avec ``next_retry = NULL`` (jamais retenté).
 """
 
 from __future__ import annotations
@@ -34,7 +32,7 @@ from application.ports.pipeline.cross_imports.fetch_missing_doi import (
     not_found_marker,
 )
 from domain.publications.identifiers import clean_doi
-from infrastructure.sources.common import upsert_not_found_stub, upsert_staging
+from infrastructure.sources.common import record_doi_not_found, upsert_staging
 from infrastructure.sources.config import get_api_base_urls, get_polite_pool_email
 from infrastructure.sources.http_retry_async import http_request_with_retry_async
 
@@ -117,14 +115,8 @@ class DataciteFetchMissingDoiAdapter:
 
     def insert(self, conn: Connection, record: dict) -> bool:
         if is_not_found_marker(record):
-            # Source native du DOI pour ses préfixes : miss définitif → stub, pas de re-arm.
-            upsert_not_found_stub(
-                conn,
-                source="datacite",
-                source_id=record["_doi"],
-                doi=record["_doi"],
-                entry_mode="cross_import_doi",
-            )
+            # Source native du DOI pour ses préfixes : miss définitif → doi_lookups permanent.
+            record_doi_not_found(conn, "datacite", record["_doi"], permanent=True)
             conn.commit()
             return False
 

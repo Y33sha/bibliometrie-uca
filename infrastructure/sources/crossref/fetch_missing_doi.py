@@ -9,10 +9,9 @@ Polite pool obtenu via le header ``User-Agent`` qui inclut un mailto.
 Doc CrossRef : polite = 10 req/s + 3 concurrentes. On colle exactement à
 ces limites (max_concurrent=3, request_delay=0.1 s) pour éviter les 429.
 
-Les DOI introuvables (HTTP 404) sont stockés avec ``not_found_at`` et
-``processed=TRUE`` pour ne pas être réinterrogés à chaque run. Crossref
-est la source native du DOI : un 404 est définitif (DOI erroné ou non
-Crossref), donc le stub reste dans ``staging`` (pas de backoff).
+Crossref est la source native du DOI : un 404 est définitif (DOI erroné ou non
+Crossref). Le miss est mémorisé dans ``doi_lookups`` avec ``next_retry = NULL``
+(jamais retenté), ce qui l'exclut définitivement du pool de cross-import.
 """
 
 from __future__ import annotations
@@ -28,7 +27,7 @@ from application.ports.pipeline.cross_imports.fetch_missing_doi import (
     not_found_marker,
 )
 from domain.publications.identifiers import clean_doi
-from infrastructure.sources.common import upsert_not_found_stub, upsert_staging
+from infrastructure.sources.common import record_doi_not_found, upsert_staging
 from infrastructure.sources.config import get_api_base_urls, get_polite_pool_email
 from infrastructure.sources.http_retry_async import http_request_with_retry_async
 
@@ -71,8 +70,8 @@ class CrossrefFetchMissingDoiAdapter:
             )
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 404:
-                # 404 = DOI confirmé absent de Crossref. Source native du DOI :
-                # le miss est définitif, insert() pose un stub `staging`.
+                # 404 = DOI confirmé absent de Crossref (source native du DOI, miss
+                # définitif). insert() le mémorise dans doi_lookups (permanent).
                 return [not_found_marker(doi)]
             return []
         except httpx.RequestError:
@@ -85,14 +84,8 @@ class CrossrefFetchMissingDoiAdapter:
 
     def insert(self, conn: Connection, record: dict) -> bool:
         if is_not_found_marker(record):
-            # Source native du DOI : un 404 est définitif → stub `staging`, pas de re-arm.
-            upsert_not_found_stub(
-                conn,
-                source="crossref",
-                source_id=record["_doi"],
-                doi=record["_doi"],
-                entry_mode="cross_import_doi",
-            )
+            # Source native du DOI : un 404 est définitif → doi_lookups permanent, jamais retenté.
+            record_doi_not_found(conn, "crossref", record["_doi"], permanent=True)
             conn.commit()
             return False
 

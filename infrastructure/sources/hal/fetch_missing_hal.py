@@ -236,9 +236,7 @@ class PgHalFetchMissingAdapter(HalFetchMissingAdapter):
         if doc:
             insert_staging_hal(conn, hal_id, extract_doi(doc), doc)
             return True
-        upsert_not_found_stub(
-            conn, source="hal", source_id=hal_id, entry_mode="cross_import_hal", rearm=True
-        )
+        upsert_not_found_stub(conn, source="hal", source_id=hal_id, entry_mode="cross_import_hal")
         return False
 
     def insert_nnt_result(
