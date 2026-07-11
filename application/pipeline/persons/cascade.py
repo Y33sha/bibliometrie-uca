@@ -2,39 +2,22 @@
 
 Deux populations de candidats traversent la même cascade :
 
-- **In-périmètre** (`source_authorships.in_perimeter = TRUE`) : authorships dont la source a
-  détecté une affiliation UCA. Éligibles à tous les barreaux.
-- **Hors-périmètre** ancrés (`in_perimeter = FALSE`) : rattachables sans forme de nom —
-  identifiant fort partagé avec une personne connue, ou ancrage cross-source (même publication ×
-  position qu'un authorship déjà lié). Le barreau `person_name_forms` (match unique / création) y
-  est neutralisé : un nom seul ne peut ni introduire ni attacher une personne hors-périmètre.
+- **In-périmètre** (`source_authorships.in_perimeter = TRUE`) : authorships dont la source a détecté une affiliation dans le périmètre. Éligibles à tous les barreaux.
+- **Hors-périmètre** ancrés (`in_perimeter = FALSE`) : rattachables sans forme de nom — identifiant fort partagé avec une personne connue, ou ancrage cross-source (même publication × position qu'un authorship déjà lié). Le barreau `person_name_forms` (match unique / création) y est neutralisé : un nom seul ne peut ni introduire ni attacher une personne hors-périmètre.
 
-`match` interroge, pour chaque signature non liée, les signaux du plus fiable au moins fiable et
-rattache **sans jamais créer** :
+`match` interroge, pour chaque signature non liée, les signaux du plus fiable au moins fiable et rattache **sans jamais créer** :
 
-1. **ORCID** déposé par l'auteur (`ORCID_MATCH_SOURCES` : crossref / openalex / hal) — l'ORCID WoS,
-   algorithmique, n'est pas un signal.
+1. **ORCID** déposé par l'auteur (`ORCID_MATCH_SOURCES` : crossref / openalex / hal) — l'ORCID WoS, algorithmique, n'est pas un signal.
 2. **`hal_person_id`** — compte HAL, porté par les authorships HAL.
 3. **IdRef**.
-4. **Match par `person_name_forms`** — nom normalisé désignant une seule personne. Avant le
-   cross-source, pour maximiser les ancres fermes que ce dernier exploite.
+4. **Match par `person_name_forms`** — nom normalisé désignant une seule personne. Avant le cross-source, pour maximiser les ancres fermes que ce dernier exploite.
 5. **Cross-source** — même publication × position, nom compatible ; inopérant au bootstrap.
 
-Un match par identifiant est **corroboré par le nom** : refusé (et journalisé) si le nom de la
-signature est incompatible avec le propriétaire de la valeur (identifiant recopié sur le mauvais
-co-auteur). Les signatures qu'aucun signal ne rattache — nom inconnu, ou ambigu — restent non liées.
+Un match par identifiant est **corroboré par le nom** : refusé (et journalisé) si le nom de la signature est incompatible avec le propriétaire de la valeur (identifiant recopié sur le mauvais co-auteur). Les signatures qu'aucun signal ne rattache — nom inconnu, ou ambigu — restent non liées.
 
-`create` reprend les signatures restées non liées et les re-juge contre l'état ferme désormais
-complet, **cross-source et forme de nom seulement** (les restantes n'ont aucun match identifiant,
-sinon `match` les aurait prises). Une à-créer peut ainsi rejoindre par cross-source une ancre d'une
-autre source de la même publication — deux graphies du même auteur aux formes disjointes
-(« Jean Martin » / « J-P Martin ») ne créent plus deux personnes selon l'ordre ; ne restent créées
-que les vraies inconnues. `create` recharge ses index depuis la base : il voit tout ce que `match`
-a posé, la création reste différée sans liste en mémoire.
+`create` reprend les signatures restées non liées et les re-juge contre l'état ferme désormais complet, **cross-source et forme de nom seulement** (les restantes n'ont aucun match identifiant, sinon `match` les aurait prises). Une à-créer peut ainsi rejoindre par cross-source une ancre d'une autre source de la même publication — deux graphies du même auteur aux formes disjointes (« Jean Martin » / « J-P Martin ») ne créent pas deux personnes selon l'ordre ; ne restent créées que les vraies inconnues. `create` recharge ses index depuis la base : il voit tout ce que `match` a posé, la création reste différée sans liste en mémoire.
 
-Garde de rejet : les personnes rejetées pour la publication (`rejected_authorships`) sont éliminées
-des candidats à chaque signal — un match ne recrée pas une paire rejetée, et l'élimination peut
-désambiguïser un name form (2 candidats dont 1 rejeté → match univoque).
+Garde de rejet : les personnes rejetées pour la publication (`rejected_authorships`) sont éliminées des candidats à chaque signal — un match ne recrée pas une paire rejetée, et l'élimination peut désambiguïser un name form (2 candidats dont 1 rejeté → match univoque).
 """
 
 import logging
@@ -139,20 +122,16 @@ def _enrich(row: BareUnlinkedAuthorship) -> EnrichedAuthorship:
 def get_all_unlinked_authorships(
     conn: Connection, queries: PersonsCreateQueries
 ) -> list[EnrichedAuthorship]:
-    """Charge les authorships UCA sans person_id (toutes sources) et les enrichit
-    (parsing noms, flag allow_create)."""
+    """Charge les authorships in-périmètre sans person_id (toutes sources) et les enrichit (parsing noms, flag allow_create)."""
     return [_enrich(row) for row in queries.fetch_unlinked_authorships(conn)]
 
 
 def get_out_of_perimeter_candidates(
     conn: Connection, queries: PersonsCreateQueries
 ) -> list[EnrichedAuthorship]:
-    """Charge les candidats hors-périmètre rattachables sans forme de nom
-    (identifiant fort partagé ou ancrage cross-source) et les enrichit.
+    """Charge les candidats hors-périmètre rattachables sans forme de nom (identifiant fort partagé ou ancrage cross-source) et les enrichit.
 
-    Ces candidats traversent la même cascade que les UCA, mais le barreau
-    `person_name_forms` (match unique / création) y est neutralisé : un nom
-    seul ne peut ni introduire ni attacher une personne hors-périmètre."""
+    Ces candidats traversent la même cascade que les in-périmètre, mais le barreau `person_name_forms` (match unique / création) y est neutralisé : un nom seul ne peut ni introduire ni attacher une personne hors-périmètre."""
     return [_enrich(row) for row in queries.fetch_out_of_perimeter_candidates(conn)]
 
 
@@ -176,14 +155,9 @@ def _max_authors_per_pub(
 ) -> dict[int, int]:
     """Nombre d'auteurs pour chaque publication (max parmi les sources).
 
-    Sert au court-circuit du matching cross-source au-delà de
-    `MAX_AUTHORS_CROSS_SOURCE`. Le matching personnes "cross-source" repose sur le
-    triplet "même publi récupérée sur plusieurs sources, même position auteur, noms compatibles". Sur les méga-papers, ce triplet cesse d'être discriminant : désalignements de positions fréquents entre sources, homonymes de patronyme, prénoms réduits à l'initiale. Le seuil 50 est un proxy arbitraire pour écarter ces publis.
+    Sert au court-circuit du matching cross-source au-delà de `MAX_AUTHORS_CROSS_SOURCE`. Le matching personnes "cross-source" repose sur le triplet "même publi récupérée sur plusieurs sources, même position auteur, noms compatibles". Sur les méga-papers, ce triplet cesse d'être discriminant : désalignements de positions fréquents entre sources, homonymes de patronyme, prénoms réduits à l'initiale. Le seuil 50 est un proxy arbitraire pour écarter ces publis.
 
-    Une publi peut avoir un nombre d'auteurs différent selon
-    la source — il faut bien retenir un chiffre pour comparer au
-    seuil. On prend le plus élevé par défensivité : si HAL dit 48 et
-    OpenAlex 52, on est dans le régime méga-paper.
+    Une publi peut avoir un nombre d'auteurs différent selon la source — il faut bien retenir un chiffre pour comparer au seuil. On prend le plus élevé par défensivité : si HAL dit 48 et OpenAlex 52, on est dans le régime méga-paper.
     """
     counts: dict[int, dict[str, int]] = defaultdict(lambda: defaultdict(int))
     for a in all_authorships:
@@ -204,10 +178,7 @@ def _max_authors_per_pub(
 class _Cascade:
     """État d'une passe de cascade : signatures non liées, index préchargés, compteurs, effets.
 
-    `match` et `create` en instancient chacun une (fetch + prefetch frais) : aucune mémoire n'est
-    partagée entre les deux étapes, `create` relit depuis la base l'état ferme posé par `match`.
-    Les index sont tenus à jour en vif pendant la passe pour qu'une signature voie ce qu'une
-    signature précédente de la **même** passe vient de poser.
+    `match` et `create` en instancient chacun une (fetch + prefetch frais) : aucune mémoire n'est partagée entre les deux étapes, `create` relit depuis la base l'état ferme posé par `match`. Les index sont tenus à jour en vif pendant la passe pour qu'une signature voie ce qu'une signature précédente de la **même** passe vient de poser.
     """
 
     def __init__(
@@ -262,8 +233,7 @@ class _Cascade:
             if a.publication_id is not None
             else frozenset()
         )
-        # Barreau name_form réservé au périmètre UCA : hors-périmètre, un nom seul ne peut ni
-        # attacher ni créer (on n'a que des candidats ancrés sur identifiant ou position).
+        # Barreau name_form réservé au périmètre : hors-périmètre, un nom seul ne peut ni attacher ni créer (on n'a que des candidats ancrés sur identifiant ou position).
         if a.in_perimeter:
             norm = a.author_name_normalized
             name_form_outcome = decide_name_form_outcome(
@@ -285,9 +255,7 @@ class _Cascade:
         hal_decision = decide_match_by_identifier(
             a.hal_person_id, self._hal_account_map, a.full_name, form, self._name_form_status
         )
-        # ORCID comme signal uniquement quand il est déposé par l'auteur (crossref / openalex
-        # raw_orcid / hal TEI) ; l'ORCID WoS, algorithmique, est ignoré ici (mais enregistré sur
-        # person_identifiers via add_identifiers).
+        # ORCID comme signal uniquement quand il est déposé par l'auteur (crossref / openalex raw_orcid / hal TEI) ; l'ORCID WoS, algorithmique, est ignoré ici (mais enregistré sur person_identifiers via add_identifiers).
         orcid_signal = a.orcid if a.source in ORCID_MATCH_SOURCES else None
         orcid_decision = decide_match_by_identifier(
             orcid_signal, self._orcid_map, a.full_name, form, self._name_form_status
@@ -318,8 +286,7 @@ class _Cascade:
         )
 
     def decide_cross_and_name(self, a: EnrichedAuthorship) -> PersonMatchDecision:
-        """Décision cross-source + nom seulement (sans identifiant). Pour `create` : les restantes
-        n'ont aucun match identifiant, sinon `match` les aurait prises."""
+        """Décision cross-source + nom seulement (sans identifiant). Pour `create` : les restantes n'ont aucun match identifiant, sinon `match` les aurait prises."""
         cross_source_match, name_form_outcome, rejected_for_pub = self._cross_and_name(a)
         return decide_person_match(
             orcid_match=None,
@@ -332,8 +299,7 @@ class _Cascade:
 
     def apply_match(self, a: EnrichedAuthorship, pid: int | None, reason: str) -> None:
         assert pid is not None  # garanti par decide_person_match action=match
-        # `link_to_person` et `add_identifiers` consomment des dicts (API historique de
-        # `application.services.persons`) : conversion via `_asdict()` au boundary.
+        # `link_to_person` et `add_identifiers` consomment des dicts (API historique de `application.services.persons`) : conversion via `_asdict()` au boundary.
         a_dict = a._asdict()
         link_to_person(
             pid,
@@ -347,8 +313,7 @@ class _Cascade:
         self.matched_counts[reason] += 1
         if not a.in_perimeter:
             self.out_of_perimeter_matched += 1
-        # Un membre ferme (identifiant, nom, création) ancre le cross-source de sa position ;
-        # un résultat cross-source, jamais — il n'ancre pas un autre cross-source.
+        # Un membre ferme (identifiant, nom, création) ancre le cross-source de sa position ; un résultat cross-source, jamais — il n'ancre pas un autre cross-source.
         if a.publication_id is not None and reason != "cross_source":
             self._linked_index[(a.publication_id, a.author_position)].append(
                 (pid, a.last_norm, a.first_norm, a.source)
@@ -362,10 +327,8 @@ class _Cascade:
         link_to_person(marker, [a_dict], repo=self._person_repo, resolution_mode="name")
         add_identifiers(marker, [a_dict], repo=self._person_repo)
         add_name_form(marker, a.full_name, repo=self._person_repo)
-        # Rendre la personne créée matchable dans la même passe par toutes ses formes — ordres ET
-        # initiales — via le générateur qui sert au peuplement de `person_name_forms`. On fusionne
-        # dans les listes existantes : une forme déjà portée reste ambiguë (donc non matchée en
-        # aveugle), au lieu d'être détournée vers la dernière créée.
+        # Rendre la personne créée matchable dans la même passe par toutes ses formes — ordres ET initiales — via le générateur qui sert au peuplement de `person_name_forms`.
+        # On fusionne dans les listes existantes : une forme déjà portée reste ambiguë (donc non matchée en aveugle), au lieu d'être détournée vers la dernière créée.
         for f in compute_person_name_forms(last, first):
             form_person_ids = self._name_form_map.setdefault(f, [])
             if marker not in form_person_ids:
@@ -459,8 +422,7 @@ def build_metrics(
 
     metrics = PhaseMetrics()
     metrics.add(total=match_result.in_perimeter_total, new=created, updated=linked_total)
-    # Tableau « méthode de rattachement » : clés techniques (libellés portés par le frontend),
-    # ordre par fiabilité décroissante de la cascade.
+    # Tableau « méthode de rattachement » : clés techniques (libellés portés par le frontend), ordre par fiabilité décroissante de la cascade.
     metrics.details["table"] = {
         "rows": [
             {"key": method, "count": matched[method]}

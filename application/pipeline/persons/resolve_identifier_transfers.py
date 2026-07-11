@@ -1,18 +1,10 @@
 """Passe de résolution : arbitrage par consensus des conflits d'attribution d'identifiant.
 
-Après la cascade personnes, les conflits collectés (`IdentifierConflict` : une valeur
-qu'une signature du candidat porte, déjà attribuée à un autre propriétaire) sont arbitrés
-par le **consensus** des porteurs — l'`author_name_normalized` majoritaire de la valeur.
-La valeur est transférée au candidat si, et seulement si, le consensus le désigne, lui et
-pas le propriétaire actuel (`form_matches_person`). Seules les attributions `pending` sont
-transférables ; les `confirmed` (verrou admin) sont laissées.
+Après la cascade personnes, les conflits collectés (`IdentifierConflict` : une valeur qu'une signature du candidat porte, déjà attribuée à un autre propriétaire) sont arbitrés par le **consensus** des porteurs — l'`author_name_normalized` majoritaire de la valeur. La valeur est transférée au candidat si, et seulement si, le consensus le désigne, lui et pas le propriétaire actuel (`form_matches_person`). Seules les attributions `pending` sont transférables ; les `confirmed` (verrou admin) sont laissées.
 
-Ordre-indépendant : le consensus est un agrégat de tous les porteurs, insensible à la
-séquence d'ingestion. Conservateur : un consensus qui désigne le propriétaire — ou ni
-l'un ni l'autre, ou plusieurs candidats à la fois — ne déclenche aucun transfert.
+Ordre-indépendant : le consensus est un agrégat de tous les porteurs, insensible à la séquence d'ingestion. Conservateur : un consensus qui désigne le propriétaire — ou ni l'un ni l'autre, ou plusieurs candidats à la fois — ne déclenche aucun transfert.
 
-La remédiation du stock déjà rattaché (déplacer les captures historiques et recomputer les
-formes des personnes délestées) est un chantier séparé, en oneshot sur la base de prod.
+La remédiation du stock déjà rattaché (déplacer les captures historiques et recomputer les formes des personnes délestées) est un chantier séparé, en oneshot sur la base de prod.
 """
 
 import logging
@@ -36,10 +28,7 @@ def build_identifier_conflicts(
 ) -> list[IdentifierConflict]:
     """Balaye le snapshot pour tous les conflits d'attribution d'identifiant.
 
-    Chaque personne qui détient des signatures d'une valeur d'identifiant sans en être le
-    propriétaire attribué est un conflit. Lecture d'agrégat — le résultat ne dépend pas de la
-    séquence de la cascade —, à confier ensuite à `resolve_identifier_transfers` qui tranche
-    par consensus. Partagé par le pipeline (balayage frontal) et la remédiation du stock.
+    Chaque personne qui détient des signatures d'une valeur d'identifiant sans en être le propriétaire attribué est un conflit. Lecture d'agrégat — le résultat ne dépend pas de la séquence de la cascade —, à confier ensuite à `resolve_identifier_transfers` qui tranche par consensus. Partagé par le pipeline (balayage frontal) et la remédiation du stock.
     """
     conflicts: list[IdentifierConflict] = []
     for id_type in _CONFLICT_ID_TYPES:
@@ -91,8 +80,7 @@ def resolve_identifier_transfers(
     person_ids = {c.candidate_person_id for c in pending} | {c.owner_person_id for c in pending}
     persons = queries.fetch_person_name_forms(conn, sorted(person_ids))
 
-    # Une valeur peut apparaître dans plusieurs conflits (candidats distincts) : on
-    # regroupe pour trancher une seule fois, la personne du consensus l'emportant.
+    # Une valeur peut apparaître dans plusieurs conflits (candidats distincts) : on regroupe pour trancher une seule fois, la personne du consensus l'emportant.
     candidates_by_value: dict[tuple[str, str], set[int]] = defaultdict(set)
     owner_by_value: dict[tuple[str, str], int] = {}
     for c in pending:
@@ -123,8 +111,7 @@ def resolve_identifier_transfers(
             continue  # l'état a changé entre la collecte et la résolution
         ident.transfer_to(target, source="auto")
         repo.update_identifier(ident)
-        # Les signatures affectées, restées sur l'ancien propriétaire et résolues par
-        # identifiant, repassent à NULL : la cascade les re-résout vers le nouveau propriétaire.
+        # Les signatures affectées, restées sur l'ancien propriétaire et résolues par identifiant, repassent à NULL : la cascade les re-résout vers le nouveau propriétaire.
         detached = queries.null_identifier_signatures(conn, id_type, id_value, owner_id)
         logger.info(
             "Transfert %s=%s : personne %d → %d (consensus %r), %d signature(s) détachée(s)",

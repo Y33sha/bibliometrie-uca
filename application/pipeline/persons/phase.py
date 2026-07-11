@@ -1,21 +1,15 @@
 """Orchestrateur unique de la phase personnes.
 
-Phase mono-transaction : les six étapes tournent sur **une seule** transaction gérée (ouverte via
-`open_tx`), et rattachent les `source_authorships` aux personnes de façon ordre-indépendante :
+Phase mono-transaction : les six étapes tournent sur **une seule** transaction gérée (ouverte via `open_tx`), et rattachent les `source_authorships` aux personnes de façon ordre-indépendante :
 
-1. **enforce** — réapplique les épinglages admin (`confirmed_authorships`, must-link) : entrée
-   fixe reposée avant toute dérivation.
-2. **reset** — réinitialise les attributions dérivées (arbitrage des conflits d'identifiant par
-   consensus, recompute complet du cross-source).
+1. **enforce** — réapplique les épinglages admin (`confirmed_authorships`, must-link) : entrée fixe reposée avant toute dérivation.
+2. **reset** — réinitialise les attributions dérivées (arbitrage des conflits d'identifiant par consensus, recompute complet du cross-source).
 3. **match** — rattache aux personnes existantes ou déjà résolues, sans jamais créer.
-4. **create** — re-juge les signatures restées non liées (cross-source rejoué) puis crée les
-   vraies inconnues.
+4. **create** — re-juge les signatures restées non liées (cross-source rejoué) puis crée les vraies inconnues.
 5. **populate** — régénère les formes de nom canoniques (initiales comprises).
-6. **purge** — re-orpheline les formes devenues ambiguës après régénération et supprime les
-   personnes vidées.
+6. **purge** — re-orpheline les formes devenues ambiguës après régénération et supprime les personnes vidées.
 
-Le commit est porté par `open_tx` : `managed_transaction` commite en sortie de bloc si succès,
-rollback sinon. `phase_persons` de `run_pipeline` s'y réduit au câblage.
+Le commit est porté par `open_tx` : `managed_transaction` commite en sortie de bloc si succès, rollback sinon. `phase_persons` de `run_pipeline` s'y réduit au câblage.
 """
 
 import logging
