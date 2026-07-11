@@ -141,8 +141,6 @@ class ThesesExtractor(SourceExtractor[ThesesExtractConfig]):
                 )
         return stats
 
-    # log_summary : on hérite du défaut de SourceExtractor (`=== Terminé : as_summary ===`).
-
 
 __all__ = [
     "ThesesExtractor",
