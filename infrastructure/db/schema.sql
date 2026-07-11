@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict h4UwW06dhghFFvxeLYDsYH12zu7vVVcj6F8qa5ld2VrQoP2SCdR6hLYuYMuEFsM
+\restrict GPwu4YGPblWEdDG4zf7bycN9LpWdzZMbA8uvYsXwo2PrDeUjunpI6iZDR9BKpZW
 
 -- Dumped from database version 18.4
 -- Dumped by pg_dump version 18.4
@@ -890,7 +890,7 @@ CREATE TABLE public.doi_lookups (
     source public.source_type NOT NULL,
     doi text NOT NULL,
     not_found_at timestamp with time zone NOT NULL,
-    next_retry timestamp with time zone NOT NULL
+    next_retry timestamp with time zone
 );
 
 
@@ -3442,5 +3442,5 @@ ALTER TABLE ONLY public.structure_relations
 -- PostgreSQL database dump complete
 --
 
-\unrestrict h4UwW06dhghFFvxeLYDsYH12zu7vVVcj6F8qa5ld2VrQoP2SCdR6hLYuYMuEFsM
+\unrestrict GPwu4YGPblWEdDG4zf7bycN9LpWdzZMbA8uvYsXwo2PrDeUjunpI6iZDR9BKpZW
 
