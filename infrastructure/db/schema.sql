@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict gswOtQsaldK4VrpNBSaVF5MS0dTG1yshNVnTinqPPjcdLbFKI379YKAfOf0QM0R
+\restrict h4UwW06dhghFFvxeLYDsYH12zu7vVVcj6F8qa5ld2VrQoP2SCdR6hLYuYMuEFsM
 
 -- Dumped from database version 18.4
 -- Dumped by pg_dump version 18.4
@@ -622,7 +622,6 @@ CREATE TABLE public.source_authorships (
     source_publication_id integer NOT NULL,
     author_position smallint,
     in_perimeter boolean DEFAULT false,
-    countries text[],
     person_id integer,
     is_corresponding boolean DEFAULT false,
     roles text[] DEFAULT ARRAY['author'::text],
@@ -3443,5 +3442,5 @@ ALTER TABLE ONLY public.structure_relations
 -- PostgreSQL database dump complete
 --
 
-\unrestrict gswOtQsaldK4VrpNBSaVF5MS0dTG1yshNVnTinqPPjcdLbFKI379YKAfOf0QM0R
+\unrestrict h4UwW06dhghFFvxeLYDsYH12zu7vVVcj6F8qa5ld2VrQoP2SCdR6hLYuYMuEFsM
 
