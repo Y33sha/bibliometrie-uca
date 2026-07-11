@@ -1,10 +1,6 @@
 """Détection du pays d'une adresse par **nom de pays**.
 
-Parse le dernier segment (après la dernière virgule) de chaque adresse sans pays et le matche
-contre les noms de pays de `place_name_forms` (`kind = 'country'` : variantes anglais/français,
-codes ISO, abréviations). Un nom de pays y figure typiquement en fin de segment ; les noms de
-lieux (institutions, villes) relèvent de la détection par nom de lieu. Écriture directe dans
-`addresses.countries` (confiance élevée), qui marque aussi `countries_dirty` pour le recalcul aval.
+Parse le dernier segment (après la dernière virgule) de chaque adresse sans pays et le matche contre les noms de pays de `place_name_forms` (`kind = 'country'` : variantes anglais/français, codes ISO, abréviations). Un nom de pays y figure typiquement en fin de segment ; les noms de lieux (institutions, villes) relèvent de la détection par nom de lieu. Écriture directe dans `addresses.countries` (confiance élevée), qui marque aussi `countries_dirty` pour le recalcul aval.
 
 Ne dépend que du port `CountryQueries` et du domaine ; le commit est laissé au caller.
 """
@@ -27,8 +23,7 @@ def _last_segment(raw_text: str) -> str:
 def run(conn: Connection, queries: CountryQueries, logger: logging.Logger) -> PhaseMetrics:
     """Détecte le pays des adresses sans pays via le nom de pays du dernier segment.
 
-    `seen` = adresses sans pays, `new` = adresses matchées et écrites,
-    `extras["unmatched"]` = sans correspondance.
+    `seen` = adresses sans pays, `new` = adresses matchées et écrites, `extras["unmatched"]` = sans correspondance.
     """
     country_forms = queries.load_country_forms(conn)
     logger.info("%d formes de noms de pays chargées", len(country_forms))

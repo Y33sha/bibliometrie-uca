@@ -1,8 +1,6 @@
 """Résolution des adresses : rattachement aux structures et détection du périmètre.
 
 Lit les formes de noms depuis `structure_name_forms` et enregistre dans `address_structures` la forme à l'origine de chaque détection (`matched_form_id`).
-
-*Relu le 2026-07-11*
 """
 
 import logging

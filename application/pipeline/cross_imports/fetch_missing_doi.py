@@ -4,7 +4,7 @@ Pour chaque DOI présent dans d'autres sources mais absent de la cible, interrog
 
 Le comportement spécifique à chaque source (endpoint, auth, format de requête/réponse, SQL d'insertion) est délégué à un adapter qui implémente `AsyncFetchMissingDoiAdapter` (`application/ports/pipeline/cross_imports/fetch_missing_doi.py`).
 
-Implémentation async (`httpx.AsyncClient` + pool de `max_concurrent` workers par source) pour saturer les rate-limits autorisés. Sur OpenAlex on mesure environ 18 req/s, soit ×3-4 par rapport à un appel séquentiel respectant le même quota.
+Implémentation async (`httpx.AsyncClient` + pool de `max_concurrent` workers par source) pour saturer les rate-limits autorisés.
 
 Utilisé par la phase `cross_imports` du pipeline, une fois par source cible (hal, openalex, wos, scanr, crossref).
 """

@@ -1,8 +1,6 @@
 """Résolution des affiliations sur les authorships sources.
 
 Pose `in_perimeter` sur les `source_authorships` via les adresses résolues (`address_structures`), puis rafraîchit la matview `source_authorship_structures`.
-
-*Relu le 2026-07-11*
 """
 
 import logging

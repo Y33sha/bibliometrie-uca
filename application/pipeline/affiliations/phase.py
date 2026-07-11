@@ -5,8 +5,6 @@ Trois sous-étapes, chacune dans sa propre transaction :
 1. **refresh_perimeter_structures** — rafraîchit la table `perimeter_structures`.
 2. **resolve_addresses** — matche les adresses vers les structures connues (commits par lots).
 3. **populate_affiliations** — pose `in_perimeter` sur les `source_authorships` depuis les adresses résolues.
-
-*Relu le 2026-07-11*
 """
 
 import logging
