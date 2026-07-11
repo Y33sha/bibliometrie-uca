@@ -1,8 +1,8 @@
 """Résolution des affiliations sur les authorships sources.
 
-Pose `in_perimeter` sur les `source_authorships` via les adresses résolues (`address_structures`) et le périmètre restreint, puis rafraîchit la matview `source_authorship_structures` (dérivée des adresses et de `perimeter_structures`, sur le périmètre d'affiliation).
+Pose `in_perimeter` sur les `source_authorships` via les adresses résolues (`address_structures`), puis rafraîchit la matview `source_authorship_structures`.
 
-Les fonctions dépendent du port `AffiliationsQueries` ; elles sont enchaînées par l'orchestrateur de la phase (`phase.py`).
+*Relu le 2026-07-11*
 """
 
 import logging
@@ -19,12 +19,10 @@ def run_populate(
     logger: logging.Logger,
     perimeter_ids: set[int],
 ) -> None:
-    """Aligne `in_perimeter` de toutes les sources, dérivé de la matview.
+    """Renseigne les affiliations des `source_authorships`
 
-    1. Refresh de `source_authorship_structures` (le JOIN adresses ⋈ structures sur le périmètre d'affiliation), en amont du refresh de `authorship_structures` (phase authorships).
-    2. Sync source-agnostique de `in_perimeter` depuis cette matview, filtrée au périmètre restreint. Idempotent : un run qui ne change rien n'écrit rien.
-
-    Source-agnostique par construction : `resolve_addresses` résout les adresses indépendamment des sources, donc la propagation l'est aussi (sinon des `source_authorships` resteraient bloquées sans `in_perimeter` malgré une adresse résolue).
+    1. Refresh de la matview `source_authorship_structures`.
+    2. Sync de `in_perimeter` (BOOL) depuis cette matview.
     """
     t0 = time.perf_counter()
     logger.info(f"Périmètre restreint : {len(perimeter_ids)} structures")

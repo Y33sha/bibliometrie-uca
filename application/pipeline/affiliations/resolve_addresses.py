@@ -1,6 +1,8 @@
 """Résolution des adresses : rattachement aux structures et détection du périmètre.
 
 Lit les formes de noms depuis `structure_name_forms` et enregistre dans `address_structures` la forme à l'origine de chaque détection (`matched_form_id`).
+
+*Relu le 2026-07-11*
 """
 
 import logging
@@ -19,6 +21,14 @@ CHUNK_SIZE = 10000
 
 
 # ─── Matching ────────────────────────────────────────────────────
+
+
+def _is_whole_word(text: str, start: int, end: int) -> bool:
+    """Vrai si `text[start:end+1]` est un mot entier : bord de chaîne ou caractère non
+    alphanumérique de part et d'autre."""
+    before_ok = start == 0 or not text[start - 1].isalnum()
+    after_ok = end + 1 >= len(text) or not text[end + 1].isalnum()
+    return before_ok and after_ok
 
 
 class AddressMatcher:
@@ -45,18 +55,13 @@ class AddressMatcher:
         matched: set[int] = set()
         if self._empty:
             return matched
-        n = len(text_normalized)
         for end, forms_here in self._automaton.iter(text_normalized):
             for f in forms_here:
                 if f.id in matched:
                     continue
-                if f.is_word_boundary:
-                    start = end - len(f.form_text) + 1
-                    before_ok = start == 0 or not text_normalized[start - 1].isalnum()
-                    after_ok = end + 1 >= n or not text_normalized[end + 1].isalnum()
-                    if before_ok and after_ok:
-                        matched.add(f.id)
-                else:
+                if not f.is_word_boundary or _is_whole_word(
+                    text_normalized, end - len(f.form_text) + 1, end
+                ):
                     matched.add(f.id)
         return matched
 
@@ -119,8 +124,9 @@ def process_addresses(
 ) -> tuple[int, int, int]:
     """Résout toutes les adresses par tranches (keyset) : matching mémoire + écritures en bloc.
 
-    Chaque tranche est lue (`normalized_text`, déjà normalisé en base — aucun recalcul), matchée en mémoire, puis synchronisée en trois requêtes ensemblistes (delete obsolètes / unflag / upsert idempotent des détections) avant commit. Seules les détections qui changent sont écrites ; mémoire et allers-retours SQL bornés par `chunk_size`.
+    Chaque tranche est lue et matchée en mémoire, puis mise à jour des liens adresse→structure en base pour qu'ils correspondent au matching, en trois requêtes ensemblistes : on retire les liens automatiques qui ne sont plus détectés ; un lien confirmé par l'admin est conservé mais perd sa marque « automatique » ; les liens trouvés cette fois sont insérés ou mis à jour. Seul ce qui change est écrit ; mémoire et allers-retours SQL bornés par `chunk_size`.
     """
+
     t_start = time.perf_counter()
     processed = 0
     in_perimeter_count = 0
