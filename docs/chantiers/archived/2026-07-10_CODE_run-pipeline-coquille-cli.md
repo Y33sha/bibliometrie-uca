@@ -1,5 +1,7 @@
 # Chantier — run_pipeline : réduire à la coquille CLI
 
+Commencé le 2026-07-09 - Terminé le 2026-07-10
+
 `run_pipeline.py` (2340 lignes) porte l'orchestration de chaque phase — séquence des sous-étapes, frontière transactionnelle, logging de progression, assemblage des métriques — alors que cette orchestration relève de la couche applicative. Ce chantier la rapatrie dans `application/pipeline/<phase>/` et réduit `run_pipeline.py` à une coquille de composition : câblage des adapters, graphe des phases, dispatch séquentiel, signaux.
 
 ## Contexte
@@ -85,7 +87,3 @@ Phases :
 
 - [x] `run_pipeline.py` réduit à : parsing, graphe des phases, câblage par phase (construction des adapters `Pg*` et injection dans les orchestrateurs applicatifs), dispatch séquentiel, signaux.
 - [x] `main()` découpé en helpers (`_build_arg_parser`, `_select_phases_to_run`, `_run_one_phase`, `_execute_phases`…), `# noqa: C901` levé.
-
-## Questions ouvertes
-
-- **Partage éventuel du unit of work avec l'API.** Le pilote retient l'appelable `OpenTransaction`. Un objet `UnitOfWork` réifié partagé entre le pipeline et l'API — dont les command handlers exposent déjà un unit of work fonctionnel — relèverait, s'il devenait souhaitable, d'un chantier séparé touchant `interfaces/api/`.
