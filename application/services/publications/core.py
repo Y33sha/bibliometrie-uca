@@ -1,7 +1,7 @@
 """
 Service Publications — accès exclusif en écriture à la table `publications`.
 
-Toute création, mise à jour ou recherche de publication passe par ce module. Les scripts de normalisation (HAL, OpenAlex, WoS, ScanR) et les autres traitements appellent ces fonctions au lieu de faire du SQL direct.
+Toute création ou mise à jour d'une publication passe par ce module. Les scripts de normalisation (HAL, OpenAlex, WoS, ScanR) et les autres traitements appellent ces fonctions au lieu de faire du SQL direct.
 """
 
 from application.audit_log import emit_event
@@ -181,20 +181,14 @@ def merge_publications(
 ) -> None:
     """Fusionne la publication `source_id` dans `target_id`.
 
-    Orchestration domain-driven :
+    Orchestration :
 
     1. Charge `target` et `source` comme entités `Publication` via le repo.
-    2. Garde « 1 DOI = 1 publication » : si les deux portent des DOI non-nuls
-       différents, refuse (`DistinctDoiError`) — ce sont des œuvres distinctes,
-       quelle que soit la clé qui les a rapprochées.
-    3. `target.absorb(source)` : enrichissement métadonnées en mémoire (règle pairwise OA, COALESCE des scalaires nullable, union countries) — vit dans l'aggregate.
-    4. `repo.merge_into(target_id, source_id)` : plumbing FK (transfert des source_publications + authorships avec dédup, cleanup distinct_publications, DELETE de la ligne source).
-    5. `repo.save(target)` : persistance des métadonnées enrichies, après le `merge_into`.
-    6. Recalcule `sources` agrégé.
-    7. Émet l'événement d'audit.
+    2. Garde « 1 DOI = 1 publication » : si les deux portent des DOI non-nuls différents, refuse (`DistinctDoiError`) — ce sont des œuvres distinctes, quelle que soit la clé qui les a rapprochées.
+    3. `repo.merge_into(target_id, source_id)` : plumbing FK (transfert des `source_publications` + authorships avec dédup, repointage des `distinct_publications`, DELETE de la ligne source).
+    4. `refresh_from_sources(target_id)` : recompute les métadonnées canoniques de la cible depuis ses `source_publications` — désormais l'union des siennes et de celles de la source. Même règle d'agrégation que partout ailleurs (statut OA le plus ouvert, scalaires par priorité de source), donc aucune divergence selon le chemin de fusion.
 
-    Lève `NotFoundError` si target ou source n'existe pas ; `DistinctDoiError`
-    si les deux portent des DOI non-nuls différents.
+    Lève `NotFoundError` si target ou source n'existe pas ; `DistinctDoiError` si les deux portent des DOI non-nuls différents.
     """
     target = repo.find_by_id(target_id)
     source = repo.find_by_id(source_id)
@@ -206,10 +200,8 @@ def merge_publications(
     if target.doi and source.doi and target.doi != source.doi:
         raise DistinctDoiError(target_id, source_id, str(target.doi), str(source.doi))
 
-    target.absorb(source)
     repo.merge_into(target_id, source_id)
-    repo.save(target)
-    repo.update_sources(target_id)
+    refresh_from_sources(target_id, repo=repo, audit_repo=audit_repo)
     emit_event(
         audit_repo,
         "publication.merged",
