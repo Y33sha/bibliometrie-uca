@@ -1,11 +1,11 @@
 """Orchestrateur unique de la phase personnes.
 
-Les six étapes tournent sur **une seule** transaction (ouverte via `open_tx`) : le `reset` détache les attributions dérivées (remise à NULL) que `match` et `create` reconstruisent. Détachement et reconstruction doivent committer ensemble — un crash en cours de phase laisserait sinon des signatures détachées jusqu'au run suivant.
+Les six étapes tournent sur **une seule** transaction (ouverte via `open_tx`) : `reset` peut détacher des signatures (conflits d'identifiant), la cascade les re-résout, et le détachement cross-source final retire les liens sans appui. Ces mutations dérivées doivent committer ensemble — un crash en cours de phase laisserait sinon des signatures détachées jusqu'au run suivant.
 
 1. **enforce** — réapplique les épinglages admin (`confirmed_authorships`, must-link) : entrée fixe reposée avant toute dérivation.
-2. **reset** — réinitialise les attributions dérivées (arbitrage des conflits d'identifiant par consensus, recompute complet du cross-source).
-3. **match** — rattache aux personnes existantes ou déjà résolues, sans jamais créer.
-4. **create** — re-juge les signatures restées non liées (cross-source rejoué) puis crée les vraies inconnues.
+2. **reset** — arbitre les conflits d'attribution d'identifiant par consensus (les signatures captées repassent à NULL).
+3. **cascade** — un seul balayage en deux passes internes, sur des index vivants partagés : `match` (rattachement ferme + cross-source), puis `create` (rattrapage cross-source + création des inconnues).
+4. **détachement cross-source** — les liens cross-source restés sans appui ferme repassent à NULL.
 5. **populate** — régénère les formes de nom canoniques.
 6. **purge** — re-orpheline les formes devenues ambiguës après régénération et supprime les personnes vidées.
 
@@ -21,7 +21,7 @@ from collections.abc import Callable
 from sqlalchemy import Connection
 
 from application.pipeline.metrics import PhaseMetrics
-from application.pipeline.persons.cascade import create, match
+from application.pipeline.persons.cascade import run_cascade
 from application.pipeline.persons.metrics import build_metrics, log_matching_breakdown
 from application.pipeline.persons.populate_person_name_forms import populate
 from application.pipeline.persons.purge import purge
@@ -54,12 +54,12 @@ def run(
             logger.info("Épinglages réappliqués : %d signatures recalées", n_enforced)
 
         reset_counts = reset(conn, persons_queries, logger, person_repo=person_repo)
-        match_result = match(conn, persons_queries, logger, person_repo=person_repo)
-        create_result = create(conn, persons_queries, logger, person_repo=person_repo)
+        cascade_result = run_cascade(conn, persons_queries, logger, person_repo=person_repo)
 
         # Les signatures cross-source qu'aucune passe n'a re-résolues ont perdu leur ancre ferme → détachées.
-        resolved = match_result.resolved_cross_source_ids | create_result.resolved_cross_source_ids
-        stale = sorted(match_result.cross_source_candidate_ids - resolved)
+        stale = sorted(
+            cascade_result.cross_source_candidate_ids - cascade_result.resolved_cross_source_ids
+        )
         cross_source_detached = persons_queries.detach_authorships(conn, stale)
         if cross_source_detached:
             logger.info("  %d signature(s) cross-source sans appui détachée(s)", cross_source_detached)
@@ -68,13 +68,12 @@ def run(
         purge_counts = purge(conn, persons_queries, logger)
 
         metrics = build_metrics(
-            match_result,
-            create_result,
+            cascade_result,
             transferred=reset_counts["transferred"],
             cross_source_detached=cross_source_detached,
             reorphaned=purge_counts["reorphaned"],
             deleted_persons=purge_counts["deleted_persons"],
         )
-        log_matching_breakdown(logger, match_result, create_result)
+        log_matching_breakdown(logger, cascade_result)
     logger.info("✓ persons terminé en %.1fs", time.perf_counter() - t0)
     return metrics

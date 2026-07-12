@@ -59,7 +59,7 @@ def run_create_persons(conn):
 
     from sqlalchemy import text
 
-    from application.pipeline.persons.cascade import create, match
+    from application.pipeline.persons.cascade import run_cascade
     from application.pipeline.persons.reset import reset
     from infrastructure.queries.pipeline.persons_create import PgPersonsCreateQueries
     from infrastructure.repositories import person_repository
@@ -68,8 +68,7 @@ def run_create_persons(conn):
     logger = logging.getLogger("test")
     repo = person_repository(conn)
     reset(conn, queries, logger, person_repo=repo)
-    match(conn, queries, logger, person_repo=repo)
-    create(conn, queries, logger, person_repo=repo)
+    run_cascade(conn, queries, logger, person_repo=repo)
 
     return conn.execute(
         text(

@@ -22,7 +22,6 @@ Garde de rejet : les personnes rejetées pour la publication (`rejected_authorsh
 
 import logging
 from collections import defaultdict
-from collections.abc import Callable
 
 from sqlalchemy import Connection
 
@@ -246,72 +245,42 @@ class _Cascade:
         )
 
 
-def _defer_create(cascade: _Cascade, authorship: EnrichedAuthorship) -> None:
-    """No-op : dans la passe `match`, l'action `create` est différée à la passe `create` ; la signature reste non liée."""
-
-
-def _run_pass(
+def run_cascade(
     conn: Connection,
     queries: PersonsCreateQueries,
     logger: logging.Logger,
     *,
     person_repo: PersonRepository,
-    decide: Callable[[_Cascade, EnrichedAuthorship], PersonMatchDecision],
-    on_create: Callable[[_Cascade, EnrichedAuthorship], None],
 ) -> CascadeResult:
-    """Squelette commun aux deux passes : instancie un `_Cascade` (fetch + prefetch frais), décide chaque signature via `decide` puis applique (match / create / skip).
+    """Rattache les signatures aux personnes, en deux passes sur un **seul** `_Cascade` (index vivants partagés — un seul fetch, un seul chargement).
 
-    Seuls diffèrent la décision (`decide`) et le sort de l'action `create` (`on_create` : différée pour `match`, matérialisée pour `create`)."""
-    logger.info("  chargement des index...")
+    Passe `match` (`decide_full`) : rattachement ferme (identifiant, nom) et cross-source contre les ancres présentes ; les signatures non rattachées sont reprises en passe suivante. Passe `create` (`decide_cross_and_name`) sur ces seules restantes : cross-source de rattrapage contre l'état ferme complet, puis création des inconnues — une création ancre le cross-source d'une co-signature traitée juste après, dans la même passe.
+    """
+    logger.info("▶ chargement des index de la cascade...")
     c = _Cascade(conn, queries, logger, person_repo=person_repo)
     total = len(c.authorships)
     logger.info("  %d signatures à traiter", total)
+
+    logger.info("▶ match : rattachement aux personnes existantes ou déjà résolues")
+    unresolved: list[EnrichedAuthorship] = []
     for i, a in enumerate(c.authorships):
         if i and i % 5000 == 0:
-            logger.info("  %d/%d signatures traitées", i, total)
-        decision = decide(c, a)
+            logger.info("  %d/%d signatures (match)", i, total)
+        decision = c.decide_full(a)
+        if decision.action == "match":
+            c.apply_match(a, decision.person_id, decision.reason)
+        else:
+            unresolved.append(a)  # création différée ou aucun signal : reprise en passe create
+
+    logger.info("▶ create : création des personnes inconnues (%d signatures restantes)", len(unresolved))
+    for i, a in enumerate(unresolved):
+        if i and i % 5000 == 0:
+            logger.info("  %d/%d signatures (create)", i, len(unresolved))
+        decision = c.decide_cross_and_name(a)
         if decision.action == "match":
             c.apply_match(a, decision.person_id, decision.reason)
         elif decision.action == "create":
-            on_create(c, a)
+            c.apply_create(a)
         else:
             c.skipped_counts[decision.reason] += 1
     return c.result()
-
-
-def match(
-    conn: Connection,
-    queries: PersonsCreateQueries,
-    logger: logging.Logger,
-    *,
-    person_repo: PersonRepository,
-) -> CascadeResult:
-    """Rattache les signatures non liées aux personnes existantes ou déjà résolues, sans créer."""
-    logger.info("▶ match : rattachement aux personnes existantes ou déjà résolues")
-    return _run_pass(
-        conn,
-        queries,
-        logger,
-        person_repo=person_repo,
-        decide=_Cascade.decide_full,
-        on_create=_defer_create,
-    )
-
-
-def create(
-    conn: Connection,
-    queries: PersonsCreateQueries,
-    logger: logging.Logger,
-    *,
-    person_repo: PersonRepository,
-) -> CascadeResult:
-    """Reprend les signatures non liées : cross-source rejoué contre l'état ferme, puis création."""
-    logger.info("▶ create : création des personnes inconnues")
-    return _run_pass(
-        conn,
-        queries,
-        logger,
-        person_repo=person_repo,
-        decide=_Cascade.decide_cross_and_name,
-        on_create=_Cascade.apply_create,
-    )
