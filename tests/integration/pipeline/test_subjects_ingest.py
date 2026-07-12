@@ -1,5 +1,5 @@
-"""Tests d'intégration des ingestors `application/pipeline/subjects/*`
-et de l'orchestrateur d'ingestion."""
+"""Tests des extracteurs de libellés par source (`extractors`, purs) et de
+l'orchestrateur d'ingestion des sujets (`ingestion.run`, intégration)."""
 
 import json
 import logging
@@ -8,21 +8,62 @@ import pytest
 from sqlalchemy import bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
-from application.pipeline.subjects import (
-    ingest_hal,
-    ingest_openalex,
-    ingest_scanr,
-    ingest_theses,
-    ingest_wos,
+from application.pipeline.subjects.extractors import (
+    hal_labels,
+    openalex_labels,
+    scanr_labels,
+    theses_labels,
+    wos_labels,
 )
-from application.pipeline.subjects._common import SubjectCache
 from application.pipeline.subjects.ingestion import run
 from infrastructure.queries.subjects import PgSubjectsQueries
 
 
-@pytest.fixture
-def cache():
-    return SubjectCache(PgSubjectsQueries())
+class TestExtractors:
+    def test_hal_strips_prefix_and_derives_label(self):
+        assert hal_labels({"hal_domains": ["0.phys"]}) == ["Physique"]
+
+    def test_hal_dedups_same_code_across_levels(self):
+        assert hal_labels({"hal_domains": ["0.phys", "phys"]}) == ["Physique"]
+
+    def test_hal_non_dict(self):
+        assert hal_labels(None) == []
+
+    def test_openalex_four_levels_flat(self):
+        topics = [{"domain": "D", "field": "F", "subfield": "S", "topic": "T", "score": 0.9}]
+        assert openalex_labels(topics) == ["D", "F", "S", "T"]
+
+    def test_openalex_partial(self):
+        assert openalex_labels([{"domain": "Physical Sciences"}]) == ["Physical Sciences"]
+
+    def test_openalex_non_list(self):
+        assert openalex_labels({}) == []
+
+    def test_wos_subjects_and_headings(self):
+        topics = {"subjects": ["Biology"], "headings": ["Life Sciences"]}
+        assert wos_labels(topics) == ["Biology", "Life Sciences"]
+
+    def test_wos_non_dict(self):
+        assert wos_labels([]) == []
+
+    def test_scanr_as_list(self):
+        assert scanr_labels(["Sciences de l'environnement"]) == ["Sciences de l'environnement"]
+
+    def test_scanr_as_dict_domains(self):
+        assert scanr_labels({"domains": ["Biologie", "Chimie"]}) == ["Biologie", "Chimie"]
+
+    def test_scanr_unknown_shape(self):
+        assert scanr_labels("x") == []
+
+    def test_theses_discipline_and_rameau(self):
+        topics = {"discipline": "Informatique", "rameau": ["Algorithme", "Réseau de neurones"]}
+        assert theses_labels(topics) == ["Informatique", "Algorithme", "Réseau de neurones"]
+
+    def test_theses_non_dict(self):
+        assert theses_labels(None) == []
+
+
+# ── Orchestrateur (intégration) ──────────────────────────────────
 
 
 @pytest.fixture
@@ -76,160 +117,6 @@ def _subjects_of(conn, pub_id):
     ).all()
 
 
-class TestIngestHal:
-    def test_domains(self, sa_sync_conn, cache):
-        pub = _create_pub(sa_sync_conn)
-        n = ingest_hal.ingest(
-            sa_sync_conn,
-            publication_id=pub,
-            topics={"hal_domains": ["info.eea", "sdv.bbm"]},
-            cache=cache,
-        )
-        assert n == 2
-        assert len(_subjects_of(sa_sync_conn, pub)) == 2
-
-    def test_empty(self, sa_sync_conn, cache):
-        pub = _create_pub(sa_sync_conn)
-        assert ingest_hal.ingest(sa_sync_conn, publication_id=pub, topics=None, cache=cache) == 0
-
-    def test_strips_level_prefix_and_derives_label(self, sa_sync_conn, cache):
-        pub = _create_pub(sa_sync_conn)
-        n = ingest_hal.ingest(
-            sa_sync_conn,
-            publication_id=pub,
-            topics={"hal_domains": ["0.phys", "1.phys.hexp"]},
-            cache=cache,
-        )
-        assert n == 2
-        # Libellé feuille dérivé du référentiel CCSD.
-        assert "Physique" in {r.label for r in _subjects_of(sa_sync_conn, pub)}
-
-    def test_dedup_same_code_at_multiple_levels(self, sa_sync_conn, cache):
-        # '0.phys' → 'phys' et 'phys' → 'phys' = même code, une seule entrée.
-        pub = _create_pub(sa_sync_conn)
-        n = ingest_hal.ingest(
-            sa_sync_conn,
-            publication_id=pub,
-            topics={"hal_domains": ["0.phys", "phys"]},
-            cache=cache,
-        )
-        assert n == 1
-
-
-class TestIngestOpenAlex:
-    def test_four_levels_flat(self, sa_sync_conn, cache):
-        pub = _create_pub(sa_sync_conn)
-        n = ingest_openalex.ingest(
-            sa_sync_conn,
-            publication_id=pub,
-            topics=[
-                {
-                    "domain": "Health Sciences",
-                    "field": "Medicine",
-                    "subfield": "Cardiology",
-                    "topic": "Heart Failure",
-                    "score": 0.92,
-                }
-            ],
-            cache=cache,
-        )
-        assert n == 4  # les 4 niveaux, à plat
-        labels = {r.label for r in _subjects_of(sa_sync_conn, pub)}
-        assert labels == {"Health Sciences", "Medicine", "Cardiology", "Heart Failure"}
-
-    def test_partial_hierarchy(self, sa_sync_conn, cache):
-        pub = _create_pub(sa_sync_conn)
-        n = ingest_openalex.ingest(
-            sa_sync_conn,
-            publication_id=pub,
-            topics=[{"domain": "Physical Sciences"}],
-            cache=cache,
-        )
-        assert n == 1
-
-    def test_language_en(self, sa_sync_conn, cache):
-        pub = _create_pub(sa_sync_conn)
-        ingest_openalex.ingest(
-            sa_sync_conn, publication_id=pub, topics=[{"topic": "Physics"}], cache=cache
-        )
-        lang = sa_sync_conn.execute(
-            text("SELECT language FROM subjects WHERE label = 'Physics'")
-        ).scalar_one()
-        assert lang == "en"
-
-
-class TestIngestWos:
-    def test_subjects_and_headings(self, sa_sync_conn, cache):
-        pub = _create_pub(sa_sync_conn)
-        n = ingest_wos.ingest(
-            sa_sync_conn,
-            publication_id=pub,
-            topics={"subjects": ["Biology"], "headings": ["Life Sciences"]},
-            cache=cache,
-        )
-        assert n == 2
-        assert {r.label for r in _subjects_of(sa_sync_conn, pub)} == {"Biology", "Life Sciences"}
-
-
-class TestIngestTheses:
-    def test_discipline_and_rameau(self, sa_sync_conn, cache):
-        pub = _create_pub(sa_sync_conn)
-        n = ingest_theses.ingest(
-            sa_sync_conn,
-            publication_id=pub,
-            topics={"discipline": "Informatique", "rameau": ["Algorithme", "Réseau de neurones"]},
-            cache=cache,
-        )
-        assert n == 3
-        assert {r.label for r in _subjects_of(sa_sync_conn, pub)} == {
-            "Informatique",
-            "Algorithme",
-            "Réseau de neurones",
-        }
-
-
-class TestIngestScanr:
-    def test_topics_as_list(self, sa_sync_conn, cache):
-        pub = _create_pub(sa_sync_conn)
-        n = ingest_scanr.ingest(
-            sa_sync_conn,
-            publication_id=pub,
-            topics=["Sciences de l'environnement"],
-            cache=cache,
-        )
-        assert n == 1
-
-    def test_topics_as_dict_with_domains(self, sa_sync_conn, cache):
-        pub = _create_pub(sa_sync_conn)
-        n = ingest_scanr.ingest(
-            sa_sync_conn,
-            publication_id=pub,
-            topics={"domains": ["Biologie", "Chimie"]},
-            cache=cache,
-        )
-        assert n == 2
-        assert {r.label for r in _subjects_of(sa_sync_conn, pub)} == {"Biologie", "Chimie"}
-
-
-class TestFusionAcrossSources:
-    def test_same_label_merges_to_one_subject(self, sa_sync_conn, cache):
-        # Un même label depuis deux sources → un seul subject, deux liens (un par source).
-        pub = _create_pub(sa_sync_conn)
-        ingest_hal.ingest(
-            sa_sync_conn, publication_id=pub, topics={"hal_domains": ["info"]}, cache=cache
-        )
-        ingest_theses.ingest(
-            sa_sync_conn, publication_id=pub, topics={"discipline": "Informatique"}, cache=cache
-        )
-        subjects = sa_sync_conn.execute(
-            text("SELECT id FROM subjects WHERE lower(label) = 'informatique'")
-        ).all()
-        assert len(subjects) == 1
-        rows = _subjects_of(sa_sync_conn, pub)
-        assert len(rows) == 2
-        assert {r.id for r in rows} == {subjects[0].id}
-
-
 class TestRunOrchestrator:
     def test_ingests_then_skips_unchanged(self, sa_sync_conn, queries):
         pub = _create_pub(sa_sync_conn)
@@ -267,9 +154,7 @@ class TestRunOrchestrator:
         # Changement de contenu : nouveau topic + bump de publications.updated_at (ce
         # que fait refresh_from_sources en réel quand une source change).
         sa_sync_conn.execute(
-            text(
-                "UPDATE source_publications SET topics = CAST(:t AS jsonb) WHERE source_id = 'h1'"
-            ),
+            text("UPDATE source_publications SET topics = CAST(:t AS jsonb) WHERE source_id = 'h1'"),
             {"t": json.dumps({"hal_domains": ["phys"]})},
         )
         sa_sync_conn.execute(
@@ -303,9 +188,8 @@ class TestRunOrchestrator:
         labels = {r.label for r in _subjects_of(sa_sync_conn, pub)}
         assert labels == {"Informatique", "Physics"}
 
-    def test_multi_source_pub_same_source_keeps_both(self, sa_sync_conn, queries):
-        # Deux source_publications de la MÊME source sur une pub (cas ~7%) : le clear
-        # étant par publication, les deux jumeaux sont ré-ingérés ensemble.
+    def test_same_label_across_sources_merges(self, sa_sync_conn, queries):
+        # Un même label depuis deux sources → un seul subject, deux liens (un par source).
         pub = _create_pub(sa_sync_conn)
         _create_source_pub(
             sa_sync_conn,
@@ -316,18 +200,23 @@ class TestRunOrchestrator:
         )
         _create_source_pub(
             sa_sync_conn,
-            source="hal",
-            source_id="h2",
+            source="theses",
+            source_id="t1",
             publication_id=pub,
-            topics={"hal_domains": ["phys"]},
+            topics={"discipline": "Informatique"},
         )
         run(sa_sync_conn, queries, logging.getLogger("test"))
-        labels = {r.label for r in _subjects_of(sa_sync_conn, pub)}
-        assert labels == {"Informatique", "Physique"}
+        subjects = sa_sync_conn.execute(
+            text("SELECT id FROM subjects WHERE lower(label) = 'informatique'")
+        ).all()
+        assert len(subjects) == 1
+        rows = _subjects_of(sa_sync_conn, pub)
+        assert len(rows) == 2
+        assert {r.id for r in rows} == {subjects[0].id}
 
     def test_ignores_unlinked_source_publications(self, sa_sync_conn, queries):
-        # source_pub orphelin (publication_id NULL) : aucune publication ne le
-        # référence → jamais sélectionné, son concept n'est pas ingéré.
+        # source_pub orphelin (publication_id NULL) : jamais sélectionné, son concept
+        # n'est pas ingéré.
         sa_sync_conn.execute(
             text(
                 "INSERT INTO source_publications (source, source_id, title, topics) "
