@@ -4,7 +4,7 @@ Pour chaque DOI présent dans d'autres sources mais absent de la cible, interrog
 
 Le comportement spécifique à chaque source (endpoint, auth, format de requête/réponse, SQL d'insertion) est délégué à un adapter qui implémente `AsyncFetchMissingDoiAdapter` (`application/ports/pipeline/cross_imports/fetch_missing_doi.py`).
 
-Implémentation async (`httpx.AsyncClient` + pool de `max_concurrent` workers par source) pour saturer les rate-limits autorisés.
+Implémentation async via `run_fetch_pool` (pool de `max_concurrent` workers par source) pour saturer les rate-limits autorisés.
 
 Utilisé par la phase `cross_imports` du pipeline, une fois par source cible.
 """
@@ -13,10 +13,12 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from typing import Any
 
 import httpx
 from sqlalchemy import Connection
 
+from application.pipeline._fetch_pool import run_fetch_pool
 from application.pipeline.logging_scope import scoped_logger
 from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.circuit_breaker import CircuitBreaker
@@ -40,7 +42,7 @@ async def run_async(
 ) -> PhaseMetrics:
     """Boucle principale : DOIs → fetch async → insert.
 
-    Les fetchs HTTP tournent concurremment via un pool de `adapter.max_concurrent` workers qui se partagent un itérateur de lots, ce qui borne le débit au rate-limit de l'API. Les inserts DB restent sync, délégués au threadpool via `asyncio.to_thread` et sérialisés par un `asyncio.Lock` (la `Connection` SA sync n'est pas thread-safe) ; chaque lot est committé en une transaction par cet orchestrateur (l'adapter source ne commite pas).
+    Les fetchs HTTP tournent concurremment via `run_fetch_pool` (pool de `adapter.max_concurrent` workers), ce qui borne le débit au rate-limit de l'API. Les inserts DB restent sync, sérialisés par le pool sous un lock (la `Connection` SA sync n'est pas thread-safe) ; chaque lot est committé en une transaction (l'adapter source ne commite pas).
 
     Quand la source confirme l'absence d'un DOI (réponse vide / 404), `fetch_async` renvoie une sentinelle `not_found_marker` au lieu d'un record : comptée à part (`not_found`, exclue de `fetched`) et passée à `adapter.insert()`, qui la mémorise dans `doi_lookups`.
 
@@ -70,63 +72,67 @@ async def run_async(
 
     batches = [dois[i : i + adapter.batch_size] for i in range(0, total, adapter.batch_size)]
 
-    # Sérialise les inserts : la `Connection` SA sync n'est pas thread-safe, or `asyncio.to_thread` exécute dans un ThreadPoolExecutor partagé.
-    db_lock = asyncio.Lock()
     progress = {"processed": 0, "fetched": 0, "inserted": 0, "not_found": 0}
+    request_delay = getattr(adapter, "request_delay_s", 0.0)
+    items = list(enumerate(batches))
 
-    batch_iter = iter(enumerate(batches))
+    async def _fetch(
+        client: httpx.AsyncClient, item: tuple[int, list[str]]
+    ) -> list[dict[str, Any]]:
+        batch_idx, batch = item
+        try:
+            records = list(await adapter.fetch_async(client, batch))
+        except Exception as e:
+            # Breaker tripé pendant le fetch (source indisponible) : abandon silencieux, le log unique vient après le pool.
+            if not (breaker is not None and breaker.tripped):
+                slog.error("erreur sur lot %d (%d DOI) : %s", batch_idx, len(batch), e)
+            records = []
+        if request_delay:
+            await asyncio.sleep(request_delay)
+        return records
 
-    async with httpx.AsyncClient() as client:
-        request_delay = getattr(adapter, "request_delay_s", 0.0)
+    def _write(
+        conn: Connection, item: tuple[int, list[str]], records: list[dict[str, Any]]
+    ) -> None:
+        batch_idx, batch = item
+        real = [r for r in records if not is_not_found_marker(r)]
+        progress["fetched"] += len(real)
+        progress["not_found"] += len(records) - len(real)
 
-        async def worker() -> None:
-            for batch_idx, batch in batch_iter:
-                if breaker is not None and breaker.tripped:
-                    return
-                try:
-                    records = list(await adapter.fetch_async(client, batch))
-                except Exception as e:
-                    # Breaker tripé pendant le fetch (source indisponible) : abandon silencieux, le log unique vient après le gather.
-                    if breaker is not None and breaker.tripped:
-                        return
-                    slog.error("erreur sur lot %d (%d DOI) : %s", batch_idx, len(batch), e)
-                    records = []
-                if request_delay:
-                    await asyncio.sleep(request_delay)
+        # Un lot = une transaction (le pool commite après ce write). Sur erreur,
+        # rollback (désempoisonne la connexion), le lot repartira au prochain run.
+        try:
+            batch_inserted = 0
+            for record in records:
+                if adapter.insert(conn, record):
+                    batch_inserted += 1
+            progress["inserted"] += batch_inserted
+        except Exception as e:
+            conn.rollback()
+            slog.warning("lot %d (%d DOI) : insertion échouée, rollback — %s", batch_idx, len(batch), e)
 
-                real = [r for r in records if not is_not_found_marker(r)]
-                progress["fetched"] += len(real)
-                progress["not_found"] += len(records) - len(real)
+        progress["processed"] += len(batch)
+        if progress["processed"] % 100 == 0 or progress["processed"] >= total:
+            duplicates = progress["fetched"] - progress["inserted"]
+            slog.info(
+                "%d/%d — %d records (%d nouveaux, %d doublons, %d not-found)",
+                progress["processed"],
+                total,
+                progress["fetched"],
+                progress["inserted"],
+                duplicates,
+                progress["not_found"],
+            )
 
-                # Un lot = une transaction : inserts sérialisés puis commit unique.
-                # En cas d'erreur, rollback (désempoisonne la connexion pour le lot suivant),
-                # le lot repartira au prochain run.
-                async with db_lock:
-                    try:
-                        batch_inserted = 0
-                        for record in records:
-                            if await asyncio.to_thread(adapter.insert, conn, record):
-                                batch_inserted += 1
-                        await asyncio.to_thread(conn.commit)
-                        progress["inserted"] += batch_inserted
-                    except Exception as e:
-                        await asyncio.to_thread(conn.rollback)
-                        slog.warning("lot %d (%d DOI) : insertion échouée, rollback — %s", batch_idx, len(batch), e)
-
-                progress["processed"] += len(batch)
-                if progress["processed"] % 100 == 0 or progress["processed"] >= total:
-                    duplicates = progress["fetched"] - progress["inserted"]
-                    slog.info(
-                        "%d/%d — %d records (%d nouveaux, %d doublons, %d not-found)",
-                        progress["processed"],
-                        total,
-                        progress["fetched"],
-                        progress["inserted"],
-                        duplicates,
-                        progress["not_found"],
-                    )
-
-        await asyncio.gather(*(worker() for _ in range(adapter.max_concurrent)))
+    await run_fetch_pool(
+        items,
+        conn,
+        max_concurrent=adapter.max_concurrent,
+        commit_every=1,
+        fetch=_fetch,
+        write=_write,
+        should_continue=lambda: breaker is None or not breaker.tripped,
+    )
 
     if breaker is not None and breaker.tripped:
         slog.warning(
