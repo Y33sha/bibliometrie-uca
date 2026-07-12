@@ -144,14 +144,14 @@ def reconcile(
         queries.repoint_dependents(
             conn, dissolved.publication_id, dissolved.successor_publication_id
         )
-        with savepoint(conn, "reconcile_dissolve"):
+        with savepoint(conn):
             refresh_from_sources(dissolved.publication_id, repo=pub_repo, audit_repo=audit_repo)
 
     # 3. Rafraîchir les survivants : métadonnées canoniques recomputées. Phase la plus longue sur un gros run → progression tous les 5000.
     survivor_ids = sorted(survivors)
     total = len(survivor_ids)
     for i, pub_id in enumerate(survivor_ids, 1):
-        with savepoint(conn, "reconcile_refresh"):
+        with savepoint(conn):
             refresh_from_sources(pub_id, repo=pub_repo, audit_repo=audit_repo)
         if logger and (i % 5000 == 0 or i == total):
             logger.info("  rafraîchissement des métadonnées : %d/%d publications", i, total)

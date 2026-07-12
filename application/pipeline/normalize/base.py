@@ -117,11 +117,7 @@ class SourceNormalizer(ABC):
     def _process_one(self, conn: Connection, row: StagingRow) -> bool | None:
         """Enveloppe process_work dans un SAVEPOINT : un work en erreur est annulé sans abandonner le batch en cours."""
         try:
-            with savepoint(
-                conn,
-                f"normalize_{self.SOURCE}_work",
-                on_rollback_failure=self.conn.rollback,
-            ):
+            with savepoint(conn, on_rollback_failure=self.conn.rollback):
                 return self.process_work(conn, row)
         except Exception:
             self.on_error()
