@@ -5,6 +5,8 @@
 `--rebuild-publications` re-dirtie tout le stock avant la réconciliation : celle-ci dégénère alors en cluster-then-materialize global (après une évolution des règles de clés).
 
 En fin de phase, `addresses.pub_count` (nombre de publications par adresse) est recalculé, une fois les publications créées et fusionnées.
+
+Les trois étapes — redirty optionnel, réconciliation, recompute du cache `pub_count` — sont indépendantes et idempotentes ; chacune tourne dans sa propre transaction.
 """
 
 import logging
@@ -72,7 +74,7 @@ def _reconcile(
             pub_repo=pub_repo_factory(conn),
             audit_repo=audit_repo_factory(conn),
         )
-        _sp_in_perimeter, pub_total = reconciliation_queries.count_dedup_inputs(conn)
+        pub_total = reconciliation_queries.count_publications(conn)
     logger.info("✓ reconcile_components terminé en %.1fs", time.perf_counter() - t0)
 
     metrics = PhaseMetrics()

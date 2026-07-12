@@ -180,19 +180,9 @@ def mark_keys_dirty(conn: Connection, where: str | None = None, *, dry_run: bool
     ).rowcount
 
 
-def count_dedup_inputs(conn: Connection) -> tuple[int, int]:
-    # `(source_publications in-périmètre, publications)`. In-périmètre = au moins une
-    # authorship in-périmètre (même définition que l'univers de réconciliation ; index
-    # idx_sa_in_perimeter). Les publications sont toutes in-périmètre par construction.
-    sp = conn.execute(
-        text(
-            "SELECT count(*) FROM source_publications sp "
-            "WHERE EXISTS (SELECT 1 FROM source_authorships sa "
-            "WHERE sa.source_publication_id = sp.id AND sa.in_perimeter)"
-        )
-    ).scalar_one()
-    pubs = conn.execute(text("SELECT count(*) FROM publications")).scalar_one()
-    return int(sp), int(pubs)
+def count_publications(conn: Connection) -> int:
+    # Toutes les publications sont in-périmètre par construction : la réconciliation gate leur création sur le périmètre.
+    return int(conn.execute(text("SELECT count(*) FROM publications")).scalar_one())
 
 
 class PgPublicationsReconciliationQueries(PublicationsReconciliationQueries):
@@ -223,5 +213,5 @@ class PgPublicationsReconciliationQueries(PublicationsReconciliationQueries):
     def clear_keys_dirty(self, conn: Connection, source_publication_ids: list[int]) -> int:
         return clear_keys_dirty(conn, source_publication_ids)
 
-    def count_dedup_inputs(self, conn: Connection) -> tuple[int, int]:
-        return count_dedup_inputs(conn)
+    def count_publications(self, conn: Connection) -> int:
+        return count_publications(conn)
