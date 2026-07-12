@@ -68,10 +68,10 @@ if TYPE_CHECKING:
     )
     from application.ports.pipeline.extract.refresh_stale import RefreshStaleAdapter
 
-from application.pipeline.graph import PHASE_ORDER
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.modes import MODE_NAMES, MODES
 from application.pipeline.normalize.base import NormalizeStats
+from application.pipeline.phase_order import PHASE_ORDER
 from domain.sources.registry import ALL_SOURCES_SET
 from infrastructure.observability.log import reset_log_phase, set_log_phase, setup_logger
 from infrastructure.observability.pipeline_status import clear_status, read_status, write_status
@@ -1204,9 +1204,9 @@ def phase_oa_status(**kw: Any) -> PhaseMetrics:
     return metrics
 
 
-# Registre des phases : l'implémentation de chacune. L'ordre d'exécution vient du
-# graphe des phases (`PHASE_ORDER`), source de vérité unique ; ce registre ne fournit
-# que les fonctions, validées comme couvrant exactement le graphe.
+# Registre des phases : l'implémentation de chacune. L'ordre d'exécution vient de
+# `PHASE_ORDER`, source de vérité unique ; ce registre ne fournit que les fonctions,
+# validées comme couvrant exactement cet ordre.
 _PHASE_FUNCTIONS: dict[str, Callable[..., PhaseMetrics]] = {
     "extract": phase_extract,
     "resolve_ra": phase_resolve_ra,
@@ -1228,7 +1228,7 @@ _PHASE_FUNCTIONS: dict[str, Callable[..., PhaseMetrics]] = {
 
 if set(_PHASE_FUNCTIONS) != set(PHASE_ORDER):
     raise RuntimeError(
-        "Le registre des phases de l'orchestrateur et le graphe des phases divergent : "
+        "Le registre des phases de l'orchestrateur et `PHASE_ORDER` divergent : "
         f"{set(_PHASE_FUNCTIONS) ^ set(PHASE_ORDER)}"
     )
 

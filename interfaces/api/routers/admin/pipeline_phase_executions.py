@@ -9,7 +9,7 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from application.pipeline.graph import PHASE_ORDER
+from application.pipeline.phase_order import PHASE_ORDER
 from application.ports.api.pipeline_phase_executions_queries import (
     PhaseExecutionsQueries,
     RunDetail,
