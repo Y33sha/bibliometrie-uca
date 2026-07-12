@@ -114,7 +114,7 @@ class TestOnErrorHook:
             error_on_ids={42},
         )
         # Force run() à utiliser nos args par défaut
-        normalizer.run([])
+        normalizer.run()
 
         assert normalizer.processed_ids == [1, 42, 3]  # tous vus
         assert normalizer.on_error_calls == 1  # un seul échec
@@ -128,5 +128,5 @@ class TestOnErrorHook:
         staging.fetch_staging_by_ids.return_value = [_row(1), _row(2)]
 
         normalizer = _SpyNormalizer(conn, MagicMock(), staging, use_savepoint=False)
-        normalizer.run([])
+        normalizer.run()
         assert normalizer.on_error_calls == 0

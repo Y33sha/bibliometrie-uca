@@ -23,17 +23,13 @@ class StagingRow:
 class StagingQueries(Protocol):
     """Opérations SQL sur la table `staging`."""
 
-    def reset_processed_flag(self, conn: Connection, source: str) -> int: ...
-
     def count_pending_staging(self, conn: Connection, source: str) -> int: ...
 
     def fetch_pending_staging(
         self, conn: Connection, source: str, *, limit: int
     ) -> list[StagingRow]: ...
 
-    def fetch_pending_staging_ids(
-        self, conn: Connection, source: str, *, limit: int
-    ) -> list[int]: ...
+    def fetch_pending_staging_ids(self, conn: Connection, source: str) -> list[int]: ...
 
     def fetch_staging_by_ids(
         self, conn: Connection, staging_ids: list[int], *, source: str

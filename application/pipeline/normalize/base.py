@@ -1,9 +1,7 @@
 """Base class pour les normaliseurs de sources.
 
 Capture le code commun aux normaliseurs :
-- parsing CLI (--limit, --reset, --batch-size)
 - commit périodique et rollback sur la connexion injectée (ouverte et fermée par l'appelant)
-- --reset : UPDATE processed=FALSE
 - comptage + chargement des work_ids à traiter
 - boucle : un SAVEPOINT par work (une erreur isolée sans perdre le batch en cours), commit périodique
 - logs de progression et bilan
@@ -13,7 +11,6 @@ L'accès au staging passe par le port `StagingQueries` (injecté par le composit
 
 from __future__ import annotations
 
-import argparse
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
@@ -85,31 +82,12 @@ class SourceNormalizer(ABC):
 
     # ── Template method ────────────────────────────────────────
 
-    def parse_args(self, argv: list[str] | None = None) -> argparse.Namespace:
-        parser = argparse.ArgumentParser(
-            description=f"Normalisation {self.SOURCE} → tables structurées"
-        )
-        parser.add_argument("--limit", type=int, help="Nombre max de works à traiter")
-        parser.add_argument(
-            "--reset", action="store_true", help="Remettre tous les works à processed=FALSE"
-        )
-        parser.add_argument(
-            "--batch-size",
-            type=int,
-            default=self.DEFAULT_BATCH_SIZE,
-            help=f"Taille du commit batch (défaut: {self.DEFAULT_BATCH_SIZE})",
-        )
-        return parser.parse_args(argv)
-
-    def _reset(self, conn: Connection) -> int:
-        return self._staging.reset_processed_flag(conn, self.SOURCE)
-
     def _count_pending(self, conn: Connection) -> int:
         return self._staging.count_pending_staging(conn, self.SOURCE)
 
-    def _iter_rows(self, conn: Connection, limit: int) -> Iterator[StagingRow]:
-        """Itère les lignes à traiter par sous-lots de `FETCH_SUB_BATCH`."""
-        work_ids = self._staging.fetch_pending_staging_ids(conn, self.SOURCE, limit=limit)
+    def _iter_rows(self, conn: Connection) -> Iterator[StagingRow]:
+        """Itère toutes les lignes à traiter par sous-lots de `FETCH_SUB_BATCH`."""
+        work_ids = self._staging.fetch_pending_staging_ids(conn, self.SOURCE)
         for start in range(0, len(work_ids), self.FETCH_SUB_BATCH):
             batch_ids = work_ids[start : start + self.FETCH_SUB_BATCH]
             yield from self._staging.fetch_staging_by_ids(conn, batch_ids, source=self.SOURCE)
@@ -123,29 +101,21 @@ class SourceNormalizer(ABC):
             self.on_error()
             raise
 
-    def run(self, argv: list[str] | None = None) -> NormalizeStats:
-        """Entry point : parse les arguments, pilote la boucle de normalisation."""
-        args = self.parse_args(argv)
+    def run(self) -> NormalizeStats:
+        """Entry point : pilote la boucle de normalisation."""
         self.conn.rollback()
 
         # Préfixe `[source]` sur les lignes de la boucle (progression, bilan) : dans un run multi-sources, chaque batch reste rattaché à sa source sans remonter au bandeau.
         slog = scoped_logger(self.logger, self.SOURCE)
 
         try:
-            if args.reset:
-                count = self._reset(self.conn)
-                self.conn.commit()
-                slog.info(f"Reset : {count} works remis à processed=FALSE")
-                return NormalizeStats(0, 0, 0)
-
             total = self._count_pending(self.conn)
             slog.info(f"=== Normalisation : {total} works à traiter ===")
             if total == 0:
                 slog.info("rien à traiter")
                 return NormalizeStats(0, 0, 0)
 
-            limit = min(args.limit or total, total)
-            slog.info(f"Traitement de {limit} works (batch size: {args.batch_size})")
+            slog.info(f"Traitement de {total} works (batch size: {self.DEFAULT_BATCH_SIZE})")
 
             self.preload_caches(self.conn)
 
@@ -153,7 +123,7 @@ class SourceNormalizer(ABC):
             skipped = 0
             errors = 0
 
-            for row in self._iter_rows(self.conn, limit):
+            for row in self._iter_rows(self.conn):
                 try:
                     result = self._process_one(self.conn, row)
                 except Exception as e:
@@ -169,9 +139,9 @@ class SourceNormalizer(ABC):
                     errors += 1
 
                 done = processed + skipped
-                if done > 0 and done % args.batch_size == 0:
+                if done > 0 and done % self.DEFAULT_BATCH_SIZE == 0:
                     self.conn.commit()
-                    parts = [f"{done}/{limit} traités"]
+                    parts = [f"{done}/{total} traités"]
                     if skipped:
                         parts.append(f"{skipped} ignorés")
                     if errors:
