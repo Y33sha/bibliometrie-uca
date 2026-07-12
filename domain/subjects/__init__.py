@@ -1,11 +1,7 @@
-"""Concept métier Sujet : libellés agrégés depuis les ontologies sources.
+"""Concept métier Sujet : libellés agrégés depuis les sources.
 
-Un sujet est un libellé observé sur des publications, dédupliqué sur
-`lower(label)`, annoté par les ontologies sources qui l'ont produit
-(HAL CCSD, OpenAlex topics/keywords, WoS subjects, RAMEAU, theses
-discipline, ScanR domain).
+Un sujet est un libellé observé sur des publications, dédupliqué sur `lower(label)`. La provenance (quelle source l'a annoté) vit sur `publication_subjects.source`.
 
 Sous-modules :
-- `subject` : constantes d'ontologies + helpers de normalisation
-  des libellés.
+- `subject` : helper de normalisation des libellés.
 """

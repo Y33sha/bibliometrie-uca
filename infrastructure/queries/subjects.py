@@ -4,78 +4,29 @@
 Consommé par la phase `application/pipeline/subjects/` (fonctions sync)
 et par les routes API `/api/subjects/*` (classe `PgSubjectsAdminQueries`,
 implémentation du port `application.ports.subjects_queries`).
-Voir docs/chantiers/sujets-mots-cles.md.
 """
 
 from typing import Any
 
-from sqlalchemy import Connection, bindparam, text
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import Connection, text
 
 from application.ports.api.subjects_queries import (
     SubjectListItem,
     SubjectNeighborOut,
     SubjectsAdminQueries,
 )
-from application.ports.pipeline.subjects import OntologyEntry, SubjectsQueries
+from application.ports.pipeline.subjects import SubjectsQueries
 from domain.subjects.subject import normalize_label
 
-# Le ON CONFLICT fusionne par ontologie : pour chaque clé présente dans l'un
-# OU l'autre des dicts, on construit un objet `{codes, level, parent}` agrégé.
-# `codes` = union des listes ; `level` et `parent` = premier non-null
-# (existant prioritaire).
 _UPSERT_SUBJECT_SQL = text(
     """
-    INSERT INTO subjects (label, language, ontologies)
-    VALUES (:label, :language, :ontologies)
+    INSERT INTO subjects (label, language)
+    VALUES (:label, :language)
     ON CONFLICT (lower(label)) DO UPDATE SET
-        ontologies = COALESCE(
-            (
-                SELECT jsonb_object_agg(k, body)
-                FROM (
-                    SELECT
-                        k,
-                        jsonb_build_object(
-                            'codes',
-                            COALESCE(
-                                (
-                                    SELECT jsonb_agg(DISTINCT code)
-                                    FROM (
-                                        SELECT jsonb_array_elements_text(
-                                            COALESCE(subjects.ontologies->k->'codes', '[]'::jsonb)
-                                        ) AS code
-                                        UNION
-                                        SELECT jsonb_array_elements_text(
-                                            COALESCE(EXCLUDED.ontologies->k->'codes', '[]'::jsonb)
-                                        )
-                                    ) merged_codes
-                                ),
-                                '[]'::jsonb
-                            ),
-                            'level',
-                            COALESCE(
-                                subjects.ontologies->k->'level',
-                                EXCLUDED.ontologies->k->'level'
-                            ),
-                            'parent',
-                            COALESCE(
-                                subjects.ontologies->k->'parent',
-                                EXCLUDED.ontologies->k->'parent'
-                            )
-                        ) AS body
-                    FROM (
-                        SELECT key AS k FROM jsonb_each(subjects.ontologies)
-                        UNION
-                        SELECT key AS k FROM jsonb_each(EXCLUDED.ontologies)
-                    ) keys
-                ) merged
-            ),
-            '{}'::jsonb
-        ),
         language = COALESCE(subjects.language, EXCLUDED.language)
     RETURNING id
     """
-).bindparams(bindparam("ontologies", type_=JSONB))
+)
 
 
 def upsert_subject(
@@ -83,19 +34,14 @@ def upsert_subject(
     *,
     label: str,
     language: str | None = None,
-    ontologies: dict[str, OntologyEntry] | None = None,
 ) -> int:
     """UPSERT d'un sujet identifié par `lower(label)`. Retourne l'id.
 
-    `ontologies` : dict `{ontology_name: {"codes": [...], "level": int|null,
-    "parent": str|null}}`. Vide ou None pour un libre. À l'`ON CONFLICT` :
-    pour chaque clé d'ontologie commune, on fusionne les `codes` (union sans
-    doublon) ; on garde la première valeur non-null vue pour `level` et
-    `parent` (côté existant prioritaire).
+    Au `ON CONFLICT`, la `language` déjà posée est conservée (premier non-null).
     """
     return conn.execute(
         _UPSERT_SUBJECT_SQL,
-        {"label": normalize_label(label), "language": language, "ontologies": ontologies or {}},
+        {"label": normalize_label(label), "language": language},
     ).scalar_one()
 
 
@@ -105,24 +51,21 @@ def link_publication_subject(
     publication_id: int,
     subject_id: int,
     source: str,
-    score: float | None = None,
 ) -> None:
     """Crée le lien publication↔subject pour une source donnée.
 
-    PK `(publication_id, subject_id, source)` : un même sujet annoté par
-    deux sources différentes donne deux lignes ; un même sujet annoté
-    deux fois par la même source écrase le score précédent.
+    PK `(publication_id, subject_id, source)` : un même sujet annoté par deux
+    sources différentes donne deux lignes. Idempotent (`ON CONFLICT DO NOTHING`).
     """
     conn.execute(
         text(
             """
-            INSERT INTO publication_subjects (publication_id, subject_id, source, score)
-            VALUES (:pid, :sid, :src, :score)
-            ON CONFLICT (publication_id, subject_id, source)
-            DO UPDATE SET score = EXCLUDED.score
+            INSERT INTO publication_subjects (publication_id, subject_id, source)
+            VALUES (:pid, :sid, :src)
+            ON CONFLICT (publication_id, subject_id, source) DO NOTHING
             """
         ),
-        {"pid": publication_id, "sid": subject_id, "src": source, "score": score},
+        {"pid": publication_id, "sid": subject_id, "src": source},
     )
 
 
@@ -130,16 +73,14 @@ def link_publication_subjects_bulk(
     conn: Connection,
     *,
     source: str,
-    rows: list[tuple[int, int, float | None]],
+    rows: list[tuple[int, int]],
 ) -> int:
     """Bulk INSERT des liens publication↔subject pour une source.
 
-    `rows` : liste `(publication_id, subject_id, score)`. La source est
-    constante pour le batch. Idempotent grâce au `ON CONFLICT DO UPDATE`.
-    Avec la fusion par label, plusieurs annotations source peuvent pointer
-    vers le même `subject_id` pour une même publication ; on dédoublonne
-    `(pub_id, subject_id)` côté Python avant l'INSERT pour ne pas envoyer
-    de lignes redondantes (lourd à inutile).
+    `rows` : liste `(publication_id, subject_id)`. La source est constante pour
+    le batch. Idempotent (`ON CONFLICT DO NOTHING`). Plusieurs annotations source
+    peuvent pointer vers le même `subject_id` pour une même publication ; on
+    dédoublonne `(pub_id, subject_id)` côté Python avant l'INSERT.
 
     Retourne le nombre de lignes envoyées.
     """
@@ -147,19 +88,18 @@ def link_publication_subjects_bulk(
         return 0
     seen: set[tuple[int, int]] = set()
     deduped: list[dict[str, Any]] = []
-    for pub_id, sid, score in rows:
+    for pub_id, sid in rows:
         key = (pub_id, sid)
         if key in seen:
             continue
         seen.add(key)
-        deduped.append({"pid": pub_id, "sid": sid, "src": source, "score": score})
+        deduped.append({"pid": pub_id, "sid": sid, "src": source})
     conn.execute(
         text(
             """
-            INSERT INTO publication_subjects (publication_id, subject_id, source, score)
-            VALUES (:pid, :sid, :src, :score)
-            ON CONFLICT (publication_id, subject_id, source)
-            DO UPDATE SET score = EXCLUDED.score
+            INSERT INTO publication_subjects (publication_id, subject_id, source)
+            VALUES (:pid, :sid, :src)
+            ON CONFLICT (publication_id, subject_id, source) DO NOTHING
             """
         ),
         deduped,
@@ -232,9 +172,9 @@ def select_publications_to_reingest(conn: Connection) -> list[int]:
 def select_source_publications_for_pubs(
     conn: Connection, *, publication_ids: list[int]
 ) -> list[Any]:
-    """`source_publications` (id, publication_id, source, keywords, topics) des
-    publications données — la matière première par-source pour ré-ingérer leurs
-    sujets en conservant l'attribution `publication_subjects.source`.
+    """`source_publications` (id, publication_id, source, topics) des publications
+    données — la matière première par-source pour ré-ingérer leurs concepts en
+    conservant l'attribution `publication_subjects.source`.
     """
     if not publication_ids:
         return []
@@ -242,7 +182,7 @@ def select_source_publications_for_pubs(
         conn.execute(
             text(
                 """
-                SELECT id, publication_id, source, keywords, topics
+                SELECT id, publication_id, source, topics
                 FROM source_publications
                 WHERE publication_id = ANY(:ids)
                 ORDER BY publication_id
@@ -423,21 +363,15 @@ class PgSubjectsQueries(SubjectsQueries):
         *,
         label: str,
         language: str | None = None,
-        ontologies: dict[str, OntologyEntry] | None = None,
     ) -> int:
-        return upsert_subject(
-            conn,
-            label=label,
-            language=language,
-            ontologies=ontologies,
-        )
+        return upsert_subject(conn, label=label, language=language)
 
     def link_publication_subjects_bulk(
         self,
         conn: Connection,
         *,
         source: str,
-        rows: list[tuple[int, int, float | None]],
+        rows: list[tuple[int, int]],
     ) -> int:
         return link_publication_subjects_bulk(conn, source=source, rows=rows)
 
