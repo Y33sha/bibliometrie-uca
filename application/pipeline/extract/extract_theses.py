@@ -8,7 +8,6 @@ Asymétrie avec les autres extracteurs : ne consomme pas la liste `years_full` /
 from __future__ import annotations
 
 import argparse
-import logging
 
 from sqlalchemy import Connection
 
@@ -89,19 +88,10 @@ def extract_ppn(
     return total, inserted, updated, unchanged
 
 
-class ThesesExtractor(SourceExtractor[ThesesExtractConfig]):
+class ThesesExtractor(SourceExtractor[ThesesExtractConfig, ThesesExtractAdapter]):
     """Extraction theses.fr — orchestrateur applicatif."""
 
     SOURCE = "theses"
-
-    def __init__(
-        self,
-        conn: Connection,
-        logger: logging.Logger,
-        adapter: ThesesExtractAdapter,
-    ) -> None:
-        super().__init__(conn, logger)
-        self._adapter = adapter
 
     def load_config(self, conn: Connection) -> ThesesExtractConfig:
         config = self._adapter.load_config(conn)
@@ -119,11 +109,7 @@ class ThesesExtractor(SourceExtractor[ThesesExtractConfig]):
     def extract_all(self, args: argparse.Namespace, config: ThesesExtractConfig) -> PhaseMetrics:
         stats = PhaseMetrics()
         for ppn in config.ppns:
-            if self._breaker_tripped():
-                self.logger.warning(
-                    "theses.fr à bout (429/5xx répétés) — PPN restants sautés"
-                    " (retry au prochain run)"
-                )
+            if self._stop_on_tripped("PPN restants sautés"):
                 break
             slog = scoped_logger(self.logger, self.SOURCE, f"PPN {ppn}")
             total, inserted, updated, unchanged = extract_ppn(

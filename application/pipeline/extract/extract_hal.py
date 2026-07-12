@@ -8,7 +8,6 @@ Le routage new/updated/unchanged vient du `(inserted, changed)` de l'upsert stag
 from __future__ import annotations
 
 import argparse
-import logging
 from collections.abc import Callable
 
 from sqlalchemy import Connection
@@ -111,19 +110,10 @@ def extract_union(
     return metrics
 
 
-class HalExtractor(SourceExtractor[HalExtractConfig]):
+class HalExtractor(SourceExtractor[HalExtractConfig, HalExtractAdapter]):
     """Extraction HAL — orchestrateur applicatif."""
 
     SOURCE = "hal"
-
-    def __init__(
-        self,
-        conn: Connection,
-        logger: logging.Logger,
-        adapter: HalExtractAdapter,
-    ) -> None:
-        super().__init__(conn, logger)
-        self._adapter = adapter
 
     def load_config(self, conn: Connection) -> HalExtractConfig:
         config = self._adapter.load_config(conn)
@@ -165,11 +155,7 @@ class HalExtractor(SourceExtractor[HalExtractConfig]):
 
         metrics = PhaseMetrics()
         for year in years:
-            if self._breaker_tripped():
-                self.logger.warning(
-                    "HAL à bout (429/5xx répétés) — années restantes sautées"
-                    " (retry au prochain run)"
-                )
+            if self._stop_on_tripped("années restantes sautées"):
                 break
             slog = scoped_logger(self.logger, self.SOURCE, str(year))
             year_metrics = extract_union(

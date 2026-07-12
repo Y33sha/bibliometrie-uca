@@ -6,7 +6,6 @@ Pilote l'extraction par année via la pagination `search_after` (Elasticsearch).
 from __future__ import annotations
 
 import argparse
-import logging
 
 from sqlalchemy import Connection
 
@@ -82,19 +81,10 @@ def extract_year(
     return total, inserted, updated, unchanged
 
 
-class ScanrExtractor(SourceExtractor[ScanrExtractConfig]):
+class ScanrExtractor(SourceExtractor[ScanrExtractConfig, ScanrExtractAdapter]):
     """Extraction ScanR — orchestrateur applicatif."""
 
     SOURCE = "scanr"
-
-    def __init__(
-        self,
-        conn: Connection,
-        logger: logging.Logger,
-        adapter: ScanrExtractAdapter,
-    ) -> None:
-        super().__init__(conn, logger)
-        self._adapter = adapter
 
     def load_config(self, conn: Connection) -> ScanrExtractConfig:
         config = self._adapter.load_config(conn)
@@ -115,11 +105,7 @@ class ScanrExtractor(SourceExtractor[ScanrExtractConfig]):
         self.logger.info(f"Années : {years}")
         stats = PhaseMetrics()
         for year in years:
-            if self._breaker_tripped():
-                self.logger.warning(
-                    "ScanR à bout (429/5xx répétés) — années restantes sautées"
-                    " (retry au prochain run)"
-                )
+            if self._stop_on_tripped("années restantes sautées"):
                 break
             slog = scoped_logger(self.logger, self.SOURCE, str(year))
             total, inserted, updated, unchanged = extract_year(
