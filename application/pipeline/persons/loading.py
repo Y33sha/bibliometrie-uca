@@ -31,6 +31,7 @@ class EnrichedAuthorship(NamedTuple):
     publication_id: int | None
     author_position: int
     in_perimeter: bool
+    current_person_id: int | None
     last_name: str
     first_name: str
     last_norm: str
@@ -57,6 +58,7 @@ def _enrich(row: BareUnlinkedAuthorship) -> EnrichedAuthorship:
         publication_id=row.publication_id,
         author_position=row.author_position,
         in_perimeter=row.in_perimeter,
+        current_person_id=row.current_person_id,
         last_name=last_name,
         first_name=first_name,
         last_norm=last_norm,

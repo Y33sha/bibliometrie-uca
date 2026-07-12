@@ -40,7 +40,8 @@ def fetch_unlinked_authorships(conn: Connection) -> list[BareUnlinkedAuthorship]
                    sa_auth.roles,
                    sd.publication_id,
                    sa_auth.author_position,
-                   TRUE AS in_perimeter
+                   TRUE AS in_perimeter,
+                   NULL::integer AS current_person_id
             FROM source_authorships sa_auth
             JOIN author_identifying_keys aik ON aik.id = sa_auth.identity_id
             JOIN source_publications sd ON sd.id = sa_auth.source_publication_id
@@ -69,6 +70,7 @@ def _to_bare(r: Row) -> BareUnlinkedAuthorship:
         publication_id=r.publication_id,
         author_position=r.author_position,
         in_perimeter=r.in_perimeter,
+        current_person_id=r.current_person_id,
     )
 
 
@@ -83,7 +85,8 @@ _OOP_PROJECTION = """
     sa_auth.roles,
     sd.publication_id,
     sa_auth.author_position,
-    FALSE AS in_perimeter
+    FALSE AS in_perimeter,
+    NULL::integer AS current_person_id
 """
 
 # Conditions communes à toutes les branches : SA orpheline hors-périmètre,
