@@ -28,7 +28,7 @@ class TruncatedWork:
 class OpenalexRefetchAdapter(Protocol):
     """Port refetch_truncated : config, lookup SQL, HTTP, UPDATE SQL."""
 
-    max_concurrent: int  # plafond asyncio.Semaphore — respect du rate-limit API
+    max_concurrent: int  # plafond de workers concurrents — respect du rate-limit API
 
     def configure(self, conn: Connection) -> None:
         """Lit la config (URL, auth) depuis la base avant la boucle."""
