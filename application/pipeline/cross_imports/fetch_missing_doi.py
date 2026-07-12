@@ -40,7 +40,7 @@ async def run_async(
 ) -> PhaseMetrics:
     """Boucle principale : DOIs → fetch async → insert.
 
-    Lance les fetchs HTTP en parallèle via `asyncio.gather`, bornés par un sémaphore `adapter.max_concurrent` pour respecter le rate-limit de l'API. Les inserts DB restent sync, délégués au threadpool via `asyncio.to_thread` et sérialisés par un `asyncio.Lock` (la `Connection` SA sync n'est pas thread-safe).
+    Les fetchs HTTP tournent concurremment via un pool de `adapter.max_concurrent` workers qui se partagent un itérateur de lots, ce qui borne le débit au rate-limit de l'API. Les inserts DB restent sync, délégués au threadpool via `asyncio.to_thread` et sérialisés par un `asyncio.Lock` (la `Connection` SA sync n'est pas thread-safe) ; chaque lot est committé en une transaction par cet orchestrateur (l'adapter source ne commite pas).
 
     Quand la source confirme l'absence d'un DOI (réponse vide / 404), `fetch_async` renvoie une sentinelle `not_found_marker` au lieu d'un record : comptée à part (`not_found`, exclue de `fetched`) et passée à `adapter.insert()`, qui la mémorise dans `doi_lookups`.
 
@@ -97,14 +97,21 @@ async def run_async(
                 real = [r for r in records if not is_not_found_marker(r)]
                 progress["fetched"] += len(real)
                 progress["not_found"] += len(records) - len(real)
-                for record in records:
+
+                # Un lot = une transaction : inserts sérialisés puis commit unique.
+                # En cas d'erreur, rollback (désempoisonne la connexion pour le lot suivant),
+                # le lot repartira au prochain run.
+                async with db_lock:
                     try:
-                        async with db_lock:
-                            inserted_one = await asyncio.to_thread(adapter.insert, conn, record)
-                            if inserted_one:
-                                progress["inserted"] += 1
+                        batch_inserted = 0
+                        for record in records:
+                            if await asyncio.to_thread(adapter.insert, conn, record):
+                                batch_inserted += 1
+                        await asyncio.to_thread(conn.commit)
+                        progress["inserted"] += batch_inserted
                     except Exception as e:
-                        slog.warning("erreur insertion : %s", e)
+                        await asyncio.to_thread(conn.rollback)
+                        slog.warning("lot %d (%d DOI) : insertion échouée, rollback — %s", batch_idx, len(batch), e)
 
                 progress["processed"] += len(batch)
                 if progress["processed"] % 100 == 0 or progress["processed"] >= total:

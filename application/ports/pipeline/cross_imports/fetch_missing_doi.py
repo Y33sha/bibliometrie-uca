@@ -72,4 +72,5 @@ class AsyncFetchMissingDoiAdapter(Protocol):
 
     def insert(self, conn: Connection, record: dict[str, Any]) -> bool:
         """Insère le record dans staging. Retourne True si nouveau, False
-        si déjà présent (ON CONFLICT DO NOTHING) ou non inséré."""
+        si déjà présent (ON CONFLICT DO NOTHING) ou non inséré. Ne commite
+        pas : `run_async` commite par lot."""

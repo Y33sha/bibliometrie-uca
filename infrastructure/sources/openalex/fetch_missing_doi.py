@@ -79,7 +79,6 @@ class OpenalexFetchMissingDoiAdapter:
     def insert(self, conn: Connection, record: dict) -> bool:
         if is_not_found_marker(record):
             record_doi_not_found(conn, "openalex", record["_doi"])
-            conn.commit()
             return False
 
         inserted, _ = upsert_staging(
@@ -90,5 +89,4 @@ class OpenalexFetchMissingDoiAdapter:
             raw_data=record,
             entry_mode="cross_import_doi",
         )
-        conn.commit()
         return inserted

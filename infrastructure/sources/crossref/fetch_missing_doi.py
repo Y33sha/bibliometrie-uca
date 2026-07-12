@@ -86,7 +86,6 @@ class CrossrefFetchMissingDoiAdapter:
         if is_not_found_marker(record):
             # Source native du DOI : un 404 est définitif → doi_lookups permanent, jamais retenté.
             record_doi_not_found(conn, "crossref", record["_doi"], permanent=True)
-            conn.commit()
             return False
 
         # DOI = identifiant CrossRef. On le passe par `clean_doi` (normalisation
@@ -103,5 +102,4 @@ class CrossrefFetchMissingDoiAdapter:
             raw_data=record,
             entry_mode="cross_import_doi",
         )
-        conn.commit()
         return inserted
