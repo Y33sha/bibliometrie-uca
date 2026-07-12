@@ -3,10 +3,7 @@
 
 # ── OpenAlex ─────────────────────────────────────────────────────
 
-from application.pipeline.normalize.normalize_openalex import (
-    extract_locations_data,
-    extract_short_id,
-)
+from application.pipeline.normalize.normalize_openalex import extract_locations_data
 
 
 class TestExtractLocationsDataHalIds:
@@ -38,21 +35,6 @@ from domain.source_publications.doc_types import (
     DOC_TYPES_SET as VALID_DOC_TYPES_SET,
     map_doc_type,
 )
-
-
-class TestOAExtractShortId:
-    def test_standard_url(self):
-        assert extract_short_id("https://openalex.org/W2741809807") == "W2741809807"
-
-    def test_already_short(self):
-        assert extract_short_id("W123") == "W123"
-
-    def test_none(self):
-        assert extract_short_id(None) == ""
-
-    def test_empty(self):
-        assert extract_short_id("") == ""
-
 
 # is_hal_primary_location migré vers domain/sources/openalex.is_hal_location
 # (cf. tests/unit/domain/sources/test_openalex.py).

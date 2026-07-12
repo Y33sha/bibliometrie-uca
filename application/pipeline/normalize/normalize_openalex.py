@@ -33,6 +33,7 @@ from domain.sources.openalex import (
     is_theses_fr_location,
     map_openalex_oa_status,
     parse_primary_location,
+    short_openalex_id,
     should_skip_publisher_journal,
 )
 from domain.types import JsonValue
@@ -115,13 +116,6 @@ def extract_topics(work: dict) -> list[dict] | None:
     return topics or None
 
 
-def extract_short_id(url: str, prefix: str = "https://openalex.org/") -> str:
-    """Extrait l'ID court d'une URL OpenAlex."""
-    if url and url.startswith(prefix):
-        return url.replace(prefix, "")
-    return url or ""
-
-
 # =============================================================
 # PUBLISHERS & JOURNALS
 # =============================================================
@@ -134,7 +128,7 @@ def upsert_publisher(work: dict, *, publisher_repo: PublisherRepository) -> int 
     publisher_name = source.get("host_organization_name")
     if not publisher_name:
         return None
-    openalex_id = extract_short_id(source.get("host_organization") or "")
+    openalex_id = short_openalex_id(source.get("host_organization") or "")
     return find_or_create_publisher(
         publisher_name, openalex_id=openalex_id or None, repo=publisher_repo
     )
@@ -150,7 +144,7 @@ def upsert_journal(
     if not title:
         return None
 
-    openalex_id = extract_short_id(source.get("id") or "")
+    openalex_id = short_openalex_id(source.get("id") or "")
     issn_l = source.get("issn_l")
     issns = source.get("issn") or []
     issn = None
@@ -191,10 +185,7 @@ def extract_pub_metadata(
 ) -> dict:
     """Extrait les métadonnées de publication d'un work OpenAlex.
 
-    Retourne un dict utilisable par `insert_openalex_document`. Toutes les
-    valeurs sont brutes — pas de transformation de cohérence. `doc_type`
-    est le `work["type"]` brut OpenAlex (mapping canonique en aval, dans
-    `map_doc_type(source="openalex")`).
+    Retourne un dict utilisable par `insert_openalex_document`. Toutes les valeurs sont brutes — pas de transformation de cohérence. `doc_type` est le `work["type"]` brut OpenAlex (mapping canonique en aval, dans `map_doc_type(source="openalex")`).
     """
     title = work.get("title") or work.get("display_name") or ""
     if primary is None:
@@ -234,13 +225,9 @@ def insert_openalex_document(
     """Crée/retrouve l'entrée source_publications pour OpenAlex.
 
     Les métadonnées canoniques (doi, title, pub_year, doc_type, nnt,
-    journal_id, oa_status, language, container_title) viennent toutes de
-    `pub_meta`, construit en amont par `extract_pub_metadata`. `work`
-    ne sert ici que pour les extras OpenAlex-spécifiques (urls,
-    cited_by_count, is_retracted, biblio, publisher/journal bruts,
-    abstract, keywords, topics, location_ids).
+    journal_id, oa_status, language, container_title) viennent toutes de `pub_meta`, construit en amont par `extract_pub_metadata`. `work` ne sert ici que pour les extras OpenAlex-spécifiques (urls, cited_by_count, is_retracted, biblio, publisher/journal bruts, abstract, keywords, topics, location_ids).
     """
-    openalex_id = extract_short_id(work["id"])
+    openalex_id = short_openalex_id(work["id"])
     if primary is None:
         primary = parse_primary_location(work)
 
@@ -296,7 +283,7 @@ def insert_openalex_document(
             journal_obj["eissn"] = journal_eissn
         if issn_l:
             journal_obj["issnl"] = issn_l
-        if journal_oa_id := extract_short_id(source.get("id") or ""):
+        if journal_oa_id := short_openalex_id(source.get("id") or ""):
             journal_obj["openalex_id"] = journal_oa_id
         if journal_obj:
             biblio["journal"] = journal_obj

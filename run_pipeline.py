@@ -773,29 +773,45 @@ def _run_enrich_journals_from_openalex() -> PhaseMetrics:
     from infrastructure.queries.pipeline.enrich import PgEnrichQueries
     from infrastructure.repositories import journal_repository
     from infrastructure.sources.api_limits import DOAJ_DELAY
+    from infrastructure.sources.circuit_breaker import (
+        SourceCircuitBreaker,
+        reset_current_breaker,
+        set_current_breaker,
+    )
     from infrastructure.sources.config import (
         get_api_base_urls,
         get_openalex_api_key,
         get_polite_pool_email_optional,
     )
+    from infrastructure.sources.openalex.journal_enrichment import fetch_sources_batch
 
     log.info("▶ enrich_journals_from_openalex")
     t0 = time.time()
     conn = get_sync_engine().connect()
+    # Seuil 3 : trois batches consécutifs à bout de budget (429) suffisent à conclure
+    # que le quota OpenAlex quotidien est épuisé et à reporter le reste au prochain run.
+    breaker = SourceCircuitBreaker("openalex sources", threshold=3)
+    token = set_current_breaker(breaker)
     try:
+        api_key = get_openalex_api_key(conn)
+        mailto = get_polite_pool_email_optional(conn) or ""
+        sources_api = get_api_base_urls()["openalex_sources"]
         metrics = run_enrich_journals_from_openalex(
             conn,
             PgEnrichQueries(),
             log,
             journal_repo=journal_repository(conn),
-            api_key=get_openalex_api_key(conn),
-            mailto=get_polite_pool_email_optional(conn) or "",
-            openalex_sources_api=get_api_base_urls()["openalex_sources"],
+            fetch_batch=lambda oa_ids: fetch_sources_batch(
+                oa_ids, openalex_sources_api=sources_api, api_key=api_key, mailto=mailto
+            ),
+            breaker=breaker,
             rate_delay=DOAJ_DELAY,
         )
     finally:
+        reset_current_breaker(token)
         conn.close()
     log.info("✓ enrich_journals_from_openalex terminé en %.1fs", time.time() - t0)
+    _signal_if_tripped(metrics, breaker)
     return metrics
 
 
