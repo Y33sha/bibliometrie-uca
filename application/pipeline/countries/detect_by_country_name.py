@@ -16,8 +16,8 @@ from domain.normalize import normalize_text
 
 def _last_segment(raw_text: str) -> str:
     """Dernier segment normalisé après la dernière virgule (l'adresse entière si aucune virgule)."""
-    last, _, tail = raw_text.rpartition(",")
-    return normalize_text((tail if last else raw_text).strip())
+    _, _, last_segment = raw_text.rpartition(",")
+    return normalize_text(last_segment.strip())
 
 
 def run(conn: Connection, queries: CountryQueries, logger: logging.Logger) -> PhaseMetrics:
