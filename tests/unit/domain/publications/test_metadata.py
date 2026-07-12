@@ -7,6 +7,7 @@ from domain.publications.metadata import (
     absorb_oa_status,
     best_oa_status,
     clean_publication_title,
+    decide_oa_status,
     has_minimal_publication_metadata,
     has_open_archive_deposit,
     normalized_title,
@@ -222,3 +223,35 @@ class TestCleanPublicationTitle:
 
     def test_returns_empty_for_empty(self):
         assert clean_publication_title("") == ""
+
+
+class TestDecideOaStatus:
+    def test_new_status_overwrites(self):
+        assert decide_oa_status("closed", "gold", False) == "gold"
+
+    def test_unchanged_returns_none(self):
+        assert decide_oa_status("gold", "gold", False) is None
+
+    def test_diamond_preserved_against_gold(self):
+        assert decide_oa_status("diamond", "gold", False) is None
+
+    def test_diamond_not_preserved_against_more_open(self):
+        # Seul gold est confondu avec diamond par Unpaywall ; un autre statut écrase.
+        assert decide_oa_status("diamond", "green", False) == "green"
+
+    def test_embargoed_not_downgraded(self):
+        assert decide_oa_status("embargoed", "closed", False) is None
+        assert decide_oa_status("embargoed", "unknown", False) is None
+
+    def test_embargoed_upgraded_to_open(self):
+        assert decide_oa_status("embargoed", "gold", False) == "gold"
+
+    def test_open_deposit_blocks_downgrade(self):
+        assert decide_oa_status("green", "closed", True) is None
+        assert decide_oa_status("green", "unknown", True) is None
+
+    def test_open_deposit_allows_open_status(self):
+        assert decide_oa_status("closed", "gold", True) == "gold"
+
+    def test_no_deposit_writes_closed(self):
+        assert decide_oa_status("green", "closed", False) == "closed"

@@ -120,6 +120,28 @@ def absorb_oa_status(target: str | None, source: str | None) -> str | None:
     return target
 
 
+def decide_oa_status(current: str | None, fetched: str, has_open_deposit: bool) -> str | None:
+    """Statut OA à écrire pour une publication après vérification Unpaywall, ou None si rien ne change (statut préservé).
+
+    Le statut remonté par Unpaywall (`fetched`) écrase le statut courant, sauf quatre préservations :
+    - statut inchangé (`fetched == current`) ;
+    - `current == 'diamond'` face à `gold` : Unpaywall ne connaît pas le diamond OA ;
+    - `current == 'embargoed'` face à `closed`/`unknown` : l'embargo est connu (HAL), pas de rétrogradation ;
+    - `has_open_deposit` face à `closed`/`unknown` : une archive ouverte détient le fichier, qu'Unpaywall ne voit pas sous le DOI.
+
+    Un statut plus ouvert (green+) écrase bien.
+    """
+    if fetched == current:
+        return None
+    if current == "diamond" and fetched == "gold":
+        return None
+    if current == "embargoed" and fetched in OA_CLOSED_STATUSES:
+        return None
+    if has_open_deposit and fetched in OA_CLOSED_STATUSES:
+        return None
+    return fetched
+
+
 # ── Canonicalisation des titres double-encodés HTML ─────────────────
 #
 # OpenAlex et ScanR remontent parfois des titres avec un encodage HTML
