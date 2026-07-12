@@ -1,10 +1,9 @@
-"""Tests des règles métier sur les métadonnées de publication (best_oa_status, absorb_oa_status, clean_publication_title, has_minimal_publication_metadata)."""
+"""Tests des règles métier sur les métadonnées de publication (best_oa_status, decide_oa_status, clean_publication_title, has_minimal_publication_metadata)."""
 
 from types import SimpleNamespace
 
 from domain.publications.metadata import (
     OA_RANK,
-    absorb_oa_status,
     best_oa_status,
     clean_publication_title,
     decide_oa_status,
@@ -117,44 +116,6 @@ class TestBestOAStatus:
         assert OA_RANK["diamond"] > OA_RANK["gold"] > OA_RANK["hybrid"]
         assert OA_RANK["hybrid"] > OA_RANK["bronze"] > OA_RANK["green"]
         assert OA_RANK["green"] > OA_RANK["embargoed"] > OA_RANK["closed"] > OA_RANK["unknown"]
-
-
-# ── absorb_oa_status (règle pairwise pour fusion d'entités) ─────────
-
-
-class TestAbsorbOaStatus:
-    def test_diamond_source_always_wins(self):
-        """Diamond côté source écrase target, même si target était mieux."""
-        assert absorb_oa_status("gold", "diamond") == "diamond"
-        assert absorb_oa_status("hybrid", "diamond") == "diamond"
-        assert absorb_oa_status("closed", "diamond") == "diamond"
-        assert absorb_oa_status(None, "diamond") == "diamond"
-
-    def test_upgrade_from_closed_zone(self):
-        """Target dans la zone fermée (closed/unknown/None) : source ouvert l'upgrade."""
-        assert absorb_oa_status("closed", "green") == "green"
-        assert absorb_oa_status("unknown", "hybrid") == "hybrid"
-        assert absorb_oa_status(None, "gold") == "gold"
-
-    def test_target_open_stays_when_source_better(self):
-        """Target déjà ouvert : on ne reflippe pas même si source est meilleur (cf. docstring)."""
-        assert absorb_oa_status("hybrid", "gold") == "hybrid"
-        assert absorb_oa_status("green", "gold") == "green"
-        assert absorb_oa_status("bronze", "hybrid") == "bronze"
-
-    def test_target_open_stays_when_source_closed(self):
-        """Target ouvert reste, source closed/unknown n'écrase pas."""
-        assert absorb_oa_status("green", "closed") == "green"
-        assert absorb_oa_status("gold", "unknown") == "gold"
-        assert absorb_oa_status("hybrid", None) == "hybrid"
-
-    def test_both_closed_keeps_target(self):
-        """Pas de signal exploitable : target conservé."""
-        assert absorb_oa_status("closed", "unknown") == "closed"
-        assert absorb_oa_status("unknown", "closed") == "unknown"
-        assert absorb_oa_status(None, None) is None
-        assert absorb_oa_status(None, "closed") is None
-        assert absorb_oa_status(None, "unknown") is None
 
 
 # ── clean_publication_title (décodage des entités HTML) ───────────

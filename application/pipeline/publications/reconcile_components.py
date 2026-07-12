@@ -139,7 +139,7 @@ def reconcile(
         queries.repoint_source_publications(conn, list(group.source_publication_ids), target)
         survivors.add(target)
 
-    # 2. Dissolutions d'abord : sauver les dépendants curatés vers le successeur, puis `refresh_from_sources` supprime la pub vidée (cas orphelin). Avant les survivants, pour libérer le DOI dupliqué (sinon l'auto-merge-sur-collision-DOI du refresh survivant retomberait dessus).
+    # 2. Dissolutions d'abord : sauver les dépendants curatés vers le successeur, puis `refresh_from_sources` supprime la pub vidée (cas orphelin). Avant les survivants, pour libérer le DOI qu'un survivant reprend : sinon son `save` heurterait la contrainte unique tant que la pub dissoute porte encore ce DOI.
     for dissolved in plan.dissolved:
         queries.repoint_dependents(
             conn, dissolved.publication_id, dissolved.successor_publication_id

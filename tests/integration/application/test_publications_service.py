@@ -1,17 +1,19 @@
-"""Tests de caractérisation pour application/publications/core.py.
+"""Tests d'intégration pour application/services/publications/core.py.
 
-Couvre `find_by_doi` (guards + happy path) et merge_publications.
+Couvre `merge_publications` (garde DOI, transfert des dépendants, recompute des
+métadonnées canoniques depuis les sources) et `mark_distinct`.
+
+Une publication n'existe qu'attestée par au moins une `source_publication` : les
+helpers sèment donc toujours la ligne `publications` **et** une SP rattachée qui
+porte les mêmes métadonnées. C'est cette SP qui fait exister la publication, et
+`merge_publications` recompute le canonique depuis l'union des SP.
 """
 
 import pytest
 from sqlalchemy import bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
-from application.services.publications.core import (
-    find_by_doi,
-    mark_distinct,
-    merge_publications,
-)
+from application.services.publications.core import mark_distinct, merge_publications
 from domain.errors import DistinctDoiError
 from infrastructure.repositories import publication_repository
 
@@ -40,6 +42,9 @@ def _insert_publication(
     journal_id=None,
     oa_status="unknown",
 ):
+    """Insère une ligne `publications` brute (sans source rattachée). Réservé à
+    `_seed_publication` : une publication sans SP est un état interdit, jamais un
+    point de départ de test."""
     return conn.execute(
         text(
             """
@@ -63,16 +68,28 @@ def _insert_publication(
 
 _INSERT_SOURCE_PUB_SQL = text(
     """
-    INSERT INTO source_publications (source, source_id, title,
-                                     publication_id, external_ids)
-    VALUES (:source, :source_id, :title, :publication_id, :external_ids)
+    INSERT INTO source_publications (source, source_id, title, pub_year, publication_id,
+                                     doi, doc_type, oa_status, journal_id, language, external_ids)
+    VALUES (:source, :source_id, :title, :pub_year, :publication_id,
+            :doi, :doc_type, :oa_status, :journal_id, :language, :external_ids)
     RETURNING id
     """
 ).bindparams(bindparam("external_ids", type_=JSONB))
 
 
 def _insert_source_publication(
-    conn, publication_id, source="hal", source_id="h-1", title="Test", external_ids=None
+    conn,
+    publication_id,
+    source="hal",
+    source_id="h-1",
+    title="Test",
+    pub_year=2024,
+    doi=None,
+    doc_type="article",
+    oa_status=None,
+    journal_id=None,
+    language=None,
+    external_ids=None,
 ):
     return conn.execute(
         _INSERT_SOURCE_PUB_SQL,
@@ -80,10 +97,55 @@ def _insert_source_publication(
             "source": source,
             "source_id": source_id,
             "title": title,
+            "pub_year": pub_year,
             "publication_id": publication_id,
+            "doi": doi,
+            "doc_type": doc_type,
+            "oa_status": oa_status,
+            "journal_id": journal_id,
+            "language": language,
             "external_ids": external_ids or {},
         },
     ).scalar_one()
+
+
+def _seed_publication(
+    conn,
+    title="Test",
+    pub_year=2024,
+    doi=None,
+    doc_type="article",
+    journal_id=None,
+    oa_status="unknown",
+    language=None,
+    source="hal",
+    source_id=None,
+):
+    """Sème une publication valide : la ligne `publications` et une `source_publication`
+    rattachée qui porte les mêmes métadonnées. Retourne l'id de la publication."""
+    pub_id = _insert_publication(
+        conn,
+        title=title,
+        pub_year=pub_year,
+        doi=doi,
+        doc_type=doc_type,
+        journal_id=journal_id,
+        oa_status=oa_status,
+    )
+    _insert_source_publication(
+        conn,
+        pub_id,
+        source=source,
+        source_id=source_id or f"{source}-{pub_id}",
+        title=title,
+        pub_year=pub_year,
+        doi=doi,
+        doc_type=doc_type,
+        oa_status=oa_status,
+        journal_id=journal_id,
+        language=language,
+    )
+    return pub_id
 
 
 def _insert_person(conn, last="Dupont", first="Jean"):
@@ -113,22 +175,10 @@ def _select_one(conn, sql, **binds):
     return conn.execute(text(sql), binds).one_or_none()
 
 
-# ── find_by_* ──────────────────────────────────────────────────────
-
-
-class TestFindByDoi:
-    def test_returns_none_on_empty(self, sa_sync_conn, repo):
-        assert find_by_doi(None, repo=repo) is None
-        assert find_by_doi("", repo=repo) is None
-
-    def test_finds_by_doi_case_insensitive(self, sa_sync_conn, repo):
-        pub_id = _insert_publication(sa_sync_conn, doi="10.1234/ABC")
-        result = find_by_doi("10.1234/abc", repo=repo)
-        assert result is not None
-        assert result.id == pub_id
-
-    def test_returns_none_if_not_found(self, sa_sync_conn, repo):
-        assert find_by_doi("10.1234/unknown", repo=repo) is None
+def _oa_status(conn, pub_id):
+    return conn.execute(
+        text("SELECT oa_status FROM publications WHERE id = :id"), {"id": pub_id}
+    ).scalar_one()
 
 
 # ── merge_publications ────────────────────────────────────────────
@@ -136,18 +186,16 @@ class TestFindByDoi:
 
 class TestMergePublications:
     def test_transfers_source_publications_and_authorships(self, sa_sync_conn, repo):
-        target = _insert_publication(sa_sync_conn, title="Target")
-        source = _insert_publication(sa_sync_conn, title="Source")
-        sp_id = _insert_source_publication(sa_sync_conn, source, source="hal", source_id="h-src")
-
+        target = _seed_publication(sa_sync_conn, title="Target", source_id="h-tgt")
+        source = _seed_publication(sa_sync_conn, title="Source", source_id="h-src")
         person_id = _insert_person(sa_sync_conn)
         auth_id = _insert_authorship(sa_sync_conn, source, person_id=person_id)
 
         merge_publications(target, source, repo=repo)
 
-        # source_publication repointée
+        # source_publication de la source repointée vers la cible
         sp_pub = sa_sync_conn.execute(
-            text("SELECT publication_id FROM source_publications WHERE id = :id"), {"id": sp_id}
+            text("SELECT publication_id FROM source_publications WHERE source_id = 'h-src'")
         ).scalar_one()
         assert sp_pub == target
         # authorship repointée
@@ -160,12 +208,17 @@ class TestMergePublications:
             _select_one(sa_sync_conn, "SELECT id FROM publications WHERE id = :id", id=source)
             is None
         )
+        # cible survivante (elle porte des SP)
+        assert (
+            _select_one(sa_sync_conn, "SELECT id FROM publications WHERE id = :id", id=target)
+            is not None
+        )
 
     def test_refuses_distinct_dois(self, sa_sync_conn, repo):
         """Garde « 1 DOI = 1 publication » : deux DOI non-nuls différents → refus,
         aucune des deux n'est touchée."""
-        target = _insert_publication(sa_sync_conn, doi="10.1/a")
-        source = _insert_publication(sa_sync_conn, doi="10.2/b")
+        target = _seed_publication(sa_sync_conn, doi="10.1/a", source_id="h-tgt")
+        source = _seed_publication(sa_sync_conn, doi="10.2/b", source_id="h-src")
         with pytest.raises(DistinctDoiError):
             merge_publications(target, source, repo=repo)
         for pid in (target, source):
@@ -175,19 +228,23 @@ class TestMergePublications:
             )
 
     def test_merges_when_one_doi_null(self, sa_sync_conn, repo):
-        """Un seul DOI non-null : pas de conflit, fusion appliquée."""
-        target = _insert_publication(sa_sync_conn, doi="10.1/a")
-        source = _insert_publication(sa_sync_conn, doi=None)
+        """Un seul DOI non-null : pas de conflit, fusion appliquée ; la cible garde son DOI."""
+        target = _seed_publication(sa_sync_conn, doi="10.1/a", source_id="h-tgt")
+        source = _seed_publication(sa_sync_conn, doi=None, source_id="h-src")
         merge_publications(target, source, repo=repo)
         assert (
             _select_one(sa_sync_conn, "SELECT id FROM publications WHERE id = :id", id=source)
             is None
         )
+        doi = sa_sync_conn.execute(
+            text("SELECT doi FROM publications WHERE id = :id"), {"id": target}
+        ).scalar_one()
+        assert doi == "10.1/a"
 
     def test_dedup_authorships_by_person(self, sa_sync_conn, repo):
-        """Si target et source ont une authorship pour la même person, la source est jetée."""
-        target = _insert_publication(sa_sync_conn, title="Target")
-        source = _insert_publication(sa_sync_conn, title="Source")
+        """Si target et source ont une authorship pour la même personne, celle de la source est jetée."""
+        target = _seed_publication(sa_sync_conn, title="Target", source_id="h-tgt")
+        source = _seed_publication(sa_sync_conn, title="Source", source_id="h-src")
         person_id = _insert_person(sa_sync_conn)
         keep_auth = _insert_authorship(sa_sync_conn, target, person_id=person_id)
         drop_auth = _insert_authorship(sa_sync_conn, source, person_id=person_id)
@@ -203,11 +260,11 @@ class TestMergePublications:
             is None
         )
 
-    def test_enriches_journal_id(self, sa_sync_conn, repo):
-        """Target sans journal_id → reçoit celui de la source (COALESCE)."""
+    def test_recomputes_journal_id_from_sources(self, sa_sync_conn, repo):
+        """La cible sans journal reçoit celui de la source par recompute (premier non-nul)."""
         j_id = _insert_journal(sa_sync_conn)
-        target = _insert_publication(sa_sync_conn, title="Target", doi=None, journal_id=None)
-        source = _insert_publication(sa_sync_conn, title="Source", doi=None, journal_id=j_id)
+        target = _seed_publication(sa_sync_conn, title="Target", journal_id=None, source_id="h-tgt")
+        source = _seed_publication(sa_sync_conn, title="Source", journal_id=j_id, source_id="h-src")
 
         merge_publications(target, source, repo=repo)
 
@@ -216,10 +273,12 @@ class TestMergePublications:
         ).scalar_one()
         assert result == j_id
 
-    def test_doi_transferred_when_target_has_none(self, sa_sync_conn, repo):
-        """Target sans DOI, source avec : la cible reçoit le DOI de la source."""
-        target = _insert_publication(sa_sync_conn, title="Target", doi=None)
-        source = _insert_publication(sa_sync_conn, title="Source", doi="10.1234/src")
+    def test_recomputes_doi_when_target_has_none(self, sa_sync_conn, repo):
+        """Cible sans DOI, source avec : le recompute promeut le DOI de la source."""
+        target = _seed_publication(sa_sync_conn, title="Target", doi=None, source_id="h-tgt")
+        source = _seed_publication(
+            sa_sync_conn, title="Source", doi="10.1234/src", source_id="h-src"
+        )
 
         merge_publications(target, source, repo=repo)
 
@@ -228,31 +287,32 @@ class TestMergePublications:
         ).scalar_one()
         assert doi == "10.1234/src"
 
-    def test_oa_status_upgrade_diamond_wins(self, sa_sync_conn, repo):
-        """Si source est diamond, la cible devient diamond même si elle avait gold."""
-        target = _insert_publication(sa_sync_conn, title="Target", oa_status="gold")
-        source = _insert_publication(sa_sync_conn, title="Source", oa_status="diamond")
+    def test_recomputes_oa_status_diamond_wins(self, sa_sync_conn, repo):
+        """Statut OA le plus ouvert : une source diamond fait passer la cible en diamond."""
+        target = _seed_publication(
+            sa_sync_conn, title="Target", oa_status="gold", source_id="h-tgt"
+        )
+        source = _seed_publication(
+            sa_sync_conn, title="Source", oa_status="diamond", source_id="h-src"
+        )
         merge_publications(target, source, repo=repo)
-        oa_status = sa_sync_conn.execute(
-            text("SELECT oa_status FROM publications WHERE id = :id"), {"id": target}
-        ).scalar_one()
-        assert oa_status == "diamond"
+        assert _oa_status(sa_sync_conn, target) == "diamond"
 
-    def test_oa_status_upgrade_from_closed_to_gold(self, sa_sync_conn, repo):
-        target = _insert_publication(sa_sync_conn, title="Target", oa_status="closed")
-        source = _insert_publication(sa_sync_conn, title="Source", oa_status="gold")
+    def test_recomputes_oa_status_from_closed_to_gold(self, sa_sync_conn, repo):
+        target = _seed_publication(
+            sa_sync_conn, title="Target", oa_status="closed", source_id="h-tgt"
+        )
+        source = _seed_publication(
+            sa_sync_conn, title="Source", oa_status="gold", source_id="h-src"
+        )
         merge_publications(target, source, repo=repo)
-        oa_status = sa_sync_conn.execute(
-            text("SELECT oa_status FROM publications WHERE id = :id"), {"id": target}
-        ).scalar_one()
-        assert oa_status == "gold"
+        assert _oa_status(sa_sync_conn, target) == "gold"
 
 
 class TestMarkDistinct:
-    def test_inserts_ordered_pair(self, sa_sync_conn):
-        repo = publication_repository(sa_sync_conn)
-        p1 = _insert_publication(sa_sync_conn, title="A")
-        p2 = _insert_publication(sa_sync_conn, title="B")
+    def test_inserts_ordered_pair(self, sa_sync_conn, repo):
+        p1 = _seed_publication(sa_sync_conn, title="A", source_id="h-a")
+        p2 = _seed_publication(sa_sync_conn, title="B", source_id="h-b")
         mark_distinct(p2, p1, repo=repo)  # ordre inverse exprès
         assert (
             _select_one(
@@ -265,10 +325,9 @@ class TestMarkDistinct:
             is not None
         )
 
-    def test_idempotent(self, sa_sync_conn):
-        repo = publication_repository(sa_sync_conn)
-        p1 = _insert_publication(sa_sync_conn, title="A")
-        p2 = _insert_publication(sa_sync_conn, title="B")
+    def test_idempotent(self, sa_sync_conn, repo):
+        p1 = _seed_publication(sa_sync_conn, title="A", source_id="h-a")
+        p2 = _seed_publication(sa_sync_conn, title="B", source_id="h-b")
         mark_distinct(p1, p2, repo=repo)
         mark_distinct(p1, p2, repo=repo)  # ON CONFLICT DO NOTHING
         n = sa_sync_conn.execute(
@@ -295,9 +354,9 @@ class TestMergeRepointsDistinct:
         }
 
     def test_repoints_loser_to_winner(self, sa_sync_conn, repo):
-        winner = _insert_publication(sa_sync_conn, title="Winner")
-        loser = _insert_publication(sa_sync_conn, title="Loser")
-        other = _insert_publication(sa_sync_conn, title="Other")
+        winner = _seed_publication(sa_sync_conn, title="Winner", source_id="h-win")
+        loser = _seed_publication(sa_sync_conn, title="Loser", source_id="h-lose")
+        other = _seed_publication(sa_sync_conn, title="Other", source_id="h-other")
         mark_distinct(loser, other, repo=repo)  # (loser, other) distinctes
 
         merge_publications(winner, loser, repo=repo)  # loser absorbée par winner
@@ -307,9 +366,9 @@ class TestMergeRepointsDistinct:
         assert all(loser not in pair for pair in pairs)  # plus de référence au perdant
 
     def test_dedupes_when_target_pair_exists(self, sa_sync_conn, repo):
-        winner = _insert_publication(sa_sync_conn, title="Winner")
-        loser = _insert_publication(sa_sync_conn, title="Loser")
-        other = _insert_publication(sa_sync_conn, title="Other")
+        winner = _seed_publication(sa_sync_conn, title="Winner", source_id="h-win")
+        loser = _seed_publication(sa_sync_conn, title="Loser", source_id="h-lose")
+        other = _seed_publication(sa_sync_conn, title="Other", source_id="h-other")
         mark_distinct(loser, other, repo=repo)
         mark_distinct(winner, other, repo=repo)  # la paire cible existe déjà
 
@@ -327,8 +386,8 @@ class TestMergeRepointsDistinct:
     def test_drops_self_pair(self, sa_sync_conn, repo):
         """Défensif : si perdant et gagnant étaient marqués distincts, la fusion
         ne crée pas d'auto-paire (gagnant, gagnant)."""
-        winner = _insert_publication(sa_sync_conn, title="Winner")
-        loser = _insert_publication(sa_sync_conn, title="Loser")
+        winner = _seed_publication(sa_sync_conn, title="Winner", source_id="h-win")
+        loser = _seed_publication(sa_sync_conn, title="Loser", source_id="h-lose")
         mark_distinct(winner, loser, repo=repo)
 
         merge_publications(winner, loser, repo=repo)

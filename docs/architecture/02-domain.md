@@ -19,7 +19,7 @@ Contenu, organisé par concept métier :
   - Formes de nom : `PersonNameForm`, `StructureNameForm`
   - Adresse : `Address` (défini par `normalized_text`)
   - Enums : `StructureType`, `AttributionStatus` (statut d'un `PersonIdentifier`)
-- **Règles métier pures** : matching de personnes (`domain/persons/matching.py`), invariant de fusion de personnes (`Person.can_merge_with` dans `domain/persons/person.py`), déduplication des publications par clustering en composantes connexes (primitive pure `domain/entity_resolution.py`, plan de réconciliation `domain/publications/reconciliation.py`) et agrégation cross-source des métadonnées (`domain/publications/aggregation.py`, méthode `Publication.absorb` dans `domain/publications/publication.py`), validation des relations structure (`domain/structures/relations.py`), `doc_types`, `authorship_roles`, `sources` (référentiel des 6 sources).
+- **Règles métier pures** : matching de personnes (`domain/persons/matching.py`), invariant de fusion de personnes (`Person.can_merge_with` dans `domain/persons/person.py`), déduplication des publications par clustering en composantes connexes (primitive pure `domain/entity_resolution.py`, plan de réconciliation `domain/publications/reconciliation.py`) et agrégation cross-source des métadonnées (`domain/publications/aggregation.py`), validation des relations structure (`domain/structures/relations.py`), `doc_types`, `authorship_roles`, `sources` (référentiel des 6 sources).
 
 Le domaine est testé en unit sans DB. Il ne contient aucun port — les Protocols de persistance vivent dans `application/ports/repositories/`.
 
