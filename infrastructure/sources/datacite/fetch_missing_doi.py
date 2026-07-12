@@ -117,7 +117,6 @@ class DataciteFetchMissingDoiAdapter:
         if is_not_found_marker(record):
             # Source native du DOI pour ses préfixes : miss définitif → doi_lookups permanent.
             record_doi_not_found(conn, "datacite", record["_doi"], permanent=True)
-            conn.commit()
             return False
 
         # `record` est le nœud JSON:API `data` : son `id` est le DOI, dupliqué
@@ -133,5 +132,4 @@ class DataciteFetchMissingDoiAdapter:
             raw_data=record,
             entry_mode="cross_import_doi",
         )
-        conn.commit()
         return inserted

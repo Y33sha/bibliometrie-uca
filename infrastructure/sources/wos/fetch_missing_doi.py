@@ -146,7 +146,6 @@ class WosFetchMissingDoiAdapter:
     def insert(self, conn: Connection, record: dict) -> bool:
         if is_not_found_marker(record):
             record_doi_not_found(conn, "wos", record["_doi"])
-            conn.commit()
             return False
 
         inserted, _ = upsert_staging(
@@ -157,5 +156,4 @@ class WosFetchMissingDoiAdapter:
             raw_data=record,
             entry_mode="cross_import_doi",
         )
-        conn.commit()
         return inserted

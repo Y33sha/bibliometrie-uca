@@ -64,7 +64,6 @@ class HalFetchMissingDoiAdapter:
     def insert(self, conn: Connection, record: dict) -> bool:
         if is_not_found_marker(record):
             record_doi_not_found(conn, "hal", record["_doi"])
-            conn.commit()
             return False
 
         hal_id = record.get("halId_s")
@@ -85,5 +84,4 @@ class HalFetchMissingDoiAdapter:
             raw_data=record,
             entry_mode="cross_import_doi",
         )
-        conn.commit()
         return inserted
