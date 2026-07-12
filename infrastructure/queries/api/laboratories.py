@@ -227,7 +227,7 @@ class PgLaboratoriesQueries(LaboratoriesQueries):
         # (pub_id, subject_id) (sources différentes).
         rows = self._conn.execute(
             text("""
-                SELECT s.id, s.label, s.ontologies, COUNT(DISTINCT p.id) AS n
+                SELECT s.id, s.label, COUNT(DISTINCT p.id) AS n
                 FROM publication_subjects ps
                 JOIN publications p ON p.id = ps.publication_id
                 JOIN subjects s ON s.id = ps.subject_id
@@ -239,16 +239,13 @@ class PgLaboratoriesQueries(LaboratoriesQueries):
                         AND a.roles && ARRAY['author']::text[]
                         AND a.in_perimeter = TRUE
                   )
-                GROUP BY s.id, s.label, s.ontologies
+                GROUP BY s.id, s.label
                 ORDER BY n DESC, lower(s.label)
                 LIMIT :lim
             """),
             {"lab_arr": [lab_id], "lim": limit},
         ).all()
-        return [
-            SubjectFrequency(id=r.id, label=r.label, ontologies=r.ontologies, count=r.n)
-            for r in rows
-        ]
+        return [SubjectFrequency(id=r.id, label=r.label, count=r.n) for r in rows]
 
     def get_laboratory_dashboard(self, lab_id: int) -> LaboratoryDashboardResponse:
         """Dashboard labo : publis/an, répartition OA, collab internationales, top pays."""

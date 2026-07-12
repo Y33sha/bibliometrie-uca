@@ -271,7 +271,7 @@ class PgSubjectsAdminQueries(SubjectsAdminQueries):
             binds["q"] = f"%{q}%"
         rows = self._conn.execute(
             text(f"""
-                SELECT id, label, language, ontologies, usage_count
+                SELECT id, label, language, usage_count
                 FROM subjects
                 WHERE {where}
                 ORDER BY usage_count DESC, lower(label)
@@ -284,7 +284,6 @@ class PgSubjectsAdminQueries(SubjectsAdminQueries):
                 id=r.id,
                 label=r.label,
                 language=r.language,
-                ontologies=r.ontologies or {},
                 usage_count=r.usage_count,
             )
             for r in rows
@@ -305,7 +304,7 @@ class PgSubjectsAdminQueries(SubjectsAdminQueries):
     def get_subject(self, subject_id: int) -> SubjectListItem | None:
         row = self._conn.execute(
             text("""
-                SELECT id, label, language, ontologies, usage_count
+                SELECT id, label, language, usage_count
                 FROM subjects
                 WHERE id = :id
             """),
@@ -317,7 +316,6 @@ class PgSubjectsAdminQueries(SubjectsAdminQueries):
             id=row.id,
             label=row.label,
             language=row.language,
-            ontologies=row.ontologies or {},
             usage_count=row.usage_count,
         )
 
@@ -326,7 +324,7 @@ class PgSubjectsAdminQueries(SubjectsAdminQueries):
     ) -> list[SubjectNeighborOut]:
         rows = self._conn.execute(
             text("""
-                SELECT s.id, s.label, s.ontologies, s.usage_count,
+                SELECT s.id, s.label, s.usage_count,
                        c.n AS cooccurrence_count
                 FROM (
                     SELECT subject_b_id AS other, count AS n
@@ -346,7 +344,6 @@ class PgSubjectsAdminQueries(SubjectsAdminQueries):
             SubjectNeighborOut(
                 id=r.id,
                 label=r.label,
-                ontologies=r.ontologies or {},
                 usage_count=r.usage_count,
                 cooccurrence_count=r.cooccurrence_count,
             )

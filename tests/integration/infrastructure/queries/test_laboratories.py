@@ -1,6 +1,5 @@
 """Tests d'intégration pour `infrastructure.queries.api.laboratories`."""
 
-import json
 
 from sqlalchemy import text
 
@@ -247,10 +246,10 @@ class TestGetLaboratorySubjects:
             ).one()
             return row.id
 
-        def _create_subject(label, ontologies=None):
+        def _create_subject(label):
             row = sa_sync_conn.execute(
-                text("INSERT INTO subjects (label, ontologies) VALUES (:l, :o) RETURNING id"),
-                {"l": label, "o": json.dumps(ontologies or {})},
+                text("INSERT INTO subjects (label) VALUES (:l) RETURNING id"),
+                {"l": label},
             ).one()
             return row.id
 

@@ -341,6 +341,7 @@ class PublicationDetailResponse(BaseModel):
     thesis_meta: ThesisMeta | None
     structures: dict[str, StructureInfo]
     subjects: list[SubjectOut]
+    keywords: list[str]  # mots-clés libres agrégés des sources (hors référentiel `subjects`)
     relations: list[RelatedPublicationOut]
     external_identifiers: list[ExternalIdentifierOut]
 

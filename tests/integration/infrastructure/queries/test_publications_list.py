@@ -1,6 +1,5 @@
 """Tests d'intégration pour `infrastructure.queries.api.publications.list`."""
 
-import json
 
 from sqlalchemy import text
 
@@ -46,8 +45,8 @@ def _attach(conn, pub_id, lab_id):
 
 def _create_subject(conn, label):
     row = conn.execute(
-        text("INSERT INTO subjects (label, ontologies) VALUES (:l, :o) RETURNING id"),
-        {"l": label, "o": json.dumps({})},
+        text("INSERT INTO subjects (label) VALUES (:l) RETURNING id"),
+        {"l": label},
     ).one()
     return row.id
 
