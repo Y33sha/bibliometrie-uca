@@ -31,13 +31,14 @@ def reset(
 
     Retourne les compteurs `{transferred, reset_cross}`. Le commit est laissé au caller.
     """
-    logger.info("Canal identifiant : balayage des conflits d'attribution...")
+    logger.info("▶ reset : réinitialisation des rattachements dérivés")
+    logger.info("  arbitrage des conflits d'identifiant...")
     conflicts = build_identifier_conflicts(conn, queries)
     transferred = resolve_identifier_transfers(
         conn, conflicts, queries=queries, repo=person_repo, logger=logger
     )["transferred"]
 
-    logger.info("Cross-source : recompute complet...")
+    logger.info("  détachement des rattachements cross-source...")
     reset_cross = queries.reset_cross_source(conn)
     logger.info("  → %d signatures détachées", reset_cross)
 

@@ -177,7 +177,7 @@ class _Cascade:
             if id_decision.rejection is not None:
                 rejected_pid, target_name = id_decision.rejection
                 self._logger.info(
-                    "corroboration: rejet %s=%s — signature %r incompatible avec personne %d (%r)",
+                    "  corroboration : identifiant %s=%s rejeté — « %s » incompatible avec la personne #%d (« %s »)",
                     id_type,
                     id_value,
                     a.full_name,
@@ -273,16 +273,17 @@ def _run_pass(
     person_repo: PersonRepository,
     decide: Callable[[_Cascade, EnrichedAuthorship], PersonMatchDecision],
     on_create: Callable[[_Cascade, EnrichedAuthorship], None],
-    label: str,
 ) -> CascadeResult:
     """Squelette commun aux deux passes : instancie un `_Cascade` (fetch + prefetch frais), décide chaque signature via `decide` puis applique (match / create / skip).
 
     Seuls diffèrent la décision (`decide`) et le sort de l'action `create` (`on_create` : différée pour `match`, matérialisée pour `create`)."""
+    logger.info("  chargement des index...")
     c = _Cascade(conn, queries, logger, person_repo=person_repo)
     total = len(c.authorships)
+    logger.info("  %d signatures à traiter", total)
     for i, a in enumerate(c.authorships):
         if i and i % 5000 == 0:
-            logger.info("  %d/%d authorships (%s)...", i, total, label)
+            logger.info("  %d/%d signatures traitées", i, total)
         decision = decide(c, a)
         if decision.action == "match":
             c.apply_match(a, decision.person_id, decision.reason)
@@ -301,6 +302,7 @@ def match(
     person_repo: PersonRepository,
 ) -> CascadeResult:
     """Rattache les signatures non liées aux personnes existantes ou déjà résolues, sans créer."""
+    logger.info("▶ match : rattachement aux personnes existantes ou déjà résolues")
     return _run_pass(
         conn,
         queries,
@@ -308,7 +310,6 @@ def match(
         person_repo=person_repo,
         decide=_Cascade.decide_full,
         on_create=_defer_create,
-        label="match",
     )
 
 
@@ -320,6 +321,7 @@ def create(
     person_repo: PersonRepository,
 ) -> CascadeResult:
     """Reprend les signatures non liées : cross-source rejoué contre l'état ferme, puis création."""
+    logger.info("▶ create : re-jugement cross-source puis création des inconnues")
     return _run_pass(
         conn,
         queries,
@@ -327,5 +329,4 @@ def create(
         person_repo=person_repo,
         decide=_Cascade.decide_cross_and_name,
         on_create=_Cascade.apply_create,
-        label="create",
     )

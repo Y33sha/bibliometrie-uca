@@ -19,11 +19,12 @@ def purge(
 
     Retourne les compteurs `{reorphaned, deleted_persons}`. Le commit est laissé au caller.
     """
-    logger.info("Re-orphelinage des formes de nom devenues ambiguës...")
+    logger.info("▶ purge : formes de nom ambiguës et personnes vides")
+    logger.info("  détachement des signatures à forme de nom devenue ambiguë...")
     reorphaned = queries.reorphan_ambiguous_nominal(conn)
     logger.info("  → %d signatures détachées", reorphaned)
 
-    logger.info("GC des personnes vidées...")
+    logger.info("  suppression des personnes sans signature...")
     deleted_persons = queries.delete_empty_persons(conn)
     logger.info("  → %d personnes supprimées", deleted_persons)
 

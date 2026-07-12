@@ -22,7 +22,7 @@ BATCH_SIZE = 5000
 
 
 def populate(conn: Connection, queries: NameFormsQueries, logger: logging.Logger) -> None:
-    logger.info("Source 1 : persons (compute_person_name_forms en Python)")
+    logger.info("▶ régénération des formes de nom")
     queries.create_temp_raw_forms_table(conn)
     batch: list[RawFormBatchItem] = []
     n_persons_rows = 0
@@ -37,15 +37,14 @@ def populate(conn: Connection, queries: NameFormsQueries, logger: logging.Logger
                 batch = []
     if batch:
         queries.insert_raw_forms_batch(conn, batch)
-    logger.info("  %d formes 'persons' chargées en _raw_forms", n_persons_rows)
+    logger.info("  %d formes calculées depuis les personnes", n_persons_rows)
 
-    logger.info("Source 2 : source_authorships (lecture directe dans la query d'agrégation)")
-    logger.info("Synchronisation person_name_forms (agrégation + diff SQL)...")
+    logger.info("  synchronisation avec les formes issues des signatures...")
     inserted, updated, deleted = queries.sync_from_raw_forms(conn)
     queries.drop_temp_raw_forms_table(conn)
 
     logger.info(
-        "Terminé : %d ajoutés, %d mis à jour, %d supprimés",
+        "  → %d ajoutées, %d mises à jour, %d supprimées",
         inserted,
         updated,
         deleted,
