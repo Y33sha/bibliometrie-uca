@@ -219,7 +219,7 @@ def fetch_linked_authorships(conn: Connection) -> list[LinkedAuthorshipRow]:
 def fetch_cross_source_linked(conn: Connection) -> list[BareUnlinkedAuthorship]:
     """Signatures déjà liées **en cross-source** (non épinglées), à re-juger contre les ancres fermes.
 
-    Même projection que les non-liées, plus `current_person_id` = le `person_id` courant. Une signature cross-source peut désormais porter un identifiant/nom qui matche (une personne a été créée ce run) : la ré-évaluation passe par toute la cascade, d'où les colonnes d'identifiant.
+    Même projection que les non-liées, plus `current_person_id` = le `person_id` courant. Une signature cross-source peut porter un identifiant ou un nom qui matche une personne existante : la ré-évaluation passe par toute la cascade, d'où les colonnes d'identifiant.
     """
     rows = conn.execute(
         text("""

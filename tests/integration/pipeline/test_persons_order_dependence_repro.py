@@ -20,9 +20,9 @@ import logging
 
 from sqlalchemy import text
 
+from application.pipeline.persons.arbitrate_identifiers import arbitrate_identifier_conflicts
 from application.pipeline.persons.cascade import run_cascade
 from application.pipeline.persons.purge import purge
-from application.pipeline.persons.reset import reset
 from domain.persons.name_forms import compute_person_name_forms
 from infrastructure.queries.pipeline.persons_create import PgPersonsCreateQueries
 from infrastructure.repositories import person_repository
@@ -104,9 +104,9 @@ def _seed_cross_source_pair(conn, *, pub_id, sa1_id, raw1, norm1, sa2_id, raw2, 
 
 
 def _run_create(conn):
-    """La cascade : reset (no-op ici, pas d'identifiant), puis match, puis create."""
+    """Arbitrage des conflits d'identifiant (no-op ici, pas d'identifiant) puis la cascade."""
     q, repo = PgPersonsCreateQueries(), person_repository(conn)
-    reset(conn, q, _LOG, person_repo=repo)
+    arbitrate_identifier_conflicts(conn, q, _LOG, person_repo=repo)
     run_cascade(conn, q, _LOG, person_repo=repo)
 
 

@@ -23,7 +23,7 @@ from domain.persons.matching import ORCID_MATCH_SOURCES, form_matches_person
 _CONFLICT_ID_TYPES = ("orcid", "idref", "hal_person_id")
 
 
-def build_identifier_conflicts(
+def detect_identifier_conflicts(
     conn: Connection, queries: PersonsCreateQueries
 ) -> list[IdentifierConflict]:
     """Balaye le snapshot pour tous les conflits d'attribution d'identifiant.
