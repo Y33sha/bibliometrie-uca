@@ -77,8 +77,9 @@ def run(
 ) -> PhaseMetrics:
     """Retient les sources effectives selon le mode, les extrait, et assemble les métriques."""
     policy = MODES[mode]
-    allowed = set(policy.extract_sources) | ({"wos"} if include_wos else set())
-    effective = (set(sources) if sources else allowed) & allowed
+    effective = set(policy.extract_sources) | ({"wos"} if include_wos else set())
+    if sources:
+        effective &= sources
     metrics = PhaseMetrics()
 
     if policy.year_selection == "since_last":
