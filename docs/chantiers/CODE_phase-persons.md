@@ -24,32 +24,35 @@ La phase `persons` (`application/pipeline/persons/`) enchaîne enforce → reset
 ### Docstrings
 
 - [x] `phase.py` : pourquoi du mono-transaction énoncé, ordre-indépendance découplée (`afe969ec`). Docstrings-fleuves : le volume venait surtout de la taille du fichier d'avant-découpe ; une fois `cascade.py` scindé, sa docstring mappe exactement son contenu (les cinq signaux, les deux populations, la corroboration) au bon niveau, et `reset`/`purge`/`populate`/`resolve` portent du rationale substantiel. Pas de resserrage imposé — la matière relue est jugée à sa place.
+
 ### Optimisation du matching cross-source
 
 Le `reset` détache en bloc toutes les signatures résolues en cross-source (~75 000 par run) pour les recalculer, alors que le cross-source est une **fonction pure des ancres fermes** : un résultat cross-source n'ancre jamais un autre (seuls identifiant / nom / création entrent dans l'index d'ancrage, cf. `apply_match`). L'écrasante majorité se ré-attache à l'identique — du churn à vide. Cible : recompute **incrémental** contre les ancres fermes, sans passer par la destruction. Inchangé → no-op ; ancre déplacée → update ; ancre disparue → détaché. Résultat identique à la reconstruction actuelle, churn réduit à ce qui change réellement.
 
+Livré : plumbing `current_person_id` (`2fcbb896`), logique incrémentale (`c8f387fd`).
+
 #### Ancrage sur les liens fermes
 
-- [ ] La query d'ancrage (`fetch_linked_authorships` → `load_linked_authorships_by_pub`) ne charge que les liens fermes (`resolution_mode != 'cross_source'`). Aujourd'hui garanti implicitement par le wipe qui précède ; à rendre explicite dès que celui-ci disparaît.
+- [x] `fetch_linked_authorships` ne charge que les liens fermes (`resolution_mode IS DISTINCT FROM 'cross_source'`), explicitement.
 
 #### Reset
 
-- [ ] `reset` ne détache plus le cross-source (`reset_cross_source` retiré) ; il ne conserve que l'arbitrage des conflits d'identifiant, qui nulle les quelques ancres fermes déplacées — leurs dépendants cross-source sont re-jugés à l'étape suivante.
+- [x] `reset` ne détache plus le cross-source ; il ne fait que l'arbitrage des conflits d'identifiant. `reset_cross_source` (le wipe) est remplacé par `detach_authorships(ids)` (détachement ciblé).
 
 #### Ré-évaluation incrémentale
 
-- [ ] La cascade fetche aussi les signatures **déjà liées en cross-source** (pas seulement les non-liées) pour les re-juger contre les ancres fermes.
-- [ ] Application d'un lien existant re-jugé : même personne → no-op (aucune écriture) ; personne différente → update ; plus d'ancre → détaché (`person_id` NULL, la signature redevient non liée et suit le sort des non-liées).
+- [x] La cascade fetche aussi les signatures **déjà liées en cross-source** (`get_cross_source_candidates`, avec `current_person_id`) et les re-juge dans le pool, aux deux passes.
+- [x] `apply_match` : même personne en cross-source → no-op (pas d'écriture, pas d'ancrage) ; sinon écriture. Les candidates re-résolues sont mémorisées (`resolved_cross_source_ids`) ; le complément (candidates − résolues) est détaché en fin de phase par `detach_authorships`.
 
 #### Métriques et observabilité
 
-- [ ] Compteurs cross-source : inchangés / mis à jour / détachés, en remplacement du `reset_cross` massif. Le bilan par méthode et le `updated` de phase restent justes.
+- [x] `cross_source_detached` (signatures sans appui) remplace `reset_cross_source` dans le résumé de phase et est surfacé dans l'UI admin. Le bilan par méthode compte les résolutions nouvelles ou changées, pas les ré-affirmations.
 
 #### Tests
 
-- [ ] Les tests d'ordre-indépendance restent verts. Ajouter les cas incrémentaux : ancre stable → no-op, ancre déplacée → update, ancre disparue → détaché.
+- [x] Ordre-indépendance et idempotence restent verts (le résultat est identique à la reconstruction). Le test du wipe est remplacé par un test de `detach_authorships` (par id, protège les épinglés).
 
-#### À trancher en conception
+#### Conception arrêtée
 
-- La structure à deux passes (`match` puis `create`, `create` rechargeant pour voir l'état posé par `match`) : le recompute incrémental la rend-elle superflue, ou reste-t-elle nécessaire pour que `create` voie les ancres fermes nouvellement posées ?
-- S'assurer que la ré-évaluation couvre **tous** les liens cross-source, pour que le ripple de l'arbitrage d'identifiant (une ancre déplacée re-juge ses dépendants) soit garanti.
+- Deux passes `match`/`create` **conservées** : orthogonales au cross-source (elles ordonnent match ferme puis création, qui ancre le cross-source de ses co-signatures). Un éventuel collapse en une passe serait un chantier séparé.
+- Toutes les signatures cross-source sont re-jugées chaque run (pool de candidats) — le ripple de l'arbitrage d'identifiant est ainsi couvert. Pas de `link_authorship` conditionnel finalement : la cascade saute elle-même l'écriture d'une ré-affirmation à l'identique. Le détachement des sans-appui est un SQL final ciblé par ids (pas dans la passe `create`).
