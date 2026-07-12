@@ -31,6 +31,8 @@ class BareUnlinkedAuthorship(NamedTuple):
     publication_id: int | None
     author_position: int
     in_perimeter: bool
+    # `person_id` courant si la signature est déjà liée en cross-source et re-jugée ce run ; `None` pour une signature non liée. Sert à diffuser l'écriture (no-op / update) et le détachement des sans-appui.
+    current_person_id: int | None
 
 
 class LinkedAuthorshipRow(NamedTuple):
