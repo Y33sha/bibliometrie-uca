@@ -3,7 +3,7 @@
 Incrémental et publication-centré :
   1. Sélectionne les publications dont le contenu canonique a changé depuis la dernière ingestion de leurs sujets (`publications.updated_at` > `max(publication_subjects.created_at)`), ou jamais ingérées.
   2. Dégage leurs liens `publication_subjects` (non rejetés).
-  3. Ré-ingère, par `source_publication`, via l'ingestor de chaque source, avec un `SubjectCache` global (un même label ne déclenche qu'un seul UPSERT, y compris entre sources).
+  3. Ré-ingère, par `source_publication`, via l'extracteur de libellés de chaque source (`extractors`), avec un `SubjectCache` global (un même label ne déclenche qu'un seul UPSERT, y compris entre sources).
   4. Purge les `subjects` devenus orphelins (plus aucun lien).
 
 Seuls les concepts issus des ontologies sources (champ `topics` : domaines, topics, disciplines…) sont ingérés. Les mots-clés libres (`keywords`) restent portés par `source_publications` et affichés via `publications_detail.keywords`, hors de `subjects`.
@@ -15,41 +15,13 @@ Aucune colonne d'état dédiée : la référence « dernière ingestion » est l
 
 import logging
 import time
-from typing import Protocol
 
 from sqlalchemy import Connection
 
 from application.pipeline.metrics import PhaseMetrics
-from application.pipeline.subjects import (
-    ingest_hal,
-    ingest_openalex,
-    ingest_scanr,
-    ingest_theses,
-    ingest_wos,
-)
 from application.pipeline.subjects._common import SubjectCache
+from application.pipeline.subjects.extractors import SUBJECT_EXTRACTORS
 from application.ports.pipeline.subjects import SubjectsQueries
-from domain.types import JsonValue
-
-
-class SubjectIngestor(Protocol):
-    def __call__(
-        self,
-        conn: Connection,
-        *,
-        publication_id: int,
-        topics: JsonValue,
-        cache: SubjectCache,
-    ) -> int: ...
-
-
-INGESTORS: dict[str, SubjectIngestor] = {
-    "hal": ingest_hal.ingest,
-    "openalex": ingest_openalex.ingest,
-    "wos": ingest_wos.ingest,
-    "theses": ingest_theses.ingest,
-    "scanr": ingest_scanr.ingest,
-}
 
 # Fréquence des logs de progression.
 _LOG_EVERY = 2000
@@ -90,15 +62,15 @@ def run(conn: Connection, queries: SubjectsQueries, logger: logging.Logger) -> P
     n_links = 0
     t0 = time.perf_counter()
     for i, r in enumerate(rows, start=1):
-        ingestor = INGESTORS.get(r.source)
-        if ingestor is None:
+        extractor_lang = SUBJECT_EXTRACTORS.get(r.source)
+        if extractor_lang is None:
             continue
-        n_links += ingestor(
-            conn,
-            publication_id=r.publication_id,
-            topics=r.topics,
-            cache=cache,
-        )
+        extractor, language = extractor_lang
+        links = [
+            (r.publication_id, cache.get_or_upsert(conn, label=label, language=language))
+            for label in extractor(r.topics)
+        ]
+        n_links += cache.link_bulk(conn, source=r.source, rows=links)
         if i % _LOG_EVERY == 0:
             elapsed = time.perf_counter() - t0
             rate = i / elapsed if elapsed else 0.0
