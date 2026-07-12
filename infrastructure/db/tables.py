@@ -37,7 +37,7 @@ from sqlalchemy import (
     func,
     text,
 )
-from sqlalchemy.dialects.postgresql import ARRAY, ENUM as PgEnum, JSONB, REAL
+from sqlalchemy.dialects.postgresql import ARRAY, ENUM as PgEnum, JSONB
 
 metadata = MetaData()
 
@@ -1156,7 +1156,6 @@ subjects = Table(
     Column("language", Text),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     Column("usage_count", Integer, nullable=False, server_default="0"),
-    Column("ontologies", JSONB, nullable=False, server_default="{}"),
     # Index UNIQUE sur expression lower(label) — complété à la main.
     Index("subjects_label_key", text("lower(label)"), unique=True),
     # Index GIN trigram sur expression normalize_name_form(label) — complété
@@ -1181,7 +1180,6 @@ publication_subjects = Table(
     Column("publication_id", Integer, nullable=False),
     Column("subject_id", Integer, nullable=False),
     Column("source", source_type_enum, nullable=False),
-    Column("score", REAL),
     Column("rejected", Boolean, nullable=False, server_default="false"),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     PrimaryKeyConstraint("publication_id", "subject_id", "source"),
