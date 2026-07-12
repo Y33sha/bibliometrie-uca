@@ -20,7 +20,7 @@ from sqlalchemy import Connection
 
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.persons.cascade import create, match
-from application.pipeline.persons.metrics import build_metrics
+from application.pipeline.persons.metrics import build_metrics, log_matching_breakdown
 from application.pipeline.persons.populate_person_name_forms import populate
 from application.pipeline.persons.purge import purge
 from application.pipeline.persons.reset import reset
@@ -65,5 +65,6 @@ def run(
             reorphaned=purge_counts["reorphaned"],
             deleted_persons=purge_counts["deleted_persons"],
         )
+        log_matching_breakdown(logger, match_result, create_result)
     logger.info("✓ persons terminé en %.1fs", time.perf_counter() - t0)
     return metrics
