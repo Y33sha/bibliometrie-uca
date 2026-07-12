@@ -6,7 +6,6 @@
 
 - [Lisibilité](CODE_lisibilite.md)
   - [Phase personnes — lisibilité et refonte](CODE_phase-persons.md)
-  - [Fusion des publications — dénouer l'enchevêtrement](CODE_merge-publications.md)
 
 ### En pause
 
@@ -19,6 +18,7 @@
 
 ## Chantiers archivés
 
+- 2026-07-12 — [Fusion des publications — dénouer l'enchevêtrement](archived/2026-07-12_CODE_merge-publications.md)
 - 2026-07-11 — [Countries : caches pays intermédiaires](archived/2026-07-11_CODE_countries-caches-intermediaires.md)
 - 2026-07-10 — [run_pipeline : réduire à la coquille CLI](archived/2026-07-10_CODE_run-pipeline-coquille-cli.md)
 - 2026-07-09 — [Hors périmètre : ne pas matérialiser plutôt que masquer](archived/2026-07-09_DATA_hors-perimetre-non-materialise.md)
