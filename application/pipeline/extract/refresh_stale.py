@@ -24,7 +24,7 @@ from sqlalchemy import Connection
 from application.pipeline._fetch_pool import run_fetch_pool
 from application.pipeline.extract.base import scoped_logger
 from application.pipeline.metrics import PhaseMetrics
-from application.pipeline.signals import filter_configured, timed_metrics
+from application.pipeline.signals import filter_configured, select_targets, timed_metrics
 from application.ports.pipeline.circuit_breaker import CircuitBreaker
 from application.ports.pipeline.extract.refresh_stale import (
     NOT_FOUND,
@@ -64,9 +64,7 @@ def run_phase(
     WoS est opt-in (`--include-wos`). Fenêtre d'années : `--year` cible une seule année, sinon `[start_year … courante]` ; `theses` ignore la borne large (tout l'historique des PPN), mais suit `--year`. Les sources non configurées sont sautées avec un signal `source_unconfigured`.
     """
     metrics = PhaseMetrics()
-    allowed = set(ALL_SOURCES) - ({"wos"} if not include_wos else set())
-    effective = (set(sources) if sources else allowed) & allowed
-    targets = [t for t in ALL_SOURCES if t in effective]
+    targets = select_targets(ALL_SOURCES, sources, include_wos=include_wos)
     configured = filter_configured(
         targets,
         metrics,
