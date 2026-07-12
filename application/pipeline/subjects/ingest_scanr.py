@@ -1,16 +1,11 @@
 """Ingestion des sujets ScanR.
 
-Source format (cf normalize_scanr.py:176-190) :
-- `keywords` : list[str] résolus depuis un dict multilingue (default/en/fr).
-  La langue d'origine est perdue à la normalisation.
-- `topics`   : JSONB libre. Peut être une liste de domaines ou une
-  structure dict avec clés `domains` / `topics`. On ignore le reste.
+`topics` : JSONB libre, soit une liste de domaines, soit un dict avec clés `domains` / `topics`. On ignore le reste.
 """
 
 from sqlalchemy import Connection
 
 from application.pipeline.subjects._common import SubjectCache, dedup_strs
-from domain.subjects.subject import ONTOLOGY_SCANR_DOMAIN
 from domain.types import JsonValue
 
 SOURCE = "scanr"
@@ -20,29 +15,18 @@ def ingest(
     conn: Connection,
     *,
     publication_id: int,
-    keywords: list[str] | None,
     topics: JsonValue,
     cache: SubjectCache,
 ) -> int:
-    links: list[tuple[int, int, float | None]] = []
-
-    for kw in dedup_strs(keywords):
-        sid = cache.get_or_upsert(conn, label=kw)
-        links.append((publication_id, sid, None))
-
+    links: list[tuple[int, int]] = []
     for label in _extract_domain_labels(topics):
-        sid = cache.get_or_upsert(
-            conn,
-            label=label,
-            ontologies={ONTOLOGY_SCANR_DOMAIN: {"codes": [label.lower()]}},
-        )
-        links.append((publication_id, sid, None))
-
+        sid = cache.get_or_upsert(conn, label=label)
+        links.append((publication_id, sid))
     return cache.link_bulk(conn, source=SOURCE, rows=links)
 
 
 def _extract_domain_labels(topics: JsonValue) -> list[str]:
-    """Extrait des libellés de domaine depuis la structure libre `topics`."""
+    """Libellés de domaine depuis la structure libre `topics`."""
     if isinstance(topics, list):
         return dedup_strs(topics)
     if isinstance(topics, dict):

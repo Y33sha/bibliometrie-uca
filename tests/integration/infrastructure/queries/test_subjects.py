@@ -1,6 +1,5 @@
 """Tests d'intégration pour `infrastructure.queries.subjects`."""
 
-import pytest
 from sqlalchemy import text
 
 from infrastructure.queries.subjects import (
@@ -22,37 +21,21 @@ def _create_pub(conn, title="X"):
 
 
 class TestUpsertSubject:
-    def test_creates_new_free(self, sa_sync_conn):
+    def test_creates_new(self, sa_sync_conn):
         sid = upsert_subject(sa_sync_conn, label="machine learning")
         assert sid > 0
         row = sa_sync_conn.execute(
-            text("SELECT label, language, ontologies FROM subjects WHERE id = :id"), {"id": sid}
+            text("SELECT label, language FROM subjects WHERE id = :id"), {"id": sid}
         ).one()
         assert row.label == "machine learning"
         assert row.language is None
-        assert row.ontologies == {}
 
-    def test_creates_new_concept(self, sa_sync_conn):
-        sid = upsert_subject(
-            sa_sync_conn,
-            label="Machine Learning",
-            language="en",
-            ontologies={
-                "openalex_topic": {
-                    "codes": ["machine learning"],
-                    "level": 3,
-                    "parent": "Computer Science",
-                }
-            },
-        )
-        row = sa_sync_conn.execute(
-            text("SELECT label, language, ontologies FROM subjects WHERE id = :id"), {"id": sid}
-        ).one()
-        assert row.language == "en"
-        entry = row.ontologies["openalex_topic"]
-        assert entry["codes"] == ["machine learning"]
-        assert entry["level"] == 3
-        assert entry["parent"] == "Computer Science"
+    def test_stores_language(self, sa_sync_conn):
+        sid = upsert_subject(sa_sync_conn, label="Machine Learning", language="en")
+        language = sa_sync_conn.execute(
+            text("SELECT language FROM subjects WHERE id = :id"), {"id": sid}
+        ).scalar_one()
+        assert language == "en"
 
     def test_dedup_case_insensitive(self, sa_sync_conn):
         a = upsert_subject(sa_sync_conn, label="Machine Learning")
@@ -69,127 +52,28 @@ class TestUpsertSubject:
         b = upsert_subject(sa_sync_conn, label="machine learning")
         assert a == b
 
-    def test_merges_ontologies_on_conflict(self, sa_sync_conn):
-        # Premier UPSERT : libre.
-        a = upsert_subject(sa_sync_conn, label="biology")
-        # Deuxième UPSERT : concept HAL avec le même label.
-        b = upsert_subject(
-            sa_sync_conn, label="biology", ontologies={"hal_domain": {"codes": ["sdv.bio"]}}
-        )
-        assert a == b
-        onto = sa_sync_conn.execute(
-            text("SELECT ontologies FROM subjects WHERE id = :id"), {"id": a}
+    def test_language_first_non_null_wins(self, sa_sync_conn):
+        sid = upsert_subject(sa_sync_conn, label="Biology", language="en")
+        upsert_subject(sa_sync_conn, label="biology", language="fr")
+        language = sa_sync_conn.execute(
+            text("SELECT language FROM subjects WHERE id = :id"), {"id": sid}
         ).scalar_one()
-        assert onto["hal_domain"]["codes"] == ["sdv.bio"]
-
-    def test_merges_ontologies_across_sources(self, sa_sync_conn):
-        sid = upsert_subject(
-            sa_sync_conn, label="Informatique", ontologies={"hal_domain": {"codes": ["info"]}}
-        )
-        upsert_subject(
-            sa_sync_conn,
-            label="Informatique",
-            ontologies={"theses_discipline": {"codes": ["informatique"]}},
-        )
-        onto = sa_sync_conn.execute(
-            text("SELECT ontologies FROM subjects WHERE id = :id"), {"id": sid}
-        ).scalar_one()
-        assert set(onto.keys()) == {"hal_domain", "theses_discipline"}
-        assert onto["hal_domain"]["codes"] == ["info"]
-        assert onto["theses_discipline"]["codes"] == ["informatique"]
-
-    def test_appends_codes_within_same_ontology(self, sa_sync_conn):
-        # Même label HAL avec deux codes intra-ontologie.
-        sid = upsert_subject(
-            sa_sync_conn, label="Informatique", ontologies={"hal_domain": {"codes": ["info"]}}
-        )
-        upsert_subject(
-            sa_sync_conn,
-            label="Informatique",
-            ontologies={"hal_domain": {"codes": ["scco.comp"]}},
-        )
-        onto = sa_sync_conn.execute(
-            text("SELECT ontologies FROM subjects WHERE id = :id"), {"id": sid}
-        ).scalar_one()
-        assert sorted(onto["hal_domain"]["codes"]) == ["info", "scco.comp"]
-
-    def test_idempotent_same_ontology_code(self, sa_sync_conn):
-        sid = upsert_subject(sa_sync_conn, label="X", ontologies={"hal_domain": {"codes": ["a"]}})
-        upsert_subject(sa_sync_conn, label="X", ontologies={"hal_domain": {"codes": ["a"]}})
-        onto = sa_sync_conn.execute(
-            text("SELECT ontologies FROM subjects WHERE id = :id"), {"id": sid}
-        ).scalar_one()
-        assert onto["hal_domain"]["codes"] == ["a"]
-
-    def test_level_and_parent_per_ontology(self, sa_sync_conn):
-        # Le level/parent sont stockés dans le JSONB, par ontologie.
-        sid = upsert_subject(
-            sa_sync_conn,
-            label="Medicine",
-            ontologies={
-                "openalex_topic": {
-                    "codes": ["medicine"],
-                    "level": 1,
-                    "parent": "Health Sciences",
-                }
-            },
-        )
-        onto = sa_sync_conn.execute(
-            text("SELECT ontologies FROM subjects WHERE id = :id"), {"id": sid}
-        ).scalar_one()
-        entry = onto["openalex_topic"]
-        assert entry["level"] == 1
-        assert entry["parent"] == "Health Sciences"
-
-    def test_first_non_null_level_parent_wins(self, sa_sync_conn):
-        # Premier UPSERT pose level=2, parent="Engineering".
-        sid = upsert_subject(
-            sa_sync_conn,
-            label="Computer Science",
-            ontologies={
-                "openalex_topic": {
-                    "codes": ["computer science"],
-                    "level": 2,
-                    "parent": "Engineering",
-                }
-            },
-        )
-        # Deuxième UPSERT avec level=1, parent="Other" : ne devrait PAS écraser.
-        upsert_subject(
-            sa_sync_conn,
-            label="Computer Science",
-            ontologies={
-                "openalex_topic": {
-                    "codes": ["computer science"],
-                    "level": 1,
-                    "parent": "Other",
-                }
-            },
-        )
-        onto = sa_sync_conn.execute(
-            text("SELECT ontologies FROM subjects WHERE id = :id"), {"id": sid}
-        ).scalar_one()
-        entry = onto["openalex_topic"]
-        assert entry["level"] == 2
-        assert entry["parent"] == "Engineering"
+        assert language == "en"
 
 
 class TestLinkAndClear:
     def test_link_creates_row(self, sa_sync_conn):
         pub = _create_pub(sa_sync_conn)
         sid = upsert_subject(sa_sync_conn, label="x")
-        link_publication_subject(
-            sa_sync_conn, publication_id=pub, subject_id=sid, source="hal", score=None
-        )
-        row = sa_sync_conn.execute(
+        link_publication_subject(sa_sync_conn, publication_id=pub, subject_id=sid, source="hal")
+        source = sa_sync_conn.execute(
             text(
-                "SELECT source, score FROM publication_subjects "
+                "SELECT source FROM publication_subjects "
                 "WHERE publication_id = :p AND subject_id = :s"
             ),
             {"p": pub, "s": sid},
-        ).one()
-        assert row.source == "hal"
-        assert row.score is None
+        ).scalar_one()
+        assert source == "hal"
 
     def test_link_same_subject_two_sources(self, sa_sync_conn):
         pub = _create_pub(sa_sync_conn)
@@ -204,23 +88,23 @@ class TestLinkAndClear:
         ).scalar_one()
         assert n == 2
 
-    def test_link_same_source_updates_score(self, sa_sync_conn):
+    def test_link_idempotent_same_source(self, sa_sync_conn):
         pub = _create_pub(sa_sync_conn)
         sid = upsert_subject(sa_sync_conn, label="x")
         link_publication_subject(
-            sa_sync_conn, publication_id=pub, subject_id=sid, source="openalex", score=0.5
+            sa_sync_conn, publication_id=pub, subject_id=sid, source="openalex"
         )
         link_publication_subject(
-            sa_sync_conn, publication_id=pub, subject_id=sid, source="openalex", score=0.8
+            sa_sync_conn, publication_id=pub, subject_id=sid, source="openalex"
         )
-        score = sa_sync_conn.execute(
+        n = sa_sync_conn.execute(
             text(
-                "SELECT score FROM publication_subjects "
-                "WHERE publication_id = :p AND subject_id = :s AND source = 'openalex'"
+                "SELECT count(*) AS n FROM publication_subjects "
+                "WHERE publication_id = :p AND source = 'openalex'"
             ),
-            {"p": pub, "s": sid},
+            {"p": pub},
         ).scalar_one()
-        assert score == pytest.approx(0.8)
+        assert n == 1
 
     def test_clear_only_removes_target_source(self, sa_sync_conn):
         pub = _create_pub(sa_sync_conn)

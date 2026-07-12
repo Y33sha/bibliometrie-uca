@@ -1,25 +1,6 @@
-"""Tests des constantes et helpers de `domain/subjects/subject.py`."""
+"""Tests du helper de `domain/subjects/subject.py`."""
 
-from domain.subjects.subject import (
-    ONTOLOGIES,
-    ONTOLOGY_HAL_DOMAIN,
-    ONTOLOGY_OPENALEX_TOPIC,
-    ONTOLOGY_RAMEAU,
-    normalize_label,
-)
-
-
-class TestOntologies:
-    def test_known_ontologies_present(self):
-        assert ONTOLOGY_OPENALEX_TOPIC in ONTOLOGIES
-        assert ONTOLOGY_HAL_DOMAIN in ONTOLOGIES
-        assert ONTOLOGY_RAMEAU in ONTOLOGIES
-
-    def test_all_ontology_constants_in_set(self):
-        from domain.subjects import subject as m
-
-        constants = {v for k, v in vars(m).items() if k.startswith("ONTOLOGY_")}
-        assert constants == set(ONTOLOGIES)
+from domain.subjects.subject import normalize_label
 
 
 class TestNormalizeLabel:

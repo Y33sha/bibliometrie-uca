@@ -1,23 +1,16 @@
 """Ingestion des sujets d'une publication — première étape de la phase `subjects` (avant les co-occurrences).
 
 Incrémental et publication-centré :
-  1. Sélectionne les publications dont le contenu canonique a changé depuis la
-     dernière ingestion de leurs sujets (`publications.updated_at` >
-     `max(publication_subjects.created_at)`), ou jamais ingérées.
+  1. Sélectionne les publications dont le contenu canonique a changé depuis la dernière ingestion de leurs sujets (`publications.updated_at` > `max(publication_subjects.created_at)`), ou jamais ingérées.
   2. Dégage leurs liens `publication_subjects` (non rejetés).
-  3. Ré-ingère, par `source_publication`, via l'ingestor de chaque source, avec
-     un `SubjectCache` global (les sujets récurrents ne déclenchent qu'un seul
-     UPSERT, y compris la fusion d'un même label entre sources).
+  3. Ré-ingère, par `source_publication`, via l'ingestor de chaque source, avec un `SubjectCache` global (un même label ne déclenche qu'un seul UPSERT, y compris entre sources).
   4. Purge les `subjects` devenus orphelins (plus aucun lien).
 
-On lit les `source_publications` (et non `publications_detail`) pour préserver
-l'attribution par-source des liens : `publication_subjects.source` dit quelle
-source a fourni chaque sujet, alors que les keywords sont fusionnés sans source
-dans `publications_detail`.
+Seuls les concepts issus des ontologies sources (champ `topics` : domaines, topics, disciplines…) sont ingérés. Les mots-clés libres (`keywords`) restent portés par `source_publications` et affichés via `publications_detail.keywords`, hors de `subjects`.
 
-Aucune colonne d'état dédiée : la référence « dernière ingestion » est le
-`created_at` des liens eux-mêmes ; la purge des orphelins (étape 4) remplace
-l'ancien référentiel « jamais purgé ».
+On lit les `source_publications` (et non `publications_detail`) pour préserver l'attribution par-source : `publication_subjects.source` dit quelle source a fourni chaque sujet.
+
+Aucune colonne d'état dédiée : la référence « dernière ingestion » est le `created_at` des liens eux-mêmes ; la purge des orphelins (étape 4) remplace l'ancien référentiel « jamais purgé ».
 """
 
 import logging
@@ -28,7 +21,6 @@ from sqlalchemy import Connection
 
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.subjects import (
-    ingest_crossref,
     ingest_hal,
     ingest_openalex,
     ingest_scanr,
@@ -46,7 +38,6 @@ class SubjectIngestor(Protocol):
         conn: Connection,
         *,
         publication_id: int,
-        keywords: list[str] | None,
         topics: JsonValue,
         cache: SubjectCache,
     ) -> int: ...
@@ -56,7 +47,6 @@ INGESTORS: dict[str, SubjectIngestor] = {
     "hal": ingest_hal.ingest,
     "openalex": ingest_openalex.ingest,
     "wos": ingest_wos.ingest,
-    "crossref": ingest_crossref.ingest,
     "theses": ingest_theses.ingest,
     "scanr": ingest_scanr.ingest,
 }
@@ -68,10 +58,7 @@ _LOG_EVERY = 2000
 def run(conn: Connection, queries: SubjectsQueries, logger: logging.Logger) -> PhaseMetrics:
     """Ré-ingère les sujets des publications modifiées depuis la dernière passe.
 
-    `metrics.new` porte le nombre de liens publication↔sujet créés ; le résumé
-    sur-mesure expose les sujets ajoutés (évolution nette du référentiel, ingestion
-    moins purge des orphelins), le nouveau total du vocabulaire et le nombre de
-    publications ré-ingérées.
+    `metrics.new` porte le nombre de liens publication↔sujet créés ; le résumé sur-mesure expose les sujets ajoutés (évolution nette du référentiel, ingestion moins purge des orphelins), le nouveau total du vocabulaire et le nombre de publications ré-ingérées.
     """
     t_run = time.perf_counter()
     subjects_before = queries.count_subjects(conn)
@@ -109,7 +96,6 @@ def run(conn: Connection, queries: SubjectsQueries, logger: logging.Logger) -> P
         n_links += ingestor(
             conn,
             publication_id=r.publication_id,
-            keywords=r.keywords,
             topics=r.topics,
             cache=cache,
         )
