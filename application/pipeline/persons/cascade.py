@@ -29,6 +29,7 @@ from sqlalchemy import Connection
 from application.pipeline.persons.loading import (
     EnrichedAuthorship,
     get_all_unlinked_authorships,
+    get_cross_source_candidates,
     get_out_of_perimeter_candidates,
     load_linked_authorships_by_pub,
 )
@@ -77,9 +78,13 @@ class _Cascade:
 
         in_perimeter = get_all_unlinked_authorships(conn, queries)
         out_of_perimeter = get_out_of_perimeter_candidates(conn, queries)
-        self.authorships = in_perimeter + out_of_perimeter
+        cross_source = get_cross_source_candidates(conn, queries)
+        self.authorships = in_perimeter + out_of_perimeter + cross_source
         self.in_perimeter_total = len(in_perimeter)
         self.out_of_perimeter_total = len(out_of_perimeter)
+        # Signatures déjà liées en cross-source, re-jugées ce run. Celles qu'aucune passe ne re-résout (absentes de `resolved_cross_source_ids`) ont perdu leur ancre : la phase les détache.
+        self.cross_source_candidate_ids = {a.authorship_id for a in cross_source}
+        self.resolved_cross_source_ids: set[int] = set()
 
         self._linked_index = load_linked_authorships_by_pub(conn, queries)
         self._idref_map = queries.fetch_idref_to_person_map(conn)
@@ -180,6 +185,11 @@ class _Cascade:
 
     def apply_match(self, a: EnrichedAuthorship, pid: int | None, reason: str) -> None:
         assert pid is not None  # garanti par decide_person_match action=match
+        if a.current_person_id is not None:
+            # Signature déjà liée en cross-source, re-jugée : couverte ce run, la phase ne la détache pas.
+            self.resolved_cross_source_ids.add(a.authorship_id)
+            if reason == "cross_source" and pid == a.current_person_id:
+                return  # ré-affirmée à l'identique : pas d'écriture, pas d'ancrage, pas de compteur
         link_authorship(
             pid,
             a.source,
@@ -200,6 +210,9 @@ class _Cascade:
             )
 
     def apply_create(self, a: EnrichedAuthorship) -> None:
+        if a.current_person_id is not None:
+            # Ancienne signature cross-source qui rejoint une création : couverte ce run.
+            self.resolved_cross_source_ids.add(a.authorship_id)
         last = a.last_name or a.full_name or "?"
         first = a.first_name or ""
         marker = create_person(last, first, repo=self._person_repo)
@@ -228,6 +241,8 @@ class _Cascade:
             out_of_perimeter_matched=self.out_of_perimeter_matched,
             in_perimeter_total=self.in_perimeter_total,
             out_of_perimeter_total=self.out_of_perimeter_total,
+            cross_source_candidate_ids=self.cross_source_candidate_ids,
+            resolved_cross_source_ids=self.resolved_cross_source_ids,
         )
 
 

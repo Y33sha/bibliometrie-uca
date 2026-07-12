@@ -187,9 +187,9 @@ def fetch_out_of_perimeter_candidates(conn: Connection) -> list[BareUnlinkedAuth
 
 
 def fetch_linked_authorships(conn: Connection) -> list[LinkedAuthorshipRow]:
-    """`source_authorships` déjà rattachées (toutes sources confondues).
+    """`source_authorships` déjà rattachées par un canal **ferme** (identifiant / nom / épinglage), toutes sources confondues.
 
-    Ramène `raw_author_name` ; le caller parse via `domain.names.parse_raw_author_name` pour toutes les sources uniformément.
+    Sert d'index d'ancrage au matching cross-source. Les liens cross-source eux-mêmes en sont exclus (`resolution_mode <> 'cross_source'`) : un résultat cross-source n'ancre jamais un autre. Ramène `raw_author_name` ; le caller parse via `parse_raw_author_name` uniformément.
     """
     rows = conn.execute(
         text("""
@@ -200,6 +200,7 @@ def fetch_linked_authorships(conn: Connection) -> list[LinkedAuthorshipRow]:
             FROM source_authorships sa_auth
             JOIN source_publications sd ON sd.id = sa_auth.source_publication_id
             WHERE sa_auth.person_id IS NOT NULL
+              AND sa_auth.resolution_mode IS DISTINCT FROM 'cross_source'
               AND sd.publication_id IS NOT NULL
         """)
     ).all()
@@ -213,6 +214,40 @@ def fetch_linked_authorships(conn: Connection) -> list[LinkedAuthorshipRow]:
         )
         for r in rows
     ]
+
+
+def fetch_cross_source_linked(conn: Connection) -> list[BareUnlinkedAuthorship]:
+    """Signatures déjà liées **en cross-source** (non épinglées), à re-juger contre les ancres fermes.
+
+    Même projection que les non-liées, plus `current_person_id` = le `person_id` courant. Une signature cross-source peut désormais porter un identifiant/nom qui matche (une personne a été créée ce run) : la ré-évaluation passe par toute la cascade, d'où les colonnes d'identifiant.
+    """
+    rows = conn.execute(
+        text("""
+            SELECT sa_auth.id AS authorship_id,
+                   sa_auth.source::text AS source,
+                   sa_auth.raw_author_name AS full_name,
+                   aik.author_name_normalized,
+                   aik.person_identifiers->>'orcid' AS orcid,
+                   aik.person_identifiers->>'hal_person_id' AS hal_person_id,
+                   aik.person_identifiers->>'idref' AS idref,
+                   sa_auth.roles,
+                   sd.publication_id,
+                   sa_auth.author_position,
+                   sa_auth.in_perimeter,
+                   sa_auth.person_id AS current_person_id
+            FROM source_authorships sa_auth
+            JOIN author_identifying_keys aik ON aik.id = sa_auth.identity_id
+            JOIN source_publications sd ON sd.id = sa_auth.source_publication_id
+            WHERE sa_auth.resolution_mode = 'cross_source'
+              AND sd.publication_id IS NOT NULL
+              AND sa_auth.raw_author_name IS NOT NULL
+              AND NOT EXISTS (
+                  SELECT 1 FROM confirmed_authorships ca WHERE ca.source_authorship_id = sa_auth.id
+              )
+            ORDER BY sa_auth.id
+        """)
+    ).all()
+    return [_to_bare(r) for r in rows]
 
 
 def _fetch_identifier_to_person_map(
@@ -489,24 +524,23 @@ def reorphan_ambiguous_nominal(conn: Connection) -> int:
     ).rowcount
 
 
-def reset_cross_source(conn: Connection) -> int:
-    """Détache toutes les signatures résolues en cross-source, non épinglées.
+def detach_authorships(conn: Connection, authorship_ids: list[int]) -> int:
+    """Détache un lot de signatures (`person_id` et `resolution_mode` → NULL), par id.
 
-    Le cross-source est un opérateur d'ensemble par (publication, position) : le résultat
-    ne dépend que de l'état ferme (identifiant/nom) du snapshot, jamais de la séquence.
-    Le recalculer complètement à chaque run — plutôt que de suivre la fraîcheur des ancres —
-    est le plus simple et suffit : `person_id` et mode repassent à NULL, la cascade
-    re-résout contre l'état ferme courant. Retourne le nombre de signatures détachées.
+    Sert aux liens cross-source devenus sans appui : une signature dont l'ancre ferme a disparu ce run et que la cascade n'a pas re-résolue. Retourne le nombre détaché.
     """
+    if not authorship_ids:
+        return 0
     return conn.execute(
         text("""
             UPDATE source_authorships sa
             SET person_id = NULL, resolution_mode = NULL
-            WHERE sa.resolution_mode = 'cross_source'
+            WHERE sa.id = ANY(:ids)
               AND NOT EXISTS (
                   SELECT 1 FROM confirmed_authorships ca WHERE ca.source_authorship_id = sa.id
               )
-        """)
+        """),
+        {"ids": authorship_ids},
     ).rowcount
 
 
@@ -541,6 +575,9 @@ class PgPersonsCreateQueries(PersonsCreateQueries):
 
     def fetch_linked_authorships(self, conn: Connection) -> list[LinkedAuthorshipRow]:
         return fetch_linked_authorships(conn)
+
+    def fetch_cross_source_linked(self, conn: Connection) -> list[BareUnlinkedAuthorship]:
+        return fetch_cross_source_linked(conn)
 
     def fetch_idref_to_person_map(self, conn: Connection) -> dict[str, tuple[int, str, str]]:
         return fetch_idref_to_person_map(conn)
@@ -586,8 +623,8 @@ class PgPersonsCreateQueries(PersonsCreateQueries):
     def reorphan_ambiguous_nominal(self, conn: Connection) -> int:
         return reorphan_ambiguous_nominal(conn)
 
-    def reset_cross_source(self, conn: Connection) -> int:
-        return reset_cross_source(conn)
+    def detach_authorships(self, conn: Connection, authorship_ids: list[int]) -> int:
+        return detach_authorships(conn, authorship_ids)
 
     def delete_empty_persons(self, conn: Connection) -> int:
         return delete_empty_persons(conn)

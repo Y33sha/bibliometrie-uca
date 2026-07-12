@@ -6,9 +6,9 @@ from sqlalchemy import text
 
 from infrastructure.queries.pipeline.persons_create import (
     delete_empty_persons,
+    detach_authorships,
     null_identifier_signatures,
     reorphan_ambiguous_nominal,
-    reset_cross_source,
 )
 from tests.integration.helpers.authorships import upsert_identity
 
@@ -95,7 +95,7 @@ def test_reorphan_only_ambiguous_unpinned_nominal(sa_sync_conn):
     assert _row(conn, by_identifier).person_id == a  # résolu par identifiant
 
 
-def test_reset_cross_source_detaches_only_cross_source(sa_sync_conn):
+def test_detach_authorships_by_id_protects_confirmed(sa_sync_conn):
     conn = sa_sync_conn
     p = _person(conn, "Zhang", "Wei")
     cross = _signature(conn, form="wei zhang", person_id=p, mode="cross_source")
@@ -106,11 +106,12 @@ def test_reset_cross_source_detaches_only_cross_source(sa_sync_conn):
         {"s": pinned_cross, "p": p},
     )
 
-    assert reset_cross_source(conn) == 1
+    # Détache le lot demandé, mais jamais un épinglage admin.
+    assert detach_authorships(conn, [cross, pinned_cross]) == 1
 
-    assert _row(conn, cross) == (None, None)  # recompute complet
-    assert _row(conn, nominal).person_id == p  # canal nominal intact
-    assert _row(conn, pinned_cross).person_id == p  # épinglé admin
+    assert _row(conn, cross) == (None, None)  # détachée
+    assert _row(conn, pinned_cross).person_id == p  # épinglée admin, protégée
+    assert _row(conn, nominal).person_id == p  # hors du lot, intacte
 
 
 def test_null_identifier_signatures_targets_old_owner_only(sa_sync_conn):

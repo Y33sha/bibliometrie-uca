@@ -199,6 +199,7 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
       { key: "created", label: "Personnes créées" },
       { key: "skipped_ambiguous", label: "Ignorées (nom ambigu)" },
       { key: "corroboration_rejected", label: "Rejets par corroboration de nom" },
+      { key: "cross_source_detached", label: "Cross-source détachés (sans appui)" },
     ],
     tables: [
       {

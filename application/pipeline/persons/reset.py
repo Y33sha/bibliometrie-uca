@@ -1,11 +1,8 @@
-"""Reset de la phase personnes : réinitialise les attributions dérivées avant le match.
+"""Reset de la phase personnes : arbitrage des conflits d'attribution d'identifiant.
 
-Deux canaux, ordre-indépendants par lecture d'agrégat sur le snapshot :
+Ordre-indépendant par lecture d'agrégat sur le snapshot : `build_identifier_conflicts` balaye le snapshot pour toutes les valeurs d'identifiant qu'au moins deux personnes se disputent ; `resolve_identifier_transfers` tranche par consensus des porteurs, transfère la valeur captée à son propriétaire légitime et remet à NULL les signatures affectées, re-résolues ensuite par `match` puis `create`.
 
-- **Identifiant** : arbitrage frontal des conflits d'attribution. `build_identifier_conflicts` balaye le snapshot pour toutes les valeurs d'identifiant qu'au moins deux personnes se disputent ; `resolve_identifier_transfers` tranche par consensus des porteurs, transfère la valeur captée à son propriétaire légitime et remet à NULL les signatures affectées.
-- **Cross-source** : recompute complet — toutes les signatures résolues en cross-source repassent à NULL, le cross-source étant un opérateur d'ensemble qu'on recalcule en bloc.
-
-Les signatures ainsi détachées sont re-résolues par `match` puis `create` contre l'état ferme du snapshot ; le résultat ne dépend pas de l'ordre d'ingestion des sources.
+Le cross-source n'est plus détaché en bloc ici : il est re-jugé de façon incrémentale par la cascade contre les ancres fermes, et une signature cross-source dont l'ancre a disparu est détachée en fin de phase.
 """
 
 import logging
@@ -27,19 +24,14 @@ def reset(
     *,
     person_repo: PersonRepository,
 ) -> dict[str, int]:
-    """Arbitre les conflits d'identifiant et remet à NULL les résolutions cross-source.
+    """Arbitre les conflits d'attribution d'identifiant (transfert par consensus, détachement des signatures captées).
 
-    Retourne les compteurs `{transferred, reset_cross}`. Le commit est laissé au caller.
+    Retourne `{transferred}`. Le commit est laissé au caller.
     """
-    logger.info("▶ reset : réinitialisation des rattachements dérivés")
-    logger.info("  arbitrage des conflits d'identifiant...")
+    logger.info("▶ reset : arbitrage des conflits d'identifiant")
     conflicts = build_identifier_conflicts(conn, queries)
     transferred = resolve_identifier_transfers(
         conn, conflicts, queries=queries, repo=person_repo, logger=logger
     )["transferred"]
 
-    logger.info("  détachement des rattachements cross-source...")
-    reset_cross = queries.reset_cross_source(conn)
-    logger.info("  → %d signatures détachées", reset_cross)
-
-    return {"transferred": transferred, "reset_cross": reset_cross}
+    return {"transferred": transferred}
