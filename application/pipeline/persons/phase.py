@@ -1,6 +1,6 @@
 """Orchestrateur unique de la phase personnes.
 
-Phase mono-transaction : les six étapes tournent sur **une seule** transaction gérée (ouverte via `open_tx`), et rattachent les `source_authorships` aux personnes de façon ordre-indépendante :
+Les six étapes tournent sur **une seule** transaction (ouverte via `open_tx`) : le `reset` détache les attributions dérivées (remise à NULL) que `match` et `create` reconstruisent. Détachement et reconstruction doivent committer ensemble — un crash en cours de phase laisserait sinon des signatures détachées jusqu'au run suivant.
 
 1. **enforce** — réapplique les épinglages admin (`confirmed_authorships`, must-link) : entrée fixe reposée avant toute dérivation.
 2. **reset** — réinitialise les attributions dérivées (arbitrage des conflits d'identifiant par consensus, recompute complet du cross-source).
@@ -8,6 +8,8 @@ Phase mono-transaction : les six étapes tournent sur **une seule** transaction 
 4. **create** — re-juge les signatures restées non liées (cross-source rejoué) puis crée les vraies inconnues.
 5. **populate** — régénère les formes de nom canoniques.
 6. **purge** — re-orpheline les formes devenues ambiguës après régénération et supprime les personnes vidées.
+
+Le rattachement est ordre-indépendant : le résultat ne dépend pas de la séquence d'ingestion des sources — propriété de l'algorithme (recompute complet, arbitrage par consensus, lectures d'agrégat sur le snapshot), non de la transaction.
 
 Le commit est porté par `open_tx` : `managed_transaction` commite en sortie de bloc si succès, rollback sinon. `phase_persons` de `run_pipeline` s'y réduit au câblage.
 """
