@@ -14,6 +14,7 @@ from dataclasses import dataclass
 
 from sqlalchemy import Connection
 
+from application.pipeline.metadata_correction._persist import persist_in_batches
 from application.ports.pipeline.metadata_correction import (
     DoiClusterRow,
     DoiCorrectionUpdate,
@@ -25,8 +26,6 @@ from domain.source_publications.correction import (
     resolve_cluster_doi_corrections,
 )
 from domain.source_publications.raw_metadata import CORRECTED_BY, raw_value, stash_entry
-
-_PERSIST_BATCH = 5000
 
 
 def _compute_update(
@@ -106,9 +105,6 @@ def run(
     logger.info("  %d corrections de DOI à appliquer", len(updates))
     case_counts = tally_doi_corrections(updates)
 
-    total = 0
-    for start in range(0, len(updates), _PERSIST_BATCH):
-        total += queries.persist_doi_corrections(conn, updates[start : start + _PERSIST_BATCH])
-        conn.commit()
+    total = persist_in_batches(conn, updates, queries.persist_doi_corrections)
     logger.info("✓ %d DOI corrigés (cluster)", total)
     return ClusterCorrectionStats(len(rows), len(updates), case_counts)

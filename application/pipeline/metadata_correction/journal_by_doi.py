@@ -10,6 +10,7 @@ from dataclasses import dataclass
 
 from sqlalchemy import Connection
 
+from application.pipeline.metadata_correction._persist import persist_in_batches
 from application.ports.pipeline.metadata_correction import (
     JournalByDoiRow,
     JournalCorrectionUpdate,
@@ -17,8 +18,6 @@ from application.ports.pipeline.metadata_correction import (
 )
 from domain.source_publications.correction import JOURNAL_BY_DOI_PREFIX, resolve_journal_by_doi
 from domain.source_publications.raw_metadata import raw_value, stash_entry
-
-_PERSIST_BATCH = 5000
 
 
 def _compute_update(
@@ -72,8 +71,6 @@ def run(
     attached = sum(1 for u in updates if u.journal_id is not None)
     logger.info("  %d rattachements à appliquer (%d journaux posés)", len(updates), attached)
 
-    for start in range(0, len(updates), _PERSIST_BATCH):
-        queries.persist_journal_corrections(conn, updates[start : start + _PERSIST_BATCH])
-        conn.commit()
+    persist_in_batches(conn, updates, queries.persist_journal_corrections)
     logger.info("✓ %d source_publications rattachées (journal_by_doi)", len(updates))
     return JournalByDoiStats(len(rows), attached)
