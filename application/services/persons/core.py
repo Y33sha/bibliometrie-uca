@@ -6,7 +6,7 @@ Gère aussi le rattachement/détachement des authorships sources (`source_author
 import logging
 from collections import Counter
 from enum import StrEnum
-from typing import NamedTuple, TypedDict, cast
+from typing import NamedTuple, TypedDict
 
 from application.audit_log import emit_event
 from application.ports.repositories.audit_repository import AuditRepository
@@ -54,7 +54,6 @@ __all__ = [
     "IdentifierConflict",
     "add_name_form",
     "link_authorship",
-    "link_authorships",
     "refresh_person_name_forms",
     "unlink_authorship",
     "set_rejected",
@@ -124,29 +123,6 @@ def link_authorship(
     if source not in ALL_SOURCES_SET:
         return
     repo.link_authorship(person_id, source, authorship_id, resolution_mode)
-
-
-def link_authorships(
-    person_id: int,
-    authorships: list[dict[str, JsonValue]],
-    *,
-    repo: PersonRepository,
-    resolution_mode: str,
-) -> None:
-    """Rattache un groupe d'authorships à une personne (pipeline).
-
-    Chaque dict doit avoir 'source' et 'authorship_id'. `resolution_mode`
-    (`identifier` / `name` / `cross_source`) est le canal par lequel la cascade
-    a résolu le rattachement.
-    """
-    for a in authorships:
-        link_authorship(
-            person_id,
-            cast(str, a["source"]),
-            cast(int, a["authorship_id"]),
-            repo=repo,
-            resolution_mode=resolution_mode,
-        )
 
 
 def unlink_authorship(

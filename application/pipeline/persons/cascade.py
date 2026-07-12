@@ -39,7 +39,7 @@ from application.services.persons.core import (
     add_identifiers_from_authorships as add_identifiers,
     add_name_form,
     create_person,
-    link_authorships as link_to_person,
+    link_authorship,
 )
 from domain.persons.matching import (
     ORCID_MATCH_SOURCES,
@@ -180,17 +180,16 @@ class _Cascade:
 
     def apply_match(self, a: EnrichedAuthorship, pid: int | None, reason: str) -> None:
         assert pid is not None  # garanti par decide_person_match action=match
-        # `link_to_person` et `add_identifiers` consomment des dicts (API historique de `application.services.persons`) : conversion via `_asdict()` au boundary.
-        a_dict = a._asdict()
-        link_to_person(
+        link_authorship(
             pid,
-            [a_dict],
+            a.source,
+            a.authorship_id,
             repo=self._person_repo,
             resolution_mode=RESOLUTION_MODE_BY_REASON[reason],
         )
         add_name_form(pid, a.full_name, repo=self._person_repo)
-        # Identifiants ajoutés en `pending` quelle que soit la source du match.
-        add_identifiers(pid, [a_dict], repo=self._person_repo)
+        # `add_identifiers` reste une API batch (dict) partagée avec les CLI de maintenance ; conversion via `_asdict()` au boundary. Identifiants ajoutés en `pending` quelle que soit la source du match.
+        add_identifiers(pid, [a._asdict()], repo=self._person_repo)
         self.matched_counts[reason] += 1
         if not a.in_perimeter:
             self.out_of_perimeter_matched += 1
@@ -204,9 +203,8 @@ class _Cascade:
         last = a.last_name or a.full_name or "?"
         first = a.first_name or ""
         marker = create_person(last, first, repo=self._person_repo)
-        a_dict = a._asdict()
-        link_to_person(marker, [a_dict], repo=self._person_repo, resolution_mode="name")
-        add_identifiers(marker, [a_dict], repo=self._person_repo)
+        link_authorship(marker, a.source, a.authorship_id, repo=self._person_repo, resolution_mode="name")
+        add_identifiers(marker, [a._asdict()], repo=self._person_repo)
         add_name_form(marker, a.full_name, repo=self._person_repo)
         # Rendre la personne créée matchable dans la même passe par toutes ses formes — ordres ET initiales — via le générateur qui sert au peuplement de `person_name_forms`.
         # On fusionne dans les listes existantes : une forme déjà portée reste ambiguë (donc non matchée en aveugle), au lieu d'être détournée vers la dernière créée.
