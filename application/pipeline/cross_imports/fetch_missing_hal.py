@@ -5,7 +5,7 @@ Deux pistes distinctes, chacune son orchestrateur, partageant un runner async :
 - `fetch_missing_hal_by_id` : hal-ids repérés par OpenAlex et ScanR (absents du staging HAL), requête Solr `halId_s`.
 - `fetch_missing_hal_by_nnt` : NNT de thèses soutenues sans document HAL (theses.fr), requête Solr `nntId_s`. Réservé au mode `full`.
 
-Fetch HTTP async (httpx + `asyncio.Semaphore(adapter.max_concurrent)`) ; inserts DB sync sérialisés (`asyncio.Lock` + `asyncio.to_thread`, la `Connection` SA sync n'étant pas thread-safe) ; commits intermédiaires tous les `_COMMIT_EVERY`.
+Fetch HTTP async (httpx, pool de `adapter.max_concurrent` workers) ; inserts DB sync sérialisés (`asyncio.Lock` + `asyncio.to_thread`, la `Connection` SA sync n'étant pas thread-safe) ; commits intermédiaires tous les `_COMMIT_EVERY`.
 """
 
 from __future__ import annotations
@@ -51,33 +51,33 @@ async def _fetch_refs_async[Ref](
     fetch_one: Callable[[httpx.AsyncClient, Ref], Awaitable[dict[str, Any] | None]],
     insert_one: Callable[[Connection, Ref, dict[str, Any] | None], tuple[int, int]],
 ) -> tuple[int, int]:
-    """Boucle async partagée : fetch concurrent par ref, puis insert sérialisé.
+    """Boucle async partagée : pool de `max_concurrent` workers sur un itérateur de refs partagé, fetch concurrent puis insert sérialisé.
 
     `insert_one` retourne `(fetched, not_found)` en incréments (0/1) : la sémantique de comptage propre à chaque piste vit dans la closure appelante. Retourne les totaux `(fetched, not_found)`.
     """
-    sem = asyncio.Semaphore(max_concurrent)
     db_lock = asyncio.Lock()
     progress = {"done": 0, "fetched": 0, "not_found": 0}
     total = len(refs)
+    ref_iter = iter(refs)
 
     async with httpx.AsyncClient() as client:
 
-        async def process_one(ref: Ref) -> None:
-            async with sem:
+        async def worker() -> None:
+            for ref in ref_iter:
                 doc = await fetch_one(client, ref)
                 if delay_s:
                     await asyncio.sleep(delay_s)
 
-            async with db_lock:
-                fetched, not_found = await asyncio.to_thread(insert_one, conn, ref, doc)
-                progress["fetched"] += fetched
-                progress["not_found"] += not_found
-                progress["done"] += 1
-                if progress["done"] % _COMMIT_EVERY == 0:
-                    await asyncio.to_thread(conn.commit)
-                    log.info(f"  {progress['done']}/{total} — {progress['fetched']} récupérés")
+                async with db_lock:
+                    fetched, not_found = await asyncio.to_thread(insert_one, conn, ref, doc)
+                    progress["fetched"] += fetched
+                    progress["not_found"] += not_found
+                    progress["done"] += 1
+                    if progress["done"] % _COMMIT_EVERY == 0:
+                        await asyncio.to_thread(conn.commit)
+                        log.info(f"  {progress['done']}/{total} — {progress['fetched']} récupérés")
 
-        await asyncio.gather(*(process_one(r) for r in refs))
+        await asyncio.gather(*(worker() for _ in range(max_concurrent)))
 
     await asyncio.to_thread(conn.commit)
     return progress["fetched"], progress["not_found"]
