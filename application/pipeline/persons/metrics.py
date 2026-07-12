@@ -4,7 +4,6 @@
 """
 
 import logging
-from collections import defaultdict
 from typing import NamedTuple
 
 from application.pipeline.metrics import PhaseMetrics
@@ -28,50 +27,37 @@ class CascadeResult(NamedTuple):
     resolved_cross_source_ids: set[int]
 
 
-def log_matching_breakdown(
-    logger: logging.Logger, match_result: CascadeResult, create_result: CascadeResult
-) -> None:
-    """Loggue le nombre de rattachements par méthode (cumul des passes `match` + `create`) et le nombre de créations."""
-    matched: dict[str, int] = defaultdict(int)
-    for r in (match_result, create_result):
-        for method, count in r.matched_counts.items():
-            matched[method] += count
-    breakdown = ", ".join(f"{method}={matched[method]}" for method in _MATCHING_METHODS)
-    logger.info("Rattachements par méthode : %s | créées : %d", breakdown, create_result.created)
+def log_matching_breakdown(logger: logging.Logger, result: CascadeResult) -> None:
+    """Loggue le nombre de rattachements par méthode et le nombre de créations."""
+    matched = result.matched_counts
+    breakdown = ", ".join(f"{method}={matched.get(method, 0)}" for method in _MATCHING_METHODS)
+    logger.info("Rattachements par méthode : %s | créées : %d", breakdown, result.created)
 
 
 def build_metrics(
-    match_result: CascadeResult,
-    create_result: CascadeResult,
+    result: CascadeResult,
     *,
     transferred: int,
     cross_source_detached: int,
     reorphaned: int,
     deleted_persons: int,
 ) -> PhaseMetrics:
-    """Assemble les métriques de la phase personnes depuis les compteurs de chaque étape."""
-    matched: dict[str, int] = defaultdict(int)
-    for r in (match_result, create_result):
-        for method, count in r.matched_counts.items():
-            matched[method] += count
-    skipped: dict[str, int] = defaultdict(int)
-    for r in (match_result, create_result):
-        for reason, count in r.skipped_counts.items():
-            skipped[reason] += count
-
+    """Assemble les métriques de la phase personnes depuis les compteurs de la cascade."""
+    matched = result.matched_counts
+    skipped = result.skipped_counts
     linked_total = sum(matched.values())
-    created = create_result.created
+    created = result.created
 
     metrics = PhaseMetrics()
-    metrics.add(total=match_result.in_perimeter_total, new=created, updated=linked_total)
+    metrics.add(total=result.in_perimeter_total, new=created, updated=linked_total)
     # Tableau « méthode de rattachement » : clés techniques (libellés portés par le frontend), ordre par fiabilité décroissante de la cascade.
     metrics.details["table"] = {
-        "rows": [{"key": method, "count": matched[method]} for method in _MATCHING_METHODS]
+        "rows": [{"key": method, "count": matched.get(method, 0)} for method in _MATCHING_METHODS]
     }
     metrics.details["summary"] = {
         "created": created,
-        "skipped_ambiguous": skipped["ambiguous_name_form"],
-        "corroboration_rejected": match_result.corroboration_rejected,
+        "skipped_ambiguous": skipped.get("ambiguous_name_form", 0),
+        "corroboration_rejected": result.corroboration_rejected,
         "identifiers_transferred": transferred,
         "cross_source_detached": cross_source_detached,
         "reorphaned_nominal": reorphaned,
