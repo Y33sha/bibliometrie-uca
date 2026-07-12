@@ -12,19 +12,44 @@ La phase `persons` (`application/pipeline/persons/`) enchaîne enforce → reset
 
 ### cascade.py — désengorger
 
-- [ ] Quatre responsabilités dans un fichier (~480 lignes) : chargement de données (`get_all_unlinked_authorships`, `load_linked_authorships_by_pub`, `_max_authors_per_pub`), état de passe (`_Cascade` et ses 7 index préchargés), les deux passes (`match`, `create`), assemblage des métriques (`build_metrics`). À découper.
-- [ ] `match` et `create` sont quasi-dupliqués : même squelette (instancier `_Cascade`, boucler, `decide_*`, `apply_*`) ; seuls la méthode de décision (`decide_full` vs `decide_cross_and_name`) et le sort de l'action `create` (`pass` différé chez `match`, `apply_create` chez `create`) diffèrent. Factoriser une passe paramétrée. Le double `_Cascade` (donc le double rechargement des 7 index par run) est voulu — `create` doit voir ce que `match` a posé — ; c'est le squelette de boucle qui est du copier-coller.
-- [ ] `_max_authors_per_pub` : suringénierie. Agrège le nombre d'auteurs par publication (max entre sources) pour gater le matching cross-source des méga-papers, avec un seuil magique (`50`, « proxy arbitraire » de l'aveu du docstring). Le compte d'auteurs est une propriété de chaque `source_publication` : le porter sur l'authorship et gater le seul signal cross-source dessus suffit (les signaux identifiants restent fiables quelle que soit la taille du papier). Une publi mixte (SP au-dessus ET en dessous du seuil) n'utilise alors que ses SP éligibles — comportement attendu, sans agrégat pré-calculé. Détail à respecter : filtrer aussi les SP méga du pool de candidats (une petite SP ne doit pas matcher contre les positions d'une SP méga). Résultat : agrégat + nombre magique remplacés par un prédicat par-authorship.
+- [x] Data-loading (`EnrichedAuthorship`, `_enrich`, les `get_*`, `load_linked_authorships_by_pub`) sorti dans `loading.py` ; `CascadeResult` + `build_metrics` dans `metrics.py`. `cascade.py` ne garde que `_Cascade` et les passes (`c68dc4eb`).
+- [x] `match`/`create` factorisés dans `_run_pass`, paramétré par `decide` et `on_create` ; le double `_Cascade` (double-fetch voulu) est conservé (`fd01fec4`).
+- [x] `_max_authors_per_pub` : le gate méga-paper est **supprimé**. Mesure faite (run persons complet, seuil relevé à 10000) : la durée reste dans la norme — le cross-source ne compare qu'à la position exacte, pas tout-contre-tout, donc le gate ne servait pas la perf. Constante `MAX_AUTHORS_CROSS_SOURCE`, paramètre `total_author_count` et agrégat Python retirés (`0a1e927e`). Le rework par-SP envisagé devient sans objet.
+- [x] Logs de phase dé-jargonnés (plus de nom de fonction Python, table temporaire, « GC » ni « SQL ») ; chaque étape annonce son départ (fin des longs silences) ; bilan par méthode de rattachement re-logué en fin de phase (`31dc69ce`).
 
 ### Boundary services
 
-- [ ] `EnrichedAuthorship` (NamedTuple typé, 15 champs) est reconverti en `dict` via `_asdict()` parce que `link_to_person`/`add_identifiers` (`application.services.persons`) consomment des dicts. On construit un tuple typé pour le désassembler juste après. Aligner l'API services sur le type (ou l'inverse) pour lever l'impédance.
+- [x] Moitié `link` levée : la cascade appelle le singulier typé `link_authorship(person_id, source, authorship_id, …)` ; le batch `link_authorships`, dont elle était l'unique appelant, est supprimé (`9b89934a`). `add_identifiers_from_authorships` reste en API batch dict, assumée : partagée avec les CLI de maintenance, et `BareUnlinkedAuthorship` n'a pas de champ `idhal` (la typer brasserait le futur matching idhal).
 
 ### Docstrings
 
-- [ ] Docstrings-fleuves : `cascade.py` ouvre sur ~37 lignes de module ; `reset`/`purge`/`resolve_identifier_transfers`/`populate_person_name_forms` ont 14–24 lignes chacun. Le volume porte surtout du rationale de conception (seuils, double-fetch, gardes) qui narre ce que la logique déléguée à `domain/persons/matching.py` fait. Une fois `cascade.py` découpé et la logique clarifiée, resserrer — ce qui reste du rationale peut migrer vers une note d'architecture.
-- [ ] `phase.py` : `mono-transaction` sur-souligné. Le docstring martèle le *quoi* (« une seule transaction ») sans le *pourquoi* — l'atomicité du `reset` destructif : la remise à NULL des attributions dérivées et sa reconstruction (`match`/`create`) doivent committer ensemble, sinon un crash en cours de phase laisse des signatures détachées jusqu'au run suivant. Énoncer ce pourquoi et découpler de « ordre-indépendante », qui est une propriété de l'algorithme (recompute complet + consensus + lectures d'agrégat), pas de la transaction.
+- [x] `phase.py` : pourquoi du mono-transaction énoncé, ordre-indépendance découplée (`afe969ec`). Docstrings-fleuves : le volume venait surtout de la taille du fichier d'avant-découpe ; une fois `cascade.py` scindé, sa docstring mappe exactement son contenu (les cinq signaux, les deux populations, la corroboration) au bon niveau, et `reset`/`purge`/`populate`/`resolve` portent du rationale substantiel. Pas de resserrage imposé — la matière relue est jugée à sa place.
+### Optimisation du matching cross-source
 
-## Questions ouvertes
+Le `reset` détache en bloc toutes les signatures résolues en cross-source (~75 000 par run) pour les recalculer, alors que le cross-source est une **fonction pure des ancres fermes** : un résultat cross-source n'ancre jamais un autre (seuls identifiant / nom / création entrent dans l'index d'ancrage, cf. `apply_match`). L'écrasante majorité se ré-attache à l'identique — du churn à vide. Cible : recompute **incrémental** contre les ancres fermes, sans passer par la destruction. Inchangé → no-op ; ancre déplacée → update ; ancre disparue → détaché. Résultat identique à la reconstruction actuelle, churn réduit à ce qui change réellement.
 
-La convention « étape de phase = module » (dont `enforce`, inline dans `phase.py`, est un cas) est transverse : elle vit dans les Questions ouvertes de `CODE_lisibilite.md`, pas ici.
+#### Ancrage sur les liens fermes
+
+- [ ] La query d'ancrage (`fetch_linked_authorships` → `load_linked_authorships_by_pub`) ne charge que les liens fermes (`resolution_mode != 'cross_source'`). Aujourd'hui garanti implicitement par le wipe qui précède ; à rendre explicite dès que celui-ci disparaît.
+
+#### Reset
+
+- [ ] `reset` ne détache plus le cross-source (`reset_cross_source` retiré) ; il ne conserve que l'arbitrage des conflits d'identifiant, qui nulle les quelques ancres fermes déplacées — leurs dépendants cross-source sont re-jugés à l'étape suivante.
+
+#### Ré-évaluation incrémentale
+
+- [ ] La cascade fetche aussi les signatures **déjà liées en cross-source** (pas seulement les non-liées) pour les re-juger contre les ancres fermes.
+- [ ] Application d'un lien existant re-jugé : même personne → no-op (aucune écriture) ; personne différente → update ; plus d'ancre → détaché (`person_id` NULL, la signature redevient non liée et suit le sort des non-liées).
+
+#### Métriques et observabilité
+
+- [ ] Compteurs cross-source : inchangés / mis à jour / détachés, en remplacement du `reset_cross` massif. Le bilan par méthode et le `updated` de phase restent justes.
+
+#### Tests
+
+- [ ] Les tests d'ordre-indépendance restent verts. Ajouter les cas incrémentaux : ancre stable → no-op, ancre déplacée → update, ancre disparue → détaché.
+
+#### À trancher en conception
+
+- La structure à deux passes (`match` puis `create`, `create` rechargeant pour voir l'état posé par `match`) : le recompute incrémental la rend-elle superflue, ou reste-t-elle nécessaire pour que `create` voie les ancres fermes nouvellement posées ?
+- S'assurer que la ré-évaluation couvre **tous** les liens cross-source, pour que le ripple de l'arbitrage d'identifiant (une ancre déplacée re-juge ses dépendants) soit garanti.
