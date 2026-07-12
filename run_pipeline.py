@@ -757,7 +757,7 @@ def _run_normalize(source: str, build: Callable[[Any], Any]) -> dict[str, object
     t0 = time.time()
     conn = get_sync_engine().connect()
     try:
-        stats = build(conn).run([])
+        stats = build(conn).run()
     finally:
         conn.close()
     duration = time.time() - t0

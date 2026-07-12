@@ -28,14 +28,6 @@ def _row(r: Row) -> StagingRow:  # type: ignore[type-arg]
     return StagingRow(id=r.id, source_id=r.source_id, doi=r.doi, raw_data=r.raw_data)
 
 
-def reset_processed_flag(conn: Connection, source: str) -> int:
-    """Remet tous les `staging` de la source à `processed=FALSE`. Retourne rowcount."""
-    return conn.execute(
-        text("UPDATE staging SET processed = FALSE WHERE source = :source"),
-        {"source": source},
-    ).rowcount
-
-
 def count_pending_staging(conn: Connection, source: str) -> int:
     """Nombre de `staging` avec `processed=FALSE` pour la source donnée."""
     row = conn.execute(
@@ -60,16 +52,15 @@ def fetch_pending_staging(conn: Connection, source: str, *, limit: int) -> list[
     return [_row(r) for r in rows]
 
 
-def fetch_pending_staging_ids(conn: Connection, source: str, *, limit: int) -> list[int]:
-    """Charge seulement les `id` des `staging` non traités (pour fetch par sous-lots)."""
+def fetch_pending_staging_ids(conn: Connection, source: str) -> list[int]:
+    """Charge les `id` de tous les `staging` non traités de la source (pour fetch par sous-lots)."""
     rows = conn.execute(
         text("""
             SELECT id FROM staging
             WHERE source = :source AND processed = FALSE
             ORDER BY id
-            LIMIT :lim
         """),
-        {"source": source, "lim": limit},
+        {"source": source},
     ).all()
     return [r.id for r in rows]
 
@@ -145,9 +136,6 @@ class PgStagingQueries(StagingQueries):
     def __init__(self, raw_store: RawStore | None = None) -> None:
         self._raw_store = raw_store if raw_store is not None else get_raw_store()
 
-    def reset_processed_flag(self, conn: Connection, source: str) -> int:
-        return reset_processed_flag(conn, source)
-
     def count_pending_staging(self, conn: Connection, source: str) -> int:
         return count_pending_staging(conn, source)
 
@@ -156,8 +144,8 @@ class PgStagingQueries(StagingQueries):
     ) -> list[StagingRow]:
         return fetch_pending_staging(conn, source, limit=limit)
 
-    def fetch_pending_staging_ids(self, conn: Connection, source: str, *, limit: int) -> list[int]:
-        return fetch_pending_staging_ids(conn, source, limit=limit)
+    def fetch_pending_staging_ids(self, conn: Connection, source: str) -> list[int]:
+        return fetch_pending_staging_ids(conn, source)
 
     def fetch_staging_by_ids(
         self, conn: Connection, staging_ids: list[int], *, source: str

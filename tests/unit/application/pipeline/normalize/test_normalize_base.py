@@ -1,7 +1,6 @@
 """Tests unitaires de `application.pipeline.normalize.base.SourceNormalizer.run`.
 
 Couvre la template method `run()` et ses chemins :
-- mode `--reset` (commit + sortie immédiate)
 - `total == 0` (rien à faire)
 - happy path (success / skip / error mélangés, batch commit, summary)
 - exception dans `process_work` (log de l'échec + rollback au SAVEPOINT + on_error)
@@ -33,15 +32,10 @@ class _FakeStaging:
     """Stub minimal du port `StagingQueries`."""
 
     def __init__(self) -> None:
-        self.reset_called = 0
         self.count_returns = 0
         self.pending_rows: list[StagingRow] = []
         self.batch_ids: list[int] = []
         self.batch_id_rows: dict[tuple[int, ...], list[StagingRow]] = {}
-
-    def reset_processed_flag(self, conn, source: str) -> int:
-        self.reset_called += 1
-        return 42
 
     def count_pending_staging(self, conn, source: str) -> int:
         return self.count_returns
@@ -49,12 +43,12 @@ class _FakeStaging:
     def fetch_pending_staging(self, conn, source: str, *, limit: int) -> list[StagingRow]:
         return self.pending_rows[:limit]
 
-    def fetch_pending_staging_ids(self, conn, source: str, *, limit: int) -> list[int]:
+    def fetch_pending_staging_ids(self, conn, source: str) -> list[int]:
         # Le test dédié à `FETCH_SUB_BATCH` peuple `batch_ids` directement.
         # Pour les autres tests qui peuplent `pending_rows`, on dérive les ids.
         if self.batch_ids:
-            return self.batch_ids[:limit]
-        return [r.id for r in self.pending_rows[:limit]]
+            return self.batch_ids
+        return [r.id for r in self.pending_rows]
 
     def fetch_staging_by_ids(self, conn, ids: list[int], *, source: str) -> list[StagingRow]:
         if self.batch_id_rows:
@@ -106,22 +100,6 @@ class _Norm(SourceNormalizer):
         self.on_error_called += 1
 
 
-# ── --reset ───────────────────────────────────────────────────────
-
-
-class TestRunReset:
-    def test_reset_then_return(self, caplog):
-        staging = _FakeStaging()
-        norm = _Norm(staging)
-        with caplog.at_level(logging.INFO):
-            norm.run(argv=["--reset"])
-        assert staging.reset_called == 1
-        # Pas d'appel à _count_pending ni à preload_caches sur reset.
-        assert norm.preload_called is False
-        assert norm.conn.commit.called is True  # type: ignore[attr-defined]
-        assert "Reset : 42" in caplog.text
-
-
 # ── total == 0 ────────────────────────────────────────────────────
 
 
@@ -131,7 +109,7 @@ class TestRunNoWork:
         staging.count_returns = 0
         norm = _Norm(staging)
         with caplog.at_level(logging.INFO):
-            norm.run(argv=[])
+            norm.run()
         # Pas de preload sur total=0 (sortie avant).
         assert norm.preload_called is False
         assert "rien à traiter" in caplog.text
@@ -146,7 +124,7 @@ class TestRunHappyPath:
         staging.count_returns = 3
         staging.pending_rows = [_row("r1"), _row("r2"), _row("r3")]
         norm = _Norm(staging, results=[True, True, True])
-        norm.run(argv=[])
+        norm.run()
         assert norm.preload_called is True
         assert [r.source_id for r in norm.processed_rows] == ["r1", "r2", "r3"]
         assert norm.cleanup_called is True
@@ -158,7 +136,7 @@ class TestRunHappyPath:
         staging.pending_rows = [_row("ok"), _row("skip"), _row("err")]
         norm = _Norm(staging, results=[True, None, False])
         with caplog.at_level(logging.INFO):
-            stats = norm.run(argv=[])
+            stats = norm.run()
         assert "Traités avec succès : 1" in caplog.text
         assert "Ignorés : 1" in caplog.text
         assert "Erreurs : 1" in caplog.text
@@ -171,7 +149,7 @@ class TestRunHappyPath:
         staging.pending_rows = [_row(s) for s in ("a", "b", "c", "d")]
         norm = _Norm(staging, results=[True, True, True, True])
         with caplog.at_level(logging.INFO):
-            norm.run(argv=[])
+            norm.run()
         # Log progress contient "2/4" et "4/4" — mais seul "2/4 traités" passe par le batch commit.
         assert "2/4 traités" in caplog.text
 
@@ -183,7 +161,7 @@ class TestRunHappyPath:
         # 1 ok + 1 skip → done=2 (batch_size=2) → log avec skipped et 0 errors (errors=0 donc pas affiché).
         norm = _Norm(staging, results=[True, None])
         with caplog.at_level(logging.INFO):
-            norm.run(argv=[])
+            norm.run()
         # "1 ignorés" doit apparaître dans le log progress
         assert "1 ignorés" in caplog.text
 
@@ -197,18 +175,9 @@ class TestRunHappyPath:
         staging.pending_rows = [_row("x")]
         norm = _NormWithSummary(staging, results=[True])
         with caplog.at_level(logging.INFO):
-            norm.run(argv=[])
+            norm.run()
         assert "table_a : 100" in caplog.text
         assert "table_b : 250" in caplog.text
-
-    def test_limit_caps_processing(self):
-        """`--limit 1` limite à 1 row même si total=3."""
-        staging = _FakeStaging()
-        staging.count_returns = 3
-        staging.pending_rows = [_row("a"), _row("b"), _row("c")]
-        norm = _Norm(staging, results=[True, True, True])
-        norm.run(argv=["--limit", "1"])
-        assert [r.source_id for r in norm.processed_rows] == ["a"]
 
 
 # ── Exception dans un work ────────────────────────────────────────
@@ -221,7 +190,7 @@ class TestRunWorkException:
         staging.pending_rows = [_row("a"), _row("b")]
         norm = _Norm(staging, results=[True, True], raises_on={"a"})
         with caplog.at_level(logging.INFO):
-            norm.run(argv=[])
+            norm.run()
         # Le work en échec est annulé au SAVEPOINT et on_error est appelé.
         assert norm.on_error_called == 1
         # Le work en échec est loggé par la boucle (les process_work ne loggent pas eux-mêmes).
@@ -246,7 +215,7 @@ class TestRunKeyboardInterrupt:
 
         norm = _Kb(staging, results=[True])
         with caplog.at_level(logging.WARNING), pytest.raises(KeyboardInterrupt):
-            norm.run(argv=[])
+            norm.run()
         # Le batch en cours est rollbacké (la transaction est avortée par le Ctrl+C ;
         # `commit()` lèverait `PendingRollbackError`), et le KeyboardInterrupt est
         # re-levé pour que `run_pipeline` arrête proprement (les batches committés
@@ -271,7 +240,7 @@ class TestRunFatalException:
 
         norm = _Fatal(staging)
         with caplog.at_level(logging.ERROR), pytest.raises(RuntimeError):
-            norm.run(argv=[])
+            norm.run()
         assert "Erreur fatale" in caplog.text
         assert norm.conn.rollback.called is True  # type: ignore[attr-defined]
 
@@ -291,5 +260,5 @@ class TestIterRowsSubBatch:
         a, b, c = _row("a"), _row("b"), _row("c")
         staging.batch_id_rows = {(10, 20): [a, b], (30,): [c]}
         norm = _SubBatch(staging)
-        rows = list(norm._iter_rows(MagicMock(), limit=3))
+        rows = list(norm._iter_rows(MagicMock()))
         assert rows == [a, b, c]
