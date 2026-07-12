@@ -19,8 +19,7 @@ Sur la fiche publication, les mots-clés libres sont affichés **via `publicatio
 3. **Plus de score.** La colonne `publication_subjects.score` est supprimée (non lue, peu fiable). Les scores OpenAlex ne sont plus repris.
 4. **Plus de `codes`.** Les codes CCSD HAL, s'ils redeviennent utiles, se remoissonnent.
 5. **`cleanup_oa_subjects` est supprimé** : sans `level`/`parent`, il n'a plus de matière.
-
-Une fois les libres partis et `codes`/`level`/`parent` retirés, tout sujet restant est un concept issu d'une ontologie. Le sort de la colonne `subjects.ontologies` (désormais réduite à une appartenance) est en question ouverte.
+6. **La colonne `subjects.ontologies` disparaît entièrement.** Vidée de `codes`/`level`/`parent`, elle ne portait plus que l'appartenance à une ontologie, sans usage : la granularité `wos_subject` vs `wos_heading` n'est exploitée nulle part. Les badges d'ontologie disparaissent donc des pages sujets ; la provenance reste disponible sur `publication_subjects.source`. Les constantes `ONTOLOGY_*` (y compris `ONTOLOGY_OPENALEX_KEYWORD`, jamais produite) sont retirées. Un sujet se réduit à `label` + `language` + `usage_count`.
 
 ## Phasage
 
@@ -30,21 +29,21 @@ Une fois les libres partis et `codes`/`level`/`parent` retirés, tout sujet rest
 - [ ] Fiche publication : afficher les mots-clés libres depuis `publications_detail.keywords` (ajout côté API `publications/detail` + front), indépendamment de `publication_subjects`. Le `SubjectsBlock` ne montre plus que des concepts.
 - [ ] Le stock existant de sujets/liens libres se nettoie côté données prod (le code cesse d'en produire ; `purge_orphan_subjects` retire les sujets devenus sans lien après re-ingestion). Pas de one-shot ici.
 
-### Phase B — Dégraisser le modèle concept
+### Phase B — Supprimer le modèle d'ontologie
 
-- [ ] Migration : `DROP COLUMN publication_subjects.score`.
-- [ ] Retirer `score` / `level` / `parent` / `codes` des ingestors, de `SubjectCache`, de `upsert_subject` (SQL + port), de `OntologyEntry` (port pipeline) et de `SubjectOntologyEntry` (port API).
-- [ ] `subjects.ontologies` → selon la décision de la question ouverte ci-dessous.
+- [ ] Migration : `DROP COLUMN publication_subjects.score` **et** `DROP COLUMN subjects.ontologies`.
+- [ ] Retirer `ontologies` / `OntologyEntry` de `upsert_subject` (SQL + port pipeline), de `SubjectCache`, des ingestors ; `upsert_subject` ne prend plus que `label` + `language`.
+- [ ] Retirer `SubjectOntologyEntry` (port API) et le champ `ontologies` des DTO sujets (`SubjectOut`, `SubjectListItem`, `SubjectNeighborOut`, `SubjectFrequency`) ; retirer `ontologies` des `SELECT`.
+- [ ] `domain/subjects/subject.py` : retirer les constantes `ONTOLOGY_*` (dont `ONTOLOGY_OPENALEX_KEYWORD`), ne garder que `normalize_label` ; docstring recalé.
+- [ ] Front : retirer les badges d'ontologie (pages `/subjects`, détail sujet, `SubjectsBlock`, nuages). Un sujet s'affiche par son libellé seul.
 - [ ] Supprimer `cleanup_oa_subjects`.
 
 ### Phase C — Simplifier et factoriser le reste
 
-- [ ] `SubjectCache` réduit à `label → subject_id` (plus de suivi codes/level/parent).
-- [ ] Ingestors uniformisés autour d'un helper commun de ramassage de libellés (le bloc de liaison est aujourd'hui dupliqué à l'identique dans les six modules).
+- [ ] `SubjectCache` réduit à `label → subject_id` (plus de suivi ontologies, plus de `_covers`).
+- [ ] Ingestors uniformisés autour d'un helper commun de ramassage de libellés (le bloc de liaison est aujourd'hui dupliqué à l'identique dans les six modules). `ingest_hal` garde la dérivation code CCSD → libellé (`hal_domain_label`), mais ne stocke plus le code.
 - [ ] Docstrings des ingestors : citer les fonctions productrices de la forme source (au lieu des numéros de ligne, qui pourrissent), retirer les renvois à des fiches chantier et les notes de roadmap (« Phase ultérieure »).
-- [ ] `domain/subjects/subject.py` : docstring recalé sur le format réel, sans hiérarchie ni renvoi chantier.
 
 ## Questions ouvertes
 
-- **Sort de `subjects.ontologies`** une fois vidée de `codes`/`level`/`parent`. Deux options : la garder en simple appartenance `{ontologie: {}}` — badges par ontologie, avec la granularité `wos_subject` vs `wos_heading` ; ou la supprimer et dériver les badges de `publication_subjects.source` — plus grossier (« WoS » au lieu de `wos_subject`/`wos_heading`, « OpenAlex » couvrant topics et éventuels keywords). La provenance reste dans tous les cas sur `publication_subjects.source`.
-- **`ONTOLOGY_OPENALEX_KEYWORD`** : constante définie, mais l'ingestor OpenAlex traite ses `keywords` comme des libres (jamais en `openalex_keyword`). À supprimer si confirmée sans usage — d'autant que les libres quittent la phase.
+Aucune.
