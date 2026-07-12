@@ -70,8 +70,8 @@ OA_MODEL_LABELS_FR: dict[OaModel, str] = {
     "repository": "Archive / dépôt",
 }
 
-# Mapping OpenAlex Sources `type` → notre `journal_type`. Lu par la phase
-# enrich et par le script de backfill `backfill_journal_types_from_openalex`.
+# Mapping OpenAlex Sources `type` → notre `journal_type`, lu par la sous-étape
+# d'enrichissement des revues de la phase `publishers_journals`.
 # Skip (None) sur `metadata` et `other` : pas de signal exploitable.
 # `preprint_server` et `media` n'ont pas d'équivalent OpenAlex (les preprint
 # servers y sont catégorisés en `repository`) — restent purement manuels.
