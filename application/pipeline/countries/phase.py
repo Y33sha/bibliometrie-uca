@@ -105,7 +105,6 @@ def run(
     logger.info("✓ refresh_publication_countries terminé en %.1fs", time.perf_counter() - t0)
 
     final = _bilan(open_tx, queries, logger, "Bilan final")
-    # Entonnoir : du manque initial (adresses sans pays avant la détection du run) aux pays rattachés par le run, puis au reste (dont une part porte une suggestion).
     total = final.total
     without_initial = total - initial.with_country
     metrics.details["summary"] = {
