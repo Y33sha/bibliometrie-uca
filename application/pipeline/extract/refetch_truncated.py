@@ -54,9 +54,8 @@ async def refetch(
         return metrics
 
     sem = asyncio.Semaphore(adapter.max_concurrent)
-    # La `Connection` SA sync n'est pas thread-safe ; tous les writes (UPDATE, commit) passent par `to_thread` sous ce lock.
+    # La `Connection` SA sync n'est pas thread-safe ; les writes concurrents d'un paquet passent par `to_thread` sous ce lock (le commit se fait à la frontière de paquet, hors concurrence).
     db_lock = asyncio.Lock()
-    progress = {"processed": 0}
 
     async with httpx.AsyncClient() as client:
 
@@ -77,19 +76,16 @@ async def refetch(
                     await asyncio.to_thread(adapter.update_raw_data, conn, ref.staging_id, work)
                 metrics.add(updated=1)
 
-            progress["processed"] += 1
-            if progress["processed"] % COMMIT_EVERY == 0:
-                async with db_lock:
-                    await asyncio.to_thread(conn.commit)
-                log.info(
-                    f"  {progress['processed']}/{len(truncated)}... "
-                    f"({metrics.updated} mis à jour, "
-                    f"{metrics.extras.get('already_complete', 0)} déjà complets)"
-                )
-
-        await asyncio.gather(*(process_one(ref) for ref in truncated))
-
-    conn.commit()
+        # Traitement par paquets : chaque paquet part en concurrence (débit borné par `sem`) puis est committé.
+        for start in range(0, len(truncated), COMMIT_EVERY):
+            chunk = truncated[start : start + COMMIT_EVERY]
+            await asyncio.gather(*(process_one(ref) for ref in chunk))
+            await asyncio.to_thread(conn.commit)
+            done = min(start + COMMIT_EVERY, len(truncated))
+            log.info(
+                f"  {done}/{len(truncated)} — {metrics.updated} mis à jour, "
+                f"{metrics.extras.get('already_complete', 0)} déjà complets"
+            )
     log.info(
         f"Terminé : {metrics.updated} works mis à jour avec authorships complètes, "
         f"{metrics.extras.get('already_complete', 0)} déjà complets, "
