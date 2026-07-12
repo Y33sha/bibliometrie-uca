@@ -23,15 +23,17 @@ Garde de rejet : les personnes rejetées pour la publication (`rejected_authorsh
 import logging
 from collections import defaultdict
 from collections.abc import Callable
-from typing import NamedTuple
 
 from sqlalchemy import Connection
 
-from application.pipeline.metrics import PhaseMetrics
-from application.ports.pipeline.persons_create import (
-    BareUnlinkedAuthorship,
-    PersonsCreateQueries,
+from application.pipeline.persons.loading import (
+    EnrichedAuthorship,
+    get_all_unlinked_authorships,
+    get_out_of_perimeter_candidates,
+    load_linked_authorships_by_pub,
 )
+from application.pipeline.persons.metrics import CascadeResult
+from application.ports.pipeline.persons_create import PersonsCreateQueries
 from application.ports.repositories.person_repository import PersonRepository
 from application.services.persons.core import (
     add_identifiers_from_authorships as add_identifiers,
@@ -39,8 +41,6 @@ from application.services.persons.core import (
     create_person,
     link_authorships as link_to_person,
 )
-from domain.normalize import normalize_name
-from domain.persons.creation import allow_person_creation
 from domain.persons.matching import (
     ORCID_MATCH_SOURCES,
     RESOLUTION_MODE_BY_REASON,
@@ -52,102 +52,10 @@ from domain.persons.matching import (
     decide_person_match,
 )
 from domain.persons.name_forms import compute_person_name_forms
-from domain.persons.name_matching import parse_raw_author_name
-
-
-class EnrichedAuthorship(NamedTuple):
-    """`BareUnlinkedAuthorship` enrichie côté Python : nom parsé, normalisations, flag de création autorisée."""
-
-    authorship_id: int
-    source: str
-    full_name: str
-    author_name_normalized: str | None
-    orcid: str | None
-    hal_person_id: str | None
-    idref: str | None
-    roles: list[str] | None
-    publication_id: int | None
-    author_position: int
-    in_perimeter: bool
-    last_name: str
-    first_name: str
-    last_norm: str
-    first_norm: str
-    allow_create: bool
-
-
-class CascadeResult(NamedTuple):
-    """Compteurs d'une passe (`match` ou `create`), agrégés en métriques de phase."""
-
-    matched_counts: dict[str, int]
-    skipped_counts: dict[str, int]
-    created: int
-    corroboration_rejected: int
-    out_of_perimeter_matched: int
-    in_perimeter_total: int
-    out_of_perimeter_total: int
-
 
 # ---------------------------------------------------------------------------
 # Data loading
 # ---------------------------------------------------------------------------
-
-
-def _enrich(row: BareUnlinkedAuthorship) -> EnrichedAuthorship:
-    """Parse le nom, normalise, calcule le flag de création autorisée."""
-    last_name, first_name = parse_raw_author_name(row.full_name)
-    last_norm = normalize_name(last_name)
-    first_norm = normalize_name(first_name)
-    allow_create = allow_person_creation(row.source, row.roles or [])
-
-    return EnrichedAuthorship(
-        authorship_id=row.authorship_id,
-        source=row.source,
-        full_name=row.full_name,
-        author_name_normalized=row.author_name_normalized,
-        orcid=row.orcid,
-        hal_person_id=row.hal_person_id,
-        idref=row.idref,
-        roles=row.roles,
-        publication_id=row.publication_id,
-        author_position=row.author_position,
-        in_perimeter=row.in_perimeter,
-        last_name=last_name,
-        first_name=first_name,
-        last_norm=last_norm,
-        first_norm=first_norm,
-        allow_create=allow_create,
-    )
-
-
-def get_all_unlinked_authorships(
-    conn: Connection, queries: PersonsCreateQueries
-) -> list[EnrichedAuthorship]:
-    """Charge les authorships in-périmètre sans person_id (toutes sources) et les enrichit (parsing noms, flag allow_create)."""
-    return [_enrich(row) for row in queries.fetch_unlinked_authorships(conn)]
-
-
-def get_out_of_perimeter_candidates(
-    conn: Connection, queries: PersonsCreateQueries
-) -> list[EnrichedAuthorship]:
-    """Charge les candidats hors-périmètre rattachables sans forme de nom (identifiant fort partagé ou ancrage cross-source) et les enrichit.
-
-    Ces candidats traversent la même cascade que les in-périmètre, mais le barreau `person_name_forms` (match unique / création) y est neutralisé : un nom seul ne peut ni introduire ni attacher une personne hors-périmètre."""
-    return [_enrich(row) for row in queries.fetch_out_of_perimeter_candidates(conn)]
-
-
-def load_linked_authorships_by_pub(
-    conn: Connection, queries: PersonsCreateQueries
-) -> dict[tuple[int, int], list[tuple[int, str, str, str]]]:
-    """Index des authorships rattachées par (publication_id, author_position)."""
-    index: dict[tuple[int, int], list[tuple[int, str, str, str]]] = defaultdict(list)
-
-    for r in queries.fetch_linked_authorships(conn):
-        last, first = parse_raw_author_name(r.full_name)
-        ln, fn = normalize_name(last), normalize_name(first)
-        index[(r.publication_id, r.author_position)].append((r.person_id, ln, fn, r.source))
-
-    return index
 
 
 def _max_authors_per_pub(
@@ -421,46 +329,3 @@ def create(
         on_create=_Cascade.apply_create,
         label="create",
     )
-
-
-def build_metrics(
-    match_result: CascadeResult,
-    create_result: CascadeResult,
-    *,
-    transferred: int,
-    reset_cross: int,
-    reorphaned: int,
-    deleted_persons: int,
-) -> PhaseMetrics:
-    """Assemble les métriques de la phase personnes depuis les compteurs de chaque étape."""
-    matched: dict[str, int] = defaultdict(int)
-    for r in (match_result, create_result):
-        for method, count in r.matched_counts.items():
-            matched[method] += count
-    skipped: dict[str, int] = defaultdict(int)
-    for r in (match_result, create_result):
-        for reason, count in r.skipped_counts.items():
-            skipped[reason] += count
-
-    linked_total = sum(matched.values())
-    created = create_result.created
-
-    metrics = PhaseMetrics()
-    metrics.add(total=match_result.in_perimeter_total, new=created, updated=linked_total)
-    # Tableau « méthode de rattachement » : clés techniques (libellés portés par le frontend), ordre par fiabilité décroissante de la cascade.
-    metrics.details["table"] = {
-        "rows": [
-            {"key": method, "count": matched[method]}
-            for method in ("orcid", "hal_person_id", "idref", "cross_source", "single_name")
-        ]
-    }
-    metrics.details["summary"] = {
-        "created": created,
-        "skipped_ambiguous": skipped["ambiguous_name_form"],
-        "corroboration_rejected": match_result.corroboration_rejected,
-        "identifiers_transferred": transferred,
-        "reset_cross_source": reset_cross,
-        "reorphaned_nominal": reorphaned,
-        "deleted_empty_persons": deleted_persons,
-    }
-    return metrics
