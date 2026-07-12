@@ -1,18 +1,12 @@
-"""
-Sub-step de la phase pipeline `publishers_journals` — enrichit les
-revues à partir de l'API OpenAlex Sources.
+"""Sous-étape de la phase `publishers_journals` — enrichit les revues à partir de l'API OpenAlex Sources.
 
 Champs mis à jour :
 - `apc_amount`, `apc_currency` (prix catalogue DOAJ exposés par OpenAlex)
 - `journal_type` (via `domain.journals.journal.map_openalex_source_type`), uniquement quand le mapping renvoie une valeur exploitable
 
-Utilise le filtre openalex avec pipe (|) pour interroger jusqu'à 50 sources par requête.
+Interroge jusqu'à 50 sources par requête via le filtre OpenAlex à pipe (`|`).
 
 L'orchestrateur dépend du port `EnrichQueries` ; il est appelé par `run_pipeline`. Pour ré-interroger toutes les revues ayant un openalex_id (et pas seulement celles sans APC), utiliser le script `interfaces/cli/oneshot/backfill_journal_types_from_openalex.py`.
-
-Module renommé depuis `application/pipeline/enrich/enrich_journal_apc.py`
-le 2026-05-26 dans le cadre de la refonte structurelle de la phase
-`publishers_journals` (cf. METIER_pipeline-publishers-journals.md).
 """
 
 import logging
@@ -34,9 +28,7 @@ from domain.journals.journal import map_openalex_source_type
 OPENALEX_PREFIX = "https://openalex.org/"
 BATCH_SIZE = 50  # max IDs par requête (API limit = 100, on reste prudent)
 COMMIT_EVERY = 500  # commit DB tous les N journals traités
-# Coupe-circuit : N batches consécutifs en 429 (budget API OpenAlex quotidien épuisé)
-# avant d'interrompre l'enrichissement. OpenAlex est la seule source à limite dure
-# quotidienne ; les autres sources n'en ont pas besoin.
+# Batches 429 consécutifs tolérés avant d'interrompre l'enrichissement (budget OpenAlex quotidien épuisé).
 RATE_LIMIT_STRIKES_MAX = 3
 
 
