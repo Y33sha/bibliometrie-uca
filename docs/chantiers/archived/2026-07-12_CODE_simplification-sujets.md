@@ -27,7 +27,7 @@ Sur la fiche publication, les mots-clés libres sont affichés **via `publicatio
 
 - [x] Ingestors : n'ingérer que `topics` (concepts). Le champ `keywords` n'alimente plus `subjects` / `publication_subjects` ; l'ingestor CrossRef (libres seuls) est supprimé. (`6b85ac57`)
 - [x] Fiche publication : afficher les mots-clés libres depuis `publications_detail.keywords` (champ `keywords` de la réponse détail + `SubjectsBlock`), indépendamment de `publication_subjects`. (`b7db61df`)
-- Le stock existant de sujets/liens libres se nettoie côté données prod (le code cesse d'en produire ; `purge_orphan_subjects` retire les sujets devenus sans lien après re-ingestion). Pas de one-shot ici.
+- [x] Le stock existant se nettoie par une ré-ingestion complète : le flag `--rebuild-subjects` repasse toutes les publications (efface + reconstruit les liens), et `purge_orphan_subjects` retire les sujets libres devenus orphelins. (`259f2cba`)
 
 ### Phase B — Supprimer le modèle d'ontologie
 
