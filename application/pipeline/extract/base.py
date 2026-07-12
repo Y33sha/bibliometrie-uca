@@ -35,10 +35,12 @@ class ExtractionConfigError(Exception):
     """
 
 
-class SourceExtractor[ConfigT](ABC):
+class SourceExtractor[ConfigT, AdapterT](ABC):
     """Template pour l'extraction API → staging.
 
     `ConfigT` (paramètre PEP 695) = type de la config chargée par `load_config`, propre à chaque source. Permet aux sous-classes de retourner une dataclass typée plutôt qu'un `dict` opaque. Le base class ne consomme jamais le contenu de la config — il la passe à `extract_all` qui sait l'interpréter.
+
+    `AdapterT` (paramètre PEP 695) = type de l'adapter infra injecté à la construction, stocké en `self._adapter` et consommé par les hooks de la sous-classe.
 
     Points d'override obligatoires :
     - `SOURCE` : identifiant source (ex: "hal", "openalex")
@@ -55,15 +57,26 @@ class SourceExtractor[ConfigT](ABC):
         self,
         conn: Connection,
         logger: logging.Logger,
+        adapter: AdapterT,
     ) -> None:
         self.conn = conn
         self.logger = logger
+        self._adapter = adapter
         # Circuit-breaker de la source (posé par `run`) : les boucles `extract_all` consultent `_breaker_tripped()` pour s'arrêter quand la source est à bout de budget / en panne.
         self._breaker: CircuitBreaker | None = None
 
     def _breaker_tripped(self) -> bool:
         """`True` si le circuit-breaker de la source a tripé (à consulter dans les boucles d'`extract_all` pour stopper la source)."""
         return self._breaker is not None and self._breaker.tripped
+
+    def _stop_on_tripped(self, remaining: str) -> bool:
+        """`True`, avec avertissement, si le circuit-breaker a tripé : à tester en tête de boucle d'items pour stopper la source. `remaining` nomme les items non traités (accordé par l'appelant), qui repartent au prochain run."""
+        if self._breaker_tripped():
+            self.logger.warning(
+                "%s à bout (429/5xx répétés) — %s (retry au prochain run)", self.SOURCE, remaining
+            )
+            return True
+        return False
 
     # ── Hooks métier ────────────────────────────────────────────
 

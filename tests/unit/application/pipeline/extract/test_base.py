@@ -31,7 +31,7 @@ class _FakeExtractor(SourceExtractor):
         config: dict[str, Any] | None = None,
         metrics: PhaseMetrics | None = None,
     ) -> None:
-        super().__init__(conn, logger)
+        super().__init__(conn, logger, MagicMock())
         self._config = config or {"affiliations": ["UCA"]}
         self._metrics = metrics or PhaseMetrics(new=42)
         self.load_config_calls = 0
@@ -101,7 +101,7 @@ class TestRunLogsSummary:
     def test_run_logs_terminé_message(self, conn, caplog):
         """`run()` loggue le résumé `=== Terminé : … ===` en fin d'extraction."""
         logger = logging.getLogger("test_run_summary")
-        ext = _MinimalExtractor(conn, logger)
+        ext = _MinimalExtractor(conn, logger, MagicMock())
 
         with caplog.at_level(logging.INFO, logger=logger.name):
             ext.run(argparse.Namespace(dry_run=False))

@@ -6,7 +6,6 @@ Pilote l'extraction par année (ou par `since` en mode incrémental) via le curs
 from __future__ import annotations
 
 import argparse
-import logging
 
 from sqlalchemy import Connection
 
@@ -88,19 +87,10 @@ def extract_year(
     return total_new, total_updated, total_unchanged
 
 
-class OpenalexExtractor(SourceExtractor[OpenalexExtractConfig]):
+class OpenalexExtractor(SourceExtractor[OpenalexExtractConfig, OpenalexExtractAdapter]):
     """Extraction OpenAlex — orchestrateur applicatif."""
 
     SOURCE = "openalex"
-
-    def __init__(
-        self,
-        conn: Connection,
-        logger: logging.Logger,
-        adapter: OpenalexExtractAdapter,
-    ) -> None:
-        super().__init__(conn, logger)
-        self._adapter = adapter
 
     def load_config(self, conn: Connection) -> OpenalexExtractConfig:
         config = self._adapter.load_config(conn)
@@ -138,11 +128,7 @@ class OpenalexExtractor(SourceExtractor[OpenalexExtractConfig]):
             stats.add(new=year_new, updated=year_updated, unchanged=year_unchanged)
         else:
             for year in years:
-                if self._breaker_tripped():
-                    self.logger.warning(
-                        "OpenAlex à bout (429/5xx répétés) — années restantes sautées"
-                        " (retry au prochain run)"
-                    )
+                if self._stop_on_tripped("années restantes sautées"):
                     break
                 year_new, year_updated, year_unchanged = extract_year(
                     self._adapter,

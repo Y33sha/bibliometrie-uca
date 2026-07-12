@@ -6,7 +6,6 @@ Pilote l'extraction par année via la pagination `firstRecord` (queryId non fiab
 from __future__ import annotations
 
 import argparse
-import logging
 import time
 
 from sqlalchemy import Connection
@@ -112,19 +111,10 @@ def extract_year(
     return total_new, total_updated, total_unchanged
 
 
-class WosExtractor(SourceExtractor[WosExtractConfig]):
+class WosExtractor(SourceExtractor[WosExtractConfig, WosExtractAdapter]):
     """Extraction WoS — orchestrateur applicatif."""
 
     SOURCE = "wos"
-
-    def __init__(
-        self,
-        conn: Connection,
-        logger: logging.Logger,
-        adapter: WosExtractAdapter,
-    ) -> None:
-        super().__init__(conn, logger)
-        self._adapter = adapter
 
     def load_config(self, conn: Connection) -> WosExtractConfig:
         config = self._adapter.load_config(conn)
@@ -153,10 +143,7 @@ class WosExtractor(SourceExtractor[WosExtractConfig]):
 
         stats = PhaseMetrics()
         for i, year in enumerate(years):
-            if self._breaker_tripped():
-                self.logger.warning(
-                    "WoS à bout (429/5xx répétés) — années restantes sautées (retry au prochain run)"
-                )
+            if self._stop_on_tripped("années restantes sautées"):
                 break
             slog = scoped_logger(self.logger, self.SOURCE, str(year))
             try:
