@@ -18,9 +18,9 @@ L'identité (quelles publications sont une seule œuvre) est du ressort exclusif
 
 ## Phasage
 
-- [ ] `refresh_from_sources` → recompute pur : retirer le `find_by_doi` + l'auto-merge (`merge_publications`). Il ne connaît plus que les `source_publications` de sa propre publication.
-- [ ] `merge_publications` = `merge_into` puis recompute depuis les sources, au lieu de `Publication.absorb`. Supprime `Publication.absorb` (agrégation métadonnées) et `absorb_oa_status` (`domain/publications/metadata`), lève la divergence OA, et — l'auto-merge de `refresh` étant parti — sans circularité `merge → refresh → merge`.
-- [ ] Reformuler le commentaire d'ordonnancement de `reconcile` (étape 2, dissolutions) : la raison devient « libérer le DOI avant que le survivant le reprenne », plus « éviter que l'auto-merge se déclenche ».
+- [x] `refresh_from_sources` → recompute pur : retirer le `find_by_doi` + l'auto-merge (`merge_publications`). Il ne connaît plus que les `source_publications` de sa propre publication. (`f1ee192a`)
+- [x] `merge_publications` = `merge_into` puis recompute depuis les sources, au lieu de `Publication.absorb`. Supprime `Publication.absorb` (agrégation métadonnées) et `absorb_oa_status` (`domain/publications/metadata`), lève la divergence OA, et — l'auto-merge de `refresh` étant parti — sans circularité `merge → refresh → merge`. (`65ec1511`)
+- [x] Reformuler le commentaire d'ordonnancement de `reconcile` (étape 2, dissolutions) : la raison devient « libérer le DOI avant que le survivant le reprenne », plus « éviter que l'auto-merge se déclenche ». (`65ec1511`)
 
 ## Questions ouvertes
 
