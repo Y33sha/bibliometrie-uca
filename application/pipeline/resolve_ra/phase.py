@@ -25,7 +25,6 @@ def run(
     repo: DoiPrefixRepository,
     resolve_ra_fn: ResolveRaFn,
     n_samples: int = 3,
-    limit: int | None = None,
     breaker: CircuitBreaker | None = None,
 ) -> PhaseMetrics:
     """Résout la RA des préfixes non encore en base (`doi.org/ra` seul) et l'insère.
@@ -38,10 +37,6 @@ def run(
     metrics = PhaseMetrics()
     prefixes = repo.get_unresolved_prefixes_with_samples(n_samples_per_prefix=n_samples)
     log.info("%d préfixes à résoudre", len(prefixes))
-
-    if limit is not None:
-        prefixes = prefixes[:limit]
-        log.info("Limité à %d préfixes", len(prefixes))
 
     new_by_ra: dict[str, int] = {}
     for prefix, samples in prefixes:
@@ -60,7 +55,7 @@ def run(
             new_by_ra[ra] = new_by_ra.get(ra, 0) + 1
         log.info("%s → %s", prefix, ra)
 
-    # Indicateurs sur-mesure : synthèse du run + tableau par Registration Agency (Crossref / DataCite / unknown) avec DOI candidats et préfixes. La part `unknown` inclut les préfixes que doi.org/ra ne classe pas et les préfixes malformés (DOI à scheme « doi: » non nettoyé), ce qui la rend lisible comme signal de qualité.
+    # Indicateurs sur-mesure : synthèse du run + tableau par Registration Agency (Crossref / DataCite / unknown) avec DOI candidats et préfixes. La part `unknown` inclut les préfixes que doi.org/ra ne classe pas et les préfixes malformés (DOI à scheme « doi: » non nettoyé).
     metrics.details["summary"] = {
         "new_prefixes": metrics.new,
         "resolved": metrics.extras.get("resolved", 0),
