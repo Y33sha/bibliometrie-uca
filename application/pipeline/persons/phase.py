@@ -56,6 +56,14 @@ def run(
         reset_counts = reset(conn, persons_queries, logger, person_repo=person_repo)
         match_result = match(conn, persons_queries, logger, person_repo=person_repo)
         create_result = create(conn, persons_queries, logger, person_repo=person_repo)
+
+        # Les signatures cross-source qu'aucune passe n'a re-résolues ont perdu leur ancre ferme → détachées.
+        resolved = match_result.resolved_cross_source_ids | create_result.resolved_cross_source_ids
+        stale = sorted(match_result.cross_source_candidate_ids - resolved)
+        cross_source_detached = persons_queries.detach_authorships(conn, stale)
+        if cross_source_detached:
+            logger.info("  %d signature(s) cross-source sans appui détachée(s)", cross_source_detached)
+
         populate(conn, name_forms_queries, logger)
         purge_counts = purge(conn, persons_queries, logger)
 
@@ -63,7 +71,7 @@ def run(
             match_result,
             create_result,
             transferred=reset_counts["transferred"],
-            reset_cross=reset_counts["reset_cross"],
+            cross_source_detached=cross_source_detached,
             reorphaned=purge_counts["reorphaned"],
             deleted_persons=purge_counts["deleted_persons"],
         )

@@ -83,6 +83,15 @@ def get_out_of_perimeter_candidates(
     return [_enrich(row) for row in queries.fetch_out_of_perimeter_candidates(conn)]
 
 
+def get_cross_source_candidates(
+    conn: Connection, queries: PersonsCreateQueries
+) -> list[EnrichedAuthorship]:
+    """Charge les signatures déjà liées **en cross-source**, à re-juger contre les ancres fermes.
+
+    Elles portent leur `current_person_id` : la cascade compare la nouvelle décision au lien courant — même personne → no-op, différente → update, plus d'appui → détachée."""
+    return [_enrich(row) for row in queries.fetch_cross_source_linked(conn)]
+
+
 def load_linked_authorships_by_pub(
     conn: Connection, queries: PersonsCreateQueries
 ) -> dict[tuple[int, int], list[tuple[int, str, str, str]]]:
