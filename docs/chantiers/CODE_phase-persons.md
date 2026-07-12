@@ -56,3 +56,15 @@ Livré : plumbing `current_person_id` (`2fcbb896`), logique incrémentale (`c8f3
 
 - Deux passes `match`/`create` **conservées** : orthogonales au cross-source (elles ordonnent match ferme puis création, qui ancre le cross-source de ses co-signatures). Un éventuel collapse en une passe serait un chantier séparé.
 - Toutes les signatures cross-source sont re-jugées chaque run (pool de candidats) — le ripple de l'arbitrage d'identifiant est ainsi couvert. Pas de `link_authorship` conditionnel finalement : la cascade saute elle-même l'écriture d'une ré-affirmation à l'identique. Le détachement des sans-appui est un SQL final ciblé par ids (pas dans la passe `create`).
+
+### Passe unique : une cascade pour match et create
+
+`match` et `create` réinstancient chacun un `_Cascade` : deux fetch, deux chargements des huit index, deux parsings de noms. Sur la transaction unique de la phase, autant tout garder en mémoire. Cible : un seul `_Cascade`, deux passes internes qui partagent ses index vivants.
+
+Livré : `7535b43a`.
+
+- [x] `run_cascade` remplace `match` + `create` : un `_Cascade` (un fetch, un chargement d'index), passe 1 `decide_full` sur tout le pool (rattachements fermes + cross-source, non-résolues collectées), passe 2 `decide_cross_and_name` sur les seules non-résolues (cross-source de rattrapage + création), contre les mêmes index vivants.
+- [x] `phase.py` appelle `run_cascade` (un seul résultat) ; `build_metrics` et `log_matching_breakdown` prennent un `CascadeResult` au lieu de deux.
+- [x] Scalabilité : pool et index tenus une fois (mémoire ≈ une passe actuelle), chargés une fois — l'économie est maximale sur le run full (base vide).
+- [x] Bénéfices annexes actés : plus de double-traitement des candidates cross-source ; skips comptés une seule fois (le skip final, pas match + create).
+- [x] Tests d'ordre-indépendance et idempotence verts.
