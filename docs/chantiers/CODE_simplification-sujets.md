@@ -42,7 +42,7 @@ Sur la fiche publication, les mots-clés libres sont affichés **via `publicatio
 
 - [x] `SubjectCache` réduit à `label → subject_id` (plus de suivi ontologies, plus de `_covers`). (`6b85ac57`)
 - [x] Docstrings des ingestors recalés (format source décrit en clair, sans numéros de ligne ni renvoi chantier ni note de roadmap). `ingest_hal` garde la dérivation code CCSD → libellé (`hal_domain_label`), sans stocker le code. (`6b85ac57`)
-- [ ] Ingestors uniformisés autour d'un helper commun de ramassage de libellés (le motif `get_or_upsert` + `append` reste répété dans les cinq modules — polissage optionnel).
+- [x] Cinq modules `ingest_<source>` réduits à cinq extracteurs purs `topics → list[str]` (`extractors.py`) + registre `SUBJECT_EXTRACTORS` ; l'upsert/liaison n'est plus écrit qu'une fois, dans l'orchestrateur. (`12009caa`)
 
 ## Questions ouvertes
 
