@@ -20,8 +20,8 @@ import logging
 
 from sqlalchemy import text
 
+from application.pipeline.persons.arbitrate_identifiers import arbitrate_identifier_conflicts
 from application.pipeline.persons.cascade import run_cascade
-from application.pipeline.persons.reset import reset
 from application.services.persons.core import add_name_form, create_person
 from infrastructure.queries.pipeline.persons_create import PgPersonsCreateQueries
 from infrastructure.repositories import person_repository
@@ -155,7 +155,7 @@ def _get_person_identifiers(conn, person_id):
 
 def _run_cascade(conn):
     repo = person_repository(conn)
-    reset(conn, _queries, _logger, person_repo=repo)
+    arbitrate_identifier_conflicts(conn, _queries, _logger, person_repo=repo)
     run_cascade(conn, _queries, _logger, person_repo=repo)
 
 

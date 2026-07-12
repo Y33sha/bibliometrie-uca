@@ -28,7 +28,7 @@ MODULES = [
     "application.pipeline.normalize.normalize_scanr",
     "application.pipeline.normalize.normalize_theses",
     "application.pipeline.publications.reconcile_components",
-    "application.pipeline.persons.reset",
+    "application.pipeline.persons.arbitrate_identifiers",
     "application.pipeline.persons.cascade",
     "application.pipeline.persons.purge",
     "application.pipeline.persons.phase",

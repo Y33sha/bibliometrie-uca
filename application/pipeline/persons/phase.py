@@ -3,7 +3,7 @@
 Les six étapes tournent sur **une seule** transaction (ouverte via `open_tx`) : `reset` peut détacher des signatures (conflits d'identifiant), la cascade les re-résout, et le détachement cross-source final retire les liens sans appui. Ces mutations dérivées doivent committer ensemble — un crash en cours de phase laisserait sinon des signatures détachées jusqu'au run suivant.
 
 1. **enforce** — réapplique les épinglages admin (`confirmed_authorships`, must-link) : entrée fixe reposée avant toute dérivation.
-2. **reset** — arbitre les conflits d'attribution d'identifiant par consensus (les signatures captées repassent à NULL).
+2. **arbitrage des conflits d'identifiant** — tranche par consensus des porteurs (les signatures captées repassent à NULL).
 3. **cascade** — un seul balayage en deux passes internes, sur des index vivants partagés : `match` (rattachement ferme + cross-source), puis `create` (rattrapage cross-source + création des inconnues).
 4. **détachement cross-source** — les liens cross-source restés sans appui ferme repassent à NULL.
 5. **populate** — régénère les formes de nom canoniques.
@@ -21,11 +21,11 @@ from collections.abc import Callable
 from sqlalchemy import Connection
 
 from application.pipeline.metrics import PhaseMetrics
+from application.pipeline.persons.arbitrate_identifiers import arbitrate_identifier_conflicts
 from application.pipeline.persons.cascade import run_cascade
 from application.pipeline.persons.metrics import build_metrics, log_matching_breakdown
 from application.pipeline.persons.populate_person_name_forms import populate
 from application.pipeline.persons.purge import purge
-from application.pipeline.persons.reset import reset
 from application.ports.pipeline.name_forms import NameFormsQueries
 from application.ports.pipeline.persons_create import PersonsCreateQueries
 from application.ports.pipeline.transaction import OpenTransaction
@@ -53,7 +53,9 @@ def run(
         if n_enforced:
             logger.info("Épinglages réappliqués : %d signatures recalées", n_enforced)
 
-        reset_counts = reset(conn, persons_queries, logger, person_repo=person_repo)
+        arbitration = arbitrate_identifier_conflicts(
+            conn, persons_queries, logger, person_repo=person_repo
+        )
         cascade_result = run_cascade(conn, persons_queries, logger, person_repo=person_repo)
 
         # Les signatures cross-source qu'aucune passe n'a re-résolues ont perdu leur ancre ferme → détachées.
@@ -69,7 +71,7 @@ def run(
 
         metrics = build_metrics(
             cascade_result,
-            transferred=reset_counts["transferred"],
+            transferred=arbitration["transferred"],
             cross_source_detached=cross_source_detached,
             reorphaned=purge_counts["reorphaned"],
             deleted_persons=purge_counts["deleted_persons"],

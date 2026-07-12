@@ -14,8 +14,8 @@ import logging
 
 from sqlalchemy import text
 
+from application.pipeline.persons.arbitrate_identifiers import arbitrate_identifier_conflicts
 from application.pipeline.persons.cascade import run_cascade
-from application.pipeline.persons.reset import reset
 from infrastructure.queries.pipeline.persons_create import PgPersonsCreateQueries
 from infrastructure.repositories import person_repository
 from tests.integration.helpers.authorships import upsert_identity
@@ -55,9 +55,9 @@ def _seed(conn, *, sa_id, raw_name, name_norm, idref):
 
 
 def _run(conn):
-    """La cascade : reset (transfert d'identifiant par consensus), match, create."""
+    """Arbitrage des conflits d'identifiant (transfert par consensus) puis la cascade."""
     q, repo = PgPersonsCreateQueries(), person_repository(conn)
-    reset(conn, q, _LOG, person_repo=repo)
+    arbitrate_identifier_conflicts(conn, q, _LOG, person_repo=repo)
     run_cascade(conn, q, _LOG, person_repo=repo)
 
 

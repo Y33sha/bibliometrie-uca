@@ -1,4 +1,4 @@
-"""Idempotence : phase personnes (reset / match / create)."""
+"""Idempotence : phase personnes (arbitrage des conflits d'identifiant, cascade)."""
 
 
 def setup_persons_test_data(conn):
@@ -59,15 +59,15 @@ def run_create_persons(conn):
 
     from sqlalchemy import text
 
+    from application.pipeline.persons.arbitrate_identifiers import arbitrate_identifier_conflicts
     from application.pipeline.persons.cascade import run_cascade
-    from application.pipeline.persons.reset import reset
     from infrastructure.queries.pipeline.persons_create import PgPersonsCreateQueries
     from infrastructure.repositories import person_repository
 
     queries = PgPersonsCreateQueries()
     logger = logging.getLogger("test")
     repo = person_repository(conn)
-    reset(conn, queries, logger, person_repo=repo)
+    arbitrate_identifier_conflicts(conn, queries, logger, person_repo=repo)
     run_cascade(conn, queries, logger, person_repo=repo)
 
     return conn.execute(

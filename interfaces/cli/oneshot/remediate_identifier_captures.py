@@ -24,7 +24,7 @@ import os
 import sys
 
 from application.pipeline.persons.resolve_identifier_transfers import (
-    build_identifier_conflicts,
+    detect_identifier_conflicts,
     resolve_identifier_transfers,
 )
 from infrastructure.db.engine import get_sync_engine
@@ -45,7 +45,7 @@ def main() -> None:
 
     with get_sync_engine().connect() as conn:
         queries = PgPersonsCreateQueries()
-        conflicts = build_identifier_conflicts(conn, queries)
+        conflicts = detect_identifier_conflicts(conn, queries)
         result = resolve_identifier_transfers(
             conn,
             conflicts,
