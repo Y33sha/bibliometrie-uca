@@ -306,7 +306,7 @@ def create(
     person_repo: PersonRepository,
 ) -> CascadeResult:
     """Reprend les signatures non liées : cross-source rejoué contre l'état ferme, puis création."""
-    logger.info("▶ create : re-jugement cross-source puis création des inconnues")
+    logger.info("▶ create : création des personnes inconnues")
     return _run_pass(
         conn,
         queries,
