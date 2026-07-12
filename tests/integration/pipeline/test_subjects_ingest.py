@@ -214,6 +214,23 @@ class TestRunOrchestrator:
         assert len(rows) == 2
         assert {r.id for r in rows} == {subjects[0].id}
 
+    def test_rebuild_reingests_all(self, sa_sync_conn, queries):
+        # `rebuild=True` ré-ingère même une publication non modifiée.
+        pub = _create_pub(sa_sync_conn)
+        _create_source_pub(
+            sa_sync_conn,
+            source="hal",
+            source_id="h1",
+            publication_id=pub,
+            topics={"hal_domains": ["info"]},
+        )
+        logger = logging.getLogger("test")
+        run(sa_sync_conn, queries, logger)
+        # Sans rebuild : rien à faire (non modifiée).
+        assert run(sa_sync_conn, queries, logger).new == 0
+        # Avec rebuild : ré-ingérée quand même.
+        assert run(sa_sync_conn, queries, logger, rebuild=True).new == 1
+
     def test_ignores_unlinked_source_publications(self, sa_sync_conn, queries):
         # source_pub orphelin (publication_id NULL) : jamais sélectionné, son concept
         # n'est pas ingéré.

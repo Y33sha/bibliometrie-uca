@@ -27,15 +27,27 @@ from application.ports.pipeline.subjects import SubjectsQueries
 _LOG_EVERY = 2000
 
 
-def run(conn: Connection, queries: SubjectsQueries, logger: logging.Logger) -> PhaseMetrics:
-    """Ré-ingère les sujets des publications modifiées depuis la dernière passe.
+def run(
+    conn: Connection,
+    queries: SubjectsQueries,
+    logger: logging.Logger,
+    *,
+    rebuild: bool = False,
+) -> PhaseMetrics:
+    """Ré-ingère les sujets des publications modifiées depuis la dernière passe (ou de toutes si `rebuild`).
 
     `metrics.new` porte le nombre de liens publication↔sujet créés ; le résumé sur-mesure expose les sujets ajoutés (évolution nette du référentiel, ingestion moins purge des orphelins), le nouveau total du vocabulaire et le nombre de publications ré-ingérées.
+
+    `rebuild` repasse toutes les publications, indépendamment du signal incrémental : chaque lien non rejeté est effacé puis reconstruit, et la purge finale retire les sujets devenus sans lien. Sert à propager une évolution des règles d'ingestion sur tout le stock.
     """
     t_run = time.perf_counter()
     subjects_before = queries.count_subjects(conn)
 
-    pub_ids = queries.select_publications_to_reingest(conn)
+    if rebuild:
+        pub_ids = queries.select_all_publication_ids(conn)
+        logger.info("subjects : rebuild complet — %d publications à ré-ingérer", len(pub_ids))
+    else:
+        pub_ids = queries.select_publications_to_reingest(conn)
     if not pub_ids:
         n_purged = queries.purge_orphan_subjects(conn)
         logger.info("subjects : rien à ré-ingérer ; %d sujets orphelins purgés", n_purged)

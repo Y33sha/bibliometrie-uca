@@ -656,9 +656,9 @@ def phase_subjects(**kw: Any) -> PhaseMetrics:
     1. **Ingestion** (`subjects` + `publication_subjects`) — incrémentale et
        publication-centrée : ne ré-ingère que les publications dont le contenu
        canonique a changé depuis leur dernière ingestion (`publications.updated_at`
-       > `max(publication_subjects.created_at)`), à partir des `keywords` /
-       `topics` de leurs `source_publications`. Purge en fin les sujets devenus
-       orphelins (plus aucun lien). Cf. `application/pipeline/subjects/ingestion.py`.
+       > `max(publication_subjects.created_at)`), à partir des `topics` de leurs
+       `source_publications`. Purge en fin les sujets devenus orphelins (plus aucun
+       lien). Cf. `application/pipeline/subjects/ingestion.py`.
 
     2. **Co-occurrences** (`subjects.usage_count` + matview `subject_cooccurrences`)
        — recalcule l'usage de chaque sujet et rafraîchit la matview des
@@ -669,16 +669,16 @@ def phase_subjects(**kw: Any) -> PhaseMetrics:
     porte plus que du périmètre et `usage_count` / `subject_cooccurrences` en
     héritent. Ne pas re-filtrer (cf. `purge_orphan_publications`).
 
-    Idempotente. Pour forcer une ré-ingestion complète (récupération), vider
-    `publication_subjects` non rejetés : toutes les publications redeviennent
-    « jamais ingérées ».
+    Idempotente. `--rebuild-subjects` force une ré-ingestion complète (toutes les
+    publications, pas seulement les modifiées), pour propager une évolution des
+    règles d'ingestion sur tout le stock.
 
     Séquence, transactions et métriques dans `application/pipeline/subjects/phase.py`.
     """
     from application.pipeline.subjects.phase import run
     from infrastructure.queries.subjects import PgSubjectsQueries
 
-    return run(_open_tx, PgSubjectsQueries(), log)
+    return run(_open_tx, PgSubjectsQueries(), log, rebuild=bool(kw.get("rebuild_subjects")))
 
 
 def _normalize_row(source: str, stats: NormalizeStats, duration_s: float) -> dict[str, object]:
@@ -1315,6 +1315,12 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         help="Avant la phase authorships, purge complète de la table puis reconstruction "
         "depuis zéro (filet anti-divergence, en récupération).",
     )
+    parser.add_argument(
+        "--rebuild-subjects",
+        action="store_true",
+        help="À la phase subjects, ré-ingère toutes les publications (pas seulement les "
+        "modifiées) pour propager une évolution des règles d'ingestion sur tout le stock.",
+    )
     return parser
 
 
@@ -1392,6 +1398,7 @@ def _run_one_phase(
                 include_wos=args.include_wos,
                 rebuild_publications=args.rebuild_publications,
                 rebuild_authorships=args.rebuild_authorships,
+                rebuild_subjects=args.rebuild_subjects,
             )
         except KeyboardInterrupt:
             log.warning("Pipeline interrompu par l'utilisateur à la phase '%s'", name)

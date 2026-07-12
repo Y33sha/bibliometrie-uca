@@ -169,6 +169,11 @@ def select_publications_to_reingest(conn: Connection) -> list[int]:
     ]
 
 
+def select_all_publication_ids(conn: Connection) -> list[int]:
+    """Ids de toutes les publications (ré-ingestion complète)."""
+    return [r.id for r in conn.execute(text("SELECT id FROM publications")).all()]
+
+
 def select_source_publications_for_pubs(
     conn: Connection, *, publication_ids: list[int]
 ) -> list[Any]:
@@ -379,6 +384,9 @@ class PgSubjectsQueries(SubjectsQueries):
 
     def select_publications_to_reingest(self, conn: Connection) -> list[int]:
         return select_publications_to_reingest(conn)
+
+    def select_all_publication_ids(self, conn: Connection) -> list[int]:
+        return select_all_publication_ids(conn)
 
     def select_source_publications_for_pubs(
         self, conn: Connection, *, publication_ids: list[int]
