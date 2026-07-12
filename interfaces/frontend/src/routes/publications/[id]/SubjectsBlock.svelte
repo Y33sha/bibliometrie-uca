@@ -3,37 +3,36 @@
   import SectionLabel from "./SectionLabel.svelte";
   import type { Subject } from "./types";
 
-  let { subjects }: { subjects: Subject[] } = $props();
-
-  function isFree(s: Subject): boolean {
-    return Object.keys(s.ontologies).length === 0;
-  }
-
-  const concepts = $derived(subjects.filter((s) => !isFree(s)));
-  const freeKeywords = $derived(subjects.filter(isFree));
+  let { subjects, keywords }: { subjects: Subject[]; keywords: string[] } = $props();
 
   function tooltip(s: Subject): string {
     return `Source : ${s.sources.join(", ")}`;
   }
 </script>
 
-{#if subjects.length > 0}
+{#if subjects.length > 0 || keywords.length > 0}
   <div class="detail-section">
     <SectionLabel icon="tag" text="Sujets" />
-    {#if concepts.length > 0}
+    {#if subjects.length > 0}
       <div class="detail-tags">
-        {#each concepts as s (s.id)}
+        {#each subjects as s (s.id)}
           <a href="{base}/subjects/{s.id}" title={tooltip(s)}>{s.label}</a>
         {/each}
       </div>
     {/if}
-    {#if freeKeywords.length > 0}
+    {#if keywords.length > 0}
       <div class="detail-sublabel">Mots-clés libres</div>
       <div class="detail-tags">
-        {#each freeKeywords as s (s.id)}
-          <a href="{base}/subjects/{s.id}" title={tooltip(s)}>{s.label}</a>
+        {#each keywords as kw (kw)}
+          <span class="free-keyword">{kw}</span>
         {/each}
       </div>
     {/if}
   </div>
 {/if}
+
+<style>
+  .free-keyword {
+    color: var(--muted);
+  }
+</style>

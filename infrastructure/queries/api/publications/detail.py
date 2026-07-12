@@ -119,7 +119,7 @@ def get_publication_detail(conn: Connection, pub_id: int) -> dict[str, Any] | No
         text("""
             SELECT p.id, p.title, p.pub_year, p.doi, p.doc_type::text AS doc_type,
                    p.oa_status::text AS oa_status,
-                   p.language, p.container_title, d.abstract,
+                   p.language, p.container_title, d.abstract, d.keywords,
                    j.id AS journal_id, j.title AS journal_title, j.issn, j.eissn,
                    j.is_predatory AS journal_predatory, j.apc_amount, j.apc_currency,
                    j.oa_model,
@@ -138,6 +138,8 @@ def get_publication_detail(conn: Connection, pub_id: int) -> dict[str, Any] | No
     if not pub_row:
         return None
     pub = dict(pub_row._mapping)
+    # Mots-clés libres (agrégat des sources) : hors référentiel `subjects`, retournés à part.
+    keywords = pub.pop("keywords", None) or []
 
     sources_rows = conn.execute(
         text("""
@@ -259,6 +261,7 @@ def get_publication_detail(conn: Connection, pub_id: int) -> dict[str, Any] | No
         "thesis_meta": thesis_meta,
         "structures": structures,
         "subjects": subjects,
+        "keywords": keywords,
         "relations": relations,
         "external_identifiers": external_identifiers,
     }
@@ -304,21 +307,20 @@ def get_publication_external_identifiers(conn: Connection, pub_id: int) -> list[
 
 
 def get_publication_subjects(conn: Connection, pub_id: int) -> list[dict[str, Any]]:
-    """Sujets attachés à une publication, dédupliqués par `subject_id`.
+    """Sujets (concepts) attachés à une publication, dédupliqués par `subject_id`.
 
-    Les sources qui ont annoté chaque sujet sont agrégées dans la colonne
-    `sources`. Tri : concepts (avec ontologies) avant libres (ontologies
-    vides), puis label alphabétique insensible à la casse.
+    Les sources qui ont annoté chaque sujet sont agrégées dans `sources`. Triés par
+    label, insensible à la casse.
     """
     rows = conn.execute(
         text("""
-            SELECT s.id, s.label, s.language, s.ontologies,
+            SELECT s.id, s.label, s.language,
                    array_agg(DISTINCT ps.source::text ORDER BY ps.source::text) AS sources
             FROM publication_subjects ps
             JOIN subjects s ON s.id = ps.subject_id
             WHERE ps.publication_id = :pid
             GROUP BY s.id
-            ORDER BY (s.ontologies = '{}'::jsonb), lower(s.label)
+            ORDER BY lower(s.label)
         """),
         {"pid": pub_id},
     ).all()

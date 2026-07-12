@@ -2505,7 +2505,7 @@ export interface paths {
          * Pipeline Status
          * @description Retourne le statut du pipeline en cours, ou null si aucun ne tourne.
          *
-         *     Un status.json orphelin (PID mort) est traité comme "inactif" et nettoyé par ``read_status``.
+         *     Un status.json orphelin (PID mort) est traité comme "inactif" et nettoyé par `read_status`.
          */
         get: operations["pipeline_status_api_admin_pipeline_status_get"];
         put?: never;
@@ -2525,10 +2525,10 @@ export interface paths {
         };
         /**
          * Phase Log
-         * @description Log d'une phase, découpé depuis ``logs/pipeline.log``.
+         * @description Log d'une phase, découpé depuis `logs/pipeline.log`.
          *
          *     `available` est faux (et `content` vide) quand le fichier est absent
-         *     (``LOG_TO_FILE`` désactivé) ou quand la section est introuvable (log purgé).
+         *     (`LOG_TO_FILE` désactivé) ou quand la section est introuvable (log purgé).
          */
         get: operations["phase_log_api_admin_pipeline_runs__run_id__phases__phase__log_get"];
         put?: never;
@@ -4963,6 +4963,8 @@ export interface components {
             };
             /** Subjects */
             subjects: components["schemas"]["SubjectOut"][];
+            /** Keywords */
+            keywords: string[];
             /** Relations */
             relations: components["schemas"]["RelatedPublicationOut"][];
             /** External Identifiers */
@@ -5617,10 +5619,6 @@ export interface components {
             id: number;
             /** Label */
             label: string;
-            /** Ontologies */
-            ontologies: {
-                [key: string]: components["schemas"]["SubjectOntologyEntry"];
-            };
             /** Count */
             count: number;
         };
@@ -5635,10 +5633,6 @@ export interface components {
             label: string;
             /** Language */
             language: string | null;
-            /** Ontologies */
-            ontologies: {
-                [key: string]: components["schemas"]["SubjectOntologyEntry"];
-            };
             /** Usage Count */
             usage_count: number;
         };
@@ -5662,35 +5656,14 @@ export interface components {
             id: number;
             /** Label */
             label: string;
-            /** Ontologies */
-            ontologies: {
-                [key: string]: components["schemas"]["SubjectOntologyEntry"];
-            };
             /** Usage Count */
             usage_count: number;
             /** Cooccurrence Count */
             cooccurrence_count: number;
         };
         /**
-         * SubjectOntologyEntry
-         * @description Annotation d'un sujet par une ontologie donnée :
-         *     - `codes` : codes intra-ontologie observés (ex 'info' pour HAL).
-         *     - `level` : niveau hiérarchique (0=racine), null si non applicable.
-         *     - `parent` : libellé du sujet parent dans la même ontologie, null si racine.
-         */
-        SubjectOntologyEntry: {
-            /** Codes */
-            codes: string[];
-            /** Level */
-            level?: number | null;
-            /** Parent */
-            parent?: string | null;
-        };
-        /**
          * SubjectOut
-         * @description Sujet attaché à une publication, agrégé par `subject_id` sur les différentes sources qui l'ont annoté.
-         *
-         *     `ontologies` : annotations multi-sources. Vide pour un libre.
+         * @description Sujet attaché à une publication, agrégé par `subject_id` sur les différentes sources qui l'ont annoté. `sources` liste les sources qui l'ont fourni.
          */
         SubjectOut: {
             /** Id */
@@ -5699,10 +5672,6 @@ export interface components {
             label: string;
             /** Language */
             language: string | null;
-            /** Ontologies */
-            ontologies: {
-                [key: string]: components["schemas"]["SubjectOntologyEntry"];
-            };
             /** Sources */
             sources: string[];
         };

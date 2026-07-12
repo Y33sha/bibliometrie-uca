@@ -302,41 +302,6 @@ class TestGetPublicationSubjects:
         assert subjects[0]["label"] == "AI"
         assert subjects[0]["sources"] == ["hal", "openalex"]
 
-    def test_orders_concepts_before_free(self, sa_sync_conn):
-        pub = _create_pub(sa_sync_conn)
-        # Concept (avec ontologies) avant libre (ontologies vides).
-        c_row = sa_sync_conn.execute(
-            text(
-                "INSERT INTO subjects (label, ontologies) "
-                "VALUES ('Sciences EEA', CAST(:o AS jsonb)) RETURNING id"
-            ),
-            {"o": json.dumps({"hal_domain": {"codes": ["info.eea"]}})},
-        ).one()
-        c_id = c_row.id
-        f_row = sa_sync_conn.execute(
-            text("INSERT INTO subjects (label) VALUES ('physics') RETURNING id")
-        ).one()
-        f_id = f_row.id
-        sa_sync_conn.execute(
-            text(
-                "INSERT INTO publication_subjects (publication_id, subject_id, source) "
-                "VALUES (:p, :s, 'hal')"
-            ),
-            {"p": pub, "s": c_id},
-        )
-        sa_sync_conn.execute(
-            text(
-                "INSERT INTO publication_subjects (publication_id, subject_id, source) "
-                "VALUES (:p, :s, 'openalex')"
-            ),
-            {"p": pub, "s": f_id},
-        )
-
-        subjects = get_publication_subjects(sa_sync_conn, pub)
-        # Concept (ontologies non vides) en premier, libre ensuite.
-        assert subjects[0]["ontologies"] != {}
-        assert subjects[1]["ontologies"] == {}
-
     def test_included_in_publication_detail(self, sa_sync_conn):
         pub = _create_pub(sa_sync_conn)
         sub_row = sa_sync_conn.execute(
@@ -356,3 +321,5 @@ class TestGetPublicationSubjects:
         assert len(detail["subjects"]) == 1
         assert detail["subjects"][0]["label"] == "genomics"
         assert detail["subjects"][0]["sources"] == ["wos"]
+        # Mots-clés libres retournés à part (hors référentiel `subjects`).
+        assert detail["keywords"] == []

@@ -9,18 +9,6 @@
   type SubjectListItem = components["schemas"]["SubjectListItem"];
   type SubjectListResponse = components["schemas"]["SubjectListResponse"];
 
-  // Libellés courts d'ontologies pour le badge.
-  const ONTOLOGY_LABELS: Record<string, string> = {
-    openalex_topic: "OpenAlex",
-    openalex_keyword: "OpenAlex",
-    hal_domain: "HAL",
-    wos_subject: "WoS",
-    wos_heading: "WoS",
-    rameau: "RAMEAU",
-    theses_discipline: "Thèse",
-    scanr_domain: "ScanR",
-  };
-
   const PER_PAGE = 50;
 
   let search = $state("");
@@ -62,18 +50,6 @@
   function onPageChange(p: number) {
     page = p;
     load();
-  }
-
-  function isFree(s: SubjectListItem): boolean {
-    return Object.keys(s.ontologies).length === 0;
-  }
-
-  function ontologiesLabel(s: SubjectListItem): string {
-    const keys = Object.keys(s.ontologies);
-    if (keys.length === 0) return "libre";
-    const names = keys.map((k) => ONTOLOGY_LABELS[k] ?? k);
-    // Dédoublonne (openalex_topic + openalex_keyword → "OpenAlex" une fois).
-    return [...new Set(names)].join(", ");
   }
 
   const totalPages = $derived(data ? Math.max(1, Math.ceil(data.total / PER_PAGE)) : 1);
@@ -119,7 +95,6 @@
         <thead>
           <tr>
             <th>Libellé</th>
-            <th>Type</th>
             <th class="right">Occurrences</th>
           </tr>
         </thead>
@@ -128,11 +103,6 @@
             <tr>
               <td>
                 <a href="{base}/subjects/{s.id}">{s.label}</a>
-              </td>
-              <td>
-                <span class="badge" class:concept={!isFree(s)} class:free={isFree(s)}>
-                  {ontologiesLabel(s)}
-                </span>
               </td>
               <td class="right">{s.usage_count.toLocaleString("fr-FR")}</td>
             </tr>
@@ -207,22 +177,6 @@
   td.right,
   th.right {
     text-align: right;
-  }
-  .badge {
-    display: inline-block;
-    padding: 2px 8px;
-    border-radius: 12px;
-    font-size: 0.8rem;
-  }
-  .badge.concept {
-    background: #e0f2fe;
-    color: #075985;
-    border: 1px solid #bae6fd;
-  }
-  .badge.free {
-    background: #fef3c7;
-    color: #92400e;
-    border: 1px solid #fde68a;
   }
   a {
     color: #075985;

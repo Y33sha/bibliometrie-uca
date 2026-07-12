@@ -271,7 +271,7 @@ def person_subjects(conn: Connection, person_id: int, *, limit: int = 30) -> lis
     """
     rows = conn.execute(
         text("""
-            SELECT s.id, s.label, s.ontologies, COUNT(DISTINCT p.id) AS count
+            SELECT s.id, s.label, COUNT(DISTINCT p.id) AS count
             FROM authorships a
             JOIN publications p ON p.id = a.publication_id
             JOIN publication_subjects ps ON ps.publication_id = p.id
@@ -279,7 +279,7 @@ def person_subjects(conn: Connection, person_id: int, *, limit: int = 30) -> lis
             WHERE a.person_id = :pid
               AND a.roles && ARRAY['author']::text[]
               AND s.usage_count <= 5000
-            GROUP BY s.id, s.label, s.ontologies
+            GROUP BY s.id, s.label
             ORDER BY count DESC, lower(s.label)
             LIMIT :lim
         """),

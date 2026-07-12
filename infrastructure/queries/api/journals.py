@@ -388,23 +388,20 @@ class PgJournalQueries(JournalQueries):
         """
         rows = self._conn.execute(
             text(f"""
-                SELECT s.id, s.label, s.ontologies, COUNT(DISTINCT p.id) AS n
+                SELECT s.id, s.label, COUNT(DISTINCT p.id) AS n
                 FROM publication_subjects ps
                 JOIN publications p ON p.id = ps.publication_id
                 JOIN subjects s ON s.id = ps.subject_id
                 WHERE p.journal_id = :id
                   AND {publication_in_perimeter("p")}
                   AND s.usage_count <= 5000
-                GROUP BY s.id, s.label, s.ontologies
+                GROUP BY s.id, s.label
                 ORDER BY n DESC, lower(s.label)
                 LIMIT :lim
             """),
             {"id": journal_id, "lim": limit},
         ).all()
-        return [
-            SubjectFrequency(id=r.id, label=r.label, ontologies=r.ontologies, count=r.n)
-            for r in rows
-        ]
+        return [SubjectFrequency(id=r.id, label=r.label, count=r.n) for r in rows]
 
     def existing_journal_ids(self, journal_ids: tuple[int, ...]) -> set[int]:
         if not journal_ids:

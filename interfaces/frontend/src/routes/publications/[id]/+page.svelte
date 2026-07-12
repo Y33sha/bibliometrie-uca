@@ -169,7 +169,7 @@
 
         <StructuresBlock {structureIds} structures={data!.structures} />
 
-        <SubjectsBlock subjects={data!.subjects} />
+        <SubjectsBlock subjects={data!.subjects} keywords={data!.keywords} />
 
         {#if pub.abstract}
           <div class="detail-section">

@@ -7,7 +7,6 @@ Couvre :
 
 from __future__ import annotations
 
-import json
 import os
 import uuid
 from contextlib import contextmanager
@@ -41,15 +40,12 @@ def _uniq(prefix: str) -> str:
     return f"{prefix}_{uuid.uuid4().hex[:8]}"
 
 
-def _seed_subject(
-    label: str | None = None, usage_count: int = 1, ontologies: dict | None = None
-) -> int:
+def _seed_subject(label: str | None = None, usage_count: int = 1) -> int:
     label = label or _uniq("Subject")
     with _pool() as cur:
         cur.execute(
-            "INSERT INTO subjects (label, usage_count, ontologies) "
-            "VALUES (%s, %s, CAST(%s AS jsonb)) RETURNING id",
-            (label, usage_count, json.dumps(ontologies or {})),
+            "INSERT INTO subjects (label, usage_count) VALUES (%s, %s) RETURNING id",
+            (label, usage_count),
         )
         return cur.fetchone()["id"]
 

@@ -58,17 +58,6 @@
     goto(`${base}/subjects/${id}`);
   }
 
-  // Libellés courts d'ontologies pour les badges sous le titre.
-  const ONTOLOGY_LABELS: Record<string, string> = {
-    openalex_topic: "OpenAlex",
-    openalex_keyword: "OpenAlex",
-    hal_domain: "HAL",
-    wos_subject: "WoS",
-    wos_heading: "WoS",
-    rameau: "RAMEAU",
-    theses_discipline: "Thèse",
-    scanr_domain: "ScanR",
-  };
 </script>
 
 <svelte:head>
@@ -84,22 +73,6 @@
   {:else}
     <div class="header">
       <h1>{data.subject.label}</h1>
-      <div class="badges">
-        {#if Object.keys(data.subject.ontologies).length === 0}
-          <span class="badge free">Mot-clé libre</span>
-        {:else}
-          {#each Object.entries(data.subject.ontologies) as [ont, entry] (ont)}
-            {@const label = ONTOLOGY_LABELS[ont] ?? ont}
-            {@const codes = entry.codes ?? []}
-            <span
-              class="badge concept"
-              title={codes.length ? `Codes : ${codes.join(", ")}` : ont}
-            >
-              {label}
-            </span>
-          {/each}
-        {/if}
-      </div>
     </div>
     <TabNav
       tabs={[
@@ -159,27 +132,6 @@
   h1 {
     margin: 0;
     font-size: 1.4rem;
-  }
-  .badges {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-  }
-  .badge {
-    display: inline-block;
-    padding: 2px 10px;
-    border-radius: 12px;
-    font-size: 0.8rem;
-  }
-  .badge.concept {
-    background: #e0f2fe;
-    color: #075985;
-    border: 1px solid #bae6fd;
-  }
-  .badge.free {
-    background: #fef3c7;
-    color: #92400e;
-    border: 1px solid #fde68a;
   }
   .graph-wrapper {
     width: 100%;
