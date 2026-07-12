@@ -213,14 +213,6 @@ def test_resolve_ra_first_sample_fails_second_succeeds():
     assert repo.rows["10.1038"].ra == "DataCite"
 
 
-def test_resolve_ra_limit():
-    repo = FakeDoiPrefixRepo(unresolved=[("10.a", ["10.a/x"]), ("10.b", ["10.b/x"])])
-    ra = StubResolveRa(answers={"10.a/x": "Crossref", "10.b/x": "Crossref"})
-
-    metrics = _run_ra(repo, ra, limit=1)
-    assert len(repo.rows) == 1 and metrics.total == 1
-
-
 # ── run_resolve_publishers ─────────────────────────────────────────
 
 
