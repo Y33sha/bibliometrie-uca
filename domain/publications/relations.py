@@ -154,15 +154,16 @@ def extract_datacite_relations(meta: dict[str, JsonValue] | None) -> list[tuple[
     return out
 
 
-# Signal #2 — inférence depuis le couple de doc_type d'une paire de publications distinctes (DOI
-# distincts) partageant une clé de confirmation. Types « dépendants » : une publication de ce type
-# est, par nature, sujet d'une relation dirigée vers l'œuvre principale (le preprint est_preprint_de
-# l'article publié, l'erratum corrige l'article, le dataset complète l'article).
-_DEPENDENT_SHARED_KEY_RELATIONS: tuple[tuple[str, RelationType], ...] = (
-    ("preprint", RelationType.IS_PREPRINT_OF),
-    ("erratum", RelationType.IS_CORRECTION_OF),
-    ("dataset", RelationType.IS_SUPPLEMENT_TO),
-)
+# Types de document « dépendants » : une publication de ce type est, par nature, sujet d'une relation
+# dirigée vers l'œuvre principale (le preprint est_preprint_de l'article publié, l'erratum corrige
+# l'article, le dataset complète l'article). Point de vérité partagé : le signal #2 l'utilise pour
+# inférer la relation d'une paire à clé de confirmation partagée (`infer_shared_key_relation`), le
+# signal #3 pour typer un rapprochement par titre (phase `relations`).
+DEPENDENT_DOC_TYPE_RELATIONS: dict[str, RelationType] = {
+    "preprint": RelationType.IS_PREPRINT_OF,
+    "erratum": RelationType.IS_CORRECTION_OF,
+    "dataset": RelationType.IS_SUPPLEMENT_TO,
+}
 
 
 def infer_shared_key_relation(
@@ -180,7 +181,7 @@ def infer_shared_key_relation(
     encore fusionnés — donne `is_related_to`, en attendant d'être qualifié."""
     if "peer_review" in (doc_type_a, doc_type_b):
         return None
-    for dependent, relation in _DEPENDENT_SHARED_KEY_RELATIONS:
+    for dependent, relation in DEPENDENT_DOC_TYPE_RELATIONS.items():
         a_is_dependent = doc_type_a == dependent
         b_is_dependent = doc_type_b == dependent
         if a_is_dependent and not b_is_dependent:
