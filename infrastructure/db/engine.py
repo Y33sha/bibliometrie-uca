@@ -1,14 +1,10 @@
 """Engine SQLAlchemy synchrone basé sur le driver psycopg3.
 
 Un seul Engine sync utilisé par toute l'application :
-- L'API FastAPI consomme cet engine via `db_conn_sync` (les routes `def`
-  tournent dans le threadpool Starlette).
-- Le pipeline et les scripts CLI ouvrent leurs propres connexions via
-  `engine.begin()` / `engine.connect()`.
+- L'API FastAPI consomme cet engine via `db_conn_sync` (les routes `def` tournent dans le threadpool Starlette).
+- Le pipeline et les scripts CLI ouvrent leurs propres connexions via `engine.begin()` / `engine.connect()`.
 
-Le driver `postgresql+psycopg` permet d'accéder aux features psycopg3
-(server-side cursors, COPY) via `Connection.connection.driver_connection`
-si besoin.
+Le driver `postgresql+psycopg` permet d'accéder aux features psycopg3 (server-side cursors, COPY) via `Connection.connection.driver_connection` si besoin.
 """
 
 import os
@@ -38,15 +34,10 @@ def build_sync_engine() -> Engine:
 
     Utilisé par toute la surface (API, pipeline, CLI). Paramètres pool :
     - `pool_size = db_pool_min` : connexions persistantes
-    - `max_overflow = db_pool_max - db_pool_min` : connexions
-      supplémentaires sous charge, fermées au retour
-    - `pool_pre_ping = True` : détecte les connexions perdues
-      (timeout réseau, reset SGBD) avant de les remettre en service
+    - `max_overflow = db_pool_max - db_pool_min` : connexions supplémentaires sous charge, fermées au retour
+    - `pool_pre_ping = True` : détecte les connexions perdues (timeout réseau, reset SGBD) avant de les remettre en service
 
-    Garde-fou : sous pytest, refuse les bases dont le nom n'a pas le
-    suffixe `_test`. Cas historique : un monkey-patch de `build_sync_engine`
-    qui aurait été contourné pourrait laisser un test toucher la prod
-    (cf. incident structure "Nouvelle" créée dans `bibliometrie`).
+    Garde-fou : sous pytest, refuse toute base dont le nom n'a pas le suffixe `_test`. Les tests redirigent l'engine vers la base de test par monkey-patch (conftest) ; ce backstop empêche qu'un test écrive dans la base de production si ce monkey-patch venait à être contourné.
     """
     if os.environ.get("PYTEST_CURRENT_TEST") and not settings.db_name.endswith("_test"):
         raise RuntimeError(
@@ -72,9 +63,7 @@ def set_sync_engine(engine: Engine | None) -> None:
 def get_sync_engine() -> Engine:
     """Retourne l'engine sync global, en le construisant à la demande.
 
-    L'API initialise l'engine au démarrage via le lifespan, mais les
-    scripts CLI / le pipeline n'ont pas de cycle de vie applicatif :
-    ils déclenchent la construction lazy au premier appel.
+    L'API initialise l'engine au démarrage via le lifespan, mais les scripts CLI et le pipeline n'ont pas de cycle de vie applicatif : ils déclenchent la construction lazy au premier appel.
     """
     global _sync_engine
     if _sync_engine is None:
