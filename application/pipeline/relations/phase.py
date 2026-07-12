@@ -27,6 +27,7 @@ from application.ports.pipeline.relations import (
 from application.ports.pipeline.transaction import OpenTransaction
 from domain.publications.identifiers import clean_doi
 from domain.publications.relations import (
+    DEPENDENT_DOC_TYPE_RELATIONS,
     RelationType,
     extract_crossref_relations,
     extract_datacite_relations,
@@ -110,8 +111,8 @@ def run(
         erratum_matches = queries.fetch_erratum_title_matches(conn)
         preprint_matches = queries.fetch_preprint_title_matches(conn)
         title_edges = _build_title_match_edges(
-            erratum_matches, RelationType.IS_CORRECTION_OF
-        ) + _build_title_match_edges(preprint_matches, RelationType.IS_PREPRINT_OF)
+            erratum_matches, DEPENDENT_DOC_TYPE_RELATIONS["erratum"]
+        ) + _build_title_match_edges(preprint_matches, DEPENDENT_DOC_TYPE_RELATIONS["preprint"])
         written_title = queries.replace_title_match_relations(conn, title_edges)
 
         by_type = queries.count_by_relation_type(conn)
