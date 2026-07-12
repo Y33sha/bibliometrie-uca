@@ -33,14 +33,6 @@ française IdRef/SUDOC) mais à objectiver : mesurer le taux d'accord IdRef Scan
 vs sources fiables avant de décider de garder, ou de source-garder l'IdRef
 comme l'ORCID."""
 
-MAX_AUTHORS_CROSS_SOURCE = 50
-"""Au-delà de ce seuil d'auteurs sur une publication, le matching
-cross-source est désactivé. Sur les méga-papers (consortiums avec
-plusieurs dizaines à plusieurs centaines d'auteurs), les positions
-divergent fréquemment entre HAL/OpenAlex/WoS — on récolterait
-surtout des faux conflits ou des faux matchings."""
-
-
 # Canal de résolution par lequel la cascade a posé le `person_id` d'une signature,
 # indexé par le `reason` de `decide_person_match`. Enregistré dans
 # `source_authorships.resolution_mode`, il porte les réinitialisations ordre-indépendantes
@@ -63,8 +55,6 @@ def decide_cross_source_match(
     last_norm: str,
     first_norm: str,
     candidates: list[tuple[int, str, str, str]],
-    *,
-    total_author_count: int | None = None,
 ) -> int | None:
     """Décide si une authorship peut être rattachée à une `person` déjà
     associée à la même publication × position auteur via une autre source.
@@ -87,23 +77,15 @@ def decide_cross_source_match(
       déjà rattachées à la même `(publication_id, author_position)`,
       à fournir via prefetch (typiquement
       `linked_index[(pub_id, position)]`).
-    - `total_author_count` (optionnel) : nombre maximal d'auteurs
-      sur la publication tous (source × source_authorships) confondus.
-      Si > `MAX_AUTHORS_CROSS_SOURCE`, le matching est court-circuité
-      (`None`) — méga-paper, positions non fiables.
 
     Cascade :
 
-    - Méga-paper (`total_author_count > MAX_AUTHORS_CROSS_SOURCE`)
-      → `None`.
     - Aucun candidat compatible → `None`.
     - Candidats compatibles convergent tous vers la même `person_id`
       → cette `person_id`.
     - Candidats compatibles divergent (≥ 2 `person_id` distincts)
       → `None` (conflit, pas de match safe).
     """
-    if total_author_count is not None and total_author_count > MAX_AUTHORS_CROSS_SOURCE:
-        return None
     matched_pid: int | None = None
     for pid, ln, fn, src in candidates:
         if src == authorship_source:

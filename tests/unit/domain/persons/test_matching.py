@@ -114,35 +114,6 @@ class TestDecideCrossSourceMatch:
             is None
         )
 
-    def test_megapaper_short_circuits(self):
-        """Au-delà du seuil méga-paper, on ne tente pas le cross-source
-        (positions divergent trop entre sources sur les consortiums)."""
-        candidates = [(42, "dupont", "jean", "hal")]
-        assert (
-            decide_cross_source_match(
-                authorship_source="openalex",
-                last_norm="dupont",
-                first_norm="jean",
-                candidates=candidates,
-                total_author_count=120,
-            )
-            is None
-        )
-
-    def test_under_megapaper_threshold_passes_through(self):
-        """En deçà du seuil, le match cross-source fonctionne normalement."""
-        candidates = [(42, "dupont", "jean", "hal")]
-        assert (
-            decide_cross_source_match(
-                authorship_source="openalex",
-                last_norm="dupont",
-                first_norm="jean",
-                candidates=candidates,
-                total_author_count=10,
-            )
-            == 42
-        )
-
 
 class TestDecideNameFormOutcome:
     def test_single_person_id_matches(self):

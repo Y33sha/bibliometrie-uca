@@ -54,32 +54,6 @@ from domain.persons.matching import (
 from domain.persons.name_forms import compute_person_name_forms
 
 # ---------------------------------------------------------------------------
-# Data loading
-# ---------------------------------------------------------------------------
-
-
-def _max_authors_per_pub(
-    all_authorships: list[EnrichedAuthorship],
-    linked_index: dict[tuple[int, int], list[tuple[int, str, str, str]]],
-) -> dict[int, int]:
-    """Nombre d'auteurs pour chaque publication (max parmi les sources).
-
-    Sert au court-circuit du matching cross-source au-delà de `MAX_AUTHORS_CROSS_SOURCE`. Le matching personnes "cross-source" repose sur le triplet "même publi récupérée sur plusieurs sources, même position auteur, noms compatibles". Sur les méga-papers, ce triplet cesse d'être discriminant : désalignements de positions fréquents entre sources, homonymes de patronyme, prénoms réduits à l'initiale. Le seuil 50 est un proxy arbitraire pour écarter ces publis.
-
-    Une publi peut avoir un nombre d'auteurs différent selon la source — il faut bien retenir un chiffre pour comparer au seuil. On prend le plus élevé par défensivité : si HAL dit 48 et OpenAlex 52, on est dans le régime méga-paper.
-    """
-    counts: dict[int, dict[str, int]] = defaultdict(lambda: defaultdict(int))
-    for a in all_authorships:
-        if a.publication_id is None:
-            continue
-        counts[a.publication_id][a.source] += 1
-    for (pub_id, _pos), candidates in linked_index.items():
-        for _pid, _ln, _fn, src in candidates:
-            counts[pub_id][src] += 1
-    return {pub_id: max(per_source.values()) for pub_id, per_source in counts.items()}
-
-
-# ---------------------------------------------------------------------------
 # Passe de cascade
 # ---------------------------------------------------------------------------
 
@@ -114,7 +88,6 @@ class _Cascade:
         self._name_form_map = queries.fetch_name_form_map(conn)
         self._name_form_status = queries.fetch_name_form_status_map(conn)
         self._rejected_by_pub = queries.fetch_rejected_person_ids_by_pub(conn)
-        self._pub_max_authors = _max_authors_per_pub(self.authorships, self._linked_index)
 
         self.matched_counts: dict[str, int] = defaultdict(int)
         self.skipped_counts: dict[str, int] = defaultdict(int)
@@ -135,7 +108,6 @@ class _Cascade:
                     last_norm=a.last_norm,
                     first_norm=a.first_norm,
                     candidates=candidates,
-                    total_author_count=self._pub_max_authors.get(a.publication_id),
                 )
         rejected_for_pub = (
             self._rejected_by_pub.get(a.publication_id, frozenset())
