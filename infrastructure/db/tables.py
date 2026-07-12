@@ -473,9 +473,10 @@ addresses = Table(
     Column("pub_count", Integer, server_default="0"),
     Column("countries", ARRAY(CHAR(2))),
     Column("suggested_countries", ARRAY(CHAR(2))),
-    # Refresh pays incrémental : True = `countries` vient de changer, les `sa`
-    # liés sont à recalculer. Posé gratuitement à l'écriture de `countries`
-    # (detect / institution), dérivé par JOIN au refresh, purgé en fin de cascade.
+    # Refresh pays incrémental : True = `countries` vient de changer, les
+    # `source_authorships` liés sont à recalculer. Posé gratuitement à l'écriture
+    # de `countries` (detect / institution), dérivé par JOIN au refresh, purgé en
+    # fin de cascade.
     Column("countries_dirty", Boolean, nullable=False, server_default="false"),
     # Index UNIQUE sur expression md5(raw_text) — complété à la main, hors
     # de portée de --autogenerate qui ne sait pas représenter l'expression.
@@ -510,7 +511,7 @@ place_name_forms = Table(
     Column("form_normalized", Text, nullable=False),
     # `country` (noms de pays, détectés en fin d'adresse) | `institution` /
     # `city` (lieux détectés n'importe où, via la passe place). Défaut `country` :
-    # legacy + résolution nom-de-pays → ISO.
+    # cas d'usage principal (résolution d'un nom de pays vers son code ISO).
     Column("kind", Text, nullable=False, server_default="country"),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     UniqueConstraint("form_normalized", name="place_name_forms_form_normalized_key"),
@@ -589,7 +590,7 @@ authorships = Table(
 # REFRESH — pour éviter qu'`alembic --autogenerate` tente de la recréer en table.
 #
 # `publication_structures` (MATERIALIZED VIEW, migration d8b3f5a2c9e6) : lien
-# publi↔structure dédoublonné, dérivé d'`authorships` × `authorship_structures`.
+# publication↔structure dédoublonné, dérivé d'`authorships` × `authorship_structures`.
 # Sert la facette labos (COUNT par structure sans DISTINCT). Même statut (SQL brut
 # + REFRESH dans le pipeline, après `authorship_structures`).
 
@@ -648,13 +649,13 @@ source_authorships = Table(
     Column("in_perimeter", Boolean, server_default="false"),
     # Refresh pays incrémental : True = les pays dérivés (source_publications,
     # publications) sont à recalculer depuis les adresses de ce source_authorship.
-    # Posé par normalize (nouveaux sa) et la détection (adresse changée), remis à
-    # False par le refresh.
+    # Posé par normalize (nouveaux source_authorships) et la détection (adresse
+    # changée), remis à False par le refresh.
     Column("countries_dirty", Boolean, nullable=False, server_default="true"),
     Column("person_id", Integer),
     # Canal ayant posé `person_id` (NULL si orpheline ou non résolue) : identifiant
-    # fort, forme de nom, ou ancrage cross-source. Partitionne les réinitialisations
-    # de la phase personnes.
+    # fort, forme de nom, ou ancrage cross-source. Partitionne la ré-évaluation des
+    # rattachements par la phase personnes.
     Column("resolution_mode", resolution_mode_enum),
     Column("is_corresponding", Boolean, server_default="false"),
     Column("roles", ARRAY(Text), server_default="{author}"),
@@ -817,8 +818,8 @@ publications = Table(
     # `publications` étroite (scans listes/facettes).
     # Flag périmètre matérialisé (rollup de authorships.in_perimeter, hors personnes
     # rejetées), maintenu en phase authorships + à l'action de rejet. Lu par le filtre
-    # des listes UCA (cf. publication_in_perimeter) ; le scope doc_type reste un filtre
-    # inline (domain/publications/scope), séparé du périmètre.
+    # de périmètre des listes (cf. publication_in_perimeter) ; le scope doc_type reste
+    # un filtre inline (domain/publications/scope), séparé du périmètre.
     Column("in_perimeter", Boolean, nullable=False, server_default="false"),
     # Staleness de l'enrichissement OA : date de la dernière vérification Unpaywall
     # (NULL = jamais). La phase oa_status ne re-vérifie que les non-vérifiés ou les

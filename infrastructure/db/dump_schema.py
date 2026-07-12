@@ -3,13 +3,9 @@
 Usage:
     python -m infrastructure.db.dump_schema
 
-`schema.sql` est un snapshot descriptif du schéma, utile pour la
-relecture et pour le bootstrap rapide des tests d'intégration
-(cf. `tests/integration/conftest.py`). Il n'est PAS la source de
-vérité — ce sont les migrations Alembic dans `alembic/versions/`.
+`schema.sql` est un snapshot descriptif du schéma, utile pour la relecture et pour le bootstrap rapide des tests d'intégration (cf. `tests/integration/conftest.py`). Il n'est PAS la source de vérité — ce sont les migrations Alembic dans `alembic/versions/`.
 
-À regénérer après une série de migrations significatives, pour que
-`schema.sql` reflète l'état courant.
+À régénérer après une série de migrations significatives, pour que `schema.sql` reflète l'état courant.
 """
 
 import glob
@@ -31,9 +27,7 @@ SCHEMA_PATH = Path(__file__).parent / "schema.sql"
 def _resolve_pg_dump() -> str:
     """Localise l'exécutable `pg_dump`.
 
-    Ordre : variable d'environnement `PG_DUMP` (chemin complet, override explicite),
-    puis le `PATH`, puis les dossiers d'installation PostgreSQL usuels sous Windows —
-    où les binaires sont posés hors `PATH` (`C:\\Program Files\\PostgreSQL\\<ver>\\bin`).
+    Ordre : variable d'environnement `PG_DUMP` (chemin complet, override explicite), puis le `PATH`, puis les dossiers d'installation PostgreSQL usuels sous Windows — où les binaires sont posés hors `PATH` (`C:\\Program Files\\PostgreSQL\\<ver>\\bin`).
     """
     env = os.environ.get("PG_DUMP")
     if env:
