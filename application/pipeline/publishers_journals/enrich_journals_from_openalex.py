@@ -4,19 +4,18 @@ Champs mis à jour :
 - `apc_amount`, `apc_currency` (prix catalogue DOAJ exposés par OpenAlex)
 - `journal_type` (via `domain.journals.journal.map_openalex_source_type`), uniquement quand le mapping renvoie une valeur exploitable
 
-Interroge jusqu'à 50 sources par requête via le filtre OpenAlex à pipe (`|`).
-
-L'orchestrateur dépend du port `EnrichQueries` ; il est appelé par `run_pipeline`. Pour ré-interroger toutes les revues ayant un openalex_id (et pas seulement celles sans APC), utiliser le script `interfaces/cli/oneshot/backfill_journal_types_from_openalex.py`.
+Le fetch OpenAlex et le circuit-breaker de source sont injectés (le HTTP vit dans `infrastructure/sources/openalex`). L'orchestrateur ne consulte que l'état du breaker pour s'arrêter quand la source est à bout de budget. Appelé par `run_pipeline`.
 """
 
 import logging
 import time
 from collections import Counter
+from collections.abc import Callable
 
-import requests
 from sqlalchemy import Connection
 
 from application.pipeline.metrics import PhaseMetrics
+from application.ports.pipeline.circuit_breaker import CircuitBreaker
 from application.ports.pipeline.enrich import EnrichQueries
 from application.ports.repositories.journal_repository import (
     JournalRepository,
@@ -25,103 +24,11 @@ from application.ports.repositories.journal_repository import (
 from application.services.journals.core import update_journal_apc
 from domain.journals.journal import map_openalex_source_type
 
-OPENALEX_PREFIX = "https://openalex.org/"
-BATCH_SIZE = 50  # max IDs par requête (API limit = 100, on reste prudent)
+BATCH_SIZE = 50
 COMMIT_EVERY = 500  # commit DB tous les N journals traités
-# Batches 429 consécutifs tolérés avant d'interrompre l'enrichissement (budget OpenAlex quotidien épuisé).
-RATE_LIMIT_STRIKES_MAX = 3
 
-
-class _OpenAlexRateLimited(Exception):
-    """429 répétés sur un batch (3 retries épuisés) : budget API probablement épuisé."""
-
-
-def to_full_id(short_id: str) -> str:
-    """Convertit 'S20400310' → 'https://openalex.org/S20400310'."""
-    if short_id.startswith("http"):
-        return short_id
-    return OPENALEX_PREFIX + short_id
-
-
-def to_short_id(full_id: str) -> str:
-    """Convertit 'https://openalex.org/S20400310' → 'S20400310'."""
-    if full_id.startswith(OPENALEX_PREFIX):
-        return full_id[len(OPENALEX_PREFIX) :]
-    return full_id
-
-
-_DEFAULT_SELECT = "id,apc_usd,apc_prices,type"
-
-
-def fetch_sources_batch(
-    openalex_ids: list[str],
-    logger: logging.Logger,
-    *,
-    openalex_sources_api: str,
-    api_key: str | None,
-    mailto: str,
-    select: str = _DEFAULT_SELECT,
-) -> dict[str, dict]:
-    """Interroge l'API OpenAlex pour un lot d'IDs et retourne un dict short_id → données.
-
-    Le paramètre `select` permet aux scripts d'audit oneshot de demander
-    des champs différents (ex. `id,host_organization`) sans dupliquer le
-    code de batching/retry.
-    """
-    full_ids = [to_full_id(oid) for oid in openalex_ids]
-    filter_value = "|".join(full_ids)
-    params = {
-        "filter": f"openalex:{filter_value}",
-        "per_page": str(len(openalex_ids)),
-        "select": select,
-    }
-    if api_key:
-        params["api_key"] = api_key
-    else:
-        params["mailto"] = mailto
-
-    for attempt in range(3):
-        try:
-            resp = requests.get(openalex_sources_api, params=params, timeout=30)
-            if resp.status_code == 429:
-                wait = 2 ** (attempt + 1)
-                logger.warning(f"Rate limited (429), attente {wait}s...")
-                time.sleep(wait)
-                continue
-            resp.raise_for_status()
-            data = resp.json()
-            return {to_short_id(source["id"]): source for source in data.get("results", [])}
-        except requests.RequestException as e:
-            if attempt < 2:
-                logger.warning(f"Erreur requête (tentative {attempt + 1}/3): {e}")
-                time.sleep(2 ** (attempt + 1))
-            else:
-                logger.error(f"Échec après 3 tentatives: {e}")
-                return {}
-    # Boucle épuisée sans succès ni exception réseau = 3 × 429 → budget épuisé.
-    raise _OpenAlexRateLimited()
-
-
-def extract_apc(source: dict) -> tuple[float | None, str]:
-    """Extrait le montant APC et la devise depuis les données OpenAlex.
-
-    Priorité : EUR dans apc_prices > première devise dispo > apc_usd en USD.
-    """
-    apc_prices = source.get("apc_prices") or []
-
-    for entry in apc_prices:
-        if entry.get("currency") == "EUR":
-            return entry["price"], "EUR"
-
-    if apc_prices:
-        entry = apc_prices[0]
-        return entry["price"], entry.get("currency", "USD")
-
-    apc_usd = source.get("apc_usd")
-    if apc_usd is not None:
-        return apc_usd, "USD"
-
-    return None, "EUR"
+FetchSourcesBatch = Callable[[list[str]], dict[str, tuple[float | None, str, str | None]]]
+"""Signature du fetch injecté : `(openalex_ids) -> {short_id: (apc_amount, apc_currency, raw_type)}`."""
 
 
 def run_enrich_journals_from_openalex(
@@ -130,117 +37,81 @@ def run_enrich_journals_from_openalex(
     logger: logging.Logger,
     *,
     journal_repo: JournalRepository,
-    api_key: str | None,
-    mailto: str,
-    openalex_sources_api: str,
-    limit: int = 0,
+    fetch_batch: FetchSourcesBatch,
+    breaker: CircuitBreaker,
     rate_delay: float = 0.1,
 ) -> PhaseMetrics:
-    try:
-        journals = queries.fetch_journals_of_unknown_type(conn, limit=limit or None)
-        total = len(journals)
-        logger.info(f"{total} revues à typer (openalex_id, journal_type inconnu).")
+    journals = queries.fetch_journals_of_unknown_type(conn, limit=None)
+    total = len(journals)
+    logger.info("%d revues à typer (openalex_id, journal_type inconnu).", total)
+    if total == 0:
+        logger.info("Rien à faire.")
+        return PhaseMetrics()
 
-        if total == 0:
-            logger.info("Rien à faire.")
-            return PhaseMetrics()
+    updated = 0
+    with_apc = 0
+    processed = 0
+    type_written = 0
+    raw_type_counter: Counter[str] = Counter()
 
-        updated = 0
-        with_apc = 0
-        processed = 0
-        raw_type_counter: Counter[str] = Counter()
-        type_written = 0
-        strikes = 0  # batches 429 consécutifs (coupe-circuit)
-
-        for i in range(0, total, BATCH_SIZE):
-            batch = journals[i : i + BATCH_SIZE]
-            oa_ids = [row[1] for row in batch]
-            id_map = {row[1]: row[0] for row in batch}
-
-            try:
-                sources = fetch_sources_batch(
-                    oa_ids,
-                    logger,
-                    openalex_sources_api=openalex_sources_api,
-                    api_key=api_key,
-                    mailto=mailto,
-                )
-            except _OpenAlexRateLimited:
-                strikes += 1
-                if strikes >= RATE_LIMIT_STRIKES_MAX:
-                    conn.commit()
-                    logger.warning(
-                        "⚡ Coupe-circuit OpenAlex (429 sur %d batches consécutifs) : "
-                        "enrichissement revues interrompu à %d/%d. Reste retenté au prochain run.",
-                        strikes,
-                        processed,
-                        total,
-                    )
-                    return PhaseMetrics(seen=total, updated=updated)
-                continue  # budget peut-être ponctuel : on saute ce batch, on retente le suivant
-            strikes = 0  # succès (ou skip réseau) → on remet le compteur à zéro
-            time.sleep(rate_delay)
-
-            for oa_id, journal_id in id_map.items():
-                source = sources.get(oa_id)
-                if not source:
-                    processed += 1
-                    continue
-
-                apc_amount, apc_currency = extract_apc(source)
-                raw_type = source.get("type")
-                mapped_type = map_openalex_source_type(raw_type)
-                if raw_type:
-                    raw_type_counter[raw_type] += 1
-
-                update_journal_apc(
-                    journal_id,
-                    apc_amount=apc_amount,
-                    apc_currency=apc_currency,
-                    repo=journal_repo,
-                )
-                # journal_type : on ne traite que les revues `unknown`
-                # (cf. `fetch_journals_of_unknown_type`). On écrit dès que le mapping
-                # OpenAlex renvoie une valeur ; sinon la revue reste `unknown`
-                # (re-tentée au prochain run — cas `metadata`/`other`).
-                if mapped_type is not None:
-                    journal_repo.update_journal_fields(
-                        journal_id,
-                        JournalUpdateFields(journal_type=mapped_type),
-                    )
-                    type_written += 1
-
-                updated += 1
-                if apc_amount is not None:
-                    with_apc += 1
-                processed += 1
-
-            if processed % COMMIT_EVERY < BATCH_SIZE:
-                conn.commit()
-
-            logger.info(
-                f"  {min(i + BATCH_SIZE, total)}/{total} — {with_apc} avec APC, {type_written} types écrits"
+    for i in range(0, total, BATCH_SIZE):
+        if breaker.tripped:
+            conn.commit()
+            logger.warning(
+                "⚡ Coupe-circuit OpenAlex : enrichissement revues interrompu à %d/%d, reste retenté au prochain run.",
+                processed,
+                total,
             )
+            return PhaseMetrics(seen=total, updated=updated)
 
-        conn.commit()
+        id_map = {row[1]: row[0] for row in journals[i : i + BATCH_SIZE]}
+        sources = fetch_batch(list(id_map))
+        time.sleep(rate_delay)
 
+        for oa_id, journal_id in id_map.items():
+            data = sources.get(oa_id)
+            if data is None:
+                processed += 1
+                continue
+            apc_amount, apc_currency, raw_type = data
+            if raw_type:
+                raw_type_counter[raw_type] += 1
+
+            update_journal_apc(
+                journal_id, apc_amount=apc_amount, apc_currency=apc_currency, repo=journal_repo
+            )
+            # journal_type : seules les revues `unknown` sont traitées (cf. `fetch_journals_of_unknown_type`). On écrit dès que le mapping OpenAlex renvoie une valeur ; une revue au type `metadata`/`other` reste `unknown` et repasse au prochain run.
+            mapped_type = map_openalex_source_type(raw_type)
+            if mapped_type is not None:
+                journal_repo.update_journal_fields(
+                    journal_id, JournalUpdateFields(journal_type=mapped_type)
+                )
+                type_written += 1
+
+            updated += 1
+            if apc_amount is not None:
+                with_apc += 1
+            processed += 1
+
+        if processed % COMMIT_EVERY < BATCH_SIZE:
+            conn.commit()
         logger.info(
-            f"Terminé : {updated}/{total} revues mises à jour, "
-            f"{with_apc} avec APC, {type_written} journal_type écrits."
+            "  %d/%d — %d avec APC, %d types écrits",
+            min(i + BATCH_SIZE, total),
+            total,
+            with_apc,
+            type_written,
         )
-        if raw_type_counter:
-            distrib = ", ".join(f"{t}={n}" for t, n in raw_type_counter.most_common())
-            logger.info(f"Distribution OpenAlex `type` : {distrib}")
-        return PhaseMetrics(seen=total, updated=updated)
 
-    except KeyboardInterrupt:
-        # Ctrl+C peut frapper en plein execute (transaction avortée → `commit()`
-        # lèverait `PendingRollbackError`) : on rollback le batch en cours et on
-        # re-raise pour laisser `run_pipeline` arrêter proprement le pipeline.
-        conn.rollback()
-        logger.warning("Interruption — batches déjà committés conservés.")
-        raise
-    except Exception as e:
-        conn.rollback()
-        logger.error(f"Erreur fatale : {e}")
-        raise
+    conn.commit()
+    logger.info(
+        "Terminé : %d/%d revues mises à jour, %d avec APC, %d journal_type écrits.",
+        updated,
+        total,
+        with_apc,
+        type_written,
+    )
+    if raw_type_counter:
+        distrib = ", ".join(f"{t}={n}" for t, n in raw_type_counter.most_common())
+        logger.info("Distribution OpenAlex `type` : %s", distrib)
+    return PhaseMetrics(seen=total, updated=updated)

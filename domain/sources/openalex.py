@@ -21,6 +21,36 @@ from domain.publications.identifiers import (
 )
 
 # =============================================================
+# IDENTIFIANT OPENALEX (court ↔ URL)
+# =============================================================
+
+# OpenAlex expose ses identifiants sous forme d'URL (`https://openalex.org/<id>`)
+# pour tous les types d'entité : W works, A auteurs, S sources, I institutions,
+# P éditeurs. En base on conserve la forme courte (`S20400310`).
+_OPENALEX_ID_PREFIX = "https://openalex.org/"
+
+
+def short_openalex_id(id_or_url: str) -> str:
+    """Forme courte d'un identifiant OpenAlex (`https://openalex.org/S20400310` → `S20400310`).
+
+    Inchangé si l'entrée est déjà courte.
+    """
+    if id_or_url.startswith(_OPENALEX_ID_PREFIX):
+        return id_or_url[len(_OPENALEX_ID_PREFIX) :]
+    return id_or_url
+
+
+def full_openalex_id(id_or_url: str) -> str:
+    """Forme URL d'un identifiant OpenAlex (`S20400310` → `https://openalex.org/S20400310`).
+
+    Inchangé si l'entrée est déjà une URL.
+    """
+    if id_or_url.startswith("http"):
+        return id_or_url
+    return _OPENALEX_ID_PREFIX + id_or_url
+
+
+# =============================================================
 # LOCATIONS
 # =============================================================
 

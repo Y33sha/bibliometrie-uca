@@ -2,13 +2,29 @@ from domain.sources.openalex import (
     OpenalexLocation,
     extract_external_ids_from_urls,
     extract_nnt_from_location,
+    full_openalex_id,
     is_hal_location,
     is_repository_location,
     is_theses_fr_location,
     map_openalex_oa_status,
     parse_primary_location,
+    short_openalex_id,
     should_skip_publisher_journal,
 )
+
+
+class TestOpenalexIdConversion:
+    def test_short_from_url(self):
+        assert short_openalex_id("https://openalex.org/S20400310") == "S20400310"
+
+    def test_short_already_short(self):
+        assert short_openalex_id("S20400310") == "S20400310"
+
+    def test_full_from_short(self):
+        assert full_openalex_id("S20400310") == "https://openalex.org/S20400310"
+
+    def test_full_already_url(self):
+        assert full_openalex_id("https://openalex.org/S20400310") == "https://openalex.org/S20400310"
 
 
 class TestExtractExternalIdsFromUrls:

@@ -29,8 +29,8 @@ from application.ports.repositories.publisher_repository import (
     PublisherRepository,
     PublisherUpdateFields,
 )
+from domain.sources.openalex import full_openalex_id, short_openalex_id
 
-OPENALEX_PREFIX = "https://openalex.org/"
 ROR_PREFIX = "https://ror.org/"
 BATCH_SIZE = 50
 COMMIT_EVERY = 500
@@ -40,20 +40,6 @@ RATE_LIMIT_STRIKES_MAX = 3
 
 class _OpenAlexRateLimited(Exception):
     """429 répétés sur un batch (3 retries épuisés) : budget API probablement épuisé."""
-
-
-def to_full_openalex_id(short_id: str) -> str:
-    """Convertit 'P4310320990' → 'https://openalex.org/P4310320990'."""
-    if short_id.startswith("http"):
-        return short_id
-    return OPENALEX_PREFIX + short_id
-
-
-def to_short_openalex_id(full_id: str) -> str:
-    """Convertit 'https://openalex.org/P4310320990' → 'P4310320990'."""
-    if full_id.startswith(OPENALEX_PREFIX):
-        return full_id[len(OPENALEX_PREFIX) :]
-    return full_id
 
 
 def to_short_ror(full_url: str) -> str:
@@ -73,7 +59,7 @@ def fetch_publishers_batch(
 ) -> dict[str, dict]:
     """Interroge l'API OpenAlex Publishers pour un lot d'IDs et retourne
     un dict short_id → données. Select restreint aux champs consommés."""
-    full_ids = [to_full_openalex_id(oid) for oid in openalex_ids]
+    full_ids = [full_openalex_id(oid) for oid in openalex_ids]
     filter_value = "|".join(full_ids)
     params = {
         "filter": f"ids.openalex:{filter_value}",
@@ -95,9 +81,7 @@ def fetch_publishers_batch(
                 continue
             resp.raise_for_status()
             data = resp.json()
-            return {
-                to_short_openalex_id(source["id"]): source for source in data.get("results", [])
-            }
+            return {short_openalex_id(source["id"]): source for source in data.get("results", [])}
         except requests.RequestException as e:
             if attempt < 2:
                 logger.warning(f"Erreur requête (tentative {attempt + 1}/3): {e}")

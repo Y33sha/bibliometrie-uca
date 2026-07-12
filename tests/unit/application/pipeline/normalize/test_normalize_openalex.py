@@ -1,6 +1,6 @@
 """Tests unitaires de `application.pipeline.normalize.normalize_openalex`.
 
-Couvre les helpers de parsing (extract_locations_data, reconstruct_abstract, extract_topics, extract_short_id), les branches de `upsert_journal` / `insert_openalex_document`, le parsing auteurs `build_openalex_author_records`, l'orchestrateur `process_work`, et la classe `OpenalexNormalizer` (preload_caches / process_work wrapper / summary_stats).
+Couvre les helpers de parsing (extract_locations_data, reconstruct_abstract, extract_topics), les branches de `upsert_journal` / `insert_openalex_document`, le parsing auteurs `build_openalex_author_records`, l'orchestrateur `process_work`, et la classe `OpenalexNormalizer` (preload_caches / process_work wrapper / summary_stats).
 
 Pattern : `_FakeQueries` + `MagicMock` pour repos / authorship_queries. Pas de DB.
 """
@@ -20,7 +20,6 @@ from application.pipeline.normalize.normalize_openalex import (
     build_openalex_author_records,
     extract_locations_data,
     extract_pub_metadata,
-    extract_short_id,
     extract_topics,
     insert_openalex_document,
     process_work,
@@ -162,23 +161,6 @@ class TestExtractTopics:
         """Si un topic n'a aucun champ exploitable, il n'est pas inclus."""
         work = {"topics": [{"foo": "bar"}]}  # ni domain, ni field, ni subfield, ni display_name
         assert extract_topics(work) is None
-
-
-# ── extract_short_id ─────────────────────────────────────────────
-
-
-class TestExtractShortId:
-    def test_with_prefix(self):
-        assert extract_short_id("https://openalex.org/W123") == "W123"
-
-    def test_without_prefix(self):
-        assert extract_short_id("W123") == "W123"
-
-    def test_empty(self):
-        assert extract_short_id("") == ""
-
-    def test_custom_prefix(self):
-        assert extract_short_id("ror:abc123", prefix="ror:") == "abc123"
 
 
 # ── _extract_openalex_orcid ──────────────────────────────────────
