@@ -1,6 +1,6 @@
 #  Matching et création de personnes
 
-*À jour le 2026-07-08.*
+*À jour le 2026-07-12.*
 
 ```mermaid
 flowchart LR
@@ -8,8 +8,7 @@ flowchart LR
     classDef new  fill:#bbf
     class B new;
 ```
-Phase `persons`:
-`create_persons_from_source_authorships` — cascade en 5 étapes, du signal le plus fiable au moins fiable (décideur pur `decide_person_match`) :
+Phase `persons` — une cascade en 5 signaux, du plus fiable au moins fiable (décideur pur `decide_person_match`), rattache ou crée chaque signature :
 
 1. **Identifiant ORCID déposé par l'auteur** : ORCID présent dans les métadonnées Crossref de la publication, dans le `raw_orcid` d'OpenAlex, ou dans le TEI HAL (`label_xml`) — soit les sources où l'ORCID est déposé par l'auteur (`ORCID_MATCH_SOURCES`). On ignore les ORCID ajoutés algorithmiquement par la source (`author.orcid` dans OpenAlex, distingué de `raw_orcid` ; dans WoS, pas de distinction possible — `PreferredORCID` ignoré en entier).
 
@@ -19,9 +18,7 @@ Phase `persons`:
 
 > **Corroboration par le nom.** Un match par identifiant (ORCID, `hal_person_id`, IdRef) n'est retenu que si le nom de la signature est compatible avec celui du propriétaire de la valeur : un identifiant recopié sur le mauvais co-auteur est refusé, la signature retombe sur les signaux suivants.
 
-4. **Même publication + même position auteur + nom similaire** (cross-source) : pour chaque authorship sans `person_id`, cherche sur la même publication (même position) une *authorship* d'une **autre source** déjà rattachée à une personne. Si le nom est compatible → rattacher. Placé après les identifiants : en tête il serait inopérant au bootstrap (suppose des rattachements préexistants). Approche conservatrice (requiert position identique dans la liste des auteurs).
-
-> **Limité aux publications de 50 auteurs max** : les méga-papers (plusieurs centaines voire milliers d'auteurs) contiennent souvent des homonymes + l'initiale au lieu du prénom + de fréquents désalignements de position auteur entre sources, pouvant conduire à de faux rattachemements. On les ignore.
+4. **Même publication + même position auteur + nom similaire** (cross-source) : pour chaque authorship sans `person_id`, cherche sur la même publication (même position) une *authorship* d'une **autre source** déjà rattachée à une personne. Si le nom est compatible → rattacher. Placé après les identifiants : en tête il serait inopérant au bootstrap (suppose des rattachements préexistants). Approche conservatrice (requiert position identique dans la liste des auteurs) : elle ne compare qu'à la position exacte, jamais tous les auteurs entre eux, donc reste peu coûteuse même sur les méga-papers.
 
 5. **Recherche par nom** : lookup par nom normalisé dans `person_name_forms`.
    - Nom relié à 1 personne → rattacher
@@ -32,7 +29,7 @@ Phase `persons`:
 
 ## Indépendance de l'ordre d'ingestion
 
-La cascade ne fige pas ses rattachements : à chaque exécution, la phase **réinitialise ce qu'elle a déduit automatiquement et le recalcule** depuis l'ensemble du corpus, pour que le résultat ne dépende pas de l'ordre d'ingestion des sources. La curation (épinglage d'une signature à une personne, formes de nom `confirmed`/`rejected`, personnes déclarées distinctes, notices du référentiel RH) est une entrée fixe, jamais réinitialisée.
+La cascade ne fige pas ses rattachements : à chaque exécution, elle **ré-évalue les attributions dérivées** contre l'état ferme de tout le corpus, pour que le résultat ne dépende pas de l'ordre d'ingestion des sources. Ce qui reste valide n'est pas ré-écrit ; seul ce qui a changé est mis à jour. La curation (épinglage d'une signature à une personne, formes de nom `confirmed`/`rejected`, personnes déclarées distinctes, notices du référentiel RH) est une entrée fixe, jamais réinitialisée.
 
 Trois situations que l'ordre d'arrivée fausserait sont corrigées à chaque passe :
 
