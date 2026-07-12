@@ -219,7 +219,8 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
   authorships: {
     summary: [
       { key: "created", label: "Authorships créées" },
-      { key: "pruned", label: "Orphelines supprimées" },
+      { key: "pruned", label: "Authorships orphelines supprimées" },
+      { key: "publications_purged", label: "Publications orphelines supprimées" },
       { key: "total_in_perimeter", label: "Total dans le périmètre" },
     ],
   },

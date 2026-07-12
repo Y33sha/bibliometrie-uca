@@ -39,15 +39,18 @@ def run(
         metrics = build(conn, build_queries, logger, rebuild_full=rebuild_authorships)
     logger.info("✓ build_authorships terminé en %.1fs", time.perf_counter() - t0)
 
-    _purge_orphan_publications(open_tx, purge_queries, logger)
+    n_purged = _purge_orphan_publications(open_tx, purge_queries, logger)
+    summary = metrics.details["summary"]
+    if isinstance(summary, dict):
+        summary["publications_purged"] = n_purged
     _refresh_pub_counts(open_tx, pub_counts_queries, logger)
     return metrics
 
 
 def _purge_orphan_publications(
     open_tx: OpenTransaction, purge_queries: PurgeOrphanPublicationsQueries, logger: logging.Logger
-) -> None:
-    """Purge par lots (commit par chunk) puis récupération de l'espace churné."""
+) -> int:
+    """Purge par lots (commit par chunk) puis récupération de l'espace churné. Retourne le nombre de publications supprimées."""
     logger.info("▶ purge publications orphelines (zéro authorship)")
     t0 = time.perf_counter()
     n = 0
@@ -65,6 +68,7 @@ def _purge_orphan_publications(
         n,
         time.perf_counter() - t0,
     )
+    return n
 
 
 def _refresh_pub_counts(
