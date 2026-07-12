@@ -58,10 +58,12 @@ def run(
             metrics.merge(nnt_metrics)
             by_channel["NNT"] = _summary(nnt_metrics, nnt_duration)
 
-    # Étape 2 : par DOI. WoS opt-in.
-    targets = set(DOI_SEARCHABLE_SOURCES) - ({"wos"} if not include_wos else set())
-    effective = (set(sources) if sources else set(targets)) & targets
-    doi_targets = [t for t in DOI_SEARCHABLE_SOURCES if t in effective]
+    # Étape 2 : par DOI. WoS opt-in ; filtre `--sources` optionnel ; ordre canonique
+    # de `DOI_SEARCHABLE_SOURCES` pour un dispatch et des logs déterministes.
+    eligible = set(DOI_SEARCHABLE_SOURCES) - (set() if include_wos else {"wos"})
+    if sources:
+        eligible &= sources
+    doi_targets = [t for t in DOI_SEARCHABLE_SOURCES if t in eligible]
     configured = filter_configured(
         doi_targets,
         metrics,
