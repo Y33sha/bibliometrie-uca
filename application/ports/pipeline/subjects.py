@@ -50,6 +50,11 @@ class SubjectsQueries(Protocol):
         > `max(publication_subjects.created_at)`), ou jamais ingérées."""
         ...
 
+    def select_all_publication_ids(self, conn: Connection) -> list[int]:
+        """Ids de toutes les publications — pour une ré-ingestion complète
+        (`rebuild`), indépendante du signal incrémental."""
+        ...
+
     def select_source_publications_for_pubs(
         self, conn: Connection, *, publication_ids: list[int]
     ) -> list[Any]:

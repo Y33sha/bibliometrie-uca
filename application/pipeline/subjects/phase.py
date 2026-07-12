@@ -18,12 +18,18 @@ from application.ports.pipeline.subjects import SubjectsQueries
 from application.ports.pipeline.transaction import OpenTransaction
 
 
-def run(open_tx: OpenTransaction, queries: SubjectsQueries, logger: logging.Logger) -> PhaseMetrics:
-    """Ingestion des sujets puis recalcul des co-occurrences ; retourne les métriques d'ingestion."""
+def run(
+    open_tx: OpenTransaction,
+    queries: SubjectsQueries,
+    logger: logging.Logger,
+    *,
+    rebuild: bool = False,
+) -> PhaseMetrics:
+    """Ingestion des sujets puis recalcul des co-occurrences ; retourne les métriques d'ingestion. `rebuild` force la ré-ingestion de toutes les publications."""
     logger.info("▶ subjects")
     t0 = time.perf_counter()
     with open_tx() as conn:
-        metrics = run_ingest(conn, queries, logger)
+        metrics = run_ingest(conn, queries, logger, rebuild=rebuild)
     logger.info("✓ subjects terminé en %.1fs", time.perf_counter() - t0)
 
     logger.info("▶ cooccurrences")
