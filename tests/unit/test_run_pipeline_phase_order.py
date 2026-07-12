@@ -21,7 +21,7 @@ def _fake_tx():
 
 def test_recompute_addresses_runs_in_publications_phase():
     reconciliation = MagicMock()
-    reconciliation.count_dedup_inputs.return_value = (0, 0)
+    reconciliation.count_publications.return_value = 0
     address_pub_count = MagicMock()
     # La réconciliation est hors sujet ici : on la neutralise pour isoler le recompute.
     with patch.object(publications_phase, "reconcile_run", return_value=None):
