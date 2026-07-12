@@ -29,9 +29,6 @@ async def refetch(
     conn: Connection,
     adapter: OpenalexRefetchAdapter,
     log: logging.Logger,
-    *,
-    dry_run: bool = False,
-    limit: int | None = None,
 ) -> PhaseMetrics:
     """Re-fetch les works OpenAlex marqués `staging.authors_truncated`.
 
@@ -41,11 +38,11 @@ async def refetch(
     t0 = time.perf_counter()
     adapter.configure(conn)
 
-    truncated = adapter.find_truncated(conn, limit=limit)
+    truncated = adapter.find_truncated(conn)
     log.info(f"{len(truncated)} works marqués tronqués (à vérifier/compléter)")
 
     metrics = PhaseMetrics(seen=len(truncated))
-    if not truncated or dry_run:
+    if not truncated:
         log.info(
             "✓ refetch_truncated terminé en %.1fs — %s",
             time.perf_counter() - t0,
@@ -86,11 +83,6 @@ async def refetch(
                 f"  {done}/{len(truncated)} — {metrics.updated} mis à jour, "
                 f"{metrics.extras.get('already_complete', 0)} déjà complets"
             )
-    log.info(
-        f"Terminé : {metrics.updated} works mis à jour avec authorships complètes, "
-        f"{metrics.extras.get('already_complete', 0)} déjà complets, "
-        f"{metrics.errors} erreurs"
-    )
     log.info(
         "✓ refetch_truncated terminé en %.1fs — %s", time.perf_counter() - t0, metrics.as_summary()
     )
