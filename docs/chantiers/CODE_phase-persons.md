@@ -27,4 +27,4 @@ La phase `persons` (`application/pipeline/persons/`) enchaîne enforce → reset
 
 ## Questions ouvertes
 
-- `enforce` est numéroté comme l'étape 1 de la phase mais reste un appel repo inline dans `phase.py` (`authorship_repo.enforce_confirmed_authorships()`), là où les cinq autres étapes sont des modules. Motif récurrent dans d'autres phases : convention « étape = module » à trancher globalement, plutôt que dans cette seule fiche.
+La convention « étape de phase = module » (dont `enforce`, inline dans `phase.py`, est un cas) est transverse : elle vit dans les Questions ouvertes de `CODE_lisibilite.md`, pas ici.
