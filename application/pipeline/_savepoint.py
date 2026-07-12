@@ -14,22 +14,15 @@ from sqlalchemy import Connection, NestedTransaction
 @contextmanager
 def savepoint(
     conn: Connection,
-    name: str,
     *,
     on_rollback_failure: Callable[[], None] | None = None,
 ) -> Iterator[None]:
-    """Context manager autour d'un SAVEPOINT SQLAlchemy.
+    """Context manager autour d'un SAVEPOINT SQLAlchemy (`Connection.begin_nested()`).
 
-    Délégué à `Connection.begin_nested()`. Le paramètre `name` est
-    conservé pour faciliter le tracing (SA gère la nomenclature interne).
-
-    Si le rollback du SAVEPOINT échoue (transaction cassée),
-    `on_rollback_failure` est appelé (typiquement `conn.rollback`)
-    pour permettre au caller de récupérer un état utilisable, et
-    l'exception originale est re-raise.
+    Si le rollback du SAVEPOINT échoue (transaction cassée), `on_rollback_failure` est appelé (typiquement `conn.rollback`) pour permettre au caller de récupérer un état utilisable, et l'exception originale est re-raise.
 
     Usage :
-        with savepoint(conn, "merge_pub"):
+        with savepoint(conn):
             do_work(conn)
     """
     sp: NestedTransaction = conn.begin_nested()
