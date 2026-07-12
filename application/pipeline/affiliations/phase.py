@@ -36,18 +36,18 @@ def run(
     logger.info("▶ resolve_addresses")
     t0 = time.perf_counter()
     with open_tx() as conn:
+        # Périmètre lu une fois après le refresh, réutilisé par les deux sous-étapes suivantes.
         perimeter_ids = set(perimeter_queries.get_persons_structure_ids_list(conn))
-        processed, in_perimeter, _affil = run_resolution(
-            conn, address_queries, perimeter_ids, logger
-        )
+        stats = run_resolution(conn, address_queries, perimeter_ids, logger)
     logger.info("✓ resolve_addresses terminé en %.1fs", time.perf_counter() - t0)
+
     metrics = PhaseMetrics()
-    metrics.details["summary"] = {"adresses": processed, "in_perimeter": in_perimeter}
+    metrics.add(total=stats.processed)
+    metrics.details["summary"] = {"adresses": stats.processed, "in_perimeter": stats.in_perimeter}
 
     logger.info("▶ populate_affiliations")
     t0 = time.perf_counter()
     with open_tx() as conn:
-        perimeter_ids = set(perimeter_queries.get_persons_structure_ids_list(conn))
         run_populate(conn, affiliations_queries, logger, perimeter_ids)
     logger.info("✓ populate_affiliations terminé en %.1fs", time.perf_counter() - t0)
 

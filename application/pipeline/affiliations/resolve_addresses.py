@@ -5,6 +5,7 @@ Lit les formes de noms depuis `structure_name_forms` et enregistre dans `address
 
 import logging
 import time
+from typing import NamedTuple
 
 import ahocorasick
 from sqlalchemy import Connection
@@ -92,16 +93,21 @@ class AddressMatcher:
 # ─── Run ─────────────────────────────────────────────────────────
 
 
+class ResolutionStats(NamedTuple):
+    """Bilan d'une passe de résolution d'adresses."""
+
+    processed: int  # adresses traitées
+    in_perimeter: int  # adresses portant ≥1 structure du périmètre
+    affiliations: int  # liens adresse↔structure détectés
+
+
 def run_resolution(
     conn: Connection,
     queries: AddressResolutionQueries,
     perimeter_ids: set[int],
     logger: logging.Logger,
-) -> tuple[int, int, int]:
-    """Recalcul complet idempotent des affiliations. `conn` nécessaire pour commit batch.
-
-    Retourne `(adresses traitées, adresses in_perimeter, affiliations détectées)`.
-    """
+) -> ResolutionStats:
+    """Recalcul complet idempotent des affiliations (commit par lot, d'où le `conn`)."""
     logger.info("Chargement des structures et formes...")
     forms = queries.load_name_forms(conn)
     logger.info(f"  {len(forms)} formes chargées")
@@ -119,7 +125,7 @@ def process_addresses(
     logger: logging.Logger,
     *,
     chunk_size: int = CHUNK_SIZE,
-) -> tuple[int, int, int]:
+) -> ResolutionStats:
     """Résout toutes les adresses par tranches (keyset) : matching mémoire + écritures en bloc.
 
     Chaque tranche est lue et matchée en mémoire, puis mise à jour des liens adresse→structure en base pour qu'ils correspondent au matching, en trois requêtes ensemblistes : on retire les liens automatiques qui ne sont plus détectés ; un lien confirmé par l'admin est conservé mais perd sa marque « automatique » ; les liens trouvés cette fois sont insérés ou mis à jour. Seul ce qui change est écrit ; mémoire et allers-retours SQL bornés par `chunk_size`.
@@ -176,4 +182,4 @@ def process_addresses(
         logger.info(f"  Affiliations créées  : {affil_count}")
         logger.info(f"  Obsolètes supprimés  : {removed_count}")
 
-    return processed, in_perimeter_count, affil_count
+    return ResolutionStats(processed, in_perimeter_count, affil_count)
