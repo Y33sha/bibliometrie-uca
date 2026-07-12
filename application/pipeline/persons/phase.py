@@ -6,7 +6,7 @@ Phase mono-transaction : les six étapes tournent sur **une seule** transaction 
 2. **reset** — réinitialise les attributions dérivées (arbitrage des conflits d'identifiant par consensus, recompute complet du cross-source).
 3. **match** — rattache aux personnes existantes ou déjà résolues, sans jamais créer.
 4. **create** — re-juge les signatures restées non liées (cross-source rejoué) puis crée les vraies inconnues.
-5. **populate** — régénère les formes de nom canoniques (initiales comprises).
+5. **populate** — régénère les formes de nom canoniques.
 6. **purge** — re-orpheline les formes devenues ambiguës après régénération et supprime les personnes vidées.
 
 Le commit est porté par `open_tx` : `managed_transaction` commite en sortie de bloc si succès, rollback sinon. `phase_persons` de `run_pipeline` s'y réduit au câblage.
@@ -19,7 +19,8 @@ from collections.abc import Callable
 from sqlalchemy import Connection
 
 from application.pipeline.metrics import PhaseMetrics
-from application.pipeline.persons.cascade import build_metrics, create, match
+from application.pipeline.persons.cascade import create, match
+from application.pipeline.persons.metrics import build_metrics
 from application.pipeline.persons.populate_person_name_forms import populate
 from application.pipeline.persons.purge import purge
 from application.pipeline.persons.reset import reset
