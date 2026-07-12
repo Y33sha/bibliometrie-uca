@@ -132,42 +132,6 @@ class TestRefreshFromSources:
         assert row.journal_id == journal_id
         assert row.oa_status == "gold"
 
-    def test_refresh_auto_merges_when_doi_already_taken(self, sa_sync_conn, pub_repo):
-        """Régression : la promotion d'un DOI déjà occupé par une autre publication doit déclencher une fusion automatique au lieu de violer publications_doi_lower_key."""
-        existing_id = _seed_pub(
-            pub_repo,
-            "Thèse côté OpenAlex",
-            pub_year=2020,
-            doc_type="thesis",
-            doi="10.70675/regression-test",
-        )
-        current_id = _seed_pub(pub_repo, "Thèse côté theses.fr", pub_year=2020, doc_type="thesis")
-        sa_sync_conn.execute(
-            text(
-                """
-                INSERT INTO source_publications (source, source_id, title, pub_year,
-                                              publication_id, doi)
-                VALUES ('theses', '2020REGRESS', 'Thèse', 2020, :pid, :doi)
-                """
-            ),
-            {"pid": current_id, "doi": "10.70675/regression-test"},
-        )
-
-        refresh_from_sources(current_id, repo=pub_repo)
-
-        # current est vivant et a hérité du DOI
-        doi = sa_sync_conn.execute(
-            text("SELECT doi FROM publications WHERE id = :id"), {"id": current_id}
-        ).scalar_one_or_none()
-        assert doi == "10.70675/regression-test"
-        # existing a été absorbée
-        assert (
-            sa_sync_conn.execute(
-                text("SELECT id FROM publications WHERE id = :id"), {"id": existing_id}
-            ).first()
-            is None
-        )
-
 
 # ── Cohérence enum sources ──
 

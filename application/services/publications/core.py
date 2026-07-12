@@ -6,13 +6,9 @@ Toute création, mise à jour ou recherche de publication passe par ce module. L
 
 from application.audit_log import emit_event
 from application.ports.repositories.audit_repository import AuditRepository
-from application.ports.repositories.publication_repository import PubByDoi, PublicationRepository
+from application.ports.repositories.publication_repository import PublicationRepository
 from domain.errors import DistinctDoiError, NotFoundError
-from domain.publications.aggregation import (
-    first_non_null,
-    refresh_from_sources as _refresh_aggregate,
-)
-from domain.publications.identifiers import DOI
+from domain.publications.aggregation import refresh_from_sources as _refresh_aggregate
 from domain.publications.publication import Publication
 from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES
 from domain.source_publications.correction import (
@@ -20,12 +16,6 @@ from domain.source_publications.correction import (
     effective_metadata,
 )
 from domain.sources.registry import SOURCE_PRIORITY
-
-
-def find_by_doi(doi: str, *, repo: PublicationRepository) -> PubByDoi | None:
-    """Cherche une publication par DOI (case-insensitive)."""
-    return repo.find_by_doi(doi)
-
 
 # ── Recalcul complet des métadonnées depuis les source_publications ──────
 
@@ -44,7 +34,7 @@ def refresh_from_sources(
 
     **Cas hors périmètre** : si le `doc_type` canonique résolu appartient à `OUT_OF_SCOPE_DOC_TYPES`, la publication ne doit pas non plus exister (invariant « hors périmètre = jamais matérialisé »). Suppression via `repo.delete` + audit event `publication.deleted_out_of_scope`, après l'arbitrage du type. Les `source_publications` sont détachées (FK ON DELETE SET NULL) et les `authorships` canoniques emportées en cascade.
 
-    Auto-fusion sur conflit DOI : si la promotion du DOI agrégé entre en collision avec une autre publication qui occupe déjà ce DOI, cette dernière est absorbée dans `pub_id` avant le save — au lieu de laisser remonter une violation de la contrainte unique. `pub_id` reste vivant pour le caller. La fusion est tracée via l'audit event `publication.merged`.
+    L'identité des publications (quelles `source_publications` forment une même œuvre, fusions et scissions comprises) relève de la réconciliation (`application/pipeline/publications`), jamais d'ici : ce recalcul ne touche que la publication reçue et ses propres sources. Une seule publication porte un DOI donné à l'arrivée de la réconciliation, donc `repo.save` ne peut pas heurter la contrainte unique sur le DOI.
 
     Si `audit_repo` est fourni et que le DOI canonique change effectivement (passage d'une valeur à une autre, ou perte du DOI), un événement `publication.doi_changed` est émis avec l'ancienne et la nouvelle valeur. Pas d'event sur l'attribution initiale (passage de None à une valeur) ni quand la valeur reste identique.
 
@@ -60,23 +50,6 @@ def refresh_from_sources(
         repo.delete(pub_id)
         emit_event(audit_repo, "publication.deleted_orphan", "publication", pub_id, {})
         return
-
-    # Si le DOI à promouvoir est déjà occupé par une autre publication, fusionner d'abord pour éviter une violation de la contrainte unique `publications_doi_lower_key`. Cas typique : une thèse avec un DOI ABES (10.70675/…) créée en double — une fois via OpenAlex (DOI seul, NNT inconnu) et une fois via theses.fr/HAL (NNT seul, DOI publié plus tard). Quand le DOI finit par apparaître dans une `source_publication`, sa promotion collisionne avec la pub OpenAlex. La fusion absorbe l'autre dans `pub_id` (qui reste vivant pour le caller).
-    #
-    # Le DOI brut est normalisé via le VO `DOI` avant le lookup : c'est cette forme normalisée (suffixe `.vN` strippé, lowercased) qui sera posée par l'agrégation. Le pré-merge doit chercher la même forme, sinon des collisions échappent au mécanisme.
-    rank = {s: i for i, s in enumerate(SOURCE_PRIORITY)}
-    sorted_sources = sorted(sources, key=lambda s: rank.get(s.source, 99))
-    new_doi_raw = first_non_null(sorted_sources, "doi")
-    new_doi_vo = DOI.try_parse(new_doi_raw) if new_doi_raw else None
-    if new_doi_vo:
-        existing = repo.find_by_doi(str(new_doi_vo))
-        if existing and existing.id != pub_id:
-            merge_publications(pub_id, existing.id, repo=repo, audit_repo=audit_repo)
-            sources = repo.get_source_publications(pub_id)
-            # Recharger pub : ses attributs ont pu être enrichis via Publication.absorb pendant merge_publications.
-            pub = repo.find_by_id(pub_id)
-            if pub is None:
-                return
 
     previous_doi = pub.doi
     # Les corrections per-record sont déjà persistées sur chaque `source_publication` par la phase
