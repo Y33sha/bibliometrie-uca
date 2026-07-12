@@ -6,6 +6,7 @@
 
 - [Lisibilité](CODE_lisibilite.md)
   - [Phase personnes — lisibilité et refonte](CODE_phase-persons.md)
+  - [Simplification de la phase sujets](CODE_simplification-sujets.md)
 
 ### En pause
 

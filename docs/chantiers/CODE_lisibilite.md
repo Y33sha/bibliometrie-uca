@@ -56,6 +56,7 @@ Réorganisation du sommet :
 - [ ] `normalize/base.py` (et sans doute `extract/base.py`) : l'argparse (`--limit`/`--reset`/`--batch-size`, `run(argv)`) hérite des CLI de phase supprimés. Sans CLI pipeline, potentiellement vestigial — à vérifier au dossier `normalize`.
 - [ ] Passe de fond du dossier (docstrings, lisibilité des modules).
 - [ ] `pipeline/persons/` : la cascade `enforce → reset → match → create → populate → purge` concentre plusieurs points lourds (surtout `cascade.py`) — voir la fiche dédiée `CODE_phase-persons.md`.
+- [ ] `pipeline/subjects/` : l'ingestion moissonne mots-clés libres (bruit) et concepts avec un modèle surdimensionné (`ontologies` codes/level/parent, colonne `score`) largement inexploité — voir la fiche dédiée `CODE_simplification-sujets.md`.
 - [ ] Concurrence async des phases : `extract/refresh_stale` (pool de workers borné + compteur/commit sous `db_lock`), `oa_status` et `extract/refetch_truncated` (gather par paquets) sont sains. Reste `cross_imports/fetch_missing_hal` : gather global qui crée toutes les coroutines d'un coup (compteur-commit sous lock, donc correct, mais non borné) — à passer au gather par paquets lors de la passe `cross_imports`. (Basse priorité : correct, seulement non borné.)
 
 #### 1.2 - `application/services`
