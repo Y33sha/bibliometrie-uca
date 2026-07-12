@@ -9,7 +9,7 @@ from collections.abc import Callable
 from functools import partial
 
 from application.pipeline.metrics import PhaseMetrics
-from application.pipeline.signals import filter_configured, timed_metrics
+from application.pipeline.signals import filter_configured, select_targets, timed_metrics
 from application.ports.pipeline.parallel import RunParallel
 from domain.sources.registry import DOI_SEARCHABLE_SOURCES
 
@@ -58,12 +58,8 @@ def run(
             metrics.merge(nnt_metrics)
             by_channel["NNT"] = _summary(nnt_metrics, nnt_duration)
 
-    # Étape 2 : par DOI. WoS opt-in ; filtre `--sources` optionnel ; ordre canonique
-    # de `DOI_SEARCHABLE_SOURCES` pour un dispatch et des logs déterministes.
-    eligible = set(DOI_SEARCHABLE_SOURCES) - (set() if include_wos else {"wos"})
-    if sources:
-        eligible &= sources
-    doi_targets = [t for t in DOI_SEARCHABLE_SOURCES if t in eligible]
+    # Étape 2 : par DOI. WoS opt-in, filtre `--sources` optionnel, ordre canonique.
+    doi_targets = select_targets(DOI_SEARCHABLE_SOURCES, sources, include_wos=include_wos)
     configured = filter_configured(
         doi_targets,
         metrics,
