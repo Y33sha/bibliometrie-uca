@@ -552,11 +552,11 @@ def phase_publications(**kw: Any) -> PhaseMetrics:
     Séquence, transactions et métriques dans `application/pipeline/publications/phase.py`.
     """
     from application.pipeline.publications.phase import run
+    from infrastructure.queries.pipeline.address_pub_count import PgAddressPubCountQueries
     from infrastructure.queries.pipeline.publications_reconciliation import (
         PgPublicationsReconciliationQueries,
     )
     from infrastructure.repositories import audit_repository, publication_repository
-    from infrastructure.repositories.address_linker import PgAddressPubCountQueries
 
     return run(
         _open_tx,

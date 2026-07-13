@@ -1,6 +1,6 @@
 """Port : recompute du cache `addresses.pub_count`, fin de phase publications.
 
-Implémenté par `infrastructure.repositories.address_linker.PgAddressPubCountQueries`.
+Implémenté par `infrastructure.queries.pipeline.address_pub_count.PgAddressPubCountQueries`.
 """
 
 from typing import Protocol
