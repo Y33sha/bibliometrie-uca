@@ -65,8 +65,7 @@ Port `application/ports/api/journals_queries.py` (DTOs co-localisés), adaptateu
 
 Dette assumée et décisions d'architecture propres à cet agrégat, gardées explicites.
 
-1. **Agrégat anémique.** `Journal` est une dataclass de données sans comportement ni invariant maintenu ; le label « aggregate root » est aspirationnel. L'opportunité d'un objet de domaine riche rejoint le catalogue d'invariants évalué en fin de tour.
-2. **Écritures cross-agrégat dans la fusion de revues (décision d'archi assumée).** `merge_journal_into` repointe `publications` / `source_publications` / `apc_payments` en `text()` — des tables d'autres agrégats, hors MetaData du repo journal. Une fusion est intrinsèquement cross-agrégat (repointer les dépendants *est* l'opération) et exige l'atomicité d'une seule transaction ; le repo journal l'assume.
+1. **Écritures cross-agrégat dans la fusion de revues (décision d'archi assumée).** `merge_journal_into` repointe `publications` / `source_publications` / `apc_payments` en `text()` — des tables d'autres agrégats, hors MetaData du repo journal. Une fusion est intrinsèquement cross-agrégat (repointer les dépendants *est* l'opération) et exige l'atomicité d'une seule transaction ; le repo journal l'assume.
 
 ## Invariants métier
 
@@ -74,4 +73,4 @@ Règles métier de l'agrégat maintenues par discipline — ni par une contraint
 
 - **Cohérence `journal_type` → `doc_type`.** Le `doc_type` canonique d'une publication dépend du `journal_type` de sa revue (règles journal-dépendantes d'`effective_metadata`). L'invariant est tenu par deux chemins selon le contexte : la phase pipeline `metadata_correction`, qui recalcule tous les `doc_type` depuis le brut reconstruit, en aval de `publishers_journals` (idempotente, auto-cicatrisante) ; et le hook API `requalify_publications_for_journal`, qui requalifie sur-le-champ les publications de la revue éditée, sans attendre le prochain run.
 
-La minceur de cette section confirme le caractère anémique de l'agrégat : la règle est portée par la phase de correction et le service, pas par le concept `Journal` lui-même.
+`Journal` est délibérément un agrégat mince : sa seule règle transverse (`journal_type` → `doc_type`) vit dans la phase de correction et le service, et le concept reste un porteur de données — sans matière à en faire un objet de domaine riche.
