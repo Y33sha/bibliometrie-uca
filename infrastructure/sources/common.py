@@ -19,9 +19,7 @@ from infrastructure.sources.hal.hash_normalize import strip_volatile_for_hash
 def canonical_json_bytes(raw_data: dict) -> bytes:
     """Sérialise un payload en JSON canonique (clés triées, compact, UTF-8).
 
-    Forme unique partagée par `compute_hash` (empreinte du payload) et le raw
-    store (contenu écrit) : garantit `md5(canonical_json_bytes(d)) ==
-    compute_hash(d)`.
+    Forme unique partagée par `compute_hash` (empreinte du payload) et le raw store (contenu écrit) : garantit `md5(canonical_json_bytes(d)) == compute_hash(d)`.
     """
     return json.dumps(raw_data, sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode(
         "utf-8"
@@ -33,9 +31,8 @@ def compute_hash(raw_data: dict) -> str:
     return hashlib.md5(canonical_json_bytes(raw_data)).hexdigest()
 
 
-# Neutralisation, par source, du bruit volatil avant calcul du hash de détection
-# de changement. Une source absente n'est pas normalisée (hash sur le payload
-# fidèle). HAL : horodatage de génération enfoui dans le TEI `label_xml`.
+# Neutralisation, par source, du bruit volatil avant calcul du hash de détection de changement. Une source absente n'est pas normalisée (hash sur le payload fidèle).
+# HAL : horodatage de génération enfoui dans le TEI `label_xml`.
 _HASH_NORMALIZERS: dict[str, Callable[[dict], dict]] = {
     "hal": strip_volatile_for_hash,
 }
@@ -44,15 +41,9 @@ _HASH_NORMALIZERS: dict[str, Callable[[dict], dict]] = {
 def change_detection_hash(source: str, raw_data: dict) -> str:
     """Hash pilotant l'UPSERT `staging` (réécriture `raw_data` + `processed`).
 
-    Calculé sur une copie du payload dont le bruit volatil propre à la source est
-    neutralisé (cf. `_HASH_NORMALIZERS`), pour qu'un champ réémis à l'identique
-    métier ne déclenche ni réécriture ni re-normalisation. Le payload stocké
-    (`staging.raw_data`, raw store) reste, lui, fidèle à la source.
+    Calculé sur une copie du payload dont le bruit volatil propre à la source est neutralisé (cf. `_HASH_NORMALIZERS`), pour qu'un champ réémis à l'identique métier ne déclenche ni réécriture ni re-normalisation. Le payload stocké (`staging.raw_data`, raw store) reste, lui, fidèle à la source.
 
-    Point d'entrée unique du hash de détection : partagé par l'UPSERT d'extraction
-    et la réhydratation depuis le raw store, pour qu'ils s'accordent (une ligne
-    réhydratée ne re-diverge pas au moissonnage suivant). Pour les sources sans
-    normaliseur, égale `compute_hash(raw_data)`.
+    Point d'entrée unique du hash de détection : partagé par l'UPSERT d'extraction et la réhydratation depuis le raw store, pour qu'ils s'accordent (une ligne réhydratée ne re-diverge pas au moissonnage suivant). Pour les sources sans normaliseur, égale `compute_hash(raw_data)`.
     """
     normalize = _HASH_NORMALIZERS.get(source)
     return compute_hash(normalize(raw_data) if normalize else raw_data)
@@ -107,28 +98,15 @@ def upsert_staging(
     authors_truncated: bool = False,
     entry_mode: str = "bulk",
 ) -> tuple[bool, bool]:
-    """UPSERT canonique d'une ligne `staging`, partagé par toutes les voies d'entrée
-    (extraction bulk **et** cross-import — un seul endroit pour la logique d'UPSERT).
+    """UPSERT canonique d'une ligne `staging`, partagé par toutes les voies d'entrée (extraction bulk **et** cross-import — un seul endroit pour la logique d'UPSERT).
 
-    `INSERT … ON CONFLICT (source, source_id) DO UPDATE` piloté par `raw_hash` :
-    réécrit `raw_data` (et repasse `processed=FALSE`) seulement si le hash a changé,
-    met toujours à jour `last_seen_at`, et renseigne `doi` s'il manquait (jamais d'écrasement).
-    Un `raw_hash=null` en base force le re-import (`NULL IS DISTINCT FROM <hash>`).
-    Le hash est calculé via `change_detection_hash`, qui neutralise le bruit volatil
-    propre à la source avant l'empreinte (le payload stocké reste, lui, fidèle).
+    `INSERT … ON CONFLICT (source, source_id) DO UPDATE` piloté par `raw_hash` : réécrit `raw_data` (et repasse `processed=FALSE`) seulement si le hash a changé, met toujours à jour `last_seen_at`, et renseigne `doi` s'il manquait (jamais d'écrasement). Un `raw_hash=null` en base force le re-import (`NULL IS DISTINCT FROM <hash>`). Le hash est calculé via `change_detection_hash`, qui neutralise le bruit volatil propre à la source avant l'empreinte (le payload stocké reste, lui, fidèle).
 
-    `authors_truncated` (OpenAlex : payload bulk plafonné à 100 auteurs) suit la même
-    logique que `processed` — (re)posé seulement quand le hash change, sinon préservé
-    (n'écrase pas l'effacement de `refetch_truncated`). Les sources non plafonnées
-    laissent le défaut `False`.
+    `authors_truncated` (OpenAlex : payload bulk plafonné à 100 auteurs) suit la même logique que `processed` — (re)posé seulement quand le hash change, sinon préservé (n'écrase pas l'effacement de `refetch_truncated`). Les sources non plafonnées laissent le défaut `False`.
 
-    `entry_mode` enregistre comment la ligne est **entrée** (`bulk` à l'extraction,
-    `cross_import_doi` / `cross_import_hal` au cross-import) ; posé à la création,
-    jamais réécrit (provenance d'origine).
+    `entry_mode` enregistre comment la ligne est **entrée** (`bulk` à l'extraction, `cross_import_doi` / `cross_import_hal` au cross-import) ; posé à la création, jamais réécrit (provenance d'origine).
 
-    Retourne `(inserted, changed)` : `inserted` = vraie insertion (`xmax = 0`),
-    `changed` = contenu réécrit (hash distinct de l'ancien). Le commit est à la
-    charge de l'appelant.
+    Retourne `(inserted, changed)` : `inserted` = vraie insertion (`xmax = 0`), `changed` = contenu réécrit (hash distinct de l'ancien). Le commit est à la charge de l'appelant.
     """
     row = conn.execute(
         _UPSERT_STAGING_SQL,
@@ -164,10 +142,7 @@ def upsert_not_found_stub(
 ) -> None:
     """Pose un stub `staging` « introuvable » (raw_data vide, `not_found_at`, `processed`).
 
-    Utilisé par le cross-import HAL (hal-id / NNT), dont l'identifiant natif est le hal-id :
-    le stub est keyé par `(source, source_id)` et ré-arme `not_found_at` sur conflit (le miss
-    est retriable — HAL peut publier le document plus tard). Ne commit pas. Les misses par
-    DOI, eux, vivent dans `doi_lookups` (cf. `record_doi_not_found`).
+    Utilisé par le cross-import HAL (hal-id / NNT), dont l'identifiant natif est le hal-id : le stub est keyé par `(source, source_id)` et ré-arme `not_found_at` sur conflit (le miss est retriable — HAL peut publier le document plus tard). Ne commit pas. Les misses par DOI, eux, vivent dans `doi_lookups` (cf. `record_doi_not_found`).
     """
     conn.execute(
         _NOT_FOUND_STUB_SQL,
@@ -191,27 +166,13 @@ _TARGET_RA: dict[str, str] = {
 DOI_LOOKUP_RETRY_DAYS = 30
 """Délai (jours) avant de re-tenter un DOI introuvable sur une source non native.
 
-Un DOI absent d'une source *autre que sa source native* n'est pas
-définitivement absent : la source peut l'indexer plus tard. On mémorise le
-miss dans `doi_lookups` avec `next_retry = now() + DOI_LOOKUP_RETRY_DAYS`,
-ce qui borne le pool de re-tentatives — sans ce backoff, ces DOI seraient
-réinterrogés à chaque run (coût API non borné, croissant avec le temps).
-
-Vit ici (infrastructure) et non dans `domain/` : c'est une politique du
-pipeline d'extraction, pas une règle métier du domaine.
+Un DOI absent d'une source *autre que sa source native* n'est pas définitivement absent : la source peut l'indexer plus tard. On mémorise le miss dans `doi_lookups` avec `next_retry = now() + DOI_LOOKUP_RETRY_DAYS`, ce qui borne le pool de re-tentatives (sans ce backoff, ces DOI seraient réinterrogés à chaque run, coût API croissant).
 """
 
 STALE_REFRESH_AFTER_DAYS = 90
 """Âge (jours) de `staging.last_seen_at` au-delà duquel une row est refetchée.
 
-La phase « refresh stale » (fin de cross-import, à chaque run) refetche par id
-natif les rows dont `last_seen_at < now() - STALE_REFRESH_AFTER_DAYS` : trouvé
-→ bump `last_seen_at` + refresh `raw_data` ; 404 → `disappeared_at`. Tournant à
-chaque run, le seuil étale la charge (chaque passe ne ramasse que ce qui vient
-de franchir le délai) sans `LIMIT`.
-
-Même nature que [`DOI_LOOKUP_RETRY_DAYS`] : politique de fraîcheur du pipeline,
-pas une règle métier — d'où sa place ici et non dans `domain/`.
+La phase « refresh stale » (fin de cross-import, à chaque run) refetche par id natif les rows dont `last_seen_at < now() - STALE_REFRESH_AFTER_DAYS` : trouvé → `last_seen_at` mis à jour + refresh `raw_data` ; 404 → `disappeared_at`. Tournant à chaque run, le seuil étale la charge (chaque passe ne ramasse que ce qui vient de franchir le délai) sans `LIMIT`.
 """
 
 _RECORD_DOI_NOT_FOUND_SQL = text(
@@ -280,16 +241,9 @@ def get_stale_rows(
 ) -> list[tuple[int, str]]:
     """Rows `(id, source_id)` de `source` à `last_seen_at` ancien (> STALE_REFRESH_AFTER_DAYS).
 
-    Alimente la phase refresh : chaque row est refetchée par son `source_id`
-    natif. Toute row a un `source_id` (`NOT NULL`), donc la sélection ne dépend
-    pas de la présence d'un DOI. Exclut les stubs not-found et les rows déjà
-    marquées disparues.
+    Alimente la phase refresh : chaque row est refetchée par son `source_id` natif. Toute row a un `source_id` (`NOT NULL`), donc la sélection ne dépend pas de la présence d'un DOI. Exclut les stubs not-found et les rows déjà marquées disparues.
 
-    `years` borne la sélection à la fenêtre d'années du run courant, jointe depuis
-    `source_publications.pub_year` : un run sur une période glissante ne refetche
-    ainsi que le stale de ses propres années, sans requêtes unitaires inutiles sur
-    des années qu'il ne moissonne plus en bulk. `None` = aucune borne (tout le
-    stale de la source).
+    `years` borne la sélection à la fenêtre d'années du run courant, jointe depuis `source_publications.pub_year` : un run sur une période glissante ne refetche ainsi que le stale de ses propres années, sans requêtes unitaires inutiles sur des années qu'il ne moissonne plus en bulk. `None` = aucune borne (tout le stale de la source).
     """
     if source not in VALID_SOURCES:
         raise ValueError(f"Source inconnue : {source}. Valides : {', '.join(VALID_SOURCES)}")
@@ -314,31 +268,13 @@ def set_disappeared_by_source_id(conn: Connection, source: str, source_id: str) 
 def get_cross_import_dois(conn: Connection, target: str) -> list[str]:
     """Retourne les DOI présents dans les autres sources mais absents de la cible.
 
-    Pool (vue `candidate_dois`) restreint aux publications **in-périmètre** :
-    `source_publications.doi` (DOI primaire) ∪ `external_ids.related_dois` (DOI
-    secondaires : preprint/dépôt/édition) ∪ `publication_relations.target_doi`
-    (cibles des relations : preprint/supplément/data paper… à rapatrier) ∪ DOI
-    DataCite déduits de `external_ids.arxiv_id` (préfixe `10.48550/arXiv.<id>` :
-    tout dépôt arXiv expose ce DOI DataCite). Le périmètre (`publications.in_perimeter`)
-    est celui matérialisé au run précédent : ne cross-importer que des DOI de
-    publications confirmées UCA coupe la propagation de cross-imports hors-périmètre.
-    Les DOI de records fraîchement ingérés sont donc rattrapés au run suivant —
-    bénin (le pipeline est convergent).
+    Pool (vue `candidate_dois`) restreint aux publications **in-périmètre** : `source_publications.doi` (DOI primaire) ∪ `external_ids.related_dois` (DOI secondaires : preprint/dépôt/édition) ∪ `publication_relations.target_doi` (cibles des relations : preprint/supplément/data paper… à rapatrier) ∪ DOI DataCite déduits de `external_ids.arxiv_id` (préfixe `10.48550/arXiv.<id>` : tout dépôt arXiv expose ce DOI DataCite). Le périmètre (`publications.in_perimeter`) est celui matérialisé au run précédent : ne cross-importer que des DOI de publications in-périmètre coupe la propagation de cross-imports hors-périmètre. Les DOI de records fraîchement ingérés sont donc rattrapés au run suivant — bénin (le pipeline est convergent).
 
-    Le SQL compare les `doi` par égalité directe. Les candidats retenus sont
-    normalisés via `clean_doi`
-    et dédoublonnés avant d'être renvoyés : les appels HTTP par DOI en aval
-    reçoivent une forme canonique, quelle que soit la propreté de la valeur source.
+    Le SQL compare les `doi` par égalité directe. Les candidats retenus sont normalisés via `clean_doi` et dédoublonnés avant d'être renvoyés : les appels HTTP par DOI en aval reçoivent une forme canonique, quelle que soit la propreté de la valeur source.
 
-    Exclut les DOI en backoff dans `doi_lookups` (miss cross-import récent
-    sur la cible dont `next_retry` n'est pas encore atteint). Le pool est
-    ainsi auto-borné et convergent : 1er pass tente tout, les misses reçoivent
-    un `next_retry`, les passes suivantes ne retentent que les DOI dont le
-    délai est écoulé.
+    Exclut les DOI en backoff dans `doi_lookups` (miss cross-import récent sur la cible dont `next_retry` n'est pas encore atteint). Le pool est ainsi auto-borné et convergent : 1er pass tente tout, les misses reçoivent un `next_retry`, les passes suivantes ne retentent que les DOI dont le délai est écoulé.
 
-    Pour les cibles présentes dans `_TARGET_RA`, ajoute un LEFT JOIN sur
-    `doi_prefixes` pour filtrer les DOIs dont la RA résolue ne correspond
-    pas (les NULL — préfixe pas encore résolu — sont conservés).
+    Pour les cibles présentes dans `_TARGET_RA`, ajoute un LEFT JOIN sur `doi_prefixes` pour filtrer les DOIs dont la RA résolue ne correspond pas (les NULL — préfixe non résolu — sont conservés).
 
     Args:
         conn: `Connection` SA ou cur psycopg.

@@ -16,9 +16,7 @@ logger = logging.getLogger(__name__)
 def _get_from_db(conn: Connection, key: str) -> JsonValue:
     """Lit une valeur depuis la table config. Retourne None si absente.
 
-    Le retour est typé `JsonValue` (frontière JSONB libre) — chaque caller
-    fait son `isinstance(...)` pour contraindre le type (str, list, dict, …)
-    avant usage.
+    Le retour est typé `JsonValue` (frontière JSONB libre) — chaque caller fait son `isinstance(...)` pour contraindre le type (str, list, dict, …) avant usage.
     """
     try:
         row = conn.execute(
@@ -45,9 +43,7 @@ def _config_int(conn: Connection, key: str) -> int | None:
 def get_years(conn: Connection, start_year: int | None = None) -> list[int]:
     """Retourne les années à extraire : `[start_year … année courante]`.
 
-    `start_year` est l'ancre absolue du range. Si `None`, on lit la config
-    `pipeline_start_year_full`. Rétention cumulative. Fallback `[année courante]`
-    si l'ancre est absente, invalide ou dans le futur.
+    `start_year` est l'ancre absolue du range. Si `None`, on lit la config `pipeline_start_year_full`. Rétention cumulative. Fallback `[année courante]` si l'ancre est absente, invalide ou dans le futur.
     """
     current_year = datetime.date.today().year
     if start_year is None:
@@ -60,8 +56,7 @@ def get_years(conn: Connection, start_year: int | None = None) -> list[int]:
 def get_hal_collections(conn: Connection) -> dict[str, str]:
     """Retourne les collections HAL {code_hal: label}.
 
-    Dérivé des structures du périmètre UCA qui ont un hal_collection renseigné,
-    avec fallback sur la clé `hal_collections` de la table config.
+    Dérivé des structures du périmètre qui ont un hal_collection renseigné, avec fallback sur la clé `hal_collections` de la table config.
     """
     try:
         from infrastructure.queries.perimeter import get_perimeter_structure_ids
@@ -123,15 +118,7 @@ _API_BASE_URLS: dict[str, str] = {
 
 
 def get_api_base_urls() -> dict[str, str]:
-    """Retourne les URLs de base des API (extracteurs + endpoints secondaires).
-
-    Source unique : la constante `_API_BASE_URLS` du code. Ce sont des constantes
-    amont (mêmes endpoints en dev et en prod, qui ne changent quasiment jamais et
-    dont une évolution s'accompagne d'ordinaire d'un changement d'adapter), pas de
-    la config d'environnement — elles n'ont donc pas à vivre en base. Les valeurs
-    qui *varient* par déploiement (clés d'API, auth, email polite pool) restent
-    lues séparément depuis la table `config`.
-    """
+    """URLs de base des API, par source (extracteurs + endpoints secondaires)."""
     return dict(_API_BASE_URLS)
 
 
@@ -139,7 +126,6 @@ def get_extraction_api_ids(conn: Connection, source: str) -> list[str]:
     """Retourne les identifiants API pour une source, déduits du périmètre d'extraction.
 
     Lit `perimeter_extraction` → structures du périmètre → `structures.api_ids[source]`.
-    Seul circuit autorisé : pas de fallback vers des clés `config.*` plates.
     """
     perim_code = _get_from_db(conn, "perimeter_extraction")
     if not (perim_code and isinstance(perim_code, str)):
@@ -174,9 +160,7 @@ def get_extraction_api_ids(conn: Connection, source: str) -> list[str]:
 def get_polite_pool_email_optional(conn: Connection) -> str | None:
     """Retourne l'email polite pool, ou `None` si non configuré (sans lever).
 
-    Pour les consommateurs qui traitent l'email comme facultatif : OpenAlex, dont
-    l'accès au polite pool peut aussi passer par une clé API. Les consommateurs qui
-    exigent l'email utilisent `get_polite_pool_email`.
+    Pour les consommateurs qui traitent l'email comme facultatif : OpenAlex, dont l'accès au polite pool peut aussi passer par une clé API. Les consommateurs qui exigent l'email utilisent `get_polite_pool_email`.
     """
     val = _get_from_db(conn, "polite_pool_email")
     if val and isinstance(val, str):
@@ -218,14 +202,7 @@ def get_scanr_credentials(conn: Connection) -> tuple[str, str]:
 def source_credentials_missing(conn: Connection, source: str) -> str | None:
     """Motif d'absence des credentials d'API d'une source, ou `None` si utilisable.
 
-    Source unique de vérité de la présence des credentials par source, consultée
-    par toutes les phases qui interrogent une API tierce (extraction, cross-import,
-    refresh stale, enrichissements) : un accès dont cette fonction renvoie un motif
-    est sauté proprement. HAL, theses.fr, DOI.org et DOAJ sont des API publiques
-    sans credential (jamais de motif). L'email polite pool est traité comme un
-    credential : Crossref, DataCite et Unpaywall en dépendent, et OpenAlex l'accepte
-    à défaut de clé API. Le périmètre d'interrogation (collections, identifiants de
-    structure, PPN) est un contrôle distinct, propre à l'extraction bulk.
+    Source unique de vérité de la présence des credentials par source, consultée par toutes les phases qui interrogent une API tierce (extraction, cross-import, refresh stale, enrichissements) : un accès dont cette fonction renvoie un motif est sauté proprement. HAL, theses.fr, DOI.org et DOAJ sont des API publiques sans credential (jamais de motif). L'email polite pool est traité comme un credential : Crossref, DataCite et Unpaywall en dépendent, et OpenAlex l'accepte à défaut de clé API. Le périmètre d'interrogation (collections, identifiants de structure, PPN) est un contrôle distinct, propre à l'extraction bulk.
     """
     if source in ("hal", "theses"):
         return None
