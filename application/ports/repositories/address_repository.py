@@ -1,6 +1,29 @@
 """Port AddressRepository — contrat d'accès à l'agrégat Address."""
 
-from typing import Any, Protocol
+from dataclasses import dataclass
+from typing import Protocol
+
+
+@dataclass(frozen=True, slots=True)
+class AddressCountryFilter:
+    """Critères de sélection d'adresses pour une attribution de pays en masse.
+
+    Combinés en AND. `has_country` : True → `countries` renseigné, False → NULL, None → critère inactif. `country_code` / `suggested_country` : code présent dans la colonne correspondante."""
+
+    search: str | None = None
+    has_country: bool | None = None
+    country_code: str | None = None
+    suggested_country: str | None = None
+
+    @property
+    def is_empty(self) -> bool:
+        """Vrai si aucun critère n'est renseigné."""
+        return not (
+            self.search
+            or self.has_country is not None
+            or self.country_code
+            or self.suggested_country
+        )
 
 
 class AddressRepository(Protocol):
@@ -60,13 +83,10 @@ class AddressRepository(Protocol):
         address_ids: list[int],
     ) -> list[int]: ...
 
-    def batch_add_country_by_where(
+    def batch_add_country_by_filter(
         self,
         country_code: str,
-        where_clause: str,
-        # Liste de bind-params SQL hétérogènes (str/int/bool/list[int]/...).
-        # `Any` justifié : frontière SQL, types dépendent du `where_clause`.
-        where_params: list[Any],
+        criteria: AddressCountryFilter,
     ) -> list[int]: ...
 
     def propagate_countries_across_similar_addresses(

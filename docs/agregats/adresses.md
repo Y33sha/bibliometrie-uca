@@ -75,7 +75,6 @@ Routeur `interfaces/api/routers/admin/addresses.py`, port `application/ports/api
 ## Points d'attention
 
 1. **Deux dérivations pays → publications.** Le pipeline utilise la cascade incrémentale `countries_dirty` ; le chemin de fond de l'API recalcule en plein via `PgAddressRepository.refresh_*`, sans passer par `countries_dirty`. Deux implémentations de « `addresses.countries` → `publications.countries` » à garder synchronisées.
-2. **La couche application compose du SQL.** `application/services/addresses/countries.py` construit une clause `where` SQL (placeholders `%s` et noms de colonnes) passée à `PgAddressRepository.batch_add_country_by_where`, qui substitue les placeholders. De la logique SQL remonte dans la couche application.
-3. **Écritures cross-agrégat dans le repo adresses.** `PgAddressRepository` écrit `source_publications.countries` et `publications.countries` (exception documentée dans sa docstring).
-4. **Condition miroir couplée par commentaire.** `which_contribute_to_perimeter` (`is_confirmed IS DISTINCT FROM FALSE`) doit rester synchrone avec `recompute_in_perimeter_on_source_authorships` — garanti seulement par un commentaire.
-5. **Péremption des matviews assumée.** Le chemin de review de l'API recalcule `in_perimeter` depuis les tables de base mais ne rafraîchit pas `source_authorship_structures` / `authorship_structures` : elles attendent le prochain run pipeline.
+2. **Écritures cross-agrégat dans le repo adresses.** `PgAddressRepository` écrit `source_publications.countries` et `publications.countries` (exception documentée dans sa docstring).
+3. **Condition miroir couplée par commentaire.** `which_contribute_to_perimeter` (`is_confirmed IS DISTINCT FROM FALSE`) doit rester synchrone avec `recompute_in_perimeter_on_source_authorships` — garanti seulement par un commentaire.
+4. **Péremption des matviews assumée.** Le chemin de review de l'API recalcule `in_perimeter` depuis les tables de base mais ne rafraîchit pas `source_authorship_structures` / `authorship_structures` : elles attendent le prochain run pipeline.
