@@ -1,10 +1,6 @@
 """État du pipeline en cours, persisté dans `logs/status.json`.
 
-Écriture côté orchestrateur (`run_pipeline.py`), lecture côté API
-(`interfaces/api/routers/admin/pipeline_logs.py`). Le PID du writer est
-embarqué dans le fichier : si le process n'existe plus (SIGKILL, crash
-C-level, OOM killer — cas non couverts par atexit/signal), le statut
-est considéré comme orphelin et nettoyé.
+Écriture côté orchestrateur (`run_pipeline.py`), lecture côté API (`interfaces/api/routers/admin/pipeline_logs.py`). Le PID du writer est embarqué dans le fichier : si le process est mort (SIGKILL, crash C-level, OOM killer — cas non couverts par atexit/signal), le statut est considéré comme orphelin et nettoyé.
 """
 
 import datetime
@@ -24,15 +20,9 @@ STATUS_FILE = PROJECT_ROOT / "logs" / "status.json"
 def _is_pid_alive(pid: int) -> bool:
     """True si le process `pid` existe encore.
 
-    POSIX : `os.kill(pid, 0)` lève `ProcessLookupError` si mort,
-    `PermissionError` si le process existe mais appartient à un autre
-    user (considéré vivant).
+    POSIX : `os.kill(pid, 0)` lève `ProcessLookupError` si mort, `PermissionError` si le process existe mais appartient à un autre user (considéré vivant).
 
-    Windows : `os.kill(pid, 0)` ne fonctionne pas correctement (lève
-    `OSError WinError 87` pour un PID mort *et* pour des PIDs juste
-    invalides). On passe par `OpenProcess` + `GetExitCodeProcess` :
-    un process vivant renvoie `STILL_ACTIVE` (259), un process terminé
-    renvoie son code de sortie.
+    Windows : `os.kill(pid, 0)` ne fonctionne pas correctement (lève `OSError WinError 87` pour un PID mort *et* pour des PIDs juste invalides). On passe par `OpenProcess` + `GetExitCodeProcess` : un process vivant renvoie `STILL_ACTIVE` (259), un process terminé renvoie son code de sortie.
     """
     if pid <= 0:
         return False
@@ -95,8 +85,7 @@ def clear_status() -> None:
 def read_status() -> dict[str, JsonValue] | None:
     """Lit le statut, ou `None` si aucun pipeline n'est actif.
 
-    Un statut dont le PID est mort est traité comme "pas de pipeline
-    actif" et le fichier est nettoyé au passage (warning loggé).
+    Un statut dont le PID est mort est traité comme "pas de pipeline actif" et le fichier est nettoyé au passage (warning loggé).
     """
     if not STATUS_FILE.exists():
         return None

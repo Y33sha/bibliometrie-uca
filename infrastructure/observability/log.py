@@ -1,11 +1,8 @@
 """Configuration centralisée du logging.
 
-Par défaut, les logs sont émis au format JSON (une ligne = un record) pour
-permettre leur agrégation par un collecteur externe (Loki, ELK, stdout→fluentd).
-Pour revenir au format texte lisible en dev : `export LOG_FORMAT=text`.
+Par défaut, les logs sont émis au format JSON (une ligne = un record) pour permettre leur agrégation par un collecteur externe (Loki, ELK, stdout→fluentd). Pour le format texte lisible en dev : `export LOG_FORMAT=text`.
 
-Tous les fichiers .log sont consolidés sous `PROJECT_ROOT/logs/`, en
-reproduisant l'arborescence du caller (voir `_rebase_log_dir`).
+Tous les fichiers .log sont consolidés sous `PROJECT_ROOT/logs/`, en reproduisant l'arborescence du caller (voir `_rebase_log_dir`).
 """
 
 import contextvars
@@ -19,17 +16,15 @@ from pathlib import Path
 
 from infrastructure import PROJECT_ROOT as _PROJECT_ROOT
 
-# Phase pipeline courante, injectée comme nom de logger dans chaque record émis
-# pendant la phase (voir `_PhaseNameFilter`). Posée par l'orchestrateur
-# (`run_pipeline`) ; jamais renseignée hors run pipeline (API, scripts CLI).
+# Phase pipeline courante, injectée comme nom de logger dans chaque record émis pendant la phase (voir `_PhaseNameFilter`).
+# Posée par l'orchestrateur (`run_pipeline`) ; jamais renseignée hors run pipeline (API, scripts CLI).
 _log_phase: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "pipeline_log_phase", default=None
 )
 
 
 def set_log_phase(phase: str | None) -> contextvars.Token[str | None]:
-    """Définit la phase pipeline courante. Retourne un token à passer à
-    `reset_log_phase` pour restaurer la valeur précédente."""
+    """Définit la phase pipeline courante. Retourne un token à passer à `reset_log_phase` pour restaurer la valeur précédente."""
     return _log_phase.set(phase)
 
 
@@ -41,9 +36,7 @@ def reset_log_phase(token: contextvars.Token[str | None]) -> None:
 class _PhaseNameFilter(logging.Filter):
     """Réécrit `record.name` avec la phase pipeline courante quand elle est posée.
 
-    Rend chaque ligne auto-située — `normalize:` plutôt que `pipeline:` — sans câbler
-    un logger par phase à travers tout l'orchestrateur. Sans phase active (API,
-    scripts), le nom du logger d'origine est conservé.
+    Rend chaque ligne auto-située : `record.name` porte le nom de la phase (`normalize:`, `subjects:`…). Sans phase active (API, scripts), le nom du logger d'origine est conservé.
     """
 
     def filter(self, record: logging.LogRecord) -> bool:
@@ -53,8 +46,7 @@ class _PhaseNameFilter(logging.Filter):
         return True
 
 
-# Attributs internes de logging.LogRecord à ne PAS inclure dans la sortie JSON
-# (ils sont soit déjà couverts, soit trop verbeux).
+# Attributs internes de logging.LogRecord à ne PAS inclure dans la sortie JSON (déjà couverts, ou trop verbeux).
 _STD_RECORD_ATTRS = {
     "name",
     "msg",
@@ -84,9 +76,7 @@ _STD_RECORD_ATTRS = {
 class JsonFormatter(logging.Formatter):
     """Formatter produisant une ligne JSON par record.
 
-    Champs : timestamp (ISO UTC), level, logger, message.
-    Les `extra={...}` passés au logger sont fusionnés à la racine.
-    Les exceptions (`exc_info`) sont formatées dans `exception`.
+    Champs : timestamp (ISO UTC), level, logger, message. Les `extra={...}` passés au logger sont fusionnés à la racine ; les exceptions (`exc_info`) sont formatées dans `exception`.
     """
 
     def format(self, record: logging.LogRecord) -> str:
@@ -115,10 +105,7 @@ def _make_formatter() -> logging.Formatter:
 def _rebase_log_dir(log_dir: str) -> Path:
     """Rebase `log_dir` vers `PROJECT_ROOT/logs/<relpath>/`.
 
-    Le relpath est calculé à partir du chemin du caller relatif à la racine
-    du projet. Un suffixe `logs` final est éliminé pour éviter une
-    imbrication redondante `logs/.../logs/`. Un chemin hors projet est
-    replié sous `PROJECT_ROOT/logs/` en préservant ses segments nommés.
+    Le relpath est calculé à partir du chemin du caller relatif à la racine du projet. Un suffixe `logs` final est éliminé pour éviter une imbrication redondante `logs/.../logs/`. Un chemin hors projet est replié sous `PROJECT_ROOT/logs/` en préservant ses segments nommés.
     """
     p = Path(log_dir)
     if not p.is_absolute():
@@ -136,18 +123,11 @@ def _rebase_log_dir(log_dir: str) -> Path:
 def setup_logger(name: str, log_dir: str) -> logging.Logger:
     """Configure un logger avec sortie console, et fichier optionnel.
 
-    Le FileHandler est **opt-in** via `LOG_TO_FILE=true` (12-factor :
-    par défaut, l'app n'écrit pas sur disque — c'est à l'orchestrateur
-    qui tourne autour de décider quoi faire de stdout). Activer en dev
-    local pour garder un historique sans avoir à rediriger à la main.
+    Le FileHandler est **opt-in** via `LOG_TO_FILE=true` : par défaut l'app n'écrit pas sur disque (logs sur stdout, 12-factor). Activer en dev local pour garder un historique.
 
-    Quand activé, le `log_dir` passé par le caller est rebasé vers
-    `PROJECT_ROOT/logs/<relpath>/` (voir `_rebase_log_dir`) afin que
-    tous les fichiers `.log` soient regroupés sous une arborescence
-    unique. Crée le répertoire si nécessaire.
+    Quand activé, le `log_dir` passé par le caller est rebasé vers `PROJECT_ROOT/logs/<relpath>/` (voir `_rebase_log_dir`), regroupant tous les fichiers `.log` sous une arborescence unique. Crée le répertoire si nécessaire.
 
-    Configure uniquement le logger nommé (pas le root logger).
-    Format : JSON par défaut, texte si LOG_FORMAT=text.
+    Configure uniquement le logger nommé (pas le root logger). Format : JSON par défaut, texte si LOG_FORMAT=text.
     """
     logger = logging.getLogger(name)
     logger.setLevel(logging.INFO)
@@ -159,7 +139,7 @@ def setup_logger(name: str, log_dir: str) -> logging.Logger:
     fmt = _make_formatter()
 
     # Force UTF-8 sur la console pour éviter les UnicodeEncodeError Windows (cp1252)
-    # On wrape stdout.buffer sans en prendre ownership (line_buffering pour flush immédiat)
+    # On enveloppe stdout.buffer sans se l'approprier (line_buffering pour flush immédiat)
     utf8_stream = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", line_buffering=True)
     utf8_stream.close = lambda: None  # type: ignore[method-assign]  # Empêcher la fermeture de stdout.buffer
     console = logging.StreamHandler(stream=utf8_stream)
@@ -179,9 +159,7 @@ def setup_logger(name: str, log_dir: str) -> logging.Logger:
 
 
 def configure_root_logging(level: int = logging.INFO) -> None:
-    """Configure le root logger (utilisé par les modules qui font simplement
-    `logging.getLogger(__name__)` sans passer par setup_logger, notamment
-    les routers FastAPI).
+    """Configure le root logger (utilisé par les modules qui font simplement `logging.getLogger(__name__)` sans passer par setup_logger, notamment les routers FastAPI).
 
     Appelé au démarrage de backend/app.py.
     """
