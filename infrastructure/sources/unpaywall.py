@@ -3,9 +3,7 @@
 API: https://api.unpaywall.org/v2/{doi}?email=...
 Rate limit: 100 000 req/jour, ~10 req/s recommandé.
 
-Implémentation async sur `httpx.AsyncClient` + retry/backoff via
-`http_request_with_retry_async`. Le client httpx est passé en
-paramètre pour être partagé sur toute la boucle d'enrichissement.
+Implémentation async sur `httpx.AsyncClient` + retry/backoff via `http_request_with_retry_async`. Le client httpx est passé en paramètre pour être partagé sur toute la boucle d'enrichissement.
 """
 
 from __future__ import annotations
@@ -36,8 +34,8 @@ async def fetch_oa_status(
     logger: logging.Logger,
 ) -> str | None:
     """Interroge Unpaywall pour un DOI. Retourne le statut OA mappé ou None (DOI inconnu / erreur)."""
-    # Re-nettoyage avant l'appel HTTP par DOI (idempotent) : la colonne source du
-    # DOI peut porter du legacy non normalisé. Un DOI inexploitable → pas d'appel.
+    # Re-nettoyage avant l'appel HTTP par DOI (idempotent) : la colonne source
+    # peut porter un DOI non normalisé. Un DOI inexploitable → pas d'appel.
     cleaned = clean_doi(doi)
     if not cleaned:
         return None
