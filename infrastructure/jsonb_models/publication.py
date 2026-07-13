@@ -3,9 +3,10 @@
 Validation à la construction (via les VO domain pour les identifiants), sérialisation en dict pour l'écriture en base.
 """
 
-from typing import Any
+from collections.abc import Callable
+from typing import Any, Protocol
 
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, ValidationInfo, field_validator
 
 from application.ports.api.publications_queries import EcoleDoctorale, PartenaireThese
 from domain.publications.identifiers import DOI, NNT, PMCID, PMID, ArxivId, HALId
@@ -23,6 +24,26 @@ __all__ = [
 ]
 
 # ── ExternalIds : colonne source_publications.external_ids ─────────
+
+
+class _IdentifierVO(Protocol):
+    """Contrat des value objects d'identifiant : attribut `.value` canonique."""
+
+    @property
+    def value(self) -> str: ...
+
+
+# Champ → (`try_parse` du value object, libellé d'erreur).
+_SCALAR_IDS: dict[str, tuple[Callable[[str | None], _IdentifierVO | None], str]] = {
+    "nnt": (NNT.try_parse, "NNT"),
+    "pmid": (PMID.try_parse, "PMID"),
+    "pmcid": (PMCID.try_parse, "PMCID"),
+    "arxiv_id": (ArxivId.try_parse, "arXiv ID"),
+}
+_LIST_IDS: dict[str, tuple[Callable[[str | None], _IdentifierVO | None], str]] = {
+    "hal_id": (HALId.try_parse, "HAL ID"),
+    "related_dois": (DOI.try_parse, "DOI"),
+}
 
 
 class ExternalIds(BaseModel):
@@ -44,77 +65,37 @@ class ExternalIds(BaseModel):
     # Jamais clé de fusion : le DOI primaire de la publication est sur la colonne `doi`.
     related_dois: list[str] | None = None
 
-    @field_validator("hal_id", mode="before")
+    @field_validator("nnt", "pmid", "pmcid", "arxiv_id", mode="before")
     @classmethod
-    def _normalize_hal_id(cls, v: str | list[str] | None) -> list[str] | None:
-        """Normalise chaque hal_id via HALId (URL → ID canonique, strip version) ; dédoublonne. Tolère un scalaire en plus d'une liste."""
-        if v is None or v == "":
+    def _normalize_scalar_id(cls, v: str | None, info: ValidationInfo) -> str | None:
+        """Normalise un identifiant scalaire via son value object. Vide → None, invalide → `ValueError`."""
+        if not v:
             return None
+        assert info.field_name is not None
+        parse, label = _SCALAR_IDS[info.field_name]
+        parsed = parse(v)
+        if parsed is None:
+            raise ValueError(f"{label} invalide : {v!r}")
+        return parsed.value
+
+    @field_validator("hal_id", "related_dois", mode="before")
+    @classmethod
+    def _normalize_id_list(
+        cls, v: str | list[str] | None, info: ValidationInfo
+    ) -> list[str] | None:
+        """Normalise et dédoublonne une liste d'identifiants via leur value object. Tolère un scalaire. Vide → None."""
+        if not v:
+            return None
+        assert info.field_name is not None
+        parse, label = _LIST_IDS[info.field_name]
         raw = [v] if isinstance(v, str) else list(v)
         out: list[str] = []
         for item in raw:
-            normalized = HALId.try_parse(item)
-            if normalized is None:
-                raise ValueError(f"HAL ID invalide : {item!r}")
-            if normalized.value not in out:
-                out.append(normalized.value)
-        return out or None
-
-    @field_validator("nnt", mode="before")
-    @classmethod
-    def _normalize_nnt(cls, v: str | None) -> str | None:
-        """Normalise via NNT : trim + uppercase."""
-        if v is None or v == "":
-            return None
-        normalized = NNT.try_parse(v)
-        if normalized is None:
-            raise ValueError(f"NNT invalide : {v!r}")
-        return normalized.value
-
-    @field_validator("pmid", mode="before")
-    @classmethod
-    def _normalize_pmid(cls, v: str | None) -> str | None:
-        if v is None or v == "":
-            return None
-        normalized = PMID.try_parse(v)
-        if normalized is None:
-            raise ValueError(f"PMID invalide : {v!r}")
-        return normalized.value
-
-    @field_validator("pmcid", mode="before")
-    @classmethod
-    def _normalize_pmcid(cls, v: str | None) -> str | None:
-        if v is None or v == "":
-            return None
-        normalized = PMCID.try_parse(v)
-        if normalized is None:
-            raise ValueError(f"PMCID invalide : {v!r}")
-        return normalized.value
-
-    @field_validator("arxiv_id", mode="before")
-    @classmethod
-    def _normalize_arxiv_id(cls, v: str | None) -> str | None:
-        if v is None or v == "":
-            return None
-        normalized = ArxivId.try_parse(v)
-        if normalized is None:
-            raise ValueError(f"arXiv ID invalide : {v!r}")
-        return normalized.value
-
-    @field_validator("related_dois", mode="before")
-    @classmethod
-    def _normalize_related_dois(cls, v: str | list[str] | None) -> list[str] | None:
-        """Normalise chaque DOI via le VO DOI ; dédoublonne. Tolère un scalaire."""
-        if v is None or v == "":
-            return None
-        raw = [v] if isinstance(v, str) else list(v)
-        out: list[str] = []
-        for item in raw:
-            normalized = DOI.try_parse(item)
-            if normalized is None:
-                raise ValueError(f"DOI invalide : {item!r}")
-            if normalized.value not in out:
-                out.append(normalized.value)
+            parsed = parse(item)
+            if parsed is None:
+                raise ValueError(f"{label} invalide : {item!r}")
+            if parsed.value not in out:
+                out.append(parsed.value)
         return out or None
 
     def to_dict(self) -> dict[str, Any]:
