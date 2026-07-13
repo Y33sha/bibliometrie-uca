@@ -1,19 +1,8 @@
-"""Aggregate root `Journal` — entité métier d'un journal/conférence/etc.
+"""Aggregate root `Journal` — un journal, une conférence ou un autre support de publication.
 
-Identité = `id` (clé surrogate). Identifiant naturel : `title`
-(via la normalisation côté `journal_name_forms`). Les ISSN sont
-fortement discriminants mais facultatifs.
+Identité = `id` (clé surrogate). Identifiant naturel : `title`, via la normalisation de `journal_name_forms`. Les ISSN sont fortement discriminants mais facultatifs. `publisher_id` référence l'aggregate `Publisher` par son id.
 
-`publisher_id` est une **référence par id** à l'aggregate `Publisher`
-(pattern Cosmic Python ch. 7 : références entre aggregates par id, pas
-par objet), pour éviter de charger toute la grappe à chaque lecture.
-
-La logique métier touchant aux journaux (matching, fusion, APC, OA)
-vit ici. Scaffolding a minima : pas d'invariants métier identifiés
-aujourd'hui, à enrichir si nécessaire.
-
-`JOURNAL_TYPES` doit rester synchronisé avec l'enum SQL `journal_type` —
-test de cohérence dans `tests/integration/test_scenarios.py::TestJournalTypesEnum`.
+`JOURNAL_TYPES` reste synchronisé avec l'enum SQL `journal_type` — cohérence vérifiée par `tests/integration/test_scenarios.py::TestJournalTypesEnum`.
 """
 
 from dataclasses import dataclass
@@ -42,9 +31,7 @@ JOURNAL_TYPES: tuple[JournalType, ...] = (
 )
 JOURNAL_TYPES_SET: frozenset[str] = frozenset(JOURNAL_TYPES)
 
-# Labels FR de chaque valeur d'enum, source de vérité côté Python pour les
-# affichages UI (dropdowns admin, colonnes/badges des pages publiques).
-# Exposés au frontend via `/api/journal-types`.
+# Labels FR des valeurs d'enum, source de vérité Python pour l'UI (dropdowns admin, badges publics), exposés via `/api/journal-types`.
 JOURNAL_TYPE_LABELS_FR: dict[JournalType, str] = {
     "journal": "Revue",
     "proceedings": "Proceedings",
@@ -56,25 +43,19 @@ JOURNAL_TYPE_LABELS_FR: dict[JournalType, str] = {
     "unknown": "Inconnu",
 }
 
-# Modèles OA observés en base (colonne `journals.oa_model`, text libre côté
-# schéma mais en pratique restreint à ce vocabulaire — fixé par le modal
-# d'édition admin et par les rares écritures pipeline).
+# Modèles OA de `journals.oa_model` : colonne text au schéma, restreinte en pratique à ce vocabulaire par le modal admin et les écritures pipeline.
 OaModel = Literal["subscription", "full_oa", "repository"]
 OA_MODELS: tuple[OaModel, ...] = ("subscription", "full_oa", "repository")
 
-# Labels FR exposés via `/api/journals/oa-models` (consommé par les
-# dropdowns/facettes côté UI, et par le modal d'édition admin).
+# Labels FR exposés via `/api/journals/oa-models` (dropdowns/facettes UI, modal d'édition admin).
 OA_MODEL_LABELS_FR: dict[OaModel, str] = {
     "subscription": "Abonnement",
     "full_oa": "Full OA (gold/diamond)",
     "repository": "Archive / dépôt",
 }
 
-# Mapping OpenAlex Sources `type` → notre `journal_type`, lu par la sous-étape
-# d'enrichissement des revues de la phase `publishers_journals`.
-# Skip (None) sur `metadata` et `other` : pas de signal exploitable.
-# `preprint_server` et `media` n'ont pas d'équivalent OpenAlex (les preprint
-# servers y sont catégorisés en `repository`) — restent purement manuels.
+# Mapping du champ OpenAlex Sources `type` vers l'enum `journal_type`, lu par l'enrichissement des revues (phase `publishers_journals`).
+# `metadata` et `other` sont absents (pas de signal exploitable) ; `preprint_server` et `media` aussi (sans équivalent OpenAlex, posés à la main).
 _OPENALEX_SOURCE_TYPE_MAP: dict[str, JournalType] = {
     "journal": "journal",
     "repository": "repository",
@@ -85,11 +66,7 @@ _OPENALEX_SOURCE_TYPE_MAP: dict[str, JournalType] = {
 
 
 def map_openalex_source_type(raw: str | None) -> JournalType | None:
-    """Mappe un champ OpenAlex Sources `type` vers notre enum `journal_type`.
-
-    Renvoie `None` pour les types sans signal exploitable (`metadata`,
-    `other`) ou inconnus — le caller doit alors ne pas écrire.
-    """
+    """Mappe un champ OpenAlex Sources `type` vers l'enum `journal_type`, ou `None` pour les types sans signal exploitable (`metadata`, `other`) et les types inconnus."""
     if not raw:
         return None
     return _OPENALEX_SOURCE_TYPE_MAP.get(raw.lower())
@@ -97,7 +74,7 @@ def map_openalex_source_type(raw: str | None) -> JournalType | None:
 
 @dataclass(slots=True)
 class Journal:
-    """Journal / conférence / autre support de publication (aggregate root)."""
+    """Journal, conférence ou autre support de publication (aggregate root)."""
 
     id: int | None
     title: str
