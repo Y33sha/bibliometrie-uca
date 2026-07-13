@@ -25,8 +25,8 @@ class Settings(BaseSettings):
     )
 
     # ----- Authentification admin -----
-    # Hash bcrypt : python3 -c 'import bcrypt; print(bcrypt.hashpw(b"MOT_DE_PASSE", bcrypt.gensalt()).decode())'
-    # Session secret : python3 -c "import secrets; print(secrets.token_hex(32))"
+    # Hash bcrypt : python -c 'import bcrypt; print(bcrypt.hashpw(b"MOT_DE_PASSE", bcrypt.gensalt()).decode())'
+    # Session secret : python -c "import secrets; print(secrets.token_hex(32))"
     admin_user: str = "admin"
     admin_hash: str
     session_secret: str
