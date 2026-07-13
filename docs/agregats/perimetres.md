@@ -57,7 +57,7 @@ Port `application/ports/api/perimeters_queries.py`, adaptateur `PgPerimetersAdmi
 Dette assumée et décisions d'architecture propres à cet agrégat, gardées explicites.
 
 1. **Double calcul de la clôture récursive.** La descente `est_tutelle_de` des racines est écrite deux fois : la CTE live `get_perimeter_structure_ids` (un périmètre, à la demande) et la matérialisation `refresh_perimeter_structures` (tous les périmètres, en table). Même logique, deux implémentations synchronisées par convention. La CTE live pourrait sans doute lire la table matérialisée au lieu de recalculer — à vérifier qu'aucun appelant live n'exige une clôture plus fraîche que la matérialisation.
-2. **Racines en colonne tableau.** `perimeters.structure_ids` est un `int[]`, sans clé étrangère sur ses éléments : rien en base ne garantit qu'un id racine désigne une structure existante (choix moins relationnel qu'une table de jointure).
+2. **Racines en colonne tableau (décision assumée).** `perimeters.structure_ids` est un `int[]` sans clé étrangère sur ses éléments. L'intégrité repose sur la discipline des points d'écriture — édition de périmètre, suppression de structure, ajout/retrait de tutelle — qui nettoient les racines et recalculent la clôture. Une table de jointure serait plus relationnelle, mais overkill à ce stade.
 
 ## Invariants métier
 
