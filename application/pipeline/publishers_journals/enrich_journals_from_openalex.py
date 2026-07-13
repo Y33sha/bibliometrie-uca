@@ -2,14 +2,13 @@
 
 Champs mis à jour :
 - `apc_amount`, `apc_currency` (prix catalogue DOAJ exposés par OpenAlex)
-- `journal_type` (via `domain.journals.journal.map_openalex_source_type`), uniquement quand le mapping renvoie une valeur exploitable
+- `journal_type` (via le mapping local du `type` OpenAlex), uniquement quand le mapping renvoie une valeur exploitable
 
 Le fetch OpenAlex et le circuit-breaker de source sont injectés (le HTTP vit dans `infrastructure/sources/openalex`). L'orchestrateur ne consulte que l'état du breaker pour s'arrêter quand la source est à bout de budget. Appelé par `run_pipeline`.
 """
 
 import logging
 import time
-from collections import Counter
 from collections.abc import Callable
 
 from sqlalchemy import Connection
@@ -22,10 +21,29 @@ from application.ports.repositories.journal_repository import (
     JournalUpdate,
 )
 from application.services.journals.core import update_journal_apc
-from domain.journals.journal import map_openalex_source_type
+from domain.journals.journal import JournalType
 
 BATCH_SIZE = 50
 COMMIT_EVERY = 500  # commit DB tous les N journals traités
+
+_OPENALEX_SOURCE_TYPE_MAP: dict[str, JournalType] = {
+    "journal": "journal",
+    "repository": "repository",
+    "conference": "proceedings",
+    "book series": "book_series",
+    "ebook platform": "ebook_platform",
+}
+
+
+def map_openalex_source_type(raw: str | None) -> JournalType | None:
+    """Mappe le champ `type` d'une source OpenAlex vers l'enum `journal_type`, ou `None` pour les types sans signal exploitable (`metadata`, `other`) et les types inconnus.
+
+    `preprint_server` et `media` sont absents de la table (sans équivalent dans la taxonomie OpenAlex) et restent posés à la main.
+    """
+    if not raw:
+        return None
+    return _OPENALEX_SOURCE_TYPE_MAP.get(raw.lower())
+
 
 FetchSourcesBatch = Callable[[list[str]], dict[str, tuple[float | None, str, str | None]]]
 """Signature du fetch injecté : `(openalex_ids) -> {short_id: (apc_amount, apc_currency, raw_type)}`."""
@@ -52,7 +70,6 @@ def run_enrich_journals_from_openalex(
     with_apc = 0
     processed = 0
     type_written = 0
-    raw_type_counter: Counter[str] = Counter()
 
     for i in range(0, total, BATCH_SIZE):
         if breaker.tripped:
@@ -74,8 +91,6 @@ def run_enrich_journals_from_openalex(
                 processed += 1
                 continue
             apc_amount, apc_currency, raw_type = data
-            if raw_type:
-                raw_type_counter[raw_type] += 1
 
             update_journal_apc(
                 journal_id, apc_amount=apc_amount, apc_currency=apc_currency, repo=journal_repo
@@ -111,7 +126,4 @@ def run_enrich_journals_from_openalex(
         with_apc,
         type_written,
     )
-    if raw_type_counter:
-        distrib = ", ".join(f"{t}={n}" for t, n in raw_type_counter.most_common())
-        logger.info("Distribution OpenAlex `type` : %s", distrib)
     return PhaseMetrics(seen=total, updated=updated)

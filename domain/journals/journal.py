@@ -45,23 +45,6 @@ OA_MODEL_LABELS_FR: dict[OaModel, str] = {
     "repository": "Archive / dépôt",
 }
 
-# Mapping du champ OpenAlex Sources `type` vers l'enum `journal_type`, lu par l'enrichissement des revues (phase `publishers_journals`).
-# `metadata` et `other` sont absents (pas de signal exploitable) ; `preprint_server` et `media` aussi (sans équivalent OpenAlex, posés à la main).
-_OPENALEX_SOURCE_TYPE_MAP: dict[str, JournalType] = {
-    "journal": "journal",
-    "repository": "repository",
-    "conference": "proceedings",
-    "book series": "book_series",
-    "ebook platform": "ebook_platform",
-}
-
-
-def map_openalex_source_type(raw: str | None) -> JournalType | None:
-    """Mappe un champ OpenAlex Sources `type` vers l'enum `journal_type`, ou `None` pour les types sans signal exploitable (`metadata`, `other`) et les types inconnus."""
-    if not raw:
-        return None
-    return _OPENALEX_SOURCE_TYPE_MAP.get(raw.lower())
-
 
 @dataclass(slots=True)
 class Journal:
