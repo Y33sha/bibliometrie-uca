@@ -74,6 +74,7 @@ from application.pipeline.normalize.base import NormalizeStats
 from application.pipeline.phase_order import PHASE_ORDER
 from domain.sources.registry import ALL_SOURCES_SET
 from infrastructure.observability.log import reset_log_phase, set_log_phase, setup_logger
+from infrastructure.observability.log_markers import PHASE_MARKER, RUN_END_MARKER, RUN_MARKER
 from infrastructure.observability.pipeline_status import clear_status, read_status, write_status
 from infrastructure.pipeline_lock import PipelineAlreadyRunningError, acquire_pipeline_lock
 
@@ -1377,7 +1378,7 @@ def _run_one_phase(
     phase_token = set_log_phase(name)
     try:
         log.info("─" * 40)
-        log.info("PHASE : %s", name)
+        log.info("%s%s", PHASE_MARKER, name)
         log.info("─" * 40)
         write_status(
             mode=args.mode,
@@ -1464,7 +1465,7 @@ def _execute_phases(
     # Observabilité par phase : run_id de séquence, capture entrée/sortie + statut.
     recorder = start_run(mode=args.mode, sources=effective_sources)
     if recorder.run_id is not None:
-        log.info("Run pipeline #%d", recorder.run_id)
+        log.info("%s%d", RUN_MARKER, recorder.run_id)
 
     t0_total = time.time()
     pipeline_started_at = datetime.datetime.now().isoformat(timespec="seconds")
@@ -1487,7 +1488,7 @@ def _execute_phases(
     recorder.close()
     clear_status()
     log.info("=" * 60)
-    log.info("PIPELINE TERMINÉ en %.0fs (%.1f min)", elapsed_total, elapsed_total / 60)
+    log.info("%s en %.0fs (%.1f min)", RUN_END_MARKER, elapsed_total, elapsed_total / 60)
     if recorder.run_id is not None:
         log.info("Run #%d — récapitulatif par phase :", recorder.run_id)
         for phase_name, phase_duration in phase_results:

@@ -14,12 +14,9 @@ from __future__ import annotations
 import re
 
 from infrastructure import PROJECT_ROOT
+from infrastructure.observability.log_markers import PHASE_MARKER, RUN_END_MARKER, RUN_MARKER
 
 PIPELINE_LOG = PROJECT_ROOT / "logs" / "pipeline.log"
-
-_RUN_MARKER = "Run pipeline #"
-_PHASE_MARKER = "PHASE : "
-_RUN_END_MARKER = "PIPELINE TERMINÉ"
 
 
 def slice_phase_log(log_text: str, run_id: int, phase: str) -> str | None:
@@ -28,8 +25,8 @@ def slice_phase_log(log_text: str, run_id: int, phase: str) -> str | None:
     Renvoie `None` si le run ou la phase ne figure pas dans `log_text` (log purgé, run antérieur au suivi, phase non jouée). La section court du marqueur `PHASE : <phase>` jusqu'au prochain début de phase, début de run ou fin de run (bornes exclues) ; pour un run encore en cours, jusqu'à la fin du texte.
     """
     lines = log_text.splitlines()
-    run_re = re.compile(rf"{re.escape(_RUN_MARKER)}{run_id}(?!\d)")
-    phase_re = re.compile(rf"{re.escape(_PHASE_MARKER)}{re.escape(phase)}\b")
+    run_re = re.compile(rf"{re.escape(RUN_MARKER)}{run_id}(?!\d)")
+    phase_re = re.compile(rf"{re.escape(PHASE_MARKER)}{re.escape(phase)}\b")
 
     run_start = next((i for i, line in enumerate(lines) if run_re.search(line)), None)
     if run_start is None:
@@ -42,7 +39,7 @@ def slice_phase_log(log_text: str, run_id: int, phase: str) -> str | None:
     end = len(lines)
     for i in range(phase_start + 1, len(lines)):
         line = lines[i]
-        if _PHASE_MARKER in line or _RUN_MARKER in line or _RUN_END_MARKER in line:
+        if PHASE_MARKER in line or RUN_MARKER in line or RUN_END_MARKER in line:
             end = i
             break
     return "\n".join(lines[phase_start:end])
