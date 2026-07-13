@@ -139,7 +139,7 @@ def get_extraction_api_ids(conn: Connection, source: str) -> list[str]:
     """Retourne les identifiants API pour une source, déduits du périmètre d'extraction.
 
     Lit `perimeter_extraction` → structures du périmètre → `structures.api_ids[source]`.
-    Seul circuit autorisé : pas de fallback vers d'anciennes clés `config.*` plates.
+    Seul circuit autorisé : pas de fallback vers des clés `config.*` plates.
     """
     perim_code = _get_from_db(conn, "perimeter_extraction")
     if not (perim_code and isinstance(perim_code, str)):
@@ -163,7 +163,7 @@ def get_extraction_api_ids(conn: Connection, source: str) -> list[str]:
             if isinstance(ids, list):
                 result.extend(ids)
             elif isinstance(ids, str):
-                # Tolérance scalaire historique (cf. `StructureApiIds._ensure_list`).
+                # Tolérance d'un scalaire (cf. `StructureApiIds._ensure_list`).
                 result.append(ids)
         return list(dict.fromkeys(result))  # dédupliqué, ordre préservé
     except Exception as e:

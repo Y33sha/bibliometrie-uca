@@ -1,6 +1,4 @@
-"""
-Fonctions partagées par les scripts d'extraction (OpenAlex, HAL, WoS, ScanR).
-"""
+"""Fonctions partagées par les scripts d'extraction (OpenAlex, HAL, WoS, ScanR)."""
 
 import hashlib
 import json
@@ -114,7 +112,7 @@ def upsert_staging(
 
     `INSERT … ON CONFLICT (source, source_id) DO UPDATE` piloté par `raw_hash` :
     réécrit `raw_data` (et repasse `processed=FALSE`) seulement si le hash a changé,
-    bumpe toujours `last_seen_at`, et renseigne `doi` s'il manquait (jamais d'écrasement).
+    met toujours à jour `last_seen_at`, et renseigne `doi` s'il manquait (jamais d'écrasement).
     Un `raw_hash=null` en base force le re-import (`NULL IS DISTINCT FROM <hash>`).
     Le hash est calculé via `change_detection_hash`, qui neutralise le bruit volatil
     propre à la source avant l'empreinte (le payload stocké reste, lui, fidèle).
@@ -381,9 +379,9 @@ def get_cross_import_dois(conn: Connection, target: str) -> list[str]:
             params["target_ra"] = target_ra
         rows = conn.execute(text(query), params).scalars()
         # Re-nettoyage des candidats avant tout appel HTTP par DOI : la colonne
-        # `staging.doi` peut porter du legacy non normalisé (le `clean_doi` à
-        # l'écriture est récent). Idempotent ; `dict.fromkeys` dédoublonne les
-        # collisions induites par la normalisation en préservant l'ordre.
+        # `staging.doi` peut porter des DOI non normalisés. Idempotent ;
+        # `dict.fromkeys` dédoublonne les collisions induites par la normalisation
+        # en préservant l'ordre.
         return list(dict.fromkeys(c for d in rows if (c := clean_doi(d))))
 
     pg_prefix_filter = " AND (dp.ra = %(target_ra)s OR dp.ra IS NULL)" if target_ra else ""

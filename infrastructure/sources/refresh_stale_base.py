@@ -1,9 +1,6 @@
 """Classe de base des adapters `refresh_stale` : opérations DB génériques.
 
-Seul `fetch_by_native_id` (l'appel HTTP par identifiant natif) et la
-configuration (URL, auth) sont source-spécifiques. La sélection des rows stale,
-la persistance du refresh et le marquage de disparition sont identiques d'une
-source à l'autre : ils vivent ici, factorisés depuis `infrastructure.sources.common`.
+Seul `fetch_by_native_id` (l'appel HTTP par identifiant natif) et la configuration (URL, auth) sont source-spécifiques. La sélection des rows stale, la persistance du refresh et le marquage de disparition sont identiques d'une source à l'autre : ils vivent ici, factorisés depuis `infrastructure.sources.common`.
 """
 
 from __future__ import annotations
