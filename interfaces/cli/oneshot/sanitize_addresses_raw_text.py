@@ -33,7 +33,7 @@ from sqlalchemy import text
 from domain.normalize import normalize_text, sanitize_raw_text
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from infrastructure.repositories.address_linker import recompute_pub_count
+from infrastructure.queries.pipeline.address_pub_count import recompute_pub_count
 
 log = setup_logger("sanitize_addresses_raw_text", os.path.dirname(__file__))
 
