@@ -5,7 +5,7 @@ Encapsule le pattern commun aux extracteurs :
   - retry sur les erreurs réseau (RequestException)
   - optionnellement retry sur body vide (certaines API comme WoS renvoient parfois un body vide sans 429, typiquement sous rate-limit silencieux)
 
-Les scripts d'extraction utilisent ce module au lieu de dupliquer la logique.
+Les scripts d'extraction s'appuient sur ce module pour leur logique de retry commune.
 """
 
 import logging
