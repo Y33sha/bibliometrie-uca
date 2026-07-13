@@ -73,8 +73,14 @@ from application.pipeline.modes import MODE_NAMES, MODES
 from application.pipeline.normalize.base import NormalizeStats
 from application.pipeline.phase_order import PHASE_ORDER
 from domain.sources.registry import ALL_SOURCES_SET
-from infrastructure.observability.log import reset_log_phase, set_log_phase, setup_logger
-from infrastructure.observability.log_markers import PHASE_MARKER, RUN_END_MARKER, RUN_MARKER
+from infrastructure.observability.log import (
+    PHASE_MARKER,
+    RUN_END_MARKER,
+    RUN_MARKER,
+    reset_log_phase,
+    set_log_phase,
+    setup_logger,
+)
 from infrastructure.observability.pipeline_status import clear_status, read_status, write_status
 from infrastructure.pipeline_lock import PipelineAlreadyRunningError, acquire_pipeline_lock
 

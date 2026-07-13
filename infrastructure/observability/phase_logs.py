@@ -14,7 +14,7 @@ from __future__ import annotations
 import re
 
 from infrastructure import PROJECT_ROOT
-from infrastructure.observability.log_markers import PHASE_MARKER, RUN_END_MARKER, RUN_MARKER
+from infrastructure.observability.log import PHASE_MARKER, RUN_END_MARKER, RUN_MARKER
 
 PIPELINE_LOG = PROJECT_ROOT / "logs" / "pipeline.log"
 
