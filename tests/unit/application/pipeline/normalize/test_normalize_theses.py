@@ -1,8 +1,8 @@
 """Tests unitaires de `application.pipeline.normalize.normalize_theses`.
 
-Couvre `extract_pub_metadata` (cascade pub_year soutenance/inscription, NNT, doc_type), `_build_source_meta` (date_soutenance, date_inscription, discipline, écoles doctorales, partenaires), `insert_source_document` (keywords sujets, topics discipline+rameau, NNT external_ids), `process_authorships` (aggregate_thesis_persons, partenaires → addr_parts), `process_work` (skip sans titre, happy path, exception), et la classe `ThesesNormalizer` (preload, _row_factory, process_work wrapper, cleanup, on_error, summary_stats).
+Couvre `extract_pub_metadata` (cascade pub_year soutenance/inscription, NNT, doc_type), `_build_source_meta` (date_soutenance, date_inscription, discipline, écoles doctorales, partenaires), `insert_source_document` (keywords sujets, topics discipline+rameau, NNT external_ids), `process_authorships` (aggregate_thesis_persons, partenaires + établissement → adresses partagées), `process_work` (skip sans titre, happy path, exception), et la classe `ThesesNormalizer` (preload, process_work wrapper, summary_stats).
 
-Pattern : `_FakeQueries` + `_FakeAddressLinker` + `MagicMock`, pas de DB.
+Pattern : `_FakeQueries` + `MagicMock`, pas de DB.
 """
 
 from __future__ import annotations
@@ -51,18 +51,6 @@ class _FakeQueries:
 
     def count_theses_table(self, conn, table: str) -> int:
         return self.count_table_returns.get(table, 0)
-
-
-class _FakeAddressLinker:
-    def __init__(self) -> None:
-        self.links: list[tuple[int, list[str]]] = []
-        self.cleared = 0
-
-    def link(self, conn, sa_id: int, addr_parts: list[str]) -> None:
-        self.links.append((sa_id, addr_parts))
-
-    def clear_cache(self) -> None:
-        self.cleared += 1
 
 
 class _FakeStagingQueries:
@@ -258,98 +246,93 @@ class TestInsertSourceDocument:
 # ── process_authorships ──────────────────────────────────────────────
 
 
+def _spy_write_addresses(monkeypatch):
+    """Espion sur `write_addresses` capturant les `sa_addresses` de chaque appel."""
+    calls: list[list[tuple[int | None, list]]] = []
+    monkeypatch.setattr(
+        normalize_theses,
+        "write_addresses",
+        lambda conn, batch_queries, sa_addresses: calls.append(sa_addresses),
+    )
+    return calls
+
+
+def _addr_texts(sa_addresses):
+    """Aplati les `sa_addresses` capturés en `(sa_id, [texte, ...])` pour les assertions."""
+    return [(sa_id, [a.text for a in addrs]) for sa_id, addrs in sa_addresses]
+
+
+class _Author:
+    def __init__(self, name="X", pos=0, roles=None, ids=None):
+        self.raw_author_name = name
+        self.author_position = pos
+        self.roles = roles or ["author"]
+        self.person_identifiers = ids
+
+
 class TestProcessPersons:
     def test_no_authors_no_upsert(self, monkeypatch):
         monkeypatch.setattr(normalize_theses, "aggregate_thesis_persons", lambda these: [])
+        calls = _spy_write_addresses(monkeypatch)
         queries = _FakeQueries()
-        process_authorships(MagicMock(), queries, {}, 10, address_linker=_FakeAddressLinker())
+        process_authorships(MagicMock(), queries, {}, 10, batch_queries=MagicMock())
         assert queries.cleared_for == [10]
         assert queries.upserted_authorships == []
+        assert calls == []
 
     def test_with_authors(self, monkeypatch):
-        # Stub aggregate_thesis_persons pour ne pas dépendre du domain.
-        class _A:
-            def __init__(self, name, pos, roles, ids=None):
-                self.raw_author_name = name
-                self.author_position = pos
-                self.roles = roles
-                self.person_identifiers = ids
-
         monkeypatch.setattr(
             normalize_theses,
             "aggregate_thesis_persons",
             lambda these: [
-                _A("DUPONT Marie", 0, ["author"], {"idref": "123"}),
-                _A("MARTIN Jean", 1, ["director"]),
+                _Author("DUPONT Marie", 0, ["author"], {"idref": "123"}),
+                _Author("MARTIN Jean", 1, ["director"]),
             ],
         )
+        _spy_write_addresses(monkeypatch)
         queries = _FakeQueries()
-        process_authorships(MagicMock(), queries, {}, 10, address_linker=_FakeAddressLinker())
+        process_authorships(MagicMock(), queries, {}, 10, batch_queries=MagicMock())
         assert len(queries.upserted_authorships) == 2
         assert queries.upserted_authorships[0]["person_identifiers"] == {"idref": "123"}
         # `None` quand l'aggregate n'a pas d'identifiants.
         assert queries.upserted_authorships[1]["person_identifiers"] is None
 
     def test_partenaires_become_addr_parts(self, monkeypatch):
-        class _A:
-            raw_author_name = "X"
-            author_position = 0
-            roles = ["author"]
-            person_identifiers = None
-
-        monkeypatch.setattr(normalize_theses, "aggregate_thesis_persons", lambda these: [_A()])
+        monkeypatch.setattr(normalize_theses, "aggregate_thesis_persons", lambda these: [_Author()])
+        calls = _spy_write_addresses(monkeypatch)
         queries = _FakeQueries()
-        linker = _FakeAddressLinker()
         these = {"partenairesDeRecherche": [{"nom": "LIMOS"}, {"nom": "LRL"}, {}]}
-        process_authorships(MagicMock(), queries, these, 10, address_linker=linker)
-        assert linker.links == [(101, ["LIMOS", "LRL"])]
+        process_authorships(MagicMock(), queries, these, 10, batch_queries=MagicMock())
+        assert _addr_texts(calls[0]) == [(101, ["LIMOS", "LRL"])]
 
     def test_etablissement_appended_to_addr_parts(self, monkeypatch):
-        class _A:
-            raw_author_name = "X"
-            author_position = 0
-            roles = ["author"]
-            person_identifiers = None
-
-        monkeypatch.setattr(normalize_theses, "aggregate_thesis_persons", lambda these: [_A()])
+        monkeypatch.setattr(normalize_theses, "aggregate_thesis_persons", lambda these: [_Author()])
+        calls = _spy_write_addresses(monkeypatch)
         queries = _FakeQueries()
-        linker = _FakeAddressLinker()
         these = {
             "partenairesDeRecherche": [{"nom": "LIMOS"}],
             "etabSoutenanceN": "Université Clermont Auvergne (2021-...)",
         }
-        process_authorships(MagicMock(), queries, these, 10, address_linker=linker)
-        assert linker.links == [(101, ["LIMOS", "Université Clermont Auvergne (2021-...)"])]
+        process_authorships(MagicMock(), queries, these, 10, batch_queries=MagicMock())
+        assert _addr_texts(calls[0]) == [
+            (101, ["LIMOS", "Université Clermont Auvergne (2021-...)"])
+        ]
 
     def test_etablissement_alone_creates_link(self, monkeypatch):
-        """Sans partenaire, l'établissement de soutenance suffit à poser une
-        adresse (→ rattachement périmètre des thèses)."""
-
-        class _A:
-            raw_author_name = "X"
-            author_position = 0
-            roles = ["author"]
-            person_identifiers = None
-
-        monkeypatch.setattr(normalize_theses, "aggregate_thesis_persons", lambda these: [_A()])
+        """Sans partenaire, l'établissement de soutenance suffit à poser une adresse (→ rattachement périmètre des thèses)."""
+        monkeypatch.setattr(normalize_theses, "aggregate_thesis_persons", lambda these: [_Author()])
+        calls = _spy_write_addresses(monkeypatch)
         queries = _FakeQueries()
-        linker = _FakeAddressLinker()
         these = {"etabSoutenanceN": "Université Clermont Auvergne (2021-...)"}
-        process_authorships(MagicMock(), queries, these, 10, address_linker=linker)
-        assert linker.links == [(101, ["Université Clermont Auvergne (2021-...)"])]
+        process_authorships(MagicMock(), queries, these, 10, batch_queries=MagicMock())
+        assert _addr_texts(calls[0]) == [(101, ["Université Clermont Auvergne (2021-...)"])]
 
     def test_no_partenaires_no_link(self, monkeypatch):
-        class _A:
-            raw_author_name = "X"
-            author_position = 0
-            roles = ["author"]
-            person_identifiers = None
-
-        monkeypatch.setattr(normalize_theses, "aggregate_thesis_persons", lambda these: [_A()])
+        monkeypatch.setattr(normalize_theses, "aggregate_thesis_persons", lambda these: [_Author()])
+        calls = _spy_write_addresses(monkeypatch)
         queries = _FakeQueries()
-        linker = _FakeAddressLinker()
-        process_authorships(MagicMock(), queries, {}, 10, address_linker=linker)
-        assert linker.links == []
+        process_authorships(MagicMock(), queries, {}, 10, batch_queries=MagicMock())
+        assert calls == []
 
 
 # ── process_work ─────────────────────────────────────────────────
@@ -362,7 +345,7 @@ class TestProcessWork:
             "logger": logging.getLogger("test"),
             "pub_repo": MagicMock(),
             "staging_queries": staging_queries or _FakeStagingQueries(),
-            "address_linker": _FakeAddressLinker(),
+            "batch_queries": MagicMock(),
         }
 
     def test_skip_when_no_title(self, caplog):
@@ -405,7 +388,7 @@ def _make_normalizer():
         staging_queries=_FakeStagingQueries(),
         queries=_FakeQueries(),
         pub_repo_factory=lambda c: MagicMock(),
-        address_linker=_FakeAddressLinker(),
+        batch_queries=MagicMock(),
     )
 
 
@@ -421,16 +404,6 @@ class TestThesesNormalizerClass:
         monkeypatch.setattr(normalize_theses, "process_work", lambda *a, **kw: True)
         result = norm.process_work(MagicMock(), _staging_row())
         assert result is True
-
-    def test_cleanup_clears_address_linker_cache(self):
-        norm = _make_normalizer()
-        norm.cleanup()
-        assert norm._address_linker.cleared == 1  # type: ignore[attr-defined]
-
-    def test_on_error_clears_address_linker_cache(self):
-        norm = _make_normalizer()
-        norm.on_error()
-        assert norm._address_linker.cleared == 1  # type: ignore[attr-defined]
 
     def test_summary_stats_returns_2_lines(self):
         norm = _make_normalizer()

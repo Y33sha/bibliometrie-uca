@@ -3,12 +3,10 @@
 Couvre la template method `run()` et ses chemins :
 - `total == 0` (rien à faire)
 - happy path (success / skip / error mélangés, batch commit, summary)
-- exception dans `process_work` (log de l'échec + rollback au SAVEPOINT + on_error)
+- exception dans `process_work` (log de l'échec + rollback au SAVEPOINT)
 - `KeyboardInterrupt` (rollback du batch en cours + re-raise pour arrêt propre)
 - exception fatale en dehors de la boucle (rollback + relève)
 - `_iter_rows` mode `FETCH_SUB_BATCH` (chargement par sous-lots)
-
-Le test `_process_one` avec SAVEPOINT vit dans `tests/integration/pipeline/test_normalize_on_error_hook.py`.
 """
 
 from __future__ import annotations
@@ -78,7 +76,6 @@ class _Norm(SourceNormalizer):
         self.processed_rows: list[StagingRow] = []
         self.preload_called = False
         self.cleanup_called = False
-        self.on_error_called = 0
 
     def process_work(self, conn, row: StagingRow) -> bool | None:
         self.processed_rows.append(row)
@@ -95,9 +92,6 @@ class _Norm(SourceNormalizer):
 
     def cleanup(self):
         self.cleanup_called = True
-
-    def on_error(self):
-        self.on_error_called += 1
 
 
 # ── total == 0 ────────────────────────────────────────────────────
@@ -184,15 +178,13 @@ class TestRunHappyPath:
 
 
 class TestRunWorkException:
-    def test_savepoint_rollback_and_on_error_called(self, caplog):
+    def test_savepoint_rollback_continues_batch(self, caplog):
         staging = _FakeStaging()
         staging.count_returns = 2
         staging.pending_rows = [_row("a"), _row("b")]
         norm = _Norm(staging, results=[True, True], raises_on={"a"})
         with caplog.at_level(logging.INFO):
             norm.run()
-        # Le work en échec est annulé au SAVEPOINT et on_error est appelé.
-        assert norm.on_error_called == 1
         # Le work en échec est loggé par la boucle (les process_work ne loggent pas eux-mêmes).
         assert "Erreur sur a" in caplog.text
         # Le 2e row est quand même traité après le rollback du 1er.

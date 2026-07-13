@@ -438,7 +438,7 @@ def insert_wos_document(
 def build_wos_author_records(rec: dict, logger: logging.Logger) -> list[AuthorRecord]:
     """Parse les authorships d'un record WoS en `AuthorRecord` (sans I/O).
 
-    Filtre les auteurs via `is_wos_author_exploitable` ; si aucun n'est exploitable alors que le record en porte, logge un warning (détecte une dérive éventuelle de l'API WoS — perte silencieuse de records sinon). Chaque auteur porte `person_identifiers` (researcher_id ; l'ORCID WoS n'est pas moissonné, cf. extraction) et ses adresses brutes. La déduplication par position est faite par le writer.
+    Filtre les auteurs via `is_wos_author_exploitable` ; si aucun n'est exploitable alors que le record en porte, logge un warning (détecte une dérive éventuelle de l'API WoS — perte silencieuse de records sinon). Chaque auteur porte `person_identifiers` (researcher_id ; l'ORCID WoS n'est pas moissonné, cf. extraction) et ses adresses brutes. Les `author_position` du payload WoS peuvent se répéter ; elles sont dédoublonnées ici (première occurrence gagne), la clé `(source_publication_id, author_position)` interdisant les doublons en base.
     """
     raw_authors = rec.get("authors", [])
     authors_kept = [a for a in raw_authors if is_wos_author_exploitable(a)]
@@ -470,7 +470,11 @@ def build_wos_author_records(rec: dict, logger: logging.Logger) -> list[AuthorRe
                 addresses=[AddressRecord(text=addr) for addr in (author.get("addresses") or [])],
             )
         )
-    return records
+    # `author_position` lue du payload WoS : dédup (première occurrence gagne).
+    by_position: dict[int, AuthorRecord] = {}
+    for r in records:
+        by_position.setdefault(r.position, r)
+    return list(by_position.values())
 
 
 def process_authorships(

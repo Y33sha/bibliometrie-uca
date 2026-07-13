@@ -12,9 +12,10 @@ from collections.abc import Callable
 
 from sqlalchemy import Connection
 
+from application.pipeline.normalize._authorships_batch import AddressRecord, write_addresses
 from application.pipeline.normalize.base import SourceNormalizer
 from application.pipeline.timings import StepTimer
-from application.ports.pipeline.address_linker import AddressLinker
+from application.ports.pipeline.normalize.authorships import AuthorshipsBatchQueries
 from application.ports.pipeline.normalize.theses import ThesesNormalizeQueries
 from application.ports.pipeline.staging import StagingQueries, StagingRow
 from application.ports.repositories.publication_repository import PublicationRepository
@@ -164,7 +165,7 @@ def process_authorships(
     these: dict,
     source_publication_id: int,
     *,
-    address_linker: AddressLinker,
+    batch_queries: AuthorshipsBatchQueries,
 ) -> None:
     """Traite tous les rôles d'une thèse (auteurs, directeurs, rapporteurs, jury, président) en consommant `aggregate_thesis_persons` côté domain pour la déduplication multi-rôles + fusion + assignation de position."""
     queries.clear_source_authorships_for_publication(conn, source_publication_id)
@@ -177,7 +178,11 @@ def process_authorships(
     addr_parts = [p["nom"] for p in partenaires if p.get("nom")]
     if etablissement := these.get("etabSoutenanceN"):
         addr_parts.append(etablissement)
+    shared_addresses = [AddressRecord(text=t) for t in addr_parts]
 
+    # Signatures insérées une par une (`RETURNING`) : les non-auteurs ont `author_position` NULL, que le remap par position du writer batch ne saurait porter.
+    # Les `sa_id` récoltés portent tous les mêmes adresses document, écrites en un seul `write_addresses`.
+    sa_addresses: list[tuple[int | None, list[AddressRecord]]] = []
     for a in authorships:
         sa_id = queries.upsert_theses_source_authorship(
             conn,
@@ -188,8 +193,10 @@ def process_authorships(
             author_name_normalized=normalize_name_form(a.raw_author_name),
             person_identifiers=a.person_identifiers if a.person_identifiers else None,
         )
-        if addr_parts:
-            address_linker.link(conn, sa_id, addr_parts)
+        sa_addresses.append((sa_id, shared_addresses))
+
+    if addr_parts:
+        write_addresses(conn, batch_queries, sa_addresses)
 
 
 # =============================================================
@@ -205,7 +212,7 @@ def process_work(
     *,
     pub_repo: PublicationRepository,
     staging_queries: StagingQueries,
-    address_linker: AddressLinker,
+    batch_queries: AuthorshipsBatchQueries,
 ) -> bool:
     """Traite une thèse du staging."""
     staging_id = staging_row.id
@@ -226,7 +233,7 @@ def process_work(
     )
     t.mark("theses_doc")
 
-    process_authorships(conn, queries, these, source_publication_id, address_linker=address_linker)
+    process_authorships(conn, queries, these, source_publication_id, batch_queries=batch_queries)
     t.mark("authorships")
 
     staging_queries.mark_done(conn, staging_id)
@@ -246,13 +253,13 @@ class ThesesNormalizer(SourceNormalizer):
         staging_queries: StagingQueries,
         queries: ThesesNormalizeQueries,
         pub_repo_factory: Callable[[Connection], PublicationRepository],
-        address_linker: AddressLinker,
+        batch_queries: AuthorshipsBatchQueries,
     ) -> None:
         super().__init__(conn, logger, staging_queries)
         self._queries = queries
         self._pub_repo_factory = pub_repo_factory
         self._pub_repo: PublicationRepository | None = None
-        self._address_linker = address_linker
+        self._batch_queries = batch_queries
 
     def preload_caches(self, conn: Connection) -> None:
         self._pub_repo = self._pub_repo_factory(conn)
@@ -266,15 +273,8 @@ class ThesesNormalizer(SourceNormalizer):
             row,
             pub_repo=self._pub_repo,
             staging_queries=self._staging,
-            address_linker=self._address_linker,
+            batch_queries=self._batch_queries,
         )
-
-    def cleanup(self) -> None:
-        self._address_linker.clear_cache()
-
-    def on_error(self) -> None:
-        # Le cache peut contenir des address_id insérés dans la transaction qui vient d'être annulée — invalide-le pour éviter les violations de clé étrangère sur les works suivants.
-        self._address_linker.clear_cache()
 
     def summary_stats(self, conn: Connection) -> list[str]:
         return [

@@ -61,19 +61,17 @@ def write_source_authorships(
     Enchaîne, par document :
       1. clear des authorships existantes (re-traitement → table blanche)
       2. bulk upsert `source_authorships` puis fetch des ids par position
-      3. bulk upsert des `addresses` uniques puis fetch des ids
-      4. propagation des pays (≤2 executemany)
-      5. bulk insert des liens `source_authorship_addresses`
+      3. écriture des adresses via `write_addresses` (clé par `sa_id`)
+
+    Les `author_position` de `records` doivent être uniques : c'est la clé qui
+    remappe les `sa_id` fraîchement insérés (étape 3) et la contrainte
+    `(source_publication_id, author_position)` en base. Chaque parser la garantit
+    (les cinq sources par `enumerate` ; WoS, qui lit la position du payload,
+    dédoublonne dans son parser).
     """
     queries.clear_source_authorships_for_publication(conn, source_publication_id)
     if not records:
         return
-
-    # Dédup défensive par position (première occurrence gagne) : la clé (source_publication_id, author_position) interdit les doublons.
-    by_position: dict[int, AuthorRecord] = {}
-    for rec in records:
-        by_position.setdefault(rec.position, rec)
-    ordered = list(by_position.values())
 
     sa_values: list[SourceAuthorshipBatchItem] = [
         {
@@ -86,7 +84,7 @@ def write_source_authorships(
             "raw_author_name": rec.raw_name,
             "person_identifiers": rec.person_identifiers,
         }
-        for rec in ordered
+        for rec in records
     ]
     queries.upsert_source_authorships_batch(conn, sa_values)
 
@@ -94,14 +92,35 @@ def write_source_authorships(
         conn,
         source=source,
         source_publication_id=source_publication_id,
-        positions=[rec.position for rec in ordered],
+        positions=[rec.position for rec in records],
+    )
+    write_addresses(
+        conn,
+        queries,
+        [(sa_id_by_position.get(rec.position), rec.addresses) for rec in records],
     )
 
-    # ── Adresses : textes uniques du document + pays (première occurrence) ──
+
+def write_addresses(
+    conn: Connection,
+    queries: AuthorshipsBatchQueries,
+    sa_addresses: list[tuple[int | None, list[AddressRecord]]],
+) -> None:
+    """Écrit les `addresses` d'un document et leurs liens `source_authorship_addresses`.
+
+    `sa_addresses` : les couples `(sa_id, adresses)` du document. Les textes uniques
+    sont upsertés puis leurs ids récupérés en une passe, les pays propagés sur la row
+    `addresses`, et les liens pivot insérés en batch. Un `sa_id` None (position
+    introuvable) est ignoré.
+
+    Clé par `sa_id` : l'appelant obtient ses `sa_id` à sa façon — l'écriture batch par
+    remap de position, le normaliseur theses par `RETURNING` (ses adresses sont
+    partagées au niveau document, attachées à chaque personne).
+    """
     addr_countries: dict[str, list[str] | None] = {}
     addr_suggested: dict[str, list[str] | None] = {}
-    for rec in ordered:
-        for addr in rec.addresses:
+    for _sa_id, addresses in sa_addresses:
+        for addr in addresses:
             cleaned = sanitize_raw_text(addr.text)
             if not cleaned or cleaned in addr_countries:
                 continue
@@ -127,14 +146,12 @@ def write_source_authorships(
     queries.apply_address_countries_batch(conn, country_items)
     queries.apply_address_suggested_countries_batch(conn, suggested_items)
 
-    # ── Liens pivot (source_authorship_addresses) ──
     link_values: list[AuthorshipAddressItem] = []
-    for rec in ordered:
-        sa_id = sa_id_by_position.get(rec.position)
+    for sa_id, addresses in sa_addresses:
         if not sa_id:
             continue
         seen: set[int] = set()
-        for addr in rec.addresses:
+        for addr in addresses:
             cleaned = sanitize_raw_text(addr.text)
             if not cleaned:
                 continue

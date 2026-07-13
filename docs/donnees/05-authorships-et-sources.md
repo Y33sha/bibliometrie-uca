@@ -69,6 +69,6 @@ Cache des tentatives négatives de cross-import DOI sur les sources **non native
 | `doi_lookups` | pipeline | cross-imports DOI (`infrastructure/sources/*/fetch_missing_doi.py`) |
 | `source_publications` | pipeline | `application/pipeline/normalize/normalize_*.py` |
 | `source_authorships` | mixte | `normalize_*.py` (pipeline) ; `in_perimeter` par la phase `affiliations`, `authorship_id` par la phase `authorships` ; `person_id` par le pipeline ou en admin (orphan-assign) |
-| `source_authorship_addresses` | pipeline | `normalize_*.py` (via `PgAddressLinker`) |
+| `source_authorship_addresses` | pipeline | `normalize_*.py` (via `_authorships_batch.py`) |
 | `authorships` | pipeline | `build_authorships.py` (dédupliquée, dérivée des sources) |
 | `rejected_authorships` | admin | exclusion d'une paire (`PATCH /api/authorships/{id}/exclude`) |
