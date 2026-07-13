@@ -1,8 +1,5 @@
-"""Concept métier Perimeter — aggregate root et règles associées.
+"""Entité de domaine `Perimeter`.
 
 Sous-modules :
-- `perimeter` : aggregate root `Perimeter` (table `perimeters`).
-
-Scaffolding a minima : pas d'invariants métier rapatriés ici, à
-enrichir lors d'un chantier ultérieur si besoin.
+- `perimeter` : l'entité `Perimeter` (table `perimeters`).
 """
