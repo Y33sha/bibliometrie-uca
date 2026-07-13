@@ -1,19 +1,14 @@
-"""MetaData SQLAlchemy — source de vérité du schéma Postgres.
+"""Modèle SQLAlchemy des tables Postgres — surface de query-building.
 
-Description complète des tables, indexes, contraintes uniques, CHECK
-constraints et comments. Sert :
-- au query-building côté SQLAlchemy Core (`select(config.c.key)…`),
-- à `alembic revision --autogenerate` (comparaison MetaData ↔ DB).
+Décrit tables, indexes, contraintes uniques, CHECK et comments, pour deux usages :
+- le query-building côté SQLAlchemy Core (`select(config.c.key)…`),
+- servir de référence à `alembic revision --autogenerate` (comparaison MetaData ↔ DB).
 
-Les Foreign Keys ne sont volontairement pas déclarées (pattern
-query-building, pas modélisation relationnelle complète). Le filtre
-`include_object` dans `alembic/env.py` empêche autogenerate de les
-considérer.
+Ce modèle n'est pas la source de vérité du schéma : les migrations Alembic (`alembic/versions/`, écrites à la main) font foi, et `infrastructure/db/schema.sql` en est un snapshot descriptif régénéré par `python -m infrastructure.db.dump_schema`. Le fichier est maintenu à la main en miroir de la base ; le test `tests/integration/infrastructure/db/test_sqlalchemy_smoke.py` garde les deux cohérents, en vérifiant que colonnes déclarées et colonnes réelles coïncident (un drift d'index, de contrainte ou d'enum, lui, n'est pas couvert).
 
-`infrastructure/db/schema.sql` reste un snapshot descriptif lisible,
-régénéré par `python -m infrastructure.db.dump_schema`. Le test
-`tests/integration/infrastructure/db/test_sqlalchemy_smoke.py`
-vérifie la cohérence MetaData ↔ DB sur les colonnes.
+Deux familles d'objets sont volontairement tenues hors du metadata et écartées de l'autogenerate :
+- les Foreign Keys — non déclarées (query-building, pas modélisation relationnelle complète) ; le filtre `include_object` dans `alembic/env.py` les ignore.
+- les vues matérialisées (`authorship_structures`, `publication_structures`, `source_authorship_structures`, `subject_cooccurrences`) — non modélisées, accès en SQL brut par nom, car autogenerate ne gère pas les MATERIALIZED VIEW.
 """
 
 from sqlalchemy import (
@@ -1028,6 +1023,10 @@ distinct_publications = Table(
 )
 
 
+# Relevés de paiements de frais de publication (Article Processing Charges) :
+# une ligne par paiement, importés depuis des exports comptables (colonnes à
+# plat ; `source_file` trace le fichier d'origine). `publication_id`,
+# `journal_id`, `publisher_id` et `*_structure_id` sont rapprochés après import.
 apc_payments = Table(
     "apc_payments",
     metadata,
@@ -1188,15 +1187,8 @@ publication_subjects = Table(
 )
 
 
-# `subject_cooccurrences` est une MATERIALIZED VIEW (alembic
-# `c8a3f2e5b4d7`). La projection SA Core ci-dessous sert uniquement aux
-# SELECT côté queries — les contraintes/indexes vivent en migration.
-subject_cooccurrences = Table(
-    "subject_cooccurrences",
-    metadata,
-    Column("subject_a_id", Integer, nullable=False),
-    Column("subject_b_id", Integer, nullable=False),
-    Column("count", Integer, nullable=False),
-    PrimaryKeyConstraint("subject_a_id", "subject_b_id"),
-    info={"is_view": True},
-)
+# `subject_cooccurrences` est une MATERIALIZED VIEW (migration c8a3f2e5b4d7),
+# pas une table : paires de sujets co-présents sur une même publication, avec
+# leur effectif (seuil `count >= 2`). Non modélisée dans le metadata SQLAlchemy
+# — accès en SQL brut par nom (lectures) ou via REFRESH — pour éviter
+# qu'`alembic --autogenerate` tente de la recréer en table.
