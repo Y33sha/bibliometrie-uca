@@ -57,10 +57,7 @@ def _isolate_raw_store(tmp_path_factory):
 
 @pytest.fixture(autouse=True)
 def _clear_caches():
-    """Vide les caches module-level restants entre chaque test (rollback-safe).
-
-    Le cache d'adresses est désormais instance-level (PgAddressLinker).
-    """
+    """Vide les caches module-level restants entre chaque test (rollback-safe)."""
     yield
     # HAL author cache
     try:

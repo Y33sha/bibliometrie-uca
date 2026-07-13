@@ -703,7 +703,7 @@ def _normalize_builders() -> dict[str, Callable[[Any], Any]]:
     """Constructeur du normalizer par source, dans l'ordre de priorité (source la plus
     autoritative en premier — cf. SOURCE_PRIORITY) : les suivantes n'écrasent pas les
     métadonnées déjà posées. Les six sources bibliographiques partagent le câblage
-    `_biblio` ; `theses` a le sien (`address_linker`, sans repos journal/publisher)."""
+    `_biblio` ; `theses` a le sien (sans repos journal/publisher)."""
     from application.pipeline.normalize.normalize_crossref import CrossrefNormalizer
     from application.pipeline.normalize.normalize_datacite import DataciteNormalizer
     from application.pipeline.normalize.normalize_hal import HalNormalizer
@@ -725,7 +725,6 @@ def _normalize_builders() -> dict[str, Callable[[Any], Any]]:
         publication_repository,
         publisher_repository,
     )
-    from infrastructure.repositories.address_linker import PgAddressLinker
 
     def _biblio(cls: Any, queries_cls: Any) -> Callable[[Any], Any]:
         return lambda conn: cls(
@@ -746,7 +745,7 @@ def _normalize_builders() -> dict[str, Callable[[Any], Any]]:
             PgStagingQueries(),
             PgThesesNormalizeQueries(),
             pub_repo_factory=publication_repository,
-            address_linker=PgAddressLinker(),
+            batch_queries=PgAuthorshipsBatchQueries(),
         ),
         "crossref": _biblio(CrossrefNormalizer, PgCrossrefNormalizeQueries),
         "datacite": _biblio(DataciteNormalizer, PgDataciteNormalizeQueries),

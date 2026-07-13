@@ -74,12 +74,6 @@ class SourceNormalizer(ABC):
     def cleanup(self) -> None:  # noqa: B027 (hook optionnel)
         """Libération des caches in-memory."""
 
-    def on_error(self) -> None:  # noqa: B027 (hook optionnel)
-        """Appelé après chaque rollback (SAVEPOINT ou complet).
-
-        Les caches qui référencent des IDs générés dans la transaction annulée doivent être invalidés ici — sinon ils pointent vers des lignes qui n'existent plus, provoquant des violations de clé étrangère sur les works suivants. Exemple typique : `PgAddressLinker._cache`.
-        """
-
     # ── Template method ────────────────────────────────────────
 
     def _count_pending(self, conn: Connection) -> int:
@@ -94,12 +88,8 @@ class SourceNormalizer(ABC):
 
     def _process_one(self, conn: Connection, row: StagingRow) -> bool | None:
         """Enveloppe process_work dans un SAVEPOINT : un work en erreur est annulé sans abandonner le batch en cours."""
-        try:
-            with savepoint(conn, on_rollback_failure=self.conn.rollback):
-                return self.process_work(conn, row)
-        except Exception:
-            self.on_error()
-            raise
+        with savepoint(conn, on_rollback_failure=self.conn.rollback):
+            return self.process_work(conn, row)
 
     def run(self) -> NormalizeStats:
         """Entry point : pilote la boucle de normalisation."""
