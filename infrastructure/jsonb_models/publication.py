@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, ValidationInfo, field_validator
 
 from application.ports.api.publications_queries import EcoleDoctorale, PartenaireThese
 from domain.publications.identifiers import DOI, NNT, PMCID, PMID, ArxivId, HALId
+from infrastructure.jsonb_models._base import JsonbModel
 
 # Types re-exportés (importables depuis ce module).
 __all__ = [
@@ -46,7 +47,7 @@ _LIST_IDS: dict[str, tuple[Callable[[str | None], _IdentifierVO | None], str]] =
 }
 
 
-class ExternalIds(BaseModel):
+class ExternalIds(JsonbModel):
     """Modèle de la colonne JSONB `external_ids` des source_publications.
 
     Identifiants externes cross-source, utilisés notamment pour la déduplication (fusion par HAL-ID, par NNT, …). Les valeurs sont normalisées via les value objects du domaine — un HAL URL en entrée est stocké comme HAL ID canonique, un NNT est mis en majuscules, etc.
@@ -98,15 +99,11 @@ class ExternalIds(BaseModel):
                 out.append(parsed.value)
         return out or None
 
-    def to_dict(self) -> dict[str, Any]:
-        """Sérialise pour écriture en base (JSONB). Omet les clés None ; préserve les clés supplémentaires (`extra="allow"`)."""
-        return self.model_dump(exclude_none=True)
-
 
 # ── PublicationBiblio : colonne biblio ─────────────────────────────
 
 
-class PublicationBiblio(BaseModel):
+class PublicationBiblio(JsonbModel):
     """Modèle de la colonne JSONB `biblio` (sur source_publications ET publications).
 
     Contient les infos bibliographiques d'un article (volume, issue, numéro de page). **Schéma hétérogène selon la source** :
@@ -124,15 +121,11 @@ class PublicationBiblio(BaseModel):
     first_page: str | None = None  # OpenAlex, WoS
     last_page: str | None = None  # OpenAlex, WoS
 
-    def to_dict(self) -> dict[str, Any]:
-        """Sérialise pour écriture en base (colonne JSONB `biblio`)."""
-        return self.model_dump(exclude_none=True)
-
 
 # ── PublicationMeta : colonne meta ─────────────────────────────────
 
 
-class PublicationMeta(BaseModel):
+class PublicationMeta(JsonbModel):
     """Modèle de la colonne JSONB `meta` (sur source_publications ET
     publications).
 
@@ -151,10 +144,6 @@ class PublicationMeta(BaseModel):
     etablissement: str | None = None  # établissement de soutenance (theses.fr)
     ecoles_doctorales: list[EcoleDoctorale] | None = None
     partenaires: list[PartenaireThese] | None = None
-
-    def to_dict(self) -> dict[str, Any]:
-        """Sérialise pour écriture en base (colonne JSONB `meta`)."""
-        return self.model_dump(exclude_none=True)
 
 
 # ── PublicationTopics : colonne topics ─────────────────────────────
@@ -187,7 +176,7 @@ class ThesesTopics(BaseModel):
     rameau: list[str] | None = None
 
 
-class PublicationTopics(BaseModel):
+class PublicationTopics(JsonbModel):
     """Modèle de la colonne JSONB `topics` (sur publications,
     reconstituée par refresh_from_sources).
 
@@ -205,7 +194,3 @@ class PublicationTopics(BaseModel):
     theses: ThesesTopics | None = None
     # ScanR a un format variable côté API, non figé en sous-modèle Pydantic.
     scanr: dict[str, Any] | None = None
-
-    def to_dict(self) -> dict[str, Any]:
-        """Sérialise pour écriture en base (colonne JSONB `topics`)."""
-        return self.model_dump(exclude_none=True)
