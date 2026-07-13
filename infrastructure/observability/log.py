@@ -16,6 +16,11 @@ from pathlib import Path
 
 from infrastructure import PROJECT_ROOT as _PROJECT_ROOT
 
+# Marqueurs délimitant runs et phases dans le flux de log : `run_pipeline` les émet, `phase_logs` les parse pour découper le log par phase.
+RUN_MARKER = "Run pipeline #"
+PHASE_MARKER = "PHASE : "
+RUN_END_MARKER = "PIPELINE TERMINÉ"
+
 # Phase pipeline courante, injectée comme nom de logger dans chaque record émis pendant la phase (voir `_PhaseNameFilter`).
 # Posée par l'orchestrateur (`run_pipeline`) ; jamais renseignée hors run pipeline (API, scripts CLI).
 _log_phase: contextvars.ContextVar[str | None] = contextvars.ContextVar(
