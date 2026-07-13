@@ -89,10 +89,6 @@ class TestFactory:
     def test_empty_url_uses_default_local_store(self):
         assert isinstance(get_raw_store(url=""), LocalFileRawStore)
 
-    def test_s3_not_implemented(self):
-        with pytest.raises(NotImplementedError):
-            get_raw_store(url="s3://bucket/prefix")
-
     def test_unknown_scheme_raises(self):
         with pytest.raises(ValueError, match="non supporté"):
             get_raw_store(url="ftp://host/path")

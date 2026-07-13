@@ -44,8 +44,7 @@ class Settings(BaseSettings):
     db_pool_max: int = 30
 
     # ----- Raw store (payloads bruts hors BDD) -----
-    # Vide → store local par défaut (`data/raw_store`). Sinon `file:///chemin`
-    # ou `s3://bucket/prefix` (backend S3 non implémenté).
+    # Vide → store local par défaut (`data/raw_store`). Sinon un `file:///chemin` absolu.
     biblio_raw_store_url: str = ""
 
     @property

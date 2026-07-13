@@ -2,7 +2,7 @@
 
 - non défini → store local par défaut (`{PROJECT_ROOT}/data/raw_store`) ;
 - `file:///chemin/absolu` → `LocalFileRawStore` (chemin résolu cross-platform) ;
-- `s3://bucket/prefix` → non implémenté.
+- tout autre schéma → `ValueError`.
 """
 
 from __future__ import annotations
@@ -29,8 +29,4 @@ def get_raw_store(url: str | None = None) -> RawStore:
     if parsed.scheme == "file":
         # url2pathname gère le `/C:/...` de Windows comme le `/home/...` Unix.
         return LocalFileRawStore(Path(url2pathname(parsed.path)))
-    if parsed.scheme == "s3":
-        raise NotImplementedError(
-            "Backend S3 non implémenté — utiliser file://."
-        )
     raise ValueError(f"BIBLIO_RAW_STORE_URL : schéma non supporté ({raw_url!r})")
