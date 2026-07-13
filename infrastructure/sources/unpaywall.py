@@ -34,8 +34,7 @@ async def fetch_oa_status(
     logger: logging.Logger,
 ) -> str | None:
     """Interroge Unpaywall pour un DOI. Retourne le statut OA mappé ou None (DOI inconnu / erreur)."""
-    # Re-nettoyage avant l'appel HTTP par DOI (idempotent) : la colonne source
-    # peut porter un DOI non normalisé. Un DOI inexploitable → pas d'appel.
+    # Re-nettoyage avant l'appel HTTP par DOI (idempotent) : la colonne source peut porter un DOI non normalisé. Un DOI inexploitable → pas d'appel.
     cleaned = clean_doi(doi)
     if not cleaned:
         return None
