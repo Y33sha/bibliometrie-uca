@@ -79,9 +79,11 @@ def delete_structure(
     perimeter_repo: PerimeterRepository,
     audit_repo: AuditRepository,
 ) -> None:
-    """Supprime une structure (cascade relations + formes de noms). Rafraîchit la clôture
-    matérialisée des périmètres : la cascade sur les tutelles peut en modifier la descente."""
+    """Supprime une structure (cascade relations + formes de noms), la retire des racines de
+    tout périmètre, puis rafraîchit la clôture matérialisée : la structure supprimée et la
+    cascade sur ses tutelles en modifient la descente."""
     structures_service.delete_structure(structure_id, repo=repo, audit_repo=audit_repo)
+    perimeter_repo.remove_structure_from_all_perimeters(structure_id)
     perimeter_repo.refresh_structures()
     conn.commit()
 

@@ -41,6 +41,10 @@ class PerimeterRepository(Protocol):
         structure_id: int,
     ) -> bool: ...
 
+    def remove_structure_from_all_perimeters(self, structure_id: int) -> None:
+        """Retire une structure des racines (`structure_ids`) de tout périmètre, après sa suppression."""
+        ...
+
     # ── CRUD ───────────────────────────────────────────────────────
 
     def perimeter_exists(self, perimeter_id: int) -> bool: ...
