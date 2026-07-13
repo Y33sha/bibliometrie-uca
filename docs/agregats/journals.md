@@ -67,7 +67,6 @@ Dette assumée et décisions d'architecture propres à cet agrégat, gardées ex
 
 1. **Agrégat anémique.** `Journal` est une dataclass de données sans comportement ni invariant maintenu ; le label « aggregate root » est aspirationnel. L'opportunité d'un objet de domaine riche rejoint le catalogue d'invariants évalué en fin de tour.
 2. **`merge_journal_into` : SQL cross-agrégat et contrainte gérée à la main.** La fusion mêle SQLAlchemy Core et `text()` pour écrire `publications` / `source_publications` / `apc_payments` (tables hors MetaData du repo journal), et neutralise l'`openalex_id` source avant le COALESCE pour éviter une violation d'unicité — logique sensible à l'ordre des statements.
-3. **Cascade `find_or_create_journal` incohérente entre branches.** Les chemins openalex / ISSN réenregistrent une forme de nom via `enrich_journal`, mais le chemin par titre ne le fait pas ; un `# TODO` explicite subsiste dans `core.py`.
 
 ## Invariants métier
 
