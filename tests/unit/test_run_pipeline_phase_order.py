@@ -1,9 +1,6 @@
-"""Régression : `addresses.pub_count` est recalculé en phase `publications`, pas `normalize`.
+"""Régression : `addresses.pub_count` se recalcule en phase `publications`.
 
-`recompute_pub_count` compte les publications par adresse. Le placer en fin de `normalize`
-(état antérieur) opérait sur des publications inexistantes à ce stade (elles ne sont créées qu'en
-phase `publications`). Le recalcul tourne donc dans l'orchestrateur `publications`, après la
-réconciliation — jamais dans `normalize`, dont l'orchestration n'y a aucun accès.
+`recompute_pub_count` compte les publications rattachées à chaque adresse ; celles-ci ne sont créées qu'en phase `publications`, après réconciliation. Le recalcul tourne dans cet orchestrateur, hors de portée de `normalize`.
 """
 
 import logging
