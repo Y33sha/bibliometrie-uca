@@ -24,41 +24,26 @@ from application.ports.pipeline.perimeter import PerimeterQueries
 
 
 def get_perimeter_structure_ids(conn: Connection, perimeter_code: str) -> set[int]:
-    """Retourne l'ensemble des `structure_ids` pour un périmètre donné.
+    """Ensemble des `structure_id` du périmètre `perimeter_code` — racines et descendants (`est_tutelle_de`) — lu depuis la table matérialisée `perimeter_structures`.
 
-    Chaque structure listée dans `perimeters.structure_ids` est une racine. Ses descendants récursifs (via `est_tutelle_de`) sont inclus.
+    La clôture est calculée par `refresh_perimeter_structures` (en tête de pipeline, à chaque édition admin, et au début d'`affiliations`) ; cette lecture ne fait que la restituer.
     """
-    row = conn.execute(
-        text("SELECT structure_ids FROM perimeters WHERE code = :code"),
-        {"code": perimeter_code},
-    ).first()
-    root_ids = list(row.structure_ids) if row and row.structure_ids else None
-    if not root_ids:
-        return set()
     result = conn.execute(
         text("""
-            WITH RECURSIVE descendants AS (
-                SELECT unnest(CAST(:roots AS int[])) AS id
-                UNION
-                SELECT sr.child_id FROM structure_relations sr
-                JOIN descendants d ON d.id = sr.parent_id
-                WHERE sr.relation_type = 'est_tutelle_de'
-            )
-            SELECT id FROM descendants
+            SELECT ps.structure_id
+            FROM perimeter_structures ps
+            JOIN perimeters p ON p.id = ps.perimeter_id
+            WHERE p.code = :code
         """),
-        {"roots": root_ids},
+        {"code": perimeter_code},
     )
-    return {row.id for row in result}
+    return {row.structure_id for row in result}
 
 
 def refresh_perimeter_structures(conn: Connection) -> int:
-    """Recompute la table matérialisée `perimeter_structures` : clôture récursive
-    (`est_tutelle_de`) de chaque `perimeters.structure_ids`. Idempotent (DELETE +
-    réinsertion complète). Retourne le nombre de liens. Commit laissé au caller.
+    """Recompute la table matérialisée `perimeter_structures` : pour chaque périmètre, la clôture récursive (`est_tutelle_de`) de ses racines `perimeters.structure_ids`, filtrée aux structures existantes. Idempotent (DELETE + réinsertion complète). Retourne le nombre de liens ; commit laissé au caller.
 
-    Reproduit la CTE de `get_perimeter_structure_ids` (mêmes racines, même
-    relation) à l'échelle de tous les périmètres en une passe. À rejouer à chaque
-    édition de `perimeters.structure_ids` ou `structure_relations`.
+    Seule implémentation de la clôture d'un périmètre — `get_perimeter_structure_ids` lit cette table. À rejouer à chaque édition de `perimeters.structure_ids` ou `structure_relations`.
     """
     conn.execute(text("DELETE FROM perimeter_structures"))
     return conn.execute(

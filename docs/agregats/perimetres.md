@@ -20,12 +20,12 @@ flowchart LR
     ADM[API admin] -->|CRUD, add/remove racine| P[perimeters.structure_ids]
     STR[édition structures/relations] -->|refresh_structures| PS[(perimeter_structures)]
     P -->|refresh_structures| PS
-    AFF[phase affiliations] -->|refresh au démarrage| PS
+    START[démarrage pipeline] -->|refresh| PS
+    AFF[phase affiliations] -->|refresh| PS
     PS --> INP[in_perimeter des signatures]
-    P -->|CTE live| LIVE[get_perimeter_structure_ids]
-    LIVE --> PERS[phase persons]
-    CFG[config perimeter_extraction / _persons] -.nomme.-> PS
-    CFG -.nomme.-> LIVE
+    PS -->|lecture| LIVE[get_perimeter_structure_ids]
+    LIVE --> USE[extraction / phase persons]
+    CFG[config perimeter_extraction / _persons] -.nomme le périmètre.-> LIVE
 ```
 
 ## Écriture — API (curation admin)
@@ -38,12 +38,13 @@ Routeur `interfaces/api/routers/admin/perimeters.py`, services `application/serv
 
 ## Écriture — pipeline
 
-Le pipeline n'édite pas les périmètres (curation admin), mais la phase `affiliations` **rematérialise** `perimeter_structures` en première étape (`refresh_perimeter_structures`, port `PerimeterQueries`) : la clôture est ainsi fraîche avant de servir au cadrage.
+Le pipeline n'édite pas les périmètres (curation admin), mais **rematérialise** `perimeter_structures` (`refresh_perimeter_structures`) à deux moments : en tête de run, avant l'extraction qui lit le périmètre d'extraction ; et une seconde fois au début de la phase `affiliations`. La clôture est ainsi fraîche avant de servir au cadrage.
 
 ## Lecture — pipeline
 
+- **Extraction** : les extracteurs lisent, via `get_extraction_api_ids`, les structures du périmètre d'extraction (`get_perimeter_structure_ids`) pour savoir quoi interroger aux sources.
 - **Cadrage `in_perimeter`** : la phase `affiliations` reconnaît comme in-perimeter les structures présentes dans `perimeter_structures` du périmètre d'extraction (jointes via la matview `source_authorship_structures`).
-- **Périmètre personnes** : `get_persons_structure_ids` calcule à la volée, par CTE récursive, la clôture du périmètre `perimeter_persons` pour la phase `persons`.
+- **Périmètre personnes** : `get_persons_structure_ids` lit dans `perimeter_structures` la clôture du périmètre `perimeter_persons` pour la phase `persons`.
 
 ## Lecture — API
 
@@ -56,9 +57,8 @@ Port `application/ports/api/perimeters_queries.py`, adaptateur `PgPerimetersAdmi
 
 Dette assumée et décisions d'architecture propres à cet agrégat, gardées explicites.
 
-1. **Double calcul de la clôture récursive.** La descente `est_tutelle_de` des racines est écrite deux fois : la CTE live `get_perimeter_structure_ids` (un périmètre, à la demande) et la matérialisation `refresh_perimeter_structures` (tous les périmètres, en table). Même logique, deux implémentations synchronisées par convention. La CTE live pourrait sans doute lire la table matérialisée au lieu de recalculer — à vérifier qu'aucun appelant live n'exige une clôture plus fraîche que la matérialisation.
-2. **Racines en colonne tableau (décision assumée).** `perimeters.structure_ids` est un `int[]` sans clé étrangère sur ses éléments. L'intégrité repose sur la discipline des points d'écriture — édition de périmètre, suppression de structure, ajout/retrait de tutelle — qui nettoient les racines et recalculent la clôture. Une table de jointure serait plus relationnelle, mais overkill à ce stade.
+1. **Racines en colonne tableau (décision assumée).** `perimeters.structure_ids` est un `int[]` sans clé étrangère sur ses éléments. L'intégrité repose sur la discipline des points d'écriture — édition de périmètre, suppression de structure, ajout/retrait de tutelle — qui nettoient les racines et recalculent la clôture. Une table de jointure serait plus relationnelle, mais overkill à ce stade.
 
 ## Invariants métier
 
-- **Clôture d'un périmètre.** `perimeter_structures` = les racines `perimeters.structure_ids` plus tous leurs descendants via `structure_relations.est_tutelle_de`. La règle est portée par la CTE récursive (live et matérialisée), pas par l'entité `Perimeter`.
+- **Clôture d'un périmètre.** `perimeter_structures` = les racines `perimeters.structure_ids` plus tous leurs descendants via `structure_relations.est_tutelle_de`. La règle est portée par l'unique CTE de `refresh_perimeter_structures` (`get_perimeter_structure_ids` ne fait que lire la table), pas par l'entité `Perimeter`.
