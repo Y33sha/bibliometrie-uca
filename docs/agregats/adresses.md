@@ -77,5 +77,12 @@ Routeur `interfaces/api/routers/admin/addresses.py`, port `application/ports/api
 Dette assumée et décisions d'architecture propres à cet agrégat, gardées explicites.
 
 1. **Recompute d'un cache dénormalisé déclenché depuis l'agrégat adresses (décision d'archi assumée).** Le recalcul de `source_publications.countries` / `publications.countries` — cross-table par nature — vit dans le module de cache pays `infrastructure/queries/pipeline/countries.py` ; `PgAddressRepository` y délègue pour propager après une édition de pays côté API. Conforme au pattern « queries mutualisées, ports par contexte » (cf. [03-application.md](../architecture/03-application.md)).
-2. **Condition miroir couplée par commentaire.** `which_contribute_to_perimeter` (`is_confirmed IS DISTINCT FROM FALSE`) doit rester synchrone avec `recompute_in_perimeter_on_source_authorships` — garanti seulement par un commentaire.
-3. **Péremption des matviews assumée.** Le chemin de review de l'API recalcule `in_perimeter` depuis les tables de base mais ne rafraîchit pas `source_authorship_structures` / `authorship_structures` : elles attendent le prochain run pipeline.
+2. **Péremption des matviews assumée.** Le chemin de review de l'API recalcule `in_perimeter` depuis les tables de base mais ne rafraîchit pas `source_authorship_structures` / `authorship_structures` : elles attendent le prochain run pipeline.
+
+## Invariants métier
+
+Règles métier de l'agrégat maintenues par discipline — ni par une contrainte de base, ni par un objet de domaine — et dispersées dans le SQL et les services. Leur recensement sert de base à l'évaluation d'un éventuel objet de domaine.
+
+- **Contribution au périmètre.** Un lien adresse→structure compte pour l'appartenance au périmètre sauf rejet explicite (`is_confirmed IS DISTINCT FROM FALSE` : pending ou confirmé comptent, rejeté non). La condition est écrite à l'identique dans six sites : la définition de la matview `source_authorship_structures`, le recalcul live `recompute_in_perimeter_on_source_authorships`, la détection de no-op `which_contribute_to_perimeter`, et les lectures API `laboratories` et `persons/detail`. Synchronisation garantie par convention seulement.
+- **Autorité des pays.** `countries` (source autoritaire : ScanR, détection) n'est jamais écrasé ; `suggested_countries` (faillible : OpenAlex) n'est posé qu'en l'absence de `countries`. Garanti par des clauses `WHERE` répétées à chaque écriture de pays (détection, suggestion, override admin, propagation aux jumelles).
+- **Lien détecté vs manuel.** `matched_form_id` non-NULL marque un lien issu du matching automatique (recalculé à chaque résolution, supprimé s'il disparaît) ; `NULL` marque un lien posé ou confirmé à la main, préservé par la résolution — qui repasse seulement son `matched_form_id` obsolète à NULL, sans supprimer la ligne.
