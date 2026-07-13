@@ -2,7 +2,7 @@
 
 - non défini → store local par défaut (`{PROJECT_ROOT}/data/raw_store`) ;
 - `file:///chemin/absolu` → `LocalFileRawStore` (chemin résolu cross-platform) ;
-- `s3://bucket/prefix` → non implémenté (placeholder Backblaze B2).
+- `s3://bucket/prefix` → non implémenté.
 """
 
 from __future__ import annotations
@@ -31,6 +31,6 @@ def get_raw_store(url: str | None = None) -> RawStore:
         return LocalFileRawStore(Path(url2pathname(parsed.path)))
     if parsed.scheme == "s3":
         raise NotImplementedError(
-            "Backend S3 (Backblaze B2) pas encore implémenté — utiliser file:// pour l'instant."
+            "Backend S3 non implémenté — utiliser file://."
         )
     raise ValueError(f"BIBLIO_RAW_STORE_URL : schéma non supporté ({raw_url!r})")
