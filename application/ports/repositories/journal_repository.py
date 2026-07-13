@@ -13,31 +13,30 @@ Implémenté par `infrastructure/repositories/journal_repository.py`.
 """
 
 from datetime import datetime
-from typing import Any, Protocol, TypedDict
+from typing import Any, Protocol
+
+from pydantic import BaseModel
 
 from domain.journals.journal import Journal
 
 
-class JournalUpdateFields(TypedDict, total=False):
-    """Partial update sur la table `journals`.
+class JournalUpdate(BaseModel):
+    """Champs éditables d'une revue, en modification sélective.
 
-    Toutes les clés sont optionnelles (`total=False`) ; le repo applique
-    un UPDATE sur les clés effectivement présentes. `title_normalized`
-    est calculé par le service quand `title` est fourni.
+    Seuls les champs explicitement fournis sont écrits (`model_dump(exclude_unset=True)`). Les champs listés sont ceux qu'un client peut fournir ; `title_normalized`, dérivé de `title`, est posé par le repository.
     """
 
-    title: str
-    title_normalized: str
-    issn: str | None
-    eissn: str | None
-    issnl: str | None
-    doi_prefix: str | None
-    oa_model: str | None
-    journal_type: str | None
-    is_academic: bool | None
-    is_predatory: bool | None
-    is_in_doaj: bool | None
-    apc_amount: float | None
+    title: str | None = None
+    issn: str | None = None
+    eissn: str | None = None
+    issnl: str | None = None
+    doi_prefix: str | None = None
+    oa_model: str | None = None
+    journal_type: str | None = None
+    is_academic: bool | None = None
+    is_predatory: bool | None = None
+    is_in_doaj: bool | None = None
+    apc_amount: float | None = None
 
 
 class JournalRepository(Protocol):
@@ -88,7 +87,6 @@ class JournalRepository(Protocol):
         self,
         *,
         title: str,
-        title_normalized: str,
         issn: str | None,
         eissn: str | None,
         issnl: str | None,
@@ -101,7 +99,7 @@ class JournalRepository(Protocol):
 
     def journal_exists(self, journal_id: int) -> bool: ...
 
-    def update_journal_fields(self, journal_id: int, fields: JournalUpdateFields) -> None: ...
+    def update_journal_fields(self, journal_id: int, fields: JournalUpdate) -> None: ...
 
     # ── APC / DOAJ ─────────────────────────────────────────────────
 

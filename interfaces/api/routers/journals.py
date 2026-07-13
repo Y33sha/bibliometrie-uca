@@ -15,7 +15,7 @@ from application.ports.api.journals_queries import (
 from application.ports.api.subjects_queries import SubjectFrequency
 from application.ports.pipeline.metadata_correction import MetadataCorrectionQueries
 from application.ports.repositories.audit_repository import AuditRepository
-from application.ports.repositories.journal_repository import JournalRepository
+from application.ports.repositories.journal_repository import JournalRepository, JournalUpdate
 from application.ports.repositories.publication_repository import PublicationRepository
 from application.services.journals import commands as journal_commands
 from application.services.journals.core import requalify_publications_for_journal
@@ -38,7 +38,6 @@ from interfaces.api.filters import parse_str_csv
 from interfaces.api.models import (
     EnumOption,
     JournalTypeChangeImpact,
-    JournalUpdate,
     MergeRequest,
     MergeResponse,
     OkResponse,
@@ -212,7 +211,7 @@ def get_type_change_impact(
         raise HTTPException(status_code=400, detail=f"journal_type inconnu : {new_type}")
     savepoint = conn.begin_nested()
     try:
-        repo.update_journal_fields(journal_id, {"journal_type": new_type})
+        repo.update_journal_fields(journal_id, JournalUpdate(journal_type=new_type))
         count = requalify_publications_for_journal(
             journal_id,
             conn=conn,
@@ -240,11 +239,10 @@ def update_journal(
 
     Si `journal_type` change effectivement de valeur, déclenche la requalification synchrone du `doc_type` des publications rattachées dans la même transaction — cf. `requalify_publications_for_journal` côté application. Le caller frontal aura typiquement appelé le preview (`type-change-impact`) en amont pour afficher l'ampleur à l'admin.
     """
-    fields = body.model_dump(exclude_unset=True)
     journal_commands.update_journal(
         conn,
         journal_id,
-        fields=fields,
+        update=body,
         repo=repo,
         pub_repo=pub_repo,
         audit_repo=audit,

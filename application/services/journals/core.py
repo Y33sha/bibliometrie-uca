@@ -6,20 +6,17 @@ Les opérations sur l'agrégat Publisher vivent dans `application/publishers/cor
 Les routers FastAPI utilisent les mêmes repos que le pipeline (routes `def` exécutées dans le threadpool Starlette).
 """
 
-from typing import cast
-
 from sqlalchemy import Connection
 
 from application.audit_log import emit_event
 from application.pipeline.metadata_correction.correct_unary import compute_update
 from application.ports.pipeline.metadata_correction import MetadataCorrectionQueries
 from application.ports.repositories.audit_repository import AuditRepository
-from application.ports.repositories.journal_repository import JournalRepository, JournalUpdateFields
+from application.ports.repositories.journal_repository import JournalRepository, JournalUpdate
 from application.ports.repositories.publication_repository import PublicationRepository
 from application.services.publications.core import refresh_from_sources
 from domain.errors import ConflictError, NotFoundError, ValidationError
 from domain.normalize import normalize_text
-from domain.types import JsonValue
 
 
 def find_or_create_journal(
@@ -98,7 +95,6 @@ def find_or_create_journal(
     # 6. Créer + enregistrer la forme de nom
     journal_id = repo.create_journal(
         title=title.strip(),
-        title_normalized=title_normalized,
         issn=issn,
         eissn=eissn,
         issnl=issnl,
@@ -110,27 +106,18 @@ def find_or_create_journal(
     return journal_id
 
 
-def update_journal(
-    journal_id: int, *, fields: dict[str, JsonValue], repo: JournalRepository
-) -> None:
-    """Met à jour une revue. Le `title` est automatiquement normalisé en
-    `title_normalized`.
+def update_journal(journal_id: int, *, update: JournalUpdate, repo: JournalRepository) -> None:
+    """Met à jour une revue à partir des champs explicitement fournis.
 
-    Lève NotFoundError si la revue n'existe pas.
-    Lève ValidationError si `fields` est vide.
+    Lève NotFoundError si la revue n'existe pas, ValidationError si aucun champ n'est fourni.
     """
-    if not fields:
+    if not update.model_fields_set:
         raise ValidationError("Aucun champ à mettre à jour")
 
     if not repo.journal_exists(journal_id):
         raise NotFoundError(f"Revue {journal_id} introuvable")
 
-    update_fields = cast(JournalUpdateFields, dict(fields))
-    if "title" in update_fields:
-        title = update_fields["title"]
-        assert isinstance(title, str), "fields['title'] doit être un str (validé par Pydantic)"
-        update_fields["title_normalized"] = normalize_text(title)
-    repo.update_journal_fields(journal_id, update_fields)
+    repo.update_journal_fields(journal_id, update)
 
 
 def update_journal_apc(

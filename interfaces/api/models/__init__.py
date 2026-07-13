@@ -82,7 +82,7 @@ from interfaces.api.models.admin.structures import (
     StructureUpdate,
 )
 from interfaces.api.models.auth import AuthCheckResponse, LoginRequest
-from interfaces.api.models.journals import JournalTypeChangeImpact, JournalUpdate
+from interfaces.api.models.journals import JournalTypeChangeImpact
 from interfaces.api.models.publishers import PublisherUpdate
 
 __all__ = [
@@ -112,7 +112,6 @@ __all__ = [
     "IdentifierReassignResponse",
     "IdentifierStatusResponse",
     "JournalTypeChangeImpact",
-    "JournalUpdate",
     "LoginRequest",
     "MarkDistinctPublications",
     "MarkPersonsDistinct",

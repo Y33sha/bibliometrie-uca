@@ -9,6 +9,7 @@ merge_*).
 import pytest
 from sqlalchemy import text
 
+from application.ports.repositories.journal_repository import JournalUpdate
 from application.services.journals.core import (
     find_or_create_journal,
     merge_journals,
@@ -293,16 +294,16 @@ class TestUpdateJournalApc:
 class TestUpdateJournal:
     def test_raises_not_found(self, sa_sync_conn, repo):
         with pytest.raises(NotFoundError):
-            update_journal(999999, fields={"title": "X"}, repo=repo)
+            update_journal(999999, update=JournalUpdate(title="X"), repo=repo)
 
     def test_raises_on_empty_fields(self, sa_sync_conn, repo):
         j = _insert_journal(sa_sync_conn, "Nature")
         with pytest.raises(ValidationError):
-            update_journal(j, fields={}, repo=repo)
+            update_journal(j, update=JournalUpdate(), repo=repo)
 
     def test_updates_title_and_normalizes(self, sa_sync_conn, repo):
         j = _insert_journal(sa_sync_conn, "Old Title")
-        update_journal(j, fields={"title": "Nature Medicine"}, repo=repo)
+        update_journal(j, update=JournalUpdate(title="Nature Medicine"), repo=repo)
         row = _fetch_one(
             sa_sync_conn, "SELECT title, title_normalized FROM journals WHERE id = :id", id=j
         )
@@ -311,7 +312,7 @@ class TestUpdateJournal:
 
     def test_partial_update(self, sa_sync_conn, repo):
         j = _insert_journal(sa_sync_conn, "Nature", issn="0028-0836")
-        update_journal(j, fields={"eissn": "1476-4687"}, repo=repo)
+        update_journal(j, update=JournalUpdate(eissn="1476-4687"), repo=repo)
         row = _fetch_one(sa_sync_conn, "SELECT issn, eissn FROM journals WHERE id = :id", id=j)
         assert row.issn == "0028-0836"
         assert row.eissn == "1476-4687"

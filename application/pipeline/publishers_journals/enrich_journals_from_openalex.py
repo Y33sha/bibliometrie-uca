@@ -19,7 +19,7 @@ from application.ports.pipeline.circuit_breaker import CircuitBreaker
 from application.ports.pipeline.enrich import EnrichQueries
 from application.ports.repositories.journal_repository import (
     JournalRepository,
-    JournalUpdateFields,
+    JournalUpdate,
 )
 from application.services.journals.core import update_journal_apc
 from domain.journals.journal import map_openalex_source_type
@@ -84,7 +84,7 @@ def run_enrich_journals_from_openalex(
             mapped_type = map_openalex_source_type(raw_type)
             if mapped_type is not None:
                 journal_repo.update_journal_fields(
-                    journal_id, JournalUpdateFields(journal_type=mapped_type)
+                    journal_id, JournalUpdate(journal_type=mapped_type)
                 )
                 type_written += 1
 
