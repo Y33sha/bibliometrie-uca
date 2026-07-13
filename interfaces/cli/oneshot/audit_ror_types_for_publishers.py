@@ -28,7 +28,7 @@ from collections import defaultdict
 
 from sqlalchemy import text
 
-from domain.publishers.publisher import map_ror_types
+from application.services.publishers.enrichment.from_ror import map_ror_types
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from infrastructure.sources.api_limits import ROR_DELAY

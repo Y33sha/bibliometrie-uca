@@ -1,6 +1,6 @@
-"""Tests pour `domain.publishers.crossref_location.parse_country_segment`."""
+"""Tests de `parse_country_segment` (`application/services/publishers/enrichment/from_crossref_members`)."""
 
-from domain.publishers.crossref_location import parse_country_segment
+from application.services.publishers.enrichment.from_crossref_members import parse_country_segment
 
 
 class TestParseCountrySegment:

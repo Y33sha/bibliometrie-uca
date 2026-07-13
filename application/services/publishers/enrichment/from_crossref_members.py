@@ -7,8 +7,7 @@ Pour chaque publisher avec `country IS NULL` + au moins un
 `doi_prefixes.crossref_member_id` :
 1. Fetche `api.crossref.org/members/{id}` (via le `CrossrefMemberFetcher`
    injecté par la composition root).
-2. Parse `location` (texte libre) → dernier segment = nom du pays via
-   `domain.publishers.crossref_location.parse_country_segment`.
+2. Parse `location` (texte libre) → dernier segment = nom du pays (`parse_country_segment`, plus bas).
 3. Résout le nom du pays en ISO-2 via la table `place_name_forms`
    (mapping chargé en bloc au démarrage).
 4. Écrit `publishers.country` si résolu — politique « NULL only »
@@ -41,12 +40,25 @@ from application.ports.repositories.publisher_repository import (
     PublisherUpdateFields,
 )
 from domain.normalize import normalize_text
-from domain.publishers.crossref_location import parse_country_segment
 
 type CrossrefMemberFetcher = Callable[[int], dict[str, Any] | None]
 """Signature : `(member_id) → record message ou None (404 / erreur)`."""
 
 COMMIT_EVERY = 50
+
+
+def parse_country_segment(location: str) -> str | None:
+    """Dernier segment d'une location Crossref Members (texte libre `"City, State, Country"`), soit le nom du pays — résolu ensuite en ISO-2 via `place_name_forms`.
+
+    >>> parse_country_segment("Amsterdam, NX, Netherlands")
+    'Netherlands'
+    >>> parse_country_segment("Oxford, Oxfordshire, United Kingdom")
+    'United Kingdom'
+    >>> parse_country_segment("")
+    >>> parse_country_segment("  ")
+    """
+    parts = [p.strip() for p in location.split(",") if p.strip()]
+    return parts[-1] if parts else None
 
 
 def run_enrich_publishers_from_crossref_members(
