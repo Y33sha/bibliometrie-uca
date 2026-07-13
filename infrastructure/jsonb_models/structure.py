@@ -2,10 +2,12 @@
 
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import ConfigDict, field_validator
+
+from infrastructure.jsonb_models._base import JsonbModel
 
 
-class StructureApiIds(BaseModel):
+class StructureApiIds(JsonbModel):
     """Modèle de la colonne JSONB `structures.api_ids`.
 
     Identifiants API externes d'une structure, **indexés par source**. Chaque source peut avoir 0, 1 ou plusieurs IDs (une structure fusionnée dans OpenAlex garde parfois deux entrées distinctes). Les valeurs sont des **listes de strings**, même quand il n'y a qu'un seul ID.
