@@ -1,15 +1,8 @@
 """Capture et persistance des exécutions de phase du pipeline.
 
-`PhaseExecutionRecorder` est l'API offerte à l'orchestrateur : il génère le
-`run_id` au lancement et persiste une ligne dans `pipeline_phase_executions` par
-phase jouée. Tout est best-effort — une défaillance d'observabilité est loggée
-sans jamais interrompre le pipeline, et un recorder désactivé (connexion
-impossible, par exemple migration non appliquée) laisse le run tourner sans le
-tracer.
+`PhaseExecutionRecorder` est l'API offerte à l'orchestrateur : il génère le `run_id` au lancement et persiste une ligne dans `pipeline_phase_executions` par phase jouée. Tout est best-effort — une défaillance d'observabilité est loggée sans jamais interrompre le pipeline, et un recorder désactivé (connexion impossible, par exemple migration non appliquée) laisse le run tourner sans le tracer.
 
-La colonne `details` rassemble les indicateurs sur-mesure que chaque phase
-remonte via son `PhaseMetrics` (conventions `summary`, `table`, `lines`,
-`matrix`). La connexion est utilisée en autocommit : chaque écriture est immédiate.
+La colonne `details` rassemble les indicateurs sur-mesure que chaque phase remonte via son `PhaseMetrics` (conventions `summary`, `table`, `lines`, `matrix`). La connexion est utilisée en autocommit : chaque écriture est immédiate.
 """
 
 from __future__ import annotations
@@ -57,9 +50,7 @@ def persist_phase_execution(conn: Connection, execution: PhaseExecution) -> None
             "mode": execution.mode,
             "sources": execution.sources,
             "status": execution.status,
-            # `default=str` : une valeur récalcitrante (ex. objet non-JSON glissé dans
-            # `details`) est stringifiée au lieu de faire échouer l'INSERT et perdre
-            # toute la ligne d'exécution de phase (l'observabilité est best-effort).
+            # `default=str` : une valeur non-JSON glissée dans `details` est stringifiée ; l'INSERT ne perd pas la ligne d'exécution de phase (best-effort).
             "signals": json.dumps(execution.signals, default=str),
             "metrics": json.dumps(execution.metrics, default=str),
             "details": json.dumps(execution.details, default=str),
@@ -70,11 +61,7 @@ def persist_phase_execution(conn: Connection, execution: PhaseExecution) -> None
 def last_extract_date(conn: Connection, source: str) -> datetime.date | None:
     """Jour (UTC) de la dernière phase `extract` ayant inclus `source`, hors échec.
 
-    Sert de borne « depuis » à l'extraction incrémentale : on repart de la dernière
-    extraction réussie de cette source, pas d'un run quelconque — un run partiel sans
-    phase `extract` ne fait donc pas avancer le curseur. L'ancrage au jour de début
-    (`started_at`) ménage un léger recouvrement plutôt qu'un trou, l'upsert staging
-    étant idempotent. `status <> 'error'` écarte les extractions échouées.
+    Sert de borne « depuis » à l'extraction incrémentale : on repart de la dernière extraction réussie de cette source (un run partiel sans phase `extract` ne fait pas avancer le curseur). L'ancrage au jour de début (`started_at`) ménage un léger recouvrement, l'upsert staging étant idempotent. `status <> 'error'` écarte les extractions échouées.
     """
     last = conn.execute(
         text(
@@ -92,8 +79,7 @@ def last_extract_date(conn: Connection, source: str) -> datetime.date | None:
 
 
 def get_last_extract_date(source: str) -> datetime.date | None:
-    """Variante best-effort ouvrant sa propre connexion ; renvoie None (→ fallback de
-    l'appelant) si la lecture échoue (table absente, connexion impossible)."""
+    """Variante best-effort ouvrant sa propre connexion ; renvoie None (→ fallback de l'appelant) si la lecture échoue (table absente, connexion impossible)."""
     try:
         with get_sync_engine().connect() as conn:
             return last_extract_date(conn, source)
@@ -132,8 +118,7 @@ class PhaseExecutionRecorder:
         signals: list[Signal],
         details: dict[str, object],
     ) -> None:
-        """Persiste l'exécution de la phase. `details` = indicateurs sur-mesure
-        remontés par la phase via son `PhaseMetrics`."""
+        """Persiste l'exécution de la phase. `details` = indicateurs sur-mesure remontés par la phase via son `PhaseMetrics`."""
         if self._conn is None or self._run_id is None:
             return
         try:
@@ -164,8 +149,7 @@ class PhaseExecutionRecorder:
 
 
 def start_run(*, mode: str, sources: list[str]) -> PhaseExecutionRecorder:
-    """Ouvre la connexion d'observabilité et génère le `run_id`. Renvoie un recorder
-    désactivé (sans tracer le run) si l'ouverture ou la séquence échoue."""
+    """Ouvre la connexion d'observabilité et génère le `run_id`. Renvoie un recorder désactivé (sans tracer le run) si l'ouverture ou la séquence échoue."""
     try:
         conn = get_sync_engine().connect().execution_options(isolation_level="AUTOCOMMIT")
         run_id = next_run_id(conn)
