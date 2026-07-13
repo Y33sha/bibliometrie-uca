@@ -67,9 +67,8 @@ Dette assumée et décisions d'architecture propres à cet agrégat, gardées ex
 
 1. **`map_openalex_source_type` dans le domaine.** `domain/journals/journal.py` porte la taxonomie `type` des Sources OpenAlex (`conference`, `book series`…). Le domaine connaît le vocabulaire d'une source externe — préoccupation plus proche d'un adaptateur source ou de la phase d'enrichissement que du domaine pur.
 2. **Agrégat anémique.** `Journal` est une dataclass de données sans comportement ni invariant maintenu ; le label « aggregate root » est aspirationnel. L'opportunité d'un objet de domaine riche rejoint le catalogue d'invariants évalué en fin de tour.
-3. **`oa_model` : divergence schéma / domaine.** La colonne est un `text` libre sans contrainte `CHECK`, alors que le domaine la restreint à `OaModel` (`subscription` / `full_oa` / `repository`). La validation vit à la frontière (`_journal_from_row` coerce le hors-vocabulaire vers `None`) et dans le modal admin, pas en base.
-4. **`merge_journal_into` : SQL cross-agrégat et contrainte gérée à la main.** La fusion mêle SQLAlchemy Core et `text()` pour écrire `publications` / `source_publications` / `apc_payments` (tables hors MetaData du repo journal), et neutralise l'`openalex_id` source avant le COALESCE pour éviter une violation d'unicité — logique sensible à l'ordre des statements.
-5. **Cascade `find_or_create_journal` incohérente entre branches.** Les chemins openalex / ISSN réenregistrent une forme de nom via `enrich_journal`, mais le chemin par titre ne le fait pas ; un `# TODO` explicite subsiste dans `core.py`.
+3. **`merge_journal_into` : SQL cross-agrégat et contrainte gérée à la main.** La fusion mêle SQLAlchemy Core et `text()` pour écrire `publications` / `source_publications` / `apc_payments` (tables hors MetaData du repo journal), et neutralise l'`openalex_id` source avant le COALESCE pour éviter une violation d'unicité — logique sensible à l'ordre des statements.
+4. **Cascade `find_or_create_journal` incohérente entre branches.** Les chemins openalex / ISSN réenregistrent une forme de nom via `enrich_journal`, mais le chemin par titre ne le fait pas ; un `# TODO` explicite subsiste dans `core.py`.
 
 ## Invariants métier
 
