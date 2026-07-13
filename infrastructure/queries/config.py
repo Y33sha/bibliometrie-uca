@@ -1,7 +1,7 @@
 """Query services pour les paramètres applicatifs (table `config`).
 
 Lookups par clé pour l'application (extraction, OA email, etc.) restent
-dans `infrastructure/app_config.py` ; ce module héberge la query servie
+dans `infrastructure/sources/config.py` ; ce module héberge la query servie
 par le router admin (listing complet) ainsi que l'adapter du port
 `application.ports.config.ConfigStore`.
 """
