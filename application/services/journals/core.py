@@ -49,7 +49,7 @@ def find_or_create_journal(
     title_normalized = normalize_text(title)
 
     def _match_and_enrich(journal_id: int, *, with_openalex: bool = True) -> int:
-        """Enrichit le journal trouvé et rattache la forme de nom. Retourne son id."""
+        """Enrichit le journal trouvé et enregistre son titre en forme de nom — accumulation des variantes pour un futur match par titre. Retourne son id."""
         repo.enrich_journal(
             journal_id,
             issn=issn,
