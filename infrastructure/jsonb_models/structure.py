@@ -15,7 +15,7 @@ class StructureApiIds(BaseModel):
     même quand il n'y a qu'un seul ID.
 
     Utilisé pour configurer les filtres d'affiliation lors des
-    extractions (via `utils/app_config.get_extraction_api_ids`).
+    extractions (via `infrastructure/sources/config.py`, `get_extraction_api_ids`).
 
     Clés strictes (whitelist `domain.sources.STRUCTURE_API_SOURCES`) :
     `extra="forbid"` rejette toute clé inconnue, par cohérence avec
