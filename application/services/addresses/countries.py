@@ -1,17 +1,15 @@
 """
-Service Pays des adresses — attribution, propagation horizontale
-(adresses similaires) et verticale (vers source_publications /
-publications).
+Service Pays des adresses — attribution, propagation horizontale(adresses similaires) et verticale (vers source_publications / publications).
 
-Séparé de `application/addresses.py` (principe SRP) : la validation
-des liens adresse↔structure vit dans
-`application/addresses_structures.py`. Les deux surfaces partagent
-l'agrégat Address mais n'interagissent pas entre elles.
+Séparé de `application/addresses.py` (principe SRP) : la validation des liens adresse↔structure vit dans `application/addresses_structures.py`. Les deux surfaces partagent l'agrégat Address mais n'interagissent pas entre elles.
 """
 
 import logging
 
-from application.ports.repositories.address_repository import AddressRepository
+from application.ports.repositories.address_repository import (
+    AddressCountryFilter,
+    AddressRepository,
+)
 from domain.errors import ValidationError
 
 logger = logging.getLogger(__name__)
@@ -55,6 +53,15 @@ def batch_set_country_by_ids(
     return repo.batch_add_country_by_ids(country_code, address_ids)
 
 
+def _has_country_flag(value: str | None) -> bool | None:
+    """Booléen tri-état du filtre `has_country` : "yes" → True, "no" → False, autre → None."""
+    if value == "yes":
+        return True
+    if value == "no":
+        return False
+    return None
+
+
 def batch_set_country_by_filter(
     country_code: str,
     *,
@@ -74,34 +81,19 @@ def batch_set_country_by_filter(
 
     Retourne les IDs modifiés.
     """
-    conditions: list[str] = []
-    params: list[object] = []
-    if search:
-        conditions.append("unaccent(raw_text) ILIKE unaccent(%s)")
-        params.append(f"%{search}%")
-    if has_country == "yes":
-        conditions.append("countries IS NOT NULL")
-    elif has_country == "no":
-        conditions.append("countries IS NULL")
-    if country_code_filter:
-        conditions.append("%s = ANY(countries)")
-        params.append(country_code_filter)
-    if suggested_country:
-        conditions.append("%s = ANY(suggested_countries)")
-        params.append(suggested_country)
-
-    if not conditions:
+    criteria = AddressCountryFilter(
+        search=search,
+        has_country=_has_country_flag(has_country),
+        country_code=country_code_filter,
+        suggested_country=suggested_country,
+    )
+    if criteria.is_empty:
         raise ValidationError(
             "batch_set_country_by_filter exige au moins un filtre "
             "(search / has_country / country_code_filter / suggested_country) : "
             "refus d'appliquer un pays à toutes les adresses."
         )
-    where_clause = " AND ".join(conditions)
-    return repo.batch_add_country_by_where(
-        country_code,
-        where_clause,
-        params,
-    )
+    return repo.batch_add_country_by_filter(country_code, criteria)
 
 
 def propagate_countries_to_similar(

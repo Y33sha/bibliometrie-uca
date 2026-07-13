@@ -9,6 +9,7 @@ accepté en exception, documenté dans `docs/architecture.md`.
 from sqlalchemy import Connection, delete, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
+from application.ports.repositories.address_repository import AddressCountryFilter
 from infrastructure.db.tables import address_structures, addresses
 
 
@@ -147,19 +148,31 @@ class PgAddressRepository:
         )
         return [row.id for row in result]
 
-    def batch_add_country_by_where(
+    def batch_add_country_by_filter(
         self,
         country_code: str,
-        where_clause: str,
-        where_params: list,
+        criteria: AddressCountryFilter,
     ) -> list[int]:
-        # `where_clause` arrive en str brut avec paramstyle psycopg `%s`.
-        # SA Core `text()` utilise paramstyle nommé : on convertit à la volée.
-        sql_where = where_clause
+        conditions: list[str] = []
         params: dict = {"cc": country_code}
-        for i, v in enumerate(where_params):
-            sql_where = sql_where.replace("%s", f":p_{i}", 1)
-            params[f"p_{i}"] = v
+        if criteria.search:
+            conditions.append("unaccent(raw_text) ILIKE unaccent(:search)")
+            params["search"] = f"%{criteria.search}%"
+        if criteria.has_country is True:
+            conditions.append("countries IS NOT NULL")
+        elif criteria.has_country is False:
+            conditions.append("countries IS NULL")
+        if criteria.country_code:
+            conditions.append(":country_code = ANY(countries)")
+            params["country_code"] = criteria.country_code
+        if criteria.suggested_country:
+            conditions.append(":suggested_country = ANY(suggested_countries)")
+            params["suggested_country"] = criteria.suggested_country
+
+        if not conditions:
+            return []
+
+        where_clause = " AND ".join(conditions)
         result = self._conn.execute(
             text(f"""
                 UPDATE addresses
@@ -168,7 +181,7 @@ class PgAddressRepository:
                     WHEN :cc = ANY(countries) THEN countries
                     ELSE array_append(countries, CAST(:cc AS char(2)))
                 END
-                WHERE {sql_where}
+                WHERE {where_clause}
                 RETURNING id
             """),
             params,
