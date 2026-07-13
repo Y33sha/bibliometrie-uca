@@ -33,10 +33,10 @@ class TestAcquire:
         assert lockfile.read_text() == str(os.getpid())
 
     def test_orphan_lockfile_is_overwritten(self, lockfile: Path) -> None:
-        # PID 999999 : pratiquement garanti de ne pas exister (pid_max usuellement < 100k)
-        # Sur Windows, `os.kill(pid, 0)` tente une terminaison au lieu d'une sonde — on patch `_process_alive` pour le rendre cross-platform.
+        # PID 999999 : pratiquement garanti absent (pid_max usuellement < 100k).
+        # On patche `is_pid_alive` pour contrôler la réponse sans dépendre d'un vrai PID.
         lockfile.write_text("999999")
-        with patch("infrastructure.pipeline_lock._process_alive", return_value=False):
+        with patch("infrastructure.pipeline_lock.is_pid_alive", return_value=False):
             acquire_pipeline_lock(lockfile=lockfile)
         assert lockfile.read_text() == str(os.getpid())
 
@@ -48,7 +48,7 @@ class TestAcquire:
     def test_alive_lockfile_aborts_without_force(self, lockfile: Path) -> None:
         # On simule un PID vivant en mettant notre propre PID (qui est forcément vivant)
         lockfile.write_text("1")  # PID 1 (init) — toujours vivant
-        with patch("infrastructure.pipeline_lock._process_alive", return_value=True):
+        with patch("infrastructure.pipeline_lock.is_pid_alive", return_value=True):
             with pytest.raises(PipelineAlreadyRunningError, match=r"PID 1"):
                 acquire_pipeline_lock(lockfile=lockfile, force=False)
         # Lockfile préservé : on n'écrase pas un lock actif sans permission.
@@ -62,15 +62,14 @@ class TestAcquire:
         def fake_kill(pid: int, sig: int) -> None:
             kill_calls.append((pid, sig))
 
-        # _process_alive : True d'abord (détecté à l'acquisition), puis False
-        # immédiatement après SIGTERM (le précédent répond proprement).
+        # is_pid_alive : True d'abord (détecté à l'acquisition), puis False immédiatement après SIGTERM (le précédent répond proprement).
         alive_responses = iter([True, False])
 
         def fake_process_alive(pid: int) -> bool:
             return next(alive_responses)
 
         with (
-            patch("infrastructure.pipeline_lock._process_alive", side_effect=fake_process_alive),
+            patch("infrastructure.pipeline_lock.is_pid_alive", side_effect=fake_process_alive),
             patch("infrastructure.pipeline_lock.os.kill", side_effect=fake_kill),
             patch("infrastructure.pipeline_lock.time.sleep"),
         ):
@@ -91,7 +90,7 @@ class TestAcquire:
 
         # Le process ne meurt jamais après SIGTERM → SIGKILL en fallback.
         with (
-            patch("infrastructure.pipeline_lock._process_alive", return_value=True),
+            patch("infrastructure.pipeline_lock.is_pid_alive", return_value=True),
             patch("infrastructure.pipeline_lock.os.kill", side_effect=fake_kill),
             patch("infrastructure.pipeline_lock.time.sleep"),
         ):
