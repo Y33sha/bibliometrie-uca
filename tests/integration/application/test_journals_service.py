@@ -151,7 +151,7 @@ class TestJournalFindById:
             apc_amount=1700,
             apc_currency="USD",
             is_in_doaj=True,
-            oa_model="gold",
+            oa_model="full_oa",
         )
         j = repo.find_by_id(jid)
         assert j is not None
@@ -161,7 +161,7 @@ class TestJournalFindById:
         assert j.eissn == "1932-6203"
         assert j.openalex_id == "S202381698"
         assert j.is_in_doaj is True
-        assert j.oa_model == "gold"
+        assert j.oa_model == "full_oa"
 
 
 # ── find_or_create_publisher ───────────────────────────────────────

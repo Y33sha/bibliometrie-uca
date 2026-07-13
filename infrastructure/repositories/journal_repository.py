@@ -8,13 +8,13 @@ pas d'orchestration métier (qui reste dans `application/journals.py`).
 
 from datetime import datetime
 from decimal import Decimal
-from typing import Any, NamedTuple
+from typing import Any, NamedTuple, cast
 
 from sqlalchemy import Connection, case, delete, func, or_, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from application.ports.repositories.journal_repository import JournalUpdateFields
-from domain.journals.journal import Journal
+from domain.journals.journal import OA_MODELS, Journal, JournalType, OaModel
 from infrastructure.db.tables import journal_name_forms, journals
 from infrastructure.queries.pipeline.pub_counts import (
     refresh_journal_pub_count,
@@ -43,9 +43,9 @@ class _JournalRow(NamedTuple):
 
 
 def _journal_from_row(row: _JournalRow) -> Journal:
-    """Mapping d'une row `journals` SQL vers l'aggregate `Journal`.
+    """Mappe une row `journals` SQL vers l'aggregate `Journal`.
 
-    `journal_type` et `is_academic` ont des DEFAULT côté DB ('unknown' / true) mais leur colonne reste nullable au schéma — on coerce vers le default pour préserver la sémantique non-nullable de l'aggregate.
+    Coerce les valeurs vers les types du domaine : `journal_type` et `is_academic`, nullables au schéma, retombent sur leur défaut (`unknown` / `True`) ; `oa_model`, colonne text libre, est validé contre `OaModel` (hors vocabulaire → `None`).
     """
     return Journal(
         id=row.id,
@@ -59,8 +59,10 @@ def _journal_from_row(row: _JournalRow) -> Journal:
         is_predatory=row.is_predatory,
         apc_amount=row.apc_amount,
         apc_currency=row.apc_currency,
-        oa_model=row.oa_model,
-        journal_type=row.journal_type if row.journal_type is not None else "unknown",
+        oa_model=cast(OaModel, row.oa_model) if row.oa_model in OA_MODELS else None,
+        journal_type=cast(JournalType, row.journal_type)
+        if row.journal_type is not None
+        else "unknown",
         is_academic=row.is_academic if row.is_academic is not None else True,
         doi_prefix=row.doi_prefix,
     )
