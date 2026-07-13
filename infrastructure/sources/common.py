@@ -64,17 +64,14 @@ _UPSERT_STAGING_SQL = text(
             ELSE staging.raw_data
         END,
         raw_hash = COALESCE(EXCLUDED.raw_hash, staging.raw_hash),
-        -- Renseigne le DOI quand la ligne existait sans (doc moissonné avant que la
-        -- source ne porte le DOI) ; ne clobbe jamais un DOI déjà posé.
+        -- Renseigne le DOI quand la ligne existait sans (doc moissonné avant que la source ne porte le DOI) ; ne clobbe jamais un DOI déjà posé.
         doi = COALESCE(staging.doi, EXCLUDED.doi),
         processed = CASE
             WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
                 THEN FALSE
             ELSE staging.processed
         END,
-        -- Suit `raw_hash` comme `processed` : un payload bulk inchangé n'écrase pas
-        -- le flag (préserve l'effacement posé par refetch_truncated) ; un payload
-        -- modifié le recalcule depuis le nouveau contenu.
+        -- Suit `raw_hash` comme `processed` : un payload bulk inchangé n'écrase pas le flag (préserve l'effacement posé par refetch_truncated) ; un payload modifié le recalcule depuis le nouveau contenu.
         authors_truncated = CASE
             WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
                 THEN EXCLUDED.authors_truncated
@@ -150,13 +147,8 @@ def upsert_not_found_stub(
     )
 
 
-# Mapping `target source → RA attendue côté doi_prefixes`. Pour ces sources,
-# on filtre les DOIs candidats sur leur préfixe : un DOI non-Crossref n'a rien
-# à faire dans un appel API Crossref (404 garanti, pollution `not_found_at`).
-# La valeur NULL côté `doi_prefixes.ra` est acceptée — préfixe pas encore
-# résolu par la phase `resolve_ra`, on tente quand même en best-effort.
-# Sources absentes du mapping (hal, openalex, wos, scanr) : aucun filtre RA,
-# ces APIs cherchent par DOI sans contrainte de registrar.
+# `target source → RA attendue côté doi_prefixes` : pour crossref/datacite, les DOIs candidats sont filtrés sur la RA du préfixe (`ra` NULL accepté).
+# Sources absentes (hal, openalex, wos, scanr) : aucun filtre RA.
 _TARGET_RA: dict[str, str] = {
     "crossref": "Crossref",
     "datacite": "DataCite",
@@ -209,11 +201,7 @@ def record_doi_not_found(
     )
 
 
-# Filtre optionnel sur l'année de publication (`{year_clause}`) : la fenêtre
-# d'années du run courant est jointe depuis `source_publications.pub_year`
-# (année normalisée, déjà présente pour toute row stale — normalisée à un run
-# antérieur). Les rows sans ligne `source_publications` (jamais normalisées, cas
-# anormal) gardent `pub_year` NULL et sont conservées par le LEFT JOIN.
+# Filtre année (`{year_clause}`) : `pub_year` vient de `source_publications` (LEFT JOIN ; NULL si absent, conservé).
 _STALE_ROWS_SQL_TEMPLATE = """
     SELECT s.id, s.source_id
     FROM staging s
@@ -287,12 +275,7 @@ def get_cross_import_dois(conn: Connection, target: str) -> list[str]:
     join_clause = (
         "LEFT JOIN doi_prefixes dp ON dp.prefix = split_part(c.doi, '/', 1)" if target_ra else ""
     )
-    # Pool de DOI candidats centralisé dans la vue `candidate_dois` (in-périmètre) :
-    # DOI primaires des SP + related_dois + cibles de relations (source NULL) +
-    # arXiv-dérivés. La même vue alimente la résolution de RA des préfixes — tout
-    # DOI interrogé ici a donc son préfixe résolu en amont. L'exclusion du target se
-    # fait via `source IS DISTINCT FROM` (les relations à source NULL restent
-    # candidates pour toutes les cibles) et le `NOT IN (staging du target)` final.
+    # Exclusion du target : `source IS DISTINCT FROM` (relations à source NULL candidates pour toutes les cibles) + `NOT IN (staging du target)`.
     if isinstance(conn, Connection):
         prefix_filter = " AND (dp.ra = :target_ra OR dp.ra IS NULL)" if target_ra else ""
         query = f"""
@@ -314,10 +297,7 @@ def get_cross_import_dois(conn: Connection, target: str) -> list[str]:
         if target_ra:
             params["target_ra"] = target_ra
         rows = conn.execute(text(query), params).scalars()
-        # Re-nettoyage des candidats avant tout appel HTTP par DOI : la colonne
-        # `staging.doi` peut porter des DOI non normalisés. Idempotent ;
-        # `dict.fromkeys` dédoublonne les collisions induites par la normalisation
-        # en préservant l'ordre.
+        # Re-nettoyage des candidats (idempotent) : `staging.doi` peut porter des DOI non normalisés ; `dict.fromkeys` dédoublonne en préservant l'ordre.
         return list(dict.fromkeys(c for d in rows if (c := clean_doi(d))))
 
     pg_prefix_filter = " AND (dp.ra = %(target_ra)s OR dp.ra IS NULL)" if target_ra else ""
