@@ -8,8 +8,6 @@ Contenu :
 - **Orchestrateurs pipeline** dans `application/pipeline/` : un sous-package par phase. Chaque orchestrateur séquence sa phase et délègue HTTP et SQL à des adapters via des ports (`application/ports/pipeline/*`), sans jamais importer `infrastructure/` directement. L'inventaire phase par phase, avec entrées et sorties, vit dans la [documentation du pipeline](../pipeline/01-vue-d-ensemble.md).
 - **Ports** (`application/ports/*`) : interfaces Protocol pour les query services (adapters dans `infrastructure/queries/*`) et pour les repositories d'agrégats (`application/ports/repositories/*`, implémentés dans `infrastructure/repositories/*`).
 
-Interdiction : **`application/` ne peut pas importer `infrastructure/`**. Toute nouvelle dépendance doit passer par un port. Vérifié par le contrat `layered` d'`import-linter`.
-
 ## Patterns d'injection
 
 Toute dépendance vers un adapter sortant passe par un port, instancié uniquement aux composition roots (cf. [06-composition-roots.md](06-composition-roots.md)). Deux styles cohabitent :
@@ -20,3 +18,11 @@ Toute dépendance vers un adapter sortant passe par un port, instancié uniqueme
 ### Batch commits dans le pipeline
 
 La règle générale est que les use-cases commitent (cf. [discipline transactionnelle](04-infrastructure.md#discipline-transactionnelle)). Côté pipeline, les phases qui traitent des dizaines de milliers d'items commitent **par batch** (toutes les N opérations) pour qu'un crash ne perde pas tout le travail déjà fait ; cela suppose des phases idempotentes (vrai par construction). Les phases concernées sont listées dans la discipline transactionnelle de l'infrastructure (cf. [04-infrastructure.md](04-infrastructure.md#discipline-transactionnelle)).
+
+## Queries mutualisées et ports par contexte
+
+Le recalcul d'un cache dénormalisé (par exemple `journals.pub_count`, `addresses.countries`, les cooccurrences de sujets) sert deux contextes : le pipeline le recalcule en masse, l'API le recalcule de façon ciblée après une édition de curation. Le SQL correspondant est mutualisé dans un module `infrastructure/queries/*`, qui peut héberger plusieurs adaptateurs. Ainsi `infrastructure/queries/subjects.py` expose `PgSubjectsQueries`, adaptateur du port pipeline `application/ports/pipeline/subjects.py`, et `PgSubjectsAdminQueries`, adaptateur du port API `application/ports/api/subjects_queries.py`.
+
+Le partage reste confiné à l'infrastructure. La contrainte porte sur la couche application : une brique applicative ne dépend que du port de son propre contexte — `application/ports/pipeline/*` pour un orchestrateur de phase, `application/ports/api/*` (ou le port de repository de l'agrégat visé) pour un service d'écriture API. Un service API n'importe jamais un port pipeline, ni l'inverse. Deux adaptateurs de contextes différents peuvent donc partager des fragments de requête sans que les couches applicatives ne se couplent entre elles.
+
+Cette frontière garde chaque contexte remplaçable indépendamment : réécrire la surface API dans une autre technologie ne réimplémente que les adaptateurs du contexte API, tandis que le module d'infrastructure mutualisé continue de servir le pipeline.
