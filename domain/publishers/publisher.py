@@ -6,7 +6,7 @@ Identité = `id` (clé surrogate). Identifiant naturel : `name`, via la normalis
 """
 
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, get_args
 
 PublisherType = Literal[
     "commercial",
@@ -16,14 +16,7 @@ PublisherType = Literal[
     "aggregator",
     "unknown",
 ]
-PUBLISHER_TYPES: tuple[PublisherType, ...] = (
-    "commercial",
-    "learned_society",
-    "academic_institution",
-    "repository",
-    "aggregator",
-    "unknown",
-)
+PUBLISHER_TYPES: tuple[PublisherType, ...] = get_args(PublisherType)
 PUBLISHER_TYPES_SET: frozenset[str] = frozenset(PUBLISHER_TYPES)
 
 # Labels FR des valeurs d'enum, source de vérité Python pour l'UI (dropdowns admin, badges publics), exposés via `/api/publisher-types`.
@@ -65,4 +58,4 @@ class Publisher:
     openalex_id: str | None = None
     ror: str | None = None
     is_predatory: bool = False
-    publisher_type: str = "unknown"  # une des valeurs de PUBLISHER_TYPES
+    publisher_type: PublisherType = "unknown"
