@@ -77,6 +77,31 @@ Réorganisation du sommet :
 
 ### Phase 2 - `infrastructure/`
 
+#### 2.1 `db`
+
+#### 2.2 `jsonb_models`
+
+#### 2.3 `raw_store`
+
+#### 2.4 `observability`
+
+#### 2.5 `sources`
+
+Racine (transverse) : passe docstrings/commentaires faite. Findings structurels remontés à la relecture :
+
+- [ ] `common.py` — fourre-tout à éclater par préoccupation (ses voisins sont nommés par concern) : `staging.py` (écriture staging + hash), `cross_import.py` (pool DOI cross-import), et repli de la sélection stale dans/à côté de `refresh_stale_base.py`. `common.py` disparaît.
+- [ ] `http_retry.py` + `http_retry_async.py` — factoriser la logique de décision pure (backoff, classification 429/4xx/5xx/body vide, règles breaker) ; les deux boucles d'I/O minces (sync `requests` / async `httpx`) cohabitent dans un seul fichier.
+- [ ] `_API_BASE_URLS` (+ `get_api_base_urls`) sort de `config.py` vers un module dédié `api_urls.py` : ni des limites, ni de la config d'environnement.
+- [ ] Un dossier par source : `ror.py`, `unpaywall.py` et le code de `doaj/__init__.py` passent en `<source>/client.py` (+ `__init__` mince). Racine = transverse seulement.
+- [ ] Renvoi périmé : `openalex/__init__.py` prétend que l'URL de base vit en config DB — faux, c'est la constante `_API_BASE_URLS`.
+
+#### 2.5 `sources`
+
+#### 2.6 `queries`
+
+#### 2.7 `repositories`
+
+
 ### Phase 3 - `interfaces/`
 
 - [ ] CLI `maintenance/` : coquille-ification. `enrich_publishers` séquence ses trois étapes dans son `main()` au lieu de déléguer en un appel à un orchestrateur applicatif, contrairement à ses voisins.
