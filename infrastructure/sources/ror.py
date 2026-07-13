@@ -1,14 +1,10 @@
 """Client API ROR (Research Organization Registry) — v2.
 
-Endpoint unique consommé pour l'instant : `GET /v2/organizations/{ror}`,
-qui retourne le record ROR complet. ROR n'expose pas de bulk endpoint
-par liste d'IDs — chaque ROR doit être fetché individuellement.
+Endpoint unique : `GET /v2/organizations/{ror}`, qui retourne le record ROR complet. ROR n'expose pas de bulk endpoint par liste d'IDs — chaque ROR doit être fetché individuellement.
 
-Consommateurs : `application.services.publishers.enrichment.from_ror` (maintenance) +
-oneshot `audit_ror_types_for_publishers`.
+Consommateurs : `application.services.publishers.enrichment.from_ror` (maintenance) + oneshot `audit_ror_types_for_publishers`.
 
-URL de base configurable via `_API_BASE_URLS_DEFAULTS["ror"]` (cf.
-`infrastructure.sources.config`).
+URL de base via `_API_BASE_URLS["ror"]` (cf. `infrastructure.sources.config`).
 """
 
 import logging
@@ -27,9 +23,7 @@ def fetch_ror_record(
 ) -> dict[str, Any] | None:
     """GET sur l'API ROR v2 pour un ROR ID donné.
 
-    Retourne le record JSON ou `None` sur 404 / erreur réseau. Pas de
-    retry élaboré — les consommateurs sont tolérants à un fetch
-    occasionnellement raté (skip la ligne et continue).
+    Retourne le record JSON ou `None` sur 404 / erreur réseau. Pas de retry élaboré — les consommateurs sont tolérants à un fetch occasionnellement raté (skip la ligne et continue).
     """
     try:
         resp = requests.get(
