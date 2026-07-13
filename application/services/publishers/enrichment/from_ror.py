@@ -2,28 +2,11 @@
 Orchestrateur d'enrichissement éditeurs (maintenance, hors pipeline) —
 types `publisher_type` dérivés des records ROR.
 
-Pour chaque publisher avec `ror IS NOT NULL AND publisher_type='unknown'`,
-fetche l'API ROR v2 (via le `RorFetcher` injecté par la composition
-root) et mappe `types` (liste) vers notre enum via
-`domain.publishers.publisher.map_ror_types`. Politique d'écrasement
-« unknown only » : ne touche pas les valeurs admin explicites.
+Pour chaque publisher avec `ror IS NOT NULL AND publisher_type='unknown'`, fetche l'API ROR v2 (via le `RorFetcher` injecté par la composition root) et mappe `types` (liste) vers l'enum via `map_ror_types` (défini plus bas). Politique « unknown only » : les valeurs admin explicites sont préservées.
 
-Mapping ROR → `publisher_type` :
-- ROR `education` → `academic_institution`
-- ROR `archive` → `repository`
-- ROR `company` → `commercial`
-- ROR `nonprofit` → `learned_society`
-- ROR `government` / `facility` / `other` / `healthcare` / `funder` seul
-  → skip (= laissé `unknown`)
+ROR expose un fetch unitaire par id (aucun endpoint bulk) ; la latence dominant (~3s/appel), les fetches sont **parallélisés** (`ThreadPoolExecutor`), tandis que le traitement et l'écriture restent séquentiels (connexion sync mono-thread).
 
-ROR n'a pas de bulk endpoint par liste d'IDs : 1 req par publisher. La
-latence ROR (~3s/appel) domine, donc les fetches sont **parallélisés**
-(`ThreadPoolExecutor`) ; le traitement + l'écriture restent séquentiels
-(la connexion sync n'est pas thread-safe).
-
-Le fetcher concret vit dans `infrastructure/sources/ror.py` ; il est
-injecté par la composition root pour respecter l'étanchéité DDD
-(application n'importe pas infrastructure).
+Le fetcher concret vit dans `infrastructure/sources/ror.py` ; il est injecté par la composition root pour respecter l'isolement DDD application / infrastructure.
 """
 
 import logging
@@ -39,13 +22,31 @@ from application.ports.repositories.publisher_repository import (
     PublisherRepository,
     PublisherUpdateFields,
 )
-from domain.publishers.publisher import map_ror_types
+from domain.publishers.publisher import PublisherType
 
 type RorFetcher = Callable[[str], dict[str, Any] | None]
 """Signature : `(ror) → record JSON ou None (404 / erreur)`."""
 
 COMMIT_EVERY = 50
 MAX_WORKERS = 8
+
+# Mapping ROR `types` (v2 : une LISTE, ex. `['company', 'funder']`) → `publisher_type`, par ordre de précédence : le premier type ROR mappé l'emporte.
+# Absents volontairement : `funder` (type secondaire bruité), `government` (European Commission, académies… pas des academic_institution), `facility` / `other` / `healthcare` (bruit, à arbitrer en admin).
+# `nonprofit` → `learned_society` couvre sociétés savantes et éditeurs nonprofit (eLife, BioOne) : amalgame assumé, préféré à un skip.
+_ROR_TYPE_TO_PUBLISHER_TYPE: list[tuple[str, PublisherType]] = [
+    ("education", "academic_institution"),
+    ("archive", "repository"),
+    ("company", "commercial"),
+    ("nonprofit", "learned_society"),
+]
+
+
+def map_ror_types(ror_types: list[str]) -> PublisherType | None:
+    """Mappe une liste de ROR `types` vers l'enum `publisher_type`, ou `None` si aucun type de la liste n'est mappé (`government`, `facility`, `other`, `healthcare`, ou `funder` seul)."""
+    for ror_type, publisher_type in _ROR_TYPE_TO_PUBLISHER_TYPE:
+        if ror_type in ror_types:
+            return publisher_type
+    return None
 
 
 def run_enrich_publishers_from_ror(
