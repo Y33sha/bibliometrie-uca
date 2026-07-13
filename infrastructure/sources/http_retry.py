@@ -50,7 +50,7 @@ def http_request_with_retry(
 
     `max_retries=3` : avec le backoff par défaut, les pauses sont de 1, 2, 4 s ; pousser plus loin ferait attendre 8, 16 s pour un seul document, inutile.
 
-    Circuit-breaker : si un `SourceCircuitBreaker` est posé (ContextVar), on court-circuite quand il a tripé, on lui compte les échecs 429/5xx/réseau (pas les 4xx) et on le remet à zéro au succès.
+    Circuit-breaker : si un `SourceCircuitBreaker` est posé (ContextVar), on court-circuite quand il s'est déclenché, on lui compte les échecs 429/5xx/réseau (pas les 4xx) et on le remet à zéro au succès.
 
     `label` : chaîne courte (ex: "year 2024, rec 100") insérée dans les logs.
 
@@ -58,10 +58,8 @@ def http_request_with_retry(
     """
     breaker = get_current_breaker()
     if breaker is not None:
-        breaker.check()  # court-circuite si la source a déjà tripé
-        # Préfixe la source dans tous les logs de retry/échec ci-dessous : sans
-        # ça, un message comme « 429 Too Many Requests rec 1 » ne dit pas *quelle*
-        # source rate-limite. Le breaker (ContextVar) porte le nom de la source.
+        breaker.check()  # court-circuite si le breaker s'est déjà déclenché
+        # Préfixe la source dans tous les logs de retry/échec ci-dessous : sans ça, un message comme « 429 Too Many Requests rec 1 » ne dit pas *quelle* source rate-limite. Le breaker (ContextVar) porte le nom de la source.
         label = f"{breaker.source} {label}".rstrip()
 
     last_error: Exception | None = None
@@ -101,9 +99,7 @@ def http_request_with_retry(
             time.sleep(wait)
         except requests.RequestException as e:
             last_error = e
-            # 4xx déterministe (≠ 429, déjà géré plus haut) : retenter ne changera
-            # rien (préfixe inconnu, requête malformée…) → échec immédiat. On ne
-            # retente que les 5xx et les erreurs réseau.
+            # 4xx déterministe (≠ 429, déjà géré plus haut) : retenter ne changera rien (préfixe inconnu, requête malformée…) → échec immédiat. On ne retente que les 5xx et les erreurs réseau.
             status = getattr(getattr(e, "response", None), "status_code", None)
             client_error = status is not None and 400 <= status < 500
             if client_error or attempt == max_retries - 1:
