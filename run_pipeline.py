@@ -1472,6 +1472,16 @@ def _execute_phases(
     if recorder.run_id is not None:
         log.info("%s%d", RUN_MARKER, recorder.run_id)
 
+    # Matérialise `perimeter_structures` avant toute phase : l'extraction lit le périmètre
+    # d'extraction dès la première phase ; `affiliations` la rematérialise ensuite, à son démarrage.
+    from infrastructure.db.engine import get_sync_engine
+    from infrastructure.queries.perimeter import refresh_perimeter_structures
+
+    with get_sync_engine().connect() as perimeter_conn:
+        n_perimeter_links = refresh_perimeter_structures(perimeter_conn)
+        perimeter_conn.commit()
+    log.info("perimeter_structures : %d liens matérialisés", n_perimeter_links)
+
     t0_total = time.time()
     pipeline_started_at = datetime.datetime.now().isoformat(timespec="seconds")
     total = len(phases_to_run)
