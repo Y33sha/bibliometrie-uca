@@ -170,7 +170,7 @@ def get_polite_pool_email_optional(conn: Connection) -> str | None:
 def get_polite_pool_email(conn: Connection) -> str:
     """Retourne l'email envoyé en polite pool aux APIs externes (Crossref, DataCite, Unpaywall, …).
 
-    Raise si la row `polite_pool_email` n'est pas configurée : un email invalide envoyé à l'API peut entraîner un blacklist côté serveur, donc on force la config explicite plutôt que de fallback sur un email inventé.
+    Raise si la row `polite_pool_email` n'est pas configurée. Un email invalide ou inventé risque un blacklist côté serveur.
     """
     email = get_polite_pool_email_optional(conn)
     if email is not None:
