@@ -51,15 +51,14 @@ async def http_request_with_retry_async(
 
     `label` : chaîne courte (ex: "DOI 10.xxx") insérée dans les logs pour distinguer les requêtes concurrentes.
 
-    Circuit-breaker : si un `SourceCircuitBreaker` est posé (ContextVar, cf. `infrastructure.sources.circuit_breaker`), on court-circuite quand il a tripé (`SourceUnavailableError`), on lui compte les échecs 429/5xx/réseau et on le remet à zéro au succès. Les 4xx (404…) ne comptent pas (résultat normal).
+    Circuit-breaker : si un `SourceCircuitBreaker` est posé (ContextVar, cf. `infrastructure.sources.circuit_breaker`), on court-circuite quand il s'est déclenché (`SourceUnavailableError`), on lui compte les échecs 429/5xx/réseau et on le remet à zéro au succès. Les 4xx (404…) ne comptent pas (résultat normal).
 
     Lève la dernière exception rencontrée si max_retries est atteint.
     """
     breaker = get_current_breaker()
     if breaker is not None:
-        breaker.check()  # court-circuite si la source a déjà tripé
-        # Préfixe la source dans les logs de retry/échec (cf. http_retry sync) :
-        # le breaker (ContextVar) porte le nom de la source qui rate-limite.
+        breaker.check()  # court-circuite si le breaker s'est déjà déclenché
+        # Préfixe la source dans les logs de retry/échec (cf. http_retry sync) : le breaker (ContextVar) porte le nom de la source qui rate-limite.
         label = f"{breaker.source} {label}".rstrip()
 
     last_error: Exception | None = None
@@ -84,9 +83,7 @@ async def http_request_with_retry_async(
             try:
                 resp.raise_for_status()
             except httpx.HTTPStatusError:
-                # 5xx = source en panne → compte pour le breaker ; 4xx (404…) =
-                # résultat normal (non trouvé), on ne compte pas. On propage dans
-                # les deux cas (comportement inchangé).
+                # 5xx = source en panne → compte pour le breaker ; 4xx (404…) = résultat normal (non trouvé), on ne compte pas. On propage dans les deux cas (comportement inchangé).
                 if breaker is not None and 500 <= resp.status_code < 600:
                     breaker.record_failure()
                 raise

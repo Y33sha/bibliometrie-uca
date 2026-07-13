@@ -44,10 +44,10 @@ def fetch_crossref_member(
     ni pénaliser le coupe-circuit. L'appelant interroge en **séquentiel** (pas de
     fan-out parallèle qui bursterait au-dessus du quota polite pool).
 
-    Coupe-circuit (budget Crossref) : si `breaker` est fourni et **tripé**, on ne
+    Coupe-circuit (budget Crossref) : si `breaker` est fourni et **déclenché**, on ne
     tape plus l'API (retourne `None` immédiatement). Un échec *définitif* (429 ou
     panne après épuisement des retries) compte un échec ; un 200 / 404 le remet à
-    zéro. Une fois le breaker tripé, les fetches restants sont sautés sans coût.
+    zéro. Une fois le breaker déclenché, les fetches restants sont sautés sans coût.
     """
     if breaker is not None and breaker.tripped:
         return None

@@ -17,10 +17,10 @@ DEFAULT_THRESHOLD = 10
 
 
 class SourceUnavailableError(Exception):
-    """Le breaker d'une source a tripé : source à bout (budget/panne), à sauter pour la phase en cours."""
+    """Le breaker d'une source s'est déclenché : source à bout (budget/panne), à sauter pour la phase en cours."""
 
     def __init__(self, source: str) -> None:
-        super().__init__(f"source {source} indisponible (circuit-breaker tripé)")
+        super().__init__(f"source {source} indisponible (circuit-breaker déclenché)")
         self.source = source
 
 
@@ -44,7 +44,7 @@ class SourceCircuitBreaker:
             self.tripped = True
 
     def check(self) -> None:
-        """Lève `SourceUnavailableError` si le breaker est tripé."""
+        """Lève `SourceUnavailableError` si le breaker est déclenché."""
         if self.tripped:
             raise SourceUnavailableError(self.source)
 
