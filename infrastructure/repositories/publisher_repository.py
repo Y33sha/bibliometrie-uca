@@ -11,13 +11,13 @@ d'éditeurs ; la détection préalable des journaux à titre partagé
 deux.
 """
 
-from typing import NamedTuple
+from typing import NamedTuple, cast
 
 from sqlalchemy import Connection, delete, func, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from application.ports.repositories.publisher_repository import PublisherUpdateFields
-from domain.publishers.publisher import Publisher
+from domain.publishers.publisher import Publisher, PublisherType
 from infrastructure.db.tables import publisher_name_forms, publishers
 from infrastructure.queries.pipeline.pub_counts import refresh_publisher_pub_count
 
@@ -43,7 +43,7 @@ def _publisher_from_row(row: _PublisherRow) -> Publisher:
         openalex_id=row.openalex_id,
         ror=row.ror,
         is_predatory=row.is_predatory,
-        publisher_type=row.publisher_type,
+        publisher_type=cast(PublisherType, row.publisher_type),
     )
 
 
