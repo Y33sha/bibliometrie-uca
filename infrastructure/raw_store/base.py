@@ -1,13 +1,8 @@
 """Abstraction du store de payloads bruts (raw store).
 
-Un `RawStore` conserve hors BDD les payloads JSON bruts renvoyés par les APIs
-sources, pour re-normalisation / audit / re-matérialisation. Deux
-implémentations : `LocalFileRawStore` (dev) et, à venir, un backend S3-compatible
-(Backblaze B2) en prod.
+Un `RawStore` conserve hors BDD les payloads JSON bruts renvoyés par les APIs sources, pour re-normalisation / audit / re-matérialisation. Implémentation : `LocalFileRawStore` (système de fichiers).
 
-Clé logique = `(source, source_id)`. L'encodage de cette clé en chemin/objet
-physique (URL-encoding du `source_id`, compression gzip) est un détail de
-chaque implémentation, pas du contrat.
+Clé logique = `(source, source_id)`. L'encodage de cette clé en chemin/objet physique (URL-encoding du `source_id`, compression gzip) est un détail d'implémentation.
 """
 
 from __future__ import annotations
