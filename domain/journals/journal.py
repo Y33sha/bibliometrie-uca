@@ -7,7 +7,7 @@ Identité = `id` (clé surrogate). Identifiant naturel : `title`, via la normali
 
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Literal
+from typing import Literal, get_args
 
 JournalType = Literal[
     "journal",
@@ -19,16 +19,7 @@ JournalType = Literal[
     "media",
     "unknown",
 ]
-JOURNAL_TYPES: tuple[JournalType, ...] = (
-    "journal",
-    "proceedings",
-    "repository",
-    "book_series",
-    "ebook_platform",
-    "preprint_server",
-    "media",
-    "unknown",
-)
+JOURNAL_TYPES: tuple[JournalType, ...] = get_args(JournalType)
 JOURNAL_TYPES_SET: frozenset[str] = frozenset(JOURNAL_TYPES)
 
 # Labels FR des valeurs d'enum, source de vérité Python pour l'UI (dropdowns admin, badges publics), exposés via `/api/journal-types`.
@@ -45,7 +36,7 @@ JOURNAL_TYPE_LABELS_FR: dict[JournalType, str] = {
 
 # Modèles OA de `journals.oa_model` : colonne text au schéma, restreinte en pratique à ce vocabulaire par le modal admin et les écritures pipeline.
 OaModel = Literal["subscription", "full_oa", "repository"]
-OA_MODELS: tuple[OaModel, ...] = ("subscription", "full_oa", "repository")
+OA_MODELS: tuple[OaModel, ...] = get_args(OaModel)
 
 # Labels FR exposés via `/api/journals/oa-models` (dropdowns/facettes UI, modal d'édition admin).
 OA_MODEL_LABELS_FR: dict[OaModel, str] = {
@@ -87,7 +78,7 @@ class Journal:
     is_predatory: bool = False
     apc_amount: Decimal | None = None
     apc_currency: str | None = None
-    oa_model: str | None = None
-    journal_type: str = "unknown"
+    oa_model: OaModel | None = None
+    journal_type: JournalType = "unknown"
     is_academic: bool = True
     doi_prefix: str | None = None
