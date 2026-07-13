@@ -33,7 +33,7 @@ def find_or_create_journal(
     """Trouve ou crée un journal.
 
     Cascade de recherche :
-    1. openalex_id (upsert si fourni) #TODO: virer ça! Osef
+    1. openalex_id
     2. ISSN (cherche dans issn, eissn, issnl)
     3. eISSN (idem)
     4. ISSN-L (idem)
