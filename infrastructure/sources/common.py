@@ -103,7 +103,7 @@ def upsert_staging(
 
     `entry_mode` enregistre comment la ligne est **entrée** (`bulk` à l'extraction, `cross_import_doi` / `cross_import_hal` au cross-import) ; posé à la création, jamais réécrit (provenance d'origine).
 
-    Retourne `(inserted, changed)` : `inserted` = vraie insertion (`xmax = 0`), `changed` = contenu réécrit (hash distinct de l'ancien). Le commit est à la charge de l'appelant.
+    Retourne `(inserted, changed)` : `inserted` = vraie insertion (`xmax = 0`), `changed` = contenu réécrit (hash distinct de celui déjà en base). Le commit est à la charge de l'appelant.
     """
     row = conn.execute(
         _UPSERT_STAGING_SQL,
@@ -227,11 +227,11 @@ _SET_DISAPPEARED_BY_SOURCE_ID_SQL = text(
 def get_stale_rows(
     conn: Connection, source: str, years: list[int] | None = None
 ) -> list[tuple[int, str]]:
-    """Rows `(id, source_id)` de `source` à `last_seen_at` ancien (> STALE_REFRESH_AFTER_DAYS).
+    """Rows `(id, source_id)` de `source` dont `last_seen_at` dépasse STALE_REFRESH_AFTER_DAYS.
 
-    Alimente la phase refresh : chaque row est refetchée par son `source_id` natif. Toute row a un `source_id` (`NOT NULL`), donc la sélection ne dépend pas de la présence d'un DOI. Exclut les stubs not-found et les rows déjà marquées disparues.
+    Alimente la phase refresh : chaque row est refetchée par son `source_id` natif. Toute row a un `source_id` (`NOT NULL`) : la sélection ne dépend pas de la présence d'un DOI. Exclut les stubs not-found et les rows déjà marquées disparues.
 
-    `years` borne la sélection à la fenêtre d'années du run courant, jointe depuis `source_publications.pub_year` : un run sur une période glissante ne refetche ainsi que le stale de ses propres années, sans requêtes unitaires inutiles sur des années qu'il ne moissonne plus en bulk. `None` = aucune borne (tout le stale de la source).
+    `years` borne la sélection à la fenêtre d'années du run courant, jointe depuis `source_publications.pub_year` : un run sur une période glissante ne refetche que le stale de ses propres années, sans requêtes unitaires inutiles sur des années hors de sa fenêtre bulk. `None` = aucune borne (tout le stale de la source).
     """
     if source not in VALID_SOURCES:
         raise ValueError(f"Source inconnue : {source}. Valides : {', '.join(VALID_SOURCES)}")
@@ -256,11 +256,11 @@ def set_disappeared_by_source_id(conn: Connection, source: str, source_id: str) 
 def get_cross_import_dois(conn: Connection, target: str) -> list[str]:
     """Retourne les DOI présents dans les autres sources mais absents de la cible.
 
-    Pool (vue `candidate_dois`) restreint aux publications **in-périmètre** : `source_publications.doi` (DOI primaire) ∪ `external_ids.related_dois` (DOI secondaires : preprint/dépôt/édition) ∪ `publication_relations.target_doi` (cibles des relations : preprint/supplément/data paper… à rapatrier) ∪ DOI DataCite déduits de `external_ids.arxiv_id` (préfixe `10.48550/arXiv.<id>` : tout dépôt arXiv expose ce DOI DataCite). Le périmètre (`publications.in_perimeter`) est celui matérialisé au run précédent : ne cross-importer que des DOI de publications in-périmètre coupe la propagation de cross-imports hors-périmètre. Les DOI de records fraîchement ingérés sont donc rattrapés au run suivant — bénin (le pipeline est convergent).
+    Pool (vue `candidate_dois`) restreint aux publications **in-périmètre** : `source_publications.doi` (DOI primaire) ∪ `external_ids.related_dois` (DOI secondaires : preprint/dépôt/édition) ∪ `publication_relations.target_doi` (cibles des relations : preprint/supplément/data paper… à rapatrier) ∪ DOI DataCite déduits de `external_ids.arxiv_id` (préfixe `10.48550/arXiv.<id>` : tout dépôt arXiv expose ce DOI DataCite). Le périmètre (`publications.in_perimeter`) est celui matérialisé au run précédent : ne cross-importer que des DOI de publications in-périmètre coupe la propagation de cross-imports hors-périmètre. Les DOI de records fraîchement ingérés sont rattrapés au run suivant (pipeline convergent).
 
     Le SQL compare les `doi` par égalité directe. Les candidats retenus sont normalisés via `clean_doi` et dédoublonnés avant d'être renvoyés : les appels HTTP par DOI en aval reçoivent une forme canonique, quelle que soit la propreté de la valeur source.
 
-    Exclut les DOI en backoff dans `doi_lookups` (miss cross-import récent sur la cible dont `next_retry` n'est pas encore atteint). Le pool est ainsi auto-borné et convergent : 1er pass tente tout, les misses reçoivent un `next_retry`, les passes suivantes ne retentent que les DOI dont le délai est écoulé.
+    Exclut les DOI en backoff dans `doi_lookups` (miss cross-import récent sur la cible dont `next_retry` n'est pas encore atteint). Le pool est auto-borné et convergent : 1er pass tente tout, les misses reçoivent un `next_retry`, les passes suivantes ne retentent que les DOI dont le délai est écoulé.
 
     Pour les cibles présentes dans `_TARGET_RA`, ajoute un LEFT JOIN sur `doi_prefixes` pour filtrer les DOIs dont la RA résolue ne correspond pas (les NULL — préfixe non résolu — sont conservés).
 
