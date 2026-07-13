@@ -6,9 +6,9 @@ Le lock est un fichier `logs/pipeline.lock` qui contient le PID du process actue
 
 - Démarrage : si le fichier existe et le PID dedans est vivant → on abort (sauf `force=True` qui SIGTERM puis SIGKILL le précédent).
 - Fin (normale ou exception) : `atexit` supprime le lockfile.
-- Lockfile orphelin (crash brutal SIGKILL/OOM) : le PID dedans ne vit plus → on l'écrase silencieusement au démarrage suivant.
+- Lockfile orphelin (crash brutal SIGKILL/OOM) : le PID dedans est mort → on l'écrase silencieusement au démarrage suivant.
 
-Comportement Windows (dev) dégradé : `os.kill(pid, 0)` n'est pas une sonde sur Windows (il termine le process avec exit code 0) et `signal.SIGKILL` n'existe pas. `_process_alive` retourne toujours False sur Windows — le module devient effectivement no-op. La prod tourne sous Linux (cron), seule plateforme où la concurrence est à craindre.
+Sur Windows, la vivacité passe par `OpenProcess` (`infrastructure.process.is_pid_alive`) et le `--force` envoie `SIGTERM`, que Windows exécute en `TerminateProcess` (arrêt immédiat, sans l'escalade SIGKILL du POSIX).
 """
 
 import atexit
@@ -19,6 +19,8 @@ import sys
 import time
 from pathlib import Path
 
+from infrastructure.process import is_pid_alive
+
 log = logging.getLogger(__name__)
 
 PIPELINE_LOCK_FILE = Path(__file__).resolve().parent.parent / "logs" / "pipeline.lock"
@@ -28,23 +30,6 @@ _SIGTERM_GRACE_SECONDS = 30
 
 class PipelineAlreadyRunningError(RuntimeError):
     """Levée si un autre pipeline tourne déjà et que --force n'a pas été demandé."""
-
-
-def _process_alive(pid: int) -> bool:
-    """Retourne True si le process PID existe (signal.0 = sonde, ne tue pas).
-
-    No-op (toujours False) sur Windows : cf. docstring du module.
-    """
-    if sys.platform == "win32":
-        return False
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        return False
-    except PermissionError:
-        # Process existe mais on n'a pas le droit de lui parler — supposé vivant.
-        return True
-    return True
 
 
 def _read_lock_pid(lockfile: Path) -> int | None:
@@ -64,12 +49,12 @@ def _terminate_existing(pid: int, *, grace_seconds: int = _SIGTERM_GRACE_SECONDS
         log.info("PID %d déjà terminé entre détection et SIGTERM", pid)
         return
     for _ in range(grace_seconds):
-        if not _process_alive(pid):
+        if not is_pid_alive(pid):
             log.info("Pipeline précédent (PID %d) terminé proprement", pid)
             return
         time.sleep(1)
     if sys.platform == "win32":
-        return  # SIGKILL n'existe pas sur Windows ; cf. docstring du module.
+        return  # Windows : le SIGTERM ci-dessus a déjà fait un TerminateProcess ; SIGKILL n'existe pas.
     log.warning("Pipeline précédent (PID %d) ne répond pas après %ds — SIGKILL", pid, grace_seconds)
     try:
         os.kill(pid, signal.SIGKILL)
@@ -87,7 +72,7 @@ def acquire_pipeline_lock(*, force: bool = False, lockfile: Path = PIPELINE_LOCK
     """
     lockfile.parent.mkdir(parents=True, exist_ok=True)
     existing_pid = _read_lock_pid(lockfile)
-    if existing_pid is not None and _process_alive(existing_pid):
+    if existing_pid is not None and is_pid_alive(existing_pid):
         if force:
             _terminate_existing(existing_pid)
         else:
