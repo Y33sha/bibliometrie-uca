@@ -12,17 +12,16 @@ from sqlalchemy import Connection
 
 from application.ports.pipeline.metadata_correction import MetadataCorrectionQueries
 from application.ports.repositories.audit_repository import AuditRepository
-from application.ports.repositories.journal_repository import JournalRepository
+from application.ports.repositories.journal_repository import JournalRepository, JournalUpdate
 from application.ports.repositories.publication_repository import PublicationRepository
 from application.services.journals import core as journals
-from domain.types import JsonValue
 
 
 def update_journal(
     conn: Connection,
     journal_id: int,
     *,
-    fields: dict[str, JsonValue],
+    update: JournalUpdate,
     repo: JournalRepository,
     pub_repo: PublicationRepository,
     audit_repo: AuditRepository,
@@ -31,14 +30,14 @@ def update_journal(
     """Met à jour une revue (champs sélectifs). Si `journal_type` change
     effectivement, requalifie le `doc_type` des publications rattachées dans la
     même transaction."""
-    new_type = fields.get("journal_type")
+    new_type = update.journal_type
     type_changed = False
     if isinstance(new_type, str):
         existing = repo.find_by_id(journal_id)
         if existing is not None and existing.journal_type != new_type:
             type_changed = True
 
-    journals.update_journal(journal_id, fields=fields, repo=repo)
+    journals.update_journal(journal_id, update=update, repo=repo)
 
     if type_changed:
         journals.requalify_publications_for_journal(

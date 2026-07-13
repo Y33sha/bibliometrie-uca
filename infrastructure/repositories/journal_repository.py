@@ -13,8 +13,9 @@ from typing import Any, NamedTuple, cast
 from sqlalchemy import Connection, case, delete, func, or_, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from application.ports.repositories.journal_repository import JournalUpdateFields
+from application.ports.repositories.journal_repository import JournalUpdate
 from domain.journals.journal import OA_MODELS, Journal, JournalType, OaModel
+from domain.normalize import normalize_text
 from infrastructure.db.tables import journal_name_forms, journals
 from infrastructure.queries.pipeline.pub_counts import (
     refresh_journal_pub_count,
@@ -222,7 +223,6 @@ class PgJournalRepository:
         self,
         *,
         title: str,
-        title_normalized: str,
         issn: str | None,
         eissn: str | None,
         issnl: str | None,
@@ -230,12 +230,12 @@ class PgJournalRepository:
         openalex_id: str | None,
         oa_model: str | None,
     ) -> int:
-        """Insère un journal et retourne son id."""
+        """Insère un journal et retourne son id. `title_normalized` est dérivé de `title`."""
         stmt = (
             journals.insert()
             .values(
                 title=title,
-                title_normalized=title_normalized,
+                title_normalized=normalize_text(title),
                 issn=issn,
                 eissn=eissn,
                 issnl=issnl,
@@ -256,10 +256,12 @@ class PgJournalRepository:
             is not None
         )
 
-    def update_journal_fields(self, journal_id: int, fields: JournalUpdateFields) -> None:
-        """UPDATE dynamique sur journals. Pas de validation ici (l'existence
-        et la non-vacuité des fields sont vérifiées par le service)."""
-        stmt = update(journals).where(journals.c.id == journal_id).values(**fields)
+    def update_journal_fields(self, journal_id: int, fields: JournalUpdate) -> None:
+        """UPDATE dynamique sur journals à partir des champs fournis, `title_normalized` dérivé de `title` quand il est présent. L'existence de la revue et la non-vacuité sont vérifiées par le service."""
+        data = fields.model_dump(exclude_unset=True)
+        if data.get("title") is not None:
+            data["title_normalized"] = normalize_text(data["title"])
+        stmt = update(journals).where(journals.c.id == journal_id).values(**data)
         self._conn.execute(stmt)
 
     # ── APC / DOAJ ─────────────────────────────────────────────────
