@@ -1,5 +1,4 @@
-"""
-Helper générique pour les requêtes HTTP async avec retry + backoff exponentiel.
+"""Helper générique pour les requêtes HTTP async avec retry + backoff exponentiel.
 
 Variante async de `infrastructure.sources.http_retry.http_request_with_retry`, utilisée par les extracteurs et scripts du pipeline qui lancent plusieurs requêtes en parallèle via `asyncio.gather`.
 
@@ -50,13 +49,9 @@ async def http_request_with_retry_async(
       - autres erreurs HTTP → raise_for_status() immédiat
       - succès → retourne response.json()
 
-    `label` : chaîne courte (ex: "DOI 10.xxx") insérée dans les logs
-    pour distinguer les requêtes concurrentes.
+    `label` : chaîne courte (ex: "DOI 10.xxx") insérée dans les logs pour distinguer les requêtes concurrentes.
 
-    Circuit-breaker : si un `SourceCircuitBreaker` est posé (ContextVar, cf.
-    `infrastructure.sources.circuit_breaker`), on court-circuite quand il a tripé
-    (`SourceUnavailableError`), on lui compte les échecs 429/5xx/réseau et on le
-    remet à zéro au succès. Les 4xx (404…) ne comptent pas (résultat normal).
+    Circuit-breaker : si un `SourceCircuitBreaker` est posé (ContextVar, cf. `infrastructure.sources.circuit_breaker`), on court-circuite quand il a tripé (`SourceUnavailableError`), on lui compte les échecs 429/5xx/réseau et on le remet à zéro au succès. Les 4xx (404…) ne comptent pas (résultat normal).
 
     Lève la dernière exception rencontrée si max_retries est atteint.
     """

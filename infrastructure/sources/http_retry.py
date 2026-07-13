@@ -1,5 +1,4 @@
-"""
-Helper générique pour les requêtes HTTP avec retry + backoff exponentiel.
+"""Helper générique pour les requêtes HTTP avec retry + backoff exponentiel.
 
 Encapsule le pattern commun aux extracteurs :
   - retry sur HTTP 429 (Too Many Requests)
@@ -20,9 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 def _counts_as_source_failure(error: Exception) -> bool:
-    """Un échec qui suggère que la source est indisponible (budget/panne) : 5xx ou
-    réseau/timeout. Les 4xx (404 « non trouvé »…) sont des résultats normaux, non
-    comptés par le circuit-breaker."""
+    """Un échec qui suggère que la source est indisponible (budget/panne) : 5xx ou réseau/timeout. Les 4xx (404 « non trouvé »…) sont des résultats normaux, non comptés par le circuit-breaker."""
     if isinstance(error, requests.exceptions.HTTPError) and error.response is not None:
         return error.response.status_code >= 500
     return True
@@ -51,12 +48,9 @@ def http_request_with_retry(
       - body vide (si retry_on_empty_body) → pause puis retry
       - succès → retourne response.json()
 
-    `max_retries=3` (2,4,8s avec backoff 2) : 3 tentatives suffisent, attendre 16
-    ou 32s pour un document est inutile.
+    `max_retries=3` : avec le backoff par défaut, les pauses sont de 1, 2, 4 s ; pousser plus loin ferait attendre 8, 16 s pour un seul document, inutile.
 
-    Circuit-breaker : si un `SourceCircuitBreaker` est posé (ContextVar), on
-    court-circuite quand il a tripé, on lui compte les échecs 429/5xx/réseau (pas
-    les 4xx) et on le remet à zéro au succès.
+    Circuit-breaker : si un `SourceCircuitBreaker` est posé (ContextVar), on court-circuite quand il a tripé, on lui compte les échecs 429/5xx/réseau (pas les 4xx) et on le remet à zéro au succès.
 
     `label` : chaîne courte (ex: "year 2024, rec 100") insérée dans les logs.
 
