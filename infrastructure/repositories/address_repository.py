@@ -11,6 +11,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from application.ports.repositories.address_repository import AddressCountryFilter
 from infrastructure.db.tables import address_structures, addresses
+from infrastructure.queries.pipeline import countries as country_queries
 
 
 class PgAddressRepository:
@@ -217,64 +218,12 @@ class PgAddressRepository:
         self,
         address_ids: list[int],
     ) -> int:
-        if not address_ids:
-            return 0
-        result = self._conn.execute(
-            text("""
-                UPDATE source_publications sd
-                SET countries = sub.new_countries
-                FROM (
-                    SELECT sa.source_publication_id AS doc_id,
-                           (SELECT array_agg(DISTINCT c::text ORDER BY c::text)
-                            FROM source_authorship_addresses saa2
-                            JOIN addresses a2 ON a2.id = saa2.address_id
-                            JOIN source_authorships sa2 ON sa2.id = saa2.source_authorship_id,
-                            LATERAL unnest(a2.countries) AS c
-                            WHERE sa2.source_publication_id = sa.source_publication_id
-                              AND a2.countries IS NOT NULL
-                           ) AS new_countries
-                    FROM source_authorship_addresses saa
-                    JOIN source_authorships sa ON sa.id = saa.source_authorship_id
-                    WHERE saa.address_id = ANY(:ids)
-                    GROUP BY sa.source_publication_id
-                ) sub
-                WHERE sd.id = sub.doc_id
-                  AND sd.countries IS DISTINCT FROM sub.new_countries
-            """),
-            {"ids": address_ids},
+        return country_queries.refresh_source_publications_countries_for_addresses(
+            self._conn, address_ids
         )
-        return result.rowcount
 
     def refresh_publications_countries_for_addresses(
         self,
         address_ids: list[int],
     ) -> int:
-        if not address_ids:
-            return 0
-        result = self._conn.execute(
-            text("""
-                WITH affected_pubs AS (
-                    SELECT DISTINCT sd.publication_id
-                    FROM source_authorship_addresses saa
-                    JOIN source_authorships sa ON sa.id = saa.source_authorship_id
-                    JOIN source_publications sd ON sd.id = sa.source_publication_id
-                    WHERE saa.address_id = ANY(:ids) AND sd.publication_id IS NOT NULL
-                )
-                UPDATE publications p
-                SET countries = sub.all_countries
-                FROM (
-                    SELECT ap.publication_id,
-                           (SELECT array_agg(DISTINCT c::text ORDER BY c::text)
-                            FROM source_publications sd,
-                            LATERAL unnest(sd.countries) AS c
-                            WHERE sd.publication_id = ap.publication_id
-                              AND sd.countries IS NOT NULL
-                           ) AS all_countries
-                    FROM affected_pubs ap
-                ) sub
-                WHERE p.id = sub.publication_id
-                  AND p.countries IS DISTINCT FROM sub.all_countries
-            """),
-            {"ids": address_ids},
-        )
-        return result.rowcount
+        return country_queries.refresh_publications_countries_for_addresses(self._conn, address_ids)
