@@ -6,7 +6,7 @@ L'orchestrateur écrit ses logs dans un fichier unique et append-only (`logs/pip
 - début de phase : `PHASE : <nom>` ;
 - fin de run : `PIPELINE TERMINÉ`.
 
-Servir le log d'une phase revient à découper la section correspondante du fichier. Le découpage se fait sur les marqueurs (présents quel que soit `LOG_FORMAT`, texte ou JSON — ils vivent dans le message), pas sur les horodatages.
+Servir le log d'une phase revient à découper la section correspondante du fichier. Le découpage se fait sur les marqueurs (présents quel que soit `LOG_FORMAT`, texte ou JSON — ils vivent dans le message).
 """
 
 from __future__ import annotations
