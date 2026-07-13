@@ -3,11 +3,10 @@
 import pytest
 from pydantic import ValidationError as PydanticValidationError
 
+from application.ports.api.publications_queries import EcoleDoctorale, PartenaireThese
 from infrastructure.jsonb_models.publication import (
-    EcoleDoctorale,
     ExternalIds,
     OpenAlexTopic,
-    PartenaireThese,
     PublicationBiblio,
     PublicationMeta,
     PublicationTopics,

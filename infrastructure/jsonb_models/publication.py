@@ -12,12 +12,9 @@ from application.ports.api.publications_queries import EcoleDoctorale, Partenair
 from domain.publications.identifiers import DOI, NNT, PMCID, PMID, ArxivId, HALId
 from infrastructure.jsonb_models._base import JsonbModel
 
-# Types re-exportés (importables depuis ce module).
 __all__ = [
-    "EcoleDoctorale",
     "ExternalIds",
     "OpenAlexTopic",
-    "PartenaireThese",
     "PublicationBiblio",
     "PublicationMeta",
     "PublicationTopics",
