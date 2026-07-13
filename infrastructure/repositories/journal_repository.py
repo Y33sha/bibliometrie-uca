@@ -341,17 +341,16 @@ class PgJournalRepository:
         return [dict(r._mapping) for r in self._conn.execute(stmt)]
 
     def merge_journal_into(self, target_id: int, source_id: int) -> None:
-        """Fusion de journal (5 étapes SQL) :
+        """Fusion de journal (une transaction) :
         1. Transfert des publications et source_publications
         2. Transfert/dédup des journal_name_forms
         3. Transfert des apc_payments
-        4. Enrichissement COALESCE des métadonnées journal
-        5. Suppression de la source
+        4. Suppression de la source
+        5. Enrichissement COALESCE de la cible depuis les valeurs capturées de la source
 
-        Les UPDATEs cross-agrégat (publications, source_publications,
-        apc_payments) restent en `text()` : leurs tables ne sont pas dans
-        la MetaData côté `infrastructure/db/tables.py` (volontairement —
-        elles sont gérées par leurs propres repos).
+        La source est supprimée avant l'enrichissement : la cible reprend alors son `openalex_id` (COALESCE) sans buter sur la contrainte `UNIQUE`, l'enrichissement lisant des valeurs déjà capturées.
+
+        Les UPDATEs cross-agrégat (publications, source_publications, apc_payments) restent en `text()` : leurs tables ne sont pas dans la MetaData côté `infrastructure/db/tables.py` (gérées par leurs propres repos).
         """
         self._conn.execute(
             text("UPDATE publications SET journal_id = :t WHERE journal_id = :s"),
@@ -383,10 +382,7 @@ class PgJournalRepository:
             {"t": target_id, "s": source_id},
         )
 
-        # Ordre : capture src → NULL-er openalex_id src (libère la contrainte
-        # UNIQUE) → enrich target → delete source. Sans ce NULL préalable,
-        # COALESCE essaie de coller openalex_id source sur target alors que
-        # source l'a encore → UniqueViolation.
+        # Capture des métadonnées de la source, puis suppression de la source avant l'enrichissement : la cible reprend ensuite ses valeurs (COALESCE) sans conflit sur `UNIQUE(openalex_id)`.
         src = self._conn.execute(
             select(
                 journals.c.issn,
@@ -401,9 +397,7 @@ class PgJournalRepository:
                 journals.c.oa_model,
             ).where(journals.c.id == source_id)
         ).one()
-        self._conn.execute(
-            update(journals).where(journals.c.id == source_id).values(openalex_id=None)
-        )
+        self._conn.execute(delete(journals).where(journals.c.id == source_id))
         self._conn.execute(
             update(journals)
             .where(journals.c.id == target_id)
@@ -420,8 +414,6 @@ class PgJournalRepository:
                 oa_model=func.coalesce(journals.c.oa_model, src.oa_model),
             )
         )
-
-        self._conn.execute(delete(journals).where(journals.c.id == source_id))
 
         # pub_count : la cible a absorbé les publications de la source. Recalcule la
         # revue cible, puis les éditeurs concernés (cible + ancien éditeur source).
