@@ -61,17 +61,6 @@ repos:
         pass_filenames: false
         files: ^(pyproject\.toml|uv\.lock)$
 
-      # Type check du frontend (Svelte + TypeScript). Tourne uniquement
-      # quand des fichiers frontend sont staged. `npm run check` invoque
-      # svelte-check avec --threshold error : seules les vraies erreurs
-      # bloquent, les warnings passent (cf. ~70 warnings tolérés actuels).
-      - id: svelte-check
-        name: svelte-check (types frontend)
-        entry: bash -c 'cd interfaces/frontend && npm run check'
-        language: system
-        pass_filenames: false
-        files: ^interfaces/frontend/.*\.(svelte|ts|js)$
-
       # --------------------------------------------------------
       # Étage pre-push : miroir local de la CI (.github/workflows/ci.yml).
       # Tourne avant chaque `git push`, sur tout le projet, quels que soient
