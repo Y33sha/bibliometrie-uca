@@ -176,13 +176,13 @@ class TestIsRepositoryLocation:
 
 
 class TestIsHalLocation:
-    def test_via_landing_page_prefix(self):
-        # Préfixes hal-, tel-, halshs-, inserm-, pasteur-, cea-, ineris-
-        assert is_hal_location(_loc(landing_page_url="https://hal.science/hal-1234567"))
-        assert is_hal_location(_loc(landing_page_url="https://tel.archives-ouvertes.fr/tel-987654"))
+    def test_via_landing_page(self):
+        # Landing page reconnue par le détecteur central : hôte HAL + docid à 8 chiffres, toute collection.
+        assert is_hal_location(_loc(landing_page_url="https://hal.science/hal-04123456"))
         assert is_hal_location(
-            _loc(landing_page_url="https://halshs.archives-ouvertes.fr/halshs-111")
+            _loc(landing_page_url="https://tel.archives-ouvertes.fr/tel-09876543")
         )
+        assert is_hal_location(_loc(landing_page_url="https://dumas.ccsd.cnrs.fr/dumas-01234567"))
 
     def test_via_source_homepage(self):
         assert is_hal_location(
@@ -207,7 +207,9 @@ class TestIsHalLocation:
 
 class TestShouldSkipPublisherJournal:
     def test_hal_skips(self):
-        assert should_skip_publisher_journal(_loc(landing_page_url="https://hal.science/hal-12"))
+        assert should_skip_publisher_journal(
+            _loc(landing_page_url="https://hal.science/hal-04123456")
+        )
 
     def test_theses_fr_skips(self):
         assert should_skip_publisher_journal(_loc(source_display_name="theses.fr"))

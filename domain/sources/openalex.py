@@ -109,19 +109,15 @@ def is_repository_location(loc: OpenalexLocation) -> bool:
     return loc.source_type == "repository"
 
 
-# Préfixes HAL dans les URL des landing pages : hal-, tel-, halshs-, etc.
-_HAL_LANDING_RE = re.compile(r"/(?:hal|tel|halshs|inserm|pasteur|cea|ineris)-\d+")
-
-
 def is_hal_location(loc: OpenalexLocation) -> bool:
     """True si la location pointe vers HAL.
 
     Trois signaux :
-    1. URL de la landing page contient un préfixe HAL identifié.
+    1. La landing page est un identifiant HAL reconnu (`extract_hal_id_from_url`).
     2. `source.type == 'repository'` ET `source.homepage_url` contient 'hal'.
     3. `source.type == 'repository'` ET `source.display_name` contient 'hal'.
     """
-    if loc.landing_page_url and _HAL_LANDING_RE.search(loc.landing_page_url):
+    if extract_hal_id_from_url(loc.landing_page_url) is not None:
         return True
     if loc.source_type == "repository":
         if "hal" in (loc.source_homepage_url or "").lower():
