@@ -2,7 +2,7 @@
 
 Ces exceptions sont levées par la couche services/ pour signaler des
 situations métier sans dépendre de FastAPI. La traduction en codes HTTP
-se fait dans backend/app.py via des exception handlers dédiés.
+se fait dans `interfaces/api/app.py` via des exception handlers dédiés.
 """
 
 from typing import TypedDict
