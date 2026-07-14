@@ -1,11 +1,6 @@
-"""Command handlers des écritures API sur les périmètres : la frontière transactionnelle.
+"""Command handlers des écritures API sur les périmètres : frontière transactionnelle de l'agrégat.
 
-Une écriture API est une commande (intention courte d'un acteur). Chaque handler
-reçoit la connexion de la requête, compose les briques agnostiques de `core.py`
-et `conn.commit()` au succès — pour que la donnée soit persistée avant l'envoi de
-la réponse (cf. `docs/chantiers/CODE_commit-avant-reponse.md`). Les briques
-composées restent transaction-agnostiques (réutilisées par les CLI) ; seul le
-command handler commit.
+`update_perimeter`, `add_perimeter_structure` et `remove_perimeter_structure` rafraîchissent en plus la clôture matérialisée, dont les racines du périmètre commandent la descente.
 """
 
 from sqlalchemy import Connection
