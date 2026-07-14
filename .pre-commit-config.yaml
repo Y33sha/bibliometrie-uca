@@ -1,11 +1,21 @@
 # ============================================================
-# pre-commit : vérifications lancées avant chaque git commit.
-# Les hooks constatent et refusent ; ils ne modifient aucun fichier. Un commit
-# refusé se corrige à la main (ou via `ruff format` / `ruff check --fix` / `uv
-# lock` lancés explicitement) puis se rejoue.
-# Installation : `pre-commit install` (après `pip install ".[dev]"`)
+# Vérifications git : deux étages.
+#   - pre-commit : garde rapide et locale à chaque commit (lint, format, types,
+#     tests unitaires). Installation : `pre-commit install`.
+#   - pre-push   : rejoue la CI complète avant chaque push (deptry, pip-audit,
+#     suite de tests + couverture, build frontend), pour qu'un push vert
+#     garantisse une CI verte. Installation : `pre-commit install --hook-type pre-push`.
+# Les hooks constatent et refusent ; ils ne modifient aucun fichier. Une
+# vérification en échec se corrige à la main (ou via `ruff format` / `ruff check
+# --fix` / `uv lock` lancés explicitement) puis se rejoue.
 # Lancement manuel sur tout le repo : `pre-commit run --all-files`
+#   (et `pre-commit run --all-files --hook-stage pre-push` pour l'étage push).
 # ============================================================
+
+# Les hooks sans `stages` explicite ne tournent qu'au commit ; l'étage pre-push
+# est réservé aux hooks qui le déclarent.
+default_stages: [pre-commit]
+
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.15.11
@@ -73,3 +83,90 @@ repos:
         language: system
         pass_filenames: false
         files: ^interfaces/frontend/.*\.(svelte|ts|js)$
+
+      # --------------------------------------------------------
+      # Étage pre-push : miroir local de la CI (.github/workflows/ci.yml).
+      # Tourne avant chaque `git push`, sur tout le projet, quels que soient
+      # les fichiers modifiés. Nécessite `pre-commit install --hook-type pre-push`
+      # et une base de test accessible (DB_PASSWORD dans l'environnement).
+      # --------------------------------------------------------
+
+      # Hygiène des dépendances : imports non déclarés, dépendances inutilisées.
+      - id: ci-deptry
+        name: deptry (hygiène des dépendances)
+        entry: uv run deptry .
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
+
+      # Scan de vulnérabilités des dépendances installées.
+      - id: ci-pip-audit
+        name: pip-audit (vulnérabilités)
+        entry: uv run pip-audit --ignore-vuln CVE-2026-3219
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
+
+      # Lint + format + contrats d'architecture + types sur tout le projet.
+      # Rejoués ici même s'ils tournent au commit : garantit un push propre
+      # y compris après un commit passé en --no-verify.
+      - id: ci-ruff-check
+        name: ruff check (lint)
+        entry: uv run ruff check .
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
+
+      - id: ci-ruff-format
+        name: ruff format --check (format)
+        entry: uv run ruff format --check .
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
+
+      - id: ci-lint-imports
+        name: lint-imports (architecture DDD)
+        entry: uv run lint-imports
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
+
+      - id: ci-mypy
+        name: mypy (type check)
+        entry: uv run mypy .
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
+
+      # Suite complète (unitaires + intégration) sous instrumentation :
+      # pass/fail ET seuil de couverture (fail_under dans pyproject.toml).
+      - id: ci-pytest-cov
+        name: pytest (suite complète + couverture)
+        entry: uv run pytest tests/ --cov --cov-report=term-missing
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
+
+      # Frontend : types puis build de production (comme la CI).
+      - id: ci-frontend-check
+        name: svelte-check (types frontend)
+        entry: bash -c 'cd interfaces/frontend && npm run check'
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
+
+      - id: ci-frontend-build
+        name: build frontend (vite build)
+        entry: bash -c 'cd interfaces/frontend && npm run build'
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
