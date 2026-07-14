@@ -36,6 +36,6 @@ Phase `oa_status`: interroge [Unpaywall](../glossaire.md#unpaywall) par DOI pour
 
 Incrémentale : chaque run est plafonné (10 000 DOI) et ne (re)vérifie que les publications jamais vérifiées ou dont le statut n'a pas été revu depuis 30 jours (les statuts stables `gold`, `hybrid`, `diamond` ne sont pas réinterrogés). Le retard des jamais-vérifiées s'écoule ainsi sur plusieurs runs au lieu d'un pic. La phase tourne dans tous les modes du pipeline.
 
-Code : `application/pipeline/oa_status/run.py`.
+Code : `application/pipeline/oa_status/phase.py`.
 
 Les enrichissements sur les **revues** et **éditeurs** (APC, type, pays, etc.) sont rassemblés dans la phase distincte [`publishers_journals`](05-publishers-journals.md), positionnée beaucoup plus tôt dans le pipeline (juste après affiliations).

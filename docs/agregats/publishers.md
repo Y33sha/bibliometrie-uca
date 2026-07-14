@@ -55,7 +55,6 @@ Port `application/ports/api/publishers_queries.py`, adaptateur `PgPublisherQueri
 Dette assumée et décisions d'architecture propres à cet agrégat, gardées explicites.
 
 1. **Écritures cross-agrégat de la fusion (décision d'archi assumée).** `merge_publisher_into` repointe `journals` / `journal_name_forms` / `apc_payments` en `text()`, comme `merge_journal_into` : une fusion est intrinsèquement cross-agrégat.
-2. **Unicité globale de `publisher_name_forms.form_normalized`.** Une forme de nom n'appartient qu'à un seul éditeur ; à la fusion, les formes de la source en collision avec la cible sont supprimées — perte silencieuse des alias en doublon.
 
 ## Invariants métier
 
