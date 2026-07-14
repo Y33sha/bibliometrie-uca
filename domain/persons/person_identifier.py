@@ -1,13 +1,8 @@
 """Aggregate root `PersonIdentifier` — relation Personne ↔ identifiant externe avec statut.
 
-`PersonIdentifier` est un aggregate à part, pas un VO ni une entité fille de `Person`. Justifications :
+Aggregate à part (pas un VO, pas une entité fille de `Person`) : le `status` (`pending` / `confirmed` / `rejected`) porte sur la *relation* identifier ↔ person, et la réattribution charge et mute le seul identifier (load + save), pas les deux personnes. Identité naturelle : `(id_type, id_value)` ; identité surrogate : `id`.
 
-1. Le `status` (`pending` / `confirmed` / `rejected`) porte sur la *relation* identifier ↔ person, pas sur l'identifier nu — c'est un objet métier de premier rang.
-2. La réattribution (déplacer un identifier d'une personne à une autre, autorisée depuis le statut `rejected`) charge et mute l'identifier, pas les deux personnes — modèle aggregate-séparé qui collapse l'opération en un load + un save.
-
-Identité naturelle : `(id_type, id_value)`. Identité surrogate : `id`.
-
-`Person.identifiers: tuple[PersonIdentifier, ...]` reste possible comme projection en lecture hydratée par le repository à la demande, mais n'est pas la source de vérité des mutations.
+`Person.identifiers: tuple[PersonIdentifier, ...]` est une projection en lecture hydratée par le repository à la demande, pas la source de vérité des mutations.
 
 La logique métier touchant aux attributions d'identifiants (transitions de statut, réattribution) vit ici.
 """

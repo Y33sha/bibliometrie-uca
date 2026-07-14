@@ -10,28 +10,20 @@ from domain.persons.name_matching import (
     same_person_name,
 )
 
+# TODO(scanr-idref-asymetrie) : l'IdRef est matché sans restriction de source
+# (`decide_match_by_identifier(idref, idref_map)`), alors que l'IdRef ScanR provient
+# du même bloc `denormalized` que son ORCID exclu. Asymétrie possiblement défendable
+# (ScanR relève de l'autorité française IdRef/SUDOC) mais à objectiver : mesurer le
+# taux d'accord de l'IdRef ScanR vs sources fiables avant de le garder ou de le
+# source-restreindre comme l'ORCID.
 ORCID_MATCH_SOURCES = frozenset({"crossref", "openalex", "hal"})
-"""Sources dont l'ORCID porté par une authorship est déposé par l'auteur,
-donc fiable comme signal de matching personne.
+"""Sources dont l'ORCID porté par une authorship est déposé par l'auteur, fiable comme signal de matching personne.
 
 - `crossref` : ORCID fourni par l'auteur à l'éditeur lors de la soumission.
-- `openalex` : `raw_orcid` recopié par OpenAlex de la métadonnée brute de
-  la source amont (cf. `_extract_openalex_orcid`) — même provenance que
-  Crossref.
+- `openalex` : `raw_orcid` recopié par OpenAlex de la métadonnée brute de la source amont (cf. `_extract_openalex_orcid`) — même provenance que Crossref.
 - `hal` : ORCID attaché à l'auteur dans le TEI HAL (`label_xml`).
 
-`wos` et `scanr` sont exclus : leur ORCID est dérivé (matching
-algorithmique interne pour WoS, couche de dénormalisation pour ScanR), pas
-déposé par l'auteur. Il reste enregistré sur `person_identifiers` mais n'est
-pas utilisé comme signal de matching.
-
-TODO(scanr-idref-asymetrie) : l'IdRef est matché sans restriction de source
-(`decide_match_by_identifier(idref, idref_map)`), donc l'IdRef ScanR EST un
-signal, alors qu'il provient du même bloc `denormalized` que son ORCID exclu.
-Asymétrie possiblement défendable (ScanR est dans le domaine de l'autorité
-française IdRef/SUDOC) mais à objectiver : mesurer le taux d'accord IdRef ScanR
-vs sources fiables avant de décider de garder, ou de source-garder l'IdRef
-comme l'ORCID."""
+`wos` et `scanr` sont exclus : leur ORCID est dérivé (matching algorithmique interne pour WoS, couche de dénormalisation pour ScanR), pas déposé par l'auteur. Il reste enregistré sur `person_identifiers` mais n'est pas utilisé comme signal de matching."""
 
 # Canal de résolution par lequel la cascade a posé le `person_id` d'une signature,
 # indexé par le `reason` de `decide_person_match`. Enregistré dans
