@@ -1,7 +1,7 @@
 # ============================================================
 # Vérifications git : deux étages.
-#   - pre-commit : garde rapide et locale à chaque commit (lint, format, types,
-#     tests unitaires). Installation : `pre-commit install`.
+#   - pre-commit : garde rapide et locale à chaque commit (lint, format sur
+#     l'index, tests unitaires). Installation : `pre-commit install`.
 #   - pre-push   : rejoue les vérifications de la CI avant chaque push (lint,
 #     format, types, contrats d'architecture, hygiène des dépendances, build
 #     frontend). La suite de tests reste à la charge de la CI, trop longue pour
@@ -38,24 +38,11 @@ repos:
         args: [--maxkb=500]
 
   # Hooks locaux : outils installés dans l'env Python du projet.
+  # mypy et lint-imports résolvent les imports sur tout le projet : ils exigent
+  # un arbre cohérent, que le commit d'un sous-ensemble de fichiers ne garantit
+  # pas. Ils vivent donc à l'étage pre-push (arbre entièrement commité), pas ici.
   - repo: local
     hooks:
-      # Vérifie les contrats d'architecture DDD (pyproject.toml).
-      - id: lint-imports
-        name: lint-imports (architecture DDD)
-        entry: uv run lint-imports
-        language: system
-        pass_filenames: false
-        types: [python]
-
-      # Type check (config permissive dans pyproject.toml — à durcir progressivement).
-      - id: mypy
-        name: mypy (type check)
-        entry: uv run mypy .
-        language: system
-        pass_filenames: false
-        types: [python]
-
       # Lance uniquement les tests unitaires (sans BDD, ~1-2s).
       # Les tests d'intégration (avec BDD) sont lancés en CI, pas ici.
       - id: pytest-unit
