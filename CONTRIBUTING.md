@@ -17,7 +17,7 @@ Prérequis : comprendre l'architecture DDD en 4 couches — voir [`docs/architec
 - **Noms de personnes / DOI** : `names_compatible`, `parse_raw_author_name` de `domain/names.py` ; `DOI`, `DOI.try_parse` de `domain/publication.py`.
 - **Couches DDD** : le contrat `import-linter` interdit certaines directions d'import (`domain/` ne peut rien importer, `application/` ne peut pas importer `infrastructure/`, etc.). Un import interdit fera échouer le pre-commit et la CI.
 - **Tests** : `python -m pytest tests/ -v` (la base `DB_PASSWORD` doit être exportée). Les tests unitaires (`tests/unit/`) tournent aussi au pre-commit. Seuil de couverture global : `fail_under = 85` dans `pyproject.toml`, à faire monter progressivement (cf. `docs/chantiers/CODE_couverture-tests.md`).
-- **Pre-commit** : lance ruff + ruff format + mypy + lint-imports + pytest-unit + uv-lock. Les hooks constatent et refusent ; ils ne modifient aucun fichier. Lancer `ruff format .` (et au besoin `ruff check --fix .`) avant `git commit`, sinon le hook refuse le commit.
+- **Hooks git** : deux étages, tous non-mutants (ils constatent et refusent, ne modifient aucun fichier). Le **pre-commit** (garde rapide à chaque commit) lance ruff + ruff format + mypy + lint-imports + pytest-unit + uv-lock ; lancer `ruff format .` (et au besoin `ruff check --fix .`) avant `git commit`, sinon le hook refuse le commit. Le **pre-push** rejoue la CI complète avant chaque push (deptry, pip-audit, suite de tests + couverture, build frontend), pour qu'un push vert garantisse une CI verte. Installation : `pre-commit install` puis `pre-commit install --hook-type pre-push`.
 
 ---
 
