@@ -99,6 +99,14 @@ def normalize_text(text: str) -> str:
     return text.strip()
 
 
+def normalize_label(label: str) -> str:
+    """Assainit un libellé de sujet avant insertion : trim + collapse des espaces internes.
+
+    Préserve casse et accents ; la déduplication se fait en SQL via `lower(label)` (index unique), et `subjects.label` garde la forme du premier insert.
+    """
+    return " ".join(label.split())
+
+
 # Alias — normalize_name est identique à normalize_text.
 # Les deux noms sont conservés pour la lisibilité du code appelant.
 normalize_name = normalize_text

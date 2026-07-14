@@ -16,7 +16,7 @@ from application.ports.api.subjects_queries import (
     SubjectsAdminQueries,
 )
 from application.ports.pipeline.subjects import SubjectsQueries
-from domain.subjects.subject import normalize_label
+from domain.normalize import normalize_label
 
 _UPSERT_SUBJECT_SQL = text(
     """
