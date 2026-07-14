@@ -252,9 +252,7 @@
 						{:else}
 							<span class="badge-doaj" title="Indexée dans DOAJ">DOAJ</span>
 						{/if}
-					{/if}
-					{#if j.is_predatory}<span class="badge-pred">prédatrice</span>{/if}
-				</td>
+					{/if}				</td>
 				<td class="issn-cell">{formatIssns(j)}</td>
 				{#if !hidePublisherColumn}
 					<td class="muted">
@@ -345,15 +343,5 @@
 		text-decoration: none;
 	}
 	:global(a.badge-doaj:hover) { background: #256528; }
-	.badge-pred {
-		font-size: 0.7rem;
-		padding: 1px 5px;
-		background: var(--danger);
-		color: white;
-		border-radius: 8px;
-		margin-left: 4px;
-		vertical-align: middle;
-		font-weight: 600;
-	}
 	.actions { white-space: nowrap; position: relative; }
 </style>

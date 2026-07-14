@@ -27,7 +27,6 @@
 		id: number;
 		name: string;
 		country: string;
-		is_predatory: boolean;
 		publisher_type: string;
 	} | null = $state(null);
 
@@ -36,7 +35,6 @@
 			id: pub.id,
 			name: pub.name,
 			country: (pub.country || '').toUpperCase(),
-			is_predatory: pub.is_predatory,
 			publisher_type: pub.publisher_type,
 		};
 	}
@@ -46,7 +44,6 @@
 		const body: Record<string, any> = {};
 		if (editModal.name.trim()) body.name = editModal.name.trim();
 		body.country = editModal.country.trim() || null;
-		body.is_predatory = editModal.is_predatory;
 		body.publisher_type = editModal.publisher_type;
 		try {
 			await publishersApi.update(editModal.id, body);
@@ -215,9 +212,6 @@
 				<option value={opt.value}>{opt.label_fr}</option>
 			{/each}
 		</select></label>
-		<label class="checkbox-row">
-			<input type="checkbox" bind:checked={editModal.is_predatory} /> Prédateur
-		</label>
 		{#snippet actions()}
 			<button class="btn" onclick={() => editModal = null}>Annuler</button>
 			<button class="btn btn-primary" onclick={saveEdit}>Enregistrer</button>

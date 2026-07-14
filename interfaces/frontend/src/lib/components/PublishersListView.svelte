@@ -204,11 +204,9 @@
 	</thead>
 	<tbody>
 		{#each publishers.items as p (p.id)}
-			<tr class:predatory={p.is_predatory}>
+			<tr>
 				<td>
-					<a href="{base}/publishers/{p.id}" class="publisher-link">{p.name}</a>
-					{#if p.is_predatory}<span class="badge-pred">prédateur</span>{/if}
-				</td>
+					<a href="{base}/publishers/{p.id}" class="publisher-link">{p.name}</a>				</td>
 				<td class="muted">{publisherTypeLabel(p.publisher_type)}</td>
 				<td class="muted">{p.country?.toUpperCase() ?? ''}</td>
 				<td class="prefixes">
@@ -262,9 +260,7 @@
 	.publishers-table thead th.sortable:hover { color: var(--accent); }
 	.publishers-table tbody tr { border-bottom: 1px solid var(--border-subtle); }
 	.publishers-table tbody tr:last-child { border-bottom: none; }
-	.publishers-table tbody tr:hover { background: var(--surface-hover); }
-	.publishers-table tbody tr.predatory td { background: #fff0f0; }
-	.publishers-table td { padding: 7px 10px; font-size: 0.95rem; vertical-align: top; }
+	.publishers-table tbody tr:hover { background: var(--surface-hover); }	.publishers-table td { padding: 7px 10px; font-size: 0.95rem; vertical-align: top; }
 	.publishers-table td.num {
 		text-align: right;
 		font-variant-numeric: tabular-nums;
@@ -285,15 +281,5 @@
 
 	.publisher-link { color: var(--accent); text-decoration: none; font-weight: 500; }
 	.publisher-link:hover { text-decoration: underline; }
-	.badge-pred {
-		font-size: 0.7rem;
-		padding: 1px 5px;
-		background: var(--danger);
-		color: white;
-		border-radius: 8px;
-		margin-left: 6px;
-		vertical-align: middle;
-		font-weight: 600;
-	}
 	.actions { white-space: nowrap; position: relative; }
 </style>
