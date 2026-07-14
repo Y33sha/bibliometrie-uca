@@ -1,9 +1,8 @@
-"""
-Service Liens adresse ↔ structure — validation manuelle des détections de périmètre.
+"""Service Liens adresse ↔ structure — validation manuelle des détections de périmètre.
 
-Séparé de `application/addresses.py` (principe SRP) : la validation adresse↔structure (confirm / reject / reset / batch) et l'attribution des pays sont deux responsabilités distinctes, orchestrées par des routers différents. La gestion des pays vit dans `application/addresses_countries.py`.
+La validation adresse ↔ structure (confirm / reject / reset / batch) et l'attribution des pays sont deux responsabilités distinctes, orchestrées par des routers différents ; les pays vivent dans `application/services/addresses/countries.py`.
 
-Ces opérations écrivent le lien et **retournent les adresses dont la contribution au calcul `in_perimeter` a changé**. La propagation (`propagate_in_perimeter_for_addresses`, potentiellement massive — jusqu'à des dizaines de milliers de source_authorships) est lancée en tâche de fond par le caller (`bg_propagate_in_perimeter_sync`), jamais synchrone dans la requête.
+Ces opérations écrivent le lien et **retournent les adresses dont la contribution au calcul `in_perimeter` a changé**. La propagation (`propagate_in_perimeter_for_addresses`, potentiellement massive — jusqu'à des dizaines de milliers de source_authorships) est lancée en tâche de fond par l'appelant (`bg_propagate_in_perimeter_sync`), jamais synchrone dans la requête.
 """
 
 from application.ports.repositories.address_repository import AddressRepository
@@ -16,7 +15,7 @@ def review_structure_link(
     *,
     repo: AddressRepository,
 ) -> list[int]:
-    """Upsert le lien address ↔ structure (validation manuelle).
+    """Insère ou met à jour le lien adresse ↔ structure (validation manuelle).
 
     - is_confirmed = True  → confirme (crée le lien si besoin)
     - is_confirmed = False → rejette (crée le lien si besoin)
@@ -42,9 +41,9 @@ def batch_review_structure_link(
     *,
     repo: AddressRepository,
 ) -> tuple[int, list[int]]:
-    """Comme review_structure_link mais sur un lot d'adresses.
+    """Comme `review_structure_link` mais sur un lot d'adresses.
 
-    Retourne `(nombre d'adresses touchées, adresses dont la contribution au calcul in_perimeter a changé)`. Pour les reset, le nombre touché est le nombre de lignes UPDATEes ; pour les upserts, la taille du lot. La propagation des adresses changées est lancée en tâche de fond par le caller.
+    Retourne `(nombre d'adresses touchées, adresses dont la contribution au calcul in_perimeter a changé)`. Pour les reset, le nombre touché est le nombre de lignes mises à jour ; pour les upserts, la taille du lot. La propagation des adresses changées est lancée en tâche de fond par l'appelant.
     """
     if not address_ids:
         return 0, []

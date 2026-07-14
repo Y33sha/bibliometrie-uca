@@ -1,6 +1,6 @@
 """Service Référentiel Personnes — accès exclusif en écriture aux tables `persons`, `person_identifiers`, `person_name_forms`.
 
-Gère aussi le rattachement/détachement des authorships sources (`source_authorships`) puisque le `person_id` y est la source de vérité du lien personne.
+Gère aussi le rattachement/détachement des authorships sources (`source_authorships`), dont le `person_id` porte le lien vers la personne.
 """
 
 import logging
@@ -139,9 +139,7 @@ def unlink_authorship(
 class AddIdentifierOutcome(StrEnum):
     """Issue de la cascade de décision d'`add_identifier`.
 
-    Porte le résultat au lieu de le laisser l'appelant le redéduire : un seul
-    site de décision, l'appelant (API) se contente de traduire l'issue en réponse.
-    Le cas conflit n'est pas une issue mais une levée de `CannotAttributeConflict`.
+    L'appelant (API) traduit l'issue en réponse ; un conflit lève `CannotAttributeConflict` (hors énumération).
     """
 
     ADDED = "added"  # insertion en `pending`
@@ -150,8 +148,7 @@ class AddIdentifierOutcome(StrEnum):
 
 
 class AddIdentifierResult(NamedTuple):
-    """Retour d'`add_identifier` : l'issue de la cascade et la valeur canonique
-    normalisée (que l'appelant ré-affiche sans re-normaliser)."""
+    """Retour d'`add_identifier` : l'issue de la cascade et la valeur canonique normalisée, que l'appelant ré-affiche sans re-normaliser."""
 
     outcome: AddIdentifierOutcome
     id_value: str
@@ -288,14 +285,9 @@ def import_authenticated_orcids(
 ) -> dict[str, int]:
     """Applique le statut `authenticated` à des paires `(person_id, orcid)` déjà résolues.
 
-    Ouvre une fois le contexte d'écriture protégé pour la transaction courante
-    (`begin_authenticated_orcid_import`), puis délègue chaque paire à `authenticate_orcid`.
-    Les valeurs ORCID sont supposées déjà normalisées et les personnes déjà résolues :
-    le point d'entrée qui lit le fichier des ORCID authentifiés porte cette préparation.
+    Ouvre une fois le contexte d'écriture protégé pour la transaction courante (`begin_authenticated_orcid_import`), puis délègue chaque paire à `authenticate_orcid`. Les valeurs ORCID sont supposées déjà normalisées et les personnes déjà résolues : le point d'entrée qui lit le fichier des ORCID authentifiés porte cette préparation.
 
-    Retourne le décompte des issues (`inserted`/`upgraded`/`reassigned`/`noop`). C'est
-    l'unique chemin d'écriture autorisé pour ce statut ; en dehors de lui, le trigger
-    `protect_authenticated_identifier` rejette toute écriture de `authenticated`.
+    Retourne le décompte des issues (`inserted`/`upgraded`/`reassigned`/`noop`). C'est l'unique chemin d'écriture autorisé pour ce statut ; en dehors de lui, le trigger `protect_authenticated_identifier` rejette toute écriture de `authenticated`.
     """
     repo.begin_authenticated_orcid_import()
     outcomes: Counter[str] = Counter()
@@ -305,13 +297,9 @@ def import_authenticated_orcids(
 
 
 class IdentifierConflict(NamedTuple):
-    """Conflit d'attribution collecté par le path batch : une valeur d'identifiant
-    portée par une signature du candidat est déjà attribuée à un autre propriétaire.
+    """Conflit d'attribution collecté par le traitement par lot : une valeur d'identifiant portée par une signature du candidat est déjà attribuée à un autre propriétaire.
 
-    Arbitré après la cascade par le consensus des porteurs (canal identifiant
-    ordre-indépendant) : la valeur est transférée au candidat si le consensus le
-    désigne, lui et pas le propriétaire. `owner_status` distingue le `pending`
-    (transférable) du `confirmed` (verrou admin, jamais transféré)."""
+    Arbitré après la cascade par le consensus des porteurs (canal identifiant ordre-indépendant) : la valeur est transférée au candidat si le consensus le désigne face au propriétaire. `owner_status` distingue le `pending` (transférable) du `confirmed` (verrou admin, jamais transféré)."""
 
     id_type: str
     id_value: str
@@ -328,13 +316,13 @@ def add_identifiers_from_authorships(
 ) -> None:
     """Promotion canonique en batch : pour chaque authorship source, extrait les identifiants observés (orcid/idhal/idref/hal_person_id) et délègue à `add_identifier` qui dispatche selon l'état existant en base.
 
-    Path batch tolérant : un `ValidationError` (identifiant source mal formé) est loggé et la promotion continue. Un `CannotAttributeConflict` (valeur déjà attribuée en pending/confirmed à une autre personne) est loggé en warning et la valeur n'est pas écrasée — l'arbitrage par consensus du balayage frontal de la phase (`detect_identifier_conflicts`) le tranche au run suivant. Le path strict reste `add_identifier` (singulier) que l'API admin utilise directement.
+    Traitement par lot tolérant : un `ValidationError` (identifiant source mal formé) est loggé et la promotion continue. Un `CannotAttributeConflict` (valeur déjà attribuée en pending/confirmed à une autre personne) est loggé en warning et la valeur n'est pas écrasée — l'arbitrage par consensus du balayage frontal de la phase (`detect_identifier_conflicts`) le tranche au run suivant. Le point d'entrée strict reste `add_identifier` (singulier), que l'API admin utilise directement.
 
     Couvre les 4 id_types acceptés en base (`PERSON_IDENTIFIER_TYPES`) : `orcid`, `idhal`, `idref`, `hal_person_id`. Les 3 premiers sont visibles UI ; `hal_person_id` est interne (filtré côté lecture par `PUBLIC_PERSON_IDENTIFIER_TYPES`).
 
     Spécificité `hal_person_id` : la valeur arrive en `int` depuis la query (cf. `fetch_unlinked_authorships`), on convertit en str pour la table `person_identifiers`.
 
-    La `source` enregistrée sur `person_identifiers` reste à sa valeur par défaut (`'auto'`) : tracer la source d'origine n'apporte rien d'exploitable (la valeur n'est pas mise à jour quand une autre source confirme plus tard l'identifiant) et la priorité Crossref pour les ORCID se gérera côté cascade de matching, pas via ce champ.
+    La `source` enregistrée sur `person_identifiers` reste à sa valeur par défaut (`'auto'`).
     """
     seen: set[tuple[str, str]] = set()
     for a in authorships:
@@ -369,10 +357,7 @@ def refresh_person_name_forms(
     *,
     repo: PersonRepository,
 ) -> None:
-    """Recalcule les formes de nom source 'persons' d'une personne.
-
-    Shim : calcule les formes via le domaine et délègue au repository.
-    """
+    """Recalcule les formes de nom de source 'persons' d'une personne : calcul via le domaine, écriture par le repository."""
     forms = compute_person_name_forms(last_name, first_name)
     repo.refresh_name_forms(person_id, forms)
 
@@ -399,13 +384,9 @@ def update_name_form_status(
 ) -> NameFormStatusRow:
     """Met à jour le statut d'une forme de nom (pending/confirmed/rejected).
 
-    `confirmed` valide le lien. `rejected` est le verrou de non-retour ET déclenche
-    le **détachement** des signatures portant cette forme : leurs `source_authorships`
-    sont nullées et les `authorships` canoniques devenues sans source sont supprimées
-    (le verrou seul n'agirait qu'au matching futur, et la phase persons est incrémentale).
+    `confirmed` valide le lien. `rejected` est le verrou de non-retour ET déclenche le **détachement** des signatures portant cette forme : leurs `source_authorships` sont nullées et les `authorships` canoniques devenues sans source sont supprimées.
 
-    Retourne la ligne {person_id, name_form, status}. Lève NotFoundError si le couple
-    (name_form, person_id) n'existe pas.
+    Retourne la ligne {person_id, name_form, status}. Lève NotFoundError si le couple (name_form, person_id) n'existe pas.
     """
     row = repo.update_name_form_status(person_id, name_form, status)
     if status == "rejected":
@@ -434,14 +415,9 @@ def detach_authorships(
     authorship_repo: AuthorshipRepository,
     audit_repo: AuditRepository | None = None,
 ) -> DetachResult:
-    """Rejette durablement les paires (publication, personne) couvertes par un
-    lot d'authorships sources sélectionnées.
+    """Rejette durablement les paires (publication, personne) couvertes par un lot d'authorships sources sélectionnées.
 
-    Le rejet porte sur la publication entière : on résout l'ensemble distinct
-    des `publication_id` des sources sélectionnées et on applique `reject_pair`
-    à chaque paire (enregistrement du rejet, détachement de toutes les sources
-    de la paire, suppression de la ligne consolidée). Puis on supprime les
-    formes de nom de la personne que plus aucune source n'atteste.
+    Le rejet porte sur la publication entière : on résout l'ensemble distinct des `publication_id` des sources sélectionnées et on applique `reject_pair` à chaque paire (enregistrement du rejet, détachement de toutes les sources de la paire, suppression de la ligne consolidée). Puis on supprime les formes de nom de la personne qu'aucune source restante n'atteste.
 
     Retourne {"detached": N, "deleted_authorships": M, "cleaned_forms": K}.
     """
@@ -478,8 +454,7 @@ def mark_distinct(
     repo: PersonRepository,
     audit_repo: AuditRepository | None = None,
 ) -> None:
-    """Marque deux personnes comme distinctes (non-doublon) dans
-    `distinct_persons`. Idempotent.
+    """Marque deux personnes comme distinctes (non-doublon) dans `distinct_persons`. Idempotent.
 
     Les IDs sont triés pour garantir l'unicité de la paire.
     """
@@ -504,14 +479,9 @@ def merge_person(
 ) -> None:
     """Fusionne la personne `source_id` dans `target_id`.
 
-    Orchestration domain-driven : load target + source via le repo,
-    délègue l'invariant métier à `Person.can_merge_with` (refus si les
-    deux personnes ont chacune une fiche RH distincte), puis applique
-    le plumbing FK via `repo.merge_into`.
+    Charge target et source via le repo, délègue l'invariant métier à `Person.can_merge_with` (refus si les deux personnes ont chacune une fiche RH distincte), puis reprend les clés étrangères via `repo.merge_into`.
 
-    Lève `NotFoundError` si target ou source n'existe pas. Lève
-    `ConflictError` si l'invariant RH est violé. Émet un événement
-    d'audit `person.merged` si un utilisateur est dans le contexte.
+    Lève `NotFoundError` si target ou source n'existe pas. Lève `ConflictError` si l'invariant RH est violé. Émet un événement d'audit `person.merged` si un utilisateur est dans le contexte.
     """
     target = repo.find_by_id(target_id)
     source = repo.find_by_id(source_id)

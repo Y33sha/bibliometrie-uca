@@ -1,14 +1,8 @@
-"""Use case : attribuer à une personne des authorships sources orphelines.
+"""Attribuer à une personne des authorships sources orphelines.
 
-Ces deux use cases (single + batch) sont exposés par l'API admin
-(`POST /api/admin/orphan-authorships/...`) — actions utilisateur, hors
-pipeline. À l'interface entre `persons`, `source_authorships` et
-`publications`, mais leur issue est la création / mise à jour de lignes
-dans la table `authorships`.
+Ces deux opérations (unitaire et par lot) sont exposées par l'API admin (`POST /api/admin/orphan-authorships/...`) — actions utilisateur, hors pipeline. À l'interface entre `persons`, `source_authorships` et `publications`, leur issue est la création ou la mise à jour de lignes dans `authorships`.
 
-Le helper privé `_refresh_authorship_from_sources` chaîne les 5
-opérations atomiques du port qui recomposent une authorship pour une
-paire (publication, person) depuis ses source_authorships.
+Le helper privé `_refresh_authorship_from_sources` chaîne les cinq opérations atomiques du port qui recomposent une authorship pour une paire (publication, personne) depuis ses source_authorships.
 """
 
 from application.audit_log import emit_event
@@ -166,16 +160,13 @@ def _refresh_authorship_from_sources(
     *,
     repo: PersonRepository,
 ) -> None:
-    """Recompose une authorship pour la paire (publication, person) depuis
-    ses source_authorships actives.
+    """Recompose une authorship pour la paire (publication, personne) depuis ses source_authorships actives.
 
     Chaîne :
     1. INSERT IF MISSING dans authorships
     2. Pose la FK source_authorships.authorship_id (sources non exclues)
-    3. Recalcule author_position (par priorité de source) et is_corresponding
-       (bool_or)
-    4. Recalcule in_perimeter (agrégation OR ; les structures dérivées vivent
-       dans la matview `authorship_structures`, rafraîchie par le caller)
+    3. Recalcule author_position (par priorité de source) et is_corresponding (bool_or)
+    4. Recalcule in_perimeter (agrégation OR ; les structures dérivées vivent dans la matview `authorship_structures`, rafraîchie par l'appelant)
     """
     repo.insert_authorship_if_missing(publication_id, person_id)
     repo.link_source_authorships_to_authorship(publication_id, person_id)

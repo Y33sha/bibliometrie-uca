@@ -1,9 +1,8 @@
-"""
-Service Éditeurs — accès exclusif en écriture à la table `publishers`.
+"""Service Éditeurs — accès exclusif en écriture à la table `publishers`.
 
-Séparé de `application/journals/core.py` (principe SRP) : publishers et journals sont deux agrégats distincts, servis par deux ports distincts (`PublisherRepository`, `JournalRepository`). Un caller qui ne touche qu'aux éditeurs (ex. `update_publisher` d'un router admin) n'a pas à charger la surface journaux.
+Agrégat distinct de Journal, servi par son propre port (`PublisherRepository`). Un appelant qui ne touche qu'aux éditeurs (ex. `update_publisher` d'un router admin) charge cette seule surface.
 
-La fusion d'éditeurs (`merge_publishers`) reste ici parce que sémantiquement c'est une opération sur l'agrégat Publisher ; elle a besoin du port `JournalRepository` en complément pour détecter les journaux à conflit entre les deux éditeurs à fusionner avant de déléguer les transferts SQL.
+La fusion d'éditeurs (`merge_publishers`) vit ici : c'est une opération de l'agrégat Publisher. Elle prend aussi le port `JournalRepository` pour détecter les journaux en conflit entre les deux éditeurs avant de déléguer les transferts SQL.
 """
 
 from collections import Counter
@@ -96,13 +95,9 @@ def merge_publishers(
 ) -> None:
     """Fusionne l'éditeur source dans l'éditeur cible.
 
-    Invariant métier : s'il y a des journaux aux titres partagés entre
-    les deux éditeurs avec des ISSN/eISSN/ISSN-L différents, la fusion
-    est refusée (ConflictError) — on ne veut pas fusionner deux
-    journaux qui ont manifestement des identités distinctes.
+    Invariant métier : si deux journaux aux titres partagés entre les deux éditeurs portent des ISSN/eISSN/ISSN-L différents, la fusion est refusée (`ConflictError`) — leurs identités sont distinctes.
 
-    La détection est côté `journal_repo` (query sur `journals`), la
-    fusion finale est côté `publisher_repo` (transferts + delete).
+    La détection est côté `journal_repo` (requête sur `journals`), la fusion finale côté `publisher_repo` (transferts + delete).
     """
     if target_id == source_id:
         raise ConflictError("Impossible de fusionner un éditeur avec lui-même")
@@ -112,10 +107,10 @@ def merge_publishers(
     #    PublisherMergeBlockedError avec l'ensemble — l'UI les affiche
     #    d'un coup.
     pairs = journal_repo.find_shared_title_journal_pairs(target_id, source_id)
-    # Si un journal apparaît dans plusieurs paires, le publisher correspondant
+    # Si un journal apparaît dans plusieurs paires, l'éditeur correspondant
     # contient un doublon interne (2 journaux au même title_normalized). La
-    # fusion N→1 casserait (le source serait supprimé puis re-fetchée). On
-    # flagge toutes les paires concernées comme blockers.
+    # fusion N→1 casserait (la source supprimée puis rechargée). On signale
+    # toutes les paires concernées comme bloquantes.
     target_seen = Counter(p["target_journal_id"] for p in pairs)
     source_seen = Counter(p["source_journal_id"] for p in pairs)
     blockers: list[BlockingJournal] = []
