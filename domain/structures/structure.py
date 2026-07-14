@@ -1,16 +1,8 @@
-"""Aggregate root `Structure` — entité métier d'une structure de
-recherche / d'enseignement (laboratoire, école doctorale, université,
-hôpital, …).
+"""Aggregate root `Structure` — entité métier d'une structure de recherche / d'enseignement (laboratoire, école doctorale, université, hôpital, …).
 
-Identité = `id` (clé surrogate). Identifiant naturel : `code`
-(unique). Une structure agrège ses formes de noms (`name_forms`) ainsi
-que ses identifiants externes (RorId, HalCollection) et un dict
-`api_ids` JSONB pour les identifiants des sources qui ne méritent pas
-encore leur VO (clés métier : `openalex`, `wos`, `scanr`, `theses`,
-`hal`).
+Identité = `id` (clé surrogate) ; identifiant naturel : `code` (unique). Une structure agrège ses formes de noms (`name_forms`), ses identifiants externes (`RorId`, `HalCollection`) et un dict `api_ids` JSONB pour les identifiants de sources sans VO dédié (clés : `openalex`, `wos`, `scanr`, `theses`, `hal`).
 
-La logique métier touchant aux structures (matching, désambiguïsation,
-règles sur la hiérarchie `structure_relations`) vit ici.
+Les règles métier des structures (matching des formes de nom, hiérarchie `structure_relations`) vivent dans les modules voisins du package `domain/structures/`.
 """
 
 from dataclasses import dataclass, field
@@ -23,8 +15,7 @@ from domain.structures.name_forms import StructureNameForm
 class StructureType(StrEnum):
     """Type d'une structure de recherche / d'enseignement.
 
-    Mappe sur l'enum Postgres `structure_type`. `StrEnum` (PEP 663) garde
-    la valeur sérialisable telle quelle vers SQL et API.
+    Mappe sur l'enum Postgres `structure_type`. `StrEnum` garde la valeur sérialisable telle quelle vers SQL et API.
     """
 
     UNIVERSITE = "universite"

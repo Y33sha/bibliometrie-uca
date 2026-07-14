@@ -1,13 +1,8 @@
 """Règles métier sur les relations entre structures (`structure_relations`).
 
-Free functions (domain services) plutôt que méthodes d'aggregate : la
-relation `parent → child` est une entité de bord à part qui ne se
-collapse pas dans `Structure` — la validation cycle/self-reference
-porte sur le graphe des relations, pas sur la structure individuelle.
+Fonctions libres (domain services) validant le graphe `structure_relations` : la règle cycle / auto-référence porte sur la relation `parent → child`, hors de l'agrégat `Structure`.
 
-Pattern caller : le service applicatif prefetche les ancêtres du
-`parent_id` candidat via le repo (`WITH RECURSIVE`) et passe le set
-ici. Le domain reste pur (zéro I/O).
+Pattern caller : le service applicatif prefetche les ancêtres du `parent_id` candidat via le repo (`WITH RECURSIVE`) et passe le set ici. Le domaine reste pur (zéro I/O).
 """
 
 from domain.errors import ValidationError
@@ -24,12 +19,9 @@ def check_can_create_relation(
     Refus :
 
     - **auto-référence** : `parent_id == child_id` (cas dégénéré).
-    - **cycle** : `child_id` est déjà un ancêtre de `parent_id` ;
-      ajouter cette relation refermerait la boucle.
+    - **cycle** : `child_id` est déjà un ancêtre de `parent_id` ; ajouter cette relation refermerait la boucle.
 
-    Le set `ancestors_of_parent` n'inclut pas `parent_id` lui-même —
-    c'est l'ensemble strict des structures atteignables depuis
-    `parent_id` en remontant les arêtes `child → parent` du graphe.
+    Le set `ancestors_of_parent` n'inclut pas `parent_id` lui-même : c'est l'ensemble strict des structures atteignables depuis `parent_id` en remontant les arêtes `child → parent` du graphe.
     """
     if parent_id == child_id:
         raise ValidationError(

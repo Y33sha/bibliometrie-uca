@@ -1,15 +1,8 @@
 """Value object `StructureNameForm` — forme du nom d'une structure.
 
-Contrairement à `PersonNameForm`, une forme de nom de structure n'est
-pas qu'une string : elle est qualifiée par des options de matching
-(`is_word_boundary` pour exiger une frontière de mot,
-`is_excluding` pour les formes qui doivent provoquer un *rejet* du
-match plutôt qu'un match, `requires_context_of` pour les formes qui
-ne valident le match que si certaines autres structures sont aussi
-présentes dans la même adresse).
+Une forme de nom de structure porte des options de matching en plus de la string : `is_word_boundary` (exiger une frontière de mot), `is_excluding` (la forme provoque un *rejet* du match), `requires_context_of` (le match n'est valide que si certaines autres structures sont présentes dans la même adresse).
 
-Toutes ces attributs étant des valeurs (booléens, tuple d'entiers), la
-classe reste un VO : égalité par contenu, immuable.
+Ces attributs étant tous des valeurs (booléens, tuple d'entiers), la classe reste un VO : égalité par contenu, immuable.
 """
 
 from dataclasses import dataclass, field
@@ -24,13 +17,9 @@ class StructureNameForm:
     Champs (miroir de la table `structure_name_forms`) :
 
     - `form_text` : la string à matcher (déjà normalisée).
-    - `is_word_boundary` : exige une frontière de mot avant/après la
-      forme pour valider un match (évite p. ex. de matcher « ica »
-      dans « africa »).
-    - `is_excluding` : si la forme matche, le match global est rejeté
-      (forme négative).
-    - `requires_context_of` : tuple d'ids de structures qui doivent
-      aussi être présentes pour valider ce match (désambiguïsation).
+    - `is_word_boundary` : exige une frontière de mot avant/après la forme pour valider un match (évite p. ex. de matcher « ica » dans « africa »).
+    - `is_excluding` : si la forme matche, le match global est rejeté (forme négative).
+    - `requires_context_of` : tuple d'ids de structures qui doivent aussi être présentes pour valider ce match (désambiguïsation).
     """
 
     form_text: str
