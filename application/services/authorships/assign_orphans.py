@@ -113,8 +113,7 @@ def assign_orphan_authorship(
     if publication_id is not None:
         _refresh_authorship_from_sources(person_id, publication_id, repo=repo)
     # `authorship_structures` (agrégation des structure_ids) maintenue uniquement
-    # par le pipeline — pas de refresh sur action admin (staleness bornée à un run,
-    # cf. docs/chantiers/CODE_background-jobs.md).
+    # par le pipeline — pas de refresh sur action admin (staleness bornée à un run).
     return True
 
 
@@ -157,8 +156,7 @@ def batch_assign_orphan_authorships(
         repo.add_name_form(person_id, name_form)
 
     # `authorship_structures` (agrégation des structure_ids) maintenue uniquement
-    # par le pipeline — pas de refresh sur action admin (staleness bornée à un run,
-    # cf. docs/chantiers/CODE_background-jobs.md).
+    # par le pipeline — pas de refresh sur action admin (staleness bornée à un run).
     return assigned
 
 

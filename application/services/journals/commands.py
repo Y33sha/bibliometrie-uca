@@ -1,11 +1,6 @@
-"""Command handlers des écritures API sur les revues : la frontière transactionnelle.
+"""Command handlers des écritures API sur les revues : frontière transactionnelle de l'agrégat.
 
-Une écriture API est une commande (intention courte d'un acteur). Chaque handler
-reçoit la connexion de la requête, compose les briques agnostiques de
-`core.py` et `conn.commit()` au succès — pour que la donnée soit persistée
-avant l'envoi de la réponse (cf. `docs/chantiers/CODE_commit-avant-reponse.md`).
-Les briques composées restent transaction-agnostiques (réutilisées par le
-pipeline et les CLI) ; seul le command handler commit.
+`update_journal` et `merge_journals` requalifient dans la foulée le `doc_type` des publications rattachées quand le `journal_type` cible change.
 """
 
 from sqlalchemy import Connection

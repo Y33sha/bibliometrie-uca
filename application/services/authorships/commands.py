@@ -1,16 +1,6 @@
-"""Command handlers des écritures API sur les authorships : la frontière transactionnelle.
+"""Command handlers des écritures API sur les authorships : frontière transactionnelle de l'agrégat.
 
-Une écriture API est une commande (intention courte d'un acteur). Chaque handler
-reçoit la connexion de la requête, compose les briques agnostiques de `core.py` /
-`assign_orphans.py` et `conn.commit()` au succès — pour que la donnée soit
-persistée avant l'envoi de la réponse (cf.
-`docs/chantiers/CODE_commit-avant-reponse.md`). Les briques composées restent
-transaction-agnostiques (réutilisées par le pipeline et les CLI) ; seul le
-command handler commit.
-
-`assign_orphan_authorship` compose deux agrégats : il peut créer la personne
-cible (`persons.core.create_person`) puis lui rattacher l'authorship, le tout
-dans une seule transaction.
+`assign_orphan_authorship` compose deux agrégats : il peut créer la personne cible (`persons.core.create_person`) avant de lui rattacher l'authorship, dans une seule transaction.
 """
 
 from sqlalchemy import Connection
