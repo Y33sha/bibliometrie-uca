@@ -3,11 +3,11 @@
 Une *clé de confirmation* est un attribut cross-source par lequel deux `source_publications` attestent du même document. Deux familles :
 
 - **Identifiants** : DOI, NNT, HAL ID, PMID — égalité directe.
-- **Token métadonnée** : `("metadata_block", "<doc_type>|<title_normalized>|<pub_year>")`, pour **tout** `doc_type` (audit chantier `DATA_dedup-pairwise-gated` : ~99 % de même-œuvre par type au-delà du seuil de longueur). `doc_type` dans la clé = égalité de type requise (décision « DOI = identité » étendue au type). Garde de **longueur minimale de titre** : écarte les collisions de titres génériques. La thèse passe par ce même token (`thesis|<titre>|<année>`) ; pas de collapse `thesis`/`ongoing_thesis` (leurs années diffèrent — inscription vs soutenance —, ils ne co-bloquent donc jamais). Les paliers plus lâches (hors `doc_type`, titres courts via le conteneur) qui exigeraient un second accord pairwise relèvent d'un mécanisme distinct.
+- **Token métadonnée** : `("metadata_block", "<doc_type>|<title_normalized>|<pub_year>")`, pour **tout** `doc_type` (empiriquement ~99 % de même-œuvre par type au-delà du seuil de longueur de titre). Le `doc_type` dans la clé impose l'égalité de type (« DOI = identité » étendue au type). Garde de **longueur minimale de titre** : écarte les collisions de titres génériques. La thèse passe par ce même token (`thesis|<titre>|<année>`) ; `thesis` et `ongoing_thesis` ne co-bloquent jamais (leurs années diffèrent — inscription vs soutenance). Les paliers plus lâches (hors `doc_type`, titres courts via le conteneur), qui exigeraient un second accord pairwise, relèvent d'un mécanisme distinct.
 
-La projection est l'unique définition de « quelles clés porte cette SP », consommée par la passe d'assignation + réconciliation des composantes (`reconcile_components`) — aucun site ne ré-encode son extraction.
+La projection est l'unique définition des clés que porte une `source_publication`, consommée par la passe d'assignation et de réconciliation des composantes (`reconcile_components`) — aucun autre site ne ré-encode son extraction.
 
-Les valeurs sont lues sur la SP **corrigée** (colonnes typées + `external_ids`), déjà normalisées en amont (phase `normalize`) puis corrigées (phase `metadata_correction`). Les identifiants repassent par les VO : idempotent sur des valeurs propres, forme canonique unique quel que soit l'appelant (le clustering relie les SP par égalité de tokens). Le DOI lu est la colonne nue (concept Zenodo déjà substitué a priori par `metadata_correction`) : la projection ignore Zenodo.
+Les valeurs sont lues sur la `source_publication` **corrigée** (colonnes typées + `external_ids`), déjà normalisées (phase `normalize`) puis corrigées (phase `metadata_correction`). Les identifiants repassent par les VO : idempotent sur des valeurs propres, forme canonique unique quel que soit l'appelant. Le DOI lu est la colonne nue (concept Zenodo déjà substitué en amont par `metadata_correction`) : la projection ignore Zenodo.
 """
 
 from collections.abc import Mapping
@@ -25,7 +25,7 @@ _METADATA_BLOCK_MIN_TITLE_LENGTH = 30
 class ConfirmationKeys:
     """Clés de confirmation portées par une `source_publication`, normalisées.
 
-    `hal_ids` est multivalué (une SP peut référencer plusieurs dépôts HAL) ; les autres clés sont au plus unitaires. Les identifiants sont des chaînes canoniques (forme produite par les VO), prêtes pour les lookups `find_by_*`. `metadata_block` = `"<doc_type>|<title_normalized>|<pub_year>"` pour toute SP à `doc_type` présent et titre assez long. Une clé absente vaut `None` (tuple vide pour `hal_ids`).
+    `hal_ids` est multivalué (une `source_publication` peut référencer plusieurs dépôts HAL) ; les autres clés sont au plus unitaires. Les identifiants sont des chaînes canoniques (forme produite par les VO), prêtes pour les lookups `find_by_*`. `metadata_block` = `"<doc_type>|<title_normalized>|<pub_year>"` pour toute `source_publication` à `doc_type` présent et titre assez long. Une clé absente vaut `None` (tuple vide pour `hal_ids`).
     """
 
     doi: str | None
@@ -35,7 +35,7 @@ class ConfirmationKeys:
     metadata_block: str | None
 
     def tokens(self) -> frozenset[tuple[str, str]]:
-        """Jeu de tokens `(type, valeur)` portés par la SP, pour le clustering.
+        """Jeu de tokens `(type, valeur)` portés par la `source_publication`, pour le clustering.
 
         Chaque token est namespacé par son type : un DOI `x` et un NNT `x` ne s'apparentent pas. Deux `source_publications` partageant un token sont reliées dans le graphe de composantes (cf. `connected_components`). Une clé absente ne produit pas de token.
         """
@@ -61,7 +61,7 @@ def project_confirmation_keys(
 ) -> ConfirmationKeys:
     """Extrait les clés de confirmation normalisées d'une `source_publication`.
 
-    `external_ids` porte `nnt`, `pmid`, `hal_id` (liste). Le DOI est lu sur la colonne (déjà corrigée, concept Zenodo inclus). Une valeur d'identifiant malformée est écartée silencieusement (`try_parse` → `None`), comme une clé absente. `metadata_block` est posée pour toute SP à `doc_type` présent, `pub_year` présent et `title_normalized` plus long que `_METADATA_BLOCK_MIN_TITLE_LENGTH`.
+    `external_ids` porte `nnt`, `pmid`, `hal_id` (liste). Le DOI est lu sur la colonne (déjà corrigée, concept Zenodo inclus). Une valeur d'identifiant malformée est écartée silencieusement (`try_parse` → `None`), comme une clé absente. `metadata_block` est posée pour toute `source_publication` à `doc_type` présent, `pub_year` présent et `title_normalized` plus long que `_METADATA_BLOCK_MIN_TITLE_LENGTH`.
     """
     ids: Mapping[str, object] = external_ids if isinstance(external_ids, Mapping) else {}
 

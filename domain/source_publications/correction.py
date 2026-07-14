@@ -1,11 +1,11 @@
 """Correction des métadonnées canoniques.
 
-Expose `effective_metadata`, fonction pure qui applique des règles de correction sur les valeurs d'une publication source, à partir de `SourcePublicationForCorrection` — sa vue d'entrée, qui porte les champs lus **plus** des champs joints depuis `journals` (`journal_type`, `oa_model`, `apc_amount`). C'est ce qui rend la fonction capable d'appliquer aussi bien les règles SP-intrinsèques (URL) que les règles journal-dépendantes, sans threader de repo.
+Expose `effective_metadata`, fonction pure qui applique des règles de correction sur les valeurs d'une publication source, à partir de `SourcePublicationForCorrection` — sa vue d'entrée, qui porte les champs lus **plus** des champs joints depuis `journals` (`journal_type`, `oa_model`, `apc_amount`). C'est ce qui rend la fonction capable d'appliquer aussi bien les règles intrinsèques à la `source_publication` (URL) que les règles journal-dépendantes, sans threader de repo.
 
-Distincte de l'agrégation (`aggregation.py` arbitre entre sources) et du normalizer (qui ne mute pas `source_publications`, trace inviolable des sources). Les corrections s'appliquent sur le canonique via `refresh_from_sources` et sur la SP entrante au moment du matching, pour que la dédup matche sur les valeurs corrigées.
+Distincte de l'agrégation (`aggregation.py` arbitre entre sources) et du normalizer (qui ne mute pas `source_publications`, trace inviolable des sources). Les corrections s'appliquent sur le canonique via `refresh_from_sources` et sur la `source_publication` entrante au moment du matching, pour que la dédup matche sur les valeurs corrigées.
 
 Architecture : chaque règle est une entrée du dict `_RULES`, mappant un membre de `MetadataCorrectionRule` à sa définition `{applies_to, applies_correction}` où :
-- `applies_to` est un dict de prédicats AND-és sur la SP (clés typées par `_AppliesTo`).
+- `applies_to` est un dict de prédicats AND-és sur la `source_publication` (clés typées par `_AppliesTo`).
 - `applies_correction` est un dict champ → valeur cible (une seule entrée par règle aujourd'hui).
 
 Le moteur `_check_predicate` interprète chaque clé d'`applies_to` selon une convention fixe (voir le TypedDict `_AppliesTo` pour la liste exhaustive). `_correct_field(sp, "doc_type")` parcourt les règles dans l'ordre du dict et retourne la première qui (a) corrige le champ demandé et (b) dont tous les prédicats matchent.
@@ -28,16 +28,9 @@ from domain.types import JsonValue
 class SourcePublicationForCorrection:
     """Vue d'une `source_publications` pour la correction de métadonnées.
 
-    Contrat d'entrée de `effective_metadata` (et `hydrate_raw_view`) : les champs
-    lus par les règles — **valeurs courantes** des colonnes (potentiellement déjà
-    corrigées d'un run précédent) plus les champs joints de `journals`
-    (`journal_type`, `oa_model`, `apc_amount`) — et `raw_metadata`, qui reconstruit
-    le brut normalisé d'origine (`raw_metadata->'<champ>'->>'raw'` prime sur la
-    colonne). Sous-ensemble dédié : l'entité `SourcePublication` complète n'est pas
-    requise (la correction ne porte aucun invariant).
+    Contrat d'entrée de `effective_metadata` (et `hydrate_raw_view`) : les champs lus par les règles — **valeurs courantes** des colonnes (potentiellement déjà corrigées d'un run précédent) plus les champs joints de `journals` (`journal_type`, `oa_model`, `apc_amount`) — et `raw_metadata`, qui reconstruit le brut normalisé d'origine (`raw_metadata->'<champ>'->>'raw'` prime sur la colonne). Sous-ensemble dédié : l'entité `SourcePublication` complète n'est pas requise (la correction ne porte aucun invariant).
 
-    Frozen : `hydrate_raw_view` et la cascade produisent une nouvelle vue via
-    `dataclasses.replace`, jamais une mutation en place.
+    Frozen : `hydrate_raw_view` et la cascade produisent une vue par `dataclasses.replace`, jamais une mutation en place.
     """
 
     id: int
@@ -69,7 +62,7 @@ class SourcePublicationForCorrection:
 class MetadataCorrectionRule(StrEnum):
     """Identifiants des règles de correction figées. Une règle = un membre.
 
-    Convention de nommage : `INPUT_CONDITION_TO_OUTPUT`. Le membre est tracé par le caller au moment où la règle est appliquée (`source_publications.raw_metadata.<champ>.corrected_by` côté SP, `publications.meta.corrections.<champ>` côté canonique) — trace d'audit consultable pour le re-run ciblé et l'affichage UI.
+    Convention de nommage : `INPUT_CONDITION_TO_OUTPUT`. Le membre est tracé par le caller au moment où la règle est appliquée (`source_publications.raw_metadata.<champ>.corrected_by` côté source_publication, `publications.meta.corrections.<champ>` côté canonique) — trace d'audit consultable pour le re-run ciblé et l'affichage UI.
     """
 
     THESES_FR_URL_TO_THESIS = "THESES_FR_URL_TO_THESIS"
@@ -185,11 +178,11 @@ class _AppliesTo(TypedDict, total=False):
     - `doi_contains` : `str` — substring présente dans `sp.doi` (DOIs stockés en minuscules).
     - `title_prefix_normalized` : `tuple[str, ...]` — `normalize_text(sp.title)` commence par au moins un préfixe du tuple.
     - `title_regex` : `re.Pattern[str]` — `pattern.search(sp.title)` matche.
-    - `journal_id_present` : `bool` — `(sp.journal_id is not None)` vaut la valeur attendue. Signal « la SP est rattachée à un journal », marqueur d'article.
-    - `doi_prefix_not_in` : `tuple[str, ...]` — la SP porte un DOI **et** son préfixe (`doi.split('/')[0]`) n'appartient à aucun préfixe du tuple. Faux si pas de DOI (le prédicat affirme quelque chose *sur* le DOI). Sert à exclure des registrants connus par préfixe (ex. registres de thèses).
+    - `journal_id_present` : `bool` — `(sp.journal_id is not None)` vaut la valeur attendue. Signal « la `source_publication` est rattachée à un journal », marqueur d'article.
+    - `doi_prefix_not_in` : `tuple[str, ...]` — la `source_publication` porte un DOI **et** son préfixe (`doi.split('/')[0]`) n'appartient à aucun préfixe du tuple. Faux si pas de DOI (le prédicat affirme quelque chose *sur* le DOI). Sert à exclure des registrants connus par préfixe (ex. registres de thèses).
     - `oa_status` : `str` — équivalence sur `sp.oa_status` (le statut d'entrée, ex. `embargoed`).
     - `embargo_expired` : `bool` — `sp.embargo_expired` (calculé au fetch : `embargo_until <= current_date`) vaut la valeur attendue.
-    - `declares_preprint` : `bool` — `sp.declares_preprint` (calculé au fetch : la SP déclare une relation `is-preprint-of`) vaut la valeur attendue.
+    - `declares_preprint` : `bool` — `sp.declares_preprint` (calculé au fetch : la `source_publication` déclare une relation `is-preprint-of`) vaut la valeur attendue.
 
     Étendre les prédicats = ajouter une clé ici + une branche dans `_check_predicate`.
     """
@@ -408,7 +401,7 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
 
 
 def _check_predicate(sp: SourcePublicationForCorrection, key: str, value: object) -> bool:
-    """Évalue un prédicat (paire clé/valeur de `applies_to`) sur la SP. Voir `_AppliesTo` pour la sémantique de chaque clé."""
+    """Évalue un prédicat (paire clé/valeur de `applies_to`) sur la `source_publication`. Voir `_AppliesTo` pour la sémantique de chaque clé."""
     if key == "doc_type":
         doc_type = (sp.doc_type or "").lower()
         if isinstance(value, frozenset):
@@ -467,7 +460,7 @@ def _correct_field(sp: SourcePublicationForCorrection, field: str) -> Correction
 def effective_metadata(sp: SourcePublicationForCorrection) -> CorrectedFields:
     """Applique les corrections sur les champs d'une `SourcePublicationForCorrection`. Retourne un `CorrectedFields` (vide si aucune règle ne s'applique).
 
-    Fonction pure : aucune I/O, aucun effet de bord. Les données journal/publisher consommées par les règles arrivent par la vue (champs joints à la lecture), pas via des entités passées en paramètre — c'est ce qui permet à la fonction de servir aussi bien la dédup (sur la SP entrante) que le refresh (sur les sources d'une publication).
+    Fonction pure : aucune I/O, aucun effet de bord. Les données journal/publisher consommées par les règles arrivent par la vue (champs joints à la lecture), pas via des entités passées en paramètre — c'est ce qui permet à la fonction de servir aussi bien la dédup (sur la source_publication entrante) que le refresh (sur les sources d'une publication).
 
     `doc_type` et `oa_status` sont corrigés **indépendamment** depuis la même vue : aucune règle de l'un ne lit la valeur corrigée de l'autre (`oa_status` est la promotion d'embargo, orthogonale au `doc_type`). Les dépendances inter-champ — un type corrigé selon le `journal_type` du journal rattaché — se résolvent par l'**ordre des sous-steps** de la phase (chacun re-lit l'état persisté du précédent), pas par un feed-forward intra-fonction.
     """
@@ -483,13 +476,10 @@ _DISSERTATION_HALID_PREFIXES = ("tel-", "dumas-")
 
 
 def strip_dissertation_keys(external_ids: dict[str, JsonValue]) -> dict[str, JsonValue]:
-    """Retire d'un `external_ids` les clés propres aux **dissertations**, erronées sur une SP
-    article (conflation thèse↔article publié : OpenAlex/ScanR fusionnent une thèse et son article
-    dans un seul enregistrement, en gardant le `nnt` / les hal_id `tel-`/`dumas-` de la thèse).
+    """Retire d'un `external_ids` les clés propres aux **dissertations**, erronées sur une `source_publication` article (conflation thèse↔article publié : OpenAlex/ScanR fusionnent une thèse et son article dans un seul enregistrement, en gardant le `nnt` / les hal_id `tel-`/`dumas-` de la thèse).
 
-    Retire `nnt` et les `hal_id` préfixés `tel-`/`dumas-` (en conservant les autres hal_id, qui
-    pointent l'article). Pur. Le caller n'appelle cette fonction que sur les SP corrigées
-    thèse→article (`THESIS_WITH_JOURNAL_TO_ARTICLE`)."""
+    Retire `nnt` et les `hal_id` préfixés `tel-`/`dumas-` (en conservant les autres hal_id, qui pointent l'article). Pur. Le caller n'appelle cette fonction que sur les `source_publications` corrigées thèse→article (`THESIS_WITH_JOURNAL_TO_ARTICLE`).
+    """
     result = {k: v for k, v in external_ids.items() if k != "nnt"}
     hal_ids = result.get("hal_id")
     if isinstance(hal_ids, list):
@@ -526,8 +516,7 @@ def strip_dissertation_keys(external_ids: dict[str, JsonValue]) -> dict[str, Jso
 
 
 class DoiClusterCase(StrEnum):
-    """Cas de correction du DOI d'un membre d'un groupe partageant un DOI. Inscrit dans
-    `raw_metadata.doi.corrected_by`."""
+    """Cas de correction du DOI d'un membre d'un groupe partageant un DOI. Inscrit dans `raw_metadata.doi.corrected_by`."""
 
     # Formes secondaires DataCite → convergence sur l'œuvre canonique.
     DATACITE_VERSION_TO_CONCEPT = "DATACITE_VERSION_TO_CONCEPT"  # version → concept (IsVersionOf)
@@ -562,11 +551,7 @@ CONVERGENCE_CASES: frozenset[str] = frozenset(
 
 
 class DoiClusterMember(NamedTuple):
-    """Un membre d'un groupe de SP partageant un DOI : son id, son `doc_type` **canonique**
-    (corrigé par la passe unaire) et son `title_normalized` (matérialisé). `canonical_doi` est
-    le DOI de l'œuvre canonique vers laquelle converger, présent si ce membre (typiquement une
-    SP `datacite`) est une **forme secondaire** déclarant la relation ; `same_work_case` porte
-    alors le `DoiClusterCase` correspondant (version/variante/pièce de package)."""
+    """Un membre d'un groupe de `source_publications` partageant un DOI : son id, son `doc_type` **canonique** (corrigé par la passe unaire) et son `title_normalized` (matérialisé). `canonical_doi` est le DOI de l'œuvre canonique vers laquelle converger, présent si ce membre (typiquement une `source_publication` `datacite`) est une **forme secondaire** déclarant la relation ; `same_work_case` porte alors le `DoiClusterCase` correspondant (version/variante/pièce de package)."""
 
     id: int
     doc_type: str | None
@@ -576,8 +561,7 @@ class DoiClusterMember(NamedTuple):
 
 
 class DoiClusterDecision(NamedTuple):
-    """Cible de correction du DOI d'un membre : `target_doi` (`None` = nullage, sinon le DOI
-    substitué) et le cas qui l'a produite."""
+    """Cible de correction du DOI d'un membre : `target_doi` (`None` = nullage, sinon le DOI substitué) et le cas qui l'a produite."""
 
     id: int
     target_doi: str | None
@@ -602,9 +586,7 @@ def _clean_chapter_title(title_normalized: str | None) -> str:
 
 
 def _group_has_distinct_chapters(titles: list[str | None]) -> bool:
-    """True si le groupe contient deux chapitres **réellement distincts** : après nettoyage,
-    une paire de titres qui ne sont ni égaux ni l'un contenu dans l'autre (la containment
-    couvre les troncatures de sous-titre). Identité stricte sur le résidu — pas de seuil flou."""
+    """True si le groupe contient deux chapitres **réellement distincts** : après nettoyage, une paire de titres qui ne sont ni égaux ni l'un contenu dans l'autre (la containment couvre les troncatures de sous-titre). Identité stricte sur le résidu — pas de seuil flou."""
     cleaned = [c for c in (_clean_chapter_title(t) for t in titles) if c]
     return any(a != b and a not in b and b not in a for a, b in combinations(cleaned, 2))
 
@@ -612,23 +594,13 @@ def _group_has_distinct_chapters(titles: list[str | None]) -> bool:
 def resolve_cluster_doi_corrections(
     group: list[DoiClusterMember],
 ) -> list[DoiClusterDecision]:
-    """Pour un groupe de SP partageant un DOI, renvoie les corrections `(sp_id, target_doi,
-    cas)`. Pur, déterministe, sans effet de bord, agnostique de la source — c'est le caller
-    qui forme le groupe par DOI.
+    """Pour un groupe de `source_publications` partageant un DOI, renvoie les corrections `(sp_id, target_doi, cas)`. Pur, déterministe, sans effet de bord, agnostique de la source — c'est le caller qui forme le groupe par DOI.
 
-    - **Même œuvre DataCite** (un membre porte un `canonical_doi`) : tous les membres convergent
-      sur l'œuvre canonique (`target_doi = canonical_doi`), avec le cas porté par ce membre
-      (version → concept, variante → version publiée, fichier → dépôt parent). Prime sur les cas
-      ci-dessous — ces œuvres (datasets, preprints, copies repository) ne sont pas des ouvrages.
-    - **Ouvrage + chapitre** : les `book_chapter` perdent le DOI (`target_doi = None`, celui
-      de l'ouvrage). Signal = le mix de `doc_type`, sans comparaison de titre.
-    - **Chapitres seuls, titres réellement différents** : tous les `book_chapter` perdent le
-      DOI (celui de l'ouvrage hôte absent). Détection par nettoyage + containment + identité
-      stricte (`_group_has_distinct_chapters`) — pas de similarité floue. Les faux positifs
-      résiduels (coquilles) relèvent d'une correction admin.
+    - **Même œuvre DataCite** (un membre porte un `canonical_doi`) : tous les membres convergent sur l'œuvre canonique (`target_doi = canonical_doi`), avec le cas porté par ce membre (version → concept, variante → version publiée, fichier → dépôt parent). Prime sur les cas ci-dessous — ces œuvres (datasets, preprints, copies repository) ne sont pas des ouvrages.
+    - **Ouvrage + chapitre** : les `book_chapter` perdent le DOI (`target_doi = None`, celui de l'ouvrage). Signal = le mix de `doc_type`, sans comparaison de titre.
+    - **Chapitres seuls, titres réellement différents** : tous les `book_chapter` perdent le DOI (celui de l'ouvrage hôte absent). Détection par nettoyage + containment + identité stricte (`_group_has_distinct_chapters`) — pas de similarité floue. Les faux positifs résiduels (coquilles) relèvent d'une correction admin.
 
-    Les membres hors famille ouvrage (article partageant le DOI par accident) ne reçoivent
-    aucune décision : la détection ouvrage/chapitre raisonne sur le sous-ensemble book/chapter.
+    Les membres hors famille ouvrage (article partageant le DOI par accident) ne reçoivent aucune décision : la détection ouvrage/chapitre raisonne sur le sous-ensemble book/chapter.
 
     Différé : thèse/article (souvent un mistype → correction de `doc_type`, pas du DOI)."""
     canonical = next((m for m in group if m.canonical_doi), None)
@@ -669,12 +641,8 @@ JOURNAL_BY_DOI_PREFIX = "JOURNAL_BY_DOI_PREFIX"
 def resolve_journal_by_doi(doi: str, journal_prefixes: list[tuple[str, int]]) -> int | None:
     """Rattache un DOI au journal dont le `doi_prefix` le préfixe, le plus spécifique.
 
-    `journal_prefixes` = `[(doi_prefix, journal_id), ...]`. Renvoie le `journal_id` du préfixe
-    le plus long qui préfixe `doi`, à condition qu'il désigne un **unique** journal à cette
-    longueur (abstention si deux journaux portent ce même préfixe). `None` si aucun préfixe ne
-    matche. Pur et déterministe. `doi` et les préfixes sont comparés tels quels (DOIs et
-    `doi_prefix` stockés en minuscules). Les préfixes emboîtés (registrant nu `10.5194` et
-    namespace `10.5194/acp`) sont départagés par le plus long."""
+    `journal_prefixes` = `[(doi_prefix, journal_id), ...]`. Renvoie le `journal_id` du préfixe le plus long qui préfixe `doi`, à condition qu'il désigne un **unique** journal à cette longueur (abstention si deux journaux portent ce même préfixe). `None` si aucun préfixe ne matche. Pur et déterministe. `doi` et les préfixes sont comparés tels quels (DOIs et `doi_prefix` stockés en minuscules). Les préfixes emboîtés (registrant nu `10.5194` et namespace `10.5194/acp`) sont départagés par le plus long.
+    """
     matches = [
         (prefix, journal_id) for prefix, journal_id in journal_prefixes if doi.startswith(prefix)
     ]

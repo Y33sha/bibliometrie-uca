@@ -1,15 +1,8 @@
 """Entité `SourcePublication` — l'image d'un document dans une source externe.
 
-Une `SourcePublication` représente un document tel que remonté par une source
-(HAL, OpenAlex, WoS, theses.fr, ScanR, …), avant agrégation dans la `Publication`
-canonique. Identité : `id` (surrogate) / `(source, source_id)` (naturelle) ;
-un réimport met à jour la même entité.
+Une `SourcePublication` représente un document tel que remonté par une source (HAL, OpenAlex, WoS, theses.fr, ScanR, …), avant agrégation dans la `Publication` canonique. Identité : `id` (surrogate) / `(source, source_id)` (naturelle) ; un réimport met à jour la même entité.
 
-Immuable (frozen), utilisée en lecture seule : jamais persistée via cet objet —
-les écritures passent par le SQL. Consommée par `refresh_from_sources` /
-`_refresh_aggregate` (agrégation canonique des métadonnées). La correction de
-métadonnées, elle, opère sur sa propre vue d'entrée
-(`SourcePublicationForCorrection`, cf. `correction.py`), pas sur cette entité.
+Immuable (frozen), utilisée en lecture seule : jamais persistée via cet objet — les écritures passent par le SQL. Consommée par `refresh_from_sources` / `_refresh_aggregate` (agrégation canonique des métadonnées). La correction de métadonnées, elle, opère sur sa propre vue d'entrée (`SourcePublicationForCorrection`, cf. `correction.py`), pas sur cette entité.
 """
 
 from dataclasses import dataclass
