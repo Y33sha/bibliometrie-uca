@@ -1,11 +1,11 @@
-"""Tests de caractérisation pour application/config/core.py."""
+"""Tests de caractérisation pour application/services/config/commands.py."""
 
 import json
 
 import pytest
 from sqlalchemy import text
 
-from application.services.config.core import update_config_value
+from application.services.config.commands import update_config_value
 from domain.errors import NotFoundError
 from infrastructure.repositories import config_store
 
@@ -34,15 +34,15 @@ def _insert_config_sync(conn, key, value, description="desc"):
 class TestUpdateConfigValue:
     def test_raises_not_found(self, sa_sync_conn, sync_config):
         with pytest.raises(NotFoundError):
-            update_config_value("nonexistent", "x", config=sync_config)
+            update_config_value(sa_sync_conn, "nonexistent", "x", config=sync_config)
 
     def test_updates_existing(self, sa_sync_conn, sync_config):
         _insert_config_sync(sa_sync_conn, "test_key", "old")
-        row = update_config_value("test_key", "new", config=sync_config)
+        row = sync_config.update_config_value("test_key", "new")
         assert row is not None
         assert row["value"] == "new"
 
     def test_updates_with_dict_value(self, sa_sync_conn, sync_config):
         _insert_config_sync(sa_sync_conn, "test_key", {})
-        row = update_config_value("test_key", {"a": 1, "b": 2}, config=sync_config)
+        row = sync_config.update_config_value("test_key", {"a": 1, "b": 2})
         assert row["value"] == {"a": 1, "b": 2}
