@@ -1,20 +1,14 @@
 """Aggregate root `Person` — référentiel chercheur unifié multi-sources.
 
-Une `Person` est la vue UCA d'un chercheur, agrégeant les signatures
-remontées par les sources externes (HAL, OpenAlex, WoS, …). Identité =
-`id` (clé surrogate).
+Une `Person` est la vue UCA d'un chercheur, agrégeant les signatures remontées par les sources externes (HAL, OpenAlex, WoS, …). Identité = `id` (clé surrogate).
 
 Composition / associations :
-- `identifiers: tuple[PersonIdentifier, ...]` — projection lecture
-  (chaque `PersonIdentifier` est un aggregate séparé).
-- `name_forms: tuple[PersonNameForm, ...]` — formes textuelles connues
-  (VOs).
+- `identifiers: tuple[PersonIdentifier, ...]` — projection lecture (chaque `PersonIdentifier` est un aggregate séparé).
+- `name_forms: tuple[PersonNameForm, ...]` — formes textuelles connues (VOs).
 
-`hal_person_id` n'est pas un attribut nu : c'est un `PersonIdentifier`
-d'`id_type` = `"hal_person_id"`. Jamais exposé en UI.
+`hal_person_id` n'est pas un attribut nu : c'est un `PersonIdentifier` d'`id_type` = `"hal_person_id"`. Jamais exposé en UI.
 
-La logique métier touchant à une personne (fusion, matching cross-source,
-création contrôlée, normalisation des noms) vit ici.
+La logique métier touchant à une personne (fusion, matching cross-source, création contrôlée, normalisation des noms) vit ici.
 """
 
 from dataclasses import dataclass, field
@@ -40,10 +34,7 @@ class Person:
     def can_merge_with(self, other: "Person", *, has_distinct_rh: bool) -> None:
         """Valide qu'une fusion `self ← other` est autorisée.
 
-        Invariant : refus si les deux personnes ont chacune une fiche RH
-        distincte (risque de perdre de l'information RH). L'appelant
-        fournit l'information `has_distinct_rh`, typiquement déterminée
-        par le repository en interrogeant `persons_rh`.
+        Invariant : refus si les deux personnes ont chacune une fiche RH distincte (risque de perdre de l'information RH). L'appelant fournit l'information `has_distinct_rh`, typiquement déterminée par le repository en interrogeant `persons_rh`.
 
         Lève `ConflictError` si l'invariant est violé.
         """
