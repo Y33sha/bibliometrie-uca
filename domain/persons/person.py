@@ -1,6 +1,6 @@
 """Aggregate root `Person` — référentiel chercheur unifié multi-sources.
 
-Une `Person` est la vue UCA d'un chercheur, agrégeant les signatures remontées par les sources externes (HAL, OpenAlex, WoS, …). Identité = `id` (clé surrogate).
+Une `Person` rassemble sous une identité unique les signatures d'auteur qu'un même chercheur porte à travers les sources (HAL, OpenAlex, WoS, …). Identité = `id` (clé surrogate).
 
 Composition / associations :
 - `identifiers: tuple[PersonIdentifier, ...]` — projection lecture (chaque `PersonIdentifier` est un aggregate séparé).
