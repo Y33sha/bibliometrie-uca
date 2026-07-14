@@ -50,7 +50,7 @@ Le producteur de la couche est unique : la phase `normalize`. Un seul autre muta
 
 - **Agrégation canonique** — `refresh_from_sources` (`application/services/publications/core.py`) lit **toutes** les `source_publications` d'une publication (recalcul complet, pas de `COALESCE` incrémental) et délègue l'arbitrage à `domain/publications/aggregation.py`. Champ par champ : scalaires en premier non-null par `SOURCE_PRIORITY` ; `doc_type` avec préférence au sous-type d'article précis d'une source moins prioritaire sur le `journal-article` générique CrossRef ; `oa_status` = statut le plus ouvert (`best_oa_status`, garde Unpaywall) ; listes en union dédupliquée. Les valeurs lues sont **déjà corrigées** (colonnes nues). Une correction journal-dépendante est rejouée sur le canonique quand `doc_type` et `journal_id` sont arbitrés depuis deux sources différentes.
 - **Déduplication** — `project_confirmation_keys` projette chaque `source_publication` dirty en tokens `(type, valeur)` ; `connected_components` relie les images partageant un token ; le primitif unifié `plan_reconciliation` (`domain/publications/reconciliation.py`) tranche match / create / merge / split et repointe les `publication_id`. L'univers de voisinage a un miroir SQL (`publications_reconciliation.py`) qui ré-encode les mêmes clés.
-- **Autres consommateurs** : `subjects` lit les `topics` par source (préserve l'attribution) ; `authorships` consolide `source_authorships` en table de vérité (`author_position` de la source prioritaire, `is_corresponding`/`in_perimeter` en `bool_or`, `roles` en union) ; la cascade `persons` lit les `source_authorships` in-périmètre.
+- **Autres consommateurs** : `subjects` lit les `topics` par source (préserve l'attribution) ; `authorships` consolide `source_authorships` en table de liaison (`author_position` de la source prioritaire, `is_corresponding`/`in_perimeter` en `bool_or`, `roles` en union) ; la cascade `persons` lit les `source_authorships` in-périmètre.
 
 ## Lecture — API
 
@@ -58,7 +58,7 @@ Le détail d'une publication expose la **provenance par source** : la liste des 
 
 ## Points d'attention
 
-**Le miroir SQL de la réconciliation duplique les types de clés.** L'univers de voisinage 1-hop (`publications_reconciliation`) ré-encode en branches `UNION` les mêmes types de clés que `keys.py` (DOI, NNT, PMID, HAL ID, token `metadata_block`) : duplication par nécessité — le voisinage se calcule côté base, et `keys.py` reste l'unique définition Python des clés. Le seuil de longueur minimale de titre, lui, est importé du domaine.
+**Le miroir SQL de la réconciliation duplique les types de clés.** L'univers de voisinage 1-hop (`publications_reconciliation`) ré-encode en branches `UNION` les mêmes types de clés que `keys.py` (DOI, NNT, PMID, HAL ID, token `metadata_block`) : duplication par nécessité — le voisinage se calcule côté base, et `keys.py` reste l'unique définition Python des clés.
 
 La taxonomie `doc_type` est répartie proprement : vocabulaire canonique (enum, `ARTICLE_SUBTYPES`, familles) dans `domain/publications/doc_types.py`, mapping des nomenclatures sources dans `domain/source_publications/doc_types.py`. Le `CASE` de ventilation du pivot est rendu côté infrastructure.
 
