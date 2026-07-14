@@ -5,6 +5,7 @@
 ### En cours
 
 - [Lisibilité](CODE_lisibilite.md)
+- [Domaines HAL : libellés depuis la source, suppression de la table](CODE_hal-domaines-libelles.md)
 
 ### En pause
 
