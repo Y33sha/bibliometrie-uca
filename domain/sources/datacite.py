@@ -1,12 +1,8 @@
 """Règles métier pures spécifiques à la source DataCite.
 
-Interprétation des champs propres au schéma DataCite (réponse JSON:API
-`api.datacite.org/dois/{doi}`, nœud `data.attributes`). Extracteurs et
-nettoyeurs qui encapsulent les conventions DataCite pour le reste du pipeline.
+Interprétation des champs propres au schéma DataCite (réponse JSON:API `api.datacite.org/dois/{doi}`, nœud `data.attributes`). Extracteurs et nettoyeurs qui encapsulent les conventions DataCite pour le reste du pipeline.
 
-Les `dict[str, Any]` ici sont des payloads JSON bruts de l'API DataCite
-(frontière dynamique avec une source externe, schéma non typé). Le `Any` est
-délibéré, comme pour `domain.sources.crossref`.
+Les `dict[str, Any]` ici sont des payloads JSON bruts de l'API DataCite (frontière dynamique avec une source externe, schéma non typé). Le `Any` est délibéré, comme pour `domain.sources.crossref`.
 """
 
 from __future__ import annotations
@@ -17,9 +13,9 @@ from domain.publications.identifiers import clean_doi
 
 
 def get_title(attributes: dict[str, Any]) -> str | None:
-    """Titre principal : premier `titles[*].title` sans `titleType`
-    (un `titleType` qualifie un sous-titre / titre alternatif / traduit).
-    Fallback : premier titre disponible.
+    """Titre principal : premier `titles[*].title` sans `titleType`.
+
+    Un `titleType` qualifie un sous-titre / titre alternatif / traduit. Fallback : premier titre disponible.
     """
     titles = attributes.get("titles") or []
     if not isinstance(titles, list):
@@ -41,9 +37,7 @@ def get_title(attributes: dict[str, Any]) -> str | None:
 def extract_datacite_pub_year(attributes: dict[str, Any], *, max_year: int) -> int | None:
     """Année de publication (`publicationYear`).
 
-    Borne supérieure `max_year` (typiquement `current_year + 1`) : au-dessus,
-    donnée polluée → None (le caller skippera, `refresh_from_sources`
-    arbitrera). Borne inférieure 1500. `max_year` injecté pour la testabilité.
+    Borne supérieure `max_year` (typiquement `current_year + 1`) : au-dessus, donnée polluée → None (le caller skippera, `refresh_from_sources` arbitrera). Borne inférieure 1500. `max_year` injecté pour la testabilité.
     """
     raw = attributes.get("publicationYear")
     if raw is None:
@@ -60,8 +54,7 @@ def extract_datacite_pub_year(attributes: dict[str, Any], *, max_year: int) -> i
 def get_publisher_name(attributes: dict[str, Any]) -> str | None:
     """Nom de l'éditeur / dépôt (`publisher`).
 
-    DataCite expose `publisher` comme chaîne (la plupart des cas) ou comme
-    objet `{name, publisherIdentifier, ...}` (schéma 4.5). On gère les deux.
+    DataCite expose `publisher` comme chaîne (la plupart des cas) ou comme objet `{name, publisherIdentifier, ...}` (schéma 4.5). On gère les deux.
     """
     publisher = attributes.get("publisher")
     if isinstance(publisher, str) and publisher.strip():
@@ -76,9 +69,7 @@ def get_publisher_name(attributes: dict[str, Any]) -> str | None:
 def get_container(attributes: dict[str, Any]) -> tuple[str | None, str | None]:
     """`(container_title, issn)` depuis `container`.
 
-    Présent pour les contributions publiées dans une revue / série
-    (`container.type` = Journal, Series…). Vide pour la majorité des datasets.
-    L'ISSN n'est extrait que si `identifierType == 'ISSN'`.
+    Présent pour les contributions publiées dans une revue / série (`container.type` = Journal, Series…). Vide pour la majorité des datasets. L'ISSN n'est extrait que si `identifierType == 'ISSN'`.
     """
     container = attributes.get("container")
     if not isinstance(container, dict) or not container:
@@ -94,9 +85,7 @@ def get_container(attributes: dict[str, Any]) -> tuple[str | None, str | None]:
 
 
 def get_abstract(attributes: dict[str, Any]) -> str | None:
-    """Résumé : `descriptions` de `descriptionType == 'Abstract'` en priorité,
-    sinon la première description disponible.
-    """
+    """Résumé : `descriptions` de `descriptionType == 'Abstract'` en priorité, sinon la première description disponible."""
     descriptions = attributes.get("descriptions") or []
     if not isinstance(descriptions, list):
         return None
@@ -151,10 +140,7 @@ def get_cited_by_count(attributes: dict[str, Any]) -> int | None:
 def extract_datacite_doc_type_token(attributes: dict[str, Any]) -> str | None:
     """Token brut de doc_type à stocker sur `source_publications.doc_type`.
 
-    DataCite porte deux niveaux dans `types` : `resourceTypeGeneral`
-    (vocabulaire contrôlé : JournalArticle, Preprint, Dataset, Text…) et
-    `resourceType` (texte libre). On stocke un seul token, mappé ensuite par
-    `domain.source_publications.doc_types._SOURCE_MAPS["datacite"]` :
+    DataCite porte deux niveaux dans `types` : `resourceTypeGeneral` (vocabulaire contrôlé : JournalArticle, Preprint, Dataset, Text…) et `resourceType` (texte libre). On stocke un seul token, mappé ensuite par `domain.source_publications.doc_types._SOURCE_MAPS["datacite"]` :
 
     - `resourceTypeGeneral` spécifique (≠ Text / Other) → ce token ;
     - sinon `resourceType` libre s'il est renseigné ;
@@ -173,12 +159,9 @@ def extract_datacite_doc_type_token(attributes: dict[str, Any]) -> str | None:
 
 
 def _doi_related_identifiers(attributes: dict[str, Any]) -> list[dict[str, str]]:
-    """`relatedIdentifiers` de type DOI, normalisés en
-    `{"doi": <doi minuscule>, "relation_type": <relationType>}`.
+    """`relatedIdentifiers` de type DOI, normalisés en `{"doi": <doi minuscule>, "relation_type": <relationType>}`.
 
-    Conserve le `relationType` (`IsVersionOf`, `HasVersion`, `IsSupplementTo`,
-    `IsPartOf`, `Cites`…) : c'est la matière des relations entre publications,
-    et `IsVersionOf` porte le concept DOI (résolution concept/version).
+    Conserve le `relationType` (`IsVersionOf`, `HasVersion`, `IsSupplementTo`, `IsPartOf`, `Cites`…) : c'est la matière des relations entre publications, et `IsVersionOf` porte le concept DOI (résolution concept/version).
     """
     related = attributes.get("relatedIdentifiers") or []
     if not isinstance(related, list):
@@ -223,10 +206,7 @@ _CORPUS_RELATION_TYPES = frozenset(
 def extract_related_dois(attributes: dict[str, Any], self_doi: str) -> list[str]:
     """DOI secondaires à rapatrier dans le corpus, hors DOI primaire, dédupliqués.
 
-    Filtré sur `_CORPUS_RELATION_TYPES` (versions / formes / parties /
-    suppléments) — pas les citations. Alimente `external_ids.related_dois`
-    (pool cross-import). La liste typée complète vit dans
-    `meta.related_identifiers`.
+    Filtré sur `_CORPUS_RELATION_TYPES` (versions / formes / parties / suppléments) — pas les citations. Alimente `external_ids.related_dois` (pool cross-import). La liste typée complète vit dans `meta.related_identifiers`.
     """
     self_doi_clean = clean_doi(self_doi)
     out: list[str] = []
@@ -243,12 +223,9 @@ def extract_related_dois(attributes: dict[str, Any], self_doi: str) -> list[str]
 
 
 def extract_datacite_meta(attributes: dict[str, Any]) -> dict[str, Any] | None:
-    """Champs DataCite-spécifiques conservés en JSONB sur
-    `source_publications.meta`.
+    """Champs DataCite-spécifiques conservés en JSONB sur `source_publications.meta`.
 
-    Whitelist : `related_identifiers` (DOI typés avec leur `relationType`,
-    pour les relations et la résolution concept/version), `rights` (licences)
-    et `funding` (financeurs).
+    Whitelist : `related_identifiers` (DOI typés avec leur `relationType`, pour les relations et la résolution concept/version), `rights` (licences) et `funding` (financeurs).
     """
     meta: dict[str, Any] = {}
     related = _doi_related_identifiers(attributes)

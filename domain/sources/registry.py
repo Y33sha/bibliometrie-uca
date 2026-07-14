@@ -1,11 +1,8 @@
 """Registre des sources bibliographiques : liste, ordres de priorité, helpers.
 
-Source unique de vérité côté Python pour la liste des sources et les ordres de
-priorité entre sources.
+Source unique de vérité côté Python pour la liste des sources et les ordres de priorité entre sources.
 
-Si une source est ajoutée ou supprimée, modifier ce fichier ET l'enum
-`source_type` en base (via une migration). Le test
-`tests/integration/test_scenarios.py::TestSourcesEnum` vérifie la cohérence.
+Si une source est ajoutée ou supprimée, modifier ce fichier ET l'enum `source_type` en base (via une migration). Le test `tests/integration/test_scenarios.py::TestSourcesEnum` vérifie la cohérence.
 """
 
 # Toutes les sources, dans l'ordre conventionnel (chronologique d'intégration)
@@ -73,12 +70,9 @@ STRUCTURE_API_SOURCES_SET: frozenset[str] = frozenset(STRUCTURE_API_SOURCES)
 
 
 def source_case_sql(priorities: tuple[str, ...], col: str = "sa.source") -> str:
-    """Construit un fragment SQL `CASE <col> WHEN 's1' THEN 1 ... END`
-    à partir d'un tuple de sources, pour poser une priorité dans un
-    `ORDER BY` ou un `array_agg(... ORDER BY ...)`.
+    """Construit un fragment SQL `CASE <col> WHEN 's1' THEN 1 ... END` à partir d'un tuple de sources, pour poser une priorité dans un `ORDER BY` ou un `array_agg(... ORDER BY ...)`.
 
-    Utilisé pour que les ordres de priorité vivent dans `domain/sources/`
-    comme constantes Python plutôt que dupliqués en SQL.
+    Garde les ordres de priorité comme constantes Python dans `domain/sources/`, sans duplication SQL.
     """
     whens = " ".join(f"WHEN '{s}' THEN {i + 1}" for i, s in enumerate(priorities))
     return f"CASE {col} {whens} END"

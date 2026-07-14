@@ -1,15 +1,8 @@
 """Règles métier pures spécifiques à la source CrossRef.
 
-Interprétation des champs propres au schéma CrossRef Works API —
-extracteurs et nettoyeurs qui encapsulent les conventions CrossRef
-pour le reste du pipeline.
+Interprétation des champs propres au schéma CrossRef Works API — extracteurs et nettoyeurs qui encapsulent les conventions CrossRef pour le reste du pipeline.
 
-Les `dict[str, Any]` ici sont des payloads JSON bruts de l'API
-CrossRef (frontière dynamique avec une source externe, schéma non
-typé). Le `Any` est délibéré : forcer `JsonValue` exigerait des
-`isinstance` partout sur le dict-walking interne, sans gain métier.
-Idem pour le retour de `extract_crossref_meta`, qui est un
-sous-ensemble destiné à `source_publications.meta` (JSONB).
+Les `dict[str, Any]` ici sont des payloads JSON bruts de l'API CrossRef (frontière dynamique avec une source externe, schéma non typé). Le `Any` est délibéré : forcer `JsonValue` exigerait des `isinstance` partout sur le dict-walking interne, sans gain métier. Idem pour le retour de `extract_crossref_meta`, qui est un sous-ensemble destiné à `source_publications.meta` (JSONB).
 """
 
 from __future__ import annotations
@@ -23,32 +16,19 @@ _JATS_TAG_RE = re.compile(r"<[^>]+>")
 def strip_jats_tags(s: str) -> str:
     """Retire les balises XML JATS d'une chaîne.
 
-    CrossRef stocke l'abstract en JATS XML (balises `<jats:p>`,
-    `<jats:sec>`, etc.) ; on les retire pour exposer le texte brut.
-    Pas de désencodage HTML — les entités sont rares dans ce flux et
-    seraient à traiter en aval si nécessaire.
+    CrossRef stocke l'abstract en JATS XML (balises `<jats:p>`, `<jats:sec>`, etc.) ; on les retire pour exposer le texte brut. Pas de désencodage HTML — les entités sont rares dans ce flux et seraient à traiter en aval si nécessaire.
     """
     return _JATS_TAG_RE.sub("", s)
 
 
 def extract_crossref_pub_year(msg: dict[str, Any], *, max_year: int) -> int | None:
-    """Année de publication CrossRef, dans l'ordre :
-    `published > issued > published-online > published-print`.
+    """Année de publication CrossRef, dans l'ordre `published > issued > published-online > published-print`.
 
-    Sémantique CrossRef : `published` = min(published-online,
-    published-print) ; `issued` = date déclarée par l'éditeur (peut
-    être prospective sur des « futur numéro » 2030+ déposés avant
-    publication réelle).
+    Sémantique CrossRef : `published` = min(published-online, published-print) ; `issued` = date déclarée par l'éditeur (peut être prospective sur des « futur numéro » 2030+ déposés avant publication réelle).
 
-    Borne supérieure `max_year` (typiquement `current_year + 1` —
-    un preprint daté de l'année suivante reste plausible). Au-dessus,
-    on considère la donnée polluée et on retourne None ; le caller
-    skippera la normalisation, et `refresh_from_sources` arbitrera
-    depuis les autres sources. Borne inférieure 1500 (un DOI antérieur
-    est manifestement aberrant).
+    Borne supérieure `max_year` (typiquement `current_year + 1` — un preprint daté de l'année suivante reste plausible). Au-dessus, on considère la donnée polluée et on retourne None ; le caller skippera la normalisation, et `refresh_from_sources` arbitrera depuis les autres sources. Borne inférieure 1500 (un DOI antérieur est manifestement aberrant).
 
-    `max_year` est un paramètre injecté pour la testabilité (sinon
-    couplage au calendrier réel rendrait les tests fragiles).
+    `max_year` est un paramètre injecté pour la testabilité (sinon couplage au calendrier réel rendrait les tests fragiles).
     """
     for field in ("published", "issued", "published-online", "published-print"):
         d = msg.get(field) or {}
@@ -66,11 +46,7 @@ def extract_crossref_pub_year(msg: dict[str, Any], *, max_year: int) -> int | No
 def parse_crossref_issns(msg: dict[str, Any]) -> tuple[str | None, str | None]:
     """Retourne `(issn_print, eissn)`.
 
-    CrossRef expose deux formats : `issn-type` (objets typés
-    `{"type": "electronic"|"print", "value": "..."}`, fiable quand
-    présent) et `ISSN` (liste plate non typée, fallback). Si
-    `issn-type` distingue clairement les deux, on les sépare ; sinon
-    on prend le premier `ISSN` brut comme print et eissn reste None.
+    CrossRef expose deux formats : `issn-type` (objets typés `{"type": "electronic"|"print", "value": "..."}`, fiable quand présent) et `ISSN` (liste plate non typée, fallback). Si `issn-type` distingue clairement les deux, on les sépare ; sinon on prend le premier `ISSN` brut comme print et eissn reste None.
     """
     issn_print: str | None = None
     eissn: str | None = None
@@ -98,14 +74,9 @@ def parse_crossref_issns(msg: dict[str, Any]) -> tuple[str | None, str | None]:
 def extract_crossref_meta(msg: dict[str, Any]) -> dict[str, Any] | None:
     """Extrait les champs CrossRef-spécifiques à conserver en JSONB.
 
-    Whitelist explicite : `license`, `funder`, `relation`,
-    `references_count` (si > 0), `indexed.timestamp`. Décision
-    métier « ces champs ont une valeur, les autres on jette » — évite
-    d'embarquer la totalité du payload CrossRef et fige le contrat de
-    la colonne `source_publications.meta`.
+    Whitelist explicite : `license`, `funder`, `relation`, `references_count` (si > 0), `indexed.timestamp`. Décision métier « ces champs ont une valeur, les autres on jette » — évite d'embarquer la totalité du payload CrossRef et fige le contrat de la colonne `source_publications.meta`.
 
-    Le sous-objet `meta->'relation'` est consommé par l'étape
-    « relations » de l'ingestion des sujets.
+    Le sous-objet `meta->'relation'` est consommé par l'étape « relations » de l'ingestion des sujets.
     """
     meta: dict[str, Any] = {}
     for key in ("license", "funder", "relation"):
