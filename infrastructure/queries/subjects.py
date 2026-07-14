@@ -1,9 +1,6 @@
-"""Query service : SQL pour la table `subjects` et la liaison
-`publication_subjects`.
+"""Query service : SQL pour la table `subjects` et la liaison `publication_subjects`.
 
-Consommé par la phase `application/pipeline/subjects/` (fonctions sync)
-et par les routes API `/api/subjects/*` (classe `PgSubjectsAdminQueries`,
-implémentation du port `application.ports.subjects_queries`).
+Un seul module, deux adaptateurs par contexte : `PgSubjectsQueries` pour la phase pipeline (port `application.ports.pipeline.subjects`) et `PgSubjectsAdminQueries` pour les routes API `/api/subjects/*` (port `application.ports.api.subjects_queries`).
 """
 
 from typing import Any
@@ -261,7 +258,7 @@ def refresh_cooccurrences(conn: Connection) -> int:
 
 
 class PgSubjectsAdminQueries(SubjectsAdminQueries):
-    """Adapter SA pour `application.ports.subjects_queries.SubjectsAdminQueries`."""
+    """Adapter SA pour `application.ports.api.subjects_queries.SubjectsAdminQueries`."""
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
@@ -357,7 +354,7 @@ class PgSubjectsAdminQueries(SubjectsAdminQueries):
 
 
 class PgSubjectsQueries(SubjectsQueries):
-    """Adapter PostgreSQL implémentant `application.ports.subjects.SubjectsQueries`."""
+    """Adapter PostgreSQL implémentant `application.ports.pipeline.subjects.SubjectsQueries`."""
 
     def upsert_subject(
         self,
