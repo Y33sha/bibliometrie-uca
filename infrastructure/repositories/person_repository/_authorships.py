@@ -2,7 +2,7 @@
 
 from sqlalchemy import Connection, text
 
-from domain.sources.registry import source_case_sql
+from infrastructure.queries.sources_sql import source_case_sql
 
 
 def link_authorship(

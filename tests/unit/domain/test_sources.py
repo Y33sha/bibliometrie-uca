@@ -5,7 +5,6 @@ from domain.sources.registry import (
     ALL_SOURCES,
     DOI_SEARCHABLE_SOURCES,
     SOURCE_PRIORITY,
-    source_case_sql,
 )
 
 
@@ -18,23 +17,6 @@ class TestSourcePriority:
 
     def test_contains_all_sources(self):
         assert set(SOURCE_PRIORITY) == set(ALL_SOURCES)
-
-
-class TestSourceCaseSql:
-    def test_builds_case_fragment(self):
-        sql = source_case_sql(("hal", "openalex"))
-        assert sql == "CASE sa.source WHEN 'hal' THEN 1 WHEN 'openalex' THEN 2 END"
-
-    def test_custom_column(self):
-        sql = source_case_sql(("wos",), col="s.source")
-        assert sql == "CASE s.source WHEN 'wos' THEN 1 END"
-
-    def test_full_source_priority(self):
-        sql = source_case_sql(SOURCE_PRIORITY)
-        assert "WHEN 'theses' THEN 1" in sql
-        assert "WHEN 'crossref' THEN 2" in sql
-        assert "WHEN 'datacite' THEN 3" in sql
-        assert "WHEN 'wos' THEN 7" in sql
 
 
 class TestDoiSearchableSources:

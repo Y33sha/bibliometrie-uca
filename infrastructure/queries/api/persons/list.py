@@ -6,7 +6,6 @@ from sqlalchemy import Connection, text
 
 from application.ports.api.persons_queries import DirectoryFilters, ListFilters
 from domain.persons.identifiers import PUBLIC_PERSON_IDENTIFIER_TYPES
-from domain.sources.registry import AUTHOR_SOURCES_SQL
 from infrastructure.queries.filters import (
     WhereClause,
     assemble_where,
@@ -18,6 +17,7 @@ from infrastructure.queries.filters import (
     person_search_clause,
     persons_sort_clause,
 )
+from infrastructure.queries.sources_sql import AUTHOR_SOURCES_SQL
 
 # ── Annuaire public ──────────────────────────────────────────────
 

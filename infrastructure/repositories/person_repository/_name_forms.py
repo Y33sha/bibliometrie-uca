@@ -17,7 +17,7 @@ from sqlalchemy import Connection, text
 from application.ports.repositories.person_repository import NameFormStatusRow
 from domain.errors import NotFoundError
 from domain.normalize import normalize_name
-from domain.sources.registry import AUTHOR_SOURCES_SQL
+from infrastructure.queries.sources_sql import AUTHOR_SOURCES_SQL
 
 
 def refresh_name_forms(conn: Connection, person_id: int, forms: set[str]) -> None:
