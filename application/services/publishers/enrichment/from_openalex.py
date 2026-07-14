@@ -1,11 +1,6 @@
-"""
-Orchestrateur d'enrichissement éditeurs (maintenance, hors pipeline) à
-partir de l'API OpenAlex Publishers.
+"""Orchestrateur d'enrichissement éditeurs (maintenance, hors pipeline) à partir de l'API OpenAlex Publishers.
 
-Met à jour `country` quand la valeur DB est NULL, depuis
-`country_codes[0]` : un éditeur peut opérer dans plusieurs pays côté
-OpenAlex, on prend le premier, qui correspond généralement au siège
-social.
+Met à jour `country` quand la valeur en base est NULL, depuis `country_codes[0]` : un éditeur peut opérer dans plusieurs pays côté OpenAlex, on prend le premier, qui correspond généralement au siège social.
 
 L'API Publishers filtre par `ids.openalex:P1|P2|...`.
 """
@@ -30,7 +25,7 @@ RATE_LIMIT_STRIKES_MAX = 3
 
 
 class _OpenAlexRateLimited(Exception):
-    """429 répétés sur un batch (3 retries épuisés) : budget API probablement épuisé."""
+    """429 répétés sur un batch (3 tentatives épuisées) : budget API probablement épuisé."""
 
 
 def fetch_publishers_batch(
@@ -154,10 +149,9 @@ def run_enrich_publishers_from_openalex(
 
                 country = extract_country(source)
 
-                # On charge l'état actuel via l'aggregate pour décider du
-                # gating "NULL only". Un fetch supplémentaire par publisher
-                # — acceptable vu le volume (au max ~1000 publishers à
-                # enrichir).
+                # On charge l'état actuel de l'éditeur pour n'écrire que si
+                # `country` est NULL. Une lecture supplémentaire par éditeur,
+                # acceptable vu le volume (au max ~1000 éditeurs à enrichir).
                 current = publisher_repo.find_by_id(publisher_id)
                 if current is None:
                     no_response += 1
@@ -174,9 +168,9 @@ def run_enrich_publishers_from_openalex(
                     updated += 1
                 processed += 1
 
-            # Commit chaque batch pour préserver la progression en cas
-            # d'interruption — l'enrich est par nature idempotent (re-skip
-            # les publishers déjà enrichis via le filtre `fetch_publishers_needing_enrichment`).
+            # Commit chaque batch pour préserver la progression en cas d'interruption —
+            # l'enrichissement est idempotent (les éditeurs déjà enrichis sont ignorés
+            # via le filtre `fetch_publishers_needing_enrichment`).
             if not dry_run:
                 conn.commit()
 

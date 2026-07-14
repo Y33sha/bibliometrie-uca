@@ -1,5 +1,4 @@
-"""
-Service Périmètres — orchestrateur des opérations sur `perimeters` (agrégat Perimeter).
+"""Service Périmètres — orchestrateur des opérations sur `perimeters` (agrégat Perimeter).
 
 Le SQL vit dans `infrastructure/repositories/perimeter_repository.py`. Les routers passent par ces fonctions pour toute écriture ; les lectures restent autorisées dans les routers (convention du projet). `delete_perimeter` consulte la table `config` (via `ConfigStore`) pour refuser la suppression d'un périmètre encore référencé par la configuration pipeline.
 """

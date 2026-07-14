@@ -1,7 +1,6 @@
-"""
-Service Pays des adresses — attribution, propagation horizontale(adresses similaires) et verticale (vers source_publications / publications).
+"""Service Pays des adresses — attribution, propagation horizontale (adresses similaires) et verticale (vers source_publications / publications).
 
-Séparé de `application/addresses.py` (principe SRP) : la validation des liens adresse↔structure vit dans `application/addresses_structures.py`. Les deux surfaces partagent l'agrégat Address mais n'interagissent pas entre elles.
+La validation des liens adresse ↔ structure vit dans `application/services/addresses/structures.py`. Les deux surfaces partagent l'agrégat Address mais n'interagissent pas entre elles.
 """
 
 import logging
@@ -27,7 +26,7 @@ def set_country(
     - Propage la même valeur aux adresses partageant le même normalized_text.
 
     Retourne la liste des IDs affectés (y compris address_id).
-    Ne valide pas les codes pays : c'est au caller de le faire.
+    Ne valide pas les codes pays : c'est à l'appelant de le faire.
     """
     repo.set_countries(address_id, countries)
     affected = [address_id]
@@ -73,11 +72,7 @@ def batch_set_country_by_filter(
 ) -> list[int]:
     """Ajoute `country_code` aux adresses correspondant aux filtres.
 
-    Filtres combinés en AND (tous doivent matcher). **Au moins un filtre est
-    exigé** : un appel sans aucun filtre est refusé (`ValidationError`) pour ne
-    pas appliquer un pays à toutes les adresses en masse (~475k → cascade de
-    propagation). Pour viser un grand ensemble explicitement, passer par
-    `batch_set_country_by_ids`.
+    Filtres combinés en AND (tous doivent correspondre). **Au moins un filtre est exigé** : un appel sans aucun filtre est refusé (`ValidationError`), garde-fou contre l'application d'un pays à toutes les adresses en masse (~475k → cascade de propagation). Pour viser un grand ensemble explicitement, passer par `batch_set_country_by_ids`.
 
     Retourne les IDs modifiés.
     """
@@ -109,8 +104,7 @@ def propagate_countries_to_similar(
 def propagate_countries_to_publications(address_ids: list[int], *, repo: AddressRepository) -> None:
     """Propage addresses.countries → source_publications.countries → publications.countries.
 
-    Appelée après une modification de pays sur les adresses (typiquement en
-    background task). Recalcule depuis les adresses, idempotent.
+    Appelée après une modification de pays sur les adresses (typiquement en tâche de fond). Recalcule depuis les adresses, idempotent.
     """
     if not address_ids:
         return

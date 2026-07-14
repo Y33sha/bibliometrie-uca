@@ -1,9 +1,8 @@
-"""
-Service Structures — orchestrateur des opérations sur `structures`, `structure_relations`, `structure_name_forms`.
+"""Service Structures — orchestrateur des opérations sur `structures`, `structure_relations`, `structure_name_forms`.
 
-Le SQL vit dans `infrastructure/repositories/structure_repository.py`. La validation du JSONB `api_ids` se fait à la frontière infra (repo) plutôt qu'ici — tout chemin d'écriture (service applicatif + scripts CLI éventuels) passe par le repo, donc la validation y est appliquée uniformément.
+Le SQL vit dans `infrastructure/repositories/structure_repository.py`. La validation du JSONB `api_ids` se fait à la frontière infra (repo) : tout chemin d'écriture passe par le repo, la validation y est appliquée uniformément.
 
-Les routers passent par ces fonctions pour toute écriture. Les lectures restent autorisées dans les routers (convention du projet).
+Les routers passent par ces fonctions pour toute écriture ; les lectures restent autorisées dans les routers (convention du projet).
 """
 
 from typing import cast
@@ -37,11 +36,9 @@ _STRUCTURE_FIELD_MAP = {
 
 
 def _normalize_ror_id(raw: str | None) -> str | None:
-    """Forme canonique courte du ror_id (le VO `RorId` strip l'URL `https://ror.org/`),
-    ou `None` si vide. Lève `ValidationError` si une valeur non vide n'est pas un ROR valide.
+    """Forme canonique courte du ror_id (le VO `RorId` retire l'URL `https://ror.org/`), ou `None` si vide. Lève `ValidationError` si une valeur non vide n'est pas un ROR valide.
 
-    Seule barrière d'écriture : tout chemin (form admin, import, futur appelant) passe par
-    le service, donc une URL complète envoyée par un client est ramenée à l'ID 9-char ici.
+    Tout chemin d'écriture (formulaire admin, import) passe par le service : une URL complète envoyée par un client est ramenée à l'ID court ici.
     """
     if not raw or not raw.strip():
         return None
@@ -110,8 +107,7 @@ def update_structure(
 
     api_ids = fields.get("api_ids")
     if isinstance(api_ids, dict):
-        # SA sérialise auto en JSONB depuis un dict Python ; pas de Json() wrap.
-        # Validation appliquée côté repo.
+        # SQLAlchemy sérialise le dict Python en JSONB ; validation appliquée côté repo.
         update_fields["api_ids"] = cast("dict[str, str | list[str]]", api_ids)
 
     if not update_fields:
@@ -154,10 +150,7 @@ def create_relation(
 ) -> StructureRelationRow | None:
     """Crée une relation. Retourne la ligne insérée, ou None si elle existait déjà.
 
-    Lève `ValidationError` si la relation viole l'invariant de graphe
-    (auto-référence `parent_id == child_id` ou cycle : `child_id` est déjà
-    un ancêtre de `parent_id`). Les ancêtres sont prefetched via
-    `repo.get_ancestor_ids` et la validation est déléguée au domain.
+    Lève `ValidationError` si la relation viole l'invariant de graphe (auto-référence `parent_id == child_id` ou cycle : `child_id` est déjà un ancêtre de `parent_id`). Les ancêtres sont préchargés via `repo.get_ancestor_ids` et la validation est déléguée au domaine.
     """
     check_can_create_relation(
         parent_id=parent_id,

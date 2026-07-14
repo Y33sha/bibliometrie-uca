@@ -1,12 +1,6 @@
-"""
-Service Authorships — orchestrateur des opérations sur `authorships`
-et `source_authorships`.
+"""Service Authorships — orchestrateur des opérations unitaires sur `authorships` et `source_authorships`.
 
-Opérations unitaires sur les authorships consolidées. Le script batch
-`build_authorships.py` reste le constructeur principal (reconstruction
-complète).
-
-Le SQL vit dans `infrastructure/repositories/authorship_repository.py`.
+Le constructeur principal (reconstruction complète) est le script batch `build_authorships.py`. Le SQL vit dans `infrastructure/repositories/authorship_repository.py`.
 """
 
 from sqlalchemy import Connection
@@ -27,21 +21,13 @@ def reject_pair(
     repo: AuthorshipRepository,
     audit_repo: AuditRepository | None = None,
 ) -> dict[str, int]:
-    """Rejette durablement une paire (publication, personne) : enregistre que
-    cette personne n'est pas l'auteur de cette publication.
+    """Rejette durablement une paire (publication, personne) : enregistre que cette personne n'est pas l'auteur de cette publication.
 
-    Opération unique partagée par les deux façons de rejeter une contribution
-    (depuis la fiche personne et depuis la fiche publication). Trois effets :
+    Opération unique partagée par les deux façons de rejeter une contribution (depuis la fiche personne et depuis la fiche publication). Trois effets :
 
-    1. Enregistre la paire dans `rejected_authorships`. Ce registre est
-       consulté par le matching des personnes et par le rebuild des
-       `authorships`, qui ne recréent jamais une paire rejetée — le rejet
-       survit donc aux exécutions suivantes du pipeline.
-    2. Met à NULL le `person_id` de toutes les `source_authorships` de la paire,
-       sur toutes les sources : le lien disparaît côté données sources, et la
-       personne ne se verra plus attribuer la forme de nom correspondante.
-    3. Supprime la ligne consolidée dans `authorships`, qui n'est plus attestée
-       par aucune source.
+    1. Enregistre la paire dans `rejected_authorships`. Ce registre est consulté par le matching des personnes et par le rebuild des `authorships`, qui écartent toute paire rejetée : le rejet survit aux exécutions suivantes du pipeline.
+    2. Met à NULL le `person_id` de toutes les `source_authorships` de la paire, sur toutes les sources : le lien disparaît côté données sources, et la forme de nom correspondante cesse de lui être attribuée.
+    3. Supprime la ligne consolidée dans `authorships`, qu'aucune source n'atteste.
 
     Retourne {"detached": N, "deleted_authorships": M}.
     """
@@ -69,12 +55,9 @@ def exclude_authorship(
 ) -> dict[str, JsonValue]:
     """Rejette une contribution à partir de sa ligne consolidée (`authorships`).
 
-    Retrouve la paire (publication, personne) à partir de l'`authorship_id`
-    puis applique `reject_pair`. Si `person_repo` est fourni, supprime ensuite
-    les formes de nom de la personne que plus aucune source n'atteste.
+    Retrouve la paire (publication, personne) à partir de l'`authorship_id` puis applique `reject_pair`. Si `person_repo` est fourni, supprime ensuite les formes de nom de la personne qu'aucune source restante n'atteste.
 
-    Si la ligne n'a pas de `person_id`, il n'y a pas de paire à rejeter : on se
-    contente de supprimer la ligne.
+    Si la ligne n'a pas de `person_id`, il n'y a pas de paire à rejeter : on se contente de supprimer la ligne.
 
     Lève NotFoundError si la ligne n'existe pas.
     """
@@ -101,11 +84,9 @@ def propagate_in_perimeter_for_addresses(
     repo: AuthorshipRepository,
     perimeter_queries: PerimeterQueries,
 ) -> None:
-    """Recalcule in_perimeter sur source_authorships et authorships canoniques
-    pour tous les authorships liés aux adresses données.
+    """Recalcule `in_perimeter` sur les `source_authorships` et les `authorships` canoniques liés aux adresses données.
 
-    Appelé après chaque review/assign/unassign d'adresse pour
-    propagation en temps réel.
+    Appelé après chaque review/assign/unassign d'adresse, pour une propagation en temps réel.
     """
     if not address_ids:
         return
@@ -129,8 +110,5 @@ def propagate_in_perimeter_for_addresses(
 
 
 def delete_orphan_authorships(person_id: int, *, repo: AuthorshipRepository) -> int:
-    """Supprime les authorships canoniques d'une personne qui ne sont plus
-    attestées par aucune authorship source. Retourne le nombre d'authorships
-    supprimées.
-    """
+    """Supprime les authorships canoniques d'une personne qu'aucune authorship source n'atteste. Retourne le nombre d'authorships supprimées."""
     return repo.delete_orphan_authorships_for_person(person_id)

@@ -1,7 +1,6 @@
-"""
-Service Publications — accès exclusif en écriture à la table `publications`.
+"""Service Publications — accès exclusif en écriture à la table `publications`.
 
-Toute création ou mise à jour d'une publication passe par ce module. Les scripts de normalisation (HAL, OpenAlex, WoS, ScanR) et les autres traitements appellent ces fonctions au lieu de faire du SQL direct.
+Toute création ou mise à jour d'une publication passe par ce module : les scripts de normalisation (HAL, OpenAlex, WoS, ScanR) et les autres traitements appellent ces fonctions, sans SQL direct.
 """
 
 from application.audit_log import emit_event
@@ -28,17 +27,17 @@ def refresh_from_sources(
 ) -> None:
     """Recalcule les métadonnées canoniques d'une publication depuis ses `source_publications`.
 
-    Recalcul complet (pas de COALESCE incrémental qui figerait les valeurs au premier arrivé) : lit TOUS les `source_publications` attachés, applique l'algorithme d'agrégation `refresh_from_sources` (domain) qui mute l'entité Publication en place, et persiste via `repo.save`. Peut corriger des métadonnées obsolètes (ex: `ongoing_thesis` → `thesis` après soutenance).
+    Recalcul complet : lit TOUS les `source_publications` attachés, applique l'algorithme d'agrégation `refresh_from_sources` (domain) qui mute l'entité Publication en place, et persiste via `repo.save`. Peut corriger des métadonnées périmées (ex : `ongoing_thesis` → `thesis` après soutenance).
 
-    **Cas orphelin** : si la publication n'a aucune source rattachée, la règle métier dicte qu'elle ne doit pas exister. Court-circuit : suppression via `repo.delete` + audit event `publication.deleted_orphan`, sans appel à l'agrégation.
+    **Cas orphelin** : une publication sans aucune source rattachée n'a pas lieu d'exister. Suppression via `repo.delete` + audit `publication.deleted_orphan`, sans agrégation.
 
-    **Cas hors périmètre** : si le `doc_type` canonique résolu appartient à `OUT_OF_SCOPE_DOC_TYPES`, la publication ne doit pas non plus exister (invariant « hors périmètre = jamais matérialisé »). Suppression via `repo.delete` + audit event `publication.deleted_out_of_scope`, après l'arbitrage du type. Les `source_publications` sont détachées (FK ON DELETE SET NULL) et les `authorships` canoniques emportées en cascade.
+    **Cas hors périmètre** : si le `doc_type` canonique résolu appartient à `OUT_OF_SCOPE_DOC_TYPES`, la publication est supprimée de même (invariant « hors périmètre = jamais matérialisé »), via `repo.delete` + audit `publication.deleted_out_of_scope`. Ses `source_publications` sont détachées (FK ON DELETE SET NULL), ses `authorships` canoniques emportés en cascade.
 
-    L'identité des publications (quelles `source_publications` forment une même œuvre, fusions et scissions comprises) relève de la réconciliation (`application/pipeline/publications`), jamais d'ici : ce recalcul ne touche que la publication reçue et ses propres sources. Une seule publication porte un DOI donné à l'arrivée de la réconciliation, donc `repo.save` ne peut pas heurter la contrainte unique sur le DOI.
+    L'identité des publications (quelles `source_publications` forment une même œuvre) relève de la réconciliation (`application/pipeline/publications`), jamais d'ici : ce recalcul ne touche que la publication reçue et ses sources. Une seule publication porte un DOI donné à ce stade : `repo.save` respecte la contrainte d'unicité.
 
-    Si `audit_repo` est fourni et que le DOI canonique change effectivement (passage d'une valeur à une autre, ou perte du DOI), un événement `publication.doi_changed` est émis avec l'ancienne et la nouvelle valeur. Pas d'event sur l'attribution initiale (passage de None à une valeur) ni quand la valeur reste identique.
+    Si `audit_repo` est fourni et que le DOI canonique change (d'une valeur à une autre, ou perte), un événement `publication.doi_changed` porte l'ancienne et la nouvelle valeur. Rien sur l'attribution initiale (None → valeur) ni sur une valeur inchangée.
 
-    Ne touche PAS à `notes` ni à `sources` (utiliser `update_sources` séparément).
+    Laisse `notes` et `sources` inchangés (utiliser `update_sources` séparément).
     """
     pub = repo.find_by_id(pub_id)
     if pub is None:
@@ -46,16 +45,16 @@ def refresh_from_sources(
 
     sources = repo.get_source_publications(pub_id)
     if not sources:
-        # Pub orpheline : la règle métier dicte qu'une publication non attestée par aucune source n'a pas de raison d'exister.
+        # Publication orpheline : la règle métier dicte qu'une publication non attestée par aucune source n'a pas de raison d'exister.
         repo.delete(pub_id)
         emit_event(audit_repo, "publication.deleted_orphan", "publication", pub_id, {})
         return
 
     previous_doi = pub.doi
-    # Les corrections per-record sont déjà persistées sur chaque `source_publication` par la phase
-    # `metadata_correction` (colonnes lues par `get_source_publications`) ; l'agrégation repart donc
-    # des valeurs corrigées. Mais l'arbitrage choisit `doc_type` et `journal_id` indépendamment :
-    # une correction journal-dépendante appliquée à la SP qui a résolu le journal ne suit pas le
+    # Les corrections par enregistrement sont déjà persistées sur chaque `source_publication` par la
+    # phase `metadata_correction` (colonnes lues par `get_source_publications`) : l'agrégation repart
+    # des valeurs corrigées. L'arbitrage choisit `doc_type` et `journal_id` indépendamment : une
+    # correction journal-dépendante appliquée à la source qui a résolu le journal ne suit pas le
     # `journal_id` canonique — on la rejoue sur le canonique après agrégation.
     secondary_ids = repo.get_converged_secondary_ids(pub_id)
     _refresh_aggregate(pub, sources, source_priority=SOURCE_PRIORITY, secondary_ids=secondary_ids)
@@ -98,21 +97,9 @@ def refresh_from_sources(
 def _apply_canonical_doc_type_correction(pub: Publication, *, repo: PublicationRepository) -> None:
     """Rejoue les corrections de `doc_type` sur la publication canonique après l'arbitrage.
 
-    L'arbitrage choisit `doc_type` (première source par priorité) et `journal_id` (premier non-nul)
-    **indépendamment**, possiblement depuis deux `source_publications` différentes. Une correction
-    journal-dépendante (`JOURNAL_TYPE_MEDIA_TO_MEDIA`, …) appliquée par SP en phase
-    `metadata_correction` ne fire que sur la SP qui a résolu le journal ; elle ne suit donc pas le
-    `journal_id` canonique. On reconstruit une vue de la publication canonique (son `doc_type` arbitré
-    + le `journal_type` de son `journal_id` arbitré) et on rejoue `effective_metadata` complète : les
-    règles journal-dépendantes s'appliquent alors au journal réellement résolu. Les règles URL n'ont
-    pas d'effet ici (le canonique n'agrège pas les URLs), ce qui est voulu — elles restent
-    SP-intrinsèques.
+    L'arbitrage choisit `doc_type` (première source par priorité) et `journal_id` (premier non-nul) **indépendamment**, possiblement depuis deux `source_publications` différentes. Une correction journal-dépendante (`JOURNAL_TYPE_MEDIA_TO_MEDIA`, …) appliquée par `source_publication` en phase `metadata_correction` ne se déclenche que sur celle qui a résolu le journal ; elle ne suit pas le `journal_id` canonique. On reconstruit une vue de la publication canonique (son `doc_type` arbitré + le `journal_type` de son `journal_id` arbitré) et on rejoue `effective_metadata` complète : les règles journal-dépendantes s'appliquent alors au journal réellement résolu. Les règles URL n'ont pas d'effet ici (le canonique n'agrège pas les URLs) : elles restent propres aux `source_publications`.
 
-    Mute `pub.doc_type` et trace la règle dans `pub.meta['corrections']['doc_type']` si une
-    correction s'applique. `meta` étant recalculé à chaque refresh (merge des `meta` sources), la
-    trace est éphémère et re-posée à chaque run — pas de brut à préserver côté canonique, contrairement
-    au sidecar `raw_metadata` des `source_publications`. Une seule lecture I/O (`journal_type`).
-    Idempotent : sur une publication déjà cohérente, aucun changement.
+    Mute `pub.doc_type` et trace la règle dans `pub.meta['corrections']['doc_type']` si une correction s'applique. `meta` est recalculé à chaque refresh (fusion des `meta` sources) : la trace est éphémère, re-posée à chaque run, sans brut à préserver côté canonique. Une seule lecture I/O (`journal_type`). Idempotent : sur une publication déjà cohérente, aucun changement.
     """
     journal_type = repo.get_journal_type(pub.journal_id) if pub.journal_id is not None else None
     view = SourcePublicationForCorrection(
@@ -156,8 +143,7 @@ def mark_distinct(
     repo: PublicationRepository,
     audit_repo: AuditRepository | None = None,
 ) -> None:
-    """Marque deux publications comme distinctes (non-doublon) dans
-    `distinct_publications`. Idempotent.
+    """Marque deux publications comme distinctes (non-doublon) dans `distinct_publications`. Idempotent.
 
     Les IDs sont triés pour garantir l'unicité de la paire.
     """
@@ -185,8 +171,8 @@ def merge_publications(
 
     1. Charge `target` et `source` comme entités `Publication` via le repo.
     2. Garde « 1 DOI = 1 publication » : si les deux portent des DOI non-nuls différents, refuse (`DistinctDoiError`) — ce sont des œuvres distinctes, quelle que soit la clé qui les a rapprochées.
-    3. `repo.merge_into(target_id, source_id)` : plumbing FK (transfert des `source_publications` + authorships avec dédup, repointage des `distinct_publications`, DELETE de la ligne source).
-    4. `refresh_from_sources(target_id)` : recompute les métadonnées canoniques de la cible depuis ses `source_publications` — désormais l'union des siennes et de celles de la source. Même règle d'agrégation que partout ailleurs (statut OA le plus ouvert, scalaires par priorité de source), donc aucune divergence selon le chemin de fusion.
+    3. `repo.merge_into(target_id, source_id)` : reprise des clés étrangères (transfert des `source_publications` et authorships avec dédup, repointage des `distinct_publications`, DELETE de la ligne source).
+    4. `refresh_from_sources(target_id)` : recalcule les métadonnées canoniques de la cible depuis ses `source_publications`, à ce stade l'union des siennes et de celles de la source. Même règle d'agrégation que partout ailleurs (statut OA le plus ouvert, scalaires par priorité de source) : aucune divergence selon le chemin de fusion.
 
     Lève `NotFoundError` si target ou source n'existe pas ; `DistinctDoiError` si les deux portent des DOI non-nuls différents.
     """

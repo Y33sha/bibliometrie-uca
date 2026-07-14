@@ -1,7 +1,6 @@
-"""
-Service Journaux — accès exclusif en écriture à la table `journals`.
+"""Service Journaux — accès exclusif en écriture à la table `journals`.
 
-Les opérations sur l'agrégat Publisher vivent dans `application/publishers/core.py` (principe SRP). Les deux agrégats restent liés par `journals.publisher_id` (FK) mais sont manipulés par des services distincts, chacun sur son propre port.
+Les opérations sur l'agrégat Publisher vivent dans `application/services/publishers/core.py` ; les deux agrégats restent liés par `journals.publisher_id` (FK), chacun manipulé par son propre service et son propre port.
 
 Les routers FastAPI utilisent les mêmes repos que le pipeline (routes `def` exécutées dans le threadpool Starlette).
 """
@@ -138,9 +137,10 @@ def update_journal_apc(
 def _correct_for_journal(
     conn: Connection, queries: MetadataCorrectionQueries, journal_id: int
 ) -> int:
-    """Recompute+persiste les corrections unaires des `source_publications` d'un journal, après un changement de son `journal_type`. Retourne le nombre de `source_publications` corrigées.
+    """Recalcule et persiste les corrections unaires des `source_publications` d'un journal, après un changement de son `journal_type`. Retourne le nombre de `source_publications` corrigées.
 
-    À enchaîner avec `refresh_from_sources` des publications du journal : la colonne `source_publication` rafraîchie ici est ce que le refresh (et plus tard le matcher) liront — sans ce recompute, `refresh_from_sources` repartirait de la correction périmée."""
+    À enchaîner avec `refresh_from_sources` des publications du journal, qui repart de la colonne `source_publication` rafraîchie ici.
+    """
     rows = queries.fetch_for_unary_correction_by_journal(conn, journal_id)
     updates = [u for row in rows if (u := compute_update(row)) is not None]
     return queries.persist_corrections(conn, updates)
@@ -158,12 +158,7 @@ def merge_journals(
 ) -> None:
     """Fusionne le journal source dans le journal cible.
 
-    Les `source_publications` et publications du journal absorbé sont repointées vers
-    la cible (`merge_journal_into`), puis **requalifiées** contre le `journal_type` de
-    la cible : on recompute en place les corrections des SP de la cible
-    (`_correct_for_journal`, qui voit désormais les SP absorbées via le `journal_id`
-    repointé), puis on rafraîchit les publications absorbées. Fusionner une revue dans
-    un média retype donc ses publications en `media`.
+    Les `source_publications` et publications du journal absorbé sont repointées vers la cible (`merge_journal_into`), puis **requalifiées** contre le `journal_type` de la cible : on recalcule en place les corrections des `source_publications` de la cible (`_correct_for_journal`, qui voit alors les enregistrements absorbés via le `journal_id` repointé), puis on rafraîchit les publications absorbées. Fusionner une revue dans un média retype ses publications en `media`.
     """
     if target_id == source_id:
         raise ConflictError("Impossible de fusionner un journal avec lui-même")
@@ -173,9 +168,9 @@ def merge_journals(
 
     repo.merge_journal_into(target_id, source_id)
 
-    # Les SP absorbées portent désormais `journal_id = target` : recompute en place leurs
-    # corrections (le `journal_type` lu par la correction est celui de la cible), puis
-    # refresh des publications absorbées (qui lisent les colonnes SP fraîchement corrigées).
+    # Les enregistrements absorbés portent maintenant `journal_id = target` : recalcule en
+    # place leurs corrections (le `journal_type` lu est celui de la cible), puis refresh des
+    # publications absorbées (qui lisent les colonnes `source_publication` fraîchement corrigées).
     _correct_for_journal(conn, correction_queries, target_id)
     for pub_id in absorbed_pub_ids:
         refresh_from_sources(pub_id, repo=pub_repo, audit_repo=audit_repo)
@@ -183,7 +178,7 @@ def merge_journals(
     emit_event(audit_repo, "journal.merged", "journal", target_id, {"source_id": source_id})
 
 
-# ── Requalification des publications d'un journal après changement d'un input éditable ──
+# ── Requalification des publications d'un journal après changement d'un champ éditable ──
 
 
 def requalify_publications_for_journal(
@@ -196,22 +191,14 @@ def requalify_publications_for_journal(
 ) -> int:
     """Requalifie le `doc_type` des publications d'un journal après changement de son `journal_type`.
 
-    Précondition : le `journal.journal_type` a déjà été mis à jour par le caller (dans la
-    même transaction qu'un `update_journal`). Deux temps :
+    Précondition : le `journal.journal_type` a déjà été mis à jour par l'appelant (dans la même transaction qu'un `update_journal`). Deux temps :
 
-    1. `_correct_for_journal` recompute **en place** les corrections des `source_publications`
-       du journal — indispensable car `refresh_from_sources` repart de la colonne SP corrigée
-       (pas du brut), donc sans ce recompute il figerait la publication sur l'ancienne
-       correction journal-dépendante.
-    2. `refresh_from_sources` sur chaque publication du journal ré-agrège les colonnes SP
-       fraîchement corrigées (garde-fous habituels : conflits DOI, audit `doi_changed`, orphelins).
+    1. `_correct_for_journal` recalcule **en place** les corrections des `source_publications` du journal. `refresh_from_sources` repart de la colonne corrigée (pas du brut) ; ce recalcul préalable garantit qu'elle reflète le `journal_type` mis à jour.
+    2. `refresh_from_sources` sur chaque publication du journal ré-agrège les colonnes `source_publication` fraîchement corrigées (garde-fous habituels : conflits DOI, audit `doi_changed`, orphelins).
 
-    Retourne le nombre de publications dont le `doc_type` a effectivement changé ; émet
-    l'audit `journal.type_requalified` si > 0.
+    Retourne le nombre de publications dont le `doc_type` a effectivement changé ; émet l'audit `journal.type_requalified` si > 0.
 
-    Le **preview** (combien changeraient sans appliquer) s'obtient en enveloppant cet appel
-    dans un `SAVEPOINT` rollbacké côté caller — preview et apply partagent ainsi exactement
-    la même logique.
+    Le **preview** (combien changeraient sans appliquer) s'obtient en enveloppant cet appel dans un `SAVEPOINT` que l'appelant annule : preview et apply partagent alors exactement la même logique.
     """
     pub_ids = pub_repo.find_ids_by_journal_id(journal_id)
     if not pub_ids:
