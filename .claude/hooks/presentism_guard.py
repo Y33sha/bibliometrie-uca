@@ -52,7 +52,7 @@ HARD = [
     r"ancien(?:ne|s|nes)?\b",
     r"legacy",
     r"deprecated|obsolète",
-    r"(?:c'est|il s'agit) pourquoi",
+    r"(?:c'est) pourquoi",
     r"\bcar\b|\bpuisque\b|\bdonc\b|\bainsi\b",  # justification
 ]
 
@@ -61,7 +61,7 @@ SOFT = [
     r"ne (?:doit|doivent|faut) pas",
     r"ne pas\b",
     r"n['e]\s*(?:\w+\s+)?pas à\b",
-    r"\bdo not\b|\bdon't\b|\bmust not\b",
+    r"\bet non\b",
 ]
 
 HARD_RE = re.compile("|".join(HARD), re.IGNORECASE)
@@ -135,8 +135,7 @@ def extract_prose(source: str) -> tuple[list[str], list[str]]:
                 comments.append(tok.string.lstrip("# ").strip())
     except (tokenize.TokenError, IndentationError, SyntaxError):
         comments += [
-            m.group(1).strip()
-            for m in re.finditer(r"^\s*#\s?(.*)$", source, re.MULTILINE)
+            m.group(1).strip() for m in re.finditer(r"^\s*#\s?(.*)$", source, re.MULTILINE)
         ]
     return docstrings, comments
 
