@@ -1,6 +1,5 @@
 """Tests d'intégration pour `infrastructure.queries.api.publications.list`."""
 
-
 from sqlalchemy import text
 
 from application.ports.api.publications_queries import FacetFilters, ListFilters
