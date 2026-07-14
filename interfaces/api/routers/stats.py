@@ -1,6 +1,7 @@
 """Router /api/stats/* — délègue les requêtes au port StatsQueries."""
 
 import logging
+from dataclasses import asdict, dataclass
 from typing import Literal
 
 from fastapi import APIRouter, Depends, Query
@@ -23,6 +24,43 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
+@dataclass(frozen=True)
+class StatsFilters:
+    """Filtres communs à tous les endpoints stats, parsés depuis les query params CSV. Les clés
+    reprennent la signature des méthodes de `StatsQueries`, pour un passage direct en `**asdict(...)`."""
+
+    apc_structure_ids: list[int]
+    lab_ids: list[int]
+    years: list[int]
+    publisher_ids: list[int]
+    journal_ids: list[int]
+    oa_status: list[str]
+    has_apc: list[str]
+    doc_types: list[str]
+
+
+def stats_filters(
+    lab_id: str = Query(""),
+    year: str = Query(""),
+    publisher_id: str = Query(""),
+    journal_id: str = Query(""),
+    oa_status: str = Query(""),
+    has_apc: str = Query(""),
+    doc_type: str = Query(""),
+) -> StatsFilters:
+    """Dépendance : assemble les filtres communs des endpoints stats depuis les query params."""
+    return StatsFilters(
+        apc_structure_ids=get_apc_structure_ids_sync(),
+        lab_ids=parse_int_csv(lab_id),
+        years=parse_int_csv(year),
+        publisher_ids=parse_int_csv(publisher_id),
+        journal_ids=parse_int_csv(journal_id),
+        oa_status=parse_str_csv(oa_status),
+        has_apc=parse_str_csv(has_apc),
+        doc_types=parse_str_csv(doc_type),
+    )
+
+
 @router.get("/api/stats/years", response_model=list[int])
 def available_years(
     queries: StatsQueries = Depends(stats_queries_sync),
@@ -33,55 +71,23 @@ def available_years(
 
 @router.get("/api/stats/facets", response_model=StatsFacetsResponse)
 def stats_facets(
-    lab_id: str = Query(""),
-    year: str = Query(""),
-    publisher_id: str = Query(""),
-    journal_id: str = Query(""),
-    oa_status: str = Query(""),
-    has_apc: str = Query(""),
-    doc_type: str = Query(""),
+    filters: StatsFilters = Depends(stats_filters),
     queries: StatsQueries = Depends(stats_queries_sync),
 ) -> StatsFacetsResponse:
     """Facettes dynamiques : années, labos, oa_status, apc."""
-    return queries.stats_facets(
-        apc_structure_ids=get_apc_structure_ids_sync(),
-        lab_ids=parse_int_csv(lab_id),
-        years=parse_int_csv(year),
-        publisher_ids=parse_int_csv(publisher_id),
-        journal_ids=parse_int_csv(journal_id),
-        oa_status=parse_str_csv(oa_status),
-        has_apc=parse_str_csv(has_apc),
-        doc_types=parse_str_csv(doc_type),
-    )
+    return queries.stats_facets(**asdict(filters))
 
 
 @router.get("/api/stats/facets/entities", response_model=EntityFacetResponse)
 def stats_entity_facet(
     kind: Literal["publisher", "journal"] = Query(...),
     entity_search: str = Query(""),
-    lab_id: str = Query(""),
-    year: str = Query(""),
-    publisher_id: str = Query(""),
-    journal_id: str = Query(""),
-    oa_status: str = Query(""),
-    has_apc: str = Query(""),
-    doc_type: str = Query(""),
+    filters: StatsFilters = Depends(stats_filters),
     queries: StatsQueries = Depends(stats_queries_sync),
 ) -> EntityFacetResponse:
     """Facette éditeur/revue contextuelle : N premières entités sous les filtres actifs (corrélées
     entre elles), avec décompte. `entity_search` recherche dans les noms d'entités."""
-    return queries.stats_entity_facet(
-        kind=kind,
-        search=entity_search,
-        apc_structure_ids=get_apc_structure_ids_sync(),
-        lab_ids=parse_int_csv(lab_id),
-        years=parse_int_csv(year),
-        publisher_ids=parse_int_csv(publisher_id),
-        journal_ids=parse_int_csv(journal_id),
-        oa_status=parse_str_csv(oa_status),
-        has_apc=parse_str_csv(has_apc),
-        doc_types=parse_str_csv(doc_type),
-    )
+    return queries.stats_entity_facet(kind=kind, search=entity_search, **asdict(filters))
 
 
 @router.get("/api/stats/facets/entity-label", response_model=EntityLabelResponse)
@@ -97,27 +103,12 @@ def stats_entity_label(
 
 @router.get("/api/stats/collaborations", response_model=CollaborationsResponse)
 def collaborations(
-    lab_id: str = Query(""),
-    year: str = Query(""),
-    publisher_id: str = Query(""),
-    journal_id: str = Query(""),
-    oa_status: str = Query(""),
-    has_apc: str = Query(""),
-    doc_type: str = Query(""),
+    filters: StatsFilters = Depends(stats_filters),
     queries: StatsQueries = Depends(stats_queries_sync),
 ) -> CollaborationsResponse:
     """Collaborations internationales : nombre de publications co-affiliées à chaque pays étranger,
     sous les filtres actifs. Source : la colonne `countries` des publications, hors pays domestique."""
-    return queries.collaborations(
-        apc_structure_ids=get_apc_structure_ids_sync(),
-        lab_ids=parse_int_csv(lab_id),
-        years=parse_int_csv(year),
-        publisher_ids=parse_int_csv(publisher_id),
-        journal_ids=parse_int_csv(journal_id),
-        oa_status=parse_str_csv(oa_status),
-        has_apc=parse_str_csv(has_apc),
-        doc_types=parse_str_csv(doc_type),
-    )
+    return queries.collaborations(**asdict(filters))
 
 
 @router.get("/api/stats/pivot/schema", response_model=PivotSchemaResponse)
@@ -133,27 +124,10 @@ def pivot(
     measure: str = Query("pub_count"),
     group: str = Query(""),
     group2: str = Query(""),
-    lab_id: str = Query(""),
-    year: str = Query(""),
-    publisher_id: str = Query(""),
-    journal_id: str = Query(""),
-    oa_status: str = Query(""),
-    has_apc: str = Query(""),
-    doc_type: str = Query(""),
+    filters: StatsFilters = Depends(stats_filters),
     queries: StatsQueries = Depends(stats_queries_sync),
 ) -> PivotResponse:
     """Agrégation générique : `measure` ventilée selon `group` (primaire) et `group2` (secondaire),
     sous les filtres. Clés validées contre le registre (400 si inconnues)."""
     groups = [g for g in (group, group2) if g]
-    return queries.pivot(
-        measure=measure,
-        groups=groups,
-        apc_structure_ids=get_apc_structure_ids_sync(),
-        lab_ids=parse_int_csv(lab_id),
-        years=parse_int_csv(year),
-        publisher_ids=parse_int_csv(publisher_id),
-        journal_ids=parse_int_csv(journal_id),
-        oa_status=parse_str_csv(oa_status),
-        has_apc=parse_str_csv(has_apc),
-        doc_types=parse_str_csv(doc_type),
-    )
+    return queries.pivot(measure=measure, groups=groups, **asdict(filters))
