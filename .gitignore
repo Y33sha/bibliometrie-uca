@@ -48,4 +48,4 @@ docs/chantiers/datacite-vs-natives-spike-data/
 .env
 
 # Claude Code
-.claude/
+.claude/*.json
