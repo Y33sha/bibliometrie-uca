@@ -16,9 +16,9 @@ from dataclasses import dataclass
 from domain.publications.identifiers import DOI, NNT, PMID, HALId
 
 # Seuil de longueur de `title_normalized` (caractères, strict) pour le token `metadata_block` :
-# écarte les collisions de titres génériques. Dupliqué en SQL dans la branche `metadata_block`
-# de l'univers de réconciliation (`publications_reconciliation`) — garder synchrone.
-_METADATA_BLOCK_MIN_TITLE_LENGTH = 30
+# écarte les collisions de titres génériques. Le miroir SQL de l'univers de réconciliation
+# (`publications_reconciliation`) importe cette constante.
+METADATA_BLOCK_MIN_TITLE_LENGTH = 30
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,7 +61,7 @@ def project_confirmation_keys(
 ) -> ConfirmationKeys:
     """Extrait les clés de confirmation normalisées d'une `source_publication`.
 
-    `external_ids` porte `nnt`, `pmid`, `hal_id` (liste). Le DOI est lu sur la colonne (déjà corrigée, concept Zenodo inclus). Une valeur d'identifiant malformée est écartée silencieusement (`try_parse` → `None`), comme une clé absente. `metadata_block` est posée pour toute `source_publication` à `doc_type` présent, `pub_year` présent et `title_normalized` plus long que `_METADATA_BLOCK_MIN_TITLE_LENGTH`.
+    `external_ids` porte `nnt`, `pmid`, `hal_id` (liste). Le DOI est lu sur la colonne (déjà corrigée, concept Zenodo inclus). Une valeur d'identifiant malformée est écartée silencieusement (`try_parse` → `None`), comme une clé absente. `metadata_block` est posée pour toute `source_publication` à `doc_type` présent, `pub_year` présent et `title_normalized` plus long que `METADATA_BLOCK_MIN_TITLE_LENGTH`.
     """
     ids: Mapping[str, object] = external_ids if isinstance(external_ids, Mapping) else {}
 
@@ -84,7 +84,7 @@ def project_confirmation_keys(
         f"{doc_type}|{title_normalized}|{pub_year}"
         if doc_type
         and title_normalized
-        and len(title_normalized) > _METADATA_BLOCK_MIN_TITLE_LENGTH
+        and len(title_normalized) > METADATA_BLOCK_MIN_TITLE_LENGTH
         and pub_year is not None
         else None
     )
