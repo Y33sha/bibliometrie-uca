@@ -58,15 +58,15 @@ Trois tables alimentées par les phases `subjects` et `cooccurrences` du pipelin
 
 | Table | Autorité | Écrit par |
 |---|---|---|
-| `publications` | pipeline | `application/publications/core.py` (`refresh_from_sources` recalcule depuis les sources) |
-| `publications_detail` | pipeline | `application/publications/core.py` |
+| `publications` | pipeline | `application/services/publications/core.py` (`refresh_from_sources` recalcule depuis les sources) |
+| `publications_detail` | pipeline | `application/services/publications/core.py` |
 | `publication_relations` | pipeline | phase `relations` |
-| `subjects`, `publication_subjects` | pipeline | `application/pipeline/subjects/run.py` |
-| `subject_cooccurrences` | pipeline | `application/pipeline/cooccurrences/run.py` (matview) |
+| `subjects`, `publication_subjects` | pipeline | `application/pipeline/subjects/ingestion.py` |
+| `subject_cooccurrences` | pipeline | `application/pipeline/subjects/cooccurrences.py` (matview) |
 | `doi_prefixes` | pipeline | phases `resolve_ra` et `publishers_journals` |
-| `journals`, `journal_name_forms` | mixte | créés et enrichis par le pipeline ; édités et fusionnés en admin (`application/journals/commands.py`) |
-| `publishers`, `publisher_name_forms` | mixte | créés et enrichis par le pipeline ; édités et fusionnés en admin (`application/publishers/commands.py`) |
-| `distinct_publications` | admin | `application/publications/commands.py` |
+| `journals`, `journal_name_forms` | mixte | créés et enrichis par le pipeline ; édités et fusionnés en admin (`application/services/journals/commands.py`) |
+| `publishers`, `publisher_name_forms` | mixte | créés et enrichis par le pipeline ; édités et fusionnés en admin (`application/services/publishers/commands.py`) |
+| `distinct_publications` | admin | `application/services/publications/commands.py` |
 | `apc_payments` | import | `interfaces/cli/imports/import_apc.py`, `import_openapc.py` |
 
 La propriété n'est pas verrouillée (convention, pas de contrat import-linter ni de GRANT). Deux écritures transverses la franchissent : la **fusion de journaux** re-pointe `journal_id` sur `publications` et `source_publications` ; la **propagation des pays** écrit les colonnes `countries[]` sur `source_authorships`, `source_publications` et `publications`.

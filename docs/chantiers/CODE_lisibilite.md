@@ -77,13 +77,10 @@ Réorganisation du sommet :
 
 ### Phase 2 - `infrastructure/`
 
-#### 2.1 `db`
-
-#### 2.2 `jsonb_models`
-
-#### 2.3 `raw_store`
-
-#### 2.4 `observability`
+#### 2.1 `db` : OK
+#### 2.2 `jsonb_models` : OK
+#### 2.3 `raw_store` : OK
+#### 2.4 `observability` : OK
 
 #### 2.5 `sources`
 
@@ -95,14 +92,18 @@ Racine (transverse) : passe docstrings/commentaires faite. Findings structurels 
 - [ ] Un dossier par source : `ror.py`, `unpaywall.py` et le code de `doaj/__init__.py` passent en `<source>/client.py` (+ `__init__` mince). Racine = transverse seulement.
 - [ ] Renvoi périmé : `openalex/__init__.py` prétend que l'URL de base vit en config DB — faux, c'est la constante `_API_BASE_URLS`.
 
-#### 2.5 `sources`
-
 #### 2.6 `queries`
 
 #### 2.7 `repositories`
 
 
 ### Phase 3 - `interfaces/`
+
+#### 3.1 - API
+
+#### 3.2 - Frontend
+
+#### 3.3 - CLI
 
 - [ ] CLI `maintenance/` : coquille-ification. `enrich_publishers` séquence ses trois étapes dans son `main()` au lieu de déléguer en un appel à un orchestrateur applicatif, contrairement à ses voisins.
 - [ ] Passe des CLI `maintenance/` et `oneshot/`.

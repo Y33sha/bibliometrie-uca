@@ -63,11 +63,11 @@ Légende :
 
 | Table | Autorité | Écrit par |
 |---|---|---|
-| `structures` | admin | `application/structures/core.py` |
-| `structure_relations` | admin | `application/structures/core.py` |
-| `structure_name_forms` | admin | `application/structures/core.py` |
-| `perimeters` | admin | `application/config/core.py` |
-| `config` | admin | `application/config/core.py` |
+| `structures` | admin | `application/services/structures/core.py` |
+| `structure_relations` | admin | `application/services/structures/core.py` |
+| `structure_name_forms` | admin | `application/services/structures/core.py` |
+| `perimeters` | admin | `application/services/config/core.py` |
+| `config` | admin | `application/services/config/core.py` |
 | `perimeter_structures` | pipeline | rematérialisée par la phase `affiliations` (`refresh_perimeter_structures`) |
 | `addresses` | mixte | créées par le pipeline (`resolve_addresses.py`) ; colonne `country` éditable en admin (`addresses/commands.py`) |
 | `address_structures` | mixte | liens posés par le pipeline (`resolve_addresses.py`) ; colonne `is_confirmed` posée en admin (`addresses/commands.py`) |

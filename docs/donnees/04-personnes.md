@@ -44,8 +44,8 @@ Légende :
 
 | Table | Autorité | Écrit par |
 |---|---|---|
-| `persons` | mixte | créées par le pipeline (`create_persons_from_source_authorships.py`) ou par l'import RH (`import_persons.py`) ; fusions, renommage et rejet en admin (`application/persons/commands.py`) |
-| `person_identifiers` | mixte | moissonnés par le pipeline ; ajout manuel et statut en admin (`application/persons/commands.py`) |
+| `persons` | mixte | créées par le pipeline (`create_persons_from_source_authorships.py`) ou par l'import RH (`import_persons.py`) ; fusions, renommage et rejet en admin (`application/services/persons/commands.py`) |
+| `person_identifiers` | mixte | moissonnés par le pipeline ; ajout manuel et statut en admin (`application/services/persons/commands.py`) |
 | `person_name_forms` | mixte | peuplées par le pipeline (`populate_person_name_forms.py`) ; statut en admin |
-| `distinct_persons` | admin | `application/persons/commands.py` |
+| `distinct_persons` | admin | `application/services/persons/commands.py` |
 | `persons_rh` | import | `interfaces/cli/imports/import_persons.py` |
