@@ -29,12 +29,9 @@ class TestExtractLocationsDataHalIds:
         assert "hal_id" not in ext
 
 
+from domain.publications.doc_types import DOC_TYPES_SET as VALID_DOC_TYPES_SET
 from domain.publications.identifiers import extract_hal_id_from_url
-from domain.source_publications.doc_types import (
-    _SOURCE_MAPS,
-    DOC_TYPES_SET as VALID_DOC_TYPES_SET,
-    map_doc_type,
-)
+from domain.source_publications.doc_types import _SOURCE_MAPS, map_doc_type
 
 # is_hal_primary_location migré vers domain/sources/openalex.is_hal_location
 # (cf. tests/unit/domain/sources/test_openalex.py).

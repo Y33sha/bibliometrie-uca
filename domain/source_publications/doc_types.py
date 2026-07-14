@@ -9,63 +9,7 @@ Usage :
     canonical = map_doc_type("article")                    # → "article" (lookup global)
 """
 
-from typing import Literal
-
-DocType = Literal[
-    "article",
-    "conference_paper",
-    "book",
-    "book_chapter",
-    "thesis",
-    "ongoing_thesis",
-    "preprint",
-    "review",
-    "editorial",
-    "report",
-    "peer_review",
-    "other",
-    "dataset",
-    "software",
-    "patent",
-    "hdr",
-    "memoir",
-    "poster",
-    "letter",
-    "erratum",
-    "retraction",
-    "book_review",
-    "data_paper",
-    "proceedings",
-    "media",
-]
-DOC_TYPES: tuple[DocType, ...] = (
-    "article",
-    "conference_paper",
-    "book",
-    "book_chapter",
-    "thesis",
-    "ongoing_thesis",
-    "preprint",
-    "review",
-    "editorial",
-    "report",
-    "peer_review",
-    "other",
-    "dataset",
-    "software",
-    "patent",
-    "hdr",
-    "memoir",
-    "poster",
-    "letter",
-    "erratum",
-    "retraction",
-    "book_review",
-    "data_paper",
-    "proceedings",
-    "media",
-)
-DOC_TYPES_SET: frozenset[str] = frozenset(DOC_TYPES)
+from domain.publications.doc_types import DOC_TYPES_SET
 
 # Mapping par source. Clés en minuscules pour le lookup.
 # Les valeurs sont des valeurs valides de l'enum doc_type.
@@ -262,28 +206,6 @@ _SOURCE_MAPS: dict[str, dict[str, str]] = {
         "other": "other",
     },
 }
-
-# Sous-types qui priment sur "article" générique : si une source prioritaire
-# (typiquement CrossRef avec "journal-article") dit "article", mais qu'une
-# source moins prioritaire (HAL, OA…) reconnaît un sous-type plus précis,
-# on préfère le sous-type pour ne pas perdre l'information.
-#
-# CrossRef ne distingue pas ces sous-types (tout est "journal-article") ;
-# HAL fait la distinction via ses combinaisons type_sous-type
-# ("art_artrev" → "review", "art_bookreview" → "book_review", etc.).
-# Cette logique d'arbitrage vit dans `application.services.publications._first_doc_type`.
-ARTICLE_SUBTYPES: frozenset[str] = frozenset(
-    {
-        "review",
-        "book_review",
-        "data_paper",
-        "conference_paper",
-        "editorial",
-        "letter",
-        "erratum",
-        "retraction",
-    }
-)
 
 
 def map_doc_type(raw: str | None, source: str | None = None) -> str:
