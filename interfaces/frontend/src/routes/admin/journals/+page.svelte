@@ -38,7 +38,7 @@
 		id: number; title: string; issn: string; eissn: string; issnl: string;
 		doi_prefix: string; oa_model: string;
 		journal_type: string; original_journal_type: string;
-		is_academic: boolean; is_predatory: boolean; is_in_doaj: boolean;
+		is_academic: boolean; is_in_doaj: boolean;
 		apc_amount: string;
 	} | null = $state(null);
 
@@ -50,7 +50,7 @@
 			doi_prefix: j.doi_prefix || '', oa_model: j.oa_model || '',
 			journal_type: jt, original_journal_type: jt,
 			is_academic: j.is_academic ?? true,
-			is_predatory: j.is_predatory, is_in_doaj: j.is_in_doaj,
+			is_in_doaj: j.is_in_doaj,
 			apc_amount: j.apc_amount ? String(j.apc_amount) : '',
 		};
 	}
@@ -84,7 +84,6 @@
 		body.oa_model = editModal.oa_model || null;
 		body.journal_type = editModal.journal_type;
 		body.is_academic = editModal.is_academic;
-		body.is_predatory = editModal.is_predatory;
 		body.is_in_doaj = editModal.is_in_doaj;
 		body.apc_amount = editModal.apc_amount ? parseFloat(editModal.apc_amount) : null;
 		try {
@@ -210,7 +209,6 @@
 		</div>
 		<div style="display:flex;gap:12px;margin-top:8px">
 			<label class="checkbox-row"><input type="checkbox" bind:checked={editModal.is_academic} /> Académique</label>
-			<label class="checkbox-row"><input type="checkbox" bind:checked={editModal.is_predatory} /> Prédateur</label>
 			<label class="checkbox-row"><input type="checkbox" bind:checked={editModal.is_in_doaj} /> DOAJ</label>
 		</div>
 		<label>APC (€) <input bind:value={editModal.apc_amount} placeholder="ex: 2500" type="number" /></label>

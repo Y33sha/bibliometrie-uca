@@ -115,9 +115,6 @@
 	<div class="p-header">
 		<h1 class="p-title">
 			{publisher.name}
-			{#if publisher.is_predatory}
-				<span class="badge-predatory" title="Éditeur prédateur">Prédateur</span>
-			{/if}
 		</h1>
 		<div class="p-meta">
 			<div class="meta-row">
@@ -241,11 +238,6 @@
 		background: var(--border-subtle); color: var(--muted);
 		padding: 2px 8px; border-radius: 10px; font-size: 0.85rem;
 		margin-right: 8px;
-	}
-	.badge-predatory {
-		font-size: 0.7rem; padding: 2px 6px; background: var(--danger);
-		color: white; border-radius: 8px; margin-left: 8px;
-		vertical-align: middle; font-weight: 600; letter-spacing: 0.3px;
 	}
 
 	.tab-content { margin-top: 16px; }

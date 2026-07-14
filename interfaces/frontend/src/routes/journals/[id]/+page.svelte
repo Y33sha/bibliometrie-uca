@@ -137,9 +137,6 @@
 					<span class="badge-doaj" title="Indexée dans DOAJ">DOAJ</span>
 				{/if}
 			{/if}
-			{#if journal.is_predatory}
-				<span class="badge-predatory" title="Revue prédatrice">Prédatrice</span>
-			{/if}
 		</h1>
 		<div class="j-meta">
 			<div class="meta-row">
@@ -306,11 +303,6 @@
 		text-decoration: none;
 	}
 	a.badge-doaj:hover { background: #256528; }
-	.badge-predatory {
-		font-size: 0.7rem; padding: 2px 6px; background: var(--danger);
-		color: white; border-radius: 8px; margin-left: 6px;
-		vertical-align: middle; font-weight: 600; letter-spacing: 0.3px;
-	}
 
 	.tab-content { margin-top: 16px; }
 	.loading, .no-results { padding: 20px; color: var(--muted); }
