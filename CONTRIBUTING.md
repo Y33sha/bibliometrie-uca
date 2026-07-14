@@ -17,7 +17,7 @@ Prérequis : comprendre l'architecture DDD en 4 couches — voir [`docs/architec
 - **Noms de personnes / DOI** : `names_compatible`, `parse_raw_author_name` de `domain/names.py` ; `DOI`, `DOI.try_parse` de `domain/publication.py`.
 - **Couches DDD** : le contrat `import-linter` interdit certaines directions d'import (`domain/` ne peut rien importer, `application/` ne peut pas importer `infrastructure/`, etc.). Un import interdit fera échouer le pre-commit et la CI.
 - **Tests** : `python -m pytest tests/ -v` (la base `DB_PASSWORD` doit être exportée). Les tests unitaires (`tests/unit/`) tournent aussi au pre-commit. Seuil de couverture global : `fail_under = 85` dans `pyproject.toml`, à faire monter progressivement (cf. `docs/chantiers/CODE_couverture-tests.md`).
-- **Pre-commit** : lance ruff + ruff format + mypy + lint-imports + pytest-unit + uv-lock. Lancer `ruff format .` avant `git commit` évite le double-commit quand le hook reformate.
+- **Pre-commit** : lance ruff + ruff format + mypy + lint-imports + pytest-unit + uv-lock. Les hooks constatent et refusent ; ils ne modifient aucun fichier. Lancer `ruff format .` (et au besoin `ruff check --fix .`) avant `git commit`, sinon le hook refuse le commit.
 
 ---
 
@@ -260,6 +260,6 @@ Le script dump l'OpenAPI offline ([`interfaces/cli/dev/dump_openapi.py`](interfa
 
 1. Créer une branche `feature/<nom>` depuis `master`.
 2. Coder, tester (`pytest tests/ -v`, `npm run check` côté frontend si front touché).
-3. `ruff format .` avant de committer (évite le double-commit du pre-commit hook).
+3. `ruff format .` avant de committer (le pre-commit refuse un commit non formaté).
 4. Commits atomiques, messages en français, référence à la fiche chantier concernée dans [`docs/chantiers/`](docs/chantiers/) quand applicable.
 5. Merge en `--no-ff` pour garder la trace du chantier.
