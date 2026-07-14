@@ -31,14 +31,13 @@ def run(
     address_pub_count_queries: AddressPubCountQueries,
     logger: logging.Logger,
     *,
-    pub_repo_factory: Callable[[Connection], PublicationRepository],    rebuild_publications: bool = False,
+    pub_repo_factory: Callable[[Connection], PublicationRepository],
+    rebuild_publications: bool = False,
 ) -> PhaseMetrics:
     """Redirty optionnel → réconciliation → recompute `addresses.pub_count`."""
     if rebuild_publications:
         _redirty_all(open_tx, reconciliation_queries, logger)
-    metrics = _reconcile(
-        open_tx, reconciliation_queries, logger, pub_repo_factory
-    )
+    metrics = _reconcile(open_tx, reconciliation_queries, logger, pub_repo_factory)
     _recompute_address_pub_count(open_tx, address_pub_count_queries, logger)
     return metrics
 
@@ -58,7 +57,8 @@ def _reconcile(
     open_tx: OpenTransaction,
     reconciliation_queries: PublicationsReconciliationQueries,
     logger: logging.Logger,
-    pub_repo_factory: Callable[[Connection], PublicationRepository],) -> PhaseMetrics:
+    pub_repo_factory: Callable[[Connection], PublicationRepository],
+) -> PhaseMetrics:
     logger.info("▶ reconcile_components")
     t0 = time.perf_counter()
     with open_tx() as conn:
