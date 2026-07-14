@@ -23,15 +23,14 @@ def refresh_from_sources(
     pub_id: int,
     *,
     repo: PublicationRepository,
-    audit_repo: AuditRepository | None = None,
 ) -> None:
     """Recalcule les métadonnées canoniques d'une publication depuis ses `source_publications`.
 
     Recalcul complet : lit TOUS les `source_publications` attachés, applique l'algorithme d'agrégation `refresh_from_sources` (domain) qui mute l'entité Publication en place, et persiste via `repo.save`. Peut corriger des métadonnées périmées (ex : `ongoing_thesis` → `thesis` après soutenance).
 
-    **Cas orphelin** : une publication sans aucune source rattachée n'a pas lieu d'exister. Suppression via `repo.delete` + audit `publication.deleted_orphan`, sans agrégation.
+    **Cas orphelin** : une publication sans aucune source rattachée n'a pas lieu d'exister. Suppression via `repo.delete`, sans agrégation.
 
-    **Cas hors périmètre** : si le `doc_type` canonique résolu appartient à `OUT_OF_SCOPE_DOC_TYPES`, la publication est supprimée de même (invariant « hors périmètre = jamais matérialisé »), via `repo.delete` + audit `publication.deleted_out_of_scope`. Ses `source_publications` sont détachées (FK ON DELETE SET NULL), ses `authorships` canoniques emportés en cascade.
+    **Cas hors périmètre** : si le `doc_type` canonique résolu appartient à `OUT_OF_SCOPE_DOC_TYPES`, la publication est supprimée de même (invariant « hors périmètre = jamais matérialisé »), via `repo.delete`. Ses `source_publications` sont détachées (FK ON DELETE SET NULL), ses `authorships` canoniques emportés en cascade.
 
     L'identité des publications (quelles `source_publications` forment une même œuvre) relève de la réconciliation (`application/pipeline/publications`), jamais d'ici : ce recalcul ne touche que la publication reçue et ses sources. Une seule publication porte un DOI donné à ce stade : `repo.save` respecte la contrainte d'unicité.
 
@@ -45,14 +44,9 @@ def refresh_from_sources(
     if not sources:
         # Publication orpheline : la règle métier dicte qu'une publication non attestée par aucune source n'a pas de raison d'exister.
         repo.delete(pub_id)
-        emit_event(audit_repo, "publication.deleted_orphan", "publication", pub_id, {})
         return
 
-    # Les corrections par enregistrement sont déjà persistées sur chaque `source_publication` par la
-    # phase `metadata_correction` (colonnes lues par `get_source_publications`) : l'agrégation repart
-    # des valeurs corrigées. L'arbitrage choisit `doc_type` et `journal_id` indépendamment : une
-    # correction journal-dépendante appliquée à la source qui a résolu le journal ne suit pas le
-    # `journal_id` canonique — on la rejoue sur le canonique après agrégation.
+    # Les corrections par enregistrement sont déjà persistées sur chaque `source_publication` par la phase `metadata_correction` (colonnes lues par `get_source_publications`) : l'agrégation repart des valeurs corrigées. L'arbitrage choisit `doc_type` et `journal_id` indépendamment : une correction journal-dépendante appliquée à la source qui a résolu le journal ne suit pas le `journal_id` canonique — on la rejoue sur le canonique après agrégation.
     secondary_ids = repo.get_converged_secondary_ids(pub_id)
     _refresh_aggregate(pub, sources, source_priority=SOURCE_PRIORITY, secondary_ids=secondary_ids)
     _apply_canonical_doc_type_correction(pub, repo=repo)
@@ -66,13 +60,6 @@ def refresh_from_sources(
     # redondante : hors périmètre ne se matérialise jamais.
     if pub.doc_type in OUT_OF_SCOPE_DOC_TYPES:
         repo.delete(pub_id)
-        emit_event(
-            audit_repo,
-            "publication.deleted_out_of_scope",
-            "publication",
-            pub_id,
-            {"doc_type": pub.doc_type},
-        )
         return
 
     repo.save(pub)
@@ -172,7 +159,7 @@ def merge_publications(
         raise DistinctDoiError(target_id, source_id, str(target.doi), str(source.doi))
 
     repo.merge_into(target_id, source_id)
-    refresh_from_sources(target_id, repo=repo, audit_repo=audit_repo)
+    refresh_from_sources(target_id, repo=repo)
     emit_event(
         audit_repo,
         "publication.merged",
