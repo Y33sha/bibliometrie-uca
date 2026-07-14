@@ -52,8 +52,7 @@ def run_resolve_publishers(
         name_raw = row.publisher_name_raw
         name_normalized = row.publisher_name_normalized
         if name_normalized is None:
-            # `/prefixes` pas encore tenté pour cette row → fetch + persistance des
-            # métadonnées (et correction de la RA si elle était `unknown`).
+            # `/prefixes` pas encore tenté pour cette row → fetch + persistance des métadonnées (et correction de la RA si elle était `unknown`).
             name_raw, name_normalized = _fetch_and_store_publisher_metadata(
                 row,
                 repo=repo,
@@ -63,8 +62,8 @@ def run_resolve_publishers(
 
         if name_normalized is not None:
             assert name_raw is not None
-            publisher_id, created = _match_or_create_publisher(
-                publisher_repo, name_raw=name_raw, name_normalized=name_normalized
+            publisher_id, created = publisher_repo.match_or_create_by_name_form(
+                name_raw, name_normalized
             )
             repo.update_publisher_id(row.prefix, publisher_id)
             metrics.add(**{"publisher_created" if created else "publisher_matched": 1})
@@ -124,8 +123,7 @@ def _fetch_and_store_publisher_metadata(
         publisher_name_normalized = normalize_text(publisher_name_raw) or None
         client_name_normalized = normalize_text(client_name_raw) or None
 
-    # Persiste même si le nom est vide : la row sera marquée vérifiée par l'appelant,
-    # donc pas de re-fetch — autant garder la RA corrigée et les colonnes à jour.
+    # Persiste même si le nom est vide : la row sera marquée vérifiée par l'appelant, donc pas de re-fetch — autant garder la RA corrigée et les colonnes à jour.
     repo.set_prefix_publisher_metadata(
         prefix=row.prefix,
         ra=ra,
@@ -137,26 +135,3 @@ def _fetch_and_store_publisher_metadata(
         datacite_client_symbol=datacite_client_symbol,
     )
     return publisher_name_raw, publisher_name_normalized
-
-
-def _match_or_create_publisher(
-    publisher_repo: PublisherRepository,
-    *,
-    name_raw: str,
-    name_normalized: str,
-) -> tuple[int, bool]:
-    """Cherche un publisher par forme normalisée ; crée-le si absent.
-
-    Retourne `(publisher_id, created)`. La création insère également la
-    forme normalisée dans `publisher_name_forms`, ce qui permet aux appels
-    suivants dans la même transaction (et au-delà) de retomber dessus via
-    `find_publisher_by_name_form` — dédoublonnage naturel sans cache local.
-    """
-    existing = publisher_repo.find_publisher_by_name_form(name_normalized)
-    if existing is not None:
-        return existing, False
-    new_id = publisher_repo.create_publisher(
-        name=name_raw, name_normalized=name_normalized, openalex_id=None
-    )
-    publisher_repo.add_publisher_name_form(new_id, name_normalized)
-    return new_id, True

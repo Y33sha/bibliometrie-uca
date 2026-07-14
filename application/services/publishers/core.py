@@ -59,20 +59,11 @@ def find_or_create_publisher(
             repo.add_publisher_name_form(pub_id, name_normalized)
             return pub_id
 
-    # 2. Par forme de nom (rattache l'openalex_id si on en a un)
-    pub_id = repo.find_publisher_by_name_form(name_normalized)
-    if pub_id:
-        if openalex_id:
-            repo.set_publisher_openalex_id_if_missing(pub_id, openalex_id)
-        return pub_id
-
-    # 3. Créer
-    pub_id = repo.create_publisher(
-        name=name.strip(),
-        name_normalized=name_normalized,
-        openalex_id=openalex_id,
-    )
-    repo.add_publisher_name_form(pub_id, name_normalized)
+    # 2-3. Match ou création par forme de nom, puis rattachement de l'openalex_id
+    # (sur l'éditeur trouvé comme sur celui créé).
+    pub_id, _ = repo.match_or_create_by_name_form(name.strip(), name_normalized)
+    if openalex_id:
+        repo.set_publisher_openalex_id_if_missing(pub_id, openalex_id)
     return pub_id
 
 

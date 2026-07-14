@@ -111,6 +111,16 @@ class FakePublisherRepo:
     def add_publisher_name_form(self, publisher_id: int, form_normalized: str) -> None:
         self.name_to_id[form_normalized] = publisher_id
 
+    def match_or_create_by_name_form(self, name_raw: str, name_normalized: str) -> tuple[int, bool]:
+        existing = self.find_publisher_by_name_form(name_normalized)
+        if existing is not None:
+            return existing, False
+        new_id = self.create_publisher(
+            name=name_raw, name_normalized=name_normalized, openalex_id=None
+        )
+        self.add_publisher_name_form(new_id, name_normalized)
+        return new_id, True
+
 
 @dataclass
 class StubResolveRa:
