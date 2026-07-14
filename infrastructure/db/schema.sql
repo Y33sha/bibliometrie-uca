@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict yiwXNEhftUiurjVVyDGtCyodDx8HzTt1ZuT5CKWU7m4c03pJYhvchEFF6oDwNew
+\restrict vJOyjMIeqmYYa2HhSBljjJaLaxvZgrgZIbailpopuIfdOWRBrMboqmkzZ1icghX
 
 -- Dumped from database version 18.4
 -- Dumped by pg_dump version 18.4
@@ -960,7 +960,6 @@ CREATE TABLE public.journals (
     publisher_id integer,
     openalex_id text,
     is_in_doaj boolean DEFAULT false,
-    is_predatory boolean DEFAULT false,
     apc_amount numeric(10,2),
     apc_currency text DEFAULT 'EUR'::text,
     oa_model text,
@@ -1330,7 +1329,6 @@ CREATE TABLE public.publishers (
     name_normalized text NOT NULL,
     openalex_id text,
     country text,
-    is_predatory boolean DEFAULT false,
     created_at timestamp with time zone DEFAULT now(),
     publisher_type public.publisher_type DEFAULT 'unknown'::public.publisher_type NOT NULL,
     pub_count integer DEFAULT 0 NOT NULL
@@ -3433,5 +3431,5 @@ ALTER TABLE ONLY public.structure_relations
 -- PostgreSQL database dump complete
 --
 
-\unrestrict yiwXNEhftUiurjVVyDGtCyodDx8HzTt1ZuT5CKWU7m4c03pJYhvchEFF6oDwNew
+\unrestrict vJOyjMIeqmYYa2HhSBljjJaLaxvZgrgZIbailpopuIfdOWRBrMboqmkzZ1icghX
 

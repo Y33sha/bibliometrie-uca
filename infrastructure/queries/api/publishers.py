@@ -29,7 +29,6 @@ def _build_publisher_where(
     search: str | None,
     publisher_types: list[str],
     countries: list[str],
-    is_predatory: bool | None,
     with_pubs: bool,
     skip_publisher_types: bool = False,
     skip_countries: bool = False,
@@ -55,9 +54,6 @@ def _build_publisher_where(
     if countries and not skip_countries:
         parts.append("p.country = ANY(:countries)")
         binds["countries"] = countries
-    if is_predatory is not None:
-        parts.append("p.is_predatory = :is_predatory")
-        binds["is_predatory"] = is_predatory
     if with_pubs:
         parts.append("p.pub_count > 0")
     return (" AND ".join(parts) if parts else "TRUE", binds)
@@ -101,7 +97,6 @@ class PgPublisherQueries(PublisherQueries):
         search: str | None,
         publisher_types: list[str],
         countries: list[str],
-        is_predatory: bool | None,
         with_pubs: bool,
         sort: str,
         page: int,
@@ -111,7 +106,6 @@ class PgPublisherQueries(PublisherQueries):
             search=search,
             publisher_types=publisher_types,
             countries=countries,
-            is_predatory=is_predatory,
             with_pubs=with_pubs,
         )
 
@@ -125,7 +119,7 @@ class PgPublisherQueries(PublisherQueries):
         offset = (page - 1) * per_page
         rows = self._conn.execute(
             text(f"""
-                SELECT p.id, p.name, p.openalex_id, p.country, p.is_predatory,
+                SELECT p.id, p.name, p.openalex_id, p.country,
                        p.publisher_type,
                        (SELECT COUNT(*) FROM journals j
                         WHERE j.publisher_id = p.id) AS journal_count,
@@ -149,7 +143,6 @@ class PgPublisherQueries(PublisherQueries):
                     openalex_id=r.openalex_id,
                     country=r.country,
                     doi_prefixes=[DoiPrefixInfo(**p) for p in r.doi_prefixes],
-                    is_predatory=r.is_predatory,
                     publisher_type=r.publisher_type,
                     journal_count=r.journal_count,
                     pub_count=r.pub_count,
@@ -164,14 +157,12 @@ class PgPublisherQueries(PublisherQueries):
         search: str | None,
         publisher_types: list[str],
         countries: list[str],
-        is_predatory: bool | None,
         with_pubs: bool,
     ) -> PublishersFacetsResponse:
         where_pt, binds_pt = _build_publisher_where(
             search=search,
             publisher_types=publisher_types,
             countries=countries,
-            is_predatory=is_predatory,
             with_pubs=with_pubs,
             skip_publisher_types=True,
         )
@@ -198,7 +189,6 @@ class PgPublisherQueries(PublisherQueries):
             search=search,
             publisher_types=publisher_types,
             countries=countries,
-            is_predatory=is_predatory,
             with_pubs=with_pubs,
             skip_countries=True,
         )
@@ -228,7 +218,7 @@ class PgPublisherQueries(PublisherQueries):
     def get_publisher_detail(self, publisher_id: int) -> PublisherDetailResponse | None:
         row = self._conn.execute(
             text(f"""
-                SELECT p.id, p.name, p.openalex_id, p.country, p.is_predatory,
+                SELECT p.id, p.name, p.openalex_id, p.country,
                        p.publisher_type,
                        (SELECT COUNT(*) FROM journals j
                         WHERE j.publisher_id = p.id) AS journal_count,
@@ -247,7 +237,6 @@ class PgPublisherQueries(PublisherQueries):
             openalex_id=row.openalex_id,
             country=row.country,
             doi_prefixes=[DoiPrefixInfo(**p) for p in row.doi_prefixes],
-            is_predatory=row.is_predatory,
             publisher_type=row.publisher_type,
             journal_count=row.journal_count,
             pub_count=row.pub_count,

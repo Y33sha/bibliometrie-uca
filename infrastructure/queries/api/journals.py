@@ -131,7 +131,7 @@ class PgJournalQueries(JournalQueries):
             text(f"""
                 SELECT j.id, j.title, j.issn, j.eissn, j.issnl,
                        j.publisher_id, p.name AS pub_name,
-                       j.openalex_id, j.is_in_doaj, j.is_predatory,
+                       j.openalex_id, j.is_in_doaj,
                        j.apc_amount, j.apc_currency, j.oa_model,
                        j.journal_type, j.is_academic, j.doi_prefix,
                        j.doaj_payload->>'DOAJ id' AS doaj_id,
@@ -160,7 +160,6 @@ class PgJournalQueries(JournalQueries):
                     pub_name=r.pub_name,
                     openalex_id=r.openalex_id,
                     is_in_doaj=r.is_in_doaj,
-                    is_predatory=r.is_predatory,
                     apc_amount=r.apc_amount,
                     apc_currency=r.apc_currency,
                     oa_model=r.oa_model,
@@ -280,7 +279,7 @@ class PgJournalQueries(JournalQueries):
             text("""
                 SELECT j.id, j.title, j.issn, j.eissn, j.issnl,
                        j.publisher_id, p.name AS pub_name,
-                       j.openalex_id, j.is_in_doaj, j.is_predatory,
+                       j.openalex_id, j.is_in_doaj,
                        j.apc_amount, j.apc_currency, j.oa_model,
                        j.journal_type, j.is_academic, j.doi_prefix,
                        j.doaj_payload, j.doaj_imported_at,
@@ -305,7 +304,6 @@ class PgJournalQueries(JournalQueries):
             pub_name=row.pub_name,
             openalex_id=row.openalex_id,
             is_in_doaj=row.is_in_doaj,
-            is_predatory=row.is_predatory,
             apc_amount=row.apc_amount,
             apc_currency=row.apc_currency,
             oa_model=row.oa_model,

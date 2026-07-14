@@ -247,15 +247,6 @@ class TestListPublishers:
         names = {p["name"] for p in r.json()["publishers"]}
         assert "OrphanDefault" in names
 
-    def test_filter_by_is_predatory(self, client):
-        pid = _seed_publisher()
-        with _pool() as cur:
-            cur.execute("UPDATE publishers SET is_predatory = TRUE WHERE id = %s", (pid,))
-        r = client.get("/api/publishers", params={"is_predatory": "true", "per_page": 200})
-        assert r.status_code == 200
-        flags = {p["is_predatory"] for p in r.json()["publishers"]}
-        assert flags == {True}
-
 
 # ── GET /api/publishers/facets ───────────────────────────────────
 
@@ -420,7 +411,6 @@ class TestUpdatePublisher:
             json={
                 "name": "UpdatedName",
                 "country": "FR",
-                "is_predatory": False,
             },
         )
         assert r.status_code == 200

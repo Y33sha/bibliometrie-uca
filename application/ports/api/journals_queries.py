@@ -30,7 +30,6 @@ class JournalOut(BaseModel):
     pub_name: str | None
     openalex_id: str | None
     is_in_doaj: bool
-    is_predatory: bool
     apc_amount: float | None
     apc_currency: str | None
     oa_model: str | None
@@ -65,7 +64,6 @@ class JournalDetailResponse(BaseModel):
     pub_name: str | None
     openalex_id: str | None
     is_in_doaj: bool
-    is_predatory: bool
     apc_amount: float | None
     apc_currency: str | None
     oa_model: str | None

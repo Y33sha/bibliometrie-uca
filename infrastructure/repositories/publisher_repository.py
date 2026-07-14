@@ -29,7 +29,6 @@ class _PublisherRow(NamedTuple):
     name: str
     country: str | None
     openalex_id: str | None
-    is_predatory: bool
     publisher_type: str
 
 
@@ -40,7 +39,6 @@ def _publisher_from_row(row: _PublisherRow) -> Publisher:
         name=row.name,
         country=row.country,
         openalex_id=row.openalex_id,
-        is_predatory=row.is_predatory,
         publisher_type=cast(PublisherType, row.publisher_type),
     )
 
@@ -60,7 +58,6 @@ class PgPublisherRepository:
                 publishers.c.name,
                 publishers.c.country,
                 publishers.c.openalex_id,
-                publishers.c.is_predatory,
                 publishers.c.publisher_type,
             ).where(publishers.c.id == publisher_id)
         ).first()
@@ -150,7 +147,7 @@ class PgPublisherRepository:
         3. Transfert/dédup des publisher_name_forms
         3b. Transfert/dédup des journal_name_forms référençant le publisher
         4. Transfert des apc_payments
-        5. Enrichissement des champs (openalex_id, country, is_predatory)
+        5. Enrichissement des champs (openalex_id, country)
         6. Suppression de l'éditeur source
         """
         self._conn.execute(
@@ -202,7 +199,6 @@ class PgPublisherRepository:
             select(
                 publishers.c.openalex_id,
                 publishers.c.country,
-                publishers.c.is_predatory,
             ).where(publishers.c.id == source_id)
         ).one()
         self._conn.execute(
@@ -214,7 +210,6 @@ class PgPublisherRepository:
             .values(
                 openalex_id=func.coalesce(publishers.c.openalex_id, src.openalex_id),
                 country=func.coalesce(publishers.c.country, src.country),
-                is_predatory=publishers.c.is_predatory | src.is_predatory,
             )
         )
 
