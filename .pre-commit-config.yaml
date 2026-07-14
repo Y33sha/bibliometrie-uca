@@ -80,7 +80,7 @@ repos:
       # Scan de vulnérabilités des dépendances installées.
       - id: ci-pip-audit
         name: pip-audit (vulnérabilités)
-        entry: uv run pip-audit --ignore-vuln CVE-2026-3219
+        entry: uv run pip-audit
         language: system
         pass_filenames: false
         always_run: true
