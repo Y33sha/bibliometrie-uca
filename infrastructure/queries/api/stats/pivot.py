@@ -1,13 +1,13 @@
 """Moteur d'agrégation générique (pivot).
 
-Liaison SQL du registre `domain.stats.pivot` + constructeur de requête sur **liste blanche** :
+Liaison SQL du registre `domain.stats` + constructeur de requête sur **liste blanche** :
 la composition `SELECT <dimensions>, <mesure> … GROUP BY <dimensions>` n'utilise que des
 expressions connues, indexées par les clés validées du registre. Aucun SQL libre, aucune
 injection : le vocabulaire est borné côté domaine, l'infrastructure n'y associe que des
 fragments SQL.
 
 Le grain est tenu par les mesures : toutes comptent les publications de façon distincte
-(`COUNT(DISTINCT p.id)`), donc une dimension qui démultiplie (`source`) ne surcompte pas.
+(`COUNT(DISTINCT p.id)`), si bien qu'une dimension qui démultiplie (`lab`) ne les surcompte pas.
 """
 
 from typing import Any
@@ -15,7 +15,7 @@ from typing import Any
 from sqlalchemy import Connection, text
 
 from domain.publications.doc_type_families import doc_type_grouped_sql
-from domain.stats.pivot import DIMENSIONS, MEASURES, Dimension, validate_pivot
+from domain.stats import DIMENSIONS, MEASURES, Dimension, validate_pivot
 from infrastructure.queries.api.stats._shared import STATS_BASE, stats_filter_clauses
 from infrastructure.queries.filters import OA_OPEN_SQL, assemble_where
 

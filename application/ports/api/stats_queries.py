@@ -1,8 +1,6 @@
 """Port : lectures stats (consommé par le router stats).
 
-Implémenté par `infrastructure.queries.api.stats.PgStatsQueries`.
-
-Co-localise les DTOs Pydantic retournés par ce port. Cf. chantier `CODE_typage-projections-strict` Phase 4.
+Implémenté par `infrastructure.queries.api.stats.PgStatsQueries`. Co-localise les DTOs Pydantic retournés par ce port.
 """
 
 from typing import Literal, Protocol
