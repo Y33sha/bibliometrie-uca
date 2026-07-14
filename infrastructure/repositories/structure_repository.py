@@ -27,6 +27,17 @@ from infrastructure.db.tables import (
 )
 from infrastructure.jsonb_models.structure import StructureApiIds
 
+# Colonnes de `structure_name_forms` renvoyées par create / update / get (RETURNING ou SELECT).
+_NAME_FORM_COLUMNS = (
+    structure_name_forms.c.id,
+    structure_name_forms.c.structure_id,
+    structure_name_forms.c.form_text,
+    structure_name_forms.c.created_at,
+    structure_name_forms.c.is_word_boundary,
+    structure_name_forms.c.requires_context_of,
+    structure_name_forms.c.is_excluding,
+)
+
 
 class _StructureNameFormRow(NamedTuple):
     """Projection SQL sur `structure_name_forms` (find_by_id de l'aggregate Structure)."""
@@ -273,11 +284,12 @@ class PgStructureRepository:
 
     # ── structure_name_forms ───────────────────────────────────────
 
-    def name_form_exists(self, form_id: int) -> bool:
+    def get_name_form(self, form_id: int) -> StructureNameFormRow | None:
         result = self._conn.execute(
-            select(structure_name_forms.c.id).where(structure_name_forms.c.id == form_id)
+            select(*_NAME_FORM_COLUMNS).where(structure_name_forms.c.id == form_id)
         )
-        return result.first() is not None
+        row = result.first()
+        return cast(StructureNameFormRow, dict(row._mapping)) if row else None
 
     def create_name_form(
         self,
@@ -297,15 +309,7 @@ class PgStructureRepository:
                 is_excluding=is_excluding,
                 requires_context_of=requires_context_of or None,
             )
-            .returning(
-                structure_name_forms.c.id,
-                structure_name_forms.c.structure_id,
-                structure_name_forms.c.form_text,
-                structure_name_forms.c.created_at,
-                structure_name_forms.c.is_word_boundary,
-                structure_name_forms.c.requires_context_of,
-                structure_name_forms.c.is_excluding,
-            )
+            .returning(*_NAME_FORM_COLUMNS)
         )
         result = self._conn.execute(stmt)
         return cast(StructureNameFormRow, dict(result.one()._mapping))
@@ -317,15 +321,7 @@ class PgStructureRepository:
             update(structure_name_forms)
             .where(structure_name_forms.c.id == form_id)
             .values(**fields)
-            .returning(
-                structure_name_forms.c.id,
-                structure_name_forms.c.structure_id,
-                structure_name_forms.c.form_text,
-                structure_name_forms.c.created_at,
-                structure_name_forms.c.is_word_boundary,
-                structure_name_forms.c.requires_context_of,
-                structure_name_forms.c.is_excluding,
-            )
+            .returning(*_NAME_FORM_COLUMNS)
         )
         result = self._conn.execute(stmt)
         return cast(StructureNameFormRow, dict(result.one()._mapping))

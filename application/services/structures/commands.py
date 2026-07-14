@@ -56,9 +56,12 @@ def update_structure(
     *,
     fields: dict[str, JsonValue],
     repo: StructureRepository,
+    audit_repo: AuditRepository,
 ) -> StructureRow:
     """Met à jour une structure (champs sélectifs). Retourne la ligne modifiée."""
-    row = structures_service.update_structure(structure_id, fields=fields, repo=repo)
+    row = structures_service.update_structure(
+        structure_id, fields=fields, repo=repo, audit_repo=audit_repo
+    )
     conn.commit()
     return row
 
@@ -91,6 +94,7 @@ def create_relation(
     relation_type: str,
     repo: StructureRepository,
     perimeter_repo: PerimeterRepository,
+    audit_repo: AuditRepository,
 ) -> StructureRelationRow | None:
     """Crée une relation parent-enfant. Retourne la ligne insérée, ou None si
     elle existait déjà. Rafraîchit la clôture matérialisée des périmètres : une
@@ -100,6 +104,7 @@ def create_relation(
         child_id=child_id,
         relation_type=relation_type,
         repo=repo,
+        audit_repo=audit_repo,
     )
     perimeter_repo.refresh_structures()
     conn.commit()
@@ -133,6 +138,7 @@ def create_name_form(
     is_excluding: bool,
     requires_context_of: list[int] | None,
     repo: StructureRepository,
+    audit_repo: AuditRepository,
 ) -> StructureNameFormRow:
     """Crée une forme de nom. Retourne la ligne insérée."""
     row = structures_service.create_name_form(
@@ -142,6 +148,7 @@ def create_name_form(
         is_excluding=is_excluding,
         requires_context_of=requires_context_of,
         repo=repo,
+        audit_repo=audit_repo,
     )
     conn.commit()
     return row
@@ -153,9 +160,12 @@ def update_name_form(
     *,
     fields: dict[str, JsonValue],
     repo: StructureRepository,
+    audit_repo: AuditRepository,
 ) -> StructureNameFormRow:
     """Met à jour une forme de nom (champs sélectifs). Retourne la ligne modifiée."""
-    row = structures_service.update_name_form(form_id, fields=fields, repo=repo)
+    row = structures_service.update_name_form(
+        form_id, fields=fields, repo=repo, audit_repo=audit_repo
+    )
     conn.commit()
     return row
 
