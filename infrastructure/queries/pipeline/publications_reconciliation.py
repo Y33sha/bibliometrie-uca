@@ -9,6 +9,7 @@ from application.ports.pipeline.publications_reconciliation import (
     PublicationsReconciliationQueries,
     ReconcileRow,
 )
+from domain.source_publications.keys import METADATA_BLOCK_MIN_TITLE_LENGTH
 
 
 def fetch_dirty_source_publication_ids(conn: Connection) -> list[int]:
@@ -71,7 +72,6 @@ _UNIVERSE_SQL = text(f"""
     WHERE jsonb_typeof(d.external_ids -> 'hal_id') = 'array'
     UNION
     -- Token metadata_block : même doc_type + titre + année, pour tout doc_type, titre assez long.
-    -- length(...) > 30 duplique _METADATA_BLOCK_MIN_TITLE_LENGTH (keys.py) — garder synchrone.
     SELECT {_COLS.format(a="o")}
     FROM dirty d
     JOIN source_publications o
@@ -80,7 +80,7 @@ _UNIVERSE_SQL = text(f"""
          AND o.pub_year = d.pub_year
     LEFT JOIN publications p ON p.id = o.publication_id
     WHERE d.doc_type IS NOT NULL
-      AND length(d.title_normalized) > 30
+      AND length(d.title_normalized) > {METADATA_BLOCK_MIN_TITLE_LENGTH}
       AND d.pub_year IS NOT NULL
 """)
 
