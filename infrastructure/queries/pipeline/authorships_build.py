@@ -1,8 +1,6 @@
 """Query service : SQL de construction de la table `authorships`.
 
-Appelé par `application/pipeline/build/build_authorships.py`. Regroupe les
-étapes SQL pures (INSERT, UPDATE FROM CTE) qui promeuvent les
-`source_authorships` en `authorships` consolidées.
+Appelé par `application/pipeline/authorships/build_authorships.py`. Regroupe les étapes SQL pures (INSERT, UPDATE FROM CTE) qui promeuvent les `source_authorships` en `authorships` consolidées.
 """
 
 from sqlalchemy import Connection, text

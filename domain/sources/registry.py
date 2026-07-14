@@ -24,7 +24,7 @@ AUTHOR_SOURCES = ALL_SOURCES
 # question est « quelle source gagne ? ». Couvre :
 #
 # - l'agrégation multi-sources des métadonnées publication
-#   (`refresh_from_sources` dans `application/publications.py`)
+#   (`refresh_from_sources` dans `application/services/publications/core.py`)
 # - la résolution de `author_position` quand plusieurs sources
 #   attestent une même authorship
 # - l'ordre d'exécution des normalizers dans le pipeline
