@@ -154,7 +154,9 @@ class TestRunOrchestrator:
         # Changement de contenu : nouveau topic + bump de publications.updated_at (ce
         # que fait refresh_from_sources en réel quand une source change).
         sa_sync_conn.execute(
-            text("UPDATE source_publications SET topics = CAST(:t AS jsonb) WHERE source_id = 'h1'"),
+            text(
+                "UPDATE source_publications SET topics = CAST(:t AS jsonb) WHERE source_id = 'h1'"
+            ),
             {"t": json.dumps({"hal_domains": ["phys"]})},
         )
         sa_sync_conn.execute(

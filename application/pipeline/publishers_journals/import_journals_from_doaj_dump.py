@@ -1,12 +1,8 @@
 """Import du dump CSV DOAJ dans `journals.doaj_payload` (DOAJ = source de vérité).
 
-Bulk, set-based : indexe les `journals` par ISSN (issn / eissn / issnl) en O(1),
-remet `is_in_doaj = FALSE` partout, puis pour chaque row du dump matchée par ISSN
-écrit `doaj_payload` (dict CSV strippé) + `doaj_imported_at` + `is_in_doaj = TRUE`.
+Bulk, set-based : indexe les `journals` par ISSN (issn / eissn / issnl) en O(1), remet `is_in_doaj = FALSE` partout, puis pour chaque row du dump matchée par ISSN écrit `doaj_payload` (dict CSV strippé) + `doaj_imported_at` + `is_in_doaj = TRUE`.
 
-Découplé de la source des rows : la CLI `import_doaj_csv` lit un fichier local,
-le pipeline télécharge le dump (cf. `infrastructure.sources.doaj.fetch_doaj_dump`)
-— les deux passent un itérable de dicts `{colonne CSV: valeur}`.
+Découplé de la source des rows : la CLI `import_doaj_csv` lit un fichier local, le pipeline télécharge le dump (cf. `infrastructure.sources.doaj.fetch_doaj_dump`) — les deux passent un itérable de dicts `{colonne CSV: valeur}`.
 """
 
 import logging

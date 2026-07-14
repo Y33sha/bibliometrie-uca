@@ -215,7 +215,9 @@ class _Cascade:
         last = a.last_name or a.full_name or "?"
         first = a.first_name or ""
         marker = create_person(last, first, repo=self._person_repo)
-        link_authorship(marker, a.source, a.authorship_id, repo=self._person_repo, resolution_mode="name")
+        link_authorship(
+            marker, a.source, a.authorship_id, repo=self._person_repo, resolution_mode="name"
+        )
         add_identifiers(marker, [a._asdict()], repo=self._person_repo)
         add_name_form(marker, a.full_name, repo=self._person_repo)
         # Rendre la personne créée matchable dans la même passe par toutes ses formes — ordres ET initiales — via le générateur qui sert au peuplement de `person_name_forms`.
@@ -272,7 +274,9 @@ def run_cascade(
         else:
             unresolved.append(a)  # création différée ou aucun signal : reprise en passe create
 
-    logger.info("▶ create : création des personnes inconnues (%d signatures restantes)", len(unresolved))
+    logger.info(
+        "▶ create : création des personnes inconnues (%d signatures restantes)", len(unresolved)
+    )
     for i, a in enumerate(unresolved):
         if i and i % 5000 == 0:
             logger.info("  %d/%d signatures (create)", i, len(unresolved))
