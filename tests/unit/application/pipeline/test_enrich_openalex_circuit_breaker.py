@@ -14,7 +14,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from application.pipeline.publishers_journals import enrich_journals_from_openalex as journals_mod
-from application.services.publishers.enrichment import from_openalex as publishers_mod
+from application.services.publishers import enrich_country as publishers_mod
 
 
 @pytest.fixture(autouse=True)

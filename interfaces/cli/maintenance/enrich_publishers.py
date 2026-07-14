@@ -11,7 +11,7 @@ from __future__ import annotations
 import argparse
 import os
 
-from application.services.publishers.enrichment import run_enrich_publishers_from_openalex
+from application.services.publishers.enrich_country import run_enrich_publishers_from_openalex
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from infrastructure.queries.publishers_enrichment import PgPublisherEnrichmentQueries

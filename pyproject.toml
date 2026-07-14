@@ -196,7 +196,6 @@ combine-as-imports = true
     "C901",
 ] # normalisation par source, nombreuses branches métier
 "infrastructure/sources/*" = ["C901"] # idem pour les extracteurs
-"application/services/publishers/enrichment/*" = ["C901"] # orchestrateurs d'API (retry, circuit-breaker, gating)
 "interfaces/api/routers/*" = ["E402"] # imports tardifs fréquents
 
 # ----------------------------------------------------------------------
@@ -321,9 +320,6 @@ exclude = [
 #   cache (dict mutable avec sets, difficile à typer).
 # - `infrastructure.repositories.*` et `infrastructure.queries.*` :
 #   couche SQL — Row, records DB, batchs hétérogènes.
-# - `application.services.publishers.enrichment.*` : orchestrateurs d'enrichissement
-#   consommant des payloads d'API externes (`dict[str, Any]`, fetchers typés
-#   `Callable[..., dict[str, Any]]`) — comme `infrastructure.sources.*`.
 # - `interfaces.cli.{imports,maintenance,oneshot}.*` : scripts touchant des
 #   records DB / payloads JSONB — `Any` délibéré, comme les couches SQL. Ils
 #   restent annotés et leurs corps vérifiés (≠ exclusion : cf. `exclude` plus haut).
@@ -343,7 +339,6 @@ module = [
     "application.pipeline.oa_status.*",
     "application.pipeline.publishers_journals.*",
     "application.pipeline.subjects._common",
-    "application.services.publishers.enrichment.*",
     "application.ports.api.*",
     "application.ports.pipeline.cross_imports.*",
     "application.ports.pipeline.extract.*",
