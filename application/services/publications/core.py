@@ -63,7 +63,7 @@ def refresh_from_sources(
 def _apply_canonical_doc_type_correction(pub: Publication, *, repo: PublicationRepository) -> None:
     """Rejoue les corrections de `doc_type` sur la publication canonique après l'arbitrage.
 
-    L'arbitrage choisit `doc_type` (première source par priorité) et `journal_id` (premier non-nul) **indépendamment**, possiblement depuis deux `source_publications` différentes. Une correction journal-dépendante (`JOURNAL_TYPE_MEDIA_TO_MEDIA`, …) appliquée par `source_publication` en phase `metadata_correction` ne se déclenche que sur celle qui a résolu le journal ; elle ne suit pas le `journal_id` canonique. On reconstruit une vue de la publication canonique (son `doc_type` arbitré + le `journal_type` de son `journal_id` arbitré) et on rejoue `effective_metadata` complète : les règles journal-dépendantes s'appliquent alors au journal réellement résolu. Les règles URL n'ont pas d'effet ici (le canonique n'agrège pas les URLs) : elles restent propres aux `source_publications`.
+    L'arbitrage choisit `doc_type` (première source par priorité) et `journal_id` (premier non-nul) **indépendamment**, possiblement depuis deux `source_publications` différentes. Une correction journal-dépendante (`JOURNAL_TYPE_MEDIA_TO_MEDIA`, …) appliquée par `source_publication` en phase `metadata_correction` ne se déclenche que sur celle qui a résolu le journal ; elle ne suit pas le `journal_id` canonique. On reconstruit une vue de la publication canonique (son `doc_type` arbitré + le `journal_type` de son `journal_id` arbitré) et on rejoue `effective_metadata` complète : les règles journal-dépendantes s'appliquent alors au journal réellement résolu.
 
     Mute `pub.doc_type` et trace la règle dans `pub.meta['corrections']['doc_type']` si une correction s'applique. `meta` est recalculé à chaque refresh (fusion des `meta` sources) : la trace est éphémère, re-posée à chaque run, sans brut à préserver côté canonique. Une seule lecture I/O (`journal_type`). Idempotent : sur une publication déjà cohérente, aucun changement.
     """
@@ -87,8 +87,6 @@ def _apply_canonical_doc_type_correction(pub: Publication, *, repo: PublicationR
         apc_amount=None,
         raw_metadata={},
         embargo_expired=False,
-        # Rejeu canonique limité aux règles journal-dépendantes ; le retypage preprint se fait au
-        # niveau SP (puis gagne par arbitrage Crossref), pas ici.
         declares_preprint=False,
     )
     corrected = effective_metadata(view)

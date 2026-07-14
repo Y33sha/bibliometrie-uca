@@ -27,27 +27,27 @@ Deux défauts du dispositif actuel, relevés au passage :
 
 ## Phasage
 
-### Phase A — Extraction et règle de découpe
+### Phase 1 — Extraction et règle de découpe
 
 - [ ] `domain/sources/hal.py` : fonction pure `hal_domain_labels(facet_entry)` → liste des libellés de niveaux (découpe `_FacetSep_` puis `/` bornée par la profondeur du code, retrait des annotations `[…]`, exclusion « Autre »/« Autres »). Constante `_GENERIC_DOMAIN_LABELS`.
 - [ ] `infrastructure/sources/hal/fields.py` : remplacer `domain_s` par `fr_domainAllCodeLabel_fs` dans `HAL_FIELDS`.
 - [ ] `application/pipeline/normalize/normalize_hal.py` : lire `fr_domainAllCodeLabel_fs`, le stocker tel quel dans `topics.hal_domains`.
 - [ ] `application/pipeline/subjects/extractors.py` : `hal_labels` déduplique les entrées puis délègue à `hal_domain_labels` ; retrait de `_strip_level_prefix` (obsolète) et de l'import `hal_domain_label`.
 
-### Phase B — Suppressions
+### Phase 2 — Suppressions
 
 - [ ] Supprimer `domain/sources/hal_domains.py`.
 - [ ] Supprimer `interfaces/cli/dev/refresh_hal_domain_labels.py`.
 - [ ] Supprimer `tests/unit/domain/test_hal_domains.py` ; couvrir `hal_domain_labels` par un test dédié (multi-niveaux, `/` interne à un libellé, exclusion « Autre », entrée mal formée).
 
-### Phase C — Tests et documentation
+### Phase 3 — Tests et documentation
 
 - [ ] `tests/integration/pipeline/test_subjects_ingest.py` : fixtures `hal_domains` au format `fr_domainAllCodeLabel_fs` ; ajouter un cas multi-niveaux et un cas « Autre » exclu.
 - [ ] `tests/unit/application/pipeline/normalize/test_normalize_hal.py` : entrée `fr_domainAllCodeLabel_fs`, assertion `topics` mise à jour.
 - [ ] `tests/integration/pipeline/test_dedup_publications.py` : fixtures `hal_domains` au format libellé.
 - [ ] `docs/sources/02-hal.md` : recaler le champ domaines ; balayer `docs/pipeline` et `docs/donnees` pour les mentions de la table.
 
-### Phase D — Reprise du stock (production)
+### Phase 4 — Reprise du stock (production)
 
 - [ ] Re-fetch HAL (le champ `fr_domainAllCodeLabel_fs` n'est pas dans les `raw_data` existantes) → re-normalize → re-run `subjects`.
 

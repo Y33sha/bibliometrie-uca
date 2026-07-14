@@ -48,7 +48,6 @@ HARD = [
     r"plutôt que",
     r"contrairement",
     r"remplace(?:nt|ment)?\b",
-    r"nouveau|nouvelle|nouveaux|nouvelles",
     r"ancien(?:ne|s|nes)?\b",
     r"legacy",
     r"deprecated|obsolète",

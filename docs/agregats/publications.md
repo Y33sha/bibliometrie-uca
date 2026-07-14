@@ -9,7 +9,7 @@ Une `publication` est la référence canonique unifiée d'un document (`domain/p
 | Table | Rôle | Colonnes clés |
 |---|---|---|
 | `publications` | La référence canonique | `id` (surrogate), `doi` (identité naturelle, unique sur `lower(doi)`), `doc_type`, `oa_status`, `pub_year`, `journal_id`, `sources[]` (sources contributrices), `in_perimeter` (matérialisé), `unpaywall_checked_at`, `meta` |
-| `authorships` | Table de vérité personne ↔ publication | `publication_id` (FK NOT NULL), `person_id`, `author_position`, `roles`, `is_corresponding`, `in_perimeter`, unique `(publication_id, person_id)` |
+| `authorships` | Table de liaison personne ↔ publication | `publication_id` (FK NOT NULL), `person_id`, `author_position`, `roles`, `is_corresponding`, `in_perimeter`, unique `(publication_id, person_id)` |
 | `publication_relations` | Arête dirigée entre publications distinctes | `from_publication_id`, `relation_type` (enum), `target_publication_id` **ou** `target_doi` (CHECK : au moins un), `source` |
 | `distinct_publications` | Paires marquées « pas la même œuvre » | `(pub_id_a, pub_id_b)` ordonné (`a < b`) |
 | `apc_payments` | Frais de publication (APC), import curé | `publication_id` (FK `ON DELETE SET NULL`), `doi`, `amount_eur_ht`, `billing_year`… |

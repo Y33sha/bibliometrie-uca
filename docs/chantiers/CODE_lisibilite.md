@@ -66,8 +66,8 @@ Réorganisation du sommet :
 #### 1.2 - `application/services`
 
 - [ ] `persons/core.py` : `import_authenticated_orcids` est une opération d'ingestion (lecture d'ORCID authentifiés depuis une source externe pour les injecter) logée dans le référentiel d'écriture de l'agrégat, où elle détonne. À requalifier.
-- [ ] `publishers/enrichment/` : les orchestrateurs parsent du JSON d'API brut (OpenAlex, Crossref, ROR) directement dans la couche application — d'où les exceptions `ruff C901` (une fonction à complexité 18) et l'override mypy `Any` (deux alias `dict[str, Any]` de fetchers, deux `dict` nus). Extraire le parsing vers des fonctions pures typées (patron `domain/sources/*_extract.py` déjà en place ailleurs) ; l'orchestrateur ne manipule plus que du typé, la complexité retombe sous le seuil et l'`Any` quitte la couche, ce qui dissout les deux exceptions.
-- [ ] `publishers/enrichment/` : forme du sous-package — garder les trois modules par source, ou consolider (les autres services sont plats).
+- [x] `publishers/enrichment/` : sous-package (réduit à un seul module) aplati en module plat `enrich_country.py` ; payload OpenAlex typée + boucle par batch extraite dans `_enrich_batch` → exceptions `ruff C901` et override mypy `disallow-any` retirées (`0a8f95f8`).
+- [ ] `commands.py` : l'alias d'import du module `core` diffère d'un service à l'autre (`structures_service`, `journals`, `publications_service`, `publishers`). Harmoniser sur une convention unique.
 - [x] `publications/core.py` (`merge_publications`) : chemin de fusion et règle `absorb` — traité par la fiche dédiée `archived/2026-07-12_CODE_merge-publications.md`.
 
 #### 1.3 - `application/ports`
@@ -106,6 +106,7 @@ Racine (transverse) : passe docstrings/commentaires faite. Findings structurels 
 #### 3.3 - CLI
 
 - [ ] CLI `maintenance/` : coquille-ification. `enrich_publishers` séquence ses trois étapes dans son `main()` au lieu de déléguer en un appel à un orchestrateur applicatif, contrairement à ses voisins.
+- [ ] `maintenance/merge_publications.py` porte `# STATUS: oneshot` alors qu'il vit dans `maintenance/` et se décrit comme réutilisable (nettoyage en lot) — marqueur à revoir.
 - [ ] Passe des CLI `maintenance/` et `oneshot/`.
 
 ### Phase 4 - `domain/`
