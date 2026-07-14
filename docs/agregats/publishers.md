@@ -29,9 +29,9 @@ flowchart LR
 
 ## Écriture — pipeline
 
-**Rattachement (`normalize`)** : chaque normaliseur appelle `find_or_create_publisher` (`application/services/publishers/core.py`) — cascade `openalex_id` → forme de nom → création + `add_publisher_name_form` — puis passe le `publisher_id` à `find_or_create_journal`. Seul OpenAlex fournit un `openalex_id` (via `host_organization`).
+**Rattachement (`normalize`)** : chaque normaliseur appelle `find_or_create_publisher` (`application/services/publishers/core.py`) — cascade `openalex_id`, sinon la primitive repo `match_or_create_by_name_form` (forme de nom → éditeur existant ou créé) — puis passe le `publisher_id` à `find_or_create_journal`. Seul OpenAlex fournit un `openalex_id` (via `host_organization`).
 
-**Résolution par préfixe DOI (`publishers_journals` → `resolve_publishers`)** : pour chaque `doi_prefixes` non résolu, route par Registration Agency, interroge le préfixe Crossref/DataCite, persiste les métadonnées, matche ou crée l'éditeur, et pose `doi_prefixes.publisher_id`. Une seule tentative (`publisher_checked_at`).
+**Résolution par préfixe DOI (`publishers_journals` → `resolve_publishers`)** : pour chaque `doi_prefixes` non résolu, route par Registration Agency, interroge le préfixe Crossref/DataCite, persiste les métadonnées, matche ou crée l'éditeur via `match_or_create_by_name_form` (la même primitive repo que l'axe `normalize`), et pose `doi_prefixes.publisher_id`. Une seule tentative (`publisher_checked_at`).
 
 **Enrichissement — hors pipeline (maintenance)** : le CLI `interfaces/cli/maintenance/enrich_publishers.py` renseigne le `country` des éditeurs depuis OpenAlex Publishers. Politique « NULL only » : une valeur saisie à la main est préservée.
 
@@ -54,9 +54,8 @@ Port `application/ports/api/publishers_queries.py`, adaptateur `PgPublisherQueri
 
 Dette assumée et décisions d'architecture propres à cet agrégat, gardées explicites.
 
-1. **Match-or-create dupliqué.** `find_or_create_publisher` (service, appelé par `normalize`) et `_match_or_create_publisher` (`resolve_publishers`, pipeline) réimplémentent la même séquence forme-de-nom → création → enregistrement ; le pipeline ne passe pas par le service. (À vérifier avant traitement — les deux contextes diffèrent peut-être.)
-2. **Écritures cross-agrégat de la fusion (décision d'archi assumée).** `merge_publisher_into` repointe `journals` / `journal_name_forms` / `apc_payments` en `text()`, comme `merge_journal_into` : une fusion est intrinsèquement cross-agrégat.
-3. **Unicité globale de `publisher_name_forms.form_normalized`.** Une forme de nom n'appartient qu'à un seul éditeur ; à la fusion, les formes de la source en collision avec la cible sont supprimées — perte silencieuse des alias en doublon.
+1. **Écritures cross-agrégat de la fusion (décision d'archi assumée).** `merge_publisher_into` repointe `journals` / `journal_name_forms` / `apc_payments` en `text()`, comme `merge_journal_into` : une fusion est intrinsèquement cross-agrégat.
+2. **Unicité globale de `publisher_name_forms.form_normalized`.** Une forme de nom n'appartient qu'à un seul éditeur ; à la fusion, les formes de la source en collision avec la cible sont supprimées — perte silencieuse des alias en doublon.
 
 ## Invariants métier
 

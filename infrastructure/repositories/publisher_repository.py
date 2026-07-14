@@ -122,6 +122,17 @@ class PgPublisherRepository:
         )
         return self._conn.execute(stmt).scalar_one()
 
+    def match_or_create_by_name_form(self, name_raw: str, name_normalized: str) -> tuple[int, bool]:
+        """Retourne `(id, created)` pour la forme de nom normalisée : l'éditeur existant si la forme est connue, sinon un éditeur créé et sa forme enregistrée. La forme insérée permet aux appels suivants de retomber dessus (dédoublonnage naturel)."""
+        existing = self.find_publisher_by_name_form(name_normalized)
+        if existing is not None:
+            return existing, False
+        new_id = self.create_publisher(
+            name=name_raw, name_normalized=name_normalized, openalex_id=None
+        )
+        self.add_publisher_name_form(new_id, name_normalized)
+        return new_id, True
+
     def publisher_exists(self, publisher_id: int) -> bool:
         """Vérifie l'existence d'un publisher."""
         return (
