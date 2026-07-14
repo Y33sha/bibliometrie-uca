@@ -1,14 +1,11 @@
 """Value objects et helpers de normalisation des identifiants structure.
 
-RorId (Research Organization Registry), HalCollection (code collection HAL).
-Deux VOs immuables et auto-validés au même contrat que `domain/persons/identifiers.py`
-et `domain/publications/identifiers.py` :
+`RorId` (Research Organization Registry), `HalCollection` (code collection HAL) : deux VOs immuables et auto-validés, au même contrat que `domain/persons/identifiers.py` et `domain/publications/identifiers.py` :
 
 - `X("...")` strict : lève `ValidationError` si malformé
 - `X.try_parse(...)` tolérant : renvoie None si malformé
 
-Les helpers `normalize_*` sont exposés indépendamment pour les call
-sites qui veulent juste normaliser sans construire un VO.
+Les helpers `normalize_*` sont exposés indépendamment pour les call sites qui veulent juste normaliser sans construire un VO.
 """
 
 import re
@@ -34,8 +31,7 @@ _ROR_CANONICAL = re.compile(r"^0[0-9a-hjkmnp-z]{8}$")
 def normalize_ror_id(raw: str | None) -> str | None:
     """Normalise un RorId : strip URL préfixe, lowercase, validation alphabet ROR.
 
-    Accepte une URL `https://ror.org/<id>` ou l'id 9-char nu. Renvoie
-    None si la forme finale n'est pas valide.
+    Accepte une URL `https://ror.org/<id>` ou l'id 9-char nu. Renvoie None si la forme finale n'est pas valide.
     """
     if not raw:
         return None
@@ -54,9 +50,7 @@ def normalize_ror_id(raw: str | None) -> str | None:
 class RorId:
     """Identifiant Research Organization Registry, forme canonique 9-char.
 
-    Format ROR : `0` + 8 caractères de l'alphabet ROR (chiffres + lettres
-    sans i/l/o/u). Stocké et comparé en forme courte ; l'URL complète
-    `https://ror.org/<id>` est une décoration d'affichage uniquement.
+    Format ROR : `0` + 8 caractères de l'alphabet ROR (chiffres + lettres sans i/l/o/u). Stocké et comparé en forme courte ; l'URL complète `https://ror.org/<id>` est une décoration d'affichage uniquement.
     """
 
     value: str
@@ -93,8 +87,7 @@ _HAL_COLLECTION_CANONICAL = re.compile(r"^[A-Z0-9][A-Z0-9_-]*$")
 
 
 def normalize_hal_collection(raw: str | None) -> str | None:
-    """Normalise un code de collection HAL : trim + uppercase, valide
-    qu'il ne contient que [A-Z0-9_-] et commence par une lettre/chiffre."""
+    """Normalise un code de collection HAL : trim + uppercase, valide qu'il ne contient que [A-Z0-9_-] et commence par une lettre/chiffre."""
     if not raw:
         return None
     s = raw.strip().upper()
@@ -107,8 +100,7 @@ def normalize_hal_collection(raw: str | None) -> str | None:
 class HalCollection:
     """Code de collection HAL (ex. `LIMOS`, `INSTITUT_PASCAL`).
 
-    Normalisé en majuscules. Le format admis est `[A-Z0-9][A-Z0-9_-]*`
-    — observation empirique sur le corpus, pas de spec HAL formelle.
+    Normalisé en majuscules. Le format admis est `[A-Z0-9][A-Z0-9_-]*` — observation empirique sur le corpus, pas de spec HAL formelle.
     """
 
     value: str
