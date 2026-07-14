@@ -1,6 +1,6 @@
-"""Orchestrateur d'enrichissement éditeurs (maintenance, hors pipeline) à partir de l'API OpenAlex Publishers.
+"""Enrichissement (cosmétique) du `country` des éditeurs depuis l'API OpenAlex Publishers.
 
-Met à jour `country` quand la valeur en base est NULL, depuis `country_codes[0]` : un éditeur peut opérer dans plusieurs pays côté OpenAlex, on prend le premier, qui correspond généralement au siège social.
+Maintenance hors pipeline, lancé à la demande par `interfaces/cli/maintenance/enrich_publishers.py`. Met à jour `country` quand la valeur en base est NULL, depuis `country_codes[0]` : un éditeur peut opérer dans plusieurs pays côté OpenAlex, on prend le premier, qui correspond généralement au siège social. Politique « NULL only » : une valeur saisie à la main est préservée ; idempotent.
 
 L'API Publishers filtre par `ids.openalex:P1|P2|...`.
 """
@@ -8,6 +8,7 @@ L'API Publishers filtre par `ids.openalex:P1|P2|...`.
 import logging
 import time
 from collections import Counter
+from typing import NamedTuple, NotRequired, TypedDict, cast
 
 import requests
 from sqlalchemy import Connection
@@ -24,8 +25,24 @@ BATCH_SIZE = 50
 RATE_LIMIT_STRIKES_MAX = 3
 
 
+class _OpenAlexPublisher(TypedDict):
+    """Sous-ensemble de la payload OpenAlex Publishers consommé ici."""
+
+    id: str
+    country_codes: NotRequired[list[str]]
+
+
 class _OpenAlexRateLimited(Exception):
     """429 répétés sur un batch (3 tentatives épuisées) : budget API probablement épuisé."""
+
+
+class _BatchOutcome(NamedTuple):
+    """Compteurs agrégés du traitement d'un batch d'éditeurs."""
+
+    updated: int
+    with_country: int
+    no_response: int
+    countries: Counter[str]
 
 
 def fetch_publishers_batch(
@@ -35,9 +52,8 @@ def fetch_publishers_batch(
     openalex_publishers_api: str,
     api_key: str | None,
     mailto: str,
-) -> dict[str, dict]:
-    """Interroge l'API OpenAlex Publishers pour un lot d'IDs et retourne
-    un dict short_id → données. Select restreint aux champs consommés."""
+) -> dict[str, _OpenAlexPublisher]:
+    """Interroge l'API OpenAlex Publishers pour un lot d'IDs et retourne un dict short_id → données. Select restreint aux champs consommés."""
     full_ids = [full_openalex_id(oid) for oid in openalex_ids]
     filter_value = "|".join(full_ids)
     params = {
@@ -59,8 +75,8 @@ def fetch_publishers_batch(
                 time.sleep(wait)
                 continue
             resp.raise_for_status()
-            data = resp.json()
-            return {short_openalex_id(source["id"]): source for source in data.get("results", [])}
+            results = cast("list[_OpenAlexPublisher]", resp.json().get("results", []))
+            return {short_openalex_id(source["id"]): source for source in results}
         except requests.RequestException as e:
             if attempt < 2:
                 logger.warning(f"Erreur requête (tentative {attempt + 1}/3): {e}")
@@ -71,14 +87,47 @@ def fetch_publishers_batch(
     raise _OpenAlexRateLimited()
 
 
-def extract_country(source: dict) -> str | None:
+def extract_country(source: _OpenAlexPublisher) -> str | None:
     """Extrait le `country` depuis la payload OpenAlex Publishers.
 
-    Premier code de `country_codes`, en minuscule (canonique ; OpenAlex
-    renvoie de la majuscule). Vide → None.
+    Premier code de `country_codes`, en minuscule (canonique ; OpenAlex renvoie de la majuscule). Vide → None.
     """
     country_codes = source.get("country_codes") or []
     return country_codes[0].lower() if country_codes else None
+
+
+def _enrich_batch(
+    id_map: dict[str, int],
+    sources: dict[str, _OpenAlexPublisher],
+    *,
+    publisher_repo: PublisherRepository,
+    dry_run: bool,
+) -> _BatchOutcome:
+    """Applique le `country` OpenAlex aux éditeurs d'un batch, en « NULL only ».
+
+    `id_map` associe openalex_id → publisher_id. Un éditeur absent de `sources` ou disparu de la base compte comme `no_response` ; un éditeur au `country` déjà renseigné est ignoré.
+    """
+    updated = with_country = no_response = 0
+    countries: Counter[str] = Counter()
+    for oa_id, publisher_id in id_map.items():
+        source = sources.get(oa_id)
+        if source is None:
+            no_response += 1
+            continue
+        country = extract_country(source)
+        current = publisher_repo.find_by_id(publisher_id)
+        if current is None:
+            no_response += 1
+            continue
+        if country and current.country is None:
+            with_country += 1
+            countries[country] += 1
+            if not dry_run:
+                publisher_repo.update_publisher_fields(
+                    publisher_id, PublisherUpdate(country=country)
+                )
+            updated += 1
+    return _BatchOutcome(updated, with_country, no_response, countries)
 
 
 def run_enrich_publishers_from_openalex(
@@ -103,12 +152,8 @@ def run_enrich_publishers_from_openalex(
             logger.info("Rien à faire.")
             return
 
-        updated = 0
-        with_country = 0
+        updated = with_country = no_response = processed = strikes = 0
         country_counter: Counter[str] = Counter()
-        no_response = 0
-        processed = 0
-        strikes = 0  # batches 429 consécutifs (coupe-circuit)
 
         for i in range(0, total, BATCH_SIZE):
             batch = publishers[i : i + BATCH_SIZE]
@@ -140,37 +185,13 @@ def run_enrich_publishers_from_openalex(
             strikes = 0
             time.sleep(rate_delay)
 
-            for oa_id, publisher_id in id_map.items():
-                source = sources.get(oa_id)
-                if not source:
-                    no_response += 1
-                    processed += 1
-                    continue
+            outcome = _enrich_batch(id_map, sources, publisher_repo=publisher_repo, dry_run=dry_run)
+            updated += outcome.updated
+            with_country += outcome.with_country
+            no_response += outcome.no_response
+            country_counter += outcome.countries
+            processed += len(id_map)
 
-                country = extract_country(source)
-
-                # On charge l'état actuel de l'éditeur pour n'écrire que si
-                # `country` est NULL. Une lecture supplémentaire par éditeur,
-                # acceptable vu le volume (au max ~1000 éditeurs à enrichir).
-                current = publisher_repo.find_by_id(publisher_id)
-                if current is None:
-                    no_response += 1
-                    processed += 1
-                    continue
-
-                if country and current.country is None:
-                    with_country += 1
-                    country_counter[country] += 1
-                    if not dry_run:
-                        publisher_repo.update_publisher_fields(
-                            publisher_id, PublisherUpdate(country=country)
-                        )
-                    updated += 1
-                processed += 1
-
-            # Commit chaque batch pour préserver la progression en cas d'interruption —
-            # l'enrichissement est idempotent (les éditeurs déjà enrichis sont ignorés
-            # via le filtre `fetch_publishers_needing_enrichment`).
             if not dry_run:
                 conn.commit()
 

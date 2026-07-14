@@ -1,6 +1,6 @@
 """Query service : sélection des éditeurs à enrichir depuis OpenAlex Publishers.
 
-Implémente `application.ports.publishers_enrichment.PublisherEnrichmentQueries`. Alimente `application.services.publishers.enrichment.from_openalex` (lancé par le CLI de maintenance, hors pipeline — l'enrichissement éditeurs est cosmétique).
+Implémente `application.ports.publishers_enrichment.PublisherEnrichmentQueries`. Alimente `application.services.publishers.enrich_country` (lancé par le CLI de maintenance, hors pipeline — l'enrichissement éditeurs est cosmétique).
 """
 
 from sqlalchemy import Connection, text
