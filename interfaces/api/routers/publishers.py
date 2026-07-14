@@ -17,7 +17,10 @@ from application.ports.pipeline.metadata_correction import MetadataCorrectionQue
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.journal_repository import JournalRepository
 from application.ports.repositories.publication_repository import PublicationRepository
-from application.ports.repositories.publisher_repository import PublisherRepository
+from application.ports.repositories.publisher_repository import (
+    PublisherRepository,
+    PublisherUpdate,
+)
 from application.services.publishers import commands as publisher_commands
 from domain.publishers.publisher import PUBLISHER_TYPE_LABELS_FR, PUBLISHER_TYPES
 from interfaces.api.deps import (
@@ -35,7 +38,6 @@ from interfaces.api.models import (
     MergeRequest,
     MergeResponse,
     OkResponse,
-    PublisherUpdate,
 )
 
 router = APIRouter()
@@ -173,8 +175,7 @@ def update_publisher(
     Seuls les champs explicitement présents dans le body sont écrits
     (`exclude_unset=True`). Lève 404 si l'éditeur n'existe pas.
     """
-    fields = body.model_dump(exclude_unset=True)
-    publisher_commands.update_publisher(conn, publisher_id, fields=fields, repo=repo)
+    publisher_commands.update_publisher(conn, publisher_id, update=body, repo=repo)
     return OkResponse()
 
 

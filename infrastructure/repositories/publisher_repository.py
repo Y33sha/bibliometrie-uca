@@ -16,7 +16,8 @@ from typing import NamedTuple, cast
 from sqlalchemy import Connection, delete, func, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from application.ports.repositories.publisher_repository import PublisherUpdateFields
+from application.ports.repositories.publisher_repository import PublisherUpdate
+from domain.normalize import normalize_text
 from domain.publishers.publisher import Publisher, PublisherType
 from infrastructure.db.tables import publisher_name_forms, publishers
 from infrastructure.queries.pipeline.pub_counts import refresh_publisher_pub_count
@@ -130,9 +131,12 @@ class PgPublisherRepository:
             is not None
         )
 
-    def update_publisher_fields(self, publisher_id: int, fields: PublisherUpdateFields) -> None:
-        """UPDATE dynamique sur publishers."""
-        stmt = update(publishers).where(publishers.c.id == publisher_id).values(**fields)
+    def update_publisher_fields(self, publisher_id: int, fields: PublisherUpdate) -> None:
+        """UPDATE dynamique sur publishers à partir des champs fournis, `name_normalized` dérivé de `name` quand il est présent. L'existence de l'éditeur et la non-vacuité sont vérifiées par le service."""
+        data = fields.model_dump(exclude_unset=True)
+        if data.get("name") is not None:
+            data["name_normalized"] = normalize_text(data["name"])
+        stmt = update(publishers).where(publishers.c.id == publisher_id).values(**data)
         self._conn.execute(stmt)
 
     # ── Fusion ─────────────────────────────────────────────────────

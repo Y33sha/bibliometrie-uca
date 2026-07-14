@@ -10,6 +10,7 @@ import pytest
 from sqlalchemy import text
 
 from application.ports.repositories.journal_repository import JournalUpdate
+from application.ports.repositories.publisher_repository import PublisherUpdate
 from application.services.journals.core import (
     find_or_create_journal,
     merge_journals,
@@ -319,16 +320,16 @@ class TestUpdateJournal:
 class TestUpdatePublisher:
     def test_raises_not_found(self, sa_sync_conn, pub_repo):
         with pytest.raises(NotFoundError):
-            update_publisher(999999, fields={"name": "X"}, repo=pub_repo)
+            update_publisher(999999, update=PublisherUpdate(name="X"), repo=pub_repo)
 
     def test_raises_on_empty_fields(self, sa_sync_conn, pub_repo):
         p = _insert_publisher(sa_sync_conn, "Elsevier")
         with pytest.raises(ValidationError):
-            update_publisher(p, fields={}, repo=pub_repo)
+            update_publisher(p, update=PublisherUpdate(), repo=pub_repo)
 
     def test_updates_name_and_normalizes(self, sa_sync_conn, pub_repo):
         p = _insert_publisher(sa_sync_conn, "Old Name")
-        update_publisher(p, fields={"name": "Springer Nature"}, repo=pub_repo)
+        update_publisher(p, update=PublisherUpdate(name="Springer Nature"), repo=pub_repo)
         row = _fetch_one(
             sa_sync_conn, "SELECT name, name_normalized FROM publishers WHERE id = :id", id=p
         )

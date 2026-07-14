@@ -9,20 +9,22 @@ from application.ports.pipeline.metadata_correction import MetadataCorrectionQue
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.journal_repository import JournalRepository
 from application.ports.repositories.publication_repository import PublicationRepository
-from application.ports.repositories.publisher_repository import PublisherRepository
+from application.ports.repositories.publisher_repository import (
+    PublisherRepository,
+    PublisherUpdate,
+)
 from application.services.publishers import core as publishers
-from domain.types import JsonValue
 
 
 def update_publisher(
     conn: Connection,
     publisher_id: int,
     *,
-    fields: dict[str, JsonValue],
+    update: PublisherUpdate,
     repo: PublisherRepository,
 ) -> None:
     """Met à jour un éditeur (champs sélectifs)."""
-    publishers.update_publisher(publisher_id, fields=fields, repo=repo)
+    publishers.update_publisher(publisher_id, update=update, repo=repo)
     conn.commit()
 
 
