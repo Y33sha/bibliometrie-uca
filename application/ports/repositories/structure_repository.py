@@ -155,7 +155,7 @@ class StructureRepository(Protocol):
 
     # ── structure_name_forms ───────────────────────────────────────
 
-    def name_form_exists(self, form_id: int) -> bool: ...
+    def get_name_form(self, form_id: int) -> StructureNameFormRow | None: ...
 
     def create_name_form(
         self,

@@ -86,7 +86,11 @@ def create_structure(
 
 
 def update_structure(
-    structure_id: int, *, fields: dict[str, JsonValue], repo: StructureRepository
+    structure_id: int,
+    *,
+    fields: dict[str, JsonValue],
+    repo: StructureRepository,
+    audit_repo: AuditRepository | None = None,
 ) -> StructureRow:
     """Met à jour une structure. Retourne la ligne modifiée.
 
@@ -113,7 +117,15 @@ def update_structure(
     if not update_fields:
         raise ValidationError("Aucun champ à mettre à jour")
 
-    return repo.update_structure_fields(structure_id, update_fields)
+    row = repo.update_structure_fields(structure_id, update_fields)
+    emit_event(
+        audit_repo,
+        "structure.updated",
+        "structure",
+        structure_id,
+        {"fields": sorted(update_fields)},
+    )
+    return row
 
 
 def delete_structure(
@@ -147,6 +159,7 @@ def create_relation(
     child_id: int,
     relation_type: str,
     repo: StructureRepository,
+    audit_repo: AuditRepository | None = None,
 ) -> StructureRelationRow | None:
     """Crée une relation. Retourne la ligne insérée, ou None si elle existait déjà.
 
@@ -157,11 +170,25 @@ def create_relation(
         child_id=child_id,
         ancestors_of_parent=repo.get_ancestor_ids(parent_id),
     )
-    return repo.create_relation(
+    row = repo.create_relation(
         parent_id=parent_id,
         child_id=child_id,
         relation_type=relation_type,
     )
+    if row is not None:
+        emit_event(
+            audit_repo,
+            "structure_relation.created",
+            "structure",
+            parent_id,
+            {
+                "relation_id": row["id"],
+                "parent_id": parent_id,
+                "child_id": child_id,
+                "relation_type": relation_type,
+            },
+        )
+    return row
 
 
 def delete_relation(
@@ -199,10 +226,11 @@ def create_name_form(
     is_excluding: bool = False,
     requires_context_of: list[int] | None = None,
     repo: StructureRepository,
+    audit_repo: AuditRepository | None = None,
 ) -> StructureNameFormRow:
     """Crée une forme de nom. Retourne la ligne insérée."""
     form_text_normalized = normalize_text(form_text)
-    return repo.create_name_form(
+    row = repo.create_name_form(
         structure_id=structure_id,
         form_text_normalized=form_text_normalized,
         # Forme courte ⇒ frontière de mot forcée (invariant verrouillé par une CHECK).
@@ -210,17 +238,30 @@ def create_name_form(
         is_excluding=is_excluding,
         requires_context_of=requires_context_of,
     )
+    emit_event(
+        audit_repo,
+        "structure_name_form.created",
+        "structure",
+        structure_id,
+        {"form_id": row["id"], "form_text": row["form_text"]},
+    )
+    return row
 
 
 def update_name_form(
-    form_id: int, *, fields: dict[str, JsonValue], repo: StructureRepository
+    form_id: int,
+    *,
+    fields: dict[str, JsonValue],
+    repo: StructureRepository,
+    audit_repo: AuditRepository | None = None,
 ) -> StructureNameFormRow:
     """Met à jour une forme de nom. Retourne la ligne modifiée.
 
     Lève NotFoundError si la forme n'existe pas.
     Lève ValidationError si `fields` ne contient aucun champ valide.
     """
-    if not repo.name_form_exists(form_id):
+    existing = repo.get_name_form(form_id)
+    if existing is None:
         raise NotFoundError(f"Forme {form_id} introuvable")
 
     update_fields: StructureNameFormUpdateFields = {}
@@ -238,15 +279,24 @@ def update_name_form(
     if isinstance(requires_context_of, list):
         update_fields["requires_context_of"] = cast("list[int]", requires_context_of) or None
 
-    # Forme courte ⇒ frontière de mot forcée (invariant verrouillé par une CHECK).
-    new_form_text = update_fields.get("form_text")
-    if isinstance(new_form_text, str) and is_short_form(new_form_text):
-        update_fields["is_word_boundary"] = True
-
     if not update_fields:
         raise ValidationError("Aucun champ à mettre à jour")
 
-    return repo.update_name_form_fields(form_id, update_fields)
+    # Forme courte ⇒ frontière de mot forcée (invariant verrouillé par une CHECK).
+    # Texte effectif : le nouveau s'il est fourni, sinon celui déjà en base.
+    effective_form_text = update_fields.get("form_text", existing["form_text"])
+    if is_short_form(effective_form_text):
+        update_fields["is_word_boundary"] = True
+
+    row = repo.update_name_form_fields(form_id, update_fields)
+    emit_event(
+        audit_repo,
+        "structure_name_form.updated",
+        "structure",
+        existing["structure_id"],
+        {"form_id": form_id, "fields": sorted(update_fields)},
+    )
+    return row
 
 
 def delete_name_form(

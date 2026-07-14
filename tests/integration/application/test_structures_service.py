@@ -1,4 +1,4 @@
-"""Tests de caractérisation pour application/structures/core.py.
+"""Tests de caractérisation pour application/services/structures/core.py.
 
 Couvre create/update/delete sur structures, structure_relations,
 structure_name_forms.
@@ -375,6 +375,18 @@ class TestUpdateNameForm:
         assert form["is_word_boundary"] is False  # forme longue
         updated = update_name_form(form["id"], fields={"form_text": "IGCNC"}, repo=repo)
         assert updated["is_word_boundary"] is True  # raccourcie → forcé
+
+    def test_forces_word_boundary_on_unchanged_short_form(self, sa_sync_conn, repo):
+        """Baisser is_word_boundary sans toucher form_text sur une forme courte : re-forcé.
+
+        Le forçage lit le form_text effectif (celui en base si le payload ne le change pas),
+        pas seulement le texte fourni ; l'invariant tient sans dépendre de la CHECK DB.
+        """
+        s = create_structure(code="X", name="X", type="labo", repo=repo)
+        form = create_name_form(structure_id=s["id"], form_text="INRAE", repo=repo)
+        assert form["is_word_boundary"] is True  # courte → forcé à la création
+        updated = update_name_form(form["id"], fields={"is_word_boundary": False}, repo=repo)
+        assert updated["is_word_boundary"] is True
 
 
 class TestDeleteNameForm:

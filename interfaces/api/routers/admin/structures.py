@@ -99,6 +99,7 @@ def update_structure(
     data: StructureUpdate,
     conn: Connection = Depends(db_conn_sync),
     repo: StructureRepository = Depends(structure_repo_sync),
+    audit: AuditRepository = Depends(audit_repo_sync),
 ) -> StructureOut:
     """Met à jour une structure (mise à jour sélective des champs fournis).
 
@@ -107,7 +108,9 @@ def update_structure(
     """
     fields = data.model_dump(exclude_unset=True)
     return StructureOut.model_validate(
-        structure_commands.update_structure(conn, structure_id, fields=fields, repo=repo)
+        structure_commands.update_structure(
+            conn, structure_id, fields=fields, repo=repo, audit_repo=audit
+        )
     )
 
 
@@ -132,6 +135,7 @@ def create_relation(
     conn: Connection = Depends(db_conn_sync),
     repo: StructureRepository = Depends(structure_repo_sync),
     perimeter_repo: PerimeterRepository = Depends(perimeter_repo_sync),
+    audit: AuditRepository = Depends(audit_repo_sync),
 ) -> StructureRelationCreateResponse:
     """Crée une relation parent-enfant entre deux structures.
 
@@ -144,6 +148,7 @@ def create_relation(
         relation_type=data.relation_type,
         repo=repo,
         perimeter_repo=perimeter_repo,
+        audit_repo=audit,
     )
     if row is None:
         return StructureRelationCreateResponse.model_validate({"status": "already_exists"})
@@ -182,6 +187,7 @@ def create_name_form(
     data: NameFormCreate,
     conn: Connection = Depends(db_conn_sync),
     repo: StructureRepository = Depends(structure_repo_sync),
+    audit: AuditRepository = Depends(audit_repo_sync),
 ) -> NameFormOut:
     """Crée une forme de nom pour une structure, utilisée par le matching d'adresses.
 
@@ -197,6 +203,7 @@ def create_name_form(
             is_excluding=data.is_excluding,
             requires_context_of=data.requires_context_of,
             repo=repo,
+            audit_repo=audit,
         )
     )
 
@@ -207,11 +214,14 @@ def update_name_form(
     data: NameFormUpdate,
     conn: Connection = Depends(db_conn_sync),
     repo: StructureRepository = Depends(structure_repo_sync),
+    audit: AuditRepository = Depends(audit_repo_sync),
 ) -> NameFormOut:
     """Met à jour une forme de nom (sélective des champs fournis). 404 si inconnue."""
     fields = data.model_dump(exclude_unset=True)
     return NameFormOut.model_validate(
-        structure_commands.update_name_form(conn, form_id, fields=fields, repo=repo)
+        structure_commands.update_name_form(
+            conn, form_id, fields=fields, repo=repo, audit_repo=audit
+        )
     )
 
 
