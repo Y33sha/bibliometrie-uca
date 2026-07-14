@@ -7,7 +7,6 @@ La fusion d'éditeurs (`merge_publishers`) reste ici parce que sémantiquement c
 """
 
 from collections import Counter
-from typing import cast
 
 from sqlalchemy import Connection
 
@@ -18,7 +17,7 @@ from application.ports.repositories.journal_repository import JournalRepository
 from application.ports.repositories.publication_repository import PublicationRepository
 from application.ports.repositories.publisher_repository import (
     PublisherRepository,
-    PublisherUpdateFields,
+    PublisherUpdate,
 )
 from application.services.journals.core import merge_journals
 from domain.errors import (
@@ -29,7 +28,6 @@ from domain.errors import (
     ValidationError,
 )
 from domain.normalize import normalize_text
-from domain.types import JsonValue
 
 
 def find_or_create_publisher(
@@ -79,26 +77,19 @@ def find_or_create_publisher(
 
 
 def update_publisher(
-    publisher_id: int, *, fields: dict[str, JsonValue], repo: PublisherRepository
+    publisher_id: int, *, update: PublisherUpdate, repo: PublisherRepository
 ) -> None:
-    """Met à jour un éditeur. Le `name` est automatiquement normalisé en
-    `name_normalized`.
+    """Met à jour un éditeur à partir des champs explicitement fournis.
 
-    Lève NotFoundError si l'éditeur n'existe pas.
-    Lève ValidationError si `fields` est vide.
+    Lève NotFoundError si l'éditeur n'existe pas, ValidationError si aucun champ n'est fourni.
     """
-    if not fields:
+    if not update.model_fields_set:
         raise ValidationError("Aucun champ à mettre à jour")
 
     if not repo.publisher_exists(publisher_id):
         raise NotFoundError(f"Éditeur {publisher_id} introuvable")
 
-    update_fields = cast(PublisherUpdateFields, dict(fields))
-    if "name" in update_fields:
-        name = update_fields["name"]
-        assert isinstance(name, str), "fields['name'] doit être un str (validé par Pydantic)"
-        update_fields["name_normalized"] = normalize_text(name)
-    repo.update_publisher_fields(publisher_id, update_fields)
+    repo.update_publisher_fields(publisher_id, update)
 
 
 def merge_publishers(

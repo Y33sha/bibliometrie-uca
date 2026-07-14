@@ -16,21 +16,28 @@ query sur `journals`.
 Implémenté par `infrastructure/repositories/publisher_repository.py`.
 """
 
-from typing import Protocol, TypedDict
+from typing import Protocol
+
+from pydantic import BaseModel, field_validator
 
 from domain.publishers.publisher import Publisher
 
 
-class PublisherUpdateFields(TypedDict, total=False):
-    """Partial update sur la table `publishers`.
+class PublisherUpdate(BaseModel):
+    """Champs éditables d'un éditeur, en modification sélective.
 
-    `name_normalized` est calculé par le service quand `name` est fourni.
+    Seuls les champs explicitement fournis sont écrits (`model_dump(exclude_unset=True)`). Les champs listés sont ceux qu'un client peut fournir ; `name_normalized`, dérivé de `name`, est posé par le repository.
     """
 
-    name: str
-    name_normalized: str
-    country: str | None
-    publisher_type: str
+    name: str | None = None
+    country: str | None = None
+    publisher_type: str | None = None
+
+    @field_validator("country")
+    @classmethod
+    def _country_lowercase(cls, v: str | None) -> str | None:
+        # Code pays canonique en minuscule (cf. countries.code / addresses.countries).
+        return v.lower() if v else v
 
 
 class PublisherRepository(Protocol):
@@ -75,7 +82,7 @@ class PublisherRepository(Protocol):
 
     def publisher_exists(self, publisher_id: int) -> bool: ...
 
-    def update_publisher_fields(self, publisher_id: int, fields: PublisherUpdateFields) -> None: ...
+    def update_publisher_fields(self, publisher_id: int, fields: PublisherUpdate) -> None: ...
 
     # ── Fusion ─────────────────────────────────────────────────────
 

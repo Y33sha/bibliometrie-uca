@@ -39,7 +39,7 @@ flowchart LR
 
 Routeur `interfaces/api/routers/publishers.py`, command handlers `commands.py`, cœur `core.py`, adaptateur `PgPublisherRepository`.
 
-- **Édition** (`PUT /api/publishers/{id}`) : `update_publisher` normalise `name` → `name_normalized`.
+- **Édition** (`PUT /api/publishers/{id}`) : modification sélective via le contrat `PublisherUpdate` (Pydantic, porté par `PublisherRepository`, même patron que `JournalUpdate`) ; `name_normalized` dérivé de `name` par le repository.
 - **Fusion** (`POST /api/publishers/{id}/merge`) : `merge_publishers` bloque sur ISSN divergents ou doublon interne, fusionne d'abord les revues à titre partagé (`merge_journals`), puis `merge_publisher_into` repointe `journals` / `journal_name_forms` / `apc_payments` et recale `pub_count`.
 
 ## Lecture — pipeline
@@ -54,14 +54,13 @@ Port `application/ports/api/publishers_queries.py`, adaptateur `PgPublisherQueri
 
 Dette assumée et décisions d'architecture propres à cet agrégat, gardées explicites.
 
-1. **Contrat de champs éditables dupliqué.** `PublisherUpdateFields` (TypedDict, port) et `PublisherUpdate` (Pydantic, API) listent des champs qui se recoupent sans coïncider (`name_normalized` côté port seulement, dérivé par le service). C'est le symptôme déjà traité côté journals (contrat unique `JournalUpdate` dans le port) — le même traitement s'applique.
-2. **Match-or-create dupliqué.** `find_or_create_publisher` (service, appelé par `normalize`) et `_match_or_create_publisher` (`resolve_publishers`, pipeline) réimplémentent la même séquence forme-de-nom → création → enregistrement ; le pipeline ne passe pas par le service. (À vérifier avant traitement — les deux contextes diffèrent peut-être.)
-3. **Écritures cross-agrégat de la fusion (décision d'archi assumée).** `merge_publisher_into` repointe `journals` / `journal_name_forms` / `apc_payments` en `text()`, comme `merge_journal_into` : une fusion est intrinsèquement cross-agrégat.
-4. **Unicité globale de `publisher_name_forms.form_normalized`.** Une forme de nom n'appartient qu'à un seul éditeur ; à la fusion, les formes de la source en collision avec la cible sont supprimées — perte silencieuse des alias en doublon.
+1. **Match-or-create dupliqué.** `find_or_create_publisher` (service, appelé par `normalize`) et `_match_or_create_publisher` (`resolve_publishers`, pipeline) réimplémentent la même séquence forme-de-nom → création → enregistrement ; le pipeline ne passe pas par le service. (À vérifier avant traitement — les deux contextes diffèrent peut-être.)
+2. **Écritures cross-agrégat de la fusion (décision d'archi assumée).** `merge_publisher_into` repointe `journals` / `journal_name_forms` / `apc_payments` en `text()`, comme `merge_journal_into` : une fusion est intrinsèquement cross-agrégat.
+3. **Unicité globale de `publisher_name_forms.form_normalized`.** Une forme de nom n'appartient qu'à un seul éditeur ; à la fusion, les formes de la source en collision avec la cible sont supprimées — perte silencieuse des alias en doublon.
 
 ## Invariants métier
 
-- **`name_normalized` dérivé de `name`** (par la normalisation), maintenu à chaque écriture (service, résolution).
+- **`name_normalized` dérivé de `name`**, maintenu à chaque écriture (création par le service, édition par le repository, résolution par le pipeline).
 - **`pub_count` dérivé** : somme des `journals.pub_count`, recalculée par le pipeline et par les fusions.
 
 `Publisher` est délibérément un agrégat mince, comme `Journal` : ces règles sont portées par les services et le pipeline, pas par le concept — sans matière à un objet de domaine riche.

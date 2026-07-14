@@ -20,7 +20,7 @@ from sqlalchemy import Connection
 from application.ports.publishers_enrichment import PublisherEnrichmentQueries
 from application.ports.repositories.publisher_repository import (
     PublisherRepository,
-    PublisherUpdateFields,
+    PublisherUpdate,
 )
 from domain.sources.openalex import full_openalex_id, short_openalex_id
 
@@ -164,17 +164,14 @@ def run_enrich_publishers_from_openalex(
                     processed += 1
                     continue
 
-                fields: PublisherUpdateFields = {}
                 if country and current.country is None:
-                    fields["country"] = country
                     with_country += 1
                     country_counter[country] += 1
-
-                if fields and not dry_run:
-                    publisher_repo.update_publisher_fields(publisher_id, fields)
+                    if not dry_run:
+                        publisher_repo.update_publisher_fields(
+                            publisher_id, PublisherUpdate(country=country)
+                        )
                     updated += 1
-                elif fields:
-                    updated += 1  # compté en dry-run aussi
                 processed += 1
 
             # Commit chaque batch pour préserver la progression en cas
