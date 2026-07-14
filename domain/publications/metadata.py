@@ -46,9 +46,6 @@ OA_CLOSED_STATUSES: frozenset[str] = frozenset({"closed", "unknown"})
 # périmés (staleness). Source unique pour le filtre SQL de `fetch_publications_with_doi`.
 STABLE_OA_STATUSES: frozenset[str] = frozenset({"gold", "diamond", "hybrid"})
 
-STABLE_OA_STATUSES_SQL: str = "(" + ", ".join(f"'{s}'" for s in sorted(STABLE_OA_STATUSES)) + ")"
-"""Forme SQL `('diamond', 'gold', 'hybrid')` pour la clause `NOT IN`."""
-
 # Sources qui sont des archives ouvertes : quand l'une déclare `green`, elle atteste un FICHIER
 # déposé et lisible (pas une estimation à distance). Ce dépôt est un fait — un `closed` d'Unpaywall,
 # qui ne voit pas ce fichier sous le DOI, ne peut pas le refermer (cf. `has_open_archive_deposit`,

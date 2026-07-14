@@ -15,7 +15,10 @@ from application.ports.pipeline.enrich import (
     JournalIssnRow,
     PublicationOaCheck,
 )
-from domain.publications.metadata import OPEN_ARCHIVE_SOURCES, STABLE_OA_STATUSES_SQL
+from domain.publications.metadata import OPEN_ARCHIVE_SOURCES, STABLE_OA_STATUSES
+
+# Rendu SQL des statuts OA stables, pour la clause `NOT IN` de fetch_publications_with_doi.
+_STABLE_OA_SQL = "(" + ", ".join(f"'{s}'" for s in sorted(STABLE_OA_STATUSES)) + ")"
 
 
 def fetch_publications_with_doi(
@@ -47,7 +50,7 @@ def fetch_publications_with_doi(
             WHERE doi IS NOT NULL
               AND (
                   unpaywall_checked_at IS NULL
-                  OR (oa_status::text NOT IN {STABLE_OA_STATUSES_SQL}
+                  OR (oa_status::text NOT IN {_STABLE_OA_SQL}
                       AND unpaywall_checked_at < now() - make_interval(days => :stale))
               )
             ORDER BY unpaywall_checked_at ASC NULLS FIRST
@@ -72,7 +75,7 @@ def count_stale_publications(conn: Connection, *, staleness_days: int = 30) -> i
             WHERE doi IS NOT NULL
               AND (
                   unpaywall_checked_at IS NULL
-                  OR (oa_status::text NOT IN {STABLE_OA_STATUSES_SQL}
+                  OR (oa_status::text NOT IN {_STABLE_OA_SQL}
                       AND unpaywall_checked_at < now() - make_interval(days => :stale))
               )
         """),
