@@ -46,18 +46,12 @@ def refresh_from_sources(
         repo.delete(pub_id)
         return
 
-    # Les corrections par enregistrement sont déjà persistées sur chaque `source_publication` par la phase `metadata_correction` (colonnes lues par `get_source_publications`) : l'agrégation repart des valeurs corrigées. L'arbitrage choisit `doc_type` et `journal_id` indépendamment : une correction journal-dépendante appliquée à la source qui a résolu le journal ne suit pas le `journal_id` canonique — on la rejoue sur le canonique après agrégation.
     secondary_ids = repo.get_converged_secondary_ids(pub_id)
+    # L'agrégation repart des colonnes déjà corrigées par la phase `metadata_correction`, pas du brut.
     _refresh_aggregate(pub, sources, source_priority=SOURCE_PRIORITY, secondary_ids=secondary_ids)
     _apply_canonical_doc_type_correction(pub, repo=repo)
 
-    # Une publication dont le type résolu est hors périmètre ne doit pas exister — même
-    # verdict que le cas orphelin, appliqué au seul endroit qui arbitre le `doc_type`
-    # canonique. La suppression détache ses `source_publications` (FK ON DELETE SET NULL) :
-    # elles redeviennent orphelines et ne génèrent ni personne ni authorship (les deux
-    # chemins exigent une publication) ; les authorships canoniques déjà bâties partent en
-    # cascade (FK ON DELETE CASCADE). C'est ce qui rend l'exclusion `doc_type` en aval
-    # redondante : hors périmètre ne se matérialise jamais.
+    # Une publication dont le type résolu est hors périmètre ne doit pas exister.
     if pub.doc_type in OUT_OF_SCOPE_DOC_TYPES:
         repo.delete(pub_id)
         return
