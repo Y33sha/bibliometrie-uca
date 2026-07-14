@@ -2,9 +2,10 @@
 # Vérifications git : deux étages.
 #   - pre-commit : garde rapide et locale à chaque commit (lint, format, types,
 #     tests unitaires). Installation : `pre-commit install`.
-#   - pre-push   : rejoue la CI complète avant chaque push (deptry, pip-audit,
-#     suite de tests + couverture, build frontend), pour qu'un push vert
-#     garantisse une CI verte. Installation : `pre-commit install --hook-type pre-push`.
+#   - pre-push   : rejoue les vérifications de la CI avant chaque push (lint,
+#     format, types, contrats d'architecture, hygiène des dépendances, build
+#     frontend). La suite de tests reste à la charge de la CI, trop longue pour
+#     un pre-push. Installation : `pre-commit install --hook-type pre-push`.
 # Les hooks constatent et refusent ; ils ne modifient aucun fichier. Une
 # vérification en échec se corrige à la main (ou via `ruff format` / `ruff check
 # --fix` / `uv lock` lancés explicitement) puis se rejoue.
@@ -139,16 +140,6 @@ repos:
       - id: ci-mypy
         name: mypy (type check)
         entry: uv run mypy .
-        language: system
-        pass_filenames: false
-        always_run: true
-        stages: [pre-push]
-
-      # Suite complète (unitaires + intégration) sous instrumentation :
-      # pass/fail ET seuil de couverture (fail_under dans pyproject.toml).
-      - id: ci-pytest-cov
-        name: pytest (suite complète + couverture)
-        entry: uv run pytest tests/ --cov --cov-report=term-missing
         language: system
         pass_filenames: false
         always_run: true
