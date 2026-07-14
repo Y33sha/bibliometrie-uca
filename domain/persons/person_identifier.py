@@ -1,25 +1,15 @@
-"""Aggregate root `PersonIdentifier` — relation Personne ↔ identifiant
-externe avec statut.
+"""Aggregate root `PersonIdentifier` — relation Personne ↔ identifiant externe avec statut.
 
-`PersonIdentifier` est un aggregate à part, pas un VO ni une entité
-fille de `Person`. Justifications :
+`PersonIdentifier` est un aggregate à part, pas un VO ni une entité fille de `Person`. Justifications :
 
-1. Le `status` (`pending` / `confirmed` / `rejected`) porte sur la
-   *relation* identifier ↔ person, pas sur l'identifier nu — c'est un
-   objet métier de premier rang.
-2. La réattribution (déplacer un identifier d'une personne à une autre
-   quand l'ancien statut était `rejected`) charge et mute l'identifier,
-   pas les deux personnes — modèle aggregate-séparé qui collapse
-   l'opération en un load + un save.
+1. Le `status` (`pending` / `confirmed` / `rejected`) porte sur la *relation* identifier ↔ person, pas sur l'identifier nu — c'est un objet métier de premier rang.
+2. La réattribution (déplacer un identifier d'une personne à une autre, autorisée depuis le statut `rejected`) charge et mute l'identifier, pas les deux personnes — modèle aggregate-séparé qui collapse l'opération en un load + un save.
 
 Identité naturelle : `(id_type, id_value)`. Identité surrogate : `id`.
 
-`Person.identifiers: tuple[PersonIdentifier, ...]` reste possible comme
-projection en lecture hydratée par le repository à la demande, mais
-n'est pas la source de vérité des mutations.
+`Person.identifiers: tuple[PersonIdentifier, ...]` reste possible comme projection en lecture hydratée par le repository à la demande, mais n'est pas la source de vérité des mutations.
 
-La logique métier touchant aux attributions d'identifiants (transitions
-de statut, réattribution) vit ici.
+La logique métier touchant aux attributions d'identifiants (transitions de statut, réattribution) vit ici.
 """
 
 from dataclasses import dataclass
@@ -30,12 +20,9 @@ from domain.persons.identifiers import AttributionStatus
 
 @dataclass(slots=True)
 class PersonIdentifier:
-    """Attribution d'un identifiant externe (ORCID, idHAL, IdRef,
-    hal_person_id) à une personne, avec statut.
+    """Attribution d'un identifiant externe (ORCID, idHAL, IdRef, hal_person_id) à une personne, avec statut.
 
-    `id_type` ∈ `PERSON_IDENTIFIER_TYPES`. `id_value` est la valeur
-    canonique stockée en base (déjà normalisée par les VOs ORCID/IdHAL/
-    IdRef à la construction ; `hal_person_id` est stocké tel quel).
+    `id_type` ∈ `PERSON_IDENTIFIER_TYPES`. `id_value` est la valeur canonique stockée en base (déjà normalisée par les VOs ORCID/IdHAL/IdRef à la construction ; `hal_person_id` est stocké tel quel).
     """
 
     id: int | None
@@ -48,12 +35,9 @@ class PersonIdentifier:
     def reattribute_to(self, new_person_id: int, *, source: str) -> None:
         """Déplace l'attribution vers une autre personne.
 
-        Autorisée uniquement depuis le statut `REJECTED` : un identifiant
-        rejeté pour une personne A peut être réattribué à une personne B
-        avec statut `PENDING`. Lève `CannotAttributeConflict` sinon.
+        Autorisée uniquement depuis le statut `REJECTED` : un identifiant rejeté pour une personne A peut être réattribué à une personne B avec statut `PENDING`. Lève `CannotAttributeConflict` sinon.
 
-        `source` trace l'origine de la réattribution (ex. "manual",
-        "matching_cascade").
+        `source` trace l'origine de la réattribution (ex. "manual", "matching_cascade").
         """
         if self.status is not AttributionStatus.REJECTED:
             raise CannotAttributeConflict(
@@ -68,14 +52,9 @@ class PersonIdentifier:
     def transfer_to(self, new_person_id: int, *, source: str) -> None:
         """Transfère une attribution `pending` vers une autre personne.
 
-        Réservé à l'arbitrage automatique par consensus du canal identifiant : une
-        valeur captée par le premier arrivé (statut `pending`) est déplacée vers la
-        personne que soutient la majorité des porteurs. Le statut reste `pending`
-        (attribution non vérifiée, simplement mieux placée).
+        Réservé à l'arbitrage automatique par consensus du canal identifiant : une valeur captée par le premier arrivé (statut `pending`) est déplacée vers la personne que soutient la majorité des porteurs. Le statut reste `pending` (attribution non vérifiée, simplement mieux placée).
 
-        Interdit sur `confirmed` (attribution verrouillée par l'admin — jamais déplacée
-        automatiquement) et sur `rejected` (qui relève de `reattribute_to`). Lève
-        `CannotAttributeConflict` sinon.
+        Interdit sur `confirmed` (attribution verrouillée par l'admin — jamais déplacée automatiquement) et sur `rejected` (qui relève de `reattribute_to`). Lève `CannotAttributeConflict` sinon.
         """
         if self.status is not AttributionStatus.PENDING:
             raise CannotAttributeConflict(

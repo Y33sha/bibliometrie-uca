@@ -1,14 +1,11 @@
 """Value objects et helpers de normalisation des identifiants personne.
 
-ORCID, IdHAL (login HAL en forme slug), IdRef (PPN SUDOC). Trois VOs
-immuables et auto-validés au même contrat que `domain/publication.py` :
+ORCID, IdHAL (login HAL en forme slug), IdRef (PPN SUDOC). Trois VOs immuables et auto-validés au même contrat que `domain/publications/identifiers.py` :
 
 - `X("...")` strict : lève `ValidationError` si malformé
 - `X.try_parse(...)` tolérant : renvoie None si malformé
 
-Les helpers `normalize_*` sont exposés indépendamment pour les call
-sites qui veulent juste normaliser sans construire un VO (typiquement
-les normalizers de pipeline qui stockent la forme texte en base).
+Les helpers `normalize_*` sont exposés indépendamment pour les call sites qui veulent juste normaliser sans construire un VO (typiquement les normalizers de pipeline qui stockent la forme texte en base).
 """
 
 import re
@@ -23,23 +20,14 @@ from domain.types import JsonValue
 class AttributionStatus(StrEnum):
     """Statut d'une attribution `PersonIdentifier ↔ Person`.
 
-    Mappe sur l'enum Postgres `identifier_status`. `StrEnum` (PEP 663) garde
-    la valeur sérialisable telle quelle vers SQL et API.
+    Mappe sur l'enum Postgres `identifier_status`. `StrEnum` garde la valeur sérialisable telle quelle vers SQL et API.
 
     Transitions valides :
     - `PENDING → CONFIRMED` (validation) ou `→ REJECTED` (rejet)
     - `CONFIRMED → REJECTED` (rejet d'une attribution validée)
-    - `REJECTED → PENDING` lors d'une réattribution à une autre personne
-      (seule transition portée par une méthode du domaine,
-      `PersonIdentifier.reattribute_to` ; les autres passent par
-      `update_identifier_status`, validées par l'enum Postgres).
+    - `REJECTED → PENDING` lors d'une réattribution à une autre personne (seule transition portée par une méthode du domaine, `PersonIdentifier.reattribute_to` ; les autres passent par `update_identifier_status`, validées par l'enum Postgres).
 
-    `AUTHENTICATED` est un statut à part : il atteste que le chercheur a
-    lui-même authentifié son ORCID en se connectant à son compte. Seul un
-    ORCID peut le porter. C'est le statut le plus fort et le seul immuable :
-    un trigger Postgres interdit d'en sortir (aucune dégradation, même par
-    l'admin) et de le poser hors de l'import dédié des ORCID authentifiés.
-    Il ne participe donc à aucune transition applicative.
+    `AUTHENTICATED` est un statut à part : il atteste que le chercheur a lui-même authentifié son ORCID en se connectant à son compte. Seul un ORCID peut le porter. C'est le statut le plus fort et le seul immuable : un trigger Postgres interdit d'en sortir (aucune dégradation, même par l'admin) et de le poser hors de l'import dédié des ORCID authentifiés. Il ne participe à aucune transition applicative.
     """
 
     PENDING = "pending"
@@ -89,8 +77,7 @@ _ORCID_CANONICAL = re.compile(r"^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$")
 def normalize_orcid(raw: str | None) -> str | None:
     """Normalise un ORCID : supprime le préfixe URL, met les hyphens en forme.
 
-    Accepte les variantes avec ou sans URL, avec ou sans hyphens.
-    Renvoie None si la normalisation échoue ou si le format est invalide.
+    Accepte les variantes avec ou sans URL, avec ou sans hyphens. Renvoie None si la normalisation échoue ou si le format est invalide.
     """
     if not raw:
         return None
@@ -114,8 +101,7 @@ def normalize_orcid(raw: str | None) -> str | None:
 class ORCID:
     """Open Researcher and Contributor ID, format XXXX-XXXX-XXXX-XXXX.
 
-    Lève ValidationError si la valeur ne respecte pas le format. Ne
-    valide pas la checksum MOD 11-2 (à ajouter si besoin ultérieurement).
+    Lève `ValidationError` si la valeur ne respecte pas le format. Contrôle le format, sans vérifier la checksum MOD 11-2.
     """
 
     value: str
@@ -141,9 +127,9 @@ class ORCID:
 
 # ── IdHAL (personne) ───────────────────────────────────────────────
 
-# Slug HAL : minuscules, chiffres, tirets. Les anciens comptes peuvent
-# aussi être numériques (l'API HAL distingue idHal_s et idHal_i). On
-# accepte les deux formes, stockées en base comme texte.
+# Slug HAL : minuscules, chiffres, tirets. Certains comptes sont numériques
+# (l'API HAL distingue idHal_s et idHal_i). On accepte les deux formes,
+# stockées en base comme texte.
 _IDHAL_CANONICAL = re.compile(r"^[a-z0-9][a-z0-9-]{1,59}$")
 
 
@@ -161,7 +147,7 @@ def _normalize_idhal(raw: str | None) -> str | None:
 class IdHAL:
     """Identifiant IdHAL d'une personne (login HAL, forme slug).
 
-    Ex. `jean-dupont`, `jdupont`, ou numérique pour les anciens comptes.
+    Ex. `jean-dupont`, `jdupont`, ou une forme numérique.
     """
 
     value: str
@@ -290,11 +276,7 @@ _IDENTIFIER_VALUE_OBJECTS: dict[str, type[ORCID | IdHAL | IdRef | HalPersonId]] 
 def normalized_identifier_value(id_type: str, raw: str) -> str:
     """Valide et normalise la valeur d'un identifiant via le value object de son type.
 
-    Point d'entrée unique de validation avant écriture : délègue au VO auto-validé
-    du type et renvoie la forme canonique stockée en base. Couvre les quatre types
-    de `PERSON_IDENTIFIER_TYPES`. Lève `ValidationError` si le type est inconnu ou
-    si la valeur est malformée — à l'appelant de décider (rejet 4xx côté API, log et
-    poursuite côté pipeline).
+    Point d'entrée unique de validation avant écriture : délègue au VO auto-validé du type et renvoie la forme canonique stockée en base. Couvre les quatre types de `PERSON_IDENTIFIER_TYPES`. Lève `ValidationError` si le type est inconnu ou si la valeur est malformée — à l'appelant de décider (rejet 4xx côté API, log et poursuite côté pipeline).
     """
     value_object = _IDENTIFIER_VALUE_OBJECTS.get(id_type)
     if value_object is None:
@@ -308,8 +290,7 @@ def normalized_identifier_value(id_type: str, raw: str) -> str:
 def compact_identifiers(**ids: JsonValue) -> dict[str, JsonValue] | None:
     """Construit le dict d'identifiants pour `source_authorships.person_identifiers`.
 
-    Convention : valeur falsy (None, 0, "", …) → clé absente du dict,
-    dict vide → None.
+    Convention : valeur falsy (None, 0, "", …) → clé absente du dict, dict vide → None.
     """
     out: dict[str, JsonValue] = {k: v for k, v in ids.items() if v}
     return out or None
@@ -320,22 +301,11 @@ def mark_shared_identifiers_dubious(
 ) -> list[dict[str, JsonValue] | None]:
     """Requalifie `_dubious` les identifiants partagés entre signatures d'un même enregistrement.
 
-    Un identifiant — quel que soit son type — porté par **≥2 positions d'auteur distinctes**
-    au sein d'un même enregistrement source est une corruption : un identifiant ne peut pas
-    désigner deux signatures dans un même document (dépôt HAL référençant deux fois le même
-    compte, ORCID du premier auteur recopié sur tous les co-auteurs d'un méga-papier
-    crossref/openalex…). Toute position portant une valeur partagée voit **tous** ses
-    identifiants suffixés `_dubious` : conservés (réversible, diagnosticable) mais invisibles
-    au matching personnes, qui lit les clés non suffixées.
+    Un identifiant — quel que soit son type — porté par **≥2 positions d'auteur distinctes** au sein d'un même enregistrement source est une corruption : un identifiant ne peut pas désigner deux signatures dans un même document (dépôt HAL référençant deux fois le même compte, ORCID du premier auteur recopié sur tous les co-auteurs d'un méga-papier crossref/openalex…). Toute position portant une valeur partagée voit **tous** ses identifiants suffixés `_dubious` : conservés (réversible, diagnosticable) mais invisibles au matching personnes, qui lit les clés non suffixées.
 
-    On requalifie y compris la position du vrai propriétaire de l'identifiant : on ne peut
-    pas la distinguer des usurpations, donc on sacrifie le match par identifiant sur ce
-    document (la signature matchera par nom) plutôt que de mal-attribuer les autres.
+    On requalifie y compris la position du vrai propriétaire de l'identifiant : rien ne la distingue des usurpations. Le match par identifiant est sacrifié sur ce document (la signature matchera par nom), pour éviter de mal-attribuer les autres.
 
-    Un par position, tels que produits par `compact_identifiers` (`None` = aucun identifiant).
-    Idempotent : les clés déjà suffixées `_dubious` sont ignorées à la détection et ne sont
-    pas re-suffixées — réappliquer la fonction (re-normalisation, backfill ré-exécuté) ne
-    change rien. Au normalize, l'entrée est toujours nue, donc comportement inchangé.
+    Un par position, tels que produits par `compact_identifiers` (`None` = aucun identifiant). Idempotent : les clés déjà suffixées `_dubious` sont ignorées à la détection et ne sont pas re-suffixées — réappliquer la fonction (re-normalisation, backfill ré-exécuté) ne change rien. Au normalize, l'entrée est toujours nue : comportement inchangé.
     """
 
     def bare(ids: dict[str, JsonValue] | None) -> list[tuple[str, JsonValue]]:

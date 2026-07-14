@@ -1,20 +1,10 @@
 """Value object `PersonNameForm` + factory `compute_person_name_forms`.
 
-Une forme de nom est une représentation normalisée d'une combinaison
-(last_name, first_name) destinée au matching. Plusieurs formes par
-personne : « prenom nom », « nom prenom », formes initialisées, etc.
-(cf. `compute_person_name_forms` ci-dessous).
+Une forme de nom est une représentation normalisée d'une combinaison (last_name, first_name) destinée au matching. Plusieurs formes par personne : « prenom nom », « nom prenom », formes initialisées, etc. (cf. `compute_person_name_forms` ci-dessous).
 
-Du point de vue domain, une forme de nom est entièrement définie par
-sa string normalisée — VO immuable, égalité par valeur.
+Du point de vue domain, une forme de nom est entièrement définie par sa string normalisée — VO immuable, égalité par valeur.
 
-Note storage : la table `person_name_forms (name_form, person_id,
-sources[])` est un **index inverse** dénormalisé pour le matching nom
-→ personnes. Les opérations d'écriture / interrogation sur ce mapping
-vivent côté repo (`infrastructure/repositories/person_repository/
-_name_forms.py`) : avec une PK composite `(name_form, person_id)` la
-sémantique "ajouter une source", "retirer une source", "forme
-ambiguë" devient SQL direct, sans représentation in-memory.
+Note storage : la table `person_name_forms (name_form, person_id, sources[])` est un **index inverse** dénormalisé pour le matching nom → personnes. Les opérations d'écriture / interrogation sur ce mapping vivent côté repo (`infrastructure/repositories/person_repository/_name_forms.py`) : avec une PK composite `(name_form, person_id)` la sémantique "ajouter une source", "retirer une source", "forme ambiguë" devient SQL direct, sans représentation in-memory.
 """
 
 from dataclasses import dataclass
@@ -27,9 +17,7 @@ from domain.normalize import normalize_name
 class PersonNameForm:
     """Forme normalisée du nom d'une personne (VO).
 
-    Identité = la string normalisée. La normalisation préalable est
-    portée par `compute_person_name_forms` ; le VO se contente de
-    garantir la non-vacuité.
+    Identité = la string normalisée. La normalisation préalable est portée par `compute_person_name_forms` ; le VO se contente de garantir la non-vacuité.
     """
 
     value: str
@@ -45,9 +33,7 @@ class PersonNameForm:
 def compute_person_name_forms(last_name: str, first_name: str) -> set[str]:
     """Calcule les variantes normalisées de formes de nom pour une personne.
 
-    Règle de composition du domaine (ne dépend d'aucune BD). Les
-    strings retournées sont les valeurs canoniques d'instances de
-    `PersonNameForm`.
+    Règle de composition du domaine (ne dépend d'aucune BD). Les strings retournées sont les valeurs canoniques d'instances de `PersonNameForm`.
 
     Retourne un ensemble de formes normalisées :
       - "prenom nom", "nom prenom"
