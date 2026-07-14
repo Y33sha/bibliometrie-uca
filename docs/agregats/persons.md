@@ -15,7 +15,7 @@
 | `distinct_persons` | Paires marquées « pas la même personne » | `(person_id_a, person_id_b)` unique, CHECK `a < b` |
 | `rejected_authorships` | Rejet durable d'une paire (publication, personne) | PK `(publication_id, person_id)` |
 
-Le rattachement d'une signature à une personne vit sur `source_authorships.person_id` + `resolution_mode` (enum `identifier` / `name` / `cross_source`), consolidé ensuite en table de vérité `authorships` par la phase suivante (cluster voisin).
+Le rattachement d'une signature à une personne vit sur `source_authorships.person_id` + `resolution_mode` (enum `identifier` / `name` / `cross_source`), consolidé ensuite dans la table de liaison `authorships` par la phase suivante (cluster voisin).
 
 ## Les deux axes
 

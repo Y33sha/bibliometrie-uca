@@ -15,7 +15,7 @@ Une `publication` est la référence canonique unifiée d'un document (`domain/p
 | `apc_payments` | Frais de publication (APC), import curé | `publication_id` (FK `ON DELETE SET NULL`), `doi`, `amount_eur_ht`, `billing_year`… |
 | `publications_detail` | Matview de détail pour l'API | `publication_id` (PK), rafraîchie à chaque `refresh_from_sources` |
 
-En amont : `source_publications` (via `publication_id`, cf. [source_publications](source_publications.md)). `authorships` est le pivot vers les [personnes](persons.md) ; ce bilan la couvre comme table de vérité produite en aval, sa construction relève du bilan authorships.
+En amont : `source_publications` (via `publication_id`, cf. [source_publications](source_publications.md)). `authorships` est le pivot vers les [personnes](persons.md) ; ce bilan la couvre comme table de liaison produite en aval, sa construction relève du bilan authorships.
 
 ## Les deux axes
 
@@ -77,7 +77,7 @@ Deux opérations seulement, dans un router admin (`interfaces/api/routers/admin/
 Portés par le domaine (`domain/publications/`), le SQL et le service.
 
 - **1 DOI = 1 publication.** Garde triple : la réconciliation ne fusionne jamais deux DOI distincts (cannot-link), l'index unique `lower(doi)` l'interdit en base, et la fusion manuelle lève `DistinctDoiError`. Une publication sans DOI peut rejoindre une publication avec DOI.
-- **Publication dérivée.** Hors fusion / marquage distinct, une publication n'est jamais écrite à la main ; `refresh_from_sources` recalcule tout depuis l'union des `source_publications`. La direction d'une fusion est sans effet durable (union identique).
+- **Publication dérivée.** Hors fusion / marquage distinct, une publication n'est jamais écrite à la main ; `refresh_from_sources` recalcule tout depuis l'union des `source_publications`.
 - **Non-matérialisé = supprimé.** Une publication orpheline (aucune source) ou de `doc_type` hors périmètre (`OUT_OF_SCOPE_DOC_TYPES`) est supprimée ; ses `source_publications` se détachent (`publication_id` nul), sans générer d'authorship ni de personne.
 - **Autorité Unpaywall sur l'OA.** Une fois `unpaywall_checked_at` posé, l'agrégation ne ré-écrit plus `oa_status` depuis les sources, sauf le plancher archive-ouverte (dépôt HAL `green`).
 - **Identité des authorships.** `(publication_id, person_id)` unique ; la FK `publication_id NOT NULL` verrouille l'entité fille au root.
