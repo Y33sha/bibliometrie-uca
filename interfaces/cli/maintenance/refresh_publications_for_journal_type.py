@@ -16,7 +16,7 @@ from sqlalchemy import text
 from application.services.publications.core import refresh_from_sources
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from infrastructure.repositories import audit_repository, publication_repository
+from infrastructure.repositories import publication_repository
 
 log = setup_logger("refresh_publications_for_journal_type", os.path.dirname(__file__))
 
@@ -65,9 +65,8 @@ def main() -> int:
             return 0
 
         pub_repo = publication_repository(conn)
-        audit_repo = audit_repository(conn)
         for pub_id in pub_ids:
-            refresh_from_sources(pub_id, repo=pub_repo, audit_repo=audit_repo)
+            refresh_from_sources(pub_id, repo=pub_repo)
         conn.commit()
         log.info("Terminé : %d publications rafraîchies.", total)
     return 0

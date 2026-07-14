@@ -556,7 +556,7 @@ def phase_publications(**kw: Any) -> PhaseMetrics:
     from infrastructure.queries.pipeline.publications_reconciliation import (
         PgPublicationsReconciliationQueries,
     )
-    from infrastructure.repositories import audit_repository, publication_repository
+    from infrastructure.repositories import publication_repository
 
     return run(
         _open_tx,
@@ -564,7 +564,6 @@ def phase_publications(**kw: Any) -> PhaseMetrics:
         PgAddressPubCountQueries(),
         log,
         pub_repo_factory=publication_repository,
-        audit_repo_factory=audit_repository,
         rebuild_publications=bool(kw.get("rebuild_publications")),
     )
 

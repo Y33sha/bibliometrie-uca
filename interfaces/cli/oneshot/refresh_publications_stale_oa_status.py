@@ -20,7 +20,7 @@ from application.services.publications.core import refresh_from_sources
 from domain.publications.metadata import OA_RANK
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from infrastructure.repositories import audit_repository, publication_repository
+from infrastructure.repositories import publication_repository
 
 log = setup_logger("refresh_publications_stale_oa_status", os.path.dirname(__file__))
 
@@ -81,12 +81,11 @@ def main() -> int:
             return 0
 
         pub_repo = publication_repository(conn)
-        audit_repo = audit_repository(conn)
 
         refreshed = 0
         for i, pub_id in enumerate(pub_ids):
             try:
-                refresh_from_sources(pub_id, repo=pub_repo, audit_repo=audit_repo)
+                refresh_from_sources(pub_id, repo=pub_repo)
             except Exception:
                 log.exception("  refresh_from_sources crash sur pub_id=%d", pub_id)
                 raise

@@ -19,7 +19,7 @@ from sqlalchemy import text
 from application.services.publications.core import refresh_from_sources
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from infrastructure.repositories import audit_repository, publication_repository
+from infrastructure.repositories import publication_repository
 
 log = setup_logger(
     "refresh_publications_with_supplementary_content_title", os.path.dirname(__file__)
@@ -77,9 +77,8 @@ def main() -> int:
             return 0
 
         pub_repo = publication_repository(conn)
-        audit_repo = audit_repository(conn)
         for i, pub_id in enumerate(pub_ids):
-            refresh_from_sources(pub_id, repo=pub_repo, audit_repo=audit_repo)
+            refresh_from_sources(pub_id, repo=pub_repo)
             if (i + 1) % BATCH_COMMIT == 0:
                 conn.commit()
                 log.info("  %d/%d rafraîchies…", i + 1, total)

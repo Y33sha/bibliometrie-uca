@@ -23,7 +23,6 @@ from application.ports.pipeline.publications_reconciliation import (
     PublicationsReconciliationQueries,
     ReconcileRow,
 )
-from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.publication_repository import PublicationRepository
 from application.services.publications.core import refresh_from_sources
 from domain.publications.metadata import OA_STATUS_UNKNOWN_DEFAULT
@@ -91,7 +90,6 @@ def reconcile(
     queries: PublicationsReconciliationQueries,
     *,
     pub_repo: PublicationRepository,
-    audit_repo: AuditRepository | None = None,
     logger: logging.Logger | None = None,
 ) -> ReconcileStats | None:
     """Planifie et applique la réconciliation du voisinage dirty, **sans `commit`** (à la charge du caller). Retourne `None` si aucune SP n'est dirty, sinon le bilan.
@@ -145,14 +143,14 @@ def reconcile(
             conn, dissolved.publication_id, dissolved.successor_publication_id
         )
         with savepoint(conn):
-            refresh_from_sources(dissolved.publication_id, repo=pub_repo, audit_repo=audit_repo)
+            refresh_from_sources(dissolved.publication_id, repo=pub_repo)
 
     # 3. Rafraîchir les survivants : métadonnées canoniques recomputées. Phase la plus longue sur un gros run → progression tous les 5000.
     survivor_ids = sorted(survivors)
     total = len(survivor_ids)
     for i, pub_id in enumerate(survivor_ids, 1):
         with savepoint(conn):
-            refresh_from_sources(pub_id, repo=pub_repo, audit_repo=audit_repo)
+            refresh_from_sources(pub_id, repo=pub_repo)
         if logger and (i % 5000 == 0 or i == total):
             logger.info("  rafraîchissement des métadonnées : %d/%d publications", i, total)
 
@@ -174,10 +172,9 @@ def run(
     logger: logging.Logger,
     *,
     pub_repo: PublicationRepository,
-    audit_repo: AuditRepository | None = None,
 ) -> ReconcileStats | None:
     try:
-        stats = reconcile(conn, queries, pub_repo=pub_repo, audit_repo=audit_repo, logger=logger)
+        stats = reconcile(conn, queries, pub_repo=pub_repo, logger=logger)
         if stats is None:
             logger.info("Réconciliation : aucune source_publication dirty")
             return None

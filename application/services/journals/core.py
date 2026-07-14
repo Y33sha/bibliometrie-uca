@@ -173,7 +173,7 @@ def merge_journals(
     # publications absorbées (qui lisent les colonnes `source_publication` fraîchement corrigées).
     _correct_for_journal(conn, correction_queries, target_id)
     for pub_id in absorbed_pub_ids:
-        refresh_from_sources(pub_id, repo=pub_repo, audit_repo=audit_repo)
+        refresh_from_sources(pub_id, repo=pub_repo)
 
     emit_event(audit_repo, "journal.merged", "journal", target_id, {"source_id": source_id})
 
@@ -212,7 +212,7 @@ def requalify_publications_for_journal(
         if pub is None:
             continue
         original_doc_type = pub.doc_type
-        refresh_from_sources(pub_id, repo=pub_repo, audit_repo=audit_repo)
+        refresh_from_sources(pub_id, repo=pub_repo)
         pub_after = pub_repo.find_by_id(pub_id)
         if pub_after is not None and pub_after.doc_type != original_doc_type:
             changed += 1
