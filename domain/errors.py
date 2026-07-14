@@ -1,8 +1,6 @@
 """Exceptions métier du domaine bibliométrique.
 
-Ces exceptions sont levées par la couche services/ pour signaler des
-situations métier sans dépendre de FastAPI. La traduction en codes HTTP
-se fait dans `interfaces/api/app.py` via des exception handlers dédiés.
+Ces exceptions sont levées par la couche services/ pour signaler des situations métier sans dépendre de FastAPI. La traduction en codes HTTP se fait dans `interfaces/api/app.py` via des exception handlers dédiés.
 """
 
 from typing import TypedDict
@@ -21,20 +19,13 @@ class ValidationError(DomainError):
 
 
 class ConflictError(DomainError):
-    """Opération refusée car elle violerait un invariant métier :
-    fusion d'une entité avec elle-même, suppression d'une ressource référencée,
-    création d'un doublon interdit, etc. (→ HTTP 409)."""
+    """Opération refusée : elle violerait un invariant métier — fusion d'une entité avec elle-même, suppression d'une ressource référencée, création d'un doublon interdit, etc. (→ HTTP 409)."""
 
 
 class CannotAttributeConflict(ConflictError):
-    """Tentative d'attribution d'un identifiant déjà attribué à une autre
-    personne avec un statut `pending` ou `confirmed`. Pour réattribuer,
-    le statut existant doit d'abord être passé à `rejected`.
+    """Tentative d'attribution d'un identifiant déjà attribué à une autre personne avec un statut `pending` ou `confirmed`. Pour réattribuer, le statut existant doit d'abord passer à `rejected`.
 
-    Porte, quand ils sont disponibles, les champs structurés du conflit (type et
-    valeur de l'identifiant, personne détentrice et son statut) : le path batch de la
-    cascade personnes les collecte pour arbitrer un transfert par consensus au lieu de
-    refuser en bloc. Le chemin admin unitaire les ignore (refus strict → 409)."""
+    Porte, quand ils sont disponibles, les champs structurés du conflit (type et valeur de l'identifiant, personne détentrice et son statut) : le path batch de la cascade personnes les collecte pour arbitrer un transfert par consensus. Le chemin admin unitaire les ignore (refus strict → 409)."""
 
     def __init__(
         self,
@@ -53,8 +44,7 @@ class CannotAttributeConflict(ConflictError):
 
 
 class BlockingJournal(TypedDict):
-    """Description structurée d'une paire de journaux qui bloque la fusion
-    de deux éditeurs (cf. `PublisherMergeBlockedError`)."""
+    """Description structurée d'une paire de journaux qui bloque la fusion de deux éditeurs (cf. `PublisherMergeBlockedError`)."""
 
     target_journal_id: int
     target_title: str
@@ -64,13 +54,9 @@ class BlockingJournal(TypedDict):
 
 
 class PublisherMergeBlockedError(ConflictError):
-    """Fusion d'éditeurs refusée parce que des paires de revues ne peuvent
-    pas être fusionnées automatiquement (ex: ISSN divergents pour des
-    revues partageant le même titre). L'utilisatrice doit traiter les
-    paires bloquantes côté admin Revues d'abord, puis relancer la fusion.
+    """Fusion d'éditeurs refusée : des paires de revues ne peuvent pas être fusionnées automatiquement (ex: ISSN divergents pour des revues partageant le même titre). L'utilisatrice doit traiter les paires bloquantes côté admin Revues d'abord, puis relancer la fusion.
 
-    `blocking_journals` énumère les paires problématiques pour que l'UI
-    puisse les afficher et permettre l'action manuelle."""
+    `blocking_journals` énumère les paires problématiques pour que l'UI puisse les afficher et permettre l'action manuelle."""
 
     def __init__(self, blocking_journals: list[BlockingJournal]) -> None:
         self.blocking_journals = blocking_journals
@@ -83,10 +69,7 @@ class PublisherMergeBlockedError(ConflictError):
 class DistinctDoiError(ConflictError):
     """Fusion refusée : deux publications portent des DOI non-nuls différents.
 
-    Par principe « 1 DOI = 1 publication », elles désignent des œuvres
-    distinctes et ne peuvent pas fusionner — quelle que soit la clé qui les a
-    rapprochées (hal_id, nnt, pmid, métadonnées). Les cas où l'on voudrait
-    malgré tout fusionner (DOI erroné, ou documents liés) sont traités à part."""
+    Par principe « 1 DOI = 1 publication », elles désignent des œuvres distinctes et ne peuvent pas fusionner — quelle que soit la clé qui les a rapprochées (hal_id, nnt, pmid, métadonnées). Les cas où l'on voudrait malgré tout fusionner (DOI erroné, ou documents liés) sont traités à part."""
 
     def __init__(self, target_id: int, source_id: int, target_doi: str, source_doi: str) -> None:
         self.target_id = target_id
@@ -104,8 +87,7 @@ class UnauthorizedError(DomainError):
 
 
 class RejectedPair(TypedDict):
-    """Paire (publication, personne) figurant dans le registre des rejets,
-    qui bloque une réassignation (cf. `RejectedPairError`)."""
+    """Paire (publication, personne) figurant dans le registre des rejets, qui bloque une réassignation (cf. `RejectedPairError`)."""
 
     publication_id: int
     person_id: int
@@ -113,13 +95,9 @@ class RejectedPair(TypedDict):
 
 
 class RejectedPairError(ConflictError):
-    """Réassignation refusée : une ou plusieurs paires (publication, personne)
-    ont déjà été rejetées et figurent dans `rejected_authorships`. Réassigner
-    recréerait un lien explicitement rejeté ; l'utilisatrice doit confirmer
-    pour lever le rejet (`force=true`).
+    """Réassignation refusée : une ou plusieurs paires (publication, personne) ont déjà été rejetées et figurent dans `rejected_authorships`. Réassigner recréerait un lien explicitement rejeté ; l'utilisatrice doit confirmer pour lever le rejet (`force=true`).
 
-    `rejected_pairs` énumère les paires concernées (avec la date du rejet) pour
-    que l'UI les affiche avant de demander confirmation."""
+    `rejected_pairs` énumère les paires concernées (avec la date du rejet) pour que l'UI les affiche avant de demander confirmation."""
 
     def __init__(self, rejected_pairs: list[RejectedPair]) -> None:
         self.rejected_pairs = rejected_pairs
