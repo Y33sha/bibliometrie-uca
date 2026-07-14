@@ -35,16 +35,16 @@ def connected_components(
             parent[max(ra, rb)] = min(ra, rb)
 
     token_owner: dict[tuple[str, str], int] = {}
-    for sp_id, tokens in members:
-        parent.setdefault(sp_id, sp_id)
+    for record_id, tokens in members:
+        parent.setdefault(record_id, record_id)
         for token in tokens:
             owner = token_owner.get(token)
             if owner is None:
-                token_owner[token] = sp_id
+                token_owner[token] = record_id
             else:
-                union(sp_id, owner)
+                union(record_id, owner)
 
     groups: dict[int, list[int]] = {}
-    for sp_id in parent:
-        groups.setdefault(find(sp_id), []).append(sp_id)
+    for record_id in parent:
+        groups.setdefault(find(record_id), []).append(record_id)
     return sorted((sorted(group) for group in groups.values()), key=lambda group: group[0])
