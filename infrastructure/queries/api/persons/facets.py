@@ -5,8 +5,8 @@ from typing import Any
 from sqlalchemy import Connection, text
 
 from application.ports.api.persons_queries import FacetFilters
-from domain.persons.identifiers import PUBLIC_PERSON_IDENTIFIER_TYPES_SQL
 from infrastructure.queries.filters import (
+    PUBLIC_PERSON_IDENTIFIER_TYPES_SQL,
     WhereClause,
     assemble_where,
     person_has_identifier_clause,

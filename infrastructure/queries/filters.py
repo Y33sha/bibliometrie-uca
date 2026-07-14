@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from domain.normalize import normalize_text
-from domain.persons.identifiers import PUBLIC_PERSON_IDENTIFIER_TYPES_SQL
+from domain.persons.identifiers import PUBLIC_PERSON_IDENTIFIER_TYPES
 
 OA_OPEN_STATUSES = ("gold", "hybrid", "bronze", "green", "diamond")
 OA_CLOSED_STATUSES = ("closed", "unknown")
@@ -29,6 +29,7 @@ def _sql_list(values: tuple[str, ...]) -> str:
 
 OA_OPEN_SQL = _sql_list(OA_OPEN_STATUSES)
 OA_CLOSED_SQL = _sql_list(OA_CLOSED_STATUSES)
+PUBLIC_PERSON_IDENTIFIER_TYPES_SQL = _sql_list(PUBLIC_PERSON_IDENTIFIER_TYPES)
 
 # Colonnes de ventilation OA par statut (alias `p` = publications), partagées par les
 # requêtes stats (éditeurs/revues/labos/années). `embargoed` est rangé par rang, juste
