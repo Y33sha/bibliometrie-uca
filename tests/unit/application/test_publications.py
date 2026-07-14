@@ -1,11 +1,14 @@
-"""Tests unitaires de la re-correction canonique du `doc_type`
-(`_apply_canonical_doc_type_correction`).
+"""Tests unitaires de la couche application des publications.
 
-Couvre le découplage de l'arbitrage : `doc_type` et `journal_id` canoniques peuvent provenir de
-`source_publications` différentes, donc une correction journal-dépendante appliquée par SP ne suit
-pas le `journal_id` canonique. La re-correction la rejoue sur le journal réellement résolu.
+Re-correction canonique du `doc_type` (`_apply_canonical_doc_type_correction`) : découplage de l'arbitrage — `doc_type` et `journal_id` canoniques peuvent provenir de `source_publications` différentes ; une correction journal-dépendante appliquée par source ne suit pas le `journal_id` canonique. La re-correction la rejoue sur le journal réellement résolu.
+
+Frontière transactionnelle de la fusion (`commands.merge_publications`) : la cible n'est recomposée qu'une fois.
 """
 
+from types import SimpleNamespace
+from unittest.mock import MagicMock
+
+from application.services.publications import commands, core
 from application.services.publications.core import _apply_canonical_doc_type_correction
 from domain.publications.identifiers import DOI
 from domain.publications.publication import Publication
@@ -76,3 +79,14 @@ def test_meta_preserved_when_correction_added():
     pub = _pub(doc_type="preprint", journal_id=7, meta={"k": "v"})
     _apply_canonical_doc_type_correction(pub, repo=_FakeRepo(journal_type="media"))
     assert pub.meta == {"k": "v", "corrections": {"doc_type": "JOURNAL_TYPE_MEDIA_TO_MEDIA"}}
+
+
+def test_merge_handler_recomposes_target_once(monkeypatch):
+    """Le handler de fusion recompose la cible une seule fois : `refresh_from_sources` vit dans `core.merge_publications`, que le handler appelle sans le doubler."""
+    calls: list[int] = []
+    monkeypatch.setattr(core, "refresh_from_sources", lambda *a, **k: calls.append(1))
+    repo = MagicMock()
+    repo.find_by_id.return_value = SimpleNamespace(doi=None)
+    commands.merge_publications(MagicMock(), 1, 2, repo=repo, audit_repo=MagicMock())
+    assert calls == [1]
+    repo.merge_into.assert_called_once_with(1, 2)
