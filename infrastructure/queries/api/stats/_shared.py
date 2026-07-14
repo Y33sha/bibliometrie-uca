@@ -52,8 +52,8 @@ def stats_filter_clauses(
     return out
 
 
-# Fragments APC — définis ici car spécifiques aux agrégations stats
-# (distincts de `apc_clause` de filters.py qui filtre sur l'existence).
+# Fragments APC spécifiques aux agrégations stats, distincts d'`apc_clause`
+# (`filters.py`), qui ne teste que l'existence d'un paiement.
 _APC_EXISTS_SA = (
     "EXISTS (SELECT 1 FROM apc_payments ap "
     "WHERE ap.publication_id = p.id "

@@ -3,10 +3,11 @@
 Le package est organisé par thème d'agrégat :
 - `pivot` : `run_pivot` (agrégation générique) et le schéma du registre
 - `collaborations` : `run_collaborations` (décompte des pays étrangers co-affiliés)
+- `entity_facets` : `stats_entity_facet` (facette éditeur/revue contextuelle)
 - `summary` : `available_years`, `stats_facets`
 - `_shared` : périmètre de base, assemblage des filtres et filtre APC partagés par les agrégats.
 
-`PgStatsQueries` agrège ces fonctions sous le port `application.ports.stats_queries.StatsQueries`. Les fonctions libres retournent des dicts conformes au shape des DTOs ; la conversion vers Pydantic est faite ici à la sortie, pour garder les fonctions libres réutilisables hors API.
+`PgStatsQueries` agrège ces fonctions sous le port `application.ports.api.stats_queries.StatsQueries`. Les fonctions libres retournent des dicts conformes au shape des DTOs ; la conversion vers Pydantic est faite ici à la sortie, pour garder les fonctions libres réutilisables hors API.
 """
 
 from typing import Literal
@@ -33,7 +34,7 @@ from application.ports.api.stats_queries import (
     StatsQueries,
     YearFacet,
 )
-from domain.stats.pivot import DIMENSIONS, MEASURES
+from domain.stats import DIMENSIONS, MEASURES
 from infrastructure.queries.api.entity_labels import entity_label as _entity_label
 from infrastructure.queries.api.stats.collaborations import (
     run_collaborations as _run_collaborations,
@@ -47,7 +48,7 @@ from infrastructure.queries.api.stats.summary import (
 
 
 class PgStatsQueries(StatsQueries):
-    """Adapter SA pour `application.ports.stats_queries.StatsQueries`."""
+    """Adapter SA pour `application.ports.api.stats_queries.StatsQueries`."""
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
