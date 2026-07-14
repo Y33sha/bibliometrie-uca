@@ -58,9 +58,9 @@ Le détail d'une publication expose la **provenance par source** : la liste des 
 
 ## Points d'attention
 
-1. **Le `doc_type` est à cheval sur deux packages.** Le vocabulaire canonique (`DocType`, `DOC_TYPES`) et le mapping source → canonique vivent dans `domain/source_publications/doc_types.py` ; les familles de types (`DOC_TYPE_FAMILIES`) et leur projection de ventilation dans `domain/publications/doc_type_families.py`. Un même concept scindé entre la couche par-source et la couche canonique. De plus `doc_type_grouped_sql` génère du SQL dans le domaine (alias `p.doc_type` en défaut) — le travers déjà rapatrié pour les priorités de sources et les types d'identifiants. Rangement possible : enum canonique + familles côté canonique, mapping source → canonique côté source.
-2. **Seuil de titre dupliqué.** La longueur minimale de titre du token `metadata_block` (30 caractères) est définie dans `keys.py` (`_METADATA_BLOCK_MIN_TITLE_LENGTH`) **et** ré-encodée dans le miroir SQL de l'univers de réconciliation — à garder synchrones (commenté aux deux endroits).
-3. **Deux sidecars à ne pas confondre.** `meta` porte les métadonnées source-natives (funders, `related_identifiers`, `relation`), écrite par `normalize`. `raw_metadata` porte la réversibilité des corrections (brut d'origine + provenance), écrite par `metadata_correction`. `normalize` ne touche jamais `raw_metadata`.
+**Le miroir SQL de la réconciliation duplique les types de clés.** L'univers de voisinage 1-hop (`publications_reconciliation`) ré-encode en branches `UNION` les mêmes types de clés que `keys.py` (DOI, NNT, PMID, HAL ID, token `metadata_block`) : duplication par nécessité — le voisinage se calcule côté base, et `keys.py` reste l'unique définition Python des clés. Le seuil de longueur minimale de titre, lui, est importé du domaine.
+
+La taxonomie `doc_type` est répartie proprement : vocabulaire canonique (enum, `ARTICLE_SUBTYPES`, familles) dans `domain/publications/doc_types.py`, mapping des nomenclatures sources dans `domain/source_publications/doc_types.py`. Le `CASE` de ventilation du pivot est rendu côté infrastructure.
 
 ## Invariants métier
 
