@@ -1,7 +1,4 @@
-"""Services applicatifs autour de la table `config` (paramètres clé / valeur JSON).
+"""Écritures API sur la table `config` (paramètres clé / valeur JSON).
 
-Sous-modules :
-- `core` : briques transaction-agnostiques (mise à jour de valeur), réutilisées
-  par l'API et les CLI.
-- `commands` : command handlers de l'API (frontière transactionnelle, commit).
+Un seul module, `commands` : les command handlers de l'API (frontière transactionnelle, commit). Les lectures restent autorisées dans les routers (convention du projet).
 """
