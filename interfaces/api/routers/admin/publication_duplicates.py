@@ -99,9 +99,7 @@ def mark_publications_distinct(
 ) -> OkResponse:
     """Marque deux publications comme distinctes (non-doublon confirmé).
 
-    Persiste l'annotation dans `publication_distinctions` : la paire
-    ne sera plus proposée par `/duplicates/next` lors des prochaines
-    revues. 400 si `pub_id_a == pub_id_b`.
+    Persiste l'annotation dans `distinct_publications` : la paire est écartée des prochaines revues de `/duplicates/next`. 400 si `pub_id_a == pub_id_b`.
     """
     if body.pub_id_a == body.pub_id_b:
         raise HTTPException(status_code=400, detail="pub_id_a et pub_id_b doivent être différents")
