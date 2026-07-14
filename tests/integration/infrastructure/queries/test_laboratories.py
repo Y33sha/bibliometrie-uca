@@ -1,9 +1,9 @@
 """Tests d'intégration pour `infrastructure.queries.api.laboratories`."""
 
-
 from sqlalchemy import text
 
 from infrastructure.queries.api.laboratories import PgLaboratoriesQueries
+from infrastructure.queries.perimeter import refresh_perimeter_structures
 from tests.integration.helpers.structures import add_authorship_structure
 
 
@@ -40,6 +40,9 @@ def _setup_perimeter(conn, lab_ids, code="uca"):
             ),
             {"p": root, "c": lab},
         )
+    # Matérialise la clôture du périmètre : `get_perimeter_structure_ids` lit la table
+    # `perimeter_structures`, peuplée par `refresh_perimeter_structures`.
+    refresh_perimeter_structures(conn)
     return root
 
 
