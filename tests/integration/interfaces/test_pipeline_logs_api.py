@@ -31,11 +31,11 @@ class TestPipelineStatus:
         assert r.json() is None
 
     def test_returns_status_when_alive(self, client, _isolate_paths, monkeypatch):
-        # `read_status` valide le PID — on stub `_is_pid_alive` pour
+        # `read_status` valide le PID — on stub `is_pid_alive` pour
         # éviter de devoir spawner un vrai process.
         import infrastructure.observability.pipeline_status as ps
 
-        monkeypatch.setattr(ps, "_is_pid_alive", lambda pid: True)
+        monkeypatch.setattr(ps, "is_pid_alive", lambda pid: True)
 
         status_file = _isolate_paths / "status.json"
         status_file.write_text(
