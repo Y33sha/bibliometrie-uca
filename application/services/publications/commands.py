@@ -18,15 +18,13 @@ def merge_publications(
     repo: PublicationRepository,
     audit_repo: AuditRepository,
 ) -> None:
-    """Fusionne deux publications doublons puis re-dérive les métadonnées
-    canoniques de la cible depuis l'union des sources, en une seule transaction.
+    """Fusionne deux publications doublons, en une seule transaction.
 
-    La cible (survivante) est l'id le plus petit : côté publications le sens de
-    fusion n'a pas d'effet durable, `refresh_from_sources` re-dérivant tout depuis
-    l'union des `source_publications`.
+    La cible (survivante) est l'id le plus petit ; le sens de fusion n'a pas d'effet
+    durable, `core.merge_publications` re-dérivant les métadonnées canoniques de la
+    cible depuis l'union des `source_publications`.
     """
     publications_service.merge_publications(target_id, source_id, repo=repo, audit_repo=audit_repo)
-    publications_service.refresh_from_sources(target_id, repo=repo, audit_repo=audit_repo)
     conn.commit()
 
 

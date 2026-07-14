@@ -35,8 +35,6 @@ def refresh_from_sources(
 
     L'identité des publications (quelles `source_publications` forment une même œuvre) relève de la réconciliation (`application/pipeline/publications`), jamais d'ici : ce recalcul ne touche que la publication reçue et ses sources. Une seule publication porte un DOI donné à ce stade : `repo.save` respecte la contrainte d'unicité.
 
-    Si `audit_repo` est fourni et que le DOI canonique change (d'une valeur à une autre, ou perte), un événement `publication.doi_changed` porte l'ancienne et la nouvelle valeur. Rien sur l'attribution initiale (None → valeur) ni sur une valeur inchangée.
-
     Laisse `notes` et `sources` inchangés (utiliser `update_sources` séparément).
     """
     pub = repo.find_by_id(pub_id)
@@ -50,7 +48,6 @@ def refresh_from_sources(
         emit_event(audit_repo, "publication.deleted_orphan", "publication", pub_id, {})
         return
 
-    previous_doi = pub.doi
     # Les corrections par enregistrement sont déjà persistées sur chaque `source_publication` par la
     # phase `metadata_correction` (colonnes lues par `get_source_publications`) : l'agrégation repart
     # des valeurs corrigées. L'arbitrage choisit `doc_type` et `journal_id` indépendamment : une
@@ -80,18 +77,6 @@ def refresh_from_sources(
 
     repo.save(pub)
     repo.update_sources(pub_id)
-
-    if previous_doi is not None and pub.doi != previous_doi:
-        emit_event(
-            audit_repo,
-            "publication.doi_changed",
-            "publication",
-            pub_id,
-            {
-                "previous_doi": str(previous_doi),
-                "new_doi": str(pub.doi) if pub.doi else None,
-            },
-        )
 
 
 def _apply_canonical_doc_type_correction(pub: Publication, *, repo: PublicationRepository) -> None:
