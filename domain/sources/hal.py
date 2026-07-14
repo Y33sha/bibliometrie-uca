@@ -25,9 +25,6 @@ from datetime import date
 GREEN_LINK_EXT_IDS = frozenset({"arxiv", "pubmedcentral"})
 
 
-# TODO: quand le lookup `journals.oa_model` sera disponible au normalize,
-# remonter le défaut publisher de 'hybrid' à 'gold' (voie la plus fréquente)
-# et ne rétrograder à 'hybrid' que pour les journaux non full-OA. Idem ScanR.
 def derive_hal_oa_status(
     open_access_bool: bool | None,
     file_main: str | None,

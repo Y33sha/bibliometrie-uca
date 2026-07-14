@@ -31,9 +31,6 @@ def extract_nnt_from_scanr_id(scanr_id: str | None) -> str | None:
     return None
 
 
-# TODO: quand le lookup `journals.oa_model` sera disponible au normalize,
-# remonter le défaut publisher de 'hybrid' à 'gold' (voie la plus fréquente)
-# et ne rétrograder à 'hybrid' que pour les journaux non full-OA. Idem HAL.
 def derive_scanr_oa_status(is_oa: bool | None, oa_evidence: dict[str, Any] | None) -> str | None:
     """Mapping (isOa, oaEvidence) ScanR → enum oa_status canonique.
 
