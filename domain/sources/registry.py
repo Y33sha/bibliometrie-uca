@@ -1,4 +1,4 @@
-"""Registre des sources bibliographiques : liste, ordres de priorité, helpers.
+"""Registre des sources bibliographiques : liste et ordres de priorité.
 
 Source unique de vérité côté Python pour la liste des sources et les ordres de priorité entre sources.
 
@@ -15,15 +15,8 @@ ALL_SOURCES_SET = frozenset(ALL_SOURCES)
 # Theses absent car son API ne se requête pas par DOI mais par NNT.
 DOI_SEARCHABLE_SOURCES = ("hal", "openalex", "wos", "scanr", "crossref", "datacite")
 
-
-def _to_sql(sources: tuple[str, ...]) -> str:
-    """Construit une clause SQL IN à partir d'un tuple de sources."""
-    return "(" + ", ".join(f"'{s}'" for s in sources) + ")"
-
-
 # Sources avec des auteurs exploitables (noms, identifiants, affiliations)
 AUTHOR_SOURCES = ALL_SOURCES
-AUTHOR_SOURCES_SQL = _to_sql(AUTHOR_SOURCES)
 
 # ── Ordres de priorité entre sources ─────────────────────────────
 
@@ -61,18 +54,3 @@ SOURCE_PRIORITY: tuple[str, ...] = (
 # stricte au modèle JSONB `StructureApiIds` côté infra.
 STRUCTURE_API_SOURCES: tuple[str, ...] = ("openalex", "wos", "scanr", "theses", "hal")
 STRUCTURE_API_SOURCES_SET: frozenset[str] = frozenset(STRUCTURE_API_SOURCES)
-
-# `is_corresponding` n'a pas d'ordre de priorité : il s'agrège en `bool_or`
-# (vrai si au moins une source l'atteste). Audit prod : le FALSE des sources est
-# une absence de signal (champ booléen défaut FALSE), pas une non-correspondance
-# explicite — aucune source n'émet de FALSE à écraser, donc l'union ne risque
-# pas de « true indu ».
-
-
-def source_case_sql(priorities: tuple[str, ...], col: str = "sa.source") -> str:
-    """Construit un fragment SQL `CASE <col> WHEN 's1' THEN 1 ... END` à partir d'un tuple de sources, pour poser une priorité dans un `ORDER BY` ou un `array_agg(... ORDER BY ...)`.
-
-    Garde les ordres de priorité comme constantes Python dans `domain/sources/`, sans duplication SQL.
-    """
-    whens = " ".join(f"WHEN '{s}' THEN {i + 1}" for i, s in enumerate(priorities))
-    return f"CASE {col} {whens} END"

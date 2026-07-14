@@ -7,7 +7,7 @@ from typing import Any
 from sqlalchemy import Connection, bindparam, text
 
 from domain.persons.name_matching import names_compatible, parse_raw_author_name
-from domain.sources.registry import AUTHOR_SOURCES_SQL
+from infrastructure.queries.sources_sql import AUTHOR_SOURCES_SQL
 
 # ── Orphan authorships ───────────────────────────────────────────
 
