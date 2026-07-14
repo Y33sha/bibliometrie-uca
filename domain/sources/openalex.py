@@ -1,11 +1,8 @@
 """Règles métier pures spécifiques à la source OpenAlex.
 
-Interprétation des champs propres au schéma OpenAlex — prédicats et
-extracteurs qui encapsulent la connaissance de la sémantique OpenAlex
-pour le reste du pipeline.
+Interprétation des champs propres au schéma OpenAlex — prédicats et extracteurs qui encapsulent la connaissance de la sémantique OpenAlex pour le reste du pipeline.
 
-Les `dict[str, Any]` ici sont des payloads JSON bruts de l'API OpenAlex
-(frontière dynamique avec une source externe, schéma non typé).
+Les `dict[str, Any]` ici sont des payloads JSON bruts de l'API OpenAlex (frontière dynamique avec une source externe, schéma non typé).
 """
 
 import re
@@ -60,18 +57,12 @@ class OpenalexLocation:
     """Vue structurée d'une `location` d'un work OpenAlex.
 
     OpenAlex expose deux entrées de même shape :
-    - `work.primary_location` : la location principale (où OA a
-      moissonné le document).
-    - `work.locations` (liste) : toutes les locations connues pour le
-      document (incluant typiquement la primary en `locations[0]`).
+    - `work.primary_location` : la location principale (où OA a moissonné le document).
+    - `work.locations` (liste) : toutes les locations connues pour le document (incluant typiquement la primary en `locations[0]`).
 
-    Cette dataclass représente une location quelconque, indépendamment
-    de son rôle primary/secondaire ; `parse_primary_location` en
-    construit la vue depuis `work.primary_location`.
+    Cette dataclass représente une location quelconque, indépendamment de son rôle primary/secondaire ; `parse_primary_location` en construit la vue depuis `work.primary_location`.
 
-    Tous les champs sont nullable car OpenAlex peut retourner une
-    location partielle (publi sans landing page, source non
-    identifiée…).
+    Tous les champs sont nullable : OpenAlex peut retourner une location partielle (publi sans landing page, source non identifiée…).
     """
 
     location_id: str | None  # location.id (ex. "pmh:2023UCFAC123")
@@ -141,11 +132,9 @@ def is_hal_location(loc: OpenalexLocation) -> bool:
 
 
 def should_skip_publisher_journal(loc: OpenalexLocation | None) -> bool:
-    """True si la primary_location ne représente pas un éditeur — donc
-    on ne cherche ni publisher ni journal pour ce work.
+    """True si la primary_location ne désigne pas un éditeur : ni publisher ni journal ne sont cherchés pour ce work.
 
-    Couvre HAL, theses.fr et tout autre repository (Zenodo, SPIRE, etc.).
-    `None` (pas de primary) → False par défaut (rare en pratique).
+    Couvre HAL, theses.fr et tout autre repository (Zenodo, SPIRE, etc.). `None` (pas de primary) → False par défaut (rare en pratique).
     """
     if loc is None:
         return False
@@ -190,18 +179,10 @@ _KNOWN_OA_STATUSES = frozenset({"gold", "diamond", "hybrid", "bronze", "green", 
 def map_openalex_oa_status(raw: str | None) -> str | None:
     """Mapping OpenAlex `open_access.oa_status` → enum oa_status canonique.
 
-    OpenAlex utilise les mêmes labels que notre enum (gold, diamond,
-    hybrid, bronze, green, closed). Mapping identitaire pour les
-    valeurs connues, plus :
+    OpenAlex utilise les mêmes labels que notre enum (gold, diamond, hybrid, bronze, green, closed). Mapping identitaire pour les valeurs connues, plus :
 
-    - `None` ou `""` → `None` (OpenAlex ne s'est pas prononcé ; on
-      délègue aux autres sources via `best_oa_status` côté
-      `refresh_from_sources`. Cas rare : OpenAlex peuple presque
-      toujours `open_access.oa_status` quand `open_access` est
-      présent. Cohérent avec la sémantique HAL/ScanR : on ne mappe
-      pas un champ vide à `closed`.)
-    - valeur inattendue → `'unknown'` (catch-all si OpenAlex introduit
-      un nouveau label qu'on n'a pas encore intégré au mapping).
+    - `None` ou `""` → `None` (OpenAlex ne s'est pas prononcé ; on délègue aux autres sources via `best_oa_status` côté `refresh_from_sources`. Cas rare : OpenAlex peuple presque toujours `open_access.oa_status` quand `open_access` est présent. Cohérent avec la sémantique HAL/ScanR : un champ vide ne se mappe pas à `closed`.)
+    - valeur inattendue → `'unknown'` (catch-all si OpenAlex introduit un label pas encore intégré au mapping).
     """
     if not raw:
         return None
@@ -218,21 +199,13 @@ def map_openalex_oa_status(raw: str | None) -> str | None:
 def extract_external_ids_from_urls(urls: list[str]) -> dict[str, str | list[str]]:
     """Extrait les identifiants exposés dans une liste d'URLs.
 
-    Reconnait HAL (préfixes `hal-`/`tel-`/`halshs-`…), NNT
-    (URLs `theses.fr/<NNT>`), PMID (PubMed), PMCID et arXiv.
+    Reconnait HAL (préfixes `hal-`/`tel-`/`halshs-`…), NNT (URLs `theses.fr/<NNT>`), PMID (PubMed), PMCID et arXiv.
 
-    `hal_id` est **multivalué** : une œuvre peut référencer plusieurs
-    dépôts HAL (chapitres, versions, doublons), tous collectés (liste
-    dédupliquée, ordre d'apparition). Les autres clés sont 1:1 avec un
-    document → premier match gagnant (l'ordre des URLs est significatif :
-    le caller choisit typiquement landing_page_url avant pdf_url).
+    `hal_id` est **multivalué** : une œuvre peut référencer plusieurs dépôts HAL (chapitres, versions, doublons), tous collectés (liste dédupliquée, ordre d'apparition). Les autres clés sont 1:1 avec un document → premier match gagnant (l'ordre des URLs est significatif : le caller choisit typiquement landing_page_url avant pdf_url).
 
-    Les extracteurs d'ID par URL (PMID/PMCID/arXiv/HAL) vivent dans
-    `domain.publications.identifiers` (neutres, réutilisés par HAL).
+    Les extracteurs d'ID par URL (PMID/PMCID/arXiv/HAL) vivent dans `domain.publications.identifiers` (neutres, réutilisés par HAL).
 
-    Pas de normalisation du NNT ici (à l'inverse de
-    `extract_nnt_from_location`) — extracteur opportuniste depuis une
-    URL, la normalisation est laissée au caller.
+    Pas de normalisation du NNT ici (à l'inverse de `extract_nnt_from_location`) — extracteur opportuniste depuis une URL, la normalisation est laissée au caller.
     """
     external_ids: dict[str, str | list[str]] = {}
     hal_ids: list[str] = []
