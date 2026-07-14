@@ -2136,7 +2136,6 @@ export interface paths {
          *     - `publisher_type` / `country` : CSV de valeurs (ex. `commercial,learned_society`).
          *       Vide = pas de filtre. Aligné sur la convention multi-valeurs de
          *       `/api/journals` et `/api/publications`.
-         *     - `is_predatory` : booléen (true/false). Omettre = pas de filtre.
          *     - `with_pubs` : si true, n'expose que les éditeurs avec au moins 1
          *       publication rattachée (via leurs revues). Utilisé par la page
          *       publique /publishers pour masquer les éditeurs orphelins. L'admin
@@ -3692,8 +3691,6 @@ export interface components {
             openalex_id: string | null;
             /** Is In Doaj */
             is_in_doaj: boolean;
-            /** Is Predatory */
-            is_predatory: boolean;
             /** Apc Amount */
             apc_amount: number | null;
             /** Apc Currency */
@@ -3755,8 +3752,6 @@ export interface components {
             openalex_id: string | null;
             /** Is In Doaj */
             is_in_doaj: boolean;
-            /** Is Predatory */
-            is_predatory: boolean;
             /** Apc Amount */
             apc_amount: number | null;
             /** Apc Currency */
@@ -3792,7 +3787,12 @@ export interface components {
             /** Count */
             count: number;
         };
-        /** JournalUpdate */
+        /**
+         * JournalUpdate
+         * @description Champs éditables d'une revue, en modification sélective.
+         *
+         *     Seuls les champs explicitement fournis sont écrits (`model_dump(exclude_unset=True)`). Les champs listés sont ceux qu'un client peut fournir ; `title_normalized`, dérivé de `title`, est posé par le repository.
+         */
         JournalUpdate: {
             /** Title */
             title?: string | null;
@@ -3810,8 +3810,6 @@ export interface components {
             journal_type?: string | null;
             /** Is Academic */
             is_academic?: boolean | null;
-            /** Is Predatory */
-            is_predatory?: boolean | null;
             /** Is In Doaj */
             is_in_doaj?: boolean | null;
             /** Apc Amount */
@@ -4921,8 +4919,6 @@ export interface components {
             issn: string | null;
             /** Eissn */
             eissn: string | null;
-            /** Journal Predatory */
-            journal_predatory: boolean | null;
             /** Apc Amount */
             apc_amount: number | null;
             /** Apc Currency */
@@ -4933,8 +4929,6 @@ export interface components {
             publisher_id: number | null;
             /** Publisher Name */
             publisher_name: string | null;
-            /** Publisher Predatory */
-            publisher_predatory: boolean | null;
         };
         /**
          * PublicationDetailResponse
@@ -5105,14 +5099,10 @@ export interface components {
             name: string;
             /** Openalex Id */
             openalex_id: string | null;
-            /** Ror */
-            ror: string | null;
             /** Country */
             country: string | null;
             /** Doi Prefixes */
             doi_prefixes: components["schemas"]["DoiPrefixInfo"][];
-            /** Is Predatory */
-            is_predatory: boolean;
             /** Publisher Type */
             publisher_type: string;
             /** Journal Count */
@@ -5128,14 +5118,10 @@ export interface components {
             name: string;
             /** Openalex Id */
             openalex_id: string | null;
-            /** Ror */
-            ror: string | null;
             /** Country */
             country: string | null;
             /** Doi Prefixes */
             doi_prefixes: components["schemas"]["DoiPrefixInfo"][];
-            /** Is Predatory */
-            is_predatory: boolean;
             /** Publisher Type */
             publisher_type: string;
             /** Journal Count */
@@ -5160,8 +5146,6 @@ export interface components {
             name?: string | null;
             /** Country */
             country?: string | null;
-            /** Is Predatory */
-            is_predatory?: boolean | null;
             /** Publisher Type */
             publisher_type?: string | null;
         };
@@ -9166,7 +9150,6 @@ export interface operations {
                 search?: string | null;
                 publisher_type?: string;
                 country?: string;
-                is_predatory?: boolean | null;
                 with_pubs?: boolean;
             };
             header?: never;
@@ -9203,7 +9186,6 @@ export interface operations {
                 search?: string | null;
                 publisher_type?: string;
                 country?: string;
-                is_predatory?: boolean | null;
                 with_pubs?: boolean;
                 sort?: string;
             };
