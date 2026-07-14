@@ -1,9 +1,6 @@
-"""
-Mapping unifié des doc_types sources → enum canonique doc_type.
+"""Mapping unifié des doc_types sources → enum canonique doc_type.
 
-Chaque source (HAL, OpenAlex, WoS, ScanR, theses.fr) utilise sa propre
-nomenclature. Ce module fournit un point unique de conversion vers l'enum
-PostgreSQL `doc_type` de la table `publications`.
+Chaque source (HAL, OpenAlex, WoS, ScanR, theses.fr) utilise sa propre nomenclature. Ce module fournit un point unique de conversion vers l'enum PostgreSQL `doc_type` de la table `publications`.
 
 Usage :
     from domain.source_publications.doc_types import map_doc_type
@@ -292,8 +289,7 @@ ARTICLE_SUBTYPES: frozenset[str] = frozenset(
 def map_doc_type(raw: str | None, source: str | None = None) -> str:
     """Convertit un doc_type source en valeur canonique de l'enum doc_type.
 
-    Gère les types composites séparés par ";" (ex: WoS "Article; Proceedings Paper")
-    en prenant le premier type significatif (non "other").
+    Gère les types composites séparés par ";" (ex: WoS "Article; Proceedings Paper") en prenant le premier type significatif (non "other").
 
     Lookup :
     1. Si source est fourni, cherche dans le mapping de cette source.
