@@ -99,10 +99,7 @@ def refresh_from_sources(
 def first_non_null(sources: list[SourcePublication], attr: str) -> Any:
     """Premier `getattr(source, attr)` non-null dans l'ordre des `sources`. None si tous absents.
 
-    Retour `Any` justifié : type polymorphique selon `attr` (str pour
-    `title`, int pour `pub_year`, list pour `keywords`, …). Typer un
-    générique via TypeVar serait excessif pour 1 helper utilisé en
-    interne par `refresh_from_sources`.
+    Retour `Any` justifié : type polymorphique selon `attr` (str pour `title`, int pour `pub_year`, list pour `keywords`, …). Typer un générique via TypeVar serait excessif pour 1 helper utilisé en interne par `refresh_from_sources`.
     """
     for s in sources:
         v = getattr(s, attr)
@@ -114,9 +111,7 @@ def first_non_null(sources: list[SourcePublication], attr: str) -> Any:
 def merge_lists_dedup_ci(sources: list[SourcePublication], attr: str) -> list[Any] | None:
     """Union dédupliquée des listes `source.<attr>`. Déduplication case-insensitive pour les strings, sinon par valeur. Préserve l'ordre d'apparition. None si toutes vides/null.
 
-    `list[Any]` justifié : les listes consommées sont `list[str]` (`keywords`,
-    `countries`, …) en pratique, mais `getattr` est polymorphique — même
-    justification que `first_non_null`.
+    `list[Any]` justifié : les listes consommées sont `list[str]` (`keywords`, `countries`, …) en pratique, mais `getattr` est polymorphique — même justification que `first_non_null`.
     """
     seen: set[Any] = set()
     result: list[Any] = []
@@ -155,7 +150,7 @@ def topics_by_source(
 def arbitrate_doc_type_with_article_subtype(sources: list[SourcePublication]) -> str:
     """Choix du `doc_type` canonique : premier non-null dans l'ordre de priorité, avec exception pour les sous-types d'article.
 
-    Les `doc_type` lus sont déjà **canoniques et corrigés** (la phase `metadata_correction` a mappé source→canonique et appliqué les corrections en place sur la `source_publication`) ; l'arbitrage opère donc directement sur les colonnes, sans re-mapper.
+    Les `doc_type` lus sont déjà **canoniques et corrigés** (la phase `metadata_correction` a mappé source→canonique et appliqué les corrections en place sur la `source_publication`) ; l'arbitrage opère directement sur les colonnes, sans re-mapper.
 
     CrossRef (priorité 2) renvoie `journal-article` indistinctement pour tous les sous-types (review, book_review, data_paper, poster, conference_paper, editorial, letter, erratum, retraction). Une source moins prioritaire ayant produit un de ces sous-types plus précis, on le préfère pour ne pas perdre l'information.
     """

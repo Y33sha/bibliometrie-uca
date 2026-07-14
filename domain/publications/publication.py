@@ -1,6 +1,6 @@
 """Aggregate root `Publication` — référence biblio canonique.
 
-Une `Publication` est la vue UCA d'un document scientifique, agrégée depuis une ou plusieurs `SourcePublication`. Identité = `id` (clé surrogate). Identifiant naturel principal : `doi` (quand renseigné ; les autres identifiants — HALId, NNT — vivent côté `source_publications.external_ids`).
+Une `Publication` unifie les images qu'une ou plusieurs `SourcePublication` donnent d'un même document scientifique. Identité = `id` (clé surrogate). Identifiant naturel principal : `doi` (quand renseigné ; les autres identifiants — HALId, NNT — vivent côté `source_publications.external_ids`).
 
 Composition : `Publication.authorships` (entité fille `Authorship`). Les `source_publications` attachées sont lues en projection (`SourcePublication`), jamais comme un agrégat mutable.
 
@@ -42,5 +42,5 @@ class Publication:
     authorships: tuple[Authorship, ...] = field(default=())
     # Date de la dernière vérification Unpaywall (None = jamais). Quand posée,
     # Unpaywall fait autorité sur `oa_status` : l'agrégation cross-sources ne le
-    # ré-écrit pas (cf. `aggregation.recompute`).
+    # ré-écrit pas (cf. `aggregation.refresh_from_sources`).
     unpaywall_checked_at: datetime | None = None

@@ -5,7 +5,7 @@ OUT_OF_SCOPE_DOC_TYPES = frozenset({"peer_review", "memoir"})
 
 Une œuvre dont le `doc_type` canonique résolu appartient à cet ensemble n'a pas de ligne
 `publications` : `refresh_from_sources` la supprime après l'arbitrage du type
-(`application/publications/core.py`), au même titre qu'une publication orpheline. Ses
+(`application/services/publications/core.py`), au même titre qu'une publication orpheline. Ses
 `source_publications` et `source_authorships` subsistent — trace de leur passage en
 source — mais détachées : sans publication, elles ne génèrent ni authorship canonique ni
 personne, les deux chemins exigeant une publication matérialisée.
