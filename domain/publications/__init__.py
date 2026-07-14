@@ -1,5 +1,4 @@
-"""Concept métier Publication — value objects, règles, et invariants
-de portée (scope).
+"""Concept métier Publication — value objects, règles, et invariants de portée (scope).
 
 Sous-modules :
 - `identifiers` : VOs DOI/HALId/NNT + helpers de normalisation (`clean_doi`, `normalize_nnt`, `extract_hal_id_from_url`)

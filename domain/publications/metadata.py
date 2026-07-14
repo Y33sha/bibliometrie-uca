@@ -1,10 +1,6 @@
-"""Règles métier sur les métadonnées de publication — domain services
-purs sans état d'instance.
+"""Règles métier sur les métadonnées de publication — domain services purs sans état d'instance.
 
-Catch-all pour les règles qui touchent aux métadonnées d'une
-publication (oa_status, titre canonique, …) et n'ont pas de meilleure
-cible. À mesure qu'un type d'opération gagne en volume, il peut sortir
-dans son propre module.
+Catch-all pour les règles qui touchent aux métadonnées d'une publication (oa_status, titre canonique, …) et n'ont pas de meilleure cible. À mesure qu'un type d'opération gagne en volume, il peut sortir dans son propre module.
 """
 
 import re
@@ -62,9 +58,7 @@ OPEN_ARCHIVE_SOURCES: frozenset[str] = frozenset({"hal"})
 
 
 class _OaSignalSource(Protocol):
-    """Forme minimale lue par `has_open_archive_deposit` : la provenance et le statut OA d'une
-    `source_publication`. Membres en lecture seule (propriétés) pour accepter aussi bien un dataclass
-    mutable qu'un `frozen` (comme `SourcePublication`)."""
+    """Forme minimale lue par `has_open_archive_deposit` : la provenance et le statut OA d'une `source_publication`. Membres en lecture seule (propriétés) pour accepter aussi bien un dataclass mutable qu'un `frozen` (comme `SourcePublication`)."""
 
     @property
     def source(self) -> str: ...
@@ -75,18 +69,14 @@ class _OaSignalSource(Protocol):
 def has_open_archive_deposit(sources: Iterable[_OaSignalSource]) -> bool:
     """Vrai si une archive ouverte (`OPEN_ARCHIVE_SOURCES`) atteste un dépôt avec fichier (`green`).
 
-    Un tel dépôt est un fait : il prime sur un `closed`/`unknown` d'Unpaywall (lequel ne voit pas le
-    fichier sous le DOI). Le `hybrid` ne compte pas — c'est un lien éditeur relayé par l'archive,
-    sans fichier déposé."""
+    Un tel dépôt est un fait : il prime sur un `closed`/`unknown` d'Unpaywall (lequel ne voit pas le fichier sous le DOI). Le `hybrid` ne compte pas — c'est un lien éditeur relayé par l'archive, sans fichier déposé."""
     return any(s.source in OPEN_ARCHIVE_SOURCES and s.oa_status == "green" for s in sources)
 
 
 def best_oa_status(statuses: Iterable[str | None]) -> str | None:
     """Retourne le statut OA le plus ouvert parmi `statuses`.
 
-    Ordre décroissant : diamond > gold > hybrid > bronze > green > closed > unknown.
-    Les valeurs None, vides ou inconnues sont ignorées. Retourne None
-    si aucune valeur exploitable n'est fournie.
+    Ordre décroissant : diamond > gold > hybrid > bronze > green > closed > unknown. Les valeurs None, vides ou inconnues sont ignorées. Retourne None si aucune valeur exploitable n'est fournie.
     """
     best: str | None = None
     best_rank = 0
@@ -163,15 +153,8 @@ _WHITESPACE_RE = re.compile(r"\s+")
 def clean_publication_title(title: str | None) -> str | None:
     """Nettoie un titre pour la persistance et l'affichage.
 
-    - Décode les entités HTML jusqu'à stabilisation : `&lt;sub&gt;` → `<sub>`,
-      `&amp;` → `&`, `&#233;` → `é`. La boucle (bornée) absorbe les flux
-      double-échappés (`&amp;lt;`, OpenAlex / ScanR). Décoder est sûr : un `&` de
-      contenu ("Smith & Jones") est ré-échappé au point d'affichage et réduit à
-      un espace par `normalize_text` — rien ne consomme le titre stocké sans
-      l'une ou l'autre de ces étapes.
-    - Collapse le whitespace parasite (newlines / tabs / espaces multiples → un
-      seul espace, trim) : fréquent quand le markup source (MathML/HTML) est
-      indenté dans le titre.
+    - Décode les entités HTML jusqu'à stabilisation : `&lt;sub&gt;` → `<sub>`, `&amp;` → `&`, `&#233;` → `é`. La boucle (bornée) absorbe les flux double-échappés (`&amp;lt;`, OpenAlex / ScanR). Décoder est sûr : un `&` de contenu ("Smith & Jones") est ré-échappé au point d'affichage et réduit à un espace par `normalize_text` — rien ne consomme le titre stocké sans l'une ou l'autre de ces étapes.
+    - Collapse le whitespace parasite (newlines / tabs / espaces multiples → un seul espace, trim) : fréquent quand le markup source (MathML/HTML) est indenté dans le titre.
 
     Conserve les balises HTML (rendues à l'affichage). Idempotent.
     """
@@ -186,8 +169,5 @@ def clean_publication_title(title: str | None) -> str | None:
 
 
 def normalized_title(title: str | None) -> str:
-    """Forme normalisée d'un titre pour le blocking / la dédup / le matching : nettoyage HTML
-    (`clean_publication_title`) puis `normalize_text`. Déterministe et idempotent — c'est la
-    valeur matérialisée dans `source_publications.title_normalized`, identique à ce que le
-    matcher calcule à la volée."""
+    """Forme normalisée d'un titre pour le blocking / la dédup / le matching : nettoyage HTML (`clean_publication_title`) puis `normalize_text`. Déterministe et idempotent — c'est la valeur matérialisée dans `source_publications.title_normalized`, identique à ce que le matcher calcule à la volée."""
     return normalize_text(clean_publication_title(title) or "")

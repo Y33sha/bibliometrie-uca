@@ -43,19 +43,11 @@ _DASH_TRANSLATION = {ord(c): "-" for c in "‐‑‒–—―−﹘﹣－"}
 
 
 def _normalize_doi(raw: str | None) -> str | None:
-    """Normalise un DOI brut vers sa forme canonique : minuscule, sans préfixe URL ni schéma,
-    sans artefact de copier-coller, ramené sur son concept (suffixe de version retiré).
+    """Normalise un DOI brut vers sa forme canonique : minuscule, sans préfixe URL ni schéma, sans artefact de copier-coller, ramené sur son concept (suffixe de version retiré).
 
-    Lowercase systématique : la spec DOI Handbook précise que le préfixe `10.xxxx` est
-    insensible à la casse, et CrossRef (registre officiel) traite l'ensemble du DOI en
-    case-insensitive. Stocker tout en minuscules évite les faux doublons cross-sources.
+    Lowercase systématique : la spec DOI Handbook précise que le préfixe `10.xxxx` est insensible à la casse, et CrossRef (registre officiel) traite l'ensemble du DOI en case-insensitive. Stocker tout en minuscules évite les faux doublons cross-sources.
 
-    Idempotent par construction : une passe (`_normalize_doi_step`) est réappliquée jusqu'au
-    point fixe. Chaque transformation retire des caractères ou est un remplacement idempotent
-    (minuscule, tirets Unicode) — aucune n'en ajoute — donc l'itération converge, et un DOI
-    déjà normalisé est renvoyé inchangé. L'itération est nécessaire parce qu'une étape de fin
-    (suffixe `.vN`) peut ré-exposer du travail pour une étape de début (slash ou `/pdf` final),
-    résidu qu'une passe unique laisserait.
+    Idempotent par construction : une passe (`_normalize_doi_step`) est réappliquée jusqu'au point fixe. Chaque transformation retire des caractères ou est une substitution idempotente (minuscule, tirets Unicode), sans jamais en ajouter : l'itération converge, et un DOI déjà normalisé est renvoyé inchangé. L'itération est nécessaire parce qu'une étape de fin (suffixe `.vN`) peut ré-exposer du travail pour une étape de début (slash ou `/pdf` final), résidu qu'une passe unique laisserait.
     """
     if not raw:
         return None
@@ -69,12 +61,7 @@ def _normalize_doi(raw: str | None) -> str | None:
 
 
 def _normalize_doi_step(s: str) -> str:
-    """Une passe de normalisation d'un DOI déjà minuscule. Retire, dans l'ordre : le préfixe de
-    schéma `doi:`, un préfixe URL (`https://doi.org/`…), l'encodage pourcent (`%2f` → `/`), les
-    tirets typographiques Unicode (ramenés sur `-`), une query string (`?utm_…`), les DOI
-    surnuméraires d'une liste au point-virgule (le premier est gardé), le slash final, la
-    ponctuation/markup de fin (`. , ; : < >` et parenthèse non appariée — les parenthèses
-    appariées de `10.1007/jhep07(2020)108` sont conservées), puis les suffixes `/pdf` et `.vN`.
+    """Une passe de normalisation d'un DOI déjà minuscule. Retire, dans l'ordre : le préfixe de schéma `doi:`, un préfixe URL (`https://doi.org/`…), l'encodage pourcent (`%2f` → `/`), les tirets typographiques Unicode (ramenés sur `-`), une query string (`?utm_…`), les DOI surnuméraires d'une liste au point-virgule (le premier est gardé), le slash final, la ponctuation/markup de fin (`. , ; : < >` et parenthèse non appariée — les parenthèses appariées de `10.1007/jhep07(2020)108` sont conservées), puis les suffixes `/pdf` et `.vN`.
 
     Ne converge pas seule : c'est `_normalize_doi` qui la réitère jusqu'au point fixe."""
     if s.startswith("doi:"):
@@ -239,11 +226,7 @@ _NNT_RE = re.compile(r"[0-9A-Z]+")
 
 
 def _normalize_nnt(raw: str | None) -> str | None:
-    """Normalise un NNT : uppercase + strip. Format historiquement variable,
-    on exige une valeur strictement alphanumérique ASCII (chiffres et lettres
-    non accentuées). Ce garde rejette les identifiants OAI-PMH (`oai:HAL:…`,
-    `doi:…`, `ark:/…`) qu'OpenAlex expose dans `primary_location.id` et qui ne
-    sont pas des NNT — sans lui, ces valeurs alimenteraient un lien theses.fr mort."""
+    """Normalise un NNT : uppercase + strip. Format variable, on exige une valeur strictement alphanumérique ASCII (chiffres et lettres non accentuées). Ce garde rejette les identifiants OAI-PMH (`oai:HAL:…`, `doi:…`, `ark:/…`) qu'OpenAlex expose dans `primary_location.id` et qui ne sont pas des NNT — sans lui, ces valeurs alimenteraient un lien theses.fr mort."""
     if not raw:
         return None
     s = raw.strip().upper()
@@ -254,8 +237,7 @@ def _normalize_nnt(raw: str | None) -> str | None:
 
 @dataclass(frozen=True)
 class NNT:
-    """Numéro National de Thèse. Format typique : YYYY + code établissement
-    + séquence (ex. 2021CLFAC030), mais le format a varié historiquement.
+    """Numéro National de Thèse. Format typique : YYYY + code établissement + séquence (ex. 2021CLFAC030), sans être garanti.
 
     On normalise en majuscules, trim, et on exige une valeur alphanumérique.
     """
@@ -373,8 +355,7 @@ _ARXIV_BARE_RE = re.compile(r"^(\d{4}\.\d{4,5}|[a-z.\-]+/\d{7})(?:v\d+)?$", re.I
 def _normalize_arxiv_id(raw: str | None) -> str | None:
     """Identifiant arXiv depuis une URL `arxiv.org/abs|pdf/<id>` ou un id brut.
 
-    Gère le format moderne (`2103.00001`) et l'ancien (`math/0211159`),
-    en ignorant le suffixe de version (`v2`) et l'extension `.pdf`.
+    Gère les deux schémas d'identifiant : `AAAA.NNNNN` (`2103.00001`) et `catégorie/NNNNNNN` (`math/0211159`), en ignorant le suffixe de version (`v2`) et l'extension `.pdf`.
     """
     if not raw:
         return None
@@ -420,9 +401,7 @@ class ArxivId:
 
 
 def clean_doi(doi: str | None) -> str | None:
-    """Nettoie un DOI brut : préfixe URL, espaces, suffixe de version.
-    Retourne le DOI canonique, ou None si l'entrée est vide/inutilisable.
-    """
+    """Nettoie un DOI brut : préfixe URL, espaces, suffixe de version. Retourne le DOI canonique, ou None si l'entrée est vide/inutilisable."""
     return _normalize_doi(doi)
 
 
@@ -432,11 +411,7 @@ _DOI_PREFIX_RE = re.compile(r"(10\.\d+)")
 def clean_doi_prefix(prefix: str | None) -> str | None:
     """Isole le préfixe DOI canonique (`10.<chiffres>`) d'une chaîne brute.
 
-    Le préfixe est la partie registrant d'un DOI, avant le premier `/`. Tolère
-    une entrée bruitée (espaces, casse, DOI complet, ponctuation parasite) en
-    extrayant le motif `10.<chiffres>` en tête. Retourne `None` si aucun préfixe
-    valide n'est présent. À appliquer avant d'interroger les endpoints préfixe
-    (`api.crossref.org/prefixes`, `api.datacite.org/prefixes`)."""
+    Le préfixe est la partie registrant d'un DOI, avant le premier `/`. Tolère une entrée bruitée (espaces, casse, DOI complet, ponctuation parasite) en extrayant le motif `10.<chiffres>` en tête. Retourne `None` si aucun préfixe valide n'est présent. À appliquer avant d'interroger les endpoints préfixe (`api.crossref.org/prefixes`, `api.datacite.org/prefixes`)."""
     if not prefix:
         return None
     match = _DOI_PREFIX_RE.match(prefix.strip())
@@ -444,8 +419,7 @@ def clean_doi_prefix(prefix: str | None) -> str | None:
 
 
 def normalize_nnt(nnt: str | None) -> str | None:
-    """Normalise un NNT : uppercase, strip whitespace. Retourne None
-    si l'entrée est vide ou ne contient pas de caractères alphanumériques."""
+    """Normalise un NNT : uppercase, strip whitespace. Retourne None si l'entrée est vide ou ne contient pas de caractères alphanumériques."""
     return _normalize_nnt(nnt)
 
 

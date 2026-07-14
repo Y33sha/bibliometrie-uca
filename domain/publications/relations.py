@@ -121,8 +121,7 @@ _INVERSE_RELATIONS: dict[RelationType, RelationType] = {
 
 
 def inverse_relation(relation: RelationType) -> RelationType:
-    """Type inverse (la relation vue depuis l'autre bout). `is_related_to`, symétrique, est son
-    propre inverse."""
+    """Type inverse (la relation vue depuis l'autre bout). `is_related_to`, symétrique, est son propre inverse."""
     return _INVERSE_RELATIONS[relation]
 
 
@@ -137,9 +136,7 @@ def map_crossref_relation(relation_key: str) -> RelationType | None:
 
 
 def extract_datacite_relations(meta: dict[str, JsonValue] | None) -> list[tuple[RelationType, str]]:
-    """Relations en scope déclarées par un payload DataCite, depuis
-    `meta.related_identifiers` (`[{doi, relation_type}]`). Renvoie `(type canonique,
-    DOI cible)` ; ignore les types hors scope et les entrées sans DOI."""
+    """Relations en scope déclarées par un payload DataCite, depuis `meta.related_identifiers` (`[{doi, relation_type}]`). Renvoie `(type canonique, DOI cible)` ; ignore les types hors scope et les entrées sans DOI."""
     related = (meta or {}).get("related_identifiers")
     if not isinstance(related, list):
         return []
@@ -169,16 +166,11 @@ DEPENDENT_DOC_TYPE_RELATIONS: dict[str, RelationType] = {
 def infer_shared_key_relation(
     doc_type_a: str | None, doc_type_b: str | None
 ) -> tuple[RelationType, str] | None:
-    """Infère la relation entre deux publications **distinctes** (DOI distincts) qui partagent une
-    clé de confirmation, depuis leur couple de `doc_type`.
+    """Infère la relation entre deux publications **distinctes** (DOI distincts) qui partagent une clé de confirmation, depuis leur couple de `doc_type`.
 
-    Renvoie `(type, sujet)` où `sujet` désigne le bout porteur de la relation dirigée : `"a"`
-    (sujet = A), `"b"` (sujet = B), ou `"sym"` pour `is_related_to` (symétrique — le caller oriente
-    par convention). Renvoie `None` si la paire est hors scope (peer-review).
+    Renvoie `(type, sujet)` où `sujet` désigne le bout porteur de la relation dirigée : `"a"` (sujet = A), `"b"` (sujet = B), ou `"sym"` pour `is_related_to` (symétrique — le caller oriente par convention). Renvoie `None` si la paire est hors scope (peer-review).
 
-    Un couple typé (preprint, erratum, dataset, ou ouvrage ↔ chapitre) donne une relation précise et
-    dirigée ; tout autre couple — y compris deux exemplaires d'une même œuvre à DOI distincts non
-    encore fusionnés — donne `is_related_to`, en attendant d'être qualifié."""
+    Un couple typé (preprint, erratum, dataset, ou ouvrage ↔ chapitre) donne une relation précise et dirigée ; tout autre couple — y compris deux exemplaires d'une même œuvre à DOI distincts non encore fusionnés — donne `is_related_to`, en attendant d'être qualifié."""
     if "peer_review" in (doc_type_a, doc_type_b):
         return None
     for dependent, relation in DEPENDENT_DOC_TYPE_RELATIONS.items():
@@ -195,9 +187,7 @@ def infer_shared_key_relation(
 
 
 def extract_crossref_relations(meta: dict[str, JsonValue] | None) -> list[tuple[RelationType, str]]:
-    """Relations en scope déclarées par un payload Crossref, depuis `meta.relation`
-    (`{clé: [{id, id-type, …}]}`). Renvoie `(type canonique, DOI cible)` ; ne garde que les
-    cibles de type DOI et les clés en scope."""
+    """Relations en scope déclarées par un payload Crossref, depuis `meta.relation` (`{clé: [{id, id-type, …}]}`). Renvoie `(type canonique, DOI cible)` ; ne garde que les cibles de type DOI et les clés en scope."""
     relation = (meta or {}).get("relation")
     if not isinstance(relation, dict):
         return []

@@ -1,9 +1,6 @@
-"""
-Rôles canoniques des authorships et mappings par source.
+"""Rôles canoniques des authorships et mappings par source.
 
-Chaque authorship peut avoir un ou plusieurs rôles (text[]).
-Les normalizers appellent map_roles(source, raw_role) pour obtenir
-la liste de rôles canoniques + un flag is_corresponding.
+Chaque authorship peut avoir un ou plusieurs rôles (text[]). Les normalizers appellent `map_role(source, raw_role)` pour obtenir la liste de rôles canoniques + un flag `is_corresponding`.
 """
 
 # ═══════════════════════════════════════════════════════════════════
@@ -202,8 +199,7 @@ def map_role(source: str, raw_role: str | None) -> tuple[list[str], bool]:
 def merge_roles(role_lists: list[list[str]]) -> list[str]:
     """Fusionne plusieurs listes de rôles en supprimant les redondances.
 
-    Applique la règle : si un rôle thèse impliquant le jury est présent,
-    jury_member est superflu.
+    Applique la règle : si un rôle thèse impliquant le jury est présent, `jury_member` est superflu.
     """
     all_roles = set()
     for roles in role_lists:
