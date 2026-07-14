@@ -1,6 +1,6 @@
-"""Tests du helper de `domain/subjects/subject.py`."""
+"""Tests unitaires de `domain.normalize.normalize_label`."""
 
-from domain.subjects.subject import normalize_label
+from domain.normalize import normalize_label
 
 
 class TestNormalizeLabel:
