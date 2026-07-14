@@ -91,6 +91,7 @@ class MetadataCorrectionRule(StrEnum):
     TITLE_RECENSION_TO_BOOK_REVIEW = "TITLE_RECENSION_TO_BOOK_REVIEW"
     DOI_FIGSHARE_COLLECTION_TO_DATASET = "DOI_FIGSHARE_COLLECTION_TO_DATASET"
     EMBARGO_EXPIRED_TO_GREEN = "EMBARGO_EXPIRED_TO_GREEN"
+    HYBRID_FULL_OA_TO_GOLD = "HYBRID_FULL_OA_TO_GOLD"
 
 
 class Correction[T](NamedTuple):
@@ -179,21 +180,23 @@ class _AppliesTo(TypedDict, total=False):
 
     - `doc_type` : `str` (équivalence après lowercase) ou `frozenset[str]` (appartenance après lowercase). Whitelist : limite la règle aux types bruts plausibles, épargne les types-référents (thesis, book, …).
     - `journal_type` : `str` — équivalence sur `sp.journal_type` (champ joint depuis `journals`).
+    - `oa_model` : `str` — équivalence sur `sp.oa_model` (champ joint depuis `journals`).
     - `url_contains` : `str` — substring présente dans au moins une des `sp.urls`.
     - `doi_contains` : `str` — substring présente dans `sp.doi` (DOIs stockés en minuscules).
     - `title_prefix_normalized` : `tuple[str, ...]` — `normalize_text(sp.title)` commence par au moins un préfixe du tuple.
     - `title_regex` : `re.Pattern[str]` — `pattern.search(sp.title)` matche.
-    - `journal_id_present` : `bool` — `(sp.journal_id is not None)` vaut la valeur attendue. Signal « la SP est rattachée à un journal » (donc un article, pas une thèse).
+    - `journal_id_present` : `bool` — `(sp.journal_id is not None)` vaut la valeur attendue. Signal « la SP est rattachée à un journal », marqueur d'article.
     - `doi_prefix_not_in` : `tuple[str, ...]` — la SP porte un DOI **et** son préfixe (`doi.split('/')[0]`) n'appartient à aucun préfixe du tuple. Faux si pas de DOI (le prédicat affirme quelque chose *sur* le DOI). Sert à exclure des registrants connus par préfixe (ex. registres de thèses).
     - `oa_status` : `str` — équivalence sur `sp.oa_status` (le statut d'entrée, ex. `embargoed`).
     - `embargo_expired` : `bool` — `sp.embargo_expired` (calculé au fetch : `embargo_until <= current_date`) vaut la valeur attendue.
     - `declares_preprint` : `bool` — `sp.declares_preprint` (calculé au fetch : la SP déclare une relation `is-preprint-of`) vaut la valeur attendue.
 
-    Ajouter un nouveau type de prédicat = ajouter une clé ici + une branche dans `_check_predicate`.
+    Étendre les prédicats = ajouter une clé ici + une branche dans `_check_predicate`.
     """
 
     doc_type: str | frozenset[str]
     journal_type: str
+    oa_model: str
     url_contains: str
     doi_contains: str
     title_prefix_normalized: tuple[str, ...]
@@ -391,6 +394,13 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
         "applies_to": {"oa_status": "embargoed", "embargo_expired": True},
         "applies_correction": {"oa_status": "green"},
     },
+    # Un `hybrid` posé par défaut au normalize (avant l'enrichissement des revues) dans
+    # une revue full-OA est en réalité `gold` : `hybrid` sort des statuts attendus pour
+    # `oa_model = full_oa`. Champ orthogonal au `doc_type`, aucun chaînage avec les autres règles.
+    MetadataCorrectionRule.HYBRID_FULL_OA_TO_GOLD: {
+        "applies_to": {"oa_status": "hybrid", "oa_model": "full_oa"},
+        "applies_correction": {"oa_status": "gold"},
+    },
 }
 
 
@@ -404,8 +414,9 @@ def _check_predicate(sp: SourcePublicationForCorrection, key: str, value: object
         if isinstance(value, frozenset):
             return doc_type in value
         return doc_type == value
-    if key == "journal_type":
-        return sp.journal_type == value
+    # Égalité simple sur l'attribut de même nom.
+    if key in ("journal_type", "oa_model", "oa_status"):
+        return getattr(sp, key) == value
     if key == "url_contains":
         assert isinstance(value, str)
         return any(value in (u or "") for u in (sp.urls or ()))
@@ -429,8 +440,6 @@ def _check_predicate(sp: SourcePublicationForCorrection, key: str, value: object
         if not sp.doi:
             return False
         return sp.doi.split("/", 1)[0] not in value
-    if key == "oa_status":
-        return sp.oa_status == value
     if key == "embargo_expired":
         assert isinstance(value, bool)
         return sp.embargo_expired == value

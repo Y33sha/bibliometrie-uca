@@ -829,6 +829,28 @@ class TestEmbargoExpiredRule:
         assert effective_metadata(_view(oa_status="closed", embargo_expired=True)).oa_status is None
 
 
+class TestHybridFullOaRule:
+    def test_hybrid_in_full_oa_journal_promoted_to_gold(self):
+        view = _view(oa_status="hybrid", oa_model="full_oa")
+        corrected = effective_metadata(view).oa_status
+        assert corrected is not None
+        assert corrected.value == "gold"
+        assert corrected.rule == MetadataCorrectionRule.HYBRID_FULL_OA_TO_GOLD
+
+    def test_hybrid_outside_full_oa_untouched(self):
+        # Revue par abonnement : `hybrid` est un statut légitime, aucune promotion.
+        assert (
+            effective_metadata(_view(oa_status="hybrid", oa_model="subscription")).oa_status is None
+        )
+        # oa_model inconnu (revue non enrichie) : abstention.
+        assert effective_metadata(_view(oa_status="hybrid", oa_model=None)).oa_status is None
+
+    def test_non_hybrid_status_untouched(self):
+        # Un statut déjà `gold`/`green` dans une revue full-OA reste inchangé.
+        assert effective_metadata(_view(oa_status="gold", oa_model="full_oa")).oa_status is None
+        assert effective_metadata(_view(oa_status="green", oa_model="full_oa")).oa_status is None
+
+
 class TestPreprintRelationRule:
     def test_declared_preprint_retyped_even_without_doc_type(self):
         # Crossref n'a pas typé le record (doc_type nul) mais déclare is-preprint-of.
