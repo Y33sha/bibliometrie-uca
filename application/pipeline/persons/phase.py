@@ -64,7 +64,9 @@ def run(
         )
         cross_source_detached = persons_queries.detach_authorships(conn, stale)
         if cross_source_detached:
-            logger.info("  %d signature(s) cross-source sans appui détachée(s)", cross_source_detached)
+            logger.info(
+                "  %d signature(s) cross-source sans appui détachée(s)", cross_source_detached
+            )
 
         populate(conn, name_forms_queries, logger)
         purge_counts = purge(conn, persons_queries, logger)

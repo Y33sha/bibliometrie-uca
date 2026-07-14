@@ -109,7 +109,9 @@ async def run_async(
             progress["inserted"] += batch_inserted
         except Exception as e:
             conn.rollback()
-            slog.warning("lot %d (%d DOI) : insertion échouée, rollback — %s", batch_idx, len(batch), e)
+            slog.warning(
+                "lot %d (%d DOI) : insertion échouée, rollback — %s", batch_idx, len(batch), e
+            )
 
         progress["processed"] += len(batch)
         if progress["processed"] % 100 == 0 or progress["processed"] >= total:

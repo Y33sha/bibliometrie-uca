@@ -24,7 +24,9 @@ class TestOpenalexIdConversion:
         assert full_openalex_id("S20400310") == "https://openalex.org/S20400310"
 
     def test_full_already_url(self):
-        assert full_openalex_id("https://openalex.org/S20400310") == "https://openalex.org/S20400310"
+        assert (
+            full_openalex_id("https://openalex.org/S20400310") == "https://openalex.org/S20400310"
+        )
 
 
 class TestExtractExternalIdsFromUrls:

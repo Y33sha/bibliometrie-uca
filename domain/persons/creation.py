@@ -5,9 +5,7 @@ def allow_person_creation(source: str, roles: list[str]) -> bool:
     """Indique si la cascade de matching peut créer une personne pour
     cette authorship, à défaut d'avoir trouvé un match.
 
-    Le matching à une personne existante reste **toujours autorisé** —
-    cette règle ne pilote que la décision « match introuvable, faut-il
-    créer une nouvelle fiche ? ».
+    Le matching à une personne existante reste **toujours autorisé** — cette règle ne pilote que la décision « match introuvable, faut-il créer une nouvelle fiche ? ».
 
     Règle : pour les sources qui exposent les rôles d'encadrement de
     thèse (theses.fr aujourd'hui), seules les authorships dont les

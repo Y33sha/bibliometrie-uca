@@ -1,18 +1,8 @@
 """Command handlers des écritures API sur les adresses : la frontière transactionnelle.
 
-Une écriture API est une commande (intention courte d'un acteur). Chaque command
-handler reçoit la connexion de la requête et les ports (repos), compose les
-briques d'écriture agnostiques de `structures.py` / `countries.py`, et
-`conn.commit()` au succès — pour que la donnée soit persistée avant l'envoi de la
-réponse et avant les tâches de fond (cf.
-`docs/chantiers/CODE_commit-avant-reponse.md`). Les briques composées restent
-transaction-agnostiques (réutilisées par le pipeline et les CLI) ; seul le
-command handler commit.
+Une écriture API est une commande (intention courte d'un acteur). Chaque command handler reçoit la connexion de la requête et les ports (repos), compose les briques d'écriture agnostiques de `structures.py` / `countries.py`, et `conn.commit()` au succès — pour que la donnée soit persistée avant l'envoi de la réponse et avant les tâches de fond (cf. `docs/chantiers/CODE_commit-avant-reponse.md`). Les briques composées restent transaction-agnostiques (réutilisées par le pipeline et les CLI) ; seul le command handler commit.
 
-Les propagations potentiellement massives (`in_perimeter`, pays → publications)
-ne sont pas faites ici : le handler retourne les identifiants d'adresses
-concernés, que le routeur passe en tâche de fond (elles lisent l'état committé
-puisque le commit précède leur exécution).
+Les propagations potentiellement massives (`in_perimeter`, pays → publications) ne sont pas faites ici : le handler retourne les identifiants d'adresses concernés, que le routeur passe en tâche de fond (elles lisent l'état committé puisque le commit précède leur exécution).
 """
 
 from sqlalchemy import Connection

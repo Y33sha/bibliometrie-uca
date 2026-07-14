@@ -45,9 +45,7 @@ _MARKUP_RE = re.compile(r"</?[A-Za-z][^>]*>")
 def strip_markup(text: str) -> str:
     """Retire les balises HTML/MathML `<...>` (remplacées par un espace).
 
-    Le premier caractère doit être une lettre (ou `/`) pour ne pas avaler les
-    indices de Miller `<111>` / `< 110 >` (cristallographie), qui sont du
-    contenu, pas du markup (audit titres bruts : seuls cas non-balise observés).
+    Le premier caractère doit être une lettre (ou `/`) pour ne pas avaler les indices de Miller `<111>` / `< 110 >` (cristallographie), qui sont du contenu, pas du markup (audit titres bruts : seuls cas non-balise observés).
     Réutilisé par l'export CSV (titre brut) et par `normalize_text` (dédup).
     """
     return _MARKUP_RE.sub(" ", text)
@@ -56,17 +54,13 @@ def strip_markup(text: str) -> str:
 def sanitize_raw_text(text: str) -> str:
     """Assainit un texte brut de son bruit invisible, sans le dénaturer.
 
-    Contrairement à `normalize_text` (qui produit une clé de comparaison repliée),
-    préserve casse, accents et ponctuation : sert au texte brut affiché et recherché
-    (`addresses.raw_text`), pas à une clé de matching.
+    Contrairement à `normalize_text` (qui produit une clé de comparaison repliée), préserve casse, accents et ponctuation : sert au texte brut affiché et recherché (`addresses.raw_text`), pas à une clé de matching.
 
     - tout caractère d'espacement Unicode (NBSP, fine insécable, tabulation…) → espace simple
-    - suppression des caractères de format/contrôle invisibles (zero-width, BOM,
-      trait d'union conditionnel, marques directionnelles, contrôles C0/C1)
+    - suppression des caractères de format/contrôle invisibles (zero-width, BOM, trait d'union conditionnel, marques directionnelles, contrôles C0/C1)
     - collapse des espaces multiples + strip
 
-    Remplace `str.strip()` au point d'insertion des adresses : deux textes ne
-    différant que par un espace insécable convergent ainsi sur la même `raw_text`.
+    Remplace `str.strip()` au point d'insertion des adresses : deux textes ne différant que par un espace insécable convergent ainsi sur la même `raw_text`.
     """
     if not text:
         return ""
@@ -90,14 +84,12 @@ def normalize_text(text: str) -> str:
       3. translittérer les lettres latines autonomes (ß, ø, ł...)
       4. NFKD (décompose les caractères accentués et de compatibilité)
       5. retirer les seules combining marks (diacritiques)
-      6. tout sauf [a-z0-9] → espaces (les symboles restants n'avalent
-         donc pas leurs voisins)
+      6. tout sauf [a-z0-9] → espaces (les symboles restants n'avalent donc pas leurs voisins)
       7. collapse espaces multiples
     """
     if not text:
         return ""
-    # Retrait des balises avant tout, sinon `mml`/`i`/`sub`… subsisteraient
-    # comme texte après l'étape [^a-z0-9] et pollueraient le dédoublonnage.
+    # Retrait des balises avant tout, sinon `mml`/`i`/`sub`… subsisteraient comme texte après l'étape [^a-z0-9] et pollueraient le dédoublonnage.
     text = strip_markup(text)
     text = text.lower().strip()
     text = text.translate(_LATIN_LETTERS)

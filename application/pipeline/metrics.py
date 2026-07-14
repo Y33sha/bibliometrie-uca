@@ -71,8 +71,7 @@ class PhaseMetrics:
     def merge(self, other: PhaseMetrics) -> None:
         """Agrège les compteurs d'un autre `PhaseMetrics` en place.
 
-        Utilisé par les phases qui chaînent plusieurs sous-helpers (ex:
-        `phase_extract` accumule les 5 extracteurs sources).
+        Utilisé par les phases qui chaînent plusieurs sous-helpers (ex: `phase_extract` accumule les 5 extracteurs sources).
         """
         self.new += other.new
         self.updated += other.updated

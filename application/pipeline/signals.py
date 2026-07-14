@@ -37,7 +37,9 @@ def signal_source_unconfigured(
     )
 
 
-def select_targets(base: Sequence[str], sources: set[str] | None, *, include_wos: bool) -> list[str]:
+def select_targets(
+    base: Sequence[str], sources: set[str] | None, *, include_wos: bool
+) -> list[str]:
     """Sources à interroger : `base` moins WoS (opt-in via `include_wos`), restreintes au filtre `sources` s'il est fourni, dans l'ordre canonique de `base`.
 
     Prologue commun aux phases à interrogation externe, en amont de `filter_configured`. L'ordre stable garantit des logs et un dispatch déterministes.
