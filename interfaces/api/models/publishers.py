@@ -13,7 +13,6 @@ from pydantic import BaseModel, field_validator
 class PublisherUpdate(BaseModel):
     name: str | None = None
     country: str | None = None
-    is_predatory: bool | None = None
     publisher_type: str | None = None
 
     @field_validator("country")

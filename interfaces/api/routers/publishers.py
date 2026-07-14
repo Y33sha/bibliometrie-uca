@@ -59,7 +59,6 @@ def publishers_facets(
     search: str | None = None,
     publisher_type: str = Query(""),
     country: str = Query(""),
-    is_predatory: bool | None = None,
     with_pubs: bool = False,
     queries: PublisherQueries = Depends(publisher_queries_sync),
 ) -> PublishersFacetsResponse:
@@ -73,7 +72,6 @@ def publishers_facets(
         search=search,
         publisher_types=parse_str_csv(publisher_type),
         countries=parse_str_csv(country),
-        is_predatory=is_predatory,
         with_pubs=with_pubs,
     )
 
@@ -85,7 +83,6 @@ def list_publishers(
     search: str | None = None,
     publisher_type: str = Query(""),
     country: str = Query(""),
-    is_predatory: bool | None = None,
     with_pubs: bool = False,
     sort: str = "name",
     queries: PublisherQueries = Depends(publisher_queries_sync),
@@ -98,7 +95,6 @@ def list_publishers(
     - `publisher_type` / `country` : CSV de valeurs (ex. `commercial,learned_society`).
       Vide = pas de filtre. Aligné sur la convention multi-valeurs de
       `/api/journals` et `/api/publications`.
-    - `is_predatory` : booléen (true/false). Omettre = pas de filtre.
     - `with_pubs` : si true, n'expose que les éditeurs avec au moins 1
       publication rattachée (via leurs revues). Utilisé par la page
       publique /publishers pour masquer les éditeurs orphelins. L'admin
@@ -111,7 +107,6 @@ def list_publishers(
         search=search,
         publisher_types=parse_str_csv(publisher_type),
         countries=parse_str_csv(country),
-        is_predatory=is_predatory,
         with_pubs=with_pubs,
         sort=sort,
         page=page,

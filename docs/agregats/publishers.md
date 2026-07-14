@@ -2,13 +2,13 @@
 
 *À jour le 2026-07-14.*
 
-L'aggregate root `Publisher` (`domain/publishers/publisher.py`) représente un éditeur. Entité mince (id, nom, pays, `openalex_id`, `is_predatory`, `publisher_type`) : comme `Journal`, elle ne porte ni comportement ni invariant riche — matching, fusion et enrichissement vivent dans `application/services/publishers/`. Identité = `id` (surrogate) ; identifiant naturel = `name` via la normalisation de `publisher_name_forms`.
+L'aggregate root `Publisher` (`domain/publishers/publisher.py`) représente un éditeur. Entité mince (id, nom, pays, `openalex_id`, `publisher_type`) : comme `Journal`, elle ne porte ni comportement ni invariant riche — matching, fusion et enrichissement vivent dans `application/services/publishers/`. Identité = `id` (surrogate) ; identifiant naturel = `name` via la normalisation de `publisher_name_forms`.
 
 ## Tables du cluster
 
 | Table | Rôle | Colonnes clés |
 |---|---|---|
-| `publishers` | L'éditeur | `name` / `name_normalized`, `country`, `openalex_id` (unique), `is_predatory`, `publisher_type` (enum SQL), `pub_count` |
+| `publishers` | L'éditeur | `name` / `name_normalized`, `country`, `openalex_id` (unique), `publisher_type` (enum SQL), `pub_count` |
 | `publisher_name_forms` | Formes de nom → éditeur (match par nom) | `publisher_id` (ON DELETE CASCADE), `form_normalized` (unique **globale**) |
 | `doi_prefixes` | Jonction préfixe DOI → éditeur | `publisher_id` (ON DELETE SET NULL), `crossref_member_id`, `datacite_client_symbol`, `publisher_checked_at` |
 

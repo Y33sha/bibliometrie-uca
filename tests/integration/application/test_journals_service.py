@@ -121,7 +121,6 @@ class TestPublisherFindById:
         assert p.id == pub_id
         assert p.name == "Elsevier"
         assert p.openalex_id == "P123"
-        assert p.is_predatory is False
 
 
 class TestJournalFindById:
@@ -137,7 +136,6 @@ class TestJournalFindById:
         assert j.publisher_id is None
         assert j.apc_currency is None
         assert j.is_in_doaj is False
-        assert j.is_predatory is False
 
     def test_hydrates_full(self, sa_sync_conn, repo):
         pub_id = _insert_publisher(sa_sync_conn, "PLOS")
@@ -504,29 +502,6 @@ class TestMergePublishers:
             )
 
         assert len(exc_info.value.blocking_journals) == 2
-
-    def test_enriches_target_flags(self, sa_sync_conn, repo, pub_repo, publication_repo):
-        """is_predatory = OR logique : vrai si l'une des sources l'était."""
-        target = _insert_publisher(sa_sync_conn, "Target")
-        source = _insert_publisher(sa_sync_conn, "Source")
-        sa_sync_conn.execute(
-            text("UPDATE publishers SET is_predatory = TRUE WHERE id = :id"), {"id": source}
-        )
-
-        merge_publishers(
-            target,
-            source,
-            conn=sa_sync_conn,
-            correction_queries=_CORRECTION_QUERIES,
-            publisher_repo=pub_repo,
-            journal_repo=repo,
-            pub_repo=publication_repo,
-        )
-
-        row = _fetch_one(
-            sa_sync_conn, "SELECT is_predatory FROM publishers WHERE id = :id", id=target
-        )
-        assert row.is_predatory is True
 
     def test_transfers_openalex_id_when_target_has_none(
         self, sa_sync_conn, repo, pub_repo, publication_repo

@@ -58,7 +58,6 @@ class Journal:
     publisher_id: int | None = None
     openalex_id: str | None = None
     is_in_doaj: bool = False
-    is_predatory: bool = False
     apc_amount: Decimal | None = None
     apc_currency: str | None = None
     oa_model: OaModel | None = None

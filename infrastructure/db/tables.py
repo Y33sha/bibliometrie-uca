@@ -249,7 +249,6 @@ journals = Table(
     Column("publisher_id", Integer),
     Column("openalex_id", Text),
     Column("is_in_doaj", Boolean, server_default="false"),
-    Column("is_predatory", Boolean, server_default="false"),
     Column("apc_amount", Numeric(10, 2)),
     Column("apc_currency", Text, server_default="EUR"),
     Column("oa_model", Text),
@@ -298,7 +297,6 @@ publishers = Table(
     Column("name_normalized", Text, nullable=False),
     Column("openalex_id", Text),
     Column("country", Text),
-    Column("is_predatory", Boolean, server_default="false"),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     Column(
         "publisher_type",

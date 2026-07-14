@@ -34,7 +34,6 @@ class _JournalRow(NamedTuple):
     publisher_id: int | None
     openalex_id: str | None
     is_in_doaj: bool
-    is_predatory: bool
     apc_amount: Decimal | None
     apc_currency: str | None
     oa_model: str | None
@@ -57,7 +56,6 @@ def _journal_from_row(row: _JournalRow) -> Journal:
         publisher_id=row.publisher_id,
         openalex_id=row.openalex_id,
         is_in_doaj=row.is_in_doaj,
-        is_predatory=row.is_predatory,
         apc_amount=row.apc_amount,
         apc_currency=row.apc_currency,
         oa_model=cast(OaModel, row.oa_model) if row.oa_model in OA_MODELS else None,
@@ -88,7 +86,6 @@ class PgJournalRepository:
                 journals.c.publisher_id,
                 journals.c.openalex_id,
                 journals.c.is_in_doaj,
-                journals.c.is_predatory,
                 journals.c.apc_amount,
                 journals.c.apc_currency,
                 journals.c.oa_model,
@@ -391,7 +388,6 @@ class PgJournalRepository:
                 journals.c.publisher_id,
                 journals.c.openalex_id,
                 journals.c.is_in_doaj,
-                journals.c.is_predatory,
                 journals.c.apc_amount,
                 journals.c.apc_currency,
                 journals.c.oa_model,
@@ -408,7 +404,6 @@ class PgJournalRepository:
                 publisher_id=func.coalesce(journals.c.publisher_id, src.publisher_id),
                 openalex_id=func.coalesce(journals.c.openalex_id, src.openalex_id),
                 is_in_doaj=journals.c.is_in_doaj | src.is_in_doaj,
-                is_predatory=journals.c.is_predatory | src.is_predatory,
                 apc_amount=func.coalesce(journals.c.apc_amount, src.apc_amount),
                 apc_currency=func.coalesce(journals.c.apc_currency, src.apc_currency),
                 oa_model=func.coalesce(journals.c.oa_model, src.oa_model),

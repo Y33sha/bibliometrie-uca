@@ -199,13 +199,11 @@ class PublicationDetailCore(BaseModel):
     journal_title: str | None
     issn: str | None
     eissn: str | None
-    journal_predatory: bool | None
     apc_amount: float | None
     apc_currency: str | None
     oa_model: str | None
     publisher_id: int | None
     publisher_name: str | None
-    publisher_predatory: bool | None
 
 
 class SourcePublicationOut(BaseModel):

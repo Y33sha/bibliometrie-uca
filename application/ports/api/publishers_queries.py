@@ -26,7 +26,6 @@ class PublisherListItem(BaseModel):
     openalex_id: str | None
     country: str | None
     doi_prefixes: list[DoiPrefixInfo]
-    is_predatory: bool
     publisher_type: str
     journal_count: int
     pub_count: int
@@ -47,7 +46,6 @@ class PublisherDetailResponse(BaseModel):
     openalex_id: str | None
     country: str | None
     doi_prefixes: list[DoiPrefixInfo]
-    is_predatory: bool
     publisher_type: str
     journal_count: int
     pub_count: int
@@ -119,7 +117,6 @@ class PublisherQueries(Protocol):
         search: str | None,
         publisher_types: list[str],
         countries: list[str],
-        is_predatory: bool | None,
         with_pubs: bool,
         sort: str,
         page: int,
@@ -132,7 +129,6 @@ class PublisherQueries(Protocol):
         search: str | None,
         publisher_types: list[str],
         countries: list[str],
-        is_predatory: bool | None,
         with_pubs: bool,
     ) -> PublishersFacetsResponse: ...
 
