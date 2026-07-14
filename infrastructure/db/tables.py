@@ -298,7 +298,6 @@ publishers = Table(
     Column("name_normalized", Text, nullable=False),
     Column("openalex_id", Text),
     Column("country", Text),
-    Column("ror", Text),
     Column("is_predatory", Boolean, server_default="false"),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     Column(

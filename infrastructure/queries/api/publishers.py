@@ -125,7 +125,7 @@ class PgPublisherQueries(PublisherQueries):
         offset = (page - 1) * per_page
         rows = self._conn.execute(
             text(f"""
-                SELECT p.id, p.name, p.openalex_id, p.ror, p.country, p.is_predatory,
+                SELECT p.id, p.name, p.openalex_id, p.country, p.is_predatory,
                        p.publisher_type,
                        (SELECT COUNT(*) FROM journals j
                         WHERE j.publisher_id = p.id) AS journal_count,
@@ -147,7 +147,6 @@ class PgPublisherQueries(PublisherQueries):
                     id=r.id,
                     name=r.name,
                     openalex_id=r.openalex_id,
-                    ror=r.ror,
                     country=r.country,
                     doi_prefixes=[DoiPrefixInfo(**p) for p in r.doi_prefixes],
                     is_predatory=r.is_predatory,
@@ -229,7 +228,7 @@ class PgPublisherQueries(PublisherQueries):
     def get_publisher_detail(self, publisher_id: int) -> PublisherDetailResponse | None:
         row = self._conn.execute(
             text(f"""
-                SELECT p.id, p.name, p.openalex_id, p.ror, p.country, p.is_predatory,
+                SELECT p.id, p.name, p.openalex_id, p.country, p.is_predatory,
                        p.publisher_type,
                        (SELECT COUNT(*) FROM journals j
                         WHERE j.publisher_id = p.id) AS journal_count,
@@ -246,7 +245,6 @@ class PgPublisherQueries(PublisherQueries):
             id=row.id,
             name=row.name,
             openalex_id=row.openalex_id,
-            ror=row.ror,
             country=row.country,
             doi_prefixes=[DoiPrefixInfo(**p) for p in row.doi_prefixes],
             is_predatory=row.is_predatory,

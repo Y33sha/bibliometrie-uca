@@ -1,14 +1,14 @@
 # Éditeurs — cycle de vie
 
-*À jour le 2026-07-13.*
+*À jour le 2026-07-14.*
 
-L'aggregate root `Publisher` (`domain/publishers/publisher.py`) représente un éditeur. Entité mince (id, nom, pays, `openalex_id`, `ror`, `is_predatory`, `publisher_type`) : comme `Journal`, elle ne porte ni comportement ni invariant riche — matching, fusion et enrichissement vivent dans `application/services/publishers/`. Identité = `id` (surrogate) ; identifiant naturel = `name` via la normalisation de `publisher_name_forms`.
+L'aggregate root `Publisher` (`domain/publishers/publisher.py`) représente un éditeur. Entité mince (id, nom, pays, `openalex_id`, `is_predatory`, `publisher_type`) : comme `Journal`, elle ne porte ni comportement ni invariant riche — matching, fusion et enrichissement vivent dans `application/services/publishers/`. Identité = `id` (surrogate) ; identifiant naturel = `name` via la normalisation de `publisher_name_forms`.
 
 ## Tables du cluster
 
 | Table | Rôle | Colonnes clés |
 |---|---|---|
-| `publishers` | L'éditeur | `name` / `name_normalized`, `country`, `openalex_id` (unique), `ror`, `is_predatory`, `publisher_type` (enum SQL), `pub_count` |
+| `publishers` | L'éditeur | `name` / `name_normalized`, `country`, `openalex_id` (unique), `is_predatory`, `publisher_type` (enum SQL), `pub_count` |
 | `publisher_name_forms` | Formes de nom → éditeur (match par nom) | `publisher_id` (ON DELETE CASCADE), `form_normalized` (unique **globale**) |
 | `doi_prefixes` | Jonction préfixe DOI → éditeur | `publisher_id` (ON DELETE SET NULL), `crossref_member_id`, `datacite_client_symbol`, `publisher_checked_at` |
 
@@ -21,7 +21,7 @@ flowchart LR
     N[normalize] -->|find_or_create_publisher| P[publishers]
     RP[publishers_journals : resolve_publishers] -->|préfixe DOI → éditeur| P
     RP --> DP[doi_prefixes.publisher_id]
-    ENR[CLI maintenance enrich_publishers] -->|country, ror, publisher_type| P
+    ENR[CLI maintenance enrich_publishers] -->|country| P
     AU[authorships] -->|refresh_pub_counts| P
     ADM[API admin] -->|update / merge| P
     P --> API[listing / dashboard / facettes]
@@ -33,7 +33,7 @@ flowchart LR
 
 **Résolution par préfixe DOI (`publishers_journals` → `resolve_publishers`)** : pour chaque `doi_prefixes` non résolu, route par Registration Agency, interroge le préfixe Crossref/DataCite, persiste les métadonnées, matche ou crée l'éditeur, et pose `doi_prefixes.publisher_id`. Une seule tentative (`publisher_checked_at`).
 
-**Enrichissements — hors pipeline (maintenance)** : le CLI `interfaces/cli/maintenance/enrich_publishers.py` enchaîne OpenAlex Publishers (`country`, `ror`), Crossref Members (`country` en fallback), ROR (`publisher_type` via `map_ror_types`). Politiques « NULL only » / « unknown only ».
+**Enrichissement — hors pipeline (maintenance)** : le CLI `interfaces/cli/maintenance/enrich_publishers.py` renseigne le `country` des éditeurs depuis OpenAlex Publishers. Politique « NULL only » : une valeur saisie à la main est préservée.
 
 ## Écriture — API (curation admin)
 
@@ -54,7 +54,7 @@ Port `application/ports/api/publishers_queries.py`, adaptateur `PgPublisherQueri
 
 Dette assumée et décisions d'architecture propres à cet agrégat, gardées explicites.
 
-1. **Contrat de champs éditables dupliqué.** `PublisherUpdateFields` (TypedDict, port) et `PublisherUpdate` (Pydantic, API) listent des champs qui se recoupent sans coïncider (`ror` côté port seulement). C'est le symptôme déjà traité côté journals (contrat unique `JournalUpdate` dans le port) — le même traitement s'applique.
+1. **Contrat de champs éditables dupliqué.** `PublisherUpdateFields` (TypedDict, port) et `PublisherUpdate` (Pydantic, API) listent des champs qui se recoupent sans coïncider (`name_normalized` côté port seulement, dérivé par le service). C'est le symptôme déjà traité côté journals (contrat unique `JournalUpdate` dans le port) — le même traitement s'applique.
 2. **Match-or-create dupliqué.** `find_or_create_publisher` (service, appelé par `normalize`) et `_match_or_create_publisher` (`resolve_publishers`, pipeline) réimplémentent la même séquence forme-de-nom → création → enregistrement ; le pipeline ne passe pas par le service. (À vérifier avant traitement — les deux contextes diffèrent peut-être.)
 3. **Écritures cross-agrégat de la fusion (décision d'archi assumée).** `merge_publisher_into` repointe `journals` / `journal_name_forms` / `apc_payments` en `text()`, comme `merge_journal_into` : une fusion est intrinsèquement cross-agrégat.
 4. **Unicité globale de `publisher_name_forms.form_normalized`.** Une forme de nom n'appartient qu'à un seul éditeur ; à la fusion, les formes de la source en collision avec la cible sont supprimées — perte silencieuse des alias en doublon.

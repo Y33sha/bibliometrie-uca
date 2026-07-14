@@ -1,13 +1,8 @@
-"""Port : lectures pour l'enrichissement (cosmétique) des éditeurs.
+"""Port : lecture pour l'enrichissement (cosmétique) des éditeurs depuis OpenAlex Publishers.
 
-Implémenté par `infrastructure.queries.publishers_enrichment.PgPublisherEnrichmentQueries`.
-Consommé par les orchestrateurs `application.services.publishers.enrichment` et le CLI de
-maintenance `interfaces/cli/maintenance/enrich_publishers.py`.
+Implémenté par `infrastructure.queries.publishers_enrichment.PgPublisherEnrichmentQueries`. Consommé par `application.services.publishers.enrichment.from_openalex` et le CLI de maintenance `interfaces/cli/maintenance/enrich_publishers.py`.
 
-L'enrichissement éditeurs (pays, ROR, type) est purement cosmétique (affichage) —
-hors du pipeline, lancé à la demande — d'où ce port distinct de
-`application.ports.pipeline.enrich.EnrichQueries` (qui reste pipeline : oa_status,
-journaux, DOAJ).
+L'enrichissement éditeurs est purement cosmétique (affichage), hors du pipeline, lancé à la demande — d'où ce port distinct de `application.ports.pipeline.enrich.EnrichQueries` (pipeline : oa_status, journaux, DOAJ).
 """
 
 from typing import Protocol
@@ -21,18 +16,5 @@ class PublisherEnrichmentQueries(Protocol):
     def fetch_publishers_needing_enrichment(
         self, conn: Connection, *, limit: int | None = None
     ) -> list[tuple[int, str]]:
-        """`(id, openalex_id)` des éditeurs avec `openalex_id` et `country` ou `ror` manquant."""
-        ...
-
-    def fetch_publishers_needing_publisher_type_from_ror(
-        self, conn: Connection, *, limit: int | None = None
-    ) -> list[tuple[int, str]]:
-        """`(id, ror)` des éditeurs avec `ror` non-NULL et `publisher_type = 'unknown'`."""
-        ...
-
-    def fetch_publishers_needing_country_from_crossref(
-        self, conn: Connection, *, limit: int | None = None
-    ) -> list[tuple[int, int]]:
-        """`(publisher_id, crossref_member_id)` des éditeurs sans `country` mais reliés à un
-        membre Crossref via `doi_prefixes` (fallback country après OpenAlex)."""
+        """`(id, openalex_id)` des éditeurs avec `openalex_id` et `country` manquant."""
         ...

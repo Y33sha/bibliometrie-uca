@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict GPwu4YGPblWEdDG4zf7bycN9LpWdzZMbA8uvYsXwo2PrDeUjunpI6iZDR9BKpZW
+\restrict yiwXNEhftUiurjVVyDGtCyodDx8HzTt1ZuT5CKWU7m4c03pJYhvchEFF6oDwNew
 
 -- Dumped from database version 18.4
 -- Dumped by pg_dump version 18.4
@@ -970,7 +970,8 @@ CREATE TABLE public.journals (
     doi_prefix text,
     doaj_payload jsonb,
     doaj_imported_at timestamp with time zone,
-    pub_count integer DEFAULT 0 NOT NULL
+    pub_count integer DEFAULT 0 NOT NULL,
+    CONSTRAINT journals_oa_model_check CHECK (((oa_model IS NULL) OR (oa_model = ANY (ARRAY['subscription'::text, 'full_oa'::text, 'repository'::text]))))
 );
 
 
@@ -1249,7 +1250,6 @@ CREATE TABLE public.publication_subjects (
     publication_id integer NOT NULL,
     subject_id integer NOT NULL,
     source public.source_type NOT NULL,
-    score real,
     created_at timestamp with time zone DEFAULT now(),
     rejected boolean DEFAULT false NOT NULL
 );
@@ -1333,7 +1333,6 @@ CREATE TABLE public.publishers (
     is_predatory boolean DEFAULT false,
     created_at timestamp with time zone DEFAULT now(),
     publisher_type public.publisher_type DEFAULT 'unknown'::public.publisher_type NOT NULL,
-    ror text,
     pub_count integer DEFAULT 0 NOT NULL
 );
 
@@ -1612,8 +1611,7 @@ CREATE TABLE public.subjects (
     label text NOT NULL,
     language text,
     created_at timestamp with time zone DEFAULT now(),
-    usage_count integer DEFAULT 0 NOT NULL,
-    ontologies jsonb DEFAULT '{}'::jsonb NOT NULL
+    usage_count integer DEFAULT 0 NOT NULL
 );
 
 
@@ -2979,13 +2977,6 @@ CREATE INDEX idx_structures_type ON public.structures USING btree (structure_typ
 
 
 --
--- Name: idx_subjects_oa_label_lower; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_subjects_oa_label_lower ON public.subjects USING btree (lower(label)) WHERE (ontologies ? 'openalex_topic'::text);
-
-
---
 -- Name: publication_structures_pub_struct; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3442,5 +3433,5 @@ ALTER TABLE ONLY public.structure_relations
 -- PostgreSQL database dump complete
 --
 
-\unrestrict GPwu4YGPblWEdDG4zf7bycN9LpWdzZMbA8uvYsXwo2PrDeUjunpI6iZDR9BKpZW
+\unrestrict yiwXNEhftUiurjVVyDGtCyodDx8HzTt1ZuT5CKWU7m4c03pJYhvchEFF6oDwNew
 
