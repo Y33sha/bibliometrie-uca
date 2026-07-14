@@ -14,10 +14,25 @@ from typing import Any
 
 from sqlalchemy import Connection, text
 
-from domain.publications.doc_type_families import doc_type_grouped_sql
+from domain.publications.doc_types import DOC_TYPE_FAMILIES
 from domain.stats import DIMENSIONS, MEASURES, Dimension, validate_pivot
 from infrastructure.queries.api.stats._shared import STATS_BASE, stats_filter_clauses
 from infrastructure.queries.filters import OA_OPEN_SQL, assemble_where
+
+
+def doc_type_grouped_sql(column: str = "p.doc_type") -> str:
+    """Expression SQL `CASE` projetant `column` (enum `doc_type`) sur la clé de groupement du pivot : les types de la famille « publications » (article, communication, chapitre…) gardent leur grain fin, les autres familles restent agrégées sous leur clé de famille. Le détail là où il porte le plus d'information (les publications au sens strict, dont la répartition varie fortement d'un laboratoire à l'autre), le grossier ailleurs. Couvre exhaustivement l'enum ; les types non listés tombent dans `misc` (filet)."""
+    expanded = DOC_TYPE_FAMILIES["publications"]
+    whens = [
+        f"WHEN {column}::text IN ({', '.join(f'{t!r}' for t in expanded)}) THEN {column}::text"
+    ]
+    whens += [
+        f"WHEN {column}::text IN ({', '.join(f'{t!r}' for t in types)}) THEN {family!r}"
+        for family, types in DOC_TYPE_FAMILIES.items()
+        if family != "publications"
+    ]
+    return f"CASE {' '.join(whens)} ELSE 'misc' END"
+
 
 # Liaison SQL par clé de dimension : expression de groupement et jointure éventuelle.
 _DIM_EXPR: dict[str, str] = {

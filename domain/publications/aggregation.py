@@ -19,6 +19,7 @@ Priorité d'ordre : les enregistrements canoniques passent avant les formes seco
 from typing import Any
 
 from domain.normalize import normalize_text
+from domain.publications.doc_types import ARTICLE_SUBTYPES
 from domain.publications.identifiers import DOI
 from domain.publications.metadata import (
     OA_CLOSED_STATUSES,
@@ -27,7 +28,6 @@ from domain.publications.metadata import (
     has_open_archive_deposit,
 )
 from domain.publications.publication import Publication
-from domain.source_publications.doc_types import ARTICLE_SUBTYPES
 from domain.source_publications.source_publication import SourcePublication
 from domain.types import JsonValue
 

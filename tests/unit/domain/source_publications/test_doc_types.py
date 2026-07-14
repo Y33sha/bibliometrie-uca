@@ -3,7 +3,8 @@
 import re
 from pathlib import Path
 
-from domain.source_publications.doc_types import DOC_TYPES_SET, map_doc_type
+from domain.publications.doc_types import DOC_TYPES_SET
+from domain.source_publications.doc_types import map_doc_type
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
 SCHEMA_PATH = PROJECT_ROOT / "infrastructure" / "db" / "schema.sql"
