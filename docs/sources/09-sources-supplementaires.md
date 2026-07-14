@@ -83,39 +83,3 @@ Pour chaque revue candidate, essai successif `issn` → `eissn` → `issnl` (dou
 **Pas de reset global** — Contrairement à l'import CSV bootstrap (qui reset `is_in_doaj=FALSE` partout avant de re-marquer), le sub-step API est purement incrémental.
 
 **Bootstrap CSV** — Le script `interfaces/cli/imports/import_doaj_csv.py` reste utilisable pour seeder rapidement depuis un dump complet téléchargé sur https://doaj.org/csv (~21 k revues, plus rapide qu'un fetch unitaire). Même format de stockage → pas de conflit avec le sub-step API.
-
-## ROR
-
-*Pas à jour: sorti du pipeline, relégué dans un script CLI*
-
-https://ror.org/ — Research Organization Registry
-
-Documentation API : https://ror.readme.io/
-
-Source de typage canonique pour les organismes éditeurs. Consommée par le sub-step `enrich_publishers_from_ror` de la phase [`publishers_journals`](../pipeline/05-publishers-journals.md) pour déduire `publishers.publisher_type` à partir du champ `types` ROR.
-
-### API utilisée
-
-`GET https://api.ror.org/v2/organizations/{ror}` — interrogation unitaire par ROR (pas de bulk dispo).
-
-- Polite pool via `User-Agent: bibliometrie-uca/1.0 (mailto:...)`.
-- Limites : 2 000 requêtes / 5 min sustained (≈ 6.66 req/s), 100 req / 10 s en burst. Throttle `ROR_DELAY = 0.15s` (sous le seuil sustained).
-- Pas de retry élaboré : skip sur 404 / erreur réseau.
-
-### Données récupérées
-
-Champ `types` du record ROR (`Company`, `Education`, `Government`, `Nonprofit`, `Archive`, etc.), mappé sur l'enum applicatif `publisher_type` :
-
-| ROR `types` | `publisher_type` |
-|---|---|
-| `education[+funder]` | `academic_institution` |
-| `nonprofit` seul, `funder+nonprofit` | `learned_society` |
-| `company[+funder]` | `commercial` |
-| `archive[+facility]` | `repository` |
-| autres (`government`, `facility`, `other`, `healthcare`) | NULL (laisse `publisher_type='unknown'` pour arbitrage manuel) |
-
-Mapping figé dans `domain.publishers.publisher.map_ror_types`.
-
-### Particularités
-
-Le `publishers.ror` lui-même est posé en amont par le sub-step `enrich_publishers_from_openalex` (depuis `ids.ror` d'OpenAlex Publishers). Pas de matching ROR par nom : trop fragile. Les publishers sans `openalex_id` restent à `ror=NULL` et `publisher_type='unknown'` (arbitrage admin).

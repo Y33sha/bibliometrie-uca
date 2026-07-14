@@ -29,7 +29,6 @@ class _PublisherRow(NamedTuple):
     name: str
     country: str | None
     openalex_id: str | None
-    ror: str | None
     is_predatory: bool
     publisher_type: str
 
@@ -41,7 +40,6 @@ def _publisher_from_row(row: _PublisherRow) -> Publisher:
         name=row.name,
         country=row.country,
         openalex_id=row.openalex_id,
-        ror=row.ror,
         is_predatory=row.is_predatory,
         publisher_type=cast(PublisherType, row.publisher_type),
     )
@@ -62,7 +60,6 @@ class PgPublisherRepository:
                 publishers.c.name,
                 publishers.c.country,
                 publishers.c.openalex_id,
-                publishers.c.ror,
                 publishers.c.is_predatory,
                 publishers.c.publisher_type,
             ).where(publishers.c.id == publisher_id)
@@ -200,12 +197,10 @@ class PgPublisherRepository:
         )
 
         # Ordre : capture src → NULL-er openalex_id src (libère la contrainte
-        # UNIQUE — `ror` n'a pas de UNIQUE, plusieurs publishers peuvent
-        # légitimement le partager) → enrich target → delete source.
+        # UNIQUE) → enrich target → delete source.
         src = self._conn.execute(
             select(
                 publishers.c.openalex_id,
-                publishers.c.ror,
                 publishers.c.country,
                 publishers.c.is_predatory,
             ).where(publishers.c.id == source_id)
@@ -218,7 +213,6 @@ class PgPublisherRepository:
             .where(publishers.c.id == target_id)
             .values(
                 openalex_id=func.coalesce(publishers.c.openalex_id, src.openalex_id),
-                ror=func.coalesce(publishers.c.ror, src.ror),
                 country=func.coalesce(publishers.c.country, src.country),
                 is_predatory=publishers.c.is_predatory | src.is_predatory,
             )

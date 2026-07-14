@@ -2,19 +2,12 @@
 Orchestrateur d'enrichissement éditeurs (maintenance, hors pipeline) à
 partir de l'API OpenAlex Publishers.
 
-Champs mis à jour (si NULL côté DB seulement — ne jamais écraser un signal
-admin) :
-- `country` (depuis `country_codes[0]` ; un éditeur peut opérer dans
-  plusieurs pays côté OpenAlex, on prend le premier qui correspond
-  généralement au siège social)
-- `ror` (depuis `ids.ror`, stocké en short form `02scfj030` sans le
-  préfixe `https://ror.org/`)
+Met à jour `country` quand la valeur DB est NULL, depuis
+`country_codes[0]` : un éditeur peut opérer dans plusieurs pays côté
+OpenAlex, on prend le premier, qui correspond généralement au siège
+social.
 
-Le `ror` posé ici est consommé par `from_ror` pour dériver `publisher_type`
-via les types ROR.
-
-L'API Publishers utilise un filtre différent de Sources :
-`ids.openalex:P1|P2|...` (et non `openalex:`).
+L'API Publishers filtre par `ids.openalex:P1|P2|...`.
 """
 
 import logging
@@ -31,22 +24,13 @@ from application.ports.repositories.publisher_repository import (
 )
 from domain.sources.openalex import full_openalex_id, short_openalex_id
 
-ROR_PREFIX = "https://ror.org/"
 BATCH_SIZE = 50
-COMMIT_EVERY = 500
 # Coupe-circuit : N batches consécutifs en 429 (budget API OpenAlex épuisé) avant coupure.
 RATE_LIMIT_STRIKES_MAX = 3
 
 
 class _OpenAlexRateLimited(Exception):
     """429 répétés sur un batch (3 retries épuisés) : budget API probablement épuisé."""
-
-
-def to_short_ror(full_url: str) -> str:
-    """Convertit 'https://ror.org/02scfj030' → '02scfj030'."""
-    if full_url.startswith(ROR_PREFIX):
-        return full_url[len(ROR_PREFIX) :]
-    return full_url
 
 
 def fetch_publishers_batch(
@@ -64,7 +48,7 @@ def fetch_publishers_batch(
     params = {
         "filter": f"ids.openalex:{filter_value}",
         "per_page": str(len(openalex_ids)),
-        "select": "id,country_codes,ids",
+        "select": "id,country_codes",
     }
     if api_key:
         params["api_key"] = api_key
@@ -92,21 +76,14 @@ def fetch_publishers_batch(
     raise _OpenAlexRateLimited()
 
 
-def extract_country_ror(source: dict) -> tuple[str | None, str | None]:
-    """Extrait `(country, ror)` depuis la payload OpenAlex Publishers.
+def extract_country(source: dict) -> str | None:
+    """Extrait le `country` depuis la payload OpenAlex Publishers.
 
-    `country` = premier code de `country_codes`, en minuscule (canonique ;
-    OpenAlex renvoie de la majuscule) (vide → None).
-    `ror` = `ids.ror` parsé en short form (vide → None).
+    Premier code de `country_codes`, en minuscule (canonique ; OpenAlex
+    renvoie de la majuscule). Vide → None.
     """
     country_codes = source.get("country_codes") or []
-    country = country_codes[0].lower() if country_codes else None
-
-    ids = source.get("ids") or {}
-    ror_url = ids.get("ror")
-    ror = to_short_ror(ror_url) if ror_url else None
-
-    return country, ror
+    return country_codes[0].lower() if country_codes else None
 
 
 def run_enrich_publishers_from_openalex(
@@ -125,7 +102,7 @@ def run_enrich_publishers_from_openalex(
     try:
         publishers = queries.fetch_publishers_needing_enrichment(conn, limit=limit or None)
         total = len(publishers)
-        logger.info(f"{total} publishers à enrichir (avec openalex_id, manque country ou ror).")
+        logger.info(f"{total} publishers à enrichir (avec openalex_id, manque country).")
 
         if total == 0:
             logger.info("Rien à faire.")
@@ -133,7 +110,6 @@ def run_enrich_publishers_from_openalex(
 
         updated = 0
         with_country = 0
-        with_ror = 0
         country_counter: Counter[str] = Counter()
         no_response = 0
         processed = 0
@@ -176,7 +152,7 @@ def run_enrich_publishers_from_openalex(
                     processed += 1
                     continue
 
-                country, ror = extract_country_ror(source)
+                country = extract_country(source)
 
                 # On charge l'état actuel via l'aggregate pour décider du
                 # gating "NULL only". Un fetch supplémentaire par publisher
@@ -193,9 +169,6 @@ def run_enrich_publishers_from_openalex(
                     fields["country"] = country
                     with_country += 1
                     country_counter[country] += 1
-                if ror and current.ror is None:
-                    fields["ror"] = ror
-                    with_ror += 1
 
                 if fields and not dry_run:
                     publisher_repo.update_publisher_fields(publisher_id, fields)
@@ -210,16 +183,14 @@ def run_enrich_publishers_from_openalex(
             if not dry_run:
                 conn.commit()
 
-            logger.info(
-                f"  {min(i + BATCH_SIZE, total)}/{total} — {with_country} countries, {with_ror} ROR écrits"
-            )
+            logger.info(f"  {min(i + BATCH_SIZE, total)}/{total} — {with_country} countries écrits")
 
         if not dry_run:
             conn.commit()
 
         logger.info(
             f"Terminé : {updated}/{total} publishers mis à jour "
-            f"({with_country} countries, {with_ror} ROR, {no_response} sans réponse)."
+            f"({with_country} countries, {no_response} sans réponse)."
         )
         if country_counter:
             distrib = ", ".join(f"{c}={n}" for c, n in country_counter.most_common(10))
