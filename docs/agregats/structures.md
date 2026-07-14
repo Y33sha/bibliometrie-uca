@@ -12,7 +12,7 @@
 | `structure_relations` | Hiérarchie parent → enfant | `parent_id`, `child_id`, `relation_type` (`est_tutelle_de`, `est_partenaire_de`), unique `(parent, child, type)`, CHECK `parent <> child` |
 | `structure_name_forms` | Formes de nom pour le matching d'adresses | `structure_id`, `form_text` (normalisé), `is_word_boundary`, `is_excluding`, `requires_context_of` (int[]), CHECK `char_length > 6 OR is_word_boundary` |
 
-Le périmètre (`perimeters`, `perimeter_structures`) est un cluster voisin dont les racines sont des `structures` : son cycle de vie propre est décrit dans [perimetres.md](perimetres.md).
+Le périmètre (`perimeters`, `perimeter_structures`) est un cluster voisin dont les racines sont des `structures` : son cycle de vie propre est décrit dans [perimeters.md](perimeters.md).
 
 ## Les deux axes
 
@@ -34,10 +34,10 @@ flowchart LR
 Routeur `interfaces/api/routers/admin/structures.py`, command handlers `application/services/structures/commands.py`, cœur `core.py`, adaptateur `PgStructureRepository`. **Seul chemin d'écriture** du cluster.
 
 - **Structures** (`POST` / `PUT` / `DELETE /api/structures/{id}`) : `create_structure` / `update_structure` / `delete_structure`. Le service normalise `ror_id` (VO `RorId`), mappe les champs UI → colonnes, et le repo valide `api_ids` contre le modèle JSONB `StructureApiIds`. La suppression cascade en base sur `authorship_structures` et `source_authorship_structures` (FK `ON DELETE CASCADE`).
-- **Relations** (`POST /api/structure-relations`, `DELETE /…/{id}`) : `create_relation` prefetche les ancêtres du parent (`repo.get_ancestor_ids`, `WITH RECURSIVE`) et délègue au domaine `check_can_create_relation` (refus auto-référence / cycle) ; idempotent (`already_exists` si la relation existe). 
+- **Relations** (`POST /api/structure-relations`, `DELETE /…/{id}`) : `create_relation` prefetche les ancêtres du parent (`repo.get_ancestor_ids`, `WITH RECURSIVE`) et délègue au domaine `check_can_create_relation` (refus auto-référence / cycle) ; idempotent (`already_exists` si la relation existe).
 - **Formes de nom** (`POST` / `PUT` / `DELETE /api/name-forms`) : `create_name_form` / `update_name_form` normalisent `form_text` (`normalize_text`) et forcent `is_word_boundary` sur les formes courtes.
 
-Les commandes de relation (création / suppression) et la suppression d'une structure rafraîchissent la clôture `perimeter_structures` via le `PerimeterRepository` ; la suppression retire en plus la structure des racines de tout périmètre (`remove_structure_from_all_perimeters`). Créer ou éditer les attributs d'une structure n'y touche pas (cf. perimetres.md). Chaque opération émet un événement d'audit.
+Les commandes de relation (création / suppression) et la suppression d'une structure rafraîchissent la clôture `perimeter_structures` via le `PerimeterRepository` ; la suppression retire en plus la structure des racines de tout périmètre (`remove_structure_from_all_perimeters`). Créer ou éditer les attributs d'une structure n'y touche pas (cf. perimeters.md). Chaque opération émet un événement d'audit.
 
 ## Écriture — pipeline
 
@@ -46,7 +46,7 @@ Les commandes de relation (création / suppression) et la suppression d'une stru
 ## Lecture — pipeline
 
 - **Matching d'adresses** (phase `affiliations`) : `infrastructure/queries/pipeline/address_resolution.py` charge les `structure_name_forms` dans un `AddressMatcher` (Aho-Corasick) qui balaie le `normalized_text` des adresses. Les options de la forme pilotent le match : `is_word_boundary` (frontière de mot exigée), `is_excluding` (la forme provoque un rejet), `requires_context_of` (le match ne vaut que si les structures citées matchent aussi la même adresse).
-- **Clôture de périmètre** : `structure_relations` (`est_tutelle_de`) fournit la descente récursive qui matérialise `perimeter_structures` à partir des racines `perimeters.structure_ids` — le mécanisme qui, in fine, pilote `source_authorships.in_perimeter` (cf. perimetres.md).
+- **Clôture de périmètre** : `structure_relations` (`est_tutelle_de`) fournit la descente récursive qui matérialise `perimeter_structures` à partir des racines `perimeters.structure_ids` — le mécanisme qui, in fine, pilote `source_authorships.in_perimeter` (cf. perimeters.md).
 
 ## Lecture — API
 
@@ -66,6 +66,6 @@ Portés par le domaine (`domain/structures/`), le SQL et le service.
 
 - **Identité.** `code` unique (identifiant naturel) ; `id` surrogate.
 - **Graphe acyclique.** Une relation `parent → child` est refusée en auto-référence (CHECK DB + domaine) ou si elle referme un cycle (`check_can_create_relation` sur les ancêtres prefetchés).
-- **Forme courte ⇒ frontière de mot.** Une forme de ≤ 6 caractères (texte normalisé) exige `is_word_boundary`, pour éviter les faux positifs en sous-chaîne (« ica » dans « africa »). Verrouillé par une CHECK et forcé par le service.
+- **Forme courte ⇒ frontière de mot.** Une forme de ≤ 6 caractères (texte normalisé) exige `is_word_boundary`, pour éviter les faux positifs en sous-chaîne (« uca » dans « éducation »). Verrouillé par une CHECK et forcé par le service.
 - **Identifiants canoniques.** `ror_id` (forme courte 9-char, alphabet ROR) et `hal_collection` (`[A-Z0-9][A-Z0-9_-]*`) normalisés et validés par leur VO à l'écriture comme à l'hydratation ; `api_ids` validé contre le modèle JSONB `StructureApiIds`.
 - **Formes de nom normalisées.** `form_text` passe par `normalize_text` avant insertion, comme les textes matchés.
