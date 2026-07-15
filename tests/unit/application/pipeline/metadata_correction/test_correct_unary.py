@@ -5,8 +5,7 @@ from application.pipeline.metadata_correction.correct_unary import (
     compute_update,
     tally_corrections,
 )
-from application.ports.pipeline.metadata_correction import CorrectionUpdate
-from domain.source_publications.correction import SourcePublicationForCorrection
+from application.ports.pipeline.metadata_correction import CorrectionUpdate, UnaryCorrectionRow
 from domain.source_publications.raw_metadata import stash_entry
 
 
@@ -45,30 +44,25 @@ def test_tally_corrections_exclut_le_mapping_doc_type():
     }
 
 
-def _sp(**overrides: object) -> SourcePublicationForCorrection:
+def _sp(**overrides: object) -> UnaryCorrectionRow:
     base: dict[str, object] = {
         "id": 1,
         "source": "openalex",
-        "source_id": "W1",
         "title": "Un titre quelconque",
-        "pub_year": 2020,
         "doc_type": "article",
         "doi": None,
         "journal_id": None,
         "oa_status": None,
-        "container_title": None,
-        "language": None,
         "urls": None,
         "external_ids": {},
         "journal_type": None,
         "oa_model": None,
-        "apc_amount": None,
         "raw_metadata": {},
         "embargo_expired": False,
-        "declares_preprint": False,
+        "self_declared_preprint": False,
     }
     base.update(overrides)
-    return SourcePublicationForCorrection(**base)  # type: ignore[arg-type]
+    return UnaryCorrectionRow(**base)  # type: ignore[arg-type]
 
 
 def test_no_rule_no_mapping_change_returns_none():

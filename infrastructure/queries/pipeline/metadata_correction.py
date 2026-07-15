@@ -14,42 +14,45 @@ from application.ports.pipeline.metadata_correction import (
     JournalByDoiRow,
     JournalCorrectionUpdate,
     MetadataCorrectionQueries,
+    UnaryCorrectionRow,
 )
-from domain.source_publications.correction import SourcePublicationForCorrection
 
-# Projection partagée : SP + champs joints `journals` (règles journal-dépendantes)
-# + `raw_metadata` (reconstruction du brut) + deux booléens calculés ici pour garder
-# `effective_metadata` pure : `embargo_expired` (date-dépendant ; la règle d'embargo lit le
-# booléen, pas la date) et `declares_preprint` (la SP déclare `is-preprint-of`, sans lire `meta`
-# dans le domaine). Le `WHERE` est ajouté par chaque variante.
+# Projection partagée. L'ordre des colonnes est celui des champs d'`UnaryCorrectionRow` : les
+# lignes sont construites par déballage positionnel (`UnaryCorrectionRow(*row)`). Contenu : SP +
+# champs joints `journals` (règles journal-dépendantes) + `raw_metadata` (reconstruction du brut)
+# + deux booléens calculés ici pour garder `effective_metadata` pure : `embargo_expired`
+# (date-dépendant ; la règle d'embargo lit le booléen, pas la date) et `self_declared_preprint`
+# (la SP déclare `is-preprint-of`, sans lire `meta` dans le domaine). Le `WHERE` est ajouté par
+# chaque variante.
 _SELECT = """
-    SELECT sp.id, sp.source::text AS source, sp.source_id,
-           sp.title, sp.pub_year, sp.doc_type, sp.doi,
-           sp.journal_id, sp.oa_status, sp.container_title, sp.language,
+    SELECT sp.id, sp.source::text AS source,
+           sp.title, sp.doc_type, sp.doi,
+           sp.journal_id, sp.oa_status,
            sp.urls, sp.external_ids,
-           j.journal_type::text AS journal_type, j.oa_model, j.apc_amount,
+           j.journal_type::text AS journal_type, j.oa_model,
            sp.raw_metadata,
            (sp.embargo_until IS NOT NULL AND sp.embargo_until <= current_date) AS embargo_expired,
-           COALESCE(jsonb_exists(sp.meta->'relation', 'is-preprint-of'), false) AS declares_preprint
+           COALESCE(jsonb_exists(sp.meta->'relation', 'is-preprint-of'), false)
+               AS self_declared_preprint
     FROM source_publications sp
     LEFT JOIN journals j ON j.id = sp.journal_id
 """
 
 
-def fetch_for_unary_correction(conn: Connection) -> list[SourcePublicationForCorrection]:
+def fetch_for_unary_correction(conn: Connection) -> list[UnaryCorrectionRow]:
     """Toutes les `source_publications`, LEFT JOIN `journals` pour les champs des règles
-    journal-dépendantes (`journal_type`, `oa_model`, `apc_amount`), `raw_metadata` inclus
-    pour la reconstruction du brut."""
+    journal-dépendantes (`journal_type`, `oa_model`), `raw_metadata` inclus pour la
+    reconstruction du brut."""
     rows = conn.execute(text(_SELECT)).all()
-    return [SourcePublicationForCorrection(*row) for row in rows]
+    return [UnaryCorrectionRow(*row) for row in rows]
 
 
 def fetch_for_unary_correction_by_journal(
     conn: Connection, journal_id: int
-) -> list[SourcePublicationForCorrection]:
+) -> list[UnaryCorrectionRow]:
     """Les `source_publications` d'un journal (`journal_id = :jid`) — recompute ciblé."""
     rows = conn.execute(text(_SELECT + " WHERE sp.journal_id = :jid"), {"jid": journal_id}).all()
-    return [SourcePublicationForCorrection(*row) for row in rows]
+    return [UnaryCorrectionRow(*row) for row in rows]
 
 
 def fetch_journal_doi_prefixes(conn: Connection) -> list[tuple[str, int]]:
@@ -215,12 +218,12 @@ def persist_corrections(conn: Connection, updates: list[CorrectionUpdate]) -> in
 class PgMetadataCorrectionQueries(MetadataCorrectionQueries):
     """Adapter PostgreSQL pour `application.ports.pipeline.metadata_correction.MetadataCorrectionQueries`."""
 
-    def fetch_for_unary_correction(self, conn: Connection) -> list[SourcePublicationForCorrection]:
+    def fetch_for_unary_correction(self, conn: Connection) -> list[UnaryCorrectionRow]:
         return fetch_for_unary_correction(conn)
 
     def fetch_for_unary_correction_by_journal(
         self, conn: Connection, journal_id: int
-    ) -> list[SourcePublicationForCorrection]:
+    ) -> list[UnaryCorrectionRow]:
         return fetch_for_unary_correction_by_journal(conn, journal_id)
 
     def persist_corrections(self, conn: Connection, updates: list[CorrectionUpdate]) -> int:
