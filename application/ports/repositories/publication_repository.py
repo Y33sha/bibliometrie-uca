@@ -67,9 +67,6 @@ class PublicationRepository(Protocol):
         pub_year: int,
         doi: str | None,
         oa_status: str,
-        journal_id: int | None,
-        container_title: str | None,
-        language: str | None,
     ) -> int: ...
 
     # ── Fusion ─────────────────────────────────────────────────────

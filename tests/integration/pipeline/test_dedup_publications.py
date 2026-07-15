@@ -24,8 +24,7 @@ from infrastructure.repositories import publication_repository
 def _insert_pub(conn, **kwargs):
     """Sème une publication directement via le repo et retourne son id.
 
-    Pas de cascade de matching : on veut juste une ligne à laquelle rattacher
-    des `source_publications`.
+    Pas de cascade de matching : on veut juste une ligne à laquelle rattacher des `source_publications`.
     """
     title = kwargs.get("title", "Test Publication")
     return publication_repository(conn).create(
@@ -35,9 +34,6 @@ def _insert_pub(conn, **kwargs):
         pub_year=kwargs.get("pub_year", 2024),
         doi=kwargs.get("doi"),
         oa_status=kwargs.get("oa_status", "unknown"),
-        journal_id=kwargs.get("journal_id"),
-        container_title=kwargs.get("container_title"),
-        language=kwargs.get("language"),
     )
 
 

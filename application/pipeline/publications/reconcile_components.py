@@ -24,8 +24,7 @@ from application.ports.pipeline.publications_reconciliation import (
     ReconcileRow,
 )
 from application.ports.repositories.publication_repository import PublicationRepository
-from application.services.publications.core import refresh_from_sources
-from domain.publications.metadata import OA_STATUS_UNKNOWN_DEFAULT
+from application.services.publications.core import create_publication, refresh_from_sources
 from domain.publications.reconciliation import ReconcileMember, WorkGroup, plan_reconciliation
 from domain.source_publications.keys import project_confirmation_keys
 
@@ -49,7 +48,7 @@ def _member(row: ReconcileRow) -> ReconcileMember:
 def _create_new_publication(
     group: WorkGroup, rows_by_sp: dict[int, ReconcileRow], pub_repo: PublicationRepository
 ) -> int:
-    """Crée le pub d'un groupe sans ancre existante (split, ou création depuis orphelins), semé depuis sa plus petite SP portant une année (`pub_year`, seule colonne NOT NULL de `publications` ici). Les métadonnées définitives sont posées juste après par `refresh_from_sources`.
+    """Crée la publication d'un groupe sans ancre existante (split, ou création depuis orphelins), semée depuis sa plus petite SP portant une année. Les métadonnées définitives sont posées juste après par `refresh_from_sources`.
 
     Un groupe `target=None` est soit une partition d'orphelins ayant passé le gate `has_minimal_publication_metadata` (≥1 membre titre + année), soit une partition split perdante (membres matérialisés, qui portaient déjà une année) — dans les deux cas ≥1 membre a une année."""
     seed = min(
@@ -57,16 +56,12 @@ def _create_new_publication(
         key=lambda r: r.id,
     )
     assert seed.pub_year is not None
-    return pub_repo.create(
-        title=seed.title_normalized or "",
+    return create_publication(
         title_normalized=seed.title_normalized or "",
-        doc_type=seed.doc_type or "other",
+        doc_type=seed.doc_type,
         pub_year=seed.pub_year,
         doi=seed.doi,
-        oa_status=OA_STATUS_UNKNOWN_DEFAULT,
-        journal_id=None,
-        container_title=None,
-        language=None,
+        repo=pub_repo,
     )
 
 

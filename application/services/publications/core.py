@@ -1,6 +1,6 @@
 """Service Publications — écritures sur l'agrégat Publication, transaction-agnostiques.
 
-Trois opérations : recalcul des métadonnées canoniques depuis les `source_publications`, fusion de deux doublons, marquage d'une paire comme distincte. Les appelants sont la phase `publications` du pipeline, les command handlers de l'API et les CLI de maintenance ; chacun tient sa propre frontière transactionnelle et commite lui-même.
+Quatre opérations : création, recalcul des métadonnées canoniques depuis les `source_publications`, fusion de deux doublons, marquage d'une paire comme distincte. Toute écriture sur la table `publications` passe par ici. Les appelants sont la phase `publications` du pipeline, les command handlers de l'API et les CLI de maintenance ; chacun tient sa propre frontière transactionnelle et commite lui-même.
 """
 
 from application.audit_log import emit_event
@@ -8,6 +8,7 @@ from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.publication_repository import PublicationRepository
 from domain.errors import DistinctDoiError, NotFoundError
 from domain.publications.aggregation import refresh_from_sources as _refresh_aggregate
+from domain.publications.metadata import OA_STATUS_UNKNOWN_DEFAULT
 from domain.publications.publication import Publication
 from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES
 from domain.source_publications.correction import (
@@ -15,6 +16,31 @@ from domain.source_publications.correction import (
     effective_metadata,
 )
 from domain.sources.registry import SOURCE_PRIORITY
+
+# ── Création ─────────────────────────────────────────────────────────────
+
+
+def create_publication(
+    *,
+    title_normalized: str,
+    doc_type: str | None,
+    pub_year: int,
+    doi: str | None,
+    repo: PublicationRepository,
+) -> int:
+    """Crée une publication semée sur le minimum requis par les colonnes NOT NULL, et retourne son id.
+
+    Les valeurs de semis tiennent jusqu'au premier `refresh_from_sources`, qui pose les métadonnées définitives par agrégation une fois les `source_publications` rattachées : `title` reçoit le titre normalisé, `doc_type` vaut `other` quand la source n'en donne aucun, `oa_status` vaut la valeur par défaut, et les métadonnées de publication (journal, titre de conteneur, langue) restent nulles.
+    """
+    return repo.create(
+        title=title_normalized,
+        title_normalized=title_normalized,
+        doc_type=doc_type or "other",
+        pub_year=pub_year,
+        doi=doi,
+        oa_status=OA_STATUS_UNKNOWN_DEFAULT,
+    )
+
 
 # ── Recalcul complet des métadonnées depuis les source_publications ──────
 

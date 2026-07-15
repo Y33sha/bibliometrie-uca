@@ -305,22 +305,17 @@ class PgPublicationRepository:
         pub_year: int,
         doi: str | None,
         oa_status: str,
-        journal_id: int | None,
-        container_title: str | None,
-        language: str | None,
     ) -> int:
-        """Insère une publication et retourne son id.
+        """Insère une publication et retourne son id. INSERT brut : la déduplication relève du caller.
 
-        Le caller est responsable du tier de déduplication avant
-        d'appeler `create` — le repo ne fait que le INSERT brut.
+        Les colonnes hors des NOT NULL et du DOI prennent leur valeur par défaut ; `save` les pose.
         """
         return self._conn.execute(
             text("""
                 INSERT INTO publications
-                    (title, title_normalized, doc_type, pub_year, doi,
-                     oa_status, journal_id, container_title, language)
+                    (title, title_normalized, doc_type, pub_year, doi, oa_status)
                 VALUES (:title, :tn, CAST(:doc_type AS doc_type), :py, :doi,
-                        CAST(:oa AS oa_type), :jid, :ct, :lang)
+                        CAST(:oa AS oa_type))
                 RETURNING id
             """),
             {
@@ -330,9 +325,6 @@ class PgPublicationRepository:
                 "py": pub_year,
                 "doi": doi,
                 "oa": oa_status,
-                "jid": journal_id,
-                "ct": container_title,
-                "lang": language,
             },
         ).scalar_one()
 

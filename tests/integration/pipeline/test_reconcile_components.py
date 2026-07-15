@@ -30,9 +30,6 @@ def _seed_pub(conn, doi=None) -> int:
         pub_year=2024,
         doi=doi,
         oa_status="unknown",
-        journal_id=None,
-        container_title=None,
-        language=None,
     )
 
 
