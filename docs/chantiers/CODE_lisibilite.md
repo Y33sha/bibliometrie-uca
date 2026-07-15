@@ -84,6 +84,16 @@ Réorganisation du sommet :
 
 #### 1.2 - `application/services`
 
+Passes de relecture : `structures`, `publishers`, `publications`, `persons`, `perimeters`, `journals`, `config`, `authorships`. Reste `addresses`.
+
+- [ ] `addresses` : seul service non relu. Son `commands.py` alias `application.services.addresses.structures` en `structures_service` — le même identifiant qui, dans `structures/commands.py`, désigne `application.services.structures.core`. Deux modules sous un nom identique dans deux fichiers voisins : `addresses` porte un sous-module qui reprend le nom d'un autre agrégat. La convention d'alias ne crée pas la collision, elle la révèle.
+- [x] Docstrings des quatre services qui s'annonçaient « accès exclusif en écriture » (`publications`, `persons`, `journals`, `publishers`) : la formule était recopiée et fausse à la lettre partout. La ligne ne passe pas entre l'API et le pipeline — celui-ci respecte l'exclusivité pour tout l'éditorial (`find_or_create_journal`, `create_person`, `create_publication`, `refresh_from_sources`) — mais entre l'éditorial et le dérivé : `pub_count`, drapeau `is_in_doaj`, formes de nom sont recalculés en bloc, en un ordre SQL (`6bc83de4`).
+- [x] Phrase « les lectures restent autorisées dans les routers (convention du projet) » bannie de `config` (deux fois) et `structures` : vestige de l'époque où les routers écrivaient du SQL (`ba891d8e`).
+- [x] `perimeters` : le contrat d'édition était déclaré trois fois (`PerimeterUpdate` Pydantic côté API, `PerimeterUpdateFields` TypedDict au port, liste `allowed` en dur au service), et le typage détruit puis ré-affirmé par un `cast` — qui ne vérifie rien : `{"name": 123}` traversait mypy jusqu'à une colonne texte. Aligné sur le motif de `journals` (un modèle Pydantic déclaré une fois au port, partagé du router au repo) ; `.strip()` rendu déclaratif, issue de l'ajout typée en `StrEnum`, paire renommée d'après le repo (`0790a781`).
+- [x] `journals` : `requalify_publications_for_journal` chargeait trois fois chaque publication pour compter les `doc_type` qui bougent ; deux relevés encadrant la boucle suffisent. `update_journal_apc` garde son absence de vérification d'existence — justifiée, son appelant boucle sur des ids issus d'une requête — et la docstring le dit (`51178a91`).
+- [x] `config` : `update_config_value` sondait la clé avant de l'écrire, parce que l'implémentation finissait par `result.one()`. Le port rend `dict | None`, le service lève `NotFoundError` — une requête au lieu de deux, et l'absence dite dans la signature (`ba891d8e`).
+- [x] `authorships` : `assign_orphan_authorship` rendait `False` quand la signature portait déjà une personne ; le command handler jetait ce retour et le router en faisait un 200. Lève `AuthorshipAlreadyAssignedError` (409) ou `NotFoundError` (`b6d9ae53`). Le corps du batch perd sa `source`, que le service ne recevait jamais et qui ne servait qu'à un filtre silencieux (`fdd40b67`).
+- [x] Contrôle d'appartenance d'une source mutualisé en `domain/sources/registry.py::require_known_source` : trois endroits, trois messages (`b9857f74`). Il reste appelé par le router, qui ordonne les erreurs — valider le corps avant de lire la base.
 - [x] `persons/core.py` : `import_authenticated_orcids` ne lit aucune source externe — elle reçoit des paires `(person_id, orcid)` déjà résolues et normalisées, et applique un statut. Le nom promettait une ingestion que le corps ne fait pas : renommée `authenticate_orcids`. L'ingestion réelle vit dans le CLI, notée en 3.3.
 - [x] `publishers/enrichment/` : sous-package (réduit à un seul module) aplati en module plat `enrich_country.py` ; payload OpenAlex typée + boucle par batch extraite dans `_enrich_batch` → exceptions `ruff C901` et override mypy `disallow-any` retirées (`0a8f95f8`).
 - [x] `commands.py` : l'alias d'import du module `core` divergeait (cinq en `<agrégat>_service`, deux en nom nu). Harmonisé sur `<agrégat>_service`, la forme majoritaire ; la convention est en Décisions.
@@ -104,6 +114,8 @@ Traverse `domain/`, `application/ports`, `application/pipeline/metadata_correcti
 
 #### 1.3 - `application/ports`
 
+- [ ] **Frontière Person / Authorship : à qui appartient `source_authorships.person_id` ?** Six méthodes de `PersonRepository` portent ce lien — `link_authorship`, `unlink_authorship`, `assign_orphan_sa`, `assign_orphan_source_authorships_to_person`, `null_person_id_for_name_form`, et `find_source_authorship_owner` qui le lit. La colonne vit sur `source_authorships`, donc côté Authorship ; mais ce sont des gestes pilotés par la personne. Selon la réponse elles basculent ou restent, et les signatures des services suivent (`link_authorship(..., repo: PersonRepository)` deviendrait `authorship_repo`), avec leurs appelants — cascade du pipeline, command handlers, router, tests. Mécanique et tenue par mypy, mais large. Ce qui écrivait la table `authorships` sans toucher au lien a déjà basculé (`4132786a`).
+- [ ] `AuthorshipRepository` recalcule `in_perimeter` à deux granularités : `recompute_authorship_in_perimeter` (par paire publication/personne, action admin) et `recompute_in_perimeter_on_source_authorships` + `propagate_in_perimeter_to_authorships` (par lot d'adresses, après review). Le rapprochement des deux dans le même port (`4132786a`) rend la question visible ; reste à décider si elles fusionnent.
 - [ ] Placement du port `publishers_enrichment.py`, aujourd'hui à plat sous `ports/` (comme `config.py`). Sa place définitive se tranche en réorganisant `ports/`.
 - [ ] `ports/pipeline/enrich.py` (`EnrichQueries`) : port grab-bag hérité de la phase monolithique `enrich`, depuis scindée en `oa_status` + `publishers_journals`. Il regroupe deux familles de requêtes disjointes (publications OA vs journaux/DOAJ) ; chaque phase tire des méthodes qu'elle n'utilise pas (violation d'*Interface Segregation*). À scinder en deux ports étroits — l'impl `PgEnrichQueries` implémentant les deux, ou se scindant elle aussi. Le nom `EnrichQueries` disparaît avec.
 
@@ -133,6 +145,7 @@ Racine (transverse) : passe docstrings/commentaires faite. Findings structurels 
 #### 2.7 `repositories`
 
 - [ ] Même motif de déballage positionnel qu'en 2.6, sur cinq repositories : `_PerimeterRow`, `_PublisherRow`, `_StructureRow`, `_JournalRow`, `_SourcePublicationViewRow`.
+- [ ] `person_repository/_authorships.py` suit la frontière tranchée en 1.3 : le sous-module ne porte plus que le lien `person_id` des signatures, et disparaît si le lien passe côté Authorship.
 
 
 ### Phase 3 - `interfaces/`
