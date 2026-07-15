@@ -141,6 +141,8 @@ Racine (transverse) : passe docstrings/commentaires faite. Findings structurels 
 
 #### 3.2 - Frontend
 
+- [ ] `src/lib/api/schema.ts` est généré depuis l'OpenAPI (`npm run types:gen`), mais aucun garde-fou ne vérifie qu'il suit : ni la CI ni les hooks pre-commit ne le régénèrent ni ne comparent. Il dérive donc en silence — une régénération faite au passage a rattrapé une docstring de router modifiée dans un commit antérieur. `svelte-check` ne le voit pas : le front appelle les routes par chemin, pas par `operationId`. Un contrôle de fraîcheur en CI (régénérer, échouer si le diff est non vide) fermerait la dérive.
+
 #### 3.3 - CLI
 
 - [ ] CLI `maintenance/` : coquille-ification. `enrich_publishers` séquence ses trois étapes dans son `main()` au lieu de déléguer en un appel à un orchestrateur applicatif, contrairement à ses voisins.

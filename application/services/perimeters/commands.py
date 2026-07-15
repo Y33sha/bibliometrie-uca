@@ -1,15 +1,18 @@
 """Command handlers des écritures API sur les périmètres : frontière transactionnelle de l'agrégat.
 
-`update_perimeter`, `add_perimeter_structure` et `remove_perimeter_structure` rafraîchissent en plus la clôture matérialisée, dont les racines du périmètre commandent la descente.
+`update_perimeter`, `add_structure_to_perimeter` et `remove_structure_from_perimeter` rafraîchissent en plus la clôture matérialisée, dont les racines du périmètre commandent la descente.
 """
 
 from sqlalchemy import Connection
 
 from application.ports.config import ConfigStore
 from application.ports.repositories.audit_repository import AuditRepository
-from application.ports.repositories.perimeter_repository import PerimeterRepository
+from application.ports.repositories.perimeter_repository import (
+    PerimeterRepository,
+    PerimeterUpdate,
+)
 from application.services.perimeters import core as perimeters_service
-from domain.types import JsonValue
+from application.services.perimeters.core import AddStructureOutcome
 
 
 def create_perimeter(
@@ -29,11 +32,11 @@ def update_perimeter(
     conn: Connection,
     perimeter_id: int,
     *,
-    fields: dict[str, JsonValue],
+    update: PerimeterUpdate,
     repo: PerimeterRepository,
 ) -> None:
-    """Met à jour un périmètre (champs sélectifs : name, structure_ids)."""
-    perimeters_service.update_perimeter(perimeter_id, fields=fields, repo=repo)
+    """Met à jour un périmètre à partir des champs explicitement fournis."""
+    perimeters_service.update_perimeter(perimeter_id, update=update, repo=repo)
     repo.refresh_structures()
     conn.commit()
 
@@ -53,21 +56,21 @@ def delete_perimeter(
     conn.commit()
 
 
-def add_perimeter_structure(
+def add_structure_to_perimeter(
     conn: Connection,
     perimeter_id: int,
     structure_id: int,
     *,
     repo: PerimeterRepository,
-) -> str:
-    """Ajoute une structure racine au périmètre. Retourne "added"/"already_present"."""
-    status = perimeters_service.add_perimeter_structure(perimeter_id, structure_id, repo=repo)
+) -> AddStructureOutcome:
+    """Ajoute une structure racine au périmètre. Retourne l'issue."""
+    outcome = perimeters_service.add_structure_to_perimeter(perimeter_id, structure_id, repo=repo)
     repo.refresh_structures()
     conn.commit()
-    return status
+    return outcome
 
 
-def remove_perimeter_structure(
+def remove_structure_from_perimeter(
     conn: Connection,
     perimeter_id: int,
     structure_id: int,
@@ -75,6 +78,6 @@ def remove_perimeter_structure(
     repo: PerimeterRepository,
 ) -> None:
     """Retire une structure racine du périmètre."""
-    perimeters_service.remove_perimeter_structure(perimeter_id, structure_id, repo=repo)
+    perimeters_service.remove_structure_from_perimeter(perimeter_id, structure_id, repo=repo)
     repo.refresh_structures()
     conn.commit()

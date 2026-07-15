@@ -45,7 +45,6 @@ from interfaces.api.models.admin.feedback import FeedbackStructuresResponse
 from interfaces.api.models.admin.perimeters import (
     AddPerimeterStructure,
     PerimeterCreate,
-    PerimeterUpdate,
 )
 from interfaces.api.models.admin.persons import (
     AddIdentifier,
@@ -125,7 +124,6 @@ __all__ = [
     "OrphanAssignResponse",
     "OrphanBatchAssignResponse",
     "PerimeterCreate",
-    "PerimeterUpdate",
     "PipelinePhaseLog",
     "PipelineStatus",
     "PubMergeResponse",

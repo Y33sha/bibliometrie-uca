@@ -4,7 +4,7 @@ from typing import NamedTuple
 
 from sqlalchemy import Connection, delete, func, select, update
 
-from application.ports.repositories.perimeter_repository import PerimeterUpdateFields
+from application.ports.repositories.perimeter_repository import PerimeterUpdate
 from domain.perimeters.perimeter import Perimeter
 from infrastructure.db.tables import perimeters
 from infrastructure.queries.perimeter import refresh_perimeter_structures
@@ -104,8 +104,10 @@ class PgPerimeterRepository:
         result = self._conn.execute(stmt)
         return result.scalar_one()
 
-    def update_perimeter_fields(self, perimeter_id: int, fields: PerimeterUpdateFields) -> None:
-        stmt = update(perimeters).where(perimeters.c.id == perimeter_id).values(**fields)
+    def update_perimeter_fields(self, perimeter_id: int, fields: PerimeterUpdate) -> None:
+        """UPDATE dynamique sur `perimeters` à partir des champs fournis. L'existence du périmètre et la non-vacuité sont vérifiées par le service."""
+        data = fields.model_dump(exclude_unset=True)
+        stmt = update(perimeters).where(perimeters.c.id == perimeter_id).values(**data)
         self._conn.execute(stmt)
 
     def get_perimeter_code(self, perimeter_id: int) -> str | None:

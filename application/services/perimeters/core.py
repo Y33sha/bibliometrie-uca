@@ -5,41 +5,47 @@ Un périmètre porte des structures **racines** (`perimeters.structure_ids`) ; l
 `delete_perimeter` consulte la table `config` (via `ConfigStore`) pour refuser la suppression d'un périmètre encore référencé par la configuration pipeline.
 """
 
-from typing import cast
+from enum import StrEnum
 
 from application.audit_log import emit_event
 from application.ports.config import ConfigStore
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.perimeter_repository import (
     PerimeterRepository,
-    PerimeterUpdateFields,
+    PerimeterUpdate,
 )
 from domain.errors import ConflictError, NotFoundError, ValidationError
-from domain.types import JsonValue
 
 # ── Structures membres ────────────────────────────────────────────
 
 
-def add_perimeter_structure(
+class AddStructureOutcome(StrEnum):
+    """Issue d'`add_structure_to_perimeter`, relayée telle quelle par l'API."""
+
+    ADDED = "added"
+    ALREADY_PRESENT = "already_present"
+
+
+def add_structure_to_perimeter(
     perimeter_id: int,
     structure_id: int,
     *,
     repo: PerimeterRepository,
-) -> str:
-    """Ajoute une structure racine au périmètre. Idempotent : retourne `added` ou `already_present`.
+) -> AddStructureOutcome:
+    """Ajoute une structure racine au périmètre. Idempotent.
 
     Lève `NotFoundError` si le périmètre n'existe pas.
     """
     if repo.add_structure_to_perimeter(perimeter_id, structure_id):
-        return "added"
+        return AddStructureOutcome.ADDED
 
     # Pas d'UPDATE → soit déjà présent, soit périmètre inexistant
     if repo.perimeter_exists(perimeter_id):
-        return "already_present"
+        return AddStructureOutcome.ALREADY_PRESENT
     raise NotFoundError(f"Périmètre {perimeter_id} introuvable")
 
 
-def remove_perimeter_structure(
+def remove_structure_from_perimeter(
     perimeter_id: int,
     structure_id: int,
     *,
@@ -77,22 +83,20 @@ def create_perimeter(
 def update_perimeter(
     perimeter_id: int,
     *,
-    fields: dict[str, JsonValue],
+    update: PerimeterUpdate,
     repo: PerimeterRepository,
 ) -> None:
-    """Met à jour un périmètre à partir des champs explicitement fournis (`name`, `structure_ids`).
+    """Met à jour un périmètre à partir des champs explicitement fournis.
 
-    Lève `NotFoundError` si le périmètre n'existe pas, `ValidationError` si aucun champ éditable n'est fourni.
+    Lève `ValidationError` si aucun champ n'est fourni, `NotFoundError` si le périmètre n'existe pas.
     """
+    if not update.model_fields_set:
+        raise ValidationError("Aucun champ à mettre à jour")
+
     if not repo.perimeter_exists(perimeter_id):
         raise NotFoundError(f"Périmètre {perimeter_id} introuvable")
 
-    allowed = {"name", "structure_ids"}
-    clean = cast(PerimeterUpdateFields, {k: v for k, v in fields.items() if k in allowed})
-    if not clean:
-        raise ValidationError("Aucun champ à mettre à jour")
-
-    repo.update_perimeter_fields(perimeter_id, clean)
+    repo.update_perimeter_fields(perimeter_id, update)
 
 
 def delete_perimeter(

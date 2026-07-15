@@ -1,11 +1,13 @@
 """Modèles Pydantic (bodies HTTP) pour les périmètres.
 
-Les DTOs de retour des query services (`PerimeterOut`, `PerimeterStructureItem`)
-vivent dans `application/ports/api/perimeters_queries.py` (cf. chantier
-`CODE_typage-projections-strict` Phase 4).
+Le contrat d'édition `PerimeterUpdate` vit dans le port `application/ports/repositories/perimeter_repository.py` ; les DTOs de retour des query services (`PerimeterOut`, `PerimeterStructureItem`) dans `application/ports/api/perimeters_queries.py` (cf. chantier `CODE_typage-projections-strict` Phase 4).
 """
 
-from pydantic import BaseModel
+from typing import Annotated
+
+from pydantic import BaseModel, StringConstraints
+
+_Trimmed = Annotated[str, StringConstraints(strip_whitespace=True)]
 
 
 class AddPerimeterStructure(BaseModel):
@@ -13,10 +15,5 @@ class AddPerimeterStructure(BaseModel):
 
 
 class PerimeterCreate(BaseModel):
-    code: str
-    name: str
-
-
-class PerimeterUpdate(BaseModel):
-    name: str | None = None
-    structure_ids: list[int] | None = None
+    code: _Trimmed
+    name: _Trimmed
