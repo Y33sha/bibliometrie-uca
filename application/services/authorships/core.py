@@ -1,6 +1,8 @@
-"""Service Authorships — orchestrateur des opérations unitaires sur `authorships` et `source_authorships`.
+"""Service Authorships — écritures sur l'agrégat Authorship, transaction-agnostiques.
 
-Le constructeur principal (reconstruction complète) est le script batch `build_authorships.py`. Le SQL vit dans `infrastructure/repositories/authorship_repository.py`.
+Couvre les lignes consolidées (`authorships`) et les signatures sources (`source_authorships`), dont le `person_id` porte le lien vers la personne. Les opérations servent des actions utilisateur : rejeter une contribution, propager un changement de périmètre. Elles traitent une paire ou une signature à la fois.
+
+La construction du stock relève du pipeline, qui écrit en SQL ensembliste : la phase `authorships` (`build_authorships.py`) reconstruit les lignes consolidées depuis les signatures, les phases `normalize`, `affiliations`, `countries` et `persons` alimentent les signatures.
 """
 
 from sqlalchemy import Connection

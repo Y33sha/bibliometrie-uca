@@ -39,8 +39,7 @@ def assign_orphan_authorship(
     audit_repo: AuditRepository,
     force: bool = False,
 ) -> int:
-    """Attribue une authorship orpheline à une personne, en créant celle-ci au
-    besoin (`new_person` = (nom, prénom)). Création + rattachement sont atomiques.
+    """Attribue une authorship orpheline à une personne, en créant celle-ci au besoin (`new_person` = (nom, prénom)). Création et rattachement sont atomiques.
 
     Retourne l'id de la personne finalement rattachée.
     """
