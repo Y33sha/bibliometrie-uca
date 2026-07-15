@@ -8,7 +8,7 @@ from sqlalchemy import Connection
 from application.ports.repositories.address_repository import AddressRepository
 from application.services.addresses import (
     countries as countries_service,
-    structures as structures_service,
+    structure_links as structure_links_service,
 )
 
 
@@ -22,7 +22,7 @@ def review_structure_link(
 ) -> list[int]:
     """Valide un lien adresse ↔ structure. Retourne les adresses dont la
     contribution à `in_perimeter` a changé (à propager en tâche de fond)."""
-    changed = structures_service.review_structure_link(
+    changed = structure_links_service.review_structure_link(
         address_id, structure_id, is_confirmed, repo=repo
     )
     conn.commit()
@@ -39,7 +39,7 @@ def batch_review_structure_link(
 ) -> tuple[int, list[int]]:
     """Valide un lot de liens adresse ↔ structure. Retourne `(nombre d'adresses
     touchées, adresses dont la contribution à `in_perimeter` a changé)`."""
-    updated, changed = structures_service.batch_review_structure_link(
+    updated, changed = structure_links_service.batch_review_structure_link(
         address_ids, structure_id, is_confirmed, repo=repo
     )
     conn.commit()

@@ -47,7 +47,7 @@ theses écrit ses `source_authorships` une par une (`upsert_theses_source_author
 
 ## Écriture — API (curation admin)
 
-Routeur `interfaces/api/routers/admin/addresses.py`, couche commande transactionnelle `application/services/addresses/commands.py`, briques `structures.py` / `countries.py`, adaptateur `PgAddressRepository`.
+Routeur `interfaces/api/routers/admin/addresses.py`, couche commande transactionnelle `application/services/addresses/commands.py`, briques `structure_links.py` / `countries.py`, adaptateur `PgAddressRepository`.
 
 **Confirmer / rejeter / réinitialiser un rattachement** : `POST /addresses/{id}/review` et `/batch-review` → `review_structure_link`. Le service lit l'appartenance au périmètre *avant*, applique soit `reset_manual_link` (repasse `is_confirmed` à NULL et supprime le lien automatique), soit `upsert_structure_link` (`is_confirmed` TRUE/FALSE), relit *après*, et renvoie le diff symétrique des `address_ids` réellement touchés (détection des no-op). En cas de changement, une tâche de fond propage `in_perimeter` (recompute sur les `source_authorships` des adresses, puis propagation aux `authorships`) sans rafraîchir les vues matérialisées.
 

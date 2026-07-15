@@ -1,6 +1,9 @@
-"""Services applicatifs autour des adresses (VO `Address`) et de leur résolution vers les structures.
+"""Services applicatifs de curation des adresses (écritures API).
+
+L'adresse n'a pas d'objet de domaine : le cluster de tables est porté par `AddressRepository`, ses règles par le SQL et par ces modules. La détection appartient au pipeline — matching des structures en phase `affiliations`, détection des pays en phase `countries` ; ces services portent la curation manuelle de ses résultats.
 
 Sous-modules :
-- `countries` : résolution des pays depuis les adresses normalisées.
-- `structures` : matching des structures candidates pour une adresse.
+- `commands` : command handlers de l'API (frontière transactionnelle, commit).
+- `structure_links` : validation manuelle des rattachements adresse ↔ structure (confirmer / rejeter / réinitialiser).
+- `countries` : attribution manuelle des pays, propagation aux adresses jumelles puis vers les `source_publications` et `publications`.
 """
