@@ -1,4 +1,6 @@
-"""Service Éditeurs — accès exclusif en écriture à la table `publishers`.
+"""Service Éditeurs — écritures sur l'agrégat Publisher, transaction-agnostiques.
+
+Toute écriture éditoriale passe par ce service. Le compteur dérivé `pub_count`, que le pipeline recalcule en bloc, s'écrit en SQL ensembliste (`infrastructure/queries/pipeline/pub_counts.py`), hors de ce service qui traite un éditeur à la fois.
 
 Agrégat distinct de Journal, servi par son propre port (`PublisherRepository`). Un appelant qui ne touche qu'aux éditeurs (ex. `update_publisher` d'un router admin) charge cette seule surface.
 
