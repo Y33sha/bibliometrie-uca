@@ -212,9 +212,10 @@ class TestBatchReviewStructureLink:
         _insert_address_structure(sa_sync_conn, a1, uca, is_confirmed=True)
         _insert_address_structure(sa_sync_conn, a2, uca, is_confirmed=False)
 
-        batch_review_structure_link([a1, a2], uca, None, repo=repo)
+        updated, _ = batch_review_structure_link([a1, a2], uca, None, repo=repo)
 
-        # Les 2 liens manuels ont été supprimés
+        # Les 2 liens manuels sont supprimés, et comptés parmi les adresses touchées.
+        assert updated == 2
         assert _get_link(sa_sync_conn, a1, uca) is None
         assert _get_link(sa_sync_conn, a2, uca) is None
 

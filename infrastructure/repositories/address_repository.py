@@ -58,19 +58,22 @@ class PgAddressRepository:
         address_ids: list[int],
         structure_id: int,
     ) -> int:
-        self._conn.execute(
+        # Un rattachement est unique par (address_id, structure_id) : une ligne est soit
+        # supprimée (purement manuelle), soit repassée à pending — jamais les deux. Les
+        # deux compteurs s'additionnent sans doublon.
+        deleted = self._conn.execute(
             delete(address_structures)
             .where(address_structures.c.address_id.in_(address_ids))
             .where(address_structures.c.structure_id == structure_id)
             .where(address_structures.c.matched_form_id.is_(None))
         )
-        result = self._conn.execute(
+        updated = self._conn.execute(
             update(address_structures)
             .where(address_structures.c.address_id.in_(address_ids))
             .where(address_structures.c.structure_id == structure_id)
             .values(is_confirmed=None)
         )
-        return result.rowcount
+        return deleted.rowcount + updated.rowcount
 
     def batch_upsert_structure_links(
         self,
