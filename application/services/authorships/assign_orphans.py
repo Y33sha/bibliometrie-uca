@@ -9,7 +9,12 @@ from application.audit_log import emit_event
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.authorship_repository import AuthorshipRepository
 from application.ports.repositories.person_repository import PersonRepository
-from domain.errors import RejectedPairError, ValidationError
+from domain.errors import (
+    AuthorshipAlreadyAssignedError,
+    NotFoundError,
+    RejectedPairError,
+    ValidationError,
+)
 from domain.sources.registry import (
     ALL_SOURCES_SET,
     AUTHOR_SOURCES,
@@ -65,18 +70,18 @@ def assign_orphan_authorship(
     authorship_repo: AuthorshipRepository,
     audit_repo: AuditRepository | None = None,
     force: bool = False,
-) -> bool:
-    """Attribue une authorship orpheline (person_id IS NULL) à une personne.
+) -> None:
+    """Attribue une signature source orpheline (`person_id IS NULL`) à une personne.
 
     1. Valide la source
     2. Pré-contrôle de rejet : si la paire (publication, personne) est rejetée
        et que `force` est faux, lève `RejectedPairError` ; avec `force`, lève
        le rejet d'abord (cf. `_resolve_rejection`)
-    3. Met person_id sur l'authorship source (seulement si elle est orpheline)
+    3. Pose `person_id` sur la signature source, si elle est orpheline
     4. Ajoute la forme de nom
     5. Crée/met à jour l'authorship canonique + FK source
 
-    Retourne True si l'authorship a été attribuée, False sinon.
+    Lève `ValidationError` sur une source hors registre, `NotFoundError` si la signature n'existe pas, `AuthorshipAlreadyAssignedError` si elle porte déjà une personne.
     """
     if source not in ALL_SOURCES_SET:
         raise ValidationError(f"Source inconnue : {source}")
@@ -92,8 +97,14 @@ def assign_orphan_authorship(
         )
 
     row = repo.assign_orphan_sa(person_id, source, authorship_id)
-    if not row:
-        return False
+    if row is None:
+        # L'UPDATE ne pose `person_id` que sur une signature orpheline : son échec signale une
+        # signature absente ou déjà rattachée. Un `owner` nul tranche pour l'absence — sur une
+        # signature orpheline et existante, l'UPDATE aboutit.
+        owner = repo.find_source_authorship_owner(source, authorship_id)
+        if owner is None:
+            raise NotFoundError(f"Signature {source} #{authorship_id} introuvable")
+        raise AuthorshipAlreadyAssignedError(source, authorship_id, owner)
 
     # Épingler la résolution admin (must-link grain signature) : le pipeline la
     # relira comme entrée fixe et ne re-dérivera jamais cette signature.
@@ -108,7 +119,6 @@ def assign_orphan_authorship(
         _refresh_authorship_from_sources(person_id, publication_id, repo=repo)
     # `authorship_structures` (agrégation des structure_ids) maintenue uniquement
     # par le pipeline — pas de refresh sur action admin (staleness bornée à un run).
-    return True
 
 
 def batch_assign_orphan_authorships(
