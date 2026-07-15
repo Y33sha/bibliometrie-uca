@@ -101,6 +101,8 @@ Racine (transverse) : passe docstrings/commentaires faite. Findings structurels 
 
 #### 3.1 - API
 
+- [ ] `routers/admin/publication_duplicates.py` : docstrings hard-wrappées. Celle de `merge_duplicate_publications` réexplique le mécanisme du refresh, qui relève de `services/publications`. Le fait qui appartient au router est le choix du survivant (`sorted()`), et l'invariance du sens de fusion qui l'autorise.
+
 #### 3.2 - Frontend
 
 #### 3.3 - CLI
