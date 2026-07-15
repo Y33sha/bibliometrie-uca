@@ -16,7 +16,6 @@ from domain.source_publications.correction import (
     effective_metadata,
 )
 from domain.sources.registry import SOURCE_PRIORITY
-from domain.types import JsonValue
 
 # ── Création ─────────────────────────────────────────────────────────────
 
@@ -75,7 +74,7 @@ def refresh_from_sources(
     secondary_ids = repo.get_converged_secondary_ids(pub_id)
     # L'agrégation repart des colonnes déjà corrigées par la phase `metadata_correction`, pas du brut.
     _refresh_aggregate(pub, sources, source_priority=SOURCE_PRIORITY, secondary_ids=secondary_ids)
-    _apply_canonical_corrections(pub, repo=repo)
+    _apply_canonical_doc_type_correction(pub, repo=repo)
 
     if pub.doc_type in OUT_OF_SCOPE_DOC_TYPES:
         repo.delete(pub_id)
@@ -85,16 +84,16 @@ def refresh_from_sources(
     repo.update_sources(pub_id)
 
 
-def _apply_canonical_corrections(pub: Publication, *, repo: PublicationRepository) -> None:
-    """Rejoue les corrections de métadonnées sur la publication canonique après l'arbitrage.
+def _apply_canonical_doc_type_correction(pub: Publication, *, repo: PublicationRepository) -> None:
+    """Rejoue les corrections de `doc_type` sur la publication canonique après l'arbitrage.
 
-    L'arbitrage choisit chaque champ **indépendamment** — `doc_type` par priorité de source, `journal_id` premier non-nul, `oa_status` le plus ouvert — possiblement depuis des `source_publications` différentes : la publication canonique porte alors une combinaison de champs qu'aucune source ne portait, et qu'aucune correction appliquée par `source_publication` en phase `metadata_correction` n'a pu voir. Le contrat est renseigné sur les champs que l'agrégation arbitre — dont le `journal_type` et l'`oa_model` du `journal_id` canonique — et `effective_metadata` rejoue les règles sur cette combinaison.
+    L'arbitrage prend chaque champ de la source la plus prioritaire qui le renseigne : la publication porte alors une combinaison — `doc_type` de l'une, `journal_id` de l'autre — qu'aucune `source_publication` ne portait, et qu'aucune correction par source n'a pu voir. Le contrat reçoit les champs que l'agrégation arbitre, dont le `journal_type` du `journal_id` canonique.
 
-    `urls` et `self_declared_preprint` sont des faits d'un enregistrement source, sans contrepartie canonique : les règles qui les lisent restent muettes ici. `embargo_expired` de même, et son rejeu serait sans effet : `EMBARGO_EXPIRED_TO_GREEN` ouvre l'`oa_status` de la source, que l'agrégation retient déjà comme le plus ouvert.
+    Hors périmètre : `urls` et `self_declared_preprint`, faits d'un enregistrement source sans contrepartie canonique ; les corrections d'`oa_status`, qu'une source corrigée fait remonter d'elle-même par l'agrégation du statut le plus ouvert, et qu'Unpaywall tranche après vérification.
 
-    Mute `pub.doc_type` et `pub.oa_status`, et trace chaque règle appliquée dans `pub.meta['corrections'][<champ>]`. `meta` est recalculé à chaque refresh (fusion des `meta` sources) : la trace est éphémère, re-posée à chaque run, sans brut à préserver côté canonique. Une seule lecture I/O. Idempotent : sur une publication déjà cohérente, aucun changement.
+    Mute `pub.doc_type` et trace la règle dans `pub.meta['corrections']['doc_type']`. Idempotent.
     """
-    journal = repo.get_journal_correction_inputs(pub.journal_id)
+    journal_type = repo.get_journal_type(pub.journal_id) if pub.journal_id is not None else None
     corrected = effective_metadata(
         MetadataForCorrection(
             title=pub.title,
@@ -103,29 +102,20 @@ def _apply_canonical_corrections(pub: Publication, *, repo: PublicationRepositor
             journal_id=pub.journal_id,
             oa_status=pub.oa_status,
             urls=None,
-            journal_type=journal.journal_type,
-            oa_model=journal.oa_model,
+            journal_type=journal_type,
+            oa_model=None,
             embargo_expired=False,
             self_declared_preprint=False,
         )
     )
-
-    applied: dict[str, JsonValue] = {}
     if corrected.doc_type is not None and corrected.doc_type.value != pub.doc_type:
         pub.doc_type = corrected.doc_type.value
-        applied["doc_type"] = corrected.doc_type.rule.value
-    if corrected.oa_status is not None and corrected.oa_status.value != pub.oa_status:
-        pub.oa_status = corrected.oa_status.value
-        applied["oa_status"] = corrected.oa_status.rule.value
-    if not applied:
-        return
-
-    meta = dict(pub.meta or {})
-    existing_corrections = meta.get("corrections")
-    corrections = dict(existing_corrections) if isinstance(existing_corrections, dict) else {}
-    corrections.update(applied)
-    meta["corrections"] = corrections
-    pub.meta = meta
+        meta = dict(pub.meta or {})
+        existing_corrections = meta.get("corrections")
+        corrections = dict(existing_corrections) if isinstance(existing_corrections, dict) else {}
+        corrections["doc_type"] = corrected.doc_type.rule.value
+        meta["corrections"] = corrections
+        pub.meta = meta
 
 
 def mark_distinct(

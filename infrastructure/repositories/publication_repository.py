@@ -12,10 +12,7 @@ from typing import Any, NamedTuple
 
 from sqlalchemy import Connection, text
 
-from application.ports.repositories.publication_repository import (
-    JournalCorrectionInputs,
-    PubByDoi,
-)
+from application.ports.repositories.publication_repository import PubByDoi
 from domain.publications.identifiers import DOI
 from domain.publications.publication import Publication
 from domain.source_publications.correction import CONVERGENCE_CASES
@@ -290,19 +287,12 @@ class PgPublicationRepository:
         )
         return frozenset(row.id for row in result)
 
-    def get_journal_correction_inputs(self, journal_id: int | None) -> JournalCorrectionInputs:
-        """`journal_type` (cast text) et `oa_model` d'un journal, en une lecture. Champs nuls si `journal_id` est nul ou si le journal n'existe pas."""
-        if journal_id is None:
-            return JournalCorrectionInputs()
-        row = self._conn.execute(
-            text(
-                "SELECT journal_type::text AS journal_type, oa_model FROM journals WHERE id = :id"
-            ),
+    def get_journal_type(self, journal_id: int) -> str | None:
+        """`journal_type` d'un journal (cast text). None si le journal n'existe pas ou son type est NULL."""
+        return self._conn.execute(
+            text("SELECT journal_type::text FROM journals WHERE id = :id"),
             {"id": journal_id},
-        ).first()
-        if row is None:
-            return JournalCorrectionInputs()
-        return JournalCorrectionInputs(**row._mapping)
+        ).scalar_one_or_none()
 
     # ── Création ───────────────────────────────────────────────────
 
