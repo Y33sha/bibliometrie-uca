@@ -1,4 +1,7 @@
-"""Port AddressRepository — contrat d'accès à l'agrégat Address."""
+"""Port AddressRepository — contrat d'accès au cluster de tables des adresses.
+
+L'adresse n'a pas d'objet de domaine : « agrégat » désigne ici le cluster que ce repository possède, sans racine d'entité côté `domain/`. Les invariants (autorité de `countries` sur `suggested_countries`, états d'un rattachement) sont portés par le SQL et les services.
+"""
 
 from dataclasses import dataclass
 from typing import Protocol
@@ -58,16 +61,12 @@ class AddressRepository(Protocol):
         self,
         address_ids: list[int],
         structure_id: int,
-    ) -> set[int]: ...
+    ) -> set[int]:
+        """Sous-ensemble de `address_ids` qui contribue au calcul `in_perimeter` pour `structure_id` : lien existant avec `is_confirmed IS DISTINCT FROM FALSE` (NULL ou TRUE).
 
-    """Sous-ensemble de `address_ids` qui contribue actuellement au calcul
-    `in_perimeter` pour `structure_id` — i.e. lien existant avec
-    `is_confirmed IS DISTINCT FROM FALSE` (NULL ou TRUE).
-
-    Utilisé par les services de validation pour détecter les opérations
-    no-op (ex: cliquer "Relier" sur une adresse déjà auto-détectée) et
-    skipper la propagation UCA inutile.
-    """
+        Sert aux services de validation à détecter les opérations no-op (confirmer une adresse déjà auto-détectée) et à éviter une propagation d'`in_perimeter` inutile.
+        """
+        ...
 
     # ── Pays ───────────────────────────────────────────────────────
 
