@@ -1,4 +1,4 @@
-"""Port : SQL de construction de la table `authorships`.
+"""Port : construction de la table `authorships` depuis les `source_authorships`, phase `authorships`.
 
 Implémenté par `infrastructure.queries.pipeline.authorships_build.PgAuthorshipsBuildQueries`.
 """
@@ -9,13 +9,28 @@ from sqlalchemy import Connection
 
 
 class AuthorshipsBuildQueries(Protocol):
-    """Opérations SQL pour promouvoir `source_authorships` → `authorships`."""
+    """Promotion des `source_authorships` en `authorships` consolidées."""
 
-    def purge_authorships(self, conn: Connection) -> int: ...
+    def purge_authorships(self, conn: Connection) -> int:
+        """Vide `authorships` et délie les `source_authorships` qui y pointaient. Retourne le nombre de lignes purgées.
 
-    def insert_missing_authorships(self, conn: Connection) -> int: ...
+        Réservé au mode `full`, qui repart de zéro ; le build incrémental s'en passe, sa logique étant idempotente.
+        """
+        ...
 
-    def prune_orphan_authorships(self, conn: Connection) -> int: ...
+    def insert_missing_authorships(self, conn: Connection) -> int:
+        """Crée les `authorships` manquantes : les paires `(publication_id, person_id)` qu'atteste une `source_authorship` rattachée à une publication active. Retourne le rowcount.
+
+        Une paire inscrite dans `rejected_authorships` est écartée par un anti-join : le rejet admin survit aux runs suivants.
+        """
+        ...
+
+    def prune_orphan_authorships(self, conn: Connection) -> int:
+        """Supprime les `authorships` qu'aucune `source_authorship` n'atteste — auteur retiré de toutes les sources. Retourne le nombre supprimé.
+
+        Inverse d'`insert_missing_authorships`, à tourner à chaque build : l'incrémental étant add-only, une orpheline y survivrait jusqu'au prochain `full`.
+        """
+        ...
 
     def analyze_authorships(self, conn: Connection) -> None:
         """Met à jour les stats Postgres sur `authorships`.
@@ -24,7 +39,9 @@ class AuthorshipsBuildQueries(Protocol):
         """
         ...
 
-    def link_source_authorships_to_authorships(self, conn: Connection) -> int: ...
+    def link_source_authorships_to_authorships(self, conn: Connection) -> int:
+        """Pose `source_authorships.authorship_id` sur les signatures encore non liées, toutes sources confondues. Retourne le nombre de lignes reliées."""
+        ...
 
     def analyze_source_authorships(self, conn: Connection) -> None:
         """Met à jour les stats Postgres sur `source_authorships`.
@@ -33,7 +50,16 @@ class AuthorshipsBuildQueries(Protocol):
         """
         ...
 
-    def propagate_authorship_attributes(self, conn: Connection) -> int: ...
+    def propagate_authorship_attributes(self, conn: Connection) -> int:
+        """Recompose les attributs dérivés de chaque authorship depuis ses `source_authorships` liées. Retourne le nombre d'authorships modifiées.
+
+        - `author_position` : valeur de la source la plus prioritaire qui la renseigne (`SOURCE_PRIORITY`) — seul attribut qui départage les sources.
+        - `is_corresponding` et `in_perimeter` : `bool_or`. Aucune source n'émet de FALSE explicite ; son silence ne saurait écraser l'affirmation d'une autre.
+        - `roles` : union triée.
+
+        Convergente : une valeur que plus aucune source n'atteste retombe — TRUE périmé à FALSE, rôle disparu retiré.
+        """
+        ...
 
     def refresh_authorship_structures(self, conn: Connection) -> None:
         """Rafraîchit la matview `authorship_structures` (`REFRESH … CONCURRENTLY`)."""
@@ -44,7 +70,9 @@ class AuthorshipsBuildQueries(Protocol):
         `refresh_authorship_structures` dont elle dérive)."""
         ...
 
-    def count_authorships_in_perimeter(self, conn: Connection) -> int: ...
+    def count_authorships_in_perimeter(self, conn: Connection) -> int:
+        """Nombre d'`authorships` dont `in_perimeter` est vrai."""
+        ...
 
     def refresh_publications_in_perimeter(self, conn: Connection) -> int:
         """Matérialise `publications.in_perimeter` (rollup de `authorships.in_perimeter`).

@@ -75,9 +75,8 @@ def prune_orphan_authorships(conn: Connection) -> int:
 def link_source_authorships_to_authorships(conn: Connection) -> int:
     """Étape 2 : peuple `source_authorships.authorship_id` pour toutes les sources.
 
-    Source-agnostique : un seul UPDATE sur l'ensemble des `source_authorships`
-    encore non liées (l'ancien code bouclait par source). Retourne le nombre de
-    lignes reliées.
+    Un seul UPDATE sur l'ensemble des `source_authorships` encore non liées, sans
+    distinction de source. Retourne le nombre de lignes reliées.
     """
     return conn.execute(
         text("""
@@ -103,13 +102,13 @@ def propagate_authorship_attributes(conn: Connection) -> int:
       priorité : le FALSE des sources est une absence de signal, pas une
       non-correspondance — aucune source n'émet de FALSE explicite à écraser.
     - `in_perimeter` : `bool_or` de `source_authorships.in_perimeter`.
-    - `roles` : union triée des rôles (au moins `{author}`, défaut côté SA).
+    - `roles` : union triée des rôles (au moins `{author}`, défaut côté `source_authorships`).
 
     Convergente (`IS DISTINCT FROM`, sans garde `IS NULL`) : une valeur révisée en
     source se met à jour, une valeur que plus aucune source n'atteste retombe
-    (TRUE périmé → FALSE, rôle disparu → retiré, périmètre perdu → FALSE). Source-
-    agnostique : remplace les passes séquentielles per-attribut et la propagation
-    de périmètre per-source. Retourne le nombre d'authorships modifiées.
+    (TRUE périmé → FALSE, rôle disparu → retiré, périmètre perdu → FALSE). Une seule
+    passe couvre tous les attributs et toutes les sources. Retourne le nombre
+    d'authorships modifiées.
     """
     return conn.execute(
         text(f"""
@@ -149,7 +148,7 @@ def purge_authorships(conn: Connection) -> int:
 
     Utilisé en mode pipeline `full` pour garantir la convergence absolue : on repart de zéro et `build_authorships` reconstruit tout depuis les `source_authorships`. Le build incrémental (modes daily/weekly) ne déclenche pas ce purge, sa logique étant idempotente.
 
-    Délie d'abord les `source_authorships.authorship_id` (FK ON DELETE SET NULL), puis DELETE de toutes les lignes. TRUNCATE refusé par Postgres dès lors qu'une FK existe (même `SET NULL` et même si aucune ligne ne référence) — DELETE contourne. Reset de la séquence d'identité ensuite pour cohérence avec l'ancien comportement. Retourne le nombre d'authorships purgées.
+    Délie d'abord les `source_authorships.authorship_id` (FK ON DELETE SET NULL), puis DELETE de toutes les lignes. TRUNCATE refusé par Postgres dès lors qu'une FK existe (même `SET NULL` et même si aucune ligne ne référence) — DELETE contourne. Reset de la séquence d'identité ensuite. Retourne le nombre d'authorships purgées.
     """
     n = conn.execute(text("SELECT COUNT(*) FROM authorships")).scalar_one()
     conn.execute(
@@ -225,14 +224,12 @@ class PgAuthorshipsBuildQueries(AuthorshipsBuildQueries):
         return prune_orphan_authorships(conn)
 
     def analyze_authorships(self, conn: Connection) -> None:
-        # ANALYZE intra-transaction est valide : Postgres met à jour pg_statistic immédiatement, et le planner relit ces stats au moment où il prépare chaque requête suivante de la même session. Sans ça, l'UPDATE de l'étape 3 (`propagate_authorship_attributes`) part en Nested Loop sur estimate `rows=1` au lieu de Hash Join, bloquant le pipeline pendant des heures sur ~100 k authorships fraîchement insérées (null_frac obsolète à 0).
         conn.execute(text("ANALYZE authorships"))
 
     def link_source_authorships_to_authorships(self, conn: Connection) -> int:
         return link_source_authorships_to_authorships(conn)
 
     def analyze_source_authorships(self, conn: Connection) -> None:
-        # Après l'étape 2, `source_authorships.authorship_id` vient d'être posé sur des centaines de milliers de lignes (non committé). Sans ce ANALYZE, le planner garde le null_frac committé (≈ 1, colonne quasi 100% NULL) et estime que le filtre `authorship_id IS NOT NULL` de l'étape 3 ne ramène rien → Nested Loop au lieu de Hash Aggregate. L'ANALYZE intra-transaction voit les mises à jour non committées de la transaction courante ; coût sub-seconde (échantillon fixe, indépendant des 9 M lignes).
         conn.execute(text("ANALYZE source_authorships"))
 
     def propagate_authorship_attributes(self, conn: Connection) -> int:
