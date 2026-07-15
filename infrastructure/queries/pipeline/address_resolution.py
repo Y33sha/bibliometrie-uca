@@ -1,11 +1,8 @@
-"""Query service : SQL du pipeline de résolution d'adresses.
+"""Query service : matching des adresses vers les structures, phase `affiliations`.
 
-Appelé par `application/pipeline/affiliations/resolve_addresses.py`.
-Regroupe les opérations SQL de la boucle de matching adresses → structures
-(détection automatique via `structure_name_forms`).
+Appelé par `application/pipeline/affiliations/resolve_addresses.py`. Regroupe le SQL de la boucle de détection automatique via `structure_name_forms` : chargement des formes, parcours des adresses par tranches, écriture des seules détections qui changent.
 
-Séparé de `infrastructure/queries/addresses.py`, qui sert la couche API
-(lecture/CRUD des adresses). Ici : écritures de la pipeline.
+Séparé de `infrastructure/queries/addresses.py`, qui sert la couche API (lecture/CRUD des adresses).
 """
 
 from sqlalchemy import Connection, text
@@ -17,7 +14,7 @@ from application.ports.pipeline.address_resolution import (
 
 
 def load_name_forms(conn: Connection) -> list[StructureNameForm]:
-    """Charge toutes les formes depuis `structure_name_forms` + infos structure."""
+    """Charge toutes les formes de `structure_name_forms`, triées par `id`."""
     rows = conn.execute(
         text("""
             SELECT nf.id, nf.structure_id, nf.form_text,
@@ -144,7 +141,7 @@ def upsert_detected_structures_bulk(
 
 
 class PgAddressResolutionQueries(AddressResolutionQueries):
-    """Adapter PostgreSQL pour `application.ports.address_resolution.AddressResolutionQueries`."""
+    """Adapter PostgreSQL pour `application.ports.pipeline.address_resolution.AddressResolutionQueries`."""
 
     def load_name_forms(self, conn: Connection) -> list[StructureNameForm]:
         return load_name_forms(conn)
