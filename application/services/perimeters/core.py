@@ -1,6 +1,8 @@
-"""Service Périmètres — orchestrateur des opérations sur `perimeters` (agrégat Perimeter).
+"""Service Périmètres — écritures sur l'agrégat Perimeter, transaction-agnostiques.
 
-Le SQL vit dans `infrastructure/repositories/perimeter_repository.py`. Les routers passent par ces fonctions pour toute écriture ; les lectures restent autorisées dans les routers (convention du projet). `delete_perimeter` consulte la table `config` (via `ConfigStore`) pour refuser la suppression d'un périmètre encore référencé par la configuration pipeline.
+Un périmètre porte des structures **racines** (`perimeters.structure_ids`) ; la clôture récursive de ces racines est matérialisée dans `perimeter_structures`, que `repo.refresh_structures` reconstruit. Toute écriture qui touche aux racines laisse la clôture à recalculer : les command handlers s'en chargent.
+
+`delete_perimeter` consulte la table `config` (via `ConfigStore`) pour refuser la suppression d'un périmètre encore référencé par la configuration pipeline.
 """
 
 from typing import cast
@@ -24,13 +26,9 @@ def add_perimeter_structure(
     *,
     repo: PerimeterRepository,
 ) -> str:
-    """Ajoute une structure au périmètre (idempotent).
+    """Ajoute une structure racine au périmètre. Idempotent : retourne `added` ou `already_present`.
 
-    Retourne :
-      - "added" : la structure a été ajoutée au périmètre
-      - "already_present" : la structure y était déjà
-
-    Lève NotFoundError si le périmètre n'existe pas.
+    Lève `NotFoundError` si le périmètre n'existe pas.
     """
     if repo.add_structure_to_perimeter(perimeter_id, structure_id):
         return "added"
@@ -47,9 +45,9 @@ def remove_perimeter_structure(
     *,
     repo: PerimeterRepository,
 ) -> None:
-    """Retire une structure d'un périmètre (idempotent).
+    """Retire une structure racine d'un périmètre. Idempotent : retirer une structure absente ne change rien.
 
-    Lève NotFoundError si le périmètre n'existe pas.
+    Lève `NotFoundError` si le périmètre n'existe pas.
     """
     if not repo.remove_structure_from_perimeter(perimeter_id, structure_id):
         raise NotFoundError(f"Périmètre {perimeter_id} introuvable")
@@ -64,10 +62,9 @@ def create_perimeter(
     name: str,
     repo: PerimeterRepository,
 ) -> int:
-    """Crée un nouveau périmètre. Retourne l'id créé.
+    """Crée un périmètre sans structure racine. Retourne l'id créé.
 
-    Lève ValidationError si code ou name est vide.
-    Lève ConflictError si le code existe déjà.
+    Lève `ValidationError` si le code ou le nom est vide, `ConflictError` si le code existe déjà.
     """
     if not code or not name:
         raise ValidationError("Code et nom requis")
@@ -83,10 +80,9 @@ def update_perimeter(
     fields: dict[str, JsonValue],
     repo: PerimeterRepository,
 ) -> None:
-    """Met à jour un périmètre (name, structure_ids).
+    """Met à jour un périmètre à partir des champs explicitement fournis (`name`, `structure_ids`).
 
-    Lève NotFoundError si le périmètre n'existe pas.
-    Lève ValidationError si `fields` est vide ou ne contient aucun champ valide.
+    Lève `NotFoundError` si le périmètre n'existe pas, `ValidationError` si aucun champ éditable n'est fourni.
     """
     if not repo.perimeter_exists(perimeter_id):
         raise NotFoundError(f"Périmètre {perimeter_id} introuvable")
@@ -106,11 +102,9 @@ def delete_perimeter(
     config: ConfigStore,
     audit_repo: AuditRepository | None = None,
 ) -> None:
-    """Supprime un périmètre.
+    """Supprime un périmètre. Ses lignes de clôture partent en cascade (FK `ON DELETE CASCADE`).
 
-    Lève NotFoundError si le périmètre n'existe pas.
-    Lève ConflictError si le périmètre est utilisé par la config pipeline ;
-    le message contient la liste des clés qui le référencent.
+    Lève `NotFoundError` si le périmètre n'existe pas, `ConflictError` s'il est référencé par la configuration pipeline — le message porte alors la liste des clés qui le référencent.
     """
     code = repo.get_perimeter_code(perimeter_id)
     if code is None:
