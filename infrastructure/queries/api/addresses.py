@@ -1,6 +1,6 @@
 """Query services sync pour /api/addresses/* et /api/countries.
 
-`PgAddressesQueries` hérite explicitement du Protocol `application.ports.addresses_queries.AddressesQueries` : mypy vérifie la conformité à la définition de classe. Les dataclasses de filtres (`AddressListFilters`, `AddressCountriesFilters`) sont importées du port pour typer les signatures (cf. règle 3 d'`architecture.md`).
+`PgAddressesQueries` hérite explicitement du Protocol `application.ports.api.addresses_queries.AddressesQueries` : mypy vérifie la conformité à la définition de classe. Les dataclasses de filtres (`AddressListFilters`, `AddressCountriesFilters`) sont importées du port pour typer les signatures (cf. règle 3 d'`architecture.md`).
 """
 
 from typing import Any
@@ -42,7 +42,7 @@ def _structure_summary(d: dict[str, Any]) -> AddressStructureSummary:
 
 
 class PgAddressesQueries(AddressesQueries):
-    """Adapter SA sync pour `application.ports.addresses_queries.AddressesQueries`."""
+    """Adapter SA sync pour `application.ports.api.addresses_queries.AddressesQueries`."""
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn

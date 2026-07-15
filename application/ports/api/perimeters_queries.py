@@ -1,6 +1,6 @@
 """Port : lectures sur les périmètres pour le router /api/perimeters/.
 
-Distinct de `application.ports.perimeter.PerimeterQueries` qui expose
+Distinct de `application.ports.pipeline.perimeter.PerimeterQueries` qui expose
 la résolution du périmètre `persons` consommée par d'autres modules.
 Ce port-ci sert le listing complet pour la page admin périmètres.
 

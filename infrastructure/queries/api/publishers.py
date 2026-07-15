@@ -86,7 +86,7 @@ def _doi_prefixes_sql() -> str:
 
 
 class PgPublisherQueries(PublisherQueries):
-    """Adapter SA pour `application.ports.publishers_queries.PublisherQueries`."""
+    """Adapter SA pour `application.ports.api.publishers_queries.PublisherQueries`."""
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn

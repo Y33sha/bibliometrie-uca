@@ -104,7 +104,7 @@ def upsert_wos_source_publication(
 
 
 class PgWosNormalizeQueries(WosNormalizeQueries):
-    """Adapter PostgreSQL pour `application.ports.normalize_wos.WosNormalizeQueries`."""
+    """Adapter PostgreSQL pour `application.ports.pipeline.normalize.wos.WosNormalizeQueries`."""
 
     def upsert_wos_source_publication(
         self,

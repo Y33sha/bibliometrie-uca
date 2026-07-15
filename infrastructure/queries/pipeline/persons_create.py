@@ -565,7 +565,7 @@ def delete_empty_persons(conn: Connection) -> int:
 
 
 class PgPersonsCreateQueries(PersonsCreateQueries):
-    """Adapter PostgreSQL pour `application.ports.persons_create.PersonsCreateQueries`."""
+    """Adapter PostgreSQL pour `application.ports.pipeline.persons_create.PersonsCreateQueries`."""
 
     def fetch_unlinked_authorships(self, conn: Connection) -> list[BareUnlinkedAuthorship]:
         return fetch_unlinked_authorships(conn)

@@ -92,7 +92,7 @@ _SORT_MAP = {
 
 
 class PgJournalQueries(JournalQueries):
-    """Adapter SA pour `application.ports.journals_queries.JournalQueries`."""
+    """Adapter SA pour `application.ports.api.journals_queries.JournalQueries`."""
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn

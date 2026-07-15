@@ -1,6 +1,6 @@
 """Query services pour /api/structures/* et /api/name-forms/*.
 
-`PgStructuresQueries` hérite explicitement du Protocol `application.ports.structures_queries.StructuresQueries`.
+`PgStructuresQueries` hérite explicitement du Protocol `application.ports.api.structures_queries.StructuresQueries`.
 """
 
 from typing import Any
@@ -82,7 +82,7 @@ def _name_form_from_row(row: Any) -> NameFormOut:
 
 
 class PgStructuresQueries(StructuresQueries):
-    """Adapter SA pour `application.ports.structures_queries.StructuresQueries`."""
+    """Adapter SA pour `application.ports.api.structures_queries.StructuresQueries`."""
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn

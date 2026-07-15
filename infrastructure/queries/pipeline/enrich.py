@@ -161,7 +161,7 @@ def doaj_last_import_at(conn: Connection) -> datetime | None:
 
 
 class PgEnrichQueries(EnrichQueries):
-    """Adapter PostgreSQL pour `application.ports.enrich.EnrichQueries`."""
+    """Adapter PostgreSQL pour `application.ports.pipeline.enrich.EnrichQueries`."""
 
     def fetch_publications_with_doi(
         self, conn: Connection, *, limit: int | None = None, staleness_days: int = 30
