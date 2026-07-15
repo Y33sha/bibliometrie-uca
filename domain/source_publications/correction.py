@@ -1,6 +1,6 @@
 """Correction des métadonnées canoniques.
 
-Expose `effective_metadata`, fonction pure qui applique des règles de correction sur les valeurs d'une publication source, à partir de `SourcePublicationForCorrection` — sa vue d'entrée, qui porte les champs lus **plus** des champs joints depuis `journals` (`journal_type`, `oa_model`, `apc_amount`). C'est ce qui rend la fonction capable d'appliquer aussi bien les règles intrinsèques à la `source_publication` (URL) que les règles journal-dépendantes, sans threader de repo.
+Expose `effective_metadata`, fonction pure qui applique des règles de correction sur des métadonnées de publication, à partir de `MetadataForCorrection` — son contrat d'entrée, qui porte les champs lus par les prédicats des règles, dont `journal_type` et `oa_model` joints depuis `journals`. La fonction couvre les règles intrinsèques à un enregistrement (URL) comme les règles journal-dépendantes, sans threader de repo. Le contrat est alimenté par une `source_publication` (phase `metadata_correction`) ou par une publication canonique (`refresh_from_sources`).
 
 Distincte de l'agrégation (`aggregation.py` arbitre entre sources) et du normalizer (qui ne mute pas `source_publications`, trace inviolable des sources). Les corrections s'appliquent sur le canonique via `refresh_from_sources` et sur la `source_publication` entrante au moment du matching, pour que la dédup matche sur les valeurs corrigées.
 
@@ -15,7 +15,6 @@ Champs corrigés : `doc_type` et `oa_status` (le rattachement du `journal_id` ma
 
 import re
 from dataclasses import dataclass
-from decimal import Decimal
 from enum import StrEnum
 from itertools import combinations
 from typing import NamedTuple, TypedDict
@@ -25,38 +24,31 @@ from domain.types import JsonValue
 
 
 @dataclass(frozen=True, slots=True)
-class SourcePublicationForCorrection:
-    """Vue d'une `source_publications` pour la correction de métadonnées.
+class MetadataForCorrection:
+    """Contrat d'entrée de `effective_metadata` (et `hydrate_raw_view`) : les champs que lisent les prédicats des règles, et eux seuls.
 
-    Contrat d'entrée de `effective_metadata` (et `hydrate_raw_view`) : les champs lus par les règles — **valeurs courantes** des colonnes (potentiellement déjà corrigées d'un run précédent) plus les champs joints de `journals` (`journal_type`, `oa_model`, `apc_amount`) — et `raw_metadata`, qui reconstruit le brut normalisé d'origine (`raw_metadata->'<champ>'->>'raw'` prime sur la colonne). Sous-ensemble dédié : l'entité `SourcePublication` complète n'est pas requise (la correction ne porte aucun invariant).
+    Les valeurs sont celles des colonnes, potentiellement déjà corrigées d'un run précédent ; `hydrate_raw_view` reconstruit le brut d'origine depuis le sidecar `raw_metadata`. `journal_type` et `oa_model` sont joints depuis `journals`, ce qui rend les règles journal-dépendantes décidables sans threader de repo.
+
+    Deux niveaux alimentent ce contrat. Une `source_publication` renseigne tous les champs. Une publication canonique renseigne ceux que l'agrégation arbitre ; `urls` et `self_declared_preprint` sont des faits d'un enregistrement source, sans contrepartie canonique, et les règles qui les lisent restent muettes sur ce niveau.
 
     Frozen : `hydrate_raw_view` et la cascade produisent une vue par `dataclasses.replace`, jamais une mutation en place.
     """
 
-    id: int
-    source: str
-    source_id: str
     title: str
-    pub_year: int | None
     doc_type: str | None
     doi: str | None
     journal_id: int | None
     oa_status: str | None
-    container_title: str | None
-    language: str | None
     urls: list[str] | None
-    external_ids: dict[str, JsonValue]
     journal_type: str | None
     oa_model: str | None
-    apc_amount: Decimal | None
-    raw_metadata: dict[str, JsonValue]
-    # Calculé au fetch (`embargo_until <= current_date`), pas une colonne : seule donnée
-    # date-dépendante de la vue, pour garder `effective_metadata` pure (elle lit un booléen).
+    # Calculé à la lecture (`embargo_until <= current_date`), pas une colonne : seule donnée
+    # date-dépendante du contrat, pour garder `effective_metadata` pure (elle lit un booléen).
     embargo_expired: bool
-    # Calculé au fetch : la SP déclare une relation `is-preprint-of` (Crossref `meta.relation`),
-    # donc elle EST un preprint. Booléen pour garder `effective_metadata` pure (pas de lecture de
-    # `meta` dans le domaine).
-    declares_preprint: bool
+    # Calculé à la lecture : l'enregistrement déclare la relation Crossref `is-preprint-of`, soit
+    # « je suis le preprint d'une autre œuvre ». Le sens inverse porte la clé `has-preprint`.
+    # Booléen pour garder `effective_metadata` pure (pas de lecture de `meta` dans le domaine).
+    self_declared_preprint: bool
 
 
 class MetadataCorrectionRule(StrEnum):
@@ -182,7 +174,7 @@ class _AppliesTo(TypedDict, total=False):
     - `doi_prefix_not_in` : `tuple[str, ...]` — la `source_publication` porte un DOI **et** son préfixe (`doi.split('/')[0]`) n'appartient à aucun préfixe du tuple. Faux si pas de DOI (le prédicat affirme quelque chose *sur* le DOI). Sert à exclure des registrants connus par préfixe (ex. registres de thèses).
     - `oa_status` : `str` — équivalence sur `sp.oa_status` (le statut d'entrée, ex. `embargoed`).
     - `embargo_expired` : `bool` — `sp.embargo_expired` (calculé au fetch : `embargo_until <= current_date`) vaut la valeur attendue.
-    - `declares_preprint` : `bool` — `sp.declares_preprint` (calculé au fetch : la `source_publication` déclare une relation `is-preprint-of`) vaut la valeur attendue.
+    - `self_declared_preprint` : `bool` — `sp.self_declared_preprint` (calculé à la lecture : l'enregistrement déclare la relation `is-preprint-of`) vaut la valeur attendue.
 
     Étendre les prédicats = ajouter une clé ici + une branche dans `_check_predicate`.
     """
@@ -198,7 +190,7 @@ class _AppliesTo(TypedDict, total=False):
     doi_prefix_not_in: tuple[str, ...]
     oa_status: str
     embargo_expired: bool
-    declares_preprint: bool
+    self_declared_preprint: bool
 
 
 class _AppliesCorrection(TypedDict, total=False):
@@ -271,7 +263,7 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
     # quand Crossref n'a pas typé le record (`doc_type` nul → l'arbitrage prenait `article`
     # d'OpenAlex faute de mieux ; Crossref étant prioritaire, le `preprint` corrigé gagne).
     MetadataCorrectionRule.PREPRINT_RELATION_TO_PREPRINT: {
-        "applies_to": {"declares_preprint": True},
+        "applies_to": {"self_declared_preprint": True},
         "applies_correction": {"doc_type": "preprint"},
     },
     # Titre `interview`/`reportage`/`podcast` + `doc_type` ∈ {article, other} ⇒ `media`. Patterns univoques et récurrents dans le corpus UCA.
@@ -400,7 +392,7 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
 # ── Moteur ──────────────────────────────────────────────────────────────
 
 
-def _check_predicate(sp: SourcePublicationForCorrection, key: str, value: object) -> bool:
+def _check_predicate(sp: MetadataForCorrection, key: str, value: object) -> bool:
     """Évalue un prédicat (paire clé/valeur de `applies_to`) sur la `source_publication`. Voir `_AppliesTo` pour la sémantique de chaque clé."""
     if key == "doc_type":
         doc_type = (sp.doc_type or "").lower()
@@ -436,18 +428,18 @@ def _check_predicate(sp: SourcePublicationForCorrection, key: str, value: object
     if key == "embargo_expired":
         assert isinstance(value, bool)
         return sp.embargo_expired == value
-    if key == "declares_preprint":
+    if key == "self_declared_preprint":
         assert isinstance(value, bool)
-        return sp.declares_preprint == value
+        return sp.self_declared_preprint == value
     raise ValueError(f"Prédicat inconnu : {key!r}")
 
 
-def _rule_applies(sp: SourcePublicationForCorrection, rule_def: _RuleDefinition) -> bool:
+def _rule_applies(sp: MetadataForCorrection, rule_def: _RuleDefinition) -> bool:
     """True si tous les prédicats `applies_to` de la règle sont vérifiés (AND)."""
     return all(_check_predicate(sp, k, v) for k, v in rule_def["applies_to"].items())
 
 
-def _correct_field(sp: SourcePublicationForCorrection, field: str) -> Correction[str] | None:
+def _correct_field(sp: MetadataForCorrection, field: str) -> Correction[str] | None:
     """Applique les règles `_RULES` dans l'ordre ; première qui corrige `field` et dont les prédicats matchent gagne."""
     for rule_id, rule_def in _RULES.items():
         if field not in rule_def["applies_correction"]:
@@ -457,10 +449,10 @@ def _correct_field(sp: SourcePublicationForCorrection, field: str) -> Correction
     return None
 
 
-def effective_metadata(sp: SourcePublicationForCorrection) -> CorrectedFields:
-    """Applique les corrections sur les champs d'une `SourcePublicationForCorrection`. Retourne un `CorrectedFields` (vide si aucune règle ne s'applique).
+def effective_metadata(sp: MetadataForCorrection) -> CorrectedFields:
+    """Applique les corrections sur les champs d'un `MetadataForCorrection`. Retourne un `CorrectedFields` (vide si aucune règle ne s'applique).
 
-    Fonction pure : aucune I/O, aucun effet de bord. Les données journal/publisher consommées par les règles arrivent par la vue (champs joints à la lecture), pas via des entités passées en paramètre — c'est ce qui permet à la fonction de servir aussi bien la dédup (sur la source_publication entrante) que le refresh (sur les sources d'une publication).
+    Fonction pure : aucune I/O, aucun effet de bord. Les données journal consommées par les règles arrivent par le contrat (champs joints à la lecture), pas via des entités passées en paramètre — ce qui permet à la fonction de servir aussi bien la dédup (sur la `source_publication` entrante) que le refresh (sur la publication canonique).
 
     `doc_type` et `oa_status` sont corrigés **indépendamment** depuis la même vue : aucune règle de l'un ne lit la valeur corrigée de l'autre (`oa_status` est la promotion d'embargo, orthogonale au `doc_type`). Les dépendances inter-champ — un type corrigé selon le `journal_type` du journal rattaché — se résolvent par l'**ordre des sous-steps** de la phase (chacun re-lit l'état persisté du précédent), pas par un feed-forward intra-fonction.
     """

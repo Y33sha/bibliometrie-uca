@@ -18,10 +18,10 @@ from application.pipeline.metadata_correction._persist import persist_in_batches
 from application.ports.pipeline.metadata_correction import (
     CorrectionUpdate,
     MetadataCorrectionQueries,
+    UnaryCorrectionRow,
 )
 from domain.source_publications.correction import (
     MetadataCorrectionRule,
-    SourcePublicationForCorrection,
     effective_metadata,
     strip_dissertation_keys,
 )
@@ -41,13 +41,13 @@ _UNARY_FIELDS = ("doc_type", "oa_status", "external_ids")
 DOC_TYPE_MAP_MARKER = "DOC_TYPE_MAP"
 
 
-def compute_update(row: SourcePublicationForCorrection) -> CorrectionUpdate | None:
+def compute_update(row: UnaryCorrectionRow) -> CorrectionUpdate | None:
     """Recalcule les métadonnées corrigées d'une `source_publication` depuis son brut reconstruit. Retourne la mise à jour à persister, ou `None` si rien ne change (colonnes + `raw_metadata` identiques).
 
     `doc_type` subit deux transformations enchaînées : **mapping** source→canonique (`map_doc_type`) puis **correction** (`effective_metadata`, dont les whitelists sont canoniques). `oa_status` n'a que la correction (pas de mapping). Le `raw` stashé est toujours la valeur **source d'origine** ; `corrected_by` porte la règle, ou `DOC_TYPE_MAP` quand seul le mapping a changé la valeur.
 
     Pure : ne fait pas d'I/O. Préserve les clés de `raw_metadata` hors `_UNARY_FIELDS` (la sous-étape cluster gère `doi`, le sous-step `journal_by_doi` gère `journal_id`)."""
-    raw = hydrate_raw_view(row, row.raw_metadata)
+    raw = hydrate_raw_view(row.for_correction(), row.raw_metadata)
 
     # doc_type : mapping d'abord (None laissé tel quel — pas de représentation à traduire), puis correction sur la valeur canonique.
     raw_doc_type = raw.doc_type

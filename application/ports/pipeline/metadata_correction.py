@@ -12,8 +12,47 @@ from typing import NamedTuple, Protocol
 
 from sqlalchemy import Connection
 
-from domain.source_publications.correction import SourcePublicationForCorrection
+from domain.source_publications.correction import MetadataForCorrection
 from domain.types import JsonValue
+
+
+class UnaryCorrectionRow(NamedTuple):
+    """Une `source_publication` candidate à la correction unaire, jointe à son journal.
+
+    Porte les champs du contrat des règles (`for_correction`) et ceux dont la phase seule se sert : `id` pour persister, `source` pour `map_doc_type`, `external_ids` et `raw_metadata` pour le stash et la reconstruction du brut.
+
+    L'ordre des champs est celui des colonnes du `SELECT` de l'adapter, qui construit les lignes en déballant chaque ligne SQL dans le constructeur (`UnaryCorrectionRow(*row)`) : l'appariement se fait par rang, pas par nom.
+    """
+
+    id: int
+    source: str
+    title: str
+    doc_type: str | None
+    doi: str | None
+    journal_id: int | None
+    oa_status: str | None
+    urls: list[str] | None
+    external_ids: dict[str, JsonValue]
+    journal_type: str | None
+    oa_model: str | None
+    raw_metadata: dict[str, JsonValue]
+    embargo_expired: bool
+    self_declared_preprint: bool
+
+    def for_correction(self) -> MetadataForCorrection:
+        """Projette la ligne vers le contrat d'entrée des règles."""
+        return MetadataForCorrection(
+            title=self.title,
+            doc_type=self.doc_type,
+            doi=self.doi,
+            journal_id=self.journal_id,
+            oa_status=self.oa_status,
+            urls=self.urls,
+            journal_type=self.journal_type,
+            oa_model=self.oa_model,
+            embargo_expired=self.embargo_expired,
+            self_declared_preprint=self.self_declared_preprint,
+        )
 
 
 class CorrectionUpdate(NamedTuple):
@@ -79,7 +118,7 @@ class DoiCorrectionUpdate(NamedTuple):
 class MetadataCorrectionQueries(Protocol):
     """Opérations SQL de la phase `metadata_correction`."""
 
-    def fetch_for_unary_correction(self, conn: Connection) -> list[SourcePublicationForCorrection]:
+    def fetch_for_unary_correction(self, conn: Connection) -> list[UnaryCorrectionRow]:
         """Toutes les `source_publications`, avec join `journals` et `raw_metadata`.
 
         Pas de pré-filtre par règle : certaines règles sont inconditionnelles sur
@@ -90,7 +129,7 @@ class MetadataCorrectionQueries(Protocol):
 
     def fetch_for_unary_correction_by_journal(
         self, conn: Connection, journal_id: int
-    ) -> list[SourcePublicationForCorrection]:
+    ) -> list[UnaryCorrectionRow]:
         """Les `source_publications` rattachées à un journal (`journal_id = :jid`).
 
         Recompute ciblé après un changement de `journal_type` (hook admin) : seules

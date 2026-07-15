@@ -2,7 +2,7 @@
 
 from domain.source_publications.correction import (
     MetadataCorrectionRule,
-    SourcePublicationForCorrection,
+    MetadataForCorrection,
     effective_metadata,
     resolve_journal_by_doi,
 )
@@ -33,30 +33,21 @@ class TestResolveJournalByDoi:
         assert resolve_journal_by_doi("10.5194/acp.123", prefixes) == 2
 
 
-def _view(**overrides: object) -> SourcePublicationForCorrection:
+def _view(**overrides: object) -> MetadataForCorrection:
     defaults: dict[str, object] = {
-        "id": 1,
-        "source": "openalex",
-        "source_id": "W42",
         "title": "Some title",
-        "pub_year": None,
         "doc_type": None,
         "doi": None,
         "journal_id": None,
         "oa_status": None,
-        "container_title": None,
-        "language": None,
         "urls": (),
-        "external_ids": {},
         "journal_type": None,
         "oa_model": None,
-        "apc_amount": None,
-        "raw_metadata": {},
         "embargo_expired": False,
-        "declares_preprint": False,
+        "self_declared_preprint": False,
     }
     defaults.update(overrides)
-    return SourcePublicationForCorrection(**defaults)  # type: ignore[arg-type]
+    return MetadataForCorrection(**defaults)  # type: ignore[arg-type]
 
 
 class TestThesesFrRule:
@@ -854,19 +845,22 @@ class TestHybridFullOaRule:
 class TestPreprintRelationRule:
     def test_declared_preprint_retyped_even_without_doc_type(self):
         # Crossref n'a pas typé le record (doc_type nul) mais déclare is-preprint-of.
-        corrected = effective_metadata(_view(doc_type=None, declares_preprint=True)).doc_type
+        corrected = effective_metadata(_view(doc_type=None, self_declared_preprint=True)).doc_type
         assert corrected is not None
         assert corrected.value == "preprint"
         assert corrected.rule == MetadataCorrectionRule.PREPRINT_RELATION_TO_PREPRINT
 
     def test_declared_preprint_overrides_article(self):
-        corrected = effective_metadata(_view(doc_type="article", declares_preprint=True)).doc_type
+        corrected = effective_metadata(
+            _view(doc_type="article", self_declared_preprint=True)
+        ).doc_type
         assert corrected is not None
         assert corrected.value == "preprint"
 
     def test_no_declaration_no_retyping(self):
         assert (
-            effective_metadata(_view(doc_type="article", declares_preprint=False)).doc_type is None
+            effective_metadata(_view(doc_type="article", self_declared_preprint=False)).doc_type
+            is None
         )
 
 

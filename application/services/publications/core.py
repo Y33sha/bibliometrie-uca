@@ -12,7 +12,7 @@ from domain.publications.metadata import OA_STATUS_UNKNOWN_DEFAULT
 from domain.publications.publication import Publication
 from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES
 from domain.source_publications.correction import (
-    SourcePublicationForCorrection,
+    MetadataForCorrection,
     effective_metadata,
 )
 from domain.sources.registry import SOURCE_PRIORITY
@@ -87,33 +87,27 @@ def refresh_from_sources(
 def _apply_canonical_doc_type_correction(pub: Publication, *, repo: PublicationRepository) -> None:
     """Rejoue les corrections de `doc_type` sur la publication canonique après l'arbitrage.
 
-    L'arbitrage choisit `doc_type` (première source par priorité) et `journal_id` (premier non-nul) **indépendamment**, possiblement depuis deux `source_publications` différentes. Une correction journal-dépendante (`JOURNAL_TYPE_MEDIA_TO_MEDIA`, …) appliquée par `source_publication` en phase `metadata_correction` ne se déclenche que sur celle qui a résolu le journal ; elle ne suit pas le `journal_id` canonique. On reconstruit une vue de la publication canonique (son `doc_type` arbitré + le `journal_type` de son `journal_id` arbitré) et on rejoue `effective_metadata` complète : les règles journal-dépendantes s'appliquent alors au journal réellement résolu.
+    L'arbitrage choisit `doc_type` (première source par priorité) et `journal_id` (premier non-nul) **indépendamment**, possiblement depuis deux `source_publications` différentes : la publication canonique porte alors une combinaison de champs qu'aucune source ne portait, et qu'aucune correction appliquée par `source_publication` en phase `metadata_correction` n'a pu voir. Le contrat est renseigné sur les champs que l'agrégation arbitre — dont le `journal_type` du `journal_id` canonique — et `effective_metadata` rejoue les règles sur cette combinaison.
+
+    `urls` et `self_declared_preprint` sont des faits d'un enregistrement source, sans contrepartie canonique : les règles qui les lisent restent muettes ici.
 
     Mute `pub.doc_type` et trace la règle dans `pub.meta['corrections']['doc_type']` si une correction s'applique. `meta` est recalculé à chaque refresh (fusion des `meta` sources) : la trace est éphémère, re-posée à chaque run, sans brut à préserver côté canonique. Une seule lecture I/O (`journal_type`). Idempotent : sur une publication déjà cohérente, aucun changement.
     """
     journal_type = repo.get_journal_type(pub.journal_id) if pub.journal_id is not None else None
-    view = SourcePublicationForCorrection(
-        id=pub.id or 0,
-        source="canonical",
-        source_id=str(pub.id),
-        title=pub.title,
-        pub_year=pub.pub_year,
-        doc_type=pub.doc_type,
-        doi=str(pub.doi) if pub.doi else None,
-        journal_id=pub.journal_id,
-        oa_status=pub.oa_status,
-        container_title=pub.container_title,
-        language=pub.language,
-        urls=None,
-        external_ids={},
-        journal_type=journal_type,
-        oa_model=None,
-        apc_amount=None,
-        raw_metadata={},
-        embargo_expired=False,
-        declares_preprint=False,
+    corrected = effective_metadata(
+        MetadataForCorrection(
+            title=pub.title,
+            doc_type=pub.doc_type,
+            doi=str(pub.doi) if pub.doi else None,
+            journal_id=pub.journal_id,
+            oa_status=pub.oa_status,
+            urls=None,
+            journal_type=journal_type,
+            oa_model=None,
+            embargo_expired=False,
+            self_declared_preprint=False,
+        )
     )
-    corrected = effective_metadata(view)
     if corrected.doc_type is not None and corrected.doc_type.value != pub.doc_type:
         pub.doc_type = corrected.doc_type.value
         meta = dict(pub.meta or {})

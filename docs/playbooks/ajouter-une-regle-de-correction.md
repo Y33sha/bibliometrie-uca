@@ -28,12 +28,13 @@ Hors-scope : les patterns d'incohérence détectables mais non corrigibles autom
 Avant d'ouvrir un fichier, expliciter :
 
 - **Champ corrigé** (output) : `doc_type`, `journal_id`, `oa_status`.
-- **Inputs lus** : quels champs de `SourcePublication` ? Mono- ou multi-critères ?
+- **Inputs lus** : quels champs de `MetadataForCorrection` ? Mono- ou multi-critères ?
 - **Condition** : whitelist (sur un set fini de valeurs d'input) ou inconditionnelle ? La whitelist est presque toujours plus défensive — elle épargne les types-référents (`thesis`, `book`, …).
 - **Origine de l'input** :
-  - intrinsèque à la SP (`title`, `urls`, `doc_type`, `doi`) → rien à câbler ;
-  - joint depuis `journals`, déjà projeté (`journal_type`, `oa_model`, `apc_amount`) → idem ;
-  - joint depuis une table **hors projection** → étendre la vue (cf. § 4).
+  - intrinsèque à la `source_publication` (`title`, `urls`, `doc_type`, `doi`) → rien à câbler ;
+  - joint depuis `journals`, déjà projeté (`journal_type`, `oa_model`) → idem ;
+  - hors du contrat → l'étendre (cf. § 4).
+- **Rejouable sur la publication canonique ?** L'agrégation arbitre chaque champ indépendamment, donc une publication peut porter une combinaison qu'aucune source ne portait. Une règle se rejoue sur le canonique si et seulement si ses prédicats lisent des champs que l'agrégation arbitre. `urls` et `self_declared_preprint` sont des faits d'un enregistrement source, sans contrepartie canonique.
 - **Input admin-éditable ?** Détermine s'il faut un hook (cf. § 6).
 - **Output qui change le clustering ?** Une correction de `doc_type` change le token `metadata_block` de la SP : tester que le rapprochement utilise la valeur corrigée (la persistance pose `keys_dirty`, la réconciliation suit).
 
@@ -101,15 +102,16 @@ return CorrectedFields(
 
 `_correct_field` est paramétrique sur le champ — aucune logique additionnelle. La sous-étape unaire stashe et persiste le champ ajouté en l'inscrivant dans `_UNARY_FIELDS` ([`correct_unary.py`](../../application/pipeline/metadata_correction/correct_unary.py)).
 
-### 4. Étendre la projection si nécessaire (rare)
+### 4. Étendre le contrat si nécessaire (rare)
 
-Si l'input vient d'une table hors projection :
+Si l'input est absent de `MetadataForCorrection` :
 
-1. champ ajouté à `SourcePublication` ([`views.py`](../../domain/source_publications/source_publication.py)) ;
-2. projeté dans la requête `fetch_for_unary_correction` ([`metadata_correction.py`](../../infrastructure/queries/pipeline/metadata_correction.py)) + le port `SourcePublicationForCorrection` ([`metadata_correction`](../../application/ports/pipeline/metadata_correction.py)) ;
-3. reporté dans `_view_from_row` (`correct_unary.py`).
+1. champ ajouté au contrat ([`correction.py`](../../domain/source_publications/correction.py)), avec son prédicat dans `_AppliesTo` et sa branche dans `_check_predicate` ;
+2. champ ajouté à `UnaryCorrectionRow` et à sa méthode `for_correction` ([`metadata_correction.py`](../../application/ports/pipeline/metadata_correction.py)) ;
+3. colonne ajoutée au `_SELECT` de l'adapter ([`metadata_correction.py`](../../infrastructure/queries/pipeline/metadata_correction.py)), **à la position du champ dans `UnaryCorrectionRow`** : les lignes sont construites par déballage positionnel, l'appariement se fait par rang et non par nom ;
+4. si l'agrégation arbitre ce champ, le renseigner aussi dans `_apply_canonical_doc_type_correction` ([`core.py`](../../application/services/publications/core.py)), pour que la règle se rejoue sur la publication canonique.
 
-Alternative écartée : threader un repo dans toutes les signatures. Beaucoup plus invasif sans bénéfice métier — la vue (champs joints à la lecture) garde `effective_metadata` pure.
+Alternative écartée : threader un repo dans toutes les signatures. Beaucoup plus invasif sans bénéfice métier — le contrat (champs joints à la lecture) garde `effective_metadata` pure.
 
 ### 5. Tests
 
