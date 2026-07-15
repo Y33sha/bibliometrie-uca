@@ -347,7 +347,7 @@ class TestBatchAssignOrphanAuthorships:
     def test_requires_admin(self, client):
         r = client.post(
             "/api/admin/orphan-authorships/batch-assign",
-            json={"authorships": [], "person_id": 1},
+            json={"authorship_ids": [], "person_id": 1},
         )
         assert r.status_code == 401
 
@@ -355,19 +355,7 @@ class TestBatchAssignOrphanAuthorships:
         pid = _seed_person()
         r = auth_client.post(
             "/api/admin/orphan-authorships/batch-assign",
-            json={"authorships": [], "person_id": pid},
-        )
-        assert r.status_code == 200
-        assert r.json()["assigned"] == 0
-
-    def test_all_sources_unknown_returns_zero(self, auth_client):
-        pid = _seed_person()
-        r = auth_client.post(
-            "/api/admin/orphan-authorships/batch-assign",
-            json={
-                "authorships": [{"source": "unknown", "authorship_id": 1}],
-                "person_id": pid,
-            },
+            json={"authorship_ids": [], "person_id": pid},
         )
         assert r.status_code == 200
         assert r.json()["assigned"] == 0
@@ -376,10 +364,7 @@ class TestBatchAssignOrphanAuthorships:
         sa = _seed_source_authorship(source="hal")
         r = auth_client.post(
             "/api/admin/orphan-authorships/batch-assign",
-            json={
-                "authorships": [{"source": "hal", "authorship_id": sa}],
-                "person_id": 999999999,
-            },
+            json={"authorship_ids": [sa], "person_id": 999999999},
         )
         assert r.status_code == 404
 
@@ -389,13 +374,7 @@ class TestBatchAssignOrphanAuthorships:
         sa2 = _seed_source_authorship(source="openalex")
         r = auth_client.post(
             "/api/admin/orphan-authorships/batch-assign",
-            json={
-                "authorships": [
-                    {"source": "hal", "authorship_id": sa1},
-                    {"source": "openalex", "authorship_id": sa2},
-                ],
-                "person_id": pid,
-            },
+            json={"authorship_ids": [sa1, sa2], "person_id": pid},
         )
         assert r.status_code == 200
         assert r.json()["assigned"] >= 0
@@ -406,7 +385,7 @@ class TestBatchAssignOrphanAuthorships:
         _reject_pair(pub, pid)
         r = auth_client.post(
             "/api/admin/orphan-authorships/batch-assign",
-            json={"authorships": [{"source": "hal", "authorship_id": sa}], "person_id": pid},
+            json={"authorship_ids": [sa], "person_id": pid},
         )
         assert r.status_code == 409
         assert r.json()["rejected_pairs"][0]["publication_id"] == pub
@@ -417,11 +396,7 @@ class TestBatchAssignOrphanAuthorships:
         _reject_pair(pub, pid)
         r = auth_client.post(
             "/api/admin/orphan-authorships/batch-assign",
-            json={
-                "authorships": [{"source": "hal", "authorship_id": sa}],
-                "person_id": pid,
-                "force": True,
-            },
+            json={"authorship_ids": [sa], "person_id": pid, "force": True},
         )
         assert r.status_code == 200
         assert r.json()["assigned"] == 1

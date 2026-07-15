@@ -30,7 +30,9 @@ class AssignOrphanAuthorship(BaseModel):
 
 
 class BatchAssignOrphanAuthorships(BaseModel):
-    authorships: list[SourceAuthorshipRef]
+    """Attribution en lot : `source_authorships.id` est une clé primaire, l'id suffit à désigner chaque signature."""
+
+    authorship_ids: list[int]
     person_id: int
     force: bool = False
 

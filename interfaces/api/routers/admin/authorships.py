@@ -18,7 +18,7 @@ from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.authorship_repository import AuthorshipRepository
 from application.ports.repositories.person_repository import PersonRepository
 from application.services.authorships import commands as authorship_commands
-from domain.sources.registry import ALL_SOURCES_SET, require_known_source
+from domain.sources.registry import require_known_source
 from interfaces.api.deps import (
     audit_repo_sync,
     authorship_repo_sync,
@@ -141,8 +141,7 @@ def batch_assign_orphan_authorships(
     et que `force` est faux ; avec `force`, les rejets sont d'abord levés.
     """
     person_id = body.person_id
-    sa_ids = [a.authorship_id for a in body.authorships if a.source in ALL_SOURCES_SET]
-    if not sa_ids:
+    if not body.authorship_ids:
         return OrphanBatchAssignResponse(assigned=0)
 
     if not queries.person_exists(person_id):
@@ -150,7 +149,7 @@ def batch_assign_orphan_authorships(
     assigned = authorship_commands.batch_assign_orphan_authorships(
         conn,
         person_id,
-        sa_ids,
+        body.authorship_ids,
         repo=repo,
         authorship_repo=authorship_repo,
         audit_repo=audit,

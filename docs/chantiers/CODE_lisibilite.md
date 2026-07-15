@@ -109,7 +109,9 @@ Traverse `domain/`, `application/ports`, `application/pipeline/metadata_correcti
 
 ### Phase 2 - `infrastructure/`
 
-#### 2.1 `db` : OK
+#### 2.1 `db`
+
+- [ ] `alembic check` est rouge : 38 opérations, dont six tables absentes de `tables.py` (`publication_relations`, `pipeline_phase_executions`, `confirmed_authorships`…) et 26 index divergents. Le métadonnée ne décrit pas le schéma. C'est le terrain d'une dérive silencieuse : le seul garde-fou du fichier est un contrôle que personne ne peut passer au vert, donc personne ne le lance — l'enum `source_type` y avait perdu `datacite` sans que rien ne le signale (`e47421a7`). Remettre `alembic check` au vert, puis le brancher en CI.
 #### 2.2 `jsonb_models` : OK
 #### 2.3 `raw_store` : OK
 #### 2.4 `observability` : OK
