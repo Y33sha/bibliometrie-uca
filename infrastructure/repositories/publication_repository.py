@@ -96,6 +96,18 @@ class PgPublicationRepository:
         )
         return [row.id for row in result]
 
+    def find_doc_types_by_ids(self, pub_ids: list[int]) -> dict[int, str]:
+        """`doc_type` de chaque publication demandée. Une publication absente de la table manque de la réponse."""
+        if not pub_ids:
+            return {}
+        result = self._conn.execute(
+            text(
+                "SELECT id, CAST(doc_type AS text) AS doc_type FROM publications WHERE id = ANY(:ids)"
+            ),
+            {"ids": pub_ids},
+        )
+        return {row.id: row.doc_type for row in result}
+
     # ── Chargement / persistance de l'aggregate Publication ────────
 
     def find_by_id(self, pub_id: int) -> Publication | None:
