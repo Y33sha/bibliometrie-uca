@@ -52,15 +52,11 @@ def refresh_from_sources(
 ) -> None:
     """Recalcule les métadonnées canoniques d'une publication depuis ses `source_publications`.
 
-    Recalcul complet : lit TOUS les `source_publications` attachés, applique l'algorithme d'agrégation `refresh_from_sources` (domain) qui mute l'entité Publication en place, et persiste via `repo.save`. Peut corriger des métadonnées périmées (ex : `ongoing_thesis` → `thesis` après soutenance).
+    Recalcul complet : lit toutes les sources attachées, agrège (`domain.publications.aggregation`), rejoue les corrections nées de l'arbitrage, persiste. Rattrape les métadonnées périmées (`ongoing_thesis` → `thesis` après soutenance).
 
-    **Cas orphelin** : une publication sans aucune source rattachée n'a pas lieu d'exister. Suppression via `repo.delete`, sans agrégation.
+    Deux cas de suppression : la publication sans source rattachée, qu'aucune source n'atteste ; et celle dont le `doc_type` résolu tombe dans `OUT_OF_SCOPE_DOC_TYPES` (invariant « hors périmètre = jamais matérialisé »). Le `delete` détache les `source_publications` (FK ON DELETE SET NULL) et emporte les `authorships` canoniques en cascade.
 
-    **Cas hors périmètre** : si le `doc_type` canonique résolu appartient à `OUT_OF_SCOPE_DOC_TYPES`, la publication est supprimée de même (invariant « hors périmètre = jamais matérialisé »), via `repo.delete`. Ses `source_publications` sont détachées (FK ON DELETE SET NULL), ses `authorships` canoniques emportés en cascade.
-
-    L'identité des publications (quelles `source_publications` forment une même œuvre) relève de la réconciliation (`application/pipeline/publications`), jamais d'ici : ce recalcul ne touche que la publication reçue et ses sources. Une seule publication porte un DOI donné à ce stade : `repo.save` respecte la contrainte d'unicité.
-
-    Laisse `notes` et `sources` inchangés (utiliser `update_sources` séparément).
+    Ne touche que la publication reçue et ses sources : quelles `source_publications` forment une même œuvre relève de la réconciliation (`application/pipeline/publications`). Laisse `notes` et `sources` inchangés (`update_sources` les pose).
     """
     pub = repo.find_by_id(pub_id)
     if pub is None:
@@ -89,7 +85,7 @@ def _apply_canonical_doc_type_correction(pub: Publication, *, repo: PublicationR
 
     L'arbitrage prend chaque champ de la source la plus prioritaire qui le renseigne : la publication porte alors une combinaison — `doc_type` de l'une, `journal_id` de l'autre — qu'aucune `source_publication` ne portait, et qu'aucune correction par source n'a pu voir. Le contrat reçoit les champs que l'agrégation arbitre, dont le `journal_type` du `journal_id` canonique.
 
-    Hors périmètre : `urls` et `self_declared_preprint`, faits d'un enregistrement source sans contrepartie canonique ; les corrections d'`oa_status`, qu'une source corrigée fait remonter d'elle-même par l'agrégation du statut le plus ouvert, et qu'Unpaywall tranche après vérification.
+    `urls` et `self_declared_preprint` sont des faits d'un enregistrement source, sans contrepartie canonique : les règles qui les lisent restent muettes. L'`oa_status` reste hors du contrat, en entrée comme en sortie — une source corrigée remonte d'elle-même par l'agrégation du statut le plus ouvert, et Unpaywall tranche après vérification.
 
     Mute `pub.doc_type` et trace la règle dans `pub.meta['corrections']['doc_type']`. Idempotent.
     """
@@ -100,7 +96,7 @@ def _apply_canonical_doc_type_correction(pub: Publication, *, repo: PublicationR
             doc_type=pub.doc_type,
             doi=str(pub.doi) if pub.doi else None,
             journal_id=pub.journal_id,
-            oa_status=pub.oa_status,
+            oa_status=None,
             urls=None,
             journal_type=journal_type,
             oa_model=None,
