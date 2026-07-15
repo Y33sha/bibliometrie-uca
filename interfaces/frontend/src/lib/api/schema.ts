@@ -1779,8 +1779,9 @@ export interface paths {
          * Assign Orphan Authorship Endpoint
          * @description Attribue une authorship orpheline à une personne.
          *
-         *     Renvoie 409 (`RejectedPairError`) si la paire a déjà été rejetée et que
-         *     `force` est faux ; avec `force`, le rejet est d'abord levé.
+         *     Renvoie 409 si la paire a déjà été rejetée et que `force` est faux
+         *     (`RejectedPairError` ; avec `force`, le rejet est d'abord levé), ou si la
+         *     signature porte déjà une personne (`AuthorshipAlreadyAssignedError`).
          */
         post: operations["assign_orphan_authorship_endpoint_api_admin_orphan_authorships_assign_post"];
         delete?: never;
@@ -2904,10 +2905,13 @@ export interface components {
             /** Ok */
             ok: boolean;
         };
-        /** BatchAssignOrphanAuthorships */
+        /**
+         * BatchAssignOrphanAuthorships
+         * @description Attribution en lot : `source_authorships.id` est une clé primaire, l'id suffit à désigner chaque signature.
+         */
         BatchAssignOrphanAuthorships: {
-            /** Authorships */
-            authorships: components["schemas"]["SourceAuthorshipRef"][];
+            /** Authorship Ids */
+            authorship_ids: number[];
             /** Person Id */
             person_id: number;
             /**
