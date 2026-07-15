@@ -13,7 +13,7 @@ from application.services.addresses.countries import (
     propagate_countries_to_similar,
     set_country,
 )
-from application.services.addresses.structures import (
+from application.services.addresses.structure_links import (
     batch_review_structure_link,
     review_structure_link,
 )

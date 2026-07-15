@@ -1,6 +1,4 @@
-"""Service Liens adresse ↔ structure — validation manuelle des détections de périmètre.
-
-La validation adresse ↔ structure (confirm / reject / reset / batch) et l'attribution des pays sont deux responsabilités distinctes, orchestrées par des routers différents ; les pays vivent dans `application/services/addresses/countries.py`.
+"""Validation manuelle des rattachements adresse ↔ structure (table `address_structures`) : confirmer, rejeter ou réinitialiser une détection de la phase `affiliations`.
 
 Ces opérations écrivent le lien et **retournent les adresses dont la contribution au calcul `in_perimeter` a changé**. La propagation (`propagate_in_perimeter_for_addresses`, potentiellement massive — jusqu'à des dizaines de milliers de source_authorships) est lancée en tâche de fond par l'appelant (`bg_propagate_in_perimeter_sync`), jamais synchrone dans la requête.
 """

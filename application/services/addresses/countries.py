@@ -1,7 +1,4 @@
-"""Service Pays des adresses — attribution, propagation horizontale (adresses similaires) et verticale (vers source_publications / publications).
-
-La validation des liens adresse ↔ structure vit dans `application/services/addresses/structures.py`. Les deux surfaces partagent l'agrégat Address mais n'interagissent pas entre elles.
-"""
+"""Pays des adresses — attribution manuelle, propagation horizontale (adresses jumelles) et verticale (vers `source_publications` / `publications`)."""
 
 import logging
 
