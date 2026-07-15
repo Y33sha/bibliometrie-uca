@@ -1,6 +1,6 @@
 """Service Publications — écritures sur l'agrégat Publication, transaction-agnostiques.
 
-Quatre opérations : création, recalcul des métadonnées canoniques depuis les `source_publications`, fusion de deux doublons, marquage d'une paire comme distincte. Toute écriture sur la table `publications` passe par ici. Les appelants sont la phase `publications` du pipeline, les command handlers de l'API et les CLI de maintenance ; chacun tient sa propre frontière transactionnelle et commite lui-même.
+Quatre opérations : création, recalcul des métadonnées canoniques depuis les `source_publications`, fusion de deux doublons, marquage d'une paire comme distincte. Toute écriture éditoriale passe par ici, pipeline compris (`create_publication` et `refresh_from_sources` à la réconciliation). Les appelants — phase `publications`, command handlers de l'API, CLI de maintenance — tiennent chacun leur propre frontière transactionnelle et commitent eux-mêmes.
 """
 
 from application.audit_log import emit_event

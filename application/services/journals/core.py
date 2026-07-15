@@ -1,8 +1,10 @@
-"""Service Journaux — accès exclusif en écriture à la table `journals`.
+"""Service Journaux — écritures sur l'agrégat Journal, transaction-agnostiques.
+
+Toute écriture éditoriale passe par ce service, pipeline compris (`find_or_create_journal` au normalize). Les colonnes dérivées que le pipeline recalcule en bloc — `pub_count`, drapeau `is_in_doaj` — s'écrivent en SQL ensembliste (`infrastructure/queries/pipeline/`), hors de ce service qui traite une revue à la fois.
 
 Les opérations sur l'agrégat Publisher vivent dans `application/services/publishers/core.py` ; les deux agrégats restent liés par `journals.publisher_id` (FK), chacun manipulé par son propre service et son propre port.
 
-Les routers FastAPI utilisent les mêmes repos que le pipeline (routes `def` exécutées dans le threadpool Starlette).
+Un champ éditable d'une revue commande le `doc_type` de ses publications : le `journal_type` alimente des règles de correction. D'où `requalify_publications_for_journal` et le volet requalification de `merge_journals`, qui rejouent ces corrections sur le stock après une édition.
 """
 
 from sqlalchemy import Connection
@@ -29,18 +31,11 @@ def find_or_create_journal(
     oa_model: str | None = None,
     repo: JournalRepository,
 ) -> int | None:
-    """Trouve ou crée un journal.
+    """Trouve ou crée un journal. Retourne son id, ou `None` si le titre est vide.
 
-    Cascade de recherche :
-    1. openalex_id
-    2. ISSN (cherche dans issn, eissn, issnl)
-    3. eISSN (idem)
-    4. ISSN-L (idem)
-    5. Titre normalisé (forme de nom journal)
-    6. Création + enregistrement de la forme de nom
+    Cascade de recherche : `openalex_id`, puis chacun des identifiants ISSN fournis (`issn`, `eissn`, `issnl`) cherché indifféremment dans les trois colonnes, puis le titre normalisé parmi les formes de nom. Sans correspondance, le journal est créé.
 
-    Enrichit les métadonnées manquantes quand un journal existant est trouvé.
-    Retourne journal.id ou None si title est vide.
+    Un journal trouvé voit ses métadonnées manquantes enrichies, et le titre reçu enregistré comme forme de nom — les variantes s'accumulent pour les matchs par titre suivants.
     """
     if not title:
         return None
