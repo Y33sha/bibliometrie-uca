@@ -1,8 +1,11 @@
 """Tests de `effective_metadata` (correction des métadonnées canoniques)."""
 
 from domain.source_publications.correction import (
+    _SOURCE_ONLY_PREDICATES,
     MetadataCorrectionRule,
     MetadataForCorrection,
+    _AppliesTo,
+    effective_doc_type_for_publication,
     effective_metadata,
     resolve_journal_by_doi,
 )
@@ -881,3 +884,30 @@ class TestEffectiveMetadataScope:
         )
         fields = effective_metadata(view)
         assert fields.oa_status is None
+
+
+class TestEffectiveDocTypeForPublication:
+    def test_arbitrated_predicates_still_apply(self):
+        # journal_type est arbitré (il suit le journal_id canonique) : la règle se rejoue.
+        corrected = effective_doc_type_for_publication(
+            _view(doc_type="preprint", journal_type="media")
+        )
+        assert corrected is not None
+        assert corrected.rule == MetadataCorrectionRule.JOURNAL_TYPE_MEDIA_TO_MEDIA
+
+    def test_source_only_rule_is_skipped_even_when_its_signal_is_present(self):
+        # Une vue canonique ne porte pas d'urls ; si un appelant en fournissait quand même,
+        # la règle resterait écartée — l'exclusion tient au prédicat, pas à la valeur.
+        view = _view(doc_type="article", urls=("https://theses.fr/s1",))
+        assert effective_metadata(view).doc_type is not None
+        assert effective_doc_type_for_publication(view) is None
+
+    def test_declared_preprint_rule_is_skipped(self):
+        view = _view(doc_type="article", self_declared_preprint=True)
+        assert effective_metadata(view).doc_type is not None
+        assert effective_doc_type_for_publication(view) is None
+
+    def test_source_only_predicates_are_real_predicate_names(self):
+        # Un nom absent d'`_AppliesTo` n'écarterait aucune règle : le filtre deviendrait muet
+        # sans rien signaler, et les règles source-only se rejoueraient sur le canonique.
+        assert _SOURCE_ONLY_PREDICATES <= set(_AppliesTo.__annotations__)
