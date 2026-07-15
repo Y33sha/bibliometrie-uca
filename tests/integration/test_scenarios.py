@@ -92,7 +92,6 @@ def _seed_pub(
     pub_year: int = 2024,
     doi: str | None = None,
     doc_type: str = "article",
-    journal_id: int | None = None,
     oa_status: str = "unknown",
 ) -> int:
     """Sème une publication directement via le repo (sans cascade de matching)."""
@@ -103,9 +102,6 @@ def _seed_pub(
         pub_year=pub_year,
         doi=doi,
         oa_status=oa_status,
-        journal_id=journal_id,
-        container_title=None,
-        language=None,
     )
 
 

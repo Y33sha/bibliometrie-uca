@@ -29,9 +29,6 @@ def _pub(conn, *, doc_type, title_normalized, doi, pub_year=2024) -> int:
         pub_year=pub_year,
         doi=doi,
         oa_status="unknown",
-        journal_id=None,
-        container_title=None,
-        language=None,
     )
 
 
