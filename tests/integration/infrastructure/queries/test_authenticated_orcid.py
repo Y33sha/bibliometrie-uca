@@ -146,7 +146,10 @@ class TestAuthenticateOrcid:
         assert repo.authenticate_orcid(person, _ORCID) == "noop"
 
     def test_import_is_idempotent(self, sa_sync_conn):
-        from application.services.persons.core import import_authenticated_orcids
+        from collections import Counter
+
+        from application.ports.repositories.person_repository import AuthenticateOrcidOutcome
+        from application.services.persons.core import authenticate_orcids
 
         p1 = _create_person(sa_sync_conn, last="One")
         p2 = _create_person(sa_sync_conn, last="Two")
@@ -154,7 +157,9 @@ class TestAuthenticateOrcid:
         entries = [(p1, _ORCID), (p2, _ORCID_B)]
 
         repo = person_repository(sa_sync_conn)
-        first = import_authenticated_orcids(entries, repo=repo)
-        assert first == {"inserted": 1, "upgraded": 1}
-        second = import_authenticated_orcids(entries, repo=repo)
-        assert second == {"noop": 2}
+        first = authenticate_orcids(entries, repo=repo)
+        assert first == Counter(
+            {AuthenticateOrcidOutcome.INSERTED: 1, AuthenticateOrcidOutcome.UPGRADED: 1}
+        )
+        second = authenticate_orcids(entries, repo=repo)
+        assert second == Counter({AuthenticateOrcidOutcome.NOOP: 2})

@@ -26,7 +26,8 @@ import os
 
 from sqlalchemy import text
 
-from application.services.persons.core import import_authenticated_orcids
+from application.ports.repositories.person_repository import AuthenticateOrcidOutcome
+from application.services.persons.core import authenticate_orcids
 from domain.persons.identifiers import normalize_orcid
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
@@ -140,14 +141,14 @@ def main() -> int:
 
     with engine.begin() as conn:
         repo = person_repository(conn)
-        outcomes = import_authenticated_orcids(entries, repo=repo)
+        outcomes = authenticate_orcids(entries, repo=repo)
 
     log.info(
         "✓ Terminé — insérés %d, renforcés %d, déplacés %d, inchangés %d.",
-        outcomes.get("inserted", 0),
-        outcomes.get("upgraded", 0),
-        outcomes.get("reassigned", 0),
-        outcomes.get("noop", 0),
+        outcomes[AuthenticateOrcidOutcome.INSERTED],
+        outcomes[AuthenticateOrcidOutcome.UPGRADED],
+        outcomes[AuthenticateOrcidOutcome.REASSIGNED],
+        outcomes[AuthenticateOrcidOutcome.NOOP],
     )
     return 0
 

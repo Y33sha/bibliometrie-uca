@@ -82,10 +82,10 @@ Réorganisation du sommet :
 
 #### 1.2 - `application/services`
 
-- [ ] `persons/core.py` : `import_authenticated_orcids` est une opération d'ingestion (lecture d'ORCID authentifiés depuis une source externe pour les injecter) logée dans le référentiel d'écriture de l'agrégat, où elle détonne. À requalifier.
+- [x] `persons/core.py` : `import_authenticated_orcids` ne lit aucune source externe — elle reçoit des paires `(person_id, orcid)` déjà résolues et normalisées, et applique un statut. Le nom promettait une ingestion que le corps ne fait pas : renommée `authenticate_orcids`. L'ingestion réelle vit dans le CLI, notée en 3.3.
 - [x] `publishers/enrichment/` : sous-package (réduit à un seul module) aplati en module plat `enrich_country.py` ; payload OpenAlex typée + boucle par batch extraite dans `_enrich_batch` → exceptions `ruff C901` et override mypy `disallow-any` retirées (`0a8f95f8`).
 - [ ] `commands.py` : l'alias d'import du module `core` diffère d'un service à l'autre (`structures_service`, `journals`, `publications_service`, `publishers`). Harmoniser sur une convention unique.
-- [ ] `publications/core.py` (`_apply_canonical_doc_type_correction`) : vue de correction — voir *Scinder le contrat des règles de correction de sa projection de lecture* en Décisions, et le phasage en 1.2.1.
+- [x] `publications/core.py` (`_apply_canonical_doc_type_correction`) : vue de correction — voir *Scinder le contrat des règles de correction de sa projection de lecture* en Décisions, et le phasage en 1.2.1.
 - [x] `publications/core.py` (`merge_publications`) : chemin de fusion et règle `absorb` — traité par la fiche dédiée `archived/2026-07-12_CODE_merge-publications.md`.
 - [x] `publications/core.py` : passe docstrings. Le module revendiquait un accès exclusif en écriture démenti par le pipeline, qui appelait `pub_repo.create` en direct — seul `repo.create` de la couche application à court-circuiter son service, là où les phases `persons` et `normalize` passent par `create_person` et `find_or_create_journal`. `create_publication` porte les valeurs de semis (`title` = titre normalisé, `doc_type` à `other`, `oa_status` par défaut) ; `repo.create` perd `journal_id`, `container_title` et `language`, que tous ses appelants fixaient à `None` (`abed5138`, `6bfbf94a`).
 
@@ -142,6 +142,8 @@ Racine (transverse) : passe docstrings/commentaires faite. Findings structurels 
 #### 3.3 - CLI
 
 - [ ] CLI `maintenance/` : coquille-ification. `enrich_publishers` séquence ses trois étapes dans son `main()` au lieu de déléguer en un appel à un orchestrateur applicatif, contrairement à ses voisins.
+- [ ] `maintenance/import_authenticated_orcids.py` : l'ingestion vit ici, en SQL brut depuis `interfaces/cli/` — résolution email → personne sur `persons_rh`, puis sondage de `person_identifiers` pour prévoir les déplacements. Le service ne reçoit que des paires déjà résolues et normalisées. À faire descendre derrière un port, comme ses voisins.
+- [ ] `imports/import_persons.py` : son `INSERT INTO persons` (lignes 265-276) duplique `repo.create`, et la ligne suivante appelle `refresh_person_name_forms` depuis le service — soit les deux moitiés de `create_person`, dont l'une réécrite en SQL. Remplacer par un appel à `create_person`. Le CLI calcule par ailleurs `last_norm`/`first_norm` pour sa requête de détection de doublon, ce que `repo.create` refait de son côté.
 - [ ] `maintenance/merge_publications.py` porte `# STATUS: oneshot` alors qu'il vit dans `maintenance/` et se décrit comme réutilisable (nettoyage en lot) — marqueur à revoir.
 - [ ] Passe des CLI `maintenance/` et `oneshot/`.
 
