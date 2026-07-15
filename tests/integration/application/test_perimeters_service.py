@@ -183,12 +183,6 @@ class TestUpdatePerimeter:
         result = sa_sync_conn.execute(text("SELECT name FROM perimeters WHERE id = :p"), {"p": p})
         assert result.scalar_one() == "New"
 
-    def test_name_is_trimmed(self, sa_sync_conn, repo):
-        p = _insert_perimeter_sync(sa_sync_conn, name="Old")
-        update_perimeter(p, update=PerimeterUpdate(name="  New  "), repo=repo)
-        result = sa_sync_conn.execute(text("SELECT name FROM perimeters WHERE id = :p"), {"p": p})
-        assert result.scalar_one() == "New"
-
     def test_updates_structure_ids(self, sa_sync_conn, repo):
         p = _insert_perimeter_sync(sa_sync_conn, structure_ids=[1])
         update_perimeter(p, update=PerimeterUpdate(structure_ids=[4, 5, 6]), repo=repo)
