@@ -36,6 +36,10 @@ class PublicationRepository(Protocol):
         """Ids des publications rattachées à ce journal. Utilisé pour requalifier le stock quand un input éditable du journal (ex. `journal_type`) change."""
         ...
 
+    def find_doc_types_by_ids(self, pub_ids: list[int]) -> dict[int, str]:
+        """`doc_type` de chaque publication demandée, en une lecture. Une publication absente de la table manque de la réponse — un refresh peut l'avoir supprimée."""
+        ...
+
     # ── Écritures simples ──────────────────────────────────────────
 
     def update_oa_status(self, pub_id: int, oa_status: str) -> None: ...

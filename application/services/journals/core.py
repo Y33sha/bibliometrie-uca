@@ -121,7 +121,10 @@ def update_journal_apc(
     apc_currency: str | None = None,
     repo: JournalRepository,
 ) -> None:
-    """Met à jour les informations APC d'un journal."""
+    """Met à jour les informations APC d'un journal.
+
+    Sans vérification d'existence, à la différence d'`update_journal` : l'appelant est la phase `publishers_journals`, qui boucle sur des ids issus d'une requête.
+    """
     repo.update_journal_apc(
         journal_id,
         apc_amount=apc_amount,
@@ -191,7 +194,7 @@ def requalify_publications_for_journal(
     1. `_correct_for_journal` recalcule **en place** les corrections des `source_publications` du journal. `refresh_from_sources` repart de la colonne corrigée (pas du brut) ; ce recalcul préalable garantit qu'elle reflète le `journal_type` mis à jour.
     2. `refresh_from_sources` sur chaque publication du journal ré-agrège les colonnes `source_publication` fraîchement corrigées (garde-fous habituels : conflits DOI, audit `doi_changed`, orphelins).
 
-    Retourne le nombre de publications dont le `doc_type` a effectivement changé ; émet l'audit `journal.type_requalified` si > 0.
+    Retourne le nombre de publications dont le `doc_type` a effectivement changé, par comparaison de deux relevés encadrant la boucle ; émet l'audit `journal.type_requalified` si > 0.
 
     Le **preview** (combien changeraient sans appliquer) s'obtient en enveloppant cet appel dans un `SAVEPOINT` que l'appelant annule : preview et apply partagent alors exactement la même logique.
     """
@@ -199,18 +202,17 @@ def requalify_publications_for_journal(
     if not pub_ids:
         return 0
 
+    before = pub_repo.find_doc_types_by_ids(pub_ids)
     _correct_for_journal(conn, correction_queries, journal_id)
-
-    changed = 0
     for pub_id in pub_ids:
-        pub = pub_repo.find_by_id(pub_id)
-        if pub is None:
-            continue
-        original_doc_type = pub.doc_type
         refresh_from_sources(pub_id, repo=pub_repo)
-        pub_after = pub_repo.find_by_id(pub_id)
-        if pub_after is not None and pub_after.doc_type != original_doc_type:
-            changed += 1
+    after = pub_repo.find_doc_types_by_ids(pub_ids)
+
+    # Une publication que le refresh a supprimée (orpheline, hors périmètre) manque d'`after` :
+    # elle n'est pas requalifiée, elle a disparu.
+    changed = sum(
+        1 for pub_id, doc_type in before.items() if after.get(pub_id, doc_type) != doc_type
+    )
 
     if changed > 0:
         emit_event(
