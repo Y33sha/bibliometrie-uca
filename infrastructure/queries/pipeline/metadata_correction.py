@@ -17,10 +17,10 @@ from application.ports.pipeline.metadata_correction import (
     UnaryCorrectionRow,
 )
 
-# Projection partagée. L'ordre des colonnes est celui des champs d'`UnaryCorrectionRow` : les
-# lignes sont construites par déballage positionnel (`UnaryCorrectionRow(*row)`). Contenu : SP +
-# champs joints `journals` (règles journal-dépendantes) + `raw_metadata` (reconstruction du brut)
-# + deux booléens calculés ici pour garder `effective_metadata` pure : `embargo_expired`
+# Projection partagée. Chaque colonne porte le nom du champ d'`UnaryCorrectionRow` qu'elle
+# alimente : les lignes sont construites par appariement de noms. Contenu : SP + champs joints
+# `journals` (règles journal-dépendantes) + `raw_metadata` (reconstruction du brut) + deux
+# booléens calculés ici pour garder `effective_metadata` pure : `embargo_expired`
 # (date-dépendant ; la règle d'embargo lit le booléen, pas la date) et `self_declared_preprint`
 # (la SP déclare `is-preprint-of`, sans lire `meta` dans le domaine). Le `WHERE` est ajouté par
 # chaque variante.
@@ -44,7 +44,7 @@ def fetch_for_unary_correction(conn: Connection) -> list[UnaryCorrectionRow]:
     journal-dépendantes (`journal_type`, `oa_model`), `raw_metadata` inclus pour la
     reconstruction du brut."""
     rows = conn.execute(text(_SELECT)).all()
-    return [UnaryCorrectionRow(*row) for row in rows]
+    return [UnaryCorrectionRow(**row._mapping) for row in rows]
 
 
 def fetch_for_unary_correction_by_journal(
@@ -52,7 +52,7 @@ def fetch_for_unary_correction_by_journal(
 ) -> list[UnaryCorrectionRow]:
     """Les `source_publications` d'un journal (`journal_id = :jid`) — recompute ciblé."""
     rows = conn.execute(text(_SELECT + " WHERE sp.journal_id = :jid"), {"jid": journal_id}).all()
-    return [UnaryCorrectionRow(*row) for row in rows]
+    return [UnaryCorrectionRow(**row._mapping) for row in rows]
 
 
 def fetch_journal_doi_prefixes(conn: Connection) -> list[tuple[str, int]]:

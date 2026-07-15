@@ -21,7 +21,7 @@ class UnaryCorrectionRow(NamedTuple):
 
     Porte les champs du contrat des règles (`for_correction`) et ceux dont la phase seule se sert : `id` pour persister, `source` pour `map_doc_type`, `external_ids` et `raw_metadata` pour le stash et la reconstruction du brut.
 
-    L'ordre des champs est celui des colonnes du `SELECT` de l'adapter, qui construit les lignes en déballant chaque ligne SQL dans le constructeur (`UnaryCorrectionRow(*row)`) : l'appariement se fait par rang, pas par nom.
+    L'adapter construit les lignes par appariement de noms : chaque champ porte le nom de la colonne qui l'alimente.
     """
 
     id: int

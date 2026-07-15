@@ -122,7 +122,11 @@ Racine (transverse) : passe docstrings/commentaires faite. Findings structurels 
 
 #### 2.6 `queries`
 
+- [ ] Construction des lignes par déballage positionnel (`Row(*row)`) : l'ordre des champs de la classe et celui des colonnes du `SELECT` forment un contrat unique, écrit dans deux couches et vérifié par rien — réordonner l'un sans l'autre range les valeurs dans les mauvais champs, en silence dès que les types sont compatibles. L'appariement par nom (`Row(**row._mapping)`) supprime le couplage et échoue bruyamment sur un nom manquant. Fait pour `UnaryCorrectionRow` ; restent `JournalByDoiRow` et `DoiClusterRow` (`pipeline/metadata_correction.py`).
+
 #### 2.7 `repositories`
+
+- [ ] Même motif de déballage positionnel qu'en 2.6, sur cinq repositories : `_PerimeterRow`, `_PublisherRow`, `_StructureRow`, `_JournalRow`, `_SourcePublicationViewRow`.
 
 
 ### Phase 3 - `interfaces/`
