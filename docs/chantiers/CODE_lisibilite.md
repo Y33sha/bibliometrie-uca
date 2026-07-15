@@ -147,6 +147,9 @@ Racine (transverse) : passe docstrings/commentaires faite. Findings structurels 
 
 ### Phase 4 - `domain/`
 
+- [ ] `source_publications/correction.py` (680 lignes) porte trois sujets, qui sont les trois sous-étapes de la phase `metadata_correction` — le module le documente déjà (« unaire : `doc_type`/`oa_status`/`external_ids` ; cluster : `doi` ; `journal_by_doi` : `journal_id` ») : le moteur de règles unaire (contrat, table `_RULES`, `effective_metadata`), la correction relationnelle par cluster DOI (`DoiClusterMember`, `resolve_cluster_doi_corrections`, `CONVERGENCE_CASES`), et le rattachement du journal par préfixe DOI (`resolve_journal_by_doi`). Candidat à la scission ; les deux derniers sujets raisonnent sur des `source_publications` et restent en place.
+- [ ] Placement du moteur de règles unaire, seul sujet bi-niveau (alimenté par une `source_publication` comme par une publication canonique), à trancher après la scission. À noter : ce n'est pas une question de couches, `publications/` et `source_publications/` s'important déjà mutuellement (`source_publications/doc_types.py` et `keys.py` vers `publications/` ; `publications/aggregation.py` vers `source_publications/`). Aucun cycle créé ni supprimé par un déplacement.
+
 ## Questions ouvertes
 
 - **Style de logging incohérent** (transverse). f-string vs `%`-lazy : ~79 occurrences sur 22 fichiers du seul `application/pipeline`, motif probablement plus large. Faible nuisance (le logging de progression et de bilan est une observabilité légitime, feeding `pipeline.log` que l'UI admin ressort par phase). Ne vaut le coup que couplé à un durcissement lint (règles ruff `G`/`LOG`) qui verrouille le style. Hors périmètre de ce chantier ; éventuel chantier dédié.
