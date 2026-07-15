@@ -1,6 +1,6 @@
-"""Service Publications — accès exclusif en écriture à la table `publications`.
+"""Service Publications — écritures sur l'agrégat Publication, transaction-agnostiques.
 
-Toute création ou mise à jour d'une publication passe par ce module : les scripts de normalisation (HAL, OpenAlex, WoS, ScanR) et les autres traitements appellent ces fonctions, sans SQL direct.
+Trois opérations : recalcul des métadonnées canoniques depuis les `source_publications`, fusion de deux doublons, marquage d'une paire comme distincte. Les appelants sont la phase `publications` du pipeline, les command handlers de l'API et les CLI de maintenance ; chacun tient sa propre frontière transactionnelle et commite lui-même.
 """
 
 from application.audit_log import emit_event
@@ -42,7 +42,6 @@ def refresh_from_sources(
 
     sources = repo.get_source_publications(pub_id)
     if not sources:
-        # Publication orpheline : la règle métier dicte qu'une publication non attestée par aucune source n'a pas de raison d'exister.
         repo.delete(pub_id)
         return
 
@@ -51,7 +50,6 @@ def refresh_from_sources(
     _refresh_aggregate(pub, sources, source_priority=SOURCE_PRIORITY, secondary_ids=secondary_ids)
     _apply_canonical_doc_type_correction(pub, repo=repo)
 
-    # Une publication dont le type résolu est hors périmètre ne doit pas exister.
     if pub.doc_type in OUT_OF_SCOPE_DOC_TYPES:
         repo.delete(pub_id)
         return
