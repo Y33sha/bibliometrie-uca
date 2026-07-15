@@ -9,7 +9,7 @@ def recompute_pub_count(conn: Connection) -> int:
     """Recalcule `addresses.pub_count` = nb de publications canoniques distinctes
     liées à l'adresse via `source_authorship_addresses`.
 
-    Recompute global idempotent (guard `IS DISTINCT FROM`) couvrant **toutes**
+    Recalcul global idempotent (guard `IS DISTINCT FROM`) couvrant **toutes**
     les adresses : celles qui ont perdu tous leurs liens repassent à 0. Lancé en
     fin de phase `publications`, une fois les publications créées et fusionnées —
     il n'y a rien à compter au stade `normalize`. Un run `--only publications`
