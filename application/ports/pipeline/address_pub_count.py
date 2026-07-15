@@ -1,4 +1,4 @@
-"""Port : recompute du cache `addresses.pub_count`, fin de phase publications.
+"""Port : recalcul du cache `addresses.pub_count`, en fin de phase publications.
 
 Implémenté par `infrastructure.queries.pipeline.address_pub_count.PgAddressPubCountQueries`.
 """
@@ -12,5 +12,8 @@ class AddressPubCountQueries(Protocol):
     """Recalcul du nombre de publications distinctes rattachées à chaque adresse."""
 
     def recompute_pub_count(self, conn: Connection) -> int:
-        """Recompute `addresses.pub_count` sur toutes les adresses. Retourne le nombre de lignes modifiées."""
+        """Recalcule `addresses.pub_count` sur **toutes** les adresses, depuis les publications canoniques liées par `source_authorship_addresses`. Retourne le nombre de lignes modifiées.
+
+        Idempotent, et de portée globale : une adresse qui a perdu tous ses liens repasse à 0.
+        """
         ...
