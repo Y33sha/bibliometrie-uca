@@ -66,6 +66,10 @@ class PublisherRepository(Protocol):
 
     def find_publisher_by_openalex_id(self, openalex_id: str) -> int | None: ...
 
+    def find_needing_country_enrichment(self, *, limit: int | None = None) -> list[tuple[int, str]]:
+        """`(id, openalex_id)` des éditeurs à `openalex_id` connu et `country` absent, triés par id (batching stable). `limit=None` les rend tous."""
+        ...
+
     def set_publisher_openalex_id_if_missing(
         self,
         publisher_id: int,

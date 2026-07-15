@@ -93,6 +93,17 @@ class PgPublisherRepository:
             select(publishers.c.id).where(publishers.c.openalex_id == openalex_id)
         ).scalar_one_or_none()
 
+    def find_needing_country_enrichment(self, *, limit: int | None = None) -> list[tuple[int, str]]:
+        """`(id, openalex_id)` des éditeurs enrichissables, triés par id. `.limit(None)` laisse la requête sans clause LIMIT."""
+        rows = self._conn.execute(
+            select(publishers.c.id, publishers.c.openalex_id)
+            .where(publishers.c.openalex_id.is_not(None))
+            .where(publishers.c.country.is_(None))
+            .order_by(publishers.c.id)
+            .limit(limit)
+        ).all()
+        return [(r.id, r.openalex_id) for r in rows]
+
     def set_publisher_openalex_id_if_missing(
         self,
         publisher_id: int,

@@ -14,7 +14,6 @@ import os
 from application.services.publishers.enrich_country import run_enrich_publishers_from_openalex
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from infrastructure.queries.publishers_enrichment import PgPublisherEnrichmentQueries
 from infrastructure.repositories import publisher_repository
 from infrastructure.sources.api_limits import DOAJ_DELAY
 from infrastructure.sources.config import (
@@ -37,14 +36,12 @@ def main() -> int:
     parser.add_argument("--dry-run", action="store_true", help="Aperçu sans modifier la base.")
     args = parser.parse_args()
 
-    queries = PgPublisherEnrichmentQueries()
     api_base_urls = get_api_base_urls()
     conn = get_sync_engine().connect()
     try:
         repo = publisher_repository(conn)
         run_enrich_publishers_from_openalex(
             conn,
-            queries,
             log,
             publisher_repo=repo,
             api_key=get_openalex_api_key(conn),
