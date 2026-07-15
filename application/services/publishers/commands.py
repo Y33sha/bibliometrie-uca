@@ -13,7 +13,7 @@ from application.ports.repositories.publisher_repository import (
     PublisherRepository,
     PublisherUpdate,
 )
-from application.services.publishers import core as publishers
+from application.services.publishers import core as publishers_service
 
 
 def update_publisher(
@@ -24,7 +24,7 @@ def update_publisher(
     repo: PublisherRepository,
 ) -> None:
     """Met à jour un éditeur (champs sélectifs)."""
-    publishers.update_publisher(publisher_id, update=update, repo=repo)
+    publishers_service.update_publisher(publisher_id, update=update, repo=repo)
     conn.commit()
 
 
@@ -41,7 +41,7 @@ def merge_publishers(
 ) -> None:
     """Fusionne l'éditeur source dans l'éditeur cible (transferts revues +
     publications, fusion des revues à titre partagé, suppression de la source)."""
-    publishers.merge_publishers(
+    publishers_service.merge_publishers(
         target_id,
         source_id,
         conn=conn,
