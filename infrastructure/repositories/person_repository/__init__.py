@@ -117,17 +117,6 @@ class PgPersonRepository:
             self._conn, person_id, sa_ids
         )
 
-    def create_authorships_from_sources(
-        self,
-        person_id: int,
-        sa_ids: list[int],
-        source_priority: tuple[str, ...],
-    ) -> None:
-        _authorships.create_authorships_from_sources(self._conn, person_id, sa_ids, source_priority)
-
-    def link_source_authorships_to_authorships(self, person_id: int, sa_ids: list[int]) -> None:
-        _authorships.link_source_authorships_to_authorships(self._conn, person_id, sa_ids)
-
     def get_distinct_name_forms_from_source_authorships(self, sa_ids: list[int]) -> list[str]:
         return _authorships.get_distinct_name_forms_from_source_authorships(self._conn, sa_ids)
 
@@ -143,35 +132,6 @@ class PgPersonRepository:
 
     def null_person_id_for_name_form(self, person_id: int, name_form: str) -> int:
         return _authorships.null_person_id_for_name_form(self._conn, person_id, name_form)
-
-    def insert_authorship_if_missing(self, publication_id: int, person_id: int) -> None:
-        _authorships.insert_authorship_if_missing(self._conn, publication_id, person_id)
-
-    def link_source_authorships_to_authorship(self, publication_id: int, person_id: int) -> None:
-        _authorships.link_source_authorships_to_authorship(self._conn, publication_id, person_id)
-
-    def recompute_authorship_author_position_and_corresponding(
-        self,
-        publication_id: int,
-        person_id: int,
-        source_priority: tuple[str, ...],
-    ) -> None:
-        _authorships.recompute_authorship_author_position_and_corresponding(
-            self._conn,
-            publication_id,
-            person_id,
-            source_priority,
-        )
-
-    def recompute_authorship_in_perimeter(
-        self,
-        publication_id: int,
-        person_id: int,
-        sources: tuple[str, ...],
-    ) -> None:
-        _authorships.recompute_authorship_in_perimeter(
-            self._conn, publication_id, person_id, sources
-        )
 
     # ── person_name_forms ──────────────────────────────────────────
 

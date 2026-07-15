@@ -1,8 +1,9 @@
-"""SQL pour les liens personne ↔ `source_authorships` et les authorships."""
+"""SQL du lien personne ↔ `source_authorships` : pose, retrait et lecture du `person_id` des signatures.
+
+La recomposition des lignes consolidées (`authorships`) qui en découlent vit dans `infrastructure/repositories/authorship_repository.py`.
+"""
 
 from sqlalchemy import Connection, text
-
-from infrastructure.queries.sources_sql import source_case_sql
 
 
 def link_authorship(
@@ -92,76 +93,6 @@ def assign_orphan_source_authorships_to_person(
     ).rowcount
 
 
-def create_authorships_from_sources(
-    conn: Connection,
-    person_id: int,
-    sa_ids: list[int],
-    source_priority: tuple[str, ...],
-) -> None:
-    """Crée les authorships manquantes pour la personne, depuis les sources.
-
-    Pour chaque `publication_id` distinct du lot, insère une row dans
-    `authorships` en prenant les colonnes (author_position, in_perimeter,
-    is_corresponding) de la source de plus haute priorité (paramétrée par le
-    use case). Les structures dérivées vivent dans la matview
-    `authorship_structures`, rafraîchie par le caller après l'assignation.
-    """
-    if not sa_ids:
-        return
-    conn.execute(
-        text(f"""
-            CREATE TEMP TABLE _chosen_sa AS
-            SELECT DISTINCT ON (sd.publication_id)
-                sd.publication_id, sa.id AS sa_id,
-                sa.author_position, sa.in_perimeter, sa.is_corresponding
-            FROM source_authorships sa
-            JOIN source_publications sd ON sd.id = sa.source_publication_id
-            WHERE sa.id = ANY(:ids) AND sd.publication_id IS NOT NULL
-            ORDER BY sd.publication_id, {source_case_sql(source_priority)}
-        """),
-        {"ids": sa_ids},
-    )
-    conn.execute(
-        text("""
-            INSERT INTO authorships (publication_id, person_id,
-                author_position, in_perimeter, is_corresponding)
-            SELECT cs.publication_id, :pid, cs.author_position, cs.in_perimeter, cs.is_corresponding
-            FROM _chosen_sa cs
-            WHERE NOT EXISTS (
-                SELECT 1 FROM rejected_authorships rj
-                WHERE rj.publication_id = cs.publication_id AND rj.person_id = :pid
-            )
-            ON CONFLICT (publication_id, person_id) DO NOTHING
-        """),
-        {"pid": person_id},
-    )
-    conn.execute(text("DROP TABLE _chosen_sa"))
-
-
-def link_source_authorships_to_authorships(
-    conn: Connection, person_id: int, sa_ids: list[int]
-) -> None:
-    """Pose `source_authorships.authorship_id` vers l'authorship canonique
-    de la même paire (publication, person), pour les lignes du lot.
-
-    N'écrase que les FK encore NULL (idempotent).
-    """
-    if not sa_ids:
-        return
-    conn.execute(
-        text("""
-            UPDATE source_authorships sa SET authorship_id = a.id
-            FROM source_publications sd, authorships a
-            WHERE sa.id = ANY(:ids)
-              AND sd.id = sa.source_publication_id
-              AND a.publication_id = sd.publication_id
-              AND a.person_id = :pid
-              AND sa.authorship_id IS NULL
-        """),
-        {"ids": sa_ids, "pid": person_id},
-    )
-
-
 def get_distinct_name_forms_from_source_authorships(
     conn: Connection, sa_ids: list[int]
 ) -> list[str]:
@@ -225,108 +156,3 @@ def find_publication_ids_for_source_authorships(conn: Connection, sa_ids: list[i
         {"ids": sa_ids},
     ).all()
     return [row.publication_id for row in rows]
-
-
-def insert_authorship_if_missing(conn: Connection, publication_id: int, person_id: int) -> None:
-    """INSERT ... ON CONFLICT DO NOTHING dans `authorships` pour la paire.
-
-    Skippe les paires présentes dans `rejected_authorships` (rejet canonique).
-    """
-    conn.execute(
-        text("""
-            INSERT INTO authorships (publication_id, person_id)
-            SELECT :pub, :pid
-            WHERE NOT EXISTS (
-                SELECT 1 FROM rejected_authorships rj
-                WHERE rj.publication_id = :pub AND rj.person_id = :pid
-            )
-            ON CONFLICT (publication_id, person_id) DO NOTHING
-        """),
-        {"pub": publication_id, "pid": person_id},
-    )
-
-
-def link_source_authorships_to_authorship(
-    conn: Connection, publication_id: int, person_id: int
-) -> None:
-    """Pose `source_authorships.authorship_id` pour l'authorship (publication,
-    person), sur toutes les sa encore non liées."""
-    conn.execute(
-        text("""
-            UPDATE source_authorships sa
-            SET authorship_id = a.id
-            FROM source_publications sd, authorships a
-            WHERE sd.id = sa.source_publication_id
-              AND a.publication_id = sd.publication_id
-              AND a.person_id = sa.person_id
-              AND sd.publication_id = :pub
-              AND sa.person_id = :pid
-              AND sa.authorship_id IS NULL
-        """),
-        {"pub": publication_id, "pid": person_id},
-    )
-
-
-def recompute_authorship_author_position_and_corresponding(
-    conn: Connection,
-    publication_id: int,
-    person_id: int,
-    source_priority: tuple[str, ...],
-) -> None:
-    """Réagrège `authorships.author_position` et `is_corresponding` pour
-    l'authorship, depuis les sources actives.
-
-    Aligné sur le build (`propagate_authorship_attributes`) : position par
-    priorité de source, `is_corresponding` en `bool_or` (vrai si une source
-    l'atteste — pas de priorité, le FALSE des sources étant une absence de
-    signal).
-    """
-    conn.execute(
-        text(f"""
-            UPDATE authorships a
-            SET author_position = sub.pos,
-                is_corresponding = sub.is_corr
-            FROM (
-                SELECT sa.authorship_id,
-                       (array_agg(sa.author_position ORDER BY
-                           {source_case_sql(source_priority)})
-                           FILTER (WHERE sa.author_position IS NOT NULL))[1] AS pos,
-                       bool_or(sa.is_corresponding) AS is_corr
-                FROM source_authorships sa
-                WHERE sa.authorship_id IS NOT NULL
-                GROUP BY sa.authorship_id
-            ) sub
-            WHERE a.id = sub.authorship_id
-              AND a.publication_id = :pub AND a.person_id = :pid
-        """),
-        {"pub": publication_id, "pid": person_id},
-    )
-
-
-def recompute_authorship_in_perimeter(
-    conn: Connection,
-    publication_id: int,
-    person_id: int,
-    sources: tuple[str, ...],
-) -> None:
-    """Réagrège `authorships.in_perimeter` (OR-bool des sources) pour la paire.
-
-    Les structures dérivées vivent dans la matview `authorship_structures`,
-    rafraîchie par le caller après l'opération.
-    """
-    sources_sql = "(" + ", ".join(f"'{s}'" for s in sources) + ")"
-    conn.execute(
-        text(f"""
-            UPDATE authorships a
-            SET in_perimeter = COALESCE((
-                    SELECT bool_or(sa.in_perimeter)
-                    FROM source_authorships sa
-                    JOIN source_publications sd ON sd.id = sa.source_publication_id
-                    WHERE sa.source IN {sources_sql}
-                      AND sd.publication_id = :pub
-                      AND sa.person_id = :pid
-                ), FALSE)
-            WHERE a.publication_id = :pub AND a.person_id = :pid
-        """),
-        {"pub": publication_id, "pid": person_id},
-    )

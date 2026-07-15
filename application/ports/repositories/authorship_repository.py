@@ -78,3 +78,52 @@ class AuthorshipRepository(Protocol):
         self,
         source_authorship_ids: list[int],
     ) -> None: ...
+
+    # ── Recomposition d'une authorship depuis ses signatures ───────
+
+    def insert_authorship_if_missing(self, publication_id: int, person_id: int) -> None:
+        """Crée la ligne consolidée de la paire si elle manque. Écarte les paires figurant dans `rejected_authorships`."""
+        ...
+
+    def create_authorships_from_sources(
+        self,
+        person_id: int,
+        sa_ids: list[int],
+        source_priority: tuple[str, ...],
+    ) -> None:
+        """Crée les lignes consolidées manquantes pour la personne, une par publication couverte par le lot, depuis la signature la plus prioritaire."""
+        ...
+
+    def link_source_authorships_to_authorship(
+        self,
+        publication_id: int,
+        person_id: int,
+    ) -> None:
+        """Pose `source_authorships.authorship_id` vers la ligne consolidée de la paire, sur les signatures encore non liées."""
+        ...
+
+    def link_source_authorships_to_authorships(
+        self,
+        person_id: int,
+        sa_ids: list[int],
+    ) -> None:
+        """Même pose de FK, cantonnée aux signatures du lot."""
+        ...
+
+    def recompute_authorship_author_position_and_corresponding(
+        self,
+        publication_id: int,
+        person_id: int,
+        source_priority: tuple[str, ...],
+    ) -> None:
+        """Réagrège `author_position` (par priorité de source) et `is_corresponding` (OR des signatures) sur la ligne consolidée."""
+        ...
+
+    def recompute_authorship_in_perimeter(
+        self,
+        publication_id: int,
+        person_id: int,
+        sources: tuple[str, ...],
+    ) -> None:
+        """Réagrège `in_perimeter` (OR des signatures) sur la ligne consolidée d'une paire. `recompute_in_perimeter_on_source_authorships` couvre le cas ensembliste, par adresses."""
+        ...

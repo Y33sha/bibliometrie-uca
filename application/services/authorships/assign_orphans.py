@@ -114,7 +114,7 @@ def assign_orphan_authorship(
 
     # Recomposer l'authorship canonique pour la paire (pub, person)
     if publication_id is not None:
-        _refresh_authorship_from_sources(person_id, publication_id, repo=repo)
+        _refresh_authorship_from_sources(person_id, publication_id, authorship_repo=authorship_repo)
     # `authorship_structures` (agrégation des structure_ids) maintenue uniquement
     # par le pipeline — pas de refresh sur action admin (staleness bornée à un run).
 
@@ -151,8 +151,8 @@ def batch_assign_orphan_authorships(
 
     assigned = repo.assign_orphan_source_authorships_to_person(person_id, sa_ids)
     authorship_repo.pin_authorships(sa_ids, person_id)
-    repo.create_authorships_from_sources(person_id, sa_ids, SOURCE_PRIORITY)
-    repo.link_source_authorships_to_authorships(person_id, sa_ids)
+    authorship_repo.create_authorships_from_sources(person_id, sa_ids, SOURCE_PRIORITY)
+    authorship_repo.link_source_authorships_to_authorships(person_id, sa_ids)
 
     for name_form in repo.get_distinct_name_forms_from_source_authorships(sa_ids):
         repo.add_name_form(person_id, name_form)
@@ -166,7 +166,7 @@ def _refresh_authorship_from_sources(
     person_id: int,
     publication_id: int,
     *,
-    repo: PersonRepository,
+    authorship_repo: AuthorshipRepository,
 ) -> None:
     """Recompose une authorship pour la paire (publication, personne) depuis ses source_authorships actives.
 
@@ -176,11 +176,11 @@ def _refresh_authorship_from_sources(
     3. Recalcule author_position (par priorité de source) et is_corresponding (bool_or)
     4. Recalcule in_perimeter (agrégation OR ; les structures dérivées vivent dans la matview `authorship_structures`, rafraîchie par l'appelant)
     """
-    repo.insert_authorship_if_missing(publication_id, person_id)
-    repo.link_source_authorships_to_authorship(publication_id, person_id)
-    repo.recompute_authorship_author_position_and_corresponding(
+    authorship_repo.insert_authorship_if_missing(publication_id, person_id)
+    authorship_repo.link_source_authorships_to_authorship(publication_id, person_id)
+    authorship_repo.recompute_authorship_author_position_and_corresponding(
         publication_id,
         person_id,
         SOURCE_PRIORITY,
     )
-    repo.recompute_authorship_in_perimeter(publication_id, person_id, AUTHOR_SOURCES)
+    authorship_repo.recompute_authorship_in_perimeter(publication_id, person_id, AUTHOR_SOURCES)
