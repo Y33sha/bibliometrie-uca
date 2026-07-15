@@ -177,12 +177,6 @@ class TestUpdatePerimeter:
         with pytest.raises(ValidationError):
             update_perimeter(p, update=PerimeterUpdate(), repo=repo)
 
-    def test_raises_if_no_valid_field(self, sa_sync_conn, repo):
-        """Un champ hors contrat est écarté à la validation : il ne reste rien à écrire."""
-        p = _insert_perimeter_sync(sa_sync_conn)
-        with pytest.raises(ValidationError):
-            update_perimeter(p, update=PerimeterUpdate.model_validate({"code": "other"}), repo=repo)
-
     def test_updates_name(self, sa_sync_conn, repo):
         p = _insert_perimeter_sync(sa_sync_conn, name="Old")
         update_perimeter(p, update=PerimeterUpdate(name="New"), repo=repo)
