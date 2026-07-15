@@ -23,6 +23,7 @@ from infrastructure.repositories.person_repository import (
 
 if TYPE_CHECKING:
     from application.ports.repositories.person_repository import (
+        AuthenticateOrcidOutcome,
         IdentifierStatusRow,
         NameFormStatusRow,
     )
@@ -86,7 +87,7 @@ class PgPersonRepository:
     def begin_authenticated_orcid_import(self) -> None:
         _identifiers.begin_authenticated_orcid_import(self._conn)
 
-    def authenticate_orcid(self, person_id: int, orcid: str) -> str:
+    def authenticate_orcid(self, person_id: int, orcid: str) -> "AuthenticateOrcidOutcome":
         return _identifiers.authenticate_orcid(self._conn, person_id, orcid)
 
     # ── source_authorships (liens personne ↔ authorship source) ────

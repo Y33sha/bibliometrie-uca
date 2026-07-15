@@ -14,6 +14,7 @@ from application.audit_log import emit_event
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.authorship_repository import AuthorshipRepository
 from application.ports.repositories.person_repository import (
+    AuthenticateOrcidOutcome,
     IdentifierStatusRow,
     NameFormStatusRow,
     PersonRepository,
@@ -46,28 +47,6 @@ class DetachResult(TypedDict):
     detached: int
     deleted_authorships: int
     cleaned_forms: int
-
-
-__all__ = [
-    "create_person",
-    "merge_person",
-    "add_identifier",
-    "add_identifiers_from_authorships",
-    "IdentifierConflict",
-    "add_name_form",
-    "link_authorship",
-    "refresh_person_name_forms",
-    "unlink_authorship",
-    "set_rejected",
-    "update_name",
-    "remove_identifier",
-    "update_identifier_status",
-    "reassign_identifier",
-    "import_authenticated_orcids",
-    "update_name_form_status",
-    "detach_authorships",
-    "mark_distinct",
-]
 
 
 # ── Création / mise à jour personne ──
@@ -113,6 +92,17 @@ def update_name(
 # ── Rattachement / détachement authorships ──
 
 
+def _require_known_source(source: str) -> None:
+    """Vérifie qu'une source appartient au registre. Lève `ValidationError` sinon.
+
+    `source_authorships.source` est un enum Postgres : une valeur hors registre y produirait une erreur de coercition, dont le message ne nomme ni l'appelant ni le champ fautif.
+    """
+    if source not in ALL_SOURCES_SET:
+        raise ValidationError(
+            f"Source inconnue : {source!r}. Sources valides : {', '.join(sorted(ALL_SOURCES_SET))}."
+        )
+
+
 def link_authorship(
     person_id: int,
     source: str,
@@ -121,18 +111,17 @@ def link_authorship(
     repo: PersonRepository,
     resolution_mode: str,
 ) -> None:
-    """Rattache une authorship source à une personne (pipeline), en marquant le canal."""
-    if source not in ALL_SOURCES_SET:
-        return
+    """Rattache une authorship source à une personne (pipeline), en marquant le canal. Lève `ValidationError` sur une source hors registre."""
+    _require_known_source(source)
     repo.link_authorship(person_id, source, authorship_id, resolution_mode)
 
 
 def unlink_authorship(
     person_id: int, source: str, authorship_id: int, *, repo: PersonRepository
 ) -> None:
-    """Détache une authorship source d'une personne (met person_id à NULL)."""
-    if source in ALL_SOURCES_SET:
-        repo.unlink_authorship(person_id, source, authorship_id)
+    """Détache une authorship source d'une personne (met person_id à NULL). Lève `ValidationError` sur une source hors registre."""
+    _require_known_source(source)
+    repo.unlink_authorship(person_id, source, authorship_id)
 
 
 # ── Identifiants ──
@@ -282,20 +271,17 @@ def reassign_identifier(
     )
 
 
-def import_authenticated_orcids(
+def authenticate_orcids(
     entries: list[tuple[int, str]], *, repo: PersonRepository
-) -> dict[str, int]:
-    """Applique le statut `authenticated` à des paires `(person_id, orcid)` déjà résolues.
+) -> Counter[AuthenticateOrcidOutcome]:
+    """Applique le statut `authenticated` à des paires `(person_id, orcid)` déjà résolues, et retourne le décompte des issues.
 
-    Ouvre une fois le contexte d'écriture protégé pour la transaction courante (`begin_authenticated_orcid_import`), puis délègue chaque paire à `authenticate_orcid`. Les valeurs ORCID sont supposées déjà normalisées et les personnes déjà résolues : le point d'entrée qui lit le fichier des ORCID authentifiés porte cette préparation.
+    Ouvre une fois le contexte d'écriture protégé pour la transaction courante (`begin_authenticated_orcid_import`), puis délègue chaque paire à `authenticate_orcid`. Les valeurs ORCID sont supposées déjà normalisées et les personnes déjà résolues : l'appelant qui lit le fichier des ORCID authentifiés porte cette préparation.
 
-    Retourne le décompte des issues (`inserted`/`upgraded`/`reassigned`/`noop`). C'est l'unique chemin d'écriture autorisé pour ce statut ; en dehors de lui, le trigger `protect_authenticated_identifier` rejette toute écriture de `authenticated`.
+    Unique chemin d'écriture autorisé pour ce statut : ailleurs, le trigger `protect_authenticated_identifier` rejette toute écriture de `authenticated`.
     """
     repo.begin_authenticated_orcid_import()
-    outcomes: Counter[str] = Counter()
-    for person_id, orcid in entries:
-        outcomes[repo.authenticate_orcid(person_id, orcid)] += 1
-    return dict(outcomes)
+    return Counter(repo.authenticate_orcid(person_id, orcid) for person_id, orcid in entries)
 
 
 class IdentifierConflict(NamedTuple):
@@ -421,10 +407,10 @@ def detach_authorships(
     """
     publication_ids: set[int] = set()
     for a in authorships:
-        if a["source"] in ALL_SOURCES_SET:
-            pub_id = repo.find_publication_id_for_source_authorship(a["source"], a["authorship_id"])
-            if pub_id is not None:
-                publication_ids.add(pub_id)
+        _require_known_source(a["source"])
+        pub_id = repo.find_publication_id_for_source_authorship(a["source"], a["authorship_id"])
+        if pub_id is not None:
+            publication_ids.add(pub_id)
 
     detached = 0
     deleted = 0

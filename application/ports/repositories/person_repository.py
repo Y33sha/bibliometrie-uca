@@ -6,10 +6,20 @@ concrète). Toute autre implémentation respectant cette interface
 (fake en mémoire pour tests, autre SGBD, etc.) est également acceptable.
 """
 
+from enum import StrEnum
 from typing import Any, Protocol, TypedDict
 
 from domain.persons.person import Person
 from domain.persons.person_identifier import PersonIdentifier
+
+
+class AuthenticateOrcidOutcome(StrEnum):
+    """Issue de l'authentification d'un ORCID par `authenticate_orcid`."""
+
+    INSERTED = "inserted"  # l'ORCID n'existait pas, créé authentifié
+    UPGRADED = "upgraded"  # déjà rattaché à cette personne, statut renforcé
+    REASSIGNED = "reassigned"  # déplacé depuis une autre personne, puis authentifié
+    NOOP = "noop"  # déjà authentifié sur cette personne
 
 
 class IdentifierStatusRow(TypedDict):
@@ -75,7 +85,7 @@ class PersonRepository(Protocol):
 
     def begin_authenticated_orcid_import(self) -> None: ...
 
-    def authenticate_orcid(self, person_id: int, orcid: str) -> str: ...
+    def authenticate_orcid(self, person_id: int, orcid: str) -> AuthenticateOrcidOutcome: ...
 
     # ── source_authorships (liens personne ↔ authorship source) ────
 

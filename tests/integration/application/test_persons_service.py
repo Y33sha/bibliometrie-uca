@@ -135,9 +135,10 @@ def _scalar(conn, sql_text: str, **params):
 
 
 class TestLinkAuthorship:
-    def test_ignores_invalid_source(self, sa_sync_conn, repo):
-        """Source inconnue → no-op silencieux (pas d'exception)."""
-        link_authorship(1, "invalid", 1, repo=repo, resolution_mode="name")
+    def test_rejects_unknown_source(self, sa_sync_conn, repo):
+        """Source hors registre → `ValidationError` (mappée en 400 côté API)."""
+        with pytest.raises(ValidationError):
+            link_authorship(1, "invalid", 1, repo=repo, resolution_mode="name")
 
     def test_sets_person_id_on_source_authorship(self, sa_sync_conn, repo):
         person_id = _insert_person(sa_sync_conn)
@@ -162,8 +163,9 @@ class TestLinkAuthorship:
 
 
 class TestUnlinkAuthorship:
-    def test_ignores_invalid_source(self, sa_sync_conn, repo):
-        unlink_authorship(1, "invalid", 1, repo=repo)
+    def test_rejects_unknown_source(self, sa_sync_conn, repo):
+        with pytest.raises(ValidationError):
+            unlink_authorship(1, "invalid", 1, repo=repo)
 
     def test_unsets_person_id(self, sa_sync_conn, repo):
         person_id = _insert_person(sa_sync_conn)

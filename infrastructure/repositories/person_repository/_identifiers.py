@@ -4,7 +4,10 @@ from typing import cast
 
 from sqlalchemy import Connection, text
 
-from application.ports.repositories.person_repository import IdentifierStatusRow
+from application.ports.repositories.person_repository import (
+    AuthenticateOrcidOutcome,
+    IdentifierStatusRow,
+)
 from domain.errors import NotFoundError
 from domain.persons.identifiers import AttributionStatus
 from domain.persons.person_identifier import PersonIdentifier
@@ -118,17 +121,10 @@ def begin_authenticated_orcid_import(conn: Connection) -> None:
     conn.execute(text("SET LOCAL app.orcid_authenticated_import = 'on'"))
 
 
-def authenticate_orcid(conn: Connection, person_id: int, orcid: str) -> str:
-    """Pose le statut `authenticated` sur l'ORCID `orcid`, rattaché à `person_id`.
+def authenticate_orcid(conn: Connection, person_id: int, orcid: str) -> AuthenticateOrcidOutcome:
+    """Pose le statut `authenticated` sur l'ORCID `orcid`, rattaché à `person_id`, et retourne l'issue.
 
-    Requiert `begin_authenticated_orcid_import` dans la même transaction, sinon le trigger
-    rejette l'écriture. Idempotent. `orcid` est supposé déjà normalisé. Retourne l'issue :
-
-    - `inserted` — l'ORCID n'existait pas, créé authentifié (source `manual`) ;
-    - `upgraded` — déjà rattaché à cette personne, statut renforcé en `authenticated` ;
-    - `reassigned` — déplacé depuis une autre personne (l'authentification fait autorité
-      sur l'identité), puis authentifié ;
-    - `noop` — déjà `authenticated` sur cette personne.
+    Requiert `begin_authenticated_orcid_import` dans la même transaction, sinon le trigger rejette l'écriture. Idempotent. `orcid` est supposé déjà normalisé. Un ORCID porté par une autre personne est déplacé, l'authentification faisant autorité sur l'identité.
     """
     existing = conn.execute(
         text(
@@ -145,10 +141,14 @@ def authenticate_orcid(conn: Connection, person_id: int, orcid: str) -> str:
             ),
             {"pid": person_id, "v": orcid},
         )
-        return "inserted"
+        return AuthenticateOrcidOutcome.INSERTED
     if existing.person_id == person_id and existing.status == "authenticated":
-        return "noop"
-    outcome = "reassigned" if existing.person_id != person_id else "upgraded"
+        return AuthenticateOrcidOutcome.NOOP
+    outcome = (
+        AuthenticateOrcidOutcome.REASSIGNED
+        if existing.person_id != person_id
+        else AuthenticateOrcidOutcome.UPGRADED
+    )
     conn.execute(
         text(
             "UPDATE person_identifiers "
