@@ -48,13 +48,19 @@ repos:
   # mypy et lint-imports résolvent les imports sur tout le projet : ils exigent
   # un arbre cohérent, que le commit d'un sous-ensemble de fichiers ne garantit
   # pas. Ils vivent donc à l'étage pre-push (arbre entièrement commité), pas ici.
+  #
+  # Les outils sont lancés par `python -m <module>`, pas par leur exécutable : le
+  # contrôle d'application de Windows bloque les shims .exe non signés que uv pose
+  # dans le venv (« os error 4551 »), binaire par binaire selon leur réputation.
+  # L'interpréteur, lui, est signé. `lint-imports` fait exception : il n'expose pas
+  # de point d'entrée module.
   - repo: local
     hooks:
       # Lance uniquement les tests unitaires (sans BDD, ~1-2s).
       # Les tests d'intégration (avec BDD) sont lancés en CI, pas ici.
       - id: pytest-unit
         name: pytest (tests unitaires)
-        entry: uv run pytest tests/unit/ -q
+        entry: uv run python -m pytest tests/unit/ -q
         language: system
         pass_filenames: false
         types: [python]
@@ -78,7 +84,7 @@ repos:
       # Hygiène des dépendances : imports non déclarés, dépendances inutilisées.
       - id: ci-deptry
         name: deptry (hygiène des dépendances)
-        entry: uv run deptry .
+        entry: uv run python -m deptry .
         language: system
         pass_filenames: false
         always_run: true
@@ -87,7 +93,7 @@ repos:
       # Scan de vulnérabilités des dépendances installées.
       - id: ci-pip-audit
         name: pip-audit (vulnérabilités)
-        entry: uv run pip-audit
+        entry: uv run python -m pip_audit
         language: system
         pass_filenames: false
         always_run: true
@@ -98,7 +104,7 @@ repos:
       # y compris après un commit passé en --no-verify.
       - id: ci-ruff-check
         name: ruff check (lint)
-        entry: uv run ruff check .
+        entry: uv run python -m ruff check .
         language: system
         pass_filenames: false
         always_run: true
@@ -106,7 +112,7 @@ repos:
 
       - id: ci-ruff-format
         name: ruff format --check (format)
-        entry: uv run ruff format --check .
+        entry: uv run python -m ruff format --check .
         language: system
         pass_filenames: false
         always_run: true
@@ -122,7 +128,7 @@ repos:
 
       - id: ci-mypy
         name: mypy (type check)
-        entry: uv run mypy .
+        entry: uv run python -m mypy .
         language: system
         pass_filenames: false
         always_run: true
