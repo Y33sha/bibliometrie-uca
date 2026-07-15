@@ -13,12 +13,11 @@ from domain.errors import (
     AuthorshipAlreadyAssignedError,
     NotFoundError,
     RejectedPairError,
-    ValidationError,
 )
 from domain.sources.registry import (
-    ALL_SOURCES_SET,
     AUTHOR_SOURCES,
     SOURCE_PRIORITY,
+    require_known_source,
 )
 
 
@@ -83,8 +82,7 @@ def assign_orphan_authorship(
 
     Lève `ValidationError` sur une source hors registre, `NotFoundError` si la signature n'existe pas, `AuthorshipAlreadyAssignedError` si elle porte déjà une personne.
     """
-    if source not in ALL_SOURCES_SET:
-        raise ValidationError(f"Source inconnue : {source}")
+    require_known_source(source)
 
     publication_id = repo.find_publication_id_for_source_authorship(source, authorship_id)
     if publication_id is not None:
