@@ -44,9 +44,10 @@ On sépare les deux. Le contrat des règles reste dans `domain/`, réduit aux di
 
 **Périmètre de la correction canonique.** La correction de métadonnées est l'affaire des `source_publications`. Son extension à la publication canonique traite un cas précis : l'arbitrage prend chaque champ de la source la plus prioritaire qui le renseigne, donc deux champs d'une même publication peuvent venir de deux sources et former une combinaison qu'aucune source ne portait. Le cas d'école est `THESIS_WITH_JOURNAL_TO_ARTICLE` : `doc_type` = `thesis` de theses.fr, `journal_id` de Crossref. D'où la règle de rejouabilité : une règle se rejoue sur la publication si et seulement si ses prédicats lisent des champs que l'agrégation arbitre.
 
-- `oa_model` est arbitré (il suit le `journal_id` canonique, même ligne `journals` que `journal_type`, donc sans I/O supplémentaire) : `HYBRID_FULL_OA_TO_GOLD` se rejoue, et la correction `oa_status` que renvoie `effective_metadata` est appliquée et tracée, non plus écartée.
 - `urls` et `self_declared_preprint` sont des faits d'un enregistrement source, sans contrepartie canonique : les règles qui les lisent ne se rejouent pas.
-- `embargo_expired` de même, et le rejeu serait de toute façon sans effet : `EMBARGO_EXPIRED_TO_GREEN` ouvre l'`oa_status` de la source, et l'agrégation retient le statut le plus ouvert.
+- Aucune règle d'`oa_status` ne se rejoue, `oa_model` reste donc hors du contrat canonique. Une correction d'`oa_status` appliquée sur une `source_publication` remonte d'elle-même : l'agrégation retient le statut le plus ouvert, et `best_oa_status` classe `gold` au-dessus de `hybrid` comme `green` au-dessus de `closed`. Le rejeu canonique n'ajoute rien et se heurterait à l'autorité d'Unpaywall, que l'agrégation protège dès que `unpaywall_checked_at` est posé. Vaut pour `HYBRID_FULL_OA_TO_GOLD` comme pour `EMBARGO_EXPIRED_TO_GREEN`.
+
+La frontière tient donc à un principe unique : le rejeu canonique répare les combinaisons de champs nées de l'arbitrage, sur les champs dont la valeur canonique est un arbitrage — pas sur ceux qu'une source atteste seule, ni sur ceux qu'une autorité externe tranche.
 
 **Nommage.** `declares_preprint` vaut `jsonb_exists(sp.meta->'relation', 'is-preprint-of')` : l'enregistrement déclare être le preprint d'une autre œuvre. Le nom se lit « déclare avoir un preprint », qui est le sens inverse — et cette clé existe, `has-preprint`, mappée en `HAS_PREPRINT` dans `domain/publications/relations.py`. Renommé `self_declared_preprint`.
 
@@ -96,8 +97,8 @@ Traverse `domain/`, `application/ports`, `application/pipeline/metadata_correcti
 - [x] Projection de ligne de la phase (`UnaryCorrectionRow`) déplacée dans `application/ports/pipeline/metadata_correction.py` ; les cinq champs morts sortent du `_SELECT` et des deux types (`71337ec6`).
 - [x] `declares_preprint` → `self_declared_preprint` (`71337ec6`).
 - [x] Appariement des lignes par nom plutôt que par rang, qui supprime le couplage entre l'ordre des champs et celui des colonnes (`b229c3ed`). Le reste du motif est noté en 2.6 et 2.7.
-- [x] `_apply_canonical_doc_type_correction` construit le contrat sans valeurs inventées ; `oa_model` alimenté depuis le `journal_id` arbitré (`get_journal_correction_inputs`, une seule lecture), correction `oa_status` appliquée et tracée dans `meta.corrections`. Renommée `_apply_canonical_corrections`, la fonction couvrant deux champs.
-- [ ] Rejouabilité au niveau canonique rendue vérifiable plutôt que documentée : les prédicats d'`applies_to` sont de la donnée déclarative, une règle se rejoue si ses clés font partie de celles que le contrat sait répondre. Aujourd'hui la frontière tient à quatre champs figés à `None`/`False` dans `_apply_canonical_corrections`, et à la docstring qui l'énonce.
+- [x] `_apply_canonical_doc_type_correction` construit le contrat sans valeurs inventées (`71337ec6`). Le rejeu des règles d'`oa_status` sur le canonique est écarté ; la docstring dit ce que la fonction reprend et ce qu'elle laisse.
+- [ ] Rejouabilité au niveau canonique rendue vérifiable plutôt que documentée : les prédicats d'`applies_to` sont de la donnée déclarative, une règle se rejoue si ses clés font partie de celles que le contrat sait répondre. Aujourd'hui la frontière tient à quatre champs figés à `None`/`False` dans `_apply_canonical_doc_type_correction`, au fait que la fonction ignore la correction `oa_status` retournée, et à la docstring qui énonce les deux.
 
 #### 1.3 - `application/ports`
 
