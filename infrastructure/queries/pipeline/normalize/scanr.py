@@ -103,7 +103,7 @@ def upsert_scanr_source_publication(
 
 
 class PgScanrNormalizeQueries(ScanrNormalizeQueries):
-    """Adapter PostgreSQL pour `application.ports.normalize_scanr.ScanrNormalizeQueries`."""
+    """Adapter PostgreSQL pour `application.ports.pipeline.normalize.scanr.ScanrNormalizeQueries`."""
 
     def upsert_scanr_source_publication(
         self,

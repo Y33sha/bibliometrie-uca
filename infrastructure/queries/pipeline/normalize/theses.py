@@ -164,7 +164,7 @@ def count_theses_table(conn: Connection, table: str) -> int:
 
 
 class PgThesesNormalizeQueries(ThesesNormalizeQueries):
-    """Adapter PostgreSQL pour `application.ports.normalize_theses.ThesesNormalizeQueries`."""
+    """Adapter PostgreSQL pour `application.ports.pipeline.normalize.theses.ThesesNormalizeQueries`."""
 
     def upsert_theses_source_publication(
         self,

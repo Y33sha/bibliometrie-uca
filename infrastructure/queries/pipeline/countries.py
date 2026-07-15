@@ -366,7 +366,7 @@ def fetch_addresses_missing_country_normalized(conn: Connection) -> list[tuple[i
 
 
 class PgCountryQueries(CountryQueries):
-    """Adapter PostgreSQL implémentant `application.ports.countries.CountryQueries`."""
+    """Adapter PostgreSQL implémentant `application.ports.pipeline.countries.CountryQueries`."""
 
     def count_address_country_status(self, conn: Connection) -> AddressCountryStatus:
         return count_address_country_status(conn)

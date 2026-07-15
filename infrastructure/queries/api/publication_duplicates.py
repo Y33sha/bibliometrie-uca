@@ -1,6 +1,6 @@
 """Query services pour /api/admin/duplicates/*.
 
-`PgPublicationDuplicatesQueries` hérite explicitement du Protocol `application.ports.publication_duplicates_queries.PublicationDuplicatesQueries`.
+`PgPublicationDuplicatesQueries` hérite explicitement du Protocol `application.ports.api.publication_duplicates_queries.PublicationDuplicatesQueries`.
 """
 
 from sqlalchemy import Connection, text

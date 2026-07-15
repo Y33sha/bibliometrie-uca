@@ -115,7 +115,7 @@ def count_openalex_table(conn: Connection, table: str) -> int:
 
 
 class PgOpenalexNormalizeQueries(OpenalexNormalizeQueries):
-    """Adapter PostgreSQL pour `application.ports.normalize_openalex.OpenalexNormalizeQueries`."""
+    """Adapter PostgreSQL pour `application.ports.pipeline.normalize.openalex.OpenalexNormalizeQueries`."""
 
     def upsert_openalex_source_publication(
         self,

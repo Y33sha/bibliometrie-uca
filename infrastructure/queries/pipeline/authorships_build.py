@@ -213,7 +213,7 @@ def refresh_publications_in_perimeter(conn: Connection) -> int:
 
 
 class PgAuthorshipsBuildQueries(AuthorshipsBuildQueries):
-    """Adapter PostgreSQL pour `application.ports.authorships_build.AuthorshipsBuildQueries`."""
+    """Adapter PostgreSQL pour `application.ports.pipeline.authorships_build.AuthorshipsBuildQueries`."""
 
     def purge_authorships(self, conn: Connection) -> int:
         return purge_authorships(conn)

@@ -103,7 +103,7 @@ def upsert_crossref_source_publication(
 
 
 class PgCrossrefNormalizeQueries(CrossrefNormalizeQueries):
-    """Adapter PostgreSQL pour `application.ports.normalize_crossref.CrossrefNormalizeQueries`."""
+    """Adapter PostgreSQL pour `application.ports.pipeline.normalize.crossref.CrossrefNormalizeQueries`."""
 
     def upsert_crossref_source_publication(
         self,

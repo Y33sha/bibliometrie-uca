@@ -1,6 +1,6 @@
 """Query services pour le router `/api/hal-problems/*`.
 
-Contrôles qualité HAL au niveau des publications (doublons de dépôts, manques dans les collections, conflits d'affiliation) + comptes HAL multiples par personne. `PgHalProblemsQueries` hérite explicitement du Protocol `application.ports.hal_problems_queries.HalProblemsQueries`.
+Contrôles qualité HAL au niveau des publications (doublons de dépôts, manques dans les collections, conflits d'affiliation) + comptes HAL multiples par personne. `PgHalProblemsQueries` hérite explicitement du Protocol `application.ports.api.hal_problems_queries.HalProblemsQueries`.
 """
 
 from typing import Any

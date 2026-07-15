@@ -115,7 +115,7 @@ def upsert_hal_source_publication(
 
 
 class PgHalNormalizeQueries(HalNormalizeQueries):
-    """Adapter PostgreSQL pour `application.ports.normalize_hal.HalNormalizeQueries`."""
+    """Adapter PostgreSQL pour `application.ports.pipeline.normalize.hal.HalNormalizeQueries`."""
 
     def upsert_hal_source_publication(
         self,
