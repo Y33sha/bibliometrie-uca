@@ -68,7 +68,7 @@ SOFT_RE = re.compile("|".join(SOFT), re.IGNORECASE)
 
 # Seuils de longueur. Un commentaire au-delà de `MAX_COMMENT_CHARS` bloque : la concision est son contrat.
 # Pour une docstring, la longueur n'active que l'examen SOFT, elle ne bloque pas seule (un mécanisme se décrit parfois sur plusieurs paragraphes).
-MAX_DOCSTRING_CHARS = 1500
+MAX_DOCSTRING_CHARS = 1000
 MAX_DOCSTRING_LINES = 20
 MAX_COMMENT_CHARS = 250
 
