@@ -38,13 +38,20 @@ def unlink_authorship(conn: Connection, person_id: int, source: str, authorship_
     )
 
 
+def find_source_authorship_owner(conn: Connection, source: str, authorship_id: int) -> int | None:
+    """`person_id` d'une signature source. `None` si elle est orpheline ou n'existe pas."""
+    return conn.execute(
+        text("SELECT person_id FROM source_authorships WHERE id = :aid AND source = :src"),
+        {"aid": authorship_id, "src": source},
+    ).scalar_one_or_none()
+
+
 def assign_orphan_sa(
     conn: Connection, person_id: int, source: str, authorship_id: int
 ) -> dict | None:
     """Tente de poser person_id sur une source_authorship orpheline.
 
-    Retourne un dict {author_name_normalized} si l'UPDATE a touché une
-    ligne, None si déjà attribuée à une autre personne.
+    Retourne un dict {author_name_normalized} si l'UPDATE a touché une ligne, `None` sinon — la signature n'existe pas, ou elle porte déjà un `person_id` (fût-ce celui demandé). `find_source_authorship_owner` départage.
     """
     row = conn.execute(
         text("""

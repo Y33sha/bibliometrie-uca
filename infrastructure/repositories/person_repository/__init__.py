@@ -107,6 +107,9 @@ class PgPersonRepository:
     def assign_orphan_sa(self, person_id: int, source: str, authorship_id: int) -> dict | None:
         return _authorships.assign_orphan_sa(self._conn, person_id, source, authorship_id)
 
+    def find_source_authorship_owner(self, source: str, authorship_id: int) -> int | None:
+        return _authorships.find_source_authorship_owner(self._conn, source, authorship_id)
+
     # ── Opérations atomiques pour le use case `assign_orphans` ────
 
     def assign_orphan_source_authorships_to_person(self, person_id: int, sa_ids: list[int]) -> int:
