@@ -20,7 +20,7 @@ Le sommet de `application/` mélange deux axes de classification : des subdivisi
 - `ports/` et `pipeline/` restent au sommet : ce sont des subdivisions techniques, et `pipeline` est un sous-système nommé à part entière, avec sa propre structure interne.
 - `application/observability/` (vide) est supprimé.
 - `application/audit.py` reste au sommet : c'est une préoccupation transverse et technique (journalisation des opérations destructives dans `audit_log`), pas un agrégat. Il est renommé `audit_log.py` pour lever la confusion avec les scripts d'inspection `interfaces/cli/oneshot/audit_*.py`, qui portent le même mot dans un sens différent (inspecter une donnée, non journaliser un événement).
-- `application/publishers_enrichment/` est fondu dans l'agrégat publishers, sous `services/publishers/enrichment/`. Tous les CLI de maintenance délèguent leur logique à `application.<agrégat>` ; ce package à plat était le seul orphelin de ce patron. Son port `ports/publishers_enrichment.py` est conservé — dès que la logique vit dans `application/`, la couche interdit d'y toucher `infrastructure` en direct, donc le port n'est pas spéculatif — et sa place au sein de `ports/` se décide lors de la passe dédiée.
+- `application/publishers_enrichment/` est fondu dans l'agrégat publishers (module `services/publishers/enrich_country.py`). Tous les CLI de maintenance délèguent leur logique à `application.<agrégat>` ; ce package à plat était le seul orphelin de ce patron. Sa lecture — la sélection des éditeurs à enrichir — est un finder de l'agrégat Publisher : elle vit sur `PublisherRepository`, sans port dédié.
 
 Cible :
 
@@ -62,7 +62,7 @@ Réorganisation du sommet :
 - [x] Supprimer `observability/` (vide).
 - [x] Créer `application/services/` et y déplacer les neuf agrégats (`ec5c7879`).
 - [x] Renommer `audit.py` → `audit_log.py` (`5b96b61f`).
-- [x] Fondre `publishers_enrichment/` dans `services/publishers/enrichment/` (`7a14b517`). Le port reste à `ports/publishers_enrichment.py` ; son placement se décide en 1.2.
+- [x] Fondre `publishers_enrichment/` dans l'agrégat publishers (`7a14b517`).
 - [ ] Passe docstrings du dossier : retours à la ligne non sémantiques, formulations, présent intemporel.
 
 #### 1.1 - `application/pipeline`
@@ -116,7 +116,7 @@ Traverse `domain/`, `application/ports`, `application/pipeline/metadata_correcti
 
 - [ ] **Frontière Person / Authorship : à qui appartient `source_authorships.person_id` ?** Six méthodes de `PersonRepository` portent ce lien — `link_authorship`, `unlink_authorship`, `assign_orphan_sa`, `assign_orphan_source_authorships_to_person`, `null_person_id_for_name_form`, et `find_source_authorship_owner` qui le lit. La colonne vit sur `source_authorships`, donc côté Authorship ; mais ce sont des gestes pilotés par la personne. Selon la réponse elles basculent ou restent, et les signatures des services suivent (`link_authorship(..., repo: PersonRepository)` deviendrait `authorship_repo`), avec leurs appelants — cascade du pipeline, command handlers, router, tests. Mécanique et tenue par mypy, mais large. Ce qui écrivait la table `authorships` sans toucher au lien a déjà basculé (`4132786a`).
 - [ ] `AuthorshipRepository` recalcule `in_perimeter` à deux granularités : `recompute_authorship_in_perimeter` (par paire publication/personne, action admin) et `recompute_in_perimeter_on_source_authorships` + `propagate_in_perimeter_to_authorships` (par lot d'adresses, après review). Le rapprochement des deux dans le même port (`4132786a`) rend la question visible ; reste à décider si elles fusionnent.
-- [ ] Placement du port `publishers_enrichment.py`, aujourd'hui à plat sous `ports/` (comme `config.py`). Sa place définitive se tranche en réorganisant `ports/`.
+- [x] Port `publishers_enrichment.py` dissous plutôt que placé : sa seule lecture (sélection des éditeurs à `country` absent) est un finder de l'agrégat Publisher, passé sur `PublisherRepository` aux côtés de `find_publisher_by_openalex_id`. Le port à plat et son query service disparaissent ; `enrich_country` ne prend plus qu'un port pour l'agrégat, au lieu de deux en deux styles (`6e97bd27`).
 - [ ] `ports/pipeline/enrich.py` (`EnrichQueries`) : port grab-bag hérité de la phase monolithique `enrich`, depuis scindée en `oa_status` + `publishers_journals`. Il regroupe deux familles de requêtes disjointes (publications OA vs journaux/DOAJ) ; chaque phase tire des méthodes qu'elle n'utilise pas (violation d'*Interface Segregation*). À scinder en deux ports étroits — l'impl `PgEnrichQueries` implémentant les deux, ou se scindant elle aussi. Le nom `EnrichQueries` disparaît avec.
 
 ### Phase 2 - `infrastructure/`
