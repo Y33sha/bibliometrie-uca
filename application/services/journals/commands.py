@@ -9,7 +9,7 @@ from application.ports.pipeline.metadata_correction import MetadataCorrectionQue
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.journal_repository import JournalRepository, JournalUpdate
 from application.ports.repositories.publication_repository import PublicationRepository
-from application.services.journals import core as journals
+from application.services.journals import core as journals_service
 
 
 def update_journal(
@@ -32,10 +32,10 @@ def update_journal(
         if existing is not None and existing.journal_type != new_type:
             type_changed = True
 
-    journals.update_journal(journal_id, update=update, repo=repo)
+    journals_service.update_journal(journal_id, update=update, repo=repo)
 
     if type_changed:
-        journals.requalify_publications_for_journal(
+        journals_service.requalify_publications_for_journal(
             journal_id,
             conn=conn,
             correction_queries=correction_queries,
@@ -58,7 +58,7 @@ def merge_journals(
     """Fusionne la revue source dans la cible (transferts publications +
     métadonnées, requalification contre le `journal_type` cible, suppression
     de la source)."""
-    journals.merge_journals(
+    journals_service.merge_journals(
         target_id,
         source_id,
         conn=conn,
