@@ -1,9 +1,8 @@
-"""Port : opérations sur la table `config` (clé/valeur applicative).
+"""Port : écritures et vérifications sur la table `config` (paramètres applicatifs clé/valeur).
 
-`config` n'est pas un agrégat métier — c'est un store clé/valeur utilisé
-par l'orchestration (paramètres pipeline, identifiants sources, etc.).
-Le port vit donc à la racine de `application/ports/` plutôt que dans
-`application/ports/repositories/` (réservé aux agrégats du domaine).
+Sert l'admin qui édite les paramètres. Les lookups par clé du pipeline et des CLI (clé d'API OpenAlex, email du polite pool, URLs de base) vivent dans `infrastructure/sources/config.py` : ils sont lus au composition root et passés en paramètres, sans passer par ce port.
+
+`config` n'est pas un agrégat du domaine ; le port vit à la racine de `application/ports/`, hors de `repositories/` (agrégats), `api/` (projections de lecture des routers) et `pipeline/` (queries de phase).
 
 Implémenté par `infrastructure.queries.config.PgConfig`.
 """
@@ -14,7 +13,7 @@ from domain.types import JsonValue
 
 
 class ConfigStore(Protocol):
-    """Lecture/écriture des paramètres applicatifs (table `config`)."""
+    """Mise à jour d'un paramètre, et recherche des clés citant un périmètre."""
 
     def update_config_value(self, key: str, value: JsonValue) -> dict[str, JsonValue] | None:
         """Met à jour la valeur d'un paramètre. Retourne la ligne `{key, value, description}`, ou `None` si la clé n'existe pas."""
