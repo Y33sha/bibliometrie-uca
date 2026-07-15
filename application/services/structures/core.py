@@ -1,8 +1,6 @@
-"""Service Structures — orchestrateur des opérations sur `structures`, `structure_relations`, `structure_name_forms`.
+"""Service Structures — écritures sur l'agrégat Structure, transaction-agnostiques.
 
-Le SQL vit dans `infrastructure/repositories/structure_repository.py`. La validation du JSONB `api_ids` se fait à la frontière infra (repo) : tout chemin d'écriture passe par le repo, la validation y est appliquée uniformément.
-
-Les routers passent par ces fonctions pour toute écriture ; les lectures restent autorisées dans les routers (convention du projet).
+Couvre les tables `structures`, `structure_relations` et `structure_name_forms`. La validation du JSONB `api_ids` se fait à la frontière infra (repo) : tout chemin d'écriture y passe, la validation s'y applique uniformément.
 """
 
 from typing import cast

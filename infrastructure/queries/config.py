@@ -38,19 +38,15 @@ class PgConfig(ConfigStore):
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
 
-    def config_key_exists(self, key: str) -> bool:
-        result = self._conn.execute(select(config.c.key).where(config.c.key == key))
-        return result.first() is not None
-
-    def update_config_value(self, key: str, value: JsonValue) -> dict:
+    def update_config_value(self, key: str, value: JsonValue) -> dict[str, JsonValue] | None:
         stmt = (
             update(config)
             .where(config.c.key == key)
             .values(value=value)
             .returning(config.c.key, config.c.value, config.c.description)
         )
-        result = self._conn.execute(stmt)
-        return dict(result.one()._mapping)
+        row = self._conn.execute(stmt).one_or_none()
+        return dict(row._mapping) if row is not None else None
 
     def config_keys_referencing_perimeter(self, perimeter_code: str) -> list[str]:
         # Le `#>> '{}'` extrait le scalar JSON. SA Core n'a pas d'opérateur
