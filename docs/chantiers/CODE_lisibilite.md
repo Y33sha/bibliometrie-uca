@@ -34,6 +34,22 @@ application/
   audit_log.py
 ```
 
+### Scinder le contrat des règles de correction de sa projection de lecture
+
+`SourcePublicationForCorrection` (`domain/source_publications/correction.py`) confond deux choses. Elle est construite par splat positionnel — `SourcePublicationForCorrection(*row)` — depuis le `_SELECT` de `infrastructure/queries/pipeline/metadata_correction.py` : ses 19 champs et leur ordre sont les colonnes de ce SELECT. C'est une projection de lecture de la phase `metadata_correction`, et c'est la seule de cette phase à vivre hors du port `application/ports/pipeline/metadata_correction.py`, où logent ses cinq homologues (`DoiClusterRow`, `JournalByDoiRow`, `CorrectionUpdate`, `DoiCorrectionUpdate`, `JournalCorrectionUpdate`). C'est aussi, par ailleurs, le contrat d'entrée de `effective_metadata`, fonction pure du domaine.
+
+De cette confusion découlent les deux symptômes. Cinq champs (`source_id`, `pub_year`, `container_title`, `language`, `apc_amount`) sont sélectionnés en SQL, portés par la dataclass, et lus par personne. Et le second appelant, `_apply_canonical_doc_type_correction`, doit se faire passer pour une ligne du SELECT : il invente `id=pub.id or 0`, `source="canonical"`, `source_id=str(pub.id)` et six autres valeurs de remplissage.
+
+On sépare les deux. Le contrat des règles reste dans `domain/`, réduit aux dix champs que les prédicats d'`_AppliesTo` lisent (`title`, `doc_type`, `doi`, `journal_id`, `oa_status`, `journal_type`, `oa_model`, `urls`, `embargo_expired`, `self_declared_preprint`) : c'est la signature d'une fonction pure qui encode des règles métier. La projection de ligne descend dans le port auprès de ses homologues, garde le couplage à l'ordre du SELECT — local au port et à son adapter — porte les quatre champs que la phase seule utilise (`id` pour persister, `source` pour `map_doc_type`, `external_ids` et `raw_metadata` pour le stash et l'hydratation), et se projette vers le contrat du domaine.
+
+**Périmètre de la correction canonique.** La correction de métadonnées est l'affaire des `source_publications`. Son extension à la publication canonique traite un cas précis : l'arbitrage prend chaque champ de la source la plus prioritaire qui le renseigne, donc deux champs d'une même publication peuvent venir de deux sources et former une combinaison qu'aucune source ne portait. Le cas d'école est `THESIS_WITH_JOURNAL_TO_ARTICLE` : `doc_type` = `thesis` de theses.fr, `journal_id` de Crossref. D'où la règle de rejouabilité : une règle se rejoue sur la publication si et seulement si ses prédicats lisent des champs que l'agrégation arbitre.
+
+- `oa_model` est arbitré (il suit le `journal_id` canonique, même ligne `journals` que `journal_type`, donc sans I/O supplémentaire) : `HYBRID_FULL_OA_TO_GOLD` se rejoue, et la correction `oa_status` que renvoie `effective_metadata` est appliquée et tracée, non plus écartée.
+- `urls` et `self_declared_preprint` sont des faits d'un enregistrement source, sans contrepartie canonique : les règles qui les lisent ne se rejouent pas.
+- `embargo_expired` de même, et le rejeu serait de toute façon sans effet : `EMBARGO_EXPIRED_TO_GREEN` ouvre l'`oa_status` de la source, et l'agrégation retient le statut le plus ouvert.
+
+**Nommage.** `declares_preprint` vaut `jsonb_exists(sp.meta->'relation', 'is-preprint-of')` : l'enregistrement déclare être le preprint d'une autre œuvre. Le nom se lit « déclare avoir un preprint », qui est le sens inverse — et cette clé existe, `has-preprint`, mappée en `HAS_PREPRINT` dans `domain/publications/relations.py`. Renommé `self_declared_preprint`.
+
 ## Phasage
 
 ### Phase 1 - `application/`
@@ -68,9 +84,19 @@ Réorganisation du sommet :
 - [ ] `persons/core.py` : `import_authenticated_orcids` est une opération d'ingestion (lecture d'ORCID authentifiés depuis une source externe pour les injecter) logée dans le référentiel d'écriture de l'agrégat, où elle détonne. À requalifier.
 - [x] `publishers/enrichment/` : sous-package (réduit à un seul module) aplati en module plat `enrich_country.py` ; payload OpenAlex typée + boucle par batch extraite dans `_enrich_batch` → exceptions `ruff C901` et override mypy `disallow-any` retirées (`0a8f95f8`).
 - [ ] `commands.py` : l'alias d'import du module `core` diffère d'un service à l'autre (`structures_service`, `journals`, `publications_service`, `publishers`). Harmoniser sur une convention unique.
-- [ ] `publications/core.py` (`_apply_canonical_doc_type_correction`) : la fonction fabrique un `SourcePublicationForCorrection` de 19 champs pour décrire une publication, alors que `effective_metadata` n'en lit que 10 (liste exhaustive dans `_AppliesTo`). Neuf champs ne sont lus par aucune règle (`id`, `source`, `source_id`, `pub_year`, `container_title`, `language`, `external_ids`, `apc_amount`, `raw_metadata`) ; cinq sont fixés à une valeur qui éteint silencieusement les règles correspondantes (`urls=None` pour `THESES_FR_URL_TO_THESIS` et `DUMAS_URL_TO_MEMOIR`, `declares_preprint=False` pour `PREPRINT_RELATION_TO_PREPRINT`, `embargo_expired=False` pour `EMBARGO_EXPIRED_TO_GREEN`, `oa_model=None` pour `HYBRID_FULL_OA_TO_GOLD`). La docstring annonce un rejeu complet des règles : cinq sur vingt sont mortes par construction. La correction `oa_status` que renvoie `effective_metadata` est écartée sans mention — sans effet tant que ses deux règles figurent parmi les mortes. Piste : resserrer le contrat d'entrée sur les champs que les règles lisent, pour que le canonique déclare ses absences. Emporte `id=pub.id or 0`.
+- [ ] `publications/core.py` (`_apply_canonical_doc_type_correction`) : vue de correction — voir *Scinder le contrat des règles de correction de sa projection de lecture* en Décisions, et le phasage en 1.2.1.
 - [x] `publications/core.py` (`merge_publications`) : chemin de fusion et règle `absorb` — traité par la fiche dédiée `archived/2026-07-12_CODE_merge-publications.md`.
 - [x] `publications/core.py` : passe docstrings. Le module revendiquait un accès exclusif en écriture démenti par le pipeline, qui appelait `pub_repo.create` en direct — seul `repo.create` de la couche application à court-circuiter son service, là où les phases `persons` et `normalize` passent par `create_person` et `find_or_create_journal`. `create_publication` porte les valeurs de semis (`title` = titre normalisé, `doc_type` à `other`, `oa_status` par défaut) ; `repo.create` perd `journal_id`, `container_title` et `language`, que tous ses appelants fixaient à `None` (`abed5138`, `6bfbf94a`).
+
+##### 1.2.1 - Vue de correction des métadonnées
+
+Traverse `domain/`, `application/ports`, `application/pipeline/metadata_correction` et `infrastructure/queries` : le service publications n'en est que le symptôme visible.
+
+- [ ] Contrat des règles réduit aux dix champs lus, dans `domain/source_publications/correction.py`.
+- [ ] Projection de ligne de la phase déplacée dans `application/ports/pipeline/metadata_correction.py` ; les cinq champs morts sortent du `_SELECT` et des deux types.
+- [ ] `declares_preprint` → `self_declared_preprint`.
+- [ ] `_apply_canonical_doc_type_correction` construit le contrat du domaine sans valeurs inventées ; `oa_model` alimenté depuis le `journal_id` arbitré, correction `oa_status` appliquée et tracée dans `meta.corrections`. La fonction couvre alors deux champs : à renommer.
+- [ ] Rejouabilité au niveau canonique rendue vérifiable plutôt que documentée, si le terrain dégagé le permet : les prédicats d'`applies_to` sont de la donnée déclarative, une règle se rejoue si ses clés font partie de celles que la vue sait répondre.
 
 #### 1.3 - `application/ports`
 
