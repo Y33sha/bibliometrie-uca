@@ -18,12 +18,7 @@ def merge_publications(
     repo: PublicationRepository,
     audit_repo: AuditRepository,
 ) -> None:
-    """Fusionne deux publications doublons, en une seule transaction.
-
-    La cible (survivante) est l'id le plus petit ; le sens de fusion n'a pas d'effet
-    durable, `core.merge_publications` re-dérivant les métadonnées canoniques de la
-    cible depuis l'union des `source_publications`.
-    """
+    """Fusionne la publication `source_id` dans `target_id`, en une seule transaction."""
     publications_service.merge_publications(target_id, source_id, repo=repo, audit_repo=audit_repo)
     conn.commit()
 
