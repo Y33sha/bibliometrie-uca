@@ -11,7 +11,10 @@ from sqlalchemy import Connection
 from application.ports.api.perimeters_queries import PerimeterOut, PerimetersAdminQueries
 from application.ports.config import ConfigStore
 from application.ports.repositories.audit_repository import AuditRepository
-from application.ports.repositories.perimeter_repository import PerimeterRepository
+from application.ports.repositories.perimeter_repository import (
+    PerimeterRepository,
+    PerimeterUpdate,
+)
 from application.services.perimeters import commands as perimeter_commands
 from interfaces.api.deps import (
     audit_repo_sync,
@@ -25,7 +28,6 @@ from interfaces.api.models import (
     CreatedIdResponse,
     OkResponse,
     PerimeterCreate,
-    PerimeterUpdate,
     StatusResponse,
 )
 
@@ -50,15 +52,8 @@ def create_perimeter(
     conn: Connection = Depends(db_conn_sync),
     repo: PerimeterRepository = Depends(perimeter_repo_sync),
 ) -> CreatedIdResponse:
-    """Crée un nouveau périmètre."""
-    code = body.code.strip()
-    name = body.name.strip()
-    pid = perimeter_commands.create_perimeter(
-        conn,
-        code=code,
-        name=name,
-        repo=repo,
-    )
+    """Crée un nouveau périmètre, sans structure racine."""
+    pid = perimeter_commands.create_perimeter(conn, code=body.code, name=body.name, repo=repo)
     return CreatedIdResponse(id=pid)
 
 
@@ -69,11 +64,8 @@ def update_perimeter(
     conn: Connection = Depends(db_conn_sync),
     repo: PerimeterRepository = Depends(perimeter_repo_sync),
 ) -> OkResponse:
-    """Met à jour un périmètre (nom, structures)."""
-    fields = body.model_dump(exclude_unset=True)
-    if "name" in fields and isinstance(fields["name"], str):
-        fields["name"] = fields["name"].strip()
-    perimeter_commands.update_perimeter(conn, perimeter_id, fields=fields, repo=repo)
+    """Met à jour un périmètre (nom, structures racines)."""
+    perimeter_commands.update_perimeter(conn, perimeter_id, update=body, repo=repo)
     return OkResponse()
 
 
@@ -93,7 +85,7 @@ def delete_perimeter(
 
 
 @router.post("/api/perimeters/{perimeter_id}/structures", response_model=StatusResponse)
-def add_perimeter_structure(
+def add_structure_to_perimeter(
     perimeter_id: int,
     body: AddPerimeterStructure,
     conn: Connection = Depends(db_conn_sync),
@@ -103,21 +95,21 @@ def add_perimeter_structure(
 
     Renvoie `{"status": "added"}` ou `"already_present"` si la structure était déjà racine.
     """
-    status = perimeter_commands.add_perimeter_structure(
+    outcome = perimeter_commands.add_structure_to_perimeter(
         conn, perimeter_id, body.structure_id, repo=repo
     )
-    return StatusResponse(status=status)
+    return StatusResponse(status=outcome)
 
 
 @router.delete(
     "/api/perimeters/{perimeter_id}/structures/{structure_id}", response_model=StatusResponse
 )
-def remove_perimeter_structure(
+def remove_structure_from_perimeter(
     perimeter_id: int,
     structure_id: int,
     conn: Connection = Depends(db_conn_sync),
     repo: PerimeterRepository = Depends(perimeter_repo_sync),
 ) -> StatusResponse:
     """Retire une structure racine du périmètre. N'affecte pas ses sous-structures tant qu'elles sont rattachées à d'autres racines."""
-    perimeter_commands.remove_perimeter_structure(conn, perimeter_id, structure_id, repo=repo)
+    perimeter_commands.remove_structure_from_perimeter(conn, perimeter_id, structure_id, repo=repo)
     return StatusResponse(status="removed")

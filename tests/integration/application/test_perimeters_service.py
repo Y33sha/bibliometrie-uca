@@ -1,16 +1,17 @@
-"""Tests de caractérisation pour application/perimeters/core.py et l'hydratation
-du PerimeterRepository."""
+"""Tests de caractérisation pour application/services/perimeters/core.py et l'hydratation du PerimeterRepository."""
 
 import json
 
 import pytest
 from sqlalchemy import text
 
+from application.ports.repositories.perimeter_repository import PerimeterUpdate
 from application.services.perimeters.core import (
-    add_perimeter_structure,
+    AddStructureOutcome,
+    add_structure_to_perimeter,
     create_perimeter,
     delete_perimeter,
-    remove_perimeter_structure,
+    remove_structure_from_perimeter,
     update_perimeter,
 )
 from domain.errors import ConflictError, NotFoundError, ValidationError
@@ -93,14 +94,14 @@ class TestPerimeterFindById:
         assert p.structure_ids == (10, 20, 30)
 
 
-# ── add_perimeter_structure ────────────────────────────────────────
+# ── add_structure_to_perimeter ─────────────────────────────────────
 
 
-class TestAddPerimeterStructure:
+class TestAddStructureToPerimeter:
     def test_adds_new_structure(self, sa_sync_conn, repo):
         s = _create_struct_sync(sa_sync_conn)
         p = _insert_perimeter_sync(sa_sync_conn)
-        assert add_perimeter_structure(p, s, repo=repo) == "added"
+        assert add_structure_to_perimeter(p, s, repo=repo) is AddStructureOutcome.ADDED
         result = sa_sync_conn.execute(
             text("SELECT structure_ids FROM perimeters WHERE id = :p"), {"p": p}
         )
@@ -109,20 +110,20 @@ class TestAddPerimeterStructure:
     def test_already_present(self, sa_sync_conn, repo):
         s = _create_struct_sync(sa_sync_conn)
         p = _insert_perimeter_sync(sa_sync_conn, structure_ids=[s])
-        assert add_perimeter_structure(p, s, repo=repo) == "already_present"
+        assert add_structure_to_perimeter(p, s, repo=repo) is AddStructureOutcome.ALREADY_PRESENT
 
     def test_perimeter_not_found(self, sa_sync_conn, repo):
         with pytest.raises(NotFoundError):
-            add_perimeter_structure(999999, 1, repo=repo)
+            add_structure_to_perimeter(999999, 1, repo=repo)
 
 
-# ── remove_perimeter_structure ─────────────────────────────────────
+# ── remove_structure_from_perimeter ────────────────────────────────
 
 
-class TestRemovePerimeterStructure:
+class TestRemoveStructureFromPerimeter:
     def test_removes_if_present(self, sa_sync_conn, repo):
         p = _insert_perimeter_sync(sa_sync_conn, structure_ids=[1, 2, 3])
-        remove_perimeter_structure(p, 2, repo=repo)
+        remove_structure_from_perimeter(p, 2, repo=repo)
         result = sa_sync_conn.execute(
             text("SELECT structure_ids FROM perimeters WHERE id = :p"), {"p": p}
         )
@@ -130,11 +131,11 @@ class TestRemovePerimeterStructure:
 
     def test_idempotent_if_absent(self, sa_sync_conn, repo):
         p = _insert_perimeter_sync(sa_sync_conn, structure_ids=[1])
-        remove_perimeter_structure(p, 999, repo=repo)  # no-op : pas d'erreur
+        remove_structure_from_perimeter(p, 999, repo=repo)  # no-op : pas d'erreur
 
     def test_raises_if_perimeter_not_found(self, sa_sync_conn, repo):
         with pytest.raises(NotFoundError):
-            remove_perimeter_structure(999999, 1, repo=repo)
+            remove_structure_from_perimeter(999999, 1, repo=repo)
 
 
 # ── create_perimeter ───────────────────────────────────────────────
@@ -169,28 +170,34 @@ class TestCreatePerimeter:
 class TestUpdatePerimeter:
     def test_raises_not_found(self, sa_sync_conn, repo):
         with pytest.raises(NotFoundError):
-            update_perimeter(999999, fields={"name": "X"}, repo=repo)
+            update_perimeter(999999, update=PerimeterUpdate(name="X"), repo=repo)
 
     def test_raises_on_empty_fields(self, sa_sync_conn, repo):
         p = _insert_perimeter_sync(sa_sync_conn)
         with pytest.raises(ValidationError):
-            update_perimeter(p, fields={}, repo=repo)
+            update_perimeter(p, update=PerimeterUpdate(), repo=repo)
 
     def test_raises_if_no_valid_field(self, sa_sync_conn, repo):
-        """Seules name, structure_ids sont permises."""
+        """Un champ hors contrat est écarté à la validation : il ne reste rien à écrire."""
         p = _insert_perimeter_sync(sa_sync_conn)
         with pytest.raises(ValidationError):
-            update_perimeter(p, fields={"code": "other"}, repo=repo)
+            update_perimeter(p, update=PerimeterUpdate.model_validate({"code": "other"}), repo=repo)
 
     def test_updates_name(self, sa_sync_conn, repo):
         p = _insert_perimeter_sync(sa_sync_conn, name="Old")
-        update_perimeter(p, fields={"name": "New"}, repo=repo)
+        update_perimeter(p, update=PerimeterUpdate(name="New"), repo=repo)
+        result = sa_sync_conn.execute(text("SELECT name FROM perimeters WHERE id = :p"), {"p": p})
+        assert result.scalar_one() == "New"
+
+    def test_name_is_trimmed(self, sa_sync_conn, repo):
+        p = _insert_perimeter_sync(sa_sync_conn, name="Old")
+        update_perimeter(p, update=PerimeterUpdate(name="  New  "), repo=repo)
         result = sa_sync_conn.execute(text("SELECT name FROM perimeters WHERE id = :p"), {"p": p})
         assert result.scalar_one() == "New"
 
     def test_updates_structure_ids(self, sa_sync_conn, repo):
         p = _insert_perimeter_sync(sa_sync_conn, structure_ids=[1])
-        update_perimeter(p, fields={"structure_ids": [4, 5, 6]}, repo=repo)
+        update_perimeter(p, update=PerimeterUpdate(structure_ids=[4, 5, 6]), repo=repo)
         result = sa_sync_conn.execute(
             text("SELECT structure_ids FROM perimeters WHERE id = :p"), {"p": p}
         )

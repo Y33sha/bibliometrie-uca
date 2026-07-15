@@ -479,9 +479,7 @@ export interface paths {
          * Mark Publications Distinct
          * @description Marque deux publications comme distinctes (non-doublon confirmé).
          *
-         *     Persiste l'annotation dans `publication_distinctions` : la paire
-         *     ne sera plus proposée par `/duplicates/next` lors des prochaines
-         *     revues. 400 si `pub_id_a == pub_id_b`.
+         *     Persiste l'annotation dans `distinct_publications` : la paire est écartée des prochaines revues de `/duplicates/next`. 400 si `pub_id_a == pub_id_b`.
          */
         post: operations["mark_publications_distinct_api_admin_duplicates_mark_distinct_post"];
         delete?: never;
@@ -1995,7 +1993,7 @@ export interface paths {
         put?: never;
         /**
          * Create Perimeter
-         * @description Crée un nouveau périmètre.
+         * @description Crée un nouveau périmètre, sans structure racine.
          */
         post: operations["create_perimeter_api_perimeters_post"];
         delete?: never;
@@ -2014,7 +2012,7 @@ export interface paths {
         get?: never;
         /**
          * Update Perimeter
-         * @description Met à jour un périmètre (nom, structures).
+         * @description Met à jour un périmètre (nom, structures racines).
          */
         put: operations["update_perimeter_api_perimeters__perimeter_id__put"];
         post?: never;
@@ -2038,12 +2036,12 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Add Perimeter Structure
+         * Add Structure To Perimeter
          * @description Ajoute une structure racine au périmètre.
          *
          *     Renvoie `{"status": "added"}` ou `"already_present"` si la structure était déjà racine.
          */
-        post: operations["add_perimeter_structure_api_perimeters__perimeter_id__structures_post"];
+        post: operations["add_structure_to_perimeter_api_perimeters__perimeter_id__structures_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2061,10 +2059,10 @@ export interface paths {
         put?: never;
         post?: never;
         /**
-         * Remove Perimeter Structure
+         * Remove Structure From Perimeter
          * @description Retire une structure racine du périmètre. N'affecte pas ses sous-structures tant qu'elles sont rattachées à d'autres racines.
          */
-        delete: operations["remove_perimeter_structure_api_perimeters__perimeter_id__structures__structure_id__delete"];
+        delete: operations["remove_structure_from_perimeter_api_perimeters__perimeter_id__structures__structure_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -4328,7 +4326,12 @@ export interface components {
             /** Code */
             code: string;
         };
-        /** PerimeterUpdate */
+        /**
+         * PerimeterUpdate
+         * @description Champs éditables d'un périmètre, en modification sélective.
+         *
+         *     Seuls les champs explicitement fournis sont écrits (`model_dump(exclude_unset=True)`). `structure_ids` liste les structures **racines** ; la clôture qui en descend est matérialisée à part, et son recalcul revient au caller.
+         */
         PerimeterUpdate: {
             /** Name */
             name?: string | null;
@@ -5140,7 +5143,12 @@ export interface components {
             /** Publishers */
             publishers: components["schemas"]["PublisherListItem"][];
         };
-        /** PublisherUpdate */
+        /**
+         * PublisherUpdate
+         * @description Champs éditables d'un éditeur, en modification sélective.
+         *
+         *     Seuls les champs explicitement fournis sont écrits (`model_dump(exclude_unset=True)`). Les champs listés sont ceux qu'un client peut fournir ; `name_normalized`, dérivé de `name`, est posé par le repository.
+         */
         PublisherUpdate: {
             /** Name */
             name?: string | null;
@@ -9057,7 +9065,7 @@ export interface operations {
             };
         };
     };
-    add_perimeter_structure_api_perimeters__perimeter_id__structures_post: {
+    add_structure_to_perimeter_api_perimeters__perimeter_id__structures_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -9092,7 +9100,7 @@ export interface operations {
             };
         };
     };
-    remove_perimeter_structure_api_perimeters__perimeter_id__structures__structure_id__delete: {
+    remove_structure_from_perimeter_api_perimeters__perimeter_id__structures__structure_id__delete: {
         parameters: {
             query?: never;
             header?: never;

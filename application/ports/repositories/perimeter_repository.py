@@ -3,16 +3,21 @@
 Implémenté par `infrastructure/repositories/perimeter_repository.py`.
 """
 
-from typing import Protocol, TypedDict
+from typing import Annotated, Protocol
+
+from pydantic import BaseModel, StringConstraints
 
 from domain.perimeters.perimeter import Perimeter
 
 
-class PerimeterUpdateFields(TypedDict, total=False):
-    """Partial update sur la table `perimeters` (clés optionnelles)."""
+class PerimeterUpdate(BaseModel):
+    """Champs éditables d'un périmètre, en modification sélective.
 
-    name: str
-    structure_ids: list[int]
+    Seuls les champs explicitement fournis sont écrits (`model_dump(exclude_unset=True)`). `structure_ids` liste les structures **racines** ; la clôture qui en descend est matérialisée à part, et son recalcul revient au caller.
+    """
+
+    name: Annotated[str, StringConstraints(strip_whitespace=True)] | None = None
+    structure_ids: list[int] | None = None
 
 
 class PerimeterRepository(Protocol):
@@ -58,7 +63,7 @@ class PerimeterRepository(Protocol):
         name: str,
     ) -> int: ...
 
-    def update_perimeter_fields(self, perimeter_id: int, fields: PerimeterUpdateFields) -> None: ...
+    def update_perimeter_fields(self, perimeter_id: int, fields: PerimeterUpdate) -> None: ...
 
     def get_perimeter_code(self, perimeter_id: int) -> str | None: ...
 
