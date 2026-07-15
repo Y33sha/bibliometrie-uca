@@ -126,19 +126,6 @@ class PersonRepository(Protocol):
         sa_ids: list[int],
     ) -> int: ...
 
-    def create_authorships_from_sources(
-        self,
-        person_id: int,
-        sa_ids: list[int],
-        source_priority: tuple[str, ...],
-    ) -> None: ...
-
-    def link_source_authorships_to_authorships(
-        self,
-        person_id: int,
-        sa_ids: list[int],
-    ) -> None: ...
-
     def get_distinct_name_forms_from_source_authorships(
         self,
         sa_ids: list[int],
@@ -162,28 +149,6 @@ class PersonRepository(Protocol):
         """Détache (person_id → NULL) les source_authorships d'une personne portant
         une forme de nom donnée. Retourne le nombre de signatures détachées."""
         ...
-
-    def insert_authorship_if_missing(self, publication_id: int, person_id: int) -> None: ...
-
-    def link_source_authorships_to_authorship(
-        self,
-        publication_id: int,
-        person_id: int,
-    ) -> None: ...
-
-    def recompute_authorship_author_position_and_corresponding(
-        self,
-        publication_id: int,
-        person_id: int,
-        source_priority: tuple[str, ...],
-    ) -> None: ...
-
-    def recompute_authorship_in_perimeter(
-        self,
-        publication_id: int,
-        person_id: int,
-        sources: tuple[str, ...],
-    ) -> None: ...
 
     # ── person_name_forms ──────────────────────────────────────────
 
