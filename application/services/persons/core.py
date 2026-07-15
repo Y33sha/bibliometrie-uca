@@ -28,7 +28,7 @@ from domain.persons.identifiers import (
 )
 from domain.persons.name_forms import compute_person_name_forms
 from domain.persons.person_identifier import PersonIdentifier
-from domain.sources.registry import ALL_SOURCES_SET
+from domain.sources.registry import require_known_source
 from domain.types import JsonValue
 
 logger = logging.getLogger(__name__)
@@ -92,17 +92,6 @@ def update_name(
 # ── Rattachement / détachement authorships ──
 
 
-def _require_known_source(source: str) -> None:
-    """Vérifie qu'une source appartient au registre. Lève `ValidationError` sinon.
-
-    `source_authorships.source` est un enum Postgres : une valeur hors registre y produirait une erreur de coercition, dont le message ne nomme ni l'appelant ni le champ fautif.
-    """
-    if source not in ALL_SOURCES_SET:
-        raise ValidationError(
-            f"Source inconnue : {source!r}. Sources valides : {', '.join(sorted(ALL_SOURCES_SET))}."
-        )
-
-
 def link_authorship(
     person_id: int,
     source: str,
@@ -112,7 +101,7 @@ def link_authorship(
     resolution_mode: str,
 ) -> None:
     """Rattache une authorship source à une personne (pipeline), en marquant le canal. Lève `ValidationError` sur une source hors registre."""
-    _require_known_source(source)
+    require_known_source(source)
     repo.link_authorship(person_id, source, authorship_id, resolution_mode)
 
 
@@ -120,7 +109,7 @@ def unlink_authorship(
     person_id: int, source: str, authorship_id: int, *, repo: PersonRepository
 ) -> None:
     """Détache une authorship source d'une personne (met person_id à NULL). Lève `ValidationError` sur une source hors registre."""
-    _require_known_source(source)
+    require_known_source(source)
     repo.unlink_authorship(person_id, source, authorship_id)
 
 
@@ -407,7 +396,7 @@ def detach_authorships(
     """
     publication_ids: set[int] = set()
     for a in authorships:
-        _require_known_source(a["source"])
+        require_known_source(a["source"])
         pub_id = repo.find_publication_id_for_source_authorship(a["source"], a["authorship_id"])
         if pub_id is not None:
             publication_ids.add(pub_id)

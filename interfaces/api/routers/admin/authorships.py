@@ -18,7 +18,7 @@ from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.authorship_repository import AuthorshipRepository
 from application.ports.repositories.person_repository import PersonRepository
 from application.services.authorships import commands as authorship_commands
-from domain.sources.registry import ALL_SOURCES_SET
+from domain.sources.registry import ALL_SOURCES_SET, require_known_source
 from interfaces.api.deps import (
     audit_repo_sync,
     authorship_repo_sync,
@@ -94,11 +94,11 @@ def assign_orphan_authorship_endpoint(
 ) -> OrphanAssignResponse:
     """Attribue une authorship orpheline à une personne.
 
-    Renvoie 409 (`RejectedPairError`) si la paire a déjà été rejetée et que
-    `force` est faux ; avec `force`, le rejet est d'abord levé.
+    Renvoie 409 si la paire a déjà été rejetée et que `force` est faux
+    (`RejectedPairError` ; avec `force`, le rejet est d'abord levé), ou si la
+    signature porte déjà une personne (`AuthorshipAlreadyAssignedError`).
     """
-    if body.source not in ALL_SOURCES_SET:
-        raise HTTPException(status_code=400, detail=f"Source inconnue: {body.source}")
+    require_known_source(body.source)
 
     new_person: tuple[str, str] | None = None
     if body.create_person:

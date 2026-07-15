@@ -5,6 +5,8 @@ Source unique de vérité côté Python pour la liste des sources et les ordres 
 Si une source est ajoutée ou supprimée, modifier ce fichier ET l'enum `source_type` en base (via une migration). Le test `tests/integration/test_scenarios.py::TestSourcesEnum` vérifie la cohérence.
 """
 
+from domain.errors import ValidationError
+
 # Toutes les sources, dans l'ordre conventionnel (chronologique d'intégration)
 ALL_SOURCES = ("hal", "openalex", "wos", "scanr", "theses", "crossref", "datacite")
 
@@ -54,3 +56,17 @@ SOURCE_PRIORITY: tuple[str, ...] = (
 # stricte au modèle JSONB `StructureApiIds` côté infra.
 STRUCTURE_API_SOURCES: tuple[str, ...] = ("openalex", "wos", "scanr", "theses", "hal")
 STRUCTURE_API_SOURCES_SET: frozenset[str] = frozenset(STRUCTURE_API_SOURCES)
+
+
+# ── Contrôle d'appartenance ──────────────────────────────────────
+
+
+def require_known_source(source: str) -> None:
+    """Vérifie qu'une source appartient au registre. Lève `ValidationError` sinon.
+
+    Les colonnes `source` sont typées par l'enum Postgres `source_type` : une valeur hors registre y produit une erreur de coercition, dont le message ne nomme ni l'appelant ni le champ fautif.
+    """
+    if source not in ALL_SOURCES_SET:
+        raise ValidationError(
+            f"Source inconnue : {source!r}. Sources valides : {', '.join(sorted(ALL_SOURCES))}."
+        )
