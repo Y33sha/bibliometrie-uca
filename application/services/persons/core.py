@@ -1,6 +1,8 @@
-"""Service Référentiel Personnes — accès exclusif en écriture aux tables `persons`, `person_identifiers`, `person_name_forms`.
+"""Service Personnes — écritures unitaires sur l'agrégat, transaction-agnostiques.
 
-Gère aussi le rattachement/détachement des authorships sources (`source_authorships`), dont le `person_id` porte le lien vers la personne.
+Couvre les tables `persons`, `person_identifiers` et `person_name_forms`, plus le rattachement des authorships sources (`source_authorships`), dont le `person_id` porte le lien vers la personne. Les appelants sont la phase `persons` du pipeline, les command handlers de l'API et les CLI de maintenance ; chacun tient sa propre frontière transactionnelle et commite lui-même.
+
+Ce service traite une personne à la fois. Les reconstructions ensemblistes de la phase `persons` passent par du SQL direct : `infrastructure/queries/pipeline/name_forms.py` resynchronise `person_name_forms` sur tout le stock.
 """
 
 import logging
@@ -318,11 +320,7 @@ def add_identifiers_from_authorships(
 
     Traitement par lot tolérant : un `ValidationError` (identifiant source mal formé) est loggé et la promotion continue. Un `CannotAttributeConflict` (valeur déjà attribuée en pending/confirmed à une autre personne) est loggé en warning et la valeur n'est pas écrasée — l'arbitrage par consensus du balayage frontal de la phase (`detect_identifier_conflicts`) le tranche au run suivant. Le point d'entrée strict reste `add_identifier` (singulier), que l'API admin utilise directement.
 
-    Couvre les 4 id_types acceptés en base (`PERSON_IDENTIFIER_TYPES`) : `orcid`, `idhal`, `idref`, `hal_person_id`. Les 3 premiers sont visibles UI ; `hal_person_id` est interne (filtré côté lecture par `PUBLIC_PERSON_IDENTIFIER_TYPES`).
-
-    Spécificité `hal_person_id` : la valeur arrive en `int` depuis la query (cf. `fetch_unlinked_authorships`), on convertit en str pour la table `person_identifiers`.
-
-    La `source` enregistrée sur `person_identifiers` reste à sa valeur par défaut (`'auto'`).
+    Balaie les types d'identifiants acceptés en base (`PERSON_IDENTIFIER_TYPES`) ; la lecture filtre ensuite ceux réservés à l'usage interne (`PUBLIC_PERSON_IDENTIFIER_TYPES`). La valeur est convertie en `str` pour la table `person_identifiers`, `hal_person_id` arrivant en `int` depuis la query (cf. `fetch_unlinked_authorships`). La `source` enregistrée garde sa valeur par défaut (`'auto'`).
     """
     seen: set[tuple[str, str]] = set()
     for a in authorships:
@@ -454,12 +452,8 @@ def mark_distinct(
     repo: PersonRepository,
     audit_repo: AuditRepository | None = None,
 ) -> None:
-    """Marque deux personnes comme distinctes (non-doublon) dans `distinct_persons`. Idempotent.
-
-    Les IDs sont triés pour garantir l'unicité de la paire.
-    """
+    """Marque deux personnes comme distinctes (non-doublon) dans `distinct_persons`. Idempotent : l'événement d'audit n'est émis que si la paire vient d'être insérée."""
     inserted = repo.mark_distinct(person_id_a, person_id_b)
-    # Audit seulement si une ligne a été insérée (la paire n'existait pas déjà)
     if inserted:
         emit_event(
             audit_repo,

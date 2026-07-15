@@ -147,8 +147,7 @@ def detach_authorships(
     authorship_repo: AuthorshipRepository,
     audit_repo: AuditRepository,
 ) -> DetachResult:
-    """Rejette durablement les paires (publication, personne) des authorships
-    sélectionnées et nettoie les formes de noms orphelines.
+    """Rejette durablement les paires (publication, personne) des authorships sélectionnées et nettoie les formes de noms orphelines.
 
     Retourne {"detached": N, "deleted_authorships": M, "cleaned_forms": K}."""
     result = persons_service.detach_authorships(
@@ -172,8 +171,7 @@ def update_name_form_status(
     authorship_repo: AuthorshipRepository,
     audit_repo: AuditRepository,
 ) -> NameFormStatusRow:
-    """Met à jour le statut d'une forme de nom. `rejected` détache aussi les
-    signatures portant la forme. Retourne la ligne {person_id, name_form, status}."""
+    """Met à jour le statut d'une forme de nom. `rejected` détache aussi les signatures portant la forme. Retourne la ligne {person_id, name_form, status}."""
     row = persons_service.update_name_form_status(
         person_id,
         name_form,
