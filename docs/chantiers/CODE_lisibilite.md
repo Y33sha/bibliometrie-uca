@@ -144,6 +144,7 @@ Racine (transverse) : passe docstrings/commentaires faite. Findings structurels 
 
 #### 2.7 `repositories`
 
+- [ ] Héritage explicite du Protocol par les adaptateurs : `PgConfig` et `PgConfigQueries` (`infrastructure/queries/config.py`) déclarent `class PgX(PortProtocol)` ; les dix `PgXxxRepository` ne l'implémentent que structurellement. La forme explicite fait vérifier l'implémentation par mypy dès la définition de la classe, quand la structurelle attend le site d'injection (`deps.py`, factories) — un écart de signature y passe inaperçu plus longtemps. À harmoniser.
 - [ ] Même motif de déballage positionnel qu'en 2.6, sur cinq repositories : `_PerimeterRow`, `_PublisherRow`, `_StructureRow`, `_JournalRow`, `_SourcePublicationViewRow`.
 - [ ] `person_repository/_authorships.py` suit la frontière tranchée en 1.3 : le sous-module ne porte plus que le lien `person_id` des signatures, et disparaît si le lien passe côté Authorship.
 

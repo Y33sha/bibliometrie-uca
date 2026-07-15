@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 class PgConfigQueries(ConfigQueries):
-    """Adapter SA pour `application.ports.config_queries.ConfigQueries`."""
+    """Adapter SA pour `application.ports.api.config_queries.ConfigQueries`."""
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn

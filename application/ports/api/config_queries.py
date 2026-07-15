@@ -1,6 +1,6 @@
 """Port : lectures sur la config + dérivés (consommé par le router config).
 
-Distinct du port `application.ports.config.ConfigStore` qui couvre la lecture/écriture par clé de la table `config`. Ce port-ci liste l'ensemble des paramètres.
+Distinct du port `application.ports.config.ConfigStore`, qui porte les écritures sur la table `config`. Ce port-ci liste l'ensemble des paramètres.
 
 Implémenté par `infrastructure.queries.config.PgConfigQueries`.
 
