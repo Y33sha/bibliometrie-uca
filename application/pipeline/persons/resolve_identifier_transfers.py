@@ -12,9 +12,7 @@ from collections import defaultdict
 
 from sqlalchemy import Connection
 
-from application.audit_log import emit_event
 from application.ports.pipeline.persons_create import PersonsCreateQueries
-from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.person_repository import PersonRepository
 from application.services.persons.core import IdentifierConflict
 from domain.persons.matching import ORCID_MATCH_SOURCES, form_matches_person
@@ -55,7 +53,6 @@ def resolve_identifier_transfers(
     queries: PersonsCreateQueries,
     repo: PersonRepository,
     logger: logging.Logger,
-    audit_repo: AuditRepository | None = None,
 ) -> dict[str, int]:
     """Arbitre les conflits d'attribution collectés et transfère les identifiants captés.
 
@@ -121,13 +118,6 @@ def resolve_identifier_transfers(
             target,
             cons,
             detached,
-        )
-        emit_event(
-            audit_repo,
-            "person_identifier.transferred",
-            "person",
-            target,
-            {"id_type": id_type, "id_value": id_value, "from_person_id": owner_id},
         )
         transferred += 1
 
