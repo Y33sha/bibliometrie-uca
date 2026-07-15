@@ -1,8 +1,8 @@
-"""Correction des métadonnées canoniques.
+"""Règles de correction des métadonnées de publication.
 
-Expose `effective_metadata`, fonction pure qui applique des règles de correction sur des métadonnées de publication, à partir de `MetadataForCorrection` — son contrat d'entrée, qui porte les champs lus par les prédicats des règles, dont `journal_type` et `oa_model` joints depuis `journals`. La fonction couvre les règles intrinsèques à un enregistrement (URL) comme les règles journal-dépendantes, sans threader de repo. Le contrat est alimenté par une `source_publication` (phase `metadata_correction`) ou par une publication canonique (`refresh_from_sources`).
+Expose `effective_metadata`, fonction pure qui applique des règles de correction sur des métadonnées de publication, à partir de `MetadataForCorrection` — son contrat d'entrée, qui porte les champs lus par les prédicats des règles, dont `journal_type` et `oa_model` joints depuis `journals`. La fonction couvre les règles intrinsèques à un enregistrement (URL) comme les règles journal-dépendantes, sans threader de repo.
 
-Distincte de l'agrégation (`aggregation.py` arbitre entre sources) et du normalizer (qui ne mute pas `source_publications`, trace inviolable des sources). Les corrections s'appliquent sur le canonique via `refresh_from_sources` et sur la `source_publication` entrante au moment du matching, pour que la dédup matche sur les valeurs corrigées.
+Distincte de l'agrégation (`aggregation.py` arbitre entre sources) et du normalizer (qui ne mute pas `source_publications`, trace inviolable des sources). La phase `metadata_correction` persiste les valeurs corrigées sur les `source_publications`, pour que le matching et l'agrégation lisent des colonnes déjà corrigées ; `refresh_from_sources` rejoue les règles sur la publication canonique, dont l'arbitrage croise des champs de sources différentes.
 
 Architecture : chaque règle est une entrée du dict `_RULES`, mappant un membre de `MetadataCorrectionRule` à sa définition `{applies_to, applies_correction}` où :
 - `applies_to` est un dict de prédicats AND-és sur la `source_publication` (clés typées par `_AppliesTo`).
