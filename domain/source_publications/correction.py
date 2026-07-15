@@ -388,6 +388,13 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
     },
 }
 
+# Prédicats portant sur un fait propre à un enregistrement source. L'agrégation n'arbitre pas ces
+# champs : une publication canonique n'en a aucune contrepartie, et toute règle qui en lit un est
+# écartée du rejeu canonique (`effective_doc_type_for_publication`). Décrit la forme du contrat,
+# pas la table des règles : un champ propre aux sources ajouté à `MetadataForCorrection` s'inscrit
+# ici, et les règles qui le liront seront écartées d'elles-mêmes.
+_SOURCE_ONLY_PREDICATES = frozenset({"url_contains", "embargo_expired", "self_declared_preprint"})
+
 
 # ── Moteur ──────────────────────────────────────────────────────────────
 
@@ -439,10 +446,20 @@ def _rule_applies(sp: MetadataForCorrection, rule_def: _RuleDefinition) -> bool:
     return all(_check_predicate(sp, k, v) for k, v in rule_def["applies_to"].items())
 
 
-def _correct_field(sp: MetadataForCorrection, field: str) -> Correction[str] | None:
-    """Applique les règles `_RULES` dans l'ordre ; première qui corrige `field` et dont les prédicats matchent gagne."""
+def _correct_field(
+    sp: MetadataForCorrection,
+    field: str,
+    *,
+    skip_predicates: frozenset[str] = frozenset(),
+) -> Correction[str] | None:
+    """Applique les règles `_RULES` dans l'ordre ; première qui corrige `field` et dont les prédicats matchent gagne.
+
+    Une règle dont `applies_to` porte l'une des clés de `skip_predicates` est écartée sans être évaluée : le niveau appelant ne renseigne pas les champs correspondants.
+    """
     for rule_id, rule_def in _RULES.items():
         if field not in rule_def["applies_correction"]:
+            continue
+        if rule_def["applies_to"].keys() & skip_predicates:
             continue
         if _rule_applies(sp, rule_def):
             return Correction(rule_def["applies_correction"][field], rule_id)  # type: ignore[literal-required]
@@ -460,6 +477,16 @@ def effective_metadata(sp: MetadataForCorrection) -> CorrectedFields:
         doc_type=_correct_field(sp, "doc_type"),
         oa_status=_correct_field(sp, "oa_status"),
     )
+
+
+def effective_doc_type_for_publication(view: MetadataForCorrection) -> Correction[str] | None:
+    """Correction de `doc_type` applicable à une publication canonique, ou `None`.
+
+    Retient les règles dont tous les prédicats portent sur des champs que l'agrégation arbitre. Celles qui lisent un fait propre à un enregistrement source (`_SOURCE_ONLY_PREDICATES`) sont écartées : la publication n'en a aucune contrepartie.
+
+    L'`oa_status` relève de l'agrégation du statut le plus ouvert et d'Unpaywall, hors de ce rejeu.
+    """
+    return _correct_field(view, "doc_type", skip_predicates=_SOURCE_ONLY_PREDICATES)
 
 
 # Préfixes d'identifiants HAL propres aux dissertations : TEL (thèses en ligne) et DUMAS

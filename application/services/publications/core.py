@@ -13,7 +13,7 @@ from domain.publications.publication import Publication
 from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES
 from domain.source_publications.correction import (
     MetadataForCorrection,
-    effective_metadata,
+    effective_doc_type_for_publication,
 )
 from domain.sources.registry import SOURCE_PRIORITY
 
@@ -85,12 +85,12 @@ def _apply_canonical_doc_type_correction(pub: Publication, *, repo: PublicationR
 
     L'arbitrage prend chaque champ de la source la plus prioritaire qui le renseigne : la publication porte alors une combinaison — `doc_type` de l'une, `journal_id` de l'autre — qu'aucune `source_publication` ne portait, et qu'aucune correction par source n'a pu voir. Le contrat reçoit les champs que l'agrégation arbitre, dont le `journal_type` du `journal_id` canonique.
 
-    `urls` et `self_declared_preprint` sont des faits d'un enregistrement source, sans contrepartie canonique : les règles qui les lisent restent muettes. L'`oa_status` reste hors du contrat, en entrée comme en sortie — une source corrigée remonte d'elle-même par l'agrégation du statut le plus ouvert, et Unpaywall tranche après vérification.
+    `effective_doc_type_for_publication` écarte les règles lisant un fait propre à un enregistrement source ; les champs correspondants restent nuls ici. L'`oa_status` est hors du rejeu, en entrée comme en sortie — une source corrigée remonte d'elle-même par l'agrégation du statut le plus ouvert, et Unpaywall tranche après vérification.
 
     Mute `pub.doc_type` et trace la règle dans `pub.meta['corrections']['doc_type']`. Idempotent.
     """
     journal_type = repo.get_journal_type(pub.journal_id) if pub.journal_id is not None else None
-    corrected = effective_metadata(
+    corrected = effective_doc_type_for_publication(
         MetadataForCorrection(
             title=pub.title,
             doc_type=pub.doc_type,
@@ -104,12 +104,12 @@ def _apply_canonical_doc_type_correction(pub: Publication, *, repo: PublicationR
             self_declared_preprint=False,
         )
     )
-    if corrected.doc_type is not None and corrected.doc_type.value != pub.doc_type:
-        pub.doc_type = corrected.doc_type.value
+    if corrected is not None and corrected.value != pub.doc_type:
+        pub.doc_type = corrected.value
         meta = dict(pub.meta or {})
         existing_corrections = meta.get("corrections")
         corrections = dict(existing_corrections) if isinstance(existing_corrections, dict) else {}
-        corrections["doc_type"] = corrected.doc_type.rule.value
+        corrections["doc_type"] = corrected.rule.value
         meta["corrections"] = corrections
         pub.meta = meta
 

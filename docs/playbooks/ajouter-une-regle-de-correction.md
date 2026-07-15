@@ -34,7 +34,7 @@ Avant d'ouvrir un fichier, expliciter :
   - intrinsèque à la `source_publication` (`title`, `urls`, `doc_type`, `doi`) → rien à câbler ;
   - joint depuis `journals`, déjà projeté (`journal_type`, `oa_model`) → idem ;
   - hors du contrat → l'étendre (cf. § 4).
-- **Rejouable sur la publication canonique ?** L'agrégation arbitre chaque champ indépendamment, donc une publication peut porter une combinaison qu'aucune source ne portait. Une règle se rejoue sur le canonique si et seulement si ses prédicats lisent des champs que l'agrégation arbitre. `urls` et `self_declared_preprint` sont des faits d'un enregistrement source, sans contrepartie canonique.
+- **Rejouable sur la publication canonique ?** Rien à câbler : `effective_doc_type_for_publication` écarte d'elle-même toute règle dont un prédicat figure dans `_SOURCE_ONLY_PREDICATES` (`url_contains`, `embargo_expired`, `self_declared_preprint` — des faits d'un enregistrement source, sans contrepartie canonique). Une règle qui n'en lit aucun se rejoue sur le canonique, ce qui répare les combinaisons nées de l'arbitrage (`doc_type` d'une source, `journal_id` d'une autre).
 - **Input admin-éditable ?** Détermine s'il faut un hook (cf. § 6).
 - **Output qui change le clustering ?** Une correction de `doc_type` change le token `metadata_block` de la SP : tester que le rapprochement utilise la valeur corrigée (la persistance pose `keys_dirty`, la réconciliation suit).
 
@@ -109,7 +109,7 @@ Si l'input est absent de `MetadataForCorrection` :
 1. champ ajouté au contrat ([`correction.py`](../../domain/source_publications/correction.py)), avec son prédicat dans `_AppliesTo` et sa branche dans `_check_predicate` ;
 2. champ ajouté à `UnaryCorrectionRow` et à sa méthode `for_correction` ([`metadata_correction.py`](../../application/ports/pipeline/metadata_correction.py)) ;
 3. colonne ajoutée au `_SELECT` de l'adapter ([`metadata_correction.py`](../../infrastructure/queries/pipeline/metadata_correction.py)), **sous le nom du champ** : les lignes sont construites par appariement de noms ;
-4. si l'agrégation arbitre ce champ, le renseigner aussi dans `_apply_canonical_doc_type_correction` ([`core.py`](../../application/services/publications/core.py)), pour que la règle se rejoue sur la publication canonique.
+4. si le champ est un fait propre à un enregistrement source, sans contrepartie sur une publication canonique, inscrire son prédicat dans `_SOURCE_ONLY_PREDICATES` : les règles qui le lisent sont écartées du rejeu canonique. Sinon, le renseigner dans `_apply_canonical_doc_type_correction` ([`core.py`](../../application/services/publications/core.py)) depuis la valeur arbitrée.
 
 Alternative écartée : threader un repo dans toutes les signatures. Beaucoup plus invasif sans bénéfice métier — le contrat (champs joints à la lecture) garde `effective_metadata` pure.
 
