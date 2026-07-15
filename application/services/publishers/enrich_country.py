@@ -13,7 +13,6 @@ from typing import NamedTuple, NotRequired, TypedDict, cast
 import requests
 from sqlalchemy import Connection
 
-from application.ports.publishers_enrichment import PublisherEnrichmentQueries
 from application.ports.repositories.publisher_repository import (
     PublisherRepository,
     PublisherUpdate,
@@ -132,7 +131,6 @@ def _enrich_batch(
 
 def run_enrich_publishers_from_openalex(
     conn: Connection,
-    queries: PublisherEnrichmentQueries,
     logger: logging.Logger,
     *,
     publisher_repo: PublisherRepository,
@@ -144,7 +142,7 @@ def run_enrich_publishers_from_openalex(
     rate_delay: float = 0.1,
 ) -> None:
     try:
-        publishers = queries.fetch_publishers_needing_enrichment(conn, limit=limit or None)
+        publishers = publisher_repo.find_needing_country_enrichment(limit=limit or None)
         total = len(publishers)
         logger.info(f"{total} publishers à enrichir (avec openalex_id, manque country).")
 
