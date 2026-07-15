@@ -1,9 +1,8 @@
-"""Query service : résolution des affiliations sur `source_authorships`.
+"""Query service : résolution des affiliations sur `source_authorships`, phase `affiliations`.
 
-Appelé par `application/pipeline/affiliations/populate_affiliations.py`.
-Pose `in_perimeter` sur `source_authorships` via les adresses résolues
-(`address_structures`) et le périmètre restreint, et rafraîchit la matview
-`source_authorship_structures` (dérivée des adresses + `perimeter_structures`).
+Appelé par `application/pipeline/affiliations/populate_affiliations.py` : rafraîchit la matview `source_authorship_structures`, puis pose `in_perimeter` depuis celle-ci.
+
+Deux périmètres se composent. La matview est bornée au périmètre d'extraction, qu'elle lit par sa jointure sur `perimeter_structures` ; `sync_in_perimeter` la filtre ensuite sur les structures que l'appelant lui passe, celles du périmètre des personnes (`get_persons_structure_ids_list`).
 """
 
 from sqlalchemy import Connection, text
@@ -65,11 +64,10 @@ def sync_in_perimeter(conn: Connection, *, perimeter_ids: list[int]) -> tuple[in
 
 
 def refresh_source_authorship_structures(conn: Connection) -> None:
-    """Rafraîchit la matview `source_authorship_structures` (dérivée de
-    `source_authorship_addresses ⋈ address_structures ⋈ perimeter_structures`,
-    périmètre d'affiliation). `CONCURRENTLY` pour ne pas bloquer les lectures.
-    À appeler après `perimeter_structures` et la résolution des adresses, avant
-    le refresh de `authorship_structures` (matview-sur-matview)."""
+    """Rafraîchit la matview `source_authorship_structures`, dérivée de `source_authorship_addresses ⋈ address_structures ⋈ perimeter_structures` et bornée au périmètre d'extraction (code lu dans la clé de config `perimeter_extraction`). `CONCURRENTLY` pour ne pas bloquer les lectures.
+
+    À appeler après `perimeter_structures` et la résolution des adresses, avant le refresh de `authorship_structures` (matview-sur-matview).
+    """
     conn.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY source_authorship_structures"))
 
 
