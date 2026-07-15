@@ -34,6 +34,8 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import ARRAY, ENUM as PgEnum, JSONB
 
+from domain.sources.registry import ALL_SOURCES
+
 metadata = MetaData()
 
 
@@ -391,16 +393,9 @@ identifier_origin_enum = PgEnum(
     create_type=False,
 )
 
-source_type_enum = PgEnum(
-    "hal",
-    "openalex",
-    "wos",
-    "scanr",
-    "theses",
-    "crossref",
-    name="source_type",
-    create_type=False,
-)
+# Valeurs dérivées du registre : l'enum Postgres est créé par migration
+# (`create_type=False`), et `TestSourcesEnum` compare le registre à la base.
+source_type_enum = PgEnum(*ALL_SOURCES, name="source_type", create_type=False)
 
 oa_type_enum = PgEnum(
     "gold",
