@@ -18,6 +18,15 @@ class PubByDoi:
     id: int
 
 
+@dataclass(frozen=True, slots=True)
+class JournalCorrectionInputs:
+    """Projection de lecture retournée par `get_journal_correction_inputs` : les colonnes de
+    `journals` que lisent les prédicats des règles de correction."""
+
+    journal_type: str | None = None
+    oa_model: str | None = None
+
+
 class PublicationRepository(Protocol):
     """Contrat d'accès à l'agrégat Publication (tables publications,
     source_publications et distinct_publications)."""
@@ -52,8 +61,8 @@ class PublicationRepository(Protocol):
         """Ids des `source_publications` de `pub_id` dont le DOI a été substitué par une correction de convergence (forme secondaire : version, variante, pièce d'un dataset). L'agrégation les déprioris pour que les scalaires descriptifs viennent de l'enregistrement canonique."""
         ...
 
-    def get_journal_type(self, journal_id: int) -> str | None:
-        """`journal_type` d'un journal, pour la re-correction canonique journal-dépendante dans `refresh_from_sources`. None si le journal n'existe pas ou son type n'est pas posé."""
+    def get_journal_correction_inputs(self, journal_id: int | None) -> JournalCorrectionInputs:
+        """Champs joints depuis `journals` que lisent les règles de correction, pour la re-correction canonique dans `refresh_from_sources`. Champs nuls si `journal_id` est nul, si le journal n'existe pas, ou si les colonnes ne sont pas posées."""
         ...
 
     # ── Création ───────────────────────────────────────────────────

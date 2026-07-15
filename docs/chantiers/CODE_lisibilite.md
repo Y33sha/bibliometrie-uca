@@ -92,11 +92,12 @@ Réorganisation du sommet :
 
 Traverse `domain/`, `application/ports`, `application/pipeline/metadata_correction` et `infrastructure/queries` : le service publications n'en est que le symptôme visible.
 
-- [ ] Contrat des règles réduit aux dix champs lus, dans `domain/source_publications/correction.py`.
-- [ ] Projection de ligne de la phase déplacée dans `application/ports/pipeline/metadata_correction.py` ; les cinq champs morts sortent du `_SELECT` et des deux types.
-- [ ] `declares_preprint` → `self_declared_preprint`.
-- [ ] `_apply_canonical_doc_type_correction` construit le contrat du domaine sans valeurs inventées ; `oa_model` alimenté depuis le `journal_id` arbitré, correction `oa_status` appliquée et tracée dans `meta.corrections`. La fonction couvre alors deux champs : à renommer.
-- [ ] Rejouabilité au niveau canonique rendue vérifiable plutôt que documentée, si le terrain dégagé le permet : les prédicats d'`applies_to` sont de la donnée déclarative, une règle se rejoue si ses clés font partie de celles que la vue sait répondre.
+- [x] Contrat des règles (`MetadataForCorrection`) réduit aux dix champs lus, dans `domain/source_publications/correction.py` (`71337ec6`).
+- [x] Projection de ligne de la phase (`UnaryCorrectionRow`) déplacée dans `application/ports/pipeline/metadata_correction.py` ; les cinq champs morts sortent du `_SELECT` et des deux types (`71337ec6`).
+- [x] `declares_preprint` → `self_declared_preprint` (`71337ec6`).
+- [x] Appariement des lignes par nom plutôt que par rang, qui supprime le couplage entre l'ordre des champs et celui des colonnes (`b229c3ed`). Le reste du motif est noté en 2.6 et 2.7.
+- [x] `_apply_canonical_doc_type_correction` construit le contrat sans valeurs inventées ; `oa_model` alimenté depuis le `journal_id` arbitré (`get_journal_correction_inputs`, une seule lecture), correction `oa_status` appliquée et tracée dans `meta.corrections`. Renommée `_apply_canonical_corrections`, la fonction couvrant deux champs.
+- [ ] Rejouabilité au niveau canonique rendue vérifiable plutôt que documentée : les prédicats d'`applies_to` sont de la donnée déclarative, une règle se rejoue si ses clés font partie de celles que le contrat sait répondre. Aujourd'hui la frontière tient à quatre champs figés à `None`/`False` dans `_apply_canonical_corrections`, et à la docstring qui l'énonce.
 
 #### 1.3 - `application/ports`
 
