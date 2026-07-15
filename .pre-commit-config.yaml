@@ -1,17 +1,24 @@
 # ============================================================
 # Vérifications git : deux étages.
 #   - pre-commit : garde rapide et locale à chaque commit (lint, format sur
-#     l'index, tests unitaires). Installation : `pre-commit install`.
+#     l'index, tests unitaires).
 #   - pre-push   : rejoue les vérifications de la CI avant chaque push (lint,
 #     format, types, contrats d'architecture, hygiène des dépendances, build
 #     frontend). La suite de tests reste à la charge de la CI, trop longue pour
-#     un pre-push. Installation : `pre-commit install --hook-type pre-push`.
+#     un pre-push.
+# Installation des deux étages, par machine (`.git/hooks/` n'est pas versionné) :
+# `pre-commit install`.
 # Les hooks constatent et refusent ; ils ne modifient aucun fichier. Une
 # vérification en échec se corrige à la main (ou via `ruff format` / `ruff check
 # --fix` / `uv lock` lancés explicitement) puis se rejoue.
 # Lancement manuel sur tout le repo : `pre-commit run --all-files`
 #   (et `pre-commit run --all-files --hook-stage pre-push` pour l'étage push).
 # ============================================================
+
+# `pre-commit install` installe les deux étages : sans cette clé, il n'en pose
+# qu'un, et le pre-push reste muet jusqu'à ce que quelqu'un pense au
+# `--hook-type pre-push`.
+default_install_hook_types: [pre-commit, pre-push]
 
 # Les hooks sans `stages` explicite ne tournent qu'au commit ; l'étage pre-push
 # est réservé aux hooks qui le déclarent.
