@@ -49,3 +49,4 @@ docs/chantiers/datacite-vs-natives-spike-data/
 
 # Claude Code
 .claude/*.json
+.claude/projects
