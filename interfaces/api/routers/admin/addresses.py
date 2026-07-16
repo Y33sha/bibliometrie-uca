@@ -30,7 +30,6 @@ from interfaces.api.deps import (
     bg_propagate_countries,
     bg_propagate_in_perimeter,
     db_conn,
-    require_admin,
 )
 from interfaces.api.models import (
     AddressPublicationsResponse,
@@ -217,7 +216,6 @@ def list_addresses_countries(
 def suggest_countries(
     search: str = Query(""),
     queries: AddressesQueries = Depends(addresses_queries),
-    _: None = Depends(require_admin),
 ) -> CountrySuggestionsResponse:
     """Distribution des pays des adresses matchantes + compte des sans-pays."""
     return queries.suggest_countries(search)
@@ -231,7 +229,6 @@ def set_address_country(
     conn: Connection = Depends(db_conn),
     queries: AddressesQueries = Depends(addresses_queries),
     addr_repo: AddressRepository = Depends(address_repo),
-    _: None = Depends(require_admin),
 ) -> OkResponse:
     """Attribue des pays à une adresse."""
     if not queries.address_exists(addr_id):
@@ -252,7 +249,6 @@ def batch_set_country(
     conn: Connection = Depends(db_conn),
     queries: AddressesQueries = Depends(addresses_queries),
     addr_repo: AddressRepository = Depends(address_repo),
-    _: None = Depends(require_admin),
 ) -> BatchCountryResponse:
     """Ajoute un pays à des adresses (par IDs ou par filtre)."""
     country_code = body.country_code
