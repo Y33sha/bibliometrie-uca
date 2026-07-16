@@ -145,6 +145,7 @@ Racine (transverse) : passe docstrings/commentaires faite. Findings structurels 
 - [ ] Motif fonction libre + classe adaptateur qui la délègue. La doc le justifie par la mutualisation entre contextes : le module héberge le SQL en fonctions libres, et plusieurs adaptateurs s'en servent (`subjects.py` expose `PgSubjectsQueries` pour le pipeline et `PgSubjectsAdminQueries` pour l'API). Là où le module n'a qu'un seul adaptateur, la classe se borne à déléguer et ne mutualise rien : `address_pub_count.py` en est un cas net (`PgAddressPubCountQueries.recompute_pub_count` → `recompute_pub_count`). Recenser les modules à adaptateur unique et replier le SQL dans la classe. Les tests qui appellent la fonction libre passeront par l'adaptateur — un test ne justifie pas l'existence d'une fonction de production, pas plus qu'un CLI oneshot destiné à disparaître.
   - Cas le plus lourd du motif, traité par la fiche dédiée [Normalize : factoriser l'upsert des `source_publications`](CODE_normalize-upsert-source-publications.md) : les sept `upsert_<source>_source_publication` (ports par source, fonctions libres et méthodes de délégation) se replient sur un objet de transport `SourcePublicationRow` et une méthode unique.
 - [ ] Construction des lignes par déballage positionnel (`Row(*row)`) : l'ordre des champs de la classe et celui des colonnes du `SELECT` forment un contrat unique, écrit dans deux couches et vérifié par rien — réordonner l'un sans l'autre range les valeurs dans les mauvais champs, en silence dès que les types sont compatibles. L'appariement par nom (`Row(**row._mapping)`) supprime le couplage et échoue bruyamment sur un nom manquant. Fait pour `UnaryCorrectionRow` et `DoiClusterRow` ; reste `JournalByDoiRow` (`pipeline/metadata_correction.py`).
+- [ ] `api/publications/list.py` : `_hal_status_clause_sync` porte le suffixe fossile d'une couche async retirée, comme les dépendances de l'API avant elle (`85f4c974`). Rien n'en distingue une variante asynchrone : il n'y en a pas.
 
 #### 2.7 `repositories`
 
@@ -157,11 +158,26 @@ Racine (transverse) : passe docstrings/commentaires faite. Findings structurels 
 
 #### 3.1 - API
 
-- [ ] `routers/admin/publication_duplicates.py` : docstrings hard-wrappées. Celle de `merge_duplicate_publications` réexplique le mécanisme du refresh, qui relève de `services/publications`. Le fait qui appartient au router est le choix du survivant (`sorted()`), et l'invariance du sens de fusion qui l'autorise.
+Passe faite sur `models/`, `deps.py`, `app.py` et les docstrings des dix-neuf routers.
+
+- [x] `models/` : `MergePersons` et `AuthorshipExcludeResponse` étaient les copies de `MergeRequest` et `OkResponse`, déjà partagés ; re-export mort des types de `ports/api/_common.py` retiré (`20271ac0`). Docstrings allégées : chaque module réénumérait les projections vivant dans son port, et la règle s'énonçait de huit façons (`729441c9`).
+- [x] `deps.py` : `SPAStaticFiles` n'était pas une dépendance — sortie en `spa.py`, avec le `PROJECT_ROOT` qu'elle recalculait à la main (`0920e16a`). Suffixe `_sync` retiré des 29 dépendances : sans pendant async, il ne distinguait rien (`85f4c974`). `require_admin` supprimé, le middleware couvrant déjà toutes les écritures (`b4b9a4ea`).
+- [x] `app.py` : `/api/health` annonçait un pipeline en cours après un crash, faute du contrôle de PID que `read_status` porte (`d2afe1d1`) ; l'endpoint et `/api/metrics`, qu'aucun consommateur n'interrogeait, sont supprimés (`8fae017e`, `88a6a4b1`).
+- [x] Docstrings des routers : une formule unique, hard-wraps déroulés, six messages d'erreur passés en français (`bd8d1eaa`, `49df8267`). Deux d'entre elles décrivaient une clôture de périmètre que les tests contredisent, et la publiaient dans le contrat TypeScript (`8e26875c`) ; celle de `auth.login` nommait une variable d'environnement inexistante (`d714738d`).
+- [x] `logger = logging.getLogger(__name__)` déclaré par les dix-neuf routers, utilisé par aucun (`abb6d3f2`).
+- [ ] **Le format du jeton de session n'appartient à personne.** `admin_user|timestamp` est composé par `routers/auth.py`, découpé par `deps._verify_token` pour son horodatage, et redécoupé par le middleware d'`app.py` pour son utilisateur. Trois modules connaissent la forme, aucun ne la possède, et le middleware portait une branche de repli pour un cas que `_verify_token` a déjà rejeté (`630d3dd7`).
+- [ ] **L'underscore de `deps.py` ne protège rien.** `_sign_token`, `_verify_token` et `_check_password` sont importés par `routers/auth.py`, `app.py` et le conftest des tests d'intégration. Soit ce sont trois modules qui atteignent ce qu'ils ne devraient pas, soit c'est l'interface publique d'une brique de session, et l'underscore ment. Se traite avec le point précédent : une brique qui possède le format possède aussi sa signature.
+- [ ] `routers/subjects.py` est public et consomme `SubjectsAdminQueries`, dont le nom annonce l'admin. Le port sert les deux ; son nom en désigne un seul.
+- [ ] `PublicationMergeResponse` (`ok`, `target_id`, `source_id`) et `MergeResponse` (`merged`, `source_id`, `target_id`) disent la même chose sous deux formes. Laissées en place faute d'un motif clair — à trancher avec la fiche des règles métier, qui touche les mêmes endpoints.
+- [ ] **Le test « qui l'appelle » n'a pas été passé sur les endpoints.** Il a suffi à condamner `/api/health` et `/api/metrics`, et une fonction morte du client frontend. Croiser chaque route avec les appels du frontend dirait lesquelles ne servent plus.
+- [ ] `routers/admin/publication_duplicates.py` : la docstring de `merge_duplicate_publications` explique encore le rafraîchissement, qui relève de `services/publications`. Le fait qui appartient au router est le choix du survivant et l'invariance du sens de fusion qui l'autorise.
+
+Deux findings ont leur fiche dédiée : [Périmètre APC](CODE_apc-perimetre-au-router.md) (la liste descend du router jusqu'au SQL à travers deux ports) et [Règles métier dans les routers](CODE_regles-metier-dans-les-routers.md) (les gardes de fusion sont réparties à l'inverse selon l'agrégat).
 
 #### 3.2 - Frontend
 
 - [ ] `src/lib/api/schema.ts` est généré depuis l'OpenAPI (`npm run types:gen`), mais aucun garde-fou ne vérifie qu'il suit : ni la CI ni les hooks pre-commit ne le régénèrent ni ne comparent. Il dérive donc en silence — une régénération faite au passage a rattrapé une docstring de router modifiée dans un commit antérieur. `svelte-check` ne le voit pas : le front appelle les routes par chemin, pas par `operationId`. Un contrôle de fraîcheur en CI (régénérer, échouer si le diff est non vide) fermerait la dérive.
+- [ ] **Passe de `src/lib/api/` au test « qui l'appelle ».** `auth.ts` réécrivait ses trois types à la main plutôt que de lire le contrat généré, d'où trois dérives qu'aucun outil ne voyait : un champ `user` que l'API ne sert pas, un `login()` typé comme rendant `{authenticated}` quand l'endpoint rend `{ok}`, et un `health()` mort (`630d3dd7`, `88a6a4b1`). Les douze autres modules du dossier n'ont pas été relus ; ceux qui déclarent leurs types au lieu de les lire sont exposés au même écart silencieux.
 
 #### 3.3 - CLI
 
@@ -179,7 +195,8 @@ Racine (transverse) : passe docstrings/commentaires faite. Findings structurels 
 
 ### Phase 5 - `tests/`
 
-
+- [x] `integration/infrastructure/queries/test_address_resolution.py` : sept tests passaient des tuples positionnels aux fonctions de résolution d'adresses, dont le contrat veut les `NamedTuple` `KeptPair` et `DetectedStructure`. Ils levaient `AttributeError` ; ceux qui passaient une liste vide n'y coupaient que parce que la fonction retourne avant la lecture (`b5055298`).
+- [ ] Helpers locaux à suffixe `_sync` fossile : `_insert_config_sync`, `_insert_perimeter_sync`, `_create_struct_sync` (`integration/application/test_config_service.py`, `test_perimeters_service.py`). Même fossile qu'en 2.6 et qu'aux dépendances de l'API (`85f4c974`).
 
 ## Questions ouvertes
 
