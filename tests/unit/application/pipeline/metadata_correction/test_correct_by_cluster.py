@@ -60,7 +60,7 @@ def test_same_work_all_converge_on_canonical():
             1,
             "dataset",
             canonical_doi="10.5281/zenodo.1",
-            same_work_case="DATACITE_VERSION_TO_CONCEPT",
+            same_work_case=DoiClusterCase.DATACITE_VERSION_TO_CONCEPT,
         ),
         _m(2, "dataset"),
     ]
@@ -72,11 +72,9 @@ def test_same_work_all_converge_on_canonical():
 
 def test_same_work_carries_its_case():
     # Le cas porté par le membre est restitué (variante, pièce de package…).
-    for case in ("DATACITE_VARIANT_TO_PRIMARY", "DATACITE_PACKAGE_PIECE"):
+    for case in (DoiClusterCase.DATACITE_VARIANT_TO_PRIMARY, DoiClusterCase.DATACITE_PACKAGE_PIECE):
         group = [_m(1, "dataset", canonical_doi="10.9/canon", same_work_case=case)]
-        assert resolve_cluster_doi_corrections(group) == [
-            DoiClusterDecision(1, "10.9/canon", DoiClusterCase(case))
-        ]
+        assert resolve_cluster_doi_corrections(group) == [DoiClusterDecision(1, "10.9/canon", case)]
 
 
 def test_same_work_takes_precedence_over_book_chapter():
@@ -85,7 +83,7 @@ def test_same_work_takes_precedence_over_book_chapter():
             1,
             "book",
             canonical_doi="10.5281/zenodo.1",
-            same_work_case="DATACITE_VERSION_TO_CONCEPT",
+            same_work_case=DoiClusterCase.DATACITE_VERSION_TO_CONCEPT,
         ),
         _m(2, "book_chapter"),
     ]
@@ -172,7 +170,7 @@ def test_version_doi_substituted_to_concept():
         "10.5281/zenodo.10",
         raw_doi="10.5281/zenodo.10",
         canonical_doi="10.5281/zenodo.1",
-        same_work_case="DATACITE_VERSION_TO_CONCEPT",
+        same_work_case=DoiClusterCase.DATACITE_VERSION_TO_CONCEPT,
     )
     hal = _row(2, "dataset", "10.5281/zenodo.10", raw_doi="10.5281/zenodo.10")
     updates = compute_updates([datacite, hal])
@@ -193,7 +191,7 @@ def test_variant_substituted_to_primary():
         "10.18154/rwth-1",
         raw_doi="10.18154/rwth-1",
         canonical_doi="10.1103/published",
-        same_work_case="DATACITE_VARIANT_TO_PRIMARY",
+        same_work_case=DoiClusterCase.DATACITE_VARIANT_TO_PRIMARY,
     )
     assert compute_updates([row]) == [
         DoiCorrectionUpdate(
@@ -211,7 +209,7 @@ def test_package_piece_substituted_to_parent():
         "10.15454/abc/file1",
         raw_doi="10.15454/abc/file1",
         canonical_doi="10.15454/abc",
-        same_work_case="DATACITE_PACKAGE_PIECE",
+        same_work_case=DoiClusterCase.DATACITE_PACKAGE_PIECE,
     )
     assert compute_updates([row]) == [
         DoiCorrectionUpdate(
@@ -230,7 +228,7 @@ def test_concept_equal_to_canonical_is_noop():
         "10.5281/zenodo.5",
         raw_doi="10.5281/zenodo.5",
         canonical_doi="10.5281/zenodo.5",
-        same_work_case="DATACITE_VERSION_TO_CONCEPT",
+        same_work_case=DoiClusterCase.DATACITE_VERSION_TO_CONCEPT,
     )
     assert compute_updates([row]) == []
 
