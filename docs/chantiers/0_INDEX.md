@@ -15,6 +15,7 @@
 ### Non commencé
 
 - [Périmètre APC : le résoudre dans l'adapter au lieu de le faire descendre du router](CODE_apc-perimetre-au-router.md)
+- [Règles métier retenues dans les routers HTTP](CODE_regles-metier-dans-les-routers.md)
 - [Qualité et cohérence des sujets](METIER_sujets-qualite.md)
 - [Signatures institutionnelles](METIER_signatures-institutionnelles.md)
 
