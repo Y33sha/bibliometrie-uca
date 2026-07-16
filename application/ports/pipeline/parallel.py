@@ -2,7 +2,7 @@
 
 Injecté par le composition-root aux orchestrateurs des phases qui lancent plusieurs sous-tâches concurrentes (`extract`, `cross_imports`). L'application ordonne « lance ces N thunks » sans connaître le mécanisme (thread pool, propagation du contexte de log).
 
-Satisfait par `infrastructure.concurrency.run_parallel`.
+Satisfait par `infrastructure.parallel.run_parallel`.
 """
 
 from collections.abc import Callable
