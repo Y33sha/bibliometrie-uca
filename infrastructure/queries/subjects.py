@@ -12,7 +12,11 @@ from application.ports.api.subjects_queries import (
     SubjectNeighborOut,
     SubjectsAdminQueries,
 )
-from application.ports.pipeline.subjects import SourcePublicationTopics, SubjectsQueries
+from application.ports.pipeline.subjects import (
+    PublicationSubjectLink,
+    SourcePublicationTopics,
+    SubjectsQueries,
+)
 from domain.normalize import normalize_label
 
 _UPSERT_SUBJECT_SQL = text(
@@ -70,7 +74,7 @@ def link_publication_subjects_bulk(
     conn: Connection,
     *,
     source: str,
-    rows: list[tuple[int, int]],
+    rows: list[PublicationSubjectLink],
 ) -> int:
     """Bulk INSERT des liens publication↔subject pour une source.
 
@@ -83,14 +87,13 @@ def link_publication_subjects_bulk(
     """
     if not rows:
         return 0
-    seen: set[tuple[int, int]] = set()
+    seen: set[PublicationSubjectLink] = set()
     deduped: list[dict[str, Any]] = []
-    for pub_id, sid in rows:
-        key = (pub_id, sid)
-        if key in seen:
+    for link in rows:
+        if link in seen:
             continue
-        seen.add(key)
-        deduped.append({"pid": pub_id, "sid": sid, "src": source})
+        seen.add(link)
+        deduped.append({"pid": link.publication_id, "sid": link.subject_id, "src": source})
     conn.execute(
         text(
             """
@@ -372,7 +375,7 @@ class PgSubjectsQueries(SubjectsQueries):
         conn: Connection,
         *,
         source: str,
-        rows: list[tuple[int, int]],
+        rows: list[PublicationSubjectLink],
     ) -> int:
         return link_publication_subjects_bulk(conn, source=source, rows=rows)
 
