@@ -136,7 +136,7 @@ def decide_match_by_identifier(
 ) -> IdentifierMatch:
     """Résout un identifiant (IdRef, ORCID…) vers une `person_id`, corroboré par le nom.
 
-    `identifier_map` est typiquement `{idref: (person_id, last_name_normalized, first_name_normalized)}` prefetché via une query du type `fetch_idref_to_person_map` / `fetch_orcid_to_person_map`, déjà filtré sur les statuts non-`rejected`. La fonction est générique : elle marche pour n'importe quel id_type indexé sur `person_identifiers`.
+    `identifier_map` est typiquement `{idref: (person_id, last_name_normalized, first_name_normalized)}` prefetché via `fetch_identifier_to_person_map(conn, id_type)`, déjà filtré sur les statuts non-`rejected`. La fonction est générique : elle marche pour n'importe quel id_type indexé sur `person_identifiers`.
 
     Corroboration par le nom, du verdict humain au test heuristique :
 

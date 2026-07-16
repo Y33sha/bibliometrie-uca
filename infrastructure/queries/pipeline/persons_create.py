@@ -250,15 +250,12 @@ def fetch_cross_source_linked(conn: Connection) -> list[BareUnlinkedAuthorship]:
     return [_to_bare(r) for r in rows]
 
 
-def _fetch_identifier_to_person_map(
+def fetch_identifier_to_person_map(
     conn: Connection, id_type: str
 ) -> dict[str, tuple[int, str, str]]:
-    """`{id_value: (person_id, last_name_normalized, first_name_normalized)}` pour les
-    identifiants `id_type` connus non rejetés.
+    """`{id_value: (person_id, last_name_normalized, first_name_normalized)}` pour les identifiants `id_type` (`idref`, `orcid`, `hal_person_id`) connus non rejetés.
 
-    Le nom normalisé de la personne ciblée accompagne le `person_id` : la cascade
-    corrobore le match identifiant par le nom (`decide_match_by_identifier`), refusant
-    un identifiant porté par une signature étrangère.
+    Le nom normalisé de la personne ciblée accompagne le `person_id` : la cascade corrobore le match identifiant par le nom (`decide_match_by_identifier`), refusant un identifiant porté par une signature étrangère.
     """
     rows = conn.execute(
         text("""
@@ -272,21 +269,6 @@ def _fetch_identifier_to_person_map(
         {"id_type": id_type},
     ).all()
     return {r.id_value: (r.person_id, r.ln or "", r.fn or "") for r in rows}
-
-
-def fetch_idref_to_person_map(conn: Connection) -> dict[str, tuple[int, str, str]]:
-    """`{idref: (person_id, nom, prénom) normalisés}` pour les IdRef connus non rejetés."""
-    return _fetch_identifier_to_person_map(conn, "idref")
-
-
-def fetch_orcid_to_person_map(conn: Connection) -> dict[str, tuple[int, str, str]]:
-    """`{orcid: (person_id, nom, prénom) normalisés}` pour les ORCID connus non rejetés."""
-    return _fetch_identifier_to_person_map(conn, "orcid")
-
-
-def fetch_hal_account_to_person_map(conn: Connection) -> dict[str, tuple[int, str, str]]:
-    """`{hal_person_id: (person_id, nom, prénom) normalisés}` pour les comptes HAL connus non rejetés."""
-    return _fetch_identifier_to_person_map(conn, "hal_person_id")
 
 
 def fetch_name_form_map(conn: Connection) -> dict[str, list[int]]:
@@ -579,14 +561,10 @@ class PgPersonsCreateQueries(PersonsCreateQueries):
     def fetch_cross_source_linked(self, conn: Connection) -> list[BareUnlinkedAuthorship]:
         return fetch_cross_source_linked(conn)
 
-    def fetch_idref_to_person_map(self, conn: Connection) -> dict[str, tuple[int, str, str]]:
-        return fetch_idref_to_person_map(conn)
-
-    def fetch_orcid_to_person_map(self, conn: Connection) -> dict[str, tuple[int, str, str]]:
-        return fetch_orcid_to_person_map(conn)
-
-    def fetch_hal_account_to_person_map(self, conn: Connection) -> dict[str, tuple[int, str, str]]:
-        return fetch_hal_account_to_person_map(conn)
+    def fetch_identifier_to_person_map(
+        self, conn: Connection, id_type: str
+    ) -> dict[str, tuple[int, str, str]]:
+        return fetch_identifier_to_person_map(conn, id_type)
 
     def fetch_name_form_map(self, conn: Connection) -> dict[str, list[int]]:
         return fetch_name_form_map(conn)
