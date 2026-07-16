@@ -1,11 +1,11 @@
 """Query service : SQL de la passe de réconciliation des composantes.
 
-Implémente `application.ports.pipeline.publications_reconciliation.PublicationsReconciliationQueries`.
+Implémente `application.ports.pipeline.publications.reconciliation.PublicationsReconciliationQueries`.
 """
 
 from sqlalchemy import Connection, bindparam, text
 
-from application.ports.pipeline.publications_reconciliation import (
+from application.ports.pipeline.publications.reconciliation import (
     PublicationsReconciliationQueries,
     ReconcileRow,
 )

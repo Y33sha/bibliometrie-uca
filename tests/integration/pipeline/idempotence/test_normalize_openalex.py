@@ -109,7 +109,7 @@ def run_normalize_oa(conn):
     from sqlalchemy import text
 
     from application.pipeline.normalize.normalize_openalex import process_work
-    from application.ports.pipeline.staging import StagingRow
+    from application.ports.pipeline.normalize.staging import StagingRow
     from infrastructure.queries.pipeline.normalize.authorships import PgAuthorshipsBatchQueries
     from infrastructure.queries.pipeline.normalize.openalex import PgOpenalexNormalizeQueries
     from infrastructure.queries.pipeline.staging import PgStagingQueries

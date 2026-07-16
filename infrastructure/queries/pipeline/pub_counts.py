@@ -10,7 +10,7 @@ recalcule que les lignes touchées). Tous idempotents (`IS DISTINCT FROM`).
 
 from sqlalchemy import Connection, text
 
-from application.ports.pipeline.pub_counts import PubCountChanges, PubCountsQueries
+from application.ports.pipeline.authorships.pub_counts import PubCountChanges, PubCountsQueries
 
 
 def refresh_pub_counts(conn: Connection) -> PubCountChanges:

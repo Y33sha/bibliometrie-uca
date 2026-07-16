@@ -33,7 +33,7 @@ from application.pipeline.persons.loading import (
     load_linked_authorships_by_pub,
 )
 from application.pipeline.persons.metrics import CascadeResult
-from application.ports.pipeline.persons_matching import PersonsMatchingQueries
+from application.ports.pipeline.persons.matching import PersonsMatchingQueries
 from application.ports.repositories.person_repository import PersonRepository
 from application.services.persons.core import (
     add_identifiers_from_authorships as add_identifiers,

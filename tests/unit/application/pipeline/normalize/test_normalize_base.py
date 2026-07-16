@@ -18,7 +18,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from application.pipeline.normalize.base import NormalizeStats, SourceNormalizer
-from application.ports.pipeline.staging import StagingRow
+from application.ports.pipeline.normalize.staging import StagingRow
 
 
 def _row(label: str) -> StagingRow:

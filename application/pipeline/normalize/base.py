@@ -20,7 +20,7 @@ from sqlalchemy import Connection
 
 from application.pipeline._savepoint import savepoint
 from application.pipeline.logging_scope import scoped_logger
-from application.ports.pipeline.staging import StagingQueries, StagingRow
+from application.ports.pipeline.normalize.staging import StagingQueries, StagingRow
 
 
 class NormalizeStats(NamedTuple):

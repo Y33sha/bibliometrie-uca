@@ -9,7 +9,7 @@ from application.pipeline.affiliations.resolve_addresses import (
     process_addresses,
     run_resolution,
 )
-from application.ports.pipeline.address_resolution import StructureNameForm
+from application.ports.pipeline.affiliations.address_resolution import StructureNameForm
 from domain.structures.name_forms import is_short_form
 
 # ── Helpers pour construire des formes de test ───────────────────

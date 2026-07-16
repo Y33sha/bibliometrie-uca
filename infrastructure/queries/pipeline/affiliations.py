@@ -7,7 +7,7 @@ Deux périmètres se composent. La matview est bornée au périmètre d'extracti
 
 from sqlalchemy import Connection, text
 
-from application.ports.pipeline.affiliations import AffiliationsQueries
+from application.ports.pipeline.affiliations.in_perimeter import AffiliationsQueries
 
 # Ensembles d'ids utilisés par les deux UPDATE de `sync_in_perimeter` :
 #   should    = authorships dans le périmètre restreint, lus depuis la matview
@@ -72,7 +72,7 @@ def refresh_source_authorship_structures(conn: Connection) -> None:
 
 
 class PgAffiliationsQueries(AffiliationsQueries):
-    """Adapter PostgreSQL pour `application.ports.pipeline.affiliations.AffiliationsQueries`."""
+    """Adapter PostgreSQL pour `application.ports.pipeline.affiliations.in_perimeter.AffiliationsQueries`."""
 
     def sync_in_perimeter(self, conn: Connection, *, perimeter_ids: list[int]) -> tuple[int, int]:
         return sync_in_perimeter(conn, perimeter_ids=perimeter_ids)

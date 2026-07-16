@@ -26,7 +26,7 @@ from application.pipeline.normalize.normalize_openalex import (
     reconstruct_abstract,
     upsert_journal,
 )
-from application.ports.pipeline.staging import StagingRow
+from application.ports.pipeline.normalize.staging import StagingRow
 
 # ── Helpers de fabrication de données de test ────────────────────
 

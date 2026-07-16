@@ -7,7 +7,7 @@ Séparé de `infrastructure/queries/addresses.py`, qui sert la couche API (lectu
 
 from sqlalchemy import Connection, text
 
-from application.ports.pipeline.address_resolution import (
+from application.ports.pipeline.affiliations.address_resolution import (
     AddressResolutionQueries,
     StructureNameForm,
 )
@@ -141,7 +141,7 @@ def upsert_detected_structures_bulk(
 
 
 class PgAddressResolutionQueries(AddressResolutionQueries):
-    """Adapter PostgreSQL pour `application.ports.pipeline.address_resolution.AddressResolutionQueries`."""
+    """Adapter PostgreSQL pour `application.ports.pipeline.affiliations.address_resolution.AddressResolutionQueries`."""
 
     def load_name_forms(self, conn: Connection) -> list[StructureNameForm]:
         return load_name_forms(conn)

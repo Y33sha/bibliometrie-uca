@@ -5,7 +5,7 @@ Appelé par `application/pipeline/authorships/build_authorships.py`. Regroupe le
 
 from sqlalchemy import Connection, text
 
-from application.ports.pipeline.authorships_build import AuthorshipsBuildQueries
+from application.ports.pipeline.authorships.build import AuthorshipsBuildQueries
 from domain.sources.registry import SOURCE_PRIORITY
 from infrastructure.queries.sources_sql import source_case_sql
 
@@ -212,7 +212,7 @@ def refresh_publications_in_perimeter(conn: Connection) -> int:
 
 
 class PgAuthorshipsBuildQueries(AuthorshipsBuildQueries):
-    """Adapter PostgreSQL pour `application.ports.pipeline.authorships_build.AuthorshipsBuildQueries`."""
+    """Adapter PostgreSQL pour `application.ports.pipeline.authorships.build.AuthorshipsBuildQueries`."""
 
     def purge_authorships(self, conn: Connection) -> int:
         return purge_authorships(conn)

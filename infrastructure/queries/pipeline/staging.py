@@ -11,7 +11,7 @@ import logging
 
 from sqlalchemy import Connection, Row, text
 
-from application.ports.pipeline.staging import (
+from application.ports.pipeline.normalize.staging import (
     StagingQueries,
     StagingRow,
 )
@@ -126,7 +126,7 @@ def fetch_existing_source_ids(conn: Connection, source: str) -> set[str]:
 
 
 class PgStagingQueries(StagingQueries):
-    """Adapter PostgreSQL pour `application.ports.pipeline.staging.StagingQueries`.
+    """Adapter PostgreSQL pour `application.ports.pipeline.normalize.staging.StagingQueries`.
 
     `raw_store` (défaut : `get_raw_store()`) reçoit chaque payload `raw_data`
     juste avant sa vidange par `mark_done` (archivage hors BDD). Injectable

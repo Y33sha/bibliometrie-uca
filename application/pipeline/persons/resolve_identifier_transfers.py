@@ -12,7 +12,7 @@ from collections import defaultdict
 
 from sqlalchemy import Connection
 
-from application.ports.pipeline.persons_matching import PersonsMatchingQueries
+from application.ports.pipeline.persons.matching import PersonsMatchingQueries
 from application.ports.repositories.person_repository import PersonRepository
 from application.services.persons.core import IdentifierConflict
 from domain.persons.matching import ORCID_MATCH_SOURCES, form_matches_person

@@ -9,7 +9,7 @@ import logging
 
 from sqlalchemy import Connection
 
-from application.ports.pipeline.persons_matching import PersonsMatchingQueries
+from application.ports.pipeline.persons.matching import PersonsMatchingQueries
 
 
 def purge(

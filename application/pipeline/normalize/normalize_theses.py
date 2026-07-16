@@ -16,8 +16,8 @@ from application.pipeline.normalize._authorships_batch import AddressRecord, wri
 from application.pipeline.normalize.base import SourceNormalizer
 from application.pipeline.timings import StepTimer
 from application.ports.pipeline.normalize.authorships import AuthorshipsBatchQueries
+from application.ports.pipeline.normalize.staging import StagingQueries, StagingRow
 from application.ports.pipeline.normalize.theses import ThesesNormalizeQueries
-from application.ports.pipeline.staging import StagingQueries, StagingRow
 from application.ports.repositories.publication_repository import PublicationRepository
 from domain.dates import french_date_to_iso
 from domain.normalize import normalize_name_form

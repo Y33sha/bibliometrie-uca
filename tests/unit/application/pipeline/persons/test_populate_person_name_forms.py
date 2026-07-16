@@ -13,7 +13,7 @@ import pytest
 
 from application.pipeline.persons import populate_person_name_forms
 from application.pipeline.persons.populate_person_name_forms import BATCH_SIZE, populate
-from application.ports.pipeline.person_name_forms import (
+from application.ports.pipeline.persons.name_forms import (
     PersonNameRow,
     RawFormBatchItem,
     SyncCounts,

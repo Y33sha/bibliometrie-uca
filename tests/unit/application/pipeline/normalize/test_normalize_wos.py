@@ -906,7 +906,7 @@ class TestBuildWosAuthorRecords:
 
 def _staging_row(staging_id=1, ut="WOS:1", doi=None, raw=None):
     """Construit une `StagingRow` (NamedTuple) pour les tests de `process_record`."""
-    from application.ports.pipeline.staging import StagingRow
+    from application.ports.pipeline.normalize.staging import StagingRow
 
     return StagingRow(id=staging_id, source_id=ut, doi=doi, raw_data=raw or {})
 

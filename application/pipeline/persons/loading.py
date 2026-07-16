@@ -8,7 +8,7 @@ from typing import NamedTuple
 
 from sqlalchemy import Connection
 
-from application.ports.pipeline.persons_matching import (
+from application.ports.pipeline.persons.matching import (
     BareUnlinkedAuthorship,
     PersonsMatchingQueries,
 )

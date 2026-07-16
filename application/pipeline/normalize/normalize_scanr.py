@@ -14,7 +14,7 @@ from application.pipeline.normalize.base import SourceNormalizer
 from application.pipeline.timings import StepTimer
 from application.ports.pipeline.normalize.authorships import AuthorshipsBatchQueries
 from application.ports.pipeline.normalize.scanr import ScanrNormalizeQueries
-from application.ports.pipeline.staging import StagingQueries, StagingRow
+from application.ports.pipeline.normalize.staging import StagingQueries, StagingRow
 from application.ports.repositories.journal_repository import JournalRepository
 from application.ports.repositories.publication_repository import PublicationRepository
 from application.ports.repositories.publisher_repository import PublisherRepository
