@@ -207,7 +207,6 @@ class PgAddressRepository:
                   AND a1.countries IS NOT NULL
                   AND a2.normalized_text = a1.normalized_text
                   AND a2.countries IS DISTINCT FROM a1.countries
-                  AND LENGTH(a2.normalized_text) >= 5
                   AND a2.id <> a1.id
                 RETURNING a2.id
             """),

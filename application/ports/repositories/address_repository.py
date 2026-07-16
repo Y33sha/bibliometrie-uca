@@ -108,7 +108,7 @@ class AddressRepository(Protocol):
     ) -> list[int]:
         """Propage `countries` depuis les adresses `source_ids` vers celles qui partagent leur `normalized_text` et portent un `countries` différent (ou NULL). Retourne les ids propagés ; `source_ids` vide : `[]`.
 
-        Deux restrictions : la source doit avoir un `countries` non NULL, et la jumelle un `normalized_text` d'au moins 5 caractères — un texte plus court rapprocherait des adresses sans rapport.
+        La source doit avoir un `countries` non NULL.
         """
         ...
 
