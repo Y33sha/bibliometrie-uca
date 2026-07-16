@@ -1,12 +1,12 @@
 """Circuit-breaker par source (implémentation) : coupe les fetches d'une source à bout de budget API (429) ou en panne (5xx / réseau).
 
-Un compteur d'échecs **consécutifs** par source, partagé entre les requêtes concurrentes d'une phase via une `ContextVar` : `+1` sur requête échouée (429 / 5xx / réseau après retries), **remis à 0 au premier succès**. Au seuil, le breaker est `tripped` : `http_request_with_retry_async` court-circuite les requêtes suivantes (`SourceUnavailableError`) et la boucle de fetch saute le reste de la source — les items non traités sont retentés au run suivant (phases de rattrapage idempotentes).
+Un compteur d'échecs **consécutifs** par source, partagé au sein d'une phase via une `ContextVar` : `+1` sur requête échouée (429 / 5xx / réseau après retries), **remis à 0 au premier succès**. Au seuil, le breaker est `tripped` : les deux helpers HTTP — `http_request_with_retry` et sa variante async — court-circuitent les requêtes suivantes (`SourceUnavailableError`) et la boucle de fetch saute le reste de la source ; les items non traités sont retentés au run suivant (phases de rattrapage idempotentes).
 
 Le helper HTTP infra le manipule (check / record) ; les orchestrateurs `application/` ne consultent que l'état `tripped` via le protocole `application.ports.pipeline.circuit_breaker.CircuitBreaker` (implémenté ici en duck typing). Le câblage (création, pose de la ContextVar) est fait par la composition root `run_pipeline`.
 
 Seuil à 10 échecs consécutifs : encaisse un batch d'échecs concurrents ponctuel avant de couper la source.
 
-Concurrence : tout tourne dans l'event loop (mono-thread) ; `record_*` sont sans `await`, atomiques vis-à-vis des autres coroutines — pas de race sur le compteur partagé.
+Concurrence : `record_*` sont sans `await`, atomiques vis-à-vis des autres coroutines — pas de race quand les requêtes async d'une même phase partagent le compteur. Les appelants du helper sync (extracteurs page à page, clients de préfixes DOI, enrichissement des revues) fetchent en séquence.
 """
 
 from __future__ import annotations
