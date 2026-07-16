@@ -1,8 +1,8 @@
-"""Modèles Pydantic des routers, regroupés par domaine fonctionnel.
+"""Modèles Pydantic des routers : corps des requêtes entrantes, et réponses que le router compose lui-même.
 
-Le découpage suit les routers (`interfaces/api/routers/*`). Pour éviter de
-casser les imports historiques (`from interfaces.api.models import X`),
-ce `__init__` re-expose toutes les classes au niveau du package.
+Le découpage des modules suit celui des routers (`interfaces/api/routers/*`). Ce `__init__` re-expose les classes au niveau du package, qui est le point d'importation : `from interfaces.api.models import X`.
+
+Les projections de lecture rendues par un port vivent auprès de lui, dans `application/ports/api/` : leur contrat appartient à la couche application, et un port ne peut pas importer `interfaces/`.
 """
 
 from interfaces.api.models._common import (
@@ -53,7 +53,7 @@ from interfaces.api.models.admin.persons import (
     DetachAuthorshipsResponse,
     IdentifierReassignResponse,
     IdentifierStatusResponse,
-    MarkPersonsDistinct,
+    MarkDistinctPersons,
     MergePersons,
     NameFormStatusResponse,
     ReassignIdentifier,
@@ -70,7 +70,7 @@ from interfaces.api.models.admin.pipeline_logs import (
 from interfaces.api.models.admin.publication_duplicates import (
     MarkDistinctPublications,
     MergePublications,
-    PubMergeResponse,
+    PublicationMergeResponse,
 )
 from interfaces.api.models.admin.structures import (
     NameFormCreate,
@@ -111,8 +111,8 @@ __all__ = [
     "IdentifierStatusResponse",
     "JournalTypeChangeImpact",
     "LoginRequest",
+    "MarkDistinctPersons",
     "MarkDistinctPublications",
-    "MarkPersonsDistinct",
     "MergePersons",
     "MergePublications",
     "MergeRequest",
@@ -126,8 +126,8 @@ __all__ = [
     "PerimeterCreate",
     "PipelinePhaseLog",
     "PipelineStatus",
-    "PubMergeResponse",
     "PubYearCount",
+    "PublicationMergeResponse",
     "ReassignIdentifier",
     "RejectPerson",
     "RelationCreate",
