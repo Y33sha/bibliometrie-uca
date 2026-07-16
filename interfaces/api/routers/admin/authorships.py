@@ -1,7 +1,6 @@
-"""Authorships admin router : exclusion consolidée, gestion des orphelines.
+"""Router /api/authorships/* et /api/admin/orphan-authorships/* — les gestes admin sur les signatures.
 
-- Exclude : `PATCH /api/authorships/{id}/exclude` (niveau consolidé).
-- Orphelines : `/api/admin/orphan-authorships/*` — listage et assignation des authorships UCA sans `person_id`.
+L'exclusion rejette une contribution au niveau consolidé. Les orphelines sont les signatures du périmètre qu'aucune personne ne porte (`person_id` nul) : le router les liste et les attribue.
 """
 
 import logging

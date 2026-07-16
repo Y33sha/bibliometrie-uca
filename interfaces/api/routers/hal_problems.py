@@ -1,6 +1,6 @@
-"""Router HAL problems : diagnostics sur les dépôts HAL.
+"""Router /api/hal-problems/* — les anomalies des dépôts HAL.
 
-Regroupe les endpoints `/api/hal-problems/*` qui servent le tableau de bord qualité HAL : comptes dupliqués, dépôts en double par DOI ou métadonnées, publications manquant dans la collection d'un labo, conflits d'affiliations inter-sources.
+Sert le tableau de bord qualité HAL : comptes d'auteur dupliqués, dépôts en double par identifiant ou par métadonnées, publications absentes de la collection de leur laboratoire, affiliations en conflit d'une source à l'autre.
 """
 
 import logging

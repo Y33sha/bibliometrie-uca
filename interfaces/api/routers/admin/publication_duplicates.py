@@ -1,4 +1,4 @@
-"""Router /api/admin/duplicates/* (doublons publications)."""
+"""Router /api/admin/duplicates/* — les doublons de publications : revue, fusion, marquage comme distincts."""
 
 import logging
 

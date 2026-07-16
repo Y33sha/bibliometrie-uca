@@ -1,6 +1,6 @@
-"""Configuration du pipeline — paramètres applicatifs clé/valeur.
+"""Router /api/config/* — les paramètres clé-valeur du pipeline.
 
-La table `config` stocke des paramètres globaux (années pipeline, clés API, credentials sources, etc.). Les périmètres (table `perimeters`) sont dans le router dédié `admin/perimeters.py`.
+La table `config` porte les réglages globaux : années couvertes, identifiants d'accès aux sources, choix des périmètres par phase. La définition des périmètres eux-mêmes appartient au router `admin/perimeters.py`.
 """
 
 import logging

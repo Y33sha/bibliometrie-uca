@@ -1,4 +1,4 @@
-"""Auth endpoints: login, check, logout."""
+"""Router /api/auth/* — ouverture, vérification et fermeture de la session admin."""
 
 import logging
 import time

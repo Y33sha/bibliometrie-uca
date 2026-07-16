@@ -1,4 +1,4 @@
-"""Router Éditeurs — liste, recherche, fusion, types."""
+"""Router /api/publishers/* — les éditeurs : listes, recherche, édition, fusion."""
 
 import logging
 

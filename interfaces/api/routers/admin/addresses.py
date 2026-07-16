@@ -1,8 +1,6 @@
-"""Router /api/addresses/* et /api/countries.
+"""Router /api/addresses/* et /api/countries — les adresses brutes des sources, leur rattachement aux structures et leurs pays.
 
-Lectures : port `AddressesQueries`. Écritures : command handlers de
-`application.services.addresses.commands` (frontière transactionnelle : ils committent
-avant que le routeur ne rende la main).
+Les lectures passent par le port `AddressesQueries`, les écritures par les command handlers de `application.services.addresses.commands`, qui committent avant que le router ne rende la main.
 """
 
 import logging
@@ -126,7 +124,7 @@ def get_address_publications(
     """Échantillon de publications liées à une adresse."""
     raw_text = queries.get_address_raw_text(addr_id)
     if not raw_text:
-        raise HTTPException(status_code=404, detail="Address not found")
+        raise HTTPException(status_code=404, detail="Adresse introuvable")
     publications = queries.get_address_publications(addr_id, limit)
     return AddressPublicationsResponse(
         address_id=addr_id, raw_text=raw_text, publications=publications
