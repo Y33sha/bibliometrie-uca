@@ -70,6 +70,5 @@ Vu l'hétérogénéité des entités personnes selon les sources, il a été dé
 |--------|------|-----------|-----|-----|
 | [Unpaywall](09-sources-supplementaires.md#unpaywall) | Enrichissement OA | Statut Open Access par DOI | REST (gratuit, 100k req/jour) | *polite pool* via *mailto* |
 | [DOAJ](09-sources-supplementaires.md#doaj) | Annuaire des revues OA certifiées | Métadonnées qualifiées par revue (licence, APC, sujets…), interrogée par ISSN | REST + dump CSV bootstrap | *polite pool* via *mailto* |
-| [ROR](09-sources-supplementaires.md#ror) | Registry des organismes de recherche | Typage canonique des éditeurs (`publisher_type`) via le champ `types` du record ROR | REST v2 | *polite pool* via *mailto* |
 | [Base RH](10-imports-manuels.md#extraction-rh) | Import manuel | Personnel UCA (noms, départements, rôles) | Fichier CSV | |
 | [Données APC](10-imports-manuels.md#données-apc) | Import manuel | Paiements APC (montants, éditeurs) | Fichier CSV | |
