@@ -14,6 +14,7 @@ Champs corrigés : `doc_type` et `oa_status` (le rattachement du `journal_id` ma
 """
 
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from itertools import combinations
@@ -576,7 +577,7 @@ class DoiClusterMember(NamedTuple):
     doc_type: str | None
     title_normalized: str | None
     canonical_doi: str | None = None
-    same_work_case: str | None = None
+    same_work_case: DoiClusterCase | None = None
 
 
 class DoiClusterDecision(NamedTuple):
@@ -624,7 +625,7 @@ def resolve_cluster_doi_corrections(
     Différé : thèse/article (souvent un mistype → correction de `doc_type`, pas du DOI)."""
     canonical = next((m for m in group if m.canonical_doi), None)
     if canonical is not None and canonical.same_work_case is not None:
-        case = DoiClusterCase(canonical.same_work_case)
+        case = canonical.same_work_case
         return [DoiClusterDecision(m.id, canonical.canonical_doi, case) for m in group]
 
     book_family = [m for m in group if m.doc_type in ("book", "book_chapter")]
@@ -657,10 +658,10 @@ def resolve_cluster_doi_corrections(
 JOURNAL_BY_DOI_PREFIX = "JOURNAL_BY_DOI_PREFIX"
 
 
-def resolve_journal_by_doi(doi: str, journal_prefixes: list[tuple[str, int]]) -> int | None:
+def resolve_journal_by_doi(doi: str, journal_prefixes: Sequence[tuple[str, int]]) -> int | None:
     """Rattache un DOI au journal dont le `doi_prefix` le préfixe, le plus spécifique.
 
-    `journal_prefixes` = `[(doi_prefix, journal_id), ...]`. Renvoie le `journal_id` du préfixe le plus long qui préfixe `doi`, à condition qu'il désigne un **unique** journal à cette longueur (abstention si deux journaux portent ce même préfixe). `None` si aucun préfixe ne matche. Pur et déterministe. `doi` et les préfixes sont comparés tels quels (DOIs et `doi_prefix` stockés en minuscules). Les préfixes emboîtés (registrant nu `10.5194` et namespace `10.5194/acp`) sont départagés par le plus long.
+    `journal_prefixes` = une suite de `(doi_prefix, journal_id)`, lue sans être modifiée. Renvoie le `journal_id` du préfixe le plus long qui préfixe `doi`, à condition qu'il désigne un **unique** journal à cette longueur (abstention si deux journaux portent ce même préfixe). `None` si aucun préfixe ne matche. Pur et déterministe. `doi` et les préfixes sont comparés tels quels (DOIs et `doi_prefix` stockés en minuscules). Les préfixes emboîtés (registrant nu `10.5194` et namespace `10.5194/acp`) sont départagés par le plus long.
     """
     matches = [
         (prefix, journal_id) for prefix, journal_id in journal_prefixes if doi.startswith(prefix)

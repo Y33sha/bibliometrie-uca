@@ -9,7 +9,7 @@ from typing import NamedTuple, Protocol
 
 from sqlalchemy import Connection
 
-from domain.source_publications.correction import MetadataForCorrection
+from domain.source_publications.correction import DoiClusterCase, MetadataForCorrection
 from domain.types import JsonValue
 
 
@@ -62,6 +62,13 @@ class CorrectionUpdate(NamedTuple):
     raw_metadata: dict[str, JsonValue]
 
 
+class JournalDoiPrefixRow(NamedTuple):
+    """Un préfixe DOI et la revue qui le porte. Matière du longest-prefix-match qui rattache une `source_publication` à sa revue."""
+
+    doi_prefix: str
+    journal_id: int
+
+
 class JournalByDoiRow(NamedTuple):
     """Une `source_publication` candidate au rattachement du journal par préfixe DOI : son id, son DOI courant, son `journal_id` courant et `raw_metadata` (reconstruction du brut `journal_id` et garde « ne corriger que le manquant »)."""
 
@@ -82,7 +89,7 @@ class JournalCorrectionUpdate(NamedTuple):
 class DoiClusterRow(NamedTuple):
     """Une `source_publication` candidate à la correction de DOI par cluster.
 
-    `raw_doi` est le DOI **source reconstruit** (`raw_metadata.doi.raw` ou colonne `doi`), en minuscules — clé de regroupement par DOI. `title_normalized` sert à la comparaison chapitre/chapitre. `canonical_doi` est le DOI de l'œuvre canonique quand `raw_doi` est une **forme secondaire** DataCite (version, forme variante, ou fichier de package), sinon `None` ; `same_work_case` porte alors le `DoiClusterCase` correspondant."""
+    `raw_doi` est le DOI **source reconstruit** (`raw_metadata.doi.raw` ou colonne `doi`), en minuscules — clé de regroupement par DOI. `title_normalized` sert à la comparaison chapitre/chapitre. `canonical_doi` est le DOI de l'œuvre canonique quand `raw_doi` est une **forme secondaire** DataCite (version, forme variante, ou fichier de package), sinon `None` ; `same_work_case` porte alors le cas correspondant."""
 
     id: int
     doc_type: str | None
@@ -91,7 +98,7 @@ class DoiClusterRow(NamedTuple):
     raw_metadata: dict[str, JsonValue]
     raw_doi: str
     canonical_doi: str | None
-    same_work_case: str | None
+    same_work_case: DoiClusterCase | None
 
 
 class DoiCorrectionUpdate(NamedTuple):
@@ -124,8 +131,8 @@ class MetadataCorrectionQueries(Protocol):
         """UPDATE en lot des colonnes effectives + `raw_metadata`, bump `updated_at`, marque `keys_dirty` — `doc_type` et `external_ids` sont des clés de matching, dont la mutation appelle une réconciliation. Retourne le nombre de lignes mises à jour."""
         ...
 
-    def fetch_journal_doi_prefixes(self, conn: Connection) -> list[tuple[str, int]]:
-        """`(doi_prefix, journal_id)` de tous les journaux portant un `doi_prefix`. Carte chargée en mémoire pour le longest-prefix-match (volume négligeable)."""
+    def fetch_journal_doi_prefixes(self, conn: Connection) -> list[JournalDoiPrefixRow]:
+        """Toutes les revues portant un `doi_prefix`. Carte chargée en mémoire pour le longest-prefix-match (volume négligeable)."""
         ...
 
     def fetch_journal_by_doi_candidates(self, conn: Connection) -> list[JournalByDoiRow]:

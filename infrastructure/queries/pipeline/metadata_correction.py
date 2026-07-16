@@ -13,9 +13,11 @@ from application.ports.pipeline.metadata_correction import (
     DoiCorrectionUpdate,
     JournalByDoiRow,
     JournalCorrectionUpdate,
+    JournalDoiPrefixRow,
     MetadataCorrectionQueries,
     UnaryCorrectionRow,
 )
+from domain.source_publications.correction import DoiClusterCase
 
 # Projection partagée. Chaque colonne porte le nom du champ d'`UnaryCorrectionRow` qu'elle
 # alimente : les lignes sont construites par appariement de noms. Contenu : SP + champs joints
@@ -55,12 +57,12 @@ def fetch_for_unary_correction_by_journal(
     return [UnaryCorrectionRow(**row._mapping) for row in rows]
 
 
-def fetch_journal_doi_prefixes(conn: Connection) -> list[tuple[str, int]]:
-    """`(doi_prefix, journal_id)` de tous les journaux portant un `doi_prefix`."""
+def fetch_journal_doi_prefixes(conn: Connection) -> list[JournalDoiPrefixRow]:
+    """Toutes les revues portant un `doi_prefix`."""
     rows = conn.execute(
-        text("SELECT doi_prefix, id FROM journals WHERE doi_prefix IS NOT NULL")
+        text("SELECT doi_prefix, id AS journal_id FROM journals WHERE doi_prefix IS NOT NULL")
     ).all()
-    return [(row.doi_prefix, row.id) for row in rows]
+    return [JournalDoiPrefixRow(**row._mapping) for row in rows]
 
 
 def fetch_journal_by_doi_candidates(conn: Connection) -> list[JournalByDoiRow]:
@@ -95,6 +97,11 @@ def persist_journal_corrections(conn: Connection, updates: list[JournalCorrectio
     return len(updates)
 
 
+def _cluster_case(value: str | None) -> DoiClusterCase | None:
+    """Convertit le cas rendu par le `CASE` SQL, dont les littéraux sont ceux de l'enum."""
+    return DoiClusterCase(value) if value is not None else None
+
+
 def fetch_doi_cluster_candidates(conn: Connection) -> list[DoiClusterRow]:
     """Membres des groupes-DOI candidats à la correction par cluster.
 
@@ -108,7 +115,7 @@ def fetch_doi_cluster_candidates(conn: Connection) -> list[DoiClusterRow]:
     `book`/`book_chapter`, ou déjà corrigés (`raw_metadata.doi`, pour l'auto-cicatrisation).
     On renvoie **tous** les membres de ces DOI (toutes sources)."""
     rows = conn.execute(
-        text("""
+        text(f"""
             WITH dataset_dois AS (
                 SELECT DISTINCT lower(COALESCE(raw_metadata->'doi'->>'raw', doi)) AS d
                 FROM source_publications
@@ -122,8 +129,10 @@ def fetch_doi_cluster_candidates(conn: Connection) -> list[DoiClusterRow]:
                         lower(COALESCE(sp.raw_metadata->'doi'->>'raw', sp.doi)) AS secondary_doi,
                         lower(rel->>'doi') AS canonical_doi,
                         CASE rel->>'relation_type'
-                            WHEN 'IsVersionOf' THEN 'DATACITE_VERSION_TO_CONCEPT'
-                            WHEN 'IsVariantFormOf' THEN 'DATACITE_VARIANT_TO_PRIMARY'
+                            WHEN 'IsVersionOf'
+                                THEN '{DoiClusterCase.DATACITE_VERSION_TO_CONCEPT.value}'
+                            WHEN 'IsVariantFormOf'
+                                THEN '{DoiClusterCase.DATACITE_VARIANT_TO_PRIMARY.value}'
                         END AS same_work_case
                     FROM source_publications sp
                     CROSS JOIN LATERAL jsonb_array_elements(sp.meta->'related_identifiers') rel
@@ -141,7 +150,7 @@ def fetch_doi_cluster_candidates(conn: Connection) -> list[DoiClusterRow]:
                     SELECT
                         lower(COALESCE(sp.raw_metadata->'doi'->>'raw', sp.doi)) AS secondary_doi,
                         lower(rel->>'doi') AS canonical_doi,
-                        'DATACITE_PACKAGE_PIECE' AS same_work_case
+                        '{DoiClusterCase.DATACITE_PACKAGE_PIECE.value}' AS same_work_case
                     FROM source_publications sp
                     CROSS JOIN LATERAL jsonb_array_elements(sp.meta->'related_identifiers') rel
                     WHERE sp.source = 'datacite'
@@ -176,7 +185,19 @@ def fetch_doi_cluster_candidates(conn: Connection) -> list[DoiClusterRow]:
               ON sw.secondary_doi = lower(COALESCE(sp.raw_metadata->'doi'->>'raw', sp.doi))
         """)
     ).all()
-    return [DoiClusterRow(*row) for row in rows]
+    return [
+        DoiClusterRow(
+            id=row.id,
+            doc_type=row.doc_type,
+            doi=row.doi,
+            title_normalized=row.title_normalized,
+            raw_metadata=row.raw_metadata,
+            raw_doi=row.raw_doi,
+            canonical_doi=row.canonical_doi,
+            same_work_case=_cluster_case(row.same_work_case),
+        )
+        for row in rows
+    ]
 
 
 def persist_doi_corrections(conn: Connection, updates: list[DoiCorrectionUpdate]) -> int:
@@ -229,7 +250,7 @@ class PgMetadataCorrectionQueries(MetadataCorrectionQueries):
     def persist_corrections(self, conn: Connection, updates: list[CorrectionUpdate]) -> int:
         return persist_corrections(conn, updates)
 
-    def fetch_journal_doi_prefixes(self, conn: Connection) -> list[tuple[str, int]]:
+    def fetch_journal_doi_prefixes(self, conn: Connection) -> list[JournalDoiPrefixRow]:
         return fetch_journal_doi_prefixes(conn)
 
     def fetch_journal_by_doi_candidates(self, conn: Connection) -> list[JournalByDoiRow]:

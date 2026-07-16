@@ -14,6 +14,7 @@ from application.pipeline.metadata_correction._persist import persist_in_batches
 from application.ports.pipeline.metadata_correction import (
     JournalByDoiRow,
     JournalCorrectionUpdate,
+    JournalDoiPrefixRow,
     MetadataCorrectionQueries,
 )
 from domain.source_publications.correction import JOURNAL_BY_DOI_PREFIX, resolve_journal_by_doi
@@ -21,7 +22,7 @@ from domain.source_publications.raw_metadata import raw_value, stash_entry
 
 
 def _compute_update(
-    row: JournalByDoiRow, journal_prefixes: list[tuple[str, int]]
+    row: JournalByDoiRow, journal_prefixes: list[JournalDoiPrefixRow]
 ) -> JournalCorrectionUpdate | None:
     """État cible d'une source_publication : si le `journal_id` brut est manquant et qu'un préfixe unique matche le DOI, on pose ce journal et on stashe le brut (NULL) sous la provenance ; sinon on restaure le brut. Retourne `None` si rien ne change (idempotence / auto-cicatrisation). La source_publication possède la clé `raw_metadata.journal_id` ; les autres clés sont préservées."""
     raw_journal_id = raw_value(row.raw_metadata, "journal_id", row.journal_id)
@@ -40,7 +41,7 @@ def _compute_update(
 
 
 def compute_updates(
-    rows: list[JournalByDoiRow], journal_prefixes: list[tuple[str, int]]
+    rows: list[JournalByDoiRow], journal_prefixes: list[JournalDoiPrefixRow]
 ) -> list[JournalCorrectionUpdate]:
     """Calcule les rattachements à persister. Pur (hors I/O) : la décision vit dans `resolve_journal_by_doi`, ici on reconstruit le brut, applique la garde « manquant » et forme l'état cible."""
     updates = [u for row in rows if (u := _compute_update(row, journal_prefixes)) is not None]
