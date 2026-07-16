@@ -2,10 +2,7 @@
 
 Implémenté par `infrastructure.queries.pipeline.name_forms.PgNameFormsQueries`.
 
-Workflow attendu : l'orchestrateur peuple une table temp `_raw_forms`
-avec les formes calculées depuis `persons` (compute_person_name_forms),
-puis appelle `sync_from_raw_forms` qui agrège (UNION SQL avec
-`source_authorships`) et synchronise `person_name_forms`.
+Workflow attendu : l'orchestrateur peuple une table temp `_raw_forms` avec les formes calculées depuis `persons` (compute_person_name_forms), puis appelle `sync_from_raw_forms` qui agrège (UNION SQL avec `source_authorships`) et synchronise `person_name_forms`.
 """
 
 from typing import NamedTuple, Protocol, TypedDict
@@ -41,6 +38,5 @@ class NameFormsQueries(Protocol):
     def drop_temp_raw_forms_table(self, conn: Connection) -> None: ...
 
     def sync_from_raw_forms(self, conn: Connection) -> tuple[int, int, int]:
-        """Agrège `_raw_forms` ∪ `source_authorships` et synchronise
-        `person_name_forms`. Retourne `(inserted, updated, deleted)`."""
+        """Agrège `_raw_forms` ∪ `source_authorships` et synchronise `person_name_forms`. Retourne `(inserted, updated, deleted)`."""
         ...
