@@ -6,10 +6,7 @@ Implémente `application.ports.pipeline.oa_status.OaStatusQueries`, consommé pa
 from sqlalchemy import Connection, text
 
 from application.ports.pipeline.oa_status import OaStatusQueries, PublicationOaCheck
-from domain.publications.metadata import OPEN_ARCHIVE_SOURCES, STABLE_OA_STATUSES
-
-# Rendu SQL des statuts OA stables, pour la clause `NOT IN` de fetch_publications_with_doi.
-_STABLE_OA_SQL = "(" + ", ".join(f"'{s}'" for s in sorted(STABLE_OA_STATUSES)) + ")"
+from domain.publications.metadata import OPEN_ARCHIVE_SOURCES
 
 
 def fetch_publications_with_doi(
@@ -17,19 +14,17 @@ def fetch_publications_with_doi(
 ) -> list[PublicationOaCheck]:
     """`PublicationOaCheck` des publications à (re)vérifier sur Unpaywall.
 
-    Incrémental : ne renvoie que les publications **jamais vérifiées**
-    (`unpaywall_checked_at IS NULL` — y compris gold/diamond/hybrid, vérifiés une
-    fois car OpenAlex se trompe parfois) ou dont le statut est **changeable**
-    (hors `STABLE_OA_STATUSES`) et **périmé** (> `staleness_days`). Triées
-    jamais-vérifiées d'abord puis les plus périmées ; `limit` cape le run pour
-    lisser la charge (le backlog s'écoule sur plusieurs runs).
+    Incrémental : les publications **jamais vérifiées**, puis celles dont la
+    vérification est **périmée** (> `staleness_days`). Triées jamais-vérifiées
+    d'abord puis les plus périmées ; `limit` cape le run pour lisser la charge
+    (le backlog s'écoule sur plusieurs runs).
 
     `has_open_deposit` signale qu'une archive ouverte détient le fichier (`OPEN_ARCHIVE_SOURCES`
     avec `green`) : la phase oa_status s'en sert pour ne pas refermer un dépôt sur un `closed`
     d'Unpaywall.
     """
     rows = conn.execute(
-        text(f"""
+        text("""
             SELECT id, doi, oa_status::text AS oa_status,
                    EXISTS (
                        SELECT 1 FROM source_publications s
@@ -41,8 +36,7 @@ def fetch_publications_with_doi(
             WHERE doi IS NOT NULL
               AND (
                   unpaywall_checked_at IS NULL
-                  OR (oa_status::text NOT IN {_STABLE_OA_SQL}
-                      AND unpaywall_checked_at < now() - make_interval(days => :stale))
+                  OR unpaywall_checked_at < now() - make_interval(days => :stale)
               )
             ORDER BY unpaywall_checked_at ASC NULLS FIRST
             LIMIT :lim
@@ -60,14 +54,13 @@ def count_stale_publications(conn: Connection, *, staleness_days: int = 30) -> i
     """Nombre de publications avec DOI à (re)vérifier — même prédicat que
     `fetch_publications_with_doi`, sans cap. C'est le backlog de staleness OA."""
     return conn.execute(
-        text(f"""
+        text("""
             SELECT count(*)
             FROM publications
             WHERE doi IS NOT NULL
               AND (
                   unpaywall_checked_at IS NULL
-                  OR (oa_status::text NOT IN {_STABLE_OA_SQL}
-                      AND unpaywall_checked_at < now() - make_interval(days => :stale))
+                  OR unpaywall_checked_at < now() - make_interval(days => :stale)
               )
         """),
         {"stale": staleness_days},

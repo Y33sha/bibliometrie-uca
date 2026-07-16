@@ -34,7 +34,7 @@ Idempotent : le résultat ne dépend que de l'état courant de `publication_subj
 
 Phase `oa_status`: interroge [Unpaywall](../glossaire.md#unpaywall) par DOI pour rafraîchir `publications.oa_status` — souvent plus à jour que le statut renseigné dans les sources. Préserve `diamond` qu'Unpaywall ne distingue pas du `gold`.
 
-Incrémentale : chaque run est plafonné (10 000 DOI) et ne (re)vérifie que les publications jamais vérifiées ou dont le statut n'a pas été revu depuis 30 jours (les statuts stables `gold`, `hybrid`, `diamond` ne sont pas réinterrogés). Le retard des jamais-vérifiées s'écoule ainsi sur plusieurs runs au lieu d'un pic. La phase tourne dans tous les modes du pipeline.
+Incrémentale : chaque run est plafonné (10 000 DOI) et ne (re)vérifie que les publications jamais interrogées ou dont le statut n'a pas été revu depuis 15 jours. Le retard des jamais-vérifiées s'écoule ainsi sur plusieurs runs au lieu d'un pic. La phase tourne dans tous les modes du pipeline.
 
 Code : `application/pipeline/oa_status/phase.py`.
 
