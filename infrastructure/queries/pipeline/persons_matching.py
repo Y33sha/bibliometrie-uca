@@ -14,6 +14,7 @@ from application.ports.pipeline.persons.matching import (
     LinkedAuthorshipRow,
     PersonsMatchingQueries,
 )
+from domain.persons.matching import IdentifiedPerson, PersonNameForms
 
 
 def fetch_unlinked_authorships(conn: Connection) -> list[BareUnlinkedAuthorship]:
@@ -250,9 +251,7 @@ def fetch_cross_source_linked(conn: Connection) -> list[BareUnlinkedAuthorship]:
     return [_to_bare(r) for r in rows]
 
 
-def fetch_identifier_to_person_map(
-    conn: Connection, id_type: str
-) -> dict[str, tuple[int, str, str]]:
+def fetch_identifier_to_person_map(conn: Connection, id_type: str) -> dict[str, IdentifiedPerson]:
     """`{id_value: (person_id, last_name_normalized, first_name_normalized)}` pour les identifiants `id_type` (`idref`, `orcid`, `hal_person_id`) connus non rejetés.
 
     Le nom normalisé de la personne ciblée accompagne le `person_id` : la cascade corrobore le match identifiant par le nom (`decide_match_by_identifier`), refusant un identifiant porté par une signature étrangère.
@@ -268,7 +267,7 @@ def fetch_identifier_to_person_map(
         """),
         {"id_type": id_type},
     ).all()
-    return {r.id_value: (r.person_id, r.ln or "", r.fn or "") for r in rows}
+    return {r.id_value: IdentifiedPerson(r.person_id, r.ln or "", r.fn or "") for r in rows}
 
 
 def fetch_name_form_map(conn: Connection) -> dict[str, list[int]]:
@@ -369,9 +368,7 @@ def fetch_identifier_consensus(conn: Connection, id_type: str, values: list[str]
     return {r.id_value: r.author_name_normalized for r in rows}
 
 
-def fetch_person_name_forms(
-    conn: Connection, person_ids: list[int]
-) -> dict[int, tuple[str, str, list[str]]]:
+def fetch_person_name_forms(conn: Connection, person_ids: list[int]) -> dict[int, PersonNameForms]:
     """`{person_id: (nom_normalisé, prénom_normalisé, [formes confirmées])}`.
 
     Les formes `confirmed` accompagnent le nom-prénom canonique pour l'arbitrage des
@@ -397,7 +394,7 @@ def fetch_person_name_forms(
         """),
         {"ids": list(person_ids)},
     ).all()
-    return {r.id: (r.ln or "", r.fn or "", list(r.confirmed_forms)) for r in rows}
+    return {r.id: PersonNameForms(r.ln or "", r.fn or "", list(r.confirmed_forms)) for r in rows}
 
 
 def fetch_identifier_owners(conn: Connection, id_type: str) -> dict[str, tuple[int, str]]:
@@ -563,7 +560,7 @@ class PgPersonsMatchingQueries(PersonsMatchingQueries):
 
     def fetch_identifier_to_person_map(
         self, conn: Connection, id_type: str
-    ) -> dict[str, tuple[int, str, str]]:
+    ) -> dict[str, IdentifiedPerson]:
         return fetch_identifier_to_person_map(conn, id_type)
 
     def fetch_name_form_map(self, conn: Connection) -> dict[str, list[int]]:
@@ -582,7 +579,7 @@ class PgPersonsMatchingQueries(PersonsMatchingQueries):
 
     def fetch_person_name_forms(
         self, conn: Connection, person_ids: list[int]
-    ) -> dict[int, tuple[str, str, list[str]]]:
+    ) -> dict[int, PersonNameForms]:
         return fetch_person_name_forms(conn, person_ids)
 
     def fetch_identifier_owners(self, conn: Connection, id_type: str) -> dict[str, tuple[int, str]]:

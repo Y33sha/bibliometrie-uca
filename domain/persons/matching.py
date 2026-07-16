@@ -2,13 +2,30 @@
 
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, NamedTuple
 
 from domain.persons.name_matching import (
     names_compatible,
     parse_raw_author_name,
     same_person_name,
 )
+
+
+class IdentifiedPerson(NamedTuple):
+    """Personne ciblée par une valeur d'identifiant, avec son nom normalisé pour corroboration."""
+
+    person_id: int
+    last_name: str
+    first_name: str
+
+
+class PersonNameForms(NamedTuple):
+    """Nom normalisé d'une personne et ses formes de nom confirmées, pour l'arbitrage des transferts d'identifiant."""
+
+    last_name: str
+    first_name: str
+    confirmed_forms: list[str]
+
 
 # TODO(scanr-idref-asymetrie) : l'IdRef est matché sans restriction de source
 # (`decide_match_by_identifier(idref, idref_map)`), alors que l'IdRef ScanR provient
@@ -129,7 +146,7 @@ class IdentifierMatch:
 
 def decide_match_by_identifier(
     value: str | None,
-    identifier_map: Mapping[str, tuple[int, str, str]],
+    identifier_map: Mapping[str, IdentifiedPerson],
     signature: str,
     signature_form: str | None,
     name_form_status: Mapping[tuple[str, int], str],
@@ -150,18 +167,20 @@ def decide_match_by_identifier(
     target = identifier_map.get(value)
     if target is None:
         return IdentifierMatch()
-    person_id, target_ln, target_fn = target
+    person_id = target.person_id
 
     verdict = name_form_status.get((signature_form, person_id)) if signature_form else None
     if verdict == "confirmed":
         return IdentifierMatch(person_id=person_id)
     if verdict == "rejected":
-        return IdentifierMatch(rejection=(person_id, f"{target_fn} {target_ln}".strip()))
+        return IdentifierMatch(
+            rejection=(person_id, f"{target.first_name} {target.last_name}".strip())
+        )
 
     sig_last, sig_first = parse_raw_author_name(signature)
-    if same_person_name(sig_last, sig_first, target_ln, target_fn):
+    if same_person_name(sig_last, sig_first, target.last_name, target.first_name):
         return IdentifierMatch(person_id=person_id)
-    return IdentifierMatch(rejection=(person_id, f"{target_fn} {target_ln}".strip()))
+    return IdentifierMatch(rejection=(person_id, f"{target.first_name} {target.last_name}".strip()))
 
 
 def form_matches_person(
