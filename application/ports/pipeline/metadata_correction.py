@@ -2,10 +2,7 @@
 
 Implémenté par `infrastructure.queries.pipeline.metadata_correction.PgMetadataCorrectionQueries`.
 
-La phase persiste sur `source_publications` les valeurs corrigées par les règles
-de `domain.source_publications.correction`, pour que le matching aval lise des colonnes
-déjà corrigées. Sous-étape unaire (per-record) ici ; la sous-étape relationnelle
-(group-by-DOI) viendra en Phase 2.
+La phase persiste sur `source_publications` les valeurs corrigées par les règles de `domain.source_publications.correction`, pour que le matching aval lise des colonnes déjà corrigées. Trois sous-étapes s'appuient sur ce port : la correction unaire, qui traite chaque `source_publication` isolément ; le rattachement d'un journal par préfixe de DOI ; et la correction de DOI par groupe de `source_publications` partageant un même DOI.
 """
 
 from typing import NamedTuple, Protocol
@@ -66,9 +63,7 @@ class CorrectionUpdate(NamedTuple):
 
 
 class JournalByDoiRow(NamedTuple):
-    """Une SP candidate au rattachement du journal par préfixe DOI : son id, son DOI courant,
-    son `journal_id` courant et `raw_metadata` (reconstruction du brut `journal_id` et garde
-    « ne corriger que le manquant »)."""
+    """Une `source_publication` candidate au rattachement du journal par préfixe DOI : son id, son DOI courant, son `journal_id` courant et `raw_metadata` (reconstruction du brut `journal_id` et garde « ne corriger que le manquant »)."""
 
     id: int
     doi: str | None
@@ -77,9 +72,7 @@ class JournalByDoiRow(NamedTuple):
 
 
 class JournalCorrectionUpdate(NamedTuple):
-    """Une mise à jour de rattachement : colonne `journal_id` (posée ou restaurée à NULL) +
-    sidecar `raw_metadata`. Produite par le sous-step `journal_by_doi`, persistée via
-    `persist_journal_corrections`."""
+    """Une mise à jour de rattachement : colonne `journal_id` (posée ou restaurée à NULL) + sidecar `raw_metadata`. Produite par la sous-étape `journal_by_doi`, persistée via `persist_journal_corrections`."""
 
     id: int
     journal_id: int | None
@@ -87,13 +80,9 @@ class JournalCorrectionUpdate(NamedTuple):
 
 
 class DoiClusterRow(NamedTuple):
-    """Une SP candidate à la correction de DOI par cluster.
+    """Une `source_publication` candidate à la correction de DOI par cluster.
 
-    `raw_doi` est le DOI **source reconstruit** (`raw_metadata.doi.raw` ou colonne `doi`),
-    en minuscules — clé de regroupement par DOI. `title_normalized` sert à la comparaison
-    chapitre/chapitre. `canonical_doi` est le DOI de l'œuvre canonique quand `raw_doi` est
-    une **forme secondaire** DataCite (version, forme variante, ou fichier de package), sinon
-    `None` ; `same_work_case` porte alors le `DoiClusterCase` correspondant."""
+    `raw_doi` est le DOI **source reconstruit** (`raw_metadata.doi.raw` ou colonne `doi`), en minuscules — clé de regroupement par DOI. `title_normalized` sert à la comparaison chapitre/chapitre. `canonical_doi` est le DOI de l'œuvre canonique quand `raw_doi` est une **forme secondaire** DataCite (version, forme variante, ou fichier de package), sinon `None` ; `same_work_case` porte alors le `DoiClusterCase` correspondant."""
 
     id: int
     doc_type: str | None
@@ -106,9 +95,7 @@ class DoiClusterRow(NamedTuple):
 
 
 class DoiCorrectionUpdate(NamedTuple):
-    """Une mise à jour de correction de DOI : colonne `doi` (nullée, restaurée ou
-    substituée) + sidecar. Produite par la correction de DOI par cluster (convergence
-    même-œuvre ou nullage de DOI partagé à tort), persistée via `persist_doi_corrections`."""
+    """Une mise à jour de correction de DOI : colonne `doi` (nullée, restaurée ou substituée) + sidecar. Produite par la correction de DOI par cluster (convergence même-œuvre ou nullage de DOI partagé à tort), persistée via `persist_doi_corrections`."""
 
     id: int
     doi: str | None
@@ -116,14 +103,12 @@ class DoiCorrectionUpdate(NamedTuple):
 
 
 class MetadataCorrectionQueries(Protocol):
-    """Opérations SQL de la phase `metadata_correction`."""
+    """Lecture des candidats de chaque sous-étape, et écriture en lot des corrections qu'elles produisent."""
 
     def fetch_for_unary_correction(self, conn: Connection) -> list[UnaryCorrectionRow]:
         """Toutes les `source_publications`, avec join `journals` et `raw_metadata`.
 
-        Pas de pré-filtre par règle : certaines règles sont inconditionnelles sur
-        `doc_type` (URL theses.fr/DUMAS), donc une SP sans `doc_type` reste
-        candidate. Le filtrage fin est porté par la cascade `effective_metadata`.
+        Pas de pré-filtre par règle : certaines règles sont inconditionnelles sur `doc_type` (URL theses.fr/DUMAS), et une `source_publication` sans `doc_type` reste candidate. Le filtrage fin est porté par la cascade `effective_metadata`.
         """
         ...
 
@@ -132,43 +117,31 @@ class MetadataCorrectionQueries(Protocol):
     ) -> list[UnaryCorrectionRow]:
         """Les `source_publications` rattachées à un journal (`journal_id = :jid`).
 
-        Recompute ciblé après un changement de `journal_type` (hook admin) : seules
-        ces SP voient leur correction journal-dépendante bouger."""
+        Recompute ciblé après un changement de `journal_type` (hook admin) : seules ces `source_publications` voient leur correction journal-dépendante bouger."""
         ...
 
     def persist_corrections(self, conn: Connection, updates: list[CorrectionUpdate]) -> int:
-        """UPDATE en lot des colonnes effectives + `raw_metadata`, bump `updated_at`
-        (pour que le refresh stale aval ré-agrège la publication). Retourne le
-        nombre de lignes mises à jour."""
+        """UPDATE en lot des colonnes effectives + `raw_metadata`, bump `updated_at` (pour que le refresh stale aval ré-agrège la publication). Retourne le nombre de lignes mises à jour."""
         ...
 
     def fetch_journal_doi_prefixes(self, conn: Connection) -> list[tuple[str, int]]:
-        """`(doi_prefix, journal_id)` de tous les journaux portant un `doi_prefix`. Carte
-        chargée en mémoire pour le longest-prefix-match (volume négligeable)."""
+        """`(doi_prefix, journal_id)` de tous les journaux portant un `doi_prefix`. Carte chargée en mémoire pour le longest-prefix-match (volume négligeable)."""
         ...
 
     def fetch_journal_by_doi_candidates(self, conn: Connection) -> list[JournalByDoiRow]:
-        """SP candidates au rattachement : orphelines à DOI (`journal_id IS NULL AND doi IS
-        NOT NULL`) et SP déjà rattachées par préfixe (`raw_metadata ? 'journal_id'`, pour la
-        ré-évaluation auto-cicatrisante)."""
+        """`source_publications` candidates au rattachement : orphelines à DOI (`journal_id IS NULL AND doi IS NOT NULL`) et déjà rattachées par préfixe (`raw_metadata ? 'journal_id'`, pour la ré-évaluation auto-cicatrisante)."""
         ...
 
     def persist_journal_corrections(
         self, conn: Connection, updates: list[JournalCorrectionUpdate]
     ) -> int:
-        """UPDATE en lot de la colonne `journal_id` + `raw_metadata`, bump `updated_at`, marque
-        `keys_dirty` (pour que la réconciliation rafraîchisse le `journal_id` canonique — bien
-        que `journal_id` ne soit pas une clé de matching). Retourne le nombre de lignes."""
+        """UPDATE en lot de la colonne `journal_id` + `raw_metadata`, bump `updated_at`, marque `keys_dirty` (pour que la réconciliation rafraîchisse le `journal_id` canonique — bien que `journal_id` ne soit pas une clé de matching). Retourne le nombre de lignes."""
         ...
 
     def fetch_doi_cluster_candidates(self, conn: Connection) -> list[DoiClusterRow]:
-        """Les membres des groupes-DOI candidats à la correction par cluster, avec leur
-        `concept_doi` éventuel : groupes contenant un `book`/`book_chapter`, groupes dont le
-        DOI est un DOI de version DataCite (`IsVersionOf`), et SP déjà corrigées
-        (`raw_metadata.doi`) pour la ré-évaluation auto-cicatrisante."""
+        """Les membres des groupes-DOI candidats à la correction par cluster, avec leur `canonical_doi` éventuel : groupes contenant un `book`/`book_chapter`, groupes dont le DOI est un DOI de version DataCite (`IsVersionOf`), et `source_publications` déjà corrigées (`raw_metadata.doi`) pour la ré-évaluation auto-cicatrisante."""
         ...
 
     def persist_doi_corrections(self, conn: Connection, updates: list[DoiCorrectionUpdate]) -> int:
-        """UPDATE en lot de la colonne `doi` + `raw_metadata`, bump `updated_at`. Retourne le
-        nombre de lignes mises à jour."""
+        """UPDATE en lot de la colonne `doi` + `raw_metadata`, bump `updated_at`. Retourne le nombre de lignes mises à jour."""
         ...
