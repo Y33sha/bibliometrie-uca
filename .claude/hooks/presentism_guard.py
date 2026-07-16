@@ -45,14 +45,12 @@ HARD = [
     r"n['e]\s*(?:\w+\s+)?plus\b",
     r"n['e]\s*(?:\w+\s+)?jamais\b",
     r"au lieu de",
-    r"plutôt que",
     r"contrairement",
     r"remplace(?:nt|ment)?\b",
-    r"ancien(?:ne|s|nes)?\b",
     r"legacy",
     r"deprecated|obsolète",
     r"(?:c'est) pourquoi",
-    r"\bcar\b|\bpuisque\b|\bdonc\b|\bainsi\b",  # justification
+    r"\bcar\b|\bpuisque\b",  # justification
 ]
 
 # SOFT : peuvent être légitimes (contrat d'appel réel : « ne pas appeler depuis un thread »). Ne bloquent que si la docstring est déjà longue -> voir plus bas.
