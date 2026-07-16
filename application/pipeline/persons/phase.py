@@ -26,8 +26,8 @@ from application.pipeline.persons.cascade import run_cascade
 from application.pipeline.persons.metrics import build_metrics, log_matching_breakdown
 from application.pipeline.persons.populate_person_name_forms import populate
 from application.pipeline.persons.purge import purge
-from application.ports.pipeline.person_name_forms import PersonNameFormsQueries
-from application.ports.pipeline.persons_matching import PersonsMatchingQueries
+from application.ports.pipeline.persons.matching import PersonsMatchingQueries
+from application.ports.pipeline.persons.name_forms import PersonNameFormsQueries
 from application.ports.pipeline.transaction import OpenTransaction
 from application.ports.repositories.authorship_repository import AuthorshipRepository
 from application.ports.repositories.person_repository import PersonRepository

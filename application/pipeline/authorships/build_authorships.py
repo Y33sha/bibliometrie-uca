@@ -13,7 +13,7 @@ import time
 from sqlalchemy import Connection
 
 from application.pipeline.metrics import PhaseMetrics
-from application.ports.pipeline.authorships_build import AuthorshipsBuildQueries
+from application.ports.pipeline.authorships.build import AuthorshipsBuildQueries
 
 
 def build(

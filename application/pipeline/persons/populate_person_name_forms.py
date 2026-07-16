@@ -15,7 +15,7 @@ import logging
 
 from sqlalchemy import Connection
 
-from application.ports.pipeline.person_name_forms import PersonNameFormsQueries, RawFormBatchItem
+from application.ports.pipeline.persons.name_forms import PersonNameFormsQueries, RawFormBatchItem
 from domain.persons.name_forms import compute_person_name_forms
 
 BATCH_SIZE = 5000

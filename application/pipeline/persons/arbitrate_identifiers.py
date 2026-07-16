@@ -11,7 +11,7 @@ from application.pipeline.persons.resolve_identifier_transfers import (
     detect_identifier_conflicts,
     resolve_identifier_transfers,
 )
-from application.ports.pipeline.persons_matching import PersonsMatchingQueries
+from application.ports.pipeline.persons.matching import PersonsMatchingQueries
 from application.ports.repositories.person_repository import PersonRepository
 
 

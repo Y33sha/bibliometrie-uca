@@ -71,7 +71,7 @@ def run_normalize_hal(conn):
     from sqlalchemy import text
 
     from application.pipeline.normalize.normalize_hal import process_work
-    from application.ports.pipeline.staging import StagingRow
+    from application.ports.pipeline.normalize.staging import StagingRow
     from infrastructure.queries.pipeline.normalize.authorships import PgAuthorshipsBatchQueries
     from infrastructure.queries.pipeline.normalize.hal import PgHalNormalizeQueries
     from infrastructure.queries.pipeline.staging import PgStagingQueries

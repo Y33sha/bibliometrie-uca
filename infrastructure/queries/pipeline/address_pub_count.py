@@ -2,7 +2,7 @@
 
 from sqlalchemy import Connection, text
 
-from application.ports.pipeline.address_pub_count import AddressPubCountQueries
+from application.ports.pipeline.publications.address_pub_count import AddressPubCountQueries
 
 
 def recompute_pub_count(conn: Connection) -> int:

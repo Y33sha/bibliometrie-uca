@@ -10,7 +10,7 @@ from typing import NamedTuple
 import ahocorasick
 from sqlalchemy import Connection
 
-from application.ports.pipeline.address_resolution import (
+from application.ports.pipeline.affiliations.address_resolution import (
     AddressResolutionQueries,
     StructureNameForm,
 )

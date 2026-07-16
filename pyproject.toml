@@ -342,7 +342,7 @@ module = [
     "application.ports.api.*",
     "application.ports.pipeline.cross_imports.*",
     "application.ports.pipeline.extract.*",
-    "application.ports.pipeline.staging",
+    "application.ports.pipeline.normalize.staging",
     "application.ports.pipeline.subjects",
     "application.ports.repositories.*",
     "domain.publications.aggregation",

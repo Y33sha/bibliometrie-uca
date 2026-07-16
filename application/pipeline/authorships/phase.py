@@ -14,9 +14,11 @@ import time
 
 from application.pipeline.authorships.build_authorships import build
 from application.pipeline.metrics import PhaseMetrics
-from application.ports.pipeline.authorships_build import AuthorshipsBuildQueries
-from application.ports.pipeline.pub_counts import PubCountsQueries
-from application.ports.pipeline.purge_orphan_publications import PurgeOrphanPublicationsQueries
+from application.ports.pipeline.authorships.build import AuthorshipsBuildQueries
+from application.ports.pipeline.authorships.pub_counts import PubCountsQueries
+from application.ports.pipeline.authorships.purge_orphan_publications import (
+    PurgeOrphanPublicationsQueries,
+)
 from application.ports.pipeline.transaction import OpenTransaction
 
 # Taille des lots du DELETE de purge (un commit par lot).

@@ -19,7 +19,7 @@ from typing import NamedTuple
 from sqlalchemy import Connection
 
 from application.pipeline._savepoint import savepoint
-from application.ports.pipeline.publications_reconciliation import (
+from application.ports.pipeline.publications.reconciliation import (
     PublicationsReconciliationQueries,
     ReconcileRow,
 )

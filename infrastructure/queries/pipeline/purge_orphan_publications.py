@@ -15,7 +15,9 @@ la matview `subject_cooccurrences` en héritent.
 
 from sqlalchemy import Connection, text
 
-from application.ports.pipeline.purge_orphan_publications import PurgeOrphanPublicationsQueries
+from application.ports.pipeline.authorships.purge_orphan_publications import (
+    PurgeOrphanPublicationsQueries,
+)
 
 
 def purge_orphan_publications(conn: Connection, *, limit: int | None = None) -> int:

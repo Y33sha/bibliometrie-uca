@@ -22,7 +22,7 @@ from application.pipeline.normalize.normalize_theses import (
     process_authorships,
     process_work,
 )
-from application.ports.pipeline.staging import StagingRow
+from application.ports.pipeline.normalize.staging import StagingRow
 
 # ── Stubs ────────────────────────────────────────────────────────
 

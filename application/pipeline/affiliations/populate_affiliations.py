@@ -8,7 +8,7 @@ import time
 
 from sqlalchemy import Connection
 
-from application.ports.pipeline.affiliations import AffiliationsQueries
+from application.ports.pipeline.affiliations.in_perimeter import AffiliationsQueries
 
 
 def run_populate(

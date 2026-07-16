@@ -17,8 +17,8 @@ from sqlalchemy import Connection
 
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.publications.reconcile_components import run as reconcile_run
-from application.ports.pipeline.address_pub_count import AddressPubCountQueries
-from application.ports.pipeline.publications_reconciliation import (
+from application.ports.pipeline.publications.address_pub_count import AddressPubCountQueries
+from application.ports.pipeline.publications.reconciliation import (
     PublicationsReconciliationQueries,
 )
 from application.ports.pipeline.transaction import OpenTransaction

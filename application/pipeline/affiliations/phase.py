@@ -13,8 +13,8 @@ import time
 from application.pipeline.affiliations.populate_affiliations import run_populate
 from application.pipeline.affiliations.resolve_addresses import run_resolution
 from application.pipeline.metrics import PhaseMetrics
-from application.ports.pipeline.address_resolution import AddressResolutionQueries
-from application.ports.pipeline.affiliations import AffiliationsQueries
+from application.ports.pipeline.affiliations.address_resolution import AddressResolutionQueries
+from application.ports.pipeline.affiliations.in_perimeter import AffiliationsQueries
 from application.ports.pipeline.perimeter import PerimeterQueries
 from application.ports.pipeline.transaction import OpenTransaction
 
