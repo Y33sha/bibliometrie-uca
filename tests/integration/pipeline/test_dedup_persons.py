@@ -23,11 +23,11 @@ from sqlalchemy import text
 from application.pipeline.persons.arbitrate_identifiers import arbitrate_identifier_conflicts
 from application.pipeline.persons.cascade import run_cascade
 from application.services.persons.core import add_name_form, create_person
-from infrastructure.queries.pipeline.persons_create import PgPersonsCreateQueries
+from infrastructure.queries.pipeline.persons_matching import PgPersonsMatchingQueries
 from infrastructure.repositories import person_repository
 from tests.integration.helpers.authorships import upsert_identity
 
-_queries = PgPersonsCreateQueries()
+_queries = PgPersonsMatchingQueries()
 _logger = logging.getLogger("test")
 
 

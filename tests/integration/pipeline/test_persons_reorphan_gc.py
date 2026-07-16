@@ -4,7 +4,7 @@ forme de nom devenue ambiguë, puis GC des personnes vidées.
 
 from sqlalchemy import text
 
-from infrastructure.queries.pipeline.persons_create import (
+from infrastructure.queries.pipeline.persons_matching import (
     delete_empty_persons,
     detach_authorships,
     null_identifier_signatures,

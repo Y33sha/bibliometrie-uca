@@ -9,11 +9,11 @@ import logging
 
 from sqlalchemy import Connection
 
-from application.ports.pipeline.persons_create import PersonsCreateQueries
+from application.ports.pipeline.persons_matching import PersonsMatchingQueries
 
 
 def purge(
-    conn: Connection, queries: PersonsCreateQueries, logger: logging.Logger
+    conn: Connection, queries: PersonsMatchingQueries, logger: logging.Logger
 ) -> dict[str, int]:
     """Re-orpheline les signatures nominales à forme ambiguë puis supprime les personnes vidées.
 

@@ -33,7 +33,7 @@ from application.pipeline.persons.loading import (
     load_linked_authorships_by_pub,
 )
 from application.pipeline.persons.metrics import CascadeResult
-from application.ports.pipeline.persons_create import PersonsCreateQueries
+from application.ports.pipeline.persons_matching import PersonsMatchingQueries
 from application.ports.repositories.person_repository import PersonRepository
 from application.services.persons.core import (
     add_identifiers_from_authorships as add_identifiers,
@@ -67,7 +67,7 @@ class _Cascade:
     def __init__(
         self,
         conn: Connection,
-        queries: PersonsCreateQueries,
+        queries: PersonsMatchingQueries,
         logger: logging.Logger,
         *,
         person_repo: PersonRepository,
@@ -249,7 +249,7 @@ class _Cascade:
 
 def run_cascade(
     conn: Connection,
-    queries: PersonsCreateQueries,
+    queries: PersonsMatchingQueries,
     logger: logging.Logger,
     *,
     person_repo: PersonRepository,

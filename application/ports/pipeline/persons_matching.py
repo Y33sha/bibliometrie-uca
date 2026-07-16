@@ -2,7 +2,7 @@
 
 Les lectures alimentent la cascade de matching (signatures non liées, index d'ancrage, maps identifiant→personne, formes de nom et leurs verdicts) ; les écritures sont les réinitialisations ordre-indépendantes de la phase (détachement, re-orphelinage, suppression des personnes vides). La création d'une personne relève du service (`application.services.persons`), pas de ce port.
 
-Implémenté par `infrastructure.queries.pipeline.persons_create.PgPersonsCreateQueries`.
+Implémenté par `infrastructure.queries.pipeline.persons_matching.PgPersonsMatchingQueries`.
 """
 
 from typing import NamedTuple, Protocol
@@ -43,7 +43,7 @@ class LinkedAuthorshipRow(NamedTuple):
     source: str
 
 
-class PersonsCreateQueries(Protocol):
+class PersonsMatchingQueries(Protocol):
     """Opérations SQL pour le rattachement des authorships aux personnes."""
 
     def fetch_unlinked_authorships(self, conn: Connection) -> list[BareUnlinkedAuthorship]:

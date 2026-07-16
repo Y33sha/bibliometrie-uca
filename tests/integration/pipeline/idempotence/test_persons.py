@@ -61,10 +61,10 @@ def run_create_persons(conn):
 
     from application.pipeline.persons.arbitrate_identifiers import arbitrate_identifier_conflicts
     from application.pipeline.persons.cascade import run_cascade
-    from infrastructure.queries.pipeline.persons_create import PgPersonsCreateQueries
+    from infrastructure.queries.pipeline.persons_matching import PgPersonsMatchingQueries
     from infrastructure.repositories import person_repository
 
-    queries = PgPersonsCreateQueries()
+    queries = PgPersonsMatchingQueries()
     logger = logging.getLogger("test")
     repo = person_repository(conn)
     arbitrate_identifier_conflicts(conn, queries, logger, person_repo=repo)

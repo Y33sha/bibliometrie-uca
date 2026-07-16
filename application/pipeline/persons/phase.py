@@ -27,7 +27,7 @@ from application.pipeline.persons.metrics import build_metrics, log_matching_bre
 from application.pipeline.persons.populate_person_name_forms import populate
 from application.pipeline.persons.purge import purge
 from application.ports.pipeline.person_name_forms import PersonNameFormsQueries
-from application.ports.pipeline.persons_create import PersonsCreateQueries
+from application.ports.pipeline.persons_matching import PersonsMatchingQueries
 from application.ports.pipeline.transaction import OpenTransaction
 from application.ports.repositories.authorship_repository import AuthorshipRepository
 from application.ports.repositories.person_repository import PersonRepository
@@ -35,7 +35,7 @@ from application.ports.repositories.person_repository import PersonRepository
 
 def run(
     open_tx: OpenTransaction,
-    persons_queries: PersonsCreateQueries,
+    persons_queries: PersonsMatchingQueries,
     name_forms_queries: PersonNameFormsQueries,
     logger: logging.Logger,
     *,

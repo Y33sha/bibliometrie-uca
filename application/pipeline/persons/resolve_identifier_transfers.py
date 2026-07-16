@@ -12,7 +12,7 @@ from collections import defaultdict
 
 from sqlalchemy import Connection
 
-from application.ports.pipeline.persons_create import PersonsCreateQueries
+from application.ports.pipeline.persons_matching import PersonsMatchingQueries
 from application.ports.repositories.person_repository import PersonRepository
 from application.services.persons.core import IdentifierConflict
 from domain.persons.matching import ORCID_MATCH_SOURCES, form_matches_person
@@ -22,7 +22,7 @@ _CONFLICT_ID_TYPES = ("orcid", "idref", "hal_person_id")
 
 
 def detect_identifier_conflicts(
-    conn: Connection, queries: PersonsCreateQueries
+    conn: Connection, queries: PersonsMatchingQueries
 ) -> list[IdentifierConflict]:
     """Balaye le snapshot pour tous les conflits d'attribution d'identifiant.
 
@@ -50,7 +50,7 @@ def resolve_identifier_transfers(
     conn: Connection,
     conflicts: list[IdentifierConflict],
     *,
-    queries: PersonsCreateQueries,
+    queries: PersonsMatchingQueries,
     repo: PersonRepository,
     logger: logging.Logger,
 ) -> dict[str, int]:

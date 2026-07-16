@@ -29,7 +29,7 @@ from application.pipeline.persons.resolve_identifier_transfers import (
 )
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from infrastructure.queries.pipeline.persons_create import PgPersonsCreateQueries
+from infrastructure.queries.pipeline.persons_matching import PgPersonsMatchingQueries
 from infrastructure.repositories import person_repository
 
 log = setup_logger("remediate_identifier_captures", os.path.dirname(__file__))
@@ -44,7 +44,7 @@ def main() -> None:
     args = parser.parse_args()
 
     with get_sync_engine().connect() as conn:
-        queries = PgPersonsCreateQueries()
+        queries = PgPersonsMatchingQueries()
         conflicts = detect_identifier_conflicts(conn, queries)
         result = resolve_identifier_transfers(
             conn,
