@@ -140,10 +140,11 @@ repos:
       # Frontend : vulnérabilités, types, tests, puis build de production.
       # `--omit=dev` : seul `dependencies` part dans le bundle servi au
       # navigateur ; les failles de l'outillage de développement ne concernent
-      # pas l'application déployée.
+      # pas l'application déployée. Seuil `moderate` : c'est là que CVSS range
+      # les XSS, qui sont la menace propre au code de navigateur.
       - id: ci-frontend-audit
         name: npm audit (vulnérabilités du bundle)
-        entry: bash -c 'cd interfaces/frontend && npm audit --omit=dev --audit-level=high'
+        entry: bash -c 'cd interfaces/frontend && npm audit --omit=dev --audit-level=moderate'
         language: system
         pass_filenames: false
         always_run: true
