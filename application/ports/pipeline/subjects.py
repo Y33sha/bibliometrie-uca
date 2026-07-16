@@ -3,9 +3,19 @@
 Implémenté par `infrastructure.queries.subjects.PgSubjectsQueries`.
 """
 
-from typing import Any, Protocol
+from typing import NamedTuple, Protocol
 
 from sqlalchemy import Connection
+
+from domain.types import JsonValue
+
+
+class SourcePublicationTopics(NamedTuple):
+    """Le champ `topics` d'une `source_publication`, avec sa publication et sa source — matière première par-source de la ré-ingestion des concepts."""
+
+    publication_id: int
+    source: str
+    topics: JsonValue
 
 
 class SubjectsQueries(Protocol):
@@ -49,8 +59,8 @@ class SubjectsQueries(Protocol):
 
     def select_source_publications_for_pubs(
         self, conn: Connection, *, publication_ids: list[int]
-    ) -> list[Any]:
-        """`source_publications` (id, publication_id, source, topics) des publications données — matière première par-source de la ré-ingestion des concepts."""
+    ) -> list[SourcePublicationTopics]:
+        """Le `topics` de chaque `source_publication` des publications données, avec sa source."""
         ...
 
     def purge_orphan_subjects(self, conn: Connection) -> int:

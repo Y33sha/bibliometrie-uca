@@ -12,7 +12,7 @@ from application.ports.api.subjects_queries import (
     SubjectNeighborOut,
     SubjectsAdminQueries,
 )
-from application.ports.pipeline.subjects import SubjectsQueries
+from application.ports.pipeline.subjects import SourcePublicationTopics, SubjectsQueries
 from domain.normalize import normalize_label
 
 _UPSERT_SUBJECT_SQL = text(
@@ -173,26 +173,28 @@ def select_all_publication_ids(conn: Connection) -> list[int]:
 
 def select_source_publications_for_pubs(
     conn: Connection, *, publication_ids: list[int]
-) -> list[Any]:
-    """`source_publications` (id, publication_id, source, topics) des publications
-    données — la matière première par-source pour ré-ingérer leurs concepts en
-    conservant l'attribution `publication_subjects.source`.
+) -> list[SourcePublicationTopics]:
+    """Le `topics` de chaque `source_publication` des publications données, avec sa
+    source — matière première par-source pour ré-ingérer leurs concepts en conservant
+    l'attribution `publication_subjects.source`.
     """
     if not publication_ids:
         return []
-    return list(
-        conn.execute(
-            text(
-                """
-                SELECT id, publication_id, source, topics
-                FROM source_publications
-                WHERE publication_id = ANY(:ids)
-                ORDER BY publication_id
-                """
-            ),
-            {"ids": publication_ids},
-        ).all()
-    )
+    rows = conn.execute(
+        text(
+            """
+            SELECT publication_id, source::text AS source, topics
+            FROM source_publications
+            WHERE publication_id = ANY(:ids)
+            ORDER BY publication_id
+            """
+        ),
+        {"ids": publication_ids},
+    ).all()
+    return [
+        SourcePublicationTopics(publication_id=r.publication_id, source=r.source, topics=r.topics)
+        for r in rows
+    ]
 
 
 def purge_orphan_subjects(conn: Connection) -> int:
@@ -387,7 +389,7 @@ class PgSubjectsQueries(SubjectsQueries):
 
     def select_source_publications_for_pubs(
         self, conn: Connection, *, publication_ids: list[int]
-    ) -> list[Any]:
+    ) -> list[SourcePublicationTopics]:
         return select_source_publications_for_pubs(conn, publication_ids=publication_ids)
 
     def purge_orphan_subjects(self, conn: Connection) -> int:
