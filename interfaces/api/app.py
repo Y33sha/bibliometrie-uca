@@ -186,8 +186,9 @@ async def auth_middleware(request: Request, call_next: RequestResponseEndpoint) 
     if not payload:
         return JSONResponse(status_code=401, content={"detail": "Non authentifié"})
 
-    # Payload format : "admin_user|timestamp"
-    admin_user = payload.split("|", 1)[0] if "|" in payload else payload
+    # Le payload signé a la forme "admin_user|timestamp" ; `_verify_token` a
+    # déjà rejeté ceux qui n'ont pas d'horodatage lisible en seconde position.
+    admin_user = payload.split("|", 1)[0]
 
     # Propager l'utilisateur dans le contexte async pour que emit_event()
     # l'inclue dans les enregistrements audit_log, sans polluer les
