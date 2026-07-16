@@ -95,9 +95,15 @@ jobs:
       # navigateur. Les vulnérabilités de l'outillage (serveur de dev vite,
       # ws) ne concernent pas l'application déployée et bloqueraient la CI
       # pour un risque qu'elle ne court pas.
+      #
+      # Seuil `moderate` et non `high` : le score CVSS mesure la gravité dans
+      # l'absolu, pas dans notre contexte. Ce qui menace du code de navigateur,
+      # ce sont les XSS et les pollutions de prototype, qu'il classe justement
+      # sous la barre du `high` — elles supposent une entrée hostile et un
+      # utilisateur qui charge la page, et leur portée s'arrête à sa session.
       - name: Vulnerability scan (npm audit)
         working-directory: interfaces/frontend
-        run: npm audit --omit=dev --audit-level=high
+        run: npm audit --omit=dev --audit-level=moderate
 
       - name: Type check
         working-directory: interfaces/frontend
