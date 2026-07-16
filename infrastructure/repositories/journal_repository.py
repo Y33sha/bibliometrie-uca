@@ -13,7 +13,7 @@ from typing import Any, NamedTuple, cast
 from sqlalchemy import Connection, case, delete, func, or_, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from application.ports.repositories.journal_repository import JournalUpdate
+from application.ports.repositories.journal_repository import JournalIssnRow, JournalUpdate
 from domain.journals.journal import OA_MODELS, Journal, JournalType, OaModel
 from domain.normalize import normalize_text
 from infrastructure.db.tables import journal_name_forms, journals
@@ -156,6 +156,35 @@ class PgJournalRepository:
         return self._conn.execute(
             select(journals.c.id).where(journals.c.openalex_id == openalex_id)
         ).scalar_one_or_none()
+
+    def find_journals_of_unknown_type(self, *, limit: int | None = None) -> list[tuple[int, str]]:
+        """`(id, openalex_id)` des revues à typer via OpenAlex.
+
+        Filtre : `openalex_id` renseigné ET `journal_type = 'unknown'`. Le type est stable par revue : une revue créée naît `unknown` (défaut DB), est typée au passage, puis sort de la file. L'APC est extrait opportunistement dans la même réponse OpenAlex.
+        """
+        rows = self._conn.execute(
+            select(journals.c.id, journals.c.openalex_id)
+            .where(journals.c.openalex_id.is_not(None))
+            .where(journals.c.journal_type == "unknown")
+            .order_by(journals.c.id)
+            .limit(limit or None)
+        ).all()
+        return [(r.id, r.openalex_id) for r in rows]
+
+    def find_journal_issn_index(self) -> list[JournalIssnRow]:
+        """Les revues portant au moins un ISSN, sous l'une des trois formes."""
+        return [
+            JournalIssnRow(r.id, r.issn, r.eissn, r.issnl)
+            for r in self._conn.execute(
+                select(journals.c.id, journals.c.issn, journals.c.eissn, journals.c.issnl).where(
+                    or_(
+                        journals.c.issn.is_not(None),
+                        journals.c.eissn.is_not(None),
+                        journals.c.issnl.is_not(None),
+                    )
+                )
+            ).all()
+        ]
 
     def find_journal_by_issn_any(self, issn_value: str) -> int | None:
         """Cherche un journal dont l'un des 3 champs issn/eissn/issnl
@@ -300,6 +329,19 @@ class PgJournalRepository:
             )
         )
         self._conn.execute(stmt)
+
+    def reset_is_in_doaj(self) -> int:
+        """Efface le drapeau `is_in_doaj` des revues qui le portent.
+
+        Le `WHERE is_in_doaj` donne un rowcount juste et épargne des dead tuples : sans lui, l'UPDATE réécrirait toute la table.
+        """
+        return self._conn.execute(
+            update(journals).where(journals.c.is_in_doaj).values(is_in_doaj=False)
+        ).rowcount
+
+    def doaj_last_import_at(self) -> datetime | None:
+        """Date du dernier import DOAJ, `None` si jamais importé."""
+        return self._conn.execute(select(func.max(journals.c.doaj_imported_at))).scalar_one()
 
     # ── Fusion ─────────────────────────────────────────────────────
 

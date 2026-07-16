@@ -35,7 +35,7 @@ flowchart LR
 
 **Rattachement tardif par préfixe DOI (`metadata_correction`)** : `journal_by_doi.py` pose `source_publications.journal_id` quand un préfixe DOI unique désigne une revue (décision pure dans `domain/source_publications/correction.py`).
 
-**Enrichissement du référentiel (`publishers_journals`)** : l'orchestrateur `phase.py` enchaîne, sous gardes de config, la résolution des éditeurs (`resolve_publishers.py`), l'enrichissement OpenAlex (`enrich_journals_from_openalex.py` : APC + `journal_type` sur les revues `unknown`, via `map_openalex_source_type`), et l'import du dump DOAJ (`import_journals_from_doaj_dump.py` : `doaj_payload` + `is_in_doaj`). Adapters d'écriture : `PgJournalRepository` (`create_journal`, `enrich_journal`, `update_journal_apc`, `update_journal_doaj`, `update_journal_fields`) et `PgEnrichQueries`.
+**Enrichissement du référentiel (`publishers_journals`)** : l'orchestrateur `phase.py` enchaîne, sous gardes de config, la résolution des éditeurs (`resolve_publishers.py`), l'enrichissement OpenAlex (`enrich_journals_from_openalex.py` : APC + `journal_type` sur les revues `unknown`, via `map_openalex_source_type`), et l'import du dump DOAJ (`import_journals_from_doaj_dump.py` : `doaj_payload` + `is_in_doaj`). Adapter d'écriture : `PgJournalRepository`, qui porte aussi les files de ces sous-étapes (`find_journals_of_unknown_type`, `find_journal_issn_index`, `reset_is_in_doaj`, `doaj_last_import_at`).
 
 ## Écriture — API (curation admin)
 

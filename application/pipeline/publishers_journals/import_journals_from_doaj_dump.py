@@ -12,7 +12,6 @@ from datetime import UTC, datetime
 
 from sqlalchemy import Connection
 
-from application.ports.pipeline.enrich import EnrichQueries
 from application.ports.repositories.journal_repository import JournalRepository
 
 # Colonnes ISSN du dump CSV DOAJ.
@@ -56,7 +55,6 @@ def _extract_issns(row: dict[str, str]) -> list[str]:
 
 def run_import_doaj_dump(
     conn: Connection,
-    queries: EnrichQueries,
     logger: logging.Logger,
     *,
     journal_repo: JournalRepository,
@@ -69,7 +67,7 @@ def run_import_doaj_dump(
     rollbackée). Retourne les stats."""
     # Index ISSN → journal_id (premier gagnant) pour matcher en O(1).
     issn_to_journal_id: dict[str, int] = {}
-    for indexed_journal_id, issn, eissn, issnl in queries.fetch_journal_issn_index(conn):
+    for indexed_journal_id, issn, eissn, issnl in journal_repo.find_journal_issn_index():
         for issn_value in (issn, eissn, issnl):
             if issn_value:
                 issn_to_journal_id.setdefault(issn_value, indexed_journal_id)
@@ -77,7 +75,7 @@ def run_import_doaj_dump(
 
     # Le dump fait autorité : reset global avant de re-poser les TRUE.
     if not dry_run:
-        n_reset = queries.reset_is_in_doaj(conn)
+        n_reset = journal_repo.reset_is_in_doaj()
         logger.info("Reset is_in_doaj = FALSE sur %d journaux", n_reset)
 
     stats = DoajImportStats()

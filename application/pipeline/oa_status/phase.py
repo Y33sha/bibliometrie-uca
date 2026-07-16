@@ -15,7 +15,7 @@ import httpx
 from sqlalchemy import Connection
 
 from application.pipeline.metrics import PhaseMetrics
-from application.ports.pipeline.enrich import EnrichQueries
+from application.ports.pipeline.oa_status import OaStatusQueries
 from application.ports.repositories.publication_repository import PublicationRepository
 from domain.publications.metadata import decide_oa_status
 
@@ -33,7 +33,7 @@ STALENESS_DAYS = 15
 
 async def run(
     conn: Connection,
-    queries: EnrichQueries,
+    queries: OaStatusQueries,
     logger: logging.Logger,
     *,
     pub_repo: PublicationRepository,
