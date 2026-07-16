@@ -283,9 +283,7 @@ def get_apc_structure_ids(
 ) -> list[int]:
     """Structures considérées comme « internes » pour la catégorisation APC.
 
-    Réutilise le périmètre `perimeter_persons`, avec expansion `est_tutelle_de` : l'établissement et tous ses laboratoires. Une publication APC est classée interne dès qu'un de ses `apc_payments.budget_structure_id` appartient à cet ensemble.
-
-    Pas de cache applicatif : la lecture est un lookup par clé primaire, que FastAPI résout une fois par requête, et l'invalidation reste transparente quand le périmètre change via `/admin/config` ou que ses structures évoluent.
+    Le périmètre `perimeter_persons` dans sa clôture transitive : l'établissement et tous ses laboratoires descendants. Le filtre qui s'en sert est `infrastructure.queries.filters.apc_clause`.
     """
     return perimeter_queries.get_persons_structure_ids_list(conn)
 
