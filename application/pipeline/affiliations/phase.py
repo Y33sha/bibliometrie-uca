@@ -30,8 +30,8 @@ def run(
     logger.info("▶ refresh perimeter_structures")
     t0 = time.perf_counter()
     with open_tx() as conn:
-        n_links = perimeter_queries.refresh_perimeter_structures(conn)
-    logger.info("✓ perimeter_structures : %d liens en %.1fs", n_links, time.perf_counter() - t0)
+        perimeter_queries.refresh_perimeter_structures(conn)
+    logger.info("✓ perimeter_structures en %.1fs", time.perf_counter() - t0)
 
     logger.info("▶ resolve_addresses")
     t0 = time.perf_counter()
