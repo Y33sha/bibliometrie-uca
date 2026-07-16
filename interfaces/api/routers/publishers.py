@@ -46,12 +46,9 @@ logger = logging.getLogger(__name__)
 
 @router.get("/api/publisher-types", response_model=list[EnumOption])
 def list_publisher_types() -> list[EnumOption]:
-    """Valeurs possibles de l'enum `publisher_type` avec leur label français.
+    """Valeurs possibles de l'enum `publisher_type` avec leur libellé français.
 
-    Source de vérité côté Python : `domain.publishers.publisher.PUBLISHER_TYPES`
-    + `PUBLISHER_TYPE_LABELS_FR` (test d'intégration `TestPublisherTypesEnum`
-    vérifie la cohérence avec l'enum SQL). Sert à alimenter le dropdown de
-    la page admin éditeurs et la colonne « Type » des pages publiques.
+    La source de vérité côté Python est `domain.publishers.publisher.PUBLISHER_TYPES` et `PUBLISHER_TYPE_LABELS_FR`, dont un test d'intégration vérifie l'accord avec l'enum SQL. Alimente la liste déroulante de la page admin des éditeurs et la colonne « Type » des pages publiques.
     """
     return [EnumOption(value=v, label_fr=PUBLISHER_TYPE_LABELS_FR[v]) for v in PUBLISHER_TYPES]
 
@@ -64,11 +61,9 @@ def publishers_facets(
     with_pubs: bool = False,
     queries: PublisherQueries = Depends(publisher_queries),
 ) -> PublishersFacetsResponse:
-    """Comptes par option pour les 3 facettes du listing éditeurs.
+    """Comptes par option des facettes de la liste des éditeurs.
 
-    Convention identique à `/api/journals/facets` et
-    `/api/publications/facets` : chaque facette exclut sa propre
-    dimension de la condition WHERE.
+    Convention partagée avec `/api/journals/facets` et `/api/publications/facets` : chaque facette écarte sa propre dimension de la clause WHERE.
     """
     return queries.publishers_facets(
         search=search,
@@ -89,21 +84,15 @@ def list_publishers(
     sort: str = "name",
     queries: PublisherQueries = Depends(publisher_queries),
 ) -> PublisherListResponse:
-    """Liste paginée des éditeurs avec comptage revues + publications.
+    """Liste paginée des éditeurs, avec le décompte de leurs revues et de leurs publications.
 
     Filtres :
-    - `search` : insensible à la casse sur le nom normalisé, ignorée si
-      < 2 caractères.
-    - `publisher_type` / `country` : CSV de valeurs (ex. `commercial,learned_society`).
-      Vide = pas de filtre. Aligné sur la convention multi-valeurs de
-      `/api/journals` et `/api/publications`.
-    - `with_pubs` : si true, n'expose que les éditeurs avec au moins 1
-      publication rattachée (via leurs revues). Utilisé par la page
-      publique /publishers pour masquer les éditeurs orphelins. L'admin
-      garde l'option de tout voir (défaut false).
 
-    `sort` : `name` / `-name` / `journals` / `-journals` / `pubs` /
-    `-pubs` ; fallback sur `name` si inconnu.
+    - `search` : insensible à la casse sur le nom normalisé, ignoré en deçà de deux caractères.
+    - `publisher_type` et `country` : valeurs séparées par des virgules (par exemple `commercial,learned_society`), vide valant absence de filtre, selon la convention multi-valeurs de `/api/journals` et `/api/publications`.
+    - `with_pubs` : restreint aux éditeurs portant au moins une publication, par le détour de leurs revues. La page publique s'en sert pour masquer les éditeurs orphelins, que l'admin garde la possibilité de voir.
+
+    `sort` accepte `name`, `journals` et `pubs`, préfixés d'un tiret pour l'ordre descendant, et retombe sur `name` devant une valeur inconnue.
     """
     return queries.list_publishers(
         search=search,
@@ -121,10 +110,9 @@ def get_publisher(
     publisher_id: int,
     queries: PublisherQueries = Depends(publisher_queries),
 ) -> PublisherDetailResponse:
-    """Profil complet d'un éditeur pour la page publique `/publishers/[id]`.
+    """Profil complet d'un éditeur, pour sa page publique.
 
-    Inclut métadonnées + préfixes DOI + nombre de revues et publications
-    rattachées. 404 si l'éditeur est inconnu.
+    Porte ses métadonnées, ses préfixes DOI, et le décompte de ses revues et de ses publications. Renvoie 404 sur un éditeur inconnu.
     """
     row = queries.get_publisher_detail(publisher_id)
     if row is None:
@@ -137,11 +125,9 @@ def get_publisher_dashboard(
     publisher_id: int,
     queries: PublisherQueries = Depends(publisher_queries),
 ) -> PublisherDashboardResponse:
-    """Agrégats pour l'onglet « Dashboard » de la page éditeur.
+    """Agrégats de l'onglet tableau de bord de la page d'un éditeur.
 
-    Distribution des `journal_type` du portfolio + distributions `doc_type` /
-    `oa_status` des publications rattachées via les revues. 404 si l'éditeur
-    est inconnu.
+    Distribution des `journal_type` de son catalogue, et distributions des `doc_type` et `oa_status` des publications que ses revues portent. Renvoie 404 sur un éditeur inconnu.
     """
     result = queries.get_publisher_dashboard(publisher_id)
     if result is None:
@@ -155,10 +141,9 @@ def get_publisher_subjects(
     limit: int = Query(30, ge=1, le=200),
     queries: PublisherQueries = Depends(publisher_queries),
 ) -> list[SubjectFrequency]:
-    """Top sujets des publications de l'éditeur (pour l'onglet Dashboard).
+    """Sujets les plus fréquents des publications de l'éditeur, pour l'onglet tableau de bord.
 
-    Exclut les sujets génériques (`usage_count > 5000`). Retourne une liste
-    vide si l'éditeur existe sans publications taggées.
+    Les sujets génériques, dont l'`usage_count` dépasse 5000, sont écartés. Un éditeur sans publication indexée donne une liste vide.
     """
     return queries.get_publisher_subjects(publisher_id, limit=limit)
 
@@ -170,10 +155,9 @@ def update_publisher(
     conn: Connection = Depends(db_conn),
     repo: PublisherRepository = Depends(publisher_repo),
 ) -> OkResponse:
-    """Met à jour un éditeur (modification sélective des champs fournis).
+    """Met à jour un éditeur, champ par champ.
 
-    Seuls les champs explicitement présents dans le body sont écrits
-    (`exclude_unset=True`). Lève 404 si l'éditeur n'existe pas.
+    Seuls les champs présents dans le corps de la requête sont écrits (`exclude_unset=True`). Renvoie 404 sur un éditeur inconnu.
     """
     publisher_commands.update_publisher(conn, publisher_id, update=body, repo=repo)
     return OkResponse()
@@ -193,10 +177,7 @@ def merge(
 ) -> MergeResponse:
     """Fusionne l'éditeur `source_id` dans l'éditeur `publisher_id`.
 
-    Les revues et publications rattachées à la source sont transférées à la
-    cible ; la source est supprimée. Les journaux à titre partagé sont fusionnés
-    (et leurs publications requalifiées contre le `journal_type` cible, cf.
-    `merge_journals`). 404 si l'un des deux éditeurs est introuvable.
+    Les revues et les publications de la source passent à la cible, puis la source est supprimée. Deux revues au même titre fusionnent, et leurs publications sont requalifiées contre le `journal_type` de la cible (`merge_journals`). Renvoie 404 si l'un des deux éditeurs est introuvable.
     """
     found = queries.existing_publisher_ids((publisher_id, body.source_id))
     if publisher_id not in found:

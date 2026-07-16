@@ -26,8 +26,10 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class StatsFilters:
-    """Filtres communs à tous les endpoints stats, parsés depuis les query params CSV. Les clés
-    reprennent la signature des méthodes de `StatsQueries`, pour un passage direct en `**asdict(...)`."""
+    """Filtres communs à tous les endpoints de statistiques, lus des paramètres de requête en valeurs séparées par des virgules.
+
+    Les noms des champs reprennent ceux des méthodes de `StatsQueries`, ce qui permet de les passer en `**asdict(...)`.
+    """
 
     apc_structure_ids: list[int]
     lab_ids: list[int]
@@ -86,8 +88,10 @@ def stats_entity_facet(
     filters: StatsFilters = Depends(stats_filters),
     queries: StatsQueries = Depends(stats_queries),
 ) -> EntityFacetResponse:
-    """Facette éditeur/revue contextuelle : N premières entités sous les filtres actifs (corrélées
-    entre elles), avec décompte. `entity_search` recherche dans les noms d'entités."""
+    """Facette contextuelle des éditeurs ou des revues : les premières entités sous les filtres actifs, avec leur décompte.
+
+    Les entités sont corrélées entre elles. `entity_search` cherche dans leurs noms.
+    """
     return queries.stats_entity_facet(kind=kind, search=entity_search, **asdict(filters))
 
 
@@ -97,8 +101,10 @@ def stats_entity_label(
     entity_id: int = Query(...),
     queries: StatsQueries = Depends(stats_queries),
 ) -> EntityLabelResponse:
-    """Libellé d'une entité (revue/éditeur) par id, pour réafficher une pastille de facette restaurée
-    depuis l'URL (qui ne porte que l'id, état canonique de la sélection)."""
+    """Libellé d'une revue ou d'un éditeur par son identifiant.
+
+    Sert à réafficher une pastille de facette restaurée depuis l'URL, qui porte l'identifiant seul : il est l'état canonique de la sélection.
+    """
     return queries.resolve_entity_label(kind=kind, entity_id=entity_id)
 
 
@@ -107,8 +113,10 @@ def collaborations(
     filters: StatsFilters = Depends(stats_filters),
     queries: StatsQueries = Depends(stats_queries),
 ) -> CollaborationsResponse:
-    """Collaborations internationales : nombre de publications co-affiliées à chaque pays étranger,
-    sous les filtres actifs. Source : la colonne `countries` des publications, hors pays domestique."""
+    """Collaborations internationales : le nombre de publications co-affiliées à chaque pays étranger, sous les filtres actifs.
+
+    Le décompte se lit dans la colonne `countries` des publications, le pays domestique écarté.
+    """
     return queries.collaborations(**asdict(filters))
 
 
@@ -128,7 +136,9 @@ def pivot(
     filters: StatsFilters = Depends(stats_filters),
     queries: StatsQueries = Depends(stats_queries),
 ) -> PivotResponse:
-    """Agrégation générique : `measure` ventilée selon `group` (primaire) et `group2` (secondaire),
-    sous les filtres. Clés validées contre le registre (400 si inconnues)."""
+    """Agrégation générique : `measure` ventilée selon `group` puis `group2`, sous les filtres actifs.
+
+    Les trois clés sont validées contre le registre des mesures et des ventilations ; une clé inconnue donne un 400.
+    """
     groups = [g for g in (group, group2) if g]
     return queries.pivot(measure=measure, groups=groups, **asdict(filters))

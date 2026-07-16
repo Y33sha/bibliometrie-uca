@@ -17,11 +17,7 @@ export interface paths {
          * Auth Login
          * @description Authentifie l'admin et pose un cookie de session signé.
          *
-         *     Renvoie 401 si les identifiants ne correspondent pas à ceux
-         *     configurés (`ADMIN_USER` / `ADMIN_PASSWORD_HASH` côté serveur).
-         *     Sur succès, un cookie `session` (httponly, samesite=strict,
-         *     durée `SESSION_MAX_AGE`) est posé et autorise toutes les
-         *     mutations POST/PUT/PATCH/DELETE.
+         *     Renvoie 401 si les identifiants ne correspondent pas à ceux configurés côté serveur (`ADMIN_USER` et `ADMIN_PASSWORD_HASH`). Sur succès, un cookie `session` (httponly, samesite=strict, durée `SESSION_MAX_AGE`) est posé et autorise les écritures, que le middleware garde.
          */
         post: operations["auth_login_api_auth_login_post"];
         delete?: never;
@@ -39,10 +35,9 @@ export interface paths {
         };
         /**
          * Auth Check
-         * @description Indique si le cookie de session en cours est valide et non expiré.
+         * @description Indique si le cookie de session en cours est valide.
          *
-         *     Ne renvoie jamais 401 — c'est un endpoint de diagnostic pour le
-         *     frontend, qui s'en sert pour afficher le bouton login/logout.
+         *     Répond toujours 200 : le frontend s'en sert pour choisir entre le bouton de connexion et celui de déconnexion.
          */
         get: operations["auth_check_api_auth_check_get"];
         put?: never;
@@ -122,8 +117,9 @@ export interface paths {
         };
         /**
          * Stats Entity Facet
-         * @description Facette éditeur/revue contextuelle : N premières entités sous les filtres actifs (corrélées
-         *     entre elles), avec décompte. `entity_search` recherche dans les noms d'entités.
+         * @description Facette contextuelle des éditeurs ou des revues : les premières entités sous les filtres actifs, avec leur décompte.
+         *
+         *     Les entités sont corrélées entre elles. `entity_search` cherche dans leurs noms.
          */
         get: operations["stats_entity_facet_api_stats_facets_entities_get"];
         put?: never;
@@ -143,8 +139,9 @@ export interface paths {
         };
         /**
          * Stats Entity Label
-         * @description Libellé d'une entité (revue/éditeur) par id, pour réafficher une pastille de facette restaurée
-         *     depuis l'URL (qui ne porte que l'id, état canonique de la sélection).
+         * @description Libellé d'une revue ou d'un éditeur par son identifiant.
+         *
+         *     Sert à réafficher une pastille de facette restaurée depuis l'URL, qui porte l'identifiant seul : il est l'état canonique de la sélection.
          */
         get: operations["stats_entity_label_api_stats_facets_entity_label_get"];
         put?: never;
@@ -164,8 +161,9 @@ export interface paths {
         };
         /**
          * Collaborations
-         * @description Collaborations internationales : nombre de publications co-affiliées à chaque pays étranger,
-         *     sous les filtres actifs. Source : la colonne `countries` des publications, hors pays domestique.
+         * @description Collaborations internationales : le nombre de publications co-affiliées à chaque pays étranger, sous les filtres actifs.
+         *
+         *     Le décompte se lit dans la colonne `countries` des publications, le pays domestique écarté.
          */
         get: operations["collaborations_api_stats_collaborations_get"];
         put?: never;
@@ -205,8 +203,9 @@ export interface paths {
         };
         /**
          * Pivot
-         * @description Agrégation générique : `measure` ventilée selon `group` (primaire) et `group2` (secondaire),
-         *     sous les filtres. Clés validées contre le registre (400 si inconnues).
+         * @description Agrégation générique : `measure` ventilée selon `group` puis `group2`, sous les filtres actifs.
+         *
+         *     Les trois clés sont validées contre le registre des mesures et des ventilations ; une clé inconnue donne un 400.
          */
         get: operations["pivot_api_stats_pivot_get"];
         put?: never;
@@ -246,9 +245,9 @@ export interface paths {
         };
         /**
          * Publications Entity Facet
-         * @description Facette éditeur/revue contextuelle de la liste : N premières entités sous les filtres actifs
-         *     (corrélées entre elles), avec décompte. `entity_search` recherche dans les noms d'entités ;
-         *     `search` reste le filtre titre/sujet des publications.
+         * @description Facette contextuelle des éditeurs ou des revues : les premières entités sous les filtres actifs, avec leur décompte.
+         *
+         *     Les entités sont corrélées entre elles. `entity_search` cherche dans leurs noms, là où `search` filtre les publications sur leur titre et leurs sujets.
          */
         get: operations["publications_entity_facet_api_publications_facets_entities_get"];
         put?: never;
@@ -268,8 +267,9 @@ export interface paths {
         };
         /**
          * Publications Entity Label
-         * @description Libellé d'une entité (revue/éditeur) par id, pour réafficher une pastille de facette restaurée
-         *     depuis l'URL (qui ne porte que l'id, état canonique de la sélection).
+         * @description Libellé d'une revue ou d'un éditeur par son identifiant.
+         *
+         *     Sert à réafficher une pastille de facette restaurée depuis l'URL, qui porte l'identifiant seul : il est l'état canonique de la sélection.
          */
         get: operations["publications_entity_label_api_publications_facets_entity_label_get"];
         put?: never;
@@ -289,8 +289,7 @@ export interface paths {
         };
         /**
          * Export Publications Csv
-         * @description Export CSV des publications : mêmes filtres ET mêmes colonnes que le
-         *     tableau affiché (`columns` = clés des colonnes visibles).
+         * @description Export CSV des publications, fidèle au tableau affiché : mêmes filtres, et mêmes colonnes que celles listées dans `columns`.
          */
         get: operations["export_publications_csv_api_publications_export_csv_get"];
         put?: never;
@@ -372,12 +371,9 @@ export interface paths {
         };
         /**
          * Next Duplicate Candidate
-         * @description Renvoie la paire de publications candidate au dédoublonnage à l'offset donné.
+         * @description Paire de publications candidate au dédoublonnage, à l'offset donné.
          *
-         *     Les candidats sont produits par la requête `next_pub_duplicate`
-         *     (similarité de titre + proximité pub_year + DOI convergents) ;
-         *     `min_title_len` filtre les titres trop courts pour être
-         *     discriminants. Permet au front d'itérer pair par pair via offset.
+         *     Les candidats viennent de la requête `next_pub_duplicate`, qui rapproche les titres semblables, les années de publication voisines et les DOI convergents. `min_title_len` écarte les titres trop courts pour discriminer. L'offset laisse l'interface avancer paire par paire.
          */
         get: operations["next_duplicate_candidate_api_admin_duplicates_next_get"];
         put?: never;
@@ -401,19 +397,9 @@ export interface paths {
          * Merge Duplicate Publications
          * @description Fusionne deux publications doublons.
          *
-         *     La cible survivante est choisie implicitement (le plus petit id) : côté
-         *     publications, la direction de fusion n'a aucun effet durable, car
-         *     `refresh_from_sources` re-dérive *toutes* les métadonnées canoniques depuis
-         *     l'union des `source_publications` — union identique quel que soit le sens.
-         *     (À l'inverse des personnes, dont le nom du côté gardé survit.) Le refresh
-         *     immédiat fait converger la publication vers son état canonique sans attendre
-         *     un run du pipeline.
+         *     La cible est le plus petit des deux identifiants. Le sens de la fusion est sans portée durable : `refresh_from_sources` re-dérive toutes les métadonnées canoniques depuis l'union des `source_publications`, et cette union est la même dans un sens comme dans l'autre. Le rafraîchissement immédiat porte la publication à son état canonique sans attendre un run du pipeline.
          *
-         *     Authorships, sources, adresses et métadonnées sont transférés vers la cible ;
-         *     la source est supprimée. Fusion + refresh forment une unité transactionnelle
-         *     (command handler) : un échec est mappé en 500 et la transaction est annulée
-         *     sans état partiel. 400 si les ids sont égaux, 404 si une des publications est
-         *     introuvable.
+         *     Les signatures, les sources, les adresses et les métadonnées passent à la cible, puis la source est supprimée. La fusion et le rafraîchissement forment une seule transaction, tenue par le command handler : un échec devient un 500 et annule l'ensemble, sans état intermédiaire. Renvoie 400 sur deux identifiants égaux, 404 sur une publication introuvable.
          */
         post: operations["merge_duplicate_publications_api_admin_duplicates_merge_post"];
         delete?: never;
@@ -737,7 +723,7 @@ export interface paths {
         };
         /**
          * List Laboratories
-         * @description Liste des labos du périmètre.
+         * @description Liste des laboratoires du périmètre, avec toutes leurs tutelles.
          */
         get: operations["list_laboratories_api_laboratories_get"];
         put?: never;
@@ -797,7 +783,7 @@ export interface paths {
         };
         /**
          * Get Laboratory Dashboard
-         * @description Dashboard labo : publications par an + répartition OA.
+         * @description Agrégats du laboratoire : publications par année et répartition par statut d'accès ouvert.
          */
         get: operations["get_laboratory_dashboard_api_laboratories__lab_id__dashboard_get"];
         put?: never;
@@ -817,7 +803,7 @@ export interface paths {
         };
         /**
          * Get Laboratory Subjects
-         * @description Top sujets des publications du labo (pour le nuage de mots dashboard).
+         * @description Sujets les plus fréquents des publications du laboratoire, pour le nuage de mots de son tableau de bord.
          */
         get: operations["get_laboratory_subjects_api_laboratories__lab_id__subjects_get"];
         put?: never;
@@ -870,10 +856,9 @@ export interface paths {
         get: operations["get_structure_api_structures__structure_id__get"];
         /**
          * Update Structure
-         * @description Met à jour une structure (mise à jour sélective des champs fournis).
+         * @description Met à jour une structure, champ par champ.
          *
-         *     Seuls les champs explicitement présents dans le body sont écrits.
-         *     404 si la structure n'existe pas.
+         *     Seuls les champs présents dans le corps de la requête sont écrits. Renvoie 404 sur une structure inconnue.
          */
         put: operations["update_structure_api_structures__structure_id__put"];
         post?: never;
@@ -989,10 +974,9 @@ export interface paths {
         };
         /**
          * Persons Directory
-         * @description Annuaire public des personnes UCA avec ORCID et idHAL.
+         * @description Annuaire public des personnes du périmètre, avec leurs ORCID et idHAL.
          *
-         *     `lab_id` (optionnel) scope l'annuaire aux personnes du laboratoire — sert
-         *     l'onglet personnes de la fiche labo (un seul endpoint par entité).
+         *     `lab_id` restreint l'annuaire aux personnes d'un laboratoire : l'onglet personnes de la fiche d'un laboratoire s'en sert, plutôt que d'un endpoint qui lui serait propre.
          */
         get: operations["persons_directory_api_persons_directory_get"];
         put?: never;
@@ -1234,13 +1218,9 @@ export interface paths {
         put?: never;
         /**
          * Add Person Identifier
-         * @description Ajoute manuellement un identifiant (ORCID, idHAL ou IdRef) à une personne.
+         * @description Ajoute à la main un identifiant (ORCID, idHAL ou IdRef) à une personne.
          *
-         *     La cascade de décision (insertion / idempotence / réattribution / conflit) est
-         *     portée par `add_identifier` ; le router se contente d'appliquer la politique
-         *     d'interface (type visible UI, existence de la personne) et de traduire l'issue
-         *     en réponse. Le conflit remonte en `CannotAttributeConflict` → 409 (handler global) ;
-         *     la valeur malformée en `ValidationError` → 400 (handler global).
+         *     La cascade de décision — insertion, idempotence, réattribution, conflit — appartient à `add_identifier`. Le router applique la politique d'interface, à savoir les types que l'interface expose et l'existence de la personne, puis traduit l'issue en réponse. Les handlers globaux traduisent le conflit (`CannotAttributeConflict`) en 409 et la valeur malformée (`ValidationError`) en 400.
          */
         post: operations["add_person_identifier_api_persons__person_id__identifiers_post"];
         delete?: never;
@@ -1380,8 +1360,7 @@ export interface paths {
         put?: never;
         /**
          * Mark Persons Distinct
-         * @description Marque deux personnes comme distinctes (non-doublon) : la paire ne sera plus proposée par les
-         *     files de triage par nom / identifiant.
+         * @description Marque deux personnes comme distinctes : les files de triage par nom et par identifiant écartent la paire.
          */
         post: operations["mark_persons_distinct_api_admin_persons_mark_distinct_post"];
         delete?: never;
@@ -1479,8 +1458,9 @@ export interface paths {
         };
         /**
          * Identifier Conflicts
-         * @description Paires de personnes au même identifiant brut (ORCID / IdRef / hal_person_id / idHAL),
-         *     paginées : doublons probables ou erreurs d'attribution, à trancher à l'œil.
+         * @description Paires de personnes partageant un identifiant brut (ORCID, IdRef, hal_person_id ou idHAL), paginées.
+         *
+         *     Ce sont des doublons probables ou des erreurs d'attribution, que l'admin tranche à l'œil.
          */
         get: operations["identifier_conflicts_api_admin_identifier_conflicts_get"];
         put?: never;
@@ -1520,8 +1500,9 @@ export interface paths {
         };
         /**
          * Detachable Intruders
-         * @description Personnes rattachées à ≥2 signatures d'une même publication, avec ancre et intrus, paginées :
-         *     l'intrus se détache en rejetant sa forme de nom (`PATCH /api/persons/{id}/name-forms/status`).
+         * @description Personnes rattachées à deux signatures ou plus d'une même publication, avec leur ancre et leur intrus, paginées.
+         *
+         *     L'intrus se détache en rejetant sa forme de nom, par `PATCH /api/persons/{id}/name-forms/status`.
          */
         get: operations["detachable_intruders_api_admin_detachable_intruders_get"];
         put?: never;
@@ -1561,8 +1542,9 @@ export interface paths {
         };
         /**
          * Name Duplicates
-         * @description Paires de personnes aux noms compatibles, triées par force de réseau (co-auteurs / publis
-         *     co-signées / labos / revues communs), paginées : doublons probables en tête, homonymes en fin.
+         * @description Paires de personnes aux noms compatibles, paginées, triées par force de réseau : co-auteurs, publications co-signées, laboratoires et revues en commun.
+         *
+         *     Les doublons probables viennent en tête, les homonymes en fin.
          */
         get: operations["name_duplicates_api_admin_name_duplicates_get"];
         put?: never;
@@ -1624,8 +1606,7 @@ export interface paths {
         put?: never;
         /**
          * Detach Authorships
-         * @description Rejette durablement les paires (publication, personne) des authorships
-         *     sources sélectionnées et nettoie les formes de noms.
+         * @description Rejette durablement les paires (publication, personne) des signatures sources choisies, et nettoie les formes de nom devenues sans objet.
          */
         post: operations["detach_authorships_api_persons__person_id__detach_authorships_post"];
         delete?: never;
@@ -1649,11 +1630,9 @@ export interface paths {
         head?: never;
         /**
          * Update Name Form Status
-         * @description Met à jour le statut d'une forme de nom (pending/confirmed/rejected).
+         * @description Met à jour le statut d'une forme de nom : `pending`, `confirmed` ou `rejected`.
          *
-         *     `rejected` pose le verrou de non-retour ET détache les signatures portant la forme
-         *     (null des source_authorships + suppression des authorships canoniques orphelines) ;
-         *     `confirmed` valide le lien et corrobore les matchs par identifiant sans test de nom.
+         *     `rejected` pose un verrou durable et détache les signatures qui portent la forme : leur `person_id` est vidé dans `source_authorships`, et les signatures consolidées devenues orphelines sont supprimées. `confirmed` valide le lien et corrobore les rapprochements faits par identifiant, qui n'éprouvent pas le nom.
          */
         patch: operations["update_name_form_status_api_persons__person_id__name_forms_status_patch"];
         trace?: never;
@@ -1673,11 +1652,9 @@ export interface paths {
         head?: never;
         /**
          * Exclude Authorship Endpoint
-         * @description Rejette une contribution (« cette personne n'est pas l'auteur »).
+         * @description Rejette une contribution : cette personne n'a pas signé cette publication.
          *
-         *     Enregistre la paire (publication, personne) dans `rejected_authorships`,
-         *     détache les sources et supprime la row consolidée ; le rebuild ne la
-         *     recrée pas. Action à sens unique.
+         *     Enregistre la paire (publication, personne) dans `rejected_authorships`, détache les signatures sources et supprime la ligne consolidée. La table de rejet vaut verrou : les reconstructions ultérieures respectent l'arbitrage. Le geste est à sens unique.
          */
         patch: operations["exclude_authorship_endpoint_api_authorships__authorship_id__exclude_patch"];
         trace?: never;
@@ -1733,11 +1710,9 @@ export interface paths {
         put?: never;
         /**
          * Assign Orphan Authorship Endpoint
-         * @description Attribue une authorship orpheline à une personne.
+         * @description Attribue une signature orpheline à une personne.
          *
-         *     Renvoie 409 si la paire a déjà été rejetée et que `force` est faux
-         *     (`RejectedPairError` ; avec `force`, le rejet est d'abord levé), ou si la
-         *     signature porte déjà une personne (`AuthorshipAlreadyAssignedError`).
+         *     Renvoie 409 sur une paire déjà rejetée (`RejectedPairError`), à moins que `force` ne lève le rejet au passage, et sur une signature qui porte déjà une personne (`AuthorshipAlreadyAssignedError`).
          */
         post: operations["assign_orphan_authorship_endpoint_api_admin_orphan_authorships_assign_post"];
         delete?: never;
@@ -1757,10 +1732,9 @@ export interface paths {
         put?: never;
         /**
          * Batch Assign Orphan Authorships
-         * @description Attribue plusieurs authorships orphelines à une même personne.
+         * @description Attribue plusieurs signatures orphelines à une même personne.
          *
-         *     Renvoie 409 (`RejectedPairError`) si au moins une paire a déjà été rejetée
-         *     et que `force` est faux ; avec `force`, les rejets sont d'abord levés.
+         *     Renvoie 409 (`RejectedPairError`) dès qu'une paire du lot est déjà rejetée, à moins que `force` ne lève les rejets au passage.
          */
         post: operations["batch_assign_orphan_authorships_api_admin_orphan_authorships_batch_assign_post"];
         delete?: never;
@@ -1942,9 +1916,9 @@ export interface paths {
         };
         /**
          * List Perimeters
-         * @description Liste tous les périmètres avec leurs structures racines résolues.
+         * @description Liste les périmètres avec leurs structures racines.
          *
-         *     Pour chaque périmètre, renvoie les structures racines directes (`structures`) et le décompte total après descente récursive des relations (`structure_count`). Le décompte inclut donc les sous-structures rattachées par `est_tutelle_de` / `est_partenaire_de`.
+         *     `structures` porte les seules racines ; `structure_count` compte l'ensemble effectif, racines et descendants par `est_tutelle_de` réunis.
          */
         get: operations["list_perimeters_api_perimeters_get"];
         put?: never;
@@ -2034,12 +2008,9 @@ export interface paths {
         };
         /**
          * List Publisher Types
-         * @description Valeurs possibles de l'enum `publisher_type` avec leur label français.
+         * @description Valeurs possibles de l'enum `publisher_type` avec leur libellé français.
          *
-         *     Source de vérité côté Python : `domain.publishers.publisher.PUBLISHER_TYPES`
-         *     + `PUBLISHER_TYPE_LABELS_FR` (test d'intégration `TestPublisherTypesEnum`
-         *     vérifie la cohérence avec l'enum SQL). Sert à alimenter le dropdown de
-         *     la page admin éditeurs et la colonne « Type » des pages publiques.
+         *     La source de vérité côté Python est `domain.publishers.publisher.PUBLISHER_TYPES` et `PUBLISHER_TYPE_LABELS_FR`, dont un test d'intégration vérifie l'accord avec l'enum SQL. Alimente la liste déroulante de la page admin des éditeurs et la colonne « Type » des pages publiques.
          */
         get: operations["list_publisher_types_api_publisher_types_get"];
         put?: never;
@@ -2059,11 +2030,9 @@ export interface paths {
         };
         /**
          * Publishers Facets
-         * @description Comptes par option pour les 3 facettes du listing éditeurs.
+         * @description Comptes par option des facettes de la liste des éditeurs.
          *
-         *     Convention identique à `/api/journals/facets` et
-         *     `/api/publications/facets` : chaque facette exclut sa propre
-         *     dimension de la condition WHERE.
+         *     Convention partagée avec `/api/journals/facets` et `/api/publications/facets` : chaque facette écarte sa propre dimension de la clause WHERE.
          */
         get: operations["publishers_facets_api_publishers_facets_get"];
         put?: never;
@@ -2083,21 +2052,15 @@ export interface paths {
         };
         /**
          * List Publishers
-         * @description Liste paginée des éditeurs avec comptage revues + publications.
+         * @description Liste paginée des éditeurs, avec le décompte de leurs revues et de leurs publications.
          *
          *     Filtres :
-         *     - `search` : insensible à la casse sur le nom normalisé, ignorée si
-         *       < 2 caractères.
-         *     - `publisher_type` / `country` : CSV de valeurs (ex. `commercial,learned_society`).
-         *       Vide = pas de filtre. Aligné sur la convention multi-valeurs de
-         *       `/api/journals` et `/api/publications`.
-         *     - `with_pubs` : si true, n'expose que les éditeurs avec au moins 1
-         *       publication rattachée (via leurs revues). Utilisé par la page
-         *       publique /publishers pour masquer les éditeurs orphelins. L'admin
-         *       garde l'option de tout voir (défaut false).
          *
-         *     `sort` : `name` / `-name` / `journals` / `-journals` / `pubs` /
-         *     `-pubs` ; fallback sur `name` si inconnu.
+         *     - `search` : insensible à la casse sur le nom normalisé, ignoré en deçà de deux caractères.
+         *     - `publisher_type` et `country` : valeurs séparées par des virgules (par exemple `commercial,learned_society`), vide valant absence de filtre, selon la convention multi-valeurs de `/api/journals` et `/api/publications`.
+         *     - `with_pubs` : restreint aux éditeurs portant au moins une publication, par le détour de leurs revues. La page publique s'en sert pour masquer les éditeurs orphelins, que l'admin garde la possibilité de voir.
+         *
+         *     `sort` accepte `name`, `journals` et `pubs`, préfixés d'un tiret pour l'ordre descendant, et retombe sur `name` devant une valeur inconnue.
          */
         get: operations["list_publishers_api_publishers_get"];
         put?: never;
@@ -2117,18 +2080,16 @@ export interface paths {
         };
         /**
          * Get Publisher
-         * @description Profil complet d'un éditeur pour la page publique `/publishers/[id]`.
+         * @description Profil complet d'un éditeur, pour sa page publique.
          *
-         *     Inclut métadonnées + préfixes DOI + nombre de revues et publications
-         *     rattachées. 404 si l'éditeur est inconnu.
+         *     Porte ses métadonnées, ses préfixes DOI, et le décompte de ses revues et de ses publications. Renvoie 404 sur un éditeur inconnu.
          */
         get: operations["get_publisher_api_publishers__publisher_id__get"];
         /**
          * Update Publisher
-         * @description Met à jour un éditeur (modification sélective des champs fournis).
+         * @description Met à jour un éditeur, champ par champ.
          *
-         *     Seuls les champs explicitement présents dans le body sont écrits
-         *     (`exclude_unset=True`). Lève 404 si l'éditeur n'existe pas.
+         *     Seuls les champs présents dans le corps de la requête sont écrits (`exclude_unset=True`). Renvoie 404 sur un éditeur inconnu.
          */
         put: operations["update_publisher_api_publishers__publisher_id__put"];
         post?: never;
@@ -2147,11 +2108,9 @@ export interface paths {
         };
         /**
          * Get Publisher Dashboard
-         * @description Agrégats pour l'onglet « Dashboard » de la page éditeur.
+         * @description Agrégats de l'onglet tableau de bord de la page d'un éditeur.
          *
-         *     Distribution des `journal_type` du portfolio + distributions `doc_type` /
-         *     `oa_status` des publications rattachées via les revues. 404 si l'éditeur
-         *     est inconnu.
+         *     Distribution des `journal_type` de son catalogue, et distributions des `doc_type` et `oa_status` des publications que ses revues portent. Renvoie 404 sur un éditeur inconnu.
          */
         get: operations["get_publisher_dashboard_api_publishers__publisher_id__dashboard_get"];
         put?: never;
@@ -2171,10 +2130,9 @@ export interface paths {
         };
         /**
          * Get Publisher Subjects
-         * @description Top sujets des publications de l'éditeur (pour l'onglet Dashboard).
+         * @description Sujets les plus fréquents des publications de l'éditeur, pour l'onglet tableau de bord.
          *
-         *     Exclut les sujets génériques (`usage_count > 5000`). Retourne une liste
-         *     vide si l'éditeur existe sans publications taggées.
+         *     Les sujets génériques, dont l'`usage_count` dépasse 5000, sont écartés. Un éditeur sans publication indexée donne une liste vide.
          */
         get: operations["get_publisher_subjects_api_publishers__publisher_id__subjects_get"];
         put?: never;
@@ -2198,10 +2156,7 @@ export interface paths {
          * Merge
          * @description Fusionne l'éditeur `source_id` dans l'éditeur `publisher_id`.
          *
-         *     Les revues et publications rattachées à la source sont transférées à la
-         *     cible ; la source est supprimée. Les journaux à titre partagé sont fusionnés
-         *     (et leurs publications requalifiées contre le `journal_type` cible, cf.
-         *     `merge_journals`). 404 si l'un des deux éditeurs est introuvable.
+         *     Les revues et les publications de la source passent à la cible, puis la source est supprimée. Deux revues au même titre fusionnent, et leurs publications sont requalifiées contre le `journal_type` de la cible (`merge_journals`). Renvoie 404 si l'un des deux éditeurs est introuvable.
          */
         post: operations["merge_api_publishers__publisher_id__merge_post"];
         delete?: never;
@@ -2219,11 +2174,9 @@ export interface paths {
         };
         /**
          * List Oa Models
-         * @description Valeurs possibles de `oa_model` avec leur label français.
+         * @description Valeurs possibles de `oa_model` avec leur libellé français.
          *
-         *     Source de vérité côté Python : `domain.journals.journal.OA_MODELS` +
-         *     `OA_MODEL_LABELS_FR`. Sert à alimenter les facettes « Modèle OA » des
-         *     listings de revues et le dropdown du modal d'édition admin.
+         *     La source de vérité côté Python est `domain.journals.journal.OA_MODELS` et `OA_MODEL_LABELS_FR`. Alimente la facette « Modèle OA » des listes de revues et la liste déroulante de la modale d'édition admin.
          */
         get: operations["list_oa_models_api_journals_oa_models_get"];
         put?: never;
@@ -2243,12 +2196,9 @@ export interface paths {
         };
         /**
          * List Journal Types
-         * @description Valeurs possibles de l'enum `journal_type` avec leur label français.
+         * @description Valeurs possibles de l'enum `journal_type` avec leur libellé français.
          *
-         *     Source de vérité côté Python : `domain.journals.journal.JOURNAL_TYPES` +
-         *     `JOURNAL_TYPE_LABELS_FR` (test d'intégration `TestJournalTypesEnum`
-         *     vérifie la cohérence avec l'enum SQL). Sert à alimenter le dropdown de
-         *     la page admin revues et la colonne « Type » des pages publiques.
+         *     La source de vérité côté Python est `domain.journals.journal.JOURNAL_TYPES` et `JOURNAL_TYPE_LABELS_FR`, dont un test d'intégration vérifie l'accord avec l'enum SQL. Alimente la liste déroulante de la page admin des revues et la colonne « Type » des pages publiques.
          */
         get: operations["list_journal_types_api_journal_types_get"];
         put?: never;
@@ -2268,12 +2218,9 @@ export interface paths {
         };
         /**
          * Journals Facets
-         * @description Comptes par option pour les 3 facettes du listing revues.
+         * @description Comptes par option des facettes de la liste des revues.
          *
-         *     Convention identique à `/api/publications/facets` : chaque facette
-         *     exclut sa propre dimension de la condition WHERE, ce qui permet
-         *     d'afficher le nombre de revues atteignables si l'option était
-         *     (dé)cochée.
+         *     Convention partagée avec `/api/publications/facets` : chaque facette écarte sa propre dimension de la clause WHERE, de sorte que son décompte annonce le nombre de revues atteignables si l'option était cochée ou décochée.
          */
         get: operations["journals_facets_api_journals_facets_get"];
         put?: never;
@@ -2293,23 +2240,17 @@ export interface paths {
         };
         /**
          * List Journals
-         * @description Liste paginée des revues avec comptage des publications rattachées.
+         * @description Liste paginée des revues, avec le décompte de leurs publications.
          *
          *     Filtres :
-         *     - `search` : insensible à la casse sur le titre normalisé, ignorée si
-         *       < 2 caractères.
-         *     - `publisher_id` : égalité stricte.
-         *     - `journal_type` / `oa_model` : CSV de valeurs (ex. `journal,proceedings`).
-         *       Vide = pas de filtre. Aligné sur la convention multi-valeurs de
-         *       `/api/publications`.
-         *     - `is_in_doaj` : booléen (true/false). Omettre = pas de filtre.
-         *     - `with_pubs` : si true, n'expose que les revues avec au moins 1
-         *       publication rattachée. Utilisé par la page publique /journals pour
-         *       masquer les revues orphelines (résiduels de pipeline ou imports
-         *       sans match). L'admin garde l'option de tout voir (défaut false).
          *
-         *     `sort` : `title` / `-title` / `publisher` / `-publisher` /
-         *     `pubs` / `-pubs` ; fallback sur `title` si valeur inconnue.
+         *     - `search` : insensible à la casse sur le titre normalisé, ignoré en deçà de deux caractères.
+         *     - `publisher_id` : égalité stricte.
+         *     - `journal_type` et `oa_model` : valeurs séparées par des virgules (par exemple `journal,proceedings`), vide valant absence de filtre, selon la convention multi-valeurs de `/api/publications`.
+         *     - `is_in_doaj` : booléen ; omis, il ne filtre rien.
+         *     - `with_pubs` : restreint aux revues portant au moins une publication. La page publique s'en sert pour masquer les revues orphelines, que l'admin garde la possibilité de voir.
+         *
+         *     `sort` accepte `title`, `publisher` et `pubs`, préfixés d'un tiret pour l'ordre descendant, et retombe sur `title` devant une valeur inconnue.
          */
         get: operations["list_journals_api_journals_get"];
         put?: never;
@@ -2329,19 +2270,18 @@ export interface paths {
         };
         /**
          * Get Journal
-         * @description Profil complet d'une revue pour la page publique `/journals/[id]`.
+         * @description Profil complet d'une revue, pour sa page publique.
          *
-         *     Inclut métadonnées + payload DOAJ brut + date d'import DOAJ + nombre de
-         *     publications rattachées. 404 si la revue est inconnue.
+         *     Porte ses métadonnées, la réponse DOAJ brute et sa date d'import, et le décompte de ses publications. Renvoie 404 sur une revue inconnue.
          */
         get: operations["get_journal_api_journals__journal_id__get"];
         /**
          * Update Journal
-         * @description Met à jour une revue (modification sélective des champs fournis).
+         * @description Met à jour une revue, champ par champ.
          *
-         *     Seuls les champs explicitement présents dans le body sont écrits (`exclude_unset=True`). Lève 404 si la revue n'existe pas.
+         *     Seuls les champs présents dans le corps de la requête sont écrits (`exclude_unset=True`). Renvoie 404 sur une revue inconnue.
          *
-         *     Si `journal_type` change effectivement de valeur, déclenche la requalification synchrone du `doc_type` des publications rattachées dans la même transaction — cf. `requalify_publications_for_journal` côté application. Le caller frontal aura typiquement appelé le preview (`type-change-impact`) en amont pour afficher l'ampleur à l'admin.
+         *     Un `journal_type` qui change de valeur entraîne la requalification du `doc_type` des publications rattachées, dans la même transaction (`requalify_publications_for_journal`). L'endpoint `type-change-impact` en donne l'ampleur avant confirmation.
          */
         put: operations["update_journal_api_journals__journal_id__put"];
         post?: never;
@@ -2360,11 +2300,9 @@ export interface paths {
         };
         /**
          * Get Journal Dashboard
-         * @description Agrégats des publications de la revue (distribution `doc_type` + `oa_status`).
+         * @description Agrégats des publications de la revue : distributions de `doc_type` et de `oa_status`.
          *
-         *     Sert l'onglet « Dashboard » de la page publique d'une revue pour repérer
-         *     visuellement les incohérences (ex. `article` sur un journal_type
-         *     `proceedings`). 404 si la revue est inconnue.
+         *     Sert l'onglet tableau de bord de la page d'une revue, où ces distributions donnent à voir les incohérences — un `article` dans une revue de type `proceedings`, par exemple. Renvoie 404 sur une revue inconnue.
          */
         get: operations["get_journal_dashboard_api_journals__journal_id__dashboard_get"];
         put?: never;
@@ -2384,11 +2322,9 @@ export interface paths {
         };
         /**
          * Get Journal Subjects
-         * @description Top sujets des publications de la revue (pour l'onglet Dashboard).
+         * @description Sujets les plus fréquents des publications de la revue, pour l'onglet tableau de bord.
          *
-         *     Exclut les sujets trop génériques (`usage_count > 5000`) pour ne pas
-         *     noyer le top-N. Retourne une liste vide si la revue existe sans
-         *     publications taggées (pas de 404 pour rester idempotent à l'usage UI).
+         *     Les sujets génériques, dont l'`usage_count` dépasse 5000, sont écartés : ils noieraient les autres. Une revue sans publication indexée donne une liste vide.
          */
         get: operations["get_journal_subjects_api_journals__journal_id__subjects_get"];
         put?: never;
@@ -2408,11 +2344,9 @@ export interface paths {
         };
         /**
          * Get Type Change Impact
-         * @description Compte combien de publications du journal verraient leur `doc_type` changer si on passait `journal_type` à `new_type`.
+         * @description Compte les publications de la revue dont le `doc_type` changerait si son `journal_type` passait à `new_type`.
          *
-         *     Preview honnête vis-à-vis du PUT : on applique réellement (set du type → recompute des
-         *     corrections SP → refresh) dans un `SAVEPOINT` qu'on rollback ensuite — preview et apply
-         *     partagent exactement la même logique, aucune écriture ne survit.
+         *     L'aperçu applique réellement le changement — écriture du type, recalcul des corrections sur les publications sources, rafraîchissement — dans un `SAVEPOINT` annulé ensuite. Il emprunte donc le chemin exact de l'édition, et aucune écriture ne survit.
          */
         get: operations["get_type_change_impact_api_journals__journal_id__type_change_impact_get"];
         put?: never;
@@ -2436,10 +2370,7 @@ export interface paths {
          * Merge
          * @description Fusionne la revue `source_id` dans la revue `journal_id`.
          *
-         *     Les publications et métadonnées de la source sont transférées à la cible ;
-         *     la source est supprimée. Les publications absorbées sont requalifiées contre
-         *     le `journal_type` de la cible (cf. `merge_journals`). 404 si l'une des deux
-         *     est introuvable.
+         *     Les publications et les métadonnées de la source passent à la cible, puis la source est supprimée. Les publications absorbées sont requalifiées contre le `journal_type` de la cible (`merge_journals`). Renvoie 404 si l'une des deux revues est introuvable.
          */
         post: operations["merge_api_journals__journal_id__merge_post"];
         delete?: never;
@@ -2481,8 +2412,7 @@ export interface paths {
          * Phase Log
          * @description Log d'une phase, découpé depuis `logs/pipeline.log`.
          *
-         *     `available` est faux (et `content` vide) quand le fichier est absent
-         *     (`LOG_TO_FILE` désactivé) ou quand la section est introuvable (log purgé).
+         *     `available` vaut vrai quand la section de la phase a été retrouvée ; sinon `content` est vide, que le fichier soit absent (`LOG_TO_FILE` inactif) ou que la section ait été purgée.
          */
         get: operations["phase_log_api_admin_pipeline_runs__run_id__phases__phase__log_get"];
         put?: never;
@@ -2522,8 +2452,7 @@ export interface paths {
         };
         /**
          * List Runs
-         * @description Fenêtre de runs (agrégés par `run_id`), plus récent en premier ; `offset` pour
-         *     le chargement incrémental.
+         * @description Fenêtre de runs agrégés par `run_id`, le plus récent en tête ; `offset` sert au chargement incrémental.
          */
         get: operations["list_runs_api_admin_pipeline_runs_get"];
         put?: never;
@@ -2583,7 +2512,7 @@ export interface paths {
         };
         /**
          * Get Subject
-         * @description Détail d'un sujet + ses voisins par co-occurrence (top N).
+         * @description Détail d'un sujet et ses voisins par co-occurrence, les plus fréquents d'abord.
          */
         get: operations["get_subject_api_subjects__subject_id__get"];
         put?: never;

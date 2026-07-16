@@ -26,11 +26,7 @@ def auth_login(
 ) -> OkResponse:
     """Authentifie l'admin et pose un cookie de session signé.
 
-    Renvoie 401 si les identifiants ne correspondent pas à ceux
-    configurés (`ADMIN_USER` / `ADMIN_PASSWORD_HASH` côté serveur).
-    Sur succès, un cookie `session` (httponly, samesite=strict,
-    durée `SESSION_MAX_AGE`) est posé et autorise toutes les
-    mutations POST/PUT/PATCH/DELETE.
+    Renvoie 401 si les identifiants ne correspondent pas à ceux configurés côté serveur (`ADMIN_USER` et `ADMIN_PASSWORD_HASH`). Sur succès, un cookie `session` (httponly, samesite=strict, durée `SESSION_MAX_AGE`) est posé et autorise les écritures, que le middleware garde.
     """
     from fastapi import HTTPException
 
@@ -51,10 +47,9 @@ def auth_login(
 
 @router.get("/api/auth/check", response_model=AuthCheckResponse)
 def auth_check(session: str | None = Cookie(None, alias="session")) -> AuthCheckResponse:
-    """Indique si le cookie de session en cours est valide et non expiré.
+    """Indique si le cookie de session en cours est valide.
 
-    Ne renvoie jamais 401 — c'est un endpoint de diagnostic pour le
-    frontend, qui s'en sert pour afficher le bouton login/logout.
+    Répond toujours 200 : le frontend s'en sert pour choisir entre le bouton de connexion et celui de déconnexion.
     """
     return AuthCheckResponse(authenticated=bool(session and _verify_token(session)))
 

@@ -101,10 +101,9 @@ def update_structure(
     repo: StructureRepository = Depends(structure_repo),
     audit: AuditRepository = Depends(audit_repo),
 ) -> StructureOut:
-    """Met à jour une structure (mise à jour sélective des champs fournis).
+    """Met à jour une structure, champ par champ.
 
-    Seuls les champs explicitement présents dans le body sont écrits.
-    404 si la structure n'existe pas.
+    Seuls les champs présents dans le corps de la requête sont écrits. Renvoie 404 sur une structure inconnue.
     """
     fields = data.model_dump(exclude_unset=True)
     return StructureOut.model_validate(
