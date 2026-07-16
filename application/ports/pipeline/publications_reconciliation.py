@@ -9,6 +9,8 @@ from typing import NamedTuple, Protocol
 
 from sqlalchemy import Connection
 
+from domain.types import JsonValue
+
 
 class ReconcileRow(NamedTuple):
     """Projection d'une `source_publication` du voisinage : clés + publication courante.
@@ -18,7 +20,7 @@ class ReconcileRow(NamedTuple):
 
     id: int
     doi: str | None
-    external_ids: dict[str, object] | None
+    external_ids: dict[str, JsonValue] | None
     publication_id: int | None
     doc_type: str | None
     title_normalized: str | None
