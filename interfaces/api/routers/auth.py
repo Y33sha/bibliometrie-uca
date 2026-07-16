@@ -1,9 +1,8 @@
 """Router /api/auth/* — ouverture, vérification et fermeture de la session admin."""
 
-import logging
 import time
 
-from fastapi import APIRouter, Cookie, Depends, Response
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Response
 
 from interfaces.api.deps import (
     SESSION_MAX_AGE,
@@ -15,7 +14,6 @@ from interfaces.api.deps import (
 from interfaces.api.models import AuthCheckResponse, LoginRequest, OkResponse
 
 router = APIRouter()
-logger = logging.getLogger(__name__)
 
 
 @router.post("/api/auth/login", response_model=OkResponse)
@@ -26,10 +24,8 @@ def auth_login(
 ) -> OkResponse:
     """Authentifie l'admin et pose un cookie de session signé.
 
-    Renvoie 401 si les identifiants ne correspondent pas à ceux configurés côté serveur (`ADMIN_USER` et `ADMIN_PASSWORD_HASH`). Sur succès, un cookie `session` (httponly, samesite=strict, durée `SESSION_MAX_AGE`) est posé et autorise les écritures, que le middleware garde.
+    Renvoie 401 si les identifiants ne correspondent pas à ceux configurés côté serveur (`ADMIN_USER` et `ADMIN_HASH`). Sur succès, un cookie `session` (httponly, samesite=strict, durée `SESSION_MAX_AGE`) est posé et autorise les écritures, que le middleware garde.
     """
-    from fastapi import HTTPException
-
     if data.username != admin_user or not _check_password(data.password):
         raise HTTPException(status_code=401, detail="Identifiants incorrects")
     payload = f"{admin_user}|{int(time.time())}"

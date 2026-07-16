@@ -17,7 +17,7 @@ export interface paths {
          * Auth Login
          * @description Authentifie l'admin et pose un cookie de session signé.
          *
-         *     Renvoie 401 si les identifiants ne correspondent pas à ceux configurés côté serveur (`ADMIN_USER` et `ADMIN_PASSWORD_HASH`). Sur succès, un cookie `session` (httponly, samesite=strict, durée `SESSION_MAX_AGE`) est posé et autorise les écritures, que le middleware garde.
+         *     Renvoie 401 si les identifiants ne correspondent pas à ceux configurés côté serveur (`ADMIN_USER` et `ADMIN_HASH`). Sur succès, un cookie `session` (httponly, samesite=strict, durée `SESSION_MAX_AGE`) est posé et autorise les écritures, que le middleware garde.
          */
         post: operations["auth_login_api_auth_login_post"];
         delete?: never;
