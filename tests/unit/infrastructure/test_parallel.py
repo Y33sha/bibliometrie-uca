@@ -2,7 +2,7 @@
 
 import pytest
 
-from infrastructure.concurrency import run_parallel
+from infrastructure.parallel import run_parallel
 
 
 def test_returns_results_by_label():

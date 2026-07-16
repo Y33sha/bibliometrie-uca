@@ -129,8 +129,8 @@ def phase_extract(
     câblage : registre des adapters, primitif de parallélisme, lecture de la dernière extraction.
     """
     from application.pipeline.extract.phase import run
-    from infrastructure.concurrency import run_parallel
     from infrastructure.observability.phase_executions import get_last_extract_date
+    from infrastructure.parallel import run_parallel
 
     registry = _extractors()
 
@@ -220,7 +220,7 @@ def phase_cross_imports(
     Séquence, parallélisme et métriques dans `application/pipeline/cross_imports/phase.py`.
     """
     from application.pipeline.cross_imports.phase import run
-    from infrastructure.concurrency import run_parallel
+    from infrastructure.parallel import run_parallel
 
     return run(
         mode=mode,
