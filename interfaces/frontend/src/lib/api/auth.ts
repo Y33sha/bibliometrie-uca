@@ -1,15 +1,17 @@
 import { api, post } from './client';
+import type { components } from './schema';
 
-export type AuthCheck = { authenticated: boolean; user?: string };
+type AuthCheckResponse = components['schemas']['AuthCheckResponse'];
+type OkResponse = components['schemas']['OkResponse'];
 
-export function check(): Promise<AuthCheck> {
-	return api<AuthCheck>('/api/auth/check');
+export function check(): Promise<AuthCheckResponse> {
+	return api<AuthCheckResponse>('/api/auth/check');
 }
 
-export function login(username: string, password: string): Promise<AuthCheck> {
-	return post<AuthCheck>('/api/auth/login', { username, password });
+export function login(username: string, password: string): Promise<OkResponse> {
+	return post<OkResponse>('/api/auth/login', { username, password });
 }
 
-export function logout(): Promise<null> {
-	return post<null>('/api/auth/logout');
+export function logout(): Promise<OkResponse> {
+	return post<OkResponse>('/api/auth/logout');
 }
