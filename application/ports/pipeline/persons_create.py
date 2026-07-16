@@ -13,11 +13,7 @@ class BareUnlinkedAuthorship(NamedTuple):
 
     `roles` non vide en pratique uniquement pour theses (auteur vs directeur).
 
-    `in_perimeter` reflète la détection UCA de la source sur cette signature.
-    Les candidats `in_perimeter = FALSE` ne sont rattachables que par les
-    barreaux non-nominaux de la cascade (identifiants forts, cross-source) —
-    le matching/création par forme de nom reste réservé au périmètre UCA
-    (cf. `decide_name_form_outcome` et l'orchestrateur).
+    `in_perimeter` reflète la détection d'une structure du périmètre sur cette signature. Les candidats `in_perimeter = FALSE` ne sont rattachables que par les barreaux non-nominaux de la cascade (identifiants forts, cross-source) — le matching/création par forme de nom reste réservé au périmètre (cf. `decide_name_form_outcome` et l'orchestrateur).
     """
 
     authorship_id: int

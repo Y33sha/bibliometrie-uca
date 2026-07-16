@@ -1,5 +1,4 @@
-"""Port : opérations SQL pour la phase d'ingestion des sujets
-et le recalcul des co-occurrences.
+"""Port : opérations SQL pour la phase d'ingestion des sujets et le recalcul des co-occurrences.
 
 Implémenté par `infrastructure.queries.subjects.PgSubjectsQueries`.
 """
@@ -10,8 +9,7 @@ from sqlalchemy import Connection
 
 
 class SubjectsQueries(Protocol):
-    """Toutes les opérations SQL nécessaires aux phases `subjects` et
-    `cooccurrences`."""
+    """Toutes les opérations SQL nécessaires aux phases `subjects` et `cooccurrences`."""
 
     def upsert_subject(
         self,
@@ -22,8 +20,7 @@ class SubjectsQueries(Protocol):
     ) -> int:
         """UPSERT d'un sujet (clé d'unicité = lower(label)). Retourne l'id.
 
-        Au `ON CONFLICT`, la `language` déjà posée est conservée (premier
-        non-null gagne)."""
+        Au `ON CONFLICT`, la `language` déjà posée est conservée (premier non-null gagne)."""
         ...
 
     def link_publication_subjects_bulk(
@@ -33,39 +30,31 @@ class SubjectsQueries(Protocol):
         source: str,
         rows: list[tuple[int, int]],
     ) -> int:
-        """Bulk INSERT (avec ON CONFLICT) de liens publication↔subject pour
-        une source. Dédoublonne `(pub_id, subject_id)` côté client."""
+        """Bulk INSERT (avec ON CONFLICT) de liens publication↔subject pour une source. Dédoublonne `(pub_id, subject_id)` côté client."""
         ...
 
     def clear_publication_subjects_for_pubs(
         self, conn: Connection, *, publication_ids: list[int]
     ) -> int:
-        """`DELETE` des liens (non rejetés) des publications données, toutes
-        sources. Préserve les liens rejetés. Retourne le rowcount."""
+        """`DELETE` des liens (non rejetés) des publications données, toutes sources. Préserve les liens rejetés. Retourne le rowcount."""
         ...
 
     def select_publications_to_reingest(self, conn: Connection) -> list[int]:
-        """Ids des publications dont les sujets sont à (ré)ingérer : contenu
-        canonique modifié depuis la dernière ingestion (`publications.updated_at`
-        > `max(publication_subjects.created_at)`), ou jamais ingérées."""
+        """Ids des publications dont les sujets sont à (ré)ingérer : contenu canonique modifié depuis la dernière ingestion (`publications.updated_at` > `max(publication_subjects.created_at)`), ou jamais ingérées."""
         ...
 
     def select_all_publication_ids(self, conn: Connection) -> list[int]:
-        """Ids de toutes les publications — pour une ré-ingestion complète
-        (`rebuild`), indépendante du signal incrémental."""
+        """Ids de toutes les publications — pour une ré-ingestion complète (`rebuild`), indépendante du signal incrémental."""
         ...
 
     def select_source_publications_for_pubs(
         self, conn: Connection, *, publication_ids: list[int]
     ) -> list[Any]:
-        """`source_publications` (id, publication_id, source, topics) des
-        publications données — matière première par-source de la ré-ingestion
-        des concepts."""
+        """`source_publications` (id, publication_id, source, topics) des publications données — matière première par-source de la ré-ingestion des concepts."""
         ...
 
     def purge_orphan_subjects(self, conn: Connection) -> int:
-        """`DELETE` des sujets sans aucun lien `publication_subjects` (tous
-        statuts). Retourne le nombre supprimé."""
+        """`DELETE` des sujets sans aucun lien `publication_subjects` (tous statuts). Retourne le nombre supprimé."""
         ...
 
     def count_subjects(self, conn: Connection) -> int:
@@ -77,6 +66,5 @@ class SubjectsQueries(Protocol):
         ...
 
     def refresh_cooccurrences(self, conn: Connection) -> int:
-        """Rafraîchit la matview `subject_cooccurrences`. Retourne le nombre
-        de paires après refresh (seuil `count >= 2` figé dans la matview)."""
+        """Rafraîchit la matview `subject_cooccurrences`. Retourne le nombre de paires après refresh (seuil `count >= 2` figé dans la matview)."""
         ...

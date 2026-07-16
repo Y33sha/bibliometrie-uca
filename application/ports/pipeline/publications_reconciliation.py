@@ -13,11 +13,8 @@ from sqlalchemy import Connection
 class ReconcileRow(NamedTuple):
     """Projection d'une `source_publication` du voisinage : clés + publication courante.
 
-    `doc_type`/`title_normalized`/`pub_year` alimentent le token métadonnée thèse de
-    `project_confirmation_keys` (les identifiants viennent de `doi`/`external_ids`).
-    `publication_id` = `None` si orpheline ; `publication_doi` = DOI canonique de la
-    publication courante (`None` si orpheline), pour choisir l'ancre ; `in_perimeter` =
-    la SP a ≥1 authorship in-périmètre (gate de création d'une pub neuve)."""
+    `doc_type`/`title_normalized`/`pub_year` alimentent le token métadonnée thèse de `project_confirmation_keys` (les identifiants viennent de `doi`/`external_ids`).
+    `publication_id` = `None` si orpheline ; `publication_doi` = DOI canonique de la publication courante (`None` si orpheline), pour choisir l'ancre ; `in_perimeter` = la SP a ≥1 authorship in-périmètre (gate de création d'une pub neuve)."""
 
     id: int
     doi: str | None
@@ -36,30 +33,22 @@ class PublicationsReconciliationQueries(Protocol):
     def mark_keys_dirty(self, conn: Connection) -> int:
         """Pose `keys_dirty = true` sur toutes les `source_publications` (rebuild complet).
 
-        Retourne le nombre de lignes marquées. Force la réconciliation à dégénérer en
-        cluster-then-materialize global (après une évolution des règles de clés).
+        Retourne le nombre de lignes marquées. Force la réconciliation à dégénérer en cluster-then-materialize global (après une évolution des règles de clés).
         """
         ...
 
     def fetch_dirty_source_publication_ids(self, conn: Connection) -> list[int]:
-        """Les `source_publications` `keys_dirty` (**orphelines comprises** : la réconciliation est
-        aussi l'assignation). Seeds à réconcilier puis à nettoyer (`clear_keys_dirty`)."""
+        """Les `source_publications` `keys_dirty` (**orphelines comprises** : la réconciliation est aussi l'assignation). Seeds à réconcilier puis à nettoyer (`clear_keys_dirty`)."""
         ...
 
     def fetch_reconciliation_universe(self, conn: Connection) -> list[ReconcileRow]:
-        """Le voisinage 1-hop : les SP dirty (orphelines comprises) **et** les SP qui partagent une
-        clé de confirmation (DOI / NNT / hal_id / PMID, ou le composite thèse `title_normalized`+`pub_year`)
-        avec l'une d'elles — matérialisées ou orphelines. Univers sur lequel tourne `connected_components`."""
+        """Le voisinage 1-hop : les SP dirty (orphelines comprises) **et** les SP qui partagent une clé de confirmation (DOI / NNT / hal_id / PMID, ou le composite thèse `title_normalized`+`pub_year`) avec l'une d'elles — matérialisées ou orphelines. Univers sur lequel tourne `connected_components`."""
         ...
 
     def fetch_publication_ids_by_doi(self, conn: Connection) -> dict[str, int]:
         """Map `lower(doi) → id` des publications existantes portant un DOI.
 
-        Permet à `plan_reconciliation` d'ancrer un groupe sur la publication qui porte
-        déjà son DOI même quand **aucune** SP du voisinage n'y est rattachée — publication
-        devenue orpheline après un TRUNCATE + réimport des sources, ou dérive du
-        `publications.doi` vis-à-vis de ses sources. Sans cela, le groupe créerait une
-        publication neuve qui heurterait la contrainte unique sur le DOI."""
+        Permet à `plan_reconciliation` d'ancrer un groupe sur la publication qui porte déjà son DOI même quand **aucune** SP du voisinage n'y est rattachée — publication devenue orpheline après un TRUNCATE + réimport des sources, ou dérive du `publications.doi` vis-à-vis de ses sources. Sans cela, le groupe créerait une publication neuve qui heurterait la contrainte unique sur le DOI."""
         ...
 
     def repoint_source_publications(
@@ -71,10 +60,7 @@ class PublicationsReconciliationQueries(Protocol):
     def repoint_dependents(
         self, conn: Connection, from_publication_id: int, to_publication_id: int
     ) -> None:
-        """Re-pointe les dépendants curatés/importés d'une publication **dissoute** vers son
-        successeur : paires `distinct_publications` (réordonnées + dédupliquées) et
-        `apc_payments`. À appeler avant la suppression de la publication dissoute (sinon CASCADE
-        / SET NULL les perdrait)."""
+        """Re-pointe les dépendants curatés/importés d'une publication **dissoute** vers son successeur : paires `distinct_publications` (réordonnées + dédupliquées) et `apc_payments`. À appeler avant la suppression de la publication dissoute (sinon CASCADE / SET NULL les perdrait)."""
         ...
 
     def clear_keys_dirty(self, conn: Connection, source_publication_ids: list[int]) -> int:
