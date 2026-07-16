@@ -30,6 +30,24 @@ class TestCountrySuggester:
         pool = [("univ x clermont ferrand cedex france", ["FR"])]
         assert CountrySuggester(targets).suggest(pool) == {1: ["FR"]}
 
+    def test_target_matches_whole_words_only(self):
+        # Match au mot près : « ip » se distingue de « philippe » et « equipe ».
+        targets = [(1, "ip")]
+        pool = [("philippe equipe lab", ["FR"])]
+        assert CountrySuggester(targets).suggest(pool) == {}
+
+    def test_short_target_matches_as_whole_word(self):
+        # Une cible courte reste éligible dès lors qu'elle matche un mot entier.
+        targets = [(1, "ip")]
+        pool = [("lab ip univ", ["FR"])]
+        assert CountrySuggester(targets).suggest(pool) == {1: ["FR"]}
+
+    def test_target_matches_at_pool_text_boundaries(self):
+        # Le texte du pool est encadré d'espaces : une cible en tête ou en queue matche.
+        targets = [(1, "lyon")]
+        pool = [("lyon cedex", ["FR"]), ("chu de lyon", ["FR"])]
+        assert CountrySuggester(targets).suggest(pool) == {1: ["FR"]}
+
     def test_pool_address_counts_once_per_target(self):
         # "ab" apparaît 2x dans la 1re adresse pool mais ne compte qu'une fois.
         targets = [(1, "ab")]
