@@ -28,6 +28,14 @@ class RawFormBatchItem(TypedDict):
     source: str
 
 
+class SyncCounts(NamedTuple):
+    """Bilan d'une synchronisation de `person_name_forms`."""
+
+    inserted: int
+    updated: int
+    deleted: int
+
+
 class PersonNameFormsQueries(Protocol):
     """Opérations SQL pour synchroniser `person_name_forms` depuis les sources."""
 
@@ -39,6 +47,6 @@ class PersonNameFormsQueries(Protocol):
 
     def drop_temp_raw_forms_table(self, conn: Connection) -> None: ...
 
-    def sync_from_raw_forms(self, conn: Connection) -> tuple[int, int, int]:
-        """Agrège `_raw_forms` ∪ `source_authorships` et synchronise `person_name_forms`. Retourne `(inserted, updated, deleted)`."""
+    def sync_from_raw_forms(self, conn: Connection) -> SyncCounts:
+        """Agrège `_raw_forms` ∪ `source_authorships` et synchronise `person_name_forms`."""
         ...

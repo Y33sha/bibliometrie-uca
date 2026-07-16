@@ -17,6 +17,7 @@ from application.ports.pipeline.person_name_forms import (
     PersonNameFormsQueries,
     PersonNameRow,
     RawFormBatchItem,
+    SyncCounts,
 )
 
 
@@ -66,7 +67,7 @@ def drop_temp_raw_forms_table(conn: Connection) -> None:
     conn.execute(text("DROP TABLE _raw_forms"))
 
 
-def sync_from_raw_forms(conn: Connection) -> tuple[int, int, int]:
+def sync_from_raw_forms(conn: Connection) -> SyncCounts:
     """Agrège `_raw_forms` ∪ `source_authorships` et synchronise `person_name_forms`.
 
     Construit en table temp `_expected_pnf` l'état attendu agrégé par
@@ -81,12 +82,10 @@ def sync_from_raw_forms(conn: Connection) -> tuple[int, int, int]:
     - il ne **modifie jamais** le `status` d'une ligne existante (l'UPDATE ne touche
       que `sources`) ;
     - il ne **supprime jamais** une ligne `confirmed`/`rejected` (verdict), sauf une
-      forme de source `'persons'` devenue obsolète — seule une édition du nom/prénom
-      de la personne peut faire disparaître ses formes canoniques ;
+      forme de source `'persons'` absente de l'état attendu — seule une édition du
+      nom/prénom de la personne retire une de ses formes canoniques ;
     - une ligne **nouvelle** est insérée `confirmed` si elle dérive du nom/prénom
       (source `'persons'`, forme canonique de la personne), `pending` sinon.
-
-    Retourne `(inserted, updated, deleted)`.
     """
     conn.execute(
         text("""
@@ -156,7 +155,7 @@ def sync_from_raw_forms(conn: Connection) -> tuple[int, int, int]:
     ).rowcount
 
     conn.execute(text("DROP TABLE _expected_pnf"))
-    return inserted, updated, deleted
+    return SyncCounts(inserted=inserted, updated=updated, deleted=deleted)
 
 
 class PgPersonNameFormsQueries(PersonNameFormsQueries):
@@ -174,5 +173,5 @@ class PgPersonNameFormsQueries(PersonNameFormsQueries):
     def drop_temp_raw_forms_table(self, conn: Connection) -> None:
         drop_temp_raw_forms_table(conn)
 
-    def sync_from_raw_forms(self, conn: Connection) -> tuple[int, int, int]:
+    def sync_from_raw_forms(self, conn: Connection) -> SyncCounts:
         return sync_from_raw_forms(conn)

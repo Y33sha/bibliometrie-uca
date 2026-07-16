@@ -13,7 +13,11 @@ import pytest
 
 from application.pipeline.persons import populate_person_name_forms
 from application.pipeline.persons.populate_person_name_forms import BATCH_SIZE, populate
-from application.ports.pipeline.person_name_forms import PersonNameRow, RawFormBatchItem
+from application.ports.pipeline.person_name_forms import (
+    PersonNameRow,
+    RawFormBatchItem,
+    SyncCounts,
+)
 
 
 class _FakeQueries:
@@ -22,7 +26,7 @@ class _FakeQueries:
         self.create_temp_called = False
         self.drop_temp_called = False
         self.batches: list[list[RawFormBatchItem]] = []
-        self.sync_return = (0, 0, 0)
+        self.sync_return = SyncCounts(0, 0, 0)
         self.sync_called = False
 
     def fetch_persons_names(self, conn: object) -> list[PersonNameRow]:
@@ -38,7 +42,7 @@ class _FakeQueries:
     def drop_temp_raw_forms_table(self, conn: object) -> None:
         self.drop_temp_called = True
 
-    def sync_from_raw_forms(self, conn: object) -> tuple[int, int, int]:
+    def sync_from_raw_forms(self, conn: object) -> SyncCounts:
         self.sync_called = True
         return self.sync_return
 
@@ -145,7 +149,7 @@ def test_batches_flush_at_batch_size(monkeypatch, logger):
 def test_sync_return_values_logged(logger, caplog):
     """Le tuple (inserted, updated, deleted) renvoyé par `sync_from_raw_forms` est loggé."""
     queries = _FakeQueries(persons_rows=[])
-    queries.sync_return = (42, 7, 3)
+    queries.sync_return = SyncCounts(42, 7, 3)
     conn = _FakeConn()
 
     with caplog.at_level(logging.INFO, logger=logger.name):
