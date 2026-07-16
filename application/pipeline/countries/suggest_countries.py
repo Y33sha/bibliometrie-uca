@@ -1,10 +1,12 @@
 """Suggestion de pays par adresse via un automate Aho-Corasick inversé.
 
-Pour les adresses sans pays, on cherche dans le pool des adresses *avec* pays celles dont le `normalized_text` contient la cible comme sous-chaîne, et on retient le ou les pays les plus fréquents parmi elles.
+Pour les adresses sans pays, on cherche dans le pool des adresses *avec* pays celles dont le `normalized_text` contient la cible, et on retient le ou les pays les plus fréquents parmi elles.
 
-Au lieu d'une recherche trigram par cible (une requête SQL par adresse, lente), on **inverse la boucle** : les cibles deviennent les motifs d'un automate Aho-Corasick, le pool devient les textes. Un seul passage sur le pool ressort, pour chaque adresse-pool, toutes les cibles qu'elle contient — coût indépendant du nombre de cibles. L'automate est construit par batch de cibles pour borner la mémoire ; le pool est rescanné à chaque batch.
+Match **au mot près** : cibles et textes du pool sont encadrés d'espaces, si bien que la cible « ip » se distingue de « philippe » et « equipe ».
 
-L'orchestrateur `run` alimente `addresses.suggested_countries` (confirmation manuelle attendue) ; il ne dépend que du port `CountryQueries` et de l'automate ci-dessous. Il commite par batch : la progression est ainsi durable si le run est interrompu, et le journal de transactions (WAL) borné (le stock complet se traite en ~1-2 min, en plusieurs batches).
+La boucle est inversée : les cibles sont les motifs de l'automate, le pool fournit les textes. Un seul passage sur le pool ressort, pour chaque adresse-pool, toutes les cibles qu'elle contient — coût indépendant du nombre de cibles. L'automate est construit par batch de cibles pour borner la mémoire ; le pool est rescanné à chaque batch.
+
+L'orchestrateur `run` alimente `addresses.suggested_countries` (confirmation manuelle attendue) ; il ne dépend que du port `CountryQueries` et de l'automate ci-dessous. Il commite par batch : la progression survit à une interruption du run, et le journal de transactions (WAL) reste borné (le stock complet se traite en ~1-2 min, en plusieurs batches).
 """
 
 import logging
@@ -34,7 +36,7 @@ class CountrySuggester:
                 by_text[normalized_text].append(target_id)
         self._automaton = ahocorasick.Automaton()
         for normalized_text, ids in by_text.items():
-            self._automaton.add_word(normalized_text, ids)
+            self._automaton.add_word(f" {normalized_text} ", ids)
         self._empty = not by_text
         if not self._empty:
             self._automaton.make_automaton()
@@ -42,7 +44,7 @@ class CountrySuggester:
     def suggest(self, pool: Iterable[tuple[str, Sequence[str] | None]]) -> dict[int, list[str]]:
         """Balaie le pool `(normalized_text, countries)` et rend `{target_id: [pays]}`.
 
-        Par cible matchée : le ou les pays les plus fréquents (ex-aequo triés) parmi les adresses-pool qui la contiennent comme sous-chaîne. Une adresse sans aucun match est absente du résultat (le caller lui pose un array vide). Chaque adresse-pool ne compte qu'une fois par cible, quelles que soient les positions du match.
+        Par cible matchée : le ou les pays les plus fréquents (ex-aequo triés) parmi les adresses-pool qui la contiennent au mot près. Une adresse sans aucun match est absente du résultat (le caller lui pose un array vide). Chaque adresse-pool ne compte qu'une fois par cible, quelles que soient les positions du match.
         """
         counts: dict[int, Counter[str]] = defaultdict(Counter)
         if not self._empty:
@@ -53,7 +55,7 @@ class CountrySuggester:
                 if not codes:
                     continue
                 matched: set[int] = set()
-                for _end, ids in self._automaton.iter(normalized_text):
+                for _end, ids in self._automaton.iter(f" {normalized_text} "):
                     matched.update(ids)
                 for target_id in matched:
                     counts[target_id].update(codes)
@@ -82,13 +84,12 @@ def run(
     mode = "retry-vides" if retry_empty else "incrémental"
     logger.info(
         "%d adresses à traiter (mode %s, batch_size=%d) — %d déjà avec suggestion, "
-        "%d déjà tentées sans match, %d trop courtes",
+        "%d déjà tentées sans match",
         total,
         mode,
         batch_size,
         counts.has_suggestion,
         counts.empty_attempted,
-        counts.too_short,
     )
     if total == 0:
         logger.info("Rien à faire.")

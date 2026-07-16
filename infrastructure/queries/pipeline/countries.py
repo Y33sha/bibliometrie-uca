@@ -226,25 +226,20 @@ def count_address_country_status(conn: Connection) -> AddressCountryStatus:
 
 
 def count_suggest_eligible(conn: Connection) -> SuggestEligibleCounts:
-    """Compteurs des adresses sans pays (éligibles, déjà suggérées, tentées sans match, trop courtes)."""
+    """Compteurs des adresses sans pays (éligibles, déjà suggérées, tentées sans match)."""
     row = conn.execute(
         text("""
             SELECT
-                COUNT(*) FILTER (
-                    WHERE suggested_countries IS NULL AND length(normalized_text) >= 5
-                ) AS eligible,
+                COUNT(*) FILTER (WHERE suggested_countries IS NULL) AS eligible,
                 COUNT(*) FILTER (WHERE cardinality(suggested_countries) > 0) AS has_suggestion,
                 COUNT(*) FILTER (
                     WHERE suggested_countries IS NOT NULL AND cardinality(suggested_countries) = 0
-                ) AS empty_attempted,
-                COUNT(*) FILTER (WHERE length(normalized_text) < 5) AS too_short
+                ) AS empty_attempted
             FROM addresses
             WHERE countries IS NULL
         """)
     ).one()
-    return SuggestEligibleCounts(
-        row.eligible, row.has_suggestion, row.empty_attempted, row.too_short
-    )
+    return SuggestEligibleCounts(row.eligible, row.has_suggestion, row.empty_attempted)
 
 
 def fetch_suggest_targets_chunk(
@@ -269,7 +264,6 @@ def fetch_suggest_targets_chunk(
             FROM addresses
             WHERE countries IS NULL
               {suggested_filter}
-              AND length(normalized_text) >= 5
               AND id > :after
             ORDER BY id
             LIMIT :limit
@@ -355,12 +349,9 @@ def load_place_forms(conn: Connection) -> dict[str, str]:
 
 
 def fetch_addresses_missing_country_normalized(conn: Connection) -> list[tuple[int, str]]:
-    """`(id, normalized_text)` des adresses sans pays (texte >= 5 caractères), pour la détection par nom de lieu."""
+    """`(id, normalized_text)` des adresses sans pays, pour la détection par nom de lieu."""
     rows = conn.execute(
-        text(
-            "SELECT id, normalized_text FROM addresses "
-            "WHERE countries IS NULL AND length(normalized_text) >= 5"
-        )
+        text("SELECT id, normalized_text FROM addresses WHERE countries IS NULL")
     ).all()
     return [(r.id, r.normalized_text) for r in rows]
 

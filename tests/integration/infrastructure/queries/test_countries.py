@@ -258,14 +258,14 @@ class TestSuggestCountryQueries:
     def test_fetch_targets_excludes_ineligible(self, sa_sync_conn):
         eligible = _create_address_full_sa(sa_sync_conn, "Lab Foo seul", "lab foo seul")
         countried = _create_address_full_sa(sa_sync_conn, "Done", "already done", countries=["FR"])
-        short = _create_address_full_sa(sa_sync_conn, "Sh", "abcd")  # 4 chars
+        short = _create_address_full_sa(sa_sync_conn, "Sh", "lyon")
         suggested = _create_address_full_sa(sa_sync_conn, "Sug", "sug done")
         write_countries(sa_sync_conn, [(suggested, ["FR"])])
 
         ids = {i for i, _ in fetch_suggest_targets_chunk(sa_sync_conn, after_id=0, limit=1000)}
         assert eligible in ids
+        assert short in ids  # la longueur du texte ne conditionne pas l'éligibilité
         assert countried not in ids  # a déjà des pays
-        assert short not in ids  # normalized_text < 5
         assert suggested not in ids  # déjà tentée
 
     def test_fetch_targets_keyset_after_id(self, sa_sync_conn):

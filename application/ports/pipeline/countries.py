@@ -11,10 +11,9 @@ from sqlalchemy import Connection
 class SuggestEligibleCounts(NamedTuple):
     """Compteurs des adresses sans pays, pour le log de la passe de suggestion."""
 
-    eligible: int  # aucune suggestion tentée, et texte assez long pour l'être
+    eligible: int  # aucune suggestion tentée
     has_suggestion: int
     empty_attempted: int  # tentées sans match (`= []`) — retraitées en mode retry_empty
-    too_short: int
 
 
 class AddressCountryStatus(NamedTuple):
@@ -66,13 +65,13 @@ class CountryQueries(Protocol):
         ...
 
     def fetch_addresses_missing_country_normalized(self, conn: Connection) -> list[tuple[int, str]]:
-        """`(id, normalized_text)` des adresses sans pays dont le texte atteint 5 caractères, pour la détection par nom de lieu."""
+        """`(id, normalized_text)` des adresses sans pays, pour la détection par nom de lieu."""
         ...
 
     # ── Suggestion floue (sous-chaîne dans le pool des adresses avec pays) ──
 
     def count_suggest_eligible(self, conn: Connection) -> SuggestEligibleCounts:
-        """Compte les adresses sans pays selon ce que la passe de suggestion en fait : à traiter, déjà suggérées, déjà tentées sans match, écartées comme trop courtes."""
+        """Compte les adresses sans pays selon ce que la passe de suggestion en fait : à traiter, déjà suggérées, déjà tentées sans match. Les trois ensembles partitionnent les adresses sans pays."""
         ...
 
     def fetch_suggest_targets_chunk(
