@@ -1,13 +1,8 @@
 """Port : lectures sur les périmètres pour le router /api/perimeters/.
 
-Distinct de `application.ports.pipeline.perimeter.PerimeterQueries` qui expose
-la résolution du périmètre `persons` consommée par d'autres modules.
-Ce port-ci sert le listing complet pour la page admin périmètres.
+Distinct de `application.ports.pipeline.perimeter.PerimeterQueries`, qui expose la résolution du périmètre `persons` consommée par d'autres modules : ce port-ci sert le listing complet de la page admin périmètres.
 
-Implémenté par
-`infrastructure.queries.perimeter.PgPerimetersAdminQueries`.
-
-Co-localise les DTOs Pydantic retournés par ce port. Cf. chantier `CODE_typage-projections-strict` Phase 4 — les DTOs vivent dans le port qui les définit (zone neutre, à côté des Protocols).
+Implémenté par `infrastructure.queries.perimeter.PgPerimetersAdminQueries`.
 """
 
 from typing import Protocol

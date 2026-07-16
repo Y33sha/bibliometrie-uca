@@ -1,8 +1,6 @@
 """Port : lectures sur les laboratoires (consommé par le router laboratories).
 
-Les DTOs Pydantic sont co-localisés avec le `Protocol` (cf. décision 3
-du chantier typage-projections-strict). Implémenté par
-`infrastructure.queries.api.laboratories.PgLaboratoriesQueries`.
+Implémenté par `infrastructure.queries.api.laboratories.PgLaboratoriesQueries`.
 """
 
 from typing import Protocol

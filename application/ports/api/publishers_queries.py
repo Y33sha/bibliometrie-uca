@@ -1,8 +1,6 @@
 """Port : lectures sur les éditeurs (consommé par le router publishers).
 
 Implémenté par `infrastructure.queries.api.publishers.PgPublisherQueries`.
-
-Co-localise les DTOs Pydantic retournés par ce port. Cf. chantier `CODE_typage-projections-strict` Phase 4 — les DTOs vivent dans le port qui les définit (zone neutre, à côté des Protocols).
 """
 
 from typing import Protocol
