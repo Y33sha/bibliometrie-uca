@@ -58,11 +58,11 @@ from infrastructure.settings import settings as _settings  # noqa: E402
 def _fail_on_escaped_dml():
     """Échoue si une écriture API échappe à un command handler.
 
-    `db_conn_sync` émet un warning quand son commit de fin rattrape du DML non
+    `db_conn` émet un warning quand son commit de fin rattrape du DML non
     committé (écriture qui ne passe pas par un command handler committant). On le
     transforme en échec de test pour verrouiller l'invariant « toute écriture API
     commit avant la réponse », y compris pour les futurs endpoints — c'est ce qui
-    rend sûre la lecture seule de `db_conn_sync` (commit de fin retiré).
+    rend sûre la lecture seule de `db_conn` (commit de fin retiré).
     """
     captured: list[str] = []
 

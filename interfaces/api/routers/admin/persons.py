@@ -25,11 +25,11 @@ from application.services.persons import commands as person_commands
 from application.services.persons.core import AddIdentifierOutcome
 from domain.persons.identifiers import PUBLIC_PERSON_IDENTIFIER_TYPES
 from interfaces.api.deps import (
-    audit_repo_sync,
-    authorship_repo_sync,
-    db_conn_sync,
-    person_repo_sync,
-    persons_queries_sync,
+    audit_repo,
+    authorship_repo,
+    db_conn,
+    person_repo,
+    persons_queries,
 )
 from interfaces.api.models import (
     AddIdentifier,
@@ -63,9 +63,9 @@ logger = logging.getLogger(__name__)
 def add_person_identifier(
     person_id: int,
     data: AddIdentifier,
-    conn: Connection = Depends(db_conn_sync),
-    queries: PersonsQueries = Depends(persons_queries_sync),
-    repo: PersonRepository = Depends(person_repo_sync),
+    conn: Connection = Depends(db_conn),
+    queries: PersonsQueries = Depends(persons_queries),
+    repo: PersonRepository = Depends(person_repo),
 ) -> AddIdentifierResponse:
     """Ajoute manuellement un identifiant (ORCID, idHAL ou IdRef) à une personne.
 
@@ -105,9 +105,9 @@ def remove_person_identifier(
     person_id: int,
     id_type: str,
     id_value: str,
-    conn: Connection = Depends(db_conn_sync),
-    repo: PersonRepository = Depends(person_repo_sync),
-    audit: AuditRepository = Depends(audit_repo_sync),
+    conn: Connection = Depends(db_conn),
+    repo: PersonRepository = Depends(person_repo),
+    audit: AuditRepository = Depends(audit_repo),
 ) -> RemovedResponse:
     """Supprime un identifiant d'une personne."""
     person_commands.remove_identifier(
@@ -120,9 +120,9 @@ def remove_person_identifier(
 def update_identifier_status(
     ident_id: int,
     body: UpdateIdentifierStatus,
-    conn: Connection = Depends(db_conn_sync),
-    repo: PersonRepository = Depends(person_repo_sync),
-    audit: AuditRepository = Depends(audit_repo_sync),
+    conn: Connection = Depends(db_conn),
+    repo: PersonRepository = Depends(person_repo),
+    audit: AuditRepository = Depends(audit_repo),
 ) -> IdentifierStatusResponse:
     """Met à jour le statut d'un identifiant (pending/confirmed/rejected)."""
     row = person_commands.update_identifier_status(
@@ -137,10 +137,10 @@ def update_identifier_status(
 def reassign_identifier(
     ident_id: int,
     body: ReassignIdentifier,
-    conn: Connection = Depends(db_conn_sync),
-    queries: PersonsQueries = Depends(persons_queries_sync),
-    repo: PersonRepository = Depends(person_repo_sync),
-    audit: AuditRepository = Depends(audit_repo_sync),
+    conn: Connection = Depends(db_conn),
+    queries: PersonsQueries = Depends(persons_queries),
+    repo: PersonRepository = Depends(person_repo),
+    audit: AuditRepository = Depends(audit_repo),
 ) -> IdentifierReassignResponse:
     """Réattribue un identifiant rejeté à une autre personne (status → pending)."""
     if not queries.person_exists(body.person_id):
@@ -156,9 +156,9 @@ def reassign_identifier(
 def reject_person(
     person_id: int,
     body: RejectPerson,
-    conn: Connection = Depends(db_conn_sync),
-    repo: PersonRepository = Depends(person_repo_sync),
-    audit: AuditRepository = Depends(audit_repo_sync),
+    conn: Connection = Depends(db_conn),
+    repo: PersonRepository = Depends(person_repo),
+    audit: AuditRepository = Depends(audit_repo),
 ) -> OkResponse:
     """Marque/démarque une personne comme rejetée."""
     person_commands.set_rejected(conn, person_id, body.rejected, repo=repo, audit_repo=audit)
@@ -169,8 +169,8 @@ def reject_person(
 def update_person_name(
     person_id: int,
     body: UpdatePersonName,
-    conn: Connection = Depends(db_conn_sync),
-    repo: PersonRepository = Depends(person_repo_sync),
+    conn: Connection = Depends(db_conn),
+    repo: PersonRepository = Depends(person_repo),
 ) -> OkResponse:
     """Modifie le nom/prénom d'une personne."""
     last_name = body.last_name.strip()
@@ -185,10 +185,10 @@ def update_person_name(
 def merge_persons(
     person_id: int,
     body: MergeRequest,
-    conn: Connection = Depends(db_conn_sync),
-    queries: PersonsQueries = Depends(persons_queries_sync),
-    repo: PersonRepository = Depends(person_repo_sync),
-    audit: AuditRepository = Depends(audit_repo_sync),
+    conn: Connection = Depends(db_conn),
+    queries: PersonsQueries = Depends(persons_queries),
+    repo: PersonRepository = Depends(person_repo),
+    audit: AuditRepository = Depends(audit_repo),
 ) -> MergeResponse:
     """Fusionne une autre personne (source) dans celle-ci (target)."""
     source_id = body.source_id
@@ -207,9 +207,9 @@ def merge_persons(
 @router.post("/api/admin/persons/mark-distinct", response_model=OkResponse)
 def mark_persons_distinct(
     body: MarkDistinctPersons,
-    conn: Connection = Depends(db_conn_sync),
-    repo: PersonRepository = Depends(person_repo_sync),
-    audit: AuditRepository = Depends(audit_repo_sync),
+    conn: Connection = Depends(db_conn),
+    repo: PersonRepository = Depends(person_repo),
+    audit: AuditRepository = Depends(audit_repo),
 ) -> OkResponse:
     """Marque deux personnes comme distinctes (non-doublon) : la paire ne sera plus proposée par les
     files de triage par nom / identifiant."""
@@ -233,7 +233,7 @@ def mark_persons_distinct(
 def name_form_authorships(
     person_id: int,
     name_form: str = Query(...),
-    queries: PersonsQueries = Depends(persons_queries_sync),
+    queries: PersonsQueries = Depends(persons_queries),
 ) -> NameFormAuthorshipsResponse:
     """Authorships sources + autres personnes partageant une forme de nom."""
     return queries.name_form_authorships(person_id, name_form)
@@ -244,7 +244,7 @@ def name_form_authorships(
 
 @router.get("/api/admin/ambiguous-name-forms/count", response_model=TotalCountResponse)
 def ambiguous_name_forms_count(
-    queries: PersonsQueries = Depends(persons_queries_sync),
+    queries: PersonsQueries = Depends(persons_queries),
 ) -> TotalCountResponse:
     """Compteur de l'onglet « Formes ambiguës » (badge)."""
     return TotalCountResponse(total=queries.ambiguous_name_forms_count())
@@ -254,7 +254,7 @@ def ambiguous_name_forms_count(
 def ambiguous_name_forms(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=200),
-    queries: PersonsQueries = Depends(persons_queries_sync),
+    queries: PersonsQueries = Depends(persons_queries),
 ) -> AmbiguousNameFormsResponse:
     """Formes de nom portées par ≥2 personnes avec ≥1 lien pending, paginées."""
     return queries.ambiguous_name_forms(page=page, per_page=per_page)
@@ -262,7 +262,7 @@ def ambiguous_name_forms(
 
 @router.get("/api/admin/identifier-conflicts/count", response_model=TotalCountResponse)
 def identifier_conflicts_count(
-    queries: PersonsQueries = Depends(persons_queries_sync),
+    queries: PersonsQueries = Depends(persons_queries),
 ) -> TotalCountResponse:
     """Compteur de l'onglet « Conflits d'identifiant » (badge)."""
     return TotalCountResponse(total=queries.identifier_conflicts_count())
@@ -272,7 +272,7 @@ def identifier_conflicts_count(
 def identifier_conflicts(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=200),
-    queries: PersonsQueries = Depends(persons_queries_sync),
+    queries: PersonsQueries = Depends(persons_queries),
 ) -> IdentifierConflictsResponse:
     """Paires de personnes au même identifiant brut (ORCID / IdRef / hal_person_id / idHAL),
     paginées : doublons probables ou erreurs d'attribution, à trancher à l'œil."""
@@ -284,7 +284,7 @@ def identifier_conflicts(
 
 @router.get("/api/admin/detachable-intruders/count", response_model=TotalCountResponse)
 def detachable_intruders_count(
-    queries: PersonsQueries = Depends(persons_queries_sync),
+    queries: PersonsQueries = Depends(persons_queries),
 ) -> TotalCountResponse:
     """Compteur de l'onglet « Intrus détachables » (badge)."""
     return TotalCountResponse(total=queries.detachable_intruders_count())
@@ -294,7 +294,7 @@ def detachable_intruders_count(
 def detachable_intruders(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=200),
-    queries: PersonsQueries = Depends(persons_queries_sync),
+    queries: PersonsQueries = Depends(persons_queries),
 ) -> DetachableIntrudersResponse:
     """Personnes rattachées à ≥2 signatures d'une même publication, avec ancre et intrus, paginées :
     l'intrus se détache en rejetant sa forme de nom (`PATCH /api/persons/{id}/name-forms/status`)."""
@@ -306,7 +306,7 @@ def detachable_intruders(
 
 @router.get("/api/admin/name-duplicates/count", response_model=TotalCountResponse)
 def name_duplicates_count(
-    queries: PersonsQueries = Depends(persons_queries_sync),
+    queries: PersonsQueries = Depends(persons_queries),
 ) -> TotalCountResponse:
     """Compteur de l'onglet « Doublons par nom » (badge)."""
     return TotalCountResponse(total=queries.name_duplicates_count())
@@ -316,7 +316,7 @@ def name_duplicates_count(
 def name_duplicates(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=200),
-    queries: PersonsQueries = Depends(persons_queries_sync),
+    queries: PersonsQueries = Depends(persons_queries),
 ) -> NameDuplicatesResponse:
     """Paires de personnes aux noms compatibles, triées par force de réseau (co-auteurs / publis
     co-signées / labos / revues communs), paginées : doublons probables en tête, homonymes en fin."""
@@ -326,7 +326,7 @@ def name_duplicates(
 @router.get("/api/admin/persons/{person_id}", response_model=PersonOut)
 def person_admin(
     person_id: int,
-    queries: PersonsQueries = Depends(persons_queries_sync),
+    queries: PersonsQueries = Depends(persons_queries),
 ) -> PersonOut:
     """Une personne (projection liste admin) par id — alimente le drawer ouvert hors liste."""
     person = queries.person_admin(person_id)
@@ -340,7 +340,7 @@ def person_admin(
 )
 def persons_sharing_name_form(
     person_id: int,
-    queries: PersonsQueries = Depends(persons_queries_sync),
+    queries: PersonsQueries = Depends(persons_queries),
 ) -> list[SharingPersonOut]:
     """Personnes partageant ≥1 forme de nom avec celle-ci (candidates à l'absorption)."""
     return queries.persons_sharing_name_form(person_id)
@@ -352,10 +352,10 @@ def persons_sharing_name_form(
 def detach_authorships(
     person_id: int,
     body: DetachAuthorships,
-    conn: Connection = Depends(db_conn_sync),
-    person_repo_: PersonRepository = Depends(person_repo_sync),
-    auth_repo: AuthorshipRepository = Depends(authorship_repo_sync),
-    audit: AuditRepository = Depends(audit_repo_sync),
+    conn: Connection = Depends(db_conn),
+    person_repo_: PersonRepository = Depends(person_repo),
+    auth_repo: AuthorshipRepository = Depends(authorship_repo),
+    audit: AuditRepository = Depends(audit_repo),
 ) -> DetachAuthorshipsResponse:
     """Rejette durablement les paires (publication, personne) des authorships
     sources sélectionnées et nettoie les formes de noms."""
@@ -375,10 +375,10 @@ def detach_authorships(
 def update_name_form_status(
     person_id: int,
     body: UpdateNameFormStatus,
-    conn: Connection = Depends(db_conn_sync),
-    repo: PersonRepository = Depends(person_repo_sync),
-    auth_repo: AuthorshipRepository = Depends(authorship_repo_sync),
-    audit: AuditRepository = Depends(audit_repo_sync),
+    conn: Connection = Depends(db_conn),
+    repo: PersonRepository = Depends(person_repo),
+    auth_repo: AuthorshipRepository = Depends(authorship_repo),
+    audit: AuditRepository = Depends(audit_repo),
 ) -> NameFormStatusResponse:
     """Met à jour le statut d'une forme de nom (pending/confirmed/rejected).
 

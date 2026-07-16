@@ -25,11 +25,11 @@ from application.ports.api.addresses_queries import (
 from application.ports.repositories.address_repository import AddressRepository
 from application.services.addresses import commands as address_commands
 from interfaces.api.deps import (
-    address_repo_sync,
-    addresses_queries_sync,
-    bg_propagate_countries_sync,
-    bg_propagate_in_perimeter_sync,
-    db_conn_sync,
+    address_repo,
+    addresses_queries,
+    bg_propagate_countries,
+    bg_propagate_in_perimeter,
+    db_conn,
     require_admin,
 )
 from interfaces.api.models import (
@@ -90,7 +90,7 @@ def list_addresses(
     validation: str = Query("pending"),
     text: list[str] = Query(default=[]),
     struct: list[str] = Query(default=[]),
-    queries: AddressesQueries = Depends(addresses_queries_sync),
+    queries: AddressesQueries = Depends(addresses_queries),
 ) -> AddressListResponse:
     """Liste les adresses pour une structure, avec prédicats texte/structure composables."""
     text_predicates = _parse_text_predicates(text)
@@ -122,7 +122,7 @@ def list_addresses(
 def get_address_publications(
     addr_id: int,
     limit: int = Query(20),
-    queries: AddressesQueries = Depends(addresses_queries_sync),
+    queries: AddressesQueries = Depends(addresses_queries),
 ) -> AddressPublicationsResponse:
     """Échantillon de publications liées à une adresse."""
     raw_text = queries.get_address_raw_text(addr_id)
@@ -139,9 +139,9 @@ def review_address(
     addr_id: int,
     action: ReviewAction,
     bg: BackgroundTasks,
-    conn: Connection = Depends(db_conn_sync),
-    queries: AddressesQueries = Depends(addresses_queries_sync),
-    addr_repo: AddressRepository = Depends(address_repo_sync),
+    conn: Connection = Depends(db_conn),
+    queries: AddressesQueries = Depends(addresses_queries),
+    addr_repo: AddressRepository = Depends(address_repo),
 ) -> AddressReviewResponse:
     """Confirme, rejette ou reset le lien adresse ↔ structure."""
     changed = address_commands.review_structure_link(
@@ -152,7 +152,7 @@ def review_address(
         repo=addr_repo,
     )
     if changed:
-        bg.add_task(bg_propagate_in_perimeter_sync, changed)
+        bg.add_task(bg_propagate_in_perimeter, changed)
     structures = queries.get_address_structures(addr_id)
     link = queries.get_structure_link(addr_id, action.structure_id)
     return AddressReviewResponse(
@@ -167,8 +167,8 @@ def review_address(
 def batch_review(
     data: BatchReviewAction,
     bg: BackgroundTasks,
-    conn: Connection = Depends(db_conn_sync),
-    addr_repo: AddressRepository = Depends(address_repo_sync),
+    conn: Connection = Depends(db_conn),
+    addr_repo: AddressRepository = Depends(address_repo),
 ) -> BatchUpdatedResponse:
     """Confirme/rejette/reset en batch."""
     updated, changed = address_commands.batch_review_structure_link(
@@ -179,13 +179,13 @@ def batch_review(
         repo=addr_repo,
     )
     if changed:
-        bg.add_task(bg_propagate_in_perimeter_sync, changed)
+        bg.add_task(bg_propagate_in_perimeter, changed)
     return BatchUpdatedResponse(updated=updated)
 
 
 @router.get("/api/countries", response_model=list[CountryOut])
 def list_countries(
-    queries: AddressesQueries = Depends(addresses_queries_sync),
+    queries: AddressesQueries = Depends(addresses_queries),
 ) -> list[CountryOut]:
     """Liste des pays."""
     return queries.list_countries()
@@ -200,7 +200,7 @@ def list_addresses_countries(
     suggest: bool = Query(False),
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=10, le=200),
-    queries: AddressesQueries = Depends(addresses_queries_sync),
+    queries: AddressesQueries = Depends(addresses_queries),
 ) -> AddressesCountriesResponse:
     """Liste des adresses pour l'attribution de pays."""
     filters = AddressCountriesFilters(
@@ -216,7 +216,7 @@ def list_addresses_countries(
 @router.get("/api/addresses/suggest-countries", response_model=CountrySuggestionsResponse)
 def suggest_countries(
     search: str = Query(""),
-    queries: AddressesQueries = Depends(addresses_queries_sync),
+    queries: AddressesQueries = Depends(addresses_queries),
     _: None = Depends(require_admin),
 ) -> CountrySuggestionsResponse:
     """Distribution des pays des adresses matchantes + compte des sans-pays."""
@@ -228,9 +228,9 @@ def set_address_country(
     addr_id: int,
     body: SetCountry,
     bg: BackgroundTasks,
-    conn: Connection = Depends(db_conn_sync),
-    queries: AddressesQueries = Depends(addresses_queries_sync),
-    addr_repo: AddressRepository = Depends(address_repo_sync),
+    conn: Connection = Depends(db_conn),
+    queries: AddressesQueries = Depends(addresses_queries),
+    addr_repo: AddressRepository = Depends(address_repo),
     _: None = Depends(require_admin),
 ) -> OkResponse:
     """Attribue des pays à une adresse."""
@@ -241,7 +241,7 @@ def set_address_country(
             raise HTTPException(status_code=400, detail=f"Code pays inconnu: {c}")
 
     affected = address_commands.set_country(conn, addr_id, body.countries, repo=addr_repo)
-    bg.add_task(bg_propagate_countries_sync, affected)
+    bg.add_task(bg_propagate_countries, affected)
     return OkResponse()
 
 
@@ -249,9 +249,9 @@ def set_address_country(
 def batch_set_country(
     body: BatchSetCountry,
     bg: BackgroundTasks,
-    conn: Connection = Depends(db_conn_sync),
-    queries: AddressesQueries = Depends(addresses_queries_sync),
-    addr_repo: AddressRepository = Depends(address_repo_sync),
+    conn: Connection = Depends(db_conn),
+    queries: AddressesQueries = Depends(addresses_queries),
+    addr_repo: AddressRepository = Depends(address_repo),
     _: None = Depends(require_admin),
 ) -> BatchCountryResponse:
     """Ajoute un pays à des adresses (par IDs ou par filtre)."""
@@ -273,14 +273,14 @@ def batch_set_country(
         repo=addr_repo,
     )
 
-    bg.add_task(bg_propagate_countries_sync, all_ids)
+    bg.add_task(bg_propagate_countries, all_ids)
     return BatchCountryResponse(updated=updated, propagated=propagated)
 
 
 @router.get("/api/admin/address-stats", response_model=AddressStatsResponse)
 def admin_address_stats(
     structure_id: int | None = Query(None),
-    queries: AddressesQueries = Depends(addresses_queries_sync),
+    queries: AddressesQueries = Depends(addresses_queries),
 ) -> AddressStatsResponse:
     """Compteurs d'adresses par détection/validation pour une structure."""
     if structure_id is None:

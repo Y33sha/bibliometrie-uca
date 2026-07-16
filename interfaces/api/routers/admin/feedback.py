@@ -13,7 +13,7 @@ from application.ports.api.admin_feedback_queries import (
     FeedbackStats,
     FeedbackStructureItem,
 )
-from interfaces.api.deps import admin_feedback_queries_sync
+from interfaces.api.deps import admin_feedback_queries
 from interfaces.api.models import FeedbackStructuresResponse
 
 # Types de structures éligibles au tableau de bord feedback, dans l'ordre d'affichage (universités en premier, laboratoires en dernier).
@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 
 @router.get("/api/admin/feedback/structures", response_model=FeedbackStructuresResponse)
 def feedback_structures(
-    queries: AdminFeedbackQueries = Depends(admin_feedback_queries_sync),
+    queries: AdminFeedbackQueries = Depends(admin_feedback_queries),
 ) -> FeedbackStructuresResponse:
     """Structures éligibles au tableau de bord feedback, groupées par type.
 
@@ -64,7 +64,7 @@ def feedback_structures(
 @router.get("/api/admin/feedback/stats", response_model=FeedbackStats)
 def feedback_stats(
     structure_id: int = Query(...),
-    queries: AdminFeedbackQueries = Depends(admin_feedback_queries_sync),
+    queries: AdminFeedbackQueries = Depends(admin_feedback_queries),
 ) -> FeedbackStats:
     """Statistiques de qualité de la détection pour une structure donnée."""
     return queries.feedback_stats(structure_id)
@@ -76,7 +76,7 @@ def feedback_false_negatives(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=10, le=200),
     search: str = Query(""),
-    queries: AdminFeedbackQueries = Depends(admin_feedback_queries_sync),
+    queries: AdminFeedbackQueries = Depends(admin_feedback_queries),
 ) -> FeedbackAddressesResponse:
     """Adresses confirmées manuellement pour cette structure mais non détectées par le script."""
     return queries.feedback_false_negatives(
@@ -90,7 +90,7 @@ def feedback_false_positives(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=10, le=200),
     search: str = Query(""),
-    queries: AdminFeedbackQueries = Depends(admin_feedback_queries_sync),
+    queries: AdminFeedbackQueries = Depends(admin_feedback_queries),
 ) -> FeedbackAddressesResponse:
     """Adresses détectées pour cette structure mais rejetées manuellement."""
     return queries.feedback_false_positives(

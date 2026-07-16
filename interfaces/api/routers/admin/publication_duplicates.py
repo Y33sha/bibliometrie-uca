@@ -13,10 +13,10 @@ from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.publication_repository import PublicationRepository
 from application.services.publications import commands as publication_commands
 from interfaces.api.deps import (
-    audit_repo_sync,
-    db_conn_sync,
-    publication_duplicates_queries_sync,
-    publication_repo_sync,
+    audit_repo,
+    db_conn,
+    publication_duplicates_queries,
+    publication_repo,
 )
 from interfaces.api.models import (
     MarkDistinctPublications,
@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 def next_duplicate_candidate(
     min_title_len: int = Query(30, ge=10),
     offset: int = Query(0, ge=0),
-    queries: PublicationDuplicatesQueries = Depends(publication_duplicates_queries_sync),
+    queries: PublicationDuplicatesQueries = Depends(publication_duplicates_queries),
 ) -> PubDuplicateNextResponse:
     """Renvoie la paire de publications candidate au dédoublonnage à l'offset donné.
 
@@ -48,10 +48,10 @@ def next_duplicate_candidate(
 @router.post("/api/admin/duplicates/merge", response_model=PublicationMergeResponse)
 def merge_duplicate_publications(
     body: MergePublications,
-    conn: Connection = Depends(db_conn_sync),
-    queries: PublicationDuplicatesQueries = Depends(publication_duplicates_queries_sync),
-    repo: PublicationRepository = Depends(publication_repo_sync),
-    audit: AuditRepository = Depends(audit_repo_sync),
+    conn: Connection = Depends(db_conn),
+    queries: PublicationDuplicatesQueries = Depends(publication_duplicates_queries),
+    repo: PublicationRepository = Depends(publication_repo),
+    audit: AuditRepository = Depends(audit_repo),
 ) -> PublicationMergeResponse:
     """Fusionne deux publications doublons.
 
@@ -83,7 +83,7 @@ def merge_duplicate_publications(
             conn, target_id, source_id, repo=repo, audit_repo=audit
         )
     except Exception as e:
-        # Le command handler n'a pas committé ; db_conn_sync rollback sur l'exception
+        # Le command handler n'a pas committé ; db_conn rollback sur l'exception
         # propagée. On mappe en 500 sans exposer un état partiel.
         raise HTTPException(status_code=500, detail=f"Échec de la fusion : {e}") from e
 
@@ -93,9 +93,9 @@ def merge_duplicate_publications(
 @router.post("/api/admin/duplicates/mark-distinct", response_model=OkResponse)
 def mark_publications_distinct(
     body: MarkDistinctPublications,
-    conn: Connection = Depends(db_conn_sync),
-    repo: PublicationRepository = Depends(publication_repo_sync),
-    audit: AuditRepository = Depends(audit_repo_sync),
+    conn: Connection = Depends(db_conn),
+    repo: PublicationRepository = Depends(publication_repo),
+    audit: AuditRepository = Depends(audit_repo),
 ) -> OkResponse:
     """Marque deux publications comme distinctes (non-doublon confirmé).
 
