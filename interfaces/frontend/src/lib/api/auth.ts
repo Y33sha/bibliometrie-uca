@@ -1,7 +1,6 @@
 import { api, post } from './client';
 
 export type AuthCheck = { authenticated: boolean; user?: string };
-export type HealthResponse = { status: string; [k: string]: unknown };
 
 export function check(): Promise<AuthCheck> {
 	return api<AuthCheck>('/api/auth/check');
@@ -13,8 +12,4 @@ export function login(username: string, password: string): Promise<AuthCheck> {
 
 export function logout(): Promise<null> {
 	return post<null>('/api/auth/logout');
-}
-
-export function health(): Promise<HealthResponse> {
-	return api<HealthResponse>('/api/health');
 }

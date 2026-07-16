@@ -1,6 +1,6 @@
 """Bibliométrie UCA — application FastAPI : point d'assemblage de la surface HTTP.
 
-Câble le cycle de vie de l'engine SQLAlchemy, la traduction des erreurs métier en codes HTTP, les middlewares (authentification des écritures, mesure de durée), les endpoints d'exploitation `/api/health` et `/api/metrics`, les routers, et le service du frontend buildé.
+Câble le cycle de vie de l'engine SQLAlchemy, la traduction des erreurs métier en codes HTTP, les middlewares (authentification des écritures, mesure de durée), les routers, et le service du frontend buildé.
 
 Lancement en développement : `bash start.sh`, qui démarre uvicorn sur le port 8003 et le serveur de développement du frontend.
 """
@@ -11,13 +11,10 @@ import time
 import traceback
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import Any, cast
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from sqlalchemy import text
-from sqlalchemy.pool import QueuePool
 from starlette.middleware.base import RequestResponseEndpoint
 from starlette.responses import Response
 
@@ -31,14 +28,8 @@ from domain.errors import (
     UnauthorizedError,
     ValidationError,
 )
-from domain.types import JsonValue
-from infrastructure.db.engine import (
-    build_sync_engine,
-    get_sync_engine,
-    set_sync_engine,
-)
+from infrastructure.db.engine import build_sync_engine, set_sync_engine
 from infrastructure.observability.log import configure_root_logging
-from infrastructure.observability.pipeline_status import read_status
 from interfaces.api.deps import _verify_token
 from interfaces.api.spa import BUILD_DIR, SPAStaticFiles
 
@@ -220,77 +211,24 @@ async def auth_middleware(request: Request, call_next: RequestResponseEndpoint) 
     return response
 
 
-# Les endpoints d'exploitation sont faits pour être sondés en boucle : leur
-# durée n'apprend rien et noierait le trafic réel.
-_TIMING_LOG_SKIP_PATHS = ("/api/health", "/api/metrics")
-
-
 @app.middleware("http")
 async def timing_middleware(request: Request, call_next: RequestResponseEndpoint) -> Response:
-    """Mesure la durée de chaque requête, pose l'en-tête `X-Response-Time` et journalise un record structuré `request_completed`, sauf pour `/api/health` et `/api/metrics`."""
+    """Mesure la durée de chaque requête, pose l'en-tête `X-Response-Time` et journalise un record structuré `request_completed`."""
     start = time.perf_counter()
     response = await call_next(request)
     duration_ms = round((time.perf_counter() - start) * 1000, 2)
     response.headers["X-Response-Time"] = f"{duration_ms}ms"
 
-    path = request.scope.get("path", "")
-    if not any(path.startswith(p) for p in _TIMING_LOG_SKIP_PATHS):
-        logger.info(
-            "request_completed",
-            extra={
-                "method": request.method,
-                "path": path,
-                "status": response.status_code,
-                "duration_ms": duration_ms,
-            },
-        )
-    return response
-
-
-# ----- Health check -----
-
-
-@app.get("/api/health", response_model=None)
-def health() -> JSONResponse | dict[str, JsonValue]:
-    """Vérifie que l'API répond et que la base est joignable, et indique si un pipeline est en cours."""
-    try:
-        engine = get_sync_engine()
-        with engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
-    except Exception as e:
-        return JSONResponse(status_code=503, content={"status": "error", "db": str(e)})
-
-    return {
-        "status": "ok",
-        "db": "ok",
-        "pipeline_running": read_status() is not None,
-    }
-
-
-# ----- Metrics -----
-
-
-@app.get("/api/metrics")
-def metrics() -> dict[str, Any]:
-    """Métriques internes : état du pool de connexions SQLAlchemy.
-
-    La durée des requêtes est émise par `timing_middleware`, dans le record structuré `request_completed`.
-    """
-    engine = get_sync_engine()
-    # `engine.pool` est typé `Pool` (interface mince), mais l'instance concrète
-    # est un `QueuePool` qui expose size/checkedout/checkedin. Le maximum de
-    # débordement n'a pas d'accesseur public : `_max_overflow` est lu tel quel,
-    # et suit les versions de SQLAlchemy.
-    pool = cast(QueuePool, engine.pool)
-    size = pool.size()
-    return {
-        "db_pool": {
-            "minconn": size,
-            "maxconn": size + pool._max_overflow,
-            "in_use": pool.checkedout(),
-            "available": pool.checkedin(),
+    logger.info(
+        "request_completed",
+        extra={
+            "method": request.method,
+            "path": request.scope.get("path", ""),
+            "status": response.status_code,
+            "duration_ms": duration_ms,
         },
-    }
+    )
+    return response
 
 
 # ----- Include routers -----

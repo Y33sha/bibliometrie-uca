@@ -4,48 +4,6 @@
  */
 
 export interface paths {
-    "/api/health": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Health
-         * @description Vérifie que l'API est opérationnelle et la base accessible, et rend la fraîcheur des données : date de la dernière extraction par source, et sources dont elle dépasse le seuil.
-         */
-        get: operations["health_api_health_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/metrics": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Metrics
-         * @description Métriques internes : état du pool de connexions SQLAlchemy.
-         *
-         *     La durée des requêtes est émise par `timing_middleware`, dans le record structuré `request_completed`.
-         */
-        get: operations["metrics_api_metrics_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/auth/login": {
         parameters: {
             query?: never;
@@ -5823,48 +5781,6 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    health_api_health_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    metrics_api_metrics_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-        };
-    };
     auth_login_api_auth_login_post: {
         parameters: {
             query?: never;
@@ -6769,9 +6685,7 @@ export interface operations {
             };
             header?: never;
             path?: never;
-            cookie?: {
-                session?: string | null;
-            };
+            cookie?: never;
         };
         requestBody?: never;
         responses: {
@@ -6802,9 +6716,7 @@ export interface operations {
             path: {
                 addr_id: number;
             };
-            cookie?: {
-                session?: string | null;
-            };
+            cookie?: never;
         };
         requestBody: {
             content: {
@@ -6837,9 +6749,7 @@ export interface operations {
             query?: never;
             header?: never;
             path?: never;
-            cookie?: {
-                session?: string | null;
-            };
+            cookie?: never;
         };
         requestBody: {
             content: {

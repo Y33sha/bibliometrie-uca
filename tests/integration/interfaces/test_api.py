@@ -8,17 +8,6 @@ Fixtures `client` et `auth_client` viennent de `conftest.py`.
 """
 
 
-# ── Health ──────────────────────────────────────────────────────
-
-
-class TestHealth:
-    def test_health(self, client):
-        r = client.get("/api/health")
-        assert r.status_code in (200, 503)
-        if r.status_code == 200:
-            assert r.json()["status"] == "ok"
-
-
 # ── Publications ────────────────────────────────────────────────
 
 
