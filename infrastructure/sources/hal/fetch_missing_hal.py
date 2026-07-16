@@ -18,6 +18,7 @@ from sqlalchemy import Connection, text
 from application.ports.pipeline.cross_imports.fetch_missing_hal import (
     HalFetchMissingAdapter,
     HalIdRef,
+    NntInsertResult,
     NntRef,
 )
 from infrastructure.sources.api_limits import HAL_DELAY
@@ -241,17 +242,17 @@ class PgHalFetchMissingAdapter(HalFetchMissingAdapter):
 
     def insert_nnt_result(
         self, conn: Connection, nnt: str, doc: dict[str, Any] | None
-    ) -> tuple[bool, bool]:
+    ) -> NntInsertResult:
         if not doc:
-            return (False, False)
+            return NntInsertResult(api_found=False, inserted=False)
         hal_id = doc.get("halId_s")
         if not hal_id:
-            return (True, False)
+            return NntInsertResult(api_found=True, inserted=False)
         exists = conn.execute(
             text("SELECT 1 FROM staging WHERE source = 'hal' AND source_id = :id"),
             {"id": hal_id},
         ).first()
         if exists:
-            return (True, False)
+            return NntInsertResult(api_found=True, inserted=False)
         insert_staging_hal(conn, hal_id, extract_doi(doc), doc)
-        return (True, True)
+        return NntInsertResult(api_found=True, inserted=True)

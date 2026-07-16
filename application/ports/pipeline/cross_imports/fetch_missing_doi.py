@@ -16,12 +16,10 @@ from typing import Any, Protocol
 import httpx
 from sqlalchemy import Connection
 
-CrossImportDoisReader = Callable[[Any, str], list[str]]
+CrossImportDoisReader = Callable[[Connection, str], list[str]]
 """Signature : `(conn, target) -> list[doi]`.
 
-Injecté dans `run_async` pour respecter l'étanchéité DDD : la couche
-application ne doit pas importer infrastructure pour lire la liste des
-DOI manquants.
+La fonction elle-même (`infrastructure.sources.common.get_cross_import_dois`) est injectée dans `run_async` : la couche application ne dépend pas d'`infrastructure` pour lire la liste des DOI manquants.
 """
 
 _NOT_FOUND_STATUS = "not_found"

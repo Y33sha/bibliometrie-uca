@@ -11,10 +11,17 @@ ScanR) et `fetch_missing_hal_by_nnt` pour les NNT (theses).
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Any, NamedTuple, Protocol
 
 import httpx
 from sqlalchemy import Connection
+
+
+class NntInsertResult(NamedTuple):
+    """Issue d'`insert_nnt_result` : HAL a-t-il renvoyé un doc, et a-t-il été ajouté au staging."""
+
+    api_found: bool
+    inserted: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,10 +86,5 @@ class HalFetchMissingAdapter(Protocol):
 
     def insert_nnt_result(
         self, conn: Connection, nnt: str, doc: dict[str, Any] | None
-    ) -> tuple[bool, bool]:
-        """Insère le doc HAL trouvé par NNT.
-
-        Retourne `(api_found, inserted)` : `api_found=True` si HAL a
-        renvoyé un doc, `inserted=True` s'il a effectivement été ajouté
-        (i.e. son halId n'était pas déjà en staging).
-        """
+    ) -> NntInsertResult:
+        """Insère le doc HAL trouvé par NNT. `inserted` est faux si son halId était déjà en staging."""
