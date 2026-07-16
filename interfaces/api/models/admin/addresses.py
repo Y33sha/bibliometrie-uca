@@ -1,7 +1,4 @@
-"""Modèles Pydantic (bodies + réponses router-only) pour les adresses.
-
-Les DTOs retournés par le port `AddressesQueries` (AddressOut, AddressListResponse, AddressStructureSummary, AddressPublicationItem, CountryOut, CountrySuggestion, AddressForCountryAttribution, AddressesCountriesResponse, CountrySuggestionsResponse, AddressStatsResponse) vivent dans `application/ports/api/addresses_queries.py` (cf. chantier `CODE_typage-projections-strict` Phase 4). Restent ici les bodies HTTP et les réponses composées par le router.
-"""
+"""Modèles Pydantic du router des adresses : corps des requêtes entrantes et réponses composées après mutation."""
 
 from pydantic import BaseModel
 
@@ -10,12 +7,14 @@ from application.ports.api.addresses_queries import (
     AddressStructureSummary,
 )
 
-# ----- Bodies HTTP -----
+# ----- Corps des requêtes -----
+
+# `is_confirmed` : True = confirmé, False = rejeté, None = retour à l'état non tranché.
 
 
 class ReviewAction(BaseModel):
     structure_id: int
-    is_confirmed: bool | None  # True = confirmé, False = rejeté, None = reset
+    is_confirmed: bool | None
 
 
 class BatchReviewAction(BaseModel):

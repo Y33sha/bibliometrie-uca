@@ -1,7 +1,4 @@
-"""Modèles Pydantic (router-only) pour la déduplication de publications (admin).
-
-Les modèles que rend le query service vivent auprès de leur port, dans `application/ports/api/publication_duplicates_queries.py`. Ici : les corps des requêtes POST (`MergePublications`, `MarkDistinctPublications`) et la réponse que le router compose après une fusion (`PublicationMergeResponse`).
-"""
+"""Modèles Pydantic du router de déduplication des publications : corps des requêtes entrantes et réponse composée après fusion."""
 
 from pydantic import BaseModel
 

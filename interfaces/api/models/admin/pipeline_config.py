@@ -1,7 +1,4 @@
-"""Modèles Pydantic (router-only) pour la config pipeline.
-
-Le DTO `ConfigItem` (retourné par `ConfigQueries.list_config`) vit dans `application/ports/api/config_queries.py` (cf. chantier `CODE_typage-projections-strict` Phase 4). Reste ici le body `ConfigValueUpdate`.
-"""
+"""Modèles Pydantic du router de configuration du pipeline : corps des requêtes entrantes."""
 
 from typing import Any
 

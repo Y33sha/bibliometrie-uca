@@ -1,11 +1,8 @@
-"""Modèles Pydantic pour les structures (référentiel institutionnel).
-
-Les DTOs de retour des query services (`StructureListItem`, `StructureOut`, `RelatedStructureOut`, `NameFormOut`, `StructureDetailResponse`) vivent dans `application/ports/api/structures_queries.py` (cf. chantier `CODE_typage-projections-strict` Phase 4). Restent ici les bodies HTTP et la réponse polymorphe construite par le router pour la création de relation.
-"""
+"""Modèles Pydantic du router des structures : corps des requêtes entrantes et réponses composées après mutation."""
 
 from pydantic import BaseModel
 
-# ----- Entrées (POST/PUT/PATCH) -----
+# ----- Corps des requêtes -----
 
 
 class StructureCreate(BaseModel):
@@ -51,14 +48,11 @@ class NameFormUpdate(BaseModel):
     requires_context_of: list[int] | None = None
 
 
-# ----- Sorties router-only -----
+# ----- Réponses composées par le router -----
 
 
 class StructureRelationCreateResponse(BaseModel):
-    """Réponse de POST /api/structure-relations.
-
-    Polymorphe : soit la relation créée, soit `{status: "already_exists"}`.
-    """
+    """Réponse de POST /api/structure-relations, polymorphe : soit la relation créée, soit `{status: "already_exists"}`."""
 
     id: int | None = None
     parent_id: int | None = None

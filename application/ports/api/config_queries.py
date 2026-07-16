@@ -3,8 +3,6 @@
 Distinct du port `application.ports.config.ConfigStore`, qui porte les écritures sur la table `config`. Ce port-ci liste l'ensemble des paramètres.
 
 Implémenté par `infrastructure.queries.config.PgConfigQueries`.
-
-Co-localise le DTO `ConfigItem` (retourné par `list_config`). Cf. chantier `CODE_typage-projections-strict` Phase 4.
 """
 
 from typing import Any, Protocol

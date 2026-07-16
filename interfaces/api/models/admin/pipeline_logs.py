@@ -18,9 +18,7 @@ class PipelineStatus(BaseModel):
 class PipelinePhaseLog(BaseModel):
     """Log d'une phase, découpé depuis logs/pipeline.log.
 
-    `available` est faux quand le fichier est absent (LOG_TO_FILE désactivé) ou
-    quand la section de la phase est introuvable (log purgé) ; `content` est
-    alors vide.
+    `available` est faux quand le fichier est absent (LOG_TO_FILE désactivé) ou quand la section de la phase est introuvable (log purgé) ; `content` est alors vide.
     """
 
     available: bool

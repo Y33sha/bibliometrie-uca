@@ -1,8 +1,6 @@
 """Port : lectures pour /api/admin/duplicates/* (doublons publications).
 
 Implémenté par `infrastructure.queries.api.publication_duplicates.PgPublicationDuplicatesQueries`.
-
-Co-localise les DTOs Pydantic retournés par ce port. Cf. chantier `CODE_typage-projections-strict` Phase 4.
 """
 
 from typing import Protocol

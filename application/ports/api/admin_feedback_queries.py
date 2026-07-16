@@ -1,6 +1,6 @@
 """Port : lectures pour le tableau de bord admin de feedback détection d'adresses (consommé par /api/admin/feedback/*).
 
-Co-localise les DTOs Pydantic retournés par ce port. Cf. chantier `CODE_typage-projections-strict` Phase 4.
+Implémenté par `infrastructure.queries.api.admin_feedback.PgAdminFeedbackQueries`.
 """
 
 from typing import Protocol

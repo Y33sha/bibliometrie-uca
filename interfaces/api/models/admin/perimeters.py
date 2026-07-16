@@ -1,6 +1,6 @@
-"""Modèles Pydantic (bodies HTTP) pour les périmètres.
+"""Modèles Pydantic du router des périmètres : corps des requêtes entrantes.
 
-Le contrat d'édition `PerimeterUpdate` vit dans le port `application/ports/repositories/perimeter_repository.py` ; les DTOs de retour des query services (`PerimeterOut`, `PerimeterStructureItem`) dans `application/ports/api/perimeters_queries.py` (cf. chantier `CODE_typage-projections-strict` Phase 4).
+Le contrat d'édition `PerimeterUpdate` vit dans le port `application/ports/repositories/perimeter_repository.py`.
 """
 
 from typing import Annotated

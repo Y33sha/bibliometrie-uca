@@ -1,7 +1,4 @@
-"""Modèles Pydantic (router-only) pour la page admin feedback.
-
-Les DTOs retournés par le port `AdminFeedbackQueries` (FeedbackStats, FeedbackAddressesResponse, FeedbackStructureItem, et les sous-types FeedbackLabDetected/FeedbackMatchedForm/FeedbackAddressItem) vivent dans `application/ports/api/admin_feedback_queries.py` (cf. chantier `CODE_typage-projections-strict` Phase 4). Reste ici la réponse composée par le router (groupement par type + structure par défaut).
-"""
+"""Modèles Pydantic du router de la page de retours : réponse composée par le router."""
 
 from pydantic import BaseModel
 
