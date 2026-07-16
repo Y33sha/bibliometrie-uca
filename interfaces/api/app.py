@@ -351,10 +351,3 @@ app.include_router(subjects.router)
 # Absent en dev (vite sert le frontend) : on ne monte que si le build existe.
 if os.path.isdir(BUILD_DIR):
     app.mount("/", SPAStaticFiles(directory=BUILD_DIR, html=True), name="spa")
-
-
-if __name__ == "__main__":
-    import uvicorn
-
-    print("Démarrage du serveur sur http://localhost:8003")
-    uvicorn.run(app, host="127.0.0.1", port=8003)
