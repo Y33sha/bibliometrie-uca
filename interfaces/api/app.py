@@ -12,7 +12,6 @@ import traceback
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
 from typing import Any, cast
 
 from fastapi import FastAPI, Request
@@ -40,6 +39,7 @@ from infrastructure.db.engine import (
     set_sync_engine,
 )
 from infrastructure.observability.log import configure_root_logging
+from infrastructure.observability.pipeline_status import read_status
 from interfaces.api.deps import _verify_token
 from interfaces.api.spa import BUILD_DIR, SPAStaticFiles
 
@@ -76,8 +76,8 @@ logger = logging.getLogger(__name__)
 
 # ----- Lifespan -----
 #
-# Initialise/dispose l'Engine SA sync pour toute la surface API.
-# Les routers `def` consomment cet engine via `db_conn`.
+# Construit l'engine SQLAlchemy au démarrage et le libère à l'arrêt.
+# Les routes le consomment via `db_conn`.
 
 
 @asynccontextmanager
@@ -221,8 +221,9 @@ async def auth_middleware(request: Request, call_next: RequestResponseEndpoint) 
     return response
 
 
-# Endpoints exclus du logging de timing (trop bavards, peu utiles)
-_METRICS_SKIP_PATHS = ("/api/health", "/api/metrics")
+# Les endpoints d'exploitation sont faits pour être sondés en boucle : leur
+# durée n'apprend rien et noierait le trafic réel.
+_TIMING_LOG_SKIP_PATHS = ("/api/health", "/api/metrics")
 
 
 @app.middleware("http")
@@ -234,7 +235,7 @@ async def timing_middleware(request: Request, call_next: RequestResponseEndpoint
     response.headers["X-Response-Time"] = f"{duration_ms}ms"
 
     path = request.scope.get("path", "")
-    if not any(path.startswith(p) for p in _METRICS_SKIP_PATHS):
+    if not any(path.startswith(p) for p in _TIMING_LOG_SKIP_PATHS):
         logger.info(
             "request_completed",
             extra={
@@ -252,7 +253,6 @@ async def timing_middleware(request: Request, call_next: RequestResponseEndpoint
 # Seuil à partir duquel une source est considérée "stale" (pas extraite
 # récemment). theses.fr est mensuel, les autres devraient être hebdomadaires.
 _STALE_THRESHOLD_DAYS = 7
-_PIPELINE_STATUS_FILE = Path(__file__).resolve().parent.parent.parent / "logs" / "status.json"
 
 
 @app.get("/api/health", response_model=None)
@@ -290,7 +290,7 @@ def health() -> JSONResponse | dict[str, JsonValue]:
     return {
         "status": "ok",
         "db": "ok",
-        "pipeline_running": _PIPELINE_STATUS_FILE.exists(),
+        "pipeline_running": read_status() is not None,
         "last_extraction": last_extraction,
         "stale_sources": stale,
         "stale_threshold_days": _STALE_THRESHOLD_DAYS,
@@ -307,8 +307,10 @@ def metrics() -> dict[str, Any]:
     La durée des requêtes est émise par `timing_middleware`, dans le record structuré `request_completed`.
     """
     engine = get_sync_engine()
-    # `engine.pool` est typé `Pool` (interface mince), mais l'instance
-    # concrète est un `QueuePool` qui expose size/checkedout/checkedin.
+    # `engine.pool` est typé `Pool` (interface mince), mais l'instance concrète
+    # est un `QueuePool` qui expose size/checkedout/checkedin. Le maximum de
+    # débordement n'a pas d'accesseur public : `_max_overflow` est lu tel quel,
+    # et suit les versions de SQLAlchemy.
     pool = cast(QueuePool, engine.pool)
     size = pool.size()
     return {
