@@ -23,6 +23,21 @@ class StructureNameForm(NamedTuple):
     is_excluding: bool
 
 
+class KeptPair(NamedTuple):
+    """Détection `(address_id, structure_id)` encore présente, à préserver de la purge."""
+
+    address_id: int
+    structure_id: int
+
+
+class DetectedStructure(NamedTuple):
+    """Détection à écrire : structure `structure_id` reconnue dans l'adresse `address_id` par la forme `form_id`."""
+
+    address_id: int
+    structure_id: int
+    form_id: int
+
+
 class AddressResolutionQueries(Protocol):
     """Opérations SQL pour résoudre les adresses → structures.
 
@@ -43,7 +58,7 @@ class AddressResolutionQueries(Protocol):
         ...
 
     def delete_obsolete_detections_bulk(
-        self, conn: Connection, addr_ids: list[int], kept_pairs: list[tuple[int, int]]
+        self, conn: Connection, addr_ids: list[int], kept_pairs: list[KeptPair]
     ) -> int:
         """Supprime les détections auto non confirmées devenues obsolètes.
 
@@ -52,13 +67,13 @@ class AddressResolutionQueries(Protocol):
         ...
 
     def unflag_obsolete_detections_bulk(
-        self, conn: Connection, addr_ids: list[int], kept_pairs: list[tuple[int, int]]
+        self, conn: Connection, addr_ids: list[int], kept_pairs: list[KeptPair]
     ) -> None:
         """Retire `matched_form_id` des liens manuels (is_confirmed) obsolètes."""
         ...
 
     def upsert_detected_structures_bulk(
-        self, conn: Connection, detections: list[tuple[int, int, int]]
+        self, conn: Connection, detections: list[DetectedStructure]
     ) -> None:
         """Insère/maj en bloc les détections `(address_id, structure_id, form_id)`.
 

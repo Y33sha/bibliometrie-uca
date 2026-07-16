@@ -7,7 +7,10 @@ Deux périmètres se composent. La matview est bornée au périmètre d'extracti
 
 from sqlalchemy import Connection, text
 
-from application.ports.pipeline.affiliations.in_perimeter import AffiliationsQueries
+from application.ports.pipeline.affiliations.in_perimeter import (
+    AffiliationsQueries,
+    InPerimeterSyncCounts,
+)
 
 # Ensembles d'ids utilisés par les deux UPDATE de `sync_in_perimeter` :
 #   should    = authorships dans le périmètre restreint, lus depuis la matview
@@ -29,13 +32,13 @@ _DELTA_CTE = """
 """
 
 
-def sync_in_perimeter(conn: Connection, *, perimeter_ids: list[int]) -> tuple[int, int]:
+def sync_in_perimeter(conn: Connection, *, perimeter_ids: list[int]) -> InPerimeterSyncCounts:
     """Aligne `in_perimeter` sur le périmètre, en n'écrivant que les changements.
 
     Dérivé de la matview `source_authorship_structures` (à rafraîchir en amont) :
     `in_perimeter = TRUE` ssi l'authorship y figure pour une structure du
     périmètre restreint. Delta par différence d'ensembles d'ids (index-only),
-    pas de balayage des `source_authorships`. Retourne `(passées_TRUE, passées_FALSE)`.
+    pas de balayage des `source_authorships`.
     """
     params = {"perimeter_ids": perimeter_ids}
     added = conn.execute(
@@ -60,7 +63,7 @@ def sync_in_perimeter(conn: Connection, *, perimeter_ids: list[int]) -> tuple[in
         ),
         params,
     ).rowcount
-    return added, removed
+    return InPerimeterSyncCounts(added=added, removed=removed)
 
 
 def refresh_source_authorship_structures(conn: Connection) -> None:
@@ -74,7 +77,9 @@ def refresh_source_authorship_structures(conn: Connection) -> None:
 class PgAffiliationsQueries(AffiliationsQueries):
     """Adapter PostgreSQL pour `application.ports.pipeline.affiliations.in_perimeter.AffiliationsQueries`."""
 
-    def sync_in_perimeter(self, conn: Connection, *, perimeter_ids: list[int]) -> tuple[int, int]:
+    def sync_in_perimeter(
+        self, conn: Connection, *, perimeter_ids: list[int]
+    ) -> InPerimeterSyncCounts:
         return sync_in_perimeter(conn, perimeter_ids=perimeter_ids)
 
     def refresh_source_authorship_structures(self, conn: Connection) -> None:

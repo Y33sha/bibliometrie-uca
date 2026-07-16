@@ -9,6 +9,8 @@ from sqlalchemy import Connection, text
 
 from application.ports.pipeline.affiliations.address_resolution import (
     AddressResolutionQueries,
+    DetectedStructure,
+    KeptPair,
     StructureNameForm,
 )
 
@@ -54,7 +56,7 @@ def fetch_addresses_chunk(conn: Connection, *, after_id: int, limit: int) -> lis
 
 
 def delete_obsolete_detections_bulk(
-    conn: Connection, addr_ids: list[int], kept_pairs: list[tuple[int, int]]
+    conn: Connection, addr_ids: list[int], kept_pairs: list[KeptPair]
 ) -> int:
     """Supprime en bloc les détections auto non confirmées devenues obsolètes.
 
@@ -64,8 +66,8 @@ def delete_obsolete_detections_bulk(
     """
     if not addr_ids:
         return 0
-    kept_aids = [a for a, _ in kept_pairs]
-    kept_sids = [s for _, s in kept_pairs]
+    kept_aids = [p.address_id for p in kept_pairs]
+    kept_sids = [p.structure_id for p in kept_pairs]
     return conn.execute(
         text("""
             DELETE FROM address_structures a
@@ -83,7 +85,7 @@ def delete_obsolete_detections_bulk(
 
 
 def unflag_obsolete_detections_bulk(
-    conn: Connection, addr_ids: list[int], kept_pairs: list[tuple[int, int]]
+    conn: Connection, addr_ids: list[int], kept_pairs: list[KeptPair]
 ) -> None:
     """Retire en bloc `matched_form_id` des liens manuels (is_confirmed) obsolètes.
 
@@ -91,8 +93,8 @@ def unflag_obsolete_detections_bulk(
     """
     if not addr_ids:
         return
-    kept_aids = [a for a, _ in kept_pairs]
-    kept_sids = [s for _, s in kept_pairs]
+    kept_aids = [p.address_id for p in kept_pairs]
+    kept_sids = [p.structure_id for p in kept_pairs]
     conn.execute(
         text("""
             UPDATE address_structures a
@@ -110,9 +112,7 @@ def unflag_obsolete_detections_bulk(
     )
 
 
-def upsert_detected_structures_bulk(
-    conn: Connection, detections: list[tuple[int, int, int]]
-) -> None:
+def upsert_detected_structures_bulk(conn: Connection, detections: list[DetectedStructure]) -> None:
     """Insère/maj en bloc les détections `(address_id, structure_id, form_id)`.
 
     `resolve` garantit l'unicité de `(address_id, structure_id)` dans la tranche,
@@ -123,9 +123,9 @@ def upsert_detected_structures_bulk(
     """
     if not detections:
         return
-    aids = [d[0] for d in detections]
-    sids = [d[1] for d in detections]
-    fids = [d[2] for d in detections]
+    aids = [d.address_id for d in detections]
+    sids = [d.structure_id for d in detections]
+    fids = [d.form_id for d in detections]
     conn.execute(
         text("""
             INSERT INTO address_structures (address_id, structure_id, matched_form_id)
@@ -152,16 +152,16 @@ class PgAddressResolutionQueries(AddressResolutionQueries):
         return fetch_addresses_chunk(conn, after_id=after_id, limit=limit)
 
     def delete_obsolete_detections_bulk(
-        self, conn: Connection, addr_ids: list[int], kept_pairs: list[tuple[int, int]]
+        self, conn: Connection, addr_ids: list[int], kept_pairs: list[KeptPair]
     ) -> int:
         return delete_obsolete_detections_bulk(conn, addr_ids, kept_pairs)
 
     def unflag_obsolete_detections_bulk(
-        self, conn: Connection, addr_ids: list[int], kept_pairs: list[tuple[int, int]]
+        self, conn: Connection, addr_ids: list[int], kept_pairs: list[KeptPair]
     ) -> None:
         unflag_obsolete_detections_bulk(conn, addr_ids, kept_pairs)
 
     def upsert_detected_structures_bulk(
-        self, conn: Connection, detections: list[tuple[int, int, int]]
+        self, conn: Connection, detections: list[DetectedStructure]
     ) -> None:
         upsert_detected_structures_bulk(conn, detections)

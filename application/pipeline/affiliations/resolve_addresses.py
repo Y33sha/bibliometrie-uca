@@ -12,6 +12,8 @@ from sqlalchemy import Connection
 
 from application.ports.pipeline.affiliations.address_resolution import (
     AddressResolutionQueries,
+    DetectedStructure,
+    KeptPair,
     StructureNameForm,
 )
 
@@ -28,6 +30,13 @@ def _is_whole_word(text: str, start: int, end: int) -> bool:
     before_ok = start == 0 or not text[start - 1].isalnum()
     after_ok = end + 1 >= len(text) or not text[end + 1].isalnum()
     return before_ok and after_ok
+
+
+class StructureMatch(NamedTuple):
+    """Structure `structure_id` reconnue dans une adresse par sa forme `form_id`."""
+
+    structure_id: int
+    form_id: int
 
 
 class AddressMatcher:
@@ -64,8 +73,8 @@ class AddressMatcher:
                     matched.add(f.id)
         return matched
 
-    def resolve(self, text_normalized: str) -> list[tuple[int, int]]:
-        """Résout une adresse normalisée : liste de (structure_id, form_id).
+    def resolve(self, text_normalized: str) -> list[StructureMatch]:
+        """Résout une adresse normalisée : structures reconnues et forme à l'origine.
 
         Pour chaque structure, la première forme par `id` qui matche l'emporte.
         """
@@ -76,7 +85,7 @@ class AddressMatcher:
         structs_matched = {f.structure_id for f in matched}
         excluded = {f.structure_id for f in matched if f.is_excluding}
 
-        result: list[tuple[int, int]] = []
+        result: list[StructureMatch] = []
         seen: set[int] = set()
         for f in sorted(matched, key=lambda f: f.id):
             sid = f.structure_id
@@ -85,7 +94,7 @@ class AddressMatcher:
             ctx = f.requires_context_of
             if ctx and not any(cid in structs_matched for cid in ctx):
                 continue
-            result.append((sid, f.id))
+            result.append(StructureMatch(sid, f.id))
             seen.add(sid)
         return result
 
@@ -145,16 +154,16 @@ def process_addresses(
         after_id = rows[-1][0]  # tranche triée par id
 
         addr_ids: list[int] = []
-        detections: list[tuple[int, int, int]] = []
-        kept_pairs: list[tuple[int, int]] = []
+        detections: list[DetectedStructure] = []
+        kept_pairs: list[KeptPair] = []
         for addr_id, normalized_text in rows:
             addr_ids.append(addr_id)
             matches = matcher.resolve(normalized_text)
-            if any(sid in perimeter for sid, _ in matches):
+            if any(m.structure_id in perimeter for m in matches):
                 in_perimeter_count += 1
-            for structure_id, form_id in matches:
-                detections.append((addr_id, structure_id, form_id))
-                kept_pairs.append((addr_id, structure_id))
+            for match in matches:
+                detections.append(DetectedStructure(addr_id, match.structure_id, match.form_id))
+                kept_pairs.append(KeptPair(addr_id, match.structure_id))
                 affil_count += 1
 
         removed_count += queries.delete_obsolete_detections_bulk(conn, addr_ids, kept_pairs)
