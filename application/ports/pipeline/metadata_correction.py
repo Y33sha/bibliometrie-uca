@@ -121,7 +121,7 @@ class MetadataCorrectionQueries(Protocol):
         ...
 
     def persist_corrections(self, conn: Connection, updates: list[CorrectionUpdate]) -> int:
-        """UPDATE en lot des colonnes effectives + `raw_metadata`, bump `updated_at` (pour que le refresh stale aval ré-agrège la publication). Retourne le nombre de lignes mises à jour."""
+        """UPDATE en lot des colonnes effectives + `raw_metadata`, bump `updated_at`, marque `keys_dirty` — `doc_type` et `external_ids` sont des clés de matching, dont la mutation appelle une réconciliation. Retourne le nombre de lignes mises à jour."""
         ...
 
     def fetch_journal_doi_prefixes(self, conn: Connection) -> list[tuple[str, int]]:
@@ -143,5 +143,5 @@ class MetadataCorrectionQueries(Protocol):
         ...
 
     def persist_doi_corrections(self, conn: Connection, updates: list[DoiCorrectionUpdate]) -> int:
-        """UPDATE en lot de la colonne `doi` + `raw_metadata`, bump `updated_at`. Retourne le nombre de lignes mises à jour."""
+        """UPDATE en lot de la colonne `doi` + `raw_metadata`, bump `updated_at`, marque `keys_dirty` — le DOI est une clé de confirmation, dont la mutation appelle une réconciliation. Retourne le nombre de lignes mises à jour."""
         ...
