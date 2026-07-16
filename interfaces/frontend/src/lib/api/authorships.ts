@@ -1,8 +1,8 @@
 import { patch } from './client';
 import type { components } from './schema';
 
-type AuthorshipExcludeResponse = components['schemas']['AuthorshipExcludeResponse'];
+type OkResponse = components['schemas']['OkResponse'];
 
-export function exclude(authorshipId: number): Promise<AuthorshipExcludeResponse> {
-	return patch<AuthorshipExcludeResponse>(`/api/authorships/${authorshipId}/exclude`);
+export function exclude(authorshipId: number): Promise<OkResponse> {
+	return patch<OkResponse>(`/api/authorships/${authorshipId}/exclude`);
 }

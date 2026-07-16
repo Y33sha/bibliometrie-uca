@@ -1,24 +1,8 @@
-"""Modèles Pydantic transverses router-side : réponses génériques + bodies.
-
-Les types **retournés par les ports** (facets, refs de structure, blocs
-dashboard partagés) vivent dans `application/ports/api/_common.py` et
-sont re-exportés ici pour compat des importeurs historiques. Les types
-**router-only** (réponses d'acquittement après mutation, bodies HTTP)
-sont définis ici.
-"""
+"""Modèles Pydantic partagés par plusieurs routers : corps des requêtes entrantes et réponses d'acquittement après mutation."""
 
 from pydantic import BaseModel
 
-from application.ports.api._common import (
-    DashboardOa,
-    FacetValueCount,
-    PubYearCount,
-    StructureRef,
-    ValueConfirmedOut,
-    YesNoCount,
-)
-
-# ----- Réponses génériques d'acquittement (router-only) -----
+# ----- Réponses génériques d'acquittement -----
 
 
 class DeletedResponse(BaseModel):
@@ -58,21 +42,21 @@ class TotalCountResponse(BaseModel):
 
 
 class EnumOption(BaseModel):
-    """Une valeur d'enum exposée à l'UI : `{value, label_fr}`.
+    """Une valeur d'enum exposée à l'interface : `{value, label_fr}`.
 
-    Sert aux endpoints qui alimentent les dropdowns (publisher_type,
-    journal_type, …). La source de vérité côté Python est l'ordre de
-    la constante associée (ex. `domain.publishers.PUBLISHER_TYPES`).
+    Sert aux endpoints qui alimentent les listes déroulantes (publisher_type, journal_type, …). La source de vérité côté Python est l'ordre de la constante associée (ex. `domain.publishers.PUBLISHER_TYPES`).
     """
 
     value: str
     label_fr: str
 
 
-# ----- Merge (journals / publishers / persons) -----
+# ----- Fusion d'entités (revues, éditeurs, personnes) -----
 
 
 class MergeRequest(BaseModel):
+    """Fusionne l'entité `source_id` dans celle désignée par le chemin."""
+
     source_id: int
 
 
@@ -85,18 +69,12 @@ class MergeResponse(BaseModel):
 __all__ = [
     "BatchUpdatedResponse",
     "CreatedIdResponse",
-    "DashboardOa",
     "DeletedResponse",
     "EnumOption",
-    "FacetValueCount",
     "MergeRequest",
     "MergeResponse",
     "OkResponse",
-    "PubYearCount",
     "RemovedResponse",
     "StatusResponse",
-    "StructureRef",
     "TotalCountResponse",
-    "ValueConfirmedOut",
-    "YesNoCount",
 ]
