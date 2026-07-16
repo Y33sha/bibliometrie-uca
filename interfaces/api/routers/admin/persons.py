@@ -38,7 +38,7 @@ from interfaces.api.models import (
     DetachAuthorshipsResponse,
     IdentifierReassignResponse,
     IdentifierStatusResponse,
-    MarkPersonsDistinct,
+    MarkDistinctPersons,
     MergePersons,
     MergeResponse,
     NameFormStatusResponse,
@@ -206,7 +206,7 @@ def merge_persons(
 
 @router.post("/api/admin/persons/mark-distinct", response_model=OkResponse)
 def mark_persons_distinct(
-    body: MarkPersonsDistinct,
+    body: MarkDistinctPersons,
     conn: Connection = Depends(db_conn_sync),
     repo: PersonRepository = Depends(person_repo_sync),
     audit: AuditRepository = Depends(audit_repo_sync),

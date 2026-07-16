@@ -22,7 +22,7 @@ from interfaces.api.models import (
     MarkDistinctPublications,
     MergePublications,
     OkResponse,
-    PubMergeResponse,
+    PublicationMergeResponse,
 )
 
 router = APIRouter()
@@ -45,14 +45,14 @@ def next_duplicate_candidate(
     return queries.next_pub_duplicate(min_title_len=min_title_len, offset=offset)
 
 
-@router.post("/api/admin/duplicates/merge", response_model=PubMergeResponse)
+@router.post("/api/admin/duplicates/merge", response_model=PublicationMergeResponse)
 def merge_duplicate_publications(
     body: MergePublications,
     conn: Connection = Depends(db_conn_sync),
     queries: PublicationDuplicatesQueries = Depends(publication_duplicates_queries_sync),
     repo: PublicationRepository = Depends(publication_repo_sync),
     audit: AuditRepository = Depends(audit_repo_sync),
-) -> PubMergeResponse:
+) -> PublicationMergeResponse:
     """Fusionne deux publications doublons.
 
     La cible survivante est choisie implicitement (le plus petit id) : côté
@@ -87,7 +87,7 @@ def merge_duplicate_publications(
         # propagée. On mappe en 500 sans exposer un état partiel.
         raise HTTPException(status_code=500, detail=f"Échec de la fusion : {e}") from e
 
-    return PubMergeResponse(ok=True, target_id=target_id, source_id=source_id)
+    return PublicationMergeResponse(ok=True, target_id=target_id, source_id=source_id)
 
 
 @router.post("/api/admin/duplicates/mark-distinct", response_model=OkResponse)

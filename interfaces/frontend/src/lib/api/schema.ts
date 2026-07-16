@@ -13,8 +13,7 @@ export interface paths {
         };
         /**
          * Health
-         * @description Vérifie que l'API est opérationnelle, la DB accessible, et la fraîcheur
-         *     des données (date de la dernière extraction par source).
+         * @description Vérifie que l'API est opérationnelle et la base accessible, et rend la fraîcheur des données : date de la dernière extraction par source, et sources dont elle dépasse le seuil.
          */
         get: operations["health_api_health_get"];
         put?: never;
@@ -36,8 +35,7 @@ export interface paths {
          * Metrics
          * @description Métriques internes : état du pool de connexions SQLAlchemy.
          *
-         *     Le timing des requêtes est émis via le middleware `timing_middleware`
-         *     (champs `method`, `path`, `status`, `duration_ms` en JSON structuré).
+         *     La durée des requêtes est émise par `timing_middleware`, dans le record structuré `request_completed`.
          */
         get: operations["metrics_api_metrics_get"];
         put?: never;
@@ -4013,19 +4011,19 @@ export interface components {
             /** Password */
             password: string;
         };
+        /** MarkDistinctPersons */
+        MarkDistinctPersons: {
+            /** Person Id A */
+            person_id_a: number;
+            /** Person Id B */
+            person_id_b: number;
+        };
         /** MarkDistinctPublications */
         MarkDistinctPublications: {
             /** Pub Id A */
             pub_id_a: number;
             /** Pub Id B */
             pub_id_b: number;
-        };
-        /** MarkPersonsDistinct */
-        MarkPersonsDistinct: {
-            /** Person Id A */
-            person_id_a: number;
-            /** Person Id B */
-            person_id_b: number;
         };
         /** MergePersons */
         MergePersons: {
@@ -4667,8 +4665,7 @@ export interface components {
         };
         /**
          * PhaseMetricsPayload
-         * @description Sérialisation JSON de `application.pipeline.metrics.PhaseMetrics`, durée
-         *     d'exécution mesurée par l'orchestrateur comprise.
+         * @description Sérialisation JSON de `application.pipeline.metrics.PhaseMetrics`, durée d'exécution mesurée par l'orchestrateur comprise.
          */
         PhaseMetricsPayload: {
             /** New */
@@ -4877,15 +4874,6 @@ export interface components {
             /** Label */
             label: string;
         };
-        /** PubMergeResponse */
-        PubMergeResponse: {
-            /** Ok */
-            ok: boolean;
-            /** Target Id */
-            target_id: number;
-            /** Source Id */
-            source_id: number;
-        };
         /** PubYearCount */
         PubYearCount: {
             /** Year */
@@ -5039,6 +5027,15 @@ export interface components {
             pages: number;
             /** Publications */
             publications: components["schemas"]["PublicationListItem"][];
+        };
+        /** PublicationMergeResponse */
+        PublicationMergeResponse: {
+            /** Ok */
+            ok: boolean;
+            /** Target Id */
+            target_id: number;
+            /** Source Id */
+            source_id: number;
         };
         /**
          * PublicationsFacetsResponse
@@ -5374,8 +5371,7 @@ export interface components {
          * Signal
          * @description Un fait notable remonté par une phase.
          *
-         *     `level` aligne la couleur de la phase (`warning` ou `error`), `code` permet le
-         *     regroupement, `message` est lisible tel quel.
+         *     `level` aligne la couleur de la phase (`warning` ou `error`), `code` permet le regroupement, `message` est lisible tel quel.
          */
         Signal: {
             /**
@@ -6538,7 +6534,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PubMergeResponse"];
+                    "application/json": components["schemas"]["PublicationMergeResponse"];
                 };
             };
             /** @description Validation Error */
@@ -8167,7 +8163,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["MarkPersonsDistinct"];
+                "application/json": components["schemas"]["MarkDistinctPersons"];
             };
         };
         responses: {

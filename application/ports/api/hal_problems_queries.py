@@ -2,9 +2,9 @@
 
 Implémenté par `infrastructure.queries.api.hal_problems.PgHalProblemsQueries`.
 
-Placement par cas d'usage (le seul caller est le router de diagnostics HAL), pas par table.
+Placement par cas d'usage (le seul appelant est le router de diagnostics HAL), pas par table.
 
-Co-localise les DTOs Pydantic retournés par ce port. Cf. chantier `CODE_typage-projections-strict` Phase 4.
+Les modèles Pydantic que ces lectures rendent sont co-localisés ici : leur contrat appartient au port.
 """
 
 from typing import Protocol

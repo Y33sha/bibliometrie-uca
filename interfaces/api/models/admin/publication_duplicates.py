@@ -1,6 +1,6 @@
 """Modèles Pydantic (router-only) pour la déduplication de publications (admin).
 
-Les DTOs de retour du query service (`PubDedupDetail`, `PubDuplicatePair`, `PubDuplicateNextResponse`, et les sous-types) vivent dans `application/ports/api/publication_duplicates_queries.py` (cf. chantier `CODE_typage-projections-strict` Phase 4). Restent ici les bodies POST (`MergePublications`, `MarkDistinctPublications`) et la réponse construite par le router après merge (`PubMergeResponse`).
+Les modèles que rend le query service vivent auprès de leur port, dans `application/ports/api/publication_duplicates_queries.py`. Ici : les corps des requêtes POST (`MergePublications`, `MarkDistinctPublications`) et la réponse que le router compose après une fusion (`PublicationMergeResponse`).
 """
 
 from pydantic import BaseModel
@@ -19,7 +19,7 @@ class MarkDistinctPublications(BaseModel):
     pub_id_b: int
 
 
-class PubMergeResponse(BaseModel):
+class PublicationMergeResponse(BaseModel):
     ok: bool
     target_id: int
     source_id: int

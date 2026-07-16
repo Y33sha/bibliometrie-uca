@@ -41,7 +41,7 @@ class MergePersons(BaseModel):
     source_id: int
 
 
-class MarkPersonsDistinct(BaseModel):
+class MarkDistinctPersons(BaseModel):
     person_id_a: int
     person_id_b: int
 
