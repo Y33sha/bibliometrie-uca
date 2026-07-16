@@ -76,7 +76,7 @@ def write_source_authorships(
     sa_values: list[SourceAuthorshipBatchItem] = [
         {
             "source": source,
-            "spid": source_publication_id,
+            "source_publication_id": source_publication_id,
             "author_position": rec.position,
             "author_name_normalized": normalize_name_form(rec.raw_name),
             "is_corresponding": rec.is_corresponding,

@@ -101,7 +101,11 @@ def upsert_source_authorships_batch(
     """).bindparams(bindparam("payload", type_=JSONB))
     conn.execute(
         stmt,
-        {"source": values[0]["source"], "spid": values[0]["spid"], "payload": payload},
+        {
+            "source": values[0]["source"],
+            "spid": values[0]["source_publication_id"],
+            "payload": payload,
+        },
     )
 
 
