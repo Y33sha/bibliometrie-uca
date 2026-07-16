@@ -86,9 +86,9 @@ class _Cascade:
         self.resolved_cross_source_ids: set[int] = set()
 
         self._linked_index = load_linked_authorships_by_pub(conn, queries)
-        self._idref_map = queries.fetch_idref_to_person_map(conn)
-        self._orcid_map = queries.fetch_orcid_to_person_map(conn)
-        self._hal_account_map = queries.fetch_hal_account_to_person_map(conn)
+        self._idref_map = queries.fetch_identifier_to_person_map(conn, "idref")
+        self._orcid_map = queries.fetch_identifier_to_person_map(conn, "orcid")
+        self._hal_account_map = queries.fetch_identifier_to_person_map(conn, "hal_person_id")
         self._name_form_map = queries.fetch_name_form_map(conn)
         self._name_form_status = queries.fetch_name_form_status_map(conn)
         self._rejected_by_pub = queries.fetch_rejected_person_ids_by_pub(conn)
