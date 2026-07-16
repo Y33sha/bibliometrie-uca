@@ -270,17 +270,17 @@ class TestSetCountry:
         assert _get_countries(sa_sync_conn, a1) == ["FR"]
         assert _get_countries(sa_sync_conn, a2) == ["FR"]  # propagé
 
-    def test_no_propagation_on_short_normalized(self, sa_sync_conn, repo):
-        """Pas de propagation si normalized_text < 5 chars."""
+    def test_propagates_on_short_normalized(self, sa_sync_conn, repo):
+        """Deux adresses de même normalized_text court héritent aussi des countries."""
         _ensure_country(sa_sync_conn, "FR")
-        a1 = _create_address(sa_sync_conn, raw_text="addr short A")
-        a2 = _create_address(sa_sync_conn, raw_text="addr short B")
+        a1 = _create_address(sa_sync_conn, raw_text="Lyon A")
+        a2 = _create_address(sa_sync_conn, raw_text="Lyon B")
         sa_sync_conn.execute(
-            text("UPDATE addresses SET normalized_text = 'abc' WHERE id = ANY(:ids)"),
+            text("UPDATE addresses SET normalized_text = 'lyon' WHERE id = ANY(:ids)"),
             {"ids": [a1, a2]},
         )
         set_country(a1, ["FR"], repo=repo)
-        assert _get_countries(sa_sync_conn, a2) is None
+        assert _get_countries(sa_sync_conn, a2) == ["FR"]
 
 
 # ── batch_set_country_by_ids ────────────────────────────────────────
