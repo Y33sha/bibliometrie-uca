@@ -13,11 +13,20 @@ Implémenté par `infrastructure/repositories/journal_repository.py`.
 """
 
 from datetime import datetime
-from typing import Any, Protocol
+from typing import Any, NamedTuple, Protocol
 
 from pydantic import BaseModel
 
 from domain.journals.journal import Journal
+
+
+class JournalIssnRow(NamedTuple):
+    """Une revue indexable par ISSN : son `id` et ses trois formes d'ISSN (au moins une non-nulle)."""
+
+    id: int
+    issn: str | None
+    eissn: str | None
+    issnl: str | None
 
 
 class JournalUpdate(BaseModel):
@@ -70,6 +79,14 @@ class JournalRepository(Protocol):
     def find_journal_by_openalex_id(self, openalex_id: str) -> int | None: ...
 
     def find_journal_by_issn_any(self, issn_value: str) -> int | None: ...
+
+    def find_journals_of_unknown_type(self, *, limit: int | None = None) -> list[tuple[int, str]]:
+        """`(id, openalex_id)` des revues au `journal_type` indéterminé qui portent un `openalex_id`, à typer via OpenAlex. Le type étant stable par revue, une revue typée sort de la file. `limit` cape le run."""
+        ...
+
+    def find_journal_issn_index(self) -> list[JournalIssnRow]:
+        """Les revues portant au moins un ISSN — matière de l'index ISSN → revue à l'import du dump DOAJ."""
+        ...
 
     def enrich_journal(
         self,
@@ -125,6 +142,14 @@ class JournalRepository(Protocol):
         dump » est traité en bloc par `reset_is_in_doaj` (FALSE global avant
         re-pose).
         """
+        ...
+
+    def reset_is_in_doaj(self) -> int:
+        """Efface le drapeau `is_in_doaj` de toutes les revues qui le portent, le dump DOAJ faisant autorité — l'import le re-pose ensuite sur les revues matchées. Retourne le nombre de drapeaux effacés."""
+        ...
+
+    def doaj_last_import_at(self) -> datetime | None:
+        """Date du dernier import DOAJ (`max(doaj_imported_at)`), `None` si jamais importé. Commande la staleness du téléchargement du dump."""
         ...
 
     # ── Fusion ─────────────────────────────────────────────────────

@@ -44,15 +44,14 @@ class TestPublishersFetchSignalsRateLimit:
 class TestJournalsWorkerStopsOnTrippedBreaker:
     def _run(self, fetch_batch, breaker, n_batches):
         conn = MagicMock()
-        queries = MagicMock()
+        journal_repo = MagicMock()
         # row = (journal_id, oa_id) ; BATCH_SIZE journaux par batch.
         rows = [(i, f"S{i}") for i in range(n_batches * journals_mod.BATCH_SIZE)]
-        queries.fetch_journals_of_unknown_type.return_value = rows
+        journal_repo.find_journals_of_unknown_type.return_value = rows
         journals_mod.run_enrich_journals_from_openalex(
             conn,
-            queries,
             MagicMock(),
-            journal_repo=MagicMock(),
+            journal_repo=journal_repo,
             fetch_batch=fetch_batch,
             breaker=breaker,
         )

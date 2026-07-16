@@ -22,7 +22,6 @@ from application.pipeline.publishers_journals.import_journals_from_doaj_dump imp
 )
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from infrastructure.queries.pipeline.enrich import PgEnrichQueries
 from infrastructure.repositories import journal_repository
 from infrastructure.sources.doaj import read_doaj_dump_rows
 
@@ -43,7 +42,6 @@ def main() -> None:
     try:
         run_import_doaj_dump(
             conn,
-            PgEnrichQueries(),
             log,
             journal_repo=journal_repository(conn),
             rows=read_doaj_dump_rows(args.csv_file),

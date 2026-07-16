@@ -7,7 +7,6 @@ from sqlalchemy import text
 from application.pipeline.publishers_journals.import_journals_from_doaj_dump import (
     run_import_doaj_dump,
 )
-from infrastructure.queries.pipeline.enrich import PgEnrichQueries
 from infrastructure.repositories import journal_repository
 
 
@@ -34,7 +33,6 @@ def _run(conn, rows, *, dry_run=False):
     # commit=False : le fixture sa_sync_conn est une transaction rollbackée.
     return run_import_doaj_dump(
         conn,
-        PgEnrichQueries(),
         logging.getLogger("test"),
         journal_repo=journal_repository(conn),
         rows=rows,

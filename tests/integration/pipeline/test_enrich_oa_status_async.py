@@ -10,7 +10,7 @@ end-to-end avec le `fetcher` concret depuis `infrastructure.sources.unpaywall` :
 - 429 retry transparent (géré par `http_request_with_retry_async`)
 - semaphore plafonne les fetches concurrents
 
-Mocks : port `EnrichQueries`, `PublicationRepository` ; httpx via `respx`.
+Mocks : port `OaStatusQueries`, `PublicationRepository` ; httpx via `respx`.
 """
 
 from __future__ import annotations

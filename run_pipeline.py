@@ -775,7 +775,6 @@ def _run_enrich_journals_from_openalex() -> PhaseMetrics:
         run_enrich_journals_from_openalex,
     )
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.pipeline.enrich import PgEnrichQueries
     from infrastructure.repositories import journal_repository
     from infrastructure.sources.api_limits import DOAJ_DELAY
     from infrastructure.sources.circuit_breaker import (
@@ -803,7 +802,6 @@ def _run_enrich_journals_from_openalex() -> PhaseMetrics:
         sources_api = get_api_base_urls()["openalex_sources"]
         metrics = run_enrich_journals_from_openalex(
             conn,
-            PgEnrichQueries(),
             log,
             journal_repo=journal_repository(conn),
             fetch_batch=lambda oa_ids: fetch_sources_batch(
@@ -831,7 +829,6 @@ def _run_enrich_journals_from_doaj() -> PhaseMetrics:
         run_import_doaj_dump,
     )
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.pipeline.enrich import PgEnrichQueries
     from infrastructure.repositories import journal_repository
     from infrastructure.sources.config import get_polite_pool_email_optional
     from infrastructure.sources.doaj import (
@@ -844,8 +841,8 @@ def _run_enrich_journals_from_doaj() -> PhaseMetrics:
     t0 = time.time()
     conn = get_sync_engine().connect()
     try:
-        queries = PgEnrichQueries()
-        last = queries.doaj_last_import_at(conn)
+        journal_repo = journal_repository(conn)
+        last = journal_repo.doaj_last_import_at()
         threshold = datetime.datetime.now(datetime.UTC) - datetime.timedelta(days=_DOAJ_STALE_DAYS)
         if last is not None and last > threshold:
             log.info(
@@ -861,9 +858,8 @@ def _run_enrich_journals_from_doaj() -> PhaseMetrics:
         fetch_doaj_dump(str(_DOAJ_DUMP_PATH), user_agent=user_agent, logger=log)
         stats = run_import_doaj_dump(
             conn,
-            queries,
             log,
-            journal_repo=journal_repository(conn),
+            journal_repo=journal_repo,
             rows=read_doaj_dump_rows(str(_DOAJ_DUMP_PATH)),
         )
     finally:
@@ -1170,7 +1166,7 @@ def phase_oa_status(**kw: Any) -> PhaseMetrics:
     from application.pipeline.oa_status.phase import run
     from application.pipeline.signals import filter_configured
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.pipeline.enrich import PgEnrichQueries
+    from infrastructure.queries.pipeline.oa_status import PgOaStatusQueries
     from infrastructure.repositories import publication_repository
     from infrastructure.sources.config import get_api_base_urls, get_polite_pool_email_optional
     from infrastructure.sources.unpaywall import fetch_oa_status
@@ -1197,7 +1193,7 @@ def phase_oa_status(**kw: Any) -> PhaseMetrics:
             asyncio.run(
                 run(
                     conn,
-                    PgEnrichQueries(),
+                    PgOaStatusQueries(),
                     log,
                     pub_repo=publication_repository(conn),
                     fetcher=fetcher,

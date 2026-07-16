@@ -15,7 +15,6 @@ from sqlalchemy import Connection
 
 from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.circuit_breaker import CircuitBreaker
-from application.ports.pipeline.enrich import EnrichQueries
 from application.ports.repositories.journal_repository import (
     JournalRepository,
     JournalUpdate,
@@ -51,7 +50,6 @@ FetchSourcesBatch = Callable[[list[str]], dict[str, tuple[float | None, str, str
 
 def run_enrich_journals_from_openalex(
     conn: Connection,
-    queries: EnrichQueries,
     logger: logging.Logger,
     *,
     journal_repo: JournalRepository,
@@ -59,7 +57,7 @@ def run_enrich_journals_from_openalex(
     breaker: CircuitBreaker,
     rate_delay: float = 0.1,
 ) -> PhaseMetrics:
-    journals = queries.fetch_journals_of_unknown_type(conn, limit=None)
+    journals = journal_repo.find_journals_of_unknown_type()
     total = len(journals)
     logger.info("%d revues à typer (openalex_id, journal_type inconnu).", total)
     if total == 0:
