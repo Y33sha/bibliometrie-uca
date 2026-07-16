@@ -8,7 +8,7 @@ import hmac
 import logging
 import os
 import time
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 
 import bcrypt
 from fastapi import Cookie, Depends, HTTPException, Request
@@ -44,6 +44,8 @@ from application.ports.repositories.person_repository import PersonRepository
 from application.ports.repositories.publication_repository import PublicationRepository
 from application.ports.repositories.publisher_repository import PublisherRepository
 from application.ports.repositories.structure_repository import StructureRepository
+from application.services.addresses import countries as countries_service
+from application.services.authorships.core import propagate_in_perimeter_for_addresses
 from infrastructure.db.dml_guard import has_uncommitted_dml, reset_dml_flag
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.queries.api.addresses import PgAddressesQueries
@@ -317,73 +319,59 @@ def metadata_correction_queries_sync() -> MetadataCorrectionQueries:
 
 
 # ----- Tâches de fond (BackgroundTasks) -----
-#
-# Contrat : une tâche de fond ouvre sa propre connexion via `with engine.begin()`
-# (commit/rollback et fermeture en sortie, même sur exception) et enveloppe son
-# corps dans un `try/except` qui logue. La connexion de la requête appartient à un
-# autre contexte et tourne en parallèle : la réutiliser laisserait une transaction
-# ouverte (idle in transaction).
-#
-# Une tâche de fond s'exécute pendant l'envoi de la réponse, avant la sortie de
-# `db_conn_sync` : elle voit les écritures de la requête que le command handler a
-# committées avant de retourner.
+
+
+def _run_detached(label: str, work: Callable[[Connection], None]) -> None:
+    """Exécute `work` sur une connexion à elle, hors du cycle de requête.
+
+    Une tâche de fond s'exécute pendant l'envoi de la réponse, en parallèle de la requête qui l'a enregistrée : la connexion de celle-ci appartient à un autre contexte, et la partager laisserait une transaction ouverte (idle in transaction). `engine.begin()` commite en sortie, annule sur exception, et ferme dans les deux cas.
+
+    L'exception est piégée et loguée : une tâche de fond n'a personne à qui la remonter, la réponse étant partie. `work` voit les écritures que le command handler de la requête a committées avant de retourner.
+    """
+    try:
+        with get_sync_engine().begin() as conn:
+            work(conn)
+    except Exception:
+        logger.exception("Tâche de fond en échec : %s", label)
 
 
 def bg_propagate_countries_sync(address_ids: list[int]) -> None:
-    """Tâche de fond sync : propager les pays d'adresses → publications.
-
-    Lancée hors cycle de requête (`BackgroundTasks`), où les `Depends` ne s'appliquent pas : la composition est manuelle ici (composition root).
-    """
-    import logging
-
-    from application.services.addresses import countries as countries_service
-
-    logger = logging.getLogger(__name__)
-    try:
-        engine = get_sync_engine()
-        with engine.begin() as conn:
-            countries_service.propagate_countries_to_publications(
-                address_ids, repo=address_repository(conn)
-            )
-    except Exception:
-        logger.exception("Erreur propagation pays en background")
+    """Tâche de fond : propage les pays des adresses vers les publications."""
+    _run_detached(
+        "propagation des pays",
+        lambda conn: countries_service.propagate_countries_to_publications(
+            address_ids, repo=address_repository(conn)
+        ),
+    )
 
 
 def bg_propagate_in_perimeter_sync(address_ids: list[int]) -> None:
-    """Tâche de fond sync : propager `in_perimeter` après une review d'affiliation.
+    """Tâche de fond : propage `in_perimeter` après une review d'affiliation.
 
-    Lancée hors cycle de requête (`BackgroundTasks`) : composition manuelle, connexion propre. Le recalcul peut toucher des dizaines de milliers de `source_authorships`, d'où son décorrélage de la réponse admin.
+    Le recalcul peut toucher des dizaines de milliers de `source_authorships`, d'où son décorrélage de la réponse admin.
     """
-    import logging
-
-    from application.services.authorships.core import propagate_in_perimeter_for_addresses
-
-    logger = logging.getLogger(__name__)
-    try:
-        engine = get_sync_engine()
-        with engine.begin() as conn:
-            propagate_in_perimeter_for_addresses(
-                conn,
-                address_ids,
-                repo=authorship_repository(conn),
-                perimeter_queries=get_perimeter_queries_sync(),
-            )
-    except Exception:
-        logger.exception("Erreur propagation in_perimeter en background")
+    _run_detached(
+        "propagation d'in_perimeter",
+        lambda conn: propagate_in_perimeter_for_addresses(
+            conn,
+            address_ids,
+            repo=authorship_repository(conn),
+            perimeter_queries=get_perimeter_queries_sync(),
+        ),
+    )
 
 
 # ----- Périmètre APC : structures considérées comme "internes" -----
 
 
-def get_apc_structure_ids_sync() -> list[int]:
+def get_apc_structure_ids_sync(
+    conn: Connection = Depends(db_conn_sync),
+    perimeter_queries: PerimeterQueries = Depends(get_perimeter_queries_sync),
+) -> list[int]:
     """Structures considérées comme « internes » pour la catégorisation APC.
 
     Réutilise le périmètre `perimeter_persons`, avec expansion `est_tutelle_de` : l'établissement et tous ses laboratoires. Une publication APC est classée interne dès qu'un de ses `apc_payments.budget_structure_id` appartient à cet ensemble.
 
-    Pas de cache : un lookup par clé primaire et par requête API, et l'invalidation reste transparente quand le périmètre change via `/admin/config` ou que ses structures évoluent.
+    Pas de cache applicatif : la lecture est un lookup par clé primaire, que FastAPI résout une fois par requête, et l'invalidation reste transparente quand le périmètre change via `/admin/config` ou que ses structures évoluent.
     """
-    from infrastructure.queries.perimeter import get_persons_structure_ids_list
-
-    engine = get_sync_engine()
-    with engine.connect() as conn:
-        return get_persons_structure_ids_list(conn)
+    return perimeter_queries.get_persons_structure_ids_list(conn)

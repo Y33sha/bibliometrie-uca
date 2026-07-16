@@ -47,10 +47,11 @@ def stats_filters(
     oa_status: str = Query(""),
     has_apc: str = Query(""),
     doc_type: str = Query(""),
+    apc_structure_ids: list[int] = Depends(get_apc_structure_ids_sync),
 ) -> StatsFilters:
     """Dépendance : assemble les filtres communs des endpoints stats depuis les query params."""
     return StatsFilters(
-        apc_structure_ids=get_apc_structure_ids_sync(),
+        apc_structure_ids=apc_structure_ids,
         lab_ids=parse_int_csv(lab_id),
         years=parse_int_csv(year),
         publisher_ids=parse_int_csv(publisher_id),
