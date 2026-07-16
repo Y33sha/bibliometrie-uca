@@ -1,21 +1,17 @@
-"""Dépendances partagées des routers : service du frontend buildé, helpers d'authentification, factories DB.
+"""Dépendances partagées des routers : helpers d'authentification, factories DB, tâches de fond.
 
-`db_conn_sync` ouvre une `Connection` SQLAlchemy via `engine.connect()` et la fournit aux routes par `Depends(...)` ; le handler d'écriture commite lui-même. Les factories câblent les query services et repositories sur cette connexion.
+`db_conn_sync` fournit aux routes, par `Depends(...)`, la connexion sur laquelle les factories câblent les query services et les repositories.
 """
 
 import hashlib
 import hmac
 import logging
-import os
 import time
 from collections.abc import Callable, Iterator
 
 import bcrypt
 from fastapi import Cookie, Depends, HTTPException, Request
-from fastapi.staticfiles import StaticFiles
 from sqlalchemy import Connection
-from starlette.responses import Response
-from starlette.types import Scope
 
 from application.ports.api.addresses_queries import AddressesQueries
 from application.ports.api.admin_feedback_queries import AdminFeedbackQueries
@@ -77,33 +73,7 @@ from infrastructure.repositories import (
 )
 from infrastructure.settings import settings
 
-# ----- SPA Static Files -----
-
 logger = logging.getLogger(__name__)
-
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-BUILD_DIR = os.path.join(PROJECT_ROOT, "interfaces", "frontend", "build")
-
-
-class SPAStaticFiles(StaticFiles):
-    """Sert le build SvelteKit (adapter-static).
-
-    Deux particularités du format prérendu :
-
-    - les pages prérendues sont écrites en `<route>.html` (par exemple `docs/glossaire.html`) : le chemin nu introuvable est retenté avec l'extension `.html` ;
-    - les routes purement client-side (`ssr=false`, non prérendues) retombent sur `index.html`, qui les route côté client.
-    """
-
-    async def get_response(self, path: str, scope: Scope) -> Response:
-        try:
-            return await super().get_response(path, scope)
-        except Exception:
-            if not path.endswith(".html"):
-                try:
-                    return await super().get_response(f"{path}.html", scope)
-                except Exception:
-                    pass
-            return await super().get_response("index.html", scope)
 
 
 # ----- Auth helpers -----
@@ -299,14 +269,12 @@ def addresses_queries_sync(conn: Connection = Depends(db_conn_sync)) -> Addresse
     return PgAddressesQueries(conn)
 
 
-# PgPerimeterQueries est sans état (la connexion est passée aux méthodes),
-# donc un singleton par processus suffit.
-_perimeter_queries_sync_singleton: PerimeterQueries = PgPerimeterQueries()
+# `PgPerimeterQueries` est sans état (la connexion est passée aux méthodes) : un singleton par processus suffit.
+_perimeter_queries_singleton: PerimeterQueries = PgPerimeterQueries()
 
 
 def get_perimeter_queries_sync() -> PerimeterQueries:
-    """Retourne le singleton sync de `PerimeterQueries`."""
-    return _perimeter_queries_sync_singleton
+    return _perimeter_queries_singleton
 
 
 def get_apc_structure_ids_sync(
@@ -322,12 +290,12 @@ def get_apc_structure_ids_sync(
     return perimeter_queries.get_persons_structure_ids_list(conn)
 
 
-# `PgMetadataCorrectionQueries` est sans état (connexion passée aux méthodes) → singleton.
+# `PgMetadataCorrectionQueries` est sans état (la connexion est passée aux méthodes) : un singleton par processus suffit.
 _metadata_correction_queries_singleton: MetadataCorrectionQueries = PgMetadataCorrectionQueries()
 
 
 def metadata_correction_queries_sync() -> MetadataCorrectionQueries:
-    """Retourne le singleton sync de `MetadataCorrectionQueries` (hooks admin journaux)."""
+    """Corrections de métadonnées déclenchées par les hooks d'édition des revues."""
     return _metadata_correction_queries_singleton
 
 

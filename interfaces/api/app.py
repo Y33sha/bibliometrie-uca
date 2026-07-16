@@ -40,7 +40,8 @@ from infrastructure.db.engine import (
     set_sync_engine,
 )
 from infrastructure.observability.log import configure_root_logging
-from interfaces.api.deps import BUILD_DIR, SPAStaticFiles, _verify_token
+from interfaces.api.deps import _verify_token
+from interfaces.api.spa import BUILD_DIR, SPAStaticFiles
 
 # Configure le root logger (format JSON par défaut, texte si LOG_FORMAT=text).
 # À faire AVANT l'import des routers qui peuvent créer leur propre logger.
@@ -349,5 +350,5 @@ app.include_router(subjects.router)
 # (ssr=false) et les docs prérendues vivent dans interfaces/frontend/build.
 # Monté en dernier — catch-all — pour que les routes /api/* matchent d'abord.
 # Absent en dev (vite sert le frontend) : on ne monte que si le build existe.
-if os.path.isdir(BUILD_DIR):
+if BUILD_DIR.is_dir():
     app.mount("/", SPAStaticFiles(directory=BUILD_DIR, html=True), name="spa")
