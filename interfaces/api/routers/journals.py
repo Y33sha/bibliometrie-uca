@@ -1,4 +1,4 @@
-"""Router Revues — liste, recherche, fusion, types."""
+"""Router /api/journals/* — les revues : listes, recherche, édition, fusion."""
 
 import logging
 

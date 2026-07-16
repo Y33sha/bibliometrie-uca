@@ -1,6 +1,6 @@
-"""Persons admin router : identifiants, fusion, rejet, renommage, détachement.
+"""Router /api/persons/* et /api/person-identifiers/* — les mutations sur les personnes : identifiants, fusion, rejet, renommage, détachement.
 
-Toutes les mutations sur personnes. Les opérations sur les authorships en tant que telles (exclude, orphan-authorships) sont dans `admin/authorships.py`. Les lectures publiques restent dans `routers/persons.py`.
+Les gestes qui portent sur les signatures elles-mêmes vivent dans `admin/authorships.py`, et les lectures publiques dans `routers/persons.py`.
 """
 
 import logging

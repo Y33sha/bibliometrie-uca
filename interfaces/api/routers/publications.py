@@ -1,4 +1,4 @@
-"""Router /api/publications/* — délègue au port `PublicationsQueries`."""
+"""Router /api/publications/* — les publications : listes, facettes, détail, export, servis par le port `PublicationsQueries`."""
 
 import logging
 from typing import Literal
@@ -247,7 +247,7 @@ def get_publication(
     """Détail complet d'une publication."""
     detail = queries.get_publication_detail(pub_id)
     if detail is None:
-        raise HTTPException(status_code=404, detail="Publication not found")
+        raise HTTPException(status_code=404, detail="Publication introuvable")
     return detail
 
 

@@ -1,8 +1,6 @@
-"""Router admin : exécutions de phase du pipeline (observabilité par phase).
+"""Router /api/admin/pipeline/runs/* — l'historique des exécutions du pipeline.
 
-Expose `/api/admin/pipeline/runs` (liste agrégée par run) et
-`/api/admin/pipeline/runs/{run_id}` (détail : phases avec rendement et écart de
-durée recalculés à la lecture).
+La liste agrège les exécutions de phase par run. Le détail d'un run rend ses phases dans l'ordre, chacune avec son rendement et son écart de durée au médian historique, recalculés à la lecture.
 """
 
 import logging

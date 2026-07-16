@@ -1,6 +1,6 @@
-"""Router admin feedback : diagnostics qualité de la détection d'adresses.
+"""Router /api/admin/feedback/* — la qualité de la détection des structures dans les adresses.
 
-Expose les endpoints `/api/admin/feedback/*` qui servent le tableau de bord qualité : taux de détection global, liste des faux négatifs (adresses confirmées manuellement mais non détectées par le script) et faux positifs (adresses détectées mais rejetées manuellement).
+Sert le tableau de bord qui confronte la détection automatique aux arbitrages manuels : taux de détection, faux négatifs (adresses confirmées à la main mais non détectées) et faux positifs (adresses détectées mais rejetées à la main).
 """
 
 import logging

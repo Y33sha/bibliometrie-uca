@@ -1,4 +1,4 @@
-"""Router Sujets — liste, détail, voisins par co-occurrence."""
+"""Router /api/subjects/* — les sujets : liste paginée, et détail portant les voisins par co-occurrence."""
 
 import logging
 
@@ -37,10 +37,10 @@ def get_subject(
     min_cooccurrence: int = Query(2, ge=1),
     queries: SubjectsAdminQueries = Depends(subjects_admin_queries),
 ) -> SubjectDetailResponse:
-    """Détail d'un sujet + ses voisins par co-occurrence (top N)."""
+    """Détail d'un sujet et ses voisins par co-occurrence, les plus fréquents d'abord."""
     subject = queries.get_subject(subject_id)
     if subject is None:
-        raise HTTPException(status_code=404, detail="Subject not found")
+        raise HTTPException(status_code=404, detail="Sujet introuvable")
     neighbors = queries.get_subject_neighbors(
         subject_id, limit=neighbors_limit, min_count=min_cooccurrence
     )

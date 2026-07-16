@@ -1,4 +1,4 @@
-"""Router /api/stats/* — délègue les requêtes au port StatsQueries."""
+"""Router /api/stats/* — les agrégats des tableaux de bord, servis par le port `StatsQueries`."""
 
 import logging
 from dataclasses import asdict, dataclass

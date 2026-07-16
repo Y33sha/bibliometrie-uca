@@ -1,4 +1,4 @@
-"""Router /api/laboratories/* — délègue au port `LaboratoriesQueries`."""
+"""Router /api/laboratories/* — les laboratoires du périmètre, servis par le port `LaboratoriesQueries`."""
 
 import logging
 

@@ -1,9 +1,6 @@
-"""Endpoints admin adossés aux fichiers du pipeline : statut en cours et log par phase.
+"""Router /api/admin/pipeline/status et /api/admin/pipeline/logs/* — ce que le pipeline laisse dans ses fichiers.
 
-Le statut vient de `logs/status.json` (écrit par l'orchestrateur), le log
-d'une phase est découpé de `logs/pipeline.log` (cf.
-`infrastructure.observability.phase_logs`). L'observabilité structurée par run
-et par phase, elle, est servie par le router `pipeline_phase_executions`.
+Le statut du run en cours vient de `logs/status.json`, écrit par l'orchestrateur ; le log d'une phase est découpé de `logs/pipeline.log` par `infrastructure.observability.phase_logs`. L'historique structuré des runs est servi par le router `pipeline_phase_executions`.
 """
 
 import logging
