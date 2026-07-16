@@ -127,7 +127,7 @@ class PgPerimetersAdminQueries(PerimetersAdminQueries):
         self._conn = conn
 
     def list_perimeters_with_structures(self) -> list[PerimeterOut]:
-        """Liste tous les périmètres avec leurs structures racines + le décompte après descente récursive (CTE `get_perimeter_structure_ids`)."""
+        """Liste tous les périmètres avec leurs structures racines et le décompte de leur ensemble effectif, lu dans `perimeter_structures`."""
         perim_rows = self._conn.execute(
             text("SELECT id, code, name, structure_ids FROM perimeters ORDER BY id")
         ).all()

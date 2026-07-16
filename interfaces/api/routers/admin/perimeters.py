@@ -1,6 +1,6 @@
-"""Router périmètres — définition des ensembles de structures UCA.
+"""Router /api/perimeters/* — les ensembles de structures que les phases du pipeline consomment.
 
-Un `perimeter` (table `perimeters`) nomme un ensemble de structures racines (colonne `structure_ids`) ; l'ensemble effectif est résolu par la CTE récursive `get_perimeter_structure_ids` (descend est_tutelle_de et est_partenaire_de).
+Un périmètre (table `perimeters`) nomme des structures racines dans sa colonne `structure_ids`. L'ensemble effectif y ajoute leurs descendants par `est_tutelle_de`, à l'exclusion de `est_partenaire_de` : un partenaire n'entre pas dans le périmètre de sa contrepartie. Cet ensemble est matérialisé dans `perimeter_structures` par `refresh_perimeter_structures` ; les lectures le restituent sans le recalculer.
 """
 
 import logging
@@ -39,9 +39,9 @@ logger = logging.getLogger(__name__)
 def list_perimeters(
     queries: PerimetersAdminQueries = Depends(perimeters_admin_queries),
 ) -> list[PerimeterOut]:
-    """Liste tous les périmètres avec leurs structures racines résolues.
+    """Liste les périmètres avec leurs structures racines.
 
-    Pour chaque périmètre, renvoie les structures racines directes (`structures`) et le décompte total après descente récursive des relations (`structure_count`). Le décompte inclut donc les sous-structures rattachées par `est_tutelle_de` / `est_partenaire_de`.
+    `structures` porte les seules racines ; `structure_count` compte l'ensemble effectif, racines et descendants par `est_tutelle_de` réunis.
     """
     return queries.list_perimeters_with_structures()
 
