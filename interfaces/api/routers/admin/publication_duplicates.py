@@ -35,12 +35,9 @@ def next_duplicate_candidate(
     offset: int = Query(0, ge=0),
     queries: PublicationDuplicatesQueries = Depends(publication_duplicates_queries),
 ) -> PubDuplicateNextResponse:
-    """Renvoie la paire de publications candidate au dédoublonnage à l'offset donné.
+    """Paire de publications candidate au dédoublonnage, à l'offset donné.
 
-    Les candidats sont produits par la requête `next_pub_duplicate`
-    (similarité de titre + proximité pub_year + DOI convergents) ;
-    `min_title_len` filtre les titres trop courts pour être
-    discriminants. Permet au front d'itérer pair par pair via offset.
+    Les candidats viennent de la requête `next_pub_duplicate`, qui rapproche les titres semblables, les années de publication voisines et les DOI convergents. `min_title_len` écarte les titres trop courts pour discriminer. L'offset laisse l'interface avancer paire par paire.
     """
     return queries.next_pub_duplicate(min_title_len=min_title_len, offset=offset)
 
@@ -55,19 +52,9 @@ def merge_duplicate_publications(
 ) -> PublicationMergeResponse:
     """Fusionne deux publications doublons.
 
-    La cible survivante est choisie implicitement (le plus petit id) : côté
-    publications, la direction de fusion n'a aucun effet durable, car
-    `refresh_from_sources` re-dérive *toutes* les métadonnées canoniques depuis
-    l'union des `source_publications` — union identique quel que soit le sens.
-    (À l'inverse des personnes, dont le nom du côté gardé survit.) Le refresh
-    immédiat fait converger la publication vers son état canonique sans attendre
-    un run du pipeline.
+    La cible est le plus petit des deux identifiants. Le sens de la fusion est sans portée durable : `refresh_from_sources` re-dérive toutes les métadonnées canoniques depuis l'union des `source_publications`, et cette union est la même dans un sens comme dans l'autre. Le rafraîchissement immédiat porte la publication à son état canonique sans attendre un run du pipeline.
 
-    Authorships, sources, adresses et métadonnées sont transférés vers la cible ;
-    la source est supprimée. Fusion + refresh forment une unité transactionnelle
-    (command handler) : un échec est mappé en 500 et la transaction est annulée
-    sans état partiel. 400 si les ids sont égaux, 404 si une des publications est
-    introuvable.
+    Les signatures, les sources, les adresses et les métadonnées passent à la cible, puis la source est supprimée. La fusion et le rafraîchissement forment une seule transaction, tenue par le command handler : un échec devient un 500 et annule l'ensemble, sans état intermédiaire. Renvoie 400 sur deux identifiants égaux, 404 sur une publication introuvable.
     """
     if body.pub_id_a == body.pub_id_b:
         raise HTTPException(status_code=400, detail="pub_id_a et pub_id_b doivent être différents")

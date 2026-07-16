@@ -49,23 +49,18 @@ logger = logging.getLogger(__name__)
 
 @router.get("/api/journals/oa-models", response_model=list[EnumOption])
 def list_oa_models() -> list[EnumOption]:
-    """Valeurs possibles de `oa_model` avec leur label français.
+    """Valeurs possibles de `oa_model` avec leur libellé français.
 
-    Source de vérité côté Python : `domain.journals.journal.OA_MODELS` +
-    `OA_MODEL_LABELS_FR`. Sert à alimenter les facettes « Modèle OA » des
-    listings de revues et le dropdown du modal d'édition admin.
+    La source de vérité côté Python est `domain.journals.journal.OA_MODELS` et `OA_MODEL_LABELS_FR`. Alimente la facette « Modèle OA » des listes de revues et la liste déroulante de la modale d'édition admin.
     """
     return [EnumOption(value=v, label_fr=OA_MODEL_LABELS_FR[v]) for v in OA_MODELS]
 
 
 @router.get("/api/journal-types", response_model=list[EnumOption])
 def list_journal_types() -> list[EnumOption]:
-    """Valeurs possibles de l'enum `journal_type` avec leur label français.
+    """Valeurs possibles de l'enum `journal_type` avec leur libellé français.
 
-    Source de vérité côté Python : `domain.journals.journal.JOURNAL_TYPES` +
-    `JOURNAL_TYPE_LABELS_FR` (test d'intégration `TestJournalTypesEnum`
-    vérifie la cohérence avec l'enum SQL). Sert à alimenter le dropdown de
-    la page admin revues et la colonne « Type » des pages publiques.
+    La source de vérité côté Python est `domain.journals.journal.JOURNAL_TYPES` et `JOURNAL_TYPE_LABELS_FR`, dont un test d'intégration vérifie l'accord avec l'enum SQL. Alimente la liste déroulante de la page admin des revues et la colonne « Type » des pages publiques.
     """
     return [EnumOption(value=v, label_fr=JOURNAL_TYPE_LABELS_FR[v]) for v in JOURNAL_TYPES]
 
@@ -80,12 +75,9 @@ def journals_facets(
     with_pubs: bool = False,
     queries: JournalQueries = Depends(journal_queries),
 ) -> JournalsFacetsResponse:
-    """Comptes par option pour les 3 facettes du listing revues.
+    """Comptes par option des facettes de la liste des revues.
 
-    Convention identique à `/api/publications/facets` : chaque facette
-    exclut sa propre dimension de la condition WHERE, ce qui permet
-    d'afficher le nombre de revues atteignables si l'option était
-    (dé)cochée.
+    Convention partagée avec `/api/publications/facets` : chaque facette écarte sa propre dimension de la clause WHERE, de sorte que son décompte annonce le nombre de revues atteignables si l'option était cochée ou décochée.
     """
     return queries.journals_facets(
         search=search,
@@ -110,23 +102,17 @@ def list_journals(
     sort: str = "title",
     queries: JournalQueries = Depends(journal_queries),
 ) -> JournalListResponse:
-    """Liste paginée des revues avec comptage des publications rattachées.
+    """Liste paginée des revues, avec le décompte de leurs publications.
 
     Filtres :
-    - `search` : insensible à la casse sur le titre normalisé, ignorée si
-      < 2 caractères.
-    - `publisher_id` : égalité stricte.
-    - `journal_type` / `oa_model` : CSV de valeurs (ex. `journal,proceedings`).
-      Vide = pas de filtre. Aligné sur la convention multi-valeurs de
-      `/api/publications`.
-    - `is_in_doaj` : booléen (true/false). Omettre = pas de filtre.
-    - `with_pubs` : si true, n'expose que les revues avec au moins 1
-      publication rattachée. Utilisé par la page publique /journals pour
-      masquer les revues orphelines (résiduels de pipeline ou imports
-      sans match). L'admin garde l'option de tout voir (défaut false).
 
-    `sort` : `title` / `-title` / `publisher` / `-publisher` /
-    `pubs` / `-pubs` ; fallback sur `title` si valeur inconnue.
+    - `search` : insensible à la casse sur le titre normalisé, ignoré en deçà de deux caractères.
+    - `publisher_id` : égalité stricte.
+    - `journal_type` et `oa_model` : valeurs séparées par des virgules (par exemple `journal,proceedings`), vide valant absence de filtre, selon la convention multi-valeurs de `/api/publications`.
+    - `is_in_doaj` : booléen ; omis, il ne filtre rien.
+    - `with_pubs` : restreint aux revues portant au moins une publication. La page publique s'en sert pour masquer les revues orphelines, que l'admin garde la possibilité de voir.
+
+    `sort` accepte `title`, `publisher` et `pubs`, préfixés d'un tiret pour l'ordre descendant, et retombe sur `title` devant une valeur inconnue.
     """
     return queries.list_journals(
         search=search,
@@ -146,10 +132,9 @@ def get_journal(
     journal_id: int,
     queries: JournalQueries = Depends(journal_queries),
 ) -> JournalDetailResponse:
-    """Profil complet d'une revue pour la page publique `/journals/[id]`.
+    """Profil complet d'une revue, pour sa page publique.
 
-    Inclut métadonnées + payload DOAJ brut + date d'import DOAJ + nombre de
-    publications rattachées. 404 si la revue est inconnue.
+    Porte ses métadonnées, la réponse DOAJ brute et sa date d'import, et le décompte de ses publications. Renvoie 404 sur une revue inconnue.
     """
     row = queries.get_journal_detail(journal_id)
     if row is None:
@@ -162,11 +147,9 @@ def get_journal_dashboard(
     journal_id: int,
     queries: JournalQueries = Depends(journal_queries),
 ) -> JournalDashboardResponse:
-    """Agrégats des publications de la revue (distribution `doc_type` + `oa_status`).
+    """Agrégats des publications de la revue : distributions de `doc_type` et de `oa_status`.
 
-    Sert l'onglet « Dashboard » de la page publique d'une revue pour repérer
-    visuellement les incohérences (ex. `article` sur un journal_type
-    `proceedings`). 404 si la revue est inconnue.
+    Sert l'onglet tableau de bord de la page d'une revue, où ces distributions donnent à voir les incohérences — un `article` dans une revue de type `proceedings`, par exemple. Renvoie 404 sur une revue inconnue.
     """
     result = queries.get_journal_dashboard(journal_id)
     if result is None:
@@ -180,11 +163,9 @@ def get_journal_subjects(
     limit: int = Query(30, ge=1, le=200),
     queries: JournalQueries = Depends(journal_queries),
 ) -> list[SubjectFrequency]:
-    """Top sujets des publications de la revue (pour l'onglet Dashboard).
+    """Sujets les plus fréquents des publications de la revue, pour l'onglet tableau de bord.
 
-    Exclut les sujets trop génériques (`usage_count > 5000`) pour ne pas
-    noyer le top-N. Retourne une liste vide si la revue existe sans
-    publications taggées (pas de 404 pour rester idempotent à l'usage UI).
+    Les sujets génériques, dont l'`usage_count` dépasse 5000, sont écartés : ils noieraient les autres. Une revue sans publication indexée donne une liste vide.
     """
     return queries.get_journal_subjects(journal_id, limit=limit)
 
@@ -201,11 +182,9 @@ def get_type_change_impact(
     pub_repo: PublicationRepository = Depends(publication_repo),
     correction_queries: MetadataCorrectionQueries = Depends(metadata_correction_queries),
 ) -> JournalTypeChangeImpact:
-    """Compte combien de publications du journal verraient leur `doc_type` changer si on passait `journal_type` à `new_type`.
+    """Compte les publications de la revue dont le `doc_type` changerait si son `journal_type` passait à `new_type`.
 
-    Preview honnête vis-à-vis du PUT : on applique réellement (set du type → recompute des
-    corrections SP → refresh) dans un `SAVEPOINT` qu'on rollback ensuite — preview et apply
-    partagent exactement la même logique, aucune écriture ne survit.
+    L'aperçu applique réellement le changement — écriture du type, recalcul des corrections sur les publications sources, rafraîchissement — dans un `SAVEPOINT` annulé ensuite. Il emprunte donc le chemin exact de l'édition, et aucune écriture ne survit.
     """
     if new_type not in JOURNAL_TYPES_SET:
         raise HTTPException(status_code=400, detail=f"journal_type inconnu : {new_type}")
@@ -233,11 +212,11 @@ def update_journal(
     audit: AuditRepository = Depends(audit_repo),
     correction_queries: MetadataCorrectionQueries = Depends(metadata_correction_queries),
 ) -> OkResponse:
-    """Met à jour une revue (modification sélective des champs fournis).
+    """Met à jour une revue, champ par champ.
 
-    Seuls les champs explicitement présents dans le body sont écrits (`exclude_unset=True`). Lève 404 si la revue n'existe pas.
+    Seuls les champs présents dans le corps de la requête sont écrits (`exclude_unset=True`). Renvoie 404 sur une revue inconnue.
 
-    Si `journal_type` change effectivement de valeur, déclenche la requalification synchrone du `doc_type` des publications rattachées dans la même transaction — cf. `requalify_publications_for_journal` côté application. Le caller frontal aura typiquement appelé le preview (`type-change-impact`) en amont pour afficher l'ampleur à l'admin.
+    Un `journal_type` qui change de valeur entraîne la requalification du `doc_type` des publications rattachées, dans la même transaction (`requalify_publications_for_journal`). L'endpoint `type-change-impact` en donne l'ampleur avant confirmation.
     """
     journal_commands.update_journal(
         conn,
@@ -264,10 +243,7 @@ def merge(
 ) -> MergeResponse:
     """Fusionne la revue `source_id` dans la revue `journal_id`.
 
-    Les publications et métadonnées de la source sont transférées à la cible ;
-    la source est supprimée. Les publications absorbées sont requalifiées contre
-    le `journal_type` de la cible (cf. `merge_journals`). 404 si l'une des deux
-    est introuvable.
+    Les publications et les métadonnées de la source passent à la cible, puis la source est supprimée. Les publications absorbées sont requalifiées contre le `journal_type` de la cible (`merge_journals`). Renvoie 404 si l'une des deux revues est introuvable.
     """
     found = queries.existing_journal_ids((journal_id, body.source_id))
     if journal_id not in found:

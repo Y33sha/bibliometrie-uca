@@ -103,9 +103,10 @@ def publications_entity_facet(
     queries: PublicationsQueries = Depends(publications_queries),
     apc_structure_ids: list[int] = Depends(get_apc_structure_ids),
 ) -> EntityFacetResponse:
-    """Facette éditeur/revue contextuelle de la liste : N premières entités sous les filtres actifs
-    (corrélées entre elles), avec décompte. `entity_search` recherche dans les noms d'entités ;
-    `search` reste le filtre titre/sujet des publications."""
+    """Facette contextuelle des éditeurs ou des revues : les premières entités sous les filtres actifs, avec leur décompte.
+
+    Les entités sont corrélées entre elles. `entity_search` cherche dans leurs noms, là où `search` filtre les publications sur leur titre et leurs sujets.
+    """
     lab_ids, lab_none = _parse_lab_id(lab_id)
     filters = FacetFilters(
         years=parse_int_csv(year),
@@ -141,8 +142,10 @@ def publications_entity_label(
     entity_id: int = Query(...),
     queries: PublicationsQueries = Depends(publications_queries),
 ) -> EntityLabelResponse:
-    """Libellé d'une entité (revue/éditeur) par id, pour réafficher une pastille de facette restaurée
-    depuis l'URL (qui ne porte que l'id, état canonique de la sélection)."""
+    """Libellé d'une revue ou d'un éditeur par son identifiant.
+
+    Sert à réafficher une pastille de facette restaurée depuis l'URL, qui porte l'identifiant seul : il est l'état canonique de la sélection.
+    """
     return queries.resolve_entity_label(kind=kind, entity_id=entity_id)
 
 
@@ -170,8 +173,7 @@ def export_publications_csv(
     queries: PublicationsQueries = Depends(publications_queries),
     apc_structure_ids: list[int] = Depends(get_apc_structure_ids),
 ) -> Response:
-    """Export CSV des publications : mêmes filtres ET mêmes colonnes que le
-    tableau affiché (`columns` = clés des colonnes visibles)."""
+    """Export CSV des publications, fidèle au tableau affiché : mêmes filtres, et mêmes colonnes que celles listées dans `columns`."""
     lab_ids, lab_none = _parse_lab_id(lab_id)
     filters = ListFilters(
         search=search,

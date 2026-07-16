@@ -31,8 +31,7 @@ def list_runs(
     offset: int = Query(0, ge=0),
     queries: PhaseExecutionsQueries = Depends(pipeline_phase_executions_queries),
 ) -> list[RunSummary]:
-    """Fenêtre de runs (agrégés par `run_id`), plus récent en premier ; `offset` pour
-    le chargement incrémental."""
+    """Fenêtre de runs agrégés par `run_id`, le plus récent en tête ; `offset` sert au chargement incrémental."""
     return queries.list_runs(limit=limit, offset=offset)
 
 

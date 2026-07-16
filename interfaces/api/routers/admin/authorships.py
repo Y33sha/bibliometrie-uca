@@ -48,11 +48,9 @@ def exclude_authorship_endpoint(
     person_repo: PersonRepository = Depends(person_repo),
     audit: AuditRepository = Depends(audit_repo),
 ) -> OkResponse:
-    """Rejette une contribution (« cette personne n'est pas l'auteur »).
+    """Rejette une contribution : cette personne n'a pas signé cette publication.
 
-    Enregistre la paire (publication, personne) dans `rejected_authorships`,
-    détache les sources et supprime la row consolidée ; le rebuild ne la
-    recrée pas. Action à sens unique.
+    Enregistre la paire (publication, personne) dans `rejected_authorships`, détache les signatures sources et supprime la ligne consolidée. La table de rejet vaut verrou : les reconstructions ultérieures respectent l'arbitrage. Le geste est à sens unique.
     """
     authorship_commands.exclude_authorship(
         conn, authorship_id, repo=repo, person_repo=person_repo, audit_repo=audit
@@ -91,11 +89,9 @@ def assign_orphan_authorship_endpoint(
     authorship_repo: AuthorshipRepository = Depends(authorship_repo),
     audit: AuditRepository = Depends(audit_repo),
 ) -> OrphanAssignResponse:
-    """Attribue une authorship orpheline à une personne.
+    """Attribue une signature orpheline à une personne.
 
-    Renvoie 409 si la paire a déjà été rejetée et que `force` est faux
-    (`RejectedPairError` ; avec `force`, le rejet est d'abord levé), ou si la
-    signature porte déjà une personne (`AuthorshipAlreadyAssignedError`).
+    Renvoie 409 sur une paire déjà rejetée (`RejectedPairError`), à moins que `force` ne lève le rejet au passage, et sur une signature qui porte déjà une personne (`AuthorshipAlreadyAssignedError`).
     """
     require_known_source(body.source)
 
@@ -134,10 +130,9 @@ def batch_assign_orphan_authorships(
     authorship_repo: AuthorshipRepository = Depends(authorship_repo),
     audit: AuditRepository = Depends(audit_repo),
 ) -> OrphanBatchAssignResponse:
-    """Attribue plusieurs authorships orphelines à une même personne.
+    """Attribue plusieurs signatures orphelines à une même personne.
 
-    Renvoie 409 (`RejectedPairError`) si au moins une paire a déjà été rejetée
-    et que `force` est faux ; avec `force`, les rejets sont d'abord levés.
+    Renvoie 409 (`RejectedPairError`) dès qu'une paire du lot est déjà rejetée, à moins que `force` ne lève les rejets au passage.
     """
     person_id = body.person_id
     if not body.authorship_ids:

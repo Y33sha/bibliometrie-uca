@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 def list_laboratories(
     queries: LaboratoriesQueries = Depends(laboratories_queries),
 ) -> list[LaboratoryListItem]:
-    """Liste des labos du périmètre."""
+    """Liste des laboratoires du périmètre, avec toutes leurs tutelles."""
     return queries.list_laboratories()
 
 
@@ -34,7 +34,7 @@ def get_laboratory(
     """Profil public d'un laboratoire."""
     result = queries.get_laboratory(lab_id)
     if not result:
-        raise HTTPException(404, "Laboratory not found")
+        raise HTTPException(status_code=404, detail="Laboratoire introuvable")
     return result
 
 
@@ -54,7 +54,7 @@ def get_laboratory_dashboard(
     lab_id: int,
     queries: LaboratoriesQueries = Depends(laboratories_queries),
 ) -> LaboratoryDashboardResponse:
-    """Dashboard labo : publications par an + répartition OA."""
+    """Agrégats du laboratoire : publications par année et répartition par statut d'accès ouvert."""
     return queries.get_laboratory_dashboard(lab_id)
 
 
@@ -64,5 +64,5 @@ def get_laboratory_subjects(
     limit: int = Query(30, ge=1, le=200),
     queries: LaboratoriesQueries = Depends(laboratories_queries),
 ) -> list[SubjectFrequency]:
-    """Top sujets des publications du labo (pour le nuage de mots dashboard)."""
+    """Sujets les plus fréquents des publications du laboratoire, pour le nuage de mots de son tableau de bord."""
     return queries.get_laboratory_subjects(lab_id, limit=limit)

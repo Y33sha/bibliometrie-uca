@@ -49,9 +49,9 @@ _STRUCT_OPS = {"recognized", "not_recognized"}
 
 
 def _parse_text_predicates(raw: list[str]) -> tuple[TextPredicate, ...]:
-    """Parse les params répétés `text=<mode>:<terme>` (cf. fiche, décision 8).
+    """Lit les paramètres répétés `text=<mode>:<terme>`, dont les modes sont `contains` et `not_contains`.
 
-    Tolérant : mode inconnu ou terme vide → prédicat ignoré.
+    La lecture est tolérante : un mode inconnu ou un terme vide laisse tomber le prédicat plutôt que de refuser la requête.
     """
     out: list[TextPredicate] = []
     for item in raw:
@@ -63,9 +63,9 @@ def _parse_text_predicates(raw: list[str]) -> tuple[TextPredicate, ...]:
 
 
 def _parse_structure_predicates(raw: list[str]) -> tuple[StructurePredicate, ...]:
-    """Parse les params répétés `struct=<operator>:<id>[,<id>…]`.
+    """Lit les paramètres répétés `struct=<operateur>:<id>[,<id>…]`, dont les opérateurs sont `recognized` et `not_recognized`.
 
-    Tolérant : opérateur inconnu ou aucun id valide → prédicat ignoré.
+    La lecture est tolérante : un opérateur inconnu ou une liste sans identifiant valide laisse tomber le prédicat plutôt que de refuser la requête.
     """
     out: list[StructurePredicate] = []
     for item in raw:

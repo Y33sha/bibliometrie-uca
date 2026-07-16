@@ -67,13 +67,9 @@ def add_person_identifier(
     queries: PersonsQueries = Depends(persons_queries),
     repo: PersonRepository = Depends(person_repo),
 ) -> AddIdentifierResponse:
-    """Ajoute manuellement un identifiant (ORCID, idHAL ou IdRef) à une personne.
+    """Ajoute à la main un identifiant (ORCID, idHAL ou IdRef) à une personne.
 
-    La cascade de décision (insertion / idempotence / réattribution / conflit) est
-    portée par `add_identifier` ; le router se contente d'appliquer la politique
-    d'interface (type visible UI, existence de la personne) et de traduire l'issue
-    en réponse. Le conflit remonte en `CannotAttributeConflict` → 409 (handler global) ;
-    la valeur malformée en `ValidationError` → 400 (handler global).
+    La cascade de décision — insertion, idempotence, réattribution, conflit — appartient à `add_identifier`. Le router applique la politique d'interface, à savoir les types que l'interface expose et l'existence de la personne, puis traduit l'issue en réponse. Les handlers globaux traduisent le conflit (`CannotAttributeConflict`) en 409 et la valeur malformée (`ValidationError`) en 400.
     """
     if data.id_type not in PUBLIC_PERSON_IDENTIFIER_TYPES:
         raise HTTPException(
@@ -211,8 +207,7 @@ def mark_persons_distinct(
     repo: PersonRepository = Depends(person_repo),
     audit: AuditRepository = Depends(audit_repo),
 ) -> OkResponse:
-    """Marque deux personnes comme distinctes (non-doublon) : la paire ne sera plus proposée par les
-    files de triage par nom / identifiant."""
+    """Marque deux personnes comme distinctes : les files de triage par nom et par identifiant écartent la paire."""
     if body.person_id_a == body.person_id_b:
         raise HTTPException(
             status_code=400, detail="person_id_a et person_id_b doivent être différents"
@@ -274,8 +269,10 @@ def identifier_conflicts(
     per_page: int = Query(50, ge=1, le=200),
     queries: PersonsQueries = Depends(persons_queries),
 ) -> IdentifierConflictsResponse:
-    """Paires de personnes au même identifiant brut (ORCID / IdRef / hal_person_id / idHAL),
-    paginées : doublons probables ou erreurs d'attribution, à trancher à l'œil."""
+    """Paires de personnes partageant un identifiant brut (ORCID, IdRef, hal_person_id ou idHAL), paginées.
+
+    Ce sont des doublons probables ou des erreurs d'attribution, que l'admin tranche à l'œil.
+    """
     return queries.identifier_conflicts(page=page, per_page=per_page)
 
 
@@ -296,8 +293,10 @@ def detachable_intruders(
     per_page: int = Query(50, ge=1, le=200),
     queries: PersonsQueries = Depends(persons_queries),
 ) -> DetachableIntrudersResponse:
-    """Personnes rattachées à ≥2 signatures d'une même publication, avec ancre et intrus, paginées :
-    l'intrus se détache en rejetant sa forme de nom (`PATCH /api/persons/{id}/name-forms/status`)."""
+    """Personnes rattachées à deux signatures ou plus d'une même publication, avec leur ancre et leur intrus, paginées.
+
+    L'intrus se détache en rejetant sa forme de nom, par `PATCH /api/persons/{id}/name-forms/status`.
+    """
     return queries.detachable_intruders(page=page, per_page=per_page)
 
 
@@ -318,8 +317,10 @@ def name_duplicates(
     per_page: int = Query(50, ge=1, le=200),
     queries: PersonsQueries = Depends(persons_queries),
 ) -> NameDuplicatesResponse:
-    """Paires de personnes aux noms compatibles, triées par force de réseau (co-auteurs / publis
-    co-signées / labos / revues communs), paginées : doublons probables en tête, homonymes en fin."""
+    """Paires de personnes aux noms compatibles, paginées, triées par force de réseau : co-auteurs, publications co-signées, laboratoires et revues en commun.
+
+    Les doublons probables viennent en tête, les homonymes en fin.
+    """
     return queries.name_duplicates(page=page, per_page=per_page)
 
 
@@ -357,8 +358,7 @@ def detach_authorships(
     auth_repo: AuthorshipRepository = Depends(authorship_repo),
     audit: AuditRepository = Depends(audit_repo),
 ) -> DetachAuthorshipsResponse:
-    """Rejette durablement les paires (publication, personne) des authorships
-    sources sélectionnées et nettoie les formes de noms."""
+    """Rejette durablement les paires (publication, personne) des signatures sources choisies, et nettoie les formes de nom devenues sans objet."""
     return DetachAuthorshipsResponse.model_validate(
         person_commands.detach_authorships(
             conn,
@@ -380,11 +380,10 @@ def update_name_form_status(
     auth_repo: AuthorshipRepository = Depends(authorship_repo),
     audit: AuditRepository = Depends(audit_repo),
 ) -> NameFormStatusResponse:
-    """Met à jour le statut d'une forme de nom (pending/confirmed/rejected).
+    """Met à jour le statut d'une forme de nom : `pending`, `confirmed` ou `rejected`.
 
-    `rejected` pose le verrou de non-retour ET détache les signatures portant la forme
-    (null des source_authorships + suppression des authorships canoniques orphelines) ;
-    `confirmed` valide le lien et corrobore les matchs par identifiant sans test de nom."""
+    `rejected` pose un verrou durable et détache les signatures qui portent la forme : leur `person_id` est vidé dans `source_authorships`, et les signatures consolidées devenues orphelines sont supprimées. `confirmed` valide le lien et corrobore les rapprochements faits par identifiant, qui n'éprouvent pas le nom.
+    """
     row = person_commands.update_name_form_status(
         conn,
         person_id,

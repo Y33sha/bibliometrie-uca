@@ -32,8 +32,7 @@ def pipeline_status() -> PipelineStatus | None:
 def phase_log(run_id: int, phase: str) -> PipelinePhaseLog:
     """Log d'une phase, découpé depuis `logs/pipeline.log`.
 
-    `available` est faux (et `content` vide) quand le fichier est absent
-    (`LOG_TO_FILE` désactivé) ou quand la section est introuvable (log purgé).
+    `available` vaut vrai quand la section de la phase a été retrouvée ; sinon `content` est vide, que le fichier soit absent (`LOG_TO_FILE` inactif) ou que la section ait été purgée.
     """
     content = read_phase_log(run_id, phase)
     if content is None:

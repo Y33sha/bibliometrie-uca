@@ -47,10 +47,9 @@ def persons_directory(
     sort: str = Query("name"),
     queries: PersonsQueries = Depends(persons_queries),
 ) -> PersonDirectoryResponse:
-    """Annuaire public des personnes UCA avec ORCID et idHAL.
+    """Annuaire public des personnes du périmètre, avec leurs ORCID et idHAL.
 
-    `lab_id` (optionnel) scope l'annuaire aux personnes du laboratoire — sert
-    l'onglet personnes de la fiche labo (un seul endpoint par entité).
+    `lab_id` restreint l'annuaire aux personnes d'un laboratoire : l'onglet personnes de la fiche d'un laboratoire s'en sert, plutôt que d'un endpoint qui lui serait propre.
     """
     filters = DirectoryFilters(
         search=search,
