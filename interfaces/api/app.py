@@ -11,7 +11,6 @@ import time
 import traceback
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime, timedelta
 from typing import Any, cast
 
 from fastapi import FastAPI, Request
@@ -250,50 +249,21 @@ async def timing_middleware(request: Request, call_next: RequestResponseEndpoint
 
 # ----- Health check -----
 
-# Seuil à partir duquel une source est considérée "stale" (pas extraite
-# récemment). theses.fr est mensuel, les autres devraient être hebdomadaires.
-_STALE_THRESHOLD_DAYS = 7
-
 
 @app.get("/api/health", response_model=None)
 def health() -> JSONResponse | dict[str, JsonValue]:
-    """Vérifie que l'API est opérationnelle et la base accessible, et rend la fraîcheur des données : date de la dernière extraction par source, et sources dont elle dépasse le seuil."""
+    """Vérifie que l'API répond et que la base est joignable, et indique si un pipeline est en cours."""
     try:
         engine = get_sync_engine()
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
-            rows = conn.execute(
-                text(
-                    "SELECT source, MAX(created_at) AS last_at "
-                    "FROM source_publications GROUP BY source"
-                )
-            ).all()
     except Exception as e:
         return JSONResponse(status_code=503, content={"status": "error", "db": str(e)})
-
-    now = datetime.now(UTC)
-    threshold = now - timedelta(days=_STALE_THRESHOLD_DAYS)
-    last_extraction: dict[str, dict[str, JsonValue]] = {}
-    stale: list[str] = []
-    for r in rows:
-        source = r.source
-        last_at = r.last_at
-        is_stale = bool(last_at and last_at < threshold)
-        last_extraction[source] = {
-            "at": last_at.isoformat() if last_at else None,
-            "age_days": (now - last_at).days if last_at else None,
-            "stale": is_stale,
-        }
-        if is_stale:
-            stale.append(source)
 
     return {
         "status": "ok",
         "db": "ok",
         "pipeline_running": read_status() is not None,
-        "last_extraction": last_extraction,
-        "stale_sources": stale,
-        "stale_threshold_days": _STALE_THRESHOLD_DAYS,
     }
 
 
