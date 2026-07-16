@@ -2,6 +2,10 @@
 
 from sqlalchemy import text
 
+from application.ports.pipeline.affiliations.address_resolution import (
+    DetectedStructure,
+    KeptPair,
+)
 from infrastructure.queries.pipeline.address_resolution import (
     delete_obsolete_detections_bulk,
     fetch_addresses_chunk,
@@ -91,7 +95,9 @@ class TestDeleteObsoleteDetectionsBulk:
                 {"addr": addr, "struct": struct, "form": f},
             )
 
-        count = delete_obsolete_detections_bulk(sa_sync_conn, [addr], kept_pairs=[(addr, s1)])
+        count = delete_obsolete_detections_bulk(
+            sa_sync_conn, [addr], kept_pairs=[KeptPair(addr, s1)]
+        )
         assert count == 1
         rows = sa_sync_conn.execute(
             text("SELECT structure_id FROM address_structures WHERE address_id = :addr"),
@@ -145,7 +151,7 @@ class TestDeleteObsoleteDetectionsBulk:
             )
         # On garde (addr1, s) ; (addr2, s) devient obsolète bien que même structure.
         count = delete_obsolete_detections_bulk(
-            sa_sync_conn, [addr1, addr2], kept_pairs=[(addr1, s)]
+            sa_sync_conn, [addr1, addr2], kept_pairs=[KeptPair(addr1, s)]
         )
         assert count == 1
         remaining = (
@@ -174,7 +180,7 @@ class TestUnflagObsoleteDetectionsBulk:
             {"addr": addr, "struct": s2, "form": f},
         )
 
-        unflag_obsolete_detections_bulk(sa_sync_conn, [addr], kept_pairs=[(addr, s1)])
+        unflag_obsolete_detections_bulk(sa_sync_conn, [addr], kept_pairs=[KeptPair(addr, s1)])
         row = sa_sync_conn.execute(
             text(
                 "SELECT matched_form_id, is_confirmed FROM address_structures "
@@ -191,7 +197,7 @@ class TestUpsertDetectedStructuresBulk:
         s = _create_structure(sa_sync_conn)
         f = _create_form(sa_sync_conn, s)
         addr = _create_address(sa_sync_conn)
-        upsert_detected_structures_bulk(sa_sync_conn, [(addr, s, f)])
+        upsert_detected_structures_bulk(sa_sync_conn, [DetectedStructure(addr, s, f)])
         result = sa_sync_conn.execute(
             text(
                 "SELECT matched_form_id FROM address_structures "
@@ -206,8 +212,8 @@ class TestUpsertDetectedStructuresBulk:
         f1 = _create_form(sa_sync_conn, s, form_text="x1")
         f2 = _create_form(sa_sync_conn, s, form_text="x2")
         addr = _create_address(sa_sync_conn)
-        upsert_detected_structures_bulk(sa_sync_conn, [(addr, s, f1)])
-        upsert_detected_structures_bulk(sa_sync_conn, [(addr, s, f2)])
+        upsert_detected_structures_bulk(sa_sync_conn, [DetectedStructure(addr, s, f1)])
+        upsert_detected_structures_bulk(sa_sync_conn, [DetectedStructure(addr, s, f2)])
         result = sa_sync_conn.execute(
             text(
                 "SELECT matched_form_id FROM address_structures "
@@ -223,7 +229,9 @@ class TestUpsertDetectedStructuresBulk:
         f1 = _create_form(sa_sync_conn, s1)
         f2 = _create_form(sa_sync_conn, s2, form_text="y")
         addr = _create_address(sa_sync_conn)
-        upsert_detected_structures_bulk(sa_sync_conn, [(addr, s1, f1), (addr, s2, f2)])
+        upsert_detected_structures_bulk(
+            sa_sync_conn, [DetectedStructure(addr, s1, f1), DetectedStructure(addr, s2, f2)]
+        )
         count = sa_sync_conn.execute(
             text("SELECT count(*) FROM address_structures WHERE address_id = :addr"),
             {"addr": addr},
@@ -235,13 +243,13 @@ class TestUpsertDetectedStructuresBulk:
         s = _create_structure(sa_sync_conn)
         f = _create_form(sa_sync_conn, s)
         addr = _create_address(sa_sync_conn)
-        upsert_detected_structures_bulk(sa_sync_conn, [(addr, s, f)])
+        upsert_detected_structures_bulk(sa_sync_conn, [DetectedStructure(addr, s, f)])
         xmin_before = sa_sync_conn.execute(
             text("SELECT xmin FROM address_structures WHERE address_id = :a AND structure_id = :s"),
             {"a": addr, "s": s},
         ).scalar_one()
         # Même détection : l'ON CONFLICT ... WHERE IS DISTINCT FROM ne réécrit rien.
-        upsert_detected_structures_bulk(sa_sync_conn, [(addr, s, f)])
+        upsert_detected_structures_bulk(sa_sync_conn, [DetectedStructure(addr, s, f)])
         xmin_after = sa_sync_conn.execute(
             text("SELECT xmin FROM address_structures WHERE address_id = :a AND structure_id = :s"),
             {"a": addr, "s": s},
