@@ -1,15 +1,11 @@
 #!/usr/bin/env python3
 """Hook PreToolUse (Bash) — garde-fous sur les commandes shell de Claude Code.
 
-Règle 1 : `cd` en commande composée. Toléré uniquement en tête de chaîne et
-vers un sous-répertoire du projet en chemin relatif descendant.
+Règle 1 : `cd` en commande composée. Toléré uniquement en tête de chaîne, et vers une cible qui reste dans le projet — sa racine comprise, en chemin absolu comme relatif.
 
-Règle 2 : contournement des hooks git (`--no-verify` & co), au commit comme au
-push. Le pre-commit et le pre-push font partie du contrat du dépôt.
+Règle 2 : contournement des hooks git (`--no-verify` & co), au commit comme au push. Le pre-commit et le pre-push font partie du contrat du dépôt.
 
-Règle 3 : indexation globale (`git add .`, `-A`, `-u`, `git commit -a`). Elle
-embarque les modifications d'autrui — l'utilisateur, ou un autre agent —
-présentes dans l'arbre de travail.
+Règle 3 : indexation globale (`git add .`, `-A`, `-u`, `git commit -a`). Elle embarque les modifications d'autrui — l'utilisateur, ou un autre agent — présentes dans l'arbre de travail.
 
 Installation : .claude/settings.json
 
@@ -32,8 +28,10 @@ Installation : .claude/settings.json
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
+from pathlib import Path
 
 # --- Découpage ------------------------------------------------------------
 
@@ -42,9 +40,8 @@ LEADING_RE = re.compile(r"^\s*(?:\w+=\S*\s+)*")
 
 # --- Règle 1 : cd ---------------------------------------------------------
 
-# Chemin relatif descendant : pas de racine absolue (/, C:), pas de remontée,
-# pas de ~, pas de $VAR. Autorise "src", "./src", "interfaces/frontend".
-SAFE_CD_TARGET = re.compile(r"^(?:\./)?[\w.\-]+(?:/[\w.\-]+)*/?$")
+# Le hook lit le texte de la commande, pas son expansion par le shell : une cible qui porte `~`, `$VAR` ou un glob n'est pas résoluble ici, donc pas vérifiable.
+UNRESOLVABLE_CD_TARGET = re.compile(r"[$~*?`]")
 
 # --- Règle 2 : contournement des hooks git --------------------------------
 
@@ -107,6 +104,10 @@ def decide(decision: str, reason: str) -> int:
 def check_cd(segs: list[str]) -> int | None:
     if len(segs) < 2:
         return None
+    root_env = os.environ.get("CLAUDE_PROJECT_DIR")
+    if not root_env:
+        return None
+    root = Path(root_env).resolve()
     for i, seg in enumerate(segs):
         target = cd_target(seg)
         if target is None:
@@ -117,14 +118,21 @@ def check_cd(segs: list[str]) -> int | None:
                 "Commande refusée : `cd` au milieu d'une chaîne. Un changement de "
                 "répertoire n'est toléré qu'en tête de commande composée.",
             )
-        if ".." in target or not SAFE_CD_TARGET.match(target):
+        if UNRESOLVABLE_CD_TARGET.search(target):
             return decide(
                 "deny",
-                f"Commande refusée : `cd {target}`. L'outil Bash s'exécute déjà à la "
-                "racine du projet. Seul un `cd` en tête vers un sous-répertoire du "
-                "projet, en chemin relatif, est autorisé.\n"
-                "Retire le `cd` et utilise des chemins relatifs, ou les options "
-                "prévues pour ça : `git -C <dir>`, `npm --prefix <dir>`.",
+                f"Commande refusée : `cd {target}`. La cible porte une expansion shell "
+                "(`~`, `$VAR`, glob) : ce garde-fou lit le texte de la commande, il ne "
+                "peut pas vérifier où elle mène. Écris le chemin littéralement.",
+            )
+        # Résolution depuis la racine : pathlib absorbe une cible absolue, greffe une cible relative, et évalue les `..`.
+        dest = (root / target).resolve()
+        if dest != root and root not in dest.parents:
+            return decide(
+                "deny",
+                f"Commande refusée : `cd {target}` mène hors du projet ({dest}).\n"
+                "Vise un répertoire du projet, ou utilise les options prévues pour "
+                "viser ailleurs : `git -C <dir>`, `npm --prefix <dir>`.",
             )
     return None
 
