@@ -1,9 +1,6 @@
 """Query service : lectures pour les scripts d'enrichissement pipeline.
 
-`fetch_publications_with_doi` est consommée par la phase `oa_status`
-(`application/pipeline/oa_status/`). Les autres queries alimentent les
-sous-étapes journaux de la phase `publishers_journals` (typage OpenAlex et
-import DOAJ).
+La file de vérification Unpaywall et les deux compteurs de statut OA sont consommés par la phase `oa_status` (`application/pipeline/oa_status/`). Les queries journaux alimentent les sous-étapes de la phase `publishers_journals` (typage OpenAlex et import du dump DOAJ), et `doaj_last_import_at` sert à l'orchestrateur `run_pipeline` pour décider du téléchargement du dump.
 """
 
 from datetime import datetime
