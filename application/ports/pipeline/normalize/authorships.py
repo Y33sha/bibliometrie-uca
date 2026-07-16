@@ -20,7 +20,7 @@ class SourceAuthorshipBatchItem(TypedDict):
     """
 
     source: str
-    spid: int
+    source_publication_id: int
     author_position: int
     author_name_normalized: str
     is_corresponding: bool
