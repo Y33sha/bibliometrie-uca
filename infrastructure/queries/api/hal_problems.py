@@ -24,6 +24,7 @@ from application.ports.api.hal_problems_queries import (
     HalProblemsQueries,
     HalPubDetail,
 )
+from domain.source_publications.keys import DISCRIMINANT_TITLE_MIN_LENGTH
 
 
 class PgHalProblemsQueries(HalProblemsQueries):
@@ -205,7 +206,7 @@ class PgHalProblemsQueries(HalProblemsQueries):
         self, *, page: int, per_page: int
     ) -> HalMetaDuplicatesResponse:
         offset = (page - 1) * per_page
-        dup_query = """
+        dup_query = f"""
             FROM publications p1
             JOIN publications p2
               ON p1.title_normalized = p2.title_normalized AND p1.id < p2.id
@@ -213,7 +214,7 @@ class PgHalProblemsQueries(HalProblemsQueries):
               ON hd1.publication_id = p1.id AND hd1.source = 'hal'
             JOIN source_publications hd2
               ON hd2.publication_id = p2.id AND hd2.source = 'hal'
-            WHERE LENGTH(p1.title_normalized) > 30
+            WHERE LENGTH(p1.title_normalized) > {DISCRIMINANT_TITLE_MIN_LENGTH}
               AND p1.pub_year = p2.pub_year
               AND p1.doc_type = p2.doc_type
               AND NOT (p1.doi IS NOT NULL AND p2.doi IS NOT NULL
