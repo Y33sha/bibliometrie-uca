@@ -1,22 +1,14 @@
 """Port : refetch d'une row `staging` stale par son identifiant natif.
 
-La phase `refresh_stale` (cf. `application.pipeline.extract.refresh_stale.refresh`)
-interroge chaque source par le `source_id` de la row — hal-id, id OpenAlex, UT
-WoS, id ScanR, id theses.fr / NNT, DOI pour crossref/datacite — plutôt que par
-DOI. Toute row possède un `source_id` (`staging.source_id NOT NULL`), donc toute
-row est refetchable, avec ou sans DOI.
+La phase `refresh_stale` (cf. `application.pipeline.extract.refresh_stale.refresh`) interroge chaque source par le `source_id` de la row — hal-id, id OpenAlex, UT WoS, id ScanR, id theses.fr / NNT, DOI pour crossref/datacite — plutôt que par DOI. Toute row possède un `source_id` (`staging.source_id NOT NULL`), donc toute row est refetchable, avec ou sans DOI.
 
 `fetch_by_native_id` a trois issues, portées par le type de retour :
 
 - `FetchedRecord` : record trouvé → refresh de `raw_data` + bump `last_seen_at` ;
 - `NOT_FOUND` : absence confirmée (réponse valide, zéro record) → `disappeared_at` ;
-- `None` : échec transitoire (réseau, 429, réponse malformée) → no-op, retry au
-  run suivant. L'absence n'est pas prouvée, on ne marque rien.
+- `None` : échec transitoire (réseau, 429, réponse malformée) → no-op, retry au run suivant. L'absence n'est pas prouvée, on ne marque rien.
 
-Seul `fetch_by_native_id` est source-spécifique. La sélection des rows stale, la
-persistance du refresh et le marquage de disparition sont génériques : ils sont
-factorisés dans une classe de base infra (`BaseRefreshStaleAdapter`), le
-Protocol ne fixe que leur contrat.
+Seul `fetch_by_native_id` est source-spécifique. La sélection des rows stale, la persistance du refresh et le marquage de disparition sont génériques : ils sont factorisés dans une classe de base infra (`BaseRefreshStaleAdapter`), le Protocol ne fixe que leur contrat.
 """
 
 from __future__ import annotations
@@ -71,8 +63,7 @@ class RefreshStaleAdapter(Protocol):
     def find_stale(self, conn: Connection, years: list[int] | None) -> list[StaleRow]:
         """SELECT des rows staging de la source dont `last_seen_at` a expiré.
 
-        `years` borne la sélection à la fenêtre d'années du run (via
-        `source_publications.pub_year`) ; `None` = tout le stale de la source.
+        `years` borne la sélection à la fenêtre d'années du run (via `source_publications.pub_year`) ; `None` = tout le stale de la source.
         """
 
     async def fetch_by_native_id(self, client: httpx.AsyncClient, source_id: str) -> FetchOutcome:
