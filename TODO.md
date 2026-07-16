@@ -7,6 +7,7 @@
 * [ ] CLI `seed_journals_doi_prefix`: intégrer au pipeline? + recalculer les anciens pour tenir compte des nouveaux (chaque doi_prefix de journal doit être unique et aussi précis que possible; à cette occasion, réécrire la fonction resolve_journal_by_doi de manière moins alambiquée)
 * [ ] tester la nouvelle logique de matching personnes: faire une copie de la base, vider les `persons`, `person_name_forms` et `person_identifiers`, relancer le pipeline, comparer le résultat à la base canonique; étudier le diff, retravailler la logique, itérer jusqu'à convergence.
 * [ ] réévaluer l'utilité du flag in_perimeter sur la table publications
+* [ ] suggested countries: jamais remis à null
 
 # Données
 * [ ] distinguer conference_paper et conférence (présence d'un journal_id?)
