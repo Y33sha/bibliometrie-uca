@@ -3,8 +3,6 @@
 Sert le tableau de bord qui confronte la détection automatique aux arbitrages manuels : taux de détection, faux négatifs (adresses confirmées à la main mais non détectées) et faux positifs (adresses détectées mais rejetées à la main).
 """
 
-import logging
-
 from fastapi import APIRouter, Depends, Query
 
 from application.ports.api.admin_feedback_queries import (
@@ -29,7 +27,6 @@ _FEEDBACK_STRUCTURE_TYPES: tuple[str, ...] = (
 _DEFAULT_STRUCTURE_CODE = "uca"
 
 router = APIRouter()
-logger = logging.getLogger(__name__)
 
 
 @router.get("/api/admin/feedback/structures", response_model=FeedbackStructuresResponse)

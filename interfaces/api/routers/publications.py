@@ -1,6 +1,5 @@
 """Router /api/publications/* — les publications : listes, facettes, détail, export, servis par le port `PublicationsQueries`."""
 
-import logging
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
@@ -21,7 +20,6 @@ from interfaces.api.deps import (
 from interfaces.api.filters import parse_int_csv, parse_str_csv
 
 router = APIRouter()
-logger = logging.getLogger(__name__)
 
 
 def _parse_lab_id(lab_id: str) -> tuple[list[int], bool]:

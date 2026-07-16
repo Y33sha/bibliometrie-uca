@@ -1,6 +1,5 @@
 """Router /api/stats/* — les agrégats des tableaux de bord, servis par le port `StatsQueries`."""
 
-import logging
 from dataclasses import asdict, dataclass
 from typing import Literal
 
@@ -21,7 +20,6 @@ from interfaces.api.deps import (
 from interfaces.api.filters import parse_int_csv, parse_str_csv
 
 router = APIRouter()
-logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)

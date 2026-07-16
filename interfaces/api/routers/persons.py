@@ -3,8 +3,6 @@
 Lectures via le port `PersonsQueries`. Les mutations vivent dans `routers/admin/persons.py`.
 """
 
-import logging
-
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from application.ports.api.persons_queries import (
@@ -29,7 +27,6 @@ from interfaces.api.deps import persons_queries
 from interfaces.api.filters import parse_str_csv
 
 router = APIRouter()
-logger = logging.getLogger(__name__)
 
 
 @router.get("/api/persons/directory", response_model=PersonDirectoryResponse)

@@ -3,8 +3,6 @@
 Une structure est un laboratoire, une composante, une université, un centre hospitalier, une école ou un site. La table `structure_relations` en exprime les liens : `est_tutelle_de` pour le rattachement hiérarchique, seul à peser dans la clôture d'un périmètre, et `est_partenaire_de` pour une association sans rattachement. Les formes de nom (`structure_name_forms`) servent à reconnaître les structures dans les adresses.
 """
 
-import logging
-
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import Connection
 
@@ -37,7 +35,6 @@ from interfaces.api.models import (
 )
 
 router = APIRouter()
-logger = logging.getLogger(__name__)
 
 
 @router.get("/api/structures", response_model=list[StructureListItem])

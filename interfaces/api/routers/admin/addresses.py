@@ -3,8 +3,6 @@
 Les lectures passent par le port `AddressesQueries`, les écritures par les command handlers de `application.services.addresses.commands`, qui committent avant que le router ne rende la main.
 """
 
-import logging
-
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy import Connection
 
@@ -42,7 +40,6 @@ from interfaces.api.models import (
 )
 
 router = APIRouter()
-logger = logging.getLogger(__name__)
 
 _TEXT_MODES = {"contains", "not_contains"}
 _STRUCT_OPS = {"recognized", "not_recognized"}

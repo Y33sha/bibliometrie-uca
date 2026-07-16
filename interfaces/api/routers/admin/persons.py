@@ -3,8 +3,6 @@
 Les gestes qui portent sur les signatures elles-mêmes vivent dans `admin/authorships.py`, et les lectures publiques dans `routers/persons.py`.
 """
 
-import logging
-
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import Connection
 
@@ -53,7 +51,6 @@ from interfaces.api.models import (
 )
 
 router = APIRouter()
-logger = logging.getLogger(__name__)
 
 
 # ── Gestion des identifiants ─────────────────────────────────────

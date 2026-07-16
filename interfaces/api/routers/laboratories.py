@@ -1,7 +1,5 @@
 """Router /api/laboratories/* — les laboratoires du périmètre, servis par le port `LaboratoriesQueries`."""
 
-import logging
-
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from application.ports.api.laboratories_queries import (
@@ -15,7 +13,6 @@ from application.ports.api.subjects_queries import SubjectFrequency
 from interfaces.api.deps import laboratories_queries
 
 router = APIRouter()
-logger = logging.getLogger(__name__)
 
 
 @router.get("/api/laboratories", response_model=list[LaboratoryListItem])

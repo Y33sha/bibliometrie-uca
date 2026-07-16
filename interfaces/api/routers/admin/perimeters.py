@@ -3,8 +3,6 @@
 Un périmètre (table `perimeters`) nomme des structures racines dans sa colonne `structure_ids`. L'ensemble effectif y ajoute leurs descendants par `est_tutelle_de`, à l'exclusion de `est_partenaire_de` : un partenaire n'entre pas dans le périmètre de sa contrepartie. Cet ensemble est matérialisé dans `perimeter_structures` par `refresh_perimeter_structures` ; les lectures le restituent sans le recalculer.
 """
 
-import logging
-
 from fastapi import APIRouter, Depends
 from sqlalchemy import Connection
 
@@ -32,7 +30,6 @@ from interfaces.api.models import (
 )
 
 router = APIRouter()
-logger = logging.getLogger(__name__)
 
 
 @router.get("/api/perimeters", response_model=list[PerimeterOut])

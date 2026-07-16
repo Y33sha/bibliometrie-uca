@@ -3,8 +3,6 @@
 Le statut du run en cours vient de `logs/status.json`, écrit par l'orchestrateur ; le log d'une phase est découpé de `logs/pipeline.log` par `infrastructure.observability.phase_logs`. L'historique structuré des runs est servi par le router `pipeline_phase_executions`.
 """
 
-import logging
-
 from fastapi import APIRouter
 
 from infrastructure.observability.phase_logs import read_phase_log
@@ -12,7 +10,6 @@ from infrastructure.observability.pipeline_status import read_status
 from interfaces.api.models import PipelinePhaseLog, PipelineStatus
 
 router = APIRouter()
-logger = logging.getLogger(__name__)
 
 
 @router.get("/api/admin/pipeline/status", response_model=PipelineStatus | None)

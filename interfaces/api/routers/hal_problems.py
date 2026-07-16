@@ -3,8 +3,6 @@
 Sert le tableau de bord qualité HAL : comptes d'auteur dupliqués, dépôts en double par identifiant ou par métadonnées, publications absentes de la collection de leur laboratoire, affiliations en conflit d'une source à l'autre.
 """
 
-import logging
-
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from application.ports.api.hal_problems_queries import (
@@ -19,7 +17,6 @@ from application.ports.api.hal_problems_queries import (
 from interfaces.api.deps import hal_problems_queries
 
 router = APIRouter()
-logger = logging.getLogger(__name__)
 
 
 @router.get("/api/hal-problems/duplicate-accounts", response_model=HalDuplicateAccountsResponse)
