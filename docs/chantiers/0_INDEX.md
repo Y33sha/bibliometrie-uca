@@ -5,6 +5,7 @@
 ### En cours
 
 - [Lisibilité](CODE_lisibilite.md)
+- [Normalize : factoriser l'upsert des `source_publications`](CODE_normalize-upsert-source-publications.md)
 - [Domaines HAL : libellés depuis la source, suppression de la table](CODE_hal-domaines-libelles.md)
 
 ### En pause
