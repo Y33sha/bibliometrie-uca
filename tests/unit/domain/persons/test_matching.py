@@ -1,6 +1,7 @@
 """Tests des règles pures de matching d'authorships à des personnes."""
 
 from domain.persons.matching import (
+    IdentifiedPerson,
     NameFormDecision,
     PersonMatchDecision,
     decide_cross_source_match,
@@ -170,7 +171,7 @@ class TestDecideNameFormOutcome:
 
 class TestDecideMatchByIdentifier:
     def test_compatible_name_returns_person_id(self):
-        idref_map = {"252404955": (42, "dupont", "jean")}
+        idref_map = {"252404955": IdentifiedPerson(42, "dupont", "jean")}
         result = decide_match_by_identifier(
             "252404955", idref_map, "Jean Dupont", "jean dupont", {}
         )
@@ -179,7 +180,7 @@ class TestDecideMatchByIdentifier:
 
     def test_incompatible_name_rejected(self):
         """Sans verdict, nom incompatible → match refusé (test de tokens), rejet journalisé."""
-        idref_map = {"252404955": (42, "dupont", "jean")}
+        idref_map = {"252404955": IdentifiedPerson(42, "dupont", "jean")}
         result = decide_match_by_identifier(
             "252404955", idref_map, "Paul Martin", "paul martin", {}
         )
@@ -189,7 +190,7 @@ class TestDecideMatchByIdentifier:
     def test_confirmed_name_form_matches_without_token_test(self):
         """Forme confirmée pour la personne → match même si les tokens divergeraient
         (changement de nom : « Van Lander » confirmée pour « Maneval »)."""
-        idref_map = {"x": (42, "maneval", "axelle")}
+        idref_map = {"x": IdentifiedPerson(42, "maneval", "axelle")}
         status = {("van lander axelle", 42): "confirmed"}
         result = decide_match_by_identifier(
             "x", idref_map, "Van Lander Axelle", "van lander axelle", status
@@ -199,21 +200,21 @@ class TestDecideMatchByIdentifier:
 
     def test_rejected_name_form_refused_even_if_compatible(self):
         """Forme rejetée pour la personne → refus même si les tokens seraient compatibles."""
-        idref_map = {"x": (42, "dupont", "jean")}
+        idref_map = {"x": IdentifiedPerson(42, "dupont", "jean")}
         status = {("jean dupont", 42): "rejected"}
         result = decide_match_by_identifier("x", idref_map, "Jean Dupont", "jean dupont", status)
         assert result.person_id is None
         assert result.rejection == (42, "jean dupont")
 
     def test_value_absent_returns_empty(self):
-        idref_map = {"252404955": (42, "dupont", "jean")}
+        idref_map = {"252404955": IdentifiedPerson(42, "dupont", "jean")}
         result = decide_match_by_identifier("999999999", idref_map, "X", "x", {})
         assert result.person_id is None
         assert result.rejection is None
 
     def test_falsy_value_returns_empty(self):
         """Pas de tentative de lookup si la valeur est vide/None."""
-        m = {"foo": (1, "a", "b")}
+        m = {"foo": IdentifiedPerson(1, "a", "b")}
         assert decide_match_by_identifier(None, m, "X", "x", {}).person_id is None
         assert decide_match_by_identifier("", m, "X", "x", {}).person_id is None
 
@@ -223,14 +224,14 @@ class TestDecideMatchByIdentifier:
     def test_surname_only_signature_not_rejected(self):
         """Signature trop pauvre (nom seul) : compatible (sous-ensemble de tokens),
         donc pas de refus — on s'abstient plutôt que de rejeter."""
-        idref_map = {"x": (42, "dupont", "jean")}
+        idref_map = {"x": IdentifiedPerson(42, "dupont", "jean")}
         result = decide_match_by_identifier("x", idref_map, "Dupont", "dupont", {})
         assert result.person_id == 42
         assert result.rejection is None
 
     def test_works_for_orcid_too(self):
         """La fonction est générique : même contrat pour IdRef et ORCID."""
-        orcid_map = {"0000-0001-2345-6789": (7, "curie", "marie")}
+        orcid_map = {"0000-0001-2345-6789": IdentifiedPerson(7, "curie", "marie")}
         result = decide_match_by_identifier(
             "0000-0001-2345-6789", orcid_map, "Marie Curie", "marie curie", {}
         )
@@ -239,7 +240,7 @@ class TestDecideMatchByIdentifier:
     def test_graphie_variant_corroborates(self):
         """Variante de graphie du propriétaire (concaténation) : corrobore et se
         rattache, au lieu d'être rejetée puis dédoublée au canal nominal."""
-        idref_map = {"x": (42, "gannoun", "abdel mouhcine")}
+        idref_map = {"x": IdentifiedPerson(42, "gannoun", "abdel mouhcine")}
         result = decide_match_by_identifier(
             "x", idref_map, "Abdelmouhcine Gannoun", "abdelmouhcine gannoun", {}
         )
@@ -249,7 +250,7 @@ class TestDecideMatchByIdentifier:
     def test_surname_homonym_still_rejected(self):
         """Même patronyme, prénom franchement autre : reste rejeté (pas de fausse
         corroboration par graphie)."""
-        idref_map = {"x": (42, "chanal", "helene")}
+        idref_map = {"x": IdentifiedPerson(42, "chanal", "helene")}
         result = decide_match_by_identifier("x", idref_map, "Herve Chanal", "herve chanal", {})
         assert result.person_id is None
         assert result.rejection == (42, "helene chanal")

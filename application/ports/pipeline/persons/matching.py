@@ -9,6 +9,8 @@ from typing import NamedTuple, Protocol
 
 from sqlalchemy import Connection
 
+from domain.persons.matching import IdentifiedPerson, PersonNameForms
+
 
 class BareUnlinkedAuthorship(NamedTuple):
     """Projection SQL brute : `source_authorships` non rattaché à une personne.
@@ -64,8 +66,8 @@ class PersonsMatchingQueries(Protocol):
 
     def fetch_identifier_to_person_map(
         self, conn: Connection, id_type: str
-    ) -> dict[str, tuple[int, str, str]]:
-        """`{id_value: (person_id, nom, prénom) normalisés}` pour les valeurs connues non rejetées d'un type d'identifiant (`idref`, `orcid`, `hal_person_id`)."""
+    ) -> dict[str, IdentifiedPerson]:
+        """`{id_value: IdentifiedPerson}` pour les valeurs connues non rejetées d'un type d'identifiant (`idref`, `orcid`, `hal_person_id`)."""
         ...
 
     def fetch_name_form_map(self, conn: Connection) -> dict[str, list[int]]:
@@ -88,8 +90,8 @@ class PersonsMatchingQueries(Protocol):
 
     def fetch_person_name_forms(
         self, conn: Connection, person_ids: list[int]
-    ) -> dict[int, tuple[str, str, list[str]]]:
-        """`{person_id: (nom, prénom normalisés, [formes confirmées])}` — le nom canonique et ses formes `confirmed`, pour l'arbitrage des conflits d'identifiant."""
+    ) -> dict[int, PersonNameForms]:
+        """`{person_id: PersonNameForms}` — le nom canonique et ses formes `confirmed`, pour l'arbitrage des conflits d'identifiant."""
         ...
 
     def fetch_identifier_owners(self, conn: Connection, id_type: str) -> dict[str, tuple[int, str]]:
