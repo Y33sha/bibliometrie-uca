@@ -1,9 +1,6 @@
 """Adapter PostgreSQL sync pour `addresses` et ses propagations.
 
-Note : ce repo expose des méthodes de propagation cross-aggregate
-(`refresh_publications_countries_for_addresses`, etc.) qui touchent
-`publications.countries` et `source_publications.countries`. Pattern
-accepté en exception, documenté dans `docs/architecture.md`.
+Les méthodes de propagation (`refresh_publications_countries_for_addresses`, entre autres) débordent l'agrégat : elles écrivent `publications.countries` et `source_publications.countries`, que les pays d'une adresse alimentent.
 """
 
 from sqlalchemy import Connection, delete, select, text, update

@@ -309,6 +309,19 @@ def get_perimeter_queries_sync() -> PerimeterQueries:
     return _perimeter_queries_sync_singleton
 
 
+def get_apc_structure_ids_sync(
+    conn: Connection = Depends(db_conn_sync),
+    perimeter_queries: PerimeterQueries = Depends(get_perimeter_queries_sync),
+) -> list[int]:
+    """Structures considérées comme « internes » pour la catégorisation APC.
+
+    Réutilise le périmètre `perimeter_persons`, avec expansion `est_tutelle_de` : l'établissement et tous ses laboratoires. Une publication APC est classée interne dès qu'un de ses `apc_payments.budget_structure_id` appartient à cet ensemble.
+
+    Pas de cache applicatif : la lecture est un lookup par clé primaire, que FastAPI résout une fois par requête, et l'invalidation reste transparente quand le périmètre change via `/admin/config` ou que ses structures évoluent.
+    """
+    return perimeter_queries.get_persons_structure_ids_list(conn)
+
+
 # `PgMetadataCorrectionQueries` est sans état (connexion passée aux méthodes) → singleton.
 _metadata_correction_queries_singleton: MetadataCorrectionQueries = PgMetadataCorrectionQueries()
 
@@ -359,19 +372,3 @@ def bg_propagate_in_perimeter_sync(address_ids: list[int]) -> None:
             perimeter_queries=get_perimeter_queries_sync(),
         ),
     )
-
-
-# ----- Périmètre APC : structures considérées comme "internes" -----
-
-
-def get_apc_structure_ids_sync(
-    conn: Connection = Depends(db_conn_sync),
-    perimeter_queries: PerimeterQueries = Depends(get_perimeter_queries_sync),
-) -> list[int]:
-    """Structures considérées comme « internes » pour la catégorisation APC.
-
-    Réutilise le périmètre `perimeter_persons`, avec expansion `est_tutelle_de` : l'établissement et tous ses laboratoires. Une publication APC est classée interne dès qu'un de ses `apc_payments.budget_structure_id` appartient à cet ensemble.
-
-    Pas de cache applicatif : la lecture est un lookup par clé primaire, que FastAPI résout une fois par requête, et l'invalidation reste transparente quand le périmètre change via `/admin/config` ou que ses structures évoluent.
-    """
-    return perimeter_queries.get_persons_structure_ids_list(conn)

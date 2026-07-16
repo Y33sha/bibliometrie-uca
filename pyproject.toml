@@ -72,10 +72,10 @@ layers = ["interfaces", "infrastructure | application", "domain"]
 # `application` n'importe pas `infrastructure` : toute nouvelle
 # dépendance doit passer par un port.
 #
-# Exception : `application.ports.*` est zone neutre (cf. règle 2
-# d'architecture.md). `infrastructure` peut en importer les
-# dataclasses de transport pour typer ses signatures (cf. règle 3).
-# Les Protocols restent implémentés via duck typing.
+# Exception : `application.ports.*` est zone neutre (cf. règle 2 de
+# docs/architecture/01-vue-d-ensemble.md). `infrastructure` peut en
+# importer les dataclasses de transport pour typer ses signatures
+# (cf. règle 3). Les Protocols restent implémentés via duck typing.
 #
 ignore_imports = [
     "infrastructure.** -> application.ports.**",
@@ -88,12 +88,12 @@ source_modules = ["interfaces.api.routers"]
 forbidden_modules = ["infrastructure"]
 # Les routers FastAPI pilotent des use-cases applicatifs et reçoivent
 # leurs dépendances via `Depends(...)` (factories dans
-# `interfaces.api.async_deps`, composition root). La construction des
+# `interfaces.api.deps`, composition root). La construction des
 # adapters et l'accès direct à l'infra (queries, repos, pool, engine)
-# y sont interdits. Cf. règle 4 de docs/architecture.md.
+# y sont interdits. Cf. règle 4 de docs/architecture/01-vue-d-ensemble.md.
 #
-# Imports transitifs autorisés : `routers → async_deps → infrastructure`
-# est le chemin attendu (composition root), donc on n'interdit que les
+# Imports transitifs autorisés : `routers → deps → infrastructure` est
+# le chemin attendu (composition root), donc on n'interdit que les
 # imports directs.
 allow_indirect_imports = "true"
 ignore_imports = [
@@ -112,10 +112,10 @@ forbidden_modules = [
     "infrastructure.repositories",
     "infrastructure.queries",
 ]
-# Verrouillage de la règle 5 de docs/architecture.md : seul
-# `interfaces/api/deps.py` instancie les `Pg*` concrets ; les routers
-# et autres modules sous `interfaces.api/` passent par un port via
-# `Depends(...)`.
+# Verrouillage de la règle 5 de docs/architecture/01-vue-d-ensemble.md :
+# seul `interfaces/api/deps.py` instancie les `Pg*` concrets ; les
+# routers et autres modules sous `interfaces.api/` passent par un port
+# via `Depends(...)`.
 ignore_imports = [
     "interfaces.api.deps -> infrastructure.repositories.**",
     "interfaces.api.deps -> infrastructure.queries.**",

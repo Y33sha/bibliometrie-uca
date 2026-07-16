@@ -1,6 +1,6 @@
 """Query services sync pour /api/addresses/* et /api/countries.
 
-`PgAddressesQueries` hérite explicitement du Protocol `application.ports.api.addresses_queries.AddressesQueries` : mypy vérifie la conformité à la définition de classe. Les dataclasses de filtres (`AddressListFilters`, `AddressCountriesFilters`) sont importées du port pour typer les signatures (cf. règle 3 d'`architecture.md`).
+`PgAddressesQueries` hérite explicitement du Protocol `application.ports.api.addresses_queries.AddressesQueries` : mypy vérifie la conformité à la définition de classe. Les dataclasses de filtres (`AddressListFilters`, `AddressCountriesFilters`) sont importées du port pour typer les signatures (règle 3 de `docs/architecture/01-vue-d-ensemble.md`).
 """
 
 from typing import Any
