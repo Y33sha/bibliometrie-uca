@@ -21,7 +21,7 @@ from sqlalchemy import Connection
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.subjects._common import SubjectCache
 from application.pipeline.subjects.extractors import SUBJECT_EXTRACTORS
-from application.ports.pipeline.subjects import SubjectsQueries
+from application.ports.pipeline.subjects import PublicationSubjectLink, SubjectsQueries
 
 # Fréquence des logs de progression.
 _LOG_EVERY = 2000
@@ -79,7 +79,10 @@ def run(
             continue
         extractor, language = extractor_lang
         links = [
-            (r.publication_id, cache.get_or_upsert(conn, label=label, language=language))
+            PublicationSubjectLink(
+                r.publication_id,
+                cache.get_or_upsert(conn, label=label, language=language),
+            )
             for label in extractor(r.topics)
         ]
         n_links += cache.link_bulk(conn, source=r.source, rows=links)

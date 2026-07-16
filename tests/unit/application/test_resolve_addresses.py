@@ -9,7 +9,11 @@ from application.pipeline.affiliations.resolve_addresses import (
     process_addresses,
     run_resolution,
 )
-from application.ports.pipeline.affiliations.address_resolution import StructureNameForm
+from application.ports.pipeline.affiliations.address_resolution import (
+    DetectedStructure,
+    KeptPair,
+    StructureNameForm,
+)
 from domain.structures.name_forms import is_short_form
 
 # ── Helpers pour construire des formes de test ───────────────────
@@ -217,9 +221,9 @@ class _FakeQueries:
         self._obsolete_per_chunk = obsolete_per_chunk
 
         self.load_called = False
-        self.upserts: list[tuple[int, int, int]] = []
-        self.delete_calls: list[tuple[list[int], list[tuple[int, int]]]] = []
-        self.unflag_calls: list[tuple[list[int], list[tuple[int, int]]]] = []
+        self.upserts: list[DetectedStructure] = []
+        self.delete_calls: list[tuple[list[int], list[KeptPair]]] = []
+        self.unflag_calls: list[tuple[list[int], list[KeptPair]]] = []
 
     def load_name_forms(self, conn: object) -> list[StructureNameForm]:
         self.load_called = True
@@ -232,18 +236,18 @@ class _FakeQueries:
         return avail[:limit]
 
     def delete_obsolete_detections_bulk(
-        self, conn: object, addr_ids: list[int], kept_pairs: list[tuple[int, int]]
+        self, conn: object, addr_ids: list[int], kept_pairs: list[KeptPair]
     ) -> int:
         self.delete_calls.append((list(addr_ids), list(kept_pairs)))
         return self._obsolete_per_chunk
 
     def unflag_obsolete_detections_bulk(
-        self, conn: object, addr_ids: list[int], kept_pairs: list[tuple[int, int]]
+        self, conn: object, addr_ids: list[int], kept_pairs: list[KeptPair]
     ) -> None:
         self.unflag_calls.append((list(addr_ids), list(kept_pairs)))
 
     def upsert_detected_structures_bulk(
-        self, conn: object, detections: list[tuple[int, int, int]]
+        self, conn: object, detections: list[DetectedStructure]
     ) -> None:
         self.upserts.extend(detections)
 

@@ -18,6 +18,13 @@ class SourcePublicationTopics(NamedTuple):
     topics: JsonValue
 
 
+class PublicationSubjectLink(NamedTuple):
+    """Lien à créer entre une publication et un sujet du référentiel."""
+
+    publication_id: int
+    subject_id: int
+
+
 class SubjectsQueries(Protocol):
     """Toutes les opérations SQL nécessaires aux phases `subjects` et `cooccurrences`."""
 
@@ -38,7 +45,7 @@ class SubjectsQueries(Protocol):
         conn: Connection,
         *,
         source: str,
-        rows: list[tuple[int, int]],
+        rows: list[PublicationSubjectLink],
     ) -> int:
         """Bulk INSERT (avec ON CONFLICT) de liens publication↔subject pour une source. Dédoublonne `(pub_id, subject_id)` côté client."""
         ...

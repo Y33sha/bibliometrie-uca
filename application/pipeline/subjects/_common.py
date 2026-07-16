@@ -2,7 +2,7 @@
 
 from sqlalchemy import Connection
 
-from application.ports.pipeline.subjects import SubjectsQueries
+from application.ports.pipeline.subjects import PublicationSubjectLink, SubjectsQueries
 
 
 def dedup_strs(values: object) -> list[str]:
@@ -45,7 +45,9 @@ class SubjectCache:
         self._cache[key] = sid
         return sid
 
-    def link_bulk(self, conn: Connection, *, source: str, rows: list[tuple[int, int]]) -> int:
+    def link_bulk(
+        self, conn: Connection, *, source: str, rows: list[PublicationSubjectLink]
+    ) -> int:
         return self._queries.link_publication_subjects_bulk(conn, source=source, rows=rows)
 
     def stats(self) -> dict[str, int]:
