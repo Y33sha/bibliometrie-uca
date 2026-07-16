@@ -1,9 +1,6 @@
-"""Shared dependencies : SPA static files, auth helpers, DB factories.
+"""Dépendances partagées des routers : service du frontend buildé, helpers d'authentification, factories DB.
 
-`db_conn_sync` ouvre une `Connection` SQLAlchemy via `engine.connect()`
-(commit-as-you-go : le handler d'écriture commit lui-même) et la fournit aux
-routes via `Depends(...)`. Les factories câblent les query services et
-repositories sur cette Connection.
+`db_conn_sync` ouvre une `Connection` SQLAlchemy via `engine.connect()` et la fournit aux routes par `Depends(...)` ; le handler d'écriture commite lui-même. Les factories câblent les query services et repositories sur cette connexion.
 """
 
 import hashlib
@@ -90,11 +87,9 @@ class SPAStaticFiles(StaticFiles):
     """Sert le build SvelteKit (adapter-static).
 
     Deux particularités du format prérendu :
-    - les pages prérendues sont écrites en `<route>.html` (ex.
-      `docs/glossaire.html`) : on retente avec l'extension `.html` quand le
-      chemin nu est introuvable ;
-    - les routes purement client-side (ssr=false, non prérendues) retombent
-      sur `index.html` (routage SPA côté client).
+
+    - les pages prérendues sont écrites en `<route>.html` (par exemple `docs/glossaire.html`) : le chemin nu introuvable est retenté avec l'extension `.html` ;
+    - les routes purement client-side (`ssr=false`, non prérendues) retombent sur `index.html`, qui les route côté client.
     """
 
     async def get_response(self, path: str, scope: Scope) -> Response:
@@ -147,9 +142,7 @@ def _check_password(password: str) -> bool:
 def get_admin_user() -> str:
     """Username admin attendu (depuis `infrastructure.settings`).
 
-    Exposé en `Depends(...)` pour que les routers n'importent pas
-    `infrastructure.settings` directement (cf. règle 4 de
-    `docs/architecture.md`).
+    Exposé en `Depends(...)` pour que les routers n'importent pas `infrastructure.settings` directement (règle 4 de `docs/architecture/01-vue-d-ensemble.md`, tenue par un contrat import-linter).
     """
     return settings.admin_user
 
@@ -160,25 +153,15 @@ def require_admin(session: str | None = Cookie(None, alias="session")) -> None:
         raise HTTPException(status_code=401, detail="Non authentifié")
 
 
-# ----- Sync DB factories (chantier sync-async-deduplication option D) -----
+# ----- Factories DB sync -----
 
 
 def db_conn_sync(request: Request) -> Iterator[Connection]:
-    """Connection SA sync ouverte pour les routers `def`, via `Depends(db_conn_sync)`.
+    """Connection SQLAlchemy sync ouverte pour les routers `def`, via `Depends(db_conn_sync)`.
 
-    La persistance est la prérogative du use case : un command handler de la
-    couche application appelle `conn.commit()` lui-même, avant de retourner. C'est
-    nécessaire pour que la donnée soit persistée *avant* l'envoi de la réponse —
-    FastAPI exécute le teardown des dépendances `yield` après l'envoi, donc un
-    commit fait ici en sortie arriverait trop tard (un GET ou une tâche de fond
-    déclenchés juste après liraient l'état pré-commit).
+    La persistance est la prérogative du use case : un command handler de la couche application appelle `conn.commit()` lui-même avant de retourner, ce qui persiste la donnée *avant* l'envoi de la réponse. FastAPI exécute le teardown des dépendances `yield` après cet envoi : un commit placé ici arriverait trop tard, et un GET ou une tâche de fond déclenchés dans l'intervalle liraient l'état antérieur.
 
-    En sortie, la transaction est **annulée** (`rollback`) : une session sans
-    écriture (GET) ou dont le command handler a déjà committé n'a rien à
-    persister. Si du DML atteint cette sortie sans avoir été committé, c'est un
-    bug (écriture qui ne passe pas par un command handler) : le rollback le perd
-    et un warning le signale. Toute dépendance qui en dérive (`*_repo` sync, query
-    adapters sync) partage la même connexion.
+    En sortie, la transaction est **annulée** (`rollback`) : une session de lecture, ou une session dont le command handler a committé, n'a rien à persister. Du DML qui atteint cette sortie sans commit signale une écriture qui contourne les command handlers : le rollback la perd, et un warning la signale. Toute dépendance qui en dérive (repositories et query adapters sync) partage la même connexion.
     """
     engine = get_sync_engine()
     with engine.connect() as conn:
@@ -335,22 +318,21 @@ def metadata_correction_queries_sync() -> MetadataCorrectionQueries:
 
 # ----- Tâches de fond (BackgroundTasks) -----
 #
-# Contrat (cf. chantier CODE_background-jobs, phase hygiène) : une BG task ouvre
-# TOUJOURS sa propre connexion via `with engine.begin()` (commit/rollback + close
-# en sortie, même sur exception) et enveloppe son corps dans un `try/except` qui
-# logue — jamais réutiliser la connexion de la requête (elle appartient à un autre
-# contexte et tourne en parallèle) et jamais laisser une transaction ouverte (idle
-# in transaction). Note : une BG task s'exécute pendant l'envoi de la réponse, donc
-# AVANT le commit de fin de la requête (cf. chantier CODE_commit-avant-reponse) ;
-# elle ne voit les écritures de la requête que si le handler les a commitées avant
-# de retourner.
+# Contrat : une tâche de fond ouvre sa propre connexion via `with engine.begin()`
+# (commit/rollback et fermeture en sortie, même sur exception) et enveloppe son
+# corps dans un `try/except` qui logue. La connexion de la requête appartient à un
+# autre contexte et tourne en parallèle : la réutiliser laisserait une transaction
+# ouverte (idle in transaction).
+#
+# Une tâche de fond s'exécute pendant l'envoi de la réponse, avant la sortie de
+# `db_conn_sync` : elle voit les écritures de la requête que le command handler a
+# committées avant de retourner.
 
 
 def bg_propagate_countries_sync(address_ids: list[int]) -> None:
     """Tâche de fond sync : propager les pays d'adresses → publications.
 
-    Lancée hors cycle de requête (`BackgroundTasks`), donc les `Depends`
-    ne s'appliquent pas — composition manuelle ici (composition root).
+    Lancée hors cycle de requête (`BackgroundTasks`), où les `Depends` ne s'appliquent pas : la composition est manuelle ici (composition root).
     """
     import logging
 
@@ -370,10 +352,7 @@ def bg_propagate_countries_sync(address_ids: list[int]) -> None:
 def bg_propagate_in_perimeter_sync(address_ids: list[int]) -> None:
     """Tâche de fond sync : propager `in_perimeter` après une review d'affiliation.
 
-    Lancée hors cycle de requête (`BackgroundTasks`) : composition manuelle,
-    connexion DB propre (jamais celle de la requête). Le recompute peut toucher
-    des dizaines de milliers de source_authorships — on le décorrèle de la réponse
-    admin (cf. `docs/chantiers/CODE_background-jobs.md`).
+    Lancée hors cycle de requête (`BackgroundTasks`) : composition manuelle, connexion propre. Le recalcul peut toucher des dizaines de milliers de `source_authorships`, d'où son décorrélage de la réponse admin.
     """
     import logging
 
@@ -397,16 +376,11 @@ def bg_propagate_in_perimeter_sync(address_ids: list[int]) -> None:
 
 
 def get_apc_structure_ids_sync() -> list[int]:
-    """Structures considérées comme "internes" pour la catégorisation APC.
+    """Structures considérées comme « internes » pour la catégorisation APC.
 
-    Réutilise le périmètre `perimeter_persons` (avec expansion
-    `est_tutelle_de`) : UCA + tous ses labos UCA. Une publication APC
-    est classée "uca" si au moins un de ses `apc_payments.budget_structure_id`
-    est dans cet ensemble.
+    Réutilise le périmètre `perimeter_persons`, avec expansion `est_tutelle_de` : l'établissement et tous ses laboratoires. Une publication APC est classée interne dès qu'un de ses `apc_payments.budget_structure_id` appartient à cet ensemble.
 
-    Pas de cache : un lookup PK par requête API (~µs), invalidation
-    transparente si le périmètre change via `/admin/config` ou si les
-    structures du périmètre évoluent.
+    Pas de cache : un lookup par clé primaire et par requête API, et l'invalidation reste transparente quand le périmètre change via `/admin/config` ou que ses structures évoluent.
     """
     from infrastructure.queries.perimeter import get_persons_structure_ids_list
 

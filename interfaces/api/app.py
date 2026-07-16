@@ -1,11 +1,8 @@
-"""
-Bibliométrie UCA — API FastAPI.
+"""Bibliométrie UCA — application FastAPI : point d'assemblage de la surface HTTP.
 
-Usage:
-    cd publisher-stats
-    python webapp/app.py
+Câble le cycle de vie de l'engine SQLAlchemy, la traduction des erreurs métier en codes HTTP, les middlewares (authentification des écritures, mesure de durée), les endpoints d'exploitation `/api/health` et `/api/metrics`, les routers, et le service du frontend buildé.
 
-Puis ouvrir http://localhost:8003
+Lancement en développement : `bash start.sh`, qui démarre uvicorn sur le port 8003 et le serveur de développement du frontend.
 """
 
 import logging
@@ -60,12 +57,12 @@ from interfaces.api.routers import (  # noqa: E402
     stats,
     subjects,
 )
-from interfaces.api.routers.admin import (  # noqa: E402  # noqa: E402  # noqa: E402  # noqa: E402  # noqa: E402  # noqa: E402  # noqa: E402  # noqa: E402
-    addresses as admin_addresses,  # noqa: E402
+from interfaces.api.routers.admin import (  # noqa: E402
+    addresses as admin_addresses,
     authorships as admin_authorships,
-    feedback as admin_feedback,  # noqa: E402
+    feedback as admin_feedback,
     perimeters as admin_perimeters,
-    persons as admin_persons,  # noqa: E402
+    persons as admin_persons,
     pipeline_config as admin_pipeline_config,
     pipeline_logs as admin_pipeline_logs,
     pipeline_phase_executions as admin_pipeline_phase_executions,
@@ -93,11 +90,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         set_sync_engine(None)
 
 
-# `root_path` : préfixe de déploiement (ex. `/bibliometrie` en prod).
-# Le strip du préfixe est fait par le serveur ASGI (uvicorn `--root-path` ou
-# env `UVICORN_ROOT_PATH`) avant que FastAPI route ; cette valeur sert ici à
-# générer correctement les URLs absolues dans OpenAPI et les redirections.
-# Vide par défaut (dev local nu, ou reverse proxy qui strip déjà en amont).
+# `root_path` : préfixe de déploiement (par exemple `/bibliometrie` en production).
+# Le serveur ASGI retire ce préfixe (uvicorn `--root-path` ou variable
+# d'environnement `UVICORN_ROOT_PATH`) avant que FastAPI route ; la valeur sert ici
+# à générer les URLs absolues d'OpenAPI et les redirections. Vide par défaut : en
+# développement local, ou derrière un reverse proxy qui le retire en amont.
 app = FastAPI(
     title="Bibliométrie UCA",
     lifespan=lifespan,
@@ -182,11 +179,9 @@ app.add_middleware(
 
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next: RequestResponseEndpoint) -> Response:
-    """Protège les endpoints d'écriture (POST/PUT/DELETE/PATCH) sauf auth.
+    """Protège les endpoints d'écriture (POST/PUT/DELETE/PATCH), hors authentification.
 
-    Log aussi les actions admin réussies (status < 400) pour traçabilité —
-    format key=value parseable : `admin_action user=admin method=POST
-    path=/api/... status=200`.
+    Journalise les actions admin réussies (statut < 400) sous le record structuré `admin_action`, qui porte l'utilisateur, la méthode, le chemin et le statut.
     """
     if request.method not in ("POST", "PUT", "DELETE", "PATCH"):
         return await call_next(request)
@@ -231,9 +226,7 @@ _METRICS_SKIP_PATHS = ("/api/health", "/api/metrics")
 
 @app.middleware("http")
 async def timing_middleware(request: Request, call_next: RequestResponseEndpoint) -> Response:
-    """Mesure la durée de chaque requête, ajoute un header X-Response-Time
-    et log un record `request_completed` structuré (sauf /api/health et /api/metrics).
-    """
+    """Mesure la durée de chaque requête, pose l'en-tête `X-Response-Time` et journalise un record structuré `request_completed`, sauf pour `/api/health` et `/api/metrics`."""
     start = time.perf_counter()
     response = await call_next(request)
     duration_ms = round((time.perf_counter() - start) * 1000, 2)
@@ -263,9 +256,7 @@ _PIPELINE_STATUS_FILE = Path(__file__).resolve().parent.parent.parent / "logs" /
 
 @app.get("/api/health", response_model=None)
 def health() -> JSONResponse | dict[str, JsonValue]:
-    """Vérifie que l'API est opérationnelle, la DB accessible, et la fraîcheur
-    des données (date de la dernière extraction par source).
-    """
+    """Vérifie que l'API est opérationnelle et la base accessible, et rend la fraîcheur des données : date de la dernière extraction par source, et sources dont elle dépasse le seuil."""
     try:
         engine = get_sync_engine()
         with engine.connect() as conn:
@@ -312,8 +303,7 @@ def health() -> JSONResponse | dict[str, JsonValue]:
 def metrics() -> dict[str, Any]:
     """Métriques internes : état du pool de connexions SQLAlchemy.
 
-    Le timing des requêtes est émis via le middleware `timing_middleware`
-    (champs `method`, `path`, `status`, `duration_ms` en JSON structuré).
+    La durée des requêtes est émise par `timing_middleware`, dans le record structuré `request_completed`.
     """
     engine = get_sync_engine()
     # `engine.pool` est typé `Pool` (interface mince), mais l'instance
