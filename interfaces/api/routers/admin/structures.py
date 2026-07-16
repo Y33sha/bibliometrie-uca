@@ -1,6 +1,6 @@
-"""Router structures — CRUD structures, relations parent-enfant, formes de noms.
+"""Router /api/structures/*, /api/structure-relations/* et /api/name-forms/* — le référentiel des entités organisationnelles.
 
-Les structures couvrent les entités organisationnelles (labos, UFR, universités, CHU, écoles, sites). Les relations `structure_relations` expriment les tutelles (`est_tutelle_de`, `est_partenaire_de`) et les formes de nom `structure_name_forms` servent au matching d'adresses.
+Une structure est un laboratoire, une composante, une université, un centre hospitalier, une école ou un site. La table `structure_relations` en exprime les liens : `est_tutelle_de` pour le rattachement hiérarchique, seul à peser dans la clôture d'un périmètre, et `est_partenaire_de` pour une association sans rattachement. Les formes de nom (`structure_name_forms`) servent à reconnaître les structures dans les adresses.
 """
 
 import logging
@@ -64,7 +64,7 @@ def get_structure(
     """
     detail = queries.get_structure_detail(structure_id)
     if detail is None:
-        raise HTTPException(status_code=404, detail="Structure not found")
+        raise HTTPException(status_code=404, detail="Structure introuvable")
     return detail
 
 
@@ -178,7 +178,7 @@ def get_name_form(
     """Récupère une forme de nom par son id. 404 si inconnue."""
     row = queries.get_name_form(form_id)
     if not row:
-        raise HTTPException(status_code=404, detail="Form not found")
+        raise HTTPException(status_code=404, detail="Forme de nom introuvable")
     return row
 
 

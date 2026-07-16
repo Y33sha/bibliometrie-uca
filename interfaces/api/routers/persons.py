@@ -1,6 +1,6 @@
-"""Persons public router : annuaire, recherche, listing, facettes, profil, stats.
+"""Router /api/persons/* — annuaire public : recherche, listes, facettes, profil.
 
-Lectures via le port `PersonsQueries` (SQL dans `infrastructure/queries/persons/`). Les mutations sont dans `routers/admin/persons.py`.
+Lectures via le port `PersonsQueries`. Les mutations vivent dans `routers/admin/persons.py`.
 """
 
 import logging
@@ -168,7 +168,7 @@ def person_profile(
     """Profil public complet d'une personne."""
     profile = queries.person_profile(person_id)
     if not profile:
-        raise HTTPException(status_code=404, detail="Person not found")
+        raise HTTPException(status_code=404, detail="Personne introuvable")
     return profile
 
 
