@@ -1,6 +1,6 @@
 """Dépendances partagées des routers : helpers d'authentification, factories DB, tâches de fond.
 
-`db_conn_sync` fournit aux routes, par `Depends(...)`, la connexion sur laquelle les factories câblent les query services et les repositories.
+`db_conn` fournit aux routes, par `Depends(...)`, la connexion sur laquelle les factories câblent les query services et les repositories.
 """
 
 import hashlib
@@ -125,15 +125,15 @@ def require_admin(session: str | None = Cookie(None, alias="session")) -> None:
         raise HTTPException(status_code=401, detail="Non authentifié")
 
 
-# ----- Factories DB sync -----
+# ----- Factories DB -----
 
 
-def db_conn_sync(request: Request) -> Iterator[Connection]:
-    """Connection SQLAlchemy sync ouverte pour les routers `def`, via `Depends(db_conn_sync)`.
+def db_conn(request: Request) -> Iterator[Connection]:
+    """Connection SQLAlchemy ouverte pour la durée de la requête, via `Depends(db_conn)`.
 
     La persistance est la prérogative du use case : un command handler de la couche application appelle `conn.commit()` lui-même avant de retourner, ce qui persiste la donnée *avant* l'envoi de la réponse. FastAPI exécute le teardown des dépendances `yield` après cet envoi : un commit placé ici arriverait trop tard, et un GET ou une tâche de fond déclenchés dans l'intervalle liraient l'état antérieur.
 
-    En sortie, la transaction est **annulée** (`rollback`) : une session de lecture, ou une session dont le command handler a committé, n'a rien à persister. Du DML qui atteint cette sortie sans commit signale une écriture qui contourne les command handlers : le rollback la perd, et un warning la signale. Toute dépendance qui en dérive (repositories et query adapters sync) partage la même connexion.
+    En sortie, la transaction est **annulée** (`rollback`) : une session de lecture, ou une session dont le command handler a committé, n'a rien à persister. Du DML qui atteint cette sortie sans commit signale une écriture qui contourne les command handlers : le rollback la perd, et un warning la signale. Toute dépendance qui en dérive (repositories et query adapters) partage la même connexion.
     """
     engine = get_sync_engine()
     with engine.connect() as conn:
@@ -149,123 +149,123 @@ def db_conn_sync(request: Request) -> Iterator[Connection]:
             if escaped_dml:
                 logger.warning(
                     "DML annulé : %s %s a émis une écriture qui n'est pas passée par un "
-                    "command handler committant ; le rollback de fin de db_conn_sync l'a perdue.",
+                    "command handler committant ; le rollback de fin de db_conn l'a perdue.",
                     request.method,
                     request.url.path,
                 )
 
 
 def subjects_admin_queries(
-    conn: Connection = Depends(db_conn_sync),
+    conn: Connection = Depends(db_conn),
 ) -> SubjectsAdminQueries:
     return PgSubjectsAdminQueries(conn)
 
 
-def config_queries_sync(conn: Connection = Depends(db_conn_sync)) -> ConfigQueries:
+def config_queries(conn: Connection = Depends(db_conn)) -> ConfigQueries:
     return PgConfigQueries(conn)
 
 
-def config_store_sync(conn: Connection = Depends(db_conn_sync)) -> ConfigStore:
+def config_store(conn: Connection = Depends(db_conn)) -> ConfigStore:
     return PgConfig(conn)
 
 
-def hal_problems_queries_sync(
-    conn: Connection = Depends(db_conn_sync),
+def hal_problems_queries(
+    conn: Connection = Depends(db_conn),
 ) -> HalProblemsQueries:
     return PgHalProblemsQueries(conn)
 
 
-def audit_repo_sync(conn: Connection = Depends(db_conn_sync)) -> AuditRepository:
+def audit_repo(conn: Connection = Depends(db_conn)) -> AuditRepository:
     return audit_repository(conn)
 
 
-def publication_repo_sync(conn: Connection = Depends(db_conn_sync)) -> PublicationRepository:
+def publication_repo(conn: Connection = Depends(db_conn)) -> PublicationRepository:
     return publication_repository(conn)
 
 
-def publication_duplicates_queries_sync(
-    conn: Connection = Depends(db_conn_sync),
+def publication_duplicates_queries(
+    conn: Connection = Depends(db_conn),
 ) -> PublicationDuplicatesQueries:
     return PgPublicationDuplicatesQueries(conn)
 
 
-def person_repo_sync(conn: Connection = Depends(db_conn_sync)) -> PersonRepository:
+def person_repo(conn: Connection = Depends(db_conn)) -> PersonRepository:
     return person_repository(conn)
 
 
-def journal_queries_sync(conn: Connection = Depends(db_conn_sync)) -> JournalQueries:
+def journal_queries(conn: Connection = Depends(db_conn)) -> JournalQueries:
     return PgJournalQueries(conn)
 
 
-def journal_repo_sync(conn: Connection = Depends(db_conn_sync)) -> JournalRepository:
+def journal_repo(conn: Connection = Depends(db_conn)) -> JournalRepository:
     return journal_repository(conn)
 
 
-def publisher_queries_sync(conn: Connection = Depends(db_conn_sync)) -> PublisherQueries:
+def publisher_queries(conn: Connection = Depends(db_conn)) -> PublisherQueries:
     return PgPublisherQueries(conn)
 
 
-def publisher_repo_sync(conn: Connection = Depends(db_conn_sync)) -> PublisherRepository:
+def publisher_repo(conn: Connection = Depends(db_conn)) -> PublisherRepository:
     return publisher_repository(conn)
 
 
-def laboratories_queries_sync(conn: Connection = Depends(db_conn_sync)) -> LaboratoriesQueries:
+def laboratories_queries(conn: Connection = Depends(db_conn)) -> LaboratoriesQueries:
     return PgLaboratoriesQueries(conn)
 
 
-def perimeter_repo_sync(conn: Connection = Depends(db_conn_sync)) -> PerimeterRepository:
+def perimeter_repo(conn: Connection = Depends(db_conn)) -> PerimeterRepository:
     return perimeter_repository(conn)
 
 
-def perimeters_admin_queries_sync(
-    conn: Connection = Depends(db_conn_sync),
+def perimeters_admin_queries(
+    conn: Connection = Depends(db_conn),
 ) -> PerimetersAdminQueries:
     return PgPerimetersAdminQueries(conn)
 
 
-def admin_feedback_queries_sync(
-    conn: Connection = Depends(db_conn_sync),
+def admin_feedback_queries(
+    conn: Connection = Depends(db_conn),
 ) -> AdminFeedbackQueries:
     return PgAdminFeedbackQueries(conn)
 
 
-def stats_queries_sync(conn: Connection = Depends(db_conn_sync)) -> StatsQueries:
+def stats_queries(conn: Connection = Depends(db_conn)) -> StatsQueries:
     return PgStatsQueries(conn)
 
 
-def structure_repo_sync(conn: Connection = Depends(db_conn_sync)) -> StructureRepository:
+def structure_repo(conn: Connection = Depends(db_conn)) -> StructureRepository:
     return structure_repository(conn)
 
 
-def structures_queries_sync(conn: Connection = Depends(db_conn_sync)) -> StructuresQueries:
+def structures_queries(conn: Connection = Depends(db_conn)) -> StructuresQueries:
     return PgStructuresQueries(conn)
 
 
-def publications_queries_sync(
-    conn: Connection = Depends(db_conn_sync),
+def publications_queries(
+    conn: Connection = Depends(db_conn),
 ) -> PublicationsQueries:
     return PgPublicationsQueries(conn)
 
 
-def authorship_repo_sync(conn: Connection = Depends(db_conn_sync)) -> AuthorshipRepository:
+def authorship_repo(conn: Connection = Depends(db_conn)) -> AuthorshipRepository:
     return authorship_repository(conn)
 
 
-def address_repo_sync(conn: Connection = Depends(db_conn_sync)) -> AddressRepository:
+def address_repo(conn: Connection = Depends(db_conn)) -> AddressRepository:
     return address_repository(conn)
 
 
-def persons_queries_sync(conn: Connection = Depends(db_conn_sync)) -> PersonsQueries:
+def persons_queries(conn: Connection = Depends(db_conn)) -> PersonsQueries:
     return PgPersonsQueries(conn)
 
 
-def pipeline_phase_executions_queries_sync(
-    conn: Connection = Depends(db_conn_sync),
+def pipeline_phase_executions_queries(
+    conn: Connection = Depends(db_conn),
 ) -> PhaseExecutionsQueries:
     return PgPhaseExecutionsQueries(conn)
 
 
-def addresses_queries_sync(conn: Connection = Depends(db_conn_sync)) -> AddressesQueries:
+def addresses_queries(conn: Connection = Depends(db_conn)) -> AddressesQueries:
     return PgAddressesQueries(conn)
 
 
@@ -273,13 +273,13 @@ def addresses_queries_sync(conn: Connection = Depends(db_conn_sync)) -> Addresse
 _perimeter_queries_singleton: PerimeterQueries = PgPerimeterQueries()
 
 
-def get_perimeter_queries_sync() -> PerimeterQueries:
+def get_perimeter_queries() -> PerimeterQueries:
     return _perimeter_queries_singleton
 
 
-def get_apc_structure_ids_sync(
-    conn: Connection = Depends(db_conn_sync),
-    perimeter_queries: PerimeterQueries = Depends(get_perimeter_queries_sync),
+def get_apc_structure_ids(
+    conn: Connection = Depends(db_conn),
+    perimeter_queries: PerimeterQueries = Depends(get_perimeter_queries),
 ) -> list[int]:
     """Structures considérées comme « internes » pour la catégorisation APC.
 
@@ -294,7 +294,7 @@ def get_apc_structure_ids_sync(
 _metadata_correction_queries_singleton: MetadataCorrectionQueries = PgMetadataCorrectionQueries()
 
 
-def metadata_correction_queries_sync() -> MetadataCorrectionQueries:
+def metadata_correction_queries() -> MetadataCorrectionQueries:
     """Corrections de métadonnées déclenchées par les hooks d'édition des revues."""
     return _metadata_correction_queries_singleton
 
@@ -316,7 +316,7 @@ def _run_detached(label: str, work: Callable[[Connection], None]) -> None:
         logger.exception("Tâche de fond en échec : %s", label)
 
 
-def bg_propagate_countries_sync(address_ids: list[int]) -> None:
+def bg_propagate_countries(address_ids: list[int]) -> None:
     """Tâche de fond : propage les pays des adresses vers les publications."""
     _run_detached(
         "propagation des pays",
@@ -326,7 +326,7 @@ def bg_propagate_countries_sync(address_ids: list[int]) -> None:
     )
 
 
-def bg_propagate_in_perimeter_sync(address_ids: list[int]) -> None:
+def bg_propagate_in_perimeter(address_ids: list[int]) -> None:
     """Tâche de fond : propage `in_perimeter` après une review d'affiliation.
 
     Le recalcul peut toucher des dizaines de milliers de `source_authorships`, d'où son décorrélage de la réponse admin.
@@ -337,6 +337,6 @@ def bg_propagate_in_perimeter_sync(address_ids: list[int]) -> None:
             conn,
             address_ids,
             repo=authorship_repository(conn),
-            perimeter_queries=get_perimeter_queries_sync(),
+            perimeter_queries=get_perimeter_queries(),
         ),
     )

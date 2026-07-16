@@ -1,7 +1,7 @@
 """Engine SQLAlchemy synchrone basé sur le driver psycopg3.
 
 Un seul Engine sync utilisé par toute l'application :
-- L'API FastAPI consomme cet engine via `db_conn_sync` (les routes `def` tournent dans le threadpool Starlette).
+- L'API FastAPI consomme cet engine via `db_conn` (les routes `def` tournent dans le threadpool Starlette).
 - Le pipeline et les scripts CLI ouvrent leurs propres connexions via `engine.begin()` / `engine.connect()`.
 
 Le driver `postgresql+psycopg` permet d'accéder aux features psycopg3 (server-side cursors, COPY) via `Connection.connection.driver_connection` si besoin.

@@ -20,11 +20,11 @@ from application.ports.repositories.person_repository import PersonRepository
 from application.services.authorships import commands as authorship_commands
 from domain.sources.registry import require_known_source
 from interfaces.api.deps import (
-    audit_repo_sync,
-    authorship_repo_sync,
-    db_conn_sync,
-    person_repo_sync,
-    persons_queries_sync,
+    audit_repo,
+    authorship_repo,
+    db_conn,
+    person_repo,
+    persons_queries,
 )
 from interfaces.api.models import (
     AssignOrphanAuthorship,
@@ -44,10 +44,10 @@ logger = logging.getLogger(__name__)
 @router.patch("/api/authorships/{authorship_id}/exclude", response_model=OkResponse)
 def exclude_authorship_endpoint(
     authorship_id: int,
-    conn: Connection = Depends(db_conn_sync),
-    repo: AuthorshipRepository = Depends(authorship_repo_sync),
-    person_repo: PersonRepository = Depends(person_repo_sync),
-    audit: AuditRepository = Depends(audit_repo_sync),
+    conn: Connection = Depends(db_conn),
+    repo: AuthorshipRepository = Depends(authorship_repo),
+    person_repo: PersonRepository = Depends(person_repo),
+    audit: AuditRepository = Depends(audit_repo),
 ) -> OkResponse:
     """Rejette une contribution (« cette personne n'est pas l'auteur »).
 
@@ -66,7 +66,7 @@ def exclude_authorship_endpoint(
 
 @router.get("/api/admin/orphan-authorships/count", response_model=OrphanCountResponse)
 def orphan_authorships_count(
-    queries: PersonsQueries = Depends(persons_queries_sync),
+    queries: PersonsQueries = Depends(persons_queries),
 ) -> OrphanCountResponse:
     """Nombre d'authorships UCA sans person_id."""
     return queries.orphan_authorships_count()
@@ -77,7 +77,7 @@ def list_orphan_authorships(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=10, le=200),
     search: str = Query(""),
-    queries: PersonsQueries = Depends(persons_queries_sync),
+    queries: PersonsQueries = Depends(persons_queries),
 ) -> OrphanAuthorshipsResponse:
     """Liste les authorships UCA sans person_id."""
     return queries.list_orphan_authorships(search=search, page=page, per_page=per_page)
@@ -86,11 +86,11 @@ def list_orphan_authorships(
 @router.post("/api/admin/orphan-authorships/assign", response_model=OrphanAssignResponse)
 def assign_orphan_authorship_endpoint(
     body: AssignOrphanAuthorship,
-    conn: Connection = Depends(db_conn_sync),
-    queries: PersonsQueries = Depends(persons_queries_sync),
-    repo: PersonRepository = Depends(person_repo_sync),
-    authorship_repo: AuthorshipRepository = Depends(authorship_repo_sync),
-    audit: AuditRepository = Depends(audit_repo_sync),
+    conn: Connection = Depends(db_conn),
+    queries: PersonsQueries = Depends(persons_queries),
+    repo: PersonRepository = Depends(person_repo),
+    authorship_repo: AuthorshipRepository = Depends(authorship_repo),
+    audit: AuditRepository = Depends(audit_repo),
 ) -> OrphanAssignResponse:
     """Attribue une authorship orpheline à une personne.
 
@@ -129,11 +129,11 @@ def assign_orphan_authorship_endpoint(
 @router.post("/api/admin/orphan-authorships/batch-assign", response_model=OrphanBatchAssignResponse)
 def batch_assign_orphan_authorships(
     body: BatchAssignOrphanAuthorships,
-    conn: Connection = Depends(db_conn_sync),
-    queries: PersonsQueries = Depends(persons_queries_sync),
-    repo: PersonRepository = Depends(person_repo_sync),
-    authorship_repo: AuthorshipRepository = Depends(authorship_repo_sync),
-    audit: AuditRepository = Depends(audit_repo_sync),
+    conn: Connection = Depends(db_conn),
+    queries: PersonsQueries = Depends(persons_queries),
+    repo: PersonRepository = Depends(person_repo),
+    authorship_repo: AuthorshipRepository = Depends(authorship_repo),
+    audit: AuditRepository = Depends(audit_repo),
 ) -> OrphanBatchAssignResponse:
     """Attribue plusieurs authorships orphelines à une même personne.
 

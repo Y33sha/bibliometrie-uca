@@ -15,8 +15,8 @@ from application.ports.api.publications_queries import (
     PublicationsQueries,
 )
 from interfaces.api.deps import (
-    get_apc_structure_ids_sync,
-    publications_queries_sync,
+    get_apc_structure_ids,
+    publications_queries,
 )
 from interfaces.api.filters import parse_int_csv, parse_str_csv
 
@@ -51,8 +51,8 @@ def publications_facets(
     in_perimeter: str = Query(""),
     subject_id: int | None = Query(None),
     search: str = Query(""),
-    queries: PublicationsQueries = Depends(publications_queries_sync),
-    apc_structure_ids: list[int] = Depends(get_apc_structure_ids_sync),
+    queries: PublicationsQueries = Depends(publications_queries),
+    apc_structure_ids: list[int] = Depends(get_apc_structure_ids),
 ) -> PublicationsFacetsResponse:
     """Facettes dynamiques pour la page publications."""
     lab_ids, lab_none = _parse_lab_id(lab_id)
@@ -100,8 +100,8 @@ def publications_entity_facet(
     in_perimeter: str = Query(""),
     subject_id: int | None = Query(None),
     search: str = Query(""),
-    queries: PublicationsQueries = Depends(publications_queries_sync),
-    apc_structure_ids: list[int] = Depends(get_apc_structure_ids_sync),
+    queries: PublicationsQueries = Depends(publications_queries),
+    apc_structure_ids: list[int] = Depends(get_apc_structure_ids),
 ) -> EntityFacetResponse:
     """Facette éditeur/revue contextuelle de la liste : N premières entités sous les filtres actifs
     (corrélées entre elles), avec décompte. `entity_search` recherche dans les noms d'entités ;
@@ -139,7 +139,7 @@ def publications_entity_facet(
 def publications_entity_label(
     kind: Literal["publisher", "journal"] = Query(...),
     entity_id: int = Query(...),
-    queries: PublicationsQueries = Depends(publications_queries_sync),
+    queries: PublicationsQueries = Depends(publications_queries),
 ) -> EntityLabelResponse:
     """Libellé d'une entité (revue/éditeur) par id, pour réafficher une pastille de facette restaurée
     depuis l'URL (qui ne porte que l'id, état canonique de la sélection)."""
@@ -167,8 +167,8 @@ def export_publications_csv(
     in_perimeter: str = Query(""),
     subject_id: int | None = Query(None),
     columns: str = Query(""),
-    queries: PublicationsQueries = Depends(publications_queries_sync),
-    apc_structure_ids: list[int] = Depends(get_apc_structure_ids_sync),
+    queries: PublicationsQueries = Depends(publications_queries),
+    apc_structure_ids: list[int] = Depends(get_apc_structure_ids),
 ) -> Response:
     """Export CSV des publications : mêmes filtres ET mêmes colonnes que le
     tableau affiché (`columns` = clés des colonnes visibles)."""
@@ -215,8 +215,8 @@ def export_theses_csv(
     source_filter: str = Query(""),
     doc_type: str = Query(""),
     sort: str = Query("soutenance_desc"),
-    queries: PublicationsQueries = Depends(publications_queries_sync),
-    apc_structure_ids: list[int] = Depends(get_apc_structure_ids_sync),
+    queries: PublicationsQueries = Depends(publications_queries),
+    apc_structure_ids: list[int] = Depends(get_apc_structure_ids),
 ) -> Response:
     """Export CSV de la page thèses (filtres + tri identiques à la liste)."""
     lab_ids, lab_none = _parse_lab_id(lab_id)
@@ -242,7 +242,7 @@ def export_theses_csv(
 @router.get("/api/publications/{pub_id}", response_model=PublicationDetailResponse)
 def get_publication(
     pub_id: int,
-    queries: PublicationsQueries = Depends(publications_queries_sync),
+    queries: PublicationsQueries = Depends(publications_queries),
 ) -> PublicationDetailResponse:
     """Détail complet d'une publication."""
     detail = queries.get_publication_detail(pub_id)
@@ -273,8 +273,8 @@ def list_publications(
     hal_status: str = Query(""),
     in_perimeter: str = Query(""),
     subject_id: int | None = Query(None),
-    queries: PublicationsQueries = Depends(publications_queries_sync),
-    apc_structure_ids: list[int] = Depends(get_apc_structure_ids_sync),
+    queries: PublicationsQueries = Depends(publications_queries),
+    apc_structure_ids: list[int] = Depends(get_apc_structure_ids),
 ) -> PublicationListResponse:
     """Liste paginée des publications avec sources, labos et journal rattachés.
 

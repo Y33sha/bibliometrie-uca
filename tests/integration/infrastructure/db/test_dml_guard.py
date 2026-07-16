@@ -7,7 +7,7 @@ Deux niveaux :
   DML enveloppé dans un CTE (`WITH … UPDATE`), et reste muet sur les lectures (le cas
   du DELETE-404 : une méthode d'écriture qui ne fait que valider puis renvoyer 404).
   Un commit ou un rollback réarme le flag.
-- `TestDbConnSyncTeardown` : `db_conn_sync` émet un warning quand son rollback de fin
+- `TestDbConnSyncTeardown` : `db_conn` émet un warning quand son rollback de fin
   annule du DML échappé à un command handler (donc perdu), et reste silencieux quand
   le handler a commité ou quand la requête n'a fait que lire.
 """
@@ -135,7 +135,7 @@ _NOOP_DML = "DELETE FROM countries WHERE code = '__dml_guard_probe__'"
 
 
 class TestDbConnSyncTeardown:
-    """Pilote le générateur `db_conn_sync` à la main (sans FastAPI) avec une fausse
+    """Pilote le générateur `db_conn` à la main (sans FastAPI) avec une fausse
     Request, l'engine de test substitué à `get_sync_engine`.
 
     Le warning est observé par un spy sur `deps.logger.warning`, pas via les handlers
@@ -150,7 +150,7 @@ class TestDbConnSyncTeardown:
         warnings: list = []
         monkeypatch.setattr(deps.logger, "warning", lambda *args, **kwargs: warnings.append(args))
         request = SimpleNamespace(method="POST", url=SimpleNamespace(path="/api/_probe"))
-        gen = deps.db_conn_sync(request)
+        gen = deps.db_conn(request)
         conn = next(gen)
         try:
             body(conn)

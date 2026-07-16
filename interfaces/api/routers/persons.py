@@ -25,7 +25,7 @@ from application.ports.api.persons_queries import (
     RoleCount,
 )
 from application.ports.api.subjects_queries import SubjectFrequency
-from interfaces.api.deps import persons_queries_sync
+from interfaces.api.deps import persons_queries
 from interfaces.api.filters import parse_str_csv
 
 router = APIRouter()
@@ -45,7 +45,7 @@ def persons_directory(
     has_rh: str = Query(""),
     lab_id: int | None = Query(None),
     sort: str = Query("name"),
-    queries: PersonsQueries = Depends(persons_queries_sync),
+    queries: PersonsQueries = Depends(persons_queries),
 ) -> PersonDirectoryResponse:
     """Annuaire public des personnes UCA avec ORCID et idHAL.
 
@@ -69,7 +69,7 @@ def persons_directory(
 def search_persons(
     q: str = Query("", min_length=2),
     limit: int = Query(10, ge=1, le=30),
-    queries: PersonsQueries = Depends(persons_queries_sync),
+    queries: PersonsQueries = Depends(persons_queries),
 ) -> list[PersonSearchResult]:
     """Recherche rapide de personnes (autocomplete)."""
     return queries.search_persons(q=q, limit=limit)
@@ -89,7 +89,7 @@ def list_persons(
     has_pending_forms: str = Query(""),
     has_pending_identifiers: str = Query(""),
     sort: str = Query("name"),
-    queries: PersonsQueries = Depends(persons_queries_sync),
+    queries: PersonsQueries = Depends(persons_queries),
 ) -> PersonListResponse:
     """Liste des personnes avec filtres (admin)."""
     filters = ListFilters(
@@ -118,7 +118,7 @@ def persons_facets(
     has_pending_identifiers: str = Query(""),
     lab_id: int | None = Query(None),
     search: str = Query(""),
-    queries: PersonsQueries = Depends(persons_queries_sync),
+    queries: PersonsQueries = Depends(persons_queries),
 ) -> PersonsFacetsResponse:
     """Facettes dynamiques pour la page personnes (scopables à un labo via `lab_id`)."""
     filters = FacetFilters(
@@ -138,7 +138,7 @@ def persons_facets(
 
 @router.get("/api/persons/departments", response_model=list[DepartmentCount])
 def list_departments(
-    queries: PersonsQueries = Depends(persons_queries_sync),
+    queries: PersonsQueries = Depends(persons_queries),
 ) -> list[DepartmentCount]:
     """Liste des départements distincts."""
     return queries.list_departments()
@@ -146,7 +146,7 @@ def list_departments(
 
 @router.get("/api/persons/roles", response_model=list[RoleCount])
 def list_roles(
-    queries: PersonsQueries = Depends(persons_queries_sync),
+    queries: PersonsQueries = Depends(persons_queries),
 ) -> list[RoleCount]:
     """Liste des rôles distincts."""
     return queries.list_roles()
@@ -154,7 +154,7 @@ def list_roles(
 
 @router.get("/api/persons/stats", response_model=PersonsStatsResponse)
 def persons_stats(
-    queries: PersonsQueries = Depends(persons_queries_sync),
+    queries: PersonsQueries = Depends(persons_queries),
 ) -> PersonsStatsResponse:
     """Statistiques sur les personnes et l'alignement."""
     return queries.persons_stats()
@@ -163,7 +163,7 @@ def persons_stats(
 @router.get("/api/persons/{person_id}", response_model=PersonProfileResponse)
 def person_profile(
     person_id: int,
-    queries: PersonsQueries = Depends(persons_queries_sync),
+    queries: PersonsQueries = Depends(persons_queries),
 ) -> PersonProfileResponse:
     """Profil public complet d'une personne."""
     profile = queries.person_profile(person_id)
@@ -175,7 +175,7 @@ def person_profile(
 @router.get("/api/persons/{person_id}/theses", response_model=PersonThesesResponse)
 def person_theses(
     person_id: int,
-    queries: PersonsQueries = Depends(persons_queries_sync),
+    queries: PersonsQueries = Depends(persons_queries),
 ) -> PersonThesesResponse:
     """Thèses liées à cette personne avec un rôle non-auteur."""
     return queries.person_theses(person_id)
@@ -186,7 +186,7 @@ def person_addresses(
     person_id: int,
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=200),
-    queries: PersonsQueries = Depends(persons_queries_sync),
+    queries: PersonsQueries = Depends(persons_queries),
 ) -> PersonAddressesResponse:
     """Adresses distinctes utilisées dans les authorships sources de cette personne."""
     return queries.person_addresses(person_id, page=page, per_page=per_page)
@@ -195,7 +195,7 @@ def person_addresses(
 @router.get("/api/persons/{person_id}/dashboard", response_model=PersonDashboardResponse)
 def person_dashboard(
     person_id: int,
-    queries: PersonsQueries = Depends(persons_queries_sync),
+    queries: PersonsQueries = Depends(persons_queries),
 ) -> PersonDashboardResponse:
     """Dashboard personne : publis/an + Open Access."""
     return queries.person_dashboard(person_id)
@@ -205,7 +205,7 @@ def person_dashboard(
 def person_subjects(
     person_id: int,
     limit: int = Query(30, ge=1, le=100),
-    queries: PersonsQueries = Depends(persons_queries_sync),
+    queries: PersonsQueries = Depends(persons_queries),
 ) -> list[SubjectFrequency]:
     """Top sujets des publications de cette personne (nuage de mots)."""
     return queries.person_subjects(person_id, limit=limit)

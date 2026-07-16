@@ -77,7 +77,7 @@ logger = logging.getLogger(__name__)
 # ----- Lifespan -----
 #
 # Initialise/dispose l'Engine SA sync pour toute la surface API.
-# Les routers `def` consomment cet engine via `db_conn_sync`.
+# Les routers `def` consomment cet engine via `db_conn`.
 
 
 @asynccontextmanager

@@ -15,7 +15,7 @@ from application.ports.api.pipeline_phase_executions_queries import (
     RunDetail,
     RunSummary,
 )
-from interfaces.api.deps import pipeline_phase_executions_queries_sync
+from interfaces.api.deps import pipeline_phase_executions_queries
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -31,7 +31,7 @@ def list_phases() -> list[str]:
 def list_runs(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
-    queries: PhaseExecutionsQueries = Depends(pipeline_phase_executions_queries_sync),
+    queries: PhaseExecutionsQueries = Depends(pipeline_phase_executions_queries),
 ) -> list[RunSummary]:
     """Fenêtre de runs (agrégés par `run_id`), plus récent en premier ; `offset` pour
     le chargement incrémental."""
@@ -41,7 +41,7 @@ def list_runs(
 @router.get("/api/admin/pipeline/runs/{run_id}", response_model=RunDetail)
 def get_run(
     run_id: int,
-    queries: PhaseExecutionsQueries = Depends(pipeline_phase_executions_queries_sync),
+    queries: PhaseExecutionsQueries = Depends(pipeline_phase_executions_queries),
 ) -> RunDetail:
     """Détail d'un run : ses exécutions de phase avec rendement et écart de durée."""
     detail = queries.get_run(run_id)

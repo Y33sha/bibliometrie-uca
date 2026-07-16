@@ -181,7 +181,7 @@ class TestCreateStructure:
     def test_create_visible_immediately(self, auth_client):
         # Régression (chantier commit-avant-réponse) : la structure écrite par le POST
         # est commitée avant l'envoi de la réponse, donc lisible depuis une connexion
-        # indépendante. Garde-fou du passage final du teardown de db_conn_sync en
+        # indépendante. Garde-fou du passage final du teardown de db_conn en
         # rollback — un command handler sans `commit()` ferait alors échouer ce test.
         code = _uniq("READBACK")
         r = auth_client.post(

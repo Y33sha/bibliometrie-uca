@@ -24,13 +24,13 @@ from application.ports.repositories.publisher_repository import (
 from application.services.publishers import commands as publisher_commands
 from domain.publishers.publisher import PUBLISHER_TYPE_LABELS_FR, PUBLISHER_TYPES
 from interfaces.api.deps import (
-    audit_repo_sync,
-    db_conn_sync,
-    journal_repo_sync,
-    metadata_correction_queries_sync,
-    publication_repo_sync,
-    publisher_queries_sync,
-    publisher_repo_sync,
+    audit_repo,
+    db_conn,
+    journal_repo,
+    metadata_correction_queries,
+    publication_repo,
+    publisher_queries,
+    publisher_repo,
 )
 from interfaces.api.filters import parse_str_csv
 from interfaces.api.models import (
@@ -62,7 +62,7 @@ def publishers_facets(
     publisher_type: str = Query(""),
     country: str = Query(""),
     with_pubs: bool = False,
-    queries: PublisherQueries = Depends(publisher_queries_sync),
+    queries: PublisherQueries = Depends(publisher_queries),
 ) -> PublishersFacetsResponse:
     """Comptes par option pour les 3 facettes du listing éditeurs.
 
@@ -87,7 +87,7 @@ def list_publishers(
     country: str = Query(""),
     with_pubs: bool = False,
     sort: str = "name",
-    queries: PublisherQueries = Depends(publisher_queries_sync),
+    queries: PublisherQueries = Depends(publisher_queries),
 ) -> PublisherListResponse:
     """Liste paginée des éditeurs avec comptage revues + publications.
 
@@ -119,7 +119,7 @@ def list_publishers(
 @router.get("/api/publishers/{publisher_id}", response_model=PublisherDetailResponse)
 def get_publisher(
     publisher_id: int,
-    queries: PublisherQueries = Depends(publisher_queries_sync),
+    queries: PublisherQueries = Depends(publisher_queries),
 ) -> PublisherDetailResponse:
     """Profil complet d'un éditeur pour la page publique `/publishers/[id]`.
 
@@ -135,7 +135,7 @@ def get_publisher(
 @router.get("/api/publishers/{publisher_id}/dashboard", response_model=PublisherDashboardResponse)
 def get_publisher_dashboard(
     publisher_id: int,
-    queries: PublisherQueries = Depends(publisher_queries_sync),
+    queries: PublisherQueries = Depends(publisher_queries),
 ) -> PublisherDashboardResponse:
     """Agrégats pour l'onglet « Dashboard » de la page éditeur.
 
@@ -153,7 +153,7 @@ def get_publisher_dashboard(
 def get_publisher_subjects(
     publisher_id: int,
     limit: int = Query(30, ge=1, le=200),
-    queries: PublisherQueries = Depends(publisher_queries_sync),
+    queries: PublisherQueries = Depends(publisher_queries),
 ) -> list[SubjectFrequency]:
     """Top sujets des publications de l'éditeur (pour l'onglet Dashboard).
 
@@ -167,8 +167,8 @@ def get_publisher_subjects(
 def update_publisher(
     publisher_id: int,
     body: PublisherUpdate,
-    conn: Connection = Depends(db_conn_sync),
-    repo: PublisherRepository = Depends(publisher_repo_sync),
+    conn: Connection = Depends(db_conn),
+    repo: PublisherRepository = Depends(publisher_repo),
 ) -> OkResponse:
     """Met à jour un éditeur (modification sélective des champs fournis).
 
@@ -183,13 +183,13 @@ def update_publisher(
 def merge(
     publisher_id: int,
     body: MergeRequest,
-    conn: Connection = Depends(db_conn_sync),
-    queries: PublisherQueries = Depends(publisher_queries_sync),
-    pub_repo: PublisherRepository = Depends(publisher_repo_sync),
-    j_repo: JournalRepository = Depends(journal_repo_sync),
-    publication_repo: PublicationRepository = Depends(publication_repo_sync),
-    audit: AuditRepository = Depends(audit_repo_sync),
-    correction_queries: MetadataCorrectionQueries = Depends(metadata_correction_queries_sync),
+    conn: Connection = Depends(db_conn),
+    queries: PublisherQueries = Depends(publisher_queries),
+    pub_repo: PublisherRepository = Depends(publisher_repo),
+    j_repo: JournalRepository = Depends(journal_repo),
+    publication_repo: PublicationRepository = Depends(publication_repo),
+    audit: AuditRepository = Depends(audit_repo),
+    correction_queries: MetadataCorrectionQueries = Depends(metadata_correction_queries),
 ) -> MergeResponse:
     """Fusionne l'éditeur `source_id` dans l'éditeur `publisher_id`.
 

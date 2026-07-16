@@ -2,7 +2,7 @@
 
 Un listener marque la connexion « dirty » dès qu'un statement émet du DML (INSERT/UPDATE/DELETE), en lisant le command tag PostgreSQL (psycopg `statusmessage` : `UPDATE n`, `INSERT 0 n`, `DELETE n`) plutôt qu'en analysant le SQL. C'est la classification faite par la base elle-même : robuste pour le SQL brut comme pour les constructs Core, y compris le DML enveloppé dans un CTE (`WITH … UPDATE`), et muet sur les lectures (une requête qui ne fait que valider puis renvoyer un 404 n'émet aucun DML, donc ne déclenche rien). Un commit ou un rollback réarme le flag.
 
-Les écritures applicatives passent par des command handlers qui committent explicitement. `db_conn_sync` (interfaces API) lit ce flag à la fermeture de la connexion : s'il reste positionné alors qu'une transaction est encore ouverte, une écriture a échappé à ce commit explicite (écriture parasite dans un routeur) et un warning est émis.
+Les écritures applicatives passent par des command handlers qui committent explicitement. `db_conn` (interfaces API) lit ce flag à la fermeture de la connexion : s'il reste positionné alors qu'une transaction est encore ouverte, une écriture a échappé à ce commit explicite (écriture parasite dans un routeur) et un warning est émis.
 """
 
 import logging
@@ -64,7 +64,7 @@ def _on_release_savepoint(conn: Connection, name: str, context: object) -> None:
 def install_dml_guard(engine: Engine) -> None:
     """Attache les listeners de suivi du DML non committé sur l'engine.
 
-    Posé sur l'engine global : le suivi vaut pour toutes les connexions (API, pipeline, CLI), mais seule `db_conn_sync` lit le flag pour émettre le warning.
+    Posé sur l'engine global : le suivi vaut pour toutes les connexions (API, pipeline, CLI), mais seule `db_conn` lit le flag pour émettre le warning.
     """
     event.listen(engine, "after_cursor_execute", _mark_dml)
     event.listen(engine, "commit", _clear_dml_flag)

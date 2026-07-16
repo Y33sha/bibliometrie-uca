@@ -27,12 +27,12 @@ from domain.journals.journal import (
     OA_MODELS,
 )
 from interfaces.api.deps import (
-    audit_repo_sync,
-    db_conn_sync,
-    journal_queries_sync,
-    journal_repo_sync,
-    metadata_correction_queries_sync,
-    publication_repo_sync,
+    audit_repo,
+    db_conn,
+    journal_queries,
+    journal_repo,
+    metadata_correction_queries,
+    publication_repo,
 )
 from interfaces.api.filters import parse_str_csv
 from interfaces.api.models import (
@@ -78,7 +78,7 @@ def journals_facets(
     is_in_doaj: bool | None = None,
     oa_model: str = Query(""),
     with_pubs: bool = False,
-    queries: JournalQueries = Depends(journal_queries_sync),
+    queries: JournalQueries = Depends(journal_queries),
 ) -> JournalsFacetsResponse:
     """Comptes par option pour les 3 facettes du listing revues.
 
@@ -108,7 +108,7 @@ def list_journals(
     oa_model: str = Query(""),
     with_pubs: bool = False,
     sort: str = "title",
-    queries: JournalQueries = Depends(journal_queries_sync),
+    queries: JournalQueries = Depends(journal_queries),
 ) -> JournalListResponse:
     """Liste paginée des revues avec comptage des publications rattachées.
 
@@ -144,7 +144,7 @@ def list_journals(
 @router.get("/api/journals/{journal_id}", response_model=JournalDetailResponse)
 def get_journal(
     journal_id: int,
-    queries: JournalQueries = Depends(journal_queries_sync),
+    queries: JournalQueries = Depends(journal_queries),
 ) -> JournalDetailResponse:
     """Profil complet d'une revue pour la page publique `/journals/[id]`.
 
@@ -160,7 +160,7 @@ def get_journal(
 @router.get("/api/journals/{journal_id}/dashboard", response_model=JournalDashboardResponse)
 def get_journal_dashboard(
     journal_id: int,
-    queries: JournalQueries = Depends(journal_queries_sync),
+    queries: JournalQueries = Depends(journal_queries),
 ) -> JournalDashboardResponse:
     """Agrégats des publications de la revue (distribution `doc_type` + `oa_status`).
 
@@ -178,7 +178,7 @@ def get_journal_dashboard(
 def get_journal_subjects(
     journal_id: int,
     limit: int = Query(30, ge=1, le=200),
-    queries: JournalQueries = Depends(journal_queries_sync),
+    queries: JournalQueries = Depends(journal_queries),
 ) -> list[SubjectFrequency]:
     """Top sujets des publications de la revue (pour l'onglet Dashboard).
 
@@ -196,10 +196,10 @@ def get_journal_subjects(
 def get_type_change_impact(
     journal_id: int,
     new_type: str = Query(...),
-    conn: Connection = Depends(db_conn_sync),
-    repo: JournalRepository = Depends(journal_repo_sync),
-    pub_repo: PublicationRepository = Depends(publication_repo_sync),
-    correction_queries: MetadataCorrectionQueries = Depends(metadata_correction_queries_sync),
+    conn: Connection = Depends(db_conn),
+    repo: JournalRepository = Depends(journal_repo),
+    pub_repo: PublicationRepository = Depends(publication_repo),
+    correction_queries: MetadataCorrectionQueries = Depends(metadata_correction_queries),
 ) -> JournalTypeChangeImpact:
     """Compte combien de publications du journal verraient leur `doc_type` changer si on passait `journal_type` à `new_type`.
 
@@ -227,11 +227,11 @@ def get_type_change_impact(
 def update_journal(
     journal_id: int,
     body: JournalUpdate,
-    conn: Connection = Depends(db_conn_sync),
-    repo: JournalRepository = Depends(journal_repo_sync),
-    pub_repo: PublicationRepository = Depends(publication_repo_sync),
-    audit: AuditRepository = Depends(audit_repo_sync),
-    correction_queries: MetadataCorrectionQueries = Depends(metadata_correction_queries_sync),
+    conn: Connection = Depends(db_conn),
+    repo: JournalRepository = Depends(journal_repo),
+    pub_repo: PublicationRepository = Depends(publication_repo),
+    audit: AuditRepository = Depends(audit_repo),
+    correction_queries: MetadataCorrectionQueries = Depends(metadata_correction_queries),
 ) -> OkResponse:
     """Met à jour une revue (modification sélective des champs fournis).
 
@@ -255,12 +255,12 @@ def update_journal(
 def merge(
     journal_id: int,
     body: MergeRequest,
-    conn: Connection = Depends(db_conn_sync),
-    queries: JournalQueries = Depends(journal_queries_sync),
-    repo: JournalRepository = Depends(journal_repo_sync),
-    pub_repo: PublicationRepository = Depends(publication_repo_sync),
-    audit: AuditRepository = Depends(audit_repo_sync),
-    correction_queries: MetadataCorrectionQueries = Depends(metadata_correction_queries_sync),
+    conn: Connection = Depends(db_conn),
+    queries: JournalQueries = Depends(journal_queries),
+    repo: JournalRepository = Depends(journal_repo),
+    pub_repo: PublicationRepository = Depends(publication_repo),
+    audit: AuditRepository = Depends(audit_repo),
+    correction_queries: MetadataCorrectionQueries = Depends(metadata_correction_queries),
 ) -> MergeResponse:
     """Fusionne la revue `source_id` dans la revue `journal_id`.
 

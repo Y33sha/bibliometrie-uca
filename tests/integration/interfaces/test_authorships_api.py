@@ -292,7 +292,7 @@ class TestAssignOrphanAuthorship:
         # Régression (chantier commit-avant-réponse) : le command handler commit
         # avant l'envoi de la réponse, donc le rattachement est lisible depuis une
         # connexion indépendante. Garde-fou du passage final du teardown de
-        # db_conn_sync en rollback — un handler sans `commit()` ferait échouer ce test.
+        # db_conn en rollback — un handler sans `commit()` ferait échouer ce test.
         pid = _seed_person()
         sa = _seed_source_authorship(source="hal")
         r = auth_client.post(

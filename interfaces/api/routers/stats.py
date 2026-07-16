@@ -15,8 +15,8 @@ from application.ports.api.stats_queries import (
     StatsQueries,
 )
 from interfaces.api.deps import (
-    get_apc_structure_ids_sync,
-    stats_queries_sync,
+    get_apc_structure_ids,
+    stats_queries,
 )
 from interfaces.api.filters import parse_int_csv, parse_str_csv
 
@@ -47,7 +47,7 @@ def stats_filters(
     oa_status: str = Query(""),
     has_apc: str = Query(""),
     doc_type: str = Query(""),
-    apc_structure_ids: list[int] = Depends(get_apc_structure_ids_sync),
+    apc_structure_ids: list[int] = Depends(get_apc_structure_ids),
 ) -> StatsFilters:
     """Dépendance : assemble les filtres communs des endpoints stats depuis les query params."""
     return StatsFilters(
@@ -64,7 +64,7 @@ def stats_filters(
 
 @router.get("/api/stats/years", response_model=list[int])
 def available_years(
-    queries: StatsQueries = Depends(stats_queries_sync),
+    queries: StatsQueries = Depends(stats_queries),
 ) -> list[int]:
     """Liste des années présentes dans les publications validées (tri asc, restreint via la config `years_validated`)."""
     return queries.available_years()
@@ -73,7 +73,7 @@ def available_years(
 @router.get("/api/stats/facets", response_model=StatsFacetsResponse)
 def stats_facets(
     filters: StatsFilters = Depends(stats_filters),
-    queries: StatsQueries = Depends(stats_queries_sync),
+    queries: StatsQueries = Depends(stats_queries),
 ) -> StatsFacetsResponse:
     """Facettes dynamiques : années, labos, oa_status, apc."""
     return queries.stats_facets(**asdict(filters))
@@ -84,7 +84,7 @@ def stats_entity_facet(
     kind: Literal["publisher", "journal"] = Query(...),
     entity_search: str = Query(""),
     filters: StatsFilters = Depends(stats_filters),
-    queries: StatsQueries = Depends(stats_queries_sync),
+    queries: StatsQueries = Depends(stats_queries),
 ) -> EntityFacetResponse:
     """Facette éditeur/revue contextuelle : N premières entités sous les filtres actifs (corrélées
     entre elles), avec décompte. `entity_search` recherche dans les noms d'entités."""
@@ -95,7 +95,7 @@ def stats_entity_facet(
 def stats_entity_label(
     kind: Literal["publisher", "journal"] = Query(...),
     entity_id: int = Query(...),
-    queries: StatsQueries = Depends(stats_queries_sync),
+    queries: StatsQueries = Depends(stats_queries),
 ) -> EntityLabelResponse:
     """Libellé d'une entité (revue/éditeur) par id, pour réafficher une pastille de facette restaurée
     depuis l'URL (qui ne porte que l'id, état canonique de la sélection)."""
@@ -105,7 +105,7 @@ def stats_entity_label(
 @router.get("/api/stats/collaborations", response_model=CollaborationsResponse)
 def collaborations(
     filters: StatsFilters = Depends(stats_filters),
-    queries: StatsQueries = Depends(stats_queries_sync),
+    queries: StatsQueries = Depends(stats_queries),
 ) -> CollaborationsResponse:
     """Collaborations internationales : nombre de publications co-affiliées à chaque pays étranger,
     sous les filtres actifs. Source : la colonne `countries` des publications, hors pays domestique."""
@@ -114,7 +114,7 @@ def collaborations(
 
 @router.get("/api/stats/pivot/schema", response_model=PivotSchemaResponse)
 def pivot_schema(
-    queries: StatsQueries = Depends(stats_queries_sync),
+    queries: StatsQueries = Depends(stats_queries),
 ) -> PivotSchemaResponse:
     """Vocabulaire du pivot (dimensions groupables, mesures) dont l'interface tire ses sélecteurs."""
     return queries.pivot_schema()
@@ -126,7 +126,7 @@ def pivot(
     group: str = Query(""),
     group2: str = Query(""),
     filters: StatsFilters = Depends(stats_filters),
-    queries: StatsQueries = Depends(stats_queries_sync),
+    queries: StatsQueries = Depends(stats_queries),
 ) -> PivotResponse:
     """Agrégation générique : `measure` ventilée selon `group` (primaire) et `group2` (secondaire),
     sous les filtres. Clés validées contre le registre (400 si inconnues)."""

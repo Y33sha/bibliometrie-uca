@@ -11,7 +11,7 @@ from sqlalchemy import Connection
 from application.ports.api.config_queries import ConfigItem, ConfigQueries
 from application.ports.config import ConfigStore
 from application.services.config import commands as config_commands
-from interfaces.api.deps import config_queries_sync, config_store_sync, db_conn_sync
+from interfaces.api.deps import config_queries, config_store, db_conn
 from interfaces.api.models import ConfigValueUpdate
 
 router = APIRouter()
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 @router.get("/api/config", response_model=list[ConfigItem])
 def list_config(
-    queries: ConfigQueries = Depends(config_queries_sync),
+    queries: ConfigQueries = Depends(config_queries),
 ) -> list[ConfigItem]:
     """Liste tous les paramètres applicatifs (clé, valeur JSON, description).
 
@@ -33,8 +33,8 @@ def list_config(
 def update_config(
     key: str,
     body: ConfigValueUpdate,
-    conn: Connection = Depends(db_conn_sync),
-    config_repo: ConfigStore = Depends(config_store_sync),
+    conn: Connection = Depends(db_conn),
+    config_repo: ConfigStore = Depends(config_store),
 ) -> ConfigItem:
     """Met à jour la valeur d'un paramètre de config.
 
