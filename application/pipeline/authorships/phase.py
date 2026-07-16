@@ -77,10 +77,10 @@ def _refresh_pub_counts(
     logger.info("▶ refresh pub_count (journals + publishers)")
     t0 = time.perf_counter()
     with open_tx() as conn:
-        n_journals, n_publishers = pub_counts_queries.refresh_pub_counts(conn)
+        changes = pub_counts_queries.refresh_pub_counts(conn)
     logger.info(
         "✓ pub_count : %d revues, %d éditeurs mis à jour en %.1fs",
-        n_journals,
-        n_publishers,
+        changes.journals,
+        changes.publishers,
         time.perf_counter() - t0,
     )

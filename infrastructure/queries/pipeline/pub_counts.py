@@ -10,12 +10,11 @@ recalcule que les lignes touchées). Tous idempotents (`IS DISTINCT FROM`).
 
 from sqlalchemy import Connection, text
 
-from application.ports.pipeline.pub_counts import PubCountsQueries
+from application.ports.pipeline.pub_counts import PubCountChanges, PubCountsQueries
 
 
-def refresh_pub_counts(conn: Connection) -> tuple[int, int]:
-    """Recalcule tous les `pub_count` (journals puis publishers). Retourne les
-    nombres de lignes modifiées."""
+def refresh_pub_counts(conn: Connection) -> PubCountChanges:
+    """Recalcule tous les `pub_count` (journals puis publishers). Retourne le nombre de lignes changées de chaque côté."""
     n_journals = conn.execute(
         text("""
             WITH counts AS (
@@ -33,7 +32,7 @@ def refresh_pub_counts(conn: Connection) -> tuple[int, int]:
         """)
     ).rowcount
     n_publishers = _refresh_all_publishers(conn)
-    return n_journals, n_publishers
+    return PubCountChanges(journals=n_journals, publishers=n_publishers)
 
 
 def _refresh_all_publishers(conn: Connection) -> int:
@@ -84,5 +83,5 @@ def refresh_publisher_pub_count(conn: Connection, publisher_id: int) -> None:
 class PgPubCountsQueries(PubCountsQueries):
     """Adapter PostgreSQL pour le port `PubCountsQueries`."""
 
-    def refresh_pub_counts(self, conn: Connection) -> tuple[int, int]:
+    def refresh_pub_counts(self, conn: Connection) -> PubCountChanges:
         return refresh_pub_counts(conn)
