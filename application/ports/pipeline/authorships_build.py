@@ -66,8 +66,7 @@ class AuthorshipsBuildQueries(Protocol):
         ...
 
     def refresh_publication_structures(self, conn: Connection) -> None:
-        """Rafraîchit la matview `publication_structures` (publi↔structure, après
-        `refresh_authorship_structures` dont elle dérive)."""
+        """Rafraîchit la matview `publication_structures` (publi↔structure), après `refresh_authorship_structures` dont elle dérive."""
         ...
 
     def count_authorships_in_perimeter(self, conn: Connection) -> int:
@@ -77,7 +76,6 @@ class AuthorshipsBuildQueries(Protocol):
     def refresh_publications_in_perimeter(self, conn: Connection) -> int:
         """Matérialise `publications.in_perimeter` (rollup de `authorships.in_perimeter`).
 
-        À appeler après `propagate_authorship_attributes` (qui pose
-        `authorships.in_perimeter`). Idempotent.
+        À appeler après `propagate_authorship_attributes`, qui pose `authorships.in_perimeter`. Idempotent.
         """
         ...
