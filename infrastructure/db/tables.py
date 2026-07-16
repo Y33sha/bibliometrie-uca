@@ -808,9 +808,9 @@ publications = Table(
     # de périmètre des listes (cf. publication_in_perimeter) ; le scope doc_type reste
     # un filtre inline (domain/publications/scope), séparé du périmètre.
     Column("in_perimeter", Boolean, nullable=False, server_default="false"),
-    # Staleness de l'enrichissement OA : date de la dernière vérification Unpaywall
-    # (NULL = jamais). La phase oa_status ne re-vérifie que les non-vérifiés ou les
-    # statuts changeables périmés (cf. STABLE_OA_STATUSES, application/.../oa_status).
+    # Staleness de l'enrichissement OA : date de la dernière interrogation d'Unpaywall
+    # (NULL = jamais), qu'elle ait trouvé la publication ou non. La phase `oa_status`
+    # re-vérifie les jamais-interrogées, puis les plus périmées.
     Column("unpaywall_checked_at", DateTime(timezone=True)),
     Index(
         "idx_pub_countries",

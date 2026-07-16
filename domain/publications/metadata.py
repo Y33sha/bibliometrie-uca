@@ -39,13 +39,6 @@ OA_STATUS_UNKNOWN_DEFAULT = "unknown"
 # usage dans `decide_oa_status` et le plancher archive-ouverte de l'agrégation.
 OA_CLOSED_STATUSES: frozenset[str] = frozenset({"closed", "unknown"})
 
-# Statuts OA « stables » : une fois vérifiés par Unpaywall ils ne changent plus
-# (un accès gold/diamond/hybrid reste ouvert dans le temps). La phase `oa_status`
-# ne les re-interroge donc **jamais** une fois vérifiés. Les autres
-# (`closed`/`green`/`bronze`/`unknown`) peuvent évoluer et sont re-vérifiés quand
-# périmés (staleness). Source unique pour le filtre SQL de `fetch_publications_with_doi`.
-STABLE_OA_STATUSES: frozenset[str] = frozenset({"gold", "diamond", "hybrid"})
-
 # Sources qui sont des archives ouvertes : quand l'une déclare `green`, elle atteste un FICHIER
 # déposé et lisible (pas une estimation à distance). Ce dépôt est un fait — un `closed` d'Unpaywall,
 # qui ne voit pas ce fichier sous le DOI, ne peut pas le refermer (cf. `has_open_archive_deposit`,

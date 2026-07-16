@@ -64,22 +64,28 @@ class TestFetchPublicationsWithDoi:
         ordered = [r.id for r in rows if r.id in (checked, never)]
         assert ordered[0] == never
 
-    def test_staleness_excludes_stable_and_fresh(self, sa_sync_conn):
-        # jamais vérifié → inclus (1× même gold, OpenAlex se trompe parfois)
+    def test_staleness_excludes_only_the_fresh(self, sa_sync_conn):
+        """La péremption ne regarde que la date : le statut courant n'exempte personne."""
+        # jamais interrogé → inclus
         never_gold = _create_pub(sa_sync_conn, doi="10.1/n", oa_status="gold")
-        # gold vérifié → exclu (stable, plus jamais re-vérifié)
-        gold_checked = _create_pub(sa_sync_conn, doi="10.1/g", oa_status="gold")
-        _set_checked(sa_sync_conn, gold_checked, days_ago=999)
-        # closed vérifié récemment → exclu (frais)
+        # gold périmé → inclus : son statut peut venir d'une source, sans qu'Unpaywall
+        # ait jamais confirmé (publication absente de son index à l'interrogation)
+        gold_stale = _create_pub(sa_sync_conn, doi="10.1/g", oa_status="gold")
+        _set_checked(sa_sync_conn, gold_stale, days_ago=999)
+        # gold interrogé récemment → exclu (frais)
+        gold_fresh = _create_pub(sa_sync_conn, doi="10.1/gf", oa_status="gold")
+        _set_checked(sa_sync_conn, gold_fresh, days_ago=1)
+        # closed interrogé récemment → exclu (frais)
         closed_fresh = _create_pub(sa_sync_conn, doi="10.1/cf", oa_status="closed")
         _set_checked(sa_sync_conn, closed_fresh, days_ago=1)
-        # closed vérifié il y a longtemps → inclus (périmé)
+        # closed périmé → inclus
         closed_stale = _create_pub(sa_sync_conn, doi="10.1/cs", oa_status="closed")
         _set_checked(sa_sync_conn, closed_stale, days_ago=999)
 
         ids = {r.id for r in fetch_publications_with_doi(sa_sync_conn, staleness_days=30)}
         assert never_gold in ids
-        assert gold_checked not in ids
+        assert gold_stale in ids
+        assert gold_fresh not in ids
         assert closed_fresh not in ids
         assert closed_stale in ids
 

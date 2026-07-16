@@ -65,11 +65,11 @@ def refresh_from_sources(
     pub.doi = DOI(new_doi_str) if new_doi_str else None
 
     pub.journal_id = first_non_null(sorted_sources, "journal_id")
-    # Unpaywall fait autorité sur l'OA une fois qu'il a vérifié (cf.
+    # Unpaywall fait autorité sur l'OA une fois qu'il a été interrogé (cf.
     # `publications.unpaywall_checked_at`) : on ne ré-agrège `oa_status` depuis les
-    # sources que tant que la publi n'a pas été vérifiée. Sinon un réimport
-    # écraserait la correction Unpaywall — et, la date étant posée, elle ne serait
-    # jamais re-vérifiée (perte permanente sur un statut stable-open).
+    # sources que tant que la publication ne l'a pas été. Sinon un réimport
+    # écraserait le verdict d'Unpaywall par une valeur de source, jusqu'à la
+    # prochaine péremption.
     if pub.unpaywall_checked_at is None:
         pub.oa_status = (
             best_oa_status(s.oa_status for s in sorted_sources) or OA_STATUS_UNKNOWN_DEFAULT

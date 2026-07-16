@@ -22,13 +22,13 @@ from domain.publications.metadata import decide_oa_status
 type OaStatusFetcher = Callable[[httpx.AsyncClient, str], Awaitable[str | None]]
 """Signature : `(client, doi) → statut OA mappé (str) | None`."""
 
-# Constantes opérationnelles (pas métier — la règle métier des statuts stables est dans domain/publications/metadata.STABLE_OA_STATUSES).
+# Constantes opérationnelles.
 BATCH_SIZE = 50
 MAX_CONCURRENT = 5
 MAX_PER_RUN = 10_000
-"""Nombre maximum de DOI vérifiés par run : lisse la charge, le backlog des jamais-vérifiés s'écoulant sur plusieurs runs au lieu d'un pic de ~100k."""
+"""Nombre maximum de DOI vérifiés par run : lisse la charge, le backlog des jamais-vérifiés s'écoulant sur plusieurs runs au lieu d'un pic."""
 STALENESS_DAYS = 15
-"""Au-delà, un statut OA changeable (hors STABLE_OA_STATUSES) est re-vérifié."""
+"""Au-delà, un statut OA est re-vérifié."""
 
 
 async def run(
@@ -111,7 +111,9 @@ async def run(
             async with sem:
                 status = await fetcher(client, doi)
 
-            # `new_status` non None = on écrit un nouveau statut ; sinon on pose juste `unpaywall_checked_at` (vérifié, rien à changer) pour ne pas re-tenter ce DOI au run suivant.
+            # `new_status` non None = on écrit un nouveau statut ; sinon on pose seulement
+            # `unpaywall_checked_at`, que la publication soit absente d'Unpaywall ou que son
+            # statut y soit inchangé — dans les deux cas elle sort de la file jusqu'à péremption.
             new_status: str | None = None
             if status is None:
                 progress["not_found"] += 1

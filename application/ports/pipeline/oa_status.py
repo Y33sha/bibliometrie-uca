@@ -23,7 +23,7 @@ class OaStatusQueries(Protocol):
     def fetch_publications_with_doi(
         self, conn: Connection, *, limit: int | None = None, staleness_days: int = 30
     ) -> list[PublicationOaCheck]:
-        """Publications à (re)vérifier sur Unpaywall : jamais vérifiées, ou portant un statut changeable (hors `STABLE_OA_STATUSES`) vérifié il y a plus de `staleness_days` jours. Triées jamais-vérifiées d'abord, puis les plus périmées ; `limit` cape le run, le reliquat s'écoulant sur les suivants."""
+        """Publications à (re)vérifier sur Unpaywall : jamais vérifiées, ou vérifiées il y a plus de `staleness_days` jours. Triées jamais-vérifiées d'abord, puis les plus périmées ; `limit` cape le run, le reliquat s'écoulant sur les suivants."""
         ...
 
     def count_stale_publications(self, conn: Connection, *, staleness_days: int = 30) -> int:
