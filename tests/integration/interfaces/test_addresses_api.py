@@ -287,16 +287,12 @@ class TestCountries:
         assert r.status_code == 200
 
 
-# ── GET /api/addresses/suggest-countries (admin only) ────────────
+# ── GET /api/addresses/suggest-countries ─────────────────────────
 
 
 class TestSuggestCountries:
-    def test_requires_admin(self, client):
-        r = client.get("/api/addresses/suggest-countries")
-        assert r.status_code in (401, 403)
-
-    def test_admin_ok(self, auth_client):
-        r = auth_client.get("/api/addresses/suggest-countries", params={"search": "X"})
+    def test_ok(self, client):
+        r = client.get("/api/addresses/suggest-countries", params={"search": "X"})
         assert r.status_code == 200
 
 

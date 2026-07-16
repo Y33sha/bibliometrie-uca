@@ -1,6 +1,8 @@
-"""Dépendances partagées des routers : helpers d'authentification, factories DB, tâches de fond.
+"""Dépendances partagées des routers : session admin, factories DB, tâches de fond.
 
 `db_conn` fournit aux routes, par `Depends(...)`, la connexion sur laquelle les factories câblent les query services et les repositories.
+
+Les jetons de session sont signés et vérifiés ici ; `app.py` en fait la garde des écritures dans un middleware, et `routers/auth.py` les émet à la connexion.
 """
 
 import hashlib
@@ -10,7 +12,7 @@ import time
 from collections.abc import Callable, Iterator
 
 import bcrypt
-from fastapi import Cookie, Depends, HTTPException, Request
+from fastapi import Depends, Request
 from sqlalchemy import Connection
 
 from application.ports.api.addresses_queries import AddressesQueries
@@ -76,7 +78,7 @@ from infrastructure.settings import settings
 logger = logging.getLogger(__name__)
 
 
-# ----- Auth helpers -----
+# ----- Session admin -----
 
 SESSION_MAX_AGE = 86400 * 7  # 7 jours
 
@@ -117,12 +119,6 @@ def get_admin_user() -> str:
     Exposé en `Depends(...)` pour que les routers n'importent pas `infrastructure.settings` directement (règle 4 de `docs/architecture/01-vue-d-ensemble.md`, tenue par un contrat import-linter).
     """
     return settings.admin_user
-
-
-def require_admin(session: str | None = Cookie(None, alias="session")) -> None:
-    """Dépendance FastAPI : vérifie que l'utilisateur est authentifié."""
-    if not session or not _verify_token(session):
-        raise HTTPException(status_code=401, detail="Non authentifié")
 
 
 # ----- Factories DB -----
