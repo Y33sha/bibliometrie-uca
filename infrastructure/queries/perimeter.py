@@ -40,13 +40,13 @@ def get_perimeter_structure_ids(conn: Connection, perimeter_code: str) -> set[in
     return {row.structure_id for row in result}
 
 
-def refresh_perimeter_structures(conn: Connection) -> int:
-    """Recompute la table matérialisée `perimeter_structures` : pour chaque périmètre, la clôture récursive (`est_tutelle_de`) de ses racines `perimeters.structure_ids`, filtrée aux structures existantes. Idempotent (DELETE + réinsertion complète). Retourne le nombre de liens ; commit laissé au caller.
+def refresh_perimeter_structures(conn: Connection) -> None:
+    """Recompute la table matérialisée `perimeter_structures` : pour chaque périmètre, la clôture récursive (`est_tutelle_de`) de ses racines `perimeters.structure_ids`, filtrée aux structures existantes. Idempotent (DELETE + réinsertion complète). Commit laissé au caller.
 
     Seule implémentation de la clôture d'un périmètre — `get_perimeter_structure_ids` lit cette table. À rejouer à chaque édition de `perimeters.structure_ids` ou `structure_relations`.
     """
     conn.execute(text("DELETE FROM perimeter_structures"))
-    return conn.execute(
+    conn.execute(
         text("""
             INSERT INTO perimeter_structures (perimeter_id, structure_id)
             WITH RECURSIVE descendants AS (
@@ -63,7 +63,7 @@ def refresh_perimeter_structures(conn: Connection) -> int:
             FROM descendants d
             WHERE EXISTS (SELECT 1 FROM structures st WHERE st.id = d.structure_id)
         """)
-    ).rowcount
+    )
 
 
 def _config_perimeter_code(conn: Connection, config_key: str, default: str) -> str:
@@ -88,7 +88,7 @@ def get_persons_structure_ids(conn: Connection) -> set[int]:
 
 
 def get_persons_structure_ids_list(conn: Connection) -> list[int]:
-    """Variante liste (pour usage dans les requêtes SQL `ANY(:ids)`)."""
+    """Variante liste de `get_persons_structure_ids` (un `set` n'est pas un paramètre lié valide pour `ANY(:ids)`)."""
     return list(get_persons_structure_ids(conn))
 
 
@@ -116,8 +116,8 @@ class PgPerimeterQueries(PerimeterQueries):
     def get_persons_structure_ids_list(self, conn: Connection) -> list[int]:
         return get_persons_structure_ids_list(conn)
 
-    def refresh_perimeter_structures(self, conn: Connection) -> int:
-        return refresh_perimeter_structures(conn)
+    def refresh_perimeter_structures(self, conn: Connection) -> None:
+        refresh_perimeter_structures(conn)
 
 
 class PgPerimetersAdminQueries(PerimetersAdminQueries):

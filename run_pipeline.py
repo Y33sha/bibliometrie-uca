@@ -1473,9 +1473,9 @@ def _execute_phases(
     from infrastructure.queries.perimeter import refresh_perimeter_structures
 
     with get_sync_engine().connect() as perimeter_conn:
-        n_perimeter_links = refresh_perimeter_structures(perimeter_conn)
+        refresh_perimeter_structures(perimeter_conn)
         perimeter_conn.commit()
-    log.info("perimeter_structures : %d liens matérialisés", n_perimeter_links)
+    log.info("perimeter_structures matérialisées")
 
     t0_total = time.time()
     pipeline_started_at = datetime.datetime.now().isoformat(timespec="seconds")
