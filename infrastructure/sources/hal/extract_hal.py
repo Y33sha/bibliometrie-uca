@@ -13,6 +13,7 @@ from typing import Any
 
 from sqlalchemy import Connection
 
+from application.ports.pipeline.extract._common import UpsertOutcome
 from application.ports.pipeline.extract.hal import HalExtractAdapter, HalExtractConfig
 from domain.publications.identifiers import clean_doi
 from infrastructure.sources.api_limits import HAL_DELAY, hal_per_page_for
@@ -157,6 +158,9 @@ class PgHalExtractAdapter(HalExtractAdapter):
         hal_id: str,
         doi: str | None,
         raw_data: dict[str, Any],
-    ) -> tuple[bool, bool]:
-        """UPSERT staging via le helper canonique. Retourne `(inserted, changed)`."""
-        return upsert_staging(conn, source="hal", source_id=hal_id, doi=doi, raw_data=raw_data)
+    ) -> UpsertOutcome:
+        """UPSERT staging via le helper canonique."""
+        inserted, changed = upsert_staging(
+            conn, source="hal", source_id=hal_id, doi=doi, raw_data=raw_data
+        )
+        return UpsertOutcome.of(inserted=inserted, changed=changed)

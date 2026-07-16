@@ -14,6 +14,7 @@ from typing import Any
 
 from sqlalchemy import Connection
 
+from application.ports.pipeline.extract._common import UpsertOutcome
 from application.ports.pipeline.extract.theses import (
     ThesesExtractAdapter,
     ThesesExtractConfig,
@@ -100,12 +101,8 @@ class PgThesesExtractAdapter(ThesesExtractAdapter):
 
     # ── SQL ────────────────────────────────────────────────────
 
-    def upsert_these(self, conn: Connection, these: dict[str, Any]) -> tuple[bool, bool, bool]:
-        """UPSERT staging via le helper canonique, ventilé `(new, updated, unchanged)`.
-
-        Exactement un `True` : `updated` = contenu réécrit (hash changé),
-        `unchanged` = re-vu identique.
-        """
+    def upsert_these(self, conn: Connection, these: dict[str, Any]) -> UpsertOutcome:
+        """UPSERT staging via le helper canonique."""
         inserted, changed = upsert_staging(
             conn,
             source="theses",
@@ -113,6 +110,4 @@ class PgThesesExtractAdapter(ThesesExtractAdapter):
             doi=self.extract_doi(these),
             raw_data=these,
         )
-        if inserted:
-            return (True, False, False)
-        return (False, changed, not changed)
+        return UpsertOutcome.of(inserted=inserted, changed=changed)

@@ -17,6 +17,7 @@ from collections.abc import Mapping
 from unittest.mock import MagicMock
 
 from application.pipeline.extract.extract_hal import extract_union
+from application.ports.pipeline.extract._common import UpsertOutcome
 from application.ports.pipeline.extract.hal import HalExtractConfig
 
 _LOGGER = logging.getLogger("test")
@@ -43,7 +44,7 @@ def _adapter(pages: list[dict]) -> MagicMock:
 
     Les méthodes pures (`build_query`, `build_collections_fq`, `extract_id`,
     `extract_doi`) gardent un comportement réaliste ; `upsert_work` renvoie
-    `(inserted, changed)` selon le champ `_route` du doc.
+    l'`UpsertOutcome` porté par le champ `_route` du doc.
     """
     a = MagicMock()
     a.build_query.return_value = "q"
@@ -51,11 +52,11 @@ def _adapter(pages: list[dict]) -> MagicMock:
     a.fetch_page_cursor.side_effect = pages
     a.extract_id.side_effect = lambda doc: doc.get("halId_s", "")
     a.extract_doi.side_effect = lambda doc: doc.get("doiId_s")
-    a.upsert_work.side_effect = lambda conn, hal_id, doi, raw: raw.get("_route", (True, False))
+    a.upsert_work.side_effect = lambda conn, hal_id, doi, raw: raw.get("_route", UpsertOutcome.NEW)
     return a
 
 
-def _doc(hal_id: str, *, route=(True, False)) -> dict:
+def _doc(hal_id: str, *, route: UpsertOutcome = UpsertOutcome.NEW) -> dict:
     return {"halId_s": hal_id, "_route": route}
 
 
@@ -100,13 +101,13 @@ class TestCursorPagination:
 
 class TestRouting:
     def test_routes_inserted_updated_unchanged(self):
-        """`(inserted, changed)` de l'upsert ventile new / updated / unchanged."""
+        """L'`UpsertOutcome` de l'upsert ventile new / updated / unchanged."""
         pages = [
             _page(
                 [
-                    _doc("hal-new", route=(True, False)),
-                    _doc("hal-upd", route=(False, True)),
-                    _doc("hal-same", route=(False, False)),
+                    _doc("hal-new", route=UpsertOutcome.NEW),
+                    _doc("hal-upd", route=UpsertOutcome.UPDATED),
+                    _doc("hal-same", route=UpsertOutcome.UNCHANGED),
                 ],
                 next_cursor="c1",
             ),

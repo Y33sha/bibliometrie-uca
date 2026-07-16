@@ -16,6 +16,7 @@ from application.pipeline.extract.base import (
     scoped_logger,
 )
 from application.pipeline.metrics import PhaseMetrics
+from application.ports.pipeline.extract._common import UpsertOutcome
 from application.ports.pipeline.extract.scanr import ScanrExtractAdapter, ScanrExtractConfig
 
 
@@ -60,12 +61,12 @@ def extract_year(
                 continue
 
             seen += 1
-            was_new, was_updated, was_unchanged = adapter.upsert_doc(conn, doc)
-            if was_new:
+            outcome = adapter.upsert_doc(conn, doc)
+            if outcome is UpsertOutcome.NEW:
                 inserted += 1
-            elif was_updated:
+            elif outcome is UpsertOutcome.UPDATED:
                 updated += 1
-            elif was_unchanged:
+            else:
                 unchanged += 1
 
         search_after = hits[-1]["sort"]
