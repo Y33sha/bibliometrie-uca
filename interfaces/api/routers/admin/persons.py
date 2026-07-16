@@ -39,7 +39,7 @@ from interfaces.api.models import (
     IdentifierReassignResponse,
     IdentifierStatusResponse,
     MarkDistinctPersons,
-    MergePersons,
+    MergeRequest,
     MergeResponse,
     NameFormStatusResponse,
     OkResponse,
@@ -184,7 +184,7 @@ def update_person_name(
 @router.post("/api/persons/{person_id}/merge", response_model=MergeResponse)
 def merge_persons(
     person_id: int,
-    body: MergePersons,
+    body: MergeRequest,
     conn: Connection = Depends(db_conn_sync),
     queries: PersonsQueries = Depends(persons_queries_sync),
     repo: PersonRepository = Depends(person_repo_sync),

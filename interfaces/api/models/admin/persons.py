@@ -1,10 +1,4 @@
-"""Modèles Pydantic (router-only) pour les mutations sur personnes.
-
-Bodies HTTP (POST/PATCH) et réponses construites par le router après
-mutation. Les retours de query service (`NameFormAuthorshipRef`,
-`OtherPersonOut`, `NameFormAuthorshipsResponse`) vivent dans
-`application/ports/api/persons_queries.py` (cf. chantier `CODE_typage-projections-strict` Phase 4).
-"""
+"""Modèles Pydantic du router des personnes admin : corps des requêtes entrantes et réponses composées après mutation."""
 
 from typing import Literal
 
@@ -12,11 +6,11 @@ from pydantic import BaseModel
 
 from interfaces.api.models.admin.authorships import SourceAuthorshipRef
 
-# ----- Entrées (POST/PUT/PATCH) -----
+# ----- Corps des requêtes -----
 
 
 class AddIdentifier(BaseModel):
-    id_type: str  # 'orcid' or 'idhal'
+    id_type: str  # 'orcid' ou 'idhal'
     id_value: str
 
 
@@ -37,10 +31,6 @@ class UpdatePersonName(BaseModel):
     first_name: str = ""
 
 
-class MergePersons(BaseModel):
-    source_id: int
-
-
 class MarkDistinctPersons(BaseModel):
     person_id_a: int
     person_id_b: int
@@ -55,16 +45,15 @@ class UpdateNameFormStatus(BaseModel):
     status: Literal["pending", "confirmed", "rejected"]
 
 
-# ----- Réponses mutations (construites par le router) -----
+# ----- Réponses composées par le router -----
 
 
 class AddIdentifierResponse(BaseModel):
-    """Réponse de `POST /api/persons/{id}/identifiers`.
+    """Réponse de `POST /api/persons/{id}/identifiers`, polymorphe selon l'issue :
 
-    Polymorphe selon le chemin :
     - doublon exact : `added=False` + `reason`
-    - ajout normal  : `added=True` + `id_type` + `id_value`
-    - réattribution : en plus, `reassigned=True`
+    - ajout : `added=True` + `id_type` + `id_value`
+    - réattribution depuis une autre personne : en plus, `reassigned=True`
     """
 
     added: bool

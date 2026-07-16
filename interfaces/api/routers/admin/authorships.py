@@ -28,8 +28,8 @@ from interfaces.api.deps import (
 )
 from interfaces.api.models import (
     AssignOrphanAuthorship,
-    AuthorshipExcludeResponse,
     BatchAssignOrphanAuthorships,
+    OkResponse,
     OrphanAssignResponse,
     OrphanBatchAssignResponse,
 )
@@ -41,14 +41,14 @@ logger = logging.getLogger(__name__)
 # ── Exclusion d'authorships ──────────────────────────────────────
 
 
-@router.patch("/api/authorships/{authorship_id}/exclude", response_model=AuthorshipExcludeResponse)
+@router.patch("/api/authorships/{authorship_id}/exclude", response_model=OkResponse)
 def exclude_authorship_endpoint(
     authorship_id: int,
     conn: Connection = Depends(db_conn_sync),
     repo: AuthorshipRepository = Depends(authorship_repo_sync),
     person_repo: PersonRepository = Depends(person_repo_sync),
     audit: AuditRepository = Depends(audit_repo_sync),
-) -> AuthorshipExcludeResponse:
+) -> OkResponse:
     """Rejette une contribution (« cette personne n'est pas l'auteur »).
 
     Enregistre la paire (publication, personne) dans `rejected_authorships`,
@@ -58,7 +58,7 @@ def exclude_authorship_endpoint(
     authorship_commands.exclude_authorship(
         conn, authorship_id, repo=repo, person_repo=person_repo, audit_repo=audit
     )
-    return AuthorshipExcludeResponse(ok=True)
+    return OkResponse()
 
 
 # ── Authorships orphelines ───────────────────────────────────────

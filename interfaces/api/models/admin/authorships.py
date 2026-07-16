@@ -1,14 +1,8 @@
-"""Modèles Pydantic (router-only) pour les authorships admin.
-
-Bodies HTTP (POST) et réponses construites par le router après mutation.
-Les retours de query service (`OrphanCountResponse`, `OrphanAuthorshipOut`,
-`OrphanAuthorshipsResponse`) vivent dans `application/ports/api/persons_queries.py`
-(cf. chantier `CODE_typage-projections-strict` Phase 4).
-"""
+"""Modèles Pydantic du router des contributions admin : corps des requêtes entrantes et réponses composées après mutation."""
 
 from pydantic import BaseModel
 
-# ----- Entrées -----
+# ----- Corps des requêtes -----
 
 
 class CreatePersonName(BaseModel):
@@ -37,11 +31,7 @@ class BatchAssignOrphanAuthorships(BaseModel):
     force: bool = False
 
 
-# ----- Réponses mutations (construites par le router) -----
-
-
-class AuthorshipExcludeResponse(BaseModel):
-    ok: bool
+# ----- Réponses composées par le router -----
 
 
 class OrphanAssignResponse(BaseModel):

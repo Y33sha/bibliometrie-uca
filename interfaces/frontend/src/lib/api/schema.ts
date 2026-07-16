@@ -2649,12 +2649,11 @@ export interface components {
         };
         /**
          * AddIdentifierResponse
-         * @description Réponse de `POST /api/persons/{id}/identifiers`.
+         * @description Réponse de `POST /api/persons/{id}/identifiers`, polymorphe selon l'issue :
          *
-         *     Polymorphe selon le chemin :
          *     - doublon exact : `added=False` + `reason`
-         *     - ajout normal  : `added=True` + `id_type` + `id_value`
-         *     - réattribution : en plus, `reassigned=True`
+         *     - ajout : `added=True` + `id_type` + `id_value`
+         *     - réattribution depuis une autre personne : en plus, `reassigned=True`
          */
         AddIdentifierResponse: {
             /** Added */
@@ -2897,11 +2896,6 @@ export interface components {
         AuthCheckResponse: {
             /** Authenticated */
             authenticated: boolean;
-        };
-        /** AuthorshipExcludeResponse */
-        AuthorshipExcludeResponse: {
-            /** Ok */
-            ok: boolean;
         };
         /**
          * BatchAssignOrphanAuthorships
@@ -3222,11 +3216,9 @@ export interface components {
         };
         /**
          * EnumOption
-         * @description Une valeur d'enum exposée à l'UI : `{value, label_fr}`.
+         * @description Une valeur d'enum exposée à l'interface : `{value, label_fr}`.
          *
-         *     Sert aux endpoints qui alimentent les dropdowns (publisher_type,
-         *     journal_type, …). La source de vérité côté Python est l'ordre de
-         *     la constante associée (ex. `domain.publishers.PUBLISHER_TYPES`).
+         *     Sert aux endpoints qui alimentent les listes déroulantes (publisher_type, journal_type, …). La source de vérité côté Python est l'ordre de la constante associée (ex. `domain.publishers.PUBLISHER_TYPES`).
          */
         EnumOption: {
             /** Value */
@@ -4025,11 +4017,6 @@ export interface components {
             /** Pub Id B */
             pub_id_b: number;
         };
-        /** MergePersons */
-        MergePersons: {
-            /** Source Id */
-            source_id: number;
-        };
         /** MergePublications */
         MergePublications: {
             /** Pub Id A */
@@ -4037,7 +4024,10 @@ export interface components {
             /** Pub Id B */
             pub_id_b: number;
         };
-        /** MergeRequest */
+        /**
+         * MergeRequest
+         * @description Fusionne l'entité `source_id` dans celle désignée par le chemin.
+         */
         MergeRequest: {
             /** Source Id */
             source_id: number;
@@ -4689,9 +4679,7 @@ export interface components {
          * PipelinePhaseLog
          * @description Log d'une phase, découpé depuis logs/pipeline.log.
          *
-         *     `available` est faux quand le fichier est absent (LOG_TO_FILE désactivé) ou
-         *     quand la section de la phase est introuvable (log purgé) ; `content` est
-         *     alors vide.
+         *     `available` est faux quand le fichier est absent (LOG_TO_FILE désactivé) ou quand la section de la phase est introuvable (log purgé) ; `content` est alors vide.
          */
         PipelinePhaseLog: {
             /** Available */
@@ -5558,9 +5546,7 @@ export interface components {
         };
         /**
          * StructureRelationCreateResponse
-         * @description Réponse de POST /api/structure-relations.
-         *
-         *     Polymorphe : soit la relation créée, soit `{status: "already_exists"}`.
+         * @description Réponse de POST /api/structure-relations, polymorphe : soit la relation créée, soit `{status: "already_exists"}`.
          */
         StructureRelationCreateResponse: {
             /** Id */
@@ -8130,7 +8116,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["MergePersons"];
+                "application/json": components["schemas"]["MergeRequest"];
             };
         };
         responses: {
@@ -8577,7 +8563,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AuthorshipExcludeResponse"];
+                    "application/json": components["schemas"]["OkResponse"];
                 };
             };
             /** @description Validation Error */
