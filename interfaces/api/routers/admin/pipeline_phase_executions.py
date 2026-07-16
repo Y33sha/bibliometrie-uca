@@ -3,8 +3,6 @@
 La liste agrège les exécutions de phase par run. Le détail d'un run rend ses phases dans l'ordre, chacune avec son rendement et son écart de durée au médian historique, recalculés à la lecture.
 """
 
-import logging
-
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from application.pipeline.phase_order import PHASE_ORDER
@@ -16,7 +14,6 @@ from application.ports.api.pipeline_phase_executions_queries import (
 from interfaces.api.deps import pipeline_phase_executions_queries
 
 router = APIRouter()
-logger = logging.getLogger(__name__)
 
 
 @router.get("/api/admin/pipeline/phases", response_model=list[str])

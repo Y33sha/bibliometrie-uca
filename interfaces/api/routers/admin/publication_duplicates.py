@@ -1,7 +1,5 @@
 """Router /api/admin/duplicates/* — les doublons de publications : revue, fusion, marquage comme distincts."""
 
-import logging
-
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import Connection
 
@@ -26,7 +24,6 @@ from interfaces.api.models import (
 )
 
 router = APIRouter()
-logger = logging.getLogger(__name__)
 
 
 @router.get("/api/admin/duplicates/next", response_model=PubDuplicateNextResponse)

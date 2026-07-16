@@ -1,7 +1,5 @@
 """Router /api/subjects/* — les sujets : liste paginée, et détail portant les voisins par co-occurrence."""
 
-import logging
-
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from application.ports.api.subjects_queries import (
@@ -12,7 +10,6 @@ from application.ports.api.subjects_queries import (
 from interfaces.api.deps import subjects_admin_queries
 
 router = APIRouter()
-logger = logging.getLogger(__name__)
 
 
 @router.get("/api/subjects", response_model=SubjectListResponse)

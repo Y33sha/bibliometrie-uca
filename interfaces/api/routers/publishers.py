@@ -1,7 +1,5 @@
 """Router /api/publishers/* — les éditeurs : listes, recherche, édition, fusion."""
 
-import logging
-
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import Connection
 
@@ -41,7 +39,6 @@ from interfaces.api.models import (
 )
 
 router = APIRouter()
-logger = logging.getLogger(__name__)
 
 
 @router.get("/api/publisher-types", response_model=list[EnumOption])
