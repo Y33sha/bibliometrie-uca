@@ -9,10 +9,10 @@ personnes vidées.
 
 from sqlalchemy import Connection, Row, text
 
-from application.ports.pipeline.persons_create import (
+from application.ports.pipeline.persons_matching import (
     BareUnlinkedAuthorship,
     LinkedAuthorshipRow,
-    PersonsCreateQueries,
+    PersonsMatchingQueries,
 )
 
 
@@ -546,8 +546,8 @@ def delete_empty_persons(conn: Connection) -> int:
     ).rowcount
 
 
-class PgPersonsCreateQueries(PersonsCreateQueries):
-    """Adapter PostgreSQL pour `application.ports.pipeline.persons_create.PersonsCreateQueries`."""
+class PgPersonsMatchingQueries(PersonsMatchingQueries):
+    """Adapter PostgreSQL pour `application.ports.pipeline.persons_matching.PersonsMatchingQueries`."""
 
     def fetch_unlinked_authorships(self, conn: Connection) -> list[BareUnlinkedAuthorship]:
         return fetch_unlinked_authorships(conn)

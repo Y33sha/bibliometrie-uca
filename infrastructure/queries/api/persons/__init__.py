@@ -7,7 +7,7 @@ Le package est organisé par thème :
   `person_dashboard`, `person_subjects`
 - `admin` : `person_exists`, orphan authorships, name-form authorships
 
-L'adapter d'écriture pipeline (`pipeline.persons_create`) vit côté
+L'adapter d'écriture pipeline (`pipeline.persons_matching`) vit côté
 `infrastructure/queries/pipeline/`.
 
 `PgPersonsQueries` agrège l'ensemble des fonctions de lecture + admin

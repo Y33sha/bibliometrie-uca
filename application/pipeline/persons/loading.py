@@ -8,9 +8,9 @@ from typing import NamedTuple
 
 from sqlalchemy import Connection
 
-from application.ports.pipeline.persons_create import (
+from application.ports.pipeline.persons_matching import (
     BareUnlinkedAuthorship,
-    PersonsCreateQueries,
+    PersonsMatchingQueries,
 )
 from domain.normalize import normalize_name
 from domain.persons.creation import allow_person_creation
@@ -68,14 +68,14 @@ def _enrich(row: BareUnlinkedAuthorship) -> EnrichedAuthorship:
 
 
 def get_all_unlinked_authorships(
-    conn: Connection, queries: PersonsCreateQueries
+    conn: Connection, queries: PersonsMatchingQueries
 ) -> list[EnrichedAuthorship]:
     """Charge les authorships in-périmètre sans person_id (toutes sources) et les enrichit (parsing noms, flag allow_create)."""
     return [_enrich(row) for row in queries.fetch_unlinked_authorships(conn)]
 
 
 def get_out_of_perimeter_candidates(
-    conn: Connection, queries: PersonsCreateQueries
+    conn: Connection, queries: PersonsMatchingQueries
 ) -> list[EnrichedAuthorship]:
     """Charge les candidats hors-périmètre rattachables sans forme de nom (identifiant fort partagé ou ancrage cross-source) et les enrichit.
 
@@ -84,7 +84,7 @@ def get_out_of_perimeter_candidates(
 
 
 def get_cross_source_candidates(
-    conn: Connection, queries: PersonsCreateQueries
+    conn: Connection, queries: PersonsMatchingQueries
 ) -> list[EnrichedAuthorship]:
     """Charge les signatures déjà liées **en cross-source**, à re-juger contre les ancres fermes.
 
@@ -93,7 +93,7 @@ def get_cross_source_candidates(
 
 
 def load_linked_authorships_by_pub(
-    conn: Connection, queries: PersonsCreateQueries
+    conn: Connection, queries: PersonsMatchingQueries
 ) -> dict[tuple[int, int], list[tuple[int, str, str, str]]]:
     """Index des authorships rattachées par (publication_id, author_position)."""
     index: dict[tuple[int, int], list[tuple[int, str, str, str]]] = defaultdict(list)

@@ -597,12 +597,12 @@ def phase_persons(**kw: Any) -> PhaseMetrics:
     """
     from application.pipeline.persons.phase import run
     from infrastructure.queries.pipeline.person_name_forms import PgPersonNameFormsQueries
-    from infrastructure.queries.pipeline.persons_create import PgPersonsCreateQueries
+    from infrastructure.queries.pipeline.persons_matching import PgPersonsMatchingQueries
     from infrastructure.repositories import authorship_repository, person_repository
 
     return run(
         _open_tx,
-        PgPersonsCreateQueries(),
+        PgPersonsMatchingQueries(),
         PgPersonNameFormsQueries(),
         log,
         person_repo_factory=person_repository,

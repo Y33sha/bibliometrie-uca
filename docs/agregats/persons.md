@@ -67,7 +67,7 @@ Aucun endpoint n'écrit `persons_rh` : la fiche RH est alimentée hors API (impo
 
 ## Lecture — pipeline
 
-La cascade lit en bloc, via le port `PersonMatchingQueries` (`infrastructure/queries/pipeline/persons_create.py`) : les maps `idref` / `orcid` / `hal_account` → personne (statuts non-`rejected`, nom normalisé joint pour corroborer le match), `name_form` → personnes, les verdicts `(name_form, person_id)` (`confirmed` / `rejected`, formes canoniques incluses), les personnes rejetées par publication (`rejected_authorships`), et l'index d'ancres `(publication, position)`. C'est la boucle producteur/consommateur inter-runs qui porte la convergence.
+La cascade lit en bloc, via le port `PersonsMatchingQueries` (`infrastructure/queries/pipeline/persons_matching.py`) : les maps `idref` / `orcid` / `hal_account` → personne (statuts non-`rejected`, nom normalisé joint pour corroborer le match), `name_form` → personnes, les verdicts `(name_form, person_id)` (`confirmed` / `rejected`, formes canoniques incluses), les personnes rejetées par publication (`rejected_authorships`), et l'index d'ancres `(publication, position)`. C'est la boucle producteur/consommateur inter-runs qui porte la convergence.
 
 ## Lecture — API
 
