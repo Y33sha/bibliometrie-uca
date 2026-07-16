@@ -9,7 +9,7 @@ from application.ports.pipeline.publications_reconciliation import (
     PublicationsReconciliationQueries,
     ReconcileRow,
 )
-from domain.source_publications.keys import METADATA_BLOCK_MIN_TITLE_LENGTH
+from domain.source_publications.keys import DISCRIMINANT_TITLE_MIN_LENGTH
 
 
 def fetch_dirty_source_publication_ids(conn: Connection) -> list[int]:
@@ -80,7 +80,7 @@ _UNIVERSE_SQL = text(f"""
          AND o.pub_year = d.pub_year
     LEFT JOIN publications p ON p.id = o.publication_id
     WHERE d.doc_type IS NOT NULL
-      AND length(d.title_normalized) > {METADATA_BLOCK_MIN_TITLE_LENGTH}
+      AND length(d.title_normalized) > {DISCRIMINANT_TITLE_MIN_LENGTH}
       AND d.pub_year IS NOT NULL
 """)
 

@@ -24,6 +24,7 @@ import os
 from sqlalchemy import text
 
 from domain.publications.metadata import normalized_title
+from domain.source_publications.keys import DISCRIMINANT_TITLE_MIN_LENGTH
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 
@@ -32,9 +33,12 @@ log = setup_logger("backfill_title_normalized", os.path.dirname(__file__))
 BATCH = 5000
 
 # SP qui gagnent le token `metadata_block` quand `title_normalized` se remplit (cf. `keys.py`) :
-# tout doc_type, titre assez long, année présente. `length > 30` duplique
-# `_METADATA_BLOCK_MIN_TITLE_LENGTH` (keys.py) — garder synchrone.
-_GAINS_TOKEN = "doc_type IS NOT NULL AND length(title_normalized) > 30 AND pub_year IS NOT NULL"
+# tout doc_type, titre plus long que le seuil discriminant, année présente.
+_GAINS_TOKEN = (
+    "doc_type IS NOT NULL "
+    f"AND length(title_normalized) > {DISCRIMINANT_TITLE_MIN_LENGTH} "
+    "AND pub_year IS NOT NULL"
+)
 
 
 def main() -> int:
@@ -56,7 +60,7 @@ def main() -> int:
                 text(
                     "SELECT count(*) FROM source_publications "
                     "WHERE doc_type IS NOT NULL AND pub_year IS NOT NULL "
-                    "AND length(COALESCE(title_normalized, title, '')) > 30"
+                    f"AND length(COALESCE(title_normalized, title, '')) > {DISCRIMINANT_TITLE_MIN_LENGTH}"
                 )
             ).scalar_one()
             log.info(

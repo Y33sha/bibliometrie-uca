@@ -14,6 +14,12 @@ from application.ports.pipeline.relations import (
     SharedKeyPair,
     TitleMatch,
 )
+from domain.source_publications.keys import DISCRIMINANT_TITLE_MIN_LENGTH
+
+# Écart d'années toléré entre une œuvre dépendante et son parent, dans les deux sens :
+# un erratum suit son article (parent dans `[année − N … année]`), une version publiée
+# suit son preprint (parent dans `[année … année + N]`).
+_TITLE_MATCH_YEAR_WINDOW = 2
 
 
 def fetch_declared_relation_sources(conn: Connection) -> list[DeclaredRelationSource]:
@@ -93,10 +99,10 @@ def fetch_declared_related_pairs(conn: Connection) -> set[frozenset[int]]:
 #  - erratum : le titre reproduit celui du parent après un préfixe (« Erratum: », « Corrigendum
 #    to »…), donc `title_normalized` du parent est un **suffixe** de celui de l'erratum ;
 #  - preprint : le preprint et sa version publiée portent un titre **identique**.
-# Garde commune : longueur de titre > 30 (génériques écartés) et garde d'ambiguïté — un seul
+# Garde commune : titre plus long que `DISCRIMINANT_TITLE_MIN_LENGTH` (génériques écartés) et garde d'ambiguïté — un seul
 # candidat « substantiel » (hors formes de la même œuvre) doit porter ce titre, sinon collision →
 # abstention. Le parent est au corpus : on renvoie son `publication_id` (et son DOI s'il en a un).
-_ERRATUM_TITLE_MATCHES_SQL = text("""
+_ERRATUM_TITLE_MATCHES_SQL = text(f"""
     WITH child AS (
         SELECT id, title_normalized AS t, pub_year AS y
         FROM publications
@@ -109,8 +115,8 @@ _ERRATUM_TITLE_MATCHES_SQL = text("""
         JOIN publications p
           ON p.id <> c.id
          AND p.doc_type <> 'erratum'
-         AND length(p.title_normalized) > 30
-         AND p.pub_year BETWEEN c.y - 2 AND c.y
+         AND length(p.title_normalized) > {DISCRIMINANT_TITLE_MIN_LENGTH}
+         AND p.pub_year BETWEEN c.y - {_TITLE_MATCH_YEAR_WINDOW} AND c.y
          AND right(c.t, length(p.title_normalized)) = p.title_normalized
     ),
     substantive_count AS (
@@ -126,12 +132,12 @@ _ERRATUM_TITLE_MATCHES_SQL = text("""
 # Preprint → version publiée : titre identique (le preprint ne préfixe pas), parent publié dans la
 # fenêtre [année … année + 2] (la version publiée suit le preprint). Garde d'ambiguïté : un seul
 # candidat substantiel (hors `dataset`) au même titre.
-_PREPRINT_TITLE_MATCHES_SQL = text("""
+_PREPRINT_TITLE_MATCHES_SQL = text(f"""
     WITH child AS (
         SELECT id, title_normalized AS t, pub_year AS y
         FROM publications
         WHERE doc_type = 'preprint' AND title_normalized IS NOT NULL
-          AND length(title_normalized) > 30 AND pub_year IS NOT NULL
+          AND length(title_normalized) > {DISCRIMINANT_TITLE_MIN_LENGTH} AND pub_year IS NOT NULL
     ),
     candidate AS (
         SELECT c.id AS child_id, p.id AS parent_id, p.doi AS parent_doi,
@@ -140,8 +146,8 @@ _PREPRINT_TITLE_MATCHES_SQL = text("""
         JOIN publications p
           ON p.doc_type <> 'preprint'
          AND p.title_normalized = c.t
-         AND length(p.title_normalized) > 30
-         AND p.pub_year BETWEEN c.y AND c.y + 2
+         AND length(p.title_normalized) > {DISCRIMINANT_TITLE_MIN_LENGTH}
+         AND p.pub_year BETWEEN c.y AND c.y + {_TITLE_MATCH_YEAR_WINDOW}
     ),
     substantive_count AS (
         SELECT child_id, count(*) FILTER (WHERE substantive) AS n
