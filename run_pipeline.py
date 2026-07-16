@@ -596,14 +596,14 @@ def phase_persons(**kw: Any) -> PhaseMetrics:
     Séquence, transaction et métriques dans `application/pipeline/persons/phase.py`.
     """
     from application.pipeline.persons.phase import run
-    from infrastructure.queries.pipeline.name_forms import PgNameFormsQueries
+    from infrastructure.queries.pipeline.person_name_forms import PgPersonNameFormsQueries
     from infrastructure.queries.pipeline.persons_create import PgPersonsCreateQueries
     from infrastructure.repositories import authorship_repository, person_repository
 
     return run(
         _open_tx,
         PgPersonsCreateQueries(),
-        PgNameFormsQueries(),
+        PgPersonNameFormsQueries(),
         log,
         person_repo_factory=person_repository,
         authorship_repo_factory=authorship_repository,

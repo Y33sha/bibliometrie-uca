@@ -2,7 +2,7 @@
 
 Couvre les tables `persons`, `person_identifiers` et `person_name_forms`, plus le rattachement des authorships sources (`source_authorships`), dont le `person_id` porte le lien vers la personne. Les appelants sont la phase `persons` du pipeline, les command handlers de l'API et les CLI de maintenance ; chacun tient sa propre frontière transactionnelle et commite lui-même.
 
-Toute écriture éditoriale passe par ce service, pipeline compris (`create_person` dans la cascade). Les formes de nom dérivées, que la phase `persons` resynchronise sur tout le stock, s'écrivent en SQL ensembliste (`infrastructure/queries/pipeline/name_forms.py`), hors de ce service qui traite une personne à la fois.
+Toute écriture éditoriale passe par ce service, pipeline compris (`create_person` dans la cascade). Les formes de nom dérivées, que la phase `persons` resynchronise sur tout le stock, s'écrivent en SQL ensembliste (`infrastructure/queries/pipeline/person_name_forms.py`), hors de ce service qui traite une personne à la fois.
 """
 
 import logging

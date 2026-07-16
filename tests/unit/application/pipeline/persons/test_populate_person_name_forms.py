@@ -1,6 +1,6 @@
 """Tests unitaires de `populate_person_name_forms.populate`.
 
-Mocks : port `NameFormsQueries`, `Connection`, logger. Pas de DB.
+Mocks : port `PersonNameFormsQueries`, `Connection`, logger. Pas de DB.
 
 L'orchestrateur calcule les formes de noms en Python via `compute_person_name_forms` (déjà testé côté domain) puis insère par batches dans une table temp avant un sync SQL final.
 """
@@ -13,7 +13,7 @@ import pytest
 
 from application.pipeline.persons import populate_person_name_forms
 from application.pipeline.persons.populate_person_name_forms import BATCH_SIZE, populate
-from application.ports.pipeline.name_forms import PersonNameRow, RawFormBatchItem
+from application.ports.pipeline.person_name_forms import PersonNameRow, RawFormBatchItem
 
 
 class _FakeQueries:

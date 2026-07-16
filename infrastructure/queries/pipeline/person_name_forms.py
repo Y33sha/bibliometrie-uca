@@ -13,8 +13,8 @@ est faite en SQL (`array_agg DISTINCT`), pas en Python.
 
 from sqlalchemy import Connection, text
 
-from application.ports.pipeline.name_forms import (
-    NameFormsQueries,
+from application.ports.pipeline.person_name_forms import (
+    PersonNameFormsQueries,
     PersonNameRow,
     RawFormBatchItem,
 )
@@ -159,8 +159,8 @@ def sync_from_raw_forms(conn: Connection) -> tuple[int, int, int]:
     return inserted, updated, deleted
 
 
-class PgNameFormsQueries(NameFormsQueries):
-    """Adapter PostgreSQL pour `application.ports.pipeline.name_forms.NameFormsQueries`."""
+class PgPersonNameFormsQueries(PersonNameFormsQueries):
+    """Adapter PostgreSQL pour `application.ports.pipeline.person_name_forms.PersonNameFormsQueries`."""
 
     def fetch_persons_names(self, conn: Connection) -> list[PersonNameRow]:
         return fetch_persons_names(conn)
