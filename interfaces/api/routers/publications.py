@@ -52,6 +52,7 @@ def publications_facets(
     subject_id: int | None = Query(None),
     search: str = Query(""),
     queries: PublicationsQueries = Depends(publications_queries_sync),
+    apc_structure_ids: list[int] = Depends(get_apc_structure_ids_sync),
 ) -> PublicationsFacetsResponse:
     """Facettes dynamiques pour la page publications."""
     lab_ids, lab_none = _parse_lab_id(lab_id)
@@ -75,9 +76,7 @@ def publications_facets(
         subject_id=subject_id,
         search=search,
     )
-    return queries.publications_facets(
-        filters=filters, apc_structure_ids=get_apc_structure_ids_sync()
-    )
+    return queries.publications_facets(filters=filters, apc_structure_ids=apc_structure_ids)
 
 
 @router.get("/api/publications/facets/entities", response_model=EntityFacetResponse)
@@ -102,6 +101,7 @@ def publications_entity_facet(
     subject_id: int | None = Query(None),
     search: str = Query(""),
     queries: PublicationsQueries = Depends(publications_queries_sync),
+    apc_structure_ids: list[int] = Depends(get_apc_structure_ids_sync),
 ) -> EntityFacetResponse:
     """Facette éditeur/revue contextuelle de la liste : N premières entités sous les filtres actifs
     (corrélées entre elles), avec décompte. `entity_search` recherche dans les noms d'entités ;
@@ -131,7 +131,7 @@ def publications_entity_facet(
         kind=kind,
         search=entity_search,
         filters=filters,
-        apc_structure_ids=get_apc_structure_ids_sync(),
+        apc_structure_ids=apc_structure_ids,
     )
 
 
@@ -168,6 +168,7 @@ def export_publications_csv(
     subject_id: int | None = Query(None),
     columns: str = Query(""),
     queries: PublicationsQueries = Depends(publications_queries_sync),
+    apc_structure_ids: list[int] = Depends(get_apc_structure_ids_sync),
 ) -> Response:
     """Export CSV des publications : mêmes filtres ET mêmes colonnes que le
     tableau affiché (`columns` = clés des colonnes visibles)."""
@@ -194,7 +195,7 @@ def export_publications_csv(
     )
     csv_content = queries.export_publications_csv(
         filters=filters,
-        apc_structure_ids=get_apc_structure_ids_sync(),
+        apc_structure_ids=apc_structure_ids,
         sort=sort,
         columns=parse_str_csv(columns),
     )
@@ -215,6 +216,7 @@ def export_theses_csv(
     doc_type: str = Query(""),
     sort: str = Query("soutenance_desc"),
     queries: PublicationsQueries = Depends(publications_queries_sync),
+    apc_structure_ids: list[int] = Depends(get_apc_structure_ids_sync),
 ) -> Response:
     """Export CSV de la page thèses (filtres + tri identiques à la liste)."""
     lab_ids, lab_none = _parse_lab_id(lab_id)
@@ -228,7 +230,7 @@ def export_theses_csv(
         doc_types=parse_str_csv(doc_type) or ["thesis", "ongoing_thesis"],
     )
     csv_content = queries.export_theses_csv(
-        filters=filters, apc_structure_ids=get_apc_structure_ids_sync(), sort=sort
+        filters=filters, apc_structure_ids=apc_structure_ids, sort=sort
     )
     return Response(
         content=csv_content,
@@ -272,6 +274,7 @@ def list_publications(
     in_perimeter: str = Query(""),
     subject_id: int | None = Query(None),
     queries: PublicationsQueries = Depends(publications_queries_sync),
+    apc_structure_ids: list[int] = Depends(get_apc_structure_ids_sync),
 ) -> PublicationListResponse:
     """Liste paginée des publications avec sources, labos et journal rattachés.
 
@@ -300,7 +303,7 @@ def list_publications(
     )
     return queries.list_publications(
         filters=filters,
-        apc_structure_ids=get_apc_structure_ids_sync(),
+        apc_structure_ids=apc_structure_ids,
         page=page,
         per_page=per_page,
         sort=sort,
