@@ -8,20 +8,20 @@ Sources :
 
 L'orchestrateur produit les formes "persons" en Python via `compute_person_name_forms` (variantes prénom/nom/initiales) et les charge dans la table temp `_raw_forms`. La fusion et la synchronisation se font ensuite côté SQL via `sync_from_raw_forms` (GROUP BY (name_form, person_id), agrégation des sources, diff INSERT/UPDATE/DELETE).
 
-L'orchestrateur dépend du port `NameFormsQueries` ; il est appelé par `run_pipeline`.
+L'orchestrateur dépend du port `PersonNameFormsQueries` ; il est appelé par `run_pipeline`.
 """
 
 import logging
 
 from sqlalchemy import Connection
 
-from application.ports.pipeline.name_forms import NameFormsQueries, RawFormBatchItem
+from application.ports.pipeline.person_name_forms import PersonNameFormsQueries, RawFormBatchItem
 from domain.persons.name_forms import compute_person_name_forms
 
 BATCH_SIZE = 5000
 
 
-def populate(conn: Connection, queries: NameFormsQueries, logger: logging.Logger) -> None:
+def populate(conn: Connection, queries: PersonNameFormsQueries, logger: logging.Logger) -> None:
     logger.info("▶ régénération des formes de nom")
     queries.create_temp_raw_forms_table(conn)
     batch: list[RawFormBatchItem] = []

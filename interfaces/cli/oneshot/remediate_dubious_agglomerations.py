@@ -37,7 +37,7 @@ from sqlalchemy import Connection, text
 from application.pipeline.persons.populate_person_name_forms import populate
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from infrastructure.queries.pipeline.name_forms import PgNameFormsQueries
+from infrastructure.queries.pipeline.person_name_forms import PgPersonNameFormsQueries
 
 log = setup_logger("remediate_dubious_agglomerations", os.path.dirname(__file__))
 
@@ -121,7 +121,7 @@ def main() -> int:
         log.info("2/3 — %d person_identifiers pending orphelins supprimés", n_purged)
 
         log.info("3/3 — recalcul person_name_forms…")
-        populate(conn, PgNameFormsQueries(), log)
+        populate(conn, PgPersonNameFormsQueries(), log)
         conn.commit()
 
     log.info("Terminé. Relancer le pipeline (phase persons) pour la ré-attribution.")

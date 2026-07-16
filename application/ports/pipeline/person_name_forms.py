@@ -1,6 +1,8 @@
 """Port : SQL du peuplement de `person_name_forms`.
 
-Implémenté par `infrastructure.queries.pipeline.name_forms.PgNameFormsQueries`.
+Quatre autres tables portent des formes de nom — structures, revues, éditeurs, lieux — chacune avec ses propres chemins d'écriture.
+
+Implémenté par `infrastructure.queries.pipeline.person_name_forms.PgPersonNameFormsQueries`.
 
 Workflow attendu : l'orchestrateur peuple une table temp `_raw_forms` avec les formes calculées depuis `persons` (compute_person_name_forms), puis appelle `sync_from_raw_forms` qui agrège (UNION SQL avec `source_authorships`) et synchronise `person_name_forms`.
 """
@@ -26,7 +28,7 @@ class RawFormBatchItem(TypedDict):
     source: str
 
 
-class NameFormsQueries(Protocol):
+class PersonNameFormsQueries(Protocol):
     """Opérations SQL pour synchroniser `person_name_forms` depuis les sources."""
 
     def fetch_persons_names(self, conn: Connection) -> list[PersonNameRow]: ...

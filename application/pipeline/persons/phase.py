@@ -26,7 +26,7 @@ from application.pipeline.persons.cascade import run_cascade
 from application.pipeline.persons.metrics import build_metrics, log_matching_breakdown
 from application.pipeline.persons.populate_person_name_forms import populate
 from application.pipeline.persons.purge import purge
-from application.ports.pipeline.name_forms import NameFormsQueries
+from application.ports.pipeline.person_name_forms import PersonNameFormsQueries
 from application.ports.pipeline.persons_create import PersonsCreateQueries
 from application.ports.pipeline.transaction import OpenTransaction
 from application.ports.repositories.authorship_repository import AuthorshipRepository
@@ -36,7 +36,7 @@ from application.ports.repositories.person_repository import PersonRepository
 def run(
     open_tx: OpenTransaction,
     persons_queries: PersonsCreateQueries,
-    name_forms_queries: NameFormsQueries,
+    name_forms_queries: PersonNameFormsQueries,
     logger: logging.Logger,
     *,
     person_repo_factory: Callable[[Connection], PersonRepository],
