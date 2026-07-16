@@ -3,7 +3,7 @@
 Trois sous-étapes :
 
 1. **build_authorships** — consolide les `source_authorships` en authorships canoniques (une entrée par couple publication × personne), avec `in_perimeter` consolidé.
-2. **purge des orphelines** — supprime les publications restées à zéro authorship, puis récupère l'espace churné (maintenance physique, hors transaction).
+2. **purge des orphelines** — supprime les publications rétrogradées à zéro authorship (défense en profondeur).
 3. **refresh des `pub_count`** — recalcule les compteurs `journals` + `publishers` qui dérivent de `in_perimeter`.
 
 Le build est incrémental et convergent (add + prune + recompute en une passe) ; le recalcul complet de la table est possible via `run_pipeline --rebuild-authorships`.
@@ -50,7 +50,7 @@ def run(
 def _purge_orphan_publications(
     open_tx: OpenTransaction, purge_queries: PurgeOrphanPublicationsQueries, logger: logging.Logger
 ) -> int:
-    """Purge par lots (commit par chunk) puis récupération de l'espace churné. Retourne le nombre de publications supprimées."""
+    """Purge par lots (commit par chunk). Retourne le nombre de publications supprimées."""
     logger.info("▶ purge publications orphelines (zéro authorship)")
     t0 = time.perf_counter()
     n = 0
@@ -61,10 +61,8 @@ def _purge_orphan_publications(
                 break
             conn.commit()
             n += deleted
-    # Reclaim : maintenance physique hors transaction, encapsulée dans l'adapter.
-    purge_queries.vacuum_analyze_churned()
     logger.info(
-        "✓ purge : %d publication(s) supprimée(s) + VACUUM ANALYZE en %.1fs",
+        "✓ purge : %d publication(s) supprimée(s) en %.1fs",
         n,
         time.perf_counter() - t0,
     )
