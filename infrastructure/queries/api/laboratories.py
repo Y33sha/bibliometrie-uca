@@ -1,9 +1,6 @@
 """Query services pour /api/laboratories/*.
 
-`PgLaboratoriesQueries` hérite explicitement du Protocol
-`application.ports.api.laboratories_queries.LaboratoriesQueries` : mypy
-vérifie la conformité à la définition de classe. Les DTOs sont importés
-du port (cf. règle 3 d'`architecture.md`).
+`PgLaboratoriesQueries` hérite explicitement du Protocol `application.ports.api.laboratories_queries.LaboratoriesQueries` : mypy vérifie la conformité à la définition de classe. Les modèles rendus sont importés du port (règle 3 de `docs/architecture/01-vue-d-ensemble.md`).
 """
 
 import datetime

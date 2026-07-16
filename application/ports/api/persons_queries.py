@@ -1,13 +1,8 @@
 """Port : lectures sur les personnes (consommé par le router persons).
 
-Les DTOs Pydantic sont co-localisés avec le `Protocol` (cf. décision 3
-du chantier typage-projections-strict). Implémenté par
-`infrastructure.queries.api.persons.PgPersonsQueries`.
+Implémenté par `infrastructure.queries.api.persons.PgPersonsQueries`. Les modèles Pydantic que ces lectures rendent sont co-localisés avec le `Protocol` : leur contrat appartient au port.
 
-Les dataclasses `DirectoryFilters` / `ListFilters` / `FacetFilters`
-vivent ici (source de vérité) ; les fonctions infra les importent
-depuis ce module pour typer leurs signatures (cf. règle 3
-d'`architecture.md`).
+Les dataclasses `DirectoryFilters`, `ListFilters` et `FacetFilters` font ici référence ; l'infrastructure les importe pour typer ses signatures (règle 3 de `docs/architecture/01-vue-d-ensemble.md`).
 """
 
 from dataclasses import dataclass, field
