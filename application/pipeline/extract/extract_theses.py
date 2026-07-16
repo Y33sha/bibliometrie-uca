@@ -18,6 +18,7 @@ from application.pipeline.extract.base import (
     scoped_logger,
 )
 from application.pipeline.metrics import PhaseMetrics
+from application.ports.pipeline.extract._common import UpsertOutcome
 from application.ports.pipeline.extract.theses import (
     ThesesExtractAdapter,
     ThesesExtractConfig,
@@ -68,12 +69,12 @@ def extract_ppn(
             if year is not None and not theses_id.startswith(str(year)):
                 continue
 
-            was_new, was_updated, was_unchanged = adapter.upsert_these(conn, these)
-            if was_new:
+            outcome = adapter.upsert_these(conn, these)
+            if outcome is UpsertOutcome.NEW:
                 inserted += 1
-            elif was_updated:
+            elif outcome is UpsertOutcome.UPDATED:
                 updated += 1
-            elif was_unchanged:
+            else:
                 unchanged += 1
 
         conn.commit()

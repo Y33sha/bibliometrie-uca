@@ -7,8 +7,7 @@ Regroupe en un seul Protocol :
 - les appels HTTP à l'API HAL (Solr search API)
 - les écritures SQL dans `staging`
 
-Cette unification reflète l'usage : l'orchestrateur `HalExtractor`
-consomme les trois aspects en série pour une même extraction.
+Cette unification reflète l'usage : l'orchestrateur `HalExtractor` consomme les trois aspects en série pour une même extraction.
 """
 
 from collections.abc import Mapping
@@ -16,6 +15,8 @@ from dataclasses import dataclass
 from typing import Any, Protocol
 
 from sqlalchemy import Connection
+
+from application.ports.pipeline.extract._common import UpsertOutcome
 
 
 @dataclass(frozen=True)
@@ -55,8 +56,7 @@ class HalExtractAdapter(Protocol):
     # ── HTTP (l'adapter connaît la base_url via sa construction) ──
 
     def fetch_page_cursor(self, query: str, fq: str, cursor_mark: str) -> dict[str, Any]:
-        """Une page Solr en pagination `cursorMark` (`cursor_mark="*"` au premier
-        appel, puis le `nextCursorMark` de la réponse précédente)."""
+        """Une page Solr en pagination `cursorMark` (`cursor_mark="*"` au premier appel, puis le `nextCursorMark` de la réponse précédente)."""
         ...
 
     # ── SQL ────────────────────────────────────────────────────
@@ -67,7 +67,6 @@ class HalExtractAdapter(Protocol):
         hal_id: str,
         doi: str | None,
         raw_data: dict[str, Any],
-    ) -> tuple[bool, bool]:
-        """UPSERT staging. Retourne `(inserted, changed)` : insertion réelle
-        (`xmax = 0`) et contenu réécrit (hash distinct de l'ancien)."""
+    ) -> UpsertOutcome:
+        """UPSERT staging d'un document HAL."""
         ...

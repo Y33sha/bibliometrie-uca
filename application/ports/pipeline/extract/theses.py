@@ -13,6 +13,8 @@ from typing import Any, Protocol
 
 from sqlalchemy import Connection
 
+from application.ports.pipeline.extract._common import UpsertOutcome
+
 
 @dataclass(frozen=True)
 class ThesesExtractConfig:
@@ -45,9 +47,6 @@ class ThesesExtractAdapter(Protocol):
 
     # ── SQL ────────────────────────────────────────────────────
 
-    def upsert_these(self, conn: Connection, these: dict[str, Any]) -> tuple[bool, bool, bool]:
-        """UPSERT staging d'une thèse.
-
-        Retourne `(new, updated, unchanged)` — exactement un `True`.
-        """
+    def upsert_these(self, conn: Connection, these: dict[str, Any]) -> UpsertOutcome:
+        """UPSERT staging d'une thèse."""
         ...

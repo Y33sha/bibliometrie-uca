@@ -15,6 +15,7 @@ from typing import Any
 
 from sqlalchemy import Connection
 
+from application.ports.pipeline.extract._common import UpsertOutcome
 from application.ports.pipeline.extract.scanr import (
     ScanrExtractAdapter,
     ScanrExtractConfig,
@@ -150,12 +151,8 @@ class PgScanrExtractAdapter(ScanrExtractAdapter):
 
     # ── SQL ────────────────────────────────────────────────────
 
-    def upsert_doc(self, conn: Connection, doc: dict[str, Any]) -> tuple[bool, bool, bool]:
-        """UPSERT staging via le helper canonique, ventilé `(new, updated, unchanged)`.
-
-        Exactement un `True` : `updated` = contenu réécrit (hash changé),
-        `unchanged` = re-vu identique.
-        """
+    def upsert_doc(self, conn: Connection, doc: dict[str, Any]) -> UpsertOutcome:
+        """UPSERT staging via le helper canonique."""
         inserted, changed = upsert_staging(
             conn,
             source="scanr",
@@ -163,9 +160,7 @@ class PgScanrExtractAdapter(ScanrExtractAdapter):
             doi=self.extract_doi(doc),
             raw_data=doc,
         )
-        if inserted:
-            return (True, False, False)
-        return (False, changed, not changed)
+        return UpsertOutcome.of(inserted=inserted, changed=changed)
 
 
 def get_scanr_credentials_from_db(conn: Connection) -> tuple[str, str]:

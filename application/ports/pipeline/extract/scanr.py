@@ -13,6 +13,8 @@ from typing import Any, Protocol
 
 from sqlalchemy import Connection
 
+from application.ports.pipeline.extract._common import UpsertOutcome
+
 
 @dataclass(frozen=True)
 class ScanrExtractConfig:
@@ -56,10 +58,6 @@ class ScanrExtractAdapter(Protocol):
 
     # ── SQL ────────────────────────────────────────────────────
 
-    def upsert_doc(self, conn: Connection, doc: dict[str, Any]) -> tuple[bool, bool, bool]:
-        """UPSERT staging d'un document ScanR.
-
-        Retourne `(new, updated, unchanged)` — exactement un `True`.
-        `updated` = contenu réécrit (hash changé) ; `unchanged` = re-vu identique.
-        """
+    def upsert_doc(self, conn: Connection, doc: dict[str, Any]) -> UpsertOutcome:
+        """UPSERT staging d'un document ScanR."""
         ...

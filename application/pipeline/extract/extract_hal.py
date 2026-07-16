@@ -19,6 +19,7 @@ from application.pipeline.extract.base import (
     scoped_logger,
 )
 from application.pipeline.metrics import PhaseMetrics
+from application.ports.pipeline.extract._common import UpsertOutcome
 from application.ports.pipeline.extract.hal import HalExtractAdapter, HalExtractConfig
 
 
@@ -79,10 +80,10 @@ def extract_union(
             if not hal_id:
                 continue
             doi = adapter.extract_doi(doc)
-            inserted, changed = adapter.upsert_work(conn, hal_id, doi, doc)
-            if inserted:
+            outcome = adapter.upsert_work(conn, hal_id, doi, doc)
+            if outcome is UpsertOutcome.NEW:
                 metrics.add(new=1, total=1)
-            elif changed:
+            elif outcome is UpsertOutcome.UPDATED:
                 metrics.add(updated=1, total=1)
             else:
                 metrics.add(unchanged=1, total=1)
