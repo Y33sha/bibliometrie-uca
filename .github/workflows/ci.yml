@@ -91,9 +91,21 @@ jobs:
         working-directory: interfaces/frontend
         run: npm ci
 
+      # `--omit=dev` : seul `dependencies` part dans le bundle servi au
+      # navigateur. Les vulnérabilités de l'outillage (serveur de dev vite,
+      # ws) ne concernent pas l'application déployée et bloqueraient la CI
+      # pour un risque qu'elle ne court pas.
+      - name: Vulnerability scan (npm audit)
+        working-directory: interfaces/frontend
+        run: npm audit --omit=dev --audit-level=high
+
       - name: Type check
         working-directory: interfaces/frontend
         run: npm run check
+
+      - name: Tests
+        working-directory: interfaces/frontend
+        run: npm test
 
       - name: Build
         working-directory: interfaces/frontend

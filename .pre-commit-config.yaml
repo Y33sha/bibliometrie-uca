@@ -75,10 +75,13 @@ repos:
         files: ^(pyproject\.toml|uv\.lock)$
 
       # --------------------------------------------------------
-      # Étage pre-push : miroir local de la CI (.github/workflows/ci.yml).
-      # Tourne avant chaque `git push`, sur tout le projet, quels que soient
-      # les fichiers modifiés. Nécessite `pre-commit install --hook-type pre-push`
-      # et une base de test accessible (DB_PASSWORD dans l'environnement).
+      # Étage pre-push : les contrôles de la CI (.github/workflows/ci.yml) qui
+      # tiennent en quelques secondes et se passent d'une base. Tourne avant
+      # chaque `git push`, sur tout le projet, quels que soient les fichiers
+      # modifiés. Nécessite `pre-commit install --hook-type pre-push`.
+      #
+      # La suite d'intégration reste à la CI seule : elle demande une base et
+      # dure plus d'une minute, ce qui pèserait sur chaque push.
       # --------------------------------------------------------
 
       # Hygiène des dépendances : imports non déclarés, dépendances inutilisées.
@@ -134,10 +137,29 @@ repos:
         always_run: true
         stages: [pre-push]
 
-      # Frontend : types puis build de production (comme la CI).
+      # Frontend : vulnérabilités, types, tests, puis build de production.
+      # `--omit=dev` : seul `dependencies` part dans le bundle servi au
+      # navigateur ; les failles de l'outillage de développement ne concernent
+      # pas l'application déployée.
+      - id: ci-frontend-audit
+        name: npm audit (vulnérabilités du bundle)
+        entry: bash -c 'cd interfaces/frontend && npm audit --omit=dev --audit-level=high'
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
+
       - id: ci-frontend-check
         name: svelte-check (types frontend)
         entry: bash -c 'cd interfaces/frontend && npm run check'
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
+
+      - id: ci-frontend-test
+        name: vitest (tests frontend)
+        entry: bash -c 'cd interfaces/frontend && npm test'
         language: system
         pass_filenames: false
         always_run: true
