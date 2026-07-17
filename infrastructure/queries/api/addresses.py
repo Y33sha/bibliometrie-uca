@@ -245,13 +245,6 @@ class PgAddressesQueries(AddressesQueries):
         ).all()
         return [CountryOut(code=r.code, name=r.name) for r in rows]
 
-    def country_exists(self, code: str) -> bool:
-        row = self._conn.execute(
-            text("SELECT code FROM countries WHERE code = :code"),
-            {"code": code},
-        ).one_or_none()
-        return row is not None
-
     def address_exists(self, addr_id: int) -> bool:
         row = self._conn.execute(
             text("SELECT id FROM addresses WHERE id = :id"),

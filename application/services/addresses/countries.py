@@ -11,6 +11,13 @@ from domain.errors import ValidationError
 logger = logging.getLogger(__name__)
 
 
+def _require_known_countries(codes: list[str], *, repo: AddressRepository) -> None:
+    """Refuse un code absent du référentiel `countries`, qu'aucune clé étrangère ne garde côté tableau."""
+    for code in codes:
+        if not repo.country_exists(code):
+            raise ValidationError(f"Code pays inconnu : {code}")
+
+
 def set_country(
     address_id: int,
     countries: list[str] | None,
@@ -22,9 +29,9 @@ def set_country(
     - `countries=None` ou `[]` → remet la colonne à NULL.
     - Propage la même valeur aux adresses partageant le même normalized_text.
 
-    Retourne la liste des IDs affectés (y compris address_id).
-    Ne valide pas les codes pays : c'est à l'appelant de le faire.
+    Retourne la liste des IDs affectés (y compris address_id). Lève `ValidationError` sur un code absent du référentiel.
     """
+    _require_known_countries(countries or [], repo=repo)
     repo.set_countries(address_id, countries)
     affected = [address_id]
     if countries:
@@ -44,8 +51,9 @@ def batch_set_country_by_ids(
     - Si `country_code` est déjà dans `countries` → no-op.
     - Sinon → append.
 
-    Retourne les IDs effectivement modifiés (= tous ceux passés en entrée).
+    Retourne les IDs effectivement modifiés (= tous ceux passés en entrée). Lève `ValidationError` sur un code absent du référentiel.
     """
+    _require_known_countries([country_code], repo=repo)
     return repo.batch_add_country_by_ids(country_code, address_ids)
 
 
@@ -71,8 +79,9 @@ def batch_set_country_by_filter(
 
     Filtres combinés en AND (tous doivent correspondre). **Au moins un filtre est exigé** : un appel sans aucun filtre est refusé (`ValidationError`), garde-fou contre l'application d'un pays à toutes les adresses en masse (~475k → cascade de propagation). Pour viser un grand ensemble explicitement, passer par `batch_set_country_by_ids`.
 
-    Retourne les IDs modifiés.
+    Retourne les IDs modifiés. Lève `ValidationError` sur un code absent du référentiel.
     """
+    _require_known_countries([country_code], repo=repo)
     criteria = AddressCountryFilter(
         search=search,
         has_country=_has_country_flag(has_country),

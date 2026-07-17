@@ -20,9 +20,9 @@ from application.services.journals.core import requalify_publications_for_journa
 from domain.journals.journal import (
     JOURNAL_TYPE_LABELS_FR,
     JOURNAL_TYPES,
-    JOURNAL_TYPES_SET,
     OA_MODEL_LABELS_FR,
     OA_MODELS,
+    JournalType,
 )
 from interfaces.api.deps import (
     audit_repo,
@@ -173,7 +173,7 @@ def get_journal_subjects(
 )
 def get_type_change_impact(
     journal_id: int,
-    new_type: str = Query(...),
+    new_type: JournalType = Query(...),
     conn: Connection = Depends(db_conn),
     repo: JournalRepository = Depends(journal_repo),
     pub_repo: PublicationRepository = Depends(publication_repo),
@@ -183,8 +183,6 @@ def get_type_change_impact(
 
     L'aperçu applique réellement le changement — écriture du type, recalcul des corrections sur les publications sources, rafraîchissement — dans un `SAVEPOINT` annulé ensuite. Il emprunte donc le chemin exact de l'édition, et aucune écriture ne survit.
     """
-    if new_type not in JOURNAL_TYPES_SET:
-        raise HTTPException(status_code=400, detail=f"journal_type inconnu : {new_type}")
     savepoint = conn.begin_nested()
     try:
         repo.update_journal_fields(journal_id, JournalUpdate(journal_type=new_type))

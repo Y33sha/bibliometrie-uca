@@ -246,6 +246,20 @@ class TestSetCountry:
         assert affected == [addr]
         assert _get_countries(sa_sync_conn, addr) == ["FR"]
 
+    def test_raises_on_unknown_country(self, sa_sync_conn, repo):
+        """`addresses.countries` est un tableau : aucune clé étrangère n'en garde les éléments."""
+        addr = _create_address(sa_sync_conn)
+        with pytest.raises(ValidationError, match="Code pays inconnu"):
+            set_country(addr, ["ZZ"], repo=repo)
+        assert _get_countries(sa_sync_conn, addr) is None
+
+    def test_raises_on_one_unknown_among_known(self, sa_sync_conn, repo):
+        _ensure_country(sa_sync_conn, "FR")
+        addr = _create_address(sa_sync_conn)
+        with pytest.raises(ValidationError, match="ZZ"):
+            set_country(addr, ["FR", "ZZ"], repo=repo)
+        assert _get_countries(sa_sync_conn, addr) is None
+
     def test_none_clears_countries(self, sa_sync_conn, repo):
         _ensure_country(sa_sync_conn, "FR")
         addr = _create_address(sa_sync_conn)
@@ -295,6 +309,17 @@ class TestBatchSetCountryByIds:
         for a in addrs:
             assert _get_countries(sa_sync_conn, a) == ["FR"]
 
+    def test_raises_on_unknown_country(self, sa_sync_conn, repo):
+        addr = _create_address(sa_sync_conn)
+        with pytest.raises(ValidationError, match="Code pays inconnu"):
+            batch_set_country_by_ids("ZZ", [addr], repo=repo)
+
+    def test_raises_on_empty_country_code(self, sa_sync_conn, repo):
+        """La chaîne vide ne figure pas au référentiel : le contrôle référentiel la couvre."""
+        addr = _create_address(sa_sync_conn)
+        with pytest.raises(ValidationError, match="Code pays inconnu"):
+            batch_set_country_by_ids("", [addr], repo=repo)
+
     def test_appends_to_existing_countries(self, sa_sync_conn, repo):
         _ensure_country(sa_sync_conn, "FR")
         _ensure_country(sa_sync_conn, "US")
@@ -323,6 +348,11 @@ class TestBatchSetCountryByFilter:
         modified = batch_set_country_by_filter("FR", search="Clermont", repo=repo)
         assert match in modified
         assert other not in modified
+
+    def test_raises_on_unknown_country(self, sa_sync_conn, repo):
+        _create_address(sa_sync_conn, raw_text="Université Clermont")
+        with pytest.raises(ValidationError, match="Code pays inconnu"):
+            batch_set_country_by_filter("ZZ", search="Clermont", repo=repo)
 
     def test_filter_has_country_no(self, sa_sync_conn, repo):
         _ensure_country(sa_sync_conn, "FR")

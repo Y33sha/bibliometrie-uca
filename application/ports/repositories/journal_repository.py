@@ -17,7 +17,7 @@ from typing import Any, NamedTuple, Protocol
 
 from pydantic import BaseModel
 
-from domain.journals.journal import Journal
+from domain.journals.journal import Journal, JournalType
 
 
 class JournalIssnRow(NamedTuple):
@@ -33,6 +33,8 @@ class JournalUpdate(BaseModel):
     """Champs éditables d'une revue, en modification sélective.
 
     Seuls les champs explicitement fournis sont écrits (`model_dump(exclude_unset=True)`). Les champs listés sont ceux qu'un client peut fournir ; `title_normalized`, dérivé de `title`, est posé par le repository.
+
+    `journal_type` porte le type du domaine : le jeu de valeurs, que l'enum SQL du même nom reprend, se vérifie ici plutôt que chez chaque appelant.
     """
 
     title: str | None = None
@@ -41,7 +43,7 @@ class JournalUpdate(BaseModel):
     issnl: str | None = None
     doi_prefix: str | None = None
     oa_model: str | None = None
-    journal_type: str | None = None
+    journal_type: JournalType | None = None
     is_academic: bool | None = None
     is_in_doaj: bool | None = None
     apc_amount: float | None = None

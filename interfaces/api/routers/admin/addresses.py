@@ -225,13 +225,12 @@ def set_address_country(
     queries: AddressesQueries = Depends(addresses_queries),
     addr_repo: AddressRepository = Depends(address_repo),
 ) -> OkResponse:
-    """Attribue des pays à une adresse."""
+    """Attribue des pays à une adresse.
+
+    Renvoie 400 sur un code pays absent du référentiel (`set_country`).
+    """
     if not queries.address_exists(addr_id):
         raise HTTPException(status_code=404, detail="Adresse introuvable")
-    for c in body.countries or []:
-        if not queries.country_exists(c):
-            raise HTTPException(status_code=400, detail=f"Code pays inconnu: {c}")
-
     affected = address_commands.set_country(conn, addr_id, body.countries, repo=addr_repo)
     bg.add_task(bg_propagate_countries, affected)
     return OkResponse()
@@ -245,14 +244,11 @@ def batch_set_country(
     queries: AddressesQueries = Depends(addresses_queries),
     addr_repo: AddressRepository = Depends(address_repo),
 ) -> BatchCountryResponse:
-    """Ajoute un pays à des adresses (par IDs ou par filtre)."""
+    """Ajoute un pays à des adresses (par IDs ou par filtre).
+
+    Renvoie 400 sur un code pays absent du référentiel — la chaîne vide comprise — et sur un appel par filtre qui n'en porte aucun (`batch_set_country_by_filter`).
+    """
     country_code = body.country_code
-    if not country_code:
-        raise HTTPException(status_code=400, detail="country_code requis")
-
-    if not queries.country_exists(country_code):
-        raise HTTPException(status_code=400, detail=f"Code pays inconnu: {country_code}")
-
     updated, propagated, all_ids = address_commands.batch_set_country(
         conn,
         country_code,

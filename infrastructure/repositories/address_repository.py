@@ -116,6 +116,13 @@ class PgAddressRepository:
 
     # ── Pays ───────────────────────────────────────────────────────
 
+    def country_exists(self, code: str) -> bool:
+        row = self._conn.execute(
+            text("SELECT code FROM countries WHERE code = :code"),
+            {"code": code},
+        ).one_or_none()
+        return row is not None
+
     def set_countries(
         self,
         address_id: int,
