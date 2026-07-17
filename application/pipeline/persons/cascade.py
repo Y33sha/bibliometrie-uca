@@ -212,7 +212,7 @@ class _Cascade:
         if a.current_person_id is not None:
             # Ancienne signature cross-source qui rejoint une création : couverte ce run.
             self.resolved_cross_source_ids.add(a.authorship_id)
-        last = a.last_name or a.full_name or "?"
+        last = a.last_name or a.full_name
         first = a.first_name or ""
         marker = create_person(last, first, repo=self._person_repo)
         link_authorship(
