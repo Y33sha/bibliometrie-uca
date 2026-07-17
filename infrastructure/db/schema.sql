@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict YUxH6rzFMOu0pczCkGJZheKW4KrOnHysNcRCaArEAaHmfGoQc3q82833LfXPEXy
+\restrict 4KTemHIxirprXMmhOvIpp7Av1MhI11DNvuV3rAyTOUN6bo1xQbLfXG5xhAofVtI
 
 -- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg22.04+1)
 -- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg22.04+1)
@@ -1463,7 +1463,7 @@ CREATE TABLE public.staging (
 -- Name: COLUMN staging.raw_hash; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON COLUMN public.staging.raw_hash IS 'Empreinte md5 du payload tel qu''extrait de la source bulk. Sert de clé de détection de changement à l''UPSERT (et d''empreinte d''intégrité pour le chantier DATA_raw-data-store). Cas particulier OpenAlex : `refetch_truncated` n''écrit PAS `raw_hash` quand il complète les authorships d''une publication tronquée à 100 — la ligne garde le hash du payload bulk pour que le bulk suivant ne déclenche pas de réécriture inutile. L''invariant `raw_hash = md5(raw_data)` est donc volontairement rompu sur les lignes OpenAlex refetchées.';
+COMMENT ON COLUMN public.staging.raw_hash IS 'Empreinte md5 servant de clé de détection de changement à l''UPSERT. Calculée via `change_detection_hash`, qui neutralise le bruit volatil propre à la source avant l''empreinte (HAL : horodatage de génération du TEI `label_xml`) — le payload stocké reste, lui, fidèle à la source. L''empreinte ne coïncide donc pas avec `md5(raw_data)` pour les sources normalisées. Cas particulier OpenAlex : `refetch_truncated` n''écrit PAS `raw_hash` quand il complète les authorships d''une publication tronquée à 100 — la ligne garde le hash du payload bulk pour que le bulk suivant ne déclenche pas de réécriture inutile.';
 
 
 --
@@ -3441,5 +3441,5 @@ ALTER TABLE ONLY public.structure_relations
 -- PostgreSQL database dump complete
 --
 
-\unrestrict YUxH6rzFMOu0pczCkGJZheKW4KrOnHysNcRCaArEAaHmfGoQc3q82833LfXPEXy
+\unrestrict 4KTemHIxirprXMmhOvIpp7Av1MhI11DNvuV3rAyTOUN6bo1xQbLfXG5xhAofVtI
 

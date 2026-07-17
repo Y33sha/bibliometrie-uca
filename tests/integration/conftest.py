@@ -117,6 +117,19 @@ def _sa_url():
     )
 
 
+@pytest.fixture(scope="session")
+def alembic_config() -> Config:
+    """Configuration Alembic pointée sur la base de test, que `pytest_configure` monte à `head`.
+
+    `configure_logger` à faux laisse le logging de la session pytest en place : `env.py` le
+    reconfigurerait sinon en pleine session, désactivant les loggers que les tests observent.
+    """
+    cfg = Config(str(ALEMBIC_INI))
+    cfg.set_main_option("sqlalchemy.url", _sa_url().render_as_string(hide_password=False))
+    cfg.attributes["configure_logger"] = False
+    return cfg
+
+
 @pytest.fixture
 def sa_sync_conn():
     """Connection SQLAlchemy sur la base test, transaction rollbackée.
