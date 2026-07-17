@@ -125,7 +125,7 @@ Traverse `domain/`, `application/ports`, `application/pipeline/metadata_correcti
 
 #### 2.1 `db`
 
-- [ ] `alembic check` est rouge : 38 opérations, dont six tables absentes de `tables.py` (`publication_relations`, `pipeline_phase_executions`, `confirmed_authorships`…) et 26 index divergents. Le métadonnée ne décrit pas le schéma. C'est le terrain d'une dérive silencieuse : le seul garde-fou du fichier est un contrôle que personne ne peut passer au vert, donc personne ne le lance — l'enum `source_type` y avait perdu `datacite` sans que rien ne le signale (`e47421a7`). Remettre `alembic check` au vert, puis le brancher en CI.
+- [x] **`alembic check` était rouge**, donc jamais joué : un garde-fou qui échoue par construction ne garde rien — l'enum `source_type` y avait perdu `datacite` sans que rien ne le signale (`e47421a7`), et `idx_sa_countries_dirty` était déclaré sur la mauvaise colonne, qu'un autogenerate aurait imposée à la base. Les 26 index divergents sortent de la comparaison, `tables.py` ne les déclarant plus (`b7e7befa`) ; les trois tables absentes sont déclarées, le `nullable` de `rejected_authorships.created_at` corrigé, et le commentaire périmé de `staging.raw_hash` migré (`18d4bf38`). Le contrôle vit dans un test d'intégration : la base de test étant montée par `alembic upgrade head`, il compare le schéma aux migrations qui l'écrivent, et tourne partout où la suite tourne. Un pre-push en était écarté : l'étage se veut sans base, et une migration en attente d'application y bloquerait le push.
 #### 2.2 `jsonb_models` : OK
 #### 2.3 `raw_store` : OK
 #### 2.4 `observability` : OK
