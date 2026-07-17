@@ -2360,7 +2360,7 @@ export interface paths {
          * Get Type Change Impact
          * @description Compte les publications de la revue dont le `doc_type` changerait si son `journal_type` passait à `new_type`.
          *
-         *     L'aperçu applique réellement le changement — écriture du type, recalcul des corrections sur les publications sources, rafraîchissement — dans un `SAVEPOINT` annulé ensuite. Il emprunte donc le chemin exact de l'édition, et aucune écriture ne survit.
+         *     L'aperçu applique réellement le changement — écriture du type, recalcul des corrections sur les publications sources, rafraîchissement — dans un `SAVEPOINT` annulé ensuite. Il emprunte donc le chemin exact de l'édition, et aucune écriture ne survit. Renvoie 404 sur une revue inconnue, comme l'édition qu'il simule.
          */
         get: operations["get_type_change_impact_api_journals__journal_id__type_change_impact_get"];
         put?: never;
@@ -3533,17 +3533,11 @@ export interface components {
         };
         /**
          * JournalDashboardResponse
-         * @description GET /api/journals/{id}/dashboard : agrégats de signalement pour l'exploration.
+         * @description GET /api/journals/{id}/dashboard : distributions des publications d'une revue.
          *
-         *     Les distributions exposent les compteurs bruts (incluant `None` /
-         *     `unknown`) pour faciliter le repérage d'incohérences à l'œil
-         *     (ex. publis `article` sur un `journal_type=proceedings`).
+         *     Les compteurs sont bruts, `None` et `unknown` compris : c'est à l'œil que se repèrent les incohérences, par exemple des publications `article` dans une revue de type `proceedings`.
          *
-         *     `expected_doc_types` / `expected_oa_statuses` listent les valeurs
-         *     attendues pour les `journal_type` / `oa_model` de la revue (cf.
-         *     `domain.journals.expected`). Servent à afficher la liste « Attendus »
-         *     au-dessus de chaque tableau. Listes vides si la revue n'a pas de
-         *     journal_type / oa_model renseigné, ou si la valeur n'est pas mappée.
+         *     `expected_doc_types` et `expected_oa_statuses` listent les valeurs attendues pour le `journal_type` et le `oa_model` de la revue (`domain.journals.expected`), affichées au-dessus de chaque tableau. Elles sont vides quand la revue ne porte pas la valeur correspondante, ou que celle-ci n'est pas mappée.
          */
         JournalDashboardResponse: {
             /** Total Publications */
@@ -3559,11 +3553,9 @@ export interface components {
         };
         /**
          * JournalDetailResponse
-         * @description GET /api/journals/{id} : profil complet de la revue pour la page publique.
+         * @description GET /api/journals/{id} : profil complet de la revue pour sa page publique.
          *
-         *     Superset de `JournalOut` + payload DOAJ brut + date d'import DOAJ.
-         *     Le payload est exposé tel quel pour permettre l'exploration en attendant
-         *     qu'on en extraie des colonnes typées (Phase 4 du chantier publishers-journals).
+         *     Une ligne de liste, plus la réponse DOAJ brute et sa date d'import. Le payload est exposé tel quel : son exploration précède le choix des colonnes typées qu'on en tirerait.
          */
         JournalDetailResponse: {
             /** Id */
@@ -3591,21 +3583,21 @@ export interface components {
             /** Oa Model */
             oa_model: string | null;
             /** Journal Type */
-            journal_type: string | null;
+            journal_type: ("journal" | "proceedings" | "repository" | "book_series" | "ebook_platform" | "preprint_server" | "media" | "unknown") | null;
             /** Is Academic */
             is_academic: boolean | null;
             /** Doi Prefix */
             doi_prefix: string | null;
             /** Pub Count */
             pub_count: number;
+            /** Doaj Url */
+            doaj_url: string | null;
             /** Doaj Payload */
             doaj_payload: {
                 [key: string]: unknown;
             } | null;
             /** Doaj Imported At */
             doaj_imported_at: string | null;
-            /** Doaj Url */
-            doaj_url: string | null;
         };
         /** JournalListResponse */
         JournalListResponse: {
@@ -3624,9 +3616,7 @@ export interface components {
          * JournalOut
          * @description Représentation d'une revue dans la liste paginée `/api/journals`.
          *
-         *     `pub_name` est joint depuis `publishers`, `pub_count` est un agrégat
-         *     sur `publications` ; ni l'un ni l'autre ne sont des colonnes natives
-         *     de la table `journals`.
+         *     `pub_name` est joint depuis `publishers`, `pub_count` est un agrégat sur `publications` ; ni l'un ni l'autre ne sont des colonnes natives de la table `journals`.
          */
         JournalOut: {
             /** Id */
@@ -3654,7 +3644,7 @@ export interface components {
             /** Oa Model */
             oa_model: string | null;
             /** Journal Type */
-            journal_type: string | null;
+            journal_type: ("journal" | "proceedings" | "repository" | "book_series" | "ebook_platform" | "preprint_server" | "media" | "unknown") | null;
             /** Is Academic */
             is_academic: boolean | null;
             /** Doi Prefix */
@@ -3714,16 +3704,11 @@ export interface components {
         };
         /**
          * JournalsFacetOption
-         * @description Option d'une facette du listing revues : valeur + label FR + compte.
+         * @description Option d'une facette de la liste des revues : valeur, libellé français et compte.
          *
-         *     `label` reprend `JOURNAL_TYPE_LABELS_FR` / `OA_MODEL_LABELS_FR` côté
-         *     `journal_type` / `oa_model` ; pour la facette DOAJ on expose `Indexée`
-         *     / `Non indexée`. Le champ s'appelle `label` (pas `label_fr`) pour
-         *     rester compatible avec le composable `useFacets` côté front
-         *     (convention partagée avec les facettes publications). `count` est le
-         *     nombre de revues qui matcheraient si on ne sélectionnait que cette
-         *     option, en appliquant tous les autres filtres actifs (= compte
-         *     exclusif à la dimension, comme les facettes publications).
+         *     `label` reprend `JOURNAL_TYPE_LABELS_FR` ou `OA_MODEL_LABELS_FR` selon la dimension ; la facette DOAJ expose `Indexée` / `Non indexée`. Le champ se nomme `label` et non `label_fr` pour le composable `useFacets` du frontend, convention partagée avec les facettes des publications.
+         *
+         *     `count` est le nombre de revues atteignables si cette seule option était cochée, les autres filtres actifs restant appliqués.
          */
         JournalsFacetOption: {
             /** Value */
@@ -3735,11 +3720,9 @@ export interface components {
         };
         /**
          * JournalsFacetsResponse
-         * @description Facettes dynamiques pour `/api/journals` (3 dimensions).
+         * @description Facettes de `/api/journals` sur trois dimensions.
          *
-         *     Chaque dimension exclut son propre filtre de la condition WHERE, ce
-         *     qui permet d'afficher le nombre de revues atteignables si l'option
-         *     était (dé)cochée.
+         *     Chaque dimension écarte son propre filtre de la condition WHERE, de sorte que son décompte annonce le nombre de revues atteignables si l'option était cochée ou décochée.
          */
         JournalsFacetsResponse: {
             /** Journal Types */
@@ -5678,9 +5661,7 @@ export interface components {
          * DocTypeCount
          * @description Compteur de publications par `doc_type` pour une revue.
          *
-         *     `expected` est vrai si ce `doc_type` figure dans les valeurs attendues
-         *     pour le `journal_type` de la revue (cf. `domain.journals.expected`).
-         *     Permet au frontend de styler les inattendus en warning.
+         *     `expected` est vrai si ce `doc_type` figure parmi les valeurs attendues pour le `journal_type` de la revue (`domain.journals.expected`), ce qui laisse le frontend signaler les autres.
          */
         application__ports__api__journals_queries__DocTypeCount: {
             /** Doc Type */
@@ -5694,8 +5675,7 @@ export interface components {
          * OaStatusCount
          * @description Compteur de publications par `oa_status` pour une revue.
          *
-         *     `expected` est vrai si ce `oa_status` figure dans les valeurs attendues
-         *     pour le `oa_model` de la revue (cf. `domain.journals.expected`).
+         *     `expected` est vrai si ce `oa_status` figure parmi les valeurs attendues pour le `oa_model` de la revue (`domain.journals.expected`).
          */
         application__ports__api__journals_queries__OaStatusCount: {
             /** Oa Status */

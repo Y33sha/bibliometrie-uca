@@ -32,6 +32,41 @@ from domain.normalize import normalize_text
 from infrastructure.queries.filters import publication_in_perimeter
 from infrastructure.sources.doaj import resolve_doaj_url
 
+# Colonnes du profil d'une revue, communes à la ligne de liste et à la page d'une revue. `doaj_id` et `doaj_url_csv` sont les deux entrées de `resolve_doaj_url` ; la jointure `publishers p` est attendue par `pub_name`.
+_JOURNAL_COLUMNS = """
+    j.id, j.title, j.issn, j.eissn, j.issnl,
+    j.publisher_id, p.name AS pub_name,
+    j.openalex_id, j.is_in_doaj,
+    j.apc_amount, j.apc_currency, j.oa_model,
+    j.journal_type, j.is_academic, j.doi_prefix,
+    j.doaj_payload->>'DOAJ id' AS doaj_id,
+    j.doaj_payload->>'URL in DOAJ' AS doaj_url_csv,
+    j.pub_count
+"""
+
+
+def _journal_fields(row: Any) -> dict[str, Any]:
+    """Champs de `JournalOut` lus d'une ligne de `_JOURNAL_COLUMNS`."""
+    return {
+        "id": row.id,
+        "title": row.title,
+        "issn": row.issn,
+        "eissn": row.eissn,
+        "issnl": row.issnl,
+        "publisher_id": row.publisher_id,
+        "pub_name": row.pub_name,
+        "openalex_id": row.openalex_id,
+        "is_in_doaj": row.is_in_doaj,
+        "apc_amount": row.apc_amount,
+        "apc_currency": row.apc_currency,
+        "oa_model": row.oa_model,
+        "journal_type": row.journal_type,
+        "is_academic": row.is_academic,
+        "doi_prefix": row.doi_prefix,
+        "pub_count": row.pub_count,
+        "doaj_url": resolve_doaj_url(row.doaj_url_csv, row.doaj_id),
+    }
+
 
 def _build_journal_where(
     *,
@@ -128,14 +163,7 @@ class PgJournalQueries(JournalQueries):
         offset = (page - 1) * per_page
         rows = self._conn.execute(
             text(f"""
-                SELECT j.id, j.title, j.issn, j.eissn, j.issnl,
-                       j.publisher_id, p.name AS pub_name,
-                       j.openalex_id, j.is_in_doaj,
-                       j.apc_amount, j.apc_currency, j.oa_model,
-                       j.journal_type, j.is_academic, j.doi_prefix,
-                       j.doaj_payload->>'DOAJ id' AS doaj_id,
-                       j.doaj_payload->>'URL in DOAJ' AS doaj_url_csv,
-                       j.pub_count
+                SELECT {_JOURNAL_COLUMNS}
                 FROM journals j
                 LEFT JOIN publishers p ON p.id = j.publisher_id
                 WHERE {where}
@@ -148,28 +176,7 @@ class PgJournalQueries(JournalQueries):
             total=total,
             page=page,
             per_page=per_page,
-            journals=[
-                JournalOut(
-                    id=r.id,
-                    title=r.title,
-                    issn=r.issn,
-                    eissn=r.eissn,
-                    issnl=r.issnl,
-                    publisher_id=r.publisher_id,
-                    pub_name=r.pub_name,
-                    openalex_id=r.openalex_id,
-                    is_in_doaj=r.is_in_doaj,
-                    apc_amount=r.apc_amount,
-                    apc_currency=r.apc_currency,
-                    oa_model=r.oa_model,
-                    journal_type=r.journal_type,
-                    is_academic=r.is_academic,
-                    doi_prefix=r.doi_prefix,
-                    pub_count=r.pub_count,
-                    doaj_url=resolve_doaj_url(r.doaj_url_csv, r.doaj_id),
-                )
-                for r in rows
-            ],
+            journals=[JournalOut(**_journal_fields(r)) for r in rows],
         )
 
     def journals_facets(
@@ -275,16 +282,9 @@ class PgJournalQueries(JournalQueries):
 
     def get_journal_detail(self, journal_id: int) -> JournalDetailResponse | None:
         row = self._conn.execute(
-            text("""
-                SELECT j.id, j.title, j.issn, j.eissn, j.issnl,
-                       j.publisher_id, p.name AS pub_name,
-                       j.openalex_id, j.is_in_doaj,
-                       j.apc_amount, j.apc_currency, j.oa_model,
-                       j.journal_type, j.is_academic, j.doi_prefix,
-                       j.doaj_payload, j.doaj_imported_at,
-                       j.doaj_payload->>'DOAJ id' AS doaj_id,
-                       j.doaj_payload->>'URL in DOAJ' AS doaj_url_csv,
-                       j.pub_count
+            text(f"""
+                SELECT {_JOURNAL_COLUMNS},
+                       j.doaj_payload, j.doaj_imported_at
                 FROM journals j
                 LEFT JOIN publishers p ON p.id = j.publisher_id
                 WHERE j.id = :id
@@ -294,25 +294,9 @@ class PgJournalQueries(JournalQueries):
         if row is None:
             return None
         return JournalDetailResponse(
-            id=row.id,
-            title=row.title,
-            issn=row.issn,
-            eissn=row.eissn,
-            issnl=row.issnl,
-            publisher_id=row.publisher_id,
-            pub_name=row.pub_name,
-            openalex_id=row.openalex_id,
-            is_in_doaj=row.is_in_doaj,
-            apc_amount=row.apc_amount,
-            apc_currency=row.apc_currency,
-            oa_model=row.oa_model,
-            journal_type=row.journal_type,
-            is_academic=row.is_academic,
-            doi_prefix=row.doi_prefix,
-            pub_count=row.pub_count,
+            **_journal_fields(row),
             doaj_payload=row.doaj_payload,
             doaj_imported_at=row.doaj_imported_at,
-            doaj_url=resolve_doaj_url(row.doaj_url_csv, row.doaj_id),
         )
 
     def get_journal_dashboard(self, journal_id: int) -> JournalDashboardResponse | None:
