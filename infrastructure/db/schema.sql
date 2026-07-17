@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict vJOyjMIeqmYYa2HhSBljjJaLaxvZgrgZIbailpopuIfdOWRBrMboqmkzZ1icghX
+\restrict YUxH6rzFMOu0pczCkGJZheKW4KrOnHysNcRCaArEAaHmfGoQc3q82833LfXPEXy
 
--- Dumped from database version 18.4
--- Dumped by pg_dump version 18.4
+-- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg22.04+1)
+-- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg22.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -115,6 +115,17 @@ CREATE TYPE public.journal_type AS ENUM (
     'media',
     'ebook_platform',
     'unknown'
+);
+
+
+--
+-- Name: oa_model; Type: TYPE; Schema: public; Owner: -
+--
+
+CREATE TYPE public.oa_model AS ENUM (
+    'subscription',
+    'full_oa',
+    'repository'
 );
 
 
@@ -962,15 +973,14 @@ CREATE TABLE public.journals (
     is_in_doaj boolean DEFAULT false,
     apc_amount numeric(10,2),
     apc_currency text DEFAULT 'EUR'::text,
-    oa_model text,
+    oa_model public.oa_model,
     created_at timestamp with time zone DEFAULT now(),
     journal_type public.journal_type DEFAULT 'unknown'::public.journal_type,
     is_academic boolean DEFAULT true,
     doi_prefix text,
     doaj_payload jsonb,
     doaj_imported_at timestamp with time zone,
-    pub_count integer DEFAULT 0 NOT NULL,
-    CONSTRAINT journals_oa_model_check CHECK (((oa_model IS NULL) OR (oa_model = ANY (ARRAY['subscription'::text, 'full_oa'::text, 'repository'::text]))))
+    pub_count integer DEFAULT 0 NOT NULL
 );
 
 
@@ -2796,7 +2806,7 @@ CREATE INDEX idx_sa_authorship ON public.source_authorships USING btree (authors
 -- Name: idx_sa_countries_dirty; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_sa_countries_dirty ON public.source_authorships USING btree (source) WHERE countries_dirty;
+CREATE INDEX idx_sa_countries_dirty ON public.source_authorships USING btree (source_publication_id) WHERE countries_dirty;
 
 
 --
@@ -3431,5 +3441,5 @@ ALTER TABLE ONLY public.structure_relations
 -- PostgreSQL database dump complete
 --
 
-\unrestrict vJOyjMIeqmYYa2HhSBljjJaLaxvZgrgZIbailpopuIfdOWRBrMboqmkzZ1icghX
+\unrestrict YUxH6rzFMOu0pczCkGJZheKW4KrOnHysNcRCaArEAaHmfGoQc3q82833LfXPEXy
 
