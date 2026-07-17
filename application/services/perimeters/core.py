@@ -88,13 +88,10 @@ def update_perimeter(
 ) -> None:
     """Met à jour un périmètre à partir des champs explicitement fournis.
 
-    Lève `ValidationError` si aucun champ n'est fourni, `NotFoundError` si le périmètre n'existe pas.
+    Lève `ValidationError` si aucun champ n'est fourni, `NotFoundError` si le périmètre n'existe pas — l'`UPDATE` du repository n'apparie alors aucune ligne.
     """
     if not update.model_fields_set:
         raise ValidationError("Aucun champ à mettre à jour")
-
-    if not repo.perimeter_exists(perimeter_id):
-        raise NotFoundError(f"Périmètre {perimeter_id} introuvable")
 
     repo.update_perimeter_fields(perimeter_id, update)
 

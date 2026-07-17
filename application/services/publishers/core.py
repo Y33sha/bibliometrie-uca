@@ -72,13 +72,10 @@ def update_publisher(
 ) -> None:
     """Met à jour un éditeur à partir des champs explicitement fournis.
 
-    Lève NotFoundError si l'éditeur n'existe pas, ValidationError si aucun champ n'est fourni.
+    Lève `ValidationError` si aucun champ n'est fourni, `NotFoundError` si l'éditeur n'existe pas — l'`UPDATE` du repository n'apparie alors aucune ligne.
     """
     if not update.model_fields_set:
         raise ValidationError("Aucun champ à mettre à jour")
-
-    if not repo.publisher_exists(publisher_id):
-        raise NotFoundError(f"Éditeur {publisher_id} introuvable")
 
     repo.update_publisher_fields(publisher_id, update)
 

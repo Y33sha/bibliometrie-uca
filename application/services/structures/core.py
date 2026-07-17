@@ -92,12 +92,8 @@ def update_structure(
 ) -> StructureRow:
     """Met à jour une structure. Retourne la ligne modifiée.
 
-    Lève NotFoundError si la structure n'existe pas.
-    Lève ValidationError si `fields` ne contient aucun champ valide.
+    Lève `ValidationError` si `fields` ne contient aucun champ valide, `NotFoundError` si la structure n'existe pas — l'`UPDATE` du repository n'apparie alors aucune ligne.
     """
-    if not repo.structure_exists(structure_id):
-        raise NotFoundError(f"Structure {structure_id} introuvable")
-
     update_fields: StructureUpdateFields = {}
     for field_name, col_name in _STRUCTURE_FIELD_MAP.items():
         val = fields.get(field_name)
