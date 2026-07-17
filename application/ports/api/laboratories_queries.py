@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 from application.ports.api._common import (
     DashboardOa,
+    PaginatedResponse,
     PubYearCount,
 )
 from application.ports.api.subjects_queries import SubjectFrequency
@@ -79,11 +80,7 @@ class LabAddressOut(BaseModel):
     is_confirmed: bool | None
 
 
-class LaboratoryAddressesResponse(BaseModel):
-    total: int
-    page: int
-    per_page: int
-    pages: int
+class LaboratoryAddressesResponse(PaginatedResponse):
     addresses: list[LabAddressOut]
 
 

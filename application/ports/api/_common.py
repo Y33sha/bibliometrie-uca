@@ -6,7 +6,30 @@ publications). Les ports les importent directement ; `interfaces/api/models/`
 ne contient que les types router-only (`OkResponse`, `MergeRequest`, etc.).
 """
 
-from pydantic import BaseModel
+import math
+
+from pydantic import BaseModel, Field, computed_field
+
+
+def page_count(total: int, per_page: int) -> int:
+    """Nombre de pages couvrant `total` résultats, zéro sur un résultat vide."""
+    return math.ceil(total / per_page)
+
+
+class PaginatedResponse(BaseModel):
+    """Socle des lectures paginées : la tranche demandée et de quoi situer le reste.
+
+    `pages` se déduit de `total` et `per_page` — c'est une conséquence, pas une donnée. Les réponses qui en héritent ajoutent leur liste de résultats et ce que leur lecture porte en propre.
+    """
+
+    total: int
+    page: int
+    per_page: int = Field(gt=0)
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def pages(self) -> int:
+        return page_count(self.total, self.per_page)
 
 
 class FacetValueCount(BaseModel):
@@ -49,7 +72,9 @@ class DashboardOa(BaseModel):
 __all__ = [
     "DashboardOa",
     "FacetValueCount",
+    "PaginatedResponse",
     "PubYearCount",
+    "page_count",
     "StructureRef",
     "ValueConfirmedOut",
     "YesNoCount",

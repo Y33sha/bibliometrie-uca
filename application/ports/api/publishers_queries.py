@@ -7,6 +7,7 @@ from typing import Protocol
 
 from pydantic import BaseModel
 
+from application.ports.api._common import PaginatedResponse
 from application.ports.api.subjects_queries import SubjectFrequency
 
 
@@ -29,10 +30,7 @@ class PublisherListItem(BaseModel):
     pub_count: int
 
 
-class PublisherListResponse(BaseModel):
-    total: int
-    page: int
-    pages: int
+class PublisherListResponse(PaginatedResponse):
     publishers: list[PublisherListItem]
 
 

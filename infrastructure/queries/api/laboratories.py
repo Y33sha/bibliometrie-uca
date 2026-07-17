@@ -205,7 +205,6 @@ class PgLaboratoriesQueries(LaboratoriesQueries):
             total=total,
             page=page,
             per_page=per_page,
-            pages=(total + per_page - 1) // per_page or 1,
             addresses=[
                 LabAddressOut(id=r.id, raw_text=r.raw_text, is_confirmed=r.is_confirmed)
                 for r in rows

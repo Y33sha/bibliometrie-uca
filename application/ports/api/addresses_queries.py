@@ -8,6 +8,8 @@ from typing import Any, Protocol
 
 from pydantic import BaseModel
 
+from application.ports.api._common import PaginatedResponse
+
 
 @dataclass(frozen=True, slots=True)
 class TextPredicate:
@@ -72,16 +74,12 @@ class AddressOut(BaseModel):
     pub_count: int
 
 
-class AddressListResponse(BaseModel):
+class AddressListResponse(PaginatedResponse):
     """Réponse paginée de `/api/addresses`.
 
     `requires_search=True` quand le caller utilise un filtre trop large (no/all + pas de search) et que le serveur a renvoyé une liste vide par garde-fou.
     """
 
-    total: int
-    page: int
-    per_page: int
-    pages: int
     addresses: list[AddressOut]
     requires_search: bool | None = None
 
@@ -117,11 +115,7 @@ class AddressForCountryAttribution(BaseModel):
     pub_count: int
 
 
-class AddressesCountriesResponse(BaseModel):
-    total: int
-    page: int
-    per_page: int
-    pages: int
+class AddressesCountriesResponse(PaginatedResponse):
     addresses: list[AddressForCountryAttribution]
     suggestion_facets: list[CountrySuggestion] | None = None
     country_facets: list[CountrySuggestion]

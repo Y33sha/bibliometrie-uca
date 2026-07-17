@@ -10,7 +10,7 @@ from typing import Protocol
 
 from pydantic import BaseModel, ConfigDict
 
-from application.ports.api._common import YesNoCount
+from application.ports.api._common import PaginatedResponse, YesNoCount
 from application.ports.api.entity_facet import EntityFacetResponse, EntityLabelResponse
 from application.ports.api.subjects_queries import SubjectOut
 
@@ -115,11 +115,7 @@ class PublicationListItem(BaseModel):
     hal_collections: list[str] | None
 
 
-class PublicationListResponse(BaseModel):
-    total: int
-    page: int
-    per_page: int
-    pages: int
+class PublicationListResponse(PaginatedResponse):
     publications: list[PublicationListItem]
 
 

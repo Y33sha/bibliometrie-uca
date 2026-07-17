@@ -5,6 +5,7 @@ from typing import Any
 
 from sqlalchemy import Connection, text
 
+from application.ports.api._common import page_count
 from domain.persons.identifiers import PUBLIC_PERSON_IDENTIFIER_TYPES
 from infrastructure.queries.filters import OA_DASHBOARD_COLS_SQL
 
@@ -235,8 +236,8 @@ def person_addresses(
         {"pid": person_id},
     ).one()
     total = count_row.total
-    pages = max(1, (total + per_page - 1) // per_page)
-    page = min(page, pages)
+    # Une page au-delà de la dernière ramène sur la dernière, plutôt que sur une liste vide.
+    page = min(page, page_count(total, per_page) or 1)
     offset = (page - 1) * per_page
 
     rows = conn.execute(
@@ -259,7 +260,7 @@ def person_addresses(
     return {
         "total": total,
         "page": page,
-        "pages": pages,
+        "per_page": per_page,
         "addresses": [dict(r._mapping) for r in rows],
     }
 

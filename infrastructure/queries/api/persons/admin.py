@@ -86,7 +86,7 @@ def list_orphan_authorships(
     return {
         "total": total,
         "page": page,
-        "pages": (total + per_page - 1) // per_page or 1,
+        "per_page": per_page,
         "authorships": authorships,
     }
 
@@ -202,7 +202,6 @@ def ambiguous_name_forms(conn: Connection, *, page: int, per_page: int) -> dict[
         "total": total,
         "page": page,
         "per_page": per_page,
-        "pages": (total + per_page - 1) // per_page if per_page else 0,
         "forms": [{"name_form": f, "persons": persons_by_form[f]} for f in forms],
     }
 
@@ -313,7 +312,6 @@ def identifier_conflicts(conn: Connection, *, page: int, per_page: int) -> dict[
         "total": total,
         "page": page,
         "per_page": per_page,
-        "pages": (total + per_page - 1) // per_page if per_page else 0,
         "pairs": pairs,
     }
 
@@ -460,7 +458,6 @@ def detachable_intruders(conn: Connection, *, page: int, per_page: int) -> dict[
         "total": total,
         "page": page,
         "per_page": per_page,
-        "pages": (total + per_page - 1) // per_page if per_page else 0,
         "groups": items,
     }
 
@@ -659,7 +656,6 @@ def name_duplicates(conn: Connection, *, page: int, per_page: int) -> dict[str, 
         "total": total,
         "page": page,
         "per_page": per_page,
-        "pages": (total + per_page - 1) // per_page if per_page else 0,
         "pairs": items,
     }
 

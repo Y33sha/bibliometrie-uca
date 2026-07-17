@@ -134,7 +134,7 @@ class PgPublisherQueries(PublisherQueries):
         return PublisherListResponse(
             total=total,
             page=page,
-            pages=(total + per_page - 1) // per_page,
+            per_page=per_page,
             publishers=[
                 PublisherListItem(
                     id=r.id,

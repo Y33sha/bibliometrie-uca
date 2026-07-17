@@ -97,7 +97,6 @@ def list_addresses(
             total=0,
             page=1,
             per_page=per_page,
-            pages=0,
             addresses=[],
             requires_search=True,
         )
