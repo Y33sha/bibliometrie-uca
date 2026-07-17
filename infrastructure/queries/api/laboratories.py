@@ -1,9 +1,10 @@
-"""Query services pour /api/laboratories/*.
+"""Query services pour /api/laboratories/* — la page publique d'un laboratoire.
 
-`PgLaboratoriesQueries` hérite explicitement du Protocol `application.ports.api.laboratories_queries.LaboratoriesQueries` : mypy vérifie la conformité à la définition de classe. Les modèles rendus sont importés du port (règle 3 de `docs/architecture/01-vue-d-ensemble.md`).
+La liste est celle des structures du périmètre `persons` dont le type figure dans la configuration ; le détail, les adresses, les sujets et le tableau de bord portent sur une structure donnée.
 """
 
 import datetime
+from typing import Any
 
 from sqlalchemy import Connection, text
 
@@ -28,6 +29,37 @@ from application.ports.api.subjects_queries import SubjectFrequency
 from infrastructure.queries.filters import OA_DASHBOARD_COLS_SQL
 from infrastructure.queries.perimeter import get_persons_structure_ids_list
 
+# Signature portée par le laboratoire `:lab_id` : dans le périmètre, rattachée à lui par une
+# structure d'authorship, et tenant le rôle d'auteur. S'applique à un alias `a` sur `authorships`.
+_LAB_AUTHOR_SIGNATURE = """
+    a.in_perimeter = TRUE
+    AND a.roles && ARRAY['author']::text[]
+    AND EXISTS (
+        SELECT 1 FROM authorship_structures aus
+        WHERE aus.authorship_id = a.id AND aus.structure_id = :lab_id
+    )
+"""
+
+# Publication `p` que le laboratoire signe. La forme `EXISTS` compte chaque publication une fois,
+# là où une jointure la dupliquerait par auteur du laboratoire.
+_LAB_AUTHORED_PUBLICATION = f"""
+    EXISTS (
+        SELECT 1 FROM authorships a
+        WHERE a.publication_id = p.id AND {_LAB_AUTHOR_SIGNATURE}
+    )
+"""
+
+
+def _related_structure(row: Any) -> LabRelatedStructure:
+    """Structure voisine d'un laboratoire — tutelle ou sous-structure, selon le sens de la relation lue."""
+    return LabRelatedStructure(
+        id=row.id,
+        name=row.name,
+        acronym=row.acronym,
+        type=row.type,
+        relation_type=row.relation_type,
+    )
+
 
 class PgLaboratoriesQueries(LaboratoriesQueries):
     """Adapter SA pour `application.ports.api.laboratories_queries.LaboratoriesQueries`."""
@@ -36,11 +68,9 @@ class PgLaboratoriesQueries(LaboratoriesQueries):
         self._conn = conn
 
     def list_laboratories(self) -> list[LaboratoryListItem]:
-        """Liste des labos du périmètre, avec toutes leurs tutelles.
+        """Liste des laboratoires du périmètre, avec toutes leurs tutelles.
 
-        Résout en interne le périmètre `persons` (ids des structures) avant de filtrer. Les
-        types de structure affichés sont configurables (clé `laboratories_display_types`,
-        défaut `['labo']`).
+        Résout le périmètre `persons` en identifiants de structures avant de filtrer, et retient les types que porte la configuration (`laboratories_display_types`).
         """
         perimeter_ids = get_persons_structure_ids_list(self._conn)
         display_types = self._laboratories_display_types()
@@ -78,9 +108,10 @@ class PgLaboratoriesQueries(LaboratoriesQueries):
         ]
 
     def _laboratories_display_types(self) -> list[str]:
-        """Types de structure affichés sur la page publique des laboratoires. Lit la clé de
-        config `laboratories_display_types` (liste) ; défaut `['labo']` si absente ou malformée.
-        Une liste vide est respectée (page vide) : la config fait foi."""
+        """Types de structure que la page publique des laboratoires affiche.
+
+        Lit la clé de configuration `laboratories_display_types`, et retombe sur `['labo']` quand elle est absente ou malformée. Une liste vide est honorée telle quelle, et donne une page vide : la configuration fait foi.
+        """
         row = self._conn.execute(
             text("SELECT value FROM config WHERE key = 'laboratories_display_types'")
         ).one_or_none()
@@ -149,53 +180,32 @@ class PgLaboratoriesQueries(LaboratoriesQueries):
                 rnsr_id=struct_row.rnsr_id,
                 hal_collection=struct_row.hal_collection,
             ),
-            parents=[
-                LabRelatedStructure(
-                    id=r.id,
-                    name=r.name,
-                    acronym=r.acronym,
-                    type=r.type,
-                    relation_type=r.relation_type,
-                )
-                for r in parents
-            ],
-            children=[
-                LabRelatedStructure(
-                    id=r.id,
-                    name=r.name,
-                    acronym=r.acronym,
-                    type=r.type,
-                    relation_type=r.relation_type,
-                )
-                for r in children
-            ],
+            parents=[_related_structure(r) for r in parents],
+            children=[_related_structure(r) for r in children],
             theses_count=theses_row.n,
         )
 
     def get_laboratory_addresses(
         self, lab_id: int, *, page: int, per_page: int
     ) -> LaboratoryAddressesResponse:
-        """Adresses liées à un laboratoire."""
+        """Adresses rattachées à un laboratoire, le rattachement rejeté écarté."""
+        from_where = """
+            FROM addresses a
+            JOIN address_structures ast ON ast.address_id = a.id
+            WHERE ast.structure_id = :lab_id
+              AND ast.is_confirmed IS DISTINCT FROM FALSE
+        """
         offset = (page - 1) * per_page
         count_row = self._conn.execute(
-            text("""
-                SELECT COUNT(*) AS total
-                FROM addresses a
-                JOIN address_structures ast ON ast.address_id = a.id
-                WHERE ast.structure_id = :lab_id
-                  AND ast.is_confirmed IS DISTINCT FROM FALSE
-            """),
+            text(f"SELECT COUNT(*) AS total {from_where}"),
             {"lab_id": lab_id},
         ).one()
         total = count_row.total
 
         rows = self._conn.execute(
-            text("""
+            text(f"""
                 SELECT a.id, a.raw_text, ast.is_confirmed
-                FROM addresses a
-                JOIN address_structures ast ON ast.address_id = a.id
-                WHERE ast.structure_id = :lab_id
-                  AND ast.is_confirmed IS DISTINCT FROM FALSE
+                {from_where}
                 ORDER BY a.raw_text
                 LIMIT :pg_limit OFFSET :pg_offset
             """),
@@ -212,56 +222,42 @@ class PgLaboratoriesQueries(LaboratoriesQueries):
         )
 
     def get_laboratory_subjects(self, lab_id: int, *, limit: int = 30) -> list[SubjectFrequency]:
-        """Top sujets des publications d'un labo, ordonnés par fréquence locale.
+        """Sujets des publications d'un laboratoire, les plus fréquents d'abord.
 
-        Filtre le scope (`peer_review`, `memoir`) et exclut les sujets trop
-        génériques (`subjects.usage_count` > 5000).
+        Écarte les sujets trop génériques, dont l'`usage_count` dépasse 5000. Le `COUNT(DISTINCT p.id)` tient au grain de `publication_subjects`, qui porte une ligne par source pour une même paire (publication, sujet).
         """
-        # EXISTS plutôt que JOIN authorships : chaque publi apparaît une fois,
-        # plutôt que dupliquée par auteur du labo. Le COUNT(DISTINCT p.id) reste
-        # nécessaire car publication_subjects peut avoir plusieurs rows par
-        # (pub_id, subject_id) (sources différentes).
         rows = self._conn.execute(
-            text("""
+            text(f"""
                 SELECT s.id, s.label, COUNT(DISTINCT p.id) AS n
                 FROM publication_subjects ps
                 JOIN publications p ON p.id = ps.publication_id
                 JOIN subjects s ON s.id = ps.subject_id
                 WHERE s.usage_count <= 5000
-                  AND EXISTS (
-                      SELECT 1 FROM authorships a
-                      WHERE a.publication_id = p.id
-                        AND EXISTS (SELECT 1 FROM authorship_structures aus WHERE aus.authorship_id = a.id AND aus.structure_id = ANY(:lab_arr))
-                        AND a.roles && ARRAY['author']::text[]
-                        AND a.in_perimeter = TRUE
-                  )
+                  AND {_LAB_AUTHORED_PUBLICATION}
                 GROUP BY s.id, s.label
                 ORDER BY n DESC, lower(s.label)
                 LIMIT :lim
             """),
-            {"lab_arr": [lab_id], "lim": limit},
+            {"lab_id": lab_id, "lim": limit},
         ).all()
         return [SubjectFrequency(id=r.id, label=r.label, count=r.n) for r in rows]
 
     def get_laboratory_dashboard(self, lab_id: int) -> LaboratoryDashboardResponse:
-        """Dashboard labo : publis/an, répartition OA, collab internationales, top pays."""
-        lab_arr = [lab_id]
+        """Agrégats d'un laboratoire : publications par année sur sept ans, répartition des statuts d'accès ouvert, part de collaboration internationale et pays les plus fréquents."""
         current_year = datetime.date.today().year
 
         pubs_year_rows = self._conn.execute(
-            text("""
+            text(f"""
                 SELECT p.pub_year, COUNT(DISTINCT p.id) AS n
                 FROM publications p
                 JOIN authorships a ON a.publication_id = p.id
-                WHERE a.in_perimeter = TRUE
-                  AND EXISTS (SELECT 1 FROM authorship_structures aus WHERE aus.authorship_id = a.id AND aus.structure_id = ANY(:lab_arr))
-                  AND a.roles && ARRAY['author']::text[]
+                WHERE {_LAB_AUTHOR_SIGNATURE}
                   AND p.pub_year IS NOT NULL
                   AND p.pub_year >= :min_year
                 GROUP BY p.pub_year
                 ORDER BY p.pub_year
             """),
-            {"lab_arr": lab_arr, "min_year": current_year - 6},
+            {"lab_id": lab_id, "min_year": current_year - 6},
         ).all()
         pubs_by_year = [PubYearCount(year=r.pub_year, count=r.n) for r in pubs_year_rows]
 
@@ -271,15 +267,13 @@ class PgLaboratoriesQueries(LaboratoriesQueries):
                     {OA_DASHBOARD_COLS_SQL}
                 FROM publications p
                 JOIN authorships a ON a.publication_id = p.id
-                WHERE a.in_perimeter = TRUE
-                  AND EXISTS (SELECT 1 FROM authorship_structures aus WHERE aus.authorship_id = a.id AND aus.structure_id = ANY(:lab_arr))
-                  AND a.roles && ARRAY['author']::text[]
+                WHERE {_LAB_AUTHOR_SIGNATURE}
             """),
-            {"lab_arr": lab_arr},
+            {"lab_id": lab_id},
         ).one()
 
         collab = self._conn.execute(
-            text("""
+            text(f"""
                 SELECT
                     COUNT(DISTINCT p.id) AS total_articles,
                     COUNT(DISTINCT p.id) FILTER (
@@ -288,31 +282,22 @@ class PgLaboratoriesQueries(LaboratoriesQueries):
                     ) AS international
                 FROM publications p
                 JOIN authorships a ON a.publication_id = p.id
-                WHERE a.in_perimeter = TRUE
-                  AND EXISTS (SELECT 1 FROM authorship_structures aus WHERE aus.authorship_id = a.id AND aus.structure_id = ANY(:lab_arr))
-                  AND a.roles && ARRAY['author']::text[]
+                WHERE {_LAB_AUTHOR_SIGNATURE}
                   AND p.doc_type = 'article'
             """),
-            {"lab_arr": lab_arr},
+            {"lab_id": lab_id},
         ).one()
 
-        # EXISTS plutôt que JOIN authorships : évite la duplication de chaque
-        # publi par auteur du labo (× ~1.2) avant l'unnest des pays (× ~27),
-        # ce qui faisait déborder le sort sur disque.
+        # L'`unnest` des pays multiplie chaque publication par ~27 : la dédupliquer avant, plutôt
+        # que par auteur du laboratoire ensuite, garde le tri en mémoire.
         top_country_rows = self._conn.execute(
-            text("""
+            text(f"""
                 SELECT co.code, co.name, COUNT(*) AS n
                 FROM (
                     SELECT p.id, unnest(p.countries) AS cc
                     FROM publications p
                     WHERE p.doc_type = 'article'
-                      AND EXISTS (
-                          SELECT 1 FROM authorships a
-                          WHERE a.publication_id = p.id
-                            AND a.in_perimeter = TRUE
-                            AND EXISTS (SELECT 1 FROM authorship_structures aus WHERE aus.authorship_id = a.id AND aus.structure_id = ANY(:lab_arr))
-                            AND a.roles && ARRAY['author']::text[]
-                      )
+                      AND {_LAB_AUTHORED_PUBLICATION}
                 ) sub
                 JOIN countries co ON co.code = sub.cc
                 WHERE sub.cc NOT IN ('fr', 'xx')
@@ -320,7 +305,7 @@ class PgLaboratoriesQueries(LaboratoriesQueries):
                 ORDER BY n DESC
                 LIMIT 5
             """),
-            {"lab_arr": lab_arr},
+            {"lab_id": lab_id},
         ).all()
         top_countries = [
             LabTopCountry(code=r.code.strip(), name=r.name, count=r.n) for r in top_country_rows
