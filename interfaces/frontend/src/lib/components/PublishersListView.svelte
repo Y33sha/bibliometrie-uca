@@ -13,7 +13,7 @@
 	import { useUrlFilters } from '$lib/composables/useUrlFilters.svelte';
 	import type { components } from '$lib/api/schema';
 
-	type Publisher = components['schemas']['PublisherListItem'];
+	type Publisher = components['schemas']['Publisher'];
 
 	// Composant de liste d'éditeurs réutilisable. Utilisé par :
 	// - `/publishers` (mode autonome avec sync URL)

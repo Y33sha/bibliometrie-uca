@@ -280,7 +280,7 @@ class TestGetPublisher:
         body = r.json()
         assert body["id"] == pid
         assert body["name"] == "TestGetPub"
-        # Champs ajoutés par la promotion vers PublisherDetailResponse.
+        # Le profil détaillé porte le type, les préfixes DOI et les décomptes.
         assert "publisher_type" in body
         assert "doi_prefixes" in body
         assert "journal_count" in body
@@ -446,12 +446,12 @@ class TestMergePublishers:
         assert body["target_id"] == dst
 
 
-# ── GET /api/publisher-types ────────────────────────────────────
+# ── GET /api/publishers/types ───────────────────────────────────
 
 
 class TestPublisherTypes:
     def test_returns_all_values_with_labels(self, client):
-        r = client.get("/api/publisher-types")
+        r = client.get("/api/publishers/types")
         assert r.status_code == 200
         body = r.json()
         values = [opt["value"] for opt in body]

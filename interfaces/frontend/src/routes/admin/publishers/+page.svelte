@@ -9,7 +9,7 @@
 	import { toast } from '$lib/dialogs.svelte';
 
 	import type { components } from '$lib/api/schema';
-	type Publisher = components['schemas']['PublisherListItem'];
+	type Publisher = components['schemas']['Publisher'];
 	type EnumOption = components['schemas']['EnumOption'];
 	type Country = components['schemas']['CountryOut'];
 
@@ -118,7 +118,7 @@
 	}
 
 	onMount(async () => {
-		publisherTypes = await api<EnumOption[]>('/api/publisher-types');
+		publisherTypes = await api<EnumOption[]>('/api/publishers/types');
 		countries = await api<Country[]>('/api/countries');
 	});
 </script>

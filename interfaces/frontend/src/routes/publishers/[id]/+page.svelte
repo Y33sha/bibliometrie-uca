@@ -12,7 +12,7 @@
 	import SubjectsCloud from '$lib/components/SubjectsCloud.svelte';
 	import type { components } from '$lib/api/schema';
 
-	type PublisherDetail = components['schemas']['PublisherDetailResponse'];
+	type PublisherDetail = components['schemas']['Publisher'];
 	type PublisherDashboard = components['schemas']['PublisherDashboardResponse'];
 	type SubjectFrequency = components['schemas']['SubjectFrequency'];
 	type EnumOption = components['schemas']['EnumOption'];
@@ -63,7 +63,7 @@
 	}
 
 	async function loadTypeLabels() {
-		const pubOpts = await api<EnumOption[]>('/api/publisher-types');
+		const pubOpts = await api<EnumOption[]>('/api/publishers/types');
 		publisherTypeLabels = Object.fromEntries(pubOpts.map((o) => [o.value, o.label_fr]));
 	}
 

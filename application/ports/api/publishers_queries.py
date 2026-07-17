@@ -19,7 +19,12 @@ class DoiPrefixInfo(BaseModel):
     crossref_member_id: int | None = None
 
 
-class PublisherListItem(BaseModel):
+class Publisher(BaseModel):
+    """Profil d'un éditeur, commun à la ligne de liste et à la page publique `/publishers/[id]`.
+
+    `pub_count` compte les seules publications du périmètre, sommées sur les revues de l'éditeur.
+    """
+
     id: int
     name: str
     openalex_id: str | None
@@ -31,20 +36,7 @@ class PublisherListItem(BaseModel):
 
 
 class PublisherListResponse(PaginatedResponse):
-    publishers: list[PublisherListItem]
-
-
-class PublisherDetailResponse(BaseModel):
-    """GET /api/publishers/{id} : profil complet pour la page publique /publishers/[id]."""
-
-    id: int
-    name: str
-    openalex_id: str | None
-    country: str | None
-    doi_prefixes: list[DoiPrefixInfo]
-    publisher_type: str
-    journal_count: int
-    pub_count: int
+    publishers: list[Publisher]
 
 
 class JournalTypeCount(BaseModel):
@@ -128,7 +120,7 @@ class PublisherQueries(Protocol):
         with_pubs: bool,
     ) -> PublishersFacetsResponse: ...
 
-    def get_publisher_detail(self, publisher_id: int) -> PublisherDetailResponse | None: ...
+    def get_publisher_detail(self, publisher_id: int) -> Publisher | None: ...
 
     def get_publisher_dashboard(self, publisher_id: int) -> PublisherDashboardResponse | None: ...
 

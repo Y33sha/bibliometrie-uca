@@ -9,9 +9,8 @@ from application.ports.api.publishers_queries import (
     DoiPrefixInfo,
     JournalTypeCount,
     OaStatusCount,
+    Publisher,
     PublisherDashboardResponse,
-    PublisherDetailResponse,
-    PublisherListItem,
     PublisherListResponse,
     PublisherQueries,
     PublishersFacetOption,
@@ -20,7 +19,7 @@ from application.ports.api.publishers_queries import (
 from application.ports.api.subjects_queries import SubjectFrequency
 from domain.normalize import normalize_text
 from domain.publishers.publisher import PUBLISHER_TYPE_LABELS_FR, PUBLISHER_TYPES
-from infrastructure.queries.filters import publication_in_perimeter
+from infrastructure.queries.filters import SUBJECT_IS_NOT_GENERIC, publication_in_perimeter
 
 
 def _build_publisher_where(
@@ -84,6 +83,30 @@ def _doi_prefixes_sql() -> str:
     """
 
 
+# Colonnes du profil d'un éditeur (alias `p` = publishers), communes à la ligne de liste et à
+# la page d'un éditeur, projetées par `_row_to_publisher`.
+_PUBLISHER_COLUMNS = f"""
+    p.id, p.name, p.openalex_id, p.country,
+    p.publisher_type,
+    (SELECT COUNT(*) FROM journals j WHERE j.publisher_id = p.id) AS journal_count,
+    p.pub_count,
+    {_doi_prefixes_sql()} AS doi_prefixes
+""".strip()
+
+
+def _row_to_publisher(row: Any) -> Publisher:
+    return Publisher(
+        id=row.id,
+        name=row.name,
+        openalex_id=row.openalex_id,
+        country=row.country,
+        doi_prefixes=[DoiPrefixInfo(**p) for p in row.doi_prefixes],
+        publisher_type=row.publisher_type,
+        journal_count=row.journal_count,
+        pub_count=row.pub_count,
+    )
+
+
 class PgPublisherQueries(PublisherQueries):
     """Adapter SA pour `application.ports.api.publishers_queries.PublisherQueries`."""
 
@@ -118,12 +141,7 @@ class PgPublisherQueries(PublisherQueries):
         offset = (page - 1) * per_page
         rows = self._conn.execute(
             text(f"""
-                SELECT p.id, p.name, p.openalex_id, p.country,
-                       p.publisher_type,
-                       (SELECT COUNT(*) FROM journals j
-                        WHERE j.publisher_id = p.id) AS journal_count,
-                       p.pub_count,
-                       {_doi_prefixes_sql()} AS doi_prefixes
+                SELECT {_PUBLISHER_COLUMNS}
                 FROM publishers p
                 WHERE {where}
                 ORDER BY {order}
@@ -135,19 +153,7 @@ class PgPublisherQueries(PublisherQueries):
             total=total,
             page=page,
             per_page=per_page,
-            publishers=[
-                PublisherListItem(
-                    id=r.id,
-                    name=r.name,
-                    openalex_id=r.openalex_id,
-                    country=r.country,
-                    doi_prefixes=[DoiPrefixInfo(**p) for p in r.doi_prefixes],
-                    publisher_type=r.publisher_type,
-                    journal_count=r.journal_count,
-                    pub_count=r.pub_count,
-                )
-                for r in rows
-            ],
+            publishers=[_row_to_publisher(r) for r in rows],
         )
 
     def publishers_facets(
@@ -214,15 +220,10 @@ class PgPublisherQueries(PublisherQueries):
             countries=countries_facet,
         )
 
-    def get_publisher_detail(self, publisher_id: int) -> PublisherDetailResponse | None:
+    def get_publisher_detail(self, publisher_id: int) -> Publisher | None:
         row = self._conn.execute(
             text(f"""
-                SELECT p.id, p.name, p.openalex_id, p.country,
-                       p.publisher_type,
-                       (SELECT COUNT(*) FROM journals j
-                        WHERE j.publisher_id = p.id) AS journal_count,
-                       p.pub_count,
-                       {_doi_prefixes_sql()} AS doi_prefixes
+                SELECT {_PUBLISHER_COLUMNS}
                 FROM publishers p
                 WHERE p.id = :id
             """),
@@ -230,16 +231,7 @@ class PgPublisherQueries(PublisherQueries):
         ).one_or_none()
         if row is None:
             return None
-        return PublisherDetailResponse(
-            id=row.id,
-            name=row.name,
-            openalex_id=row.openalex_id,
-            country=row.country,
-            doi_prefixes=[DoiPrefixInfo(**p) for p in row.doi_prefixes],
-            publisher_type=row.publisher_type,
-            journal_count=row.journal_count,
-            pub_count=row.pub_count,
-        )
+        return _row_to_publisher(row)
 
     def get_publisher_dashboard(self, publisher_id: int) -> PublisherDashboardResponse | None:
         exists = self._conn.execute(
@@ -294,14 +286,10 @@ class PgPublisherQueries(PublisherQueries):
             oa_statuses=[OaStatusCount(oa_status=r.oa_status, count=r.n) for r in oa_rows],
         )
 
-    def get_publisher_subjects(
-        self, publisher_id: int, *, limit: int = 30
-    ) -> list[SubjectFrequency]:
-        """Top sujets des publications de l'éditeur (via JOIN journals → publications).
+    def get_publisher_subjects(self, publisher_id: int, *, limit: int) -> list[SubjectFrequency]:
+        """Sujets des publications de l'éditeur, les plus fréquents d'abord, atteintes par ses revues.
 
-        Filtre les sujets génériques (`usage_count > 5000`) pour rester utile
-        à l'œil. COUNT(DISTINCT p.id) car publication_subjects peut avoir
-        plusieurs rows par (pub_id, subject_id) (sources différentes).
+        Le `COUNT(DISTINCT p.id)` tient au grain de `publication_subjects`, qui porte une ligne par source pour une même paire (publication, sujet).
         """
         rows = self._conn.execute(
             text(f"""
@@ -312,7 +300,7 @@ class PgPublisherQueries(PublisherQueries):
                 JOIN subjects s ON s.id = ps.subject_id
                 WHERE j.publisher_id = :id
                   AND {publication_in_perimeter("p")}
-                  AND s.usage_count <= 5000
+                  AND {SUBJECT_IS_NOT_GENERIC}
                 GROUP BY s.id, s.label
                 ORDER BY n DESC, lower(s.label)
                 LIMIT :lim
