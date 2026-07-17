@@ -1,10 +1,10 @@
-# Règles métier retenues dans les routers HTTP
+# Exceptions : démêler les `HTTPException` des routers
 
 ## Contexte
 
 `app.py` déclare que ses handlers d'exception sont le seul endroit où une erreur métier devient un code HTTP : les services lèvent les erreurs de `domain/errors.py`, et `NotFoundError`, `ValidationError`, `ConflictError` et leurs sœurs y trouvent leur statut. Les routers lèvent pourtant `HTTPException` en une trentaine d'endroits.
 
-Ces trente occurrences ne relèvent pas d'un même cas.
+Ces trente occurrences ne relèvent pas d'un même cas — c'est leur tri qui fait ce chantier. Les unes traduisent une lecture vide et sont à leur place ; les autres portent des règles métier, des validations de corps de requête, ou masquent le handler global.
 
 Treize traduisent une lecture qui n'a rien rendu. Le port déclare `get_journal_detail(id) -> JournalDetail | None`, le router reçoit `None` et répond 404. Aucune règle n'est violée : la requête n'a pas trouvé. Le contrat du port porte l'absence, et la traduire en statut est le travail de l'adaptateur HTTP.
 
