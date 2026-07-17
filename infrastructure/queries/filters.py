@@ -73,6 +73,15 @@ def publication_in_perimeter(alias: str = "p") -> str:
 # La plupart des requêtes aliasent les publications `p` : constante de commodité.
 PUBLICATION_IS_IN_PERIMETER = publication_in_perimeter()
 
+# Un sujet dont l'usage global dépasse ce seuil est trop générique pour un nuage de mots :
+# « research article » ou « science » arrivent en tête de tous les contextes et masquent ce
+# qui distingue celui qu'on regarde.
+GENERIC_SUBJECT_MAX_USAGE = 5000
+
+# Filtre SQL : le sujet (table `subjects` aliasée `s`) n'est pas générique. Partagé par les
+# quatre nuages de mots — éditeur, revue, laboratoire, personne — qui écartent le même ensemble.
+SUBJECT_IS_NOT_GENERIC = f"(s.usage_count <= {GENERIC_SUBJECT_MAX_USAGE})"
+
 
 @dataclass(frozen=True)
 class WhereClause:
