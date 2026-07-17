@@ -225,7 +225,9 @@ export interface paths {
         };
         /**
          * Publications Facets
-         * @description Facettes dynamiques pour la page publications.
+         * @description Décomptes par option des facettes de la liste des publications.
+         *
+         *     Chaque facette écarte sa propre dimension de la clause WHERE : son décompte annonce le nombre de publications atteignables si l'option était cochée ou décochée.
          */
         get: operations["publications_facets_api_publications_facets_get"];
         put?: never;
@@ -309,7 +311,9 @@ export interface paths {
         };
         /**
          * Export Theses Csv
-         * @description Export CSV de la page thèses (filtres + tri identiques à la liste).
+         * @description Export CSV de la page thèses, aux mêmes filtres et au même tri que sa liste.
+         *
+         *     La surface de filtres est plus étroite que celle des publications, et n'annonce que ce que l'export honore. Sans `doc_type`, il porte sur les thèses soutenues et en cours.
          */
         get: operations["export_theses_csv_api_publications_export_theses_csv_get"];
         put?: never;
@@ -349,9 +353,9 @@ export interface paths {
         };
         /**
          * List Publications
-         * @description Liste paginée des publications avec sources, labos et journal rattachés.
+         * @description Liste paginée des publications, avec leurs sources, leurs laboratoires et leur revue.
          *
-         *     Filtres multiples cumulables. `lab_id` et `year` acceptent des listes CSV ; `lab_id=none` = publications sans labo rattaché. `sort` : `year_desc` / `year_asc` / `title` / `cited_by`. `in_perimeter=yes|no|""` sélectionne les publications dont au moins un auteur est in_perimeter. `subject_id` filtre les publications annotées par ce sujet.
+         *     Les filtres se cumulent. `sort` accepte `year_desc`, `year_asc`, `title` et `cited_by`.
          */
         get: operations["list_publications_api_publications_get"];
         put?: never;
@@ -6041,23 +6045,23 @@ export interface operations {
     publications_facets_api_publications_facets_get: {
         parameters: {
             query?: {
-                year?: string;
+                search?: string;
                 lab_id?: string;
-                doc_type?: string;
-                excluded_doc_type?: string;
-                access?: string;
-                oa_status?: string;
-                source_filter?: string;
+                year?: string;
                 publisher_id?: number | null;
                 journal_id?: number | null;
                 person_id?: number | null;
+                subject_id?: number | null;
+                access?: string;
+                oa_status?: string;
+                source_filter?: string;
+                doc_type?: string;
+                excluded_doc_type?: string;
                 is_corresponding?: string;
                 has_apc?: string;
                 country?: string;
                 hal_status?: string;
                 in_perimeter?: string;
-                subject_id?: number | null;
-                search?: string;
             };
             header?: never;
             path?: never;
@@ -6090,23 +6094,23 @@ export interface operations {
             query: {
                 kind: "publisher" | "journal";
                 entity_search?: string;
-                year?: string;
+                search?: string;
                 lab_id?: string;
-                doc_type?: string;
-                excluded_doc_type?: string;
-                access?: string;
-                oa_status?: string;
-                source_filter?: string;
+                year?: string;
                 publisher_id?: number | null;
                 journal_id?: number | null;
                 person_id?: number | null;
+                subject_id?: number | null;
+                access?: string;
+                oa_status?: string;
+                source_filter?: string;
+                doc_type?: string;
+                excluded_doc_type?: string;
                 is_corresponding?: string;
                 has_apc?: string;
                 country?: string;
                 hal_status?: string;
                 in_perimeter?: string;
-                subject_id?: number | null;
-                search?: string;
             };
             header?: never;
             path?: never;
@@ -6169,25 +6173,25 @@ export interface operations {
     export_publications_csv_api_publications_export_csv_get: {
         parameters: {
             query?: {
+                sort?: string;
+                columns?: string;
                 search?: string;
                 lab_id?: string;
                 year?: string;
                 publisher_id?: number | null;
                 journal_id?: number | null;
+                person_id?: number | null;
+                subject_id?: number | null;
                 access?: string;
                 oa_status?: string;
                 source_filter?: string;
                 doc_type?: string;
                 excluded_doc_type?: string;
-                sort?: string;
-                person_id?: number | null;
                 is_corresponding?: string;
                 has_apc?: string;
                 country?: string;
                 hal_status?: string;
                 in_perimeter?: string;
-                subject_id?: number | null;
-                columns?: string;
             };
             header?: never;
             path?: never;
@@ -6288,24 +6292,24 @@ export interface operations {
             query?: {
                 page?: number;
                 per_page?: number;
+                sort?: string;
                 search?: string;
                 lab_id?: string;
                 year?: string;
                 publisher_id?: number | null;
                 journal_id?: number | null;
+                person_id?: number | null;
+                subject_id?: number | null;
                 access?: string;
                 oa_status?: string;
                 source_filter?: string;
                 doc_type?: string;
                 excluded_doc_type?: string;
-                sort?: string;
-                person_id?: number | null;
                 is_corresponding?: string;
                 has_apc?: string;
                 country?: string;
                 hal_status?: string;
                 in_perimeter?: string;
-                subject_id?: number | null;
             };
             header?: never;
             path?: never;

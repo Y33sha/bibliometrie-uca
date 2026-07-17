@@ -2,7 +2,7 @@
 
 from sqlalchemy import text
 
-from application.ports.api.publications_queries import FacetFilters, ListFilters
+from application.ports.api.publications_queries import PublicationFilters
 from infrastructure.queries.api.publications.facets import _PublicationFacetsBuilder
 from infrastructure.queries.api.publications.list import list_publications
 from tests.integration.helpers.structures import add_authorship_structure
@@ -70,7 +70,7 @@ class TestSearch:
 
         res = list_publications(
             sa_sync_conn,
-            filters=ListFilters(search="quantum", lab_ids=[lab]),
+            filters=PublicationFilters(search="quantum", lab_ids=[lab]),
             perimeter_structure_ids=[],
             page=1,
             per_page=50,
@@ -93,7 +93,7 @@ class TestSearch:
 
         res = list_publications(
             sa_sync_conn,
-            filters=ListFilters(search="quantum", lab_ids=[lab]),
+            filters=PublicationFilters(search="quantum", lab_ids=[lab]),
             perimeter_structure_ids=[],
             page=1,
             per_page=50,
@@ -117,7 +117,7 @@ class TestSearch:
 
         res = list_publications(
             sa_sync_conn,
-            filters=ListFilters(search="quantum", lab_ids=[lab]),
+            filters=PublicationFilters(search="quantum", lab_ids=[lab]),
             perimeter_structure_ids=[],
             page=1,
             per_page=50,
@@ -136,7 +136,7 @@ class TestSearch:
 
         res = list_publications(
             sa_sync_conn,
-            filters=ListFilters(search="econometrie", lab_ids=[lab]),
+            filters=PublicationFilters(search="econometrie", lab_ids=[lab]),
             perimeter_structure_ids=[],
             page=1,
             per_page=50,
@@ -158,7 +158,7 @@ class TestSearch:
 
         def years_total(search: str) -> int:
             builder = _PublicationFacetsBuilder(
-                sa_sync_conn, FacetFilters(search=search, lab_ids=[lab]), []
+                sa_sync_conn, PublicationFilters(search=search, lab_ids=[lab]), []
             )
             return sum(r["count"] for r in builder._facet_years())
 
@@ -209,7 +209,7 @@ class TestHalStatusMultipleHalEntries:
 
         res = list_publications(
             sa_sync_conn,
-            filters=ListFilters(lab_ids=[lab], hal_status_values=["hors_collection"]),
+            filters=PublicationFilters(lab_ids=[lab], hal_status_values=["hors_collection"]),
             perimeter_structure_ids=[],
             page=1,
             per_page=50,
@@ -228,7 +228,7 @@ class TestHalStatusMultipleHalEntries:
 
         res = list_publications(
             sa_sync_conn,
-            filters=ListFilters(lab_ids=[lab]),
+            filters=PublicationFilters(lab_ids=[lab]),
             perimeter_structure_ids=[],
             page=1,
             per_page=50,
@@ -247,7 +247,7 @@ class TestHalStatusMultipleHalEntries:
 
         res = list_publications(
             sa_sync_conn,
-            filters=ListFilters(lab_ids=[lab], hal_status_values=["hors_collection"]),
+            filters=PublicationFilters(lab_ids=[lab], hal_status_values=["hors_collection"]),
             perimeter_structure_ids=[],
             page=1,
             per_page=50,
