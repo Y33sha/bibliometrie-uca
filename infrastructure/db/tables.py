@@ -1,14 +1,12 @@
 """Modèle SQLAlchemy des tables Postgres — surface de query-building.
 
-Décrit tables, indexes, contraintes uniques, CHECK et comments, pour deux usages :
+Décrit tables, colonnes, contraintes uniques, CHECK et comments, pour deux usages :
 - le query-building côté SQLAlchemy Core (`select(config.c.key)…`),
 - servir de référence à `alembic revision --autogenerate` (comparaison MetaData ↔ DB).
 
-Ce modèle n'est pas la source de vérité du schéma : les migrations Alembic (`alembic/versions/`, écrites à la main) font foi, et `infrastructure/db/schema.sql` en est un snapshot descriptif régénéré par `python -m infrastructure.db.dump_schema`. Le fichier est maintenu à la main en miroir de la base ; le test `tests/integration/infrastructure/db/test_sqlalchemy_smoke.py` garde les deux cohérents, en vérifiant que colonnes déclarées et colonnes réelles coïncident (un drift d'index, de contrainte ou d'enum, lui, n'est pas couvert).
+Ce modèle n'est pas la source de vérité du schéma : les migrations Alembic (`alembic/versions/`, écrites à la main) font foi, et `infrastructure/db/schema.sql` en est un snapshot descriptif régénéré par `python -m infrastructure.db.dump_schema`. Le fichier est maintenu à la main en miroir de la base ; le test `tests/integration/infrastructure/db/test_sqlalchemy_smoke.py` garde les deux cohérents, en vérifiant que colonnes déclarées et colonnes réelles coïncident.
 
-Deux familles d'objets sont volontairement tenues hors du metadata et écartées de l'autogenerate :
-- les Foreign Keys — non déclarées (query-building, pas modélisation relationnelle complète) ; le filtre `include_object` dans `alembic/env.py` les ignore.
-- les vues matérialisées (`authorship_structures`, `publication_structures`, `source_authorship_structures`, `subject_cooccurrences`) — non modélisées, accès en SQL brut par nom, car autogenerate ne gère pas les MATERIALIZED VIEW.
+Le périmètre du metadata s'arrête aux tables et à leurs colonnes. Index, clés étrangères et vues matérialisées (`authorship_structures`, `publication_structures`, `source_authorship_structures`, `subject_cooccurrences`) appartiennent aux seules migrations ; le filtre `include_object` d'`alembic/env.py` les écarte de la comparaison.
 """
 
 from sqlalchemy import (
@@ -20,7 +18,6 @@ from sqlalchemy import (
     Computed,
     Date,
     DateTime,
-    Index,
     Integer,
     MetaData,
     Numeric,
@@ -92,9 +89,6 @@ audit_log = Table(
         ),
     ),
     Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
-    Index("audit_log_aggregate_idx", "aggregate_type", "aggregate_id"),
-    Index("audit_log_created_at_idx", text("created_at DESC")),
-    Index("audit_log_event_type_idx", "event_type", text("created_at DESC")),
     comment=(
         "Trace des opérations destructives/décisionnelles déclenchées via "
         "l'admin HTTP. Les opérations du pipeline ne sont pas auditées."
@@ -142,7 +136,6 @@ perimeter_structures = Table(
         "structure_id",
         name="perimeter_structures_pkey",
     ),
-    Index("idx_ps_structure_id", "structure_id"),
 )
 
 
@@ -209,7 +202,6 @@ structures = Table(
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     Column("api_ids", JSONB),
     UniqueConstraint("code", name="structures_code_key"),
-    Index("idx_structures_type", "structure_type"),
 )
 
 
@@ -227,8 +219,6 @@ structure_relations = Table(
         "relation_type",
         name="structure_relations_parent_id_child_id_relation_type_key",
     ),
-    Index("idx_struct_rel_child", "child_id"),
-    Index("idx_struct_rel_parent", "parent_id"),
 )
 
 
@@ -243,7 +233,6 @@ structure_name_forms = Table(
     Column("requires_context_of", ARRAY(Integer)),
     Column("is_excluding", Boolean, nullable=False, server_default="false"),
     UniqueConstraint("structure_id", "form_text", name="uq_snf_structure_form"),
-    Index("idx_structure_name_forms_structure", "structure_id"),
 )
 
 
@@ -273,16 +262,6 @@ journals = Table(
     # publications pour le filtre `with_pubs` / le tri / l'affichage.
     Column("pub_count", Integer, nullable=False, server_default="0"),
     UniqueConstraint("openalex_id", name="journals_openalex_id_key"),
-    Index(
-        "idx_journals_doi_prefix",
-        "doi_prefix",
-        postgresql_where=text("doi_prefix IS NOT NULL"),
-    ),
-    Index("idx_journals_eissn", "eissn"),
-    Index("idx_journals_issn", "issn"),
-    Index("idx_journals_issnl", "issnl"),
-    Index("idx_journals_publisher", "publisher_id"),
-    Index("idx_journals_titlenorm", "title_normalized"),
 )
 
 
@@ -295,7 +274,6 @@ journal_name_forms = Table(
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     Column("publisher_id", Integer),
     UniqueConstraint("form_normalized", "publisher_id", name="uq_jnl_nf_form_publisher"),
-    Index("idx_jnl_nf_journal", "journal_id"),
 )
 
 
@@ -318,13 +296,6 @@ publishers = Table(
     # revues). Maintenu par le pipeline + aux fusions admin. Cf. `journals.pub_count`.
     Column("pub_count", Integer, nullable=False, server_default="0"),
     UniqueConstraint("openalex_id", name="publishers_openalex_id_key"),
-    Index("idx_publishers_name_norm", "name_normalized"),
-    Index(
-        "idx_publishers_name_trgm",
-        "name",
-        postgresql_ops={"name": "gin_trgm_ops"},
-        postgresql_using="gin",
-    ),
 )
 
 
@@ -336,7 +307,6 @@ publisher_name_forms = Table(
     Column("form_normalized", Text, nullable=False),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     UniqueConstraint("form_normalized", name="publisher_name_forms_form_normalized_key"),
-    Index("idx_pub_nf_publisher", "publisher_id"),
 )
 
 
@@ -354,32 +324,6 @@ doi_prefixes = Table(
     Column("datacite_client_symbol", Text),
     Column("fetched_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
     Column("publisher_checked_at", DateTime(timezone=True)),
-    Index("idx_doi_prefixes_ra", "ra"),
-    Index(
-        "idx_doi_prefixes_publisher_pending",
-        "prefix",
-        postgresql_where=text("publisher_id IS NULL AND publisher_checked_at IS NULL"),
-    ),
-    Index(
-        "idx_doi_prefixes_publisher",
-        "publisher_id",
-        postgresql_where=text("publisher_id IS NOT NULL"),
-    ),
-    Index(
-        "idx_doi_prefixes_publisher_name_normalized",
-        "publisher_name_normalized",
-        postgresql_where=text("publisher_id IS NULL"),
-    ),
-    Index(
-        "idx_doi_prefixes_client_name_normalized",
-        "client_name_normalized",
-        postgresql_where=text("client_name_normalized IS NOT NULL"),
-    ),
-    Index(
-        "idx_doi_prefixes_datacite_client_symbol",
-        "datacite_client_symbol",
-        postgresql_where=text("datacite_client_symbol IS NOT NULL"),
-    ),
 )
 
 
@@ -475,25 +419,6 @@ addresses = Table(
     Column("countries_dirty", Boolean, nullable=False, server_default="false"),
     # Index UNIQUE sur expression md5(raw_text) — complété à la main, hors
     # de portée de --autogenerate qui ne sait pas représenter l'expression.
-    Index("addresses_raw_text_key", text("md5(raw_text)"), unique=True),
-    Index(
-        "idx_addr_sug_countries",
-        "suggested_countries",
-        postgresql_using="gin",
-        postgresql_where=text("suggested_countries IS NOT NULL"),
-    ),
-    Index(
-        "idx_addresses_countries",
-        "countries",
-        postgresql_using="gin",
-        postgresql_where=text("countries IS NOT NULL"),
-    ),
-    Index(
-        "idx_addresses_normalized_text_trgm",
-        "normalized_text",
-        postgresql_ops={"normalized_text": "gin_trgm_ops"},
-        postgresql_using="gin",
-    ),
 )
 
 
@@ -510,7 +435,6 @@ place_name_forms = Table(
     Column("kind", Text, nullable=False, server_default="country"),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     UniqueConstraint("form_normalized", name="place_name_forms_form_normalized_key"),
-    Index("idx_pnf_iso", "iso_code"),
     CheckConstraint(
         "kind IN ('country', 'institution', 'city')", name="place_name_forms_kind_check"
     ),
@@ -528,14 +452,6 @@ address_structures = Table(
     UniqueConstraint(
         "address_id", "structure_id", name="address_structures_address_id_structure_id_key"
     ),
-    Index("idx_addr_struct_address", "address_id"),
-    Index(
-        "idx_addr_struct_filter",
-        "structure_id",
-        "address_id",
-        postgresql_include=["matched_form_id", "is_confirmed"],
-    ),
-    Index("idx_addr_struct_structure", "structure_id"),
 )
 
 
@@ -554,27 +470,6 @@ authorships = Table(
     Column("is_corresponding", Boolean),
     Column("roles", ARRAY(Text)),
     UniqueConstraint("publication_id", "person_id", name="authorships_publication_person_uq"),
-    Index(
-        "idx_authorships_corresponding_uca",
-        "publication_id",
-        postgresql_where=text("(is_corresponding = true) AND (in_perimeter = true)"),
-    ),
-    Index(
-        "idx_authorships_person",
-        "person_id",
-        postgresql_where=text("person_id IS NOT NULL"),
-    ),
-    Index("idx_authorships_pub", "publication_id"),
-    Index(
-        "idx_authorships_pub_uca",
-        "publication_id",
-        postgresql_where=text("in_perimeter = true"),
-    ),
-    Index(
-        "idx_authorships_uca",
-        "in_perimeter",
-        postgresql_where=text("in_perimeter = true"),
-    ),
 )
 
 
@@ -630,7 +525,6 @@ author_identifying_keys = Table(
         name="author_identifying_keys_key",
         postgresql_nulls_not_distinct=True,
     ),
-    Index("author_identifying_keys_key_hash_idx", "key_hash"),
 )
 
 
@@ -667,34 +561,10 @@ source_authorships = Table(
         "author_position",
         name="source_authorships_pub_pos_key",
     ),
-    Index(
-        "idx_sa_authorship",
-        "authorship_id",
-        postgresql_where=text("authorship_id IS NOT NULL"),
-    ),
-    Index(
-        "idx_sa_in_perimeter",
-        "source_publication_id",
-        postgresql_where=text("in_perimeter = TRUE"),
-    ),
     # Index couvrant : `person_id` en tête sert les recherches par personne ;
     # `identity_id` en colonne incluse permet l'index-only scan de la projection
     # `(person_id, identifiants)` de la file « conflits d'identifiant » (admin),
     # qui rejoint `author_identifying_keys` sur `identity_id`.
-    Index(
-        "idx_sa_person",
-        "person_id",
-        "identity_id",
-        postgresql_where=text("person_id IS NOT NULL"),
-    ),
-    Index(
-        "idx_sa_pub_person",
-        "source_publication_id",
-        "person_id",
-        postgresql_where=text("person_id IS NOT NULL"),
-    ),
-    Index("idx_sa_identity", "identity_id"),
-    Index("idx_sa_countries_dirty", "source", postgresql_where=text("countries_dirty")),
 )
 
 
@@ -709,7 +579,6 @@ source_authorship_addresses = Table(
         "address_id",
         name="source_authorship_addresses_source_authorship_id_address_id_key",
     ),
-    Index("idx_saa_address", "address_id"),
 )
 
 
@@ -734,7 +603,6 @@ persons = Table(
     Column("first_name_normalized", Text, nullable=False),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     Column("rejected", Boolean, server_default="false"),
-    Index("idx_persons_name", "last_name_normalized", "first_name_normalized"),
 )
 
 
@@ -752,8 +620,6 @@ persons_rh = Table(
     Column("hr_export_date", Date),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     UniqueConstraint("person_id", name="persons_rh_person_id_key"),
-    Index("idx_persons_rh_department", "department_name"),
-    Index("idx_persons_rh_person_id", "person_id"),
 )
 
 
@@ -768,8 +634,6 @@ person_identifiers = Table(
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     Column("status", identifier_status_enum, nullable=False, server_default="pending"),
     UniqueConstraint("id_type", "id_value", name="person_identifiers_id_type_id_value_key"),
-    Index("idx_person_ids_lookup", "id_type", "id_value"),
-    Index("idx_person_ids_person", "person_id"),
 )
 
 
@@ -782,7 +646,6 @@ person_name_forms = Table(
     Column("status", identifier_status_enum, nullable=False, server_default="pending"),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     PrimaryKeyConstraint("name_form", "person_id", name="person_name_forms_pkey"),
-    Index("idx_pnf_person_id", "person_id"),
 )
 
 
@@ -820,58 +683,14 @@ publications = Table(
     # (NULL = jamais), qu'elle ait trouvé la publication ou non. La phase `oa_status`
     # re-vérifie les jamais-interrogées, puis les plus périmées.
     Column("unpaywall_checked_at", DateTime(timezone=True)),
-    Index(
-        "idx_pub_countries",
-        "countries",
-        postgresql_using="gin",
-        postgresql_where=text("countries IS NOT NULL"),
-    ),
-    Index(
-        "idx_pub_title_trgm",
-        "title_normalized",
-        postgresql_ops={"title_normalized": "gin_trgm_ops"},
-        postgresql_using="gin",
-    ),
-    Index("idx_publications_journal", "journal_id"),
-    Index(
-        "idx_publications_meta",
-        "meta",
-        postgresql_using="gin",
-        postgresql_where=text("meta IS NOT NULL"),
-    ),
-    Index("idx_publications_sources", "sources", postgresql_using="gin"),
-    Index("idx_publications_titlenorm_year", "title_normalized", "pub_year"),
-    Index("idx_publications_year", "pub_year"),
-    Index("idx_publications_year_type", "pub_year", "doc_type"),
     # Listes scopées au périmètre : tri par défaut (pub_year DESC) et sous-requêtes
     # pub_count par éditeur/revue (jointure via journal_id), restreints au périmètre.
-    Index(
-        "idx_publications_in_perimeter_year",
-        text("pub_year DESC"),
-        postgresql_where=text("in_perimeter"),
-    ),
-    Index(
-        "idx_publications_in_perimeter_journal",
-        "journal_id",
-        postgresql_where=text("in_perimeter"),
-    ),
     # Index UNIQUE sur expression lower(doi) — complété à la main. L'unicité
     # « 1 DOI = 1 publication » est garantie par la DB : la réconciliation des
     # composantes ne produit jamais deux publications au même DOI (assignation à
     # l'unique pub-ancre de la partition `(composante ∩ DOI)`). Partiel : les
     # publications sans DOI (NULL) ne sont pas contraintes.
-    Index(
-        "publications_doi_lower_key",
-        text("lower(doi)"),
-        unique=True,
-        postgresql_where=text("doi IS NOT NULL"),
-    ),
     # Fetch incrémental oa_status : jamais vérifiés (NULL) d'abord, puis les plus périmés.
-    Index(
-        "idx_pub_unpaywall_checked",
-        text("unpaywall_checked_at NULLS FIRST"),
-        postgresql_where=text("doi IS NOT NULL"),
-    ),
 )
 
 
@@ -938,25 +757,6 @@ source_publications = Table(
     ),
     Column("keys_dirty", Boolean, nullable=False, server_default="true"),
     UniqueConstraint("source", "source_id", name="source_publications_source_source_id_key"),
-    Index(
-        "idx_source_pubs_title_normalized_trgm",
-        "title_normalized",
-        postgresql_using="gin",
-        postgresql_ops={"title_normalized": "gin_trgm_ops"},
-    ),
-    Index(
-        "idx_source_pubs_countries",
-        "countries",
-        postgresql_using="gin",
-        postgresql_where=text("countries IS NOT NULL"),
-    ),
-    Index("idx_source_pubs_doi", "doi", postgresql_where=text("doi IS NOT NULL")),
-    Index(
-        "idx_source_pubs_external_ids",
-        "external_ids",
-        postgresql_using="gin",
-        postgresql_where=text("external_ids != '{}'::jsonb"),
-    ),
     CheckConstraint(
         "jsonb_typeof(external_ids) = 'object'",
         name="source_publications_external_ids_is_object",
@@ -964,27 +764,6 @@ source_publications = Table(
     CheckConstraint(
         "jsonb_typeof(raw_metadata) = 'object'",
         name="source_publications_raw_metadata_is_object",
-    ),
-    Index(
-        "idx_source_pubs_hal_collections",
-        "hal_collections",
-        postgresql_using="gin",
-        postgresql_where=text("hal_collections IS NOT NULL"),
-    ),
-    Index(
-        "idx_source_pubs_pub",
-        "publication_id",
-        postgresql_where=text("publication_id IS NOT NULL"),
-    ),
-    Index(
-        "idx_source_pubs_keys_dirty",
-        "keys_dirty",
-        postgresql_where=text("keys_dirty"),
-    ),
-    Index(
-        "idx_source_pubs_staging",
-        "staging_id",
-        postgresql_where=text("staging_id IS NOT NULL"),
     ),
 )
 
@@ -1018,8 +797,6 @@ distinct_publications = Table(
         "pub_id_b",
         name="distinct_publications_pub_id_a_pub_id_b_key",
     ),
-    Index("idx_distinct_pubs_a", "pub_id_a"),
-    Index("idx_distinct_pubs_b", "pub_id_b"),
 )
 
 
@@ -1057,25 +834,7 @@ apc_payments = Table(
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     Column("budget_structure_id", Integer),
     Column("lab_structure_id", Integer),
-    Index("idx_apc_billing_year", "billing_year"),
-    Index(
-        "idx_apc_budget_struct",
-        "budget_structure_id",
-        postgresql_where=text("budget_structure_id IS NOT NULL"),
-    ),
     # Index sur expression lower(doi) — complété à la main.
-    Index("idx_apc_doi", text("lower(doi)"), postgresql_where=text("doi IS NOT NULL")),
-    Index("idx_apc_institution", "institution"),
-    Index(
-        "idx_apc_lab_struct",
-        "lab_structure_id",
-        postgresql_where=text("lab_structure_id IS NOT NULL"),
-    ),
-    Index(
-        "idx_apc_pub",
-        "publication_id",
-        postgresql_where=text("publication_id IS NOT NULL"),
-    ),
 )
 
 
@@ -1125,9 +884,6 @@ staging = Table(
         "not_found_at IS NULL OR processed",
         name="staging_not_found_at_implies_processed",
     ),
-    Index("idx_staging_doi", "doi", postgresql_where=text("doi IS NOT NULL")),
-    Index("idx_staging_processed", "processed", postgresql_where=text("NOT processed")),
-    Index("idx_staging_source", "source"),
 )
 
 
@@ -1157,20 +913,12 @@ subjects = Table(
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     Column("usage_count", Integer, nullable=False, server_default="0"),
     # Index UNIQUE sur expression lower(label) — complété à la main.
-    Index("subjects_label_key", text("lower(label)"), unique=True),
     # Index GIN trigram sur expression normalize_name_form(label) — complété
     # à la main (sqlacodegen ne sait pas représenter cette expression).
     # L'op `gin_trgm_ops` est passé via postgresql_ops pour permettre la
     # comparaison fine de l'expression par Alembic. Pas de préfixe `public.`
     # ici : la reflection Postgres ne le renvoie pas, donc le préfixe
     # générerait un diff cosmétique permanent.
-    Index(
-        "subjects_label_norm_trgm_idx",
-        text("normalize_name_form(label)"),
-        postgresql_ops={"normalize_name_form(label)": "gin_trgm_ops"},
-        postgresql_using="gin",
-    ),
-    Index("subjects_usage_count_idx", text("usage_count DESC")),
 )
 
 
@@ -1183,7 +931,6 @@ publication_subjects = Table(
     Column("rejected", Boolean, nullable=False, server_default="false"),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     PrimaryKeyConstraint("publication_id", "subject_id", "source"),
-    Index("publication_subjects_subject_idx", "subject_id"),
 )
 
 

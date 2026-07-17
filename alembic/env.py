@@ -31,13 +31,11 @@ def _include_object(
     reflected: bool,
     compare_to: object | None,
 ) -> bool:
-    # La MetaData du projet (`infrastructure/db/tables.py`) ne déclare
-    # pas les ForeignKey (pattern délibéré : la MetaData sert au query
-    # building, pas à la modélisation relationnelle complète). Sans ce
-    # filtre, autogenerate proposerait de DROP toutes les FK existantes
-    # en DB. Les éventuelles FK à ajouter ou modifier se font à la main
-    # dans la migration générée, via `op.create_foreign_key(...)`.
-    return not (type_ == "foreign_key_constraint" and reflected)
+    """Écarte de la comparaison les objets que la MetaData du projet ne modélise pas.
+
+    `infrastructure/db/tables.py` sert au query building, qui ne connaît que tables et colonnes. Les clés étrangères et les index n'y sont pas déclarés : sans ce filtre, autogenerate proposerait de supprimer de la base tous ceux qu'elle porte. Les uns comme les autres s'écrivent à la main dans la migration, seule source de vérité du schéma.
+    """
+    return type_ not in ("foreign_key_constraint", "index")
 
 
 def _build_url() -> str:
