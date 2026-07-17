@@ -4,8 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import Connection
 
 from application.ports.api.publishers_queries import (
+    Publisher,
     PublisherDashboardResponse,
-    PublisherDetailResponse,
     PublisherListResponse,
     PublisherQueries,
     PublishersFacetsResponse,
@@ -37,11 +37,12 @@ from interfaces.api.models import (
     MergeResponse,
     OkResponse,
 )
+from interfaces.api.params import TOP_SUBJECTS_LIMIT, TopSubjectsLimit
 
 router = APIRouter()
 
 
-@router.get("/api/publisher-types", response_model=list[EnumOption])
+@router.get("/api/publishers/types", response_model=list[EnumOption])
 def list_publisher_types() -> list[EnumOption]:
     """Valeurs possibles de l'enum `publisher_type` avec leur libellé français.
 
@@ -87,7 +88,7 @@ def list_publishers(
 
     - `search` : insensible à la casse sur le nom normalisé, ignoré en deçà de deux caractères.
     - `publisher_type` et `country` : valeurs séparées par des virgules (par exemple `commercial,learned_society`), vide valant absence de filtre, selon la convention multi-valeurs de `/api/journals` et `/api/publications`.
-    - `with_pubs` : restreint aux éditeurs portant au moins une publication, par le détour de leurs revues. La page publique s'en sert pour masquer les éditeurs orphelins, que l'admin garde la possibilité de voir.
+    - `with_pubs` : restreint aux éditeurs dont le `pub_count` est non nul. Ce compteur ne retient que les publications du périmètre, atteintes par les revues de l'éditeur : un éditeur dont toutes les publications sont hors périmètre est donc « orphelin ». La page publique s'en sert pour les masquer, que l'admin garde la possibilité de voir.
 
     `sort` accepte `name`, `journals` et `pubs`, préfixés d'un tiret pour l'ordre descendant, et retombe sur `name` devant une valeur inconnue.
     """
@@ -102,11 +103,11 @@ def list_publishers(
     )
 
 
-@router.get("/api/publishers/{publisher_id}", response_model=PublisherDetailResponse)
+@router.get("/api/publishers/{publisher_id}", response_model=Publisher)
 def get_publisher(
     publisher_id: int,
     queries: PublisherQueries = Depends(publisher_queries),
-) -> PublisherDetailResponse:
+) -> Publisher:
     """Profil complet d'un éditeur, pour sa page publique.
 
     Porte ses métadonnées, ses préfixes DOI, et le décompte de ses revues et de ses publications. Renvoie 404 sur un éditeur inconnu.
@@ -135,12 +136,12 @@ def get_publisher_dashboard(
 @router.get("/api/publishers/{publisher_id}/subjects", response_model=list[SubjectFrequency])
 def get_publisher_subjects(
     publisher_id: int,
-    limit: int = Query(30, ge=1, le=200),
+    limit: TopSubjectsLimit = TOP_SUBJECTS_LIMIT,
     queries: PublisherQueries = Depends(publisher_queries),
 ) -> list[SubjectFrequency]:
     """Sujets les plus fréquents des publications de l'éditeur, pour l'onglet tableau de bord.
 
-    Les sujets génériques, dont l'`usage_count` dépasse 5000, sont écartés. Un éditeur sans publication indexée donne une liste vide.
+    Les sujets trop génériques sont écartés. Un éditeur sans publication indexée donne une liste vide.
     """
     return queries.get_publisher_subjects(publisher_id, limit=limit)
 
@@ -165,25 +166,24 @@ def merge(
     publisher_id: int,
     body: MergeRequest,
     conn: Connection = Depends(db_conn),
-    pub_repo: PublisherRepository = Depends(publisher_repo),
-    j_repo: JournalRepository = Depends(journal_repo),
+    publisher_repo: PublisherRepository = Depends(publisher_repo),
+    journal_repo: JournalRepository = Depends(journal_repo),
     publication_repo: PublicationRepository = Depends(publication_repo),
-    audit: AuditRepository = Depends(audit_repo),
+    audit_repo: AuditRepository = Depends(audit_repo),
     correction_queries: MetadataCorrectionQueries = Depends(metadata_correction_queries),
 ) -> MergeResponse:
     """Fusionne l'éditeur `source_id` dans l'éditeur `publisher_id`.
 
     Les revues et les publications de la source passent à la cible, puis la source est supprimée. Deux revues au même titre fusionnent, et leurs publications sont requalifiées contre le `journal_type` de la cible (`merge_journals`). Renvoie 400 sur deux identifiants égaux, 404 si l'un des deux éditeurs est introuvable.
     """
-
     publisher_commands.merge_publishers(
         conn,
         publisher_id,
         body.source_id,
         correction_queries=correction_queries,
-        publisher_repo=pub_repo,
-        journal_repo=j_repo,
+        publisher_repo=publisher_repo,
+        journal_repo=journal_repo,
         pub_repo=publication_repo,
-        audit_repo=audit,
+        audit_repo=audit_repo,
     )
     return MergeResponse(merged=True, source_id=body.source_id, target_id=publisher_id)

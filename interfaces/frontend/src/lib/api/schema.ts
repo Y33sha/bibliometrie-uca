@@ -2019,7 +2019,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/publisher-types": {
+    "/api/publishers/types": {
         parameters: {
             query?: never;
             header?: never;
@@ -2032,7 +2032,7 @@ export interface paths {
          *
          *     La source de vérité côté Python est `domain.publishers.publisher.PUBLISHER_TYPES` et `PUBLISHER_TYPE_LABELS_FR`, dont un test d'intégration vérifie l'accord avec l'enum SQL. Alimente la liste déroulante de la page admin des éditeurs et la colonne « Type » des pages publiques.
          */
-        get: operations["list_publisher_types_api_publisher_types_get"];
+        get: operations["list_publisher_types_api_publishers_types_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2078,7 +2078,7 @@ export interface paths {
          *
          *     - `search` : insensible à la casse sur le nom normalisé, ignoré en deçà de deux caractères.
          *     - `publisher_type` et `country` : valeurs séparées par des virgules (par exemple `commercial,learned_society`), vide valant absence de filtre, selon la convention multi-valeurs de `/api/journals` et `/api/publications`.
-         *     - `with_pubs` : restreint aux éditeurs portant au moins une publication, par le détour de leurs revues. La page publique s'en sert pour masquer les éditeurs orphelins, que l'admin garde la possibilité de voir.
+         *     - `with_pubs` : restreint aux éditeurs dont le `pub_count` est non nul. Ce compteur ne retient que les publications du périmètre, atteintes par les revues de l'éditeur : un éditeur dont toutes les publications sont hors périmètre est donc « orphelin ». La page publique s'en sert pour les masquer, que l'admin garde la possibilité de voir.
          *
          *     `sort` accepte `name`, `journals` et `pubs`, préfixés d'un tiret pour l'ordre descendant, et retombe sur `name` devant une valeur inconnue.
          */
@@ -2152,7 +2152,7 @@ export interface paths {
          * Get Publisher Subjects
          * @description Sujets les plus fréquents des publications de l'éditeur, pour l'onglet tableau de bord.
          *
-         *     Les sujets génériques, dont l'`usage_count` dépasse 5000, sont écartés. Un éditeur sans publication indexée donne une liste vide.
+         *     Les sujets trop génériques sont écartés. Un éditeur sans publication indexée donne une liste vide.
          */
         get: operations["get_publisher_subjects_api_publishers__publisher_id__subjects_get"];
         put?: never;
@@ -2207,7 +2207,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/journal-types": {
+    "/api/journals/types": {
         parameters: {
             query?: never;
             header?: never;
@@ -2220,7 +2220,7 @@ export interface paths {
          *
          *     La source de vérité côté Python est `domain.journals.journal.JOURNAL_TYPES` et `JOURNAL_TYPE_LABELS_FR`, dont un test d'intégration vérifie l'accord avec l'enum SQL. Alimente la liste déroulante de la page admin des revues et la colonne « Type » des pages publiques.
          */
-        get: operations["list_journal_types_api_journal_types_get"];
+        get: operations["list_journal_types_api_journals_types_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2344,7 +2344,7 @@ export interface paths {
          * Get Journal Subjects
          * @description Sujets les plus fréquents des publications de la revue, pour l'onglet tableau de bord.
          *
-         *     Les sujets génériques, dont l'`usage_count` dépasse 5000, sont écartés : ils noieraient les autres. Une revue sans publication indexée donne une liste vide.
+         *     Les sujets trop génériques sont écartés : ils noieraient les autres. Une revue sans publication indexée donne une liste vide.
          */
         get: operations["get_journal_subjects_api_journals__journal_id__subjects_get"];
         put?: never;
@@ -4974,6 +4974,30 @@ export interface components {
             in_perimeter: components["schemas"]["TextStrFacet"][];
         };
         /**
+         * Publisher
+         * @description Profil d'un éditeur, commun à la ligne de liste et à la page publique `/publishers/[id]`.
+         *
+         *     `pub_count` compte les seules publications du périmètre, sommées sur les revues de l'éditeur.
+         */
+        Publisher: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Openalex Id */
+            openalex_id: string | null;
+            /** Country */
+            country: string | null;
+            /** Doi Prefixes */
+            doi_prefixes: components["schemas"]["DoiPrefixInfo"][];
+            /** Publisher Type */
+            publisher_type: string;
+            /** Journal Count */
+            journal_count: number;
+            /** Pub Count */
+            pub_count: number;
+        };
+        /**
          * PublisherDashboardResponse
          * @description GET /api/publishers/{id}/dashboard : agrégats pour l'exploration visuelle.
          *
@@ -4991,47 +5015,6 @@ export interface components {
             /** Oa Statuses */
             oa_statuses: components["schemas"]["application__ports__api__publishers_queries__OaStatusCount"][];
         };
-        /**
-         * PublisherDetailResponse
-         * @description GET /api/publishers/{id} : profil complet pour la page publique /publishers/[id].
-         */
-        PublisherDetailResponse: {
-            /** Id */
-            id: number;
-            /** Name */
-            name: string;
-            /** Openalex Id */
-            openalex_id: string | null;
-            /** Country */
-            country: string | null;
-            /** Doi Prefixes */
-            doi_prefixes: components["schemas"]["DoiPrefixInfo"][];
-            /** Publisher Type */
-            publisher_type: string;
-            /** Journal Count */
-            journal_count: number;
-            /** Pub Count */
-            pub_count: number;
-        };
-        /** PublisherListItem */
-        PublisherListItem: {
-            /** Id */
-            id: number;
-            /** Name */
-            name: string;
-            /** Openalex Id */
-            openalex_id: string | null;
-            /** Country */
-            country: string | null;
-            /** Doi Prefixes */
-            doi_prefixes: components["schemas"]["DoiPrefixInfo"][];
-            /** Publisher Type */
-            publisher_type: string;
-            /** Journal Count */
-            journal_count: number;
-            /** Pub Count */
-            pub_count: number;
-        };
         /** PublisherListResponse */
         PublisherListResponse: {
             /** Total */
@@ -5041,7 +5024,7 @@ export interface components {
             /** Per Page */
             per_page: number;
             /** Publishers */
-            publishers: components["schemas"]["PublisherListItem"][];
+            publishers: components["schemas"]["Publisher"][];
             /** Pages */
             readonly pages: number;
         };
@@ -8980,7 +8963,7 @@ export interface operations {
             };
         };
     };
-    list_publisher_types_api_publisher_types_get: {
+    list_publisher_types_api_publishers_types_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -9088,7 +9071,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PublisherDetailResponse"];
+                    "application/json": components["schemas"]["Publisher"];
                 };
             };
             /** @description Validation Error */
@@ -9256,7 +9239,7 @@ export interface operations {
             };
         };
     };
-    list_journal_types_api_journal_types_get: {
+    list_journal_types_api_journals_types_get: {
         parameters: {
             query?: never;
             header?: never;

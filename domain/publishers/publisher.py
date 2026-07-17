@@ -19,7 +19,7 @@ PublisherType = Literal[
 PUBLISHER_TYPES: tuple[PublisherType, ...] = get_args(PublisherType)
 PUBLISHER_TYPES_SET: frozenset[str] = frozenset(PUBLISHER_TYPES)
 
-# Labels FR des valeurs d'enum, source de vérité Python pour l'UI (dropdowns admin, badges publics), exposés via `/api/publisher-types`.
+# Labels FR des valeurs d'enum, source de vérité Python pour l'UI (dropdowns admin, badges publics), exposés via `/api/publishers/types`.
 PUBLISHER_TYPE_LABELS_FR: dict[PublisherType, str] = {
     "commercial": "Éditeur commercial",
     "learned_society": "Société savante",
