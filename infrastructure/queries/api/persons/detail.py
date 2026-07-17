@@ -27,12 +27,16 @@ def person_profile(conn: Connection, person_id: int) -> dict[str, Any] | None:
         return None
     person = dict(person_row._mapping)
 
+    # Un identifiant rejeté est une attribution que la curation a écartée : la page publique
+    # d'une personne ne l'annonce pas. Le statut accompagne les autres, qu'il distingue entre
+    # attribution observée et attribution validée.
     id_rows = conn.execute(
         text("""
             SELECT id, id_type, id_value, source, status
             FROM person_identifiers
             WHERE person_id = :pid
               AND id_type = ANY(:public_id_types)
+              AND status <> 'rejected'
         """),
         {"pid": person_id, "public_id_types": list(PUBLIC_PERSON_IDENTIFIER_TYPES)},
     ).all()
