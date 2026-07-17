@@ -10,6 +10,7 @@ from application.ports.repositories.authorship_repository import AuthorshipRepos
 from application.ports.repositories.person_repository import PersonRepository
 from application.services.authorships import assign_orphans, core as authorships_service
 from application.services.persons import core as persons_service
+from domain.errors import ValidationError
 
 
 def exclude_authorship(
@@ -41,11 +42,14 @@ def assign_orphan_authorship(
 ) -> int:
     """Attribue une authorship orpheline à une personne, en créant celle-ci au besoin (`new_person` = (nom, prénom)). Création et rattachement sont atomiques.
 
+    L'un de `person_id` ou `new_person` est exigé : la commande rattache à une personne, qu'elle reçoive laquelle ou de quoi la créer. Sans l'un ni l'autre, elle lève `ValidationError`.
+
     Retourne l'id de la personne finalement rattachée.
     """
     if new_person is not None:
         person_id = persons_service.create_person(new_person[0], new_person[1], repo=repo)
-    assert person_id is not None
+    if person_id is None:
+        raise ValidationError("person_id ou create_person requis")
     assign_orphans.assign_orphan_authorship(
         person_id,
         source,

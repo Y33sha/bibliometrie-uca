@@ -33,6 +33,15 @@ class AddressRepository(Protocol):
     """Contrat d'accès aux tables addresses, address_structures, et
     propagations vers source_publications/publications.countries."""
 
+    # ── Référentiel pays ───────────────────────────────────────────
+
+    def country_exists(self, code: str) -> bool:
+        """Le code figure-t-il au référentiel `countries` ?
+
+        `addresses.countries` est un tableau : aucune clé étrangère ne peut en garder les éléments, et les écritures de pays s'appuient sur cette lecture.
+        """
+        ...
+
     # ── Liens address ↔ structure ──────────────────────────────────
 
     def reset_manual_link(self, address_id: int, structure_id: int) -> None:

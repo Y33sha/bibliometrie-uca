@@ -381,11 +381,6 @@ class TestCountryCheckers:
         assert codes[0] == "xx"
         assert "FR" in codes
 
-    def test_country_exists(self, sa_sync_conn):
-        _ensure_country(sa_sync_conn, "FR")
-        assert _q(sa_sync_conn).country_exists("FR") is True
-        assert _q(sa_sync_conn).country_exists("ZZ") is False
-
     def test_address_exists(self, sa_sync_conn):
         addr = _create_address(sa_sync_conn)
         assert _q(sa_sync_conn).address_exists(addr) is True

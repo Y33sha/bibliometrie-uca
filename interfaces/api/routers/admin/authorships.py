@@ -88,16 +88,14 @@ def assign_orphan_authorship_endpoint(
 ) -> OrphanAssignResponse:
     """Attribue une signature orpheline à une personne.
 
-    Renvoie 400 sans patronyme à la création (`create_person`), 409 sur une paire déjà rejetée (`RejectedPairError`), à moins que `force` ne lève le rejet au passage, et sur une signature qui porte déjà une personne (`AuthorshipAlreadyAssignedError`).
+    Renvoie 400 sans `person_id` ni `create_person`, et sans patronyme à la création (`assign_orphan_authorship`) ; 409 sur une paire déjà rejetée (`RejectedPairError`), à moins que `force` ne lève le rejet au passage, et sur une signature qui porte déjà une personne (`AuthorshipAlreadyAssignedError`).
     """
     require_known_source(body.source)
 
     new_person: tuple[str, str] | None = None
     if body.create_person:
         new_person = (body.create_person.last_name, body.create_person.first_name)
-    elif not body.person_id:
-        raise HTTPException(status_code=400, detail="person_id ou create_person requis")
-    elif not queries.person_exists(body.person_id):
+    elif body.person_id and not queries.person_exists(body.person_id):
         raise HTTPException(status_code=404, detail="Personne introuvable")
 
     person_id = authorship_commands.assign_orphan_authorship(
