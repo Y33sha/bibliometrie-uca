@@ -64,6 +64,10 @@ Les lectures se rejoignent sous `/api/structures/*`, qui portent l'entité :
 - [ ] Les pages `/laboratories` et `/laboratories/[id]` interrogent `/api/structures*`.
 - [ ] Contrat TypeScript régénéré.
 
+## Lien
+
+Même motif que [Projections de lecture des personnes](CODE_projections-de-lecture-des-personnes.md) : une entité, deux piles de lecture nées de deux pages. Les deux fiches se tranchent ensemble ou pas du tout — la réponse à l'une vaut réponse à l'autre.
+
 ## Questions ouvertes
 
 - **Le périmètre de la liste.** `/api/laboratories` filtre sur le périmètre `persons` et sur `laboratories_display_types` ; `/api/structures` ne filtre ni l'un ni l'autre et sert l'admin. Réunir les deux demande de décider si le filtre de périmètre est un paramètre de la requête (l'admin voit tout par défaut) ou un défaut de la route.
