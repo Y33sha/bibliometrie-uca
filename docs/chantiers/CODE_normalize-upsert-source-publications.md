@@ -20,7 +20,11 @@ Un développeur extérieur voit sept variantes d'un même geste, sans pouvoir di
 
 ## Décisions
 
-Un objet de transport unique porte l'écriture. Une dataclass `SourcePublicationRow` réunit toutes les colonnes de `source_publications`, les champs hors périmètre d'une source restant à `None`. Elle vit dans `application/ports/pipeline/normalize/_common.py`, sur le modèle de `UpsertOutcome` dans `extract/_common.py`. Le port n'expose plus qu'une méthode `upsert_source_publication(conn, row) -> int`, et une seule implémentation Pg la sert. Disparaissent les sept méthodes de port bespoke, les sept fonctions libres et les sept méthodes de délégation.
+Un objet de transport unique porte l'écriture. Une dataclass `SourcePublicationRow` réunit toutes les colonnes de `source_publications`, les champs hors périmètre d'une source restant à `None`. Elle vit dans `application/ports/pipeline/normalize/source_publications.py`, auprès du port `SourcePublicationQueries` qui la consomme, lequel n'expose qu'une méthode `upsert_source_publication(conn, row) -> int` servie par une seule implémentation Pg. Disparaissent les sept méthodes de port bespoke, les sept fonctions libres et les sept méthodes de délégation ; cinq des sept ports par source (`crossref`, `datacite`, `hal`, `scanr`, `wos`), qui ne portaient que leur upsert, disparaissent avec elles.
+
+La construction est keyword-only (`kw_only`), comme l'étaient les signatures qu'elle remplace : les champs se déclarent par groupe logique (identité, rattachement, métadonnées bibliographiques, contenu, accès ouvert, métriques, colonnes propres à une source) sans que les champs obligatoires aient à précéder les autres.
+
+La clé de conflit `(source, source_id)` porte un `source` littéral par source : **une source n'entre jamais en conflit qu'avec ses propres lignes**. Les colonnes propres à une source (`hal_collections`, `embargo_until`, `is_retracted`) ne sont donc jamais renseignées ailleurs, et `embargo_until` n'a d'autre écrivain que le normaliseur HAL — appliquer leurs règles de fusion depuis le statement commun est un no-op pour les autres sources.
 
 L'implémentation Pg porte un seul statement SQL listant toutes les colonnes. La faisabilité tient à une condition : chaque règle de fusion du `DO UPDATE` doit dégrader en no-op quand la colonne vaut `None` pour la source qui écrit. C'est vérifiable colonne par colonne — `COALESCE(EXCLUDED.x, existant.x)` garde l'existant quand `EXCLUDED` est `NULL` ; `GREATEST(existant, EXCLUDED)` ignore les `NULL` et remplace la forme `GREATEST(COALESCE(EXCLUDED, 0), COALESCE(existant, 0))` qui, elle, convertit un `NULL` en `0` ; le merge de tableau avec `COALESCE(..., '{}')` laisse l'existant inchangé quand l'apport est `NULL`. C'est un chemin d'écriture : l'audit de chaque règle précède la bascule et se double d'une couverture de tests.
 
@@ -32,19 +36,35 @@ Hors périmètre : les méthodes de port qui ne sont pas l'upsert de publication
 
 ### Phase 1 — objet et port
 
-- [ ] `SourcePublicationRow` (dataclass, toutes colonnes, champs source-spécifiques par défaut `None`) dans `application/ports/pipeline/normalize/_common.py`.
-- [ ] Méthode unique `upsert_source_publication(conn, row) -> int` sur un port partagé ; suppression des sept méthodes bespoke des ports par source.
+- [x] `SourcePublicationRow` (dataclass `kw_only`, toutes colonnes, champs propres à une source par défaut `None`) et port `SourcePublicationQueries` (méthode unique `upsert_source_publication(conn, row) -> int`) dans `application/ports/pipeline/normalize/source_publications.py`.
 
 ### Phase 2 — implémentation
 
-- [ ] Audit colonne par colonne des règles de fusion du `DO UPDATE` (garde-existant, concaténation, `GREATEST`, merge de tableau, écrasement inconditionnel, `COALESCE`), en vérifiant le no-op sur `None`.
-- [ ] Un seul statement SQL et une seule implémentation Pg ; suppression des sept fonctions libres et des sept méthodes de délégation.
+- [x] Audit colonne par colonne des règles de fusion du `DO UPDATE` — voir *Audit des règles de fusion* ci-dessous.
+- [ ] Un seul statement SQL et une seule implémentation Pg.
 
-### Phase 3 — appelants et tests
+### Phase 3 — bascule et suppressions
+
+Les suppressions ne peuvent précéder la bascule des appelants : jusque-là, les méthodes par source restent appelées.
 
 - [ ] Les sept normaliseurs construisent `SourcePublicationRow` au lieu d'appeler la méthode par source.
 - [ ] Bascule des tests de normalisation sur l'objet et la méthode unique.
+- [ ] Suppression des sept méthodes de port bespoke, des sept fonctions libres et des sept méthodes de délégation ; suppression des cinq ports par source devenus vides (`crossref`, `datacite`, `hal`, `scanr`, `wos`) et de leurs adapters.
+
+## Audit des règles de fusion
+
+Union des colonnes écrites, et règle de `DO UPDATE` par source. `title`, `title_normalized`, `pub_year` et `staging_id` sont **insert-only** chez les sept : aucune ne figure dans un `DO UPDATE`. `publication_id` (`COALESCE(existant, EXCLUDED)`), `external_ids` (concaténation), `doc_type` / `journal_id` / `oa_status` / `language` / `container_title` (`COALESCE(EXCLUDED, existant)`), `keywords`, `keys_dirty` et `updated_at` sont uniformes chez les sept.
+
+Les colonnes que seules certaines sources renseignent (`abstract`, `biblio`, `meta`, `topics`, `urls`, `is_retracted`) suivent partout `COALESCE(EXCLUDED, existant)`, qui dégrade en no-op quand l'apport est `NULL` : leur généralisation au statement commun est neutre.
+
+`external_ids` exige la substitution `None → {}` avant binding : `existant || NULL` vaut `NULL` et effacerait la colonne. Cette substitution, faite en Python dans chaque adapter, est à conserver dans l'implémentation commune.
+
+Deux règles ne se généralisent pas telles quelles :
+
+- **`cited_by_count`** — les cinq sources qui le fournissent appliquent `GREATEST(COALESCE(EXCLUDED, 0), COALESCE(existant, 0))`, qui force un résultat non-`NULL`. Généralisée à HAL et theses.fr, qui ne le fournissent jamais, cette forme convertirait leur `NULL` en `0` à chaque ré-upsert. La forme `GREATEST(existant, EXCLUDED)` ignore les `NULL` et redevient un no-op pour eux ; elle change en contrepartie, pour les cinq autres, le cas où l'existant et l'apport sont tous deux `NULL` : le résultat reste `NULL` au lieu de devenir `0`. C'est le comportement que l'INSERT pose déjà (il écrit `NULL` quand la source ne fournit rien).
+- **`doi`** — `COALESCE(existant.doi, EXCLUDED.doi)` (renseigner si absent, ne jamais écraser) figure chez `crossref`, `datacite`, `hal` et `scanr`, mais `openalex`, `theses` et `wos` ne mettent pas `doi` à jour du tout. La règle commune renseignerait donc un `doi` resté `NULL` sur ces trois sources, ce qu'elles ne font pas aujourd'hui.
 
 ## Questions ouvertes
 
-- L'ordre des champs dans la dataclass et dans le statement (regroupement logique : identité, métadonnées bibliographiques, contenu, liens, drapeaux).
+- **`cited_by_count` : `NULL` ou `0` quand rien n'est connu ?** La bascule vers `GREATEST(existant, EXCLUDED)` est nécessaire pour que le statement commun soit neutre sur HAL et theses.fr ; elle aligne l'`UPDATE` sur l'`INSERT`, au prix d'un `NULL` là où un `0` était posé quand les deux valeurs manquaient.
+- **`doi` : renseigner si absent, pour les sept ?** Uniformiser étend aux trois sources qui n'y touchent pas (`openalex`, `theses`, `wos`) le comportement des quatre autres. À trancher : uniformisation, ou conservation à l'identique via une règle qui distingue les sources.
