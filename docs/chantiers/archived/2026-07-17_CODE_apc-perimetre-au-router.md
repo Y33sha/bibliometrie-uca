@@ -28,27 +28,40 @@ La résolution se fait par appel dans chaque méthode publique d'adapter, sans c
 
 Hors périmètre : la valeur `"uca"` codée en dur dans le vocabulaire du filtre `has_apc`, que lisent `apc_clause` et `stats_apc_clause`, ne change pas.
 
+### Ce que « interne » veut dire
+
+Le relevé des données éclaire ce que le filtre classe, et confirme que le classement est celui voulu.
+
+`apc_payments.budget_structure_id` porte le **financeur** : six valeurs distinctes seulement — CNRS (9 835 paiements), Inserm (5 165), INRAE (2 663), IRD (1 010), UCA (341), AgroParisTech (34). Le labo, lui, vit dans `lab_structure_id` (25 valeurs, 302 lignes). Le périmètre `uca` réunissant l'établissement et ses 45 laboratoires, seule la structure « UCA » peut donc matcher `budget_structure_id` : `has_apc=uca` retient 341 paiements sur 37 566.
+
+C'est le résultat attendu. « Interne » signifie **payé sur le budget de l'établissement**, non « payé pour l'un de nos laboratoires » : un APC réglé par le CNRS pour une UMR co-tutelle relève du budget du CNRS. Les 18 707 paiements ainsi classés `non_uca` le sont à juste titre.
+
+Aucun code du dépôt n'écrit `budget_structure_id` — `import_openapc.py` ne renseigne que `institution`, en texte libre. Les rattachements viennent des chargements `enquete_apc` et `fp_hors_oa`, hors dépôt.
+
 ## Phasage
 
 ### Phase 1 — adapter publications
 
-- [ ] `PgPublicationsQueries` résout le périmètre dans ses six méthodes publiques et le passe à ses constructeurs privés.
-- [ ] Retrait de `apc_structure_ids` des six signatures du port `application/ports/api/publications_queries.py`.
-- [ ] Les cinq endpoints de `interfaces/api/routers/publications.py` cessent de déclarer le paramètre.
+- [x] `PgPublicationsQueries` résout le périmètre dans les cinq méthodes publiques qui le consomment et le passe à ses constructeurs privés.
+- [x] Retrait du paramètre des cinq signatures du port `application/ports/api/publications_queries.py`.
+- [x] Les cinq endpoints de `interfaces/api/routers/publications.py` cessent de déclarer le paramètre.
 
 ### Phase 2 — adapter stats
 
-- [ ] `PgStatsQueries` résout le périmètre dans ses quatre méthodes publiques et le passe à ses constructeurs privés.
-- [ ] Retrait de `apc_structure_ids` des quatre signatures du port `application/ports/api/stats_queries.py`.
-- [ ] L'endpoint de `interfaces/api/routers/stats.py` cesse de déclarer le paramètre.
+- [x] `PgStatsQueries` résout le périmètre dans ses quatre méthodes publiques et le passe à ses constructeurs privés.
+- [x] Retrait du paramètre des quatre signatures du port `application/ports/api/stats_queries.py`.
+- [x] `StatsFilters` et sa dépendance, dans `interfaces/api/routers/stats.py`, cessent de le porter.
 
 ### Phase 3 — retrait de la dépendance
 
-- [ ] Suppression de `get_apc_structure_ids` de `interfaces/api/deps.py`.
-- [ ] Les docstrings de `apc_clause` et `stats_apc_clause` nomment le périmètre au lieu de le supposer.
+- [x] Suppression de `get_apc_structure_ids` de `interfaces/api/deps.py`.
+- [x] Les docstrings de `apc_clause` et `stats_apc_clause` nomment le périmètre au lieu de le supposer.
+- [x] Sous les adapters, le paramètre devient `perimeter_structure_ids`.
 
 ## Questions ouvertes
 
-- Le nom `apc_structure_ids` qualifie d'APC un périmètre qui n'a rien de propre aux APC. Une fois la liste confinée sous les adapters, elle ne sert plus qu'aux deux clauses de filtre : le nom peut rester à leur frontière, ou devenir celui du périmètre qu'il désigne.
-- Les deux adapters résoudront le périmètre par la fonction libre `get_persons_structure_ids_list`, comme `PgLaboratoriesQueries`, ou par le port `PerimeterQueries` qui l'expose déjà. La première est l'usage établi dans `infrastructure/queries/api/` ; la seconde laisse le périmètre injectable.
-- `publications/facets.py` instancie plusieurs `_PublicationFacetsBuilder` par appel, dont un sur une connexion distincte. La résolution du périmètre se fait une fois dans la méthode publique et se passe aux constructeurs, ce qui suppose de vérifier qu'aucun chemin n'en ait besoin avant.
+Aucune. Les trois points ouverts au cadrage se sont tranchés à l'exécution :
+
+- **Le nom.** Sous les adapters, le paramètre s'appelle `perimeter_structure_ids`, du périmètre qu'il désigne. Le préfixe `apc` ne subsiste que sur les binds SQL des deux clauses, locaux à leur requête.
+- **La résolution** passe par la fonction libre `get_persons_structure_ids_list`, usage établi dans `infrastructure/queries/api/` et celui de `PgLaboratoriesQueries`. Le port `PerimeterQueries` supposerait de l'injecter dans deux adapters qui portent déjà leur connexion, sans bénéfice.
+- **`publications/facets.py`** : la méthode publique résout le périmètre une fois et passe la liste à tous les `_PublicationFacetsBuilder`, celui sur connexion distincte compris. Aucun chemin n'en a besoin plus tôt.
