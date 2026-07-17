@@ -1,0 +1,7 @@
+# Fins de ligne : LF dans le dépôt comme dans les copies de travail, quelle que soit
+# la plateforme. `text=auto` laisse Git reconnaître les fichiers binaires et n'y touche pas.
+* text=auto eol=lf
+
+# Binaires, déclarés pour affranchir la détection de tout doute.
+*.png binary
+*.ico binary
