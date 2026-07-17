@@ -11,6 +11,7 @@ from application.ports.api.laboratories_queries import (
 )
 from application.ports.api.subjects_queries import SubjectFrequency
 from interfaces.api.deps import laboratories_queries
+from interfaces.api.params import TOP_SUBJECTS_LIMIT, TopSubjectsLimit
 
 router = APIRouter()
 
@@ -58,7 +59,7 @@ def get_laboratory_dashboard(
 @router.get("/api/laboratories/{lab_id}/subjects", response_model=list[SubjectFrequency])
 def get_laboratory_subjects(
     lab_id: int,
-    limit: int = Query(30, ge=1, le=200),
+    limit: TopSubjectsLimit = TOP_SUBJECTS_LIMIT,
     queries: LaboratoriesQueries = Depends(laboratories_queries),
 ) -> list[SubjectFrequency]:
     """Sujets les plus fréquents des publications du laboratoire, pour le nuage de mots de son tableau de bord."""

@@ -25,6 +25,7 @@ from application.ports.api.persons_queries import (
 from application.ports.api.subjects_queries import SubjectFrequency
 from interfaces.api.deps import persons_queries
 from interfaces.api.filters import parse_str_csv
+from interfaces.api.params import TOP_SUBJECTS_LIMIT, TopSubjectsLimit
 
 router = APIRouter()
 
@@ -203,7 +204,7 @@ def person_dashboard(
 @router.get("/api/persons/{person_id}/subjects", response_model=list[SubjectFrequency])
 def person_subjects(
     person_id: int,
-    limit: int = Query(30, ge=1, le=100),
+    limit: TopSubjectsLimit = TOP_SUBJECTS_LIMIT,
     queries: PersonsQueries = Depends(persons_queries),
 ) -> list[SubjectFrequency]:
     """Top sujets des publications de cette personne (nuage de mots)."""

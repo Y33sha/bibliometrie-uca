@@ -26,7 +26,7 @@ from application.ports.api.laboratories_queries import (
     LabTutelle,
 )
 from application.ports.api.subjects_queries import SubjectFrequency
-from infrastructure.queries.filters import OA_DASHBOARD_COLS_SQL
+from infrastructure.queries.filters import OA_DASHBOARD_COLS_SQL, SUBJECT_IS_NOT_GENERIC
 from infrastructure.queries.perimeter import get_persons_structure_ids_list
 
 # Signature portée par le laboratoire `:lab_id` : dans le périmètre, rattachée à lui par une
@@ -221,10 +221,10 @@ class PgLaboratoriesQueries(LaboratoriesQueries):
             ],
         )
 
-    def get_laboratory_subjects(self, lab_id: int, *, limit: int = 30) -> list[SubjectFrequency]:
+    def get_laboratory_subjects(self, lab_id: int, *, limit: int) -> list[SubjectFrequency]:
         """Sujets des publications d'un laboratoire, les plus fréquents d'abord.
 
-        Écarte les sujets trop génériques, dont l'`usage_count` dépasse 5000. Le `COUNT(DISTINCT p.id)` tient au grain de `publication_subjects`, qui porte une ligne par source pour une même paire (publication, sujet).
+        Le `COUNT(DISTINCT p.id)` tient au grain de `publication_subjects`, qui porte une ligne par source pour une même paire (publication, sujet).
         """
         rows = self._conn.execute(
             text(f"""
@@ -232,7 +232,7 @@ class PgLaboratoriesQueries(LaboratoriesQueries):
                 FROM publication_subjects ps
                 JOIN publications p ON p.id = ps.publication_id
                 JOIN subjects s ON s.id = ps.subject_id
-                WHERE s.usage_count <= 5000
+                WHERE {SUBJECT_IS_NOT_GENERIC}
                   AND {_LAB_AUTHORED_PUBLICATION}
                 GROUP BY s.id, s.label
                 ORDER BY n DESC, lower(s.label)
