@@ -17,7 +17,7 @@ from application.services.addresses.structure_links import (
     batch_review_structure_link,
     review_structure_link,
 )
-from domain.errors import ValidationError
+from domain.errors import NotFoundError, ValidationError
 from infrastructure.queries.perimeter import PgPerimeterQueries
 from infrastructure.repositories import address_repository, authorship_repository
 from tests.integration.helpers.authorships import upsert_identity
@@ -252,6 +252,12 @@ class TestSetCountry:
         with pytest.raises(ValidationError, match="Code pays inconnu"):
             set_country(addr, ["ZZ"], repo=repo)
         assert _get_countries(sa_sync_conn, addr) is None
+
+    def test_raises_on_unknown_address(self, sa_sync_conn, repo):
+        """L'`UPDATE` n'apparie aucune ligne : sans cette garde, l'API répondrait 200 sans rien faire."""
+        _ensure_country(sa_sync_conn, "FR")
+        with pytest.raises(NotFoundError):
+            set_country(999999, ["FR"], repo=repo)
 
     def test_raises_on_one_unknown_among_known(self, sa_sync_conn, repo):
         _ensure_country(sa_sync_conn, "FR")

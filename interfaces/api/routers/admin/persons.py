@@ -65,11 +65,8 @@ def add_person_identifier(
 ) -> AddIdentifierResponse:
     """Ajoute à la main un identifiant (ORCID, idHAL ou IdRef) à une personne.
 
-    La cascade de décision — insertion, idempotence, réattribution, conflit — appartient à `add_identifier`, appelé avec `source="manual"`, qui refuse alors les types qu'aucun humain n'attribue. Le router vérifie l'existence de la personne, puis traduit l'issue en réponse. Les handlers globaux traduisent le conflit (`CannotAttributeConflict`) en 409, le type ou la valeur refusés (`ValidationError`) en 400.
+    La cascade de décision — insertion, idempotence, réattribution, conflit — appartient à `add_identifier`, appelé avec `source="manual"` : il refuse alors les types qu'aucun humain n'attribue, et vérifie l'existence de la personne. Le router traduit l'issue en réponse. Les handlers globaux traduisent la personne absente (`NotFoundError`) en 404, le conflit (`CannotAttributeConflict`) en 409, le type ou la valeur refusés (`ValidationError`) en 400.
     """
-    if not queries.person_exists(person_id):
-        raise HTTPException(status_code=404, detail="Personne introuvable")
-
     result = person_commands.add_identifier(
         conn, person_id, data.id_type, data.id_value, source="manual", repo=repo
     )
@@ -124,13 +121,13 @@ def reassign_identifier(
     ident_id: int,
     body: ReassignIdentifier,
     conn: Connection = Depends(db_conn),
-    queries: PersonsQueries = Depends(persons_queries),
     repo: PersonRepository = Depends(person_repo),
     audit: AuditRepository = Depends(audit_repo),
 ) -> IdentifierReassignResponse:
-    """Réattribue un identifiant rejeté à une autre personne (status → pending)."""
-    if not queries.person_exists(body.person_id):
-        raise HTTPException(status_code=404, detail="Personne cible introuvable")
+    """Réattribue un identifiant rejeté à une autre personne (status → pending).
+
+    Renvoie 404 sur un identifiant ou une personne cible introuvable (`reassign_identifier`).
+    """
     person_commands.reassign_identifier(conn, ident_id, body.person_id, repo=repo, audit_repo=audit)
     return IdentifierReassignResponse(id=ident_id, person_id=body.person_id, status="pending")
 

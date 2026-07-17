@@ -7,6 +7,7 @@ from sqlalchemy import Connection, delete, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from application.ports.repositories.address_repository import AddressCountryFilter
+from domain.errors import NotFoundError
 from infrastructure.db.tables import address_structures, addresses
 from infrastructure.queries.pipeline import countries as country_queries
 
@@ -128,11 +129,13 @@ class PgAddressRepository:
         address_id: int,
         countries: list[str] | None,
     ) -> None:
-        self._conn.execute(
+        result = self._conn.execute(
             update(addresses)
             .where(addresses.c.id == address_id)
             .values(countries=countries if countries else None)
         )
+        if result.rowcount == 0:
+            raise NotFoundError(f"Adresse {address_id} introuvable")
 
     def batch_add_country_by_ids(
         self,

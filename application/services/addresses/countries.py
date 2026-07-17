@@ -29,7 +29,7 @@ def set_country(
     - `countries=None` ou `[]` → remet la colonne à NULL.
     - Propage la même valeur aux adresses partageant le même normalized_text.
 
-    Retourne la liste des IDs affectés (y compris address_id). Lève `ValidationError` sur un code absent du référentiel.
+    Retourne la liste des IDs affectés (y compris address_id). Lève `ValidationError` sur un code absent du référentiel, `NotFoundError` sur une adresse introuvable.
     """
     _require_known_countries(countries or [], repo=repo)
     repo.set_countries(address_id, countries)

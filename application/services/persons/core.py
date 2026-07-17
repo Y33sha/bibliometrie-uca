@@ -175,12 +175,21 @@ def add_identifier(
     forme canonique sert aux deux et soit renvoyée dans le résultat. Lève
     `ValidationError` si elle est malformée.
 
-    `source="manual"` restreint les types à `PUBLIC_PERSON_IDENTIFIER_TYPES` : `hal_person_id`
-    est la référence d'un compte HAL, que l'extraction observe dans le TEI. Personne ne
-    l'attribue à la main, et le refuser ici vaut pour tout appelant, non pour le seul router.
+    `source="manual"` désigne l'attribution par une utilisatrice, et resserre deux gardes que
+    l'appel automatique n'a pas lieu de payer :
+
+    - les types se restreignent à `PUBLIC_PERSON_IDENTIFIER_TYPES` — `hal_person_id` est la
+      référence d'un compte HAL, que l'extraction observe dans le TEI, et que personne
+      n'attribue à la main ;
+    - l'existence de la personne est vérifiée, l'identifiant venant d'un formulaire. La
+      promotion depuis les signatures (`source="auto"`) en fait l'économie : elle boucle sur
+      une personne que la cascade vient de créer ou de rapprocher.
     """
-    if source == "manual" and id_type not in PUBLIC_PERSON_IDENTIFIER_TYPES:
-        raise ValidationError(f"id_type doit être l'un de {PUBLIC_PERSON_IDENTIFIER_TYPES}")
+    if source == "manual":
+        if id_type not in PUBLIC_PERSON_IDENTIFIER_TYPES:
+            raise ValidationError(f"id_type doit être l'un de {PUBLIC_PERSON_IDENTIFIER_TYPES}")
+        if repo.find_by_id(person_id) is None:
+            raise NotFoundError(f"Personne {person_id} introuvable")
     id_value = normalized_identifier_value(id_type, id_value)
     existing = repo.find_identifier(id_type, id_value)
 
@@ -268,8 +277,10 @@ def reassign_identifier(
 ) -> None:
     """Réattribue un identifiant à une autre personne (status → pending).
 
-    Lève NotFoundError si l'identifiant n'existe pas.
+    Lève `NotFoundError` si l'identifiant ou la personne cible n'existe pas : sans la seconde garde, la clé étrangère refuserait la réattribution par une erreur d'intégrité.
     """
+    if repo.find_by_id(target_person_id) is None:
+        raise NotFoundError(f"Personne {target_person_id} introuvable")
     repo.reassign_identifier(ident_id, target_person_id)
     emit_event(
         audit_repo,

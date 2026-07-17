@@ -12,7 +12,6 @@ from infrastructure.queries.api.persons.admin import (
     name_duplicates_count,
     name_form_authorships,
     orphan_authorships_count,
-    person_exists,
 )
 from tests.integration.helpers.authorships import upsert_identity
 
@@ -153,15 +152,6 @@ class TestListOrphanAuthorships:
         res = list_orphan_authorships(sa_sync_conn, search="Special", page=1, per_page=50)
         ids = [a["authorship_id"] for a in res["authorships"]]
         assert sa_match in ids
-
-
-class TestPersonExists:
-    def test_true_when_exists(self, sa_sync_conn):
-        pid = _create_person(sa_sync_conn)
-        assert person_exists(sa_sync_conn, pid) is True
-
-    def test_false_when_missing(self, sa_sync_conn):
-        assert person_exists(sa_sync_conn, 999_999) is False
 
 
 class TestNameFormAuthorships:

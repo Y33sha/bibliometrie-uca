@@ -222,15 +222,12 @@ def set_address_country(
     body: SetCountry,
     bg: BackgroundTasks,
     conn: Connection = Depends(db_conn),
-    queries: AddressesQueries = Depends(addresses_queries),
     addr_repo: AddressRepository = Depends(address_repo),
 ) -> OkResponse:
     """Attribue des pays à une adresse.
 
-    Renvoie 400 sur un code pays absent du référentiel (`set_country`).
+    Renvoie 400 sur un code pays absent du référentiel, 404 sur une adresse introuvable (`set_country`).
     """
-    if not queries.address_exists(addr_id):
-        raise HTTPException(status_code=404, detail="Adresse introuvable")
     affected = address_commands.set_country(conn, addr_id, body.countries, repo=addr_repo)
     bg.add_task(bg_propagate_countries, affected)
     return OkResponse()

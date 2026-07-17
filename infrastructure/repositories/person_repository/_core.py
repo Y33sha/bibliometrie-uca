@@ -86,12 +86,8 @@ def create(conn: Connection, last_name: str, first_name: str = "") -> int:
 
 
 def update_name(conn: Connection, person_id: int, last_name: str, first_name: str) -> None:
-    if (
-        conn.execute(text("SELECT id FROM persons WHERE id = :id"), {"id": person_id}).first()
-        is None
-    ):
-        raise NotFoundError(f"Personne {person_id} introuvable")
-    conn.execute(
+    """L'`UPDATE` rapporte les lignes appariées : zéro dit l'absence, sans lecture préalable."""
+    result = conn.execute(
         text(
             "UPDATE persons SET last_name = :ln, first_name = :fn, "
             "last_name_normalized = :lnn, first_name_normalized = :fnn "
@@ -105,6 +101,8 @@ def update_name(conn: Connection, person_id: int, last_name: str, first_name: st
             "id": person_id,
         },
     )
+    if result.rowcount == 0:
+        raise NotFoundError(f"Personne {person_id} introuvable")
 
 
 def set_rejected(conn: Connection, person_id: int, rejected: bool) -> None:
