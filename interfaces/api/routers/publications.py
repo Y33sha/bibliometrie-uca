@@ -245,7 +245,7 @@ def get_publication(
 @router.get("/api/publications", response_model=PublicationListResponse)
 def list_publications(
     page: int = Query(1, ge=1),
-    per_page: int = Query(50, ge=10, le=200),
+    per_page: int = Query(50, ge=1, le=200),
     search: str = Query(""),
     lab_id: str = Query(""),
     year: str = Query(""),

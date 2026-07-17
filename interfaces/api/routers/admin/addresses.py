@@ -78,7 +78,7 @@ def _parse_structure_predicates(raw: list[str]) -> tuple[StructurePredicate, ...
 @router.get("/api/addresses", response_model=AddressListResponse)
 def list_addresses(
     page: int = Query(1, ge=1),
-    per_page: int = Query(50, ge=10, le=200),
+    per_page: int = Query(50, ge=1, le=200),
     structure_id: int | None = Query(None),
     detected: str = Query("yes"),
     validation: str = Query("pending"),
@@ -192,7 +192,7 @@ def list_addresses_countries(
     suggested_country: str = Query(""),
     suggest: bool = Query(False),
     page: int = Query(1, ge=1),
-    per_page: int = Query(50, ge=10, le=200),
+    per_page: int = Query(50, ge=1, le=200),
     queries: AddressesQueries = Depends(addresses_queries),
 ) -> AddressesCountriesResponse:
     """Liste des adresses pour l'attribution de pays."""

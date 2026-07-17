@@ -71,7 +71,7 @@ def feedback_stats(
 def feedback_false_negatives(
     structure_id: int = Query(...),
     page: int = Query(1, ge=1),
-    per_page: int = Query(50, ge=10, le=200),
+    per_page: int = Query(50, ge=1, le=200),
     search: str = Query(""),
     queries: AdminFeedbackQueries = Depends(admin_feedback_queries),
 ) -> FeedbackAddressesResponse:
@@ -85,7 +85,7 @@ def feedback_false_negatives(
 def feedback_false_positives(
     structure_id: int = Query(...),
     page: int = Query(1, ge=1),
-    per_page: int = Query(50, ge=10, le=200),
+    per_page: int = Query(50, ge=1, le=200),
     search: str = Query(""),
     queries: AdminFeedbackQueries = Depends(admin_feedback_queries),
 ) -> FeedbackAddressesResponse:
