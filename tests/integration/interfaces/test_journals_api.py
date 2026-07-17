@@ -585,12 +585,12 @@ class TestOaModels:
         assert all("label_fr" in m and m["label_fr"] for m in models)
 
 
-# ── GET /api/journal-types ──────────────────────────────────────
+# ── GET /api/journals/types ─────────────────────────────────────
 
 
 class TestJournalTypes:
     def test_returns_all_values_with_labels(self, client):
-        r = client.get("/api/journal-types")
+        r = client.get("/api/journals/types")
         assert r.status_code == 200
         body = r.json()
         values = [opt["value"] for opt in body]

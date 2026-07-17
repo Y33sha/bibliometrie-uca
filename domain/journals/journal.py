@@ -22,7 +22,7 @@ JournalType = Literal[
 JOURNAL_TYPES: tuple[JournalType, ...] = get_args(JournalType)
 JOURNAL_TYPES_SET: frozenset[str] = frozenset(JOURNAL_TYPES)
 
-# Labels FR des valeurs d'enum, source de vérité Python pour l'UI (dropdowns admin, badges publics), exposés via `/api/journal-types`.
+# Labels FR des valeurs d'enum, source de vérité Python pour l'UI (dropdowns admin, badges publics), exposés via `/api/journals/types`.
 JOURNAL_TYPE_LABELS_FR: dict[JournalType, str] = {
     "journal": "Revue",
     "proceedings": "Proceedings",
