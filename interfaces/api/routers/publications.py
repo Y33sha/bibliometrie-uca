@@ -1,14 +1,14 @@
 """Router /api/publications/* — les publications : listes, facettes, détail, export, servis par le port `PublicationsQueries`."""
 
-from typing import Literal
+from dataclasses import dataclass
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 
 from application.ports.api.entity_facet import EntityFacetResponse, EntityLabelResponse
 from application.ports.api.publications_queries import (
-    FacetFilters,
-    ListFilters,
     PublicationDetailResponse,
+    PublicationFilters,
     PublicationListResponse,
     PublicationsFacetsResponse,
     PublicationsQueries,
@@ -22,111 +22,98 @@ router = APIRouter()
 
 
 def _parse_lab_id(lab_id: str) -> tuple[list[int], bool]:
-    """Parse lab_id CSV : retourne (lab_ids, lab_none)."""
+    """Découpe `lab_id` en identifiants de laboratoires et en drapeau « sans laboratoire ».
+
+    La sentinelle `none` se mêle aux identifiants dans la même liste : `lab_id=12,none` retient les publications que le laboratoire 12 signe et celles qu'aucun laboratoire ne signe.
+    """
     parts = parse_str_csv(lab_id)
-    lab_none = "none" in parts
-    lab_ids = [int(v) for v in parts if v != "none"]
-    return lab_ids, lab_none
+    return [int(v) for v in parts if v != "none"], "none" in parts
+
+
+@dataclass(frozen=True, slots=True)
+class PublicationFilterParams:
+    """Filtres de la page publications tels que la query string les porte.
+
+    Injectés par `Depends()` : la liste, les deux facettes et l'export répondent aux mêmes
+    questions sur le même ensemble, et les déclarer une fois les tient d'accord.
+
+    Les valeurs multiples se séparent par des virgules. `lab_id` accepte la sentinelle `none`,
+    qui retient les publications qu'aucun laboratoire ne signe, et se combine aux identifiants.
+    """
+
+    search: Annotated[str, Query()] = ""
+    lab_id: Annotated[str, Query()] = ""
+    year: Annotated[str, Query()] = ""
+    publisher_id: Annotated[int | None, Query()] = None
+    journal_id: Annotated[int | None, Query()] = None
+    person_id: Annotated[int | None, Query()] = None
+    subject_id: Annotated[int | None, Query()] = None
+    access: Annotated[str, Query()] = ""
+    oa_status: Annotated[str, Query()] = ""
+    source_filter: Annotated[str, Query()] = ""
+    doc_type: Annotated[str, Query()] = ""
+    excluded_doc_type: Annotated[str, Query()] = ""
+    is_corresponding: Annotated[str, Query()] = ""
+    has_apc: Annotated[str, Query()] = ""
+    country: Annotated[str, Query()] = ""
+    hal_status: Annotated[str, Query()] = ""
+    in_perimeter: Annotated[str, Query()] = ""
+
+    def to_filters(self) -> PublicationFilters:
+        """Traduit la query string en filtres du port."""
+        lab_ids, lab_none = _parse_lab_id(self.lab_id)
+        return PublicationFilters(
+            search=self.search,
+            lab_ids=lab_ids,
+            lab_none=lab_none,
+            years=parse_int_csv(self.year),
+            publisher_id=self.publisher_id,
+            journal_id=self.journal_id,
+            person_id=self.person_id,
+            subject_id=self.subject_id,
+            access=parse_str_csv(self.access),
+            oa_status=parse_str_csv(self.oa_status),
+            source_values=parse_str_csv(self.source_filter),
+            doc_types=parse_str_csv(self.doc_type),
+            excluded_types=parse_str_csv(self.excluded_doc_type),
+            is_corresponding=parse_str_csv(self.is_corresponding),
+            has_apc=parse_str_csv(self.has_apc),
+            country_values=parse_str_csv(self.country),
+            hal_status_values=parse_str_csv(self.hal_status),
+            in_perimeter=parse_str_csv(self.in_perimeter),
+        )
+
+
+Filters = Annotated[PublicationFilterParams, Depends()]
 
 
 @router.get("/api/publications/facets", response_model=PublicationsFacetsResponse)
 def publications_facets(
-    year: str = Query(""),
-    lab_id: str = Query(""),
-    doc_type: str = Query(""),
-    excluded_doc_type: str = Query(""),
-    access: str = Query(""),
-    oa_status: str = Query(""),
-    source_filter: str = Query(""),
-    publisher_id: int | None = Query(None),
-    journal_id: int | None = Query(None),
-    person_id: int | None = Query(None),
-    is_corresponding: str = Query(""),
-    has_apc: str = Query(""),
-    country: str = Query(""),
-    hal_status: str = Query(""),
-    in_perimeter: str = Query(""),
-    subject_id: int | None = Query(None),
-    search: str = Query(""),
+    filters: Filters,
     queries: PublicationsQueries = Depends(publications_queries),
 ) -> PublicationsFacetsResponse:
-    """Facettes dynamiques pour la page publications."""
-    lab_ids, lab_none = _parse_lab_id(lab_id)
-    filters = FacetFilters(
-        years=parse_int_csv(year),
-        lab_ids=lab_ids,
-        lab_none=lab_none,
-        doc_types=parse_str_csv(doc_type),
-        excluded_types=parse_str_csv(excluded_doc_type),
-        access=parse_str_csv(access),
-        oa_status=parse_str_csv(oa_status),
-        source_values=parse_str_csv(source_filter),
-        publisher_id=publisher_id,
-        journal_id=journal_id,
-        person_id=person_id,
-        is_corresponding=parse_str_csv(is_corresponding),
-        has_apc=parse_str_csv(has_apc),
-        country_values=parse_str_csv(country),
-        hal_status_values=parse_str_csv(hal_status),
-        in_perimeter=parse_str_csv(in_perimeter),
-        subject_id=subject_id,
-        search=search,
-    )
-    return queries.publications_facets(filters=filters)
+    """Décomptes par option des facettes de la liste des publications.
+
+    Chaque facette écarte sa propre dimension de la clause WHERE : son décompte annonce le nombre de publications atteignables si l'option était cochée ou décochée.
+    """
+    return queries.publications_facets(filters=filters.to_filters())
 
 
 @router.get("/api/publications/facets/entities", response_model=EntityFacetResponse)
 def publications_entity_facet(
+    filters: Filters,
     kind: Literal["publisher", "journal"] = Query(...),
     entity_search: str = Query(""),
-    year: str = Query(""),
-    lab_id: str = Query(""),
-    doc_type: str = Query(""),
-    excluded_doc_type: str = Query(""),
-    access: str = Query(""),
-    oa_status: str = Query(""),
-    source_filter: str = Query(""),
-    publisher_id: int | None = Query(None),
-    journal_id: int | None = Query(None),
-    person_id: int | None = Query(None),
-    is_corresponding: str = Query(""),
-    has_apc: str = Query(""),
-    country: str = Query(""),
-    hal_status: str = Query(""),
-    in_perimeter: str = Query(""),
-    subject_id: int | None = Query(None),
-    search: str = Query(""),
     queries: PublicationsQueries = Depends(publications_queries),
 ) -> EntityFacetResponse:
     """Facette contextuelle des éditeurs ou des revues : les premières entités sous les filtres actifs, avec leur décompte.
 
     Les entités sont corrélées entre elles. `entity_search` cherche dans leurs noms, là où `search` filtre les publications sur leur titre et leurs sujets.
     """
-    lab_ids, lab_none = _parse_lab_id(lab_id)
-    filters = FacetFilters(
-        years=parse_int_csv(year),
-        lab_ids=lab_ids,
-        lab_none=lab_none,
-        doc_types=parse_str_csv(doc_type),
-        excluded_types=parse_str_csv(excluded_doc_type),
-        access=parse_str_csv(access),
-        oa_status=parse_str_csv(oa_status),
-        source_values=parse_str_csv(source_filter),
-        publisher_id=publisher_id,
-        journal_id=journal_id,
-        person_id=person_id,
-        is_corresponding=parse_str_csv(is_corresponding),
-        has_apc=parse_str_csv(has_apc),
-        country_values=parse_str_csv(country),
-        hal_status_values=parse_str_csv(hal_status),
-        in_perimeter=parse_str_csv(in_perimeter),
-        subject_id=subject_id,
-        search=search,
-    )
     return queries.publications_entity_facet(
         kind=kind,
         search=entity_search,
-        filters=filters,
+        filters=filters.to_filters(),
     )
 
 
@@ -145,51 +132,14 @@ def publications_entity_label(
 
 @router.get("/api/publications/export.csv")
 def export_publications_csv(
-    search: str = Query(""),
-    lab_id: str = Query(""),
-    year: str = Query(""),
-    publisher_id: int | None = Query(None),
-    journal_id: int | None = Query(None),
-    access: str = Query(""),
-    oa_status: str = Query(""),
-    source_filter: str = Query(""),
-    doc_type: str = Query(""),
-    excluded_doc_type: str = Query(""),
+    filters: Filters,
     sort: str = Query("year_desc"),
-    person_id: int | None = Query(None),
-    is_corresponding: str = Query(""),
-    has_apc: str = Query(""),
-    country: str = Query(""),
-    hal_status: str = Query(""),
-    in_perimeter: str = Query(""),
-    subject_id: int | None = Query(None),
     columns: str = Query(""),
     queries: PublicationsQueries = Depends(publications_queries),
 ) -> Response:
     """Export CSV des publications, fidèle au tableau affiché : mêmes filtres, et mêmes colonnes que celles listées dans `columns`."""
-    lab_ids, lab_none = _parse_lab_id(lab_id)
-    filters = ListFilters(
-        search=search,
-        lab_ids=lab_ids,
-        lab_none=lab_none,
-        years=parse_int_csv(year),
-        publisher_id=publisher_id,
-        journal_id=journal_id,
-        access=parse_str_csv(access),
-        oa_status=parse_str_csv(oa_status),
-        source_values=parse_str_csv(source_filter),
-        doc_types=parse_str_csv(doc_type),
-        excluded_types=parse_str_csv(excluded_doc_type),
-        person_id=person_id,
-        is_corresponding=parse_str_csv(is_corresponding),
-        has_apc=parse_str_csv(has_apc),
-        country_values=parse_str_csv(country),
-        hal_status_values=parse_str_csv(hal_status),
-        in_perimeter=parse_str_csv(in_perimeter),
-        subject_id=subject_id,
-    )
     csv_content = queries.export_publications_csv(
-        filters=filters,
+        filters=filters.to_filters(),
         sort=sort,
         columns=parse_str_csv(columns),
     )
@@ -211,9 +161,12 @@ def export_theses_csv(
     sort: str = Query("soutenance_desc"),
     queries: PublicationsQueries = Depends(publications_queries),
 ) -> Response:
-    """Export CSV de la page thèses (filtres + tri identiques à la liste)."""
+    """Export CSV de la page thèses, aux mêmes filtres et au même tri que sa liste.
+
+    La surface de filtres est plus étroite que celle des publications, et n'annonce que ce que l'export honore. Sans `doc_type`, il porte sur les thèses soutenues et en cours.
+    """
     lab_ids, lab_none = _parse_lab_id(lab_id)
-    filters = ListFilters(
+    filters = PublicationFilters(
         search=search,
         lab_ids=lab_ids,
         lab_none=lab_none,
@@ -244,55 +197,18 @@ def get_publication(
 
 @router.get("/api/publications", response_model=PublicationListResponse)
 def list_publications(
+    filters: Filters,
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=200),
-    search: str = Query(""),
-    lab_id: str = Query(""),
-    year: str = Query(""),
-    publisher_id: int | None = Query(None),
-    journal_id: int | None = Query(None),
-    access: str = Query(""),
-    oa_status: str = Query(""),
-    source_filter: str = Query(""),
-    doc_type: str = Query(""),
-    excluded_doc_type: str = Query(""),
     sort: str = Query("year_desc"),
-    person_id: int | None = Query(None),
-    is_corresponding: str = Query(""),
-    has_apc: str = Query(""),
-    country: str = Query(""),
-    hal_status: str = Query(""),
-    in_perimeter: str = Query(""),
-    subject_id: int | None = Query(None),
     queries: PublicationsQueries = Depends(publications_queries),
 ) -> PublicationListResponse:
-    """Liste paginée des publications avec sources, labos et journal rattachés.
+    """Liste paginée des publications, avec leurs sources, leurs laboratoires et leur revue.
 
-    Filtres multiples cumulables. `lab_id` et `year` acceptent des listes CSV ; `lab_id=none` = publications sans labo rattaché. `sort` : `year_desc` / `year_asc` / `title` / `cited_by`. `in_perimeter=yes|no|""` sélectionne les publications dont au moins un auteur est in_perimeter. `subject_id` filtre les publications annotées par ce sujet.
+    Les filtres se cumulent. `sort` accepte `year_desc`, `year_asc`, `title` et `cited_by`.
     """
-    lab_ids, lab_none = _parse_lab_id(lab_id)
-    filters = ListFilters(
-        search=search,
-        lab_ids=lab_ids,
-        lab_none=lab_none,
-        years=parse_int_csv(year),
-        publisher_id=publisher_id,
-        journal_id=journal_id,
-        access=parse_str_csv(access),
-        oa_status=parse_str_csv(oa_status),
-        source_values=parse_str_csv(source_filter),
-        doc_types=parse_str_csv(doc_type),
-        excluded_types=parse_str_csv(excluded_doc_type),
-        person_id=person_id,
-        is_corresponding=parse_str_csv(is_corresponding),
-        has_apc=parse_str_csv(has_apc),
-        country_values=parse_str_csv(country),
-        hal_status_values=parse_str_csv(hal_status),
-        in_perimeter=parse_str_csv(in_perimeter),
-        subject_id=subject_id,
-    )
     return queries.list_publications(
-        filters=filters,
+        filters=filters.to_filters(),
         page=page,
         per_page=per_page,
         sort=sort,

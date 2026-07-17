@@ -9,7 +9,7 @@ from typing import Any
 
 from sqlalchemy import Connection, text
 
-from application.ports.api.publications_queries import ListFilters
+from application.ports.api.publications_queries import PublicationFilters
 from domain.normalize import normalize_text, strip_markup
 from infrastructure.queries.filters import (
     OA_OPEN_STATUSES,
@@ -40,7 +40,7 @@ from infrastructure.queries.filters import (
 _THESES_STATUS_LABELS = {"thesis": "Soutenue", "ongoing_thesis": "En cours"}
 
 
-def _initial_clauses(filters: ListFilters) -> list[WhereClause]:
+def _initial_clauses(filters: PublicationFilters) -> list[WhereClause]:
     """Initialise les conditions de base selon le scope (person, labs, UCA)."""
     if filters.person_id:
         return [person_clause(filters.person_id)]
@@ -49,7 +49,7 @@ def _initial_clauses(filters: ListFilters) -> list[WhereClause]:
     return [WhereClause(PUBLICATION_IS_IN_PERIMETER, {})]
 
 
-def _inline_clauses(filters: ListFilters) -> list[WhereClause | None]:
+def _inline_clauses(filters: PublicationFilters) -> list[WhereClause | None]:
     """Filtres simples partagés entre list/export."""
     out: list[WhereClause | None] = [
         excluded_doc_type_clause(filters.excluded_types),
@@ -64,7 +64,7 @@ def _inline_clauses(filters: ListFilters) -> list[WhereClause | None]:
     return out
 
 
-def _hal_status_clause_sync(conn: Connection, filters: ListFilters) -> WhereClause | None:
+def _hal_status_clause_sync(conn: Connection, filters: PublicationFilters) -> WhereClause | None:
     """Charge la collection HAL du labo unique pour le filtre hal_status."""
     if filters.hal_status_values and len(filters.lab_ids) == 1:
         row = conn.execute(
@@ -77,7 +77,7 @@ def _hal_status_clause_sync(conn: Connection, filters: ListFilters) -> WhereClau
 
 
 def _build_list_clauses(
-    conn: Connection, filters: ListFilters, perimeter_structure_ids: list[int]
+    conn: Connection, filters: PublicationFilters, perimeter_structure_ids: list[int]
 ) -> tuple[str, dict[str, Any]]:
     """Construit le WHERE complet pour list_publications."""
     clauses: list[WhereClause | None] = list(_initial_clauses(filters))
@@ -125,7 +125,7 @@ _ORDER_MAP = {
 def list_publications(
     conn: Connection,
     *,
-    filters: ListFilters,
+    filters: PublicationFilters,
     perimeter_structure_ids: list[int],
     page: int,
     per_page: int,
@@ -323,7 +323,7 @@ def _plain_text(s: str | None) -> str:
 def export_publications_csv(
     conn: Connection,
     *,
-    filters: ListFilters,
+    filters: PublicationFilters,
     perimeter_structure_ids: list[int],
     sort: str,
     columns: list[str],
@@ -447,7 +447,7 @@ def export_publications_csv(
     return "﻿" + buf.getvalue()
 
 
-def _build_theses_export_clauses(filters: ListFilters) -> tuple[str, dict[str, Any]]:
+def _build_theses_export_clauses(filters: PublicationFilters) -> tuple[str, dict[str, Any]]:
     """Conditions WHERE pour l'export CSV des thèses.
 
     Spécifique à la page thèses : `source_clause` canonique (4 sources) +
@@ -466,7 +466,7 @@ def _build_theses_export_clauses(filters: ListFilters) -> tuple[str, dict[str, A
 
 
 def export_theses_csv(
-    conn: Connection, *, filters: ListFilters, perimeter_structure_ids: list[int], sort: str
+    conn: Connection, *, filters: PublicationFilters, perimeter_structure_ids: list[int], sort: str
 ) -> str:
     """Export CSV dédié à la page thèses.
 

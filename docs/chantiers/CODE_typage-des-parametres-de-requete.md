@@ -6,11 +6,13 @@ Une query string ne transporte que du texte. C'est l'annotation d'un paramètre 
 
 Les routers déclarent pourtant `str` une centaine de fois, y compris là où le vocabulaire est connu. Trois familles s'y confondent.
 
-**Les tri-états.** `has_orcid`, `has_idhal`, `has_idref`, `has_rh`, `has_pending_forms`, `has_pending_identifiers`, `has_country`, `has_apc`, `is_corresponding`, `in_perimeter` portent trois états — filtrer sur oui, filtrer sur non, ne pas filtrer — encodés `"yes"` / `"no"` / `""`. La forme typée existe et le projet la pratique ailleurs : `journals.py` déclare `is_in_doaj: bool | None = None`, où le paramètre absent vaut `None`.
+**Les tri-états.** `has_orcid`, `has_idhal`, `has_idref`, `has_rh`, `has_pending_forms`, `has_pending_identifiers` (personnes) et `has_country` (adresses) portent trois états — filtrer sur oui, filtrer sur non, ne pas filtrer — encodés `"yes"` / `"no"` / `""` dans une chaîne unique. La forme typée existe et le projet la pratique ailleurs : `journals.py` déclare `is_in_doaj: bool | None = None`, où le paramètre absent vaut `None`.
 
 **Les vocabulaires fermés.** `validation` (`all`, `pending`, `confirmed`, `rejected`), `detected` (`all`, `yes`, `no`), `access`, `hal_status` : des énumérations, qu'un `Literal` déclarerait.
 
 **Les listes.** `department`, `role`, `year`, `doc_type`, `country`, `oa_status`, `lab_id`, `source_filter` transportent plusieurs valeurs séparées par des virgules, que `parse_str_csv` découpe. La convention CSV est délibérée et se défend ; elle n'est pas en cause ici.
+
+`is_corresponding`, `has_apc` et `in_perimeter` (publications) ressemblent à des tri-états et n'en sont pas : ce sont des **facettes multi-sélection sur une dimension binaire**, une liste de `yes` / `no` combinée en OR par `_person_toggle_clause`. Cocher les deux ne contraint rien, ne rien cocher non plus. Ils relèvent des listes, et un booléen les trahirait.
 
 Les deux premières familles paient le même prix.
 

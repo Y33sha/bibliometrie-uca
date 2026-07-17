@@ -11,7 +11,7 @@ from typing import Any
 
 from sqlalchemy import Connection, text
 
-from application.ports.api.publications_queries import FacetFilters
+from application.ports.api.publications_queries import PublicationFilters
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.queries.filters import (
     OA_CLOSED_SQL,
@@ -48,7 +48,7 @@ class _PublicationFacetsBuilder:
     """
 
     def __init__(
-        self, conn: Connection, filters: FacetFilters, perimeter_structure_ids: list[int]
+        self, conn: Connection, filters: PublicationFilters, perimeter_structure_ids: list[int]
     ) -> None:
         self.conn = conn
         self.filters = filters
@@ -476,7 +476,7 @@ class _PublicationFacetsBuilder:
 
 
 def publications_facets(
-    conn: Connection, *, filters: FacetFilters, perimeter_structure_ids: list[int]
+    conn: Connection, *, filters: PublicationFilters, perimeter_structure_ids: list[int]
 ) -> dict[str, Any]:
     """Facettes dynamiques : chaque facette exclut son propre filtre mais
     applique tous les autres.
@@ -538,7 +538,7 @@ def publications_entity_facet(
     *,
     kind: str,
     search: str,
-    filters: FacetFilters,
+    filters: PublicationFilters,
     perimeter_structure_ids: list[int],
     limit: int = 20,
 ) -> list[dict[str, Any]]:

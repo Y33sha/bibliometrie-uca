@@ -27,9 +27,8 @@ from application.ports.api.entity_facet import (
     EntityLabelResponse,
 )
 from application.ports.api.publications_queries import (
-    FacetFilters,
-    ListFilters,
     PublicationDetailResponse,
+    PublicationFilters,
     PublicationListResponse,
     PublicationsFacetsResponse,
     PublicationsQueries,
@@ -62,7 +61,7 @@ class PgPublicationsQueries(PublicationsQueries):
     def list_publications(
         self,
         *,
-        filters: ListFilters,
+        filters: PublicationFilters,
         page: int,
         per_page: int,
         sort: str,
@@ -77,7 +76,7 @@ class PgPublicationsQueries(PublicationsQueries):
         )
         return PublicationListResponse.model_validate(data)
 
-    def publications_facets(self, *, filters: FacetFilters) -> PublicationsFacetsResponse:
+    def publications_facets(self, *, filters: PublicationFilters) -> PublicationsFacetsResponse:
         data = _publications_facets(
             self._conn,
             filters=filters,
@@ -90,7 +89,7 @@ class PgPublicationsQueries(PublicationsQueries):
         *,
         kind: str,
         search: str,
-        filters: FacetFilters,
+        filters: PublicationFilters,
     ) -> EntityFacetResponse:
         rows = _publications_entity_facet(
             self._conn,
@@ -107,7 +106,7 @@ class PgPublicationsQueries(PublicationsQueries):
     def export_publications_csv(
         self,
         *,
-        filters: ListFilters,
+        filters: PublicationFilters,
         sort: str,
         columns: list[str],
     ) -> str:
@@ -119,7 +118,7 @@ class PgPublicationsQueries(PublicationsQueries):
             columns=columns,
         )
 
-    def export_theses_csv(self, *, filters: ListFilters, sort: str) -> str:
+    def export_theses_csv(self, *, filters: PublicationFilters, sort: str) -> str:
         return _export_theses_csv(
             self._conn,
             filters=filters,

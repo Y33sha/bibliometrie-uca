@@ -2,7 +2,7 @@
 
 Implémenté par `infrastructure.queries.api.publications.PgPublicationsQueries`. Les modèles Pydantic que ces lectures rendent sont co-localisés avec le `Protocol` : leur contrat appartient au port.
 
-Les dataclasses `FacetFilters` et `ListFilters` font ici référence ; l'infrastructure les importe pour typer ses signatures (règle 3 de `docs/architecture/01-vue-d-ensemble.md`).
+Les dataclasses `PublicationFilters` et `PublicationFilters` font ici référence ; l'infrastructure les importe pour typer ses signatures (règle 3 de `docs/architecture/01-vue-d-ensemble.md`).
 """
 
 from dataclasses import dataclass, field
@@ -16,9 +16,13 @@ from application.ports.api.subjects_queries import SubjectOut
 
 
 @dataclass(frozen=True, slots=True)
-class ListFilters:
-    """Bundle des filtres pour list_publications / export_publications.
-    Tous les champs ont un défaut — facilite les appels partiels."""
+class PublicationFilters:
+    """Filtres de la page publications, partagés par la liste, les facettes et l'export.
+
+    Les trois lectures répondent aux mêmes questions sur le même ensemble : leurs décomptes, leurs lignes et leur export ne se recouperaient pas si elles n'écoutaient pas les mêmes filtres. Tous les champs ont un défaut, ce qui autorise les constructions partielles.
+
+    Les listes valent absence de filtre quand elles sont vides. `lab_none` retient les publications qu'aucun laboratoire ne signe ; `is_corresponding`, `has_apc` et `in_perimeter` portent une sélection de `yes` / `no` combinée en OR, où cocher les deux ne contraint rien.
+    """
 
     search: str = ""
     lab_ids: list[int] = field(default_factory=list)
@@ -38,31 +42,6 @@ class ListFilters:
     hal_status_values: list[str] = field(default_factory=list)
     in_perimeter: list[str] = field(default_factory=list)
     subject_id: int | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class FacetFilters:
-    """Bundle spécifique aux facettes (similaire à ListFilters mais sans
-    pagination/sort)."""
-
-    years: list[int] = field(default_factory=list)
-    lab_ids: list[int] = field(default_factory=list)
-    lab_none: bool = False
-    doc_types: list[str] = field(default_factory=list)
-    excluded_types: list[str] = field(default_factory=list)
-    access: list[str] = field(default_factory=list)
-    oa_status: list[str] = field(default_factory=list)
-    source_values: list[str] = field(default_factory=list)
-    publisher_id: int | None = None
-    journal_id: int | None = None
-    person_id: int | None = None
-    is_corresponding: list[str] = field(default_factory=list)
-    has_apc: list[str] = field(default_factory=list)
-    country_values: list[str] = field(default_factory=list)
-    hal_status_values: list[str] = field(default_factory=list)
-    in_perimeter: list[str] = field(default_factory=list)
-    subject_id: int | None = None
-    search: str = ""
 
 
 # ---------------------------------------------------------------------------
@@ -339,22 +318,22 @@ class PublicationDetailResponse(BaseModel):
 class PublicationsQueries(Protocol):
     """Lectures sync pour /api/publications/*.
 
-    Le filtre `has_apc` de `ListFilters` / `FacetFilters` s'appuie sur le périmètre des structures internes, que l'implémentation résout elle-même.
+    Le filtre `has_apc` de `PublicationFilters` / `PublicationFilters` s'appuie sur le périmètre des structures internes, que l'implémentation résout elle-même.
     """
 
     def list_publications(
         self,
         *,
-        filters: ListFilters,
+        filters: PublicationFilters,
         page: int,
         per_page: int,
         sort: str,
     ) -> PublicationListResponse: ...
 
-    def publications_facets(self, *, filters: FacetFilters) -> PublicationsFacetsResponse: ...
+    def publications_facets(self, *, filters: PublicationFilters) -> PublicationsFacetsResponse: ...
 
     def publications_entity_facet(
-        self, *, kind: str, search: str, filters: FacetFilters
+        self, *, kind: str, search: str, filters: PublicationFilters
     ) -> EntityFacetResponse: ...
 
     def resolve_entity_label(self, *, kind: str, entity_id: int) -> EntityLabelResponse: ...
@@ -362,11 +341,11 @@ class PublicationsQueries(Protocol):
     def export_publications_csv(
         self,
         *,
-        filters: ListFilters,
+        filters: PublicationFilters,
         sort: str,
         columns: list[str],
     ) -> str: ...
 
-    def export_theses_csv(self, *, filters: ListFilters, sort: str) -> str: ...
+    def export_theses_csv(self, *, filters: PublicationFilters, sort: str) -> str: ...
 
     def get_publication_detail(self, pub_id: int) -> PublicationDetailResponse | None: ...
