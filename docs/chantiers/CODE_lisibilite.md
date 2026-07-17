@@ -172,7 +172,7 @@ Passe faite sur `models/`, `deps.py`, `app.py` et les docstrings des dix-neuf ro
 - [ ] **Le test « qui l'appelle » n'a pas été passé sur les endpoints.** Il a suffi à condamner `/api/health` et `/api/metrics`, et une fonction morte du client frontend. Croiser chaque route avec les appels du frontend dirait lesquelles ne servent plus.
 - [ ] `routers/admin/publication_duplicates.py` : la docstring de `merge_duplicate_publications` explique encore le rafraîchissement, qui relève de `services/publications`. Le fait qui appartient au router est le choix du survivant et l'invariance du sens de fusion qui l'autorise.
 
-Deux findings ont leur fiche dédiée : [Périmètre APC](archived/2026-07-17_CODE_apc-perimetre-au-router.md), traité — le périmètre APC était un alias de `perimeter_persons`, et les adapters le résolvent maintenant eux-mêmes ; et [Exceptions des routers](CODE_exceptions-des-routers.md), où les gardes de fusion sont réparties à l'inverse selon l'agrégat.
+Deux findings ont leur fiche dédiée, tous deux traités : [Périmètre APC](archived/2026-07-17_CODE_apc-perimetre-au-router.md) — le périmètre APC était un alias de `perimeter_persons`, et les adapters le résolvent eux-mêmes ; et [Exceptions des routers](archived/2026-07-17_CODE_exceptions-des-routers.md) — les gardes de fusion, réparties à l'inverse selon l'agrégat, sont descendues dans les services, et les routers ne gardent que les traductions d'une lecture vide.
 
 #### 3.2 - Frontend
 
