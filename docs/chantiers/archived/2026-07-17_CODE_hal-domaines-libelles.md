@@ -58,7 +58,9 @@ Relevé par facette sur `fr_domainAllCodeLabel_fs` (707 valeurs distinctes), qui
 
 ### Phase 4 — Reprise du stock (production)
 
-- [ ] Re-fetch HAL (le champ `fr_domainAllCodeLabel_fs` n'est pas dans les `raw_data` existantes) → re-normalize → re-run `subjects`.
+Le champ `fr_domainAllCodeLabel_fs` est absent des `raw_data` déjà en base : les documents HAL extraits avant ce chantier n'ont pas de domaines exploitables tant que le stock n'est pas repris.
+
+- [ ] Re-fetch HAL → re-normalize → re-run `subjects`. Exécution laissée à l'administratrice de la base.
 
 ## Questions ouvertes
 
