@@ -279,7 +279,8 @@ class TestRefreshFromSources:
             text(
                 """
                 INSERT INTO source_publications (source, source_id, title, pub_year, publication_id, topics)
-                VALUES ('hal', 'hal-tp1', 'Test', 2024, :p, '{"hal_domains": ["info"]}'),
+                VALUES ('hal', 'hal-tp1', 'Test', 2024, :p,
+                        '{"hal_domains": ["info_FacetSep_Informatique [cs]"]}'),
                        ('openalex', 'oa-tp1', 'Test', 2024, :p,
                         '{"concepts": ["AI"], "hal_domains": ["math"]}')
                 """
@@ -294,7 +295,7 @@ class TestRefreshFromSources:
             id=id1,
         )
         # Chaque source garde sa forme sous sa propre clé
-        assert topics["hal"] == {"hal_domains": ["info"]}
+        assert topics["hal"] == {"hal_domains": ["info_FacetSep_Informatique [cs]"]}
         assert topics["openalex"] == {"concepts": ["AI"], "hal_domains": ["math"]}
 
     def test_topics_composite_supports_openalex_list(self, sa_sync_conn):

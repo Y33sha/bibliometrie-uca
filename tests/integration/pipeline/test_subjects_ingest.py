@@ -20,11 +20,28 @@ from infrastructure.queries.subjects import PgSubjectsQueries
 
 
 class TestExtractors:
-    def test_hal_strips_prefix_and_derives_label(self):
-        assert hal_labels({"hal_domains": ["0.phys"]}) == ["Physique"]
+    def test_hal_label_from_the_source(self):
+        assert hal_labels({"hal_domains": ["phys_FacetSep_Physique [physics]"]}) == ["Physique"]
 
-    def test_hal_dedups_same_code_across_levels(self):
-        assert hal_labels({"hal_domains": ["0.phys", "phys"]}) == ["Physique"]
+    def test_hal_all_levels_flat(self):
+        topics = {
+            "hal_domains": [
+                "sdv.bbm.bm_FacetSep_Sciences du Vivant [q-bio]"
+                "/Biochimie, Biologie Moléculaire/Biologie moléculaire"
+            ]
+        }
+        assert hal_labels(topics) == [
+            "Sciences du Vivant",
+            "Biochimie, Biologie Moléculaire",
+            "Biologie moléculaire",
+        ]
+
+    def test_hal_dedups_identical_entries(self):
+        entry = "phys_FacetSep_Physique [physics]"
+        assert hal_labels({"hal_domains": [entry, entry]}) == ["Physique"]
+
+    def test_hal_generic_leaf_excluded(self):
+        assert hal_labels({"hal_domains": ["chim.othe_FacetSep_Chimie/Autre"]}) == ["Chimie"]
 
     def test_hal_non_dict(self):
         assert hal_labels(None) == []
@@ -125,7 +142,7 @@ class TestRunOrchestrator:
             source="hal",
             source_id="h1",
             publication_id=pub,
-            topics={"hal_domains": ["info"]},
+            topics={"hal_domains": ["info_FacetSep_Informatique [cs]"]},
         )
         logger = logging.getLogger("test")
 
@@ -146,7 +163,7 @@ class TestRunOrchestrator:
             source="hal",
             source_id="h1",
             publication_id=pub,
-            topics={"hal_domains": ["info"]},
+            topics={"hal_domains": ["info_FacetSep_Informatique [cs]"]},
         )
         logger = logging.getLogger("test")
         run(sa_sync_conn, queries, logger)
@@ -157,7 +174,7 @@ class TestRunOrchestrator:
             text(
                 "UPDATE source_publications SET topics = CAST(:t AS jsonb) WHERE source_id = 'h1'"
             ),
-            {"t": json.dumps({"hal_domains": ["phys"]})},
+            {"t": json.dumps({"hal_domains": ["phys_FacetSep_Physique [physics]"]})},
         )
         sa_sync_conn.execute(
             text("UPDATE publications SET updated_at = clock_timestamp() WHERE id = :id"),
@@ -177,7 +194,7 @@ class TestRunOrchestrator:
             source="hal",
             source_id="h1",
             publication_id=pub,
-            topics={"hal_domains": ["info"]},
+            topics={"hal_domains": ["info_FacetSep_Informatique [cs]"]},
         )
         _create_source_pub(
             sa_sync_conn,
@@ -198,7 +215,7 @@ class TestRunOrchestrator:
             source="hal",
             source_id="h1",
             publication_id=pub,
-            topics={"hal_domains": ["info"]},
+            topics={"hal_domains": ["info_FacetSep_Informatique [cs]"]},
         )
         _create_source_pub(
             sa_sync_conn,
@@ -224,7 +241,7 @@ class TestRunOrchestrator:
             source="hal",
             source_id="h1",
             publication_id=pub,
-            topics={"hal_domains": ["info"]},
+            topics={"hal_domains": ["info_FacetSep_Informatique [cs]"]},
         )
         logger = logging.getLogger("test")
         run(sa_sync_conn, queries, logger)

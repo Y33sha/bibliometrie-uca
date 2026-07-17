@@ -193,8 +193,8 @@ def insert_hal_document(
     kw_raw = doc.get("keyword_s")
     keywords = list(dict.fromkeys(kw_raw)) if isinstance(kw_raw, list) and kw_raw else None
 
-    # Topics (domaines HAL)
-    domain_raw = doc.get("domain_s")
+    # Topics : domaines HAL, stockés tels que la source les expose (code + chemin de libellés).
+    domain_raw = doc.get("fr_domainAllCodeLabel_fs")
     topics = {"hal_domains": domain_raw} if isinstance(domain_raw, list) and domain_raw else None
 
     # Biblio

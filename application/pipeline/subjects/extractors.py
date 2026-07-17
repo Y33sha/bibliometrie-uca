@@ -6,33 +6,23 @@ Chaque source expose ses concepts dans un format `topics` distinct ; ces fonctio
 from collections.abc import Callable
 
 from application.pipeline.subjects._common import dedup_strs
-from domain.sources.hal_domains import hal_domain_label
+from domain.sources.hal import hal_domain_labels
 from domain.types import JsonValue
 
 # Niveaux OpenAlex, liés à plat : domain, field, subfield, topic.
 _OPENALEX_LEVELS = ("domain", "field", "subfield", "topic")
 
 
-def _strip_level_prefix(raw: str) -> str:
-    """`0.phys` → `phys` : retire le préfixe `<digit>.` des codes domain HAL Solr."""
-    head, sep, tail = raw.partition(".")
-    return tail if sep and head.isdigit() else raw
-
-
 def hal_labels(topics: JsonValue) -> list[str]:
-    """Domaines HAL (`{"hal_domains": [...]}`), libellés dérivés du référentiel CCSD.
+    """Domaines HAL (`{"hal_domains": [...]}`), chaque niveau du chemin à plat.
 
-    HAL Solr préfixe ses codes par `<level>.` (`0.phys`) pour l'auto-complétion par profondeur ; on strippe ce préfixe pour retrouver le code stable, dont `hal_domain_label` donne le libellé feuille (fallback sur le code si inconnu).
+    Chaque entrée porte le code du domaine et le chemin de ses libellés, que `hal_domain_labels` découpe. Les niveaux sont liés à plat, comme les quatre niveaux OpenAlex.
     """
     if not isinstance(topics, dict):
         return []
     labels: list[str] = []
-    seen: set[str] = set()
-    for raw in dedup_strs(topics.get("hal_domains")):
-        code = _strip_level_prefix(raw)
-        if code not in seen:
-            seen.add(code)
-            labels.append(hal_domain_label(code))
+    for entry in dedup_strs(topics.get("hal_domains")):
+        labels.extend(hal_domain_labels(entry))
     return labels
 
 
