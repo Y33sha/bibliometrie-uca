@@ -123,8 +123,10 @@ def mark_distinct(
 ) -> None:
     """Marque deux publications comme distinctes (non-doublon) dans `distinct_publications`. Idempotent.
 
-    Les IDs sont triés pour garantir l'unicité de la paire.
+    Les IDs sont triés pour garantir l'unicité de la paire. Lève `ValidationError` sur deux identifiants égaux : une publication n'est pas un non-doublon d'elle-même.
     """
+    if pub_id_a == pub_id_b:
+        raise ValidationError("Impossible de distinguer une publication d'elle-même")
     inserted = repo.mark_distinct(pub_id_a, pub_id_b)
     if inserted:
         emit_event(

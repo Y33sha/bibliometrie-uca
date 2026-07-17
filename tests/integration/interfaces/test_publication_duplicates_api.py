@@ -167,12 +167,13 @@ class TestMarkDistinctPublications:
         assert r.status_code == 401
 
     def test_rejects_same_ids(self, auth_client):
+        """La garde vit dans `mark_distinct` ; le handler global en fait un 400."""
         r = auth_client.post(
             "/api/admin/duplicates/mark-distinct",
             json={"pub_id_a": 1, "pub_id_b": 1},
         )
         assert r.status_code == 400
-        assert "différents" in r.json()["detail"]
+        assert "elle-même" in r.json()["detail"]
 
     def test_marks_pair_distinct(self, auth_client):
         a = _seed_publication("Pub A distinct")
