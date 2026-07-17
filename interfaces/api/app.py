@@ -30,7 +30,7 @@ from domain.errors import (
 )
 from infrastructure.db.engine import build_sync_engine, set_sync_engine
 from infrastructure.observability.log import configure_root_logging
-from interfaces.api.deps import _verify_token
+from interfaces.api.session import read_session
 from interfaces.api.spa import BUILD_DIR, SPAStaticFiles
 
 # Configure le root logger (format JSON par défaut, texte si LOG_FORMAT=text).
@@ -182,13 +182,9 @@ async def auth_middleware(request: Request, call_next: RequestResponseEndpoint) 
         return await call_next(request)
 
     token = request.cookies.get("session")
-    payload = _verify_token(token) if token else None
-    if not payload:
+    admin_user = read_session(token) if token else None
+    if not admin_user:
         return JSONResponse(status_code=401, content={"detail": "Non authentifié"})
-
-    # Le payload signé a la forme "admin_user|timestamp" ; `_verify_token` a
-    # déjà rejeté ceux qui n'ont pas d'horodatage lisible en seconde position.
-    admin_user = payload.split("|", 1)[0]
 
     # Propager l'utilisateur dans le contexte async pour que emit_event()
     # l'inclue dans les enregistrements audit_log, sans polluer les
