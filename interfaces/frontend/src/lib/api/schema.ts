@@ -399,7 +399,7 @@ export interface paths {
          *
          *     La cible est le plus petit des deux identifiants. Le sens de la fusion est sans portée durable : `refresh_from_sources` re-dérive toutes les métadonnées canoniques depuis l'union des `source_publications`, et cette union est la même dans un sens comme dans l'autre. Le rafraîchissement immédiat porte la publication à son état canonique sans attendre un run du pipeline.
          *
-         *     Les signatures, les sources, les adresses et les métadonnées passent à la cible, puis la source est supprimée. La fusion et le rafraîchissement forment une seule transaction, tenue par le command handler : un échec devient un 500 et annule l'ensemble, sans état intermédiaire. Renvoie 400 sur deux identifiants égaux, 404 sur une publication introuvable.
+         *     Les signatures, les sources, les adresses et les métadonnées passent à la cible, puis la source est supprimée. La fusion et le rafraîchissement forment une seule transaction, tenue par le command handler : un échec laisse `db_conn` l'annuler, sans état intermédiaire. Renvoie 400 sur deux identifiants égaux, 404 sur une publication introuvable, 409 sur deux DOI non-nuls distincts (`merge_publications`).
          */
         post: operations["merge_duplicate_publications_api_admin_duplicates_merge_post"];
         delete?: never;
@@ -421,7 +421,7 @@ export interface paths {
          * Mark Publications Distinct
          * @description Marque deux publications comme distinctes (non-doublon confirmé).
          *
-         *     Persiste l'annotation dans `distinct_publications` : la paire est écartée des prochaines revues de `/duplicates/next`. 400 si `pub_id_a == pub_id_b`.
+         *     Persiste l'annotation dans `distinct_publications` : la paire est écartée des prochaines revues de `/duplicates/next`. Renvoie 400 sur deux identifiants égaux (`mark_distinct`).
          */
         post: operations["mark_publications_distinct_api_admin_duplicates_mark_distinct_post"];
         delete?: never;
@@ -582,6 +582,8 @@ export interface paths {
         /**
          * Set Address Country
          * @description Attribue des pays à une adresse.
+         *
+         *     Renvoie 400 sur un code pays absent du référentiel, 404 sur une adresse introuvable (`set_country`).
          */
         post: operations["set_address_country_api_addresses__addr_id__country_post"];
         delete?: never;
@@ -602,6 +604,8 @@ export interface paths {
         /**
          * Batch Set Country
          * @description Ajoute un pays à des adresses (par IDs ou par filtre).
+         *
+         *     Renvoie 400 sur un code pays absent du référentiel — la chaîne vide comprise — et sur un appel par filtre qui n'en porte aucun (`batch_set_country_by_filter`).
          */
         post: operations["batch_set_country_api_addresses_batch_country_post"];
         delete?: never;
@@ -1220,7 +1224,7 @@ export interface paths {
          * Add Person Identifier
          * @description Ajoute à la main un identifiant (ORCID, idHAL ou IdRef) à une personne.
          *
-         *     La cascade de décision — insertion, idempotence, réattribution, conflit — appartient à `add_identifier`. Le router applique la politique d'interface, à savoir les types que l'interface expose et l'existence de la personne, puis traduit l'issue en réponse. Les handlers globaux traduisent le conflit (`CannotAttributeConflict`) en 409 et la valeur malformée (`ValidationError`) en 400.
+         *     La cascade de décision — insertion, idempotence, réattribution, conflit — appartient à `add_identifier`, appelé avec `source="manual"` : il refuse alors les types qu'aucun humain n'attribue, et vérifie l'existence de la personne. Le router traduit l'issue en réponse. Les handlers globaux traduisent la personne absente (`NotFoundError`) en 404, le conflit (`CannotAttributeConflict`) en 409, le type ou la valeur refusés (`ValidationError`) en 400.
          */
         post: operations["add_person_identifier_api_persons__person_id__identifiers_post"];
         delete?: never;
@@ -1285,6 +1289,8 @@ export interface paths {
         /**
          * Reassign Identifier
          * @description Réattribue un identifiant rejeté à une autre personne (status → pending).
+         *
+         *     Renvoie 404 sur un identifiant ou une personne cible introuvable (`reassign_identifier`).
          */
         patch: operations["reassign_identifier_api_person_identifiers__ident_id__reassign_patch"];
         trace?: never;
@@ -1325,6 +1331,8 @@ export interface paths {
         /**
          * Update Person Name
          * @description Modifie le nom/prénom d'une personne.
+         *
+         *     Renvoie 400 sans patronyme, 404 sur une personne introuvable (`update_name`).
          */
         patch: operations["update_person_name_api_persons__person_id__name_patch"];
         trace?: never;
@@ -1341,6 +1349,8 @@ export interface paths {
         /**
          * Merge Persons
          * @description Fusionne une autre personne (source) dans celle-ci (target).
+         *
+         *     Renvoie 400 sur deux identifiants égaux, 404 sur une personne introuvable, 409 si chacune porte une fiche RH distincte (`merge_person`).
          */
         post: operations["merge_persons_api_persons__person_id__merge_post"];
         delete?: never;
@@ -1361,6 +1371,8 @@ export interface paths {
         /**
          * Mark Persons Distinct
          * @description Marque deux personnes comme distinctes : les files de triage par nom et par identifiant écartent la paire.
+         *
+         *     Renvoie 400 sur deux identifiants égaux (`mark_distinct`).
          */
         post: operations["mark_persons_distinct_api_admin_persons_mark_distinct_post"];
         delete?: never;
@@ -1712,7 +1724,7 @@ export interface paths {
          * Assign Orphan Authorship Endpoint
          * @description Attribue une signature orpheline à une personne.
          *
-         *     Renvoie 409 sur une paire déjà rejetée (`RejectedPairError`), à moins que `force` ne lève le rejet au passage, et sur une signature qui porte déjà une personne (`AuthorshipAlreadyAssignedError`).
+         *     Renvoie 400 sans `person_id` ni `create_person`, et sans patronyme à la création (`assign_orphan_authorship`) ; 404 sur une personne ou une signature introuvable ; 409 sur une paire déjà rejetée (`RejectedPairError`), à moins que `force` ne lève le rejet au passage, et sur une signature qui porte déjà une personne (`AuthorshipAlreadyAssignedError`).
          */
         post: operations["assign_orphan_authorship_endpoint_api_admin_orphan_authorships_assign_post"];
         delete?: never;
@@ -1734,7 +1746,7 @@ export interface paths {
          * Batch Assign Orphan Authorships
          * @description Attribue plusieurs signatures orphelines à une même personne.
          *
-         *     Renvoie 409 (`RejectedPairError`) dès qu'une paire du lot est déjà rejetée, à moins que `force` ne lève les rejets au passage.
+         *     Renvoie 404 sur une personne introuvable, 409 (`RejectedPairError`) dès qu'une paire du lot est déjà rejetée, à moins que `force` ne lève les rejets au passage.
          */
         post: operations["batch_assign_orphan_authorships_api_admin_orphan_authorships_batch_assign_post"];
         delete?: never;
@@ -2156,7 +2168,7 @@ export interface paths {
          * Merge
          * @description Fusionne l'éditeur `source_id` dans l'éditeur `publisher_id`.
          *
-         *     Les revues et les publications de la source passent à la cible, puis la source est supprimée. Deux revues au même titre fusionnent, et leurs publications sont requalifiées contre le `journal_type` de la cible (`merge_journals`). Renvoie 404 si l'un des deux éditeurs est introuvable.
+         *     Les revues et les publications de la source passent à la cible, puis la source est supprimée. Deux revues au même titre fusionnent, et leurs publications sont requalifiées contre le `journal_type` de la cible (`merge_journals`). Renvoie 400 sur deux identifiants égaux, 404 si l'un des deux éditeurs est introuvable.
          */
         post: operations["merge_api_publishers__publisher_id__merge_post"];
         delete?: never;
@@ -2370,7 +2382,7 @@ export interface paths {
          * Merge
          * @description Fusionne la revue `source_id` dans la revue `journal_id`.
          *
-         *     Les publications et les métadonnées de la source passent à la cible, puis la source est supprimée. Les publications absorbées sont requalifiées contre le `journal_type` de la cible (`merge_journals`). Renvoie 404 si l'une des deux revues est introuvable.
+         *     Les publications et les métadonnées de la source passent à la cible, puis la source est supprimée. Les publications absorbées sont requalifiées contre le `journal_type` de la cible (`merge_journals`). Renvoie 400 sur deux identifiants égaux, 404 si l'une des deux revues est introuvable.
          */
         post: operations["merge_api_journals__journal_id__merge_post"];
         delete?: never;
@@ -2588,12 +2600,12 @@ export interface components {
             page: number;
             /** Per Page */
             per_page: number;
-            /** Pages */
-            pages: number;
             /** Addresses */
             addresses: components["schemas"]["AddressOut"][];
             /** Requires Search */
             requires_search?: boolean | null;
+            /** Pages */
+            readonly pages: number;
         };
         /**
          * AddressOut
@@ -2695,14 +2707,14 @@ export interface components {
             page: number;
             /** Per Page */
             per_page: number;
-            /** Pages */
-            pages: number;
             /** Addresses */
             addresses: components["schemas"]["AddressForCountryAttribution"][];
             /** Suggestion Facets */
             suggestion_facets?: components["schemas"]["CountrySuggestion"][] | null;
             /** Country Facets */
             country_facets: components["schemas"]["CountrySuggestion"][];
+            /** Pages */
+            readonly pages: number;
         };
         /** AmbiguousFormPersonOut */
         AmbiguousFormPersonOut: {
@@ -2737,10 +2749,10 @@ export interface components {
             page: number;
             /** Per Page */
             per_page: number;
-            /** Pages */
-            pages: number;
             /** Forms */
             forms: components["schemas"]["AmbiguousNameFormOut"][];
+            /** Pages */
+            readonly pages: number;
         };
         /**
          * AnchorOccurrenceOut
@@ -3037,10 +3049,10 @@ export interface components {
             page: number;
             /** Per Page */
             per_page: number;
-            /** Pages */
-            pages: number;
             /** Groups */
             groups: components["schemas"]["DetachableIntruderGroupOut"][];
+            /** Pages */
+            readonly pages: number;
         };
         /** DocTypeFacet */
         DocTypeFacet: {
@@ -3156,10 +3168,10 @@ export interface components {
             page: number;
             /** Per Page */
             per_page: number;
-            /** Pages */
-            pages: number;
             /** Addresses */
             addresses: components["schemas"]["FeedbackAddressItem"][];
+            /** Pages */
+            readonly pages: number;
         };
         /**
          * FeedbackLabDetected
@@ -3281,10 +3293,10 @@ export interface components {
             page: number;
             /** Per Page */
             per_page: number;
-            /** Pages */
-            pages: number;
             /** Publications */
             publications: components["schemas"]["HalAffiliationConflictPub"][];
+            /** Pages */
+            readonly pages: number;
         };
         /**
          * HalCollectionLab
@@ -3334,10 +3346,10 @@ export interface components {
             page: number;
             /** Per Page */
             per_page: number;
-            /** Pages */
-            pages: number;
             /** Pairs */
             pairs: components["schemas"]["HalDoiDuplicatePair"][];
+            /** Pages */
+            readonly pages: number;
         };
         /** HalDuplicateAccountPerson */
         HalDuplicateAccountPerson: {
@@ -3360,10 +3372,10 @@ export interface components {
             page: number;
             /** Per Page */
             per_page: number;
-            /** Pages */
-            pages: number;
             /** Persons */
             persons: components["schemas"]["HalDuplicateAccountPerson"][];
+            /** Pages */
+            readonly pages: number;
         };
         /** HalMetaDuplicatePair */
         HalMetaDuplicatePair: {
@@ -3378,10 +3390,10 @@ export interface components {
             page: number;
             /** Per Page */
             per_page: number;
-            /** Pages */
-            pages: number;
             /** Pairs */
             pairs: components["schemas"]["HalMetaDuplicatePair"][];
+            /** Pages */
+            readonly pages: number;
         };
         /** HalMissingCollectionPub */
         HalMissingCollectionPub: {
@@ -3408,14 +3420,14 @@ export interface components {
             page: number;
             /** Per Page */
             per_page: number;
-            /** Pages */
-            pages: number;
             /** Lab Acronym */
             lab_acronym: string | null;
             /** Hal Collection */
             hal_collection: string;
             /** Publications */
             publications: components["schemas"]["HalMissingCollectionPub"][];
+            /** Pages */
+            readonly pages: number;
         };
         /**
          * HalPubDetail
@@ -3474,10 +3486,10 @@ export interface components {
             page: number;
             /** Per Page */
             per_page: number;
-            /** Pages */
-            pages: number;
             /** Pairs */
             pairs: components["schemas"]["IdentifierConflictPairOut"][];
+            /** Pages */
+            readonly pages: number;
         };
         /** IdentifierReassignResponse */
         IdentifierReassignResponse: {
@@ -3599,10 +3611,12 @@ export interface components {
             total: number;
             /** Page */
             page: number;
-            /** Pages */
-            pages: number;
+            /** Per Page */
+            per_page: number;
             /** Journals */
             journals: components["schemas"]["JournalOut"][];
+            /** Pages */
+            readonly pages: number;
         };
         /**
          * JournalOut
@@ -3671,6 +3685,8 @@ export interface components {
          * @description Champs éditables d'une revue, en modification sélective.
          *
          *     Seuls les champs explicitement fournis sont écrits (`model_dump(exclude_unset=True)`). Les champs listés sont ceux qu'un client peut fournir ; `title_normalized`, dérivé de `title`, est posé par le repository.
+         *
+         *     `journal_type` porte le type du domaine : le jeu de valeurs, que l'enum SQL du même nom reprend, se vérifie ici plutôt que chez chaque appelant.
          */
         JournalUpdate: {
             /** Title */
@@ -3686,7 +3702,7 @@ export interface components {
             /** Oa Model */
             oa_model?: string | null;
             /** Journal Type */
-            journal_type?: string | null;
+            journal_type?: ("journal" | "proceedings" | "repository" | "book_series" | "ebook_platform" | "preprint_server" | "media" | "unknown") | null;
             /** Is Academic */
             is_academic?: boolean | null;
             /** Is In Doaj */
@@ -3839,10 +3855,10 @@ export interface components {
             page: number;
             /** Per Page */
             per_page: number;
-            /** Pages */
-            pages: number;
             /** Addresses */
             addresses: components["schemas"]["LabAddressOut"][];
+            /** Pages */
+            readonly pages: number;
         };
         /** LaboratoryDashboardResponse */
         LaboratoryDashboardResponse: {
@@ -3946,10 +3962,10 @@ export interface components {
             page: number;
             /** Per Page */
             per_page: number;
-            /** Pages */
-            pages: number;
             /** Pairs */
             pairs: components["schemas"]["NameDuplicatePairOut"][];
+            /** Pages */
+            readonly pages: number;
         };
         /** NameFormAuthorshipRef */
         NameFormAuthorshipRef: {
@@ -4106,10 +4122,12 @@ export interface components {
             total: number;
             /** Page */
             page: number;
-            /** Pages */
-            pages: number;
+            /** Per Page */
+            per_page: number;
             /** Authorships */
             authorships: components["schemas"]["OrphanAuthorshipOut"][];
+            /** Pages */
+            readonly pages: number;
         };
         /** OrphanBatchAssignResponse */
         OrphanBatchAssignResponse: {
@@ -4241,10 +4259,12 @@ export interface components {
             total: number;
             /** Page */
             page: number;
-            /** Pages */
-            pages: number;
+            /** Per Page */
+            per_page: number;
             /** Addresses */
             addresses: components["schemas"]["PersonAddressOut"][];
+            /** Pages */
+            readonly pages: number;
         };
         /** PersonDashboardResponse */
         PersonDashboardResponse: {
@@ -4286,10 +4306,10 @@ export interface components {
             page: number;
             /** Per Page */
             per_page: number;
-            /** Pages */
-            pages: number;
             /** Persons */
             persons: components["schemas"]["PersonDirectoryEntry"][];
+            /** Pages */
+            readonly pages: number;
         };
         /**
          * PersonIdentifierOut
@@ -4318,10 +4338,10 @@ export interface components {
             page: number;
             /** Per Page */
             per_page: number;
-            /** Pages */
-            pages: number;
             /** Persons */
             persons: components["schemas"]["PersonOut"][];
+            /** Pages */
+            readonly pages: number;
         };
         /**
          * PersonOut
@@ -4898,10 +4918,10 @@ export interface components {
             page: number;
             /** Per Page */
             per_page: number;
-            /** Pages */
-            pages: number;
             /** Publications */
             publications: components["schemas"]["PublicationListItem"][];
+            /** Pages */
+            readonly pages: number;
         };
         /** PublicationMergeResponse */
         PublicationMergeResponse: {
@@ -5014,10 +5034,12 @@ export interface components {
             total: number;
             /** Page */
             page: number;
-            /** Pages */
-            pages: number;
+            /** Per Page */
+            per_page: number;
             /** Publishers */
             publishers: components["schemas"]["PublisherListItem"][];
+            /** Pages */
+            readonly pages: number;
         };
         /**
          * PublisherUpdate
@@ -9461,7 +9483,7 @@ export interface operations {
     get_type_change_impact_api_journals__journal_id__type_change_impact_get: {
         parameters: {
             query: {
-                new_type: string;
+                new_type: "journal" | "proceedings" | "repository" | "book_series" | "ebook_platform" | "preprint_server" | "media" | "unknown";
             };
             header?: never;
             path: {

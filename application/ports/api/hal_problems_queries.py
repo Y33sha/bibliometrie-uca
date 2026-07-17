@@ -11,6 +11,8 @@ from typing import Protocol
 
 from pydantic import BaseModel
 
+from application.ports.api._common import PaginatedResponse
+
 
 class HalDocSummary(BaseModel):
     """Détail d'un dépôt HAL rattaché à une publication."""
@@ -41,11 +43,7 @@ class HalDoiDuplicatePair(BaseModel):
     publication: HalPubDetail
 
 
-class HalDoiDuplicatesResponse(BaseModel):
-    total: int
-    page: int
-    per_page: int
-    pages: int
+class HalDoiDuplicatesResponse(PaginatedResponse):
     pairs: list[HalDoiDuplicatePair]
 
 
@@ -54,11 +52,7 @@ class HalMetaDuplicatePair(BaseModel):
     pub_b: HalPubDetail
 
 
-class HalMetaDuplicatesResponse(BaseModel):
-    total: int
-    page: int
-    per_page: int
-    pages: int
+class HalMetaDuplicatesResponse(PaginatedResponse):
     pairs: list[HalMetaDuplicatePair]
 
 
@@ -81,11 +75,7 @@ class HalMissingCollectionPub(BaseModel):
     hors_uca: bool
 
 
-class HalMissingCollectionsResponse(BaseModel):
-    total: int
-    page: int
-    per_page: int
-    pages: int
+class HalMissingCollectionsResponse(PaginatedResponse):
     lab_acronym: str | None
     hal_collection: str
     publications: list[HalMissingCollectionPub]
@@ -101,11 +91,7 @@ class HalAffiliationConflictPub(BaseModel):
     labs: str | None
 
 
-class HalAffiliationConflictsResponse(BaseModel):
-    total: int
-    page: int
-    per_page: int
-    pages: int
+class HalAffiliationConflictsResponse(PaginatedResponse):
     publications: list[HalAffiliationConflictPub]
 
 
@@ -126,11 +112,7 @@ class HalDuplicateAccountPerson(BaseModel):
     hal_accounts: list[HalAccountSummary]
 
 
-class HalDuplicateAccountsResponse(BaseModel):
-    total: int
-    page: int
-    per_page: int
-    pages: int
+class HalDuplicateAccountsResponse(PaginatedResponse):
     persons: list[HalDuplicateAccountPerson]
 
 

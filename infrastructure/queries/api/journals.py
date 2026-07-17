@@ -147,7 +147,7 @@ class PgJournalQueries(JournalQueries):
         return JournalListResponse(
             total=total,
             page=page,
-            pages=(total + per_page - 1) // per_page,
+            per_page=per_page,
             journals=[
                 JournalOut(
                     id=r.id,

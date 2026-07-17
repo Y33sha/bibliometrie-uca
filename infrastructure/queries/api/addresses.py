@@ -166,7 +166,6 @@ class PgAddressesQueries(AddressesQueries):
             total=total,
             page=page,
             per_page=per_page,
-            pages=(total + per_page - 1) // per_page,
             addresses=addresses,
         )
 
@@ -365,7 +364,6 @@ class PgAddressesQueries(AddressesQueries):
             total=total,
             page=page,
             per_page=per_page,
-            pages=(total + per_page - 1) // per_page or 1,
             addresses=addresses,
             suggestion_facets=suggestion_facets,
             country_facets=country_facets,

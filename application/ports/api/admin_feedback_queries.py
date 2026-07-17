@@ -7,6 +7,8 @@ from typing import Protocol
 
 from pydantic import BaseModel
 
+from application.ports.api._common import PaginatedResponse
+
 
 class FeedbackStats(BaseModel):
     """GET /api/admin/feedback/stats : qualité de la détection d'adresses."""
@@ -54,11 +56,7 @@ class FeedbackAddressItem(BaseModel):
     matched_forms: list[FeedbackMatchedForm] | None = None
 
 
-class FeedbackAddressesResponse(BaseModel):
-    total: int
-    page: int
-    per_page: int
-    pages: int
+class FeedbackAddressesResponse(PaginatedResponse):
     addresses: list[FeedbackAddressItem]
 
 

@@ -14,6 +14,7 @@ from pydantic import BaseModel
 from application.ports.api._common import (
     DashboardOa,
     FacetValueCount,
+    PaginatedResponse,
     PubYearCount,
     StructureRef,
     ValueConfirmedOut,
@@ -111,11 +112,7 @@ class PersonDirectoryEntry(BaseModel):
     idrefs: list[ValueConfirmedOut] | None
 
 
-class PersonDirectoryResponse(BaseModel):
-    total: int
-    page: int
-    per_page: int
-    pages: int
+class PersonDirectoryResponse(PaginatedResponse):
     persons: list[PersonDirectoryEntry]
 
 
@@ -149,11 +146,7 @@ class PersonOut(BaseModel):
     name_forms: list[NameFormSummaryOut] | None
 
 
-class PersonListResponse(BaseModel):
-    total: int
-    page: int
-    per_page: int
-    pages: int
+class PersonListResponse(PaginatedResponse):
     persons: list[PersonOut]
 
 
@@ -263,10 +256,7 @@ class PersonAddressOut(BaseModel):
     structures: list[PersonAddressStruct] | None
 
 
-class PersonAddressesResponse(BaseModel):
-    total: int
-    page: int
-    pages: int
+class PersonAddressesResponse(PaginatedResponse):
     addresses: list[PersonAddressOut]
 
 
@@ -323,11 +313,7 @@ class AmbiguousNameFormOut(BaseModel):
     persons: list[AmbiguousFormPersonOut]
 
 
-class AmbiguousNameFormsResponse(BaseModel):
-    total: int
-    page: int
-    per_page: int
-    pages: int
+class AmbiguousNameFormsResponse(PaginatedResponse):
     forms: list[AmbiguousNameFormOut]
 
 
@@ -356,11 +342,7 @@ class IdentifierConflictPairOut(BaseModel):
     shared_identifiers: list[SharedIdentifierOut]
 
 
-class IdentifierConflictsResponse(BaseModel):
-    total: int
-    page: int
-    per_page: int
-    pages: int
+class IdentifierConflictsResponse(PaginatedResponse):
     pairs: list[IdentifierConflictPairOut]
 
 
@@ -393,11 +375,7 @@ class DetachableIntruderGroupOut(BaseModel):
     intruders: list[IntruderOccurrenceOut]
 
 
-class DetachableIntrudersResponse(BaseModel):
-    total: int
-    page: int
-    per_page: int
-    pages: int
+class DetachableIntrudersResponse(PaginatedResponse):
     groups: list[DetachableIntruderGroupOut]
 
 
@@ -419,11 +397,7 @@ class NameDuplicatePairOut(BaseModel):
     overlaps: OverlapCountsOut
 
 
-class NameDuplicatesResponse(BaseModel):
-    total: int
-    page: int
-    per_page: int
-    pages: int
+class NameDuplicatesResponse(PaginatedResponse):
     pairs: list[NameDuplicatePairOut]
 
 
@@ -457,10 +431,7 @@ class OrphanAuthorshipOut(BaseModel):
     pub_year: int | None
 
 
-class OrphanAuthorshipsResponse(BaseModel):
-    total: int
-    page: int
-    pages: int
+class OrphanAuthorshipsResponse(PaginatedResponse):
     authorships: list[OrphanAuthorshipOut]
 
 

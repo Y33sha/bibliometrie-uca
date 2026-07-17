@@ -8,6 +8,7 @@ from typing import Any, Protocol
 
 from pydantic import BaseModel
 
+from application.ports.api._common import PaginatedResponse
 from application.ports.api.subjects_queries import SubjectFrequency
 
 
@@ -38,10 +39,7 @@ class JournalOut(BaseModel):
     doaj_url: str | None
 
 
-class JournalListResponse(BaseModel):
-    total: int
-    page: int
-    pages: int
+class JournalListResponse(PaginatedResponse):
     journals: list[JournalOut]
 
 

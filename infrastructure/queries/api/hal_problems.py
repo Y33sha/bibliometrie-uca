@@ -155,7 +155,6 @@ class PgHalProblemsQueries(HalProblemsQueries):
             total=total,
             page=page,
             per_page=per_page,
-            pages=(total + per_page - 1) // per_page or 1,
             persons=persons,
         )
 
@@ -198,7 +197,6 @@ class PgHalProblemsQueries(HalProblemsQueries):
             total=total,
             page=page,
             per_page=per_page,
-            pages=(total + per_page - 1) // per_page or 1,
             pairs=pairs,
         )
 
@@ -253,7 +251,6 @@ class PgHalProblemsQueries(HalProblemsQueries):
             total=total,
             page=page,
             per_page=per_page,
-            pages=(total + per_page - 1) // per_page or 1,
             pairs=pairs,
         )
 
@@ -343,7 +340,6 @@ class PgHalProblemsQueries(HalProblemsQueries):
             total=total,
             page=page,
             per_page=per_page,
-            pages=(total + per_page - 1) // per_page or 1,
             lab_acronym=lab_row.acronym,
             hal_collection=col,
             publications=pubs,
@@ -451,6 +447,5 @@ class PgHalProblemsQueries(HalProblemsQueries):
             total=total,
             page=page,
             per_page=per_page,
-            pages=(total + per_page - 1) // per_page or 1,
             publications=pubs,
         )
