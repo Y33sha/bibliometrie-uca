@@ -62,6 +62,7 @@ Une vérification d'existence a sa place quand l'écriture référence l'entité
 - [x] Existence d'un code pays et validité de `journal_type` descendues dans les services.
 - [x] Restriction des types d'identifiant portée par `add_identifier`, conditionnée à `source="manual"`.
 - [x] `set_countries` et `update_name` lèvent `NotFoundError` sur un `rowcount` nul.
+- [x] `update_publisher`, `update_perimeter` et `update_structure` détectent l'absence par le `rowcount` de l'`UPDATE` (ou le `RETURNING` vide), non plus par un `*_exists()` préalable ; `publisher_exists` et `structure_exists` disparaissent faute d'appelant, `perimeter_exists` reste pour l'ajout de structure à un périmètre (`dedc215f`).
 - [x] Les vérifications d'existence des cibles de `reassign_identifier` et des assignations de signatures orphelines descendent dans les services.
 - [x] Les routers concernés retirent les contrôles correspondants ; les ports `person_exists` et `address_exists` disparaissent faute d'appelant.
 
