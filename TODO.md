@@ -9,7 +9,7 @@
 * [ ] tester la nouvelle logique de matching personnes: faire une copie de la base, vider les `persons`, `person_name_forms` et `person_identifiers`, relancer le pipeline, comparer le résultat à la base canonique; étudier le diff, retravailler la logique, itérer jusqu'à convergence.
 * [ ] réévaluer l'utilité du flag in_perimeter sur la table publications
 * [ ] suggested countries: jamais remis à null
-* [ ] arrêter d'utiliser hal_person_id pour matching: remplacer par idhal
+* [ ] arrêter d'utiliser hal_person_id pour matching: remplacer par idhal / ou rendre hal_person_id visible et confirmable/rejetable via UI admin?
 
 # Données
 * [ ] distinguer conference_paper et conférence (présence d'un journal_id?)
@@ -53,16 +53,18 @@
 * [ ] « Daniel Régnier-Roux » incompatible avec la personne 2958 (« daniel roux ») Identifiant hal_person_id='1169' déjà attribué à person_id=2958 avec statut 'pending' ; impossible d'attribuer à person_id=44830. (Correct par hasard; mais l'incompatibilité est anormale)
 
 # Idées pour plus tard, éventuellement
+## Fonctionnalités
 * financements (projets ANR, projets européens)
 * stats en compte fractionnaire vs compte entier
 * collaborations nationales et internationales: identification des structures partenaires; évolution des collaborations dans le temps (graphes de collaboration par labo, avec visualisation animée par année)
 * définir des groupes de pays (UE, continents) pour la facette "pays des co-auteurs"
 * citation count / cité par... (DOI)
 * règles de correction de métadonnées et règles de déduplication de publications: actuellement logées dans le code; possibilité de les stocker en base et de les rendre configurables via l'UI?
+* OpenAPC: j'ai utilisé les données sur les APC UCA, mais il faudrait partir du dump complet et matcher tous les DOI des publis UCA pour voir quels établissements ont payé les APC quand ce n'est pas l'UCA
+## Détails techniques
 * audit trail: uniformiser les types d'action qui génèrent un log ou pas + interface pour les consulter
 * rendre les extracteurs interruptibles avec ctrl+C sous Windows
 * mettre en place des slugs pour les URL?
-* [ ] OpenAPC: j'ai utilisé les données sur les APC UCA, mais il faudrait partir du dump complet et matcher tous les DOI des publis UCA pour voir quels établissements ont payé les APC quand ce n'est pas l'UCA
 
 # Pas nécessaire de le régler, du moment qu'on le documente quelque part
 * [ ] re-tester le circuit des imports RH => pas urgent, pas d'imports csv à terme en prod
