@@ -98,11 +98,8 @@ def client() -> TestClient:
 @pytest.fixture(scope="module")
 def auth_client() -> TestClient:
     """Client authentifié (cookie session valide)."""
-    import time
-
-    from interfaces.api.deps import _sign_token
+    from interfaces.api.session import issue_token
 
     with TestClient(app, raise_server_exceptions=False) as c:
-        token = _sign_token(f"{_settings.admin_user}|{int(time.time())}")
-        c.cookies.set("session", token)
+        c.cookies.set("session", issue_token(_settings.admin_user))
         yield c

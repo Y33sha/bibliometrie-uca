@@ -1,17 +1,13 @@
-"""Dépendances partagées des routers : session admin, factories DB, tâches de fond.
+"""Dépendances partagées des routers : factories DB, tâches de fond, réglages du serveur.
 
 `db_conn` fournit aux routes, par `Depends(...)`, la connexion sur laquelle les factories câblent les query services et les repositories.
 
-Les jetons de session sont signés et vérifiés ici ; `app.py` en fait la garde des écritures dans un middleware, et `routers/auth.py` les émet à la connexion.
+La session admin vit dans `session.py` ; ce module n'en expose que le nom d'utilisateur attendu, par `Depends(...)`.
 """
 
-import hashlib
-import hmac
 import logging
-import time
 from collections.abc import Callable, Iterator
 
-import bcrypt
 from fastapi import Depends, Request
 from sqlalchemy import Connection
 
@@ -79,38 +75,6 @@ logger = logging.getLogger(__name__)
 
 
 # ----- Session admin -----
-
-SESSION_MAX_AGE = 86400 * 7  # 7 jours
-
-
-def _sign_token(payload: str) -> str:
-    sig = hmac.new(settings.session_secret.encode(), payload.encode(), hashlib.sha256).hexdigest()
-    return f"{payload}.{sig}"
-
-
-def _verify_token(token: str) -> str | None:
-    if not token or "." not in token:
-        return None
-    payload, sig = token.rsplit(".", 1)
-    expected = hmac.new(
-        settings.session_secret.encode(), payload.encode(), hashlib.sha256
-    ).hexdigest()
-    if not hmac.compare_digest(sig, expected):
-        return None
-    try:
-        parts = payload.split("|")
-        ts = int(parts[1])
-        if time.time() - ts > SESSION_MAX_AGE:
-            return None
-    except (IndexError, ValueError):
-        return None
-    return payload
-
-
-def _check_password(password: str) -> bool:
-    if not settings.admin_hash:
-        return False
-    return bcrypt.checkpw(password.encode(), settings.admin_hash.encode())
 
 
 def get_admin_user() -> str:
