@@ -75,33 +75,28 @@
 			: ''
 	);
 
-	const allOrcids = $derived(() => {
+	/**
+	 * Identifiants d'un type, regroupés par valeur : une même valeur peut être attribuée par
+	 * plusieurs sources, et la valeur est confirmée dès que l'une de ses attributions l'est.
+	 * `person_identifiers` fait seule foi — les idhal portés par les entités auteurs HAL sont
+	 * écartés, une valeur polluée s'y glissant (un hal_person_id numérique lu comme un idhal).
+	 */
+	function groupedIdentifiers(type: string) {
 		const map = new Map<string, boolean>();
-		identifiers.filter((i) => i.id_type === 'orcid' && i.status !== 'rejected').forEach((i) => {
-			map.set(i.id_value, map.get(i.id_value) || i.status === 'confirmed' || i.status === 'authenticated');
-		});
+		identifiers
+			.filter((i) => i.id_type === type)
+			.forEach((i) => {
+				map.set(
+					i.id_value,
+					map.get(i.id_value) || i.status === 'confirmed' || i.status === 'authenticated'
+				);
+			});
 		return Array.from(map, ([value, confirmed]) => ({ value, confirmed }));
-	});
+	}
 
-	const allIdhals = $derived(() => {
-		// Aligné sur ORCID / IdRef : seule person_identifiers fait foi.
-		// On ne fusionne plus les idhal des entités auteurs HAL (qui peuvent
-		// contenir des valeurs polluées — typiquement un hal_person_id
-		// numérique mal interprété en idhal).
-		const map = new Map<string, boolean>();
-		identifiers.filter((i) => i.id_type === 'idhal' && i.status !== 'rejected').forEach((i) => {
-			map.set(i.id_value, map.get(i.id_value) || i.status === 'confirmed' || i.status === 'authenticated');
-		});
-		return Array.from(map, ([value, confirmed]) => ({ value, confirmed }));
-	});
-
-	const allIdrefs = $derived(() => {
-		const map = new Map<string, boolean>();
-		identifiers.filter((i) => i.id_type === 'idref' && i.status !== 'rejected').forEach((i) => {
-			map.set(i.id_value, map.get(i.id_value) || i.status === 'confirmed' || i.status === 'authenticated');
-		});
-		return Array.from(map, ([value, confirmed]) => ({ value, confirmed }));
-	});
+	const allOrcids = $derived(() => groupedIdentifiers('orcid'));
+	const allIdhals = $derived(() => groupedIdentifiers('idhal'));
+	const allIdrefs = $derived(() => groupedIdentifiers('idref'));
 
 	async function loadTheses() {
 		const res = await api<ThesesResponse>(

@@ -202,6 +202,23 @@ class TestPersonsList:
         assert r.status_code == 200
 
 
+class TestPersonProfileIdentifiers:
+    def test_rejected_identifier_never_leaves_the_api(self, client):
+        """Un identifiant rejeté est une attribution écartée : l'endpoint public ne l'annonce pas.
+
+        La règle tient dans la lecture, non dans la page : tout client de l'API en dépend.
+        """
+        person = _seed_person(last="REJECTEDID")
+        _seed_identifier(person, "orcid", "0000-0002-0000-0001", status="rejected")
+        _seed_identifier(person, "orcid", "0000-0002-0000-0002", status="confirmed")
+
+        r = client.get(f"/api/persons/{person}")
+
+        assert r.status_code == 200
+        served = {i["id_value"]: i["status"] for i in r.json()["identifiers"]}
+        assert served == {"0000-0002-0000-0002": "confirmed"}
+
+
 class TestPersonsFacets:
     def test_facets_structure(self, client):
         r = client.get("/api/persons/facets")
