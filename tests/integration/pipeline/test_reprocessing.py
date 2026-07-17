@@ -74,7 +74,7 @@ def _run_normalize_hal(conn):
     logger = logging.getLogger("test")
     journal_repo = journal_repository(conn)
     publisher_repo = publisher_repository(conn)
-    pub_repo = publication_repository(conn)
+    publication_repo = publication_repository(conn)
 
     rows = conn.execute(
         text("""
@@ -99,7 +99,7 @@ def _run_normalize_hal(conn):
             staging_row,
             journal_repo=journal_repo,
             publisher_repo=publisher_repo,
-            pub_repo=pub_repo,
+            publication_repo=publication_repo,
             staging_queries=staging_queries,
             authorship_queries=authorship_queries,
         ):
@@ -134,7 +134,9 @@ def _refresh_stale_publications(conn):
 
     apply_metadata_corrections(conn)
 
-    reconcile(conn, PgPublicationsReconciliationQueries(), pub_repo=publication_repository(conn))
+    reconcile(
+        conn, PgPublicationsReconciliationQueries(), publication_repo=publication_repository(conn)
+    )
 
 
 # ── Tests ───────────────────────────────────────────────────────

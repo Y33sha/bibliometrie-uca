@@ -36,7 +36,7 @@ def merge_publishers(
     correction_queries: MetadataCorrectionQueries,
     publisher_repo: PublisherRepository,
     journal_repo: JournalRepository,
-    pub_repo: PublicationRepository,
+    publication_repo: PublicationRepository,
     audit_repo: AuditRepository | None = None,
 ) -> None:
     """Fusionne l'éditeur source dans l'éditeur cible (transferts revues +
@@ -48,7 +48,7 @@ def merge_publishers(
         correction_queries=correction_queries,
         publisher_repo=publisher_repo,
         journal_repo=journal_repo,
-        pub_repo=pub_repo,
+        publication_repo=publication_repo,
         audit_repo=audit_repo,
     )
     conn.commit()

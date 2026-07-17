@@ -81,7 +81,7 @@ def run_normalize_wos(conn):
     logger = logging.getLogger("test")
     journal_repo = journal_repository(conn)
     publisher_repo = publisher_repository(conn)
-    pub_repo = publication_repository(conn)
+    publication_repo = publication_repository(conn)
 
     rows = staging_queries.fetch_pending_staging(conn, "wos", limit=10_000)
     processed = 0
@@ -93,7 +93,7 @@ def run_normalize_wos(conn):
             row,
             journal_repo=journal_repo,
             publisher_repo=publisher_repo,
-            pub_repo=pub_repo,
+            publication_repo=publication_repo,
             staging_queries=staging_queries,
             authorship_queries=authorship_queries,
         ):

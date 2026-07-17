@@ -563,7 +563,7 @@ def phase_publications(**kw: Any) -> PhaseMetrics:
         PgPublicationsReconciliationQueries(),
         PgAddressPubCountQueries(),
         log,
-        pub_repo_factory=publication_repository,
+        publication_repo_factory=publication_repository,
         rebuild_publications=bool(kw.get("rebuild_publications")),
     )
 
@@ -729,7 +729,7 @@ def _normalize_builders() -> dict[str, Callable[[Any], Any]]:
             PgSourcePublicationQueries(),
             journal_repo_factory=journal_repository,
             publisher_repo_factory=publisher_repository,
-            pub_repo_factory=publication_repository,
+            publication_repo_factory=publication_repository,
             authorship_queries=PgAuthorshipsBatchQueries(),
         )
 
@@ -739,7 +739,7 @@ def _normalize_builders() -> dict[str, Callable[[Any], Any]]:
             log,
             PgStagingQueries(),
             PgSourcePublicationQueries(),
-            pub_repo_factory=publication_repository,
+            publication_repo_factory=publication_repository,
             batch_queries=PgAuthorshipsBatchQueries(),
         ),
         "crossref": _biblio(CrossrefNormalizer),
@@ -1191,7 +1191,7 @@ def phase_oa_status(**kw: Any) -> PhaseMetrics:
                     conn,
                     PgOaStatusQueries(),
                     log,
-                    pub_repo=publication_repository(conn),
+                    publication_repo=publication_repository(conn),
                     fetcher=fetcher,
                 )
             )

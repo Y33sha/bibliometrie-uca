@@ -36,7 +36,7 @@ async def run(
     queries: OaStatusQueries,
     logger: logging.Logger,
     *,
-    pub_repo: PublicationRepository,
+    publication_repo: PublicationRepository,
     fetcher: OaStatusFetcher,
     max_concurrent: int = MAX_CONCURRENT,
 ) -> PhaseMetrics:
@@ -126,9 +126,9 @@ async def run(
 
             async with db_lock:
                 if new_status is not None:
-                    await asyncio.to_thread(pub_repo.update_oa_status, pub_id, new_status)
+                    await asyncio.to_thread(publication_repo.update_oa_status, pub_id, new_status)
                 else:
-                    await asyncio.to_thread(pub_repo.mark_unpaywall_checked, pub_id)
+                    await asyncio.to_thread(publication_repo.mark_unpaywall_checked, pub_id)
 
         # Traitement par paquets : chaque paquet part en concurrence (débit borné par `sem`) puis est committé.
         for start in range(0, total, BATCH_SIZE):

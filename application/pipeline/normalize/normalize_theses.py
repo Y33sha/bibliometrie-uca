@@ -217,7 +217,7 @@ def process_work(
     logger: logging.Logger,
     staging_row: StagingRow,
     *,
-    pub_repo: PublicationRepository,
+    publication_repo: PublicationRepository,
     staging_queries: StagingQueries,
     batch_queries: AuthorshipsBatchQueries,
 ) -> bool:
@@ -259,26 +259,26 @@ class ThesesNormalizer(SourceNormalizer):
         logger: logging.Logger,
         staging_queries: StagingQueries,
         queries: SourcePublicationQueries,
-        pub_repo_factory: Callable[[Connection], PublicationRepository],
+        publication_repo_factory: Callable[[Connection], PublicationRepository],
         batch_queries: AuthorshipsBatchQueries,
     ) -> None:
         super().__init__(conn, logger, staging_queries)
         self._queries = queries
-        self._pub_repo_factory = pub_repo_factory
-        self._pub_repo: PublicationRepository | None = None
+        self._publication_repo_factory = publication_repo_factory
+        self._publication_repo: PublicationRepository | None = None
         self._batch_queries = batch_queries
 
     def preload_caches(self, conn: Connection) -> None:
-        self._pub_repo = self._pub_repo_factory(conn)
+        self._publication_repo = self._publication_repo_factory(conn)
 
     def process_work(self, conn: Connection, row: StagingRow) -> bool | None:
-        assert self._pub_repo is not None
+        assert self._publication_repo is not None
         return process_work(
             conn,
             self._queries,
             self.logger,
             row,
-            pub_repo=self._pub_repo,
+            publication_repo=self._publication_repo,
             staging_queries=self._staging,
             batch_queries=self._batch_queries,
         )

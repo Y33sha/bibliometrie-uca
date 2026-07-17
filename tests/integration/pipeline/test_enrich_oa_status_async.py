@@ -112,7 +112,7 @@ async def test_happy_path_updates_each_pub(logger):
         MagicMock(),
         _FakeQueries(pubs, stale_total=42, oa_distribution={"gold": 7, "closed": 3}),
         logger,
-        pub_repo=repo,
+        publication_repo=repo,
         fetcher=_make_fetcher(logger),
     )
 
@@ -143,7 +143,7 @@ async def test_404_marks_as_not_found(logger):
         MagicMock(),
         _FakeQueries(pubs),
         logger,
-        pub_repo=repo,
+        publication_repo=repo,
         fetcher=_make_fetcher(logger),
     )
     assert repo.updates == []
@@ -162,7 +162,7 @@ async def test_diamond_not_replaced_by_gold(logger):
         MagicMock(),
         _FakeQueries(pubs),
         logger,
-        pub_repo=repo,
+        publication_repo=repo,
         fetcher=_make_fetcher(logger),
     )
     assert repo.updates == []
@@ -180,7 +180,7 @@ async def test_diamond_replaced_by_other_status(logger):
         MagicMock(),
         _FakeQueries(pubs),
         logger,
-        pub_repo=repo,
+        publication_repo=repo,
         fetcher=_make_fetcher(logger),
     )
     assert repo.updates == [(1, "bronze")]
@@ -199,7 +199,7 @@ async def test_embargoed_not_downgraded_to_closed(logger):
         MagicMock(),
         _FakeQueries(pubs),
         logger,
-        pub_repo=repo,
+        publication_repo=repo,
         fetcher=_make_fetcher(logger),
     )
     assert repo.updates == []
@@ -217,7 +217,7 @@ async def test_embargoed_replaced_by_open_status(logger):
         MagicMock(),
         _FakeQueries(pubs),
         logger,
-        pub_repo=repo,
+        publication_repo=repo,
         fetcher=_make_fetcher(logger),
     )
     assert repo.updates == [(1, "green")]
@@ -236,7 +236,7 @@ async def test_open_archive_deposit_not_downgraded_to_closed(logger):
         MagicMock(),
         _FakeQueries(pubs),
         logger,
-        pub_repo=repo,
+        publication_repo=repo,
         fetcher=_make_fetcher(logger),
     )
     assert repo.updates == []
@@ -256,7 +256,7 @@ async def test_open_archive_deposit_upgraded_by_unpaywall(logger):
         MagicMock(),
         _FakeQueries(pubs),
         logger,
-        pub_repo=repo,
+        publication_repo=repo,
         fetcher=_make_fetcher(logger),
     )
     assert repo.updates == [(1, "gold")]
@@ -273,7 +273,7 @@ async def test_unchanged_status_skipped(logger):
         MagicMock(),
         _FakeQueries(pubs),
         logger,
-        pub_repo=repo,
+        publication_repo=repo,
         fetcher=_make_fetcher(logger),
     )
     assert repo.updates == []
@@ -296,7 +296,7 @@ async def test_429_retries_transparently(logger):
         MagicMock(),
         _FakeQueries([(1, "10.1/r", "closed", False)]),
         logger,
-        pub_repo=repo,
+        publication_repo=repo,
         fetcher=_make_fetcher(logger),
     )
     assert repo.updates == [(1, "green")]
@@ -326,7 +326,7 @@ async def test_semaphore_caps_concurrent_fetches(logger):
         MagicMock(),
         _FakeQueries(pubs),
         logger,
-        pub_repo=_FakeRepo(),
+        publication_repo=_FakeRepo(),
         fetcher=tracked_fetcher,
         max_concurrent=3,
     )

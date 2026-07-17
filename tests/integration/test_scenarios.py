@@ -18,7 +18,7 @@ def person_repo(sa_sync_conn):
 
 
 @pytest.fixture
-def pub_repo(sa_sync_conn):
+def publication_repo(sa_sync_conn):
     return publication_repository(sa_sync_conn)
 
 
@@ -108,10 +108,10 @@ def _seed_pub(
 
 
 class TestRefreshFromSources:
-    def test_enrich_via_refresh(self, sa_sync_conn, pub_repo):
+    def test_enrich_via_refresh(self, sa_sync_conn, publication_repo):
         """refresh_from_sources enrichit les métadonnées depuis les source_publications."""
         journal_id = create_journal(sa_sync_conn, "Science")
-        pub_id = _seed_pub(pub_repo, "Pub", doi="10.5555/enrich-test")
+        pub_id = _seed_pub(publication_repo, "Pub", doi="10.5555/enrich-test")
         sa_sync_conn.execute(
             text(
                 """
@@ -122,7 +122,7 @@ class TestRefreshFromSources:
             ),
             {"pid": pub_id, "jid": journal_id},
         )
-        refresh_from_sources(pub_id, repo=pub_repo)
+        refresh_from_sources(pub_id, repo=publication_repo)
         row = sa_sync_conn.execute(
             text("SELECT oa_status, journal_id FROM publications WHERE id = :id"),
             {"id": pub_id},

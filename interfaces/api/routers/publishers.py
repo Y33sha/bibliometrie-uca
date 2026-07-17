@@ -183,7 +183,7 @@ def merge(
         correction_queries=correction_queries,
         publisher_repo=publisher_repo,
         journal_repo=journal_repo,
-        pub_repo=publication_repo,
+        publication_repo=publication_repo,
         audit_repo=audit_repo,
     )
     return MergeResponse(merged=True, source_id=body.source_id, target_id=publisher_id)

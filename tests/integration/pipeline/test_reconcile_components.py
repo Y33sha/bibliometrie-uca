@@ -162,7 +162,7 @@ class TestEndToEnd:
             conn,
             PgPublicationsReconciliationQueries(),
             logger,
-            pub_repo=publication_repository(conn),
+            publication_repo=publication_repository(conn),
         )
 
         # Aucune pub ne porte le DOI en colonne → ancre = pub du plus petit source_publication_id.
@@ -189,7 +189,7 @@ class TestEndToEnd:
             conn,
             PgPublicationsReconciliationQueries(),
             logger,
-            pub_repo=publication_repository(conn),
+            publication_repo=publication_repository(conn),
         )
 
         # X garde le pub d'origine ; Y est parti sur un autre pub (créé).
@@ -225,7 +225,7 @@ class TestEndToEnd:
             conn,
             PgPublicationsReconciliationQueries(),
             logger,
-            pub_repo=publication_repository(conn),
+            publication_repo=publication_repository(conn),
         )
 
         anchor, absorbed = (pub_a, pub_b) if sp_a < sp_b else (pub_b, pub_a)
@@ -259,7 +259,7 @@ class TestEndToEnd:
             conn,
             PgPublicationsReconciliationQueries(),
             logger,
-            pub_repo=publication_repository(conn),
+            publication_repo=publication_repository(conn),
         )
 
         assert _pub_exists(conn, pub_a)
@@ -297,7 +297,7 @@ class TestMetadataBlock:
             conn,
             PgPublicationsReconciliationQueries(),
             logger,
-            pub_repo=publication_repository(conn),
+            publication_repo=publication_repository(conn),
         )
 
         anchor, absorbed = (pub_a, pub_b) if sp_a < sp_b else (pub_b, pub_a)
@@ -331,7 +331,7 @@ class TestMetadataBlock:
             conn,
             PgPublicationsReconciliationQueries(),
             logger,
-            pub_repo=publication_repository(conn),
+            publication_repo=publication_repository(conn),
         )
 
         assert _pub_exists(conn, pub_a)
@@ -364,7 +364,7 @@ class TestMetadataBlock:
             conn,
             PgPublicationsReconciliationQueries(),
             logger,
-            pub_repo=publication_repository(conn),
+            publication_repo=publication_repository(conn),
         )
 
         assert _pub_exists(conn, pub_a)
@@ -529,7 +529,9 @@ class TestExternalDoiCarrier:
         )
 
         reconcile(
-            conn, PgPublicationsReconciliationQueries(), pub_repo=publication_repository(conn)
+            conn,
+            PgPublicationsReconciliationQueries(),
+            publication_repo=publication_repository(conn),
         )
 
         assert _pub_exists(conn, orphan_pub)

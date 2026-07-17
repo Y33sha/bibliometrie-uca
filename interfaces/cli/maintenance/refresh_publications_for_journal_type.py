@@ -64,9 +64,9 @@ def main() -> int:
             log.info("Ids : %s", list(pub_ids))
             return 0
 
-        pub_repo = publication_repository(conn)
+        publication_repo = publication_repository(conn)
         for pub_id in pub_ids:
-            refresh_from_sources(pub_id, repo=pub_repo)
+            refresh_from_sources(pub_id, repo=publication_repo)
         conn.commit()
         log.info("Terminé : %d publications rafraîchies.", total)
     return 0

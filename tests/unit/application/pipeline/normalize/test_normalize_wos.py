@@ -950,7 +950,7 @@ class TestProcessRecord:
             row,
             journal_repo=MagicMock(),
             publisher_repo=MagicMock(),
-            pub_repo=MagicMock(),
+            publication_repo=MagicMock(),
             staging_queries=staging_queries,
             authorship_queries=authorship_queries,
         )
@@ -1001,7 +1001,7 @@ class TestProcessRecord:
             row,
             journal_repo=MagicMock(),
             publisher_repo=MagicMock(),
-            pub_repo=MagicMock(),
+            publication_repo=MagicMock(),
             staging_queries=MagicMock(),
             authorship_queries=MagicMock(),
         )
@@ -1025,7 +1025,7 @@ class TestProcessRecord:
                 row,
                 journal_repo=MagicMock(),
                 publisher_repo=MagicMock(),
-                pub_repo=MagicMock(),
+                publication_repo=MagicMock(),
                 staging_queries=MagicMock(),
                 authorship_queries=MagicMock(),
             )
@@ -1046,7 +1046,7 @@ class TestWosNormalizer:
             queries=MagicMock(),
             journal_repo_factory=journal_factory,
             publisher_repo_factory=publisher_factory,
-            pub_repo_factory=pub_factory,
+            publication_repo_factory=pub_factory,
             authorship_queries=MagicMock(),
         )
 
@@ -1058,7 +1058,7 @@ class TestWosNormalizer:
         pub_factory.assert_called_once_with(conn2)
         assert norm._journal_repo == "j-repo"
         assert norm._publisher_repo == "p-repo"
-        assert norm._pub_repo == "pub-repo"
+        assert norm._publication_repo == "pub-repo"
 
     def test_process_work_delegates_to_process_record(self, logger, monkeypatch):
         norm = WosNormalizer(
@@ -1068,7 +1068,7 @@ class TestWosNormalizer:
             queries=MagicMock(),
             journal_repo_factory=lambda c: MagicMock(),
             publisher_repo_factory=lambda c: MagicMock(),
-            pub_repo_factory=lambda c: MagicMock(),
+            publication_repo_factory=lambda c: MagicMock(),
             authorship_queries=MagicMock(),
         )
         norm.preload_caches(MagicMock())
@@ -1091,7 +1091,7 @@ class TestWosNormalizer:
         assert set(captured["kwargs"].keys()) == {
             "journal_repo",
             "publisher_repo",
-            "pub_repo",
+            "publication_repo",
             "staging_queries",
             "authorship_queries",
         }

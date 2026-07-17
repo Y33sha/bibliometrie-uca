@@ -27,7 +27,7 @@ def test_recompute_addresses_runs_in_publications_phase():
             reconciliation,
             address_pub_count,
             logging.getLogger("test"),
-            pub_repo_factory=lambda conn: MagicMock(),
+            publication_repo_factory=lambda conn: MagicMock(),
         )
     address_pub_count.recompute_pub_count.assert_called_once()
 
