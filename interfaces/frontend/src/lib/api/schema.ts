@@ -2356,15 +2356,17 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        get?: never;
+        put?: never;
         /**
          * Get Type Change Impact
-         * @description Compte les publications de la revue dont le `doc_type` changerait si son `journal_type` passait à `new_type`.
+         * @description Compte les publications de la revue dont le `doc_type` changerait si son `journal_type` passait à la valeur demandée.
          *
          *     L'aperçu applique réellement le changement — écriture du type, recalcul des corrections sur les publications sources, rafraîchissement — dans un `SAVEPOINT` annulé ensuite. Il emprunte donc le chemin exact de l'édition, et aucune écriture ne survit. Renvoie 404 sur une revue inconnue, comme l'édition qu'il simule.
+         *
+         *     La méthode est POST bien qu'aucune écriture ne survive : l'aperçu écrit, pose les verrous de l'édition et en coûte le prix. Un GET s'annonce sans effet, et la garde d'authentification, qui s'applique aux méthodes d'écriture, laisserait passer une action admin.
          */
-        get: operations["get_type_change_impact_api_journals__journal_id__type_change_impact_get"];
-        put?: never;
-        post?: never;
+        post: operations["get_type_change_impact_api_journals__journal_id__type_change_impact_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3581,7 +3583,7 @@ export interface components {
             /** Apc Currency */
             apc_currency: string | null;
             /** Oa Model */
-            oa_model: string | null;
+            oa_model: ("subscription" | "full_oa" | "repository") | null;
             /** Journal Type */
             journal_type: ("journal" | "proceedings" | "repository" | "book_series" | "ebook_platform" | "preprint_server" | "media" | "unknown") | null;
             /** Is Academic */
@@ -3642,7 +3644,7 @@ export interface components {
             /** Apc Currency */
             apc_currency: string | null;
             /** Oa Model */
-            oa_model: string | null;
+            oa_model: ("subscription" | "full_oa" | "repository") | null;
             /** Journal Type */
             journal_type: ("journal" | "proceedings" | "repository" | "book_series" | "ebook_platform" | "preprint_server" | "media" | "unknown") | null;
             /** Is Academic */
@@ -3653,6 +3655,17 @@ export interface components {
             pub_count: number;
             /** Doaj Url */
             doaj_url: string | null;
+        };
+        /**
+         * JournalTypeChange
+         * @description Valeur de `journal_type` dont la modale admin demande l'impact avant de confirmer l'édition.
+         */
+        JournalTypeChange: {
+            /**
+             * Journal Type
+             * @enum {string}
+             */
+            journal_type: "journal" | "proceedings" | "repository" | "book_series" | "ebook_platform" | "preprint_server" | "media" | "unknown";
         };
         /**
          * JournalTypeChangeImpact
@@ -3678,7 +3691,7 @@ export interface components {
          *
          *     Seuls les champs explicitement fournis sont écrits (`model_dump(exclude_unset=True)`). Les champs listés sont ceux qu'un client peut fournir ; `title_normalized`, dérivé de `title`, est posé par le repository.
          *
-         *     `journal_type` porte le type du domaine : le jeu de valeurs, que l'enum SQL du même nom reprend, se vérifie ici plutôt que chez chaque appelant.
+         *     `journal_type` et `oa_model` portent les types du domaine : leurs jeux de valeurs, que les enums SQL des mêmes noms reprennent, se vérifient ici plutôt que chez chaque appelant.
          */
         JournalUpdate: {
             /** Title */
@@ -3692,7 +3705,7 @@ export interface components {
             /** Doi Prefix */
             doi_prefix?: string | null;
             /** Oa Model */
-            oa_model?: string | null;
+            oa_model?: ("subscription" | "full_oa" | "repository") | null;
             /** Journal Type */
             journal_type?: ("journal" | "proceedings" | "repository" | "book_series" | "ebook_platform" | "preprint_server" | "media" | "unknown") | null;
             /** Is Academic */
@@ -9462,18 +9475,20 @@ export interface operations {
             };
         };
     };
-    get_type_change_impact_api_journals__journal_id__type_change_impact_get: {
+    get_type_change_impact_api_journals__journal_id__type_change_impact_post: {
         parameters: {
-            query: {
-                new_type: "journal" | "proceedings" | "repository" | "book_series" | "ebook_platform" | "preprint_server" | "media" | "unknown";
-            };
+            query?: never;
             header?: never;
             path: {
                 journal_id: number;
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JournalTypeChange"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

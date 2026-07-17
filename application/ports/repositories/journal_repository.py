@@ -17,7 +17,7 @@ from typing import Any, NamedTuple, Protocol
 
 from pydantic import BaseModel
 
-from domain.journals.journal import Journal, JournalType
+from domain.journals.journal import Journal, JournalType, OaModel
 
 
 class JournalIssnRow(NamedTuple):
@@ -34,7 +34,7 @@ class JournalUpdate(BaseModel):
 
     Seuls les champs explicitement fournis sont écrits (`model_dump(exclude_unset=True)`). Les champs listés sont ceux qu'un client peut fournir ; `title_normalized`, dérivé de `title`, est posé par le repository.
 
-    `journal_type` porte le type du domaine : le jeu de valeurs, que l'enum SQL du même nom reprend, se vérifie ici plutôt que chez chaque appelant.
+    `journal_type` et `oa_model` portent les types du domaine : leurs jeux de valeurs, que les enums SQL des mêmes noms reprennent, se vérifient ici plutôt que chez chaque appelant.
     """
 
     title: str | None = None
@@ -42,7 +42,7 @@ class JournalUpdate(BaseModel):
     eissn: str | None = None
     issnl: str | None = None
     doi_prefix: str | None = None
-    oa_model: str | None = None
+    oa_model: OaModel | None = None
     journal_type: JournalType | None = None
     is_academic: bool | None = None
     is_in_doaj: bool | None = None
@@ -98,7 +98,7 @@ class JournalRepository(Protocol):
         eissn: str | None = None,
         publisher_id: int | None = None,
         openalex_id: str | None = None,
-        oa_model: str | None = None,
+        oa_model: OaModel | None = None,
     ) -> None: ...
 
     def create_journal(
@@ -110,7 +110,7 @@ class JournalRepository(Protocol):
         issnl: str | None,
         publisher_id: int | None,
         openalex_id: str | None,
-        oa_model: str | None,
+        oa_model: OaModel | None,
     ) -> int: ...
 
     # ── Updates génériques ─────────────────────────────────────────

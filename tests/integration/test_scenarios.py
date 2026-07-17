@@ -190,6 +190,27 @@ class TestJournalTypesEnum:
         )
 
 
+class TestOaModelEnum:
+    def test_python_matches_db(self, sa_sync_conn):
+        """L'enum SQL `oa_model` doit correspondre au domaine (`OA_MODELS`) ET à la métadonnée SQLAlchemy (`tables.py`)."""
+        from domain.journals.journal import OA_MODELS
+        from infrastructure.db.tables import oa_model_enum
+
+        db_models = set(
+            sa_sync_conn.execute(text("SELECT unnest(enum_range(NULL::oa_model))::text")).scalars()
+        )
+        assert set(OA_MODELS) == db_models, (
+            f"Désynchronisation domaine/DB !\n"
+            f"  Domaine : {sorted(OA_MODELS)}\n"
+            f"  DB      : {sorted(db_models)}"
+        )
+        assert set(oa_model_enum.enums) == db_models, (
+            f"Désynchronisation tables.py/DB !\n"
+            f"  tables.py : {sorted(oa_model_enum.enums)}\n"
+            f"  DB        : {sorted(db_models)}"
+        )
+
+
 # ── Merge persons ──
 
 
