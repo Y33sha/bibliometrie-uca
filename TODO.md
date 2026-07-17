@@ -3,11 +3,13 @@
 * [ ] ajouter extraction par ORCID: vérifier pertinence (tester différentes sources, auditer le gain)
 * [ ] bioRxiv, medRxiv: identifiants différents de arxiv? cf publi 2757 (voir si on moissonne ces identifiants; possibilité de récupérer les DOI à partir des identifiants comme dans ArXiv)
 * [ ] chercher dans ScanR par hal-id? (généraliser cross-import à tous les identifiants et toutes les sources; ajouter système de backoff)
+* [ ] cross_import: max 10k par source par run? (pour lisser dans le temps)
 ## Suite du traitement
 * [ ] CLI `seed_journals_doi_prefix`: intégrer au pipeline? + recalculer les anciens pour tenir compte des nouveaux (chaque doi_prefix de journal doit être unique et aussi précis que possible; à cette occasion, réécrire la fonction resolve_journal_by_doi de manière moins alambiquée)
 * [ ] tester la nouvelle logique de matching personnes: faire une copie de la base, vider les `persons`, `person_name_forms` et `person_identifiers`, relancer le pipeline, comparer le résultat à la base canonique; étudier le diff, retravailler la logique, itérer jusqu'à convergence.
 * [ ] réévaluer l'utilité du flag in_perimeter sur la table publications
 * [ ] suggested countries: jamais remis à null
+* [ ] arrêter d'utiliser hal_person_id pour matching: remplacer par idhal
 
 # Données
 * [ ] distinguer conference_paper et conférence (présence d'un journal_id?)
@@ -48,6 +50,7 @@
 * [ ] fusion entre article et conference_paper: 12362
 * [ ] 205492 et 205499: pourquoi pas de fusion? (lesdeux résolvent vers le même DOI)
 * [ ] 165425: fusion d'un article et d'un dataset
+* [ ] « Daniel Régnier-Roux » incompatible avec la personne 2958 (« daniel roux ») Identifiant hal_person_id='1169' déjà attribué à person_id=2958 avec statut 'pending' ; impossible d'attribuer à person_id=44830. (Correct par hasard; mais l'incompatibilité est anormale)
 
 # Idées pour plus tard, éventuellement
 * financements (projets ANR, projets européens)
