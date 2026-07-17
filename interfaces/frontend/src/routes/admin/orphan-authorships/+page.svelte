@@ -13,7 +13,7 @@
 	type PersonResult = components['schemas']['PersonSearchResult'];
 	type OrphanAuthorship = components['schemas']['OrphanAuthorshipOut'];
 	type OrphansResponse = components['schemas']['OrphanAuthorshipsResponse'];
-	type RejectedPair = { publication_id: number; person_id: number; rejected_at: string };
+	type RejectedPair = components['schemas']['RejectedPairItem'];
 
 	async function searchPersons(q: string): Promise<PersonResult[]> {
 		return api<PersonResult[]>(`/api/persons/search?q=${encodeURIComponent(q)}`);
@@ -46,7 +46,7 @@
 			await run(false);
 		} catch (e) {
 			if (e instanceof ApiError && e.status === 409) {
-				const body = e.detail as { detail?: string; rejected_pairs?: RejectedPair[] };
+				const body = e.detail as Partial<components['schemas']['RejectedPairsResponse']>;
 				if (body?.rejected_pairs?.length) {
 					rejectModal = { detail: body.detail ?? '', pairs: body.rejected_pairs, retry: () => run(true) };
 					return;

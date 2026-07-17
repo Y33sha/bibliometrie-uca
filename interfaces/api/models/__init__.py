@@ -1,4 +1,4 @@
-"""Modèles Pydantic des routers : corps des requêtes entrantes, et réponses que le router compose lui-même.
+"""Modèles Pydantic des routers : corps des requêtes entrantes, réponses que le router compose lui-même, et corps d'erreur structurés (`errors.py`) que les handlers d'`app.py` produisent et que les routes déclarent.
 
 Le découpage des modules suit celui des routers (`interfaces/api/routers/*`). Ce `__init__` re-expose les classes au niveau du package, qui est le point d'importation : `from interfaces.api.models import X`.
 
@@ -73,6 +73,12 @@ from interfaces.api.models.admin.structures import (
     StructureUpdate,
 )
 from interfaces.api.models.auth import AuthCheckResponse, LoginRequest
+from interfaces.api.models.errors import (
+    BlockingJournalItem,
+    PublisherMergeBlockedResponse,
+    RejectedPairItem,
+    RejectedPairsResponse,
+)
 from interfaces.api.models.journals import JournalTypeChange, JournalTypeChangeImpact
 
 __all__ = [
@@ -88,6 +94,7 @@ __all__ = [
     "BatchReviewAction",
     "BatchSetCountry",
     "BatchUpdatedResponse",
+    "BlockingJournalItem",
     "ConfigValueUpdate",
     "CreatePersonName",
     "CreatedIdResponse",
@@ -116,8 +123,11 @@ __all__ = [
     "PipelinePhaseLog",
     "PipelineStatus",
     "PublicationMergeResponse",
+    "PublisherMergeBlockedResponse",
     "ReassignIdentifier",
     "RejectPerson",
+    "RejectedPairItem",
+    "RejectedPairsResponse",
     "RelationCreate",
     "RemovedResponse",
     "ReviewAction",

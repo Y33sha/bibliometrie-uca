@@ -29,6 +29,7 @@ from interfaces.api.models import (
     OkResponse,
     OrphanAssignResponse,
     OrphanBatchAssignResponse,
+    RejectedPairsResponse,
 )
 
 router = APIRouter()
@@ -77,7 +78,11 @@ def list_orphan_authorships(
     return queries.list_orphan_authorships(search=search, page=page, per_page=per_page)
 
 
-@router.post("/api/admin/orphan-authorships/assign", response_model=OrphanAssignResponse)
+@router.post(
+    "/api/admin/orphan-authorships/assign",
+    response_model=OrphanAssignResponse,
+    responses={409: {"model": RejectedPairsResponse}},
+)
 def assign_orphan_authorship_endpoint(
     body: AssignOrphanAuthorship,
     conn: Connection = Depends(db_conn),
@@ -109,7 +114,11 @@ def assign_orphan_authorship_endpoint(
     return OrphanAssignResponse(person_id=person_id)
 
 
-@router.post("/api/admin/orphan-authorships/batch-assign", response_model=OrphanBatchAssignResponse)
+@router.post(
+    "/api/admin/orphan-authorships/batch-assign",
+    response_model=OrphanBatchAssignResponse,
+    responses={409: {"model": RejectedPairsResponse}},
+)
 def batch_assign_orphan_authorships(
     body: BatchAssignOrphanAuthorships,
     conn: Connection = Depends(db_conn),
