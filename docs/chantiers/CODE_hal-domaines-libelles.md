@@ -21,31 +21,40 @@ Deux défauts du dispositif actuel, relevés au passage :
 ## Décisions
 
 1. **L'extraction HAL passe de `domain_s` à `fr_domainAllCodeLabel_fs`.** Le libellé vient de la source, comme pour toutes les autres sources. `topics.hal_domains` stocke les chaînes `<code>_FacetSep_<chemin>` brutes ; la découpe en libellés est une règle pure appelée par l'extracteur.
-2. **Tous les niveaux hiérarchiques sont conservés, à plat.** Le chemin est découpé sur `/`, chaque segment donne un libellé. La profondeur est lue du code (préfixe avant `_FacetSep_`), ce qui borne le découpage et préserve les `/` internes à un libellé (« Chimie théorique et/ou physique »). Même traitement que les 4 niveaux OpenAlex à plat.
-3. **Les libellés génériques « Autre »/« Autres » sont écartés** à l'extraction. Sans risque de déclassement : le parent est toujours présent dans le chemin.
+2. **Tous les niveaux hiérarchiques sont conservés, à plat.** Le chemin est découpé sur `/`, chaque segment donne un libellé. La profondeur est lue du code (préfixe avant `_FacetSep_`), ce qui borne le découpage et préserve les `/` internes au libellé de feuille. Même traitement que les 4 niveaux OpenAlex à plat.
+3. **Les libellés génériques « Autre »/« Autres » sont écartés** à l'extraction. Sans risque de déclassement : le parent est toujours présent dans le chemin. L'exclusion suit le retrait des annotations, certaines feuilles portant `Autre [cs.OH]` ou `Autres [stat.ML]`.
 4. **La table et son générateur disparaissent.** `domain/sources/hal_domains.py` et `interfaces/cli/dev/refresh_hal_domain_labels.py` sont supprimés, avec leurs tests. La découpe d'un chemin de domaine HAL devient une règle pure dans `domain/sources/hal.py`.
+
+### Ce que dit le référentiel
+
+Relevé par facette sur `fr_domainAllCodeLabel_fs` (707 valeurs distinctes), qui fonde la règle de découpe :
+
+- **671 entrées bien formées**, dont le code répond à `[a-z0-9]+([-.][a-z0-9]+)*`. Les 36 autres portent un chemin de libellés en guise de code (`Informatique [cs]/Biotechnologie_FacetSep_domain_Informatique [cs]/Biotechnologie`), certaines franchement corrompues ; elles n'apparaissent que sur une centaine de documents et ne donnent aucun libellé.
+- **Quatre domaines portent un `/` dans leur libellé de feuille**, ce qui interdit un découpage libre : `chim.theo` (« Chimie théorique et/ou physique »), `spi.opti` (« Optique / photonique »), `spi.auto` (« Automatique / Robotique ») et `spi.nano` (« Micro et nanotechnologies/Microélectronique »). Chacun pèse 20 000 à 32 000 documents. Le dernier n'est pas une tournure de langue mais deux niveaux tassés dans un code de profondeur 2 : aucune liste d'expressions ne le couvrirait, là où la profondeur annoncée par le code le borne.
+- **Les seuls libellés génériques sont « Autre » et « Autres »**, annotations retirées.
+- Partout ailleurs, le nombre de segments du chemin égale la profondeur du code.
 
 ## Phasage
 
 ### Phase 1 — Extraction et règle de découpe
 
-- [ ] `domain/sources/hal.py` : fonction pure `hal_domain_labels(facet_entry)` → liste des libellés de niveaux (découpe `_FacetSep_` puis `/` bornée par la profondeur du code, retrait des annotations `[…]`, exclusion « Autre »/« Autres »). Constante `_GENERIC_DOMAIN_LABELS`.
-- [ ] `infrastructure/sources/hal/fields.py` : remplacer `domain_s` par `fr_domainAllCodeLabel_fs` dans `HAL_FIELDS`.
-- [ ] `application/pipeline/normalize/normalize_hal.py` : lire `fr_domainAllCodeLabel_fs`, le stocker tel quel dans `topics.hal_domains`.
-- [ ] `application/pipeline/subjects/extractors.py` : `hal_labels` déduplique les entrées puis délègue à `hal_domain_labels` ; retrait de `_strip_level_prefix` (obsolète) et de l'import `hal_domain_label`.
+- [x] `domain/sources/hal.py` : fonction pure `hal_domain_labels(facet_entry)` → liste des libellés de niveaux (découpe `_FacetSep_` puis `/` bornée par la profondeur du code, retrait des annotations `[…]`, exclusion « Autre »/« Autres »). Constantes `_DOMAIN_CODE`, `_DOMAIN_ANNOTATION`, `_GENERIC_DOMAIN_LABELS`.
+- [x] `infrastructure/sources/hal/fields.py` : remplacer `domain_s` par `fr_domainAllCodeLabel_fs` dans `HAL_FIELDS`.
+- [x] `application/pipeline/normalize/normalize_hal.py` : lire `fr_domainAllCodeLabel_fs`, le stocker tel quel dans `topics.hal_domains`.
+- [x] `application/pipeline/subjects/extractors.py` : `hal_labels` déduplique les entrées puis délègue à `hal_domain_labels` ; retrait de `_strip_level_prefix` et de l'import `hal_domain_label`.
 
 ### Phase 2 — Suppressions
 
-- [ ] Supprimer `domain/sources/hal_domains.py`.
-- [ ] Supprimer `interfaces/cli/dev/refresh_hal_domain_labels.py`.
-- [ ] Supprimer `tests/unit/domain/test_hal_domains.py` ; couvrir `hal_domain_labels` par un test dédié (multi-niveaux, `/` interne à un libellé, exclusion « Autre », entrée mal formée).
+- [x] Supprimer `domain/sources/hal_domains.py`.
+- [x] Supprimer `interfaces/cli/dev/refresh_hal_domain_labels.py`.
+- [x] Supprimer `tests/unit/domain/test_hal_domains.py` ; `hal_domain_labels` couvert par `tests/unit/domain/sources/test_hal_domain_labels.py`, dont les entrées sont des valeurs réelles du référentiel.
 
 ### Phase 3 — Tests et documentation
 
-- [ ] `tests/integration/pipeline/test_subjects_ingest.py` : fixtures `hal_domains` au format `fr_domainAllCodeLabel_fs` ; ajouter un cas multi-niveaux et un cas « Autre » exclu.
-- [ ] `tests/unit/application/pipeline/normalize/test_normalize_hal.py` : entrée `fr_domainAllCodeLabel_fs`, assertion `topics` mise à jour.
-- [ ] `tests/integration/pipeline/test_dedup_publications.py` : fixtures `hal_domains` au format libellé.
-- [ ] `docs/sources/02-hal.md` : recaler le champ domaines ; balayer `docs/pipeline` et `docs/donnees` pour les mentions de la table.
+- [x] `tests/integration/pipeline/test_subjects_ingest.py` : fixtures au format `fr_domainAllCodeLabel_fs`, avec un cas multi-niveaux et un cas « Autre » exclu.
+- [x] `tests/unit/application/pipeline/normalize/test_normalize_hal.py` : entrée `fr_domainAllCodeLabel_fs`, assertion `topics` mise à jour.
+- [x] `tests/integration/pipeline/test_dedup_publications.py` : fixtures `hal_domains` au format source.
+- [x] `docs/sources/02-hal.md` : champ domaines recalé. `docs/pipeline` et `docs/donnees` ne mentionnaient pas la table.
 
 ### Phase 4 — Reprise du stock (production)
 
@@ -54,3 +63,4 @@ Deux défauts du dispositif actuel, relevés au passage :
 ## Questions ouvertes
 
 - **Interaction avec la qualité des sujets** : le chantier `METIER_sujets-qualite` se sert des libellés `hal_domain` comme arbitres du nettoyage OpenAlex. Le changement les enrichit (parents remontés) et les assainit (« Autre » retiré) sans casser l'usage — à garder en tête au calibrage des arbitres.
+- **Limite de la règle de découpe** : la profondeur du code ne protège que le **dernier** segment. Un `/` dans un libellé intermédiaire scinderait à tort. Aucune des 671 entrées bien formées n'est dans ce cas, mais c'est une propriété des données du référentiel, pas une garantie de son schéma.
