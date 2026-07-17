@@ -41,7 +41,9 @@ HAL_FIELDS = [
     "pubmedid_s",
     "abstract_s",
     "keyword_s",
-    "domain_s",
+    # Domaines CCSD : `<code>_FacetSep_<libellé racine>/…/<libellé feuille>`, qui
+    # porte le libellé de chaque niveau. `domain_s` n'expose que les codes.
+    "fr_domainAllCodeLabel_fs",
     "volume_s",
     "issue_s",
     "page_s",

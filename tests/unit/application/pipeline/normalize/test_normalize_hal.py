@@ -313,9 +313,14 @@ class TestInsertHalDocument:
         assert captured.keywords is None
 
     def test_topics_from_domain(self):
+        """Les domaines sont stockés tels que la source les expose ; la découpe en libellés vit dans la phase `subjects`."""
         queries = _FakeQueries()
-        captured = self._call(queries, {"domain_s": ["sdv.bibs", "info.algo"]})
-        assert captured.topics == {"hal_domains": ["sdv.bibs", "info.algo"]}
+        entries = [
+            "sdv.bibs_FacetSep_Sciences du Vivant [q-bio]/Biostatistiques",
+            "info.algo_FacetSep_Informatique [cs]/Algorithme et structure de données",
+        ]
+        captured = self._call(queries, {"fr_domainAllCodeLabel_fs": entries})
+        assert captured.topics == {"hal_domains": entries}
 
     def test_biblio_built_from_volume_issue_pages(self):
         queries = _FakeQueries()

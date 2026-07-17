@@ -48,7 +48,10 @@ Document `hal-04836977` (3 auteurs, podcast Métaclassique). `abstract_s`, `subT
     "HAL-LYON-2-NOUVELLE-VERSION"
   ],
   "docType_s": "OTHER",
-  "domain_s": ["0.shs", "0.shs", "1.shs.hisphilso", "0.shs", "1.shs.musiq"],
+  "fr_domainAllCodeLabel_fs": [
+    "shs.hisphilso_FacetSep_Sciences de l'Homme et Société/Histoire, Philosophie et Sociologie des sciences",
+    "shs.musiq_FacetSep_Sciences de l'Homme et Société/Musique, musicologie et arts de la scène"
+  ],
   "halId_s": "hal-04836977",
   "keyword_s": ["Hypnose", "Hypnose musicale", "Suggestion", "Auditeurs", "Musiciens", "Piano"],
   "label_s": "Céline Frigau Manning, Hélène Tysman, David Christoffel. Podcast… (tronqué)",
