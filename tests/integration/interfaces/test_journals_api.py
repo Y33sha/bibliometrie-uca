@@ -512,6 +512,28 @@ class TestUpdateJournal:
             assert row["is_in_doaj"] is True
 
 
+class TestTypeChangeImpact:
+    def test_counts_without_writing(self, client, auth_client):
+        """L'aperçu écrit dans un SAVEPOINT annulé : le type de la revue ne bouge pas."""
+        jid = _seed_journal()
+        auth_client.put(f"/api/journals/{jid}", json={"journal_type": "journal"})
+        r = client.get(
+            f"/api/journals/{jid}/type-change-impact", params={"new_type": "proceedings"}
+        )
+        assert r.status_code == 200
+        assert "count" in r.json()
+        with _pool() as cur:
+            cur.execute("SELECT journal_type FROM journals WHERE id = %s", (jid,))
+            assert cur.fetchone()["journal_type"] == "journal"
+
+    def test_404_on_unknown_journal(self, client):
+        """L'aperçu emprunte le chemin de l'édition : il en hérite l'absence."""
+        r = client.get(
+            "/api/journals/999999/type-change-impact", params={"new_type": "proceedings"}
+        )
+        assert r.status_code == 404
+
+
 class TestMergeJournals:
     def test_requires_admin(self, client):
         r = client.post("/api/journals/1/merge", json={"source_id": 2})

@@ -115,8 +115,6 @@ class JournalRepository(Protocol):
 
     # ── Updates génériques ─────────────────────────────────────────
 
-    def journal_exists(self, journal_id: int) -> bool: ...
-
     def update_journal_fields(self, journal_id: int, fields: JournalUpdate) -> None: ...
 
     # ── APC / DOAJ ─────────────────────────────────────────────────

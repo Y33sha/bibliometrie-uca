@@ -103,13 +103,10 @@ def find_or_create_journal(
 def update_journal(journal_id: int, *, update: JournalUpdate, repo: JournalRepository) -> None:
     """Met à jour une revue à partir des champs explicitement fournis.
 
-    Lève NotFoundError si la revue n'existe pas, ValidationError si aucun champ n'est fourni.
+    Lève `ValidationError` si aucun champ n'est fourni, `NotFoundError` si la revue n'existe pas — l'`UPDATE` du repository ne trouve alors aucune ligne à apparier.
     """
     if not update.model_fields_set:
         raise ValidationError("Aucun champ à mettre à jour")
-
-    if not repo.journal_exists(journal_id):
-        raise NotFoundError(f"Revue {journal_id} introuvable")
 
     repo.update_journal_fields(journal_id, update)
 

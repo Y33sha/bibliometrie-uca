@@ -181,7 +181,7 @@ def get_type_change_impact(
 ) -> JournalTypeChangeImpact:
     """Compte les publications de la revue dont le `doc_type` changerait si son `journal_type` passait à `new_type`.
 
-    L'aperçu applique réellement le changement — écriture du type, recalcul des corrections sur les publications sources, rafraîchissement — dans un `SAVEPOINT` annulé ensuite. Il emprunte donc le chemin exact de l'édition, et aucune écriture ne survit.
+    L'aperçu applique réellement le changement — écriture du type, recalcul des corrections sur les publications sources, rafraîchissement — dans un `SAVEPOINT` annulé ensuite. Il emprunte donc le chemin exact de l'édition, et aucune écriture ne survit. Renvoie 404 sur une revue inconnue, comme l'édition qu'il simule.
     """
     savepoint = conn.begin_nested()
     try:

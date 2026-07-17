@@ -14,6 +14,7 @@ from sqlalchemy import Connection, case, delete, func, or_, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from application.ports.repositories.journal_repository import JournalIssnRow, JournalUpdate
+from domain.errors import NotFoundError
 from domain.journals.journal import OA_MODELS, Journal, JournalType, OaModel
 from domain.normalize import normalize_text
 from infrastructure.db.tables import journal_name_forms, journals
@@ -275,20 +276,18 @@ class PgJournalRepository:
 
     # ── Updates génériques ─────────────────────────────────────────
 
-    def journal_exists(self, journal_id: int) -> bool:
-        """Vérifie l'existence d'un journal."""
-        return (
-            self._conn.execute(select(journals.c.id).where(journals.c.id == journal_id)).first()
-            is not None
-        )
-
     def update_journal_fields(self, journal_id: int, fields: JournalUpdate) -> None:
-        """UPDATE dynamique sur journals à partir des champs fournis, `title_normalized` dérivé de `title` quand il est présent. L'existence de la revue et la non-vacuité sont vérifiées par le service."""
+        """UPDATE dynamique sur journals à partir des champs fournis, `title_normalized` dérivé de `title` quand il est présent.
+
+        L'`UPDATE` rapporte les lignes appariées : zéro dit l'absence, sans lecture préalable. La non-vacuité des champs est vérifiée par le service.
+        """
         data = fields.model_dump(exclude_unset=True)
         if data.get("title") is not None:
             data["title_normalized"] = normalize_text(data["title"])
         stmt = update(journals).where(journals.c.id == journal_id).values(**data)
-        self._conn.execute(stmt)
+        result = self._conn.execute(stmt)
+        if result.rowcount == 0:
+            raise NotFoundError(f"Revue {journal_id} introuvable")
 
     # ── APC / DOAJ ─────────────────────────────────────────────────
 
