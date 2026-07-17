@@ -46,7 +46,7 @@ def _member(row: ReconcileRow) -> ReconcileMember:
 
 
 def _create_new_publication(
-    group: WorkGroup, rows_by_sp: dict[int, ReconcileRow], pub_repo: PublicationRepository
+    group: WorkGroup, rows_by_sp: dict[int, ReconcileRow], publication_repo: PublicationRepository
 ) -> int:
     """Crée la publication d'un groupe sans ancre existante (split, ou création depuis orphelins), semée depuis sa plus petite SP portant une année. Les métadonnées définitives sont posées juste après par `refresh_from_sources`.
 
@@ -61,7 +61,7 @@ def _create_new_publication(
         doc_type=seed.doc_type,
         pub_year=seed.pub_year,
         doi=seed.doi,
-        repo=pub_repo,
+        repo=publication_repo,
     )
 
 
@@ -84,7 +84,7 @@ def reconcile(
     conn: Connection,
     queries: PublicationsReconciliationQueries,
     *,
-    pub_repo: PublicationRepository,
+    publication_repo: PublicationRepository,
     logger: logging.Logger | None = None,
 ) -> ReconcileStats | None:
     """Planifie et applique la réconciliation du voisinage dirty, **sans `commit`** (à la charge du caller). Retourne `None` si aucune SP n'est dirty, sinon le bilan.
@@ -125,7 +125,7 @@ def reconcile(
             from_existing = any(
                 rows_by_sp[sp].publication_id is not None for sp in group.source_publication_ids
             )
-            target = _create_new_publication(group, rows_by_sp, pub_repo)
+            target = _create_new_publication(group, rows_by_sp, publication_repo)
             created += 1
             if from_existing:
                 splits += 1
@@ -138,14 +138,14 @@ def reconcile(
             conn, dissolved.publication_id, dissolved.successor_publication_id
         )
         with savepoint(conn):
-            refresh_from_sources(dissolved.publication_id, repo=pub_repo)
+            refresh_from_sources(dissolved.publication_id, repo=publication_repo)
 
     # 3. Rafraîchir les survivants : métadonnées canoniques recomputées. Phase la plus longue sur un gros run → progression tous les 5000.
     survivor_ids = sorted(survivors)
     total = len(survivor_ids)
     for i, pub_id in enumerate(survivor_ids, 1):
         with savepoint(conn):
-            refresh_from_sources(pub_id, repo=pub_repo)
+            refresh_from_sources(pub_id, repo=publication_repo)
         if logger and (i % 5000 == 0 or i == total):
             logger.info("  rafraîchissement des métadonnées : %d/%d publications", i, total)
 
@@ -166,10 +166,10 @@ def run(
     queries: PublicationsReconciliationQueries,
     logger: logging.Logger,
     *,
-    pub_repo: PublicationRepository,
+    publication_repo: PublicationRepository,
 ) -> ReconcileStats | None:
     try:
-        stats = reconcile(conn, queries, pub_repo=pub_repo, logger=logger)
+        stats = reconcile(conn, queries, publication_repo=publication_repo, logger=logger)
         if stats is None:
             logger.info("Réconciliation : aucune source_publication dirty")
             return None

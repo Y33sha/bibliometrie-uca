@@ -605,7 +605,7 @@ class TestProcessWork:
             "logger": logging.getLogger("test"),
             "journal_repo": MagicMock(),
             "publisher_repo": MagicMock(),
-            "pub_repo": MagicMock(),
+            "publication_repo": MagicMock(),
             "staging_queries": staging_queries or _FakeStagingQueries(),
             "authorship_queries": _FakeAuthorshipQueries(),
         }
@@ -698,7 +698,7 @@ def _make_normalizer():
         queries=_FakeQueries(),
         journal_repo_factory=lambda c: MagicMock(),
         publisher_repo_factory=lambda c: MagicMock(),
-        pub_repo_factory=lambda c: MagicMock(),
+        publication_repo_factory=lambda c: MagicMock(),
         authorship_queries=_FakeAuthorshipQueries(),
     )
 
@@ -709,7 +709,7 @@ class TestHalNormalizerClass:
         norm.preload_caches(MagicMock())
         assert norm._journal_repo is not None
         assert norm._publisher_repo is not None
-        assert norm._pub_repo is not None
+        assert norm._publication_repo is not None
 
     def test_process_work_delegates(self, monkeypatch):
         norm = _make_normalizer()

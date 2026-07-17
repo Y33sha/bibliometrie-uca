@@ -149,7 +149,7 @@ def merge_journals(
     conn: Connection,
     correction_queries: MetadataCorrectionQueries,
     repo: JournalRepository,
-    pub_repo: PublicationRepository,
+    publication_repo: PublicationRepository,
     audit_repo: AuditRepository | None = None,
 ) -> None:
     """Fusionne le journal source dans le journal cible.
@@ -166,7 +166,7 @@ def merge_journals(
         raise NotFoundError("Revue source introuvable")
 
     # Capturer les publications du source avant le repoint, pour les rafraîchir.
-    absorbed_pub_ids = pub_repo.find_ids_by_journal_id(source_id)
+    absorbed_pub_ids = publication_repo.find_ids_by_journal_id(source_id)
 
     repo.merge_journal_into(target_id, source_id)
 
@@ -175,7 +175,7 @@ def merge_journals(
     # publications absorbées (qui lisent les colonnes `source_publication` fraîchement corrigées).
     _correct_for_journal(conn, correction_queries, target_id)
     for pub_id in absorbed_pub_ids:
-        refresh_from_sources(pub_id, repo=pub_repo)
+        refresh_from_sources(pub_id, repo=publication_repo)
 
     emit_event(audit_repo, "journal.merged", "journal", target_id, {"source_id": source_id})
 
@@ -188,7 +188,7 @@ def requalify_publications_for_journal(
     *,
     conn: Connection,
     correction_queries: MetadataCorrectionQueries,
-    pub_repo: PublicationRepository,
+    publication_repo: PublicationRepository,
     audit_repo: AuditRepository | None = None,
 ) -> int:
     """Requalifie le `doc_type` des publications d'un journal après changement de son `journal_type`.
@@ -202,15 +202,15 @@ def requalify_publications_for_journal(
 
     Le **preview** (combien changeraient sans appliquer) s'obtient en enveloppant cet appel dans un `SAVEPOINT` que l'appelant annule : preview et apply partagent alors exactement la même logique.
     """
-    pub_ids = pub_repo.find_ids_by_journal_id(journal_id)
+    pub_ids = publication_repo.find_ids_by_journal_id(journal_id)
     if not pub_ids:
         return 0
 
-    before = pub_repo.find_doc_types_by_ids(pub_ids)
+    before = publication_repo.find_doc_types_by_ids(pub_ids)
     _correct_for_journal(conn, correction_queries, journal_id)
     for pub_id in pub_ids:
-        refresh_from_sources(pub_id, repo=pub_repo)
-    after = pub_repo.find_doc_types_by_ids(pub_ids)
+        refresh_from_sources(pub_id, repo=publication_repo)
+    after = publication_repo.find_doc_types_by_ids(pub_ids)
 
     # Une publication que le refresh a supprimée (orpheline, hors périmètre) manque d'`after` :
     # elle n'est pas requalifiée, elle a disparu.

@@ -506,7 +506,7 @@ def process_record(
     *,
     journal_repo: JournalRepository,
     publisher_repo: PublisherRepository,
-    pub_repo: PublicationRepository,
+    publication_repo: PublicationRepository,
     staging_queries: StagingQueries,
     authorship_queries: AuthorshipsBatchQueries,
 ) -> bool:
@@ -551,7 +551,7 @@ class WosNormalizer(SourceNormalizer):
         queries: SourcePublicationQueries,
         journal_repo_factory: Callable[[Connection], JournalRepository],
         publisher_repo_factory: Callable[[Connection], PublisherRepository],
-        pub_repo_factory: Callable[[Connection], PublicationRepository],
+        publication_repo_factory: Callable[[Connection], PublicationRepository],
         authorship_queries: AuthorshipsBatchQueries,
     ) -> None:
         super().__init__(conn, logger, staging_queries)
@@ -560,20 +560,20 @@ class WosNormalizer(SourceNormalizer):
         self._journal_repo: JournalRepository | None = None
         self._publisher_repo_factory = publisher_repo_factory
         self._publisher_repo: PublisherRepository | None = None
-        self._pub_repo_factory = pub_repo_factory
-        self._pub_repo: PublicationRepository | None = None
+        self._publication_repo_factory = publication_repo_factory
+        self._publication_repo: PublicationRepository | None = None
         self._authorship_queries = authorship_queries
 
     def preload_caches(self, conn: Connection) -> None:
         self._journal_repo = self._journal_repo_factory(conn)
         self._publisher_repo = self._publisher_repo_factory(conn)
-        self._pub_repo = self._pub_repo_factory(conn)
+        self._publication_repo = self._publication_repo_factory(conn)
 
     def process_work(self, conn: Connection, row: StagingRow) -> bool | None:
         assert (
             self._journal_repo is not None
             and self._publisher_repo is not None
-            and self._pub_repo is not None
+            and self._publication_repo is not None
         )
         return process_record(
             conn,
@@ -582,7 +582,7 @@ class WosNormalizer(SourceNormalizer):
             row,
             journal_repo=self._journal_repo,
             publisher_repo=self._publisher_repo,
-            pub_repo=self._pub_repo,
+            publication_repo=self._publication_repo,
             staging_queries=self._staging,
             authorship_queries=self._authorship_queries,
         )

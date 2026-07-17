@@ -76,9 +76,9 @@ def main() -> int:
             log.info("(dry-run : aucune écriture effective)")
             return 0
 
-        pub_repo = publication_repository(conn)
+        publication_repo = publication_repository(conn)
         for i, pub_id in enumerate(pub_ids):
-            refresh_from_sources(pub_id, repo=pub_repo)
+            refresh_from_sources(pub_id, repo=publication_repo)
             if (i + 1) % BATCH_COMMIT == 0:
                 conn.commit()
                 log.info("  %d/%d rafraîchies…", i + 1, total)

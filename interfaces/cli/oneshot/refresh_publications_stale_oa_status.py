@@ -80,12 +80,12 @@ def main() -> int:
             log.info("Échantillon : %s%s", sample, " …" if total > len(sample) else "")
             return 0
 
-        pub_repo = publication_repository(conn)
+        publication_repo = publication_repository(conn)
 
         refreshed = 0
         for i, pub_id in enumerate(pub_ids):
             try:
-                refresh_from_sources(pub_id, repo=pub_repo)
+                refresh_from_sources(pub_id, repo=publication_repo)
             except Exception:
                 log.exception("  refresh_from_sources crash sur pub_id=%d", pub_id)
                 raise

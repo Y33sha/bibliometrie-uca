@@ -65,7 +65,9 @@ def create_all_publications(conn: Connection) -> None:
 
     apply_metadata_corrections(conn)
 
-    reconcile(conn, PgPublicationsReconciliationQueries(), pub_repo=publication_repository(conn))
+    reconcile(
+        conn, PgPublicationsReconciliationQueries(), publication_repo=publication_repository(conn)
+    )
 
 
 __all__ = ["apply_metadata_corrections", "create_all_publications"]

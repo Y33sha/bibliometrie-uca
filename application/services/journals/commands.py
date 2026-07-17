@@ -18,7 +18,7 @@ def update_journal(
     *,
     update: JournalUpdate,
     repo: JournalRepository,
-    pub_repo: PublicationRepository,
+    publication_repo: PublicationRepository,
     audit_repo: AuditRepository,
     correction_queries: MetadataCorrectionQueries,
 ) -> None:
@@ -39,7 +39,7 @@ def update_journal(
             journal_id,
             conn=conn,
             correction_queries=correction_queries,
-            pub_repo=pub_repo,
+            publication_repo=publication_repo,
             audit_repo=audit_repo,
         )
     conn.commit()
@@ -52,7 +52,7 @@ def merge_journals(
     *,
     correction_queries: MetadataCorrectionQueries,
     repo: JournalRepository,
-    pub_repo: PublicationRepository,
+    publication_repo: PublicationRepository,
     audit_repo: AuditRepository | None = None,
 ) -> None:
     """Fusionne la revue source dans la cible (transferts publications +
@@ -64,7 +64,7 @@ def merge_journals(
         conn=conn,
         correction_queries=correction_queries,
         repo=repo,
-        pub_repo=pub_repo,
+        publication_repo=publication_repo,
         audit_repo=audit_repo,
     )
     conn.commit()
