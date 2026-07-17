@@ -23,6 +23,7 @@ from application.services.authorships.core import reject_pair
 from domain.errors import CannotAttributeConflict, NotFoundError, ValidationError
 from domain.persons.identifiers import (
     PERSON_IDENTIFIER_TYPES,
+    PUBLIC_PERSON_IDENTIFIER_TYPES,
     AttributionStatus,
     normalized_identifier_value,
 )
@@ -173,7 +174,13 @@ def add_identifier(
     (`normalized_identifier_value`) avant lookup et écriture, de sorte que la même
     forme canonique sert aux deux et soit renvoyée dans le résultat. Lève
     `ValidationError` si elle est malformée.
+
+    `source="manual"` restreint les types à `PUBLIC_PERSON_IDENTIFIER_TYPES` : `hal_person_id`
+    est la référence d'un compte HAL, que l'extraction observe dans le TEI. Personne ne
+    l'attribue à la main, et le refuser ici vaut pour tout appelant, non pour le seul router.
     """
+    if source == "manual" and id_type not in PUBLIC_PERSON_IDENTIFIER_TYPES:
+        raise ValidationError(f"id_type doit être l'un de {PUBLIC_PERSON_IDENTIFIER_TYPES}")
     id_value = normalized_identifier_value(id_type, id_value)
     existing = repo.find_identifier(id_type, id_value)
 

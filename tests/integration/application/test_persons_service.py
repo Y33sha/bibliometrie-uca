@@ -205,6 +205,18 @@ class TestUnlinkAuthorship:
 
 
 class TestAddIdentifier:
+    def test_manual_source_refuses_hal_person_id(self, sa_sync_conn, repo):
+        """`hal_person_id` est la référence d'un compte HAL, que l'extraction observe : personne ne l'attribue à la main."""
+        person_id = _insert_person(sa_sync_conn)
+        with pytest.raises(ValidationError, match="id_type"):
+            add_identifier(person_id, "hal_person_id", "12345", source="manual", repo=repo)
+
+    def test_auto_source_accepts_hal_person_id(self, sa_sync_conn, repo):
+        """La promotion depuis les signatures reste libre de le poser."""
+        person_id = _insert_person(sa_sync_conn)
+        result = add_identifier(person_id, "hal_person_id", "12345", repo=repo)
+        assert result.outcome is AddIdentifierOutcome.ADDED
+
     def test_inserts_new(self, sa_sync_conn, repo):
         person_id = _insert_person(sa_sync_conn)
         result = add_identifier(person_id, "orcid", "0000-0001-2345-6789", repo=repo)
