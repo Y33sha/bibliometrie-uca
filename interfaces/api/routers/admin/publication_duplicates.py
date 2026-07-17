@@ -51,7 +51,7 @@ def merge_duplicate_publications(
 
     La cible est le plus petit des deux identifiants. Le sens de la fusion est sans portée durable : `refresh_from_sources` re-dérive toutes les métadonnées canoniques depuis l'union des `source_publications`, et cette union est la même dans un sens comme dans l'autre. Le rafraîchissement immédiat porte la publication à son état canonique sans attendre un run du pipeline.
 
-    Les signatures, les sources, les adresses et les métadonnées passent à la cible, puis la source est supprimée. La fusion et le rafraîchissement forment une seule transaction, tenue par le command handler : un échec devient un 500 et annule l'ensemble, sans état intermédiaire. Renvoie 400 sur deux identifiants égaux, 404 sur une publication introuvable.
+    Les signatures, les sources, les adresses et les métadonnées passent à la cible, puis la source est supprimée. La fusion et le rafraîchissement forment une seule transaction, tenue par le command handler : un échec laisse `db_conn` l'annuler, sans état intermédiaire. Renvoie 400 sur deux identifiants égaux, 404 sur une publication introuvable.
     """
     if body.pub_id_a == body.pub_id_b:
         raise HTTPException(status_code=400, detail="pub_id_a et pub_id_b doivent être différents")
@@ -61,16 +61,7 @@ def merge_duplicate_publications(
         raise HTTPException(status_code=404, detail="Publication introuvable")
 
     target_id, source_id = sorted((body.pub_id_a, body.pub_id_b))
-
-    try:
-        publication_commands.merge_publications(
-            conn, target_id, source_id, repo=repo, audit_repo=audit
-        )
-    except Exception as e:
-        # Le command handler n'a pas committé ; db_conn rollback sur l'exception
-        # propagée. On mappe en 500 sans exposer un état partiel.
-        raise HTTPException(status_code=500, detail=f"Échec de la fusion : {e}") from e
-
+    publication_commands.merge_publications(conn, target_id, source_id, repo=repo, audit_repo=audit)
     return PublicationMergeResponse(ok=True, target_id=target_id, source_id=source_id)
 
 
