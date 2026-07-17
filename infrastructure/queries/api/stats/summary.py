@@ -45,7 +45,7 @@ def _publisher_journal_clauses(
 
 def _common_clauses(
     *,
-    apc_structure_ids: list[int],
+    perimeter_structure_ids: list[int],
     lab_ids: list[int],
     years: list[int],
     publisher_ids: list[int],
@@ -70,7 +70,7 @@ def _common_clauses(
     if skip != "oa":
         out.append(oa_clause(oa_status))
     if skip != "apc":
-        out.append(stats_apc_clause(has_apc, apc_structure_ids))
+        out.append(stats_apc_clause(has_apc, perimeter_structure_ids))
     if skip != "doc_type":
         out.append(doc_type_clause(doc_types))
     return out
@@ -92,7 +92,7 @@ def available_years(conn: Connection) -> list[int]:
 
 def _facets_sqls(
     *,
-    apc_structure_ids: list[int],
+    perimeter_structure_ids: list[int],
     lab_ids: list[int],
     years: list[int],
     publisher_ids: list[int],
@@ -105,7 +105,7 @@ def _facets_sqls(
 
     def _clauses(skip: str) -> list[WhereClause | None]:
         return _common_clauses(
-            apc_structure_ids=apc_structure_ids,
+            perimeter_structure_ids=perimeter_structure_ids,
             lab_ids=lab_ids,
             years=years,
             publisher_ids=publisher_ids,
@@ -190,7 +190,7 @@ def _facets_sqls(
         "year": (year_sql, year_binds),
         "lab": (lab_sql, lab_binds),
         "oa": (oa_sql, oa_binds),
-        "apc": (apc_sql, {**apc_binds, "apc_root_ids": apc_structure_ids}),
+        "apc": (apc_sql, {**apc_binds, "apc_root_ids": perimeter_structure_ids}),
         "doc_type": (doc_type_sql, dt_binds),
     }
 
@@ -198,7 +198,7 @@ def _facets_sqls(
 def stats_facets(
     conn: Connection,
     *,
-    apc_structure_ids: list[int],
+    perimeter_structure_ids: list[int],
     lab_ids: list[int],
     years: list[int],
     publisher_ids: list[int],
@@ -210,7 +210,7 @@ def stats_facets(
     """Facettes dynamiques."""
     conn.execute(text("SET LOCAL jit = off"))
     sqls = _facets_sqls(
-        apc_structure_ids=apc_structure_ids,
+        perimeter_structure_ids=perimeter_structure_ids,
         lab_ids=lab_ids,
         years=years,
         publisher_ids=publisher_ids,

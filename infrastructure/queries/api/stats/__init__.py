@@ -45,10 +45,14 @@ from infrastructure.queries.api.stats.summary import (
     available_years as _available_years,
     stats_facets as _stats_facets,
 )
+from infrastructure.queries.perimeter import get_persons_structure_ids_list
 
 
 class PgStatsQueries(StatsQueries):
-    """Adapter SA pour `application.ports.api.stats_queries.StatsQueries`."""
+    """Adapter SA pour `application.ports.api.stats_queries.StatsQueries`.
+
+    Le filtre `has_apc` classe un paiement d'APC en « interne » quand sa structure de budget appartient au périmètre `persons`. L'adapter résout ce périmètre là où il sert, comme `PgLaboratoriesQueries` : ses appelants n'ont pas à le connaître pour demander des statistiques.
+    """
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
@@ -59,7 +63,6 @@ class PgStatsQueries(StatsQueries):
     def collaborations(
         self,
         *,
-        apc_structure_ids: list[int],
         lab_ids: list[int],
         years: list[int],
         publisher_ids: list[int],
@@ -70,7 +73,7 @@ class PgStatsQueries(StatsQueries):
     ) -> CollaborationsResponse:
         data = _run_collaborations(
             self._conn,
-            apc_structure_ids=apc_structure_ids,
+            perimeter_structure_ids=get_persons_structure_ids_list(self._conn),
             lab_ids=lab_ids,
             years=years,
             publisher_ids=publisher_ids,
@@ -107,7 +110,6 @@ class PgStatsQueries(StatsQueries):
         *,
         measure: str,
         groups: list[str],
-        apc_structure_ids: list[int],
         lab_ids: list[int],
         years: list[int],
         publisher_ids: list[int],
@@ -121,7 +123,7 @@ class PgStatsQueries(StatsQueries):
                 self._conn,
                 measure=measure,
                 groups=groups,
-                apc_structure_ids=apc_structure_ids,
+                perimeter_structure_ids=get_persons_structure_ids_list(self._conn),
                 lab_ids=lab_ids,
                 years=years,
                 publisher_ids=publisher_ids,
@@ -137,7 +139,6 @@ class PgStatsQueries(StatsQueries):
         *,
         kind: Literal["publisher", "journal"],
         search: str,
-        apc_structure_ids: list[int],
         lab_ids: list[int],
         years: list[int],
         publisher_ids: list[int],
@@ -150,7 +151,7 @@ class PgStatsQueries(StatsQueries):
             self._conn,
             kind=kind,
             search=search,
-            apc_structure_ids=apc_structure_ids,
+            perimeter_structure_ids=get_persons_structure_ids_list(self._conn),
             lab_ids=lab_ids,
             years=years,
             publisher_ids=publisher_ids,
@@ -169,7 +170,6 @@ class PgStatsQueries(StatsQueries):
     def stats_facets(
         self,
         *,
-        apc_structure_ids: list[int],
         lab_ids: list[int],
         years: list[int],
         publisher_ids: list[int],
@@ -180,7 +180,7 @@ class PgStatsQueries(StatsQueries):
     ) -> StatsFacetsResponse:
         data = _stats_facets(
             self._conn,
-            apc_structure_ids=apc_structure_ids,
+            perimeter_structure_ids=get_persons_structure_ids_list(self._conn),
             lab_ids=lab_ids,
             years=years,
             publisher_ids=publisher_ids,

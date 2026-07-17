@@ -48,11 +48,11 @@ class _PublicationFacetsBuilder:
     """
 
     def __init__(
-        self, conn: Connection, filters: FacetFilters, apc_structure_ids: list[int]
+        self, conn: Connection, filters: FacetFilters, perimeter_structure_ids: list[int]
     ) -> None:
         self.conn = conn
         self.filters = filters
-        self.apc_structure_ids = apc_structure_ids
+        self.perimeter_structure_ids = perimeter_structure_ids
         self.lab_hal_col: str | None = None
 
     # ── Utilitaires internes ────────────────────────────────────
@@ -102,7 +102,7 @@ class _PublicationFacetsBuilder:
         if skip != "source":
             clauses.append(source_clause(f.source_values))
         if skip != "apc":
-            clauses.append(apc_clause(f.has_apc, self.apc_structure_ids, f.lab_ids))
+            clauses.append(apc_clause(f.has_apc, self.perimeter_structure_ids, f.lab_ids))
         if skip != "publisher":
             clauses.append(publisher_id_clause(f.publisher_id))
         if skip != "journal":
@@ -314,7 +314,7 @@ class _PublicationFacetsBuilder:
             {
                 **binds,
                 "apc_facet_lab_ids": lab_ids,
-                "apc_facet_root_ids": self.apc_structure_ids,
+                "apc_facet_root_ids": self.perimeter_structure_ids,
             },
         ).one()
         label_row = self.conn.execute(
@@ -351,7 +351,7 @@ class _PublicationFacetsBuilder:
                 FROM publications p
                 WHERE {where}
             """),
-            {**binds, "apc_facet_root_ids": self.apc_structure_ids},
+            {**binds, "apc_facet_root_ids": self.perimeter_structure_ids},
         ).one()
         return [
             {"value": "uca", "text": "APC — UCA", "count": r.apc_uca},
@@ -476,7 +476,7 @@ class _PublicationFacetsBuilder:
 
 
 def publications_facets(
-    conn: Connection, *, filters: FacetFilters, apc_structure_ids: list[int]
+    conn: Connection, *, filters: FacetFilters, perimeter_structure_ids: list[int]
 ) -> dict[str, Any]:
     """Facettes dynamiques : chaque facette exclut son propre filtre mais
     applique tous les autres.
@@ -487,7 +487,7 @@ def publications_facets(
     avec sa propre connexion (psycopg libère le GIL pendant la requête). Le
     `lab_hal_col` est préchargé une fois et partagé (lecture seule).
     """
-    pre = _PublicationFacetsBuilder(conn, filters, apc_structure_ids)
+    pre = _PublicationFacetsBuilder(conn, filters, perimeter_structure_ids)
     pre._preload_lab_hal_col()
     lab_hal_col = pre.lab_hal_col
     engine = get_sync_engine()
@@ -495,7 +495,7 @@ def publications_facets(
     def run(method_name: str) -> Any:
         with engine.connect() as facet_conn:
             facet_conn.execute(text("SET LOCAL jit = off"))
-            builder = _PublicationFacetsBuilder(facet_conn, filters, apc_structure_ids)
+            builder = _PublicationFacetsBuilder(facet_conn, filters, perimeter_structure_ids)
             builder.lab_hal_col = lab_hal_col
             return getattr(builder, method_name)()
 
@@ -539,14 +539,14 @@ def publications_entity_facet(
     kind: str,
     search: str,
     filters: FacetFilters,
-    apc_structure_ids: list[int],
+    perimeter_structure_ids: list[int],
     limit: int = 20,
 ) -> list[dict[str, Any]]:
     """Facette éditeur/revue contextuelle de la liste : N premières entités sous les filtres actifs,
     en sautant le filtre de la dimension demandée (les autres, dont l'autre entité, restent
     appliqués → corrélation). Décompte par `COUNT(*)` (filtres scalaires ou `EXISTS`, sans
     démultiplication). Recherche serveur par nom."""
-    builder = _PublicationFacetsBuilder(conn, filters, apc_structure_ids)
+    builder = _PublicationFacetsBuilder(conn, filters, perimeter_structure_ids)
     builder._preload_lab_hal_col()
     where_sql, binds = builder._clauses_skipping(kind)
 

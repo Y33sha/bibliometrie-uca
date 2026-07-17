@@ -46,7 +46,7 @@ def stats_entity_facet(
     *,
     kind: EntityKind,
     search: str,
-    apc_structure_ids: list[int],
+    perimeter_structure_ids: list[int],
     lab_ids: list[int],
     years: list[int],
     publisher_ids: list[int],
@@ -66,7 +66,7 @@ def stats_entity_facet(
         year_clause(years),
         lab_clause(lab_ids),
         oa_clause(oa_status),
-        stats_apc_clause(has_apc, apc_structure_ids),
+        stats_apc_clause(has_apc, perimeter_structure_ids),
         doc_type_clause(doc_types),
     ]
     if publisher_ids:

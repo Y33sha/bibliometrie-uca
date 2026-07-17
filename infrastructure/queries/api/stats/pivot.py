@@ -86,7 +86,7 @@ def run_pivot(
     *,
     measure: str,
     groups: list[str],
-    apc_structure_ids: list[int],
+    perimeter_structure_ids: list[int],
     lab_ids: list[int],
     years: list[int],
     publisher_ids: list[int],
@@ -100,7 +100,7 @@ def run_pivot(
     m, dims = validate_pivot(measure, groups)
     where, binds = assemble_where(
         stats_filter_clauses(
-            apc_structure_ids=apc_structure_ids,
+            perimeter_structure_ids=perimeter_structure_ids,
             lab_ids=lab_ids,
             years=years,
             publisher_ids=publisher_ids,

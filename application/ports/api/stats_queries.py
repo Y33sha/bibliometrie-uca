@@ -109,7 +109,6 @@ class StatsQueries(Protocol):
         *,
         measure: str,
         groups: list[str],
-        apc_structure_ids: list[int],
         lab_ids: list[int],
         years: list[int],
         publisher_ids: list[int],
@@ -124,7 +123,6 @@ class StatsQueries(Protocol):
     def collaborations(
         self,
         *,
-        apc_structure_ids: list[int],
         lab_ids: list[int],
         years: list[int],
         publisher_ids: list[int],
@@ -139,7 +137,6 @@ class StatsQueries(Protocol):
         *,
         kind: Literal["publisher", "journal"],
         search: str,
-        apc_structure_ids: list[int],
         lab_ids: list[int],
         years: list[int],
         publisher_ids: list[int],
@@ -156,7 +153,6 @@ class StatsQueries(Protocol):
     def stats_facets(
         self,
         *,
-        apc_structure_ids: list[int],
         lab_ids: list[int],
         years: list[int],
         publisher_ids: list[int],

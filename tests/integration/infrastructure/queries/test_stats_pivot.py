@@ -23,7 +23,7 @@ def _piv(conn, measure, groups, doc_types=("article", "review")):
         conn,
         measure=measure,
         groups=list(groups),
-        apc_structure_ids=[],
+        perimeter_structure_ids=[],
         lab_ids=[],
         years=[],
         publisher_ids=[],

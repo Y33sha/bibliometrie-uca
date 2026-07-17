@@ -13,10 +13,7 @@ from application.ports.api.stats_queries import (
     StatsFacetsResponse,
     StatsQueries,
 )
-from interfaces.api.deps import (
-    get_apc_structure_ids,
-    stats_queries,
-)
+from interfaces.api.deps import stats_queries
 from interfaces.api.filters import parse_int_csv, parse_str_csv
 
 router = APIRouter()
@@ -29,7 +26,6 @@ class StatsFilters:
     Les noms des champs reprennent ceux des méthodes de `StatsQueries`, ce qui permet de les passer en `**asdict(...)`.
     """
 
-    apc_structure_ids: list[int]
     lab_ids: list[int]
     years: list[int]
     publisher_ids: list[int]
@@ -47,11 +43,9 @@ def stats_filters(
     oa_status: str = Query(""),
     has_apc: str = Query(""),
     doc_type: str = Query(""),
-    apc_structure_ids: list[int] = Depends(get_apc_structure_ids),
 ) -> StatsFilters:
     """Dépendance : assemble les filtres communs des endpoints stats depuis les query params."""
     return StatsFilters(
-        apc_structure_ids=apc_structure_ids,
         lab_ids=parse_int_csv(lab_id),
         years=parse_int_csv(year),
         publisher_ids=parse_int_csv(publisher_id),

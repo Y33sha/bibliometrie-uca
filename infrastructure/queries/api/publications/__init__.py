@@ -47,10 +47,14 @@ from infrastructure.queries.api.publications.list import (
     export_theses_csv as _export_theses_csv,
     list_publications as _list_publications,
 )
+from infrastructure.queries.perimeter import get_persons_structure_ids_list
 
 
 class PgPublicationsQueries(PublicationsQueries):
-    """Adapter SA pour `application.ports.api.publications_queries.PublicationsQueries`."""
+    """Adapter SA pour `application.ports.api.publications_queries.PublicationsQueries`.
+
+    Le filtre `has_apc` classe un paiement d'APC en « interne » quand sa structure de budget appartient au périmètre `persons`. L'adapter résout ce périmètre là où il sert, comme `PgLaboratoriesQueries` : ses appelants n'ont pas à le connaître pour lister des publications.
+    """
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
@@ -59,7 +63,6 @@ class PgPublicationsQueries(PublicationsQueries):
         self,
         *,
         filters: ListFilters,
-        apc_structure_ids: list[int],
         page: int,
         per_page: int,
         sort: str,
@@ -67,18 +70,18 @@ class PgPublicationsQueries(PublicationsQueries):
         data = _list_publications(
             self._conn,
             filters=filters,
-            apc_structure_ids=apc_structure_ids,
+            perimeter_structure_ids=get_persons_structure_ids_list(self._conn),
             page=page,
             per_page=per_page,
             sort=sort,
         )
         return PublicationListResponse.model_validate(data)
 
-    def publications_facets(
-        self, *, filters: FacetFilters, apc_structure_ids: list[int]
-    ) -> PublicationsFacetsResponse:
+    def publications_facets(self, *, filters: FacetFilters) -> PublicationsFacetsResponse:
         data = _publications_facets(
-            self._conn, filters=filters, apc_structure_ids=apc_structure_ids
+            self._conn,
+            filters=filters,
+            perimeter_structure_ids=get_persons_structure_ids_list(self._conn),
         )
         return PublicationsFacetsResponse.model_validate(data)
 
@@ -88,14 +91,13 @@ class PgPublicationsQueries(PublicationsQueries):
         kind: str,
         search: str,
         filters: FacetFilters,
-        apc_structure_ids: list[int],
     ) -> EntityFacetResponse:
         rows = _publications_entity_facet(
             self._conn,
             kind=kind,
             search=search,
             filters=filters,
-            apc_structure_ids=apc_structure_ids,
+            perimeter_structure_ids=get_persons_structure_ids_list(self._conn),
         )
         return EntityFacetResponse(entities=[EntityFacetItem(**r) for r in rows])
 
@@ -106,23 +108,23 @@ class PgPublicationsQueries(PublicationsQueries):
         self,
         *,
         filters: ListFilters,
-        apc_structure_ids: list[int],
         sort: str,
         columns: list[str],
     ) -> str:
         return _export_publications_csv(
             self._conn,
             filters=filters,
-            apc_structure_ids=apc_structure_ids,
+            perimeter_structure_ids=get_persons_structure_ids_list(self._conn),
             sort=sort,
             columns=columns,
         )
 
-    def export_theses_csv(
-        self, *, filters: ListFilters, apc_structure_ids: list[int], sort: str
-    ) -> str:
+    def export_theses_csv(self, *, filters: ListFilters, sort: str) -> str:
         return _export_theses_csv(
-            self._conn, filters=filters, apc_structure_ids=apc_structure_ids, sort=sort
+            self._conn,
+            filters=filters,
+            perimeter_structure_ids=get_persons_structure_ids_list(self._conn),
+            sort=sort,
         )
 
     def get_publication_detail(self, pub_id: int) -> PublicationDetailResponse | None:
