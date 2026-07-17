@@ -103,11 +103,16 @@ class TestMissingCollections:
         assert r.status_code == 422
 
     def test_400_when_lab_has_no_hal_collection(self, client):
-        # Labo sans hal_collection → la query retourne None, le router transforme en 400.
+        """Le laboratoire existe, mais sans collection il n'y a rien à quoi comparer."""
         lab = _seed_lab(hal_collection=None)
         r = client.get("/api/hal-problems/missing-collections", params={"lab_id": lab})
         assert r.status_code == 400
         assert "collection" in r.json()["detail"]
+
+    def test_404_when_lab_is_unknown(self, client):
+        """L'absence de laboratoire et l'absence de collection ne se disent pas du même statut."""
+        r = client.get("/api/hal-problems/missing-collections", params={"lab_id": 999999})
+        assert r.status_code == 404
 
     def test_returns_results_when_lab_has_collection(self, client):
         lab = _seed_lab(hal_collection="MY-LAB-COLL")
