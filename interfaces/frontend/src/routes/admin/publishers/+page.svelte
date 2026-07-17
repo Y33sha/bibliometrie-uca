@@ -77,13 +77,7 @@
 		mergeSearch.clear();
 	}
 
-	interface BlockingJournal {
-		target_journal_id: number;
-		target_title: string;
-		source_journal_id: number;
-		source_title: string;
-		reason: string;
-	}
+	type BlockingJournal = components['schemas']['BlockingJournalItem'];
 
 	let blockingJournals: BlockingJournal[] | null = $state(null);
 	let blockingDetail = $state('');
@@ -96,10 +90,7 @@
 			reload();
 		} catch (e: any) {
 			if (e instanceof ApiError) {
-				const body = e.detail as {
-					detail?: string;
-					blocking_journals?: BlockingJournal[];
-				};
+				const body = e.detail as Partial<components['schemas']['PublisherMergeBlockedResponse']>;
 				if (body?.blocking_journals?.length) {
 					blockingJournals = body.blocking_journals;
 					blockingDetail = body.detail ?? '';

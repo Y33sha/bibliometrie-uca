@@ -2176,7 +2176,9 @@ export interface paths {
          * Merge
          * @description Fusionne l'éditeur `source_id` dans l'éditeur `publisher_id`.
          *
-         *     Les revues et les publications de la source passent à la cible, puis la source est supprimée. Deux revues au même titre fusionnent, et leurs publications sont requalifiées contre le `journal_type` de la cible (`merge_journals`). Renvoie 400 sur deux identifiants égaux, 404 si l'un des deux éditeurs est introuvable.
+         *     Les revues et les publications de la source passent à la cible, puis la source est supprimée. Deux revues au titre partagé entre les deux éditeurs sont fondues en une, et leurs publications requalifiées contre le `journal_type` de la cible (`merge_journals`).
+         *
+         *     Cette fusion de revues peut buter : ISSN divergents pour un même titre, ou doublon interne de titre chez l'un des éditeurs. La fusion entière est alors refusée par un 409 (`PublisherMergeBlockedResponse`), dont le corps énumère toutes les paires bloquantes ; l'admin les traite côté revues avant de relancer. Renvoie aussi 400 sur deux identifiants égaux, 404 si l'un des deux éditeurs est introuvable.
          */
         post: operations["merge_api_publishers__publisher_id__merge_post"];
         delete?: never;
@@ -2871,6 +2873,22 @@ export interface components {
         BatchUpdatedResponse: {
             /** Updated */
             updated: number;
+        };
+        /**
+         * BlockingJournalItem
+         * @description Paire de revues qui empêche la fusion de deux éditeurs.
+         */
+        BlockingJournalItem: {
+            /** Target Journal Id */
+            target_journal_id: number;
+            /** Target Title */
+            target_title: string;
+            /** Source Journal Id */
+            source_journal_id: number;
+            /** Source Title */
+            source_title: string;
+            /** Reason */
+            reason: string;
         };
         /**
          * CollaborationsResponse
@@ -5029,6 +5047,16 @@ export interface components {
             readonly pages: number;
         };
         /**
+         * PublisherMergeBlockedResponse
+         * @description 409 de `POST /api/publishers/{id}/merge` : la fusion est refusée en bloc, `blocking_journals` énumère les paires à traiter.
+         */
+        PublisherMergeBlockedResponse: {
+            /** Detail */
+            detail: string;
+            /** Blocking Journals */
+            blocking_journals: components["schemas"]["BlockingJournalItem"][];
+        };
+        /**
          * PublisherUpdate
          * @description Champs éditables d'un éditeur, en modification sélective.
          *
@@ -5082,6 +5110,28 @@ export interface components {
              * @default true
              */
             rejected: boolean;
+        };
+        /**
+         * RejectedPairItem
+         * @description Paire (publication, personne) déjà rejetée, qui bloque une réassignation.
+         */
+        RejectedPairItem: {
+            /** Publication Id */
+            publication_id: number;
+            /** Person Id */
+            person_id: number;
+            /** Rejected At */
+            rejected_at: string;
+        };
+        /**
+         * RejectedPairsResponse
+         * @description 409 des attributions de signatures orphelines : `rejected_pairs` énumère les paires rejetées, à confirmer avec `force`.
+         */
+        RejectedPairsResponse: {
+            /** Detail */
+            detail: string;
+            /** Rejected Pairs */
+            rejected_pairs: components["schemas"]["RejectedPairItem"][];
         };
         /**
          * RelatedPublicationOut
@@ -8497,6 +8547,15 @@ export interface operations {
                     "application/json": components["schemas"]["OrphanAssignResponse"];
                 };
             };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RejectedPairsResponse"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -8528,6 +8587,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OrphanBatchAssignResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RejectedPairsResponse"];
                 };
             };
             /** @description Validation Error */
@@ -9206,6 +9274,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MergeResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublisherMergeBlockedResponse"];
                 };
             };
             /** @description Validation Error */

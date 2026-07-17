@@ -36,6 +36,7 @@ from interfaces.api.models import (
     MergeRequest,
     MergeResponse,
     OkResponse,
+    PublisherMergeBlockedResponse,
 )
 from interfaces.api.params import TOP_SUBJECTS_LIMIT, TopSubjectsLimit
 
@@ -161,7 +162,11 @@ def update_publisher(
     return OkResponse()
 
 
-@router.post("/api/publishers/{publisher_id}/merge", response_model=MergeResponse)
+@router.post(
+    "/api/publishers/{publisher_id}/merge",
+    response_model=MergeResponse,
+    responses={409: {"model": PublisherMergeBlockedResponse}},
+)
 def merge(
     publisher_id: int,
     body: MergeRequest,
@@ -174,7 +179,9 @@ def merge(
 ) -> MergeResponse:
     """Fusionne l'éditeur `source_id` dans l'éditeur `publisher_id`.
 
-    Les revues et les publications de la source passent à la cible, puis la source est supprimée. Deux revues au même titre fusionnent, et leurs publications sont requalifiées contre le `journal_type` de la cible (`merge_journals`). Renvoie 400 sur deux identifiants égaux, 404 si l'un des deux éditeurs est introuvable.
+    Les revues et les publications de la source passent à la cible, puis la source est supprimée. Deux revues au titre partagé entre les deux éditeurs sont fondues en une, et leurs publications requalifiées contre le `journal_type` de la cible (`merge_journals`).
+
+    Cette fusion de revues peut buter : ISSN divergents pour un même titre, ou doublon interne de titre chez l'un des éditeurs. La fusion entière est alors refusée par un 409 (`PublisherMergeBlockedResponse`), dont le corps énumère toutes les paires bloquantes ; l'admin les traite côté revues avant de relancer. Renvoie aussi 400 sur deux identifiants égaux, 404 si l'un des deux éditeurs est introuvable.
     """
     publisher_commands.merge_publishers(
         conn,
