@@ -21,7 +21,6 @@ from application.ports.repositories.authorship_repository import AuthorshipRepos
 from application.ports.repositories.person_repository import PersonRepository
 from application.services.persons import commands as person_commands
 from application.services.persons.core import AddIdentifierOutcome
-from domain.persons.identifiers import PUBLIC_PERSON_IDENTIFIER_TYPES
 from interfaces.api.deps import (
     audit_repo,
     authorship_repo,
@@ -66,14 +65,8 @@ def add_person_identifier(
 ) -> AddIdentifierResponse:
     """Ajoute à la main un identifiant (ORCID, idHAL ou IdRef) à une personne.
 
-    La cascade de décision — insertion, idempotence, réattribution, conflit — appartient à `add_identifier`. Le router applique la politique d'interface, à savoir les types que l'interface expose et l'existence de la personne, puis traduit l'issue en réponse. Les handlers globaux traduisent le conflit (`CannotAttributeConflict`) en 409 et la valeur malformée (`ValidationError`) en 400.
+    La cascade de décision — insertion, idempotence, réattribution, conflit — appartient à `add_identifier`, appelé avec `source="manual"`, qui refuse alors les types qu'aucun humain n'attribue. Le router vérifie l'existence de la personne, puis traduit l'issue en réponse. Les handlers globaux traduisent le conflit (`CannotAttributeConflict`) en 409, le type ou la valeur refusés (`ValidationError`) en 400.
     """
-    if data.id_type not in PUBLIC_PERSON_IDENTIFIER_TYPES:
-        raise HTTPException(
-            status_code=400,
-            detail=f"id_type doit être l'un de {PUBLIC_PERSON_IDENTIFIER_TYPES}",
-        )
-
     if not queries.person_exists(person_id):
         raise HTTPException(status_code=404, detail="Personne introuvable")
 
