@@ -12,13 +12,13 @@
 
 ### Non commencé
 
-- [Périmètre APC : le résoudre dans l'adapter au lieu de le faire descendre du router](CODE_apc-perimetre-au-router.md)
 - [Règles métier retenues dans les routers HTTP](CODE_regles-metier-dans-les-routers.md)
 - [Qualité et cohérence des sujets](METIER_sujets-qualite.md)
 - [Signatures institutionnelles](METIER_signatures-institutionnelles.md)
 
 ## Chantiers archivés
 
+- 2026-07-17 — [Périmètre APC : le résoudre dans l'adapter au lieu de le faire descendre du router](archived/2026-07-17_CODE_apc-perimetre-au-router.md)
 - 2026-07-17 — [Domaines HAL : libellés depuis la source, suppression de la table](archived/2026-07-17_CODE_hal-domaines-libelles.md)
 - 2026-07-17 — [Normalize : factoriser l'upsert des `source_publications`](archived/2026-07-17_CODE_normalize-upsert-source-publications.md)
 - 2026-07-12 — [Phase personnes — lisibilité et refonte](archived/2026-07-12_CODE_phase-persons.md)
