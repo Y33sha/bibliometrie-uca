@@ -15,7 +15,7 @@ from application.ports.pipeline.normalize.authorships import (
     AddressCountryItem,
     AuthorshipAddressItem,
     AuthorshipsBatchQueries,
-    SourceAuthorshipBatchItem,
+    SourceAuthorshipItem,
 )
 from domain.normalize import normalize_name_form, normalize_text, sanitize_raw_text
 from domain.types import JsonValue
@@ -73,7 +73,7 @@ def write_source_authorships(
     if not records:
         return
 
-    sa_values: list[SourceAuthorshipBatchItem] = [
+    sa_values: list[SourceAuthorshipItem] = [
         {
             "source": source,
             "source_publication_id": source_publication_id,

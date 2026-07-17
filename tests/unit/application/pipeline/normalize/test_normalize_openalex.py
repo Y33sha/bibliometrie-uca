@@ -26,6 +26,7 @@ from application.pipeline.normalize.normalize_openalex import (
     reconstruct_abstract,
     upsert_journal,
 )
+from application.ports.pipeline.normalize.source_publications import SourcePublicationRow
 from application.ports.pipeline.normalize.staging import StagingRow
 
 # ── Helpers de fabrication de données de test ────────────────────
@@ -36,18 +37,14 @@ def _staging_row(staging_id=1, source_id="W:1", doi=None, raw=None):
 
 
 class _FakeQueries:
-    """Stub minimal du port `OpenalexNormalizeQueries`."""
+    """Stub minimal du port `SourcePublicationQueries`."""
 
     def __init__(self) -> None:
-        self.upserted_documents: list[dict[str, Any]] = []
-        self.count_table_returns = 0
+        self.upserted_documents: list[SourcePublicationRow] = []
 
-    def upsert_openalex_source_publication(self, conn, **kw) -> int:
-        self.upserted_documents.append(kw)
+    def upsert_source_publication(self, conn, row) -> int:
+        self.upserted_documents.append(row)
         return 999
-
-    def count_openalex_table(self, conn, table: str) -> int:
-        return self.count_table_returns
 
 
 class _FakeStagingQueries:
@@ -352,16 +349,14 @@ class TestInsertOpenalexDocument:
         # forcer une valeur passent un pub_meta explicite.
         if pub_meta is None:
             pub_meta = extract_pub_metadata(work, journal_id=None)
-        insert_openalex_document(
-            MagicMock(), queries, work, staging_id=1, publication_id=None, pub_meta=pub_meta
-        )
+        insert_openalex_document(MagicMock(), queries, work, staging_id=1, pub_meta=pub_meta)
         return queries.upserted_documents[-1]
 
     def test_keywords_list_of_strings(self):
         queries = _FakeQueries()
         work = {"id": "https://openalex.org/W1", "keywords": ["a", "b"]}
         captured = self._call(queries, work)
-        assert captured["keywords"] == ["a", "b"]
+        assert captured.keywords == ["a", "b"]
 
     def test_keywords_list_of_dicts(self):
         queries = _FakeQueries()
@@ -370,13 +365,13 @@ class TestInsertOpenalexDocument:
             "keywords": [{"keyword": "kw1"}, {"keyword": "kw2"}],
         }
         captured = self._call(queries, work)
-        assert captured["keywords"] == ["kw1", "kw2"]
+        assert captured.keywords == ["kw1", "kw2"]
 
     def test_keywords_not_a_list(self):
         queries = _FakeQueries()
         work = {"id": "https://openalex.org/W1", "keywords": "scalar"}
         captured = self._call(queries, work)
-        assert captured["keywords"] is None
+        assert captured.keywords is None
 
     def test_biblio_extracted(self):
         queries = _FakeQueries()
@@ -385,7 +380,7 @@ class TestInsertOpenalexDocument:
             "biblio": {"volume": "10", "issue": "2", "first_page": "100", "last_page": "120"},
         }
         captured = self._call(queries, work)
-        assert captured["biblio"] == {
+        assert captured.biblio == {
             "volume": "10",
             "issue": "2",
             "first_page": "100",
@@ -396,12 +391,12 @@ class TestInsertOpenalexDocument:
         queries = _FakeQueries()
         work = {"id": "https://openalex.org/W1", "biblio": {"volume": "10"}}
         captured = self._call(queries, work)
-        assert captured["biblio"] == {"volume": "10"}
+        assert captured.biblio == {"volume": "10"}
 
     def test_biblio_empty_is_none(self):
         queries = _FakeQueries()
         captured = self._call(queries, {"id": "https://openalex.org/W1", "biblio": {}})
-        assert captured["biblio"] is None
+        assert captured.biblio is None
 
     def test_related_dois_excludes_primary(self):
         queries = _FakeQueries()
@@ -414,7 +409,7 @@ class TestInsertOpenalexDocument:
             ],
         }
         captured = self._call(queries, work)
-        assert captured["external_ids"]["related_dois"] == ["10.2/preprint"]
+        assert captured.external_ids["related_dois"] == ["10.2/preprint"]
 
     def test_related_dois_absent_when_only_primary(self):
         queries = _FakeQueries()
@@ -424,7 +419,7 @@ class TestInsertOpenalexDocument:
             "locations": [{"landing_page_url": "https://doi.org/10.1/primary"}],
         }
         captured = self._call(queries, work)
-        assert "related_dois" not in (captured["external_ids"] or {})
+        assert "related_dois" not in (captured.external_ids or {})
 
     def test_biblio_publisher_and_journal_from_primary_location(self):
         queries = _FakeQueries()
@@ -443,7 +438,7 @@ class TestInsertOpenalexDocument:
         captured = self._call(queries, work)
         # `issn_l` est mis dans `issnl` ; le premier non-issn_l de la liste passe en
         # `issn` (pas de typage `electronic`/`print` côté OpenAlex sur ce chemin).
-        assert captured["biblio"] == {
+        assert captured.biblio == {
             "publisher": "Elsevier",
             "journal": {
                 "title": "Journal of Physics",
@@ -468,7 +463,7 @@ class TestInsertOpenalexDocument:
             "primary_location": {"source": {"host_organization_name": "HAL"}},
         }
         captured = self._call(queries, work)
-        assert captured["biblio"] is None
+        assert captured.biblio is None
 
     def test_pub_meta_nnt_passed_through_to_external_ids(self):
         """insert lit pub_meta["nnt"] et le pose dans external_ids."""
@@ -477,8 +472,8 @@ class TestInsertOpenalexDocument:
         pub_meta = extract_pub_metadata(work, journal_id=None)
         pub_meta["nnt"] = "2024CLFAC001"
         captured = self._call(queries, work, pub_meta=pub_meta)
-        assert captured["external_ids"] is not None
-        assert captured["external_ids"]["nnt"] == "2024CLFAC001"
+        assert captured.external_ids is not None
+        assert captured.external_ids["nnt"] == "2024CLFAC001"
 
     def test_pub_meta_source_doi_passed_through(self):
         """Si `pub_meta` contient `source_doi`, il est repris dans external_ids."""
@@ -487,7 +482,7 @@ class TestInsertOpenalexDocument:
         pub_meta = extract_pub_metadata(work, journal_id=None)
         pub_meta["source_doi"] = "10.1234/abc"
         captured = self._call(queries, work, pub_meta=pub_meta)
-        assert captured["external_ids"]["source_doi"] == "10.1234/abc"
+        assert captured.external_ids["source_doi"] == "10.1234/abc"
 
 
 # ── build_openalex_author_records (parsing pur) ──────────────────
@@ -718,10 +713,3 @@ class TestOpenalexNormalizerClass:
             "staging_queries",
             "authorship_queries",
         }
-
-    def test_summary_stats_calls_count_table(self):
-        norm = _make_normalizer()
-        norm._queries.count_table_returns = 42  # type: ignore[attr-defined]
-        lines = norm.summary_stats(MagicMock())
-        assert len(lines) == 1
-        assert "42" in lines[0]

@@ -711,13 +711,9 @@ def _normalize_builders() -> dict[str, Callable[[Any], Any]]:
     from application.pipeline.normalize.normalize_theses import ThesesNormalizer
     from application.pipeline.normalize.normalize_wos import WosNormalizer
     from infrastructure.queries.pipeline.normalize.authorships import PgAuthorshipsBatchQueries
-    from infrastructure.queries.pipeline.normalize.crossref import PgCrossrefNormalizeQueries
-    from infrastructure.queries.pipeline.normalize.datacite import PgDataciteNormalizeQueries
-    from infrastructure.queries.pipeline.normalize.hal import PgHalNormalizeQueries
-    from infrastructure.queries.pipeline.normalize.openalex import PgOpenalexNormalizeQueries
-    from infrastructure.queries.pipeline.normalize.scanr import PgScanrNormalizeQueries
-    from infrastructure.queries.pipeline.normalize.theses import PgThesesNormalizeQueries
-    from infrastructure.queries.pipeline.normalize.wos import PgWosNormalizeQueries
+    from infrastructure.queries.pipeline.normalize.source_publications import (
+        PgSourcePublicationQueries,
+    )
     from infrastructure.queries.pipeline.staging import PgStagingQueries
     from infrastructure.repositories import (
         journal_repository,
@@ -725,12 +721,12 @@ def _normalize_builders() -> dict[str, Callable[[Any], Any]]:
         publisher_repository,
     )
 
-    def _biblio(cls: Any, queries_cls: Any) -> Callable[[Any], Any]:
+    def _biblio(cls: Any) -> Callable[[Any], Any]:
         return lambda conn: cls(
             conn,
             log,
             PgStagingQueries(),
-            queries_cls(),
+            PgSourcePublicationQueries(),
             journal_repo_factory=journal_repository,
             publisher_repo_factory=publisher_repository,
             pub_repo_factory=publication_repository,
@@ -742,16 +738,16 @@ def _normalize_builders() -> dict[str, Callable[[Any], Any]]:
             conn,
             log,
             PgStagingQueries(),
-            PgThesesNormalizeQueries(),
+            PgSourcePublicationQueries(),
             pub_repo_factory=publication_repository,
             batch_queries=PgAuthorshipsBatchQueries(),
         ),
-        "crossref": _biblio(CrossrefNormalizer, PgCrossrefNormalizeQueries),
-        "datacite": _biblio(DataciteNormalizer, PgDataciteNormalizeQueries),
-        "scanr": _biblio(ScanrNormalizer, PgScanrNormalizeQueries),
-        "hal": _biblio(HalNormalizer, PgHalNormalizeQueries),
-        "openalex": _biblio(OpenalexNormalizer, PgOpenalexNormalizeQueries),
-        "wos": _biblio(WosNormalizer, PgWosNormalizeQueries),
+        "crossref": _biblio(CrossrefNormalizer),
+        "datacite": _biblio(DataciteNormalizer),
+        "scanr": _biblio(ScanrNormalizer),
+        "hal": _biblio(HalNormalizer),
+        "openalex": _biblio(OpenalexNormalizer),
+        "wos": _biblio(WosNormalizer),
     }
 
 

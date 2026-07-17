@@ -2,9 +2,10 @@
 
 from sqlalchemy import text
 
+from application.ports.pipeline.normalize.source_publications import SourcePublicationRow
 from domain.publications.metadata import normalized_title
-from infrastructure.queries.pipeline.normalize.openalex import (
-    upsert_openalex_source_publication,
+from infrastructure.queries.pipeline.normalize.source_publications import (
+    upsert_source_publication,
 )
 
 
@@ -17,27 +18,16 @@ def test_upsert_writes_title_normalized(sa_sync_conn):
         )
     ).scalar_one()
     raw_title = "Les Cœurs <b>simples</b> &amp;amp; complexes"
-    sp_id = upsert_openalex_source_publication(
+    sp_id = upsert_source_publication(
         conn,
-        openalex_id="W_title_norm",
-        doi=None,
-        title=raw_title,
-        pub_year=2020,
-        doc_type="article",
-        publication_id=None,
-        staging_id=staging_id,
-        external_ids={},
-        urls=None,
-        cited_by_count=None,
-        journal_id=None,
-        oa_status=None,
-        language=None,
-        container_title=None,
-        is_retracted=None,
-        biblio={},
-        abstract=None,
-        keywords=None,
-        topics_json={},
+        SourcePublicationRow(
+            source="openalex",
+            source_id="W_title_norm",
+            staging_id=staging_id,
+            title=raw_title,
+            pub_year=2020,
+            doc_type="article",
+        ),
     )
     stored = conn.execute(
         text("SELECT title, title_normalized FROM source_publications WHERE id = :id"),

@@ -13,8 +13,11 @@ from application.pipeline.normalize._authorships_batch import (
 from application.pipeline.normalize.base import SourceNormalizer
 from application.pipeline.timings import StepTimer
 from application.ports.pipeline.normalize.authorships import AuthorshipsBatchQueries
+from application.ports.pipeline.normalize.source_publications import (
+    SourcePublicationQueries,
+    SourcePublicationRow,
+)
 from application.ports.pipeline.normalize.staging import StagingQueries, StagingRow
-from application.ports.pipeline.normalize.wos import WosNormalizeQueries
 from application.ports.repositories.journal_repository import JournalRepository
 from application.ports.repositories.publication_repository import PublicationRepository
 from application.ports.repositories.publisher_repository import PublisherRepository
@@ -391,10 +394,9 @@ def extract_pub_metadata(rec: dict, journal_id: int | None) -> dict:
 
 def insert_wos_document(
     conn: Connection,
-    queries: WosNormalizeQueries,
+    queries: SourcePublicationQueries,
     rec: dict,
     staging_id: int,
-    publication_id: int | None,
     pub_meta: dict,
 ) -> int:
     """Crée/retrouve l'entrée source_publications pour WoS.
@@ -405,26 +407,28 @@ def insert_wos_document(
     que pour les extras WoS-spécifiques (abstract, cited_by_count, biblio,
     keywords, topics, urls, external_ids non canoniques).
     """
-    return queries.upsert_wos_source_publication(
+    return queries.upsert_source_publication(
         conn,
-        ut=rec["ut"],
-        doi=pub_meta["doi"],
-        title=pub_meta["title"],
-        pub_year=pub_meta["pub_year"],
-        doc_type=pub_meta["doc_type"],
-        publication_id=publication_id,
-        staging_id=staging_id,
-        journal_id=pub_meta["journal_id"],
-        oa_status=pub_meta["oa_status"],
-        language=pub_meta["language"],
-        container_title=pub_meta["container_title"],
-        abstract=rec.get("abstract"),
-        cited_by_count=rec.get("cited_by_count"),
-        biblio=rec.get("biblio"),
-        keywords=rec.get("keywords"),
-        topics=rec.get("topics"),
-        urls=rec.get("urls"),
-        external_ids=rec.get("external_ids"),
+        SourcePublicationRow(
+            source="wos",
+            source_id=rec["ut"],
+            staging_id=staging_id,
+            doi=pub_meta["doi"],
+            external_ids=rec.get("external_ids"),
+            title=pub_meta["title"],
+            pub_year=pub_meta["pub_year"],
+            doc_type=pub_meta["doc_type"],
+            journal_id=pub_meta["journal_id"],
+            container_title=pub_meta["container_title"],
+            language=pub_meta["language"],
+            biblio=rec.get("biblio"),
+            abstract=rec.get("abstract"),
+            keywords=rec.get("keywords"),
+            topics=rec.get("topics"),
+            oa_status=pub_meta["oa_status"],
+            urls=rec.get("urls"),
+            cited_by_count=rec.get("cited_by_count"),
+        ),
     )
 
 
@@ -496,7 +500,7 @@ def process_authorships(
 
 def process_record(
     conn: Connection,
-    queries: WosNormalizeQueries,
+    queries: SourcePublicationQueries,
     logger: logging.Logger,
     staging_row: StagingRow,
     *,
@@ -524,7 +528,7 @@ def process_record(
 
     pub_meta = extract_pub_metadata(rec, journal_id)
 
-    source_publication_id = insert_wos_document(conn, queries, rec, staging_id, None, pub_meta)
+    source_publication_id = insert_wos_document(conn, queries, rec, staging_id, pub_meta)
     t.mark("wos_doc")
 
     process_authorships(conn, authorship_queries, logger, rec, source_publication_id)
@@ -544,7 +548,7 @@ class WosNormalizer(SourceNormalizer):
         conn: Connection,
         logger: logging.Logger,
         staging_queries: StagingQueries,
-        queries: WosNormalizeQueries,
+        queries: SourcePublicationQueries,
         journal_repo_factory: Callable[[Connection], JournalRepository],
         publisher_repo_factory: Callable[[Connection], PublisherRepository],
         pub_repo_factory: Callable[[Connection], PublicationRepository],

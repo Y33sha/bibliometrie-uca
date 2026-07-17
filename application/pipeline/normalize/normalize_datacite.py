@@ -25,7 +25,10 @@ from application.pipeline.normalize._authorships_batch import (
 from application.pipeline.normalize.base import SourceNormalizer
 from application.pipeline.timings import StepTimer
 from application.ports.pipeline.normalize.authorships import AuthorshipsBatchQueries
-from application.ports.pipeline.normalize.datacite import DataciteNormalizeQueries
+from application.ports.pipeline.normalize.source_publications import (
+    SourcePublicationQueries,
+    SourcePublicationRow,
+)
 from application.ports.pipeline.normalize.staging import StagingQueries, StagingRow
 from application.ports.repositories.journal_repository import JournalRepository
 from application.ports.repositories.publication_repository import PublicationRepository
@@ -214,7 +217,7 @@ def process_authorships(
 
 def process_work(
     conn: Connection,
-    queries: DataciteNormalizeQueries,
+    queries: SourcePublicationQueries,
     logger: logging.Logger,
     staging_row: StagingRow,
     *,
@@ -263,24 +266,27 @@ def process_work(
     if related_dois:
         external_ids["related_dois"] = related_dois
 
-    source_publication_id = queries.upsert_datacite_source_publication(
+    source_publication_id = queries.upsert_source_publication(
         conn,
-        doi=doi,
-        title=title,
-        pub_year=pub_year,
-        doc_type=extract_datacite_doc_type_token(attributes),
-        publication_id=None,
-        staging_id=staging_id,
-        external_ids=external_ids or None,
-        journal_id=journal_id,
-        oa_status=None,
-        language=get_language(attributes),
-        container_title=container_title if not journal_id else None,
-        abstract=get_abstract(attributes),
-        keywords=get_keywords(attributes),
-        cited_by_count=get_cited_by_count(attributes),
-        biblio=get_biblio(attributes),
-        meta=extract_datacite_meta(attributes),
+        SourcePublicationRow(
+            source="datacite",
+            source_id=doi,
+            staging_id=staging_id,
+            doi=doi,
+            external_ids=external_ids or None,
+            title=title,
+            pub_year=pub_year,
+            doc_type=extract_datacite_doc_type_token(attributes),
+            journal_id=journal_id,
+            container_title=container_title if not journal_id else None,
+            language=get_language(attributes),
+            biblio=get_biblio(attributes),
+            abstract=get_abstract(attributes),
+            keywords=get_keywords(attributes),
+            oa_status=None,
+            cited_by_count=get_cited_by_count(attributes),
+            meta=extract_datacite_meta(attributes),
+        ),
     )
     t.mark("datacite_doc")
 
@@ -301,7 +307,7 @@ class DataciteNormalizer(SourceNormalizer):
         conn: Connection,
         logger: logging.Logger,
         staging_queries: StagingQueries,
-        queries: DataciteNormalizeQueries,
+        queries: SourcePublicationQueries,
         journal_repo_factory: Callable[[Connection], JournalRepository],
         publisher_repo_factory: Callable[[Connection], PublisherRepository],
         pub_repo_factory: Callable[[Connection], PublicationRepository],

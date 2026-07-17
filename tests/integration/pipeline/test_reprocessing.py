@@ -59,14 +59,16 @@ def _run_normalize_hal(conn):
     from application.pipeline.normalize.normalize_hal import process_work
     from application.ports.pipeline.normalize.staging import StagingRow
     from infrastructure.queries.pipeline.normalize.authorships import PgAuthorshipsBatchQueries
-    from infrastructure.queries.pipeline.normalize.hal import PgHalNormalizeQueries
+    from infrastructure.queries.pipeline.normalize.source_publications import (
+        PgSourcePublicationQueries,
+    )
     from infrastructure.queries.pipeline.staging import PgStagingQueries
     from infrastructure.repositories import (
         journal_repository,
         publisher_repository,
     )
 
-    queries = PgHalNormalizeQueries()
+    queries = PgSourcePublicationQueries()
     staging_queries = PgStagingQueries()
     authorship_queries = PgAuthorshipsBatchQueries()
     logger = logging.getLogger("test")

@@ -25,16 +25,14 @@ from application.ports.pipeline.normalize.authorships import (
     AddressCountryItem,
     AuthorshipAddressItem,
     AuthorshipsBatchQueries,
-    SourceAuthorshipBatchItem,
+    SourceAuthorshipItem,
 )
 from infrastructure.queries.pipeline.source_authorships import (
     clear_source_authorships_for_publication,
 )
 
 
-def upsert_source_authorships_batch(
-    conn: Connection, values: list[SourceAuthorshipBatchItem]
-) -> None:
+def upsert_source_authorships_batch(conn: Connection, values: list[SourceAuthorshipItem]) -> None:
     """Batch UPSERT de `source_authorships` (toutes sources, `source` par ligne).
 
     L'identité de l'auteur (`author_name_normalized`, `person_identifiers`) vit sur
@@ -107,6 +105,39 @@ def upsert_source_authorships_batch(
             "payload": payload,
         },
     )
+
+
+_UPSERT_IDENTITY_SQL = text("""
+    INSERT INTO author_identifying_keys (author_name_normalized, person_identifiers)
+    VALUES (:author_name_normalized, :person_identifiers)
+    ON CONFLICT (author_name_normalized, person_identifiers) DO NOTHING
+""").bindparams(bindparam("person_identifiers", type_=JSONB))
+
+_INSERT_AUTHORSHIP_SQL = text(r"""
+    INSERT INTO source_authorships
+        (source, source_publication_id, author_position,
+         is_corresponding, roles, raw_author_name, identity_id)
+    VALUES (:source, :source_publication_id, :author_position,
+            :is_corresponding, :roles, :raw_author_name,
+            (SELECT id FROM author_identifying_keys
+             WHERE key_hash = md5(
+                 coalesce(:author_name_normalized, E'\x01') || E'\x1f'
+                 || coalesce((:person_identifiers)::text, E'\x01'))))
+    RETURNING id
+""").bindparams(bindparam("person_identifiers", type_=JSONB))
+
+
+def upsert_source_authorship(conn: Connection, item: SourceAuthorshipItem) -> int:
+    """Écrit une signature seule et retourne son id.
+
+    Même mécanisme que le batch — upsert de l'identité, puis résolution de `identity_id`
+    par `key_hash` — pour une seule ligne, dont l'id est rendu par `RETURNING`. Sert les
+    signatures sans rang d'auteur, que le remap par position du writer batch ne sait pas
+    retrouver. Pas d'`ON CONFLICT`, pour la même raison que le batch : le `clear` en amont
+    vide le document.
+    """
+    conn.execute(_UPSERT_IDENTITY_SQL, dict(item))
+    return conn.execute(_INSERT_AUTHORSHIP_SQL, dict(item)).one().id
 
 
 def delete_orphan_identities(conn: Connection) -> int:
@@ -251,8 +282,11 @@ class PgAuthorshipsBatchQueries(AuthorshipsBatchQueries):
     ) -> None:
         clear_source_authorships_for_publication(conn, source_publication_id)
 
+    def upsert_source_authorship(self, conn: Connection, item: SourceAuthorshipItem) -> int:
+        return upsert_source_authorship(conn, item)
+
     def upsert_source_authorships_batch(
-        self, conn: Connection, values: list[SourceAuthorshipBatchItem]
+        self, conn: Connection, values: list[SourceAuthorshipItem]
     ) -> None:
         upsert_source_authorships_batch(conn, values)
 

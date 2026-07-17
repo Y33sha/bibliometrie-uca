@@ -21,7 +21,10 @@ from application.pipeline.normalize._authorships_batch import (
 from application.pipeline.normalize.base import SourceNormalizer
 from application.pipeline.timings import StepTimer
 from application.ports.pipeline.normalize.authorships import AuthorshipsBatchQueries
-from application.ports.pipeline.normalize.crossref import CrossrefNormalizeQueries
+from application.ports.pipeline.normalize.source_publications import (
+    SourcePublicationQueries,
+    SourcePublicationRow,
+)
 from application.ports.pipeline.normalize.staging import StagingQueries, StagingRow
 from application.ports.repositories.journal_repository import JournalRepository
 from application.ports.repositories.publication_repository import PublicationRepository
@@ -283,7 +286,7 @@ def process_authorships(
 
 def process_work(
     conn: Connection,
-    queries: CrossrefNormalizeQueries,
+    queries: SourcePublicationQueries,
     logger: logging.Logger,
     staging_row: StagingRow,
     *,
@@ -324,24 +327,27 @@ def process_work(
     biblio = get_biblio(msg)
     meta = get_meta(msg)
 
-    source_publication_id = queries.upsert_crossref_source_publication(
+    source_publication_id = queries.upsert_source_publication(
         conn,
-        doi=doi,
-        title=title,
-        pub_year=pub_year,
-        doc_type=msg.get("type"),
-        publication_id=None,
-        staging_id=staging_id,
-        external_ids=external_ids,
-        journal_id=journal_id,
-        oa_status=None,
-        language=get_language(msg),
-        container_title=get_container_title(msg) if not journal_id else None,
-        abstract=get_abstract(msg),
-        keywords=get_keywords(msg),
-        cited_by_count=get_cited_by_count(msg),
-        biblio=biblio,
-        meta=meta,
+        SourcePublicationRow(
+            source="crossref",
+            source_id=doi,
+            staging_id=staging_id,
+            doi=doi,
+            external_ids=external_ids,
+            title=title,
+            pub_year=pub_year,
+            doc_type=msg.get("type"),
+            journal_id=journal_id,
+            container_title=get_container_title(msg) if not journal_id else None,
+            language=get_language(msg),
+            biblio=biblio,
+            abstract=get_abstract(msg),
+            keywords=get_keywords(msg),
+            oa_status=None,
+            cited_by_count=get_cited_by_count(msg),
+            meta=meta,
+        ),
     )
     t.mark("crossref_doc")
 
@@ -362,7 +368,7 @@ class CrossrefNormalizer(SourceNormalizer):
         conn: Connection,
         logger: logging.Logger,
         staging_queries: StagingQueries,
-        queries: CrossrefNormalizeQueries,
+        queries: SourcePublicationQueries,
         journal_repo_factory: Callable[[Connection], JournalRepository],
         publisher_repo_factory: Callable[[Connection], PublisherRepository],
         pub_repo_factory: Callable[[Connection], PublicationRepository],

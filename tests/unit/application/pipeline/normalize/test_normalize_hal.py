@@ -28,6 +28,7 @@ from application.pipeline.normalize.normalize_hal import (
     upsert_journal,
     upsert_publisher,
 )
+from application.ports.pipeline.normalize.source_publications import SourcePublicationRow
 from application.ports.pipeline.normalize.staging import StagingRow
 
 # ── Stubs ────────────────────────────────────────────────────────
@@ -44,10 +45,10 @@ def _staging_row(staging_id=1, hal_id="hal-1", doi=None, raw=None):
 
 class _FakeQueries:
     def __init__(self) -> None:
-        self.upserted_documents: list[dict[str, Any]] = []
+        self.upserted_documents: list[SourcePublicationRow] = []
 
-    def upsert_hal_source_publication(self, conn, **kw) -> int:
-        self.upserted_documents.append(kw)
+    def upsert_source_publication(self, conn, row) -> int:
+        self.upserted_documents.append(row)
         return 999
 
 
@@ -265,7 +266,6 @@ class TestInsertHalDocument:
             doc,
             staging_id=1,
             hal_id="h1",
-            publication_id=None,
             pub_meta=pub_meta,
         )
         return queries.upserted_documents[-1]
@@ -274,75 +274,75 @@ class TestInsertHalDocument:
         queries = _FakeQueries()
         captured = self._call(queries, {"collCode_s": ["UCA", "LIMOS", "UCA"]})
         # Dédupliquées, triées, depuis le seul `collCode_s` du raw_data.
-        assert captured["hal_collections"] == ["LIMOS", "UCA"]
+        assert captured.hal_collections == ["LIMOS", "UCA"]
 
     def test_no_collections_returns_none(self):
         queries = _FakeQueries()
         captured = self._call(queries, {})
-        assert captured["hal_collections"] is None
+        assert captured.hal_collections is None
 
     def test_doc_type_concatenated_with_subtype(self):
         queries = _FakeQueries()
         captured = self._call(queries, {"docType_s": "ART", "docSubType_s": "review"})
-        assert captured["doc_type"] == "ART_review"
+        assert captured.doc_type == "ART_review"
 
     def test_doc_type_no_subtype(self):
         queries = _FakeQueries()
         captured = self._call(queries, {"docType_s": "BOOK"})
-        assert captured["doc_type"] == "BOOK"
+        assert captured.doc_type == "BOOK"
 
     def test_nnt_goes_in_external_ids(self):
         queries = _FakeQueries()
         captured = self._call(queries, {"nntId_s": "2024CLFAC001"})
-        assert captured["external_ids"] == {"hal_id": ["h1"], "nnt": "2024CLFAC001"}
+        assert captured.external_ids == {"hal_id": ["h1"], "nnt": "2024CLFAC001"}
 
     def test_hal_id_always_in_external_ids(self):
         """Le normalizer pose `external_ids.hal_id = source_id` même hors thèse, pour que `hal_id` soit un token de confirmation et que HAL soit clusterisé comme les autres sources (symétrie avec ce que theses fait déjà pour NNT)."""
         queries = _FakeQueries()
         captured = self._call(queries, {})
-        assert captured["external_ids"] == {"hal_id": ["h1"]}
+        assert captured.external_ids == {"hal_id": ["h1"]}
 
     def test_keywords_deduplicated(self):
         queries = _FakeQueries()
         captured = self._call(queries, {"keyword_s": ["a", "b", "a", "c"]})
-        assert captured["keywords"] == ["a", "b", "c"]
+        assert captured.keywords == ["a", "b", "c"]
 
     def test_keywords_empty(self):
         queries = _FakeQueries()
         captured = self._call(queries, {"keyword_s": []})
-        assert captured["keywords"] is None
+        assert captured.keywords is None
 
     def test_topics_from_domain(self):
         queries = _FakeQueries()
         captured = self._call(queries, {"domain_s": ["sdv.bibs", "info.algo"]})
-        assert captured["topics"] == {"hal_domains": ["sdv.bibs", "info.algo"]}
+        assert captured.topics == {"hal_domains": ["sdv.bibs", "info.algo"]}
 
     def test_biblio_built_from_volume_issue_pages(self):
         queries = _FakeQueries()
         captured = self._call(queries, {"volume_s": "10", "issue_s": "2", "page_s": "100-120"})
-        assert captured["biblio"] == {"volume": "10", "issue": "2", "pages": "100-120"}
+        assert captured.biblio == {"volume": "10", "issue": "2", "pages": "100-120"}
 
     def test_biblio_empty(self):
         queries = _FakeQueries()
         captured = self._call(queries, {})
-        assert captured["biblio"] is None
+        assert captured.biblio is None
 
     def test_biblio_publisher_from_journalPublisher_s(self):
         queries = _FakeQueries()
         captured = self._call(queries, {"journalPublisher_s": "Elsevier"})
-        assert captured["biblio"] == {"publisher": "Elsevier"}
+        assert captured.biblio == {"publisher": "Elsevier"}
 
     def test_biblio_publisher_fallback_to_publisher_s(self):
         queries = _FakeQueries()
         captured = self._call(queries, {"publisher_s": "Springer"})
-        assert captured["biblio"] == {"publisher": "Springer"}
+        assert captured.biblio == {"publisher": "Springer"}
 
     def test_biblio_journalPublisher_s_wins_over_publisher_s(self):
         queries = _FakeQueries()
         captured = self._call(
             queries, {"journalPublisher_s": "Elsevier", "publisher_s": "Springer"}
         )
-        assert captured["biblio"] == {"publisher": "Elsevier"}
+        assert captured.biblio == {"publisher": "Elsevier"}
 
     def test_biblio_journal_built_from_title_issn_eissn(self):
         queries = _FakeQueries()
@@ -354,7 +354,7 @@ class TestInsertHalDocument:
                 "journalEissn_s": "1361-6463",
             },
         )
-        assert captured["biblio"] == {
+        assert captured.biblio == {
             "journal": {
                 "title": "J. Phys.",
                 "issn": "0022-3727",
@@ -365,12 +365,12 @@ class TestInsertHalDocument:
     def test_biblio_journal_partial(self):
         queries = _FakeQueries()
         captured = self._call(queries, {"journalTitle_s": "J. Phys."})
-        assert captured["biblio"] == {"journal": {"title": "J. Phys."}}
+        assert captured.biblio == {"journal": {"title": "J. Phys."}}
 
     def test_url_from_uri(self):
         queries = _FakeQueries()
         captured = self._call(queries, {"uri_s": "https://hal.science/hal-123"})
-        assert captured["urls"] == ["https://hal.science/hal-123"]
+        assert captured.urls == ["https://hal.science/hal-123"]
 
     def test_pub_meta_propagates_journal_oa_lang(self):
         queries = _FakeQueries()
@@ -390,11 +390,11 @@ class TestInsertHalDocument:
                 "container_title": "Book",
             },
         )
-        assert captured["journal_id"] == 7
-        assert captured["oa_status"] == "gold"
-        assert captured["embargo_until"] == date(2027, 1, 1)
-        assert captured["language"] == "fr"
-        assert captured["container_title"] == "Book"
+        assert captured.journal_id == 7
+        assert captured.oa_status == "gold"
+        assert captured.embargo_until == date(2027, 1, 1)
+        assert captured.language == "fr"
+        assert captured.container_title == "Book"
 
 
 # `parse_tei_author_identifiers` est testé dans
@@ -644,7 +644,7 @@ class TestProcessWork:
         captured = {"called": False}
 
         def fake_upsert_pub(name, **kw):
-            captured["called"] = True
+            captured.called = True
             return 1
 
         monkeypatch.setattr(normalize_hal, "upsert_publisher", fake_upsert_pub)
