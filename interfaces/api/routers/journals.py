@@ -22,7 +22,6 @@ from domain.journals.journal import (
     JOURNAL_TYPES,
     OA_MODEL_LABELS_FR,
     OA_MODELS,
-    JournalType,
 )
 from interfaces.api.deps import (
     audit_repo,
@@ -35,6 +34,7 @@ from interfaces.api.deps import (
 from interfaces.api.filters import parse_str_csv
 from interfaces.api.models import (
     EnumOption,
+    JournalTypeChange,
     JournalTypeChangeImpact,
     MergeRequest,
     MergeResponse,
@@ -167,25 +167,27 @@ def get_journal_subjects(
     return queries.get_journal_subjects(journal_id, limit=limit)
 
 
-@router.get(
+@router.post(
     "/api/journals/{journal_id}/type-change-impact",
     response_model=JournalTypeChangeImpact,
 )
 def get_type_change_impact(
     journal_id: int,
-    new_type: JournalType = Query(...),
+    body: JournalTypeChange,
     conn: Connection = Depends(db_conn),
     repo: JournalRepository = Depends(journal_repo),
     pub_repo: PublicationRepository = Depends(publication_repo),
     correction_queries: MetadataCorrectionQueries = Depends(metadata_correction_queries),
 ) -> JournalTypeChangeImpact:
-    """Compte les publications de la revue dont le `doc_type` changerait si son `journal_type` passait à `new_type`.
+    """Compte les publications de la revue dont le `doc_type` changerait si son `journal_type` passait à la valeur demandée.
 
     L'aperçu applique réellement le changement — écriture du type, recalcul des corrections sur les publications sources, rafraîchissement — dans un `SAVEPOINT` annulé ensuite. Il emprunte donc le chemin exact de l'édition, et aucune écriture ne survit. Renvoie 404 sur une revue inconnue, comme l'édition qu'il simule.
+
+    La méthode est POST bien qu'aucune écriture ne survive : l'aperçu écrit, pose les verrous de l'édition et en coûte le prix. Un GET s'annonce sans effet, et la garde d'authentification, qui s'applique aux méthodes d'écriture, laisserait passer une action admin.
     """
     savepoint = conn.begin_nested()
     try:
-        repo.update_journal_fields(journal_id, JournalUpdate(journal_type=new_type))
+        repo.update_journal_fields(journal_id, JournalUpdate(journal_type=body.journal_type))
         count = requalify_publications_for_journal(
             journal_id,
             conn=conn,

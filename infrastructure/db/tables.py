@@ -186,6 +186,14 @@ journal_type_enum = PgEnum(
     create_type=False,
 )
 
+oa_model_enum = PgEnum(
+    "subscription",
+    "full_oa",
+    "repository",
+    name="oa_model",
+    create_type=False,
+)
+
 
 structures = Table(
     "structures",
@@ -253,7 +261,7 @@ journals = Table(
     Column("is_in_doaj", Boolean, server_default="false"),
     Column("apc_amount", Numeric(10, 2)),
     Column("apc_currency", Text, server_default="EUR"),
-    Column("oa_model", Text),
+    Column("oa_model", oa_model_enum),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     Column("journal_type", journal_type_enum, server_default="unknown"),
     Column("is_academic", Boolean, server_default="true"),

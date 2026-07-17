@@ -17,6 +17,7 @@ from application.ports.repositories.journal_repository import JournalRepository,
 from application.ports.repositories.publication_repository import PublicationRepository
 from application.services.publications.core import refresh_from_sources
 from domain.errors import NotFoundError, ValidationError
+from domain.journals.journal import OaModel
 from domain.normalize import normalize_text
 
 
@@ -28,7 +29,7 @@ def find_or_create_journal(
     issnl: str | None = None,
     publisher_id: int | None = None,
     openalex_id: str | None = None,
-    oa_model: str | None = None,
+    oa_model: OaModel | None = None,
     repo: JournalRepository,
 ) -> int | None:
     """Trouve ou crée un journal. Retourne son id, ou `None` si le titre est vide.

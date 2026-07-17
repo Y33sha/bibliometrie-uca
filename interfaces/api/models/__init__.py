@@ -73,7 +73,7 @@ from interfaces.api.models.admin.structures import (
     StructureUpdate,
 )
 from interfaces.api.models.auth import AuthCheckResponse, LoginRequest
-from interfaces.api.models.journals import JournalTypeChangeImpact
+from interfaces.api.models.journals import JournalTypeChange, JournalTypeChangeImpact
 
 __all__ = [
     "AddIdentifier",
@@ -98,6 +98,7 @@ __all__ = [
     "FeedbackStructuresResponse",
     "IdentifierReassignResponse",
     "IdentifierStatusResponse",
+    "JournalTypeChange",
     "JournalTypeChangeImpact",
     "LoginRequest",
     "MarkDistinctPersons",

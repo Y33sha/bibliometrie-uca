@@ -1,4 +1,4 @@
-import { api, post, put } from './client';
+import { post, put } from './client';
 
 export function update(id: number, body: Record<string, unknown>): Promise<unknown> {
 	return put(`/api/journals/${id}`, body);
@@ -10,8 +10,9 @@ export function merge(targetId: number, sourceId: number): Promise<unknown> {
 
 /**
  * Preview de l'impact d'un changement de `journal_type` sur le `doc_type` canonique
- * des publications rattachées. Dry-run pur côté backend (aucune écriture).
+ * des publications rattachées. Le backend applique le changement puis l'annule :
+ * rien ne persiste, mais l'appel est une action admin, d'où le POST.
  */
 export function typeChangeImpact(id: number, newType: string): Promise<{ count: number }> {
-	return api(`/api/journals/${id}/type-change-impact?new_type=${encodeURIComponent(newType)}`);
+	return post(`/api/journals/${id}/type-change-impact`, { journal_type: newType });
 }

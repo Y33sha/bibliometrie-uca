@@ -513,12 +513,17 @@ class TestUpdateJournal:
 
 
 class TestTypeChangeImpact:
-    def test_counts_without_writing(self, client, auth_client):
+    def test_requires_admin(self, client):
+        """L'aperçu écrit et pose les verrous de l'édition : il en partage la garde."""
+        r = client.post("/api/journals/1/type-change-impact", json={"journal_type": "proceedings"})
+        assert r.status_code == 401
+
+    def test_counts_without_writing(self, auth_client):
         """L'aperçu écrit dans un SAVEPOINT annulé : le type de la revue ne bouge pas."""
         jid = _seed_journal()
         auth_client.put(f"/api/journals/{jid}", json={"journal_type": "journal"})
-        r = client.get(
-            f"/api/journals/{jid}/type-change-impact", params={"new_type": "proceedings"}
+        r = auth_client.post(
+            f"/api/journals/{jid}/type-change-impact", json={"journal_type": "proceedings"}
         )
         assert r.status_code == 200
         assert "count" in r.json()
@@ -526,10 +531,10 @@ class TestTypeChangeImpact:
             cur.execute("SELECT journal_type FROM journals WHERE id = %s", (jid,))
             assert cur.fetchone()["journal_type"] == "journal"
 
-    def test_404_on_unknown_journal(self, client):
+    def test_404_on_unknown_journal(self, auth_client):
         """L'aperçu emprunte le chemin de l'édition : il en hérite l'absence."""
-        r = client.get(
-            "/api/journals/999999/type-change-impact", params={"new_type": "proceedings"}
+        r = auth_client.post(
+            "/api/journals/999999/type-change-impact", json={"journal_type": "proceedings"}
         )
         assert r.status_code == 404
 

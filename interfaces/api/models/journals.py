@@ -5,6 +5,14 @@ Le contrat d'édition `JournalUpdate` vit dans le port `application/ports/reposi
 
 from pydantic import BaseModel
 
+from domain.journals.journal import JournalType
+
+
+class JournalTypeChange(BaseModel):
+    """Valeur de `journal_type` dont la modale admin demande l'impact avant de confirmer l'édition."""
+
+    journal_type: JournalType
+
 
 class JournalTypeChangeImpact(BaseModel):
     """Compte des publications dont le `doc_type` canonique changerait si le `journal_type` passait à la valeur prévue. Renvoyé par le preview de la modale admin avant confirmation de l'édition."""

@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 from application.ports.api._common import PaginatedResponse
 from application.ports.api.subjects_queries import SubjectFrequency
-from domain.journals.journal import JournalType
+from domain.journals.journal import JournalType, OaModel
 
 
 class JournalOut(BaseModel):
@@ -30,7 +30,7 @@ class JournalOut(BaseModel):
     is_in_doaj: bool
     apc_amount: float | None
     apc_currency: str | None
-    oa_model: str | None
+    oa_model: OaModel | None
     journal_type: JournalType | None
     is_academic: bool | None
     doi_prefix: str | None

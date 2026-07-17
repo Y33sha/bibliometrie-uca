@@ -23,6 +23,7 @@ from application.ports.repositories.publication_repository import PublicationRep
 from application.ports.repositories.publisher_repository import PublisherRepository
 from application.services.journals.core import find_or_create_journal
 from application.services.publishers.core import find_or_create_publisher
+from domain.journals.journal import OaModel
 from domain.persons.identifiers import (
     compact_identifiers,
     mark_shared_identifiers_dubious,
@@ -160,7 +161,7 @@ def upsert_journal(
                 eissn = i
 
     source_type = source.get("type")
-    oa_model = None
+    oa_model: OaModel | None = None
     if source_type == "journal":
         oa_model = "full_oa" if source.get("is_oa", False) else "subscription"
     elif source_type == "repository":

@@ -10,12 +10,12 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any, NamedTuple, cast
 
-from sqlalchemy import Connection, case, delete, func, or_, select, text, update
+from sqlalchemy import Connection, case, delete, func, literal, or_, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from application.ports.repositories.journal_repository import JournalIssnRow, JournalUpdate
 from domain.errors import NotFoundError
-from domain.journals.journal import OA_MODELS, Journal, JournalType, OaModel
+from domain.journals.journal import Journal, JournalType, OaModel
 from domain.normalize import normalize_text
 from infrastructure.db.tables import journal_name_forms, journals
 from infrastructure.queries.pipeline.pub_counts import (
@@ -46,7 +46,7 @@ class _JournalRow(NamedTuple):
 def _journal_from_row(row: _JournalRow) -> Journal:
     """Mappe une row `journals` SQL vers l'aggregate `Journal`.
 
-    Coerce les valeurs vers les types du domaine : `journal_type` et `is_academic`, nullables au schéma, retombent sur leur défaut (`unknown` / `True`) ; `oa_model`, colonne text libre, est validé contre `OaModel` (hors vocabulaire → `None`).
+    Coerce les valeurs vers les types du domaine : `journal_type` et `is_academic`, nullables au schéma, retombent sur leur défaut (`unknown` / `True`). Les enums SQL `journal_type` et `oa_model` reprennent le vocabulaire du domaine, d'où la simple assertion de type.
     """
     return Journal(
         id=row.id,
@@ -59,7 +59,7 @@ def _journal_from_row(row: _JournalRow) -> Journal:
         is_in_doaj=row.is_in_doaj,
         apc_amount=row.apc_amount,
         apc_currency=row.apc_currency,
-        oa_model=cast(OaModel, row.oa_model) if row.oa_model in OA_MODELS else None,
+        oa_model=cast(OaModel | None, row.oa_model),
         journal_type=cast(JournalType, row.journal_type)
         if row.journal_type is not None
         else "unknown",
@@ -211,7 +211,7 @@ class PgJournalRepository:
         eissn: str | None = None,
         publisher_id: int | None = None,
         openalex_id: str | None = None,
-        oa_model: str | None = None,
+        oa_model: OaModel | None = None,
     ) -> None:
         """Enrichit un journal existant avec les champs non null fournis
         (COALESCE sur chaque champ : ne downgrade jamais).
@@ -241,7 +241,11 @@ class PgJournalRepository:
                 eissn=func.coalesce(journals.c.eissn, eissn),
                 publisher_id=func.coalesce(journals.c.publisher_id, publisher_id),
                 openalex_id=func.coalesce(journals.c.openalex_id, openalex_id),
-                oa_model=func.coalesce(journals.c.oa_model, oa_model),
+                # Le littéral est lié au type de la colonne : `coalesce` ne le lui emprunte pas, et
+                # `oa_model` est une enum, qu'un paramètre texte ne rejoint pas.
+                oa_model=func.coalesce(
+                    journals.c.oa_model, literal(oa_model, journals.c.oa_model.type)
+                ),
             )
         )
         self._conn.execute(stmt)
@@ -255,7 +259,7 @@ class PgJournalRepository:
         issnl: str | None,
         publisher_id: int | None,
         openalex_id: str | None,
-        oa_model: str | None,
+        oa_model: OaModel | None,
     ) -> int:
         """Insère un journal et retourne son id. `title_normalized` est dérivé de `title`."""
         stmt = (
