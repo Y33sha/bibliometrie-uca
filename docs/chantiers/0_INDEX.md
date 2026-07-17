@@ -5,7 +5,6 @@
 ### En cours
 
 - [Lisibilité](CODE_lisibilite.md)
-- [Normalize : factoriser l'upsert des `source_publications`](CODE_normalize-upsert-source-publications.md)
 - [Domaines HAL : libellés depuis la source, suppression de la table](CODE_hal-domaines-libelles.md)
 
 ### En pause
@@ -21,6 +20,7 @@
 
 ## Chantiers archivés
 
+- 2026-07-17 — [Normalize : factoriser l'upsert des `source_publications`](archived/2026-07-17_CODE_normalize-upsert-source-publications.md)
 - 2026-07-12 — [Phase personnes — lisibilité et refonte](archived/2026-07-12_CODE_phase-persons.md)
 - 2026-07-12 — [Simplification de la phase sujets](archived/2026-07-12_CODE_simplification-sujets.md)
 - 2026-07-12 — [Fusion des publications — dénouer l'enchevêtrement](archived/2026-07-12_CODE_merge-publications.md)
