@@ -4,7 +4,7 @@ Décrit tables, colonnes, contraintes uniques, CHECK et comments, pour deux usag
 - le query-building côté SQLAlchemy Core (`select(config.c.key)…`),
 - servir de référence à `alembic revision --autogenerate` (comparaison MetaData ↔ DB).
 
-Ce modèle n'est pas la source de vérité du schéma : les migrations Alembic (`alembic/versions/`, écrites à la main) font foi, et `infrastructure/db/schema.sql` en est un snapshot descriptif régénéré par `python -m infrastructure.db.dump_schema`. Le fichier est maintenu à la main en miroir de la base ; le test `tests/integration/infrastructure/db/test_sqlalchemy_smoke.py` garde les deux cohérents, en vérifiant que colonnes déclarées et colonnes réelles coïncident.
+Ce modèle n'est pas la source de vérité du schéma : les migrations Alembic (`alembic/versions/`, écrites à la main) font foi, et `infrastructure/db/schema.sql` en est un snapshot descriptif régénéré par `python -m infrastructure.db.dump_schema`. Le fichier est maintenu à la main en miroir de la base ; `alembic check`, joué par `tests/integration/infrastructure/db/test_sqlalchemy_smoke.py` sur une base montée par les migrations, tient l'accord entre les deux.
 
 Le périmètre du metadata s'arrête aux tables et à leurs colonnes. Index, clés étrangères et vues matérialisées (`authorship_structures`, `publication_structures`, `source_authorship_structures`, `subject_cooccurrences`) appartiennent aux seules migrations ; le filtre `include_object` d'`alembic/env.py` les écarte de la comparaison.
 """
@@ -31,6 +31,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import ARRAY, ENUM as PgEnum, JSONB
 
+from domain.publications.relations import RelationType
 from domain.sources.registry import ALL_SOURCES
 
 metadata = MetaData()
@@ -490,7 +491,7 @@ rejected_authorships = Table(
     metadata,
     Column("publication_id", Integer, nullable=False),
     Column("person_id", Integer, nullable=False),
-    Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
     PrimaryKeyConstraint("publication_id", "person_id", name="rejected_authorships_pkey"),
 )
 
@@ -525,6 +526,18 @@ author_identifying_keys = Table(
         name="author_identifying_keys_key",
         postgresql_nulls_not_distinct=True,
     ),
+)
+
+
+# Arbitrages admin au grain de la signature : la paire (signature, personne) que la
+# cascade de la phase `persons` relit comme entrée fixe, sans jamais la re-dériver.
+confirmed_authorships = Table(
+    "confirmed_authorships",
+    metadata,
+    Column("source_authorship_id", Integer, nullable=False),
+    Column("person_id", Integer, nullable=False),
+    Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    PrimaryKeyConstraint("source_authorship_id", name="confirmed_authorships_pkey"),
 )
 
 
@@ -912,13 +925,6 @@ subjects = Table(
     Column("language", Text),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     Column("usage_count", Integer, nullable=False, server_default="0"),
-    # Index UNIQUE sur expression lower(label) — complété à la main.
-    # Index GIN trigram sur expression normalize_name_form(label) — complété
-    # à la main (sqlacodegen ne sait pas représenter cette expression).
-    # L'op `gin_trgm_ops` est passé via postgresql_ops pour permettre la
-    # comparaison fine de l'expression par Alembic. Pas de préfixe `public.`
-    # ici : la reflection Postgres ne le renvoie pas, donc le préfixe
-    # générerait un diff cosmétique permanent.
 )
 
 
@@ -931,6 +937,64 @@ publication_subjects = Table(
     Column("rejected", Boolean, nullable=False, server_default="false"),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     PrimaryKeyConstraint("publication_id", "subject_id", "source"),
+)
+
+
+relation_type_enum = PgEnum(
+    *(r.value for r in RelationType),
+    name="relation_type",
+    create_type=False,
+)
+
+
+# Relations sémantiques entre publications distinctes, dirigées du sujet vers l'objet.
+# La cible est une publication du corpus (`target_publication_id`) ou un DOI hors corpus
+# (`target_doi`), d'où l'unique `NULLS NOT DISTINCT`, qui dédoublonne sur celle des deux
+# qui est renseignée.
+publication_relations = Table(
+    "publication_relations",
+    metadata,
+    Column("id", BigInteger, primary_key=True),
+    Column("from_publication_id", Integer, nullable=False),
+    Column("relation_type", relation_type_enum, nullable=False),
+    Column("target_doi", Text),
+    Column("target_publication_id", Integer),
+    Column("source", Text, nullable=False),
+    CheckConstraint(
+        "target_publication_id IS NOT NULL OR target_doi IS NOT NULL",
+        name="publication_relations_target_present",
+    ),
+    UniqueConstraint(
+        "from_publication_id",
+        "relation_type",
+        "target_publication_id",
+        "target_doi",
+        name="publication_relations_uq",
+        postgresql_nulls_not_distinct=True,
+    ),
+)
+
+
+# Journal d'exécution du pipeline, une ligne par phase et par run : l'admin y lit le
+# déroulé, les signaux d'entrée et les métriques de sortie de chaque phase.
+pipeline_phase_executions = Table(
+    "pipeline_phase_executions",
+    metadata,
+    Column("id", BigInteger, primary_key=True),
+    Column("run_id", BigInteger, nullable=False),
+    Column("phase", Text, nullable=False),
+    Column("started_at", DateTime(timezone=True), nullable=False),
+    Column("ended_at", DateTime(timezone=True), nullable=False),
+    Column("mode", Text, nullable=False),
+    Column("sources", ARRAY(Text), nullable=False, server_default=text("'{}'::text[]")),
+    Column("status", Text, nullable=False),
+    Column("signals", JSONB, nullable=False, server_default=text("'[]'::jsonb")),
+    Column("metrics", JSONB, nullable=False, server_default=text("'{}'::jsonb")),
+    Column("details", JSONB, nullable=False, server_default=text("'{}'::jsonb")),
+    CheckConstraint(
+        "status = ANY (ARRAY['ok'::text, 'warning'::text, 'error'::text])",
+        name="pipeline_phase_executions_status_check",
+    ),
 )
 
 

@@ -1,17 +1,13 @@
-"""POC SQLAlchemy Core — phase 0 du chantier sqlalchemy-core-adoption.
+"""Chaîne MetaData → SQLAlchemy Core → psycopg3, et accord de la MetaData avec les migrations.
 
-Vérifie que la chaîne MetaData → query SA Core → driver psycopg3
-fonctionne sur la DB test, et que la MetaData déclarée dans
-`infrastructure/db/tables.py` reste cohérente avec le schéma réel.
-
-Tests à conserver tant que la MetaData ne couvre pas TOUTES les
-tables : ils servent de filet contre le drift (colonne ajoutée en
-migration mais oubliée dans tables.py, ou vice-versa).
+Les tests de round-trip vérifient que les types Postgres non triviaux (JSONB, ARRAY) traversent la chaîne. `TestMetaDataMatchesMigrations` est le filet contre le drift entre `infrastructure/db/tables.py` et le schéma qu'écrivent les migrations.
 """
 
-from sqlalchemy import Connection, inspect, select, update
+from alembic.config import Config
+from sqlalchemy import Connection, select, update
 
-from infrastructure.db.tables import config, metadata, perimeters, structures
+from alembic import command
+from infrastructure.db.tables import config, perimeters, structures
 
 # ── Smoke : round-trip SQLAlchemy Core sur la table config ────────
 
@@ -71,42 +67,15 @@ class TestSqlalchemyCoreSmoke:
         assert row.api_ids == {"ror": "0000abc"}
 
 
-# ── Cohérence MetaData ↔ schéma DB ─────────────────────────────────
+# ── Cohérence MetaData ↔ migrations ────────────────────────────────
 
 
-class TestMetaDataConsistency:
-    """Détecte un drift entre `infrastructure/db/tables.py` et la DB réelle.
+class TestMetaDataMatchesMigrations:
+    def test_alembic_check_reports_no_drift(self, alembic_config: Config):
+        """Les migrations produisent le schéma que `infrastructure/db/tables.py` déclare.
 
-    Échoue si une table déclarée dans MetaData n'existe pas en DB ou si
-    elle expose des colonnes que la MetaData ignore (ou inversement).
-    """
+        La base de test est montée par `alembic upgrade head` : la confronter à la MetaData compare le schéma aux migrations qui l'écrivent, seule source de vérité. `alembic check` couvre les tables et colonnes des deux côtés, leurs types, leur nullabilité et leurs commentaires ; index, clés étrangères et vues matérialisées restent hors comparaison (`include_object` dans `alembic/env.py`).
 
-    def test_all_metadata_tables_exist_in_db(self, sa_sync_conn: Connection):
-        insp = inspect(sa_sync_conn)
-        db_relations = set(insp.get_table_names()) | set(insp.get_materialized_view_names())
-        for table in metadata.tables.values():
-            assert table.name in db_relations, (
-                f"Table/matview `{table.name}` déclarée dans MetaData absente de la DB"
-            )
-
-    def test_all_metadata_columns_exist_in_db(self, sa_sync_conn: Connection):
-        insp = inspect(sa_sync_conn)
-        for table in metadata.tables.values():
-            db_cols = {c["name"] for c in insp.get_columns(table.name)}
-            for col in table.columns:
-                assert col.name in db_cols, (
-                    f"Colonne `{table.name}.{col.name}` déclarée dans MetaData absente de la DB"
-                )
-
-    def test_no_db_columns_unknown_to_metadata(self, sa_sync_conn: Connection):
-        """Pour chaque table couverte par MetaData, la DB ne doit pas exposer
-        de colonne inconnue de la MetaData (sinon le code SA ne la verra pas
-        et passera silencieusement à côté)."""
-        insp = inspect(sa_sync_conn)
-        for table in metadata.tables.values():
-            db_cols = {c["name"] for c in insp.get_columns(table.name)}
-            md_cols = {c.name for c in table.columns}
-            extra = db_cols - md_cols
-            assert not extra, (
-                f"Table `{table.name}` : colonnes en DB mais absentes de MetaData : {sorted(extra)}"
-            )
+        L'échec porte le diff des opérations qu'un autogenerate produirait.
+        """
+        command.check(alembic_config)

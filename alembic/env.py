@@ -18,7 +18,9 @@ from infrastructure.settings import settings
 
 config = context.config
 
-if config.config_file_name is not None:
+# `fileConfig` reconfigure le logging du processus et désactive les loggers déjà créés. Un
+# appelant programmatique (fixture pytest) pose `configure_logger = False` pour garder le sien.
+if config.config_file_name is not None and config.attributes.get("configure_logger", True):
     fileConfig(config.config_file_name)
 
 target_metadata = metadata
