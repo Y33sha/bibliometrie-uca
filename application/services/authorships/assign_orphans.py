@@ -3,6 +3,8 @@
 Ces deux opérations (unitaire et par lot) sont exposées par l'API admin (`POST /api/admin/orphan-authorships/...`) — actions utilisateur, hors pipeline. À l'interface entre `persons`, `source_authorships` et `publications`, leur issue est la création ou la mise à jour de lignes dans `authorships`.
 
 Le helper privé `_refresh_authorship_from_sources` chaîne les cinq opérations atomiques du port qui recomposent une authorship pour une paire (publication, personne) depuis ses source_authorships.
+
+Les deux opérations vérifient l'existence de la personne cible : elles écrivent des lignes qui la référencent, et sans cette garde une cible absente se traduirait en violation de clé étrangère.
 """
 
 from application.audit_log import emit_event
@@ -19,6 +21,12 @@ from domain.sources.registry import (
     SOURCE_PRIORITY,
     require_known_source,
 )
+
+
+def _require_person(person_id: int, *, repo: PersonRepository) -> None:
+    """Refuse une personne cible absente, que les écritures suivantes référencent."""
+    if repo.find_by_id(person_id) is None:
+        raise NotFoundError(f"Personne {person_id} introuvable")
 
 
 def _resolve_rejection(
@@ -80,9 +88,10 @@ def assign_orphan_authorship(
     4. Ajoute la forme de nom
     5. Crée/met à jour l'authorship canonique + FK source
 
-    Lève `ValidationError` sur une source hors registre, `NotFoundError` si la signature n'existe pas, `AuthorshipAlreadyAssignedError` si elle porte déjà une personne.
+    Lève `ValidationError` sur une source hors registre, `NotFoundError` si la personne ou la signature n'existe pas, `AuthorshipAlreadyAssignedError` si elle porte déjà une personne.
     """
     require_known_source(source)
+    _require_person(person_id, repo=repo)
 
     publication_id = repo.find_publication_id_for_source_authorship(source, authorship_id)
     if publication_id is not None:
@@ -135,10 +144,12 @@ def batch_assign_orphan_authorships(
     le lot (`RejectedPairError`) ; avec `force`, les rejets sont d'abord levés.
 
     Retourne le nombre de source_authorships effectivement rattachées
-    (celles qui étaient orphelines).
+    (celles qui étaient orphelines). Lève `NotFoundError` si la personne n'existe pas.
     """
     if not sa_ids:
         return 0
+
+    _require_person(person_id, repo=repo)
 
     publication_ids = repo.find_publication_ids_for_source_authorships(sa_ids)
     _resolve_rejection(

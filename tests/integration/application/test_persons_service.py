@@ -217,6 +217,11 @@ class TestAddIdentifier:
         result = add_identifier(person_id, "hal_person_id", "12345", repo=repo)
         assert result.outcome is AddIdentifierOutcome.ADDED
 
+    def test_manual_source_raises_on_unknown_person(self, repo):
+        """Sans cette garde, l'identifiant venu d'un formulaire heurterait la clé étrangère."""
+        with pytest.raises(NotFoundError):
+            add_identifier(999999, "orcid", "0000-0001-2345-6789", source="manual", repo=repo)
+
     def test_inserts_new(self, sa_sync_conn, repo):
         person_id = _insert_person(sa_sync_conn)
         result = add_identifier(person_id, "orcid", "0000-0001-2345-6789", repo=repo)
@@ -335,6 +340,19 @@ class TestUpdateIdentifierStatus:
 
 
 class TestReassignIdentifier:
+    def test_raises_on_unknown_target_person(self, sa_sync_conn, repo):
+        """Sans cette garde, la réattribution heurterait la clé étrangère."""
+        person_id = _insert_person(sa_sync_conn)
+        ident_id = sa_sync_conn.execute(
+            text(
+                "INSERT INTO person_identifiers (person_id, id_type, id_value, source, status) "
+                "VALUES (:p, 'orcid', '0000-0001', 'auto', 'rejected') RETURNING id"
+            ),
+            {"p": person_id},
+        ).scalar_one()
+        with pytest.raises(NotFoundError):
+            reassign_identifier(ident_id, 999999, repo=repo)
+
     def test_reassigns(self, sa_sync_conn, repo):
         p1 = _insert_person(sa_sync_conn, "A", "A")
         p2 = _insert_person(sa_sync_conn, "B", "B")

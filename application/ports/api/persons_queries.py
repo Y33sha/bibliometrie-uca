@@ -505,9 +505,7 @@ class PersonsQueries(Protocol):
 
     def person_subjects(self, person_id: int, *, limit: int) -> list[SubjectFrequency]: ...
 
-    # ── Admin : existence, orphan authorships, name forms ──────────
-
-    def person_exists(self, person_id: int) -> bool: ...
+    # ── Admin : orphan authorships, name forms ─────────────────────
 
     def orphan_authorships_count(self) -> OrphanCountResponse: ...
 

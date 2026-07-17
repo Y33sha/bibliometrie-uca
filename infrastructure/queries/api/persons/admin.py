@@ -91,15 +91,6 @@ def list_orphan_authorships(
     }
 
 
-def person_exists(conn: Connection, person_id: int) -> bool:
-    """Vérifie qu'une personne existe."""
-    row = conn.execute(
-        text("SELECT id FROM persons WHERE id = :id"),
-        {"id": person_id},
-    ).one_or_none()
-    return row is not None
-
-
 # ── Name-form authorships ────────────────────────────────────────
 
 

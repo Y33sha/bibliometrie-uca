@@ -3,7 +3,7 @@
 L'exclusion rejette une contribution au niveau consolidé. Les orphelines sont les signatures du périmètre qu'aucune personne ne porte (`person_id` nul) : le router les liste et les attribue.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import Connection
 
 from application.ports.api.persons_queries import (
@@ -81,22 +81,19 @@ def list_orphan_authorships(
 def assign_orphan_authorship_endpoint(
     body: AssignOrphanAuthorship,
     conn: Connection = Depends(db_conn),
-    queries: PersonsQueries = Depends(persons_queries),
     repo: PersonRepository = Depends(person_repo),
     authorship_repo: AuthorshipRepository = Depends(authorship_repo),
     audit: AuditRepository = Depends(audit_repo),
 ) -> OrphanAssignResponse:
     """Attribue une signature orpheline à une personne.
 
-    Renvoie 400 sans `person_id` ni `create_person`, et sans patronyme à la création (`assign_orphan_authorship`) ; 409 sur une paire déjà rejetée (`RejectedPairError`), à moins que `force` ne lève le rejet au passage, et sur une signature qui porte déjà une personne (`AuthorshipAlreadyAssignedError`).
+    Renvoie 400 sans `person_id` ni `create_person`, et sans patronyme à la création (`assign_orphan_authorship`) ; 404 sur une personne ou une signature introuvable ; 409 sur une paire déjà rejetée (`RejectedPairError`), à moins que `force` ne lève le rejet au passage, et sur une signature qui porte déjà une personne (`AuthorshipAlreadyAssignedError`).
     """
     require_known_source(body.source)
 
     new_person: tuple[str, str] | None = None
     if body.create_person:
         new_person = (body.create_person.last_name, body.create_person.first_name)
-    elif body.person_id and not queries.person_exists(body.person_id):
-        raise HTTPException(status_code=404, detail="Personne introuvable")
 
     person_id = authorship_commands.assign_orphan_authorship(
         conn,
@@ -116,21 +113,18 @@ def assign_orphan_authorship_endpoint(
 def batch_assign_orphan_authorships(
     body: BatchAssignOrphanAuthorships,
     conn: Connection = Depends(db_conn),
-    queries: PersonsQueries = Depends(persons_queries),
     repo: PersonRepository = Depends(person_repo),
     authorship_repo: AuthorshipRepository = Depends(authorship_repo),
     audit: AuditRepository = Depends(audit_repo),
 ) -> OrphanBatchAssignResponse:
     """Attribue plusieurs signatures orphelines à une même personne.
 
-    Renvoie 409 (`RejectedPairError`) dès qu'une paire du lot est déjà rejetée, à moins que `force` ne lève les rejets au passage.
+    Renvoie 404 sur une personne introuvable, 409 (`RejectedPairError`) dès qu'une paire du lot est déjà rejetée, à moins que `force` ne lève les rejets au passage.
     """
     person_id = body.person_id
     if not body.authorship_ids:
         return OrphanBatchAssignResponse(assigned=0)
 
-    if not queries.person_exists(person_id):
-        raise HTTPException(status_code=404, detail="Personne introuvable")
     assigned = authorship_commands.batch_assign_orphan_authorships(
         conn,
         person_id,

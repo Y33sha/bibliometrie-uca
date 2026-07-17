@@ -5,7 +5,7 @@ Le package est organisé par thème :
 - `facets` : `persons_facets`, `list_departments`, `list_roles`, `persons_stats`
 - `detail` : `person_profile`, `person_theses`, `person_addresses`,
   `person_dashboard`, `person_subjects`
-- `admin` : `person_exists`, orphan authorships, name-form authorships
+- `admin` : orphan authorships, name-form authorships
 
 L'adapter d'écriture pipeline (`pipeline.persons_matching`) vit côté
 `infrastructure/queries/pipeline/`.
@@ -62,7 +62,6 @@ from infrastructure.queries.api.persons.admin import (
     name_duplicates_count as _name_duplicates_count,
     name_form_authorships as _name_form_authorships,
     orphan_authorships_count as _orphan_authorships_count,
-    person_exists as _person_exists,
     persons_sharing_name_form as _persons_sharing_name_form,
 )
 from infrastructure.queries.api.persons.detail import (
@@ -159,10 +158,7 @@ class PgPersonsQueries(PersonsQueries):
             for r in _person_subjects(self._conn, person_id, limit=limit)
         ]
 
-    # ── Admin : existence, orphan authorships, name forms ──────────
-
-    def person_exists(self, person_id: int) -> bool:
-        return _person_exists(self._conn, person_id)
+    # ── Admin : orphan authorships, name forms ─────────────────────
 
     def orphan_authorships_count(self) -> OrphanCountResponse:
         return OrphanCountResponse.model_validate(_orphan_authorships_count(self._conn))
