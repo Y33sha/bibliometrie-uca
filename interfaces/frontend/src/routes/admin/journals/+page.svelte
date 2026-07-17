@@ -142,7 +142,7 @@
 	}
 
 	onMount(async () => {
-		journalTypes = await api<EnumOption[]>('/api/journal-types');
+		journalTypes = await api<EnumOption[]>('/api/journals/types');
 	});
 </script>
 

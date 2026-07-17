@@ -59,7 +59,7 @@ Port `application/ports/api/journals_queries.py` (DTOs co-localisés), adaptateu
 
 - **Listing / facettes** (`GET /api/journals`, `/facets`) : `list_journals` (WHERE composé par `_build_journal_where`), `journals_facets` (comptes exclusifs par dimension). Le filtre « avec publications » s'appuie sur le cache `journals.pub_count`.
 - **Détail / dashboard** (`GET /{id}`, `/{id}/dashboard`) : le dashboard **consomme `domain/journals/expected.py`** (`is_doc_type_expected` / `is_oa_status_expected`) pour signaler les publications hors du cadre annoncé, et recompte l'appartenance au périmètre en direct.
-- **Enums** (`GET /api/journal-types`, `/api/journals/oa-models`) : exposent `JOURNAL_TYPE_LABELS_FR` / `OA_MODEL_LABELS_FR`, source de vérité Python de `domain/journals/journal.py`.
+- **Enums** (`GET /api/journals/types`, `/api/journals/oa-models`) : exposent `JOURNAL_TYPE_LABELS_FR` / `OA_MODEL_LABELS_FR`, source de vérité Python de `domain/journals/journal.py`.
 
 ## Points d'attention
 

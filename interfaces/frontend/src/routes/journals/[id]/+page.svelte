@@ -98,7 +98,7 @@
 		canGoBack =
 			(window as any).navigation?.canGoBack ??
 			document.referrer.startsWith(window.location.origin);
-		const labelsP = api<EnumOption[]>('/api/journal-types').then((opts) => {
+		const labelsP = api<EnumOption[]>('/api/journals/types').then((opts) => {
 			journalTypeLabels = Object.fromEntries(opts.map((o) => [o.value, o.label_fr]));
 		});
 		await Promise.all([loadJournal(), labelsP]);

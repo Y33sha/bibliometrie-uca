@@ -29,7 +29,7 @@ from domain.journals.journal import (
     OA_MODELS,
 )
 from domain.normalize import normalize_text
-from infrastructure.queries.filters import publication_in_perimeter
+from infrastructure.queries.filters import SUBJECT_IS_NOT_GENERIC, publication_in_perimeter
 from infrastructure.sources.doaj import resolve_doaj_url
 
 # Colonnes du profil d'une revue, communes à la ligne de liste et à la page d'une revue. `doaj_id` et `doaj_url_csv` sont les deux entrées de `resolve_doaj_url` ; la jointure `publishers p` est attendue par `pub_name`.
@@ -359,13 +359,10 @@ class PgJournalQueries(JournalQueries):
             expected_oa_statuses=expected_oa_statuses,
         )
 
-    def get_journal_subjects(self, journal_id: int, *, limit: int = 30) -> list[SubjectFrequency]:
-        """Top sujets des publications d'une revue, par fréquence locale.
+    def get_journal_subjects(self, journal_id: int, *, limit: int) -> list[SubjectFrequency]:
+        """Sujets des publications de la revue, les plus fréquents d'abord.
 
-        Filtre les sujets trop génériques (`subjects.usage_count` > 5000) pour
-        rester utile à l'œil (sinon les top-N seraient mangés par "research
-        article", "science", etc.). COUNT(DISTINCT) car `publication_subjects`
-        peut avoir plusieurs rows par (pub_id, subject_id) (sources différentes).
+        Le `COUNT(DISTINCT p.id)` tient au grain de `publication_subjects`, qui porte une ligne par source pour une même paire (publication, sujet).
         """
         rows = self._conn.execute(
             text(f"""
@@ -375,7 +372,7 @@ class PgJournalQueries(JournalQueries):
                 JOIN subjects s ON s.id = ps.subject_id
                 WHERE p.journal_id = :id
                   AND {publication_in_perimeter("p")}
-                  AND s.usage_count <= 5000
+                  AND {SUBJECT_IS_NOT_GENERIC}
                 GROUP BY s.id, s.label
                 ORDER BY n DESC, lower(s.label)
                 LIMIT :lim

@@ -40,6 +40,7 @@ from interfaces.api.models import (
     MergeResponse,
     OkResponse,
 )
+from interfaces.api.params import TOP_SUBJECTS_LIMIT, TopSubjectsLimit
 
 router = APIRouter()
 
@@ -53,7 +54,7 @@ def list_oa_models() -> list[EnumOption]:
     return [EnumOption(value=v, label_fr=OA_MODEL_LABELS_FR[v]) for v in OA_MODELS]
 
 
-@router.get("/api/journal-types", response_model=list[EnumOption])
+@router.get("/api/journals/types", response_model=list[EnumOption])
 def list_journal_types() -> list[EnumOption]:
     """Valeurs possibles de l'enum `journal_type` avec leur libellé français.
 
@@ -157,12 +158,12 @@ def get_journal_dashboard(
 @router.get("/api/journals/{journal_id}/subjects", response_model=list[SubjectFrequency])
 def get_journal_subjects(
     journal_id: int,
-    limit: int = Query(30, ge=1, le=200),
+    limit: TopSubjectsLimit = TOP_SUBJECTS_LIMIT,
     queries: JournalQueries = Depends(journal_queries),
 ) -> list[SubjectFrequency]:
     """Sujets les plus fréquents des publications de la revue, pour l'onglet tableau de bord.
 
-    Les sujets génériques, dont l'`usage_count` dépasse 5000, sont écartés : ils noieraient les autres. Une revue sans publication indexée donne une liste vide.
+    Les sujets trop génériques sont écartés : ils noieraient les autres. Une revue sans publication indexée donne une liste vide.
     """
     return queries.get_journal_subjects(journal_id, limit=limit)
 
