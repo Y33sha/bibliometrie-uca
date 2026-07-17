@@ -108,8 +108,6 @@ class StructureRepository(Protocol):
 
     # ── structures ─────────────────────────────────────────────────
 
-    def structure_exists(self, structure_id: int) -> bool: ...
-
     def create_structure(
         self,
         *,

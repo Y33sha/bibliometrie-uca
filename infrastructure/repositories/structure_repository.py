@@ -16,7 +16,7 @@ from application.ports.repositories.structure_repository import (
     StructureRow,
     StructureUpdateFields,
 )
-from domain.errors import ValidationError
+from domain.errors import NotFoundError, ValidationError
 from domain.structures.identifiers import HalCollection, RorId
 from domain.structures.name_forms import StructureNameForm
 from domain.structures.structure import Structure, StructureType
@@ -168,10 +168,6 @@ class PgStructureRepository:
 
     # ── structures ─────────────────────────────────────────────────
 
-    def structure_exists(self, structure_id: int) -> bool:
-        result = self._conn.execute(select(structures.c.id).where(structures.c.id == structure_id))
-        return result.first() is not None
-
     def create_structure(
         self,
         *,
@@ -213,7 +209,10 @@ class PgStructureRepository:
             .returning(*_structure_returning_columns())
         )
         result = self._conn.execute(stmt)
-        return cast(StructureRow, dict(result.one()._mapping))
+        row = result.one_or_none()
+        if row is None:
+            raise NotFoundError(f"Structure {structure_id} introuvable")
+        return cast(StructureRow, dict(row._mapping))
 
     def delete_structure(self, structure_id: int) -> StructureDeletedRow | None:
         stmt = (

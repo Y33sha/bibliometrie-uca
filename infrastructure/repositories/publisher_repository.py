@@ -17,6 +17,7 @@ from sqlalchemy import Connection, delete, func, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from application.ports.repositories.publisher_repository import PublisherUpdate
+from domain.errors import NotFoundError
 from domain.normalize import normalize_text
 from domain.publishers.publisher import Publisher, PublisherType
 from infrastructure.db.tables import publisher_name_forms, publishers
@@ -144,22 +145,18 @@ class PgPublisherRepository:
         self.add_publisher_name_form(new_id, name_normalized)
         return new_id, True
 
-    def publisher_exists(self, publisher_id: int) -> bool:
-        """Vérifie l'existence d'un publisher."""
-        return (
-            self._conn.execute(
-                select(publishers.c.id).where(publishers.c.id == publisher_id)
-            ).first()
-            is not None
-        )
-
     def update_publisher_fields(self, publisher_id: int, fields: PublisherUpdate) -> None:
-        """UPDATE dynamique sur publishers à partir des champs fournis, `name_normalized` dérivé de `name` quand il est présent. L'existence de l'éditeur et la non-vacuité sont vérifiées par le service."""
+        """UPDATE dynamique sur publishers à partir des champs fournis, `name_normalized` dérivé de `name` quand il est présent.
+
+        L'`UPDATE` rapporte les lignes appariées : zéro dit l'absence, sans lecture préalable. La non-vacuité des champs est vérifiée par le service.
+        """
         data = fields.model_dump(exclude_unset=True)
         if data.get("name") is not None:
             data["name_normalized"] = normalize_text(data["name"])
         stmt = update(publishers).where(publishers.c.id == publisher_id).values(**data)
-        self._conn.execute(stmt)
+        result = self._conn.execute(stmt)
+        if result.rowcount == 0:
+            raise NotFoundError(f"Éditeur {publisher_id} introuvable")
 
     # ── Fusion ─────────────────────────────────────────────────────
 
