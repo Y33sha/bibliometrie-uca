@@ -2,11 +2,13 @@
 
 import pytest
 from sqlalchemy import text
+from sqlalchemy.dialects.postgresql import ENUM as PgEnum
 from sqlalchemy.exc import IntegrityError
 
 from application.services.persons.core import merge_person
 from application.services.publications.core import refresh_from_sources
 from domain.errors import ConflictError
+from infrastructure.db.tables import metadata
 from infrastructure.repositories import person_repository, publication_repository
 
 
@@ -129,85 +131,38 @@ class TestRefreshFromSources:
         assert row.oa_status == "gold"
 
 
-# ── Cohérence enum sources ──
+# ── Cohérence des enums Postgres ──
 
 
-class TestSourcesEnum:
-    def test_python_matches_db(self, sa_sync_conn):
-        """utils.sources.ALL_SOURCES doit correspondre à l'enum source_type en base."""
-        from domain.sources.registry import ALL_SOURCES_SET
+class TestPgEnumsMatchDb:
+    def test_declared_values_match_db(self, sa_sync_conn):
+        """Chaque enum Postgres porté par `infrastructure/db/tables.py` déclare le vocabulaire de son type en base.
 
-        db_sources = set(
-            sa_sync_conn.execute(
-                text("SELECT unnest(enum_range(NULL::source_type))::text")
-            ).scalars()
-        )
-        assert ALL_SOURCES_SET == db_sources, (
-            f"Désynchronisation Python/DB !\n"
-            f"  Python : {sorted(ALL_SOURCES_SET)}\n"
-            f"  DB     : {sorted(db_sources)}"
-        )
+        Les valeurs viennent du domaine et le type est créé par migration : ce test ferme la boucle entre les trois. `alembic check` ne l'ouvre pas — il compare les colonnes, pas le contenu des types.
 
+        Une valeur en base et non déclarée casse la lecture de la colonne par SQLAlchemy (`LookupError`) ; une valeur déclarée et absente de la base casse l'écriture.
+        """
+        declared = {
+            col.type.name: set(col.type.enums)
+            for table in metadata.tables.values()
+            for col in table.columns
+            if isinstance(col.type, PgEnum) and col.type.name
+        }
+        assert declared, "Aucun enum trouvé dans la MetaData : le relevé ne mesure plus rien."
 
-class TestPublisherTypesEnum:
-    def test_python_matches_db(self, sa_sync_conn):
-        """`PUBLISHER_TYPES_SET` doit correspondre à l'enum SQL `publisher_type`."""
-        from domain.publishers.publisher import PUBLISHER_TYPES_SET
+        divergent = {}
+        for name, values in declared.items():
+            in_db = set(
+                sa_sync_conn.execute(
+                    text(f"SELECT unnest(enum_range(NULL::{name}))::text")
+                ).scalars()
+            )
+            if values != in_db:
+                divergent[name] = (sorted(values - in_db), sorted(in_db - values))
 
-        db_types = set(
-            sa_sync_conn.execute(
-                text("SELECT unnest(enum_range(NULL::publisher_type))::text")
-            ).scalars()
-        )
-        assert PUBLISHER_TYPES_SET == db_types, (
-            f"Désynchronisation Python/DB !\n"
-            f"  Python : {sorted(PUBLISHER_TYPES_SET)}\n"
-            f"  DB     : {sorted(db_types)}"
-        )
-
-
-class TestJournalTypesEnum:
-    def test_python_matches_db(self, sa_sync_conn):
-        """L'enum SQL `journal_type` doit correspondre au domaine
-        (`JOURNAL_TYPES_SET`) ET à la métadonnée SQLAlchemy (`tables.py`)."""
-        from domain.journals.journal import JOURNAL_TYPES_SET
-        from infrastructure.db.tables import journal_type_enum
-
-        db_types = set(
-            sa_sync_conn.execute(
-                text("SELECT unnest(enum_range(NULL::journal_type))::text")
-            ).scalars()
-        )
-        assert JOURNAL_TYPES_SET == db_types, (
-            f"Désynchronisation domaine/DB !\n"
-            f"  Domaine : {sorted(JOURNAL_TYPES_SET)}\n"
-            f"  DB      : {sorted(db_types)}"
-        )
-        assert set(journal_type_enum.enums) == db_types, (
-            f"Désynchronisation tables.py/DB !\n"
-            f"  tables.py : {sorted(journal_type_enum.enums)}\n"
-            f"  DB        : {sorted(db_types)}"
-        )
-
-
-class TestOaModelEnum:
-    def test_python_matches_db(self, sa_sync_conn):
-        """L'enum SQL `oa_model` doit correspondre au domaine (`OA_MODELS`) ET à la métadonnée SQLAlchemy (`tables.py`)."""
-        from domain.journals.journal import OA_MODELS
-        from infrastructure.db.tables import oa_model_enum
-
-        db_models = set(
-            sa_sync_conn.execute(text("SELECT unnest(enum_range(NULL::oa_model))::text")).scalars()
-        )
-        assert set(OA_MODELS) == db_models, (
-            f"Désynchronisation domaine/DB !\n"
-            f"  Domaine : {sorted(OA_MODELS)}\n"
-            f"  DB      : {sorted(db_models)}"
-        )
-        assert set(oa_model_enum.enums) == db_models, (
-            f"Désynchronisation tables.py/DB !\n"
-            f"  tables.py : {sorted(oa_model_enum.enums)}\n"
-            f"  DB        : {sorted(db_models)}"
+        assert not divergent, "Désynchronisation tables.py/DB :\n" + "\n".join(
+            f"  {name} : déclaré et absent de la base {missing}, en base et non déclaré {extra}"
+            for name, (missing, extra) in divergent.items()
         )
 
 
