@@ -13,6 +13,7 @@
 ### Non commencé
 
 - [Structures et laboratoires : une entité, deux piles de lecture](CODE_structures-et-laboratoires.md)
+- [Typage des paramètres de requête : ce que `str` ne dit pas](CODE_typage-des-parametres-de-requete.md)
 - [Qualité et cohérence des sujets](METIER_sujets-qualite.md)
 - [Signatures institutionnelles](METIER_signatures-institutionnelles.md)
 
