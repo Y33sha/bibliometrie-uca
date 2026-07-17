@@ -440,7 +440,12 @@ def mark_distinct(
     repo: PersonRepository,
     audit_repo: AuditRepository | None = None,
 ) -> None:
-    """Marque deux personnes comme distinctes (non-doublon) dans `distinct_persons`. Idempotent : l'événement d'audit n'est émis que si la paire vient d'être insérée."""
+    """Marque deux personnes comme distinctes (non-doublon) dans `distinct_persons`. Idempotent : l'événement d'audit n'est émis que si la paire vient d'être insérée.
+
+    Lève `ValidationError` sur deux identifiants égaux : une personne n'est pas un non-doublon d'elle-même.
+    """
+    if person_id_a == person_id_b:
+        raise ValidationError("Impossible de distinguer une personne d'elle-même")
     inserted = repo.mark_distinct(person_id_a, person_id_b)
     if inserted:
         emit_event(

@@ -196,11 +196,10 @@ def mark_persons_distinct(
     repo: PersonRepository = Depends(person_repo),
     audit: AuditRepository = Depends(audit_repo),
 ) -> OkResponse:
-    """Marque deux personnes comme distinctes : les files de triage par nom et par identifiant écartent la paire."""
-    if body.person_id_a == body.person_id_b:
-        raise HTTPException(
-            status_code=400, detail="person_id_a et person_id_b doivent être différents"
-        )
+    """Marque deux personnes comme distinctes : les files de triage par nom et par identifiant écartent la paire.
+
+    Renvoie 400 sur deux identifiants égaux (`mark_distinct`).
+    """
     person_commands.mark_distinct(
         conn, body.person_id_a, body.person_id_b, repo=repo, audit_repo=audit
     )

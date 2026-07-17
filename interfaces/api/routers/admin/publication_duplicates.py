@@ -1,6 +1,6 @@
 """Router /api/admin/duplicates/* — les doublons de publications : revue, fusion, marquage comme distincts."""
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import Connection
 
 from application.ports.api.publication_duplicates_queries import (
@@ -66,10 +66,8 @@ def mark_publications_distinct(
 ) -> OkResponse:
     """Marque deux publications comme distinctes (non-doublon confirmé).
 
-    Persiste l'annotation dans `distinct_publications` : la paire est écartée des prochaines revues de `/duplicates/next`. 400 si `pub_id_a == pub_id_b`.
+    Persiste l'annotation dans `distinct_publications` : la paire est écartée des prochaines revues de `/duplicates/next`. Renvoie 400 sur deux identifiants égaux (`mark_distinct`).
     """
-    if body.pub_id_a == body.pub_id_b:
-        raise HTTPException(status_code=400, detail="pub_id_a et pub_id_b doivent être différents")
     publication_commands.mark_distinct(
         conn, body.pub_id_a, body.pub_id_b, repo=repo, audit_repo=audit
     )

@@ -737,6 +737,11 @@ class TestDetachAuthorships:
 
 
 class TestMarkDistinctPersons:
+    def test_raises_on_same_id(self, sa_sync_conn, repo):
+        p = _insert_person(sa_sync_conn)
+        with pytest.raises(ValidationError, match="elle-même"):
+            mark_distinct(p, p, repo=repo)
+
     def test_inserts_ordered_pair(self, sa_sync_conn, repo):
         p1 = _insert_person(sa_sync_conn, "A", "A")
         p2 = _insert_person(sa_sync_conn, "B", "B")

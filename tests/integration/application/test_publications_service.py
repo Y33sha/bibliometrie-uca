@@ -320,6 +320,11 @@ class TestMergePublications:
 
 
 class TestMarkDistinct:
+    def test_raises_on_same_id(self, sa_sync_conn, repo):
+        pub = _seed_publication(sa_sync_conn, title="Seule", source_id="h-md")
+        with pytest.raises(ValidationError, match="elle-même"):
+            mark_distinct(pub, pub, repo=repo)
+
     def test_inserts_ordered_pair(self, sa_sync_conn, repo):
         p1 = _seed_publication(sa_sync_conn, title="A", source_id="h-a")
         p2 = _seed_publication(sa_sync_conn, title="B", source_id="h-b")
