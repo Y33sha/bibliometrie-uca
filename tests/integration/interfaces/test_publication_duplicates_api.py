@@ -115,12 +115,13 @@ class TestMergeDuplicatePublications:
         assert r.status_code == 401
 
     def test_rejects_same_ids(self, auth_client):
+        """La garde vit dans `merge_publications` ; le handler global en fait un 400."""
         r = auth_client.post(
             "/api/admin/duplicates/merge",
             json={"pub_id_a": 1, "pub_id_b": 1},
         )
         assert r.status_code == 400
-        assert "différents" in r.json()["detail"]
+        assert "elle-même" in r.json()["detail"]
 
     def test_404_when_both_missing(self, auth_client):
         r = auth_client.post(

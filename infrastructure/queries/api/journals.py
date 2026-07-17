@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from sqlalchemy import Connection, select, text
+from sqlalchemy import Connection, text
 
 from application.ports.api.journals_queries import (
     DocTypeCount,
@@ -29,7 +29,6 @@ from domain.journals.journal import (
     OA_MODELS,
 )
 from domain.normalize import normalize_text
-from infrastructure.db.tables import journals as t_journals
 from infrastructure.queries.filters import publication_in_perimeter
 from infrastructure.sources.doaj import resolve_doaj_url
 
@@ -400,9 +399,3 @@ class PgJournalQueries(JournalQueries):
             {"id": journal_id, "lim": limit},
         ).all()
         return [SubjectFrequency(id=r.id, label=r.label, count=r.n) for r in rows]
-
-    def existing_journal_ids(self, journal_ids: tuple[int, ...]) -> set[int]:
-        if not journal_ids:
-            return set()
-        result = self._conn.execute(select(t_journals.c.id).where(t_journals.c.id.in_(journal_ids)))
-        return {row.id for row in result}

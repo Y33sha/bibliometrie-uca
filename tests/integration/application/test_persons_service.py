@@ -409,6 +409,69 @@ class TestUpdateName:
         with pytest.raises(NotFoundError):
             update_name(999999, "X", "X", repo=repo)
 
+    def test_strips_surrounding_space(self, sa_sync_conn, repo):
+        p = _insert_person(sa_sync_conn, "Dupont", "Jean")
+        update_name(p, "  Martin  ", "  Sophie  ", repo=repo)
+        row = sa_sync_conn.execute(
+            text("SELECT last_name, first_name FROM persons WHERE id = :p"), {"p": p}
+        ).one()
+        assert row.last_name == "Martin"
+        assert row.first_name == "Sophie"
+
+    def test_raises_without_last_name(self, sa_sync_conn, repo):
+        """Effacer le patronyme retirerait à la personne les formes que seul son nom canonique porte."""
+        p = _insert_person(sa_sync_conn, "Dupont", "Jean")
+        with pytest.raises(ValidationError, match="nom est requis"):
+            update_name(p, "", "Jean", repo=repo)
+
+    def test_raises_on_blank_last_name(self, sa_sync_conn, repo):
+        p = _insert_person(sa_sync_conn, "Dupont", "Jean")
+        with pytest.raises(ValidationError, match="nom est requis"):
+            update_name(p, "   ", "Jean", repo=repo)
+
+
+# ── create_person ───────────────────────────────────────────────────
+
+
+class TestCreatePerson:
+    def test_creates_and_computes_name_forms(self, sa_sync_conn, repo):
+        p = create_person("Dupont", "Jean", repo=repo)
+        forms = {
+            r.name_form
+            for r in sa_sync_conn.execute(
+                text("SELECT name_form FROM person_name_forms WHERE person_id = :p"), {"p": p}
+            )
+        }
+        assert "dupont jean" in forms
+
+    def test_strips_surrounding_space(self, sa_sync_conn, repo):
+        p = create_person("  Dupont  ", "  Jean  ", repo=repo)
+        row = sa_sync_conn.execute(
+            text("SELECT last_name, first_name FROM persons WHERE id = :p"), {"p": p}
+        ).one()
+        assert row.last_name == "Dupont"
+        assert row.first_name == "Jean"
+
+    def test_raises_without_last_name(self, sa_sync_conn, repo):
+        """Sans patronyme, `compute_person_name_forms` ne rend aucune forme : la personne ne serait atteignable par aucun nom."""
+        with pytest.raises(ValidationError, match="nom est requis"):
+            create_person("", "Jean", repo=repo)
+
+
+# ── merge_person ────────────────────────────────────────────────────
+
+
+class TestMergePerson:
+    def test_raises_on_self_merge(self, sa_sync_conn, repo):
+        p = _insert_person(sa_sync_conn)
+        with pytest.raises(ValidationError, match="elle-même"):
+            merge_person(p, p, repo=repo)
+
+    def test_raises_not_found(self, sa_sync_conn, repo):
+        p = _insert_person(sa_sync_conn)
+        with pytest.raises(NotFoundError):
+            merge_person(p, 999999, repo=repo)
+
 
 # ── batch_assign_orphan_authorships ─────────────────────────────────
 

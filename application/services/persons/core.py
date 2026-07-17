@@ -52,8 +52,20 @@ class DetachResult(TypedDict):
 # ── Création / mise à jour personne ──
 
 
+def _validated_name(last_name: str, first_name: str) -> tuple[str, str]:
+    """Nom et prénom débarrassés de leurs espaces de bord, patronyme exigé."""
+    last_name, first_name = last_name.strip(), first_name.strip()
+    if not last_name:
+        raise ValidationError("Le nom est requis")
+    return last_name, first_name
+
+
 def create_person(last_name: str, first_name: str = "", *, repo: PersonRepository) -> int:
-    """Crée une personne et retourne son id."""
+    """Crée une personne et retourne son id.
+
+    Lève `ValidationError` sans patronyme : c'est de lui que `compute_person_name_forms` dérive les formes qui rendent la personne matchable, et une personne qui n'en a pas n'est atteignable par aucun nom.
+    """
+    last_name, first_name = _validated_name(last_name, first_name)
     person_id = repo.create(last_name, first_name)
     repo.refresh_name_forms(person_id, compute_person_name_forms(last_name, first_name))
     return person_id
@@ -83,8 +95,9 @@ def update_name(
 ) -> None:
     """Met à jour le nom/prénom d'une personne et rafraîchit ses formes de nom.
 
-    Lève NotFoundError si la personne n'existe pas.
+    Lève `ValidationError` sans patronyme : le rafraîchissement retirerait alors à la personne les formes de nom que seul son nom canonique porte. Lève `NotFoundError` si la personne n'existe pas.
     """
+    last_name, first_name = _validated_name(last_name, first_name)
     repo.update_name(person_id, last_name, first_name)
     repo.refresh_name_forms(person_id, compute_person_name_forms(last_name, first_name))
 
@@ -450,8 +463,10 @@ def merge_person(
 
     Charge target et source via le repo, délègue l'invariant métier à `Person.can_merge_with` (refus si les deux personnes ont chacune une fiche RH distincte), puis reprend les clés étrangères via `repo.merge_into`.
 
-    Lève `NotFoundError` si target ou source n'existe pas. Lève `ConflictError` si l'invariant RH est violé. Émet un événement d'audit `person.merged` si un utilisateur est dans le contexte.
+    Lève `ValidationError` sur deux identifiants égaux, `NotFoundError` si target ou source n'existe pas, `ConflictError` si l'invariant RH est violé. Émet un événement d'audit `person.merged` si un utilisateur est dans le contexte.
     """
+    if target_id == source_id:
+        raise ValidationError("Impossible de fusionner une personne avec elle-même")
     target = repo.find_by_id(target_id)
     source = repo.find_by_id(source_id)
     if target is None:

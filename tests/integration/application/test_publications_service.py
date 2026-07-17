@@ -14,7 +14,7 @@ from sqlalchemy import bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
 from application.services.publications.core import mark_distinct, merge_publications
-from domain.errors import DistinctDoiError
+from domain.errors import DistinctDoiError, NotFoundError, ValidationError
 from infrastructure.repositories import publication_repository
 
 
@@ -185,6 +185,16 @@ def _oa_status(conn, pub_id):
 
 
 class TestMergePublications:
+    def test_raises_on_self_merge(self, sa_sync_conn, repo):
+        pub = _seed_publication(sa_sync_conn, title="Seule", source_id="h-self")
+        with pytest.raises(ValidationError, match="elle-même"):
+            merge_publications(pub, pub, repo=repo)
+
+    def test_raises_not_found(self, sa_sync_conn, repo):
+        pub = _seed_publication(sa_sync_conn, title="Seule", source_id="h-nf")
+        with pytest.raises(NotFoundError):
+            merge_publications(pub, 999999, repo=repo)
+
     def test_transfers_source_publications_and_authorships(self, sa_sync_conn, repo):
         target = _seed_publication(sa_sync_conn, title="Target", source_id="h-tgt")
         source = _seed_publication(sa_sync_conn, title="Source", source_id="h-src")

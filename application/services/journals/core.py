@@ -16,7 +16,7 @@ from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.journal_repository import JournalRepository, JournalUpdate
 from application.ports.repositories.publication_repository import PublicationRepository
 from application.services.publications.core import refresh_from_sources
-from domain.errors import ConflictError, NotFoundError, ValidationError
+from domain.errors import NotFoundError, ValidationError
 from domain.normalize import normalize_text
 
 
@@ -157,9 +157,15 @@ def merge_journals(
     """Fusionne le journal source dans le journal cible.
 
     Les `source_publications` et publications du journal absorbé sont repointées vers la cible (`merge_journal_into`), puis **requalifiées** contre le `journal_type` de la cible : on recalcule en place les corrections des `source_publications` de la cible (`_correct_for_journal`, qui voit alors les enregistrements absorbés via le `journal_id` repointé), puis on rafraîchit les publications absorbées. Fusionner une revue dans un média retype ses publications en `media`.
+
+    Lève `ValidationError` sur deux identifiants égaux, `NotFoundError` sur une revue introuvable.
     """
     if target_id == source_id:
-        raise ConflictError("Impossible de fusionner un journal avec lui-même")
+        raise ValidationError("Impossible de fusionner un journal avec lui-même")
+    if repo.find_by_id(target_id) is None:
+        raise NotFoundError("Revue cible introuvable")
+    if repo.find_by_id(source_id) is None:
+        raise NotFoundError("Revue source introuvable")
 
     # Capturer les publications du source avant le repoint, pour les rafraîchir.
     absorbed_pub_ids = pub_repo.find_ids_by_journal_id(source_id)

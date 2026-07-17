@@ -151,12 +151,3 @@ class PgPublicationDuplicatesQueries(PublicationDuplicatesQueries):
             else None
         )
         return PubDuplicateNextResponse(total=total, offset=offset, pair=pair)
-
-    def existing_publication_ids(self, pub_ids: tuple[int, ...]) -> set[int]:
-        if not pub_ids:
-            return set()
-        result = self._conn.execute(
-            text("SELECT id FROM publications WHERE id = ANY(:ids)"),
-            {"ids": list(pub_ids)},
-        )
-        return {row.id for row in result}

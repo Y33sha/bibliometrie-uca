@@ -165,7 +165,6 @@ def merge(
     publisher_id: int,
     body: MergeRequest,
     conn: Connection = Depends(db_conn),
-    queries: PublisherQueries = Depends(publisher_queries),
     pub_repo: PublisherRepository = Depends(publisher_repo),
     j_repo: JournalRepository = Depends(journal_repo),
     publication_repo: PublicationRepository = Depends(publication_repo),
@@ -174,13 +173,8 @@ def merge(
 ) -> MergeResponse:
     """Fusionne l'éditeur `source_id` dans l'éditeur `publisher_id`.
 
-    Les revues et les publications de la source passent à la cible, puis la source est supprimée. Deux revues au même titre fusionnent, et leurs publications sont requalifiées contre le `journal_type` de la cible (`merge_journals`). Renvoie 404 si l'un des deux éditeurs est introuvable.
+    Les revues et les publications de la source passent à la cible, puis la source est supprimée. Deux revues au même titre fusionnent, et leurs publications sont requalifiées contre le `journal_type` de la cible (`merge_journals`). Renvoie 400 sur deux identifiants égaux, 404 si l'un des deux éditeurs est introuvable.
     """
-    found = queries.existing_publisher_ids((publisher_id, body.source_id))
-    if publisher_id not in found:
-        raise HTTPException(status_code=404, detail="Éditeur cible introuvable")
-    if body.source_id not in found:
-        raise HTTPException(status_code=404, detail="Éditeur source introuvable")
 
     publisher_commands.merge_publishers(
         conn,
