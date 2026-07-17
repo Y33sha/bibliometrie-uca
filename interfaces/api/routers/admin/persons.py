@@ -165,12 +165,11 @@ def update_person_name(
     conn: Connection = Depends(db_conn),
     repo: PersonRepository = Depends(person_repo),
 ) -> OkResponse:
-    """Modifie le nom/prénom d'une personne."""
-    last_name = body.last_name.strip()
-    first_name = body.first_name.strip()
-    if not last_name:
-        raise HTTPException(status_code=400, detail="Le nom est requis")
-    person_commands.update_name(conn, person_id, last_name, first_name, repo=repo)
+    """Modifie le nom/prénom d'une personne.
+
+    Renvoie 400 sans patronyme, 404 sur une personne introuvable (`update_name`).
+    """
+    person_commands.update_name(conn, person_id, body.last_name, body.first_name, repo=repo)
     return OkResponse()
 
 
@@ -179,22 +178,15 @@ def merge_persons(
     person_id: int,
     body: MergeRequest,
     conn: Connection = Depends(db_conn),
-    queries: PersonsQueries = Depends(persons_queries),
     repo: PersonRepository = Depends(person_repo),
     audit: AuditRepository = Depends(audit_repo),
 ) -> MergeResponse:
-    """Fusionne une autre personne (source) dans celle-ci (target)."""
-    source_id = body.source_id
-    if source_id == person_id:
-        raise HTTPException(status_code=400, detail="source_id invalide")
+    """Fusionne une autre personne (source) dans celle-ci (target).
 
-    if not queries.person_exists(person_id):
-        raise HTTPException(status_code=404, detail="Personne cible introuvable")
-    if not queries.person_exists(source_id):
-        raise HTTPException(status_code=404, detail="Personne source introuvable")
-
-    person_commands.merge_person(conn, person_id, source_id, repo=repo, audit_repo=audit)
-    return MergeResponse(merged=True, source_id=source_id, target_id=person_id)
+    Renvoie 400 sur deux identifiants égaux, 404 sur une personne introuvable, 409 si chacune porte une fiche RH distincte (`merge_person`).
+    """
+    person_commands.merge_person(conn, person_id, body.source_id, repo=repo, audit_repo=audit)
+    return MergeResponse(merged=True, source_id=body.source_id, target_id=person_id)
 
 
 @router.post("/api/admin/persons/mark-distinct", response_model=OkResponse)

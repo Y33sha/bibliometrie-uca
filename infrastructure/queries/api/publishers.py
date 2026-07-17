@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from sqlalchemy import Connection, select, text
+from sqlalchemy import Connection, text
 
 from application.ports.api.publishers_queries import (
     DocTypeCount,
@@ -20,7 +20,6 @@ from application.ports.api.publishers_queries import (
 from application.ports.api.subjects_queries import SubjectFrequency
 from domain.normalize import normalize_text
 from domain.publishers.publisher import PUBLISHER_TYPE_LABELS_FR, PUBLISHER_TYPES
-from infrastructure.db.tables import publishers as t_publishers
 from infrastructure.queries.filters import publication_in_perimeter
 
 
@@ -321,11 +320,3 @@ class PgPublisherQueries(PublisherQueries):
             {"id": publisher_id, "lim": limit},
         ).all()
         return [SubjectFrequency(id=r.id, label=r.label, count=r.n) for r in rows]
-
-    def existing_publisher_ids(self, publisher_ids: tuple[int, ...]) -> set[int]:
-        if not publisher_ids:
-            return set()
-        result = self._conn.execute(
-            select(t_publishers.c.id).where(t_publishers.c.id.in_(publisher_ids))
-        )
-        return {row.id for row in result}

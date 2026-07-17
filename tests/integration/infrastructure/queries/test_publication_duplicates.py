@@ -47,16 +47,3 @@ class TestNextPubDuplicate:
         )
         res = _q(sa_sync_conn).next_pub_duplicate(min_title_len=30, offset=0)
         assert res.total == 0
-
-
-class TestExistingPublicationIds:
-    def test_returns_only_existing(self, sa_sync_conn):
-        p1 = _create_pub(sa_sync_conn, doi="10.1/a")
-        p2 = _create_pub(sa_sync_conn, doi="10.1/b")
-        _create_pub(sa_sync_conn, doi="10.1/c")
-
-        res = _q(sa_sync_conn).existing_publication_ids((p1, p2, 999_999))
-        assert res == {p1, p2}
-
-    def test_returns_empty_for_empty_input(self, sa_sync_conn):
-        assert _q(sa_sync_conn).existing_publication_ids(()) == set()

@@ -24,7 +24,6 @@ from application.services.publishers.core import (
     update_publisher,
 )
 from domain.errors import (
-    ConflictError,
     NotFoundError,
     PublisherMergeBlockedError,
     ValidationError,
@@ -343,10 +342,36 @@ class TestUpdatePublisher:
 class TestMergePublishers:
     def test_raises_on_self_merge(self, sa_sync_conn, repo, pub_repo, publication_repo):
         p_id = _insert_publisher(sa_sync_conn, "Elsevier")
-        with pytest.raises(ConflictError, match="lui-même"):
+        with pytest.raises(ValidationError, match="lui-même"):
             merge_publishers(
                 p_id,
                 p_id,
+                conn=sa_sync_conn,
+                correction_queries=_CORRECTION_QUERIES,
+                publisher_repo=pub_repo,
+                journal_repo=repo,
+                pub_repo=publication_repo,
+            )
+
+    def test_raises_on_missing_target(self, sa_sync_conn, repo, pub_repo, publication_repo):
+        p_id = _insert_publisher(sa_sync_conn, "Elsevier")
+        with pytest.raises(NotFoundError, match="cible"):
+            merge_publishers(
+                999999,
+                p_id,
+                conn=sa_sync_conn,
+                correction_queries=_CORRECTION_QUERIES,
+                publisher_repo=pub_repo,
+                journal_repo=repo,
+                pub_repo=publication_repo,
+            )
+
+    def test_raises_on_missing_source(self, sa_sync_conn, repo, pub_repo, publication_repo):
+        p_id = _insert_publisher(sa_sync_conn, "Elsevier")
+        with pytest.raises(NotFoundError, match="source"):
+            merge_publishers(
+                p_id,
+                999999,
                 conn=sa_sync_conn,
                 correction_queries=_CORRECTION_QUERIES,
                 publisher_repo=pub_repo,
@@ -551,10 +576,34 @@ class TestMergePublishers:
 class TestMergeJournals:
     def test_raises_on_self_merge(self, sa_sync_conn, repo, publication_repo):
         j_id = _insert_journal(sa_sync_conn, "Nature")
-        with pytest.raises(ConflictError, match="lui-même"):
+        with pytest.raises(ValidationError, match="lui-même"):
             merge_journals(
                 j_id,
                 j_id,
+                conn=sa_sync_conn,
+                correction_queries=_CORRECTION_QUERIES,
+                repo=repo,
+                pub_repo=publication_repo,
+            )
+
+    def test_raises_on_missing_target(self, sa_sync_conn, repo, publication_repo):
+        j_id = _insert_journal(sa_sync_conn, "Nature")
+        with pytest.raises(NotFoundError, match="cible"):
+            merge_journals(
+                999999,
+                j_id,
+                conn=sa_sync_conn,
+                correction_queries=_CORRECTION_QUERIES,
+                repo=repo,
+                pub_repo=publication_repo,
+            )
+
+    def test_raises_on_missing_source(self, sa_sync_conn, repo, publication_repo):
+        j_id = _insert_journal(sa_sync_conn, "Nature")
+        with pytest.raises(NotFoundError, match="source"):
+            merge_journals(
+                j_id,
+                999999,
                 conn=sa_sync_conn,
                 correction_queries=_CORRECTION_QUERIES,
                 repo=repo,

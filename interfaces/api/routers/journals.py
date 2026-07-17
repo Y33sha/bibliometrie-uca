@@ -232,7 +232,6 @@ def merge(
     journal_id: int,
     body: MergeRequest,
     conn: Connection = Depends(db_conn),
-    queries: JournalQueries = Depends(journal_queries),
     repo: JournalRepository = Depends(journal_repo),
     pub_repo: PublicationRepository = Depends(publication_repo),
     audit: AuditRepository = Depends(audit_repo),
@@ -240,14 +239,8 @@ def merge(
 ) -> MergeResponse:
     """Fusionne la revue `source_id` dans la revue `journal_id`.
 
-    Les publications et les métadonnées de la source passent à la cible, puis la source est supprimée. Les publications absorbées sont requalifiées contre le `journal_type` de la cible (`merge_journals`). Renvoie 404 si l'une des deux revues est introuvable.
+    Les publications et les métadonnées de la source passent à la cible, puis la source est supprimée. Les publications absorbées sont requalifiées contre le `journal_type` de la cible (`merge_journals`). Renvoie 400 sur deux identifiants égaux, 404 si l'une des deux revues est introuvable.
     """
-    found = queries.existing_journal_ids((journal_id, body.source_id))
-    if journal_id not in found:
-        raise HTTPException(status_code=404, detail="Revue cible introuvable")
-    if body.source_id not in found:
-        raise HTTPException(status_code=404, detail="Revue source introuvable")
-
     journal_commands.merge_journals(
         conn,
         journal_id,
