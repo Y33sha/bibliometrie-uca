@@ -9,6 +9,8 @@ Ce modèle n'est pas la source de vérité du schéma : les migrations Alembic (
 Le périmètre du metadata s'arrête aux tables et à leurs colonnes. Index, clés étrangères et vues matérialisées (`authorship_structures`, `publication_structures`, `source_authorship_structures`, `subject_cooccurrences`) appartiennent aux seules migrations ; le filtre `include_object` d'`alembic/env.py` les écarte de la comparaison.
 """
 
+from typing import get_args
+
 from sqlalchemy import (
     CHAR,
     BigInteger,
@@ -31,8 +33,15 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import ARRAY, ENUM as PgEnum, JSONB
 
+from domain.journals.journal import JOURNAL_TYPES, OA_MODELS
+from domain.persons.identifiers import AttributionStatus
+from domain.persons.matching import ResolutionMode
+from domain.publications.doc_types import DOC_TYPES
+from domain.publications.metadata import OA_RANK
 from domain.publications.relations import RelationType
+from domain.publishers.publisher import PUBLISHER_TYPES
 from domain.sources.registry import ALL_SOURCES
+from domain.structures.structure import StructureType
 
 metadata = MetaData()
 
@@ -140,53 +149,21 @@ perimeter_structures = Table(
 )
 
 
-# Enum Postgres `structure_type` — déclaré tel quel côté SA pour que les
-# inserts produisent un cast typé (sinon Postgres rejette VARCHAR ↛ enum).
-# `create_type=False` : l'enum est créé par les migrations SQL, pas par SA.
+# Les enums Postgres portent leur type côté SA pour que les binds produisent un cast typé — un
+# paramètre VARCHAR ne rejoint pas une enum — et pour que la lecture reconnaisse la valeur reçue.
+# Leur vocabulaire vient du domaine, qui le déclare ; `create_type=False` laisse les migrations
+# créer le type. `TestPgEnumsMatchDb` vérifie l'accord des trois.
 structure_type_enum = PgEnum(
-    "universite",
-    "chu",
-    "ecole",
-    "labo",
-    "equipe",
-    "site",
-    "autre",
-    "onr",
+    *(t.value for t in StructureType),
     name="structure_type",
     create_type=False,
 )
 
-publisher_type_enum = PgEnum(
-    "commercial",
-    "learned_society",
-    "academic_institution",
-    "repository",
-    "aggregator",
-    "unknown",
-    name="publisher_type",
-    create_type=False,
-)
+publisher_type_enum = PgEnum(*PUBLISHER_TYPES, name="publisher_type", create_type=False)
 
-journal_type_enum = PgEnum(
-    "journal",
-    "proceedings",
-    "repository",
-    "book_series",
-    "preprint_server",
-    "media",
-    "ebook_platform",
-    "unknown",
-    name="journal_type",
-    create_type=False,
-)
+journal_type_enum = PgEnum(*JOURNAL_TYPES, name="journal_type", create_type=False)
 
-oa_model_enum = PgEnum(
-    "subscription",
-    "full_oa",
-    "repository",
-    name="oa_model",
-    create_type=False,
-)
+oa_model_enum = PgEnum(*OA_MODELS, name="oa_model", create_type=False)
 
 
 structures = Table(
@@ -332,13 +309,13 @@ doi_prefixes = Table(
 
 
 identifier_status_enum = PgEnum(
-    "pending",
-    "confirmed",
-    "rejected",
+    *(s.value for s in AttributionStatus),
     name="identifier_status",
     create_type=False,
 )
 
+# Provenance d'un identifiant : posé par une utilisatrice, ou promu depuis les signatures. Le
+# vocabulaire vit ici, le domaine ne le déclarant pas.
 identifier_origin_enum = PgEnum(
     "manual",
     "auto",
@@ -346,58 +323,18 @@ identifier_origin_enum = PgEnum(
     create_type=False,
 )
 
-# Valeurs dérivées du registre : l'enum Postgres est créé par migration
-# (`create_type=False`), et `TestSourcesEnum` compare le registre à la base.
 source_type_enum = PgEnum(*ALL_SOURCES, name="source_type", create_type=False)
 
-oa_type_enum = PgEnum(
-    "gold",
-    "hybrid",
-    "bronze",
-    "green",
-    "closed",
-    "unknown",
-    "diamond",
-    name="oa_type",
-    create_type=False,
-)
+# Tout statut d'accès ouvert est classable par ouverture : les clés d'`OA_RANK` sont le vocabulaire.
+oa_type_enum = PgEnum(*OA_RANK, name="oa_type", create_type=False)
 
 resolution_mode_enum = PgEnum(
-    "identifier",
-    "name",
-    "cross_source",
+    *get_args(ResolutionMode),
     name="resolution_mode",
     create_type=False,
 )
 
-doc_type_enum = PgEnum(
-    "article",
-    "conference_paper",
-    "book",
-    "book_chapter",
-    "thesis",
-    "ongoing_thesis",
-    "preprint",
-    "review",
-    "editorial",
-    "report",
-    "peer_review",
-    "other",
-    "dataset",
-    "software",
-    "patent",
-    "hdr",
-    "memoir",
-    "poster",
-    "letter",
-    "erratum",
-    "retraction",
-    "book_review",
-    "data_paper",
-    "proceedings",
-    name="doc_type",
-    create_type=False,
-)
+doc_type_enum = PgEnum(*DOC_TYPES, name="doc_type", create_type=False)
 
 
 # ── Adresses ──────────────────────────────────────────────────────
