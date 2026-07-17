@@ -16,14 +16,15 @@ from application.pipeline.normalize.normalize_scanr import (
     build_scanr_author_records,
     insert_scanr_document,
 )
+from application.ports.pipeline.normalize.source_publications import SourcePublicationRow
 
 
 class _FakeQueries:
     def __init__(self) -> None:
-        self.upserted_documents: list[dict[str, Any]] = []
+        self.upserted_documents: list[SourcePublicationRow] = []
 
-    def upsert_scanr_source_publication(self, conn, **kw) -> int:
-        self.upserted_documents.append(kw)
+    def upsert_source_publication(self, conn, row) -> int:
+        self.upserted_documents.append(row)
         return 999
 
 
@@ -48,18 +49,17 @@ class TestInsertScanrDocumentBiblio:
             doc,
             staging_id=1,
             scanr_id="sc-1",
-            publication_id=None,
             pub_meta=_EMPTY_PUB_META,
         )
         return queries.upserted_documents[-1]
 
     def test_biblio_none_when_no_source_fields(self):
         captured = self._call(_FakeQueries(), {})
-        assert captured["biblio"] is None
+        assert captured.biblio is None
 
     def test_biblio_publisher_only(self):
         captured = self._call(_FakeQueries(), {"source": {"publisher": "Elsevier"}})
-        assert captured["biblio"] == {"publisher": "Elsevier"}
+        assert captured.biblio == {"publisher": "Elsevier"}
 
     def test_biblio_journal_built_from_title_and_journal_issns(self):
         captured = self._call(
@@ -71,7 +71,7 @@ class TestInsertScanrDocumentBiblio:
                 }
             },
         )
-        assert captured["biblio"] == {
+        assert captured.biblio == {
             "journal": {
                 "title": "Journal of Physics",
                 "issn": "0022-3727",
@@ -90,14 +90,14 @@ class TestInsertScanrDocumentBiblio:
                 }
             },
         )
-        assert captured["biblio"] == {
+        assert captured.biblio == {
             "publisher": "Elsevier",
             "journal": {"title": "Journal of Physics", "issn": "0022-3727"},
         }
 
     def test_biblio_journal_title_only(self):
         captured = self._call(_FakeQueries(), {"source": {"title": "J. Phys."}})
-        assert captured["biblio"] == {"journal": {"title": "J. Phys."}}
+        assert captured.biblio == {"journal": {"title": "J. Phys."}}
 
 
 class TestInsertScanrDocumentExternalIds:
@@ -109,7 +109,6 @@ class TestInsertScanrDocumentExternalIds:
             doc,
             staging_id=1,
             scanr_id="sc-1",
-            publication_id=None,
             pub_meta=pub_meta,
         )
         return queries.upserted_documents[-1]
@@ -123,12 +122,12 @@ class TestInsertScanrDocumentExternalIds:
             ]
         }
         captured = self._call(doc, {**_EMPTY_PUB_META, "doi": "10.1/primary"})
-        assert captured["external_ids"]["related_dois"] == ["10.2/anie"]
+        assert captured.external_ids["related_dois"] == ["10.2/anie"]
 
     def test_related_dois_absent_when_only_primary(self):
         doc = {"externalIds": [{"type": "doi", "id": "10.1/primary"}]}
         captured = self._call(doc, {**_EMPTY_PUB_META, "doi": "10.1/primary"})
-        assert "related_dois" not in (captured["external_ids"] or {})
+        assert "related_dois" not in (captured.external_ids or {})
 
 
 # ── build_scanr_author_records (parsing pur) ─────────────────────

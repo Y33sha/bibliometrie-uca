@@ -22,6 +22,7 @@ from application.pipeline.normalize.normalize_theses import (
     process_authorships,
     process_work,
 )
+from application.ports.pipeline.normalize.source_publications import SourcePublicationRow
 from application.ports.pipeline.normalize.staging import StagingRow
 
 # ── Stubs ────────────────────────────────────────────────────────
@@ -33,24 +34,26 @@ def _staging_row(staging_id=1, theses_id="2024CLFAC001", raw=None):
 
 class _FakeQueries:
     def __init__(self) -> None:
-        self.cleared_for: list[int] = []
-        self.upserted_authorships: list[dict[str, Any]] = []
-        self.upserted_documents: list[dict[str, Any]] = []
-        self.count_table_returns: dict[str, int] = {}
+        self.upserted_documents: list[SourcePublicationRow] = []
 
-    def upsert_theses_source_publication(self, conn, **kw) -> int:
-        self.upserted_documents.append(kw)
+    def upsert_source_publication(self, conn, row) -> int:
+        self.upserted_documents.append(row)
         return 999
 
-    def upsert_theses_source_authorship(self, conn, **kw) -> int:
-        self.upserted_authorships.append(kw)
-        return 100 + len(self.upserted_authorships)
+
+class _FakeBatchQueries:
+    """Stub du port partagé des authorships — theses y écrit ses signatures une par une."""
+
+    def __init__(self) -> None:
+        self.cleared_for: list[int] = []
+        self.upserted_authorships: list[dict[str, Any]] = []
 
     def clear_source_authorships_for_publication(self, conn, source_publication_id: int) -> None:
         self.cleared_for.append(source_publication_id)
 
-    def count_theses_table(self, conn, table: str) -> int:
-        return self.count_table_returns.get(table, 0)
+    def upsert_source_authorship(self, conn, item) -> int:
+        self.upserted_authorships.append(item)
+        return 100 + len(self.upserted_authorships)
 
 
 class _FakeStagingQueries:
@@ -184,7 +187,6 @@ class TestInsertSourceDocument:
             these,
             staging_id=1,
             theses_id="2024CLFAC001",
-            publication_id=None,
             pub_meta=pub_meta or self._pub_meta(),
         )
         return queries.upserted_documents[-1]
@@ -192,28 +194,28 @@ class TestInsertSourceDocument:
     def test_nnt_goes_in_external_ids(self):
         queries = _FakeQueries()
         captured = self._call(queries, {}, pub_meta=self._pub_meta(nnt="2024CLFAC001"))
-        assert captured["external_ids"] == {"nnt": "2024CLFAC001"}
+        assert captured.external_ids == {"nnt": "2024CLFAC001"}
 
     def test_no_nnt_no_external_ids(self):
         queries = _FakeQueries()
         captured = self._call(queries, {})
-        assert captured["external_ids"] is None
+        assert captured.external_ids is None
 
     def test_keywords_from_sujets(self):
         queries = _FakeQueries()
         these = {"sujets": [{"libelle": "machine learning"}, {"libelle": "NLP"}, {}]}
         captured = self._call(queries, these)
-        assert captured["keywords"] == ["machine learning", "NLP"]
+        assert captured.keywords == ["machine learning", "NLP"]
 
     def test_no_keywords(self):
         queries = _FakeQueries()
         captured = self._call(queries, {})
-        assert captured["keywords"] is None
+        assert captured.keywords is None
 
     def test_topics_discipline_only(self):
         queries = _FakeQueries()
         captured = self._call(queries, {"discipline": "Informatique"})
-        assert captured["topics_json"] == {"discipline": "Informatique"}
+        assert captured.topics == {"discipline": "Informatique"}
 
     def test_topics_with_rameau(self):
         queries = _FakeQueries()
@@ -222,7 +224,7 @@ class TestInsertSourceDocument:
             "sujetsRameau": [{"libelle": "Apprentissage automatique"}, {}],
         }
         captured = self._call(queries, these)
-        assert captured["topics_json"] == {
+        assert captured.topics == {
             "discipline": "Informatique",
             "rameau": ["Apprentissage automatique"],
         }
@@ -230,17 +232,17 @@ class TestInsertSourceDocument:
     def test_no_topics(self):
         queries = _FakeQueries()
         captured = self._call(queries, {})
-        assert captured["topics_json"] is None
+        assert captured.topics is None
 
     def test_source_meta_passed(self):
         queries = _FakeQueries()
         captured = self._call(queries, {"dateSoutenance": "15/03/2024"})
-        assert captured["source_meta_json"] == {"date_soutenance": "2024-03-15"}
+        assert captured.meta == {"date_soutenance": "2024-03-15"}
 
     def test_title_empty_string_when_none(self):
         queries = _FakeQueries()
         captured = self._call(queries, {}, pub_meta=self._pub_meta(title=None))
-        assert captured["title"] == ""
+        assert captured.title == ""
 
 
 # ── process_authorships ──────────────────────────────────────────────
@@ -274,10 +276,10 @@ class TestProcessPersons:
     def test_no_authors_no_upsert(self, monkeypatch):
         monkeypatch.setattr(normalize_theses, "aggregate_thesis_persons", lambda these: [])
         calls = _spy_write_addresses(monkeypatch)
-        queries = _FakeQueries()
-        process_authorships(MagicMock(), queries, {}, 10, batch_queries=MagicMock())
-        assert queries.cleared_for == [10]
-        assert queries.upserted_authorships == []
+        batch = _FakeBatchQueries()
+        process_authorships(MagicMock(), {}, 10, batch_queries=batch)
+        assert batch.cleared_for == [10]
+        assert batch.upserted_authorships == []
         assert calls == []
 
     def test_with_authors(self, monkeypatch):
@@ -290,30 +292,30 @@ class TestProcessPersons:
             ],
         )
         _spy_write_addresses(monkeypatch)
-        queries = _FakeQueries()
-        process_authorships(MagicMock(), queries, {}, 10, batch_queries=MagicMock())
-        assert len(queries.upserted_authorships) == 2
-        assert queries.upserted_authorships[0]["person_identifiers"] == {"idref": "123"}
+        batch = _FakeBatchQueries()
+        process_authorships(MagicMock(), {}, 10, batch_queries=batch)
+        assert len(batch.upserted_authorships) == 2
+        assert batch.upserted_authorships[0]["person_identifiers"] == {"idref": "123"}
         # `None` quand l'aggregate n'a pas d'identifiants.
-        assert queries.upserted_authorships[1]["person_identifiers"] is None
+        assert batch.upserted_authorships[1]["person_identifiers"] is None
 
     def test_partenaires_become_addr_parts(self, monkeypatch):
         monkeypatch.setattr(normalize_theses, "aggregate_thesis_persons", lambda these: [_Author()])
         calls = _spy_write_addresses(monkeypatch)
-        queries = _FakeQueries()
+        batch = _FakeBatchQueries()
         these = {"partenairesDeRecherche": [{"nom": "LIMOS"}, {"nom": "LRL"}, {}]}
-        process_authorships(MagicMock(), queries, these, 10, batch_queries=MagicMock())
+        process_authorships(MagicMock(), these, 10, batch_queries=batch)
         assert _addr_texts(calls[0]) == [(101, ["LIMOS", "LRL"])]
 
     def test_etablissement_appended_to_addr_parts(self, monkeypatch):
         monkeypatch.setattr(normalize_theses, "aggregate_thesis_persons", lambda these: [_Author()])
         calls = _spy_write_addresses(monkeypatch)
-        queries = _FakeQueries()
+        batch = _FakeBatchQueries()
         these = {
             "partenairesDeRecherche": [{"nom": "LIMOS"}],
             "etabSoutenanceN": "Université Clermont Auvergne (2021-...)",
         }
-        process_authorships(MagicMock(), queries, these, 10, batch_queries=MagicMock())
+        process_authorships(MagicMock(), these, 10, batch_queries=batch)
         assert _addr_texts(calls[0]) == [
             (101, ["LIMOS", "Université Clermont Auvergne (2021-...)"])
         ]
@@ -322,16 +324,16 @@ class TestProcessPersons:
         """Sans partenaire, l'établissement de soutenance suffit à poser une adresse (→ rattachement périmètre des thèses)."""
         monkeypatch.setattr(normalize_theses, "aggregate_thesis_persons", lambda these: [_Author()])
         calls = _spy_write_addresses(monkeypatch)
-        queries = _FakeQueries()
+        batch = _FakeBatchQueries()
         these = {"etabSoutenanceN": "Université Clermont Auvergne (2021-...)"}
-        process_authorships(MagicMock(), queries, these, 10, batch_queries=MagicMock())
+        process_authorships(MagicMock(), these, 10, batch_queries=batch)
         assert _addr_texts(calls[0]) == [(101, ["Université Clermont Auvergne (2021-...)"])]
 
     def test_no_partenaires_no_link(self, monkeypatch):
         monkeypatch.setattr(normalize_theses, "aggregate_thesis_persons", lambda these: [_Author()])
         calls = _spy_write_addresses(monkeypatch)
-        queries = _FakeQueries()
-        process_authorships(MagicMock(), queries, {}, 10, batch_queries=MagicMock())
+        batch = _FakeBatchQueries()
+        process_authorships(MagicMock(), {}, 10, batch_queries=batch)
         assert calls == []
 
 
@@ -404,14 +406,3 @@ class TestThesesNormalizerClass:
         monkeypatch.setattr(normalize_theses, "process_work", lambda *a, **kw: True)
         result = norm.process_work(MagicMock(), _staging_row())
         assert result is True
-
-    def test_summary_stats_returns_2_lines(self):
-        norm = _make_normalizer()
-        norm._queries.count_table_returns = {  # type: ignore[attr-defined]
-            "source_publications": 100,
-            "source_authorships": 250,
-        }
-        lines = norm.summary_stats(MagicMock())
-        assert len(lines) == 2
-        assert "100" in lines[0]
-        assert "250" in lines[1]

@@ -18,7 +18,7 @@ class SourcePublicationRow:
 
     Le jeu de colonnes est commun à toutes les sources ; celles qu'une source ne renseigne pas restent à `None`. Cette absence reflète ce que la source expose : theses.fr ne fournit pas de résumé, HAL et theses.fr pas de compte de citations, `hal_collections` et `embargo_until` n'existent que pour HAL, `is_retracted` que pour OpenAlex.
 
-    `title_normalized` n'est pas un champ : il se dérive de `title` au moment de l'écriture.
+    Deux colonnes de `source_publications` n'y figurent pas. `title_normalized` se dérive de `title` au moment de l'écriture. `publication_id` est le rattachement à la publication canonique, que la phase `publications` pose et que l'import ne connaît pas.
     """
 
     # Identité de l'enregistrement source
@@ -28,7 +28,6 @@ class SourcePublicationRow:
     staging_id: int
 
     # Rattachement
-    publication_id: int | None = None
     doi: str | None = None
     external_ids: JsonValue = None
 

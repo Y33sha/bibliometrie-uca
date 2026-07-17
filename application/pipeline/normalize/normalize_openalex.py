@@ -13,7 +13,10 @@ from application.pipeline.normalize._authorships_batch import (
 from application.pipeline.normalize.base import SourceNormalizer
 from application.pipeline.timings import StepTimer
 from application.ports.pipeline.normalize.authorships import AuthorshipsBatchQueries
-from application.ports.pipeline.normalize.openalex import OpenalexNormalizeQueries
+from application.ports.pipeline.normalize.source_publications import (
+    SourcePublicationQueries,
+    SourcePublicationRow,
+)
 from application.ports.pipeline.normalize.staging import StagingQueries, StagingRow
 from application.ports.repositories.journal_repository import JournalRepository
 from application.ports.repositories.publication_repository import PublicationRepository
@@ -215,10 +218,9 @@ def extract_pub_metadata(
 
 def insert_openalex_document(
     conn: Connection,
-    queries: OpenalexNormalizeQueries,
+    queries: SourcePublicationQueries,
     work: dict,
     staging_id: int,
-    publication_id: int | None,
     pub_meta: dict,
     primary: OpenalexLocation | None = None,
 ) -> int:
@@ -301,27 +303,29 @@ def insert_openalex_document(
     topics = extract_topics(work)
     topics_json = topics if topics else None
 
-    return queries.upsert_openalex_source_publication(
+    return queries.upsert_source_publication(
         conn,
-        openalex_id=openalex_id,
-        doi=pub_meta["doi"],
-        title=pub_meta["title"],
-        pub_year=pub_meta["pub_year"],
-        doc_type=pub_meta["doc_type"],
-        publication_id=publication_id,
-        staging_id=staging_id,
-        external_ids=external_ids or None,
-        urls=urls or None,
-        cited_by_count=cited_by_count,
-        journal_id=pub_meta["journal_id"],
-        oa_status=pub_meta["oa_status"],
-        language=pub_meta["language"],
-        container_title=pub_meta["container_title"],
-        is_retracted=is_retracted,
-        biblio=biblio_json,
-        abstract=abstract,
-        keywords=keywords,
-        topics_json=topics_json,
+        SourcePublicationRow(
+            source="openalex",
+            source_id=openalex_id,
+            staging_id=staging_id,
+            doi=pub_meta["doi"],
+            external_ids=external_ids or None,
+            title=pub_meta["title"],
+            pub_year=pub_meta["pub_year"],
+            doc_type=pub_meta["doc_type"],
+            journal_id=pub_meta["journal_id"],
+            container_title=pub_meta["container_title"],
+            language=pub_meta["language"],
+            biblio=biblio_json,
+            abstract=abstract,
+            keywords=keywords,
+            topics=topics_json,
+            oa_status=pub_meta["oa_status"],
+            urls=urls or None,
+            cited_by_count=cited_by_count,
+            is_retracted=is_retracted,
+        ),
     )
 
 
@@ -416,7 +420,7 @@ def process_authorships(
 
 def process_work(
     conn: Connection,
-    queries: OpenalexNormalizeQueries,
+    queries: SourcePublicationQueries,
     logger: logging.Logger,
     staging_row: StagingRow,
     *,
@@ -445,7 +449,7 @@ def process_work(
     pub_meta = extract_pub_metadata(work, journal_id, primary)
 
     source_publication_id = insert_openalex_document(
-        conn, queries, work, staging_id, None, pub_meta, primary
+        conn, queries, work, staging_id, pub_meta, primary
     )
     t.mark("oa_doc")
 
@@ -466,7 +470,7 @@ class OpenalexNormalizer(SourceNormalizer):
         conn: Connection,
         logger: logging.Logger,
         staging_queries: StagingQueries,
-        queries: OpenalexNormalizeQueries,
+        queries: SourcePublicationQueries,
         journal_repo_factory: Callable[[Connection], JournalRepository],
         publisher_repo_factory: Callable[[Connection], PublisherRepository],
         pub_repo_factory: Callable[[Connection], PublicationRepository],
@@ -504,9 +508,3 @@ class OpenalexNormalizer(SourceNormalizer):
             staging_queries=self._staging,
             authorship_queries=self._authorship_queries,
         )
-
-    def summary_stats(self, conn: Connection) -> list[str]:
-        return [
-            f"  source_publications (openalex) : "
-            f"{self._queries.count_openalex_table(conn, 'source_publications')} enregistrements"
-        ]

@@ -774,7 +774,7 @@ class TestUpsertWrappers:
 class TestInsertWosDocument:
     def test_forwards_pub_meta_and_rec_extras_to_queries(self):
         queries = MagicMock()
-        queries.upsert_wos_source_publication.return_value = 555
+        queries.upsert_source_publication.return_value = 555
         rec = {
             "ut": "WOS:1",
             "abstract": "abs",
@@ -796,28 +796,25 @@ class TestInsertWosDocument:
             "container_title": None,
         }
 
-        result = insert_wos_document(
-            None, queries, rec, staging_id=10, publication_id=None, pub_meta=pub_meta
-        )
+        result = insert_wos_document(None, queries, rec, staging_id=10, pub_meta=pub_meta)
 
         assert result == 555
-        kwargs = queries.upsert_wos_source_publication.call_args.kwargs
-        assert kwargs["ut"] == "WOS:1"
-        assert kwargs["doi"] == "10.1/x"
-        assert kwargs["title"] == "T"
-        assert kwargs["pub_year"] == 2024
-        assert kwargs["doc_type"] == "article"
-        assert kwargs["journal_id"] == 42
-        assert kwargs["oa_status"] == "gold"
-        assert kwargs["language"] == "en"
-        assert kwargs["abstract"] == "abs"
-        assert kwargs["cited_by_count"] == 9
-        assert kwargs["staging_id"] == 10
-        assert kwargs["publication_id"] is None
+        row_arg = queries.upsert_source_publication.call_args.args[1]
+        assert row_arg.source_id == "WOS:1"
+        assert row_arg.doi == "10.1/x"
+        assert row_arg.title == "T"
+        assert row_arg.pub_year == 2024
+        assert row_arg.doc_type == "article"
+        assert row_arg.journal_id == 42
+        assert row_arg.oa_status == "gold"
+        assert row_arg.language == "en"
+        assert row_arg.abstract == "abs"
+        assert row_arg.cited_by_count == 9
+        assert row_arg.staging_id == 10
 
     def test_none_pub_meta_values_propagate(self):
         queries = MagicMock()
-        queries.upsert_wos_source_publication.return_value = 1
+        queries.upsert_source_publication.return_value = 1
         rec = {"ut": "WOS:1"}
         pub_meta = {
             "doi": None,
@@ -829,14 +826,12 @@ class TestInsertWosDocument:
             "language": None,
             "container_title": None,
         }
-        insert_wos_document(
-            None, queries, rec, staging_id=5, publication_id=None, pub_meta=pub_meta
-        )
+        insert_wos_document(None, queries, rec, staging_id=5, pub_meta=pub_meta)
 
-        kwargs = queries.upsert_wos_source_publication.call_args.kwargs
-        assert kwargs["journal_id"] is None
-        assert kwargs["oa_status"] is None
-        assert kwargs["doi"] is None
+        row_arg = queries.upsert_source_publication.call_args.args[1]
+        assert row_arg.journal_id is None
+        assert row_arg.oa_status is None
+        assert row_arg.doi is None
 
 
 # ── build_wos_author_records (parsing pur) ───────────────────────
@@ -943,7 +938,7 @@ class TestProcessRecord:
         monkeypatch.setattr(normalize_wos, "find_or_create_journal", lambda *a, **kw: 22)
 
         queries = MagicMock()
-        queries.upsert_wos_source_publication.return_value = 555
+        queries.upsert_source_publication.return_value = 555
         staging_queries = MagicMock()
         authorship_queries = MagicMock()
 
@@ -992,11 +987,11 @@ class TestProcessRecord:
 
         queries = MagicMock()
 
-        def capture_ut(conn, **kwargs):
-            captured["ut"] = kwargs["ut"]
+        def capture_ut(conn, row_arg):
+            captured["ut"] = row_arg.source_id
             return 42
 
-        queries.upsert_wos_source_publication.side_effect = capture_ut
+        queries.upsert_source_publication.side_effect = capture_ut
 
         row = _staging_row(staging_id=1, ut="WOS:fallback", doi=None)
         process_record(

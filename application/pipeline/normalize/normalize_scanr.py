@@ -13,7 +13,10 @@ from application.pipeline.normalize._authorships_batch import (
 from application.pipeline.normalize.base import SourceNormalizer
 from application.pipeline.timings import StepTimer
 from application.ports.pipeline.normalize.authorships import AuthorshipsBatchQueries
-from application.ports.pipeline.normalize.scanr import ScanrNormalizeQueries
+from application.ports.pipeline.normalize.source_publications import (
+    SourcePublicationQueries,
+    SourcePublicationRow,
+)
 from application.ports.pipeline.normalize.staging import StagingQueries, StagingRow
 from application.ports.repositories.journal_repository import JournalRepository
 from application.ports.repositories.publication_repository import PublicationRepository
@@ -119,11 +122,10 @@ def extract_pub_metadata(doc: dict, journal_id: int | None, scanr_id: str | None
 
 def insert_scanr_document(
     conn: Connection,
-    queries: ScanrNormalizeQueries,
+    queries: SourcePublicationQueries,
     doc: dict,
     staging_id: int,
     scanr_id: str,
-    publication_id: int | None,
     pub_meta: dict,
 ) -> int:
     """Crée/retrouve l'entrée source_publications pour ScanR.
@@ -207,26 +209,28 @@ def insert_scanr_document(
         biblio["journal"] = journal_obj
     biblio_json = biblio if biblio else None
 
-    return queries.upsert_scanr_source_publication(
+    return queries.upsert_source_publication(
         conn,
-        scanr_id=scanr_id,
-        doi=pub_meta["doi"],
-        title=pub_meta["title"] or "",
-        pub_year=pub_meta["pub_year"],
-        doc_type=pub_meta["doc_type"],
-        publication_id=publication_id,
-        staging_id=staging_id,
-        external_ids=external_ids,
-        journal_id=pub_meta["journal_id"],
-        oa_status=pub_meta["oa_status"],
-        language=pub_meta["language"],
-        container_title=pub_meta["container_title"],
-        abstract=abstract,
-        keywords=keywords,
-        topics=topics,
-        cited_by_count=cited_by_count,
-        urls=urls or None,
-        biblio=biblio_json,
+        SourcePublicationRow(
+            source="scanr",
+            source_id=scanr_id,
+            staging_id=staging_id,
+            doi=pub_meta["doi"],
+            external_ids=external_ids,
+            title=pub_meta["title"] or "",
+            pub_year=pub_meta["pub_year"],
+            doc_type=pub_meta["doc_type"],
+            journal_id=pub_meta["journal_id"],
+            container_title=pub_meta["container_title"],
+            language=pub_meta["language"],
+            biblio=biblio_json,
+            abstract=abstract,
+            keywords=keywords,
+            topics=topics,
+            oa_status=pub_meta["oa_status"],
+            urls=urls or None,
+            cited_by_count=cited_by_count,
+        ),
     )
 
 
@@ -302,7 +306,7 @@ def process_authorships(
 
 def process_work(
     conn: Connection,
-    queries: ScanrNormalizeQueries,
+    queries: SourcePublicationQueries,
     logger: logging.Logger,
     staging_row: StagingRow,
     *,
@@ -331,7 +335,7 @@ def process_work(
     pub_meta = extract_pub_metadata(doc, journal_id, scanr_id)
 
     source_publication_id = insert_scanr_document(
-        conn, queries, doc, staging_id, scanr_id, None, pub_meta
+        conn, queries, doc, staging_id, scanr_id, pub_meta
     )
     t.mark("scanr_doc")
 
@@ -353,7 +357,7 @@ class ScanrNormalizer(SourceNormalizer):
         conn: Connection,
         logger: logging.Logger,
         staging_queries: StagingQueries,
-        queries: ScanrNormalizeQueries,
+        queries: SourcePublicationQueries,
         journal_repo_factory: Callable[[Connection], JournalRepository],
         publisher_repo_factory: Callable[[Connection], PublisherRepository],
         pub_repo_factory: Callable[[Connection], PublicationRepository],

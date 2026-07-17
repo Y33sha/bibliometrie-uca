@@ -16,8 +16,11 @@ from application.pipeline.normalize._authorships_batch import AddressRecord, wri
 from application.pipeline.normalize.base import SourceNormalizer
 from application.pipeline.timings import StepTimer
 from application.ports.pipeline.normalize.authorships import AuthorshipsBatchQueries
+from application.ports.pipeline.normalize.source_publications import (
+    SourcePublicationQueries,
+    SourcePublicationRow,
+)
 from application.ports.pipeline.normalize.staging import StagingQueries, StagingRow
-from application.ports.pipeline.normalize.theses import ThesesNormalizeQueries
 from application.ports.repositories.publication_repository import PublicationRepository
 from domain.dates import french_date_to_iso
 from domain.normalize import normalize_name_form
@@ -101,11 +104,10 @@ def _build_source_meta(these: dict) -> dict | None:
 
 def insert_source_document(
     conn: Connection,
-    queries: ThesesNormalizeQueries,
+    queries: SourcePublicationQueries,
     these: dict,
     staging_id: int,
     theses_id: str,
-    publication_id: int | None,
     pub_meta: dict,
 ) -> int:
     """Crée/retrouve l'entrée source_publications pour theses.fr.
@@ -134,23 +136,25 @@ def insert_source_document(
     source_meta = _build_source_meta(these)
     source_meta_json = source_meta if source_meta else None
 
-    return queries.upsert_theses_source_publication(
+    return queries.upsert_source_publication(
         conn,
-        theses_id=theses_id,
-        doi=pub_meta["doi"],
-        title=pub_meta["title"] or "",
-        pub_year=pub_meta["pub_year"],
-        doc_type=pub_meta["doc_type"],
-        publication_id=publication_id,
-        staging_id=staging_id,
-        external_ids=external_ids,
-        journal_id=pub_meta["journal_id"],
-        oa_status=pub_meta["oa_status"],
-        language=pub_meta["language"],
-        container_title=pub_meta["container_title"],
-        keywords=keywords,
-        topics_json=topics_json,
-        source_meta_json=source_meta_json,
+        SourcePublicationRow(
+            source="theses",
+            source_id=theses_id,
+            staging_id=staging_id,
+            doi=pub_meta["doi"],
+            external_ids=external_ids,
+            title=pub_meta["title"] or "",
+            pub_year=pub_meta["pub_year"],
+            doc_type=pub_meta["doc_type"],
+            journal_id=pub_meta["journal_id"],
+            container_title=pub_meta["container_title"],
+            language=pub_meta["language"],
+            keywords=keywords,
+            topics=topics_json,
+            oa_status=pub_meta["oa_status"],
+            meta=source_meta_json,
+        ),
     )
 
 
@@ -161,14 +165,13 @@ def insert_source_document(
 
 def process_authorships(
     conn: Connection,
-    queries: ThesesNormalizeQueries,
     these: dict,
     source_publication_id: int,
     *,
     batch_queries: AuthorshipsBatchQueries,
 ) -> None:
     """Traite tous les rôles d'une thèse (auteurs, directeurs, rapporteurs, jury, président) en consommant `aggregate_thesis_persons` côté domain pour la déduplication multi-rôles + fusion + assignation de position."""
-    queries.clear_source_authorships_for_publication(conn, source_publication_id)
+    batch_queries.clear_source_authorships_for_publication(conn, source_publication_id)
 
     authorships = aggregate_thesis_persons(these)
 
@@ -184,14 +187,18 @@ def process_authorships(
     # Les `sa_id` récoltés portent tous les mêmes adresses document, écrites en un seul `write_addresses`.
     sa_addresses: list[tuple[int | None, list[AddressRecord]]] = []
     for a in authorships:
-        sa_id = queries.upsert_theses_source_authorship(
+        sa_id = batch_queries.upsert_source_authorship(
             conn,
-            source_publication_id=source_publication_id,
-            author_position=a.author_position,
-            roles=a.roles,
-            raw_author_name=a.raw_author_name,
-            author_name_normalized=normalize_name_form(a.raw_author_name),
-            person_identifiers=a.person_identifiers if a.person_identifiers else None,
+            {
+                "source": "theses",
+                "source_publication_id": source_publication_id,
+                "author_position": a.author_position,
+                "author_name_normalized": normalize_name_form(a.raw_author_name),
+                "is_corresponding": False,
+                "roles": a.roles,
+                "raw_author_name": a.raw_author_name,
+                "person_identifiers": a.person_identifiers if a.person_identifiers else None,
+            },
         )
         sa_addresses.append((sa_id, shared_addresses))
 
@@ -206,7 +213,7 @@ def process_authorships(
 
 def process_work(
     conn: Connection,
-    queries: ThesesNormalizeQueries,
+    queries: SourcePublicationQueries,
     logger: logging.Logger,
     staging_row: StagingRow,
     *,
@@ -229,11 +236,11 @@ def process_work(
     pub_meta = extract_pub_metadata(these)
 
     source_publication_id = insert_source_document(
-        conn, queries, these, staging_id, theses_id, None, pub_meta
+        conn, queries, these, staging_id, theses_id, pub_meta
     )
     t.mark("theses_doc")
 
-    process_authorships(conn, queries, these, source_publication_id, batch_queries=batch_queries)
+    process_authorships(conn, these, source_publication_id, batch_queries=batch_queries)
     t.mark("authorships")
 
     staging_queries.mark_done(conn, staging_id)
@@ -251,7 +258,7 @@ class ThesesNormalizer(SourceNormalizer):
         conn: Connection,
         logger: logging.Logger,
         staging_queries: StagingQueries,
-        queries: ThesesNormalizeQueries,
+        queries: SourcePublicationQueries,
         pub_repo_factory: Callable[[Connection], PublicationRepository],
         batch_queries: AuthorshipsBatchQueries,
     ) -> None:
@@ -275,9 +282,3 @@ class ThesesNormalizer(SourceNormalizer):
             staging_queries=self._staging,
             batch_queries=self._batch_queries,
         )
-
-    def summary_stats(self, conn: Connection) -> list[str]:
-        return [
-            f"  {table} (theses) : {self._queries.count_theses_table(conn, table)}"
-            for table in ("source_publications", "source_authorships")
-        ]

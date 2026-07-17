@@ -4,9 +4,7 @@ Implémente `application.ports.pipeline.normalize.source_publications.SourcePubl
 
 Une `source_publication` est la vue normalisée d'un import : le dernier import fait autorité. L'UPSERT réécrit donc toutes les colonnes de l'enregistrement depuis la ligne fournie, sans conserver de valeur antérieure. Seule l'identité `(source, source_id)` traverse les imports, ce qui maintient l'`id` de la ligne stable pour les tables qui la référencent — d'où l'UPSERT plutôt qu'un DELETE suivi d'un INSERT.
 
-`publication_id` suit la même règle : `keys_dirty` repasse à `true` à chaque écriture, et la phase `publications` recalcule le rattachement des lignes marquées.
-
-Les colonnes absentes de la ligne ne sont pas touchées : le cache `countries`, alimenté par la phase du même nom, et `created_at` traversent l'UPSERT.
+L'écriture ne porte que sur les colonnes de la ligne : celles qu'aucun import ne renseigne traversent l'UPSERT intactes. C'est le cas de `publication_id`, que la phase `publications` pose et recalcule pour les lignes marquées `keys_dirty` — ce que chaque écriture fait ici. C'est aussi le cas du cache `countries`, alimenté par la phase du même nom, et de `created_at`.
 """
 
 from dataclasses import fields

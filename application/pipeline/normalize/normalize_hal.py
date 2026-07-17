@@ -15,7 +15,10 @@ from application.pipeline.normalize._authorships_batch import (
 from application.pipeline.normalize.base import SourceNormalizer
 from application.pipeline.timings import StepTimer
 from application.ports.pipeline.normalize.authorships import AuthorshipsBatchQueries
-from application.ports.pipeline.normalize.hal import HalNormalizeQueries
+from application.ports.pipeline.normalize.source_publications import (
+    SourcePublicationQueries,
+    SourcePublicationRow,
+)
 from application.ports.pipeline.normalize.staging import StagingQueries, StagingRow
 from application.ports.repositories.journal_repository import JournalRepository
 from application.ports.repositories.publication_repository import PublicationRepository
@@ -161,11 +164,10 @@ def build_hal_external_ids(doc: dict, hal_id: str, nnt: str | None) -> dict[str,
 
 def insert_hal_document(
     conn: Connection,
-    queries: HalNormalizeQueries,
+    queries: SourcePublicationQueries,
     doc: dict,
     staging_id: int,
     hal_id: str,
-    publication_id: int | None,
     pub_meta: dict,
 ) -> int:
     """Crée/retrouve l'entrée source_publications pour HAL.
@@ -227,27 +229,29 @@ def insert_hal_document(
     uri = as_str(doc.get("uri_s"))
     urls = [uri] if uri else None
 
-    return queries.upsert_hal_source_publication(
+    return queries.upsert_source_publication(
         conn,
-        hal_id=hal_id,
-        doi=pub_meta["doi"],
-        title=pub_meta["title"] or "",
-        pub_year=pub_meta["pub_year"],
-        doc_type=pub_meta["doc_type"],
-        hal_collections=collections_array,
-        publication_id=publication_id,
-        staging_id=staging_id,
-        external_ids=external_ids,
-        journal_id=pub_meta["journal_id"],
-        oa_status=pub_meta["oa_status"],
-        embargo_until=pub_meta["embargo_until"],
-        language=pub_meta["language"],
-        container_title=pub_meta["container_title"],
-        abstract=abstract,
-        keywords=keywords,
-        topics=topics,
-        biblio=biblio_json,
-        urls=urls,
+        SourcePublicationRow(
+            source="hal",
+            source_id=hal_id,
+            staging_id=staging_id,
+            doi=pub_meta["doi"],
+            external_ids=external_ids,
+            title=pub_meta["title"] or "",
+            pub_year=pub_meta["pub_year"],
+            doc_type=pub_meta["doc_type"],
+            journal_id=pub_meta["journal_id"],
+            container_title=pub_meta["container_title"],
+            language=pub_meta["language"],
+            biblio=biblio_json,
+            abstract=abstract,
+            keywords=keywords,
+            topics=topics,
+            oa_status=pub_meta["oa_status"],
+            urls=urls,
+            embargo_until=pub_meta["embargo_until"],
+            hal_collections=collections_array,
+        ),
     )
 
 
@@ -496,7 +500,7 @@ def process_authorships(
 
 def process_work(
     conn: Connection,
-    queries: HalNormalizeQueries,
+    queries: SourcePublicationQueries,
     logger: logging.Logger,
     staging_row: StagingRow,
     *,
@@ -542,7 +546,6 @@ def process_work(
         doc,
         staging_id,
         hal_id,
-        None,
         pub_meta,
     )
     t.mark("hal_doc")
@@ -565,7 +568,7 @@ class HalNormalizer(SourceNormalizer):
         conn: Connection,
         logger: logging.Logger,
         staging_queries: StagingQueries,
-        queries: HalNormalizeQueries,
+        queries: SourcePublicationQueries,
         journal_repo_factory: Callable[[Connection], JournalRepository],
         publisher_repo_factory: Callable[[Connection], PublisherRepository],
         pub_repo_factory: Callable[[Connection], PublicationRepository],
