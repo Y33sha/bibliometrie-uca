@@ -337,15 +337,13 @@ def hal_status_clause(values: list[str], lab_hal_col: str | None) -> WhereClause
 
 
 def apc_clause(
-    has_apc: list[str], apc_structure_ids: list[int], lab_ids: list[int] | None = None
+    has_apc: list[str], perimeter_structure_ids: list[int], lab_ids: list[int] | None = None
 ) -> WhereClause | None:
     """Filtre des publications par origine du paiement APC.
 
-    `apc_structure_ids` = structures considérées comme "internes" pour la
-    catégorisation APC (typiquement le périmètre `perimeter_persons` :
-    UCA + ses labos + tutelles). Une publication APC est classée "uca"
-    si au moins un de ses `apc_payments.budget_structure_id` est dans
-    cet ensemble.
+    `perimeter_structure_ids` = les structures du périmètre `persons`, que les adapters
+    résolvent et qui tiennent lieu de structures « internes » : une publication APC est
+    classée "uca" quand au moins un de ses `apc_payments.budget_structure_id` s'y trouve.
 
     Tous les usages partagent le bind `:flt_apc_root_ids` ; ceux de
     `lab_ids` partagent `:flt_apc_lab_ids`.
@@ -398,7 +396,7 @@ def apc_clause(
         return None
     binds: dict[str, Any] = {}
     if needs_root:
-        binds["flt_apc_root_ids"] = apc_structure_ids
+        binds["flt_apc_root_ids"] = perimeter_structure_ids
     if needs_lab:
         binds["flt_apc_lab_ids"] = lab_ids
     if len(parts) == 1:

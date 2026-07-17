@@ -23,7 +23,7 @@ _DOMESTIC_COUNTRY = "fr"
 def run_collaborations(
     conn: Connection,
     *,
-    apc_structure_ids: list[int],
+    perimeter_structure_ids: list[int],
     lab_ids: list[int],
     years: list[int],
     publisher_ids: list[int],
@@ -38,7 +38,7 @@ def run_collaborations(
     corpus filtré — de quoi exprimer une part."""
     where, binds = assemble_where(
         stats_filter_clauses(
-            apc_structure_ids=apc_structure_ids,
+            perimeter_structure_ids=perimeter_structure_ids,
             lab_ids=lab_ids,
             years=years,
             publisher_ids=publisher_ids,

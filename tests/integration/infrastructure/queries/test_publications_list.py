@@ -71,7 +71,7 @@ class TestSearch:
         res = list_publications(
             sa_sync_conn,
             filters=ListFilters(search="quantum", lab_ids=[lab]),
-            apc_structure_ids=[],
+            perimeter_structure_ids=[],
             page=1,
             per_page=50,
             sort="year_desc",
@@ -94,7 +94,7 @@ class TestSearch:
         res = list_publications(
             sa_sync_conn,
             filters=ListFilters(search="quantum", lab_ids=[lab]),
-            apc_structure_ids=[],
+            perimeter_structure_ids=[],
             page=1,
             per_page=50,
             sort="year_desc",
@@ -118,7 +118,7 @@ class TestSearch:
         res = list_publications(
             sa_sync_conn,
             filters=ListFilters(search="quantum", lab_ids=[lab]),
-            apc_structure_ids=[],
+            perimeter_structure_ids=[],
             page=1,
             per_page=50,
             sort="year_desc",
@@ -137,7 +137,7 @@ class TestSearch:
         res = list_publications(
             sa_sync_conn,
             filters=ListFilters(search="econometrie", lab_ids=[lab]),
-            apc_structure_ids=[],
+            perimeter_structure_ids=[],
             page=1,
             per_page=50,
             sort="year_desc",
@@ -210,7 +210,7 @@ class TestHalStatusMultipleHalEntries:
         res = list_publications(
             sa_sync_conn,
             filters=ListFilters(lab_ids=[lab], hal_status_values=["hors_collection"]),
-            apc_structure_ids=[],
+            perimeter_structure_ids=[],
             page=1,
             per_page=50,
             sort="year_desc",
@@ -229,7 +229,7 @@ class TestHalStatusMultipleHalEntries:
         res = list_publications(
             sa_sync_conn,
             filters=ListFilters(lab_ids=[lab]),
-            apc_structure_ids=[],
+            perimeter_structure_ids=[],
             page=1,
             per_page=50,
             sort="year_desc",
@@ -248,7 +248,7 @@ class TestHalStatusMultipleHalEntries:
         res = list_publications(
             sa_sync_conn,
             filters=ListFilters(lab_ids=[lab], hal_status_values=["hors_collection"]),
-            apc_structure_ids=[],
+            perimeter_structure_ids=[],
             page=1,
             per_page=50,
             sort="year_desc",

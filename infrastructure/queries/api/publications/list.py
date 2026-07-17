@@ -77,7 +77,7 @@ def _hal_status_clause_sync(conn: Connection, filters: ListFilters) -> WhereClau
 
 
 def _build_list_clauses(
-    conn: Connection, filters: ListFilters, apc_structure_ids: list[int]
+    conn: Connection, filters: ListFilters, perimeter_structure_ids: list[int]
 ) -> tuple[str, dict[str, Any]]:
     """Construit le WHERE complet pour list_publications."""
     clauses: list[WhereClause | None] = list(_initial_clauses(filters))
@@ -94,7 +94,7 @@ def _build_list_clauses(
 
     if filters.person_id:
         clauses.append(corresponding_clause(filters.person_id, filters.is_corresponding))
-    clauses.append(apc_clause(filters.has_apc, apc_structure_ids, filters.lab_ids))
+    clauses.append(apc_clause(filters.has_apc, perimeter_structure_ids, filters.lab_ids))
     clauses.append(_hal_status_clause_sync(conn, filters))
     clauses.append(in_perimeter_person_clause(filters.in_perimeter, filters.person_id))
     return assemble_where(clauses)
@@ -126,7 +126,7 @@ def list_publications(
     conn: Connection,
     *,
     filters: ListFilters,
-    apc_structure_ids: list[int],
+    perimeter_structure_ids: list[int],
     page: int,
     per_page: int,
     sort: str,
@@ -134,7 +134,7 @@ def list_publications(
     """Liste paginée des publications avec sources, labos, journal."""
     conn.execute(text("SET LOCAL jit = off"))
     offset = (page - 1) * per_page
-    where_clause, binds = _build_list_clauses(conn, filters, apc_structure_ids)
+    where_clause, binds = _build_list_clauses(conn, filters, perimeter_structure_ids)
     order = _ORDER_MAP.get(sort, "p.pub_year DESC, p.title")
 
     # Quand la recherche match un sujet (cf. _search_clause), on remonte
@@ -325,7 +325,7 @@ def export_publications_csv(
     conn: Connection,
     *,
     filters: ListFilters,
-    apc_structure_ids: list[int],
+    perimeter_structure_ids: list[int],
     sort: str,
     columns: list[str],
 ) -> str:
@@ -338,7 +338,7 @@ def export_publications_csv(
     (router) est responsable d'emballer la réponse HTTP.
     """
     conn.execute(text("SET LOCAL jit = off"))
-    where_clause, binds = _build_list_clauses(conn, filters, apc_structure_ids)
+    where_clause, binds = _build_list_clauses(conn, filters, perimeter_structure_ids)
     order = _ORDER_MAP.get(sort, "p.pub_year DESC, p.title")
 
     if filters.person_id:
@@ -467,7 +467,7 @@ def _build_theses_export_clauses(filters: ListFilters) -> tuple[str, dict[str, A
 
 
 def export_theses_csv(
-    conn: Connection, *, filters: ListFilters, apc_structure_ids: list[int], sort: str
+    conn: Connection, *, filters: ListFilters, perimeter_structure_ids: list[int], sort: str
 ) -> str:
     """Export CSV dédié à la page thèses.
 

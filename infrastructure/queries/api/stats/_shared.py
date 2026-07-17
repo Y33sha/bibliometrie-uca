@@ -21,7 +21,7 @@ STATS_BASE = " AND ".join(
 
 def stats_filter_clauses(
     *,
-    apc_structure_ids: list[int],
+    perimeter_structure_ids: list[int],
     lab_ids: list[int],
     years: list[int],
     publisher_ids: list[int],
@@ -36,7 +36,7 @@ def stats_filter_clauses(
         year_clause(years),
         lab_clause(lab_ids),
         oa_clause(oa_status),
-        stats_apc_clause(has_apc, apc_structure_ids),
+        stats_apc_clause(has_apc, perimeter_structure_ids),
         doc_type_clause(doc_types),
     ]
     if publisher_ids:
@@ -66,11 +66,11 @@ _APC_NOT_EXISTS_SA = (
 )
 
 
-def stats_apc_clause(has_apc: list[str], apc_structure_ids: list[int]) -> WhereClause | None:
+def stats_apc_clause(has_apc: list[str], perimeter_structure_ids: list[int]) -> WhereClause | None:
     """Filtre APC pour les endpoints stats (supporte multi-sélection).
 
-    `apc_structure_ids` = structures considérées comme "internes" pour la
-    catégorisation APC (typiquement le périmètre `perimeter_persons`).
+    `perimeter_structure_ids` = les structures du périmètre `persons`, que l'adapter
+    résout et qui tiennent lieu de structures « internes ».
     Toutes les valeurs APC partagent le bind `:apc_root_ids` ; la valeur
     est constante par requête.
     """
@@ -94,7 +94,7 @@ def stats_apc_clause(has_apc: list[str], apc_structure_ids: list[int]) -> WhereC
             )
     if not parts:
         return None
-    binds: dict[str, Any] = {"apc_root_ids": apc_structure_ids} if needs_root else {}
+    binds: dict[str, Any] = {"apc_root_ids": perimeter_structure_ids} if needs_root else {}
     if len(parts) == 1:
         return WhereClause(parts[0], binds)
     return WhereClause("(" + " OR ".join(parts) + ")", binds)

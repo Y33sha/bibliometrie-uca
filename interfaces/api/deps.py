@@ -273,17 +273,6 @@ def get_perimeter_queries() -> PerimeterQueries:
     return _perimeter_queries_singleton
 
 
-def get_apc_structure_ids(
-    conn: Connection = Depends(db_conn),
-    perimeter_queries: PerimeterQueries = Depends(get_perimeter_queries),
-) -> list[int]:
-    """Structures considérées comme « internes » pour la catégorisation APC.
-
-    Le périmètre `perimeter_persons` dans sa clôture transitive : l'établissement et tous ses laboratoires descendants. Le filtre qui s'en sert est `infrastructure.queries.filters.apc_clause`.
-    """
-    return perimeter_queries.get_persons_structure_ids_list(conn)
-
-
 # `PgMetadataCorrectionQueries` est sans état (la connexion est passée aux méthodes) : un singleton par processus suffit.
 _metadata_correction_queries_singleton: MetadataCorrectionQueries = PgMetadataCorrectionQueries()
 

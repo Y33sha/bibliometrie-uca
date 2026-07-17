@@ -341,24 +341,24 @@ class PublicationDetailResponse(BaseModel):
 
 
 class PublicationsQueries(Protocol):
-    """Lectures sync pour /api/publications/*."""
+    """Lectures sync pour /api/publications/*.
+
+    Le filtre `has_apc` de `ListFilters` / `FacetFilters` s'appuie sur le périmètre des structures internes, que l'implémentation résout elle-même.
+    """
 
     def list_publications(
         self,
         *,
         filters: ListFilters,
-        apc_structure_ids: list[int],
         page: int,
         per_page: int,
         sort: str,
     ) -> PublicationListResponse: ...
 
-    def publications_facets(
-        self, *, filters: FacetFilters, apc_structure_ids: list[int]
-    ) -> PublicationsFacetsResponse: ...
+    def publications_facets(self, *, filters: FacetFilters) -> PublicationsFacetsResponse: ...
 
     def publications_entity_facet(
-        self, *, kind: str, search: str, filters: FacetFilters, apc_structure_ids: list[int]
+        self, *, kind: str, search: str, filters: FacetFilters
     ) -> EntityFacetResponse: ...
 
     def resolve_entity_label(self, *, kind: str, entity_id: int) -> EntityLabelResponse: ...
@@ -367,13 +367,10 @@ class PublicationsQueries(Protocol):
         self,
         *,
         filters: ListFilters,
-        apc_structure_ids: list[int],
         sort: str,
         columns: list[str],
     ) -> str: ...
 
-    def export_theses_csv(
-        self, *, filters: ListFilters, apc_structure_ids: list[int], sort: str
-    ) -> str: ...
+    def export_theses_csv(self, *, filters: ListFilters, sort: str) -> str: ...
 
     def get_publication_detail(self, pub_id: int) -> PublicationDetailResponse | None: ...
