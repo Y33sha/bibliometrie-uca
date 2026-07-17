@@ -12,7 +12,7 @@
 
 ### Non commencé
 
-- [Règles métier retenues dans les routers HTTP](CODE_regles-metier-dans-les-routers.md)
+- [Exceptions : démêler les `HTTPException` des routers](CODE_exceptions-des-routers.md)
 - [Qualité et cohérence des sujets](METIER_sujets-qualite.md)
 - [Signatures institutionnelles](METIER_signatures-institutionnelles.md)
 
