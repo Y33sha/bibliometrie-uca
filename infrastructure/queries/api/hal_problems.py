@@ -3,9 +3,10 @@
 Contrôles qualité HAL au niveau des publications (doublons de dépôts, manques dans les collections, conflits d'affiliation) + comptes HAL multiples par personne. `PgHalProblemsQueries` hérite explicitement du Protocol `application.ports.api.hal_problems_queries.HalProblemsQueries`.
 """
 
+from collections import defaultdict
 from typing import Any
 
-from sqlalchemy import Connection, text
+from sqlalchemy import Connection, bindparam, text
 
 from application.ports.api.hal_problems_queries import (
     HalAccountSummary,
@@ -23,8 +24,27 @@ from application.ports.api.hal_problems_queries import (
     HalMissingCollectionsResponse,
     HalProblemsQueries,
     HalPubDetail,
+    NoMissingCollections,
 )
 from domain.source_publications.keys import DISCRIMINANT_TITLE_MIN_LENGTH
+
+# Signatures HAL rattachées à une personne et portant la référence d'un compte HAL.
+_HAL_ACCOUNT_SIGNATURES = """
+    FROM source_authorships sa
+    JOIN author_identifying_keys aik ON aik.id = sa.identity_id
+    WHERE sa.source = 'hal'
+      AND sa.person_id IS NOT NULL
+      AND aik.person_identifiers->>'hal_person_id' IS NOT NULL
+"""
+
+# Personnes portant au moins deux comptes HAL distincts : l'anomalie que la page recense, et
+# la même population pour le comptage comme pour la liste.
+_PERSONS_WITH_DUPLICATE_HAL_ACCOUNTS = f"""
+    SELECT sa.person_id
+    {_HAL_ACCOUNT_SIGNATURES}
+    GROUP BY sa.person_id
+    HAVING COUNT(DISTINCT aik.person_identifiers->>'hal_person_id') >= 2
+"""
 
 
 class PgHalProblemsQueries(HalProblemsQueries):
@@ -33,71 +53,70 @@ class PgHalProblemsQueries(HalProblemsQueries):
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
 
-    def _hal_pub_detail(self, pub_id: int) -> HalPubDetail | None:
-        pub_row = self._conn.execute(
+    def _hal_pub_details(self, pub_ids: list[int]) -> dict[int, HalPubDetail]:
+        """Détail des publications d'une page et de leurs dépôts HAL, indexé par identifiant.
+
+        Deux requêtes pour la page entière : les paires de doublons se comptent par centaines, et une lecture par publication en ferait autant d'allers-retours.
+        """
+        if not pub_ids:
+            return {}
+        pub_rows = self._conn.execute(
             text("""
                 SELECT p.id, p.title, p.pub_year, p.doc_type::text AS doc_type,
                        p.doi, p.container_title
-                FROM publications p WHERE p.id = :pid
-            """),
-            {"pid": pub_id},
-        ).one_or_none()
-        if not pub_row:
-            return None
+                FROM publications p WHERE p.id = ANY(:pids)
+            """).bindparams(bindparam("pids")),
+            {"pids": pub_ids},
+        ).all()
         hal_rows = self._conn.execute(
             text("""
-                SELECT sd.source_id AS halid, sd.hal_collections,
+                SELECT sd.publication_id, sd.source_id AS halid, sd.hal_collections,
                        sd.doc_type AS hal_doc_type,
                        sd.pub_year AS hal_pub_year, sd.title AS hal_title,
                        (SELECT COUNT(*) FROM source_authorships sa2
                         WHERE sa2.source = 'hal' AND sa2.source_publication_id = sd.id) AS author_count
                 FROM source_publications sd
-                WHERE sd.publication_id = :pid AND sd.source = 'hal'
-            """),
-            {"pid": pub_id},
+                WHERE sd.publication_id = ANY(:pids) AND sd.source = 'hal'
+                ORDER BY sd.source_id
+            """).bindparams(bindparam("pids")),
+            {"pids": pub_ids},
         ).all()
-        hal_docs = [
-            HalDocSummary(
-                halid=r.halid,
-                hal_collections=list(r.hal_collections) if r.hal_collections else None,
-                hal_doc_type=r.hal_doc_type,
-                hal_pub_year=r.hal_pub_year,
-                hal_title=r.hal_title,
-                author_count=r.author_count,
+
+        docs_by_pub: dict[int, list[HalDocSummary]] = defaultdict(list)
+        for r in hal_rows:
+            docs_by_pub[r.publication_id].append(
+                HalDocSummary(
+                    halid=r.halid,
+                    hal_collections=list(r.hal_collections) if r.hal_collections else None,
+                    hal_doc_type=r.hal_doc_type,
+                    hal_pub_year=r.hal_pub_year,
+                    hal_title=r.hal_title,
+                    author_count=r.author_count,
+                )
             )
-            for r in hal_rows
-        ]
-        return HalPubDetail(
-            id=pub_row.id,
-            title=pub_row.title,
-            pub_year=pub_row.pub_year,
-            doc_type=pub_row.doc_type,
-            doi=pub_row.doi,
-            container_title=pub_row.container_title,
-            hal_docs=hal_docs,
-        )
+        return {
+            r.id: HalPubDetail(
+                id=r.id,
+                title=r.title,
+                pub_year=r.pub_year,
+                doc_type=r.doc_type,
+                doi=r.doi,
+                container_title=r.container_title,
+                hal_docs=docs_by_pub[r.id],
+            )
+            for r in pub_rows
+        }
 
     def hal_duplicate_accounts(self, *, page: int, per_page: int) -> HalDuplicateAccountsResponse:
         # Note sur les agrégats MIN() ci-dessous : pour un même `hal_person_id`, les valeurs de `raw_author_name`/`orcid`/`idhal`/`idref` observées sur les `source_authorships` HAL devraient être constantes (ces champs sont attachés au compte HAL, pas à la signature). En théorie aucune variation possible. En pratique, si des imports à des dates différentes ont posé des valeurs divergentes (avant que la comparaison de hash ne réimporte les payloads obsolètes), MIN() ramasse une valeur déterministe arbitraire. L'optimal aurait été MAX(created_at), mais `source_authorships` n'a pas de `created_at`.
         offset = (page - 1) * per_page
         total_row = self._conn.execute(
-            text("""
-                SELECT COUNT(*) AS total FROM (
-                    SELECT sa.person_id
-                    FROM source_authorships sa
-                    JOIN author_identifying_keys aik ON aik.id = sa.identity_id
-                    WHERE sa.source = 'hal'
-                      AND sa.person_id IS NOT NULL
-                      AND aik.person_identifiers->>'hal_person_id' IS NOT NULL
-                    GROUP BY sa.person_id
-                    HAVING COUNT(DISTINCT aik.person_identifiers->>'hal_person_id') >= 2
-                ) sub
-            """)
+            text(f"SELECT COUNT(*) AS total FROM ({_PERSONS_WITH_DUPLICATE_HAL_ACCOUNTS}) sub")
         ).one()
         total = total_row.total
 
         rows = self._conn.execute(
-            text("""
+            text(f"""
                 WITH hal_accounts AS (
                     SELECT
                         sa.person_id,
@@ -107,18 +126,8 @@ class PgHalProblemsQueries(HalProblemsQueries):
                         MIN(aik.person_identifiers->>'idhal') AS idhal,
                         MIN(aik.person_identifiers->>'idref') AS idref,
                         COUNT(*) AS pub_count
-                    FROM source_authorships sa
-                    JOIN author_identifying_keys aik ON aik.id = sa.identity_id
-                    WHERE sa.source = 'hal'
-                      AND sa.person_id IS NOT NULL
-                      AND aik.person_identifiers->>'hal_person_id' IS NOT NULL
+                    {_HAL_ACCOUNT_SIGNATURES}
                     GROUP BY sa.person_id, aik.person_identifiers->>'hal_person_id'
-                ),
-                duplicates AS (
-                    SELECT person_id
-                    FROM hal_accounts
-                    GROUP BY person_id
-                    HAVING COUNT(*) >= 2
                 )
                 SELECT p.id AS person_id, p.last_name, p.first_name,
                        (prh.id IS NOT NULL) AS has_rh,
@@ -134,7 +143,7 @@ class PgHalProblemsQueries(HalProblemsQueries):
                        ) AS hal_accounts
                 FROM persons p
                 LEFT JOIN persons_rh prh ON prh.person_id = p.id
-                WHERE p.id IN (SELECT person_id FROM duplicates)
+                WHERE p.id IN ({_PERSONS_WITH_DUPLICATE_HAL_ACCOUNTS})
                 ORDER BY LOWER(p.last_name), LOWER(p.first_name)
                 LIMIT :pg_limit OFFSET :pg_offset
             """),
@@ -187,11 +196,11 @@ class PgHalProblemsQueries(HalProblemsQueries):
             """),
             {"pg_limit": per_page, "pg_offset": offset},
         ).all()
-        pairs: list[HalDoiDuplicatePair] = []
-        for r in rows:
-            pub = self._hal_pub_detail(r.pub_id)
-            if pub:
-                pairs.append(HalDoiDuplicatePair(doi=r.doi, halids=list(r.halids), publication=pub))
+        details = self._hal_pub_details([r.pub_id for r in rows])
+        pairs = [
+            HalDoiDuplicatePair(doi=r.doi, halids=list(r.halids), publication=details[r.pub_id])
+            for r in rows
+        ]
 
         return HalDoiDuplicatesResponse(
             total=total,
@@ -240,12 +249,8 @@ class PgHalProblemsQueries(HalProblemsQueries):
             """),
             {"pg_limit": per_page, "pg_offset": offset},
         ).all()
-        pairs: list[HalMetaDuplicatePair] = []
-        for r in rows:
-            pub_a = self._hal_pub_detail(r.id_a)
-            pub_b = self._hal_pub_detail(r.id_b)
-            if pub_a and pub_b:
-                pairs.append(HalMetaDuplicatePair(pub_a=pub_a, pub_b=pub_b))
+        details = self._hal_pub_details([r.id_a for r in rows] + [r.id_b for r in rows])
+        pairs = [HalMetaDuplicatePair(pub_a=details[r.id_a], pub_b=details[r.id_b]) for r in rows]
 
         return HalMetaDuplicatesResponse(
             total=total,
@@ -272,14 +277,15 @@ class PgHalProblemsQueries(HalProblemsQueries):
 
     def hal_missing_collections(
         self, *, lab_id: int, page: int, per_page: int
-    ) -> HalMissingCollectionsResponse | None:
-        """Retourne None si le labo n'a pas de collection HAL configurée (le router transformera en 400)."""
+    ) -> HalMissingCollectionsResponse | NoMissingCollections:
         lab_row = self._conn.execute(
             text("SELECT acronym, hal_collection FROM structures WHERE id = :id"),
             {"id": lab_id},
         ).one_or_none()
-        if not lab_row or not lab_row.hal_collection:
-            return None
+        if not lab_row:
+            return NoMissingCollections.UNKNOWN_LAB
+        if not lab_row.hal_collection:
+            return NoMissingCollections.NO_COLLECTION
 
         offset = (page - 1) * per_page
         col = lab_row.hal_collection

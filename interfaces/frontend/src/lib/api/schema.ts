@@ -1824,7 +1824,9 @@ export interface paths {
         };
         /**
          * Hal Missing Collections
-         * @description Publications affiliées à un labo dans HAL mais absentes de sa collection.
+         * @description Publications affiliées à un laboratoire dans HAL mais absentes de sa collection.
+         *
+         *     Renvoie 404 sur un laboratoire introuvable, 400 sur un laboratoire dont aucune collection HAL n'est configurée — la question est sans objet, faute de collection à laquelle comparer.
          */
         get: operations["hal_missing_collections_api_hal_problems_missing_collections_get"];
         put?: never;

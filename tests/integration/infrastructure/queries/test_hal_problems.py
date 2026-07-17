@@ -2,6 +2,7 @@
 
 from sqlalchemy import text
 
+from application.ports.api.hal_problems_queries import NoMissingCollections
 from infrastructure.queries.api.hal_problems import PgHalProblemsQueries
 from tests.integration.helpers.authorships import upsert_identity
 from tests.integration.helpers.structures import add_authorship_structure
@@ -117,6 +118,24 @@ class TestHalDuplicatePubsByDoi:
         assert res.total >= 1
         assert any(len(p.halids) >= 2 for p in res.pairs)
 
+    def test_details_each_pair_of_a_multi_pair_page(self, sa_sync_conn):
+        """Le détail des publications se lit par lot : chaque paire de la page reçoit le sien."""
+        expected = {}
+        for i in (1, 2, 3):
+            pub = _create_pub(sa_sync_conn, title=f"Doublon {i}", doi=f"10.1/dup-{i}")
+            _create_hal_sd(sa_sync_conn, pub, f"h-dup-{i}-a", doi=f"10.1/dup-{i}")
+            _create_hal_sd(sa_sync_conn, pub, f"h-dup-{i}-b", doi=f"10.1/dup-{i}")
+            expected[pub] = (f"Doublon {i}", {f"h-dup-{i}-a", f"h-dup-{i}-b"})
+
+        res = _q(sa_sync_conn).hal_duplicate_pubs_by_doi(page=1, per_page=50)
+
+        assert res.total == 3
+        served = {
+            p.publication.id: (p.publication.title, {d.halid for d in p.publication.hal_docs})
+            for p in res.pairs
+        }
+        assert served == expected
+
     def test_noop_without_duplicates(self, sa_sync_conn):
         pub = _create_pub(sa_sync_conn)
         _create_hal_sd(sa_sync_conn, pub, "h-uniq", doi="10.1/u")
@@ -150,10 +169,15 @@ class TestHalMissingCollectionsLabs:
 
 
 class TestHalMissingCollections:
-    def test_returns_none_for_lab_without_collection(self, sa_sync_conn):
+    def test_reports_a_lab_without_collection(self, sa_sync_conn):
         lab = _create_lab(sa_sync_conn, code="LAB-NO-COL", hal_collection=None)
         res = _q(sa_sync_conn).hal_missing_collections(lab_id=lab, page=1, per_page=50)
-        assert res is None
+        assert res is NoMissingCollections.NO_COLLECTION
+
+    def test_reports_an_unknown_lab_apart(self, sa_sync_conn):
+        """Les deux absences sont distinctes : le router en tire deux statuts."""
+        res = _q(sa_sync_conn).hal_missing_collections(lab_id=999999, page=1, per_page=50)
+        assert res is NoMissingCollections.UNKNOWN_LAB
 
     def test_returns_empty_when_no_missing(self, sa_sync_conn):
         lab = _create_lab(sa_sync_conn, code="LAB-X", hal_collection="COLL-X")

@@ -7,6 +7,7 @@ Placement par cas d'usage (le seul appelant est le router de diagnostics HAL), p
 Les modèles Pydantic que ces lectures rendent sont co-localisés ici : leur contrat appartient au port.
 """
 
+from enum import StrEnum
 from typing import Protocol
 
 from pydantic import BaseModel
@@ -81,6 +82,16 @@ class HalMissingCollectionsResponse(PaginatedResponse):
     publications: list[HalMissingCollectionPub]
 
 
+class NoMissingCollections(StrEnum):
+    """Pourquoi la question « que manque-t-il à sa collection ? » n'a pas de réponse pour ce laboratoire.
+
+    Les deux cas se distinguent parce qu'ils tiennent à des choses différentes : l'un désigne un laboratoire qui n'existe pas, l'autre un laboratoire réel dont aucune collection HAL n'est configurée.
+    """
+
+    UNKNOWN_LAB = "unknown_lab"
+    NO_COLLECTION = "no_collection"
+
+
 class HalAffiliationConflictPub(BaseModel):
     id: int
     title: str
@@ -135,7 +146,7 @@ class HalProblemsQueries(Protocol):
 
     def hal_missing_collections(
         self, *, lab_id: int, page: int, per_page: int
-    ) -> HalMissingCollectionsResponse | None: ...
+    ) -> HalMissingCollectionsResponse | NoMissingCollections: ...
 
     def hal_affiliation_conflicts(
         self, *, page: int, per_page: int
