@@ -87,11 +87,14 @@ def list_persons(
     sort: str = Query("name"),
     queries: PersonsQueries = Depends(persons_queries),
 ) -> PersonListResponse:
-    """Liste des personnes avec filtres (admin)."""
+    """Liste des personnes avec filtres (admin).
+
+    `department` et `role` acceptent plusieurs valeurs séparées par des virgules, selon la même convention que l'annuaire et les facettes.
+    """
     filters = ListFilters(
         search=search,
-        department=department,
-        role=role,
+        departments=parse_str_csv(department),
+        roles=parse_str_csv(role),
         has_orcid=has_orcid,
         has_idhal=has_idhal,
         has_idref=has_idref,

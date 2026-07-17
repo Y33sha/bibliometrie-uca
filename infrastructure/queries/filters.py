@@ -524,6 +524,22 @@ def person_has_pending_identifiers_clause(value: str) -> WhereClause | None:
     )
 
 
+def person_department_clause(departments: list[str]) -> WhereClause | None:
+    """Filtre : la personne est affectée à l'un des départements RH donnés (alias `prh`)."""
+    if not departments:
+        return None
+    return WhereClause(
+        "prh.department_name = ANY(:flt_departments)", {"flt_departments": departments}
+    )
+
+
+def person_role_clause(roles: list[str]) -> WhereClause | None:
+    """Filtre : la personne porte l'un des intitulés de poste donnés (alias `prh`)."""
+    if not roles:
+        return None
+    return WhereClause("prh.role_title = ANY(:flt_roles)", {"flt_roles": roles})
+
+
 def person_has_rh_clause(value: str) -> WhereClause | None:
     if value == "yes":
         return WhereClause("prh.id IS NOT NULL", {})

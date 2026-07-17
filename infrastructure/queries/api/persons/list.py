@@ -9,11 +9,13 @@ from domain.persons.identifiers import PUBLIC_PERSON_IDENTIFIER_TYPES
 from infrastructure.queries.filters import (
     WhereClause,
     assemble_where,
+    person_department_clause,
     person_has_identifier_clause,
     person_has_pending_identifiers_clause,
     person_has_pending_name_forms_clause,
     person_has_rh_clause,
     person_in_lab_clause,
+    person_role_clause,
     person_search_clause,
     persons_sort_clause,
 )
@@ -29,17 +31,8 @@ def persons_directory(
     offset = (page - 1) * per_page
     clauses: list[WhereClause | None] = [WhereClause("p.rejected = FALSE", {})]
     clauses.append(person_search_clause(filters.search))
-    if filters.departments:
-        clauses.append(
-            WhereClause(
-                "prh.department_name = ANY(:flt_departments)",
-                {"flt_departments": filters.departments},
-            )
-        )
-    if filters.roles:
-        clauses.append(
-            WhereClause("prh.role_title = ANY(:flt_roles)", {"flt_roles": filters.roles})
-        )
+    clauses.append(person_department_clause(filters.departments))
+    clauses.append(person_role_clause(filters.roles))
     clauses.append(person_has_identifier_clause("orcid", filters.has_orcid))
     clauses.append(person_has_identifier_clause("idhal", filters.has_idhal))
     clauses.append(person_has_identifier_clause("idref", filters.has_idref))
@@ -171,14 +164,8 @@ def list_persons(
                 {"search_pat": f"%{filters.search}%"},
             )
         )
-    if filters.department:
-        clauses.append(
-            WhereClause(
-                "prh.department_name = :flt_department", {"flt_department": filters.department}
-            )
-        )
-    if filters.role:
-        clauses.append(WhereClause("prh.role_title = :flt_role", {"flt_role": filters.role}))
+    clauses.append(person_department_clause(filters.departments))
+    clauses.append(person_role_clause(filters.roles))
     clauses.append(person_has_identifier_clause("orcid", filters.has_orcid))
     clauses.append(person_has_identifier_clause("idhal", filters.has_idhal))
     clauses.append(person_has_identifier_clause("idref", filters.has_idref))

@@ -180,8 +180,8 @@
     loading = true;
     const params = new URLSearchParams({ page: String(currentPage), per_page: "50" });
     if (search.trim()) params.set("search", search.trim());
-    if (selectedDepts.length === 1) params.set("department", selectedDepts[0]);
-    if (selectedRoles.length === 1) params.set("role", selectedRoles[0]);
+    if (selectedDepts.length) params.set("department", selectedDepts.join(","));
+    if (selectedRoles.length) params.set("role", selectedRoles.join(","));
     for (const [key, qk] of Object.entries(idQueryKey)) {
       const v = idStates[key];
       if (v === "yes" || v === "no") params.set(qk, v);

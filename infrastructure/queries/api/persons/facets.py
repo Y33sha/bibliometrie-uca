@@ -9,11 +9,13 @@ from infrastructure.queries.filters import (
     PUBLIC_PERSON_IDENTIFIER_TYPES_SQL,
     WhereClause,
     assemble_where,
+    person_department_clause,
     person_has_identifier_clause,
     person_has_pending_identifiers_clause,
     person_has_pending_name_forms_clause,
     person_has_rh_clause,
     person_in_lab_clause,
+    person_role_clause,
     person_search_clause,
 )
 
@@ -31,17 +33,10 @@ def persons_facets(conn: Connection, *, filters: FacetFilters) -> dict[str, Any]
             person_in_lab_clause(filters.lab_id),
             person_search_clause(filters.search),
         ]
-        if skip != "department" and filters.departments:
-            out.append(
-                WhereClause(
-                    "prh.department_name = ANY(:flt_departments)",
-                    {"flt_departments": filters.departments},
-                )
-            )
-        if skip != "role" and filters.roles:
-            out.append(
-                WhereClause("prh.role_title = ANY(:flt_roles)", {"flt_roles": filters.roles})
-            )
+        if skip != "department":
+            out.append(person_department_clause(filters.departments))
+        if skip != "role":
+            out.append(person_role_clause(filters.roles))
         if skip != "ids":
             out.append(person_has_identifier_clause("orcid", filters.has_orcid))
             out.append(person_has_identifier_clause("idhal", filters.has_idhal))
