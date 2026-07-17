@@ -74,9 +74,13 @@ class TestDuplicateAccounts:
         r = client.get("/api/hal-problems/duplicate-accounts", params={"per_page": 500})
         assert r.status_code == 422
 
-    def test_per_page_below_minimum_rejected(self, client):
-        # `per_page` Query(ge=10) → < 10 = 422.
-        r = client.get("/api/hal-problems/duplicate-accounts", params={"per_page": 5})
+    def test_accepts_a_single_result_per_page(self, client):
+        """Aucun plancher au-delà de la page non vide : demander une ligne est une demande légitime."""
+        r = client.get("/api/hal-problems/duplicate-accounts", params={"per_page": 1})
+        assert r.status_code == 200
+
+    def test_empty_page_rejected(self, client):
+        r = client.get("/api/hal-problems/duplicate-accounts", params={"per_page": 0})
         assert r.status_code == 422
 
 

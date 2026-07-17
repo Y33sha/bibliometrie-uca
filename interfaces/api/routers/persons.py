@@ -32,7 +32,7 @@ router = APIRouter()
 @router.get("/api/persons/directory", response_model=PersonDirectoryResponse)
 def persons_directory(
     page: int = Query(1, ge=1),
-    per_page: int = Query(50, ge=10, le=200),
+    per_page: int = Query(50, ge=1, le=200),
     search: str = Query(""),
     department: str = Query(""),
     role: str = Query(""),
@@ -74,7 +74,7 @@ def search_persons(
 @router.get("/api/persons", response_model=PersonListResponse)
 def list_persons(
     page: int = Query(1, ge=1),
-    per_page: int = Query(50, ge=10, le=200),
+    per_page: int = Query(50, ge=1, le=200),
     search: str = Query(""),
     department: str = Query(""),
     role: str = Query(""),

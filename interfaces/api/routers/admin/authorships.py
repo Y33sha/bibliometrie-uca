@@ -69,7 +69,7 @@ def orphan_authorships_count(
 @router.get("/api/admin/orphan-authorships", response_model=OrphanAuthorshipsResponse)
 def list_orphan_authorships(
     page: int = Query(1, ge=1),
-    per_page: int = Query(50, ge=10, le=200),
+    per_page: int = Query(50, ge=1, le=200),
     search: str = Query(""),
     queries: PersonsQueries = Depends(persons_queries),
 ) -> OrphanAuthorshipsResponse:

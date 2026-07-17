@@ -39,7 +39,7 @@ def get_laboratory(
 def get_laboratory_addresses(
     lab_id: int,
     page: int = Query(1, ge=1),
-    per_page: int = Query(50, ge=10, le=200),
+    per_page: int = Query(50, ge=1, le=200),
     queries: LaboratoriesQueries = Depends(laboratories_queries),
 ) -> LaboratoryAddressesResponse:
     """Adresses liées à un laboratoire."""

@@ -23,7 +23,7 @@ router = APIRouter()
 @router.get("/api/hal-problems/duplicate-accounts", response_model=HalDuplicateAccountsResponse)
 def hal_duplicate_accounts(
     page: int = Query(1, ge=1),
-    per_page: int = Query(50, ge=10, le=200),
+    per_page: int = Query(50, ge=1, le=200),
     queries: HalProblemsQueries = Depends(hal_problems_queries),
 ) -> HalDuplicateAccountsResponse:
     """Personnes liées à 2+ comptes HAL distincts."""
@@ -33,7 +33,7 @@ def hal_duplicate_accounts(
 @router.get("/api/hal-problems/duplicate-pubs-doi", response_model=HalDoiDuplicatesResponse)
 def hal_duplicate_pubs_by_doi(
     page: int = Query(1, ge=1),
-    per_page: int = Query(50, ge=10, le=200),
+    per_page: int = Query(50, ge=1, le=200),
     queries: HalProblemsQueries = Depends(hal_problems_queries),
 ) -> HalDoiDuplicatesResponse:
     """Dépôts HAL avec DOI identique rattachés à la même publication."""
@@ -43,7 +43,7 @@ def hal_duplicate_pubs_by_doi(
 @router.get("/api/hal-problems/duplicate-pubs-meta", response_model=HalMetaDuplicatesResponse)
 def hal_duplicate_pubs_by_metadata(
     page: int = Query(1, ge=1),
-    per_page: int = Query(50, ge=10, le=200),
+    per_page: int = Query(50, ge=1, le=200),
     queries: HalProblemsQueries = Depends(hal_problems_queries),
 ) -> HalMetaDuplicatesResponse:
     """Doublons possibles : dépôts HAL avec métadonnées identiques."""
@@ -54,7 +54,7 @@ def hal_duplicate_pubs_by_metadata(
 def hal_missing_collections(
     lab_id: int = Query(...),
     page: int = Query(1, ge=1),
-    per_page: int = Query(50, ge=10, le=200),
+    per_page: int = Query(50, ge=1, le=200),
     queries: HalProblemsQueries = Depends(hal_problems_queries),
 ) -> HalMissingCollectionsResponse:
     """Publications affiliées à un laboratoire dans HAL mais absentes de sa collection.
@@ -82,7 +82,7 @@ def hal_missing_collections_labs(
 )
 def hal_affiliation_conflicts(
     page: int = Query(1, ge=1),
-    per_page: int = Query(50, ge=10, le=200),
+    per_page: int = Query(50, ge=1, le=200),
     queries: HalProblemsQueries = Depends(hal_problems_queries),
 ) -> HalAffiliationConflictsResponse:
     """Publications affiliées UCA dans HAL mais pas dans une autre source."""
