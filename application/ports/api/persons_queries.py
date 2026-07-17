@@ -24,7 +24,12 @@ from application.ports.api.subjects_queries import SubjectFrequency
 
 
 @dataclass(frozen=True, slots=True)
-class DirectoryFilters:
+class PersonFilters:
+    """Filtres que toutes les lectures de personnes honorent.
+
+    `departments` et `roles` sont multi-valués : une option cochée s'ajoute aux autres. Les `has_*` portent un tri-état (`yes`, `no`, vide pour ne pas filtrer). Chaque lecture ajoute les filtres qui lui sont propres, et le type dit ce qu'elle honore.
+    """
+
     search: str = ""
     departments: list[str] = field(default_factory=list)
     roles: list[str] = field(default_factory=list)
@@ -32,37 +37,24 @@ class DirectoryFilters:
     has_idhal: str = ""
     has_idref: str = ""
     has_rh: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class DirectoryFilters(PersonFilters):
     # Scope facultatif à un laboratoire (onglet personnes de la fiche labo).
     lab_id: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
-class ListFilters:
-    search: str = ""
-    department: str = ""
-    role: str = ""
-    has_orcid: str = ""
-    has_idhal: str = ""
-    has_idref: str = ""
-    has_rh: str = ""
+class ListFilters(PersonFilters):
     # « À confirmer » : personnes portant ≥1 forme de nom / identifiant `pending`.
     has_pending_forms: str = ""
     has_pending_identifiers: str = ""
 
 
 @dataclass(frozen=True, slots=True)
-class FacetFilters:
-    search: str = ""
-    departments: list[str] = field(default_factory=list)
-    roles: list[str] = field(default_factory=list)
-    has_orcid: str = ""
-    has_idhal: str = ""
-    has_idref: str = ""
-    has_rh: str = ""
-    # « À confirmer » : personnes portant ≥1 forme de nom / identifiant `pending`.
-    has_pending_forms: str = ""
-    has_pending_identifiers: str = ""
-    # Scope facultatif à un laboratoire (onglet personnes de la fiche labo).
+class FacetFilters(ListFilters):
+    # Les facettes servent les deux pages : elles honorent l'union de leurs filtres.
     lab_id: int | None = None
 
 

@@ -1021,6 +1021,8 @@ export interface paths {
         /**
          * List Persons
          * @description Liste des personnes avec filtres (admin).
+         *
+         *     `department` et `role` acceptent plusieurs valeurs séparées par des virgules, selon la même convention que l'annuaire et les facettes.
          */
         get: operations["list_persons_api_persons_get"];
         put?: never;
