@@ -1,6 +1,6 @@
-"""Router des adresses brutes des sources, de leur rattachement aux structures et de leurs pays. Sert `/api/addresses/*`, `/api/countries` et `/api/admin/address-stats`.
+"""Router des adresses brutes des sources : leur rattachement aux structures et l'attribution de leurs pays. Sert `/api/addresses/*`.
 
-Les lectures passent par le port `AddressesQueries`, les écritures par les command handlers de `application.services.addresses.commands`, qui committent avant que le router ne rende la main.
+Les lectures passent par le port `AddressesQueries`, les écritures par les command handlers de `application.services.addresses.commands`, qui committent avant que le router ne rende la main. Le référentiel des pays, qui n'est pas une lecture d'adresse, vit dans `countries.py`.
 """
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
@@ -13,7 +13,6 @@ from application.ports.api.addresses_queries import (
     AddressListFilters,
     AddressListResponse,
     AddressStatsResponse,
-    CountryOut,
     StructurePredicate,
     TextPredicate,
 )
@@ -38,7 +37,7 @@ from interfaces.api.models import (
     SetCountry,
 )
 
-router = APIRouter()
+router = APIRouter(prefix="/api/addresses", tags=["addresses"])
 
 _TEXT_MODES = {"contains", "not_contains"}
 _STRUCT_OPS = {"recognized", "not_recognized"}
@@ -74,7 +73,7 @@ def _parse_structure_predicates(raw: list[str]) -> tuple[StructurePredicate, ...
     return tuple(out)
 
 
-@router.get("/api/addresses", response_model=AddressListResponse)
+@router.get("", response_model=AddressListResponse)
 def list_addresses(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=200),
@@ -110,7 +109,7 @@ def list_addresses(
     return queries.list_addresses(structure_id=sid, filters=filters, page=page, per_page=per_page)
 
 
-@router.get("/api/addresses/{addr_id}/publications", response_model=AddressPublicationsResponse)
+@router.get("/{addr_id}/publications", response_model=AddressPublicationsResponse)
 def get_address_publications(
     addr_id: int,
     limit: int = Query(20, ge=1, le=100),
@@ -126,7 +125,7 @@ def get_address_publications(
     )
 
 
-@router.post("/api/addresses/{addr_id}/review", response_model=AddressReviewResponse)
+@router.post("/{addr_id}/review", response_model=AddressReviewResponse)
 def review_address(
     addr_id: int,
     action: ReviewAction,
@@ -155,7 +154,7 @@ def review_address(
     )
 
 
-@router.post("/api/addresses/batch-review", response_model=BatchUpdatedResponse)
+@router.post("/batch-review", response_model=BatchUpdatedResponse)
 def batch_review(
     data: BatchReviewAction,
     bg: BackgroundTasks,
@@ -175,15 +174,7 @@ def batch_review(
     return BatchUpdatedResponse(updated=updated)
 
 
-@router.get("/api/countries", response_model=list[CountryOut])
-def list_countries(
-    queries: AddressesQueries = Depends(addresses_queries),
-) -> list[CountryOut]:
-    """Référentiel des pays, servant les listes de choix de l'attribution."""
-    return queries.list_countries()
-
-
-@router.get("/api/addresses/countries", response_model=AddressesCountriesResponse)
+@router.get("/countries", response_model=AddressesCountriesResponse)
 def list_addresses_countries(
     search: str = Query(""),
     has_country: str = Query(""),
@@ -205,7 +196,7 @@ def list_addresses_countries(
     return queries.addresses_countries(filters=filters, page=page, per_page=per_page)
 
 
-@router.post("/api/addresses/{addr_id}/country", response_model=OkResponse)
+@router.post("/{addr_id}/country", response_model=OkResponse)
 def set_address_country(
     addr_id: int,
     body: SetCountry,
@@ -222,7 +213,7 @@ def set_address_country(
     return OkResponse()
 
 
-@router.post("/api/addresses/batch-country", response_model=BatchCountryResponse)
+@router.post("/batch-country", response_model=BatchCountryResponse)
 def batch_set_country(
     body: BatchSetCountry,
     bg: BackgroundTasks,
@@ -250,7 +241,7 @@ def batch_set_country(
     return BatchCountryResponse(updated=updated, propagated=propagated)
 
 
-@router.get("/api/admin/address-stats", response_model=AddressStatsResponse)
+@router.get("/stats", response_model=AddressStatsResponse)
 def admin_address_stats(
     structure_id: int | None = Query(None),
     queries: AddressesQueries = Depends(addresses_queries),

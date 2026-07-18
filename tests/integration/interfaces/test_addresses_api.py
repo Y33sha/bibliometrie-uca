@@ -375,17 +375,17 @@ class TestBatchSetCountry:
         assert r.status_code == 400
 
 
-# ── GET /api/admin/address-stats ─────────────────────────────────
+# ── GET /api/addresses/stats ─────────────────────────────────
 
 
 class TestAdminAddressStats:
     def test_default_uses_perimeter(self, client):
-        r = client.get("/api/admin/address-stats")
+        r = client.get("/api/addresses/stats")
         assert r.status_code == 200
         body = r.json()
         assert set(body.keys()) >= {"total", "detected", "pending", "rejected", "confirmed"}
 
     def test_with_structure_id(self, client):
         struct = _seed_structure("LAB-STATS")
-        r = client.get("/api/admin/address-stats", params={"structure_id": struct})
+        r = client.get("/api/addresses/stats", params={"structure_id": struct})
         assert r.status_code == 200
