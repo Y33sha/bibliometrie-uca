@@ -162,7 +162,7 @@ class PgAdminFeedbackQueries(AdminFeedbackQueries):
                     ))
                     FROM address_structures ast2
                     JOIN structures s ON s.id = ast2.structure_id
-                    WHERE ast2.address_id = a.id AND s.structure_type != 'site'
+                    WHERE ast2.address_id = a.id
                     ) AS labs{matched_forms_select}
                 FROM address_structures ast
                 JOIN addresses a ON a.id = ast.address_id

@@ -251,7 +251,7 @@ def person_addresses(
                         'id', s.id, 'acronym', s.acronym, 'name', s.name))
                     FROM address_structures ast
                     JOIN structures s ON s.id = ast.structure_id
-                    WHERE ast.address_id = a.id AND s.structure_type != 'site'
+                    WHERE ast.address_id = a.id
                       AND ast.is_confirmed IS DISTINCT FROM FALSE
                    ) AS structures
             FROM addresses a

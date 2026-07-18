@@ -16,6 +16,8 @@ L'API répare ensuite en aval. Le littéral SQL `structure_type != 'site'` est r
 
 **Le filtrage en aval disparaît, il n'est pas centralisé.** Nommer et mutualiser la condition SQL reviendrait à consolider un contournement que ce chantier supprime. Les quatre occurrences et l'omission de `get_structure_link` s'effacent avec la donnée qui les motive, et l'API cesse d'avoir à connaître l'existence des sites.
 
+**Le site reste une structure.** Il n'est pas une structure de recherche — ni existence institutionnelle, ni publications, ni périmètre — mais il emprunte les mêmes circuits qu'elles : formes de nom, appariement, `requires_context_of`. Lui donner son propre référentiel dupliquerait ce mécanisme pour une entité présente en un seul exemplaire. La valeur `site` demeure donc dans `structure_type`, et c'est la persistance de ses liens qui disparaît.
+
 **Le stock existant se purge par le mécanisme de la phase.** Les 58 331 liens sont le résidu du comportement corrigé, sans lecteur une fois les filtres retirés. La résolution étant un recalcul complet qui supprime les détections automatiques qu'elle ne retrouve pas, ils tombent d'eux-mêmes au premier passage suivant : aucune migration n'est écrite pour ce qu'une exécution normale du pipeline fait déjà.
 
 ## Phasage
@@ -38,10 +40,8 @@ Le point de branchement est `AddressMatcher.resolve` (`application/pipeline/affi
 
 Le stock se purge de lui-même, sans migration. Chaque run est un recalcul complet, et `delete_obsolete_detections_bulk` supprime les liens détectés et non confirmés absents des appariements de la passe. Les 58 331 liens de site répondent exactement à ce signalement — tous détectés, aucun confirmé — donc ils disparaissent au premier passage de la phase `affiliations` qui suit la phase 2.
 
-- [ ] Vérifier après ce passage que plus aucun lien ne pointe vers une structure de type `site`.
-- [ ] Retrait des quatre conditions `structure_type != 'site'` des adaptateurs de lecture, une fois la table assainie.
-
-**Le site reste une structure.** Il n'est pas une structure de recherche — ni existence institutionnelle, ni publications, ni périmètre — mais il emprunte les mêmes circuits qu'elles : formes de nom, appariement, `requires_context_of`. Lui donner son propre référentiel dupliquerait ce mécanisme pour une entité présente en un seul exemplaire. La valeur `site` demeure donc dans `structure_type`, et c'est la persistance de ses liens qui disparaît.
+- [x] Après ce passage, plus aucun lien ne pointe vers une structure de type `site` ; les six autres types sont inchangés au lien près.
+- [x] Retrait des quatre conditions `structure_type != 'site'` des adaptateurs de lecture. Plus aucune occurrence du littéral dans le code.
 
 ## Questions ouvertes
 

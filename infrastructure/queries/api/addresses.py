@@ -141,7 +141,7 @@ class PgAddressesQueries(AddressesQueries):
                                ) ORDER BY COALESCE(s.acronym, s.name))
                         FROM address_structures ast2
                         JOIN structures s ON s.id = ast2.structure_id
-                        WHERE ast2.address_id = a.id AND s.structure_type != 'site'
+                        WHERE ast2.address_id = a.id
                        ) AS structures
                 {from_clause}
                 ORDER BY a.pub_count DESC, a.id
@@ -220,7 +220,7 @@ class PgAddressesQueries(AddressesQueries):
                        ) ORDER BY COALESCE(s.acronym, s.name)) AS structures
                 FROM address_structures ast2
                 JOIN structures s ON s.id = ast2.structure_id
-                WHERE ast2.address_id = :id AND s.structure_type != 'site'
+                WHERE ast2.address_id = :id
             """),
             {"id": addr_id},
         ).one_or_none()
