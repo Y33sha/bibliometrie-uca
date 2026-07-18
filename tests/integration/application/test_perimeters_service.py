@@ -7,8 +7,6 @@ from sqlalchemy import text
 
 from application.ports.repositories.perimeter_repository import PerimeterUpdate
 from application.services.perimeters.core import (
-    AddStructureOutcome,
-    add_structure_to_perimeter,
     create_perimeter,
     delete_perimeter,
     update_perimeter,
@@ -54,17 +52,6 @@ def _insert_perimeter_sync(conn, code="test", name="Test", structure_ids=None):
     return result.scalar_one()
 
 
-def _create_struct_sync(conn, code="UCA"):
-    result = conn.execute(
-        text(
-            "INSERT INTO structures (code, name, structure_type) "
-            "VALUES (:code, :name, 'universite'::structure_type) RETURNING id"
-        ),
-        {"code": code, "name": code},
-    )
-    return result.scalar_one()
-
-
 # ── find_by_id (hydratation Perimeter) ─────────────────────────────
 
 
@@ -93,35 +80,12 @@ class TestPerimeterFindById:
         assert p.structure_ids == (10, 20, 30)
 
 
-# ── add_structure_to_perimeter ─────────────────────────────────────
-
-
-class TestAddStructureToPerimeter:
-    def test_adds_new_structure(self, sa_sync_conn, repo):
-        s = _create_struct_sync(sa_sync_conn)
-        p = _insert_perimeter_sync(sa_sync_conn)
-        assert add_structure_to_perimeter(p, s, repo=repo) is AddStructureOutcome.ADDED
-        result = sa_sync_conn.execute(
-            text("SELECT structure_ids FROM perimeters WHERE id = :p"), {"p": p}
-        )
-        assert s in result.scalar_one()
-
-    def test_already_present(self, sa_sync_conn, repo):
-        s = _create_struct_sync(sa_sync_conn)
-        p = _insert_perimeter_sync(sa_sync_conn, structure_ids=[s])
-        assert add_structure_to_perimeter(p, s, repo=repo) is AddStructureOutcome.ALREADY_PRESENT
-
-    def test_perimeter_not_found(self, sa_sync_conn, repo):
-        with pytest.raises(NotFoundError):
-            add_structure_to_perimeter(999999, 1, repo=repo)
-
-
 # ── create_perimeter ───────────────────────────────────────────────
 
 
 class TestCreatePerimeter:
     def test_creates(self, sa_sync_conn, repo):
-        pid = create_perimeter(code="new_perim", name="New Perimeter", repo=repo)
+        pid = create_perimeter(code="new_perim", name="New Perimeter", structure_ids=[], repo=repo)
         assert pid is not None
         result = sa_sync_conn.execute(
             text("SELECT code, name FROM perimeters WHERE id = :pid"), {"pid": pid}
@@ -133,13 +97,13 @@ class TestCreatePerimeter:
     def test_raises_on_code_conflict(self, sa_sync_conn, repo):
         _insert_perimeter_sync(sa_sync_conn, code="existing")
         with pytest.raises(ConflictError):
-            create_perimeter(code="existing", name="X", repo=repo)
+            create_perimeter(code="existing", name="X", structure_ids=[], repo=repo)
 
     def test_raises_on_empty_code_or_name(self, sa_sync_conn, repo):
         with pytest.raises(ValidationError):
-            create_perimeter(code="", name="X", repo=repo)
+            create_perimeter(code="", name="X", structure_ids=[], repo=repo)
         with pytest.raises(ValidationError):
-            create_perimeter(code="X", name="", repo=repo)
+            create_perimeter(code="X", name="", structure_ids=[], repo=repo)
 
 
 # ── update_perimeter ───────────────────────────────────────────────

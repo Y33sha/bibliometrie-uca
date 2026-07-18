@@ -2,10 +2,9 @@
 
 Couvre :
 - GET /api/perimeters (liste)
-- POST /api/perimeters (création, auth)
+- POST /api/perimeters (création avec ses racines, auth)
 - PUT /api/perimeters/{id} (update partiel, auth)
 - DELETE /api/perimeters/{id} (suppression, auth, refus si utilisé)
-- POST /api/perimeters/{id}/structures (ajout d'une racine, auth)
 """
 
 from __future__ import annotations
@@ -195,29 +194,6 @@ class TestDeletePerimeter:
             _clear_config("perimeter_persons")
 
 
-class TestAddPerimeterStructure:
-    def test_requires_admin(self, client):
-        r = client.post("/api/perimeters/1/structures", json={"structure_id": 1})
-        assert r.status_code == 401
-
-    def test_adds_new_structure(self, auth_client):
-        s = _seed_structure()
-        pid = _seed_perimeter()
-        r = auth_client.post(f"/api/perimeters/{pid}/structures", json={"structure_id": s})
-        assert r.status_code == 200
-        assert r.json() == {"status": "added"}
-        with _pool() as cur:
-            cur.execute("SELECT structure_ids FROM perimeters WHERE id = %s", (pid,))
-            assert s in cur.fetchone()["structure_ids"]
-
-    def test_idempotent_already_exists(self, auth_client):
-        s = _seed_structure()
-        pid = _seed_perimeter(structure_ids=[s])
-        r = auth_client.post(f"/api/perimeters/{pid}/structures", json={"structure_id": s})
-        assert r.status_code == 200
-        assert r.json() == {"status": "already_present"}
-
-
 def _perimeter_structure_ids(perimeter_id: int) -> set[int]:
     with _pool() as cur:
         cur.execute(
@@ -241,9 +217,25 @@ class TestMaterializedPerimeterStructures:
                 (root, lab),
             )
         pid = _seed_perimeter()
-        r = auth_client.post(f"/api/perimeters/{pid}/structures", json={"structure_id": root})
+        r = auth_client.put(f"/api/perimeters/{pid}", json={"structure_ids": [root]})
         assert r.status_code == 200
         assert _perimeter_structure_ids(pid) == {root, lab}
+
+    def test_creating_with_roots_materializes_closure(self, auth_client):
+        root = _seed_structure()
+        lab = _seed_structure(type_="labo")
+        with _pool() as cur:
+            cur.execute(
+                "INSERT INTO structure_relations (parent_id, child_id, relation_type) "
+                "VALUES (%s, %s, 'est_tutelle_de')",
+                (root, lab),
+            )
+        code = _uniq("withroots")
+        r = auth_client.post(
+            "/api/perimeters", json={"code": code, "name": code, "structure_ids": [root]}
+        )
+        assert r.status_code == 200
+        assert _perimeter_structure_ids(r.json()["id"]) == {root, lab}
 
     def test_creating_tutelle_relation_materializes_new_descendant(self, auth_client):
         root = _seed_structure()

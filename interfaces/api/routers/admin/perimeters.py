@@ -22,11 +22,9 @@ from interfaces.api.deps import (
     perimeters_admin_queries,
 )
 from interfaces.api.models import (
-    AddPerimeterStructure,
     CreatedIdResponse,
     OkResponse,
     PerimeterCreate,
-    StatusResponse,
 )
 
 router = APIRouter()
@@ -49,8 +47,10 @@ def create_perimeter(
     conn: Connection = Depends(db_conn),
     repo: PerimeterRepository = Depends(perimeter_repo),
 ) -> CreatedIdResponse:
-    """Crée un nouveau périmètre, sans structure racine."""
-    pid = perimeter_commands.create_perimeter(conn, code=body.code, name=body.name, repo=repo)
+    """Crée un périmètre avec ses structures racines, la liste pouvant être vide."""
+    pid = perimeter_commands.create_perimeter(
+        conn, code=body.code, name=body.name, structure_ids=body.structure_ids, repo=repo
+    )
     return CreatedIdResponse(id=pid)
 
 
@@ -79,20 +79,3 @@ def delete_perimeter(
         conn, perimeter_id, repo=repo, config=config_repo, audit_repo=audit
     )
     return OkResponse()
-
-
-@router.post("/api/perimeters/{perimeter_id}/structures", response_model=StatusResponse)
-def add_structure_to_perimeter(
-    perimeter_id: int,
-    body: AddPerimeterStructure,
-    conn: Connection = Depends(db_conn),
-    repo: PerimeterRepository = Depends(perimeter_repo),
-) -> StatusResponse:
-    """Ajoute une structure racine au périmètre.
-
-    Renvoie `{"status": "added"}` ou `"already_present"` si la structure était déjà racine.
-    """
-    outcome = perimeter_commands.add_structure_to_perimeter(
-        conn, perimeter_id, body.structure_id, repo=repo
-    )
-    return StatusResponse(status=outcome)

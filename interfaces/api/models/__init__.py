@@ -14,7 +14,6 @@ from interfaces.api.models._common import (
     MergeResponse,
     OkResponse,
     RemovedResponse,
-    StatusResponse,
     TotalCountResponse,
 )
 from interfaces.api.models.admin.addresses import (
@@ -36,7 +35,6 @@ from interfaces.api.models.admin.authorships import (
 )
 from interfaces.api.models.admin.feedback import FeedbackStructuresResponse
 from interfaces.api.models.admin.perimeters import (
-    AddPerimeterStructure,
     PerimeterCreate,
 )
 from interfaces.api.models.admin.persons import (
@@ -84,7 +82,6 @@ from interfaces.api.models.journals import JournalTypeChange, JournalTypeChangeI
 __all__ = [
     "AddIdentifier",
     "AddIdentifierResponse",
-    "AddPerimeterStructure",
     "AddressPublicationsResponse",
     "AddressReviewResponse",
     "AssignOrphanAuthorship",
@@ -133,7 +130,6 @@ __all__ = [
     "ReviewAction",
     "SetCountry",
     "SourceAuthorshipRef",
-    "StatusResponse",
     "StructureCreate",
     "StructureRelationCreateResponse",
     "StructureUpdate",

@@ -1,6 +1,6 @@
 """Command handlers des écritures API sur les périmètres : frontière transactionnelle de l'agrégat.
 
-`update_perimeter` et `add_structure_to_perimeter` rafraîchissent en plus la clôture matérialisée, dont les racines du périmètre commandent la descente.
+`create_perimeter` et `update_perimeter` rafraîchissent en plus la clôture matérialisée, dont les racines du périmètre commandent la descente.
 """
 
 from sqlalchemy import Connection
@@ -12,7 +12,6 @@ from application.ports.repositories.perimeter_repository import (
     PerimeterUpdate,
 )
 from application.services.perimeters import core as perimeters_service
-from application.services.perimeters.core import AddStructureOutcome
 
 
 def create_perimeter(
@@ -20,10 +19,14 @@ def create_perimeter(
     *,
     code: str,
     name: str,
+    structure_ids: list[int],
     repo: PerimeterRepository,
 ) -> int:
-    """Crée un périmètre. Retourne l'id créé."""
-    pid = perimeters_service.create_perimeter(code=code, name=name, repo=repo)
+    """Crée un périmètre avec ses structures racines. Retourne l'id créé."""
+    pid = perimeters_service.create_perimeter(
+        code=code, name=name, structure_ids=structure_ids, repo=repo
+    )
+    repo.refresh_structures()
     conn.commit()
     return pid
 
@@ -54,17 +57,3 @@ def delete_perimeter(
         perimeter_id, repo=repo, config=config, audit_repo=audit_repo
     )
     conn.commit()
-
-
-def add_structure_to_perimeter(
-    conn: Connection,
-    perimeter_id: int,
-    structure_id: int,
-    *,
-    repo: PerimeterRepository,
-) -> AddStructureOutcome:
-    """Ajoute une structure racine au périmètre. Retourne l'issue."""
-    outcome = perimeters_service.add_structure_to_perimeter(perimeter_id, structure_id, repo=repo)
-    repo.refresh_structures()
-    conn.commit()
-    return outcome

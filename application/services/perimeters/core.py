@@ -5,8 +5,6 @@ Un périmètre porte des structures **racines** (`perimeters.structure_ids`) ; l
 `delete_perimeter` consulte la table `config` (via `ConfigStore`) pour refuser la suppression d'un périmètre encore référencé par la configuration pipeline.
 """
 
-from enum import StrEnum
-
 from application.audit_log import emit_event
 from application.ports.config import ConfigStore
 from application.ports.repositories.audit_repository import AuditRepository
@@ -16,45 +14,15 @@ from application.ports.repositories.perimeter_repository import (
 )
 from domain.errors import ConflictError, NotFoundError, ValidationError
 
-# ── Structures membres ────────────────────────────────────────────
-
-
-class AddStructureOutcome(StrEnum):
-    """Issue d'`add_structure_to_perimeter`, relayée telle quelle par l'API."""
-
-    ADDED = "added"
-    ALREADY_PRESENT = "already_present"
-
-
-def add_structure_to_perimeter(
-    perimeter_id: int,
-    structure_id: int,
-    *,
-    repo: PerimeterRepository,
-) -> AddStructureOutcome:
-    """Ajoute une structure racine au périmètre. Idempotent.
-
-    Lève `NotFoundError` si le périmètre n'existe pas.
-    """
-    if repo.add_structure_to_perimeter(perimeter_id, structure_id):
-        return AddStructureOutcome.ADDED
-
-    # Pas d'UPDATE → soit déjà présent, soit périmètre inexistant
-    if repo.perimeter_exists(perimeter_id):
-        return AddStructureOutcome.ALREADY_PRESENT
-    raise NotFoundError(f"Périmètre {perimeter_id} introuvable")
-
-
-# ── CRUD ──────────────────────────────────────────────────────────
-
 
 def create_perimeter(
     *,
     code: str,
     name: str,
+    structure_ids: list[int],
     repo: PerimeterRepository,
 ) -> int:
-    """Crée un périmètre sans structure racine. Retourne l'id créé.
+    """Crée un périmètre avec ses structures racines. Retourne l'id créé.
 
     Lève `ValidationError` si le code ou le nom est vide, `ConflictError` si le code existe déjà.
     """
@@ -63,7 +31,7 @@ def create_perimeter(
 
     if repo.perimeter_code_exists(code):
         raise ConflictError(f"Le code '{code}' existe déjà")
-    return repo.create_perimeter(code=code, name=name)
+    return repo.create_perimeter(code=code, name=name, structure_ids=structure_ids)
 
 
 def update_perimeter(
