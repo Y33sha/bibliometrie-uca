@@ -1,6 +1,6 @@
-"""Router /api/hal-problems/* — les anomalies des dépôts HAL.
+"""Router des anomalies des dépôts HAL. Sert `/api/hal-problems/*`.
 
-Sert le tableau de bord qualité HAL : comptes d'auteur dupliqués, dépôts en double par identifiant ou par métadonnées, publications absentes de la collection de leur laboratoire, affiliations en conflit d'une source à l'autre.
+Alimente le tableau de bord qualité HAL : comptes d'auteur dupliqués, dépôts en double par identifiant ou par métadonnées, publications absentes de la collection de leur laboratoire, affiliations en conflit d'une source à l'autre.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -17,10 +17,10 @@ from application.ports.api.hal_problems_queries import (
 )
 from interfaces.api.deps import hal_problems_queries
 
-router = APIRouter()
+router = APIRouter(prefix="/api/hal-problems", tags=["hal-problems"])
 
 
-@router.get("/api/hal-problems/duplicate-accounts", response_model=HalDuplicateAccountsResponse)
+@router.get("/duplicate-accounts", response_model=HalDuplicateAccountsResponse)
 def hal_duplicate_accounts(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=200),
@@ -30,7 +30,7 @@ def hal_duplicate_accounts(
     return queries.hal_duplicate_accounts(page=page, per_page=per_page)
 
 
-@router.get("/api/hal-problems/duplicate-pubs-doi", response_model=HalDoiDuplicatesResponse)
+@router.get("/duplicate-pubs-doi", response_model=HalDoiDuplicatesResponse)
 def hal_duplicate_pubs_by_doi(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=200),
@@ -40,7 +40,7 @@ def hal_duplicate_pubs_by_doi(
     return queries.hal_duplicate_pubs_by_doi(page=page, per_page=per_page)
 
 
-@router.get("/api/hal-problems/duplicate-pubs-meta", response_model=HalMetaDuplicatesResponse)
+@router.get("/duplicate-pubs-meta", response_model=HalMetaDuplicatesResponse)
 def hal_duplicate_pubs_by_metadata(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=200),
@@ -50,7 +50,7 @@ def hal_duplicate_pubs_by_metadata(
     return queries.hal_duplicate_pubs_by_metadata(page=page, per_page=per_page)
 
 
-@router.get("/api/hal-problems/missing-collections", response_model=HalMissingCollectionsResponse)
+@router.get("/missing-collections", response_model=HalMissingCollectionsResponse)
 def hal_missing_collections(
     lab_id: int = Query(...),
     page: int = Query(1, ge=1),
@@ -69,7 +69,7 @@ def hal_missing_collections(
     return result
 
 
-@router.get("/api/hal-problems/missing-collections/labs", response_model=list[HalCollectionLab])
+@router.get("/missing-collections/labs", response_model=list[HalCollectionLab])
 def hal_missing_collections_labs(
     queries: HalProblemsQueries = Depends(hal_problems_queries),
 ) -> list[HalCollectionLab]:
@@ -77,9 +77,7 @@ def hal_missing_collections_labs(
     return queries.hal_missing_collections_labs()
 
 
-@router.get(
-    "/api/hal-problems/affiliation-conflicts", response_model=HalAffiliationConflictsResponse
-)
+@router.get("/affiliation-conflicts", response_model=HalAffiliationConflictsResponse)
 def hal_affiliation_conflicts(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=200),

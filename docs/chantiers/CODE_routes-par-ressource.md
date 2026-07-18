@@ -77,7 +77,7 @@ L'ordre part des modules sans chemin non couvert et sans scission — la mécani
 **Sans couverture à compléter ni recomposition**, remontée hors d'`admin/` et préfixe seulement :
 
 - [x] `subjects` — préfixe posé, chemins et `operationId` inchangés au contrat, `tags` apparus. Le contrat TypeScript régénéré ne bouge pas d'une ligne : `openapi-typescript` n'émet pas les `tags`, qui ne servent que le groupement de la documentation.
-- [ ] `publishers`, `hal_problems`.
+- [x] `publishers`, `hal_problems` — mêmes contrôles, contrat inchangé.
 - [ ] `feedback` — `/api/admin/feedback/*` → `/api/feedback/*`.
 - [ ] `publication_duplicates` → `publications` — `/api/admin/duplicates/*` → `/api/publications/duplicates/*`.
 - [ ] `authorships` — `/api/admin/orphan-authorships/*` → `/api/authorships/orphans/*`.

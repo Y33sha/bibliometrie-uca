@@ -1,4 +1,4 @@
-"""Router /api/publishers/* — les éditeurs : listes, recherche, édition, fusion."""
+"""Router des éditeurs : listes, recherche, édition, fusion. Sert `/api/publishers/*`."""
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import Connection
@@ -40,10 +40,10 @@ from interfaces.api.models import (
 )
 from interfaces.api.params import TOP_SUBJECTS_LIMIT, TopSubjectsLimit
 
-router = APIRouter()
+router = APIRouter(prefix="/api/publishers", tags=["publishers"])
 
 
-@router.get("/api/publishers/types", response_model=list[EnumOption])
+@router.get("/types", response_model=list[EnumOption])
 def list_publisher_types() -> list[EnumOption]:
     """Valeurs possibles de l'enum `publisher_type` avec leur libellé français.
 
@@ -52,7 +52,7 @@ def list_publisher_types() -> list[EnumOption]:
     return [EnumOption(value=v, label_fr=PUBLISHER_TYPE_LABELS_FR[v]) for v in PUBLISHER_TYPES]
 
 
-@router.get("/api/publishers/facets", response_model=PublishersFacetsResponse)
+@router.get("/facets", response_model=PublishersFacetsResponse)
 def publishers_facets(
     search: str | None = None,
     publisher_type: str = Query(""),
@@ -72,7 +72,7 @@ def publishers_facets(
     )
 
 
-@router.get("/api/publishers", response_model=PublisherListResponse)
+@router.get("", response_model=PublisherListResponse)
 def list_publishers(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=200),
@@ -104,7 +104,7 @@ def list_publishers(
     )
 
 
-@router.get("/api/publishers/{publisher_id}", response_model=Publisher)
+@router.get("/{publisher_id}", response_model=Publisher)
 def get_publisher(
     publisher_id: int,
     queries: PublisherQueries = Depends(publisher_queries),
@@ -119,7 +119,7 @@ def get_publisher(
     return row
 
 
-@router.get("/api/publishers/{publisher_id}/dashboard", response_model=PublisherDashboardResponse)
+@router.get("/{publisher_id}/dashboard", response_model=PublisherDashboardResponse)
 def get_publisher_dashboard(
     publisher_id: int,
     queries: PublisherQueries = Depends(publisher_queries),
@@ -134,7 +134,7 @@ def get_publisher_dashboard(
     return result
 
 
-@router.get("/api/publishers/{publisher_id}/subjects", response_model=list[SubjectFrequency])
+@router.get("/{publisher_id}/subjects", response_model=list[SubjectFrequency])
 def get_publisher_subjects(
     publisher_id: int,
     limit: TopSubjectsLimit = TOP_SUBJECTS_LIMIT,
@@ -147,7 +147,7 @@ def get_publisher_subjects(
     return queries.get_publisher_subjects(publisher_id, limit=limit)
 
 
-@router.put("/api/publishers/{publisher_id}", response_model=OkResponse)
+@router.put("/{publisher_id}", response_model=OkResponse)
 def update_publisher(
     publisher_id: int,
     body: PublisherUpdate,
@@ -163,7 +163,7 @@ def update_publisher(
 
 
 @router.post(
-    "/api/publishers/{publisher_id}/merge",
+    "/{publisher_id}/merge",
     response_model=MergeResponse,
     responses={409: {"model": PublisherMergeBlockedResponse}},
 )
