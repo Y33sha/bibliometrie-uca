@@ -50,7 +50,7 @@ BYPASS_RE = re.compile(r"--no-verify|--no-gpg-sign|HUSKY=0|SKIP=|PRE_COMMIT_ALLO
 # --- Règle 3 : indexation globale -----------------------------------------
 
 PROMISCUOUS_RE = re.compile(
-    r"\bgit\s+add\s+(?:-A\b|--all\b|-u\b|--update\b|\.(?=\s|$)|\*(?=\s|$))"
+    r"\bgit\s+(?:-C\s+\S+\s+)*add\s+(?:-A\b|--all\b|-u\b|--update\b|\.(?=\s|$)|\*(?=\s|$))"
     r"|\bgit\s+commit\b(?=[^\n]*\s-(?:a\b|[a-zA-Z]*a[a-zA-Z]*\b))"
     r"|\bgit\s+stash\b(?!\s+list\b)"
     r"|\bgit\s+checkout\s+--\s+\.(?=\s|$)"
