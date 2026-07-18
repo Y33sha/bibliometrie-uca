@@ -114,7 +114,7 @@ def list_addresses(
 @router.get("/api/addresses/{addr_id}/publications", response_model=AddressPublicationsResponse)
 def get_address_publications(
     addr_id: int,
-    limit: int = Query(20),
+    limit: int = Query(20, ge=1, le=100),
     queries: AddressesQueries = Depends(addresses_queries),
 ) -> AddressPublicationsResponse:
     """Échantillon de publications liées à une adresse."""
