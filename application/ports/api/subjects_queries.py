@@ -1,10 +1,8 @@
 """Port : lectures sur les sujets (consommé par le router subjects).
 
-Implémenté par `infrastructure.queries.subjects.PgSubjectsAdminQueries`.
+Implémenté par `infrastructure.queries.subjects.PgSubjectsAdminQueries`. Les écritures du référentiel, faites par la phase d'ingestion, passent par `application.ports.pipeline.subjects.SubjectsQueries`.
 
-Note : `application.ports.pipeline.subjects.SubjectsQueries` couvre la variante utilisée par la phase d'ingestion (upsert/link). Ce port-ci ne couvre que les lectures de l'API admin.
-
-Co-localise les DTOs Pydantic retournés par ce port + `SubjectFrequency`, utilisé par les ports voisins (`persons_queries.person_subjects`, `laboratories_queries.lab_subjects`).
+`SubjectFrequency` vit ici et sert les quatre nuages de sujets des ports voisins : personnes, laboratoires, revues et éditeurs.
 """
 
 from typing import Protocol
@@ -13,7 +11,7 @@ from pydantic import BaseModel
 
 
 class SubjectOut(BaseModel):
-    """Sujet attaché à une publication, agrégé par `subject_id` sur les différentes sources qui l'ont annoté. `sources` liste les sources qui l'ont fourni."""
+    """Sujet attaché à une publication. Les annotations des différentes sources sont agrégées en une ligne par sujet, `sources` retenant celles qui l'ont fourni."""
 
     id: int
     label: str
@@ -22,7 +20,7 @@ class SubjectOut(BaseModel):
 
 
 class SubjectListItem(BaseModel):
-    """Sujet dans une liste paginée (page `/subjects`)."""
+    """Sujet du référentiel et son nombre de publications, servi en liste comme en détail."""
 
     id: int
     label: str
@@ -47,14 +45,14 @@ class SubjectNeighborOut(BaseModel):
 
 
 class SubjectDetailResponse(BaseModel):
-    """Détail d'un sujet + ses voisins par co-occurrence (page graphe)."""
+    """Détail d'un sujet et ses voisins par co-occurrence."""
 
     subject: SubjectListItem
     neighbors: list[SubjectNeighborOut]
 
 
 class SubjectFrequency(BaseModel):
-    """Sujet avec fréquence locale (count des publis du contexte parent : labo ou personne). Utilisé pour les nuages de mots. Retourné par `PersonsQueries.person_subjects` et `LaboratoriesQueries.lab_subjects`."""
+    """Sujet et son nombre de publications au sein d'une entité donnée — personne, laboratoire, revue ou éditeur. Alimente les nuages de sujets de leurs pages de détail."""
 
     id: int
     label: str

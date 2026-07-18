@@ -1,4 +1,4 @@
-"""Router /api/subjects/* — les sujets : liste paginée, et détail portant les voisins par co-occurrence."""
+"""Router /api/subjects/* — les sujets : liste paginée et détail avec les voisins par co-occurrence."""
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
@@ -16,11 +16,13 @@ router = APIRouter()
 def list_subjects(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=200),
-    q: str | None = Query(None, description="Recherche insensible à la casse sur label"),
-    min_count: int = Query(1, ge=1, description="Filtre usage_count >= min_count"),
+    q: str | None = Query(
+        None, description="Recherche sur le libellé, insensible à la casse et aux accents"
+    ),
+    min_count: int = Query(1, ge=1, description="Nombre minimal de publications portant le sujet"),
     queries: SubjectsAdminQueries = Depends(subjects_admin_queries),
 ) -> SubjectListResponse:
-    """Liste paginée des sujets, ordonnée par `usage_count` décroissant."""
+    """Liste paginée des sujets, les plus portés par des publications d'abord."""
     offset = (page - 1) * per_page
     items = queries.list_subjects(q=q, limit=per_page, offset=offset, min_count=min_count)
     total = queries.count_subjects(q=q, min_count=min_count)
@@ -34,7 +36,7 @@ def get_subject(
     min_cooccurrence: int = Query(2, ge=1),
     queries: SubjectsAdminQueries = Depends(subjects_admin_queries),
 ) -> SubjectDetailResponse:
-    """Détail d'un sujet et ses voisins par co-occurrence, les plus fréquents d'abord."""
+    """Détail d'un sujet, avec ses voisins par co-occurrence, les plus fréquents d'abord."""
     subject = queries.get_subject(subject_id)
     if subject is None:
         raise HTTPException(status_code=404, detail="Sujet introuvable")
