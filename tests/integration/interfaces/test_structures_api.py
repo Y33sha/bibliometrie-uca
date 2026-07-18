@@ -4,7 +4,7 @@ Couvre :
 - GET /api/structures (list + filtres)
 - GET /api/structures/{id} (detail, 404)
 - POST/PUT/DELETE /api/structures (mutations, auth requise)
-- POST/DELETE /api/structure-relations (relations, auth requise)
+- POST/DELETE /api/structures/relations (relations, auth requise)
 - GET/POST/PUT/DELETE /api/name-forms (formes de noms, auth requise)
 """
 
@@ -235,7 +235,7 @@ class TestDeleteStructure:
 class TestCreateRelation:
     def test_requires_admin(self, client):
         r = client.post(
-            "/api/structure-relations",
+            "/api/structures/relations",
             json={"parent_id": 1, "child_id": 2, "relation_type": "tutelle"},
         )
         assert r.status_code == 401
@@ -244,7 +244,7 @@ class TestCreateRelation:
         parent = _seed_structure(type_="universite")
         child = _seed_structure(type_="labo")
         r = auth_client.post(
-            "/api/structure-relations",
+            "/api/structures/relations",
             json={
                 "parent_id": parent,
                 "child_id": child,
@@ -261,7 +261,7 @@ class TestCreateRelation:
         child = _seed_structure(type_="labo")
         _seed_relation(parent, child, "tutelle")
         r = auth_client.post(
-            "/api/structure-relations",
+            "/api/structures/relations",
             json={
                 "parent_id": parent,
                 "child_id": child,
@@ -274,18 +274,18 @@ class TestCreateRelation:
 
 class TestDeleteRelation:
     def test_requires_admin(self, client):
-        r = client.delete("/api/structure-relations/1")
+        r = client.delete("/api/structures/relations/1")
         assert r.status_code == 401
 
     def test_404(self, auth_client):
-        r = auth_client.delete("/api/structure-relations/999999999")
+        r = auth_client.delete("/api/structures/relations/999999999")
         assert r.status_code == 404
 
     def test_ok(self, auth_client):
         parent = _seed_structure(type_="universite")
         child = _seed_structure(type_="labo")
         rid = _seed_relation(parent, child)
-        r = auth_client.delete(f"/api/structure-relations/{rid}")
+        r = auth_client.delete(f"/api/structures/relations/{rid}")
         assert r.status_code == 200
         assert r.json()["deleted"] is True
 

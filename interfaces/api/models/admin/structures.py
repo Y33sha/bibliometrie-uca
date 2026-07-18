@@ -52,7 +52,7 @@ class NameFormUpdate(BaseModel):
 
 
 class StructureRelationCreateResponse(BaseModel):
-    """Réponse de POST /api/structure-relations, polymorphe : soit la relation créée, soit `{status: "already_exists"}`."""
+    """Réponse de POST /api/structures/relations, polymorphe : soit la relation créée, soit `{status: "already_exists"}`."""
 
     id: int | None = None
     parent_id: int | None = None

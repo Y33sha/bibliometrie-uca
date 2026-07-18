@@ -242,7 +242,7 @@ class TestMaterializedPerimeterStructures:
         lab = _seed_structure(type_="labo")
         pid = _seed_perimeter(structure_ids=[root])
         r = auth_client.post(
-            "/api/structure-relations",
+            "/api/structures/relations",
             json={"parent_id": root, "child_id": lab, "relation_type": "est_tutelle_de"},
         )
         assert r.status_code == 200

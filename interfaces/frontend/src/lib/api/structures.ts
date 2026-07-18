@@ -21,9 +21,9 @@ export function remove(id: number): Promise<DeletedResponse> {
 export function createRelation(
 	body: Record<string, unknown>
 ): Promise<StructureRelationCreateResponse> {
-	return post<StructureRelationCreateResponse>('/api/structure-relations', body);
+	return post<StructureRelationCreateResponse>('/api/structures/relations', body);
 }
 
 export function deleteRelation(relId: number): Promise<DeletedResponse> {
-	return del<DeletedResponse>(`/api/structure-relations/${relId}`);
+	return del<DeletedResponse>(`/api/structures/relations/${relId}`);
 }
