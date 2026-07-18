@@ -12,6 +12,8 @@
 
 ### Non commencé
 
+- [Routes API par ressource : supprimer le dossier `admin`](CODE_routes-par-ressource.md)
+- [Les liens adresse ↔ site ne s'écrivent pas en base](DATA_liens-adresse-site-non-persistes.md)
 - [Structures et laboratoires : une entité, deux piles de lecture](CODE_structures-et-laboratoires.md)
 - [Projections de lecture des personnes : deux endpoints pour une entité](CODE_projections-de-lecture-des-personnes.md)
 - [Typage des paramètres de requête : ce que `str` ne dit pas](CODE_typage-des-parametres-de-requete.md)
