@@ -92,6 +92,14 @@ class TestAuth:
 # ── Config ──────────────────────────────────────────────────────
 
 
+class TestApiBoundary:
+    def test_unknown_api_path_is_not_served_by_the_frontend(self, client):
+        """Le frontend est monté en dernier et reçoit tout ce qu'aucun router n'a pris : sous `/api`, il doit rendre la main plutôt que sa page d'accueil."""
+        r = client.get("/api/chemin-qui-n-existe-pas")
+        assert r.status_code == 404
+        assert r.headers["content-type"].startswith("application/json")
+
+
 class TestConfig:
     def test_get_config(self, auth_client):
         r = auth_client.get("/api/config")

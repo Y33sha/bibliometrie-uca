@@ -605,3 +605,27 @@ class TestJournalTypes:
             "unknown",
         ]
         assert all("label_fr" in opt and opt["label_fr"] for opt in body)
+
+
+class TestJournalsFacets:
+    def test_returns_every_facet(self, client):
+        r = client.get("/api/journals/facets")
+        assert r.status_code == 200
+        body = r.json()
+        assert {"journal_types", "oa_models", "doaj"} <= set(body)
+
+    def test_honours_search_and_publisher(self, client):
+        r = client.get("/api/journals/facets", params={"search": "nature", "publisher_id": 1})
+        assert r.status_code == 200
+
+    def test_honours_the_other_dimensions(self, client):
+        r = client.get(
+            "/api/journals/facets",
+            params={
+                "journal_type": "journal,proceedings",
+                "oa_model": "full_oa",
+                "is_in_doaj": "true",
+                "with_pubs": "true",
+            },
+        )
+        assert r.status_code == 200
