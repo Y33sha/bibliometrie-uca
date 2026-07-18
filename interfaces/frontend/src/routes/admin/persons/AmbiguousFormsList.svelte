@@ -27,7 +27,7 @@
   async function load() {
     loading = true;
     data = await api<AmbiguousNameFormsResponse>(
-      `/api/admin/ambiguous-name-forms?page=${page}&per_page=50`,
+      `/api/persons/ambiguous-name-forms?page=${page}&per_page=50`,
     );
     loading = false;
   }

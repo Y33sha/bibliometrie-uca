@@ -38,7 +38,7 @@
 
   async function load() {
     loading = true;
-    data = await api<Resp>(`/api/admin/name-duplicates?page=${page}&per_page=50`);
+    data = await api<Resp>(`/api/persons/name-duplicates?page=${page}&per_page=50`);
     loading = false;
   }
 

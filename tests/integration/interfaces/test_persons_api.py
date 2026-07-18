@@ -408,27 +408,29 @@ class TestRemoveIdentifier:
 
 class TestUpdateIdentifierStatus:
     def test_requires_admin(self, client):
-        r = client.patch("/api/person-identifiers/1/status", json={"status": "confirmed"})
+        r = client.patch("/api/persons/identifiers/1/status", json={"status": "confirmed"})
         assert r.status_code == 401
 
     def test_ok(self, auth_client):
         pid = _seed_person()
         iid = _seed_identifier(pid, "idhal", _uniq("st"))
-        r = auth_client.patch(f"/api/person-identifiers/{iid}/status", json={"status": "confirmed"})
+        r = auth_client.patch(
+            f"/api/persons/identifiers/{iid}/status", json={"status": "confirmed"}
+        )
         assert r.status_code == 200
         assert r.json()["status"] == "confirmed"
 
 
 class TestReassignIdentifier:
     def test_requires_admin(self, client):
-        r = client.patch("/api/person-identifiers/1/reassign", json={"person_id": 1})
+        r = client.patch("/api/persons/identifiers/1/reassign", json={"person_id": 1})
         assert r.status_code == 401
 
     def test_target_not_found(self, auth_client):
         pid = _seed_person()
         iid = _seed_identifier(pid, "idhal", _uniq("ra"))
         r = auth_client.patch(
-            f"/api/person-identifiers/{iid}/reassign", json={"person_id": 999999999}
+            f"/api/persons/identifiers/{iid}/reassign", json={"person_id": 999999999}
         )
         assert r.status_code == 404
 
@@ -436,7 +438,7 @@ class TestReassignIdentifier:
         src = _seed_person()
         dst = _seed_person()
         iid = _seed_identifier(src, "idhal", _uniq("ra"), status="rejected")
-        r = auth_client.patch(f"/api/person-identifiers/{iid}/reassign", json={"person_id": dst})
+        r = auth_client.patch(f"/api/persons/identifiers/{iid}/reassign", json={"person_id": dst})
         assert r.status_code == 200
         body = r.json()
         assert body["person_id"] == dst
@@ -618,13 +620,13 @@ class TestTriageQueues:
 
     @pytest.mark.parametrize("queue", QUEUES)
     def test_count(self, client, queue):
-        r = client.get(f"/api/admin/{queue}/count")
+        r = client.get(f"/api/persons/{queue}/count")
         assert r.status_code == 200
         assert isinstance(r.json()["total"], int)
 
     @pytest.mark.parametrize("queue", QUEUES)
     def test_list_is_paginated(self, client, queue):
-        r = client.get(f"/api/admin/{queue}", params={"page": 1, "per_page": 10})
+        r = client.get(f"/api/persons/{queue}", params={"page": 1, "per_page": 10})
         assert r.status_code == 200
         body = r.json()
         assert body["page"] == 1
@@ -633,25 +635,25 @@ class TestTriageQueues:
 
     @pytest.mark.parametrize("queue", QUEUES)
     def test_rejects_per_page_above_ceiling(self, client, queue):
-        r = client.get(f"/api/admin/{queue}", params={"per_page": 500})
+        r = client.get(f"/api/persons/{queue}", params={"per_page": 500})
         assert r.status_code == 422
 
 
 class TestPersonAdminProjection:
     def test_unknown_person_404(self, client):
-        r = client.get("/api/admin/persons/999999999")
+        r = client.get("/api/persons/999999999/curation")
         assert r.status_code == 404
 
     def test_returns_seeded_person(self, client):
         pid = _seed_person("AdminProj", "Ec")
-        r = client.get(f"/api/admin/persons/{pid}")
+        r = client.get(f"/api/persons/{pid}/curation")
         assert r.status_code == 200
         assert r.json()["id"] == pid
 
     def test_sharing_name_forms_without_sharer(self, client):
         pid = _seed_person("Sharing", "Ec")
         _seed_name_form(pid, _uniq("sharing ec"))
-        r = client.get(f"/api/admin/persons/{pid}/sharing-name-forms")
+        r = client.get(f"/api/persons/{pid}/sharing-name-forms")
         assert r.status_code == 200
         assert r.json() == []
 
@@ -661,29 +663,27 @@ class TestPersonAdminProjection:
         b = _seed_person("SharedB", "Ec")
         _seed_name_form(a, form)
         _seed_name_form(b, form)
-        r = client.get(f"/api/admin/persons/{a}/sharing-name-forms")
+        r = client.get(f"/api/persons/{a}/sharing-name-forms")
         assert r.status_code == 200
         assert b in [p["id"] for p in r.json()]
 
 
 class TestMarkPersonsDistinct:
     def test_requires_admin(self, client):
-        r = client.post(
-            "/api/admin/persons/mark-distinct", json={"person_id_a": 1, "person_id_b": 2}
-        )
+        r = client.post("/api/persons/mark-distinct", json={"person_id_a": 1, "person_id_b": 2})
         assert r.status_code == 401
 
     def test_marks_pair(self, auth_client):
         a = _seed_person("DistinctA", "Ec")
         b = _seed_person("DistinctB", "Ec")
         r = auth_client.post(
-            "/api/admin/persons/mark-distinct", json={"person_id_a": a, "person_id_b": b}
+            "/api/persons/mark-distinct", json={"person_id_a": a, "person_id_b": b}
         )
         assert r.status_code == 200
 
     def test_rejects_same_person(self, auth_client):
         a = _seed_person("DistinctSame", "Ec")
         r = auth_client.post(
-            "/api/admin/persons/mark-distinct", json={"person_id_a": a, "person_id_b": a}
+            "/api/persons/mark-distinct", json={"person_id_a": a, "person_id_b": a}
         )
         assert r.status_code == 400

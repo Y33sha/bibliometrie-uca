@@ -30,7 +30,7 @@
 
   async function load() {
     loading = true;
-    data = await api<Resp>(`/api/admin/detachable-intruders?page=${page}&per_page=50`);
+    data = await api<Resp>(`/api/persons/detachable-intruders?page=${page}&per_page=50`);
     loading = false;
   }
 

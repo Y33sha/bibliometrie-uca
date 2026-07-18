@@ -67,21 +67,21 @@ export function setIdentifierStatus(
 	identId: number,
 	status: string
 ): Promise<IdentifierStatusResponse> {
-	return patch<IdentifierStatusResponse>(`/api/person-identifiers/${identId}/status`, { status });
+	return patch<IdentifierStatusResponse>(`/api/persons/identifiers/${identId}/status`, { status });
 }
 
 export function reassignIdentifier(
 	identId: number,
 	body: Record<string, unknown>
 ): Promise<IdentifierReassignResponse> {
-	return patch<IdentifierReassignResponse>(`/api/person-identifiers/${identId}/reassign`, body);
+	return patch<IdentifierReassignResponse>(`/api/persons/identifiers/${identId}/reassign`, body);
 }
 
 export function markDistinct(
 	personIdA: number,
 	personIdB: number
 ): Promise<unknown> {
-	return post('/api/admin/persons/mark-distinct', {
+	return post('/api/persons/mark-distinct', {
 		person_id_a: personIdA,
 		person_id_b: personIdB
 	});
