@@ -30,7 +30,7 @@ flowchart LR
 
 ## Écriture — API (curation admin)
 
-Routeur `interfaces/api/routers/admin/perimeters.py`, services `application/services/perimeters/` (`core` + `commands`), adaptateur `PgPerimeterRepository`.
+Routeur `interfaces/api/routers/perimeters.py`, services `application/services/perimeters/` (`core` + `commands`), adaptateur `PgPerimeterRepository`.
 
 - **CRUD** : `create_perimeter` (code unique), `update_perimeter` (name, structure_ids), `delete_perimeter` — qui refuse la suppression d'un périmètre référencé par la config pipeline (`config_keys_referencing_perimeter`).
 - **Racines** : `add_perimeter_structure` / `remove_perimeter_structure` (idempotents, `array_append` / `array_remove` sur `perimeters.structure_ids`).

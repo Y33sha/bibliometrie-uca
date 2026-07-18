@@ -49,7 +49,7 @@ Les structures dont le type ne vaut pas affiliation — les sites, cf. `Structur
 
 ## Écriture — API (curation admin)
 
-Routeur `interfaces/api/routers/admin/addresses.py`, couche commande transactionnelle `application/services/addresses/commands.py`, briques `structure_links.py` / `countries.py`, adaptateur `PgAddressRepository`.
+Routeur `interfaces/api/routers/addresses.py`, couche commande transactionnelle `application/services/addresses/commands.py`, briques `structure_links.py` / `countries.py`, adaptateur `PgAddressRepository`.
 
 **Confirmer / rejeter / réinitialiser un rattachement** : `POST /addresses/{id}/review` et `/batch-review` → `review_structure_link`. Le service lit l'appartenance au périmètre *avant*, applique soit `reset_manual_link` (supprime le lien s'il est purement manuel, et repasse `is_confirmed` à NULL sur la détection qui subsiste), soit `upsert_structure_link` (`is_confirmed` TRUE/FALSE), relit *après*, et renvoie le diff symétrique des `address_ids` réellement touchés (détection des no-op). En cas de changement, une tâche de fond propage `in_perimeter` (recompute sur les `source_authorships` des adresses, puis propagation aux `authorships`) sans rafraîchir les vues matérialisées.
 
@@ -67,12 +67,12 @@ Routeur `interfaces/api/routers/admin/addresses.py`, couche commande transaction
 
 ## Lecture — API
 
-Routeur `interfaces/api/routers/admin/addresses.py`, port `application/ports/api/addresses_queries.py`, adaptateur `PgAddressesQueries` — **distinct** des modules SQL de résolution/pays du pipeline (séparation lecture-API vs écriture-pipeline).
+Routeur `interfaces/api/routers/addresses.py`, port `application/ports/api/addresses_queries.py`, adaptateur `PgAddressesQueries` — **distinct** des modules SQL de résolution/pays du pipeline (séparation lecture-API vs écriture-pipeline). Le référentiel des pays est servi à part, par `interfaces/api/routers/countries.py`.
 
 - **Listing / curation** (`GET /addresses`) : `addresses ⋈ address_structures` filtré sur une structure, avec prédicats détecté / validation / texte ; agrégat JSON des structures par adresse.
 - **Inspection** (`GET /addresses/{id}/publications`) : texte brut + publications de l'adresse (pivot ⋈ sa ⋈ sp ⋈ publications ⋈ journals) ; les structures d'un rattachement exposent `is_confirmed` et `is_detected` (= `matched_form_id IS NOT NULL`).
 - **Facettes pays** (`GET /addresses/countries`, `/suggest-countries`, `/countries`) : lit `countries`, `suggested_countries`, `pub_count` ; facettes construites par `unnest`.
-- **Stats** (`GET /admin/address-stats`) : comptes sur `address_structures` (détecté / pending / rejeté / confirmé) pour une structure.
+- **Stats** (`GET /addresses/stats`) : comptes sur `address_structures` (détecté / pending / rejeté / confirmé) pour une structure.
 
 ## Points d'attention
 

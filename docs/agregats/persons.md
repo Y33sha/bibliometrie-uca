@@ -53,7 +53,7 @@ flowchart LR
 
 ## Écriture — API (curation admin)
 
-Routeur `interfaces/api/routers/admin/persons.py` → command handlers `application/services/persons/commands.py` (frontière transactionnelle, `commit` au succès) → briques agnostiques `core.py` → `PgPersonRepository`. Une commande = une transaction.
+Routeur `interfaces/api/routers/persons.py` → command handlers `application/services/persons/commands.py` (frontière transactionnelle, `commit` au succès) → briques agnostiques `core.py` → `PgPersonRepository`. Une commande = une transaction.
 
 - **Fusion** (`POST /api/persons/{id}/merge`) : `merge_into` transfère six tables (`source_authorships`, `authorships`, `rejected_authorships`, `person_identifiers`, `persons_rh` si la cible n'en a pas, `person_name_forms` avec union des `sources`) puis supprime la personne source. Gardée par l'invariant `can_merge_with`.
 - **Identifiants** : ajout manuel (`source='manual'`, types publics seulement), suppression, changement de statut (`confirm` / `reject`), réattribution (statut ramené à `pending`).

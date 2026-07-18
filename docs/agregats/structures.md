@@ -31,7 +31,7 @@ flowchart LR
 
 ## Écriture — API (curation admin)
 
-Routeur `interfaces/api/routers/admin/structures.py`, command handlers `application/services/structures/commands.py`, cœur `core.py`, adaptateur `PgStructureRepository`. **Seul chemin d'écriture** du cluster.
+Routeur `interfaces/api/routers/structures.py`, command handlers `application/services/structures/commands.py`, cœur `core.py`, adaptateur `PgStructureRepository`. **Seul chemin d'écriture** du cluster.
 
 - **Structures** (`POST` / `PUT` / `DELETE /api/structures/{id}`) : `create_structure` / `update_structure` / `delete_structure`. Le service normalise `ror_id` (VO `RorId`), mappe les champs UI → colonnes, et le repo valide `api_ids` contre le modèle JSONB `StructureApiIds`. La suppression cascade en base sur `authorship_structures` et `source_authorship_structures` (FK `ON DELETE CASCADE`).
 - **Relations** (`POST /api/structures/relations`, `DELETE /…/{id}`) : `create_relation` prefetche les ancêtres du parent (`repo.get_ancestor_ids`, `WITH RECURSIVE`) et délègue au domaine `check_can_create_relation` (refus auto-référence / cycle) ; idempotent (`already_exists` si la relation existe).

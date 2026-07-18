@@ -47,10 +47,10 @@ La phase `publications` matérialise l'agrégat ; `relations`, `oa_status` et `c
 
 ## Écriture — API
 
-Deux opérations seulement, dans un router admin (`interfaces/api/routers/admin/publication_duplicates.py`) ; le command handler (`application/services/publications/commands.py`) commite, la dépendance de connexion rollback par défaut (frontière transactionnelle unique).
+Deux opérations seulement, dans un router admin (`interfaces/api/routers/publications.py`) ; le command handler (`application/services/publications/commands.py`) commite, la dépendance de connexion rollback par défaut (frontière transactionnelle unique).
 
-- **Fusion** (`POST /api/admin/duplicates/merge`) : garde « 1 DOI = 1 publication » (`DistinctDoiError` si deux DOI non-nuls distincts), `merge_into` (repointe `source_publications`, dédup + repointe `authorships`, réordonne `distinct_publications`, supprime la publication source), puis `refresh_from_sources`. Cible = plus petit id ; la direction est sans effet durable (l'union des sources est identique).
-- **Marquage distinct** (`POST /api/admin/duplicates/mark-distinct`) : insère une paire dans `distinct_publications` (idempotent).
+- **Fusion** (`POST /api/publications/duplicates/merge`) : garde « 1 DOI = 1 publication » (`DistinctDoiError` si deux DOI non-nuls distincts), `merge_into` (repointe `source_publications`, dédup + repointe `authorships`, réordonne `distinct_publications`, supprime la publication source), puis `refresh_from_sources`. Cible = plus petit id ; la direction est sans effet durable (l'union des sources est identique).
+- **Marquage distinct** (`POST /api/publications/duplicates/mark-distinct`) : insère une paire dans `distinct_publications` (idempotent).
 
 **Aucune édition de métadonnées canoniques** : le canonique est dérivé, jamais saisi. Les corrections passent par les `source_publications` (phase `metadata_correction`) ; l'APC par import CLI (`interfaces/cli/imports/import_apc.py`), en lecture seule côté API.
 
@@ -65,7 +65,7 @@ Deux opérations seulement, dans un router admin (`interfaces/api/routers/admin/
 - **Détail** (`GET /api/publications/{id}`) : métadonnées canoniques (`publications` ⨝ `publications_detail` ⨝ `journals` ⨝ `publishers`), provenance par source (avec drapeau `is_secondary`), auteurs canoniques et auteurs par source, relations (sortantes + entrantes inversées via `inverse_relation`), sujets, identifiants externes.
 - **Listes / facettes / export** : liste paginée et CSV, ~11 facettes (dont labos via le matview `publication_structures`, statut HAL, APC).
 - **Stats / pivot** : ventilations sur `publications` (années, OA, doc_type, labo, éditeur, revue), collaborations (`publications.countries`).
-- **Candidat de dédoublonnage** (`GET /api/admin/duplicates/next`) : similarité de titre + proximité d'année + DOI convergents, excluant les paires de `distinct_publications` — la lecture qui alimente la fusion manuelle.
+- **Candidat de dédoublonnage** (`GET /api/publications/duplicates/next`) : similarité de titre + proximité d'année + DOI convergents, excluant les paires de `distinct_publications` — la lecture qui alimente la fusion manuelle.
 
 ## Points d'attention
 
