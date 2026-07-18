@@ -52,8 +52,6 @@
     load();
   }
 
-  const totalPages = $derived(data ? Math.max(1, Math.ceil(data.total / PER_PAGE)) : 1);
-
   onMount(load);
 </script>
 
@@ -110,7 +108,7 @@
         </tbody>
       </table>
 
-      <Pagination page={data.page} pages={totalPages} onchange={onPageChange} />
+      <Pagination page={data.page} pages={data.pages} onchange={onPageChange} />
     {/if}
   {/if}
 

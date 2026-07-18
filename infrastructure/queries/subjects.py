@@ -269,9 +269,9 @@ class PgSubjectsAdminQueries(SubjectsAdminQueries):
         self._conn = conn
 
     def list_subjects(
-        self, *, q: str | None, limit: int, offset: int, min_count: int
+        self, *, q: str | None, limit: int, offset: int, min_usage_count: int
     ) -> list[SubjectListItem]:
-        binds: dict[str, Any] = {"min_count": min_count, "lim": limit, "off": offset}
+        binds: dict[str, Any] = {"min_count": min_usage_count, "lim": limit, "off": offset}
         where = "usage_count >= :min_count"
         if q:
             where += " AND unaccent(label) ILIKE unaccent(:q)"
@@ -296,8 +296,8 @@ class PgSubjectsAdminQueries(SubjectsAdminQueries):
             for r in rows
         ]
 
-    def count_subjects(self, *, q: str | None, min_count: int) -> int:
-        binds: dict[str, Any] = {"min_count": min_count}
+    def count_subjects(self, *, q: str | None, min_usage_count: int) -> int:
+        binds: dict[str, Any] = {"min_count": min_usage_count}
         where = "usage_count >= :min_count"
         if q:
             where += " AND unaccent(label) ILIKE unaccent(:q)"
@@ -327,7 +327,7 @@ class PgSubjectsAdminQueries(SubjectsAdminQueries):
         )
 
     def get_subject_neighbors(
-        self, subject_id: int, *, limit: int, min_count: int
+        self, subject_id: int, *, limit: int, min_cooccurrence_count: int
     ) -> list[SubjectNeighborOut]:
         rows = self._conn.execute(
             text("""
@@ -345,7 +345,7 @@ class PgSubjectsAdminQueries(SubjectsAdminQueries):
                 ORDER BY c.n DESC, lower(s.label)
                 LIMIT :lim
             """),
-            {"sid": subject_id, "min_count": min_count, "lim": limit},
+            {"sid": subject_id, "min_count": min_cooccurrence_count, "lim": limit},
         ).all()
         return [
             SubjectNeighborOut(

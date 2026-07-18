@@ -2520,7 +2520,7 @@ export interface paths {
         };
         /**
          * List Subjects
-         * @description Liste paginée des sujets, ordonnée par `usage_count` décroissant.
+         * @description Liste paginée des sujets, les plus portés par des publications d'abord.
          */
         get: operations["list_subjects_api_subjects_get"];
         put?: never;
@@ -2540,7 +2540,7 @@ export interface paths {
         };
         /**
          * Get Subject
-         * @description Détail d'un sujet et ses voisins par co-occurrence, les plus fréquents d'abord.
+         * @description Détail d'un sujet, avec ses voisins par co-occurrence, les plus fréquents d'abord.
          */
         get: operations["get_subject_api_subjects__subject_id__get"];
         put?: never;
@@ -5531,7 +5531,7 @@ export interface components {
         };
         /**
          * SubjectDetailResponse
-         * @description Détail d'un sujet + ses voisins par co-occurrence (page graphe).
+         * @description Détail d'un sujet et ses voisins par co-occurrence.
          */
         SubjectDetailResponse: {
             subject: components["schemas"]["SubjectListItem"];
@@ -5540,7 +5540,7 @@ export interface components {
         };
         /**
          * SubjectFrequency
-         * @description Sujet avec fréquence locale (count des publis du contexte parent : labo ou personne). Utilisé pour les nuages de mots. Retourné par `PersonsQueries.person_subjects` et `LaboratoriesQueries.lab_subjects`.
+         * @description Sujet et son nombre de publications au sein d'une entité donnée — personne, laboratoire, revue ou éditeur. Alimente les nuages de sujets de leurs pages de détail.
          */
         SubjectFrequency: {
             /** Id */
@@ -5552,7 +5552,7 @@ export interface components {
         };
         /**
          * SubjectListItem
-         * @description Sujet dans une liste paginée (page `/subjects`).
+         * @description Sujet du référentiel et son nombre de publications, servi en liste comme en détail.
          */
         SubjectListItem: {
             /** Id */
@@ -5566,14 +5566,16 @@ export interface components {
         };
         /** SubjectListResponse */
         SubjectListResponse: {
-            /** Items */
-            items: components["schemas"]["SubjectListItem"][];
             /** Total */
             total: number;
             /** Page */
             page: number;
             /** Per Page */
             per_page: number;
+            /** Items */
+            items: components["schemas"]["SubjectListItem"][];
+            /** Pages */
+            readonly pages: number;
         };
         /**
          * SubjectNeighborOut
@@ -5591,7 +5593,7 @@ export interface components {
         };
         /**
          * SubjectOut
-         * @description Sujet attaché à une publication, agrégé par `subject_id` sur les différentes sources qui l'ont annoté. `sources` liste les sources qui l'ont fourni.
+         * @description Sujet attaché à une publication. Les annotations des différentes sources sont agrégées en une ligne par sujet, `sources` retenant celles qui l'ont fourni.
          */
         SubjectOut: {
             /** Id */
@@ -9755,9 +9757,9 @@ export interface operations {
             query?: {
                 page?: number;
                 per_page?: number;
-                /** @description Recherche insensible à la casse sur label */
+                /** @description Recherche sur le libellé, insensible à la casse et aux accents */
                 q?: string | null;
-                /** @description Filtre usage_count >= min_count */
+                /** @description Nombre minimal de publications portant le sujet */
                 min_count?: number;
             };
             header?: never;
