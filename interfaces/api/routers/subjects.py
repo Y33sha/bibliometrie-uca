@@ -1,4 +1,4 @@
-"""Router /api/subjects/* — les sujets : liste paginée et détail avec les voisins par co-occurrence."""
+"""Router des sujets : liste paginée et détail avec les voisins par co-occurrence. Sert `/api/subjects/*`."""
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
@@ -9,10 +9,10 @@ from application.ports.api.subjects_queries import (
 )
 from interfaces.api.deps import subjects_admin_queries
 
-router = APIRouter()
+router = APIRouter(prefix="/api/subjects", tags=["subjects"])
 
 
-@router.get("/api/subjects", response_model=SubjectListResponse)
+@router.get("", response_model=SubjectListResponse)
 def list_subjects(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=200),
@@ -29,7 +29,7 @@ def list_subjects(
     return SubjectListResponse(items=items, total=total, page=page, per_page=per_page)
 
 
-@router.get("/api/subjects/{subject_id}", response_model=SubjectDetailResponse)
+@router.get("/{subject_id}", response_model=SubjectDetailResponse)
 def get_subject(
     subject_id: int,
     neighbors_limit: int = Query(20, ge=1, le=100),
