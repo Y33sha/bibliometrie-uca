@@ -34,7 +34,50 @@ class TestStatsFacets:
         assert r.status_code == 200
 
 
-class TestStatsYears:
-    def test_years_list(self, client):
-        r = client.get("/api/stats/years")
+class TestCollaborations:
+    def test_returns_country_counts(self, client):
+        r = client.get("/api/stats/collaborations")
         assert r.status_code == 200
+        assert {"rows", "total_count", "international_count"} <= set(r.json())
+
+    def test_honours_filters(self, client):
+        r = client.get("/api/stats/collaborations", params={"year": "2024", "oa_status": "gold"})
+        assert r.status_code == 200
+
+
+class TestPivot:
+    def test_schema_lists_dimensions_and_measures(self, client):
+        r = client.get("/api/stats/pivot/schema")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["dimensions"]
+        assert body["measures"]
+
+    def test_default_measure_without_grouping(self, client):
+        r = client.get("/api/stats/pivot")
+        assert r.status_code == 200
+
+    def test_single_grouping(self, client):
+        r = client.get("/api/stats/pivot", params={"measure": "pub_count", "group": "year"})
+        assert r.status_code == 200
+
+    def test_double_grouping(self, client):
+        r = client.get("/api/stats/pivot", params={"group": "year", "group2": "doc_type_grouped"})
+        assert r.status_code == 200
+
+    def test_rejects_a_dimension_that_is_not_groupable(self, client):
+        """`doc_type` se filtre mais ne se ventile pas ; `doc_type_grouped` est sa forme groupable."""
+        r = client.get("/api/stats/pivot", params={"group": "doc_type"})
+        assert r.status_code == 400
+
+    def test_rejects_second_grouping_without_the_first(self, client):
+        r = client.get("/api/stats/pivot", params={"group2": "year"})
+        assert r.status_code == 400
+
+    def test_rejects_unknown_measure(self, client):
+        r = client.get("/api/stats/pivot", params={"measure": "inexistante"})
+        assert r.status_code == 400
+
+    def test_rejects_repeated_grouping(self, client):
+        r = client.get("/api/stats/pivot", params={"group": "year", "group2": "year"})
+        assert r.status_code == 400

@@ -57,7 +57,9 @@ Ce chantier précède la fin de la relecture d'`interfaces/api/`, pour ne pas re
 - [x] Couverture d'intégration relevée : **22 chemins ne sont nommés par aucun test d'intégration**. Ils se concentrent sur les lectures d'administration des personnes (onze chemins : formes ambiguës, conflits d'identifiants, intrus détachables, doublons de nom, avec leurs compteurs), les lectures de laboratoire (adresses, tableau de bord, sujets) et les agrégats de statistiques (collaborations, pivot et son schéma). S'y ajoute l'authentification, que la fixture d'intégration court-circuite en forgeant le jeton au lieu d'appeler `/api/auth/login`.
 
   Le rapprochement se fait sur les routes de l'application assemblée — seule source qui connaisse les préfixes des routers — et chaque chemin cité est apparié au motif de sa route, un paramètre valant un segment quelconque. Deux approximations précédentes se lisaient en surcomptage : une route appelée avec un identifiant en dur passait pour découverte, et les chemins composés côté appelant (`${base}/api/…`, `${endpoint}/entity-label`) ne s'appariaient à rien. Ce dernier angle mort subsiste et se lit dans la liste sans appelant : les quatre facettes d'entité y figurent alors que le composant `EntityFilter` les consomme, en construisant leur chemin depuis une propriété que la lecture statique ne résout pas.
-La couverture se complète module par module, à l'entrée de chacun, plutôt qu'en bloc : un test qui nomme le chemin est ce qui fait échouer bruyamment un renommage manqué, et sans lui une route déplacée avec un frontend non ajusté produit un 404 que rien ne signale.
+La couverture se complète module par module, à l'entrée de chacun, plutôt qu'en bloc : un test qui nomme le chemin est ce qui fait échouer bruyamment un renommage manqué.
+
+Encore fallait-il qu'un chemin d'API inconnu échoue. Le frontend buildé est monté à la racine en dernier recours et recevait tout ce qu'aucun router n'avait pris, `/api/*` compris, à qui il servait sa page d'accueil sous un code 200. Un test qui n'affirmait que le statut passait donc sur une route supprimée — deux le faisaient, l'un sur `/api/stats/years`, l'autre sur `/api/addresses/suggest-countries`, tous deux retirés depuis. Le service du frontend s'arrête à la frontière de l'API, et un test l'atteste.
 
 #### Endpoints sans appelant
 
@@ -87,12 +89,11 @@ L'ordre part des modules sans chemin non couvert et sans scission — la mécani
 
 - [x] `journals`, `laboratories`, `stats`, `auth` — préfixe seul, aucun chemin déplacé. Les 112 routes de l'API portent désormais un tag, et la documentation OpenAPI cesse d'être une liste plate.
 
-**Couverture restant à compléter**, sans lien avec un déplacement — aucun de ces modules ne change de chemin :
+**Couverture des neuf chemins restants**, sans lien avec un déplacement — aucun de ces modules ne change de chemin :
 
-- [ ] `journals` — un chemin (`/api/journals/facets`).
-- [ ] `auth` — deux chemins. La fixture d'intégration forge le jeton au lieu d'appeler `/api/auth/login`, donc le parcours de connexion n'est jamais exercé de bout en bout.
-- [ ] `stats` — trois chemins (collaborations, pivot, schéma du pivot).
-- [ ] `laboratories` — trois chemins (adresses, tableau de bord, sujets).
+- [x] `journals` (facettes), `stats` (collaborations, pivot et son schéma), `laboratories` (adresses, tableau de bord, sujets), `auth` (connexion et déconnexion, que la fixture d'intégration court-circuitait en forgeant le jeton). Toute route de l'API est désormais nommée par au moins un test.
+
+  Deux tests écrivaient une attente fausse que rien ne contredisait : `doc_type` se filtre mais ne se ventile pas — `doc_type_grouped` est sa forme groupable —, et la facette DOAJ des revues s'appelle `doaj`, non `is_in_doaj`.
 
 **Avec recomposition :**
 

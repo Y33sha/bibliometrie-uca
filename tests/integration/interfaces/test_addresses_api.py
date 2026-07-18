@@ -290,12 +290,6 @@ class TestCountries:
 # ── GET /api/addresses/suggest-countries ─────────────────────────
 
 
-class TestSuggestCountries:
-    def test_ok(self, client):
-        r = client.get("/api/addresses/suggest-countries", params={"search": "X"})
-        assert r.status_code == 200
-
-
 # ── POST /api/addresses/{addr_id}/country ────────────────────────
 
 
