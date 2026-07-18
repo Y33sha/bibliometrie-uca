@@ -494,26 +494,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/countries": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List Countries
-         * @description Référentiel des pays, servant les listes de choix de l'attribution.
-         */
-        get: operations["list_countries_api_countries_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/addresses/countries": {
         parameters: {
             query?: never;
@@ -578,7 +558,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/admin/address-stats": {
+    "/api/addresses/stats": {
         parameters: {
             query?: never;
             header?: never;
@@ -589,7 +569,27 @@ export interface paths {
          * Admin Address Stats
          * @description Compteurs d'adresses par état de détection et de validation, pour une structure.
          */
-        get: operations["admin_address_stats_api_admin_address_stats_get"];
+        get: operations["admin_address_stats_api_addresses_stats_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/countries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Countries
+         * @description Référentiel des pays, servant les listes de choix de l'attribution.
+         */
+        get: operations["list_countries_api_countries_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -6431,26 +6431,6 @@ export interface operations {
             };
         };
     };
-    list_countries_api_countries_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CountryOut"][];
-                };
-            };
-        };
-    };
     list_addresses_countries_api_addresses_countries_get: {
         parameters: {
             query?: {
@@ -6556,7 +6536,7 @@ export interface operations {
             };
         };
     };
-    admin_address_stats_api_admin_address_stats_get: {
+    admin_address_stats_api_addresses_stats_get: {
         parameters: {
             query?: {
                 structure_id?: number | null;
@@ -6583,6 +6563,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_countries_api_countries_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CountryOut"][];
                 };
             };
         };

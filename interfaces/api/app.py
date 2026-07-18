@@ -42,9 +42,11 @@ from interfaces.api.spa import BUILD_DIR, SPAStaticFiles
 configure_root_logging()
 
 from interfaces.api.routers import (  # noqa: E402
+    addresses,
     auth,
     authorships,
     config,
+    countries,
     feedback,
     hal_problems,
     journals,
@@ -58,7 +60,6 @@ from interfaces.api.routers import (  # noqa: E402
     subjects,
 )
 from interfaces.api.routers.admin import (  # noqa: E402
-    addresses as admin_addresses,
     persons as admin_persons,
     structures as admin_structures,
 )
@@ -238,7 +239,8 @@ async def timing_middleware(request: Request, call_next: RequestResponseEndpoint
 app.include_router(auth.router)
 app.include_router(stats.router)
 app.include_router(publications.router)
-app.include_router(admin_addresses.router)
+app.include_router(addresses.router)
+app.include_router(countries.router)
 app.include_router(feedback.router)
 app.include_router(laboratories.router)
 app.include_router(admin_structures.router)
