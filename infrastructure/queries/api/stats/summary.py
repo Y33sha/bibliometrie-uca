@@ -78,13 +78,6 @@ _AVAILABLE_YEARS_SQL = f"""
 """
 
 
-def available_years(conn: Connection) -> list[int]:
-    """Liste des années de publication disponibles."""
-    conn.execute(text("SET LOCAL jit = off"))
-    rows = conn.execute(text(_AVAILABLE_YEARS_SQL)).all()
-    return [r.pub_year for r in rows]
-
-
 def _facets_sqls(
     *,
     perimeter_structure_ids: list[int],

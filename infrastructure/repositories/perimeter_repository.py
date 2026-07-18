@@ -64,16 +64,6 @@ class PgPerimeterRepository:
         result = self._conn.execute(stmt)
         return result.first() is not None
 
-    def remove_structure_from_perimeter(self, perimeter_id: int, structure_id: int) -> bool:
-        stmt = (
-            update(perimeters)
-            .where(perimeters.c.id == perimeter_id)
-            .values(structure_ids=func.array_remove(perimeters.c.structure_ids, structure_id))
-            .returning(perimeters.c.id)
-        )
-        result = self._conn.execute(stmt)
-        return result.first() is not None
-
     def remove_structure_from_all_perimeters(self, structure_id: int) -> None:
         self._conn.execute(
             update(perimeters)

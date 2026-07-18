@@ -6,7 +6,6 @@ Couvre :
 - PUT /api/perimeters/{id} (update partiel, auth)
 - DELETE /api/perimeters/{id} (suppression, auth, refus si utilisé)
 - POST /api/perimeters/{id}/structures (ajout d'une racine, auth)
-- DELETE /api/perimeters/{id}/structures/{sid} (retrait d'une racine, auth)
 """
 
 from __future__ import annotations
@@ -256,22 +255,3 @@ class TestMaterializedPerimeterStructures:
         )
         assert r.status_code == 200
         assert _perimeter_structure_ids(pid) == {root, lab}
-
-
-class TestRemovePerimeterStructure:
-    def test_requires_admin(self, client):
-        r = client.delete("/api/perimeters/1/structures/1")
-        assert r.status_code == 401
-
-    def test_removes_structure(self, auth_client):
-        s1 = _seed_structure()
-        s2 = _seed_structure()
-        pid = _seed_perimeter(structure_ids=[s1, s2])
-        r = auth_client.delete(f"/api/perimeters/{pid}/structures/{s1}")
-        assert r.status_code == 200
-        assert r.json() == {"status": "removed"}
-        with _pool() as cur:
-            cur.execute("SELECT structure_ids FROM perimeters WHERE id = %s", (pid,))
-            ids = cur.fetchone()["structure_ids"]
-            assert s1 not in ids
-            assert s2 in ids

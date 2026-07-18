@@ -41,17 +41,6 @@ def stats_filters(
     )
 
 
-@router.get("/api/stats/years", response_model=list[int])
-def available_years(
-    queries: StatsQueries = Depends(stats_queries),
-) -> list[int]:
-    """Années de publication présentes dans le périmètre, la plus récente d'abord.
-
-    Alimente le sélecteur d'années des tableaux de bord.
-    """
-    return queries.available_years()
-
-
 @router.get("/api/stats/facets", response_model=StatsFacetsResponse)
 def stats_facets(
     filters: StatsFilters = Depends(stats_filters),

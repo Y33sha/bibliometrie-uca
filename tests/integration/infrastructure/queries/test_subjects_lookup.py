@@ -117,7 +117,9 @@ class TestGetSubjectNeighbors:
         _link_cooccurrence(sa_sync_conn, center, left, 5)
         _link_cooccurrence(sa_sync_conn, center, right, 3)
         _refresh(sa_sync_conn)
-        neighbors = _q(sa_sync_conn).get_subject_neighbors(center, limit=20, min_cooccurrence_count=2)
+        neighbors = _q(sa_sync_conn).get_subject_neighbors(
+            center, limit=20, min_cooccurrence_count=2
+        )
         labels = {n.label for n in neighbors}
         assert labels == {"left", "right"}
 

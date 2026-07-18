@@ -2,7 +2,7 @@
 
 Le package est organisé par thème :
 - `list` : `persons_directory`, `search_persons`, `list_persons`
-- `facets` : `persons_facets`, `list_departments`, `list_roles`, `persons_stats`
+- `facets` : `persons_facets`, `persons_stats`
 - `detail` : `person_profile`, `person_theses`, `person_addresses`,
   `person_dashboard`, `person_subjects`
 - `admin` : orphan authorships, name-form authorships
@@ -25,7 +25,6 @@ from sqlalchemy import Connection
 
 from application.ports.api.persons_queries import (
     AmbiguousNameFormsResponse,
-    DepartmentCount,
     DetachableIntrudersResponse,
     DirectoryFilters,
     FacetFilters,
@@ -46,7 +45,6 @@ from application.ports.api.persons_queries import (
     PersonsQueries,
     PersonsStatsResponse,
     PersonThesesResponse,
-    RoleCount,
     SharingPersonOut,
 )
 from application.ports.api.subjects_queries import SubjectFrequency
@@ -72,8 +70,6 @@ from infrastructure.queries.api.persons.detail import (
     person_theses as _person_theses,
 )
 from infrastructure.queries.api.persons.facets import (
-    list_departments as _list_departments,
-    list_roles as _list_roles,
     persons_facets as _persons_facets,
     persons_stats as _persons_stats,
 )
@@ -121,12 +117,6 @@ class PgPersonsQueries(PersonsQueries):
 
     def persons_facets(self, *, filters: FacetFilters) -> PersonsFacetsResponse:
         return PersonsFacetsResponse.model_validate(_persons_facets(self._conn, filters=filters))
-
-    def list_departments(self) -> list[DepartmentCount]:
-        return [DepartmentCount.model_validate(r) for r in _list_departments(self._conn)]
-
-    def list_roles(self) -> list[RoleCount]:
-        return [RoleCount.model_validate(r) for r in _list_roles(self._conn)]
 
     def persons_stats(self) -> PersonsStatsResponse:
         return PersonsStatsResponse.model_validate(_persons_stats(self._conn))
