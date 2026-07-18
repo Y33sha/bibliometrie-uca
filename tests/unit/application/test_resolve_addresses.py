@@ -15,6 +15,7 @@ from application.ports.pipeline.affiliations.address_resolution import (
     StructureNameForm,
 )
 from domain.structures.name_forms import is_short_form
+from domain.structures.structure import StructureType
 
 # ── Helpers pour construire des formes de test ───────────────────
 
@@ -27,6 +28,7 @@ def _form(
     form_id=None,
     is_word_boundary=False,
     is_excluding=False,
+    structure_type=StructureType.LABO,
 ):
     """Construit un StructureNameForm pour les tests.
 
@@ -40,6 +42,7 @@ def _form(
         is_word_boundary=is_word_boundary or is_short_form(normalized),
         is_excluding=is_excluding,
         requires_context_of=requires_context_of,
+        structure_type=structure_type,
     )
 
 
@@ -170,6 +173,22 @@ class TestResolveAddress:
         matched_ids = {sid for sid, _ in result}
         assert 217 in matched_ids  # LRL doit matcher
         assert 169 in matched_ids  # UCA aussi
+
+    def test_site_serves_as_context_without_being_returned(self):
+        """Un site satisfait le `requires_context_of` des formes qui l'invoquent, sans produire de rattachement."""
+        forms = [
+            _form(1, "limos", "limos", form_id=10, requires_context_of=[170]),
+            _form(170, "aubiere", form_id=20, structure_type=StructureType.SITE),
+        ]
+        result = AddressMatcher(forms).resolve("limos aubiere")
+        structure_ids = {sid for sid, _ in result}
+        assert 1 in structure_ids
+        assert 170 not in structure_ids
+
+    def test_site_alone_yields_nothing(self):
+        """Une adresse qui ne porte qu'une forme de site ne produit aucun rattachement."""
+        forms = [_form(170, "aubiere", form_id=20, structure_type=StructureType.SITE)]
+        assert AddressMatcher(forms).resolve("2 rue des cezeaux aubiere") == []
 
     def test_context_tutelles(self):
         """requires_context_of = [99] (IDs directs)."""

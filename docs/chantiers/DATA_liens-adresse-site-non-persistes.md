@@ -30,9 +30,9 @@ L'API répare ensuite en aval. Le littéral SQL `structure_type != 'site'` est r
 
 Le point de branchement est `AddressMatcher.resolve` (`application/pipeline/affiliations/resolve_addresses.py`), et il se prête au filtrage sans rien déplacer. La méthode construit d'abord `structs_matched`, l'ensemble des structures dont une forme apparaît dans l'adresse, puis boucle pour composer son résultat. C'est `structs_matched` qui sert à évaluer `requires_context_of`, jamais le résultat : écarter les sites au moment de composer le résultat laisse donc l'arbitrage du contexte intact. Les structures exclues par `is_excluding` ne sont pas concernées non plus, une forme excluante ne retirant que sa propre structure.
 
-- [ ] `StructureNameForm` porte le type de sa structure ; `load_name_forms` le lit en joignant `structures`, à raison d'une requête par run. Le type voyage avec la donnée de structure plutôt qu'en paramètre d'orchestration : « un site n'est pas une affiliation » est une propriété du modèle, non un réglage de run comme l'est le périmètre.
-- [ ] Prédicat nommé dans `domain/structures/`, auprès de `StructureType`, et appelé par `resolve` : la règle cesse d'être une chaîne de caractères recopiée en SQL.
-- [ ] Tests : une adresse portant une forme de site et une forme qui dépend de ce contexte produit le lien vers la structure dépendante et aucun lien vers le site. La fabrique `_form` des tests unitaires du matcher porte le champ ajouté.
+- [x] `StructureNameForm` porte le type de sa structure ; `load_name_forms` le lit en joignant `structures`, à raison d'une requête par run. Le type voyage avec la donnée de structure plutôt qu'en paramètre d'orchestration : « un site n'est pas une affiliation » est une propriété du modèle, non un réglage de run comme l'est le périmètre.
+- [x] `StructureType.is_affiliation` nomme la règle auprès de l'énumération et documente ce qu'est un site ; `resolve` l'appelle. La règle cesse d'être une chaîne de caractères recopiée en SQL.
+- [x] Tests : une adresse portant une forme de site et une forme qui dépend de ce contexte produit le lien vers la structure dépendante et aucun lien vers le site ; une adresse ne portant qu'une forme de site ne produit rien.
 
 ### Phase 3 — Purger et nettoyer
 
