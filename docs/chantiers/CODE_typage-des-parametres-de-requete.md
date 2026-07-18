@@ -8,11 +8,13 @@ Les routers déclarent pourtant `str` une centaine de fois, y compris là où le
 
 **Les tri-états.** `has_orcid`, `has_idhal`, `has_idref`, `has_rh`, `has_pending_forms`, `has_pending_identifiers` (personnes) et `has_country` (adresses) portent trois états — filtrer sur oui, filtrer sur non, ne pas filtrer — encodés `"yes"` / `"no"` / `""` dans une chaîne unique. La forme typée existe et le projet la pratique ailleurs : `journals.py` déclare `is_in_doaj: bool | None = None`, où le paramètre absent vaut `None`.
 
-**Les vocabulaires fermés.** `validation` (`all`, `pending`, `confirmed`, `rejected`), `detected` (`all`, `yes`, `no`), `access`, `hal_status` : des énumérations, qu'un `Literal` déclarerait.
+**Les vocabulaires fermés.** `validation` (`all`, `pending`, `confirmed`, `rejected`) et `detected` (`all`, `yes`, `no`) : des énumérations à valeur unique, qu'un `Literal` déclarerait. `detected` en est bien une et non un tri-état : `all` est une valeur émise, que l'absence du paramètre ne saurait porter puisque le défaut vaut `yes`.
+
+`access` et `hal_status` en ont l'air et n'en sont pas : ils passent par `parse_str_csv` et le frontend émet `access=oa,closed`. Ce sont des listes dont les éléments viennent d'un vocabulaire fermé — un `Literal` sur la chaîne les refuserait.
 
 `sort` relève de la même famille, dans les quatre listes paginées — éditeurs, revues, personnes, publications. Chacune a son vocabulaire fermé, et sa table d'ordonnancement retombe en silence sur le tri par défaut devant une valeur inconnue (`_SORT_MAP.get(sort, défaut)`). Deux conventions y cohabitent sans que rien ne le signale : le sens descendant s'écrit en préfixe pour les trois premières (`-name`), en suffixe pour les publications (`year_desc`, `title_desc`). Un `Literal` par liste les déclarerait, et rendrait l'écart visible. La faute y coûte moins cher qu'ailleurs : un tri inconnu rend le bon ensemble dans le mauvais ordre, là où un filtre inconnu rend le mauvais ensemble.
 
-**Les listes.** `department`, `role`, `year`, `doc_type`, `country`, `oa_status`, `lab_id`, `source_filter` transportent plusieurs valeurs séparées par des virgules, que `parse_str_csv` découpe. La convention CSV est délibérée et se défend ; elle n'est pas en cause ici.
+**Les listes.** `department`, `role`, `year`, `doc_type`, `country`, `oa_status`, `access`, `hal_status`, `lab_id`, `source_filter` transportent plusieurs valeurs séparées par des virgules, que `parse_str_csv` découpe. La convention CSV est délibérée et se défend ; elle n'est pas en cause ici.
 
 **Les prédicats composés.** `text` et `struct` (adresses) sont des paramètres répétés dont chaque occurrence porte une micro-syntaxe `<opérateur>:<charge>` — `text=contains:inserm`, `struct=not_recognized:12,14`. Déclarés `list[str]`, ils échappent entièrement à FastAPI : c'est `_parse_text_predicates` et `_parse_structure_predicates` qui découpent, valident l'opérateur contre un ensemble en dur et construisent les objets-valeurs. Les deux fonctions écrivent la même décision, et la documentent chacune de leur côté : un opérateur inconnu ou une charge vide fait tomber le prédicat au lieu de refuser la requête. `?struct=recognized:abc` ne filtre donc rien, et la page affiche l'ensemble complet sans que rien ne le signale — le symptôme des tri-états, sous une autre syntaxe.
 
@@ -30,6 +32,8 @@ Les deux premières familles paient le même prix.
 
 **Les tri-états deviennent `bool | None = None`.** L'absence du paramètre vaut « ne pas filtrer », `true` et `false` valent les deux filtres. La validation revient à FastAPI, la conversion disparaît, et le contrat publie un booléen. Les décodeurs `"yes"` / `"no"` — `_has_country_flag` et ses voisins — n'ont plus d'objet ; les clauses reçoivent directement `bool | None`.
 
+Le frontend n'a rien à changer. Il omet déjà le paramètre pour ne pas filtrer (`if (…length === 1) params.set(…)`), et Pydantic lit `yes` et `no` comme des booléens. Le seul écart de comportement porte sur une valeur explicitement vide, `?has_orcid=`, aujourd'hui ignorée en silence et refusée ensuite par un 422 — qu'aucun appelant n'émet.
+
 **Les vocabulaires fermés deviennent des `Literal`.** Le jeu de valeurs se déclare une fois, le 422 tombe sur l'intrus, et le contrat TypeScript rend une union plutôt qu'une chaîne. Là où le domaine porte déjà le vocabulaire, le `Literal` en vient.
 
 **Les listes CSV restent.** La convention est en place, documentée, et partagée par les pages à facettes ; elle ne coûte pas de validation perdue, `parse_str_csv` n'ayant rien à refuser.
@@ -40,15 +44,15 @@ Les deux premières familles paient le même prix.
 
 ### Phase 1 — les tri-états
 
-- [ ] Recenser les paramètres à trois états et leurs décodeurs (`filters.py`, `queries/api/addresses.py`, `services/addresses/countries.py`).
+Sept paramètres : `has_orcid`, `has_idhal`, `has_idref`, `has_rh`, `has_pending_forms`, `has_pending_identifiers` (personnes) et `has_country` (adresses).
+
 - [ ] Les champs des dataclasses de filtres passent à `bool | None` ; les clauses SQL suivent.
-- [ ] Les routers déclarent `bool | None = None` ; les décodeurs disparaissent.
-- [ ] Le frontend émet `true` / `false` et cesse d'envoyer le paramètre pour ne pas filtrer.
-- [ ] Contrat TypeScript régénéré ; `svelte-check` couvre le changement de type.
+- [ ] Les routers déclarent `bool | None = None` ; les trois décodeurs disparaissent — `person_has_identifier_clause` et `person_has_rh_clause` (`infrastructure/queries/filters.py`), `_has_country_flag` (`services/addresses/countries.py`).
+- [ ] Contrat TypeScript régénéré ; `svelte-check` atteste que le frontend n'avait rien à changer.
 
 ### Phase 2 — les vocabulaires fermés
 
-- [ ] `validation`, `detected`, `access`, `hal_status` : recenser les valeurs réellement honorées par les adapters.
+- [ ] `validation` et `detected` : recenser les valeurs réellement honorées par les adapters.
 - [ ] Les déclarer en `Literal`, en les tirant du domaine là où il les porte.
 - [ ] `sort` des quatre listes paginées : un `Literal` par liste, et trancher si les deux conventions de sens descendant (préfixe contre suffixe) convergent.
 - [ ] Vérifier ce qu'une valeur hors vocabulaire produit aujourd'hui, avant qu'elle produise un 422.
@@ -61,5 +65,5 @@ Les deux premières familles paient le même prix.
 
 ## Questions ouvertes
 
-- **Le défaut de `detected`.** Il vaut `"yes"`, non `""` : l'absence du paramètre filtre. Un `bool | None = True` le dirait, au prix d'un défaut qui n'est pas « ne pas filtrer » — à distinguer des tri-états dont l'absence n'a pas de sens métier.
+- **Les éléments des listes à vocabulaire fermé.** `access`, `hal_status`, `oa_status` et `doc_type` transportent des valeurs prises dans un ensemble connu, qu'aucune validation ne contrôle : la convention CSV les rend opaques à FastAPI. Les valider supposerait soit un contrôle après découpage, soit le passage à des paramètres répétés typés `list[Literal[...]]`, qui change la forme des URL et donc le frontend. À instruire séparément.
 - **Ce que le 422 change pour le frontend.** Les valeurs hors vocabulaire sont aujourd'hui ignorées en silence ; après, elles seront refusées. À vérifier : aucune page n'émet une valeur que l'adapter ignore et dont elle dépendrait.
