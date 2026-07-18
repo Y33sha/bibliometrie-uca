@@ -54,16 +54,16 @@ class TestListSubjects:
         _create_subject(sa_sync_conn, label="rare", usage_count=2)
         _create_subject(sa_sync_conn, label="frequent", usage_count=50)
         _create_subject(sa_sync_conn, label="moderate", usage_count=10)
-        items = _q(sa_sync_conn).list_subjects(q=None, limit=50, offset=0, min_count=1)
+        items = _q(sa_sync_conn).list_subjects(q=None, limit=50, offset=0, min_usage_count=1)
         labels_ordered = [i.label for i in items]
         # Frequent en premier, rare en dernier.
         assert labels_ordered.index("frequent") < labels_ordered.index("moderate")
         assert labels_ordered.index("moderate") < labels_ordered.index("rare")
 
-    def test_filters_by_min_count(self, sa_sync_conn):
+    def test_filters_by_min_usage_count(self, sa_sync_conn):
         _create_subject(sa_sync_conn, label="low", usage_count=1)
         _create_subject(sa_sync_conn, label="high", usage_count=10)
-        items = _q(sa_sync_conn).list_subjects(q=None, limit=50, offset=0, min_count=5)
+        items = _q(sa_sync_conn).list_subjects(q=None, limit=50, offset=0, min_usage_count=5)
         labels = {i.label for i in items}
         assert "high" in labels
         assert "low" not in labels
@@ -72,15 +72,15 @@ class TestListSubjects:
         _create_subject(sa_sync_conn, label="Climate Change", usage_count=10)
         _create_subject(sa_sync_conn, label="ATMOSPHERIC SCIENCE", usage_count=10)
         _create_subject(sa_sync_conn, label="biology", usage_count=10)
-        items = _q(sa_sync_conn).list_subjects(q="climate", limit=50, offset=0, min_count=1)
+        items = _q(sa_sync_conn).list_subjects(q="climate", limit=50, offset=0, min_usage_count=1)
         assert len(items) == 1
         assert items[0].label == "Climate Change"
 
     def test_pagination(self, sa_sync_conn):
         for i in range(10):
             _create_subject(sa_sync_conn, label=f"s{i:02d}", usage_count=10 - i)
-        page1 = _q(sa_sync_conn).list_subjects(q=None, limit=3, offset=0, min_count=1)
-        page2 = _q(sa_sync_conn).list_subjects(q=None, limit=3, offset=3, min_count=1)
+        page1 = _q(sa_sync_conn).list_subjects(q=None, limit=3, offset=0, min_usage_count=1)
+        page2 = _q(sa_sync_conn).list_subjects(q=None, limit=3, offset=3, min_usage_count=1)
         assert {i.label for i in page1}.isdisjoint({i.label for i in page2})
         assert len(page1) == 3 and len(page2) == 3
 
@@ -91,9 +91,9 @@ class TestCountSubjects:
         _create_subject(sa_sync_conn, label="b", usage_count=10)
         _create_subject(sa_sync_conn, label="c", usage_count=20)
         q = _q(sa_sync_conn)
-        assert q.count_subjects(q=None, min_count=1) == 3
-        assert q.count_subjects(q=None, min_count=5) == 2
-        assert q.count_subjects(q="b", min_count=1) == 1
+        assert q.count_subjects(q=None, min_usage_count=1) == 3
+        assert q.count_subjects(q=None, min_usage_count=5) == 2
+        assert q.count_subjects(q="b", min_usage_count=1) == 1
 
 
 class TestGetSubject:
@@ -117,7 +117,7 @@ class TestGetSubjectNeighbors:
         _link_cooccurrence(sa_sync_conn, center, left, 5)
         _link_cooccurrence(sa_sync_conn, center, right, 3)
         _refresh(sa_sync_conn)
-        neighbors = _q(sa_sync_conn).get_subject_neighbors(center, limit=20, min_count=2)
+        neighbors = _q(sa_sync_conn).get_subject_neighbors(center, limit=20, min_cooccurrence_count=2)
         labels = {n.label for n in neighbors}
         assert labels == {"left", "right"}
 
@@ -128,20 +128,20 @@ class TestGetSubjectNeighbors:
         _link_cooccurrence(sa_sync_conn, c, n1, 2)
         _link_cooccurrence(sa_sync_conn, c, n2, 50)
         _refresh(sa_sync_conn)
-        neighbors = _q(sa_sync_conn).get_subject_neighbors(c, limit=20, min_count=1)
+        neighbors = _q(sa_sync_conn).get_subject_neighbors(c, limit=20, min_cooccurrence_count=1)
         assert neighbors[0].label == "strong"
         assert neighbors[0].cooccurrence_count == 50
 
-    def test_filters_by_min_count(self, sa_sync_conn):
+    def test_filters_by_min_cooccurrence_count(self, sa_sync_conn):
         c = _create_subject(sa_sync_conn, label="c", usage_count=10)
         keep = _create_subject(sa_sync_conn, label="keep", usage_count=10)
         skip = _create_subject(sa_sync_conn, label="skip", usage_count=10)
         _link_cooccurrence(sa_sync_conn, c, keep, 5)
         # count=1 ne franchit pas le seuil de la matview (>= 2) — la paire
-        # (c, skip) n'apparaît pas indépendamment du filtre min_count à la lecture.
+        # (c, skip) n'apparaît pas indépendamment du filtre de co-occurrences minimales à la lecture.
         _link_cooccurrence(sa_sync_conn, c, skip, 1)
         _refresh(sa_sync_conn)
-        neighbors = _q(sa_sync_conn).get_subject_neighbors(c, limit=20, min_count=3)
+        neighbors = _q(sa_sync_conn).get_subject_neighbors(c, limit=20, min_cooccurrence_count=3)
         labels = {n.label for n in neighbors}
         assert labels == {"keep"}
 
@@ -151,5 +151,5 @@ class TestGetSubjectNeighbors:
             n = _create_subject(sa_sync_conn, label=f"n{i}", usage_count=10)
             _link_cooccurrence(sa_sync_conn, c, n, 10 - i)
         _refresh(sa_sync_conn)
-        neighbors = _q(sa_sync_conn).get_subject_neighbors(c, limit=2, min_count=2)
+        neighbors = _q(sa_sync_conn).get_subject_neighbors(c, limit=2, min_cooccurrence_count=2)
         assert len(neighbors) == 2

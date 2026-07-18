@@ -24,8 +24,8 @@ def list_subjects(
 ) -> SubjectListResponse:
     """Liste paginée des sujets, les plus portés par des publications d'abord."""
     offset = (page - 1) * per_page
-    items = queries.list_subjects(q=q, limit=per_page, offset=offset, min_count=min_count)
-    total = queries.count_subjects(q=q, min_count=min_count)
+    items = queries.list_subjects(q=q, limit=per_page, offset=offset, min_usage_count=min_count)
+    total = queries.count_subjects(q=q, min_usage_count=min_count)
     return SubjectListResponse(items=items, total=total, page=page, per_page=per_page)
 
 
@@ -41,6 +41,6 @@ def get_subject(
     if subject is None:
         raise HTTPException(status_code=404, detail="Sujet introuvable")
     neighbors = queries.get_subject_neighbors(
-        subject_id, limit=neighbors_limit, min_count=min_cooccurrence
+        subject_id, limit=neighbors_limit, min_cooccurrence_count=min_cooccurrence
     )
     return SubjectDetailResponse(subject=subject, neighbors=neighbors)

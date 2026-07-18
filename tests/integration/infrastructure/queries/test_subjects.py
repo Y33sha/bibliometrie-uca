@@ -150,11 +150,11 @@ class TestListSubjectsSearch:
         queries = PgSubjectsAdminQueries(sa_sync_conn)
 
         # Requête sans accent → trouve le label accentué.
-        found = queries.list_subjects(q="epidemiologie quantique", limit=10, offset=0, min_count=0)
+        found = queries.list_subjects(q="epidemiologie quantique", limit=10, offset=0, min_usage_count=0)
         assert any(s.label == "épidémiologie quantique" for s in found)
 
         # Requête accentuée → trouve aussi (symétrie via unaccent des deux côtés).
         found_accented = queries.list_subjects(
-            q="épidémiologie quantique", limit=10, offset=0, min_count=0
+            q="épidémiologie quantique", limit=10, offset=0, min_usage_count=0
         )
         assert any(s.label == "épidémiologie quantique" for s in found_accented)

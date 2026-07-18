@@ -9,6 +9,8 @@ from typing import Protocol
 
 from pydantic import BaseModel
 
+from application.ports.api._common import PaginatedResponse
+
 
 class SubjectOut(BaseModel):
     """Sujet attaché à une publication. Les annotations des différentes sources sont agrégées en une ligne par sujet, `sources` retenant celles qui l'ont fourni."""
@@ -28,11 +30,8 @@ class SubjectListItem(BaseModel):
     usage_count: int
 
 
-class SubjectListResponse(BaseModel):
+class SubjectListResponse(PaginatedResponse):
     items: list[SubjectListItem]
-    total: int
-    page: int
-    per_page: int
 
 
 class SubjectNeighborOut(BaseModel):
@@ -63,13 +62,13 @@ class SubjectsAdminQueries(Protocol):
     """Lectures sur les sujets (annuaire, voisins par co-occurrence)."""
 
     def list_subjects(
-        self, *, q: str | None, limit: int, offset: int, min_count: int
+        self, *, q: str | None, limit: int, offset: int, min_usage_count: int
     ) -> list[SubjectListItem]: ...
 
-    def count_subjects(self, *, q: str | None, min_count: int) -> int: ...
+    def count_subjects(self, *, q: str | None, min_usage_count: int) -> int: ...
 
     def get_subject(self, subject_id: int) -> SubjectListItem | None: ...
 
     def get_subject_neighbors(
-        self, subject_id: int, *, limit: int, min_count: int
+        self, subject_id: int, *, limit: int, min_cooccurrence_count: int
     ) -> list[SubjectNeighborOut]: ...
