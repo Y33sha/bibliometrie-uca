@@ -352,22 +352,22 @@
   /* ── Onglets / files de triage ── */
 
   async function loadAmbiguousCount() {
-    const data = await api<{ total: number }>("/api/admin/ambiguous-name-forms/count");
+    const data = await api<{ total: number }>("/api/persons/ambiguous-name-forms/count");
     ambiguousCount = data.total;
   }
 
   async function loadIdentifierConflictCount() {
-    const data = await api<{ total: number }>("/api/admin/identifier-conflicts/count");
+    const data = await api<{ total: number }>("/api/persons/identifier-conflicts/count");
     identifierConflictCount = data.total;
   }
 
   async function loadDetachableCount() {
-    const data = await api<{ total: number }>("/api/admin/detachable-intruders/count");
+    const data = await api<{ total: number }>("/api/persons/detachable-intruders/count");
     detachableCount = data.total;
   }
 
   async function loadNameDuplicateCount() {
-    const data = await api<{ total: number }>("/api/admin/name-duplicates/count");
+    const data = await api<{ total: number }>("/api/persons/name-duplicates/count");
     nameDuplicateCount = data.total;
   }
 
@@ -519,7 +519,7 @@
     selectedPersonId = personId;
     updateUrl();
     if (!persons.some((p) => p.id === personId)) {
-      fetchedPerson = await api<Person>(`/api/admin/persons/${personId}`);
+      fetchedPerson = await api<Person>(`/api/persons/${personId}/curation`);
     }
   }
 
@@ -527,7 +527,7 @@
   // de la liste maîtresse (sinon `loadTable` s'en charge via le derived).
   async function refreshSelected() {
     if (selectedPersonId !== null && !persons.some((p) => p.id === selectedPersonId)) {
-      fetchedPerson = await api<Person>(`/api/admin/persons/${selectedPersonId}`);
+      fetchedPerson = await api<Person>(`/api/persons/${selectedPersonId}/curation`);
     }
     // Toute action du drawer passe ici → recharge les files de triage affichées.
     reloadFiles++;

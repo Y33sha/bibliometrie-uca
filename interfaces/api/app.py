@@ -61,9 +61,6 @@ from interfaces.api.routers import (  # noqa: E402
     structures,
     subjects,
 )
-from interfaces.api.routers.admin import (  # noqa: E402
-    persons as admin_persons,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -247,7 +244,6 @@ app.include_router(laboratories.router)
 app.include_router(structures.router)
 app.include_router(name_forms.router)
 app.include_router(persons.router)
-app.include_router(admin_persons.router)
 app.include_router(authorships.router)
 app.include_router(hal_problems.router)
 app.include_router(config.router)

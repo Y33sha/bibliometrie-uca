@@ -31,7 +31,7 @@
 
   async function load() {
     loading = true;
-    data = await api<Resp>(`/api/admin/identifier-conflicts?page=${page}&per_page=50`);
+    data = await api<Resp>(`/api/persons/identifier-conflicts?page=${page}&per_page=50`);
     loading = false;
   }
 

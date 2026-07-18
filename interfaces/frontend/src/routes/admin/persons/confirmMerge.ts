@@ -10,7 +10,7 @@ import { titleCase } from "$lib/utils";
  */
 export async function confirmMerge(sourceId: number): Promise<boolean> {
   const p = await api<{ last_name: string; first_name: string; pub_count: number }>(
-    `/api/admin/persons/${sourceId}`,
+    `/api/persons/${sourceId}/curation`,
   );
   const name = `${titleCase(p.last_name)} ${titleCase(p.first_name)}`.trim();
   const n = p.pub_count ?? 0;

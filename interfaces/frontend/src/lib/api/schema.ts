@@ -983,7 +983,7 @@ export interface paths {
         };
         /**
          * List Persons
-         * @description Liste des personnes avec filtres (admin).
+         * @description Liste des personnes avec filtres (curation).
          *
          *     `department` et `role` acceptent plusieurs valeurs séparées par des virgules, selon la même convention que l'annuaire et les facettes.
          */
@@ -1036,6 +1036,236 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/persons/ambiguous-name-forms/count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Ambiguous Name Forms Count
+         * @description Compteur de l'onglet « Formes ambiguës » (badge).
+         */
+        get: operations["ambiguous_name_forms_count_api_persons_ambiguous_name_forms_count_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/persons/ambiguous-name-forms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Ambiguous Name Forms
+         * @description Formes de nom portées par ≥2 personnes avec ≥1 lien pending, paginées.
+         */
+        get: operations["ambiguous_name_forms_api_persons_ambiguous_name_forms_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/persons/identifier-conflicts/count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Identifier Conflicts Count
+         * @description Compteur de l'onglet « Conflits d'identifiant » (badge).
+         */
+        get: operations["identifier_conflicts_count_api_persons_identifier_conflicts_count_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/persons/identifier-conflicts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Identifier Conflicts
+         * @description Paires de personnes partageant un identifiant brut (ORCID, IdRef, hal_person_id ou idHAL), paginées.
+         *
+         *     Ce sont des doublons probables ou des erreurs d'attribution, que la curation tranche à l'œil.
+         */
+        get: operations["identifier_conflicts_api_persons_identifier_conflicts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/persons/detachable-intruders/count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Detachable Intruders Count
+         * @description Compteur de l'onglet « Intrus détachables » (badge).
+         */
+        get: operations["detachable_intruders_count_api_persons_detachable_intruders_count_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/persons/detachable-intruders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Detachable Intruders
+         * @description Personnes rattachées à deux signatures ou plus d'une même publication, avec leur ancre et leur intrus, paginées.
+         *
+         *     L'intrus se détache en rejetant sa forme de nom, par `PATCH /api/persons/{id}/name-forms/status`.
+         */
+        get: operations["detachable_intruders_api_persons_detachable_intruders_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/persons/name-duplicates/count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Name Duplicates Count
+         * @description Compteur de l'onglet « Doublons par nom » (badge).
+         */
+        get: operations["name_duplicates_count_api_persons_name_duplicates_count_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/persons/name-duplicates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Name Duplicates
+         * @description Paires de personnes aux noms compatibles, paginées, triées par force de réseau : co-auteurs, publications co-signées, laboratoires et revues en commun.
+         *
+         *     Les doublons probables viennent en tête, les homonymes en fin.
+         */
+        get: operations["name_duplicates_api_persons_name_duplicates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/persons/mark-distinct": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark Persons Distinct
+         * @description Marque deux personnes comme distinctes : les files de triage par nom et par identifiant écartent la paire.
+         *
+         *     Renvoie 400 sur deux identifiants égaux (`mark_distinct`).
+         */
+        post: operations["mark_persons_distinct_api_persons_mark_distinct_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/persons/identifiers/{ident_id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Identifier Status
+         * @description Met à jour le statut d'un identifiant (pending/confirmed/rejected).
+         */
+        patch: operations["update_identifier_status_api_persons_identifiers__ident_id__status_patch"];
+        trace?: never;
+    };
+    "/api/persons/identifiers/{ident_id}/reassign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Reassign Identifier
+         * @description Réattribue un identifiant rejeté à une autre personne (status → pending).
+         *
+         *     Renvoie 404 sur un identifiant ou une personne cible introuvable (`reassign_identifier`).
+         */
+        patch: operations["reassign_identifier_api_persons_identifiers__ident_id__reassign_patch"];
+        trace?: never;
+    };
     "/api/persons/{person_id}": {
         parameters: {
             query?: never;
@@ -1048,6 +1278,28 @@ export interface paths {
          * @description Profil public complet d'une personne.
          */
         get: operations["person_profile_api_persons__person_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/persons/{person_id}/curation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Person Curation
+         * @description Une personne sous la projection de la liste de curation : drapeau de rejet, identifiants avec leur statut et leur source, formes de nom avec leur état d'arbitrage.
+         *
+         *     Alimente le panneau latéral ouvert directement par son URL, hors de la liste qui porte normalement ces données.
+         */
+        get: operations["person_curation_api_persons__person_id__curation_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1136,6 +1388,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/persons/{person_id}/sharing-name-forms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Persons Sharing Name Form
+         * @description Personnes partageant ≥1 forme de nom avec celle-ci (candidates à l'absorption).
+         */
+        get: operations["persons_sharing_name_form_api_persons__person_id__sharing_name_forms_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/persons/{person_id}/name-form-authorships": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Name Form Authorships
+         * @description Authorships sources + autres personnes partageant une forme de nom.
+         */
+        get: operations["name_form_authorships_api_persons__person_id__name_form_authorships_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/persons/{person_id}/identifiers": {
         parameters: {
             query?: never;
@@ -1176,48 +1468,6 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
-        trace?: never;
-    };
-    "/api/person-identifiers/{ident_id}/status": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /**
-         * Update Identifier Status
-         * @description Met à jour le statut d'un identifiant (pending/confirmed/rejected).
-         */
-        patch: operations["update_identifier_status_api_person_identifiers__ident_id__status_patch"];
-        trace?: never;
-    };
-    "/api/person-identifiers/{ident_id}/reassign": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /**
-         * Reassign Identifier
-         * @description Réattribue un identifiant rejeté à une autre personne (status → pending).
-         *
-         *     Renvoie 404 sur un identifiant ou une personne cible introuvable (`reassign_identifier`).
-         */
-        patch: operations["reassign_identifier_api_person_identifiers__ident_id__reassign_patch"];
         trace?: never;
     };
     "/api/persons/{person_id}/reject": {
@@ -1278,254 +1528,6 @@ export interface paths {
          *     Renvoie 400 sur deux identifiants égaux, 404 sur une personne introuvable, 409 si chacune porte une fiche RH distincte (`merge_person`).
          */
         post: operations["merge_persons_api_persons__person_id__merge_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/persons/mark-distinct": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Mark Persons Distinct
-         * @description Marque deux personnes comme distinctes : les files de triage par nom et par identifiant écartent la paire.
-         *
-         *     Renvoie 400 sur deux identifiants égaux (`mark_distinct`).
-         */
-        post: operations["mark_persons_distinct_api_admin_persons_mark_distinct_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/persons/{person_id}/name-form-authorships": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Name Form Authorships
-         * @description Authorships sources + autres personnes partageant une forme de nom.
-         */
-        get: operations["name_form_authorships_api_persons__person_id__name_form_authorships_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/ambiguous-name-forms/count": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Ambiguous Name Forms Count
-         * @description Compteur de l'onglet « Formes ambiguës » (badge).
-         */
-        get: operations["ambiguous_name_forms_count_api_admin_ambiguous_name_forms_count_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/ambiguous-name-forms": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Ambiguous Name Forms
-         * @description Formes de nom portées par ≥2 personnes avec ≥1 lien pending, paginées.
-         */
-        get: operations["ambiguous_name_forms_api_admin_ambiguous_name_forms_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/identifier-conflicts/count": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Identifier Conflicts Count
-         * @description Compteur de l'onglet « Conflits d'identifiant » (badge).
-         */
-        get: operations["identifier_conflicts_count_api_admin_identifier_conflicts_count_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/identifier-conflicts": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Identifier Conflicts
-         * @description Paires de personnes partageant un identifiant brut (ORCID, IdRef, hal_person_id ou idHAL), paginées.
-         *
-         *     Ce sont des doublons probables ou des erreurs d'attribution, que l'admin tranche à l'œil.
-         */
-        get: operations["identifier_conflicts_api_admin_identifier_conflicts_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/detachable-intruders/count": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Detachable Intruders Count
-         * @description Compteur de l'onglet « Intrus détachables » (badge).
-         */
-        get: operations["detachable_intruders_count_api_admin_detachable_intruders_count_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/detachable-intruders": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Detachable Intruders
-         * @description Personnes rattachées à deux signatures ou plus d'une même publication, avec leur ancre et leur intrus, paginées.
-         *
-         *     L'intrus se détache en rejetant sa forme de nom, par `PATCH /api/persons/{id}/name-forms/status`.
-         */
-        get: operations["detachable_intruders_api_admin_detachable_intruders_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/name-duplicates/count": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Name Duplicates Count
-         * @description Compteur de l'onglet « Doublons par nom » (badge).
-         */
-        get: operations["name_duplicates_count_api_admin_name_duplicates_count_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/name-duplicates": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Name Duplicates
-         * @description Paires de personnes aux noms compatibles, paginées, triées par force de réseau : co-auteurs, publications co-signées, laboratoires et revues en commun.
-         *
-         *     Les doublons probables viennent en tête, les homonymes en fin.
-         */
-        get: operations["name_duplicates_api_admin_name_duplicates_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/persons/{person_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Person Admin
-         * @description Une personne (projection liste admin) par id — alimente le drawer ouvert hors liste.
-         */
-        get: operations["person_admin_api_admin_persons__person_id__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/persons/{person_id}/sharing-name-forms": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Persons Sharing Name Form
-         * @description Personnes partageant ≥1 forme de nom avec celle-ci (candidates à l'absorption).
-         */
-        get: operations["persons_sharing_name_form_api_admin_persons__person_id__sharing_name_forms_get"];
-        put?: never;
-        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -7385,6 +7387,317 @@ export interface operations {
             };
         };
     };
+    ambiguous_name_forms_count_api_persons_ambiguous_name_forms_count_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TotalCountResponse"];
+                };
+            };
+        };
+    };
+    ambiguous_name_forms_api_persons_ambiguous_name_forms_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                per_page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AmbiguousNameFormsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    identifier_conflicts_count_api_persons_identifier_conflicts_count_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TotalCountResponse"];
+                };
+            };
+        };
+    };
+    identifier_conflicts_api_persons_identifier_conflicts_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                per_page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdentifierConflictsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    detachable_intruders_count_api_persons_detachable_intruders_count_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TotalCountResponse"];
+                };
+            };
+        };
+    };
+    detachable_intruders_api_persons_detachable_intruders_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                per_page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetachableIntrudersResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    name_duplicates_count_api_persons_name_duplicates_count_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TotalCountResponse"];
+                };
+            };
+        };
+    };
+    name_duplicates_api_persons_name_duplicates_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                per_page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NameDuplicatesResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mark_persons_distinct_api_persons_mark_distinct_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MarkDistinctPersons"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OkResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_identifier_status_api_persons_identifiers__ident_id__status_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ident_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateIdentifierStatus"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdentifierStatusResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reassign_identifier_api_persons_identifiers__ident_id__reassign_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ident_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReassignIdentifier"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdentifierReassignResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     person_profile_api_persons__person_id__get: {
         parameters: {
             query?: never;
@@ -7403,6 +7716,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PersonProfileResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    person_curation_api_persons__person_id__curation_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                person_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonOut"];
                 };
             };
             /** @description Validation Error */
@@ -7545,6 +7889,70 @@ export interface operations {
             };
         };
     };
+    persons_sharing_name_form_api_persons__person_id__sharing_name_forms_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                person_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SharingPersonOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    name_form_authorships_api_persons__person_id__name_form_authorships_get: {
+        parameters: {
+            query: {
+                name_form: string;
+            };
+            header?: never;
+            path: {
+                person_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NameFormAuthorshipsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     add_person_identifier_api_persons__person_id__identifiers_post: {
         parameters: {
             query?: never;
@@ -7600,76 +8008,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RemovedResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    update_identifier_status_api_person_identifiers__ident_id__status_patch: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                ident_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpdateIdentifierStatus"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["IdentifierStatusResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    reassign_identifier_api_person_identifiers__ident_id__reassign_patch: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                ident_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ReassignIdentifier"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["IdentifierReassignResponse"];
                 };
             };
             /** @description Validation Error */
@@ -7775,342 +8113,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MergeResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    mark_persons_distinct_api_admin_persons_mark_distinct_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["MarkDistinctPersons"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["OkResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    name_form_authorships_api_persons__person_id__name_form_authorships_get: {
-        parameters: {
-            query: {
-                name_form: string;
-            };
-            header?: never;
-            path: {
-                person_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["NameFormAuthorshipsResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    ambiguous_name_forms_count_api_admin_ambiguous_name_forms_count_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TotalCountResponse"];
-                };
-            };
-        };
-    };
-    ambiguous_name_forms_api_admin_ambiguous_name_forms_get: {
-        parameters: {
-            query?: {
-                page?: number;
-                per_page?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AmbiguousNameFormsResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    identifier_conflicts_count_api_admin_identifier_conflicts_count_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TotalCountResponse"];
-                };
-            };
-        };
-    };
-    identifier_conflicts_api_admin_identifier_conflicts_get: {
-        parameters: {
-            query?: {
-                page?: number;
-                per_page?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["IdentifierConflictsResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    detachable_intruders_count_api_admin_detachable_intruders_count_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TotalCountResponse"];
-                };
-            };
-        };
-    };
-    detachable_intruders_api_admin_detachable_intruders_get: {
-        parameters: {
-            query?: {
-                page?: number;
-                per_page?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DetachableIntrudersResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    name_duplicates_count_api_admin_name_duplicates_count_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TotalCountResponse"];
-                };
-            };
-        };
-    };
-    name_duplicates_api_admin_name_duplicates_get: {
-        parameters: {
-            query?: {
-                page?: number;
-                per_page?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["NameDuplicatesResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    person_admin_api_admin_persons__person_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                person_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PersonOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    persons_sharing_name_form_api_admin_persons__person_id__sharing_name_forms_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                person_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SharingPersonOut"][];
                 };
             };
             /** @description Validation Error */

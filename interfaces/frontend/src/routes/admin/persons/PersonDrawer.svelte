@@ -65,7 +65,7 @@
   let sharing = $state<SharingPerson[]>([]);
 
   async function loadSharing() {
-    sharing = await api<SharingPerson[]>(`/api/admin/persons/${person.id}/sharing-name-forms`);
+    sharing = await api<SharingPerson[]>(`/api/persons/${person.id}/sharing-name-forms`);
   }
 
   $effect(() => {
