@@ -581,3 +581,109 @@ class TestUpdateNameFormStatus:
             json={"name_form": "inexistante zzz", "status": "confirmed"},
         )
         assert r.status_code == 404
+
+
+class TestPersonDashboardAndSubjects:
+    def test_dashboard_of_unknown_person(self, client):
+        """Le tableau de bord d'un id inconnu rend une réponse vide, non un 404."""
+        r = client.get("/api/persons/999999999/dashboard")
+        assert r.status_code == 200
+
+    def test_dashboard_of_seeded_person(self, client):
+        pid = _seed_person("Dash", "Bo")
+        r = client.get(f"/api/persons/{pid}/dashboard")
+        assert r.status_code == 200
+
+    def test_subjects_of_person_without_publication(self, client):
+        pid = _seed_person("Subj", "Ec")
+        r = client.get(f"/api/persons/{pid}/subjects")
+        assert r.status_code == 200
+        assert r.json() == []
+
+    def test_subjects_honours_limit(self, client):
+        pid = _seed_person("SubjLim", "Ec")
+        r = client.get(f"/api/persons/{pid}/subjects", params={"limit": 5})
+        assert r.status_code == 200
+
+
+class TestTriageQueues:
+    """Les quatre files de triage et leurs compteurs, exercées sur une base sans cas à trancher."""
+
+    QUEUES = (
+        "ambiguous-name-forms",
+        "identifier-conflicts",
+        "detachable-intruders",
+        "name-duplicates",
+    )
+
+    @pytest.mark.parametrize("queue", QUEUES)
+    def test_count(self, client, queue):
+        r = client.get(f"/api/admin/{queue}/count")
+        assert r.status_code == 200
+        assert isinstance(r.json()["total"], int)
+
+    @pytest.mark.parametrize("queue", QUEUES)
+    def test_list_is_paginated(self, client, queue):
+        r = client.get(f"/api/admin/{queue}", params={"page": 1, "per_page": 10})
+        assert r.status_code == 200
+        body = r.json()
+        assert body["page"] == 1
+        assert body["per_page"] == 10
+        assert "pages" in body
+
+    @pytest.mark.parametrize("queue", QUEUES)
+    def test_rejects_per_page_above_ceiling(self, client, queue):
+        r = client.get(f"/api/admin/{queue}", params={"per_page": 500})
+        assert r.status_code == 422
+
+
+class TestPersonAdminProjection:
+    def test_unknown_person_404(self, client):
+        r = client.get("/api/admin/persons/999999999")
+        assert r.status_code == 404
+
+    def test_returns_seeded_person(self, client):
+        pid = _seed_person("AdminProj", "Ec")
+        r = client.get(f"/api/admin/persons/{pid}")
+        assert r.status_code == 200
+        assert r.json()["id"] == pid
+
+    def test_sharing_name_forms_without_sharer(self, client):
+        pid = _seed_person("Sharing", "Ec")
+        _seed_name_form(pid, _uniq("sharing ec"))
+        r = client.get(f"/api/admin/persons/{pid}/sharing-name-forms")
+        assert r.status_code == 200
+        assert r.json() == []
+
+    def test_sharing_name_forms_finds_sharer(self, client):
+        form = _uniq("partagee ec")
+        a = _seed_person("SharedA", "Ec")
+        b = _seed_person("SharedB", "Ec")
+        _seed_name_form(a, form)
+        _seed_name_form(b, form)
+        r = client.get(f"/api/admin/persons/{a}/sharing-name-forms")
+        assert r.status_code == 200
+        assert b in [p["id"] for p in r.json()]
+
+
+class TestMarkPersonsDistinct:
+    def test_requires_admin(self, client):
+        r = client.post(
+            "/api/admin/persons/mark-distinct", json={"person_id_a": 1, "person_id_b": 2}
+        )
+        assert r.status_code == 401
+
+    def test_marks_pair(self, auth_client):
+        a = _seed_person("DistinctA", "Ec")
+        b = _seed_person("DistinctB", "Ec")
+        r = auth_client.post(
+            "/api/admin/persons/mark-distinct", json={"person_id_a": a, "person_id_b": b}
+        )
+        assert r.status_code == 200
+
+    def test_rejects_same_person(self, auth_client):
+        a = _seed_person("DistinctSame", "Ec")
+        r = auth_client.post(
+            "/api/admin/persons/mark-distinct", json={"person_id_a": a, "person_id_b": a}
+        )
+        assert r.status_code == 400
