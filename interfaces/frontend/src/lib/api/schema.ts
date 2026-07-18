@@ -2281,7 +2281,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/admin/pipeline/status": {
+    "/api/pipeline/status": {
         parameters: {
             query?: never;
             header?: never;
@@ -2290,11 +2290,11 @@ export interface paths {
         };
         /**
          * Pipeline Status
-         * @description Retourne le statut du pipeline en cours, ou null si aucun ne tourne.
+         * @description Statut du pipeline en cours, ou null si aucun ne tourne.
          *
-         *     Un status.json orphelin (PID mort) est traité comme "inactif" et nettoyé par `read_status`.
+         *     Un `status.json` orphelin (PID mort) est traité comme inactif et nettoyé par `read_status`.
          */
-        get: operations["pipeline_status_api_admin_pipeline_status_get"];
+        get: operations["pipeline_status_api_pipeline_status_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2303,7 +2303,67 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/admin/pipeline/runs/{run_id}/phases/{phase}/log": {
+    "/api/pipeline/phases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Phases
+         * @description Ordre canonique des phases du pipeline (graphe), pour la trame du ruban.
+         */
+        get: operations["list_phases_api_pipeline_phases_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/pipeline/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Runs
+         * @description Fenêtre de runs agrégés par `run_id`, le plus récent en tête ; `offset` sert au chargement incrémental.
+         */
+        get: operations["list_runs_api_pipeline_runs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/pipeline/runs/{run_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Run
+         * @description Détail d'un run : ses exécutions de phase avec rendement et écart de durée.
+         */
+        get: operations["get_run_api_pipeline_runs__run_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/pipeline/runs/{run_id}/phases/{phase}/log": {
         parameters: {
             query?: never;
             header?: never;
@@ -2316,67 +2376,7 @@ export interface paths {
          *
          *     `available` vaut vrai quand la section de la phase a été retrouvée ; sinon `content` est vide, que le fichier soit absent (`LOG_TO_FILE` inactif) ou que la section ait été purgée.
          */
-        get: operations["phase_log_api_admin_pipeline_runs__run_id__phases__phase__log_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/pipeline/phases": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List Phases
-         * @description Ordre canonique des phases du pipeline (graphe), pour la trame du ruban.
-         */
-        get: operations["list_phases_api_admin_pipeline_phases_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/pipeline/runs": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List Runs
-         * @description Fenêtre de runs agrégés par `run_id`, le plus récent en tête ; `offset` sert au chargement incrémental.
-         */
-        get: operations["list_runs_api_admin_pipeline_runs_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/pipeline/runs/{run_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Run
-         * @description Détail d'un run : ses exécutions de phase avec rendement et écart de durée.
-         */
-        get: operations["get_run_api_admin_pipeline_runs__run_id__get"];
+        get: operations["phase_log_api_pipeline_runs__run_id__phases__phase__log_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -9298,7 +9298,7 @@ export interface operations {
             };
         };
     };
-    pipeline_status_api_admin_pipeline_status_get: {
+    pipeline_status_api_pipeline_status_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -9318,39 +9318,7 @@ export interface operations {
             };
         };
     };
-    phase_log_api_admin_pipeline_runs__run_id__phases__phase__log_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                run_id: number;
-                phase: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PipelinePhaseLog"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_phases_api_admin_pipeline_phases_get: {
+    list_phases_api_pipeline_phases_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -9370,7 +9338,7 @@ export interface operations {
             };
         };
     };
-    list_runs_api_admin_pipeline_runs_get: {
+    list_runs_api_pipeline_runs_get: {
         parameters: {
             query?: {
                 limit?: number;
@@ -9402,7 +9370,7 @@ export interface operations {
             };
         };
     };
-    get_run_api_admin_pipeline_runs__run_id__get: {
+    get_run_api_pipeline_runs__run_id__get: {
         parameters: {
             query?: never;
             header?: never;
@@ -9420,6 +9388,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RunDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    phase_log_api_pipeline_runs__run_id__phases__phase__log_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: number;
+                phase: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PipelinePhaseLog"];
                 };
             };
             /** @description Validation Error */

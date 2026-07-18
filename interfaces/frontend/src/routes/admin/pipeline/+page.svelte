@@ -29,7 +29,7 @@
 
   async function pollStatus() {
     try {
-      pipelineStatus = await api<PipelineStatus | null>("/api/admin/pipeline/status");
+      pipelineStatus = await api<PipelineStatus | null>("/api/pipeline/status");
     } catch {
       pipelineStatus = null;
     }
@@ -52,7 +52,7 @@
   }
 
   async function loadRuns() {
-    const page = await api<RunSummary[]>(`/api/admin/pipeline/runs?limit=${PAGE_SIZE}`);
+    const page = await api<RunSummary[]>(`/api/pipeline/runs?limit=${PAGE_SIZE}`);
     runs = page;
     hasMore = page.length === PAGE_SIZE;
     if (runs.length > 0 && selectedRunId === null) {
@@ -65,7 +65,7 @@
     loadingMore = true;
     try {
       const page = await api<RunSummary[]>(
-        `/api/admin/pipeline/runs?limit=${PAGE_SIZE}&offset=${runs.length}`,
+        `/api/pipeline/runs?limit=${PAGE_SIZE}&offset=${runs.length}`,
       );
       runs = [...runs, ...page];
       hasMore = page.length === PAGE_SIZE;
@@ -78,7 +78,7 @@
     runLoading = true;
     selectedRunId = runId;
     try {
-      runDetail = await api<RunDetailT>(`/api/admin/pipeline/runs/${runId}`);
+      runDetail = await api<RunDetailT>(`/api/pipeline/runs/${runId}`);
     } finally {
       runLoading = false;
     }
@@ -94,7 +94,7 @@
   onMount(async () => {
     await pollStatus();
     scheduleStatus();
-    allPhases = await api<string[]>("/api/admin/pipeline/phases");
+    allPhases = await api<string[]>("/api/pipeline/phases");
     await loadRuns();
   });
 

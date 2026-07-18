@@ -51,6 +51,7 @@ from interfaces.api.routers import (  # noqa: E402
     laboratories,
     perimeters,
     persons,
+    pipeline,
     publications,
     publishers,
     stats,
@@ -59,8 +60,6 @@ from interfaces.api.routers import (  # noqa: E402
 from interfaces.api.routers.admin import (  # noqa: E402
     addresses as admin_addresses,
     persons as admin_persons,
-    pipeline_logs as admin_pipeline_logs,
-    pipeline_phase_executions as admin_pipeline_phase_executions,
     structures as admin_structures,
 )
 
@@ -251,8 +250,7 @@ app.include_router(config.router)
 app.include_router(perimeters.router)
 app.include_router(publishers.router)
 app.include_router(journals.router)
-app.include_router(admin_pipeline_logs.router)
-app.include_router(admin_pipeline_phase_executions.router)
+app.include_router(pipeline.router)
 app.include_router(subjects.router)
 
 

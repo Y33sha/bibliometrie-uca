@@ -1,8 +1,8 @@
 """Tests d'intégration pour le router `interfaces.api.routers.admin.pipeline_logs`.
 
 Couvre :
-- GET /api/admin/pipeline/status (avec / sans pipeline en cours)
-- GET /api/admin/pipeline/runs/{run_id}/phases/{phase}/log (découpe, fichier absent)
+- GET /api/pipeline/status (avec / sans pipeline en cours)
+- GET /api/pipeline/runs/{run_id}/phases/{phase}/log (découpe, fichier absent)
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ def _isolate_paths(tmp_path, monkeypatch):
 
 class TestPipelineStatus:
     def test_returns_null_when_no_status_file(self, client, _isolate_paths):
-        r = client.get("/api/admin/pipeline/status")
+        r = client.get("/api/pipeline/status")
         assert r.status_code == 200
         assert r.json() is None
 
@@ -54,7 +54,7 @@ class TestPipelineStatus:
             encoding="utf-8",
         )
 
-        r = client.get("/api/admin/pipeline/status")
+        r = client.get("/api/pipeline/status")
         assert r.status_code == 200
         body = r.json()
         assert body is not None
@@ -80,7 +80,7 @@ class TestPhaseLog:
 
     def test_returns_phase_slice(self, client, _isolate_paths):
         self._write_log(_isolate_paths / "pipeline.log")
-        r = client.get("/api/admin/pipeline/runs/5/phases/extract/log")
+        r = client.get("/api/pipeline/runs/5/phases/extract/log")
         assert r.status_code == 200
         body = r.json()
         assert body["available"] is True
@@ -89,12 +89,12 @@ class TestPhaseLog:
 
     def test_unavailable_when_file_missing(self, client, _isolate_paths):
         # Pas de pipeline.log (LOG_TO_FILE désactivé).
-        r = client.get("/api/admin/pipeline/runs/5/phases/extract/log")
+        r = client.get("/api/pipeline/runs/5/phases/extract/log")
         assert r.status_code == 200
         assert r.json() == {"available": False, "content": ""}
 
     def test_unavailable_when_section_absent(self, client, _isolate_paths):
         self._write_log(_isolate_paths / "pipeline.log")
-        r = client.get("/api/admin/pipeline/runs/5/phases/subjects/log")
+        r = client.get("/api/pipeline/runs/5/phases/subjects/log")
         assert r.status_code == 200
         assert r.json() == {"available": False, "content": ""}
