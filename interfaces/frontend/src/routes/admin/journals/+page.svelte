@@ -13,6 +13,7 @@
 	type EnumOption = components['schemas']['EnumOption'];
 
 	let journalTypes: EnumOption[] = $state([]);
+	let oaModels: EnumOption[] = $state([]);
 
 	// Clé d'API utilisée pour invalider le cache de JournalsListView après
 	// une édition ou fusion (force un reload via incrément).
@@ -142,7 +143,10 @@
 	}
 
 	onMount(async () => {
-		journalTypes = await api<EnumOption[]>('/api/journals/types');
+		[journalTypes, oaModels] = await Promise.all([
+			api<EnumOption[]>('/api/journals/types'),
+			api<EnumOption[]>('/api/journals/oa-models')
+		]);
 	});
 </script>
 
@@ -194,9 +198,9 @@
 			<div style="flex:1">
 				<label>Modèle OA <select bind:value={editModal.oa_model}>
 					<option value="">(non renseigné)</option>
-					<option value="subscription">Abonnement</option>
-					<option value="full_oa">Full OA (gold/diamond)</option>
-					<option value="repository">Archive/dépôt</option>
+					{#each oaModels as opt (opt.value)}
+						<option value={opt.value}>{opt.label_fr}</option>
+					{/each}
 				</select></label>
 			</div>
 			<div style="flex:1">
