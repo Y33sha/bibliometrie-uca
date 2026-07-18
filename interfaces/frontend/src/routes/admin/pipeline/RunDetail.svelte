@@ -46,7 +46,7 @@
       logs[phase] = "loading";
       try {
         logs[phase] = await api<PhaseLog>(
-          `/api/admin/pipeline/runs/${detail.run_id}/phases/${phase}/log`,
+          `/api/pipeline/runs/${detail.run_id}/phases/${phase}/log`,
         );
       } catch {
         logs[phase] = { available: false, content: "" };

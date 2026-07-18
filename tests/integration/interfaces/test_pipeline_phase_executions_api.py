@@ -1,8 +1,8 @@
 """Tests d'intégration pour le router `admin.pipeline_phase_executions`.
 
 Couvre :
-- GET /api/admin/pipeline/runs (liste agrégée par run, statut global, ordre)
-- GET /api/admin/pipeline/runs/{run_id} (phases ordonnées, details avant/après et
+- GET /api/pipeline/runs (liste agrégée par run, statut global, ordre)
+- GET /api/pipeline/runs/{run_id} (phases ordonnées, details avant/après et
   by_source, médian de durée historique, écart de durée ; statut warning ; 404)
 """
 
@@ -126,7 +126,7 @@ def seeded_runs() -> dict[str, int]:
 
 
 def test_list_runs_aggrege_et_ordonne(client, seeded_runs):
-    runs = client.get("/api/admin/pipeline/runs?limit=200").json()
+    runs = client.get("/api/pipeline/runs?limit=200").json()
     by_id = {r["run_id"]: r for r in runs}
     assert seeded_runs["a"] in by_id
     assert seeded_runs["b"] in by_id
@@ -150,7 +150,7 @@ def test_list_runs_aggrege_et_ordonne(client, seeded_runs):
 
 
 def test_list_phases(client):
-    phases = client.get("/api/admin/pipeline/phases").json()
+    phases = client.get("/api/pipeline/phases").json()
     assert phases[0] == "extract"
     assert "normalize" in phases
     assert phases[-1] == "oa_status"
@@ -158,7 +158,7 @@ def test_list_phases(client):
 
 
 def test_get_run_detail(client, seeded_runs):
-    detail = client.get(f"/api/admin/pipeline/runs/{seeded_runs['b']}").json()
+    detail = client.get(f"/api/pipeline/runs/{seeded_runs['b']}").json()
     assert detail["status"] == "warning"
     assert [p["phase"] for p in detail["phases"]] == ["normalize", "publications", "persons"]
 
@@ -182,4 +182,4 @@ def test_get_run_detail(client, seeded_runs):
 
 
 def test_get_run_404(client):
-    assert client.get("/api/admin/pipeline/runs/999999999").status_code == 404
+    assert client.get("/api/pipeline/runs/999999999").status_code == 404

@@ -95,7 +95,7 @@ L'ordre part des modules sans chemin non couvert et sans scission — la mécani
 
 - [ ] `addresses` : les pays sortent en `countries.py` ; `/api/admin/address-stats` → `/api/addresses/stats`.
 - [ ] `structures` : les formes de nom sortent en `name_forms.py`, `/api/structure-relations/*` → `/api/structures/relations/*`.
-- [ ] `pipeline` : `admin/pipeline_logs.py` et `admin/pipeline_phase_executions.py` fusionnent ; `/api/admin/pipeline/*` → `/api/pipeline/*`.
+- [x] `pipeline` : `admin/pipeline_logs.py` et `admin/pipeline_phase_executions.py` fusionnent ; `/api/admin/pipeline/*` → `/api/pipeline/*`. Les deux modules se partageaient déjà le préfixe, chacun renvoyant à l'autre dans son docstring — le détail d'un run vivait d'un côté, le log de ses phases de l'autre. Le module réuni distingue ce qui compte vraiment : deux lectures viennent des fichiers que l'orchestrateur laisse derrière lui, les trois autres de la base.
 - [ ] `persons` : `persons.py` et `admin/persons.py` fusionnent — quatorze chemins non couverts à traiter d'abord, le plus gros lot du chantier. `/api/person-identifiers/*` devient une sous-ressource, et les lectures d'administration (`ambiguous-name-forms`, `identifier-conflicts`, `detachable-intruders`, `name-duplicates`, `admin/persons/{id}`) rejoignent `/api/persons/*`. Vérifier l'ordre de déclaration du module cumulé : les chemins littéraux (`/directory`, `/search`, `/facets`, `/stats`) doivent précéder `/{person_id}`, contrainte aujourd'hui tenue par l'ordre d'enregistrement de deux fichiers dans `app.py` — une route littérale ajoutée dans le mauvais fichier serait captée par le paramètre, en silence.
 
 ### Phase 3 — Clore

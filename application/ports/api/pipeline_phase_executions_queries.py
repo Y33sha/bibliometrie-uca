@@ -1,4 +1,4 @@
-"""Port : lectures sur les exécutions de phase du pipeline (/api/admin/pipeline/runs/*).
+"""Port : lectures sur les exécutions de phase du pipeline (/api/pipeline/runs/*).
 
 La liste agrège les exécutions par `run_id` (statut global = le pire des statuts de
 phase). Le détail d'un run renvoie ses phases dans l'ordre d'exécution, chacune avec
@@ -69,7 +69,7 @@ class RunDetail(BaseModel):
 
 
 class PhaseExecutionsQueries(Protocol):
-    """Lectures pour /api/admin/pipeline/runs/*."""
+    """Lectures pour /api/pipeline/runs/*."""
 
     def list_runs(self, limit: int = 50, offset: int = 0) -> list[RunSummary]: ...
 
