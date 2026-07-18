@@ -22,7 +22,7 @@ Ce chantier précède la fin de la relecture d'`interfaces/api/`, pour ne pas re
 
 **Le préfixe se déclare une fois par module.** Chaque router prend `APIRouter(prefix="/api/<ressource>", tags=["<ressource>"])` et ses décorateurs portent des chemins relatifs. Le préfixe cesse d'être recopié dans chacune des cent-cinquante routes, et les `tags` groupent la documentation OpenAPI, aujourd'hui une liste plate.
 
-**Ce chantier déplace, il ne fusionne pas.** Les endpoints qui font double emploi pour une même ressource restent en double à l'arrivée, chacun dans le module de sa ressource. Leur fusion appartient aux fiches qui la traitent : [Structures et laboratoires](CODE_structures-et-laboratoires.md) et [Projections de lecture des personnes](CODE_projections-de-lecture-des-personnes.md). Cette séparation garde le déplacement mécanique et vérifiable route par route.
+**Ce chantier déplace, il ne fusionne pas.** Les endpoints qui font double emploi pour une même ressource restent en double à l'arrivée, chacun dans le module de sa ressource. Leur fusion appartient aux fiches qui la traitent : [Structures et laboratoires](CODE_structures-et-laboratoires.md) et [Projections de lecture des personnes](CODE_projections-de-lecture-des-personnes.md), qui reprennent la main après. L'ordre compte dans ce sens : deux projections d'une même ressource se comparent une fois voisines dans le même module, alors que les fusionner d'abord reviendrait à trancher sur des fichiers dont la parenté ne se voit pas encore. Il garde aussi chaque déplacement mécanique et vérifiable route par route.
 
 **Les chemins plats deviennent des sous-ressources.** `/api/admin/address-stats` désigne des statistiques d'adresses, donc `/api/addresses/stats` ; `/api/admin/duplicates/*` désigne des doublons de publications, `/api/admin/orphan-authorships/*` des signatures orphelines. Le déplacement suit le motif déjà appliqué à `/api/publisher-types`, devenu `/api/publishers/types`.
 
@@ -55,7 +55,7 @@ Ce chantier précède la fin de la relecture d'`interfaces/api/`, pour ne pas re
 
 - [x] Recensement croisé : 127 routes pour 118 chemins distincts, contre 112 chemins appelés par le frontend. Le croisement vaut aussi comme test « qui l'appelle » — voir *Endpoints sans appelant* ci-dessous.
 - [x] Couverture d'intégration relevée : **28 chemins sur 118 ne sont nommés par aucun test d'intégration**. Ils se concentrent sur trois familles — les lectures d'administration des personnes (onze chemins : formes ambiguës, conflits d'identifiants, intrus détachables, doublons de nom, avec leurs compteurs), les lectures de laboratoire (détail, adresses, tableau de bord, sujets), et les agrégats de statistiques (collaborations, pivot et son schéma). S'y ajoutent l'authentification, que la fixture d'intégration court-circuite en forgeant le jeton au lieu d'appeler `/api/auth/login`, et quelques détails d'entité (`GET /api/publications/{id}`, `/api/persons/{id}/theses`, `/dashboard`, `/subjects`).
-- [ ] Compléter la couverture des 28 chemins avant tout déplacement : un test qui nomme le chemin est ce qui fait échouer bruyamment un renommage manqué. Sans lui, une route déplacée et un frontend non ajusté produisent un 404 que rien ne signale.
+La couverture se complète module par module, à l'entrée de chacun, plutôt qu'en bloc : un test qui nomme le chemin est ce qui fait échouer bruyamment un renommage manqué, et sans lui une route déplacée avec un frontend non ajusté produit un 404 que rien ne signale.
 
 #### Endpoints sans appelant
 
@@ -64,34 +64,45 @@ Six chemins n'étaient appelés par aucun module du frontend. Le contrôle a éc
 - [x] Cinq routes supprimées, avec leurs méthodes de port, leurs implémentations d'adaptateur et leurs tests. `GET /api/stats/years` — la page de statistiques tire ses années de `/api/stats/facets`. `GET /api/addresses/suggest-countries` — la page pays passe par `/api/addresses/countries` avec le drapeau `suggest`. `GET /api/persons/departments` et `/roles` — les deux facettes sont servies par `/api/persons/facets`, qui les porte déjà. `DELETE /api/perimeters/{id}/structures/{structure_id}` — retirer une racine se fait en réécrivant `structure_ids` par `PUT /api/perimeters/{id}`, ce que l'interface fait à chaque édition.
 - [x] `GET /api/journals/oa-models` **n'était pas mort mais contourné**, et c'est le frontend qui a été corrigé. Le modal d'édition des revues codait ses trois options en dur dans son gabarit, tandis que le sélecteur voisin du même formulaire itérait les valeurs de `/api/journals/types` ; la copie avait déjà divergé, le domaine disant « Archive / dépôt » et le gabarit « Archive/dépôt ». Le modal charge les deux énumérations de la même façon.
 
-### Phase 2 — Adopter le préfixe par module
+### Phase 2 — Traiter les modules un par un
 
-Sans changer aucun chemin servi, module par module : `APIRouter(prefix=..., tags=[...])`, décorateurs en chemins relatifs, enregistrement ajusté dans `app.py`. Étape purement mécanique, à contrat constant — le contrat OpenAPI régénéré ne doit montrer que l'apparition des `tags`.
+Chaque module se traite d'un bout à l'autre avant de passer au suivant, en trois temps.
 
-- [ ] Les huit modules déjà mono-ressource et sans préfixe `/api/admin/`.
-- [ ] Les modules à ressources multiples, après la scission de la phase 3.
+1. **Couverture.** Ajouter un test d'intégration qui nomme chacun de ses chemins non couverts. C'est le filet, et il se pose avant de toucher aux chemins.
+2. **Préfixe.** `APIRouter(prefix="/api/<ressource>", tags=["<ressource>"])`, décorateurs en chemins relatifs (`""` pour la racine de la collection, jamais `"/"` qui servirait une URL à barre finale), enregistrement ajusté dans `app.py`. Étape à contrat constant : le contrat OpenAPI régénéré ne doit montrer que l'apparition des `tags`.
+3. **Placement.** Scission, fusion ou remontée hors d'`admin/`, puis renommage des chemins, chacun avec son consommateur frontend dans le même commit.
 
-### Phase 3 — Scinder et fusionner les modules
+L'ordre part des modules sans chemin non couvert et sans scission — la mécanique s'y éprouve à risque nul — puis remonte vers ceux qui demandent des tests, et finit par les recompositions.
 
-- [ ] `admin/addresses.py` : les pays sortent en `countries.py`.
-- [ ] `admin/structures.py` : les formes de nom sortent en `name_forms.py`, les relations passent en sous-ressource de `structures`.
-- [ ] `admin/pipeline_logs.py` et `admin/pipeline_phase_executions.py` fusionnent en `pipeline.py`.
-- [ ] `persons.py` et `admin/persons.py` fusionnent. Le module cumulé étant le plus gros de l'API, vérifier au passage l'ordre de déclaration : les chemins littéraux (`/directory`, `/search`, `/facets`, `/stats`) doivent précéder `/{person_id}`, contrainte aujourd'hui tenue par l'ordre d'enregistrement de deux fichiers dans `app.py` — une route littérale ajoutée dans le mauvais fichier serait captée par le paramètre, en silence.
-- [ ] Les modules restants remontent d'`admin/` sans autre changement ; le dossier disparaît.
+**Sans couverture à compléter ni recomposition**, remontée hors d'`admin/` et préfixe seulement :
 
-### Phase 4 — Renommer les chemins
+- [ ] `subjects`, `publishers`, `hal_problems`.
+- [ ] `feedback` — `/api/admin/feedback/*` → `/api/feedback/*`.
+- [ ] `publication_duplicates` → `publications` — `/api/admin/duplicates/*` → `/api/publications/duplicates/*`.
+- [ ] `authorships` — `/api/admin/orphan-authorships/*` → `/api/authorships/orphans/*`.
+- [ ] `perimeters`, `pipeline_config` → `config`.
 
-Chaque renommage se fait avec son consommateur frontend dans le même commit, contrat OpenAPI régénéré.
+**Avec couverture à compléter :**
 
-- [ ] `/api/admin/address-stats` → `/api/addresses/stats`.
-- [ ] `/api/admin/duplicates/*` → `/api/publications/duplicates/*`.
-- [ ] `/api/admin/orphan-authorships/*` → `/api/authorships/orphans/*`.
-- [ ] `/api/admin/feedback/*` → `/api/feedback/*`.
-- [ ] `/api/admin/pipeline/*` → `/api/pipeline/*`.
-- [ ] `/api/structure-relations/*` → `/api/structures/relations/*`.
-- [ ] `/api/person-identifiers/*` → sous-ressource de `/api/persons`.
-- [ ] Les lectures d'administration des personnes (`/api/admin/ambiguous-name-forms`, `/api/admin/identifier-conflicts`, `/api/admin/detachable-intruders`, `/api/admin/name-duplicates`, `/api/admin/persons/{id}`) rejoignent `/api/persons/*`.
+- [ ] `journals` — un chemin non couvert (`/api/journals/facets`).
+- [ ] `auth` — deux chemins non couverts. La fixture d'intégration forge le jeton au lieu d'appeler `/api/auth/login`, donc le parcours de connexion n'est jamais exercé de bout en bout.
+- [ ] `config` — `PUT /api/config/{key}` non couvert.
+- [ ] `publications` — deux chemins non couverts (`export-theses.csv`, `GET /{id}`).
+- [ ] `stats` — trois chemins non couverts (collaborations, pivot, schéma du pivot).
+- [ ] `laboratories` — quatre chemins non couverts (détail, adresses, tableau de bord, sujets).
+
+**Avec recomposition :**
+
+- [ ] `addresses` : les pays sortent en `countries.py` ; `/api/admin/address-stats` → `/api/addresses/stats`.
+- [ ] `structures` : les formes de nom sortent en `name_forms.py`, `/api/structure-relations/*` → `/api/structures/relations/*`.
+- [ ] `pipeline` : `admin/pipeline_logs.py` et `admin/pipeline_phase_executions.py` fusionnent ; `/api/admin/pipeline/*` → `/api/pipeline/*`.
+- [ ] `persons` : `persons.py` et `admin/persons.py` fusionnent — quinze chemins non couverts à traiter d'abord, le plus gros lot du chantier. `/api/person-identifiers/*` devient une sous-ressource, et les lectures d'administration (`ambiguous-name-forms`, `identifier-conflicts`, `detachable-intruders`, `name-duplicates`, `admin/persons/{id}`) rejoignent `/api/persons/*`. Vérifier l'ordre de déclaration du module cumulé : les chemins littéraux (`/directory`, `/search`, `/facets`, `/stats`) doivent précéder `/{person_id}`, contrainte aujourd'hui tenue par l'ordre d'enregistrement de deux fichiers dans `app.py` — une route littérale ajoutée dans le mauvais fichier serait captée par le paramètre, en silence.
+
+### Phase 3 — Clore
+
+- [ ] Le dossier `interfaces/api/routers/admin/` est vide et disparaît.
 - [ ] Plus aucun chemin ne porte le segment `admin` : contrôle final sur le contrat OpenAPI régénéré.
+- [ ] Les fiches [Structures et laboratoires](CODE_structures-et-laboratoires.md) et [Projections de lecture des personnes](CODE_projections-de-lecture-des-personnes.md) reprennent la main : les doublons se voient mieux une fois chaque ressource rassemblée dans son module.
 
 ## Questions ouvertes
 
