@@ -1814,7 +1814,7 @@ export interface paths {
          * List Config
          * @description Liste tous les paramètres applicatifs (clé, valeur JSON, description).
          *
-         *     Retourne la table `config` triée par clé. Les valeurs sont renvoyées telles quelles (jsonb) — la sémantique de chaque clé est documentée dans `docs/exploitation.md`.
+         *     Rend la table `config` triée par clé, valeurs comprises. Parmi elles figurent les identifiants d'accès aux sources — clés d'API OpenAlex et Web of Science, compte ScanR — d'où l'authentification exigée : c'est la seule lecture de l'API qui livre des secrets, et la garde par méthode HTTP du middleware ne couvre que les écritures.
          */
         get: operations["list_config_api_config_get"];
         put?: never;

@@ -93,13 +93,18 @@ class TestAuth:
 
 
 class TestConfig:
-    def test_get_config(self, client):
-        r = client.get("/api/config")
+    def test_get_config(self, auth_client):
+        r = auth_client.get("/api/config")
         assert r.status_code == 200
 
+    def test_read_requires_auth(self, client):
+        """La config porte les identifiants d'accès aux sources : sa lecture exige une session."""
+        r = client.get("/api/config")
+        assert r.status_code == 401
+
     def test_write_requires_auth(self, client):
-        """Les écritures config sans auth renvoient 401."""
-        r = client.post("/api/perimeters/1/structures", json={"structure_id": 1})
+        """Les écritures config sans session renvoient 401."""
+        r = client.put("/api/config/pipeline_start_year_full", json={"value": 2020})
         assert r.status_code == 401
 
 

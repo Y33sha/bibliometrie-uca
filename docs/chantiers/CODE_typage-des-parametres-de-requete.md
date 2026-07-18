@@ -14,6 +14,8 @@ Les routers déclarent pourtant `str` une centaine de fois, y compris là où le
 
 **Les listes.** `department`, `role`, `year`, `doc_type`, `country`, `oa_status`, `lab_id`, `source_filter` transportent plusieurs valeurs séparées par des virgules, que `parse_str_csv` découpe. La convention CSV est délibérée et se défend ; elle n'est pas en cause ici.
 
+**Les prédicats composés.** `text` et `struct` (adresses) sont des paramètres répétés dont chaque occurrence porte une micro-syntaxe `<opérateur>:<charge>` — `text=contains:inserm`, `struct=not_recognized:12,14`. Déclarés `list[str]`, ils échappent entièrement à FastAPI : c'est `_parse_text_predicates` et `_parse_structure_predicates` qui découpent, valident l'opérateur contre un ensemble en dur et construisent les objets-valeurs. Les deux fonctions écrivent la même décision, et la documentent chacune de leur côté : un opérateur inconnu ou une charge vide fait tomber le prédicat au lieu de refuser la requête. `?struct=recognized:abc` ne filtre donc rien, et la page affiche l'ensemble complet sans que rien ne le signale — le symptôme des tri-états, sous une autre syntaxe.
+
 `is_corresponding`, `has_apc` et `in_perimeter` (publications) ressemblent à des tri-états et n'en sont pas : ce sont des **facettes multi-sélection sur une dimension binaire**, une liste de `yes` / `no` combinée en OR par `_person_toggle_clause`. Cocher les deux ne contraint rien, ne rien cocher non plus. Ils relèvent des listes, et un booléen les trahirait.
 
 Les deux premières familles paient le même prix.
@@ -32,6 +34,8 @@ Les deux premières familles paient le même prix.
 
 **Les listes CSV restent.** La convention est en place, documentée, et partagée par les pages à facettes ; elle ne coûte pas de validation perdue, `parse_str_csv` n'ayant rien à refuser.
 
+**Les prédicats composés gardent leur syntaxe et perdent leur silence.** L'opérateur se déclare en énumération, et un prédicat malformé est refusé au lieu d'être abandonné. Les deux parsers ne se factorisent pas l'un dans l'autre : leur forme commune tient en une boucle de huit lignes, et la partager supposerait une fonction paramétrée par un ensemble d'opérateurs, un parseur de charge et une fabrique — trois indirections pour deux appelants. C'est la règle de tolérance, écrite deux fois, qui est le doublon à traiter, non le découpage.
+
 ## Phasage
 
 ### Phase 1 — les tri-états
@@ -48,6 +52,12 @@ Les deux premières familles paient le même prix.
 - [ ] Les déclarer en `Literal`, en les tirant du domaine là où il les porte.
 - [ ] `sort` des quatre listes paginées : un `Literal` par liste, et trancher si les deux conventions de sens descendant (préfixe contre suffixe) convergent.
 - [ ] Vérifier ce qu'une valeur hors vocabulaire produit aujourd'hui, avant qu'elle produise un 422.
+
+### Phase 3 — les prédicats composés
+
+- [ ] Les opérateurs de `text` et `struct` se déclarent en énumération, à la place des ensembles en dur `_TEXT_MODES` et `_STRUCT_OPS`.
+- [ ] Un prédicat malformé — opérateur inconnu, terme vide, liste d'identifiants sans chiffre — est refusé plutôt qu'abandonné.
+- [ ] Vérifier d'abord ce que la page des adresses émet : elle construit ces paramètres elle-même, et un prédicat qu'elle produirait mal passerait aujourd'hui inaperçu.
 
 ## Questions ouvertes
 
