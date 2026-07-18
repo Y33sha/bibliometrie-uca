@@ -54,7 +54,7 @@
 
 	// --- Filter state ---
 	let search = $state('');
-	let currentSort = $state('-pubs');
+	let currentSort = $state('pubs_desc');
 	let selectedJournalTypes: string[] = $state([]);
 	let selectedOaModels: string[] = $state([]);
 	let selectedDoaj: string[] = $state([]); // 'true' / 'false'
@@ -114,7 +114,7 @@
 			selectedOaModels: { type: 'string_array', urlKey: 'oa_model' },
 			selectedDoaj: { type: 'string_array', urlKey: 'is_in_doaj' },
 			search: { type: 'single', urlKey: 'search' },
-			currentSort: { type: 'single', urlKey: 'sort', defaultValue: '-pubs' },
+			currentSort: { type: 'single', urlKey: 'sort', defaultValue: 'pubs_desc' },
 			currentPage: { type: 'page', urlKey: 'page' },
 		},
 	});
@@ -154,7 +154,7 @@
 	}
 
 	function oppositeSort(s: string): string {
-		return s.startsWith('-') ? s.slice(1) : '-' + s;
+		return s.endsWith('_desc') ? s.replace(/_desc$/, '_asc') : s.replace(/_asc$/, '_desc');
 	}
 
 	function sortArrow(col: 'title' | 'publisher' | 'pubs'): string {

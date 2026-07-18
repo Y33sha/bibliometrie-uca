@@ -31,14 +31,12 @@
 	} = $props();
 
 	function toggleSort(col: string) {
-		if (sort === col) onSortChange('-' + col);
-		else if (sort === '-' + col) onSortChange(col);
-		else onSortChange(col);
+		onSortChange(sort === `${col}_asc` ? `${col}_desc` : `${col}_asc`);
 	}
 
 	function sortIndicator(col: string): string {
-		if (sort === col) return ' ▲';
-		if (sort === '-' + col) return ' ▼';
+		if (sort === `${col}_asc`) return ' ▲';
+		if (sort === `${col}_desc`) return ' ▼';
 		return '';
 	}
 </script>
@@ -49,24 +47,24 @@
 		<tr>
 			<th
 				class="sortable"
-				class:active={sort === 'name' || sort === '-name'}
+				class:active={sort === 'name_asc' || sort === 'name_desc'}
 				onclick={() => toggleSort('name')}>Nom{sortIndicator('name')}</th
 			>
 			<th>Identifiants</th>
 			<th
 				class="sortable"
-				class:active={sort === 'role' || sort === '-role'}
+				class:active={sort === 'role_asc' || sort === 'role_desc'}
 				onclick={() => toggleSort('role')}>Fonction{sortIndicator('role')}</th
 			>
 			<th
 				class="sortable"
-				class:active={sort === 'dept' || sort === '-dept'}
+				class:active={sort === 'dept_asc' || sort === 'dept_desc'}
 				onclick={() => toggleSort('dept')}>Département{sortIndicator('dept')}</th
 			>
 			<th
 				class="sortable num-col"
 				style="width:80px"
-				class:active={sort === 'pubs' || sort === '-pubs'}
+				class:active={sort === 'pubs_asc' || sort === 'pubs_desc'}
 				onclick={() => toggleSort('pubs')}
 				>Publications{sortIndicator('pubs')}</th
 			>

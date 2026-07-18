@@ -116,12 +116,12 @@ def _build_journal_where(
 
 
 _SORT_MAP = {
-    "title": "j.title ASC",
-    "-title": "j.title DESC",
-    "publisher": "pub_name ASC NULLS LAST, j.title ASC",
-    "-publisher": "pub_name DESC NULLS LAST, j.title ASC",
-    "pubs": "pub_count ASC, j.title ASC",
-    "-pubs": "pub_count DESC, j.title ASC",
+    "title_asc": "j.title ASC",
+    "title_desc": "j.title DESC",
+    "publisher_asc": "pub_name ASC NULLS LAST, j.title ASC",
+    "publisher_desc": "pub_name DESC NULLS LAST, j.title ASC",
+    "pubs_asc": "pub_count ASC, j.title ASC",
+    "pubs_desc": "pub_count DESC, j.title ASC",
 }
 
 
@@ -159,7 +159,7 @@ class PgJournalQueries(JournalQueries):
         ).one()
         total = total_row.total
 
-        order = _SORT_MAP.get(sort, _SORT_MAP["title"])
+        order = _SORT_MAP.get(sort, _SORT_MAP["title_asc"])
         offset = (page - 1) * per_page
         rows = self._conn.execute(
             text(f"""

@@ -108,7 +108,7 @@ _APC_SORT = (
 _ORDER_MAP = {
     "year_desc": "p.pub_year DESC, p.title",
     "year_asc": "p.pub_year ASC, p.title",
-    "title": "p.title ASC",
+    "title_asc": "p.title ASC",
     "title_desc": "p.title DESC",
     "apc_desc": f"{_APC_SORT} DESC, p.title",
     "apc_asc": f"{_APC_SORT} ASC, p.title",

@@ -137,12 +137,12 @@ def search_persons(conn: Connection, *, q: str, limit: int) -> list[dict[str, An
 
 
 _LIST_SORT_MAP = {
-    "name": "LOWER(p.last_name) ASC, LOWER(p.first_name) ASC",
-    "-name": "LOWER(p.last_name) DESC, LOWER(p.first_name) DESC",
-    "pubs": "pub_count ASC, LOWER(p.last_name) ASC",
-    "-pubs": "pub_count DESC, LOWER(p.last_name) ASC",
-    "uca_pubs": "uca_pub_count ASC, LOWER(p.last_name) ASC",
-    "-uca_pubs": "uca_pub_count DESC, LOWER(p.last_name) ASC",
+    "name_asc": "LOWER(p.last_name) ASC, LOWER(p.first_name) ASC",
+    "name_desc": "LOWER(p.last_name) DESC, LOWER(p.first_name) DESC",
+    "pubs_asc": "pub_count ASC, LOWER(p.last_name) ASC",
+    "pubs_desc": "pub_count DESC, LOWER(p.last_name) ASC",
+    "uca_pubs_asc": "uca_pub_count ASC, LOWER(p.last_name) ASC",
+    "uca_pubs_desc": "uca_pub_count DESC, LOWER(p.last_name) ASC",
 }
 
 
@@ -174,7 +174,7 @@ def list_persons(
     clauses.append(person_has_pending_identifiers_clause(filters.has_pending_identifiers))
 
     where_sql, binds = assemble_where(clauses)
-    order = _LIST_SORT_MAP.get(sort, _LIST_SORT_MAP["name"])
+    order = _LIST_SORT_MAP.get(sort, _LIST_SORT_MAP["name_asc"])
 
     count_row = conn.execute(
         text(

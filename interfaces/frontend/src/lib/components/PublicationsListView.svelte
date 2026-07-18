@@ -214,10 +214,10 @@
 
 	// Sort display
 	const yearSortArrow = $derived(currentSort === 'year_asc' ? '▲' : currentSort === 'year_desc' ? '▼' : '');
-	const titleSortArrow = $derived(currentSort === 'title' ? '▲' : currentSort === 'title_desc' ? '▼' : '');
+	const titleSortArrow = $derived(currentSort === 'title_asc' ? '▲' : currentSort === 'title_desc' ? '▼' : '');
 	const apcSortArrow = $derived(currentSort === 'apc_asc' ? '▲' : currentSort === 'apc_desc' ? '▼' : '');
 	const yearSortActive = $derived(currentSort === 'year_desc' || currentSort === 'year_asc');
-	const titleSortActive = $derived(currentSort === 'title' || currentSort === 'title_desc');
+	const titleSortActive = $derived(currentSort === 'title_asc' || currentSort === 'title_desc');
 	const apcSortActive = $derived(currentSort === 'apc_desc' || currentSort === 'apc_asc');
 
 	// --- Shared filter params builder ---
@@ -376,7 +376,7 @@
 	}
 
 	function toggleSortTitle() {
-		currentSort = currentSort === 'title' ? 'title_desc' : 'title';
+		currentSort = currentSort === 'title_asc' ? 'title_desc' : 'title_asc';
 		onFilterChange();
 	}
 

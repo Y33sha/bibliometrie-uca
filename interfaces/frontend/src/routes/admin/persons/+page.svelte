@@ -92,7 +92,7 @@
   let totalCount = $state(0);
   let persons: Person[] = $state([]);
   let loading = $state(false);
-  let sortField = $state("name");
+  let sortField = $state("name_asc");
 
   let searchTimeout: ReturnType<typeof setTimeout> | null = null;
 
@@ -203,16 +203,14 @@
   }
 
   function toggleSort(field: string) {
-    if (sortField === field) sortField = "-" + field;
-    else if (sortField === "-" + field) sortField = field;
-    else sortField = field;
+    sortField = sortField === `${field}_asc` ? `${field}_desc` : `${field}_asc`;
     currentPage = 1;
     loadTable();
   }
 
   function sortIndicator(field: string): string {
-    if (sortField === field) return " \u25B2";
-    if (sortField === "-" + field) return " \u25BC";
+    if (sortField === `${field}_asc`) return " \u25B2";
+    if (sortField === `${field}_desc`) return " \u25BC";
     return "";
   }
 

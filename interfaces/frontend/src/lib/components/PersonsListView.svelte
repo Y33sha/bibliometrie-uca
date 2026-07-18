@@ -37,7 +37,7 @@
 	let selectedRoles: string[] = $state([]);
 	let idStates = $state<Record<string, IdState>>({});
 	let selectedRh: string[] = $state(['yes']);
-	let currentSort = $state('name');
+	let currentSort = $state('name_asc');
 
 	const idQueryKey: Record<string, string> = {
 		orcid: 'has_orcid',
@@ -117,7 +117,7 @@
 			idStates: { type: 'source_states', urlKey: 'id_filter' },
 			hasRh: { type: 'single', urlKey: 'has_rh', defaultValue: 'yes' },
 			search: { type: 'single', urlKey: 'search' },
-			currentSort: { type: 'single', urlKey: 'sort', defaultValue: 'name' },
+			currentSort: { type: 'single', urlKey: 'sort', defaultValue: 'name_asc' },
 			currentPage: { type: 'page', urlKey: 'page' }
 		}
 	});
