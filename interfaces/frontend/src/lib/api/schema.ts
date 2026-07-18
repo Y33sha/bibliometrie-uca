@@ -77,7 +77,9 @@ export interface paths {
         };
         /**
          * Available Years
-         * @description Liste des années présentes dans les publications validées (tri asc, restreint via la config `years_validated`).
+         * @description Années de publication présentes dans le périmètre, la plus récente d'abord.
+         *
+         *     Alimente le sélecteur d'années des tableaux de bord.
          */
         get: operations["available_years_api_stats_years_get"];
         put?: never;
@@ -97,7 +99,9 @@ export interface paths {
         };
         /**
          * Stats Facets
-         * @description Facettes dynamiques : années, labos, oa_status, apc.
+         * @description Décomptes par option des facettes des tableaux de bord.
+         *
+         *     Chaque facette écarte sa propre dimension de la clause WHERE : son décompte annonce le nombre de publications atteignables si l'option était cochée ou décochée.
          */
         get: operations["stats_facets_api_stats_facets_get"];
         put?: never;
@@ -205,7 +209,7 @@ export interface paths {
          * Pivot
          * @description Agrégation générique : `measure` ventilée selon `group` puis `group2`, sous les filtres actifs.
          *
-         *     Les trois clés sont validées contre le registre des mesures et des ventilations ; une clé inconnue donne un 400.
+         *     Les trois clés sont validées contre le registre des mesures et des ventilations ; une clé inconnue, une ventilation non groupable ou répétée donnent un 400, comme `group2` fourni sans `group`.
          */
         get: operations["pivot_api_stats_pivot_get"];
         put?: never;

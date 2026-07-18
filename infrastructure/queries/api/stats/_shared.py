@@ -2,6 +2,7 @@
 
 from typing import Any
 
+from application.ports.api.stats_queries import StatsFilters
 from infrastructure.queries.filters import (
     PUBLICATION_IS_IN_PERIMETER,
     WhereClause,
@@ -22,32 +23,29 @@ STATS_BASE = " AND ".join(
 def stats_filter_clauses(
     *,
     perimeter_structure_ids: list[int],
-    lab_ids: list[int],
-    years: list[int],
-    publisher_ids: list[int],
-    journal_ids: list[int],
-    oa_status: list[str],
-    has_apc: list[str],
-    doc_types: list[str],
+    filters: StatsFilters,
 ) -> list[WhereClause | None]:
     """Clauses de filtrage communes aux agrégats stats (années, labos, accès, APC, types, éditeur,
     revue). À assembler avec `assemble_where`."""
     out: list[WhereClause | None] = [
-        year_clause(years),
-        lab_clause(lab_ids),
-        oa_clause(oa_status),
-        stats_apc_clause(has_apc, perimeter_structure_ids),
-        doc_type_clause(doc_types),
+        year_clause(filters.years),
+        lab_clause(filters.lab_ids),
+        oa_clause(filters.oa_status),
+        stats_apc_clause(filters.has_apc, perimeter_structure_ids),
+        doc_type_clause(filters.doc_types),
     ]
-    if publisher_ids:
+    if filters.publisher_ids:
         out.append(
             WhereClause(
-                "j.publisher_id = ANY(:flt_publisher_ids)", {"flt_publisher_ids": publisher_ids}
+                "j.publisher_id = ANY(:flt_publisher_ids)",
+                {"flt_publisher_ids": filters.publisher_ids},
             )
         )
-    if journal_ids:
+    if filters.journal_ids:
         out.append(
-            WhereClause("p.journal_id = ANY(:flt_journal_ids)", {"flt_journal_ids": journal_ids})
+            WhereClause(
+                "p.journal_id = ANY(:flt_journal_ids)", {"flt_journal_ids": filters.journal_ids}
+            )
         )
     return out
 

@@ -3,11 +3,28 @@
 Implémenté par `infrastructure.queries.api.stats.PgStatsQueries`. Co-localise les DTOs Pydantic retournés par ce port.
 """
 
+from dataclasses import dataclass, field
 from typing import Literal, Protocol
 
 from pydantic import BaseModel
 
 from application.ports.api.entity_facet import EntityFacetResponse, EntityLabelResponse
+
+
+@dataclass(frozen=True)
+class StatsFilters:
+    """Filtres des tableaux de bord, partagés par les facettes, les collaborations et le pivot.
+
+    Les quatre lectures interrogent le même ensemble de publications : leurs décomptes ne se recouperaient pas si elles n'écoutaient pas les mêmes filtres. Une liste vide vaut absence de filtre. `has_apc` porte une sélection de `uca` / `non_uca` / `none` combinée en OR.
+    """
+
+    lab_ids: list[int] = field(default_factory=list)
+    years: list[int] = field(default_factory=list)
+    publisher_ids: list[int] = field(default_factory=list)
+    journal_ids: list[int] = field(default_factory=list)
+    oa_status: list[str] = field(default_factory=list)
+    has_apc: list[str] = field(default_factory=list)
+    doc_types: list[str] = field(default_factory=list)
 
 
 class YearFacet(BaseModel):
@@ -104,60 +121,22 @@ class StatsQueries(Protocol):
 
     def pivot_schema(self) -> PivotSchemaResponse: ...
 
-    def pivot(
-        self,
-        *,
-        measure: str,
-        groups: list[str],
-        lab_ids: list[int],
-        years: list[int],
-        publisher_ids: list[int],
-        journal_ids: list[int],
-        oa_status: list[str],
-        has_apc: list[str],
-        doc_types: list[str],
-    ) -> PivotResponse: ...
+    def pivot(self, *, measure: str, groups: list[str], filters: StatsFilters) -> PivotResponse: ...
 
     def available_years(self) -> list[int]: ...
 
-    def collaborations(
-        self,
-        *,
-        lab_ids: list[int],
-        years: list[int],
-        publisher_ids: list[int],
-        journal_ids: list[int],
-        oa_status: list[str],
-        has_apc: list[str],
-        doc_types: list[str],
-    ) -> CollaborationsResponse: ...
+    def collaborations(self, *, filters: StatsFilters) -> CollaborationsResponse: ...
 
     def stats_entity_facet(
         self,
         *,
         kind: Literal["publisher", "journal"],
         search: str,
-        lab_ids: list[int],
-        years: list[int],
-        publisher_ids: list[int],
-        journal_ids: list[int],
-        oa_status: list[str],
-        has_apc: list[str],
-        doc_types: list[str],
+        filters: StatsFilters,
     ) -> EntityFacetResponse: ...
 
     def resolve_entity_label(
         self, *, kind: Literal["publisher", "journal"], entity_id: int
     ) -> EntityLabelResponse: ...
 
-    def stats_facets(
-        self,
-        *,
-        lab_ids: list[int],
-        years: list[int],
-        publisher_ids: list[int],
-        journal_ids: list[int],
-        oa_status: list[str],
-        has_apc: list[str],
-        doc_types: list[str],
-    ) -> StatsFacetsResponse: ...
+    def stats_facets(self, *, filters: StatsFilters) -> StatsFacetsResponse: ...

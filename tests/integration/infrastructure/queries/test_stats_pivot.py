@@ -2,6 +2,7 @@
 
 from sqlalchemy import text
 
+from application.ports.api.stats_queries import StatsFilters
 from infrastructure.queries.api.stats.pivot import run_pivot
 
 
@@ -24,13 +25,7 @@ def _piv(conn, measure, groups, doc_types=("article", "review")):
         measure=measure,
         groups=list(groups),
         perimeter_structure_ids=[],
-        lab_ids=[],
-        years=[],
-        publisher_ids=[],
-        journal_ids=[],
-        oa_status="",
-        has_apc="",
-        doc_types=list(doc_types),
+        filters=StatsFilters(doc_types=list(doc_types)),
     )
 
 

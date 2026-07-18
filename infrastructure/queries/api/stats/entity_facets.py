@@ -13,6 +13,7 @@ from typing import Any, Literal
 
 from sqlalchemy import Connection, text
 
+from application.ports.api.stats_queries import StatsFilters
 from infrastructure.queries.api.stats._shared import stats_apc_clause
 from infrastructure.queries.filters import (
     PUBLICATION_IS_IN_PERIMETER,
@@ -47,27 +48,19 @@ def stats_entity_facet(
     kind: EntityKind,
     search: str,
     perimeter_structure_ids: list[int],
-    lab_ids: list[int],
-    years: list[int],
-    publisher_ids: list[int],
-    journal_ids: list[int],
-    oa_status: list[str],
-    has_apc: list[str],
-    doc_types: list[str],
+    filters: StatsFilters,
     limit: int = 20,
 ) -> list[dict[str, Any]]:
     # On saute le filtre de la dimension demandée (sinon une sélection réduit ses propres options).
-    if kind == "journal":
-        journal_ids = []
-    else:
-        publisher_ids = []
+    publisher_ids = [] if kind == "publisher" else filters.publisher_ids
+    journal_ids = [] if kind == "journal" else filters.journal_ids
 
     clauses: list[WhereClause | None] = [
-        year_clause(years),
-        lab_clause(lab_ids),
-        oa_clause(oa_status),
-        stats_apc_clause(has_apc, perimeter_structure_ids),
-        doc_type_clause(doc_types),
+        year_clause(filters.years),
+        lab_clause(filters.lab_ids),
+        oa_clause(filters.oa_status),
+        stats_apc_clause(filters.has_apc, perimeter_structure_ids),
+        doc_type_clause(filters.doc_types),
     ]
     if publisher_ids:
         clauses.append(

@@ -12,6 +12,7 @@ from typing import Any
 
 from sqlalchemy import Connection, text
 
+from application.ports.api.stats_queries import StatsFilters
 from infrastructure.queries.api.stats._shared import STATS_BASE, stats_filter_clauses
 from infrastructure.queries.filters import assemble_where
 
@@ -24,13 +25,7 @@ def run_collaborations(
     conn: Connection,
     *,
     perimeter_structure_ids: list[int],
-    lab_ids: list[int],
-    years: list[int],
-    publisher_ids: list[int],
-    journal_ids: list[int],
-    oa_status: list[str],
-    has_apc: list[str],
-    doc_types: list[str],
+    filters: StatsFilters,
 ) -> dict[str, Any]:
     """Collaborations internationales sous les filtres. Retourne les lignes `{code, value}` (un pays
     étranger, nombre de publications co-affiliées) triées par décompte décroissant, ainsi que le
@@ -39,13 +34,7 @@ def run_collaborations(
     where, binds = assemble_where(
         stats_filter_clauses(
             perimeter_structure_ids=perimeter_structure_ids,
-            lab_ids=lab_ids,
-            years=years,
-            publisher_ids=publisher_ids,
-            journal_ids=journal_ids,
-            oa_status=oa_status,
-            has_apc=has_apc,
-            doc_types=doc_types,
+            filters=filters,
         )
     )
     binds["domestic_country"] = _DOMESTIC_COUNTRY
