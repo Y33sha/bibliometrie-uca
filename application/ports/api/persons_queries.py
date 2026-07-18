@@ -27,16 +27,16 @@ from application.ports.api.subjects_queries import SubjectFrequency
 class PersonFilters:
     """Filtres que toutes les lectures de personnes honorent.
 
-    `departments` et `roles` sont multi-valués : une option cochée s'ajoute aux autres. Les `has_*` portent un tri-état (`yes`, `no`, vide pour ne pas filtrer). Chaque lecture ajoute les filtres qui lui sont propres, et le type dit ce qu'elle honore.
+    `departments` et `roles` sont multi-valués : une option cochée s'ajoute aux autres. Les `has_*` filtrent sur la présence ou l'absence, et `None` ne filtre pas. Chaque lecture ajoute les filtres qui lui sont propres, et le type dit ce qu'elle honore.
     """
 
     search: str = ""
     departments: list[str] = field(default_factory=list)
     roles: list[str] = field(default_factory=list)
-    has_orcid: str = ""
-    has_idhal: str = ""
-    has_idref: str = ""
-    has_rh: str = ""
+    has_orcid: bool | None = None
+    has_idhal: bool | None = None
+    has_idref: bool | None = None
+    has_rh: bool | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,8 +48,8 @@ class DirectoryFilters(PersonFilters):
 @dataclass(frozen=True, slots=True)
 class ListFilters(PersonFilters):
     # « À confirmer » : personnes portant ≥1 forme de nom / identifiant `pending`.
-    has_pending_forms: str = ""
-    has_pending_identifiers: str = ""
+    has_pending_forms: bool | None = None
+    has_pending_identifiers: bool | None = None
 
 
 @dataclass(frozen=True, slots=True)

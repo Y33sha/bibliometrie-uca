@@ -66,7 +66,7 @@ def batch_set_country(
     *,
     address_ids: list[int] | None,
     search: str,
-    has_country: str,
+    has_country: bool | None,
     country_code_filter: str,
     suggested_country: str,
     repo: AddressRepository,

@@ -46,9 +46,9 @@ Le frontend n'a rien à changer. Il omet déjà le paramètre pour ne pas filtre
 
 Sept paramètres : `has_orcid`, `has_idhal`, `has_idref`, `has_rh`, `has_pending_forms`, `has_pending_identifiers` (personnes) et `has_country` (adresses).
 
-- [ ] Les champs des dataclasses de filtres passent à `bool | None` ; les clauses SQL suivent.
-- [ ] Les routers déclarent `bool | None = None` ; les trois décodeurs disparaissent — `person_has_identifier_clause` et `person_has_rh_clause` (`infrastructure/queries/filters.py`), `_has_country_flag` (`services/addresses/countries.py`).
-- [ ] Contrat TypeScript régénéré ; `svelte-check` atteste que le frontend n'avait rien à changer.
+- [x] Les champs des dataclasses de filtres passent à `bool | None` ; les quatre clauses SQL suivent, et leur garde `if value not in ("yes", "no")` devient `if value is None`.
+- [x] Les routers déclarent `bool | None = None`. `_has_country_flag` disparaît : le corps de `batch-country` porte le même vocabulaire que la query string et se type de même, si bien que la conversion n'a plus de site où vivre.
+- [x] Contrat TypeScript régénéré : les sept paramètres passent de `string` à `boolean | null`. `svelte-check` reste à zéro erreur sans qu'une ligne de frontend ait bougé, ce qui vérifie la prédiction.
 
 ### Phase 2 — les vocabulaires fermés
 

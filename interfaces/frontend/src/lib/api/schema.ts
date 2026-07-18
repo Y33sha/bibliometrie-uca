@@ -2727,11 +2727,8 @@ export interface components {
              * @default
              */
             search: string;
-            /**
-             * Has Country
-             * @default
-             */
-            has_country: string;
+            /** Has Country */
+            has_country?: boolean | null;
             /**
              * Country Code Filter
              * @default
@@ -6436,7 +6433,7 @@ export interface operations {
         parameters: {
             query?: {
                 search?: string;
-                has_country?: string;
+                has_country?: boolean | null;
                 country_code?: string;
                 suggested_country?: string;
                 suggest?: boolean;
@@ -7220,10 +7217,10 @@ export interface operations {
                 search?: string;
                 department?: string;
                 role?: string;
-                has_orcid?: string;
-                has_idhal?: string;
-                has_idref?: string;
-                has_rh?: string;
+                has_orcid?: boolean | null;
+                has_idhal?: boolean | null;
+                has_idref?: boolean | null;
+                has_rh?: boolean | null;
                 lab_id?: number | null;
                 sort?: string;
             };
@@ -7293,12 +7290,12 @@ export interface operations {
                 search?: string;
                 department?: string;
                 role?: string;
-                has_orcid?: string;
-                has_idhal?: string;
-                has_idref?: string;
-                has_rh?: string;
-                has_pending_forms?: string;
-                has_pending_identifiers?: string;
+                has_orcid?: boolean | null;
+                has_idhal?: boolean | null;
+                has_idref?: boolean | null;
+                has_rh?: boolean | null;
+                has_pending_forms?: boolean | null;
+                has_pending_identifiers?: boolean | null;
                 sort?: string;
             };
             header?: never;
@@ -7332,12 +7329,12 @@ export interface operations {
             query?: {
                 department?: string;
                 role?: string;
-                has_orcid?: string;
-                has_idhal?: string;
-                has_idref?: string;
-                has_rh?: string;
-                has_pending_forms?: string;
-                has_pending_identifiers?: string;
+                has_orcid?: boolean | null;
+                has_idhal?: boolean | null;
+                has_idref?: boolean | null;
+                has_rh?: boolean | null;
+                has_pending_forms?: boolean | null;
+                has_pending_identifiers?: boolean | null;
                 lab_id?: number | null;
                 search?: string;
             };

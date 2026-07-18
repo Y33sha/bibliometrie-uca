@@ -253,10 +253,10 @@ class PgAddressesQueries(AddressesQueries):
         if filters.search:
             parts.append("unaccent(a.raw_text) ILIKE unaccent(:search)")
             binds["search"] = f"%{filters.search}%"
-        if filters.has_country == "yes":
-            parts.append("a.countries IS NOT NULL")
-        elif filters.has_country == "no":
-            parts.append("a.countries IS NULL")
+        if filters.has_country is not None:
+            parts.append(
+                "a.countries IS NOT NULL" if filters.has_country else "a.countries IS NULL"
+            )
         # Match insensible à la casse : les codes pays sont canoniquement en
         # minuscules (`countries.code`) mais les arrays peuvent contenir des
         # variantes majuscules (codes ISO OpenAlex). Cf. dedup `lower(...)` plus bas.
@@ -336,10 +336,10 @@ class PgAddressesQueries(AddressesQueries):
         if filters.search:
             cf_parts.append("unaccent(a.raw_text) ILIKE unaccent(:cf_search)")
             cf_binds["cf_search"] = f"%{filters.search}%"
-        if filters.has_country == "yes":
-            cf_parts.append("a.countries IS NOT NULL")
-        elif filters.has_country == "no":
-            cf_parts.append("a.countries IS NULL")
+        if filters.has_country is not None:
+            cf_parts.append(
+                "a.countries IS NOT NULL" if filters.has_country else "a.countries IS NULL"
+            )
         if filters.suggested_country:
             cf_parts.append(
                 "EXISTS (SELECT 1 FROM unnest(a.suggested_countries) x "

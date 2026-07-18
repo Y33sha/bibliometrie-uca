@@ -41,7 +41,7 @@ class AddressListFilters:
 @dataclass(frozen=True, slots=True)
 class AddressCountriesFilters:
     search: str = ""
-    has_country: str = ""  # "yes", "no", ""
+    has_country: bool | None = None
     country_code: str = ""
     suggested_country: str = ""
     suggest: bool = False

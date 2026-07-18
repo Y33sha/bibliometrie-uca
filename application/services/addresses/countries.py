@@ -57,20 +57,11 @@ def batch_set_country_by_ids(
     return repo.batch_add_country_by_ids(country_code, address_ids)
 
 
-def _has_country_flag(value: str | None) -> bool | None:
-    """Booléen tri-état du filtre `has_country` : "yes" → True, "no" → False, autre → None."""
-    if value == "yes":
-        return True
-    if value == "no":
-        return False
-    return None
-
-
 def batch_set_country_by_filter(
     country_code: str,
     *,
     search: str | None = None,
-    has_country: str | None = None,
+    has_country: bool | None = None,
     country_code_filter: str | None = None,
     suggested_country: str | None = None,
     repo: AddressRepository,
@@ -84,7 +75,7 @@ def batch_set_country_by_filter(
     _require_known_countries([country_code], repo=repo)
     criteria = AddressCountryFilter(
         search=search,
-        has_country=_has_country_flag(has_country),
+        has_country=has_country,
         country_code=country_code_filter,
         suggested_country=suggested_country,
     )
