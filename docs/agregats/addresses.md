@@ -41,6 +41,8 @@ theses écrit ses `source_authorships` une par une (`upsert_theses_source_author
 
 **`affiliations`** résout le texte d'adresse en structures (`pipeline/affiliations/resolve_addresses.py`, `run_resolution`). Un `AddressMatcher` Aho-Corasick chargé sur `structure_name_forms` balaie les `addresses` paginées par keyset sur `id`, matche `normalized_text`, et n'écrit que les diffs : suppression des détections obsolètes automatiques, passage de `matched_form_id` à NULL sur les liens manuels/confirmés devenus obsolètes (la ligne survit), upsert des nouvelles détections `(address_id, structure_id, matched_form_id)`.
 
+Les structures dont le type ne vaut pas affiliation — les sites, cf. `StructureType.is_affiliation` — participent à l'appariement sans produire de rattachement : elles portent les formes de nom d'un lieu pour satisfaire le `requires_context_of` d'autres structures, et sont écartées à la composition du résultat.
+
 **`countries`** détecte et écrit les pays (`pipeline/countries/phase.py`) : par nom de pays en fin d'adresse (`detect_by_country_name`), par nom de lieu (`detect_by_place_name`, Aho-Corasick sur les formes `institution`/`city`, n'écrit `countries` que si un seul ISO ressort), puis suggestion inversée (`suggest_countries`, cible les adresses sans pays et écrit `suggested_countries`). `write_countries` pose `countries_dirty = true` dès qu'il écrit dans `countries` — c'est le crochet incrémental.
 
 **Cascade `countries_dirty`** (étape finale de `countries`, `refresh_publication_countries.py`) : rassemble les `source_authorships` « sales » — soit `source_authorships.countries_dirty` posé par `normalize`, soit celles dont une `addresses.countries_dirty` a été posée par `write_countries` — recalcule `source_publications.countries` puis `publications.countries`, et remet les deux flags à zéro.
@@ -67,7 +69,7 @@ Routeur `interfaces/api/routers/admin/addresses.py`, couche commande transaction
 
 Routeur `interfaces/api/routers/admin/addresses.py`, port `application/ports/api/addresses_queries.py`, adaptateur `PgAddressesQueries` — **distinct** des modules SQL de résolution/pays du pipeline (séparation lecture-API vs écriture-pipeline).
 
-- **Listing / curation** (`GET /addresses`) : `addresses ⋈ address_structures` filtré sur une structure, avec prédicats détecté / validation / texte ; agrégat JSON des structures par adresse (hors `structure_type = 'site'`).
+- **Listing / curation** (`GET /addresses`) : `addresses ⋈ address_structures` filtré sur une structure, avec prédicats détecté / validation / texte ; agrégat JSON des structures par adresse.
 - **Inspection** (`GET /addresses/{id}/publications`) : texte brut + publications de l'adresse (pivot ⋈ sa ⋈ sp ⋈ publications ⋈ journals) ; les structures d'un rattachement exposent `is_confirmed` et `is_detected` (= `matched_form_id IS NOT NULL`).
 - **Facettes pays** (`GET /addresses/countries`, `/suggest-countries`, `/countries`) : lit `countries`, `suggested_countries`, `pub_count` ; facettes construites par `unnest`.
 - **Stats** (`GET /admin/address-stats`) : comptes sur `address_structures` (détecté / pending / rejeté / confirmé) pour une structure.
