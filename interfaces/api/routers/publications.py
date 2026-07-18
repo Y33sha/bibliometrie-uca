@@ -1,11 +1,19 @@
-"""Router /api/publications/* — les publications : listes, facettes, détail, export, servis par le port `PublicationsQueries`."""
+"""Router des publications : listes, facettes, détail, export, et revue des doublons. Sert `/api/publications/*`.
+
+Les lectures passent par les ports `PublicationsQueries` et `PublicationDuplicatesQueries`, les écritures par les command handlers de `application.services.publications.commands`.
+"""
 
 from dataclasses import dataclass
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from sqlalchemy import Connection
 
 from application.ports.api.entity_facet import EntityFacetResponse, EntityLabelResponse
+from application.ports.api.publication_duplicates_queries import (
+    PubDuplicateNextResponse,
+    PublicationDuplicatesQueries,
+)
 from application.ports.api.publications_queries import (
     PublicationDetailResponse,
     PublicationFilters,
@@ -13,12 +21,25 @@ from application.ports.api.publications_queries import (
     PublicationsFacetsResponse,
     PublicationsQueries,
 )
+from application.ports.repositories.audit_repository import AuditRepository
+from application.ports.repositories.publication_repository import PublicationRepository
+from application.services.publications import commands as publication_commands
 from interfaces.api.deps import (
+    audit_repo,
+    db_conn,
+    publication_duplicates_queries,
+    publication_repo,
     publications_queries,
 )
 from interfaces.api.filters import parse_int_csv, parse_str_csv
+from interfaces.api.models import (
+    MarkDistinctPublications,
+    MergePublications,
+    OkResponse,
+    PublicationMergeResponse,
+)
 
-router = APIRouter()
+router = APIRouter(prefix="/api/publications", tags=["publications"])
 
 
 def _parse_lab_id(lab_id: str) -> tuple[list[int], bool]:
@@ -87,7 +108,7 @@ class PublicationFilterParams:
 Filters = Annotated[PublicationFilterParams, Depends()]
 
 
-@router.get("/api/publications/facets", response_model=PublicationsFacetsResponse)
+@router.get("/facets", response_model=PublicationsFacetsResponse)
 def publications_facets(
     filters: Filters,
     queries: PublicationsQueries = Depends(publications_queries),
@@ -99,7 +120,7 @@ def publications_facets(
     return queries.publications_facets(filters=filters.to_filters())
 
 
-@router.get("/api/publications/facets/entities", response_model=EntityFacetResponse)
+@router.get("/facets/entities", response_model=EntityFacetResponse)
 def publications_entity_facet(
     filters: Filters,
     kind: Literal["publisher", "journal"] = Query(...),
@@ -117,7 +138,7 @@ def publications_entity_facet(
     )
 
 
-@router.get("/api/publications/facets/entity-label", response_model=EntityLabelResponse)
+@router.get("/facets/entity-label", response_model=EntityLabelResponse)
 def publications_entity_label(
     kind: Literal["publisher", "journal"] = Query(...),
     entity_id: int = Query(...),
@@ -130,7 +151,7 @@ def publications_entity_label(
     return queries.resolve_entity_label(kind=kind, entity_id=entity_id)
 
 
-@router.get("/api/publications/export.csv")
+@router.get("/export.csv")
 def export_publications_csv(
     filters: Filters,
     sort: str = Query("year_desc"),
@@ -150,7 +171,7 @@ def export_publications_csv(
     )
 
 
-@router.get("/api/publications/export-theses.csv")
+@router.get("/export-theses.csv")
 def export_theses_csv(
     search: str = Query(""),
     lab_id: str = Query(""),
@@ -183,7 +204,53 @@ def export_theses_csv(
     )
 
 
-@router.get("/api/publications/{pub_id}", response_model=PublicationDetailResponse)
+@router.get("/duplicates/next", response_model=PubDuplicateNextResponse)
+def next_duplicate_candidate(
+    min_title_len: int = Query(30, ge=10),
+    offset: int = Query(0, ge=0),
+    queries: PublicationDuplicatesQueries = Depends(publication_duplicates_queries),
+) -> PubDuplicateNextResponse:
+    """Paire de publications candidate au dédoublonnage, à l'offset donné.
+
+    Les candidats viennent de la requête `next_pub_duplicate`, qui rapproche les titres semblables, les années de publication voisines et les DOI convergents. `min_title_len` écarte les titres trop courts pour discriminer. L'offset laisse l'interface avancer paire par paire.
+    """
+    return queries.next_pub_duplicate(min_title_len=min_title_len, offset=offset)
+
+
+@router.post("/duplicates/merge", response_model=PublicationMergeResponse)
+def merge_duplicate_publications(
+    body: MergePublications,
+    conn: Connection = Depends(db_conn),
+    repo: PublicationRepository = Depends(publication_repo),
+    audit: AuditRepository = Depends(audit_repo),
+) -> PublicationMergeResponse:
+    """Fusionne deux publications doublons.
+
+    La cible est le plus petit des deux identifiants. Le sens de la fusion est sans portée durable : `refresh_from_sources` re-dérive toutes les métadonnées canoniques depuis l'union des `source_publications`, et cette union est la même dans un sens comme dans l'autre. Renvoie 400 sur deux identifiants égaux, 404 sur une publication introuvable, 409 sur deux DOI non-nuls distincts (`merge_publications`).
+    """
+    target_id, source_id = sorted((body.pub_id_a, body.pub_id_b))
+    publication_commands.merge_publications(conn, target_id, source_id, repo=repo, audit_repo=audit)
+    return PublicationMergeResponse(ok=True, target_id=target_id, source_id=source_id)
+
+
+@router.post("/duplicates/mark-distinct", response_model=OkResponse)
+def mark_publications_distinct(
+    body: MarkDistinctPublications,
+    conn: Connection = Depends(db_conn),
+    repo: PublicationRepository = Depends(publication_repo),
+    audit: AuditRepository = Depends(audit_repo),
+) -> OkResponse:
+    """Marque deux publications comme distinctes (non-doublon confirmé).
+
+    Persiste l'annotation dans `distinct_publications` : la paire est écartée des prochaines revues de `/duplicates/next`. Renvoie 400 sur deux identifiants égaux (`mark_distinct`).
+    """
+    publication_commands.mark_distinct(
+        conn, body.pub_id_a, body.pub_id_b, repo=repo, audit_repo=audit
+    )
+    return OkResponse()
+
+
+@router.get("/{pub_id}", response_model=PublicationDetailResponse)
 def get_publication(
     pub_id: int,
     queries: PublicationsQueries = Depends(publications_queries),
@@ -195,7 +262,7 @@ def get_publication(
     return detail
 
 
-@router.get("/api/publications", response_model=PublicationListResponse)
+@router.get("", response_model=PublicationListResponse)
 def list_publications(
     filters: Filters,
     page: int = Query(1, ge=1),

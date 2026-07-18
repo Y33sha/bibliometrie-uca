@@ -1,9 +1,9 @@
 """Tests d'intégration pour le router `interfaces.api.routers.admin_duplicates`.
 
 Couvre :
-- GET /api/admin/duplicates/next (pair candidate ou null)
-- POST /api/admin/duplicates/merge (validation, 404, happy path)
-- POST /api/admin/duplicates/mark-distinct (validation, happy path)
+- GET /api/publications/duplicates/next (pair candidate ou null)
+- POST /api/publications/duplicates/merge (validation, 404, happy path)
+- POST /api/publications/duplicates/mark-distinct (validation, happy path)
 """
 
 from __future__ import annotations
@@ -84,7 +84,7 @@ def _cleanup_after_module():
 class TestNextDuplicateCandidate:
     def test_returns_total_and_pair_shape(self, client):
         # Sur une DB sans paires candidates → total=0, pair=None.
-        r = client.get("/api/admin/duplicates/next")
+        r = client.get("/api/publications/duplicates/next")
         assert r.status_code == 200
         body = r.json()
         assert "total" in body
@@ -93,15 +93,15 @@ class TestNextDuplicateCandidate:
 
     def test_min_title_len_below_minimum_rejected(self, client):
         # Query param `min_title_len` est `Query(30, ge=10)` → < 10 = 422.
-        r = client.get("/api/admin/duplicates/next", params={"min_title_len": 5})
+        r = client.get("/api/publications/duplicates/next", params={"min_title_len": 5})
         assert r.status_code == 422
 
     def test_negative_offset_rejected(self, client):
-        r = client.get("/api/admin/duplicates/next", params={"offset": -1})
+        r = client.get("/api/publications/duplicates/next", params={"offset": -1})
         assert r.status_code == 422
 
     def test_offset_zero_default(self, client):
-        r = client.get("/api/admin/duplicates/next", params={"offset": 0})
+        r = client.get("/api/publications/duplicates/next", params={"offset": 0})
         assert r.status_code == 200
         assert r.json()["offset"] == 0
 
@@ -109,7 +109,7 @@ class TestNextDuplicateCandidate:
 class TestMergeDuplicatePublications:
     def test_requires_admin(self, client):
         r = client.post(
-            "/api/admin/duplicates/merge",
+            "/api/publications/duplicates/merge",
             json={"pub_id_a": 1, "pub_id_b": 2},
         )
         assert r.status_code == 401
@@ -117,7 +117,7 @@ class TestMergeDuplicatePublications:
     def test_rejects_same_ids(self, auth_client):
         """La garde vit dans `merge_publications` ; le handler global en fait un 400."""
         r = auth_client.post(
-            "/api/admin/duplicates/merge",
+            "/api/publications/duplicates/merge",
             json={"pub_id_a": 1, "pub_id_b": 1},
         )
         assert r.status_code == 400
@@ -125,7 +125,7 @@ class TestMergeDuplicatePublications:
 
     def test_404_when_both_missing(self, auth_client):
         r = auth_client.post(
-            "/api/admin/duplicates/merge",
+            "/api/publications/duplicates/merge",
             json={"pub_id_a": 999_999_001, "pub_id_b": 999_999_002},
         )
         assert r.status_code == 404
@@ -133,7 +133,7 @@ class TestMergeDuplicatePublications:
     def test_404_when_only_one_missing(self, auth_client):
         existing = _seed_publication()
         r = auth_client.post(
-            "/api/admin/duplicates/merge",
+            "/api/publications/duplicates/merge",
             json={"pub_id_a": existing, "pub_id_b": 999_999_999},
         )
         assert r.status_code == 404
@@ -144,7 +144,7 @@ class TestMergeDuplicatePublications:
         a = _seed_publication("First publication for merge", with_source=True)
         b = _seed_publication("Second publication for merge", with_source=True)
         r = auth_client.post(
-            "/api/admin/duplicates/merge",
+            "/api/publications/duplicates/merge",
             json={"pub_id_a": a, "pub_id_b": b},
         )
         assert r.status_code == 200
@@ -161,7 +161,7 @@ class TestMergeDuplicatePublications:
 class TestMarkDistinctPublications:
     def test_requires_admin(self, client):
         r = client.post(
-            "/api/admin/duplicates/mark-distinct",
+            "/api/publications/duplicates/mark-distinct",
             json={"pub_id_a": 1, "pub_id_b": 2},
         )
         assert r.status_code == 401
@@ -169,7 +169,7 @@ class TestMarkDistinctPublications:
     def test_rejects_same_ids(self, auth_client):
         """La garde vit dans `mark_distinct` ; le handler global en fait un 400."""
         r = auth_client.post(
-            "/api/admin/duplicates/mark-distinct",
+            "/api/publications/duplicates/mark-distinct",
             json={"pub_id_a": 1, "pub_id_b": 1},
         )
         assert r.status_code == 400
@@ -179,7 +179,7 @@ class TestMarkDistinctPublications:
         a = _seed_publication("Pub A distinct")
         b = _seed_publication("Pub B distinct")
         r = auth_client.post(
-            "/api/admin/duplicates/mark-distinct",
+            "/api/publications/duplicates/mark-distinct",
             json={"pub_id_a": a, "pub_id_b": b},
         )
         assert r.status_code == 200
