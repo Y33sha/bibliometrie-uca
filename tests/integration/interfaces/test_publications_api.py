@@ -180,6 +180,25 @@ class TestPublicationsExports:
         assert "Accès" not in header
 
 
+class TestThesesExport:
+    def test_csv_export(self, client):
+        r = client.get("/api/publications/export-theses.csv")
+        assert r.status_code == 200
+        assert "text/csv" in r.headers.get("content-type", "")
+
+    def test_csv_export_with_filters(self, client):
+        r = client.get(
+            "/api/publications/export-theses.csv",
+            params={"year": "2024", "lab_id": "1", "sort": "soutenance_asc"},
+        )
+        assert r.status_code == 200
+
+    def test_csv_export_narrows_to_given_doc_type(self, client):
+        """Sans `doc_type`, l'export porte sur les thèses soutenues et en cours ; avec, sur le seul type demandé."""
+        r = client.get("/api/publications/export-theses.csv", params={"doc_type": "thesis"})
+        assert r.status_code == 200
+
+
 class TestPublicationDetail:
     def test_not_found(self, client):
         r = client.get("/api/publications/999999999")

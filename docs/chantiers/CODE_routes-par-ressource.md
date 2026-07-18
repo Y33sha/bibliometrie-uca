@@ -43,7 +43,7 @@ Ce chantier précède la fin de la relecture d'`interfaces/api/`, pour ne pas re
 | `perimeters.py` | `/api/perimeters` | `admin/perimeters.py` ; les racines se posent à la création et se réécrivent en `PUT`, sans endpoint dédié |
 | `persons.py` | `/api/persons` | `persons.py` + `admin/persons.py` ; `person-identifiers` devient une sous-ressource |
 | `pipeline.py` | `/api/pipeline` | `admin/pipeline_logs.py` + `admin/pipeline_phase_executions.py` |
-| `publications.py` | `/api/publications` | `publications.py` ; `admin/duplicates` devient `duplicates` |
+| `publications.py` | `/api/publications` | `publications.py` + `admin/publication_duplicates.py` ; `admin/duplicates` devient `duplicates` |
 | `publishers.py` | `/api/publishers` | inchangé |
 | `stats.py` | `/api/stats` | inchangé |
 | `structures.py` | `/api/structures` | `admin/structures.py`, moins les formes de nom ; `structure-relations` devient `relations` |
@@ -79,7 +79,7 @@ L'ordre part des modules sans chemin non couvert et sans scission — la mécani
 - [x] `subjects` — préfixe posé, chemins et `operationId` inchangés au contrat, `tags` apparus. Le contrat TypeScript régénéré ne bouge pas d'une ligne : `openapi-typescript` n'émet pas les `tags`, qui ne servent que le groupement de la documentation.
 - [x] `publishers`, `hal_problems` — mêmes contrôles, contrat inchangé.
 - [ ] `feedback` — `/api/admin/feedback/*` → `/api/feedback/*`.
-- [ ] `publications` — `admin/publication_duplicates.py` y est fondu (les deux fichiers réunis restent bien en deçà de la taille raisonnable, et les doublons de publications sont voués à disparaître : rien ne justifie un module qui leur soit propre). `/api/admin/duplicates/*` → `/api/publications/duplicates/*`. Un chemin non couvert à traiter d'abord, `export-theses.csv`.
+- [x] `publications` — `admin/publication_duplicates.py` y est fondu (282 lignes réunies, bien en deçà de la taille raisonnable, et les doublons de publications sont voués à disparaître : rien ne justifie un module qui leur soit propre). `/api/admin/duplicates/*` → `/api/publications/duplicates/*`, frontend ajusté dans le même commit. `export-theses.csv` gagne au passage la couverture qui lui manquait.
 - [ ] `authorships` — `/api/admin/orphan-authorships/*` → `/api/authorships/orphans/*`.
 - [ ] `perimeters`, `pipeline_config` → `config`.
 

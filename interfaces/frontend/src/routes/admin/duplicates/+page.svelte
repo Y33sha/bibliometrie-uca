@@ -34,14 +34,14 @@
     loading = true;
     error = "";
     try {
-      const data = await api<NextResponse>(`/api/admin/duplicates/next?offset=${pos}`);
+      const data = await api<NextResponse>(`/api/publications/duplicates/next?offset=${pos}`);
       total = data.total;
       offset = data.offset;
       pair = data.pair;
       // Si l'offset dépasse le total (fin de liste), revenir au début
       if (!pair && total > 0 && pos > 0) {
         offset = 0;
-        const data2 = await api<NextResponse>(`/api/admin/duplicates/next?offset=0`);
+        const data2 = await api<NextResponse>(`/api/publications/duplicates/next?offset=0`);
         total = data2.total;
         offset = data2.offset;
         pair = data2.pair;

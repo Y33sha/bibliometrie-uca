@@ -61,7 +61,6 @@ from interfaces.api.routers.admin import (  # noqa: E402
     pipeline_config as admin_pipeline_config,
     pipeline_logs as admin_pipeline_logs,
     pipeline_phase_executions as admin_pipeline_phase_executions,
-    publication_duplicates as admin_publication_duplicates,
     structures as admin_structures,
 )
 
@@ -240,7 +239,6 @@ async def timing_middleware(request: Request, call_next: RequestResponseEndpoint
 app.include_router(auth.router)
 app.include_router(stats.router)
 app.include_router(publications.router)
-app.include_router(admin_publication_duplicates.router)
 app.include_router(admin_addresses.router)
 app.include_router(admin_feedback.router)
 app.include_router(laboratories.router)
