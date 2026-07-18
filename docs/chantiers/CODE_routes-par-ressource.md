@@ -54,7 +54,7 @@ Ce chantier précède la fin de la relecture d'`interfaces/api/`, pour ne pas re
 ### Phase 1 — Préparer le filet
 
 - [x] Recensement croisé : 127 routes pour 118 chemins distincts, contre 112 chemins appelés par le frontend. Le croisement vaut aussi comme test « qui l'appelle » — voir *Endpoints sans appelant* ci-dessous.
-- [x] Couverture d'intégration relevée : **28 chemins sur 118 ne sont nommés par aucun test d'intégration**. Ils se concentrent sur trois familles — les lectures d'administration des personnes (onze chemins : formes ambiguës, conflits d'identifiants, intrus détachables, doublons de nom, avec leurs compteurs), les lectures de laboratoire (détail, adresses, tableau de bord, sujets), et les agrégats de statistiques (collaborations, pivot et son schéma). S'y ajoutent l'authentification, que la fixture d'intégration court-circuite en forgeant le jeton au lieu d'appeler `/api/auth/login`, et quelques détails d'entité (`GET /api/publications/{id}`, `/api/persons/{id}/theses`, `/dashboard`, `/subjects`).
+- [x] Couverture d'intégration relevée : **25 chemins ne sont nommés par aucun test d'intégration**. Ils se concentrent sur les lectures d'administration des personnes (onze chemins : formes ambiguës, conflits d'identifiants, intrus détachables, doublons de nom, avec leurs compteurs), les lectures de laboratoire (adresses, tableau de bord, sujets) et les agrégats de statistiques (collaborations, pivot et son schéma). S'y ajoute l'authentification, que la fixture d'intégration court-circuite en forgeant le jeton au lieu d'appeler `/api/auth/login`. Un test qui appelle une route paramétrée avec un identifiant en dur la couvre bel et bien : le rapprochement ramène les segments numériques à leur forme paramétrée, faute de quoi `GET /api/publications/{id}`, `/api/laboratories/{id}` et `/api/persons/{id}/theses` passeraient pour découverts.
 La couverture se complète module par module, à l'entrée de chacun, plutôt qu'en bloc : un test qui nomme le chemin est ce qui fait échouer bruyamment un renommage manqué, et sans lui une route déplacée avec un frontend non ajusté produit un 404 que rien ne signale.
 
 #### Endpoints sans appelant
@@ -79,7 +79,7 @@ L'ordre part des modules sans chemin non couvert et sans scission — la mécani
 - [x] `subjects` — préfixe posé, chemins et `operationId` inchangés au contrat, `tags` apparus. Le contrat TypeScript régénéré ne bouge pas d'une ligne : `openapi-typescript` n'émet pas les `tags`, qui ne servent que le groupement de la documentation.
 - [x] `publishers`, `hal_problems` — mêmes contrôles, contrat inchangé.
 - [ ] `feedback` — `/api/admin/feedback/*` → `/api/feedback/*`.
-- [ ] `publication_duplicates` → `publications` — `/api/admin/duplicates/*` → `/api/publications/duplicates/*`.
+- [ ] `publications` — `admin/publication_duplicates.py` y est fondu (les deux fichiers réunis restent bien en deçà de la taille raisonnable, et les doublons de publications sont voués à disparaître : rien ne justifie un module qui leur soit propre). `/api/admin/duplicates/*` → `/api/publications/duplicates/*`. Un chemin non couvert à traiter d'abord, `export-theses.csv`.
 - [ ] `authorships` — `/api/admin/orphan-authorships/*` → `/api/authorships/orphans/*`.
 - [ ] `perimeters`, `pipeline_config` → `config`.
 
@@ -88,16 +88,15 @@ L'ordre part des modules sans chemin non couvert et sans scission — la mécani
 - [ ] `journals` — un chemin non couvert (`/api/journals/facets`).
 - [ ] `auth` — deux chemins non couverts. La fixture d'intégration forge le jeton au lieu d'appeler `/api/auth/login`, donc le parcours de connexion n'est jamais exercé de bout en bout.
 - [ ] `config` — `PUT /api/config/{key}` non couvert.
-- [ ] `publications` — deux chemins non couverts (`export-theses.csv`, `GET /{id}`).
 - [ ] `stats` — trois chemins non couverts (collaborations, pivot, schéma du pivot).
-- [ ] `laboratories` — quatre chemins non couverts (détail, adresses, tableau de bord, sujets).
+- [ ] `laboratories` — trois chemins non couverts (adresses, tableau de bord, sujets).
 
 **Avec recomposition :**
 
 - [ ] `addresses` : les pays sortent en `countries.py` ; `/api/admin/address-stats` → `/api/addresses/stats`.
 - [ ] `structures` : les formes de nom sortent en `name_forms.py`, `/api/structure-relations/*` → `/api/structures/relations/*`.
 - [ ] `pipeline` : `admin/pipeline_logs.py` et `admin/pipeline_phase_executions.py` fusionnent ; `/api/admin/pipeline/*` → `/api/pipeline/*`.
-- [ ] `persons` : `persons.py` et `admin/persons.py` fusionnent — quinze chemins non couverts à traiter d'abord, le plus gros lot du chantier. `/api/person-identifiers/*` devient une sous-ressource, et les lectures d'administration (`ambiguous-name-forms`, `identifier-conflicts`, `detachable-intruders`, `name-duplicates`, `admin/persons/{id}`) rejoignent `/api/persons/*`. Vérifier l'ordre de déclaration du module cumulé : les chemins littéraux (`/directory`, `/search`, `/facets`, `/stats`) doivent précéder `/{person_id}`, contrainte aujourd'hui tenue par l'ordre d'enregistrement de deux fichiers dans `app.py` — une route littérale ajoutée dans le mauvais fichier serait captée par le paramètre, en silence.
+- [ ] `persons` : `persons.py` et `admin/persons.py` fusionnent — quatorze chemins non couverts à traiter d'abord, le plus gros lot du chantier. `/api/person-identifiers/*` devient une sous-ressource, et les lectures d'administration (`ambiguous-name-forms`, `identifier-conflicts`, `detachable-intruders`, `name-duplicates`, `admin/persons/{id}`) rejoignent `/api/persons/*`. Vérifier l'ordre de déclaration du module cumulé : les chemins littéraux (`/directory`, `/search`, `/facets`, `/stats`) doivent précéder `/{person_id}`, contrainte aujourd'hui tenue par l'ordre d'enregistrement de deux fichiers dans `app.py` — une route littérale ajoutée dans le mauvais fichier serait captée par le paramètre, en silence.
 
 ### Phase 3 — Clore
 
