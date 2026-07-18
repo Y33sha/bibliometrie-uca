@@ -1,4 +1,4 @@
-"""Router /api/journals/* — les revues : listes, recherche, édition, fusion."""
+"""Router des revues : listes, recherche, édition, fusion. Sert `/api/journals/*`."""
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import Connection
@@ -42,10 +42,10 @@ from interfaces.api.models import (
 )
 from interfaces.api.params import TOP_SUBJECTS_LIMIT, TopSubjectsLimit
 
-router = APIRouter()
+router = APIRouter(prefix="/api/journals", tags=["journals"])
 
 
-@router.get("/api/journals/oa-models", response_model=list[EnumOption])
+@router.get("/oa-models", response_model=list[EnumOption])
 def list_oa_models() -> list[EnumOption]:
     """Valeurs possibles de `oa_model` avec leur libellé français.
 
@@ -54,7 +54,7 @@ def list_oa_models() -> list[EnumOption]:
     return [EnumOption(value=v, label_fr=OA_MODEL_LABELS_FR[v]) for v in OA_MODELS]
 
 
-@router.get("/api/journals/types", response_model=list[EnumOption])
+@router.get("/types", response_model=list[EnumOption])
 def list_journal_types() -> list[EnumOption]:
     """Valeurs possibles de l'enum `journal_type` avec leur libellé français.
 
@@ -63,7 +63,7 @@ def list_journal_types() -> list[EnumOption]:
     return [EnumOption(value=v, label_fr=JOURNAL_TYPE_LABELS_FR[v]) for v in JOURNAL_TYPES]
 
 
-@router.get("/api/journals/facets", response_model=JournalsFacetsResponse)
+@router.get("/facets", response_model=JournalsFacetsResponse)
 def journals_facets(
     search: str | None = None,
     publisher_id: int | None = None,
@@ -87,7 +87,7 @@ def journals_facets(
     )
 
 
-@router.get("/api/journals", response_model=JournalListResponse)
+@router.get("", response_model=JournalListResponse)
 def list_journals(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=200),
@@ -125,7 +125,7 @@ def list_journals(
     )
 
 
-@router.get("/api/journals/{journal_id}", response_model=JournalDetailResponse)
+@router.get("/{journal_id}", response_model=JournalDetailResponse)
 def get_journal(
     journal_id: int,
     queries: JournalQueries = Depends(journal_queries),
@@ -140,7 +140,7 @@ def get_journal(
     return row
 
 
-@router.get("/api/journals/{journal_id}/dashboard", response_model=JournalDashboardResponse)
+@router.get("/{journal_id}/dashboard", response_model=JournalDashboardResponse)
 def get_journal_dashboard(
     journal_id: int,
     queries: JournalQueries = Depends(journal_queries),
@@ -155,7 +155,7 @@ def get_journal_dashboard(
     return result
 
 
-@router.get("/api/journals/{journal_id}/subjects", response_model=list[SubjectFrequency])
+@router.get("/{journal_id}/subjects", response_model=list[SubjectFrequency])
 def get_journal_subjects(
     journal_id: int,
     limit: TopSubjectsLimit = TOP_SUBJECTS_LIMIT,
@@ -169,7 +169,7 @@ def get_journal_subjects(
 
 
 @router.post(
-    "/api/journals/{journal_id}/type-change-impact",
+    "/{journal_id}/type-change-impact",
     response_model=JournalTypeChangeImpact,
 )
 def get_type_change_impact(
@@ -200,7 +200,7 @@ def get_type_change_impact(
     return JournalTypeChangeImpact(count=count)
 
 
-@router.put("/api/journals/{journal_id}", response_model=OkResponse)
+@router.put("/{journal_id}", response_model=OkResponse)
 def update_journal(
     journal_id: int,
     body: JournalUpdate,
@@ -228,7 +228,7 @@ def update_journal(
     return OkResponse()
 
 
-@router.post("/api/journals/{journal_id}/merge", response_model=MergeResponse)
+@router.post("/{journal_id}/merge", response_model=MergeResponse)
 def merge(
     journal_id: int,
     body: MergeRequest,

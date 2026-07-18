@@ -1,4 +1,4 @@
-"""Router /api/auth/* — ouverture, vérification et fermeture de la session admin.
+"""Router de la session admin : ouverture, vérification et fermeture. Sert `/api/auth/*`.
 
 Le jeton et son format appartiennent à `interfaces.api.session` ; le router le pose en cookie et l'en retire.
 """
@@ -9,10 +9,10 @@ from interfaces.api.deps import get_admin_user
 from interfaces.api.models import AuthCheckResponse, LoginRequest, OkResponse
 from interfaces.api.session import SESSION_MAX_AGE, check_password, issue_token, read_session
 
-router = APIRouter()
+router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
-@router.post("/api/auth/login", response_model=OkResponse)
+@router.post("/login", response_model=OkResponse)
 def auth_login(
     data: LoginRequest,
     response: Response,
@@ -35,7 +35,7 @@ def auth_login(
     return OkResponse()
 
 
-@router.get("/api/auth/check", response_model=AuthCheckResponse)
+@router.get("/check", response_model=AuthCheckResponse)
 def auth_check(session: str | None = Cookie(None, alias="session")) -> AuthCheckResponse:
     """Indique si le cookie de session en cours est valide.
 
@@ -44,7 +44,7 @@ def auth_check(session: str | None = Cookie(None, alias="session")) -> AuthCheck
     return AuthCheckResponse(authenticated=bool(session and read_session(session)))
 
 
-@router.post("/api/auth/logout", response_model=OkResponse)
+@router.post("/logout", response_model=OkResponse)
 def auth_logout(response: Response) -> OkResponse:
     """Supprime le cookie de session (déconnexion côté client)."""
     response.delete_cookie(key="session", path="/")
