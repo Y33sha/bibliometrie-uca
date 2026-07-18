@@ -102,14 +102,16 @@ L'ordre part des modules sans chemin non couvert et sans scission — la mécani
 - [x] `pipeline` : `admin/pipeline_logs.py` et `admin/pipeline_phase_executions.py` fusionnent ; `/api/admin/pipeline/*` → `/api/pipeline/*`. Les deux modules se partageaient déjà le préfixe, chacun renvoyant à l'autre dans son docstring — le détail d'un run vivait d'un côté, le log de ses phases de l'autre. Le module réuni distingue ce qui compte vraiment : deux lectures viennent des fichiers que l'orchestrateur laisse derrière lui, les trois autres de la base.
 - [x] `persons` : `persons.py` et `admin/persons.py` fusionnent — treize chemins couverts d'abord (`0836f348`). `/api/person-identifiers/*` devient `/api/persons/identifiers/*`, et les quatre files de triage comme le marquage de deux personnes distinctes rejoignent `/api/persons/*`. La contrainte d'ordre de déclaration, jusque-là tenue par l'ordre d'enregistrement de deux fichiers dans `app.py`, devient interne au module et son docstring la nomme : les onze chemins littéraux précèdent `/{person_id}`, qui accepterait n'importe lequel d'entre eux comme identifiant. Le module réuni fait 547 lignes.
 
-### Phase 3 — Clore
+## État à la clôture
 
-- [ ] Le dossier `interfaces/api/routers/admin/` est vide et disparaît.
-- [ ] Plus aucun chemin ne porte le segment `admin` : contrôle final sur le contrat OpenAPI régénéré.
-- [ ] Les fiches [Structures et laboratoires](CODE_structures-et-laboratoires.md) et [Projections de lecture des personnes](CODE_projections-de-lecture-des-personnes.md) reprennent la main : les doublons se voient mieux une fois chaque ressource rassemblée dans son module.
+Dix-huit modules pour dix-huit ressources, chacun déclarant son préfixe et ses tags. Les 112 routes de l'API portent un tag ; aucune ne porte le segment `admin`, et le dossier `interfaces/api/routers/admin/` n'existe plus. Toute route est nommée par au moins un test d'intégration, et un chemin d'API inconnu rend un 404 plutôt que la page d'accueil du frontend.
+
+Six routes ont disparu en chemin, faute d'appelant : les années des statistiques, la suggestion de pays, les deux facettes de personnes, le retrait d'une racine de périmètre et l'ajout d'une structure à un périmètre — les deux dernières supplantées par la réécriture de `structure_ids`, que l'interface faisait déjà.
+
+Les fiches [Structures et laboratoires](CODE_structures-et-laboratoires.md) et [Projections de lecture des personnes](CODE_projections-de-lecture-des-personnes.md) reprennent la main : les doublons se comparent mieux une fois chaque ressource rassemblée dans son module.
 
 ## Questions ouvertes
 
 - **Le sort de `/api/persons/{person_id}/curation` face à `/api/persons/{person_id}`.** Deux projections de la même personne, que ce chantier rend voisines sans les fusionner. La seconde est le profil public, la première la ligne de la liste de curation — drapeau de rejet, identifiants avec leur statut et leur source, formes de nom avec leur état d'arbitrage — servie à l'unité pour le panneau latéral ouvert par son URL. Le segment `curation` est le seul mot que ce chantier ait introduit, faute d'un chemin libre : `/{person_id}` était pris. Il se change en une ligne si la fiche des projections de lecture des personnes tranche autrement.
-- **Le niveau des formes de nom.** `name_forms.py` les traite en ressource de premier rang, comme aujourd'hui, alors qu'une forme de nom n'existe que rattachée à une structure. Le rangement en sous-ressource (`/api/structures/{id}/name-forms`) se défend, mais les écritures actuelles ciblent la forme par son seul identifiant, sans passer par sa structure. À trancher en phase 3.
+- **Le niveau des formes de nom.** `name_forms.py` les traite en ressource de premier rang, comme aujourd'hui, alors qu'une forme de nom n'existe que rattachée à une structure. Le rangement en sous-ressource (`/api/structures/{id}/name-forms`) se défend, mais les écritures ciblent la forme par son seul identifiant, sans passer par sa structure.
 - **La versionnage du préfixe.** `/api/` ne porte pas de version. C'est le seul segment qui se place conventionnellement au-dessus de la ressource, et le moment de l'introduire serait celui où l'on réécrit tous les chemins. À arbitrer contre le coût : un unique consommateur, et aucune contrainte de compatibilité ascendante.
