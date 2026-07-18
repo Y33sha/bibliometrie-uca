@@ -489,7 +489,7 @@ export interface paths {
         put?: never;
         /**
          * Review Address
-         * @description Confirme, rejette ou reset le lien adresse ↔ structure.
+         * @description Confirme, rejette ou réinitialise le lien entre une adresse et une structure.
          */
         post: operations["review_address_api_addresses__addr_id__review_post"];
         delete?: never;
@@ -509,7 +509,7 @@ export interface paths {
         put?: never;
         /**
          * Batch Review
-         * @description Confirme/rejette/reset en batch.
+         * @description Confirme, rejette ou réinitialise le lien d'un lot d'adresses à une même structure.
          */
         post: operations["batch_review_api_addresses_batch_review_post"];
         delete?: never;
@@ -527,7 +527,7 @@ export interface paths {
         };
         /**
          * List Countries
-         * @description Liste des pays.
+         * @description Référentiel des pays, servant les listes de choix de l'attribution.
          */
         get: operations["list_countries_api_countries_get"];
         put?: never;
@@ -567,7 +567,7 @@ export interface paths {
         };
         /**
          * Suggest Countries
-         * @description Distribution des pays des adresses matchantes + compte des sans-pays.
+         * @description Répartition par pays des adresses correspondant à la recherche, et nombre de celles qui n'en portent aucun.
          */
         get: operations["suggest_countries_api_addresses_suggest_countries_get"];
         put?: never;
@@ -631,7 +631,7 @@ export interface paths {
         };
         /**
          * Admin Address Stats
-         * @description Compteurs d'adresses par détection/validation pour une structure.
+         * @description Compteurs d'adresses par état de détection et de validation, pour une structure.
          */
         get: operations["admin_address_stats_api_admin_address_stats_get"];
         put?: never;
@@ -2607,7 +2607,7 @@ export interface components {
          * AddressListResponse
          * @description Réponse paginée de `/api/addresses`.
          *
-         *     `requires_search=True` quand le caller utilise un filtre trop large (no/all + pas de search) et que le serveur a renvoyé une liste vide par garde-fou.
+         *     `requires_search=True` signale que le garde-fou du router a court-circuité la lecture et rendu une liste vide : la combinaison de filtres demandée porte sur toute la base plutôt que sur une structure, faute d'un prédicat de texte ou de structure pour la réduire.
          */
         AddressListResponse: {
             /** Total */
@@ -2685,7 +2685,7 @@ export interface components {
         };
         /**
          * AddressStatsResponse
-         * @description GET /api/admin/address-stats.
+         * @description Compteurs d'adresses d'une structure, par état de détection et de validation.
          */
         AddressStatsResponse: {
             /** Total */
@@ -2986,7 +2986,7 @@ export interface components {
         };
         /**
          * CountrySuggestionsResponse
-         * @description GET /api/addresses/suggest-countries (admin).
+         * @description Répartition par pays des adresses d'une recherche, et nombre de celles qui n'en portent aucun.
          */
         CountrySuggestionsResponse: {
             /** Suggestions */
