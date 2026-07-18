@@ -1866,7 +1866,7 @@ export interface paths {
         put?: never;
         /**
          * Create Perimeter
-         * @description Crée un nouveau périmètre, sans structure racine.
+         * @description Crée un périmètre avec ses structures racines, la liste pouvant être vide.
          */
         post: operations["create_perimeter_api_perimeters_post"];
         delete?: never;
@@ -1894,28 +1894,6 @@ export interface paths {
          * @description Supprime un périmètre (interdit si utilisé dans la config pipeline).
          */
         delete: operations["delete_perimeter_api_perimeters__perimeter_id__delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/perimeters/{perimeter_id}/structures": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Add Structure To Perimeter
-         * @description Ajoute une structure racine au périmètre.
-         *
-         *     Renvoie `{"status": "added"}` ou `"already_present"` si la structure était déjà racine.
-         */
-        post: operations["add_structure_to_perimeter_api_perimeters__perimeter_id__structures_post"];
-        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -2479,11 +2457,6 @@ export interface components {
             id_value?: string | null;
             /** Reassigned */
             reassigned?: boolean | null;
-        };
-        /** AddPerimeterStructure */
-        AddPerimeterStructure: {
-            /** Structure Id */
-            structure_id: number;
         };
         /**
          * AddressForCountryAttribution
@@ -4100,6 +4073,8 @@ export interface components {
             code: string;
             /** Name */
             name: string;
+            /** Structure Ids */
+            structure_ids?: number[];
         };
         /**
          * PerimeterOut
@@ -5255,14 +5230,6 @@ export interface components {
             apc: components["schemas"]["ApcFacet"][];
             /** Doc Types */
             doc_types: components["schemas"]["DocTypeFacet"][];
-        };
-        /**
-         * StatusResponse
-         * @description Réponse générique : `{status: str}` (mutations sans corps utile).
-         */
-        StatusResponse: {
-            /** Status */
-            status: string;
         };
         /** StrValueFacet */
         StrValueFacet: {
@@ -8740,41 +8707,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OkResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    add_structure_to_perimeter_api_perimeters__perimeter_id__structures_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                perimeter_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AddPerimeterStructure"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StatusResponse"];
                 };
             };
             /** @description Validation Error */

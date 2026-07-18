@@ -11,7 +11,3 @@ export function update(id: number, body: Record<string, unknown>): Promise<unkno
 export function remove(id: number): Promise<null> {
 	return del<null>(`/api/perimeters/${id}`);
 }
-
-export function addStructure(perimId: number, structureId: number): Promise<unknown> {
-	return post(`/api/perimeters/${perimId}/structures`, { structure_id: structureId });
-}

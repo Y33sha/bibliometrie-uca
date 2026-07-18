@@ -76,13 +76,11 @@
     if (!perimModal) return;
     try {
       if (perimModal.mode === "create") {
-        const { id } = await perimetersApi.create({
+        await perimetersApi.create({
           code: perimModal.code,
           name: perimModal.name,
+          structure_ids: perimModal.structure_ids,
         });
-        for (const sid of perimModal.structure_ids) {
-          await perimetersApi.addStructure(id, sid);
-        }
       } else {
         await perimetersApi.update(perimModal.id!, {
           name: perimModal.name,

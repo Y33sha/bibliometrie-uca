@@ -40,7 +40,7 @@ Ce chantier précède la fin de la relecture d'`interfaces/api/`, pour ne pas re
 | `journals.py` | `/api/journals` | inchangé |
 | `laboratories.py` | `/api/laboratories` | inchangé, fusion traitée par sa fiche |
 | `name_forms.py` | `/api/name-forms` | `admin/structures.py` |
-| `perimeters.py` | `/api/perimeters` | `admin/perimeters.py` |
+| `perimeters.py` | `/api/perimeters` | `admin/perimeters.py` ; les racines se posent à la création et se réécrivent en `PUT`, sans endpoint dédié |
 | `persons.py` | `/api/persons` | `persons.py` + `admin/persons.py` ; `person-identifiers` devient une sous-ressource |
 | `pipeline.py` | `/api/pipeline` | `admin/pipeline_logs.py` + `admin/pipeline_phase_executions.py` |
 | `publications.py` | `/api/publications` | `publications.py` ; `admin/duplicates` devient `duplicates` |

@@ -34,12 +34,6 @@ class PerimeterRepository(Protocol):
 
     # ── Liens structure ↔ perimeter ────────────────────────────────
 
-    def add_structure_to_perimeter(
-        self,
-        perimeter_id: int,
-        structure_id: int,
-    ) -> bool: ...
-
     def remove_structure_from_all_perimeters(self, structure_id: int) -> None:
         """Retire une structure des racines (`structure_ids`) de tout périmètre, après sa suppression."""
         ...
@@ -55,6 +49,7 @@ class PerimeterRepository(Protocol):
         *,
         code: str,
         name: str,
+        structure_ids: list[int],
     ) -> int: ...
 
     def update_perimeter_fields(self, perimeter_id: int, fields: PerimeterUpdate) -> None: ...

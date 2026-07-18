@@ -29,12 +29,6 @@ class CreatedIdResponse(BaseModel):
     id: int
 
 
-class StatusResponse(BaseModel):
-    """Réponse générique : `{status: str}` (mutations sans corps utile)."""
-
-    status: str
-
-
 class TotalCountResponse(BaseModel):
     """Compteur générique : `{total: int}` (utilisé par les endpoints `/count`)."""
 
@@ -75,6 +69,5 @@ __all__ = [
     "MergeResponse",
     "OkResponse",
     "RemovedResponse",
-    "StatusResponse",
     "TotalCountResponse",
 ]
