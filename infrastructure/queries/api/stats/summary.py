@@ -5,6 +5,7 @@ from typing import Any
 
 from sqlalchemy import Connection, Row, text
 
+from application.ports.api.stats_queries import StatsFilters
 from infrastructure.queries.api.stats._shared import stats_apc_clause
 from infrastructure.queries.filters import (
     PUBLICATION_IS_IN_PERIMETER,
@@ -46,13 +47,7 @@ def _publisher_journal_clauses(
 def _common_clauses(
     *,
     perimeter_structure_ids: list[int],
-    lab_ids: list[int],
-    years: list[int],
-    publisher_ids: list[int],
-    journal_ids: list[int],
-    oa_status: list[str],
-    has_apc: list[str],
-    doc_types: list[str],
+    filters: StatsFilters,
     skip: str = "",
 ) -> list[WhereClause | None]:
     """Construit les filtres communs aux facettes croisées.
@@ -63,16 +58,16 @@ def _common_clauses(
     """
     out: list[WhereClause | None] = []
     if skip != "year":
-        out.append(year_clause(years))
+        out.append(year_clause(filters.years))
     if skip != "lab":
-        out.append(lab_clause(lab_ids))
-    out.extend(_publisher_journal_clauses(publisher_ids, journal_ids))
+        out.append(lab_clause(filters.lab_ids))
+    out.extend(_publisher_journal_clauses(filters.publisher_ids, filters.journal_ids))
     if skip != "oa":
-        out.append(oa_clause(oa_status))
+        out.append(oa_clause(filters.oa_status))
     if skip != "apc":
-        out.append(stats_apc_clause(has_apc, perimeter_structure_ids))
+        out.append(stats_apc_clause(filters.has_apc, perimeter_structure_ids))
     if skip != "doc_type":
-        out.append(doc_type_clause(doc_types))
+        out.append(doc_type_clause(filters.doc_types))
     return out
 
 
@@ -93,26 +88,14 @@ def available_years(conn: Connection) -> list[int]:
 def _facets_sqls(
     *,
     perimeter_structure_ids: list[int],
-    lab_ids: list[int],
-    years: list[int],
-    publisher_ids: list[int],
-    journal_ids: list[int],
-    oa_status: list[str],
-    has_apc: list[str],
-    doc_types: list[str],
+    filters: StatsFilters,
 ) -> dict[str, tuple[str, dict[str, Any]]]:
-    """Retourne {facet_name: (sql, binds)} pour les 4 sous-requêtes facettes."""
+    """Retourne {facet_name: (sql, binds)} pour les sous-requêtes de facettes."""
 
     def _clauses(skip: str) -> list[WhereClause | None]:
         return _common_clauses(
             perimeter_structure_ids=perimeter_structure_ids,
-            lab_ids=lab_ids,
-            years=years,
-            publisher_ids=publisher_ids,
-            journal_ids=journal_ids,
-            oa_status=oa_status,
-            has_apc=has_apc,
-            doc_types=doc_types,
+            filters=filters,
             skip=skip,
         )
 
@@ -199,25 +182,13 @@ def stats_facets(
     conn: Connection,
     *,
     perimeter_structure_ids: list[int],
-    lab_ids: list[int],
-    years: list[int],
-    publisher_ids: list[int],
-    journal_ids: list[int],
-    oa_status: list[str],
-    has_apc: list[str],
-    doc_types: list[str],
+    filters: StatsFilters,
 ) -> dict[str, list[dict[str, Any]]]:
-    """Facettes dynamiques."""
+    """Décomptes de chaque facette, sa propre dimension écartée de la clause WHERE."""
     conn.execute(text("SET LOCAL jit = off"))
     sqls = _facets_sqls(
         perimeter_structure_ids=perimeter_structure_ids,
-        lab_ids=lab_ids,
-        years=years,
-        publisher_ids=publisher_ids,
-        journal_ids=journal_ids,
-        oa_status=oa_status,
-        has_apc=has_apc,
-        doc_types=doc_types,
+        filters=filters,
     )
 
     year_rows = conn.execute(text(sqls["year"][0]), sqls["year"][1]).all()

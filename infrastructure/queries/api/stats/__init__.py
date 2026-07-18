@@ -31,6 +31,7 @@ from application.ports.api.stats_queries import (
     PivotResponse,
     PivotSchemaResponse,
     StatsFacetsResponse,
+    StatsFilters,
     StatsQueries,
     YearFacet,
 )
@@ -60,27 +61,11 @@ class PgStatsQueries(StatsQueries):
     def available_years(self) -> list[int]:
         return _available_years(self._conn)
 
-    def collaborations(
-        self,
-        *,
-        lab_ids: list[int],
-        years: list[int],
-        publisher_ids: list[int],
-        journal_ids: list[int],
-        oa_status: list[str],
-        has_apc: list[str],
-        doc_types: list[str],
-    ) -> CollaborationsResponse:
+    def collaborations(self, *, filters: StatsFilters) -> CollaborationsResponse:
         data = _run_collaborations(
             self._conn,
             perimeter_structure_ids=get_persons_structure_ids_list(self._conn),
-            lab_ids=lab_ids,
-            years=years,
-            publisher_ids=publisher_ids,
-            journal_ids=journal_ids,
-            oa_status=oa_status,
-            has_apc=has_apc,
-            doc_types=doc_types,
+            filters=filters,
         )
         return CollaborationsResponse(
             rows=[CountryCollaboration(**r) for r in data["rows"]],
@@ -105,32 +90,14 @@ class PgStatsQueries(StatsQueries):
             measures=[PivotMeasureOut(key=m.key, label=m.label) for m in MEASURES.values()],
         )
 
-    def pivot(
-        self,
-        *,
-        measure: str,
-        groups: list[str],
-        lab_ids: list[int],
-        years: list[int],
-        publisher_ids: list[int],
-        journal_ids: list[int],
-        oa_status: list[str],
-        has_apc: list[str],
-        doc_types: list[str],
-    ) -> PivotResponse:
+    def pivot(self, *, measure: str, groups: list[str], filters: StatsFilters) -> PivotResponse:
         return PivotResponse.model_validate(
             _run_pivot(
                 self._conn,
                 measure=measure,
                 groups=groups,
                 perimeter_structure_ids=get_persons_structure_ids_list(self._conn),
-                lab_ids=lab_ids,
-                years=years,
-                publisher_ids=publisher_ids,
-                journal_ids=journal_ids,
-                oa_status=oa_status,
-                has_apc=has_apc,
-                doc_types=doc_types,
+                filters=filters,
             )
         )
 
@@ -139,26 +106,14 @@ class PgStatsQueries(StatsQueries):
         *,
         kind: Literal["publisher", "journal"],
         search: str,
-        lab_ids: list[int],
-        years: list[int],
-        publisher_ids: list[int],
-        journal_ids: list[int],
-        oa_status: list[str],
-        has_apc: list[str],
-        doc_types: list[str],
+        filters: StatsFilters,
     ) -> EntityFacetResponse:
         rows = _stats_entity_facet(
             self._conn,
             kind=kind,
             search=search,
             perimeter_structure_ids=get_persons_structure_ids_list(self._conn),
-            lab_ids=lab_ids,
-            years=years,
-            publisher_ids=publisher_ids,
-            journal_ids=journal_ids,
-            oa_status=oa_status,
-            has_apc=has_apc,
-            doc_types=doc_types,
+            filters=filters,
         )
         return EntityFacetResponse(entities=[EntityFacetItem(**r) for r in rows])
 
@@ -167,27 +122,11 @@ class PgStatsQueries(StatsQueries):
     ) -> EntityLabelResponse:
         return EntityLabelResponse(label=_entity_label(self._conn, kind=kind, entity_id=entity_id))
 
-    def stats_facets(
-        self,
-        *,
-        lab_ids: list[int],
-        years: list[int],
-        publisher_ids: list[int],
-        journal_ids: list[int],
-        oa_status: list[str],
-        has_apc: list[str],
-        doc_types: list[str],
-    ) -> StatsFacetsResponse:
+    def stats_facets(self, *, filters: StatsFilters) -> StatsFacetsResponse:
         data = _stats_facets(
             self._conn,
             perimeter_structure_ids=get_persons_structure_ids_list(self._conn),
-            lab_ids=lab_ids,
-            years=years,
-            publisher_ids=publisher_ids,
-            journal_ids=journal_ids,
-            oa_status=oa_status,
-            has_apc=has_apc,
-            doc_types=doc_types,
+            filters=filters,
         )
         return StatsFacetsResponse(
             years=[YearFacet(**y) for y in data["years"]],

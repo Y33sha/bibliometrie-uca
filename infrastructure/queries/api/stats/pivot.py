@@ -14,6 +14,7 @@ from typing import Any
 
 from sqlalchemy import Connection, text
 
+from application.ports.api.stats_queries import StatsFilters
 from domain.publications.doc_types import DOC_TYPE_FAMILIES
 from domain.stats import DIMENSIONS, MEASURES, Dimension, validate_pivot
 from infrastructure.queries.api.stats._shared import STATS_BASE, stats_filter_clauses
@@ -87,13 +88,7 @@ def run_pivot(
     measure: str,
     groups: list[str],
     perimeter_structure_ids: list[int],
-    lab_ids: list[int],
-    years: list[int],
-    publisher_ids: list[int],
-    journal_ids: list[int],
-    oa_status: list[str],
-    has_apc: list[str],
-    doc_types: list[str],
+    filters: StatsFilters,
 ) -> dict[str, Any]:
     """Exécute une agrégation : `mesure` ventilée selon `groups`, sous les filtres. Les clés sont
     validées contre le registre (`validate_pivot`) avant toute composition SQL."""
@@ -101,13 +96,7 @@ def run_pivot(
     where, binds = assemble_where(
         stats_filter_clauses(
             perimeter_structure_ids=perimeter_structure_ids,
-            lab_ids=lab_ids,
-            years=years,
-            publisher_ids=publisher_ids,
-            journal_ids=journal_ids,
-            oa_status=oa_status,
-            has_apc=has_apc,
-            doc_types=doc_types,
+            filters=filters,
         )
     )
     joins = " ".join(dict.fromkeys(_DIM_JOIN[d.key] for d in dims if d.key in _DIM_JOIN))

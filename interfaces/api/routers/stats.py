@@ -1,6 +1,5 @@
 """Router /api/stats/* — les agrégats des tableaux de bord, servis par le port `StatsQueries`."""
 
-from dataclasses import asdict, dataclass
 from typing import Literal
 
 from fastapi import APIRouter, Depends, Query
@@ -11,28 +10,14 @@ from application.ports.api.stats_queries import (
     PivotResponse,
     PivotSchemaResponse,
     StatsFacetsResponse,
+    StatsFilters,
     StatsQueries,
 )
+from domain.errors import ValidationError
 from interfaces.api.deps import stats_queries
 from interfaces.api.filters import parse_int_csv, parse_str_csv
 
 router = APIRouter()
-
-
-@dataclass(frozen=True)
-class StatsFilters:
-    """Filtres communs à tous les endpoints de statistiques, lus des paramètres de requête en valeurs séparées par des virgules.
-
-    Les noms des champs reprennent ceux des méthodes de `StatsQueries`, ce qui permet de les passer en `**asdict(...)`.
-    """
-
-    lab_ids: list[int]
-    years: list[int]
-    publisher_ids: list[int]
-    journal_ids: list[int]
-    oa_status: list[str]
-    has_apc: list[str]
-    doc_types: list[str]
 
 
 def stats_filters(
@@ -44,7 +29,7 @@ def stats_filters(
     has_apc: str = Query(""),
     doc_type: str = Query(""),
 ) -> StatsFilters:
-    """Dépendance : assemble les filtres communs des endpoints stats depuis les query params."""
+    """Dépendance : assemble les filtres communs des endpoints stats depuis les query params, en valeurs séparées par des virgules."""
     return StatsFilters(
         lab_ids=parse_int_csv(lab_id),
         years=parse_int_csv(year),
@@ -60,7 +45,10 @@ def stats_filters(
 def available_years(
     queries: StatsQueries = Depends(stats_queries),
 ) -> list[int]:
-    """Liste des années présentes dans les publications validées (tri asc, restreint via la config `years_validated`)."""
+    """Années de publication présentes dans le périmètre, la plus récente d'abord.
+
+    Alimente le sélecteur d'années des tableaux de bord.
+    """
     return queries.available_years()
 
 
@@ -69,8 +57,11 @@ def stats_facets(
     filters: StatsFilters = Depends(stats_filters),
     queries: StatsQueries = Depends(stats_queries),
 ) -> StatsFacetsResponse:
-    """Facettes dynamiques : années, labos, oa_status, apc."""
-    return queries.stats_facets(**asdict(filters))
+    """Décomptes par option des facettes des tableaux de bord.
+
+    Chaque facette écarte sa propre dimension de la clause WHERE : son décompte annonce le nombre de publications atteignables si l'option était cochée ou décochée.
+    """
+    return queries.stats_facets(filters=filters)
 
 
 @router.get("/api/stats/facets/entities", response_model=EntityFacetResponse)
@@ -84,7 +75,7 @@ def stats_entity_facet(
 
     Les entités sont corrélées entre elles. `entity_search` cherche dans leurs noms.
     """
-    return queries.stats_entity_facet(kind=kind, search=entity_search, **asdict(filters))
+    return queries.stats_entity_facet(kind=kind, search=entity_search, filters=filters)
 
 
 @router.get("/api/stats/facets/entity-label", response_model=EntityLabelResponse)
@@ -109,7 +100,7 @@ def collaborations(
 
     Le décompte se lit dans la colonne `countries` des publications, le pays domestique écarté.
     """
-    return queries.collaborations(**asdict(filters))
+    return queries.collaborations(filters=filters)
 
 
 @router.get("/api/stats/pivot/schema", response_model=PivotSchemaResponse)
@@ -130,7 +121,9 @@ def pivot(
 ) -> PivotResponse:
     """Agrégation générique : `measure` ventilée selon `group` puis `group2`, sous les filtres actifs.
 
-    Les trois clés sont validées contre le registre des mesures et des ventilations ; une clé inconnue donne un 400.
+    Les trois clés sont validées contre le registre des mesures et des ventilations ; une clé inconnue, une ventilation non groupable ou répétée donnent un 400, comme `group2` fourni sans `group`.
     """
+    if group2 and not group:
+        raise ValidationError("Une seconde ventilation exige la première : `group2` sans `group`")
     groups = [g for g in (group, group2) if g]
-    return queries.pivot(measure=measure, groups=groups, **asdict(filters))
+    return queries.pivot(measure=measure, groups=groups, filters=filters)
