@@ -1,9 +1,9 @@
 """Tests de caractérisation pour le router admin_feedback.
 
 Couvre :
-- /api/admin/feedback/stats : cas vide + cas avec données (branches des COUNT FILTER)
-- /api/admin/feedback/false-negatives : cas vide + cas avec données + filtre search
-- /api/admin/feedback/false-positives : idem
+- /api/feedback/stats : cas vide + cas avec données (branches des COUNT FILTER)
+- /api/feedback/false-negatives : cas vide + cas avec données + filtre search
+- /api/feedback/false-positives : idem
 """
 
 import os
@@ -95,7 +95,7 @@ def _cleanup_after_module():
         )
 
 
-# ── /api/admin/feedback/structures ──────────────────────────────
+# ── /api/feedback/structures ──────────────────────────────
 
 
 class TestFeedbackStructures:
@@ -111,7 +111,7 @@ class TestFeedbackStructures:
 
         labo_id = _seed_structure(type_="labo")
 
-        r = client.get("/api/admin/feedback/structures")
+        r = client.get("/api/feedback/structures")
         assert r.status_code == 200
         body = r.json()
         assert body["default_structure_id"] == uca_id
@@ -130,7 +130,7 @@ class TestFeedbackStructures:
         _seed_structure(type_="labo")
         _seed_structure(type_="chu")
 
-        r = client.get("/api/admin/feedback/structures")
+        r = client.get("/api/feedback/structures")
         assert r.status_code == 200
         body = r.json()
         default_id = body["default_structure_id"]
@@ -151,20 +151,20 @@ class TestFeedbackStructures:
         _seed_structure(type_="site")
         _seed_structure(type_="autre")
 
-        r = client.get("/api/admin/feedback/structures")
+        r = client.get("/api/feedback/structures")
         assert r.status_code == 200
         body = r.json()
         assert "site" not in body["by_type"]
         assert "autre" not in body["by_type"]
 
 
-# ── /api/admin/feedback/stats ───────────────────────────────────
+# ── /api/feedback/stats ───────────────────────────────────
 
 
 class TestFeedbackStats:
     def test_empty_structure(self, client):
         sid = _seed_structure()
-        r = client.get("/api/admin/feedback/stats", params={"structure_id": sid})
+        r = client.get("/api/feedback/stats", params={"structure_id": sid})
         assert r.status_code == 200
         body = r.json()
         assert body["total_reviewed"] == 0
@@ -198,7 +198,7 @@ class TestFeedbackStats:
         a5 = _seed_address(_uniq("a5"))
         _seed_ast(a5, sid, matched_form_id=fid, is_confirmed=None)
 
-        r = client.get("/api/admin/feedback/stats", params={"structure_id": sid})
+        r = client.get("/api/feedback/stats", params={"structure_id": sid})
         assert r.status_code == 200
         body = r.json()
         assert body["total_reviewed"] == 4
@@ -210,17 +210,17 @@ class TestFeedbackStats:
         assert body["pending"] == 1
 
     def test_missing_structure_id(self, client):
-        r = client.get("/api/admin/feedback/stats")
+        r = client.get("/api/feedback/stats")
         assert r.status_code == 422
 
 
-# ── /api/admin/feedback/false-negatives ─────────────────────────
+# ── /api/feedback/false-negatives ─────────────────────────
 
 
 class TestFeedbackFalseNegatives:
     def test_empty(self, client):
         sid = _seed_structure()
-        r = client.get("/api/admin/feedback/false-negatives", params={"structure_id": sid})
+        r = client.get("/api/feedback/false-negatives", params={"structure_id": sid})
         assert r.status_code == 200
         body = r.json()
         assert body["total"] == 0
@@ -231,7 +231,7 @@ class TestFeedbackFalseNegatives:
         a = _seed_address("Université de Clermont-Ferrand FN")
         _seed_ast(a, sid, matched_form_id=None, is_confirmed=True)
 
-        r = client.get("/api/admin/feedback/false-negatives", params={"structure_id": sid})
+        r = client.get("/api/feedback/false-negatives", params={"structure_id": sid})
         assert r.status_code == 200
         body = r.json()
         assert body["total"] == 1
@@ -245,7 +245,7 @@ class TestFeedbackFalseNegatives:
         _seed_ast(other, sid, matched_form_id=None, is_confirmed=True)
 
         r = client.get(
-            "/api/admin/feedback/false-negatives",
+            "/api/feedback/false-negatives",
             params={"structure_id": sid, "search": "Marqueur"},
         )
         assert r.status_code == 200
@@ -255,19 +255,19 @@ class TestFeedbackFalseNegatives:
     def test_pagination(self, client):
         sid = _seed_structure()
         r = client.get(
-            "/api/admin/feedback/false-negatives",
+            "/api/feedback/false-negatives",
             params={"structure_id": sid, "page": 2, "per_page": 10},
         )
         assert r.status_code == 200
 
 
-# ── /api/admin/feedback/false-positives ─────────────────────────
+# ── /api/feedback/false-positives ─────────────────────────
 
 
 class TestFeedbackFalsePositives:
     def test_empty(self, client):
         sid = _seed_structure()
-        r = client.get("/api/admin/feedback/false-positives", params={"structure_id": sid})
+        r = client.get("/api/feedback/false-positives", params={"structure_id": sid})
         assert r.status_code == 200
         assert r.json()["total"] == 0
 
@@ -277,7 +277,7 @@ class TestFeedbackFalsePositives:
         a = _seed_address("Adresse FP détectée mais rejetée")
         _seed_ast(a, sid, matched_form_id=fid, is_confirmed=False)
 
-        r = client.get("/api/admin/feedback/false-positives", params={"structure_id": sid})
+        r = client.get("/api/feedback/false-positives", params={"structure_id": sid})
         assert r.status_code == 200
         body = r.json()
         assert body["total"] == 1
@@ -291,7 +291,7 @@ class TestFeedbackFalsePositives:
         _seed_ast(other, sid, matched_form_id=fid, is_confirmed=False)
 
         r = client.get(
-            "/api/admin/feedback/false-positives",
+            "/api/feedback/false-positives",
             params={"structure_id": sid, "search": "FPUnique"},
         )
         assert r.status_code == 200
@@ -300,7 +300,7 @@ class TestFeedbackFalsePositives:
     def test_pagination(self, client):
         sid = _seed_structure()
         r = client.get(
-            "/api/admin/feedback/false-positives",
+            "/api/feedback/false-positives",
             params={"structure_id": sid, "page": 2, "per_page": 10},
         )
         assert r.status_code == 200

@@ -1,6 +1,6 @@
-"""Router /api/config/* — les paramètres clé-valeur du pipeline.
+"""Router des paramètres clé-valeur du pipeline. Sert `/api/config/*`.
 
-La table `config` porte les réglages globaux : années couvertes, identifiants d'accès aux sources, choix des périmètres par phase. La définition des périmètres eux-mêmes appartient au router `admin/perimeters.py`.
+La table `config` porte les réglages globaux : années couvertes, identifiants d'accès aux sources, choix des périmètres par phase. La définition des périmètres eux-mêmes appartient au router `perimeters.py`.
 """
 
 from fastapi import APIRouter, Depends
@@ -12,10 +12,10 @@ from application.services.config import commands as config_commands
 from interfaces.api.deps import config_queries, config_store, db_conn
 from interfaces.api.models import ConfigValueUpdate
 
-router = APIRouter()
+router = APIRouter(prefix="/api/config", tags=["config"])
 
 
-@router.get("/api/config", response_model=list[ConfigItem])
+@router.get("", response_model=list[ConfigItem])
 def list_config(
     queries: ConfigQueries = Depends(config_queries),
 ) -> list[ConfigItem]:
@@ -26,7 +26,7 @@ def list_config(
     return queries.list_config()
 
 
-@router.put("/api/config/{key}", response_model=ConfigItem)
+@router.put("/{key}", response_model=ConfigItem)
 def update_config(
     key: str,
     body: ConfigValueUpdate,

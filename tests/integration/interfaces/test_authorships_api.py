@@ -2,7 +2,7 @@
 
 Couvre :
 - PATCH /api/authorships/{id}/exclude
-- GET / POST /api/admin/orphan-authorships/*
+- GET / POST /api/authorships/orphans/*
 
 Stratégie : seed minimal via un pool dédié (hors pool API), ids uniques par
 test pour éviter les collisions.
@@ -196,15 +196,15 @@ class TestExcludeAuthorship:
 
 class TestOrphanAuthorships:
     def test_count(self, client):
-        r = client.get("/api/admin/orphan-authorships/count")
+        r = client.get("/api/authorships/orphans/count")
         assert r.status_code == 200
 
     def test_list(self, client):
-        r = client.get("/api/admin/orphan-authorships", params={"page": 1, "per_page": 50})
+        r = client.get("/api/authorships/orphans", params={"page": 1, "per_page": 50})
         assert r.status_code == 200
 
     def test_list_with_search(self, client):
-        r = client.get("/api/admin/orphan-authorships", params={"search": "foo"})
+        r = client.get("/api/authorships/orphans", params={"search": "foo"})
         assert r.status_code == 200
 
     def test_returns_last_name_first_name_from_comma_form(self, client):
@@ -212,7 +212,7 @@ class TestOrphanAuthorships:
         marker = _uniq("Marker").replace("_", "")
         _seed_orphan_authorship(f"{marker}, Jane")
 
-        r = client.get("/api/admin/orphan-authorships", params={"search": marker})
+        r = client.get("/api/authorships/orphans", params={"search": marker})
         assert r.status_code == 200
         body = r.json()
         assert body["total"] == 1
@@ -226,7 +226,7 @@ class TestOrphanAuthorships:
         marker = _uniq("Marker").replace("_", "")
         _seed_orphan_authorship(f"Jane Marie {marker}")
 
-        r = client.get("/api/admin/orphan-authorships", params={"search": marker})
+        r = client.get("/api/authorships/orphans", params={"search": marker})
         assert r.status_code == 200
         body = r.json()
         assert body["total"] == 1
@@ -238,14 +238,14 @@ class TestOrphanAuthorships:
 class TestAssignOrphanAuthorship:
     def test_requires_admin(self, client):
         r = client.post(
-            "/api/admin/orphan-authorships/assign",
+            "/api/authorships/orphans/assign",
             json={"source": "hal", "authorship_id": 1, "person_id": 1},
         )
         assert r.status_code == 401
 
     def test_unknown_source(self, auth_client):
         r = auth_client.post(
-            "/api/admin/orphan-authorships/assign",
+            "/api/authorships/orphans/assign",
             json={"source": "unknown_source", "authorship_id": 1, "person_id": 1},
         )
         assert r.status_code == 400
@@ -253,7 +253,7 @@ class TestAssignOrphanAuthorship:
     def test_missing_person_id_and_create(self, auth_client):
         sa = _seed_source_authorship(source="hal")
         r = auth_client.post(
-            "/api/admin/orphan-authorships/assign",
+            "/api/authorships/orphans/assign",
             json={"source": "hal", "authorship_id": sa},
         )
         assert r.status_code == 400
@@ -261,7 +261,7 @@ class TestAssignOrphanAuthorship:
     def test_create_person_empty_name(self, auth_client):
         sa = _seed_source_authorship(source="hal")
         r = auth_client.post(
-            "/api/admin/orphan-authorships/assign",
+            "/api/authorships/orphans/assign",
             json={
                 "source": "hal",
                 "authorship_id": sa,
@@ -273,7 +273,7 @@ class TestAssignOrphanAuthorship:
     def test_person_not_found(self, auth_client):
         sa = _seed_source_authorship(source="hal")
         r = auth_client.post(
-            "/api/admin/orphan-authorships/assign",
+            "/api/authorships/orphans/assign",
             json={"source": "hal", "authorship_id": sa, "person_id": 999999999},
         )
         assert r.status_code == 404
@@ -282,7 +282,7 @@ class TestAssignOrphanAuthorship:
         pid = _seed_person()
         sa = _seed_source_authorship(source="hal")
         r = auth_client.post(
-            "/api/admin/orphan-authorships/assign",
+            "/api/authorships/orphans/assign",
             json={"source": "hal", "authorship_id": sa, "person_id": pid},
         )
         assert r.status_code == 200
@@ -296,7 +296,7 @@ class TestAssignOrphanAuthorship:
         pid = _seed_person()
         sa = _seed_source_authorship(source="hal")
         r = auth_client.post(
-            "/api/admin/orphan-authorships/assign",
+            "/api/authorships/orphans/assign",
             json={"source": "hal", "authorship_id": sa, "person_id": pid},
         )
         assert r.status_code == 200
@@ -307,7 +307,7 @@ class TestAssignOrphanAuthorship:
     def test_ok_with_create_person(self, auth_client):
         sa = _seed_source_authorship(source="hal")
         r = auth_client.post(
-            "/api/admin/orphan-authorships/assign",
+            "/api/authorships/orphans/assign",
             json={
                 "source": "hal",
                 "authorship_id": sa,
@@ -322,7 +322,7 @@ class TestAssignOrphanAuthorship:
         sa, pub = _seed_orphan_with_pub()
         _reject_pair(pub, pid)
         r = auth_client.post(
-            "/api/admin/orphan-authorships/assign",
+            "/api/authorships/orphans/assign",
             json={"source": "hal", "authorship_id": sa, "person_id": pid},
         )
         assert r.status_code == 409
@@ -336,7 +336,7 @@ class TestAssignOrphanAuthorship:
         sa, pub = _seed_orphan_with_pub()
         _reject_pair(pub, pid)
         r = auth_client.post(
-            "/api/admin/orphan-authorships/assign",
+            "/api/authorships/orphans/assign",
             json={"source": "hal", "authorship_id": sa, "person_id": pid, "force": True},
         )
         assert r.status_code == 200
@@ -346,7 +346,7 @@ class TestAssignOrphanAuthorship:
 class TestBatchAssignOrphanAuthorships:
     def test_requires_admin(self, client):
         r = client.post(
-            "/api/admin/orphan-authorships/batch-assign",
+            "/api/authorships/orphans/batch-assign",
             json={"authorship_ids": [], "person_id": 1},
         )
         assert r.status_code == 401
@@ -354,7 +354,7 @@ class TestBatchAssignOrphanAuthorships:
     def test_empty_authorships_ok_zero(self, auth_client):
         pid = _seed_person()
         r = auth_client.post(
-            "/api/admin/orphan-authorships/batch-assign",
+            "/api/authorships/orphans/batch-assign",
             json={"authorship_ids": [], "person_id": pid},
         )
         assert r.status_code == 200
@@ -363,7 +363,7 @@ class TestBatchAssignOrphanAuthorships:
     def test_person_not_found(self, auth_client):
         sa = _seed_source_authorship(source="hal")
         r = auth_client.post(
-            "/api/admin/orphan-authorships/batch-assign",
+            "/api/authorships/orphans/batch-assign",
             json={"authorship_ids": [sa], "person_id": 999999999},
         )
         assert r.status_code == 404
@@ -373,7 +373,7 @@ class TestBatchAssignOrphanAuthorships:
         sa1 = _seed_source_authorship(source="hal")
         sa2 = _seed_source_authorship(source="openalex")
         r = auth_client.post(
-            "/api/admin/orphan-authorships/batch-assign",
+            "/api/authorships/orphans/batch-assign",
             json={"authorship_ids": [sa1, sa2], "person_id": pid},
         )
         assert r.status_code == 200
@@ -384,7 +384,7 @@ class TestBatchAssignOrphanAuthorships:
         sa, pub = _seed_orphan_with_pub()
         _reject_pair(pub, pid)
         r = auth_client.post(
-            "/api/admin/orphan-authorships/batch-assign",
+            "/api/authorships/orphans/batch-assign",
             json={"authorship_ids": [sa], "person_id": pid},
         )
         assert r.status_code == 409
@@ -395,7 +395,7 @@ class TestBatchAssignOrphanAuthorships:
         sa, pub = _seed_orphan_with_pub()
         _reject_pair(pub, pid)
         r = auth_client.post(
-            "/api/admin/orphan-authorships/batch-assign",
+            "/api/authorships/orphans/batch-assign",
             json={"authorship_ids": [sa], "person_id": pid, "force": True},
         )
         assert r.status_code == 200

@@ -1,4 +1,4 @@
-"""Port : lectures pour le tableau de bord admin de feedback détection d'adresses (consommé par /api/admin/feedback/*).
+"""Port : lectures pour le tableau de bord admin de feedback détection d'adresses (consommé par /api/feedback/*).
 
 Implémenté par `infrastructure.queries.api.admin_feedback.PgAdminFeedbackQueries`.
 """
@@ -11,7 +11,7 @@ from application.ports.api._common import PaginatedResponse
 
 
 class FeedbackStats(BaseModel):
-    """GET /api/admin/feedback/stats : qualité de la détection d'adresses."""
+    """GET /api/feedback/stats : qualité de la détection d'adresses."""
 
     total_reviewed: int
     detection_rate: float | None

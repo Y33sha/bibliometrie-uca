@@ -1,6 +1,6 @@
 """Attribuer à une personne des authorships sources orphelines.
 
-Ces deux opérations (unitaire et par lot) sont exposées par l'API admin (`POST /api/admin/orphan-authorships/...`) — actions utilisateur, hors pipeline. À l'interface entre `persons`, `source_authorships` et `publications`, leur issue est la création ou la mise à jour de lignes dans `authorships`.
+Ces deux opérations (unitaire et par lot) sont exposées par l'API admin (`POST /api/authorships/orphans/...`) — actions utilisateur, hors pipeline. À l'interface entre `persons`, `source_authorships` et `publications`, leur issue est la création ou la mise à jour de lignes dans `authorships`.
 
 Le helper privé `_refresh_authorship_from_sources` chaîne les cinq opérations atomiques du port qui recomposent une authorship pour une paire (publication, personne) depuis ses source_authorships.
 
