@@ -58,12 +58,12 @@ def _build_publisher_where(
 
 
 _SORT_MAP = {
-    "name": "p.name ASC",
-    "-name": "p.name DESC",
-    "journals": "journal_count ASC, p.name ASC",
-    "-journals": "journal_count DESC, p.name ASC",
-    "pubs": "pub_count ASC, p.name ASC",
-    "-pubs": "pub_count DESC, p.name ASC",
+    "name_asc": "p.name ASC",
+    "name_desc": "p.name DESC",
+    "journals_asc": "journal_count ASC, p.name ASC",
+    "journals_desc": "journal_count DESC, p.name ASC",
+    "pubs_asc": "pub_count ASC, p.name ASC",
+    "pubs_desc": "pub_count DESC, p.name ASC",
 }
 
 
@@ -137,7 +137,7 @@ class PgPublisherQueries(PublisherQueries):
         ).one()
         total = total_row.total
 
-        order = _SORT_MAP.get(sort, _SORT_MAP["name"])
+        order = _SORT_MAP.get(sort, _SORT_MAP["name_asc"])
         offset = (page - 1) * per_page
         rows = self._conn.execute(
             text(f"""

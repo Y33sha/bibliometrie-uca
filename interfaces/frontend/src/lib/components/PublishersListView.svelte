@@ -41,7 +41,7 @@
 
 	// --- Filter state ---
 	let search = $state('');
-	let currentSort = $state('-pubs');
+	let currentSort = $state('pubs_desc');
 	let selectedPublisherTypes: string[] = $state([]);
 	let selectedCountries: string[] = $state([]);
 
@@ -91,7 +91,7 @@
 			selectedPublisherTypes: { type: 'string_array', urlKey: 'publisher_type' },
 			selectedCountries: { type: 'string_array', urlKey: 'country' },
 			search: { type: 'single', urlKey: 'search' },
-			currentSort: { type: 'single', urlKey: 'sort', defaultValue: '-pubs' },
+			currentSort: { type: 'single', urlKey: 'sort', defaultValue: 'pubs_desc' },
 			currentPage: { type: 'page', urlKey: 'page' },
 		},
 	});
@@ -129,12 +129,12 @@
 	}
 
 	function oppositeSort(s: string): string {
-		return s.startsWith('-') ? s.slice(1) : '-' + s;
+		return s.endsWith('_desc') ? s.replace(/_desc$/, '_asc') : s.replace(/_asc$/, '_desc');
 	}
 
 	function sortArrow(col: 'name' | 'journals' | 'pubs'): string {
-		if (currentSort === col) return '▲';
-		if (currentSort === '-' + col) return '▼';
+		if (currentSort === `${col}_asc`) return '▲';
+		if (currentSort === `${col}_desc`) return '▼';
 		return '';
 	}
 

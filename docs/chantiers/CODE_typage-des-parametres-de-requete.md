@@ -12,7 +12,7 @@ Les routers déclarent pourtant `str` une centaine de fois, y compris là où le
 
 `access` et `hal_status` en ont l'air et n'en sont pas : ils passent par `parse_str_csv` et le frontend émet `access=oa,closed`. Ce sont des listes dont les éléments viennent d'un vocabulaire fermé — un `Literal` sur la chaîne les refuserait.
 
-`sort` relève de la même famille, dans les quatre listes paginées — éditeurs, revues, personnes, publications. Chacune a son vocabulaire fermé, et sa table d'ordonnancement retombe en silence sur le tri par défaut devant une valeur inconnue (`_SORT_MAP.get(sort, défaut)`). Deux conventions y cohabitent sans que rien ne le signale : le sens descendant s'écrit en préfixe pour les trois premières (`-name`), en suffixe pour les publications (`year_desc`, `title_desc`). Un `Literal` par liste les déclarerait, et rendrait l'écart visible. La faute y coûte moins cher qu'ailleurs : un tri inconnu rend le bon ensemble dans le mauvais ordre, là où un filtre inconnu rend le mauvais ensemble.
+`sort` relève de la même famille, dans les cinq listes paginées — éditeurs, revues, publications, et les personnes qui en ont deux, l'annuaire et la liste de curation. Chacune a son vocabulaire fermé, et sa table d'ordonnancement retombe en silence sur le tri par défaut devant une valeur inconnue (`_SORT_MAP.get(sort, défaut)`). Un `Literal` par liste les déclarerait. La faute y coûte moins cher qu'ailleurs : un tri inconnu rend le bon ensemble dans le mauvais ordre, là où un filtre inconnu rend le mauvais ensemble.
 
 **Les listes.** `department`, `role`, `year`, `doc_type`, `country`, `oa_status`, `access`, `hal_status`, `lab_id`, `source_filter` transportent plusieurs valeurs séparées par des virgules, que `parse_str_csv` découpe. La convention CSV est délibérée et se défend ; elle n'est pas en cause ici.
 
@@ -52,9 +52,9 @@ Sept paramètres : `has_orcid`, `has_idhal`, `has_idref`, `has_rh`, `has_pending
 
 ### Phase 2 — les vocabulaires fermés
 
+- [x] `sort` : les cinq vocabulaires s'alignent sur `<champ>_asc` / `<champ>_desc`. Quatre écrivaient le sens descendant en préfixe (`-name`), où le croissant se lisait à l'**absence** du tiret — une convention dont un terme est implicite se prête mal à un `Literal`, qui doit tout énumérer. Le cinquième, celui des publications, n'appliquait pas la sienne : `title` y côtoyait `title_desc`. Les helpers génériques du frontend suivent (`oppositeSort`, indicateurs de colonne).
 - [ ] `validation` et `detected` : recenser les valeurs réellement honorées par les adapters.
-- [ ] Les déclarer en `Literal`, en les tirant du domaine là où il les porte.
-- [ ] `sort` des quatre listes paginées : un `Literal` par liste, et trancher si les deux conventions de sens descendant (préfixe contre suffixe) convergent.
+- [ ] Les déclarer en `Literal`, avec `sort`, en les tirant du domaine là où il les porte.
 - [ ] Vérifier ce qu'une valeur hors vocabulaire produit aujourd'hui, avant qu'elle produise un 422.
 
 ### Phase 3 — les prédicats composés

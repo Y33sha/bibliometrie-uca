@@ -178,7 +178,7 @@ class TestListPublishers:
         assert all(p["crossref_member_id"] == 42 for p in pub["doi_prefixes"])
 
     def test_sort_name_desc(self, client):
-        r = client.get("/api/publishers", params={"sort": "-name"})
+        r = client.get("/api/publishers", params={"sort": "name_desc"})
         assert r.status_code == 200
 
     def test_sort_journals(self, client):
@@ -194,7 +194,7 @@ class TestListPublishers:
         assert r.status_code == 200
 
     def test_sort_pubs_desc(self, client):
-        r = client.get("/api/publishers", params={"sort": "-pubs"})
+        r = client.get("/api/publishers", params={"sort": "pubs_desc"})
         assert r.status_code == 200
 
     def test_sort_unknown_fallback(self, client):

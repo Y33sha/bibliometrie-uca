@@ -219,7 +219,15 @@ class TestListJournals:
 
     @pytest.mark.parametrize(
         "sort",
-        ["title", "-title", "publisher", "-publisher", "pubs", "-pubs", "unknown"],
+        [
+            "title_asc",
+            "title_desc",
+            "publisher_asc",
+            "publisher_desc",
+            "pubs_asc",
+            "pubs_desc",
+            "unknown",
+        ],
     )
     def test_sort_variants(self, client, sort):
         # `unknown` doit fallback sur `title` ASC sans 500.

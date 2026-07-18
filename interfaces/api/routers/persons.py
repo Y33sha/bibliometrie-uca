@@ -84,7 +84,7 @@ def persons_directory(
     has_idref: bool | None = Query(None),
     has_rh: bool | None = Query(None),
     lab_id: int | None = Query(None),
-    sort: str = Query("name"),
+    sort: str = Query("name_asc"),
     queries: PersonsQueries = Depends(persons_queries),
 ) -> PersonDirectoryResponse:
     """Annuaire public des personnes du périmètre, avec leurs ORCID et idHAL.
@@ -127,7 +127,7 @@ def list_persons(
     has_rh: bool | None = Query(None),
     has_pending_forms: bool | None = Query(None),
     has_pending_identifiers: bool | None = Query(None),
-    sort: str = Query("name"),
+    sort: str = Query("name_asc"),
     queries: PersonsQueries = Depends(persons_queries),
 ) -> PersonListResponse:
     """Liste des personnes avec filtres (curation).
