@@ -10,6 +10,8 @@ Les routers déclarent pourtant `str` une centaine de fois, y compris là où le
 
 **Les vocabulaires fermés.** `validation` (`all`, `pending`, `confirmed`, `rejected`), `detected` (`all`, `yes`, `no`), `access`, `hal_status` : des énumérations, qu'un `Literal` déclarerait.
 
+`sort` relève de la même famille, dans les quatre listes paginées — éditeurs, revues, personnes, publications. Chacune a son vocabulaire fermé, et sa table d'ordonnancement retombe en silence sur le tri par défaut devant une valeur inconnue (`_SORT_MAP.get(sort, défaut)`). Deux conventions y cohabitent sans que rien ne le signale : le sens descendant s'écrit en préfixe pour les trois premières (`-name`), en suffixe pour les publications (`year_desc`, `title_desc`). Un `Literal` par liste les déclarerait, et rendrait l'écart visible. La faute y coûte moins cher qu'ailleurs : un tri inconnu rend le bon ensemble dans le mauvais ordre, là où un filtre inconnu rend le mauvais ensemble.
+
 **Les listes.** `department`, `role`, `year`, `doc_type`, `country`, `oa_status`, `lab_id`, `source_filter` transportent plusieurs valeurs séparées par des virgules, que `parse_str_csv` découpe. La convention CSV est délibérée et se défend ; elle n'est pas en cause ici.
 
 `is_corresponding`, `has_apc` et `in_perimeter` (publications) ressemblent à des tri-états et n'en sont pas : ce sont des **facettes multi-sélection sur une dimension binaire**, une liste de `yes` / `no` combinée en OR par `_person_toggle_clause`. Cocher les deux ne contraint rien, ne rien cocher non plus. Ils relèvent des listes, et un booléen les trahirait.
@@ -44,6 +46,7 @@ Les deux premières familles paient le même prix.
 
 - [ ] `validation`, `detected`, `access`, `hal_status` : recenser les valeurs réellement honorées par les adapters.
 - [ ] Les déclarer en `Literal`, en les tirant du domaine là où il les porte.
+- [ ] `sort` des quatre listes paginées : un `Literal` par liste, et trancher si les deux conventions de sens descendant (préfixe contre suffixe) convergent.
 - [ ] Vérifier ce qu'une valeur hors vocabulaire produit aujourd'hui, avant qu'elle produise un 422.
 
 ## Questions ouvertes
