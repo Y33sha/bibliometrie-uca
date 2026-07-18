@@ -1,4 +1,4 @@
-"""Router /api/stats/* — les agrégats des tableaux de bord, servis par le port `StatsQueries`."""
+"""Router des agrégats des tableaux de bord, servis par le port `StatsQueries`. Sert `/api/stats/*`."""
 
 from typing import Literal
 
@@ -17,7 +17,7 @@ from domain.errors import ValidationError
 from interfaces.api.deps import stats_queries
 from interfaces.api.filters import parse_int_csv, parse_str_csv
 
-router = APIRouter()
+router = APIRouter(prefix="/api/stats", tags=["stats"])
 
 
 def stats_filters(
@@ -41,7 +41,7 @@ def stats_filters(
     )
 
 
-@router.get("/api/stats/facets", response_model=StatsFacetsResponse)
+@router.get("/facets", response_model=StatsFacetsResponse)
 def stats_facets(
     filters: StatsFilters = Depends(stats_filters),
     queries: StatsQueries = Depends(stats_queries),
@@ -53,7 +53,7 @@ def stats_facets(
     return queries.stats_facets(filters=filters)
 
 
-@router.get("/api/stats/facets/entities", response_model=EntityFacetResponse)
+@router.get("/facets/entities", response_model=EntityFacetResponse)
 def stats_entity_facet(
     kind: Literal["publisher", "journal"] = Query(...),
     entity_search: str = Query(""),
@@ -67,7 +67,7 @@ def stats_entity_facet(
     return queries.stats_entity_facet(kind=kind, search=entity_search, filters=filters)
 
 
-@router.get("/api/stats/facets/entity-label", response_model=EntityLabelResponse)
+@router.get("/facets/entity-label", response_model=EntityLabelResponse)
 def stats_entity_label(
     kind: Literal["publisher", "journal"] = Query(...),
     entity_id: int = Query(...),
@@ -80,7 +80,7 @@ def stats_entity_label(
     return queries.resolve_entity_label(kind=kind, entity_id=entity_id)
 
 
-@router.get("/api/stats/collaborations", response_model=CollaborationsResponse)
+@router.get("/collaborations", response_model=CollaborationsResponse)
 def collaborations(
     filters: StatsFilters = Depends(stats_filters),
     queries: StatsQueries = Depends(stats_queries),
@@ -92,7 +92,7 @@ def collaborations(
     return queries.collaborations(filters=filters)
 
 
-@router.get("/api/stats/pivot/schema", response_model=PivotSchemaResponse)
+@router.get("/pivot/schema", response_model=PivotSchemaResponse)
 def pivot_schema(
     queries: StatsQueries = Depends(stats_queries),
 ) -> PivotSchemaResponse:
@@ -100,7 +100,7 @@ def pivot_schema(
     return queries.pivot_schema()
 
 
-@router.get("/api/stats/pivot", response_model=PivotResponse)
+@router.get("/pivot", response_model=PivotResponse)
 def pivot(
     measure: str = Query("pub_count"),
     group: str = Query(""),

@@ -1,4 +1,4 @@
-"""Router /api/laboratories/* — les laboratoires du périmètre, servis par le port `LaboratoriesQueries`."""
+"""Router des laboratoires du périmètre, servis par le port `LaboratoriesQueries`. Sert `/api/laboratories/*`."""
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
@@ -13,10 +13,10 @@ from application.ports.api.subjects_queries import SubjectFrequency
 from interfaces.api.deps import laboratories_queries
 from interfaces.api.params import TOP_SUBJECTS_LIMIT, TopSubjectsLimit
 
-router = APIRouter()
+router = APIRouter(prefix="/api/laboratories", tags=["laboratories"])
 
 
-@router.get("/api/laboratories", response_model=list[LaboratoryListItem])
+@router.get("", response_model=list[LaboratoryListItem])
 def list_laboratories(
     queries: LaboratoriesQueries = Depends(laboratories_queries),
 ) -> list[LaboratoryListItem]:
@@ -24,7 +24,7 @@ def list_laboratories(
     return queries.list_laboratories()
 
 
-@router.get("/api/laboratories/{lab_id}", response_model=LaboratoryDetailResponse)
+@router.get("/{lab_id}", response_model=LaboratoryDetailResponse)
 def get_laboratory(
     lab_id: int,
     queries: LaboratoriesQueries = Depends(laboratories_queries),
@@ -36,7 +36,7 @@ def get_laboratory(
     return result
 
 
-@router.get("/api/laboratories/{lab_id}/addresses", response_model=LaboratoryAddressesResponse)
+@router.get("/{lab_id}/addresses", response_model=LaboratoryAddressesResponse)
 def get_laboratory_addresses(
     lab_id: int,
     page: int = Query(1, ge=1),
@@ -47,7 +47,7 @@ def get_laboratory_addresses(
     return queries.get_laboratory_addresses(lab_id, page=page, per_page=per_page)
 
 
-@router.get("/api/laboratories/{lab_id}/dashboard", response_model=LaboratoryDashboardResponse)
+@router.get("/{lab_id}/dashboard", response_model=LaboratoryDashboardResponse)
 def get_laboratory_dashboard(
     lab_id: int,
     queries: LaboratoriesQueries = Depends(laboratories_queries),
@@ -56,7 +56,7 @@ def get_laboratory_dashboard(
     return queries.get_laboratory_dashboard(lab_id)
 
 
-@router.get("/api/laboratories/{lab_id}/subjects", response_model=list[SubjectFrequency])
+@router.get("/{lab_id}/subjects", response_model=list[SubjectFrequency])
 def get_laboratory_subjects(
     lab_id: int,
     limit: TopSubjectsLimit = TOP_SUBJECTS_LIMIT,

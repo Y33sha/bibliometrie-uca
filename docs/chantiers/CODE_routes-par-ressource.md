@@ -85,13 +85,14 @@ L'ordre part des modules sans chemin non couvert et sans scission — la mécani
 - [x] `authorships` — `/api/admin/orphan-authorships/*` → `/api/authorships/orphans/*`.
 - [x] `perimeters`, et `pipeline_config` renommé `config` d'après la ressource qu'il sert.
 
-**Avec couverture à compléter :**
+- [x] `journals`, `laboratories`, `stats`, `auth` — préfixe seul, aucun chemin déplacé. Les 112 routes de l'API portent désormais un tag, et la documentation OpenAPI cesse d'être une liste plate.
 
-- [ ] `journals` — un chemin non couvert (`/api/journals/facets`).
-- [ ] `auth` — deux chemins non couverts. La fixture d'intégration forge le jeton au lieu d'appeler `/api/auth/login`, donc le parcours de connexion n'est jamais exercé de bout en bout.
-- [ ] `config` — `PUT /api/config/{key}` non couvert.
-- [ ] `stats` — trois chemins non couverts (collaborations, pivot, schéma du pivot).
-- [ ] `laboratories` — trois chemins non couverts (adresses, tableau de bord, sujets).
+**Couverture restant à compléter**, sans lien avec un déplacement — aucun de ces modules ne change de chemin :
+
+- [ ] `journals` — un chemin (`/api/journals/facets`).
+- [ ] `auth` — deux chemins. La fixture d'intégration forge le jeton au lieu d'appeler `/api/auth/login`, donc le parcours de connexion n'est jamais exercé de bout en bout.
+- [ ] `stats` — trois chemins (collaborations, pivot, schéma du pivot).
+- [ ] `laboratories` — trois chemins (adresses, tableau de bord, sujets).
 
 **Avec recomposition :**
 
