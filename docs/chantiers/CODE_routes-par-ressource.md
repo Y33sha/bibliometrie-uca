@@ -53,8 +53,24 @@ Ce chantier précède la fin de la relecture d'`interfaces/api/`, pour ne pas re
 
 ### Phase 1 — Préparer le filet
 
-- [ ] Recenser les chemins consommés par le frontend, module d'appel par module d'appel, pour disposer de la table de correspondance ancien chemin → nouveau chemin avant de bouger quoi que ce soit.
-- [ ] Vérifier que la suite d'intégration couvre au moins un appel par route déplacée ; compléter là où elle ne le fait pas. C'est le filet qui rend le déplacement vérifiable.
+- [x] Recensement croisé : 127 routes pour 118 chemins distincts, contre 112 chemins appelés par le frontend. Le croisement vaut aussi comme test « qui l'appelle » — voir *Endpoints sans appelant* ci-dessous.
+- [x] Couverture d'intégration relevée : **28 chemins sur 118 ne sont nommés par aucun test d'intégration**. Ils se concentrent sur trois familles — les lectures d'administration des personnes (onze chemins : formes ambiguës, conflits d'identifiants, intrus détachables, doublons de nom, avec leurs compteurs), les lectures de laboratoire (détail, adresses, tableau de bord, sujets), et les agrégats de statistiques (collaborations, pivot et son schéma). S'y ajoutent l'authentification, que la fixture d'intégration court-circuite en forgeant le jeton au lieu d'appeler `/api/auth/login`, et quelques détails d'entité (`GET /api/publications/{id}`, `/api/persons/{id}/theses`, `/dashboard`, `/subjects`).
+- [ ] Compléter la couverture des 28 chemins avant tout déplacement : un test qui nomme le chemin est ce qui fait échouer bruyamment un renommage manqué. Sans lui, une route déplacée et un frontend non ajusté produisent un 404 que rien ne signale.
+
+#### Endpoints sans appelant
+
+Six chemins ne sont appelés par aucun module du frontend. Le contrôle a écarté les faux positifs des chemins composés (`${base}/api/…`, `${endpoint}/entity-label`), qui sont bien consommés.
+
+| Chemin | Ce qui semble le servir à sa place |
+| --- | --- |
+| `GET /api/stats/years` | la page de statistiques construit ses années autrement |
+| `GET /api/addresses/suggest-countries` | la page pays passe par `/api/addresses/countries` avec le drapeau `suggest` |
+| `GET /api/persons/departments` | les listes lisent les départements dans `/api/persons/facets` |
+| `GET /api/persons/roles` | même chose pour les rôles |
+| `GET /api/journals/oa-models` | l'énumération est publiée dans le contrat OpenAPI, et le frontend la tient du type généré |
+| `DELETE /api/perimeters/{id}/structures/{structure_id}` | rien — l'interface ajoute une structure à un périmètre sans jamais l'en retirer |
+
+Les cinq lectures sont des candidates à la suppression, à confirmer une par une. Le sixième cas est de nature différente : l'endpoint fonctionne et c'est l'interface qui est incomplète. Une fonctionnalité manquante ne se traite pas en supprimant ce qui l'aurait servie.
 
 ### Phase 2 — Adopter le préfixe par module
 
