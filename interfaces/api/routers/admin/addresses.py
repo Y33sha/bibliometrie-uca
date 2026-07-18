@@ -14,7 +14,6 @@ from application.ports.api.addresses_queries import (
     AddressListResponse,
     AddressStatsResponse,
     CountryOut,
-    CountrySuggestionsResponse,
     StructurePredicate,
     TextPredicate,
 )
@@ -204,15 +203,6 @@ def list_addresses_countries(
         suggest=suggest,
     )
     return queries.addresses_countries(filters=filters, page=page, per_page=per_page)
-
-
-@router.get("/api/addresses/suggest-countries", response_model=CountrySuggestionsResponse)
-def suggest_countries(
-    search: str = Query(""),
-    queries: AddressesQueries = Depends(addresses_queries),
-) -> CountrySuggestionsResponse:
-    """Répartition par pays des adresses correspondant à la recherche, et nombre de celles qui n'en portent aucun."""
-    return queries.suggest_countries(search)
 
 
 @router.post("/api/addresses/{addr_id}/country", response_model=OkResponse)

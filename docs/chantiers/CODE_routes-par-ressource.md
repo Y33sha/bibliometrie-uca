@@ -59,18 +59,10 @@ Ce chantier précède la fin de la relecture d'`interfaces/api/`, pour ne pas re
 
 #### Endpoints sans appelant
 
-Six chemins ne sont appelés par aucun module du frontend. Le contrôle a écarté les faux positifs des chemins composés (`${base}/api/…`, `${endpoint}/entity-label`), qui sont bien consommés.
+Six chemins n'étaient appelés par aucun module du frontend. Le contrôle a écarté les faux positifs des chemins composés (`${base}/api/…`, `${endpoint}/entity-label`), qui sont bien consommés.
 
-| Chemin | Ce qui semble le servir à sa place |
-| --- | --- |
-| `GET /api/stats/years` | la page de statistiques construit ses années autrement |
-| `GET /api/addresses/suggest-countries` | la page pays passe par `/api/addresses/countries` avec le drapeau `suggest` |
-| `GET /api/persons/departments` | les listes lisent les départements dans `/api/persons/facets` |
-| `GET /api/persons/roles` | même chose pour les rôles |
-| `GET /api/journals/oa-models` | l'énumération est publiée dans le contrat OpenAPI, et le frontend la tient du type généré |
-| `DELETE /api/perimeters/{id}/structures/{structure_id}` | rien — l'interface ajoute une structure à un périmètre sans jamais l'en retirer |
-
-Les cinq lectures sont des candidates à la suppression, à confirmer une par une. Le sixième cas est de nature différente : l'endpoint fonctionne et c'est l'interface qui est incomplète. Une fonctionnalité manquante ne se traite pas en supprimant ce qui l'aurait servie.
+- [x] Cinq routes supprimées, avec leurs méthodes de port, leurs implémentations d'adaptateur et leurs tests. `GET /api/stats/years` — la page de statistiques tire ses années de `/api/stats/facets`. `GET /api/addresses/suggest-countries` — la page pays passe par `/api/addresses/countries` avec le drapeau `suggest`. `GET /api/persons/departments` et `/roles` — les deux facettes sont servies par `/api/persons/facets`, qui les porte déjà. `DELETE /api/perimeters/{id}/structures/{structure_id}` — retirer une racine se fait en réécrivant `structure_ids` par `PUT /api/perimeters/{id}`, ce que l'interface fait à chaque édition.
+- [ ] `GET /api/journals/oa-models` **n'est pas mort et n'est pas supprimé** : c'est la bonne source que le frontend contourne. Le modal d'édition des revues code ses trois options en dur dans son gabarit, tandis que le sélecteur voisin du même formulaire itère les valeurs de `/api/journals/types`. La copie a déjà divergé — le domaine dit « Archive / dépôt », le gabarit « Archive/dépôt ». Le correctif est de faire consommer l'endpoint au modal, sur le modèle de son voisin immédiat.
 
 ### Phase 2 — Adopter le préfixe par module
 

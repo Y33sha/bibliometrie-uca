@@ -68,28 +68,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/stats/years": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Available Years
-         * @description Années de publication présentes dans le périmètre, la plus récente d'abord.
-         *
-         *     Alimente le sélecteur d'années des tableaux de bord.
-         */
-        get: operations["available_years_api_stats_years_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/stats/facets": {
         parameters: {
             query?: never;
@@ -550,26 +528,6 @@ export interface paths {
          * @description Liste des adresses pour l'attribution de pays.
          */
         get: operations["list_addresses_countries_api_addresses_countries_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/addresses/suggest-countries": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Suggest Countries
-         * @description Répartition par pays des adresses correspondant à la recherche, et nombre de celles qui n'en portent aucun.
-         */
-        get: operations["suggest_countries_api_addresses_suggest_countries_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1053,46 +1011,6 @@ export interface paths {
          * @description Facettes dynamiques pour la page personnes (scopables à un labo via `lab_id`).
          */
         get: operations["persons_facets_api_persons_facets_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/persons/departments": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List Departments
-         * @description Liste des départements distincts.
-         */
-        get: operations["list_departments_api_persons_departments_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/persons/roles": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List Roles
-         * @description Liste des rôles distincts.
-         */
-        get: operations["list_roles_api_persons_roles_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1998,26 +1916,6 @@ export interface paths {
          */
         post: operations["add_structure_to_perimeter_api_perimeters__perimeter_id__structures_post"];
         delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/perimeters/{perimeter_id}/structures/{structure_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /**
-         * Remove Structure From Perimeter
-         * @description Retire une structure racine du périmètre. N'affecte pas ses sous-structures tant qu'elles sont rattachées à d'autres racines.
-         */
-        delete: operations["remove_structure_from_perimeter_api_perimeters__perimeter_id__structures__structure_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2984,16 +2882,6 @@ export interface components {
             /** Count */
             count: number;
         };
-        /**
-         * CountrySuggestionsResponse
-         * @description Répartition par pays des adresses d'une recherche, et nombre de celles qui n'en portent aucun.
-         */
-        CountrySuggestionsResponse: {
-            /** Suggestions */
-            suggestions: components["schemas"]["CountrySuggestion"][];
-            /** Without Country */
-            without_country: number;
-        };
         /** CreatePersonName */
         CreatePersonName: {
             /** Last Name */
@@ -3032,13 +2920,6 @@ export interface components {
              * @default true
              */
             deleted: boolean;
-        };
-        /** DepartmentCount */
-        DepartmentCount: {
-            /** Department Name */
-            department_name: string;
-            /** Count */
-            count: number;
         };
         /** DetachAuthorships */
         DetachAuthorships: {
@@ -5206,13 +5087,6 @@ export interface components {
             /** Is Confirmed */
             is_confirmed: boolean | null;
         };
-        /** RoleCount */
-        RoleCount: {
-            /** Role Title */
-            role_title: string;
-            /** Count */
-            count: number;
-        };
         /**
          * RunDetail
          * @description Détail d'un run : ses phases et les agrégats de run.
@@ -5852,26 +5726,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OkResponse"];
-                };
-            };
-        };
-    };
-    available_years_api_stats_years_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": number[];
                 };
             };
         };
@@ -6656,37 +6510,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AddressesCountriesResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    suggest_countries_api_addresses_suggest_countries_get: {
-        parameters: {
-            query?: {
-                search?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CountrySuggestionsResponse"];
                 };
             };
             /** @description Validation Error */
@@ -7574,46 +7397,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_departments_api_persons_departments_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DepartmentCount"][];
-                };
-            };
-        };
-    };
-    list_roles_api_persons_roles_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RoleCount"][];
                 };
             };
         };
@@ -8984,38 +8767,6 @@ export interface operations {
                 "application/json": components["schemas"]["AddPerimeterStructure"];
             };
         };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StatusResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    remove_structure_from_perimeter_api_perimeters__perimeter_id__structures__structure_id__delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                perimeter_id: number;
-                structure_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {

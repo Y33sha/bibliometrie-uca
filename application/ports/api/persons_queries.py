@@ -160,16 +160,6 @@ class PersonsFacetsResponse(BaseModel):
     pending_identifiers: YesNoCount
 
 
-class DepartmentCount(BaseModel):
-    department_name: str
-    count: int
-
-
-class RoleCount(BaseModel):
-    role_title: str
-    count: int
-
-
 class PersonsStatsResponse(BaseModel):
     total_persons: int
     linked_persons: int
@@ -447,10 +437,6 @@ class PersonsQueries(Protocol):
     # ── Facettes / listes de référence / stats ─────────────────────
 
     def persons_facets(self, *, filters: FacetFilters) -> PersonsFacetsResponse: ...
-
-    def list_departments(self) -> list[DepartmentCount]: ...
-
-    def list_roles(self) -> list[RoleCount]: ...
 
     def persons_stats(self) -> PersonsStatsResponse: ...
 

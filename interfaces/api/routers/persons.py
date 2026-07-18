@@ -6,7 +6,6 @@ Lectures via le port `PersonsQueries`. Les mutations vivent dans `routers/admin/
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from application.ports.api.persons_queries import (
-    DepartmentCount,
     DirectoryFilters,
     FacetFilters,
     ListFilters,
@@ -20,7 +19,6 @@ from application.ports.api.persons_queries import (
     PersonsQueries,
     PersonsStatsResponse,
     PersonThesesResponse,
-    RoleCount,
 )
 from application.ports.api.subjects_queries import SubjectFrequency
 from interfaces.api.deps import persons_queries
@@ -134,22 +132,6 @@ def persons_facets(
         lab_id=lab_id,
     )
     return queries.persons_facets(filters=filters)
-
-
-@router.get("/api/persons/departments", response_model=list[DepartmentCount])
-def list_departments(
-    queries: PersonsQueries = Depends(persons_queries),
-) -> list[DepartmentCount]:
-    """Liste des départements distincts."""
-    return queries.list_departments()
-
-
-@router.get("/api/persons/roles", response_model=list[RoleCount])
-def list_roles(
-    queries: PersonsQueries = Depends(persons_queries),
-) -> list[RoleCount]:
-    """Liste des rôles distincts."""
-    return queries.list_roles()
 
 
 @router.get("/api/persons/stats", response_model=PersonsStatsResponse)

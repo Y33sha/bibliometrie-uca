@@ -1,6 +1,6 @@
 """Command handlers des écritures API sur les périmètres : frontière transactionnelle de l'agrégat.
 
-`update_perimeter`, `add_structure_to_perimeter` et `remove_structure_from_perimeter` rafraîchissent en plus la clôture matérialisée, dont les racines du périmètre commandent la descente.
+`update_perimeter` et `add_structure_to_perimeter` rafraîchissent en plus la clôture matérialisée, dont les racines du périmètre commandent la descente.
 """
 
 from sqlalchemy import Connection
@@ -68,16 +68,3 @@ def add_structure_to_perimeter(
     repo.refresh_structures()
     conn.commit()
     return outcome
-
-
-def remove_structure_from_perimeter(
-    conn: Connection,
-    perimeter_id: int,
-    structure_id: int,
-    *,
-    repo: PerimeterRepository,
-) -> None:
-    """Retire une structure racine du périmètre."""
-    perimeters_service.remove_structure_from_perimeter(perimeter_id, structure_id, repo=repo)
-    repo.refresh_structures()
-    conn.commit()

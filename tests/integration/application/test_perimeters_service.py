@@ -11,7 +11,6 @@ from application.services.perimeters.core import (
     add_structure_to_perimeter,
     create_perimeter,
     delete_perimeter,
-    remove_structure_from_perimeter,
     update_perimeter,
 )
 from domain.errors import ConflictError, NotFoundError, ValidationError
@@ -115,27 +114,6 @@ class TestAddStructureToPerimeter:
     def test_perimeter_not_found(self, sa_sync_conn, repo):
         with pytest.raises(NotFoundError):
             add_structure_to_perimeter(999999, 1, repo=repo)
-
-
-# ── remove_structure_from_perimeter ────────────────────────────────
-
-
-class TestRemoveStructureFromPerimeter:
-    def test_removes_if_present(self, sa_sync_conn, repo):
-        p = _insert_perimeter_sync(sa_sync_conn, structure_ids=[1, 2, 3])
-        remove_structure_from_perimeter(p, 2, repo=repo)
-        result = sa_sync_conn.execute(
-            text("SELECT structure_ids FROM perimeters WHERE id = :p"), {"p": p}
-        )
-        assert result.scalar_one() == [1, 3]
-
-    def test_idempotent_if_absent(self, sa_sync_conn, repo):
-        p = _insert_perimeter_sync(sa_sync_conn, structure_ids=[1])
-        remove_structure_from_perimeter(p, 999, repo=repo)  # no-op : pas d'erreur
-
-    def test_raises_if_perimeter_not_found(self, sa_sync_conn, repo):
-        with pytest.raises(NotFoundError):
-            remove_structure_from_perimeter(999999, 1, repo=repo)
 
 
 # ── create_perimeter ───────────────────────────────────────────────

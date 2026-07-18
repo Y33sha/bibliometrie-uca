@@ -415,22 +415,3 @@ class TestAddressesCountries:
             filters=AddressCountriesFilters(suggest=True), page=1, per_page=50
         )
         assert res.suggestion_facets is not None
-
-
-class TestSuggestCountries:
-    def test_returns_suggestions_and_without_country(self, sa_sync_conn):
-        _ensure_country(sa_sync_conn, "FR")
-        _create_address(sa_sync_conn, raw_text="With", countries=["FR"])
-        _create_address(sa_sync_conn, raw_text="Without", countries=None)
-
-        res = _q(sa_sync_conn).suggest_countries(search="")
-        assert any(s.code == "fr" for s in res.suggestions)
-        assert res.without_country >= 1
-
-    def test_filters_by_search(self, sa_sync_conn):
-        _ensure_country(sa_sync_conn, "FR")
-        _create_address(sa_sync_conn, raw_text="Match", countries=["FR"])
-        _create_address(sa_sync_conn, raw_text="Nope", countries=["FR"])
-
-        res = _q(sa_sync_conn).suggest_countries(search="Match")
-        assert any(s.code == "fr" for s in res.suggestions)

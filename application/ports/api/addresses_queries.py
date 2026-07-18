@@ -118,13 +118,6 @@ class AddressesCountriesResponse(PaginatedResponse):
     country_facets: list[CountrySuggestion]
 
 
-class CountrySuggestionsResponse(BaseModel):
-    """Répartition par pays des adresses d'une recherche, et nombre de celles qui n'en portent aucun."""
-
-    suggestions: list[CountrySuggestion]
-    without_country: int
-
-
 class AddressStatsResponse(BaseModel):
     """Compteurs d'adresses d'une structure, par état de détection et de validation."""
 
@@ -168,7 +161,5 @@ class AddressesQueries(Protocol):
     def addresses_countries(
         self, *, filters: AddressCountriesFilters, page: int, per_page: int
     ) -> AddressesCountriesResponse: ...
-
-    def suggest_countries(self, search: str) -> CountrySuggestionsResponse: ...
 
     def admin_address_stats(self, structure_id: int) -> AddressStatsResponse: ...

@@ -192,37 +192,6 @@ def persons_facets(conn: Connection, *, filters: FacetFilters) -> dict[str, Any]
     }
 
 
-# ── Listes de référence ──────────────────────────────────────────
-
-
-def list_departments(conn: Connection) -> list[dict[str, Any]]:
-    """Liste des départements distincts."""
-    rows = conn.execute(
-        text("""
-            SELECT department_name, COUNT(*) AS count
-            FROM persons_rh
-            WHERE department_name IS NOT NULL
-            GROUP BY department_name
-            ORDER BY count DESC
-        """)
-    ).all()
-    return [dict(r._mapping) for r in rows]
-
-
-def list_roles(conn: Connection) -> list[dict[str, Any]]:
-    """Liste des rôles distincts."""
-    rows = conn.execute(
-        text("""
-            SELECT role_title, COUNT(*) AS count
-            FROM persons_rh
-            WHERE role_title IS NOT NULL
-            GROUP BY role_title
-            ORDER BY count DESC
-        """)
-    ).all()
-    return [dict(r._mapping) for r in rows]
-
-
 def persons_stats(conn: Connection) -> dict[str, Any]:
     """Statistiques globales personnes."""
     row = conn.execute(

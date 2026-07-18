@@ -96,17 +96,3 @@ def add_structure_to_perimeter(
         conn, perimeter_id, body.structure_id, repo=repo
     )
     return StatusResponse(status=outcome)
-
-
-@router.delete(
-    "/api/perimeters/{perimeter_id}/structures/{structure_id}", response_model=StatusResponse
-)
-def remove_structure_from_perimeter(
-    perimeter_id: int,
-    structure_id: int,
-    conn: Connection = Depends(db_conn),
-    repo: PerimeterRepository = Depends(perimeter_repo),
-) -> StatusResponse:
-    """Retire une structure racine du périmètre. N'affecte pas ses sous-structures tant qu'elles sont rattachées à d'autres racines."""
-    perimeter_commands.remove_structure_from_perimeter(conn, perimeter_id, structure_id, repo=repo)
-    return StatusResponse(status="removed")

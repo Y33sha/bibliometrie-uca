@@ -254,14 +254,6 @@ class TestPersonDirectory:
 
 
 class TestPersonEndpoints:
-    def test_departments_list(self, client):
-        r = client.get("/api/persons/departments")
-        assert r.status_code == 200
-
-    def test_roles_list(self, client):
-        r = client.get("/api/persons/roles")
-        assert r.status_code == 200
-
     def test_stats(self, client):
         r = client.get("/api/persons/stats")
         assert r.status_code == 200

@@ -20,7 +20,6 @@ from application.ports.api.addresses_queries import (
     AddressStructureSummary,
     CountryOut,
     CountrySuggestion,
-    CountrySuggestionsResponse,
 )
 
 # « Reconnue » comme une structure = lien pending (détecté, non revu) ou confirmé.
@@ -368,41 +367,6 @@ class PgAddressesQueries(AddressesQueries):
             suggestion_facets=suggestion_facets,
             country_facets=country_facets,
         )
-
-    def suggest_countries(self, search: str) -> CountrySuggestionsResponse:
-        binds: dict[str, Any] = {}
-        where_clause = ""
-        if search.strip():
-            where_clause = "WHERE unaccent(a.raw_text) ILIKE unaccent(:search)"
-            binds["search"] = f"%{search.strip()}%"
-
-        suggest_where = (
-            where_clause.replace("WHERE", "WHERE a.countries IS NOT NULL AND")
-            if where_clause
-            else "WHERE a.countries IS NOT NULL"
-        )
-        sug_rows = self._conn.execute(
-            text(f"""
-                SELECT lower(c) AS c, COUNT(*) AS cnt
-                FROM addresses a, unnest(a.countries) AS c
-                {suggest_where}
-                GROUP BY lower(c) ORDER BY cnt DESC
-            """),
-            binds,
-        ).all()
-        suggestions = [CountrySuggestion(code=r.c, count=r.cnt) for r in sug_rows]
-
-        no_country_where = (
-            where_clause.replace("WHERE", "WHERE countries IS NULL AND")
-            if where_clause
-            else "WHERE countries IS NULL"
-        )
-        nc_row = self._conn.execute(
-            text(f"SELECT COUNT(*) AS total FROM addresses a {no_country_where}"),
-            binds,
-        ).one()
-
-        return CountrySuggestionsResponse(suggestions=suggestions, without_country=nc_row.total)
 
     def admin_address_stats(self, structure_id: int) -> AddressStatsResponse:
         total_row = self._conn.execute(text("SELECT COUNT(*) AS total FROM addresses")).one()

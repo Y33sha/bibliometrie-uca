@@ -4,7 +4,7 @@ Le package est organisé par thème d'agrégat :
 - `pivot` : `run_pivot` (agrégation générique) et le schéma du registre
 - `collaborations` : `run_collaborations` (décompte des pays étrangers co-affiliés)
 - `entity_facets` : `stats_entity_facet` (facette éditeur/revue contextuelle)
-- `summary` : `available_years`, `stats_facets`
+- `summary` : `stats_facets`
 - `_shared` : périmètre de base, assemblage des filtres et filtre APC partagés par les agrégats.
 
 `PgStatsQueries` agrège ces fonctions sous le port `application.ports.api.stats_queries.StatsQueries`. Les fonctions libres retournent des dicts conformes au shape des DTOs ; la conversion vers Pydantic est faite ici à la sortie, pour garder les fonctions libres réutilisables hors API.
@@ -43,7 +43,6 @@ from infrastructure.queries.api.stats.collaborations import (
 from infrastructure.queries.api.stats.entity_facets import stats_entity_facet as _stats_entity_facet
 from infrastructure.queries.api.stats.pivot import run_pivot as _run_pivot
 from infrastructure.queries.api.stats.summary import (
-    available_years as _available_years,
     stats_facets as _stats_facets,
 )
 from infrastructure.queries.perimeter import get_persons_structure_ids_list
@@ -57,9 +56,6 @@ class PgStatsQueries(StatsQueries):
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
-
-    def available_years(self) -> list[int]:
-        return _available_years(self._conn)
 
     def collaborations(self, *, filters: StatsFilters) -> CollaborationsResponse:
         data = _run_collaborations(

@@ -45,20 +45,6 @@ def add_structure_to_perimeter(
     raise NotFoundError(f"Périmètre {perimeter_id} introuvable")
 
 
-def remove_structure_from_perimeter(
-    perimeter_id: int,
-    structure_id: int,
-    *,
-    repo: PerimeterRepository,
-) -> None:
-    """Retire une structure racine d'un périmètre. Idempotent : retirer une structure absente ne change rien.
-
-    Lève `NotFoundError` si le périmètre n'existe pas.
-    """
-    if not repo.remove_structure_from_perimeter(perimeter_id, structure_id):
-        raise NotFoundError(f"Périmètre {perimeter_id} introuvable")
-
-
 # ── CRUD ──────────────────────────────────────────────────────────
 
 
