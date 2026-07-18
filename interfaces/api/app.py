@@ -43,9 +43,13 @@ configure_root_logging()
 
 from interfaces.api.routers import (  # noqa: E402
     auth,
+    authorships,
+    config,
+    feedback,
     hal_problems,
     journals,
     laboratories,
+    perimeters,
     persons,
     publications,
     publishers,
@@ -54,11 +58,7 @@ from interfaces.api.routers import (  # noqa: E402
 )
 from interfaces.api.routers.admin import (  # noqa: E402
     addresses as admin_addresses,
-    authorships as admin_authorships,
-    feedback as admin_feedback,
-    perimeters as admin_perimeters,
     persons as admin_persons,
-    pipeline_config as admin_pipeline_config,
     pipeline_logs as admin_pipeline_logs,
     pipeline_phase_executions as admin_pipeline_phase_executions,
     structures as admin_structures,
@@ -240,15 +240,15 @@ app.include_router(auth.router)
 app.include_router(stats.router)
 app.include_router(publications.router)
 app.include_router(admin_addresses.router)
-app.include_router(admin_feedback.router)
+app.include_router(feedback.router)
 app.include_router(laboratories.router)
 app.include_router(admin_structures.router)
 app.include_router(persons.router)
 app.include_router(admin_persons.router)
-app.include_router(admin_authorships.router)
+app.include_router(authorships.router)
 app.include_router(hal_problems.router)
-app.include_router(admin_pipeline_config.router)
-app.include_router(admin_perimeters.router)
+app.include_router(config.router)
+app.include_router(perimeters.router)
 app.include_router(publishers.router)
 app.include_router(journals.router)
 app.include_router(admin_pipeline_logs.router)

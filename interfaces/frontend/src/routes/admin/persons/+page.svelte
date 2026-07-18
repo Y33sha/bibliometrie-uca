@@ -345,7 +345,7 @@
   /* ── Orphans ── */
 
   async function loadOrphanCount() {
-    const data = await api<{ total: number }>("/api/admin/orphan-authorships/count");
+    const data = await api<{ total: number }>("/api/authorships/orphans/count");
     orphanCount = data.total;
   }
 

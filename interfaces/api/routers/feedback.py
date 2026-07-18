@@ -1,6 +1,6 @@
-"""Router /api/admin/feedback/* — la qualité de la détection des structures dans les adresses.
+"""Router de la qualité de la détection des structures dans les adresses. Sert `/api/feedback/*`.
 
-Sert le tableau de bord qui confronte la détection automatique aux arbitrages manuels : taux de détection, faux négatifs (adresses confirmées à la main mais non détectées) et faux positifs (adresses détectées mais rejetées à la main).
+Alimente le tableau de bord qui confronte la détection automatique aux arbitrages manuels : taux de détection, faux négatifs (adresses confirmées à la main mais non détectées) et faux positifs (adresses détectées mais rejetées à la main).
 """
 
 from fastapi import APIRouter, Depends, Query
@@ -26,10 +26,10 @@ _FEEDBACK_STRUCTURE_TYPES: tuple[str, ...] = (
 # Code de la structure par défaut (UCA = tenant du projet).
 _DEFAULT_STRUCTURE_CODE = "uca"
 
-router = APIRouter()
+router = APIRouter(prefix="/api/feedback", tags=["feedback"])
 
 
-@router.get("/api/admin/feedback/structures", response_model=FeedbackStructuresResponse)
+@router.get("/structures", response_model=FeedbackStructuresResponse)
 def feedback_structures(
     queries: AdminFeedbackQueries = Depends(admin_feedback_queries),
 ) -> FeedbackStructuresResponse:
@@ -58,7 +58,7 @@ def feedback_structures(
     return FeedbackStructuresResponse(by_type=by_type, default_structure_id=default_id)
 
 
-@router.get("/api/admin/feedback/stats", response_model=FeedbackStats)
+@router.get("/stats", response_model=FeedbackStats)
 def feedback_stats(
     structure_id: int = Query(...),
     queries: AdminFeedbackQueries = Depends(admin_feedback_queries),
@@ -67,7 +67,7 @@ def feedback_stats(
     return queries.feedback_stats(structure_id)
 
 
-@router.get("/api/admin/feedback/false-negatives", response_model=FeedbackAddressesResponse)
+@router.get("/false-negatives", response_model=FeedbackAddressesResponse)
 def feedback_false_negatives(
     structure_id: int = Query(...),
     page: int = Query(1, ge=1),
@@ -81,7 +81,7 @@ def feedback_false_negatives(
     )
 
 
-@router.get("/api/admin/feedback/false-positives", response_model=FeedbackAddressesResponse)
+@router.get("/false-positives", response_model=FeedbackAddressesResponse)
 def feedback_false_positives(
     structure_id: int = Query(...),
     page: int = Query(1, ge=1),

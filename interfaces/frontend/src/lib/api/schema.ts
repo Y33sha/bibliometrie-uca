@@ -598,7 +598,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/admin/feedback/structures": {
+    "/api/feedback/structures": {
         parameters: {
             query?: never;
             header?: never;
@@ -613,7 +613,7 @@ export interface paths {
          *     - seuls les types listés dans `_FEEDBACK_STRUCTURE_TYPES` sont éligibles (universités, organismes, CHU, écoles, labos) ;
          *     - la structure UCA (code = "uca") est sélectionnée par défaut si elle existe, sinon la première structure du premier type non vide.
          */
-        get: operations["feedback_structures_api_admin_feedback_structures_get"];
+        get: operations["feedback_structures_api_feedback_structures_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -622,7 +622,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/admin/feedback/stats": {
+    "/api/feedback/stats": {
         parameters: {
             query?: never;
             header?: never;
@@ -633,7 +633,7 @@ export interface paths {
          * Feedback Stats
          * @description Statistiques de qualité de la détection pour une structure donnée.
          */
-        get: operations["feedback_stats_api_admin_feedback_stats_get"];
+        get: operations["feedback_stats_api_feedback_stats_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -642,7 +642,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/admin/feedback/false-negatives": {
+    "/api/feedback/false-negatives": {
         parameters: {
             query?: never;
             header?: never;
@@ -653,7 +653,7 @@ export interface paths {
          * Feedback False Negatives
          * @description Adresses confirmées manuellement pour cette structure mais non détectées par le script.
          */
-        get: operations["feedback_false_negatives_api_admin_feedback_false_negatives_get"];
+        get: operations["feedback_false_negatives_api_feedback_false_negatives_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -662,7 +662,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/admin/feedback/false-positives": {
+    "/api/feedback/false-positives": {
         parameters: {
             query?: never;
             header?: never;
@@ -673,7 +673,7 @@ export interface paths {
          * Feedback False Positives
          * @description Adresses détectées pour cette structure mais rejetées manuellement.
          */
-        get: operations["feedback_false_positives_api_admin_feedback_false_positives_get"];
+        get: operations["feedback_false_positives_api_feedback_false_positives_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1597,7 +1597,7 @@ export interface paths {
         patch: operations["exclude_authorship_endpoint_api_authorships__authorship_id__exclude_patch"];
         trace?: never;
     };
-    "/api/admin/orphan-authorships/count": {
+    "/api/authorships/orphans/count": {
         parameters: {
             query?: never;
             header?: never;
@@ -1608,7 +1608,7 @@ export interface paths {
          * Orphan Authorships Count
          * @description Nombre d'authorships UCA sans person_id.
          */
-        get: operations["orphan_authorships_count_api_admin_orphan_authorships_count_get"];
+        get: operations["orphan_authorships_count_api_authorships_orphans_count_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1617,7 +1617,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/admin/orphan-authorships": {
+    "/api/authorships/orphans": {
         parameters: {
             query?: never;
             header?: never;
@@ -1628,7 +1628,7 @@ export interface paths {
          * List Orphan Authorships
          * @description Liste les authorships UCA sans person_id.
          */
-        get: operations["list_orphan_authorships_api_admin_orphan_authorships_get"];
+        get: operations["list_orphan_authorships_api_authorships_orphans_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1637,7 +1637,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/admin/orphan-authorships/assign": {
+    "/api/authorships/orphans/assign": {
         parameters: {
             query?: never;
             header?: never;
@@ -1652,14 +1652,14 @@ export interface paths {
          *
          *     Renvoie 400 sans `person_id` ni `create_person`, et sans patronyme à la création (`assign_orphan_authorship`) ; 404 sur une personne ou une signature introuvable ; 409 sur une paire déjà rejetée (`RejectedPairError`), à moins que `force` ne lève le rejet au passage, et sur une signature qui porte déjà une personne (`AuthorshipAlreadyAssignedError`).
          */
-        post: operations["assign_orphan_authorship_endpoint_api_admin_orphan_authorships_assign_post"];
+        post: operations["assign_orphan_authorship_endpoint_api_authorships_orphans_assign_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/admin/orphan-authorships/batch-assign": {
+    "/api/authorships/orphans/batch-assign": {
         parameters: {
             query?: never;
             header?: never;
@@ -1674,7 +1674,7 @@ export interface paths {
          *
          *     Renvoie 404 sur une personne introuvable, 409 (`RejectedPairError`) dès qu'une paire du lot est déjà rejetée, à moins que `force` ne lève les rejets au passage.
          */
-        post: operations["batch_assign_orphan_authorships_api_admin_orphan_authorships_batch_assign_post"];
+        post: operations["batch_assign_orphan_authorships_api_authorships_orphans_batch_assign_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3091,7 +3091,7 @@ export interface components {
         };
         /**
          * FeedbackStats
-         * @description GET /api/admin/feedback/stats : qualité de la détection d'adresses.
+         * @description GET /api/feedback/stats : qualité de la détection d'adresses.
          */
         FeedbackStats: {
             /** Total Reviewed */
@@ -6587,7 +6587,7 @@ export interface operations {
             };
         };
     };
-    feedback_structures_api_admin_feedback_structures_get: {
+    feedback_structures_api_feedback_structures_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -6607,7 +6607,7 @@ export interface operations {
             };
         };
     };
-    feedback_stats_api_admin_feedback_stats_get: {
+    feedback_stats_api_feedback_stats_get: {
         parameters: {
             query: {
                 structure_id: number;
@@ -6638,7 +6638,7 @@ export interface operations {
             };
         };
     };
-    feedback_false_negatives_api_admin_feedback_false_negatives_get: {
+    feedback_false_negatives_api_feedback_false_negatives_get: {
         parameters: {
             query: {
                 structure_id: number;
@@ -6672,7 +6672,7 @@ export interface operations {
             };
         };
     };
-    feedback_false_positives_api_admin_feedback_false_positives_get: {
+    feedback_false_positives_api_feedback_false_positives_get: {
         parameters: {
             query: {
                 structure_id: number;
@@ -8226,7 +8226,7 @@ export interface operations {
             };
         };
     };
-    orphan_authorships_count_api_admin_orphan_authorships_count_get: {
+    orphan_authorships_count_api_authorships_orphans_count_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -8246,7 +8246,7 @@ export interface operations {
             };
         };
     };
-    list_orphan_authorships_api_admin_orphan_authorships_get: {
+    list_orphan_authorships_api_authorships_orphans_get: {
         parameters: {
             query?: {
                 page?: number;
@@ -8279,7 +8279,7 @@ export interface operations {
             };
         };
     };
-    assign_orphan_authorship_endpoint_api_admin_orphan_authorships_assign_post: {
+    assign_orphan_authorship_endpoint_api_authorships_orphans_assign_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -8321,7 +8321,7 @@ export interface operations {
             };
         };
     };
-    batch_assign_orphan_authorships_api_admin_orphan_authorships_batch_assign_post: {
+    batch_assign_orphan_authorships_api_authorships_orphans_batch_assign_post: {
         parameters: {
             query?: never;
             header?: never;

@@ -77,7 +77,7 @@
 		const params = new URLSearchParams({ page: String(currentPage), per_page: '50' });
 		if (search.trim()) params.set('search', search.trim());
 		const data = await api<OrphansResponse>(
-			'/api/admin/orphan-authorships?' + params, { key: 'orphans' }
+			'/api/authorships/orphans?' + params, { key: 'orphans' }
 		);
 		orphans = data.authorships;
 		total = data.total;

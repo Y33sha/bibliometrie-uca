@@ -1,4 +1,4 @@
-"""Router /api/perimeters/* — les ensembles de structures que les phases du pipeline consomment.
+"""Router des ensembles de structures que les phases du pipeline consomment. Sert `/api/perimeters/*`.
 
 Un périmètre (table `perimeters`) nomme des structures racines dans sa colonne `structure_ids`. L'ensemble effectif y ajoute leurs descendants par `est_tutelle_de`, à l'exclusion de `est_partenaire_de` : un partenaire n'entre pas dans le périmètre de sa contrepartie. Cet ensemble est matérialisé dans `perimeter_structures` par `refresh_perimeter_structures` ; les lectures le restituent sans le recalculer.
 """
@@ -27,10 +27,10 @@ from interfaces.api.models import (
     PerimeterCreate,
 )
 
-router = APIRouter()
+router = APIRouter(prefix="/api/perimeters", tags=["perimeters"])
 
 
-@router.get("/api/perimeters", response_model=list[PerimeterOut])
+@router.get("", response_model=list[PerimeterOut])
 def list_perimeters(
     queries: PerimetersAdminQueries = Depends(perimeters_admin_queries),
 ) -> list[PerimeterOut]:
@@ -41,7 +41,7 @@ def list_perimeters(
     return queries.list_perimeters_with_structures()
 
 
-@router.post("/api/perimeters", response_model=CreatedIdResponse)
+@router.post("", response_model=CreatedIdResponse)
 def create_perimeter(
     body: PerimeterCreate,
     conn: Connection = Depends(db_conn),
@@ -54,7 +54,7 @@ def create_perimeter(
     return CreatedIdResponse(id=pid)
 
 
-@router.put("/api/perimeters/{perimeter_id}", response_model=OkResponse)
+@router.put("/{perimeter_id}", response_model=OkResponse)
 def update_perimeter(
     perimeter_id: int,
     body: PerimeterUpdate,
@@ -66,7 +66,7 @@ def update_perimeter(
     return OkResponse()
 
 
-@router.delete("/api/perimeters/{perimeter_id}", response_model=OkResponse)
+@router.delete("/{perimeter_id}", response_model=OkResponse)
 def delete_perimeter(
     perimeter_id: int,
     conn: Connection = Depends(db_conn),

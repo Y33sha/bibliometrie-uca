@@ -31,7 +31,7 @@
   // Libellés d'affichage pour les groupes de structures. L'ordre des
   // clés sert aussi d'ordre d'affichage dans le picker. Les types
   // éligibles et la sélection par défaut (UCA) sont décidés côté API
-  // par /api/admin/feedback/structures.
+  // par /api/feedback/structures.
   const TYPE_LABELS: Record<string, string> = {
     universite: "Universités",
     onr: "Organismes de recherche",
@@ -111,7 +111,7 @@
     // L'API filtre les types éligibles et choisit la structure par
     // défaut (UCA ou fallback selon la règle métier côté backend).
     const data = await api<components["schemas"]["FeedbackStructuresResponse"]>(
-      "/api/admin/feedback/structures"
+      "/api/feedback/structures"
     );
     structures = data.by_type;
     allStructures = Object.values(data.by_type).flat();
@@ -122,13 +122,13 @@
 
   async function loadStats() {
     if (!currentStructureId) return;
-    stats = await api<FeedbackStats>(`/api/admin/feedback/stats?structure_id=${currentStructureId}`, { key: "feedback-stats" });
+    stats = await api<FeedbackStats>(`/api/feedback/stats?structure_id=${currentStructureId}`, { key: "feedback-stats" });
   }
 
   async function loadTable() {
     if (!currentStructureId) return;
     syncUrl();
-    const endpoint = currentTab === "fn" ? "/api/admin/feedback/false-negatives" : "/api/admin/feedback/false-positives";
+    const endpoint = currentTab === "fn" ? "/api/feedback/false-negatives" : "/api/feedback/false-positives";
     const params = new URLSearchParams({
       structure_id: String(currentStructureId),
       page: String(currentPage),

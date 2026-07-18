@@ -1,6 +1,6 @@
-"""Router /api/authorships/* et /api/admin/orphan-authorships/* — les gestes admin sur les signatures.
+"""Router des signatures : exclusion d'une contribution, et revue des signatures orphelines. Sert `/api/authorships/*`.
 
-L'exclusion rejette une contribution au niveau consolidé. Les orphelines sont les signatures du périmètre qu'aucune personne ne porte (`person_id` nul) : le router les liste et les attribue.
+L'exclusion rejette une contribution au niveau consolidé. Les orphelines sont les signatures du périmètre qu'aucune personne ne porte (`person_id` nul) : le router les liste et les attribue, sous `/orphans`.
 """
 
 from fastapi import APIRouter, Depends, Query
@@ -32,13 +32,13 @@ from interfaces.api.models import (
     RejectedPairsResponse,
 )
 
-router = APIRouter()
+router = APIRouter(prefix="/api/authorships", tags=["authorships"])
 
 
 # ── Exclusion d'authorships ──────────────────────────────────────
 
 
-@router.patch("/api/authorships/{authorship_id}/exclude", response_model=OkResponse)
+@router.patch("/{authorship_id}/exclude", response_model=OkResponse)
 def exclude_authorship_endpoint(
     authorship_id: int,
     conn: Connection = Depends(db_conn),
@@ -59,7 +59,7 @@ def exclude_authorship_endpoint(
 # ── Authorships orphelines ───────────────────────────────────────
 
 
-@router.get("/api/admin/orphan-authorships/count", response_model=OrphanCountResponse)
+@router.get("/orphans/count", response_model=OrphanCountResponse)
 def orphan_authorships_count(
     queries: PersonsQueries = Depends(persons_queries),
 ) -> OrphanCountResponse:
@@ -67,7 +67,7 @@ def orphan_authorships_count(
     return queries.orphan_authorships_count()
 
 
-@router.get("/api/admin/orphan-authorships", response_model=OrphanAuthorshipsResponse)
+@router.get("/orphans", response_model=OrphanAuthorshipsResponse)
 def list_orphan_authorships(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=200),
@@ -79,7 +79,7 @@ def list_orphan_authorships(
 
 
 @router.post(
-    "/api/admin/orphan-authorships/assign",
+    "/orphans/assign",
     response_model=OrphanAssignResponse,
     responses={409: {"model": RejectedPairsResponse}},
 )
@@ -115,7 +115,7 @@ def assign_orphan_authorship_endpoint(
 
 
 @router.post(
-    "/api/admin/orphan-authorships/batch-assign",
+    "/orphans/batch-assign",
     response_model=OrphanBatchAssignResponse,
     responses={409: {"model": RejectedPairsResponse}},
 )

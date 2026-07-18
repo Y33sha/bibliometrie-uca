@@ -78,10 +78,10 @@ L'ordre part des modules sans chemin non couvert et sans scission — la mécani
 
 - [x] `subjects` — préfixe posé, chemins et `operationId` inchangés au contrat, `tags` apparus. Le contrat TypeScript régénéré ne bouge pas d'une ligne : `openapi-typescript` n'émet pas les `tags`, qui ne servent que le groupement de la documentation.
 - [x] `publishers`, `hal_problems` — mêmes contrôles, contrat inchangé.
-- [ ] `feedback` — `/api/admin/feedback/*` → `/api/feedback/*`.
+- [x] `feedback` — `/api/admin/feedback/*` → `/api/feedback/*`.
 - [x] `publications` — `admin/publication_duplicates.py` y est fondu (282 lignes réunies, bien en deçà de la taille raisonnable, et les doublons de publications sont voués à disparaître : rien ne justifie un module qui leur soit propre). `/api/admin/duplicates/*` → `/api/publications/duplicates/*`, frontend ajusté dans le même commit. `export-theses.csv` gagne au passage la couverture qui lui manquait.
-- [ ] `authorships` — `/api/admin/orphan-authorships/*` → `/api/authorships/orphans/*`.
-- [ ] `perimeters`, `pipeline_config` → `config`.
+- [x] `authorships` — `/api/admin/orphan-authorships/*` → `/api/authorships/orphans/*`.
+- [x] `perimeters`, et `pipeline_config` renommé `config` d'après la ressource qu'il sert.
 
 **Avec couverture à compléter :**
 
