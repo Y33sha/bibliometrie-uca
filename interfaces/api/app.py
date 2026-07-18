@@ -51,17 +51,18 @@ from interfaces.api.routers import (  # noqa: E402
     hal_problems,
     journals,
     laboratories,
+    name_forms,
     perimeters,
     persons,
     pipeline,
     publications,
     publishers,
     stats,
+    structures,
     subjects,
 )
 from interfaces.api.routers.admin import (  # noqa: E402
     persons as admin_persons,
-    structures as admin_structures,
 )
 
 logger = logging.getLogger(__name__)
@@ -243,7 +244,8 @@ app.include_router(addresses.router)
 app.include_router(countries.router)
 app.include_router(feedback.router)
 app.include_router(laboratories.router)
-app.include_router(admin_structures.router)
+app.include_router(structures.router)
+app.include_router(name_forms.router)
 app.include_router(persons.router)
 app.include_router(admin_persons.router)
 app.include_router(authorships.router)

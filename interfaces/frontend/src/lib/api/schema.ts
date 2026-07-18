@@ -808,6 +808,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/structures/relations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Relation
+         * @description Crée une relation parent-enfant entre deux structures.
+         *
+         *     Idempotent : une relation identique — même parent, même enfant, même type — laisse la table inchangée et rend `{"status": "already_exists"}`.
+         */
+        post: operations["create_relation_api_structures_relations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/structures/relations/{relation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Relation
+         * @description Supprime une relation structure. 404 si l'id n'existe pas.
+         */
+        delete: operations["delete_relation_api_structures_relations__relation_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/structures/{structure_id}": {
         parameters: {
             query?: never;
@@ -840,7 +882,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/structure-relations": {
+    "/api/name-forms": {
         parameters: {
             query?: never;
             header?: never;
@@ -850,33 +892,13 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Create Relation
-         * @description Crée une relation parent-enfant entre deux structures.
+         * Create Name Form
+         * @description Crée une forme de nom pour une structure, utilisée par le matching d'adresses.
          *
-         *     Idempotent : si une relation identique (même parent, child, type) existe, renvoie `{"status": "already_exists"}` au lieu de la recréer.
+         *     `form_text` est normalisé (accents, casse, ponctuation) par le service avant insertion. `is_word_boundary` : le match exige une frontière de mot dans l'adresse brute. `is_excluding` : forme dont la présence retire la structure des résultats. `requires_context_of` : liste d'ids de structures qui doivent elles-mêmes matcher l'adresse pour que cette forme active.
          */
-        post: operations["create_relation_api_structure_relations_post"];
+        post: operations["create_name_form_api_name_forms_post"];
         delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/structure-relations/{relation_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /**
-         * Delete Relation
-         * @description Supprime une relation structure. 404 si l'id n'existe pas.
-         */
-        delete: operations["delete_relation_api_structure_relations__relation_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -905,29 +927,6 @@ export interface paths {
          * @description Supprime une forme de nom. 404 si inconnue.
          */
         delete: operations["delete_name_form_api_name_forms__form_id__delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/name-forms": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Create Name Form
-         * @description Crée une forme de nom pour une structure, utilisée par le matching d'adresses.
-         *
-         *     `form_text` est normalisé (accents, casse, ponctuation) par le service avant insertion. `is_word_boundary` : le match exige une frontière de mot dans l'adresse brute. `is_excluding` : forme à exclure, pas à matcher (anti-pattern).
-         *     `requires_context_of` : liste d'ids de structures qui doivent elles-mêmes matcher l'adresse pour que cette forme active.
-         */
-        post: operations["create_name_form_api_name_forms_post"];
-        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -5335,7 +5334,7 @@ export interface components {
         };
         /**
          * StructureRelationCreateResponse
-         * @description Réponse de POST /api/structure-relations, polymorphe : soit la relation créée, soit `{status: "already_exists"}`.
+         * @description Réponse de POST /api/structures/relations, polymorphe : soit la relation créée, soit `{status: "already_exists"}`.
          */
         StructureRelationCreateResponse: {
             /** Id */
@@ -6920,6 +6919,70 @@ export interface operations {
             };
         };
     };
+    create_relation_api_structures_relations_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RelationCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StructureRelationCreateResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_relation_api_structures_relations__relation_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                relation_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeletedResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_structure_api_structures__structure_id__get: {
         parameters: {
             query?: never;
@@ -7017,7 +7080,7 @@ export interface operations {
             };
         };
     };
-    create_relation_api_structure_relations_post: {
+    create_name_form_api_name_forms_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -7026,7 +7089,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["RelationCreate"];
+                "application/json": components["schemas"]["NameFormCreate"];
             };
         };
         responses: {
@@ -7036,38 +7099,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["StructureRelationCreateResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    delete_relation_api_structure_relations__relation_id__delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                relation_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DeletedResponse"];
+                    "application/json": components["schemas"]["NameFormOut"];
                 };
             };
             /** @description Validation Error */
@@ -7165,39 +7197,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeletedResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    create_name_form_api_name_forms_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["NameFormCreate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["NameFormOut"];
                 };
             };
             /** @description Validation Error */
