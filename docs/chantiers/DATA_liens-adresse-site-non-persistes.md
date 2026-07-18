@@ -8,7 +8,7 @@ La base ne compte qu'un site, « Site clermontois », et il est le premier fourn
 
 La phase `affiliations` ne le distingue en rien des autres structures : elle apparie le texte des adresses aux formes de nom et écrit un lien dans `address_structures` pour chaque appariement, site compris. Le résultat est **58 331 liens vers le site**, deuxième type le plus représenté de la table, tous détectés automatiquement et aucun jamais confirmé ni rejeté — une donnée que rien ne relit, produite par une étape intermédiaire dont seul le résultat importe.
 
-L'API répare ensuite en aval, et mal. Le littéral SQL `structure_type != 'site'` est recopié dans quatre requêtes de trois adaptateurs — `queries/api/addresses.py` (deux fois), `queries/api/admin_feedback.py`, `queries/api/persons/detail.py` — et manque à `get_structure_link`, qui lit pourtant le même lien que ses voisines. Une adresse peut donc rendre un lien vers une structure absente de sa propre liste de structures. La règle « un site n'est pas une affiliation » n'est nommée nulle part, alors que `StructureType.SITE` existe dans le domaine.
+L'API répare ensuite en aval. Le littéral SQL `structure_type != 'site'` est recopié dans quatre requêtes de trois adaptateurs — `queries/api/addresses.py` (deux fois), `queries/api/admin_feedback.py`, `queries/api/persons/detail.py`. Ce sont exactement les quatre lectures qui agrègent toutes les structures d'une adresse ; les autres visent une structure nommée et n'ont donc pas à se garder. La règle « un site n'est pas une affiliation » n'est nommée nulle part, alors que `StructureType.SITE` existe dans le domaine : elle vit en quatre exemplaires, sous forme d'une chaîne de caractères.
 
 ## Décisions
 
@@ -22,8 +22,9 @@ L'API répare ensuite en aval, et mal. Le littéral SQL `structure_type != 'site
 
 ### Phase 1 — Cerner les lecteurs
 
-- [ ] Recenser tout ce qui lit `address_structures` sans exclure les sites : au-delà des quatre requêtes d'API connues, le pipeline lui-même (`in_perimeter`, matview `source_authorship_structures`) et les CLI. Un lecteur qui compterait aujourd'hui les liens site verrait ses résultats changer.
-- [ ] Vérifier que `perimeter_structures` ne retient aucun site, faute de quoi la suppression des liens déplacerait le périmètre.
+- [x] Le périmètre ne retient aucun site : la matview `source_authorship_structures`, jointe à `perimeter_structures`, ne porte aucune ligne de site. `in_perimeter` est donc hors d'atteinte, et la purge ne déplace pas le périmètre.
+- [x] Recensement des lectures. Elles se partagent en deux familles. Celles qui visent une structure nommée — liste et compteurs d'adresses, statistiques et listes de retour de détection, adresses d'un laboratoire, lien d'une adresse à une structure — ne voient un site que si on leur en désigne un, ce qu'aucun appelant ne fait : la structure de travail par défaut est la racine du périmètre. Celles qui agrègent toutes les structures d'une adresse sont les quatre déjà gardées. Aucun compteur ne bouge.
+- [x] Effet de bord relevé : 3 366 adresses n'ont pour seul rattachement qu'un site. La purge les laisse sans aucun lien, ce qui les rend éligibles à `interfaces/cli/maintenance/cleanup_publications_out_of_window.py`, qui supprime les adresses sans signature ni rattachement. Correct — une adresse que plus rien ne relie n'a pas de raison de subsister — mais à constater après purge plutôt qu'à découvrir au prochain passage du script.
 
 ### Phase 2 — Cesser d'écrire
 
@@ -34,8 +35,10 @@ L'API répare ensuite en aval, et mal. Le littéral SQL `structure_type != 'site
 
 - [ ] Migration supprimant les liens `address_structures` dont la structure est de type `site`.
 - [ ] Retrait des quatre conditions `structure_type != 'site'` des adaptateurs de lecture.
-- [ ] Contrôle : `get_structure_link` et `get_address_structures` rendent des vues cohérentes d'une même adresse, ce qui n'était pas le cas.
+- [ ] Contrôle après purge : les adresses devenues sans rattachement sont celles attendues, et leur suppression éventuelle passe par le script de nettoyage existant, non par ce chantier.
+
+**Le site reste une structure.** Il n'est pas une structure de recherche — ni existence institutionnelle, ni publications, ni périmètre — mais il emprunte les mêmes circuits qu'elles : formes de nom, appariement, `requires_context_of`. Lui donner son propre référentiel dupliquerait ce mécanisme pour une entité présente en un seul exemplaire. La valeur `site` demeure donc dans `structure_type`, et c'est la persistance de ses liens qui disparaît.
 
 ## Questions ouvertes
 
-- **Le rangement des sites dans le référentiel des structures.** Un site n'est pas une structure de recherche : il partage la table pour bénéficier du moteur de formes de nom, mais n'a ni existence institutionnelle, ni publications, ni périmètre. Les lectures d'API qui l'excluent le disent déjà, chacune dans son coin. Une fois les liens supprimés, reste à savoir si le type `site` demeure une valeur de `structure_type` ou si le contexte géographique mérite son propre référentiel. Question de modélisation, indépendante de ce chantier et à instruire après lui.
+Aucune.
