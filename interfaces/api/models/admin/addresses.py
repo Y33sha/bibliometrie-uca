@@ -31,7 +31,7 @@ class BatchSetCountry(BaseModel):
     country_code: str
     address_ids: list[int] | None = None
     search: str = ""
-    has_country: str = ""
+    has_country: bool | None = None
     country_code_filter: str = ""
     suggested_country: str = ""
 

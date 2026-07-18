@@ -366,7 +366,7 @@ class TestBatchSetCountryByFilter:
         addr_no = _create_address(sa_sync_conn, raw_text="sans pays")
         addr_yes = _create_address(sa_sync_conn, raw_text="avec pays")
         set_country(addr_yes, ["US"], repo=repo)
-        modified = batch_set_country_by_filter("FR", has_country="no", repo=repo)
+        modified = batch_set_country_by_filter("FR", has_country=False, repo=repo)
         assert addr_no in modified
         assert addr_yes not in modified
 

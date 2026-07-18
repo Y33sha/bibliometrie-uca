@@ -177,7 +177,7 @@ def batch_review(
 @router.get("/countries", response_model=AddressesCountriesResponse)
 def list_addresses_countries(
     search: str = Query(""),
-    has_country: str = Query(""),
+    has_country: bool | None = Query(None),
     country_code: str = Query(""),
     suggested_country: str = Query(""),
     suggest: bool = Query(False),
