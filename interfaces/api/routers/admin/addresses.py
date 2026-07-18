@@ -1,4 +1,4 @@
-"""Router /api/addresses/* et /api/countries — les adresses brutes des sources, leur rattachement aux structures et leurs pays.
+"""Router des adresses brutes des sources, de leur rattachement aux structures et de leurs pays. Sert `/api/addresses/*`, `/api/countries` et `/api/admin/address-stats`.
 
 Les lectures passent par le port `AddressesQueries`, les écritures par les command handlers de `application.services.addresses.commands`, qui committent avant que le router ne rende la main.
 """
@@ -136,7 +136,7 @@ def review_address(
     queries: AddressesQueries = Depends(addresses_queries),
     addr_repo: AddressRepository = Depends(address_repo),
 ) -> AddressReviewResponse:
-    """Confirme, rejette ou reset le lien adresse ↔ structure."""
+    """Confirme, rejette ou réinitialise le lien entre une adresse et une structure."""
     changed = address_commands.review_structure_link(
         conn,
         addr_id,
@@ -163,7 +163,7 @@ def batch_review(
     conn: Connection = Depends(db_conn),
     addr_repo: AddressRepository = Depends(address_repo),
 ) -> BatchUpdatedResponse:
-    """Confirme/rejette/reset en batch."""
+    """Confirme, rejette ou réinitialise le lien d'un lot d'adresses à une même structure."""
     updated, changed = address_commands.batch_review_structure_link(
         conn,
         data.address_ids,
@@ -180,7 +180,7 @@ def batch_review(
 def list_countries(
     queries: AddressesQueries = Depends(addresses_queries),
 ) -> list[CountryOut]:
-    """Liste des pays."""
+    """Référentiel des pays, servant les listes de choix de l'attribution."""
     return queries.list_countries()
 
 
@@ -211,7 +211,7 @@ def suggest_countries(
     search: str = Query(""),
     queries: AddressesQueries = Depends(addresses_queries),
 ) -> CountrySuggestionsResponse:
-    """Distribution des pays des adresses matchantes + compte des sans-pays."""
+    """Répartition par pays des adresses correspondant à la recherche, et nombre de celles qui n'en portent aucun."""
     return queries.suggest_countries(search)
 
 
@@ -265,7 +265,7 @@ def admin_address_stats(
     structure_id: int | None = Query(None),
     queries: AddressesQueries = Depends(addresses_queries),
 ) -> AddressStatsResponse:
-    """Compteurs d'adresses par détection/validation pour une structure."""
+    """Compteurs d'adresses par état de détection et de validation, pour une structure."""
     if structure_id is None:
         structure_id = queries.resolve_default_structure_id()
     return queries.admin_address_stats(structure_id)

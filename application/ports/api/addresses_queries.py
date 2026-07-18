@@ -13,7 +13,7 @@ from application.ports.api._common import PaginatedResponse
 
 @dataclass(frozen=True, slots=True)
 class TextPredicate:
-    """Filtre texte sur `raw_text`. `mode` ∈ {contains, not_contains}."""
+    """Filtre sur le texte brut de l'adresse. `mode` ∈ {contains, not_contains}."""
 
     mode: str
     term: str
@@ -23,10 +23,7 @@ class TextPredicate:
 class StructurePredicate:
     """Filtre « structure reconnue » multi-structures.
 
-    `operator` ∈ {recognized, not_recognized}. Sémantique au sein du prédicat :
-    `recognized` = reconnue comme **au moins une** des `structure_ids` (OR) ;
-    `not_recognized` = reconnue comme **aucune** d'elles. « Reconnue » = lien
-    pending ou confirmé (cf. `_RECOGNIZED_LINK` dans l'adapter).
+    `operator` ∈ {recognized, not_recognized}. `recognized` retient les adresses reconnues comme au moins une des `structure_ids`, `not_recognized` celles qui ne le sont comme aucune d'elles. Une adresse est reconnue comme une structure dès que le lien existe, qu'il soit en attente de validation ou confirmé.
     """
 
     operator: str
@@ -77,7 +74,7 @@ class AddressOut(BaseModel):
 class AddressListResponse(PaginatedResponse):
     """Réponse paginée de `/api/addresses`.
 
-    `requires_search=True` quand le caller utilise un filtre trop large (no/all + pas de search) et que le serveur a renvoyé une liste vide par garde-fou.
+    `requires_search=True` signale que le garde-fou du router a court-circuité la lecture et rendu une liste vide : la combinaison de filtres demandée porte sur toute la base plutôt que sur une structure, faute d'un prédicat de texte ou de structure pour la réduire.
     """
 
     addresses: list[AddressOut]
@@ -122,14 +119,14 @@ class AddressesCountriesResponse(PaginatedResponse):
 
 
 class CountrySuggestionsResponse(BaseModel):
-    """GET /api/addresses/suggest-countries (admin)."""
+    """Répartition par pays des adresses d'une recherche, et nombre de celles qui n'en portent aucun."""
 
     suggestions: list[CountrySuggestion]
     without_country: int
 
 
 class AddressStatsResponse(BaseModel):
-    """GET /api/admin/address-stats."""
+    """Compteurs d'adresses d'une structure, par état de détection et de validation."""
 
     total: int
     detected: int
@@ -142,7 +139,7 @@ class AddressStatsResponse(BaseModel):
 
 
 class AddressesQueries(Protocol):
-    """Lectures sync sur les adresses + pays."""
+    """Lectures sur les adresses et sur le référentiel des pays."""
 
     def resolve_default_structure_id(self) -> int: ...
 
@@ -163,7 +160,7 @@ class AddressesQueries(Protocol):
 
     def get_address_structures(self, addr_id: int) -> list[AddressStructureSummary]: ...
 
-    # Les deux champs `is_confirmed` (Optional bool) et `is_detected` (bool) suffisent au router pour assembler la réponse review ; un mini-DTO serait surdimensionné. `dict[str, Any]` accepté ici en frontière.
+    # Le dictionnaire porte `is_confirmed` (`bool | None`) et `is_detected` (`bool`).
     def get_structure_link(self, addr_id: int, structure_id: int) -> dict[str, Any] | None: ...
 
     def list_countries(self) -> list[CountryOut]: ...
