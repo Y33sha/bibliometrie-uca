@@ -74,9 +74,11 @@ class AddressMatcher:
         return matched
 
     def resolve(self, text_normalized: str) -> list[StructureMatch]:
-        """Résout une adresse normalisée : structures reconnues et forme à l'origine.
+        """Résout une adresse normalisée : affiliations reconnues et forme à l'origine.
 
         Pour chaque structure, la première forme par `id` qui matche l'emporte.
+
+        Les structures dont le type ne vaut pas affiliation participent à l'arbitrage sans figurer au résultat : elles entrent dans `structs_matched`, donc satisfont le `requires_context_of` des formes qui les invoquent, mais ne produisent aucun rattachement.
         """
         matched_ids = self._matched_form_ids(text_normalized)
         if not matched_ids:
@@ -90,6 +92,8 @@ class AddressMatcher:
         for f in sorted(matched, key=lambda f: f.id):
             sid = f.structure_id
             if sid in seen or sid in excluded or f.is_excluding:
+                continue
+            if not f.structure_type.is_affiliation:
                 continue
             ctx = f.requires_context_of
             if ctx and not any(cid in structs_matched for cid in ctx):

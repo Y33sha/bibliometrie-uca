@@ -31,6 +31,14 @@ class StructureType(StrEnum):
     ADMIN = "admin"
     AUTRE = "autre"
 
+    @property
+    def is_affiliation(self) -> bool:
+        """Vrai si un rattachement à une structure de ce type constitue une affiliation.
+
+        Un site porte les formes de nom d'un lieu — communes, campus, codes postaux — pour servir de contexte de reconnaissance à d'autres structures, via `structure_name_forms.requires_context_of`. Une adresse qui le mentionne atteste d'un lieu, non d'un rattachement institutionnel : le site est un instrument du matching, jamais son résultat.
+        """
+        return self is not StructureType.SITE
+
 
 @dataclass(slots=True)
 class Structure:

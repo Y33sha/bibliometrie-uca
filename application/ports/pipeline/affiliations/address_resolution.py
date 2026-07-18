@@ -7,12 +7,15 @@ from typing import NamedTuple, Protocol
 
 from sqlalchemy import Connection
 
+from domain.structures.structure import StructureType
+
 
 class StructureNameForm(NamedTuple):
     """Forme normalisée d'une structure consommée par le matching adresses → structures.
 
     `requires_context_of` : liste des structure_ids dont au moins une forme doit aussi matcher pour valider cette forme (anti-faux-positifs cross-établissement : un code de laboratoire ambigu n'est retenu que si son université de tutelle matche la même adresse). `None` ou liste vide = pas de contexte requis.
     `is_excluding` : si TRUE et que la forme matche, retire la structure des résultats même si d'autres formes la matchent.
+    `structure_type` : type de la structure portant la forme. Détermine si un appariement vaut affiliation à retenir ou seulement contexte de reconnaissance (`StructureType.is_affiliation`).
     """
 
     id: int
@@ -21,6 +24,7 @@ class StructureNameForm(NamedTuple):
     is_word_boundary: bool
     requires_context_of: list[int] | None
     is_excluding: bool
+    structure_type: StructureType
 
 
 class KeptPair(NamedTuple):

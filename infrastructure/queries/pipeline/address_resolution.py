@@ -13,15 +13,18 @@ from application.ports.pipeline.affiliations.address_resolution import (
     KeptPair,
     StructureNameForm,
 )
+from domain.structures.structure import StructureType
 
 
 def load_name_forms(conn: Connection) -> list[StructureNameForm]:
-    """Charge toutes les formes de `structure_name_forms`, triées par `id`."""
+    """Charge toutes les formes de `structure_name_forms`, triées par `id`, avec le type de leur structure."""
     rows = conn.execute(
         text("""
             SELECT nf.id, nf.structure_id, nf.form_text,
-                   nf.is_word_boundary, nf.requires_context_of, nf.is_excluding
+                   nf.is_word_boundary, nf.requires_context_of, nf.is_excluding,
+                   s.structure_type::text AS structure_type
             FROM structure_name_forms nf
+            JOIN structures s ON s.id = nf.structure_id
             ORDER BY nf.id
         """)
     ).all()
@@ -33,6 +36,7 @@ def load_name_forms(conn: Connection) -> list[StructureNameForm]:
             is_word_boundary=r.is_word_boundary,
             requires_context_of=r.requires_context_of,
             is_excluding=r.is_excluding,
+            structure_type=StructureType(r.structure_type),
         )
         for r in rows
     ]
