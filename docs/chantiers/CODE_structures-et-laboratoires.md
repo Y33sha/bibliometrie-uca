@@ -41,7 +41,7 @@ Les lectures se rejoignent sous `/api/structures/*`, qui portent l'entité :
 - `/api/structures/{id}/addresses`, `/subjects`, `/dashboard` — les trois sous-ressources, telles quelles.
 - `/api/structures` — la liste, avec ses filtres : type, texte, et le périmètre que `/api/laboratories` applique aujourd'hui.
 
-`admin/structures.py` ne garde que les écritures. `laboratories.py`, son port, son adapter et ses modèles disparaissent ; le frontend garde sa route `/laboratories`, qui interroge la liste filtrée.
+`structures.py` accueille ces lectures auprès de ses écritures. `laboratories.py`, son port, son adapter et ses modèles disparaissent ; le frontend garde sa route `/laboratories`, qui interroge la liste filtrée.
 
 **Le détail réunit les deux projections plutôt que d'en garder deux.** Les formes de nom intéressent l'admin, le nombre de thèses la page publique ; aucun des deux ne coûte assez pour justifier deux endpoints. À vérifier avant de trancher : le coût du comptage de thèses sur une université.
 
@@ -49,8 +49,10 @@ Les lectures se rejoignent sous `/api/structures/*`, qui portent l'entité :
 
 ### Phase 1 — inventaire
 
-- [ ] Recenser les appels du frontend aux deux familles de routes, et ce que chaque page consomme réellement du détail.
-- [ ] Mesurer le comptage de thèses et le tableau de bord sur les trois universités : la page publique n'ouvre aujourd'hui que des laboratoires.
+- [x] Appels du frontend. `/api/laboratories` sert deux pages et rien d'autre : la liste `/laboratories`, et la fiche `/laboratories/[id]` qui consomme les quatre lectures — détail, adresses, tableau de bord, sujets. `/api/structures` sert trois pages d'administration (liste des structures, fiche d'une structure, sélecteur de périmètre dans la configuration) et le sélecteur de structure de la page des adresses ; ses écritures passent par `lib/api/structures.ts`. Aucune page n'appelle les deux familles.
+- [x] Coût sur une université. Il suit le volume de signatures, non le type : sur l'Université Clermont Auvergne (141 442 signatures), le détail répond en 286 ms, le tableau de bord en 1 135 ms, les sujets en 408 ms — contre 86, 598 et 119 ms sur le plus gros laboratoire (30 206 signatures). Le comptage de thèses seul y prend 88 ms, moins que sur un laboratoire moyen. Rien n'y fait obstacle : la lenteur du tableau de bord est proportionnelle au volume et préexiste à toute fusion.
+
+  Le découpage des routes a bougé depuis la rédaction : `interfaces/api/routers/structures.py` porte lectures et écritures, `name_forms.py` a pris les formes de nom, et le dossier `admin/` n'existe plus.
 
 ### Phase 2 — les lectures rejoignent `/api/structures`
 
