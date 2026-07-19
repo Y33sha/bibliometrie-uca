@@ -1,8 +1,8 @@
-"""Tests d'intégration pour `infrastructure.queries.api.laboratories`."""
+"""Tests d'intégration des lectures de structure servant la page publique des laboratoires."""
 
 from sqlalchemy import text
 
-from infrastructure.queries.api.laboratories import PgLaboratoriesQueries
+from infrastructure.queries.api.structures import PgStructuresQueries
 from infrastructure.queries.perimeter import refresh_perimeter_structures
 from tests.integration.helpers.structures import add_authorship_structure
 
@@ -82,7 +82,9 @@ class TestListLaboratories:
     def test_lists_labos_in_perimeter(self, sa_sync_conn):
         lab = _create_structure(sa_sync_conn, code="LAB-1", name="Lab 1")
         _setup_perimeter(sa_sync_conn, [lab])
-        labs = PgLaboratoriesQueries(sa_sync_conn).list_laboratories()
+        labs = PgStructuresQueries(sa_sync_conn).list_structures(
+            types=["labo"], search="", in_perimeter=True
+        )
         ids = [lab_.id for lab_ in labs]
         assert lab in ids
 
@@ -90,42 +92,62 @@ class TestListLaboratories:
         # La racine de périmètre (université) n'est plus masquée : elle figure dans les tutelles.
         lab = _create_structure(sa_sync_conn, code="LAB-2")
         root = _setup_perimeter(sa_sync_conn, [lab])
-        labs = PgLaboratoriesQueries(sa_sync_conn).list_laboratories()
+        labs = PgStructuresQueries(sa_sync_conn).list_structures(
+            types=["labo"], search="", in_perimeter=True
+        )
         lab_row = next(lab_ for lab_ in labs if lab_.id == lab)
         tutelles_ids = [t.id for t in (lab_row.tutelles or [])]
         assert root in tutelles_ids
 
-    def test_display_types_configurable(self, sa_sync_conn):
-        # Les types affichés suivent la config `laboratories_display_types`.
+    def test_filters_on_the_types_asked_for(self, sa_sync_conn):
+        """Les types viennent de l'appelant : la page publique y met ceux que sa configuration lui donne."""
         conn = sa_sync_conn
         lab = _create_structure(conn, code="LAB-D", type_="labo")
         team = _create_structure(conn, code="TEAM-D", type_="equipe")
         _setup_perimeter(conn, [lab, team])
-        q = PgLaboratoriesQueries(conn)
+        q = PgStructuresQueries(conn)
 
-        # Défaut (posé par la migration) : ['labo'] → seul le labo apparaît.
-        ids = {row.id for row in q.list_laboratories()}
+        ids = {r.id for r in q.list_structures(types=["labo"], search="", in_perimeter=True)}
         assert lab in ids
         assert team not in ids
 
-        # Ajouter 'equipe' à la config → l'équipe apparaît.
-        conn.execute(
-            text(
-                'UPDATE config SET value = \'["labo", "equipe"]\' '
-                "WHERE key = 'laboratories_display_types'"
+        both = {
+            r.id for r in q.list_structures(types=["labo", "equipe"], search="", in_perimeter=True)
+        }
+        assert {lab, team} <= both
+
+    def test_without_types_keeps_every_type_of_the_perimeter(self, sa_sync_conn):
+        conn = sa_sync_conn
+        lab = _create_structure(conn, code="LAB-N", type_="labo")
+        team = _create_structure(conn, code="TEAM-N", type_="equipe")
+        _setup_perimeter(conn, [lab, team])
+        ids = {
+            r.id
+            for r in PgStructuresQueries(conn).list_structures(
+                types=[], search="", in_perimeter=True
             )
-        )
-        ids2 = {row.id for row in q.list_laboratories()}
-        assert {lab, team} <= ids2
+        }
+        assert {lab, team} <= ids
+
+    def test_without_perimeter_keeps_structures_outside_it(self, sa_sync_conn):
+        conn = sa_sync_conn
+        outside = _create_structure(conn, code="LAB-OUT", type_="labo")
+        ids = {
+            r.id
+            for r in PgStructuresQueries(conn).list_structures(
+                types=["labo"], search="", in_perimeter=False
+            )
+        }
+        assert outside in ids
 
 
 class TestGetLaboratory:
     def test_returns_none_for_missing(self, sa_sync_conn):
-        assert PgLaboratoriesQueries(sa_sync_conn).get_laboratory(999_999) is None
+        assert PgStructuresQueries(sa_sync_conn).get_structure_detail(999_999) is None
 
     def test_returns_full_profile(self, sa_sync_conn):
         lab = _create_structure(sa_sync_conn, code="LAB", name="Le labo", hal_collection="LAB-COL")
-        res = PgLaboratoriesQueries(sa_sync_conn).get_laboratory(lab)
+        res = PgStructuresQueries(sa_sync_conn).get_structure_detail(lab)
         assert res is not None
         assert res.structure.code == "LAB"
         assert res.structure.hal_collection == "LAB-COL"
@@ -148,7 +170,7 @@ class TestGetLaboratoryAddresses:
             {"a": addr, "s": lab},
         )
 
-        res = PgLaboratoriesQueries(sa_sync_conn).get_laboratory_addresses(lab, page=1, per_page=50)
+        res = PgStructuresQueries(sa_sync_conn).get_structure_addresses(lab, page=1, per_page=50)
         ids = [a.id for a in res.addresses]
         assert addr in ids
 
@@ -164,7 +186,7 @@ class TestGetLaboratoryAddresses:
             ),
             {"a": addr, "s": lab},
         )
-        res = PgLaboratoriesQueries(sa_sync_conn).get_laboratory_addresses(lab, page=1, per_page=50)
+        res = PgStructuresQueries(sa_sync_conn).get_structure_addresses(lab, page=1, per_page=50)
         ids = [a.id for a in res.addresses]
         assert addr not in ids
 
@@ -172,7 +194,7 @@ class TestGetLaboratoryAddresses:
 class TestGetLaboratoryDashboard:
     def test_returns_structure_even_when_empty(self, sa_sync_conn):
         lab = _create_structure(sa_sync_conn, code="LAB")
-        res = PgLaboratoriesQueries(sa_sync_conn).get_laboratory_dashboard(lab)
+        res = PgStructuresQueries(sa_sync_conn).get_structure_dashboard(lab)
         assert res.pubs_by_year == []
         assert res.oa.total == 0
         assert res.collab.total_articles == 0
@@ -200,7 +222,7 @@ class TestGetLaboratoryDashboard:
         ).scalar_one()
         add_authorship_structure(sa_sync_conn, aid, lab)
 
-        res = PgLaboratoriesQueries(sa_sync_conn).get_laboratory_dashboard(lab)
+        res = PgStructuresQueries(sa_sync_conn).get_structure_dashboard(lab)
         assert res.oa.open_access == 1
         assert res.collab.international == 1
         assert any(c.code == "us" for c in res.top_countries)
@@ -226,7 +248,7 @@ class TestGetLaboratoryDashboard:
         ).scalar_one()
         add_authorship_structure(sa_sync_conn, aid, lab)
 
-        res = PgLaboratoriesQueries(sa_sync_conn).get_laboratory_dashboard(lab)
+        res = PgStructuresQueries(sa_sync_conn).get_structure_dashboard(lab)
         assert res.collab.total_articles == 1
         assert res.collab.international == 0
         assert res.collab.domestic == 1
@@ -288,7 +310,7 @@ class TestGetLaboratorySubjects:
             _link(p, ai)
         _link(p1, bio)
 
-        res = PgLaboratoriesQueries(sa_sync_conn).get_laboratory_subjects(lab, limit=10)
+        res = PgStructuresQueries(sa_sync_conn).get_structure_subjects(lab, limit=10)
         assert len(res) == 2
         assert res[0].label == "AI"
         assert res[0].count == 3

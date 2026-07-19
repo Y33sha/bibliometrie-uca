@@ -19,11 +19,11 @@
 
 	// --- Types ---
 	import type { components } from '$lib/api/schema';
-	type Structure = components['schemas']['LabStructureCore'];
-	type RelatedStructure = components['schemas']['LabRelatedStructure'];
-	type LabProfile = components['schemas']['LaboratoryDetailResponse'];
-	type LabAddress = components['schemas']['LabAddressOut'];
-	type AddressesResponse = components['schemas']['LaboratoryAddressesResponse'];
+	type Structure = components['schemas']['StructureOut'];
+	type RelatedStructure = components['schemas']['RelatedStructureOut'];
+	type LabProfile = components['schemas']['StructureDetailResponse'];
+	type LabAddress = components['schemas']['StructureAddressOut'];
+	type AddressesResponse = components['schemas']['StructureAddressesResponse'];
 
 	// --- State ---
 	let lab: Structure | null = $state(null);
@@ -94,7 +94,7 @@
 			per_page: '50'
 		});
 		const data = await api<AddressesResponse>(
-			`/api/laboratories/${labId}/addresses?${params}`, { key: 'lab-addresses' }
+			`/api/structures/${labId}/addresses?${params}`, { key: 'lab-addresses' }
 		);
 		addresses = data.addresses;
 		addrPages = data.pages;
@@ -109,8 +109,8 @@
 				oa: { open_access: number; embargoed: number; closed: number; unknown: number; total: number };
 				collab: { total_articles: number; international: number; domestic: number };
 				top_countries: { code: string; name: string; count: number }[];
-			}>(`/api/laboratories/${labId}/dashboard`, { key: 'lab-dashboard' }),
-			api<SubjectFrequency[]>(`/api/laboratories/${labId}/subjects?limit=30`, {
+			}>(`/api/structures/${labId}/dashboard`, { key: 'lab-dashboard' }),
+			api<SubjectFrequency[]>(`/api/structures/${labId}/subjects?limit=30`, {
 				key: 'lab-subjects',
 			}),
 		]);
@@ -138,7 +138,7 @@
 		if (restored.addrPage) addrPage = restored.addrPage as number;
 
 		try {
-			const profileData = await api<LabProfile>(`/api/laboratories/${labId}`);
+			const profileData = await api<LabProfile>(`/api/structures/${labId}`);
 			lab = profileData.structure;
 			parents = profileData.parents;
 			children = profileData.children;

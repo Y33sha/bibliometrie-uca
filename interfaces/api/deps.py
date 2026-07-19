@@ -16,7 +16,6 @@ from application.ports.api.admin_feedback_queries import AdminFeedbackQueries
 from application.ports.api.config_queries import ConfigQueries
 from application.ports.api.hal_problems_queries import HalProblemsQueries
 from application.ports.api.journals_queries import JournalQueries
-from application.ports.api.laboratories_queries import LaboratoriesQueries
 from application.ports.api.perimeters_queries import PerimetersAdminQueries
 from application.ports.api.persons_queries import PersonsQueries
 from application.ports.api.pipeline_phase_executions_queries import PhaseExecutionsQueries
@@ -46,7 +45,6 @@ from infrastructure.queries.api.addresses import PgAddressesQueries
 from infrastructure.queries.api.admin_feedback import PgAdminFeedbackQueries
 from infrastructure.queries.api.hal_problems import PgHalProblemsQueries
 from infrastructure.queries.api.journals import PgJournalQueries
-from infrastructure.queries.api.laboratories import PgLaboratoriesQueries
 from infrastructure.queries.api.persons import PgPersonsQueries
 from infrastructure.queries.api.pipeline_phase_executions import PgPhaseExecutionsQueries
 from infrastructure.queries.api.publication_duplicates import PgPublicationDuplicatesQueries
@@ -84,6 +82,15 @@ def get_admin_user() -> str:
     Exposé en `Depends(...)` pour que les routers n'importent pas `infrastructure.settings` directement (règle 4 de `docs/architecture/01-vue-d-ensemble.md`, tenue par un contrat import-linter).
     """
     return settings.admin_user
+
+
+def current_admin_user(request: Request) -> str | None:
+    """Utilisateur porté par la session en cours, ou `None` sans session valide.
+
+    Sert les lectures dont le contenu dépend de l'appelant sans lui être interdit — la configuration, dont une part est publique et le reste réservé.
+    """
+    token = request.cookies.get("session")
+    return read_session(token) if token else None
 
 
 def require_admin(request: Request) -> str:
@@ -182,8 +189,6 @@ def publisher_repo(conn: Connection = Depends(db_conn)) -> PublisherRepository:
     return publisher_repository(conn)
 
 
-def laboratories_queries(conn: Connection = Depends(db_conn)) -> LaboratoriesQueries:
-    return PgLaboratoriesQueries(conn)
 
 
 def perimeter_repo(conn: Connection = Depends(db_conn)) -> PerimeterRepository:

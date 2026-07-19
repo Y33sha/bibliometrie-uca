@@ -59,14 +59,14 @@ class TestPersons:
 
 class TestLaboratories:
     def test_list(self, client):
-        r = client.get("/api/laboratories")
+        r = client.get("/api/structures", params={"in_perimeter": "true", "type": "labo"})
         assert r.status_code == 200
         data = r.json()
         assert isinstance(data, list)
 
     def test_not_found(self, client):
-        r = client.get("/api/laboratories/999999999")
-        assert r.status_code in (404, 500)
+        r = client.get("/api/structures/999999999")
+        assert r.status_code == 404
 
 
 # ── Auth ────────────────────────────────────────────────────────
@@ -105,10 +105,21 @@ class TestConfig:
         r = auth_client.get("/api/config")
         assert r.status_code == 200
 
-    def test_read_requires_auth(self, client):
-        """La config porte les identifiants d'accès aux sources : sa lecture exige une session."""
+    def test_read_without_session_hides_the_credentials(self, client):
+        """La config porte les identifiants d'accès aux sources : sans session, seule la liste blanche sort."""
         r = client.get("/api/config")
-        assert r.status_code == 401
+        assert r.status_code == 200
+        keys = {item["key"] for item in r.json()}
+        assert "laboratories_display_types" in keys
+        assert keys.isdisjoint(
+            {
+                "openalex_api_key",
+                "wos_api_key",
+                "scanr_username",
+                "scanr_password",
+                "polite_pool_email",
+            }
+        )
 
     def test_write_requires_auth(self, client):
         """Les écritures config sans session renvoient 401."""

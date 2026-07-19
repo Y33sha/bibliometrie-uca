@@ -7,7 +7,8 @@
 	import FacetDropdown from "$lib/components/FacetDropdown.svelte";
 
 	import type { components } from "$lib/api/schema";
-	type Lab = components["schemas"]["LaboratoryListItem"];
+	type Lab = components["schemas"]["StructureListItem"];
+	type ConfigItem = components["schemas"]["ConfigItem"];
 
 	let labs: Lab[] = $state([]);
 	let search = $state("");
@@ -83,7 +84,14 @@
 	}
 
 	onMount(async () => {
-		labs = await api<Lab[]>("/api/laboratories");
+		// Les types affiches suivent la configuration : la page demande ce qu'elle montre,
+		// et la route des structures ne filtre rien d'elle-meme.
+		const config = await api<ConfigItem[]>("/api/config");
+		const displayTypes = (config.find((c) => c.key === "laboratories_display_types")?.value ?? [
+			"labo"
+		]) as string[];
+		const params = new URLSearchParams({ in_perimeter: "true", type: displayTypes.join(",") });
+		labs = await api<Lab[]>(`/api/structures?${params}`);
 	});
 </script>
 

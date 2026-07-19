@@ -10,7 +10,11 @@ import logging
 
 from sqlalchemy import Connection, select, text, update
 
-from application.ports.api.config_queries import ConfigItem, ConfigQueries
+from application.ports.api.config_queries import (
+    PUBLIC_CONFIG_KEYS,
+    ConfigItem,
+    ConfigQueries,
+)
 from application.ports.config import ConfigStore
 from domain.types import JsonValue
 from infrastructure.db.tables import config
@@ -24,12 +28,18 @@ class PgConfigQueries(ConfigQueries):
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
 
-    def list_config(self) -> list[ConfigItem]:
-        """Tous les paramètres applicatifs triés par clé."""
-        result = self._conn.execute(
-            select(config.c.key, config.c.value, config.c.description).order_by(config.c.key)
-        )
-        return [ConfigItem(key=r.key, value=r.value, description=r.description) for r in result]
+    def list_config(self, *, public_only: bool) -> list[ConfigItem]:
+        """Paramètres applicatifs triés par clé.
+
+        `public_only` restreint à `PUBLIC_CONFIG_KEYS` : la table porte aussi les clés d'API et les comptes de service des sources, qu'une lecture sans session ne doit pas rendre.
+        """
+        stmt = select(config.c.key, config.c.value, config.c.description).order_by(config.c.key)
+        if public_only:
+            stmt = stmt.where(config.c.key.in_(PUBLIC_CONFIG_KEYS))
+        return [
+            ConfigItem(key=r.key, value=r.value, description=r.description)
+            for r in self._conn.execute(stmt)
+        ]
 
 
 class PgConfig(ConfigStore):

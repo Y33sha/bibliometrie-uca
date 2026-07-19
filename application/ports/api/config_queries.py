@@ -23,7 +23,22 @@ class ConfigItem(BaseModel):
     description: str | None
 
 
+# Clés que la lecture publique de la configuration rend. Liste blanche : une clé qu'on
+# n'y inscrit pas reste réservée à une session, ce qui protège par défaut les clés
+# d'API et les comptes de service que la table porte aussi.
+PUBLIC_CONFIG_KEYS: frozenset[str] = frozenset(
+    {
+        "api_base_urls",
+        "hal_portals",
+        "laboratories_display_types",
+        "perimeter_extraction",
+        "perimeter_persons",
+        "pipeline_start_year_full",
+    }
+)
+
+
 class ConfigQueries(Protocol):
     """Lectures pour /api/config/*."""
 
-    def list_config(self) -> list[ConfigItem]: ...
+    def list_config(self, *, public_only: bool) -> list[ConfigItem]: ...
