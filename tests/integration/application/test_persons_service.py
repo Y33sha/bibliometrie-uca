@@ -924,10 +924,6 @@ class TestUpdateNameFormStatus:
 
 
 class TestAssignOrphanAuthorship:
-    def test_raises_on_invalid_source(self, sa_sync_conn, repo, authorship_repo):
-        with pytest.raises(ValidationError, match="Source inconnue"):
-            assign_orphan_authorship(1, "invalid", 1, repo=repo, authorship_repo=authorship_repo)
-
     def test_raises_if_already_assigned(self, sa_sync_conn, repo, authorship_repo):
         """Une signature déjà rattachée n'est pas reprise : le refus nomme la détentrice."""
         _setup_uca(sa_sync_conn)
@@ -938,9 +934,7 @@ class TestAssignOrphanAuthorship:
         sa_id = _insert_source_authorship(sa_sync_conn, sp_id, person_id=other_id)
 
         with pytest.raises(AuthorshipAlreadyAssignedError) as exc:
-            assign_orphan_authorship(
-                person_id, "hal", sa_id, repo=repo, authorship_repo=authorship_repo
-            )
+            assign_orphan_authorship(person_id, sa_id, repo=repo, authorship_repo=authorship_repo)
         assert exc.value.owner_person_id == other_id
         assert (
             _scalar(sa_sync_conn, "SELECT person_id FROM source_authorships WHERE id = :i", i=sa_id)
@@ -950,9 +944,7 @@ class TestAssignOrphanAuthorship:
     def test_raises_if_source_authorship_missing(self, sa_sync_conn, repo, authorship_repo):
         person_id = _insert_person(sa_sync_conn)
         with pytest.raises(NotFoundError):
-            assign_orphan_authorship(
-                person_id, "hal", 999999, repo=repo, authorship_repo=authorship_repo
-            )
+            assign_orphan_authorship(person_id, 999999, repo=repo, authorship_repo=authorship_repo)
 
     def test_assigns_and_creates_authorship(self, sa_sync_conn, repo, authorship_repo):
         _setup_uca(sa_sync_conn)
@@ -961,9 +953,7 @@ class TestAssignOrphanAuthorship:
         sp_id = _insert_source_publication(sa_sync_conn, pub_id)
         sa_id = _insert_source_authorship(sa_sync_conn, sp_id)
 
-        assign_orphan_authorship(
-            person_id, "hal", sa_id, repo=repo, authorship_repo=authorship_repo
-        )
+        assign_orphan_authorship(person_id, sa_id, repo=repo, authorship_repo=authorship_repo)
 
         row = sa_sync_conn.execute(
             text("SELECT person_id, authorship_id FROM source_authorships WHERE id = :i"),
@@ -998,9 +988,7 @@ class TestReassignRejectedPairUnit:
         _reject_pair(sa_sync_conn, pub_id, person_id)
 
         with pytest.raises(RejectedPairError) as exc:
-            assign_orphan_authorship(
-                person_id, "hal", sa_id, repo=repo, authorship_repo=authorship_repo
-            )
+            assign_orphan_authorship(person_id, sa_id, repo=repo, authorship_repo=authorship_repo)
         pair = exc.value.rejected_pairs[0]
         assert pair["publication_id"] == pub_id
         assert pair["person_id"] == person_id
@@ -1022,7 +1010,7 @@ class TestReassignRejectedPairUnit:
         _reject_pair(sa_sync_conn, pub_id, person_id)
 
         assign_orphan_authorship(
-            person_id, "hal", sa_id, repo=repo, authorship_repo=authorship_repo, force=True
+            person_id, sa_id, repo=repo, authorship_repo=authorship_repo, force=True
         )
 
         # Rejet levé

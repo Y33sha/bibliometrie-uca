@@ -62,7 +62,6 @@ def test_attach_pins(sa_sync_conn):
     sa, _pub = _orphan_sa(sa_sync_conn)
     assign_orphan_authorship(
         pid,
-        "hal",
         sa,
         repo=person_repository(sa_sync_conn),
         authorship_repo=authorship_repository(sa_sync_conn),
@@ -76,7 +75,6 @@ def test_detach_unpins(sa_sync_conn):
     sa, pub = _orphan_sa(sa_sync_conn)
     assign_orphan_authorship(
         pid,
-        "hal",
         sa,
         repo=person_repository(sa_sync_conn),
         authorship_repo=authorship_repository(sa_sync_conn),

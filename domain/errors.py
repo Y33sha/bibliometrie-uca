@@ -87,12 +87,11 @@ class AuthorshipAlreadyAssignedError(ConflictError):
 
     Seule une signature orpheline s'attribue ; reprendre une signature rattachée passe par un détachement explicite, qui enregistre le rejet de la paire. `owner_person_id` nomme la détentrice, pour que l'UI mène jusqu'à elle."""
 
-    def __init__(self, source: str, authorship_id: int, owner_person_id: int) -> None:
-        self.source = source
+    def __init__(self, authorship_id: int, owner_person_id: int) -> None:
         self.authorship_id = authorship_id
         self.owner_person_id = owner_person_id
         super().__init__(
-            f"La signature {source} #{authorship_id} est déjà attribuée à la personne "
+            f"La signature #{authorship_id} est déjà attribuée à la personne "
             f"#{owner_person_id} ; seule une signature orpheline peut être attribuée."
         )
 
