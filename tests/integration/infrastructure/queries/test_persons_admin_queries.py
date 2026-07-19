@@ -7,11 +7,9 @@ from infrastructure.queries.api.persons.admin import (
     detachable_intruders_count,
     identifier_conflicts,
     identifier_conflicts_count,
-    list_orphan_authorships,
     name_duplicates,
     name_duplicates_count,
     name_form_authorships,
-    orphan_authorships_count,
 )
 from tests.integration.helpers.authorships import upsert_identity
 
@@ -95,63 +93,6 @@ def _create_sa(
         },
     ).one()
     return row.id
-
-
-class TestOrphanAuthorshipsCount:
-    def test_counts_orphans(self, sa_sync_conn):
-        pub = _create_pub(sa_sync_conn)
-        sd = _create_sd(sa_sync_conn, pub)
-        _create_sa(sa_sync_conn, sd, author_position=0, person_id=None)  # orpheline
-        pid = _create_person(sa_sync_conn)
-        _create_sa(sa_sync_conn, sd, author_position=1, person_id=pid)  # attribuée
-
-        count = orphan_authorships_count(sa_sync_conn)
-        assert count["total"] >= 1
-
-    def test_excludes_non_uca(self, sa_sync_conn):
-        pub = _create_pub(sa_sync_conn)
-        sd = _create_sd(sa_sync_conn, pub)
-        _create_sa(sa_sync_conn, sd, person_id=None, in_perimeter=False)
-        count = orphan_authorships_count(sa_sync_conn)
-        assert count["total"] == 0
-
-    def test_excludes_non_author_roles(self, sa_sync_conn):
-        pub = _create_pub(sa_sync_conn)
-        sd = _create_sd(sa_sync_conn, pub, source="theses", source_id="t1")
-        _create_sa(sa_sync_conn, sd, source="theses", person_id=None, roles=["thesis_director"])
-        _create_sa(
-            sa_sync_conn,
-            sd,
-            source="theses",
-            author_position=1,
-            person_id=None,
-            roles=["jury_member"],
-        )
-        count = orphan_authorships_count(sa_sync_conn)
-        assert count["total"] == 0
-
-
-class TestListOrphanAuthorships:
-    def test_lists_orphan_authorships(self, sa_sync_conn):
-        pub = _create_pub(sa_sync_conn)
-        sd = _create_sd(sa_sync_conn, pub)
-        sa = _create_sa(sa_sync_conn, sd, person_id=None, raw_author_name="Dupond Jean")
-
-        res = list_orphan_authorships(sa_sync_conn, search="", page=1, per_page=50)
-        assert res["total"] >= 1
-        assert any(a["authorship_id"] == sa for a in res["authorships"])
-
-    def test_filters_by_search(self, sa_sync_conn):
-        pub = _create_pub(sa_sync_conn)
-        sd = _create_sd(sa_sync_conn, pub)
-        sa_match = _create_sa(
-            sa_sync_conn, sd, author_position=0, person_id=None, raw_author_name="SpecialName"
-        )
-        _create_sa(sa_sync_conn, sd, author_position=1, person_id=None, raw_author_name="Autre")
-
-        res = list_orphan_authorships(sa_sync_conn, search="Special", page=1, per_page=50)
-        ids = [a["authorship_id"] for a in res["authorships"]]
-        assert sa_match in ids
 
 
 class TestNameFormAuthorships:

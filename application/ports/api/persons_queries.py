@@ -386,30 +386,6 @@ class SharingPersonOut(BaseModel):
     shared_forms: list[str]
 
 
-# ---------------------------------------------------------------------------
-# DTOs Admin : authorships orphelines
-# ---------------------------------------------------------------------------
-
-
-class OrphanCountResponse(BaseModel):
-    total: int
-
-
-class OrphanAuthorshipOut(BaseModel):
-    source: str
-    source_authorship_id: int
-    full_name: str
-    last_name: str
-    first_name: str
-    publication_id: int
-    pub_title: str
-    pub_year: int | None
-
-
-class OrphanAuthorshipsResponse(PaginatedResponse):
-    authorships: list[OrphanAuthorshipOut]
-
-
 class PersonsQueries(Protocol):
     """Lectures sync pour /api/persons/* + endpoints admin associés."""
 
@@ -445,13 +421,7 @@ class PersonsQueries(Protocol):
 
     def person_subjects(self, person_id: int, *, limit: int) -> list[SubjectFrequency]: ...
 
-    # ── Admin : orphan authorships, name forms ─────────────────────
-
-    def orphan_authorships_count(self) -> OrphanCountResponse: ...
-
-    def list_orphan_authorships(
-        self, *, search: str, page: int, per_page: int
-    ) -> OrphanAuthorshipsResponse: ...
+    # ── Admin : name forms ─────────────────────────────────────────
 
     def name_form_authorships(
         self, person_id: int, name_form: str

@@ -1,95 +1,12 @@
-"""Query services admin sync pour les personnes : orphan authorships,
-name-form authorships."""
+"""Query services admin sync pour les personnes : authorships par forme de nom, files de triage des formes et des identifiants."""
 
 from collections import defaultdict
 from typing import Any
 
 from sqlalchemy import Connection, bindparam, text
 
-from domain.persons.name_matching import names_compatible, parse_raw_author_name
+from domain.persons.name_matching import names_compatible
 from infrastructure.queries.sources_sql import AUTHOR_SOURCES_SQL
-
-# ── Orphan authorships ───────────────────────────────────────────
-
-# Filtre commun : in_perimeter, sans person_id, sources principales
-_ORPHAN_BASE = f"""
-    sa.person_id IS NULL AND sa.in_perimeter = TRUE
-    AND sa.source IN {AUTHOR_SOURCES_SQL}
-    AND 'author' = ANY(sa.roles)
-"""
-
-
-def orphan_authorships_count(conn: Connection) -> dict[str, Any]:
-    """Nombre de signatures du périmètre qu'aucune personne ne porte."""
-    row = conn.execute(
-        text(f"""
-            SELECT COUNT(*) AS total
-            FROM source_authorships sa
-            JOIN source_publications sd ON sd.id = sa.source_publication_id
-            JOIN publications p ON p.id = sd.publication_id
-            WHERE {_ORPHAN_BASE}
-        """)
-    ).one()
-    return {"total": row.total}
-
-
-def list_orphan_authorships(
-    conn: Connection, *, search: str, page: int, per_page: int
-) -> dict[str, Any]:
-    """Liste paginée des signatures orphelines, avec la publication qu'elles signent."""
-    offset = (page - 1) * per_page
-    search_cond = ""
-    binds: dict[str, Any] = {}
-    if search.strip():
-        binds["search_pat"] = f"%{search.strip()}%"
-        search_cond = "AND unaccent(lower(sa.raw_author_name)) LIKE unaccent(lower(:search_pat))"
-
-    count_row = conn.execute(
-        text(f"""
-            SELECT COUNT(*) AS total FROM source_authorships sa
-            JOIN source_publications sd ON sd.id = sa.source_publication_id
-            JOIN publications p ON p.id = sd.publication_id
-            WHERE {_ORPHAN_BASE}
-              {search_cond}
-        """),
-        binds,
-    ).one()
-    total = count_row.total
-
-    rows = conn.execute(
-        text(f"""
-            SELECT sa.source, sa.id AS source_authorship_id,
-                   sa.raw_author_name AS full_name,
-                   sd.publication_id,
-                   p.title AS pub_title, p.pub_year
-            FROM source_authorships sa
-            JOIN source_publications sd ON sd.id = sa.source_publication_id
-            JOIN publications p ON p.id = sd.publication_id
-            WHERE {_ORPHAN_BASE}
-              {search_cond}
-            ORDER BY sa.raw_author_name, p.pub_year DESC
-            LIMIT :pg_limit OFFSET :pg_offset
-        """),
-        {**binds, "pg_limit": per_page, "pg_offset": offset},
-    ).all()
-    # Décompose `raw_author_name` en last_name/first_name côté domain,
-    # pour éviter de dupliquer la règle de parsing dans le frontend
-    # (cf. domain/names.py::parse_raw_author_name).
-    authorships: list[dict[str, Any]] = []
-    for row in rows:
-        data = dict(row._mapping)
-        last_name, first_name = parse_raw_author_name(data["full_name"])
-        data["last_name"] = last_name
-        data["first_name"] = first_name
-        authorships.append(data)
-
-    return {
-        "total": total,
-        "page": page,
-        "per_page": per_page,
-        "authorships": authorships,
-    }
-
 
 # ── Name-form authorships ────────────────────────────────────────
 

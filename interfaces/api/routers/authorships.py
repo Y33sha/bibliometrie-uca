@@ -6,10 +6,10 @@ L'exclusion rejette une contribution au niveau consolidé. Les orphelines sont l
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import Connection
 
-from application.ports.api.persons_queries import (
+from application.ports.api.authorships_queries import (
+    AuthorshipsQueries,
     OrphanAuthorshipsResponse,
     OrphanCountResponse,
-    PersonsQueries,
 )
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.authorship_repository import AuthorshipRepository
@@ -18,9 +18,9 @@ from application.services.authorships import commands as authorship_commands
 from interfaces.api.deps import (
     audit_repo,
     authorship_repo,
+    authorships_queries,
     db_conn,
     person_repo,
-    persons_queries,
 )
 from interfaces.api.models import (
     AssignOrphanAuthorship,
@@ -60,7 +60,7 @@ def exclude_authorship(
 
 @router.get("/orphans/count", response_model=OrphanCountResponse)
 def orphan_authorships_count(
-    queries: PersonsQueries = Depends(persons_queries),
+    queries: AuthorshipsQueries = Depends(authorships_queries),
 ) -> OrphanCountResponse:
     """Nombre de signatures du périmètre qu'aucune personne ne porte."""
     return queries.orphan_authorships_count()
@@ -71,7 +71,7 @@ def list_orphan_authorships(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=200),
     search: str = Query(""),
-    queries: PersonsQueries = Depends(persons_queries),
+    queries: AuthorshipsQueries = Depends(authorships_queries),
 ) -> OrphanAuthorshipsResponse:
     """Liste les signatures du périmètre qu'aucune personne ne porte."""
     return queries.list_orphan_authorships(search=search, page=page, per_page=per_page)
