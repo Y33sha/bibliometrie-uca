@@ -65,7 +65,15 @@ Sept paramètres : `has_orcid`, `has_idhal`, `has_idref`, `has_rh`, `has_pending
 
   La page des adresses garde sa propre lecture de ces prédicats (`parseTextParam`, `parseStructParam`), et c'est justifié : elle relit une query string qu'un utilisateur a pu modifier à la main, et doit en restaurer ce qu'elle peut plutôt que rompre. Sa tolérance n'est donc pas la décision que le serveur vient d'abandonner. Reste en commun le vocabulaire — quatre chaînes — qu'un type généré ne peut pas lui transmettre, `openapi-typescript` rendant `string[]` pour un paramètre dont la contrainte est un motif.
 
+### Phase 4 — les éléments des listes à vocabulaire fermé
+
+`access`, `hal_status`, `oa_status`, `doc_type` et `excluded_doc_type` transportent des valeurs prises dans un ensemble connu, que leur écriture en chaîne unique soustrait à FastAPI. Les paramètres répétés typés les rendraient validables nativement et publieraient l'énumération dans le contrat, mais rallongent les URL de moitié sur un jeu de filtres courant — la lisibilité des URL l'emporte, et le contrôle se fait après découpage.
+
+- [x] Nommer les vocabulaires avant de les contrôler, chacun une fois. `ACCESS_LEVELS` ventile les statuts OA en trois niveaux d'accès dans `domain/publications/metadata.py` — l'accès est la forme grossière de `oa_status`, non un vocabulaire parallèle —, d'où `OA_OPEN_STATUSES` et `OA_CLOSED_STATUSES` découlent au lieu d'exister à côté. `HAL_DEPOSIT_STATUSES` rejoint `domain/sources/hal.py`. L'infrastructure importe ce que le domaine porte, au lieu de le redéclarer.
+- [x] `parse_vocabulary_csv` refuse les valeurs intruses par un 422 qui nomme le vocabulaire attendu. Le raccourci `oa` est un terme d'entrée et non un statut stocké : il entre dans le vocabulaire d'`oa_status` sans figurer dans `OA_RANK`.
+- [x] `access_clause` se déduit de la ventilation au lieu d'égrener trois branches littérales, et un test du domaine vérifie que les trois niveaux couvrent `OA_RANK` sans se recouvrir.
+
 ## Questions ouvertes
 
-- **Les éléments des listes à vocabulaire fermé.** `access`, `hal_status`, `oa_status` et `doc_type` transportent des valeurs prises dans un ensemble connu, qu'aucune validation ne contrôle : leur écriture en une chaîne unique les rend opaques à FastAPI. Les valider supposerait soit un contrôle après découpage, soit le passage à des paramètres répétés typés `list[Literal[...]]`, qui change la forme des URL et donc le frontend. À instruire séparément.
+Aucune.
 - **Ce que le 422 change pour le frontend.** Les valeurs hors vocabulaire sont aujourd'hui ignorées en silence ; après, elles seront refusées. À vérifier : aucune page n'émet une valeur que l'adapter ignore et dont elle dépendrait.

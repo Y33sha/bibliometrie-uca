@@ -8,23 +8,22 @@ Vit dans `infrastructure/` parce que ces fonctions génèrent du SQL
 (infrastructure technique).
 """
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any
 
 from domain.normalize import normalize_text
 from domain.persons.identifiers import PUBLIC_PERSON_IDENTIFIER_TYPES
-
-OA_OPEN_STATUSES = ("gold", "hybrid", "bronze", "green", "diamond")
-OA_CLOSED_STATUSES = ("closed", "unknown")
+from domain.publications.metadata import ACCESS_LEVELS, OA_CLOSED_STATUSES, OA_OPEN_STATUSES
 
 
-def _sql_list(values: tuple[str, ...]) -> str:
+def _sql_list(values: Iterable[str]) -> str:
     """Formate un tuple de strings en liste SQL littérale `('a','b',...)`.
 
     Utilisé pour injecter une liste de valeurs métier stables (constantes)
     dans du SQL inline. Ne pas utiliser avec des valeurs utilisateur.
     """
-    return "(" + ",".join(f"'{v}'" for v in values) + ")"
+    return "(" + ",".join(f"'{v}'" for v in sorted(values)) + ")"
 
 
 OA_OPEN_SQL = _sql_list(OA_OPEN_STATUSES)
@@ -147,21 +146,14 @@ def oa_clause(oa_status: list[str]) -> WhereClause | None:
 
 
 def access_clause(access: list[str]) -> WhereClause | None:
-    """Filtre par bucket d'accès. `access` est une liste de buckets (`open`,
-    `embargo`, `closed`), combinés en OR. Un bucket inconnu est ignoré.
+    """Filtre par niveau d'accès, les niveaux demandés combinés en OR.
+
+    Les niveaux ventilent les statuts OA (`ACCESS_LEVELS`) : filtrer sur un niveau revient à filtrer sur les statuts qu'il recouvre. Un `oa_status` nul compte comme fermé, la colonne ayant précédé la valeur `unknown`.
     """
     if not access:
         return None
-    buckets = set(access)
-    statuses: set[str] = set()
-    include_null = False
-    if "open" in buckets:
-        statuses.update(OA_OPEN_STATUSES)
-    if "embargo" in buckets:
-        statuses.add("embargoed")
-    if "closed" in buckets:
-        statuses.update(OA_CLOSED_STATUSES)
-        include_null = True
+    statuses = {s for level in access for s in ACCESS_LEVELS.get(level, frozenset())}
+    include_null = "closed" in access
     if not statuses and not include_null:
         return None
     conditions: list[str] = []
