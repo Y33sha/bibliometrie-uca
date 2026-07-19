@@ -144,7 +144,7 @@
       {titleCase(p.first_name)}
     </button>
     {#if p.has_rh}<span class="rh-check" title="Base RH">&#x2713;</span>{/if}
-    <div class="meta">{p.pub_count} publication{p.pub_count !== 1 ? "s" : ""}</div>
+    <div class="meta">{p.signature_count} signature{p.signature_count !== 1 ? "s" : ""}</div>
     {#if p.labs.length}
       <div class="labs">
         {#each p.labs as lab (lab)}<span class="lab-badge">{lab}</span>{/each}

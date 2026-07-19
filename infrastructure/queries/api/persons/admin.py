@@ -258,7 +258,7 @@ def _light_persons(conn: Connection, ids: list[int]) -> dict[int, dict[str, Any]
         text("""
             SELECT p.id, p.first_name, p.last_name,
                    EXISTS(SELECT 1 FROM persons_rh rh WHERE rh.person_id = p.id) AS has_rh,
-                   (SELECT count(*) FROM authorships a WHERE a.person_id = p.id) AS pub_count,
+                   (SELECT count(*) FROM authorships a WHERE a.person_id = p.id) AS signature_count,
                    COALESCE((
                        SELECT array_agg(DISTINCT COALESCE(s.acronym, s.name)
                                         ORDER BY COALESCE(s.acronym, s.name))
@@ -279,7 +279,7 @@ def _light_persons(conn: Connection, ids: list[int]) -> dict[int, dict[str, Any]
             "first_name": r.first_name,
             "last_name": r.last_name,
             "has_rh": r.has_rh,
-            "pub_count": r.pub_count,
+            "signature_count": r.signature_count,
             "labs": list(r.labs or []),
         }
         for r in rows

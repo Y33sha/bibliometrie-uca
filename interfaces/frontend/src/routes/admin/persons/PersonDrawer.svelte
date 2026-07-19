@@ -161,8 +161,8 @@
 
   <div class="drawer-body">
     <div class="drawer-meta">
-      <span>{person.pub_count ?? 0} publications</span>
-      <span>{person.uca_pub_count ?? 0} UCA</span>
+      <span>{person.signature_count ?? 0} signatures</span>
+      <span>{person.in_perimeter_signature_count ?? 0} dans le périmètre</span>
       {#if person.rejected}<span class="tag tag-rejected">rejetée</span>{/if}
     </div>
 

@@ -40,6 +40,15 @@ Le choix engage le contrat public et le frontend.
 
 ## Phasage
 
+### Phase 0 — ce qui diverge sans l'avoir voulu
+
+Deux écarts précédaient toute question de projection, et l'ont faussée : la fiche affirmait les filtres partagés, ils ne l'étaient pas.
+
+- [x] `search` désignait deux comportements sous un même nom : l'annuaire cherchait dans le nom et le prénom, la liste de curation y ajoutait l'adresse électronique. Le même terme ne rendait donc pas le même ensemble. Les trois lectures — annuaire, liste, facettes — partagent maintenant `person_search_clause`, aligné sur la version la plus large.
+- [x] `pub_count` ne comptait pas la même chose de part et d'autre : l'annuaire compte les publications signées **comme auteur**, la curation comptait **toutes les signatures**, jury et rapporteurs compris. La table étant unique par paire (publication, personne), l'écart tenait entièrement au rôle — et il va du simple au double sur les encadrants. Deux mesures, deux noms : `pub_count` reste celui de l'annuaire, la curation porte `signature_count` et `in_perimeter_signature_count`. Le vocabulaire de tri suit, et l'interface cesse d'afficher des signatures sous le mot « publications ».
+
+  `uca_pub_count` disparaît au passage : le périmètre se nomme, il ne s'abrège pas en un établissement.
+
 ### Phase 1 — les identifiants
 
 - [ ] `persons_directory` rend `identifiers` à plat ; `PersonDirectoryEntry` perd `orcids`, `idhals`, `idrefs`.

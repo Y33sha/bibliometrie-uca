@@ -633,11 +633,11 @@
         <th class="sortable col-name" onclick={() => toggleSort("name")}
           >Nom{sortIndicator("name")}</th
         >
-        <th class="sortable" onclick={() => toggleSort("pubs")}
-          >Publis{sortIndicator("pubs")}</th
+        <th class="sortable" onclick={() => toggleSort("signatures")}
+          >Publis{sortIndicator("signatures")}</th
         >
-        <th class="sortable" onclick={() => toggleSort("uca_pubs")}
-          >UCA{sortIndicator("uca_pubs")}</th
+        <th class="sortable" onclick={() => toggleSort("in_perimeter_signatures")}
+          >UCA{sortIndicator("in_perimeter_signatures")}</th
         >
       </tr>
     </thead>
@@ -656,8 +656,8 @@
             </button>
             {#if p.has_rh}<span class="rh-check" title="Base RH">&#x2713;</span>{/if}
           </td>
-          <td>{p.pub_count ?? 0}</td>
-          <td>{p.uca_pub_count ?? 0}</td>
+          <td>{p.signature_count ?? 0}</td>
+          <td>{p.in_perimeter_signature_count ?? 0}</td>
         </tr>
       {/each}
     </tbody>

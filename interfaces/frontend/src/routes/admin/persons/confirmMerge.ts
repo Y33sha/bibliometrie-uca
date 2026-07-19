@@ -9,13 +9,13 @@ import { titleCase } from "$lib/utils";
  * exact quel que soit le point d'appel.
  */
 export async function confirmMerge(sourceId: number): Promise<boolean> {
-  const p = await api<{ last_name: string; first_name: string; pub_count: number }>(
+  const p = await api<{ last_name: string; first_name: string; signature_count: number }>(
     `/api/persons/${sourceId}/curation`,
   );
   const name = `${titleCase(p.last_name)} ${titleCase(p.first_name)}`.trim();
-  const n = p.pub_count ?? 0;
+  const n = p.signature_count ?? 0;
   const pubs =
-    n === 1 ? "1 publication sera réattribuée" : `${n} publications seront réattribuées`;
+    n === 1 ? "1 signature sera réattribuée" : `${n} signatures seront réattribuées`;
   return confirmDialog({
     title: "Fusionner les personnes",
     message: `La personne « ${name} » sera absorbée puis supprimée — ${pubs} à la personne conservée. Cette action est irréversible.`,
