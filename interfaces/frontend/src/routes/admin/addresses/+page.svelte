@@ -221,21 +221,23 @@
 	}
 
 	async function loadStats(): Promise<void> {
-		const params = new URLSearchParams();
-		if (currentStructureId) params.set('structure_id', String(currentStructureId));
+		if (currentStructureId === null) return;
+		const params = new URLSearchParams({ structure_id: String(currentStructureId) });
 		stats = await api<Stats>(`/api/addresses/stats?${params}`, { key: 'addr-stats' });
 	}
 
 	async function loadAddresses(): Promise<void> {
 		syncUrl();
+		// Les deux lectures sont scopées à une structure : sans elle, il n'y a rien à demander.
+		if (currentStructureId === null) return;
 		loading = true;
 		const params = new URLSearchParams({
+			structure_id: String(currentStructureId),
 			page: String(currentPage),
 			per_page: '200',
 			detected: currentDetected,
 			validation: currentValidation
 		});
-		if (currentStructureId) params.set('structure_id', String(currentStructureId));
 		serializePredicateParams(params);
 
 		const data = await api<AddressesResponse>(`/api/addresses?${params}`, { key: 'addr-list' });
