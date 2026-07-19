@@ -7,7 +7,7 @@ concrète). Toute autre implémentation respectant cette interface
 """
 
 from enum import StrEnum
-from typing import Any, Protocol, TypedDict
+from typing import Protocol, TypedDict
 
 from domain.persons.person import Person
 from domain.persons.person_identifier import PersonIdentifier
@@ -86,67 +86,6 @@ class PersonRepository(Protocol):
     def begin_authenticated_orcid_import(self) -> None: ...
 
     def authenticate_orcid(self, person_id: int, orcid: str) -> AuthenticateOrcidOutcome: ...
-
-    # ── source_authorships (liens personne ↔ authorship source) ────
-
-    def link_authorship(
-        self,
-        person_id: int,
-        source: str,
-        source_authorship_id: int,
-        resolution_mode: str,
-    ) -> None: ...
-
-    def unlink_authorship(
-        self,
-        person_id: int,
-        source: str,
-        source_authorship_id: int,
-    ) -> None: ...
-
-    def assign_orphan_sa(
-        self,
-        person_id: int,
-        source_authorship_id: int,
-    ) -> dict[str, Any] | None:
-        """Pose `person_id` sur une signature source orpheline. Retourne `{source, author_name_normalized}`, ou `None` si la signature n'existe pas ou porte déjà un `person_id` — `find_source_authorship_owner` départage."""
-        ...
-
-    def find_source_authorship_owner(self, source_authorship_id: int) -> int | None:
-        """`person_id` d'une signature source. `None` si elle est orpheline ou n'existe pas."""
-        ...
-
-    # ── Opérations atomiques pour le use case `assign_orphans` ────
-    # Orchestré dans `application/authorships/assign_orphans.py`.
-
-    def assign_orphan_source_authorships_to_person(
-        self,
-        person_id: int,
-        sa_ids: list[int],
-    ) -> int: ...
-
-    def get_distinct_name_forms_from_source_authorships(
-        self,
-        sa_ids: list[int],
-    ) -> list[str]: ...
-
-    def find_publication_id_for_source_authorship(
-        self,
-        source_authorship_id: int,
-    ) -> int | None: ...
-
-    def find_publication_ids_for_source_authorships(
-        self,
-        sa_ids: list[int],
-    ) -> list[int]:
-        """Les `publication_id` distincts couverts par un lot de
-        `source_authorships`. Sert au pré-contrôle de rejet en batch."""
-        ...
-
-    def null_person_id_for_name_form(self, person_id: int, name_form: str) -> int:
-        """Détache (person_id → NULL) les source_authorships d'une personne portant
-        une forme de nom donnée. Retourne le nombre de signatures détachées."""
-        ...
 
     # ── person_name_forms ──────────────────────────────────────────
 

@@ -34,6 +34,7 @@ from application.pipeline.persons.loading import (
 )
 from application.pipeline.persons.metrics import CascadeResult
 from application.ports.pipeline.persons.matching import PersonsMatchingQueries
+from application.ports.repositories.authorship_repository import AuthorshipRepository
 from application.ports.repositories.person_repository import PersonRepository
 from application.services.persons.core import (
     add_identifiers_from_authorships as add_identifiers,
@@ -71,9 +72,11 @@ class _Cascade:
         logger: logging.Logger,
         *,
         person_repo: PersonRepository,
+        authorship_repo: AuthorshipRepository,
     ) -> None:
         self._logger = logger
         self._person_repo = person_repo
+        self._authorship_repo = authorship_repo
 
         in_perimeter = get_all_unlinked_authorships(conn, queries)
         out_of_perimeter = get_out_of_perimeter_candidates(conn, queries)
@@ -193,7 +196,7 @@ class _Cascade:
             pid,
             a.source,
             a.authorship_id,
-            repo=self._person_repo,
+            repo=self._authorship_repo,
             resolution_mode=RESOLUTION_MODE_BY_REASON[reason],
         )
         add_name_form(pid, a.full_name, repo=self._person_repo)
@@ -216,7 +219,7 @@ class _Cascade:
         first = a.first_name or ""
         marker = create_person(last, first, repo=self._person_repo)
         link_authorship(
-            marker, a.source, a.authorship_id, repo=self._person_repo, resolution_mode="name"
+            marker, a.source, a.authorship_id, repo=self._authorship_repo, resolution_mode="name"
         )
         add_identifiers(marker, [a._asdict()], repo=self._person_repo)
         add_name_form(marker, a.full_name, repo=self._person_repo)
@@ -253,13 +256,14 @@ def run_cascade(
     logger: logging.Logger,
     *,
     person_repo: PersonRepository,
+    authorship_repo: AuthorshipRepository,
 ) -> CascadeResult:
     """Rattache les signatures aux personnes, en deux passes sur un **seul** `_Cascade` (index vivants partagés — un seul fetch, un seul chargement).
 
     Passe `match` (`decide_full`) : rattachement ferme (identifiant, nom) et cross-source contre les ancres présentes ; les signatures non rattachées sont reprises en passe suivante. Passe `create` (`decide_cross_and_name`) sur ces seules restantes : cross-source de rattrapage contre l'état ferme complet, puis création des inconnues — une création ancre le cross-source d'une co-signature traitée juste après, dans la même passe.
     """
     logger.info("▶ chargement des index de la cascade...")
-    c = _Cascade(conn, queries, logger, person_repo=person_repo)
+    c = _Cascade(conn, queries, logger, person_repo=person_repo, authorship_repo=authorship_repo)
     total = len(c.authorships)
     logger.info("  %d signatures à traiter", total)
 

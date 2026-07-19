@@ -243,7 +243,7 @@ class TestEndToEndServiceIntegration:
 
     def test_name_form_confirm_emits_event(self, sa_sync_conn):
         from application.services.persons.core import update_name_form_status
-        from infrastructure.repositories import person_repository
+        from infrastructure.repositories import authorship_repository, person_repository
 
         person_id = self._create_person(sa_sync_conn)
         sa_sync_conn.execute(
@@ -260,6 +260,7 @@ class TestEndToEndServiceIntegration:
                 "x x",
                 "confirmed",
                 repo=person_repository(sa_sync_conn),
+                authorship_repo=authorship_repository(sa_sync_conn),
                 audit_repo=audit_repository(sa_sync_conn),
             )
         finally:
@@ -273,7 +274,7 @@ class TestEndToEndServiceIntegration:
     def test_name_form_reject_emits_event(self, sa_sync_conn):
         """Le rejet d'une forme (action « détacher l'intrus ») émet l'événement."""
         from application.services.persons.core import update_name_form_status
-        from infrastructure.repositories import person_repository
+        from infrastructure.repositories import authorship_repository, person_repository
 
         person_id = self._create_person(sa_sync_conn)
         sa_sync_conn.execute(
@@ -290,6 +291,7 @@ class TestEndToEndServiceIntegration:
                 "x x",
                 "rejected",
                 repo=person_repository(sa_sync_conn),
+                authorship_repo=authorship_repository(sa_sync_conn),
                 audit_repo=audit_repository(sa_sync_conn),
             )
         finally:

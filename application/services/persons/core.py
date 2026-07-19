@@ -109,22 +109,22 @@ def update_name(
 def link_authorship(
     person_id: int,
     source: str,
-    authorship_id: int,
+    source_authorship_id: int,
     *,
-    repo: PersonRepository,
+    repo: AuthorshipRepository,
     resolution_mode: str,
 ) -> None:
-    """Rattache une authorship source à une personne (pipeline), en marquant le canal. Lève `ValidationError` sur une source hors registre."""
+    """Rattache une signature source à une personne (pipeline), en marquant le canal. Lève `ValidationError` sur une source hors registre."""
     require_known_source(source)
-    repo.link_authorship(person_id, source, authorship_id, resolution_mode)
+    repo.link_authorship(person_id, source, source_authorship_id, resolution_mode)
 
 
 def unlink_authorship(
-    person_id: int, source: str, authorship_id: int, *, repo: PersonRepository
+    person_id: int, source: str, source_authorship_id: int, *, repo: AuthorshipRepository
 ) -> None:
-    """Détache une authorship source d'une personne (met person_id à NULL). Lève `ValidationError` sur une source hors registre."""
+    """Détache une signature source d'une personne (met person_id à NULL). Lève `ValidationError` sur une source hors registre."""
     require_known_source(source)
-    repo.unlink_authorship(person_id, source, authorship_id)
+    repo.unlink_authorship(person_id, source, source_authorship_id)
 
 
 # ── Identifiants ──
@@ -383,7 +383,7 @@ def update_name_form_status(
     status: str,
     *,
     repo: PersonRepository,
-    authorship_repo: AuthorshipRepository | None = None,
+    authorship_repo: AuthorshipRepository,
     audit_repo: AuditRepository | None = None,
 ) -> NameFormStatusRow:
     """Met à jour le statut d'une forme de nom (pending/confirmed/rejected).
@@ -394,13 +394,12 @@ def update_name_form_status(
     """
     row = repo.update_name_form_status(person_id, name_form, status)
     if status == "rejected":
-        detached = repo.null_person_id_for_name_form(person_id, name_form)
-        if authorship_repo is not None:
-            # Le rejet de forme détache : retirer aussi l'épinglage éventuel des
-            # signatures concernées, sinon le pipeline les réattacherait.
-            authorship_repo.unpin_authorships_for_name_form(person_id, name_form)
-            if detached:
-                authorship_repo.delete_orphan_authorships_for_person(person_id)
+        detached = authorship_repo.null_person_id_for_name_form(person_id, name_form)
+        # Le rejet de forme détache : retirer aussi l'épinglage éventuel des
+        # signatures concernées, sinon le pipeline les réattacherait.
+        authorship_repo.unpin_authorships_for_name_form(person_id, name_form)
+        if detached:
+            authorship_repo.delete_orphan_authorships_for_person(person_id)
     emit_event(
         audit_repo,
         "person_name_form.status_changed",
@@ -428,7 +427,7 @@ def detach_authorships(
     publication_ids: set[int] = set()
     for a in authorships:
         require_known_source(a["source"])
-        pub_id = repo.find_publication_id_for_source_authorship(a["authorship_id"])
+        pub_id = authorship_repo.find_publication_id_for_source_authorship(a["authorship_id"])
         if pub_id is not None:
             publication_ids.add(pub_id)
 

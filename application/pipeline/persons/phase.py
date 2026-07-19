@@ -56,7 +56,9 @@ def run(
         arbitration = arbitrate_identifier_conflicts(
             conn, persons_queries, logger, person_repo=person_repo
         )
-        cascade_result = run_cascade(conn, persons_queries, logger, person_repo=person_repo)
+        cascade_result = run_cascade(
+            conn, persons_queries, logger, person_repo=person_repo, authorship_repo=authorship_repo
+        )
 
         # Les signatures cross-source qu'aucune passe n'a re-résolues ont perdu leur ancre ferme → détachées.
         stale = sorted(

@@ -140,18 +140,18 @@ def _scalar(conn, sql_text: str, **params):
 
 
 class TestLinkAuthorship:
-    def test_rejects_unknown_source(self, sa_sync_conn, repo):
+    def test_rejects_unknown_source(self, sa_sync_conn, authorship_repo):
         """Source hors registre → `ValidationError` (mappée en 400 côté API)."""
         with pytest.raises(ValidationError):
-            link_authorship(1, "invalid", 1, repo=repo, resolution_mode="name")
+            link_authorship(1, "invalid", 1, repo=authorship_repo, resolution_mode="name")
 
-    def test_sets_person_id_on_source_authorship(self, sa_sync_conn, repo):
+    def test_sets_person_id_on_source_authorship(self, sa_sync_conn, repo, authorship_repo):
         person_id = _insert_person(sa_sync_conn)
         pub_id = _insert_publication(sa_sync_conn)
         sp_id = _insert_source_publication(sa_sync_conn, pub_id)
         sa_id = _insert_source_authorship(sa_sync_conn, sp_id)
 
-        link_authorship(person_id, "hal", sa_id, repo=repo, resolution_mode="name")
+        link_authorship(person_id, "hal", sa_id, repo=authorship_repo, resolution_mode="name")
 
         assert (
             _scalar(sa_sync_conn, "SELECT person_id FROM source_authorships WHERE id = :i", i=sa_id)
@@ -168,24 +168,24 @@ class TestLinkAuthorship:
 
 
 class TestUnlinkAuthorship:
-    def test_rejects_unknown_source(self, sa_sync_conn, repo):
+    def test_rejects_unknown_source(self, sa_sync_conn, authorship_repo):
         with pytest.raises(ValidationError):
-            unlink_authorship(1, "invalid", 1, repo=repo)
+            unlink_authorship(1, "invalid", 1, repo=authorship_repo)
 
-    def test_unsets_person_id(self, sa_sync_conn, repo):
+    def test_unsets_person_id(self, sa_sync_conn, repo, authorship_repo):
         person_id = _insert_person(sa_sync_conn)
         pub_id = _insert_publication(sa_sync_conn)
         sp_id = _insert_source_publication(sa_sync_conn, pub_id)
         sa_id = _insert_source_authorship(sa_sync_conn, sp_id, person_id=person_id)
 
-        unlink_authorship(person_id, "hal", sa_id, repo=repo)
+        unlink_authorship(person_id, "hal", sa_id, repo=authorship_repo)
 
         assert (
             _scalar(sa_sync_conn, "SELECT person_id FROM source_authorships WHERE id = :i", i=sa_id)
             is None
         )
 
-    def test_noop_if_person_id_mismatch(self, sa_sync_conn, repo):
+    def test_noop_if_person_id_mismatch(self, sa_sync_conn, repo, authorship_repo):
         """Ne détache pas si l'authorship est liée à une autre personne."""
         p1 = _insert_person(sa_sync_conn, "Dupont", "Jean")
         p2 = _insert_person(sa_sync_conn, "Martin", "Sophie")
@@ -193,7 +193,7 @@ class TestUnlinkAuthorship:
         sp_id = _insert_source_publication(sa_sync_conn, pub_id)
         sa_id = _insert_source_authorship(sa_sync_conn, sp_id, person_id=p1)
 
-        unlink_authorship(p2, "hal", sa_id, repo=repo)
+        unlink_authorship(p2, "hal", sa_id, repo=authorship_repo)
 
         assert (
             _scalar(sa_sync_conn, "SELECT person_id FROM source_authorships WHERE id = :i", i=sa_id)
@@ -839,12 +839,13 @@ class TestAddIdentifiersFromAuthorships:
 
 
 class TestUpdateNameFormStatus:
-    def test_reject_keeps_row_and_sets_status(self, sa_sync_conn, repo):
-        """Rejeter une forme conserve la row (tombstone du verrou de non-retour),
-        contrairement à l'ancien détachement par DELETE."""
+    def test_reject_keeps_row_and_sets_status(self, sa_sync_conn, repo, authorship_repo):
+        """Rejeter une forme conserve la row (tombstone du verrou de non-retour)."""
         person_id = create_person("Unique", "Name", repo=repo)
 
-        row = update_name_form_status(person_id, "name unique", "rejected", repo=repo)
+        row = update_name_form_status(
+            person_id, "name unique", "rejected", repo=repo, authorship_repo=authorship_repo
+        )
 
         assert row["status"] == "rejected"
         db = sa_sync_conn.execute(
@@ -856,19 +857,25 @@ class TestUpdateNameFormStatus:
         ).one()
         assert db.s == "rejected"
 
-    def test_confirm_overrides_previous_status(self, repo):
+    def test_confirm_overrides_previous_status(self, repo, authorship_repo):
         person_id = create_person("Alpha", "Beta", repo=repo)
 
-        update_name_form_status(person_id, "alpha beta", "rejected", repo=repo)
-        row = update_name_form_status(person_id, "alpha beta", "confirmed", repo=repo)
+        update_name_form_status(
+            person_id, "alpha beta", "rejected", repo=repo, authorship_repo=authorship_repo
+        )
+        row = update_name_form_status(
+            person_id, "alpha beta", "confirmed", repo=repo, authorship_repo=authorship_repo
+        )
 
         assert row["status"] == "confirmed"
 
-    def test_unknown_form_raises(self, repo):
+    def test_unknown_form_raises(self, repo, authorship_repo):
         person_id = create_person("Gamma", "Delta", repo=repo)
 
         with pytest.raises(NotFoundError):
-            update_name_form_status(person_id, "inexistante xyz", "rejected", repo=repo)
+            update_name_form_status(
+                person_id, "inexistante xyz", "rejected", repo=repo, authorship_repo=authorship_repo
+            )
 
     def test_reject_detaches_authorships(self, sa_sync_conn, repo, authorship_repo):
         """Rejeter une forme détache ses signatures (source_authorships → NULL) et

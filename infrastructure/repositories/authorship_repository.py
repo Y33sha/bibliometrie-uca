@@ -158,6 +158,144 @@ class PgAuthorshipRepository:
             {"pub": publication_id, "pid": person_id},
         )
 
+    # ── source_authorships : lien personne ↔ signature ─────────────
+    # `source_authorships.person_id` pose qu'une signature est portée par une personne. Sa
+    # sémantique de suppression (`ON DELETE SET NULL`) le range côté signature : effacer la
+    # personne rend la signature orpheline, ne la détruit pas.
+
+    def link_authorship(
+        self,
+        person_id: int,
+        source: str,
+        source_authorship_id: int,
+        resolution_mode: str,
+    ) -> None:
+        """Rattache une signature source à une personne, en marquant le canal de résolution.
+
+        `resolution_mode` (`identifier` / `name` / `cross_source`) enregistre par quel canal le `person_id` a été posé ; il porte les réinitialisations ordre-indépendantes de la phase personnes.
+        """
+        self._conn.execute(
+            text(
+                "UPDATE source_authorships SET person_id = :pid, "
+                "resolution_mode = CAST(:mode AS resolution_mode) "
+                "WHERE id = :aid AND source = :src"
+            ),
+            {"pid": person_id, "aid": source_authorship_id, "src": source, "mode": resolution_mode},
+        )
+
+    def unlink_authorship(self, person_id: int, source: str, source_authorship_id: int) -> None:
+        self._conn.execute(
+            text(
+                "UPDATE source_authorships SET person_id = NULL "
+                "WHERE id = :aid AND person_id = :pid AND source = :src"
+            ),
+            {"aid": source_authorship_id, "pid": person_id, "src": source},
+        )
+
+    def find_source_authorship_owner(self, source_authorship_id: int) -> int | None:
+        """`person_id` d'une signature source. `None` si elle est orpheline ou n'existe pas."""
+        return self._conn.execute(
+            text("SELECT person_id FROM source_authorships WHERE id = :aid"),
+            {"aid": source_authorship_id},
+        ).scalar_one_or_none()
+
+    def assign_orphan_sa(self, person_id: int, source_authorship_id: int) -> dict | None:
+        """Pose `person_id` sur une signature source orpheline.
+
+        Retourne un dict {source, author_name_normalized} si l'UPDATE a touché une ligne, `None` sinon — la signature n'existe pas, ou elle porte déjà un `person_id` (fût-ce celui demandé). `find_source_authorship_owner` départage.
+        """
+        row = self._conn.execute(
+            text("""
+                UPDATE source_authorships sa SET person_id = :pid
+                FROM author_identifying_keys aik
+                WHERE sa.id = :aid AND sa.person_id IS NULL
+                  AND aik.id = sa.identity_id
+                RETURNING sa.source::text AS source, aik.author_name_normalized
+            """),
+            {"pid": person_id, "aid": source_authorship_id},
+        ).first()
+        return dict(row._mapping) if row else None
+
+    def assign_orphan_source_authorships_to_person(
+        self, person_id: int, source_authorship_ids: list[int]
+    ) -> int:
+        """Pose `person_id` sur les signatures du lot qui sont orphelines, et retourne le nombre touché.
+
+        Les signatures déjà rattachées sont laissées intactes.
+        """
+        if not source_authorship_ids:
+            return 0
+        return self._conn.execute(
+            text("""
+                UPDATE source_authorships SET person_id = :pid
+                WHERE id = ANY(:ids) AND person_id IS NULL
+                RETURNING id
+            """),
+            {"pid": person_id, "ids": source_authorship_ids},
+        ).rowcount
+
+    def get_distinct_name_forms_from_source_authorships(
+        self, source_authorship_ids: list[int]
+    ) -> list[str]:
+        """Les `author_name_normalized` distincts observés dans le lot."""
+        if not source_authorship_ids:
+            return []
+        rows = self._conn.execute(
+            text("""
+                SELECT DISTINCT aik.author_name_normalized
+                FROM source_authorships sa
+                JOIN author_identifying_keys aik ON aik.id = sa.identity_id
+                WHERE sa.id = ANY(:ids)
+                  AND aik.author_name_normalized IS NOT NULL
+            """),
+            {"ids": source_authorship_ids},
+        ).all()
+        return [row.author_name_normalized for row in rows]
+
+    def find_publication_id_for_source_authorship(
+        self, source_authorship_id: int
+    ) -> int | None:
+        """`publication_id` de la signature, ou `None` si elle n'existe pas ou n'est pas rattachée."""
+        return self._conn.execute(
+            text("""
+                SELECT d.publication_id FROM source_authorships sa
+                JOIN source_publications d ON d.id = sa.source_publication_id
+                WHERE sa.id = :aid
+            """),
+            {"aid": source_authorship_id},
+        ).scalar_one_or_none()
+
+    def find_publication_ids_for_source_authorships(
+        self, source_authorship_ids: list[int]
+    ) -> list[int]:
+        """Les `publication_id` distincts couverts par un lot de signatures."""
+        if not source_authorship_ids:
+            return []
+        rows = self._conn.execute(
+            text("""
+                SELECT DISTINCT d.publication_id FROM source_authorships sa
+                JOIN source_publications d ON d.id = sa.source_publication_id
+                WHERE sa.id = ANY(:ids) AND d.publication_id IS NOT NULL
+            """),
+            {"ids": source_authorship_ids},
+        ).all()
+        return [row.publication_id for row in rows]
+
+    def null_person_id_for_name_form(self, person_id: int, name_form: str) -> int:
+        """Détache d'une personne les signatures qui portent une forme de nom, et retourne leur nombre.
+
+        Sert au rejet d'une forme : ses signatures sont retirées de la personne (`person_id → NULL`).
+        """
+        return self._conn.execute(
+            text(
+                "UPDATE source_authorships sa SET person_id = NULL "
+                "FROM author_identifying_keys aik "
+                "WHERE sa.person_id = :pid AND aik.id = sa.identity_id "
+                "AND aik.author_name_normalized = :nf"
+            ),
+            {"pid": person_id, "nf": name_form},
+        ).rowcount
+
     # ── authorships ────────────────────────────────────────────────
 
     def get_authorship_person(self, authorship_id: int) -> dict | None:

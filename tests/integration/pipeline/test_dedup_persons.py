@@ -24,7 +24,7 @@ from application.pipeline.persons.arbitrate_identifiers import arbitrate_identif
 from application.pipeline.persons.cascade import run_cascade
 from application.services.persons.core import add_name_form, create_person
 from infrastructure.queries.pipeline.persons_matching import PgPersonsMatchingQueries
-from infrastructure.repositories import person_repository
+from infrastructure.repositories import authorship_repository, person_repository
 from tests.integration.helpers.authorships import upsert_identity
 
 _queries = PgPersonsMatchingQueries()
@@ -156,7 +156,7 @@ def _get_person_identifiers(conn, person_id):
 def _run_cascade(conn):
     repo = person_repository(conn)
     arbitrate_identifier_conflicts(conn, _queries, _logger, person_repo=repo)
-    run_cascade(conn, _queries, _logger, person_repo=repo)
+    run_cascade(conn, _queries, _logger, person_repo=repo, authorship_repo=authorship_repository(conn))
 
 
 # ── Scénarios ────────────────────────────────────────────────────
