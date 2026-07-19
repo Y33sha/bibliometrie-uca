@@ -25,7 +25,7 @@ from application.ports.api.publications_queries import PublicationsQueries
 from application.ports.api.publishers_queries import PublisherQueries
 from application.ports.api.stats_queries import StatsQueries
 from application.ports.api.structures_queries import StructuresQueries
-from application.ports.api.subjects_queries import SubjectsAdminQueries
+from application.ports.api.subjects_queries import SubjectsQueries
 from application.ports.config import ConfigStore
 from application.ports.pipeline.metadata_correction import MetadataCorrectionQueries
 from application.ports.pipeline.perimeter import PerimeterQueries
@@ -54,10 +54,10 @@ from infrastructure.queries.api.publications import PgPublicationsQueries
 from infrastructure.queries.api.publishers import PgPublisherQueries
 from infrastructure.queries.api.stats import PgStatsQueries
 from infrastructure.queries.api.structures import PgStructuresQueries
+from infrastructure.queries.api.subjects import PgSubjectsQueries
 from infrastructure.queries.config import PgConfig, PgConfigQueries
 from infrastructure.queries.perimeter import PgPerimeterQueries, PgPerimetersAdminQueries
 from infrastructure.queries.pipeline.metadata_correction import PgMetadataCorrectionQueries
-from infrastructure.queries.subjects import PgSubjectsAdminQueries
 from infrastructure.repositories import (
     address_repository,
     audit_repository,
@@ -137,10 +137,10 @@ def db_conn(request: Request) -> Iterator[Connection]:
                 )
 
 
-def subjects_admin_queries(
+def subjects_queries(
     conn: Connection = Depends(db_conn),
-) -> SubjectsAdminQueries:
-    return PgSubjectsAdminQueries(conn)
+) -> SubjectsQueries:
+    return PgSubjectsQueries(conn)
 
 
 def config_queries(conn: Connection = Depends(db_conn)) -> ConfigQueries:

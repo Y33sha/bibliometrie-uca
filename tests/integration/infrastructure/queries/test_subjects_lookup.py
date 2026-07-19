@@ -1,15 +1,15 @@
 """Tests des lectures sync sur `subjects` consommées par le router
-`/api/subjects` (port `SubjectsAdminQueries` / impl `PgSubjectsAdminQueries`).
+`/api/subjects` (port `SubjectsQueries` / impl `PgSubjectsQueries`).
 La fixture `sa_sync_conn` (transaction rollbackée à la fin) est définie
 dans `tests/integration/conftest.py`."""
 
 from sqlalchemy import text
 
-from infrastructure.queries.subjects import PgSubjectsAdminQueries
+from infrastructure.queries.api.subjects import PgSubjectsQueries
 
 
-def _q(conn) -> PgSubjectsAdminQueries:
-    return PgSubjectsAdminQueries(conn)
+def _q(conn) -> PgSubjectsQueries:
+    return PgSubjectsQueries(conn)
 
 
 def _create_subject(conn, *, label, usage_count=0, **kwargs):
@@ -67,6 +67,15 @@ class TestListSubjects:
         labels = {i.label for i in items}
         assert "high" in labels
         assert "low" not in labels
+
+    def test_search_ignores_accents(self, sa_sync_conn):
+        """Régression : `lower(label) LIKE` était sensible aux accents."""
+        _create_subject(sa_sync_conn, label="épidémiologie quantique")
+        queries = _q(sa_sync_conn)
+
+        for term in ("epidemiologie quantique", "épidémiologie quantique"):
+            found = queries.list_subjects(q=term, limit=10, offset=0, min_usage_count=0)
+            assert any(s.label == "épidémiologie quantique" for s in found), term
 
     def test_search_q_case_insensitive(self, sa_sync_conn):
         _create_subject(sa_sync_conn, label="Climate Change", usage_count=10)

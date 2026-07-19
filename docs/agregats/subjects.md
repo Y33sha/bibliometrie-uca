@@ -48,7 +48,7 @@ Une seule phase écrit le cluster : `subjects` (`application/pipeline/subjects/`
 
 ## Lecture — API
 
-Port `application/ports/api/subjects_queries.py`, adaptateur `PgSubjectsAdminQueries` (même module `infrastructure/queries/subjects.py` que les fonctions pipeline — pattern « queries mutualisées, ports par contexte »).
+Port `application/ports/api/subjects_queries.py`, adaptateur `PgSubjectsQueries` dans `infrastructure/queries/api/subjects.py`.
 
 - **Listing** (`GET /api/subjects`) : liste paginée, tri `usage_count` décroissant, recherche `unaccent(label) ILIKE`, filtre `usage_count >= min_count`.
 - **Détail + voisins** (`GET /api/subjects/{id}`) : le sujet + ses voisins par co-occurrence (top N via `subject_cooccurrences`, symétrisée par `UNION ALL` sur les deux colonnes).

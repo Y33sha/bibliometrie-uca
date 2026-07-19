@@ -11,12 +11,12 @@ import time
 
 from sqlalchemy import Connection
 
-from application.ports.pipeline.subjects import SubjectsQueries
+from application.ports.pipeline.subjects import SubjectsIngestionQueries
 
 
 def run(
     conn: Connection,
-    queries: SubjectsQueries,
+    queries: SubjectsIngestionQueries,
     logger: logging.Logger,
 ) -> dict[str, int]:
     """Recalcule usage_counts + rafraîchit la matview cooccurrences. Retourne un dict de stats."""

@@ -5,9 +5,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from application.ports.api.subjects_queries import (
     SubjectDetailResponse,
     SubjectListResponse,
-    SubjectsAdminQueries,
+    SubjectsQueries,
 )
-from interfaces.api.deps import subjects_admin_queries
+from interfaces.api.deps import subjects_queries
 
 router = APIRouter(prefix="/api/subjects", tags=["subjects"])
 
@@ -20,7 +20,7 @@ def list_subjects(
         None, description="Recherche sur le libellé, insensible à la casse et aux accents"
     ),
     min_count: int = Query(1, ge=1, description="Nombre minimal de publications portant le sujet"),
-    queries: SubjectsAdminQueries = Depends(subjects_admin_queries),
+    queries: SubjectsQueries = Depends(subjects_queries),
 ) -> SubjectListResponse:
     """Liste paginée des sujets, les plus portés par des publications d'abord."""
     offset = (page - 1) * per_page
@@ -34,7 +34,7 @@ def get_subject(
     subject_id: int,
     neighbors_limit: int = Query(20, ge=1, le=100),
     min_cooccurrence: int = Query(2, ge=1),
-    queries: SubjectsAdminQueries = Depends(subjects_admin_queries),
+    queries: SubjectsQueries = Depends(subjects_queries),
 ) -> SubjectDetailResponse:
     """Détail d'un sujet, avec ses voisins par co-occurrence, les plus fréquents d'abord."""
     subject = queries.get_subject(subject_id)

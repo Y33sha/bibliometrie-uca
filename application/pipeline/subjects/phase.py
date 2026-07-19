@@ -14,13 +14,13 @@ import time
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.subjects.cooccurrences import run as run_cooccurrences
 from application.pipeline.subjects.ingestion import run as run_ingest
-from application.ports.pipeline.subjects import SubjectsQueries
+from application.ports.pipeline.subjects import SubjectsIngestionQueries
 from application.ports.pipeline.transaction import OpenTransaction
 
 
 def run(
     open_tx: OpenTransaction,
-    queries: SubjectsQueries,
+    queries: SubjectsIngestionQueries,
     logger: logging.Logger,
     *,
     rebuild: bool = False,

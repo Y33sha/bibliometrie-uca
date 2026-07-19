@@ -2,7 +2,7 @@
 
 from sqlalchemy import Connection
 
-from application.ports.pipeline.subjects import PublicationSubjectLink, SubjectsQueries
+from application.ports.pipeline.subjects import PublicationSubjectLink, SubjectsIngestionQueries
 
 
 def dedup_strs(values: object) -> list[str]:
@@ -31,7 +31,7 @@ class SubjectCache:
     Clé = `lower(label)`. Sur des dizaines de milliers de publications, un même libellé revient des centaines de fois ; le cache élimine les UPSERTs SQL redondants.
     """
 
-    def __init__(self, queries: SubjectsQueries) -> None:
+    def __init__(self, queries: SubjectsIngestionQueries) -> None:
         self._queries = queries
         self._cache: dict[str, int] = {}
 
