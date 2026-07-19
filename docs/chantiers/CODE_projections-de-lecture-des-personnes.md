@@ -72,4 +72,4 @@ Deux écarts précédaient toute question de projection, et l'ont faussée : la 
 
 ## Lien
 
-Même motif que [Structures et laboratoires](CODE_structures-et-laboratoires.md) : une entité, deux piles de lecture nées de deux pages. Les deux fiches se tranchent ensemble ou pas du tout — la réponse à l'une vaut réponse à l'autre.
+Même motif que [Structures et laboratoires](archived/2026-07-19_CODE_structures-et-laboratoires.md), close : une entité, deux piles de lecture nées de deux pages. Elle a tranché en ramenant les lectures sous la ressource, le filtre qui les distinguait passant en paramètre — la route rend la collection, la page publique demande sa restriction.

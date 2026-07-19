@@ -12,13 +12,13 @@
 
 ### Non commencé
 
-- [Structures et laboratoires : une entité, deux piles de lecture](CODE_structures-et-laboratoires.md)
 - [Projections de lecture des personnes : deux endpoints pour une entité](CODE_projections-de-lecture-des-personnes.md)
 - [Qualité et cohérence des sujets](METIER_sujets-qualite.md)
 - [Signatures institutionnelles](METIER_signatures-institutionnelles.md)
 
 ## Chantiers archivés
 
+- 2026-07-19 — [Structures et laboratoires : une entité, deux piles de lecture](archived/2026-07-19_CODE_structures-et-laboratoires.md)
 - 2026-07-19 — [Typage des paramètres de requête : ce que `str` ne dit pas](archived/2026-07-19_CODE_typage-des-parametres-de-requete.md)
 - 2026-07-18 — [Routes API par ressource : supprimer le dossier `admin`](archived/2026-07-18_CODE_routes-par-ressource.md)
 - 2026-07-18 — [Les liens adresse ↔ site ne s'écrivent pas en base](archived/2026-07-18_DATA_liens-adresse-site-non-persistes.md)
