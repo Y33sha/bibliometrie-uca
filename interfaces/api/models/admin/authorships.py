@@ -16,7 +16,11 @@ class SourceAuthorshipRef(BaseModel):
 
 
 class AssignOrphanAuthorship(BaseModel):
-    source: str
+    """Attribution unitaire, seule à savoir créer la personne au passage.
+
+    `source_authorships.id` est une clé primaire : l'id désigne la signature à lui seul.
+    """
+
     authorship_id: int
     person_id: int | None = None
     create_person: CreatePersonName | None = None
@@ -24,7 +28,7 @@ class AssignOrphanAuthorship(BaseModel):
 
 
 class BatchAssignOrphanAuthorships(BaseModel):
-    """Attribution en lot : `source_authorships.id` est une clé primaire, l'id suffit à désigner chaque signature."""
+    """Attribution en lot à une personne existante."""
 
     authorship_ids: list[int]
     person_id: int

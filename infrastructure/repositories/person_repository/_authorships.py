@@ -39,30 +39,28 @@ def unlink_authorship(conn: Connection, person_id: int, source: str, authorship_
     )
 
 
-def find_source_authorship_owner(conn: Connection, source: str, authorship_id: int) -> int | None:
+def find_source_authorship_owner(conn: Connection, authorship_id: int) -> int | None:
     """`person_id` d'une signature source. `None` si elle est orpheline ou n'existe pas."""
     return conn.execute(
-        text("SELECT person_id FROM source_authorships WHERE id = :aid AND source = :src"),
-        {"aid": authorship_id, "src": source},
+        text("SELECT person_id FROM source_authorships WHERE id = :aid"),
+        {"aid": authorship_id},
     ).scalar_one_or_none()
 
 
-def assign_orphan_sa(
-    conn: Connection, person_id: int, source: str, authorship_id: int
-) -> dict | None:
+def assign_orphan_sa(conn: Connection, person_id: int, authorship_id: int) -> dict | None:
     """Tente de poser person_id sur une source_authorship orpheline.
 
-    Retourne un dict {author_name_normalized} si l'UPDATE a touché une ligne, `None` sinon — la signature n'existe pas, ou elle porte déjà un `person_id` (fût-ce celui demandé). `find_source_authorship_owner` départage.
+    Retourne un dict {source, author_name_normalized} si l'UPDATE a touché une ligne, `None` sinon — la signature n'existe pas, ou elle porte déjà un `person_id` (fût-ce celui demandé). `find_source_authorship_owner` départage.
     """
     row = conn.execute(
         text("""
             UPDATE source_authorships sa SET person_id = :pid
             FROM author_identifying_keys aik
-            WHERE sa.id = :aid AND sa.source = :src AND sa.person_id IS NULL
+            WHERE sa.id = :aid AND sa.person_id IS NULL
               AND aik.id = sa.identity_id
-            RETURNING aik.author_name_normalized
+            RETURNING sa.source::text AS source, aik.author_name_normalized
         """),
-        {"pid": person_id, "aid": authorship_id, "src": source},
+        {"pid": person_id, "aid": authorship_id},
     ).first()
     return dict(row._mapping) if row else None
 
@@ -113,7 +111,7 @@ def get_distinct_name_forms_from_source_authorships(
 
 
 def find_publication_id_for_source_authorship(
-    conn: Connection, source: str, authorship_id: int
+    conn: Connection, authorship_id: int
 ) -> int | None:
     """Résout la `publication_id` côté `source_publications` pour une
     source_authorship donnée. None si la sa n'existe pas ou n'est pas
@@ -122,9 +120,9 @@ def find_publication_id_for_source_authorship(
         text("""
             SELECT d.publication_id FROM source_authorships sa
             JOIN source_publications d ON d.id = sa.source_publication_id
-            WHERE sa.id = :aid AND sa.source = :src
+            WHERE sa.id = :aid
         """),
-        {"aid": authorship_id, "src": source},
+        {"aid": authorship_id},
     ).scalar_one_or_none()
 
 

@@ -107,13 +107,12 @@ class PersonRepository(Protocol):
     def assign_orphan_sa(
         self,
         person_id: int,
-        source: str,
         authorship_id: int,
     ) -> dict[str, Any] | None:
-        """Pose `person_id` sur une signature source orpheline. Retourne `{author_name_normalized}`, ou `None` si la signature n'existe pas ou porte déjà un `person_id` — `find_source_authorship_owner` départage."""
+        """Pose `person_id` sur une signature source orpheline. Retourne `{source, author_name_normalized}`, ou `None` si la signature n'existe pas ou porte déjà un `person_id` — `find_source_authorship_owner` départage."""
         ...
 
-    def find_source_authorship_owner(self, source: str, authorship_id: int) -> int | None:
+    def find_source_authorship_owner(self, authorship_id: int) -> int | None:
         """`person_id` d'une signature source. `None` si elle est orpheline ou n'existe pas."""
         ...
 
@@ -133,7 +132,6 @@ class PersonRepository(Protocol):
 
     def find_publication_id_for_source_authorship(
         self,
-        source: str,
         authorship_id: int,
     ) -> int | None: ...
 

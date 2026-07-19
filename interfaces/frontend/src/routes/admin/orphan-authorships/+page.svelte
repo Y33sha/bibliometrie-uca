@@ -98,7 +98,6 @@
 	async function assign(orphan: any, personId: number) {
 		await withRejectGuard(async (force) => {
 			await orphanAuthorships.assign({
-				source: orphan.source,
 				authorship_id: orphan.authorship_id,
 				person_id: personId,
 				force,
@@ -162,7 +161,6 @@
 		const { lastName, firstName, items } = createModal;
 		// Créer la personne avec la première authorship
 		const data = await orphanAuthorships.assign({
-			source: items[0].source,
 			authorship_id: items[0].authorship_id,
 			create_person: { last_name: lastName, first_name: firstName },
 		}) as { person_id?: number };

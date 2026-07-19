@@ -30,7 +30,6 @@ def exclude_authorship(
 
 def assign_orphan_authorship(
     conn: Connection,
-    source: str,
     authorship_id: int,
     *,
     person_id: int | None = None,
@@ -52,7 +51,6 @@ def assign_orphan_authorship(
         raise ValidationError("person_id ou create_person requis")
     assign_orphans.assign_orphan_authorship(
         person_id,
-        source,
         authorship_id,
         repo=repo,
         authorship_repo=authorship_repo,

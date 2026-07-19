@@ -1530,12 +1530,12 @@ export interface paths {
         options?: never;
         head?: never;
         /**
-         * Exclude Authorship Endpoint
+         * Exclude Authorship
          * @description Rejette une contribution : cette personne n'a pas signé cette publication.
          *
          *     Enregistre la paire (publication, personne) dans `rejected_authorships`, détache les signatures sources et supprime la ligne consolidée. La table de rejet vaut verrou : les reconstructions ultérieures respectent l'arbitrage. Le geste est à sens unique.
          */
-        patch: operations["exclude_authorship_endpoint_api_authorships__authorship_id__exclude_patch"];
+        patch: operations["exclude_authorship_api_authorships__authorship_id__exclude_patch"];
         trace?: never;
     };
     "/api/authorships/orphans/count": {
@@ -1547,7 +1547,7 @@ export interface paths {
         };
         /**
          * Orphan Authorships Count
-         * @description Nombre d'authorships UCA sans person_id.
+         * @description Nombre de signatures du périmètre qu'aucune personne ne porte.
          */
         get: operations["orphan_authorships_count_api_authorships_orphans_count_get"];
         put?: never;
@@ -1567,7 +1567,7 @@ export interface paths {
         };
         /**
          * List Orphan Authorships
-         * @description Liste les authorships UCA sans person_id.
+         * @description Liste les signatures du périmètre qu'aucune personne ne porte.
          */
         get: operations["list_orphan_authorships_api_authorships_orphans_get"];
         put?: never;
@@ -1588,12 +1588,12 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Assign Orphan Authorship Endpoint
-         * @description Attribue une signature orpheline à une personne.
+         * Assign Orphan Authorship
+         * @description Attribue une signature orpheline à une personne, que la requête désigne ou fait créer.
          *
          *     Renvoie 400 sans `person_id` ni `create_person`, et sans patronyme à la création (`assign_orphan_authorship`) ; 404 sur une personne ou une signature introuvable ; 409 sur une paire déjà rejetée (`RejectedPairError`), à moins que `force` ne lève le rejet au passage, et sur une signature qui porte déjà une personne (`AuthorshipAlreadyAssignedError`).
          */
-        post: operations["assign_orphan_authorship_endpoint_api_authorships_orphans_assign_post"];
+        post: operations["assign_orphan_authorship_api_authorships_orphans_assign_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1611,9 +1611,9 @@ export interface paths {
         put?: never;
         /**
          * Batch Assign Orphan Authorships
-         * @description Attribue plusieurs signatures orphelines à une même personne.
+         * @description Attribue plusieurs signatures orphelines à une personne existante.
          *
-         *     Renvoie 404 sur une personne introuvable, 409 (`RejectedPairError`) dès qu'une paire du lot est déjà rejetée, à moins que `force` ne lève les rejets au passage.
+         *     Les signatures déjà rattachées sont ignorées, là où l'attribution unitaire les refuse : le décompte rendu ne compte que celles qui étaient orphelines. Renvoie 404 sur une personne introuvable, 409 (`RejectedPairError`) dès qu'une paire du lot est déjà rejetée, à moins que `force` ne lève les rejets au passage.
          */
         post: operations["batch_assign_orphan_authorships_api_authorships_orphans_batch_assign_post"];
         delete?: never;
@@ -2602,10 +2602,13 @@ export interface components {
             /** Count */
             count: number;
         };
-        /** AssignOrphanAuthorship */
+        /**
+         * AssignOrphanAuthorship
+         * @description Attribution unitaire, seule à savoir créer la personne au passage.
+         *
+         *     `source_authorships.id` est une clé primaire : l'id désigne la signature à lui seul.
+         */
         AssignOrphanAuthorship: {
-            /** Source */
-            source: string;
             /** Authorship Id */
             authorship_id: number;
             /** Person Id */
@@ -2624,7 +2627,7 @@ export interface components {
         };
         /**
          * BatchAssignOrphanAuthorships
-         * @description Attribution en lot : `source_authorships.id` est une clé primaire, l'id suffit à désigner chaque signature.
+         * @description Attribution en lot à une personne existante.
          */
         BatchAssignOrphanAuthorships: {
             /** Authorship Ids */
@@ -7921,7 +7924,7 @@ export interface operations {
             };
         };
     };
-    exclude_authorship_endpoint_api_authorships__authorship_id__exclude_patch: {
+    exclude_authorship_api_authorships__authorship_id__exclude_patch: {
         parameters: {
             query?: never;
             header?: never;
@@ -8005,7 +8008,7 @@ export interface operations {
             };
         };
     };
-    assign_orphan_authorship_endpoint_api_authorships_orphans_assign_post: {
+    assign_orphan_authorship_api_authorships_orphans_assign_post: {
         parameters: {
             query?: never;
             header?: never;
