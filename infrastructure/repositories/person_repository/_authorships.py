@@ -10,7 +10,7 @@ def link_authorship(
     conn: Connection,
     person_id: int,
     source: str,
-    authorship_id: int,
+    source_authorship_id: int,
     resolution_mode: str,
 ) -> None:
     """Rattache une authorship source à une personne, en marquant le canal de résolution.
@@ -25,29 +25,29 @@ def link_authorship(
             "resolution_mode = CAST(:mode AS resolution_mode) "
             "WHERE id = :aid AND source = :src"
         ),
-        {"pid": person_id, "aid": authorship_id, "src": source, "mode": resolution_mode},
+        {"pid": person_id, "aid": source_authorship_id, "src": source, "mode": resolution_mode},
     )
 
 
-def unlink_authorship(conn: Connection, person_id: int, source: str, authorship_id: int) -> None:
+def unlink_authorship(conn: Connection, person_id: int, source: str, source_authorship_id: int) -> None:
     conn.execute(
         text("""
             UPDATE source_authorships SET person_id = NULL
             WHERE id = :aid AND person_id = :pid AND source = :src
         """),
-        {"aid": authorship_id, "pid": person_id, "src": source},
+        {"aid": source_authorship_id, "pid": person_id, "src": source},
     )
 
 
-def find_source_authorship_owner(conn: Connection, authorship_id: int) -> int | None:
+def find_source_authorship_owner(conn: Connection, source_authorship_id: int) -> int | None:
     """`person_id` d'une signature source. `None` si elle est orpheline ou n'existe pas."""
     return conn.execute(
         text("SELECT person_id FROM source_authorships WHERE id = :aid"),
-        {"aid": authorship_id},
+        {"aid": source_authorship_id},
     ).scalar_one_or_none()
 
 
-def assign_orphan_sa(conn: Connection, person_id: int, authorship_id: int) -> dict | None:
+def assign_orphan_sa(conn: Connection, person_id: int, source_authorship_id: int) -> dict | None:
     """Tente de poser person_id sur une source_authorship orpheline.
 
     Retourne un dict {source, author_name_normalized} si l'UPDATE a touché une ligne, `None` sinon — la signature n'existe pas, ou elle porte déjà un `person_id` (fût-ce celui demandé). `find_source_authorship_owner` départage.
@@ -60,7 +60,7 @@ def assign_orphan_sa(conn: Connection, person_id: int, authorship_id: int) -> di
               AND aik.id = sa.identity_id
             RETURNING sa.source::text AS source, aik.author_name_normalized
         """),
-        {"pid": person_id, "aid": authorship_id},
+        {"pid": person_id, "aid": source_authorship_id},
     ).first()
     return dict(row._mapping) if row else None
 
@@ -111,7 +111,7 @@ def get_distinct_name_forms_from_source_authorships(
 
 
 def find_publication_id_for_source_authorship(
-    conn: Connection, authorship_id: int
+    conn: Connection, source_authorship_id: int
 ) -> int | None:
     """Résout la `publication_id` côté `source_publications` pour une
     source_authorship donnée. None si la sa n'existe pas ou n'est pas
@@ -122,7 +122,7 @@ def find_publication_id_for_source_authorship(
             JOIN source_publications d ON d.id = sa.source_publication_id
             WHERE sa.id = :aid
         """),
-        {"aid": authorship_id},
+        {"aid": source_authorship_id},
     ).scalar_one_or_none()
 
 

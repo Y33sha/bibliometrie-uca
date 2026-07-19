@@ -99,7 +99,7 @@ def assign_orphan_authorship(
 
     person_id = authorship_commands.assign_orphan_authorship(
         conn,
-        body.authorship_id,
+        body.source_authorship_id,
         person_id=body.person_id,
         new_person=new_person,
         repo=persons,
@@ -126,13 +126,13 @@ def batch_assign_orphan_authorships(
 
     Les signatures déjà rattachées sont ignorées, là où l'attribution unitaire les refuse : le décompte rendu ne compte que celles qui étaient orphelines. Renvoie 404 sur une personne introuvable, 409 (`RejectedPairError`) dès qu'une paire du lot est déjà rejetée, à moins que `force` ne lève les rejets au passage.
     """
-    if not body.authorship_ids:
+    if not body.source_authorship_ids:
         return OrphanBatchAssignResponse(assigned=0)
 
     assigned = authorship_commands.batch_assign_orphan_authorships(
         conn,
         body.person_id,
-        body.authorship_ids,
+        body.source_authorship_ids,
         repo=persons,
         authorship_repo=authorships,
         audit_repo=audit,

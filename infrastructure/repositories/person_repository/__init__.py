@@ -96,19 +96,21 @@ class PgPersonRepository:
         self,
         person_id: int,
         source: str,
-        authorship_id: int,
+        source_authorship_id: int,
         resolution_mode: str,
     ) -> None:
-        _authorships.link_authorship(self._conn, person_id, source, authorship_id, resolution_mode)
+        _authorships.link_authorship(
+            self._conn, person_id, source, source_authorship_id, resolution_mode
+        )
 
-    def unlink_authorship(self, person_id: int, source: str, authorship_id: int) -> None:
-        _authorships.unlink_authorship(self._conn, person_id, source, authorship_id)
+    def unlink_authorship(self, person_id: int, source: str, source_authorship_id: int) -> None:
+        _authorships.unlink_authorship(self._conn, person_id, source, source_authorship_id)
 
-    def assign_orphan_sa(self, person_id: int, authorship_id: int) -> dict | None:
-        return _authorships.assign_orphan_sa(self._conn, person_id, authorship_id)
+    def assign_orphan_sa(self, person_id: int, source_authorship_id: int) -> dict | None:
+        return _authorships.assign_orphan_sa(self._conn, person_id, source_authorship_id)
 
-    def find_source_authorship_owner(self, authorship_id: int) -> int | None:
-        return _authorships.find_source_authorship_owner(self._conn, authorship_id)
+    def find_source_authorship_owner(self, source_authorship_id: int) -> int | None:
+        return _authorships.find_source_authorship_owner(self._conn, source_authorship_id)
 
     # ── Opérations atomiques pour le use case `assign_orphans` ────
 
@@ -120,8 +122,10 @@ class PgPersonRepository:
     def get_distinct_name_forms_from_source_authorships(self, sa_ids: list[int]) -> list[str]:
         return _authorships.get_distinct_name_forms_from_source_authorships(self._conn, sa_ids)
 
-    def find_publication_id_for_source_authorship(self, authorship_id: int) -> int | None:
-        return _authorships.find_publication_id_for_source_authorship(self._conn, authorship_id)
+    def find_publication_id_for_source_authorship(self, source_authorship_id: int) -> int | None:
+        return _authorships.find_publication_id_for_source_authorship(
+            self._conn, source_authorship_id
+        )
 
     def find_publication_ids_for_source_authorships(self, sa_ids: list[int]) -> list[int]:
         return _authorships.find_publication_ids_for_source_authorships(self._conn, sa_ids)

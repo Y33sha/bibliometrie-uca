@@ -20,7 +20,7 @@ _ORPHAN_BASE = f"""
 
 
 def orphan_authorships_count(conn: Connection) -> dict[str, Any]:
-    """Nombre d'authorships UCA sans person_id."""
+    """Nombre de signatures du périmètre qu'aucune personne ne porte."""
     row = conn.execute(
         text(f"""
             SELECT COUNT(*) AS total
@@ -36,7 +36,7 @@ def orphan_authorships_count(conn: Connection) -> dict[str, Any]:
 def list_orphan_authorships(
     conn: Connection, *, search: str, page: int, per_page: int
 ) -> dict[str, Any]:
-    """Liste paginée des authorships orphelines avec publication."""
+    """Liste paginée des signatures orphelines, avec la publication qu'elles signent."""
     offset = (page - 1) * per_page
     search_cond = ""
     binds: dict[str, Any] = {}
@@ -58,7 +58,7 @@ def list_orphan_authorships(
 
     rows = conn.execute(
         text(f"""
-            SELECT sa.source, sa.id AS authorship_id,
+            SELECT sa.source, sa.id AS source_authorship_id,
                    sa.raw_author_name AS full_name,
                    sd.publication_id,
                    p.title AS pub_title, p.pub_year
@@ -99,7 +99,7 @@ def name_form_authorships(conn: Connection, person_id: int, name_form: str) -> d
     + autres personnes partageant cette forme."""
     auth_rows = conn.execute(
         text(f"""
-            SELECT sa.source, sa.id AS authorship_id,
+            SELECT sa.source, sa.id AS source_authorship_id,
                    sd.publication_id AS pub_id, sd.title, sd.pub_year, sd.doi
             FROM source_authorships sa
             JOIN author_identifying_keys aik ON aik.id = sa.identity_id

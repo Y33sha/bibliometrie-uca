@@ -69,7 +69,7 @@ def _resolve_rejection(
 
 def assign_orphan_authorship(
     person_id: int,
-    authorship_id: int,
+    source_authorship_id: int,
     *,
     repo: PersonRepository,
     authorship_repo: AuthorshipRepository,
@@ -89,7 +89,7 @@ def assign_orphan_authorship(
     """
     _require_person(person_id, repo=repo)
 
-    publication_id = repo.find_publication_id_for_source_authorship(authorship_id)
+    publication_id = repo.find_publication_id_for_source_authorship(source_authorship_id)
     if publication_id is not None:
         _resolve_rejection(
             person_id,
@@ -99,19 +99,19 @@ def assign_orphan_authorship(
             force=force,
         )
 
-    row = repo.assign_orphan_sa(person_id, authorship_id)
+    row = repo.assign_orphan_sa(person_id, source_authorship_id)
     if row is None:
         # L'UPDATE ne pose `person_id` que sur une signature orpheline : son échec signale une
         # signature absente ou déjà rattachée. Un `owner` nul tranche pour l'absence — sur une
         # signature orpheline et existante, l'UPDATE aboutit.
-        owner = repo.find_source_authorship_owner(authorship_id)
+        owner = repo.find_source_authorship_owner(source_authorship_id)
         if owner is None:
-            raise NotFoundError(f"Signature #{authorship_id} introuvable")
-        raise AuthorshipAlreadyAssignedError(authorship_id, owner)
+            raise NotFoundError(f"Signature #{source_authorship_id} introuvable")
+        raise AuthorshipAlreadyAssignedError(source_authorship_id, owner)
 
     # Épingler la résolution admin (must-link grain signature) : le pipeline la
     # relira comme entrée fixe et ne re-dérivera jamais cette signature.
-    authorship_repo.pin_authorships([authorship_id], person_id)
+    authorship_repo.pin_authorships([source_authorship_id], person_id)
 
     # Ajouter la forme de nom
     if row["author_name_normalized"]:
@@ -179,7 +179,7 @@ def _refresh_authorship_from_sources(
 
     Chaîne :
     1. INSERT IF MISSING dans authorships
-    2. Pose la FK source_authorships.authorship_id (sources non exclues)
+    2. Pose la FK source_authorships.source_authorship_id (sources non exclues)
     3. Recalcule author_position (par priorité de source) et is_corresponding (bool_or)
     4. Recalcule in_perimeter (agrégation OR ; les structures dérivées vivent dans la matview `authorship_structures`, rafraîchie par l'appelant)
     """
