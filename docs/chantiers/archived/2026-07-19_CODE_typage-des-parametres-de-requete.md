@@ -73,6 +73,14 @@ Sept paramètres : `has_orcid`, `has_idhal`, `has_idref`, `has_rh`, `has_pending
 - [x] `parse_vocabulary_csv` refuse les valeurs intruses par un 422 qui nomme le vocabulaire attendu. Le raccourci `oa` est un terme d'entrée et non un statut stocké : il entre dans le vocabulaire d'`oa_status` sans figurer dans `OA_RANK`.
 - [x] `access_clause` se déduit de la ventilation au lieu d'égrener trois branches littérales, et un test du domaine vérifie que les trois niveaux couvrent `OA_RANK` sans se recouvrir.
 
+## État à la clôture
+
+Aucun paramètre de requête ne porte plus un vocabulaire que rien ne contrôle. Les sept tri-états sont des booléens optionnels, les sept vocabulaires fermés des `Literal`, les prédicats composés des motifs que FastAPI applique occurrence par occurrence, et les listes à vocabulaire fermé passent par un contrôle après découpage. Une valeur intruse rend un 422 partout, là où elle était ignorée en silence et rendait une liste plus large que demandée sous un code 200.
+
+Le typage a fait tomber ce qui n'avait plus d'objet : trois décodeurs `"yes"`/`"no"`, cinq replis `_SORT_MAP.get(sort, défaut)`, et la règle de tolérance des deux parseurs de prédicats. Il a aussi obligé à nommer des vocabulaires qui vivaient en littéraux dans des corps de fonction — les niveaux d'accès, les statuts de dépôt HAL — et à supprimer une déclaration en double des statuts OA fermés.
+
+Reste hors de ce chantier, noté dans [Lisibilité](CODE_lisibilite.md) : le filtre `hal_status` ne s'applique que si exactement un laboratoire est sélectionné, et son absence d'effet ne se signale pas. Le vocabulaire est validé, sa portée non.
+
 ## Questions ouvertes
 
 Aucune.
