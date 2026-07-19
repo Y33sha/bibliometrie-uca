@@ -3315,8 +3315,8 @@ export interface components {
             last_name: string;
             /** Has Rh */
             has_rh: boolean;
-            /** Pub Count */
-            pub_count: number;
+            /** Signature Count */
+            signature_count: number;
             /** Labs */
             labs: string[];
         };
@@ -3979,6 +3979,8 @@ export interface components {
         /**
          * PersonDirectoryEntry
          * @description Ligne de l'annuaire public `/api/persons/directory`.
+         *
+         *     `pub_count` compte les publications que la personne signe **comme auteur** — distinct des signatures tous rôles que la liste de curation porte sous `signature_count`. Sous scope `lab_id`, il se restreint aux publications du laboratoire.
          */
         PersonDirectoryEntry: {
             /** Id */
@@ -4074,10 +4076,10 @@ export interface components {
             has_rh: boolean;
             /** Rejected */
             rejected: boolean;
-            /** Pub Count */
-            pub_count: number;
-            /** Uca Pub Count */
-            uca_pub_count: number;
+            /** Signature Count */
+            signature_count: number;
+            /** In Perimeter Signature Count */
+            in_perimeter_signature_count: number;
             /** Identifiers */
             identifiers: components["schemas"]["PersonIdentifierOut"][] | null;
             /** Name Forms */
@@ -7132,7 +7134,7 @@ export interface operations {
                 has_rh?: boolean | null;
                 has_pending_forms?: boolean | null;
                 has_pending_identifiers?: boolean | null;
-                sort?: "name_asc" | "name_desc" | "pubs_asc" | "pubs_desc" | "uca_pubs_asc" | "uca_pubs_desc";
+                sort?: "name_asc" | "name_desc" | "signatures_asc" | "signatures_desc" | "in_perimeter_signatures_asc" | "in_perimeter_signatures_desc";
             };
             header?: never;
             path?: never;

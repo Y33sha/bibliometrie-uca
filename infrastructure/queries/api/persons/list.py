@@ -139,10 +139,10 @@ def search_persons(conn: Connection, *, q: str, limit: int) -> list[dict[str, An
 _LIST_SORT_MAP = {
     "name_asc": "LOWER(p.last_name) ASC, LOWER(p.first_name) ASC",
     "name_desc": "LOWER(p.last_name) DESC, LOWER(p.first_name) DESC",
-    "pubs_asc": "pub_count ASC, LOWER(p.last_name) ASC",
-    "pubs_desc": "pub_count DESC, LOWER(p.last_name) ASC",
-    "uca_pubs_asc": "uca_pub_count ASC, LOWER(p.last_name) ASC",
-    "uca_pubs_desc": "uca_pub_count DESC, LOWER(p.last_name) ASC",
+    "signatures_asc": "signature_count ASC, LOWER(p.last_name) ASC",
+    "signatures_desc": "signature_count DESC, LOWER(p.last_name) ASC",
+    "in_perimeter_signatures_asc": "in_perimeter_signature_count ASC, LOWER(p.last_name) ASC",
+    "in_perimeter_signatures_desc": "in_perimeter_signature_count DESC, LOWER(p.last_name) ASC",
 }
 
 
@@ -153,17 +153,7 @@ def list_persons(
     offset = (page - 1) * per_page
     clauses: list[WhereClause | None] = []
 
-    if filters.search:
-        clauses.append(
-            WhereClause(
-                """(
-                    unaccent(p.last_name) ILIKE unaccent(:search_pat)
-                    OR unaccent(p.first_name) ILIKE unaccent(:search_pat)
-                    OR prh.email ILIKE :search_pat
-                )""",
-                {"search_pat": f"%{filters.search}%"},
-            )
-        )
+    clauses.append(person_search_clause(filters.search))
     clauses.append(person_department_clause(filters.departments))
     clauses.append(person_role_clause(filters.roles))
     clauses.append(person_has_identifier_clause("orcid", filters.has_orcid))
@@ -191,8 +181,9 @@ def list_persons(
                 p.last_name_normalized, p.first_name_normalized,
                 prh.role_title, prh.department_name, prh.start_date, prh.end_date,
                 (prh.id IS NOT NULL) AS has_rh, p.rejected,
-                (SELECT COUNT(*) FROM authorships a WHERE a.person_id = p.id) AS pub_count,
-                (SELECT COUNT(*) FROM authorships a WHERE a.person_id = p.id AND a.in_perimeter = TRUE) AS uca_pub_count
+                (SELECT COUNT(*) FROM authorships a WHERE a.person_id = p.id) AS signature_count,
+                (SELECT COUNT(*) FROM authorships a WHERE a.person_id = p.id AND a.in_perimeter = TRUE)
+                    AS in_perimeter_signature_count
             FROM persons p
             LEFT JOIN persons_rh prh ON prh.person_id = p.id
             WHERE {where_sql}
@@ -292,9 +283,9 @@ def person_admin(conn: Connection, person_id: int) -> dict[str, Any] | None:
                 p.last_name_normalized, p.first_name_normalized,
                 prh.role_title, prh.department_name, prh.start_date, prh.end_date,
                 (prh.id IS NOT NULL) AS has_rh, p.rejected,
-                (SELECT COUNT(*) FROM authorships a WHERE a.person_id = p.id) AS pub_count,
+                (SELECT COUNT(*) FROM authorships a WHERE a.person_id = p.id) AS signature_count,
                 (SELECT COUNT(*) FROM authorships a
-                 WHERE a.person_id = p.id AND a.in_perimeter = TRUE) AS uca_pub_count
+                 WHERE a.person_id = p.id AND a.in_perimeter = TRUE) AS in_perimeter_signature_count
             FROM persons p
             LEFT JOIN persons_rh prh ON prh.person_id = p.id
             WHERE p.id = :id

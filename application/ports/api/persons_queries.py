@@ -35,7 +35,12 @@ PersonDirectorySort = Literal[
     "role_desc",
 ]
 PersonListSort = Literal[
-    "name_asc", "name_desc", "pubs_asc", "pubs_desc", "uca_pubs_asc", "uca_pubs_desc"
+    "name_asc",
+    "name_desc",
+    "signatures_asc",
+    "signatures_desc",
+    "in_perimeter_signatures_asc",
+    "in_perimeter_signatures_desc",
 ]
 
 
@@ -106,7 +111,10 @@ class NameFormSummaryOut(BaseModel):
 
 
 class PersonDirectoryEntry(BaseModel):
-    """Ligne de l'annuaire public `/api/persons/directory`."""
+    """Ligne de l'annuaire public `/api/persons/directory`.
+
+    `pub_count` compte les publications que la personne signe **comme auteur** — distinct des signatures tous rôles que la liste de curation porte sous `signature_count`. Sous scope `lab_id`, il se restreint aux publications du laboratoire.
+    """
 
     id: int
     last_name: str
@@ -148,8 +156,10 @@ class PersonOut(BaseModel):
     end_date: date | None
     has_rh: bool
     rejected: bool
-    pub_count: int
-    uca_pub_count: int
+    signature_count: int
+    """Signatures de la personne, tous rôles — auteur, mais aussi jury ou rapporteur d'une thèse."""
+    in_perimeter_signature_count: int
+    """Celles de ces signatures que le périmètre retient."""
     identifiers: list[PersonIdentifierOut] | None
     name_forms: list[NameFormSummaryOut] | None
 
@@ -322,7 +332,8 @@ class IdentifierConflictPersonOut(BaseModel):
     first_name: str
     last_name: str
     has_rh: bool
-    pub_count: int
+    signature_count: int
+    """Signatures de la personne, tous rôles — même mesure que la liste de curation."""
     labs: list[str]
 
 
