@@ -6,7 +6,7 @@ Le package est organisé par thème :
 - `facets` : `persons_facets`, `persons_stats`
 - `detail` : `person_profile`, `person_theses`, `person_addresses`,
   `person_dashboard`, `person_subjects`
-- `admin` : orphan authorships, name-form authorships
+- `admin` : authorships par forme de nom, files de triage des formes et des identifiants
 
 L'adapter d'écriture pipeline (`pipeline.persons_matching`) vit côté
 `infrastructure/queries/pipeline/`.
@@ -31,8 +31,6 @@ from application.ports.api.persons_queries import (
     NameDuplicatesResponse,
     NameFormAuthorshipsResponse,
     NameFormSummaryOut,
-    OrphanAuthorshipsResponse,
-    OrphanCountResponse,
     PersonAddressesResponse,
     PersonDashboardResponse,
     PersonFilters,
@@ -54,11 +52,9 @@ from infrastructure.queries.api.persons.admin import (
     detachable_intruders_count as _detachable_intruders_count,
     identifier_conflicts as _identifier_conflicts,
     identifier_conflicts_count as _identifier_conflicts_count,
-    list_orphan_authorships as _list_orphan_authorships,
     name_duplicates as _name_duplicates,
     name_duplicates_count as _name_duplicates_count,
     name_form_authorships as _name_form_authorships,
-    orphan_authorships_count as _orphan_authorships_count,
     persons_sharing_name_form as _persons_sharing_name_form,
 )
 from infrastructure.queries.api.persons.detail import (
@@ -145,17 +141,7 @@ class PgPersonsQueries(PersonsQueries):
             for r in _person_subjects(self._conn, person_id, limit=limit)
         ]
 
-    # ── Admin : orphan authorships, name forms ─────────────────────
-
-    def orphan_authorships_count(self) -> OrphanCountResponse:
-        return OrphanCountResponse.model_validate(_orphan_authorships_count(self._conn))
-
-    def list_orphan_authorships(
-        self, *, search: str, page: int, per_page: int
-    ) -> OrphanAuthorshipsResponse:
-        return OrphanAuthorshipsResponse.model_validate(
-            _list_orphan_authorships(self._conn, search=search, page=page, per_page=per_page)
-        )
+    # ── Admin : name forms ─────────────────────────────────────────
 
     def name_form_authorships(self, person_id: int, name_form: str) -> NameFormAuthorshipsResponse:
         return NameFormAuthorshipsResponse.model_validate(
