@@ -74,7 +74,7 @@ class SubjectsIngestionQueries(Protocol):
         """`DELETE` des sujets sans aucun lien `publication_subjects` (tous statuts). Retourne le nombre supprimé."""
         ...
 
-    def count_subjects(self, conn: Connection) -> int:
+    def count_all_subjects(self, conn: Connection) -> int:
         """Nombre total de sujets du référentiel (`COUNT(*)` sur `subjects`)."""
         ...
 
