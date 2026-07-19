@@ -21,7 +21,7 @@ class AssignOrphanAuthorship(BaseModel):
     `source_authorships.id` est une clé primaire : l'id désigne la signature à lui seul.
     """
 
-    authorship_id: int
+    source_authorship_id: int
     person_id: int | None = None
     create_person: CreatePersonName | None = None
     force: bool = False
@@ -30,7 +30,7 @@ class AssignOrphanAuthorship(BaseModel):
 class BatchAssignOrphanAuthorships(BaseModel):
     """Attribution en lot à une personne existante."""
 
-    authorship_ids: list[int]
+    source_authorship_ids: list[int]
     person_id: int
     force: bool = False
 

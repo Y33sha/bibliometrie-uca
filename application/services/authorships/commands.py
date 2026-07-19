@@ -21,7 +21,10 @@ def exclude_authorship(
     person_repo: PersonRepository,
     audit_repo: AuditRepository,
 ) -> None:
-    """Rejette une contribution (paire publication/personne) et la détache. Action à sens unique."""
+    """Rejette une contribution (paire publication/personne) et la détache. Action à sens unique.
+
+    `authorship_id` désigne la ligne consolidée, quand les gestes sur les orphelines adressent une signature source.
+    """
     authorships_service.exclude_authorship(
         authorship_id, repo=repo, person_repo=person_repo, audit_repo=audit_repo
     )
@@ -30,7 +33,7 @@ def exclude_authorship(
 
 def assign_orphan_authorship(
     conn: Connection,
-    authorship_id: int,
+    source_authorship_id: int,
     *,
     person_id: int | None = None,
     new_person: tuple[str, str] | None = None,
@@ -51,7 +54,7 @@ def assign_orphan_authorship(
         raise ValidationError("person_id ou create_person requis")
     assign_orphans.assign_orphan_authorship(
         person_id,
-        authorship_id,
+        source_authorship_id,
         repo=repo,
         authorship_repo=authorship_repo,
         audit_repo=audit_repo,

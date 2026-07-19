@@ -27,9 +27,9 @@
 	// Une seule ligne peut avoir son panneau "attribuer" ouvert à la fois.
 	let activeAssignIdx: number | null = $state(null);
 	const assignSearch = useDebouncedSearch<PersonResult>({ search: searchPersons });
-	let selectedIds = $state(new Set<string>());  // "source-authorship_id"
+	let selectedIds = $state(new Set<string>());  // clé locale "source-source_authorship_id"
 	const batchSearch = useDebouncedSearch<PersonResult>({ search: searchPersons });
-	const allSelected = $derived(orphans.length > 0 && orphans.every(o => selectedIds.has(`${o.source}-${o.authorship_id}`)));
+	const allSelected = $derived(orphans.length > 0 && orphans.every(o => selectedIds.has(`${o.source}-${o.source_authorship_id}`)));
 	let createModal: { lastName: string; firstName: string; items: OrphanAuthorship[] } | null = $state(null);
 	// Modale de confirmation quand la réassignation porte sur une paire déjà rejetée (409).
 	let rejectModal: { detail: string; pairs: RejectedPair[]; retry: () => Promise<void> } | null =
@@ -98,7 +98,7 @@
 	async function assign(orphan: any, personId: number) {
 		await withRejectGuard(async (force) => {
 			await orphanAuthorships.assign({
-				authorship_id: orphan.authorship_id,
+				source_authorship_id: orphan.source_authorship_id,
 				person_id: personId,
 				force,
 			});
@@ -117,7 +117,7 @@
 	}
 
 	function toggleSelect(o: any) {
-		const key = `${o.source}-${o.authorship_id}`;
+		const key = `${o.source}-${o.source_authorship_id}`;
 		const s = new Set(selectedIds);
 		if (s.has(key)) s.delete(key); else s.add(key);
 		selectedIds = s;
@@ -127,16 +127,16 @@
 		if (allSelected) {
 			selectedIds = new Set();
 		} else {
-			selectedIds = new Set(orphans.map(o => `${o.source}-${o.authorship_id}`));
+			selectedIds = new Set(orphans.map(o => `${o.source}-${o.source_authorship_id}`));
 		}
 	}
 
 	async function batchAssign(personId: number) {
-		const items = orphans.filter(o => selectedIds.has(`${o.source}-${o.authorship_id}`));
+		const items = orphans.filter(o => selectedIds.has(`${o.source}-${o.source_authorship_id}`));
 		await withRejectGuard(async (force) => {
 			await orphanAuthorships.batchAssign({
 				person_id: personId,
-				authorship_ids: items.map(o => o.authorship_id),
+				source_authorship_ids: items.map(o => o.source_authorship_id),
 				force,
 			});
 			selectedIds = new Set();
@@ -146,7 +146,7 @@
 	}
 
 	function openCreateModal() {
-		const items = orphans.filter(o => selectedIds.has(`${o.source}-${o.authorship_id}`));
+		const items = orphans.filter(o => selectedIds.has(`${o.source}-${o.source_authorship_id}`));
 		if (!items.length) return;
 		const first = items[0];
 		createModal = {
@@ -161,7 +161,7 @@
 		const { lastName, firstName, items } = createModal;
 		// Créer la personne avec la première authorship
 		const data = await orphanAuthorships.assign({
-			authorship_id: items[0].authorship_id,
+			source_authorship_id: items[0].source_authorship_id,
 			create_person: { last_name: lastName, first_name: firstName },
 		}) as { person_id?: number };
 		if (!data.person_id) return;
@@ -170,7 +170,7 @@
 		if (remaining.length) {
 			await orphanAuthorships.batchAssign({
 				person_id: data.person_id,
-				authorship_ids: remaining.map((o: any) => o.authorship_id),
+				source_authorship_ids: remaining.map((o: any) => o.source_authorship_id),
 			});
 		}
 		createModal = null;
@@ -259,7 +259,7 @@
 		<tbody>
 			{#each orphans as o, i}
 				<tr>
-					<td><input type="checkbox" checked={selectedIds.has(`${o.source}-${o.authorship_id}`)} onchange={() => toggleSelect(o)} /></td>
+					<td><input type="checkbox" checked={selectedIds.has(`${o.source}-${o.source_authorship_id}`)} onchange={() => toggleSelect(o)} /></td>
 					<td><span class="tag tag-source">{SOURCE_LABELS[o.source] ?? o.source}</span></td>
 					<td>{o.full_name}</td>
 					<td>

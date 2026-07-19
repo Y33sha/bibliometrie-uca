@@ -2609,8 +2609,8 @@ export interface components {
          *     `source_authorships.id` est une clé primaire : l'id désigne la signature à lui seul.
          */
         AssignOrphanAuthorship: {
-            /** Authorship Id */
-            authorship_id: number;
+            /** Source Authorship Id */
+            source_authorship_id: number;
             /** Person Id */
             person_id?: number | null;
             create_person?: components["schemas"]["CreatePersonName"] | null;
@@ -2630,8 +2630,8 @@ export interface components {
          * @description Attribution en lot à une personne existante.
          */
         BatchAssignOrphanAuthorships: {
-            /** Authorship Ids */
-            authorship_ids: number[];
+            /** Source Authorship Ids */
+            source_authorship_ids: number[];
             /** Person Id */
             person_id: number;
             /**
@@ -3788,8 +3788,8 @@ export interface components {
         OrphanAuthorshipOut: {
             /** Source */
             source: string;
-            /** Authorship Id */
-            authorship_id: number;
+            /** Source Authorship Id */
+            source_authorship_id: number;
             /** Full Name */
             full_name: string;
             /** Last Name */

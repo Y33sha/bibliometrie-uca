@@ -397,7 +397,7 @@ class OrphanCountResponse(BaseModel):
 
 class OrphanAuthorshipOut(BaseModel):
     source: str
-    authorship_id: int
+    source_authorship_id: int
     full_name: str
     last_name: str
     first_name: str
