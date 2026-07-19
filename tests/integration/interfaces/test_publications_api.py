@@ -93,7 +93,7 @@ class TestPublicationsList:
         assert r.status_code == 200
 
     def test_sort_by_title(self, client):
-        r = client.get("/api/publications", params={"sort": "title"})
+        r = client.get("/api/publications", params={"sort": "title_asc"})
         assert r.status_code == 200
 
     def test_complex_filter_combination(self, client):

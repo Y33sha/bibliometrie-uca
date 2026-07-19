@@ -226,7 +226,6 @@ class TestListJournals:
             "publisher_desc",
             "pubs_asc",
             "pubs_desc",
-            "unknown",
         ],
     )
     def test_sort_variants(self, client, sort):

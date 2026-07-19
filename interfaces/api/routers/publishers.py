@@ -9,6 +9,7 @@ from application.ports.api.publishers_queries import (
     PublisherListResponse,
     PublisherQueries,
     PublishersFacetsResponse,
+    PublisherSort,
 )
 from application.ports.api.subjects_queries import SubjectFrequency
 from application.ports.pipeline.metadata_correction import MetadataCorrectionQueries
@@ -80,7 +81,7 @@ def list_publishers(
     publisher_type: str = Query(""),
     country: str = Query(""),
     with_pubs: bool = False,
-    sort: str = "name_asc",
+    sort: PublisherSort = "name_asc",
     queries: PublisherQueries = Depends(publisher_queries),
 ) -> PublisherListResponse:
     """Liste paginée des éditeurs, avec le décompte de leurs revues et de leurs publications.
@@ -91,7 +92,7 @@ def list_publishers(
     - `publisher_type` et `country` : valeurs séparées par des virgules (par exemple `commercial,learned_society`), vide valant absence de filtre, selon la convention multi-valeurs de `/api/journals` et `/api/publications`.
     - `with_pubs` : restreint aux éditeurs dont le `pub_count` est non nul. Ce compteur ne retient que les publications du périmètre, atteintes par les revues de l'éditeur : un éditeur dont toutes les publications sont hors périmètre est donc « orphelin ». La page publique s'en sert pour les masquer, que l'admin garde la possibilité de voir.
 
-    `sort` accepte `name`, `journals` et `pubs`, suffixés de `_asc` ou `_desc`, et retombe sur `name_asc` devant une valeur inconnue.
+    `sort` accepte `name`, `journals` et `pubs`, suffixés de `_asc` ou `_desc` ; toute autre valeur rend un 422.
     """
     return queries.list_publishers(
         search=search,

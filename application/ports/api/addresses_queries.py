@@ -4,11 +4,15 @@ Implémenté par `infrastructure.queries.api.addresses.PgAddressesQueries`.
 """
 
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel
 
 from application.ports.api._common import PaginatedResponse
+
+# Etat de detection d'un rattachement adresse-structure, et etat de son arbitrage manuel.
+AddressDetected = Literal["all", "yes", "no"]
+AddressValidation = Literal["all", "pending", "confirmed", "rejected"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,8 +36,8 @@ class StructurePredicate:
 
 @dataclass(frozen=True, slots=True)
 class AddressListFilters:
-    detected: str = "yes"  # all, yes, no
-    validation: str = "pending"  # all, pending, confirmed, rejected
+    detected: AddressDetected = "yes"
+    validation: AddressValidation = "pending"
     text_predicates: tuple[TextPredicate, ...] = ()
     structure_predicates: tuple[StructurePredicate, ...] = ()
 

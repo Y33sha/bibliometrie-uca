@@ -15,6 +15,7 @@ from application.ports.api.publishers_queries import (
     PublisherQueries,
     PublishersFacetOption,
     PublishersFacetsResponse,
+    PublisherSort,
 )
 from application.ports.api.subjects_queries import SubjectFrequency
 from domain.normalize import normalize_text
@@ -120,7 +121,7 @@ class PgPublisherQueries(PublisherQueries):
         publisher_types: list[str],
         countries: list[str],
         with_pubs: bool,
-        sort: str,
+        sort: PublisherSort,
         page: int,
         per_page: int,
     ) -> PublisherListResponse:
@@ -137,7 +138,7 @@ class PgPublisherQueries(PublisherQueries):
         ).one()
         total = total_row.total
 
-        order = _SORT_MAP.get(sort, _SORT_MAP["name_asc"])
+        order = _SORT_MAP[sort]
         offset = (page - 1) * per_page
         rows = self._conn.execute(
             text(f"""

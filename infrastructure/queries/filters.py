@@ -588,4 +588,4 @@ def persons_sort_clause(sort: str) -> str:
         "role_desc": "prh.role_title DESC NULLS LAST, LOWER(p.last_name) ASC",
     }
     # Typing mypy : la signature Any du key n'est pas garantie, on cast
-    return SORT_MAP.get(sort, SORT_MAP["name_asc"])
+    return SORT_MAP[sort]

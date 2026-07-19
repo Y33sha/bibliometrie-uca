@@ -8,11 +8,13 @@ from sqlalchemy import Connection
 
 from application.ports.api.addresses_queries import (
     AddressCountriesFilters,
+    AddressDetected,
     AddressesCountriesResponse,
     AddressesQueries,
     AddressListFilters,
     AddressListResponse,
     AddressStatsResponse,
+    AddressValidation,
     StructurePredicate,
     TextPredicate,
 )
@@ -78,8 +80,8 @@ def list_addresses(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=200),
     structure_id: int | None = Query(None),
-    detected: str = Query("yes"),
-    validation: str = Query("pending"),
+    detected: AddressDetected = Query("yes"),
+    validation: AddressValidation = Query("pending"),
     text: list[str] = Query(default=[]),
     struct: list[str] = Query(default=[]),
     queries: AddressesQueries = Depends(addresses_queries),

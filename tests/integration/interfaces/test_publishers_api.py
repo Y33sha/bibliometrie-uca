@@ -182,25 +182,24 @@ class TestListPublishers:
         assert r.status_code == 200
 
     def test_sort_journals(self, client):
-        r = client.get("/api/publishers", params={"sort": "journals"})
+        r = client.get("/api/publishers", params={"sort": "journals_asc"})
         assert r.status_code == 200
 
     def test_sort_journals_desc(self, client):
-        r = client.get("/api/publishers", params={"sort": "-journals"})
+        r = client.get("/api/publishers", params={"sort": "journals_desc"})
         assert r.status_code == 200
 
     def test_sort_pubs(self, client):
-        r = client.get("/api/publishers", params={"sort": "pubs"})
+        r = client.get("/api/publishers", params={"sort": "pubs_asc"})
         assert r.status_code == 200
 
     def test_sort_pubs_desc(self, client):
         r = client.get("/api/publishers", params={"sort": "pubs_desc"})
         assert r.status_code == 200
 
-    def test_sort_unknown_fallback(self, client):
-        # Sort inconnu → fallback sur name ASC
+    def test_sort_outside_the_vocabulary_is_refused(self, client):
         r = client.get("/api/publishers", params={"sort": "unknown"})
-        assert r.status_code == 200
+        assert r.status_code == 422
 
     def test_filter_by_publisher_type(self, client):
         pid = _seed_publisher()

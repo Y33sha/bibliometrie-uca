@@ -42,7 +42,7 @@ def _create_person(conn, last, department=None, role=None):
 
 def _listed(conn, **filter_kwargs):
     result = list_persons(
-        conn, filters=ListFilters(**filter_kwargs), page=1, per_page=200, sort="name"
+        conn, filters=ListFilters(**filter_kwargs), page=1, per_page=200, sort="name_asc"
     )
     return {p["id"] for p in result["persons"]}
 

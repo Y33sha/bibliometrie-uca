@@ -6,11 +6,23 @@ Les dataclasses `PublicationFilters` et `PublicationFilters` font ici référenc
 """
 
 from dataclasses import dataclass, field
-from typing import Protocol
+from typing import Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict
 
 from application.ports.api._common import PaginatedResponse, YesNoCount
+
+# Vocabulaire de tri des listes de publications, thèses comprises : le champ, puis le sens.
+PublicationSort = Literal[
+    "year_asc",
+    "year_desc",
+    "title_asc",
+    "title_desc",
+    "apc_asc",
+    "apc_desc",
+    "soutenance_asc",
+    "soutenance_desc",
+]
 from application.ports.api.entity_facet import EntityFacetResponse, EntityLabelResponse
 from application.ports.api.subjects_queries import SubjectOut
 
@@ -327,7 +339,7 @@ class PublicationsQueries(Protocol):
         filters: PublicationFilters,
         page: int,
         per_page: int,
-        sort: str,
+        sort: PublicationSort,
     ) -> PublicationListResponse: ...
 
     def publications_facets(self, *, filters: PublicationFilters) -> PublicationsFacetsResponse: ...
@@ -342,10 +354,10 @@ class PublicationsQueries(Protocol):
         self,
         *,
         filters: PublicationFilters,
-        sort: str,
+        sort: PublicationSort,
         columns: list[str],
     ) -> str: ...
 
-    def export_theses_csv(self, *, filters: PublicationFilters, sort: str) -> str: ...
+    def export_theses_csv(self, *, filters: PublicationFilters, sort: PublicationSort) -> str: ...
 
     def get_publication_detail(self, pub_id: int) -> PublicationDetailResponse | None: ...

@@ -185,7 +185,7 @@ class TestPersonsList:
         assert r.status_code == 200
 
     def test_sort_by_name(self, client):
-        r = client.get("/api/persons", params={"sort": "last_name"})
+        r = client.get("/api/persons", params={"sort": "name_desc"})
         assert r.status_code == 200
 
     def test_complex_filter(self, client):

@@ -53,9 +53,9 @@ Sept paramètres : `has_orcid`, `has_idhal`, `has_idref`, `has_rh`, `has_pending
 ### Phase 2 — les vocabulaires fermés
 
 - [x] `sort` : les cinq vocabulaires s'alignent sur `<champ>_asc` / `<champ>_desc`. Quatre écrivaient le sens descendant en préfixe (`-name`), où le croissant se lisait à l'**absence** du tiret — une convention dont un terme est implicite se prête mal à un `Literal`, qui doit tout énumérer. Le cinquième, celui des publications, n'appliquait pas la sienne : `title` y côtoyait `title_desc`. Les helpers génériques du frontend suivent (`oppositeSort`, indicateurs de colonne).
-- [ ] `validation` et `detected` : recenser les valeurs réellement honorées par les adapters.
-- [ ] Les déclarer en `Literal`, avec `sort`, en les tirant du domaine là où il les porte.
-- [ ] Vérifier ce qu'une valeur hors vocabulaire produit aujourd'hui, avant qu'elle produise un 422.
+- [x] `validation` et `detected` : les valeurs honorées par l'adaptateur des adresses sont `all`/`pending`/`confirmed`/`rejected` et `all`/`yes`/`no`, `all` valant absence de clause.
+- [x] Sept vocabulaires déclarés en `Literal` auprès des lectures qu'ils paramètrent — cinq tris dans leurs ports respectifs, les deux états d'adresse dans le leur. Les adaptateurs les importent pour typer leurs signatures, si bien que mypy refuse une table d'ordonnancement dont une clé sortirait du vocabulaire.
+- [x] Les cinq replis `_SORT_MAP.get(sort, défaut)` deviennent des indexations directes : FastAPI garantit désormais que la valeur appartient au vocabulaire, et le défaut silencieux n'a plus de cas à traiter. Deux tests attestaient ce repli ; ils attestent maintenant le 422.
 
 ### Phase 3 — les prédicats composés
 

@@ -135,7 +135,7 @@ def list_publications(
     conn.execute(text("SET LOCAL jit = off"))
     offset = (page - 1) * per_page
     where_clause, binds = _build_list_clauses(conn, filters, perimeter_structure_ids)
-    order = _ORDER_MAP.get(sort, "p.pub_year DESC, p.title")
+    order = _ORDER_MAP[sort]
 
     # Quand la recherche match un sujet (cf. _search_clause), on remonte
     # d'abord les publis dont le *titre* match — les correspondances purement
@@ -338,7 +338,7 @@ def export_publications_csv(
     """
     conn.execute(text("SET LOCAL jit = off"))
     where_clause, binds = _build_list_clauses(conn, filters, perimeter_structure_ids)
-    order = _ORDER_MAP.get(sort, "p.pub_year DESC, p.title")
+    order = _ORDER_MAP[sort]
 
     if filters.person_id:
         person_lab_filter_a3 = "AND a3.person_id = :person_lab_a3"

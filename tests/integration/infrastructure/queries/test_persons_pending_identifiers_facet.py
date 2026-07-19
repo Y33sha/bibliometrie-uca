@@ -51,10 +51,10 @@ class TestPendingIdentifiersFacetPublicOnly:
         listed = _person_ids(
             list_persons(
                 sa_sync_conn,
-                filters=ListFilters(has_pending_identifiers="yes"),
+                filters=ListFilters(has_pending_identifiers=True),
                 page=1,
                 per_page=1000,
-                sort="name",
+                sort="name_asc",
             )
         )
         assert public_pending in listed
@@ -85,10 +85,10 @@ class TestPendingIdentifiersFacetPublicOnly:
         listed = _person_ids(
             list_persons(
                 sa_sync_conn,
-                filters=ListFilters(has_pending_identifiers="yes"),
+                filters=ListFilters(has_pending_identifiers=True),
                 page=1,
                 per_page=1000,
-                sort="name",
+                sort="name_asc",
             )
         )
         assert person not in listed

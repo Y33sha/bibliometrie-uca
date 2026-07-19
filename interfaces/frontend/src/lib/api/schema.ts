@@ -1959,7 +1959,7 @@ export interface paths {
          *     - `publisher_type` et `country` : valeurs séparées par des virgules (par exemple `commercial,learned_society`), vide valant absence de filtre, selon la convention multi-valeurs de `/api/journals` et `/api/publications`.
          *     - `with_pubs` : restreint aux éditeurs dont le `pub_count` est non nul. Ce compteur ne retient que les publications du périmètre, atteintes par les revues de l'éditeur : un éditeur dont toutes les publications sont hors périmètre est donc « orphelin ». La page publique s'en sert pour les masquer, que l'admin garde la possibilité de voir.
          *
-         *     `sort` accepte `name`, `journals` et `pubs`, préfixés d'un tiret pour l'ordre descendant, et retombe sur `name` devant une valeur inconnue.
+         *     `sort` accepte `name`, `journals` et `pubs`, suffixés de `_asc` ou `_desc` ; toute autre valeur rend un 422.
          */
         get: operations["list_publishers_api_publishers_get"];
         put?: never;
@@ -2151,7 +2151,7 @@ export interface paths {
          *     - `is_in_doaj` : booléen ; omis, il ne filtre rien.
          *     - `with_pubs` : restreint aux revues portant au moins une publication. La page publique s'en sert pour masquer les revues orphelines, que l'admin garde la possibilité de voir.
          *
-         *     `sort` accepte `title`, `publisher` et `pubs`, préfixés d'un tiret pour l'ordre descendant, et retombe sur `title` devant une valeur inconnue.
+         *     `sort` accepte `title`, `publisher` et `pubs`, suffixés de `_asc` ou `_desc` ; toute autre valeur rend un 422.
          */
         get: operations["list_journals_api_journals_get"];
         put?: never;
@@ -6029,7 +6029,7 @@ export interface operations {
     export_publications_csv_api_publications_export_csv_get: {
         parameters: {
             query?: {
-                sort?: string;
+                sort?: "year_asc" | "year_desc" | "title_asc" | "title_desc" | "apc_asc" | "apc_desc" | "soutenance_asc" | "soutenance_desc";
                 columns?: string;
                 search?: string;
                 lab_id?: string;
@@ -6084,7 +6084,7 @@ export interface operations {
                 access?: string;
                 source_filter?: string;
                 doc_type?: string;
-                sort?: string;
+                sort?: "year_asc" | "year_desc" | "title_asc" | "title_desc" | "apc_asc" | "apc_desc" | "soutenance_asc" | "soutenance_desc";
             };
             header?: never;
             path?: never;
@@ -6246,7 +6246,7 @@ export interface operations {
             query?: {
                 page?: number;
                 per_page?: number;
-                sort?: string;
+                sort?: "year_asc" | "year_desc" | "title_asc" | "title_desc" | "apc_asc" | "apc_desc" | "soutenance_asc" | "soutenance_desc";
                 search?: string;
                 lab_id?: string;
                 year?: string;
@@ -6297,8 +6297,8 @@ export interface operations {
                 page?: number;
                 per_page?: number;
                 structure_id?: number | null;
-                detected?: string;
-                validation?: string;
+                detected?: "all" | "yes" | "no";
+                validation?: "all" | "pending" | "confirmed" | "rejected";
                 text?: string[];
                 struct?: string[];
             };
@@ -7222,7 +7222,7 @@ export interface operations {
                 has_idref?: boolean | null;
                 has_rh?: boolean | null;
                 lab_id?: number | null;
-                sort?: string;
+                sort?: "name_asc" | "name_desc" | "pubs_asc" | "pubs_desc" | "dept_asc" | "dept_desc" | "role_asc" | "role_desc";
             };
             header?: never;
             path?: never;
@@ -7296,7 +7296,7 @@ export interface operations {
                 has_rh?: boolean | null;
                 has_pending_forms?: boolean | null;
                 has_pending_identifiers?: boolean | null;
-                sort?: string;
+                sort?: "name_asc" | "name_desc" | "pubs_asc" | "pubs_desc" | "uca_pubs_asc" | "uca_pubs_desc";
             };
             header?: never;
             path?: never;
@@ -8779,7 +8779,7 @@ export interface operations {
                 publisher_type?: string;
                 country?: string;
                 with_pubs?: boolean;
-                sort?: string;
+                sort?: "name_asc" | "name_desc" | "journals_asc" | "journals_desc" | "pubs_asc" | "pubs_desc";
             };
             header?: never;
             path?: never;
@@ -9068,7 +9068,7 @@ export interface operations {
                 is_in_doaj?: boolean | null;
                 oa_model?: string;
                 with_pubs?: boolean;
-                sort?: string;
+                sort?: "title_asc" | "title_desc" | "publisher_asc" | "publisher_desc" | "pubs_asc" | "pubs_desc";
             };
             header?: never;
             path?: never;

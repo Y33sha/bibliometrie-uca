@@ -13,6 +13,7 @@ from application.ports.api.journals_queries import (
     JournalQueries,
     JournalsFacetOption,
     JournalsFacetsResponse,
+    JournalSort,
     OaStatusCount,
 )
 from application.ports.api.subjects_queries import SubjectFrequency
@@ -140,7 +141,7 @@ class PgJournalQueries(JournalQueries):
         is_in_doaj: bool | None,
         oa_models: list[str],
         with_pubs: bool,
-        sort: str,
+        sort: JournalSort,
         page: int,
         per_page: int,
     ) -> JournalListResponse:
@@ -159,7 +160,7 @@ class PgJournalQueries(JournalQueries):
         ).one()
         total = total_row.total
 
-        order = _SORT_MAP.get(sort, _SORT_MAP["title_asc"])
+        order = _SORT_MAP[sort]
         offset = (page - 1) * per_page
         rows = self._conn.execute(
             text(f"""
