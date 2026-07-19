@@ -1,6 +1,6 @@
 """Port : opérations SQL pour la phase d'ingestion des sujets et le recalcul des co-occurrences.
 
-Implémenté par `infrastructure.queries.subjects.PgSubjectsQueries`.
+Implémenté par `infrastructure.queries.pipeline.subjects.PgSubjectsIngestionQueries`. Les lectures que servent les routes `/api/subjects/*` passent par `application.ports.api.subjects_queries.SubjectsQueries`.
 """
 
 from typing import NamedTuple, Protocol
@@ -25,8 +25,8 @@ class PublicationSubjectLink(NamedTuple):
     subject_id: int
 
 
-class SubjectsQueries(Protocol):
-    """Toutes les opérations SQL nécessaires aux phases `subjects` et `cooccurrences`."""
+class SubjectsIngestionQueries(Protocol):
+    """Opérations SQL des phases `subjects` et `cooccurrences` : elles écrivent le référentiel."""
 
     def upsert_subject(
         self,

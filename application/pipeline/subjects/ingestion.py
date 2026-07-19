@@ -21,7 +21,7 @@ from sqlalchemy import Connection
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.subjects._common import SubjectCache
 from application.pipeline.subjects.extractors import SUBJECT_EXTRACTORS
-from application.ports.pipeline.subjects import PublicationSubjectLink, SubjectsQueries
+from application.ports.pipeline.subjects import PublicationSubjectLink, SubjectsIngestionQueries
 
 # Fréquence des logs de progression.
 _LOG_EVERY = 2000
@@ -29,7 +29,7 @@ _LOG_EVERY = 2000
 
 def run(
     conn: Connection,
-    queries: SubjectsQueries,
+    queries: SubjectsIngestionQueries,
     logger: logging.Logger,
     *,
     rebuild: bool = False,

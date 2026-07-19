@@ -6,8 +6,8 @@ import logging
 from sqlalchemy import text
 
 from application.pipeline.subjects.cooccurrences import run
-from infrastructure.queries.subjects import (
-    PgSubjectsQueries,
+from infrastructure.queries.pipeline.subjects import (
+    PgSubjectsIngestionQueries,
     recompute_usage_counts,
     refresh_cooccurrences,
 )
@@ -135,7 +135,7 @@ class TestRunOrchestrator:
             _link(sa_sync_conn, pub_id=p1, subject_id=s)
             _link(sa_sync_conn, pub_id=p2, subject_id=s)
 
-        stats = run(sa_sync_conn, PgSubjectsQueries(), logging.getLogger("test"))
+        stats = run(sa_sync_conn, PgSubjectsIngestionQueries(), logging.getLogger("test"))
         assert stats["cooccurrence_pairs"] == 1  # (a,b) count=2
         # usage_count des deux sujets = 2.
         rows = sa_sync_conn.execute(

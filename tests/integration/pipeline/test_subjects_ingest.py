@@ -16,7 +16,7 @@ from application.pipeline.subjects.extractors import (
     wos_labels,
 )
 from application.pipeline.subjects.ingestion import run
-from infrastructure.queries.subjects import PgSubjectsQueries
+from infrastructure.queries.pipeline.subjects import PgSubjectsIngestionQueries
 
 
 class TestExtractors:
@@ -85,7 +85,7 @@ class TestExtractors:
 
 @pytest.fixture
 def queries():
-    return PgSubjectsQueries()
+    return PgSubjectsIngestionQueries()
 
 
 def _create_pub(conn, title="X"):

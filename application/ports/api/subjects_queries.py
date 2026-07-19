@@ -1,6 +1,6 @@
 """Port : lectures sur les sujets (consommé par le router subjects).
 
-Implémenté par `infrastructure.queries.subjects.PgSubjectsAdminQueries`. Les écritures du référentiel, faites par la phase d'ingestion, passent par `application.ports.pipeline.subjects.SubjectsQueries`.
+Implémenté par `infrastructure.queries.api.subjects.PgSubjectsQueries`. Les écritures du référentiel, faites par la phase d'ingestion, passent par `application.ports.pipeline.subjects.SubjectsIngestionQueries`.
 
 `SubjectFrequency` vit ici et sert les quatre nuages de sujets des ports voisins : personnes, laboratoires, revues et éditeurs.
 """
@@ -58,7 +58,7 @@ class SubjectFrequency(BaseModel):
     count: int
 
 
-class SubjectsAdminQueries(Protocol):
+class SubjectsQueries(Protocol):
     """Lectures sur les sujets (annuaire, voisins par co-occurrence)."""
 
     def list_subjects(
