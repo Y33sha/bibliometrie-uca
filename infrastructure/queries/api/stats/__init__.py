@@ -10,14 +10,12 @@ Le package est organisé par thème d'agrégat :
 `PgStatsQueries` agrège ces fonctions sous le port `application.ports.api.stats_queries.StatsQueries`. Les fonctions libres retournent des dicts conformes au shape des DTOs ; la conversion vers Pydantic est faite ici à la sortie, pour garder les fonctions libres réutilisables hors API.
 """
 
-from typing import Literal
-
 from sqlalchemy import Connection
 
 from application.ports.api.entity_facet import (
     EntityFacetItem,
     EntityFacetResponse,
-    EntityLabelResponse,
+    EntityKind,
 )
 from application.ports.api.stats_queries import (
     ApcFacet,
@@ -36,7 +34,6 @@ from application.ports.api.stats_queries import (
     YearFacet,
 )
 from domain.stats import DIMENSIONS, MEASURES
-from infrastructure.queries.api.entity_labels import entity_label as _entity_label
 from infrastructure.queries.api.stats.collaborations import (
     run_collaborations as _run_collaborations,
 )
@@ -100,7 +97,7 @@ class PgStatsQueries(StatsQueries):
     def stats_entity_facet(
         self,
         *,
-        kind: Literal["publisher", "journal"],
+        kind: EntityKind,
         search: str,
         filters: StatsFilters,
     ) -> EntityFacetResponse:
@@ -112,11 +109,6 @@ class PgStatsQueries(StatsQueries):
             filters=filters,
         )
         return EntityFacetResponse(entities=[EntityFacetItem(**r) for r in rows])
-
-    def resolve_entity_label(
-        self, *, kind: Literal["publisher", "journal"], entity_id: int
-    ) -> EntityLabelResponse:
-        return EntityLabelResponse(label=_entity_label(self._conn, kind=kind, entity_id=entity_id))
 
     def stats_facets(self, *, filters: StatsFilters) -> StatsFacetsResponse:
         data = _stats_facets(

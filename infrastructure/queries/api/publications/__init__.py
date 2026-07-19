@@ -24,7 +24,7 @@ from sqlalchemy import Connection
 from application.ports.api.entity_facet import (
     EntityFacetItem,
     EntityFacetResponse,
-    EntityLabelResponse,
+    EntityKind,
 )
 from application.ports.api.publications_queries import (
     PublicationDetailResponse,
@@ -33,7 +33,6 @@ from application.ports.api.publications_queries import (
     PublicationsFacetsResponse,
     PublicationsQueries,
 )
-from infrastructure.queries.api.entity_labels import entity_label as _entity_label
 from infrastructure.queries.api.publications.detail import (
     get_publication_detail as _get_publication_detail,
 )
@@ -87,7 +86,7 @@ class PgPublicationsQueries(PublicationsQueries):
     def publications_entity_facet(
         self,
         *,
-        kind: str,
+        kind: EntityKind,
         search: str,
         filters: PublicationFilters,
     ) -> EntityFacetResponse:
@@ -99,9 +98,6 @@ class PgPublicationsQueries(PublicationsQueries):
             perimeter_structure_ids=get_persons_structure_ids_list(self._conn),
         )
         return EntityFacetResponse(entities=[EntityFacetItem(**r) for r in rows])
-
-    def resolve_entity_label(self, *, kind: str, entity_id: int) -> EntityLabelResponse:
-        return EntityLabelResponse(label=_entity_label(self._conn, kind=kind, entity_id=entity_id))
 
     def export_publications_csv(
         self,

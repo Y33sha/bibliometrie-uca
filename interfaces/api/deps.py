@@ -14,6 +14,7 @@ from sqlalchemy import Connection
 from application.ports.api.addresses_queries import AddressesQueries
 from application.ports.api.admin_feedback_queries import AdminFeedbackQueries
 from application.ports.api.config_queries import ConfigQueries
+from application.ports.api.entity_facet import EntityLabelQueries
 from application.ports.api.hal_problems_queries import HalProblemsQueries
 from application.ports.api.journals_queries import JournalQueries
 from application.ports.api.perimeters_queries import PerimetersAdminQueries
@@ -43,6 +44,7 @@ from infrastructure.db.dml_guard import has_uncommitted_dml, reset_dml_flag
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.queries.api.addresses import PgAddressesQueries
 from infrastructure.queries.api.admin_feedback import PgAdminFeedbackQueries
+from infrastructure.queries.api.entity_labels import PgEntityLabelQueries
 from infrastructure.queries.api.hal_problems import PgHalProblemsQueries
 from infrastructure.queries.api.journals import PgJournalQueries
 from infrastructure.queries.api.persons import PgPersonsQueries
@@ -207,6 +209,10 @@ def admin_feedback_queries(
 
 def stats_queries(conn: Connection = Depends(db_conn)) -> StatsQueries:
     return PgStatsQueries(conn)
+
+
+def entity_label_queries(conn: Connection = Depends(db_conn)) -> EntityLabelQueries:
+    return PgEntityLabelQueries(conn)
 
 
 def structure_repo(conn: Connection = Depends(db_conn)) -> StructureRepository:

@@ -47,6 +47,7 @@ from interfaces.api.routers import (  # noqa: E402
     authorships,
     config,
     countries,
+    entity_labels,
     feedback,
     hal_problems,
     journals,
@@ -236,6 +237,7 @@ async def timing_middleware(request: Request, call_next: RequestResponseEndpoint
 app.include_router(auth.router)
 app.include_router(stats.router)
 app.include_router(publications.router)
+app.include_router(entity_labels.router)
 app.include_router(addresses.router)
 app.include_router(countries.router)
 app.include_router(feedback.router)

@@ -23,7 +23,7 @@ PublicationSort = Literal[
     "soutenance_asc",
     "soutenance_desc",
 ]
-from application.ports.api.entity_facet import EntityFacetResponse, EntityLabelResponse
+from application.ports.api.entity_facet import EntityFacetResponse, EntityKind
 from application.ports.api.subjects_queries import SubjectOut
 
 
@@ -345,10 +345,8 @@ class PublicationsQueries(Protocol):
     def publications_facets(self, *, filters: PublicationFilters) -> PublicationsFacetsResponse: ...
 
     def publications_entity_facet(
-        self, *, kind: str, search: str, filters: PublicationFilters
+        self, *, kind: EntityKind, search: str, filters: PublicationFilters
     ) -> EntityFacetResponse: ...
-
-    def resolve_entity_label(self, *, kind: str, entity_id: int) -> EntityLabelResponse: ...
 
     def export_publications_csv(
         self,

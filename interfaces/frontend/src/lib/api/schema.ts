@@ -112,28 +112,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/stats/facets/entity-label": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Stats Entity Label
-         * @description Libellé d'une revue ou d'un éditeur par son identifiant.
-         *
-         *     Sert à réafficher une pastille de facette restaurée depuis l'URL, qui porte l'identifiant seul : il est l'état canonique de la sélection.
-         */
-        get: operations["stats_entity_label_api_stats_facets_entity_label_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/stats/collaborations": {
         parameters: {
             query?: never;
@@ -234,28 +212,6 @@ export interface paths {
          *     Les entités sont corrélées entre elles. `entity_search` cherche dans leurs noms, là où `search` filtre les publications sur leur titre et leurs sujets.
          */
         get: operations["publications_entity_facet_api_publications_facets_entities_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/publications/facets/entity-label": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Publications Entity Label
-         * @description Libellé d'une revue ou d'un éditeur par son identifiant.
-         *
-         *     Sert à réafficher une pastille de facette restaurée depuis l'URL, qui porte l'identifiant seul : il est l'état canonique de la sélection.
-         */
-        get: operations["publications_entity_label_api_publications_facets_entity_label_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -406,6 +362,28 @@ export interface paths {
          *     Les filtres se cumulent. `sort` accepte `year_desc`, `year_asc`, `title` et `cited_by`.
          */
         get: operations["list_publications_api_publications_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/entity-labels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Resolve Entity Label
+         * @description Libellé d'une revue ou d'un éditeur par son identifiant.
+         *
+         *     Sert à réafficher une pastille de facette restaurée depuis l'URL, qui porte l'identifiant seul : il est l'état canonique de la sélection. Le libellé étant le même sous tous les jeux de filtres, la lecture est unique quel que soit le contexte qui affiche la facette.
+         */
+        get: operations["resolve_entity_label_api_entity_labels_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -5606,38 +5584,6 @@ export interface operations {
             };
         };
     };
-    stats_entity_label_api_stats_facets_entity_label_get: {
-        parameters: {
-            query: {
-                kind: "publisher" | "journal";
-                entity_id: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EntityLabelResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     collaborations_api_stats_collaborations_get: {
         parameters: {
             query?: {
@@ -5818,38 +5764,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EntityFacetResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    publications_entity_label_api_publications_facets_entity_label_get: {
-        parameters: {
-            query: {
-                kind: "publisher" | "journal";
-                entity_id: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EntityLabelResponse"];
                 };
             };
             /** @description Validation Error */
@@ -6115,6 +6029,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PublicationListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resolve_entity_label_api_entity_labels_get: {
+        parameters: {
+            query: {
+                kind: "publisher" | "journal";
+                entity_id: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EntityLabelResponse"];
                 };
             };
             /** @description Validation Error */
