@@ -1,7 +1,8 @@
 """Query services de lecture autour des personnes (router persons).
 
 Le package est organisé par thème :
-- `list` : `persons_directory`, `search_persons`, `list_persons`
+- `list` : `list_persons`, `search_persons`, `person_admin`, `person_name_forms`
+- `identifiers` : `public_identifiers`, partagée par la liste et le profil
 - `facets` : `persons_facets`, `persons_stats`
 - `detail` : `person_profile`, `person_theses`, `person_addresses`,
   `person_dashboard`, `person_subjects`
@@ -26,10 +27,7 @@ from sqlalchemy import Connection
 from application.ports.api.persons_queries import (
     AmbiguousNameFormsResponse,
     DetachableIntrudersResponse,
-    DirectoryFilters,
-    FacetFilters,
     IdentifierConflictsResponse,
-    ListFilters,
     NameDuplicatesResponse,
     NameFormAuthorshipsResponse,
     NameFormSummaryOut,
@@ -37,7 +35,7 @@ from application.ports.api.persons_queries import (
     OrphanCountResponse,
     PersonAddressesResponse,
     PersonDashboardResponse,
-    PersonDirectoryResponse,
+    PersonFilters,
     PersonListResponse,
     PersonOut,
     PersonProfileResponse,
@@ -78,7 +76,6 @@ from infrastructure.queries.api.persons.list import (
     list_persons as _list_persons,
     person_admin as _person_admin,
     person_name_forms as _person_name_forms,
-    persons_directory as _persons_directory,
     search_persons as _search_persons,
 )
 
@@ -89,14 +86,7 @@ class PgPersonsQueries(PersonsQueries):
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
 
-    # ── Annuaire / recherche / liste admin ─────────────────────────
-
-    def persons_directory(
-        self, *, filters: DirectoryFilters, page: int, per_page: int, sort: str
-    ) -> PersonDirectoryResponse:
-        return PersonDirectoryResponse.model_validate(
-            _persons_directory(self._conn, filters=filters, page=page, per_page=per_page, sort=sort)
-        )
+    # ── Liste / recherche ──────────────────────────────────────────
 
     def search_persons(self, *, q: str, limit: int) -> list[PersonSearchResult]:
         return [
@@ -105,7 +95,7 @@ class PgPersonsQueries(PersonsQueries):
         ]
 
     def list_persons(
-        self, *, filters: ListFilters, page: int, per_page: int, sort: str
+        self, *, filters: PersonFilters, page: int, per_page: int, sort: str
     ) -> PersonListResponse:
         return PersonListResponse.model_validate(
             _list_persons(self._conn, filters=filters, page=page, per_page=per_page, sort=sort)
@@ -117,7 +107,7 @@ class PgPersonsQueries(PersonsQueries):
 
     # ── Facettes / listes de référence / stats ─────────────────────
 
-    def persons_facets(self, *, filters: FacetFilters) -> PersonsFacetsResponse:
+    def persons_facets(self, *, filters: PersonFilters) -> PersonsFacetsResponse:
         return PersonsFacetsResponse.model_validate(_persons_facets(self._conn, filters=filters))
 
     def person_name_forms(self, person_id: int) -> list[NameFormSummaryOut]:

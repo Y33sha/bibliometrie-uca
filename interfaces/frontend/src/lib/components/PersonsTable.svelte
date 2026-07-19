@@ -5,7 +5,7 @@
 	import TableStatusRow from '$lib/components/TableStatusRow.svelte';
 	import type { components } from '$lib/api/schema';
 
-	export type PersonRow = components['schemas']['PersonDirectoryEntry'];
+	export type PersonRow = components['schemas']['PersonOut'];
 
 	let {
 		persons,

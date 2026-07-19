@@ -46,7 +46,8 @@
 	};
 
 	function buildFilterParams(): URLSearchParams {
-		const params = new URLSearchParams();
+		// L'annuaire ne montre pas les personnes que la curation a écartées.
+		const params = new URLSearchParams({ rejected: 'false' });
 		if (selectedDepts.length) params.set('department', selectedDepts.join(','));
 		if (selectedRoles.length) params.set('role', selectedRoles.join(','));
 		for (const [key, qk] of Object.entries(idQueryKey)) {
@@ -59,7 +60,7 @@
 	}
 
 	const dir = usePaginatedFetch<PersonRow>({
-		endpoint: '/api/persons/directory',
+		endpoint: '/api/persons',
 		itemsKey: 'persons',
 		// svelte-ignore state_referenced_locally
 		perPage,

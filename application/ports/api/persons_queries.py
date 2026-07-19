@@ -21,33 +21,31 @@ from application.ports.api._common import (
 )
 from application.ports.api.subjects_queries import SubjectFrequency
 
-# Vocabulaires de tri : le champ, puis le sens. L'annuaire trie sur ce qu'il affiche —
-# fonction et département —, la liste de curation sur le décompte propre au périmètre.
-PersonDirectorySort = Literal[
+# Vocabulaire de tri : le champ, puis le sens. Les trois dénombrements sont triables, comme
+# la fonction et le département.
+PersonSort = Literal[
     "name_asc",
     "name_desc",
+    "signatures_asc",
+    "signatures_desc",
     "signatures_as_author_asc",
     "signatures_as_author_desc",
+    "in_perimeter_signatures_asc",
+    "in_perimeter_signatures_desc",
     "dept_asc",
     "dept_desc",
     "role_asc",
     "role_desc",
 ]
-PersonListSort = Literal[
-    "name_asc",
-    "name_desc",
-    "signatures_asc",
-    "signatures_desc",
-    "in_perimeter_signatures_asc",
-    "in_perimeter_signatures_desc",
-]
 
 
 @dataclass(frozen=True, slots=True)
 class PersonFilters:
-    """Filtres que toutes les lectures de personnes honorent.
+    """Filtres des lectures de personnes — liste et facettes.
 
-    `departments` et `roles` sont multi-valués : une option cochée s'ajoute aux autres. Les `has_*` filtrent sur la présence ou l'absence, et `None` ne filtre pas. Chaque lecture ajoute les filtres qui lui sont propres, et le type dit ce qu'elle honore.
+    `departments` et `roles` sont multi-valués : une option cochée s'ajoute aux autres. Les `has_*` filtrent sur la présence ou l'absence, et `None` ne filtre pas — y compris `rejected`, qui laisse alors passer les personnes écartées par la curation comme les autres.
+
+    `lab_id` n'est pas un filtre mais un scope : il restreint aux personnes du laboratoire et y restreint aussi leurs dénombrements.
     """
 
     search: str = ""
@@ -57,24 +55,10 @@ class PersonFilters:
     has_idhal: bool | None = None
     has_idref: bool | None = None
     has_rh: bool | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class DirectoryFilters(PersonFilters):
-    # Scope facultatif à un laboratoire (onglet personnes de la fiche labo).
-    lab_id: int | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class ListFilters(PersonFilters):
     # « À confirmer » : personnes portant ≥1 forme de nom / identifiant `pending`.
     has_pending_forms: bool | None = None
     has_pending_identifiers: bool | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class FacetFilters(ListFilters):
-    # Les facettes servent les deux pages : elles honorent l'union de leurs filtres.
+    rejected: bool | None = None
     lab_id: int | None = None
 
 
@@ -108,28 +92,8 @@ class NameFormSummaryOut(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# DTOs Annuaire / recherche / liste admin
+# DTOs Liste / recherche
 # ---------------------------------------------------------------------------
-
-
-class PersonDirectoryEntry(BaseModel):
-    """Ligne de l'annuaire public `/api/persons/directory`.
-
-    `signature_count_as_author` compte les signatures où la personne tient le rôle d'auteur — le même dénombrement que `signature_count` de la liste de curation, la condition de rôle en plus. Sous scope `lab_id`, il se restreint aux publications du laboratoire.
-    """
-
-    id: int
-    last_name: str
-    first_name: str
-    role_title: str | None
-    department_name: str | None
-    has_rh: bool
-    signature_count_as_author: int
-    identifiers: list[PersonIdentifierOut]
-
-
-class PersonDirectoryResponse(PaginatedResponse):
-    persons: list[PersonDirectoryEntry]
 
 
 class PersonSearchResult(BaseModel):
@@ -143,7 +107,10 @@ class PersonSearchResult(BaseModel):
 
 
 class PersonOut(BaseModel):
-    """Ligne de `/api/persons` (liste admin)."""
+    """Ligne de `/api/persons`.
+
+    Les trois dénombrements comptent la même chose sous des conditions de plus en plus étroites, et se restreignent tous au laboratoire sous scope `lab_id`.
+    """
 
     id: int
     last_name: str
@@ -155,7 +122,9 @@ class PersonOut(BaseModel):
     has_rh: bool
     rejected: bool
     signature_count: int
-    """Signatures de la personne, tous rôles — auteur, mais aussi jury ou rapporteur d'une thèse. L'annuaire n'en retient que celles d'auteur, sous `signature_count_as_author`."""
+    """Signatures de la personne, tous rôles — auteur, mais aussi jury ou rapporteur d'une thèse."""
+    signature_count_as_author: int
+    """Celles de ces signatures où la personne tient le rôle d'auteur."""
     in_perimeter_signature_count: int
     """Celles de ces signatures que le périmètre retient."""
     identifiers: list[PersonIdentifierOut]
@@ -444,23 +413,19 @@ class OrphanAuthorshipsResponse(PaginatedResponse):
 class PersonsQueries(Protocol):
     """Lectures sync pour /api/persons/* + endpoints admin associés."""
 
-    # ── Annuaire / recherche / liste admin ─────────────────────────
-
-    def persons_directory(
-        self, *, filters: DirectoryFilters, page: int, per_page: int, sort: PersonDirectorySort
-    ) -> PersonDirectoryResponse: ...
+    # ── Liste / recherche ──────────────────────────────────────────
 
     def search_persons(self, *, q: str, limit: int) -> list[PersonSearchResult]: ...
 
     def list_persons(
-        self, *, filters: ListFilters, page: int, per_page: int, sort: PersonListSort
+        self, *, filters: PersonFilters, page: int, per_page: int, sort: PersonSort
     ) -> PersonListResponse: ...
 
     def person_admin(self, person_id: int) -> PersonOut | None: ...
 
     # ── Facettes / listes de référence / stats ─────────────────────
 
-    def persons_facets(self, *, filters: FacetFilters) -> PersonsFacetsResponse: ...
+    def persons_facets(self, *, filters: PersonFilters) -> PersonsFacetsResponse: ...
 
     def persons_stats(self) -> PersonsStatsResponse: ...
 

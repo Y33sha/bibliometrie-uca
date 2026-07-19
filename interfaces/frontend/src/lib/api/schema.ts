@@ -892,28 +892,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/persons/directory": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Persons Directory
-         * @description Annuaire public des personnes du périmètre, avec leurs ORCID et idHAL.
-         *
-         *     `lab_id` restreint l'annuaire aux personnes d'un laboratoire : l'onglet personnes de la fiche d'un laboratoire s'en sert, plutôt que d'un endpoint qui lui serait propre.
-         */
-        get: operations["persons_directory_api_persons_directory_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/persons/search": {
         parameters: {
             query?: never;
@@ -943,9 +921,9 @@ export interface paths {
         };
         /**
          * List Persons
-         * @description Liste des personnes avec filtres (curation).
+         * @description Liste paginée des personnes.
          *
-         *     `department` et `role` acceptent plusieurs valeurs séparées par des virgules, selon la même convention que l'annuaire et les facettes.
+         *     L'annuaire public et la liste de curation appellent tous deux cette lecture, avec des filtres différents.
          */
         get: operations["list_persons_api_persons_get"];
         put?: never;
@@ -965,7 +943,7 @@ export interface paths {
         };
         /**
          * Persons Facets
-         * @description Facettes dynamiques pour la page personnes (scopables à un labo via `lab_id`).
+         * @description Facettes dynamiques de la liste des personnes : chaque facette décompte sous les autres filtres.
          */
         get: operations["persons_facets_api_persons_facets_get"];
         put?: never;
@@ -4001,43 +3979,6 @@ export interface components {
             oa: components["schemas"]["DashboardOa"];
         };
         /**
-         * PersonDirectoryEntry
-         * @description Ligne de l'annuaire public `/api/persons/directory`.
-         *
-         *     `signature_count_as_author` compte les signatures où la personne tient le rôle d'auteur — le même dénombrement que `signature_count` de la liste de curation, la condition de rôle en plus. Sous scope `lab_id`, il se restreint aux publications du laboratoire.
-         */
-        PersonDirectoryEntry: {
-            /** Id */
-            id: number;
-            /** Last Name */
-            last_name: string;
-            /** First Name */
-            first_name: string;
-            /** Role Title */
-            role_title: string | null;
-            /** Department Name */
-            department_name: string | null;
-            /** Has Rh */
-            has_rh: boolean;
-            /** Signature Count As Author */
-            signature_count_as_author: number;
-            /** Identifiers */
-            identifiers: components["schemas"]["PersonIdentifierOut"][];
-        };
-        /** PersonDirectoryResponse */
-        PersonDirectoryResponse: {
-            /** Total */
-            total: number;
-            /** Page */
-            page: number;
-            /** Per Page */
-            per_page: number;
-            /** Persons */
-            persons: components["schemas"]["PersonDirectoryEntry"][];
-            /** Pages */
-            readonly pages: number;
-        };
-        /**
          * PersonIdentifierOut
          * @description Identifiant (ORCID, idHAL, idRef) attaché à une personne.
          */
@@ -4071,7 +4012,9 @@ export interface components {
         };
         /**
          * PersonOut
-         * @description Ligne de `/api/persons` (liste admin).
+         * @description Ligne de `/api/persons`.
+         *
+         *     Les trois dénombrements comptent la même chose sous des conditions de plus en plus étroites, et se restreignent tous au laboratoire sous scope `lab_id`.
          */
         PersonOut: {
             /** Id */
@@ -4094,6 +4037,8 @@ export interface components {
             rejected: boolean;
             /** Signature Count */
             signature_count: number;
+            /** Signature Count As Author */
+            signature_count_as_author: number;
             /** In Perimeter Signature Count */
             in_perimeter_signature_count: number;
             /** Identifiers */
@@ -7051,47 +6996,6 @@ export interface operations {
             };
         };
     };
-    persons_directory_api_persons_directory_get: {
-        parameters: {
-            query?: {
-                page?: number;
-                per_page?: number;
-                search?: string;
-                department?: string;
-                role?: string;
-                has_orcid?: boolean | null;
-                has_idhal?: boolean | null;
-                has_idref?: boolean | null;
-                has_rh?: boolean | null;
-                lab_id?: number | null;
-                sort?: "name_asc" | "name_desc" | "signatures_as_author_asc" | "signatures_as_author_desc" | "dept_asc" | "dept_desc" | "role_asc" | "role_desc";
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PersonDirectoryResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     search_persons_api_persons_search_get: {
         parameters: {
             query?: {
@@ -7129,6 +7033,7 @@ export interface operations {
             query?: {
                 page?: number;
                 per_page?: number;
+                sort?: "name_asc" | "name_desc" | "signatures_asc" | "signatures_desc" | "signatures_as_author_asc" | "signatures_as_author_desc" | "in_perimeter_signatures_asc" | "in_perimeter_signatures_desc" | "dept_asc" | "dept_desc" | "role_asc" | "role_desc";
                 search?: string;
                 department?: string;
                 role?: string;
@@ -7138,7 +7043,8 @@ export interface operations {
                 has_rh?: boolean | null;
                 has_pending_forms?: boolean | null;
                 has_pending_identifiers?: boolean | null;
-                sort?: "name_asc" | "name_desc" | "signatures_asc" | "signatures_desc" | "in_perimeter_signatures_asc" | "in_perimeter_signatures_desc";
+                rejected?: boolean | null;
+                lab_id?: number | null;
             };
             header?: never;
             path?: never;
@@ -7169,6 +7075,7 @@ export interface operations {
     persons_facets_api_persons_facets_get: {
         parameters: {
             query?: {
+                search?: string;
                 department?: string;
                 role?: string;
                 has_orcid?: boolean | null;
@@ -7177,8 +7084,8 @@ export interface operations {
                 has_rh?: boolean | null;
                 has_pending_forms?: boolean | null;
                 has_pending_identifiers?: boolean | null;
+                rejected?: boolean | null;
                 lab_id?: number | null;
-                search?: string;
             };
             header?: never;
             path?: never;

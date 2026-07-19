@@ -247,10 +247,22 @@ class TestPersonsSearch:
         assert r.status_code == 200
 
 
-class TestPersonDirectory:
-    def test_directory(self, client):
-        r = client.get("/api/persons/directory")
+class TestPersonList:
+    def test_list(self, client):
+        r = client.get("/api/persons")
         assert r.status_code == 200
+
+    def test_public_directory_call(self, client):
+        """L'appel de l'annuaire public : personnes retenues, tri sur les signatures d'auteur."""
+        r = client.get(
+            "/api/persons", params={"rejected": "false", "sort": "signatures_as_author_desc"}
+        )
+        assert r.status_code == 200
+        assert all(not p["rejected"] for p in r.json()["persons"])
+
+    def test_unknown_sort_rejected(self, client):
+        r = client.get("/api/persons", params={"sort": "pub_count_desc"})
+        assert r.status_code == 422
 
 
 class TestPersonEndpoints:
