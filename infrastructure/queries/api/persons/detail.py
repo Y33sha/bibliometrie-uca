@@ -56,7 +56,7 @@ def person_profile(conn: Connection, person_id: int) -> dict[str, Any] | None:
                    MIN(aik.person_identifiers->>'idhal') AS idhal,
                    (aik.person_identifiers->>'hal_person_id')::int AS hal_person_id,
                    NULL::text AS openalex_id,
-                   COUNT(*) FILTER (WHERE sa.in_perimeter = TRUE) AS uca_pub_count
+                   COUNT(*) FILTER (WHERE sa.in_perimeter = TRUE) AS in_perimeter_signature_count
             FROM source_authorships sa
             JOIN author_identifying_keys aik ON aik.id = sa.identity_id
             WHERE sa.source = 'hal'
@@ -74,7 +74,7 @@ def person_profile(conn: Connection, person_id: int) -> dict[str, Any] | None:
                    sa.raw_author_name AS full_name,
                    'openalex' AS source,
                    NULL::text AS orcid, NULL::text AS idhal, NULL::text AS openalex_id,
-                   COUNT(*) FILTER (WHERE sa.in_perimeter = TRUE) AS uca_pub_count
+                   COUNT(*) FILTER (WHERE sa.in_perimeter = TRUE) AS in_perimeter_signature_count
             FROM source_authorships sa
             WHERE sa.source = 'openalex' AND sa.person_id = :pid
             GROUP BY sa.raw_author_name
@@ -92,7 +92,7 @@ def person_profile(conn: Connection, person_id: int) -> dict[str, Any] | None:
                    'wos' AS source,
                    MAX(aik.person_identifiers->>'orcid') AS orcid,
                    NULL::text AS idhal, NULL::text AS openalex_id,
-                   COUNT(*) FILTER (WHERE sa.in_perimeter = TRUE) AS uca_pub_count
+                   COUNT(*) FILTER (WHERE sa.in_perimeter = TRUE) AS in_perimeter_signature_count
             FROM source_authorships sa
             JOIN author_identifying_keys aik ON aik.id = sa.identity_id
             WHERE sa.source = 'wos' AND sa.person_id = :pid

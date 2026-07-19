@@ -42,7 +42,7 @@ def persons_directory(
     where_sql, binds = assemble_where(clauses)
     order = persons_sort_clause(sort)
 
-    # En contexte labo, `pub_count` est scopé aux publications du labo (cohérent
+    # En contexte labo, le décompte est scopé aux publications du labo (cohérent
     # avec le filtre `lab_id`) ; sinon c'est le total global de la personne.
     pub_count_lab_filter = (
         " AND EXISTS (SELECT 1 FROM authorship_structures aus "
@@ -70,7 +70,7 @@ def persons_directory(
                  FROM authorships a
                  WHERE a.person_id = p.id AND a.roles && ARRAY['author']::text[]
                  {pub_count_lab_filter}
-                ) AS pub_count,
+                ) AS signature_count_as_author,
                 (SELECT json_agg(json_build_object('value', pi.id_value, 'confirmed', (pi.status IN ('confirmed', 'authenticated'))))
                  FROM person_identifiers pi
                  WHERE pi.person_id = p.id AND pi.id_type = 'orcid' AND pi.status != 'rejected'

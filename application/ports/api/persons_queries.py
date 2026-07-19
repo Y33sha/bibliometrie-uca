@@ -27,8 +27,8 @@ from application.ports.api.subjects_queries import SubjectFrequency
 PersonDirectorySort = Literal[
     "name_asc",
     "name_desc",
-    "pubs_asc",
-    "pubs_desc",
+    "signatures_as_author_asc",
+    "signatures_as_author_desc",
     "dept_asc",
     "dept_desc",
     "role_asc",
@@ -113,7 +113,7 @@ class NameFormSummaryOut(BaseModel):
 class PersonDirectoryEntry(BaseModel):
     """Ligne de l'annuaire public `/api/persons/directory`.
 
-    `pub_count` compte les publications que la personne signe **comme auteur** — distinct des signatures tous rôles que la liste de curation porte sous `signature_count`. Sous scope `lab_id`, il se restreint aux publications du laboratoire.
+    `signature_count_as_author` compte les signatures où la personne tient le rôle d'auteur — le même dénombrement que `signature_count` de la liste de curation, la condition de rôle en plus. Sous scope `lab_id`, il se restreint aux publications du laboratoire.
     """
 
     id: int
@@ -122,7 +122,7 @@ class PersonDirectoryEntry(BaseModel):
     role_title: str | None
     department_name: str | None
     has_rh: bool
-    pub_count: int
+    signature_count_as_author: int
     orcids: list[ValueConfirmedOut] | None
     idhals: list[ValueConfirmedOut] | None
     idrefs: list[ValueConfirmedOut] | None
@@ -157,7 +157,7 @@ class PersonOut(BaseModel):
     has_rh: bool
     rejected: bool
     signature_count: int
-    """Signatures de la personne, tous rôles — auteur, mais aussi jury ou rapporteur d'une thèse."""
+    """Signatures de la personne, tous rôles — auteur, mais aussi jury ou rapporteur d'une thèse. L'annuaire n'en retient que celles d'auteur, sous `signature_count_as_author`."""
     in_perimeter_signature_count: int
     """Celles de ces signatures que le périmètre retient."""
     identifiers: list[PersonIdentifierOut] | None
@@ -220,7 +220,7 @@ class PersonProfileAuthor(BaseModel):
     idhal: str | None
     hal_person_id: int | None = None
     openalex_id: str | None
-    uca_pub_count: int
+    in_perimeter_signature_count: int
 
 
 class PersonProfileResponse(BaseModel):

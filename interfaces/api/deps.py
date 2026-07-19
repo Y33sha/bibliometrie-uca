@@ -189,8 +189,6 @@ def publisher_repo(conn: Connection = Depends(db_conn)) -> PublisherRepository:
     return publisher_repository(conn)
 
 
-
-
 def perimeter_repo(conn: Connection = Depends(db_conn)) -> PerimeterRepository:
     return perimeter_repository(conn)
 
