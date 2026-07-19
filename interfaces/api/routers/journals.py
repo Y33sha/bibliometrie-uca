@@ -9,6 +9,7 @@ from application.ports.api.journals_queries import (
     JournalListResponse,
     JournalQueries,
     JournalsFacetsResponse,
+    JournalSort,
 )
 from application.ports.api.subjects_queries import SubjectFrequency
 from application.ports.pipeline.metadata_correction import MetadataCorrectionQueries
@@ -97,7 +98,7 @@ def list_journals(
     is_in_doaj: bool | None = None,
     oa_model: str = Query(""),
     with_pubs: bool = False,
-    sort: str = "title_asc",
+    sort: JournalSort = "title_asc",
     queries: JournalQueries = Depends(journal_queries),
 ) -> JournalListResponse:
     """Liste paginée des revues, avec le décompte de leurs publications.
@@ -110,7 +111,7 @@ def list_journals(
     - `is_in_doaj` : booléen ; omis, il ne filtre rien.
     - `with_pubs` : restreint aux revues portant au moins une publication. La page publique s'en sert pour masquer les revues orphelines, que l'admin garde la possibilité de voir.
 
-    `sort` accepte `title`, `publisher` et `pubs`, suffixés de `_asc` ou `_desc`, et retombe sur `title_asc` devant une valeur inconnue.
+    `sort` accepte `title`, `publisher` et `pubs`, suffixés de `_asc` ou `_desc` ; toute autre valeur rend un 422.
     """
     return queries.list_journals(
         search=search,

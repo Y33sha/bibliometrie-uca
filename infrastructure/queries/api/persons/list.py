@@ -174,7 +174,7 @@ def list_persons(
     clauses.append(person_has_pending_identifiers_clause(filters.has_pending_identifiers))
 
     where_sql, binds = assemble_where(clauses)
-    order = _LIST_SORT_MAP.get(sort, _LIST_SORT_MAP["name_asc"])
+    order = _LIST_SORT_MAP[sort]
 
     count_row = conn.execute(
         text(

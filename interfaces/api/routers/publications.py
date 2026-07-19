@@ -19,6 +19,7 @@ from application.ports.api.publications_queries import (
     PublicationFilters,
     PublicationListResponse,
     PublicationsFacetsResponse,
+    PublicationSort,
     PublicationsQueries,
 )
 from application.ports.repositories.audit_repository import AuditRepository
@@ -154,7 +155,7 @@ def publications_entity_label(
 @router.get("/export.csv")
 def export_publications_csv(
     filters: Filters,
-    sort: str = Query("year_desc"),
+    sort: PublicationSort = Query("year_desc"),
     columns: str = Query(""),
     queries: PublicationsQueries = Depends(publications_queries),
 ) -> Response:
@@ -179,7 +180,7 @@ def export_theses_csv(
     access: str = Query(""),
     source_filter: str = Query(""),
     doc_type: str = Query(""),
-    sort: str = Query("soutenance_desc"),
+    sort: PublicationSort = Query("soutenance_desc"),
     queries: PublicationsQueries = Depends(publications_queries),
 ) -> Response:
     """Export CSV de la page thèses, aux mêmes filtres et au même tri que sa liste.
@@ -267,7 +268,7 @@ def list_publications(
     filters: Filters,
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=200),
-    sort: str = Query("year_desc"),
+    sort: PublicationSort = Query("year_desc"),
     queries: PublicationsQueries = Depends(publications_queries),
 ) -> PublicationListResponse:
     """Liste paginée des publications, avec leurs sources, leurs laboratoires et leur revue.

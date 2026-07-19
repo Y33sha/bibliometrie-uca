@@ -3,11 +3,16 @@
 Implémenté par `infrastructure.queries.api.publishers.PgPublisherQueries`.
 """
 
-from typing import Protocol
+from typing import Literal, Protocol
 
 from pydantic import BaseModel
 
 from application.ports.api._common import PaginatedResponse
+
+# Vocabulaire de tri de la liste des éditeurs : le champ, puis le sens.
+PublisherSort = Literal[
+    "name_asc", "name_desc", "journals_asc", "journals_desc", "pubs_asc", "pubs_desc"
+]
 from application.ports.api.subjects_queries import SubjectFrequency
 
 
@@ -106,7 +111,7 @@ class PublisherQueries(Protocol):
         publisher_types: list[str],
         countries: list[str],
         with_pubs: bool,
-        sort: str,
+        sort: PublisherSort,
         page: int,
         per_page: int,
     ) -> PublisherListResponse: ...

@@ -4,11 +4,16 @@ Implémenté par `infrastructure.queries.api.journals.PgJournalQueries`.
 """
 
 from datetime import datetime
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel
 
 from application.ports.api._common import PaginatedResponse
+
+# Vocabulaire de tri de la liste des revues : le champ, puis le sens.
+JournalSort = Literal[
+    "title_asc", "title_desc", "publisher_asc", "publisher_desc", "pubs_asc", "pubs_desc"
+]
 from application.ports.api.subjects_queries import SubjectFrequency
 from domain.journals.journal import JournalType, OaModel
 
@@ -125,7 +130,7 @@ class JournalQueries(Protocol):
         is_in_doaj: bool | None,
         oa_models: list[str],
         with_pubs: bool,
-        sort: str,
+        sort: JournalSort,
         page: int,
         per_page: int,
     ) -> JournalListResponse: ...

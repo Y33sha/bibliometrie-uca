@@ -22,6 +22,22 @@ from application.ports.api._common import (
 )
 from application.ports.api.subjects_queries import SubjectFrequency
 
+# Vocabulaires de tri : le champ, puis le sens. L'annuaire trie sur ce qu'il affiche —
+# fonction et département —, la liste de curation sur le décompte propre au périmètre.
+PersonDirectorySort = Literal[
+    "name_asc",
+    "name_desc",
+    "pubs_asc",
+    "pubs_desc",
+    "dept_asc",
+    "dept_desc",
+    "role_asc",
+    "role_desc",
+]
+PersonListSort = Literal[
+    "name_asc", "name_desc", "pubs_asc", "pubs_desc", "uca_pubs_asc", "uca_pubs_desc"
+]
+
 
 @dataclass(frozen=True, slots=True)
 class PersonFilters:
@@ -423,13 +439,13 @@ class PersonsQueries(Protocol):
     # ── Annuaire / recherche / liste admin ─────────────────────────
 
     def persons_directory(
-        self, *, filters: DirectoryFilters, page: int, per_page: int, sort: str
+        self, *, filters: DirectoryFilters, page: int, per_page: int, sort: PersonDirectorySort
     ) -> PersonDirectoryResponse: ...
 
     def search_persons(self, *, q: str, limit: int) -> list[PersonSearchResult]: ...
 
     def list_persons(
-        self, *, filters: ListFilters, page: int, per_page: int, sort: str
+        self, *, filters: ListFilters, page: int, per_page: int, sort: PersonListSort
     ) -> PersonListResponse: ...
 
     def person_admin(self, person_id: int) -> PersonOut | None: ...

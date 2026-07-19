@@ -61,7 +61,7 @@ class TestDirectoryLabScope:
 
         q = PgPersonsQueries(sa_sync_conn)
         res = q.persons_directory(
-            filters=DirectoryFilters(lab_id=lab), page=1, per_page=50, sort="name"
+            filters=DirectoryFilters(lab_id=lab), page=1, per_page=50, sort="name_asc"
         )
         ids = {p.id for p in res.persons}
         assert p_in in ids
@@ -75,7 +75,7 @@ class TestDirectoryLabScope:
         _authorship_in_lab(sa_sync_conn, p_out, lab_id=None)
 
         q = PgPersonsQueries(sa_sync_conn)
-        res = q.persons_directory(filters=DirectoryFilters(), page=1, per_page=50, sort="name")
+        res = q.persons_directory(filters=DirectoryFilters(), page=1, per_page=50, sort="name_asc")
         ids = {p.id for p in res.persons}
         assert {p_in, p_out} <= ids
 
@@ -147,7 +147,7 @@ class TestPendingFacets:
 
         q = PgPersonsQueries(sa_sync_conn)
         res = q.list_persons(
-            filters=ListFilters(has_pending_forms="yes"), page=1, per_page=50, sort="name"
+            filters=ListFilters(has_pending_forms=True), page=1, per_page=50, sort="name_asc"
         )
         ids = {p.id for p in res.persons}
         assert p_pending in ids
@@ -174,7 +174,7 @@ class TestPendingFacets:
 
         q = PgPersonsQueries(sa_sync_conn)
         res = q.list_persons(
-            filters=ListFilters(has_pending_identifiers="yes"), page=1, per_page=50, sort="name"
+            filters=ListFilters(has_pending_identifiers=True), page=1, per_page=50, sort="name_asc"
         )
         ids = {p.id for p in res.persons}
         assert p_pending in ids
