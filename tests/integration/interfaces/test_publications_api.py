@@ -9,6 +9,8 @@ construction dynamique des WHERE/ORDER BY — si le refactor casse un
 chemin SQL, ces tests le révèlent par un 500 (via raise_server_exceptions).
 """
 
+import pytest
+
 
 class TestPublicationsList:
     """Exerce le SQL de GET /api/publications avec toutes les combinaisons
@@ -111,6 +113,42 @@ class TestPublicationsList:
                 "per_page": 20,
             },
         )
+        assert r.status_code == 200
+
+
+class TestClosedVocabularyFilters:
+    """Une valeur hors vocabulaire est refusée, non ignorée.
+
+    Ignorée, elle traversait jusqu'au SQL qui la laissait tomber : la liste rendue n'était
+    pas celle qu'on croyait, et le code restait 200.
+    """
+
+    @pytest.mark.parametrize(
+        ("param", "value"),
+        [
+            ("doc_type", "nimportequoi"),
+            ("excluded_doc_type", "nimportequoi"),
+            ("oa_status", "vert"),
+            ("access", "ouvert"),
+            ("hal_status", "bogus"),
+        ],
+    )
+    def test_refuses_a_value_outside_the_vocabulary(self, client, param, value):
+        r = client.get("/api/publications", params={param: value})
+        assert r.status_code == 422
+        assert value in r.json()["detail"]
+
+    def test_refuses_a_list_where_one_value_is_unknown(self, client):
+        r = client.get("/api/publications", params={"doc_type": "article,bogus"})
+        assert r.status_code == 422
+
+    def test_accepts_the_oa_shorthand(self, client):
+        """`oa` n'est pas un statut stocké mais un terme d'entrée, développé en cinq statuts."""
+        r = client.get("/api/publications", params={"oa_status": "oa"})
+        assert r.status_code == 200
+
+    def test_accepts_the_embargoed_status(self, client):
+        r = client.get("/api/publications", params={"oa_status": "embargoed"})
         assert r.status_code == 200
 
 

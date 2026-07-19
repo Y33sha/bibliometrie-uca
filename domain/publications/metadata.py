@@ -34,10 +34,21 @@ OA_RANK: dict[str, int] = {
 # `source_publications.oa_status` orphelin.
 OA_STATUS_UNKNOWN_DEFAULT = "unknown"
 
+# Ventilation des statuts en trois niveaux d'accès : `oa_status` est la forme fine,
+# l'accès la forme grossière. Chaque statut appartient à un niveau et à un seul, et les
+# trois niveaux couvrent `OA_RANK` — ce qu'un test du domaine vérifie.
+ACCESS_LEVELS: dict[str, frozenset[str]] = {
+    "open": frozenset({"diamond", "gold", "hybrid", "bronze", "green"}),
+    "embargo": frozenset({"embargoed"}),
+    "closed": frozenset({"closed", "unknown"}),
+}
+
+OA_OPEN_STATUSES: frozenset[str] = ACCESS_LEVELS["open"]
+
 # Statuts « non-ouverts » : aucun signal d'accès ouvert exploitable. Une archive
 # ouverte attestant un dépôt, ou un embargo connu, priment sur eux — d'où leur
 # usage dans `decide_oa_status` et le plancher archive-ouverte de l'agrégation.
-OA_CLOSED_STATUSES: frozenset[str] = frozenset({"closed", "unknown"})
+OA_CLOSED_STATUSES: frozenset[str] = ACCESS_LEVELS["closed"]
 
 # Sources qui sont des archives ouvertes : quand l'une déclare `green`, elle atteste un FICHIER
 # déposé et lisible (pas une estimation à distance). Ce dépôt est un fait — un `closed` d'Unpaywall,

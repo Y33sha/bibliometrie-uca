@@ -3,6 +3,7 @@
 from types import SimpleNamespace
 
 from domain.publications.metadata import (
+    ACCESS_LEVELS,
     OA_RANK,
     best_oa_status,
     clean_publication_title,
@@ -15,6 +16,23 @@ from domain.publications.metadata import (
 
 def _src(source: str, oa_status: str | None):
     return SimpleNamespace(source=source, oa_status=oa_status)
+
+
+class TestAccessLevels:
+    """Les niveaux d'accès ventilent les statuts OA : chaque statut appartient à un niveau et à un seul."""
+
+    def test_cover_every_status(self):
+        classes = {s for statuses in ACCESS_LEVELS.values() for s in statuses}
+        assert classes == set(OA_RANK)
+
+    def test_do_not_overlap(self):
+        total = sum(len(statuses) for statuses in ACCESS_LEVELS.values())
+        assert total == len(OA_RANK)
+
+    def test_open_is_more_open_than_embargo_than_closed(self):
+        """L'ordre des niveaux suit celui des statuts qu'ils recouvrent."""
+        rank = {level: {OA_RANK[s] for s in statuses} for level, statuses in ACCESS_LEVELS.items()}
+        assert min(rank["open"]) > max(rank["embargo"]) > max(rank["closed"])
 
 
 class TestHasOpenArchiveDeposit:

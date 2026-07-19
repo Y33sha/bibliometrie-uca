@@ -6,6 +6,14 @@ Interprétation des champs propres au schéma HAL — prédicats et extracteurs 
 import re
 from datetime import date
 
+# Situation d'une publication vis-à-vis de HAL, du dépôt le plus complet au plus absent.
+# `ok` : déposée dans la collection du laboratoire, et son texte y est accessible.
+# `notice` : dans la collection, mais réduite à une notice — aucun accès ouvert.
+# `hors_collection` : présente dans HAL sans figurer dans la collection du laboratoire.
+# `hors_hal` : absente de HAL.
+# Les deux premières se lisent au regard d'une collection donnée, les deux dernières non.
+HAL_DEPOSIT_STATUSES: tuple[str, ...] = ("ok", "notice", "hors_collection", "hors_hal")
+
 # Code d'un domaine CCSD : des segments alphanumériques séparés par des points
 # (`sdv`, `sdv.bbm.bm`), le tiret étant admis dans un segment (`info.info-oh`).
 _DOMAIN_CODE = re.compile(r"^[a-z0-9]+(?:[-.][a-z0-9]+)*$")

@@ -25,6 +25,9 @@ from application.ports.api.publications_queries import (
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.publication_repository import PublicationRepository
 from application.services.publications import commands as publication_commands
+from domain.publications.doc_types import DOC_TYPES
+from domain.publications.metadata import ACCESS_LEVELS, OA_RANK
+from domain.sources.hal import HAL_DEPOSIT_STATUSES
 from interfaces.api.deps import (
     audit_repo,
     db_conn,
@@ -32,7 +35,7 @@ from interfaces.api.deps import (
     publication_repo,
     publications_queries,
 )
-from interfaces.api.filters import parse_int_csv, parse_str_csv
+from interfaces.api.filters import parse_int_csv, parse_str_csv, parse_vocabulary_csv
 from interfaces.api.models import (
     MarkDistinctPublications,
     MergePublications,
@@ -41,6 +44,10 @@ from interfaces.api.models import (
 )
 
 router = APIRouter(prefix="/api/publications", tags=["publications"])
+
+# `oa` est un raccourci d'entrée, non un statut stocké : il vaut les cinq statuts ouverts,
+# que `oa_clause` développe.
+_OA_STATUS_VALUES: frozenset[str] = frozenset(OA_RANK) | {"oa"}
 
 
 def _parse_lab_id(lab_id: str) -> tuple[list[int], bool]:
@@ -93,15 +100,21 @@ class PublicationFilterParams:
             journal_id=self.journal_id,
             person_id=self.person_id,
             subject_id=self.subject_id,
-            access=parse_str_csv(self.access),
-            oa_status=parse_str_csv(self.oa_status),
+            access=parse_vocabulary_csv(self.access, allowed=ACCESS_LEVELS, param="access"),
+            oa_status=parse_vocabulary_csv(
+                self.oa_status, allowed=_OA_STATUS_VALUES, param="oa_status"
+            ),
             source_values=parse_str_csv(self.source_filter),
-            doc_types=parse_str_csv(self.doc_type),
-            excluded_types=parse_str_csv(self.excluded_doc_type),
+            doc_types=parse_vocabulary_csv(self.doc_type, allowed=DOC_TYPES, param="doc_type"),
+            excluded_types=parse_vocabulary_csv(
+                self.excluded_doc_type, allowed=DOC_TYPES, param="excluded_doc_type"
+            ),
             is_corresponding=parse_str_csv(self.is_corresponding),
             has_apc=parse_str_csv(self.has_apc),
             country_values=parse_str_csv(self.country),
-            hal_status_values=parse_str_csv(self.hal_status),
+            hal_status_values=parse_vocabulary_csv(
+                self.hal_status, allowed=HAL_DEPOSIT_STATUSES, param="hal_status"
+            ),
             in_perimeter=parse_str_csv(self.in_perimeter),
         )
 
