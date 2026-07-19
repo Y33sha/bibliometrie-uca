@@ -163,6 +163,34 @@ class TestListAddresses:
         assert r.json().get("requires_search") is not True
 
 
+class TestMalformedPredicates:
+    """Un prédicat qui ne se conforme pas à sa forme est refusé, non abandonné.
+
+    Abandonné, il rendait la liste non filtrée sous un code 200 : le résultat n'était pas
+    celui qu'on croyait, et rien ne le signalait.
+    """
+
+    @pytest.mark.parametrize(
+        "text",
+        ["bogus:Clermont", "contains:", "nocolon", ":Clermont"],
+    )
+    def test_refuses_malformed_text_predicate(self, client, text):
+        r = client.get("/api/addresses", params={"text": text})
+        assert r.status_code == 422
+
+    @pytest.mark.parametrize(
+        "struct",
+        ["bogus:1", "recognized:abc", "recognized:", "recognized:1,", "recognized"],
+    )
+    def test_refuses_malformed_structure_predicate(self, client, struct):
+        r = client.get("/api/addresses", params={"struct": struct})
+        assert r.status_code == 422
+
+    def test_refuses_a_lot_where_one_occurrence_is_malformed(self, client):
+        r = client.get("/api/addresses", params={"text": ["contains:Clermont", "bogus:Toulouse"]})
+        assert r.status_code == 422
+
+
 # ── GET /api/addresses/{addr_id}/publications ────────────────────
 
 

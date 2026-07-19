@@ -3,6 +3,8 @@
 Les lectures passent par le port `AddressesQueries`, les écritures par les command handlers de `application.services.addresses.commands`, qui committent avant que le router ne rende la main. Le référentiel des pays, qui n'est pas une lecture d'adresse, vit dans `countries.py`.
 """
 
+from typing import Annotated, cast
+
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy import Connection
 
@@ -16,7 +18,9 @@ from application.ports.api.addresses_queries import (
     AddressStatsResponse,
     AddressValidation,
     StructurePredicate,
+    StructurePredicateOperator,
     TextPredicate,
+    TextPredicateMode,
 )
 from application.ports.repositories.address_repository import AddressRepository
 from application.services.addresses import commands as address_commands
@@ -41,37 +45,32 @@ from interfaces.api.models import (
 
 router = APIRouter(prefix="/api/addresses", tags=["addresses"])
 
-_TEXT_MODES = {"contains", "not_contains"}
-_STRUCT_OPS = {"recognized", "not_recognized"}
+# Chaque occurrence répétée porte `<opérateur>:<charge>`. Le motif déclare la forme et le
+# vocabulaire : FastAPI refuse l'occurrence malformée par un 422, et le contrat OpenAPI la publie.
+TextPredicateParam = Annotated[str, Query(pattern=r"^(contains|not_contains):.+$")]
+StructurePredicateParam = Annotated[str, Query(pattern=r"^(recognized|not_recognized):\d+(,\d+)*$")]
 
 
 def _parse_text_predicates(raw: list[str]) -> tuple[TextPredicate, ...]:
-    """Lit les paramètres répétés `text=<mode>:<terme>`, dont les modes sont `contains` et `not_contains`.
-
-    La lecture est tolérante : un mode inconnu ou un terme vide laisse tomber le prédicat plutôt que de refuser la requête.
-    """
+    """Découpe les paramètres répétés `text=<mode>:<terme>`, dont la forme est déjà validée."""
     out: list[TextPredicate] = []
     for item in raw:
         mode, _, term = item.partition(":")
-        term = term.strip()
-        if mode in _TEXT_MODES and term:
-            out.append(TextPredicate(mode=mode, term=term))
+        out.append(TextPredicate(mode=cast(TextPredicateMode, mode), term=term))
     return tuple(out)
 
 
 def _parse_structure_predicates(raw: list[str]) -> tuple[StructurePredicate, ...]:
-    """Lit les paramètres répétés `struct=<operateur>:<id>[,<id>…]`, dont les opérateurs sont `recognized` et `not_recognized`.
-
-    La lecture est tolérante : un opérateur inconnu ou une liste sans identifiant valide laisse tomber le prédicat plutôt que de refuser la requête.
-    """
+    """Découpe les paramètres répétés `struct=<operateur>:<id>[,<id>…]`, dont la forme est déjà validée."""
     out: list[StructurePredicate] = []
     for item in raw:
-        op, _, ids_csv = item.partition(":")
-        if op not in _STRUCT_OPS:
-            continue
-        ids = tuple(int(x) for x in (s.strip() for s in ids_csv.split(",")) if x.isdigit())
-        if ids:
-            out.append(StructurePredicate(operator=op, structure_ids=ids))
+        operator, _, ids_csv = item.partition(":")
+        out.append(
+            StructurePredicate(
+                operator=cast(StructurePredicateOperator, operator),
+                structure_ids=tuple(int(x) for x in ids_csv.split(",")),
+            )
+        )
     return tuple(out)
 
 
@@ -82,8 +81,8 @@ def list_addresses(
     structure_id: int | None = Query(None),
     detected: AddressDetected = Query("yes"),
     validation: AddressValidation = Query("pending"),
-    text: list[str] = Query(default=[]),
-    struct: list[str] = Query(default=[]),
+    text: list[TextPredicateParam] = Query(default=[]),
+    struct: list[StructurePredicateParam] = Query(default=[]),
     queries: AddressesQueries = Depends(addresses_queries),
 ) -> AddressListResponse:
     """Liste les adresses pour une structure, avec prédicats texte/structure composables."""
