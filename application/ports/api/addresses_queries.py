@@ -10,16 +10,20 @@ from pydantic import BaseModel
 
 from application.ports.api._common import PaginatedResponse
 
-# Etat de detection d'un rattachement adresse-structure, et etat de son arbitrage manuel.
+# État de détection d'un rattachement adresse-structure, et état de son arbitrage manuel.
 AddressDetected = Literal["all", "yes", "no"]
 AddressValidation = Literal["all", "pending", "confirmed", "rejected"]
+
+# Vocabulaires des prédicats composables de la liste d'adresses.
+TextPredicateMode = Literal["contains", "not_contains"]
+StructurePredicateOperator = Literal["recognized", "not_recognized"]
 
 
 @dataclass(frozen=True, slots=True)
 class TextPredicate:
-    """Filtre sur le texte brut de l'adresse. `mode` ∈ {contains, not_contains}."""
+    """Filtre sur le texte brut de l'adresse."""
 
-    mode: str
+    mode: TextPredicateMode
     term: str
 
 
@@ -27,10 +31,10 @@ class TextPredicate:
 class StructurePredicate:
     """Filtre « structure reconnue » multi-structures.
 
-    `operator` ∈ {recognized, not_recognized}. `recognized` retient les adresses reconnues comme au moins une des `structure_ids`, `not_recognized` celles qui ne le sont comme aucune d'elles. Une adresse est reconnue comme une structure dès que le lien existe, qu'il soit en attente de validation ou confirmé.
+    `recognized` retient les adresses reconnues comme au moins une des `structure_ids`, `not_recognized` celles qui ne le sont comme aucune d'elles. Une adresse est reconnue comme une structure dès que le lien existe, qu'il soit en attente de validation ou confirmé.
     """
 
-    operator: str
+    operator: StructurePredicateOperator
     structure_ids: tuple[int, ...]
 
 

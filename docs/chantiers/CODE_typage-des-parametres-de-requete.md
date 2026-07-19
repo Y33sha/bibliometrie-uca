@@ -59,9 +59,11 @@ Sept paramètres : `has_orcid`, `has_idhal`, `has_idref`, `has_rh`, `has_pending
 
 ### Phase 3 — les prédicats composés
 
-- [ ] Les opérateurs de `text` et `struct` se déclarent en énumération, à la place des ensembles en dur `_TEXT_MODES` et `_STRUCT_OPS`.
-- [ ] Un prédicat malformé — opérateur inconnu, terme vide, liste d'identifiants sans chiffre — est refusé plutôt qu'abandonné.
-- [ ] Vérifier d'abord ce que la page des adresses émet : elle construit ces paramètres elle-même, et un prédicat qu'elle produirait mal passerait aujourd'hui inaperçu.
+- [x] Vérification préalable : la page des adresses n'émet jamais de prédicat malformé. Elle n'ajoute une occurrence `text` que si le terme est non vide, une occurrence `struct` que si la liste d'identifiants l'est aussi, et son mode comme son opérateur viennent d'unions typées.
+- [x] Les opérateurs se déclarent en `Literal` au port, et les dataclasses `TextPredicate` et `StructurePredicate` les portent à la place de `str`.
+- [x] La forme entière se déclare au router par un motif posé sur chaque occurrence répétée (`list[Annotated[str, Query(pattern=...)]]`). FastAPI refuse alors l'occurrence malformée par un 422 et publie le motif dans le contrat OpenAPI, sans contrôle écrit à la main. Les deux parseurs se réduisent à un découpage, et leur règle de tolérance — la même décision écrite deux fois — disparaît avec ce qu'elle traitait.
+
+  La page des adresses porte sa propre copie de ces règles (`parseTextParam`, `parseStructParam`) : elle relit la query string pour restaurer son état. Le motif étant désormais publié, cette copie pourrait s'en déduire plutôt que se réécrire.
 
 ## Questions ouvertes
 
