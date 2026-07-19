@@ -62,6 +62,19 @@ Deux écarts précédaient toute question de projection, et l'ont faussée : la 
 
 ### Phase 2 — la forme de la projection
 
+- [x] Constat après les phases 0 et 1, sur cinquante lignes : 13 351 octets pour l'annuaire, 17 655 pour la curation, dont respectivement 4 412 et 4 315 d'identifiants. L'écart initial de 4,7 tombe à 1,3, et ce qui reste tient à quatre champs.
+
+  Les deux lectures partagent `search`, `departments`, `roles`, `has_orcid`, `has_idhal`, `has_idref`, `has_rh`, et servent `id`, les deux noms, `role_title`, `department_name`, `has_rh`, `identifiers`. Ce qui les sépare :
+
+  | | annuaire | curation |
+  | --- | --- | --- |
+  | filtres propres | `lab_id` (scope) | `has_pending_forms`, `has_pending_identifiers` |
+  | personnes rejetées | exclues sans recours | incluses, sous le drapeau `rejected` |
+  | dénombrement | `signature_count_as_author` | `signature_count`, `in_perimeter_signature_count` |
+  | champs propres | — | `rejected`, `start_date`, `end_date` |
+
+  Les dates ne servent qu'au tiroir d'une personne, comme les formes de nom avant elles ; elles relèvent de la lecture par personne, non de la liste.
+
 - [ ] Trancher entre les trois issues.
 - [ ] `rejected` devient un filtre de la lecture ; `lab_id` reste un scope.
 - [ ] Selon l'issue : fusion des deux endpoints, ou énoncé de ce qui justifie leur séparation.
