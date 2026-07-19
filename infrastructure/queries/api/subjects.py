@@ -14,6 +14,19 @@ from application.ports.api.subjects_queries import (
 )
 
 
+def _search_clause(q: str | None, min_usage_count: int) -> tuple[str, dict[str, Any]]:
+    """Clause de recherche de l'annuaire des sujets, avec ses paramètres.
+
+    La liste et son total la partagent : un critère ajouté d'un seul côté fausserait la pagination.
+    """
+    where = "usage_count >= :min_count"
+    binds: dict[str, Any] = {"min_count": min_usage_count}
+    if q:
+        where += " AND unaccent(label) ILIKE unaccent(:q)"
+        binds["q"] = f"%{q}%"
+    return where, binds
+
+
 class PgSubjectsQueries(SubjectsQueries):
     """Adapter SA pour `application.ports.api.subjects_queries.SubjectsQueries`."""
 
@@ -23,11 +36,7 @@ class PgSubjectsQueries(SubjectsQueries):
     def list_subjects(
         self, *, q: str | None, limit: int, offset: int, min_usage_count: int
     ) -> list[SubjectListItem]:
-        binds: dict[str, Any] = {"min_count": min_usage_count, "lim": limit, "off": offset}
-        where = "usage_count >= :min_count"
-        if q:
-            where += " AND unaccent(label) ILIKE unaccent(:q)"
-            binds["q"] = f"%{q}%"
+        where, binds = _search_clause(q, min_usage_count)
         rows = self._conn.execute(
             text(f"""
                 SELECT id, label, language, usage_count
@@ -36,7 +45,7 @@ class PgSubjectsQueries(SubjectsQueries):
                 ORDER BY usage_count DESC, lower(label)
                 LIMIT :lim OFFSET :off
             """),
-            binds,
+            {**binds, "lim": limit, "off": offset},
         ).all()
         return [
             SubjectListItem(
@@ -49,11 +58,7 @@ class PgSubjectsQueries(SubjectsQueries):
         ]
 
     def count_subjects(self, *, q: str | None, min_usage_count: int) -> int:
-        binds: dict[str, Any] = {"min_count": min_usage_count}
-        where = "usage_count >= :min_count"
-        if q:
-            where += " AND unaccent(label) ILIKE unaccent(:q)"
-            binds["q"] = f"%{q}%"
+        where, binds = _search_clause(q, min_usage_count)
         row = self._conn.execute(
             text(f"SELECT COUNT(*) AS n FROM subjects WHERE {where}"),
             binds,

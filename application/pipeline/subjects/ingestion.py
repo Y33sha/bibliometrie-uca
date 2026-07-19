@@ -41,7 +41,7 @@ def run(
     `rebuild` repasse toutes les publications, indépendamment du signal incrémental : chaque lien non rejeté est effacé puis reconstruit, et la purge finale retire les sujets devenus sans lien. Sert à propager une évolution des règles d'ingestion sur tout le stock.
     """
     t_run = time.perf_counter()
-    subjects_before = queries.count_subjects(conn)
+    subjects_before = queries.count_all_subjects(conn)
 
     if rebuild:
         pub_ids = queries.select_all_publication_ids(conn)
@@ -51,7 +51,7 @@ def run(
     if not pub_ids:
         n_purged = queries.purge_orphan_subjects(conn)
         logger.info("subjects : rien à ré-ingérer ; %d sujets orphelins purgés", n_purged)
-        subjects_after = queries.count_subjects(conn)
+        subjects_after = queries.count_all_subjects(conn)
         metrics = PhaseMetrics()
         metrics.details["summary"] = {
             "subjects_added": subjects_after - subjects_before,
@@ -105,7 +105,7 @@ def run(
         n_purged,
         time.perf_counter() - t_run,
     )
-    subjects_after = queries.count_subjects(conn)
+    subjects_after = queries.count_all_subjects(conn)
 
     metrics = PhaseMetrics()
     metrics.add(new=n_links, total=len(rows))

@@ -2,11 +2,18 @@
 
 from sqlalchemy import text
 
+from application.ports.pipeline.subjects import PublicationSubjectLink
 from infrastructure.queries.pipeline.subjects import (
-    clear_publication_subjects,
-    link_publication_subject,
+    clear_publication_subjects_for_pubs,
+    link_publication_subjects_bulk,
     upsert_subject,
 )
+
+
+def _link(conn, publication_id, subject_id, source):
+    return link_publication_subjects_bulk(
+        conn, source=source, rows=[PublicationSubjectLink(publication_id, subject_id)]
+    )
 
 
 def _create_pub(conn, title="X"):
@@ -64,7 +71,7 @@ class TestLinkAndClear:
     def test_link_creates_row(self, sa_sync_conn):
         pub = _create_pub(sa_sync_conn)
         sid = upsert_subject(sa_sync_conn, label="x")
-        link_publication_subject(sa_sync_conn, publication_id=pub, subject_id=sid, source="hal")
+        _link(sa_sync_conn, pub, sid, "hal")
         source = sa_sync_conn.execute(
             text(
                 "SELECT source FROM publication_subjects "
@@ -77,10 +84,8 @@ class TestLinkAndClear:
     def test_link_same_subject_two_sources(self, sa_sync_conn):
         pub = _create_pub(sa_sync_conn)
         sid = upsert_subject(sa_sync_conn, label="x")
-        link_publication_subject(sa_sync_conn, publication_id=pub, subject_id=sid, source="hal")
-        link_publication_subject(
-            sa_sync_conn, publication_id=pub, subject_id=sid, source="openalex"
-        )
+        _link(sa_sync_conn, pub, sid, "hal")
+        _link(sa_sync_conn, pub, sid, "openalex")
         n = sa_sync_conn.execute(
             text("SELECT count(*) AS n FROM publication_subjects WHERE publication_id = :p"),
             {"p": pub},
@@ -90,12 +95,8 @@ class TestLinkAndClear:
     def test_link_idempotent_same_source(self, sa_sync_conn):
         pub = _create_pub(sa_sync_conn)
         sid = upsert_subject(sa_sync_conn, label="x")
-        link_publication_subject(
-            sa_sync_conn, publication_id=pub, subject_id=sid, source="openalex"
-        )
-        link_publication_subject(
-            sa_sync_conn, publication_id=pub, subject_id=sid, source="openalex"
-        )
+        _link(sa_sync_conn, pub, sid, "openalex")
+        _link(sa_sync_conn, pub, sid, "openalex")
         n = sa_sync_conn.execute(
             text(
                 "SELECT count(*) AS n FROM publication_subjects "
@@ -105,29 +106,43 @@ class TestLinkAndClear:
         ).scalar_one()
         assert n == 1
 
-    def test_clear_only_removes_target_source(self, sa_sync_conn):
+    def test_bulk_dedupes_within_a_batch(self, sa_sync_conn):
+        """Deux annotations d'une même source visant le même sujet ne donnent qu'un lien."""
         pub = _create_pub(sa_sync_conn)
         sid = upsert_subject(sa_sync_conn, label="x")
-        link_publication_subject(sa_sync_conn, publication_id=pub, subject_id=sid, source="hal")
-        link_publication_subject(
-            sa_sync_conn, publication_id=pub, subject_id=sid, source="openalex"
+        sent = link_publication_subjects_bulk(
+            sa_sync_conn,
+            source="hal",
+            rows=[PublicationSubjectLink(pub, sid), PublicationSubjectLink(pub, sid)],
         )
-        n = clear_publication_subjects(sa_sync_conn, publication_id=pub, source="hal")
-        assert n == 1
-        sources = (
+        assert sent == 1
+
+    def test_clear_preserves_rejected_links(self, sa_sync_conn):
+        """Le nettoyage avant réingestion épargne les liens que la curation a rejetés."""
+        pub = _create_pub(sa_sync_conn)
+        kept = upsert_subject(sa_sync_conn, label="rejete")
+        dropped = upsert_subject(sa_sync_conn, label="ordinaire")
+        _link(sa_sync_conn, pub, kept, "hal")
+        _link(sa_sync_conn, pub, dropped, "hal")
+        sa_sync_conn.execute(
+            text("UPDATE publication_subjects SET rejected = TRUE WHERE subject_id = :s"),
+            {"s": kept},
+        )
+        assert clear_publication_subjects_for_pubs(sa_sync_conn, publication_ids=[pub]) == 1
+        remaining = (
             sa_sync_conn.execute(
-                text("SELECT source FROM publication_subjects WHERE publication_id = :p"),
+                text("SELECT subject_id FROM publication_subjects WHERE publication_id = :p"),
                 {"p": pub},
             )
             .scalars()
             .all()
         )
-        assert sources == ["openalex"]
+        assert remaining == [kept]
 
     def test_subject_survives_publication_delete(self, sa_sync_conn):
         pub = _create_pub(sa_sync_conn)
         sid = upsert_subject(sa_sync_conn, label="orphan candidate")
-        link_publication_subject(sa_sync_conn, publication_id=pub, subject_id=sid, source="hal")
+        _link(sa_sync_conn, pub, sid, "hal")
         sa_sync_conn.execute(text("DELETE FROM publications WHERE id = :p"), {"p": pub})
         n_links = sa_sync_conn.execute(
             text("SELECT count(*) AS n FROM publication_subjects WHERE subject_id = :s"),

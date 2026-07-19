@@ -41,44 +41,15 @@ def upsert_subject(
     ).scalar_one()
 
 
-def link_publication_subject(
-    conn: Connection,
-    *,
-    publication_id: int,
-    subject_id: int,
-    source: str,
-) -> None:
-    """Crée le lien publication↔subject pour une source donnée.
-
-    PK `(publication_id, subject_id, source)` : un même sujet annoté par deux
-    sources différentes donne deux lignes. Idempotent (`ON CONFLICT DO NOTHING`).
-    """
-    conn.execute(
-        text(
-            """
-            INSERT INTO publication_subjects (publication_id, subject_id, source)
-            VALUES (:pid, :sid, :src)
-            ON CONFLICT (publication_id, subject_id, source) DO NOTHING
-            """
-        ),
-        {"pid": publication_id, "sid": subject_id, "src": source},
-    )
-
-
 def link_publication_subjects_bulk(
     conn: Connection,
     *,
     source: str,
     rows: list[PublicationSubjectLink],
 ) -> int:
-    """Bulk INSERT des liens publication↔subject pour une source.
+    """Insère en lot les liens publication↔sujet d'une source, et retourne leur nombre.
 
-    `rows` : liste `(publication_id, subject_id)`. La source est constante pour
-    le batch. Idempotent (`ON CONFLICT DO NOTHING`). Plusieurs annotations source
-    peuvent pointer vers le même `subject_id` pour une même publication ; on
-    dédoublonne `(pub_id, subject_id)` côté Python avant l'INSERT.
-
-    Retourne le nombre de lignes envoyées.
+    La clé primaire porte la source : un même sujet annoté par deux sources donne deux lignes, et réinsérer un lien connu ne fait rien. Plusieurs annotations d'une même source peuvent viser le même sujet pour une même publication ; le lot les dédoublonne avant l'insertion.
     """
     if not rows:
         return 0
@@ -102,23 +73,6 @@ def link_publication_subjects_bulk(
     return len(deduped)
 
 
-def clear_publication_subjects(
-    conn: Connection,
-    *,
-    publication_id: int,
-    source: str,
-) -> int:
-    """Supprime les liens (non rejetés) d'une publication pour une source.
-    Retourne le nombre de lignes supprimées."""
-    return conn.execute(
-        text(
-            "DELETE FROM publication_subjects "
-            "WHERE publication_id = :pid AND source = :src AND NOT rejected"
-        ),
-        {"pid": publication_id, "src": source},
-    ).rowcount
-
-
 def clear_publication_subjects_for_pubs(conn: Connection, *, publication_ids: list[int]) -> int:
     """`DELETE` des liens (non rejetés) des publications données, toutes sources.
 
@@ -135,15 +89,9 @@ def clear_publication_subjects_for_pubs(conn: Connection, *, publication_ids: li
 
 
 def select_publications_to_reingest(conn: Connection) -> list[int]:
-    """Publications dont les sujets sont à (ré)ingérer : contenu canonique modifié
-    depuis la dernière ingestion de leurs liens, ou jamais ingérées.
+    """Publications dont les sujets sont à ingérer : contenu canonique modifié depuis la dernière ingestion de leurs liens, ou jamais ingérées.
 
-    Incrémental sans colonne dédiée : la référence « dernière ingestion » est
-    `max(publication_subjects.created_at)` par publication (le `created_at` est
-    posé à l'INSERT de chaque lien) ; le signal de changement est
-    `publications.updated_at` (bumpé par `refresh_from_sources` quand une source
-    change — conditionnel, donc propre). Les pubs sans aucun lien (jamais
-    ingérées, ~1 %) sont incluses via le `IS NULL`.
+    La date de dernière ingestion se lit dans `max(publication_subjects.created_at)`, posé à l'insertion de chaque lien ; le signal de changement est `publications.updated_at`, que le rafraîchissement depuis les sources n'avance que lorsqu'une source change vraiment. Une publication sans aucun lien passe par le `IS NULL`.
     """
     return [
         r.id
@@ -196,14 +144,9 @@ def select_source_publications_for_pubs(
 
 
 def purge_orphan_subjects(conn: Connection) -> int:
-    """Supprime les sujets sans aucun lien `publication_subjects` (tous statuts).
+    """Supprime les sujets qu'aucune publication n'annote, et retourne leur nombre.
 
-    Les `subjects` ne sont créés que par l'ingestion et ne sont jamais purgés au
-    fil de l'eau ; un sujet sans lien est un orphelin (ex. keyword d'une
-    publication purgée — la purge des publications cascade les liens mais pas le
-    référentiel, ou keyword retiré d'une source). On vise **zéro lien tous
-    statuts** (et non `usage_count = 0`) pour préserver un sujet portant un lien
-    rejeté (curation). Retourne le nombre supprimé.
+    La suppression d'une publication cascade sur ses liens mais laisse le sujet dans le référentiel ; un mot-clé retiré d'une source y laisse le sien de même. Le critère est l'absence de lien tous statuts confondus, de sorte qu'un sujet dont le seul lien est rejeté par la curation survit à la purge.
     """
     return conn.execute(
         text(
@@ -213,16 +156,16 @@ def purge_orphan_subjects(conn: Connection) -> int:
     ).rowcount
 
 
-def count_subjects(conn: Connection) -> int:
-    """Nombre total de sujets du référentiel."""
+def count_all_subjects(conn: Connection) -> int:
+    """Taille du référentiel, que la phase relève avant et après son passage pour annoncer les sujets ajoutés."""
     return conn.execute(text("SELECT COUNT(*) FROM subjects")).scalar_one()
 
 
-# ── Co-occurrences ───────────────────────────────────────────────
+# ── Décomptes dérivés ────────────────────────────────────────────
 
 
 def recompute_usage_counts(conn: Connection) -> int:
-    """Recalcule `subjects.usage_count` = nb publications distinctes par sujet."""
+    """Recalcule `subjects.usage_count` : le nombre de publications distinctes que chaque sujet annote."""
     n_reset = conn.execute(
         text("UPDATE subjects SET usage_count = 0 WHERE usage_count <> 0")
     ).rowcount
@@ -245,10 +188,9 @@ def recompute_usage_counts(conn: Connection) -> int:
 
 
 def refresh_cooccurrences(conn: Connection) -> int:
-    """Rafraîchit la matview `subject_cooccurrences` depuis `publication_subjects`.
+    """Rafraîchit la vue matérialisée `subject_cooccurrences` et retourne le nombre de paires qu'elle contient ensuite.
 
-    Seuil `count >= 2` figé dans la définition de la matview. Retourne
-    le nombre de paires dans la vue après refresh.
+    Le seuil de rétention d'une paire (`count >= 2`) est porté par la définition de la vue.
     """
     conn.execute(text("REFRESH MATERIALIZED VIEW subject_cooccurrences"))
     return conn.execute(text("SELECT COUNT(*) FROM subject_cooccurrences")).scalar_one()
@@ -294,8 +236,8 @@ class PgSubjectsIngestionQueries(SubjectsIngestionQueries):
     def purge_orphan_subjects(self, conn: Connection) -> int:
         return purge_orphan_subjects(conn)
 
-    def count_subjects(self, conn: Connection) -> int:
-        return count_subjects(conn)
+    def count_all_subjects(self, conn: Connection) -> int:
+        return count_all_subjects(conn)
 
     def recompute_usage_counts(self, conn: Connection) -> int:
         return recompute_usage_counts(conn)
