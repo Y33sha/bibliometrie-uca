@@ -56,21 +56,24 @@ Les lectures se rejoignent sous `/api/structures/*`, qui portent l'entité :
 
 ### Phase 2 — les lectures rejoignent `/api/structures`
 
-- [ ] `StructuresQueries` absorbe les quatre lectures de `LaboratoriesQueries` ; le détail réunit formes de nom et nombre de thèses.
-- [ ] `RelatedStructureOut` absorbe `LabRelatedStructure`.
-- [ ] La liste des structures accueille le filtre de périmètre et celui des types configurés.
-- [ ] `laboratories.py` (router, port, adapter, modèles) disparaît ; les tests suivent.
+- [x] `StructuresQueries` absorbe les quatre lectures de `LaboratoriesQueries` ; le détail réunit formes de nom et nombre de thèses.
+- [x] `RelatedStructureOut` absorbe `LabRelatedStructure`, et sert aussi les tutelles de la liste.
+- [x] La liste accueille `in_perimeter` et un `type` multi-valué. Le périmètre est un paramètre, non un défaut : une route de collection rend la collection, et c'est à la page publique de demander sa restriction — non à l'administration de lever une restriction qu'elle n'a pas posée.
+- [x] `laboratories.py` (router, port, adapter, modèles) disparaît ; les tests suivent.
 
 ### Phase 3 — le frontend
 
-- [ ] Les pages `/laboratories` et `/laboratories/[id]` interrogent `/api/structures*`.
-- [ ] Contrat TypeScript régénéré.
+- [x] Les pages `/laboratories` et `/laboratories/[id]` interrogent `/api/structures*`, contrat TypeScript régénéré.
+- [x] Les types affichés viennent de la configuration, que la page lit désormais elle-même. Il a fallu pour cela que `GET /api/config` redevienne lisible sans session, restreint à une liste blanche de clés : la table mêle des réglages d'exploitation et les identifiants d'accès aux sources, et c'est ce mélange qui avait rendu sa lecture entière réservée. Une clé absente de la liste reste privée par défaut.
+
+  Un test se perd au passage : celui qui vérifiait que la configuration pilote les types affichés. Ce lien vit maintenant dans la page, où seul le typage le couvre. Les tests de la requête attestent le filtrage par types, non son alimentation.
 
 ## Lien
 
 Même motif que [Projections de lecture des personnes](CODE_projections-de-lecture-des-personnes.md) : une entité, deux piles de lecture nées de deux pages. Les deux fiches se tranchent ensemble ou pas du tout — la réponse à l'une vaut réponse à l'autre.
 
-## Questions ouvertes
+## État à la clôture
 
-- **Le périmètre de la liste.** `/api/laboratories` filtre sur le périmètre `persons` et sur `laboratories_display_types` ; `/api/structures` ne filtre ni l'un ni l'autre et sert l'admin. Réunir les deux demande de décider si le filtre de périmètre est un paramètre de la requête (l'admin voit tout par défaut) ou un défaut de la route.
-- **Le sort des structures sans signature.** `onr`, `site` et `admin` n'ont aucune signature rattachée : leur tableau de bord est vide et leurs sujets aussi. Un 404 sur ces types, ou une réponse vide, selon que l'endpoint se veut réservé aux structures « productrices ».
+Une entité, une pile de lecture. `/api/structures` porte la liste, le détail et les trois sous-ressources ; le router, le port, l'adaptateur et les six modèles de `laboratories` ont disparu, pour 312 lignes de moins. Les pages `/laboratories` du frontend restent, et interrogent la ressource.
+
+Les deux questions ouvertes sont tranchées. Le périmètre est un paramètre de la requête : la route rend la collection, la page publique demande sa restriction. Et les structures sans signature rendent des agrégats vides plutôt qu'un 404 — la route porte les structures, non les seules productrices.
