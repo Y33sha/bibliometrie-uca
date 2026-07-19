@@ -682,106 +682,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/laboratories": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List Laboratories
-         * @description Liste des laboratoires du périmètre, avec toutes leurs tutelles.
-         */
-        get: operations["list_laboratories_api_laboratories_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/laboratories/{lab_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Laboratory
-         * @description Profil public d'un laboratoire.
-         */
-        get: operations["get_laboratory_api_laboratories__lab_id__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/laboratories/{lab_id}/addresses": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Laboratory Addresses
-         * @description Adresses liées à un laboratoire.
-         */
-        get: operations["get_laboratory_addresses_api_laboratories__lab_id__addresses_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/laboratories/{lab_id}/dashboard": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Laboratory Dashboard
-         * @description Agrégats du laboratoire : publications par année et répartition par statut d'accès ouvert.
-         */
-        get: operations["get_laboratory_dashboard_api_laboratories__lab_id__dashboard_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/laboratories/{lab_id}/subjects": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Laboratory Subjects
-         * @description Sujets les plus fréquents des publications du laboratoire, pour le nuage de mots de son tableau de bord.
-         */
-        get: operations["get_laboratory_subjects_api_laboratories__lab_id__subjects_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/structures": {
         parameters: {
             query?: never;
@@ -791,9 +691,9 @@ export interface paths {
         };
         /**
          * List Structures
-         * @description Liste des structures, filtrable par type et par texte libre.
+         * @description Liste des structures, filtrable par types, par texte libre et par appartenance au périmètre.
          *
-         *     `type` : enum `structure_type` (`labo`, `universite`, `onr`, `chu`, `ecole`, `site`, `equipe`, `autre`). `search` : matching accent-insensible sur nom / acronyme / code. Tri canonique par type (labo > universite > onr > chu > ecole > site > autre) puis nom.
+         *     `type` accepte plusieurs valeurs de l'énumération `structure_type` séparées par des virgules. `search` : matching accent-insensible sur nom / acronyme / code. `in_perimeter` restreint aux structures du périmètre `persons`, clôture comprise : la page publique des laboratoires s'en sert, avec les types que sa configuration lui donne. Tri canonique par type (labo > universite > onr > chu > ecole > site > autre) puis nom.
          */
         get: operations["list_structures_api_structures_get"];
         put?: never;
@@ -877,6 +777,66 @@ export interface paths {
          * @description Supprime une structure. Cascade sur les relations et formes de noms liées. 404 si inconnue.
          */
         delete: operations["delete_structure_api_structures__structure_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/structures/{structure_id}/addresses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Structure Addresses
+         * @description Adresses rattachées à la structure, le rattachement rejeté écarté.
+         */
+        get: operations["get_structure_addresses_api_structures__structure_id__addresses_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/structures/{structure_id}/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Structure Dashboard
+         * @description Agrégats de la structure : publications par année, accès ouvert, collaborations internationales.
+         */
+        get: operations["get_structure_dashboard_api_structures__structure_id__dashboard_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/structures/{structure_id}/subjects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Structure Subjects
+         * @description Sujets les plus fréquents des publications de la structure (nuage de mots).
+         */
+        get: operations["get_structure_subjects_api_structures__structure_id__subjects_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1813,9 +1773,9 @@ export interface paths {
         };
         /**
          * List Config
-         * @description Liste tous les paramètres applicatifs (clé, valeur JSON, description).
+         * @description Paramètres applicatifs (clé, valeur JSON, description), triés par clé.
          *
-         *     Rend la table `config` triée par clé, valeurs comprises. Parmi elles figurent les identifiants d'accès aux sources — clés d'API OpenAlex et Web of Science, compte ScanR — d'où l'authentification exigée : c'est la seule lecture de l'API qui livre des secrets, et la garde par méthode HTTP du middleware ne couvre que les écritures.
+         *     La table porte deux natures de réglages : des paramètres d'exploitation que les pages publiques consomment, et les identifiants d'accès aux sources — clés d'API OpenAlex et Web of Science, compte ScanR, adresse du polite pool. Sans session, la lecture se restreint donc à la liste blanche `PUBLIC_CONFIG_KEYS` ; une clé qu'on n'y inscrit pas reste réservée.
          */
         get: operations["list_config_api_config_get"];
         put?: never;
@@ -3623,24 +3583,6 @@ export interface components {
             /** Doaj */
             doaj: components["schemas"]["JournalsFacetOption"][];
         };
-        /** LabAddressOut */
-        LabAddressOut: {
-            /** Id */
-            id: number;
-            /** Raw Text */
-            raw_text: string;
-            /** Is Confirmed */
-            is_confirmed: boolean | null;
-        };
-        /** LabDashboardCollab */
-        LabDashboardCollab: {
-            /** Total Articles */
-            total_articles: number;
-            /** International */
-            international: number;
-            /** Domestic */
-            domestic: number;
-        };
         /** LabFacet */
         LabFacet: {
             /** Value */
@@ -3650,70 +3592,6 @@ export interface components {
             /** Count */
             count: number;
         };
-        /**
-         * LabRelatedStructure
-         * @description Structure voisine (tutelle, sous-labo) dans le détail d'un labo.
-         *
-         *     Distinct de `RelatedStructureOut` (utilisé pour les structures
-         *     génériques) — pas de `code` ni `relation_id` côté labo.
-         */
-        LabRelatedStructure: {
-            /** Id */
-            id: number;
-            /** Name */
-            name: string;
-            /** Acronym */
-            acronym: string | null;
-            /** Type */
-            type: string;
-            /** Relation Type */
-            relation_type: string;
-        };
-        /**
-         * LabStructureCore
-         * @description Métadonnées du labo (bloc `structure` du détail).
-         */
-        LabStructureCore: {
-            /** Id */
-            id: number;
-            /** Code */
-            code: string;
-            /** Name */
-            name: string;
-            /** Acronym */
-            acronym: string | null;
-            /** Type */
-            type: string;
-            /** Ror Id */
-            ror_id: string | null;
-            /** Rnsr Id */
-            rnsr_id: string | null;
-            /** Hal Collection */
-            hal_collection: string | null;
-        };
-        /** LabTopCountry */
-        LabTopCountry: {
-            /** Code */
-            code: string;
-            /** Name */
-            name: string;
-            /** Count */
-            count: number;
-        };
-        /**
-         * LabTutelle
-         * @description Tutelle d'un labo (établissement, EPST, etc.) dans la liste.
-         */
-        LabTutelle: {
-            /** Id */
-            id: number;
-            /** Name */
-            name: string;
-            /** Acronym */
-            acronym: string | null;
-            /** Type */
-            type: string;
-        };
         /** LabeledIntFacet */
         LabeledIntFacet: {
             /** Value */
@@ -3722,58 +3600,6 @@ export interface components {
             label: string;
             /** Count */
             count: number;
-        };
-        /** LaboratoryAddressesResponse */
-        LaboratoryAddressesResponse: {
-            /** Total */
-            total: number;
-            /** Page */
-            page: number;
-            /** Per Page */
-            per_page: number;
-            /** Addresses */
-            addresses: components["schemas"]["LabAddressOut"][];
-            /** Pages */
-            readonly pages: number;
-        };
-        /** LaboratoryDashboardResponse */
-        LaboratoryDashboardResponse: {
-            /** Pubs By Year */
-            pubs_by_year: components["schemas"]["PubYearCount"][];
-            oa: components["schemas"]["DashboardOa"];
-            collab: components["schemas"]["LabDashboardCollab"];
-            /** Top Countries */
-            top_countries: components["schemas"]["LabTopCountry"][];
-        };
-        /** LaboratoryDetailResponse */
-        LaboratoryDetailResponse: {
-            structure: components["schemas"]["LabStructureCore"];
-            /** Parents */
-            parents: components["schemas"]["LabRelatedStructure"][];
-            /** Children */
-            children: components["schemas"]["LabRelatedStructure"][];
-            /** Theses Count */
-            theses_count: number;
-        };
-        /**
-         * LaboratoryListItem
-         * @description Ligne de `/api/laboratories` (liste du périmètre).
-         */
-        LaboratoryListItem: {
-            /** Id */
-            id: number;
-            /** Code */
-            code: string;
-            /** Name */
-            name: string;
-            /** Acronym */
-            acronym: string | null;
-            /** Ror Id */
-            ror_id: string | null;
-            /** Hal Collection */
-            hal_collection: string | null;
-            /** Tutelles */
-            tutelles: components["schemas"]["LabTutelle"][] | null;
         };
         /** LoginRequest */
         LoginRequest: {
@@ -5234,6 +5060,40 @@ export interface components {
             /** Count */
             count: number;
         };
+        /** StructureAddressOut */
+        StructureAddressOut: {
+            /** Id */
+            id: number;
+            /** Raw Text */
+            raw_text: string;
+            /** Is Confirmed */
+            is_confirmed: boolean | null;
+        };
+        /** StructureAddressesResponse */
+        StructureAddressesResponse: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Per Page */
+            per_page: number;
+            /** Addresses */
+            addresses: components["schemas"]["StructureAddressOut"][];
+            /** Pages */
+            readonly pages: number;
+        };
+        /**
+         * StructureCollaborations
+         * @description Articles de la structure, selon qu'ils portent ou non une affiliation étrangère.
+         */
+        StructureCollaborations: {
+            /** Total Articles */
+            total_articles: number;
+            /** International */
+            international: number;
+            /** Domestic */
+            domestic: number;
+        };
         /** StructureCreate */
         StructureCreate: {
             /** Code */
@@ -5255,6 +5115,15 @@ export interface components {
                 [key: string]: string | string[];
             } | null;
         };
+        /** StructureDashboardResponse */
+        StructureDashboardResponse: {
+            /** Pubs By Year */
+            pubs_by_year: components["schemas"]["PubYearCount"][];
+            oa: components["schemas"]["DashboardOa"];
+            collab: components["schemas"]["StructureCollaborations"];
+            /** Top Countries */
+            top_countries: components["schemas"]["StructureTopCountry"][];
+        };
         /**
          * StructureDetailResponse
          * @description Détail complet renvoyé par GET /api/structures/{id}.
@@ -5267,6 +5136,8 @@ export interface components {
             children: components["schemas"]["RelatedStructureOut"][];
             /** Forms */
             forms: components["schemas"]["NameFormOut"][];
+            /** Theses Count */
+            theses_count: number;
         };
         /** StructureInfo */
         StructureInfo: {
@@ -5292,8 +5163,14 @@ export interface components {
             acronym: string | null;
             /** Type */
             type: string;
+            /** Ror Id */
+            ror_id: string | null;
+            /** Hal Collection */
+            hal_collection: string | null;
             /** Perimeter Ids */
             perimeter_ids: number[];
+            /** Tutelles */
+            tutelles: components["schemas"]["RelatedStructureOut"][] | null;
         };
         /**
          * StructureOut
@@ -5346,6 +5223,15 @@ export interface components {
             relation_type?: string | null;
             /** Status */
             status?: string | null;
+        };
+        /** StructureTopCountry */
+        StructureTopCountry: {
+            /** Code */
+            code: string;
+            /** Name */
+            name: string;
+            /** Count */
+            count: number;
         };
         /** StructureUpdate */
         StructureUpdate: {
@@ -6704,160 +6590,12 @@ export interface operations {
             };
         };
     };
-    list_laboratories_api_laboratories_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LaboratoryListItem"][];
-                };
-            };
-        };
-    };
-    get_laboratory_api_laboratories__lab_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                lab_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LaboratoryDetailResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_laboratory_addresses_api_laboratories__lab_id__addresses_get: {
-        parameters: {
-            query?: {
-                page?: number;
-                per_page?: number;
-            };
-            header?: never;
-            path: {
-                lab_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LaboratoryAddressesResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_laboratory_dashboard_api_laboratories__lab_id__dashboard_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                lab_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LaboratoryDashboardResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_laboratory_subjects_api_laboratories__lab_id__subjects_get: {
-        parameters: {
-            query?: {
-                limit?: number;
-            };
-            header?: never;
-            path: {
-                lab_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SubjectFrequency"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     list_structures_api_structures_get: {
         parameters: {
             query?: {
-                type?: string | null;
+                type?: string;
                 search?: string;
+                in_perimeter?: boolean;
             };
             header?: never;
             path?: never;
@@ -7066,6 +6804,104 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeletedResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_structure_addresses_api_structures__structure_id__addresses_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                per_page?: number;
+            };
+            header?: never;
+            path: {
+                structure_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StructureAddressesResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_structure_dashboard_api_structures__structure_id__dashboard_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                structure_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StructureDashboardResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_structure_subjects_api_structures__structure_id__subjects_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                structure_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubjectFrequency"][];
                 };
             };
             /** @description Validation Error */

@@ -10,6 +10,9 @@ from typing import Protocol
 
 from pydantic import BaseModel
 
+from application.ports.api._common import DashboardOa, PaginatedResponse, PubYearCount
+from application.ports.api.subjects_queries import SubjectFrequency
+
 
 class StructureListItem(BaseModel):
     """Ligne résumée de `/api/structures` (liste + recherche)."""
@@ -19,8 +22,12 @@ class StructureListItem(BaseModel):
     name: str
     acronym: str | None
     type: str
+    ror_id: str | None
+    hal_collection: str | None
     perimeter_ids: list[int]
     """Périmètres auxquels la structure appartient (clôture transitive). Vide = hors périmètre."""
+    tutelles: list["RelatedStructureOut"] | None
+    """Structures qui exercent une tutelle sur celle-ci."""
 
 
 class StructureOut(BaseModel):
@@ -68,15 +75,57 @@ class StructureDetailResponse(BaseModel):
     parents: list[RelatedStructureOut]
     children: list[RelatedStructureOut]
     forms: list[NameFormOut]
+    theses_count: int
+
+
+class StructureAddressOut(BaseModel):
+    id: int
+    raw_text: str
+    is_confirmed: bool | None
+
+
+class StructureAddressesResponse(PaginatedResponse):
+    addresses: list[StructureAddressOut]
+
+
+class StructureCollaborations(BaseModel):
+    """Articles de la structure, selon qu'ils portent ou non une affiliation étrangère."""
+
+    total_articles: int
+    international: int
+    domestic: int
+
+
+class StructureTopCountry(BaseModel):
+    code: str
+    name: str
+    count: int
+
+
+class StructureDashboardResponse(BaseModel):
+    pubs_by_year: list[PubYearCount]
+    oa: DashboardOa
+    collab: StructureCollaborations
+    top_countries: list[StructureTopCountry]
 
 
 class StructuresQueries(Protocol):
     """Lectures sur les structures, relations et formes de noms."""
 
     def list_structures(
-        self, *, type_filter: str | None, search: str
+        self, *, types: list[str], search: str, in_perimeter: bool
     ) -> list[StructureListItem]: ...
 
     def get_structure_detail(self, structure_id: int) -> StructureDetailResponse | None: ...
+
+    def get_structure_addresses(
+        self, structure_id: int, *, page: int, per_page: int
+    ) -> StructureAddressesResponse: ...
+
+    def get_structure_subjects(
+        self, structure_id: int, *, limit: int
+    ) -> list[SubjectFrequency]: ...
+
+    def get_structure_dashboard(self, structure_id: int) -> StructureDashboardResponse: ...
 
     def get_name_form(self, form_id: int) -> NameFormOut | None: ...

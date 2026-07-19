@@ -9,15 +9,19 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import Connection
 
 from application.ports.api.structures_queries import (
+    StructureAddressesResponse,
+    StructureDashboardResponse,
     StructureDetailResponse,
     StructureListItem,
     StructureOut,
     StructuresQueries,
 )
+from application.ports.api.subjects_queries import SubjectFrequency
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.perimeter_repository import PerimeterRepository
 from application.ports.repositories.structure_repository import StructureRepository
 from application.services.structures import commands as structure_commands
+from domain.structures.structure import StructureType
 from interfaces.api.deps import (
     audit_repo,
     db_conn,
@@ -25,6 +29,7 @@ from interfaces.api.deps import (
     structure_repo,
     structures_queries,
 )
+from interfaces.api.filters import parse_vocabulary_csv
 from interfaces.api.models import (
     DeletedResponse,
     RelationCreate,
@@ -32,21 +37,27 @@ from interfaces.api.models import (
     StructureRelationCreateResponse,
     StructureUpdate,
 )
+from interfaces.api.params import TOP_SUBJECTS_LIMIT, TopSubjectsLimit
 
 router = APIRouter(prefix="/api/structures", tags=["structures"])
 
 
 @router.get("", response_model=list[StructureListItem])
 def list_structures(
-    type: str | None = Query(None),
+    type: str = Query(""),
     search: str = Query(""),
+    in_perimeter: bool = Query(False),
     queries: StructuresQueries = Depends(structures_queries),
 ) -> list[StructureListItem]:
-    """Liste des structures, filtrable par type et par texte libre.
+    """Liste des structures, filtrable par types, par texte libre et par appartenance au périmètre.
 
-    `type` : enum `structure_type` (`labo`, `universite`, `onr`, `chu`, `ecole`, `site`, `equipe`, `autre`). `search` : matching accent-insensible sur nom / acronyme / code. Tri canonique par type (labo > universite > onr > chu > ecole > site > autre) puis nom.
+    `type` accepte plusieurs valeurs de l'énumération `structure_type` séparées par des virgules. `search` : matching accent-insensible sur nom / acronyme / code. `in_perimeter` restreint aux structures du périmètre `persons`, clôture comprise : la page publique des laboratoires s'en sert, avec les types que sa configuration lui donne. Tri canonique par type (labo > universite > onr > chu > ecole > site > autre) puis nom.
     """
-    return queries.list_structures(type_filter=type, search=search)
+    return queries.list_structures(
+        types=parse_vocabulary_csv(type, allowed=tuple(StructureType), param="type"),
+        search=search,
+        in_perimeter=in_perimeter,
+    )
 
 
 @router.post("", response_model=StructureOut)
@@ -134,6 +145,36 @@ def get_structure(
     if detail is None:
         raise HTTPException(status_code=404, detail="Structure introuvable")
     return detail
+
+
+@router.get("/{structure_id}/addresses", response_model=StructureAddressesResponse)
+def get_structure_addresses(
+    structure_id: int,
+    page: int = Query(1, ge=1),
+    per_page: int = Query(50, ge=1, le=200),
+    queries: StructuresQueries = Depends(structures_queries),
+) -> StructureAddressesResponse:
+    """Adresses rattachées à la structure, le rattachement rejeté écarté."""
+    return queries.get_structure_addresses(structure_id, page=page, per_page=per_page)
+
+
+@router.get("/{structure_id}/dashboard", response_model=StructureDashboardResponse)
+def get_structure_dashboard(
+    structure_id: int,
+    queries: StructuresQueries = Depends(structures_queries),
+) -> StructureDashboardResponse:
+    """Agrégats de la structure : publications par année, accès ouvert, collaborations internationales."""
+    return queries.get_structure_dashboard(structure_id)
+
+
+@router.get("/{structure_id}/subjects", response_model=list[SubjectFrequency])
+def get_structure_subjects(
+    structure_id: int,
+    limit: TopSubjectsLimit = TOP_SUBJECTS_LIMIT,
+    queries: StructuresQueries = Depends(structures_queries),
+) -> list[SubjectFrequency]:
+    """Sujets les plus fréquents des publications de la structure (nuage de mots)."""
+    return queries.get_structure_subjects(structure_id, limit=limit)
 
 
 @router.put("/{structure_id}", response_model=StructureOut)
