@@ -2,41 +2,25 @@
 
 ## Contexte
 
-Deux endpoints listent les personnes. `/api/persons/directory` sert l'annuaire public (page `/persons`), `/api/persons` sert la liste admin (page `/admin/persons`). Chacun a son modèle de réponse, sa dataclasse de filtres et sa requête.
+Deux endpoints listaient les personnes. `/api/persons/directory` servait l'annuaire public (page `/persons`), `/api/persons` la liste de curation (page `/admin/persons`). Chacun avait son modèle de réponse, sa dataclasse de filtres et sa requête.
 
-Ce qui les distingue n'est pas le public — rien de ce que l'admin expose n'est confidentiel — mais trois choses de nature différente.
+Ce qui les distinguait n'était pas le public — rien de ce que la curation expose n'est confidentiel — mais trois choses de nature différente.
 
-**Un filtre.** L'annuaire exclut les personnes rejetées (`p.rejected = FALSE`), la liste admin les inclut et expose le drapeau. D'où deux totaux : 14 419 contre 14 435, soit 16 personnes.
+**Un filtre.** L'annuaire excluait les personnes rejetées, la liste de curation les incluait et exposait le drapeau. D'où deux totaux : 13 996 contre 14 012, soit 16 personnes.
 
-**Un scope.** L'annuaire accepte `lab_id`, qui restreint aux personnes d'un laboratoire et scope leur `pub_count` à ce laboratoire. La liste admin n'en a pas ; en revanche elle porte `uca_pub_count` en plus du `pub_count` global. Le même nom de champ ne compte donc pas la même chose selon l'endpoint et selon le paramètre.
+**Un scope.** L'annuaire acceptait `lab_id`, qui restreint aux personnes d'un laboratoire et y restreint leur décompte. La liste de curation n'en avait pas ; en revanche elle portait un second décompte. Le même nom de champ ne comptait donc pas la même chose selon l'endpoint et selon le paramètre.
 
-**Des champs.** La liste admin ajoute noms normalisés, dates de début et de fin, `rejected`, `uca_pub_count`, les identifiants avec leur statut et leur source, et les formes de nom avec leur état d'arbitrage.
+**Des champs.** La liste de curation ajoutait noms normalisés, dates de début et de fin, `rejected`, les identifiants avec leur statut et leur source, et les formes de nom avec leur état d'arbitrage.
 
-Le coût n'explique pas la partition. Sur cinquante lignes, l'annuaire répond en 17 ms, l'admin en 31. Le poids diverge davantage — 11 550 octets contre 54 445 — mais il tient à un seul bloc :
-
-| bloc | octets / 50 lignes |
-| --- | --- |
-| annuaire, identifiants groupés | 4 386 |
-| admin, identifiants à plat | 5 630 |
-| admin, `name_forms` | 34 101 |
-
-`name_forms` fait 63 % de la réponse admin. Les identifiants, eux, coûtent 1 244 octets de plus à plat que groupés — 25 octets par personne.
-
-**Les identifiants sont rendus sous deux formes pour rien.** L'admin rend `{id, id_type, id_value, source, status}` à plat ; l'annuaire rend `orcids`, `idhals`, `idrefs`, chacun réduit à `{value, confirmed}`, où `confirmed` vaut `status IN ('confirmed', 'authenticated')`. Cette dérivation est écrite en SQL dans l'annuaire (trois `json_agg`) et en TypeScript dans la page profil, qui reçoit la forme plate et fait le même travail. Le profil prouve que le client sait consommer la forme plate.
+Le coût n'expliquait pas la partition. Sur cinquante lignes, l'annuaire répondait en 17 ms, la curation en 31. Le poids divergeait davantage — 11 550 octets contre 54 445 — mais tenait à un seul bloc, `name_forms`, qui faisait 63 % de la réponse de curation sans qu'aucune ligne ne l'affiche.
 
 ## Décisions
 
-**Les identifiants se rendent sous une seule forme, la forme plate.** `{id, id_type, id_value, source, status}` partout ; le regroupement par type et la dérivation de `confirmed` sont des gestes d'affichage, que la page profil fait déjà. Les trois `json_agg` de l'annuaire disparaissent avec la règle qu'ils dupliquent. Le surcoût est de 25 octets par personne.
+**Les identifiants se rendent sous une seule forme, la forme plate.** `{id, id_type, id_value, source, status}` partout ; le regroupement par type et la dérivation de `confirmed` sont des gestes d'affichage, faits dans le composant qui affiche. Écarter les attributions rejetées en est un aussi, et se lit dans le même statut.
 
-**Ce qui distingue les deux lectures, ce sont des paramètres, non des ressources.** `rejected` est un filtre, `lab_id` un scope. Le reste est une question de champs servis.
+**Ce qui distingue les deux lectures, ce sont des paramètres, non des ressources.** `rejected` est un filtre, `lab_id` un scope, le reste une question de champs servis. Une fois les formes de nom sorties de la liste et les identifiants unifiés, l'écart de poids tombe de 4,7 à 1,3 et la projection complète coûte 19 125 octets contre 13 351 à la plus étroite : servir une seule projection revient moins cher que d'entretenir deux piles de lecture.
 
-**Reste à trancher la forme de la projection.** Trois issues, dont aucune n'est gratuite :
-
-- *Servir la projection complète.* Un modèle unique et statique ; l'annuaire reçoit `name_forms` sans les afficher, et sa réponse quintuple.
-- *Un paramètre de projection.* Un endpoint, deux formes ; le contrat rend une union et le typage statique s'émousse là où il est fort aujourd'hui.
-- *Deux endpoints assumés.* Deux projections d'une même ressource, dont la duplication restante est celle des mécaniques de liste — comptage, pagination, tri —, les filtres étant désormais partagés.
-
-Le choix engage le contrat public et le frontend.
+**`GET /api/persons` rend la collection.** L'annuaire public est un appel de cette lecture, avec `rejected=false` et, sur la fiche d'un laboratoire, `lab_id`. Une seule dataclasse de filtres sert la liste et ses facettes, construite par une dépendance unique : ce que l'une honore, l'autre le décompte.
 
 ## Phasage
 
@@ -75,14 +59,14 @@ Deux écarts précédaient toute question de projection, et l'ont faussée : la 
 
   Les dates ne servent qu'au tiroir d'une personne, comme les formes de nom avant elles ; elles relèvent de la lecture par personne, non de la liste.
 
-- [ ] Trancher entre les trois issues.
-- [ ] `rejected` devient un filtre de la lecture ; `lab_id` reste un scope.
-- [ ] Selon l'issue : fusion des deux endpoints, ou énoncé de ce qui justifie leur séparation.
+- [x] Aucune des trois issues n'a eu à être tranchée : une fois l'écart réduit à quatre champs, la projection complète coûte 19 125 octets contre 13 351 à la plus étroite, et la fusion tombe d'elle-même. `GET /api/persons` rend la collection, `GET /api/persons/directory` disparaît, et une seule dataclasse `PersonFilters` sert la liste et ses facettes — la même dépendance FastAPI construit les deux.
+- [x] `rejected` devient un filtre : omis il laisse tout passer, et l'annuaire public pose `rejected=false`. `lab_id` reste un scope, et restreint au laboratoire les trois dénombrements plutôt que le seul décompte d'auteur.
+- [x] Le vocabulaire de tri est l'union des deux : les trois dénombrements sont triables, comme la fonction et le département.
+- [x] Les attributions d'identifiant rejetées voyagent partout, avec leur statut ; l'affichage public les écarte à la lecture du statut, comme il en dérive déjà la confirmation. La règle d'affichage vit dans le composant qui affiche.
 
 ## Questions ouvertes
 
-- **Le sens de `pub_count`.** Il compte les publications du laboratoire quand `lab_id` est posé, toutes sinon ; et l'admin porte en plus `uca_pub_count`. Trois décomptes sous deux noms — à clarifier avant de fusionner quoi que ce soit.
-- **La duplication des mécaniques de liste.** `persons_directory` et `list_persons` émettent la même requête de comptage, au caractère près. Elle se factorise indépendamment de l'issue retenue.
+- **Les facettes de la page de curation décomptent une population plus étroite que sa liste.** Elle demande ses facettes avec `rejected=false` et sa liste sans, si bien que ses compteurs ignorent les 16 personnes rejetées que le tableau affiche. Le paramètre rend l'écart visible dans l'appel ; le retirer suffit à l'effacer, au prix d'un décompte qui bouge.
 
 ## Lien
 

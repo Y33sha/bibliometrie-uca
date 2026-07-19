@@ -7,7 +7,7 @@ reflétaient la sélection pendant que la liste montrait tout le monde.
 
 from sqlalchemy import text
 
-from application.ports.api.persons_queries import ListFilters
+from application.ports.api.persons_queries import PersonFilters
 from infrastructure.queries.api.persons.list import list_persons
 
 
@@ -42,7 +42,7 @@ def _create_person(conn, last, department=None, role=None):
 
 def _listed(conn, **filter_kwargs):
     result = list_persons(
-        conn, filters=ListFilters(**filter_kwargs), page=1, per_page=200, sort="name_asc"
+        conn, filters=PersonFilters(**filter_kwargs), page=1, per_page=200, sort="name_asc"
     )
     return {p["id"] for p in result["persons"]}
 

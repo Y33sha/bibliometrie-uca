@@ -547,6 +547,13 @@ def person_has_rh_clause(value: bool | None) -> WhereClause | None:
     return WhereClause("prh.id IS NOT NULL" if value else "prh.id IS NULL", {})
 
 
+def person_rejected_clause(value: bool | None) -> WhereClause | None:
+    """Filtre : la personne est (ou n'est pas) écartée par la curation."""
+    if value is None:
+        return None
+    return WhereClause("p.rejected = :flt_person_rejected", {"flt_person_rejected": value})
+
+
 def person_in_lab_clause(lab_id: int | None) -> WhereClause | None:
     """Filtre : la personne (alias `p`) a un authorship rôle author rattaché au labo.
 
@@ -567,17 +574,22 @@ def person_in_lab_clause(lab_id: int | None) -> WhereClause | None:
     )
 
 
+_PERSONS_SORT_MAP = {
+    "name_asc": "LOWER(p.last_name) ASC, LOWER(p.first_name) ASC",
+    "name_desc": "LOWER(p.last_name) DESC, LOWER(p.first_name) DESC",
+    "signatures_asc": "signature_count ASC, LOWER(p.last_name) ASC",
+    "signatures_desc": "signature_count DESC, LOWER(p.last_name) ASC",
+    "signatures_as_author_asc": "signature_count_as_author ASC, LOWER(p.last_name) ASC",
+    "signatures_as_author_desc": "signature_count_as_author DESC, LOWER(p.last_name) ASC",
+    "in_perimeter_signatures_asc": "in_perimeter_signature_count ASC, LOWER(p.last_name) ASC",
+    "in_perimeter_signatures_desc": "in_perimeter_signature_count DESC, LOWER(p.last_name) ASC",
+    "dept_asc": "prh.department_name ASC NULLS LAST, LOWER(p.last_name) ASC",
+    "dept_desc": "prh.department_name DESC NULLS LAST, LOWER(p.last_name) ASC",
+    "role_asc": "prh.role_title ASC NULLS LAST, LOWER(p.last_name) ASC",
+    "role_desc": "prh.role_title DESC NULLS LAST, LOWER(p.last_name) ASC",
+}
+
+
 def persons_sort_clause(sort: str) -> str:
-    """Return an ORDER BY clause for the persons query."""
-    SORT_MAP = {
-        "name_asc": "LOWER(p.last_name) ASC, LOWER(p.first_name) ASC",
-        "name_desc": "LOWER(p.last_name) DESC, LOWER(p.first_name) DESC",
-        "signatures_as_author_asc": "signature_count_as_author ASC, LOWER(p.last_name) ASC",
-        "signatures_as_author_desc": "signature_count_as_author DESC, LOWER(p.last_name) ASC",
-        "dept_asc": "prh.department_name ASC NULLS LAST, LOWER(p.last_name) ASC",
-        "dept_desc": "prh.department_name DESC NULLS LAST, LOWER(p.last_name) ASC",
-        "role_asc": "prh.role_title ASC NULLS LAST, LOWER(p.last_name) ASC",
-        "role_desc": "prh.role_title DESC NULLS LAST, LOWER(p.last_name) ASC",
-    }
-    # Typing mypy : la signature Any du key n'est pas garantie, on cast
-    return SORT_MAP[sort]
+    """Clause ORDER BY de la liste des personnes. Le nom est celui du contrat, validé en amont."""
+    return _PERSONS_SORT_MAP[sort]

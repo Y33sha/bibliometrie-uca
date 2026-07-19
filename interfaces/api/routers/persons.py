@@ -2,7 +2,7 @@
 
 Les lectures passent par le port `PersonsQueries`, les écritures par les command handlers de `application.services.persons.commands`. Les gestes qui portent sur les signatures elles-mêmes vivent dans `authorships.py`.
 
-L'ordre de déclaration porte une contrainte : les chemins littéraux — `/directory`, `/search`, `/facets`, `/stats`, les quatre files de triage, le registre des identifiants — précèdent tous `/{person_id}`, qui accepterait n'importe lequel d'entre eux comme identifiant.
+L'ordre de déclaration porte une contrainte : les chemins littéraux — `/search`, `/facets`, `/stats`, les quatre files de triage, le registre des identifiants — précèdent tous `/{person_id}`, qui accepterait n'importe lequel d'entre eux comme identifiant.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -11,23 +11,19 @@ from sqlalchemy import Connection
 from application.ports.api.persons_queries import (
     AmbiguousNameFormsResponse,
     DetachableIntrudersResponse,
-    DirectoryFilters,
-    FacetFilters,
     IdentifierConflictsResponse,
-    ListFilters,
     NameDuplicatesResponse,
     NameFormAuthorshipsResponse,
     NameFormSummaryOut,
     PersonAddressesResponse,
     PersonDashboardResponse,
-    PersonDirectoryResponse,
-    PersonDirectorySort,
+    PersonFilters,
     PersonListResponse,
-    PersonListSort,
     PersonOut,
     PersonProfileResponse,
     PersonSearchResult,
     PersonsFacetsResponse,
+    PersonSort,
     PersonsQueries,
     PersonsStatsResponse,
     PersonThesesResponse,
@@ -75,10 +71,7 @@ router = APIRouter(prefix="/api/persons", tags=["persons"])
 # ── Listes et facettes ───────────────────────────────────────────
 
 
-@router.get("/directory", response_model=PersonDirectoryResponse)
-def persons_directory(
-    page: int = Query(1, ge=1),
-    per_page: int = Query(50, ge=1, le=200),
+def person_filters(
     search: str = Query(""),
     department: str = Query(""),
     role: str = Query(""),
@@ -86,15 +79,16 @@ def persons_directory(
     has_idhal: bool | None = Query(None),
     has_idref: bool | None = Query(None),
     has_rh: bool | None = Query(None),
+    has_pending_forms: bool | None = Query(None),
+    has_pending_identifiers: bool | None = Query(None),
+    rejected: bool | None = Query(None),
     lab_id: int | None = Query(None),
-    sort: PersonDirectorySort = Query("name_asc"),
-    queries: PersonsQueries = Depends(persons_queries),
-) -> PersonDirectoryResponse:
-    """Annuaire public des personnes du périmètre, avec leurs ORCID et idHAL.
+) -> PersonFilters:
+    """Filtres communs à la liste des personnes et à ses facettes.
 
-    `lab_id` restreint l'annuaire aux personnes d'un laboratoire : l'onglet personnes de la fiche d'un laboratoire s'en sert, plutôt que d'un endpoint qui lui serait propre.
+    `department` et `role` acceptent plusieurs valeurs séparées par des virgules. `rejected` omis laisse passer les personnes écartées par la curation ; l'annuaire public pose `rejected=false`. `lab_id` restreint aux personnes d'un laboratoire et y restreint leurs dénombrements.
     """
-    filters = DirectoryFilters(
+    return PersonFilters(
         search=search,
         departments=parse_str_csv(department),
         roles=parse_str_csv(role),
@@ -102,9 +96,11 @@ def persons_directory(
         has_idhal=has_idhal,
         has_idref=has_idref,
         has_rh=has_rh,
+        has_pending_forms=has_pending_forms,
+        has_pending_identifiers=has_pending_identifiers,
+        rejected=rejected,
         lab_id=lab_id,
     )
-    return queries.persons_directory(filters=filters, page=page, per_page=per_page, sort=sort)
 
 
 @router.get("/search", response_model=list[PersonSearchResult])
@@ -121,63 +117,23 @@ def search_persons(
 def list_persons(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=200),
-    search: str = Query(""),
-    department: str = Query(""),
-    role: str = Query(""),
-    has_orcid: bool | None = Query(None),
-    has_idhal: bool | None = Query(None),
-    has_idref: bool | None = Query(None),
-    has_rh: bool | None = Query(None),
-    has_pending_forms: bool | None = Query(None),
-    has_pending_identifiers: bool | None = Query(None),
-    sort: PersonListSort = Query("name_asc"),
+    sort: PersonSort = Query("name_asc"),
+    filters: PersonFilters = Depends(person_filters),
     queries: PersonsQueries = Depends(persons_queries),
 ) -> PersonListResponse:
-    """Liste des personnes avec filtres (curation).
+    """Liste paginée des personnes.
 
-    `department` et `role` acceptent plusieurs valeurs séparées par des virgules, selon la même convention que l'annuaire et les facettes.
+    L'annuaire public et la liste de curation appellent tous deux cette lecture, avec des filtres différents.
     """
-    filters = ListFilters(
-        search=search,
-        departments=parse_str_csv(department),
-        roles=parse_str_csv(role),
-        has_orcid=has_orcid,
-        has_idhal=has_idhal,
-        has_idref=has_idref,
-        has_rh=has_rh,
-        has_pending_forms=has_pending_forms,
-        has_pending_identifiers=has_pending_identifiers,
-    )
     return queries.list_persons(filters=filters, page=page, per_page=per_page, sort=sort)
 
 
 @router.get("/facets", response_model=PersonsFacetsResponse)
 def persons_facets(
-    department: str = Query(""),
-    role: str = Query(""),
-    has_orcid: bool | None = Query(None),
-    has_idhal: bool | None = Query(None),
-    has_idref: bool | None = Query(None),
-    has_rh: bool | None = Query(None),
-    has_pending_forms: bool | None = Query(None),
-    has_pending_identifiers: bool | None = Query(None),
-    lab_id: int | None = Query(None),
-    search: str = Query(""),
+    filters: PersonFilters = Depends(person_filters),
     queries: PersonsQueries = Depends(persons_queries),
 ) -> PersonsFacetsResponse:
-    """Facettes dynamiques pour la page personnes (scopables à un labo via `lab_id`)."""
-    filters = FacetFilters(
-        search=search,
-        departments=parse_str_csv(department),
-        roles=parse_str_csv(role),
-        has_orcid=has_orcid,
-        has_idhal=has_idhal,
-        has_idref=has_idref,
-        has_rh=has_rh,
-        has_pending_forms=has_pending_forms,
-        has_pending_identifiers=has_pending_identifiers,
-        lab_id=lab_id,
-    )
+    """Facettes dynamiques de la liste des personnes : chaque facette décompte sous les autres filtres."""
     return queries.persons_facets(filters=filters)
 
 

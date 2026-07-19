@@ -9,11 +9,12 @@
 	/**
 	 * Identifiants d'un type, regroupés par valeur : une même valeur peut être attribuée par
 	 * plusieurs sources, et la valeur est confirmée dès que l'une de ses attributions l'est.
+	 * Les attributions que la curation a rejetées ne s'affichent pas.
 	 */
 	function grouped(type: string) {
 		const byValue = new Map<string, boolean>();
 		for (const i of identifiers) {
-			if (i.id_type !== type) continue;
+			if (i.id_type !== type || i.status === 'rejected') continue;
 			byValue.set(
 				i.id_value,
 				byValue.get(i.id_value) || i.status === 'confirmed' || i.status === 'authenticated'

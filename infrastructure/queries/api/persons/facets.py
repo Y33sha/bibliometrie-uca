@@ -4,7 +4,7 @@ from typing import Any
 
 from sqlalchemy import Connection, text
 
-from application.ports.api.persons_queries import FacetFilters
+from application.ports.api.persons_queries import PersonFilters
 from infrastructure.queries.filters import (
     PUBLIC_PERSON_IDENTIFIER_TYPES_SQL,
     WhereClause,
@@ -15,6 +15,7 @@ from infrastructure.queries.filters import (
     person_has_pending_name_forms_clause,
     person_has_rh_clause,
     person_in_lab_clause,
+    person_rejected_clause,
     person_role_clause,
     person_search_clause,
 )
@@ -22,14 +23,14 @@ from infrastructure.queries.filters import (
 _BASE_FROM = "persons p LEFT JOIN persons_rh prh ON prh.person_id = p.id"
 
 
-def persons_facets(conn: Connection, *, filters: FacetFilters) -> dict[str, Any]:
+def persons_facets(conn: Connection, *, filters: PersonFilters) -> dict[str, Any]:
     """Facettes dynamiques (chaque facette exclut son propre filtre)."""
 
     def base_clauses(*, skip: str) -> list[WhereClause | None]:
-        # Scope labo + recherche nom + exclusion des personnes rejetées : jamais
-        # des facettes, toujours appliqués (alignés sur l'annuaire `persons_directory`).
+        # Scope labo, recherche nom et rejet s'appliquent à toutes les facettes : ils
+        # délimitent la population décomptée, au lieu d'en être une dimension.
         out: list[WhereClause | None] = [
-            WhereClause("p.rejected = FALSE", {}),
+            person_rejected_clause(filters.rejected),
             person_in_lab_clause(filters.lab_id),
             person_search_clause(filters.search),
         ]

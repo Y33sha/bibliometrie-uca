@@ -146,6 +146,8 @@
 
   async function loadFacets() {
     const params = buildFilterParams();
+    // Les décomptes de facettes portent sur les personnes que la curation retient.
+    params.set("rejected", "false");
     const data = await api<{
       departments: { value: string; count: number }[];
       roles: { value: string; count: number }[];

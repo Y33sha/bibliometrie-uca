@@ -1,14 +1,11 @@
-"""Scope laboratoire de l'annuaire personnes (`/api/persons/directory` + facets).
+"""Scope laboratoire de la liste des personnes (`/api/persons` + facettes).
 
-Vérifie que `DirectoryFilters.lab_id` / `FacetFilters.lab_id` restreignent aux
-personnes ayant un authorship (rôle author) rattaché au labo via
-`authorship_structures` — l'alignement qui remplace l'ancien endpoint
-`/api/laboratories/[id]/persons`.
+Vérifie que `PersonFilters.lab_id` restreint aux personnes ayant une signature de rôle auteur rattachée au laboratoire via `authorship_structures`, et que le filtre `rejected` porte de la même façon sur la liste et sur ses facettes.
 """
 
 from sqlalchemy import text
 
-from application.ports.api.persons_queries import DirectoryFilters, FacetFilters, ListFilters
+from application.ports.api.persons_queries import PersonFilters
 from infrastructure.queries.api.persons import PgPersonsQueries
 from tests.integration.helpers.structures import add_authorship_structure
 
@@ -51,8 +48,8 @@ def _authorship_in_lab(conn, person_id, lab_id=None):
         add_authorship_structure(conn, aid, lab_id)
 
 
-class TestDirectoryLabScope:
-    def test_directory_restricted_to_lab(self, sa_sync_conn):
+class TestListLabScope:
+    def test_list_restricted_to_lab(self, sa_sync_conn):
         lab = _structure(sa_sync_conn, "LAB-DIR")
         p_in = _person(sa_sync_conn, "Inlab")
         _authorship_in_lab(sa_sync_conn, p_in, lab_id=lab)
@@ -60,14 +57,14 @@ class TestDirectoryLabScope:
         _authorship_in_lab(sa_sync_conn, p_out, lab_id=None)
 
         q = PgPersonsQueries(sa_sync_conn)
-        res = q.persons_directory(
-            filters=DirectoryFilters(lab_id=lab), page=1, per_page=50, sort="name_asc"
+        res = q.list_persons(
+            filters=PersonFilters(lab_id=lab), page=1, per_page=50, sort="name_asc"
         )
         ids = {p.id for p in res.persons}
         assert p_in in ids
         assert p_out not in ids
 
-    def test_directory_unscoped_includes_both(self, sa_sync_conn):
+    def test_list_unscoped_includes_both(self, sa_sync_conn):
         lab = _structure(sa_sync_conn, "LAB-DIR2")
         p_in = _person(sa_sync_conn, "Inlab")
         _authorship_in_lab(sa_sync_conn, p_in, lab_id=lab)
@@ -75,9 +72,26 @@ class TestDirectoryLabScope:
         _authorship_in_lab(sa_sync_conn, p_out, lab_id=None)
 
         q = PgPersonsQueries(sa_sync_conn)
-        res = q.persons_directory(filters=DirectoryFilters(), page=1, per_page=50, sort="name_asc")
+        res = q.list_persons(filters=PersonFilters(), page=1, per_page=50, sort="name_asc")
         ids = {p.id for p in res.persons}
         assert {p_in, p_out} <= ids
+
+    def test_signature_counts_scoped_to_lab(self, sa_sync_conn):
+        """Sous scope labo, les dénombrements ne comptent que les signatures du labo."""
+        lab = _structure(sa_sync_conn, "LAB-CNT")
+        person = _person(sa_sync_conn, "Counted")
+        _authorship_in_lab(sa_sync_conn, person, lab_id=lab)
+        _authorship_in_lab(sa_sync_conn, person, lab_id=None)
+
+        q = PgPersonsQueries(sa_sync_conn)
+        scoped = q.list_persons(
+            filters=PersonFilters(lab_id=lab), page=1, per_page=50, sort="name_asc"
+        )
+        unscoped = q.list_persons(
+            filters=PersonFilters(search="counted"), page=1, per_page=50, sort="name_asc"
+        )
+        assert next(p for p in scoped.persons if p.id == person).signature_count == 1
+        assert next(p for p in unscoped.persons if p.id == person).signature_count == 2
 
     def test_facets_restricted_to_lab(self, sa_sync_conn):
         lab = _structure(sa_sync_conn, "LAB-FAC")
@@ -87,8 +101,8 @@ class TestDirectoryLabScope:
         _authorship_in_lab(sa_sync_conn, p_out, lab_id=None)
 
         q = PgPersonsQueries(sa_sync_conn)
-        scoped = q.persons_facets(filters=FacetFilters(lab_id=lab))
-        unscoped = q.persons_facets(filters=FacetFilters())
+        scoped = q.persons_facets(filters=PersonFilters(lab_id=lab))
+        unscoped = q.persons_facets(filters=PersonFilters())
         # Le scope labo ne compte que la personne du labo (rh.no ≥ 1 scopé,
         # et strictement inférieur au global qui inclut les deux).
         assert scoped.rh.yes + scoped.rh.no == 1
@@ -103,13 +117,16 @@ class TestDirectoryLabScope:
         _authorship_in_lab(sa_sync_conn, p2, lab_id=lab)
 
         q = PgPersonsQueries(sa_sync_conn)
-        both = q.persons_facets(filters=FacetFilters(lab_id=lab))
-        dupont = q.persons_facets(filters=FacetFilters(lab_id=lab, search="dupont"))
+        both = q.persons_facets(filters=PersonFilters(lab_id=lab))
+        dupont = q.persons_facets(filters=PersonFilters(lab_id=lab, search="dupont"))
         assert both.rh.yes + both.rh.no == 2
         assert dupont.rh.yes + dupont.rh.no == 1
 
-    def test_facets_exclude_rejected(self, sa_sync_conn):
-        """Régression : les facettes excluent les personnes rejetées (comme l'annuaire)."""
+
+class TestRejectedFilter:
+    """`rejected` porte de la même façon sur la liste et sur ses facettes."""
+
+    def test_list_and_facets_follow_rejected(self, sa_sync_conn):
         lab = _structure(sa_sync_conn, "LAB-REJ")
         p_ok = _person(sa_sync_conn, "Active")
         _authorship_in_lab(sa_sync_conn, p_ok, lab_id=lab)
@@ -120,8 +137,26 @@ class TestDirectoryLabScope:
         )
 
         q = PgPersonsQueries(sa_sync_conn)
-        res = q.persons_facets(filters=FacetFilters(lab_id=lab))
-        assert res.rh.yes + res.rh.no == 1
+        kept = q.list_persons(
+            filters=PersonFilters(lab_id=lab, rejected=False), page=1, per_page=50, sort="name_asc"
+        )
+        assert {p.id for p in kept.persons} == {p_ok}
+        assert q.persons_facets(filters=PersonFilters(lab_id=lab, rejected=False)).rh.no == 1
+
+    def test_unfiltered_keeps_both(self, sa_sync_conn):
+        lab = _structure(sa_sync_conn, "LAB-REJ2")
+        p_ok = _person(sa_sync_conn, "Active")
+        _authorship_in_lab(sa_sync_conn, p_ok, lab_id=lab)
+        p_rej = _person(sa_sync_conn, "Rejected")
+        _authorship_in_lab(sa_sync_conn, p_rej, lab_id=lab)
+        sa_sync_conn.execute(
+            text("UPDATE persons SET rejected = TRUE WHERE id = :id"), {"id": p_rej}
+        )
+
+        q = PgPersonsQueries(sa_sync_conn)
+        res = q.list_persons(filters=PersonFilters(lab_id=lab), page=1, per_page=50, sort="name_asc")
+        assert {p.id for p in res.persons} == {p_ok, p_rej}
+        assert q.persons_facets(filters=PersonFilters(lab_id=lab)).rh.no == 2
 
 
 class TestPendingFacets:
@@ -147,12 +182,12 @@ class TestPendingFacets:
 
         q = PgPersonsQueries(sa_sync_conn)
         res = q.list_persons(
-            filters=ListFilters(has_pending_forms=True), page=1, per_page=50, sort="name_asc"
+            filters=PersonFilters(has_pending_forms=True), page=1, per_page=50, sort="name_asc"
         )
         ids = {p.id for p in res.persons}
         assert p_pending in ids
         assert p_clean not in ids
-        assert q.persons_facets(filters=FacetFilters()).pending_forms.yes >= 1
+        assert q.persons_facets(filters=PersonFilters()).pending_forms.yes >= 1
 
     def test_pending_identifiers_filter(self, sa_sync_conn):
         p_pending = _person(sa_sync_conn, "Pendingid")
@@ -174,7 +209,10 @@ class TestPendingFacets:
 
         q = PgPersonsQueries(sa_sync_conn)
         res = q.list_persons(
-            filters=ListFilters(has_pending_identifiers=True), page=1, per_page=50, sort="name_asc"
+            filters=PersonFilters(has_pending_identifiers=True),
+            page=1,
+            per_page=50,
+            sort="name_asc",
         )
         ids = {p.id for p in res.persons}
         assert p_pending in ids
