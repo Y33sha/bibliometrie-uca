@@ -7,11 +7,11 @@ import re
 from datetime import date
 
 # Situation d'une publication vis-à-vis de HAL, du dépôt le plus complet au plus absent.
-# `ok` : déposée dans la collection du laboratoire, et son texte y est accessible.
+# `ok` : déposée dans la collection d'un laboratoire, et son texte y est accessible.
 # `notice` : dans la collection, mais réduite à une notice — aucun accès ouvert.
-# `hors_collection` : présente dans HAL sans figurer dans la collection du laboratoire.
+# `hors_collection` : présente dans HAL sans figurer dans cette collection.
 # `hors_hal` : absente de HAL.
-# Les deux premières se lisent au regard d'une collection donnée, les deux dernières non.
+# Les trois premières se lisent au regard d'une collection ; seule la dernière s'en passe.
 HAL_DEPOSIT_STATUSES: tuple[str, ...] = ("ok", "notice", "hors_collection", "hors_hal")
 
 # Code d'un domaine CCSD : des segments alphanumériques séparés par des points
