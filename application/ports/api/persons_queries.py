@@ -95,7 +95,10 @@ class PersonIdentifierOut(BaseModel):
 
 
 class NameFormSummaryOut(BaseModel):
-    """Forme de nom observée pour une personne (liste admin)."""
+    """Forme de nom observée pour une personne, avec son état d'arbitrage.
+
+    Servie par personne, non dans la liste : seule la fiche d'une personne l'affiche.
+    """
 
     name_form: str
     sources: list[str]
@@ -161,7 +164,6 @@ class PersonOut(BaseModel):
     in_perimeter_signature_count: int
     """Celles de ces signatures que le périmètre retient."""
     identifiers: list[PersonIdentifierOut] | None
-    name_forms: list[NameFormSummaryOut] | None
 
 
 class PersonListResponse(PaginatedResponse):
@@ -466,6 +468,8 @@ class PersonsQueries(Protocol):
     def persons_facets(self, *, filters: FacetFilters) -> PersonsFacetsResponse: ...
 
     def persons_stats(self) -> PersonsStatsResponse: ...
+
+    def person_name_forms(self, person_id: int) -> list[NameFormSummaryOut]: ...
 
     # ── Détail d'une personne ──────────────────────────────────────
 

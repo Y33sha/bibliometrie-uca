@@ -193,7 +193,7 @@ def list_persons(
         {**binds, "pg_limit": per_page, "pg_offset": offset},
     ).all()
     persons_rows = [dict(r._mapping) for r in rows]
-    _attach_identifiers_and_name_forms(conn, persons_rows)
+    _attach_identifiers(conn, persons_rows)
 
     return {
         "total": total,
@@ -203,11 +203,11 @@ def list_persons(
     }
 
 
-def _attach_identifiers_and_name_forms(
-    conn: Connection, persons_rows: list[dict[str, Any]]
-) -> None:
-    """Enrichit en place chaque ligne personne (liste admin) avec ses identifiants
-    et ses formes de nom (statut, shared_count, pub_count)."""
+def _attach_identifiers(conn: Connection, persons_rows: list[dict[str, Any]]) -> None:
+    """Enrichit en place chaque ligne personne avec ses identifiants publics.
+
+    Les formes de nom ne suivent pas : seule la fiche d'une personne les affiche, et les porter par ligne pesait les deux tiers de la liste (`person_name_forms` par `PgPersonsQueries.person_name_forms`).
+    """
     person_ids = [p["id"] for p in persons_rows]
     if not person_ids:
         return
@@ -230,49 +230,39 @@ def _attach_identifiers_and_name_forms(
     for r in id_rows:
         identifiers_map[r.person_id] = r.identifiers
 
-    # Toutes les formes de la personne, y compris celles entièrement dérivées du nom
-    # canonique (source 'persons' seule) : le drawer admin les affiche pour la curation.
-    # `shared_count` / `ambiguous` : nombre de person_id portant ce name_form.
-    name_forms_map: dict[int, Any] = {}
-    nf_rows = conn.execute(
-        text(f"""
-            SELECT pnf.person_id,
-                   json_agg(json_build_object(
-                       'name_form', pnf.name_form,
-                       'sources', pnf.sources,
-                       'status', pnf.status::text,
-                       'shared_count', (
-                           SELECT COUNT(*)
-                           FROM person_name_forms p2
-                           WHERE p2.name_form = pnf.name_form
-                       ),
-                       'ambiguous', (
-                           SELECT COUNT(*) > 1
-                           FROM person_name_forms p2
-                           WHERE p2.name_form = pnf.name_form
-                       ),
-                       'pub_count', (
-                           SELECT COUNT(DISTINCT sd.publication_id)
-                           FROM source_authorships sa
-                           JOIN author_identifying_keys aik ON aik.id = sa.identity_id
-                           JOIN source_publications sd ON sd.id = sa.source_publication_id
-                           WHERE sa.person_id = pnf.person_id
-                             AND aik.author_name_normalized = pnf.name_form
-                             AND sa.source IN {AUTHOR_SOURCES_SQL}
-                       )
-                   ) ORDER BY pnf.name_form) AS name_forms
-            FROM person_name_forms pnf
-            WHERE pnf.person_id = ANY(:ids)
-            GROUP BY pnf.person_id
-        """),
-        {"ids": person_ids},
-    ).all()
-    for r in nf_rows:
-        name_forms_map[r.person_id] = r.name_forms
-
     for p in persons_rows:
         p["identifiers"] = identifiers_map.get(p["id"])
-        p["name_forms"] = name_forms_map.get(p["id"])
+
+
+def person_name_forms(conn: Connection, person_id: int) -> list[dict[str, Any]]:
+    """Formes de nom d'une personne, avec leur état d'arbitrage.
+
+    Toutes les formes, y compris celles entièrement dérivées du nom canonique (source `persons` seule) : la fiche d'une personne les présente à la curation. `shared_count` compte les personnes qui portent la même forme, `ambiguous` dit qu'elles sont plusieurs, et `pub_count` les publications distinctes que la forme signe.
+    """
+    rows = conn.execute(
+        text(f"""
+            SELECT pnf.name_form,
+                   pnf.sources,
+                   pnf.status::text AS status,
+                   (SELECT COUNT(*) FROM person_name_forms p2
+                    WHERE p2.name_form = pnf.name_form) AS shared_count,
+                   (SELECT COUNT(*) > 1 FROM person_name_forms p2
+                    WHERE p2.name_form = pnf.name_form) AS ambiguous,
+                   (SELECT COUNT(DISTINCT sd.publication_id)
+                    FROM source_authorships sa
+                    JOIN author_identifying_keys aik ON aik.id = sa.identity_id
+                    JOIN source_publications sd ON sd.id = sa.source_publication_id
+                    WHERE sa.person_id = pnf.person_id
+                      AND aik.author_name_normalized = pnf.name_form
+                      AND sa.source IN {AUTHOR_SOURCES_SQL}
+                   ) AS pub_count
+            FROM person_name_forms pnf
+            WHERE pnf.person_id = :pid
+            ORDER BY pnf.name_form
+        """),
+        {"pid": person_id},
+    ).all()
+    return [dict(r._mapping) for r in rows]
 
 
 def person_admin(conn: Connection, person_id: int) -> dict[str, Any] | None:
@@ -295,5 +285,5 @@ def person_admin(conn: Connection, person_id: int) -> dict[str, Any] | None:
     if row is None:
         return None
     persons_rows = [dict(row._mapping)]
-    _attach_identifiers_and_name_forms(conn, persons_rows)
+    _attach_identifiers(conn, persons_rows)
     return persons_rows[0]

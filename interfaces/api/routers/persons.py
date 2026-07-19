@@ -17,6 +17,7 @@ from application.ports.api.persons_queries import (
     ListFilters,
     NameDuplicatesResponse,
     NameFormAuthorshipsResponse,
+    NameFormSummaryOut,
     PersonAddressesResponse,
     PersonDashboardResponse,
     PersonDirectoryResponse,
@@ -399,6 +400,18 @@ def persons_sharing_name_form(
 ) -> list[SharingPersonOut]:
     """Personnes partageant ≥1 forme de nom avec celle-ci (candidates à l'absorption)."""
     return queries.persons_sharing_name_form(person_id)
+
+
+@router.get("/{person_id}/name-forms", response_model=list[NameFormSummaryOut])
+def person_name_forms(
+    person_id: int,
+    queries: PersonsQueries = Depends(persons_queries),
+) -> list[NameFormSummaryOut]:
+    """Formes de nom de la personne, avec leur état d'arbitrage.
+
+    Servies à part de la liste : seule la fiche d'une personne les affiche, et les porter par ligne pesait les deux tiers de la réponse.
+    """
+    return queries.person_name_forms(person_id)
 
 
 @router.get("/{person_id}/name-form-authorships", response_model=NameFormAuthorshipsResponse)

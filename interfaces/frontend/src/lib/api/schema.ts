@@ -1368,6 +1368,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/persons/{person_id}/name-forms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Person Name Forms
+         * @description Formes de nom de la personne, avec leur état d'arbitrage.
+         *
+         *     Servies à part de la liste : seule la fiche d'une personne les affiche, et les porter par ligne pesait les deux tiers de la réponse.
+         */
+        get: operations["person_name_forms_api_persons__person_id__name_forms_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/persons/{person_id}/name-form-authorships": {
         parameters: {
             query?: never;
@@ -3741,7 +3763,9 @@ export interface components {
         };
         /**
          * NameFormSummaryOut
-         * @description Forme de nom observée pour une personne (liste admin).
+         * @description Forme de nom observée pour une personne, avec son état d'arbitrage.
+         *
+         *     Servie par personne, non dans la liste : seule la fiche d'une personne l'affiche.
          */
         NameFormSummaryOut: {
             /** Name Form */
@@ -4082,8 +4106,6 @@ export interface components {
             in_perimeter_signature_count: number;
             /** Identifiers */
             identifiers: components["schemas"]["PersonIdentifierOut"][] | null;
-            /** Name Forms */
-            name_forms: components["schemas"]["NameFormSummaryOut"][] | null;
         };
         /**
          * PersonProfileAuthor
@@ -7742,6 +7764,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SharingPersonOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    person_name_forms_api_persons__person_id__name_forms_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                person_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NameFormSummaryOut"][];
                 };
             };
             /** @description Validation Error */
