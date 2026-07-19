@@ -148,8 +148,6 @@ class PersonOut(BaseModel):
     id: int
     last_name: str
     first_name: str
-    last_name_normalized: str
-    first_name_normalized: str
     role_title: str | None
     department_name: str | None
     start_date: date | None

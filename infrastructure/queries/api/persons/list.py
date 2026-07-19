@@ -169,7 +169,6 @@ def list_persons(
     rows = conn.execute(
         text(f"""
             SELECT p.id, p.last_name, p.first_name,
-                p.last_name_normalized, p.first_name_normalized,
                 prh.role_title, prh.department_name, prh.start_date, prh.end_date,
                 (prh.id IS NOT NULL) AS has_rh, p.rejected,
                 (SELECT COUNT(*) FROM authorships a WHERE a.person_id = p.id) AS signature_count,
@@ -244,7 +243,6 @@ def person_admin(conn: Connection, person_id: int) -> dict[str, Any] | None:
     row = conn.execute(
         text("""
             SELECT p.id, p.last_name, p.first_name,
-                p.last_name_normalized, p.first_name_normalized,
                 prh.role_title, prh.department_name, prh.start_date, prh.end_date,
                 (prh.id IS NOT NULL) AS has_rh, p.rejected,
                 (SELECT COUNT(*) FROM authorships a WHERE a.person_id = p.id) AS signature_count,

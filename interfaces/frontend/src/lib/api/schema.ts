@@ -4080,10 +4080,6 @@ export interface components {
             last_name: string;
             /** First Name */
             first_name: string;
-            /** Last Name Normalized */
-            last_name_normalized: string;
-            /** First Name Normalized */
-            first_name_normalized: string;
             /** Role Title */
             role_title: string | null;
             /** Department Name */
