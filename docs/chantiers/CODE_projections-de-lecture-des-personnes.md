@@ -45,9 +45,13 @@ Le choix engage le contrat public et le frontend.
 Deux écarts précédaient toute question de projection, et l'ont faussée : la fiche affirmait les filtres partagés, ils ne l'étaient pas.
 
 - [x] `search` désignait deux comportements sous un même nom : l'annuaire cherchait dans le nom et le prénom, la liste de curation y ajoutait l'adresse électronique. Le même terme ne rendait donc pas le même ensemble. Les trois lectures — annuaire, liste, facettes — partagent maintenant `person_search_clause`, aligné sur la version la plus large.
-- [x] `pub_count` ne comptait pas la même chose de part et d'autre : l'annuaire compte les publications signées **comme auteur**, la curation comptait **toutes les signatures**, jury et rapporteurs compris. La table étant unique par paire (publication, personne), l'écart tenait entièrement au rôle — et il va du simple au double sur les encadrants. Deux mesures, deux noms : `pub_count` reste celui de l'annuaire, la curation porte `signature_count` et `in_perimeter_signature_count`. Le vocabulaire de tri suit, et l'interface cesse d'afficher des signatures sous le mot « publications ».
+- [x] `pub_count` ne comptait pas la même chose de part et d'autre : l'annuaire compte les signatures où la personne tient le rôle d'**auteur**, la curation les compte **toutes**, jury et rapporteurs inclus. La table étant unique par paire (publication, personne), l'écart tient entièrement au rôle — et il va du simple au double sur les encadrants.
+
+  Les deux dénombrent donc la même chose, à une condition près, et leurs noms le disent : `signature_count` pour l'ensemble, `signature_count_as_author` pour la restriction, `in_perimeter_signature_count` pour celles du périmètre. Nommer l'un `pub_count` et l'autre `signature_count` aurait laissé croire à deux natures. Les vocabulaires de tri suivent, et l'interface cesse d'afficher des signatures sous le mot « publications » — jusque dans la confirmation de fusion, qui annonçait des publications réattribuées là où toutes les signatures le sont.
 
   `uca_pub_count` disparaît au passage : le périmètre se nomme, il ne s'abrège pas en un établissement.
+
+- [x] Mesure de ce que la liste de curation transporte : `name_forms` en fait 65 % (32 262 octets sur 49 904 pour cinquante personnes) et **aucune ligne ne l'affiche** — seul le tiroir d'une personne le consomme, par `PersonDrawer`. Sans lui, la liste tomberait à 17 642 octets, contre 10 424 pour l'annuaire. L'écart de projection qui motivait ce chantier tient donc pour l'essentiel à un champ que la lecture qui le porte ne montre pas.
 
 ### Phase 1 — les identifiants
 

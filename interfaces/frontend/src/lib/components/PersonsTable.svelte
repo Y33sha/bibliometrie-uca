@@ -12,7 +12,7 @@
 		has_rh: boolean;
 		role_title: string | null;
 		department_name: string | null;
-		pub_count: number;
+		signature_count_as_author: number;
 		orcids: Identifier[] | null;
 		idhals: Identifier[] | null;
 		idrefs: Identifier[] | null;
@@ -64,9 +64,9 @@
 			<th
 				class="sortable num-col"
 				style="width:80px"
-				class:active={sort === 'pubs_asc' || sort === 'pubs_desc'}
-				onclick={() => toggleSort('pubs')}
-				>Publications{sortIndicator('pubs')}</th
+				class:active={sort === 'signatures_as_author_asc' || sort === 'signatures_as_author_desc'}
+				onclick={() => toggleSort('signatures_as_author')}
+				>Publications{sortIndicator('signatures_as_author')}</th
 			>
 		</tr>
 	</thead>
@@ -96,7 +96,7 @@
 						{/if}
 					</td>
 					<td class="muted-cell">{p.department_name || ''}</td>
-					<td class="num-col">{p.pub_count}</td>
+					<td class="num-col">{p.signature_count_as_author}</td>
 				</tr>
 			{/each}
 		{/if}

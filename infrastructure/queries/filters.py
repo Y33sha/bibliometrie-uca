@@ -572,8 +572,8 @@ def persons_sort_clause(sort: str) -> str:
     SORT_MAP = {
         "name_asc": "LOWER(p.last_name) ASC, LOWER(p.first_name) ASC",
         "name_desc": "LOWER(p.last_name) DESC, LOWER(p.first_name) DESC",
-        "pubs_asc": "pub_count ASC, LOWER(p.last_name) ASC",
-        "pubs_desc": "pub_count DESC, LOWER(p.last_name) ASC",
+        "signatures_as_author_asc": "signature_count_as_author ASC, LOWER(p.last_name) ASC",
+        "signatures_as_author_desc": "signature_count_as_author DESC, LOWER(p.last_name) ASC",
         "dept_asc": "prh.department_name ASC NULLS LAST, LOWER(p.last_name) ASC",
         "dept_desc": "prh.department_name DESC NULLS LAST, LOWER(p.last_name) ASC",
         "role_asc": "prh.role_title ASC NULLS LAST, LOWER(p.last_name) ASC",

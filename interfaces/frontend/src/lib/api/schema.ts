@@ -3980,7 +3980,7 @@ export interface components {
          * PersonDirectoryEntry
          * @description Ligne de l'annuaire public `/api/persons/directory`.
          *
-         *     `pub_count` compte les publications que la personne signe **comme auteur** — distinct des signatures tous rôles que la liste de curation porte sous `signature_count`. Sous scope `lab_id`, il se restreint aux publications du laboratoire.
+         *     `signature_count_as_author` compte les signatures où la personne tient le rôle d'auteur — le même dénombrement que `signature_count` de la liste de curation, la condition de rôle en plus. Sous scope `lab_id`, il se restreint aux publications du laboratoire.
          */
         PersonDirectoryEntry: {
             /** Id */
@@ -3995,8 +3995,8 @@ export interface components {
             department_name: string | null;
             /** Has Rh */
             has_rh: boolean;
-            /** Pub Count */
-            pub_count: number;
+            /** Signature Count As Author */
+            signature_count_as_author: number;
             /** Orcids */
             orcids: components["schemas"]["ValueConfirmedOut"][] | null;
             /** Idhals */
@@ -4104,8 +4104,8 @@ export interface components {
             hal_person_id?: number | null;
             /** Openalex Id */
             openalex_id: string | null;
-            /** Uca Pub Count */
-            uca_pub_count: number;
+            /** In Perimeter Signature Count */
+            in_perimeter_signature_count: number;
         };
         /**
          * PersonProfileCore
@@ -7060,7 +7060,7 @@ export interface operations {
                 has_idref?: boolean | null;
                 has_rh?: boolean | null;
                 lab_id?: number | null;
-                sort?: "name_asc" | "name_desc" | "pubs_asc" | "pubs_desc" | "dept_asc" | "dept_desc" | "role_asc" | "role_desc";
+                sort?: "name_asc" | "name_desc" | "signatures_as_author_asc" | "signatures_as_author_desc" | "dept_asc" | "dept_desc" | "role_asc" | "role_desc";
             };
             header?: never;
             path?: never;
