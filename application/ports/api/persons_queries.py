@@ -17,7 +17,6 @@ from application.ports.api._common import (
     PaginatedResponse,
     PubYearCount,
     StructureRef,
-    ValueConfirmedOut,
     YesNoCount,
 )
 from application.ports.api.subjects_queries import SubjectFrequency
@@ -126,9 +125,7 @@ class PersonDirectoryEntry(BaseModel):
     department_name: str | None
     has_rh: bool
     signature_count_as_author: int
-    orcids: list[ValueConfirmedOut] | None
-    idhals: list[ValueConfirmedOut] | None
-    idrefs: list[ValueConfirmedOut] | None
+    identifiers: list[PersonIdentifierOut]
 
 
 class PersonDirectoryResponse(PaginatedResponse):
@@ -163,7 +160,7 @@ class PersonOut(BaseModel):
     """Signatures de la personne, tous rôles — auteur, mais aussi jury ou rapporteur d'une thèse. L'annuaire n'en retient que celles d'auteur, sous `signature_count_as_author`."""
     in_perimeter_signature_count: int
     """Celles de ces signatures que le périmètre retient."""
-    identifiers: list[PersonIdentifierOut] | None
+    identifiers: list[PersonIdentifierOut]
 
 
 class PersonListResponse(PaginatedResponse):

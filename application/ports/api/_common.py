@@ -49,13 +49,6 @@ class StructureRef(BaseModel):
     name: str
 
 
-class ValueConfirmedOut(BaseModel):
-    """Identifiant sous forme condensée (annuaire public)."""
-
-    value: str
-    confirmed: bool
-
-
 class PubYearCount(BaseModel):
     year: int
     count: int
@@ -76,6 +69,5 @@ __all__ = [
     "PubYearCount",
     "page_count",
     "StructureRef",
-    "ValueConfirmedOut",
     "YesNoCount",
 ]

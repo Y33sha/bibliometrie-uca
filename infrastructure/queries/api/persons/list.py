@@ -5,7 +5,7 @@ from typing import Any
 from sqlalchemy import Connection, text
 
 from application.ports.api.persons_queries import DirectoryFilters, ListFilters
-from domain.persons.identifiers import PUBLIC_PERSON_IDENTIFIER_TYPES
+from infrastructure.queries.api.persons.identifiers import public_identifiers
 from infrastructure.queries.filters import (
     WhereClause,
     assemble_where,
@@ -70,19 +70,7 @@ def persons_directory(
                  FROM authorships a
                  WHERE a.person_id = p.id AND a.roles && ARRAY['author']::text[]
                  {pub_count_lab_filter}
-                ) AS signature_count_as_author,
-                (SELECT json_agg(json_build_object('value', pi.id_value, 'confirmed', (pi.status IN ('confirmed', 'authenticated'))))
-                 FROM person_identifiers pi
-                 WHERE pi.person_id = p.id AND pi.id_type = 'orcid' AND pi.status != 'rejected'
-                ) AS orcids,
-                (SELECT json_agg(json_build_object('value', pi.id_value, 'confirmed', (pi.status IN ('confirmed', 'authenticated'))))
-                 FROM person_identifiers pi
-                 WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND pi.status != 'rejected'
-                ) AS idhals,
-                (SELECT json_agg(json_build_object('value', pi.id_value, 'confirmed', (pi.status IN ('confirmed', 'authenticated'))))
-                 FROM person_identifiers pi
-                 WHERE pi.person_id = p.id AND pi.id_type = 'idref' AND pi.status != 'rejected'
-                ) AS idrefs
+                ) AS signature_count_as_author
             FROM persons p
             LEFT JOIN persons_rh prh ON prh.person_id = p.id
             WHERE {where_sql}
@@ -91,11 +79,14 @@ def persons_directory(
         """),
         {**binds, "pg_limit": per_page, "pg_offset": offset},
     ).all()
+    persons_rows = [dict(r._mapping) for r in rows]
+    _attach_identifiers(conn, persons_rows, include_rejected=False)
+
     return {
         "total": total,
         "page": page,
         "per_page": per_page,
-        "persons": [dict(r._mapping) for r in rows],
+        "persons": persons_rows,
     }
 
 
@@ -193,7 +184,7 @@ def list_persons(
         {**binds, "pg_limit": per_page, "pg_offset": offset},
     ).all()
     persons_rows = [dict(r._mapping) for r in rows]
-    _attach_identifiers(conn, persons_rows)
+    _attach_identifiers(conn, persons_rows, include_rejected=True)
 
     return {
         "total": total,
@@ -203,35 +194,18 @@ def list_persons(
     }
 
 
-def _attach_identifiers(conn: Connection, persons_rows: list[dict[str, Any]]) -> None:
-    """Enrichit en place chaque ligne personne avec ses identifiants publics.
+def _attach_identifiers(
+    conn: Connection, persons_rows: list[dict[str, Any]], *, include_rejected: bool
+) -> None:
+    """Enrichit en place chaque ligne personne avec ses identifiants.
 
     Les formes de nom ne suivent pas : seule la fiche d'une personne les affiche, et les porter par ligne pesait les deux tiers de la liste (`person_name_forms` par `PgPersonsQueries.person_name_forms`).
     """
-    person_ids = [p["id"] for p in persons_rows]
-    if not person_ids:
-        return
-
-    identifiers_map: dict[int, Any] = {}
-    id_rows = conn.execute(
-        text("""
-            SELECT pi.person_id,
-                   json_agg(json_build_object(
-                       'id', pi.id, 'id_type', pi.id_type, 'id_value', pi.id_value,
-                       'source', pi.source, 'status', pi.status
-                   ) ORDER BY pi.id_type, pi.id_value) AS identifiers
-            FROM person_identifiers pi
-            WHERE pi.person_id = ANY(:ids)
-              AND pi.id_type = ANY(:public_id_types)
-            GROUP BY pi.person_id
-        """),
-        {"ids": person_ids, "public_id_types": list(PUBLIC_PERSON_IDENTIFIER_TYPES)},
-    ).all()
-    for r in id_rows:
-        identifiers_map[r.person_id] = r.identifiers
-
+    by_person = public_identifiers(
+        conn, [p["id"] for p in persons_rows], include_rejected=include_rejected
+    )
     for p in persons_rows:
-        p["identifiers"] = identifiers_map.get(p["id"])
+        p["identifiers"] = by_person.get(p["id"], [])
 
 
 def person_name_forms(conn: Connection, person_id: int) -> list[dict[str, Any]]:
@@ -285,5 +259,5 @@ def person_admin(conn: Connection, person_id: int) -> dict[str, Any] | None:
     if row is None:
         return None
     persons_rows = [dict(row._mapping)]
-    _attach_identifiers(conn, persons_rows)
+    _attach_identifiers(conn, persons_rows, include_rejected=True)
     return persons_rows[0]

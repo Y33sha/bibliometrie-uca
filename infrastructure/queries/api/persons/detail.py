@@ -6,7 +6,7 @@ from typing import Any
 from sqlalchemy import Connection, text
 
 from application.ports.api._common import page_count
-from domain.persons.identifiers import PUBLIC_PERSON_IDENTIFIER_TYPES
+from infrastructure.queries.api.persons.identifiers import public_identifiers
 from infrastructure.queries.filters import OA_DASHBOARD_COLS_SQL, SUBJECT_IS_NOT_GENERIC
 
 
@@ -27,20 +27,7 @@ def person_profile(conn: Connection, person_id: int) -> dict[str, Any] | None:
         return None
     person = dict(person_row._mapping)
 
-    # Un identifiant rejeté est une attribution que la curation a écartée : la page publique
-    # d'une personne ne l'annonce pas. Le statut accompagne les autres, qu'il distingue entre
-    # attribution observée et attribution validée.
-    id_rows = conn.execute(
-        text("""
-            SELECT id, id_type, id_value, source, status
-            FROM person_identifiers
-            WHERE person_id = :pid
-              AND id_type = ANY(:public_id_types)
-              AND status <> 'rejected'
-        """),
-        {"pid": person_id, "public_id_types": list(PUBLIC_PERSON_IDENTIFIER_TYPES)},
-    ).all()
-    identifiers = [dict(r._mapping) for r in id_rows]
+    identifiers = public_identifiers(conn, [person_id], include_rejected=False).get(person_id, [])
 
     # Reconstitution de la vue « comptes HAL » depuis source_authorships
     # agrégés par hal_person_id (1 row par compte HAL pour cette personne).
