@@ -32,6 +32,7 @@ from application.ports.api.persons_queries import (
     ListFilters,
     NameDuplicatesResponse,
     NameFormAuthorshipsResponse,
+    NameFormSummaryOut,
     OrphanAuthorshipsResponse,
     OrphanCountResponse,
     PersonAddressesResponse,
@@ -76,6 +77,7 @@ from infrastructure.queries.api.persons.facets import (
 from infrastructure.queries.api.persons.list import (
     list_persons as _list_persons,
     person_admin as _person_admin,
+    person_name_forms as _person_name_forms,
     persons_directory as _persons_directory,
     search_persons as _search_persons,
 )
@@ -117,6 +119,11 @@ class PgPersonsQueries(PersonsQueries):
 
     def persons_facets(self, *, filters: FacetFilters) -> PersonsFacetsResponse:
         return PersonsFacetsResponse.model_validate(_persons_facets(self._conn, filters=filters))
+
+    def person_name_forms(self, person_id: int) -> list[NameFormSummaryOut]:
+        return [
+            NameFormSummaryOut.model_validate(r) for r in _person_name_forms(self._conn, person_id)
+        ]
 
     def persons_stats(self) -> PersonsStatsResponse:
         return PersonsStatsResponse.model_validate(_persons_stats(self._conn))

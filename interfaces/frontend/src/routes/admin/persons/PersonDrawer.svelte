@@ -10,6 +10,7 @@
   import NameFormsList from "./NameFormsList.svelte";
 
   type SharingPerson = components["schemas"]["SharingPersonOut"];
+  type NameFormSummary = components["schemas"]["NameFormSummaryOut"];
 
   let {
     person,
@@ -63,19 +64,24 @@
 
   // Personnes partageant ≥1 forme de nom (candidates à l'absorption).
   let sharing = $state<SharingPerson[]>([]);
+  // Les formes de nom se chargent ici : la liste ne les porte pas, seul ce tiroir les montre.
+  let nameForms = $state<NameFormSummary[]>([]);
 
-  async function loadSharing() {
-    sharing = await api<SharingPerson[]>(`/api/persons/${person.id}/sharing-name-forms`);
+  async function loadDetails() {
+    [sharing, nameForms] = await Promise.all([
+      api<SharingPerson[]>(`/api/persons/${person.id}/sharing-name-forms`),
+      api<NameFormSummary[]>(`/api/persons/${person.id}/name-forms`)
+    ]);
   }
 
   $effect(() => {
     void person.id; // re-fetch quand le drawer change de personne
-    loadSharing();
+    loadDetails();
   });
 
   async function absorb(otherId: number) {
     await onabsorb(otherId);
-    await loadSharing();
+    await loadDetails();
   }
 
   let editing = $state(false);
@@ -199,7 +205,7 @@
 
     <section class="drawer-section">
       <h3>Formes de nom</h3>
-      <NameFormsList {person} onopenDetail={onopenDetach} onsetStatus={onsetFormStatus} />
+      <NameFormsList personId={person.id} {nameForms} onopenDetail={onopenDetach} onsetStatus={onsetFormStatus} />
     </section>
 
     {#if sharing.length}

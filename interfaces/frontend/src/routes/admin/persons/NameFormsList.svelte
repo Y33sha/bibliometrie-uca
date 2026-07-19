@@ -1,12 +1,14 @@
 <script lang="ts">
-  import type { Person, NameForm } from "./types";
+  import type { NameForm } from "./types";
 
   let {
-    person,
+    personId,
+    nameForms,
     onopenDetail,
     onsetStatus,
   }: {
-    person: Person;
+    personId: number;
+    nameForms: NameForm[];
     /** Ouvre la vue détaillée (publications liées, détachement, fusion). */
     onopenDetail: (personId: number, nameForm: string) => void | Promise<void>;
     onsetStatus: (
@@ -23,9 +25,9 @@
   }
 </script>
 
-{#if person.name_forms?.length}
+{#if nameForms.length}
   <div class="forms-list">
-    {#each person.name_forms as nf}
+    {#each nameForms as nf}
       <div class="chip-row">
         <span class="chip-controls">
           {#if isCanonical(nf)}
@@ -37,7 +39,7 @@
               title={nf.status === "confirmed" ? "Retirer la confirmation" : "Confirmer"}
               onclick={() =>
                 onsetStatus(
-                  person.id,
+                  personId,
                   nf.name_form,
                   nf.status === "confirmed" ? "pending" : "confirmed",
                 )}>&#x2713;</button
@@ -48,7 +50,7 @@
               title={nf.status === "rejected" ? "Retirer le rejet" : "Rejeter"}
               onclick={() =>
                 onsetStatus(
-                  person.id,
+                  personId,
                   nf.name_form,
                   nf.status === "rejected" ? "pending" : "rejected",
                 )}>&#x2717;</button
@@ -61,7 +63,7 @@
             class:confirmed={nf.status === "confirmed"}
             class:rejected={nf.status === "rejected"}
             title="Voir les {nf.pub_count} publication(s) liée(s)"
-            onclick={() => onopenDetail(person.id, nf.name_form)}
+            onclick={() => onopenDetail(personId, nf.name_form)}
           >
             {nf.name_form}
           </button>
