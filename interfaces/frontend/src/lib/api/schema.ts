@@ -4021,12 +4021,8 @@ export interface components {
             has_rh: boolean;
             /** Signature Count As Author */
             signature_count_as_author: number;
-            /** Orcids */
-            orcids: components["schemas"]["ValueConfirmedOut"][] | null;
-            /** Idhals */
-            idhals: components["schemas"]["ValueConfirmedOut"][] | null;
-            /** Idrefs */
-            idrefs: components["schemas"]["ValueConfirmedOut"][] | null;
+            /** Identifiers */
+            identifiers: components["schemas"]["PersonIdentifierOut"][];
         };
         /** PersonDirectoryResponse */
         PersonDirectoryResponse: {
@@ -4105,7 +4101,7 @@ export interface components {
             /** In Perimeter Signature Count */
             in_perimeter_signature_count: number;
             /** Identifiers */
-            identifiers: components["schemas"]["PersonIdentifierOut"][] | null;
+            identifiers: components["schemas"]["PersonIdentifierOut"][];
         };
         /**
          * PersonProfileAuthor
@@ -5437,16 +5433,6 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
-        };
-        /**
-         * ValueConfirmedOut
-         * @description Identifiant sous forme condensée (annuaire public).
-         */
-        ValueConfirmedOut: {
-            /** Value */
-            value: string;
-            /** Confirmed */
-            confirmed: boolean;
         };
         /** YearFacet */
         YearFacet: {

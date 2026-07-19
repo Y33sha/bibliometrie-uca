@@ -55,9 +55,10 @@ Deux écarts précédaient toute question de projection, et l'ont faussée : la 
 
 ### Phase 1 — les identifiants
 
-- [ ] `persons_directory` rend `identifiers` à plat ; `PersonDirectoryEntry` perd `orcids`, `idhals`, `idrefs`.
-- [ ] La page `/persons` regroupe côté client, par la fonction que la page profil porte déjà — à sortir dans un module partagé.
-- [ ] Contrat TypeScript régénéré.
+- [x] `persons_directory` rend `identifiers` à plat ; `PersonDirectoryEntry` perd `orcids`, `idhals`, `idrefs`, et `ValueConfirmedOut` disparaît avec eux, sans autre porteur.
+- [x] Le regroupement descend dans `IdentifiersCell`, le seul composant qui le rend, plutôt que dans un module partagé : ses deux appelants — table de l'annuaire et page profil — reçoivent la forme plate et la lui passent telle quelle.
+- [x] Une troisième copie de la lecture est apparue en chemin : le profil d'une personne émettait le même SELECT que la liste de curation, au filtre de statut près. Les trois passent par `public_identifiers`, où le seul écart devient un paramètre — une attribution rejetée est écartée des lectures publiques, gardée en curation pour permettre le retour en arrière.
+- [x] `identifiers` cesse d'être nullable : la lecture rend une liste vide plutôt que rien, et le client n'a plus de garde à porter.
 
 ### Phase 2 — la forme de la projection
 

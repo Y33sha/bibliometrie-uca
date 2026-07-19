@@ -1,43 +1,41 @@
 <script lang="ts">
 	import IdentifierLink from './IdentifierLink.svelte';
+	import type { components } from '$lib/api/schema';
 
-	type Identifier = { value: string; confirmed?: boolean };
+	type Identifier = components['schemas']['PersonIdentifierOut'];
 
-	let {
-		orcids = null,
-		idhals = null,
-		idrefs = null,
-	}: {
-		orcids?: Identifier[] | null;
-		idhals?: Identifier[] | null;
-		idrefs?: Identifier[] | null;
-	} = $props();
+	let { identifiers = [] }: { identifiers?: Identifier[] } = $props();
+
+	/**
+	 * Identifiants d'un type, regroupés par valeur : une même valeur peut être attribuée par
+	 * plusieurs sources, et la valeur est confirmée dès que l'une de ses attributions l'est.
+	 */
+	function grouped(type: string) {
+		const byValue = new Map<string, boolean>();
+		for (const i of identifiers) {
+			if (i.id_type !== type) continue;
+			byValue.set(
+				i.id_value,
+				byValue.get(i.id_value) || i.status === 'confirmed' || i.status === 'authenticated'
+			);
+		}
+		return Array.from(byValue, ([value, confirmed]) => ({ value, confirmed }));
+	}
+
+	const types = ['orcid', 'idhal', 'idref'] as const;
 </script>
 
 <span class="id-cell">
-	{#if orcids && orcids.length}
-		{#each orcids as id (id.value)}
-			<IdentifierLink id_type="orcid" id_value={id.value} confirmed={id.confirmed ?? false} />
-		{/each}
-	{:else}
-		<span class="id-icon id-placeholder"></span>
-	{/if}
-
-	{#if idhals && idhals.length}
-		{#each idhals as id (id.value)}
-			<IdentifierLink id_type="idhal" id_value={id.value} confirmed={id.confirmed ?? false} />
-		{/each}
-	{:else}
-		<span class="id-icon id-placeholder"></span>
-	{/if}
-
-	{#if idrefs && idrefs.length}
-		{#each idrefs as id (id.value)}
-			<IdentifierLink id_type="idref" id_value={id.value} confirmed={id.confirmed ?? false} />
-		{/each}
-	{:else}
-		<span class="id-icon id-placeholder"></span>
-	{/if}
+	{#each types as type (type)}
+		{@const values = grouped(type)}
+		{#if values.length}
+			{#each values as id (id.value)}
+				<IdentifierLink id_type={type} id_value={id.value} confirmed={id.confirmed} />
+			{/each}
+		{:else}
+			<span class="id-icon id-placeholder"></span>
+		{/if}
+	{/each}
 </span>
 
 <style>

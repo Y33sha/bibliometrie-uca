@@ -3,20 +3,9 @@
 	import { titleCase } from '$lib/utils';
 	import IdentifiersCell from './IdentifiersCell.svelte';
 	import TableStatusRow from '$lib/components/TableStatusRow.svelte';
+	import type { components } from '$lib/api/schema';
 
-	type Identifier = { value: string; confirmed?: boolean };
-	export type PersonRow = {
-		id: number;
-		first_name: string;
-		last_name: string;
-		has_rh: boolean;
-		role_title: string | null;
-		department_name: string | null;
-		signature_count_as_author: number;
-		orcids: Identifier[] | null;
-		idhals: Identifier[] | null;
-		idrefs: Identifier[] | null;
-	};
+	export type PersonRow = components['schemas']['PersonDirectoryEntry'];
 
 	let {
 		persons,
@@ -84,11 +73,7 @@
 						{#if p.has_rh}<span class="rh-check" title="Base RH">&#x2713;</span>{/if}
 					</td>
 					<td>
-						<IdentifiersCell
-							orcids={p.orcids}
-							idhals={p.idhals}
-							idrefs={p.idrefs}
-						/>
+						<IdentifiersCell identifiers={p.identifiers} />
 					</td>
 					<td>
 						{#if p.role_title}
