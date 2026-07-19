@@ -25,7 +25,7 @@ from application.pipeline.persons.cascade import run_cascade
 from application.pipeline.persons.purge import purge
 from domain.persons.name_forms import compute_person_name_forms
 from infrastructure.queries.pipeline.persons_matching import PgPersonsMatchingQueries
-from infrastructure.repositories import person_repository
+from infrastructure.repositories import authorship_repository, person_repository
 from tests.integration.helpers.authorships import upsert_identity
 
 _LOG = logging.getLogger("test")
@@ -107,7 +107,7 @@ def _run_create(conn):
     """Arbitrage des conflits d'identifiant (no-op ici, pas d'identifiant) puis la cascade."""
     q, repo = PgPersonsMatchingQueries(), person_repository(conn)
     arbitrate_identifier_conflicts(conn, q, _LOG, person_repo=repo)
-    run_cascade(conn, q, _LOG, person_repo=repo)
+    run_cascade(conn, q, _LOG, person_repo=repo, authorship_repo=authorship_repository(conn))
 
 
 def _populate_canonical_forms(conn):

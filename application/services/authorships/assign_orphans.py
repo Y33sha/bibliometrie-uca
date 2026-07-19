@@ -89,7 +89,7 @@ def assign_orphan_authorship(
     """
     _require_person(person_id, repo=repo)
 
-    publication_id = repo.find_publication_id_for_source_authorship(source_authorship_id)
+    publication_id = authorship_repo.find_publication_id_for_source_authorship(source_authorship_id)
     if publication_id is not None:
         _resolve_rejection(
             person_id,
@@ -99,12 +99,12 @@ def assign_orphan_authorship(
             force=force,
         )
 
-    row = repo.assign_orphan_sa(person_id, source_authorship_id)
+    row = authorship_repo.assign_orphan_sa(person_id, source_authorship_id)
     if row is None:
         # L'UPDATE ne pose `person_id` que sur une signature orpheline : son échec signale une
         # signature absente ou déjà rattachée. Un `owner` nul tranche pour l'absence — sur une
         # signature orpheline et existante, l'UPDATE aboutit.
-        owner = repo.find_source_authorship_owner(source_authorship_id)
+        owner = authorship_repo.find_source_authorship_owner(source_authorship_id)
         if owner is None:
             raise NotFoundError(f"Signature #{source_authorship_id} introuvable")
         raise AuthorshipAlreadyAssignedError(source_authorship_id, owner)
@@ -147,7 +147,7 @@ def batch_assign_orphan_authorships(
 
     _require_person(person_id, repo=repo)
 
-    publication_ids = repo.find_publication_ids_for_source_authorships(sa_ids)
+    publication_ids = authorship_repo.find_publication_ids_for_source_authorships(sa_ids)
     _resolve_rejection(
         person_id,
         publication_ids,
@@ -156,12 +156,12 @@ def batch_assign_orphan_authorships(
         force=force,
     )
 
-    assigned = repo.assign_orphan_source_authorships_to_person(person_id, sa_ids)
+    assigned = authorship_repo.assign_orphan_source_authorships_to_person(person_id, sa_ids)
     authorship_repo.pin_authorships(sa_ids, person_id)
     authorship_repo.create_authorships_from_sources(person_id, sa_ids, SOURCE_PRIORITY)
     authorship_repo.link_source_authorships_to_authorships(person_id, sa_ids)
 
-    for name_form in repo.get_distinct_name_forms_from_source_authorships(sa_ids):
+    for name_form in authorship_repo.get_distinct_name_forms_from_source_authorships(sa_ids):
         repo.add_name_form(person_id, name_form)
 
     # `authorship_structures` (agrégation des structure_ids) maintenue uniquement

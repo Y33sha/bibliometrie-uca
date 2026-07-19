@@ -2,8 +2,8 @@
 
 Implémente le port `application.ports.repositories.person_repository.PersonRepository`.
 Le SQL est réparti par thème dans les sous-modules `_core`, `_identifiers`,
-`_authorships`, `_name_forms` — la classe `PgPersonRepository` n'est qu'un
-point d'agrégation qui borne la connexion et délègue.
+`_name_forms` — la classe `PgPersonRepository` n'est qu'un point
+d'agrégation qui borne la connexion et délègue.
 
 Usage :
     repo = PgPersonRepository(conn)
@@ -15,7 +15,6 @@ from typing import TYPE_CHECKING
 from sqlalchemy import Connection
 
 from infrastructure.repositories.person_repository import (
-    _authorships,
     _core,
     _identifiers,
     _name_forms,
@@ -89,49 +88,6 @@ class PgPersonRepository:
 
     def authenticate_orcid(self, person_id: int, orcid: str) -> "AuthenticateOrcidOutcome":
         return _identifiers.authenticate_orcid(self._conn, person_id, orcid)
-
-    # ── source_authorships (liens personne ↔ authorship source) ────
-
-    def link_authorship(
-        self,
-        person_id: int,
-        source: str,
-        source_authorship_id: int,
-        resolution_mode: str,
-    ) -> None:
-        _authorships.link_authorship(
-            self._conn, person_id, source, source_authorship_id, resolution_mode
-        )
-
-    def unlink_authorship(self, person_id: int, source: str, source_authorship_id: int) -> None:
-        _authorships.unlink_authorship(self._conn, person_id, source, source_authorship_id)
-
-    def assign_orphan_sa(self, person_id: int, source_authorship_id: int) -> dict | None:
-        return _authorships.assign_orphan_sa(self._conn, person_id, source_authorship_id)
-
-    def find_source_authorship_owner(self, source_authorship_id: int) -> int | None:
-        return _authorships.find_source_authorship_owner(self._conn, source_authorship_id)
-
-    # ── Opérations atomiques pour le use case `assign_orphans` ────
-
-    def assign_orphan_source_authorships_to_person(self, person_id: int, sa_ids: list[int]) -> int:
-        return _authorships.assign_orphan_source_authorships_to_person(
-            self._conn, person_id, sa_ids
-        )
-
-    def get_distinct_name_forms_from_source_authorships(self, sa_ids: list[int]) -> list[str]:
-        return _authorships.get_distinct_name_forms_from_source_authorships(self._conn, sa_ids)
-
-    def find_publication_id_for_source_authorship(self, source_authorship_id: int) -> int | None:
-        return _authorships.find_publication_id_for_source_authorship(
-            self._conn, source_authorship_id
-        )
-
-    def find_publication_ids_for_source_authorships(self, sa_ids: list[int]) -> list[int]:
-        return _authorships.find_publication_ids_for_source_authorships(self._conn, sa_ids)
-
-    def null_person_id_for_name_form(self, person_id: int, name_form: str) -> int:
-        return _authorships.null_person_id_for_name_form(self._conn, person_id, name_form)
 
     # ── person_name_forms ──────────────────────────────────────────
 

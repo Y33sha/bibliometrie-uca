@@ -11,6 +11,62 @@ from typing import Any, Protocol
 class AuthorshipRepository(Protocol):
     """Contrat d'accès aux tables authorships et source_authorships."""
 
+    # ── source_authorships : lien personne ↔ signature ─────────────
+
+    def link_authorship(
+        self,
+        person_id: int,
+        source: str,
+        source_authorship_id: int,
+        resolution_mode: str,
+    ) -> None: ...
+
+    def unlink_authorship(
+        self,
+        person_id: int,
+        source: str,
+        source_authorship_id: int,
+    ) -> None: ...
+
+    def assign_orphan_sa(
+        self,
+        person_id: int,
+        source_authorship_id: int,
+    ) -> dict[str, Any] | None:
+        """Pose `person_id` sur une signature source orpheline. Retourne `{source, author_name_normalized}`, ou `None` si la signature n'existe pas ou porte déjà un `person_id` — `find_source_authorship_owner` départage."""
+        ...
+
+    def find_source_authorship_owner(self, source_authorship_id: int) -> int | None:
+        """`person_id` d'une signature source. `None` si elle est orpheline ou n'existe pas."""
+        ...
+
+    def assign_orphan_source_authorships_to_person(
+        self,
+        person_id: int,
+        source_authorship_ids: list[int],
+    ) -> int: ...
+
+    def get_distinct_name_forms_from_source_authorships(
+        self,
+        source_authorship_ids: list[int],
+    ) -> list[str]: ...
+
+    def find_publication_id_for_source_authorship(
+        self,
+        source_authorship_id: int,
+    ) -> int | None: ...
+
+    def find_publication_ids_for_source_authorships(
+        self,
+        source_authorship_ids: list[int],
+    ) -> list[int]:
+        """Les `publication_id` distincts couverts par un lot de signatures. Sert au pré-contrôle de rejet en batch."""
+        ...
+
+    def null_person_id_for_name_form(self, person_id: int, name_form: str) -> int:
+        """Détache (person_id → NULL) les signatures d'une personne portant une forme de nom donnée. Retourne le nombre de signatures détachées."""
+        ...
+
     # ── authorships ────────────────────────────────────────────────
 
     def get_authorship_person(self, authorship_id: int) -> dict[str, Any] | None: ...
