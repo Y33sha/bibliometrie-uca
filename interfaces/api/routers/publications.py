@@ -4,12 +4,12 @@ Les lectures passent par les ports `PublicationsQueries` et `PublicationDuplicat
 """
 
 from dataclasses import dataclass
-from typing import Annotated, Literal
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import Connection
 
-from application.ports.api.entity_facet import EntityFacetResponse, EntityLabelResponse
+from application.ports.api.entity_facet import EntityFacetResponse, EntityKind
 from application.ports.api.publication_duplicates_queries import (
     PubDuplicateNextResponse,
     PublicationDuplicatesQueries,
@@ -137,7 +137,7 @@ def publications_facets(
 @router.get("/facets/entities", response_model=EntityFacetResponse)
 def publications_entity_facet(
     filters: Filters,
-    kind: Literal["publisher", "journal"] = Query(...),
+    kind: EntityKind = Query(...),
     entity_search: str = Query(""),
     queries: PublicationsQueries = Depends(publications_queries),
 ) -> EntityFacetResponse:
@@ -150,19 +150,6 @@ def publications_entity_facet(
         search=entity_search,
         filters=filters.to_filters(),
     )
-
-
-@router.get("/facets/entity-label", response_model=EntityLabelResponse)
-def publications_entity_label(
-    kind: Literal["publisher", "journal"] = Query(...),
-    entity_id: int = Query(...),
-    queries: PublicationsQueries = Depends(publications_queries),
-) -> EntityLabelResponse:
-    """Libellé d'une revue ou d'un éditeur par son identifiant.
-
-    Sert à réafficher une pastille de facette restaurée depuis l'URL, qui porte l'identifiant seul : il est l'état canonique de la sélection.
-    """
-    return queries.resolve_entity_label(kind=kind, entity_id=entity_id)
 
 
 @router.get("/export.csv")

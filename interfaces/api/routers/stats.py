@@ -1,10 +1,9 @@
 """Router des agrégats des tableaux de bord, servis par le port `StatsQueries`. Sert `/api/stats/*`."""
 
-from typing import Literal
 
 from fastapi import APIRouter, Depends, Query
 
-from application.ports.api.entity_facet import EntityFacetResponse, EntityLabelResponse
+from application.ports.api.entity_facet import EntityFacetResponse, EntityKind
 from application.ports.api.stats_queries import (
     CollaborationsResponse,
     PivotResponse,
@@ -55,7 +54,7 @@ def stats_facets(
 
 @router.get("/facets/entities", response_model=EntityFacetResponse)
 def stats_entity_facet(
-    kind: Literal["publisher", "journal"] = Query(...),
+    kind: EntityKind = Query(...),
     entity_search: str = Query(""),
     filters: StatsFilters = Depends(stats_filters),
     queries: StatsQueries = Depends(stats_queries),
@@ -65,19 +64,6 @@ def stats_entity_facet(
     Les entités sont corrélées entre elles. `entity_search` cherche dans leurs noms.
     """
     return queries.stats_entity_facet(kind=kind, search=entity_search, filters=filters)
-
-
-@router.get("/facets/entity-label", response_model=EntityLabelResponse)
-def stats_entity_label(
-    kind: Literal["publisher", "journal"] = Query(...),
-    entity_id: int = Query(...),
-    queries: StatsQueries = Depends(stats_queries),
-) -> EntityLabelResponse:
-    """Libellé d'une revue ou d'un éditeur par son identifiant.
-
-    Sert à réafficher une pastille de facette restaurée depuis l'URL, qui porte l'identifiant seul : il est l'état canonique de la sélection.
-    """
-    return queries.resolve_entity_label(kind=kind, entity_id=entity_id)
 
 
 @router.get("/collaborations", response_model=CollaborationsResponse)

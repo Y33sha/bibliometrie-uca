@@ -8,11 +8,12 @@
 	 *
 	 *  L'état canonique côté parent est le seul **id** sélectionné. Le libellé de la pastille est de la
 	 *  donnée dérivée, gérée ici : connu d'emblée quand l'utilisateur choisit une option, sinon résolu
-	 *  via l'endpoint `entity-label` quand un id est restauré depuis l'URL sans son nom. */
+	 *  par `/api/entity-labels` quand un id est restauré depuis l'URL sans son nom. Ce libellé ne
+	 *  dépend d'aucun filtre, là où les options proposées en dépendent. */
 	interface Props {
 		label: string;
-		/** Base des endpoints (ex. /api/stats/facets) : `${endpoint}/entities` pour la recherche
-		 *  contextuelle, `${endpoint}/entity-label` pour résoudre un id en libellé. */
+		/** Base de la facette contextuelle (ex. /api/stats/facets) : `${endpoint}/entities` liste les
+		 *  premières entités sous les filtres actifs. */
 		endpoint: string;
 		kind: 'publisher' | 'journal';
 		/** Filtres actifs du contexte (l'endpoint saute de lui-même celui de `kind`). */
@@ -51,7 +52,7 @@
 		if (selectedId === resolvedId) return;
 		resolvedId = selectedId;
 		const id = selectedId;
-		api<{ label: string | null }>(`${endpoint}/entity-label?kind=${kind}&entity_id=${id}`)
+		api<{ label: string | null }>(`/api/entity-labels?kind=${kind}&entity_id=${id}`)
 			.then((d) => {
 				if (resolvedId === id) selectedLabel = d.label;
 			})

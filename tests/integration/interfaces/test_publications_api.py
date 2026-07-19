@@ -182,14 +182,6 @@ class TestPublicationsFacets:
         )
         assert r.status_code == 200
 
-    def test_entity_label_unknown_id(self, client):
-        # Résolution id → libellé : id absent sur base vide → label null, pas d'erreur.
-        r = client.get(
-            "/api/publications/facets/entity-label", params={"kind": "publisher", "entity_id": 1}
-        )
-        assert r.status_code == 200
-        assert r.json() == {"label": None}
-
 
 class TestPublicationsExports:
     """Exports CSV/JSON — génèrent des réponses non-JSON."""

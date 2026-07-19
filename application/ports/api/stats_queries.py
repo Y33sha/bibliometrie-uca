@@ -8,7 +8,7 @@ from typing import Literal, Protocol
 
 from pydantic import BaseModel
 
-from application.ports.api.entity_facet import EntityFacetResponse, EntityLabelResponse
+from application.ports.api.entity_facet import EntityFacetResponse
 
 
 @dataclass(frozen=True)
@@ -132,9 +132,5 @@ class StatsQueries(Protocol):
         search: str,
         filters: StatsFilters,
     ) -> EntityFacetResponse: ...
-
-    def resolve_entity_label(
-        self, *, kind: Literal["publisher", "journal"], entity_id: int
-    ) -> EntityLabelResponse: ...
 
     def stats_facets(self, *, filters: StatsFilters) -> StatsFacetsResponse: ...
