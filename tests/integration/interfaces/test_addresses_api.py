@@ -126,39 +126,53 @@ def _seed_structure(code):
 
 
 class TestListAddresses:
-    def test_no_structure_and_no_search_triggers_guard(self, client):
-        # Garde-fou : detected=no sans search → requires_search (pas d'accès DB)
-        r = client.get("/api/addresses", params={"detected": "no"})
+    def test_missing_structure_id_refused(self, client):
+        """Le scope est essentiel : sans lui la lecture n'a pas de sens, et se refuse."""
+        r = client.get("/api/addresses")
+        assert r.status_code == 422
+
+    def test_no_search_triggers_guard(self, client):
+        # Garde-fou : detected=no sans prédicat de réduction → requires_search (pas d'accès DB)
+        r = client.get("/api/addresses", params={"structure_id": 1, "detected": "no"})
         assert r.status_code == 200
         assert r.json().get("requires_search") is True
+
+    def test_guard_keeps_the_requested_page(self, client):
+        r = client.get(
+            "/api/addresses", params={"structure_id": 1, "detected": "no", "page": 3}
+        )
+        assert r.json()["page"] == 3
 
     def test_with_structure_id(self, client):
         r = client.get("/api/addresses", params={"structure_id": 1})
         assert r.status_code == 200
 
     def test_validation_confirmed(self, client):
-        r = client.get("/api/addresses", params={"validation": "confirmed"})
+        r = client.get("/api/addresses", params={"structure_id": 1, "validation": "confirmed"})
         assert r.status_code == 200
 
     def test_validation_rejected(self, client):
-        r = client.get("/api/addresses", params={"validation": "rejected"})
+        r = client.get("/api/addresses", params={"structure_id": 1, "validation": "rejected"})
         assert r.status_code == 200
 
     def test_text_predicates_repeated(self, client):
         r = client.get(
             "/api/addresses",
-            params={"text": ["contains:Clermont", "not_contains:Toulouse"]},
+            params={"structure_id": 1, "text": ["contains:Clermont", "not_contains:Toulouse"]},
         )
         assert r.status_code == 200
 
     def test_struct_predicate(self, client):
-        r = client.get("/api/addresses", params={"struct": "recognized:1,2"})
+        r = client.get("/api/addresses", params={"structure_id": 1, "struct": "recognized:1,2"})
         assert r.status_code == 200
 
     def test_struct_predicate_lifts_guard(self, client):
         # detected=no SANS texte mais AVEC un prédicat structure → pas de garde-fou,
         # la requête accède à la DB et renvoie une liste normale.
-        r = client.get("/api/addresses", params={"detected": "no", "struct": "recognized:1"})
+        r = client.get(
+            "/api/addresses",
+            params={"structure_id": 1, "detected": "no", "struct": "recognized:1"},
+        )
         assert r.status_code == 200
         assert r.json().get("requires_search") is not True
 
@@ -175,7 +189,7 @@ class TestMalformedPredicates:
         ["bogus:Clermont", "contains:", "nocolon", ":Clermont"],
     )
     def test_refuses_malformed_text_predicate(self, client, text):
-        r = client.get("/api/addresses", params={"text": text})
+        r = client.get("/api/addresses", params={"structure_id": 1, "text": text})
         assert r.status_code == 422
 
     @pytest.mark.parametrize(
@@ -183,11 +197,14 @@ class TestMalformedPredicates:
         ["bogus:1", "recognized:abc", "recognized:", "recognized:1,", "recognized"],
     )
     def test_refuses_malformed_structure_predicate(self, client, struct):
-        r = client.get("/api/addresses", params={"struct": struct})
+        r = client.get("/api/addresses", params={"structure_id": 1, "struct": struct})
         assert r.status_code == 422
 
     def test_refuses_a_lot_where_one_occurrence_is_malformed(self, client):
-        r = client.get("/api/addresses", params={"text": ["contains:Clermont", "bogus:Toulouse"]})
+        r = client.get(
+            "/api/addresses",
+            params={"structure_id": 1, "text": ["contains:Clermont", "bogus:Toulouse"]},
+        )
         assert r.status_code == 422
 
 
@@ -244,6 +261,15 @@ class TestReviewAddress:
             json={"structure_id": struct, "is_confirmed": None},
         )
         assert r.status_code == 200
+
+    def test_unknown_address_refused(self, auth_client):
+        """Une adresse inexistante rend 404, là où l'écriture ne toucherait rien en silence."""
+        struct = _seed_structure("LAB-REV-404")
+        r = auth_client.post(
+            "/api/addresses/999999999/review",
+            json={"structure_id": struct, "is_confirmed": True},
+        )
+        assert r.status_code == 404
 
 
 # ── POST /api/addresses/batch-review ─────────────────────────────
@@ -400,14 +426,14 @@ class TestBatchSetCountry:
 # ── GET /api/addresses/stats ─────────────────────────────────
 
 
-class TestAdminAddressStats:
-    def test_default_uses_perimeter(self, client):
+class TestAddressStats:
+    def test_missing_structure_id_refused(self, client):
         r = client.get("/api/addresses/stats")
-        assert r.status_code == 200
-        body = r.json()
-        assert set(body.keys()) >= {"total", "detected", "pending", "rejected", "confirmed"}
+        assert r.status_code == 422
 
     def test_with_structure_id(self, client):
         struct = _seed_structure("LAB-STATS")
         r = client.get("/api/addresses/stats", params={"structure_id": struct})
         assert r.status_code == 200
+        body = r.json()
+        assert set(body.keys()) >= {"total", "detected", "pending", "rejected", "confirmed"}

@@ -401,11 +401,51 @@ export interface paths {
         };
         /**
          * List Addresses
-         * @description Liste les adresses pour une structure, avec prédicats texte/structure composables.
+         * @description Liste les adresses rattachées à une structure, avec prédicats texte/structure composables.
          */
         get: operations["list_addresses_api_addresses_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/addresses/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Address Stats
+         * @description Compteurs d'adresses par état de détection et de validation, pour une structure.
+         */
+        get: operations["address_stats_api_addresses_stats_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/addresses/batch-review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Batch Review
+         * @description Confirme, rejette ou réinitialise le lien d'un lot d'adresses à une même structure.
+         */
+        post: operations["batch_review_api_addresses_batch_review_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -444,28 +484,10 @@ export interface paths {
         /**
          * Review Address
          * @description Confirme, rejette ou réinitialise le lien entre une adresse et une structure.
+         *
+         *     Renvoie 404 sur une adresse introuvable, que l'écriture traiterait sinon en silence.
          */
         post: operations["review_address_api_addresses__addr_id__review_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/addresses/batch-review": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Batch Review
-         * @description Confirme, rejette ou réinitialise le lien d'un lot d'adresses à une même structure.
-         */
-        post: operations["batch_review_api_addresses_batch_review_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -486,28 +508,6 @@ export interface paths {
         get: operations["list_addresses_countries_api_addresses_countries_get"];
         put?: never;
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/addresses/{addr_id}/country": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Set Address Country
-         * @description Attribue des pays à une adresse.
-         *
-         *     Renvoie 400 sur un code pays absent du référentiel, 404 sur une adresse introuvable (`set_country`).
-         */
-        post: operations["set_address_country_api_addresses__addr_id__country_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -536,20 +536,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/addresses/stats": {
+    "/api/addresses/{addr_id}/country": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /**
-         * Admin Address Stats
-         * @description Compteurs d'adresses par état de détection et de validation, pour une structure.
-         */
-        get: operations["admin_address_stats_api_addresses_stats_get"];
+        get?: never;
         put?: never;
-        post?: never;
+        /**
+         * Set Address Country
+         * @description Attribue des pays à une adresse.
+         *
+         *     Renvoie 400 sur un code pays absent du référentiel, 404 sur une adresse introuvable (`set_country`).
+         */
+        post: operations["set_address_country_api_addresses__addr_id__country_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6076,10 +6078,10 @@ export interface operations {
     };
     list_addresses_api_addresses_get: {
         parameters: {
-            query?: {
+            query: {
+                structure_id: number;
                 page?: number;
                 per_page?: number;
-                structure_id?: number | null;
                 detected?: "all" | "yes" | "no";
                 validation?: "all" | "pending" | "confirmed" | "rejected";
                 text?: string[];
@@ -6098,6 +6100,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AddressListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    address_stats_api_addresses_stats_get: {
+        parameters: {
+            query: {
+                structure_id: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AddressStatsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    batch_review_api_addresses_batch_review_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BatchReviewAction"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchUpdatedResponse"];
                 };
             };
             /** @description Validation Error */
@@ -6179,39 +6245,6 @@ export interface operations {
             };
         };
     };
-    batch_review_api_addresses_batch_review_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["BatchReviewAction"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["BatchUpdatedResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     list_addresses_countries_api_addresses_countries_get: {
         parameters: {
             query?: {
@@ -6236,41 +6269,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AddressesCountriesResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    set_address_country_api_addresses__addr_id__country_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                addr_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SetCountry"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["OkResponse"];
                 };
             };
             /** @description Validation Error */
@@ -6317,16 +6315,20 @@ export interface operations {
             };
         };
     };
-    admin_address_stats_api_addresses_stats_get: {
+    set_address_country_api_addresses__addr_id__country_post: {
         parameters: {
-            query?: {
-                structure_id?: number | null;
-            };
+            query?: never;
             header?: never;
-            path?: never;
+            path: {
+                addr_id: number;
+            };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetCountry"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -6334,7 +6336,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AddressStatsResponse"];
+                    "application/json": components["schemas"]["OkResponse"];
                 };
             };
             /** @description Validation Error */

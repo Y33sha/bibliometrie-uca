@@ -142,8 +142,6 @@ class AddressStatsResponse(BaseModel):
 class AddressesQueries(Protocol):
     """Lectures sur les adresses et sur le référentiel des pays."""
 
-    def resolve_default_structure_id(self) -> int: ...
-
     def list_addresses(
         self,
         *,
@@ -153,7 +151,11 @@ class AddressesQueries(Protocol):
         per_page: int,
     ) -> AddressListResponse: ...
 
-    def get_address_raw_text(self, addr_id: int) -> str | None: ...
+    def address_exists(self, addr_id: int) -> bool: ...
+
+    def get_address_raw_text(self, addr_id: int) -> str | None:
+        """Texte brut de l'adresse ; `None` signale une adresse absente, la colonne étant obligatoire."""
+        ...
 
     def get_address_publications(
         self, addr_id: int, limit: int
@@ -170,4 +172,4 @@ class AddressesQueries(Protocol):
         self, *, filters: AddressCountriesFilters, page: int, per_page: int
     ) -> AddressesCountriesResponse: ...
 
-    def admin_address_stats(self, structure_id: int) -> AddressStatsResponse: ...
+    def address_stats(self, structure_id: int) -> AddressStatsResponse: ...

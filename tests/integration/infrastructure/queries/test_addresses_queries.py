@@ -63,28 +63,6 @@ def _ensure_country(conn, code, name="Test"):
     )
 
 
-class TestResolveDefaultStructureId:
-    def test_returns_first_root_from_perimeter(self, sa_sync_conn):
-        s1 = _create_structure(sa_sync_conn, code="UCA-1")
-        s2 = _create_structure(sa_sync_conn, code="UCA-2")
-        sa_sync_conn.execute(
-            text("INSERT INTO perimeters (code, name, structure_ids) VALUES ('uca', 'UCA', :ids)"),
-            {"ids": [s1, s2]},
-        )
-        sa_sync_conn.execute(
-            text(
-                "INSERT INTO config (key, value) "
-                "VALUES ('perimeter_persons', to_jsonb('uca'::text))"
-            )
-        )
-
-        resolved = _q(sa_sync_conn).resolve_default_structure_id()
-        assert resolved == s1
-
-    def test_returns_zero_when_no_perimeter(self, sa_sync_conn):
-        assert _q(sa_sync_conn).resolve_default_structure_id() == 0
-
-
 class TestListAddresses:
     def test_lists_detected_and_pending_by_default(self, sa_sync_conn):
         struct = _create_structure(sa_sync_conn)

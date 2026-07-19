@@ -46,23 +46,6 @@ class PgAddressesQueries(AddressesQueries):
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
 
-    def resolve_default_structure_id(self) -> int:
-        """Résout la structure de travail par défaut (première racine du périmètre).
-
-        Lit `perimeters.structure_ids[1]` pour le périmètre configuré dans `config.perimeter_persons`. Retourne 0 si la config est absente ou si le périmètre n'a aucune structure (les filtres aval sont alors sans effet).
-        """
-        row = self._conn.execute(
-            text("""
-                SELECT p.structure_ids[1] AS root_id
-                FROM config c
-                JOIN perimeters p ON p.code = c.value #>> '{}'
-                WHERE c.key = 'perimeter_persons'
-            """)
-        ).one_or_none()
-        if row and row.root_id:
-            return row.root_id
-        return 0
-
     def list_addresses(
         self,
         *,
@@ -167,6 +150,12 @@ class PgAddressesQueries(AddressesQueries):
             per_page=per_page,
             addresses=addresses,
         )
+
+    def address_exists(self, addr_id: int) -> bool:
+        row = self._conn.execute(
+            text("SELECT 1 FROM addresses WHERE id = :id"), {"id": addr_id}
+        ).one_or_none()
+        return row is not None
 
     def get_address_raw_text(self, addr_id: int) -> str | None:
         row = self._conn.execute(
@@ -368,7 +357,7 @@ class PgAddressesQueries(AddressesQueries):
             country_facets=country_facets,
         )
 
-    def admin_address_stats(self, structure_id: int) -> AddressStatsResponse:
+    def address_stats(self, structure_id: int) -> AddressStatsResponse:
         total_row = self._conn.execute(text("SELECT COUNT(*) AS total FROM addresses")).one()
         total = total_row.total
 
