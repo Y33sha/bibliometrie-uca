@@ -386,7 +386,7 @@
                 {#if a.matched_forms && a.matched_forms.length > 0}
                   {#each uniqueForms(a.matched_forms) as f (f.form_id)}
                     <div class="form-info">
-                      <span class="form-struct">{f.structure_name} &rarr;</span>
+                      <span class="form-struct">{f.structure.acronym || f.structure.name} &rarr;</span>
                       <span class="form-text">{f.form_text}</span>
                       {#if f.requires_context_of && f.requires_context_of.length}
                         <span class="form-ctx">

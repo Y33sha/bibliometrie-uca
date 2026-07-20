@@ -123,7 +123,7 @@ class PgFeedbackQueries(FeedbackQueries):
                     'form_id', nf.id,
                     'form_text', nf.form_text,
                     'requires_context_of', nf.requires_context_of,
-                    'structure_name', COALESCE(s.acronym, s.name)
+                    'structure', json_build_object('acronym', s.acronym, 'name', s.name)
                 ))
                 FROM address_structures ast2
                 JOIN structure_name_forms nf ON nf.id = ast2.matched_form_id

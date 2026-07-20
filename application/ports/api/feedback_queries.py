@@ -7,7 +7,7 @@ from typing import Protocol
 
 from pydantic import BaseModel
 
-from application.ports.api._common import PaginatedResponse
+from application.ports.api._common import PaginatedResponse, StructureRef
 from application.ports.api.addresses_queries import AddressStructureSummary
 
 
@@ -27,7 +27,8 @@ class FeedbackMatchedForm(BaseModel):
 
     form_id: int
     form_text: str
-    structure_name: str
+    structure: StructureRef
+    """Structure à laquelle la forme appartient ; l'affichage choisit entre acronyme et nom."""
     requires_context_of: list[int] | None
 
 
