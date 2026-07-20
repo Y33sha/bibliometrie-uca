@@ -28,7 +28,7 @@ export interface DetachPublication {
   pub_id: number;
   title: string;
   pub_year: number | null;
-  sources: Pick<NameFormAuthorshipRef, "source" | "authorship_id">[];
+  sources: Pick<NameFormAuthorshipRef, "source" | "source_authorship_id">[];
   checked: boolean;
 }
 

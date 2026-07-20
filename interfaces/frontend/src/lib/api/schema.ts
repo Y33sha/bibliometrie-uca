@@ -1134,6 +1134,8 @@ export interface paths {
         /**
          * Update Identifier Status
          * @description Met à jour le statut d'un identifiant (pending/confirmed/rejected).
+         *
+         *     Renvoie 404 sur un identifiant introuvable (`update_identifier_status`).
          */
         patch: operations["update_identifier_status_api_persons_identifiers__ident_id__status_patch"];
         trace?: never;
@@ -1379,6 +1381,8 @@ export interface paths {
         /**
          * Remove Person Identifier
          * @description Supprime un identifiant d'une personne.
+         *
+         *     Renvoie 404 sur un identifiant introuvable (`remove_identifier`).
          */
         delete: operations["remove_person_identifier_api_persons__person_id__identifiers__id_type___id_value__delete"];
         options?: never;
@@ -1402,6 +1406,8 @@ export interface paths {
         /**
          * Reject Person
          * @description Marque/démarque une personne comme rejetée.
+         *
+         *     Renvoie 404 sur une personne introuvable (`set_rejected`).
          */
         patch: operations["reject_person_api_persons__person_id__reject_patch"];
         trace?: never;
@@ -3583,8 +3589,8 @@ export interface components {
         NameFormAuthorshipRef: {
             /** Source */
             source: string;
-            /** Authorship Id */
-            authorship_id: number;
+            /** Source Authorship Id */
+            source_authorship_id: number;
             /** Pub Id */
             pub_id: number;
             /** Title */
@@ -4893,8 +4899,8 @@ export interface components {
         SourceAuthorshipRef: {
             /** Source */
             source: string;
-            /** Authorship Id */
-            authorship_id: number;
+            /** Source Authorship Id */
+            source_authorship_id: number;
         };
         /** SourcePublicationOut */
         SourcePublicationOut: {

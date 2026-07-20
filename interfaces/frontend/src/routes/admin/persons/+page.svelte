@@ -421,7 +421,7 @@
         pub = { pub_id: r.pub_id, title: r.title, pub_year: r.pub_year, sources: [], checked: true };
         byPub.set(r.pub_id, pub);
       }
-      pub.sources.push({ source: r.source, authorship_id: r.authorship_id });
+      pub.sources.push({ source: r.source, source_authorship_id: r.source_authorship_id });
     }
     detachModal = {
       personId,

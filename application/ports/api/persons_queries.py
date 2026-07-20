@@ -246,7 +246,7 @@ class PersonDashboardResponse(BaseModel):
 
 class NameFormAuthorshipRef(BaseModel):
     source: str
-    authorship_id: int
+    source_authorship_id: int
     pub_id: int
     title: str
     pub_year: int | None
