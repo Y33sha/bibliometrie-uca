@@ -1,6 +1,6 @@
 """Calcul des périmètres de structures + adapter SQL pour les ports.
 
-Lit les périmètres depuis la table `perimeters` (colonne `structure_ids`). Chaque structure racine inclut récursivement ses sous-structures (via `est_tutelle_de` dans `structure_relations`).
+Lit les périmètres depuis la table `perimeters` (colonne `root_structure_ids`). Chaque structure racine inclut récursivement ses sous-structures (via `est_tutelle_de` dans `structure_relations`).
 
 L'association phase → périmètre est lue depuis la table `config` :
 - `perimeter_extraction` : structures interrogées à l'extraction et reconnues dans les affiliations
@@ -41,9 +41,9 @@ def get_perimeter_structure_ids(conn: Connection, perimeter_code: str) -> set[in
 
 
 def refresh_perimeter_structures(conn: Connection) -> None:
-    """Recompute la table matérialisée `perimeter_structures` : pour chaque périmètre, la clôture récursive (`est_tutelle_de`) de ses racines `perimeters.structure_ids`, filtrée aux structures existantes. Idempotent (DELETE + réinsertion complète). Commit laissé au caller.
+    """Recompute la table matérialisée `perimeter_structures` : pour chaque périmètre, la clôture récursive (`est_tutelle_de`) de ses racines `perimeters.root_structure_ids`, filtrée aux structures existantes. Idempotent (DELETE + réinsertion complète). Commit laissé au caller.
 
-    Seule implémentation de la clôture d'un périmètre — `get_perimeter_structure_ids` lit cette table. À rejouer à chaque édition de `perimeters.structure_ids` ou `structure_relations`.
+    Seule implémentation de la clôture d'un périmètre — `get_perimeter_structure_ids` lit cette table. À rejouer à chaque édition de `perimeters.root_structure_ids` ou `structure_relations`.
     """
     conn.execute(text("DELETE FROM perimeter_structures"))
     conn.execute(
@@ -52,7 +52,7 @@ def refresh_perimeter_structures(conn: Connection) -> None:
             WITH RECURSIVE descendants AS (
                 SELECT p.id AS perimeter_id, s.structure_id
                 FROM perimeters p
-                CROSS JOIN LATERAL unnest(p.structure_ids) AS s(structure_id)
+                CROSS JOIN LATERAL unnest(p.root_structure_ids) AS s(structure_id)
                 UNION
                 SELECT d.perimeter_id, sr.child_id
                 FROM descendants d
@@ -99,12 +99,12 @@ def get_persons_perimeter_root_ids(conn: Connection) -> list[int]:
     """
     code = _config_perimeter_code(conn, "perimeter_persons", "uca")
     row = conn.execute(
-        text("SELECT structure_ids FROM perimeters WHERE code = :code"),
+        text("SELECT root_structure_ids FROM perimeters WHERE code = :code"),
         {"code": code},
     ).one_or_none()
     if not row:
         return []
-    return list(row.structure_ids) if row.structure_ids else []
+    return list(row.root_structure_ids) if row.root_structure_ids else []
 
 
 # ── Adapters Pg* pour les ports ───────────────────────────────────
@@ -129,11 +129,11 @@ class PgPerimetersQueries(PerimetersQueries):
     def list_perimeters_with_structures(self) -> list[PerimeterOut]:
         """Liste tous les périmètres avec leurs structures racines et le décompte de leur ensemble effectif, lu dans `perimeter_structures`."""
         perim_rows = self._conn.execute(
-            text("SELECT id, code, name, structure_ids FROM perimeters ORDER BY id")
+            text("SELECT id, code, name, root_structure_ids FROM perimeters ORDER BY id")
         ).all()
         perimeters: list[PerimeterOut] = []
         for p_row in perim_rows:
-            root_ids = list(p_row.structure_ids or [])
+            root_ids = list(p_row.root_structure_ids or [])
             if root_ids:
                 struct_rows = self._conn.execute(
                     text(
@@ -154,7 +154,7 @@ class PgPerimetersQueries(PerimetersQueries):
                     id=p_row.id,
                     code=p_row.code,
                     name=p_row.name,
-                    structure_ids=root_ids,
+                    root_structure_ids=root_ids,
                     structures=structures,
                     structure_count=len(resolved),
                 )

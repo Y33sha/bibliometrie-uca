@@ -45,11 +45,11 @@ class TestSqlalchemyCoreSmoke:
         """Vérifie qu'un ARRAY(Integer) PostgreSQL est manipulable côté SA."""
         result = sa_sync_conn.execute(
             perimeters.insert()
-            .values(code="poc_perim", name="POC", structure_ids=[1, 2, 3])
-            .returning(perimeters.c.id, perimeters.c.structure_ids)
+            .values(code="poc_perim", name="POC", root_structure_ids=[1, 2, 3])
+            .returning(perimeters.c.id, perimeters.c.root_structure_ids)
         )
         row = result.one()
-        assert row.structure_ids == [1, 2, 3]
+        assert row.root_structure_ids == [1, 2, 3]
 
     def test_insert_structure_with_jsonb(self, sa_sync_conn: Connection):
         """Vérifie qu'un JSONB est sérialisé correctement par SA."""

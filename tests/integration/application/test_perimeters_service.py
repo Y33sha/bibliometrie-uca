@@ -39,13 +39,13 @@ def _insert_config_sync(conn, key, value, description="desc"):
     )
 
 
-def _insert_perimeter_sync(conn, code="test", name="Test", structure_ids=None):
+def _insert_perimeter_sync(conn, code="test", name="Test", root_structure_ids=None):
     result = conn.execute(
         text(
-            "INSERT INTO perimeters (code, name, structure_ids) "
-            "VALUES (:code, :name, :structure_ids) RETURNING id"
+            "INSERT INTO perimeters (code, name, root_structure_ids) "
+            "VALUES (:code, :name, :root_structure_ids) RETURNING id"
         ),
-        {"code": code, "name": name, "structure_ids": structure_ids or []},
+        {"code": code, "name": name, "root_structure_ids": root_structure_ids or []},
     )
     return result.scalar_one()
 
@@ -64,18 +64,18 @@ class TestPerimeterFindById:
         assert p.id == pid
         assert p.code == "P1"
         assert p.name == "Périmètre 1"
-        assert p.structure_ids == ()
+        assert p.root_structure_ids == ()
 
     def test_hydrates_with_structure_ids(self, sa_sync_conn, repo):
         pid = _insert_perimeter_sync(
             sa_sync_conn,
             code="P2",
             name="P2",
-            structure_ids=[10, 20, 30],
+            root_structure_ids=[10, 20, 30],
         )
         p = repo.find_by_id(pid)
         assert p is not None
-        assert p.structure_ids == (10, 20, 30)
+        assert p.root_structure_ids == (10, 20, 30)
 
 
 # ── create_perimeter ───────────────────────────────────────────────
@@ -83,7 +83,7 @@ class TestPerimeterFindById:
 
 class TestCreatePerimeter:
     def test_creates(self, sa_sync_conn, repo):
-        pid = create_perimeter(code="new_perim", name="New Perimeter", structure_ids=[], repo=repo)
+        pid = create_perimeter(code="new_perim", name="New Perimeter", root_structure_ids=[], repo=repo)
         assert pid is not None
         result = sa_sync_conn.execute(
             text("SELECT code, name FROM perimeters WHERE id = :pid"), {"pid": pid}
@@ -95,13 +95,13 @@ class TestCreatePerimeter:
     def test_raises_on_code_conflict(self, sa_sync_conn, repo):
         _insert_perimeter_sync(sa_sync_conn, code="existing")
         with pytest.raises(ConflictError):
-            create_perimeter(code="existing", name="X", structure_ids=[], repo=repo)
+            create_perimeter(code="existing", name="X", root_structure_ids=[], repo=repo)
 
     def test_raises_on_empty_code_or_name(self, sa_sync_conn, repo):
         with pytest.raises(ValidationError):
-            create_perimeter(code="", name="X", structure_ids=[], repo=repo)
+            create_perimeter(code="", name="X", root_structure_ids=[], repo=repo)
         with pytest.raises(ValidationError):
-            create_perimeter(code="X", name="", structure_ids=[], repo=repo)
+            create_perimeter(code="X", name="", root_structure_ids=[], repo=repo)
 
 
 # ── update_perimeter ───────────────────────────────────────────────
@@ -124,10 +124,10 @@ class TestUpdatePerimeter:
         assert result.scalar_one() == "New"
 
     def test_updates_structure_ids(self, sa_sync_conn, repo):
-        p = _insert_perimeter_sync(sa_sync_conn, structure_ids=[1])
-        update_perimeter(p, update=PerimeterUpdate(structure_ids=[4, 5, 6]), repo=repo)
+        p = _insert_perimeter_sync(sa_sync_conn, root_structure_ids=[1])
+        update_perimeter(p, update=PerimeterUpdate(root_structure_ids=[4, 5, 6]), repo=repo)
         result = sa_sync_conn.execute(
-            text("SELECT structure_ids FROM perimeters WHERE id = :p"), {"p": p}
+            text("SELECT root_structure_ids FROM perimeters WHERE id = :p"), {"p": p}
         )
         assert result.scalar_one() == [4, 5, 6]
 

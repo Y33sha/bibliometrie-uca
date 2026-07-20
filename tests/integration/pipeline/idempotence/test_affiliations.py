@@ -25,10 +25,10 @@ def _setup_affiliations_test_data(conn):
 
     conn.execute(
         text("""
-            INSERT INTO perimeters (code, name, structure_ids) VALUES
+            INSERT INTO perimeters (code, name, root_structure_ids) VALUES
                 ('uca', 'UCA restreint', ARRAY[80000]),
                 ('alliance_uca', 'UCA large', ARRAY[80000])
-            ON CONFLICT (code) DO UPDATE SET structure_ids = EXCLUDED.structure_ids
+            ON CONFLICT (code) DO UPDATE SET root_structure_ids = EXCLUDED.root_structure_ids
         """)
     )
 

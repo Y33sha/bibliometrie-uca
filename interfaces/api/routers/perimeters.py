@@ -52,7 +52,11 @@ def create_perimeter(
     Le code sert d'identifiant naturel — la configuration du pipeline désigne un périmètre par sa valeur — et doit être un jeton unique, sans espace : un code vide ou espacé rend 422. Renvoie 409 sur un code déjà pris.
     """
     pid = perimeter_commands.create_perimeter(
-        conn, code=body.code, name=body.name, structure_ids=body.structure_ids, repo=repo
+        conn,
+        code=body.code,
+        name=body.name,
+        root_structure_ids=body.root_structure_ids,
+        repo=repo,
     )
     return CreatedIdResponse(id=pid)
 

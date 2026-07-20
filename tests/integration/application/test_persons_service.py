@@ -122,7 +122,7 @@ def _setup_uca(conn):
         )
     ).scalar_one()
     conn.execute(
-        text("INSERT INTO perimeters (code, name, structure_ids) VALUES ('uca', 'UCA', :ids)"),
+        text("INSERT INTO perimeters (code, name, root_structure_ids) VALUES ('uca', 'UCA', :ids)"),
         {"ids": [uca_id]},
     )
     conn.execute(

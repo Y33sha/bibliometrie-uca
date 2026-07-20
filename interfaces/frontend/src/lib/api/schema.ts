@@ -1783,7 +1783,7 @@ export interface paths {
          * Create Perimeter
          * @description Crée un périmètre avec ses structures racines, la liste pouvant être vide.
          *
-         *     Le code sert d'identifiant naturel — la configuration du pipeline désigne un périmètre par sa valeur — et se restreint aux minuscules, chiffres, tiret et souligné : une autre forme rend 422. Renvoie 409 sur un code déjà pris.
+         *     Le code sert d'identifiant naturel — la configuration du pipeline désigne un périmètre par sa valeur — et doit être un jeton unique, sans espace : un code vide ou espacé rend 422. Renvoie 409 sur un code déjà pris.
          */
         post: operations["create_perimeter_api_perimeters_post"];
         delete?: never;
@@ -3807,12 +3807,12 @@ export interface components {
             code: string;
             /** Name */
             name: string;
-            /** Structure Ids */
-            structure_ids?: number[];
+            /** Root Structure Ids */
+            root_structure_ids?: number[];
         };
         /**
          * PerimeterOut
-         * @description Périmètre + ses structures racines (résolues + comptage effectif).
+         * @description Périmètre + ses structures racines (identifiants bruts, résolues, comptage effectif).
          */
         PerimeterOut: {
             /** Id */
@@ -3821,8 +3821,8 @@ export interface components {
             code: string;
             /** Name */
             name: string;
-            /** Structure Ids */
-            structure_ids: number[];
+            /** Root Structure Ids */
+            root_structure_ids: number[];
             /** Structures */
             structures: components["schemas"]["PerimeterStructureItem"][];
             /** Structure Count */
@@ -3843,13 +3843,13 @@ export interface components {
          * PerimeterUpdate
          * @description Champs éditables d'un périmètre, en modification sélective.
          *
-         *     Seuls les champs explicitement fournis sont écrits (`model_dump(exclude_unset=True)`). `structure_ids` liste les structures **racines** ; la clôture qui en descend est matérialisée à part, et son recalcul revient au caller.
+         *     Seuls les champs explicitement fournis sont écrits (`model_dump(exclude_unset=True)`). `root_structure_ids` liste les structures racines ; la clôture qui en descend est matérialisée à part, et son recalcul revient au caller.
          */
         PerimeterUpdate: {
             /** Name */
             name?: string | null;
-            /** Structure Ids */
-            structure_ids?: number[] | null;
+            /** Root Structure Ids */
+            root_structure_ids?: number[] | null;
         };
         /** PersonAddressOut */
         PersonAddressOut: {

@@ -54,12 +54,12 @@ def _seed_structure(code: str | None = None, type_: str = "universite") -> int:
         return cur.fetchone()["id"]
 
 
-def _seed_perimeter(code: str | None = None, structure_ids: list[int] | None = None) -> int:
+def _seed_perimeter(code: str | None = None, root_structure_ids: list[int] | None = None) -> int:
     code = code or _uniq("perim")
     with _pool() as cur:
         cur.execute(
-            "INSERT INTO perimeters (code, name, structure_ids) VALUES (%s, %s, %s) RETURNING id",
-            (code, code, structure_ids or []),
+            "INSERT INTO perimeters (code, name, root_structure_ids) VALUES (%s, %s, %s) RETURNING id",
+            (code, code, root_structure_ids or []),
         )
         return cur.fetchone()["id"]
 
@@ -158,12 +158,12 @@ class TestUpdatePerimeter:
     def test_update_structure_ids(self, auth_client):
         s1 = _seed_structure()
         s2 = _seed_structure()
-        pid = _seed_perimeter(structure_ids=[s1])
-        r = auth_client.put(f"/api/perimeters/{pid}", json={"structure_ids": [s1, s2]})
+        pid = _seed_perimeter(root_structure_ids=[s1])
+        r = auth_client.put(f"/api/perimeters/{pid}", json={"root_structure_ids": [s1, s2]})
         assert r.status_code == 200
         with _pool() as cur:
-            cur.execute("SELECT structure_ids FROM perimeters WHERE id = %s", (pid,))
-            assert sorted(cur.fetchone()["structure_ids"]) == sorted([s1, s2])
+            cur.execute("SELECT root_structure_ids FROM perimeters WHERE id = %s", (pid,))
+            assert sorted(cur.fetchone()["root_structure_ids"]) == sorted([s1, s2])
 
 
 class TestDeletePerimeter:
@@ -217,7 +217,7 @@ class TestMaterializedPerimeterStructures:
                 (root, lab),
             )
         pid = _seed_perimeter()
-        r = auth_client.put(f"/api/perimeters/{pid}", json={"structure_ids": [root]})
+        r = auth_client.put(f"/api/perimeters/{pid}", json={"root_structure_ids": [root]})
         assert r.status_code == 200
         assert _perimeter_structure_ids(pid) == {root, lab}
 
@@ -232,7 +232,7 @@ class TestMaterializedPerimeterStructures:
             )
         code = _uniq("withroots")
         r = auth_client.post(
-            "/api/perimeters", json={"code": code, "name": code, "structure_ids": [root]}
+            "/api/perimeters", json={"code": code, "name": code, "root_structure_ids": [root]}
         )
         assert r.status_code == 200
         assert _perimeter_structure_ids(r.json()["id"]) == {root, lab}
@@ -240,7 +240,7 @@ class TestMaterializedPerimeterStructures:
     def test_creating_tutelle_relation_materializes_new_descendant(self, auth_client):
         root = _seed_structure()
         lab = _seed_structure(type_="labo")
-        pid = _seed_perimeter(structure_ids=[root])
+        pid = _seed_perimeter(root_structure_ids=[root])
         r = auth_client.post(
             "/api/structures/relations",
             json={"parent_id": root, "child_id": lab, "relation_type": "est_tutelle_de"},

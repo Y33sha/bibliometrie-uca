@@ -72,8 +72,8 @@ def _seed_addresses_api(client):
             cur.execute("SELECT id FROM structures WHERE code = 'UCA-ADDR-API-SEED'")
             uca_id = cur.fetchone()["id"]
         cur.execute(
-            "INSERT INTO perimeters (code, name, structure_ids) VALUES ('uca', 'UCA', %s) "
-            "ON CONFLICT (code) DO UPDATE SET structure_ids = EXCLUDED.structure_ids",
+            "INSERT INTO perimeters (code, name, root_structure_ids) VALUES ('uca', 'UCA', %s) "
+            "ON CONFLICT (code) DO UPDATE SET root_structure_ids = EXCLUDED.root_structure_ids",
             ([uca_id],),
         )
         cur.execute(

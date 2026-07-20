@@ -1,7 +1,7 @@
 """Tests d'intégration de `refresh_perimeter_structures`.
 
 Vérifie que la table matérialisée `perimeter_structures` reproduit la clôture
-récursive `est_tutelle_de` des racines `perimeters.structure_ids` (et seulement
+récursive `est_tutelle_de` des racines `perimeters.root_structure_ids` (et seulement
 elle : pas de descente `est_partenaire_de`), et que le refresh est idempotent.
 """
 
@@ -33,7 +33,7 @@ def _relation(conn, parent_id: int, child_id: int, rtype: str) -> None:
 def _perimeter(conn, code: str, roots: list[int]) -> int:
     return conn.execute(
         text(
-            "INSERT INTO perimeters (code, name, structure_ids) "
+            "INSERT INTO perimeters (code, name, root_structure_ids) "
             "VALUES (:c, :c, CAST(:ids AS integer[])) RETURNING id"
         ),
         {"c": code, "ids": roots},

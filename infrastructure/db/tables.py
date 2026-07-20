@@ -124,7 +124,7 @@ perimeters = Table(
     Column("name", Text, nullable=False),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     Column(
-        "structure_ids",
+        "root_structure_ids",
         ARRAY(Integer),
         nullable=False,
         server_default=text("'{}'::integer[]"),
