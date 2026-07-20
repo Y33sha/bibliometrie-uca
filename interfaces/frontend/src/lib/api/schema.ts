@@ -1869,13 +1869,7 @@ export interface paths {
          * List Publishers
          * @description Liste paginée des éditeurs, avec le décompte de leurs revues et de leurs publications.
          *
-         *     Filtres :
-         *
-         *     - `search` : insensible à la casse sur le nom normalisé, ignoré en deçà de deux caractères.
-         *     - `publisher_type` et `country` : valeurs séparées par des virgules (par exemple `commercial,learned_society`), vide valant absence de filtre, selon la convention multi-valeurs de `/api/journals` et `/api/publications`.
-         *     - `with_pubs` : restreint aux éditeurs dont le `pub_count` est non nul. Ce compteur ne retient que les publications du périmètre, atteintes par les revues de l'éditeur : un éditeur dont toutes les publications sont hors périmètre est donc « orphelin ». La page publique s'en sert pour les masquer, que l'admin garde la possibilité de voir.
-         *
-         *     `sort` accepte `name`, `journals` et `pubs`, suffixés de `_asc` ou `_desc` ; toute autre valeur rend un 422.
+         *     `with_pubs` restreint aux éditeurs dont le décompte de publications est non nul. Ce compteur ne retient que les publications du périmètre, atteintes par les revues de l'éditeur : un éditeur dont toutes les publications sont hors périmètre est donc « orphelin », et la page publique le masque. `sort` accepte `name`, `journals` et `pubs`, suffixés de `_asc` ou `_desc` ; toute autre valeur rend un 422.
          */
         get: operations["list_publishers_api_publishers_get"];
         put?: never;
@@ -2059,15 +2053,7 @@ export interface paths {
          * List Journals
          * @description Liste paginée des revues, avec le décompte de leurs publications.
          *
-         *     Filtres :
-         *
-         *     - `search` : insensible à la casse sur le titre normalisé, ignoré en deçà de deux caractères.
-         *     - `publisher_id` : égalité stricte.
-         *     - `journal_type` et `oa_model` : valeurs séparées par des virgules (par exemple `journal,proceedings`), vide valant absence de filtre, selon la convention multi-valeurs de `/api/publications`.
-         *     - `is_in_doaj` : booléen ; omis, il ne filtre rien.
-         *     - `with_pubs` : restreint aux revues portant au moins une publication. La page publique s'en sert pour masquer les revues orphelines, que l'admin garde la possibilité de voir.
-         *
-         *     `sort` accepte `title`, `publisher` et `pubs`, suffixés de `_asc` ou `_desc` ; toute autre valeur rend un 422.
+         *     `with_pubs` restreint aux revues portant au moins une publication : la page publique s'en sert pour masquer les revues orphelines, que l'administration garde la possibilité de voir. `sort` accepte `title`, `publisher` et `pubs`, suffixés de `_asc` ou `_desc` ; toute autre valeur rend un 422.
          */
         get: operations["list_journals_api_journals_get"];
         put?: never;
@@ -8385,7 +8371,7 @@ export interface operations {
     publishers_facets_api_publishers_facets_get: {
         parameters: {
             query?: {
-                search?: string | null;
+                search?: string;
                 publisher_type?: string;
                 country?: string;
                 with_pubs?: boolean;
@@ -8421,11 +8407,11 @@ export interface operations {
             query?: {
                 page?: number;
                 per_page?: number;
-                search?: string | null;
+                sort?: "name_asc" | "name_desc" | "journals_asc" | "journals_desc" | "pubs_asc" | "pubs_desc";
+                search?: string;
                 publisher_type?: string;
                 country?: string;
                 with_pubs?: boolean;
-                sort?: "name_asc" | "name_desc" | "journals_asc" | "journals_desc" | "pubs_asc" | "pubs_desc";
             };
             header?: never;
             path?: never;
@@ -8670,7 +8656,7 @@ export interface operations {
     journals_facets_api_journals_facets_get: {
         parameters: {
             query?: {
-                search?: string | null;
+                search?: string;
                 publisher_id?: number | null;
                 journal_type?: string;
                 is_in_doaj?: boolean | null;
@@ -8708,13 +8694,13 @@ export interface operations {
             query?: {
                 page?: number;
                 per_page?: number;
-                search?: string | null;
+                sort?: "title_asc" | "title_desc" | "publisher_asc" | "publisher_desc" | "pubs_asc" | "pubs_desc";
+                search?: string;
                 publisher_id?: number | null;
                 journal_type?: string;
                 is_in_doaj?: boolean | null;
                 oa_model?: string;
                 with_pubs?: boolean;
-                sort?: "title_asc" | "title_desc" | "publisher_asc" | "publisher_desc" | "pubs_asc" | "pubs_desc";
             };
             header?: never;
             path?: never;

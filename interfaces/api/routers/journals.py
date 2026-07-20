@@ -1,4 +1,7 @@
-"""Router des revues : listes, recherche, édition, fusion. Sert `/api/journals/*`."""
+"""Router des revues : listes, recherche, édition, fusion. Sert `/api/journals/*`.
+
+Les chemins littéraux — `/oa-models`, `/types`, `/facets` — précèdent `/{journal_id}`, qui les accepterait sinon comme identifiant.
+"""
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import Connection
@@ -6,6 +9,7 @@ from sqlalchemy import Connection
 from application.ports.api.journals_queries import (
     JournalDashboardResponse,
     JournalDetailResponse,
+    JournalFilters,
     JournalListResponse,
     JournalQueries,
     JournalsFacetsResponse,
@@ -32,7 +36,7 @@ from interfaces.api.deps import (
     metadata_correction_queries,
     publication_repo,
 )
-from interfaces.api.filters import parse_str_csv
+from interfaces.api.filters import parse_vocabulary_csv
 from interfaces.api.models import (
     EnumOption,
     JournalTypeChange,
@@ -64,66 +68,55 @@ def list_journal_types() -> list[EnumOption]:
     return [EnumOption(value=v, label_fr=JOURNAL_TYPE_LABELS_FR[v]) for v in JOURNAL_TYPES]
 
 
+def journal_filters(
+    search: str = Query(""),
+    publisher_id: int | None = Query(None),
+    journal_type: str = Query(""),
+    is_in_doaj: bool | None = Query(None),
+    oa_model: str = Query(""),
+    with_pubs: bool = Query(False),
+) -> JournalFilters:
+    """Filtres communs à la liste des revues et à ses facettes.
+
+    `journal_type` et `oa_model` acceptent plusieurs valeurs séparées par des virgules, prises dans les énumérations du domaine ; une valeur inconnue rend 422. `search` est ignoré en deçà de deux caractères.
+    """
+    return JournalFilters(
+        search=search,
+        publisher_id=publisher_id,
+        journal_types=parse_vocabulary_csv(
+            journal_type, allowed=JOURNAL_TYPES, param="journal_type"
+        ),
+        is_in_doaj=is_in_doaj,
+        oa_models=parse_vocabulary_csv(oa_model, allowed=OA_MODELS, param="oa_model"),
+        with_pubs=with_pubs,
+    )
+
+
 @router.get("/facets", response_model=JournalsFacetsResponse)
 def journals_facets(
-    search: str | None = None,
-    publisher_id: int | None = None,
-    journal_type: str = Query(""),
-    is_in_doaj: bool | None = None,
-    oa_model: str = Query(""),
-    with_pubs: bool = False,
+    filters: JournalFilters = Depends(journal_filters),
     queries: JournalQueries = Depends(journal_queries),
 ) -> JournalsFacetsResponse:
     """Comptes par option des facettes de la liste des revues.
 
     Convention partagée avec `/api/publications/facets` : chaque facette écarte sa propre dimension de la clause WHERE, de sorte que son décompte annonce le nombre de revues atteignables si l'option était cochée ou décochée.
     """
-    return queries.journals_facets(
-        search=search,
-        publisher_id=publisher_id,
-        journal_types=parse_str_csv(journal_type),
-        is_in_doaj=is_in_doaj,
-        oa_models=parse_str_csv(oa_model),
-        with_pubs=with_pubs,
-    )
+    return queries.journals_facets(filters=filters)
 
 
 @router.get("", response_model=JournalListResponse)
 def list_journals(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=200),
-    search: str | None = None,
-    publisher_id: int | None = None,
-    journal_type: str = Query(""),
-    is_in_doaj: bool | None = None,
-    oa_model: str = Query(""),
-    with_pubs: bool = False,
     sort: JournalSort = "title_asc",
+    filters: JournalFilters = Depends(journal_filters),
     queries: JournalQueries = Depends(journal_queries),
 ) -> JournalListResponse:
     """Liste paginée des revues, avec le décompte de leurs publications.
 
-    Filtres :
-
-    - `search` : insensible à la casse sur le titre normalisé, ignoré en deçà de deux caractères.
-    - `publisher_id` : égalité stricte.
-    - `journal_type` et `oa_model` : valeurs séparées par des virgules (par exemple `journal,proceedings`), vide valant absence de filtre, selon la convention multi-valeurs de `/api/publications`.
-    - `is_in_doaj` : booléen ; omis, il ne filtre rien.
-    - `with_pubs` : restreint aux revues portant au moins une publication. La page publique s'en sert pour masquer les revues orphelines, que l'admin garde la possibilité de voir.
-
-    `sort` accepte `title`, `publisher` et `pubs`, suffixés de `_asc` ou `_desc` ; toute autre valeur rend un 422.
+    `with_pubs` restreint aux revues portant au moins une publication : la page publique s'en sert pour masquer les revues orphelines, que l'administration garde la possibilité de voir. `sort` accepte `title`, `publisher` et `pubs`, suffixés de `_asc` ou `_desc` ; toute autre valeur rend un 422.
     """
-    return queries.list_journals(
-        search=search,
-        publisher_id=publisher_id,
-        journal_types=parse_str_csv(journal_type),
-        is_in_doaj=is_in_doaj,
-        oa_models=parse_str_csv(oa_model),
-        with_pubs=with_pubs,
-        sort=sort,
-        page=page,
-        per_page=per_page,
-    )
+    return queries.list_journals(filters=filters, sort=sort, page=page, per_page=per_page)
 
 
 @router.get("/{journal_id}", response_model=JournalDetailResponse)

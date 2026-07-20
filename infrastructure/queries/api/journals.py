@@ -8,6 +8,7 @@ from application.ports.api.journals_queries import (
     DocTypeCount,
     JournalDashboardResponse,
     JournalDetailResponse,
+    JournalFilters,
     JournalListResponse,
     JournalOut,
     JournalQueries,
@@ -70,13 +71,8 @@ def _journal_fields(row: Any) -> dict[str, Any]:
 
 
 def _build_journal_where(
+    filters: JournalFilters,
     *,
-    search: str | None,
-    publisher_id: int | None,
-    journal_types: list[str],
-    is_in_doaj: bool | None,
-    oa_models: list[str],
-    with_pubs: bool,
     skip_journal_types: bool = False,
     skip_doaj: bool = False,
     skip_oa_models: bool = False,
@@ -89,29 +85,29 @@ def _build_journal_where(
     """
     binds: dict[str, Any] = {}
     parts: list[str] = []
-    if search and len(search) >= 2:
+    if filters.search and len(filters.search) >= 2:
         # title_normalized passe par `normalize_text` à l'ingestion ; la
         # query doit subir la même normalisation pour matcher les titres
         # contenant ponctuation ou accents.
-        normalized = normalize_text(search)
+        normalized = normalize_text(filters.search)
         if normalized:
             parts.append("j.title_normalized LIKE '%' || :search || '%'")
             binds["search"] = normalized
-    if publisher_id:
+    if filters.publisher_id:
         parts.append("j.publisher_id = :publisher_id")
-        binds["publisher_id"] = publisher_id
-    if journal_types and not skip_journal_types:
+        binds["publisher_id"] = filters.publisher_id
+    if filters.journal_types and not skip_journal_types:
         # journal_type est un enum Postgres → cast explicite en text pour
         # comparer à un array text[].
         parts.append("j.journal_type::text = ANY(:journal_types)")
-        binds["journal_types"] = journal_types
-    if is_in_doaj is not None and not skip_doaj:
+        binds["journal_types"] = filters.journal_types
+    if filters.is_in_doaj is not None and not skip_doaj:
         parts.append("j.is_in_doaj = :is_in_doaj")
-        binds["is_in_doaj"] = is_in_doaj
-    if oa_models and not skip_oa_models:
+        binds["is_in_doaj"] = filters.is_in_doaj
+    if filters.oa_models and not skip_oa_models:
         parts.append("j.oa_model = ANY(:oa_models)")
-        binds["oa_models"] = oa_models
-    if with_pubs:
+        binds["oa_models"] = filters.oa_models
+    if filters.with_pubs:
         parts.append("j.pub_count > 0")
     return (" AND ".join(parts) if parts else "TRUE", binds)
 
@@ -133,26 +129,9 @@ class PgJournalQueries(JournalQueries):
         self._conn = conn
 
     def list_journals(
-        self,
-        *,
-        search: str | None,
-        publisher_id: int | None,
-        journal_types: list[str],
-        is_in_doaj: bool | None,
-        oa_models: list[str],
-        with_pubs: bool,
-        sort: JournalSort,
-        page: int,
-        per_page: int,
+        self, *, filters: JournalFilters, sort: JournalSort, page: int, per_page: int
     ) -> JournalListResponse:
-        where, binds = _build_journal_where(
-            search=search,
-            publisher_id=publisher_id,
-            journal_types=journal_types,
-            is_in_doaj=is_in_doaj,
-            oa_models=oa_models,
-            with_pubs=with_pubs,
-        )
+        where, binds = _build_journal_where(filters)
 
         total_row = self._conn.execute(
             text(f"SELECT COUNT(*) AS total FROM journals j WHERE {where}"),
@@ -180,25 +159,8 @@ class PgJournalQueries(JournalQueries):
             journals=[JournalOut(**_journal_fields(r)) for r in rows],
         )
 
-    def journals_facets(
-        self,
-        *,
-        search: str | None,
-        publisher_id: int | None,
-        journal_types: list[str],
-        is_in_doaj: bool | None,
-        oa_models: list[str],
-        with_pubs: bool,
-    ) -> JournalsFacetsResponse:
-        where_jt, binds_jt = _build_journal_where(
-            search=search,
-            publisher_id=publisher_id,
-            journal_types=journal_types,
-            is_in_doaj=is_in_doaj,
-            oa_models=oa_models,
-            with_pubs=with_pubs,
-            skip_journal_types=True,
-        )
+    def journals_facets(self, *, filters: JournalFilters) -> JournalsFacetsResponse:
+        where_jt, binds_jt = _build_journal_where(filters, skip_journal_types=True)
         jt_rows = self._conn.execute(
             text(f"""
                 SELECT j.journal_type::text AS value, COUNT(*) AS n
@@ -221,15 +183,7 @@ class PgJournalQueries(JournalQueries):
             for v in JOURNAL_TYPES
         ]
 
-        where_oa, binds_oa = _build_journal_where(
-            search=search,
-            publisher_id=publisher_id,
-            journal_types=journal_types,
-            is_in_doaj=is_in_doaj,
-            oa_models=oa_models,
-            with_pubs=with_pubs,
-            skip_oa_models=True,
-        )
+        where_oa, binds_oa = _build_journal_where(filters, skip_oa_models=True)
         oa_rows = self._conn.execute(
             text(f"""
                 SELECT j.oa_model AS value, COUNT(*) AS n
@@ -249,15 +203,7 @@ class PgJournalQueries(JournalQueries):
             for v in OA_MODELS
         ]
 
-        where_d, binds_d = _build_journal_where(
-            search=search,
-            publisher_id=publisher_id,
-            journal_types=journal_types,
-            is_in_doaj=is_in_doaj,
-            oa_models=oa_models,
-            with_pubs=with_pubs,
-            skip_doaj=True,
-        )
+        where_d, binds_d = _build_journal_where(filters, skip_doaj=True)
         doaj_rows = self._conn.execute(
             text(f"""
                 SELECT j.is_in_doaj AS value, COUNT(*) AS n
