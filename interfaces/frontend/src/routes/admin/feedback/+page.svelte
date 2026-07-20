@@ -17,7 +17,7 @@
   type MatchedForm = components["schemas"]["FeedbackMatchedForm"];
   type FeedbackAddress = components["schemas"]["FeedbackAddressItem"];
   type FeedbackPage = components["schemas"]["FeedbackAddressesResponse"];
-  type Structure = components["schemas"]["FeedbackStructureItem"];
+  type Structure = components["schemas"]["StructureListItem"];
 
   type GroupedStructures = Record<string, Structure[]>;
 
@@ -28,10 +28,8 @@
 
   // ---------- Constants ----------
 
-  // Libellés d'affichage pour les groupes de structures. L'ordre des
-  // clés sert aussi d'ordre d'affichage dans le picker. Les types
-  // éligibles et la sélection par défaut (UCA) sont décidés côté API
-  // par /api/feedback/structures.
+  // Libellés d'affichage pour les groupes de structures. L'ordre des clés sert aussi d'ordre
+  // d'affichage dans le picker ; un type absent d'ici s'affiche après, sous son code.
   const TYPE_LABELS: Record<string, string> = {
     universite: "Universités",
     onr: "Organismes de recherche",
@@ -108,16 +106,26 @@
   // ---------- Data loading ----------
 
   async function loadStructures(): Promise<void> {
-    // L'API filtre les types éligibles et choisit la structure par
-    // défaut (UCA ou fallback selon la règle métier côté backend).
-    const data = await api<components["schemas"]["FeedbackStructuresResponse"]>(
-      "/api/feedback/structures"
-    );
-    structures = data.by_type;
-    allStructures = Object.values(data.by_type).flat();
-    if (data.default_structure_id) {
-      currentStructureId = data.default_structure_id;
+    // Un site porte les formes de nom d'un lieu pour servir de contexte au matching : une
+    // adresse qui le mentionne n'atteste d'aucun rattachement, il n'a pas de détection à juger.
+    allStructures = (await api<Structure[]>("/api/structures")).filter((s) => s.type !== "site");
+
+    const grouped: GroupedStructures = {};
+    for (const s of allStructures) (grouped[s.type] ??= []).push(s);
+    structures = grouped;
+
+    // À défaut de choix dans l'URL, la première structure du premier groupe affiché.
+    if (currentStructureId === null) {
+      const firstType = groupOrder(grouped).find((t) => grouped[t]?.length);
+      currentStructureId = firstType ? grouped[firstType][0].id : null;
     }
+  }
+
+  /** Types présents, ceux de `TYPE_LABELS` d'abord, les autres ensuite par ordre alphabétique. */
+  function groupOrder(grouped: GroupedStructures): string[] {
+    const known = TYPE_ORDER.filter((t) => t in grouped);
+    const extra = Object.keys(grouped).filter((t) => !TYPE_ORDER.includes(t)).sort();
+    return [...known, ...extra];
   }
 
   async function loadStats() {
@@ -321,14 +329,12 @@
   <!-- Toolbar -->
   <div class="toolbar">
     <select class="structure-filter" value={currentStructureId ?? ""} onchange={onStructureChange}>
-      {#each TYPE_ORDER as type}
-        {#if structures[type]?.length}
-          <optgroup label={TYPE_LABELS[type]}>
-            {#each structures[type] as s (s.id)}
-              <option value={s.id}>{s.acronym || s.name}</option>
-            {/each}
-          </optgroup>
-        {/if}
+      {#each groupOrder(structures) as type}
+        <optgroup label={TYPE_LABELS[type] ?? type}>
+          {#each structures[type] as s (s.id)}
+            <option value={s.id}>{s.acronym || s.name}</option>
+          {/each}
+        </optgroup>
       {/each}
     </select>
 

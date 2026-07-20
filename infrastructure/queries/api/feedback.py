@@ -1,44 +1,27 @@
 """Query services pour le tableau de bord admin de feedback détection d'adresses.
 
-`PgAdminFeedbackQueries` hérite explicitement du Protocol `application.ports.api.admin_feedback_queries.AdminFeedbackQueries` (mypy vérifie la conformité à la définition de classe).
+`PgFeedbackQueries` hérite explicitement du Protocol `application.ports.api.feedback_queries.FeedbackQueries` (mypy vérifie la conformité à la définition de classe).
 """
 
 from typing import Any
 
 from sqlalchemy import Connection, text
 
-from application.ports.api.admin_feedback_queries import (
-    AdminFeedbackQueries,
+from application.ports.api.feedback_queries import (
     FeedbackAddressesResponse,
     FeedbackAddressItem,
     FeedbackLabDetected,
     FeedbackMatchedForm,
+    FeedbackQueries,
     FeedbackStats,
-    FeedbackStructureItem,
 )
 
 
-class PgAdminFeedbackQueries(AdminFeedbackQueries):
-    """Adapter SA pour `AdminFeedbackQueries`."""
+class PgFeedbackQueries(FeedbackQueries):
+    """Adapter SA pour `FeedbackQueries`."""
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
-
-    def feedback_structures(self, types: list[str]) -> list[FeedbackStructureItem]:
-        rows = self._conn.execute(
-            text("""
-                SELECT s.id, s.code, s.name, s.acronym,
-                       s.structure_type::text AS type
-                FROM structures s
-                WHERE s.structure_type::text = ANY(:types)
-                ORDER BY s.name
-            """),
-            {"types": types},
-        ).all()
-        return [
-            FeedbackStructureItem(id=r.id, code=r.code, name=r.name, acronym=r.acronym, type=r.type)
-            for r in rows
-        ]
 
     def feedback_stats(self, structure_id: int) -> FeedbackStats:
         row = self._conn.execute(
