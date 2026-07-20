@@ -119,7 +119,7 @@ def _create_structure(conn, code="UCA", name="UCA", structure_type="universite")
 def _create_perimeter(conn, code, name, structure_ids):
     row = conn.execute(
         text(
-            "INSERT INTO perimeters (code, name, structure_ids) VALUES (:c, :n, :sids) RETURNING id"
+            "INSERT INTO perimeters (code, name, root_structure_ids) VALUES (:c, :n, :sids) RETURNING id"
         ),
         {"c": code, "n": name, "sids": structure_ids},
     ).one()

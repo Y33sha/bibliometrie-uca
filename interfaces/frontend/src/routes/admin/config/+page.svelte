@@ -59,7 +59,7 @@
       name: p.name,
       structSearch: "",
       structResults: [],
-      structure_ids: [...p.structure_ids],
+      structure_ids: [...p.root_structure_ids],
       structures: [...p.structures],
     };
   }
@@ -79,12 +79,12 @@
         await perimetersApi.create({
           code: perimModal.code,
           name: perimModal.name,
-          structure_ids: perimModal.structure_ids,
+          root_structure_ids: perimModal.structure_ids,
         });
       } else {
         await perimetersApi.update(perimModal.id!, {
           name: perimModal.name,
-          structure_ids: perimModal.structure_ids,
+          root_structure_ids: perimModal.structure_ids,
         });
       }
       perimModal = null;

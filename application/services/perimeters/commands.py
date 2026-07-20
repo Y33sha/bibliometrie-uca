@@ -19,12 +19,12 @@ def create_perimeter(
     *,
     code: str,
     name: str,
-    structure_ids: list[int],
+    root_structure_ids: list[int],
     repo: PerimeterRepository,
 ) -> int:
     """Crée un périmètre avec ses structures racines. Retourne l'id créé."""
     pid = perimeters_service.create_perimeter(
-        code=code, name=name, structure_ids=structure_ids, repo=repo
+        code=code, name=name, root_structure_ids=root_structure_ids, repo=repo
     )
     repo.refresh_structures()
     conn.commit()

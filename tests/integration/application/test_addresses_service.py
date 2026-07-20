@@ -54,7 +54,7 @@ def _create_structure(conn, code="UCA", name="UCA", structure_type="universite")
 
 def _create_perimeter(conn, code, structure_ids):
     conn.execute(
-        text("INSERT INTO perimeters (code, name, structure_ids) VALUES (:code, :name, :ids)"),
+        text("INSERT INTO perimeters (code, name, root_structure_ids) VALUES (:code, :name, :ids)"),
         {"code": code, "name": code.upper(), "ids": structure_ids},
     )
 

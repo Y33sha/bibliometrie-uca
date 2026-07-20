@@ -13,11 +13,11 @@ from domain.perimeters.perimeter import Perimeter
 class PerimeterUpdate(BaseModel):
     """Champs éditables d'un périmètre, en modification sélective.
 
-    Seuls les champs explicitement fournis sont écrits (`model_dump(exclude_unset=True)`). `structure_ids` liste les structures **racines** ; la clôture qui en descend est matérialisée à part, et son recalcul revient au caller.
+    Seuls les champs explicitement fournis sont écrits (`model_dump(exclude_unset=True)`). `root_structure_ids` liste les structures racines ; la clôture qui en descend est matérialisée à part, et son recalcul revient au caller.
     """
 
     name: Annotated[str, StringConstraints(strip_whitespace=True)] | None = None
-    structure_ids: list[int] | None = None
+    root_structure_ids: list[int] | None = None
 
 
 class PerimeterRepository(Protocol):
@@ -27,15 +27,15 @@ class PerimeterRepository(Protocol):
 
     def find_by_id(self, perimeter_id: int) -> Perimeter | None:
         """Hydrate l'aggregate `Perimeter` complet (code, name,
-        `structure_ids`). Retourne None si le perimeter n'existe pas.
-        `structure_ids` reste sous forme d'ids (références par id à
+        `root_structure_ids`). Retourne None si le perimeter n'existe pas.
+        `root_structure_ids` reste sous forme d'ids (références par id à
         l'aggregate Structure)."""
         ...
 
     # ── Liens structure ↔ perimeter ────────────────────────────────
 
     def remove_structure_from_all_perimeters(self, structure_id: int) -> None:
-        """Retire une structure des racines (`structure_ids`) de tout périmètre, après sa suppression."""
+        """Retire une structure des racines (`root_structure_ids`) de tout périmètre, après sa suppression."""
         ...
 
     # ── CRUD ───────────────────────────────────────────────────────
@@ -49,7 +49,7 @@ class PerimeterRepository(Protocol):
         *,
         code: str,
         name: str,
-        structure_ids: list[int],
+        root_structure_ids: list[int],
     ) -> int: ...
 
     def update_perimeter_fields(self, perimeter_id: int, fields: PerimeterUpdate) -> None: ...
@@ -62,6 +62,6 @@ class PerimeterRepository(Protocol):
 
     def refresh_structures(self) -> None:
         """Recompute la table matérialisée `perimeter_structures` (clôture récursive
-        `est_tutelle_de` de chaque `perimeters.structure_ids`). À rejouer après toute
+        `est_tutelle_de` de chaque `perimeters.root_structure_ids`). À rejouer après toute
         édition des racines d'un périmètre ou d'une relation `structure_relations`."""
         ...

@@ -17,7 +17,7 @@ class _PerimeterRow(NamedTuple):
     id: int
     code: str
     name: str
-    structure_ids: list[int]
+    root_structure_ids: list[int]
 
 
 def _perimeter_from_row(row: _PerimeterRow) -> Perimeter:
@@ -26,7 +26,7 @@ def _perimeter_from_row(row: _PerimeterRow) -> Perimeter:
         id=row.id,
         code=row.code,
         name=row.name,
-        structure_ids=tuple(row.structure_ids or ()),
+        root_structure_ids=tuple(row.root_structure_ids or ()),
     )
 
 
@@ -44,7 +44,7 @@ class PgPerimeterRepository:
                 perimeters.c.id,
                 perimeters.c.code,
                 perimeters.c.name,
-                perimeters.c.structure_ids,
+                perimeters.c.root_structure_ids,
             ).where(perimeters.c.id == perimeter_id)
         ).first()
         if row is None:
@@ -56,8 +56,12 @@ class PgPerimeterRepository:
     def remove_structure_from_all_perimeters(self, structure_id: int) -> None:
         self._conn.execute(
             update(perimeters)
-            .where(perimeters.c.structure_ids.contains([structure_id]))
-            .values(structure_ids=func.array_remove(perimeters.c.structure_ids, structure_id))
+            .where(perimeters.c.root_structure_ids.contains([structure_id]))
+            .values(
+                root_structure_ids=func.array_remove(
+                    perimeters.c.root_structure_ids, structure_id
+                )
+            )
         )
 
     # ── CRUD ───────────────────────────────────────────────────────
@@ -75,11 +79,11 @@ class PgPerimeterRepository:
         *,
         code: str,
         name: str,
-        structure_ids: list[int],
+        root_structure_ids: list[int],
     ) -> int:
         stmt = (
             perimeters.insert()
-            .values(code=code, name=name, structure_ids=structure_ids)
+            .values(code=code, name=name, root_structure_ids=root_structure_ids)
             .returning(perimeters.c.id)
         )
         result = self._conn.execute(stmt)

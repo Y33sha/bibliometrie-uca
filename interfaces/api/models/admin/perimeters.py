@@ -21,4 +21,4 @@ _PerimeterCode = Annotated[
 class PerimeterCreate(BaseModel):
     code: _PerimeterCode
     name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
-    structure_ids: list[int] = Field(default_factory=list)
+    root_structure_ids: list[int] = Field(default_factory=list)

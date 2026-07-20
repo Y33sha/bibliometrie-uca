@@ -1,6 +1,6 @@
 """Service Périmètres — écritures sur l'agrégat Perimeter, transaction-agnostiques.
 
-Un périmètre porte des structures **racines** (`perimeters.structure_ids`) ; la clôture récursive de ces racines est matérialisée dans `perimeter_structures`, que `repo.refresh_structures` reconstruit. Toute écriture qui touche aux racines laisse la clôture à recalculer : les command handlers s'en chargent.
+Un périmètre porte des structures **racines** (`perimeters.root_structure_ids`) ; la clôture récursive de ces racines est matérialisée dans `perimeter_structures`, que `repo.refresh_structures` reconstruit. Toute écriture qui touche aux racines laisse la clôture à recalculer : les command handlers s'en chargent.
 
 `delete_perimeter` consulte la table `config` (via `ConfigQueries`) pour refuser la suppression d'un périmètre encore référencé par la configuration pipeline.
 """
@@ -19,7 +19,7 @@ def create_perimeter(
     *,
     code: str,
     name: str,
-    structure_ids: list[int],
+    root_structure_ids: list[int],
     repo: PerimeterRepository,
 ) -> int:
     """Crée un périmètre avec ses structures racines. Retourne l'id créé.
@@ -31,7 +31,7 @@ def create_perimeter(
 
     if repo.perimeter_code_exists(code):
         raise ConflictError(f"Le code '{code}' existe déjà")
-    return repo.create_perimeter(code=code, name=name, structure_ids=structure_ids)
+    return repo.create_perimeter(code=code, name=name, root_structure_ids=root_structure_ids)
 
 
 def update_perimeter(

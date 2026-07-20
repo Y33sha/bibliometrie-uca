@@ -18,12 +18,12 @@ class PerimeterStructureItem(BaseModel):
 
 
 class PerimeterOut(BaseModel):
-    """Périmètre + ses structures racines (résolues + comptage effectif)."""
+    """Périmètre + ses structures racines (identifiants bruts, résolues, comptage effectif)."""
 
     id: int
     code: str
     name: str
-    structure_ids: list[int]
+    root_structure_ids: list[int]
     structures: list[PerimeterStructureItem]
     structure_count: int
 

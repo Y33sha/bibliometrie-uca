@@ -22,7 +22,7 @@ def _setup_perimeter(conn, lab_ids, code="uca"):
     root = _create_structure(conn, code=code.upper(), type_="universite")
     all_ids = [root] + list(lab_ids)
     conn.execute(
-        text("INSERT INTO perimeters (code, name, structure_ids) VALUES (:c, :n, :ids)"),
+        text("INSERT INTO perimeters (code, name, root_structure_ids) VALUES (:c, :n, :ids)"),
         {"c": code, "n": code.upper(), "ids": all_ids},
     )
     conn.execute(
