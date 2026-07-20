@@ -39,7 +39,7 @@ class AuthorshipRef(TypedDict):
     """Référence d'une signature source (entrée de `detach_authorships`)."""
 
     source: str
-    authorship_id: int
+    source_authorship_id: int
 
 
 class DetachResult(TypedDict):
@@ -427,7 +427,7 @@ def detach_authorships(
     publication_ids: set[int] = set()
     for a in authorships:
         require_known_source(a["source"])
-        pub_id = authorship_repo.find_publication_id_for_source_authorship(a["authorship_id"])
+        pub_id = authorship_repo.find_publication_id_for_source_authorship(a["source_authorship_id"])
         if pub_id is not None:
             publication_ids.add(pub_id)
 

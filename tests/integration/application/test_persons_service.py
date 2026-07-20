@@ -587,7 +587,7 @@ class TestDetachAuthorships:
 
         result = detach_authorships(
             person_id,
-            authorships=[{"source": "hal", "authorship_id": sa_id}],
+            authorships=[{"source": "hal", "source_authorship_id": sa_id}],
             repo=repo,
             authorship_repo=authorship_repo,
         )
@@ -629,7 +629,7 @@ class TestDetachAuthorships:
         # Une seule source sélectionnée (la hal).
         result = detach_authorships(
             person_id,
-            authorships=[{"source": "hal", "authorship_id": sa_hal}],
+            authorships=[{"source": "hal", "source_authorship_id": sa_hal}],
             repo=repo,
             authorship_repo=authorship_repo,
         )
@@ -667,7 +667,7 @@ class TestDetachAuthorships:
 
         result = detach_authorships(
             person_id,
-            authorships=[{"source": "hal", "authorship_id": sa_id}],
+            authorships=[{"source": "hal", "source_authorship_id": sa_id}],
             repo=repo,
             authorship_repo=authorship_repo,
         )
@@ -701,7 +701,7 @@ class TestDetachAuthorships:
 
         result = detach_authorships(
             person_id,
-            authorships=[{"source": "hal", "authorship_id": sa_id}],
+            authorships=[{"source": "hal", "source_authorship_id": sa_id}],
             repo=repo,
             authorship_repo=authorship_repo,
         )
@@ -751,7 +751,7 @@ class TestDetachAuthorships:
 
         result = detach_authorships(
             person_id,
-            authorships=[{"source": "hal", "authorship_id": sa1}],
+            authorships=[{"source": "hal", "source_authorship_id": sa1}],
             repo=repo,
             authorship_repo=authorship_repo,
         )

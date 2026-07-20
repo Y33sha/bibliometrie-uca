@@ -12,7 +12,7 @@ class CreatePersonName(BaseModel):
 
 class SourceAuthorshipRef(BaseModel):
     source: str
-    authorship_id: int
+    source_authorship_id: int
 
 
 class AssignOrphanAuthorship(BaseModel):

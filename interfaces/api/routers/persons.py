@@ -257,7 +257,10 @@ def update_identifier_status(
     repo: PersonRepository = Depends(person_repo),
     audit: AuditRepository = Depends(audit_repo),
 ) -> IdentifierStatusResponse:
-    """Met à jour le statut d'un identifiant (pending/confirmed/rejected)."""
+    """Met à jour le statut d'un identifiant (pending/confirmed/rejected).
+
+    Renvoie 404 sur un identifiant introuvable (`update_identifier_status`).
+    """
     row = person_commands.update_identifier_status(
         conn, ident_id, body.status, repo=repo, audit_repo=audit
     )
@@ -404,7 +407,7 @@ def add_person_identifier(
         added=True,
         id_type=data.id_type,
         id_value=result.id_value,
-        reassigned=True if result.outcome is AddIdentifierOutcome.REASSIGNED else None,
+        reassigned=result.outcome is AddIdentifierOutcome.REASSIGNED or None,
     )
 
 
@@ -417,7 +420,10 @@ def remove_person_identifier(
     repo: PersonRepository = Depends(person_repo),
     audit: AuditRepository = Depends(audit_repo),
 ) -> RemovedResponse:
-    """Supprime un identifiant d'une personne."""
+    """Supprime un identifiant d'une personne.
+
+    Renvoie 404 sur un identifiant introuvable (`remove_identifier`).
+    """
     person_commands.remove_identifier(
         conn, person_id, id_type, id_value, repo=repo, audit_repo=audit
     )
@@ -435,7 +441,10 @@ def reject_person(
     repo: PersonRepository = Depends(person_repo),
     audit: AuditRepository = Depends(audit_repo),
 ) -> OkResponse:
-    """Marque/démarque une personne comme rejetée."""
+    """Marque/démarque une personne comme rejetée.
+
+    Renvoie 404 sur une personne introuvable (`set_rejected`).
+    """
     person_commands.set_rejected(conn, person_id, body.rejected, repo=repo, audit_repo=audit)
     return OkResponse()
 
@@ -476,8 +485,8 @@ def detach_authorships(
     person_id: int,
     body: DetachAuthorships,
     conn: Connection = Depends(db_conn),
-    person_repo_: PersonRepository = Depends(person_repo),
-    auth_repo: AuthorshipRepository = Depends(authorship_repo),
+    persons: PersonRepository = Depends(person_repo),
+    authorships: AuthorshipRepository = Depends(authorship_repo),
     audit: AuditRepository = Depends(audit_repo),
 ) -> DetachAuthorshipsResponse:
     """Rejette durablement les paires (publication, personne) des signatures sources choisies, et nettoie les formes de nom devenues sans objet."""
@@ -485,9 +494,12 @@ def detach_authorships(
         person_commands.detach_authorships(
             conn,
             person_id,
-            [{"source": a.source, "authorship_id": a.authorship_id} for a in body.authorships],
-            repo=person_repo_,
-            authorship_repo=auth_repo,
+            [
+                {"source": a.source, "source_authorship_id": a.source_authorship_id}
+                for a in body.authorships
+            ],
+            repo=persons,
+            authorship_repo=authorships,
             audit_repo=audit,
         )
     )
@@ -499,7 +511,7 @@ def update_name_form_status(
     body: UpdateNameFormStatus,
     conn: Connection = Depends(db_conn),
     repo: PersonRepository = Depends(person_repo),
-    auth_repo: AuthorshipRepository = Depends(authorship_repo),
+    authorships: AuthorshipRepository = Depends(authorship_repo),
     audit: AuditRepository = Depends(audit_repo),
 ) -> NameFormStatusResponse:
     """Met à jour le statut d'une forme de nom : `pending`, `confirmed` ou `rejected`.
@@ -512,7 +524,7 @@ def update_name_form_status(
         body.name_form,
         body.status,
         repo=repo,
-        authorship_repo=auth_repo,
+        authorship_repo=authorships,
         audit_repo=audit,
     )
     return NameFormStatusResponse(**row)
