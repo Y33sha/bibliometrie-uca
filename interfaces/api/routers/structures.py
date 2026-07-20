@@ -47,17 +47,19 @@ router = APIRouter(prefix="/api/structures", tags=["structures"])
 
 @router.get("", response_model=list[StructureListItem])
 def list_structures(
-    type: str = Query(""),
+    structure_type: str = Query(""),
     search: str = Query(""),
     in_perimeter: bool = Query(False),
     queries: StructuresQueries = Depends(structures_queries),
 ) -> list[StructureListItem]:
     """Liste des structures, filtrable par types, par texte libre et par appartenance au périmètre.
 
-    `type` accepte plusieurs valeurs de l'énumération `structure_type` séparées par des virgules. `search` : matching accent-insensible sur nom / acronyme / code. `in_perimeter` restreint aux structures du périmètre `persons`, clôture comprise : la page publique des laboratoires s'en sert, avec les types que sa configuration lui donne. Tri canonique par type (labo > universite > onr > chu > ecole > site > autre) puis nom.
+    `structure_type` accepte plusieurs valeurs de l'énumération `structure_type` séparées par des virgules. `search` : matching accent-insensible sur nom / acronyme / code. `in_perimeter` restreint aux structures du périmètre `persons`, clôture comprise : la page publique des laboratoires s'en sert, avec les types que sa configuration lui donne. Tri canonique par type (labo > universite > onr > chu > ecole > site > autre) puis nom.
     """
     return queries.list_structures(
-        types=parse_vocabulary_csv(type, allowed=tuple(StructureType), param="type"),
+        types=parse_vocabulary_csv(
+            structure_type, allowed=tuple(StructureType), param="structure_type"
+        ),
         search=search,
         in_perimeter=in_perimeter,
     )
@@ -96,12 +98,12 @@ def create_relation(
     data: RelationCreate,
     conn: Connection = Depends(db_conn),
     repo: StructureRepository = Depends(structure_repo),
-    perimeter_repo: PerimeterRepository = Depends(perimeter_repo),
+    perimeters: PerimeterRepository = Depends(perimeter_repo),
     audit: AuditRepository = Depends(audit_repo),
 ) -> StructureRelationCreateResponse:
     """Crée une relation parent-enfant entre deux structures.
 
-    Idempotent : une relation identique — même parent, même enfant, même type — laisse la table inchangée et rend `{"status": "already_exists"}`.
+    Idempotent : une relation identique — même parent, même enfant, même type — laisse la table inchangée et rend `{"status": "already_exists"}`. Lève 400 si la relation viole l'invariant de graphe : structure liée à elle-même, ou cycle (l'enfant est déjà un ancêtre du parent). Lève 409 si `parent_id` ou `child_id` désigne une structure inexistante.
     """
     row = structure_commands.create_relation(
         conn,
@@ -109,7 +111,7 @@ def create_relation(
         child_id=data.child_id,
         relation_type=data.relation_type,
         repo=repo,
-        perimeter_repo=perimeter_repo,
+        perimeter_repo=perimeters,
         audit_repo=audit,
     )
     if row is None:
@@ -122,12 +124,12 @@ def delete_relation(
     relation_id: int,
     conn: Connection = Depends(db_conn),
     repo: StructureRepository = Depends(structure_repo),
-    perimeter_repo: PerimeterRepository = Depends(perimeter_repo),
+    perimeters: PerimeterRepository = Depends(perimeter_repo),
     audit: AuditRepository = Depends(audit_repo),
 ) -> DeletedResponse:
     """Supprime une relation structure. 404 si l'id n'existe pas."""
     structure_commands.delete_relation(
-        conn, relation_id, repo=repo, perimeter_repo=perimeter_repo, audit_repo=audit
+        conn, relation_id, repo=repo, perimeter_repo=perimeters, audit_repo=audit
     )
     return DeletedResponse()
 
@@ -146,7 +148,7 @@ def create_name_form(
 ) -> NameFormOut:
     """Crée une forme de nom pour une structure, utilisée par le matching d'adresses.
 
-    `form_text` est normalisé (accents, casse, ponctuation) par le service avant insertion. `is_word_boundary` : le match exige une frontière de mot dans l'adresse brute. `is_excluding` : forme dont la présence retire la structure des résultats. `requires_context_of` : liste d'ids de structures qui doivent elles-mêmes matcher l'adresse pour que cette forme active.
+    `form_text` est normalisé (accents, casse, ponctuation) par le service avant insertion. `is_word_boundary` : le match exige une frontière de mot dans l'adresse brute. `is_excluding` : forme dont la présence retire la structure des résultats. `requires_context_of` : liste d'ids de structures qui doivent elles-mêmes matcher l'adresse pour que cette forme active. Lève 409 si `structure_id` désigne une structure inexistante.
     """
     return NameFormOut.model_validate(
         structure_commands.create_name_form(
@@ -276,11 +278,11 @@ def delete_structure(
     structure_id: int,
     conn: Connection = Depends(db_conn),
     repo: StructureRepository = Depends(structure_repo),
-    perimeter_repo: PerimeterRepository = Depends(perimeter_repo),
+    perimeters: PerimeterRepository = Depends(perimeter_repo),
     audit: AuditRepository = Depends(audit_repo),
 ) -> DeletedResponse:
     """Supprime une structure. Cascade sur les relations et formes de noms liées. 404 si inconnue."""
     structure_commands.delete_structure(
-        conn, structure_id, repo=repo, perimeter_repo=perimeter_repo, audit_repo=audit
+        conn, structure_id, repo=repo, perimeter_repo=perimeters, audit_repo=audit
     )
     return DeletedResponse()

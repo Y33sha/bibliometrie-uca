@@ -47,7 +47,7 @@
 
   async function loadList() {
     const params = new URLSearchParams();
-    if (typeFilter) params.set("type", typeFilter);
+    if (typeFilter) params.set("structure_type", typeFilter);
     if (search) params.set("search", search);
     structures = await api<StructureListItem[]>("/api/structures?" + params);
   }

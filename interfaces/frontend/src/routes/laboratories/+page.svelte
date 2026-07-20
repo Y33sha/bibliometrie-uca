@@ -90,7 +90,7 @@
 		const displayTypes = (config.find((c) => c.key === "laboratories_display_types")?.value ?? [
 			"labo"
 		]) as string[];
-		const params = new URLSearchParams({ in_perimeter: "true", type: displayTypes.join(",") });
+		const params = new URLSearchParams({ in_perimeter: "true", structure_type: displayTypes.join(",") });
 		labs = await api<Lab[]>(`/api/structures?${params}`);
 	});
 </script>

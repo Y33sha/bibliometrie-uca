@@ -15,6 +15,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy.exc import IntegrityError
 from starlette.middleware.base import RequestResponseEndpoint
 from starlette.responses import Response
 
@@ -145,6 +146,21 @@ async def domain_error_handler(request: Request, exc: DomainError) -> JSONRespon
     # Filet de sécurité pour une DomainError non spécialisée ci-dessus.
     logger.warning("DomainError non mappée : %s", exc)
     return JSONResponse(status_code=400, content={"detail": str(exc)})
+
+
+@app.exception_handler(IntegrityError)
+async def integrity_error_handler(request: Request, exc: IntegrityError) -> JSONResponse:
+    """Traduit une violation de contrainte d'intégrité en 409, plutôt qu'un 500 opaque.
+
+    Couvre uniformément toute écriture qui heurte une contrainte de la base sur une requête bien formée : clé étrangère vers une entité inexistante, doublon sur un index unique, condition CHECK non tenue. Le détail SQL reste au log — il expose la structure interne et n'éclaire pas l'appelant.
+    """
+    logger.warning(
+        "Violation d'intégrité sur %s %s : %s", request.method, request.url.path, exc
+    )
+    return JSONResponse(
+        status_code=409,
+        content={"detail": "La requête viole une contrainte d'intégrité des données."},
+    )
 
 
 @app.exception_handler(Exception)

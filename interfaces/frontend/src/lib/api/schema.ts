@@ -649,7 +649,7 @@ export interface paths {
          * List Structures
          * @description Liste des structures, filtrable par types, par texte libre et par appartenance au périmètre.
          *
-         *     `type` accepte plusieurs valeurs de l'énumération `structure_type` séparées par des virgules. `search` : matching accent-insensible sur nom / acronyme / code. `in_perimeter` restreint aux structures du périmètre `persons`, clôture comprise : la page publique des laboratoires s'en sert, avec les types que sa configuration lui donne. Tri canonique par type (labo > universite > onr > chu > ecole > site > autre) puis nom.
+         *     `structure_type` accepte plusieurs valeurs de l'énumération `structure_type` séparées par des virgules. `search` : matching accent-insensible sur nom / acronyme / code. `in_perimeter` restreint aux structures du périmètre `persons`, clôture comprise : la page publique des laboratoires s'en sert, avec les types que sa configuration lui donne. Tri canonique par type (labo > universite > onr > chu > ecole > site > autre) puis nom.
          */
         get: operations["list_structures_api_structures_get"];
         put?: never;
@@ -677,7 +677,7 @@ export interface paths {
          * Create Relation
          * @description Crée une relation parent-enfant entre deux structures.
          *
-         *     Idempotent : une relation identique — même parent, même enfant, même type — laisse la table inchangée et rend `{"status": "already_exists"}`.
+         *     Idempotent : une relation identique — même parent, même enfant, même type — laisse la table inchangée et rend `{"status": "already_exists"}`. Lève 400 si la relation viole l'invariant de graphe : structure liée à elle-même, ou cycle (l'enfant est déjà un ancêtre du parent). Lève 409 si `parent_id` ou `child_id` désigne une structure inexistante.
          */
         post: operations["create_relation_api_structures_relations_post"];
         delete?: never;
@@ -719,7 +719,7 @@ export interface paths {
          * Create Name Form
          * @description Crée une forme de nom pour une structure, utilisée par le matching d'adresses.
          *
-         *     `form_text` est normalisé (accents, casse, ponctuation) par le service avant insertion. `is_word_boundary` : le match exige une frontière de mot dans l'adresse brute. `is_excluding` : forme dont la présence retire la structure des résultats. `requires_context_of` : liste d'ids de structures qui doivent elles-mêmes matcher l'adresse pour que cette forme active.
+         *     `form_text` est normalisé (accents, casse, ponctuation) par le service avant insertion. `is_word_boundary` : le match exige une frontière de mot dans l'adresse brute. `is_excluding` : forme dont la présence retire la structure des résultats. `requires_context_of` : liste d'ids de structures qui doivent elles-mêmes matcher l'adresse pour que cette forme active. Lève 409 si `structure_id` désigne une structure inexistante.
          */
         post: operations["create_name_form_api_structures_name_forms_post"];
         delete?: never;
@@ -6399,7 +6399,7 @@ export interface operations {
     list_structures_api_structures_get: {
         parameters: {
             query?: {
-                type?: string;
+                structure_type?: string;
                 search?: string;
                 in_perimeter?: boolean;
             };
