@@ -48,11 +48,6 @@ class TestPublicationsList:
         r = client.get("/api/publications", params={"oa_status": "gold,green"})
         assert r.status_code == 200
 
-    def test_filter_by_oa_alias(self, client):
-        """L'alias 'oa' expanse en (gold, hybrid, bronze, green, diamond)."""
-        r = client.get("/api/publications", params={"oa_status": "oa"})
-        assert r.status_code == 200
-
     def test_filter_by_search(self, client):
         r = client.get("/api/publications", params={"search": "quantum"})
         assert r.status_code == 200
@@ -106,7 +101,7 @@ class TestPublicationsList:
             params={
                 "year": "2023,2024",
                 "doc_type": "article",
-                "oa_status": "oa",
+                "oa_status": "gold",
                 "lab_id": "1",
                 "sort": "year_desc",
                 "page": 1,
@@ -129,6 +124,7 @@ class TestClosedVocabularyFilters:
             ("doc_type", "nimportequoi"),
             ("excluded_doc_type", "nimportequoi"),
             ("oa_status", "vert"),
+            ("oa_status", "oa"),
             ("access", "ouvert"),
             ("hal_status", "bogus"),
         ],
@@ -141,11 +137,6 @@ class TestClosedVocabularyFilters:
     def test_refuses_a_list_where_one_value_is_unknown(self, client):
         r = client.get("/api/publications", params={"doc_type": "article,bogus"})
         assert r.status_code == 422
-
-    def test_accepts_the_oa_shorthand(self, client):
-        """`oa` n'est pas un statut stocké mais un terme d'entrée, développé en cinq statuts."""
-        r = client.get("/api/publications", params={"oa_status": "oa"})
-        assert r.status_code == 200
 
     def test_accepts_the_embargoed_status(self, client):
         r = client.get("/api/publications", params={"oa_status": "embargoed"})

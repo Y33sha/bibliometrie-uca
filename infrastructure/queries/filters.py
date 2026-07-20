@@ -133,16 +133,9 @@ def lab_clause(lab_ids: list[int]) -> WhereClause | None:
 def oa_clause(oa_status: list[str]) -> WhereClause | None:
     if not oa_status:
         return None
-    expanded: list[str] = []
-    for v in oa_status:
-        if v == "oa":
-            expanded.extend(OA_OPEN_STATUSES)
-        else:
-            expanded.append(v)
-    expanded = list(set(expanded))
-    if len(expanded) == 1:
-        return WhereClause("p.oa_status::text = :flt_oa_status", {"flt_oa_status": expanded[0]})
-    return WhereClause("p.oa_status::text = ANY(:flt_oa_status)", {"flt_oa_status": expanded})
+    if len(oa_status) == 1:
+        return WhereClause("p.oa_status::text = :flt_oa_status", {"flt_oa_status": oa_status[0]})
+    return WhereClause("p.oa_status::text = ANY(:flt_oa_status)", {"flt_oa_status": oa_status})
 
 
 def access_clause(access: list[str]) -> WhereClause | None:

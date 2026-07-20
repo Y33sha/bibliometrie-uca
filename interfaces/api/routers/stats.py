@@ -13,8 +13,10 @@ from application.ports.api.stats_queries import (
     StatsQueries,
 )
 from domain.errors import ValidationError
+from domain.publications.doc_types import DOC_TYPES
+from domain.publications.metadata import OA_STATUSES
 from interfaces.api.deps import stats_queries
-from interfaces.api.filters import parse_int_csv, parse_str_csv
+from interfaces.api.filters import parse_int_csv, parse_str_csv, parse_vocabulary_csv
 
 router = APIRouter(prefix="/api/stats", tags=["stats"])
 
@@ -28,15 +30,18 @@ def stats_filters(
     has_apc: str = Query(""),
     doc_type: str = Query(""),
 ) -> StatsFilters:
-    """Dépendance : assemble les filtres communs des endpoints stats depuis les query params, en valeurs séparées par des virgules."""
+    """Dépendance : assemble les filtres communs des endpoints stats depuis les query params, en listes séparées par des virgules.
+
+    `oa_status` et `doc_type` sont pris dans leur vocabulaire fermé (mêmes valeurs que la liste des publications) ; une valeur inconnue rend 422. `has_apc` est une facette multi-sélection (`uca` / `non_uca` / `none`) non restreinte ici.
+    """
     return StatsFilters(
         lab_ids=parse_int_csv(lab_id),
         years=parse_int_csv(year),
         publisher_ids=parse_int_csv(publisher_id),
         journal_ids=parse_int_csv(journal_id),
-        oa_status=parse_str_csv(oa_status),
+        oa_status=parse_vocabulary_csv(oa_status, allowed=OA_STATUSES, param="oa_status"),
         has_apc=parse_str_csv(has_apc),
-        doc_types=parse_str_csv(doc_type),
+        doc_types=parse_vocabulary_csv(doc_type, allowed=DOC_TYPES, param="doc_type"),
     )
 
 
