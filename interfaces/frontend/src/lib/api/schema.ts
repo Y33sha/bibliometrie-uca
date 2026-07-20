@@ -2986,8 +2986,7 @@ export interface components {
             form_id: number;
             /** Form Text */
             form_text: string;
-            /** Structure Name */
-            structure_name: string;
+            structure: components["schemas"]["StructureRef"];
             /** Requires Context Of */
             requires_context_of: number[] | null;
         };
