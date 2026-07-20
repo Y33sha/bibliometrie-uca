@@ -171,11 +171,11 @@ def merge(
     publisher_id: int,
     body: MergeRequest,
     conn: Connection = Depends(db_conn),
-    publisher_repo: PublisherRepository = Depends(publisher_repo),
-    journal_repo: JournalRepository = Depends(journal_repo),
-    publication_repo: PublicationRepository = Depends(publication_repo),
-    audit_repo: AuditRepository = Depends(audit_repo),
-    correction_queries: MetadataCorrectionQueries = Depends(metadata_correction_queries),
+    publishers: PublisherRepository = Depends(publisher_repo),
+    journals: JournalRepository = Depends(journal_repo),
+    publications: PublicationRepository = Depends(publication_repo),
+    audit: AuditRepository = Depends(audit_repo),
+    corrections: MetadataCorrectionQueries = Depends(metadata_correction_queries),
 ) -> MergeResponse:
     """Fusionne l'éditeur `source_id` dans l'éditeur `publisher_id`.
 
@@ -187,10 +187,10 @@ def merge(
         conn,
         publisher_id,
         body.source_id,
-        correction_queries=correction_queries,
-        publisher_repo=publisher_repo,
-        journal_repo=journal_repo,
-        publication_repo=publication_repo,
-        audit_repo=audit_repo,
+        correction_queries=corrections,
+        publisher_repo=publishers,
+        journal_repo=journals,
+        publication_repo=publications,
+        audit_repo=audit,
     )
     return MergeResponse(merged=True, source_id=body.source_id, target_id=publisher_id)
