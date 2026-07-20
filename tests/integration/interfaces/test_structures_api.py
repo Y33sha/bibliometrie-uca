@@ -5,7 +5,7 @@ Couvre :
 - GET /api/structures/{id} (detail, 404)
 - POST/PUT/DELETE /api/structures (mutations, auth requise)
 - POST/DELETE /api/structures/relations (relations, auth requise)
-- GET/POST/PUT/DELETE /api/name-forms (formes de noms, auth requise)
+- GET/POST/PUT/DELETE /api/structures/name-forms (formes de noms, auth requise)
 """
 
 import os
@@ -295,26 +295,26 @@ class TestDeleteRelation:
 
 class TestGetNameForm:
     def test_404(self, client):
-        r = client.get("/api/name-forms/999999999")
+        r = client.get("/api/structures/name-forms/999999999")
         assert r.status_code == 404
 
     def test_ok(self, client):
         sid = _seed_structure()
         fid = _seed_name_form(sid)
-        r = client.get(f"/api/name-forms/{fid}")
+        r = client.get(f"/api/structures/name-forms/{fid}")
         assert r.status_code == 200
         assert r.json()["id"] == fid
 
 
 class TestCreateNameForm:
     def test_requires_admin(self, client):
-        r = client.post("/api/name-forms", json={"structure_id": 1, "form_text": "X"})
+        r = client.post("/api/structures/name-forms", json={"structure_id": 1, "form_text": "X"})
         assert r.status_code == 401
 
     def test_ok(self, auth_client):
         sid = _seed_structure()
         r = auth_client.post(
-            "/api/name-forms",
+            "/api/structures/name-forms",
             json={
                 "structure_id": sid,
                 "form_text": _uniq("F"),
@@ -329,7 +329,7 @@ class TestCreateNameForm:
         sid = _seed_structure()
         ctx = _seed_structure()
         r = auth_client.post(
-            "/api/name-forms",
+            "/api/structures/name-forms",
             json={
                 "structure_id": sid,
                 "form_text": _uniq("Fctx"),
@@ -341,18 +341,18 @@ class TestCreateNameForm:
 
 class TestUpdateNameForm:
     def test_requires_admin(self, client):
-        r = client.put("/api/name-forms/1", json={"form_text": "Y"})
+        r = client.put("/api/structures/name-forms/1", json={"form_text": "Y"})
         assert r.status_code == 401
 
     def test_404(self, auth_client):
-        r = auth_client.put("/api/name-forms/999999999", json={"form_text": "Z"})
+        r = auth_client.put("/api/structures/name-forms/999999999", json={"form_text": "Z"})
         assert r.status_code == 404
 
     def test_ok(self, auth_client):
         sid = _seed_structure()
         fid = _seed_name_form(sid)
         r = auth_client.put(
-            f"/api/name-forms/{fid}",
+            f"/api/structures/name-forms/{fid}",
             json={"form_text": _uniq("UpF"), "is_excluding": True},
         )
         assert r.status_code == 200
@@ -360,16 +360,16 @@ class TestUpdateNameForm:
 
 class TestDeleteNameForm:
     def test_requires_admin(self, client):
-        r = client.delete("/api/name-forms/1")
+        r = client.delete("/api/structures/name-forms/1")
         assert r.status_code == 401
 
     def test_404(self, auth_client):
-        r = auth_client.delete("/api/name-forms/999999999")
+        r = auth_client.delete("/api/structures/name-forms/999999999")
         assert r.status_code == 404
 
     def test_ok(self, auth_client):
         sid = _seed_structure()
         fid = _seed_name_form(sid)
-        r = auth_client.delete(f"/api/name-forms/{fid}")
+        r = auth_client.delete(f"/api/structures/name-forms/{fid}")
         assert r.status_code == 200
         assert r.json()["deleted"] is True
