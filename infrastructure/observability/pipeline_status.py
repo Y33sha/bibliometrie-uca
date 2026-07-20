@@ -29,7 +29,6 @@ def write_status(
     STATUS_FILE.write_text(
         json.dumps(
             {
-                "running": True,
                 "mode": mode,
                 "phase": phase,
                 "started_at": started_at,

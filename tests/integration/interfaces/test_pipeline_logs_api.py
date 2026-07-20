@@ -41,7 +41,6 @@ class TestPipelineStatus:
         status_file.write_text(
             json.dumps(
                 {
-                    "running": True,
                     "mode": "full",
                     "phase": "extract",
                     "started_at": "2026-05-17T10:00:00",

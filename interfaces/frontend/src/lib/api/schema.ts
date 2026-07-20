@@ -4178,10 +4178,10 @@ export interface components {
         /**
          * PipelineStatus
          * @description État du pipeline en cours (lu depuis logs/status.json).
+         *
+         *     L'objet n'est rendu que lorsqu'un run tourne : sa seule présence dit « en cours », inutile de porter un drapeau qui vaudrait toujours vrai.
          */
         PipelineStatus: {
-            /** Running */
-            running: boolean;
             /** Mode */
             mode: string;
             /** Phase */

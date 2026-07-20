@@ -4,9 +4,11 @@ from pydantic import BaseModel
 
 
 class PipelineStatus(BaseModel):
-    """État du pipeline en cours (lu depuis logs/status.json)."""
+    """État du pipeline en cours (lu depuis logs/status.json).
 
-    running: bool
+    L'objet n'est rendu que lorsqu'un run tourne : sa seule présence dit « en cours », inutile de porter un drapeau qui vaudrait toujours vrai.
+    """
+
     mode: str
     phase: str
     started_at: str
