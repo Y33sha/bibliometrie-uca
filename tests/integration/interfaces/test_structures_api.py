@@ -94,7 +94,7 @@ class TestListStructures:
 
     def test_filter_by_type(self, client):
         _seed_structure(type_="labo")
-        r = client.get("/api/structures", params={"type": "labo"})
+        r = client.get("/api/structures", params={"structure_type": "labo"})
         assert r.status_code == 200
         assert all(s["type"] == "labo" for s in r.json())
 
@@ -106,8 +106,13 @@ class TestListStructures:
         assert any(s["code"] == code for s in r.json())
 
     def test_combined_filters(self, client):
-        r = client.get("/api/structures", params={"type": "labo", "search": "abc"})
+        r = client.get("/api/structures", params={"structure_type": "labo", "search": "abc"})
         assert r.status_code == 200
+
+    def test_rejects_type_outside_the_vocabulary(self, client):
+        r = client.get("/api/structures", params={"structure_type": "nimportequoi"})
+        assert r.status_code == 422
+        assert "nimportequoi" in r.json()["detail"]
 
 
 # ── GET /api/structures/{id} ────────────────────────────────────
@@ -271,6 +276,15 @@ class TestCreateRelation:
         assert r.status_code == 200
         assert r.json().get("status") == "already_exists"
 
+    def test_conflict_when_a_structure_is_missing(self, auth_client):
+        """`parent_id` inexistant : la clé étrangère rend 409, non un 500 opaque."""
+        child = _seed_structure(type_="labo")
+        r = auth_client.post(
+            "/api/structures/relations",
+            json={"parent_id": 999999999, "child_id": child, "relation_type": "tutelle"},
+        )
+        assert r.status_code == 409
+
 
 class TestDeleteRelation:
     def test_requires_admin(self, client):
@@ -337,6 +351,14 @@ class TestCreateNameForm:
             },
         )
         assert r.status_code == 200
+
+    def test_conflict_when_structure_is_missing(self, auth_client):
+        """`structure_id` inexistant : la clé étrangère rend 409, non un 500 opaque."""
+        r = auth_client.post(
+            "/api/structures/name-forms",
+            json={"structure_id": 999999999, "form_text": _uniq("Fghost")},
+        )
+        assert r.status_code == 409
 
 
 class TestUpdateNameForm:
