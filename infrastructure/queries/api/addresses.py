@@ -1,4 +1,4 @@
-"""Query services sync pour /api/addresses/* et /api/countries.
+"""Query services sync pour /api/addresses/*.
 
 `PgAddressesQueries` hérite explicitement du Protocol `application.ports.api.addresses_queries.AddressesQueries` : mypy vérifie la conformité à la définition de classe. Les dataclasses de filtres (`AddressListFilters`, `AddressCountriesFilters`) sont importées du port pour typer les signatures (règle 3 de `docs/architecture/01-vue-d-ensemble.md`).
 """
@@ -18,7 +18,6 @@ from application.ports.api.addresses_queries import (
     AddressPublicationItem,
     AddressStatsResponse,
     AddressStructureSummary,
-    CountryOut,
     CountrySuggestion,
 )
 
@@ -225,12 +224,6 @@ class PgAddressesQueries(AddressesQueries):
             {"aid": addr_id, "sid": structure_id},
         ).one_or_none()
         return dict(row._mapping) if row else None
-
-    def list_countries(self) -> list[CountryOut]:
-        rows = self._conn.execute(
-            text("SELECT code, name FROM countries ORDER BY (code = 'xx') DESC, name")
-        ).all()
-        return [CountryOut(code=r.code, name=r.name) for r in rows]
 
     def addresses_countries(
         self, *, filters: AddressCountriesFilters, page: int, per_page: int

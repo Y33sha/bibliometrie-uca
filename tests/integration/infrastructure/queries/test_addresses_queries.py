@@ -348,18 +348,6 @@ class TestGetStructureLink:
         assert _q(sa_sync_conn).get_structure_link(addr, struct) is None
 
 
-class TestCountryCheckers:
-    def test_list_countries_sorts_xx_first(self, sa_sync_conn):
-        _ensure_country(sa_sync_conn, "FR", "France")
-        _ensure_country(sa_sync_conn, "xx", "Inconnu")
-
-        rows = _q(sa_sync_conn).list_countries()
-        codes = [r.code.strip() for r in rows]
-        # Tri `(code = 'xx') DESC, name` : TRUE > FALSE → 'xx' arrive en tête
-        assert codes[0] == "xx"
-        assert "FR" in codes
-
-
 class TestAddressesCountries:
     def test_returns_addresses_with_countries(self, sa_sync_conn):
         _ensure_country(sa_sync_conn, "FR")
