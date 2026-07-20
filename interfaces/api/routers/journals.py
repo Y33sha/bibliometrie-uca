@@ -171,7 +171,7 @@ def get_type_change_impact(
     body: JournalTypeChange,
     conn: Connection = Depends(db_conn),
     repo: JournalRepository = Depends(journal_repo),
-    publication_repo: PublicationRepository = Depends(publication_repo),
+    publications: PublicationRepository = Depends(publication_repo),
     correction_queries: MetadataCorrectionQueries = Depends(metadata_correction_queries),
 ) -> JournalTypeChangeImpact:
     """Compte les publications de la revue dont le `doc_type` changerait si son `journal_type` passait à la valeur demandée.
@@ -187,7 +187,7 @@ def get_type_change_impact(
             journal_id,
             conn=conn,
             correction_queries=correction_queries,
-            publication_repo=publication_repo,
+            publication_repo=publications,
         )
     finally:
         savepoint.rollback()
@@ -200,7 +200,7 @@ def update_journal(
     body: JournalUpdate,
     conn: Connection = Depends(db_conn),
     repo: JournalRepository = Depends(journal_repo),
-    publication_repo: PublicationRepository = Depends(publication_repo),
+    publications: PublicationRepository = Depends(publication_repo),
     audit: AuditRepository = Depends(audit_repo),
     correction_queries: MetadataCorrectionQueries = Depends(metadata_correction_queries),
 ) -> OkResponse:
@@ -215,7 +215,7 @@ def update_journal(
         journal_id,
         update=body,
         repo=repo,
-        publication_repo=publication_repo,
+        publication_repo=publications,
         audit_repo=audit,
         correction_queries=correction_queries,
     )
@@ -228,7 +228,7 @@ def merge(
     body: MergeRequest,
     conn: Connection = Depends(db_conn),
     repo: JournalRepository = Depends(journal_repo),
-    publication_repo: PublicationRepository = Depends(publication_repo),
+    publications: PublicationRepository = Depends(publication_repo),
     audit: AuditRepository = Depends(audit_repo),
     correction_queries: MetadataCorrectionQueries = Depends(metadata_correction_queries),
 ) -> MergeResponse:
@@ -242,7 +242,7 @@ def merge(
         body.source_id,
         correction_queries=correction_queries,
         repo=repo,
-        publication_repo=publication_repo,
+        publication_repo=publications,
         audit_repo=audit,
     )
     return MergeResponse(merged=True, source_id=body.source_id, target_id=journal_id)
