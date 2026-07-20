@@ -100,7 +100,7 @@
 				<div class="pub-meta-line">
 					{#if pub.pub_year}<span class="meta-badge">{pub.pub_year}</span>{/if}
 					{#if pub.doc_type}<span class="meta-badge type-badge">{docTypeSingular[pub.doc_type] || pub.doc_type}</span>{/if}
-					{#if pub.hors_uca}<span class="badge-hors-uca">Hors collections UCA</span>{/if}
+					{#if pub.outside_perimeter_collections}<span class="badge-hors-uca">Hors collections de l'établissement</span>{/if}
 					<a href="{base}/publications/{pub.id}" class="pub-link">{@html sanitizeTitle(pub.title)}</a>
 				</div>
 				<div class="hal-list">

@@ -3042,8 +3042,8 @@ export interface components {
             doi: string | null;
             /** Halids */
             halids: string[] | null;
-            /** Labs */
-            labs: string | null;
+            /** Laboratories */
+            laboratories: components["schemas"]["StructureRef"][];
         };
         /** HalAffiliationConflictsResponse */
         HalAffiliationConflictsResponse: {
@@ -3169,8 +3169,8 @@ export interface components {
             doi: string | null;
             /** Halids */
             halids: string[] | null;
-            /** Hors Uca */
-            hors_uca: boolean;
+            /** Outside Perimeter Collections */
+            outside_perimeter_collections: boolean;
         };
         /** HalMissingCollectionsResponse */
         HalMissingCollectionsResponse: {
