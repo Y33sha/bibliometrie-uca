@@ -102,10 +102,10 @@ class TestListSubjects:
         r = client.get("/api/subjects", params={"min_count": 0})
         assert r.status_code == 422
 
-    def test_search_q_param(self, client):
+    def test_search_by_label(self, client):
         label = _uniq("FindMeSubject")
         sid = _seed_subject(label=label, usage_count=10)
-        r = client.get("/api/subjects", params={"q": label.lower()})
+        r = client.get("/api/subjects", params={"search": label.lower()})
         assert r.status_code == 200
         ids = [item["id"] for item in r.json()["items"]]
         assert sid in ids

@@ -16,7 +16,7 @@
 	type RejectedPair = components['schemas']['RejectedPairItem'];
 
 	async function searchPersons(q: string): Promise<PersonResult[]> {
-		return api<PersonResult[]>(`/api/persons/search?q=${encodeURIComponent(q)}`);
+		return api<PersonResult[]>(`/api/persons/search?search=${encodeURIComponent(q)}`);
 	}
 
 	let search = $state('');

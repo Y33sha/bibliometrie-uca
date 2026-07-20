@@ -8,22 +8,24 @@ from typing import Any
 from sqlalchemy import Connection, text
 
 from application.ports.api.subjects_queries import (
+    SubjectDetailResponse,
     SubjectListItem,
+    SubjectListResponse,
     SubjectNeighborOut,
     SubjectsQueries,
 )
 
 
-def _search_clause(q: str | None, min_usage_count: int) -> tuple[str, dict[str, Any]]:
+def _search_clause(search: str | None, min_usage_count: int) -> tuple[str, dict[str, Any]]:
     """Clause de recherche de l'annuaire des sujets, avec ses paramètres.
 
     La liste et son total la partagent : un critère ajouté d'un seul côté fausserait la pagination.
     """
     where = "usage_count >= :min_count"
     binds: dict[str, Any] = {"min_count": min_usage_count}
-    if q:
-        where += " AND unaccent(label) ILIKE unaccent(:q)"
-        binds["q"] = f"%{q}%"
+    if search:
+        where += " AND unaccent(label) ILIKE unaccent(:search)"
+        binds["search"] = f"%{search}%"
     return where, binds
 
 
@@ -34,9 +36,9 @@ class PgSubjectsQueries(SubjectsQueries):
         self._conn = conn
 
     def list_subjects(
-        self, *, q: str | None, limit: int, offset: int, min_usage_count: int
-    ) -> list[SubjectListItem]:
-        where, binds = _search_clause(q, min_usage_count)
+        self, *, search: str | None, page: int, per_page: int, min_usage_count: int
+    ) -> SubjectListResponse:
+        where, binds = _search_clause(search, min_usage_count)
         rows = self._conn.execute(
             text(f"""
                 SELECT id, label, language, usage_count
@@ -45,9 +47,9 @@ class PgSubjectsQueries(SubjectsQueries):
                 ORDER BY usage_count DESC, lower(label)
                 LIMIT :lim OFFSET :off
             """),
-            {**binds, "lim": limit, "off": offset},
+            {**binds, "lim": per_page, "off": (page - 1) * per_page},
         ).all()
-        return [
+        items = [
             SubjectListItem(
                 id=r.id,
                 label=r.label,
@@ -56,16 +58,15 @@ class PgSubjectsQueries(SubjectsQueries):
             )
             for r in rows
         ]
-
-    def count_subjects(self, *, q: str | None, min_usage_count: int) -> int:
-        where, binds = _search_clause(q, min_usage_count)
-        row = self._conn.execute(
+        total = self._conn.execute(
             text(f"SELECT COUNT(*) AS n FROM subjects WHERE {where}"),
             binds,
-        ).one()
-        return row.n
+        ).one().n
+        return SubjectListResponse(items=items, total=total, page=page, per_page=per_page)
 
-    def get_subject(self, subject_id: int) -> SubjectListItem | None:
+    def get_subject_detail(
+        self, subject_id: int, *, neighbors_limit: int, min_cooccurrence_count: int
+    ) -> SubjectDetailResponse | None:
         row = self._conn.execute(
             text("""
                 SELECT id, label, language, usage_count
@@ -76,17 +77,13 @@ class PgSubjectsQueries(SubjectsQueries):
         ).one_or_none()
         if row is None:
             return None
-        return SubjectListItem(
+        subject = SubjectListItem(
             id=row.id,
             label=row.label,
             language=row.language,
             usage_count=row.usage_count,
         )
-
-    def get_subject_neighbors(
-        self, subject_id: int, *, limit: int, min_cooccurrence_count: int
-    ) -> list[SubjectNeighborOut]:
-        rows = self._conn.execute(
+        neighbor_rows = self._conn.execute(
             text("""
                 SELECT s.id, s.label, s.usage_count,
                        c.n AS cooccurrence_count
@@ -102,17 +99,18 @@ class PgSubjectsQueries(SubjectsQueries):
                 ORDER BY c.n DESC, lower(s.label)
                 LIMIT :lim
             """),
-            {"sid": subject_id, "min_count": min_cooccurrence_count, "lim": limit},
+            {"sid": subject_id, "min_count": min_cooccurrence_count, "lim": neighbors_limit},
         ).all()
-        return [
+        neighbors = [
             SubjectNeighborOut(
                 id=r.id,
                 label=r.label,
                 usage_count=r.usage_count,
                 cooccurrence_count=r.cooccurrence_count,
             )
-            for r in rows
+            for r in neighbor_rows
         ]
+        return SubjectDetailResponse(subject=subject, neighbors=neighbors)
 
 
 __all__ = ["PgSubjectsQueries"]

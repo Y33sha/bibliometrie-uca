@@ -6854,7 +6854,7 @@ export interface operations {
     search_persons_api_persons_search_get: {
         parameters: {
             query?: {
-                q?: string;
+                search?: string;
                 limit?: number;
             };
             header?: never;
@@ -9072,7 +9072,7 @@ export interface operations {
                 page?: number;
                 per_page?: number;
                 /** @description Recherche sur le libellé, insensible à la casse et aux accents */
-                q?: string | null;
+                search?: string | null;
                 /** @description Nombre minimal de publications portant le sujet */
                 min_count?: number;
             };

@@ -7,7 +7,7 @@
  *
  * Usage minimal :
  *   const search = useDebouncedSearch<Person>({
- *     search: (q) => api(`/api/persons/search?q=${encodeURIComponent(q)}`),
+ *     search: (q) => api(`/api/persons/search?search=${encodeURIComponent(q)}`),
  *     minLength: 2,
  *   });
  *

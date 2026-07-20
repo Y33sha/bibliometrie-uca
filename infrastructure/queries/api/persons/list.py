@@ -33,14 +33,14 @@ _LAB_SCOPED_SIGNATURES = (
 # ── Autocomplete ─────────────────────────────────────────────────
 
 
-def search_persons(conn: Connection, *, q: str, limit: int) -> list[dict[str, Any]]:
+def search_persons(conn: Connection, *, search: str, limit: int) -> list[dict[str, Any]]:
     """Recherche rapide (autocomplete) : chaque mot doit matcher dans last ou first name."""
-    words = q.strip().split()
+    words = search.strip().split()
     if not words:
         return []
     clauses: list[WhereClause | None] = [WhereClause("p.rejected = FALSE", {})]
     for i, w in enumerate(words):
-        key = f"q_word_{i}"
+        key = f"search_word_{i}"
         clauses.append(
             WhereClause(
                 f"(unaccent(p.last_name) ILIKE unaccent(:{key}) "

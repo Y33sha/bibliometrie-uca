@@ -24,7 +24,7 @@
     try {
       const params = new URLSearchParams();
       const q = search.trim();
-      if (q) params.set("q", q);
+      if (q) params.set("search", q);
       params.set("min_count", String(minCount));
       params.set("page", String(page));
       params.set("per_page", String(PER_PAGE));
