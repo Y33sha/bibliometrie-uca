@@ -2959,8 +2959,8 @@ export interface components {
             raw_text: string;
             /** Pub Count */
             pub_count: number;
-            /** Labs */
-            labs: components["schemas"]["FeedbackLabDetected"][];
+            /** Structures */
+            structures: components["schemas"]["AddressStructureSummary"][];
             /** Matched Forms */
             matched_forms?: components["schemas"]["FeedbackMatchedForm"][] | null;
         };
@@ -2976,24 +2976,6 @@ export interface components {
             addresses: components["schemas"]["FeedbackAddressItem"][];
             /** Pages */
             readonly pages: number;
-        };
-        /**
-         * FeedbackLabDetected
-         * @description Lien adresse↔structure tel que vu sur la page feedback.
-         *
-         *     Distinct de AddressStructureSummary : `structure_id` au lieu de `id`.
-         */
-        FeedbackLabDetected: {
-            /** Structure Id */
-            structure_id: number;
-            /** Name */
-            name: string;
-            /** Acronym */
-            acronym: string | null;
-            /** Is Detected */
-            is_detected: boolean;
-            /** Is Confirmed */
-            is_confirmed: boolean | null;
         };
         /**
          * FeedbackMatchedForm

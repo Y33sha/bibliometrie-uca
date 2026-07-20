@@ -29,16 +29,6 @@ _RECOGNIZED_LINK = (
 )
 
 
-def _structure_summary(d: dict[str, Any]) -> AddressStructureSummary:
-    return AddressStructureSummary(
-        id=d["id"],
-        name=d["name"],
-        acronym=d.get("acronym"),
-        is_confirmed=d.get("is_confirmed"),
-        is_detected=d["is_detected"],
-    )
-
-
 class PgAddressesQueries(AddressesQueries):
     """Adapter SA sync pour `application.ports.api.addresses_queries.AddressesQueries`."""
 
@@ -137,7 +127,7 @@ class PgAddressesQueries(AddressesQueries):
                 raw_text=r.raw_text,
                 is_confirmed=r.is_confirmed,
                 is_detected=r.is_detected or False,
-                structures=[_structure_summary(s) for s in (r.structures or [])],
+                structures=[AddressStructureSummary.model_validate(s) for s in (r.structures or [])],
                 pub_count=r.pub_count,
             )
             for r in rows
@@ -211,7 +201,8 @@ class PgAddressesQueries(AddressesQueries):
             """),
             {"id": addr_id},
         ).one_or_none()
-        return [_structure_summary(s) for s in (row.structures if row and row.structures else [])]
+        rows = row.structures if row and row.structures else []
+        return [AddressStructureSummary.model_validate(s) for s in rows]
 
     def get_structure_link(self, addr_id: int, structure_id: int) -> dict[str, Any] | None:
         row = self._conn.execute(
