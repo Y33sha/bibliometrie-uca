@@ -8,6 +8,7 @@ from typing import Protocol
 from pydantic import BaseModel
 
 from application.ports.api._common import PaginatedResponse
+from application.ports.api.addresses_queries import AddressStructureSummary
 
 
 class FeedbackStats(BaseModel):
@@ -19,19 +20,6 @@ class FeedbackStats(BaseModel):
     false_positives: int
     concordant_valid: int
     pending: int
-
-
-class FeedbackLabDetected(BaseModel):
-    """Lien adresse↔structure tel que vu sur la page feedback.
-
-    Distinct de AddressStructureSummary : `structure_id` au lieu de `id`.
-    """
-
-    structure_id: int
-    name: str
-    acronym: str | None
-    is_detected: bool
-    is_confirmed: bool | None
 
 
 class FeedbackMatchedForm(BaseModel):
@@ -52,7 +40,7 @@ class FeedbackAddressItem(BaseModel):
     id: int
     raw_text: str
     pub_count: int
-    labs: list[FeedbackLabDetected]
+    structures: list[AddressStructureSummary]
     matched_forms: list[FeedbackMatchedForm] | None = None
 
 

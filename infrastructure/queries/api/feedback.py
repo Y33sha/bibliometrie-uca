@@ -7,10 +7,10 @@ from typing import Any
 
 from sqlalchemy import Connection, text
 
+from application.ports.api.addresses_queries import AddressStructureSummary
 from application.ports.api.feedback_queries import (
     FeedbackAddressesResponse,
     FeedbackAddressItem,
-    FeedbackLabDetected,
     FeedbackMatchedForm,
     FeedbackQueries,
     FeedbackStats,
@@ -139,14 +139,14 @@ class PgFeedbackQueries(FeedbackQueries):
                 SELECT
                     a.id, a.raw_text, a.pub_count,
                     (SELECT json_agg(json_build_object(
-                        'structure_id', s.id, 'acronym', s.acronym, 'name', s.name,
-                        'is_detected', (ast2.matched_form_id IS NOT NULL),
-                        'is_confirmed', ast2.is_confirmed
-                    ))
+                        'id', s.id, 'name', s.name, 'acronym', s.acronym,
+                        'is_confirmed', ast2.is_confirmed,
+                        'is_detected', (ast2.matched_form_id IS NOT NULL)
+                    ) ORDER BY COALESCE(s.acronym, s.name))
                     FROM address_structures ast2
                     JOIN structures s ON s.id = ast2.structure_id
                     WHERE ast2.address_id = a.id
-                    ) AS labs{matched_forms_select}
+                    ) AS structures{matched_forms_select}
                 FROM address_structures ast
                 JOIN addresses a ON a.id = ast.address_id
                 WHERE {where}
@@ -161,7 +161,9 @@ class PgFeedbackQueries(FeedbackQueries):
                 id=r.id,
                 raw_text=r.raw_text,
                 pub_count=r.pub_count,
-                labs=[FeedbackLabDetected(**lab) for lab in (r.labs or [])],
+                structures=[
+                    AddressStructureSummary.model_validate(s) for s in (r.structures or [])
+                ],
                 matched_forms=(
                     [FeedbackMatchedForm(**mf) for mf in (r.matched_forms or [])]
                     if with_matched_forms

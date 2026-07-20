@@ -13,7 +13,7 @@
 
   import type { components } from "$lib/api/schema";
   type FeedbackStats = components["schemas"]["FeedbackStats"];
-  type LabDetected = components["schemas"]["FeedbackLabDetected"];
+  type AddressStructure = components["schemas"]["AddressStructureSummary"];
   type MatchedForm = components["schemas"]["FeedbackMatchedForm"];
   type FeedbackAddress = components["schemas"]["FeedbackAddressItem"];
   type FeedbackPage = components["schemas"]["FeedbackAddressesResponse"];
@@ -247,11 +247,11 @@
     });
   }
 
-  function structDetectionStatus(l: LabDetected): 'confirmed' | 'rejected' | 'detected' | 'manual' {
+  function structDetectionStatus(l: AddressStructure): 'confirmed' | 'rejected' | 'detected' | 'manual' {
     return deriveStructDetectionStatus(l.is_confirmed, l.is_detected);
   }
 
-  function structTagTitle(l: LabDetected): string {
+  function structTagTitle(l: AddressStructure): string {
     return `${l.name} (${structDetectionLabels[structDetectionStatus(l)]})`;
   }
 
@@ -369,8 +369,8 @@
             <td class="addr-text">{@html esc(a.raw_text)}</td>
             <td class="num">{a.pub_count}</td>
             <td>
-              {#if a.labs && a.labs.length > 0}
-                {#each a.labs as l}
+              {#if a.structures && a.structures.length > 0}
+                {#each a.structures as l}
                   <span class={structDetectionClasses[structDetectionStatus(l)]} title={structTagTitle(l)}>
                     {l.acronym || l.name}
                   </span>
