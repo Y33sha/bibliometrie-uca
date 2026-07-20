@@ -26,7 +26,7 @@ from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.publication_repository import PublicationRepository
 from application.services.publications import commands as publication_commands
 from domain.publications.doc_types import DOC_TYPES
-from domain.publications.metadata import ACCESS_LEVELS, OA_RANK
+from domain.publications.metadata import ACCESS_LEVELS, OA_STATUSES
 from domain.sources.hal import HAL_DEPOSIT_STATUSES
 from interfaces.api.deps import (
     audit_repo,
@@ -44,10 +44,6 @@ from interfaces.api.models import (
 )
 
 router = APIRouter(prefix="/api/publications", tags=["publications"])
-
-# `oa` est un raccourci d'entrée, non un statut stocké : il vaut les cinq statuts ouverts,
-# que `oa_clause` développe.
-_OA_STATUS_VALUES: frozenset[str] = frozenset(OA_RANK) | {"oa"}
 
 
 def _parse_lab_id(lab_id: str) -> tuple[list[int], bool]:
@@ -102,7 +98,7 @@ class PublicationFilterParams:
             subject_id=self.subject_id,
             access=parse_vocabulary_csv(self.access, allowed=ACCESS_LEVELS, param="access"),
             oa_status=parse_vocabulary_csv(
-                self.oa_status, allowed=_OA_STATUS_VALUES, param="oa_status"
+                self.oa_status, allowed=OA_STATUSES, param="oa_status"
             ),
             source_values=parse_str_csv(self.source_filter),
             doc_types=parse_vocabulary_csv(self.doc_type, allowed=DOC_TYPES, param="doc_type"),

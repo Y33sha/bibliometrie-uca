@@ -25,6 +25,11 @@ OA_RANK: dict[str, int] = {
     "unknown": 1,
 }
 
+# Vocabulaire de l'enum SQL `oa_status`. Chaque statut porte un rang dans `OA_RANK` :
+# les clés du classement énumèrent l'ensemble des statuts. Valide le filtre `oa_status`
+# des lectures ; une valeur hors vocabulaire est refusée.
+OA_STATUSES: frozenset[str] = frozenset(OA_RANK)
+
 # Valeur canonique de `publications.oa_status` quand aucune source n'a
 # de signal exploitable. Convention : `source_publications.oa_status`
 # accepte NULL (= la source ne s'est pas prononcée), mais au niveau

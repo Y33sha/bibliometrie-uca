@@ -292,21 +292,6 @@ def list_publications(
 # ── Export CSV ────────────────────────────────────────────────────
 
 
-def _export_oa_clause(oa_status: list[str]) -> WhereClause | None:
-    """Variante simplifiée du filtre oa_status pour l'export."""
-    if not oa_status:
-        return None
-    expanded: list[str] = []
-    for v in oa_status:
-        if v == "oa":
-            expanded.extend(OA_OPEN_STATUSES)
-        else:
-            expanded.append(v)
-    return WhereClause(
-        "p.oa_status::text = ANY(:flt_export_oa)", {"flt_export_oa": list(set(expanded))}
-    )
-
-
 _WS_RE = re.compile(r"\s+")
 
 
@@ -451,7 +436,7 @@ def _build_theses_export_clauses(filters: PublicationFilters) -> tuple[str, dict
     """Conditions WHERE pour l'export CSV des thèses.
 
     Spécifique à la page thèses : `source_clause` canonique (4 sources) +
-    filtre `access` (open/closed, facette primaire) + variante `_export_oa_clause`.
+    filtre `access` (open/closed, facette primaire) + `oa_clause`.
     """
     clauses: list[WhereClause | None] = list(_initial_clauses(filters))
     clauses.extend(_inline_clauses(filters))
@@ -461,7 +446,7 @@ def _build_theses_export_clauses(filters: PublicationFilters) -> tuple[str, dict
         clauses.append(lab_clause(filters.lab_ids))
     clauses.append(source_clause(filters.source_values))
     clauses.append(access_clause(filters.access))
-    clauses.append(_export_oa_clause(filters.oa_status))
+    clauses.append(oa_clause(filters.oa_status))
     return assemble_where(clauses)
 
 

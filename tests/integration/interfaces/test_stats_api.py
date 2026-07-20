@@ -4,6 +4,8 @@ Ces endpoints concentrent du SQL complexe (agrégations, facettes
 dynamiques).
 """
 
+import pytest
+
 
 class TestStatsEntityFacet:
     def test_journal(self, client):
@@ -75,3 +77,24 @@ class TestPivot:
     def test_rejects_repeated_grouping(self, client):
         r = client.get("/api/stats/pivot", params={"group": "year", "group2": "year"})
         assert r.status_code == 400
+
+
+class TestStatsClosedVocabularyFilters:
+    """Les filtres partagés `oa_status` et `doc_type` refusent une valeur hors vocabulaire.
+
+    Même contrat que la liste des publications : une valeur intruse rend 422, non un décompte
+    silencieusement faux. `oa` n'est pas un statut stocké et n'est pas accepté ici non plus.
+    """
+
+    @pytest.mark.parametrize(
+        ("param", "value"),
+        [
+            ("oa_status", "vert"),
+            ("oa_status", "oa"),
+            ("doc_type", "nimportequoi"),
+        ],
+    )
+    def test_refuses_a_value_outside_the_vocabulary(self, client, param, value):
+        r = client.get("/api/stats/facets", params={param: value})
+        assert r.status_code == 422
+        assert value in r.json()["detail"]
