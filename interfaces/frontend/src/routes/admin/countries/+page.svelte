@@ -34,12 +34,15 @@
 		{ value: 'yes', text: 'Avec pays' },
 		{ value: 'no', text: 'Sans pays' },
 	];
+	// Code du référentiel marquant l'absence de pays : la facette l'ouvre, c'est l'arbitrage
+	// le plus fréquent et le seul qui ne se cherche pas par son nom.
+	const NO_COUNTRY_CODE = 'xx';
 	let countryFacets: { code: string; count: number }[] = $state([]);
 	const countryOptions = $derived.by(() => {
 		if (countryFacets.length > 0) {
-			const xx = countryFacets.find(f => f.code === 'xx');
-			const rest = countryFacets.filter(f => f.code !== 'xx');
-			const sorted = [...(xx ? [xx] : []), ...rest];
+			const noCountry = countryFacets.find(f => f.code === NO_COUNTRY_CODE);
+			const rest = countryFacets.filter(f => f.code !== NO_COUNTRY_CODE);
+			const sorted = [...(noCountry ? [noCountry] : []), ...rest];
 			return sorted.map(f => ({
 				value: f.code,
 				text: `${countryMap[f.code] || f.code.toUpperCase()} (${f.code.toUpperCase()})`,
