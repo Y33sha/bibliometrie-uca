@@ -1782,6 +1782,8 @@ export interface paths {
         /**
          * Create Perimeter
          * @description Crée un périmètre avec ses structures racines, la liste pouvant être vide.
+         *
+         *     Le code sert d'identifiant naturel — la configuration du pipeline désigne un périmètre par sa valeur — et se restreint aux minuscules, chiffres, tiret et souligné : une autre forme rend 422. Renvoie 409 sur un code déjà pris.
          */
         post: operations["create_perimeter_api_perimeters_post"];
         delete?: never;
@@ -1801,12 +1803,16 @@ export interface paths {
         /**
          * Update Perimeter
          * @description Met à jour un périmètre (nom, structures racines).
+         *
+         *     Seuls les champs fournis sont écrits ; un corps vide rend 400, un périmètre inconnu 404. La clôture matérialisée suit le changement de racines.
          */
         put: operations["update_perimeter_api_perimeters__perimeter_id__put"];
         post?: never;
         /**
          * Delete Perimeter
-         * @description Supprime un périmètre (interdit si utilisé dans la config pipeline).
+         * @description Supprime un périmètre.
+         *
+         *     Renvoie 409 si une clé de configuration le désigne encore — le pipeline s'y appuierait sans le trouver. Les lignes de la clôture matérialisée s'en vont avec lui, par cascade.
          */
         delete: operations["delete_perimeter_api_perimeters__perimeter_id__delete"];
         options?: never;

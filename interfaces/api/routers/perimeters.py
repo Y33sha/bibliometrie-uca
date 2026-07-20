@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import Connection
 
 from application.ports.api.config_queries import ConfigQueries
-from application.ports.api.perimeters_queries import PerimeterOut, PerimetersAdminQueries
+from application.ports.api.perimeters_queries import PerimeterOut, PerimetersQueries
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.perimeter_repository import (
     PerimeterRepository,
@@ -19,7 +19,7 @@ from interfaces.api.deps import (
     config_queries,
     db_conn,
     perimeter_repo,
-    perimeters_admin_queries,
+    perimeters_queries,
 )
 from interfaces.api.models import (
     CreatedIdResponse,
@@ -32,7 +32,7 @@ router = APIRouter(prefix="/api/perimeters", tags=["perimeters"])
 
 @router.get("", response_model=list[PerimeterOut])
 def list_perimeters(
-    queries: PerimetersAdminQueries = Depends(perimeters_admin_queries),
+    queries: PerimetersQueries = Depends(perimeters_queries),
 ) -> list[PerimeterOut]:
     """Liste les périmètres avec leurs structures racines.
 
@@ -47,7 +47,10 @@ def create_perimeter(
     conn: Connection = Depends(db_conn),
     repo: PerimeterRepository = Depends(perimeter_repo),
 ) -> CreatedIdResponse:
-    """Crée un périmètre avec ses structures racines, la liste pouvant être vide."""
+    """Crée un périmètre avec ses structures racines, la liste pouvant être vide.
+
+    Le code sert d'identifiant naturel — la configuration du pipeline désigne un périmètre par sa valeur — et se restreint aux minuscules, chiffres, tiret et souligné : une autre forme rend 422. Renvoie 409 sur un code déjà pris.
+    """
     pid = perimeter_commands.create_perimeter(
         conn, code=body.code, name=body.name, structure_ids=body.structure_ids, repo=repo
     )
@@ -61,7 +64,10 @@ def update_perimeter(
     conn: Connection = Depends(db_conn),
     repo: PerimeterRepository = Depends(perimeter_repo),
 ) -> OkResponse:
-    """Met à jour un périmètre (nom, structures racines)."""
+    """Met à jour un périmètre (nom, structures racines).
+
+    Seuls les champs fournis sont écrits ; un corps vide rend 400, un périmètre inconnu 404. La clôture matérialisée suit le changement de racines.
+    """
     perimeter_commands.update_perimeter(conn, perimeter_id, update=body, repo=repo)
     return OkResponse()
 
@@ -74,7 +80,10 @@ def delete_perimeter(
     config: ConfigQueries = Depends(config_queries),
     audit: AuditRepository = Depends(audit_repo),
 ) -> OkResponse:
-    """Supprime un périmètre (interdit si utilisé dans la config pipeline)."""
+    """Supprime un périmètre.
+
+    Renvoie 409 si une clé de configuration le désigne encore — le pipeline s'y appuierait sans le trouver. Les lignes de la clôture matérialisée s'en vont avec lui, par cascade.
+    """
     perimeter_commands.delete_perimeter(
         conn, perimeter_id, repo=repo, config=config, audit_repo=audit
     )

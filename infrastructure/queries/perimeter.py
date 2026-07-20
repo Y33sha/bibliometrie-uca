@@ -8,14 +8,14 @@ L'association phase → périmètre est lue depuis la table `config` :
 
 Expose :
 - Fonctions libres (`get_perimeter_structure_ids`, `get_persons_structure_ids`, …) consommées directement par les CLIs pipeline.
-- `PgPerimeterQueries` / `PgPerimetersAdminQueries` : adapters pour les ports `application.ports.pipeline.perimeter` et `application.ports.api.perimeters_queries`.
+- `PgPerimeterQueries` / `PgPerimetersQueries` : adapters pour les ports `application.ports.pipeline.perimeter` et `application.ports.api.perimeters_queries`.
 """
 
 from sqlalchemy import Connection, text
 
 from application.ports.api.perimeters_queries import (
     PerimeterOut,
-    PerimetersAdminQueries,
+    PerimetersQueries,
     PerimeterStructureItem,
 )
 from application.ports.pipeline.perimeter import PerimeterQueries
@@ -120,8 +120,8 @@ class PgPerimeterQueries(PerimeterQueries):
         refresh_perimeter_structures(conn)
 
 
-class PgPerimetersAdminQueries(PerimetersAdminQueries):
-    """Adapter SA pour `application.ports.api.perimeters_queries.PerimetersAdminQueries`."""
+class PgPerimetersQueries(PerimetersQueries):
+    """Adapter SA pour `application.ports.api.perimeters_queries.PerimetersQueries`."""
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
