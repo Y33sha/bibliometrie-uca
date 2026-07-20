@@ -1,4 +1,7 @@
-"""Router des éditeurs : listes, recherche, édition, fusion. Sert `/api/publishers/*`."""
+"""Router des éditeurs : listes, recherche, édition, fusion. Sert `/api/publishers/*`.
+
+Les chemins littéraux — `/types`, `/facets` — précèdent `/{publisher_id}`, qui les accepterait sinon comme identifiant.
+"""
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import Connection
@@ -6,6 +9,7 @@ from sqlalchemy import Connection
 from application.ports.api.publishers_queries import (
     Publisher,
     PublisherDashboardResponse,
+    PublisherFilters,
     PublisherListResponse,
     PublisherQueries,
     PublishersFacetsResponse,
@@ -31,7 +35,7 @@ from interfaces.api.deps import (
     publisher_queries,
     publisher_repo,
 )
-from interfaces.api.filters import parse_str_csv
+from interfaces.api.filters import parse_str_csv, parse_vocabulary_csv
 from interfaces.api.models import (
     EnumOption,
     MergeRequest,
@@ -53,56 +57,51 @@ def list_publisher_types() -> list[EnumOption]:
     return [EnumOption(value=v, label_fr=PUBLISHER_TYPE_LABELS_FR[v]) for v in PUBLISHER_TYPES]
 
 
-@router.get("/facets", response_model=PublishersFacetsResponse)
-def publishers_facets(
-    search: str | None = None,
+def publisher_filters(
+    search: str = Query(""),
     publisher_type: str = Query(""),
     country: str = Query(""),
-    with_pubs: bool = False,
+    with_pubs: bool = Query(False),
+) -> PublisherFilters:
+    """Filtres communs à la liste des éditeurs et à ses facettes.
+
+    `publisher_type` accepte plusieurs valeurs séparées par des virgules, prises dans l'énumération du domaine ; une valeur inconnue rend 422. `country` suit la même convention multi-valeurs, sur les codes du référentiel. `search` est ignoré en deçà de deux caractères.
+    """
+    return PublisherFilters(
+        search=search,
+        publisher_types=parse_vocabulary_csv(
+            publisher_type, allowed=PUBLISHER_TYPES, param="publisher_type"
+        ),
+        countries=parse_str_csv(country),
+        with_pubs=with_pubs,
+    )
+
+
+@router.get("/facets", response_model=PublishersFacetsResponse)
+def publishers_facets(
+    filters: PublisherFilters = Depends(publisher_filters),
     queries: PublisherQueries = Depends(publisher_queries),
 ) -> PublishersFacetsResponse:
     """Comptes par option des facettes de la liste des éditeurs.
 
     Convention partagée avec `/api/journals/facets` et `/api/publications/facets` : chaque facette écarte sa propre dimension de la clause WHERE.
     """
-    return queries.publishers_facets(
-        search=search,
-        publisher_types=parse_str_csv(publisher_type),
-        countries=parse_str_csv(country),
-        with_pubs=with_pubs,
-    )
+    return queries.publishers_facets(filters=filters)
 
 
 @router.get("", response_model=PublisherListResponse)
 def list_publishers(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=200),
-    search: str | None = None,
-    publisher_type: str = Query(""),
-    country: str = Query(""),
-    with_pubs: bool = False,
     sort: PublisherSort = "name_asc",
+    filters: PublisherFilters = Depends(publisher_filters),
     queries: PublisherQueries = Depends(publisher_queries),
 ) -> PublisherListResponse:
     """Liste paginée des éditeurs, avec le décompte de leurs revues et de leurs publications.
 
-    Filtres :
-
-    - `search` : insensible à la casse sur le nom normalisé, ignoré en deçà de deux caractères.
-    - `publisher_type` et `country` : valeurs séparées par des virgules (par exemple `commercial,learned_society`), vide valant absence de filtre, selon la convention multi-valeurs de `/api/journals` et `/api/publications`.
-    - `with_pubs` : restreint aux éditeurs dont le `pub_count` est non nul. Ce compteur ne retient que les publications du périmètre, atteintes par les revues de l'éditeur : un éditeur dont toutes les publications sont hors périmètre est donc « orphelin ». La page publique s'en sert pour les masquer, que l'admin garde la possibilité de voir.
-
-    `sort` accepte `name`, `journals` et `pubs`, suffixés de `_asc` ou `_desc` ; toute autre valeur rend un 422.
+    `with_pubs` restreint aux éditeurs dont le décompte de publications est non nul. Ce compteur ne retient que les publications du périmètre, atteintes par les revues de l'éditeur : un éditeur dont toutes les publications sont hors périmètre est donc « orphelin », et la page publique le masque. `sort` accepte `name`, `journals` et `pubs`, suffixés de `_asc` ou `_desc` ; toute autre valeur rend un 422.
     """
-    return queries.list_publishers(
-        search=search,
-        publisher_types=parse_str_csv(publisher_type),
-        countries=parse_str_csv(country),
-        with_pubs=with_pubs,
-        sort=sort,
-        page=page,
-        per_page=per_page,
-    )
+    return queries.list_publishers(filters=filters, sort=sort, page=page, per_page=per_page)
 
 
 @router.get("/{publisher_id}", response_model=Publisher)

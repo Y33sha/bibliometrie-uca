@@ -11,6 +11,7 @@ from application.ports.api.publishers_queries import (
     OaStatusCount,
     Publisher,
     PublisherDashboardResponse,
+    PublisherFilters,
     PublisherListResponse,
     PublisherQueries,
     PublishersFacetOption,
@@ -24,11 +25,8 @@ from infrastructure.queries.filters import SUBJECT_IS_NOT_GENERIC, publication_i
 
 
 def _build_publisher_where(
+    filters: PublisherFilters,
     *,
-    search: str | None,
-    publisher_types: list[str],
-    countries: list[str],
-    with_pubs: bool,
     skip_publisher_types: bool = False,
     skip_countries: bool = False,
 ) -> tuple[str, dict[str, Any]]:
@@ -40,20 +38,20 @@ def _build_publisher_where(
     """
     binds: dict[str, Any] = {}
     parts: list[str] = []
-    if search and len(search) >= 2:
-        normalized = normalize_text(search)
+    if filters.search and len(filters.search) >= 2:
+        normalized = normalize_text(filters.search)
         if normalized:
             parts.append("p.name_normalized LIKE '%' || :search || '%'")
             binds["search"] = normalized
-    if publisher_types and not skip_publisher_types:
+    if filters.publisher_types and not skip_publisher_types:
         # publisher_type est un enum Postgres → cast en text pour comparer
         # à un array text[].
         parts.append("p.publisher_type::text = ANY(:publisher_types)")
-        binds["publisher_types"] = publisher_types
-    if countries and not skip_countries:
+        binds["publisher_types"] = filters.publisher_types
+    if filters.countries and not skip_countries:
         parts.append("p.country = ANY(:countries)")
-        binds["countries"] = countries
-    if with_pubs:
+        binds["countries"] = filters.countries
+    if filters.with_pubs:
         parts.append("p.pub_count > 0")
     return (" AND ".join(parts) if parts else "TRUE", binds)
 
@@ -115,22 +113,9 @@ class PgPublisherQueries(PublisherQueries):
         self._conn = conn
 
     def list_publishers(
-        self,
-        *,
-        search: str | None,
-        publisher_types: list[str],
-        countries: list[str],
-        with_pubs: bool,
-        sort: PublisherSort,
-        page: int,
-        per_page: int,
+        self, *, filters: PublisherFilters, sort: PublisherSort, page: int, per_page: int
     ) -> PublisherListResponse:
-        where, binds = _build_publisher_where(
-            search=search,
-            publisher_types=publisher_types,
-            countries=countries,
-            with_pubs=with_pubs,
-        )
+        where, binds = _build_publisher_where(filters)
 
         total_row = self._conn.execute(
             text(f"SELECT COUNT(*) AS total FROM publishers p WHERE {where}"),
@@ -157,21 +142,8 @@ class PgPublisherQueries(PublisherQueries):
             publishers=[_row_to_publisher(r) for r in rows],
         )
 
-    def publishers_facets(
-        self,
-        *,
-        search: str | None,
-        publisher_types: list[str],
-        countries: list[str],
-        with_pubs: bool,
-    ) -> PublishersFacetsResponse:
-        where_pt, binds_pt = _build_publisher_where(
-            search=search,
-            publisher_types=publisher_types,
-            countries=countries,
-            with_pubs=with_pubs,
-            skip_publisher_types=True,
-        )
+    def publishers_facets(self, *, filters: PublisherFilters) -> PublishersFacetsResponse:
+        where_pt, binds_pt = _build_publisher_where(filters, skip_publisher_types=True)
         pt_rows = self._conn.execute(
             text(f"""
                 SELECT p.publisher_type::text AS value, COUNT(*) AS n
@@ -191,13 +163,7 @@ class PgPublisherQueries(PublisherQueries):
             for v in PUBLISHER_TYPES
         ]
 
-        where_c, binds_c = _build_publisher_where(
-            search=search,
-            publisher_types=publisher_types,
-            countries=countries,
-            with_pubs=with_pubs,
-            skip_countries=True,
-        )
+        where_c, binds_c = _build_publisher_where(filters, skip_countries=True)
         country_rows = self._conn.execute(
             text(f"""
                 SELECT p.country AS value, COUNT(*) AS n

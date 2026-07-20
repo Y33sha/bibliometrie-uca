@@ -3,6 +3,7 @@
 Implémenté par `infrastructure.queries.api.publishers.PgPublisherQueries`.
 """
 
+from dataclasses import dataclass, field
 from typing import Literal, Protocol
 
 from pydantic import BaseModel
@@ -14,6 +15,19 @@ PublisherSort = Literal[
     "name_asc", "name_desc", "journals_asc", "journals_desc", "pubs_asc", "pubs_desc"
 ]
 from application.ports.api.subjects_queries import SubjectFrequency
+
+
+@dataclass(frozen=True, slots=True)
+class PublisherFilters:
+    """Filtres que la liste des éditeurs et ses facettes honorent toutes deux.
+
+    `publisher_types` et `countries` sont multi-valués. `with_pubs` restreint aux éditeurs dont le décompte de publications du périmètre est non nul.
+    """
+
+    search: str = ""
+    publisher_types: list[str] = field(default_factory=list)
+    countries: list[str] = field(default_factory=list)
+    with_pubs: bool = False
 
 
 class DoiPrefixInfo(BaseModel):
@@ -105,25 +119,10 @@ class PublisherQueries(Protocol):
     """Opérations de lecture sur les éditeurs."""
 
     def list_publishers(
-        self,
-        *,
-        search: str | None,
-        publisher_types: list[str],
-        countries: list[str],
-        with_pubs: bool,
-        sort: PublisherSort,
-        page: int,
-        per_page: int,
+        self, *, filters: PublisherFilters, sort: PublisherSort, page: int, per_page: int
     ) -> PublisherListResponse: ...
 
-    def publishers_facets(
-        self,
-        *,
-        search: str | None,
-        publisher_types: list[str],
-        countries: list[str],
-        with_pubs: bool,
-    ) -> PublishersFacetsResponse: ...
+    def publishers_facets(self, *, filters: PublisherFilters) -> PublishersFacetsResponse: ...
 
     def get_publisher_detail(self, publisher_id: int) -> Publisher | None: ...
 

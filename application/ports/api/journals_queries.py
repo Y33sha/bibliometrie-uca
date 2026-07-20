@@ -3,6 +3,7 @@
 Implémenté par `infrastructure.queries.api.journals.PgJournalQueries`.
 """
 
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Literal, Protocol
 
@@ -16,6 +17,21 @@ JournalSort = Literal[
 ]
 from application.ports.api.subjects_queries import SubjectFrequency
 from domain.journals.journal import JournalType, OaModel
+
+
+@dataclass(frozen=True, slots=True)
+class JournalFilters:
+    """Filtres que la liste des revues et ses facettes honorent toutes deux.
+
+    `journal_types` et `oa_models` sont multi-valués : une option cochée s'ajoute aux autres. `with_pubs` restreint aux revues portant au moins une publication.
+    """
+
+    search: str = ""
+    publisher_id: int | None = None
+    journal_types: list[str] = field(default_factory=list)
+    is_in_doaj: bool | None = None
+    oa_models: list[str] = field(default_factory=list)
+    with_pubs: bool = False
 
 
 class JournalOut(BaseModel):
@@ -122,29 +138,10 @@ class JournalQueries(Protocol):
     """Opérations de lecture sur les revues."""
 
     def list_journals(
-        self,
-        *,
-        search: str | None,
-        publisher_id: int | None,
-        journal_types: list[str],
-        is_in_doaj: bool | None,
-        oa_models: list[str],
-        with_pubs: bool,
-        sort: JournalSort,
-        page: int,
-        per_page: int,
+        self, *, filters: JournalFilters, sort: JournalSort, page: int, per_page: int
     ) -> JournalListResponse: ...
 
-    def journals_facets(
-        self,
-        *,
-        search: str | None,
-        publisher_id: int | None,
-        journal_types: list[str],
-        is_in_doaj: bool | None,
-        oa_models: list[str],
-        with_pubs: bool,
-    ) -> JournalsFacetsResponse: ...
+    def journals_facets(self, *, filters: JournalFilters) -> JournalsFacetsResponse: ...
 
     def get_journal_detail(self, journal_id: int) -> JournalDetailResponse | None: ...
 
