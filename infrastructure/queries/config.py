@@ -19,6 +19,18 @@ from infrastructure.db.tables import config
 logger = logging.getLogger(__name__)
 
 
+def laboratory_structure_types(conn: Connection) -> list[str]:
+    """Types de structure que la configuration tient pour des laboratoires.
+
+    Rend `["labo"]` à défaut de configuration : c'est le type qui porte le mot.
+    """
+    row = conn.execute(
+        text("SELECT value FROM config WHERE key = 'laboratories_display_types'")
+    ).one_or_none()
+    value = row.value if row else None
+    return [str(v) for v in value] if isinstance(value, list) and value else ["labo"]
+
+
 class PgConfigQueries(ConfigQueries):
     """Adapter SA pour `application.ports.api.config_queries.ConfigQueries`."""
 

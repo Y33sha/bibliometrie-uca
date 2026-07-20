@@ -28,6 +28,7 @@ from application.ports.api.hal_problems_queries import (
     NoMissingCollections,
 )
 from domain.source_publications.keys import DISCRIMINANT_TITLE_MIN_LENGTH
+from infrastructure.queries.config import laboratory_structure_types
 from infrastructure.queries.perimeter import get_persons_perimeter_root_ids
 
 # Signatures HAL rattachées à une personne et portant la référence d'un compte HAL.
@@ -262,13 +263,19 @@ class PgHalProblemsQueries(HalProblemsQueries):
         )
 
     def hal_missing_collections_labs(self) -> list[HalCollectionLab]:
+        """Laboratoires dont une collection HAL est renseignée — ceux dont la collection se compare.
+
+        Les types tenus pour des laboratoires viennent de la configuration ; sans collection, la question « que manque-t-il à sa collection ? » est sans objet.
+        """
         rows = self._conn.execute(
             text("""
                 SELECT s.id, s.acronym, s.name, s.hal_collection
                 FROM structures s
-                WHERE s.hal_collection IS NOT NULL AND s.structure_type = 'labo'
+                WHERE s.hal_collection IS NOT NULL
+                  AND s.structure_type::text = ANY(:lab_types)
                 ORDER BY s.acronym
-            """)
+            """),
+            {"lab_types": laboratory_structure_types(self._conn)},
         ).all()
         return [
             HalCollectionLab(
@@ -448,14 +455,19 @@ class PgHalProblemsQueries(HalProblemsQueries):
                               JOIN structures s ON s.id = aus2.structure_id
                               WHERE a2.publication_id = p.id
                                 AND a2.in_perimeter = TRUE
-                                AND s.structure_type = 'labo') l
+                                AND s.hal_collection IS NOT NULL
+                                AND s.structure_type::text = ANY(:lab_types)) l
                        ) AS laboratories
                 FROM conflict_pubs cp
                 JOIN publications p ON p.id = cp.publication_id
                 ORDER BY p.pub_year DESC NULLS LAST, p.id DESC
                 LIMIT :pg_limit OFFSET :pg_offset
             """),
-            {"pg_limit": per_page, "pg_offset": offset},
+            {
+                "pg_limit": per_page,
+                "pg_offset": offset,
+                "lab_types": laboratory_structure_types(self._conn),
+            },
         ).all()
         pubs = [
             HalAffiliationConflictPub(
