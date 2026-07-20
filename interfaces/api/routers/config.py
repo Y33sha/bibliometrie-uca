@@ -32,12 +32,12 @@ def update_config(
     key: str,
     body: ConfigValueUpdate,
     conn: Connection = Depends(db_conn),
-    config_repo: ConfigStore = Depends(config_store),
+    config: ConfigStore = Depends(config_store),
 ) -> ConfigItem:
-    """Met à jour la valeur d'un paramètre de config.
+    """Met à jour la valeur d'un paramètre applicatif, identifiants d'accès aux sources compris.
 
-    La clé doit préexister (pas de création via cet endpoint — les clés sont déclarées dans les migrations). 404 si la clé est inconnue.
+    L'écriture exige une session : le middleware garde toutes les méthodes autres que `GET`. La clé doit préexister — les clés sont déclarées dans les migrations, cet endpoint n'en crée pas —, et une clé inconnue rend 404.
     """
     return ConfigItem.model_validate(
-        config_commands.update_config_value(conn, key, body.value, config=config_repo)
+        config_commands.update_config_value(conn, key, body.value, config=config)
     )

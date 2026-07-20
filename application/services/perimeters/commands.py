@@ -5,7 +5,7 @@
 
 from sqlalchemy import Connection
 
-from application.ports.config import ConfigStore
+from application.ports.api.config_queries import ConfigQueries
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.perimeter_repository import (
     PerimeterRepository,
@@ -49,7 +49,7 @@ def delete_perimeter(
     perimeter_id: int,
     *,
     repo: PerimeterRepository,
-    config: ConfigStore,
+    config: ConfigQueries,
     audit_repo: AuditRepository,
 ) -> None:
     """Supprime un périmètre (interdit s'il est référencé par la config pipeline)."""

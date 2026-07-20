@@ -10,12 +10,9 @@ import logging
 
 from sqlalchemy import Connection, select, text, update
 
-from application.ports.api.config_queries import (
-    PUBLIC_CONFIG_KEYS,
-    ConfigItem,
-    ConfigQueries,
-)
+from application.ports.api.config_queries import ConfigItem, ConfigQueries
 from application.ports.config import ConfigStore
+from domain.config import PUBLIC_CONFIG_KEYS
 from domain.types import JsonValue
 from infrastructure.db.tables import config
 
@@ -41,6 +38,16 @@ class PgConfigQueries(ConfigQueries):
             for r in self._conn.execute(stmt)
         ]
 
+    def config_keys_referencing_perimeter(self, perimeter_code: str) -> list[str]:
+        """Clés dont la valeur désigne ce périmètre."""
+        # Le `#>> '{}'` extrait le scalaire JSON. SA Core n'a pas d'opérateur direct ;
+        # on passe par text() avec bind nommé.
+        result = self._conn.execute(
+            text("SELECT key FROM config WHERE key LIKE 'perimeter_%' AND value #>> '{}' = :code"),
+            {"code": perimeter_code},
+        )
+        return [r.key for r in result]
+
 
 class PgConfig(ConfigStore):
     """Adapter SA pour `application.ports.config.ConfigStore`."""
@@ -57,12 +64,3 @@ class PgConfig(ConfigStore):
         )
         row = self._conn.execute(stmt).one_or_none()
         return dict(row._mapping) if row is not None else None
-
-    def config_keys_referencing_perimeter(self, perimeter_code: str) -> list[str]:
-        # Le `#>> '{}'` extrait le scalar JSON. SA Core n'a pas d'opérateur
-        # direct ; on passe par text() avec bind nommé.
-        result = self._conn.execute(
-            text("SELECT key FROM config WHERE key LIKE 'perimeter_%' AND value #>> '{}' = :code"),
-            {"code": perimeter_code},
-        )
-        return [r.key for r in result]

@@ -7,6 +7,41 @@ Les tests de caractérisation avec données seedées sont dans les fichiers
 Fixtures `client` et `auth_client` viennent de `conftest.py`.
 """
 
+import pytest
+from sqlalchemy import text
+
+from domain.config import PUBLIC_CONFIG_KEYS
+from infrastructure.db.engine import get_sync_engine
+
+CREDENTIAL_CONFIG_KEYS = frozenset(
+    {"openalex_api_key", "wos_api_key", "scanr_username", "scanr_password", "polite_pool_email"}
+)
+
+
+@pytest.fixture
+def config_keys_seeded():
+    """Pose dans `config` chaque clé publique et chaque identifiant d'accès, puis retire ce qu'elle a posé.
+
+    Sans cette pose, une lecture qui ne rend aucun identifiant ne prouve rien : la base de test n'en porte pas. Les lectures de l'API passent par leur propre connexion, d'où une pose committée, reprise clé par clé.
+    """
+    keys = [*PUBLIC_CONFIG_KEYS, *CREDENTIAL_CONFIG_KEYS]
+    with get_sync_engine().begin() as conn:
+        added = [
+            k
+            for k in keys
+            if conn.execute(
+                text(
+                    "INSERT INTO config (key, value) VALUES (:k, to_jsonb('x'::text)) "
+                    "ON CONFLICT (key) DO NOTHING RETURNING key"
+                ),
+                {"k": k},
+            ).scalar_one_or_none()
+        ]
+    yield
+    if added:
+        with get_sync_engine().begin() as conn:
+            conn.execute(text("DELETE FROM config WHERE key = ANY(:ks)"), {"ks": added})
+
 
 # ── Publications ────────────────────────────────────────────────
 
@@ -105,21 +140,19 @@ class TestConfig:
         r = auth_client.get("/api/config")
         assert r.status_code == 200
 
-    def test_read_without_session_hides_the_credentials(self, client):
-        """La config porte les identifiants d'accès aux sources : sans session, seule la liste blanche sort."""
+    def test_read_without_session_hides_the_credentials(self, client, config_keys_seeded):
+        """Aucun identifiant d'accès aux sources ne sort d'une lecture sans session."""
         r = client.get("/api/config")
         assert r.status_code == 200
-        keys = {item["key"] for item in r.json()}
-        assert "laboratories_display_types" in keys
-        assert keys.isdisjoint(
-            {
-                "openalex_api_key",
-                "wos_api_key",
-                "scanr_username",
-                "scanr_password",
-                "polite_pool_email",
-            }
-        )
+        assert {item["key"] for item in r.json()}.isdisjoint(CREDENTIAL_CONFIG_KEYS)
+
+    def test_read_without_session_renders_exactly_the_whitelist(self, client, config_keys_seeded):
+        """Sur une table portant chaque clé publique et chaque identifiant, la lecture sans session rend la liste blanche, et elle entière.
+
+        Le sens strict compte des deux côtés : une clé réservée qui sortirait est une fuite, une clé publique retenue est une page qui se vide.
+        """
+        r = client.get("/api/config")
+        assert {item["key"] for item in r.json()} == set(PUBLIC_CONFIG_KEYS)
 
     def test_write_requires_auth(self, client):
         """Les écritures config sans session renvoient 401."""
