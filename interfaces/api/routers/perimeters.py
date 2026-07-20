@@ -6,8 +6,8 @@ Un périmètre (table `perimeters`) nomme des structures racines dans sa colonne
 from fastapi import APIRouter, Depends
 from sqlalchemy import Connection
 
+from application.ports.api.config_queries import ConfigQueries
 from application.ports.api.perimeters_queries import PerimeterOut, PerimetersAdminQueries
-from application.ports.config import ConfigStore
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.perimeter_repository import (
     PerimeterRepository,
@@ -16,7 +16,7 @@ from application.ports.repositories.perimeter_repository import (
 from application.services.perimeters import commands as perimeter_commands
 from interfaces.api.deps import (
     audit_repo,
-    config_store,
+    config_queries,
     db_conn,
     perimeter_repo,
     perimeters_admin_queries,
@@ -71,11 +71,11 @@ def delete_perimeter(
     perimeter_id: int,
     conn: Connection = Depends(db_conn),
     repo: PerimeterRepository = Depends(perimeter_repo),
-    config_repo: ConfigStore = Depends(config_store),
+    config: ConfigQueries = Depends(config_queries),
     audit: AuditRepository = Depends(audit_repo),
 ) -> OkResponse:
     """Supprime un périmètre (interdit si utilisé dans la config pipeline)."""
     perimeter_commands.delete_perimeter(
-        conn, perimeter_id, repo=repo, config=config_repo, audit_repo=audit
+        conn, perimeter_id, repo=repo, config=config, audit_repo=audit
     )
     return OkResponse()

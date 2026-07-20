@@ -2,11 +2,11 @@
 
 Un périmètre porte des structures **racines** (`perimeters.structure_ids`) ; la clôture récursive de ces racines est matérialisée dans `perimeter_structures`, que `repo.refresh_structures` reconstruit. Toute écriture qui touche aux racines laisse la clôture à recalculer : les command handlers s'en chargent.
 
-`delete_perimeter` consulte la table `config` (via `ConfigStore`) pour refuser la suppression d'un périmètre encore référencé par la configuration pipeline.
+`delete_perimeter` consulte la table `config` (via `ConfigQueries`) pour refuser la suppression d'un périmètre encore référencé par la configuration pipeline.
 """
 
 from application.audit_log import emit_event
-from application.ports.config import ConfigStore
+from application.ports.api.config_queries import ConfigQueries
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.perimeter_repository import (
     PerimeterRepository,
@@ -54,7 +54,7 @@ def delete_perimeter(
     perimeter_id: int,
     *,
     repo: PerimeterRepository,
-    config: ConfigStore,
+    config: ConfigQueries,
     audit_repo: AuditRepository | None = None,
 ) -> None:
     """Supprime un périmètre. Ses lignes de clôture partent en cascade (FK `ON DELETE CASCADE`).
