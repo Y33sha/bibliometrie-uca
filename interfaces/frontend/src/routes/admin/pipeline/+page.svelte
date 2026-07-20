@@ -33,7 +33,7 @@
     } catch {
       pipelineStatus = null;
     }
-    const running = pipelineStatus?.running ?? false;
+    const running = pipelineStatus !== null;
     // Transition fin de run (naturelle, exception ou interruption) : le ruban
     // fraîchement enregistré n'apparaît qu'au rechargement de la liste.
     if (wasRunning && !running) {
@@ -44,7 +44,7 @@
   }
 
   function scheduleStatus() {
-    const delay = pipelineStatus?.running ? STATUS_POLL_RUNNING_MS : STATUS_POLL_IDLE_MS;
+    const delay = pipelineStatus !== null ? STATUS_POLL_RUNNING_MS : STATUS_POLL_IDLE_MS;
     statusTimer = setTimeout(async () => {
       await pollStatus();
       scheduleStatus();
@@ -109,7 +109,7 @@
   <h2>Pipeline</h2>
 </div>
 
-{#if pipelineStatus?.running}
+{#if pipelineStatus}
   <div class="status-banner">
     <span class="status-dot"></span>
     Pipeline <strong>{pipelineStatus.mode}</strong> en cours — phase
