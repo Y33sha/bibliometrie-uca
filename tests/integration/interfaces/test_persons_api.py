@@ -231,19 +231,19 @@ class TestPersonsFacets:
 
 class TestPersonsSearch:
     def test_search_empty_query(self, client):
-        r = client.get("/api/persons/search", params={"q": ""})
+        r = client.get("/api/persons/search", params={"search": ""})
         assert r.status_code in (200, 400, 422)
 
     def test_search_short_query(self, client):
-        r = client.get("/api/persons/search", params={"q": "ab"})
+        r = client.get("/api/persons/search", params={"search": "ab"})
         assert r.status_code == 200
 
     def test_search_special_chars(self, client):
-        r = client.get("/api/persons/search", params={"q": "O'brien"})
+        r = client.get("/api/persons/search", params={"search": "O'brien"})
         assert r.status_code == 200
 
     def test_search_accents(self, client):
-        r = client.get("/api/persons/search", params={"q": "hervé"})
+        r = client.get("/api/persons/search", params={"search": "hervé"})
         assert r.status_code == 200
 
 

@@ -391,7 +391,7 @@ class PersonsQueries(Protocol):
 
     # ── Liste / recherche ──────────────────────────────────────────
 
-    def search_persons(self, *, q: str, limit: int) -> list[PersonSearchResult]: ...
+    def search_persons(self, *, search: str, limit: int) -> list[PersonSearchResult]: ...
 
     def list_persons(
         self, *, filters: PersonFilters, page: int, per_page: int, sort: PersonSort

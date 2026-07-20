@@ -81,7 +81,7 @@ class TestPersons:
         assert r.status_code == 200
 
     def test_search(self, client):
-        r = client.get("/api/persons/search", params={"q": "dupont"})
+        r = client.get("/api/persons/search", params={"search": "dupont"})
         assert r.status_code == 200
 
     def test_not_found(self, client):

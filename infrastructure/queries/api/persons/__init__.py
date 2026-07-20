@@ -84,10 +84,10 @@ class PgPersonsQueries(PersonsQueries):
 
     # ── Liste / recherche ──────────────────────────────────────────
 
-    def search_persons(self, *, q: str, limit: int) -> list[PersonSearchResult]:
+    def search_persons(self, *, search: str, limit: int) -> list[PersonSearchResult]:
         return [
             PersonSearchResult.model_validate(r)
-            for r in _search_persons(self._conn, q=q, limit=limit)
+            for r in _search_persons(self._conn, search=search, limit=limit)
         ]
 
     def list_persons(

@@ -105,12 +105,12 @@ def person_filters(
 
 @router.get("/search", response_model=list[PersonSearchResult])
 def search_persons(
-    q: str = Query("", min_length=2),
+    search: str = Query("", min_length=2),
     limit: int = Query(10, ge=1, le=30),
     queries: PersonsQueries = Depends(persons_queries),
 ) -> list[PersonSearchResult]:
     """Recherche rapide de personnes (autocomplete)."""
-    return queries.search_persons(q=q, limit=limit)
+    return queries.search_persons(search=search, limit=limit)
 
 
 @router.get("", response_model=PersonListResponse)
