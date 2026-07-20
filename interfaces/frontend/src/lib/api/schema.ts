@@ -1516,28 +1516,6 @@ export interface paths {
         patch: operations["update_name_form_status_api_persons__person_id__name_forms_status_patch"];
         trace?: never;
     };
-    "/api/authorships/{authorship_id}/exclude": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /**
-         * Exclude Authorship
-         * @description Rejette une contribution : cette personne n'a pas signé cette publication.
-         *
-         *     Enregistre la paire (publication, personne) dans `rejected_authorships`, détache les signatures sources et supprime la ligne consolidée. La table de rejet vaut verrou : les reconstructions ultérieures respectent l'arbitrage. Le geste est à sens unique.
-         */
-        patch: operations["exclude_authorship_api_authorships__authorship_id__exclude_patch"];
-        trace?: never;
-    };
     "/api/authorships/orphans/count": {
         parameters: {
             query?: never;
@@ -1620,6 +1598,28 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/authorships/{authorship_id}/exclude": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Exclude Authorship
+         * @description Rejette une contribution : cette personne n'a pas signé cette publication.
+         *
+         *     Enregistre la paire (publication, personne) dans `rejected_authorships`, détache les signatures sources et supprime la ligne consolidée. La table de rejet vaut verrou : les reconstructions ultérieures respectent l'arbitrage. Le geste est à sens unique.
+         */
+        patch: operations["exclude_authorship_api_authorships__authorship_id__exclude_patch"];
         trace?: never;
     };
     "/api/hal-problems/duplicate-accounts": {
@@ -1776,9 +1776,9 @@ export interface paths {
         get?: never;
         /**
          * Update Config
-         * @description Met à jour la valeur d'un paramètre de config.
+         * @description Met à jour la valeur d'un paramètre applicatif, identifiants d'accès aux sources compris.
          *
-         *     La clé doit préexister (pas de création via cet endpoint — les clés sont déclarées dans les migrations). 404 si la clé est inconnue.
+         *     L'écriture exige une session : le middleware garde toutes les méthodes autres que `GET`. La clé doit préexister — les clés sont déclarées dans les migrations, cet endpoint n'en crée pas —, et une clé inconnue rend 404.
          */
         put: operations["update_config_api_config__key__put"];
         post?: never;
@@ -2780,7 +2780,10 @@ export interface components {
             /** Value */
             value: number;
         };
-        /** CountryOut */
+        /**
+         * CountryOut
+         * @description Pays du référentiel : code ISO à deux lettres et libellé.
+         */
         CountryOut: {
             /** Code */
             code: string;
@@ -7924,37 +7927,6 @@ export interface operations {
             };
         };
     };
-    exclude_authorship_api_authorships__authorship_id__exclude_patch: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                authorship_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["OkResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     orphan_authorships_count_api_authorships_orphans_count_get: {
         parameters: {
             query?: never;
@@ -8079,6 +8051,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RejectedPairsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    exclude_authorship_api_authorships__authorship_id__exclude_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                authorship_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OkResponse"];
                 };
             };
             /** @description Validation Error */

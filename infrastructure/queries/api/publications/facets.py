@@ -12,6 +12,7 @@ from typing import Any
 from sqlalchemy import Connection, text
 
 from application.ports.api.publications_queries import PublicationFilters
+from domain.countries import NO_COUNTRY_CODE
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.queries.filters import (
     OA_CLOSED_SQL,
@@ -378,7 +379,7 @@ class _PublicationFacetsBuilder:
         return [
             {"value": r.code.strip(), "text": r.name, "count": r.count}
             for r in rows
-            if r.code.strip() != "xx"
+            if r.code.strip() != NO_COUNTRY_CODE
         ]
 
     def _facet_hal_status(self) -> list[dict[str, Any]]:

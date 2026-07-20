@@ -23,8 +23,11 @@ from application.ports.api.structures_queries import (
     StructureTopCountry,
 )
 from application.ports.api.subjects_queries import SubjectFrequency
+from domain.countries import NON_INTERNATIONAL_COUNTRY_CODES
 from infrastructure.queries.filters import OA_DASHBOARD_COLS_SQL, SUBJECT_IS_NOT_GENERIC
 from infrastructure.queries.perimeter import get_persons_structure_ids_list
+
+_NON_INTERNATIONAL = sorted(NON_INTERNATIONAL_COUNTRY_CODES)
 
 # Signature portée par la structure `:structure_id` : dans le périmètre, rattachée à elle par une
 # structure d'authorship, et tenant le rôle d'auteur. S'applique à un alias `a` sur `authorships`.
@@ -328,14 +331,15 @@ class PgStructuresQueries(StructuresQueries):
                     COUNT(DISTINCT p.id) AS total_articles,
                     COUNT(DISTINCT p.id) FILTER (
                         WHERE p.countries IS NOT NULL
-                          AND EXISTS (SELECT 1 FROM unnest(p.countries) c WHERE c NOT IN ('fr', 'xx'))
+                          AND EXISTS (SELECT 1 FROM unnest(p.countries) c
+                                        WHERE c <> ALL(:non_international))
                     ) AS international
                 FROM publications p
                 JOIN authorships a ON a.publication_id = p.id
                 WHERE {_AUTHOR_SIGNATURE}
                   AND p.doc_type = 'article'
             """),
-            {"structure_id": structure_id},
+            {"structure_id": structure_id, "non_international": _NON_INTERNATIONAL},
         ).one()
 
         # L'`unnest` des pays multiplie chaque publication par ~27 : la dédupliquer avant, plutôt
@@ -350,12 +354,12 @@ class PgStructuresQueries(StructuresQueries):
                       AND {_AUTHORED_PUBLICATION}
                 ) sub
                 JOIN countries co ON co.code = sub.cc
-                WHERE sub.cc NOT IN ('fr', 'xx')
+                WHERE sub.cc <> ALL(:non_international)
                 GROUP BY co.code, co.name
                 ORDER BY n DESC
                 LIMIT 5
             """),
-            {"structure_id": structure_id},
+            {"structure_id": structure_id, "non_international": _NON_INTERNATIONAL},
         ).all()
 
         return StructureDashboardResponse(

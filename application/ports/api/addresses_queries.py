@@ -100,11 +100,6 @@ class AddressPublicationItem(BaseModel):
     source_id: str | None
 
 
-class CountryOut(BaseModel):
-    code: str
-    name: str
-
-
 class CountrySuggestion(BaseModel):
     code: str
     count: int
@@ -140,7 +135,7 @@ class AddressStatsResponse(BaseModel):
 
 
 class AddressesQueries(Protocol):
-    """Lectures sur les adresses et sur le référentiel des pays."""
+    """Lectures sur les adresses."""
 
     def list_addresses(
         self,
@@ -165,8 +160,6 @@ class AddressesQueries(Protocol):
 
     # Le dictionnaire porte `is_confirmed` (`bool | None`) et `is_detected` (`bool`).
     def get_structure_link(self, addr_id: int, structure_id: int) -> dict[str, Any] | None: ...
-
-    def list_countries(self) -> list[CountryOut]: ...
 
     def addresses_countries(
         self, *, filters: AddressCountriesFilters, page: int, per_page: int

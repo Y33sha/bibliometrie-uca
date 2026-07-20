@@ -15,6 +15,7 @@ from application.ports.api.addresses_queries import AddressesQueries
 from application.ports.api.admin_feedback_queries import AdminFeedbackQueries
 from application.ports.api.authorships_queries import AuthorshipsQueries
 from application.ports.api.config_queries import ConfigQueries
+from application.ports.api.countries_queries import CountriesQueries
 from application.ports.api.entity_facet import EntityLabelQueries
 from application.ports.api.hal_problems_queries import HalProblemsQueries
 from application.ports.api.journals_queries import JournalQueries
@@ -46,6 +47,7 @@ from infrastructure.db.engine import get_sync_engine
 from infrastructure.queries.api.addresses import PgAddressesQueries
 from infrastructure.queries.api.admin_feedback import PgAdminFeedbackQueries
 from infrastructure.queries.api.authorships import PgAuthorshipsQueries
+from infrastructure.queries.api.countries import PgCountriesQueries
 from infrastructure.queries.api.entity_labels import PgEntityLabelQueries
 from infrastructure.queries.api.hal_problems import PgHalProblemsQueries
 from infrastructure.queries.api.journals import PgJournalQueries
@@ -147,6 +149,10 @@ def subjects_queries(
 
 def authorships_queries(conn: Connection = Depends(db_conn)) -> AuthorshipsQueries:
     return PgAuthorshipsQueries(conn)
+
+
+def countries_queries(conn: Connection = Depends(db_conn)) -> CountriesQueries:
+    return PgCountriesQueries(conn)
 
 
 def config_queries(conn: Connection = Depends(db_conn)) -> ConfigQueries:
