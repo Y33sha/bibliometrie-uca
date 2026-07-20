@@ -1,6 +1,6 @@
-"""Port : lectures pour le tableau de bord admin de feedback détection d'adresses (consommé par /api/feedback/*).
+"""Port : lectures du tableau de bord de qualité de la détection d'adresses (consommé par /api/feedback/*).
 
-Implémenté par `infrastructure.queries.api.admin_feedback.PgAdminFeedbackQueries`.
+Implémenté par `infrastructure.queries.api.feedback.PgFeedbackQueries`.
 """
 
 from typing import Protocol
@@ -60,18 +60,8 @@ class FeedbackAddressesResponse(PaginatedResponse):
     addresses: list[FeedbackAddressItem]
 
 
-class FeedbackStructureItem(BaseModel):
-    id: int
-    code: str
-    name: str
-    acronym: str | None
-    type: str
-
-
-class AdminFeedbackQueries(Protocol):
+class FeedbackQueries(Protocol):
     """Lectures sur le feedback de détection d'adresses."""
-
-    def feedback_structures(self, types: list[str]) -> list[FeedbackStructureItem]: ...
 
     def feedback_stats(self, structure_id: int) -> FeedbackStats: ...
 

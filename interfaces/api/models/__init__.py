@@ -33,7 +33,6 @@ from interfaces.api.models.admin.authorships import (
     OrphanBatchAssignResponse,
     SourceAuthorshipRef,
 )
-from interfaces.api.models.admin.feedback import FeedbackStructuresResponse
 from interfaces.api.models.admin.perimeters import (
     PerimeterCreate,
 )
@@ -99,7 +98,6 @@ __all__ = [
     "DetachAuthorships",
     "DetachAuthorshipsResponse",
     "EnumOption",
-    "FeedbackStructuresResponse",
     "IdentifierReassignResponse",
     "IdentifierStatusResponse",
     "JournalTypeChange",

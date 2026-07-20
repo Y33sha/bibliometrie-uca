@@ -578,30 +578,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/feedback/structures": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Feedback Structures
-         * @description Structures éligibles au tableau de bord feedback, groupées par type.
-         *
-         *     Encode deux règles métier :
-         *     - seuls les types listés dans `_FEEDBACK_STRUCTURE_TYPES` sont éligibles (universités, organismes, CHU, écoles, labos) ;
-         *     - la structure UCA (code = "uca") est sélectionnée par défaut si elle existe, sinon la première structure du premier type non vide.
-         */
-        get: operations["feedback_structures_api_feedback_structures_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/feedback/stats": {
         parameters: {
             query?: never;
@@ -3050,31 +3026,6 @@ export interface components {
             concordant_valid: number;
             /** Pending */
             pending: number;
-        };
-        /** FeedbackStructureItem */
-        FeedbackStructureItem: {
-            /** Id */
-            id: number;
-            /** Code */
-            code: string;
-            /** Name */
-            name: string;
-            /** Acronym */
-            acronym: string | null;
-            /** Type */
-            type: string;
-        };
-        /**
-         * FeedbackStructuresResponse
-         * @description Structures éligibles au tableau de bord feedback, groupées par type, avec la structure à sélectionner par défaut (UCA si présente).
-         */
-        FeedbackStructuresResponse: {
-            /** By Type */
-            by_type: {
-                [key: string]: components["schemas"]["FeedbackStructureItem"][];
-            };
-            /** Default Structure Id */
-            default_structure_id: number | null;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -6372,26 +6323,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CountryOut"][];
-                };
-            };
-        };
-    };
-    feedback_structures_api_feedback_structures_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["FeedbackStructuresResponse"];
                 };
             };
         };
