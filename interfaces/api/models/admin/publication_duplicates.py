@@ -1,4 +1,4 @@
-"""Modèles Pydantic du router de déduplication des publications : corps des requêtes entrantes et réponse composée après fusion."""
+"""Modèles Pydantic du router de déduplication des publications : corps des requêtes entrantes. La fusion rend le `MergeResponse` partagé."""
 
 from pydantic import BaseModel
 
@@ -16,7 +16,3 @@ class MarkDistinctPublications(BaseModel):
     pub_id_b: int
 
 
-class PublicationMergeResponse(BaseModel):
-    ok: bool
-    target_id: int
-    source_id: int

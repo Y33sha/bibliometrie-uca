@@ -59,7 +59,6 @@ from interfaces.api.models.admin.pipeline_logs import (
 from interfaces.api.models.admin.publication_duplicates import (
     MarkDistinctPublications,
     MergePublications,
-    PublicationMergeResponse,
 )
 from interfaces.api.models.admin.structures import (
     NameFormCreate,
@@ -117,7 +116,6 @@ __all__ = [
     "PerimeterCreate",
     "PipelinePhaseLog",
     "PipelineStatus",
-    "PublicationMergeResponse",
     "PublisherMergeBlockedResponse",
     "ReassignIdentifier",
     "RejectPerson",

@@ -4504,15 +4504,6 @@ export interface components {
             /** Pages */
             readonly pages: number;
         };
-        /** PublicationMergeResponse */
-        PublicationMergeResponse: {
-            /** Ok */
-            ok: boolean;
-            /** Target Id */
-            target_id: number;
-            /** Source Id */
-            source_id: number;
-        };
         /**
          * PublicationsFacetsResponse
          * @description Facettes dynamiques pour la page publications.
@@ -5852,7 +5843,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PublicationMergeResponse"];
+                    "application/json": components["schemas"]["MergeResponse"];
                 };
             };
             /** @description Validation Error */
