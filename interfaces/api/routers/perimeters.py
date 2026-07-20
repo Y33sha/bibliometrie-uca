@@ -49,7 +49,7 @@ def create_perimeter(
 ) -> CreatedIdResponse:
     """Crée un périmètre avec ses structures racines, la liste pouvant être vide.
 
-    Le code sert d'identifiant naturel — la configuration du pipeline désigne un périmètre par sa valeur — et se restreint aux minuscules, chiffres, tiret et souligné : une autre forme rend 422. Renvoie 409 sur un code déjà pris.
+    Le code sert d'identifiant naturel — la configuration du pipeline désigne un périmètre par sa valeur — et doit être un jeton unique, sans espace : un code vide ou espacé rend 422. Renvoie 409 sur un code déjà pris.
     """
     pid = perimeter_commands.create_perimeter(
         conn, code=body.code, name=body.name, structure_ids=body.structure_ids, repo=repo
