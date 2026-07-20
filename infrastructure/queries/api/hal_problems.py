@@ -8,6 +8,7 @@ from typing import Any
 
 from sqlalchemy import Connection, bindparam, text
 
+from application.ports.api._common import StructureRef
 from application.ports.api.hal_problems_queries import (
     HalAccountSummary,
     HalAffiliationConflictPub,
@@ -27,6 +28,7 @@ from application.ports.api.hal_problems_queries import (
     NoMissingCollections,
 )
 from domain.source_publications.keys import DISCRIMINANT_TITLE_MIN_LENGTH
+from infrastructure.queries.perimeter import get_persons_perimeter_root_ids
 
 # Signatures HAL rattachées à une personne et portant la référence d'un compte HAL.
 _HAL_ACCOUNT_SIGNATURES = """
@@ -275,6 +277,20 @@ class PgHalProblemsQueries(HalProblemsQueries):
             for r in rows
         ]
 
+    def _perimeter_root_collections(self) -> list[str]:
+        """Collections HAL des structures racines du périmètre — celles de l'établissement.
+
+        Une racine sans collection n'en fournit aucune ; plusieurs racines fournissent chacune la sienne.
+        """
+        rows = self._conn.execute(
+            text("""
+                SELECT s.hal_collection FROM structures s
+                WHERE s.id = ANY(:ids) AND s.hal_collection IS NOT NULL
+            """),
+            {"ids": get_persons_perimeter_root_ids(self._conn)},
+        ).all()
+        return [r.hal_collection for r in rows]
+
     def hal_missing_collections(
         self, *, lab_id: int, page: int, per_page: int
     ) -> HalMissingCollectionsResponse | NoMissingCollections:
@@ -292,6 +308,7 @@ class PgHalProblemsQueries(HalProblemsQueries):
         binds: dict[str, Any] = {
             "lab_arr": [lab_id],
             "col": col,
+            "root_cols": self._perimeter_root_collections(),
             "pg_limit": per_page,
             "pg_offset": offset,
         }
@@ -322,7 +339,8 @@ class PgHalProblemsQueries(HalProblemsQueries):
                         WHERE sd2.publication_id = p.id AND sd2.source = 'hal') AS halids,
                        NOT EXISTS (SELECT 1 FROM source_publications sd2
                                    WHERE sd2.publication_id = p.id AND sd2.source = 'hal'
-                                     AND 'PRES_CLERMONT' = ANY(sd2.hal_collections)) AS hors_uca
+                                     AND sd2.hal_collections && :root_cols
+                                  ) AS outside_perimeter_collections
                 {base_where}
                 ORDER BY p.pub_year DESC NULLS LAST, p.id DESC
                 LIMIT :pg_limit OFFSET :pg_offset
@@ -337,7 +355,7 @@ class PgHalProblemsQueries(HalProblemsQueries):
                 doc_type=r.doc_type,
                 doi=r.doi,
                 halids=list(r.halids) if r.halids else None,
-                hors_uca=r.hors_uca,
+                outside_perimeter_collections=r.outside_perimeter_collections,
             )
             for r in rows
         ]
@@ -368,7 +386,7 @@ class PgHalProblemsQueries(HalProblemsQueries):
         # pas une publi standard, crossref n'a pas d'adresses.
         #
         # Implémentation : on agrège d'abord par SP WoS/OA les drapeaux
-        # `any_addressed` et `any_uca`, puis on regroupe par publication
+        # `any_addressed` et `any_in_perimeter`, puis on regroupe par publication
         # canonique avant de filtrer (agg AS / sur les EXISTS imbriqués
         # qui forçaient un Hash Join sur les 11M source_authorships).
         # Exploite l'index partiel `idx_sa_in_perimeter`.
@@ -391,11 +409,11 @@ class PgHalProblemsQueries(HalProblemsQueries):
                     SELECT 1 FROM source_authorships sa
                     WHERE sa.source_publication_id = sps.id
                       AND sa.in_perimeter = TRUE
-                )) AS any_uca
+                )) AS any_in_perimeter
             FROM wos_oa_sps sps
             GROUP BY sps.publication_id
         ),
-        hal_uca_pubs AS (
+        hal_in_perimeter_pubs AS (
             SELECT DISTINCT sp.publication_id
             FROM source_publications sp
             JOIN source_authorships sa ON sa.source_publication_id = sp.id
@@ -405,9 +423,9 @@ class PgHalProblemsQueries(HalProblemsQueries):
         ),
         conflict_pubs AS (
             SELECT h.publication_id
-            FROM hal_uca_pubs h
+            FROM hal_in_perimeter_pubs h
             JOIN wos_oa_pub_summary s ON s.publication_id = h.publication_id
-            WHERE s.any_addressed AND NOT s.any_uca
+            WHERE s.any_addressed AND NOT s.any_in_perimeter
         )
         """
 
@@ -422,13 +440,16 @@ class PgHalProblemsQueries(HalProblemsQueries):
                 SELECT p.id, p.title, p.pub_year, p.doc_type::text AS doc_type, p.doi,
                        (SELECT array_agg(sd2.source_id) FROM source_publications sd2
                         WHERE sd2.publication_id = p.id AND sd2.source = 'hal') AS halids,
-                       (SELECT string_agg(DISTINCT s.acronym, ', ' ORDER BY s.acronym)
-                        FROM authorships a2
-                        JOIN authorship_structures aus2 ON aus2.authorship_id = a2.id
-                        JOIN structures s ON s.id = aus2.structure_id
-                        WHERE a2.publication_id = p.id
-                          AND a2.in_perimeter = TRUE
-                          AND s.structure_type = 'labo') AS labs
+                       (SELECT json_agg(json_build_object('acronym', l.acronym, 'name', l.name)
+                                        ORDER BY COALESCE(l.acronym, l.name))
+                        FROM (SELECT DISTINCT s.acronym, s.name
+                              FROM authorships a2
+                              JOIN authorship_structures aus2 ON aus2.authorship_id = a2.id
+                              JOIN structures s ON s.id = aus2.structure_id
+                              WHERE a2.publication_id = p.id
+                                AND a2.in_perimeter = TRUE
+                                AND s.structure_type = 'labo') l
+                       ) AS laboratories
                 FROM conflict_pubs cp
                 JOIN publications p ON p.id = cp.publication_id
                 ORDER BY p.pub_year DESC NULLS LAST, p.id DESC
@@ -444,7 +465,9 @@ class PgHalProblemsQueries(HalProblemsQueries):
                 doc_type=r.doc_type,
                 doi=r.doi,
                 halids=list(r.halids) if r.halids else None,
-                labs=r.labs,
+                laboratories=[
+                    StructureRef.model_validate(x) for x in (r.laboratories or [])
+                ],
             )
             for r in rows
         ]

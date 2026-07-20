@@ -12,7 +12,7 @@ from typing import Protocol
 
 from pydantic import BaseModel
 
-from application.ports.api._common import PaginatedResponse
+from application.ports.api._common import PaginatedResponse, StructureRef
 
 
 class HalDocSummary(BaseModel):
@@ -73,7 +73,8 @@ class HalMissingCollectionPub(BaseModel):
     doc_type: str
     doi: str | None
     halids: list[str] | None
-    hors_uca: bool
+    outside_perimeter_collections: bool
+    """Le dépôt HAL ne figure dans aucune collection des structures racines du périmètre : il a été trouvé par la collection d'un autre laboratoire, non par celle de l'établissement."""
 
 
 class HalMissingCollectionsResponse(PaginatedResponse):
@@ -99,7 +100,8 @@ class HalAffiliationConflictPub(BaseModel):
     doc_type: str
     doi: str | None
     halids: list[str] | None
-    labs: str | None
+    laboratories: list[StructureRef]
+    """Laboratoires du périmètre que la publication porte ; l'affichage choisit entre acronyme et nom."""
 
 
 class HalAffiliationConflictsResponse(PaginatedResponse):
