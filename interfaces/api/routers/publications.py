@@ -39,8 +39,8 @@ from interfaces.api.filters import parse_int_csv, parse_str_csv, parse_vocabular
 from interfaces.api.models import (
     MarkDistinctPublications,
     MergePublications,
+    MergeResponse,
     OkResponse,
-    PublicationMergeResponse,
 )
 
 router = APIRouter(prefix="/api/publications", tags=["publications"])
@@ -193,9 +193,10 @@ def export_theses_csv(
         lab_ids=lab_ids,
         lab_none=lab_none,
         years=parse_int_csv(year),
-        access=parse_str_csv(access),
+        access=parse_vocabulary_csv(access, allowed=ACCESS_LEVELS, param="access"),
         source_values=parse_str_csv(source_filter),
-        doc_types=parse_str_csv(doc_type) or ["thesis", "ongoing_thesis"],
+        doc_types=parse_vocabulary_csv(doc_type, allowed=DOC_TYPES, param="doc_type")
+        or ["thesis", "ongoing_thesis"],
     )
     csv_content = queries.export_theses_csv(filters=filters, sort=sort)
     return Response(
@@ -218,20 +219,20 @@ def next_duplicate_candidate(
     return queries.next_pub_duplicate(min_title_len=min_title_len, offset=offset)
 
 
-@router.post("/duplicates/merge", response_model=PublicationMergeResponse)
+@router.post("/duplicates/merge", response_model=MergeResponse)
 def merge_duplicate_publications(
     body: MergePublications,
     conn: Connection = Depends(db_conn),
     repo: PublicationRepository = Depends(publication_repo),
     audit: AuditRepository = Depends(audit_repo),
-) -> PublicationMergeResponse:
+) -> MergeResponse:
     """Fusionne deux publications doublons.
 
     La cible est le plus petit des deux identifiants. Le sens de la fusion est sans portée durable : `refresh_from_sources` re-dérive toutes les métadonnées canoniques depuis l'union des `source_publications`, et cette union est la même dans un sens comme dans l'autre. Renvoie 400 sur deux identifiants égaux, 404 sur une publication introuvable, 409 sur deux DOI non-nuls distincts (`merge_publications`).
     """
     target_id, source_id = sorted((body.pub_id_a, body.pub_id_b))
     publication_commands.merge_publications(conn, target_id, source_id, repo=repo, audit_repo=audit)
-    return PublicationMergeResponse(ok=True, target_id=target_id, source_id=source_id)
+    return MergeResponse(merged=True, source_id=source_id, target_id=target_id)
 
 
 @router.post("/duplicates/mark-distinct", response_model=OkResponse)

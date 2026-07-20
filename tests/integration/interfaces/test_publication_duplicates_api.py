@@ -150,7 +150,7 @@ class TestMergeDuplicatePublications:
         assert r.status_code == 200
         # La cible survivante est le plus petit id (direction implicite).
         survivor, absorbed = sorted((a, b))
-        assert r.json() == {"ok": True, "target_id": survivor, "source_id": absorbed}
+        assert r.json() == {"merged": True, "source_id": absorbed, "target_id": survivor}
         with _pool() as cur:
             cur.execute("SELECT id FROM publications WHERE id IN (%s, %s)", (a, b))
             ids = {row["id"] for row in cur.fetchall()}
