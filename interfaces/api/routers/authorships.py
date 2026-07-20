@@ -1,6 +1,8 @@
 """Router des signatures : exclusion d'une contribution, et revue des signatures orphelines. Sert `/api/authorships/*`.
 
-L'exclusion rejette une contribution au niveau consolidé. Les orphelines sont les signatures du périmètre qu'aucune personne ne porte (`person_id` nul) : le router les liste et les attribue, sous `/orphans`.
+L'exclusion rejette une contribution au niveau consolidé, et son `authorship_id` désigne une ligne d'`authorships`. Les orphelines vivent un cran en dessous : ce sont les lignes de `source_authorships` du périmètre qu'aucune personne ne porte (`person_id` nul), que le router liste et attribue sous `/orphans`, par leur `source_authorship_id`.
+
+Les routes sont groupées par sujet, et les chemins littéraux précèdent celui qui porte un identifiant — un chemin littéral déclaré après `/{authorship_id}` s'y ferait absorber.
 """
 
 from fastapi import APIRouter, Depends, Query
@@ -32,27 +34,6 @@ from interfaces.api.models import (
 )
 
 router = APIRouter(prefix="/api/authorships", tags=["authorships"])
-
-
-# ── Exclusion d'authorships ──────────────────────────────────────
-
-
-@router.patch("/{authorship_id}/exclude", response_model=OkResponse)
-def exclude_authorship(
-    authorship_id: int,
-    conn: Connection = Depends(db_conn),
-    repo: AuthorshipRepository = Depends(authorship_repo),
-    persons: PersonRepository = Depends(person_repo),
-    audit: AuditRepository = Depends(audit_repo),
-) -> OkResponse:
-    """Rejette une contribution : cette personne n'a pas signé cette publication.
-
-    Enregistre la paire (publication, personne) dans `rejected_authorships`, détache les signatures sources et supprime la ligne consolidée. La table de rejet vaut verrou : les reconstructions ultérieures respectent l'arbitrage. Le geste est à sens unique.
-    """
-    authorship_commands.exclude_authorship(
-        conn, authorship_id, repo=repo, person_repo=persons, audit_repo=audit
-    )
-    return OkResponse()
 
 
 # ── Authorships orphelines ───────────────────────────────────────
@@ -139,3 +120,24 @@ def batch_assign_orphan_authorships(
         force=body.force,
     )
     return OrphanBatchAssignResponse(assigned=assigned)
+
+
+# ── Exclusion d'authorships ──────────────────────────────────────
+
+
+@router.patch("/{authorship_id}/exclude", response_model=OkResponse)
+def exclude_authorship(
+    authorship_id: int,
+    conn: Connection = Depends(db_conn),
+    repo: AuthorshipRepository = Depends(authorship_repo),
+    persons: PersonRepository = Depends(person_repo),
+    audit: AuditRepository = Depends(audit_repo),
+) -> OkResponse:
+    """Rejette une contribution : cette personne n'a pas signé cette publication.
+
+    Enregistre la paire (publication, personne) dans `rejected_authorships`, détache les signatures sources et supprime la ligne consolidée. La table de rejet vaut verrou : les reconstructions ultérieures respectent l'arbitrage. Le geste est à sens unique.
+    """
+    authorship_commands.exclude_authorship(
+        conn, authorship_id, repo=repo, person_repo=persons, audit_repo=audit
+    )
+    return OkResponse()
