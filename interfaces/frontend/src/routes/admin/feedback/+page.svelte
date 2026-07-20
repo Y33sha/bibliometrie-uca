@@ -215,7 +215,7 @@
     closeCtxPicker();
 
     try {
-      const formData = await api<NameForm>("/api/name-forms/" + formId);
+      const formData = await api<NameForm>("/api/structures/name-forms/" + formId);
       const ctx = formData.requires_context_of || [];
       if (!ctx.includes(item)) ctx.push(item);
 

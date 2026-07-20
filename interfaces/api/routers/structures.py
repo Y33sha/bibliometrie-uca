@@ -1,6 +1,6 @@
 """Router du référentiel des entités organisationnelles et de leurs liens. Sert `/api/structures/*`.
 
-Une structure est un laboratoire, une composante, une université, un centre hospitalier, une école ou un site. La table `structure_relations` en exprime les liens : `est_tutelle_de` pour le rattachement hiérarchique, seul à peser dans la clôture d'un périmètre, et `est_partenaire_de` pour une association sans rattachement. Les formes de nom, qui servent à reconnaître les structures dans les adresses, vivent dans `name_forms.py`.
+Une structure est un laboratoire, une composante, une université, un centre hospitalier, une école ou un site. La table `structure_relations` en exprime les liens : `est_tutelle_de` pour le rattachement hiérarchique, seul à peser dans la clôture d'un périmètre, et `est_partenaire_de` pour une association sans rattachement. Les formes de nom, qui servent à reconnaître les structures dans les adresses, s'éditent sous `/name-forms` — celles des personnes, homonymes mais sans rapport, vivent sous `/api/persons`.
 
 Les chemins littéraux se déclarent avant `/{structure_id}` : un segment fixe placé après serait capté par le paramètre.
 """
@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import Connection
 
 from application.ports.api.structures_queries import (
+    NameFormOut,
     StructureAddressesResponse,
     StructureDashboardResponse,
     StructureDetailResponse,
@@ -32,6 +33,8 @@ from interfaces.api.deps import (
 from interfaces.api.filters import parse_vocabulary_csv
 from interfaces.api.models import (
     DeletedResponse,
+    NameFormCreate,
+    NameFormUpdate,
     RelationCreate,
     StructureCreate,
     StructureRelationCreateResponse,
@@ -126,6 +129,77 @@ def delete_relation(
     structure_commands.delete_relation(
         conn, relation_id, repo=repo, perimeter_repo=perimeter_repo, audit_repo=audit
     )
+    return DeletedResponse()
+
+
+# ── Formes de nom ────────────────────────────────────────────────
+# Une forme de nom est une écriture sous laquelle une structure se reconnaît dans le texte brut
+# d'une adresse. La phase `affiliations` les charge toutes et les apparie ; ces routes les éditent.
+
+
+@router.post("/name-forms", response_model=NameFormOut)
+def create_name_form(
+    data: NameFormCreate,
+    conn: Connection = Depends(db_conn),
+    repo: StructureRepository = Depends(structure_repo),
+    audit: AuditRepository = Depends(audit_repo),
+) -> NameFormOut:
+    """Crée une forme de nom pour une structure, utilisée par le matching d'adresses.
+
+    `form_text` est normalisé (accents, casse, ponctuation) par le service avant insertion. `is_word_boundary` : le match exige une frontière de mot dans l'adresse brute. `is_excluding` : forme dont la présence retire la structure des résultats. `requires_context_of` : liste d'ids de structures qui doivent elles-mêmes matcher l'adresse pour que cette forme active.
+    """
+    return NameFormOut.model_validate(
+        structure_commands.create_name_form(
+            conn,
+            structure_id=data.structure_id,
+            form_text=data.form_text,
+            is_word_boundary=data.is_word_boundary,
+            is_excluding=data.is_excluding,
+            requires_context_of=data.requires_context_of,
+            repo=repo,
+            audit_repo=audit,
+        )
+    )
+
+
+@router.get("/name-forms/{form_id}", response_model=NameFormOut)
+def get_name_form(
+    form_id: int,
+    queries: StructuresQueries = Depends(structures_queries),
+) -> NameFormOut:
+    """Récupère une forme de nom par son id. 404 si inconnue."""
+    row = queries.get_name_form(form_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Forme de nom introuvable")
+    return row
+
+
+@router.put("/name-forms/{form_id}", response_model=NameFormOut)
+def update_name_form(
+    form_id: int,
+    data: NameFormUpdate,
+    conn: Connection = Depends(db_conn),
+    repo: StructureRepository = Depends(structure_repo),
+    audit: AuditRepository = Depends(audit_repo),
+) -> NameFormOut:
+    """Met à jour une forme de nom (sélective des champs fournis). 404 si inconnue."""
+    fields = data.model_dump(exclude_unset=True)
+    return NameFormOut.model_validate(
+        structure_commands.update_name_form(
+            conn, form_id, fields=fields, repo=repo, audit_repo=audit
+        )
+    )
+
+
+@router.delete("/name-forms/{form_id}", response_model=DeletedResponse)
+def delete_name_form(
+    form_id: int,
+    conn: Connection = Depends(db_conn),
+    repo: StructureRepository = Depends(structure_repo),
+    audit: AuditRepository = Depends(audit_repo),
+) -> DeletedResponse:
+    """Supprime une forme de nom. 404 si inconnue."""
+    structure_commands.delete_name_form(conn, form_id, repo=repo, audit_repo=audit)
     return DeletedResponse()
 
 

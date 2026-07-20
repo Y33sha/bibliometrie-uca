@@ -51,7 +51,6 @@ from interfaces.api.routers import (  # noqa: E402
     feedback,
     hal_problems,
     journals,
-    name_forms,
     perimeters,
     persons,
     pipeline,
@@ -242,7 +241,6 @@ app.include_router(addresses.router)
 app.include_router(countries.router)
 app.include_router(feedback.router)
 app.include_router(structures.router)
-app.include_router(name_forms.router)
 app.include_router(persons.router)
 app.include_router(authorships.router)
 app.include_router(hal_problems.router)

@@ -706,6 +706,56 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/structures/name-forms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Name Form
+         * @description Crée une forme de nom pour une structure, utilisée par le matching d'adresses.
+         *
+         *     `form_text` est normalisé (accents, casse, ponctuation) par le service avant insertion. `is_word_boundary` : le match exige une frontière de mot dans l'adresse brute. `is_excluding` : forme dont la présence retire la structure des résultats. `requires_context_of` : liste d'ids de structures qui doivent elles-mêmes matcher l'adresse pour que cette forme active.
+         */
+        post: operations["create_name_form_api_structures_name_forms_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/structures/name-forms/{form_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Name Form
+         * @description Récupère une forme de nom par son id. 404 si inconnue.
+         */
+        get: operations["get_name_form_api_structures_name_forms__form_id__get"];
+        /**
+         * Update Name Form
+         * @description Met à jour une forme de nom (sélective des champs fournis). 404 si inconnue.
+         */
+        put: operations["update_name_form_api_structures_name_forms__form_id__put"];
+        post?: never;
+        /**
+         * Delete Name Form
+         * @description Supprime une forme de nom. 404 si inconnue.
+         */
+        delete: operations["delete_name_form_api_structures_name_forms__form_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/structures/{structure_id}": {
         parameters: {
             query?: never;
@@ -793,56 +843,6 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/name-forms": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Create Name Form
-         * @description Crée une forme de nom pour une structure, utilisée par le matching d'adresses.
-         *
-         *     `form_text` est normalisé (accents, casse, ponctuation) par le service avant insertion. `is_word_boundary` : le match exige une frontière de mot dans l'adresse brute. `is_excluding` : forme dont la présence retire la structure des résultats. `requires_context_of` : liste d'ids de structures qui doivent elles-mêmes matcher l'adresse pour que cette forme active.
-         */
-        post: operations["create_name_form_api_name_forms_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/name-forms/{form_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Name Form
-         * @description Récupère une forme de nom par son id. 404 si inconnue.
-         */
-        get: operations["get_name_form_api_name_forms__form_id__get"];
-        /**
-         * Update Name Form
-         * @description Met à jour une forme de nom (sélective des champs fournis). 404 si inconnue.
-         */
-        put: operations["update_name_form_api_name_forms__form_id__put"];
-        post?: never;
-        /**
-         * Delete Name Form
-         * @description Supprime une forme de nom. 404 si inconnue.
-         */
-        delete: operations["delete_name_form_api_name_forms__form_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -6523,6 +6523,136 @@ export interface operations {
             };
         };
     };
+    create_name_form_api_structures_name_forms_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NameFormCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NameFormOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_name_form_api_structures_name_forms__form_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                form_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NameFormOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_name_form_api_structures_name_forms__form_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                form_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NameFormUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NameFormOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_name_form_api_structures_name_forms__form_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                form_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeletedResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_structure_api_structures__structure_id__get: {
         parameters: {
             query?: never;
@@ -6705,136 +6835,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SubjectFrequency"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    create_name_form_api_name_forms_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["NameFormCreate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["NameFormOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_name_form_api_name_forms__form_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                form_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["NameFormOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    update_name_form_api_name_forms__form_id__put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                form_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["NameFormUpdate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["NameFormOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    delete_name_form_api_name_forms__form_id__delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                form_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DeletedResponse"];
                 };
             };
             /** @description Validation Error */
