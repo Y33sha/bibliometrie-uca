@@ -19,7 +19,7 @@ from application.ports.api.entity_facet import EntityLabelQueries
 from application.ports.api.feedback_queries import FeedbackQueries
 from application.ports.api.hal_problems_queries import HalProblemsQueries
 from application.ports.api.journals_queries import JournalQueries
-from application.ports.api.perimeters_queries import PerimetersAdminQueries
+from application.ports.api.perimeters_queries import PerimetersQueries
 from application.ports.api.persons_queries import PersonsQueries
 from application.ports.api.pipeline_phase_executions_queries import PhaseExecutionsQueries
 from application.ports.api.publication_duplicates_queries import PublicationDuplicatesQueries
@@ -60,7 +60,7 @@ from infrastructure.queries.api.stats import PgStatsQueries
 from infrastructure.queries.api.structures import PgStructuresQueries
 from infrastructure.queries.api.subjects import PgSubjectsQueries
 from infrastructure.queries.config import PgConfig, PgConfigQueries
-from infrastructure.queries.perimeter import PgPerimeterQueries, PgPerimetersAdminQueries
+from infrastructure.queries.perimeter import PgPerimeterQueries, PgPerimetersQueries
 from infrastructure.queries.pipeline.metadata_correction import PgMetadataCorrectionQueries
 from infrastructure.repositories import (
     address_repository,
@@ -207,10 +207,10 @@ def perimeter_repo(conn: Connection = Depends(db_conn)) -> PerimeterRepository:
     return perimeter_repository(conn)
 
 
-def perimeters_admin_queries(
+def perimeters_queries(
     conn: Connection = Depends(db_conn),
-) -> PerimetersAdminQueries:
-    return PgPerimetersAdminQueries(conn)
+) -> PerimetersQueries:
+    return PgPerimetersQueries(conn)
 
 
 def feedback_queries(conn: Connection = Depends(db_conn)) -> FeedbackQueries:
