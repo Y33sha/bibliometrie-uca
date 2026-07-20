@@ -4,7 +4,7 @@ from sqlalchemy import text
 
 from application.ports.api.publications_queries import PublicationFilters
 from infrastructure.queries.api.publications.facets import _PublicationFacetsBuilder
-from infrastructure.queries.api.publications.list import list_publications
+from infrastructure.queries.api.publications.list import export_theses_csv, list_publications
 from tests.integration.helpers.structures import add_authorship_structure
 
 
@@ -254,3 +254,43 @@ class TestHalStatusMultipleHalEntries:
             sort="year_desc",
         )
         assert pub in [p["id"] for p in res["publications"]]
+
+
+class TestThesesExport:
+    """Export CSV des thèses : la boucle de rendu lit chaque colonne du SELECT, donc un test avec données garde le contrat SQL du CSV et son projeté d'accord."""
+
+    def test_renders_a_thesis_with_each_source_url(self, sa_sync_conn):
+        lab = _create_lab(sa_sync_conn)
+        pub = sa_sync_conn.execute(
+            text(
+                "INSERT INTO publications (title, title_normalized, pub_year, doc_type) "
+                "VALUES ('Ma these', 'ma these', 2024, 'thesis'::doc_type) RETURNING id"
+            )
+        ).scalar_one()
+        _attach(sa_sync_conn, pub, lab)
+        for src, sid in (
+            ("hal", "hal-1"),
+            ("openalex", "W1"),
+            ("scanr", "sc-1"),
+            ("theses", "2024NNT"),
+        ):
+            sa_sync_conn.execute(
+                text(
+                    "INSERT INTO source_publications (publication_id, source, source_id, title) "
+                    "VALUES (:pid, :src, :sid, 'T')"
+                ),
+                {"pid": pub, "src": src, "sid": sid},
+            )
+
+        csv_text = export_theses_csv(
+            sa_sync_conn,
+            filters=PublicationFilters(lab_ids=[lab], doc_types=["thesis"]),
+            perimeter_structure_ids=[],
+            sort="soutenance_desc",
+        )
+
+        line = next(row for row in csv_text.splitlines() if "Ma these" in row)
+        assert "hal.science/hal-1" in line
+        assert "openalex.org/W1" in line
+        assert "scanr.enseignementsup-recherche.gouv.fr/publications/sc-1" in line
+        assert "theses.fr/2024NNT" in line

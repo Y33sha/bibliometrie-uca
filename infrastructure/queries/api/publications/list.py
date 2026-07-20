@@ -485,7 +485,7 @@ def export_theses_csv(
                 p.oa_status::text AS oa_status,
                 p.meta->>'date_soutenance' AS date_soutenance,
                 p.meta->>'date_inscription' AS date_inscription,
-                src_ids.hal_id, src_ids.openalex_id, src_ids.theses_id,
+                src_ids.hal_id, src_ids.openalex_id, src_ids.scanr_id, src_ids.theses_id,
                 (SELECT string_agg(DISTINCT COALESCE(s.acronym, s.name), ', '
                          ORDER BY COALESCE(s.acronym, s.name))
                  FROM authorships a3
