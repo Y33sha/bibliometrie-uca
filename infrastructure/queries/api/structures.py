@@ -26,8 +26,7 @@ from infrastructure.queries.perimeter import get_persons_structure_ids_list
 
 _NON_INTERNATIONAL = sorted(NON_INTERNATIONAL_COUNTRY_CODES)
 
-# Signature portée par la structure `:structure_id` : dans le périmètre, rattachée à elle par une
-# structure d'authorship, et tenant le rôle d'auteur. S'applique à un alias `a` sur `authorships`.
+# Signature portée par la structure `:structure_id` : dans le périmètre, rattachée à elle par une structure d'authorship, et tenant le rôle d'auteur. S'applique à un alias `a` sur `authorships`.
 _AUTHOR_SIGNATURE = """
     a.in_perimeter = TRUE
     AND a.roles && ARRAY['author']::text[]
@@ -37,8 +36,7 @@ _AUTHOR_SIGNATURE = """
     )
 """
 
-# Publication `p` que la structure signe. La forme `EXISTS` compte chaque publication une fois,
-# là où une jointure la dupliquerait par auteur de la structure.
+# Publication `p` que la structure signe. La forme `EXISTS` compte chaque publication une fois, là où une jointure la dupliquerait par auteur de la structure.
 _AUTHORED_PUBLICATION = f"""
     EXISTS (
         SELECT 1 FROM authorships a
@@ -339,8 +337,7 @@ class PgStructuresQueries(StructuresQueries):
             {"structure_id": structure_id, "non_international": _NON_INTERNATIONAL},
         ).one()
 
-        # L'`unnest` des pays multiplie chaque publication par ~27 : la dédupliquer avant, plutôt
-        # que par auteur de la structure ensuite, garde le tri en mémoire.
+        # L'`unnest` des pays multiplie chaque publication par ~27 : la dédupliquer avant, plutôt que par auteur de la structure ensuite, garde le tri en mémoire.
         top_country_rows = self._conn.execute(
             text(f"""
                 SELECT co.code, co.name, COUNT(*) AS n
