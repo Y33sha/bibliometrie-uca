@@ -1,14 +1,8 @@
 """Query service : SQL du peuplement de `person_name_forms`.
 
-Appelé par `application/pipeline/persons/populate_person_name_forms.py`.
-Collecte les formes brutes (table `persons` + `source_authorships`),
-passe par une table temporaire pour la normalisation SQL via
-`normalize_name_form()`, puis synchronise `person_name_forms` par
-agrégation `GROUP BY (name_form, person_id)` + diff INSERT/UPDATE/DELETE.
+Appelé par `application/pipeline/persons/populate_person_name_forms.py`. Collecte les formes brutes (table `persons` + `source_authorships`), passe par une table temporaire pour la normalisation SQL via `normalize_name_form()`, puis synchronise `person_name_forms` par agrégation `GROUP BY (name_form, person_id)` + diff INSERT/UPDATE/DELETE.
 
-Modèle de table cible : `(name_form, person_id, sources text[])` avec
-PK composite — pas de JSONB, pas d'`id` de row. La fusion par couple
-est faite en SQL (`array_agg DISTINCT`), pas en Python.
+Modèle de table cible : `(name_form, person_id, sources text[])` avec PK composite — pas de JSONB, pas d'`id` de row. La fusion par couple est faite en SQL (`array_agg DISTINCT`), pas en Python.
 """
 
 from sqlalchemy import Connection, text
@@ -24,11 +18,7 @@ from application.ports.pipeline.persons.name_forms import (
 def fetch_persons_names(conn: Connection) -> list[PersonNameRow]:
     """`(id, first_name, last_name)` de toutes les personnes avec un nom.
 
-    Inclut les `rejected = TRUE` : leurs name_forms doivent rester
-    présentes dans `person_name_forms` pour servir d'ancre au matching
-    et empêcher la re-création en boucle des entités douteuses
-    (artefacts de parsing source, noms d'organisations, etc.) à chaque
-    run pipeline.
+    Inclut les `rejected = TRUE` : leurs name_forms doivent rester présentes dans `person_name_forms` pour servir d'ancre au matching et empêcher la re-création en boucle des entités douteuses (artefacts de parsing source, noms d'organisations, etc.) à chaque run pipeline.
     """
     rows = conn.execute(
         text("""
@@ -45,10 +35,7 @@ def fetch_persons_names(conn: Connection) -> list[PersonNameRow]:
 def create_temp_raw_forms_table(conn: Connection) -> None:
     """Crée la table temporaire `_raw_forms(raw_text, person_id, source)`.
 
-    Reçoit les triplets calculés en Python depuis `persons` (un par
-    forme retournée par `compute_person_name_forms`, source `'persons'`).
-    Les formes issues de `source_authorships` sont lues directement par
-    la query d'agrégation, sans transiter par cette table.
+    Reçoit les triplets calculés en Python depuis `persons` (un par forme retournée par `compute_person_name_forms`, source `'persons'`). Les formes issues de `source_authorships` sont lues directement par la query d'agrégation, sans transiter par cette table.
     """
     conn.execute(text("CREATE TEMP TABLE _raw_forms (raw_text TEXT, person_id INT, source TEXT)"))
 
@@ -70,22 +57,9 @@ def drop_temp_raw_forms_table(conn: Connection) -> None:
 def sync_from_raw_forms(conn: Connection) -> SyncCounts:
     """Agrège `_raw_forms` ∪ `source_authorships` et synchronise `person_name_forms`.
 
-    Construit en table temp `_expected_pnf` l'état attendu agrégé par
-    `(name_form, person_id)` avec sources triées dédupliquées. Puis 3
-    statements de sync :
-      1. DELETE des couples manquants.
-      2. INSERT des couples nouveaux.
-      3. UPDATE des `sources` qui ont changé.
+    Construit en table temp `_expected_pnf` l'état attendu agrégé par `(name_form, person_id)`, sources triées dédupliquées. Puis 3 statements de sync : DELETE des couples manquants, INSERT des couples absents (statut `pending`), UPDATE des `sources` qui ont changé.
 
-    Le recompute respecte le `status` (validation du lien forme↔personne) :
-
-    - il ne **modifie jamais** le `status` d'une ligne existante (l'UPDATE ne touche
-      que `sources`) ;
-    - il ne **supprime jamais** une ligne `confirmed`/`rejected` (verdict), sauf une
-      forme de source `'persons'` absente de l'état attendu — seule une édition du
-      nom/prénom de la personne retire une de ses formes canoniques ;
-    - une ligne **nouvelle** est insérée `confirmed` si elle dérive du nom/prénom
-      (source `'persons'`, forme canonique de la personne), `pending` sinon.
+    Le recompute respecte le `status` (validation du lien forme↔personne) : l'UPDATE touche seulement `sources`, laissant le `status` intact ; une ligne `confirmed`/`rejected` (verdict) survit à la purge, sauf une forme de source `'persons'` absente de l'état attendu — seule une édition du nom/prénom retire une forme canonique. L'appartenance au nom canonique se lit dans `sources` (`'persons'`), non dans le statut.
     """
     conn.execute(
         text("""
@@ -113,9 +87,7 @@ def sync_from_raw_forms(conn: Connection) -> SyncCounts:
     )
     conn.execute(text("CREATE INDEX ON _expected_pnf (name_form, person_id)"))
 
-    # On ne supprime que les `pending` orphelins et les formes `'persons'` devenues
-    # obsolètes (édition du nom). Les verdicts `confirmed`/`rejected` sur des formes
-    # non-canoniques (bibliographiques) sont préservés même s'ils ne sont plus dérivés.
+    # La purge retire les `pending` orphelins et les formes `'persons'` absentes de l'état attendu (édition du nom) ; les verdicts `confirmed`/`rejected` sur des formes non-canoniques (bibliographiques) survivent.
     deleted = conn.execute(
         text("""
             DELETE FROM person_name_forms p
@@ -127,9 +99,7 @@ def sync_from_raw_forms(conn: Connection) -> SyncCounts:
         """)
     ).rowcount
 
-    # Une forme nouvelle entre en `pending` : seule une action admin la confirme ou
-    # la rejette. L'appartenance d'une forme au nom canonique se lit dans `sources`
-    # (`'persons'`), pas dans le statut.
+    # Toute forme insérée entre en `pending` ; seule une action admin tranche. L'appartenance au nom canonique se lit dans `sources` (`'persons'`).
     inserted = conn.execute(
         text("""
             INSERT INTO person_name_forms (name_form, person_id, sources, status)
@@ -142,8 +112,7 @@ def sync_from_raw_forms(conn: Connection) -> SyncCounts:
         """)
     ).rowcount
 
-    # Resynchronise les seules `sources` ; le statut (verdict admin ou `pending`) est
-    # préservé.
+    # Resynchronise les seules `sources` ; le statut (verdict admin ou `pending`) est préservé.
     updated = conn.execute(
         text("""
             UPDATE person_name_forms p

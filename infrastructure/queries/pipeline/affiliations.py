@@ -12,14 +12,7 @@ from application.ports.pipeline.affiliations.in_perimeter import (
     InPerimeterSyncCounts,
 )
 
-# Ensembles d'ids utilisés par les deux UPDATE de `sync_in_perimeter` :
-#   should    = authorships dans le périmètre restreint, lus depuis la matview
-#               `source_authorship_structures` (le JOIN adresses⋈structures déjà
-#               matérialisé) filtrée aux structures du périmètre persons ;
-#   currently = authorships actuellement à TRUE, lus depuis l'index partiel
-#               `WHERE in_perimeter` (index-only, pas de balayage de la table).
-# Delta calculé par différence d'ids (EXCEPT), aucun probe heap ligne à ligne :
-# un run stable n'écrit rien.
+# Ensembles d'ids des deux UPDATE de `sync_in_perimeter` : `should` (authorships du périmètre restreint, via la matview) et `currently` (à TRUE, via l'index partiel). Delta par EXCEPT ; un run stable produit un delta vide.
 _DELTA_CTE = """
     WITH should AS (
         SELECT DISTINCT source_authorship_id AS id
@@ -35,10 +28,7 @@ _DELTA_CTE = """
 def sync_in_perimeter(conn: Connection, *, perimeter_ids: list[int]) -> InPerimeterSyncCounts:
     """Aligne `in_perimeter` sur le périmètre, en n'écrivant que les changements.
 
-    Dérivé de la matview `source_authorship_structures` (à rafraîchir en amont) :
-    `in_perimeter = TRUE` ssi l'authorship y figure pour une structure du
-    périmètre restreint. Delta par différence d'ensembles d'ids (index-only),
-    pas de balayage des `source_authorships`.
+    Dérivé de la matview `source_authorship_structures` (à rafraîchir en amont) : `in_perimeter = TRUE` ssi l'authorship y figure pour une structure du périmètre restreint. Delta par différence d'ensembles d'ids (index-only), pas de balayage des `source_authorships`.
     """
     params = {"perimeter_ids": perimeter_ids}
     added = conn.execute(
