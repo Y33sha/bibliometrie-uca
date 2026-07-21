@@ -7,8 +7,8 @@ L'association phase → périmètre est lue depuis la table `config` :
 - `perimeter_persons` : périmètre pour la création des personnes
 
 Expose :
-- Fonctions libres (`get_perimeter_structure_ids`, `get_persons_structure_ids`, …) consommées directement par les CLIs pipeline.
-- `PgPerimeterQueries` / `PgPerimetersQueries` : adapters pour les ports `application.ports.pipeline.perimeter` et `application.ports.api.perimeters_queries`.
+- Fonctions libres (`get_perimeter_structure_ids`, `get_persons_structure_ids`, …) partagées par l'extraction, le bootstrap de l'orchestrateur, un repository et les adapters api.
+- `PgPerimeterStructuresQueries` / `PgPerimetersQueries` : adapters pour les ports `application.ports.pipeline.perimeter_structures` et `application.ports.api.perimeters_queries`.
 """
 
 from sqlalchemy import Connection, text
@@ -18,7 +18,7 @@ from application.ports.api.perimeters_queries import (
     PerimetersQueries,
     PerimeterStructureItem,
 )
-from application.ports.pipeline.perimeter import PerimeterQueries
+from application.ports.pipeline.perimeter_structures import PerimeterStructuresQueries
 
 # ── Fonctions libres ──────────────────────────────────────────────
 
@@ -67,17 +67,14 @@ def refresh_perimeter_structures(conn: Connection) -> None:
 
 
 def _config_perimeter_code(conn: Connection, config_key: str, default: str) -> str:
-    """Lit un code périmètre depuis la table config."""
-    try:
-        row = conn.execute(
-            text("SELECT value FROM config WHERE key = :key"),
-            {"key": config_key},
-        ).first()
-        if row:
-            val = row.value
-            return val if isinstance(val, str) else default
-    except Exception:
-        pass
+    """Lit un code périmètre depuis la table config, ou rend `default` si la clé est absente."""
+    row = conn.execute(
+        text("SELECT value FROM config WHERE key = :key"),
+        {"key": config_key},
+    ).first()
+    if row:
+        val = row.value
+        return val if isinstance(val, str) else default
     return default
 
 
@@ -110,8 +107,8 @@ def get_persons_perimeter_root_ids(conn: Connection) -> list[int]:
 # ── Adapters Pg* pour les ports ───────────────────────────────────
 
 
-class PgPerimeterQueries(PerimeterQueries):
-    """Adapter PostgreSQL pour `application.ports.pipeline.perimeter.PerimeterQueries`."""
+class PgPerimeterStructuresQueries(PerimeterStructuresQueries):
+    """Adapter PostgreSQL pour `application.ports.pipeline.perimeter_structures.PerimeterStructuresQueries`."""
 
     def get_persons_structure_ids_list(self, conn: Connection) -> list[int]:
         return get_persons_structure_ids_list(conn)

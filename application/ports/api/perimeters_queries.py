@@ -1,6 +1,6 @@
 """Port : lectures sur les périmètres pour le router /api/perimeters/.
 
-Distinct de `application.ports.pipeline.perimeter.PerimeterQueries`, qui expose au pipeline la résolution du périmètre `persons` : ce port-ci sert le listing complet des périmètres.
+Distinct de `application.ports.pipeline.perimeter_structures.PerimeterStructuresQueries`, qui expose au pipeline la résolution du périmètre `persons` : ce port-ci sert le listing complet des périmètres.
 
 Implémenté par `infrastructure.queries.perimeter.PgPerimetersQueries`.
 """

@@ -8,7 +8,7 @@ La construction du stock relève du pipeline, qui écrit en SQL ensembliste : la
 from sqlalchemy import Connection
 
 from application.audit_log import emit_event
-from application.ports.pipeline.perimeter import PerimeterQueries
+from application.ports.pipeline.perimeter_structures import PerimeterStructuresQueries
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.authorship_repository import AuthorshipRepository
 from application.ports.repositories.person_repository import PersonRepository
@@ -84,7 +84,7 @@ def propagate_in_perimeter_for_addresses(
     address_ids: list[int],
     *,
     repo: AuthorshipRepository,
-    perimeter_queries: PerimeterQueries,
+    perimeter_queries: PerimeterStructuresQueries,
 ) -> None:
     """Recalcule `in_perimeter` sur les `source_authorships` et les `authorships` canoniques liés aux adresses données.
 

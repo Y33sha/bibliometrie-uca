@@ -29,7 +29,7 @@ from application.ports.api.stats_queries import StatsQueries
 from application.ports.api.structures_queries import StructuresQueries
 from application.ports.api.subjects_queries import SubjectsQueries
 from application.ports.pipeline.metadata_correction import MetadataCorrectionQueries
-from application.ports.pipeline.perimeter import PerimeterQueries
+from application.ports.pipeline.perimeter_structures import PerimeterStructuresQueries
 from application.ports.repositories.address_repository import AddressRepository
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.authorship_repository import AuthorshipRepository
@@ -60,7 +60,7 @@ from infrastructure.queries.api.publishers import PgPublisherQueries
 from infrastructure.queries.api.stats import PgStatsQueries
 from infrastructure.queries.api.structures import PgStructuresQueries
 from infrastructure.queries.api.subjects import PgSubjectsQueries
-from infrastructure.queries.perimeter import PgPerimeterQueries, PgPerimetersQueries
+from infrastructure.queries.perimeter import PgPerimetersQueries, PgPerimeterStructuresQueries
 from infrastructure.queries.pipeline.metadata_correction import PgMetadataCorrectionQueries
 from infrastructure.repositories import (
     address_repository,
@@ -262,11 +262,11 @@ def addresses_queries(conn: Connection = Depends(db_conn)) -> AddressesQueries:
     return PgAddressesQueries(conn)
 
 
-# `PgPerimeterQueries` est sans état (la connexion est passée aux méthodes) : un singleton par processus suffit.
-_perimeter_queries_singleton: PerimeterQueries = PgPerimeterQueries()
+# `PgPerimeterStructuresQueries` est sans état (la connexion est passée aux méthodes) : un singleton par processus suffit.
+_perimeter_queries_singleton: PerimeterStructuresQueries = PgPerimeterStructuresQueries()
 
 
-def get_perimeter_queries() -> PerimeterQueries:
+def get_perimeter_queries() -> PerimeterStructuresQueries:
     return _perimeter_queries_singleton
 
 

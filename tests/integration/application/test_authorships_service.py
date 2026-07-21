@@ -16,7 +16,7 @@ from application.services.authorships.core import (
     reject_pair,
 )
 from domain.errors import NotFoundError
-from infrastructure.queries.perimeter import PgPerimeterQueries
+from infrastructure.queries.perimeter import PgPerimeterStructuresQueries
 from infrastructure.repositories import authorship_repository
 from tests.integration.helpers.authorships import upsert_identity
 from tests.integration.helpers.structures import refresh_structure_matviews
@@ -24,7 +24,7 @@ from tests.integration.helpers.structures import refresh_structure_matviews
 
 @pytest.fixture
 def perimeter_queries():
-    return PgPerimeterQueries()
+    return PgPerimeterStructuresQueries()
 
 
 @pytest.fixture
