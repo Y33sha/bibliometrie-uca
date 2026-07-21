@@ -10,7 +10,7 @@ Trois signaux peuplent la table :
 
 Les relations même-œuvre (versions, formes variantes, pièces de package) sont absentes des trois signaux : elles sont traitées en déduplication à la phase `metadata_correction`, en amont.
 
-Reconstruction complète à chaque run (table dérivée) : chaque signal purge ses propres relations (par `source`) puis les réécrit, donc idempotent et sans dérive.
+Reconstruction complète à chaque run (table dérivée) : la table est purgée puis réécrite depuis les trois signaux réunis, en une transaction — idempotent et sans dérive.
 """
 
 import logging
@@ -101,31 +101,31 @@ def run(
     with open_tx() as conn:
         sources = queries.fetch_declared_relation_sources(conn)
         declared_edges = _build_declared_edges(sources)
-        written_declared = queries.replace_declared_relations(conn, declared_edges)
 
         pairs = queries.fetch_shared_key_pairs(conn)
         declared_pairs = queries.fetch_declared_related_pairs(conn)
         shared_edges = _build_shared_key_edges(pairs, declared_pairs)
-        written_shared = queries.replace_shared_key_relations(conn, shared_edges)
 
         erratum_matches = queries.fetch_erratum_title_matches(conn)
         preprint_matches = queries.fetch_preprint_title_matches(conn)
         title_edges = _build_title_match_edges(
             erratum_matches, DEPENDENT_DOC_TYPE_RELATIONS["erratum"]
         ) + _build_title_match_edges(preprint_matches, DEPENDENT_DOC_TYPE_RELATIONS["preprint"])
-        written_title = queries.replace_title_match_relations(conn, title_edges)
 
+        # L'ordre déclarées → clés partagées → titre fixe la priorité de dédup (`ON CONFLICT`).
+        written = queries.rebuild_relations(conn, declared_edges + shared_edges + title_edges)
         by_type = queries.count_by_relation_type(conn)
 
     logger.info(
-        "✓ relations : déclarées %d (%d arêtes / %d source_publications) ; "
-        "clés partagées %d (%d paires) ; par titre %d (%d erratums, %d preprints) — en %.1fs",
-        written_declared,
+        "✓ relations : %d écrites — déclarées %d arêtes / %d source_publications ; "
+        "clés partagées %d arêtes / %d paires ; par titre %d arêtes (%d erratums, %d preprints) "
+        "— en %.1fs",
+        written,
         len(declared_edges),
         len(sources),
-        written_shared,
+        len(shared_edges),
         len(pairs),
-        written_title,
+        len(title_edges),
         len(erratum_matches),
         len(preprint_matches),
         time.perf_counter() - t0,

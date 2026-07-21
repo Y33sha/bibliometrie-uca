@@ -153,8 +153,11 @@ def fetch_preprint_title_matches(conn: Connection) -> list[TitleMatch]:
     return [TitleMatch(r.child_id, r.parent_id, r.parent_doi) for r in rows]
 
 
-def _insert_relation_edges(conn: Connection, edges: list[RelationEdge]) -> int:
-    """Insère `edges` en désignant la cible soit directement par `target_publication_id` (cible au corpus connue, ex. rapprochement par titre), soit en la résolvant par LEFT JOIN sur le DOI (relations déclarées). Écarte les auto-relations et dédoublonne par la contrainte d'unicité. Un seul aller-retour bulk via `jsonb_to_recordset`. Retourne le nombre de lignes insérées."""
+def rebuild_relations(conn: Connection, edges: list[RelationEdge]) -> int:
+    """Reconstruit `publication_relations` (table dérivée) : purge la table, puis insère `edges`.
+
+    Chaque arête porte sa propre `source`. La cible est désignée soit directement par `target_publication_id` (cible au corpus connue, ex. rapprochement par titre), soit résolue par LEFT JOIN sur le DOI (relations déclarées). Écarte les auto-relations, dédoublonne par la contrainte d'unicité — l'ordre de `edges` fixe la priorité en cas de collision. Un seul aller-retour bulk via `jsonb_to_recordset`. Retourne le nombre inséré."""
+    conn.execute(text("DELETE FROM publication_relations"))
     if not edges:
         return 0
     payload = [
@@ -179,24 +182,6 @@ def _insert_relation_edges(conn: Connection, edges: list[RelationEdge]) -> int:
     return conn.execute(stmt, {"payload": payload}).rowcount
 
 
-def replace_declared_relations(conn: Connection, edges: list[RelationEdge]) -> int:
-    """Purge les relations déclarées (`source` datacite/crossref), puis insère `edges`."""
-    conn.execute(text("DELETE FROM publication_relations WHERE source IN ('datacite', 'crossref')"))
-    return _insert_relation_edges(conn, edges)
-
-
-def replace_shared_key_relations(conn: Connection, edges: list[RelationEdge]) -> int:
-    """Purge les relations issues des clés partagées (`source` shared_key), puis insère `edges`."""
-    conn.execute(text("DELETE FROM publication_relations WHERE source = 'shared_key'"))
-    return _insert_relation_edges(conn, edges)
-
-
-def replace_title_match_relations(conn: Connection, edges: list[RelationEdge]) -> int:
-    """Purge les relations rapprochées par titre (`source` title_match), puis insère `edges`."""
-    conn.execute(text("DELETE FROM publication_relations WHERE source = 'title_match'"))
-    return _insert_relation_edges(conn, edges)
-
-
 def count_by_relation_type(conn: Connection) -> list[tuple[str, int]]:
     """`(relation_type, nombre)` par type, décroissant — distribution de `publication_relations`."""
     # Alias `rel_type` / `cnt` : nommer une colonne `t` heurterait l'attribut déprécié `Row.t` de SQLAlchemy (`r.t` renverrait la Row entière, non la colonne).
@@ -215,17 +200,11 @@ class PgPublicationRelationsQueries(PublicationRelationsQueries):
     def fetch_declared_relation_sources(self, conn: Connection) -> list[DeclaredRelationSource]:
         return fetch_declared_relation_sources(conn)
 
-    def replace_declared_relations(self, conn: Connection, edges: list[RelationEdge]) -> int:
-        return replace_declared_relations(conn, edges)
-
     def fetch_shared_key_pairs(self, conn: Connection) -> list[SharedKeyPair]:
         return fetch_shared_key_pairs(conn)
 
     def fetch_declared_related_pairs(self, conn: Connection) -> set[frozenset[int]]:
         return fetch_declared_related_pairs(conn)
-
-    def replace_shared_key_relations(self, conn: Connection, edges: list[RelationEdge]) -> int:
-        return replace_shared_key_relations(conn, edges)
 
     def fetch_erratum_title_matches(self, conn: Connection) -> list[TitleMatch]:
         return fetch_erratum_title_matches(conn)
@@ -233,8 +212,8 @@ class PgPublicationRelationsQueries(PublicationRelationsQueries):
     def fetch_preprint_title_matches(self, conn: Connection) -> list[TitleMatch]:
         return fetch_preprint_title_matches(conn)
 
-    def replace_title_match_relations(self, conn: Connection, edges: list[RelationEdge]) -> int:
-        return replace_title_match_relations(conn, edges)
+    def rebuild_relations(self, conn: Connection, edges: list[RelationEdge]) -> int:
+        return rebuild_relations(conn, edges)
 
     def count_by_relation_type(self, conn: Connection) -> list[tuple[str, int]]:
         return count_by_relation_type(conn)
