@@ -1,11 +1,6 @@
 """Fragments SQL et constructeurs de filtres pour les requêtes de lecture.
 
-API : chaque `*_clause(...)` retourne un `WhereClause | None`,
-composable via `assemble_where(...)`. Les fragments utilisent la syntaxe
-nommée SQLAlchemy `:nom` et s'exécutent via une `Connection` SA.
-
-Vit dans `infrastructure/` parce que ces fonctions génèrent du SQL
-(infrastructure technique).
+Chaque `*_clause(...)` retourne un `WhereClause | None`, composable via `assemble_where(...)`. Les fragments utilisent la syntaxe nommée SQLAlchemy `:nom` et s'exécutent via une `Connection` SA.
 """
 
 from collections.abc import Iterable

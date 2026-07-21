@@ -1,7 +1,4 @@
-"""Query services pour /api/structures/* et /api/name-forms/*.
-
-`PgStructuresQueries` hérite explicitement du Protocol `application.ports.api.structures_queries.StructuresQueries`.
-"""
+"""Query services pour /api/structures/* (structures et leurs formes de nom)."""
 
 import datetime
 from typing import Any

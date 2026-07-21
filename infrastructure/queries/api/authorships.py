@@ -12,8 +12,7 @@ from application.ports.api.authorships_queries import (
 from domain.persons.name_matching import parse_raw_author_name
 from infrastructure.queries.sources_sql import AUTHOR_SOURCES_SQL
 
-# Une signature est orpheline quand aucune personne ne la porte, dans le périmètre et sous un
-# rôle d'auteur d'une source principale : c'est la matière que la file de rattachement présente.
+# Une signature est orpheline quand aucune personne ne la porte, dans le périmètre et sous un rôle d'auteur d'une source principale : c'est la matière que la file de rattachement présente.
 _ORPHAN_BASE = f"""
     sa.person_id IS NULL AND sa.in_perimeter = TRUE
     AND sa.source IN {AUTHOR_SOURCES_SQL}
@@ -74,9 +73,7 @@ def list_orphan_authorships(
         """),
         {**binds, "pg_limit": per_page, "pg_offset": offset},
     ).all()
-    # Décompose `raw_author_name` en last_name/first_name côté domain,
-    # pour éviter de dupliquer la règle de parsing dans le frontend
-    # (cf. domain/persons/name_matching.py::parse_raw_author_name).
+    # Décompose `raw_author_name` en last_name/first_name via `parse_raw_author_name`, la règle de parsing unique du domaine.
     authorships: list[dict[str, Any]] = []
     for row in rows:
         data = dict(row._mapping)

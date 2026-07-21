@@ -1,7 +1,4 @@
-"""Query services pour /api/admin/duplicates/*.
-
-`PgPublicationDuplicatesQueries` hérite explicitement du Protocol `application.ports.api.publication_duplicates_queries.PublicationDuplicatesQueries`.
-"""
+"""Query services de la déduplication des publications, servie sous `/api/publications/duplicates/*`."""
 
 from sqlalchemy import Connection, text
 
