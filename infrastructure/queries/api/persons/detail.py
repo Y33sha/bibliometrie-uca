@@ -29,11 +29,7 @@ def person_profile(conn: Connection, person_id: int) -> dict[str, Any] | None:
 
     identifiers = public_identifiers(conn, [person_id], include_rejected=False).get(person_id, [])
 
-    # Reconstitution de la vue « comptes HAL » depuis source_authorships
-    # agrégés par hal_person_id (1 row par compte HAL pour cette personne).
-    # MIN() arbitraire mais déterministe sur les champs descriptifs : en
-    # théorie constants pour un même hal_person_id (attachés au compte
-    # HAL, pas à la signature).
+    # Reconstitution des « comptes HAL » depuis `source_authorships`, agrégés par hal_person_id (1 row par compte). MIN() sur les champs descriptifs : arbitraire mais déterministe, en théorie constants pour un même hal_person_id.
     hal_rows = conn.execute(
         text("""
             SELECT MIN(sa.id) AS id,
@@ -70,8 +66,7 @@ def person_profile(conn: Connection, person_id: int) -> dict[str, Any] | None:
     ).all()
     oa_authors = [dict(r._mapping) for r in oa_rows]
 
-    # WoS : group by raw_author_name comme OpenAlex. ORCID lu depuis
-    # l'identité de la signature (`author_identifying_keys.person_identifiers`).
+    # WoS : group by raw_author_name comme OpenAlex. ORCID lu depuis l'identité de la signature (`author_identifying_keys.person_identifiers`).
     wos_rows = conn.execute(
         text("""
             SELECT MIN(sa.id) AS id,
@@ -125,10 +120,7 @@ _THESIS_ROLE_LABELS = {
 def person_theses(conn: Connection, person_id: int) -> dict[str, Any]:
     """Thèses liées à cette personne avec un rôle non-auteur.
 
-    Les rôles sont lus depuis `authorships` canonique (alignement vérifié
-    avec `source_authorships.roles` sur la base). Le filtre `source = 'theses'`
-    reste source-spécifique (HAL/ScanR remontent quelques rôles non-auteur
-    qu'on n'affiche pas dans cette page) et passe par un `EXISTS`.
+    Les rôles sont lus depuis `authorships` canonique (alignement vérifié avec `source_authorships.roles` sur la base). Le filtre `source = 'theses'` reste source-spécifique (HAL/ScanR remontent quelques rôles non-auteur qu'on n'affiche pas dans cette page) et passe par un `EXISTS`.
     """
     rows = conn.execute(
         text("""

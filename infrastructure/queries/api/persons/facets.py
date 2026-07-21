@@ -1,4 +1,4 @@
-"""Facettes dynamiques + listes de référence (départements, rôles, stats) — sync."""
+"""Facettes dynamiques + listes de référence (départements, rôles, stats)."""
 
 from typing import Any
 
@@ -27,8 +27,7 @@ def persons_facets(conn: Connection, *, filters: PersonFilters) -> dict[str, Any
     """Facettes dynamiques (chaque facette exclut son propre filtre)."""
 
     def base_clauses(*, skip: str) -> list[WhereClause | None]:
-        # Scope labo, recherche nom et rejet s'appliquent à toutes les facettes : ils
-        # délimitent la population décomptée, au lieu d'en être une dimension.
+        # Scope labo, recherche nom et rejet s'appliquent à toutes les facettes : ils délimitent la population décomptée, au lieu d'en être une dimension.
         out: list[WhereClause | None] = [
             person_rejected_clause(filters.rejected),
             person_in_lab_clause(filters.lab_id),
@@ -160,8 +159,7 @@ def persons_facets(conn: Connection, *, filters: PersonFilters) -> dict[str, Any
         binds,
     ).one()
 
-    # IDENTIFIANTS À CONFIRMER (≥1 identifiant public `pending`) — mêmes types
-    # que la cellule d'affichage, un `hal_person_id` en attente est interne.
+    # IDENTIFIANTS À CONFIRMER (≥1 identifiant public `pending`) — mêmes types que la cellule d'affichage, un `hal_person_id` en attente est interne.
     where_sql, binds = assemble_where(base_clauses(skip="pending_identifiers"))
     pending_identifiers = conn.execute(
         text(f"""

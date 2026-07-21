@@ -1,4 +1,4 @@
-"""Query services admin sync pour les personnes : authorships par forme de nom, files de triage des formes et des identifiants."""
+"""Query services admin pour les personnes : authorships par forme de nom, files de triage des formes et des identifiants."""
 
 from collections import defaultdict
 from typing import Any
@@ -12,8 +12,7 @@ from infrastructure.queries.sources_sql import AUTHOR_SOURCES_SQL
 
 
 def name_form_authorships(conn: Connection, person_id: int, name_form: str) -> dict[str, Any]:
-    """Authorships sources liées à une personne pour une forme de nom donnée
-    + autres personnes partageant cette forme."""
+    """Authorships sources liées à une personne pour une forme de nom donnée, + autres personnes partageant cette forme."""
     auth_rows = conn.execute(
         text(f"""
             SELECT sa.source, sa.id AS source_authorship_id,
@@ -50,8 +49,7 @@ def name_form_authorships(conn: Connection, person_id: int, name_form: str) -> d
 
 # ── File de triage : formes de nom ambiguës ──────────────────────
 
-# Une forme portée par ≥2 personnes, avec au moins un lien encore `pending`
-# (les liens déjà tranchés confirmed/rejected sortent du travail à faire).
+# Une forme portée par ≥2 personnes, avec au moins un lien encore `pending` (les liens déjà tranchés confirmed/rejected sortent du travail à faire).
 _AMBIGUOUS_FORMS_HAVING = "HAVING count(*) >= 2 AND bool_or(status = 'pending')"
 
 
@@ -71,9 +69,7 @@ def ambiguous_name_forms_count(conn: Connection) -> int:
 def ambiguous_name_forms(conn: Connection, *, page: int, per_page: int) -> dict[str, Any]:
     """Formes de nom ambiguës paginées, avec les personnes qui les portent.
 
-    Chaque personne porte son statut (pending/confirmed/rejected) pour cette forme
-    et un drapeau `compatible` (nom canonique compatible avec la forme, par tokens) —
-    discriminant homonyme/doublon (compatible) vs erreur (incompatible).
+    Chaque personne porte son statut (pending/confirmed/rejected) pour cette forme et un drapeau `compatible` (nom canonique compatible avec la forme, par tokens) — discriminant homonyme/doublon (compatible) vs erreur (incompatible).
     """
     total = ambiguous_name_forms_count(conn)
     offset = (page - 1) * per_page
@@ -125,13 +121,7 @@ def ambiguous_name_forms(conn: Connection, *, page: int, per_page: int) -> dict[
 
 # ── Conflits d'identifiant (file de triage du hub) ───────────────
 
-# Paires de personnes distinctes portant la même valeur brute d'identifiant. Le CTE
-# `person_identifier_keys` projette les triplets `(person_id, id_type, id_value)` observés sur les
-# signatures rattachées, en lisant les identifiants via `author_identifying_keys` (grain identité,
-# hors `_dubious`). Référencé deux fois, il est matérialisé une fois par PostgreSQL : le parcours
-# de `source_authorships` est un index-only scan couvert par `idx_sa_person` (person_id, identity_id),
-# et le self-join sur (id_type, id_value) porte sur les seules ~24 k lignes projetées. Exclut les
-# paires déjà marquées distinctes.
+# Paires de personnes distinctes au même identifiant brut : le CTE projette `(person_id, id_type, id_value)` des signatures (via `author_identifying_keys`, hors `_dubious`), le self-join les apparie, hors paires déjà distinctes.
 _IDENTIFIER_CONFLICT_PAIRS = """
     WITH person_identifier_keys AS (
         SELECT DISTINCT sa.person_id, k.k AS id_type, (aik.person_identifiers ->> k.k) AS id_value
@@ -204,8 +194,7 @@ def _light_persons(conn: Connection, ids: list[int]) -> dict[int, dict[str, Any]
 
 
 def identifier_conflicts(conn: Connection, *, page: int, per_page: int) -> dict[str, Any]:
-    """Paires de personnes au même identifiant brut, paginées, avec vue allégée des deux personnes
-    et l'identifiant partagé en évidence. Le tri doublon / erreur d'attribution est laissé à l'œil."""
+    """Paires de personnes au même identifiant brut, paginées, avec vue allégée des deux personnes et l'identifiant partagé en évidence. Le tri doublon / erreur d'attribution est laissé à l'œil."""
     total = identifier_conflicts_count(conn)
     offset = (page - 1) * per_page
     rows = conn.execute(
@@ -235,9 +224,7 @@ def identifier_conflicts(conn: Connection, *, page: int, per_page: int) -> dict[
 
 # ── Intrus détachables (file de triage du hub) ───────────────────
 
-# Une même personne rattachée à ≥2 signatures d'une même `source_publication` : impossible (on ne
-# signe pas deux positions d'un même enregistrement), donc l'une des signatures est mal rattachée.
-# L'index partiel `idx_sa_pub_person` sert ce groupement en index-only scan ordonné.
+# Une même personne rattachée à ≥2 signatures d'une même `source_publication` : impossible (on ne signe pas deux positions d'un enregistrement), une des signatures est mal rattachée.
 _REPEATED_CANDIDATES_SQL = text("""
     SELECT source_publication_id AS spid, person_id
     FROM source_authorships
@@ -246,8 +233,7 @@ _REPEATED_CANDIDATES_SQL = text("""
     HAVING count(*) >= 2
 """)
 
-# Occurrences des seules paires candidates (pas tous les auteurs des méga-publications) : `unnest`
-# zippe les deux tableaux parallèles en couples exacts `(source_publication, personne)`.
+# Occurrences des seules paires candidates (pas tous les auteurs des méga-publications) : `unnest` zippe les deux tableaux parallèles en couples exacts `(source_publication, personne)`.
 _REPEATED_OCCURRENCES_SQL = text("""
     SELECT sa.source_publication_id AS spid, sa.person_id,
            sa.source::text AS source, sa.raw_author_name AS name,
@@ -260,8 +246,7 @@ _REPEATED_OCCURRENCES_SQL = text("""
       AND aik.author_name_normalized IS NOT NULL
 """).bindparams(bindparam("spids"), bindparam("pids"))
 
-# Formes qui font ancre : confirmées par admin, ou dérivées du nom canonique de la
-# personne (`'persons' ∈ sources`, appartenance qui ne se lit plus dans le statut).
+# Formes qui font ancre : confirmées par admin, ou dérivées du nom canonique de la personne (`'persons' ∈ sources`, confirmées d'office).
 _CONFIRMED_FORMS_SQL = text("""
     SELECT person_id, name_form FROM person_name_forms
     WHERE (status = 'confirmed' OR 'persons' = ANY(sources)) AND person_id = ANY(:pids)
@@ -271,8 +256,7 @@ _IDENTIFIER_KEYS = ("orcid", "idref", "hal_person_id", "idhal")
 
 
 def _occurrence_identifiers(raw: Any) -> list[dict[str, str]]:
-    """Identifiants bruts portés par une signature (hors valeurs neutralisées `_dubious`) —
-    élément de décision : c'est souvent l'identifiant fautif qui a rattaché l'intrus."""
+    """Identifiants bruts portés par une signature (hors valeurs neutralisées `_dubious`) — élément de décision : c'est souvent l'identifiant fautif qui a rattaché l'intrus."""
     if not raw:
         return []
     return [
@@ -283,12 +267,9 @@ def _occurrence_identifiers(raw: Any) -> list[dict[str, str]]:
 
 
 def _detachable_groups(conn: Connection) -> list[tuple[int, int, list[Any], list[Any]]]:
-    """Groupes `(source_publication, personne)` à ≥2 signatures dont au moins une est légitime
-    (compatible avec une forme `confirmed`) et au moins une est intruse (incompatible).
+    """Groupes `(source_publication, personne)` à ≥2 signatures dont au moins une est légitime (compatible avec une forme `confirmed`) et au moins une est intruse (incompatible).
 
-    Reprend le départage de l'audit `audit_repeated_person_in_publication` : seules les formes
-    `confirmed` servent d'ancre ; une occurrence sans aucune forme confirmée compatible est intruse.
-    Retourne `(spid, person_id, ancres, intrus)`."""
+    Reprend le départage de l'audit `audit_repeated_person_in_publication` : seules les formes `confirmed` servent d'ancre ; une occurrence sans aucune forme confirmée compatible est intruse. Retourne `(spid, person_id, ancres, intrus)`."""
     candidates = conn.execute(_REPEATED_CANDIDATES_SQL).all()
     if not candidates:
         return []
@@ -337,11 +318,9 @@ def _publications_for_spids(conn: Connection, spids: list[int]) -> dict[int, dic
 
 
 def detachable_intruders(conn: Connection, *, page: int, per_page: int) -> dict[str, Any]:
-    """Groupes détachables paginés : la personne, son occurrence-ancre, son occurrence-intrus (avec
-    la forme de nom à rejeter et l'identifiant fautif) et la publication où les deux coexistent.
+    """Groupes détachables paginés : la personne, son occurrence-ancre, son occurrence-intrus (avec la forme de nom à rejeter et l'identifiant fautif) et la publication où les deux coexistent.
 
-    L'action de résolution est le rejet de la forme de nom de l'intrus (`name_form`), qui détache
-    les signatures et pose le verrou de non-retour."""
+    L'action de résolution est le rejet de la forme de nom de l'intrus (`name_form`), qui détache les signatures et pose le verrou de non-retour."""
     groups = _detachable_groups(conn)
     total = len(groups)
     offset = (page - 1) * per_page
@@ -381,10 +360,7 @@ def detachable_intruders(conn: Connection, *, page: int, per_page: int) -> dict[
 
 # ── Doublons par nom (file de triage du hub) ─────────────────────
 
-# Génération des paires candidates : 4 requêtes volontairement larges (recall important), resserrées
-# ensuite par `names_compatible` (comparaison par tokens), les faux positifs résiduels étant filtrés
-# à l'œil. Exclut les paires déjà marquées distinctes et celles dont les deux membres ont une fiche
-# RH (deux titulaires distincts ne se fusionnent pas).
+# Paires candidates : 4 requêtes larges (recall), resserrées par `names_compatible` (tokens), résidus filtrés à l'œil. Exclut les paires déjà distinctes et celles dont les deux membres ont une fiche RH (deux titulaires ne fusionnent pas).
 _DUP_NOT_EXISTS = """
     WHERE NOT EXISTS (
         SELECT 1 FROM distinct_persons dp
@@ -466,9 +442,7 @@ PERSON_DUP_QUERIES = [
 ]
 
 
-# Recouvrements de réseau entre deux personnes : chaque dimension renvoie (person_id, valeur), au
-# grain `authorships`. Réseaux disjoints → homonyme légitime ; réseaux communs → doublon. Les sujets
-# sont écartés (trop larges pour discriminer : même domaine ≠ même personne).
+# Recouvrements de réseau entre deux personnes : chaque dimension renvoie (person_id, valeur) au grain `authorships`. Réseaux disjoints → homonyme, communs → doublon. Sujets écartés (trop larges : même domaine ≠ même personne).
 _OVERLAP_DIMENSIONS: dict[str, str] = {
     "coauthors": """
         SELECT a1.person_id AS person, a2.person_id AS val
@@ -504,8 +478,7 @@ def _overlap_sets(conn: Connection, sql: str, ids: list[int]) -> dict[int, set[i
 
 
 def _name_duplicate_candidates(conn: Connection) -> list[tuple[int, int]]:
-    """Paires de personnes aux noms compatibles (union des requêtes larges, resserrée par tokens).
-    Étape la moins chère : sert le badge sans charger les recouvrements de réseau."""
+    """Paires de personnes aux noms compatibles (union des requêtes larges, resserrée par tokens). Étape la moins chère : sert le badge sans charger les recouvrements de réseau."""
     seen: set[tuple[int, int]] = set()
     candidates: list[tuple[int, int]] = []
     for sql in PERSON_DUP_QUERIES:
@@ -520,8 +493,7 @@ def _name_duplicate_candidates(conn: Connection) -> list[tuple[int, int]]:
 
 
 def _name_duplicate_pairs(conn: Connection) -> list[tuple[int, int, dict[str, int]]]:
-    """Paires candidates enrichies de leurs recouvrements de réseau, triées par force décroissante
-    (doublons évidents d'abord, homonymes en fin de file)."""
+    """Paires candidates enrichies de leurs recouvrements de réseau, triées par force décroissante (doublons évidents d'abord, homonymes en fin de file)."""
     candidates = _name_duplicate_candidates(conn)
     if not candidates:
         return []
@@ -550,8 +522,7 @@ def name_duplicates_count(conn: Connection) -> int:
 
 
 def name_duplicates(conn: Connection, *, page: int, per_page: int) -> dict[str, Any]:
-    """Paires candidates par nom, paginées, avec vue allégée des deux personnes, recouvrements de
-    réseau chiffrés et pastille de force. Fusion / marquage distinct laissés à l'œil."""
+    """Paires candidates par nom, paginées, avec vue allégée des deux personnes, recouvrements de réseau chiffrés et pastille de force. Fusion / marquage distinct laissés à l'œil."""
     pairs = _name_duplicate_pairs(conn)
     total = len(pairs)
     offset = (page - 1) * per_page
@@ -580,8 +551,7 @@ def name_duplicates(conn: Connection, *, page: int, per_page: int) -> dict[str, 
 def persons_sharing_name_form(conn: Connection, person_id: int) -> list[dict[str, Any]]:
     """Autres personnes (non rejetées) partageant ≥1 forme de nom avec `person_id`.
 
-    Candidates à l'absorption (fusion vers `person_id`). `shared_forms` liste les
-    formes en commun — éléments de décision affichés dans le drawer."""
+    Candidates à l'absorption (fusion vers `person_id`). `shared_forms` liste les formes en commun — éléments de décision affichés dans le drawer."""
     rows = conn.execute(
         text("""
             SELECT p2.id, p2.first_name, p2.last_name,
