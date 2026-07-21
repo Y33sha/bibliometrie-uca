@@ -12,6 +12,7 @@
 
 ### Non commencé
 
+- [Vocabulaires fermés : StrEnum plutôt que Literal / chaînes](CODE_vocabulaires-fermes-strenum.md)
 - [Qualité et cohérence des sujets](METIER_sujets-qualite.md)
 - [Signatures institutionnelles](METIER_signatures-institutionnelles.md)
 
