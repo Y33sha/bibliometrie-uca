@@ -24,7 +24,7 @@ from application.ports.api.structures_queries import (
 )
 from application.ports.api.subjects_queries import SubjectFrequency
 from domain.countries import NON_INTERNATIONAL_COUNTRY_CODES
-from infrastructure.queries.filters import OA_DASHBOARD_COLS_SQL, SUBJECT_IS_NOT_GENERIC
+from infrastructure.queries.api.filters import OA_DASHBOARD_COLS_SQL, SUBJECT_IS_NOT_GENERIC
 from infrastructure.queries.perimeter import get_persons_structure_ids_list
 
 _NON_INTERNATIONAL = sorted(NON_INTERNATIONAL_COUNTRY_CODES)

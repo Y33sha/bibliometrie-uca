@@ -6,8 +6,8 @@ from typing import Any
 from sqlalchemy import Connection, text
 
 from application.ports.api._common import page_count
+from infrastructure.queries.api.filters import OA_DASHBOARD_COLS_SQL, SUBJECT_IS_NOT_GENERIC
 from infrastructure.queries.api.persons.identifiers import public_identifiers
-from infrastructure.queries.filters import OA_DASHBOARD_COLS_SQL, SUBJECT_IS_NOT_GENERIC
 
 
 def person_profile(conn: Connection, person_id: int) -> dict[str, Any] | None:

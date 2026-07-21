@@ -5,7 +5,7 @@ from typing import Any
 from sqlalchemy import Connection, text
 
 from application.ports.api.persons_queries import PersonFilters
-from infrastructure.queries.filters import (
+from infrastructure.queries.api.filters import (
     PUBLIC_PERSON_IDENTIFIER_TYPES_SQL,
     WhereClause,
     assemble_where,

@@ -17,8 +17,8 @@ from sqlalchemy import Connection, text
 from application.ports.api.stats_queries import StatsFilters
 from domain.publications.doc_types import DOC_TYPE_FAMILIES
 from domain.stats import DIMENSIONS, MEASURES, Dimension, validate_pivot
+from infrastructure.queries.api.filters import OA_OPEN_SQL, assemble_where
 from infrastructure.queries.api.stats._shared import STATS_BASE, stats_filter_clauses
-from infrastructure.queries.filters import OA_OPEN_SQL, assemble_where
 
 
 def doc_type_grouped_sql(column: str = "p.doc_type") -> str:

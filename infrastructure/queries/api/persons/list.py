@@ -5,8 +5,7 @@ from typing import Any
 from sqlalchemy import Connection, text
 
 from application.ports.api.persons_queries import PersonFilters
-from infrastructure.queries.api.persons.identifiers import public_identifiers
-from infrastructure.queries.filters import (
+from infrastructure.queries.api.filters import (
     WhereClause,
     assemble_where,
     person_department_clause,
@@ -20,6 +19,7 @@ from infrastructure.queries.filters import (
     person_search_clause,
     persons_sort_clause,
 )
+from infrastructure.queries.api.persons.identifiers import public_identifiers
 from infrastructure.queries.sources_sql import AUTHOR_SOURCES_SQL
 
 # Sous scope `lab_id`, les dénombrements ne comptent que les signatures portées par le

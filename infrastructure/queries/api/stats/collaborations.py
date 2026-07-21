@@ -13,8 +13,8 @@ from typing import Any
 from sqlalchemy import Connection, text
 
 from application.ports.api.stats_queries import StatsFilters
+from infrastructure.queries.api.filters import assemble_where
 from infrastructure.queries.api.stats._shared import STATS_BASE, stats_filter_clauses
-from infrastructure.queries.filters import assemble_where
 
 # Pays de rattachement du périmètre (France), exclu du décompte des collaborations internationales.
 # Codes pays en ISO 3166-1 alpha-2 minuscule, comme stockés dans `publications.countries`.

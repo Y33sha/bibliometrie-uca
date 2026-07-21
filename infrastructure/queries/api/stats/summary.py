@@ -6,8 +6,7 @@ from typing import Any
 from sqlalchemy import Connection, Row, text
 
 from application.ports.api.stats_queries import StatsFilters
-from infrastructure.queries.api.stats._shared import stats_apc_clause
-from infrastructure.queries.filters import (
+from infrastructure.queries.api.filters import (
     PUBLICATION_IS_IN_PERIMETER,
     WhereClause,
     assemble_where,
@@ -16,6 +15,7 @@ from infrastructure.queries.filters import (
     oa_clause,
     year_clause,
 )
+from infrastructure.queries.api.stats._shared import stats_apc_clause
 
 # Périmètre : corpus in-perimeter, hors revues-dépôts. Le type de document n'est PAS figé ici —
 # c'est un filtre comme un autre (facette « Type de document »), porté par `doc_type_clause`.

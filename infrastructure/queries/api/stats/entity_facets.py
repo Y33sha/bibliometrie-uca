@@ -14,8 +14,7 @@ from typing import Any, Literal
 from sqlalchemy import Connection, text
 
 from application.ports.api.stats_queries import StatsFilters
-from infrastructure.queries.api.stats._shared import stats_apc_clause
-from infrastructure.queries.filters import (
+from infrastructure.queries.api.filters import (
     PUBLICATION_IS_IN_PERIMETER,
     WhereClause,
     assemble_where,
@@ -24,6 +23,7 @@ from infrastructure.queries.filters import (
     oa_clause,
     year_clause,
 )
+from infrastructure.queries.api.stats._shared import stats_apc_clause
 
 EntityKind = Literal["publisher", "journal"]
 
