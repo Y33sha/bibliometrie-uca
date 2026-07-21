@@ -14,14 +14,9 @@ def fetch_publications_with_doi(
 ) -> list[PublicationOaCheck]:
     """`PublicationOaCheck` des publications à (re)vérifier sur Unpaywall.
 
-    Incrémental : les publications **jamais vérifiées**, puis celles dont la
-    vérification est **périmée** (> `staleness_days`). Triées jamais-vérifiées
-    d'abord puis les plus périmées ; `limit` cape le run pour lisser la charge
-    (le backlog s'écoule sur plusieurs runs).
+    Incrémental : les publications **jamais vérifiées**, puis celles dont la vérification est **périmée** (> `staleness_days`). Triées jamais-vérifiées d'abord puis les plus périmées ; `limit` cape le run pour lisser la charge (le backlog s'écoule sur plusieurs runs).
 
-    `has_open_deposit` signale qu'une archive ouverte détient le fichier (`OPEN_ARCHIVE_SOURCES`
-    avec `green`) : la phase oa_status s'en sert pour ne pas refermer un dépôt sur un `closed`
-    d'Unpaywall.
+    `has_open_deposit` signale qu'une archive ouverte détient le fichier (`OPEN_ARCHIVE_SOURCES` avec `green`) : la phase oa_status s'en sert pour ne pas refermer un dépôt sur un `closed` d'Unpaywall.
     """
     rows = conn.execute(
         text("""
@@ -51,8 +46,7 @@ def fetch_publications_with_doi(
 
 
 def count_stale_publications(conn: Connection, *, staleness_days: int = 30) -> int:
-    """Nombre de publications avec DOI à (re)vérifier — même prédicat que
-    `fetch_publications_with_doi`, sans cap. C'est le backlog de staleness OA."""
+    """Nombre de publications avec DOI à (re)vérifier — même prédicat que `fetch_publications_with_doi`, sans cap. C'est le backlog de staleness OA."""
     return conn.execute(
         text("""
             SELECT count(*)
