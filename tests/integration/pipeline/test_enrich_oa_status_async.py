@@ -66,10 +66,10 @@ class _FakeQueries:
         self._stale_total = stale_total if stale_total is not None else len(pubs)
         self._oa_distribution = oa_distribution or {}
 
-    def fetch_publications_with_doi(self, conn, *, limit=None, staleness_days=30):  # noqa: ARG002
+    def fetch_publications_with_doi(self, conn, *, limit=None, staleness_days):  # noqa: ARG002
         return self._pubs[:limit] if limit else self._pubs
 
-    def count_stale_publications(self, conn, *, staleness_days=30) -> int:  # noqa: ARG002
+    def count_stale_publications(self, conn, *, staleness_days) -> int:  # noqa: ARG002
         return self._stale_total
 
     def count_publications_by_oa_status(self, conn) -> dict[str, int]:  # noqa: ARG002

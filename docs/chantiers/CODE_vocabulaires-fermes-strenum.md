@@ -47,6 +47,13 @@ Coûts concrets :
 - [ ] Balayer les requêtes pour remplacer les littéraux de ces vocabulaires par `<Enum>.<X>.value`.
 - [ ] `metadata_correction` : remonter le mapping `relation_type` DataCite → `DoiClusterCase` au domaine.
 
+## Sites recensés
+
+Littéraux de vocabulaires fermés repérés dans le SQL, à remplacer par des membres d'enum (liste tenue au fil des relectures) :
+
+- [ ] `infrastructure/queries/pipeline/metadata_correction.py` — `'book'`, `'book_chapter'`, `'dataset'`, `'datacite'` ; et le mapping `relation_type` DataCite → `DoiClusterCase` du `CASE`.
+- [ ] `infrastructure/queries/pipeline/oa_status.py` — `'green'` (statut OA du dépôt en archive ouverte).
+
 ## Questions ouvertes
 
 - **Frontière base.** Rester sur l'égalité `str` de StrEnum (donnée = `str`, littéraux = membres), ou convertir en membres à l'ingestion pour un typage strict ? La première voie est la moins coûteuse et suffit aux comparaisons.
