@@ -2,7 +2,7 @@
 
 from sqlalchemy import text
 
-from infrastructure.queries.pipeline.address_pub_count import recompute_pub_count
+from infrastructure.queries.pipeline.publications.address_pub_count import recompute_pub_count
 from tests.integration.helpers.authorships import upsert_identity
 
 

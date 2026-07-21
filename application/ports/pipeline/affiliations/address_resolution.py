@@ -1,6 +1,6 @@
 """Port : résolution des adresses en structures, phase `affiliations`.
 
-Implémenté par `infrastructure.queries.pipeline.address_resolution.PgAddressResolutionQueries`.
+Implémenté par `infrastructure.queries.pipeline.affiliations.address_resolution.PgAddressResolutionQueries`.
 """
 
 from typing import NamedTuple, Protocol

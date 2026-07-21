@@ -21,7 +21,7 @@ from domain.errors import NotFoundError
 from domain.normalize import normalize_text
 from domain.publishers.publisher import Publisher, PublisherType
 from infrastructure.db.tables import publisher_name_forms, publishers
-from infrastructure.queries.pipeline.pub_counts import refresh_publisher_pub_count
+from infrastructure.queries.pipeline.authorships.pub_counts import refresh_publisher_pub_count
 
 
 class _PublisherRow(NamedTuple):

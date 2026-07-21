@@ -18,7 +18,7 @@ from application.ports.pipeline.normalize.authorships import (
     AuthorshipsBatchQueries,
     SourceAuthorshipItem,
 )
-from infrastructure.queries.pipeline.source_authorships import (
+from infrastructure.queries.pipeline.normalize.source_authorships import (
     clear_source_authorships_for_publication,
 )
 

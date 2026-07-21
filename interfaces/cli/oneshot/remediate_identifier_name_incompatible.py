@@ -44,7 +44,7 @@ from domain.persons.matching import ORCID_MATCH_SOURCES
 from domain.persons.name_matching import names_compatible
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from infrastructure.queries.pipeline.person_name_forms import PgPersonNameFormsQueries
+from infrastructure.queries.pipeline.persons.name_forms import PgPersonNameFormsQueries
 
 log = setup_logger("remediate_identifier_name_incompatible", os.path.dirname(__file__))
 

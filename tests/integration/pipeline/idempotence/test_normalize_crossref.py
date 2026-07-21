@@ -93,7 +93,7 @@ def _run_normalize_crossref(conn):
     from infrastructure.queries.pipeline.normalize.source_publications import (
         PgSourcePublicationQueries,
     )
-    from infrastructure.queries.pipeline.staging import PgStagingQueries
+    from infrastructure.queries.pipeline.normalize.staging import PgStagingQueries
     from infrastructure.repositories import (
         journal_repository,
         publication_repository,

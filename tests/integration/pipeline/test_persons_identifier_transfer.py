@@ -16,7 +16,7 @@ from sqlalchemy import text
 
 from application.pipeline.persons.arbitrate_identifiers import arbitrate_identifier_conflicts
 from application.pipeline.persons.cascade import run_cascade
-from infrastructure.queries.pipeline.persons_matching import PgPersonsMatchingQueries
+from infrastructure.queries.pipeline.persons.matching import PgPersonsMatchingQueries
 from infrastructure.repositories import authorship_repository, person_repository
 from tests.integration.helpers.authorships import upsert_identity
 

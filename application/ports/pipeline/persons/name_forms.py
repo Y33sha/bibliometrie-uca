@@ -2,7 +2,7 @@
 
 Quatre autres tables portent des formes de nom — structures, revues, éditeurs, lieux — chacune avec ses propres chemins d'écriture.
 
-Implémenté par `infrastructure.queries.pipeline.person_name_forms.PgPersonNameFormsQueries`.
+Implémenté par `infrastructure.queries.pipeline.persons.name_forms.PgPersonNameFormsQueries`.
 
 Workflow attendu : l'orchestrateur peuple une table temp `_raw_forms` avec les formes calculées depuis `persons` (compute_person_name_forms), puis appelle `sync_from_raw_forms` qui agrège (UNION SQL avec `source_authorships`) et synchronise `person_name_forms`.
 """

@@ -11,7 +11,7 @@ def _run_build_authorships(conn):
     import logging
 
     from application.pipeline.authorships.build_authorships import build
-    from infrastructure.queries.pipeline.authorships_build import PgAuthorshipsBuildQueries
+    from infrastructure.queries.pipeline.authorships.build import PgAuthorshipsBuildQueries
 
     build(conn, PgAuthorshipsBuildQueries(), logging.getLogger("test"))
 
@@ -67,7 +67,7 @@ class TestBuildAuthorshipsRebuildFull:
         import logging
 
         from application.pipeline.authorships.build_authorships import build
-        from infrastructure.queries.pipeline.authorships_build import PgAuthorshipsBuildQueries
+        from infrastructure.queries.pipeline.authorships.build import PgAuthorshipsBuildQueries
 
         setup_persons_test_data(sa_sync_conn)
         run_create_persons(sa_sync_conn)
@@ -145,7 +145,7 @@ class TestIncrementalEqualsFull:
         import logging
 
         from application.pipeline.authorships.build_authorships import build
-        from infrastructure.queries.pipeline.authorships_build import PgAuthorshipsBuildQueries
+        from infrastructure.queries.pipeline.authorships.build import PgAuthorshipsBuildQueries
 
         build(
             sa_sync_conn,

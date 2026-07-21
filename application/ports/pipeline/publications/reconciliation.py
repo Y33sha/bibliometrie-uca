@@ -1,6 +1,6 @@
 """Port : SQL de la passe de réconciliation des composantes (`reconcile_components`).
 
-Implémenté par `infrastructure.queries.pipeline.publications_reconciliation.PgPublicationsReconciliationQueries`.
+Implémenté par `infrastructure.queries.pipeline.publications.reconciliation.PgPublicationsReconciliationQueries`.
 
 La passe lit le **voisinage 1-hop** des `source_publications` marquées `keys_dirty` (les SP dirty + celles qui partagent une clé de confirmation avec elles), décide les assignations SP → pub-ancre (`domain.publications.reconciliation.plan_reconciliation` — assignation, merge et split unifiés : un orphelin se fait matcher/créer/skipper par le même primitif), les applique, puis efface le drapeau. Cf. le raisonnement 1-hop documenté côté domaine.
 """

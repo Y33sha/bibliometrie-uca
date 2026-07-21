@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from infrastructure.queries.pipeline.publications_reconciliation import count_publications
+from infrastructure.queries.pipeline.publications.reconciliation import count_publications
 
 
 def test_count_publications_s_execute(sa_sync_conn):

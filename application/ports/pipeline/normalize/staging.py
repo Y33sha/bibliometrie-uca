@@ -1,6 +1,6 @@
 """Port : opérations sur la table `staging`.
 
-Implémenté par `infrastructure.queries.pipeline.staging.PgStagingQueries`.
+Implémenté par `infrastructure.queries.pipeline.normalize.staging.PgStagingQueries`.
 Partagé par tous les normalizers via `SourceNormalizer`.
 """
 

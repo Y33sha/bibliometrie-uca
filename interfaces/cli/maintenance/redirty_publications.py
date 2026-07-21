@@ -26,7 +26,7 @@ import os
 
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from infrastructure.queries.pipeline.publications_reconciliation import mark_keys_dirty
+from infrastructure.queries.pipeline.publications.reconciliation import mark_keys_dirty
 
 log = setup_logger("redirty_publications", os.path.dirname(__file__))
 

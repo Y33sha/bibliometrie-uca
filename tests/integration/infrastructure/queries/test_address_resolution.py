@@ -1,4 +1,4 @@
-"""Tests d'intégration pour `infrastructure.queries.pipeline.address_resolution`."""
+"""Tests d'intégration pour `infrastructure.queries.pipeline.affiliations.address_resolution`."""
 
 from sqlalchemy import text
 
@@ -6,7 +6,7 @@ from application.ports.pipeline.affiliations.address_resolution import (
     DetectedStructure,
     KeptPair,
 )
-from infrastructure.queries.pipeline.address_resolution import (
+from infrastructure.queries.pipeline.affiliations.address_resolution import (
     delete_obsolete_detections_bulk,
     fetch_addresses_chunk,
     load_name_forms,

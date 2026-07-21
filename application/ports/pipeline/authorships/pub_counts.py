@@ -1,6 +1,6 @@
 """Port : refresh des compteurs `pub_count` (journals + publishers), fin de phase authorships.
 
-Implémenté par `infrastructure.queries.pipeline.pub_counts.PgPubCountsQueries`.
+Implémenté par `infrastructure.queries.pipeline.authorships.pub_counts.PgPubCountsQueries`.
 """
 
 from typing import NamedTuple, Protocol

@@ -25,7 +25,7 @@ from pathlib import Path
 from infrastructure import PROJECT_ROOT
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from infrastructure.queries.pipeline.staging import fetch_existing_source_ids
+from infrastructure.queries.pipeline.normalize.staging import fetch_existing_source_ids
 from infrastructure.raw_store.factory import get_raw_store
 
 log = setup_logger("prune_raw_store_orphans", os.path.dirname(__file__))
