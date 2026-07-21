@@ -34,82 +34,85 @@ _DIRTY_SA = """
     )
 """
 
+# Tail partagé du recalcul `source_publications.countries` : attend une CTE
+# amont `scoped_sp(sp_id)` (les documents à recalculer). Recalcule la valeur
+# pleine — union des pays de toutes les adresses des signatures du document —
+# et n'écrit que les lignes qui changent (LEFT JOIN → NULL si aucune adresse).
+_SP_COUNTRIES_FROM_SCOPE = """,
+    agg AS (
+        SELECT sa.source_publication_id AS sp_id,
+               array_agg(DISTINCT c::text ORDER BY c::text) AS new_countries
+        FROM source_authorships sa
+        JOIN scoped_sp ss ON ss.sp_id = sa.source_publication_id
+        JOIN source_authorship_addresses saa ON saa.source_authorship_id = sa.id
+        JOIN addresses a ON a.id = saa.address_id
+        CROSS JOIN LATERAL unnest(a.countries) AS c
+        WHERE a.countries IS NOT NULL
+        GROUP BY sa.source_publication_id
+    )
+    UPDATE source_publications sp
+    SET countries = agg.new_countries
+    FROM scoped_sp ss
+    LEFT JOIN agg ON agg.sp_id = ss.sp_id
+    WHERE sp.id = ss.sp_id
+      AND sp.countries IS DISTINCT FROM agg.new_countries
+"""
+
+# Tail partagé du recalcul `publications.countries` : attend une CTE amont
+# `scoped_pub(pub_id)`. Union des `source_publications.countries` de la
+# publication ; n'écrit que les lignes qui changent (LEFT JOIN → NULL si aucune).
+_PUB_COUNTRIES_FROM_SCOPE = """,
+    agg AS (
+        SELECT sp.publication_id AS pub_id,
+               array_agg(DISTINCT c::text ORDER BY c::text) AS new_countries
+        FROM source_publications sp
+        JOIN scoped_pub spp ON spp.pub_id = sp.publication_id
+        CROSS JOIN LATERAL unnest(sp.countries) AS c
+        WHERE sp.countries IS NOT NULL
+        GROUP BY sp.publication_id
+    )
+    UPDATE publications p
+    SET countries = agg.new_countries
+    FROM scoped_pub spp
+    LEFT JOIN agg ON agg.pub_id = spp.pub_id
+    WHERE p.id = spp.pub_id
+      AND p.countries IS DISTINCT FROM agg.new_countries
+"""
+
 
 def refresh_address_source_countries(conn: Connection) -> int:
-    """Recalcule `source_publications.countries` des sp ayant un sa dirty.
-
-    `countries` = union des pays des adresses des sa du document (calcul direct depuis les adresses), ou NULL si aucune (LEFT JOIN orphelin). Idempotent. Retourne le nombre de sp mis à jour.
-    """
+    """Recalcule `source_publications.countries` des documents ayant une signature à recalculer (`countries_dirty`, ou liée à une adresse dont les pays ont changé). Idempotent. Retourne le nombre de documents mis à jour."""
     return conn.execute(
         text(
             _DIRTY_SA
             + """,
-            dirty_sp AS (
+            scoped_sp AS (
                 SELECT DISTINCT sa.source_publication_id AS sp_id
                 FROM source_authorships sa
                 JOIN dirty_sa d ON d.id = sa.id
                 WHERE sa.source_publication_id IS NOT NULL
-            ),
-            expanded AS (
-                SELECT sa.source_publication_id AS sp_id, c::text AS country_code
-                FROM source_authorships sa
-                JOIN dirty_sp dp ON dp.sp_id = sa.source_publication_id
-                JOIN source_authorship_addresses saa ON saa.source_authorship_id = sa.id
-                JOIN addresses a ON a.id = saa.address_id
-                CROSS JOIN LATERAL unnest(a.countries) AS c
-                WHERE a.countries IS NOT NULL
-            ),
-            agg AS (
-                SELECT sp_id, array_agg(DISTINCT country_code ORDER BY country_code) AS new_countries
-                FROM expanded
-                GROUP BY sp_id
             )
-            UPDATE source_publications sp
-            SET countries = agg.new_countries
-            FROM dirty_sp dp
-            LEFT JOIN agg ON agg.sp_id = dp.sp_id
-            WHERE sp.id = dp.sp_id
-              AND sp.countries IS DISTINCT FROM agg.new_countries
-        """
+            """
+            + _SP_COUNTRIES_FROM_SCOPE
         )
     ).rowcount
 
 
 def refresh_publication_countries(conn: Connection) -> int:
-    """Recalcule `publications.countries` des publications dont un sp a un sa dirty.
-
-    `countries` = union des `source_publications.countries` de la publication, ou NULL si aucune (LEFT JOIN orphelin). Idempotent. Retourne le nombre de publications mises à jour.
-    """
+    """Recalcule `publications.countries` des publications dont une signature est à recalculer (`countries_dirty`, ou liée à une adresse dont les pays ont changé). Idempotent. Retourne le nombre de publications mises à jour."""
     return conn.execute(
         text(
             _DIRTY_SA
             + """,
-            dirty_pub AS (
+            scoped_pub AS (
                 SELECT DISTINCT sp.publication_id AS pub_id
                 FROM source_publications sp
                 JOIN source_authorships sa ON sa.source_publication_id = sp.id
                 JOIN dirty_sa d ON d.id = sa.id
                 WHERE sp.publication_id IS NOT NULL
-            ),
-            expanded AS (
-                SELECT sp.publication_id AS pub_id, c::text AS country_code
-                FROM source_publications sp
-                JOIN dirty_pub dp ON dp.pub_id = sp.publication_id
-                CROSS JOIN LATERAL unnest(sp.countries) AS c
-                WHERE sp.countries IS NOT NULL
-            ),
-            agg AS (
-                SELECT pub_id, array_agg(DISTINCT country_code ORDER BY country_code) AS all_countries
-                FROM expanded
-                GROUP BY pub_id
             )
-            UPDATE publications p
-            SET countries = agg.all_countries
-            FROM dirty_pub dp
-            LEFT JOIN agg ON agg.pub_id = dp.pub_id
-            WHERE p.id = dp.pub_id
-              AND p.countries IS DISTINCT FROM agg.all_countries
-        """
+            """
+            + _PUB_COUNTRIES_FROM_SCOPE
         )
     ).rowcount
 
@@ -125,73 +128,45 @@ def clear_countries_dirty(conn: Connection) -> None:
 def refresh_source_publications_countries_for_addresses(
     conn: Connection, address_ids: list[int]
 ) -> int:
-    """Recalcule `source_publications.countries` des documents rattachés à l'une des `address_ids`.
-
-    `countries` = union des pays des adresses des `source_authorships` du document. Portée ciblée pour le refresh après une modification manuelle de pays. Idempotent. Retourne le nombre de documents mis à jour.
-    """
+    """Recalcule `source_publications.countries` des documents rattachés à l'une des `address_ids` — refresh ciblé après une modification manuelle de pays. Idempotent. Retourne le nombre de documents mis à jour."""
     if not address_ids:
         return 0
-    result = conn.execute(
-        text("""
-            UPDATE source_publications sd
-            SET countries = sub.new_countries
-            FROM (
-                SELECT sa.source_publication_id AS doc_id,
-                       (SELECT array_agg(DISTINCT c::text ORDER BY c::text)
-                        FROM source_authorship_addresses saa2
-                        JOIN addresses a2 ON a2.id = saa2.address_id
-                        JOIN source_authorships sa2 ON sa2.id = saa2.source_authorship_id,
-                        LATERAL unnest(a2.countries) AS c
-                        WHERE sa2.source_publication_id = sa.source_publication_id
-                          AND a2.countries IS NOT NULL
-                       ) AS new_countries
+    return conn.execute(
+        text(
+            """
+            WITH scoped_sp AS (
+                SELECT DISTINCT sa.source_publication_id AS sp_id
                 FROM source_authorship_addresses saa
                 JOIN source_authorships sa ON sa.id = saa.source_authorship_id
                 WHERE saa.address_id = ANY(:ids)
-                GROUP BY sa.source_publication_id
-            ) sub
-            WHERE sd.id = sub.doc_id
-              AND sd.countries IS DISTINCT FROM sub.new_countries
-        """),
+                  AND sa.source_publication_id IS NOT NULL
+            )
+            """
+            + _SP_COUNTRIES_FROM_SCOPE
+        ),
         {"ids": address_ids},
-    )
-    return result.rowcount
+    ).rowcount
 
 
 def refresh_publications_countries_for_addresses(conn: Connection, address_ids: list[int]) -> int:
-    """Recalcule `publications.countries` des publications rattachées à l'une des `address_ids`.
-
-    `countries` = union des `source_publications.countries` de la publication. Portée ciblée pour le refresh après une modification manuelle de pays. Idempotent. Retourne le nombre de publications mises à jour.
-    """
+    """Recalcule `publications.countries` des publications rattachées à l'une des `address_ids` — refresh ciblé après une modification manuelle de pays. Idempotent. Retourne le nombre de publications mises à jour."""
     if not address_ids:
         return 0
-    result = conn.execute(
-        text("""
-            WITH affected_pubs AS (
-                SELECT DISTINCT sd.publication_id
+    return conn.execute(
+        text(
+            """
+            WITH scoped_pub AS (
+                SELECT DISTINCT sd.publication_id AS pub_id
                 FROM source_authorship_addresses saa
                 JOIN source_authorships sa ON sa.id = saa.source_authorship_id
                 JOIN source_publications sd ON sd.id = sa.source_publication_id
                 WHERE saa.address_id = ANY(:ids) AND sd.publication_id IS NOT NULL
             )
-            UPDATE publications p
-            SET countries = sub.all_countries
-            FROM (
-                SELECT ap.publication_id,
-                       (SELECT array_agg(DISTINCT c::text ORDER BY c::text)
-                        FROM source_publications sd,
-                        LATERAL unnest(sd.countries) AS c
-                        WHERE sd.publication_id = ap.publication_id
-                          AND sd.countries IS NOT NULL
-                       ) AS all_countries
-                FROM affected_pubs ap
-            ) sub
-            WHERE p.id = sub.publication_id
-              AND p.countries IS DISTINCT FROM sub.all_countries
-        """),
+            """
+            + _PUB_COUNTRIES_FROM_SCOPE
+        ),
         {"ids": address_ids},
-    )
-    return result.rowcount
+    ).rowcount
 
 
 def count_address_country_status(conn: Connection) -> AddressCountryStatus:
