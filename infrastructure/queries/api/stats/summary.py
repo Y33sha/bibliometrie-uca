@@ -17,8 +17,7 @@ from infrastructure.queries.api.filters import (
 )
 from infrastructure.queries.api.stats._shared import stats_apc_clause
 
-# Périmètre : corpus in-perimeter, hors revues-dépôts. Le type de document n'est PAS figé ici —
-# c'est un filtre comme un autre (facette « Type de document »), porté par `doc_type_clause`.
+# Périmètre : corpus in-perimeter, hors revues-dépôts. Le type de document n'est PAS figé ici — c'est un filtre comme un autre (facette « Type de document »), porté par `doc_type_clause`.
 _BASE_CLAUSES = " AND ".join(
     [
         PUBLICATION_IS_IN_PERIMETER,
@@ -52,9 +51,7 @@ def _common_clauses(
 ) -> list[WhereClause | None]:
     """Construit les filtres communs aux facettes croisées.
 
-    `skip` permet d'omettre un filtre pour les facettes croisées ("year",
-    "lab", "oa", "apc", "doc_type"). Les filtres éditeur/revue sont toujours
-    appliqués (jamais facettés via cette barre — ils passent par la recherche serveur).
+    `skip` permet d'omettre un filtre pour les facettes croisées ("year", "lab", "oa", "apc", "doc_type"). Les filtres éditeur/revue sont toujours appliqués (jamais facettés via cette barre — ils passent par la recherche serveur).
     """
     out: list[WhereClause | None] = []
     if skip != "year":

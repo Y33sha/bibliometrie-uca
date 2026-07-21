@@ -48,7 +48,7 @@ from infrastructure.queries.perimeter import get_persons_structure_ids_list
 class PgStatsQueries(StatsQueries):
     """Adapter SA pour `application.ports.api.stats_queries.StatsQueries`.
 
-    Le filtre `has_apc` classe un paiement d'APC en « interne » quand sa structure de budget appartient au périmètre `persons`. L'adapter résout ce périmètre là où il sert, comme `PgLaboratoriesQueries` : ses appelants n'ont pas à le connaître pour demander des statistiques.
+    Le filtre `has_apc` classe un paiement d'APC en « interne » quand sa structure de budget appartient au périmètre `persons`. L'adapter résout ce périmètre là où il sert : ses appelants n'ont pas à le connaître pour demander des statistiques.
     """
 
     def __init__(self, conn: Connection) -> None:

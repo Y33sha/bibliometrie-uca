@@ -12,9 +12,7 @@ from infrastructure.queries.api.filters import (
     year_clause,
 )
 
-# Périmètre commun aux agrégats stats : corpus in-perimeter, hors revues-dépôts (serveurs de
-# preprint). Le type de document n'est PAS figé ici — c'est un filtre comme un autre (cf.
-# `doc_type_clause`). Suppose une table `publications p` avec `LEFT JOIN journals j` dans la requête.
+# Périmètre commun aux agrégats stats : corpus in-perimeter, hors revues-dépôts. Le type de document n'est PAS figé ici — c'est un filtre comme un autre (cf. `doc_type_clause`). Suppose `publications p` avec `LEFT JOIN journals j`.
 STATS_BASE = " AND ".join(
     [PUBLICATION_IS_IN_PERIMETER, "(j.oa_model IS DISTINCT FROM 'repository')"]
 )
@@ -25,8 +23,7 @@ def stats_filter_clauses(
     perimeter_structure_ids: list[int],
     filters: StatsFilters,
 ) -> list[WhereClause | None]:
-    """Clauses de filtrage communes aux agrégats stats (années, labos, accès, APC, types, éditeur,
-    revue). À assembler avec `assemble_where`."""
+    """Clauses de filtrage communes aux agrégats stats (années, labos, accès, APC, types, éditeur, revue). À assembler avec `assemble_where`."""
     out: list[WhereClause | None] = [
         year_clause(filters.years),
         lab_clause(filters.lab_ids),
@@ -50,8 +47,7 @@ def stats_filter_clauses(
     return out
 
 
-# Fragments APC spécifiques aux agrégations stats, distincts d'`apc_clause`
-# (`filters.py`), qui ne teste que l'existence d'un paiement.
+# Fragments APC spécifiques aux agrégations stats, distincts d'`apc_clause` (`filters.py`), qui ne teste que l'existence d'un paiement.
 _APC_EXISTS_SA = (
     "EXISTS (SELECT 1 FROM apc_payments ap "
     "WHERE ap.publication_id = p.id "
@@ -67,10 +63,7 @@ _APC_NOT_EXISTS_SA = (
 def stats_apc_clause(has_apc: list[str], perimeter_structure_ids: list[int]) -> WhereClause | None:
     """Filtre APC pour les endpoints stats (supporte multi-sélection).
 
-    `perimeter_structure_ids` = les structures du périmètre `persons`, que l'adapter
-    résout et qui tiennent lieu de structures « internes ».
-    Toutes les valeurs APC partagent le bind `:apc_root_ids` ; la valeur
-    est constante par requête.
+    `perimeter_structure_ids` = les structures du périmètre `persons`, que l'adapter résout et qui tiennent lieu de structures « internes ». Toutes les valeurs APC partagent le bind `:apc_root_ids`, constant par requête.
     """
     if not has_apc:
         return None

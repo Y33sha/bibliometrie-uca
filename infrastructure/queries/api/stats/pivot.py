@@ -1,13 +1,8 @@
 """Moteur d'agrégation générique (pivot).
 
-Liaison SQL du registre `domain.stats` + constructeur de requête sur **liste blanche** :
-la composition `SELECT <dimensions>, <mesure> … GROUP BY <dimensions>` n'utilise que des
-expressions connues, indexées par les clés validées du registre. Aucun SQL libre, aucune
-injection : le vocabulaire est borné côté domaine, l'infrastructure n'y associe que des
-fragments SQL.
+Liaison SQL du registre `domain.stats` + constructeur de requête sur **liste blanche** : la composition `SELECT <dimensions>, <mesure> … GROUP BY <dimensions>` n'utilise que des expressions connues, indexées par les clés validées du registre. Aucun SQL libre, aucune injection : le vocabulaire est borné côté domaine, l'infrastructure n'y associe que des fragments SQL.
 
-Le grain est tenu par les mesures : toutes comptent les publications de façon distincte
-(`COUNT(DISTINCT p.id)`), si bien qu'une dimension qui démultiplie (`lab`) ne les surcompte pas.
+Le grain est tenu par les mesures : toutes comptent les publications de façon distincte (`COUNT(DISTINCT p.id)`), si bien qu'une dimension qui démultiplie (`lab`) ne les surcompte pas.
 """
 
 from typing import Any
@@ -50,9 +45,7 @@ _DIM_EXPR: dict[str, str] = {
     "publisher": "pub.name",
     "journal": "jt.title",
 }
-# Jointures supplémentaires par dimension qui sort de `publications`. Le laboratoire passe par les
-# rattachements (une publication compte dans chacun de ses laboratoires). Alias dédiés (`la`/`las`/
-# `ls`) pour ne pas heurter la sous-requête de `lab_clause`.
+# Jointures par dimension hors `publications`. Le laboratoire passe par les rattachements (une publication compte dans chacun de ses labos). Alias dédiés (`la`/`las`/`ls`), distincts de la sous-requête de `lab_clause`.
 _DIM_JOIN: dict[str, str] = {
     "lab": (
         "JOIN authorships la ON la.publication_id = p.id "
@@ -67,9 +60,7 @@ _MEASURE_AGG: dict[str, str] = {
     "pub_count": "COUNT(DISTINCT p.id)",
 }
 
-# Garde-fou d'extensibilité : toute dimension *groupable* a sa liaison SQL de groupement, et
-# réciproquement ; idem pour les mesures. Les dimensions filtrables-seules (APC, labo) n'ont pas
-# d'expression de groupement — leur SQL de filtrage vit dans les clauses de `filters.py`.
+# Garde-fou d'extensibilité : toute dimension *groupable* a sa liaison SQL de groupement, et réciproquement ; idem pour les mesures. Les dimensions filtrables-seules (APC, labo) n'ont pas de groupement — leur filtrage vit dans `filters.py`.
 _GROUPABLE = {key for key, dim in DIMENSIONS.items() if dim.groupable}
 assert set(_DIM_EXPR) == _GROUPABLE, "liaison SQL des dimensions désynchronisée du registre"
 assert set(_MEASURE_AGG) == set(MEASURES), "liaison SQL des mesures désynchronisée du registre"
@@ -90,8 +81,7 @@ def run_pivot(
     perimeter_structure_ids: list[int],
     filters: StatsFilters,
 ) -> dict[str, Any]:
-    """Exécute une agrégation : `mesure` ventilée selon `groups`, sous les filtres. Les clés sont
-    validées contre le registre (`validate_pivot`) avant toute composition SQL."""
+    """Exécute une agrégation : `mesure` ventilée selon `groups`, sous les filtres. Les clés sont validées contre le registre (`validate_pivot`) avant toute composition SQL."""
     m, dims = validate_pivot(measure, groups)
     where, binds = assemble_where(
         stats_filter_clauses(

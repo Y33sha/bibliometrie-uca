@@ -5,18 +5,12 @@ Le package est organisé par thème :
 - `facets` : `publications_facets`
 - `detail` : `get_publication_detail`
 
-Les adapters d'écriture pipeline (`pipeline.publications_reconciliation`,
-`pipeline.metadata_correction`) vivent côté `infrastructure/queries/pipeline/`.
+Les adapters d'écriture pipeline (`pipeline.publications_reconciliation`, `pipeline.metadata_correction`) vivent côté `infrastructure/queries/pipeline/`.
 
-`PgPublicationsQueries` agrège les 5 fonctions de lecture sous le port
-`application.ports.api.publications_queries.PublicationsQueries`. Les fonctions
-libres retournent des dicts (réutilisables hors API) ; la conversion vers les
-DTOs Pydantic est faite ici à la sortie de l'adapter.
+`PgPublicationsQueries` agrège les 5 fonctions de lecture sous le port `application.ports.api.publications_queries.PublicationsQueries`. Les fonctions libres retournent des dicts (réutilisables hors API) ; la conversion vers les DTOs Pydantic est faite ici à la sortie de l'adapter.
 """
 
-# Annotations différées : sinon `list[int]` est résolu comme le sous-module
-# `.list` (le `from .list import …` ci-dessous l'attache au package, et le
-# namespace global du __init__ shadow le builtin `list`).
+# Annotations différées : sinon `list[int]` est résolu comme le sous-module `.list` (le `from .list import …` ci-dessous l'attache au package, et le namespace global du __init__ shadow le builtin `list`).
 from __future__ import annotations
 
 from sqlalchemy import Connection
@@ -51,7 +45,7 @@ from infrastructure.queries.perimeter import get_persons_structure_ids_list
 class PgPublicationsQueries(PublicationsQueries):
     """Adapter SA pour `application.ports.api.publications_queries.PublicationsQueries`.
 
-    Le filtre `has_apc` classe un paiement d'APC en « interne » quand sa structure de budget appartient au périmètre `persons`. L'adapter résout ce périmètre là où il sert, comme `PgLaboratoriesQueries` : ses appelants n'ont pas à le connaître pour lister des publications.
+    Le filtre `has_apc` classe un paiement d'APC en « interne » quand sa structure de budget appartient au périmètre `persons`. L'adapter résout ce périmètre là où il sert : ses appelants n'ont pas à le connaître pour lister des publications.
     """
 
     def __init__(self, conn: Connection) -> None:
