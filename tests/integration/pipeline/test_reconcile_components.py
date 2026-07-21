@@ -10,7 +10,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 
 from application.pipeline.publications.reconcile_components import reconcile, run
 from domain.source_publications.keys import project_confirmation_keys
-from infrastructure.queries.pipeline.publications_reconciliation import (
+from infrastructure.queries.pipeline.publications.reconciliation import (
     PgPublicationsReconciliationQueries,
     fetch_dirty_source_publication_ids,
     fetch_reconciliation_universe,

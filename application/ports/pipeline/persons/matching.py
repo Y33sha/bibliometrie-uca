@@ -2,7 +2,7 @@
 
 Les lectures alimentent la cascade de matching (signatures non liées, index d'ancrage, maps identifiant→personne, formes de nom et leurs verdicts) ; les écritures sont les réinitialisations ordre-indépendantes de la phase (détachement, re-orphelinage, suppression des personnes vides). La création d'une personne relève du service (`application.services.persons`), pas de ce port.
 
-Implémenté par `infrastructure.queries.pipeline.persons_matching.PgPersonsMatchingQueries`.
+Implémenté par `infrastructure.queries.pipeline.persons.matching.PgPersonsMatchingQueries`.
 """
 
 from typing import NamedTuple, Protocol

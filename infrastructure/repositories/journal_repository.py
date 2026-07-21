@@ -18,7 +18,7 @@ from domain.errors import NotFoundError
 from domain.journals.journal import Journal, JournalType, OaModel
 from domain.normalize import normalize_text
 from infrastructure.db.tables import journal_name_forms, journals
-from infrastructure.queries.pipeline.pub_counts import (
+from infrastructure.queries.pipeline.authorships.pub_counts import (
     refresh_journal_pub_count,
     refresh_publisher_pub_count,
 )

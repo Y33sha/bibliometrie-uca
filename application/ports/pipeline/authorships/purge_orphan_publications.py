@@ -1,6 +1,6 @@
 """Port : purge des publications orphelines (fin de phase authorships).
 
-Implémenté par `infrastructure.queries.pipeline.purge_orphan_publications.PgPurgeOrphanPublicationsQueries`.
+Implémenté par `infrastructure.queries.pipeline.authorships.purge_orphan_publications.PgPurgeOrphanPublicationsQueries`.
 """
 
 from typing import Protocol

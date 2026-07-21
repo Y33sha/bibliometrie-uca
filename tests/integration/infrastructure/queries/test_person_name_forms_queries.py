@@ -1,8 +1,8 @@
-"""Tests d'intégration pour `infrastructure.queries.pipeline.person_name_forms`."""
+"""Tests d'intégration pour `infrastructure.queries.pipeline.persons.name_forms`."""
 
 from sqlalchemy import text
 
-from infrastructure.queries.pipeline.person_name_forms import (
+from infrastructure.queries.pipeline.persons.name_forms import (
     create_temp_raw_forms_table,
     drop_temp_raw_forms_table,
     fetch_persons_names,

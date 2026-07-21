@@ -37,7 +37,7 @@ from sqlalchemy import Connection, text
 from application.pipeline.persons.populate_person_name_forms import populate
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from infrastructure.queries.pipeline.person_name_forms import PgPersonNameFormsQueries
+from infrastructure.queries.pipeline.persons.name_forms import PgPersonNameFormsQueries
 
 log = setup_logger("remediate_dubious_agglomerations", os.path.dirname(__file__))
 

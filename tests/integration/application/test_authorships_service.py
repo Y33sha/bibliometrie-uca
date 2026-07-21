@@ -209,7 +209,7 @@ class TestExcludeAuthorship:
 
     def test_rebuild_does_not_recreate_rejected_pair(self, sa_sync_conn, repo):
         """Après rejet, l'insertion canonique re-skippe la paire (anti-join)."""
-        from infrastructure.queries.pipeline.authorships_build import insert_missing_authorships
+        from infrastructure.queries.pipeline.authorships.build import insert_missing_authorships
 
         person_id = _create_person(sa_sync_conn)
         pub_id = _create_publication(sa_sync_conn)
@@ -323,7 +323,7 @@ class TestRejectPair:
 
     def test_not_recreated_on_rerun(self, sa_sync_conn, repo):
         """Même si une source ressuscite person_id, l'anti-join skippe l'INSERT."""
-        from infrastructure.queries.pipeline.authorships_build import insert_missing_authorships
+        from infrastructure.queries.pipeline.authorships.build import insert_missing_authorships
 
         person_id = _create_person(sa_sync_conn)
         pub_id = _create_publication(sa_sync_conn)
@@ -438,7 +438,7 @@ class TestPruneOrphanAuthorships:
     source_authorship n'atteste — inverse d'`insert_missing_authorships`."""
 
     def test_deletes_orphan(self, sa_sync_conn):
-        from infrastructure.queries.pipeline.authorships_build import prune_orphan_authorships
+        from infrastructure.queries.pipeline.authorships.build import prune_orphan_authorships
 
         person_id = _create_person(sa_sync_conn)
         pub_id = _create_publication(sa_sync_conn)
@@ -450,7 +450,7 @@ class TestPruneOrphanAuthorships:
         assert sa_sync_conn.execute(text("SELECT id FROM authorships")).first() is None
 
     def test_keeps_attested_pair(self, sa_sync_conn):
-        from infrastructure.queries.pipeline.authorships_build import prune_orphan_authorships
+        from infrastructure.queries.pipeline.authorships.build import prune_orphan_authorships
 
         person_id = _create_person(sa_sync_conn)
         pub_id = _create_publication(sa_sync_conn)
@@ -473,7 +473,7 @@ class TestPruneOrphanAuthorships:
     def test_global_scope_across_persons(self, sa_sync_conn):
         """Prune toutes les orphelines, pas seulement celles d'une personne ;
         une authorship attestée (autre personne, même pub) est préservée."""
-        from infrastructure.queries.pipeline.authorships_build import prune_orphan_authorships
+        from infrastructure.queries.pipeline.authorships.build import prune_orphan_authorships
 
         pub_id = _create_publication(sa_sync_conn)
         sp_id = _create_source_publication(sa_sync_conn, pub_id)
@@ -513,7 +513,7 @@ class TestPropagateAuthorshipAttributes:
         ).one()
 
     def test_is_corresponding_is_bool_or(self, sa_sync_conn):
-        from infrastructure.queries.pipeline.authorships_build import (
+        from infrastructure.queries.pipeline.authorships.build import (
             propagate_authorship_attributes,
         )
 
@@ -548,7 +548,7 @@ class TestPropagateAuthorshipAttributes:
         assert self._attrs(sa_sync_conn, aid).is_corresponding is True
 
     def test_converges_when_sources_drop_signal(self, sa_sync_conn):
-        from infrastructure.queries.pipeline.authorships_build import (
+        from infrastructure.queries.pipeline.authorships.build import (
             propagate_authorship_attributes,
         )
 

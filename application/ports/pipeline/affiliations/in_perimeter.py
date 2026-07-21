@@ -1,6 +1,6 @@
 """Port : résolution des affiliations sur `source_authorships`.
 
-Implémenté par `infrastructure.queries.pipeline.affiliations.PgAffiliationsQueries`.
+Implémenté par `infrastructure.queries.pipeline.affiliations.in_perimeter.PgAffiliationsQueries`.
 """
 
 from typing import NamedTuple, Protocol
