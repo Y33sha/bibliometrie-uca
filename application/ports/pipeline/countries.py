@@ -48,24 +48,18 @@ class CountryQueries(Protocol):
         """Purge les flags `countries_dirty` (`source_authorships` et `addresses`) en fin de cascade."""
         ...
 
-    # ── Détection par nom de pays (segment final de l'adresse) ─────
+    # ── Formes de noms (pays, lieux) et adresses à résoudre ───────
 
     def load_country_forms(self, conn: Connection) -> dict[str, str]:
         """Formes normalisées des noms de pays, chacune avec le code ISO du pays qu'elle désigne : `{forme: code ISO}`."""
         ...
-
-    def fetch_addresses_missing_country_raw(self, conn: Connection) -> list[tuple[int, str]]:
-        """`(id, raw_text)` des adresses sans pays. La détection par nom de pays lit le texte brut, dont le segment final porte le pays."""
-        ...
-
-    # ── Détection par nom de lieu (institution, ville) ─────────────
 
     def load_place_forms(self, conn: Connection) -> dict[str, str]:
         """Formes normalisées des noms d'institutions et de villes, chacune avec le code ISO du pays où le lieu se situe : `{forme: code ISO}`."""
         ...
 
     def fetch_addresses_missing_country_normalized(self, conn: Connection) -> list[tuple[int, str]]:
-        """`(id, normalized_text)` des adresses sans pays, pour la détection par nom de lieu."""
+        """`(id, normalized_text)` des adresses sans pays, pour les détections par nom (pays en fin d'adresse, ou lieu)."""
         ...
 
     # ── Suggestion floue (sous-chaîne dans le pool des adresses avec pays) ──
