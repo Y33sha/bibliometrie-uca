@@ -21,6 +21,7 @@ Coûts concrets :
 - Les ensembles dérivés (`DOC_TYPES_SET`, `ALL_SOURCES_SET`, `OA_STATUSES`, `_KNOWN_OA_STATUSES`) se dérivent de l'enum (`frozenset(DocType)`), sans liste parallèle. Les ordonnancements (`SOURCE_PRIORITY`, `OA_RANK`) restent des structures à part, mais leurs clés référencent les membres.
 - Le SQL référence les membres (`DocType.BOOK.value`, `Source.DATACITE.value`), comme le fait déjà `DoiClusterCase`. Le mapping `relation_type` DataCite → `DoiClusterCase` remonte au domaine (un dict), le SQL le consomme.
 - Frontière base : psycopg rend des `str` nues, pas des membres d'enum. On s'appuie sur l'égalité `str` de StrEnum — pas de conversion imposée à l'ingestion — sauf si l'audit révèle un point qui exige des membres stricts.
+- Le traitement s'étend aux vocabulaires fermés qui ne sont pas des enums PostgreSQL mais des clés JSONB : les clés de confirmation (`hal_id`, `arxiv_id`, `pmid`, `nnt`) reçoivent une définition unique côté domaine, référencée par les requêtes qui les énumèrent.
 
 ## Phasage
 
@@ -53,10 +54,12 @@ Littéraux de vocabulaires fermés repérés dans le SQL, à remplacer par des m
 
 - [ ] `infrastructure/queries/pipeline/metadata_correction.py` — `'book'`, `'book_chapter'`, `'dataset'`, `'datacite'` ; et le mapping `relation_type` DataCite → `DoiClusterCase` du `CASE`.
 - [ ] `infrastructure/queries/pipeline/oa_status.py` — `'green'` (statut OA du dépôt en archive ouverte).
+- [ ] `infrastructure/queries/pipeline/relations.py` — `'datacite'` / `'crossref'` (source), `'erratum'` / `'preprint'` / `'dataset'` (doc_type).
+- [ ] Clés de confirmation `'hal_id'` / `'arxiv_id'` / `'pmid'` / `'nnt'` — clés JSONB, pas un enum PostgreSQL, énumérées dans `relations.py` (`_SHARED_KEY_PAIRS_SQL`) **et** `publications_reconciliation.py` (`_UNIVERSE_SQL`) : à définir une seule fois côté domaine.
 
 ## Questions ouvertes
 
 - **Frontière base.** Rester sur l'égalité `str` de StrEnum (donnée = `str`, littéraux = membres), ou convertir en membres à l'ingestion pour un typage strict ? La première voie est la moins coûteuse et suffit aux comparaisons.
 - **relation_type DataCite.** C'est du vocabulaire externe (schéma DataCite), pas une colonne du projet. Le mapping vers `DoiClusterCase` est métier et doit remonter au domaine ; ses clés (`IsVersionOf`…) restent-elles des chaînes DataCite ou deviennent-elles un StrEnum interne ?
-- **Périmètre.** S'arrêter aux vocabulaires adossés à un enum PostgreSQL, ou inclure les vocabulaires purement applicatifs (codes ISO pays, `kind` de `place_name_forms`) ?
+- **Périmètre.** Les clés de confirmation JSONB sont incluses. Reste à arbitrer les vocabulaires purement applicatifs sans colonne dédiée (codes ISO pays, `kind` de `place_name_forms`).
 - **Articulation avec l'archivé `METIER_doc-types`.** Ce chantier ne touche que la représentation (Literal → StrEnum), pas la taxonomie des types ni les règles de mapping des sources, déjà traitées.
