@@ -48,7 +48,7 @@ class _FakeStaging:
             return self.batch_ids
         return [r.id for r in self.pending_rows]
 
-    def fetch_staging_by_ids(self, conn, ids: list[int], *, source: str) -> list[StagingRow]:
+    def fetch_staging_by_ids(self, conn, ids: list[int]) -> list[StagingRow]:
         if self.batch_id_rows:
             return self.batch_id_rows.get(tuple(ids), [])
         ids_set = set(ids)
