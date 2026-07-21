@@ -3,9 +3,8 @@
 Sert les phases `subjects` et `cooccurrences`. Les lectures des routes `/api/subjects/*` vivent dans `infrastructure.queries.api.subjects`.
 """
 
-from typing import Any
-
-from sqlalchemy import Connection, text
+from sqlalchemy import Connection, bindparam, text
+from sqlalchemy.dialects.postgresql import JSONB
 
 from application.ports.pipeline.subjects import (
     PublicationSubjectLink,
@@ -54,23 +53,24 @@ def link_publication_subjects_bulk(
     if not rows:
         return 0
     seen: set[PublicationSubjectLink] = set()
-    deduped: list[dict[str, Any]] = []
+    payload: list[dict[str, int]] = []
     for link in rows:
         if link in seen:
             continue
         seen.add(link)
-        deduped.append({"pid": link.publication_id, "sid": link.subject_id, "src": source})
+        payload.append({"pid": link.publication_id, "sid": link.subject_id})
     conn.execute(
         text(
             """
             INSERT INTO publication_subjects (publication_id, subject_id, source)
-            VALUES (:pid, :sid, :src)
+            SELECT t.pid, t.sid, :source
+            FROM jsonb_to_recordset(:payload) AS t(pid int, sid int)
             ON CONFLICT (publication_id, subject_id, source) DO NOTHING
             """
-        ),
-        deduped,
+        ).bindparams(bindparam("payload", type_=JSONB)),
+        {"payload": payload, "source": source},
     )
-    return len(deduped)
+    return len(payload)
 
 
 def clear_publication_subjects_for_pubs(conn: Connection, *, publication_ids: list[int]) -> int:
