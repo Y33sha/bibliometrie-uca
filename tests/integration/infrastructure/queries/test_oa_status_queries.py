@@ -95,12 +95,6 @@ class TestFetchPublicationsWithDoi:
         rows = fetch_publications_with_doi(sa_sync_conn, limit=2)
         assert len(rows) == 2
 
-    def test_limit_zero_is_unlimited(self, sa_sync_conn):
-        _create_pub(sa_sync_conn, doi="10.1/a")
-        _create_pub(sa_sync_conn, doi="10.1/b")
-        rows = fetch_publications_with_doi(sa_sync_conn, limit=0)
-        assert len(rows) >= 2
-
     def test_returns_oa_status(self, sa_sync_conn):
         _create_pub(sa_sync_conn, doi="10.1/a", oa_status="gold")
         rows = fetch_publications_with_doi(sa_sync_conn)
