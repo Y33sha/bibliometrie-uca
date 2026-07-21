@@ -504,7 +504,7 @@ def phase_affiliations(**kw: Any) -> PhaseMetrics:
     Séquence, transactions et métriques dans `application/pipeline/affiliations/phase.py`.
     """
     from application.pipeline.affiliations.phase import run
-    from infrastructure.queries.perimeter import PgPerimeterQueries
+    from infrastructure.queries.perimeter import PgPerimeterStructuresQueries
     from infrastructure.queries.pipeline.address_resolution import PgAddressResolutionQueries
     from infrastructure.queries.pipeline.affiliations import PgAffiliationsQueries
 
@@ -512,7 +512,7 @@ def phase_affiliations(**kw: Any) -> PhaseMetrics:
         _open_tx,
         PgAddressResolutionQueries(),
         PgAffiliationsQueries(),
-        PgPerimeterQueries(),
+        PgPerimeterStructuresQueries(),
         log,
     )
 

@@ -15,7 +15,7 @@ from application.pipeline.affiliations.resolve_addresses import run_resolution
 from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.affiliations.address_resolution import AddressResolutionQueries
 from application.ports.pipeline.affiliations.in_perimeter import AffiliationsQueries
-from application.ports.pipeline.perimeter import PerimeterQueries
+from application.ports.pipeline.perimeter_structures import PerimeterStructuresQueries
 from application.ports.pipeline.transaction import OpenTransaction
 
 
@@ -23,7 +23,7 @@ def run(
     open_tx: OpenTransaction,
     address_queries: AddressResolutionQueries,
     affiliations_queries: AffiliationsQueries,
-    perimeter_queries: PerimeterQueries,
+    perimeter_queries: PerimeterStructuresQueries,
     logger: logging.Logger,
 ) -> PhaseMetrics:
     """Enchaîne les trois sous-étapes et assemble les métriques de la phase."""

@@ -1,6 +1,6 @@
 """Port : lecture des périmètres (ensembles de structures).
 
-Implémenté par `infrastructure.queries.perimeter.PgPerimeterQueries`.
+Implémenté par `infrastructure.queries.perimeter.PgPerimeterStructuresQueries`.
 """
 
 from typing import Protocol
@@ -8,7 +8,7 @@ from typing import Protocol
 from sqlalchemy import Connection
 
 
-class PerimeterQueries(Protocol):
+class PerimeterStructuresQueries(Protocol):
     """Opérations sur les périmètres (lecture des structures, rematérialisation)."""
 
     def get_persons_structure_ids_list(self, conn: Connection) -> list[int]:
