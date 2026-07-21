@@ -18,16 +18,14 @@ from application.ports.api.addresses_queries import (
     CountrySuggestion,
 )
 
-# « Reconnue » comme une structure = lien pending (détecté, non revu) ou confirmé.
-# Exclut le rejeté (is_confirmed = FALSE) et l'absence de lien. Utilisé par les
-# prédicats Structure de `list_addresses`.
+# « Reconnue » comme une structure = lien pending (détecté, non revu) ou confirmé ; exclut le rejeté (is_confirmed = FALSE) et l'absence de lien. Utilisé par les prédicats Structure de `list_addresses`.
 _RECOGNIZED_LINK = (
     "((asx.matched_form_id IS NOT NULL AND asx.is_confirmed IS NULL) OR asx.is_confirmed = TRUE)"
 )
 
 
 class PgAddressesQueries(AddressesQueries):
-    """Adapter SA sync pour `application.ports.api.addresses_queries.AddressesQueries`."""
+    """Adapter SA pour `application.ports.api.addresses_queries.AddressesQueries`."""
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
@@ -80,8 +78,7 @@ class PgAddressesQueries(AddressesQueries):
                 f"WHERE asx.address_id = a.id AND asx.structure_id = ANY(:{bind}) "
                 f"AND {_RECOGNIZED_LINK})"
             )
-            # recognized = reconnue comme au moins une des structures (OR) ;
-            # not_recognized = reconnue comme aucune (De Morgan → NOT EXISTS).
+            # recognized = reconnue comme au moins une des structures (OR) ; not_recognized = reconnue comme aucune (De Morgan → NOT EXISTS).
             parts.append(exists if sp.operator == "recognized" else f"NOT {exists}")
 
         where_clause = (" AND " + " AND ".join(parts)) if parts else ""
@@ -227,9 +224,7 @@ class PgAddressesQueries(AddressesQueries):
             parts.append(
                 "a.countries IS NOT NULL" if filters.has_country else "a.countries IS NULL"
             )
-        # Match insensible à la casse : les codes pays sont canoniquement en
-        # minuscules (`countries.code`) mais les arrays peuvent contenir des
-        # variantes majuscules (codes ISO OpenAlex). Cf. dedup `lower(...)` plus bas.
+        # Match insensible à la casse : les codes pays sont canoniquement en minuscules (`countries.code`) mais les arrays peuvent contenir des variantes majuscules (codes ISO OpenAlex).
         if filters.country_code:
             parts.append(
                 "EXISTS (SELECT 1 FROM unnest(a.countries) x WHERE lower(x) = lower(:country_code))"

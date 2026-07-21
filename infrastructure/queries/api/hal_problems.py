@@ -40,8 +40,7 @@ _HAL_ACCOUNT_SIGNATURES = """
       AND aik.person_identifiers->>'hal_person_id' IS NOT NULL
 """
 
-# Personnes portant au moins deux comptes HAL distincts : l'anomalie que la page recense, et
-# la même population pour le comptage comme pour la liste.
+# Personnes portant au moins deux comptes HAL distincts : l'anomalie que la page recense, et la même population pour le comptage comme pour la liste.
 _PERSONS_WITH_DUPLICATE_HAL_ACCOUNTS = f"""
     SELECT sa.person_id
     {_HAL_ACCOUNT_SIGNATURES}
@@ -380,23 +379,7 @@ class PgHalProblemsQueries(HalProblemsQueries):
         self, *, page: int, per_page: int
     ) -> HalAffiliationConflictsResponse:
         offset = (page - 1) * per_page
-        # Publications dont :
-        #  1. au moins une source_publication HAL a au moins une authorship in_perimeter ;
-        #  2. au moins une source_publication WoS/OA a au moins une authorship
-        #     avec une adresse (= la source a effectivement examiné
-        #     l'affiliation — garde-fou contre les faux positifs sur les SPs
-        #     sans données d'adresse, qui restent in_perimeter=FALSE par
-        #     défaut sans signal métier) ;
-        #  3. aucune authorship d'une source_publication WoS/OA n'est in_perimeter.
-        # Sources comparées limitées à WoS et OpenAlex : ScanR moissonne HAL et
-        # reproduit ses affiliations (donc non informatif), theses n'arbitre
-        # pas une publi standard, crossref n'a pas d'adresses.
-        #
-        # Implémentation : on agrège d'abord par SP WoS/OA les drapeaux
-        # `any_addressed` et `any_in_perimeter`, puis on regroupe par publication
-        # canonique avant de filtrer (agg AS / sur les EXISTS imbriqués
-        # qui forçaient un Hash Join sur les 11M source_authorships).
-        # Exploite l'index partiel `idx_sa_in_perimeter`.
+        # Conflit d'affiliation : HAL classe la publication in_perimeter, WoS/OpenAlex (seules à porter des adresses) non. `base_cte` agrège les drapeaux par SP avant de filtrer.
         base_cte = """
         WITH wos_oa_sps AS (
             SELECT id, publication_id
