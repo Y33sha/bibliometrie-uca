@@ -13,10 +13,7 @@ from infrastructure.queries.sources_sql import source_case_sql
 def insert_missing_authorships(conn: Connection) -> int:
     """Étape 1 : crée les `authorships` manquantes à partir des sources.
 
-    Insère les paires `(publication_id, person_id)` présentes dans
-    `source_authorships` (avec `person_id`) et dont la publication est
-    active, si elles n'existent pas déjà **et ne sont pas rejetées**
-    (anti-join sur `rejected_authorships`). Retourne le rowcount.
+    Insère les paires `(publication_id, person_id)` présentes dans `source_authorships` (avec `person_id`) et dont la publication est active, si elles n'existent pas déjà **et ne sont pas rejetées** (anti-join sur `rejected_authorships`). Retourne le rowcount.
     """
     return conn.execute(
         text("""
@@ -45,18 +42,11 @@ def insert_missing_authorships(conn: Connection) -> int:
 
 
 def prune_orphan_authorships(conn: Connection) -> int:
-    """Prune : supprime les `authorships` que plus aucune source n'atteste.
+    """Supprime les `authorships` que plus aucune source n'atteste.
 
-    Inverse exact d'`insert_missing_authorships` : une authorship `(publication_id,
-    person_id)` dont la paire n'existe plus dans `source_authorships` (auteur retiré
-    de toutes les sources lors d'un réimport) est orpheline et doit disparaître. Le
-    build incrémental (modes daily/weekly) étant add-only, sans ce prune une telle
-    orpheline survivrait jusqu'au prochain rebuild `full`. Tourne donc à chaque build.
+    Inverse exact d'`insert_missing_authorships` : une authorship `(publication_id, person_id)` dont la paire est absente de `source_authorships` (auteur retiré de toutes les sources lors d'un réimport) est orpheline et doit disparaître. Le build incrémental (modes daily/weekly) étant add-only, cette purge évite qu'une telle orpheline survive jusqu'au prochain rebuild `full` ; elle tourne à chaque build.
 
-    Version globale de `delete_orphan_authorships_for_person` (chemin admin detach),
-    sans le filtre personne. Le DELETE délie `source_authorships.authorship_id` (FK
-    ON DELETE SET NULL) — inerte ici, une orpheline n'ayant par définition aucun
-    `source_authorship` lié. Retourne le nombre d'authorships purgées.
+    Version globale de `delete_orphan_authorships_for_person` (chemin admin detach), sans le filtre personne. Le DELETE délie `source_authorships.authorship_id` (FK ON DELETE SET NULL) — inerte ici, une orpheline n'ayant par définition aucun `source_authorship` lié. Retourne le nombre d'authorships purgées.
     """
     return conn.execute(
         text("""
@@ -75,8 +65,7 @@ def prune_orphan_authorships(conn: Connection) -> int:
 def link_source_authorships_to_authorships(conn: Connection) -> int:
     """Étape 2 : peuple `source_authorships.authorship_id` pour toutes les sources.
 
-    Un seul UPDATE sur l'ensemble des `source_authorships` encore non liées, sans
-    distinction de source. Retourne le nombre de lignes reliées.
+    Un seul UPDATE sur l'ensemble des `source_authorships` encore non liées, sans distinction de source. Retourne le nombre de lignes reliées.
     """
     return conn.execute(
         text("""
@@ -93,22 +82,14 @@ def link_source_authorships_to_authorships(conn: Connection) -> int:
 
 
 def propagate_authorship_attributes(conn: Connection) -> int:
-    """Étape 3 : recompose en une passe convergente les attributs dérivés de
-    chaque authorship depuis ses `source_authorships` liées.
+    """Étape 3 : recompose en une passe convergente les attributs dérivés de chaque authorship depuis ses `source_authorships` liées.
 
-    - `author_position` : valeur de la source la plus prioritaire (`SOURCE_PRIORITY`)
-      qui la renseigne — seul attribut qui exige de départager les sources.
-    - `is_corresponding` : `bool_or` (vrai si au moins une source l'atteste). Pas de
-      priorité : le FALSE des sources est une absence de signal, pas une
-      non-correspondance — aucune source n'émet de FALSE explicite à écraser.
+    - `author_position` : valeur de la source la plus prioritaire (`SOURCE_PRIORITY`) qui la renseigne — seul attribut qui exige de départager les sources.
+    - `is_corresponding` : `bool_or` (vrai si au moins une source l'atteste). Pas de priorité : le FALSE des sources est une absence de signal, pas une non-correspondance — aucune source n'émet de FALSE explicite à écraser.
     - `in_perimeter` : `bool_or` de `source_authorships.in_perimeter`.
     - `roles` : union triée des rôles (au moins `{author}`, défaut côté `source_authorships`).
 
-    Convergente (`IS DISTINCT FROM`, sans garde `IS NULL`) : une valeur révisée en
-    source se met à jour, une valeur que plus aucune source n'atteste retombe
-    (TRUE périmé → FALSE, rôle disparu → retiré, périmètre perdu → FALSE). Une seule
-    passe couvre tous les attributs et toutes les sources. Retourne le nombre
-    d'authorships modifiées.
+    Convergente (`IS DISTINCT FROM`, sans garde `IS NULL`) : une valeur révisée en source se met à jour, une valeur que plus aucune source n'atteste retombe (TRUE périmé → FALSE, rôle disparu → retiré, périmètre perdu → FALSE). Une seule passe couvre tous les attributs et toutes les sources. Retourne le nombre d'authorships modifiées.
     """
     return conn.execute(
         text(f"""
@@ -160,22 +141,17 @@ def purge_authorships(conn: Connection) -> int:
 
 
 def refresh_authorship_structures(conn: Connection) -> None:
-    """Rafraîchit la matview `authorship_structures` (`CONCURRENTLY` pour ne pas
-    bloquer les lectures labo ; requiert l'index unique `(authorship_id, structure_id)`).
+    """Rafraîchit la matview `authorship_structures` (`CONCURRENTLY` pour ne pas bloquer les lectures labo ; requiert l'index unique `(authorship_id, structure_id)`).
 
-    À appeler après que `source_authorships.authorship_id` (étape 2 du build) et
-    `source_authorship_structures` (phase `affiliations`) sont posés.
+    À appeler après que `source_authorships.authorship_id` (étape 2 du build) et `source_authorship_structures` (phase `affiliations`) sont posés.
     """
     conn.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY authorship_structures"))
 
 
 def refresh_publication_structures(conn: Connection) -> None:
-    """Rafraîchit la matview `publication_structures` (publi↔structure dédoublonnée,
-    `CONCURRENTLY` ; requiert l'index unique `(publication_id, structure_id)`).
+    """Rafraîchit la matview `publication_structures` (publi↔structure dédoublonnée, `CONCURRENTLY` ; requiert l'index unique `(publication_id, structure_id)`).
 
-    Dérive d'`authorships` × `authorship_structures` : à appeler **après**
-    `refresh_authorship_structures`. Sert la facette labos (COUNT par structure
-    sans jointure authorships ni DISTINCT).
+    Dérive d'`authorships` × `authorship_structures` : à appeler **après** `refresh_authorship_structures`. Sert la facette labos (COUNT par structure sans jointure authorships ni DISTINCT).
     """
     conn.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY publication_structures"))
 
@@ -190,11 +166,7 @@ def count_authorships_in_perimeter(conn: Connection) -> int:
 def refresh_publications_in_perimeter(conn: Connection) -> int:
     """Matérialise `publications.in_perimeter` (rollup de `authorships.in_perimeter`).
 
-    Une publication est in-perimeter si elle a au moins un authorship in-perimeter
-    d'une personne non rejetée — exactement le prédicat du filtre SQL
-    `publication_in_perimeter`. À appeler après l'étape 3 (qui pose
-    `authorships.in_perimeter`). Idempotent : n'écrit que les lignes dont le flag
-    change (`IS DISTINCT FROM`). Retourne le nombre de publications modifiées.
+    Une publication est in-perimeter si elle a au moins un authorship in-perimeter d'une personne non rejetée — exactement le prédicat du filtre SQL `publication_in_perimeter`. À appeler après l'étape 3 (qui pose `authorships.in_perimeter`). Idempotent : n'écrit que les lignes dont le flag change (`IS DISTINCT FROM`). Retourne le nombre de publications modifiées.
     """
     return conn.execute(
         text("""
