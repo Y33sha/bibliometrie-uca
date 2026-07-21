@@ -1,7 +1,6 @@
 """Query service : SQL de la phase `metadata_correction`.
 
-Appelé par `application/pipeline/metadata_correction/`. Implémente le port
-`application.ports.pipeline.metadata_correction.MetadataCorrectionQueries`.
+Appelé par `application/pipeline/metadata_correction/`. Implémente le port `application.ports.pipeline.metadata_correction.MetadataCorrectionQueries`.
 """
 
 from sqlalchemy import Connection, bindparam, text
@@ -19,13 +18,9 @@ from application.ports.pipeline.metadata_correction import (
 )
 from domain.source_publications.correction import DoiClusterCase
 
-# Projection partagée. Chaque colonne porte le nom du champ d'`UnaryCorrectionRow` qu'elle
-# alimente : les lignes sont construites par appariement de noms. Contenu : SP + champs joints
-# `journals` (règles journal-dépendantes) + `raw_metadata` (reconstruction du brut) + deux
-# booléens calculés ici pour garder `effective_metadata` pure : `embargo_expired`
-# (date-dépendant ; la règle d'embargo lit le booléen, pas la date) et `self_declared_preprint`
-# (la SP déclare `is-preprint-of`, sans lire `meta` dans le domaine). Le `WHERE` est ajouté par
-# chaque variante.
+# Projection partagée : chaque colonne porte le nom du champ d'`UnaryCorrectionRow` qu'elle
+# alimente (appariement par nom). Les booléens `embargo_expired` et `self_declared_preprint`
+# sont calculés en SQL pour garder `effective_metadata` pure. Chaque variante ajoute son `WHERE`.
 _SELECT = """
     SELECT sp.id, sp.source::text AS source,
            sp.title, sp.doc_type, sp.doi,
@@ -42,9 +37,7 @@ _SELECT = """
 
 
 def fetch_for_unary_correction(conn: Connection) -> list[UnaryCorrectionRow]:
-    """Toutes les `source_publications`, LEFT JOIN `journals` pour les champs des règles
-    journal-dépendantes (`journal_type`, `oa_model`), `raw_metadata` inclus pour la
-    reconstruction du brut."""
+    """Toutes les `source_publications`, LEFT JOIN `journals` pour les champs des règles journal-dépendantes (`journal_type`, `oa_model`), `raw_metadata` inclus pour la reconstruction du brut."""
     rows = conn.execute(text(_SELECT)).all()
     return [UnaryCorrectionRow(**row._mapping) for row in rows]
 
@@ -79,10 +72,7 @@ def fetch_journal_by_doi_candidates(conn: Connection) -> list[JournalByDoiRow]:
 
 
 def persist_journal_corrections(conn: Connection, updates: list[JournalCorrectionUpdate]) -> int:
-    """UPDATE en lot de la colonne `journal_id` + `raw_metadata`, bump `updated_at`, marque
-    `keys_dirty` : `journal_id` n'est pas une clé de matching, mais la réconciliation est le
-    seul chemin vers `refresh_from_sources`, donc le rattachement doit la déclencher pour
-    propager au `journal_id` canonique."""
+    """UPDATE en lot de la colonne `journal_id` + `raw_metadata`, bump `updated_at`, marque `keys_dirty` : `journal_id` n'est pas une clé de matching, mais la réconciliation est le seul chemin vers `refresh_from_sources`, et le rattachement doit la déclencher pour propager au `journal_id` canonique."""
     if not updates:
         return 0
     stmt = text("""
@@ -105,15 +95,7 @@ def _cluster_case(value: str | None) -> DoiClusterCase | None:
 def fetch_doi_cluster_candidates(conn: Connection) -> list[DoiClusterRow]:
     """Membres des groupes-DOI candidats à la correction par cluster.
 
-    `same_work` dérive le mapping forme secondaire DataCite → DOI de l'œuvre canonique depuis
-    les `meta.related_identifiers` des SP `datacite` (clé = DOI **brut** reconstruit, stable
-    après substitution) : version → concept (`IsVersionOf`), forme variante → version publiée
-    (`IsVariantFormOf`), et pièce d'un dataset → dataset parent (`IsPartOf` vers un DOI présent
-    en base **comme dataset** — le parent doit être moissonné pour absorber ses pièces, ce qui
-    écarte aussi bien un parent article qu'un parent absent ; la forme du DOI est indifférente).
-    `candidate_dois` réunit les DOI à examiner : formes secondaires, portés par un
-    `book`/`book_chapter`, ou déjà corrigés (`raw_metadata.doi`, pour l'auto-cicatrisation).
-    On renvoie **tous** les membres de ces DOI (toutes sources)."""
+    `same_work` dérive le mapping forme secondaire DataCite → DOI de l'œuvre canonique depuis les `meta.related_identifiers` des `source_publications` `datacite` (clé = DOI **brut** reconstruit, stable après substitution) : version → concept (`IsVersionOf`), forme variante → version publiée (`IsVariantFormOf`), et pièce d'un dataset → dataset parent (`IsPartOf` vers un DOI présent en base **comme dataset** — le parent doit être moissonné pour absorber ses pièces, ce qui écarte aussi bien un parent article qu'un parent absent ; la forme du DOI est indifférente). `candidate_dois` réunit les DOI à examiner : formes secondaires, portés par un `book`/`book_chapter`, ou déjà corrigés (`raw_metadata.doi`, pour l'auto-cicatrisation). On renvoie **tous** les membres de ces DOI (toutes sources)."""
     rows = conn.execute(
         text(f"""
             WITH dataset_dois AS (
@@ -201,8 +183,7 @@ def fetch_doi_cluster_candidates(conn: Connection) -> list[DoiClusterRow]:
 
 
 def persist_doi_corrections(conn: Connection, updates: list[DoiCorrectionUpdate]) -> int:
-    """UPDATE en lot de la colonne `doi` + `raw_metadata`, bump `updated_at`, marque
-    `keys_dirty` (le DOI est une clé de confirmation : mutation ⇒ réconciliation)."""
+    """UPDATE en lot de la colonne `doi` + `raw_metadata`, bump `updated_at`, marque `keys_dirty` (le DOI est une clé de confirmation : mutation ⇒ réconciliation)."""
     if not updates:
         return 0
     stmt = text("""
@@ -218,8 +199,7 @@ def persist_doi_corrections(conn: Connection, updates: list[DoiCorrectionUpdate]
 
 
 def persist_corrections(conn: Connection, updates: list[CorrectionUpdate]) -> int:
-    """UPDATE en lot des colonnes effectives + `raw_metadata`, bump `updated_at`, marque
-    `keys_dirty` (`doc_type`/`external_ids` sont des clés : mutation ⇒ réconciliation)."""
+    """UPDATE en lot des colonnes effectives + `raw_metadata`, bump `updated_at`, marque `keys_dirty` (`doc_type`/`external_ids` sont des clés : mutation ⇒ réconciliation)."""
     if not updates:
         return 0
     stmt = text("""
