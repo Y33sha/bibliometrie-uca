@@ -12,7 +12,7 @@ from application.services.perimeters.core import (
     update_perimeter,
 )
 from domain.errors import ConflictError, NotFoundError, ValidationError
-from infrastructure.queries.config import PgConfigQueries
+from infrastructure.queries.api.config import PgConfigQueries
 from infrastructure.repositories import perimeter_repository
 
 

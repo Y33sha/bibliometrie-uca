@@ -28,7 +28,7 @@ from application.ports.api.hal_problems_queries import (
     NoMissingCollections,
 )
 from domain.source_publications.keys import DISCRIMINANT_TITLE_MIN_LENGTH
-from infrastructure.queries.config import laboratory_structure_types
+from infrastructure.queries.api.config import laboratory_structure_types
 from infrastructure.queries.perimeter import get_persons_perimeter_root_ids
 
 # Signatures HAL rattachées à une personne et portant la référence d'un compte HAL.

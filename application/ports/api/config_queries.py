@@ -2,7 +2,7 @@
 
 Distinct du port `application.ports.repositories.config_repository.ConfigRepository`, qui en porte les écritures.
 
-Implémenté par `infrastructure.queries.config.PgConfigQueries`.
+Implémenté par `infrastructure.queries.api.config.PgConfigQueries`.
 """
 
 from typing import Any, Protocol

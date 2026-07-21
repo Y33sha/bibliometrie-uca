@@ -46,6 +46,7 @@ from infrastructure.db.dml_guard import has_uncommitted_dml, reset_dml_flag
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.queries.api.addresses import PgAddressesQueries
 from infrastructure.queries.api.authorships import PgAuthorshipsQueries
+from infrastructure.queries.api.config import PgConfigQueries
 from infrastructure.queries.api.countries import PgCountriesQueries
 from infrastructure.queries.api.entity_labels import PgEntityLabelQueries
 from infrastructure.queries.api.feedback import PgFeedbackQueries
@@ -59,7 +60,6 @@ from infrastructure.queries.api.publishers import PgPublisherQueries
 from infrastructure.queries.api.stats import PgStatsQueries
 from infrastructure.queries.api.structures import PgStructuresQueries
 from infrastructure.queries.api.subjects import PgSubjectsQueries
-from infrastructure.queries.config import PgConfigQueries
 from infrastructure.queries.perimeter import PgPerimeterQueries, PgPerimetersQueries
 from infrastructure.queries.pipeline.metadata_correction import PgMetadataCorrectionQueries
 from infrastructure.repositories import (
