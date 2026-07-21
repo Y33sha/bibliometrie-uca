@@ -31,8 +31,7 @@ def _median_duration(durations: list[float]) -> float | None:
 
 
 def _duration_ratio(duration_s: float, historical_median_s: float | None) -> float | None:
-    """Rapport de la durée courante au médian historique (> 1 = plus lent que d'habitude),
-    `None` sans historique exploitable."""
+    """Rapport de la durée courante au médian historique (> 1 = plus lent que d'habitude), `None` sans historique exploitable."""
     if historical_median_s is None or historical_median_s == 0:
         return None
     return duration_s / historical_median_s
@@ -45,9 +44,7 @@ class PgPhaseExecutionsQueries(PhaseExecutionsQueries):
         self._conn = conn
 
     def list_runs(self, limit: int = 50, offset: int = 0) -> list[RunSummary]:
-        """Fenêtre de runs, plus récent en premier (`offset` runs sautés pour le
-        chargement incrémental). Statut global = le pire des statuts de phase ; mode
-        et sources pris sur la première phase du run."""
+        """Fenêtre de runs, plus récent en premier (`offset` runs sautés pour le chargement incrémental). Statut global = le pire des statuts de phase ; mode et sources pris sur la première phase du run."""
         rows = self._conn.execute(
             text(
                 """
@@ -96,8 +93,7 @@ class PgPhaseExecutionsQueries(PhaseExecutionsQueries):
         ]
 
     def get_run(self, run_id: int) -> RunDetail | None:
-        """Détail d'un run : ses phases dans l'ordre d'exécution, rendement et écart
-        de durée recalculés."""
+        """Détail d'un run : ses phases dans l'ordre d'exécution, rendement et écart de durée recalculés."""
         rows = self._conn.execute(
             text(
                 """

@@ -79,16 +79,12 @@ def _build_journal_where(
 ) -> tuple[str, dict[str, Any]]:
     """Construit la clause WHERE pour `list_journals` et `journals_facets`.
 
-    Les flags `skip_*` permettent à chaque facette d'exclure sa propre
-    dimension du filtrage — convention « comptes exclusifs » identique à
-    celle des facettes publications.
+    Les flags `skip_*` permettent à chaque facette d'exclure sa propre dimension du filtrage — convention « comptes exclusifs » identique à celle des facettes publications.
     """
     binds: dict[str, Any] = {}
     parts: list[str] = []
     if filters.search and len(filters.search) >= 2:
-        # title_normalized passe par `normalize_text` à l'ingestion ; la
-        # query doit subir la même normalisation pour matcher les titres
-        # contenant ponctuation ou accents.
+        # title_normalized passe par `normalize_text` à l'ingestion ; la query doit subir la même normalisation pour matcher les titres contenant ponctuation ou accents.
         normalized = normalize_text(filters.search)
         if normalized:
             parts.append("j.title_normalized LIKE '%' || :search || '%'")
@@ -97,8 +93,7 @@ def _build_journal_where(
         parts.append("j.publisher_id = :publisher_id")
         binds["publisher_id"] = filters.publisher_id
     if filters.journal_types and not skip_journal_types:
-        # journal_type est un enum Postgres → cast explicite en text pour
-        # comparer à un array text[].
+        # journal_type est un enum Postgres → cast explicite en text pour comparer à un array text[].
         parts.append("j.journal_type::text = ANY(:journal_types)")
         binds["journal_types"] = filters.journal_types
     if filters.is_in_doaj is not None and not skip_doaj:
@@ -171,9 +166,7 @@ class PgJournalQueries(JournalQueries):
             binds_jt,
         ).all()
         jt_counts = {r.value: r.n for r in jt_rows}
-        # On expose toutes les options de l'enum (count=0 si pas observé) — UX
-        # cohérente avec les facettes publications qui montrent les options
-        # connues, pas seulement celles présentes.
+        # On expose toutes les options de l'enum (count=0 si pas observé) — UX cohérente avec les facettes publications qui montrent les options connues, pas seulement celles présentes.
         journal_types_facet = [
             JournalsFacetOption(
                 value=v,
