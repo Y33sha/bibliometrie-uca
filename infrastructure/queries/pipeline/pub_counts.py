@@ -3,9 +3,7 @@
 `journals.pub_count` = publications in-perimeter in-scope de la revue.
 `publishers.pub_count` = somme des `pub_count` de ses revues.
 
-Le bulk `refresh_pub_counts` tourne dans le pipeline après que `in_perimeter` est
-posé (phase `authorships`). Les variantes scopées servent aux fusions admin (on ne
-recalcule que les lignes touchées). Tous idempotents (`IS DISTINCT FROM`).
+Le bulk `refresh_pub_counts` tourne dans le pipeline après que `in_perimeter` est posé (phase `authorships`). Les variantes scopées servent aux fusions admin (on ne recalcule que les lignes touchées). Tous idempotents (`IS DISTINCT FROM`).
 """
 
 from sqlalchemy import Connection, text

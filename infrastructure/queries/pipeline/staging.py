@@ -1,10 +1,8 @@
 """Query service : opérations sur la table `staging`.
 
-Partagé par tous les normalizers (`application/pipeline/normalize/*.py`)
-via la classe template `SourceNormalizer`.
+Partagé par tous les normalizers (`application/pipeline/normalize/*.py`) via la classe template `SourceNormalizer`.
 
-La table `staging` stocke les raw_data téléchargées par les extracteurs,
-avec un flag `processed` que les normalizers positionnent à TRUE.
+La table `staging` stocke les raw_data téléchargées par les extracteurs, avec un flag `processed` que les normalizers positionnent à TRUE.
 """
 
 import logging
@@ -97,10 +95,7 @@ _MARK_DONE_SQL = text(
 def mark_done(conn: Connection, staging_id: int, raw_store: RawStore) -> None:
     """Marque un staging comme traité, archive son `raw_data` au raw store, puis le vide.
 
-    La sous-requête `old` capture le payload AVANT vidange (snapshot pré-UPDATE),
-    écrit au raw store en best-effort (un échec ne casse pas la normalisation —
-    la BDD reste la source de vérité), puis `raw_data` est vidé dans le même
-    statement.
+    La sous-requête `old` capture le payload AVANT vidange (snapshot pré-UPDATE), écrit au raw store en best-effort (un échec ne casse pas la normalisation — la BDD reste la source de vérité), puis `raw_data` est vidé dans le même statement.
     """
     row = conn.execute(_MARK_DONE_SQL, {"sid": staging_id}).one_or_none()
     if row is None or not row.raw_data:  # `{}` (stub not-found) → rien à archiver
@@ -128,9 +123,7 @@ def fetch_existing_source_ids(conn: Connection, source: str) -> set[str]:
 class PgStagingQueries(StagingQueries):
     """Adapter PostgreSQL pour `application.ports.pipeline.normalize.staging.StagingQueries`.
 
-    `raw_store` (défaut : `get_raw_store()`) reçoit chaque payload `raw_data`
-    juste avant sa vidange par `mark_done` (archivage hors BDD). Injectable
-    pour les tests.
+    `raw_store` (défaut : `get_raw_store()`) reçoit chaque payload `raw_data` juste avant sa vidange par `mark_done` (archivage hors BDD). Injectable pour les tests.
     """
 
     def __init__(self, raw_store: RawStore | None = None) -> None:
