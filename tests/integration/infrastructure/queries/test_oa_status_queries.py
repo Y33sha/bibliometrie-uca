@@ -8,6 +8,8 @@ from infrastructure.queries.pipeline.oa_status import (
     fetch_publications_with_doi,
 )
 
+STALENESS = 30  # seuil de péremption arbitraire pour ces tests
+
 
 def _create_pub(conn, doi=None, pub_year=2024, oa_status=None):
     return conn.execute(
@@ -35,7 +37,7 @@ class TestFetchPublicationsWithDoi:
         """La fonction retourne des `PublicationOaCheck`, pour que les callers puissent unpacker
         `(pub_id, doi, oa_status, has_open_deposit)`."""
         _create_pub(sa_sync_conn, doi="10.1/a", oa_status="gold")
-        rows = fetch_publications_with_doi(sa_sync_conn)
+        rows = fetch_publications_with_doi(sa_sync_conn, staleness_days=STALENESS)
         assert rows
         assert all(isinstance(r, tuple) for r in rows)
         # Forme du tuple : (id, doi, oa_status, has_open_deposit)
@@ -49,7 +51,7 @@ class TestFetchPublicationsWithDoi:
         with_doi = _create_pub(sa_sync_conn, doi="10.1/a")
         _create_pub(sa_sync_conn, doi=None)
 
-        rows = fetch_publications_with_doi(sa_sync_conn)
+        rows = fetch_publications_with_doi(sa_sync_conn, staleness_days=STALENESS)
         ids = [r.id for r in rows]
         assert with_doi in ids
         # Pas de pub sans DOI
@@ -60,7 +62,7 @@ class TestFetchPublicationsWithDoi:
         checked = _create_pub(sa_sync_conn, doi="10.1/a", oa_status="closed")
         _set_checked(sa_sync_conn, checked, days_ago=1)
         never = _create_pub(sa_sync_conn, doi="10.1/b", oa_status="closed")
-        rows = fetch_publications_with_doi(sa_sync_conn)
+        rows = fetch_publications_with_doi(sa_sync_conn, staleness_days=STALENESS)
         ordered = [r.id for r in rows if r.id in (checked, never)]
         assert ordered[0] == never
 
@@ -82,7 +84,7 @@ class TestFetchPublicationsWithDoi:
         closed_stale = _create_pub(sa_sync_conn, doi="10.1/cs", oa_status="closed")
         _set_checked(sa_sync_conn, closed_stale, days_ago=999)
 
-        ids = {r.id for r in fetch_publications_with_doi(sa_sync_conn, staleness_days=30)}
+        ids = {r.id for r in fetch_publications_with_doi(sa_sync_conn, staleness_days=STALENESS)}
         assert never_gold in ids
         assert gold_stale in ids
         assert gold_fresh not in ids
@@ -92,12 +94,12 @@ class TestFetchPublicationsWithDoi:
     def test_respects_limit(self, sa_sync_conn):
         for i in range(3):
             _create_pub(sa_sync_conn, doi=f"10.1/{i}")
-        rows = fetch_publications_with_doi(sa_sync_conn, limit=2)
+        rows = fetch_publications_with_doi(sa_sync_conn, limit=2, staleness_days=STALENESS)
         assert len(rows) == 2
 
     def test_returns_oa_status(self, sa_sync_conn):
         _create_pub(sa_sync_conn, doi="10.1/a", oa_status="gold")
-        rows = fetch_publications_with_doi(sa_sync_conn)
+        rows = fetch_publications_with_doi(sa_sync_conn, staleness_days=STALENESS)
         assert any(r.oa_status == "gold" for r in rows)
 
 
@@ -106,7 +108,7 @@ class TestCounters:
         """Même prédicat que `fetch_publications_with_doi`, sans cap : le backlog avant plafonnement."""
         _create_pub(sa_sync_conn, doi="10.1/a", oa_status="closed")
         _create_pub(sa_sync_conn, doi=None)  # sans DOI → hors file
-        assert count_stale_publications(sa_sync_conn) == 1
+        assert count_stale_publications(sa_sync_conn, staleness_days=STALENESS) == 1
 
     def test_count_publications_by_oa_status_groups_the_stock(self, sa_sync_conn):
         _create_pub(sa_sync_conn, doi="10.1/a", oa_status="gold")

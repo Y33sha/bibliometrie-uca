@@ -19,7 +19,7 @@ _STALE_WHERE = """
 
 
 def fetch_publications_with_doi(
-    conn: Connection, *, limit: int | None = None, staleness_days: int = 30
+    conn: Connection, *, limit: int | None = None, staleness_days: int
 ) -> list[PublicationOaCheck]:
     """`PublicationOaCheck` des publications à (re)vérifier sur Unpaywall.
 
@@ -54,7 +54,7 @@ def fetch_publications_with_doi(
     return [PublicationOaCheck(r.id, r.doi, r.oa_status, r.has_open_deposit) for r in rows]
 
 
-def count_stale_publications(conn: Connection, *, staleness_days: int = 30) -> int:
+def count_stale_publications(conn: Connection, *, staleness_days: int) -> int:
     """Nombre de publications avec DOI à (re)vérifier — même prédicat que `fetch_publications_with_doi`, sans cap. C'est le backlog de staleness OA."""
     return conn.execute(
         text("SELECT count(*) FROM publications WHERE " + _STALE_WHERE),
@@ -77,11 +77,11 @@ class PgOaStatusQueries(OaStatusQueries):
     """Adapter PostgreSQL pour `application.ports.pipeline.oa_status.OaStatusQueries`."""
 
     def fetch_publications_with_doi(
-        self, conn: Connection, *, limit: int | None = None, staleness_days: int = 30
+        self, conn: Connection, *, limit: int | None = None, staleness_days: int
     ) -> list[PublicationOaCheck]:
         return fetch_publications_with_doi(conn, limit=limit, staleness_days=staleness_days)
 
-    def count_stale_publications(self, conn: Connection, *, staleness_days: int = 30) -> int:
+    def count_stale_publications(self, conn: Connection, *, staleness_days: int) -> int:
         return count_stale_publications(conn, staleness_days=staleness_days)
 
     def count_publications_by_oa_status(self, conn: Connection) -> dict[str, int]:

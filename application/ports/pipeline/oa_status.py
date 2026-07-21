@@ -21,12 +21,12 @@ class OaStatusQueries(Protocol):
     """Lectures de la file de vérification Unpaywall, et de la répartition OA du stock pour le bilan de phase."""
 
     def fetch_publications_with_doi(
-        self, conn: Connection, *, limit: int | None = None, staleness_days: int = 30
+        self, conn: Connection, *, limit: int | None = None, staleness_days: int
     ) -> list[PublicationOaCheck]:
         """Publications à (re)vérifier sur Unpaywall : jamais vérifiées, ou vérifiées il y a plus de `staleness_days` jours. Triées jamais-vérifiées d'abord, puis les plus périmées ; `limit` cape le run, le reliquat s'écoulant sur les suivants."""
         ...
 
-    def count_stale_publications(self, conn: Connection, *, staleness_days: int = 30) -> int:
+    def count_stale_publications(self, conn: Connection, *, staleness_days: int) -> int:
         """Nombre de publications avec DOI à (re)vérifier (même prédicat que `fetch_publications_with_doi`, sans cap) — le backlog de staleness OA, avant plafonnement du run."""
         ...
 
