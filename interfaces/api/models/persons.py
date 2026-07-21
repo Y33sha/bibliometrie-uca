@@ -64,23 +64,31 @@ class AddIdentifierResponse(BaseModel):
 
 
 class IdentifierStatusResponse(BaseModel):
+    """Identifiant après changement de statut : son id et son statut."""
+
     id: int
     status: str
 
 
 class NameFormStatusResponse(BaseModel):
+    """Forme de nom après changement de statut, pour la personne concernée."""
+
     person_id: int
     name_form: str
     status: str
 
 
 class IdentifierReassignResponse(BaseModel):
+    """Identifiant après réattribution : la personne à laquelle il est rattaché et son statut."""
+
     id: int
     person_id: int
     status: str
 
 
 class DetachAuthorshipsResponse(BaseModel):
+    """Décompte d'un détachement de signatures : signatures détachées, authorships supprimées, formes de nom nettoyées."""
+
     detached: int
     deleted_authorships: int
     cleaned_forms: int

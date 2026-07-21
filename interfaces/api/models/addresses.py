@@ -40,6 +40,8 @@ class BatchSetCountry(BaseModel):
 
 
 class AddressPublicationsResponse(BaseModel):
+    """Publications rattachées à une adresse, avec le texte brut de celle-ci."""
+
     address_id: int
     raw_text: str
     publications: list[AddressPublicationItem]

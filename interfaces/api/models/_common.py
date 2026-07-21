@@ -6,10 +6,14 @@ from pydantic import BaseModel
 
 
 class DeletedResponse(BaseModel):
+    """Acquittement de suppression : `{deleted: true}`."""
+
     deleted: bool = True
 
 
 class RemovedResponse(BaseModel):
+    """Acquittement de retrait d'un lien ou d'un élément : `{removed: true}`."""
+
     removed: bool = True
 
 
@@ -20,6 +24,8 @@ class OkResponse(BaseModel):
 
 
 class BatchUpdatedResponse(BaseModel):
+    """Décompte d'une mise à jour en lot : `{updated: int}`."""
+
     updated: int
 
 
@@ -55,6 +61,8 @@ class MergeRequest(BaseModel):
 
 
 class MergeResponse(BaseModel):
+    """Acquittement de fusion : l'entité absorbée (`source_id`) et la survivante (`target_id`)."""
+
     merged: bool
     source_id: int
     target_id: int

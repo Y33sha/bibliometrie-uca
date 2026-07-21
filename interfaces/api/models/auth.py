@@ -9,4 +9,6 @@ class LoginRequest(BaseModel):
 
 
 class AuthCheckResponse(BaseModel):
+    """Résultat de la vérification de session : `authenticated` dit si la requête porte une session valide."""
+
     authenticated: bool

@@ -2444,7 +2444,10 @@ export interface components {
             /** Source Id */
             source_id: string | null;
         };
-        /** AddressPublicationsResponse */
+        /**
+         * AddressPublicationsResponse
+         * @description Publications rattachées à une adresse, avec le texte brut de celle-ci.
+         */
         AddressPublicationsResponse: {
             /** Address Id */
             address_id: number;
@@ -2594,7 +2597,10 @@ export interface components {
              */
             force: boolean;
         };
-        /** AuthCheckResponse */
+        /**
+         * AuthCheckResponse
+         * @description Résultat de la vérification de session : `authenticated` dit si la requête porte une session valide.
+         */
         AuthCheckResponse: {
             /** Authenticated */
             authenticated: boolean;
@@ -2657,7 +2663,10 @@ export interface components {
              */
             suggested_country: string;
         };
-        /** BatchUpdatedResponse */
+        /**
+         * BatchUpdatedResponse
+         * @description Décompte d'une mise à jour en lot : `{updated: int}`.
+         */
         BatchUpdatedResponse: {
             /** Updated */
             updated: number;
@@ -2802,7 +2811,10 @@ export interface components {
             /** Total */
             total: number;
         };
-        /** DeletedResponse */
+        /**
+         * DeletedResponse
+         * @description Acquittement de suppression : `{deleted: true}`.
+         */
         DeletedResponse: {
             /**
              * Deleted
@@ -2815,7 +2827,10 @@ export interface components {
             /** Authorships */
             authorships: components["schemas"]["SourceAuthorshipRef"][];
         };
-        /** DetachAuthorshipsResponse */
+        /**
+         * DetachAuthorshipsResponse
+         * @description Décompte d'un détachement de signatures : signatures détachées, authorships supprimées, formes de nom nettoyées.
+         */
         DetachAuthorshipsResponse: {
             /** Detached */
             detached: number;
@@ -3249,7 +3264,10 @@ export interface components {
             /** Pages */
             readonly pages: number;
         };
-        /** IdentifierReassignResponse */
+        /**
+         * IdentifierReassignResponse
+         * @description Identifiant après réattribution : la personne à laquelle il est rattaché et son statut.
+         */
         IdentifierReassignResponse: {
             /** Id */
             id: number;
@@ -3258,7 +3276,10 @@ export interface components {
             /** Status */
             status: string;
         };
-        /** IdentifierStatusResponse */
+        /**
+         * IdentifierStatusResponse
+         * @description Identifiant après changement de statut : son id et son statut.
+         */
         IdentifierStatusResponse: {
             /** Id */
             id: number;
@@ -3553,7 +3574,10 @@ export interface components {
             /** Source Id */
             source_id: number;
         };
-        /** MergeResponse */
+        /**
+         * MergeResponse
+         * @description Acquittement de fusion : l'entité absorbée (`source_id`) et la survivante (`target_id`).
+         */
         MergeResponse: {
             /** Merged */
             merged: boolean;
@@ -3646,7 +3670,10 @@ export interface components {
             /** Created At */
             created_at?: string | null;
         };
-        /** NameFormStatusResponse */
+        /**
+         * NameFormStatusResponse
+         * @description Forme de nom après changement de statut, pour la personne concernée.
+         */
         NameFormStatusResponse: {
             /** Person Id */
             person_id: number;
@@ -3707,7 +3734,10 @@ export interface components {
              */
             ok: boolean;
         };
-        /** OrphanAssignResponse */
+        /**
+         * OrphanAssignResponse
+         * @description Acquittement de l'attribution d'une signature orpheline : la personne rattachée.
+         */
         OrphanAssignResponse: {
             /**
              * Ok
@@ -3749,7 +3779,10 @@ export interface components {
             /** Pages */
             readonly pages: number;
         };
-        /** OrphanBatchAssignResponse */
+        /**
+         * OrphanBatchAssignResponse
+         * @description Acquittement de l'attribution en lot : le nombre de signatures rattachées.
+         */
         OrphanBatchAssignResponse: {
             /**
              * Ok
@@ -4737,7 +4770,10 @@ export interface components {
             /** Relation Type */
             relation_type: string;
         };
-        /** RemovedResponse */
+        /**
+         * RemovedResponse
+         * @description Acquittement de retrait d'un lien ou d'un élément : `{removed: true}`.
+         */
         RemovedResponse: {
             /**
              * Removed
