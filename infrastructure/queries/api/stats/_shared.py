@@ -3,7 +3,7 @@
 from typing import Any
 
 from application.ports.api.stats_queries import StatsFilters
-from infrastructure.queries.filters import (
+from infrastructure.queries.api.filters import (
     PUBLICATION_IS_IN_PERIMETER,
     WhereClause,
     doc_type_clause,

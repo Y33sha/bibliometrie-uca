@@ -31,7 +31,7 @@ from domain.journals.journal import (
     OA_MODELS,
 )
 from domain.normalize import normalize_text
-from infrastructure.queries.filters import SUBJECT_IS_NOT_GENERIC, publication_in_perimeter
+from infrastructure.queries.api.filters import SUBJECT_IS_NOT_GENERIC, publication_in_perimeter
 from infrastructure.sources.doaj import resolve_doaj_url
 
 # Colonnes du profil d'une revue, communes à la ligne de liste et à la page d'une revue. `doaj_id` et `doaj_url_csv` sont les deux entrées de `resolve_doaj_url` ; la jointure `publishers p` est attendue par `pub_name`.

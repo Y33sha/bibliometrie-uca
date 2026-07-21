@@ -11,7 +11,7 @@ from sqlalchemy import Connection, text
 
 from application.ports.api.publications_queries import PublicationFilters
 from domain.normalize import normalize_text, strip_markup
-from infrastructure.queries.filters import (
+from infrastructure.queries.api.filters import (
     OA_OPEN_STATUSES,
     PUBLICATION_IS_IN_PERIMETER,
     WhereClause,

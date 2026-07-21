@@ -21,7 +21,7 @@ from application.ports.api.publishers_queries import (
 from application.ports.api.subjects_queries import SubjectFrequency
 from domain.normalize import normalize_text
 from domain.publishers.publisher import PUBLISHER_TYPE_LABELS_FR, PUBLISHER_TYPES
-from infrastructure.queries.filters import SUBJECT_IS_NOT_GENERIC, publication_in_perimeter
+from infrastructure.queries.api.filters import SUBJECT_IS_NOT_GENERIC, publication_in_perimeter
 
 
 def _build_publisher_where(

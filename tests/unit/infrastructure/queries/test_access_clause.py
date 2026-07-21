@@ -5,7 +5,7 @@ posait aucune contrainte, affichant les publications ouvertes malgré le filtre.
 Le découpage de la liste se fait côté routeur ; la clause reçoit une `list[str]`.
 """
 
-from infrastructure.queries.filters import (
+from infrastructure.queries.api.filters import (
     OA_CLOSED_STATUSES,
     OA_OPEN_STATUSES,
     access_clause,

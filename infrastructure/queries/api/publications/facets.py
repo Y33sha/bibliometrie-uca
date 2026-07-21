@@ -14,7 +14,7 @@ from sqlalchemy import Connection, text
 from application.ports.api.publications_queries import PublicationFilters
 from domain.countries import NO_COUNTRY_CODE
 from infrastructure.db.engine import get_sync_engine
-from infrastructure.queries.filters import (
+from infrastructure.queries.api.filters import (
     OA_CLOSED_SQL,
     OA_OPEN_SQL,
     PUBLICATION_IS_IN_PERIMETER,
