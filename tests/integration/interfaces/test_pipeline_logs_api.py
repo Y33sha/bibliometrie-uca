@@ -1,4 +1,4 @@
-"""Tests d'intégration pour le router `interfaces.api.routers.admin.pipeline_logs`.
+"""Tests d'intégration pour les endpoints de log du router `interfaces.api.routers.pipeline`.
 
 Couvre :
 - GET /api/pipeline/status (avec / sans pipeline en cours)
