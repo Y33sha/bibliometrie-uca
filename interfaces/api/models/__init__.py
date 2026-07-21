@@ -16,7 +16,7 @@ from interfaces.api.models._common import (
     RemovedResponse,
     TotalCountResponse,
 )
-from interfaces.api.models.admin.addresses import (
+from interfaces.api.models.addresses import (
     AddressPublicationsResponse,
     AddressReviewResponse,
     BatchCountryResponse,
@@ -25,7 +25,8 @@ from interfaces.api.models.admin.addresses import (
     ReviewAction,
     SetCountry,
 )
-from interfaces.api.models.admin.authorships import (
+from interfaces.api.models.auth import AuthCheckResponse, LoginRequest
+from interfaces.api.models.authorships import (
     AssignOrphanAuthorship,
     BatchAssignOrphanAuthorships,
     CreatePersonName,
@@ -33,10 +34,17 @@ from interfaces.api.models.admin.authorships import (
     OrphanBatchAssignResponse,
     SourceAuthorshipRef,
 )
-from interfaces.api.models.admin.perimeters import (
+from interfaces.api.models.errors import (
+    BlockingJournalItem,
+    PublisherMergeBlockedResponse,
+    RejectedPairItem,
+    RejectedPairsResponse,
+)
+from interfaces.api.models.journals import JournalTypeChange, JournalTypeChangeImpact
+from interfaces.api.models.perimeters import (
     PerimeterCreate,
 )
-from interfaces.api.models.admin.persons import (
+from interfaces.api.models.persons import (
     AddIdentifier,
     AddIdentifierResponse,
     DetachAuthorships,
@@ -51,16 +59,16 @@ from interfaces.api.models.admin.persons import (
     UpdateNameFormStatus,
     UpdatePersonName,
 )
-from interfaces.api.models.admin.pipeline_config import ConfigValueUpdate
-from interfaces.api.models.admin.pipeline_logs import (
+from interfaces.api.models.pipeline_config import ConfigValueUpdate
+from interfaces.api.models.pipeline_logs import (
     PipelinePhaseLog,
     PipelineStatus,
 )
-from interfaces.api.models.admin.publication_duplicates import (
+from interfaces.api.models.publication_duplicates import (
     MarkDistinctPublications,
     MergePublications,
 )
-from interfaces.api.models.admin.structures import (
+from interfaces.api.models.structures import (
     NameFormCreate,
     NameFormUpdate,
     RelationCreate,
@@ -68,14 +76,6 @@ from interfaces.api.models.admin.structures import (
     StructureRelationCreateResponse,
     StructureUpdate,
 )
-from interfaces.api.models.auth import AuthCheckResponse, LoginRequest
-from interfaces.api.models.errors import (
-    BlockingJournalItem,
-    PublisherMergeBlockedResponse,
-    RejectedPairItem,
-    RejectedPairsResponse,
-)
-from interfaces.api.models.journals import JournalTypeChange, JournalTypeChangeImpact
 
 __all__ = [
     "AddIdentifier",

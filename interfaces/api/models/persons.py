@@ -4,7 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-from interfaces.api.models.admin.authorships import SourceAuthorshipRef
+from interfaces.api.models.authorships import SourceAuthorshipRef
 
 # ----- Corps des requêtes -----
 
