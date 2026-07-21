@@ -14,19 +14,18 @@ from domain.source_publications.keys import DISCRIMINANT_TITLE_MIN_LENGTH
 
 def fetch_dirty_source_publication_ids(conn: Connection) -> list[int]:
     # Orphelins **compris** : la réconciliation est aussi l'assignation (un orphelin dirty
-    # se fait matcher/créer/skipper). Les SP traitées sont ensuite nettoyées (`clear_keys_dirty`).
+    # se fait matcher/créer/skipper). Les source_publications traitées sont ensuite
+    # nettoyées (`clear_keys_dirty`).
     rows = conn.execute(
         text("SELECT id FROM source_publications WHERE keys_dirty ORDER BY id")
     ).all()
     return [row.id for row in rows]
 
 
-# Voisinage 1-hop : les SP dirty (orphelines comprises) + celles qui partagent une clé de
-# confirmation avec elles (matérialisées **ou** orphelines). Une branche UNION par type de
-# clé ; `UNION` dédoublonne. Dernière branche = composite thèse (le token métadonnée).
-# `publication_doi` (via LEFT JOIN, `NULL` pour les orphelines) sert à choisir l'ancre ;
-# `in_perimeter` (EXISTS) gate la création d'une pub neuve pour une partition d'orphelins.
-# (Au full rerun tout est dirty : l'univers = tout le stock = cluster-then-materialize global.)
+# Voisinage 1-hop : les `source_publications` dirty (orphelines comprises) et celles qui
+# partagent une clé de confirmation avec elles. Une branche UNION par type de clé (chacune
+# annotée en ligne). `publication_doi` (via LEFT JOIN) choisit l'ancre ; `in_perimeter`
+# (EXISTS) gate la création d'une pub neuve pour une partition d'orphelins.
 _COLS = (
     "{a}.id, {a}.doi, {a}.external_ids, {a}.publication_id, "
     "{a}.doc_type, {a}.title_normalized, {a}.pub_year, p.doi AS publication_doi, "
@@ -163,12 +162,7 @@ def clear_keys_dirty(conn: Connection, source_publication_ids: list[int]) -> int
 def mark_keys_dirty(conn: Connection, where: str | None = None, *, dry_run: bool = False) -> int:
     """Pose `keys_dirty = true` sur les source_publications — toutes, ou le sous-ensemble `where`.
 
-    Outil de re-matérialisation : quand une règle de clés de confirmation change (nouveau token,
-    seuil de garde modifié, projection revue), le stock déjà réconcilié ne reflète plus la règle.
-    Re-marquer `keys_dirty` fait re-réconcilier les SP concernées au prochain run de la phase
-    `publications` ; sur tout le stock, c'est le *cluster-then-materialize* global. `where` est un
-    **fragment SQL de confiance** (CLI maintenance / run_pipeline, jamais une entrée externe).
-    `dry_run` compte sans écrire. Retourne le nombre de SP (marquées, ou qui le seraient).
+    Outil de re-matérialisation : quand une règle de clés de confirmation change (nouveau token, seuil de garde modifié, projection revue), le stock déjà réconcilié diverge de la règle. Re-marquer `keys_dirty` fait re-réconcilier les source_publications concernées au prochain run de la phase `publications` ; sur tout le stock, c'est le *cluster-then-materialize* global. `where` est un **fragment SQL de confiance** (CLI maintenance / run_pipeline, jamais une entrée externe). `dry_run` compte sans écrire. Retourne le nombre de source_publications (marquées, ou qui le seraient).
     """
     clause = f" WHERE {where}" if where else ""
     if dry_run:
