@@ -117,6 +117,22 @@ class TestLinkAndClear:
         )
         assert sent == 1
 
+    def test_bulk_counts_only_new_links(self, sa_sync_conn):
+        """Le retour compte les liens réellement insérés, pas ceux déjà présents."""
+        pub = _create_pub(sa_sync_conn)
+        sid = upsert_subject(sa_sync_conn, label="x")
+        sid2 = upsert_subject(sa_sync_conn, label="y")
+        link_publication_subjects_bulk(
+            sa_sync_conn, source="hal", rows=[PublicationSubjectLink(pub, sid)]
+        )
+        # Ré-insertion du lien existant + un nouveau : seul le nouveau est compté.
+        n = link_publication_subjects_bulk(
+            sa_sync_conn,
+            source="hal",
+            rows=[PublicationSubjectLink(pub, sid), PublicationSubjectLink(pub, sid2)],
+        )
+        assert n == 1
+
     def test_clear_preserves_rejected_links(self, sa_sync_conn):
         """Le nettoyage avant réingestion épargne les liens que la curation a rejetés."""
         pub = _create_pub(sa_sync_conn)
