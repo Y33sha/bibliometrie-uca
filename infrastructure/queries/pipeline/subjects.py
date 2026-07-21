@@ -46,20 +46,14 @@ def link_publication_subjects_bulk(
     source: str,
     rows: list[PublicationSubjectLink],
 ) -> int:
-    """Insère en lot les liens publication↔sujet d'une source, et retourne leur nombre.
+    """Insère en lot les liens publication↔sujet d'une source, et retourne le nombre réellement inséré.
 
-    La clé primaire porte la source : un même sujet annoté par deux sources donne deux lignes, et réinsérer un lien connu ne fait rien. Plusieurs annotations d'une même source peuvent viser le même sujet pour une même publication ; le lot les dédoublonne avant l'insertion.
+    La clé primaire porte la source : un même sujet annoté par deux sources donne deux lignes. L'`ON CONFLICT DO NOTHING` écarte les liens déjà présents et les doublons internes au lot (une même source peut viser deux fois le même sujet) ; le retour ne compte donc que les liens neufs.
     """
     if not rows:
         return 0
-    seen: set[PublicationSubjectLink] = set()
-    payload: list[dict[str, int]] = []
-    for link in rows:
-        if link in seen:
-            continue
-        seen.add(link)
-        payload.append({"pid": link.publication_id, "sid": link.subject_id})
-    conn.execute(
+    payload = [{"pid": link.publication_id, "sid": link.subject_id} for link in rows]
+    return conn.execute(
         text(
             """
             INSERT INTO publication_subjects (publication_id, subject_id, source)
@@ -69,8 +63,7 @@ def link_publication_subjects_bulk(
             """
         ).bindparams(bindparam("payload", type_=JSONB)),
         {"payload": payload, "source": source},
-    )
-    return len(payload)
+    ).rowcount
 
 
 def clear_publication_subjects_for_pubs(conn: Connection, *, publication_ids: list[int]) -> int:
@@ -118,8 +111,7 @@ def select_all_publication_ids(conn: Connection) -> list[int]:
 def select_source_publications_for_pubs(
     conn: Connection, *, publication_ids: list[int]
 ) -> list[SourcePublicationTopics]:
-    """Le `topics` de chaque `source_publication` des publications données, avec sa source — matière première par-source pour ré-ingérer leurs concepts en conservant l'attribution `publication_subjects.source`.
-    """
+    """Le `topics` de chaque `source_publication` des publications données, avec sa source — matière première par-source pour ré-ingérer leurs concepts en conservant l'attribution `publication_subjects.source`."""
     if not publication_ids:
         return []
     rows = conn.execute(
