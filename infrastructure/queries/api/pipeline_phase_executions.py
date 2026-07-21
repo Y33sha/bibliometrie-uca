@@ -1,9 +1,6 @@
 """Query service pour les exécutions de phase (table `pipeline_phase_executions`).
 
-Adapter SA pour le port `PhaseExecutionsQueries`. L'écart de durée est recalculé à
-la lecture : le médian historique d'une phase se calcule sur ses exécutions réussies
-hors run courant, et le rapport de la durée courante à ce médian est exposé tel quel
-(aucun seuil ; l'œil juge une phase anormalement lente).
+Adapter SA pour le port `PhaseExecutionsQueries`. L'écart de durée est recalculé à la lecture : le médian historique d'une phase se calcule sur ses exécutions réussies hors run courant, et le rapport de la durée courante à ce médian est exposé tel quel (aucun seuil ; l'œil juge une phase anormalement lente).
 """
 
 from __future__ import annotations

@@ -1,7 +1,4 @@
-"""Query services pour le tableau de bord admin de feedback détection d'adresses.
-
-`PgFeedbackQueries` hérite explicitement du Protocol `application.ports.api.feedback_queries.FeedbackQueries` (mypy vérifie la conformité à la définition de classe).
-"""
+"""Query services du tableau de bord admin : feedback sur la détection d'adresses."""
 
 from typing import Any
 
