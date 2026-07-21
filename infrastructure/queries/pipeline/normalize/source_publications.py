@@ -22,8 +22,8 @@ from domain.publications.metadata import normalized_title
 _ROW_FIELDS = tuple(f.name for f in fields(SourcePublicationRow))
 
 # Les colonnes écrites se dérivent des champs de la ligne, plus `title_normalized`
-# qui se calcule à l'écriture. Elles ne peuvent donc pas diverger du contrat :
-# un champ ajouté à `SourcePublicationRow` est inséré et réécrit sans autre geste.
+# calculé à l'écriture : un champ ajouté à `SourcePublicationRow` est inséré et
+# réécrit sans autre geste, en phase avec le contrat.
 _COLUMNS = (*_ROW_FIELDS, "title_normalized")
 
 # Tout est réécrit sauf la clé de conflit, qui est justement ce qui identifie la ligne.

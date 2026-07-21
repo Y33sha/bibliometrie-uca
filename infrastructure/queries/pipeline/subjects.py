@@ -76,9 +76,7 @@ def link_publication_subjects_bulk(
 def clear_publication_subjects_for_pubs(conn: Connection, *, publication_ids: list[int]) -> int:
     """`DELETE` des liens (non rejetés) des publications données, toutes sources.
 
-    Préserve les liens manuellement rejetés (colonne `rejected`). Appelé par la
-    phase `subjects` avant ré-ingestion des publications dont le contenu canonique
-    a changé.
+    Préserve les liens manuellement rejetés (colonne `rejected`). Appelé par la phase `subjects` avant ré-ingestion des publications dont le contenu canonique a changé.
     """
     if not publication_ids:
         return 0
@@ -120,9 +118,7 @@ def select_all_publication_ids(conn: Connection) -> list[int]:
 def select_source_publications_for_pubs(
     conn: Connection, *, publication_ids: list[int]
 ) -> list[SourcePublicationTopics]:
-    """Le `topics` de chaque `source_publication` des publications données, avec sa
-    source — matière première par-source pour ré-ingérer leurs concepts en conservant
-    l'attribution `publication_subjects.source`.
+    """Le `topics` de chaque `source_publication` des publications données, avec sa source — matière première par-source pour ré-ingérer leurs concepts en conservant l'attribution `publication_subjects.source`.
     """
     if not publication_ids:
         return []
