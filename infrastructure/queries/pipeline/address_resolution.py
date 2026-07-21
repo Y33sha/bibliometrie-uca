@@ -45,9 +45,7 @@ def load_name_forms(conn: Connection) -> list[StructureNameForm]:
 def fetch_addresses_chunk(conn: Connection, *, after_id: int, limit: int) -> list[tuple[int, str]]:
     """Tranche `(id, normalized_text)` triée par `id`, `id > after_id`.
 
-    Le matching opère sur `normalized_text` (déjà normalisé à l'insertion par
-    `normalize_text`), pas sur le brut : aucun recalcul côté pipeline.
-    Pagination keyset : la mémoire reste bornée par `limit`, pas par le total.
+    Le matching opère sur `normalized_text` (déjà normalisé à l'insertion par `normalize_text`), pas sur le brut : aucun recalcul côté pipeline. Pagination keyset : la mémoire reste bornée par `limit`, pas par le total.
     """
     rows = conn.execute(
         text(
@@ -62,11 +60,9 @@ def fetch_addresses_chunk(conn: Connection, *, after_id: int, limit: int) -> lis
 def delete_obsolete_detections_bulk(
     conn: Connection, addr_ids: list[int], kept_pairs: list[KeptPair]
 ) -> int:
-    """Supprime en bloc les détections auto non confirmées devenues obsolètes.
+    """Supprime en bloc les détections auto non confirmées absentes de `kept_pairs`.
 
-    Pour les adresses `addr_ids`, retire les liens `matched_form_id IS NOT NULL`
-    / `is_confirmed IS NULL` dont le `(address_id, structure_id)` n'est pas dans
-    `kept_pairs` (encore détecté). Retourne le rowcount.
+    Pour les adresses `addr_ids`, retire les liens `matched_form_id IS NOT NULL` / `is_confirmed IS NULL` dont le `(address_id, structure_id)` n'est pas dans `kept_pairs` (encore détecté). Retourne le rowcount.
     """
     if not addr_ids:
         return 0
@@ -119,11 +115,7 @@ def unflag_obsolete_detections_bulk(
 def upsert_detected_structures_bulk(conn: Connection, detections: list[DetectedStructure]) -> None:
     """Insère/maj en bloc les détections `(address_id, structure_id, form_id)`.
 
-    `resolve` garantit l'unicité de `(address_id, structure_id)` dans la tranche,
-    donc l'ON CONFLICT ne porte jamais deux fois sur la même ligne. La clause
-    `WHERE ... IS DISTINCT FROM` rend l'upsert idempotent : un lien dont le
-    `matched_form_id` est déjà à jour n'est pas réécrit (pas de churn ni de bloat
-    sur un recalcul qui ne change rien).
+    `resolve` garantit l'unicité de `(address_id, structure_id)` dans la tranche : l'ON CONFLICT porte sur des lignes distinctes. La clause `WHERE ... IS DISTINCT FROM` rend l'upsert idempotent : un lien dont le `matched_form_id` est déjà à jour reste inchangé (pas de churn ni de bloat sur un recalcul sans effet).
     """
     if not detections:
         return

@@ -1,7 +1,6 @@
 """Query service : SQL de la phase `relations`.
 
-Appelé par `application/pipeline/relations/phase.py`. Implémente le port
-`application.ports.pipeline.relations.PublicationRelationsQueries`.
+Appelé par `application/pipeline/relations/phase.py`. Implémente le port `application.ports.pipeline.relations.PublicationRelationsQueries`.
 """
 
 from sqlalchemy import Connection, bindparam, text
@@ -16,9 +15,7 @@ from application.ports.pipeline.relations import (
 )
 from domain.source_publications.keys import DISCRIMINANT_TITLE_MIN_LENGTH
 
-# Écart d'années toléré entre une œuvre dépendante et son parent, dans les deux sens :
-# un erratum suit son article (parent dans `[année − N … année]`), une version publiée
-# suit son preprint (parent dans `[année … année + N]`).
+# Écart d'années toléré entre une œuvre dépendante et son parent, dans les deux sens : un erratum suit son article (parent dans `[année − N … année]`), une version publiée suit son preprint (parent dans `[année … année + N]`).
 _TITLE_MATCH_YEAR_WINDOW = 2
 
 
@@ -37,10 +34,7 @@ def fetch_declared_relation_sources(conn: Connection) -> list[DeclaredRelationSo
     return [DeclaredRelationSource(r.publication_id, r.source, r.meta) for r in rows]
 
 
-# Paires de publications distinctes (DOI distincts) partageant une clé de confirmation. Les clés
-# vivent sur `source_publications.external_ids` ; une publication les hérite de ses SP rattachées.
-# `k1.pid < k2.pid` produit chaque paire une seule fois et fixe `a_id < b_id`. Le `DISTINCT` fusionne
-# les paires qui partagent plusieurs clés.
+# Paires de publications distinctes (DOI distincts) partageant une clé de confirmation (`source_publications.external_ids`, héritée par la publication). `k1.pid < k2.pid` produit chaque paire une fois ; le `DISTINCT` fusionne les clés multiples.
 _SHARED_KEY_PAIRS_SQL = text("""
     WITH pub_keys AS (
         SELECT sp.publication_id AS pid, 'hal_id' AS ktype, h AS kval
@@ -81,9 +75,7 @@ def fetch_shared_key_pairs(conn: Connection) -> list[SharedKeyPair]:
 
 
 def fetch_declared_related_pairs(conn: Connection) -> set[frozenset[int]]:
-    """Paires de publications déjà reliées par une relation **déclarée** (signal #1), cibles
-    résolues au corpus. Sert à écarter un `is_related_to` (signal #2) redondant sur une paire déjà
-    typée précisément."""
+    """Paires de publications déjà reliées par une relation **déclarée** (signal #1), cibles résolues au corpus. Sert à écarter un `is_related_to` (signal #2) redondant sur une paire déjà typée précisément."""
     rows = conn.execute(
         text("""
             SELECT from_publication_id AS a, target_publication_id AS b
@@ -94,14 +86,7 @@ def fetch_declared_related_pairs(conn: Connection) -> set[frozenset[int]]:
     return {frozenset((r.a, r.b)) for r in rows}
 
 
-# Signal #3 — rapprochement d'une publication dépendante (erratum, preprint) de l'œuvre dont elle
-# dépend, par le titre. Deux variantes selon la forme du titre :
-#  - erratum : le titre reproduit celui du parent après un préfixe (« Erratum: », « Corrigendum
-#    to »…), donc `title_normalized` du parent est un **suffixe** de celui de l'erratum ;
-#  - preprint : le preprint et sa version publiée portent un titre **identique**.
-# Garde commune : titre plus long que `DISCRIMINANT_TITLE_MIN_LENGTH` (génériques écartés) et garde d'ambiguïté — un seul
-# candidat « substantiel » (hors formes de la même œuvre) doit porter ce titre, sinon collision →
-# abstention. Le parent est au corpus : on renvoie son `publication_id` (et son DOI s'il en a un).
+# Signal #3 — rapprochement par titre de l'œuvre dépendante (erratum, preprint) à son parent. Erratum : titre parent = suffixe du titre erratum. Preprint : titre identique. Garde d'ambiguïté : un seul candidat substantiel, sinon abstention.
 _ERRATUM_TITLE_MATCHES_SQL = text(f"""
     WITH child AS (
         SELECT id, title_normalized AS t, pub_year AS y
@@ -129,9 +114,7 @@ _ERRATUM_TITLE_MATCHES_SQL = text(f"""
     WHERE s.n = 1 AND c.substantive
 """)
 
-# Preprint → version publiée : titre identique (le preprint ne préfixe pas), parent publié dans la
-# fenêtre [année … année + 2] (la version publiée suit le preprint). Garde d'ambiguïté : un seul
-# candidat substantiel (hors `dataset`) au même titre.
+# Preprint → version publiée : titre identique, parent publié dans [année … année + 2]. Garde d'ambiguïté : un seul candidat substantiel (hors `dataset`) au même titre.
 _PREPRINT_TITLE_MATCHES_SQL = text(f"""
     WITH child AS (
         SELECT id, title_normalized AS t, pub_year AS y
@@ -171,10 +154,7 @@ def fetch_preprint_title_matches(conn: Connection) -> list[TitleMatch]:
 
 
 def _insert_relation_edges(conn: Connection, edges: list[RelationEdge]) -> int:
-    """Insère `edges` en désignant la cible soit directement par `target_publication_id` (cible au
-    corpus connue, ex. rapprochement par titre), soit en la résolvant par LEFT JOIN sur le DOI
-    (relations déclarées). Écarte les auto-relations et dédoublonne par la contrainte d'unicité. Un
-    seul aller-retour bulk via `jsonb_to_recordset`. Retourne le nombre de lignes insérées."""
+    """Insère `edges` en désignant la cible soit directement par `target_publication_id` (cible au corpus connue, ex. rapprochement par titre), soit en la résolvant par LEFT JOIN sur le DOI (relations déclarées). Écarte les auto-relations et dédoublonne par la contrainte d'unicité. Un seul aller-retour bulk via `jsonb_to_recordset`. Retourne le nombre de lignes insérées."""
     if not edges:
         return 0
     payload = [
@@ -200,30 +180,26 @@ def _insert_relation_edges(conn: Connection, edges: list[RelationEdge]) -> int:
 
 
 def replace_declared_relations(conn: Connection, edges: list[RelationEdge]) -> int:
-    """Remplace les relations déclarées : purge les `source` datacite/crossref, puis insère
-    `edges`."""
+    """Purge les relations déclarées (`source` datacite/crossref), puis insère `edges`."""
     conn.execute(text("DELETE FROM publication_relations WHERE source IN ('datacite', 'crossref')"))
     return _insert_relation_edges(conn, edges)
 
 
 def replace_shared_key_relations(conn: Connection, edges: list[RelationEdge]) -> int:
-    """Remplace les relations issues des clés partagées : purge la `source` shared_key, puis insère
-    `edges`."""
+    """Purge les relations issues des clés partagées (`source` shared_key), puis insère `edges`."""
     conn.execute(text("DELETE FROM publication_relations WHERE source = 'shared_key'"))
     return _insert_relation_edges(conn, edges)
 
 
 def replace_title_match_relations(conn: Connection, edges: list[RelationEdge]) -> int:
-    """Remplace les relations rapprochées par titre : purge la `source` title_match, puis insère
-    `edges`."""
+    """Purge les relations rapprochées par titre (`source` title_match), puis insère `edges`."""
     conn.execute(text("DELETE FROM publication_relations WHERE source = 'title_match'"))
     return _insert_relation_edges(conn, edges)
 
 
 def count_by_relation_type(conn: Connection) -> list[tuple[str, int]]:
     """`(relation_type, nombre)` par type, décroissant — distribution de `publication_relations`."""
-    # Alias `rel_type` / `cnt` : `t` entrerait en collision avec l'attribut déprécié
-    # `Row.t` de SQLAlchemy, `r.t` renverrait alors la Row entière au lieu de la valeur.
+    # Alias `rel_type` / `cnt` : nommer une colonne `t` heurterait l'attribut déprécié `Row.t` de SQLAlchemy (`r.t` renverrait la Row entière, non la colonne).
     rows = conn.execute(
         text(
             "SELECT relation_type::text AS rel_type, count(*) AS cnt FROM publication_relations "
