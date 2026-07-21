@@ -32,9 +32,7 @@ def _build_publisher_where(
 ) -> tuple[str, dict[str, Any]]:
     """Construit la clause WHERE pour `list_publishers` et `publishers_facets`.
 
-    Les flags `skip_*` permettent à chaque facette d'exclure sa propre
-    dimension du filtrage — convention « comptes exclusifs » identique à
-    celle des facettes journals/publications.
+    Les flags `skip_*` permettent à chaque facette d'exclure sa propre dimension du filtrage — convention « comptes exclusifs » identique à celle des facettes journals/publications.
     """
     binds: dict[str, Any] = {}
     parts: list[str] = []
@@ -44,8 +42,7 @@ def _build_publisher_where(
             parts.append("p.name_normalized LIKE '%' || :search || '%'")
             binds["search"] = normalized
     if filters.publisher_types and not skip_publisher_types:
-        # publisher_type est un enum Postgres → cast en text pour comparer
-        # à un array text[].
+        # publisher_type est un enum Postgres → cast en text pour comparer à un array text[].
         parts.append("p.publisher_type::text = ANY(:publisher_types)")
         binds["publisher_types"] = filters.publisher_types
     if filters.countries and not skip_countries:
@@ -82,8 +79,7 @@ def _doi_prefixes_sql() -> str:
     """
 
 
-# Colonnes du profil d'un éditeur (alias `p` = publishers), communes à la ligne de liste et à
-# la page d'un éditeur, projetées par `_row_to_publisher`.
+# Colonnes du profil d'un éditeur (alias `p` = publishers), communes à la ligne de liste et à la page d'un éditeur, projetées par `_row_to_publisher`.
 _PUBLISHER_COLUMNS = f"""
     p.id, p.name, p.openalex_id, p.country,
     p.publisher_type,
@@ -174,9 +170,7 @@ class PgPublisherQueries(PublisherQueries):
             """),
             binds_c,
         ).all()
-        # Pays : pas d'enum, on expose ce qui est observé (code pays ISO en
-        # pratique). `value` = code minuscule canonique (pour le filtre) ;
-        # `label` en majuscule (présentation).
+        # Pays : pas d'enum, on expose ce qui est observé (code pays ISO en pratique). `value` = code minuscule canonique (pour le filtre) ; `label` en majuscule (présentation).
         countries_facet = [
             PublishersFacetOption(value=r.value, label=r.value.upper(), count=r.n)
             for r in country_rows
