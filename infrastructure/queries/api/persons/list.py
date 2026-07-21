@@ -22,9 +22,7 @@ from infrastructure.queries.api.filters import (
 from infrastructure.queries.api.persons.identifiers import public_identifiers
 from infrastructure.queries.sources_sql import AUTHOR_SOURCES_SQL
 
-# Sous scope `lab_id`, les dénombrements ne comptent que les signatures portées par le
-# laboratoire — sinon ils compteraient à l'échelle de la personne des lignes filtrées à
-# l'échelle du laboratoire.
+# Sous scope `lab_id`, les dénombrements ne comptent que les signatures portées par le laboratoire — sinon ils compteraient à l'échelle de la personne des lignes filtrées à l'échelle du laboratoire.
 _LAB_SCOPED_SIGNATURES = (
     " AND EXISTS (SELECT 1 FROM authorship_structures aus "
     "WHERE aus.authorship_id = a.id AND aus.structure_id = :flt_person_lab_id)"
