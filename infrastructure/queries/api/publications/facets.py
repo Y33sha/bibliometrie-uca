@@ -1,9 +1,6 @@
 """Facettes dynamiques pour /api/publications/facets.
 
-Chaque facette exclut son propre filtre mais applique tous les autres.
-Les facettes sont calculées séquentiellement sur la même Connection sync
-(le router tourne dans un thread Starlette ; pas de bénéfice à paralléliser
-les requêtes courtes contre une seule base PG locale).
+Chaque facette exclut son propre filtre mais applique tous les autres. Les facettes sont indépendantes et s'exécutent en parallèle, chacune sur sa propre connexion (cf. `publications_facets`).
 """
 
 from concurrent.futures import ThreadPoolExecutor
@@ -42,10 +39,9 @@ from infrastructure.queries.api.filters import (
 
 
 class _PublicationFacetsBuilder:
-    """Construit les facettes dynamiques pour /api/publications/facets.
+    """Construit les facettes dynamiques pour /api/publications/facets : une méthode privée `_facet_*` par facette, orchestrées par la fonction `publications_facets`.
 
     Chaque facette exclut son propre filtre mais applique tous les autres.
-    Décomposition : une méthode privée par facette + un orchestrateur `build()`.
     """
 
     def __init__(
@@ -76,8 +72,7 @@ class _PublicationFacetsBuilder:
         else:
             out.append(WhereClause(PUBLICATION_IS_IN_PERIMETER, {}))
         out.append(excluded_doc_type_clause(f.excluded_types))
-        # Recherche titre/sujet : filtre global (jamais une dimension de facette),
-        # appliqué à tous les comptes pour qu'ils suivent le champ de recherche.
+        # Recherche titre/sujet : filtre global (jamais une dimension de facette), appliqué à tous les comptes pour qu'ils suivent le champ de recherche.
         out.append(search_clause(f.search))
         return out
 
@@ -135,9 +130,7 @@ class _PublicationFacetsBuilder:
 
     def _facet_labs(self) -> tuple[list[dict[str, Any]], int]:
         where_sql, binds = self._clauses_skipping("lab")
-        # `publication_structures` (matview publi↔structure dédoublonnée) → COUNT(*)
-        # par structure, sans jointure authorships ni DISTINCT/tri (cf. migration
-        # d8b3f5a2c9e6). `where_sql` ne porte que sur `p` (publications).
+        # `publication_structures` (matview publi↔structure dédoublonnée) → COUNT(*) par structure, sans jointure authorships ni DISTINCT/tri (cf. migration d8b3f5a2c9e6). `where_sql` ne porte que sur `p` (publications).
         labs_rows = self.conn.execute(
             text(f"""
                 SELECT s.id AS value, COALESCE(s.acronym, s.name) AS label,
@@ -479,14 +472,9 @@ class _PublicationFacetsBuilder:
 def publications_facets(
     conn: Connection, *, filters: PublicationFilters, perimeter_structure_ids: list[int]
 ) -> dict[str, Any]:
-    """Facettes dynamiques : chaque facette exclut son propre filtre mais
-    applique tous les autres.
+    """Facettes dynamiques : chaque facette exclut son propre filtre mais applique tous les autres.
 
-    Les ~11 facettes sont **indépendantes** et chacune est un agrégat sur
-    l'ensemble filtré (~0,5 s) ; les enchaîner en séquence dominait le temps de
-    chargement de la page. On les exécute en **parallèle**, chacune dans un thread
-    avec sa propre connexion (psycopg libère le GIL pendant la requête). Le
-    `lab_hal_col` est préchargé une fois et partagé (lecture seule).
+    Les ~11 facettes sont **indépendantes** et chacune est un agrégat sur l'ensemble filtré (~0,5 s). On les exécute en **parallèle**, chacune dans un thread avec sa propre connexion (psycopg libère le GIL pendant la requête). Le `lab_hal_col` est préchargé une fois et partagé (lecture seule).
     """
     pre = _PublicationFacetsBuilder(conn, filters, perimeter_structure_ids)
     pre._preload_lab_hal_col()
@@ -521,9 +509,7 @@ def publications_facets(
     return {"labs": labs, "no_lab_count": no_lab_count, **results}
 
 
-# Liaison SQL des facettes-entités à forte cardinalité (recherche serveur). La revue sort
-# directement de `publications.journal_id` ; l'éditeur passe par une jointure un-à-un vers
-# `publishers` (qui exclut les publications sans éditeur).
+# Liaison SQL des facettes-entités à forte cardinalité (recherche serveur). La revue sort directement de `publications.journal_id` ; l'éditeur passe par une jointure un-à-un vers `publishers` (qui exclut les publications sans éditeur).
 _ENTITY_SQL: dict[str, dict[str, str]] = {
     "journal": {"id": "j.id", "label": "j.title", "join": ""},
     "publisher": {

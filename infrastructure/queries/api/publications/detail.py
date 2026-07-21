@@ -11,10 +11,7 @@ from domain.source_publications.correction import CONVERGENCE_CASES
 def get_publication_relations(conn: Connection, pub_id: int) -> list[dict[str, Any]]:
     """Publications apparentées, des deux sens, vues depuis `pub_id`.
 
-    Les arêtes sortantes (`from_publication_id = pub_id`) gardent leur type ; les entrantes
-    (`target_publication_id = pub_id`) sont inversées pour se lire depuis la publication courante.
-    La cible porte ses métadonnées si elle est au corpus, sinon seul son DOI est connu. Dédupliqué
-    par (type, cible) — une paire déclarée des deux côtés ne s'affiche qu'une fois.
+    Les arêtes sortantes (`from_publication_id = pub_id`) gardent leur type ; les entrantes (`target_publication_id = pub_id`) sont inversées pour se lire depuis la publication courante. La cible porte ses métadonnées si elle est au corpus, sinon seul son DOI est connu. Dédupliqué par (type, cible) — une paire déclarée des deux côtés ne s'affiche qu'une fois.
     """
     rows = conn.execute(
         text("""
@@ -44,9 +41,7 @@ def get_publication_relations(conn: Connection, pub_id: int) -> list[dict[str, A
         relation_type = r.rtype
         if r.incoming:
             relation_type = inverse_relation(RelationType(relation_type)).value
-        # Identité de la cible : son `publication_id` si au corpus, sinon son DOI (cible hors
-        # corpus, qui n'a pas de ligne `publications`). Le DOI peut être absent d'une cible au
-        # corpus, d'où la bascule sur l'id.
+        # Identité de la cible : son `publication_id` si au corpus, sinon son DOI (cible hors corpus, sans ligne `publications`). Le DOI peut être absent d'une cible au corpus, d'où la bascule sur l'id.
         target_key = f"id:{r.other_id}" if r.other_id is not None else f"doi:{r.other_doi}"
         key = (relation_type, target_key)
         if key in seen:
@@ -71,11 +66,7 @@ def _fetch_biblio_source_authorships(
 ) -> list[dict[str, Any]]:
     """Authorships HAL / OpenAlex / WoS / ScanR d'une publi, avec adresses agrégées.
 
-    Quand plusieurs `source_publications` de la même source pointent sur la
-    même publi canonique (ex: deux Work IDs OpenAlex pour un même DOI), on
-    affiche les auteurs de l'**import le plus récent** (`created_at DESC`).
-    Les liens vers les sources, eux, sont multiples côté header — cf
-    `PublicationHeader.svelte`.
+    Quand plusieurs `source_publications` de la même source pointent sur la même publi canonique (ex: deux Work IDs OpenAlex pour un même DOI), on affiche les auteurs de l'**import le plus récent** (`created_at DESC`). Les liens vers les sources, eux, sont multiples côté header — cf `PublicationHeader.svelte`.
 
     `raw_affiliation` concatène les `addresses.raw_text` liées via `source_authorship_addresses`. `countries` est dérivé à la volée de ces mêmes adresses (union de leurs pays).
     """
@@ -266,8 +257,7 @@ def get_publication_detail(conn: Connection, pub_id: int) -> dict[str, Any] | No
     }
 
 
-# Identifiants externes exposés en sidebar, ordre d'affichage. `hal_id` est exclu (déjà couvert
-# par le lien source HAL) ; `related_dois` aussi (signal de dédup, pas un identifiant à afficher).
+# Identifiants externes exposés en sidebar, ordre d'affichage. `hal_id` est exclu (déjà couvert par le lien source HAL) ; `related_dois` aussi (signal de dédup, pas un identifiant à afficher).
 _EXTERNAL_IDENTIFIER_KEYS = (
     ("arxiv", "arxiv_id"),
     ("pmid", "pmid"),
@@ -277,12 +267,9 @@ _EXTERNAL_IDENTIFIER_KEYS = (
 
 
 def get_publication_external_identifiers(conn: Connection, pub_id: int) -> list[dict[str, Any]]:
-    """Identifiants externes (arXiv, PMID, PMCID, NNT) agrégés depuis les `external_ids` des
-    `source_publications` de la publication, dédupliqués, dans l'ordre `_EXTERNAL_IDENTIFIER_KEYS`.
+    """Identifiants externes (arXiv, PMID, PMCID, NNT) agrégés depuis les `external_ids` des `source_publications` de la publication, dédupliqués, dans l'ordre `_EXTERNAL_IDENTIFIER_KEYS`.
 
-    Un NNT déjà porté par une source `theses` est omis : le `source_id` de cette source *est* le
-    NNT, et son lien theses.fr couvre déjà l'identifiant (même raison que l'exclusion de `hal_id`,
-    couvert par le lien source HAL)."""
+    Un NNT déjà porté par une source `theses` est omis : le `source_id` de cette source *est* le NNT, et son lien theses.fr couvre déjà l'identifiant (même raison que l'exclusion de `hal_id`, couvert par le lien source HAL)."""
     rows = conn.execute(
         text("""
             SELECT sp.source::text, sp.source_id, sp.external_ids FROM source_publications sp
@@ -308,8 +295,7 @@ def get_publication_external_identifiers(conn: Connection, pub_id: int) -> list[
 def get_publication_subjects(conn: Connection, pub_id: int) -> list[dict[str, Any]]:
     """Sujets (concepts) attachés à une publication, dédupliqués par `subject_id`.
 
-    Les sources qui ont annoté chaque sujet sont agrégées dans `sources`. Triés par
-    label, insensible à la casse.
+    Les sources qui ont annoté chaque sujet sont agrégées dans `sources`. Triés par label, insensible à la casse.
     """
     rows = conn.execute(
         text("""
