@@ -1,18 +1,9 @@
 """Query service : SQL batch partagé pour l'écriture des `source_authorships`.
 
 Implémente `application.ports.pipeline.normalize.authorships.AuthorshipsBatchQueries`.
-Les colonnes de `source_authorships` sont identiques pour toutes les sources,
-seul `source` paramètre l'INSERT. Chaque opération de batch est une **seule**
-requête : le lot est transmis en JSONB (ou en tableaux parallèles pour le
-pivot) et étendu côté serveur via `jsonb_to_recordset` / `unnest`. Un
-`executemany` partirait au contraire en N allers-retours séquentiels côté
-psycopg.
+Les colonnes de `source_authorships` sont identiques pour toutes les sources, seul `source` paramètre l'INSERT. Chaque opération de batch est une **seule** requête : le lot est transmis en JSONB (ou en tableaux parallèles pour le pivot) et étendu côté serveur via `jsonb_to_recordset` / `unnest`.
 
-Consommé par le writer partagé `write_source_authorships` ; le `clear` en
-amont (DELETE, qui cascade sur le pivot) garantit qu'aucune authorship ni lien
-ne préexiste — d'où l'absence d'`ON CONFLICT` sur l'INSERT des `source_authorships`
-et du pivot. L'upsert des identités (`author_identifying_keys`, table partagée non
-vidée) et celui des `addresses` conservent leur `ON CONFLICT`.
+Consommé par le writer partagé `write_source_authorships` ; le `clear` en amont (DELETE, qui cascade sur le pivot) garantit qu'aucune authorship ni lien ne préexiste — d'où l'absence d'`ON CONFLICT` sur l'INSERT des `source_authorships` et du pivot. L'upsert des identités (`author_identifying_keys`, table partagée non vidée) et celui des `addresses` conservent leur `ON CONFLICT`.
 """
 
 import hashlib
@@ -35,23 +26,12 @@ from infrastructure.queries.pipeline.source_authorships import (
 def upsert_source_authorships_batch(conn: Connection, values: list[SourceAuthorshipItem]) -> None:
     """Batch UPSERT de `source_authorships` (toutes sources, `source` par ligne).
 
-    L'identité de l'auteur (`author_name_normalized`, `person_identifiers`) vit sur
-    la table dédupliquée `author_identifying_keys` ; la signature ne porte qu'une
-    FK `identity_id`. Deux requêtes dans la transaction du writer :
+    L'identité de l'auteur (`author_name_normalized`, `person_identifiers`) vit sur la table dédupliquée `author_identifying_keys` ; la signature porte seulement une FK `identity_id`. Deux requêtes dans la transaction du writer :
 
-    1. **Upsert des identités du lot** — `INSERT … SELECT DISTINCT … ON CONFLICT
-       DO NOTHING` : les identités du document, dédupliquées, sans churn (un
-       `DO UPDATE` récrirait chaque identité récurrente à chaque document).
-    2. **Insert des signatures** — `identity_id` résolu par `key_hash` (colonne
-       générée, index dédié), rapprochement indexé et NULL-safe. Le batch est
-       transmis en JSONB et étendu via `jsonb_to_recordset` (vs un `executemany`
-       en N allers-retours). `source`/`source_publication_id` sont invariants au
-       sein d'un document, donc hoistés. Le nom normalisé est fourni pré-calculé
-       (`author_name_normalized`, via `normalize_name_form` côté Python).
+    1. **Upsert des identités du lot** — `INSERT … SELECT DISTINCT … ON CONFLICT DO NOTHING` : les identités du document, dédupliquées, sans churn (un `DO UPDATE` récrirait chaque identité récurrente à chaque document).
+    2. **Insert des signatures** — `identity_id` résolu par `key_hash` (colonne générée, index dédié), rapprochement indexé et NULL-safe. Le batch est transmis en JSONB et étendu via `jsonb_to_recordset`. `source`/`source_publication_id`, invariants au sein d'un document, sont hoistés. Le nom normalisé est fourni pré-calculé (`author_name_normalized`, via `normalize_name_form` côté Python).
 
-    Les deux requêtes sont séquentielles et non fusionnables : une CTE modifiant
-    `author_identifying_keys` ne rendrait pas ses lignes visibles au JOIN de la
-    même requête (même snapshot). La seconde requête voit celles de la première.
+    Les deux requêtes restent séquentielles, sans fusion possible : une CTE modifiant `author_identifying_keys` laisserait ses lignes invisibles au JOIN de la même requête (même snapshot). La seconde requête voit celles de la première.
     """
     if not values:
         return
@@ -77,11 +57,9 @@ def upsert_source_authorships_batch(conn: Connection, values: list[SourceAuthors
         """).bindparams(bindparam("payload", type_=JSONB)),
         {"payload": payload},
     )
-    # 2. Insert des signatures. Pas d'ON CONFLICT : le writer DELETE avant d'insérer
-    # (clear) et déduplique par position, donc (source_publication_id, author_position)
-    # ne peut pas entrer en collision. `identity_id` résolu par `key_hash` : md5 de la
-    # clé d'identité, mêmes sentinelles que la colonne générée (E'\x01' pour NULL,
-    # E'\x1f' séparateur) — lookup indexé, NULL-safe.
+    # 2. Insert des signatures. Pas d'ON CONFLICT : le writer DELETE puis déduplique par
+    # position, (source_publication_id, author_position) reste unique. `identity_id` résolu
+    # par `key_hash` (md5, sentinelles de la colonne générée), lookup indexé.
     stmt = text(r"""
         INSERT INTO source_authorships
             (source, source_publication_id, author_position,
@@ -130,11 +108,7 @@ _INSERT_AUTHORSHIP_SQL = text(r"""
 def upsert_source_authorship(conn: Connection, item: SourceAuthorshipItem) -> int:
     """Écrit une signature seule et retourne son id.
 
-    Même mécanisme que le batch — upsert de l'identité, puis résolution de `identity_id`
-    par `key_hash` — pour une seule ligne, dont l'id est rendu par `RETURNING`. Sert les
-    signatures sans rang d'auteur, que le remap par position du writer batch ne sait pas
-    retrouver. Pas d'`ON CONFLICT`, pour la même raison que le batch : le `clear` en amont
-    vide le document.
+    Même mécanisme que le batch — upsert de l'identité, puis résolution de `identity_id` par `key_hash` — pour une seule ligne, dont l'id est rendu par `RETURNING`. Sert les signatures sans rang d'auteur, que le remap par position du writer batch ignore. Pas d'`ON CONFLICT`, pour la même raison que le batch : le `clear` en amont vide le document.
     """
     conn.execute(_UPSERT_IDENTITY_SQL, dict(item))
     return conn.execute(_INSERT_AUTHORSHIP_SQL, dict(item)).one().id
@@ -143,10 +117,7 @@ def upsert_source_authorship(conn: Connection, item: SourceAuthorshipItem) -> in
 def delete_orphan_identities(conn: Connection) -> int:
     """Supprime les identités de `author_identifying_keys` que plus aucune signature ne référence.
 
-    Une identité devient orpheline quand la dernière `source_authorships` qui la portait change
-    de clé (nom ou identifiants corrigés) et bascule vers une autre identité. Balayage ensembliste
-    appuyé sur l'index `idx_sa_identity`. Idempotent (no-op si rien n'est orphelin). Retourne le
-    nombre d'identités supprimées.
+    Une identité devient orpheline quand la dernière `source_authorships` qui la portait change de clé (nom ou identifiants corrigés) et bascule vers une autre identité. Balayage ensembliste appuyé sur l'index `idx_sa_identity`. Idempotent (no-op si rien n'est orphelin). Retourne le nombre d'identités supprimées.
     """
     return conn.execute(
         text("""
@@ -195,12 +166,7 @@ def upsert_addresses_batch(conn: Connection, values: list[AddressBatchItem]) -> 
 def fetch_address_ids_by_raw_text(conn: Connection, raw_texts: list[str]) -> dict[str, int]:
     """Retourne `{raw_text: id}` pour un lot d'adresses.
 
-    Filtre sur `md5(raw_text)` (et non `raw_text`) pour exploiter l'index unique
-    fonctionnel `addresses_raw_text_key (md5(raw_text))` — celui-là même qui sert
-    le `ON CONFLICT` de `upsert_addresses_batch`. Sans ça, `WHERE raw_text = ANY(...)`
-    déclenche un seq scan de toute la table `addresses` à chaque document (coût fixe
-    ~0,5 s par publication, indépendant du nombre d'auteurs). `md5()` PostgreSQL et
-    `hashlib.md5` sur l'UTF-8 coïncident.
+    Filtre sur `md5(raw_text)` pour exploiter l'index unique fonctionnel `addresses_raw_text_key (md5(raw_text))` — celui-là même qui sert le `ON CONFLICT` de `upsert_addresses_batch`. Un `WHERE raw_text = ANY(...)` déclencherait un seq scan de toute la table `addresses` à chaque document (coût fixe ~0,5 s par publication, indépendant du nombre d'auteurs). `md5()` PostgreSQL et `hashlib.md5` sur l'UTF-8 coïncident.
     """
     if not raw_texts:
         return {}
@@ -232,8 +198,7 @@ def apply_address_suggested_countries_batch(
 ) -> None:
     """Propage une suggestion de pays sur `addresses.suggested_countries`.
 
-    Renseigne `suggested_countries` uniquement sur les adresses sans pays
-    d'autorité ni suggestion existante (jamais d'écrasement).
+    Renseigne `suggested_countries` uniquement sur les adresses sans pays d'autorité ni suggestion existante (jamais d'écrasement).
     """
     if not values:
         return
@@ -253,10 +218,7 @@ def insert_source_authorship_addresses_batch(
 ) -> None:
     """Batch INSERT de liens `source_authorship_addresses`. Dicts `{sa_id, addr_id}`.
 
-    Une seule requête : deux colonnes entières transmises en tableaux parallèles
-    et étendues via `unnest`. Pas d'ON CONFLICT : les authorships viennent
-    d'être (re)créées (le clear a cascadé sur le pivot), leurs `sa_id` sont neufs
-    et le writer déduplique les couples (sa_id, addr_id) — aucune collision.
+    Une seule requête : deux colonnes entières transmises en tableaux parallèles et étendues via `unnest`. Pas d'ON CONFLICT : les authorships viennent d'être (re)créées (le clear a cascadé sur le pivot), leurs `sa_id` sont neufs et le writer déduplique les couples (sa_id, addr_id) — aucune collision.
     """
     if not values:
         return
