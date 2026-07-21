@@ -22,10 +22,7 @@ from application.ports.pipeline.countries import (
     SuggestEligibleCounts,
 )
 
-# CTE des sa à recalculer : nouveaux (`sa.countries_dirty`, posé par normalize)
-# OU liés à une adresse dont `countries` a changé (`addresses.countries_dirty`,
-# posé gratuitement à l'écriture des pays). Aucun marquage de masse des sa : on
-# les dérive ici par JOIN, et seuls ceux qui changent réellement sont réécrits.
+# CTE des sa à recalculer : ceux marqués `countries_dirty` (posé par normalize), ou liés à une adresse dont `countries` a changé. Dérivés par JOIN, sans marquage de masse ; seuls ceux qui changent sont réécrits.
 _DIRTY_SA = """
     WITH dirty_sa AS (
         SELECT id FROM source_authorships WHERE countries_dirty
@@ -41,9 +38,7 @@ _DIRTY_SA = """
 def refresh_address_source_countries(conn: Connection) -> int:
     """Recalcule `source_publications.countries` des sp ayant un sa dirty.
 
-    `countries` = union des pays des adresses des sa du document (calcul direct
-    depuis les adresses), ou NULL si aucune (LEFT JOIN orphelin). Idempotent.
-    Retourne le nombre de sp mis à jour.
+    `countries` = union des pays des adresses des sa du document (calcul direct depuis les adresses), ou NULL si aucune (LEFT JOIN orphelin). Idempotent. Retourne le nombre de sp mis à jour.
     """
     return conn.execute(
         text(
@@ -83,9 +78,7 @@ def refresh_address_source_countries(conn: Connection) -> int:
 def refresh_publication_countries(conn: Connection) -> int:
     """Recalcule `publications.countries` des publications dont un sp a un sa dirty.
 
-    `countries` = union des `source_publications.countries` de la publication, ou
-    NULL si aucune (LEFT JOIN orphelin). Idempotent. Retourne le nombre de
-    publications mises à jour.
+    `countries` = union des `source_publications.countries` de la publication, ou NULL si aucune (LEFT JOIN orphelin). Idempotent. Retourne le nombre de publications mises à jour.
     """
     return conn.execute(
         text(
@@ -247,11 +240,7 @@ def fetch_suggest_targets_chunk(
 ) -> list[tuple[int, str]]:
     """Tranche `(id, normalized_text)` des adresses sans pays à suggérer (keyset par id).
 
-    `retry_empty=True` (mode full) : nouvelles **+ vides** (`suggested_countries IS
-    NULL OR cardinality = 0`) — on réessaie les échecs au cas où le pool aurait
-    grossi, sans toucher aux suggestions positives (qui changent rarement et
-    coûtent cher à recalculer). Sinon (incrémental) : seulement les nouvelles
-    (`suggested_countries IS NULL`). Liste vide = terminé.
+    `retry_empty=True` (mode full) : nouvelles **+ vides** (`suggested_countries IS NULL OR cardinality = 0`) — on réessaie les échecs au cas où le pool aurait grossi, sans toucher aux suggestions positives (qui changent rarement et coûtent cher à recalculer). Sinon (incrémental) : seulement les nouvelles (`suggested_countries IS NULL`). Liste vide = terminé.
     """
     suggested_filter = (
         "AND (suggested_countries IS NULL OR cardinality(suggested_countries) = 0)"
@@ -292,14 +281,9 @@ def write_countries(
 ) -> None:
     """Écrit en bloc une colonne pays d'`addresses` (`countries` ou `suggested_countries`).
 
-    `target_column` : `suggested_countries` (suggestions, `[]` = tentée sans match)
-    ou `countries` (pays détectés/confirmés). Bulk via `jsonb_array_elements`,
-    idempotent (`IS DISTINCT FROM` → seules les lignes qui changent sont écrites).
+    `target_column` : `suggested_countries` (suggestions, `[]` = tentée sans match) ou `countries` (pays détectés/confirmés). Bulk via `jsonb_array_elements`, idempotent (`IS DISTINCT FROM` → seules les lignes qui changent sont écrites).
 
-    Quand on écrit `countries`, pose aussi `countries_dirty = true` sur ces mêmes
-    lignes (déjà réécrites → gratuit) : le refresh dérivera de là les sa à
-    recalculer, sans marquage de masse. `suggested_countries` ne touche pas la
-    cascade, donc pas de flag.
+    Quand on écrit `countries`, pose aussi `countries_dirty = true` sur ces mêmes lignes (déjà réécrites → gratuit) : le refresh dérivera de là les sa à recalculer, sans marquage de masse. `suggested_countries` ne touche pas la cascade, sans flag.
     """
     if target_column not in ("suggested_countries", "countries"):
         raise ValueError(f"target_column invalide : {target_column!r}")

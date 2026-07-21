@@ -6,14 +6,9 @@ from application.ports.pipeline.publications.address_pub_count import AddressPub
 
 
 def recompute_pub_count(conn: Connection) -> int:
-    """Recalcule `addresses.pub_count` = nb de publications canoniques distinctes
-    liées à l'adresse via `source_authorship_addresses`.
+    """Recalcule `addresses.pub_count` = nb de publications canoniques distinctes liées à l'adresse via `source_authorship_addresses`.
 
-    Recalcul global idempotent (guard `IS DISTINCT FROM`) couvrant **toutes**
-    les adresses : celles qui ont perdu tous leurs liens repassent à 0. Lancé en
-    fin de phase `publications`, une fois les publications créées et fusionnées —
-    il n'y a rien à compter au stade `normalize`. Un run `--only publications`
-    suffit à tenir le décompte à jour.
+    Recalcul global idempotent (guard `IS DISTINCT FROM`) couvrant **toutes** les adresses : celles qui ont perdu tous leurs liens repassent à 0. Lancé en fin de phase `publications`, une fois les publications créées et fusionnées — il n'y a rien à compter au stade `normalize`. Un run `--only publications` suffit à tenir le décompte à jour.
 
     Ne committe pas (le caller orchestre). Retourne le nombre de rows modifiées.
     """
