@@ -39,10 +39,14 @@ class BatchAssignOrphanAuthorships(BaseModel):
 
 
 class OrphanAssignResponse(BaseModel):
+    """Acquittement de l'attribution d'une signature orpheline : la personne rattachée."""
+
     ok: bool = True
     person_id: int
 
 
 class OrphanBatchAssignResponse(BaseModel):
+    """Acquittement de l'attribution en lot : le nombre de signatures rattachées."""
+
     ok: bool = True
     assigned: int
