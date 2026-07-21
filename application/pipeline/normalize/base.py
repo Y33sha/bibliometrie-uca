@@ -84,7 +84,7 @@ class SourceNormalizer(ABC):
         work_ids = self._staging.fetch_pending_staging_ids(conn, self.SOURCE)
         for start in range(0, len(work_ids), self.FETCH_SUB_BATCH):
             batch_ids = work_ids[start : start + self.FETCH_SUB_BATCH]
-            yield from self._staging.fetch_staging_by_ids(conn, batch_ids, source=self.SOURCE)
+            yield from self._staging.fetch_staging_by_ids(conn, batch_ids)
 
     def _process_one(self, conn: Connection, row: StagingRow) -> bool | None:
         """Enveloppe process_work dans un SAVEPOINT : un work en erreur est annulé sans abandonner le batch en cours."""

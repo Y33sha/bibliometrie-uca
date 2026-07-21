@@ -38,7 +38,7 @@ class StagingQueries(Protocol):
         ...
 
     def fetch_staging_by_ids(
-        self, conn: Connection, staging_ids: list[int], *, source: str
+        self, conn: Connection, staging_ids: list[int]
     ) -> list[StagingRow]:
         """Les lignes `staging` dont l'`id` figure dans la liste donnée."""
         ...

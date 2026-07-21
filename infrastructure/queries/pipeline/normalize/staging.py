@@ -63,9 +63,7 @@ def fetch_pending_staging_ids(conn: Connection, source: str) -> list[int]:
     return [r.id for r in rows]
 
 
-def fetch_staging_by_ids(
-    conn: Connection, staging_ids: list[int], *, source: str
-) -> list[StagingRow]:
+def fetch_staging_by_ids(conn: Connection, staging_ids: list[int]) -> list[StagingRow]:
     """Charge les `staging` dont l'id est dans la liste donnée."""
     rows = conn.execute(
         text(f"""
@@ -141,9 +139,9 @@ class PgStagingQueries(StagingQueries):
         return fetch_pending_staging_ids(conn, source)
 
     def fetch_staging_by_ids(
-        self, conn: Connection, staging_ids: list[int], *, source: str
+        self, conn: Connection, staging_ids: list[int]
     ) -> list[StagingRow]:
-        return fetch_staging_by_ids(conn, staging_ids, source=source)
+        return fetch_staging_by_ids(conn, staging_ids)
 
     def mark_done(self, conn: Connection, staging_id: int) -> None:
         mark_done(conn, staging_id, self._raw_store)
