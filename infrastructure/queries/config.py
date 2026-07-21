@@ -1,22 +1,13 @@
 """Query services pour les paramètres applicatifs (table `config`).
 
-Lookups par clé pour l'application (extraction, OA email, etc.) restent
-dans `infrastructure/sources/config.py` ; ce module héberge la query servie
-par le router admin (listing complet) ainsi que l'adapter du port
-`application.ports.config.ConfigStore`.
+Ce module sert la couche requêtes-API : `PgConfigQueries` rend au router admin le listing complet et les clés qui référencent un périmètre, et `laboratory_structure_types` livre à un adapter voisin les types de structure tenus pour des laboratoires. L'écriture d'une valeur vit dans `infrastructure/repositories/config_repository.py`. Les lookups par clé du pipeline — années, collections HAL, comptes de service des sources — vivent à part, dans `infrastructure/sources/config.py`.
 """
 
-import logging
-
-from sqlalchemy import Connection, select, text, update
+from sqlalchemy import Connection, select, text
 
 from application.ports.api.config_queries import ConfigItem, ConfigQueries
-from application.ports.config import ConfigStore
 from domain.config import PUBLIC_CONFIG_KEYS
-from domain.types import JsonValue
 from infrastructure.db.tables import config
-
-logger = logging.getLogger(__name__)
 
 
 def laboratory_structure_types(conn: Connection) -> list[str]:
@@ -52,27 +43,9 @@ class PgConfigQueries(ConfigQueries):
 
     def config_keys_referencing_perimeter(self, perimeter_code: str) -> list[str]:
         """Clés dont la valeur désigne ce périmètre."""
-        # Le `#>> '{}'` extrait le scalaire JSON. SA Core n'a pas d'opérateur direct ;
-        # on passe par text() avec bind nommé.
+        # `#>> '{}'` extrait le scalaire JSON ; faute d'opérateur SA Core direct, on passe par text() avec un bind nommé.
         result = self._conn.execute(
             text("SELECT key FROM config WHERE key LIKE 'perimeter_%' AND value #>> '{}' = :code"),
             {"code": perimeter_code},
         )
         return [r.key for r in result]
-
-
-class PgConfig(ConfigStore):
-    """Adapter SA pour `application.ports.config.ConfigStore`."""
-
-    def __init__(self, conn: Connection) -> None:
-        self._conn = conn
-
-    def update_config_value(self, key: str, value: JsonValue) -> dict[str, JsonValue] | None:
-        stmt = (
-            update(config)
-            .where(config.c.key == key)
-            .values(value=value)
-            .returning(config.c.key, config.c.value, config.c.description)
-        )
-        row = self._conn.execute(stmt).one_or_none()
-        return dict(row._mapping) if row is not None else None

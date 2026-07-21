@@ -7,9 +7,9 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import Connection
 
 from application.ports.api.config_queries import ConfigItem, ConfigQueries
-from application.ports.config import ConfigStore
+from application.ports.repositories.config_repository import ConfigRepository
 from application.services.config import commands as config_commands
-from interfaces.api.deps import config_queries, config_store, current_admin_user, db_conn
+from interfaces.api.deps import config_queries, config_repository, current_admin_user, db_conn
 from interfaces.api.models import ConfigValueUpdate
 
 router = APIRouter(prefix="/api/config", tags=["config"])
@@ -32,7 +32,7 @@ def update_config(
     key: str,
     body: ConfigValueUpdate,
     conn: Connection = Depends(db_conn),
-    config: ConfigStore = Depends(config_store),
+    config: ConfigRepository = Depends(config_repository),
 ) -> ConfigItem:
     """Met à jour la valeur d'un paramètre applicatif, identifiants d'accès aux sources compris.
 

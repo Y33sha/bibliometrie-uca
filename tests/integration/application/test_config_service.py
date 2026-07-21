@@ -7,12 +7,12 @@ from sqlalchemy import text
 
 from application.services.config.commands import update_config_value
 from domain.errors import NotFoundError
-from infrastructure.repositories import config_store
+from infrastructure.repositories import config_repository
 
 
 @pytest.fixture
 def sync_config(sa_sync_conn):
-    return config_store(sa_sync_conn)
+    return config_repository(sa_sync_conn)
 
 
 # ── Helpers ────────────────────────────────────────────────────────

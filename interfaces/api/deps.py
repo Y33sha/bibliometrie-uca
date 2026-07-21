@@ -28,12 +28,12 @@ from application.ports.api.publishers_queries import PublisherQueries
 from application.ports.api.stats_queries import StatsQueries
 from application.ports.api.structures_queries import StructuresQueries
 from application.ports.api.subjects_queries import SubjectsQueries
-from application.ports.config import ConfigStore
 from application.ports.pipeline.metadata_correction import MetadataCorrectionQueries
 from application.ports.pipeline.perimeter import PerimeterQueries
 from application.ports.repositories.address_repository import AddressRepository
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.authorship_repository import AuthorshipRepository
+from application.ports.repositories.config_repository import ConfigRepository
 from application.ports.repositories.journal_repository import JournalRepository
 from application.ports.repositories.perimeter_repository import PerimeterRepository
 from application.ports.repositories.person_repository import PersonRepository
@@ -59,7 +59,7 @@ from infrastructure.queries.api.publishers import PgPublisherQueries
 from infrastructure.queries.api.stats import PgStatsQueries
 from infrastructure.queries.api.structures import PgStructuresQueries
 from infrastructure.queries.api.subjects import PgSubjectsQueries
-from infrastructure.queries.config import PgConfig, PgConfigQueries
+from infrastructure.queries.config import PgConfigQueries
 from infrastructure.queries.perimeter import PgPerimeterQueries, PgPerimetersQueries
 from infrastructure.queries.pipeline.metadata_correction import PgMetadataCorrectionQueries
 from infrastructure.repositories import (
@@ -73,6 +73,7 @@ from infrastructure.repositories import (
     publisher_repository,
     structure_repository,
 )
+from infrastructure.repositories.config_repository import PgConfigRepository
 from infrastructure.settings import settings
 from interfaces.api.session import read_session
 
@@ -159,8 +160,8 @@ def config_queries(conn: Connection = Depends(db_conn)) -> ConfigQueries:
     return PgConfigQueries(conn)
 
 
-def config_store(conn: Connection = Depends(db_conn)) -> ConfigStore:
-    return PgConfig(conn)
+def config_repository(conn: Connection = Depends(db_conn)) -> ConfigRepository:
+    return PgConfigRepository(conn)
 
 
 def hal_problems_queries(

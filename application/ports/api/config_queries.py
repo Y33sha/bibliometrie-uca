@@ -1,6 +1,6 @@
 """Port : lectures sur la table `config` (consommé par le router config).
 
-Distinct du port `application.ports.config.ConfigStore`, qui en porte les écritures.
+Distinct du port `application.ports.repositories.config_repository.ConfigRepository`, qui en porte les écritures.
 
 Implémenté par `infrastructure.queries.config.PgConfigQueries`.
 """
