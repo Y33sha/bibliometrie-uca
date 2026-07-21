@@ -56,20 +56,12 @@ class PublicationRelationsQueries(Protocol):
         """Les `source_publications` rattachées dont le `meta` déclare des relations."""
         ...
 
-    def replace_declared_relations(self, conn: Connection, edges: list[RelationEdge]) -> int:
-        """Remplace les relations déclarées (`source` datacite/crossref) par `edges` : résout chaque `target_doi` en `target_publication_id`, écarte les auto-relations, dédoublonne par `(from, type, target)`. Retourne le nombre de relations écrites."""
-        ...
-
     def fetch_shared_key_pairs(self, conn: Connection) -> list[SharedKeyPair]:
         """Les paires de publications distinctes (DOI distincts) partageant une clé de confirmation (signal #2)."""
         ...
 
     def fetch_declared_related_pairs(self, conn: Connection) -> set[frozenset[int]]:
         """Les paires déjà reliées par une relation déclarée (signal #1), pour écarter un `is_related_to` redondant."""
-        ...
-
-    def replace_shared_key_relations(self, conn: Connection, edges: list[RelationEdge]) -> int:
-        """Remplace les relations issues des clés partagées (`source` shared_key) par `edges`, avec la même résolution/dédup que `replace_declared_relations`."""
         ...
 
     def fetch_erratum_title_matches(self, conn: Connection) -> list[TitleMatch]:
@@ -84,8 +76,8 @@ class PublicationRelationsQueries(Protocol):
         Pour chaque preprint, candidats = publications non-preprint au `title_normalized` **identique** (le preprint et sa version publiée portent le même titre), titre assez long, publiées dans la fenêtre `[année … année + 2]`. Même garde d'ambiguïté : un seul candidat substantiel (hors `dataset`) au même titre."""
         ...
 
-    def replace_title_match_relations(self, conn: Connection, edges: list[RelationEdge]) -> int:
-        """Remplace les relations rapprochées par titre (`source` title_match) par `edges`, avec la même résolution/dédup que `replace_declared_relations`."""
+    def rebuild_relations(self, conn: Connection, edges: list[RelationEdge]) -> int:
+        """Reconstruit `publication_relations` : purge la table, puis insère `edges` (chaque arête portant sa `source`). Résout les `target_doi` en `target_publication_id`, écarte les auto-relations, dédoublonne par `(from, type, target)` — l'ordre de `edges` fixe la priorité. Retourne le nombre inséré."""
         ...
 
     def count_by_relation_type(self, conn: Connection) -> list[tuple[str, int]]:
