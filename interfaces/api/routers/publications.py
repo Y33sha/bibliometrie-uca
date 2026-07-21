@@ -1,6 +1,8 @@
 """Router des publications : listes, facettes, détail, export, et revue des doublons. Sert `/api/publications/*`.
 
 Les lectures passent par les ports `PublicationsQueries` et `PublicationDuplicatesQueries`, les écritures par les command handlers de `application.services.publications.commands`.
+
+Les chemins littéraux — `/facets`, `/export.csv`, `/export-theses.csv`, `/duplicates/*` — précèdent `/{pub_id}`, qui les accepterait sinon comme identifiant.
 """
 
 from dataclasses import dataclass
