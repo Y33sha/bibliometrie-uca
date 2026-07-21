@@ -8,6 +8,15 @@ from sqlalchemy import Connection, text
 from application.ports.pipeline.oa_status import OaStatusQueries, PublicationOaCheck
 from domain.publications.metadata import OPEN_ARCHIVE_SOURCES
 
+# Publications à (re)vérifier : à DOI, jamais vérifiées ou périmées (> `:stale` jours).
+_STALE_WHERE = """
+    doi IS NOT NULL
+    AND (
+        unpaywall_checked_at IS NULL
+        OR unpaywall_checked_at < now() - make_interval(days => :stale)
+    )
+"""
+
 
 def fetch_publications_with_doi(
     conn: Connection, *, limit: int | None = None, staleness_days: int = 30
@@ -19,7 +28,8 @@ def fetch_publications_with_doi(
     `has_open_deposit` signale qu'une archive ouverte détient le fichier (`OPEN_ARCHIVE_SOURCES` avec `green`) : la phase oa_status s'en sert pour ne pas refermer un dépôt sur un `closed` d'Unpaywall.
     """
     rows = conn.execute(
-        text("""
+        text(
+            """
             SELECT id, doi, oa_status::text AS oa_status,
                    EXISTS (
                        SELECT 1 FROM source_publications s
@@ -28,17 +38,16 @@ def fetch_publications_with_doi(
                          AND s.oa_status::text = 'green'
                    ) AS has_open_deposit
             FROM publications
-            WHERE doi IS NOT NULL
-              AND (
-                  unpaywall_checked_at IS NULL
-                  OR unpaywall_checked_at < now() - make_interval(days => :stale)
-              )
+            WHERE """
+            + _STALE_WHERE
+            + """
             ORDER BY unpaywall_checked_at ASC NULLS FIRST
             LIMIT :lim
-        """),
+            """
+        ),
         {
             "stale": staleness_days,
-            "lim": limit or None,
+            "lim": limit,
             "open_archive_sources": list(OPEN_ARCHIVE_SOURCES),
         },
     ).all()
@@ -48,15 +57,7 @@ def fetch_publications_with_doi(
 def count_stale_publications(conn: Connection, *, staleness_days: int = 30) -> int:
     """Nombre de publications avec DOI à (re)vérifier — même prédicat que `fetch_publications_with_doi`, sans cap. C'est le backlog de staleness OA."""
     return conn.execute(
-        text("""
-            SELECT count(*)
-            FROM publications
-            WHERE doi IS NOT NULL
-              AND (
-                  unpaywall_checked_at IS NULL
-                  OR unpaywall_checked_at < now() - make_interval(days => :stale)
-              )
-        """),
+        text("SELECT count(*) FROM publications WHERE " + _STALE_WHERE),
         {"stale": staleness_days},
     ).scalar_one()
 
