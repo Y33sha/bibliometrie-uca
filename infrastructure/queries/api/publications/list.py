@@ -137,9 +137,7 @@ def list_publications(
     where_clause, binds = _build_list_clauses(conn, filters, perimeter_structure_ids)
     order = _ORDER_MAP[sort]
 
-    # Quand la recherche match un sujet (cf. _search_clause), on remonte
-    # d'abord les publis dont le *titre* match — les correspondances purement
-    # via sujet sont reléguées en deuxième.
+    # Quand la recherche match un sujet (cf. _search_clause), on remonte d'abord les publis dont le *titre* match — les correspondances purement via sujet sont reléguées en deuxième.
     if filters.search:
         order = "(CASE WHEN p.title_normalized ILIKE :sort_search_pat THEN 0 ELSE 1 END), " + order
 
@@ -149,8 +147,7 @@ def list_publications(
     ).one()
     total = count_row.total
 
-    # Sur la vue personne (person_id défini), restreindre la liste des labos
-    # affichée à ceux portés par l'authorship de cette personne.
+    # Sur la vue personne (person_id défini), restreindre la liste des labos affichée à ceux portés par l'authorship de cette personne.
     if filters.person_id:
         person_lab_filter_a3 = "AND a3.person_id = :person_lab_a3"
         person_lab_filter_a4 = "AND a4.person_id = :person_lab_a4"
@@ -296,10 +293,7 @@ _WS_RE = re.compile(r"\s+")
 
 
 def _plain_text(s: str | None) -> str:
-    """Texte brut pour le CSV : retire les balises HTML/MathML (via
-    `strip_markup`, qui préserve les indices de Miller `<111>`), dé-échappe les
-    entités, et collapse le whitespace en un seul espace. Reflète le titre
-    affiché, sans markup."""
+    """Texte brut pour le CSV : retire les balises HTML/MathML (via `strip_markup`, qui préserve les indices de Miller `<111>`), dé-échappe les entités, et collapse le whitespace en un seul espace. Reflète le titre affiché, sans markup."""
     if not s:
         return ""
     return _WS_RE.sub(" ", html.unescape(strip_markup(s))).strip()
@@ -313,13 +307,9 @@ def export_publications_csv(
     sort: str,
     columns: list[str],
 ) -> str:
-    """Export CSV (sans pagination) qui reflète le tableau affiché : mêmes
-    filtres que list_publications (même constructeur de WHERE) ET mêmes colonnes
-    (`columns` = clés des colonnes visibles ; si vide, toutes). Titre et liens
-    (DOI + Sources) toujours présents ; « Éditeur » suit la visibilité de « Revue ».
+    """Export CSV (sans pagination) qui reflète le tableau affiché : mêmes filtres que list_publications (même constructeur de WHERE) ET mêmes colonnes (`columns` = clés des colonnes visibles ; si vide, toutes). Titre et liens (DOI + Sources) toujours présents ; « Éditeur » suit la visibilité de « Revue ».
 
-    Retourne la string CSV (préfixée d'un BOM UTF-8 pour Excel). Le caller
-    (router) est responsable d'emballer la réponse HTTP.
+    Retourne la string CSV (préfixée d'un BOM UTF-8 pour Excel). Le caller (router) est responsable d'emballer la réponse HTTP.
     """
     conn.execute(text("SET LOCAL jit = off"))
     where_clause, binds = _build_list_clauses(conn, filters, perimeter_structure_ids)
@@ -370,9 +360,7 @@ def export_publications_csv(
         {**binds, "person_lab_a3": filters.person_id, "focus_person": filters.person_id},
     ).all()
 
-    # Colonnes émises = colonnes visibles à l'affichage, dans l'ordre d'affichage.
-    # Titre et liens (DOI + Sources) toujours présents ; « Éditeur » suit « Revue »
-    # (clé `journal`). `columns` vide => toutes (compat ascendante).
+    # Colonnes émises = colonnes visibles à l'affichage, dans l'ordre d'affichage. Titre et liens (DOI + Sources) toujours présents ; « Éditeur » suit « Revue » (clé `journal`). `columns` vide => toutes (compat ascendante).
     requested = (
         set(columns)
         if columns
@@ -435,8 +423,7 @@ def export_publications_csv(
 def _build_theses_export_clauses(filters: PublicationFilters) -> tuple[str, dict[str, Any]]:
     """Conditions WHERE pour l'export CSV des thèses.
 
-    Spécifique à la page thèses : `source_clause` canonique (4 sources) +
-    filtre `access` (open/closed, facette primaire) + `oa_clause`.
+    Spécifique à la page thèses : `source_clause` canonique (4 sources) + filtre `access` (open/closed, facette primaire) + `oa_clause`.
     """
     clauses: list[WhereClause | None] = list(_initial_clauses(filters))
     clauses.extend(_inline_clauses(filters))
@@ -455,9 +442,7 @@ def export_theses_csv(
 ) -> str:
     """Export CSV dédié à la page thèses.
 
-    Colonnes spécifiques (Inscription, Soutenance, Statut, theses.fr) au lieu
-    de Revue/Éditeur/WoS pertinents pour les publications. Tri par défaut
-    `soutenance_desc` (cohérent avec l'affichage).
+    Colonnes spécifiques à la thèse (Inscription, Soutenance, Statut, theses.fr). Tri par défaut `soutenance_desc` (cohérent avec l'affichage).
     """
     conn.execute(text("SET LOCAL jit = off"))
     where_clause, binds = _build_theses_export_clauses(filters)
