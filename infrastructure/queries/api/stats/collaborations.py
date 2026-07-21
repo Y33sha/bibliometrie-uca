@@ -1,9 +1,6 @@
 """Agrégat des collaborations internationales par pays.
 
-Compte, pour chaque pays étranger, le nombre de publications du périmètre qui lui sont
-co-affiliées, en dépliant la colonne `publications.countries` (ensemble des pays présents dans les
-affiliations d'une publication). Le pays de rattachement du périmètre est exclu : l'indicateur mesure
-l'ouverture *internationale*, pas la présence domestique (quasi universelle).
+Compte, pour chaque pays étranger, le nombre de publications du périmètre qui lui sont co-affiliées, en dépliant la colonne `publications.countries` (ensemble des pays présents dans les affiliations d'une publication). Le pays de rattachement du périmètre est exclu : l'indicateur mesure l'ouverture *internationale*, pas la présence domestique (quasi universelle).
 
 Réutilise le périmètre de base et les filtres communs des agrégats stats (cf. `_shared`).
 """
@@ -16,8 +13,7 @@ from application.ports.api.stats_queries import StatsFilters
 from infrastructure.queries.api.filters import assemble_where
 from infrastructure.queries.api.stats._shared import STATS_BASE, stats_filter_clauses
 
-# Pays de rattachement du périmètre (France), exclu du décompte des collaborations internationales.
-# Codes pays en ISO 3166-1 alpha-2 minuscule, comme stockés dans `publications.countries`.
+# Pays de rattachement du périmètre (France), exclu du décompte des collaborations internationales. Codes pays en ISO 3166-1 alpha-2 minuscule, comme stockés dans `publications.countries`.
 _DOMESTIC_COUNTRY = "fr"
 
 
@@ -27,10 +23,7 @@ def run_collaborations(
     perimeter_structure_ids: list[int],
     filters: StatsFilters,
 ) -> dict[str, Any]:
-    """Collaborations internationales sous les filtres. Retourne les lignes `{code, value}` (un pays
-    étranger, nombre de publications co-affiliées) triées par décompte décroissant, ainsi que le
-    nombre de publications en collaboration internationale (au moins un pays étranger) et le total du
-    corpus filtré — de quoi exprimer une part."""
+    """Collaborations internationales sous les filtres. Retourne les lignes `{code, value}` (un pays étranger, nombre de publications co-affiliées) triées par décompte décroissant, ainsi que le nombre de publications en collaboration internationale (au moins un pays étranger) et le total du corpus filtré — de quoi exprimer une part."""
     where, binds = assemble_where(
         stats_filter_clauses(
             perimeter_structure_ids=perimeter_structure_ids,
@@ -50,8 +43,7 @@ def run_collaborations(
     )
     rows = conn.execute(text(per_country), binds).all()
 
-    # Numérateur (publications avec au moins un pays étranger) et dénominateur (corpus filtré), au grain
-    # publication : `array_remove` retire le pays domestique ; un reste non vide signale l'international.
+    # Numérateur (publications avec au moins un pays étranger) et dénominateur (corpus filtré), au grain publication : `array_remove` retire le pays domestique ; un reste non vide signale l'international.
     totals = (
         "SELECT COUNT(DISTINCT p.id) AS total, "
         "COUNT(DISTINCT p.id) FILTER "

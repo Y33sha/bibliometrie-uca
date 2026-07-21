@@ -1,12 +1,8 @@
 """Facette d'entité contextuelle (éditeur, revue) pour le tableau de bord.
 
-Renvoie les N premières entités par volume, calculées **sous les filtres actifs** (en sautant le
-filtre de la dimension demandée, pour qu'une sélection ne réduise pas ses propres options). Les
-autres filtres — dont l'autre entité — sont inclus : sélectionner une revue restreint donc les
-éditeurs proposés à celui de cette revue. Une recherche par nom borne la requête.
+Renvoie les N premières entités par volume, calculées **sous les filtres actifs** (en sautant le filtre de la dimension demandée, pour qu'une sélection ne réduise pas ses propres options). Les autres filtres — dont l'autre entité — sont inclus : sélectionner une revue restreint donc les éditeurs proposés à celui de cette revue. Une recherche par nom borne la requête.
 
-Les filtres étant scalaires ou en `EXISTS` (aucune jointure démultipliante), `COUNT(*)` par groupe
-égale le nombre de publications distinctes.
+Les filtres étant scalaires ou en `EXISTS` (aucune jointure démultipliante), `COUNT(*)` par groupe égale le nombre de publications distinctes.
 """
 
 from typing import Any, Literal
@@ -29,9 +25,7 @@ EntityKind = Literal["publisher", "journal"]
 
 _BASE = " AND ".join([PUBLICATION_IS_IN_PERIMETER, "(j.oa_model IS DISTINCT FROM 'repository')"])
 
-# Liaison SQL par entité : expression d'identifiant, de libellé et jointure additionnelle. La revue
-# sort directement de `publications.journal_id` (colonne indexée) ; l'éditeur passe par une jointure
-# un-à-un vers `publishers` (qui exclut les publications sans éditeur).
+# Liaison SQL par entité : identifiant, libellé, jointure additionnelle. La revue sort de `publications.journal_id` ; l'éditeur passe par une jointure un-à-un vers `publishers` (qui exclut les publications sans éditeur).
 _KIND_SQL: dict[str, dict[str, str]] = {
     "journal": {"id": "j.id", "label": "j.title", "join": ""},
     "publisher": {
