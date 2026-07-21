@@ -1,4 +1,4 @@
-"""Modèles Pydantic du router de déduplication des publications : corps des requêtes entrantes. La fusion rend le `MergeResponse` partagé."""
+"""Modèles Pydantic du router des publications, volet déduplication : corps des requêtes entrantes. La fusion rend le `MergeResponse` partagé."""
 
 from pydantic import BaseModel
 

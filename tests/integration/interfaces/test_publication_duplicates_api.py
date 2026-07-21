@@ -1,4 +1,4 @@
-"""Tests d'intégration pour le router `interfaces.api.routers.admin_duplicates`.
+"""Tests d'intégration pour les endpoints de déduplication du router `interfaces.api.routers.publications`.
 
 Couvre :
 - GET /api/publications/duplicates/next (pair candidate ou null)

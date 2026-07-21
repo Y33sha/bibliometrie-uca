@@ -1,4 +1,4 @@
-"""Modèles Pydantic du router de configuration du pipeline : corps des requêtes entrantes."""
+"""Modèles Pydantic du router de configuration : corps des requêtes entrantes."""
 
 from typing import Any
 

@@ -34,6 +34,7 @@ from interfaces.api.models.authorships import (
     OrphanBatchAssignResponse,
     SourceAuthorshipRef,
 )
+from interfaces.api.models.config import ConfigValueUpdate
 from interfaces.api.models.errors import (
     BlockingJournalItem,
     PublisherMergeBlockedResponse,
@@ -59,12 +60,11 @@ from interfaces.api.models.persons import (
     UpdateNameFormStatus,
     UpdatePersonName,
 )
-from interfaces.api.models.pipeline_config import ConfigValueUpdate
-from interfaces.api.models.pipeline_logs import (
+from interfaces.api.models.pipeline import (
     PipelinePhaseLog,
     PipelineStatus,
 )
-from interfaces.api.models.publication_duplicates import (
+from interfaces.api.models.publications import (
     MarkDistinctPublications,
     MergePublications,
 )
