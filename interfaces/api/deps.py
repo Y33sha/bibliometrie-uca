@@ -21,7 +21,7 @@ from application.ports.api.hal_problems_queries import HalProblemsQueries
 from application.ports.api.journals_queries import JournalQueries
 from application.ports.api.perimeters_queries import PerimetersQueries
 from application.ports.api.persons_queries import PersonsQueries
-from application.ports.api.pipeline_phase_executions_queries import PhaseExecutionsQueries
+from application.ports.api.pipeline_runs_queries import PipelineRunsQueries
 from application.ports.api.publication_duplicates_queries import PublicationDuplicatesQueries
 from application.ports.api.publications_queries import PublicationsQueries
 from application.ports.api.publishers_queries import PublisherQueries
@@ -53,7 +53,7 @@ from infrastructure.queries.api.feedback import PgFeedbackQueries
 from infrastructure.queries.api.hal_problems import PgHalProblemsQueries
 from infrastructure.queries.api.journals import PgJournalQueries
 from infrastructure.queries.api.persons import PgPersonsQueries
-from infrastructure.queries.api.pipeline_phase_executions import PgPhaseExecutionsQueries
+from infrastructure.queries.api.pipeline_runs import PgPipelineRunsQueries
 from infrastructure.queries.api.publication_duplicates import PgPublicationDuplicatesQueries
 from infrastructure.queries.api.publications import PgPublicationsQueries
 from infrastructure.queries.api.publishers import PgPublisherQueries
@@ -252,10 +252,10 @@ def persons_queries(conn: Connection = Depends(db_conn)) -> PersonsQueries:
     return PgPersonsQueries(conn)
 
 
-def pipeline_phase_executions_queries(
+def pipeline_runs_queries(
     conn: Connection = Depends(db_conn),
-) -> PhaseExecutionsQueries:
-    return PgPhaseExecutionsQueries(conn)
+) -> PipelineRunsQueries:
+    return PgPipelineRunsQueries(conn)
 
 
 def addresses_queries(conn: Connection = Depends(db_conn)) -> AddressesQueries:

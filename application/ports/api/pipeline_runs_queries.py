@@ -68,7 +68,7 @@ class RunDetail(BaseModel):
     phases: list[PhaseExecutionDetail]
 
 
-class PhaseExecutionsQueries(Protocol):
+class PipelineRunsQueries(Protocol):
     """Lectures pour /api/pipeline/runs/*."""
 
     def list_runs(self, limit: int = 50, offset: int = 0) -> list[RunSummary]: ...

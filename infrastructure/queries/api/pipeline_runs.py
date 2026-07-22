@@ -1,6 +1,6 @@
 """Query service pour les exécutions de phase (table `pipeline_phase_executions`).
 
-Adapter SA pour le port `PhaseExecutionsQueries`. L'écart de durée est recalculé à la lecture : le médian historique d'une phase se calcule sur ses exécutions réussies hors run courant, et le rapport de la durée courante à ce médian est exposé tel quel (aucun seuil ; l'œil juge une phase anormalement lente).
+Adapter SA pour le port `PipelineRunsQueries`. L'écart de durée est recalculé à la lecture : le médian historique d'une phase se calcule sur ses exécutions réussies hors run courant, et le rapport de la durée courante à ce médian est exposé tel quel (aucun seuil ; l'œil juge une phase anormalement lente).
 """
 
 from __future__ import annotations
@@ -11,10 +11,10 @@ from typing import cast
 
 from sqlalchemy import Connection, text
 
-from application.ports.api.pipeline_phase_executions_queries import (
+from application.ports.api.pipeline_runs_queries import (
     PhaseBrief,
     PhaseExecutionDetail,
-    PhaseExecutionsQueries,
+    PipelineRunsQueries,
     RunDetail,
     RunSummary,
 )
@@ -37,8 +37,8 @@ def _duration_ratio(duration_s: float, historical_median_s: float | None) -> flo
     return duration_s / historical_median_s
 
 
-class PgPhaseExecutionsQueries(PhaseExecutionsQueries):
-    """Adapter SA pour `PhaseExecutionsQueries`."""
+class PgPipelineRunsQueries(PipelineRunsQueries):
+    """Adapter SA pour `PipelineRunsQueries`."""
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
