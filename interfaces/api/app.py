@@ -54,7 +54,7 @@ from interfaces.api.routers import (  # noqa: E402
     journals,
     perimeters,
     persons,
-    pipeline,
+    pipeline_runs,
     publications,
     publishers,
     stats,
@@ -264,7 +264,7 @@ app.include_router(config.router)
 app.include_router(perimeters.router)
 app.include_router(publishers.router)
 app.include_router(journals.router)
-app.include_router(pipeline.router)
+app.include_router(pipeline_runs.router)
 app.include_router(subjects.router)
 
 

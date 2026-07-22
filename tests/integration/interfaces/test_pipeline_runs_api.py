@@ -1,4 +1,4 @@
-"""Tests d'intégration pour le router `admin.pipeline_phase_executions`.
+"""Tests d'intégration pour le router `pipeline_runs` (`/api/pipeline/runs/*`).
 
 Couvre :
 - GET /api/pipeline/runs (liste agrégée par run, statut global, ordre)

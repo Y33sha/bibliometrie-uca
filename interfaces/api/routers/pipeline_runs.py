@@ -1,19 +1,19 @@
 """Router du pipeline : statut du run en cours, historique des exécutions, logs de phase. Sert `/api/pipeline/*`.
 
-Deux origines pour ces lectures. Le statut du run en cours vient de `logs/status.json`, écrit par l'orchestrateur, et le log d'une phase est découpé de `logs/pipeline.log` par `infrastructure.observability.phase_logs` : ces deux-là ne passent par aucun port, les fichiers étant l'état que l'orchestrateur laisse derrière lui. L'historique des runs, lui, est servi en base par `PhaseExecutionsQueries` ; il agrège les exécutions de phase par run, et le détail d'un run rend ses phases dans l'ordre, chacune avec son rendement et son écart de durée au médian historique, recalculés à la lecture.
+Deux origines pour ces lectures. Le statut du run en cours vient de `logs/status.json`, écrit par l'orchestrateur, et le log d'une phase est découpé de `logs/pipeline.log` par `infrastructure.observability.phase_logs` : ces deux-là ne passent par aucun port, les fichiers étant l'état que l'orchestrateur laisse derrière lui. L'historique des runs, lui, est servi en base par `PipelineRunsQueries` ; il agrège les exécutions de phase par run, et le détail d'un run rend ses phases dans l'ordre, chacune avec son rendement et son écart de durée au médian historique, recalculés à la lecture.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from application.pipeline.phase_order import PHASE_ORDER
-from application.ports.api.pipeline_phase_executions_queries import (
-    PhaseExecutionsQueries,
+from application.ports.api.pipeline_runs_queries import (
+    PipelineRunsQueries,
     RunDetail,
     RunSummary,
 )
 from infrastructure.observability.phase_logs import read_phase_log
 from infrastructure.observability.pipeline_status import read_status
-from interfaces.api.deps import pipeline_phase_executions_queries
+from interfaces.api.deps import pipeline_runs_queries
 from interfaces.api.models import PipelinePhaseLog, PipelineStatus
 
 router = APIRouter(prefix="/api/pipeline", tags=["pipeline"])
@@ -39,7 +39,7 @@ def list_phases() -> list[str]:
 def list_runs(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
-    queries: PhaseExecutionsQueries = Depends(pipeline_phase_executions_queries),
+    queries: PipelineRunsQueries = Depends(pipeline_runs_queries),
 ) -> list[RunSummary]:
     """Fenêtre de runs agrégés par `run_id`, le plus récent en tête ; `offset` sert au chargement incrémental."""
     return queries.list_runs(limit=limit, offset=offset)
@@ -48,7 +48,7 @@ def list_runs(
 @router.get("/runs/{run_id}", response_model=RunDetail)
 def get_run(
     run_id: int,
-    queries: PhaseExecutionsQueries = Depends(pipeline_phase_executions_queries),
+    queries: PipelineRunsQueries = Depends(pipeline_runs_queries),
 ) -> RunDetail:
     """Détail d'un run : ses exécutions de phase avec rendement et écart de durée."""
     detail = queries.get_run(run_id)
