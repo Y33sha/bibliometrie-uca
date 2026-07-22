@@ -29,8 +29,10 @@ READ_CMDS = {"cat", "head", "tail", "nl", "bat"}
 SEARCH_RECURSIVE = re.compile(r"\b[ef]?grep\b[^|;&]*\s-(?!-)[a-zA-Z]*[rR]")
 FIND_NAME = re.compile(r"\bfind\s+\S+.*\s-i?name\b")
 AUTHOR_WRITE = re.compile(
-    r"\b(?:echo|printf|cat)\b[^|;&]*?>\s*[^\s|;&<>]*" + SRC_CODE
-    + r"|\btee\s+\S*" + SRC_CODE
+    r"\b(?:echo|printf|cat)\b[^|;&]*?>\s*[^\s|;&<>]*"
+    + SRC_CODE
+    + r"|\btee\s+\S*"
+    + SRC_CODE
     + r"|\bpython3?\s+-c\b[^\n]*(?:open\([^)]*['\"][wa]['\"]|\.write\()"
     + r"|\bsed\s+-i\b"
 )
@@ -60,11 +62,17 @@ def has_pipe(cmd: str) -> bool:
 
 
 def decide(reason: str) -> int:
-    print(json.dumps({"hookSpecificOutput": {
-        "hookEventName": "PreToolUse",
-        "permissionDecision": "deny",
-        "permissionDecisionReason": reason,
-    }}))
+    print(
+        json.dumps(
+            {
+                "hookSpecificOutput": {
+                    "hookEventName": "PreToolUse",
+                    "permissionDecision": "deny",
+                    "permissionDecisionReason": reason,
+                }
+            }
+        )
+    )
     return 0
 
 
