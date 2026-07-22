@@ -77,7 +77,7 @@
 		facets: {
 			years: { type: 'simple', apiKey: 'years' },
 			labs: { type: 'labeled', apiKey: 'labs' },
-			access: { type: 'passthrough', apiKey: 'access' },
+			access: { type: 'labeled', apiKey: 'access' },
 			status: {
 				type: 'label_map',
 				apiKey: 'doc_types',

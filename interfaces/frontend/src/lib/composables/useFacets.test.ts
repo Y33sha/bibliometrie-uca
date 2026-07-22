@@ -94,17 +94,17 @@ describe('useFacets', () => {
 		expect(f.options.labs).toEqual([{ value: '42', text: 'Mon Labo', count: 100 }]);
 	});
 
-	it('mappe le type "passthrough" et applique transform si fourni', async () => {
-		apiResponse = { countries: [{ value: 'fr', text: 'France', count: 1000 }] };
+	it('mappe le type "labeled" avec transform', async () => {
+		apiResponse = { countries: [{ value: 'fr', label: 'France', count: 1000 }] };
 		const f = useFacets({
 			endpoint: '/x',
 			apiKey: 'k',
 			buildParams: () => new URLSearchParams(),
 			facets: {
 				countries: {
-					type: 'passthrough',
+					type: 'labeled',
 					apiKey: 'countries',
-					transform: (item) => ({ ...item, text: item.text.toUpperCase() }),
+					transform: (item) => ({ value: item.value, text: item.label.toUpperCase(), count: item.count }),
 				},
 			},
 		});

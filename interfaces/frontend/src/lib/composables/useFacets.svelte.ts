@@ -7,8 +7,7 @@ import type { FacetOption } from '$lib/components/FacetDropdown.svelte';
  * Chaque facette est déclarée avec un type qui détermine le mapping :
  *   - simple     : { value, count }[]         → text = String(value)
  *   - label_map  : { value, count }[]         → text = labels[value] || value
- *   - labeled    : { value, label, count }[]  → text = label
- *   - passthrough: { value, text, count }[]   → tel quel
+ *   - labeled    : { value, label, count }[]  → text = label (transform optionnel)
  *   - boolean    : { value, count }[]         → deux options yes/no
  */
 
@@ -29,12 +28,7 @@ interface LabelMapFacet {
 interface LabeledFacet {
 	type: 'labeled';
 	apiKey: string;
-}
-
-interface PassthroughFacet {
-	type: 'passthrough';
-	apiKey: string;
-	transform?: (item: { value: string; text: string; count: number }) => FacetOption;
+	transform?: (item: { value: string; label: string; count: number }) => FacetOption;
 }
 
 interface BooleanFacet {
@@ -44,7 +38,7 @@ interface BooleanFacet {
 	noLabel: string;
 }
 
-export type FacetDef = SimpleFacet | LabelMapFacet | LabeledFacet | PassthroughFacet | BooleanFacet;
+export type FacetDef = SimpleFacet | LabelMapFacet | LabeledFacet | BooleanFacet;
 
 interface FacetsConfig<K extends string> {
 	endpoint: string;
@@ -107,16 +101,12 @@ export function useFacets<K extends string>(config: FacetsConfig<K>) {
 					}));
 					break;
 				case 'labeled':
-					newOpts[key] = (raw as { value: unknown; label: string; count: number }[]).map((item) => ({
-						value: String(item.value),
-						text: item.label,
-						count: item.count,
-					}));
-					break;
-				case 'passthrough':
-					newOpts[key] = (raw as { value: string; text: string; count: number }[]).map((item) =>
-						def.transform ? def.transform(item) : { value: item.value, text: item.text, count: item.count },
-					);
+					newOpts[key] = (raw as { value: unknown; label: string; count: number }[]).map((item) => {
+						const base = { value: String(item.value), label: item.label, count: item.count };
+						return def.transform
+							? def.transform(base)
+							: { value: base.value, text: base.label, count: base.count };
+					});
 					break;
 				case 'boolean': {
 					const counts = raw as Record<string, number>;
