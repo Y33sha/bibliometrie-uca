@@ -4,6 +4,7 @@ from typing import Any
 
 from sqlalchemy import Connection, text
 
+from application.ports.api._common import FacetOption
 from application.ports.api.addresses_queries import (
     AddressCountriesFilters,
     AddressesCountriesResponse,
@@ -15,7 +16,6 @@ from application.ports.api.addresses_queries import (
     AddressPublicationItem,
     AddressStatsResponse,
     AddressStructureSummary,
-    CountrySuggestion,
     StructureLinkState,
 )
 
@@ -23,6 +23,38 @@ from application.ports.api.addresses_queries import (
 _RECOGNIZED_LINK = (
     "((asx.matched_form_id IS NOT NULL AND asx.is_confirmed IS NULL) OR asx.is_confirmed = TRUE)"
 )
+
+
+def _countries_where(
+    filters: AddressCountriesFilters, *, with_country_code: bool, extra: str | None = None
+) -> tuple[str, dict[str, Any]]:
+    """Clause WHERE partagée par la liste des adresses à attribuer et ses deux facettes.
+
+    `with_country_code=False` retire le filtre pays de la clause : c'est la dimension que la facette pays écarte pour compter ses options (comptes exclusifs, comme les autres facettes). `extra` ajoute une condition finale de présence (`a.countries` ou `a.suggested_countries` selon la requête).
+    """
+    parts: list[str] = []
+    binds: dict[str, Any] = {}
+    if filters.search:
+        parts.append("unaccent(a.raw_text) ILIKE unaccent(:search)")
+        binds["search"] = f"%{filters.search}%"
+    if filters.has_country is not None:
+        parts.append("a.countries IS NOT NULL" if filters.has_country else "a.countries IS NULL")
+    # Match insensible à la casse : les codes sont canoniquement en minuscules (`countries.code`), mais les arrays peuvent porter des variantes majuscules (codes ISO OpenAlex).
+    if with_country_code and filters.country_code:
+        parts.append(
+            "EXISTS (SELECT 1 FROM unnest(a.countries) x WHERE lower(x) = lower(:country_code))"
+        )
+        binds["country_code"] = filters.country_code
+    if filters.suggested_country:
+        parts.append(
+            "EXISTS (SELECT 1 FROM unnest(a.suggested_countries) x "
+            "WHERE lower(x) = lower(:suggested_country))"
+        )
+        binds["suggested_country"] = filters.suggested_country
+    if extra:
+        parts.append(extra)
+    where = "WHERE " + " AND ".join(parts) if parts else ""
+    return where, binds
 
 
 class PgAddressesQueries(AddressesQueries):
@@ -217,34 +249,10 @@ class PgAddressesQueries(AddressesQueries):
         self, *, filters: AddressCountriesFilters, page: int, per_page: int
     ) -> AddressesCountriesResponse:
         offset = (page - 1) * per_page
-        parts: list[str] = []
-        binds: dict[str, Any] = {}
-
-        if filters.search:
-            parts.append("unaccent(a.raw_text) ILIKE unaccent(:search)")
-            binds["search"] = f"%{filters.search}%"
-        if filters.has_country is not None:
-            parts.append(
-                "a.countries IS NOT NULL" if filters.has_country else "a.countries IS NULL"
-            )
-        # Match insensible à la casse : les codes pays sont canoniquement en minuscules (`countries.code`) mais les arrays peuvent contenir des variantes majuscules (codes ISO OpenAlex).
-        if filters.country_code:
-            parts.append(
-                "EXISTS (SELECT 1 FROM unnest(a.countries) x WHERE lower(x) = lower(:country_code))"
-            )
-            binds["country_code"] = filters.country_code
-        if filters.suggested_country:
-            parts.append(
-                "EXISTS (SELECT 1 FROM unnest(a.suggested_countries) x "
-                "WHERE lower(x) = lower(:suggested_country))"
-            )
-            binds["suggested_country"] = filters.suggested_country
-
-        where = "WHERE " + " AND ".join(parts) if parts else ""
+        where, binds = _countries_where(filters, with_country_code=True)
 
         total_row = self._conn.execute(
-            text(f"SELECT COUNT(*) AS total FROM addresses a {where}"),
-            binds,
+            text(f"SELECT COUNT(*) AS total FROM addresses a {where}"), binds
         ).one()
         total = total_row.total
 
@@ -264,10 +272,7 @@ class PgAddressesQueries(AddressesQueries):
             sc = r.suggested_countries
             # Dédup + normalisation casse (un code peut apparaître en 'FR' et 'fr').
             suggestions = (
-                [
-                    CountrySuggestion(code=code, count=1)
-                    for code in sorted({c.strip().lower() for c in sc if c.strip()})
-                ]
+                sorted({c.strip().lower() for c in sc if c.strip()})
                 if filters.suggest and not r.countries and sc
                 else []
             )
@@ -283,10 +288,11 @@ class PgAddressesQueries(AddressesQueries):
                 )
             )
 
-        suggestion_facets: list[CountrySuggestion] | None = None
+        suggestion_facets: list[FacetOption] | None = None
         if filters.suggest and not filters.suggested_country:
-            extra = "a.suggested_countries IS NOT NULL"
-            sug_where = f"{where} AND {extra}" if where else f"WHERE {extra}"
+            sug_where, sug_binds = _countries_where(
+                filters, with_country_code=True, extra="a.suggested_countries IS NOT NULL"
+            )
             sug_rows = self._conn.execute(
                 text(f"""
                     SELECT lower(c) AS code, COUNT(*) AS cnt
@@ -294,28 +300,14 @@ class PgAddressesQueries(AddressesQueries):
                     {sug_where}
                     GROUP BY lower(c) ORDER BY cnt DESC LIMIT 20
                 """),
-                binds,
+                sug_binds,
             ).all()
-            suggestion_facets = [CountrySuggestion(code=r.code, count=r.cnt) for r in sug_rows]
+            suggestion_facets = [FacetOption(value=r.code, count=r.cnt) for r in sug_rows]
 
-        # Facette pays (exclut country_code, garde le reste + a.countries IS NOT NULL).
-        cf_parts: list[str] = []
-        cf_binds: dict[str, Any] = {}
-        if filters.search:
-            cf_parts.append("unaccent(a.raw_text) ILIKE unaccent(:cf_search)")
-            cf_binds["cf_search"] = f"%{filters.search}%"
-        if filters.has_country is not None:
-            cf_parts.append(
-                "a.countries IS NOT NULL" if filters.has_country else "a.countries IS NULL"
-            )
-        if filters.suggested_country:
-            cf_parts.append(
-                "EXISTS (SELECT 1 FROM unnest(a.suggested_countries) x "
-                "WHERE lower(x) = lower(:cf_suggested))"
-            )
-            cf_binds["cf_suggested"] = filters.suggested_country
-        cf_parts.append("a.countries IS NOT NULL")
-        cf_where = "WHERE " + " AND ".join(cf_parts)
+        # Facette pays : écarte sa propre dimension (country_code), garde le reste, exige un pays.
+        cf_where, cf_binds = _countries_where(
+            filters, with_country_code=False, extra="a.countries IS NOT NULL"
+        )
         cf_rows = self._conn.execute(
             text(f"""
                 SELECT lower(c) AS code, COUNT(*) AS cnt
@@ -325,7 +317,7 @@ class PgAddressesQueries(AddressesQueries):
             """),
             cf_binds,
         ).all()
-        country_facets = [CountrySuggestion(code=r.code, count=r.cnt) for r in cf_rows]
+        country_facets = [FacetOption(value=r.code, count=r.cnt) for r in cf_rows]
 
         return AddressesCountriesResponse(
             total=total,

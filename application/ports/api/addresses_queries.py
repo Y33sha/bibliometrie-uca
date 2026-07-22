@@ -8,7 +8,7 @@ from typing import Literal, Protocol
 
 from pydantic import BaseModel
 
-from application.ports.api._common import PaginatedResponse
+from application.ports.api._common import FacetOption, PaginatedResponse
 
 # État de détection d'un rattachement adresse-structure, et état de son arbitrage manuel.
 AddressDetected = Literal["all", "yes", "no"]
@@ -110,25 +110,20 @@ class AddressPublicationItem(BaseModel):
     source_id: str | None
 
 
-class CountrySuggestion(BaseModel):
-    code: str
-    count: int
-
-
 class AddressForCountryAttribution(BaseModel):
     """Ligne de `/api/addresses/countries`."""
 
     id: int
     raw_text: str
     countries: list[str] | None
-    suggested_countries: list[CountrySuggestion]
+    suggested_countries: list[str]
     pub_count: int
 
 
 class AddressesCountriesResponse(PaginatedResponse):
     addresses: list[AddressForCountryAttribution]
-    suggestion_facets: list[CountrySuggestion] | None = None
-    country_facets: list[CountrySuggestion]
+    suggestion_facets: list[FacetOption] | None = None
+    country_facets: list[FacetOption]
 
 
 class AddressStatsResponse(BaseModel):
