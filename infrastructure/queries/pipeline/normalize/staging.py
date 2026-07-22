@@ -22,7 +22,7 @@ _COLUMNS = "id, source_id, doi, raw_data"
 
 
 def _row(r: Row) -> StagingRow:  # type: ignore[type-arg]
-    """Construit le `StagingRow` depuis une row SA."""
+    """Construit le `StagingRow` depuis une ligne SQL."""
     return StagingRow(id=r.id, source_id=r.source_id, doi=r.doi, raw_data=r.raw_data)
 
 
