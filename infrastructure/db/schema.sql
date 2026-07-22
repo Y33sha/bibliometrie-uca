@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict 4KTemHIxirprXMmhOvIpp7Av1MhI11DNvuV3rAyTOUN6bo1xQbLfXG5xhAofVtI
+\restrict QxAxZ5lmd417eXArV6RWlejjDk4fjL4I0gwZoS5GGfDlQHWGlg2rDwrNP2mlEw3
 
--- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg22.04+1)
--- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg22.04+1)
+-- Dumped from database version 18.4
+-- Dumped by pg_dump version 18.4
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -590,7 +590,7 @@ CREATE TABLE public.perimeters (
     code text NOT NULL,
     name text NOT NULL,
     created_at timestamp with time zone DEFAULT now(),
-    structure_ids integer[] DEFAULT '{}'::integer[] NOT NULL
+    root_structure_ids integer[] DEFAULT '{}'::integer[] CONSTRAINT perimeters_structure_ids_not_null NOT NULL
 );
 
 
@@ -2806,7 +2806,7 @@ CREATE INDEX idx_sa_authorship ON public.source_authorships USING btree (authors
 -- Name: idx_sa_countries_dirty; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_sa_countries_dirty ON public.source_authorships USING btree (source_publication_id) WHERE countries_dirty;
+CREATE INDEX idx_sa_countries_dirty ON public.source_authorships USING btree (source) WHERE countries_dirty;
 
 
 --
@@ -3441,5 +3441,5 @@ ALTER TABLE ONLY public.structure_relations
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 4KTemHIxirprXMmhOvIpp7Av1MhI11DNvuV3rAyTOUN6bo1xQbLfXG5xhAofVtI
+\unrestrict QxAxZ5lmd417eXArV6RWlejjDk4fjL4I0gwZoS5GGfDlQHWGlg2rDwrNP2mlEw3
 
