@@ -15,7 +15,7 @@ from application.ports.pipeline.authorships.purge_orphan_publications import (
 def purge_orphan_publications(conn: Connection, *, limit: int | None = None) -> int:
     """Supprime les publications sans aucun authorship. Retourne le nombre supprimé.
 
-    Prédicat : zéro authorship actif. Sans perte de curation ni de donnée métier (mesuré : 0 `rejected_authorships`, 0 `apc_payments` sur ces publications) ; les éventuels marqueurs `distinct_publications` partent en CASCADE (paires marquées par l'admin sur une publication purgée — cas marginal).
+    Prédicat : zéro authorship actif. Les éventuels marqueurs `distinct_publications` partent en CASCADE (paires marquées par l'admin sur une publication purgée — cas marginal).
 
     `limit` borne le nombre de publications supprimées par appel (un chunk) ; `None` = tout en une fois. Le batching — boucler sur des chunks avec un commit entre chaque — est orchestré par l'orchestrateur de la phase authorships : il étale le WAL et rend la progression durable face à une interruption, sans bloquer les lectures (un DELETE prend `ROW EXCLUSIVE`, pas de conflit avec les SELECT).
     """
