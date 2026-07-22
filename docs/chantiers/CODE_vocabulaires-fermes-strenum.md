@@ -50,7 +50,7 @@ Coûts concrets :
 
 ## Sites recensés
 
-Littéraux de vocabulaires fermés repérés dans le SQL, à remplacer par des membres d'enum (liste tenue au fil des relectures) :
+Littéraux de vocabulaires fermés repérés dans le code (SQL du pipeline et ports API), à remplacer par des membres d'enum (liste tenue au fil des relectures) :
 
 - [ ] `infrastructure/queries/pipeline/metadata_correction.py` — `'book'`, `'book_chapter'`, `'dataset'`, `'datacite'` ; et le mapping `relation_type` DataCite → `DoiClusterCase` du `CASE`.
 - [ ] `infrastructure/queries/pipeline/oa_status.py` — `'green'` (statut OA du dépôt en archive ouverte).
@@ -58,6 +58,7 @@ Littéraux de vocabulaires fermés repérés dans le SQL, à remplacer par des m
 - [ ] Clés de confirmation `'hal_id'` / `'arxiv_id'` / `'pmid'` / `'nnt'` — clés JSONB, pas un enum PostgreSQL, énumérées dans `relations.py` (`_SHARED_KEY_PAIRS_SQL`) **et** `publications_reconciliation.py` (`_UNIVERSE_SQL`) : à définir une seule fois côté domaine.
 - [ ] `infrastructure/queries/pipeline/persons/matching.py` — statuts `'rejected'` / `'confirmed'` / `'pending'` (l'enum `AttributionStatus` existe déjà), modes de résolution `'cross_source'` / `'identifier'` / `'name'`, types d'identifiant `'orcid'` / `'idref'` / `'hal_person_id'`, et le marqueur `'persons'` de `person_name_forms.sources`.
 - [ ] `infrastructure/queries/pipeline/persons/name_forms.py` — mêmes statuts (`identifier_status`) et marqueur `'persons'`.
+- [ ] `application/ports/api/persons_queries.py` — statut `person_identifiers.status` re-déclaré en `Literal[...]` inline dans trois DTOs (lignes 77, 89, 278) au lieu de référencer `AttributionStatus` ; deux le restreignent à `pending` / `confirmed` / `rejected`, un inclut `authenticated`.
 
 ## Questions ouvertes
 
