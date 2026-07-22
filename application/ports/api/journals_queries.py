@@ -10,13 +10,13 @@ from typing import Any, Literal, Protocol
 from pydantic import BaseModel
 
 from application.ports.api._common import PaginatedResponse
+from application.ports.api.subjects_queries import SubjectFrequency
+from domain.journals.journal import JournalType, OaModel
 
 # Vocabulaire de tri de la liste des revues : le champ, puis le sens.
 JournalSort = Literal[
     "title_asc", "title_desc", "publisher_asc", "publisher_desc", "pubs_asc", "pubs_desc"
 ]
-from application.ports.api.subjects_queries import SubjectFrequency
-from domain.journals.journal import JournalType, OaModel
 
 
 @dataclass(frozen=True, slots=True)
