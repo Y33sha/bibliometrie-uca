@@ -1,6 +1,6 @@
 """Query services pour les paramètres applicatifs (table `config`).
 
-Ce module sert la couche requêtes-API : `PgConfigQueries` rend au router admin le listing complet et les clés qui référencent un périmètre, et `laboratory_structure_types` livre à un adapter voisin les types de structure tenus pour des laboratoires. L'écriture d'une valeur vit dans `infrastructure/repositories/config_repository.py`. Les lookups par clé du pipeline — années, collections HAL, comptes de service des sources — vivent à part, dans `infrastructure/sources/config.py`.
+Ce module sert la couche requêtes-API : `PgConfigQueries` rend au router admin le listing complet et les clés qui référencent un périmètre. L'écriture d'une valeur vit dans `infrastructure/repositories/config_repository.py`. Les lookups par clé du pipeline — années, collections HAL, comptes de service des sources — vivent à part, dans `infrastructure/sources/config.py`.
 """
 
 from sqlalchemy import Connection, select, text
@@ -8,18 +8,6 @@ from sqlalchemy import Connection, select, text
 from application.ports.api.config_queries import ConfigItem, ConfigQueries
 from domain.config import PUBLIC_CONFIG_KEYS
 from infrastructure.db.tables import config
-
-
-def laboratory_structure_types(conn: Connection) -> list[str]:
-    """Types de structure que la configuration tient pour des laboratoires.
-
-    Rend `["labo"]` à défaut de configuration : c'est le type qui porte le mot.
-    """
-    row = conn.execute(
-        text("SELECT value FROM config WHERE key = 'laboratories_display_types'")
-    ).one_or_none()
-    value = row.value if row else None
-    return [str(v) for v in value] if isinstance(value, list) and value else ["labo"]
 
 
 class PgConfigQueries(ConfigQueries):

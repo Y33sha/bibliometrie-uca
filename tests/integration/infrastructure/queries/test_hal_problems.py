@@ -52,7 +52,23 @@ def _create_lab(conn, code="LAB", hal_collection=None):
         """),
         {"c": code, "col": hal_collection},
     ).one()
-    return row.id
+    lab_id = row.id
+    # Rattache au périmètre persons (code 'uca' par défaut) : les lectures HAL scopent
+    # au périmètre, pas au type de structure.
+    perim_id = conn.execute(
+        text("""
+            INSERT INTO perimeters (code, name) VALUES ('uca', 'test persons perimeter')
+            ON CONFLICT (code) DO UPDATE SET code = EXCLUDED.code RETURNING id
+        """)
+    ).scalar_one()
+    conn.execute(
+        text(
+            "INSERT INTO perimeter_structures (perimeter_id, structure_id) "
+            "VALUES (:p, :s) ON CONFLICT DO NOTHING"
+        ),
+        {"p": perim_id, "s": lab_id},
+    )
+    return lab_id
 
 
 def _create_person(conn, last="A", first="Z"):
