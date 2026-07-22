@@ -1,6 +1,6 @@
 """Compteurs `pub_count` (publications in-perimeter) sur `journals` + `publishers`.
 
-`journals.pub_count` = publications in-perimeter in-scope de la revue.
+`journals.pub_count` = nombre de publications in-perimeter de la revue.
 `publishers.pub_count` = somme des `pub_count` de ses revues.
 
 Le bulk `refresh_pub_counts` tourne dans le pipeline après que `in_perimeter` est posé (phase `authorships`). Les variantes scopées servent aux fusions admin (on ne recalcule que les lignes touchées). Tous idempotents (`IS DISTINCT FROM`).
