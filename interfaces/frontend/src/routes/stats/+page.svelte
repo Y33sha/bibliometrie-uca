@@ -218,7 +218,7 @@
 			years: { type: 'simple', apiKey: 'years' },
 			labs: { type: 'labeled', apiKey: 'labs' },
 			oa: { type: 'label_map', apiKey: 'oa_statuses', labels: oaLabelsMap },
-			apc: { type: 'passthrough', apiKey: 'apc' },
+			apc: { type: 'labeled', apiKey: 'apc' },
 			docTypes: { type: 'label_map', apiKey: 'doc_types', labels: docTypePlural },
 		},
 	});
