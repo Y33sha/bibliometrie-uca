@@ -5,7 +5,8 @@ Appelé par `application/pipeline/persons/populate_person_name_forms.py`. Collec
 Modèle de table cible : `(name_form, person_id, sources text[])` avec PK composite — pas de JSONB, pas d'`id` de row. La fusion par couple est faite en SQL (`array_agg DISTINCT`), pas en Python.
 """
 
-from sqlalchemy import Connection, text
+from sqlalchemy import Connection, bindparam, text
+from sqlalchemy.dialects.postgresql import JSONB
 
 from application.ports.pipeline.persons.name_forms import (
     PersonNameFormsQueries,
@@ -41,12 +42,16 @@ def create_temp_raw_forms_table(conn: Connection) -> None:
 
 
 def insert_raw_forms_batch(conn: Connection, rows: list[RawFormBatchItem]) -> None:
-    """Insert par batch dans la table temporaire `_raw_forms`."""
+    """Insert massif dans la table temporaire `_raw_forms`, en une requête via `jsonb_to_recordset`."""
     if not rows:
         return
     conn.execute(
-        text("INSERT INTO _raw_forms VALUES (:raw_text, :person_id, :source)"),
-        rows,
+        text("""
+            INSERT INTO _raw_forms (raw_text, person_id, source)
+            SELECT raw_text, person_id, source
+            FROM jsonb_to_recordset(:payload) AS t(raw_text text, person_id int, source text)
+        """).bindparams(bindparam("payload", type_=JSONB)),
+        {"payload": list(rows)},
     )
 
 
