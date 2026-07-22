@@ -18,16 +18,22 @@ from application.ports.pipeline.normalize.source_publications import (
     SourcePublicationRow,
 )
 from domain.publications.metadata import normalized_title
+from domain.types import JsonValue
 
-_ROW_FIELDS = tuple(f.name for f in fields(SourcePublicationRow))
+_FIELDS = fields(SourcePublicationRow)
 
 # Les colonnes écrites se dérivent des champs de la ligne, plus `title_normalized`
 # calculé à l'écriture : un champ ajouté à `SourcePublicationRow` est inséré et
 # réécrit sans autre geste, en phase avec le contrat.
+_ROW_FIELDS = tuple(f.name for f in _FIELDS)
 _COLUMNS = (*_ROW_FIELDS, "title_normalized")
 
 # Tout est réécrit sauf la clé de conflit, qui est justement ce qui identifie la ligne.
 _UPDATED_COLUMNS = tuple(c for c in _COLUMNS if c not in ("source", "source_id"))
+
+# Colonnes JSONB : les champs annotés `JsonValue` (les `list[str]` sont des `text[]`,
+# hors JSONB). Un champ JSONB ajouté au contrat est typé sans autre geste.
+_JSONB_COLUMNS = tuple(f.name for f in _FIELDS if f.type is JsonValue)
 
 _UPSERT_SQL = text(
     f"""
@@ -39,12 +45,7 @@ _UPSERT_SQL = text(
         updated_at = clock_timestamp()
     RETURNING id
     """  # noqa: S608 — listes de colonnes construites depuis le contrat, sans entrée externe
-).bindparams(
-    bindparam("external_ids", type_=JSONB),
-    bindparam("biblio", type_=JSONB),
-    bindparam("topics", type_=JSONB),
-    bindparam("meta", type_=JSONB),
-)
+).bindparams(*(bindparam(c, type_=JSONB) for c in _JSONB_COLUMNS))
 
 
 def upsert_source_publication(conn: Connection, row: SourcePublicationRow) -> int:
