@@ -10,7 +10,7 @@ from application.ports.pipeline.persons.matching import (
     LinkedAuthorshipRow,
     PersonsMatchingQueries,
 )
-from domain.persons.matching import IdentifiedPerson, PersonNameForms
+from domain.persons.matching import ORCID_MATCH_SOURCES, IdentifiedPerson, PersonNameForms
 
 
 def fetch_unlinked_authorships(conn: Connection) -> list[BareUnlinkedAuthorship]:
@@ -26,17 +26,8 @@ def fetch_unlinked_authorships(conn: Connection) -> list[BareUnlinkedAuthorship]
     Les lignes sans `raw_author_name` sont exclues toutes sources confondues (sans nom, l'authorship est inexploitable pour le matching personnes).
     """
     rows = conn.execute(
-        text("""
-            SELECT sa_auth.id AS authorship_id,
-                   sa_auth.source::text AS source,
-                   sa_auth.raw_author_name AS full_name,
-                   aik.author_name_normalized,
-                   aik.person_identifiers->>'orcid' AS orcid,
-                   aik.person_identifiers->>'hal_person_id' AS hal_person_id,
-                   aik.person_identifiers->>'idref' AS idref,
-                   sa_auth.roles,
-                   sd.publication_id,
-                   sa_auth.author_position,
+        text(f"""
+            SELECT {_BARE_PROJECTION_HEAD},
                    TRUE AS in_perimeter,
                    NULL::integer AS current_person_id
             FROM source_authorships sa_auth
@@ -71,7 +62,9 @@ def _to_bare(r: Row) -> BareUnlinkedAuthorship:
     )
 
 
-_OOP_PROJECTION = """
+# Colonnes communes des projections d'authorship non-liée (`BareUnlinkedAuthorship`).
+# Chaque requête y ajoute ses deux colonnes finales `in_perimeter` et `current_person_id`.
+_BARE_PROJECTION_HEAD = """
     sa_auth.id AS authorship_id,
     sa_auth.source::text AS source,
     sa_auth.raw_author_name AS full_name,
@@ -81,10 +74,11 @@ _OOP_PROJECTION = """
     aik.person_identifiers->>'idref' AS idref,
     sa_auth.roles,
     sd.publication_id,
-    sa_auth.author_position,
+    sa_auth.author_position"""
+
+_OOP_PROJECTION = f"""{_BARE_PROJECTION_HEAD},
     FALSE AS in_perimeter,
-    NULL::integer AS current_person_id
-"""
+    NULL::integer AS current_person_id"""
 
 # Conditions communes à toutes les branches : SA orpheline hors-périmètre,
 # rattachée à une publication active (les hors périmètre ne sont pas matérialisées), avec un nom.
@@ -136,14 +130,12 @@ _OOP_CROSS_SOURCE_BRANCH = f"""
       AND {_OOP_COMMON_WHERE}
 """
 
-# ORCID : restreint aux sources à ORCID déposé par l'auteur, à garder synchronisé
-# avec `ORCID_MATCH_SOURCES` du domaine (filtre de correction : l'ORCID WoS/ScanR
-# est dérivé algorithmiquement, pas un signal de matching).
+# ORCID : restreint aux sources à ORCID déposé par l'auteur (`ORCID_MATCH_SOURCES` du domaine,
+# passé en bind param `:orcid_sources`). L'ORCID WoS/ScanR est dérivé algorithmiquement, pas un
+# signal de matching.
 _OOP_CANDIDATES_SQL = " UNION ".join(
     [
-        _oop_identifier_branch(
-            "orcid", source_filter="AND sa_auth.source IN ('crossref', 'openalex', 'hal')"
-        ),
+        _oop_identifier_branch("orcid", source_filter="AND sa_auth.source = ANY(:orcid_sources)"),
         _oop_identifier_branch("idref"),
         _oop_identifier_branch("hal_person_id"),
         _OOP_CROSS_SOURCE_BRANCH,
@@ -158,7 +150,9 @@ def fetch_out_of_perimeter_candidates(conn: Connection) -> list[BareUnlinkedAuth
 
     Seules les signatures ancrées sur une personne existante (jointure identifiant) ou une position liée (cross-source) sont ramenées, jamais le pool mondial non-UCA. L'ensemble *rendu* décroît à chaque run (une fois rattachée, une signature sort de l'espace orphelin) ; le *coût* du fetch, lui, reste celui d'un scan de cet espace (cf. docstrings des branches) — acceptable (~minutes) en attendant la refonte ER set-based.
     """
-    rows = conn.execute(text(_OOP_CANDIDATES_SQL)).all()
+    rows = conn.execute(
+        text(_OOP_CANDIDATES_SQL), {"orcid_sources": list(ORCID_MATCH_SOURCES)}
+    ).all()
     return [_to_bare(r) for r in rows]
 
 
@@ -198,17 +192,8 @@ def fetch_cross_source_linked(conn: Connection) -> list[BareUnlinkedAuthorship]:
     Même projection que les non-liées, plus `current_person_id` = le `person_id` courant. Une signature cross-source peut porter un identifiant ou un nom qui matche une personne existante : la ré-évaluation passe par toute la cascade, d'où les colonnes d'identifiant.
     """
     rows = conn.execute(
-        text("""
-            SELECT sa_auth.id AS authorship_id,
-                   sa_auth.source::text AS source,
-                   sa_auth.raw_author_name AS full_name,
-                   aik.author_name_normalized,
-                   aik.person_identifiers->>'orcid' AS orcid,
-                   aik.person_identifiers->>'hal_person_id' AS hal_person_id,
-                   aik.person_identifiers->>'idref' AS idref,
-                   sa_auth.roles,
-                   sd.publication_id,
-                   sa_auth.author_position,
+        text(f"""
+            SELECT {_BARE_PROJECTION_HEAD},
                    sa_auth.in_perimeter,
                    sa_auth.person_id AS current_person_id
             FROM source_authorships sa_auth
@@ -304,7 +289,10 @@ def fetch_identifier_consensus(conn: Connection, id_type: str, values: list[str]
     """
     if not values:
         return {}
-    source_filter = "AND sa.source IN ('crossref', 'openalex', 'hal')" if id_type == "orcid" else ""
+    source_filter = "AND sa.source = ANY(:orcid_sources)" if id_type == "orcid" else ""
+    params: dict[str, object] = {"id_type": id_type, "values": list(values)}
+    if id_type == "orcid":
+        params["orcid_sources"] = list(ORCID_MATCH_SOURCES)
     rows = conn.execute(
         text(f"""
             SELECT DISTINCT ON (id_value) id_value, author_name_normalized
@@ -321,7 +309,7 @@ def fetch_identifier_consensus(conn: Connection, id_type: str, values: list[str]
             ) t
             ORDER BY id_value, n DESC, author_name_normalized
         """),
-        {"id_type": id_type, "values": list(values)},
+        params,
     ).all()
     return {r.id_value: r.author_name_normalized for r in rows}
 
