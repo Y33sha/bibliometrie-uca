@@ -2383,7 +2383,7 @@ export interface components {
             /** Countries */
             countries: string[] | null;
             /** Suggested Countries */
-            suggested_countries: components["schemas"]["CountrySuggestion"][];
+            suggested_countries: string[];
             /** Pub Count */
             pub_count: number;
         };
@@ -2402,8 +2402,11 @@ export interface components {
             per_page: number;
             /** Addresses */
             addresses: components["schemas"]["AddressOut"][];
-            /** Requires Search */
-            requires_search?: boolean | null;
+            /**
+             * Requires Search
+             * @default false
+             */
+            requires_search: boolean;
             /** Pages */
             readonly pages: number;
         };
@@ -2513,9 +2516,9 @@ export interface components {
             /** Addresses */
             addresses: components["schemas"]["AddressForCountryAttribution"][];
             /** Suggestion Facets */
-            suggestion_facets?: components["schemas"]["CountrySuggestion"][] | null;
+            suggestion_facets?: components["schemas"]["FacetOption"][] | null;
             /** Country Facets */
-            country_facets: components["schemas"]["CountrySuggestion"][];
+            country_facets: components["schemas"]["FacetOption"][];
             /** Pages */
             readonly pages: number;
         };
@@ -2758,13 +2761,6 @@ export interface components {
             code: string;
             /** Name */
             name: string;
-        };
-        /** CountrySuggestion */
-        CountrySuggestion: {
-            /** Code */
-            code: string;
-            /** Count */
-            count: number;
         };
         /** CreatePersonName */
         CreatePersonName: {

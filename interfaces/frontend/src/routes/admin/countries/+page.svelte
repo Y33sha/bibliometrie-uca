@@ -37,15 +37,15 @@
 	// Code du référentiel marquant l'absence de pays : la facette l'ouvre, c'est l'arbitrage
 	// le plus fréquent et le seul qui ne se cherche pas par son nom.
 	const NO_COUNTRY_CODE = 'xx';
-	let countryFacets: { code: string; count: number }[] = $state([]);
+	let countryFacets: { value: string; count: number }[] = $state([]);
 	const countryOptions = $derived.by(() => {
 		if (countryFacets.length > 0) {
-			const noCountry = countryFacets.find(f => f.code === NO_COUNTRY_CODE);
-			const rest = countryFacets.filter(f => f.code !== NO_COUNTRY_CODE);
+			const noCountry = countryFacets.find(f => f.value === NO_COUNTRY_CODE);
+			const rest = countryFacets.filter(f => f.value !== NO_COUNTRY_CODE);
 			const sorted = [...(noCountry ? [noCountry] : []), ...rest];
 			return sorted.map(f => ({
-				value: f.code,
-				text: `${countryMap[f.code] || f.code.toUpperCase()} (${f.code.toUpperCase()})`,
+				value: f.value,
+				text: `${countryMap[f.value] || f.value.toUpperCase()} (${f.value.toUpperCase()})`,
 				count: f.count
 			}));
 		}
@@ -65,7 +65,7 @@
 		if (selectedCountry.length === 1) params.set('country_code', selectedCountry[0]);
 		if (suggestMode) params.set('suggest', 'true');
 		if (selectedSugCountry.length === 1) params.set('suggested_country', selectedSugCountry[0]);
-		const data = await api<{ total: number; page: number; pages: number; addresses: Address[]; suggestion_facets?: { code: string; count: number }[]; country_facets?: { code: string; count: number }[] }>(
+		const data = await api<{ total: number; page: number; pages: number; addresses: Address[]; suggestion_facets?: { value: string; count: number }[]; country_facets?: { value: string; count: number }[] }>(
 			'/api/addresses/countries?' + params, { key: 'countries-addr-list' }
 		);
 		addresses = data.addresses;
@@ -77,8 +77,8 @@
 		}
 		if (data.suggestion_facets) {
 			sugFacetOptions = data.suggestion_facets.map(f => ({
-				value: f.code,
-				text: countryLabel(f.code),
+				value: f.value,
+				text: countryLabel(f.value),
 				count: f.count,
 			}));
 		}
@@ -293,9 +293,8 @@
 						{/each}
 					{:else if suggestMode && a.suggested_countries && a.suggested_countries.length > 0}
 						{#each a.suggested_countries as s}
-							<button class="sug-tag" onclick={() => acceptSuggestion(a.id, s.code)}
-								title="{s.count} adresse{s.count > 1 ? 's' : ''} similaire{s.count > 1 ? 's' : ''} avec ce pays">
-								{countryLabel(s.code)} ?
+							<button class="sug-tag" onclick={() => acceptSuggestion(a.id, s)}>
+								{countryLabel(s)} ?
 							</button>
 						{/each}
 					{/if}
