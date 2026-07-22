@@ -339,8 +339,9 @@ class TestGetStructureLink:
         _link_addr_struct(sa_sync_conn, addr, struct, is_confirmed=True)
 
         link = _q(sa_sync_conn).get_structure_link(addr, struct)
-        assert link["is_confirmed"] is True
-        assert link["is_detected"] is False
+        assert link is not None
+        assert link.is_confirmed is True
+        assert link.is_detected is False
 
     def test_returns_none_when_no_link(self, sa_sync_conn):
         struct = _create_structure(sa_sync_conn)
