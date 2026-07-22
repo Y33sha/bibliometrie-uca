@@ -359,3 +359,63 @@ class PublicationsQueries(Protocol):
     def export_theses_csv(self, *, filters: PublicationFilters, sort: PublicationSort) -> str: ...
 
     def get_publication_detail(self, pub_id: int) -> PublicationDetailResponse | None: ...
+
+
+# ── Doublons (page admin de déduplication) ──────────────────────────
+# Contrat distinct de `PublicationsQueries` (ségrégation d'interface) : la page de
+# dédoublonnage est un usage admin à part, servi par le même routeur publications.
+
+
+class DuplicateJournal(BaseModel):
+    id: int
+    title: str | None
+    issn: str | None
+    eissn: str | None
+
+
+class DuplicateSource(BaseModel):
+    source: str
+    source_id: str
+
+
+class DuplicateAuthor(BaseModel):
+    author_position: int | None
+    in_perimeter: bool
+    person_id: int | None
+    last_name: str | None
+    first_name: str | None
+    full_name: str | None
+
+
+class DuplicatePublicationDetail(BaseModel):
+    """Détail d'une publication pour la page de déduplication."""
+
+    id: int
+    title: str
+    title_normalized: str
+    doi: str | None
+    pub_year: int | None
+    doc_type: str
+    container_title: str | None
+    oa_status: str
+    language: str | None
+    journal: DuplicateJournal | None
+    sources: list[DuplicateSource]
+    authors: list[DuplicateAuthor]
+
+
+class DuplicatePair(BaseModel):
+    pub_a: DuplicatePublicationDetail
+    pub_b: DuplicatePublicationDetail
+
+
+class DuplicatePairResponse(BaseModel):
+    total: int
+    offset: int
+    pair: DuplicatePair | None
+
+
+class PublicationDuplicatesQueries(Protocol):
+    """Lectures pour le dédoublonnage des publications (page admin `/api/publications/duplicates/*`)."""
+
+    def next_pub_duplicate(self, *, min_title_len: int, offset: int) -> DuplicatePairResponse: ...
