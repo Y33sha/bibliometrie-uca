@@ -1,9 +1,6 @@
 """Types Pydantic transverses retournés par plusieurs ports `application.ports.api.*`.
 
-Vit ici (et pas dans `interfaces/api/models/_common.py`) parce que ces shapes
-sont des retours de query services partagés entre features (labs + persons +
-publications). Les ports les importent directement ; `interfaces/api/models/`
-ne contient que les types router-only (`OkResponse`, `MergeRequest`, etc.).
+Vit ici (et pas dans `interfaces/api/models/_common.py`) parce que ces shapes sont des retours de query services partagés entre features (labs + persons + publications). Les ports les importent directement ; `interfaces/api/models/` ne contient que les types router-only (`OkResponse`, `MergeRequest`, etc.).
 """
 
 import math
