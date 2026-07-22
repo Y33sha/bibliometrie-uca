@@ -1,6 +1,6 @@
 """Types Pydantic transverses retournés par plusieurs ports `application.ports.api.*`.
 
-Vit ici (et pas dans `interfaces/api/models/_common.py`) parce que ces shapes sont des retours de query services partagés entre features (labs + persons + publications). Les ports les importent directement ; `interfaces/api/models/` ne contient que les types router-only (`OkResponse`, `MergeRequest`, etc.).
+Vit ici (et pas dans `interfaces/api/models/_common.py`) parce que ces shapes sont des retours de query services partagés entre plusieurs ports (persons, publications, structures). Les ports les importent directement ; `interfaces/api/models/` ne contient que les types router-only (`OkResponse`, `MergeRequest`, etc.).
 """
 
 import math
@@ -29,8 +29,14 @@ class PaginatedResponse(BaseModel):
         return page_count(self.total, self.per_page)
 
 
-class FacetValueCount(BaseModel):
+class FacetOption(BaseModel):
+    """Option d'une facette de liste : la valeur filtrable, son libellé d'affichage, le décompte.
+
+    `label` vaut `None` quand la valeur s'affiche telle quelle (année, statut) ou que le libellé est résolu côté client ; il porte le texte présentable quand seule la requête le connaît (nom de laboratoire, intitulé traduit).
+    """
+
     value: str
+    label: str | None = None
     count: int
 
 
@@ -61,7 +67,7 @@ class DashboardOa(BaseModel):
 
 __all__ = [
     "DashboardOa",
-    "FacetValueCount",
+    "FacetOption",
     "PaginatedResponse",
     "PubYearCount",
     "page_count",

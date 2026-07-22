@@ -13,7 +13,7 @@ from pydantic import BaseModel
 
 from application.ports.api._common import (
     DashboardOa,
-    FacetValueCount,
+    FacetOption,
     PaginatedResponse,
     PubYearCount,
     StructureRef,
@@ -142,8 +142,8 @@ class PersonListResponse(PaginatedResponse):
 class PersonsFacetsResponse(BaseModel):
     """Réponse de `/api/persons/facets`."""
 
-    departments: list[FacetValueCount]
-    roles: list[FacetValueCount]
+    departments: list[FacetOption]
+    roles: list[FacetOption]
     orcid: YesNoCount
     idhal: YesNoCount
     idref: YesNoCount

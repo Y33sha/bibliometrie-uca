@@ -9,7 +9,7 @@ from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel
 
-from application.ports.api._common import PaginatedResponse
+from application.ports.api._common import FacetOption, PaginatedResponse
 from application.ports.api.subjects_queries import SubjectFrequency
 from domain.journals.journal import JournalType, OaModel
 
@@ -95,28 +95,15 @@ class OaStatusCount(BaseModel):
     expected: bool
 
 
-class JournalsFacetOption(BaseModel):
-    """Option d'une facette de la liste des revues : valeur, libellé français et compte.
-
-    `label` reprend `JOURNAL_TYPE_LABELS_FR` ou `OA_MODEL_LABELS_FR` selon la dimension ; la facette DOAJ expose `Indexée` / `Non indexée`. Le champ se nomme `label` et non `label_fr` pour le composable `useFacets` du frontend, convention partagée avec les facettes des publications.
-
-    `count` est le nombre de revues atteignables si cette seule option était cochée, les autres filtres actifs restant appliqués.
-    """
-
-    value: str
-    label: str
-    count: int
-
-
 class JournalsFacetsResponse(BaseModel):
     """Facettes de `/api/journals` sur trois dimensions.
 
-    Chaque dimension écarte son propre filtre de la condition WHERE, de sorte que son décompte annonce le nombre de revues atteignables si l'option était cochée ou décochée.
+    Chaque dimension écarte son propre filtre de la condition WHERE, de sorte que son décompte annonce le nombre de revues atteignables si l'option était cochée ou décochée. `label` reprend `JOURNAL_TYPE_LABELS_FR` ou `OA_MODEL_LABELS_FR` selon la dimension ; la facette DOAJ expose `Indexée` / `Non indexée`.
     """
 
-    journal_types: list[JournalsFacetOption]
-    oa_models: list[JournalsFacetOption]
-    doaj: list[JournalsFacetOption]
+    journal_types: list[FacetOption]
+    oa_models: list[FacetOption]
+    doaj: list[FacetOption]
 
 
 class JournalDashboardResponse(BaseModel):

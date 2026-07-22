@@ -4,6 +4,7 @@ from typing import Any
 
 from sqlalchemy import Connection, text
 
+from application.ports.api._common import FacetOption
 from application.ports.api.journals_queries import (
     DocTypeCount,
     JournalDashboardResponse,
@@ -12,7 +13,6 @@ from application.ports.api.journals_queries import (
     JournalListResponse,
     JournalOut,
     JournalQueries,
-    JournalsFacetOption,
     JournalsFacetsResponse,
     JournalSort,
     OaStatusCount,
@@ -168,7 +168,7 @@ class PgJournalQueries(JournalQueries):
         jt_counts = {r.value: r.n for r in jt_rows}
         # On expose toutes les options de l'enum (count=0 si pas observé) — UX cohérente avec les facettes publications qui montrent les options connues, pas seulement celles présentes.
         journal_types_facet = [
-            JournalsFacetOption(
+            FacetOption(
                 value=v,
                 label=JOURNAL_TYPE_LABELS_FR[v],
                 count=jt_counts.get(v, 0),
@@ -188,7 +188,7 @@ class PgJournalQueries(JournalQueries):
         ).all()
         oa_counts = {r.value: r.n for r in oa_rows}
         oa_models_facet = [
-            JournalsFacetOption(
+            FacetOption(
                 value=v,
                 label=OA_MODEL_LABELS_FR[v],
                 count=oa_counts.get(v, 0),
@@ -208,10 +208,8 @@ class PgJournalQueries(JournalQueries):
         ).all()
         doaj_counts = {bool(r.value): r.n for r in doaj_rows}
         doaj_facet = [
-            JournalsFacetOption(value="true", label="Indexée", count=doaj_counts.get(True, 0)),
-            JournalsFacetOption(
-                value="false", label="Non indexée", count=doaj_counts.get(False, 0)
-            ),
+            FacetOption(value="true", label="Indexée", count=doaj_counts.get(True, 0)),
+            FacetOption(value="false", label="Non indexée", count=doaj_counts.get(False, 0)),
         ]
 
         return JournalsFacetsResponse(

@@ -119,7 +119,7 @@ class _PublicationFacetsBuilder:
         where_sql, binds = self._clauses_skipping("year")
         rows = self.conn.execute(
             text(f"""
-                SELECT p.pub_year AS value, COUNT(*) AS count
+                SELECT p.pub_year::text AS value, COUNT(*) AS count
                 FROM publications p
                 WHERE {where_sql} AND p.pub_year IS NOT NULL
                 GROUP BY p.pub_year ORDER BY p.pub_year DESC
@@ -133,7 +133,7 @@ class _PublicationFacetsBuilder:
         # `publication_structures` (matview publi↔structure dédoublonnée) → COUNT(*) par structure, sans jointure authorships ni DISTINCT/tri (cf. migration d8b3f5a2c9e6). `where_sql` ne porte que sur `p` (publications).
         labs_rows = self.conn.execute(
             text(f"""
-                SELECT s.id AS value, COALESCE(s.acronym, s.name) AS label,
+                SELECT s.id::text AS value, COALESCE(s.acronym, s.name) AS label,
                        COUNT(*) AS count
                 FROM publication_structures ps
                 JOIN publications p ON p.id = ps.publication_id
@@ -192,9 +192,9 @@ class _PublicationFacetsBuilder:
             binds,
         ).one()
         return [
-            {"value": "open", "text": "Ouvert", "count": r.open_count},
-            {"value": "embargo", "text": "Sous embargo", "count": r.embargo_count},
-            {"value": "closed", "text": "Fermé", "count": r.closed_count},
+            {"value": "open", "label": "Ouvert", "count": r.open_count},
+            {"value": "embargo", "label": "Sous embargo", "count": r.embargo_count},
+            {"value": "closed", "label": "Fermé", "count": r.closed_count},
         ]
 
     def _facet_oa_statuses(self) -> list[dict[str, Any]]:
@@ -317,10 +317,10 @@ class _PublicationFacetsBuilder:
         ).one_or_none()
         lab_label = label_row.label if label_row else "ce labo"
         return [
-            {"value": "this_lab", "text": f"APC — {lab_label}", "count": r.apc_this_lab},
-            {"value": "other_uca", "text": "APC — autres UCA", "count": r.apc_other_uca},
-            {"value": "non_uca", "text": "APC hors UCA", "count": r.apc_non_uca},
-            {"value": "none", "text": "Sans APC", "count": r.apc_none},
+            {"value": "this_lab", "label": f"APC — {lab_label}", "count": r.apc_this_lab},
+            {"value": "other_uca", "label": "APC — autres UCA", "count": r.apc_other_uca},
+            {"value": "non_uca", "label": "APC hors UCA", "count": r.apc_non_uca},
+            {"value": "none", "label": "Sans APC", "count": r.apc_none},
         ]
 
     def _facet_apc_without_lab(self, where: str, binds: dict[str, Any]) -> list[dict[str, Any]]:
@@ -348,9 +348,9 @@ class _PublicationFacetsBuilder:
             {**binds, "apc_facet_root_ids": self.perimeter_structure_ids},
         ).one()
         return [
-            {"value": "uca", "text": "APC — UCA", "count": r.apc_uca},
-            {"value": "other", "text": "APC — autres", "count": r.apc_other},
-            {"value": "none", "text": "Sans APC", "count": r.apc_none},
+            {"value": "uca", "label": "APC — UCA", "count": r.apc_uca},
+            {"value": "other", "label": "APC — autres", "count": r.apc_other},
+            {"value": "none", "label": "Sans APC", "count": r.apc_none},
         ]
 
     def _facet_countries(self) -> list[dict[str, Any]]:
@@ -370,7 +370,7 @@ class _PublicationFacetsBuilder:
             binds,
         ).all()
         return [
-            {"value": r.code.strip(), "text": r.name, "count": r.count}
+            {"value": r.code.strip(), "label": r.name, "count": r.count}
             for r in rows
             if r.code.strip() != NO_COUNTRY_CODE
         ]
@@ -435,10 +435,10 @@ class _PublicationFacetsBuilder:
                 binds,
             ).one()
         return [
-            {"value": "ok", "text": "OK", "count": r.ok},
-            {"value": "notice", "text": "Notice", "count": r.notice},
-            {"value": "hors_collection", "text": "Hors collection", "count": r.hors_collection},
-            {"value": "hors_hal", "text": "Hors HAL", "count": r.hors_hal},
+            {"value": "ok", "label": "OK", "count": r.ok},
+            {"value": "notice", "label": "Notice", "count": r.notice},
+            {"value": "hors_collection", "label": "Hors collection", "count": r.hors_collection},
+            {"value": "hors_hal", "label": "Hors HAL", "count": r.hors_hal},
         ]
 
     def _facet_in_perimeter(self) -> list[dict[str, Any]]:
@@ -464,8 +464,8 @@ class _PublicationFacetsBuilder:
             {**binds, "inp_pid": self.filters.person_id},
         ).one()
         return [
-            {"value": "yes", "text": "UCA", "count": r.yes},
-            {"value": "no", "text": "Hors périmètre", "count": r.no},
+            {"value": "yes", "label": "UCA", "count": r.yes},
+            {"value": "no", "label": "Hors périmètre", "count": r.no},
         ]
 
 
