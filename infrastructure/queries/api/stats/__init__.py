@@ -12,11 +12,11 @@ Le package est organisé par thème d'agrégat :
 
 from sqlalchemy import Connection
 
-from application.ports.api._common import FacetOption
-from application.ports.api.entity_facet import (
+from application.ports.api._common import (
     EntityFacetItem,
     EntityFacetResponse,
     EntityKind,
+    FacetOption,
 )
 from application.ports.api.stats_queries import (
     CollaborationsResponse,

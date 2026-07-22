@@ -4,6 +4,7 @@ Vit ici (et pas dans `interfaces/api/models/_common.py`) parce que ces shapes so
 """
 
 import math
+from typing import Literal
 
 from pydantic import BaseModel, Field, computed_field
 
@@ -40,6 +41,24 @@ class FacetOption(BaseModel):
     count: int
 
 
+EntityKind = Literal["publisher", "journal"]
+
+
+class EntityFacetItem(BaseModel):
+    id: int
+    label: str
+    count: int
+
+
+class EntityFacetResponse(BaseModel):
+    """Facette d'entité à forte cardinalité (éditeur, revue).
+
+    Les options sont calculées côté serveur sous les filtres actifs du contexte (tableau de bord ou liste de publications), d'où des décomptes contextuels et une corrélation entre entités (une revue sélectionnée restreint les éditeurs proposés). La recherche par nom borne la requête.
+    """
+
+    entities: list[EntityFacetItem]
+
+
 class YesNoCount(BaseModel):
     yes: int
     no: int
@@ -67,6 +86,9 @@ class DashboardOa(BaseModel):
 
 __all__ = [
     "DashboardOa",
+    "EntityFacetItem",
+    "EntityFacetResponse",
+    "EntityKind",
     "FacetOption",
     "PaginatedResponse",
     "PubYearCount",

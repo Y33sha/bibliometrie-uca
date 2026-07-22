@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from sqlalchemy import Connection
 
-from application.ports.api.entity_facet import (
+from application.ports.api._common import (
     EntityFacetItem,
     EntityFacetResponse,
     EntityKind,

@@ -11,7 +11,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import Connection
 
-from application.ports.api.entity_facet import EntityFacetResponse, EntityKind
+from application.ports.api._common import EntityFacetResponse, EntityKind
 from application.ports.api.publications_queries import (
     DuplicatePairResponse,
     PublicationDetailResponse,
