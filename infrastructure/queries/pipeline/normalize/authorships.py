@@ -216,15 +216,12 @@ def apply_address_suggested_countries_batch(
     """Écrit sur `addresses.suggested_countries` une suggestion de pays, uniquement sur les adresses sans pays confirmé ni suggestion déjà posée (jamais d'écrasement)."""
     if not values:
         return
-    conn.execute(
-        text("""
-            UPDATE addresses SET suggested_countries = :countries
-            WHERE id = :addr_id
-              AND countries IS NULL
-              AND suggested_countries IS NULL
-        """),
-        values,
-    )
+    stmt = text("""
+        UPDATE addresses a SET suggested_countries = t.countries::character(2)[]
+        FROM jsonb_to_recordset(:payload) AS t(addr_id integer, countries text[])
+        WHERE a.id = t.addr_id AND a.countries IS NULL AND a.suggested_countries IS NULL
+    """).bindparams(bindparam("payload", type_=JSONB))
+    conn.execute(stmt, {"payload": list(values)})
 
 
 def insert_source_authorship_addresses_batch(
