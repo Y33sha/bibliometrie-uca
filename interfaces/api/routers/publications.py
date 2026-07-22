@@ -12,12 +12,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import Connection
 
 from application.ports.api.entity_facet import EntityFacetResponse, EntityKind
-from application.ports.api.publication_duplicates_queries import (
-    PubDuplicateNextResponse,
-    PublicationDuplicatesQueries,
-)
 from application.ports.api.publications_queries import (
+    DuplicatePairResponse,
     PublicationDetailResponse,
+    PublicationDuplicatesQueries,
     PublicationFilters,
     PublicationListResponse,
     PublicationsFacetsResponse,
@@ -99,9 +97,7 @@ class PublicationFilterParams:
             person_id=self.person_id,
             subject_id=self.subject_id,
             access=parse_vocabulary_csv(self.access, allowed=ACCESS_LEVELS, param="access"),
-            oa_status=parse_vocabulary_csv(
-                self.oa_status, allowed=OA_STATUSES, param="oa_status"
-            ),
+            oa_status=parse_vocabulary_csv(self.oa_status, allowed=OA_STATUSES, param="oa_status"),
             source_values=parse_str_csv(self.source_filter),
             doc_types=parse_vocabulary_csv(self.doc_type, allowed=DOC_TYPES, param="doc_type"),
             excluded_types=parse_vocabulary_csv(
@@ -204,12 +200,12 @@ def export_theses_csv(
     )
 
 
-@router.get("/duplicates/next", response_model=PubDuplicateNextResponse)
+@router.get("/duplicates/next", response_model=DuplicatePairResponse)
 def next_duplicate_candidate(
     min_title_len: int = Query(30, ge=10),
     offset: int = Query(0, ge=0),
     queries: PublicationDuplicatesQueries = Depends(publication_duplicates_queries),
-) -> PubDuplicateNextResponse:
+) -> DuplicatePairResponse:
     """Paire de publications candidate au dédoublonnage, à l'offset donné.
 
     Les candidats viennent de la requête `next_pub_duplicate`, qui rapproche les titres semblables, les années de publication voisines et les DOI convergents. `min_title_len` écarte les titres trop courts pour discriminer. L'offset laisse l'interface avancer paire par paire.

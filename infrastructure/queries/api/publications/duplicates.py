@@ -2,13 +2,13 @@
 
 from sqlalchemy import Connection, text
 
-from application.ports.api.publication_duplicates_queries import (
-    PubDedupAuthor,
-    PubDedupDetail,
-    PubDedupJournal,
-    PubDedupSource,
-    PubDuplicateNextResponse,
-    PubDuplicatePair,
+from application.ports.api.publications_queries import (
+    DuplicateAuthor,
+    DuplicateJournal,
+    DuplicatePair,
+    DuplicatePairResponse,
+    DuplicatePublicationDetail,
+    DuplicateSource,
     PublicationDuplicatesQueries,
 )
 
@@ -41,7 +41,7 @@ class PgPublicationDuplicatesQueries(PublicationDuplicatesQueries):
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
 
-    def _get_pub_detail(self, pub_id: int) -> PubDedupDetail | None:
+    def _get_pub_detail(self, pub_id: int) -> DuplicatePublicationDetail | None:
         pub_row = self._conn.execute(
             text("""
                 SELECT p.id, p.title, p.title_normalized, p.doi, p.pub_year,
@@ -62,7 +62,7 @@ class PgPublicationDuplicatesQueries(PublicationDuplicatesQueries):
             text("SELECT source, source_id FROM source_publications WHERE publication_id = :pid"),
             {"pid": pub_id},
         ).all()
-        sources = [PubDedupSource(source=r.source, source_id=r.source_id) for r in src_rows]
+        sources = [DuplicateSource(source=r.source, source_id=r.source_id) for r in src_rows]
 
         auth_rows = self._conn.execute(
             text("""
@@ -86,7 +86,7 @@ class PgPublicationDuplicatesQueries(PublicationDuplicatesQueries):
             {"pid": pub_id},
         ).all()
         authors = [
-            PubDedupAuthor(
+            DuplicateAuthor(
                 author_position=r.author_position,
                 in_perimeter=r.in_perimeter,
                 person_id=r.person_id,
@@ -98,7 +98,7 @@ class PgPublicationDuplicatesQueries(PublicationDuplicatesQueries):
         ]
 
         journal = (
-            PubDedupJournal(
+            DuplicateJournal(
                 id=pub_row.journal_id,
                 title=pub_row.journal_title,
                 issn=pub_row.issn,
@@ -108,7 +108,7 @@ class PgPublicationDuplicatesQueries(PublicationDuplicatesQueries):
             else None
         )
 
-        return PubDedupDetail(
+        return DuplicatePublicationDetail(
             id=pub_row.id,
             title=pub_row.title,
             title_normalized=pub_row.title_normalized,
@@ -123,7 +123,7 @@ class PgPublicationDuplicatesQueries(PublicationDuplicatesQueries):
             authors=authors,
         )
 
-    def next_pub_duplicate(self, *, min_title_len: int, offset: int) -> PubDuplicateNextResponse:
+    def next_pub_duplicate(self, *, min_title_len: int, offset: int) -> DuplicatePairResponse:
         total_row = self._conn.execute(
             text(f"SELECT COUNT(*) AS total FROM (SELECT p1.id {_PUB_CANDIDATE_WHERE}) sub"),
             {"min_title_len": min_title_len},
@@ -138,13 +138,13 @@ class PgPublicationDuplicatesQueries(PublicationDuplicatesQueries):
             {"min_title_len": min_title_len, "pg_offset": offset},
         ).one_or_none()
         if not pair_row:
-            return PubDuplicateNextResponse(total=total, offset=offset, pair=None)
+            return DuplicatePairResponse(total=total, offset=offset, pair=None)
 
         pub_a = self._get_pub_detail(pair_row.id_a)
         pub_b = self._get_pub_detail(pair_row.id_b)
         pair = (
-            PubDuplicatePair(pub_a=pub_a, pub_b=pub_b)
+            DuplicatePair(pub_a=pub_a, pub_b=pub_b)
             if pub_a is not None and pub_b is not None
             else None
         )
-        return PubDuplicateNextResponse(total=total, offset=offset, pair=pair)
+        return DuplicatePairResponse(total=total, offset=offset, pair=pair)
