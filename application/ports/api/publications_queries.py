@@ -2,7 +2,7 @@
 
 Implémenté par `infrastructure.queries.api.publications.PgPublicationsQueries`. Les modèles Pydantic que ces lectures rendent sont co-localisés avec le `Protocol` : leur contrat appartient au port.
 
-Les dataclasses `PublicationFilters` et `PublicationFilters` font ici référence ; l'infrastructure les importe pour typer ses signatures (règle 3 de `docs/architecture/01-vue-d-ensemble.md`).
+La dataclass `PublicationFilters` fait ici référence ; l'infrastructure l'importe pour typer ses signatures (règle 3 de `docs/architecture/01-vue-d-ensemble.md`).
 """
 
 from dataclasses import dataclass, field
@@ -11,6 +11,8 @@ from typing import Literal, Protocol
 from pydantic import BaseModel, ConfigDict
 
 from application.ports.api._common import PaginatedResponse, YesNoCount
+from application.ports.api.entity_facet import EntityFacetResponse, EntityKind
+from application.ports.api.subjects_queries import SubjectOut
 
 # Vocabulaire de tri des listes de publications, thèses comprises : le champ, puis le sens.
 PublicationSort = Literal[
@@ -23,8 +25,6 @@ PublicationSort = Literal[
     "soutenance_asc",
     "soutenance_desc",
 ]
-from application.ports.api.entity_facet import EntityFacetResponse, EntityKind
-from application.ports.api.subjects_queries import SubjectOut
 
 
 @dataclass(frozen=True, slots=True)
@@ -140,10 +140,7 @@ class TextStrFacet(BaseModel):
 class PublicationsFacetsResponse(BaseModel):
     """Facettes dynamiques pour la page publications.
 
-    Chaque facette exclut son propre filtre mais applique tous les
-    autres. `hal_status` est vide tant qu'un labo unique n'est pas
-    sélectionné. `corresponding`, `in_perimeter` sont vides sans
-    `person_id`.
+    Chaque facette exclut son propre filtre mais applique tous les autres. `hal_status` est vide tant qu'un labo unique n'est pas sélectionné. `corresponding`, `in_perimeter` sont vides sans `person_id`.
     """
 
     years: list[IntValueFacet]
@@ -294,10 +291,7 @@ class StructureInfo(BaseModel):
 class RelatedPublicationOut(BaseModel):
     """Une publication apparentée, vue depuis la publication courante.
 
-    `relation_type` est exprimé du point de vue de la publication courante (les relations entrantes
-    sont inversées). `publication_id`/`title`/`pub_year`/`doc_type` sont renseignés quand la cible
-    est au corpus ; le `doi` peut être absent (cible au corpus sans DOI), auquel cas la cible se lie
-    par son `publication_id` ; une cible hors corpus n'a, elle, que son `doi`."""
+    `relation_type` est exprimé du point de vue de la publication courante (les relations entrantes sont inversées). `publication_id`/`title`/`pub_year`/`doc_type` sont renseignés quand la cible est au corpus ; le `doi` peut être absent (cible au corpus sans DOI), auquel cas la cible se lie par son `publication_id` ; une cible hors corpus n'a, elle, que son `doi`."""
 
     relation_type: str
     doi: str | None = None
@@ -330,7 +324,7 @@ class PublicationDetailResponse(BaseModel):
 class PublicationsQueries(Protocol):
     """Lectures sync pour /api/publications/*.
 
-    Le filtre `has_apc` de `PublicationFilters` / `PublicationFilters` s'appuie sur le périmètre des structures internes, que l'implémentation résout elle-même.
+    Le filtre `has_apc` de `PublicationFilters` s'appuie sur le périmètre des structures internes, que l'implémentation résout elle-même.
     """
 
     def list_publications(
