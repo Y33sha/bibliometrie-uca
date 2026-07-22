@@ -9,8 +9,8 @@
   import SourceTag from "$lib/components/SourceTag.svelte";
 
   import type { components } from "$lib/api/schema";
-  type PubDetail = components["schemas"]["PubDedupDetail"];
-  type NextResponse = components["schemas"]["PubDuplicateNextResponse"];
+  type PubDetail = components["schemas"]["DuplicatePublicationDetail"];
+  type NextResponse = components["schemas"]["DuplicatePairResponse"];
 
   // Restore state from URL
   const params = new URLSearchParams($page.url.search);

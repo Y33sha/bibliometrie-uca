@@ -2567,18 +2567,6 @@ export interface components {
             /** Raw Author Name */
             raw_author_name: string;
         };
-        /** ApcFacet */
-        ApcFacet: {
-            /**
-             * Value
-             * @enum {string}
-             */
-            value: "uca" | "non_uca" | "none";
-            /** Text */
-            text: string;
-            /** Count */
-            count: number;
-        };
         /**
          * AssignOrphanAuthorship
          * @description Attribution unitaire, seule à savoir créer la personne au passage.
@@ -2691,8 +2679,7 @@ export interface components {
          * CollaborationsResponse
          * @description Collaborations internationales ventilées par pays étranger (source `publications.countries`).
          *
-         *     `international_count` = publications avec au moins un pays étranger ; `total_count` = corpus filtré.
-         *     Leur rapport donne la part de publications en collaboration internationale.
+         *     `international_count` = publications avec au moins un pays étranger ; `total_count` = corpus filtré. Leur rapport donne la part de publications en collaboration internationale.
          */
         CollaborationsResponse: {
             /** Rows */
@@ -2754,8 +2741,7 @@ export interface components {
         };
         /**
          * CountryCollaboration
-         * @description Décompte de collaborations pour un pays : code ISO 3166-1 alpha-2 (minuscule) et nombre de
-         *     publications co-affiliées à ce pays.
+         * @description Décompte de collaborations pour un pays : code ISO 3166-1 alpha-2 (minuscule) et nombre de publications co-affiliées à ce pays.
          */
         CountryCollaboration: {
             /** Code */
@@ -2871,13 +2857,6 @@ export interface components {
             /** Pages */
             readonly pages: number;
         };
-        /** DocTypeFacet */
-        DocTypeFacet: {
-            /** Value */
-            value: string;
-            /** Count */
-            count: number;
-        };
         /**
          * DoiPrefixInfo
          * @description Préfixe DOI rattaché à un éditeur (lecture seule, vient de la table `doi_prefixes`).
@@ -2889,6 +2868,81 @@ export interface components {
             ra: string;
             /** Crossref Member Id */
             crossref_member_id?: number | null;
+        };
+        /** DuplicateAuthor */
+        DuplicateAuthor: {
+            /** Author Position */
+            author_position: number | null;
+            /** In Perimeter */
+            in_perimeter: boolean;
+            /** Person Id */
+            person_id: number | null;
+            /** Last Name */
+            last_name: string | null;
+            /** First Name */
+            first_name: string | null;
+            /** Full Name */
+            full_name: string | null;
+        };
+        /** DuplicateJournal */
+        DuplicateJournal: {
+            /** Id */
+            id: number;
+            /** Title */
+            title: string | null;
+            /** Issn */
+            issn: string | null;
+            /** Eissn */
+            eissn: string | null;
+        };
+        /** DuplicatePair */
+        DuplicatePair: {
+            pub_a: components["schemas"]["DuplicatePublicationDetail"];
+            pub_b: components["schemas"]["DuplicatePublicationDetail"];
+        };
+        /** DuplicatePairResponse */
+        DuplicatePairResponse: {
+            /** Total */
+            total: number;
+            /** Offset */
+            offset: number;
+            pair: components["schemas"]["DuplicatePair"] | null;
+        };
+        /**
+         * DuplicatePublicationDetail
+         * @description Détail d'une publication pour la page de déduplication.
+         */
+        DuplicatePublicationDetail: {
+            /** Id */
+            id: number;
+            /** Title */
+            title: string;
+            /** Title Normalized */
+            title_normalized: string;
+            /** Doi */
+            doi: string | null;
+            /** Pub Year */
+            pub_year: number | null;
+            /** Doc Type */
+            doc_type: string;
+            /** Container Title */
+            container_title: string | null;
+            /** Oa Status */
+            oa_status: string;
+            /** Language */
+            language: string | null;
+            journal: components["schemas"]["DuplicateJournal"] | null;
+            /** Sources */
+            sources: components["schemas"]["DuplicateSource"][];
+            /** Authors */
+            authors: components["schemas"]["DuplicateAuthor"][];
+        };
+        /** DuplicateSource */
+        DuplicateSource: {
+            /** Source */
+            source: string;
+            /** Source Id */
+            source_id: string;
         };
         /**
          * EcoleDoctorale
@@ -2923,8 +2977,7 @@ export interface components {
         };
         /**
          * EntityLabelResponse
-         * @description Libellé d'une entité résolu par id (None si l'id est inconnu). Réaffiche une pastille de
-         *     facette restaurée depuis l'URL, où seul l'id — l'état canonique — est transporté.
+         * @description Libellé d'une entité résolu par id (None si l'id est inconnu). Réaffiche une pastille de facette restaurée depuis l'URL, où seul l'id — l'état canonique — est transporté.
          */
         EntityLabelResponse: {
             /** Label */
@@ -2952,10 +3005,17 @@ export interface components {
             /** Value */
             value: string;
         };
-        /** FacetValueCount */
-        FacetValueCount: {
+        /**
+         * FacetOption
+         * @description Option d'une facette de liste : la valeur filtrable, son libellé d'affichage, le décompte.
+         *
+         *     `label` vaut `None` quand la valeur s'affiche telle quelle (année, statut) ou que le libellé est résolu côté client ; il porte le texte présentable quand seule la requête le connaît (nom de laboratoire, intitulé traduit).
+         */
+        FacetOption: {
             /** Value */
             value: string;
+            /** Label */
+            label?: string | null;
             /** Count */
             count: number;
         };
@@ -3224,8 +3284,7 @@ export interface components {
         };
         /**
          * IdentifierConflictPairOut
-         * @description Deux personnes distinctes portant la même valeur brute d'identifiant (ORCID / IdRef /
-         *     hal_person_id / idHAL) : doublon probable (mêmes nom/réseau) ou erreur d'attribution.
+         * @description Deux personnes distinctes portant la même valeur brute d'identifiant (ORCID / IdRef / hal_person_id / idHAL) : doublon probable (mêmes nom/réseau) ou erreur d'attribution.
          */
         IdentifierConflictPairOut: {
             person_a: components["schemas"]["IdentifierConflictPersonOut"];
@@ -3286,17 +3345,9 @@ export interface components {
             /** Status */
             status: string;
         };
-        /** IntValueFacet */
-        IntValueFacet: {
-            /** Value */
-            value: number;
-            /** Count */
-            count: number;
-        };
         /**
          * IntruderOccurrenceOut
-         * @description Signature intruse : nom incompatible avec les formes confirmées de la personne. `name_form`
-         *     est la forme à rejeter pour détacher la signature ; `identifiers` expose l'identifiant fautif.
+         * @description Signature intruse : nom incompatible avec les formes confirmées de la personne. `name_form` est la forme à rejeter pour détacher la signature ; `identifiers` expose l'identifiant fautif.
          */
         IntruderOccurrenceOut: {
             /** Source */
@@ -3491,52 +3542,18 @@ export interface components {
             apc_amount?: number | null;
         };
         /**
-         * JournalsFacetOption
-         * @description Option d'une facette de la liste des revues : valeur, libellé français et compte.
-         *
-         *     `label` reprend `JOURNAL_TYPE_LABELS_FR` ou `OA_MODEL_LABELS_FR` selon la dimension ; la facette DOAJ expose `Indexée` / `Non indexée`. Le champ se nomme `label` et non `label_fr` pour le composable `useFacets` du frontend, convention partagée avec les facettes des publications.
-         *
-         *     `count` est le nombre de revues atteignables si cette seule option était cochée, les autres filtres actifs restant appliqués.
-         */
-        JournalsFacetOption: {
-            /** Value */
-            value: string;
-            /** Label */
-            label: string;
-            /** Count */
-            count: number;
-        };
-        /**
          * JournalsFacetsResponse
          * @description Facettes de `/api/journals` sur trois dimensions.
          *
-         *     Chaque dimension écarte son propre filtre de la condition WHERE, de sorte que son décompte annonce le nombre de revues atteignables si l'option était cochée ou décochée.
+         *     Chaque dimension écarte son propre filtre de la condition WHERE, de sorte que son décompte annonce le nombre de revues atteignables si l'option était cochée ou décochée. `label` reprend `JOURNAL_TYPE_LABELS_FR` ou `OA_MODEL_LABELS_FR` selon la dimension ; la facette DOAJ expose `Indexée` / `Non indexée`.
          */
         JournalsFacetsResponse: {
             /** Journal Types */
-            journal_types: components["schemas"]["JournalsFacetOption"][];
+            journal_types: components["schemas"]["FacetOption"][];
             /** Oa Models */
-            oa_models: components["schemas"]["JournalsFacetOption"][];
+            oa_models: components["schemas"]["FacetOption"][];
             /** Doaj */
-            doaj: components["schemas"]["JournalsFacetOption"][];
-        };
-        /** LabFacet */
-        LabFacet: {
-            /** Value */
-            value: number;
-            /** Label */
-            label: string;
-            /** Count */
-            count: number;
-        };
-        /** LabeledIntFacet */
-        LabeledIntFacet: {
-            /** Value */
-            value: number;
-            /** Label */
-            label: string;
-            /** Count */
-            count: number;
+            doaj: components["schemas"]["FacetOption"][];
         };
         /** LoginRequest */
         LoginRequest: {
@@ -3588,8 +3605,7 @@ export interface components {
         };
         /**
          * NameDuplicatePairOut
-         * @description Deux personnes aux noms compatibles, avec leurs recouvrements de réseau. Un réseau commun
-         *     (co-auteurs, publications co-signées) signe un doublon ; des réseaux disjoints, un homonyme.
+         * @description Deux personnes aux noms compatibles, avec leurs recouvrements de réseau. Un réseau commun (co-auteurs, publications co-signées) signe un doublon ; des réseaux disjoints, un homonyme.
          */
         NameDuplicatePairOut: {
             person_a: components["schemas"]["IdentifierConflictPersonOut"];
@@ -3715,13 +3731,6 @@ export interface components {
             is_excluding?: boolean | null;
             /** Requires Context Of */
             requires_context_of?: number[] | null;
-        };
-        /** OaFacet */
-        OaFacet: {
-            /** Value */
-            value: string;
-            /** Count */
-            count: number;
         };
         /**
          * OkResponse
@@ -4104,9 +4113,9 @@ export interface components {
          */
         PersonsFacetsResponse: {
             /** Departments */
-            departments: components["schemas"]["FacetValueCount"][];
+            departments: components["schemas"]["FacetOption"][];
             /** Roles */
-            roles: components["schemas"]["FacetValueCount"][];
+            roles: components["schemas"]["FacetOption"][];
             orcid: components["schemas"]["YesNoCount"];
             idhal: components["schemas"]["YesNoCount"];
             idref: components["schemas"]["YesNoCount"];
@@ -4230,9 +4239,7 @@ export interface components {
         };
         /**
          * PivotDimensionOut
-         * @description Métadonnée d'une dimension, lue par les sélecteurs de l'interface : `groupable` pilote le
-         *     choix de ventilation, `comparable` celui de la comparaison (abscisse), `filterable` la barre de
-         *     facettes (dérivée par soustraction).
+         * @description Métadonnée d'une dimension, lue par les sélecteurs de l'interface : `groupable` pilote le choix de ventilation, `comparable` celui de la comparaison (abscisse), `filterable` la barre de facettes (dérivée par soustraction).
          */
         PivotDimensionOut: {
             /** Key */
@@ -4262,8 +4269,7 @@ export interface components {
         };
         /**
          * PivotResponse
-         * @description Résultat d'une agrégation. Chaque ligne porte la valeur de chaque groupement (clés =
-         *     `groups`) et la mesure sous la clé `value` (numérique, `null` si dénominateur nul).
+         * @description Résultat d'une agrégation. Chaque ligne porte la valeur de chaque groupement (clés = `groups`) et la mesure sous la clé `value` (numérique, `null` si dénominateur nul).
          */
         PivotResponse: {
             /** Measure */
@@ -4300,81 +4306,6 @@ export interface components {
             lab_acronym: string | null;
             /** Budget Structure Id */
             budget_structure_id: number | null;
-        };
-        /** PubDedupAuthor */
-        PubDedupAuthor: {
-            /** Author Position */
-            author_position: number | null;
-            /** In Perimeter */
-            in_perimeter: boolean;
-            /** Person Id */
-            person_id: number | null;
-            /** Last Name */
-            last_name: string | null;
-            /** First Name */
-            first_name: string | null;
-            /** Full Name */
-            full_name: string | null;
-        };
-        /**
-         * PubDedupDetail
-         * @description Détail d'une publication pour la page de déduplication.
-         */
-        PubDedupDetail: {
-            /** Id */
-            id: number;
-            /** Title */
-            title: string;
-            /** Title Normalized */
-            title_normalized: string;
-            /** Doi */
-            doi: string | null;
-            /** Pub Year */
-            pub_year: number | null;
-            /** Doc Type */
-            doc_type: string;
-            /** Container Title */
-            container_title: string | null;
-            /** Oa Status */
-            oa_status: string;
-            /** Language */
-            language: string | null;
-            journal: components["schemas"]["PubDedupJournal"] | null;
-            /** Sources */
-            sources: components["schemas"]["PubDedupSource"][];
-            /** Authors */
-            authors: components["schemas"]["PubDedupAuthor"][];
-        };
-        /** PubDedupJournal */
-        PubDedupJournal: {
-            /** Id */
-            id: number;
-            /** Title */
-            title: string | null;
-            /** Issn */
-            issn: string | null;
-            /** Eissn */
-            eissn: string | null;
-        };
-        /** PubDedupSource */
-        PubDedupSource: {
-            /** Source */
-            source: string;
-            /** Source Id */
-            source_id: string;
-        };
-        /** PubDuplicateNextResponse */
-        PubDuplicateNextResponse: {
-            /** Total */
-            total: number;
-            /** Offset */
-            offset: number;
-            pair: components["schemas"]["PubDuplicatePair"] | null;
-        };
-        /** PubDuplicatePair */
-        PubDuplicatePair: {
-            pub_a: components["schemas"]["PubDedupDetail"];
-            pub_b: components["schemas"]["PubDedupDetail"];
         };
         /** PubLabItem */
         PubLabItem: {
@@ -4541,38 +4472,35 @@ export interface components {
          * PublicationsFacetsResponse
          * @description Facettes dynamiques pour la page publications.
          *
-         *     Chaque facette exclut son propre filtre mais applique tous les
-         *     autres. `hal_status` est vide tant qu'un labo unique n'est pas
-         *     sélectionné. `corresponding`, `in_perimeter` sont vides sans
-         *     `person_id`.
+         *     Chaque facette exclut son propre filtre mais applique tous les autres. `hal_status` est vide tant qu'un labo unique n'est pas sélectionné. `corresponding`, `in_perimeter` sont vides sans `person_id`.
          */
         PublicationsFacetsResponse: {
             /** Years */
-            years: components["schemas"]["IntValueFacet"][];
+            years: components["schemas"]["FacetOption"][];
             /** Labs */
-            labs: components["schemas"]["LabeledIntFacet"][];
+            labs: components["schemas"]["FacetOption"][];
             /** No Lab Count */
             no_lab_count: number;
             /** Doc Types */
-            doc_types: components["schemas"]["StrValueFacet"][];
+            doc_types: components["schemas"]["FacetOption"][];
             /** Access */
-            access: components["schemas"]["TextStrFacet"][];
+            access: components["schemas"]["FacetOption"][];
             /** Oa Statuses */
-            oa_statuses: components["schemas"]["StrValueFacet"][];
+            oa_statuses: components["schemas"]["FacetOption"][];
             /** Corresponding */
-            corresponding: components["schemas"]["StrValueFacet"][];
+            corresponding: components["schemas"]["FacetOption"][];
             /** Source Counts */
             source_counts: {
                 [key: string]: components["schemas"]["YesNoCount"];
             };
             /** Apc */
-            apc: components["schemas"]["TextStrFacet"][];
+            apc: components["schemas"]["FacetOption"][];
             /** Countries */
-            countries: components["schemas"]["TextStrFacet"][];
+            countries: components["schemas"]["FacetOption"][];
             /** Hal Status */
-            hal_status: components["schemas"]["TextStrFacet"][];
+            hal_status: components["schemas"]["FacetOption"][];
             /** In Perimeter */
-            in_perimeter: components["schemas"]["TextStrFacet"][];
+            in_perimeter: components["schemas"]["FacetOption"][];
         };
         /**
          * Publisher
@@ -4602,9 +4530,7 @@ export interface components {
          * PublisherDashboardResponse
          * @description GET /api/publishers/{id}/dashboard : agrégats pour l'exploration visuelle.
          *
-         *     `journal_types` : distribution des types des revues de l'éditeur (qualifie
-         *     son portfolio). `doc_types` / `oa_statuses` : distributions des publis
-         *     rattachées via ses revues, utiles pour le repérage d'incohérences à venir.
+         *     `journal_types` : distribution des types des revues de l'éditeur (qualifie son portfolio). `doc_types` / `oa_statuses` : distributions des publis rattachées via ses revues, utiles pour le repérage d'incohérences à venir.
          */
         PublisherDashboardResponse: {
             /** Total Publications */
@@ -4654,32 +4580,16 @@ export interface components {
             publisher_type?: string | null;
         };
         /**
-         * PublishersFacetOption
-         * @description Option d'une facette du listing éditeurs : valeur + label + compte.
-         *
-         *     Pour la facette `publisher_types`, `label` reprend
-         *     `PUBLISHER_TYPE_LABELS_FR`. Pour `countries` (texte libre observé en
-         *     base), `label` est égal à `value`. `count` est exclusif à la
-         *     dimension (= filtre courant moins cette facette), même convention
-         *     que les facettes journals.
-         */
-        PublishersFacetOption: {
-            /** Value */
-            value: string;
-            /** Label */
-            label: string;
-            /** Count */
-            count: number;
-        };
-        /**
          * PublishersFacetsResponse
          * @description Facettes dynamiques pour `/api/publishers` (2 dimensions).
+         *
+         *     Pour `publisher_types`, `label` reprend `PUBLISHER_TYPE_LABELS_FR` ; pour `countries` (code ISO observé en base), `label` est le code en majuscules. Chaque décompte est exclusif à sa dimension (filtre courant moins cette facette).
          */
         PublishersFacetsResponse: {
             /** Publisher Types */
-            publisher_types: components["schemas"]["PublishersFacetOption"][];
+            publisher_types: components["schemas"]["FacetOption"][];
             /** Countries */
-            countries: components["schemas"]["PublishersFacetOption"][];
+            countries: components["schemas"]["FacetOption"][];
         };
         /** ReassignIdentifier */
         ReassignIdentifier: {
@@ -4720,10 +4630,7 @@ export interface components {
          * RelatedPublicationOut
          * @description Une publication apparentée, vue depuis la publication courante.
          *
-         *     `relation_type` est exprimé du point de vue de la publication courante (les relations entrantes
-         *     sont inversées). `publication_id`/`title`/`pub_year`/`doc_type` sont renseignés quand la cible
-         *     est au corpus ; le `doi` peut être absent (cible au corpus sans DOI), auquel cas la cible se lie
-         *     par son `publication_id` ; une cible hors corpus n'a, elle, que son `doi`.
+         *     `relation_type` est exprimé du point de vue de la publication courante (les relations entrantes sont inversées). `publication_id`/`title`/`pub_year`/`doc_type` sont renseignés quand la cible est au corpus ; le `doi` peut être absent (cible au corpus sans DOI), auquel cas la cible se lie par son `publication_id` ; une cible hors corpus n'a, elle, que son `doi`.
          */
         RelatedPublicationOut: {
             /** Relation Type */
@@ -4947,22 +4854,15 @@ export interface components {
         /** StatsFacetsResponse */
         StatsFacetsResponse: {
             /** Years */
-            years: components["schemas"]["YearFacet"][];
+            years: components["schemas"]["FacetOption"][];
             /** Labs */
-            labs: components["schemas"]["LabFacet"][];
+            labs: components["schemas"]["FacetOption"][];
             /** Oa Statuses */
-            oa_statuses: components["schemas"]["OaFacet"][];
+            oa_statuses: components["schemas"]["FacetOption"][];
             /** Apc */
-            apc: components["schemas"]["ApcFacet"][];
+            apc: components["schemas"]["FacetOption"][];
             /** Doc Types */
-            doc_types: components["schemas"]["DocTypeFacet"][];
-        };
-        /** StrValueFacet */
-        StrValueFacet: {
-            /** Value */
-            value: string;
-            /** Count */
-            count: number;
+            doc_types: components["schemas"]["FacetOption"][];
         };
         /** StructureAddressOut */
         StructureAddressOut: {
@@ -5232,15 +5132,6 @@ export interface components {
             /** Sources */
             sources: string[];
         };
-        /** TextStrFacet */
-        TextStrFacet: {
-            /** Value */
-            value: string;
-            /** Text */
-            text: string;
-            /** Count */
-            count: number;
-        };
         /** ThesesAuthorshipOut */
         ThesesAuthorshipOut: {
             /** Id */
@@ -5317,13 +5208,6 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
-        };
-        /** YearFacet */
-        YearFacet: {
-            /** Value */
-            value: number;
-            /** Count */
-            count: number;
         };
         /** YesNoCount */
         YesNoCount: {
@@ -5846,7 +5730,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PubDuplicateNextResponse"];
+                    "application/json": components["schemas"]["DuplicatePairResponse"];
                 };
             };
             /** @description Validation Error */
