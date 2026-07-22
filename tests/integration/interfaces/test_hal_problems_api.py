@@ -52,7 +52,20 @@ def _seed_lab(code: str | None = None, hal_collection: str | None = None) -> int
             "VALUES (%s, %s, 'labo'::structure_type, %s) RETURNING id",
             (code, code, hal_collection),
         )
-        return cur.fetchone()["id"]
+        lab_id = cur.fetchone()["id"]
+        # Rattache au périmètre persons (code 'uca' par défaut) : les lectures HAL
+        # scopent au périmètre, pas au type de structure.
+        cur.execute(
+            "INSERT INTO perimeters (code, name) VALUES ('uca', 'test persons perimeter') "
+            "ON CONFLICT (code) DO UPDATE SET code = EXCLUDED.code RETURNING id"
+        )
+        perim_id = cur.fetchone()["id"]
+        cur.execute(
+            "INSERT INTO perimeter_structures (perimeter_id, structure_id) "
+            "VALUES (%s, %s) ON CONFLICT DO NOTHING",
+            (perim_id, lab_id),
+        )
+        return lab_id
 
 
 @pytest.fixture(scope="module", autouse=True)

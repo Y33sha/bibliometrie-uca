@@ -28,8 +28,10 @@ from application.ports.api.hal_problems_queries import (
     NoMissingCollections,
 )
 from domain.source_publications.keys import DISCRIMINANT_TITLE_MIN_LENGTH
-from infrastructure.queries.api.config import laboratory_structure_types
-from infrastructure.queries.perimeter import get_persons_perimeter_root_ids
+from infrastructure.queries.perimeter import (
+    get_persons_perimeter_root_ids,
+    get_persons_structure_ids_list,
+)
 
 # Signatures HAL rattachées à une personne et portant la référence d'un compte HAL.
 _HAL_ACCOUNT_SIGNATURES = """
@@ -262,19 +264,19 @@ class PgHalProblemsQueries(HalProblemsQueries):
         )
 
     def hal_missing_collections_labs(self) -> list[HalCollectionLab]:
-        """Laboratoires dont une collection HAL est renseignée — ceux dont la collection se compare.
+        """Structures du périmètre dont une collection HAL est renseignée — celles dont la collection se compare.
 
-        Les types tenus pour des laboratoires viennent de la configuration ; sans collection, la question « que manque-t-il à sa collection ? » est sans objet.
+        Sans collection, la question « que manque-t-il à sa collection ? » est sans objet.
         """
         rows = self._conn.execute(
             text("""
                 SELECT s.id, s.acronym, s.name, s.hal_collection
                 FROM structures s
                 WHERE s.hal_collection IS NOT NULL
-                  AND s.structure_type::text = ANY(:lab_types)
+                  AND s.id = ANY(:perimeter_ids)
                 ORDER BY s.acronym
             """),
-            {"lab_types": laboratory_structure_types(self._conn)},
+            {"perimeter_ids": get_persons_structure_ids_list(self._conn)},
         ).all()
         return [
             HalCollectionLab(
@@ -439,7 +441,7 @@ class PgHalProblemsQueries(HalProblemsQueries):
                               WHERE a2.publication_id = p.id
                                 AND a2.in_perimeter = TRUE
                                 AND s.hal_collection IS NOT NULL
-                                AND s.structure_type::text = ANY(:lab_types)) l
+                                AND s.id = ANY(:perimeter_ids)) l
                        ) AS laboratories
                 FROM conflict_pubs cp
                 JOIN publications p ON p.id = cp.publication_id
@@ -449,7 +451,7 @@ class PgHalProblemsQueries(HalProblemsQueries):
             {
                 "pg_limit": per_page,
                 "pg_offset": offset,
-                "lab_types": laboratory_structure_types(self._conn),
+                "perimeter_ids": get_persons_structure_ids_list(self._conn),
             },
         ).all()
         pubs = [
@@ -460,9 +462,7 @@ class PgHalProblemsQueries(HalProblemsQueries):
                 doc_type=r.doc_type,
                 doi=r.doi,
                 halids=list(r.halids) if r.halids else None,
-                laboratories=[
-                    StructureRef.model_validate(x) for x in (r.laboratories or [])
-                ],
+                laboratories=[StructureRef.model_validate(x) for x in (r.laboratories or [])],
             )
             for r in rows
         ]
