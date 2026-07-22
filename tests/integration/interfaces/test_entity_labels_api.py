@@ -66,7 +66,9 @@ class TestEntityLabels:
                 (name, name),
             )
             publisher_id = cur.fetchone()["id"]
-        r = client.get("/api/entity-labels", params={"kind": "publisher", "entity_id": publisher_id})
+        r = client.get(
+            "/api/entity-labels", params={"kind": "publisher", "entity_id": publisher_id}
+        )
         assert r.json() == {"label": name}
 
     def test_unknown_kind_rejected(self, client):

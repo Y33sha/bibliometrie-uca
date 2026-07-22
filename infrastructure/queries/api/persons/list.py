@@ -146,9 +146,7 @@ def _attach_identifiers(conn: Connection, persons_rows: list[dict[str, Any]]) ->
 
     Les formes de nom, elles, ne suivent pas : seule la fiche d'une personne les affiche, et les porter par ligne pesait les deux tiers de la liste (`person_name_forms` par `PgPersonsQueries.person_name_forms`).
     """
-    by_person = public_identifiers(
-        conn, [p["id"] for p in persons_rows], include_rejected=True
-    )
+    by_person = public_identifiers(conn, [p["id"] for p in persons_rows], include_rejected=True)
     for p in persons_rows:
         p["identifiers"] = by_person.get(p["id"], [])
 

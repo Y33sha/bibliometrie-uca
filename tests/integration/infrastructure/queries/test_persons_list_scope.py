@@ -154,7 +154,9 @@ class TestRejectedFilter:
         )
 
         q = PgPersonsQueries(sa_sync_conn)
-        res = q.list_persons(filters=PersonFilters(lab_id=lab), page=1, per_page=50, sort="name_asc")
+        res = q.list_persons(
+            filters=PersonFilters(lab_id=lab), page=1, per_page=50, sort="name_asc"
+        )
         assert {p.id for p in res.persons} == {p_ok, p_rej}
         assert q.persons_facets(filters=PersonFilters(lab_id=lab)).rh.no == 2
 

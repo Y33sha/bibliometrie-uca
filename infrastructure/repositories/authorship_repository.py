@@ -252,9 +252,7 @@ class PgAuthorshipRepository:
         ).all()
         return [row.author_name_normalized for row in rows]
 
-    def find_publication_id_for_source_authorship(
-        self, source_authorship_id: int
-    ) -> int | None:
+    def find_publication_id_for_source_authorship(self, source_authorship_id: int) -> int | None:
         """`publication_id` de la signature, ou `None` si elle n'existe pas ou n'est pas rattachée."""
         return self._conn.execute(
             text("""

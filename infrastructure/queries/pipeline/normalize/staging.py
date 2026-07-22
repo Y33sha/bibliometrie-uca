@@ -138,9 +138,7 @@ class PgStagingQueries(StagingQueries):
     def fetch_pending_staging_ids(self, conn: Connection, source: str) -> list[int]:
         return fetch_pending_staging_ids(conn, source)
 
-    def fetch_staging_by_ids(
-        self, conn: Connection, staging_ids: list[int]
-    ) -> list[StagingRow]:
+    def fetch_staging_by_ids(self, conn: Connection, staging_ids: list[int]) -> list[StagingRow]:
         return fetch_staging_by_ids(conn, staging_ids)
 
     def mark_done(self, conn: Connection, staging_id: int) -> None:

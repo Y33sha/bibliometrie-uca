@@ -505,7 +505,9 @@ def phase_affiliations(**kw: Any) -> PhaseMetrics:
     """
     from application.pipeline.affiliations.phase import run
     from infrastructure.queries.perimeter import PgPerimeterStructuresQueries
-    from infrastructure.queries.pipeline.affiliations.address_resolution import PgAddressResolutionQueries
+    from infrastructure.queries.pipeline.affiliations.address_resolution import (
+        PgAddressResolutionQueries,
+    )
     from infrastructure.queries.pipeline.affiliations.in_perimeter import PgAffiliationsQueries
 
     return run(
@@ -552,7 +554,9 @@ def phase_publications(**kw: Any) -> PhaseMetrics:
     Séquence, transactions et métriques dans `application/pipeline/publications/phase.py`.
     """
     from application.pipeline.publications.phase import run
-    from infrastructure.queries.pipeline.publications.address_pub_count import PgAddressPubCountQueries
+    from infrastructure.queries.pipeline.publications.address_pub_count import (
+        PgAddressPubCountQueries,
+    )
     from infrastructure.queries.pipeline.publications.reconciliation import (
         PgPublicationsReconciliationQueries,
     )
@@ -684,7 +688,9 @@ def phase_subjects(**kw: Any) -> PhaseMetrics:
     from application.pipeline.subjects.phase import run
     from infrastructure.queries.pipeline.subjects import PgSubjectsIngestionQueries
 
-    return run(_open_tx, PgSubjectsIngestionQueries(), log, rebuild=bool(kw.get("rebuild_subjects")))
+    return run(
+        _open_tx, PgSubjectsIngestionQueries(), log, rebuild=bool(kw.get("rebuild_subjects"))
+    )
 
 
 def _normalize_row(source: str, stats: NormalizeStats, duration_s: float) -> dict[str, object]:

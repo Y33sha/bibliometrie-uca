@@ -154,9 +154,7 @@ async def integrity_error_handler(request: Request, exc: IntegrityError) -> JSON
 
     Couvre uniformément toute écriture qui heurte une contrainte de la base sur une requête bien formée : clé étrangère vers une entité inexistante, doublon sur un index unique, condition CHECK non tenue. Le détail SQL reste au log — il expose la structure interne et n'éclaire pas l'appelant.
     """
-    logger.warning(
-        "Violation d'intégrité sur %s %s : %s", request.method, request.url.path, exc
-    )
+    logger.warning("Violation d'intégrité sur %s %s : %s", request.method, request.url.path, exc)
     return JSONResponse(
         status_code=409,
         content={"detail": "La requête viole une contrainte d'intégrité des données."},
