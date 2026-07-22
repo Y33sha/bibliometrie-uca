@@ -15,7 +15,7 @@ from application.ports.api.addresses_queries import AddressesQueries
 from application.ports.api.authorships_queries import AuthorshipsQueries
 from application.ports.api.config_queries import ConfigQueries
 from application.ports.api.countries_queries import CountriesQueries
-from application.ports.api.entity_facet import EntityLabelQueries
+from application.ports.api.entity_labels_queries import EntityLabelQueries
 from application.ports.api.feedback_queries import FeedbackQueries
 from application.ports.api.hal_problems_queries import HalProblemsQueries
 from application.ports.api.journals_queries import JournalQueries

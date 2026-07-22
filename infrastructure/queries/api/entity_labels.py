@@ -5,8 +5,8 @@ Lookup sans contexte : le libellé d'une revue ou d'un éditeur est le même par
 
 from sqlalchemy import Connection, text
 
-from application.ports.api.entity_facet import (
-    EntityKind,
+from application.ports.api._common import EntityKind
+from application.ports.api.entity_labels_queries import (
     EntityLabelQueries,
     EntityLabelResponse,
 )
@@ -28,7 +28,7 @@ def entity_label(conn: Connection, *, kind: str, entity_id: int) -> str | None:
 
 
 class PgEntityLabelQueries(EntityLabelQueries):
-    """Adapter SA pour `application.ports.api.entity_facet.EntityLabelQueries`."""
+    """Adapter SA pour `application.ports.api.entity_labels_queries.EntityLabelQueries`."""
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn

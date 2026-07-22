@@ -10,8 +10,13 @@ from typing import Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict
 
-from application.ports.api._common import FacetOption, PaginatedResponse, YesNoCount
-from application.ports.api.entity_facet import EntityFacetResponse, EntityKind
+from application.ports.api._common import (
+    EntityFacetResponse,
+    EntityKind,
+    FacetOption,
+    PaginatedResponse,
+    YesNoCount,
+)
 from application.ports.api.subjects_queries import SubjectOut
 
 # Vocabulaire de tri des listes de publications, thèses comprises : le champ, puis le sens.

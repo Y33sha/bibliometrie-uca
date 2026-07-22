@@ -1,9 +1,8 @@
 """Router des agrégats des tableaux de bord, servis par le port `StatsQueries`. Sert `/api/stats/*`."""
 
-
 from fastapi import APIRouter, Depends, Query
 
-from application.ports.api.entity_facet import EntityFacetResponse, EntityKind
+from application.ports.api._common import EntityFacetResponse, EntityKind
 from application.ports.api.stats_queries import (
     CollaborationsResponse,
     PivotResponse,

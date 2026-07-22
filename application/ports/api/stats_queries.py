@@ -8,8 +8,7 @@ from typing import Literal, Protocol
 
 from pydantic import BaseModel
 
-from application.ports.api._common import FacetOption
-from application.ports.api.entity_facet import EntityFacetResponse
+from application.ports.api._common import EntityFacetResponse, FacetOption
 
 
 @dataclass(frozen=True)
