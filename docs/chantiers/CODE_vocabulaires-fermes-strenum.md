@@ -57,6 +57,7 @@ Littéraux de vocabulaires fermés repérés dans le SQL, à remplacer par des m
 - [ ] `infrastructure/queries/pipeline/relations.py` — `'datacite'` / `'crossref'` (source), `'erratum'` / `'preprint'` / `'dataset'` (doc_type).
 - [ ] Clés de confirmation `'hal_id'` / `'arxiv_id'` / `'pmid'` / `'nnt'` — clés JSONB, pas un enum PostgreSQL, énumérées dans `relations.py` (`_SHARED_KEY_PAIRS_SQL`) **et** `publications_reconciliation.py` (`_UNIVERSE_SQL`) : à définir une seule fois côté domaine.
 - [ ] `infrastructure/queries/pipeline/persons/matching.py` — statuts `'rejected'` / `'confirmed'` / `'pending'` (l'enum `AttributionStatus` existe déjà), modes de résolution `'cross_source'` / `'identifier'` / `'name'`, types d'identifiant `'orcid'` / `'idref'` / `'hal_person_id'`, et le marqueur `'persons'` de `person_name_forms.sources`.
+- [ ] `infrastructure/queries/pipeline/persons/name_forms.py` — mêmes statuts (`identifier_status`) et marqueur `'persons'`.
 
 ## Questions ouvertes
 
