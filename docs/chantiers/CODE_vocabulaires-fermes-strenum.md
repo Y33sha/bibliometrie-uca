@@ -59,6 +59,7 @@ Littéraux de vocabulaires fermés repérés dans le code (SQL du pipeline et po
 - [ ] `infrastructure/queries/pipeline/persons/matching.py` — statuts `'rejected'` / `'confirmed'` / `'pending'` (l'enum `AttributionStatus` existe déjà), modes de résolution `'cross_source'` / `'identifier'` / `'name'`, types d'identifiant `'orcid'` / `'idref'` / `'hal_person_id'`, et le marqueur `'persons'` de `person_name_forms.sources`.
 - [ ] `infrastructure/queries/pipeline/persons/name_forms.py` — mêmes statuts (`identifier_status`) et marqueur `'persons'`.
 - [ ] `application/ports/api/persons_queries.py` — statut `person_identifiers.status` re-déclaré en `Literal[...]` inline dans trois DTOs (lignes 77, 89, 278) au lieu de référencer `AttributionStatus` ; deux le restreignent à `pending` / `confirmed` / `rejected`, un inclut `authenticated`.
+- [ ] `'labo'` (`structures.structure_type`) codé en dur dans une quinzaine de requêtes — `filters.py` (`no_lab_clause`), `stats/summary.py`, `stats/pivot.py`, `publications/list.py`, `publications/facets.py`, `persons/detail.py`, `persons/admin.py`, `structures.py` (`CASE` de tri), plus les CLI `merge_person_duplicates_by_lab.py` et `audit_name_pair_overlaps.py`. L'enum `StructureType` (`domain/structures/structure.py`, `LABO = "labo"`) existe déjà : interpoler `StructureType.LABO.value`. Le réglage d'affichage `laboratories_display_types` n'est **pas** la définition d'un laboratoire (il ne pilote que la page laboratoires) et ne doit pas servir ici.
 
 ## Questions ouvertes
 
