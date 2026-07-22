@@ -22,6 +22,24 @@ from infrastructure.queries.pipeline.normalize.source_authorships import (
     clear_source_authorships_for_publication,
 )
 
+# Sentinelles du `key_hash`, alignées sur la colonne générée `author_identifying_keys.key_hash`
+# (migration `author_identity_key_hash`) : `E'\x01'` tient lieu de NULL, `E'\x1f'` sépare les deux
+# champs — des octets de contrôle absents des vraies valeurs. Un test d'intégration garde
+# l'alignement avec la colonne générée.
+_KEY_HASH_NULL = r"E'\x01'"
+_KEY_HASH_SEP = r"E'\x1f'"
+
+
+def key_hash_sql(name_expr: str, ids_expr: str) -> str:
+    """Expression SQL du `key_hash` d'une identité (md5 nom + identifiants), pour le lookup indexé.
+
+    `name_expr` / `ids_expr` : expressions SQL des deux champs (colonnes de table ou bind params).
+    """
+    return (
+        f"md5(coalesce({name_expr}, {_KEY_HASH_NULL}) || {_KEY_HASH_SEP}"
+        f" || coalesce(({ids_expr})::text, {_KEY_HASH_NULL}))"
+    )
+
 
 def upsert_source_authorships_batch(conn: Connection, values: list[SourceAuthorshipItem]) -> None:
     """Batch UPSERT de `source_authorships` (toutes sources, `source` par ligne).
@@ -60,7 +78,8 @@ def upsert_source_authorships_batch(conn: Connection, values: list[SourceAuthors
     # 2. Insert des signatures. Pas d'ON CONFLICT : le writer DELETE puis déduplique par
     # position, (source_publication_id, author_position) reste unique. `identity_id` résolu
     # par `key_hash` (md5, sentinelles de la colonne générée), lookup indexé.
-    stmt = text(r"""
+    stmt = text(
+        """
         INSERT INTO source_authorships
             (source, source_publication_id, author_position,
              is_corresponding, roles, raw_author_name, identity_id)
@@ -71,10 +90,9 @@ def upsert_source_authorships_batch(conn: Connection, values: list[SourceAuthors
             is_corresponding boolean, roles text[],
             raw_author_name text, person_identifiers jsonb)
         JOIN author_identifying_keys aik
-          ON aik.key_hash = md5(
-                 coalesce(t.author_name_normalized, E'\x01') || E'\x1f'
-                 || coalesce(t.person_identifiers::text, E'\x01'))
-    """).bindparams(bindparam("payload", type_=JSONB))
+          ON aik.key_hash = """
+        + key_hash_sql("t.author_name_normalized", "t.person_identifiers")
+    ).bindparams(bindparam("payload", type_=JSONB))
     conn.execute(
         stmt,
         {
@@ -91,18 +109,20 @@ _UPSERT_IDENTITY_SQL = text("""
     ON CONFLICT (author_name_normalized, person_identifiers) DO NOTHING
 """).bindparams(bindparam("person_identifiers", type_=JSONB))
 
-_INSERT_AUTHORSHIP_SQL = text(r"""
+_INSERT_AUTHORSHIP_SQL = text(
+    """
     INSERT INTO source_authorships
         (source, source_publication_id, author_position,
          is_corresponding, roles, raw_author_name, identity_id)
     VALUES (:source, :source_publication_id, :author_position,
             :is_corresponding, :roles, :raw_author_name,
             (SELECT id FROM author_identifying_keys
-             WHERE key_hash = md5(
-                 coalesce(:author_name_normalized, E'\x01') || E'\x1f'
-                 || coalesce((:person_identifiers)::text, E'\x01'))))
+             WHERE key_hash = """
+    + key_hash_sql(":author_name_normalized", ":person_identifiers")
+    + """))
     RETURNING id
-""").bindparams(bindparam("person_identifiers", type_=JSONB))
+"""
+).bindparams(bindparam("person_identifiers", type_=JSONB))
 
 
 def upsert_source_authorship(conn: Connection, item: SourceAuthorshipItem) -> int:
@@ -179,10 +199,7 @@ def fetch_address_ids_by_raw_text(conn: Connection, raw_texts: list[str]) -> dic
 
 
 def apply_address_countries_batch(conn: Connection, values: list[AddressCountryItem]) -> None:
-    """Propage les pays d'autorité sur `addresses.countries` (jamais d'écrasement).
-
-    Renseigne `countries` uniquement sur les adresses encore sans pays.
-    """
+    """Écrit sur `addresses.countries` le pays fourni par la source, uniquement là où l'adresse n'en a pas encore (jamais d'écrasement)."""
     if not values:
         return
     stmt = text("""
@@ -196,10 +213,7 @@ def apply_address_countries_batch(conn: Connection, values: list[AddressCountryI
 def apply_address_suggested_countries_batch(
     conn: Connection, values: list[AddressCountryItem]
 ) -> None:
-    """Propage une suggestion de pays sur `addresses.suggested_countries`.
-
-    Renseigne `suggested_countries` uniquement sur les adresses sans pays d'autorité ni suggestion existante (jamais d'écrasement).
-    """
+    """Écrit sur `addresses.suggested_countries` une suggestion de pays, uniquement sur les adresses sans pays confirmé ni suggestion déjà posée (jamais d'écrasement)."""
     if not values:
         return
     conn.execute(
