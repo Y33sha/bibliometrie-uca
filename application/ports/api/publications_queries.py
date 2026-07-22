@@ -10,7 +10,7 @@ from typing import Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict
 
-from application.ports.api._common import PaginatedResponse, YesNoCount
+from application.ports.api._common import FacetOption, PaginatedResponse, YesNoCount
 from application.ports.api.entity_facet import EntityFacetResponse, EntityKind
 from application.ports.api.subjects_queries import SubjectOut
 
@@ -115,46 +115,24 @@ class PublicationListResponse(PaginatedResponse):
 # ---------------------------------------------------------------------------
 
 
-class IntValueFacet(BaseModel):
-    value: int
-    count: int
-
-
-class StrValueFacet(BaseModel):
-    value: str
-    count: int
-
-
-class LabeledIntFacet(BaseModel):
-    value: int
-    label: str
-    count: int
-
-
-class TextStrFacet(BaseModel):
-    value: str
-    text: str
-    count: int
-
-
 class PublicationsFacetsResponse(BaseModel):
     """Facettes dynamiques pour la page publications.
 
     Chaque facette exclut son propre filtre mais applique tous les autres. `hal_status` est vide tant qu'un labo unique n'est pas sélectionné. `corresponding`, `in_perimeter` sont vides sans `person_id`.
     """
 
-    years: list[IntValueFacet]
-    labs: list[LabeledIntFacet]
+    years: list[FacetOption]
+    labs: list[FacetOption]
     no_lab_count: int
-    doc_types: list[StrValueFacet]
-    access: list[TextStrFacet]
-    oa_statuses: list[StrValueFacet]
-    corresponding: list[StrValueFacet]
+    doc_types: list[FacetOption]
+    access: list[FacetOption]
+    oa_statuses: list[FacetOption]
+    corresponding: list[FacetOption]
     source_counts: dict[str, YesNoCount]
-    apc: list[TextStrFacet]
-    countries: list[TextStrFacet]
-    hal_status: list[TextStrFacet]
-    in_perimeter: list[TextStrFacet]
+    apc: list[FacetOption]
+    countries: list[FacetOption]
+    hal_status: list[FacetOption]
+    in_perimeter: list[FacetOption]
 
 
 # ---------------------------------------------------------------------------

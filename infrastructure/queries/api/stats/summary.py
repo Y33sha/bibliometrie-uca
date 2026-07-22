@@ -198,13 +198,13 @@ def _build_facets_result(
     doc_type_rows: Sequence[Row[Any]],
 ) -> dict[str, list[dict[str, Any]]]:
     return {
-        "years": [{"value": r.pub_year, "count": r.count} for r in year_rows],
-        "labs": [{"value": r.id, "label": r.label, "count": r.count} for r in lab_rows],
+        "years": [{"value": str(r.pub_year), "count": r.count} for r in year_rows],
+        "labs": [{"value": str(r.id), "label": r.label, "count": r.count} for r in lab_rows],
         "oa_statuses": [{"value": r.value, "count": r.count} for r in oa_rows],
         "doc_types": [{"value": r.value, "count": r.count} for r in doc_type_rows],
         "apc": [
-            {"value": "uca", "text": "APC UCA", "count": apc_row.apc_uca},
-            {"value": "non_uca", "text": "APC hors UCA", "count": apc_row.apc_non_uca},
-            {"value": "none", "text": "Sans APC", "count": apc_row.apc_none},
+            {"value": "uca", "label": "APC UCA", "count": apc_row.apc_uca},
+            {"value": "non_uca", "label": "APC hors UCA", "count": apc_row.apc_non_uca},
+            {"value": "none", "label": "Sans APC", "count": apc_row.apc_none},
         ],
     }

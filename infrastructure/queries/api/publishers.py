@@ -4,6 +4,7 @@ from typing import Any
 
 from sqlalchemy import Connection, text
 
+from application.ports.api._common import FacetOption
 from application.ports.api.publishers_queries import (
     DocTypeCount,
     DoiPrefixInfo,
@@ -14,7 +15,6 @@ from application.ports.api.publishers_queries import (
     PublisherFilters,
     PublisherListResponse,
     PublisherQueries,
-    PublishersFacetOption,
     PublishersFacetsResponse,
     PublisherSort,
 )
@@ -151,7 +151,7 @@ class PgPublisherQueries(PublisherQueries):
         ).all()
         pt_counts = {r.value: r.n for r in pt_rows}
         publisher_types_facet = [
-            PublishersFacetOption(
+            FacetOption(
                 value=v,
                 label=PUBLISHER_TYPE_LABELS_FR[v],
                 count=pt_counts.get(v, 0),
@@ -172,8 +172,7 @@ class PgPublisherQueries(PublisherQueries):
         ).all()
         # Pays : pas d'enum, on expose ce qui est observé (code pays ISO en pratique). `value` = code minuscule canonique (pour le filtre) ; `label` en majuscule (présentation).
         countries_facet = [
-            PublishersFacetOption(value=r.value, label=r.value.upper(), count=r.n)
-            for r in country_rows
+            FacetOption(value=r.value, label=r.value.upper(), count=r.n) for r in country_rows
         ]
 
         return PublishersFacetsResponse(

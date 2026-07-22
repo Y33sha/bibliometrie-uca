@@ -8,7 +8,7 @@ from typing import Literal, Protocol
 
 from pydantic import BaseModel
 
-from application.ports.api._common import PaginatedResponse
+from application.ports.api._common import FacetOption, PaginatedResponse
 from application.ports.api.subjects_queries import SubjectFrequency
 
 # Vocabulaire de tri de la liste des éditeurs : le champ, puis le sens.
@@ -79,22 +79,14 @@ class OaStatusCount(BaseModel):
     count: int
 
 
-class PublishersFacetOption(BaseModel):
-    """Option d'une facette du listing éditeurs : valeur + label + compte.
+class PublishersFacetsResponse(BaseModel):
+    """Facettes dynamiques pour `/api/publishers` (2 dimensions).
 
-    Pour la facette `publisher_types`, `label` reprend `PUBLISHER_TYPE_LABELS_FR`. Pour `countries` (texte libre observé en base), `label` est égal à `value`. `count` est exclusif à la dimension (= filtre courant moins cette facette), même convention que les facettes journals.
+    Pour `publisher_types`, `label` reprend `PUBLISHER_TYPE_LABELS_FR` ; pour `countries` (code ISO observé en base), `label` est le code en majuscules. Chaque décompte est exclusif à sa dimension (filtre courant moins cette facette).
     """
 
-    value: str
-    label: str
-    count: int
-
-
-class PublishersFacetsResponse(BaseModel):
-    """Facettes dynamiques pour `/api/publishers` (2 dimensions)."""
-
-    publisher_types: list[PublishersFacetOption]
-    countries: list[PublishersFacetOption]
+    publisher_types: list[FacetOption]
+    countries: list[FacetOption]
 
 
 class PublisherDashboardResponse(BaseModel):

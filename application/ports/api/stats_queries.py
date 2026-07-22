@@ -8,6 +8,7 @@ from typing import Literal, Protocol
 
 from pydantic import BaseModel
 
+from application.ports.api._common import FacetOption
 from application.ports.api.entity_facet import EntityFacetResponse
 
 
@@ -27,39 +28,12 @@ class StatsFilters:
     doc_types: list[str] = field(default_factory=list)
 
 
-class YearFacet(BaseModel):
-    value: int
-    count: int
-
-
-class LabFacet(BaseModel):
-    value: int
-    label: str
-    count: int
-
-
-class OaFacet(BaseModel):
-    value: str
-    count: int
-
-
-class ApcFacet(BaseModel):
-    value: Literal["uca", "non_uca", "none"]
-    text: str
-    count: int
-
-
-class DocTypeFacet(BaseModel):
-    value: str
-    count: int
-
-
 class StatsFacetsResponse(BaseModel):
-    years: list[YearFacet]
-    labs: list[LabFacet]
-    oa_statuses: list[OaFacet]
-    apc: list[ApcFacet]
-    doc_types: list[DocTypeFacet]
+    years: list[FacetOption]
+    labs: list[FacetOption]
+    oa_statuses: list[FacetOption]
+    apc: list[FacetOption]
+    doc_types: list[FacetOption]
 
 
 class PivotDimensionOut(BaseModel):

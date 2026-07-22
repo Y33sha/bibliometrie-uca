@@ -12,18 +12,15 @@ Le package est organisé par thème d'agrégat :
 
 from sqlalchemy import Connection
 
+from application.ports.api._common import FacetOption
 from application.ports.api.entity_facet import (
     EntityFacetItem,
     EntityFacetResponse,
     EntityKind,
 )
 from application.ports.api.stats_queries import (
-    ApcFacet,
     CollaborationsResponse,
     CountryCollaboration,
-    DocTypeFacet,
-    LabFacet,
-    OaFacet,
     PivotDimensionOut,
     PivotMeasureOut,
     PivotResponse,
@@ -31,7 +28,6 @@ from application.ports.api.stats_queries import (
     StatsFacetsResponse,
     StatsFilters,
     StatsQueries,
-    YearFacet,
 )
 from domain.stats import DIMENSIONS, MEASURES
 from infrastructure.queries.api.stats.collaborations import (
@@ -117,11 +113,11 @@ class PgStatsQueries(StatsQueries):
             filters=filters,
         )
         return StatsFacetsResponse(
-            years=[YearFacet(**y) for y in data["years"]],
-            labs=[LabFacet(**lab) for lab in data["labs"]],
-            oa_statuses=[OaFacet(**o) for o in data["oa_statuses"]],
-            apc=[ApcFacet(**a) for a in data["apc"]],
-            doc_types=[DocTypeFacet(**d) for d in data["doc_types"]],
+            years=[FacetOption(**y) for y in data["years"]],
+            labs=[FacetOption(**lab) for lab in data["labs"]],
+            oa_statuses=[FacetOption(**o) for o in data["oa_statuses"]],
+            apc=[FacetOption(**a) for a in data["apc"]],
+            doc_types=[FacetOption(**d) for d in data["doc_types"]],
         )
 
 
