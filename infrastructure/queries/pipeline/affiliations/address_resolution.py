@@ -57,6 +57,25 @@ def fetch_addresses_chunk(conn: Connection, *, after_id: int, limit: int) -> lis
     return [(r.id, r.normalized_text) for r in rows]
 
 
+# Détections auto (`matched_form_id` posé) d'une adresse de `addr_ids` dont le couple
+# (address_id, structure_id) est absent de `kept_pairs` (les couples encore détectés).
+# Alias de table : `a`.
+_OBSOLETE_AUTO_WHERE = """
+    a.address_id = ANY(:addr_ids)
+    AND a.matched_form_id IS NOT NULL
+    AND NOT EXISTS (
+        SELECT 1
+        FROM unnest(CAST(:kept_aids AS int[]), CAST(:kept_sids AS int[])) AS k(aid, sid)
+        WHERE k.aid = a.address_id AND k.sid = a.structure_id
+    )
+"""
+
+
+def _kept_arrays(kept_pairs: list[KeptPair]) -> tuple[list[int], list[int]]:
+    """Éclate `kept_pairs` en tableaux parallèles `(address_ids, structure_ids)` pour l'`unnest` SQL."""
+    return [p.address_id for p in kept_pairs], [p.structure_id for p in kept_pairs]
+
+
 def delete_obsolete_detections_bulk(
     conn: Connection, addr_ids: list[int], kept_pairs: list[KeptPair]
 ) -> int:
@@ -66,20 +85,13 @@ def delete_obsolete_detections_bulk(
     """
     if not addr_ids:
         return 0
-    kept_aids = [p.address_id for p in kept_pairs]
-    kept_sids = [p.structure_id for p in kept_pairs]
+    kept_aids, kept_sids = _kept_arrays(kept_pairs)
     return conn.execute(
-        text("""
-            DELETE FROM address_structures a
-            WHERE a.address_id = ANY(:addr_ids)
-              AND a.matched_form_id IS NOT NULL
-              AND a.is_confirmed IS NULL
-              AND NOT EXISTS (
-                  SELECT 1
-                  FROM unnest(CAST(:kept_aids AS int[]), CAST(:kept_sids AS int[])) AS k(aid, sid)
-                  WHERE k.aid = a.address_id AND k.sid = a.structure_id
-              )
-        """),
+        text(
+            "DELETE FROM address_structures a WHERE "
+            + _OBSOLETE_AUTO_WHERE
+            + " AND a.is_confirmed IS NULL"
+        ),
         {"addr_ids": addr_ids, "kept_aids": kept_aids, "kept_sids": kept_sids},
     ).rowcount
 
@@ -93,21 +105,13 @@ def unflag_obsolete_detections_bulk(
     """
     if not addr_ids:
         return
-    kept_aids = [p.address_id for p in kept_pairs]
-    kept_sids = [p.structure_id for p in kept_pairs]
+    kept_aids, kept_sids = _kept_arrays(kept_pairs)
     conn.execute(
-        text("""
-            UPDATE address_structures a
-            SET matched_form_id = NULL
-            WHERE a.address_id = ANY(:addr_ids)
-              AND a.matched_form_id IS NOT NULL
-              AND a.is_confirmed IS NOT NULL
-              AND NOT EXISTS (
-                  SELECT 1
-                  FROM unnest(CAST(:kept_aids AS int[]), CAST(:kept_sids AS int[])) AS k(aid, sid)
-                  WHERE k.aid = a.address_id AND k.sid = a.structure_id
-              )
-        """),
+        text(
+            "UPDATE address_structures a SET matched_form_id = NULL WHERE "
+            + _OBSOLETE_AUTO_WHERE
+            + " AND a.is_confirmed IS NOT NULL"
+        ),
         {"addr_ids": addr_ids, "kept_aids": kept_aids, "kept_sids": kept_sids},
     )
 
