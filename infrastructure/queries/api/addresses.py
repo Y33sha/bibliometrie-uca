@@ -16,6 +16,7 @@ from application.ports.api.addresses_queries import (
     AddressStatsResponse,
     AddressStructureSummary,
     CountrySuggestion,
+    StructureLinkState,
 )
 
 # « Reconnue » comme une structure = lien pending (détecté, non revu) ou confirmé ; exclut le rejeté (is_confirmed = FALSE) et l'absence de lien. Utilisé par les prédicats Structure de `list_addresses`.
@@ -121,7 +122,9 @@ class PgAddressesQueries(AddressesQueries):
                 raw_text=r.raw_text,
                 is_confirmed=r.is_confirmed,
                 is_detected=r.is_detected or False,
-                structures=[AddressStructureSummary.model_validate(s) for s in (r.structures or [])],
+                structures=[
+                    AddressStructureSummary.model_validate(s) for s in (r.structures or [])
+                ],
                 pub_count=r.pub_count,
             )
             for r in rows
@@ -198,7 +201,7 @@ class PgAddressesQueries(AddressesQueries):
         rows = row.structures if row and row.structures else []
         return [AddressStructureSummary.model_validate(s) for s in rows]
 
-    def get_structure_link(self, addr_id: int, structure_id: int) -> dict[str, Any] | None:
+    def get_structure_link(self, addr_id: int, structure_id: int) -> StructureLinkState | None:
         row = self._conn.execute(
             text("""
                 SELECT is_confirmed,
@@ -208,7 +211,7 @@ class PgAddressesQueries(AddressesQueries):
             """),
             {"aid": addr_id, "sid": structure_id},
         ).one_or_none()
-        return dict(row._mapping) if row else None
+        return StructureLinkState.model_validate(row._mapping) if row else None
 
     def addresses_countries(
         self, *, filters: AddressCountriesFilters, page: int, per_page: int

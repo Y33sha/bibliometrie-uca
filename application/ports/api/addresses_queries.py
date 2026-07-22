@@ -4,7 +4,7 @@ Implémenté par `infrastructure.queries.api.addresses.PgAddressesQueries`.
 """
 
 from dataclasses import dataclass
-from typing import Any, Literal, Protocol
+from typing import Literal, Protocol
 
 from pydantic import BaseModel
 
@@ -68,6 +68,16 @@ class AddressStructureSummary(BaseModel):
     is_detected: bool
 
 
+class StructureLinkState(BaseModel):
+    """État d'un lien adresse ↔ structure : détection automatique et arbitrage manuel.
+
+    `is_confirmed` : `None` en attente d'arbitrage, `True` confirmé, `False` rejeté.
+    """
+
+    is_confirmed: bool | None
+    is_detected: bool
+
+
 class AddressOut(BaseModel):
     """Ligne de `/api/addresses` (liste paginée pour validation)."""
 
@@ -86,7 +96,7 @@ class AddressListResponse(PaginatedResponse):
     """
 
     addresses: list[AddressOut]
-    requires_search: bool | None = None
+    requires_search: bool = False
 
 
 class AddressPublicationItem(BaseModel):
@@ -158,8 +168,7 @@ class AddressesQueries(Protocol):
 
     def get_address_structures(self, addr_id: int) -> list[AddressStructureSummary]: ...
 
-    # Le dictionnaire porte `is_confirmed` (`bool | None`) et `is_detected` (`bool`).
-    def get_structure_link(self, addr_id: int, structure_id: int) -> dict[str, Any] | None: ...
+    def get_structure_link(self, addr_id: int, structure_id: int) -> StructureLinkState | None: ...
 
     def addresses_countries(
         self, *, filters: AddressCountriesFilters, page: int, per_page: int

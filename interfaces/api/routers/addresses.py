@@ -194,8 +194,8 @@ def review_address(
     link = queries.get_structure_link(addr_id, action.structure_id)
     return AddressReviewResponse(
         id=addr_id,
-        is_confirmed=link["is_confirmed"] if link else None,
-        is_detected=link["is_detected"] if link else False,
+        is_confirmed=link.is_confirmed if link else None,
+        is_detected=link.is_detected if link else False,
         structures=structures,
     )
 
