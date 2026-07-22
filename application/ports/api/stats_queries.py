@@ -63,9 +63,7 @@ class StatsFacetsResponse(BaseModel):
 
 
 class PivotDimensionOut(BaseModel):
-    """Métadonnée d'une dimension, lue par les sélecteurs de l'interface : `groupable` pilote le
-    choix de ventilation, `comparable` celui de la comparaison (abscisse), `filterable` la barre de
-    facettes (dérivée par soustraction)."""
+    """Métadonnée d'une dimension, lue par les sélecteurs de l'interface : `groupable` pilote le choix de ventilation, `comparable` celui de la comparaison (abscisse), `filterable` la barre de facettes (dérivée par soustraction)."""
 
     key: str
     label: str
@@ -89,8 +87,7 @@ class PivotSchemaResponse(BaseModel):
 
 
 class PivotResponse(BaseModel):
-    """Résultat d'une agrégation. Chaque ligne porte la valeur de chaque groupement (clés =
-    `groups`) et la mesure sous la clé `value` (numérique, `null` si dénominateur nul)."""
+    """Résultat d'une agrégation. Chaque ligne porte la valeur de chaque groupement (clés = `groups`) et la mesure sous la clé `value` (numérique, `null` si dénominateur nul)."""
 
     measure: str
     groups: list[str]
@@ -98,8 +95,7 @@ class PivotResponse(BaseModel):
 
 
 class CountryCollaboration(BaseModel):
-    """Décompte de collaborations pour un pays : code ISO 3166-1 alpha-2 (minuscule) et nombre de
-    publications co-affiliées à ce pays."""
+    """Décompte de collaborations pour un pays : code ISO 3166-1 alpha-2 (minuscule) et nombre de publications co-affiliées à ce pays."""
 
     code: str
     value: int
@@ -108,8 +104,7 @@ class CountryCollaboration(BaseModel):
 class CollaborationsResponse(BaseModel):
     """Collaborations internationales ventilées par pays étranger (source `publications.countries`).
 
-    `international_count` = publications avec au moins un pays étranger ; `total_count` = corpus filtré.
-    Leur rapport donne la part de publications en collaboration internationale."""
+    `international_count` = publications avec au moins un pays étranger ; `total_count` = corpus filtré. Leur rapport donne la part de publications en collaboration internationale."""
 
     rows: list[CountryCollaboration]
     international_count: int

@@ -9,12 +9,12 @@ from typing import Literal, Protocol
 from pydantic import BaseModel
 
 from application.ports.api._common import PaginatedResponse
+from application.ports.api.subjects_queries import SubjectFrequency
 
 # Vocabulaire de tri de la liste des éditeurs : le champ, puis le sens.
 PublisherSort = Literal[
     "name_asc", "name_desc", "journals_asc", "journals_desc", "pubs_asc", "pubs_desc"
 ]
-from application.ports.api.subjects_queries import SubjectFrequency
 
 
 @dataclass(frozen=True, slots=True)
@@ -82,11 +82,7 @@ class OaStatusCount(BaseModel):
 class PublishersFacetOption(BaseModel):
     """Option d'une facette du listing éditeurs : valeur + label + compte.
 
-    Pour la facette `publisher_types`, `label` reprend
-    `PUBLISHER_TYPE_LABELS_FR`. Pour `countries` (texte libre observé en
-    base), `label` est égal à `value`. `count` est exclusif à la
-    dimension (= filtre courant moins cette facette), même convention
-    que les facettes journals.
+    Pour la facette `publisher_types`, `label` reprend `PUBLISHER_TYPE_LABELS_FR`. Pour `countries` (texte libre observé en base), `label` est égal à `value`. `count` est exclusif à la dimension (= filtre courant moins cette facette), même convention que les facettes journals.
     """
 
     value: str
@@ -104,9 +100,7 @@ class PublishersFacetsResponse(BaseModel):
 class PublisherDashboardResponse(BaseModel):
     """GET /api/publishers/{id}/dashboard : agrégats pour l'exploration visuelle.
 
-    `journal_types` : distribution des types des revues de l'éditeur (qualifie
-    son portfolio). `doc_types` / `oa_statuses` : distributions des publis
-    rattachées via ses revues, utiles pour le repérage d'incohérences à venir.
+    `journal_types` : distribution des types des revues de l'éditeur (qualifie son portfolio). `doc_types` / `oa_statuses` : distributions des publis rattachées via ses revues, utiles pour le repérage d'incohérences à venir.
     """
 
     total_publications: int
