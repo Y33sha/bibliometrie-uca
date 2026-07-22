@@ -6,6 +6,7 @@ from sqlalchemy import Connection, text
 
 from application.ports.api.authorships_queries import (
     AuthorshipsQueries,
+    OrphanAuthorshipOut,
     OrphanAuthorshipsResponse,
     OrphanCountResponse,
 )
@@ -20,7 +21,7 @@ _ORPHAN_BASE = f"""
 """
 
 
-def orphan_authorships_count(conn: Connection) -> dict[str, Any]:
+def orphan_authorships_count(conn: Connection) -> OrphanCountResponse:
     """Nombre de signatures du périmètre qu'aucune personne ne porte."""
     row = conn.execute(
         text(f"""
@@ -31,12 +32,12 @@ def orphan_authorships_count(conn: Connection) -> dict[str, Any]:
             WHERE {_ORPHAN_BASE}
         """)
     ).one()
-    return {"total": row.total}
+    return OrphanCountResponse(total=row.total)
 
 
 def list_orphan_authorships(
     conn: Connection, *, search: str, page: int, per_page: int
-) -> dict[str, Any]:
+) -> OrphanAuthorshipsResponse:
     """Liste paginée des signatures orphelines, avec la publication qu'elles signent."""
     offset = (page - 1) * per_page
     search_cond = ""
@@ -74,20 +75,25 @@ def list_orphan_authorships(
         {**binds, "pg_limit": per_page, "pg_offset": offset},
     ).all()
     # Décompose `raw_author_name` en last_name/first_name via `parse_raw_author_name`, la règle de parsing unique du domaine.
-    authorships: list[dict[str, Any]] = []
+    authorships: list[OrphanAuthorshipOut] = []
     for row in rows:
-        data = dict(row._mapping)
-        last_name, first_name = parse_raw_author_name(data["full_name"])
-        data["last_name"] = last_name
-        data["first_name"] = first_name
-        authorships.append(data)
+        last_name, first_name = parse_raw_author_name(row.full_name)
+        authorships.append(
+            OrphanAuthorshipOut(
+                source=row.source,
+                source_authorship_id=row.source_authorship_id,
+                full_name=row.full_name,
+                last_name=last_name,
+                first_name=first_name,
+                publication_id=row.publication_id,
+                pub_title=row.pub_title,
+                pub_year=row.pub_year,
+            )
+        )
 
-    return {
-        "total": total,
-        "page": page,
-        "per_page": per_page,
-        "authorships": authorships,
-    }
+    return OrphanAuthorshipsResponse(
+        total=total, page=page, per_page=per_page, authorships=authorships
+    )
 
 
 class PgAuthorshipsQueries(AuthorshipsQueries):
@@ -97,14 +103,12 @@ class PgAuthorshipsQueries(AuthorshipsQueries):
         self._conn = conn
 
     def orphan_authorships_count(self) -> OrphanCountResponse:
-        return OrphanCountResponse.model_validate(orphan_authorships_count(self._conn))
+        return orphan_authorships_count(self._conn)
 
     def list_orphan_authorships(
         self, *, search: str, page: int, per_page: int
     ) -> OrphanAuthorshipsResponse:
-        return OrphanAuthorshipsResponse.model_validate(
-            list_orphan_authorships(self._conn, search=search, page=page, per_page=per_page)
-        )
+        return list_orphan_authorships(self._conn, search=search, page=page, per_page=per_page)
 
 
 __all__ = ["PgAuthorshipsQueries"]
