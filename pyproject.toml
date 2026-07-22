@@ -100,8 +100,8 @@ ignore_imports = [
     # Lecture filesystem (statut du run, log par phase découpé de
     # logs/pipeline.log) : pas une query / repo, ne dépend pas d'une
     # connexion DB — l'interdiction d'accès infra direct ne s'y applique pas.
-    "interfaces.api.routers.pipeline -> infrastructure.observability.pipeline_status",
-    "interfaces.api.routers.pipeline -> infrastructure.observability.phase_logs",
+    "interfaces.api.routers.pipeline_runs -> infrastructure.observability.pipeline_status",
+    "interfaces.api.routers.pipeline_runs -> infrastructure.observability.phase_logs",
 ]
 
 [[tool.importlinter.contracts]]
