@@ -138,9 +138,7 @@ class TestListAddresses:
         assert r.json().get("requires_search") is True
 
     def test_guard_keeps_the_requested_page(self, client):
-        r = client.get(
-            "/api/addresses", params={"structure_id": 1, "detected": "no", "page": 3}
-        )
+        r = client.get("/api/addresses", params={"structure_id": 1, "detected": "no", "page": 3})
         assert r.json()["page"] == 3
 
     def test_with_structure_id(self, client):

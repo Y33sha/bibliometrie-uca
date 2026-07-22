@@ -68,7 +68,9 @@ def run_create_persons(conn):
     logger = logging.getLogger("test")
     repo = person_repository(conn)
     arbitrate_identifier_conflicts(conn, queries, logger, person_repo=repo)
-    run_cascade(conn, queries, logger, person_repo=repo, authorship_repo=authorship_repository(conn))
+    run_cascade(
+        conn, queries, logger, person_repo=repo, authorship_repo=authorship_repository(conn)
+    )
 
     return conn.execute(
         text(

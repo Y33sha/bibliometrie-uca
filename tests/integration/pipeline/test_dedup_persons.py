@@ -156,7 +156,9 @@ def _get_person_identifiers(conn, person_id):
 def _run_cascade(conn):
     repo = person_repository(conn)
     arbitrate_identifier_conflicts(conn, _queries, _logger, person_repo=repo)
-    run_cascade(conn, _queries, _logger, person_repo=repo, authorship_repo=authorship_repository(conn))
+    run_cascade(
+        conn, _queries, _logger, person_repo=repo, authorship_repo=authorship_repository(conn)
+    )
 
 
 # ── Scénarios ────────────────────────────────────────────────────

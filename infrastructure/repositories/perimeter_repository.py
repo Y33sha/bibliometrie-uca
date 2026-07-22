@@ -58,9 +58,7 @@ class PgPerimeterRepository:
             update(perimeters)
             .where(perimeters.c.root_structure_ids.contains([structure_id]))
             .values(
-                root_structure_ids=func.array_remove(
-                    perimeters.c.root_structure_ids, structure_id
-                )
+                root_structure_ids=func.array_remove(perimeters.c.root_structure_ids, structure_id)
             )
         )
 

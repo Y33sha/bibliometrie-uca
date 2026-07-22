@@ -83,7 +83,9 @@ class TestPerimeterFindById:
 
 class TestCreatePerimeter:
     def test_creates(self, sa_sync_conn, repo):
-        pid = create_perimeter(code="new_perim", name="New Perimeter", root_structure_ids=[], repo=repo)
+        pid = create_perimeter(
+            code="new_perim", name="New Perimeter", root_structure_ids=[], repo=repo
+        )
         assert pid is not None
         result = sa_sync_conn.execute(
             text("SELECT code, name FROM perimeters WHERE id = :pid"), {"pid": pid}

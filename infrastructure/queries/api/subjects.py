@@ -58,10 +58,14 @@ class PgSubjectsQueries(SubjectsQueries):
             )
             for r in rows
         ]
-        total = self._conn.execute(
-            text(f"SELECT COUNT(*) AS n FROM subjects WHERE {where}"),
-            binds,
-        ).one().n
+        total = (
+            self._conn.execute(
+                text(f"SELECT COUNT(*) AS n FROM subjects WHERE {where}"),
+                binds,
+            )
+            .one()
+            .n
+        )
         return SubjectListResponse(items=items, total=total, page=page, per_page=per_page)
 
     def get_subject_detail(
