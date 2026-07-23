@@ -173,28 +173,25 @@ class PgHalProblemsQueries(HalProblemsQueries):
 
     def hal_duplicate_pubs_by_doi(self, *, page: int, per_page: int) -> HalDoiDuplicatesResponse:
         offset = (page - 1) * per_page
+        # Un même DOI (insensible à la casse) déposé sur au moins deux notices HAL de la même publication.
+        dup_query = """
+            FROM source_publications sd
+            WHERE sd.source = 'hal' AND sd.doi IS NOT NULL AND sd.doi != ''
+            GROUP BY sd.publication_id, LOWER(sd.doi)
+            HAVING COUNT(*) >= 2
+        """
+
         total_row = self._conn.execute(
-            text("""
-                SELECT COUNT(*) AS total FROM (
-                    SELECT sd.publication_id, LOWER(sd.doi)
-                    FROM source_publications sd
-                    WHERE sd.source = 'hal' AND sd.doi IS NOT NULL AND sd.doi != ''
-                    GROUP BY sd.publication_id, LOWER(sd.doi)
-                    HAVING COUNT(*) >= 2
-                ) sub
-            """)
+            text(f"SELECT COUNT(*) AS total FROM (SELECT sd.publication_id {dup_query}) sub")
         ).one()
         total = total_row.total
 
         rows = self._conn.execute(
-            text("""
+            text(f"""
                 SELECT LOWER(sd.doi) AS doi,
                        sd.publication_id AS pub_id,
                        array_agg(sd.source_id ORDER BY sd.source_id) AS halids
-                FROM source_publications sd
-                WHERE sd.source = 'hal' AND sd.doi IS NOT NULL AND sd.doi != ''
-                GROUP BY sd.publication_id, LOWER(sd.doi)
-                HAVING COUNT(*) >= 2
+                {dup_query}
                 ORDER BY LOWER(sd.doi)
                 LIMIT :pg_limit OFFSET :pg_offset
             """),
