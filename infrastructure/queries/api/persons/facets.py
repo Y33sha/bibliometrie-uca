@@ -1,10 +1,13 @@
 """Facettes dynamiques + listes de référence (départements, rôles, stats)."""
 
-from typing import Any
-
 from sqlalchemy import Connection, text
 
-from application.ports.api.persons_queries import PersonFilters
+from application.ports.api._common import FacetOption, YesNoCount
+from application.ports.api.persons_queries import (
+    PersonFilters,
+    PersonsFacetsResponse,
+    PersonsStatsResponse,
+)
 from infrastructure.queries.api.filters import (
     PUBLIC_PERSON_IDENTIFIER_TYPES_SQL,
     WhereClause,
@@ -23,7 +26,7 @@ from infrastructure.queries.api.filters import (
 _BASE_FROM = "persons p LEFT JOIN persons_rh prh ON prh.person_id = p.id"
 
 
-def persons_facets(conn: Connection, *, filters: PersonFilters) -> dict[str, Any]:
+def persons_facets(conn: Connection, *, filters: PersonFilters) -> PersonsFacetsResponse:
     """Facettes dynamiques (chaque facette exclut son propre filtre)."""
 
     def base_clauses(*, skip: str) -> list[WhereClause | None]:
@@ -53,27 +56,27 @@ def persons_facets(conn: Connection, *, filters: PersonFilters) -> dict[str, Any
     where_sql, binds = assemble_where(base_clauses(skip="department"))
     dept_rows = conn.execute(
         text(f"""
-            SELECT prh.department_name AS value, COUNT(*) AS count
+            SELECT prh.department_name AS value, COUNT(*) AS n
             FROM {_BASE_FROM}
             WHERE {where_sql} AND prh.department_name IS NOT NULL
-            GROUP BY prh.department_name ORDER BY count DESC
+            GROUP BY prh.department_name ORDER BY n DESC
         """),
         binds,
     ).all()
-    dept_facets = [dict(r._mapping) for r in dept_rows]
+    dept_facets = [FacetOption(value=r.value, count=r.n) for r in dept_rows]
 
     # RÔLES
     where_sql, binds = assemble_where(base_clauses(skip="role"))
     role_rows = conn.execute(
         text(f"""
-            SELECT prh.role_title AS value, COUNT(*) AS count
+            SELECT prh.role_title AS value, COUNT(*) AS n
             FROM {_BASE_FROM}
             WHERE {where_sql} AND prh.role_title IS NOT NULL
-            GROUP BY prh.role_title ORDER BY count DESC
+            GROUP BY prh.role_title ORDER BY n DESC
         """),
         binds,
     ).all()
-    role_facets = [dict(r._mapping) for r in role_rows]
+    role_facets = [FacetOption(value=r.value, count=r.n) for r in role_rows]
 
     # ORCID / IDHAL / IDREF — tous skip='ids', donc même WHERE
     where_sql, binds = assemble_where(base_clauses(skip="ids"))
@@ -179,19 +182,19 @@ def persons_facets(conn: Connection, *, filters: PersonFilters) -> dict[str, Any
         binds,
     ).one()
 
-    return {
-        "departments": dept_facets,
-        "roles": role_facets,
-        "orcid": {"yes": orcid.yes, "no": orcid.no},
-        "idhal": {"yes": idhal.yes, "no": idhal.no},
-        "idref": {"yes": idref.yes, "no": idref.no},
-        "rh": {"yes": rh.yes, "no": rh.no},
-        "pending_forms": {"yes": pending_forms.yes, "no": pending_forms.no},
-        "pending_identifiers": {"yes": pending_identifiers.yes, "no": pending_identifiers.no},
-    }
+    return PersonsFacetsResponse(
+        departments=dept_facets,
+        roles=role_facets,
+        orcid=YesNoCount(yes=orcid.yes, no=orcid.no),
+        idhal=YesNoCount(yes=idhal.yes, no=idhal.no),
+        idref=YesNoCount(yes=idref.yes, no=idref.no),
+        rh=YesNoCount(yes=rh.yes, no=rh.no),
+        pending_forms=YesNoCount(yes=pending_forms.yes, no=pending_forms.no),
+        pending_identifiers=YesNoCount(yes=pending_identifiers.yes, no=pending_identifiers.no),
+    )
 
 
-def persons_stats(conn: Connection) -> dict[str, Any]:
+def persons_stats(conn: Connection) -> PersonsStatsResponse:
     """Statistiques globales personnes."""
     row = conn.execute(
         text("""
@@ -205,4 +208,9 @@ def persons_stats(conn: Connection) -> dict[str, Any]:
                  FROM persons_rh WHERE department_name IS NOT NULL) AS departments
         """)
     ).one()
-    return dict(row._mapping)
+    return PersonsStatsResponse(
+        total_persons=row.total_persons,
+        linked_persons=row.linked_persons,
+        linked_authors=row.linked_authors,
+        departments=row.departments,
+    )
