@@ -307,7 +307,7 @@ def person_curation(
 
     Alimente le panneau latéral ouvert directement par son URL, hors de la liste qui porte normalement ces données.
     """
-    person = queries.person_admin(person_id)
+    person = queries.person_curation(person_id)
     if person is None:
         raise HTTPException(status_code=404, detail="Personne introuvable")
     return person

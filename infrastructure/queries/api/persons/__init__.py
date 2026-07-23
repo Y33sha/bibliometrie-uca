@@ -1,7 +1,7 @@
 """Query services de lecture autour des personnes (router persons).
 
 Le package est organisé par thème :
-- `list` : `list_persons`, `search_persons`, `person_admin`, `person_name_forms`
+- `list` : `list_persons`, `search_persons`, `person_curation`, `person_name_forms`
 - `identifiers` : `public_identifiers`, partagée par la liste et le profil
 - `facets` : `persons_facets`, `persons_stats`
 - `detail` : `person_profile`, `person_theses`, `person_addresses`,
@@ -70,7 +70,7 @@ from infrastructure.queries.api.persons.facets import (
 )
 from infrastructure.queries.api.persons.list import (
     list_persons as _list_persons,
-    person_admin as _person_admin,
+    person_curation as _person_curation,
     person_name_forms as _person_name_forms,
     search_persons as _search_persons,
 )
@@ -92,8 +92,8 @@ class PgPersonsQueries(PersonsQueries):
     ) -> PersonListResponse:
         return _list_persons(self._conn, filters=filters, page=page, per_page=per_page, sort=sort)
 
-    def person_admin(self, person_id: int) -> PersonOut | None:
-        return _person_admin(self._conn, person_id)
+    def person_curation(self, person_id: int) -> PersonOut | None:
+        return _person_curation(self._conn, person_id)
 
     # ── Facettes / listes de référence / stats ─────────────────────
 
