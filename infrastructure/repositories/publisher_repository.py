@@ -59,7 +59,7 @@ class PgPublisherRepository:
         ).first()
         if row is None:
             return None
-        return _publisher_from_row(_PublisherRow(*row))
+        return _publisher_from_row(_PublisherRow(**row._mapping))
 
     # ── publisher_name_forms ───────────────────────────────────────
 

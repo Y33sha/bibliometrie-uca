@@ -49,7 +49,7 @@ class PgPerimeterRepository:
         ).first()
         if row is None:
             return None
-        return _perimeter_from_row(_PerimeterRow(*row))
+        return _perimeter_from_row(_PerimeterRow(**row._mapping))
 
     # ── Liens structure ↔ perimeter ────────────────────────────────
 
