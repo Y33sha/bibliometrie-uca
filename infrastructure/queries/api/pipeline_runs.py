@@ -6,6 +6,7 @@ Adapter SA pour le port `PipelineRunsQueries`. L'écart de durée est recalculé
 from __future__ import annotations
 
 from collections import defaultdict
+from collections.abc import Iterable
 from statistics import median as _statistics_median
 from typing import cast
 
@@ -37,13 +38,23 @@ def _duration_ratio(duration_s: float, historical_median_s: float | None) -> flo
     return duration_s / historical_median_s
 
 
+def _worst_status(statuses: Iterable[PhaseStatus]) -> PhaseStatus:
+    """Statut d'un run = le pire de ses phases, dans l'ordre error > warning > ok."""
+    seen = set(statuses)
+    if "error" in seen:
+        return "error"
+    if "warning" in seen:
+        return "warning"
+    return "ok"
+
+
 class PgPipelineRunsQueries(PipelineRunsQueries):
     """Adapter SA pour `PipelineRunsQueries`."""
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
 
-    def list_runs(self, limit: int = 50, offset: int = 0) -> list[RunSummary]:
+    def list_runs(self, *, limit: int = 50, offset: int = 0) -> list[RunSummary]:
         """Fenêtre de runs, plus récent en premier (`offset` runs sautés pour le chargement incrémental). Statut global = le pire des statuts de phase ; mode et sources pris sur la première phase du run."""
         rows = self._conn.execute(
             text(
@@ -130,20 +141,13 @@ class PgPipelineRunsQueries(PipelineRunsQueries):
                 )
             )
 
-        status: PhaseStatus = (
-            "error"
-            if any(p.status == "error" for p in phases)
-            else "warning"
-            if any(p.status == "warning" for p in phases)
-            else "ok"
-        )
         return RunDetail(
             run_id=run_id,
             started_at=min(p.started_at for p in phases),
             ended_at=max(p.ended_at for p in phases),
             mode=rows[0].mode,
             sources=list(rows[0].sources),
-            status=status,
+            status=_worst_status(p.status for p in phases),
             total_duration_s=sum(p.duration_s for p in phases),
             phases=phases,
         )

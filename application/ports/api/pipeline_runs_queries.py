@@ -6,7 +6,7 @@ La liste agrège les exécutions par `run_id` (statut global = le pire des statu
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Protocol
+from typing import Any, Protocol
 
 from pydantic import BaseModel
 
@@ -47,7 +47,7 @@ class PhaseExecutionDetail(BaseModel):
     status: PhaseStatus
     duration_s: float
     metrics: PhaseMetricsPayload
-    details: dict[str, object]
+    details: dict[str, Any]
     historical_median_duration_s: float | None
     duration_ratio: float | None
     signals: list[Signal]
@@ -69,6 +69,6 @@ class RunDetail(BaseModel):
 class PipelineRunsQueries(Protocol):
     """Lectures pour /api/pipeline/runs/*."""
 
-    def list_runs(self, limit: int = 50, offset: int = 0) -> list[RunSummary]: ...
+    def list_runs(self, *, limit: int = 50, offset: int = 0) -> list[RunSummary]: ...
 
     def get_run(self, run_id: int) -> RunDetail | None: ...
