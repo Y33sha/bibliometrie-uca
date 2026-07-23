@@ -56,9 +56,7 @@ class PgAddressRepository:
         address_ids: list[int],
         structure_id: int,
     ) -> int:
-        # Un rattachement est unique par (address_id, structure_id) : une ligne est soit
-        # supprimée (purement manuelle), soit repassée à pending — jamais les deux. Les
-        # deux compteurs s'additionnent sans doublon.
+        # Un rattachement est unique par (address_id, structure_id) : une ligne est soit supprimée (purement manuelle), soit repassée à pending — jamais les deux. Les deux compteurs se cumulent (ensembles disjoints).
         deleted = self._conn.execute(
             delete(address_structures)
             .where(address_structures.c.address_id.in_(address_ids))
@@ -102,8 +100,7 @@ class PgAddressRepository:
     ) -> set[int]:
         """Cf. docstring du port.
 
-        Condition miroir de la clause WHERE de
-        `recompute_in_perimeter_on_source_authorships` — à garder synchronisée.
+        Condition miroir de la clause WHERE de `recompute_in_perimeter_on_source_authorships`, à garder synchronisée.
         """
         if not address_ids:
             return set()

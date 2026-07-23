@@ -1,14 +1,8 @@
 """Adapter PostgreSQL pour l'agrégat Publisher.
 
-Séparé de `journal_repository.py` (principe ISP). Même contrat que
-les autres PgXxxRepository : exceptions du domaine, pas
-d'orchestration métier (qui reste dans `application/journals.py`).
+Séparé de `journal_repository.py` (principe ISP). Même contrat que les autres PgXxxRepository : exceptions du domaine, l'orchestration métier restant dans `application/services/`.
 
-La méthode `merge_publisher_into` réalise les étapes 2-6 d'une fusion
-d'éditeurs ; la détection préalable des journaux à titre partagé
-(étape 1) est dans `JournalRepository.find_shared_title_journal_pairs`
-— le service `application/journals.merge_publishers` orchestre les
-deux.
+La méthode `merge_publisher_into` réalise les étapes 2-6 d'une fusion d'éditeurs ; la détection préalable des journaux à titre partagé (étape 1) est dans `JournalRepository.find_shared_title_journal_pairs`, le service de fusion d'éditeurs orchestrant les deux.
 """
 
 from typing import NamedTuple, cast
@@ -161,9 +155,7 @@ class PgPublisherRepository:
     # ── Fusion ─────────────────────────────────────────────────────
 
     def merge_publisher_into(self, target_id: int, source_id: int) -> None:
-        """Fusion d'éditeur — étapes 2-6 (le service a déjà traité les paires
-        de journaux partageant un titre via `find_shared_title_journal_pairs`
-        + merge_journals).
+        """Fusion d'éditeur — étapes 2-6 (le service a déjà traité les paires de journaux partageant un titre via `find_shared_title_journal_pairs` + merge_journals).
 
         1. (fait côté service) fusion des journaux à titres partagés
         2. Transfert des journaux restants vers la cible
@@ -193,8 +185,7 @@ class PgPublisherRepository:
             delete(publisher_name_forms).where(publisher_name_forms.c.publisher_id == source_id)
         )
 
-        # journal_name_forms : supprime d'abord les doublons avec target,
-        # puis transfère le reste.
+        # journal_name_forms : supprime d'abord les doublons avec target, puis transfère le reste.
         self._conn.execute(
             text("""
                 DELETE FROM journal_name_forms
@@ -216,8 +207,7 @@ class PgPublisherRepository:
             {"t": target_id, "s": source_id},
         )
 
-        # Ordre : capture src → NULL-er openalex_id src (libère la contrainte
-        # UNIQUE) → enrich target → delete source.
+        # Ordre : capture src → NULL-er openalex_id src (libère la contrainte UNIQUE) → enrich target → delete source.
         src = self._conn.execute(
             select(
                 publishers.c.openalex_id,
@@ -238,6 +228,5 @@ class PgPublisherRepository:
 
         self._conn.execute(delete(publishers).where(publishers.c.id == source_id))
 
-        # pub_count : la cible a absorbé les revues de la source (les pub_count des
-        # revues sont inchangés) → recalcule la somme côté éditeur cible.
+        # pub_count : la cible a absorbé les revues de la source (les pub_count des revues sont inchangés) → recalcule la somme côté éditeur cible.
         refresh_publisher_pub_count(self._conn, target_id)

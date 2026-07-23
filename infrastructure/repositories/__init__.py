@@ -1,13 +1,6 @@
 """Factories pour accéder aux implémentations concrètes des repositories.
 
-La couche application importe ces fonctions plutôt que les classes
-concrètes Pg* : elle ne dépend que de ce module (point de câblage
-d'infrastructure) et des Protocols dans application/ports/repositories/,
-jamais des classes d'implémentation.
-
-Pour changer d'implémentation (tests avec fake, futur changement de
-SGBD…) : remplacer le corps d'une factory par la nouvelle impl, sans
-toucher au code de l'application.
+La couche application importe ces fonctions plutôt que les classes concrètes Pg* : elle ne dépend que de ce module (point de câblage d'infrastructure) et des Protocols dans application/ports/repositories/, jamais des classes d'implémentation.
 
 Usage :
     from infrastructure.repositories import person_repository

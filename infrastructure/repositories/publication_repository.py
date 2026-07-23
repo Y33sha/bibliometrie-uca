@@ -1,11 +1,8 @@
 """Adapter PostgreSQL pour la persistance des publications.
 
-Isole le SQL de la couche application. Implémente le port
-`PublicationRepository` défini dans application/ports/repositories/.
+Isole le SQL de la couche application. Implémente le port `PublicationRepository` défini dans application/ports/repositories/.
 
-Toutes les queries publications utilisent `text()` paramétré : trop
-intriquées en casts enum (oa_type, doc_type, source_type) et opérations
-array pour gagner à passer par MetaData.
+Toutes les queries publications utilisent `text()` paramétré : trop intriquées en casts enum (oa_type, doc_type, source_type) et opérations array pour gagner à passer par MetaData.
 """
 
 from typing import Any, NamedTuple
@@ -193,8 +190,7 @@ class PgPublicationRepository:
                 "meta": _json_dumps_or_none(pub.meta),
             },
         )
-        # Colonnes grasses (abstract / keywords / topics / biblio) → table 1:1
-        # publications_detail (upsert).
+        # Colonnes grasses (abstract / keywords / topics / biblio) → table 1:1 publications_detail (upsert).
         self._conn.execute(
             text("""
                 INSERT INTO publications_detail
@@ -219,8 +215,7 @@ class PgPublicationRepository:
     # ── Écritures simples ──────────────────────────────────────────
 
     def update_oa_status(self, pub_id: int, oa_status: str) -> None:
-        """Met à jour le statut OA d'une publication (vérification Unpaywall) et
-        pose `unpaywall_checked_at` (staleness de l'enrichissement OA)."""
+        """Met à jour le statut OA d'une publication (vérification Unpaywall) et pose `unpaywall_checked_at` (staleness de l'enrichissement OA)."""
         self._conn.execute(
             text(
                 "UPDATE publications "
@@ -232,9 +227,7 @@ class PgPublicationRepository:
         )
 
     def mark_unpaywall_checked(self, pub_id: int) -> None:
-        """Pose `unpaywall_checked_at = now()` sans changer le statut — pour les
-        vérifications Unpaywall qui ne modifient rien (statut inchangé, non trouvé,
-        diamond préservé). Évite de re-interroger ce DOI au run suivant."""
+        """Pose `unpaywall_checked_at = now()` à statut constant — pour les vérifications Unpaywall neutres (statut inchangé, non trouvé, diamond préservé). Évite de re-interroger ce DOI au run suivant."""
         self._conn.execute(
             text("UPDATE publications SET unpaywall_checked_at = now() WHERE id = :id"),
             {"id": pub_id},
@@ -286,9 +279,7 @@ class PgPublicationRepository:
         return [_view_from_row(_SourcePublicationViewRow(*row)) for row in result]
 
     def get_converged_secondary_ids(self, pub_id: int) -> frozenset[int]:
-        """Ids des `source_publications` de `pub_id` dont le DOI a été substitué par une
-        correction de convergence (`raw_metadata.doi.corrected_by` ∈ `CONVERGENCE_CASES`). Ces
-        formes secondaires (version, variante, pièce) sont dépriorisées à l'agrégation."""
+        """Ids des `source_publications` de `pub_id` dont le DOI a été substitué par une correction de convergence (`raw_metadata.doi.corrected_by` ∈ `CONVERGENCE_CASES`). Ces formes secondaires (version, variante, pièce) sont dépriorisées à l'agrégation."""
         result = self._conn.execute(
             text("""
                 SELECT id FROM source_publications
@@ -376,10 +367,7 @@ class PgPublicationRepository:
             {"t": target_id, "s": source_id},
         )
 
-        # 3. Repointer distinct_publications de source vers target : pour chaque
-        #    paire (source, autre), insérer (autre, target) réordonnée. On écarte
-        #    l'auto-paire (autre = target) et on dédoublonne via ON CONFLICT, puis
-        #    on supprime les anciennes paires de source.
+        # 3. Repointer distinct_publications de source vers target : pour chaque paire (source, autre), insérer (autre, target) réordonnée. On écarte l'auto-paire (autre = target) et on dédoublonne via ON CONFLICT, puis on supprime les paires de source.
         self._conn.execute(
             text("""
                 INSERT INTO distinct_publications (pub_id_a, pub_id_b)
@@ -416,8 +404,7 @@ class PgPublicationRepository:
     def mark_distinct(self, pub_id_a: int, pub_id_b: int) -> tuple[int, int] | None:
         """Marque deux publications comme distinctes. Idempotent.
 
-        Retourne (a, b) si la paire vient d'être insérée, None sinon —
-        le caller décide s'il émet un audit ou pas.
+        Retourne (a, b) si la paire vient d'être insérée, None sinon — le caller décide s'il émet un audit.
         """
         row = self._conn.execute(
             text("""

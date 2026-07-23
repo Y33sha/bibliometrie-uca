@@ -66,9 +66,7 @@ class PgDoiPrefixRepository:
         return result.rowcount > 0
 
     def breakdown_by_registration_agency(self) -> list[tuple[str, int, int]]:
-        """`(ra, DOI distincts, préfixes distincts)` par RA, trié par DOI décroissant.
-        Le préfixe est extrait comme à l'insertion (`split_part(doi, '/', 1)`) pour
-        joindre `doi_prefixes` ; un préfixe absent (non résolu) compte comme `unknown`."""
+        """`(ra, DOI distincts, préfixes distincts)` par RA, trié par DOI décroissant. Le préfixe est extrait comme à l'insertion (`split_part(doi, '/', 1)`) pour joindre `doi_prefixes` ; un préfixe absent (non résolu) compte comme `unknown`."""
         result = self._conn.execute(
             text(
                 """

@@ -74,13 +74,7 @@ def _structure_name_form_from_row(row: _StructureNameFormRow) -> StructureNameFo
 def _structure_from_row(row: _StructureRow, name_forms: tuple[StructureNameForm, ...]) -> Structure:
     """Mapping d'une row `structures` SQL vers l'aggregate `Structure`.
 
-    Reçoit en paramètre la liste hydratée des `name_forms` (chargée à
-    part par `find_by_id`). Les VOs `ror_id` et `hal_collection` sont
-    parsés en strict (`RorId(...)` / `HalCollection(...)`) — toute donnée
-    en base qui ne respecte pas le format canonique des VOs fera lever
-    `ValidationError` à l'hydratation. C'est délibéré : la base est
-    censée être normalisée (migration 0010 pour ror_id) ; un échec ici
-    signale une corruption à investiguer plutôt qu'à masquer.
+    Reçoit la liste hydratée des `name_forms` (chargée à part par `find_by_id`). Les VOs `ror_id` et `hal_collection` sont parsés en strict (`RorId(...)` / `HalCollection(...)`) : une valeur en base au format non canonique lève `ValidationError` à l'hydratation, signalant une corruption à investiguer sur une base censée normalisée.
     """
     return Structure(
         id=row.id,
@@ -99,13 +93,10 @@ def _normalize_api_ids(raw: dict[str, Any] | None) -> dict[str, Any] | None:
     """Valide et normalise `api_ids` via le modèle JSONB StructureApiIds.
 
     - Entrée : dict brut (côté API admin) ou None.
-    - Sortie : dict canonique prêt JSONB, ou None si l'entrée est
-      vide/None.
+    - Sortie : dict canonique prêt JSONB, ou None si l'entrée est vide/None.
     - Lève `domain.errors.ValidationError` si le schéma est violé.
 
-    La validation vit côté repo (frontière infra→DB) : tout chemin
-    d'écriture passe par ici, y compris les scripts CLI qui
-    court-circuitent la couche application.
+    La validation vit côté repo (frontière infra→DB) : tout chemin d'écriture passe par ici, y compris les scripts CLI qui court-circuitent la couche application.
     """
     if not raw:
         return None
@@ -227,9 +218,7 @@ class PgStructureRepository:
     # ── structure_relations ────────────────────────────────────────
 
     def get_ancestor_ids(self, structure_id: int) -> frozenset[int]:
-        # Remontée récursive `child → parent` à travers `structure_relations`,
-        # toutes `relation_type` confondues (un cycle est un cycle quel que
-        # soit le type d'arête). `structure_id` lui-même est exclu du résultat.
+        # Remontée récursive `child → parent` à travers `structure_relations`, toutes `relation_type` confondues (un cycle est un cycle quel que soit le type d'arête). `structure_id` lui-même est exclu du résultat.
         stmt = text(
             """
             WITH RECURSIVE ancestors(id) AS (

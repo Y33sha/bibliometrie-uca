@@ -110,6 +110,5 @@ class PgPerimeterRepository:
     # ── Matérialisation ────────────────────────────────────────────
 
     def refresh_structures(self) -> None:
-        """Reconstruit `perimeter_structures` (clôture récursive des racines de tous les
-        périmètres). Commit laissé au caller (command handler)."""
+        """Reconstruit `perimeter_structures` (clôture récursive des racines de tous les périmètres). Commit laissé au caller (command handler)."""
         refresh_perimeter_structures(self._conn)

@@ -1,9 +1,6 @@
 """Adapter PostgreSQL pour l'agrégat Person.
 
-Implémente le port `application.ports.repositories.person_repository.PersonRepository`.
-Le SQL est réparti par thème dans les sous-modules `_core`, `_identifiers`,
-`_name_forms` — la classe `PgPersonRepository` n'est qu'un point
-d'agrégation qui borne la connexion et délègue.
+Implémente le port `application.ports.repositories.person_repository.PersonRepository`. Le SQL est réparti par thème dans les sous-modules `_core`, `_identifiers`, `_name_forms` — la classe `PgPersonRepository` n'est qu'un point d'agrégation qui borne la connexion et délègue.
 
 Usage :
     repo = PgPersonRepository(conn)

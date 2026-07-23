@@ -2,8 +2,7 @@
 
 L'agrégat Publisher est dans `publisher_repository.py` (principe ISP).
 
-Même contrat que les autres PgXxxRepository : exceptions du domaine,
-pas d'orchestration métier (qui reste dans `application/journals.py`).
+Même contrat que les autres PgXxxRepository : exceptions du domaine, l'orchestration métier restant dans `application/services/journals/`.
 """
 
 from datetime import datetime
@@ -107,8 +106,7 @@ class PgJournalRepository:
         form_normalized: str,
         publisher_id: int | None,
     ) -> None:
-        """Ajoute une forme de nom de journal si elle n'existe pas (idempotent).
-        No-op si form_normalized est vide."""
+        """Ajoute une forme de nom de journal si elle est absente (idempotent). No-op si form_normalized est vide."""
         if not form_normalized:
             return
         stmt = (
@@ -127,8 +125,7 @@ class PgJournalRepository:
         form_normalized: str,
         publisher_id: int | None,
     ) -> int | None:
-        """Cherche un journal_id via une forme de nom normalisée,
-        en privilégiant les journaux avec eISSN (plus fiable)."""
+        """Cherche un journal_id via une forme de nom normalisée, en privilégiant les journaux avec eISSN (plus fiable)."""
         stmt = (
             select(journal_name_forms.c.journal_id)
             .select_from(
@@ -188,9 +185,7 @@ class PgJournalRepository:
         ]
 
     def find_journal_by_issn_any(self, issn_value: str) -> int | None:
-        """Cherche un journal dont l'un des 3 champs issn/eissn/issnl
-        correspond à la valeur. Permet de chercher indifféremment par
-        ISSN, eISSN ou ISSN-L."""
+        """Cherche un journal dont l'un des 3 champs issn/eissn/issnl correspond à la valeur. Permet de chercher indifféremment par ISSN, eISSN ou ISSN-L."""
         return self._conn.execute(
             select(journals.c.id)
             .where(
@@ -213,15 +208,9 @@ class PgJournalRepository:
         openalex_id: str | None = None,
         oa_model: OaModel | None = None,
     ) -> None:
-        """Enrichit un journal existant avec les champs non null fournis
-        (COALESCE sur chaque champ : ne downgrade jamais).
+        """Enrichit un journal existant avec les champs non-null fournis (COALESCE par champ : une valeur en place tient).
 
-        Garde anti-bloat : l'UPDATE n'est émis que si au moins une colonne
-        actuellement NULL recevrait une valeur. Sans ce filtre, chaque match de
-        journal (fréquent — un journal populaire est partagé par des milliers de
-        publis) réécrivait la ligne inutilement (COALESCE vers la même valeur),
-        générant un tuple mort à chaque appel → bloat de `journals` et lookups
-        de plus en plus lents au fil du run normalize.
+        Garde anti-bloat : l'UPDATE n'est émis que si au moins une colonne actuellement NULL recevrait une valeur. Un journal populaire, partagé par des milliers de publications, est matché en masse pendant `normalize` ; borner l'écriture aux vrais remplissages épargne les tuples morts et garde les lookups rapides.
         """
         fillable = (
             (journals.c.issn, issn),
@@ -455,8 +444,7 @@ class PgJournalRepository:
             )
         )
 
-        # pub_count : la cible a absorbé les publications de la source. Recalcule la
-        # revue cible, puis les éditeurs concernés (cible + ancien éditeur source).
+        # pub_count : la cible a absorbé les publications de la source. Recalcule la revue cible, puis les éditeurs concernés (cible + éditeur de la source).
         refresh_journal_pub_count(self._conn, target_id)
         target_publisher = self._conn.execute(
             select(journals.c.publisher_id).where(journals.c.id == target_id)
