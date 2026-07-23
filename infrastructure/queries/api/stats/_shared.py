@@ -22,15 +22,23 @@ def stats_filter_clauses(
     *,
     perimeter_structure_ids: list[int],
     filters: StatsFilters,
+    skip: str = "",
 ) -> list[WhereClause | None]:
-    """Clauses de filtrage communes aux agrégats stats (années, labos, accès, APC, types, éditeur, revue). À assembler avec `assemble_where`."""
-    out: list[WhereClause | None] = [
-        year_clause(filters.years),
-        lab_clause(filters.lab_ids),
-        oa_clause(filters.oa_status),
-        stats_apc_clause(filters.has_apc, perimeter_structure_ids),
-        doc_type_clause(filters.doc_types),
-    ]
+    """Clauses de filtrage communes aux agrégats stats (années, labos, accès, APC, types, éditeur, revue). À assembler avec `assemble_where`.
+
+    `skip` omet une dimension (`year` / `lab` / `oa` / `apc` / `doc_type`) pour les facettes croisées, qui écartent leur propre filtre. Les filtres éditeur et revue s'appliquent toujours (la barre ne les facette jamais — ils passent par la recherche serveur).
+    """
+    out: list[WhereClause | None] = []
+    if skip != "year":
+        out.append(year_clause(filters.years))
+    if skip != "lab":
+        out.append(lab_clause(filters.lab_ids))
+    if skip != "oa":
+        out.append(oa_clause(filters.oa_status))
+    if skip != "apc":
+        out.append(stats_apc_clause(filters.has_apc, perimeter_structure_ids))
+    if skip != "doc_type":
+        out.append(doc_type_clause(filters.doc_types))
     if filters.publisher_ids:
         out.append(
             WhereClause(
