@@ -26,11 +26,27 @@ from infrastructure.queries.api.filters import (
 _BASE_FROM = "persons p LEFT JOIN persons_rh prh ON prh.person_id = p.id"
 
 
+def _yesno(predicate: str, prefix: str = "") -> str:
+    """Fragment SELECT comptant les personnes qui vérifient `predicate` (`{prefix}yes`) et les autres (`{prefix}no`)."""
+    return (
+        f"COUNT(*) FILTER (WHERE {predicate}) AS {prefix}yes, "
+        f"COUNT(*) FILTER (WHERE NOT ({predicate})) AS {prefix}no"
+    )
+
+
+def _has_identifier(id_type: str) -> str:
+    """Prédicat : la personne `p` porte un identifiant `id_type` au statut hors 'rejected'."""
+    return (
+        "EXISTS (SELECT 1 FROM person_identifiers pi "
+        f"WHERE pi.person_id = p.id AND pi.id_type = '{id_type}' AND pi.status != 'rejected')"
+    )
+
+
 def persons_facets(conn: Connection, *, filters: PersonFilters) -> PersonsFacetsResponse:
     """Facettes dynamiques (chaque facette exclut son propre filtre)."""
 
     def base_clauses(*, skip: str) -> list[WhereClause | None]:
-        # Scope labo, recherche nom et rejet s'appliquent à toutes les facettes : ils délimitent la population décomptée, au lieu d'en être une dimension.
+        # Scope labo, recherche nom et rejet délimitent la population décomptée : ils s'appliquent à toutes les facettes, quand les autres filtres sont chacun exclu de leur propre facette.
         out: list[WhereClause | None] = [
             person_rejected_clause(filters.rejected),
             person_in_lab_clause(filters.lab_id),
@@ -78,55 +94,13 @@ def persons_facets(conn: Connection, *, filters: PersonFilters) -> PersonsFacets
     ).all()
     role_facets = [FacetOption(value=r.value, count=r.n) for r in role_rows]
 
-    # ORCID / IDHAL / IDREF — tous skip='ids', donc même WHERE
+    # ORCID / IDHAL / IDREF partagent la population (skip='ids') : un seul passage.
     where_sql, binds = assemble_where(base_clauses(skip="ids"))
-    orcid = conn.execute(
+    ids = conn.execute(
         text(f"""
-            SELECT
-                COUNT(*) FILTER (WHERE EXISTS (
-                    SELECT 1 FROM person_identifiers pi
-                    WHERE pi.person_id = p.id AND pi.id_type = 'orcid'
-                      AND pi.status != 'rejected'
-                )) AS yes,
-                COUNT(*) FILTER (WHERE NOT EXISTS (
-                    SELECT 1 FROM person_identifiers pi
-                    WHERE pi.person_id = p.id AND pi.id_type = 'orcid'
-                      AND pi.status != 'rejected'
-                )) AS no
-            FROM {_BASE_FROM} WHERE {where_sql}
-        """),
-        binds,
-    ).one()
-    idhal = conn.execute(
-        text(f"""
-            SELECT
-                COUNT(*) FILTER (WHERE EXISTS (
-                    SELECT 1 FROM person_identifiers pi
-                    WHERE pi.person_id = p.id AND pi.id_type = 'idhal'
-                      AND pi.status != 'rejected'
-                )) AS yes,
-                COUNT(*) FILTER (WHERE NOT EXISTS (
-                    SELECT 1 FROM person_identifiers pi
-                    WHERE pi.person_id = p.id AND pi.id_type = 'idhal'
-                      AND pi.status != 'rejected'
-                )) AS no
-            FROM {_BASE_FROM} WHERE {where_sql}
-        """),
-        binds,
-    ).one()
-    idref = conn.execute(
-        text(f"""
-            SELECT
-                COUNT(*) FILTER (WHERE EXISTS (
-                    SELECT 1 FROM person_identifiers pi
-                    WHERE pi.person_id = p.id AND pi.id_type = 'idref'
-                      AND pi.status != 'rejected'
-                )) AS yes,
-                COUNT(*) FILTER (WHERE NOT EXISTS (
-                    SELECT 1 FROM person_identifiers pi
-                    WHERE pi.person_id = p.id AND pi.id_type = 'idref'
-                      AND pi.status != 'rejected'
-                )) AS no
+            SELECT {_yesno(_has_identifier("orcid"), "orcid_")},
+                   {_yesno(_has_identifier("idhal"), "idhal_")},
+                   {_yesno(_has_identifier("idref"), "idref_")}
             FROM {_BASE_FROM} WHERE {where_sql}
         """),
         binds,
@@ -135,59 +109,39 @@ def persons_facets(conn: Connection, *, filters: PersonFilters) -> PersonsFacets
     # RH
     where_sql, binds = assemble_where(base_clauses(skip="has_rh"))
     rh = conn.execute(
-        text(f"""
-            SELECT
-                COUNT(*) FILTER (WHERE prh.id IS NOT NULL) AS yes,
-                COUNT(*) FILTER (WHERE prh.id IS NULL) AS no
-            FROM {_BASE_FROM} WHERE {where_sql}
-        """),
+        text(f"SELECT {_yesno('prh.id IS NOT NULL')} FROM {_BASE_FROM} WHERE {where_sql}"),
         binds,
     ).one()
 
     # FORMES DE NOM À CONFIRMER (≥1 forme `pending`)
     where_sql, binds = assemble_where(base_clauses(skip="pending_forms"))
+    pending_forms_pred = (
+        "EXISTS (SELECT 1 FROM person_name_forms pnf "
+        "WHERE pnf.person_id = p.id AND pnf.status = 'pending')"
+    )
     pending_forms = conn.execute(
-        text(f"""
-            SELECT
-                COUNT(*) FILTER (WHERE EXISTS (
-                    SELECT 1 FROM person_name_forms pnf
-                    WHERE pnf.person_id = p.id AND pnf.status = 'pending'
-                )) AS yes,
-                COUNT(*) FILTER (WHERE NOT EXISTS (
-                    SELECT 1 FROM person_name_forms pnf
-                    WHERE pnf.person_id = p.id AND pnf.status = 'pending'
-                )) AS no
-            FROM {_BASE_FROM} WHERE {where_sql}
-        """),
+        text(f"SELECT {_yesno(pending_forms_pred)} FROM {_BASE_FROM} WHERE {where_sql}"),
         binds,
     ).one()
 
     # IDENTIFIANTS À CONFIRMER (≥1 identifiant public `pending`) — mêmes types que la cellule d'affichage, un `hal_person_id` en attente est interne.
     where_sql, binds = assemble_where(base_clauses(skip="pending_identifiers"))
+    pending_ids_pred = (
+        "EXISTS (SELECT 1 FROM person_identifiers pi "
+        "WHERE pi.person_id = p.id AND pi.status = 'pending' "
+        f"AND pi.id_type IN {PUBLIC_PERSON_IDENTIFIER_TYPES_SQL})"
+    )
     pending_identifiers = conn.execute(
-        text(f"""
-            SELECT
-                COUNT(*) FILTER (WHERE EXISTS (
-                    SELECT 1 FROM person_identifiers pi
-                    WHERE pi.person_id = p.id AND pi.status = 'pending'
-                      AND pi.id_type IN {PUBLIC_PERSON_IDENTIFIER_TYPES_SQL}
-                )) AS yes,
-                COUNT(*) FILTER (WHERE NOT EXISTS (
-                    SELECT 1 FROM person_identifiers pi
-                    WHERE pi.person_id = p.id AND pi.status = 'pending'
-                      AND pi.id_type IN {PUBLIC_PERSON_IDENTIFIER_TYPES_SQL}
-                )) AS no
-            FROM {_BASE_FROM} WHERE {where_sql}
-        """),
+        text(f"SELECT {_yesno(pending_ids_pred)} FROM {_BASE_FROM} WHERE {where_sql}"),
         binds,
     ).one()
 
     return PersonsFacetsResponse(
         departments=dept_facets,
         roles=role_facets,
-        orcid=YesNoCount(yes=orcid.yes, no=orcid.no),
-        idhal=YesNoCount(yes=idhal.yes, no=idhal.no),
-        idref=YesNoCount(yes=idref.yes, no=idref.no),
+        orcid=YesNoCount(yes=ids.orcid_yes, no=ids.orcid_no),
+        idhal=YesNoCount(yes=ids.idhal_yes, no=ids.idhal_no),
+        idref=YesNoCount(yes=ids.idref_yes, no=ids.idref_no),
         rh=YesNoCount(yes=rh.yes, no=rh.no),
         pending_forms=YesNoCount(yes=pending_forms.yes, no=pending_forms.no),
         pending_identifiers=YesNoCount(yes=pending_identifiers.yes, no=pending_identifiers.no),
