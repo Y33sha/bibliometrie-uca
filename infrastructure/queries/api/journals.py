@@ -31,7 +31,7 @@ from domain.journals.journal import (
     OA_MODELS,
 )
 from domain.normalize import normalize_text
-from infrastructure.queries.api.filters import SUBJECT_IS_NOT_GENERIC, publication_in_perimeter
+from infrastructure.queries.api.filters import entity_subjects_sql, publication_in_perimeter
 from infrastructure.sources.doaj import resolve_doaj_url
 
 # Colonnes de la ligne de liste d'une revue. `doaj_id` et `doaj_url_csv` sont les deux entrées de `resolve_doaj_url` ; la jointure `publishers p` est attendue par `pub_name`.
@@ -301,18 +301,7 @@ class PgJournalQueries(JournalQueries):
         Le `COUNT(DISTINCT p.id)` tient au grain de `publication_subjects`, qui porte une ligne par source pour une même paire (publication, sujet).
         """
         rows = self._conn.execute(
-            text(f"""
-                SELECT s.id, s.label, COUNT(DISTINCT p.id) AS n
-                FROM publication_subjects ps
-                JOIN publications p ON p.id = ps.publication_id
-                JOIN subjects s ON s.id = ps.subject_id
-                WHERE p.journal_id = :id
-                  AND {publication_in_perimeter("p")}
-                  AND {SUBJECT_IS_NOT_GENERIC}
-                GROUP BY s.id, s.label
-                ORDER BY n DESC, lower(s.label)
-                LIMIT :lim
-            """),
+            text(entity_subjects_sql("p.journal_id = :id")),
             {"id": journal_id, "lim": limit},
         ).all()
         return [SubjectFrequency(id=r.id, label=r.label, count=r.n) for r in rows]
