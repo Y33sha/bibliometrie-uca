@@ -39,6 +39,20 @@ from infrastructure.queries.api.filters import (
 # Libellés des statuts thèse pour l'export CSV.
 _THESES_STATUS_LABELS = {"thesis": "Soutenue", "ongoing_thesis": "En cours"}
 
+# Gabarits d'URL publique par source, pour la colonne « Sources » des exports CSV.
+_SOURCE_URL = {
+    "hal": "https://hal.science/{}",
+    "openalex": "https://openalex.org/{}",
+    "wos": "https://www.webofscience.com/wos/woscc/full-record/{}",
+    "scanr": "https://scanr.enseignementsup-recherche.gouv.fr/publications/{}",
+    "theses": "https://theses.fr/{}",
+}
+
+
+def _source_links(ids: dict[str, str | None]) -> dict[str, str]:
+    """URL publique de chaque source présente (identifiant non nul), pour la colonne « Sources »."""
+    return {source: _SOURCE_URL[source].format(value) for source, value in ids.items() if value}
+
 
 def _initial_clauses(filters: PublicationFilters) -> list[WhereClause]:
     """Initialise les conditions de base selon le scope (person, labs, UCA)."""
@@ -376,19 +390,15 @@ def export_publications_csv(
     writer.writerow([header for _, header in emitted])
     for row in rows:
         doi_url = f"https://doi.org/{row.doi}" if row.doi else ""
-        sources: dict[str, str] = {}
-        if row.hal_id:
-            sources["hal"] = f"https://hal.science/{row.hal_id}"
-        if row.openalex_id:
-            sources["openalex"] = f"https://openalex.org/{row.openalex_id}"
-        if row.wos_id:
-            sources["wos"] = f"https://www.webofscience.com/wos/woscc/full-record/{row.wos_id}"
-        if row.scanr_id:
-            sources["scanr"] = (
-                f"https://scanr.enseignementsup-recherche.gouv.fr/publications/{row.scanr_id}"
-            )
-        if row.theses_id:
-            sources["theses"] = f"https://theses.fr/{row.theses_id}"
+        sources = _source_links(
+            {
+                "hal": row.hal_id,
+                "openalex": row.openalex_id,
+                "wos": row.wos_id,
+                "scanr": row.scanr_id,
+                "theses": row.theses_id,
+            }
+        )
         cell = {
             "Type": row.doc_type or "",
             "Année": row.pub_year or "",
@@ -483,17 +493,14 @@ def export_theses_csv(
     )
     for row in rows:
         doi_url = f"https://doi.org/{row.doi}" if row.doi else ""
-        sources: dict[str, str] = {}
-        if row.hal_id:
-            sources["hal"] = f"https://hal.science/{row.hal_id}"
-        if row.openalex_id:
-            sources["openalex"] = f"https://openalex.org/{row.openalex_id}"
-        if row.scanr_id:
-            sources["scanr"] = (
-                f"https://scanr.enseignementsup-recherche.gouv.fr/publications/{row.scanr_id}"
-            )
-        if row.theses_id:
-            sources["theses"] = f"https://theses.fr/{row.theses_id}"
+        sources = _source_links(
+            {
+                "hal": row.hal_id,
+                "openalex": row.openalex_id,
+                "scanr": row.scanr_id,
+                "theses": row.theses_id,
+            }
+        )
         access = "ouvert" if row.oa_status in OA_OPEN_STATUSES else "fermé"
         writer.writerow(
             [
