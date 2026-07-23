@@ -88,7 +88,7 @@ logger = logging.getLogger(__name__)
 def get_admin_user() -> str:
     """Username admin attendu (depuis `infrastructure.settings`).
 
-    Exposé en `Depends(...)` pour que les routers n'importent pas `infrastructure.settings` directement (règle 4 de `docs/architecture/01-vue-d-ensemble.md`, tenue par un contrat import-linter).
+    Exposé en `Depends(...)` pour que les routers n'importent pas `infrastructure.settings` directement (tenu par un contrat import-linter).
     """
     return settings.admin_user
 

@@ -2,7 +2,7 @@
 
 Implémenté par `infrastructure.queries.api.publications.PgPublicationsQueries`. Les modèles Pydantic que ces lectures rendent sont co-localisés avec le `Protocol` : leur contrat appartient au port.
 
-La dataclass `PublicationFilters` fait ici référence ; l'infrastructure l'importe pour typer ses signatures (règle 3 de `docs/architecture/01-vue-d-ensemble.md`).
+La dataclass `PublicationFilters` fait ici référence ; l'infrastructure l'importe pour typer ses signatures.
 """
 
 from dataclasses import dataclass, field
