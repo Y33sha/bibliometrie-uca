@@ -212,14 +212,14 @@
       <section class="drawer-section">
         <h3>Personnes partageant une forme de nom</h3>
         <div class="sharing-list">
-          {#each sharing as sp (sp.id)}
+          {#each sharing as sp (sp.person_id)}
             <div class="sharing-row">
               <button
                 class="btn btn-sm"
                 title="Fusionner cette personne dans celle-ci"
-                onclick={() => absorb(sp.id)}>Absorber</button
+                onclick={() => absorb(sp.person_id)}>Absorber</button
               >
-              <button class="sharing-name" onclick={() => onopenPerson(sp.id)}>
+              <button class="sharing-name" onclick={() => onopenPerson(sp.person_id)}>
                 <span class="person-last">{titleCase(sp.last_name)}</span>
                 {titleCase(sp.first_name)}
               </button>
