@@ -159,9 +159,7 @@ class PgAuthorshipRepository:
         )
 
     # ── source_authorships : lien personne ↔ signature ─────────────
-    # `source_authorships.person_id` pose qu'une signature est portée par une personne. Sa
-    # sémantique de suppression (`ON DELETE SET NULL`) le range côté signature : effacer la
-    # personne rend la signature orpheline, ne la détruit pas.
+    # `source_authorships.person_id` pose qu'une signature est portée par une personne. Sa sémantique de suppression (`ON DELETE SET NULL`) le range côté signature : effacer la personne rend la signature orpheline ; la ligne survit.
 
     def link_authorship(
         self,
@@ -305,8 +303,7 @@ class PgAuthorshipRepository:
         return dict(row._mapping) if row else None
 
     def reject_authorship(self, publication_id: int, person_id: int) -> None:
-        """Enregistre le rejet d'une paire (publication, personne) dans le
-        store `rejected_authorships`. Idempotent."""
+        """Enregistre le rejet d'une paire (publication, personne) dans le store `rejected_authorships`. Idempotent."""
         self._conn.execute(
             text(
                 "INSERT INTO rejected_authorships (publication_id, person_id) "
@@ -339,12 +336,10 @@ class PgAuthorshipRepository:
         publication_id: int,
         person_id: int,
     ) -> int:
-        """Nulle `person_id` sur toutes les `source_authorships` de cette
-        personne dont la `source_publication` pointe sur cette publication.
+        """Nulle `person_id` sur toutes les `source_authorships` de cette personne dont la `source_publication` pointe sur cette publication.
 
-        Détache la vérité source de la paire entière : « cette personne n'est
-        pas l'auteur de cette publication » vaut pour toutes ses sources.
-        Retourne le nombre de rows détachées."""
+        Détache la vérité source de la paire entière : le rejet vaut pour toutes les sources de la personne sur cette publication. Retourne le nombre de rows détachées.
+        """
         result = self._conn.execute(
             text("""
                 UPDATE source_authorships sa

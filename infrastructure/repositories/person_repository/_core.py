@@ -112,9 +112,7 @@ def set_rejected(conn: Connection, person_id: int, rejected: bool) -> None:
     )
     if result.rowcount == 0:
         raise NotFoundError(f"Personne {person_id} introuvable")
-    # Le flag matérialisé `publications.in_perimeter` exclut les personnes rejetées
-    # (cf. `publication_in_perimeter`). Recalcule-le pour les publications de cette
-    # personne : son rejet/dé-rejet peut faire basculer leur appartenance.
+    # Le flag matérialisé `publications.in_perimeter` exclut les personnes rejetées (cf. `publication_in_perimeter`). Recalcule-le pour les publications de cette personne : son rejet/dé-rejet peut faire basculer leur appartenance.
     conn.execute(
         text("""
             UPDATE publications p
@@ -152,15 +150,11 @@ def merge_into(conn: Connection, target_id: int, source_id: int) -> None:
     2. Dédoublonnage + transfert authorships vérité (+ rejected_authorships)
     3. Dédoublonnage + transfert identifiants
     4. Transfert conditionnel fiche RH
-    5. person_name_forms : remplacement source_id → target_id
+    5. person_name_forms : bascule source_id → target_id
     6. Recalcul des formes source 'persons' pour la cible
     7. Suppression de la personne source
 
-    L'invariant (pas de fusion si les deux ont une fiche RH) doit être
-    vérifié avant par le service via `has_distinct_rh`.
-
-    Tout en `text()` : la complexité du merge ne tire pas de bénéfice
-    clair de SA Core (cross-aggregate sur 6 tables).
+    L'invariant — au plus une fiche RH sur les deux personnes — est vérifié en amont par le service via `has_distinct_rh`.
     """
     conn.execute(
         text("UPDATE source_authorships SET person_id = :t WHERE person_id = :s"),
@@ -180,8 +174,7 @@ def merge_into(conn: Connection, target_id: int, source_id: int) -> None:
         text("UPDATE authorships SET person_id = :t WHERE person_id = :s"),
         {"t": target_id, "s": source_id},
     )
-    # rejected_authorships : même motif dédup-puis-transfert. L'identité étant
-    # la même après fusion, un rejet sur l'absorbée vaut pour l'absorbante.
+    # rejected_authorships : même motif dédup-puis-transfert. L'identité étant la même après fusion, un rejet sur l'absorbée vaut pour l'absorbante.
     conn.execute(
         text("""
             DELETE FROM rejected_authorships
@@ -218,9 +211,7 @@ def merge_into(conn: Connection, target_id: int, source_id: int) -> None:
         """),
         {"t": target_id, "s": source_id},
     )
-    # Transférer les rows (name_form, source_id) vers (name_form, target_id) :
-    # UPSERT cross-person_id qui fusionne les sources si la name_form existe
-    # déjà côté target, puis DELETE des rows source résiduelles.
+    # Transférer les rows (name_form, source_id) vers (name_form, target_id) : UPSERT cross-person_id qui fusionne les sources si la name_form existe déjà côté target, puis DELETE des rows source résiduelles.
     conn.execute(
         text("""
             INSERT INTO person_name_forms (name_form, person_id, sources)
@@ -247,8 +238,7 @@ def merge_into(conn: Connection, target_id: int, source_id: int) -> None:
 
 
 def mark_distinct(conn: Connection, person_id_a: int, person_id_b: int) -> tuple[int, int] | None:
-    """Marque deux personnes comme distinctes (idempotent). Retourne (a, b)
-    triés si la paire vient d'être insérée, None si elle existait déjà."""
+    """Marque deux personnes comme distinctes (idempotent). Retourne (a, b) triés si la paire vient d'être insérée, None si elle existait déjà."""
     row = conn.execute(
         text("""
             INSERT INTO distinct_persons (person_id_a, person_id_b)
