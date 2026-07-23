@@ -3,7 +3,7 @@
 Le package est organisé par thème :
 - `list` : `list_persons`, `search_persons`, `person_curation`, `person_name_forms`
 - `identifiers` : `public_identifiers`, partagée par la liste et le profil
-- `facets` : `persons_facets`, `persons_stats`
+- `facets` : `persons_facets`
 - `detail` : `person_profile`, `person_theses`, `person_addresses`,
   `person_dashboard`, `person_subjects`
 - `admin` : authorships par forme de nom, files de triage des formes et des identifiants
@@ -40,7 +40,6 @@ from application.ports.api.persons_queries import (
     PersonSearchResult,
     PersonsFacetsResponse,
     PersonsQueries,
-    PersonsStatsResponse,
     PersonThesesResponse,
     SharingPersonOut,
 )
@@ -66,7 +65,6 @@ from infrastructure.queries.api.persons.detail import (
 )
 from infrastructure.queries.api.persons.facets import (
     persons_facets as _persons_facets,
-    persons_stats as _persons_stats,
 )
 from infrastructure.queries.api.persons.list import (
     list_persons as _list_persons,
@@ -95,16 +93,13 @@ class PgPersonsQueries(PersonsQueries):
     def person_curation(self, person_id: int) -> PersonOut | None:
         return _person_curation(self._conn, person_id)
 
-    # ── Facettes / listes de référence / stats ─────────────────────
+    # ── Facettes / listes de référence ─────────────────────────────
 
     def persons_facets(self, *, filters: PersonFilters) -> PersonsFacetsResponse:
         return _persons_facets(self._conn, filters=filters)
 
     def person_name_forms(self, person_id: int) -> list[NameFormSummaryOut]:
         return _person_name_forms(self._conn, person_id)
-
-    def persons_stats(self) -> PersonsStatsResponse:
-        return _persons_stats(self._conn)
 
     # ── Détail d'une personne ──────────────────────────────────────
 

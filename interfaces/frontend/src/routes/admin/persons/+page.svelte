@@ -16,7 +16,6 @@
     Person,
     PersonListResponse,
     PersonSearchResult,
-    PersonStats,
   } from "./types";
   import type { components } from "$lib/api/schema";
   type NameFormAuthorshipRef = components["schemas"]["NameFormAuthorshipRef"];
@@ -31,7 +30,6 @@
 
   /* ── State ── */
 
-  let stats = $state<PersonStats | null>(null);
   let orphanCount = $state(0);
 
   // Onglets du hub : liste maîtresse + files de triage.
@@ -123,10 +121,6 @@
   });
 
   /* ── Data loading ── */
-
-  async function loadStats() {
-    stats = await api<PersonStats>("/api/persons/stats", { key: "persons-stats" });
-  }
 
   function buildFilterParams(): URLSearchParams {
     const params = new URLSearchParams();
@@ -445,7 +439,6 @@
       authorships: toDetach.map((p) => p.sources[0]),
     });
     detachModal = null;
-    loadStats();
     await loadTable();
     await refreshSelected();
   }
@@ -476,7 +469,6 @@
     if (!(await confirmMerge(sourceId))) return;
     await personsApi.merge(targetId, sourceId);
     closeMergeSearch();
-    loadStats();
     await loadTable();
     await refreshSelected();
     loadAmbiguousCount();
@@ -495,7 +487,6 @@
       toast(detail || "Fusion impossible", "error");
       return;
     }
-    loadStats();
     await loadTable();
     await refreshSelected();
     loadAmbiguousCount();
@@ -509,7 +500,6 @@
     const targetId = detachModal.personId;
     await personsApi.merge(targetId, sourceId);
     detachModal = null;
-    loadStats();
     loadTable();
   }
 

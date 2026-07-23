@@ -910,26 +910,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/persons/stats": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Persons Stats
-         * @description Statistiques sur les personnes et l'alignement.
-         */
-        get: operations["persons_stats_api_persons_stats_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/persons/ambiguous-name-forms/count": {
         parameters: {
             query?: never;
@@ -4117,17 +4097,6 @@ export interface components {
             pending_forms: components["schemas"]["YesNoCount"];
             pending_identifiers: components["schemas"]["YesNoCount"];
         };
-        /** PersonsStatsResponse */
-        PersonsStatsResponse: {
-            /** Total Persons */
-            total_persons: number;
-            /** Linked Persons */
-            linked_persons: number;
-            /** Linked Authors */
-            linked_authors: number;
-            /** Departments */
-            departments: number;
-        };
         /**
          * PhaseBrief
          * @description Statut d'une phase au sein d'un run, pour le ruban de la liste.
@@ -6871,26 +6840,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    persons_stats_api_persons_stats_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PersonsStatsResponse"];
                 };
             };
         };

@@ -133,7 +133,7 @@ class PersonListResponse(PaginatedResponse):
 
 
 # ---------------------------------------------------------------------------
-# DTOs Facettes / référentiels / stats
+# DTOs Facettes / référentiels
 # ---------------------------------------------------------------------------
 
 
@@ -148,13 +148,6 @@ class PersonsFacetsResponse(BaseModel):
     rh: YesNoCount
     pending_forms: YesNoCount
     pending_identifiers: YesNoCount
-
-
-class PersonsStatsResponse(BaseModel):
-    total_persons: int
-    linked_persons: int
-    linked_authors: int
-    departments: int
 
 
 # ---------------------------------------------------------------------------
@@ -394,11 +387,9 @@ class PersonsQueries(Protocol):
 
     def person_curation(self, person_id: int) -> PersonOut | None: ...
 
-    # ── Facettes / listes de référence / stats ─────────────────────
+    # ── Facettes / listes de référence ─────────────────────────────
 
     def persons_facets(self, *, filters: PersonFilters) -> PersonsFacetsResponse: ...
-
-    def persons_stats(self) -> PersonsStatsResponse: ...
 
     def person_name_forms(self, person_id: int) -> list[NameFormSummaryOut]: ...
 

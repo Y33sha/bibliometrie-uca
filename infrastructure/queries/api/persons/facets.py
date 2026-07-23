@@ -6,7 +6,6 @@ from application.ports.api._common import FacetOption, YesNoCount
 from application.ports.api.persons_queries import (
     PersonFilters,
     PersonsFacetsResponse,
-    PersonsStatsResponse,
 )
 from infrastructure.queries.api.filters import (
     PUBLIC_PERSON_IDENTIFIER_TYPES_SQL,
@@ -145,26 +144,4 @@ def persons_facets(conn: Connection, *, filters: PersonFilters) -> PersonsFacets
         rh=YesNoCount(yes=rh.yes, no=rh.no),
         pending_forms=YesNoCount(yes=pending_forms.yes, no=pending_forms.no),
         pending_identifiers=YesNoCount(yes=pending_identifiers.yes, no=pending_identifiers.no),
-    )
-
-
-def persons_stats(conn: Connection) -> PersonsStatsResponse:
-    """Statistiques globales personnes."""
-    row = conn.execute(
-        text("""
-            SELECT
-                (SELECT COUNT(*) FROM persons) AS total_persons,
-                (SELECT COUNT(DISTINCT person_id) FROM authorships
-                 WHERE person_id IS NOT NULL) AS linked_persons,
-                (SELECT COUNT(*) FROM authorships
-                 WHERE person_id IS NOT NULL) AS linked_authors,
-                (SELECT COUNT(DISTINCT department_name)
-                 FROM persons_rh WHERE department_name IS NOT NULL) AS departments
-        """)
-    ).one()
-    return PersonsStatsResponse(
-        total_persons=row.total_persons,
-        linked_persons=row.linked_persons,
-        linked_authors=row.linked_authors,
-        departments=row.departments,
     )

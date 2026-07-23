@@ -265,12 +265,6 @@ class TestPersonList:
         assert r.status_code == 422
 
 
-class TestPersonEndpoints:
-    def test_stats(self, client):
-        r = client.get("/api/persons/stats")
-        assert r.status_code == 200
-
-
 class TestPersonDetail:
     def test_profile_not_found(self, client):
         r = client.get("/api/persons/999999999")
