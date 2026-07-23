@@ -76,7 +76,7 @@ class TestSearch:
             per_page=50,
             sort="year_desc",
         )
-        ids = [p["id"] for p in res["publications"]]
+        ids = [p.id for p in res.publications]
         assert match in ids and other not in ids
 
     def test_search_matches_subject_label(self, sa_sync_conn):
@@ -99,7 +99,7 @@ class TestSearch:
             per_page=50,
             sort="year_desc",
         )
-        ids = [p["id"] for p in res["publications"]]
+        ids = [p.id for p in res.publications]
         assert pub in ids and unrelated not in ids
 
     def test_title_match_ranks_before_subject_only_match(self, sa_sync_conn):
@@ -123,7 +123,7 @@ class TestSearch:
             per_page=50,
             sort="year_desc",
         )
-        ids = [p["id"] for p in res["publications"]]
+        ids = [p.id for p in res.publications]
         assert ids.index(title_match) < ids.index(subject_match)
 
     def test_search_unaccented_matches_accented_label(self, sa_sync_conn):
@@ -142,7 +142,7 @@ class TestSearch:
             per_page=50,
             sort="year_desc",
         )
-        ids = [p["id"] for p in res["publications"]]
+        ids = [p.id for p in res.publications]
         assert pub in ids
 
     def test_facets_respect_search(self, sa_sync_conn):
@@ -215,7 +215,7 @@ class TestHalStatusMultipleHalEntries:
             per_page=50,
             sort="year_desc",
         )
-        assert pub not in [p["id"] for p in res["publications"]]
+        assert pub not in [p.id for p in res.publications]
 
     def test_hal_collections_unions_all_hal_entries(self, sa_sync_conn):
         """`hal_collections` renvoyé par l'API = union des collections des
@@ -234,8 +234,8 @@ class TestHalStatusMultipleHalEntries:
             per_page=50,
             sort="year_desc",
         )
-        match = next(p for p in res["publications"] if p["id"] == pub)
-        assert set(match["hal_collections"]) == {"CMH", "AO-DROIT", "UPPA-DROIT"}
+        match = next(p for p in res.publications if p.id == pub)
+        assert set(match.hal_collections or []) == {"CMH", "AO-DROIT", "UPPA-DROIT"}
 
     def test_pub_only_outside_collection_is_hors_collection(self, sa_sync_conn):
         """Cas symétrique : si aucune entrée HAL n'est dans la collection,
@@ -253,7 +253,7 @@ class TestHalStatusMultipleHalEntries:
             per_page=50,
             sort="year_desc",
         )
-        assert pub in [p["id"] for p in res["publications"]]
+        assert pub in [p.id for p in res.publications]
 
 
 class TestThesesExport:
