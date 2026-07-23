@@ -2966,7 +2966,12 @@ export interface components {
             /** Count */
             count: number;
         };
-        /** EntityFacetResponse */
+        /**
+         * EntityFacetResponse
+         * @description Facette d'entité à forte cardinalité (éditeur, revue).
+         *
+         *     Les options sont calculées côté serveur sous les filtres actifs du contexte (tableau de bord ou liste de publications), d'où des décomptes contextuels et une corrélation entre entités (une revue sélectionnée restreint les éditeurs proposés). La recherche par nom borne la requête.
+         */
         EntityFacetResponse: {
             /** Entities */
             entities: components["schemas"]["EntityFacetItem"][];
@@ -3377,9 +3382,9 @@ export interface components {
         };
         /**
          * JournalDetailResponse
-         * @description GET /api/journals/{id} : profil complet de la revue pour sa page publique.
+         * @description GET /api/journals/{id} : profil complet de la revue, pour sa page publique et l'édition admin.
          *
-         *     Une ligne de liste, plus la réponse DOAJ brute et sa date d'import. Le payload est exposé tel quel : son exploration précède le choix des colonnes typées qu'on en tirerait.
+         *     Étend la ligne de liste des champs propres au détail (ISSN-L, identifiants, APC, modèle OA, préfixe DOI…), plus la réponse DOAJ brute et sa date d'import. Le payload est exposé tel quel : son exploration précède le choix des colonnes typées qu'on en tirerait.
          */
         JournalDetailResponse: {
             /** Id */
@@ -3390,38 +3395,66 @@ export interface components {
             issn: string | null;
             /** Eissn */
             eissn: string | null;
-            /** Issnl */
-            issnl: string | null;
             /** Publisher Id */
             publisher_id: number | null;
             /** Pub Name */
             pub_name: string | null;
-            /** Openalex Id */
-            openalex_id: string | null;
             /** Is In Doaj */
             is_in_doaj: boolean;
+            /** Journal Type */
+            journal_type: ("journal" | "proceedings" | "repository" | "book_series" | "ebook_platform" | "preprint_server" | "media" | "unknown") | null;
+            /** Pub Count */
+            pub_count: number;
+            /** Doaj Url */
+            doaj_url: string | null;
+            /** Issnl */
+            issnl: string | null;
+            /** Openalex Id */
+            openalex_id: string | null;
             /** Apc Amount */
             apc_amount: number | null;
             /** Apc Currency */
             apc_currency: string | null;
             /** Oa Model */
             oa_model: ("subscription" | "full_oa" | "repository") | null;
-            /** Journal Type */
-            journal_type: ("journal" | "proceedings" | "repository" | "book_series" | "ebook_platform" | "preprint_server" | "media" | "unknown") | null;
             /** Is Academic */
             is_academic: boolean | null;
             /** Doi Prefix */
             doi_prefix: string | null;
-            /** Pub Count */
-            pub_count: number;
-            /** Doaj Url */
-            doaj_url: string | null;
             /** Doaj Payload */
             doaj_payload: {
                 [key: string]: unknown;
             } | null;
             /** Doaj Imported At */
             doaj_imported_at: string | null;
+        };
+        /**
+         * JournalListItem
+         * @description Ligne de la liste paginée `/api/journals` — un résumé ; le profil complet est `JournalDetailResponse`.
+         *
+         *     `pub_name` est joint depuis `publishers`, `pub_count` est un agrégat sur `publications` ; ni l'un ni l'autre ne sont des colonnes natives de la table `journals`.
+         */
+        JournalListItem: {
+            /** Id */
+            id: number;
+            /** Title */
+            title: string;
+            /** Issn */
+            issn: string | null;
+            /** Eissn */
+            eissn: string | null;
+            /** Publisher Id */
+            publisher_id: number | null;
+            /** Pub Name */
+            pub_name: string | null;
+            /** Is In Doaj */
+            is_in_doaj: boolean;
+            /** Journal Type */
+            journal_type: ("journal" | "proceedings" | "repository" | "book_series" | "ebook_platform" | "preprint_server" | "media" | "unknown") | null;
+            /** Pub Count */
+            pub_count: number;
+            /** Doaj Url */
+            doaj_url: string | null;
         };
         /** JournalListResponse */
         JournalListResponse: {
@@ -3432,51 +3465,9 @@ export interface components {
             /** Per Page */
             per_page: number;
             /** Journals */
-            journals: components["schemas"]["JournalOut"][];
+            journals: components["schemas"]["JournalListItem"][];
             /** Pages */
             readonly pages: number;
-        };
-        /**
-         * JournalOut
-         * @description Représentation d'une revue dans la liste paginée `/api/journals`.
-         *
-         *     `pub_name` est joint depuis `publishers`, `pub_count` est un agrégat sur `publications` ; ni l'un ni l'autre ne sont des colonnes natives de la table `journals`.
-         */
-        JournalOut: {
-            /** Id */
-            id: number;
-            /** Title */
-            title: string;
-            /** Issn */
-            issn: string | null;
-            /** Eissn */
-            eissn: string | null;
-            /** Issnl */
-            issnl: string | null;
-            /** Publisher Id */
-            publisher_id: number | null;
-            /** Pub Name */
-            pub_name: string | null;
-            /** Openalex Id */
-            openalex_id: string | null;
-            /** Is In Doaj */
-            is_in_doaj: boolean;
-            /** Apc Amount */
-            apc_amount: number | null;
-            /** Apc Currency */
-            apc_currency: string | null;
-            /** Oa Model */
-            oa_model: ("subscription" | "full_oa" | "repository") | null;
-            /** Journal Type */
-            journal_type: ("journal" | "proceedings" | "repository" | "book_series" | "ebook_platform" | "preprint_server" | "media" | "unknown") | null;
-            /** Is Academic */
-            is_academic: boolean | null;
-            /** Doi Prefix */
-            doi_prefix: string | null;
-            /** Pub Count */
-            pub_count: number;
-            /** Doaj Url */
-            doaj_url: string | null;
         };
         /**
          * JournalTypeChange

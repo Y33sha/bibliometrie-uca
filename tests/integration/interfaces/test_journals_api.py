@@ -209,13 +209,16 @@ class TestListJournals:
         assert "OrphanDefaultJournal" in titles
 
     def test_filter_by_oa_model(self, client):
-        jid = _seed_journal()
+        matching = _seed_journal()
+        other = _seed_journal()
         with _pool() as cur:
-            cur.execute("UPDATE journals SET oa_model = 'full_oa' WHERE id = %s", (jid,))
+            cur.execute("UPDATE journals SET oa_model = 'full_oa' WHERE id = %s", (matching,))
+            cur.execute("UPDATE journals SET oa_model = 'subscription' WHERE id = %s", (other,))
         r = client.get("/api/journals", params={"oa_model": "full_oa", "per_page": 200})
         assert r.status_code == 200
-        models = {j["oa_model"] for j in r.json()["journals"]}
-        assert models == {"full_oa"}
+        ids = {j["id"] for j in r.json()["journals"]}
+        assert matching in ids
+        assert other not in ids
 
     @pytest.mark.parametrize(
         "sort",

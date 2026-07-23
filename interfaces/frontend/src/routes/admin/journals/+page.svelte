@@ -8,7 +8,8 @@
 	import { confirmDialog, toast } from '$lib/dialogs.svelte';
 	import type { components } from '$lib/api/schema';
 
-	type Journal = components['schemas']['JournalOut'];
+	type Journal = components['schemas']['JournalListItem'];
+	type JournalDetail = components['schemas']['JournalDetailResponse'];
 	type JournalListResponse = components['schemas']['JournalListResponse'];
 	type EnumOption = components['schemas']['EnumOption'];
 
@@ -43,16 +44,25 @@
 		apc_amount: string;
 	} | null = $state(null);
 
-	function openEdit(j: Journal) {
-		const jt = j.journal_type || 'journal';
+	async function openEdit(j: Journal) {
+		// La ligne de liste ne porte que le résumé ; on charge le détail pour pré-remplir le formulaire.
+		let detail: JournalDetail;
+		try {
+			detail = await api<JournalDetail>(`/api/journals/${j.id}`);
+		} catch (e: any) {
+			const msg = e instanceof ApiError ? JSON.stringify(e.detail) : e.message;
+			toast('Erreur lors du chargement de la revue : ' + msg, 'error');
+			return;
+		}
+		const jt = detail.journal_type || 'journal';
 		editModal = {
-			id: j.id, title: j.title,
-			issn: j.issn || '', eissn: j.eissn || '', issnl: j.issnl || '',
-			doi_prefix: j.doi_prefix || '', oa_model: j.oa_model || '',
+			id: detail.id, title: detail.title,
+			issn: detail.issn || '', eissn: detail.eissn || '', issnl: detail.issnl || '',
+			doi_prefix: detail.doi_prefix || '', oa_model: detail.oa_model || '',
 			journal_type: jt, original_journal_type: jt,
-			is_academic: j.is_academic ?? true,
-			is_in_doaj: j.is_in_doaj,
-			apc_amount: j.apc_amount ? String(j.apc_amount) : '',
+			is_academic: detail.is_academic ?? true,
+			is_in_doaj: detail.is_in_doaj,
+			apc_amount: detail.apc_amount ? String(detail.apc_amount) : '',
 		};
 	}
 
