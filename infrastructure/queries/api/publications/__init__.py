@@ -117,10 +117,7 @@ class PgPublicationsQueries(PublicationsQueries):
         )
 
     def get_publication_detail(self, pub_id: int) -> PublicationDetailResponse | None:
-        data = _get_publication_detail(self._conn, pub_id)
-        if data is None:
-            return None
-        return PublicationDetailResponse.model_validate(data)
+        return _get_publication_detail(self._conn, pub_id)
 
 
 __all__ = ["PgPublicationsQueries"]
