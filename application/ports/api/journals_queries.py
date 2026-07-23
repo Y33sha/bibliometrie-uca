@@ -34,8 +34,8 @@ class JournalFilters:
     with_pubs: bool = False
 
 
-class JournalOut(BaseModel):
-    """Représentation d'une revue dans la liste paginée `/api/journals`.
+class JournalListItem(BaseModel):
+    """Ligne de la liste paginée `/api/journals` — un résumé ; le profil complet est `JournalDetailResponse`.
 
     `pub_name` est joint depuis `publishers`, `pub_count` est un agrégat sur `publications` ; ni l'un ni l'autre ne sont des colonnes natives de la table `journals`.
     """
@@ -44,31 +44,31 @@ class JournalOut(BaseModel):
     title: str
     issn: str | None
     eissn: str | None
-    issnl: str | None
     publisher_id: int | None
     pub_name: str | None
-    openalex_id: str | None
     is_in_doaj: bool
-    apc_amount: float | None
-    apc_currency: str | None
-    oa_model: OaModel | None
     journal_type: JournalType | None
-    is_academic: bool | None
-    doi_prefix: str | None
     pub_count: int
     doaj_url: str | None
 
 
 class JournalListResponse(PaginatedResponse):
-    journals: list[JournalOut]
+    journals: list[JournalListItem]
 
 
-class JournalDetailResponse(JournalOut):
-    """GET /api/journals/{id} : profil complet de la revue pour sa page publique.
+class JournalDetailResponse(JournalListItem):
+    """GET /api/journals/{id} : profil complet de la revue, pour sa page publique et l'édition admin.
 
-    Une ligne de liste, plus la réponse DOAJ brute et sa date d'import. Le payload est exposé tel quel : son exploration précède le choix des colonnes typées qu'on en tirerait.
+    Étend la ligne de liste des champs propres au détail (ISSN-L, identifiants, APC, modèle OA, préfixe DOI…), plus la réponse DOAJ brute et sa date d'import. Le payload est exposé tel quel : son exploration précède le choix des colonnes typées qu'on en tirerait.
     """
 
+    issnl: str | None
+    openalex_id: str | None
+    apc_amount: float | None
+    apc_currency: str | None
+    oa_model: OaModel | None
+    is_academic: bool | None
+    doi_prefix: str | None
     doaj_payload: dict[str, Any] | None
     doaj_imported_at: datetime | None
 

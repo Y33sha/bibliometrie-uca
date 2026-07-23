@@ -10,8 +10,8 @@ from application.ports.api.journals_queries import (
     JournalDashboardResponse,
     JournalDetailResponse,
     JournalFilters,
+    JournalListItem,
     JournalListResponse,
-    JournalOut,
     JournalQueries,
     JournalsFacetsResponse,
     JournalSort,
@@ -34,39 +34,50 @@ from domain.normalize import normalize_text
 from infrastructure.queries.api.filters import SUBJECT_IS_NOT_GENERIC, publication_in_perimeter
 from infrastructure.sources.doaj import resolve_doaj_url
 
-# Colonnes du profil d'une revue, communes à la ligne de liste et à la page d'une revue. `doaj_id` et `doaj_url_csv` sont les deux entrées de `resolve_doaj_url` ; la jointure `publishers p` est attendue par `pub_name`.
-_JOURNAL_COLUMNS = """
-    j.id, j.title, j.issn, j.eissn, j.issnl,
+# Colonnes de la ligne de liste d'une revue. `doaj_id` et `doaj_url_csv` sont les deux entrées de `resolve_doaj_url` ; la jointure `publishers p` est attendue par `pub_name`.
+_JOURNAL_LIST_COLUMNS = """
+    j.id, j.title, j.issn, j.eissn,
     j.publisher_id, p.name AS pub_name,
-    j.openalex_id, j.is_in_doaj,
-    j.apc_amount, j.apc_currency, j.oa_model,
-    j.journal_type, j.is_academic, j.doi_prefix,
+    j.is_in_doaj, j.journal_type, j.pub_count,
     j.doaj_payload->>'DOAJ id' AS doaj_id,
-    j.doaj_payload->>'URL in DOAJ' AS doaj_url_csv,
-    j.pub_count
+    j.doaj_payload->>'URL in DOAJ' AS doaj_url_csv
+"""
+
+# Colonnes du profil complet : la ligne de liste plus les champs propres au détail (page publique, édition admin).
+_JOURNAL_DETAIL_COLUMNS = f"""
+    {_JOURNAL_LIST_COLUMNS},
+    j.issnl, j.openalex_id, j.apc_amount, j.apc_currency,
+    j.oa_model, j.is_academic, j.doi_prefix
 """
 
 
-def _journal_fields(row: Any) -> dict[str, Any]:
-    """Champs de `JournalOut` lus d'une ligne de `_JOURNAL_COLUMNS`."""
+def _journal_list_fields(row: Any) -> dict[str, Any]:
+    """Champs de `JournalListItem` lus d'une ligne de `_JOURNAL_LIST_COLUMNS`."""
     return {
         "id": row.id,
         "title": row.title,
         "issn": row.issn,
         "eissn": row.eissn,
-        "issnl": row.issnl,
         "publisher_id": row.publisher_id,
         "pub_name": row.pub_name,
-        "openalex_id": row.openalex_id,
         "is_in_doaj": row.is_in_doaj,
+        "journal_type": row.journal_type,
+        "pub_count": row.pub_count,
+        "doaj_url": resolve_doaj_url(row.doaj_url_csv, row.doaj_id),
+    }
+
+
+def _journal_detail_fields(row: Any) -> dict[str, Any]:
+    """Champs de `JournalDetailResponse` (hors DOAJ brut) lus d'une ligne de `_JOURNAL_DETAIL_COLUMNS`."""
+    return {
+        **_journal_list_fields(row),
+        "issnl": row.issnl,
+        "openalex_id": row.openalex_id,
         "apc_amount": row.apc_amount,
         "apc_currency": row.apc_currency,
         "oa_model": row.oa_model,
-        "journal_type": row.journal_type,
         "is_academic": row.is_academic,
         "doi_prefix": row.doi_prefix,
-        "pub_count": row.pub_count,
-        "doaj_url": resolve_doaj_url(row.doaj_url_csv, row.doaj_id),
     }
 
 
@@ -138,7 +149,7 @@ class PgJournalQueries(JournalQueries):
         offset = (page - 1) * per_page
         rows = self._conn.execute(
             text(f"""
-                SELECT {_JOURNAL_COLUMNS}
+                SELECT {_JOURNAL_LIST_COLUMNS}
                 FROM journals j
                 LEFT JOIN publishers p ON p.id = j.publisher_id
                 WHERE {where}
@@ -151,7 +162,7 @@ class PgJournalQueries(JournalQueries):
             total=total,
             page=page,
             per_page=per_page,
-            journals=[JournalOut(**_journal_fields(r)) for r in rows],
+            journals=[JournalListItem(**_journal_list_fields(r)) for r in rows],
         )
 
     def journals_facets(self, *, filters: JournalFilters) -> JournalsFacetsResponse:
@@ -221,7 +232,7 @@ class PgJournalQueries(JournalQueries):
     def get_journal_detail(self, journal_id: int) -> JournalDetailResponse | None:
         row = self._conn.execute(
             text(f"""
-                SELECT {_JOURNAL_COLUMNS},
+                SELECT {_JOURNAL_DETAIL_COLUMNS},
                        j.doaj_payload, j.doaj_imported_at
                 FROM journals j
                 LEFT JOIN publishers p ON p.id = j.publisher_id
@@ -232,7 +243,7 @@ class PgJournalQueries(JournalQueries):
         if row is None:
             return None
         return JournalDetailResponse(
-            **_journal_fields(row),
+            **_journal_detail_fields(row),
             doaj_payload=row.doaj_payload,
             doaj_imported_at=row.doaj_imported_at,
         )

@@ -13,7 +13,7 @@
 	import { useUrlFilters } from '$lib/composables/useUrlFilters.svelte';
 	import type { components } from '$lib/api/schema';
 
-	type Journal = components['schemas']['JournalOut'];
+	type Journal = components['schemas']['JournalListItem'];
 
 	// Composant de liste de revues réutilisable. Utilisé par :
 	// - `/journals` (mode autonome avec sync URL)
