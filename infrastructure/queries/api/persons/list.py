@@ -29,7 +29,7 @@ from infrastructure.queries.api.filters import (
 from infrastructure.queries.api.persons.identifiers import public_identifiers
 from infrastructure.queries.sources_sql import AUTHOR_SOURCES_SQL
 
-# Sous scope `lab_id`, les dénombrements ne comptent que les signatures portées par le laboratoire — sinon ils compteraient à l'échelle de la personne des lignes filtrées à l'échelle du laboratoire.
+# Sous scope `lab_id`, chaque dénombrement se limite aux signatures de la personne rattachées à ce laboratoire, cohérent avec une liste restreinte au labo. Le bind `:flt_person_lab_id` vient de `person_in_lab_clause` (filters.py).
 _LAB_SCOPED_SIGNATURES = (
     " AND EXISTS (SELECT 1 FROM authorship_structures aus "
     "WHERE aus.authorship_id = a.id AND aus.structure_id = :flt_person_lab_id)"
@@ -144,7 +144,7 @@ def list_persons(
         """),
         {**binds, "pg_limit": per_page, "pg_offset": offset},
     ).all()
-    # Les identifiants suivent chaque personne, rejetés compris (statut porté ; l'affichage public les écarte au statut). Les formes de nom restent sur la fiche personne — les porter par ligne pesait les deux tiers de la liste.
+    # Identifiants attachés à chaque personne, rejetés compris : chaque identifiant porte son statut, à charge pour chaque vue de filtrer selon ses besoins.
     by_person = public_identifiers(conn, [r.id for r in rows], include_rejected=True)
     persons = [_person_out(r, by_person.get(r.id, [])) for r in rows]
 
@@ -152,7 +152,7 @@ def list_persons(
 
 
 def _person_out(row: Any, identifiers: list[PersonIdentifierOut]) -> PersonOut:
-    """`PersonOut` d'une ligne de la projection commune à la liste et à `person_admin`."""
+    """`PersonOut` d'une ligne de la projection commune à la liste et à `person_curation`."""
     return PersonOut(
         id=row.id,
         last_name=row.last_name,
@@ -211,7 +211,7 @@ def person_name_forms(conn: Connection, person_id: int) -> list[NameFormSummaryO
     ]
 
 
-def person_admin(conn: Connection, person_id: int) -> PersonOut | None:
+def person_curation(conn: Connection, person_id: int) -> PersonOut | None:
     """Une personne par id, même projection que la liste. None si absente."""
     row = conn.execute(
         text(f"""
