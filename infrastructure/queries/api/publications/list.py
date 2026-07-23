@@ -9,7 +9,11 @@ from typing import Any
 
 from sqlalchemy import Connection, text
 
-from application.ports.api.publications_queries import PublicationFilters
+from application.ports.api.publications_queries import (
+    PublicationFilters,
+    PublicationListItem,
+    PublicationListResponse,
+)
 from domain.normalize import normalize_text, strip_markup
 from infrastructure.queries.api.filters import (
     OA_OPEN_STATUSES,
@@ -144,7 +148,7 @@ def list_publications(
     page: int,
     per_page: int,
     sort: str,
-) -> dict[str, Any]:
+) -> PublicationListResponse:
     """Liste paginée des publications avec sources, labos, journal."""
     conn.execute(text("SET LOCAL jit = off"))
     offset = (page - 1) * per_page
@@ -252,40 +256,37 @@ def list_publications(
     ).all()
 
     publications = [
-        {
-            "id": r.id,
-            "title": r.title,
-            "pub_year": r.pub_year,
-            "doi": r.doi,
-            "doc_type": r.doc_type,
-            "oa_status": r.oa_status,
-            "journal_id": r.journal_id,
-            "journal": r.journal_title,
-            "publisher_id": r.publisher_id,
-            "publisher": r.publisher_name,
-            "hal_id": r.hal_id,
-            "openalex_id": r.openalex_id,
-            "scanr_id": r.scanr_id,
-            "wos_id": r.wos_id,
-            "theses_id": r.theses_id,
-            "date_soutenance": r.date_soutenance,
-            "date_inscription": r.date_inscription,
-            "thesis_author_name": r.thesis_author_name,
-            "thesis_author_person_id": r.thesis_author_person_id,
-            "lab_items": r.lab_items,
-            "apc": r.apc_details,
-            "is_corresponding": r.is_corresponding,
-            "authorship_id": r.authorship_id,
-            "hal_collections": r.hal_collections,
-        }
+        PublicationListItem(
+            id=r.id,
+            title=r.title,
+            pub_year=r.pub_year,
+            doi=r.doi,
+            doc_type=r.doc_type,
+            oa_status=r.oa_status,
+            journal_id=r.journal_id,
+            journal=r.journal_title,
+            publisher_id=r.publisher_id,
+            publisher=r.publisher_name,
+            hal_id=r.hal_id,
+            openalex_id=r.openalex_id,
+            scanr_id=r.scanr_id,
+            wos_id=r.wos_id,
+            theses_id=r.theses_id,
+            date_soutenance=r.date_soutenance,
+            date_inscription=r.date_inscription,
+            thesis_author_name=r.thesis_author_name,
+            thesis_author_person_id=r.thesis_author_person_id,
+            lab_items=r.lab_items,
+            apc=r.apc_details,
+            is_corresponding=r.is_corresponding,
+            authorship_id=r.authorship_id,
+            hal_collections=r.hal_collections,
+        )
         for r in rows
     ]
-    return {
-        "total": total,
-        "page": page,
-        "per_page": per_page,
-        "publications": publications,
-    }
+    return PublicationListResponse(
+        total=total, page=page, per_page=per_page, publications=publications
+    )
 
 
 # ── Export CSV ────────────────────────────────────────────────────

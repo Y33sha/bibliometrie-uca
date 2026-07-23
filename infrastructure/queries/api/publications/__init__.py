@@ -59,7 +59,7 @@ class PgPublicationsQueries(PublicationsQueries):
         per_page: int,
         sort: str,
     ) -> PublicationListResponse:
-        data = _list_publications(
+        return _list_publications(
             self._conn,
             filters=filters,
             perimeter_structure_ids=get_persons_structure_ids_list(self._conn),
@@ -67,7 +67,6 @@ class PgPublicationsQueries(PublicationsQueries):
             per_page=per_page,
             sort=sort,
         )
-        return PublicationListResponse.model_validate(data)
 
     def publications_facets(self, *, filters: PublicationFilters) -> PublicationsFacetsResponse:
         data = _publications_facets(
