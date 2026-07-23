@@ -159,24 +159,6 @@ class TestListPublishers:
         names = {p["name"] for p in r.json()["publishers"]}
         assert name in names
 
-    def test_doi_prefixes_aggregated(self, client):
-        """Les préfixes DOI rattachés à un éditeur sont remontés via JOIN sur doi_prefixes."""
-        name = _uniq("PrefixedPub")
-        pid = _seed_publisher(name)
-        with _pool() as cur:
-            cur.execute(
-                "INSERT INTO doi_prefixes (prefix, ra, publisher_id, crossref_member_id) "
-                "VALUES (%s, %s, %s, %s), (%s, %s, %s, %s)",
-                ("10.aaaa", "Crossref", pid, 42, "10.bbbb", "Crossref", pid, 42),
-            )
-        r = client.get("/api/publishers", params={"search": name.lower()})
-        assert r.status_code == 200
-        pub = next(p for p in r.json()["publishers"] if p["id"] == pid)
-        prefixes = {p["prefix"] for p in pub["doi_prefixes"]}
-        assert prefixes == {"10.aaaa", "10.bbbb"}
-        assert all(p["ra"] == "Crossref" for p in pub["doi_prefixes"])
-        assert all(p["crossref_member_id"] == 42 for p in pub["doi_prefixes"])
-
     def test_sort_name_desc(self, client):
         r = client.get("/api/publishers", params={"sort": "name_desc"})
         assert r.status_code == 200
@@ -286,6 +268,24 @@ class TestGetPublisher:
         assert "pub_count" in body
         assert body["journal_count"] == 0
         assert body["pub_count"] == 0
+
+    def test_doi_prefixes_aggregated(self, client):
+        """Les préfixes DOI rattachés à un éditeur sont remontés sur la page détail."""
+        name = _uniq("PrefixedPub")
+        pid = _seed_publisher(name)
+        with _pool() as cur:
+            cur.execute(
+                "INSERT INTO doi_prefixes (prefix, ra, publisher_id, crossref_member_id) "
+                "VALUES (%s, %s, %s, %s), (%s, %s, %s, %s)",
+                ("10.aaaa", "Crossref", pid, 42, "10.bbbb", "Crossref", pid, 42),
+            )
+        r = client.get(f"/api/publishers/{pid}")
+        assert r.status_code == 200
+        pub = r.json()
+        prefixes = {p["prefix"] for p in pub["doi_prefixes"]}
+        assert prefixes == {"10.aaaa", "10.bbbb"}
+        assert all(p["ra"] == "Crossref" for p in pub["doi_prefixes"])
+        assert all(p["crossref_member_id"] == 42 for p in pub["doi_prefixes"])
 
 
 # ── GET /api/publishers/{id}/dashboard ──────────────────────────

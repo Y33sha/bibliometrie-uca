@@ -13,6 +13,7 @@ from application.ports.api.publishers_queries import (
     Publisher,
     PublisherDashboardResponse,
     PublisherFilters,
+    PublisherListItem,
     PublisherListResponse,
     PublisherQueries,
     PublishersFacetsResponse,
@@ -79,14 +80,27 @@ def _doi_prefixes_sql() -> str:
     """
 
 
-# Colonnes du profil d'un éditeur (alias `p` = publishers), communes à la ligne de liste et à la page d'un éditeur, projetées par `_row_to_publisher`.
-_PUBLISHER_COLUMNS = f"""
+# Colonnes du profil d'un éditeur (alias `p` = publishers). Le détail ajoute les préfixes DOI, que la liste n'affiche pas.
+_PUBLISHER_LIST_COLUMNS = """
     p.id, p.name, p.openalex_id, p.country,
     p.publisher_type,
     (SELECT COUNT(*) FROM journals j WHERE j.publisher_id = p.id) AS journal_count,
-    p.pub_count,
-    {_doi_prefixes_sql()} AS doi_prefixes
+    p.pub_count
 """.strip()
+
+_PUBLISHER_DETAIL_COLUMNS = f"{_PUBLISHER_LIST_COLUMNS},\n    {_doi_prefixes_sql()} AS doi_prefixes"
+
+
+def _row_to_list_item(row: Any) -> PublisherListItem:
+    return PublisherListItem(
+        id=row.id,
+        name=row.name,
+        openalex_id=row.openalex_id,
+        country=row.country,
+        publisher_type=row.publisher_type,
+        journal_count=row.journal_count,
+        pub_count=row.pub_count,
+    )
 
 
 def _row_to_publisher(row: Any) -> Publisher:
@@ -95,10 +109,10 @@ def _row_to_publisher(row: Any) -> Publisher:
         name=row.name,
         openalex_id=row.openalex_id,
         country=row.country,
-        doi_prefixes=[DoiPrefixInfo(**p) for p in row.doi_prefixes],
         publisher_type=row.publisher_type,
         journal_count=row.journal_count,
         pub_count=row.pub_count,
+        doi_prefixes=[DoiPrefixInfo(**p) for p in row.doi_prefixes],
     )
 
 
@@ -123,7 +137,7 @@ class PgPublisherQueries(PublisherQueries):
         offset = (page - 1) * per_page
         rows = self._conn.execute(
             text(f"""
-                SELECT {_PUBLISHER_COLUMNS}
+                SELECT {_PUBLISHER_LIST_COLUMNS}
                 FROM publishers p
                 WHERE {where}
                 ORDER BY {order}
@@ -135,7 +149,7 @@ class PgPublisherQueries(PublisherQueries):
             total=total,
             page=page,
             per_page=per_page,
-            publishers=[_row_to_publisher(r) for r in rows],
+            publishers=[_row_to_list_item(r) for r in rows],
         )
 
     def publishers_facets(self, *, filters: PublisherFilters) -> PublishersFacetsResponse:
@@ -183,7 +197,7 @@ class PgPublisherQueries(PublisherQueries):
     def get_publisher_detail(self, publisher_id: int) -> Publisher | None:
         row = self._conn.execute(
             text(f"""
-                SELECT {_PUBLISHER_COLUMNS}
+                SELECT {_PUBLISHER_DETAIL_COLUMNS}
                 FROM publishers p
                 WHERE p.id = :id
             """),

@@ -4465,9 +4465,7 @@ export interface components {
         };
         /**
          * Publisher
-         * @description Profil d'un éditeur, commun à la ligne de liste et à la page publique `/publishers/[id]`.
-         *
-         *     `pub_count` compte les seules publications du périmètre, sommées sur les revues de l'éditeur.
+         * @description Profil complet d'un éditeur (page publique `/publishers/[id]`) : la ligne de liste, enrichie de ses préfixes DOI.
          */
         Publisher: {
             /** Id */
@@ -4478,14 +4476,14 @@ export interface components {
             openalex_id: string | null;
             /** Country */
             country: string | null;
-            /** Doi Prefixes */
-            doi_prefixes: components["schemas"]["DoiPrefixInfo"][];
             /** Publisher Type */
             publisher_type: string;
             /** Journal Count */
             journal_count: number;
             /** Pub Count */
             pub_count: number;
+            /** Doi Prefixes */
+            doi_prefixes: components["schemas"]["DoiPrefixInfo"][];
         };
         /**
          * PublisherDashboardResponse
@@ -4503,6 +4501,28 @@ export interface components {
             /** Oa Statuses */
             oa_statuses: components["schemas"]["application__ports__api__publishers_queries__OaStatusCount"][];
         };
+        /**
+         * PublisherListItem
+         * @description Ligne de la liste des éditeurs.
+         *
+         *     `pub_count` compte les seules publications du périmètre, sommées sur les revues de l'éditeur.
+         */
+        PublisherListItem: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Openalex Id */
+            openalex_id: string | null;
+            /** Country */
+            country: string | null;
+            /** Publisher Type */
+            publisher_type: string;
+            /** Journal Count */
+            journal_count: number;
+            /** Pub Count */
+            pub_count: number;
+        };
         /** PublisherListResponse */
         PublisherListResponse: {
             /** Total */
@@ -4512,7 +4532,7 @@ export interface components {
             /** Per Page */
             per_page: number;
             /** Publishers */
-            publishers: components["schemas"]["Publisher"][];
+            publishers: components["schemas"]["PublisherListItem"][];
             /** Pages */
             readonly pages: number;
         };
