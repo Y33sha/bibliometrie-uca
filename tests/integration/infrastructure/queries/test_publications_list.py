@@ -255,6 +255,33 @@ class TestHalStatusMultipleHalEntries:
         )
         assert pub in [p.id for p in res.publications]
 
+    def test_ok_without_declared_collection_matches_nothing(self, sa_sync_conn):
+        """Labo dont la collection HAL est absente : le filtre `ok` (en collection + accès
+        ouvert) rend zéro publication."""
+        lab = sa_sync_conn.execute(
+            text(
+                "INSERT INTO structures (code, name, structure_type) "
+                "VALUES ('LABNC', 'LABNC', 'labo'::structure_type) RETURNING id"
+            )
+        ).scalar_one()
+        pub = _create_pub(sa_sync_conn, "Open in HAL")
+        _attach(sa_sync_conn, pub, lab)
+        self._add_hal_source(sa_sync_conn, pub, "hal-x", ["SOME-COL"])
+        sa_sync_conn.execute(
+            text("UPDATE publications SET oa_status = 'gold'::oa_type WHERE id = :id"),
+            {"id": pub},
+        )
+
+        res = list_publications(
+            sa_sync_conn,
+            filters=PublicationFilters(lab_ids=[lab], hal_status_values=["ok"]),
+            perimeter_structure_ids=[],
+            page=1,
+            per_page=50,
+            sort="year_desc",
+        )
+        assert res.publications == []
+
 
 class TestThesesExport:
     """Export CSV des thèses : la boucle de rendu lit chaque colonne du SELECT, donc un test avec données garde le contrat SQL du CSV et son projeté d'accord."""

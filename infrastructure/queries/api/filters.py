@@ -305,18 +305,25 @@ def hal_status_clause(values: list[str], lab_hal_col: str | None) -> WhereClause
                     "AND sd.hal_collections @> ARRAY[:flt_hal_collection]))"
                 )
                 needs_collection = True
-        elif v == "notice" and lab_hal_col is not None:
-            parts.append(
-                f"({_SQL_IN_COLLECTION_SA} "
-                f"AND (p.oa_status IS NULL OR p.oa_status::text IN {OA_CLOSED_SQL}))"
-            )
-            needs_collection = True
-        elif v == "ok" and lab_hal_col is not None:
-            parts.append(
-                f"({_SQL_IN_COLLECTION_SA} "
-                f"AND p.oa_status IS NOT NULL AND p.oa_status::text NOT IN {OA_CLOSED_SQL})"
-            )
-            needs_collection = True
+        elif v == "notice":
+            if lab_hal_col is None:
+                # Aucune collection déclarée : aucune publication n'est « en collection », `ok`/`notice` ne matchent rien.
+                parts.append("FALSE")
+            else:
+                parts.append(
+                    f"({_SQL_IN_COLLECTION_SA} "
+                    f"AND (p.oa_status IS NULL OR p.oa_status::text IN {OA_CLOSED_SQL}))"
+                )
+                needs_collection = True
+        elif v == "ok":
+            if lab_hal_col is None:
+                parts.append("FALSE")
+            else:
+                parts.append(
+                    f"({_SQL_IN_COLLECTION_SA} "
+                    f"AND p.oa_status IS NOT NULL AND p.oa_status::text NOT IN {OA_CLOSED_SQL})"
+                )
+                needs_collection = True
     if not parts:
         return None
     binds: dict[str, Any] = {"flt_hal_collection": lab_hal_col} if needs_collection else {}

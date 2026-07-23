@@ -82,7 +82,7 @@ def _inline_clauses(filters: PublicationFilters) -> list[WhereClause | None]:
     return out
 
 
-def _hal_status_clause_sync(conn: Connection, filters: PublicationFilters) -> WhereClause | None:
+def _hal_status_clause(conn: Connection, filters: PublicationFilters) -> WhereClause | None:
     """Charge la collection HAL du labo unique pour le filtre hal_status."""
     if filters.hal_status_values and len(filters.lab_ids) == 1:
         row = conn.execute(
@@ -113,7 +113,7 @@ def _build_list_clauses(
     if filters.person_id:
         clauses.append(corresponding_clause(filters.person_id, filters.is_corresponding))
     clauses.append(apc_clause(filters.has_apc, perimeter_structure_ids, filters.lab_ids))
-    clauses.append(_hal_status_clause_sync(conn, filters))
+    clauses.append(_hal_status_clause(conn, filters))
     clauses.append(in_perimeter_person_clause(filters.in_perimeter, filters.person_id))
     return assemble_where(clauses)
 
