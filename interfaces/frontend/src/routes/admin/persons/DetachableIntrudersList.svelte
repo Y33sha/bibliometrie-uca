@@ -89,9 +89,9 @@
   <div class="group-block">
     <div class="pub-row">
       {#if g.publication_id}
-        <a href="{base}/publications/{g.publication_id}" class="pub-link">{g.pub_title}</a>
+        <a href="{base}/publications/{g.publication_id}" class="pub-link">{g.title}</a>
       {:else}
-        <span class="pub-title">{g.pub_title}</span>
+        <span class="pub-title">{g.title}</span>
       {/if}
       {#if g.pub_year}<span class="pub-year">{g.pub_year}</span>{/if}
     </div>

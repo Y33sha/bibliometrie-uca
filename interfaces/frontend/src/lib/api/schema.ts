@@ -2780,6 +2780,24 @@ export interface components {
             /** Id */
             id: number;
         };
+        /**
+         * CurationPersonOut
+         * @description Fiche personne allégée, commune aux files de curation (conflits d'identifiant, intrus détachables, doublons par nom) ; le détail complet est dans le drawer.
+         */
+        CurationPersonOut: {
+            /** Person Id */
+            person_id: number;
+            /** First Name */
+            first_name: string;
+            /** Last Name */
+            last_name: string;
+            /** Has Rh */
+            has_rh: boolean;
+            /** Signature Count */
+            signature_count: number;
+            /** Labs */
+            labs: string[];
+        };
         /** DashboardOa */
         DashboardOa: {
             /** Open Access */
@@ -2830,11 +2848,11 @@ export interface components {
             source_publication_id: number;
             /** Publication Id */
             publication_id: number | null;
-            /** Pub Title */
-            pub_title: string | null;
+            /** Title */
+            title: string | null;
             /** Pub Year */
             pub_year: number | null;
-            person: components["schemas"]["IdentifierConflictPersonOut"];
+            person: components["schemas"]["CurationPersonOut"];
             /** Anchors */
             anchors: components["schemas"]["AnchorOccurrenceOut"][];
             /** Intruders */
@@ -3288,28 +3306,10 @@ export interface components {
          * @description Deux personnes distinctes portant la même valeur brute d'identifiant (ORCID / IdRef / hal_person_id / idHAL) : doublon probable (mêmes nom/réseau) ou erreur d'attribution.
          */
         IdentifierConflictPairOut: {
-            person_a: components["schemas"]["IdentifierConflictPersonOut"];
-            person_b: components["schemas"]["IdentifierConflictPersonOut"];
+            person_a: components["schemas"]["CurationPersonOut"];
+            person_b: components["schemas"]["CurationPersonOut"];
             /** Shared Identifiers */
-            shared_identifiers: components["schemas"]["SharedIdentifierOut"][];
-        };
-        /**
-         * IdentifierConflictPersonOut
-         * @description Personne d'une paire en conflit d'identifiant, vue allégée (le détail complet est dans le drawer).
-         */
-        IdentifierConflictPersonOut: {
-            /** Person Id */
-            person_id: number;
-            /** First Name */
-            first_name: string;
-            /** Last Name */
-            last_name: string;
-            /** Has Rh */
-            has_rh: boolean;
-            /** Signature Count */
-            signature_count: number;
-            /** Labs */
-            labs: string[];
+            shared_identifiers: components["schemas"]["IdentifierRef"][];
         };
         /** IdentifierConflictsResponse */
         IdentifierConflictsResponse: {
@@ -3336,6 +3336,13 @@ export interface components {
             /** Status */
             status: string;
         };
+        /** IdentifierRef */
+        IdentifierRef: {
+            /** Id Type */
+            id_type: string;
+            /** Id Value */
+            id_value: string;
+        };
         /**
          * IdentifierStatusResponse
          * @description Identifiant après changement de statut : son id et son statut.
@@ -3358,7 +3365,7 @@ export interface components {
             /** Name Form */
             name_form: string;
             /** Identifiers */
-            identifiers: components["schemas"]["SharedIdentifierOut"][];
+            identifiers: components["schemas"]["IdentifierRef"][];
         };
         /**
          * JournalDashboardResponse
@@ -3595,8 +3602,8 @@ export interface components {
          * @description Deux personnes aux noms compatibles, avec leurs recouvrements de réseau. Un réseau commun (co-auteurs, publications co-signées) signe un doublon ; des réseaux disjoints, un homonyme.
          */
         NameDuplicatePairOut: {
-            person_a: components["schemas"]["IdentifierConflictPersonOut"];
-            person_b: components["schemas"]["IdentifierConflictPersonOut"];
+            person_a: components["schemas"]["CurationPersonOut"];
+            person_b: components["schemas"]["CurationPersonOut"];
             overlaps: components["schemas"]["OverlapCountsOut"];
         };
         /** NameDuplicatesResponse */
@@ -3618,8 +3625,8 @@ export interface components {
             source: string;
             /** Source Authorship Id */
             source_authorship_id: number;
-            /** Pub Id */
-            pub_id: number;
+            /** Publication Id */
+            publication_id: number;
             /** Title */
             title: string;
             /** Pub Year */
@@ -3795,8 +3802,8 @@ export interface components {
         };
         /** OtherPersonOut */
         OtherPersonOut: {
-            /** Id */
-            id: number;
+            /** Person Id */
+            person_id: number;
             /** First Name */
             first_name: string;
             /** Last Name */
@@ -3847,7 +3854,7 @@ export interface components {
         };
         /**
          * PerimeterOut
-         * @description Périmètre + ses structures racines (identifiants bruts, résolues, comptage effectif).
+         * @description Un périmètre : ses structures racines (`root_structure_ids` bruts, `structures` résolues) et `structure_count`, la taille de la clôture transitive de ces racines (avec leurs sous-structures) — donc distinct du nombre de racines.
          */
         PerimeterOut: {
             /** Id */
@@ -4005,7 +4012,7 @@ export interface components {
             /** Idhal */
             idhal: string | null;
             /** Hal Person Id */
-            hal_person_id?: number | null;
+            hal_person_id: number | null;
             /** Openalex Id */
             openalex_id: string | null;
             /** In Perimeter Signature Count */
@@ -4751,20 +4758,13 @@ export interface components {
             /** Countries */
             countries?: string[] | null;
         };
-        /** SharedIdentifierOut */
-        SharedIdentifierOut: {
-            /** Id Type */
-            id_type: string;
-            /** Id Value */
-            id_value: string;
-        };
         /**
          * SharingPersonOut
          * @description Personne partageant ≥1 forme de nom avec une autre (candidate à l'absorption).
          */
         SharingPersonOut: {
-            /** Id */
-            id: number;
+            /** Person Id */
+            person_id: number;
             /** First Name */
             first_name: string;
             /** Last Name */

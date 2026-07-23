@@ -8,7 +8,7 @@
 
   type Resp = components["schemas"]["NameDuplicatesResponse"];
   type Pair = components["schemas"]["NameDuplicatePairOut"];
-  type Person = components["schemas"]["IdentifierConflictPersonOut"];
+  type Person = components["schemas"]["CurationPersonOut"];
 
   let {
     onopenPerson,

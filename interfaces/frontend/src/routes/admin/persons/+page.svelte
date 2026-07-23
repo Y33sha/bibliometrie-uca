@@ -416,10 +416,10 @@
     // publication pour n'afficher qu'une ligne par publi.
     const byPub = new Map<number, DetachPublication>();
     for (const r of data.authorships) {
-      let pub = byPub.get(r.pub_id);
+      let pub = byPub.get(r.publication_id);
       if (!pub) {
-        pub = { pub_id: r.pub_id, title: r.title, pub_year: r.pub_year, sources: [], checked: true };
-        byPub.set(r.pub_id, pub);
+        pub = { pub_id: r.publication_id, title: r.title, pub_year: r.pub_year, sources: [], checked: true };
+        byPub.set(r.publication_id, pub);
       }
       pub.sources.push({ source: r.source, source_authorship_id: r.source_authorship_id });
     }
