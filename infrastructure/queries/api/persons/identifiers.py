@@ -1,15 +1,14 @@
 """Lecture des identifiants publics d'un ensemble de personnes."""
 
-from typing import Any
-
 from sqlalchemy import Connection, text
 
+from application.ports.api.persons_queries import PersonIdentifierOut
 from domain.persons.identifiers import PUBLIC_PERSON_IDENTIFIER_TYPES
 
 
 def public_identifiers(
     conn: Connection, person_ids: list[int], *, include_rejected: bool
-) -> dict[int, list[dict[str, Any]]]:
+) -> dict[int, list[PersonIdentifierOut]]:
     """Identifiants de types publics, indexés par personne.
 
     Une attribution rejetée est une attribution que la curation a écartée : les lectures publiques ne l'annoncent pas, les lectures de curation la gardent pour permettre le retour en arrière. Le statut accompagne chaque attribution, qui distingue l'observée de la validée.
@@ -30,8 +29,15 @@ def public_identifiers(
         {"ids": person_ids, "public_id_types": list(PUBLIC_PERSON_IDENTIFIER_TYPES)},
     ).all()
 
-    by_person: dict[int, list[dict[str, Any]]] = {}
+    by_person: dict[int, list[PersonIdentifierOut]] = {}
     for row in rows:
-        record = dict(row._mapping)
-        by_person.setdefault(record.pop("person_id"), []).append(record)
+        by_person.setdefault(row.person_id, []).append(
+            PersonIdentifierOut(
+                id=row.id,
+                id_type=row.id_type,
+                id_value=row.id_value,
+                source=row.source,
+                status=row.status,
+            )
+        )
     return by_person

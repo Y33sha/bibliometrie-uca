@@ -4,7 +4,14 @@ from typing import Any
 
 from sqlalchemy import Connection, text
 
-from application.ports.api.persons_queries import PersonFilters
+from application.ports.api.persons_queries import (
+    NameFormSummaryOut,
+    PersonFilters,
+    PersonIdentifierOut,
+    PersonListResponse,
+    PersonOut,
+    PersonSearchResult,
+)
 from infrastructure.queries.api.filters import (
     WhereClause,
     assemble_where,
@@ -31,7 +38,7 @@ _LAB_SCOPED_SIGNATURES = (
 # ── Autocomplete ─────────────────────────────────────────────────
 
 
-def search_persons(conn: Connection, *, search: str, limit: int) -> list[dict[str, Any]]:
+def search_persons(conn: Connection, *, search: str, limit: int) -> list[PersonSearchResult]:
     """Recherche rapide (autocomplete) : chaque mot doit matcher dans last ou first name."""
     words = search.strip().split()
     if not words:
@@ -59,7 +66,16 @@ def search_persons(conn: Connection, *, search: str, limit: int) -> list[dict[st
         """),
         {**binds, "pg_limit": limit},
     ).all()
-    return [dict(r._mapping) for r in rows]
+    return [
+        PersonSearchResult(
+            id=r.id,
+            last_name=r.last_name,
+            first_name=r.first_name,
+            department_name=r.department_name,
+            has_rh=r.has_rh,
+        )
+        for r in rows
+    ]
 
 
 # ── Liste admin ──────────────────────────────────────────────────
@@ -82,7 +98,7 @@ def _signature_counts_sql(*, lab_scoped: bool) -> str:
 
 def list_persons(
     conn: Connection, *, filters: PersonFilters, page: int, per_page: int, sort: str
-) -> dict[str, Any]:
+) -> PersonListResponse:
     """Liste paginée des personnes.
 
     L'annuaire public et la liste de curation sont deux appels de cette lecture : le premier écarte les personnes rejetées et se scope à un laboratoire, le second garde tout et ajoute les filtres des files à confirmer.
@@ -128,30 +144,33 @@ def list_persons(
         """),
         {**binds, "pg_limit": per_page, "pg_offset": offset},
     ).all()
-    persons_rows = [dict(r._mapping) for r in rows]
-    _attach_identifiers(conn, persons_rows)
+    # Les identifiants suivent chaque personne, rejetés compris (statut porté ; l'affichage public les écarte au statut). Les formes de nom restent sur la fiche personne — les porter par ligne pesait les deux tiers de la liste.
+    by_person = public_identifiers(conn, [r.id for r in rows], include_rejected=True)
+    persons = [_person_out(r, by_person.get(r.id, [])) for r in rows]
 
-    return {
-        "total": total,
-        "page": page,
-        "per_page": per_page,
-        "persons": persons_rows,
-    }
+    return PersonListResponse(total=total, page=page, per_page=per_page, persons=persons)
 
 
-def _attach_identifiers(conn: Connection, persons_rows: list[dict[str, Any]]) -> None:
-    """Enrichit en place chaque ligne personne avec ses identifiants.
+def _person_out(row: Any, identifiers: list[PersonIdentifierOut]) -> PersonOut:
+    """`PersonOut` d'une ligne de la projection commune à la liste et à `person_admin`."""
+    return PersonOut(
+        id=row.id,
+        last_name=row.last_name,
+        first_name=row.first_name,
+        role_title=row.role_title,
+        department_name=row.department_name,
+        start_date=row.start_date,
+        end_date=row.end_date,
+        has_rh=row.has_rh,
+        rejected=row.rejected,
+        signature_count=row.signature_count,
+        signature_count_as_author=row.signature_count_as_author,
+        in_perimeter_signature_count=row.in_perimeter_signature_count,
+        identifiers=identifiers,
+    )
 
-    Les attributions rejetées suivent, avec leur statut : la curation les affiche pour permettre le retour en arrière, et l'affichage public les écarte à la lecture du statut, comme il en dérive déjà la confirmation.
 
-    Les formes de nom, elles, ne suivent pas : seule la fiche d'une personne les affiche, et les porter par ligne pesait les deux tiers de la liste (`person_name_forms` par `PgPersonsQueries.person_name_forms`).
-    """
-    by_person = public_identifiers(conn, [p["id"] for p in persons_rows], include_rejected=True)
-    for p in persons_rows:
-        p["identifiers"] = by_person.get(p["id"], [])
-
-
-def person_name_forms(conn: Connection, person_id: int) -> list[dict[str, Any]]:
+def person_name_forms(conn: Connection, person_id: int) -> list[NameFormSummaryOut]:
     """Formes de nom d'une personne, avec leur état d'arbitrage.
 
     Toutes les formes, y compris celles entièrement dérivées du nom canonique (source `persons` seule) : la fiche d'une personne les présente à la curation. `shared_count` compte les personnes qui portent la même forme, `ambiguous` dit qu'elles sont plusieurs, et `pub_count` les publications distinctes que la forme signe.
@@ -179,10 +198,20 @@ def person_name_forms(conn: Connection, person_id: int) -> list[dict[str, Any]]:
         """),
         {"pid": person_id},
     ).all()
-    return [dict(r._mapping) for r in rows]
+    return [
+        NameFormSummaryOut(
+            name_form=r.name_form,
+            sources=r.sources,
+            ambiguous=r.ambiguous,
+            status=r.status,
+            shared_count=r.shared_count,
+            pub_count=r.pub_count,
+        )
+        for r in rows
+    ]
 
 
-def person_admin(conn: Connection, person_id: int) -> dict[str, Any] | None:
+def person_admin(conn: Connection, person_id: int) -> PersonOut | None:
     """Une personne par id, même projection que la liste. None si absente."""
     row = conn.execute(
         text(f"""
@@ -198,6 +227,5 @@ def person_admin(conn: Connection, person_id: int) -> dict[str, Any] | None:
     ).one_or_none()
     if row is None:
         return None
-    persons_rows = [dict(row._mapping)]
-    _attach_identifiers(conn, persons_rows)
-    return persons_rows[0]
+    by_person = public_identifiers(conn, [row.id], include_rejected=True)
+    return _person_out(row, by_person.get(row.id, []))

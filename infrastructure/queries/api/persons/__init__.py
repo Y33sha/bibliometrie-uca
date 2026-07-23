@@ -85,21 +85,15 @@ class PgPersonsQueries(PersonsQueries):
     # ── Liste / recherche ──────────────────────────────────────────
 
     def search_persons(self, *, search: str, limit: int) -> list[PersonSearchResult]:
-        return [
-            PersonSearchResult.model_validate(r)
-            for r in _search_persons(self._conn, search=search, limit=limit)
-        ]
+        return _search_persons(self._conn, search=search, limit=limit)
 
     def list_persons(
         self, *, filters: PersonFilters, page: int, per_page: int, sort: str
     ) -> PersonListResponse:
-        return PersonListResponse.model_validate(
-            _list_persons(self._conn, filters=filters, page=page, per_page=per_page, sort=sort)
-        )
+        return _list_persons(self._conn, filters=filters, page=page, per_page=per_page, sort=sort)
 
     def person_admin(self, person_id: int) -> PersonOut | None:
-        row = _person_admin(self._conn, person_id)
-        return PersonOut.model_validate(row) if row is not None else None
+        return _person_admin(self._conn, person_id)
 
     # ── Facettes / listes de référence / stats ─────────────────────
 
@@ -107,9 +101,7 @@ class PgPersonsQueries(PersonsQueries):
         return PersonsFacetsResponse.model_validate(_persons_facets(self._conn, filters=filters))
 
     def person_name_forms(self, person_id: int) -> list[NameFormSummaryOut]:
-        return [
-            NameFormSummaryOut.model_validate(r) for r in _person_name_forms(self._conn, person_id)
-        ]
+        return _person_name_forms(self._conn, person_id)
 
     def persons_stats(self) -> PersonsStatsResponse:
         return PersonsStatsResponse.model_validate(_persons_stats(self._conn))
