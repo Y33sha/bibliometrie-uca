@@ -677,7 +677,7 @@ class TestPersonAdminProjection:
         _seed_name_form(b, form)
         r = client.get(f"/api/persons/{a}/sharing-name-forms")
         assert r.status_code == 200
-        assert b in [p["id"] for p in r.json()]
+        assert b in [p["person_id"] for p in r.json()]
 
 
 class TestMarkPersonsDistinct:

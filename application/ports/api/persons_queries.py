@@ -182,7 +182,7 @@ class PersonProfileAuthor(BaseModel):
     full_name: str | None
     orcid: str | None
     idhal: str | None
-    hal_person_id: int | None = None
+    hal_person_id: int | None
     openalex_id: str | None
     in_perimeter_signature_count: int
 
@@ -245,14 +245,14 @@ class PersonDashboardResponse(BaseModel):
 class NameFormAuthorshipRef(BaseModel):
     source: str
     source_authorship_id: int
-    pub_id: int
+    publication_id: int
     title: str
     pub_year: int | None
     doi: str | None
 
 
 class OtherPersonOut(BaseModel):
-    id: int
+    person_id: int
     first_name: str
     last_name: str
     department_name: str | None
@@ -289,8 +289,8 @@ class AmbiguousNameFormsResponse(PaginatedResponse):
     forms: list[AmbiguousNameFormOut]
 
 
-class IdentifierConflictPersonOut(BaseModel):
-    """Personne d'une paire en conflit d'identifiant, vue allégée (le détail complet est dans le drawer)."""
+class CurationPersonOut(BaseModel):
+    """Fiche personne allégée, commune aux files de curation (conflits d'identifiant, intrus détachables, doublons par nom) ; le détail complet est dans le drawer."""
 
     person_id: int
     first_name: str
@@ -301,7 +301,7 @@ class IdentifierConflictPersonOut(BaseModel):
     labs: list[str]
 
 
-class SharedIdentifierOut(BaseModel):
+class IdentifierRef(BaseModel):
     id_type: str
     id_value: str
 
@@ -309,9 +309,9 @@ class SharedIdentifierOut(BaseModel):
 class IdentifierConflictPairOut(BaseModel):
     """Deux personnes distinctes portant la même valeur brute d'identifiant (ORCID / IdRef / hal_person_id / idHAL) : doublon probable (mêmes nom/réseau) ou erreur d'attribution."""
 
-    person_a: IdentifierConflictPersonOut
-    person_b: IdentifierConflictPersonOut
-    shared_identifiers: list[SharedIdentifierOut]
+    person_a: CurationPersonOut
+    person_b: CurationPersonOut
+    shared_identifiers: list[IdentifierRef]
 
 
 class IdentifierConflictsResponse(PaginatedResponse):
@@ -331,7 +331,7 @@ class IntruderOccurrenceOut(BaseModel):
     source: str
     raw_author_name: str
     name_form: str
-    identifiers: list[SharedIdentifierOut]
+    identifiers: list[IdentifierRef]
 
 
 class DetachableIntruderGroupOut(BaseModel):
@@ -339,9 +339,9 @@ class DetachableIntruderGroupOut(BaseModel):
 
     source_publication_id: int
     publication_id: int | None
-    pub_title: str | None
+    title: str | None
     pub_year: int | None
-    person: IdentifierConflictPersonOut
+    person: CurationPersonOut
     anchors: list[AnchorOccurrenceOut]
     intruders: list[IntruderOccurrenceOut]
 
@@ -362,8 +362,8 @@ class OverlapCountsOut(BaseModel):
 class NameDuplicatePairOut(BaseModel):
     """Deux personnes aux noms compatibles, avec leurs recouvrements de réseau. Un réseau commun (co-auteurs, publications co-signées) signe un doublon ; des réseaux disjoints, un homonyme."""
 
-    person_a: IdentifierConflictPersonOut
-    person_b: IdentifierConflictPersonOut
+    person_a: CurationPersonOut
+    person_b: CurationPersonOut
     overlaps: OverlapCountsOut
 
 
@@ -374,7 +374,7 @@ class NameDuplicatesResponse(PaginatedResponse):
 class SharingPersonOut(BaseModel):
     """Personne partageant ≥1 forme de nom avec une autre (candidate à l'absorption)."""
 
-    id: int
+    person_id: int
     first_name: str
     last_name: str
     has_rh: bool

@@ -113,7 +113,7 @@ class TestNameFormAuthorships:
 
         res = name_form_authorships(sa_sync_conn, pid, "dupond j")
         assert len(res.authorships) >= 1
-        other_ids = [p.id for p in res.other_persons]
+        other_ids = [p.person_id for p in res.other_persons]
         assert other in other_ids
 
 
