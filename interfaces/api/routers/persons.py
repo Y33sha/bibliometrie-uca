@@ -2,7 +2,7 @@
 
 Les lectures passent par le port `PersonsQueries`, les écritures par les command handlers de `application.services.persons.commands`. Les gestes qui portent sur les signatures elles-mêmes vivent dans `authorships.py`.
 
-L'ordre de déclaration porte une contrainte : les chemins littéraux — `/search`, `/facets`, `/stats`, les quatre files de triage, le registre des identifiants — précèdent tous `/{person_id}`, qui accepterait n'importe lequel d'entre eux comme identifiant.
+L'ordre de déclaration porte une contrainte : les chemins littéraux — `/search`, `/facets`, les quatre files de triage, le registre des identifiants — précèdent tous `/{person_id}`, qui accepterait n'importe lequel d'entre eux comme identifiant.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -25,7 +25,6 @@ from application.ports.api.persons_queries import (
     PersonsFacetsResponse,
     PersonSort,
     PersonsQueries,
-    PersonsStatsResponse,
     PersonThesesResponse,
     SharingPersonOut,
 )
@@ -135,14 +134,6 @@ def persons_facets(
 ) -> PersonsFacetsResponse:
     """Facettes dynamiques de la liste des personnes : chaque facette décompte sous les autres filtres."""
     return queries.persons_facets(filters=filters)
-
-
-@router.get("/stats", response_model=PersonsStatsResponse)
-def persons_stats(
-    queries: PersonsQueries = Depends(persons_queries),
-) -> PersonsStatsResponse:
-    """Statistiques sur les personnes et l'alignement."""
-    return queries.persons_stats()
 
 
 # ── Files de triage ──────────────────────────────────────────────
