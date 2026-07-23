@@ -5,12 +5,38 @@ from typing import Any
 
 from sqlalchemy import Connection, text
 
-from application.ports.api._common import page_count
+from application.ports.api._common import DashboardOa, PubYearCount, StructureRef, page_count
+from application.ports.api.persons_queries import (
+    PersonAddressesResponse,
+    PersonAddressOut,
+    PersonAddressStruct,
+    PersonDashboardResponse,
+    PersonProfileAuthor,
+    PersonProfileCore,
+    PersonProfileResponse,
+    PersonThesesResponse,
+    PersonThesesSection,
+    PersonThesis,
+)
+from application.ports.api.subjects_queries import SubjectFrequency
 from infrastructure.queries.api.filters import OA_DASHBOARD_COLS_SQL, SUBJECT_IS_NOT_GENERIC
 from infrastructure.queries.api.persons.identifiers import public_identifiers
 
 
-def person_profile(conn: Connection, person_id: int) -> dict[str, Any] | None:
+def _profile_author(row: Any) -> PersonProfileAuthor:
+    return PersonProfileAuthor(
+        id=row.id,
+        source=row.source,
+        full_name=row.full_name,
+        orcid=row.orcid,
+        idhal=row.idhal,
+        hal_person_id=row.hal_person_id,
+        openalex_id=row.openalex_id,
+        in_perimeter_signature_count=row.in_perimeter_signature_count,
+    )
+
+
+def person_profile(conn: Connection, person_id: int) -> PersonProfileResponse | None:
     """Profil public : infos + identifiants + auteurs liés."""
     person_row = conn.execute(
         text("""
@@ -25,8 +51,6 @@ def person_profile(conn: Connection, person_id: int) -> dict[str, Any] | None:
     ).one_or_none()
     if not person_row:
         return None
-    person = dict(person_row._mapping)
-
     identifiers = public_identifiers(conn, [person_id], include_rejected=False).get(person_id, [])
 
     # Reconstitution des « comptes HAL » depuis `source_authorships`, agrégés par hal_person_id (1 row par compte). MIN() sur les champs descriptifs : arbitraire mais déterministe, en théorie constants pour un même hal_person_id.
@@ -49,14 +73,14 @@ def person_profile(conn: Connection, person_id: int) -> dict[str, Any] | None:
         """),
         {"pid": person_id},
     ).all()
-    hal_authors = [dict(r._mapping) for r in hal_rows]
 
     oa_rows = conn.execute(
         text("""
             SELECT MIN(sa.id) AS id,
                    sa.raw_author_name AS full_name,
                    'openalex' AS source,
-                   NULL::text AS orcid, NULL::text AS idhal, NULL::text AS openalex_id,
+                   NULL::text AS orcid, NULL::text AS idhal,
+                   NULL::int AS hal_person_id, NULL::text AS openalex_id,
                    COUNT(*) FILTER (WHERE sa.in_perimeter = TRUE) AS in_perimeter_signature_count
             FROM source_authorships sa
             WHERE sa.source = 'openalex' AND sa.person_id = :pid
@@ -64,7 +88,6 @@ def person_profile(conn: Connection, person_id: int) -> dict[str, Any] | None:
         """),
         {"pid": person_id},
     ).all()
-    oa_authors = [dict(r._mapping) for r in oa_rows]
 
     # WoS : group by raw_author_name comme OpenAlex. ORCID lu depuis l'identité de la signature (`author_identifying_keys.person_identifiers`).
     wos_rows = conn.execute(
@@ -73,7 +96,7 @@ def person_profile(conn: Connection, person_id: int) -> dict[str, Any] | None:
                    sa.raw_author_name AS full_name,
                    'wos' AS source,
                    MAX(aik.person_identifiers->>'orcid') AS orcid,
-                   NULL::text AS idhal, NULL::text AS openalex_id,
+                   NULL::text AS idhal, NULL::int AS hal_person_id, NULL::text AS openalex_id,
                    COUNT(*) FILTER (WHERE sa.in_perimeter = TRUE) AS in_perimeter_signature_count
             FROM source_authorships sa
             JOIN author_identifying_keys aik ON aik.id = sa.identity_id
@@ -82,11 +105,10 @@ def person_profile(conn: Connection, person_id: int) -> dict[str, Any] | None:
         """),
         {"pid": person_id},
     ).all()
-    wos_authors = [dict(r._mapping) for r in wos_rows]
 
     theses_count_row = conn.execute(
         text("""
-            SELECT COUNT(*) AS count
+            SELECT COUNT(*) AS n
             FROM source_authorships sa
             JOIN source_publications sd ON sd.id = sa.source_publication_id
             WHERE sa.person_id = :pid
@@ -97,12 +119,20 @@ def person_profile(conn: Connection, person_id: int) -> dict[str, Any] | None:
         {"pid": person_id},
     ).one()
 
-    return {
-        "person": person,
-        "identifiers": identifiers,
-        "authors": hal_authors + oa_authors + wos_authors,
-        "theses_count": theses_count_row.count,
-    }
+    return PersonProfileResponse(
+        person=PersonProfileCore(
+            id=person_row.id,
+            last_name=person_row.last_name,
+            first_name=person_row.first_name,
+            role_title=person_row.role_title,
+            department_name=person_row.department_name,
+            start_date=person_row.start_date,
+            end_date=person_row.end_date,
+        ),
+        identifiers=identifiers,
+        authors=[_profile_author(r) for r in (*hal_rows, *oa_rows, *wos_rows)],
+        theses_count=theses_count_row.n,
+    )
 
 
 # ── Thèses encadrées ─────────────────────────────────────────────
@@ -117,7 +147,7 @@ _THESIS_ROLE_LABELS = {
 }
 
 
-def person_theses(conn: Connection, person_id: int) -> dict[str, Any]:
+def person_theses(conn: Connection, person_id: int) -> PersonThesesResponse:
     """Thèses liées à cette personne avec un rôle non-auteur.
 
     Les rôles sont lus depuis `authorships` canonique (alignement vérifié avec `source_authorships.roles` sur la base). Le filtre `source = 'theses'` reste source-spécifique (HAL/ScanR remontent quelques rôles non-auteur qu'on n'affiche pas dans cette page) et passe par un `EXISTS`.
@@ -164,16 +194,16 @@ def person_theses(conn: Connection, person_id: int) -> dict[str, Any]:
         for sid in row.structure_ids or []:
             all_struct_ids.add(sid)
 
-    structures: dict[int, Any] = {}
+    structures: dict[int, StructureRef] = {}
     if all_struct_ids:
         struct_rows = conn.execute(
             text("SELECT id, acronym, name FROM structures WHERE id = ANY(:ids)"),
             {"ids": list(all_struct_ids)},
         ).all()
         for s in struct_rows:
-            structures[s.id] = {"acronym": s.acronym, "name": s.name}
+            structures[s.id] = StructureRef(acronym=s.acronym, name=s.name)
 
-    by_role: dict[str, list[dict[str, Any]]] = {}
+    by_role: dict[str, list[PersonThesis]] = {}
     for row in rows:
         roles = row.roles or []
         role = "jury_member"
@@ -182,23 +212,23 @@ def person_theses(conn: Connection, person_id: int) -> dict[str, Any]:
                 role = r
                 break
         by_role.setdefault(role, []).append(
-            {
-                "id": row.id,
-                "title": row.title,
-                "pub_year": row.pub_year,
-                "doi": row.doi,
-                "author_name": row.author_name,
-                "author_person_id": row.author_person_id,
-                "structure_ids": row.structure_ids or [],
-            }
+            PersonThesis(
+                id=row.id,
+                title=row.title,
+                pub_year=row.pub_year,
+                doi=row.doi,
+                author_name=row.author_name,
+                author_person_id=row.author_person_id,
+                structure_ids=row.structure_ids or [],
+            )
         )
 
     sections = [
-        {"role": k, "label": _THESIS_ROLE_LABELS[k], "theses": by_role[k]}
+        PersonThesesSection(role=k, label=_THESIS_ROLE_LABELS[k], theses=by_role[k])
         for k in _THESIS_ROLES
         if k in by_role
     ]
-    return {"sections": sections, "total": len(rows), "structures": structures}
+    return PersonThesesResponse(sections=sections, total=len(rows), structures=structures)
 
 
 # ── Adresses ─────────────────────────────────────────────────────
@@ -206,7 +236,7 @@ def person_theses(conn: Connection, person_id: int) -> dict[str, Any]:
 
 def person_addresses(
     conn: Connection, person_id: int, *, page: int, per_page: int
-) -> dict[str, Any]:
+) -> PersonAddressesResponse:
     """Adresses distinctes utilisées dans les authorships sources de cette personne."""
     base_where = """a.id IN (
             SELECT DISTINCT saa.address_id
@@ -240,19 +270,29 @@ def person_addresses(
         """),
         {"pid": person_id, "pg_limit": per_page, "pg_offset": offset},
     ).all()
-    return {
-        "total": total,
-        "page": page,
-        "per_page": per_page,
-        "addresses": [dict(r._mapping) for r in rows],
-    }
+    addresses = [
+        PersonAddressOut(
+            id=r.id,
+            raw_text=r.raw_text,
+            structures=(
+                [
+                    PersonAddressStruct(id=s["id"], acronym=s["acronym"], name=s["name"])
+                    for s in r.structures
+                ]
+                if r.structures
+                else None
+            ),
+        )
+        for r in rows
+    ]
+    return PersonAddressesResponse(total=total, page=page, per_page=per_page, addresses=addresses)
 
 
-def person_subjects(conn: Connection, person_id: int, *, limit: int) -> list[dict[str, Any]]:
+def person_subjects(conn: Connection, person_id: int, *, limit: int) -> list[SubjectFrequency]:
     """Sujets des publications signées par la personne, les plus fréquents d'abord."""
     rows = conn.execute(
         text(f"""
-            SELECT s.id, s.label, COUNT(DISTINCT p.id) AS count
+            SELECT s.id, s.label, COUNT(DISTINCT p.id) AS n
             FROM authorships a
             JOIN publications p ON p.id = a.publication_id
             JOIN publication_subjects ps ON ps.publication_id = p.id
@@ -261,21 +301,21 @@ def person_subjects(conn: Connection, person_id: int, *, limit: int) -> list[dic
               AND a.roles && ARRAY['author']::text[]
               AND {SUBJECT_IS_NOT_GENERIC}
             GROUP BY s.id, s.label
-            ORDER BY count DESC, lower(s.label)
+            ORDER BY n DESC, lower(s.label)
             LIMIT :lim
         """),
         {"pid": person_id, "lim": limit},
     ).all()
-    return [dict(r._mapping) for r in rows]
+    return [SubjectFrequency(id=r.id, label=r.label, count=r.n) for r in rows]
 
 
-def person_dashboard(conn: Connection, person_id: int) -> dict[str, Any]:
+def person_dashboard(conn: Connection, person_id: int) -> PersonDashboardResponse:
     """Dashboard personne : publis/an + répartition Open Access."""
     current_year = datetime.date.today().year
 
     pubs_year_rows = conn.execute(
         text("""
-            SELECT p.pub_year, COUNT(DISTINCT p.id) AS count
+            SELECT p.pub_year, COUNT(DISTINCT p.id) AS n
             FROM publications p
             JOIN authorships a ON a.publication_id = p.id
             WHERE a.person_id = :pid
@@ -287,7 +327,7 @@ def person_dashboard(conn: Connection, person_id: int) -> dict[str, Any]:
         """),
         {"pid": person_id, "min_year": current_year - 6},
     ).all()
-    pubs_by_year = [{"year": r.pub_year, "count": r.count} for r in pubs_year_rows]
+    pubs_by_year = [PubYearCount(year=r.pub_year, count=r.n) for r in pubs_year_rows]
 
     oa = conn.execute(
         text(f"""
@@ -301,13 +341,13 @@ def person_dashboard(conn: Connection, person_id: int) -> dict[str, Any]:
         {"pid": person_id},
     ).one()
 
-    return {
-        "pubs_by_year": pubs_by_year,
-        "oa": {
-            "open_access": oa.open_access,
-            "embargoed": oa.embargoed,
-            "closed": oa.closed,
-            "unknown": oa.unknown,
-            "total": oa.total,
-        },
-    }
+    return PersonDashboardResponse(
+        pubs_by_year=pubs_by_year,
+        oa=DashboardOa(
+            open_access=oa.open_access,
+            embargoed=oa.embargoed,
+            closed=oa.closed,
+            unknown=oa.unknown,
+            total=oa.total,
+        ),
+    )

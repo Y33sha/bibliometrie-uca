@@ -109,29 +109,21 @@ class PgPersonsQueries(PersonsQueries):
     # ── Détail d'une personne ──────────────────────────────────────
 
     def person_profile(self, person_id: int) -> PersonProfileResponse | None:
-        data = _person_profile(self._conn, person_id)
-        if data is None:
-            return None
-        return PersonProfileResponse.model_validate(data)
+        return _person_profile(self._conn, person_id)
 
     def person_theses(self, person_id: int) -> PersonThesesResponse:
-        return PersonThesesResponse.model_validate(_person_theses(self._conn, person_id))
+        return _person_theses(self._conn, person_id)
 
     def person_addresses(
         self, person_id: int, *, page: int, per_page: int
     ) -> PersonAddressesResponse:
-        return PersonAddressesResponse.model_validate(
-            _person_addresses(self._conn, person_id, page=page, per_page=per_page)
-        )
+        return _person_addresses(self._conn, person_id, page=page, per_page=per_page)
 
     def person_dashboard(self, person_id: int) -> PersonDashboardResponse:
-        return PersonDashboardResponse.model_validate(_person_dashboard(self._conn, person_id))
+        return _person_dashboard(self._conn, person_id)
 
     def person_subjects(self, person_id: int, *, limit: int) -> list[SubjectFrequency]:
-        return [
-            SubjectFrequency.model_validate(r)
-            for r in _person_subjects(self._conn, person_id, limit=limit)
-        ]
+        return _person_subjects(self._conn, person_id, limit=limit)
 
     # ── Admin : name forms ─────────────────────────────────────────
 
