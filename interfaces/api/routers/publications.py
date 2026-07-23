@@ -268,7 +268,7 @@ def list_publications(
 ) -> PublicationListResponse:
     """Liste paginée des publications, avec leurs sources, leurs laboratoires et leur revue.
 
-    Les filtres se cumulent. `sort` accepte `year_desc`, `year_asc`, `title` et `cited_by`.
+    Les filtres se cumulent. `sort` combine un champ — année, titre, APC, date de soutenance ou d'inscription — et un sens (`_asc` / `_desc`).
     """
     return queries.list_publications(
         filters=filters.to_filters(),

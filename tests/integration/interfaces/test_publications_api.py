@@ -93,6 +93,11 @@ class TestPublicationsList:
         r = client.get("/api/publications", params={"sort": "title_asc"})
         assert r.status_code == 200
 
+    def test_sort_by_inscription(self, client):
+        """Le tri par date d'inscription de la table des thèses est un tri valide de la liste."""
+        r = client.get("/api/publications", params={"sort": "inscription_asc"})
+        assert r.status_code == 200
+
     def test_complex_filter_combination(self, client):
         """Combine plusieurs filtres pour exercer la construction dynamique
         du WHERE complet — c'est le scénario le plus sensible pour le refactor."""
