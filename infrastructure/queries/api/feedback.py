@@ -13,6 +13,15 @@ from application.ports.api.feedback_queries import (
     FeedbackStats,
 )
 
+# Matrice de confusion de la détection d'adresses : l'arbitrage humain (`is_confirmed`) croisé avec
+# ce que la détection a proposé (`matched_form_id`), sur un lien `address_structures` aliasé `ast`.
+# Partagée entre le décompte (`feedback_stats`) et les listes (faux négatifs / faux positifs).
+_CONCORDANT_VALID = "ast.is_confirmed = TRUE AND ast.matched_form_id IS NOT NULL"
+_CONCORDANT_REJECTED = "ast.is_confirmed = FALSE AND ast.matched_form_id IS NULL"
+_FALSE_NEGATIVE = "ast.is_confirmed = TRUE AND ast.matched_form_id IS NULL"
+_FALSE_POSITIVE = "ast.is_confirmed = FALSE AND ast.matched_form_id IS NOT NULL"
+_PENDING = "ast.is_confirmed IS NULL AND ast.matched_form_id IS NOT NULL"
+
 
 class PgFeedbackQueries(FeedbackQueries):
     """Adapter SA pour `FeedbackQueries`."""
@@ -22,25 +31,15 @@ class PgFeedbackQueries(FeedbackQueries):
 
     def feedback_stats(self, structure_id: int) -> FeedbackStats:
         row = self._conn.execute(
-            text("""
+            text(f"""
                 SELECT
-                    COUNT(*) FILTER (
-                        WHERE is_confirmed = TRUE AND matched_form_id IS NOT NULL
-                    ) AS concordant_valid,
-                    COUNT(*) FILTER (
-                        WHERE is_confirmed = FALSE AND matched_form_id IS NULL
-                    ) AS concordant_rejected,
-                    COUNT(*) FILTER (
-                        WHERE is_confirmed = TRUE AND matched_form_id IS NULL
-                    ) AS false_negatives,
-                    COUNT(*) FILTER (
-                        WHERE is_confirmed = FALSE AND matched_form_id IS NOT NULL
-                    ) AS false_positives,
-                    COUNT(*) FILTER (
-                        WHERE is_confirmed IS NULL AND matched_form_id IS NOT NULL
-                    ) AS pending
-                FROM address_structures
-                WHERE structure_id = :sid
+                    COUNT(*) FILTER (WHERE {_CONCORDANT_VALID}) AS concordant_valid,
+                    COUNT(*) FILTER (WHERE {_CONCORDANT_REJECTED}) AS concordant_rejected,
+                    COUNT(*) FILTER (WHERE {_FALSE_NEGATIVE}) AS false_negatives,
+                    COUNT(*) FILTER (WHERE {_FALSE_POSITIVE}) AS false_positives,
+                    COUNT(*) FILTER (WHERE {_PENDING}) AS pending
+                FROM address_structures ast
+                WHERE ast.structure_id = :sid
             """),
             {"sid": structure_id},
         ).one()
@@ -67,7 +66,7 @@ class PgFeedbackQueries(FeedbackQueries):
             page=page,
             per_page=per_page,
             search=search,
-            kind_where="ast.is_confirmed = TRUE AND ast.matched_form_id IS NULL",
+            kind_where=_FALSE_NEGATIVE,
             with_matched_forms=False,
         )
 
@@ -79,7 +78,7 @@ class PgFeedbackQueries(FeedbackQueries):
             page=page,
             per_page=per_page,
             search=search,
-            kind_where="ast.is_confirmed = FALSE AND ast.matched_form_id IS NOT NULL",
+            kind_where=_FALSE_POSITIVE,
             with_matched_forms=True,
         )
 
