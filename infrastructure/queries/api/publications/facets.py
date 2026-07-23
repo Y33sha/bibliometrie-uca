@@ -8,7 +8,11 @@ from typing import Any
 
 from sqlalchemy import Connection, text
 
-from application.ports.api.publications_queries import PublicationFilters
+from application.ports.api._common import EntityFacetItem, FacetOption, YesNoCount
+from application.ports.api.publications_queries import (
+    PublicationFilters,
+    PublicationsFacetsResponse,
+)
 from domain.countries import NO_COUNTRY_CODE
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.queries.api.filters import (
@@ -115,7 +119,7 @@ class _PublicationFacetsBuilder:
 
     # ── Facettes ────────────────────────────────────────────────
 
-    def _facet_years(self) -> list[dict[str, Any]]:
+    def _facet_years(self) -> list[FacetOption]:
         where_sql, binds = self._clauses_skipping("year")
         rows = self.conn.execute(
             text(f"""
@@ -126,9 +130,9 @@ class _PublicationFacetsBuilder:
             """),
             binds,
         ).all()
-        return [dict(r._mapping) for r in rows]
+        return [FacetOption(**r._mapping) for r in rows]
 
-    def _facet_labs(self) -> tuple[list[dict[str, Any]], int]:
+    def _facet_labs(self) -> tuple[list[FacetOption], int]:
         where_sql, binds = self._clauses_skipping("lab")
         # `publication_structures` (matview publi↔structure dédoublonnée) → COUNT(*) par structure, sans jointure authorships ni DISTINCT/tri (cf. migration d8b3f5a2c9e6). `where_sql` ne porte que sur `p` (publications).
         labs_rows = self.conn.execute(
@@ -145,7 +149,7 @@ class _PublicationFacetsBuilder:
             """),
             binds,
         ).all()
-        labs = [dict(r._mapping) for r in labs_rows]
+        labs = [FacetOption(**r._mapping) for r in labs_rows]
 
         no_lab_row = self.conn.execute(
             text(f"""
@@ -162,7 +166,7 @@ class _PublicationFacetsBuilder:
         ).one()
         return labs, no_lab_row.total
 
-    def _facet_doc_types(self) -> list[dict[str, Any]]:
+    def _facet_doc_types(self) -> list[FacetOption]:
         where_sql, binds = self._clauses_skipping("doc_type")
         rows = self.conn.execute(
             text(f"""
@@ -173,9 +177,9 @@ class _PublicationFacetsBuilder:
             """),
             binds,
         ).all()
-        return [dict(r._mapping) for r in rows]
+        return [FacetOption(**r._mapping) for r in rows]
 
-    def _facet_access(self) -> list[dict[str, Any]]:
+    def _facet_access(self) -> list[FacetOption]:
         where_sql, binds = self._clauses_skipping("access")
         r = self.conn.execute(
             text(f"""
@@ -192,12 +196,12 @@ class _PublicationFacetsBuilder:
             binds,
         ).one()
         return [
-            {"value": "open", "label": "Ouvert", "count": r.open_count},
-            {"value": "embargo", "label": "Sous embargo", "count": r.embargo_count},
-            {"value": "closed", "label": "Fermé", "count": r.closed_count},
+            FacetOption(value="open", label="Ouvert", count=r.open_count),
+            FacetOption(value="embargo", label="Sous embargo", count=r.embargo_count),
+            FacetOption(value="closed", label="Fermé", count=r.closed_count),
         ]
 
-    def _facet_oa_statuses(self) -> list[dict[str, Any]]:
+    def _facet_oa_statuses(self) -> list[FacetOption]:
         where_sql, binds = self._clauses_skipping("oa_status")
         rows = self.conn.execute(
             text(f"""
@@ -208,9 +212,9 @@ class _PublicationFacetsBuilder:
             """),
             binds,
         ).all()
-        return [dict(r._mapping) for r in rows]
+        return [FacetOption(**r._mapping) for r in rows]
 
-    def _facet_corresponding(self) -> list[dict[str, Any]]:
+    def _facet_corresponding(self) -> list[FacetOption]:
         if not self.filters.person_id:
             return []
         where_sql, binds = self._clauses_skipping("corresponding")
@@ -233,11 +237,11 @@ class _PublicationFacetsBuilder:
             {**binds, "corr_pid": self.filters.person_id},
         ).one()
         return [
-            {"value": "yes", "count": row.yes_count},
-            {"value": "no", "count": row.no_count},
+            FacetOption(value="yes", count=row.yes_count),
+            FacetOption(value="no", count=row.no_count),
         ]
 
-    def _facet_source_counts(self) -> dict[str, dict[str, int]]:
+    def _facet_source_counts(self) -> dict[str, YesNoCount]:
         """Counts {yes, no} par source, ignorant en bloc tous les filtres source."""
         where_sql, binds = self._clauses_skipping("source")
         row = self.conn.execute(
@@ -259,21 +263,21 @@ class _PublicationFacetsBuilder:
             binds,
         ).one()
         return {
-            "hal": {"yes": row.hal_yes, "no": row.hal_no},
-            "oa": {"yes": row.oa_yes, "no": row.oa_no},
-            "scanr": {"yes": row.scanr_yes, "no": row.scanr_no},
-            "wos": {"yes": row.wos_yes, "no": row.wos_no},
-            "theses": {"yes": row.theses_yes, "no": row.theses_no},
+            "hal": YesNoCount(yes=row.hal_yes, no=row.hal_no),
+            "oa": YesNoCount(yes=row.oa_yes, no=row.oa_no),
+            "scanr": YesNoCount(yes=row.scanr_yes, no=row.scanr_no),
+            "wos": YesNoCount(yes=row.wos_yes, no=row.wos_no),
+            "theses": YesNoCount(yes=row.theses_yes, no=row.theses_no),
         }
 
-    def _facet_apc(self) -> list[dict[str, Any]]:
+    def _facet_apc(self) -> list[FacetOption]:
         """APC : variante à 4 catégories si un labo est sélectionné, sinon 3."""
         where_sql, binds = self._clauses_skipping("apc")
         if self.filters.lab_ids:
             return self._facet_apc_with_lab(where_sql, binds)
         return self._facet_apc_without_lab(where_sql, binds)
 
-    def _facet_apc_with_lab(self, where: str, binds: dict[str, Any]) -> list[dict[str, Any]]:
+    def _facet_apc_with_lab(self, where: str, binds: dict[str, Any]) -> list[FacetOption]:
         lab_ids = self.filters.lab_ids
         r = self.conn.execute(
             text(f"""
@@ -317,13 +321,13 @@ class _PublicationFacetsBuilder:
         ).one_or_none()
         lab_label = label_row.label if label_row else "ce labo"
         return [
-            {"value": "this_lab", "label": f"APC — {lab_label}", "count": r.apc_this_lab},
-            {"value": "other_uca", "label": "APC — autres UCA", "count": r.apc_other_uca},
-            {"value": "non_uca", "label": "APC hors UCA", "count": r.apc_non_uca},
-            {"value": "none", "label": "Sans APC", "count": r.apc_none},
+            FacetOption(value="this_lab", label=f"APC — {lab_label}", count=r.apc_this_lab),
+            FacetOption(value="other_uca", label="APC — autres UCA", count=r.apc_other_uca),
+            FacetOption(value="non_uca", label="APC hors UCA", count=r.apc_non_uca),
+            FacetOption(value="none", label="Sans APC", count=r.apc_none),
         ]
 
-    def _facet_apc_without_lab(self, where: str, binds: dict[str, Any]) -> list[dict[str, Any]]:
+    def _facet_apc_without_lab(self, where: str, binds: dict[str, Any]) -> list[FacetOption]:
         r = self.conn.execute(
             text(f"""
                 SELECT
@@ -348,16 +352,16 @@ class _PublicationFacetsBuilder:
             {**binds, "apc_facet_root_ids": self.perimeter_structure_ids},
         ).one()
         return [
-            {"value": "uca", "label": "APC — UCA", "count": r.apc_uca},
-            {"value": "other", "label": "APC — autres", "count": r.apc_other},
-            {"value": "none", "label": "Sans APC", "count": r.apc_none},
+            FacetOption(value="uca", label="APC — UCA", count=r.apc_uca),
+            FacetOption(value="other", label="APC — autres", count=r.apc_other),
+            FacetOption(value="none", label="Sans APC", count=r.apc_none),
         ]
 
-    def _facet_countries(self) -> list[dict[str, Any]]:
+    def _facet_countries(self) -> list[FacetOption]:
         where_sql, binds = self._clauses_skipping("country")
         rows = self.conn.execute(
             text(f"""
-                SELECT co.code, co.name, COUNT(*) AS count
+                SELECT co.code, co.name, COUNT(*) AS n
                 FROM (
                     SELECT unnest(p.countries) AS cc
                     FROM publications p
@@ -365,17 +369,17 @@ class _PublicationFacetsBuilder:
                 ) sub
                 JOIN countries co ON co.code = sub.cc
                 GROUP BY co.code, co.name
-                ORDER BY count DESC
+                ORDER BY n DESC
             """),
             binds,
         ).all()
         return [
-            {"value": r.code.strip(), "label": r.name, "count": r.count}
+            FacetOption(value=r.code.strip(), label=r.name, count=r.n)
             for r in rows
             if r.code.strip() != NO_COUNTRY_CODE
         ]
 
-    def _facet_hal_status(self) -> list[dict[str, Any]]:
+    def _facet_hal_status(self) -> list[FacetOption]:
         """HAL status : seulement si un seul labo est sélectionné."""
         if len(self.filters.lab_ids) != 1:
             return []
@@ -435,13 +439,13 @@ class _PublicationFacetsBuilder:
                 binds,
             ).one()
         return [
-            {"value": "ok", "label": "OK", "count": r.ok},
-            {"value": "notice", "label": "Notice", "count": r.notice},
-            {"value": "hors_collection", "label": "Hors collection", "count": r.hors_collection},
-            {"value": "hors_hal", "label": "Hors HAL", "count": r.hors_hal},
+            FacetOption(value="ok", label="OK", count=r.ok),
+            FacetOption(value="notice", label="Notice", count=r.notice),
+            FacetOption(value="hors_collection", label="Hors collection", count=r.hors_collection),
+            FacetOption(value="hors_hal", label="Hors HAL", count=r.hors_hal),
         ]
 
-    def _facet_in_perimeter(self) -> list[dict[str, Any]]:
+    def _facet_in_perimeter(self) -> list[FacetOption]:
         if not self.filters.person_id:
             return []
         where_sql, binds = self._clauses_skipping("in_perimeter")
@@ -464,14 +468,14 @@ class _PublicationFacetsBuilder:
             {**binds, "inp_pid": self.filters.person_id},
         ).one()
         return [
-            {"value": "yes", "label": "UCA", "count": r.yes},
-            {"value": "no", "label": "Hors périmètre", "count": r.no},
+            FacetOption(value="yes", label="UCA", count=r.yes),
+            FacetOption(value="no", label="Hors périmètre", count=r.no),
         ]
 
 
 def publications_facets(
     conn: Connection, *, filters: PublicationFilters, perimeter_structure_ids: list[int]
-) -> dict[str, Any]:
+) -> PublicationsFacetsResponse:
     """Facettes dynamiques : chaque facette exclut son propre filtre mais applique tous les autres.
 
     Les ~11 facettes sont **indépendantes** et chacune est un agrégat sur l'ensemble filtré (~0,5 s). On les exécute en **parallèle**, chacune dans un thread avec sa propre connexion (psycopg libère le GIL pendant la requête). Le `lab_hal_col` est préchargé une fois et partagé (lecture seule).
@@ -506,7 +510,20 @@ def publications_facets(
         results = {key: future.result() for key, future in futures.items()}
 
     labs, no_lab_count = results.pop("labs")
-    return {"labs": labs, "no_lab_count": no_lab_count, **results}
+    return PublicationsFacetsResponse(
+        years=results["years"],
+        labs=labs,
+        no_lab_count=no_lab_count,
+        doc_types=results["doc_types"],
+        access=results["access"],
+        oa_statuses=results["oa_statuses"],
+        corresponding=results["corresponding"],
+        source_counts=results["source_counts"],
+        apc=results["apc"],
+        countries=results["countries"],
+        hal_status=results["hal_status"],
+        in_perimeter=results["in_perimeter"],
+    )
 
 
 # Liaison SQL des facettes-entités à forte cardinalité (recherche serveur). La revue sort directement de `publications.journal_id` ; l'éditeur passe par une jointure un-à-un vers `publishers` (qui exclut les publications sans éditeur).
@@ -528,7 +545,7 @@ def publications_entity_facet(
     filters: PublicationFilters,
     perimeter_structure_ids: list[int],
     limit: int = 20,
-) -> list[dict[str, Any]]:
+) -> list[EntityFacetItem]:
     """Facette éditeur/revue contextuelle de la liste : N premières entités sous les filtres actifs,
     en sautant le filtre de la dimension demandée (les autres, dont l'autre entité, restent
     appliqués → corrélation). Décompte par `COUNT(*)` (filtres scalaires ou `EXISTS`, sans
@@ -547,14 +564,14 @@ def publications_entity_facet(
     conn.execute(text("SET LOCAL jit = off"))
     rows = conn.execute(
         text(f"""
-            SELECT {sp["id"]} AS id, {sp["label"]} AS label, COUNT(*) AS count
+            SELECT {sp["id"]} AS id, {sp["label"]} AS label, COUNT(*) AS n
             FROM publications p
             LEFT JOIN journals j ON j.id = p.journal_id {sp["join"]}
             WHERE {where_sql} AND {sp["id"]} IS NOT NULL{name_filter}
             GROUP BY {sp["id"]}, {sp["label"]}
-            ORDER BY count DESC, label
+            ORDER BY n DESC, label
             LIMIT :lim
         """),
         binds,
     ).all()
-    return [{"id": r.id, "label": r.label, "count": r.count} for r in rows]
+    return [EntityFacetItem(id=r.id, label=r.label, count=r.n) for r in rows]
