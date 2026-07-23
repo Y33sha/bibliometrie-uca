@@ -1,9 +1,6 @@
 """Port PersonRepository — contrat d'accès à l'agrégat Person.
 
-Défini par le domaine ; implémenté par infrastructure/repositories/
-person_repository.py::PgPersonRepository (implémentation PostgreSQL
-concrète). Toute autre implémentation respectant cette interface
-(fake en mémoire pour tests, autre SGBD, etc.) est également acceptable.
+Implémenté par `infrastructure/repositories/person_repository.py` (`PgPersonRepository`).
 """
 
 from enum import StrEnum
@@ -23,8 +20,7 @@ class AuthenticateOrcidOutcome(StrEnum):
 
 
 class IdentifierStatusRow(TypedDict):
-    """Ligne renvoyée par `update_identifier_status` (changement de statut d'un
-    identifiant ; `person_id` sert à l'audit)."""
+    """Ligne renvoyée par `update_identifier_status` (changement de statut d'un identifiant ; `person_id` sert à l'audit)."""
 
     id: int
     status: str
@@ -32,8 +28,7 @@ class IdentifierStatusRow(TypedDict):
 
 
 class NameFormStatusRow(TypedDict):
-    """Ligne renvoyée par `update_name_form_status` (changement de statut d'une
-    forme de nom). Alimente le DTO `NameFormStatusResponse`."""
+    """Ligne renvoyée par `update_name_form_status` (changement de statut d'une forme de nom). Alimente le DTO `NameFormStatusResponse`."""
 
     person_id: int
     name_form: str
@@ -41,9 +36,7 @@ class NameFormStatusRow(TypedDict):
 
 
 class PersonRepository(Protocol):
-    """Contrat d'accès à l'agrégat Person (tables persons,
-    person_identifiers, person_name_forms, distinct_persons, et
-    certaines opérations sur source_authorships)."""
+    """Contrat d'accès à l'agrégat Person (tables persons, person_identifiers, person_name_forms, distinct_persons, et certaines opérations sur source_authorships)."""
 
     # ── persons ────────────────────────────────────────────────────
 
@@ -103,7 +96,5 @@ class PersonRepository(Protocol):
     ) -> NameFormStatusRow: ...
 
     def delete_orphan_name_forms_for_person(self, person_id: int) -> int:
-        """Supprime les formes de nom attestées par une source qui ne sont plus
-        portées par aucune `source_authorship` active de la personne (les
-        formes calculées, source `persons`, sont préservées)."""
+        """Élague les formes de nom attestées par une source : garde celles qu'au moins une `source_authorship` active de la personne porte encore, supprime les autres. Les formes calculées (source `persons`) sont préservées."""
         ...
