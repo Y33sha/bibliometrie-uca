@@ -12,15 +12,13 @@ from domain.source_publications.source_publication import SourcePublication
 
 @dataclass(frozen=True, slots=True)
 class PubByDoi:
-    """Projection de lecture retournée par `find_by_doi` : l'id de la publication
-    portant ce DOI, sans hydrater l'agrégat complet."""
+    """Projection de lecture retournée par `find_by_doi` : l'id de la publication portant ce DOI, sans hydrater l'agrégat complet."""
 
     id: int
 
 
 class PublicationRepository(Protocol):
-    """Contrat d'accès à l'agrégat Publication (tables publications,
-    source_publications et distinct_publications)."""
+    """Contrat d'accès à l'agrégat Publication (tables publications, source_publications et distinct_publications)."""
 
     # ── Chargement / persistance de l'aggregate ────────────────────
 
@@ -53,7 +51,7 @@ class PublicationRepository(Protocol):
     def get_source_publications(self, pub_id: int) -> list[SourcePublication]: ...
 
     def get_converged_secondary_ids(self, pub_id: int) -> frozenset[int]:
-        """Ids des `source_publications` de `pub_id` dont le DOI a été substitué par une correction de convergence (forme secondaire : version, variante, pièce d'un dataset). L'agrégation les déprioris pour que les scalaires descriptifs viennent de l'enregistrement canonique."""
+        """Ids des `source_publications` de `pub_id` dont le DOI a été substitué par une correction de convergence (forme secondaire : version, variante, pièce d'un dataset). L'agrégation les dépriorise pour que les scalaires descriptifs viennent de l'enregistrement canonique."""
         ...
 
     def get_journal_type(self, journal_id: int) -> str | None:

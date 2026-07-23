@@ -1,13 +1,8 @@
 """Port JournalRepository — contrat d'accès à l'agrégat Journal.
 
-L'agrégat Publisher est dans `publisher_repository.py` (principe ISP).
-Les deux agrégats sont liés par `journals.publisher_id` (FK) mais
-manipulés par des opérations distinctes — séparer les ports réduit la
-surface sur laquelle chaque call site s'engage.
+L'agrégat Publisher est dans `publisher_repository.py` (principe ISP). Les deux agrégats sont liés par `journals.publisher_id` (FK) mais manipulés par des opérations distinctes — séparer les ports réduit la surface sur laquelle chaque call site s'engage.
 
-La méthode `find_shared_title_journal_pairs` reste ici : c'est une
-query sur la table `journals`, appelée par le service de fusion
-d'éditeurs pour détecter les conflits avant `merge_publisher_into`.
+La méthode `find_shared_title_journal_pairs` vit ici : c'est une query sur la table `journals`, appelée par le service de fusion d'éditeurs pour détecter les conflits avant `merge_publisher_into`.
 
 Implémenté par `infrastructure/repositories/journal_repository.py`.
 """
@@ -55,10 +50,7 @@ class JournalRepository(Protocol):
     # ── Chargement de l'aggregate ──────────────────────────────────
 
     def find_by_id(self, journal_id: int) -> Journal | None:
-        """Hydrate l'aggregate `Journal` complet. Retourne None si le
-        journal n'existe pas. Les `journal_name_forms` ne sont pas
-        chargées par l'aggregate (projection séparée — voir
-        `find_journal_by_name_form` pour les lookups par forme)."""
+        """Hydrate l'aggregate `Journal` complet. Retourne None si le journal n'existe pas. Les `journal_name_forms` restent une projection séparée, hors de l'aggregate (voir `find_journal_by_name_form` pour les lookups par forme)."""
         ...
 
     # ── journal_name_forms ─────────────────────────────────────────
@@ -137,10 +129,7 @@ class JournalRepository(Protocol):
     ) -> None:
         """Pose `doaj_payload`, `doaj_imported_at` et `is_in_doaj` en bloc.
 
-        Utilisé par l'import du dump DOAJ (`import_journals_from_doaj_dump`) pour
-        les revues matchées (`is_in_doaj=True` + payload). Le cas « absente du
-        dump » est traité en bloc par `reset_is_in_doaj` (FALSE global avant
-        re-pose).
+        Utilisé par l'import du dump DOAJ (`import_journals_from_doaj_dump`) pour les revues matchées (`is_in_doaj=True` + payload). Le cas « absente du dump » est traité en bloc par `reset_is_in_doaj` (FALSE global avant re-pose).
         """
         ...
 

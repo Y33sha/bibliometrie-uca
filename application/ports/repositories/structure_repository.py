@@ -34,8 +34,7 @@ class StructureNameFormUpdateFields(TypedDict, total=False):
 
 
 class StructureRow(TypedDict):
-    """Ligne `structures` renvoyée par create / update (colonne `structure_type`
-    exposée sous l'alias `type`). Alimente le DTO `StructureOut`."""
+    """Ligne `structures` renvoyée par create / update (colonne `structure_type` exposée sous l'alias `type`). Alimente le DTO `StructureOut`."""
 
     id: int
     code: str
@@ -73,8 +72,7 @@ class StructureRelationDeletedRow(TypedDict):
 
 
 class StructureNameFormRow(TypedDict):
-    """Ligne `structure_name_forms` renvoyée par create / update.
-    Alimente le DTO `NameFormOut`."""
+    """Ligne `structure_name_forms` renvoyée par create / update. Alimente le DTO `NameFormOut`."""
 
     id: int
     structure_id: int
@@ -93,17 +91,12 @@ class StructureNameFormDeletedRow(TypedDict):
 
 
 class StructureRepository(Protocol):
-    """Contrat d'accès aux 3 tables du concept Structure
-    (structures, structure_relations, structure_name_forms)."""
+    """Contrat d'accès aux 3 tables du concept Structure (structures, structure_relations, structure_name_forms)."""
 
     # ── Chargement de l'aggregate ──────────────────────────────────
 
     def find_by_id(self, structure_id: int) -> Structure | None:
-        """Hydrate l'aggregate `Structure` complet (champs scalaires +
-        VOs `name_forms`). Retourne None si la structure n'existe pas.
-        Les `structure_relations` ne sont pas chargées (graphe externe
-        à l'aggregate ; voir `get_ancestor_ids` pour les remontées
-        ciblées)."""
+        """Hydrate l'aggregate `Structure` complet (champs scalaires + VOs `name_forms`). Retourne None si la structure n'existe pas. Les `structure_relations` restent un graphe externe à l'aggregate (voir `get_ancestor_ids` pour les remontées ciblées)."""
         ...
 
     # ── structures ─────────────────────────────────────────────────
@@ -118,9 +111,7 @@ class StructureRepository(Protocol):
         ror_id: str | None,
         rnsr_id: str | None,
         hal_collection: str | None,
-        # Pré-coercion : `str` toléré, normalisé en `list[str]` par le repo
-        # via `StructureApiIds`. Le post-coercion (DB / aggregate) est
-        # `dict[str, list[str]]`.
+        # Pré-coercion : `str` toléré, normalisé en `list[str]` par le repo via `StructureApiIds`. Le post-coercion (DB / aggregate) est `dict[str, list[str]]`.
         api_ids: dict[str, str | list[str]] | None,
     ) -> StructureRow: ...
 
@@ -135,10 +126,7 @@ class StructureRepository(Protocol):
     # ── structure_relations ────────────────────────────────────────
 
     def get_ancestor_ids(self, structure_id: int) -> frozenset[int]:
-        """Ancêtres stricts de `structure_id` dans le graphe
-        `structure_relations` (toutes `relation_type` confondues).
-        N'inclut pas `structure_id` lui-même. Sert au service pour
-        valider l'absence de cycle avant insertion d'une relation."""
+        """Ancêtres stricts de `structure_id` dans le graphe `structure_relations` (toutes `relation_type` confondues). Exclut `structure_id` lui-même. Sert au service pour valider l'absence de cycle avant insertion d'une relation."""
         ...
 
     def create_relation(

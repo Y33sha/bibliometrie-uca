@@ -1,17 +1,8 @@
 """Port PublisherRepository — contrat d'accès à l'agrégat Publisher.
 
-Séparé de `JournalRepository` (principe ISP) : publishers et journals
-sont deux agrégats distincts, bien que liés par une FK. Les pipelines
-qui ne créent que des publishers ne dépendent pas du contrat journaux,
-et inversement.
+Séparé de `JournalRepository` (principe ISP) : publishers et journals sont deux agrégats distincts, bien que liés par une FK. Un pipeline limité aux publishers s'engage sur le seul contrat éditeurs, et inversement.
 
-La fusion d'éditeurs (`merge_publisher_into`) reste ici : sémantiquement
-c'est une opération atomique sur un éditeur qui touche par effet de
-bord les tables liées (`journals.publisher_id`, `publisher_name_forms`,
-`journal_name_forms.publisher_id`, `apc_payments.publisher_id`).
-La détection des journaux à conflit avant fusion est exposée par
-`JournalRepository.find_shared_title_journal_pairs` car c'est une
-query sur `journals`.
+La fusion d'éditeurs (`merge_publisher_into`) vit ici : sémantiquement c'est une opération atomique sur un éditeur qui touche par effet de bord les tables liées (`journals.publisher_id`, `publisher_name_forms`, `journal_name_forms.publisher_id`, `apc_payments.publisher_id`). La détection des journaux à conflit avant fusion est exposée par `JournalRepository.find_shared_title_journal_pairs`, une query sur `journals`.
 
 Implémenté par `infrastructure/repositories/publisher_repository.py`.
 """
@@ -46,10 +37,7 @@ class PublisherRepository(Protocol):
     # ── Chargement de l'aggregate ──────────────────────────────────
 
     def find_by_id(self, publisher_id: int) -> Publisher | None:
-        """Hydrate l'aggregate `Publisher` complet. Retourne None si
-        l'éditeur n'existe pas. Les `publisher_name_forms` ne sont pas
-        chargées par l'aggregate (projection séparée — voir
-        `find_publisher_by_name_form` pour les lookups par forme)."""
+        """Hydrate l'aggregate `Publisher` complet. Retourne None si l'éditeur n'existe pas. Les `publisher_name_forms` restent une projection séparée, hors de l'aggregate (voir `find_publisher_by_name_form` pour les lookups par forme)."""
         ...
 
     # ── publisher_name_forms ───────────────────────────────────────

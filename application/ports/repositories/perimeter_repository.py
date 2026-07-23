@@ -26,10 +26,7 @@ class PerimeterRepository(Protocol):
     # ── Chargement de l'aggregate ──────────────────────────────────
 
     def find_by_id(self, perimeter_id: int) -> Perimeter | None:
-        """Hydrate l'aggregate `Perimeter` complet (code, name,
-        `root_structure_ids`). Retourne None si le perimeter n'existe pas.
-        `root_structure_ids` reste sous forme d'ids (références par id à
-        l'aggregate Structure)."""
+        """Hydrate l'aggregate `Perimeter` complet (code, name, `root_structure_ids`). Retourne None si le perimeter n'existe pas. `root_structure_ids` reste sous forme d'ids (références par id à l'aggregate Structure)."""
         ...
 
     # ── Liens structure ↔ perimeter ────────────────────────────────
@@ -61,7 +58,5 @@ class PerimeterRepository(Protocol):
     # ── Matérialisation ────────────────────────────────────────────
 
     def refresh_structures(self) -> None:
-        """Recompute la table matérialisée `perimeter_structures` (clôture récursive
-        `est_tutelle_de` de chaque `perimeters.root_structure_ids`). À rejouer après toute
-        édition des racines d'un périmètre ou d'une relation `structure_relations`."""
+        """Recompute la table matérialisée `perimeter_structures` (clôture récursive `est_tutelle_de` de chaque `perimeters.root_structure_ids`). À rejouer après toute édition des racines d'un périmètre ou d'une relation `structure_relations`."""
         ...
