@@ -29,6 +29,12 @@ def _search_clause(search: str | None, min_usage_count: int) -> tuple[str, dict[
     return where, binds
 
 
+def _subject_list_item(row: Any) -> SubjectListItem:
+    return SubjectListItem(
+        id=row.id, label=row.label, language=row.language, usage_count=row.usage_count
+    )
+
+
 class PgSubjectsQueries(SubjectsQueries):
     """Adapter SA pour `application.ports.api.subjects_queries.SubjectsQueries`."""
 
@@ -49,15 +55,7 @@ class PgSubjectsQueries(SubjectsQueries):
             """),
             {**binds, "lim": per_page, "off": (page - 1) * per_page},
         ).all()
-        items = [
-            SubjectListItem(
-                id=r.id,
-                label=r.label,
-                language=r.language,
-                usage_count=r.usage_count,
-            )
-            for r in rows
-        ]
+        items = [_subject_list_item(r) for r in rows]
         total = (
             self._conn.execute(
                 text(f"SELECT COUNT(*) AS n FROM subjects WHERE {where}"),
@@ -81,12 +79,7 @@ class PgSubjectsQueries(SubjectsQueries):
         ).one_or_none()
         if row is None:
             return None
-        subject = SubjectListItem(
-            id=row.id,
-            label=row.label,
-            language=row.language,
-            usage_count=row.usage_count,
-        )
+        subject = _subject_list_item(row)
         neighbor_rows = self._conn.execute(
             text("""
                 SELECT s.id, s.label, s.usage_count,
