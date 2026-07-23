@@ -13,14 +13,11 @@ Le package est organisé par thème d'agrégat :
 from sqlalchemy import Connection
 
 from application.ports.api._common import (
-    EntityFacetItem,
     EntityFacetResponse,
     EntityKind,
-    FacetOption,
 )
 from application.ports.api.stats_queries import (
     CollaborationsResponse,
-    CountryCollaboration,
     PivotDimensionOut,
     PivotMeasureOut,
     PivotResponse,
@@ -51,15 +48,10 @@ class PgStatsQueries(StatsQueries):
         self._conn = conn
 
     def collaborations(self, *, filters: StatsFilters) -> CollaborationsResponse:
-        data = _run_collaborations(
+        return _run_collaborations(
             self._conn,
             perimeter_structure_ids=get_persons_structure_ids_list(self._conn),
             filters=filters,
-        )
-        return CollaborationsResponse(
-            rows=[CountryCollaboration(**r) for r in data["rows"]],
-            international_count=data["international_count"],
-            total_count=data["total_count"],
         )
 
     def pivot_schema(self) -> PivotSchemaResponse:
@@ -80,14 +72,12 @@ class PgStatsQueries(StatsQueries):
         )
 
     def pivot(self, *, measure: str, groups: list[str], filters: StatsFilters) -> PivotResponse:
-        return PivotResponse.model_validate(
-            _run_pivot(
-                self._conn,
-                measure=measure,
-                groups=groups,
-                perimeter_structure_ids=get_persons_structure_ids_list(self._conn),
-                filters=filters,
-            )
+        return _run_pivot(
+            self._conn,
+            measure=measure,
+            groups=groups,
+            perimeter_structure_ids=get_persons_structure_ids_list(self._conn),
+            filters=filters,
         )
 
     def stats_entity_facet(
@@ -97,27 +87,21 @@ class PgStatsQueries(StatsQueries):
         search: str,
         filters: StatsFilters,
     ) -> EntityFacetResponse:
-        rows = _stats_entity_facet(
-            self._conn,
-            kind=kind,
-            search=search,
-            perimeter_structure_ids=get_persons_structure_ids_list(self._conn),
-            filters=filters,
+        return EntityFacetResponse(
+            entities=_stats_entity_facet(
+                self._conn,
+                kind=kind,
+                search=search,
+                perimeter_structure_ids=get_persons_structure_ids_list(self._conn),
+                filters=filters,
+            )
         )
-        return EntityFacetResponse(entities=[EntityFacetItem(**r) for r in rows])
 
     def stats_facets(self, *, filters: StatsFilters) -> StatsFacetsResponse:
-        data = _stats_facets(
+        return _stats_facets(
             self._conn,
             perimeter_structure_ids=get_persons_structure_ids_list(self._conn),
             filters=filters,
-        )
-        return StatsFacetsResponse(
-            years=[FacetOption(**y) for y in data["years"]],
-            labs=[FacetOption(**lab) for lab in data["labs"]],
-            oa_statuses=[FacetOption(**o) for o in data["oa_statuses"]],
-            apc=[FacetOption(**a) for a in data["apc"]],
-            doc_types=[FacetOption(**d) for d in data["doc_types"]],
         )
 
 

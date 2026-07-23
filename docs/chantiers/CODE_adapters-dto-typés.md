@@ -18,8 +18,8 @@ Le pattern cible, déjà appliqué au package `persons` : chaque fonction libre 
 ## Phasage
 
 - [x] `persons` — référence (list, identifiers, facets, detail, admin).
-- [ ] `publications` — `list.py` (`list_publications`), `facets.py` (`_facet_*`, `publications_facets`, `publications_entity_facet`), `detail.py` (`get_publication_detail` et ses fetchs). L'adapter `__init__.py` retire ses `model_validate` et le `EntityFacetItem(**r)`. `duplicates.py` est déjà typé.
-- [ ] `stats` — `collaborations.py`, `entity_facets.py`, `pivot.py` ; l'adapter `__init__.py` retire son `model_validate`.
+- [x] `publications` — `list.py`, `facets.py`, `detail.py` construisent les DTO ; l'adapter `__init__.py` délègue sans `model_validate`. `duplicates.py` était déjà typé.
+- [x] `stats` — `collaborations.py`, `entity_facets.py`, `pivot.py`, `summary.py` construisent les DTO ; l'adapter `__init__.py` délègue.
 - [ ] `journals` — `_journal_list_fields` / `_journal_detail_fields` renvoient des dicts de champs consommés par la construction des DTO ; les faire construire les DTO directement (cas plus léger).
 
 ## Questions ouvertes

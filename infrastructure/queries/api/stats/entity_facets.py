@@ -6,10 +6,11 @@ Les filtres étant scalaires ou en `EXISTS` (aucune jointure démultipliante), `
 """
 
 from dataclasses import replace
-from typing import Any, Literal
+from typing import Literal
 
 from sqlalchemy import Connection, text
 
+from application.ports.api._common import EntityFacetItem
 from application.ports.api.stats_queries import StatsFilters
 from infrastructure.queries.api.filters import assemble_where
 from infrastructure.queries.api.stats._shared import STATS_BASE, stats_filter_clauses
@@ -35,7 +36,7 @@ def stats_entity_facet(
     perimeter_structure_ids: list[int],
     filters: StatsFilters,
     limit: int = 20,
-) -> list[dict[str, Any]]:
+) -> list[EntityFacetItem]:
     # On saute le filtre de la dimension demandée (sinon une sélection réduit ses propres options).
     filters_for_facet = replace(
         filters,
@@ -56,14 +57,14 @@ def stats_entity_facet(
     binds["lim"] = limit
 
     sql = f"""
-        SELECT {sp["id"]} AS id, {sp["label"]} AS label, COUNT(*) AS count
+        SELECT {sp["id"]} AS id, {sp["label"]} AS label, COUNT(*) AS n
         FROM publications p
         LEFT JOIN journals j ON j.id = p.journal_id {sp["join"]}
         WHERE {STATS_BASE} AND {where} AND {sp["id"]} IS NOT NULL{name_filter}
         GROUP BY {sp["id"]}, {sp["label"]}
-        ORDER BY count DESC, label
+        ORDER BY n DESC, label
         LIMIT :lim
     """
     conn.execute(text("SET LOCAL jit = off"))
     rows = conn.execute(text(sql), binds).all()
-    return [{"id": r.id, "label": r.label, "count": r.count} for r in rows]
+    return [EntityFacetItem(id=r.id, label=r.label, count=r.n) for r in rows]
