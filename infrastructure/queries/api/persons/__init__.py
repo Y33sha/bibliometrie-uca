@@ -12,9 +12,9 @@ L'adapter d'écriture pipeline (`pipeline.persons_matching`) vit côté
 `infrastructure/queries/pipeline/`.
 
 `PgPersonsQueries` agrège l'ensemble des fonctions de lecture + admin
-sous le port `application.ports.api.persons_queries.PersonsQueries`. Les
-fonctions libres retournent des dicts (réutilisables hors API) ; la
-conversion vers les DTOs Pydantic est faite ici à la sortie de l'adapter.
+sous le port `application.ports.api.persons_queries.PersonsQueries` et se
+contente de déléguer : chaque fonction libre construit et retourne
+directement les DTO Pydantic déclarés par le port.
 """
 
 # Annotations différées : sinon `list[int]` est résolu comme le sous-module
