@@ -1,7 +1,5 @@
 """Port : lectures sur les périmètres pour le router /api/perimeters/.
 
-Distinct de `application.ports.pipeline.perimeter_structures.PerimeterStructuresQueries`, qui expose au pipeline la résolution du périmètre `persons` : ce port-ci sert le listing complet des périmètres.
-
 Implémenté par `infrastructure.queries.perimeter.PgPerimetersQueries`.
 """
 
@@ -18,7 +16,7 @@ class PerimeterStructureItem(BaseModel):
 
 
 class PerimeterOut(BaseModel):
-    """Périmètre + ses structures racines (identifiants bruts, résolues, comptage effectif)."""
+    """Un périmètre : ses structures racines (`root_structure_ids` bruts, `structures` résolues) et `structure_count`, la taille de la clôture transitive de ces racines (avec leurs sous-structures) — donc distinct du nombre de racines."""
 
     id: int
     code: str
