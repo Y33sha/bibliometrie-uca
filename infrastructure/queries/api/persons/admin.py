@@ -10,11 +10,12 @@ from application.ports.api.persons_queries import (
     AmbiguousNameFormOut,
     AmbiguousNameFormsResponse,
     AnchorOccurrenceOut,
+    CurationPersonOut,
     DetachableIntruderGroupOut,
     DetachableIntrudersResponse,
     IdentifierConflictPairOut,
-    IdentifierConflictPersonOut,
     IdentifierConflictsResponse,
+    IdentifierRef,
     IntruderOccurrenceOut,
     NameDuplicatePairOut,
     NameDuplicatesResponse,
@@ -22,7 +23,6 @@ from application.ports.api.persons_queries import (
     NameFormAuthorshipsResponse,
     OtherPersonOut,
     OverlapCountsOut,
-    SharedIdentifierOut,
     SharingPersonOut,
 )
 from domain.persons.name_matching import names_compatible
@@ -38,7 +38,7 @@ def name_form_authorships(
     auth_rows = conn.execute(
         text(f"""
             SELECT sa.source, sa.id AS source_authorship_id,
-                   sd.publication_id AS pub_id, sd.title, sd.pub_year, sd.doi
+                   sd.publication_id, sd.title, sd.pub_year, sd.doi
             FROM source_authorships sa
             JOIN author_identifying_keys aik ON aik.id = sa.identity_id
             JOIN source_publications sd ON sd.id = sa.source_publication_id
@@ -51,7 +51,7 @@ def name_form_authorships(
 
     other_rows = conn.execute(
         text("""
-            SELECT p.id, p.first_name, p.last_name,
+            SELECT p.id AS person_id, p.first_name, p.last_name,
                    pr.department_name,
                    EXISTS(SELECT 1 FROM persons_rh rh WHERE rh.person_id = p.id) AS has_rh
             FROM person_name_forms pnf
@@ -69,7 +69,7 @@ def name_form_authorships(
             NameFormAuthorshipRef(
                 source=r.source,
                 source_authorship_id=r.source_authorship_id,
-                pub_id=r.pub_id,
+                publication_id=r.publication_id,
                 title=r.title,
                 pub_year=r.pub_year,
                 doi=r.doi,
@@ -78,7 +78,7 @@ def name_form_authorships(
         ],
         other_persons=[
             OtherPersonOut(
-                id=r.id,
+                person_id=r.person_id,
                 first_name=r.first_name,
                 last_name=r.last_name,
                 department_name=r.department_name,
@@ -201,7 +201,7 @@ def identifier_conflicts_count(conn: Connection) -> int:
     return int(row.total)
 
 
-def _light_persons(conn: Connection, ids: list[int]) -> dict[int, IdentifierConflictPersonOut]:
+def _curation_persons(conn: Connection, ids: list[int]) -> dict[int, CurationPersonOut]:
     """Vue allégée par personne (nom, RH, nb publications, labos) pour la file de triage."""
     if not ids:
         return {}
@@ -225,7 +225,7 @@ def _light_persons(conn: Connection, ids: list[int]) -> dict[int, IdentifierConf
         {"ids": ids},
     ).all()
     return {
-        r.id: IdentifierConflictPersonOut(
+        r.id: CurationPersonOut(
             person_id=r.id,
             first_name=r.first_name,
             last_name=r.last_name,
@@ -248,13 +248,13 @@ def identifier_conflicts(
         {"lim": per_page, "off": offset},
     ).all()
     ids = sorted({r.id_a for r in rows} | {r.id_b for r in rows})
-    persons = _light_persons(conn, ids)
+    persons = _curation_persons(conn, ids)
     pairs = [
         IdentifierConflictPairOut(
             person_a=persons[r.id_a],
             person_b=persons[r.id_b],
             shared_identifiers=[
-                SharedIdentifierOut(id_type=s["id_type"], id_value=s["id_value"]) for s in r.shared
+                IdentifierRef(id_type=s["id_type"], id_value=s["id_value"]) for s in r.shared
             ],
         )
         for r in rows
@@ -296,12 +296,12 @@ _CONFIRMED_FORMS_SQL = text("""
 _IDENTIFIER_KEYS = ("orcid", "idref", "hal_person_id", "idhal")
 
 
-def _occurrence_identifiers(raw: Any) -> list[SharedIdentifierOut]:
+def _occurrence_identifiers(raw: Any) -> list[IdentifierRef]:
     """Identifiants bruts portés par une signature (hors valeurs neutralisées `_dubious`) — élément de décision : c'est souvent l'identifiant fautif qui a rattaché l'intrus."""
     if not raw:
         return []
     return [
-        SharedIdentifierOut(id_type=k, id_value=str(raw[k]))
+        IdentifierRef(id_type=k, id_value=str(raw[k]))
         for k in _IDENTIFIER_KEYS
         if raw.get(k) and not str(raw[k]).endswith("_dubious")
     ]
@@ -369,14 +369,14 @@ def detachable_intruders(
     offset = (page - 1) * per_page
     page_groups = groups[offset : offset + per_page]
 
-    persons = _light_persons(conn, sorted({pid for _, pid, _, _ in page_groups}))
+    persons = _curation_persons(conn, sorted({pid for _, pid, _, _ in page_groups}))
     pubs = _publications_for_spids(conn, sorted({spid for spid, _, _, _ in page_groups}))
 
     items = [
         DetachableIntruderGroupOut(
             source_publication_id=spid,
             publication_id=pubs.get(spid, {}).get("publication_id"),
-            pub_title=pubs.get(spid, {}).get("title"),
+            title=pubs.get(spid, {}).get("title"),
             pub_year=pubs.get(spid, {}).get("pub_year"),
             person=persons[pid],
             anchors=[AnchorOccurrenceOut(source=o.source, raw_author_name=o.name) for o in anchors],
@@ -566,7 +566,7 @@ def name_duplicates(conn: Connection, *, page: int, per_page: int) -> NameDuplic
     offset = (page - 1) * per_page
     page_pairs = pairs[offset : offset + per_page]
 
-    persons = _light_persons(
+    persons = _curation_persons(
         conn, sorted({pid for id_a, id_b, _ in page_pairs for pid in (id_a, id_b)})
     )
     items = [
@@ -592,7 +592,7 @@ def persons_sharing_name_form(conn: Connection, person_id: int) -> list[SharingP
     Candidates à l'absorption (fusion vers `person_id`). `shared_forms` liste les formes en commun — éléments de décision affichés dans le drawer."""
     rows = conn.execute(
         text("""
-            SELECT p2.id, p2.first_name, p2.last_name,
+            SELECT p2.id AS person_id, p2.first_name, p2.last_name,
                    EXISTS(SELECT 1 FROM persons_rh rh WHERE rh.person_id = p2.id) AS has_rh,
                    array_agg(DISTINCT pnf1.name_form ORDER BY pnf1.name_form) AS shared_forms
             FROM person_name_forms pnf1
@@ -608,7 +608,7 @@ def persons_sharing_name_form(conn: Connection, person_id: int) -> list[SharingP
     ).all()
     return [
         SharingPersonOut(
-            id=r.id,
+            person_id=r.person_id,
             first_name=r.first_name,
             last_name=r.last_name,
             has_rh=r.has_rh,
