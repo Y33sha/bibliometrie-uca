@@ -67,8 +67,7 @@ class PgPublicationDuplicatesQueries(PublicationDuplicatesQueries):
         auth_rows = self._conn.execute(
             text("""
                 SELECT a.author_position, a.in_perimeter, a.person_id,
-                       COALESCE(p2.last_name) AS last_name,
-                       COALESCE(p2.first_name) AS first_name,
+                       p2.last_name, p2.first_name,
                        COALESCE(p2.last_name || ' ' || p2.first_name,
                                 sa_hal.raw_author_name, sa_oa.raw_author_name,
                                 sa_wos.raw_author_name) AS full_name
