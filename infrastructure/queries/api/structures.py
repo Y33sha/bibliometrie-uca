@@ -21,7 +21,7 @@ from application.ports.api.structures_queries import (
 )
 from application.ports.api.subjects_queries import SubjectFrequency
 from domain.countries import NON_INTERNATIONAL_COUNTRY_CODES
-from infrastructure.queries.api.filters import OA_DASHBOARD_COLS_SQL, SUBJECT_IS_NOT_GENERIC
+from infrastructure.queries.api.filters import OA_DASHBOARD_COLS_SQL, entity_subjects_sql
 from infrastructure.queries.perimeter import get_persons_structure_ids_list
 
 _NON_INTERNATIONAL = sorted(NON_INTERNATIONAL_COUNTRY_CODES)
@@ -276,17 +276,14 @@ class PgStructuresQueries(StructuresQueries):
         Le `COUNT(DISTINCT p.id)` tient au grain de `publication_subjects`, qui porte une ligne par source pour une même paire (publication, sujet).
         """
         rows = self._conn.execute(
-            text(f"""
-                SELECT s.id, s.label, COUNT(DISTINCT p.id) AS n
-                FROM publication_subjects ps
-                JOIN publications p ON p.id = ps.publication_id
-                JOIN subjects s ON s.id = ps.subject_id
-                WHERE {SUBJECT_IS_NOT_GENERIC}
-                  AND {_AUTHORED_PUBLICATION}
-                GROUP BY s.id, s.label
-                ORDER BY n DESC, lower(s.label)
-                LIMIT :lim
-            """),
+            text(
+                entity_subjects_sql(
+                    "EXISTS (SELECT 1 FROM authorships a "
+                    "JOIN authorship_structures aus ON aus.authorship_id = a.id "
+                    "WHERE a.publication_id = p.id AND aus.structure_id = :structure_id "
+                    "AND a.roles && ARRAY['author']::text[])"
+                )
+            ),
             {"structure_id": structure_id, "lim": limit},
         ).all()
         return [SubjectFrequency(id=r.id, label=r.label, count=r.n) for r in rows]

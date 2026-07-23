@@ -19,7 +19,7 @@ from application.ports.api.persons_queries import (
     PersonThesis,
 )
 from application.ports.api.subjects_queries import SubjectFrequency
-from infrastructure.queries.api.filters import OA_DASHBOARD_COLS_SQL, SUBJECT_IS_NOT_GENERIC
+from infrastructure.queries.api.filters import OA_DASHBOARD_COLS_SQL, entity_subjects_sql
 from infrastructure.queries.api.persons.identifiers import public_identifiers
 
 
@@ -289,19 +289,13 @@ def person_addresses(
 def person_subjects(conn: Connection, person_id: int, *, limit: int) -> list[SubjectFrequency]:
     """Sujets des publications signées par la personne, les plus fréquents d'abord."""
     rows = conn.execute(
-        text(f"""
-            SELECT s.id, s.label, COUNT(DISTINCT p.id) AS n
-            FROM authorships a
-            JOIN publications p ON p.id = a.publication_id
-            JOIN publication_subjects ps ON ps.publication_id = p.id
-            JOIN subjects s ON s.id = ps.subject_id
-            WHERE a.person_id = :pid
-              AND a.roles && ARRAY['author']::text[]
-              AND {SUBJECT_IS_NOT_GENERIC}
-            GROUP BY s.id, s.label
-            ORDER BY n DESC, lower(s.label)
-            LIMIT :lim
-        """),
+        text(
+            entity_subjects_sql(
+                "EXISTS (SELECT 1 FROM authorships a "
+                "WHERE a.publication_id = p.id AND a.person_id = :pid "
+                "AND a.roles && ARRAY['author']::text[])"
+            )
+        ),
         {"pid": person_id, "lim": limit},
     ).all()
     return [SubjectFrequency(id=r.id, label=r.label, count=r.n) for r in rows]

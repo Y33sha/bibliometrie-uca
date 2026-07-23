@@ -77,6 +77,21 @@ GENERIC_SUBJECT_MAX_USAGE = 5000
 SUBJECT_IS_NOT_GENERIC = f"(s.usage_count <= {GENERIC_SUBJECT_MAX_USAGE})"
 
 
+def entity_subjects_sql(entity_predicate: str) -> str:
+    """SQL des sujets les plus fréquents des publications retenues par `entity_predicate` (sur l'alias `p`), au grain de `publication_subjects`. Chaque page d'entité (revue, éditeur, laboratoire, personne) passe son propre prédicat ; `:lim` plafonne le nombre de sujets."""
+    return f"""
+        SELECT s.id, s.label, COUNT(DISTINCT p.id) AS n
+        FROM publication_subjects ps
+        JOIN publications p ON p.id = ps.publication_id
+        JOIN subjects s ON s.id = ps.subject_id
+        WHERE {entity_predicate}
+          AND {SUBJECT_IS_NOT_GENERIC}
+        GROUP BY s.id, s.label
+        ORDER BY n DESC, lower(s.label)
+        LIMIT :lim
+    """
+
+
 @dataclass(frozen=True)
 class WhereClause:
     """Fragment SQL avec ses bind params nommés (syntaxe `:nom`).

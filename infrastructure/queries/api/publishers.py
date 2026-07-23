@@ -22,7 +22,7 @@ from application.ports.api.publishers_queries import (
 from application.ports.api.subjects_queries import SubjectFrequency
 from domain.normalize import normalize_text
 from domain.publishers.publisher import PUBLISHER_TYPE_LABELS_FR, PUBLISHER_TYPES
-from infrastructure.queries.api.filters import SUBJECT_IS_NOT_GENERIC, publication_in_perimeter
+from infrastructure.queries.api.filters import entity_subjects_sql, publication_in_perimeter
 
 
 def _build_publisher_where(
@@ -266,19 +266,12 @@ class PgPublisherQueries(PublisherQueries):
         Le `COUNT(DISTINCT p.id)` tient au grain de `publication_subjects`, qui porte une ligne par source pour une même paire (publication, sujet).
         """
         rows = self._conn.execute(
-            text(f"""
-                SELECT s.id, s.label, COUNT(DISTINCT p.id) AS n
-                FROM publication_subjects ps
-                JOIN publications p ON p.id = ps.publication_id
-                JOIN journals j ON j.id = p.journal_id
-                JOIN subjects s ON s.id = ps.subject_id
-                WHERE j.publisher_id = :id
-                  AND {publication_in_perimeter("p")}
-                  AND {SUBJECT_IS_NOT_GENERIC}
-                GROUP BY s.id, s.label
-                ORDER BY n DESC, lower(s.label)
-                LIMIT :lim
-            """),
+            text(
+                entity_subjects_sql(
+                    "EXISTS (SELECT 1 FROM journals j "
+                    "WHERE j.id = p.journal_id AND j.publisher_id = :id)"
+                )
+            ),
             {"id": publisher_id, "lim": limit},
         ).all()
         return [SubjectFrequency(id=r.id, label=r.label, count=r.n) for r in rows]
