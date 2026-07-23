@@ -5,25 +5,16 @@ Renvoie les N premières entités par volume, calculées **sous les filtres acti
 Les filtres étant scalaires ou en `EXISTS` (aucune jointure démultipliante), `COUNT(*)` par groupe égale le nombre de publications distinctes.
 """
 
+from dataclasses import replace
 from typing import Any, Literal
 
 from sqlalchemy import Connection, text
 
 from application.ports.api.stats_queries import StatsFilters
-from infrastructure.queries.api.filters import (
-    PUBLICATION_IS_IN_PERIMETER,
-    WhereClause,
-    assemble_where,
-    doc_type_clause,
-    lab_clause,
-    oa_clause,
-    year_clause,
-)
-from infrastructure.queries.api.stats._shared import stats_apc_clause
+from infrastructure.queries.api.filters import assemble_where
+from infrastructure.queries.api.stats._shared import STATS_BASE, stats_filter_clauses
 
 EntityKind = Literal["publisher", "journal"]
-
-_BASE = " AND ".join([PUBLICATION_IS_IN_PERIMETER, "(j.oa_model IS DISTINCT FROM 'repository')"])
 
 # Liaison SQL par entité : identifiant, libellé, jointure additionnelle. La revue sort de `publications.journal_id` ; l'éditeur passe par une jointure un-à-un vers `publishers` (qui exclut les publications sans éditeur).
 _KIND_SQL: dict[str, dict[str, str]] = {
@@ -46,27 +37,16 @@ def stats_entity_facet(
     limit: int = 20,
 ) -> list[dict[str, Any]]:
     # On saute le filtre de la dimension demandée (sinon une sélection réduit ses propres options).
-    publisher_ids = [] if kind == "publisher" else filters.publisher_ids
-    journal_ids = [] if kind == "journal" else filters.journal_ids
-
-    clauses: list[WhereClause | None] = [
-        year_clause(filters.years),
-        lab_clause(filters.lab_ids),
-        oa_clause(filters.oa_status),
-        stats_apc_clause(filters.has_apc, perimeter_structure_ids),
-        doc_type_clause(filters.doc_types),
-    ]
-    if publisher_ids:
-        clauses.append(
-            WhereClause(
-                "j.publisher_id = ANY(:flt_publisher_ids)", {"flt_publisher_ids": publisher_ids}
-            )
+    filters_for_facet = replace(
+        filters,
+        publisher_ids=[] if kind == "publisher" else filters.publisher_ids,
+        journal_ids=[] if kind == "journal" else filters.journal_ids,
+    )
+    where, binds = assemble_where(
+        stats_filter_clauses(
+            perimeter_structure_ids=perimeter_structure_ids, filters=filters_for_facet
         )
-    if journal_ids:
-        clauses.append(
-            WhereClause("p.journal_id = ANY(:flt_journal_ids)", {"flt_journal_ids": journal_ids})
-        )
-    where, binds = assemble_where(clauses)
+    )
 
     sp = _KIND_SQL[kind]
     name_filter = ""
@@ -79,7 +59,7 @@ def stats_entity_facet(
         SELECT {sp["id"]} AS id, {sp["label"]} AS label, COUNT(*) AS count
         FROM publications p
         LEFT JOIN journals j ON j.id = p.journal_id {sp["join"]}
-        WHERE {_BASE} AND {where} AND {sp["id"]} IS NOT NULL{name_filter}
+        WHERE {STATS_BASE} AND {where} AND {sp["id"]} IS NOT NULL{name_filter}
         GROUP BY {sp["id"]}, {sp["label"]}
         ORDER BY count DESC, label
         LIMIT :lim

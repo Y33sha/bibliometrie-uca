@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from application.ports.api._common import EntityFacetResponse, FacetOption
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class StatsFilters:
     """Filtres des tableaux de bord, partagés par les facettes, les collaborations et le pivot.
 

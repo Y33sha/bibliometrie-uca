@@ -6,73 +6,8 @@ from typing import Any
 from sqlalchemy import Connection, Row, text
 
 from application.ports.api.stats_queries import StatsFilters
-from infrastructure.queries.api.filters import (
-    PUBLICATION_IS_IN_PERIMETER,
-    WhereClause,
-    assemble_where,
-    doc_type_clause,
-    lab_clause,
-    oa_clause,
-    year_clause,
-)
-from infrastructure.queries.api.stats._shared import stats_apc_clause
-
-# Périmètre : corpus in-perimeter, hors revues-dépôts. Le type de document n'est PAS figé ici — c'est un filtre comme un autre (facette « Type de document »), porté par `doc_type_clause`.
-_BASE_CLAUSES = " AND ".join(
-    [
-        PUBLICATION_IS_IN_PERIMETER,
-        "(j.oa_model IS DISTINCT FROM 'repository')",
-    ]
-)
-
-
-def _publisher_journal_clauses(
-    publisher_ids: list[int], journal_ids: list[int]
-) -> list[WhereClause | None]:
-    out: list[WhereClause | None] = []
-    if publisher_ids:
-        out.append(
-            WhereClause(
-                "j.publisher_id = ANY(:flt_publisher_ids)", {"flt_publisher_ids": publisher_ids}
-            )
-        )
-    if journal_ids:
-        out.append(
-            WhereClause("p.journal_id = ANY(:flt_journal_ids)", {"flt_journal_ids": journal_ids})
-        )
-    return out
-
-
-def _common_clauses(
-    *,
-    perimeter_structure_ids: list[int],
-    filters: StatsFilters,
-    skip: str = "",
-) -> list[WhereClause | None]:
-    """Construit les filtres communs aux facettes croisées.
-
-    `skip` permet d'omettre un filtre pour les facettes croisées ("year", "lab", "oa", "apc", "doc_type"). Les filtres éditeur/revue sont toujours appliqués (jamais facettés via cette barre — ils passent par la recherche serveur).
-    """
-    out: list[WhereClause | None] = []
-    if skip != "year":
-        out.append(year_clause(filters.years))
-    if skip != "lab":
-        out.append(lab_clause(filters.lab_ids))
-    out.extend(_publisher_journal_clauses(filters.publisher_ids, filters.journal_ids))
-    if skip != "oa":
-        out.append(oa_clause(filters.oa_status))
-    if skip != "apc":
-        out.append(stats_apc_clause(filters.has_apc, perimeter_structure_ids))
-    if skip != "doc_type":
-        out.append(doc_type_clause(filters.doc_types))
-    return out
-
-
-_AVAILABLE_YEARS_SQL = f"""
-    SELECT DISTINCT pub_year FROM publications p
-    WHERE {PUBLICATION_IS_IN_PERIMETER} AND pub_year IS NOT NULL
-    ORDER BY pub_year DESC
-"""
+from infrastructure.queries.api.filters import WhereClause, assemble_where
+from infrastructure.queries.api.stats._shared import STATS_BASE, stats_filter_clauses
 
 
 def _facets_sqls(
@@ -83,7 +18,7 @@ def _facets_sqls(
     """Retourne {facet_name: (sql, binds)} pour les sous-requêtes de facettes."""
 
     def _clauses(skip: str) -> list[WhereClause | None]:
-        return _common_clauses(
+        return stats_filter_clauses(
             perimeter_structure_ids=perimeter_structure_ids,
             filters=filters,
             skip=skip,
@@ -94,7 +29,7 @@ def _facets_sqls(
         SELECT p.pub_year, COUNT(DISTINCT p.id) AS count
         FROM publications p
         LEFT JOIN journals j ON j.id = p.journal_id
-        WHERE {_BASE_CLAUSES} AND {year_where}
+        WHERE {STATS_BASE} AND {year_where}
           AND p.pub_year IS NOT NULL
         GROUP BY p.pub_year
         ORDER BY p.pub_year DESC
@@ -109,7 +44,7 @@ def _facets_sqls(
         LEFT JOIN journals j ON j.id = p.journal_id
         JOIN authorship_structures aus ON aus.authorship_id = a.id
         JOIN structures s ON s.id = aus.structure_id
-        WHERE {_BASE_CLAUSES} AND {lab_where}
+        WHERE {STATS_BASE} AND {lab_where}
           AND s.structure_type = 'labo'
         GROUP BY s.id, s.acronym, s.name
         ORDER BY count DESC
@@ -120,7 +55,7 @@ def _facets_sqls(
         SELECT p.oa_status::text AS value, COUNT(DISTINCT p.id) AS count
         FROM publications p
         LEFT JOIN journals j ON j.id = p.journal_id
-        WHERE {_BASE_CLAUSES} AND {oa_where}
+        WHERE {STATS_BASE} AND {oa_where}
           AND p.oa_status IS NOT NULL
         GROUP BY p.oa_status
         ORDER BY count DESC
@@ -146,7 +81,7 @@ def _facets_sqls(
             )) AS apc_none
         FROM publications p
         LEFT JOIN journals j ON j.id = p.journal_id
-        WHERE {_BASE_CLAUSES} AND {apc_where}
+        WHERE {STATS_BASE} AND {apc_where}
     """
 
     dt_where, dt_binds = assemble_where(_clauses("doc_type"))
@@ -154,7 +89,7 @@ def _facets_sqls(
         SELECT p.doc_type::text AS value, COUNT(DISTINCT p.id) AS count
         FROM publications p
         LEFT JOIN journals j ON j.id = p.journal_id
-        WHERE {_BASE_CLAUSES} AND {dt_where}
+        WHERE {STATS_BASE} AND {dt_where}
         GROUP BY p.doc_type
         ORDER BY count DESC
     """
