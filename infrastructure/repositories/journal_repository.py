@@ -96,7 +96,7 @@ class PgJournalRepository:
         ).first()
         if row is None:
             return None
-        return _journal_from_row(_JournalRow(*row))
+        return _journal_from_row(_JournalRow(**row._mapping))
 
     # ── journal_name_forms ─────────────────────────────────────────
 

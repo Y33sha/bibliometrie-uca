@@ -276,7 +276,7 @@ class PgPublicationRepository:
             """),
             {"id": pub_id},
         )
-        return [_view_from_row(_SourcePublicationViewRow(*row)) for row in result]
+        return [_view_from_row(_SourcePublicationViewRow(**row._mapping)) for row in result]
 
     def get_converged_secondary_ids(self, pub_id: int) -> frozenset[int]:
         """Ids des `source_publications` de `pub_id` dont le DOI a été substitué par une correction de convergence (`raw_metadata.doi.corrected_by` ∈ `CONVERGENCE_CASES`). Ces formes secondaires (version, variante, pièce) sont dépriorisées à l'agrégation."""

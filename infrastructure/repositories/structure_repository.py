@@ -153,9 +153,9 @@ class PgStructureRepository:
             ).where(structure_name_forms.c.structure_id == structure_id)
         )
         name_forms = tuple(
-            _structure_name_form_from_row(_StructureNameFormRow(*r)) for r in nf_result
+            _structure_name_form_from_row(_StructureNameFormRow(**r._mapping)) for r in nf_result
         )
-        return _structure_from_row(_StructureRow(*row), name_forms)
+        return _structure_from_row(_StructureRow(**row._mapping), name_forms)
 
     # ── structures ─────────────────────────────────────────────────
 
