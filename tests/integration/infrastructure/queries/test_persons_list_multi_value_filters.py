@@ -44,7 +44,7 @@ def _listed(conn, **filter_kwargs):
     result = list_persons(
         conn, filters=PersonFilters(**filter_kwargs), page=1, per_page=200, sort="name_asc"
     )
-    return {p["id"] for p in result["persons"]}
+    return {p.id for p in result.persons}
 
 
 class TestListMultiValueFilters:

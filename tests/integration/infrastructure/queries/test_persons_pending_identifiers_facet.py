@@ -36,7 +36,7 @@ def _add_identifier(conn, person_id, id_type, id_value, status):
 
 
 def _person_ids(result):
-    return {p["id"] for p in result["persons"]}
+    return {p.id for p in result.persons}
 
 
 class TestPendingIdentifiersFacetPublicOnly:
