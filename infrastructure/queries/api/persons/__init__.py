@@ -128,47 +128,34 @@ class PgPersonsQueries(PersonsQueries):
     # ── Admin : name forms ─────────────────────────────────────────
 
     def name_form_authorships(self, person_id: int, name_form: str) -> NameFormAuthorshipsResponse:
-        return NameFormAuthorshipsResponse.model_validate(
-            _name_form_authorships(self._conn, person_id, name_form)
-        )
+        return _name_form_authorships(self._conn, person_id, name_form)
 
     def ambiguous_name_forms_count(self) -> int:
         return _ambiguous_name_forms_count(self._conn)
 
     def ambiguous_name_forms(self, *, page: int, per_page: int) -> AmbiguousNameFormsResponse:
-        return AmbiguousNameFormsResponse.model_validate(
-            _ambiguous_name_forms(self._conn, page=page, per_page=per_page)
-        )
+        return _ambiguous_name_forms(self._conn, page=page, per_page=per_page)
 
     def identifier_conflicts_count(self) -> int:
         return _identifier_conflicts_count(self._conn)
 
     def identifier_conflicts(self, *, page: int, per_page: int) -> IdentifierConflictsResponse:
-        return IdentifierConflictsResponse.model_validate(
-            _identifier_conflicts(self._conn, page=page, per_page=per_page)
-        )
+        return _identifier_conflicts(self._conn, page=page, per_page=per_page)
 
     def detachable_intruders_count(self) -> int:
         return _detachable_intruders_count(self._conn)
 
     def detachable_intruders(self, *, page: int, per_page: int) -> DetachableIntrudersResponse:
-        return DetachableIntrudersResponse.model_validate(
-            _detachable_intruders(self._conn, page=page, per_page=per_page)
-        )
+        return _detachable_intruders(self._conn, page=page, per_page=per_page)
 
     def name_duplicates_count(self) -> int:
         return _name_duplicates_count(self._conn)
 
     def name_duplicates(self, *, page: int, per_page: int) -> NameDuplicatesResponse:
-        return NameDuplicatesResponse.model_validate(
-            _name_duplicates(self._conn, page=page, per_page=per_page)
-        )
+        return _name_duplicates(self._conn, page=page, per_page=per_page)
 
     def persons_sharing_name_form(self, person_id: int) -> list[SharingPersonOut]:
-        return [
-            SharingPersonOut.model_validate(r)
-            for r in _persons_sharing_name_form(self._conn, person_id)
-        ]
+        return _persons_sharing_name_form(self._conn, person_id)
 
 
 __all__ = ["PgPersonsQueries"]
