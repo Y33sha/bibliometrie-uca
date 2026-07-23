@@ -38,8 +38,8 @@ class DoiPrefixInfo(BaseModel):
     crossref_member_id: int | None = None
 
 
-class Publisher(BaseModel):
-    """Profil d'un éditeur, commun à la ligne de liste et à la page publique `/publishers/[id]`.
+class PublisherListItem(BaseModel):
+    """Ligne de la liste des éditeurs.
 
     `pub_count` compte les seules publications du périmètre, sommées sur les revues de l'éditeur.
     """
@@ -48,14 +48,19 @@ class Publisher(BaseModel):
     name: str
     openalex_id: str | None
     country: str | None
-    doi_prefixes: list[DoiPrefixInfo]
     publisher_type: str
     journal_count: int
     pub_count: int
 
 
+class Publisher(PublisherListItem):
+    """Profil complet d'un éditeur (page publique `/publishers/[id]`) : la ligne de liste, enrichie de ses préfixes DOI."""
+
+    doi_prefixes: list[DoiPrefixInfo]
+
+
 class PublisherListResponse(PaginatedResponse):
-    publishers: list[Publisher]
+    publishers: list[PublisherListItem]
 
 
 class JournalTypeCount(BaseModel):
