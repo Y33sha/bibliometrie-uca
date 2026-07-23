@@ -51,34 +51,20 @@ _JOURNAL_DETAIL_COLUMNS = f"""
 """
 
 
-def _journal_list_fields(row: Any) -> dict[str, Any]:
-    """Champs de `JournalListItem` lus d'une ligne de `_JOURNAL_LIST_COLUMNS`."""
-    return {
-        "id": row.id,
-        "title": row.title,
-        "issn": row.issn,
-        "eissn": row.eissn,
-        "publisher_id": row.publisher_id,
-        "pub_name": row.pub_name,
-        "is_in_doaj": row.is_in_doaj,
-        "journal_type": row.journal_type,
-        "pub_count": row.pub_count,
-        "doaj_url": resolve_doaj_url(row.doaj_url_csv, row.doaj_id),
-    }
-
-
-def _journal_detail_fields(row: Any) -> dict[str, Any]:
-    """Champs de `JournalDetailResponse` (hors DOAJ brut) lus d'une ligne de `_JOURNAL_DETAIL_COLUMNS`."""
-    return {
-        **_journal_list_fields(row),
-        "issnl": row.issnl,
-        "openalex_id": row.openalex_id,
-        "apc_amount": row.apc_amount,
-        "apc_currency": row.apc_currency,
-        "oa_model": row.oa_model,
-        "is_academic": row.is_academic,
-        "doi_prefix": row.doi_prefix,
-    }
+def _journal_list_item(row: Any) -> JournalListItem:
+    """`JournalListItem` lu d'une ligne de `_JOURNAL_LIST_COLUMNS`."""
+    return JournalListItem(
+        id=row.id,
+        title=row.title,
+        issn=row.issn,
+        eissn=row.eissn,
+        publisher_id=row.publisher_id,
+        pub_name=row.pub_name,
+        is_in_doaj=row.is_in_doaj,
+        journal_type=row.journal_type,
+        pub_count=row.pub_count,
+        doaj_url=resolve_doaj_url(row.doaj_url_csv, row.doaj_id),
+    )
 
 
 def _build_journal_where(
@@ -162,7 +148,7 @@ class PgJournalQueries(JournalQueries):
             total=total,
             page=page,
             per_page=per_page,
-            journals=[JournalListItem(**_journal_list_fields(r)) for r in rows],
+            journals=[_journal_list_item(r) for r in rows],
         )
 
     def journals_facets(self, *, filters: JournalFilters) -> JournalsFacetsResponse:
@@ -243,7 +229,14 @@ class PgJournalQueries(JournalQueries):
         if row is None:
             return None
         return JournalDetailResponse(
-            **_journal_detail_fields(row),
+            **_journal_list_item(row).model_dump(),
+            issnl=row.issnl,
+            openalex_id=row.openalex_id,
+            apc_amount=row.apc_amount,
+            apc_currency=row.apc_currency,
+            oa_model=row.oa_model,
+            is_academic=row.is_academic,
+            doi_prefix=row.doi_prefix,
             doaj_payload=row.doaj_payload,
             doaj_imported_at=row.doaj_imported_at,
         )

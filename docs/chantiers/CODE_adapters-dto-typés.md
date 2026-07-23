@@ -20,7 +20,7 @@ Le pattern cible, déjà appliqué au package `persons` : chaque fonction libre 
 - [x] `persons` — référence (list, identifiers, facets, detail, admin).
 - [x] `publications` — `list.py`, `facets.py`, `detail.py` construisent les DTO ; l'adapter `__init__.py` délègue sans `model_validate`. `duplicates.py` était déjà typé.
 - [x] `stats` — `collaborations.py`, `entity_facets.py`, `pivot.py`, `summary.py` construisent les DTO ; l'adapter `__init__.py` délègue.
-- [ ] `journals` — `_journal_list_fields` / `_journal_detail_fields` renvoient des dicts de champs consommés par la construction des DTO ; les faire construire les DTO directement (cas plus léger).
+- [x] `journals` — `_journal_list_item` construit le DTO ; `get_journal_detail` étend la ligne (`model_dump`) des champs propres au détail.
 
 ## Questions ouvertes
 
