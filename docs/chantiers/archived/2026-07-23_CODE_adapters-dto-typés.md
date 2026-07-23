@@ -24,4 +24,4 @@ Le pattern cible, déjà appliqué au package `persons` : chaque fonction libre 
 
 ## Questions ouvertes
 
-- Confirmer par lecture qu'aucune fonction dict n'est réutilisée hors de son adapter avant de la convertir.
+Aucune. La réutilisation hors adapter a été vérifiée par lecture pour chaque package avant conversion : seuls les adapters et leurs tests d'intégration consommaient ces fonctions.
