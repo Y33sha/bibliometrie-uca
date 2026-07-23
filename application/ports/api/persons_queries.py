@@ -1,8 +1,6 @@
 """Port : lectures sur les personnes (consommé par le router persons).
 
 Implémenté par `infrastructure.queries.api.persons.PgPersonsQueries`. Les modèles Pydantic que ces lectures rendent sont co-localisés avec le `Protocol` : leur contrat appartient au port.
-
-Les dataclasses `DirectoryFilters`, `ListFilters` et `FacetFilters` font ici référence ; l'infrastructure les importe pour typer ses signatures (règle 3 de `docs/architecture/01-vue-d-ensemble.md`).
 """
 
 from dataclasses import dataclass, field
