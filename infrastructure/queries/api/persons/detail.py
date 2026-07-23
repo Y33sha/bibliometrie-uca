@@ -1,4 +1,4 @@
-"""Détail d'une personne (sync) : profil, auteurs liés, thèses encadrées, adresses."""
+"""Détail d'une personne (sync) : profil et auteurs liés, thèses encadrées, adresses, sujets, dashboard Open Access."""
 
 import datetime
 from typing import Any
@@ -150,25 +150,14 @@ _THESIS_ROLE_LABELS = {
 def person_theses(conn: Connection, person_id: int) -> PersonThesesResponse:
     """Thèses liées à cette personne avec un rôle non-auteur.
 
-    Les rôles sont lus depuis `authorships` canonique (alignement vérifié avec `source_authorships.roles` sur la base). Le filtre `source = 'theses'` reste source-spécifique (HAL/ScanR remontent quelques rôles non-auteur qu'on n'affiche pas dans cette page) et passe par un `EXISTS`.
+    Les rôles proviennent de la table `authorships` canonique. Le périmètre se limite aux thèses (`source = 'theses'`, via `EXISTS`) : les autres sources portent des rôles non-auteur étrangers à cette page.
     """
     rows = conn.execute(
         text("""
             SELECT p.id, p.title, p.pub_year, p.doi,
                    a.roles,
-                   (SELECT pe2.first_name || ' ' || pe2.last_name
-                    FROM authorships a2
-                    JOIN persons pe2 ON pe2.id = a2.person_id
-                    WHERE a2.publication_id = p.id
-                      AND a2.roles && ARRAY['author']::text[]
-                    LIMIT 1
-                   ) AS author_name,
-                   (SELECT a2.person_id
-                    FROM authorships a2
-                    WHERE a2.publication_id = p.id
-                      AND a2.roles && ARRAY['author']::text[]
-                    LIMIT 1
-                   ) AS author_person_id,
+                   author.author_name,
+                   author.author_person_id,
                    (SELECT ARRAY_AGG(DISTINCT aus.structure_id)
                     FROM authorships a2
                     JOIN authorship_structures aus ON aus.authorship_id = a2.id
@@ -178,6 +167,15 @@ def person_theses(conn: Connection, person_id: int) -> PersonThesesResponse:
                    ) AS structure_ids
             FROM authorships a
             JOIN publications p ON p.id = a.publication_id
+            LEFT JOIN LATERAL (
+                SELECT a2.person_id AS author_person_id,
+                       pe2.first_name || ' ' || pe2.last_name AS author_name
+                FROM authorships a2
+                JOIN persons pe2 ON pe2.id = a2.person_id
+                WHERE a2.publication_id = p.id
+                  AND a2.roles && ARRAY['author']::text[]
+                LIMIT 1
+            ) author ON TRUE
             WHERE a.person_id = :pid
               AND NOT (a.roles && ARRAY['author']::text[])
               AND EXISTS (

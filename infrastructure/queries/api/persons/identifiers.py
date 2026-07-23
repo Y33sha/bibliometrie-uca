@@ -11,7 +11,7 @@ def public_identifiers(
 ) -> dict[int, list[PersonIdentifierOut]]:
     """Identifiants de types publics, indexés par personne.
 
-    Une attribution rejetée est une attribution que la curation a écartée : les lectures publiques ne l'annoncent pas, les lectures de curation la gardent pour permettre le retour en arrière. Le statut accompagne chaque attribution, qui distingue l'observée de la validée.
+    Chaque identifiant porte son `status`. `include_rejected` garde les attributions rejetées (écartées par la curation) : les vues de curation les affichent pour autoriser un retour en arrière, les vues publiques les excluent.
     """
     if not person_ids:
         return {}
