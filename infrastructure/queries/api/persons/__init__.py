@@ -98,13 +98,13 @@ class PgPersonsQueries(PersonsQueries):
     # ── Facettes / listes de référence / stats ─────────────────────
 
     def persons_facets(self, *, filters: PersonFilters) -> PersonsFacetsResponse:
-        return PersonsFacetsResponse.model_validate(_persons_facets(self._conn, filters=filters))
+        return _persons_facets(self._conn, filters=filters)
 
     def person_name_forms(self, person_id: int) -> list[NameFormSummaryOut]:
         return _person_name_forms(self._conn, person_id)
 
     def persons_stats(self) -> PersonsStatsResponse:
-        return PersonsStatsResponse.model_validate(_persons_stats(self._conn))
+        return _persons_stats(self._conn)
 
     # ── Détail d'une personne ──────────────────────────────────────
 

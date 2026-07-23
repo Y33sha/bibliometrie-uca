@@ -65,12 +65,12 @@ class TestPendingIdentifiersFacetPublicOnly:
         internal_only = _create_person(sa_sync_conn, last="InternalCount")
         _add_identifier(sa_sync_conn, internal_only, "hal_person_id", "67890", "pending")
 
-        before = persons_facets(sa_sync_conn, filters=PersonFilters())["pending_identifiers"]["yes"]
+        before = persons_facets(sa_sync_conn, filters=PersonFilters()).pending_identifiers.yes
 
         public_pending = _create_person(sa_sync_conn, last="PublicCount")
         _add_identifier(sa_sync_conn, public_pending, "idref", "123456789", "pending")
 
-        after = persons_facets(sa_sync_conn, filters=PersonFilters())["pending_identifiers"]["yes"]
+        after = persons_facets(sa_sync_conn, filters=PersonFilters()).pending_identifiers.yes
         # +1 pour la personne à identifiant public pending, +0 pour le hal_person_id interne.
         assert after == before + 1
 
