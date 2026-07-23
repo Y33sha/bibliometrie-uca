@@ -149,10 +149,8 @@ def list_publications(
 
     # Sur la vue personne (person_id défini), restreindre la liste des labos affichée à ceux portés par l'authorship de cette personne.
     if filters.person_id:
-        person_lab_filter_a3 = "AND a3.person_id = :person_lab_a3"
         person_lab_filter_a4 = "AND a4.person_id = :person_lab_a4"
     else:
-        person_lab_filter_a3 = ""
         person_lab_filter_a4 = ""
 
     rows = conn.execute(
@@ -189,14 +187,6 @@ def list_publications(
                 (SELECT a.id FROM authorships a
                  WHERE a.publication_id = p.id AND a.person_id = :focus_person
                  LIMIT 1) AS authorship_id,
-                (SELECT string_agg(DISTINCT COALESCE(s.acronym, s.name), ', '
-                         ORDER BY COALESCE(s.acronym, s.name))
-                 FROM authorships a3
-                 JOIN authorship_structures aus3 ON aus3.authorship_id = a3.id
-                 JOIN structures s ON s.id = aus3.structure_id AND s.structure_type = 'labo'
-                 WHERE a3.publication_id = p.id AND a3.in_perimeter = TRUE
-                   {person_lab_filter_a3}
-                ) AS labs,
                 (SELECT json_agg(sub ORDER BY sub.label)
                  FROM (
                     SELECT DISTINCT s.id, COALESCE(s.acronym, s.name) AS label
@@ -240,7 +230,6 @@ def list_publications(
         {
             **binds,
             "focus_person": filters.person_id,
-            "person_lab_a3": filters.person_id,
             "person_lab_a4": filters.person_id,
             "sort_search_pat": f"%{normalize_text(filters.search)}%" if filters.search else "",
             "pg_limit": per_page,
@@ -269,7 +258,6 @@ def list_publications(
             "date_inscription": r.date_inscription,
             "thesis_author_name": r.thesis_author_name,
             "thesis_author_person_id": r.thesis_author_person_id,
-            "labs": r.labs,
             "lab_items": r.lab_items,
             "apc": r.apc_details,
             "is_corresponding": r.is_corresponding,

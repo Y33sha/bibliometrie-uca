@@ -103,7 +103,6 @@ class PublicationListItem(BaseModel):
     date_inscription: str | None
     thesis_author_name: str | None
     thesis_author_person_id: int | None
-    labs: str | None
     lab_items: list[PubLabItem] | None
     apc: list[PubApcPayment] | None
     is_corresponding: bool | None

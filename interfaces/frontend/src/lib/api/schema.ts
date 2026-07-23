@@ -4405,8 +4405,6 @@ export interface components {
             thesis_author_name: string | null;
             /** Thesis Author Person Id */
             thesis_author_person_id: number | null;
-            /** Labs */
-            labs: string | null;
             /** Lab Items */
             lab_items: components["schemas"]["PubLabItem"][] | null;
             /** Apc */
