@@ -14,9 +14,7 @@ from application.ports.api.feedback_queries import (
 )
 from infrastructure.queries.api.addresses import address_structures_json
 
-# Les cas de la détection d'adresses, croisant l'arbitrage humain (`is_confirmed`) et ce que la
-# détection a proposé (`matched_form_id`), sur un lien `address_structures` aliasé `ast`. Partagés
-# entre le décompte (`feedback_stats`) et les listes (faux négatifs / faux positifs).
+# Classent chaque lien address_structures (aliasé `ast`) en croisant ce que la détection a proposé (`matched_form_id`, vide si aucun rapprochement) et le verdict de la curation (`is_confirmed`) ; partagés par le décompte et les listes.
 _CONCORDANT_VALID = "ast.is_confirmed = TRUE AND ast.matched_form_id IS NOT NULL"
 _CONCORDANT_REJECTED = "ast.is_confirmed = FALSE AND ast.matched_form_id IS NULL"
 _FALSE_NEGATIVE = "ast.is_confirmed = TRUE AND ast.matched_form_id IS NULL"
