@@ -47,7 +47,13 @@ def read_session(token: str) -> str | None:
 
 
 def check_password(password: str) -> bool:
-    """Confronte un mot de passe au hash bcrypt configuré. Sans hash configuré, aucune connexion n'aboutit."""
+    """Confronte un mot de passe au hash bcrypt configuré. Sans hash configuré, ou si le hash est mal formé, aucune connexion n'aboutit.
+
+    `bcrypt.checkpw` lève `ValueError` quand le hash n'est pas un hash bcrypt valide : un mauvais mot de passe reste un refus, pas une erreur serveur.
+    """
     if not settings.admin_hash:
         return False
-    return bcrypt.checkpw(password.encode(), settings.admin_hash.encode())
+    try:
+        return bcrypt.checkpw(password.encode(), settings.admin_hash.encode())
+    except ValueError:
+        return False
