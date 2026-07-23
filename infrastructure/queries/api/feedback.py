@@ -12,10 +12,11 @@ from application.ports.api.feedback_queries import (
     FeedbackQueries,
     FeedbackStats,
 )
+from infrastructure.queries.api.addresses import address_structures_json
 
-# Matrice de confusion de la détection d'adresses : l'arbitrage humain (`is_confirmed`) croisé avec
-# ce que la détection a proposé (`matched_form_id`), sur un lien `address_structures` aliasé `ast`.
-# Partagée entre le décompte (`feedback_stats`) et les listes (faux négatifs / faux positifs).
+# Les cas de la détection d'adresses, croisant l'arbitrage humain (`is_confirmed`) et ce que la
+# détection a proposé (`matched_form_id`), sur un lien `address_structures` aliasé `ast`. Partagés
+# entre le décompte (`feedback_stats`) et les listes (faux négatifs / faux positifs).
 _CONCORDANT_VALID = "ast.is_confirmed = TRUE AND ast.matched_form_id IS NOT NULL"
 _CONCORDANT_REJECTED = "ast.is_confirmed = FALSE AND ast.matched_form_id IS NULL"
 _FALSE_NEGATIVE = "ast.is_confirmed = TRUE AND ast.matched_form_id IS NULL"
@@ -134,15 +135,7 @@ class PgFeedbackQueries(FeedbackQueries):
             text(f"""
                 SELECT
                     a.id, a.raw_text, a.pub_count,
-                    (SELECT json_agg(json_build_object(
-                        'id', s.id, 'name', s.name, 'acronym', s.acronym,
-                        'is_confirmed', ast2.is_confirmed,
-                        'is_detected', (ast2.matched_form_id IS NOT NULL)
-                    ) ORDER BY COALESCE(s.acronym, s.name))
-                    FROM address_structures ast2
-                    JOIN structures s ON s.id = ast2.structure_id
-                    WHERE ast2.address_id = a.id
-                    ) AS structures{matched_forms_select}
+                    ({address_structures_json("a.id")}) AS structures{matched_forms_select}
                 FROM address_structures ast
                 JOIN addresses a ON a.id = ast.address_id
                 WHERE {where}

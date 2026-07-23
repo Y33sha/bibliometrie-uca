@@ -57,6 +57,23 @@ def _countries_where(
     return where, binds
 
 
+def address_structures_json(addr_ref: str) -> str:
+    """Projection JSON des structures liées à une adresse, au format `AddressStructureSummary`.
+
+    `addr_ref` est l'expression SQL désignant l'id d'adresse : `a.id` en sous-requête corrélée d'une liste, `:id` en requête autonome.
+    """
+    return f"""
+        SELECT json_agg(json_build_object(
+                   'id', s.id, 'name', s.name, 'acronym', s.acronym,
+                   'is_confirmed', ast2.is_confirmed,
+                   'is_detected', (ast2.matched_form_id IS NOT NULL)
+               ) ORDER BY COALESCE(s.acronym, s.name))
+        FROM address_structures ast2
+        JOIN structures s ON s.id = ast2.structure_id
+        WHERE ast2.address_id = {addr_ref}
+    """
+
+
 class PgAddressesQueries(AddressesQueries):
     """Adapter SA pour `application.ports.api.addresses_queries.AddressesQueries`."""
 
@@ -132,15 +149,7 @@ class PgAddressesQueries(AddressesQueries):
                 SELECT a.id, a.raw_text, a.pub_count,
                        ast_filter.is_confirmed,
                        (ast_filter.matched_form_id IS NOT NULL) AS is_detected,
-                       (SELECT json_agg(json_build_object(
-                                   'id', s.id, 'name', s.name, 'acronym', s.acronym,
-                                   'is_confirmed', ast2.is_confirmed,
-                                   'is_detected', (ast2.matched_form_id IS NOT NULL)
-                               ) ORDER BY COALESCE(s.acronym, s.name))
-                        FROM address_structures ast2
-                        JOIN structures s ON s.id = ast2.structure_id
-                        WHERE ast2.address_id = a.id
-                       ) AS structures
+                       ({address_structures_json("a.id")}) AS structures
                 {from_clause}
                 ORDER BY a.pub_count DESC, a.id
                 LIMIT :pg_limit OFFSET :pg_offset
@@ -217,21 +226,10 @@ class PgAddressesQueries(AddressesQueries):
         ]
 
     def get_address_structures(self, addr_id: int) -> list[AddressStructureSummary]:
-        row = self._conn.execute(
-            text("""
-                SELECT json_agg(json_build_object(
-                           'id', s.id, 'name', s.name, 'acronym', s.acronym,
-                           'is_confirmed', ast2.is_confirmed,
-                           'is_detected', (ast2.matched_form_id IS NOT NULL)
-                       ) ORDER BY COALESCE(s.acronym, s.name)) AS structures
-                FROM address_structures ast2
-                JOIN structures s ON s.id = ast2.structure_id
-                WHERE ast2.address_id = :id
-            """),
-            {"id": addr_id},
-        ).one_or_none()
-        rows = row.structures if row and row.structures else []
-        return [AddressStructureSummary.model_validate(s) for s in rows]
+        structures_json = self._conn.execute(
+            text(address_structures_json(":id")), {"id": addr_id}
+        ).scalar_one_or_none()
+        return [AddressStructureSummary.model_validate(s) for s in (structures_json or [])]
 
     def get_structure_link(self, addr_id: int, structure_id: int) -> StructureLinkState | None:
         row = self._conn.execute(
