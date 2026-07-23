@@ -112,8 +112,8 @@ class TestNameFormAuthorships:
         )
 
         res = name_form_authorships(sa_sync_conn, pid, "dupond j")
-        assert len(res["authorships"]) >= 1
-        other_ids = [p["id"] for p in res["other_persons"]]
+        assert len(res.authorships) >= 1
+        other_ids = [p.id for p in res.other_persons]
         assert other in other_ids
 
 
@@ -151,11 +151,11 @@ class TestIdentifierConflicts:
 
         assert identifier_conflicts_count(sa_sync_conn) == 1
         res = identifier_conflicts(sa_sync_conn, page=1, per_page=50)
-        assert res["total"] == 1
-        pair = res["pairs"][0]
-        assert {pair["person_a"]["person_id"], pair["person_b"]["person_id"]} == {p1, p2}
-        assert pair["shared_identifiers"] == [
-            {"id_type": "orcid", "id_value": "0000-0001-2345-6789"}
+        assert res.total == 1
+        pair = res.pairs[0]
+        assert {pair.person_a.person_id, pair.person_b.person_id} == {p1, p2}
+        assert [(s.id_type, s.id_value) for s in pair.shared_identifiers] == [
+            ("orcid", "0000-0001-2345-6789")
         ]
 
     def test_dubious_excluded(self, sa_sync_conn):
@@ -200,11 +200,11 @@ class TestDetachableIntruders:
 
         assert detachable_intruders_count(sa_sync_conn) == 1
         res = detachable_intruders(sa_sync_conn, page=1, per_page=50)
-        assert res["total"] == 1
-        group = res["groups"][0]
-        assert group["person"]["person_id"] == person
-        assert [a["raw_author_name"] for a in group["anchors"]] == ["X"]
-        assert [i["name_form"] for i in group["intruders"]] == ["perez rafols i"]
+        assert res.total == 1
+        group = res.groups[0]
+        assert group.person.person_id == person
+        assert [a.raw_author_name for a in group.anchors] == ["X"]
+        assert [i.name_form for i in group.intruders] == ["perez rafols i"]
 
     def test_all_compatible_not_detachable(self, sa_sync_conn):
         """Toutes les occurrences légitimes → doublon de signature, pas un détachement."""
@@ -242,11 +242,7 @@ class TestNameDuplicates:
     """Paires aux noms compatibles, classées par recouvrement de réseau."""
 
     def _pair(self, res, a, b):
-        return next(
-            p
-            for p in res["pairs"]
-            if {p["person_a"]["person_id"], p["person_b"]["person_id"]} == {a, b}
-        )
+        return next(p for p in res.pairs if {p.person_a.person_id, p.person_b.person_id} == {a, b})
 
     def test_shared_coauthor_is_network_tier(self, sa_sync_conn):
         a = _create_person(sa_sync_conn, last="Dupont", first="J")
@@ -260,11 +256,16 @@ class TestNameDuplicates:
 
         assert name_duplicates_count(sa_sync_conn) >= 1
         pair = self._pair(name_duplicates(sa_sync_conn, page=1, per_page=50), a, b)
-        assert pair["overlaps"]["coauthors"] == 1
+        assert pair.overlaps.coauthors == 1
 
     def test_disjoint_pair_has_no_overlap(self, sa_sync_conn):
         a = _create_person(sa_sync_conn, last="Bernard", first="M")
         b = _create_person(sa_sync_conn, last="Bernard", first="Marie")
 
         pair = self._pair(name_duplicates(sa_sync_conn, page=1, per_page=50), a, b)
-        assert pair["overlaps"] == {"coauthors": 0, "shared_pubs": 0, "labs": 0, "journals": 0}
+        assert (
+            pair.overlaps.coauthors,
+            pair.overlaps.shared_pubs,
+            pair.overlaps.labs,
+            pair.overlaps.journals,
+        ) == (0, 0, 0, 0)

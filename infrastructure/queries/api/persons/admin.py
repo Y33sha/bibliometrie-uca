@@ -5,13 +5,35 @@ from typing import Any
 
 from sqlalchemy import Connection, bindparam, text
 
+from application.ports.api.persons_queries import (
+    AmbiguousFormPersonOut,
+    AmbiguousNameFormOut,
+    AmbiguousNameFormsResponse,
+    AnchorOccurrenceOut,
+    DetachableIntruderGroupOut,
+    DetachableIntrudersResponse,
+    IdentifierConflictPairOut,
+    IdentifierConflictPersonOut,
+    IdentifierConflictsResponse,
+    IntruderOccurrenceOut,
+    NameDuplicatePairOut,
+    NameDuplicatesResponse,
+    NameFormAuthorshipRef,
+    NameFormAuthorshipsResponse,
+    OtherPersonOut,
+    OverlapCountsOut,
+    SharedIdentifierOut,
+    SharingPersonOut,
+)
 from domain.persons.name_matching import names_compatible
 from infrastructure.queries.sources_sql import AUTHOR_SOURCES_SQL
 
 # ── Name-form authorships ────────────────────────────────────────
 
 
-def name_form_authorships(conn: Connection, person_id: int, name_form: str) -> dict[str, Any]:
+def name_form_authorships(
+    conn: Connection, person_id: int, name_form: str
+) -> NameFormAuthorshipsResponse:
     """Authorships sources liées à une personne pour une forme de nom donnée, + autres personnes partageant cette forme."""
     auth_rows = conn.execute(
         text(f"""
@@ -26,7 +48,6 @@ def name_form_authorships(conn: Connection, person_id: int, name_form: str) -> d
         """),
         {"pid": person_id, "nf": name_form},
     ).all()
-    authorships = [dict(r._mapping) for r in auth_rows]
 
     other_rows = conn.execute(
         text("""
@@ -43,8 +64,29 @@ def name_form_authorships(conn: Connection, person_id: int, name_form: str) -> d
         """),
         {"nf": name_form, "pid": person_id},
     ).all()
-    other_persons = [dict(r._mapping) for r in other_rows]
-    return {"authorships": authorships, "other_persons": other_persons}
+    return NameFormAuthorshipsResponse(
+        authorships=[
+            NameFormAuthorshipRef(
+                source=r.source,
+                source_authorship_id=r.source_authorship_id,
+                pub_id=r.pub_id,
+                title=r.title,
+                pub_year=r.pub_year,
+                doi=r.doi,
+            )
+            for r in auth_rows
+        ],
+        other_persons=[
+            OtherPersonOut(
+                id=r.id,
+                first_name=r.first_name,
+                last_name=r.last_name,
+                department_name=r.department_name,
+                has_rh=r.has_rh,
+            )
+            for r in other_rows
+        ],
+    )
 
 
 # ── File de triage : formes de nom ambiguës ──────────────────────
@@ -66,7 +108,9 @@ def ambiguous_name_forms_count(conn: Connection) -> int:
     return int(row.total)
 
 
-def ambiguous_name_forms(conn: Connection, *, page: int, per_page: int) -> dict[str, Any]:
+def ambiguous_name_forms(
+    conn: Connection, *, page: int, per_page: int
+) -> AmbiguousNameFormsResponse:
     """Formes de nom ambiguës paginées, avec les personnes qui les portent.
 
     Chaque personne porte son statut (pending/confirmed/rejected) pour cette forme et un drapeau `compatible` (nom canonique compatible avec la forme, par tokens) — discriminant homonyme/doublon (compatible) vs erreur (incompatible).
@@ -84,7 +128,7 @@ def ambiguous_name_forms(conn: Connection, *, page: int, per_page: int) -> dict[
     ).all()
     forms = [r.name_form for r in form_rows]
 
-    persons_by_form: dict[str, list[dict[str, Any]]] = {f: [] for f in forms}
+    persons_by_form: dict[str, list[AmbiguousFormPersonOut]] = {f: [] for f in forms}
     if forms:
         rows = conn.execute(
             text("""
@@ -101,22 +145,22 @@ def ambiguous_name_forms(conn: Connection, *, page: int, per_page: int) -> dict[
         ).all()
         for r in rows:
             persons_by_form[r.name_form].append(
-                {
-                    "person_id": r.person_id,
-                    "first_name": r.first_name,
-                    "last_name": r.last_name,
-                    "status": r.status,
-                    "has_rh": r.has_rh,
-                    "compatible": names_compatible(r.name_form, "", r.ln or "", r.fn or ""),
-                }
+                AmbiguousFormPersonOut(
+                    person_id=r.person_id,
+                    first_name=r.first_name,
+                    last_name=r.last_name,
+                    status=r.status,
+                    has_rh=r.has_rh,
+                    compatible=names_compatible(r.name_form, "", r.ln or "", r.fn or ""),
+                )
             )
 
-    return {
-        "total": total,
-        "page": page,
-        "per_page": per_page,
-        "forms": [{"name_form": f, "persons": persons_by_form[f]} for f in forms],
-    }
+    return AmbiguousNameFormsResponse(
+        total=total,
+        page=page,
+        per_page=per_page,
+        forms=[AmbiguousNameFormOut(name_form=f, persons=persons_by_form[f]) for f in forms],
+    )
 
 
 # ── Conflits d'identifiant (file de triage du hub) ───────────────
@@ -157,7 +201,7 @@ def identifier_conflicts_count(conn: Connection) -> int:
     return int(row.total)
 
 
-def _light_persons(conn: Connection, ids: list[int]) -> dict[int, dict[str, Any]]:
+def _light_persons(conn: Connection, ids: list[int]) -> dict[int, IdentifierConflictPersonOut]:
     """Vue allégée par personne (nom, RH, nb publications, labos) pour la file de triage."""
     if not ids:
         return {}
@@ -181,19 +225,21 @@ def _light_persons(conn: Connection, ids: list[int]) -> dict[int, dict[str, Any]
         {"ids": ids},
     ).all()
     return {
-        r.id: {
-            "person_id": r.id,
-            "first_name": r.first_name,
-            "last_name": r.last_name,
-            "has_rh": r.has_rh,
-            "signature_count": r.signature_count,
-            "labs": list(r.labs or []),
-        }
+        r.id: IdentifierConflictPersonOut(
+            person_id=r.id,
+            first_name=r.first_name,
+            last_name=r.last_name,
+            has_rh=r.has_rh,
+            signature_count=r.signature_count,
+            labs=list(r.labs or []),
+        )
         for r in rows
     }
 
 
-def identifier_conflicts(conn: Connection, *, page: int, per_page: int) -> dict[str, Any]:
+def identifier_conflicts(
+    conn: Connection, *, page: int, per_page: int
+) -> IdentifierConflictsResponse:
     """Paires de personnes au même identifiant brut, paginées, avec vue allégée des deux personnes et l'identifiant partagé en évidence. Le tri doublon / erreur d'attribution est laissé à l'œil."""
     total = identifier_conflicts_count(conn)
     offset = (page - 1) * per_page
@@ -204,22 +250,17 @@ def identifier_conflicts(conn: Connection, *, page: int, per_page: int) -> dict[
     ids = sorted({r.id_a for r in rows} | {r.id_b for r in rows})
     persons = _light_persons(conn, ids)
     pairs = [
-        {
-            "person_a": persons[r.id_a],
-            "person_b": persons[r.id_b],
-            "shared_identifiers": [
-                {"id_type": s["id_type"], "id_value": s["id_value"]} for s in r.shared
+        IdentifierConflictPairOut(
+            person_a=persons[r.id_a],
+            person_b=persons[r.id_b],
+            shared_identifiers=[
+                SharedIdentifierOut(id_type=s["id_type"], id_value=s["id_value"]) for s in r.shared
             ],
-        }
+        )
         for r in rows
         if r.id_a in persons and r.id_b in persons
     ]
-    return {
-        "total": total,
-        "page": page,
-        "per_page": per_page,
-        "pairs": pairs,
-    }
+    return IdentifierConflictsResponse(total=total, page=page, per_page=per_page, pairs=pairs)
 
 
 # ── Intrus détachables (file de triage du hub) ───────────────────
@@ -255,12 +296,12 @@ _CONFIRMED_FORMS_SQL = text("""
 _IDENTIFIER_KEYS = ("orcid", "idref", "hal_person_id", "idhal")
 
 
-def _occurrence_identifiers(raw: Any) -> list[dict[str, str]]:
+def _occurrence_identifiers(raw: Any) -> list[SharedIdentifierOut]:
     """Identifiants bruts portés par une signature (hors valeurs neutralisées `_dubious`) — élément de décision : c'est souvent l'identifiant fautif qui a rattaché l'intrus."""
     if not raw:
         return []
     return [
-        {"id_type": k, "id_value": str(raw[k])}
+        SharedIdentifierOut(id_type=k, id_value=str(raw[k]))
         for k in _IDENTIFIER_KEYS
         if raw.get(k) and not str(raw[k]).endswith("_dubious")
     ]
@@ -317,7 +358,9 @@ def _publications_for_spids(conn: Connection, spids: list[int]) -> dict[int, dic
     }
 
 
-def detachable_intruders(conn: Connection, *, page: int, per_page: int) -> dict[str, Any]:
+def detachable_intruders(
+    conn: Connection, *, page: int, per_page: int
+) -> DetachableIntrudersResponse:
     """Groupes détachables paginés : la personne, son occurrence-ancre, son occurrence-intrus (avec la forme de nom à rejeter et l'identifiant fautif) et la publication où les deux coexistent.
 
     L'action de résolution est le rejet de la forme de nom de l'intrus (`name_form`), qui détache les signatures et pose le verrou de non-retour."""
@@ -330,32 +373,27 @@ def detachable_intruders(conn: Connection, *, page: int, per_page: int) -> dict[
     pubs = _publications_for_spids(conn, sorted({spid for spid, _, _, _ in page_groups}))
 
     items = [
-        {
-            "source_publication_id": spid,
-            "publication_id": pubs.get(spid, {}).get("publication_id"),
-            "pub_title": pubs.get(spid, {}).get("title"),
-            "pub_year": pubs.get(spid, {}).get("pub_year"),
-            "person": persons[pid],
-            "anchors": [{"source": o.source, "raw_author_name": o.name} for o in anchors],
-            "intruders": [
-                {
-                    "source": o.source,
-                    "raw_author_name": o.name,
-                    "name_form": o.norm,
-                    "identifiers": _occurrence_identifiers(o.identifiers),
-                }
+        DetachableIntruderGroupOut(
+            source_publication_id=spid,
+            publication_id=pubs.get(spid, {}).get("publication_id"),
+            pub_title=pubs.get(spid, {}).get("title"),
+            pub_year=pubs.get(spid, {}).get("pub_year"),
+            person=persons[pid],
+            anchors=[AnchorOccurrenceOut(source=o.source, raw_author_name=o.name) for o in anchors],
+            intruders=[
+                IntruderOccurrenceOut(
+                    source=o.source,
+                    raw_author_name=o.name,
+                    name_form=o.norm,
+                    identifiers=_occurrence_identifiers(o.identifiers),
+                )
                 for o in intruders
             ],
-        }
+        )
         for spid, pid, anchors, intruders in page_groups
         if pid in persons
     ]
-    return {
-        "total": total,
-        "page": page,
-        "per_page": per_page,
-        "groups": items,
-    }
+    return DetachableIntrudersResponse(total=total, page=page, per_page=per_page, groups=items)
 
 
 # ── Doublons par nom (file de triage du hub) ─────────────────────
@@ -521,7 +559,7 @@ def name_duplicates_count(conn: Connection) -> int:
     return len(_name_duplicate_candidates(conn))
 
 
-def name_duplicates(conn: Connection, *, page: int, per_page: int) -> dict[str, Any]:
+def name_duplicates(conn: Connection, *, page: int, per_page: int) -> NameDuplicatesResponse:
     """Paires candidates par nom, paginées, avec vue allégée des deux personnes, recouvrements de réseau chiffrés et pastille de force. Fusion / marquage distinct laissés à l'œil."""
     pairs = _name_duplicate_pairs(conn)
     total = len(pairs)
@@ -532,23 +570,23 @@ def name_duplicates(conn: Connection, *, page: int, per_page: int) -> dict[str, 
         conn, sorted({pid for id_a, id_b, _ in page_pairs for pid in (id_a, id_b)})
     )
     items = [
-        {
-            "person_a": persons[id_a],
-            "person_b": persons[id_b],
-            "overlaps": overlaps,
-        }
+        NameDuplicatePairOut(
+            person_a=persons[id_a],
+            person_b=persons[id_b],
+            overlaps=OverlapCountsOut(
+                coauthors=overlaps["coauthors"],
+                shared_pubs=overlaps["shared_pubs"],
+                labs=overlaps["labs"],
+                journals=overlaps["journals"],
+            ),
+        )
         for id_a, id_b, overlaps in page_pairs
         if id_a in persons and id_b in persons
     ]
-    return {
-        "total": total,
-        "page": page,
-        "per_page": per_page,
-        "pairs": items,
-    }
+    return NameDuplicatesResponse(total=total, page=page, per_page=per_page, pairs=items)
 
 
-def persons_sharing_name_form(conn: Connection, person_id: int) -> list[dict[str, Any]]:
+def persons_sharing_name_form(conn: Connection, person_id: int) -> list[SharingPersonOut]:
     """Autres personnes (non rejetées) partageant ≥1 forme de nom avec `person_id`.
 
     Candidates à l'absorption (fusion vers `person_id`). `shared_forms` liste les formes en commun — éléments de décision affichés dans le drawer."""
@@ -568,4 +606,13 @@ def persons_sharing_name_form(conn: Connection, person_id: int) -> list[dict[str
         """),
         {"id": person_id},
     ).all()
-    return [dict(r._mapping) for r in rows]
+    return [
+        SharingPersonOut(
+            id=r.id,
+            first_name=r.first_name,
+            last_name=r.last_name,
+            has_rh=r.has_rh,
+            shared_forms=list(r.shared_forms or []),
+        )
+        for r in rows
+    ]
