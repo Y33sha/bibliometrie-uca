@@ -1,14 +1,25 @@
 """Détail d'une publication."""
 
-from typing import Any
-
 from sqlalchemy import Connection, text
 
+from application.ports.api.publications_queries import (
+    ConsolidatedAuthorshipOut,
+    ExternalIdentifierOut,
+    PublicationDetailCore,
+    PublicationDetailResponse,
+    RelatedPublicationOut,
+    SourceAuthorshipOut,
+    SourcePublicationOut,
+    StructureInfo,
+    ThesesAuthorshipOut,
+    ThesisMeta,
+)
+from application.ports.api.subjects_queries import SubjectOut
 from domain.publications.relations import RelationType, inverse_relation
 from domain.source_publications.correction import CONVERGENCE_CASES
 
 
-def get_publication_relations(conn: Connection, pub_id: int) -> list[dict[str, Any]]:
+def get_publication_relations(conn: Connection, pub_id: int) -> list[RelatedPublicationOut]:
     """Publications apparentées, des deux sens, vues depuis `pub_id`.
 
     Les arêtes sortantes (`from_publication_id = pub_id`) gardent leur type ; les entrantes (`target_publication_id = pub_id`) sont inversées pour se lire depuis la publication courante. La cible porte ses métadonnées si elle est au corpus, sinon seul son DOI est connu. Dédupliqué par (type, cible) — une paire déclarée des deux côtés ne s'affiche qu'une fois.
@@ -35,7 +46,7 @@ def get_publication_relations(conn: Connection, pub_id: int) -> list[dict[str, A
         """),
         {"pid": pub_id},
     ).all()
-    out: list[dict[str, Any]] = []
+    out: list[RelatedPublicationOut] = []
     seen: set[tuple[str, str]] = set()
     for r in rows:
         relation_type = r.rtype
@@ -48,22 +59,22 @@ def get_publication_relations(conn: Connection, pub_id: int) -> list[dict[str, A
             continue
         seen.add(key)
         out.append(
-            {
-                "relation_type": relation_type,
-                "doi": r.other_doi,
-                "publication_id": r.other_id,
-                "title": r.other_title,
-                "pub_year": r.other_year,
-                "doc_type": r.other_doc_type,
-                "source": r.source,
-            }
+            RelatedPublicationOut(
+                relation_type=relation_type,
+                doi=r.other_doi,
+                publication_id=r.other_id,
+                title=r.other_title,
+                pub_year=r.other_year,
+                doc_type=r.other_doc_type,
+                source=r.source,
+            )
         )
     return out
 
 
 def _fetch_biblio_source_authorships(
     conn: Connection, source: str, pub_id: int
-) -> list[dict[str, Any]]:
+) -> list[SourceAuthorshipOut]:
     """Authorships HAL / OpenAlex / WoS / ScanR d'une publi, avec adresses agrégées.
 
     Quand plusieurs `source_publications` de la même source pointent sur la même publi canonique (ex: deux Work IDs OpenAlex pour un même DOI), on affiche les auteurs de l'**import le plus récent** (`created_at DESC`). Les liens vers les sources, eux, sont multiples côté header — cf `PublicationHeader.svelte`.
@@ -98,10 +109,22 @@ def _fetch_biblio_source_authorships(
         """),
         {"src": source, "pid": pub_id},
     ).all()
-    return [dict(r._mapping) for r in rows]
+    return [
+        SourceAuthorshipOut(
+            id=r.id,
+            author_position=r.author_position,
+            full_name=r.full_name,
+            person_id=r.person_id,
+            in_perimeter=r.in_perimeter,
+            structure_ids=r.structure_ids,
+            raw_affiliation=r.raw_affiliation,
+            countries=r.countries,
+        )
+        for r in rows
+    ]
 
 
-def get_publication_detail(conn: Connection, pub_id: int) -> dict[str, Any] | None:
+def get_publication_detail(conn: Connection, pub_id: int) -> PublicationDetailResponse | None:
     """Détail complet d'une publication : métadonnées, sources, authorships.
 
     Retourne None si la publication n'existe pas (caller = 404).
@@ -127,9 +150,8 @@ def get_publication_detail(conn: Connection, pub_id: int) -> dict[str, Any] | No
     ).one_or_none()
     if not pub_row:
         return None
-    pub = dict(pub_row._mapping)
     # Mots-clés libres (agrégat des sources) : hors référentiel `subjects`, retournés à part.
-    keywords = pub.pop("keywords", None) or []
+    keywords = pub_row.keywords or []
 
     sources_rows = conn.execute(
         text("""
@@ -142,7 +164,17 @@ def get_publication_detail(conn: Connection, pub_id: int) -> dict[str, Any] | No
         """),
         {"pid": pub_id, "convergence_cases": list(CONVERGENCE_CASES)},
     ).all()
-    sources = [dict(r._mapping) for r in sources_rows]
+    sources = [
+        SourcePublicationOut(
+            source=r.source,
+            source_id=r.source_id,
+            doi=r.doi,
+            hal_collections=r.hal_collections,
+            countries=r.countries,
+            is_secondary=r.is_secondary,
+        )
+        for r in sources_rows
+    ]
 
     auth_rows = conn.execute(
         text("""
@@ -167,7 +199,23 @@ def get_publication_detail(conn: Connection, pub_id: int) -> dict[str, Any] | No
         """),
         {"pid": pub_id},
     ).all()
-    authorships = [dict(r._mapping) for r in auth_rows]
+    authorships = [
+        ConsolidatedAuthorshipOut(
+            author_position=r.author_position,
+            in_perimeter=r.in_perimeter,
+            is_corresponding=r.is_corresponding,
+            structure_ids=r.structure_ids,
+            source_hal=r.source_hal,
+            source_openalex=r.source_openalex,
+            source_wos=r.source_wos,
+            source_scanr=r.source_scanr,
+            person_id=r.person_id,
+            last_name=r.last_name,
+            first_name=r.first_name,
+            has_rh=r.has_rh,
+        )
+        for r in auth_rows
+    ]
 
     hal_authorships = _fetch_biblio_source_authorships(conn, "hal", pub_id)
     oa_authorships = _fetch_biblio_source_authorships(conn, "openalex", pub_id)
@@ -189,10 +237,20 @@ def get_publication_detail(conn: Connection, pub_id: int) -> dict[str, Any] | No
         """),
         {"pid": pub_id},
     ).all()
-    theses_authorships = [dict(r._mapping) for r in theses_rows]
+    theses_authorships = [
+        ThesesAuthorshipOut(
+            id=r.id,
+            author_position=r.author_position,
+            full_name=r.full_name,
+            person_id=r.person_id,
+            roles=r.roles,
+            in_perimeter=r.in_perimeter,
+        )
+        for r in theses_rows
+    ]
 
-    thesis_meta = None
-    if pub["doc_type"] in ("thesis", "ongoing_thesis"):
+    thesis_meta: ThesisMeta | None = None
+    if pub_row.doc_type in ("thesis", "ongoing_thesis"):
         meta_row = conn.execute(
             text("""
                 SELECT sd.meta AS sd_meta, p.meta AS pub_meta
@@ -207,27 +265,32 @@ def get_publication_detail(conn: Connection, pub_id: int) -> dict[str, Any] | No
         if meta_row:
             sd_meta = meta_row.sd_meta or {}
             pub_meta = meta_row.pub_meta or {}
-            thesis_meta = {
-                "discipline": sd_meta.get("discipline"),
-                "ecoles_doctorales": sd_meta.get("ecoles_doctorales"),
-                "partenaires": sd_meta.get("partenaires"),
-                "date_soutenance": sd_meta.get("date_soutenance")
-                or pub_meta.get("date_soutenance"),
-                "date_inscription": sd_meta.get("date_inscription")
+            thesis_meta = ThesisMeta(
+                discipline=sd_meta.get("discipline"),
+                ecoles_doctorales=sd_meta.get("ecoles_doctorales"),
+                partenaires=sd_meta.get("partenaires"),
+                date_soutenance=sd_meta.get("date_soutenance") or pub_meta.get("date_soutenance"),
+                date_inscription=sd_meta.get("date_inscription")
                 or pub_meta.get("date_inscription"),
-            }
+            )
 
     subjects = get_publication_subjects(conn, pub_id)
     relations = get_publication_relations(conn, pub_id)
     external_identifiers = get_publication_external_identifiers(conn, pub_id)
 
     all_struct_ids: set[int] = set()
-    for rows in (authorships, hal_authorships, oa_authorships, wos_authorships, scanr_authorships):
-        for row in rows:
-            if row["structure_ids"]:
-                all_struct_ids.update(row["structure_ids"])
+    for auth_list in (
+        authorships,
+        hal_authorships,
+        oa_authorships,
+        wos_authorships,
+        scanr_authorships,
+    ):
+        for a in auth_list:
+            if a.structure_ids:
+                all_struct_ids.update(a.structure_ids)
 
-    structures: dict[str, Any] = {}
+    structures: dict[str, StructureInfo] = {}
     if all_struct_ids:
         struct_rows = conn.execute(
             text("""
@@ -237,24 +300,44 @@ def get_publication_detail(conn: Connection, pub_id: int) -> dict[str, Any] | No
             {"ids": list(all_struct_ids)},
         ).all()
         for s in struct_rows:
-            structures[str(s.id)] = {"acronym": s.acronym, "name": s.name, "type": s.type}
+            structures[str(s.id)] = StructureInfo(acronym=s.acronym, name=s.name, type=s.type)
 
-    return {
-        "publication": pub,
-        "sources": sources,
-        "authorships": authorships,
-        "hal_authorships": hal_authorships,
-        "openalex_authorships": oa_authorships,
-        "wos_authorships": wos_authorships,
-        "scanr_authorships": scanr_authorships,
-        "theses_authorships": theses_authorships,
-        "thesis_meta": thesis_meta,
-        "structures": structures,
-        "subjects": subjects,
-        "keywords": keywords,
-        "relations": relations,
-        "external_identifiers": external_identifiers,
-    }
+    return PublicationDetailResponse(
+        publication=PublicationDetailCore(
+            id=pub_row.id,
+            title=pub_row.title,
+            pub_year=pub_row.pub_year,
+            doi=pub_row.doi,
+            doi_ra=pub_row.doi_ra,
+            doc_type=pub_row.doc_type,
+            oa_status=pub_row.oa_status,
+            language=pub_row.language,
+            container_title=pub_row.container_title,
+            abstract=pub_row.abstract,
+            journal_id=pub_row.journal_id,
+            journal_title=pub_row.journal_title,
+            issn=pub_row.issn,
+            eissn=pub_row.eissn,
+            apc_amount=pub_row.apc_amount,
+            apc_currency=pub_row.apc_currency,
+            oa_model=pub_row.oa_model,
+            publisher_id=pub_row.publisher_id,
+            publisher_name=pub_row.publisher_name,
+        ),
+        sources=sources,
+        authorships=authorships,
+        hal_authorships=hal_authorships,
+        openalex_authorships=oa_authorships,
+        wos_authorships=wos_authorships,
+        scanr_authorships=scanr_authorships,
+        theses_authorships=theses_authorships,
+        thesis_meta=thesis_meta,
+        structures=structures,
+        subjects=subjects,
+        keywords=keywords,
+        relations=relations,
+        external_identifiers=external_identifiers,
+    )
 
 
 # Identifiants externes exposés en sidebar, ordre d'affichage. `hal_id` est exclu (déjà couvert par le lien source HAL) ; `related_dois` aussi (signal de dédup, pas un identifiant à afficher).
@@ -266,7 +349,9 @@ _EXTERNAL_IDENTIFIER_KEYS = (
 )
 
 
-def get_publication_external_identifiers(conn: Connection, pub_id: int) -> list[dict[str, Any]]:
+def get_publication_external_identifiers(
+    conn: Connection, pub_id: int
+) -> list[ExternalIdentifierOut]:
     """Identifiants externes (arXiv, PMID, PMCID, NNT) agrégés depuis les `external_ids` des `source_publications` de la publication, dédupliqués, dans l'ordre `_EXTERNAL_IDENTIFIER_KEYS`.
 
     Un NNT déjà porté par une source `theses` est omis : le `source_id` de cette source *est* le NNT, et son lien theses.fr couvre déjà l'identifiant (même raison que l'exclusion de `hal_id`, couvert par le lien source HAL)."""
@@ -278,7 +363,7 @@ def get_publication_external_identifiers(conn: Connection, pub_id: int) -> list[
         {"pid": pub_id},
     ).all()
     nnt_covered_by_theses = {source_id for source, source_id, _ in rows if source == "theses"}
-    out: list[dict[str, Any]] = []
+    out: list[ExternalIdentifierOut] = []
     for id_type, key in _EXTERNAL_IDENTIFIER_KEYS:
         seen: set[str] = set()
         for _source, _source_id, external_ids in rows:
@@ -288,11 +373,11 @@ def get_publication_external_identifiers(conn: Connection, pub_id: int) -> list[
             if id_type == "nnt" and value in nnt_covered_by_theses:
                 continue
             seen.add(value)
-            out.append({"type": id_type, "value": value})
+            out.append(ExternalIdentifierOut(type=id_type, value=value))
     return out
 
 
-def get_publication_subjects(conn: Connection, pub_id: int) -> list[dict[str, Any]]:
+def get_publication_subjects(conn: Connection, pub_id: int) -> list[SubjectOut]:
     """Sujets (concepts) attachés à une publication, dédupliqués par `subject_id`.
 
     Les sources qui ont annoté chaque sujet sont agrégées dans `sources`. Triés par label, insensible à la casse.
@@ -309,4 +394,6 @@ def get_publication_subjects(conn: Connection, pub_id: int) -> list[dict[str, An
         """),
         {"pid": pub_id},
     ).all()
-    return [dict(r._mapping) for r in rows]
+    return [
+        SubjectOut(id=r.id, label=r.label, language=r.language, sources=r.sources) for r in rows
+    ]

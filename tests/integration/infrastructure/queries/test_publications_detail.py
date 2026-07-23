@@ -74,11 +74,11 @@ class TestGetPublicationDetail:
 
         detail = get_publication_detail(sa_sync_conn, pub)
         assert detail is not None
-        assert detail["publication"]["id"] == pub
-        assert detail["publication"]["doi"] == "10.1/abc"
-        assert any(s["source"] == "hal" for s in detail["sources"])
-        assert len(detail["authorships"]) == 1
-        assert detail["authorships"][0]["source_hal"] is True
+        assert detail.publication.id == pub
+        assert detail.publication.doi == "10.1/abc"
+        assert any(s.source == "hal" for s in detail.sources)
+        assert len(detail.authorships) == 1
+        assert detail.authorships[0].source_hal is True
 
     def test_sources_flagged_secondary_only_for_convergence(self, sa_sync_conn):
         # `is_secondary` marque les formes convergées (pièce, version, variante), pas les
@@ -103,7 +103,7 @@ class TestGetPublicationDetail:
             )
         detail = get_publication_detail(sa_sync_conn, pub)
         assert detail is not None
-        secondary_by_id = {s["source_id"]: s["is_secondary"] for s in detail["sources"]}
+        secondary_by_id = {s.source_id: s.is_secondary for s in detail.sources}
         assert secondary_by_id == {
             "dc-parent": False,
             "oa-piece": True,
@@ -126,14 +126,16 @@ class TestGetPublicationDetail:
         )
 
         detail = get_publication_detail(sa_sync_conn, pub)
-        assert detail["thesis_meta"] is not None
-        assert detail["thesis_meta"]["discipline"] == "Informatique"
-        assert detail["thesis_meta"]["date_soutenance"] == "2023-05-10"
+        assert detail is not None
+        assert detail.thesis_meta is not None
+        assert detail.thesis_meta.discipline == "Informatique"
+        assert detail.thesis_meta.date_soutenance == "2023-05-10"
 
     def test_thesis_meta_none_for_article(self, sa_sync_conn):
         pub = _create_pub(sa_sync_conn, doc_type="article")
         detail = get_publication_detail(sa_sync_conn, pub)
-        assert detail["thesis_meta"] is None
+        assert detail is not None
+        assert detail.thesis_meta is None
 
     def test_doi_ra_resolved_from_doi_prefixes(self, sa_sync_conn):
         """doi_ra = la RA du préfixe DOI (via doi_prefixes) — discrimine les DOI
@@ -144,13 +146,13 @@ class TestGetPublicationDetail:
         pub = _create_pub(sa_sync_conn, doi="10.5281/zenodo.99")
         detail = get_publication_detail(sa_sync_conn, pub)
         assert detail is not None
-        assert detail["publication"]["doi_ra"] == "DataCite"
+        assert detail.publication.doi_ra == "DataCite"
 
     def test_doi_ra_none_when_prefix_unknown(self, sa_sync_conn):
         pub = _create_pub(sa_sync_conn, doi="10.9999/unresolved")
         detail = get_publication_detail(sa_sync_conn, pub)
         assert detail is not None
-        assert detail["publication"]["doi_ra"] is None
+        assert detail.publication.doi_ra is None
 
     def test_multiple_source_publications_same_source(self, sa_sync_conn):
         """Plusieurs `source_publications` d'une même source pour une publi
@@ -197,11 +199,12 @@ class TestGetPublicationDetail:
         )
 
         detail = get_publication_detail(sa_sync_conn, pub)
+        assert detail is not None
         # Header : les 2 source_publications sont remontées, plus récente en 1er.
-        oa_sources = [s for s in detail["sources"] if s["source"] == "openalex"]
-        assert [s["source_id"] for s in oa_sources] == ["W2-NEW", "W1-OLD"]
+        oa_sources = [s for s in detail.sources if s.source == "openalex"]
+        assert [s.source_id for s in oa_sources] == ["W2-NEW", "W1-OLD"]
         # Comparaison sources : seul l'auteur de la plus récente est exposé.
-        assert [a["full_name"] for a in detail["openalex_authorships"]] == ["Bob"]
+        assert [a.full_name for a in detail.openalex_authorships] == ["Bob"]
 
     def test_aggregates_structures(self, sa_sync_conn):
         lab_row = sa_sync_conn.execute(
@@ -224,9 +227,10 @@ class TestGetPublicationDetail:
         add_authorship_structure(sa_sync_conn, aid, lab_id)
 
         detail = get_publication_detail(sa_sync_conn, pub)
-        assert str(lab_id) in detail["structures"]
-        assert detail["structures"][str(lab_id)]["acronym"] is None
-        assert detail["structures"][str(lab_id)]["name"] == "Labo X"
+        assert detail is not None
+        assert str(lab_id) in detail.structures
+        assert detail.structures[str(lab_id)].acronym is None
+        assert detail.structures[str(lab_id)].name == "Labo X"
 
 
 def _create_sd_with_external_ids(conn, pub_id, source, source_id, external_ids):
@@ -250,9 +254,9 @@ class TestGetPublicationExternalIdentifiers:
 
         ids = get_publication_external_identifiers(sa_sync_conn, pub)
         # Ordre = `_EXTERNAL_IDENTIFIER_KEYS` (arxiv avant pmid), une seule entrée par valeur.
-        assert ids == [
-            {"type": "arxiv", "value": "2401.001"},
-            {"type": "pmid", "value": "123"},
+        assert [(i.type, i.value) for i in ids] == [
+            ("arxiv", "2401.001"),
+            ("pmid", "123"),
         ]
 
     def test_nnt_omitted_when_covered_by_theses_source(self, sa_sync_conn):
@@ -273,7 +277,7 @@ class TestGetPublicationExternalIdentifiers:
         _create_sd_with_external_ids(sa_sync_conn, pub, "hal", "tel-1", {"nnt": "2017CLFAC011"})
 
         ids = get_publication_external_identifiers(sa_sync_conn, pub)
-        assert ids == [{"type": "nnt", "value": "2017CLFAC011"}]
+        assert [(i.type, i.value) for i in ids] == [("nnt", "2017CLFAC011")]
 
 
 class TestGetPublicationSubjects:
@@ -299,8 +303,8 @@ class TestGetPublicationSubjects:
 
         subjects = get_publication_subjects(sa_sync_conn, pub)
         assert len(subjects) == 1
-        assert subjects[0]["label"] == "AI"
-        assert subjects[0]["sources"] == ["hal", "openalex"]
+        assert subjects[0].label == "AI"
+        assert subjects[0].sources == ["hal", "openalex"]
 
     def test_included_in_publication_detail(self, sa_sync_conn):
         pub = _create_pub(sa_sync_conn)
@@ -317,9 +321,9 @@ class TestGetPublicationSubjects:
         )
 
         detail = get_publication_detail(sa_sync_conn, pub)
-        assert "subjects" in detail
-        assert len(detail["subjects"]) == 1
-        assert detail["subjects"][0]["label"] == "genomics"
-        assert detail["subjects"][0]["sources"] == ["wos"]
+        assert detail is not None
+        assert len(detail.subjects) == 1
+        assert detail.subjects[0].label == "genomics"
+        assert detail.subjects[0].sources == ["wos"]
         # Mots-clés libres retournés à part (hors référentiel `subjects`).
-        assert detail["keywords"] == []
+        assert detail.keywords == []
