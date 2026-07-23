@@ -237,6 +237,26 @@ class PgJournalQueries(JournalQueries):
             doaj_imported_at=row.doaj_imported_at,
         )
 
+    def _journal_pub_distribution(
+        self, journal_id: int, column: str
+    ) -> list[tuple[str | None, int]]:
+        """Répartition des publications du périmètre de la revue par une colonne.
+
+        `column` est un identifiant figé (`doc_type` ou `oa_status`), interpolé dans le SQL.
+        """
+        rows = self._conn.execute(
+            text(f"""
+                SELECT p.{column} AS value, COUNT(*) AS n
+                FROM publications p
+                WHERE p.journal_id = :id
+                  AND {publication_in_perimeter("p")}
+                GROUP BY p.{column}
+                ORDER BY n DESC, p.{column} NULLS LAST
+            """),
+            {"id": journal_id},
+        ).all()
+        return [(r.value, r.n) for r in rows]
+
     def get_journal_dashboard(self, journal_id: int) -> JournalDashboardResponse | None:
         # Récupère aussi journal_type + oa_model pour calculer les `expected`.
         journal_row = self._conn.execute(
@@ -248,29 +268,9 @@ class PgJournalQueries(JournalQueries):
         j_type = journal_row.journal_type
         oa_model = journal_row.oa_model
 
-        doc_type_rows = self._conn.execute(
-            text(f"""
-                SELECT p.doc_type AS doc_type, COUNT(*) AS n
-                FROM publications p
-                WHERE p.journal_id = :id
-                  AND {publication_in_perimeter("p")}
-                GROUP BY p.doc_type
-                ORDER BY n DESC, p.doc_type NULLS LAST
-            """),
-            {"id": journal_id},
-        ).all()
-        oa_rows = self._conn.execute(
-            text(f"""
-                SELECT p.oa_status AS oa_status, COUNT(*) AS n
-                FROM publications p
-                WHERE p.journal_id = :id
-                  AND {publication_in_perimeter("p")}
-                GROUP BY p.oa_status
-                ORDER BY n DESC, p.oa_status NULLS LAST
-            """),
-            {"id": journal_id},
-        ).all()
-        total = sum(r.n for r in doc_type_rows)
+        doc_type_rows = self._journal_pub_distribution(journal_id, "doc_type")
+        oa_rows = self._journal_pub_distribution(journal_id, "oa_status")
+        total = sum(count for _, count in doc_type_rows)
 
         expected_doc_types = sorted(EXPECTED_DOC_TYPES_BY_JOURNAL_TYPE.get(j_type, frozenset()))
         expected_oa_statuses = sorted(EXPECTED_OA_STATUSES_BY_OA_MODEL.get(oa_model, frozenset()))
@@ -278,20 +278,14 @@ class PgJournalQueries(JournalQueries):
         return JournalDashboardResponse(
             total_publications=total,
             doc_types=[
-                DocTypeCount(
-                    doc_type=r.doc_type,
-                    count=r.n,
-                    expected=is_doc_type_expected(j_type, r.doc_type),
-                )
-                for r in doc_type_rows
+                DocTypeCount(doc_type=dt, count=count, expected=is_doc_type_expected(j_type, dt))
+                for dt, count in doc_type_rows
             ],
             oa_statuses=[
                 OaStatusCount(
-                    oa_status=r.oa_status,
-                    count=r.n,
-                    expected=is_oa_status_expected(oa_model, r.oa_status),
+                    oa_status=oa, count=count, expected=is_oa_status_expected(oa_model, oa)
                 )
-                for r in oa_rows
+                for oa, count in oa_rows
             ],
             expected_doc_types=expected_doc_types,
             expected_oa_statuses=expected_oa_statuses,
