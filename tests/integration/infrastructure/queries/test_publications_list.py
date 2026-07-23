@@ -160,7 +160,7 @@ class TestSearch:
             builder = _PublicationFacetsBuilder(
                 sa_sync_conn, PublicationFilters(search=search, lab_ids=[lab]), []
             )
-            return sum(r["count"] for r in builder._facet_years())
+            return sum(r.count for r in builder._facet_years())
 
         assert years_total("") == 2
         assert years_total("quantum") == 1
