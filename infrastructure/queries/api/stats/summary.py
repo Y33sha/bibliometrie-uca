@@ -5,7 +5,8 @@ from typing import Any
 
 from sqlalchemy import Connection, Row, text
 
-from application.ports.api.stats_queries import StatsFilters
+from application.ports.api._common import FacetOption
+from application.ports.api.stats_queries import StatsFacetsResponse, StatsFilters
 from infrastructure.queries.api.filters import WhereClause, assemble_where
 from infrastructure.queries.api.stats._shared import STATS_BASE, stats_filter_clauses
 
@@ -26,7 +27,7 @@ def _facets_sqls(
 
     year_where, year_binds = assemble_where(_clauses("year"))
     year_sql = f"""
-        SELECT p.pub_year, COUNT(DISTINCT p.id) AS count
+        SELECT p.pub_year, COUNT(DISTINCT p.id) AS n
         FROM publications p
         LEFT JOIN journals j ON j.id = p.journal_id
         WHERE {STATS_BASE} AND {year_where}
@@ -38,7 +39,7 @@ def _facets_sqls(
     lab_where, lab_binds = assemble_where(_clauses("lab"))
     lab_sql = f"""
         SELECT s.id, COALESCE(s.acronym, s.name) AS label,
-               COUNT(DISTINCT a.publication_id) AS count
+               COUNT(DISTINCT a.publication_id) AS n
         FROM authorships a
         JOIN publications p ON p.id = a.publication_id
         LEFT JOIN journals j ON j.id = p.journal_id
@@ -47,18 +48,18 @@ def _facets_sqls(
         WHERE {STATS_BASE} AND {lab_where}
           AND s.structure_type = 'labo'
         GROUP BY s.id, s.acronym, s.name
-        ORDER BY count DESC
+        ORDER BY n DESC
     """
 
     oa_where, oa_binds = assemble_where(_clauses("oa"))
     oa_sql = f"""
-        SELECT p.oa_status::text AS value, COUNT(DISTINCT p.id) AS count
+        SELECT p.oa_status::text AS value, COUNT(DISTINCT p.id) AS n
         FROM publications p
         LEFT JOIN journals j ON j.id = p.journal_id
         WHERE {STATS_BASE} AND {oa_where}
           AND p.oa_status IS NOT NULL
         GROUP BY p.oa_status
-        ORDER BY count DESC
+        ORDER BY n DESC
     """
 
     apc_where, apc_binds = assemble_where(_clauses("apc"))
@@ -86,12 +87,12 @@ def _facets_sqls(
 
     dt_where, dt_binds = assemble_where(_clauses("doc_type"))
     doc_type_sql = f"""
-        SELECT p.doc_type::text AS value, COUNT(DISTINCT p.id) AS count
+        SELECT p.doc_type::text AS value, COUNT(DISTINCT p.id) AS n
         FROM publications p
         LEFT JOIN journals j ON j.id = p.journal_id
         WHERE {STATS_BASE} AND {dt_where}
         GROUP BY p.doc_type
-        ORDER BY count DESC
+        ORDER BY n DESC
     """
 
     return {
@@ -108,7 +109,7 @@ def stats_facets(
     *,
     perimeter_structure_ids: list[int],
     filters: StatsFilters,
-) -> dict[str, list[dict[str, Any]]]:
+) -> StatsFacetsResponse:
     """Décomptes de chaque facette, sa propre dimension écartée de la clause WHERE."""
     conn.execute(text("SET LOCAL jit = off"))
     sqls = _facets_sqls(
@@ -131,15 +132,15 @@ def _build_facets_result(
     oa_rows: Sequence[Row[Any]],
     apc_row: Row[Any],
     doc_type_rows: Sequence[Row[Any]],
-) -> dict[str, list[dict[str, Any]]]:
-    return {
-        "years": [{"value": str(r.pub_year), "count": r.count} for r in year_rows],
-        "labs": [{"value": str(r.id), "label": r.label, "count": r.count} for r in lab_rows],
-        "oa_statuses": [{"value": r.value, "count": r.count} for r in oa_rows],
-        "doc_types": [{"value": r.value, "count": r.count} for r in doc_type_rows],
-        "apc": [
-            {"value": "uca", "label": "APC UCA", "count": apc_row.apc_uca},
-            {"value": "non_uca", "label": "APC hors UCA", "count": apc_row.apc_non_uca},
-            {"value": "none", "label": "Sans APC", "count": apc_row.apc_none},
+) -> StatsFacetsResponse:
+    return StatsFacetsResponse(
+        years=[FacetOption(value=str(r.pub_year), count=r.n) for r in year_rows],
+        labs=[FacetOption(value=str(r.id), label=r.label, count=r.n) for r in lab_rows],
+        oa_statuses=[FacetOption(value=r.value, count=r.n) for r in oa_rows],
+        doc_types=[FacetOption(value=r.value, count=r.n) for r in doc_type_rows],
+        apc=[
+            FacetOption(value="uca", label="APC UCA", count=apc_row.apc_uca),
+            FacetOption(value="non_uca", label="APC hors UCA", count=apc_row.apc_non_uca),
+            FacetOption(value="none", label="Sans APC", count=apc_row.apc_none),
         ],
-    }
+    )

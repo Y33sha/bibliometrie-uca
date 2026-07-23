@@ -5,11 +5,13 @@ Compte, pour chaque pays étranger, le nombre de publications du périmètre qui
 Réutilise le périmètre de base et les filtres communs des agrégats stats (cf. `_shared`).
 """
 
-from typing import Any
-
 from sqlalchemy import Connection, text
 
-from application.ports.api.stats_queries import StatsFilters
+from application.ports.api.stats_queries import (
+    CollaborationsResponse,
+    CountryCollaboration,
+    StatsFilters,
+)
 from infrastructure.queries.api.filters import assemble_where
 from infrastructure.queries.api.stats._shared import STATS_BASE, stats_filter_clauses
 
@@ -22,7 +24,7 @@ def run_collaborations(
     *,
     perimeter_structure_ids: list[int],
     filters: StatsFilters,
-) -> dict[str, Any]:
+) -> CollaborationsResponse:
     """Collaborations internationales sous les filtres. Retourne les lignes `{code, value}` (un pays étranger, nombre de publications co-affiliées) triées par décompte décroissant, ainsi que le nombre de publications en collaboration internationale (au moins un pays étranger) et le total du corpus filtré — de quoi exprimer une part."""
     where, binds = assemble_where(
         stats_filter_clauses(
@@ -54,8 +56,8 @@ def run_collaborations(
     )
     agg = conn.execute(text(totals), binds).one()
 
-    return {
-        "rows": [dict(r._mapping) for r in rows],
-        "international_count": agg.international or 0,
-        "total_count": agg.total or 0,
-    }
+    return CollaborationsResponse(
+        rows=[CountryCollaboration(code=r.code, value=r.value) for r in rows],
+        international_count=agg.international or 0,
+        total_count=agg.total or 0,
+    )

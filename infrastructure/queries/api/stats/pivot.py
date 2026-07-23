@@ -5,11 +5,9 @@ Liaison SQL du registre `domain.stats` + constructeur de requête sur **liste bl
 Le grain est tenu par les mesures : toutes comptent les publications de façon distincte (`COUNT(DISTINCT p.id)`), si bien qu'une dimension qui démultiplie (`lab`) ne les surcompte pas.
 """
 
-from typing import Any
-
 from sqlalchemy import Connection, text
 
-from application.ports.api.stats_queries import StatsFilters
+from application.ports.api.stats_queries import PivotResponse, StatsFilters
 from domain.publications.doc_types import DOC_TYPE_FAMILIES
 from domain.stats import DIMENSIONS, MEASURES, Dimension, validate_pivot
 from infrastructure.queries.api.filters import OA_OPEN_SQL, assemble_where
@@ -80,7 +78,7 @@ def run_pivot(
     groups: list[str],
     perimeter_structure_ids: list[int],
     filters: StatsFilters,
-) -> dict[str, Any]:
+) -> PivotResponse:
     """Exécute une agrégation : `mesure` ventilée selon `groups`, sous les filtres. Les clés sont validées contre le registre (`validate_pivot`) avant toute composition SQL."""
     m, dims = validate_pivot(measure, groups)
     where, binds = assemble_where(
@@ -104,8 +102,8 @@ def run_pivot(
 
     conn.execute(text("SET LOCAL jit = off"))
     rows = conn.execute(text(sql), binds).all()
-    return {
-        "measure": m.key,
-        "groups": [d.key for d in dims],
-        "rows": [dict(r._mapping) for r in rows],
-    }
+    return PivotResponse(
+        measure=m.key,
+        groups=[d.key for d in dims],
+        rows=[dict(r._mapping) for r in rows],
+    )
