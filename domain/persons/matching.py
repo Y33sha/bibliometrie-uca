@@ -2,6 +2,7 @@
 
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
+from enum import StrEnum
 from typing import Literal, NamedTuple
 
 from domain.persons.name_matching import (
@@ -42,20 +43,21 @@ ORCID_MATCH_SOURCES = frozenset({"crossref", "openalex", "hal"})
 
 `wos` et `scanr` sont exclus : leur ORCID est dérivé (matching algorithmique interne pour WoS, couche de dénormalisation pour ScanR), pas déposé par l'auteur. Il reste enregistré sur `person_identifiers` mais n'est pas utilisé comme signal de matching."""
 
-# Canal de résolution par lequel la cascade a posé le `person_id` d'une signature,
-# indexé par le `reason` de `decide_person_match`. Enregistré dans
-# `source_authorships.resolution_mode`, il porte les réinitialisations ordre-indépendantes
-# de la phase : re-null ciblé des `identifier` transférés, re-orphelinage des `name` à forme
-# devenue ambiguë, recompute en bloc des `cross_source`. La création par nom vaut `name`
-# (elle ancre une personne sur sa forme).
-ResolutionMode = Literal["identifier", "name", "cross_source"]
+
+class ResolutionMode(StrEnum):
+    """Canal de résolution par lequel la cascade a posé le `person_id` d'une signature, indexé par le `reason` de `decide_person_match`. Enregistré dans `source_authorships.resolution_mode`, il porte les réinitialisations ordre-indépendantes de la phase : re-null ciblé des `identifier` transférés, re-orphelinage des `name` à forme devenue ambiguë, recompute en bloc des `cross_source`. La création par nom vaut `name` (elle ancre une personne sur sa forme). Mappe l'enum PostgreSQL `resolution_mode`."""
+
+    IDENTIFIER = "identifier"
+    NAME = "name"
+    CROSS_SOURCE = "cross_source"
+
 
 RESOLUTION_MODE_BY_REASON: dict[str, ResolutionMode] = {
-    "orcid": "identifier",
-    "hal_person_id": "identifier",
-    "idref": "identifier",
-    "cross_source": "cross_source",
-    "single_name": "name",
+    "orcid": ResolutionMode.IDENTIFIER,
+    "hal_person_id": ResolutionMode.IDENTIFIER,
+    "idref": ResolutionMode.IDENTIFIER,
+    "cross_source": ResolutionMode.CROSS_SOURCE,
+    "single_name": ResolutionMode.NAME,
 }
 
 
