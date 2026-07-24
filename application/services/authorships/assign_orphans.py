@@ -99,7 +99,7 @@ def assign_orphan_authorship(
             force=force,
         )
 
-    row = authorship_repo.assign_orphan_sa(person_id, source_authorship_id)
+    row = authorship_repo.assign_orphan_source_authorship(person_id, source_authorship_id)
     if row is None:
         # L'UPDATE ne pose `person_id` que sur une signature orpheline : son échec signale une
         # signature absente ou déjà rattachée. Un `owner` nul tranche pour l'absence — sur une

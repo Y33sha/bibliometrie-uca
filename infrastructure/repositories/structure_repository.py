@@ -107,19 +107,18 @@ def _normalize_api_ids(raw: dict[str, Any] | None) -> dict[str, Any] | None:
         raise ValidationError(f"api_ids invalide : {e}") from e
 
 
-def _structure_returning_columns() -> list:
-    """Colonnes RETURNING pour les opérations create/update sur structures."""
-    return [
-        structures.c.id,
-        structures.c.code,
-        structures.c.name,
-        structures.c.acronym,
-        sql_cast(structures.c.structure_type, Text).label("type"),
-        structures.c.ror_id,
-        structures.c.rnsr_id,
-        structures.c.hal_collection,
-        structures.c.api_ids,
-    ]
+# Colonnes RETURNING pour les opérations create / update sur `structures`.
+_STRUCTURE_RETURNING_COLUMNS = (
+    structures.c.id,
+    structures.c.code,
+    structures.c.name,
+    structures.c.acronym,
+    sql_cast(structures.c.structure_type, Text).label("type"),
+    structures.c.ror_id,
+    structures.c.rnsr_id,
+    structures.c.hal_collection,
+    structures.c.api_ids,
+)
 
 
 class PgStructureRepository(StructureRepository):
@@ -184,7 +183,7 @@ class PgStructureRepository(StructureRepository):
                 hal_collection=hal_collection,
                 api_ids=_normalize_api_ids(api_ids),
             )
-            .returning(*_structure_returning_columns())
+            .returning(*_STRUCTURE_RETURNING_COLUMNS)
         )
         result = self._conn.execute(stmt)
         return cast(StructureRow, dict(result.one()._mapping))
@@ -198,7 +197,7 @@ class PgStructureRepository(StructureRepository):
             update(structures)
             .where(structures.c.id == structure_id)
             .values(**fields)
-            .returning(*_structure_returning_columns())
+            .returning(*_STRUCTURE_RETURNING_COLUMNS)
         )
         result = self._conn.execute(stmt)
         row = result.one_or_none()
