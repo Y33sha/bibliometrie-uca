@@ -12,10 +12,6 @@ from infrastructure.repositories.person_repository import _name_forms
 
 
 def find_by_id(conn: Connection, person_id: int) -> Person | None:
-    """Charge l'aggregate `Person` complet (avec `identifiers` et `name_forms`) ou `None` si la personne n'existe pas.
-
-    Les `identifiers` (`PersonIdentifier`) et `name_forms` (`PersonNameForm`) sont hydratés en projection lecture : ils accompagnent l'aggregate mais leurs mutations passent par leurs propres méthodes / repos respectifs (cf. docstring de `domain/persons/person.py`).
-    """
     row = conn.execute(
         text("""
             SELECT id, last_name, first_name,
@@ -86,7 +82,6 @@ def create(conn: Connection, last_name: str, first_name: str = "") -> int:
 
 
 def update_name(conn: Connection, person_id: int, last_name: str, first_name: str) -> None:
-    """L'`UPDATE` rapporte les lignes appariées : zéro dit l'absence, sans lecture préalable."""
     result = conn.execute(
         text(
             "UPDATE persons SET last_name = :ln, first_name = :fn, "
@@ -143,9 +138,7 @@ def has_distinct_rh(conn: Connection, id_a: int, id_b: int) -> bool:
 
 
 def merge_into(conn: Connection, target_id: int, source_id: int) -> None:
-    """Fusionne `source_id` dans `target_id`.
-
-    Séquence complète en une transaction :
+    """Séquence, dans la transaction du caller :
     1. Transfert source_authorships
     2. Dédoublonnage + transfert authorships vérité (+ rejected_authorships)
     3. Dédoublonnage + transfert identifiants
@@ -153,8 +146,6 @@ def merge_into(conn: Connection, target_id: int, source_id: int) -> None:
     5. person_name_forms : bascule source_id → target_id
     6. Recalcul des formes source 'persons' pour la cible
     7. Suppression de la personne source
-
-    L'invariant — au plus une fiche RH sur les deux personnes — est vérifié en amont par le service via `has_distinct_rh`.
     """
     conn.execute(
         text("UPDATE source_authorships SET person_id = :t WHERE person_id = :s"),
@@ -238,7 +229,6 @@ def merge_into(conn: Connection, target_id: int, source_id: int) -> None:
 
 
 def mark_distinct(conn: Connection, person_id_a: int, person_id_b: int) -> tuple[int, int] | None:
-    """Marque deux personnes comme distinctes (idempotent). Retourne (a, b) triés si la paire vient d'être insérée, None si elle existait déjà."""
     row = conn.execute(
         text("""
             INSERT INTO distinct_persons (person_id_a, person_id_b)

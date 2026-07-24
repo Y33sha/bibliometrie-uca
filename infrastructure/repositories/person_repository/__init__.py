@@ -29,7 +29,7 @@ if TYPE_CHECKING:
 
 
 class PgPersonRepository(PersonRepository):
-    """Accès PostgreSQL à l'agrégat Person via une `Connection` SA."""
+    """Accès PostgreSQL à l'agrégat Person via une `Connection` SQLAlchemy."""
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn

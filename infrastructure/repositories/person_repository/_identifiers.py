@@ -14,7 +14,6 @@ from domain.persons.person_identifier import PersonIdentifier
 
 
 def find_identifier(conn: Connection, id_type: str, id_value: str) -> PersonIdentifier | None:
-    """Charge le `PersonIdentifier` pour une paire `(id_type, id_value)` (contrainte d'unicité globale de la table). Retourne None si absent."""
     row = conn.execute(
         text("""
             SELECT id, person_id, id_type, id_value, source, CAST(status AS text) AS status
@@ -37,7 +36,6 @@ def find_identifier(conn: Connection, id_type: str, id_value: str) -> PersonIden
 
 
 def insert_identifier(conn: Connection, ident: PersonIdentifier) -> int:
-    """Insère le `PersonIdentifier` et retourne son id, posé aussi sur `ident.id`. Lève si une ligne existe déjà pour `(id_type, id_value)` — l'unicité est vérifiée en amont via `find_identifier`."""
     row = conn.execute(
         text("""
             INSERT INTO person_identifiers (person_id, id_type, id_value, source, status)
@@ -58,7 +56,6 @@ def insert_identifier(conn: Connection, ident: PersonIdentifier) -> int:
 
 
 def update_identifier(conn: Connection, ident: PersonIdentifier) -> None:
-    """Persiste les mutations sur un `PersonIdentifier` existant (`person_id`, `status`, `source`). `id_type` et `id_value` sont immuables (identité naturelle, jamais modifiée après création)."""
     if ident.id is None:
         raise ValueError("update_identifier : ident.id doit être posé (utiliser insert_identifier)")
     conn.execute(
@@ -91,7 +88,6 @@ def remove_identifier(conn: Connection, person_id: int, id_type: str, id_value: 
 
 
 def update_identifier_status(conn: Connection, ident_id: int, status: str) -> IdentifierStatusRow:
-    """Change le statut d'un identifiant. Retourne {id, status, person_id}."""
     row = conn.execute(
         text(
             "UPDATE person_identifiers SET status = CAST(:st AS identifier_status) "
@@ -105,18 +101,11 @@ def update_identifier_status(conn: Connection, ident_id: int, status: str) -> Id
 
 
 def begin_authenticated_orcid_import(conn: Connection) -> None:
-    """Ouvre, pour la transaction courante, le droit d'écrire le statut `authenticated`.
-
-    Pose le paramètre de session lu par le trigger `protect_authenticated_identifier`. À réserver à l'import des ORCID authentifiés — l'unique contexte autorisé à poser ce statut. `SET LOCAL` : l'effet est borné à la transaction et disparaît au commit/rollback.
-    """
+    """Pose le paramètre de session lu par le trigger `protect_authenticated_identifier`. `SET LOCAL` : l'effet est borné à la transaction et disparaît au commit/rollback."""
     conn.execute(text("SET LOCAL app.orcid_authenticated_import = 'on'"))
 
 
 def authenticate_orcid(conn: Connection, person_id: int, orcid: str) -> AuthenticateOrcidOutcome:
-    """Pose le statut `authenticated` sur l'ORCID `orcid`, rattaché à `person_id`, et retourne l'issue.
-
-    Requiert `begin_authenticated_orcid_import` dans la même transaction, sinon le trigger rejette l'écriture. Idempotent. `orcid` est supposé déjà normalisé. Un ORCID porté par une autre personne est déplacé, l'authentification faisant autorité sur l'identité.
-    """
     existing = conn.execute(
         text(
             "SELECT id, person_id, CAST(status AS text) AS status "
@@ -152,7 +141,6 @@ def authenticate_orcid(conn: Connection, person_id: int, orcid: str) -> Authenti
 
 
 def reassign_identifier(conn: Connection, ident_id: int, target_person_id: int) -> None:
-    """Réattribue un identifiant à une autre personne (statut → pending)."""
     result = conn.execute(
         text(
             "UPDATE person_identifiers "
