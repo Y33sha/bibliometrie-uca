@@ -36,7 +36,7 @@ class TestPivotEngine:
         _pub(sa_sync_conn, oa_status="gold", sources="{openalex}", year=2023)
 
         res = _piv(sa_sync_conn, "pub_count", ["oa_access"])
-        by_access = {r["oa_access"]: r["value"] for r in res["rows"]}
+        by_access = {r["oa_access"]: r["value"] for r in res.rows}
         assert by_access == {"ouvert": 2, "ferme": 1}
 
     def test_doc_type_grouped_expands_publications(self, sa_sync_conn):
@@ -47,7 +47,7 @@ class TestPivotEngine:
         _pub(sa_sync_conn, oa_status="closed", sources="{hal}", doc_type="thesis")  # → theses
 
         res = _piv(sa_sync_conn, "pub_count", ["doc_type_grouped"], doc_types=())
-        by_type = {r["doc_type_grouped"]: r["value"] for r in res["rows"]}
+        by_type = {r["doc_type_grouped"]: r["value"] for r in res.rows}
         assert by_type == {"article": 1, "book": 1, "theses": 1}
 
     def test_group_by_lab_executes(self, sa_sync_conn):
@@ -56,8 +56,8 @@ class TestPivotEngine:
         # dépendre des matviews de rattachement peuplées.
         _pub(sa_sync_conn, oa_status="gold", sources="{hal}")
         res = _piv(sa_sync_conn, "pub_count", ["lab"])
-        assert "rows" in res
-        assert res["groups"] == ["lab"]
+        assert isinstance(res.rows, list)
+        assert res.groups == ["lab"]
 
     def test_group_by_publisher_and_journal_execute(self, sa_sync_conn):
         # Éditeur et revue composent des requêtes valides (jointures internes). Smoke test : la
@@ -65,14 +65,14 @@ class TestPivotEngine:
         _pub(sa_sync_conn, oa_status="gold", sources="{hal}")
         for dim in ("publisher", "journal"):
             res = _piv(sa_sync_conn, "pub_count", [dim])
-            assert res["groups"] == [dim]
+            assert res.groups == [dim]
 
     def test_zero_groups_returns_single_total(self, sa_sync_conn):
         _pub(sa_sync_conn, oa_status="gold", sources="{hal}")
         _pub(sa_sync_conn, oa_status="closed", sources="{hal}")
 
         res = _piv(sa_sync_conn, "pub_count", [])
-        assert res["rows"] == [{"value": 2}]
+        assert res.rows == [{"value": 2}]
 
     def test_doc_type_is_a_filter_not_hardcoded(self, sa_sync_conn):
         # Un type hors article/review est exclu par le filtre, pas par le périmètre du moteur.
@@ -80,6 +80,6 @@ class TestPivotEngine:
         _pub(sa_sync_conn, oa_status="gold", sources="{hal}", doc_type="book")
 
         restricted = _piv(sa_sync_conn, "pub_count", [], doc_types=("article", "review"))
-        assert restricted["rows"] == [{"value": 1}]
+        assert restricted.rows == [{"value": 1}]
         unrestricted = _piv(sa_sync_conn, "pub_count", [], doc_types=())
-        assert unrestricted["rows"] == [{"value": 2}]
+        assert unrestricted.rows == [{"value": 2}]
