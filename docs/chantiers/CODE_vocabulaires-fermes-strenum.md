@@ -41,7 +41,7 @@ Coûts concrets :
 
 - [ ] `source` (chaînes + `ALL_SOURCES` + `SOURCE_PRIORITY`) → StrEnum ; collections dérivées.
 - [ ] `oa_status` (chaînes + `OA_RANK` + `OA_STATUSES` + `_KNOWN_OA_STATUSES`) → StrEnum ; fusionner les deux listes.
-- [ ] `journal_type` et `oa_model` Literal → StrEnum.
+- [x] `journal_type` et `oa_model` Literal → StrEnum ; collections et labels FR dérivés des membres. Consommateurs Python alignés (normalize, enrich OpenAlex, règles de correction, hydratation `Journal`) ; mypy vert. La phase d'exploitation SQL reste à part.
 
 ### Exploitation en SQL
 

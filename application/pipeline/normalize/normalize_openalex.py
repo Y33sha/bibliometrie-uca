@@ -163,9 +163,9 @@ def upsert_journal(
     source_type = source.get("type")
     oa_model: OaModel | None = None
     if source_type == "journal":
-        oa_model = "full_oa" if source.get("is_oa", False) else "subscription"
+        oa_model = OaModel.FULL_OA if source.get("is_oa", False) else OaModel.SUBSCRIPTION
     elif source_type == "repository":
-        oa_model = "repository"
+        oa_model = OaModel.REPOSITORY
 
     return find_or_create_journal(
         title,

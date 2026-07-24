@@ -7,42 +7,53 @@ Identité = `id` (clé surrogate). Identifiant naturel : `title`, via la normali
 
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Literal, get_args
+from enum import StrEnum
 
-JournalType = Literal[
-    "journal",
-    "proceedings",
-    "repository",
-    "book_series",
-    "ebook_platform",
-    "preprint_server",
-    "media",
-    "unknown",
-]
-JOURNAL_TYPES: tuple[JournalType, ...] = get_args(JournalType)
-JOURNAL_TYPES_SET: frozenset[str] = frozenset(JOURNAL_TYPES)
+
+class JournalType(StrEnum):
+    """Type de support de publication — les membres portent les libellés de l'enum PostgreSQL `journal_type`."""
+
+    JOURNAL = "journal"
+    PROCEEDINGS = "proceedings"
+    REPOSITORY = "repository"
+    BOOK_SERIES = "book_series"
+    EBOOK_PLATFORM = "ebook_platform"
+    PREPRINT_SERVER = "preprint_server"
+    MEDIA = "media"
+    UNKNOWN = "unknown"
+
+
+JOURNAL_TYPES: tuple[JournalType, ...] = tuple(JournalType)
+JOURNAL_TYPES_SET: frozenset[str] = frozenset(JournalType)
 
 # Labels FR des valeurs d'enum, source de vérité Python pour l'UI (dropdowns admin, badges publics), exposés via `/api/journals/types`.
 JOURNAL_TYPE_LABELS_FR: dict[JournalType, str] = {
-    "journal": "Revue",
-    "proceedings": "Proceedings",
-    "repository": "Archive / dépôt",
-    "book_series": "Série d'ouvrages",
-    "ebook_platform": "Plateforme eBooks",
-    "preprint_server": "Serveur de preprints",
-    "media": "Média",
-    "unknown": "Inconnu",
+    JournalType.JOURNAL: "Revue",
+    JournalType.PROCEEDINGS: "Proceedings",
+    JournalType.REPOSITORY: "Archive / dépôt",
+    JournalType.BOOK_SERIES: "Série d'ouvrages",
+    JournalType.EBOOK_PLATFORM: "Plateforme eBooks",
+    JournalType.PREPRINT_SERVER: "Serveur de preprints",
+    JournalType.MEDIA: "Média",
+    JournalType.UNKNOWN: "Inconnu",
 }
 
-# Modèles OA de `journals.oa_model` : colonne text au schéma, restreinte en pratique à ce vocabulaire par le modal admin et les écritures pipeline.
-OaModel = Literal["subscription", "full_oa", "repository"]
-OA_MODELS: tuple[OaModel, ...] = get_args(OaModel)
+
+class OaModel(StrEnum):
+    """Modèle OA d'un journal — les membres portent les libellés de l'enum PostgreSQL `oa_model`."""
+
+    SUBSCRIPTION = "subscription"
+    FULL_OA = "full_oa"
+    REPOSITORY = "repository"
+
+
+OA_MODELS: tuple[OaModel, ...] = tuple(OaModel)
 
 # Labels FR exposés via `/api/journals/oa-models` (dropdowns/facettes UI, modal d'édition admin).
 OA_MODEL_LABELS_FR: dict[OaModel, str] = {
-    "subscription": "Abonnement",
-    "full_oa": "Full OA (gold/diamond)",
-    "repository": "Archive / dépôt",
+    OaModel.SUBSCRIPTION: "Abonnement",
+    OaModel.FULL_OA: "Full OA (gold/diamond)",
+    OaModel.REPOSITORY: "Archive / dépôt",
 }
 
 
@@ -61,6 +72,6 @@ class Journal:
     apc_amount: Decimal | None = None
     apc_currency: str | None = None
     oa_model: OaModel | None = None
-    journal_type: JournalType = "unknown"
+    journal_type: JournalType = JournalType.UNKNOWN
     is_academic: bool = True
     doi_prefix: str | None = None

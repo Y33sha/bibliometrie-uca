@@ -20,6 +20,7 @@ from enum import StrEnum
 from itertools import combinations
 from typing import NamedTuple, TypedDict
 
+from domain.journals.journal import JournalType, OaModel
 from domain.normalize import normalize_text
 from domain.publications.doc_types import DocType
 from domain.types import JsonValue
@@ -244,13 +245,13 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
     },
     # Journal typé `media` (typage manuel admin) ⇒ `media` quel que soit le `doc_type` brut.
     MetadataCorrectionRule.JOURNAL_TYPE_MEDIA_TO_MEDIA: {
-        "applies_to": {"journal_type": DocType.MEDIA},
+        "applies_to": {"journal_type": JournalType.MEDIA},
         "applies_correction": {"doc_type": DocType.MEDIA},
     },
     # Journal d'actes + doc_type plausible ⇒ `conference_paper`. `book` exclu : un volume entier d'actes peut légitimement rester `book`.
     MetadataCorrectionRule.JOURNAL_TYPE_PROCEEDINGS_TO_CONFERENCE_PAPER: {
         "applies_to": {
-            "journal_type": "proceedings",
+            "journal_type": JournalType.PROCEEDINGS,
             "doc_type": frozenset({DocType.ARTICLE, DocType.BOOK_CHAPTER}),
         },
         "applies_correction": {"doc_type": DocType.CONFERENCE_PAPER},
@@ -258,7 +259,7 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
     # Serveur de preprints (arXiv, bioRxiv, ChemRxiv, EGUsphere, SSRN, …) + doc_type ∈ {article, other} ⇒ `preprint`. Whitelist étroite : les SPs CrossRef ont `journal-article`, l'arbitrage canonique efface parfois le `preprint` brut OA. `dataset`/`software`/`poster` épargnés.
     MetadataCorrectionRule.JOURNAL_TYPE_PREPRINT_SERVER_TO_PREPRINT: {
         "applies_to": {
-            "journal_type": "preprint_server",
+            "journal_type": JournalType.PREPRINT_SERVER,
             "doc_type": _ARTICLE_OR_OTHER,
         },
         "applies_correction": {"doc_type": DocType.PREPRINT},
@@ -389,7 +390,7 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
     # une revue full-OA est en réalité `gold` : `hybrid` sort des statuts attendus pour
     # `oa_model = full_oa`. Champ orthogonal au `doc_type`, aucun chaînage avec les autres règles.
     MetadataCorrectionRule.HYBRID_FULL_OA_TO_GOLD: {
-        "applies_to": {"oa_status": "hybrid", "oa_model": "full_oa"},
+        "applies_to": {"oa_status": "hybrid", "oa_model": OaModel.FULL_OA},
         "applies_correction": {"oa_status": "gold"},
     },
 }
