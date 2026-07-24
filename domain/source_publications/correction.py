@@ -372,7 +372,9 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
     # Titre commençant par « Recension » ou « Compte(s) rendu(s) : » ⇒ `book_review`. Marqueurs univoques en usage académique français ; `preprint` inclus dans la whitelist (typage OpenAlex fréquent). `book`/`book_chapter` épargnés : la recension est l'article, pas l'ouvrage recensé.
     MetadataCorrectionRule.TITLE_RECENSION_TO_BOOK_REVIEW: {
         "applies_to": {
-            "doc_type": frozenset({DocType.ARTICLE, DocType.REVIEW, DocType.OTHER, DocType.PREPRINT}),
+            "doc_type": frozenset(
+                {DocType.ARTICLE, DocType.REVIEW, DocType.OTHER, DocType.PREPRINT}
+            ),
             "title_regex": _RECENSION_TITLE_PATTERN,
         },
         "applies_correction": {"doc_type": DocType.BOOK_REVIEW},
@@ -574,6 +576,20 @@ CONVERGENCE_CASES: frozenset[str] = frozenset(
         DoiClusterCase.DATACITE_PACKAGE_PIECE,
     }
 )
+
+
+# Rapprochement des formes secondaires DataCite : la valeur `relation_type` d'un `relatedIdentifiers`
+# (vocabulaire externe DataCite, gardé en chaîne) désigne le cas de correction du DOI. La requête de
+# candidats au clustering consomme ce mapping pour former son `CASE` et son filtre.
+#
+# Convergence directe : le `relatedIdentifiers` pointe le DOI de l'œuvre canonique, pris tel quel.
+DATACITE_DIRECT_CONVERGENCE: dict[str, DoiClusterCase] = {
+    "IsVersionOf": DoiClusterCase.DATACITE_VERSION_TO_CONCEPT,
+    "IsVariantFormOf": DoiClusterCase.DATACITE_VARIANT_TO_PRIMARY,
+}
+# Pièce d'un package : la requête exige en plus que le parent soit un dataset présent en base. Vaut
+# le cas `DATACITE_PACKAGE_PIECE`.
+DATACITE_PACKAGE_PIECE_RELATION = "IsPartOf"
 
 
 class DoiClusterMember(NamedTuple):
