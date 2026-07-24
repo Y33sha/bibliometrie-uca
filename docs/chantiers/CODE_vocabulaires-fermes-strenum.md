@@ -50,8 +50,11 @@ Coûts concrets :
 
 ### Exploitation en SQL
 
-- [ ] Balayer les requêtes pour remplacer les littéraux de ces vocabulaires par `<Enum>.<X>.value`.
+Principe (pipeline comme couche lecture API) : un **prédicat** sur une valeur devient `<Enum>.<X>.value` interpolé ; une **énumération multi-valeurs** (une colonne ou une branche par membre) est **générée** depuis l'enum, sans liste manuelle parallèle.
+
+- [ ] Balayer les requêtes pour remplacer les littéraux de ces vocabulaires par des membres d'enum.
 - [ ] `metadata_correction` : remonter le mapping `relation_type` DataCite → `DoiClusterCase` au domaine.
+- [x] `infrastructure/queries/api/filters.py` (pilote couche lecture) : ventilation OA par statut (`OA_BREAKDOWN_COLS_SQL`) générée depuis `OaStatus` (une colonne par membre) ; buckets du dashboard, prédicats `source = 'hal'`, `structure_type = 'labo'` et statuts d'identifiant/forme de nom → membres inline.
 
 ## Sites recensés
 

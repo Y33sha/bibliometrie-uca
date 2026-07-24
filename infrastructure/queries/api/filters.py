@@ -8,8 +8,15 @@ from dataclasses import dataclass
 from typing import Any
 
 from domain.normalize import normalize_text
-from domain.persons.identifiers import PUBLIC_PERSON_IDENTIFIER_TYPES
-from domain.publications.metadata import ACCESS_LEVELS, OA_CLOSED_STATUSES, OA_OPEN_STATUSES
+from domain.persons.identifiers import PUBLIC_PERSON_IDENTIFIER_TYPES, AttributionStatus
+from domain.publications.metadata import (
+    ACCESS_LEVELS,
+    OA_CLOSED_STATUSES,
+    OA_OPEN_STATUSES,
+    OaStatus,
+)
+from domain.sources.registry import Source
+from domain.structures.structure import StructureType
 
 
 def _sql_list(values: Iterable[str]) -> str:
@@ -25,29 +32,26 @@ OA_OPEN_SQL = _sql_list(OA_OPEN_STATUSES)
 OA_CLOSED_SQL = _sql_list(OA_CLOSED_STATUSES)
 PUBLIC_PERSON_IDENTIFIER_TYPES_SQL = _sql_list(PUBLIC_PERSON_IDENTIFIER_TYPES)
 
-# Colonnes de ventilation OA par statut (alias `p` = publications), partagées par les
-# requêtes stats (éditeurs/revues/labos/années). `embargoed` est rangé par rang, juste
-# avant `closed`.
-OA_BREAKDOWN_COLS_SQL = """
-            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'gold') AS gold,
-            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'diamond') AS diamond,
-            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'hybrid') AS hybrid,
-            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'bronze') AS bronze,
-            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'green') AS green,
-            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'embargoed') AS embargoed,
-            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'closed') AS closed,
-            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'unknown') AS unknown""".strip()
+# Colonnes de ventilation OA par statut (alias `p` = publications), partagées par les requêtes
+# stats (éditeurs/revues/labos/années) : une colonne par statut du vocabulaire `OaStatus`,
+# nommée par sa valeur, dans l'ordre de définition de l'enum.
+OA_BREAKDOWN_COLS_SQL = ",\n            ".join(
+    f"COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = '{status.value}') AS {status.value}"
+    for status in OaStatus
+)
 
 # Buckets OA simplifiés pour les donuts dashboard (alias `p`) : open / embargo / closed /
 # unknown + total. `open_access` exclut `embargoed` (compté à part) et les statuts fermés.
 OA_DASHBOARD_COLS_SQL = f"""
             COUNT(DISTINCT p.id) FILTER (
                 WHERE p.oa_status NOT IN {OA_CLOSED_SQL}
-                  AND p.oa_status != 'embargoed' AND p.oa_status IS NOT NULL
+                  AND p.oa_status != '{OaStatus.EMBARGOED.value}' AND p.oa_status IS NOT NULL
             ) AS open_access,
-            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'embargoed') AS embargoed,
-            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'closed') AS closed,
-            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'unknown' OR p.oa_status IS NULL) AS unknown,
+            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = '{OaStatus.EMBARGOED.value}') AS embargoed,
+            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = '{OaStatus.CLOSED.value}') AS closed,
+            COUNT(DISTINCT p.id) FILTER (
+                WHERE p.oa_status = '{OaStatus.UNKNOWN.value}' OR p.oa_status IS NULL
+            ) AS unknown,
             COUNT(DISTINCT p.id) AS total""".strip()
 
 
@@ -289,11 +293,11 @@ def corresponding_clause(person_id: int, corr_filter: list[str]) -> WhereClause 
 
 _SQL_HAS_HAL_SA = (
     "EXISTS (SELECT 1 FROM source_publications sd "
-    "WHERE sd.publication_id = p.id AND sd.source = 'hal')"
+    f"WHERE sd.publication_id = p.id AND sd.source = '{Source.HAL.value}')"
 )
 _SQL_IN_COLLECTION_SA = (
     "EXISTS (SELECT 1 FROM source_publications sd "
-    "WHERE sd.publication_id = p.id AND sd.source = 'hal' "
+    f"WHERE sd.publication_id = p.id AND sd.source = '{Source.HAL.value}' "
     "AND sd.hal_collections @> ARRAY[:flt_hal_collection])"
 )
 
@@ -316,7 +320,7 @@ def hal_status_clause(values: list[str], lab_hal_col: str | None) -> WhereClause
                 parts.append(
                     f"({_SQL_HAS_HAL_SA} "
                     "AND NOT EXISTS (SELECT 1 FROM source_publications sd "
-                    "WHERE sd.publication_id = p.id AND sd.source = 'hal' "
+                    f"WHERE sd.publication_id = p.id AND sd.source = '{Source.HAL.value}' "
                     "AND sd.hal_collections @> ARRAY[:flt_hal_collection]))"
                 )
                 needs_collection = True
@@ -431,12 +435,12 @@ def in_perimeter_person_clause(
 
 def no_lab_clause() -> WhereClause:
     return WhereClause(
-        """NOT EXISTS (
+        f"""NOT EXISTS (
             SELECT 1 FROM authorships a
             JOIN authorship_structures aus ON aus.authorship_id = a.id
             JOIN structures s ON s.id = aus.structure_id
             WHERE a.publication_id = p.id
-              AND s.structure_type = 'labo'
+              AND s.structure_type = '{StructureType.LABO.value}'
         )""",
         {},
     )
@@ -492,7 +496,7 @@ def person_has_identifier_clause(id_type: str, value: bool | None) -> WhereClaus
             SELECT 1 FROM person_identifiers pi
             WHERE pi.person_id = p.id
               AND pi.id_type = '{id_type}'
-              AND pi.status != 'rejected'
+              AND pi.status != '{AttributionStatus.REJECTED.value}'
         )""",
         {},
     )
@@ -509,7 +513,7 @@ def person_has_pending_name_forms_clause(value: bool | None) -> WhereClause | No
     return WhereClause(
         f"""{negate}EXISTS (
             SELECT 1 FROM person_name_forms pnf
-            WHERE pnf.person_id = p.id AND pnf.status = 'pending'
+            WHERE pnf.person_id = p.id AND pnf.status = '{AttributionStatus.PENDING.value}'
         )""",
         {},
     )
@@ -527,7 +531,7 @@ def person_has_pending_identifiers_clause(value: bool | None) -> WhereClause | N
     return WhereClause(
         f"""{negate}EXISTS (
             SELECT 1 FROM person_identifiers pi
-            WHERE pi.person_id = p.id AND pi.status = 'pending'
+            WHERE pi.person_id = p.id AND pi.status = '{AttributionStatus.PENDING.value}'
               AND pi.id_type IN {PUBLIC_PERSON_IDENTIFIER_TYPES_SQL}
         )""",
         {},
