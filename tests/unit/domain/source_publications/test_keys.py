@@ -1,6 +1,6 @@
 """Tests unitaires de `domain.source_publications.keys.project_confirmation_keys`.
 
-Garde le contrat de la projection partagée : extraction et normalisation des clés de confirmation (DOI / NNT / PMID / HAL), token métadonnée `metadata_block`, et tolérance aux `external_ids` malformés.
+Garde le contrat de la projection partagée : extraction et normalisation des clés de confirmation (DOI / NNT / PMID / arXiv ID / HAL), token métadonnée `metadata_block`, et tolérance aux `external_ids` malformés.
 """
 
 from __future__ import annotations
@@ -48,6 +48,14 @@ class TestPmid:
     def test_pmid_extracted_from_url(self):
         keys = _keys(None, {"pmid": "https://pubmed.ncbi.nlm.nih.gov/12345"})
         assert keys.pmid == "12345"
+
+
+class TestArxivId:
+    def test_arxiv_id_from_external_ids(self):
+        assert _keys(None, {"arxiv_id": "2301.12345"}).arxiv_id == "2301.12345"
+
+    def test_arxiv_id_absent(self):
+        assert _keys(None, {"pmid": "12345"}).arxiv_id is None
 
 
 class TestHalIds:
@@ -99,14 +107,14 @@ class TestMetadataBlock:
 class TestMalformedExternalIds:
     def test_none_external_ids(self):
         assert _keys("10.1/x") == ConfirmationKeys(
-            doi="10.1/x", nnt=None, pmid=None, hal_ids=(), metadata_block=None
+            doi="10.1/x", nnt=None, pmid=None, arxiv_id=None, hal_ids=(), metadata_block=None
         )
 
     def test_non_str_values_ignored(self):
         """`external_ids` peut porter des listes (issn/isbn) ou None : ignorés sans crash."""
         keys = _keys(None, {"issn": ["0028-0836"], "nnt": None, "pmid": "12345"})
         assert keys == ConfirmationKeys(
-            doi=None, nnt=None, pmid="12345", hal_ids=(), metadata_block=None
+            doi=None, nnt=None, pmid="12345", arxiv_id=None, hal_ids=(), metadata_block=None
         )
 
 
@@ -116,6 +124,7 @@ class TestTokens:
             doi="d",
             nnt="n",
             pmid="p",
+            arxiv_id="a",
             hal_ids=("h1", "h2"),
             metadata_block="conference_paper|titre|2020",
         )
@@ -124,6 +133,7 @@ class TestTokens:
                 ("doi", "d"),
                 ("nnt", "n"),
                 ("pmid", "p"),
+                ("arxiv_id", "a"),
                 ("hal_id", "h1"),
                 ("hal_id", "h2"),
                 ("metadata_block", "conference_paper|titre|2020"),
@@ -131,9 +141,13 @@ class TestTokens:
         )
 
     def test_absent_keys_produce_no_token(self):
-        keys = ConfirmationKeys(doi="d", nnt=None, pmid=None, hal_ids=(), metadata_block=None)
+        keys = ConfirmationKeys(
+            doi="d", nnt=None, pmid=None, arxiv_id=None, hal_ids=(), metadata_block=None
+        )
         assert keys.tokens() == frozenset({("doi", "d")})
 
     def test_no_keys_empty_token_set(self):
-        empty = ConfirmationKeys(doi=None, nnt=None, pmid=None, hal_ids=(), metadata_block=None)
+        empty = ConfirmationKeys(
+            doi=None, nnt=None, pmid=None, arxiv_id=None, hal_ids=(), metadata_block=None
+        )
         assert empty.tokens() == frozenset()
