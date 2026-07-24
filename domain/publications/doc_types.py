@@ -3,63 +3,41 @@
 Vocabulaire partagé de la couche canonique — la valeur de l'enum PostgreSQL `doc_type` de la table `publications`, ses sous-types d'article prioritaires à l'arbitrage, et le regroupement en familles pour la ventilation. Le mapping des nomenclatures sources vers cette taxonomie vit côté source (`domain/source_publications/doc_types.py`).
 """
 
-from typing import Literal
+from enum import StrEnum
 
-DocType = Literal[
-    "article",
-    "conference_paper",
-    "book",
-    "book_chapter",
-    "thesis",
-    "ongoing_thesis",
-    "preprint",
-    "review",
-    "editorial",
-    "report",
-    "peer_review",
-    "other",
-    "dataset",
-    "software",
-    "patent",
-    "hdr",
-    "memoir",
-    "poster",
-    "letter",
-    "erratum",
-    "retraction",
-    "book_review",
-    "data_paper",
-    "proceedings",
-    "media",
-]
-DOC_TYPES: tuple[DocType, ...] = (
-    "article",
-    "conference_paper",
-    "book",
-    "book_chapter",
-    "thesis",
-    "ongoing_thesis",
-    "preprint",
-    "review",
-    "editorial",
-    "report",
-    "peer_review",
-    "other",
-    "dataset",
-    "software",
-    "patent",
-    "hdr",
-    "memoir",
-    "poster",
-    "letter",
-    "erratum",
-    "retraction",
-    "book_review",
-    "data_paper",
-    "proceedings",
-    "media",
-)
-DOC_TYPES_SET: frozenset[str] = frozenset(DOC_TYPES)
+
+class DocType(StrEnum):
+    """Type de document canonique — les membres portent les libellés de l'enum PostgreSQL `doc_type`."""
+
+    ARTICLE = "article"
+    CONFERENCE_PAPER = "conference_paper"
+    BOOK = "book"
+    BOOK_CHAPTER = "book_chapter"
+    THESIS = "thesis"
+    ONGOING_THESIS = "ongoing_thesis"
+    PREPRINT = "preprint"
+    REVIEW = "review"
+    EDITORIAL = "editorial"
+    REPORT = "report"
+    PEER_REVIEW = "peer_review"
+    OTHER = "other"
+    DATASET = "dataset"
+    SOFTWARE = "software"
+    PATENT = "patent"
+    HDR = "hdr"
+    MEMOIR = "memoir"
+    POSTER = "poster"
+    LETTER = "letter"
+    ERRATUM = "erratum"
+    RETRACTION = "retraction"
+    BOOK_REVIEW = "book_review"
+    DATA_PAPER = "data_paper"
+    PROCEEDINGS = "proceedings"
+    MEDIA = "media"
+
+
+DOC_TYPES: tuple[DocType, ...] = tuple(DocType)
+DOC_TYPES_SET: frozenset[str] = frozenset(DocType)
 
 # Sous-types qui priment sur "article" générique : si une source prioritaire
 # (typiquement CrossRef avec "journal-article") dit "article", mais qu'une
@@ -73,35 +51,42 @@ DOC_TYPES_SET: frozenset[str] = frozenset(DOC_TYPES)
 # (`arbitrate_doc_type_with_article_subtype`).
 ARTICLE_SUBTYPES: frozenset[str] = frozenset(
     {
-        "review",
-        "book_review",
-        "data_paper",
-        "conference_paper",
-        "editorial",
-        "letter",
-        "erratum",
-        "retraction",
+        DocType.REVIEW,
+        DocType.BOOK_REVIEW,
+        DocType.DATA_PAPER,
+        DocType.CONFERENCE_PAPER,
+        DocType.EDITORIAL,
+        DocType.LETTER,
+        DocType.ERRATUM,
+        DocType.RETRACTION,
     }
 )
 
 # Famille → types fins. Mémoires/thèses en cours filtrés ailleurs, mais classés ici pour
 # l'exhaustivité de la couverture de l'enum. L'ordre est celui d'affichage.
 DOC_TYPE_FAMILIES: dict[str, tuple[str, ...]] = {
-    "publications": ("article", "conference_paper", "book", "book_chapter", "review", "data_paper"),
-    "preprints": ("preprint",),
-    "theses": ("thesis", "ongoing_thesis", "hdr", "memoir"),
-    "data": ("dataset", "software", "patent"),
+    "publications": (
+        DocType.ARTICLE,
+        DocType.CONFERENCE_PAPER,
+        DocType.BOOK,
+        DocType.BOOK_CHAPTER,
+        DocType.REVIEW,
+        DocType.DATA_PAPER,
+    ),
+    "preprints": (DocType.PREPRINT,),
+    "theses": (DocType.THESIS, DocType.ONGOING_THESIS, DocType.HDR, DocType.MEMOIR),
+    "data": (DocType.DATASET, DocType.SOFTWARE, DocType.PATENT),
     "misc": (
-        "other",
-        "media",
-        "poster",
-        "report",
-        "erratum",
-        "retraction",
-        "peer_review",
-        "editorial",
-        "letter",
-        "book_review",
-        "proceedings",
+        DocType.OTHER,
+        DocType.MEDIA,
+        DocType.POSTER,
+        DocType.REPORT,
+        DocType.ERRATUM,
+        DocType.RETRACTION,
+        DocType.PEER_REVIEW,
+        DocType.EDITORIAL,
+        DocType.LETTER,
+        DocType.BOOK_REVIEW,
+        DocType.PROCEEDINGS,
     ),
 }
