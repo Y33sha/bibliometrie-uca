@@ -18,7 +18,9 @@ class AuthorshipRepository(Protocol):
         source: str,
         source_authorship_id: int,
         resolution_mode: str,
-    ) -> None: ...
+    ) -> None:
+        """Rattache une signature source à une personne et marque le canal de résolution. `resolution_mode` (`identifier` / `name` / `cross_source`) enregistre par quel canal le `person_id` a été posé."""
+        ...
 
     def unlink_authorship(
         self,
@@ -43,17 +45,23 @@ class AuthorshipRepository(Protocol):
         self,
         person_id: int,
         source_authorship_ids: list[int],
-    ) -> int: ...
+    ) -> int:
+        """Pose `person_id` sur les signatures du lot qui sont orphelines et retourne le nombre touché ; les signatures déjà rattachées restent intactes."""
+        ...
 
     def get_distinct_name_forms_from_source_authorships(
         self,
         source_authorship_ids: list[int],
-    ) -> list[str]: ...
+    ) -> list[str]:
+        """Les `author_name_normalized` distincts observés dans le lot de signatures."""
+        ...
 
     def find_publication_id_for_source_authorship(
         self,
         source_authorship_id: int,
-    ) -> int | None: ...
+    ) -> int | None:
+        """`publication_id` d'une signature, ou `None` si elle n'existe pas ou n'est pas rattachée à une publication."""
+        ...
 
     def find_publication_ids_for_source_authorships(
         self,
@@ -68,9 +76,13 @@ class AuthorshipRepository(Protocol):
 
     # ── authorships ────────────────────────────────────────────────
 
-    def get_authorship_person(self, authorship_id: int) -> dict[str, Any] | None: ...
+    def get_authorship_person(self, authorship_id: int) -> dict[str, Any] | None:
+        """La ligne `authorships` (`id`, `person_id`, `publication_id`), ou `None` si l'id n'existe pas."""
+        ...
 
-    def reject_authorship(self, publication_id: int, person_id: int) -> None: ...
+    def reject_authorship(self, publication_id: int, person_id: int) -> None:
+        """Enregistre le rejet d'une paire (publication, personne) dans `rejected_authorships`. Idempotent."""
+        ...
 
     def find_rejected_authorship(self, publication_id: int, person_id: int) -> datetime | None:
         """Date du rejet de la paire (publication, personne) dans `rejected_authorships`, ou None si la paire y est absente."""
@@ -84,11 +96,15 @@ class AuthorshipRepository(Protocol):
         self,
         publication_id: int,
         person_id: int,
-    ) -> int: ...
+    ) -> int:
+        """Détache (person_id → NULL) toutes les signatures de la personne sur cette publication. Retourne le nombre de signatures détachées."""
+        ...
 
     def delete_authorship(self, authorship_id: int) -> None: ...
 
-    def delete_orphan_authorships_for_person(self, person_id: int) -> int: ...
+    def delete_orphan_authorships_for_person(self, person_id: int) -> int:
+        """Supprime les lignes consolidées de la personne dépourvues de toute signature source active. Retourne le nombre supprimé."""
+        ...
 
     # ── confirmed_authorships (épinglage admin, must-link grain signature) ──
 
@@ -113,18 +129,24 @@ class AuthorshipRepository(Protocol):
     def find_source_authorships_by_addresses(
         self,
         address_ids: list[int],
-    ) -> list[int]: ...
+    ) -> list[int]:
+        """Ids des signatures liées à l'une des adresses données (via `source_authorship_addresses`)."""
+        ...
 
     def recompute_in_perimeter_on_source_authorships(
         self,
         source_authorship_ids: list[int],
         perimeter_structure_ids: list[int],
-    ) -> None: ...
+    ) -> None:
+        """Recalcule `source_authorships.in_perimeter` pour les signatures données : vrai si l'une de leurs adresses résout vers une structure du périmètre (lien `is_confirmed IS DISTINCT FROM FALSE`)."""
+        ...
 
     def propagate_in_perimeter_to_authorships(
         self,
         source_authorship_ids: list[int],
-    ) -> None: ...
+    ) -> None:
+        """Propage `in_perimeter` des signatures vers les lignes consolidées `authorships` des paires (publication, personne) impactées."""
+        ...
 
     # ── Recomposition d'une authorship depuis ses signatures ───────
 
