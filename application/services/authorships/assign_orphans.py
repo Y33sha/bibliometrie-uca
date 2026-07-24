@@ -16,10 +16,7 @@ from domain.errors import (
     NotFoundError,
     RejectedPairError,
 )
-from domain.sources.registry import (
-    AUTHOR_SOURCES,
-    SOURCE_PRIORITY,
-)
+from domain.sources.registry import SOURCE_PRIORITY
 
 
 def _require_person(person_id: int, *, repo: PersonRepository) -> None:
@@ -190,4 +187,4 @@ def _refresh_authorship_from_sources(
         person_id,
         SOURCE_PRIORITY,
     )
-    authorship_repo.recompute_authorship_in_perimeter(publication_id, person_id, AUTHOR_SOURCES)
+    authorship_repo.recompute_authorship_in_perimeter(publication_id, person_id)
