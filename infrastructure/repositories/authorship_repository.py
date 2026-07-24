@@ -1,13 +1,15 @@
 """Adapter PostgreSQL sync pour les authorships et source_authorships."""
 
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import Connection, text
 
+from application.ports.repositories.authorship_repository import AuthorshipRepository
 from infrastructure.queries.sources_sql import source_case_sql
 
 
-class PgAuthorshipRepository:
+class PgAuthorshipRepository(AuthorshipRepository):
     """Accès PostgreSQL sync aux authorships canoniques et à leurs signatures sources."""
 
     def __init__(self, conn: Connection) -> None:
@@ -16,10 +18,6 @@ class PgAuthorshipRepository:
     # ── Recomposition d'une authorship depuis ses signatures ───────
 
     def insert_authorship_if_missing(self, publication_id: int, person_id: int) -> None:
-        """INSERT ... ON CONFLICT DO NOTHING dans `authorships` pour la paire.
-
-        Skippe les paires présentes dans `rejected_authorships` (rejet canonique).
-        """
         self._conn.execute(
             text("""
                 INSERT INTO authorships (publication_id, person_id)
@@ -36,10 +34,7 @@ class PgAuthorshipRepository:
     def create_authorships_from_sources(
         self, person_id: int, sa_ids: list[int], source_priority: tuple[str, ...]
     ) -> None:
-        """Crée les authorships manquantes pour la personne, depuis les signatures du lot.
-
-        Pour chaque `publication_id` distinct, insère une ligne dans `authorships` en prenant les colonnes (`author_position`, `in_perimeter`, `is_corresponding`) de la source la plus prioritaire. Les structures dérivées vivent dans la matview `authorship_structures`, rafraîchie par le caller.
-        """
+        """Les structures dérivées vivent dans la matview `authorship_structures`, rafraîchie par le caller."""
         if not sa_ids:
             return
         self._conn.execute(
@@ -73,7 +68,6 @@ class PgAuthorshipRepository:
         self._conn.execute(text("DROP TABLE _chosen_sa"))
 
     def link_source_authorships_to_authorship(self, publication_id: int, person_id: int) -> None:
-        """Pose `source_authorships.authorship_id` pour l'authorship de la paire, sur toutes les signatures encore non liées."""
         self._conn.execute(
             text("""
                 UPDATE source_authorships sa
@@ -90,7 +84,6 @@ class PgAuthorshipRepository:
         )
 
     def link_source_authorships_to_authorships(self, person_id: int, sa_ids: list[int]) -> None:
-        """Pose `source_authorships.authorship_id` vers l'authorship canonique de la même paire, pour les lignes du lot. N'écrase que les FK encore nulles (idempotent)."""
         if not sa_ids:
             return
         self._conn.execute(
@@ -109,10 +102,7 @@ class PgAuthorshipRepository:
     def recompute_authorship_author_position_and_corresponding(
         self, publication_id: int, person_id: int, source_priority: tuple[str, ...]
     ) -> None:
-        """Réagrège `authorships.author_position` et `is_corresponding` depuis les signatures actives.
-
-        Aligné sur le build (`propagate_authorship_attributes`) : position par priorité de source, `is_corresponding` en `bool_or` — le FALSE d'une source est une absence de signal, non une négation.
-        """
+        """Aligné sur le build (`propagate_authorship_attributes`) : `author_position` par priorité de source, `is_corresponding` en `bool_or`."""
         self._conn.execute(
             text(f"""
                 UPDATE authorships a
@@ -137,10 +127,7 @@ class PgAuthorshipRepository:
     def recompute_authorship_in_perimeter(
         self, publication_id: int, person_id: int, sources: tuple[str, ...]
     ) -> None:
-        """Recalcule `authorships.in_perimeter` (OR des signatures) pour la paire.
-
-        Les structures dérivées vivent dans la matview `authorship_structures`, rafraîchie par le caller.
-        """
+        """Les structures dérivées vivent dans la matview `authorship_structures`, rafraîchie par le caller."""
         sources_sql = "(" + ", ".join(f"'{s}'" for s in sources) + ")"
         self._conn.execute(
             text(f"""
@@ -167,10 +154,6 @@ class PgAuthorshipRepository:
         source_authorship_id: int,
         resolution_mode: str,
     ) -> None:
-        """Rattache une signature source à une personne, en marquant le canal de résolution.
-
-        `resolution_mode` (`identifier` / `name` / `cross_source`) enregistre par quel canal le `person_id` a été posé ; il porte les réinitialisations ordre-indépendantes de la phase personnes.
-        """
         self._conn.execute(
             text(
                 "UPDATE source_authorships SET person_id = :pid, "
@@ -190,17 +173,12 @@ class PgAuthorshipRepository:
         )
 
     def find_source_authorship_owner(self, source_authorship_id: int) -> int | None:
-        """`person_id` d'une signature source. `None` si elle est orpheline ou n'existe pas."""
         return self._conn.execute(
             text("SELECT person_id FROM source_authorships WHERE id = :aid"),
             {"aid": source_authorship_id},
         ).scalar_one_or_none()
 
-    def assign_orphan_sa(self, person_id: int, source_authorship_id: int) -> dict | None:
-        """Pose `person_id` sur une signature source orpheline.
-
-        Retourne un dict {source, author_name_normalized} si l'UPDATE a touché une ligne, `None` sinon — la signature n'existe pas, ou elle porte déjà un `person_id` (fût-ce celui demandé). `find_source_authorship_owner` départage.
-        """
+    def assign_orphan_sa(self, person_id: int, source_authorship_id: int) -> dict[str, Any] | None:
         row = self._conn.execute(
             text("""
                 UPDATE source_authorships sa SET person_id = :pid
@@ -216,10 +194,6 @@ class PgAuthorshipRepository:
     def assign_orphan_source_authorships_to_person(
         self, person_id: int, source_authorship_ids: list[int]
     ) -> int:
-        """Pose `person_id` sur les signatures du lot qui sont orphelines, et retourne le nombre touché.
-
-        Les signatures déjà rattachées sont laissées intactes.
-        """
         if not source_authorship_ids:
             return 0
         return self._conn.execute(
@@ -234,7 +208,6 @@ class PgAuthorshipRepository:
     def get_distinct_name_forms_from_source_authorships(
         self, source_authorship_ids: list[int]
     ) -> list[str]:
-        """Les `author_name_normalized` distincts observés dans le lot."""
         if not source_authorship_ids:
             return []
         rows = self._conn.execute(
@@ -250,7 +223,6 @@ class PgAuthorshipRepository:
         return [row.author_name_normalized for row in rows]
 
     def find_publication_id_for_source_authorship(self, source_authorship_id: int) -> int | None:
-        """`publication_id` de la signature, ou `None` si elle n'existe pas ou n'est pas rattachée."""
         return self._conn.execute(
             text("""
                 SELECT d.publication_id FROM source_authorships sa
@@ -263,7 +235,6 @@ class PgAuthorshipRepository:
     def find_publication_ids_for_source_authorships(
         self, source_authorship_ids: list[int]
     ) -> list[int]:
-        """Les `publication_id` distincts couverts par un lot de signatures."""
         if not source_authorship_ids:
             return []
         rows = self._conn.execute(
@@ -277,10 +248,6 @@ class PgAuthorshipRepository:
         return [row.publication_id for row in rows]
 
     def null_person_id_for_name_form(self, person_id: int, name_form: str) -> int:
-        """Détache d'une personne les signatures qui portent une forme de nom, et retourne leur nombre.
-
-        Sert au rejet d'une forme : ses signatures sont retirées de la personne (`person_id → NULL`).
-        """
         return self._conn.execute(
             text(
                 "UPDATE source_authorships sa SET person_id = NULL "
@@ -293,7 +260,7 @@ class PgAuthorshipRepository:
 
     # ── authorships ────────────────────────────────────────────────
 
-    def get_authorship_person(self, authorship_id: int) -> dict | None:
+    def get_authorship_person(self, authorship_id: int) -> dict[str, Any] | None:
         result = self._conn.execute(
             text("SELECT id, person_id, publication_id FROM authorships WHERE id = :id"),
             {"id": authorship_id},
@@ -302,7 +269,6 @@ class PgAuthorshipRepository:
         return dict(row._mapping) if row else None
 
     def reject_authorship(self, publication_id: int, person_id: int) -> None:
-        """Enregistre le rejet d'une paire (publication, personne) dans le store `rejected_authorships`. Idempotent."""
         self._conn.execute(
             text(
                 "INSERT INTO rejected_authorships (publication_id, person_id) "
@@ -312,7 +278,6 @@ class PgAuthorshipRepository:
         )
 
     def find_rejected_authorship(self, publication_id: int, person_id: int) -> datetime | None:
-        """Date du rejet de la paire dans `rejected_authorships`, ou None."""
         return self._conn.execute(
             text(
                 "SELECT created_at FROM rejected_authorships "
@@ -322,7 +287,6 @@ class PgAuthorshipRepository:
         ).scalar_one_or_none()
 
     def delete_rejected_authorship(self, publication_id: int, person_id: int) -> None:
-        """Retire la paire de `rejected_authorships` (lève le rejet). Idempotent."""
         self._conn.execute(
             text(
                 "DELETE FROM rejected_authorships WHERE publication_id = :pub AND person_id = :pid"
@@ -335,10 +299,6 @@ class PgAuthorshipRepository:
         publication_id: int,
         person_id: int,
     ) -> int:
-        """Nulle `person_id` sur toutes les `source_authorships` de cette personne dont la `source_publication` pointe sur cette publication.
-
-        Détache la vérité source de la paire entière : le rejet vaut pour toutes les sources de la personne sur cette publication. Retourne le nombre de rows détachées.
-        """
         result = self._conn.execute(
             text("""
                 UPDATE source_authorships sa
@@ -449,12 +409,8 @@ class PgAuthorshipRepository:
         source_authorship_ids: list[int],
         perimeter_structure_ids: list[int],
     ) -> None:
-        # `source_authorship_structures` est une matview (réalignée par le
-        # pipeline) : on ne l'écrit pas ici. On recalcule in_perimeter
-        # directement depuis les adresses résolues
-        # filtrées par le périmètre restreint, pour les sa donnés — équivalent
-        # à l'ancien EXISTS sur la table de jointure construite avec le même
-        # filtre.
+        # `source_authorship_structures` est une matview (réalignée par le pipeline).
+        # Le calcul lit directement les adresses résolues des signatures données, filtrées par le périmètre restreint.
         self._conn.execute(
             text("""
                 UPDATE source_authorships sa
