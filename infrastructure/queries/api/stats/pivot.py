@@ -9,7 +9,9 @@ from sqlalchemy import Connection, text
 
 from application.ports.api.stats_queries import PivotResponse, StatsFilters
 from domain.publications.doc_types import DOC_TYPE_FAMILIES
+from domain.publications.metadata import OaStatus
 from domain.stats import DIMENSIONS, MEASURES, Dimension, validate_pivot
+from domain.structures.structure import StructureType
 from infrastructure.queries.api.filters import OA_OPEN_SQL, assemble_where
 from infrastructure.queries.api.stats._shared import STATS_BASE, stats_filter_clauses
 
@@ -33,8 +35,8 @@ _DIM_EXPR: dict[str, str] = {
     "year": "p.pub_year",
     "oa_access": (
         f"CASE WHEN p.oa_status::text IN {OA_OPEN_SQL} THEN 'ouvert' "
-        "WHEN p.oa_status = 'embargoed' THEN 'embargo' "
-        "WHEN p.oa_status = 'closed' THEN 'ferme' "
+        f"WHEN p.oa_status = '{OaStatus.EMBARGOED.value}' THEN 'embargo' "
+        f"WHEN p.oa_status = '{OaStatus.CLOSED.value}' THEN 'ferme' "
         "ELSE 'indetermine' END"
     ),
     "oa_voie": "p.oa_status::text",
@@ -48,7 +50,7 @@ _DIM_JOIN: dict[str, str] = {
     "lab": (
         "JOIN authorships la ON la.publication_id = p.id "
         "JOIN authorship_structures las ON las.authorship_id = la.id "
-        "JOIN structures ls ON ls.id = las.structure_id AND ls.structure_type = 'labo'"
+        f"JOIN structures ls ON ls.id = las.structure_id AND ls.structure_type = '{StructureType.LABO.value}'"
     ),
     # Éditeur / revue : jointures internes (excluent les publications sans revue / sans éditeur).
     "publisher": "JOIN publishers pub ON pub.id = j.publisher_id",

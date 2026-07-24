@@ -14,6 +14,9 @@ from application.ports.api.publications_queries import (
     PublicationsFacetsResponse,
 )
 from domain.countries import NO_COUNTRY_CODE
+from domain.publications.metadata import OaStatus
+from domain.sources.registry import Source
+from domain.structures.structure import StructureType
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.queries.api.filters import (
     OA_CLOSED_SQL,
@@ -143,7 +146,7 @@ class _PublicationFacetsBuilder:
                 JOIN publications p ON p.id = ps.publication_id
                 JOIN structures s ON s.id = ps.structure_id
                 WHERE {where_sql}
-                  AND s.structure_type = 'labo'
+                  AND s.structure_type = '{StructureType.LABO.value}'
                 GROUP BY s.id, s.acronym, s.name
                 ORDER BY count DESC
             """),
@@ -159,7 +162,7 @@ class _PublicationFacetsBuilder:
                       SELECT 1 FROM publication_structures ps
                       JOIN structures s ON s.id = ps.structure_id
                       WHERE ps.publication_id = p.id
-                        AND s.structure_type = 'labo'
+                        AND s.structure_type = '{StructureType.LABO.value}'
                   )
             """),
             binds,
@@ -185,7 +188,7 @@ class _PublicationFacetsBuilder:
             text(f"""
                 SELECT
                     COUNT(*) FILTER (WHERE p.oa_status::text IN {OA_OPEN_SQL}) AS open_count,
-                    COUNT(*) FILTER (WHERE p.oa_status::text = 'embargoed') AS embargo_count,
+                    COUNT(*) FILTER (WHERE p.oa_status::text = '{OaStatus.EMBARGOED.value}') AS embargo_count,
                     COUNT(*) FILTER (
                         WHERE p.oa_status::text IN {OA_CLOSED_SQL}
                            OR p.oa_status IS NULL
@@ -391,25 +394,25 @@ class _PublicationFacetsBuilder:
                     SELECT
                         COUNT(*) FILTER (WHERE NOT EXISTS (
                             SELECT 1 FROM source_publications sd
-                            WHERE sd.publication_id = p.id AND sd.source = 'hal'
+                            WHERE sd.publication_id = p.id AND sd.source = '{Source.HAL.value}'
                         )) AS hors_hal,
                         COUNT(*) FILTER (WHERE EXISTS (
                             SELECT 1 FROM source_publications sd
-                            WHERE sd.publication_id = p.id AND sd.source = 'hal'
+                            WHERE sd.publication_id = p.id AND sd.source = '{Source.HAL.value}'
                         ) AND NOT EXISTS (
                             SELECT 1 FROM source_publications sd
-                            WHERE sd.publication_id = p.id AND sd.source = 'hal'
+                            WHERE sd.publication_id = p.id AND sd.source = '{Source.HAL.value}'
                               AND sd.hal_collections @> ARRAY[:hf_col]
                         )) AS hors_collection,
                         COUNT(*) FILTER (WHERE EXISTS (
                             SELECT 1 FROM source_publications sd
-                            WHERE sd.publication_id = p.id AND sd.source = 'hal'
+                            WHERE sd.publication_id = p.id AND sd.source = '{Source.HAL.value}'
                               AND sd.hal_collections @> ARRAY[:hf_col]
                         ) AND (p.oa_status IS NULL OR p.oa_status::text IN {OA_CLOSED_SQL})
                         ) AS notice,
                         COUNT(*) FILTER (WHERE EXISTS (
                             SELECT 1 FROM source_publications sd
-                            WHERE sd.publication_id = p.id AND sd.source = 'hal'
+                            WHERE sd.publication_id = p.id AND sd.source = '{Source.HAL.value}'
                               AND sd.hal_collections @> ARRAY[:hf_col]
                         ) AND p.oa_status IS NOT NULL
                           AND p.oa_status::text NOT IN {OA_CLOSED_SQL}
@@ -425,11 +428,11 @@ class _PublicationFacetsBuilder:
                     SELECT
                         COUNT(*) FILTER (WHERE NOT EXISTS (
                             SELECT 1 FROM source_publications sd
-                            WHERE sd.publication_id = p.id AND sd.source = 'hal'
+                            WHERE sd.publication_id = p.id AND sd.source = '{Source.HAL.value}'
                         )) AS hors_hal,
                         COUNT(*) FILTER (WHERE EXISTS (
                             SELECT 1 FROM source_publications sd
-                            WHERE sd.publication_id = p.id AND sd.source = 'hal'
+                            WHERE sd.publication_id = p.id AND sd.source = '{Source.HAL.value}'
                         )) AS hors_collection,
                         0 AS notice,
                         0 AS ok
