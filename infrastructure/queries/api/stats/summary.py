@@ -7,6 +7,7 @@ from sqlalchemy import Connection, Row, text
 
 from application.ports.api._common import FacetOption
 from application.ports.api.stats_queries import StatsFacetsResponse, StatsFilters
+from domain.structures.structure import StructureType
 from infrastructure.queries.api.filters import WhereClause, assemble_where
 from infrastructure.queries.api.stats._shared import STATS_BASE, stats_filter_clauses
 
@@ -46,7 +47,7 @@ def _facets_sqls(
         JOIN authorship_structures aus ON aus.authorship_id = a.id
         JOIN structures s ON s.id = aus.structure_id
         WHERE {STATS_BASE} AND {lab_where}
-          AND s.structure_type = 'labo'
+          AND s.structure_type = '{StructureType.LABO.value}'
         GROUP BY s.id, s.acronym, s.name
         ORDER BY n DESC
     """
