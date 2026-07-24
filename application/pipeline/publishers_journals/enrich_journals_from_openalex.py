@@ -26,11 +26,11 @@ BATCH_SIZE = 50
 COMMIT_EVERY = 500  # commit DB tous les N journals traités
 
 _OPENALEX_SOURCE_TYPE_MAP: dict[str, JournalType] = {
-    "journal": "journal",
-    "repository": "repository",
-    "conference": "proceedings",
-    "book series": "book_series",
-    "ebook platform": "ebook_platform",
+    "journal": JournalType.JOURNAL,
+    "repository": JournalType.REPOSITORY,
+    "conference": JournalType.PROCEEDINGS,
+    "book series": JournalType.BOOK_SERIES,
+    "ebook platform": JournalType.EBOOK_PLATFORM,
 }
 
 

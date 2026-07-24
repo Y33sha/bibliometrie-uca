@@ -65,7 +65,7 @@ def _journal_from_row(row: _JournalRow) -> Journal:
         oa_model=cast(OaModel | None, row.oa_model),
         journal_type=cast(JournalType, row.journal_type)
         if row.journal_type is not None
-        else "unknown",
+        else JournalType.UNKNOWN,
         is_academic=row.is_academic if row.is_academic is not None else True,
         doi_prefix=row.doi_prefix,
     )
