@@ -56,6 +56,7 @@ Principe (pipeline comme couche lecture API) : un **prédicat** sur une valeur d
 - [ ] `metadata_correction` : remonter le mapping `relation_type` DataCite → `DoiClusterCase` au domaine.
 - [x] `infrastructure/queries/api/filters.py` (pilote couche lecture) : ventilation OA par statut (`OA_BREAKDOWN_COLS_SQL`) générée depuis `OaStatus` (une colonne par membre) ; buckets du dashboard, prédicats `source = 'hal'`, `structure_type = 'labo'` et statuts d'identifiant/forme de nom → membres inline.
 - [x] `infrastructure/queries/api/publications/list.py` : pivot des identifiants source (`_SOURCE_ID_COLUMNS`, cinq sources) généré depuis `Source` et partagé par les deux listes qui l'exposent ; l'export thèses (quatre sources, sans `wos` par contrat) garde son pivot inline ; prédicats `'labo'` et `source = 'hal'` → membres. Les dicts Python de présentation (`_SOURCE_URL`, `_THESES_STATUS_LABELS`) gardent leurs clés-chaînes : lookups à échec bruyant, hors du périmètre SQL.
+- [x] `infrastructure/queries/api/publications/detail.py` : flags de présence par source (quatre sources d'authorship, sans theses) inline ; prédicats `source = 'theses'` (×2) et le test Python `doc_type in {thesis, ongoing_thesis}` → membres `Source` / `DocType`.
 
 ## Sites recensés
 

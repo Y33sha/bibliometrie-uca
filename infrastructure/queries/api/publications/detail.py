@@ -15,8 +15,10 @@ from application.ports.api.publications_queries import (
     ThesisMeta,
 )
 from application.ports.api.subjects_queries import SubjectOut
+from domain.publications.doc_types import DocType
 from domain.publications.relations import RelationType, inverse_relation
 from domain.source_publications.correction import CONVERGENCE_CASES
+from domain.sources.registry import Source
 
 
 def get_publication_relations(conn: Connection, pub_id: int) -> list[RelatedPublicationOut]:
@@ -177,19 +179,19 @@ def get_publication_detail(conn: Connection, pub_id: int) -> PublicationDetailRe
     ]
 
     auth_rows = conn.execute(
-        text("""
+        text(f"""
             SELECT a.author_position, a.in_perimeter, a.is_corresponding,
                    (SELECT array_agg(aus.structure_id ORDER BY aus.structure_id)
                     FROM authorship_structures aus
                     WHERE aus.authorship_id = a.id) AS structure_ids,
                    EXISTS (SELECT 1 FROM source_authorships sa
-                           WHERE sa.authorship_id = a.id AND sa.source = 'hal') AS source_hal,
+                           WHERE sa.authorship_id = a.id AND sa.source = '{Source.HAL.value}') AS source_hal,
                    EXISTS (SELECT 1 FROM source_authorships sa
-                           WHERE sa.authorship_id = a.id AND sa.source = 'openalex') AS source_openalex,
+                           WHERE sa.authorship_id = a.id AND sa.source = '{Source.OPENALEX.value}') AS source_openalex,
                    EXISTS (SELECT 1 FROM source_authorships sa
-                           WHERE sa.authorship_id = a.id AND sa.source = 'wos') AS source_wos,
+                           WHERE sa.authorship_id = a.id AND sa.source = '{Source.WOS.value}') AS source_wos,
                    EXISTS (SELECT 1 FROM source_authorships sa
-                           WHERE sa.authorship_id = a.id AND sa.source = 'scanr') AS source_scanr,
+                           WHERE sa.authorship_id = a.id AND sa.source = '{Source.SCANR.value}') AS source_scanr,
                    pe.id AS person_id, pe.last_name, pe.first_name,
                    EXISTS (SELECT 1 FROM persons_rh pr WHERE pr.person_id = pe.id) AS has_rh
             FROM authorships a
@@ -223,13 +225,13 @@ def get_publication_detail(conn: Connection, pub_id: int) -> PublicationDetailRe
     scanr_authorships = _fetch_biblio_source_authorships(conn, "scanr", pub_id)
 
     theses_rows = conn.execute(
-        text("""
+        text(f"""
             SELECT sa.id, sa.author_position, sa.raw_author_name AS full_name, sa.person_id,
                    sa.roles, sa.in_perimeter
             FROM source_authorships sa
             WHERE sa.source_publication_id = (
                 SELECT id FROM source_publications
-                WHERE source = 'theses' AND publication_id = :pid
+                WHERE source = '{Source.THESES.value}' AND publication_id = :pid
                 ORDER BY created_at DESC
                 LIMIT 1
             )
@@ -250,13 +252,13 @@ def get_publication_detail(conn: Connection, pub_id: int) -> PublicationDetailRe
     ]
 
     thesis_meta: ThesisMeta | None = None
-    if pub_row.doc_type in ("thesis", "ongoing_thesis"):
+    if pub_row.doc_type in (DocType.THESIS, DocType.ONGOING_THESIS):
         meta_row = conn.execute(
-            text("""
+            text(f"""
                 SELECT sd.meta AS sd_meta, p.meta AS pub_meta
                 FROM publications p
                 LEFT JOIN source_publications sd
-                       ON sd.publication_id = p.id AND sd.source = 'theses'
+                       ON sd.publication_id = p.id AND sd.source = '{Source.THESES.value}'
                 WHERE p.id = :pid
                 LIMIT 1
             """),
