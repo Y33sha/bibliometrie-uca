@@ -1,6 +1,6 @@
 """Port AuditRepository — contrat d'écriture dans `audit_log`.
 
-Implémenté par `infrastructure/repositories/audit_repository.py`. La logique de filtrage par `user_id` (no-op hors contexte HTTP) reste dans `application/audit_log.py` ; le port n'expose qu'une opération brute d'insertion.
+Le port n'expose qu'une insertion brute. Le filtrage par `user_id` (no-op hors contexte HTTP) relève de `application/audit_log.py`.
 """
 
 from typing import Protocol
@@ -18,4 +18,6 @@ class AuditRepository(Protocol):
         aggregate_id: int | None,
         payload: dict[str, JsonValue],
         user_id: str,
-    ) -> None: ...
+    ) -> None:
+        """Insère un événement d'audit. `aggregate_id` : NULL si l'entité affectée n'a pas d'équivalent survivant (suppression). `payload` : données utiles sérialisées en `jsonb`."""
+        ...
