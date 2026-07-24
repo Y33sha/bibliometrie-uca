@@ -43,6 +43,10 @@ Coûts concrets :
 - [x] `oa_status` → StrEnum `OaStatus` (dans `metadata.py`). `OA_RANK` garde des clés-membres (annoté `dict[str, int]` pour que `best_oa_status.get(str)` tienne), `OA_STATUSES` et `ACCESS_LEVELS` dérivés des membres, `OA_STATUS_UNKNOWN_DEFAULT` = membre. `_KNOWN_OA_STATUSES` (OpenAlex) référence les membres : c'est un sous-ensemble curé (6 statuts, sans unknown/embargoed), **pas** un doublon d'`OA_STATUSES` (8) — donc pas de fusion, contrairement à ce que supposait le contexte.
 - [x] `journal_type` et `oa_model` Literal → StrEnum ; collections et labels FR dérivés des membres. Consommateurs Python alignés (normalize, enrich OpenAlex, règles de correction, hydratation `Journal`) ; mypy vert. La phase d'exploitation SQL reste à part.
 
+### persons (resolution_mode, id_type)
+
+- [x] `resolution_mode` Literal → StrEnum `ResolutionMode` (`domain/persons/matching.py`) ; `RESOLUTION_MODE_BY_REASON` mappe vers des membres, `tables.py` déballe l'enum (`*ResolutionMode`) au lieu de `get_args`.
+
 ### Exploitation en SQL
 
 - [ ] Balayer les requêtes pour remplacer les littéraux de ces vocabulaires par `<Enum>.<X>.value`.

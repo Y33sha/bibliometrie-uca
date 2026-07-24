@@ -9,8 +9,6 @@ Ce modèle n'est pas la source de vérité du schéma : les migrations Alembic (
 Le périmètre du metadata s'arrête aux tables et à leurs colonnes. Index, clés étrangères et vues matérialisées (`authorship_structures`, `publication_structures`, `source_authorship_structures`, `subject_cooccurrences`) appartiennent aux seules migrations ; le filtre `include_object` d'`alembic/env.py` les écarte de la comparaison.
 """
 
-from typing import get_args
-
 from sqlalchemy import (
     CHAR,
     BigInteger,
@@ -329,7 +327,7 @@ source_type_enum = PgEnum(*ALL_SOURCES, name="source_type", create_type=False)
 oa_type_enum = PgEnum(*OA_RANK, name="oa_type", create_type=False)
 
 resolution_mode_enum = PgEnum(
-    *get_args(ResolutionMode),
+    *ResolutionMode,
     name="resolution_mode",
     create_type=False,
 )
