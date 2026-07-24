@@ -46,6 +46,7 @@ Coûts concrets :
 ### persons (resolution_mode, id_type)
 
 - [x] `resolution_mode` Literal → StrEnum `ResolutionMode` (`domain/persons/matching.py`) ; `RESOLUTION_MODE_BY_REASON` mappe vers des membres, `tables.py` déballe l'enum (`*ResolutionMode`) au lieu de `get_args`.
+- [x] `id_type` chaînes → StrEnum `PersonIdentifierType` (`domain/persons/identifiers.py`) ; `PERSON_IDENTIFIER_TYPES` = `tuple(PersonIdentifierType)`, `PUBLIC_PERSON_IDENTIFIER_TYPES` = sous-ensemble de membres, dispatch `_IDENTIFIER_VALUE_OBJECTS` keyé par membres. Les littéraux `id_type` disséminés en SQL (filtres de lecture, matching) relèvent de l'exploitation aval.
 
 ### Exploitation en SQL
 

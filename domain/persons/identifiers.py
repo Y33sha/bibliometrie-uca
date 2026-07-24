@@ -37,28 +37,35 @@ class AttributionStatus(StrEnum):
 
 
 # ── Types d'identifiants côté référentiel personnes ───────────────
-#
-# Deux listes, à ne pas confondre :
-#
-# - `PERSON_IDENTIFIER_TYPES` : liste **complète** des id_types
-#   admissibles dans la table `person_identifiers`. Utilisée par la
-#   promotion canonique depuis les `source_authorships`
-#   (`add_identifiers_from_authorships`). Inclut `hal_person_id` —
-#   identifiant interne HAL conservé pour la dédup cross-source mais
-#   **jamais exposé en UI**.
-#
-# - `PUBLIC_PERSON_IDENTIFIER_TYPES` : sous-ensemble **visible UI**.
-#   Utilisée par les filtres SQL côté lecture (page personne, liste
-#   persons, doublons) et par la validation des routes d'ajout par
-#   l'utilisatrice. `hal_person_id` exclu pour ne jamais le faire
-#   remonter dans l'UI.
-#
-# Tout nouvel id_type accepté en base doit être ajouté à au moins
-# `PERSON_IDENTIFIER_TYPES`, et à `PUBLIC_...` s'il doit apparaître
-# en UI.
 
-PERSON_IDENTIFIER_TYPES: tuple[str, ...] = ("orcid", "idhal", "idref", "hal_person_id")
-PUBLIC_PERSON_IDENTIFIER_TYPES: tuple[str, ...] = ("orcid", "idhal", "idref")
+
+class PersonIdentifierType(StrEnum):
+    """Type d'un identifiant de personne, valeur de `person_identifiers.id_type`. `hal_person_id` est l'identifiant interne HAL, conservé pour la dédup cross-source mais jamais exposé en UI."""
+
+    ORCID = "orcid"
+    IDHAL = "idhal"
+    IDREF = "idref"
+    HAL_PERSON_ID = "hal_person_id"
+
+
+# Deux vues du vocabulaire, à ne pas confondre :
+#
+# - `PERSON_IDENTIFIER_TYPES` : liste complète des types admissibles dans
+#   `person_identifiers`. Utilisée par la promotion canonique depuis les
+#   `source_authorships` (`add_identifiers_from_authorships`).
+# - `PUBLIC_PERSON_IDENTIFIER_TYPES` : sous-ensemble visible UI. Utilisée par les
+#   filtres SQL côté lecture (page personne, liste persons, doublons) et par la
+#   validation des routes d'ajout par l'utilisatrice ; `hal_person_id` en est exclu.
+#
+# Un type ajouté à l'enum entre automatiquement dans `PERSON_IDENTIFIER_TYPES`, et
+# dans `PUBLIC_...` seulement s'il doit apparaître en UI.
+
+PERSON_IDENTIFIER_TYPES: tuple[PersonIdentifierType, ...] = tuple(PersonIdentifierType)
+PUBLIC_PERSON_IDENTIFIER_TYPES: tuple[PersonIdentifierType, ...] = (
+    PersonIdentifierType.ORCID,
+    PersonIdentifierType.IDHAL,
+    PersonIdentifierType.IDREF,
+)
 
 # ── ORCID ──────────────────────────────────────────────────────────
 
@@ -259,10 +266,10 @@ class HalPersonId:
 # ── Validation d'un identifiant par type ──────────────────────────
 
 _IDENTIFIER_VALUE_OBJECTS: dict[str, type[ORCID | IdHAL | IdRef | HalPersonId]] = {
-    "orcid": ORCID,
-    "idhal": IdHAL,
-    "idref": IdRef,
-    "hal_person_id": HalPersonId,
+    PersonIdentifierType.ORCID: ORCID,
+    PersonIdentifierType.IDHAL: IdHAL,
+    PersonIdentifierType.IDREF: IdRef,
+    PersonIdentifierType.HAL_PERSON_ID: HalPersonId,
 }
 
 
