@@ -6,7 +6,7 @@ Implémente `application.ports.pipeline.oa_status.OaStatusQueries`, consommé pa
 from sqlalchemy import Connection, text
 
 from application.ports.pipeline.oa_status import OaStatusQueries, PublicationOaCheck
-from domain.publications.metadata import OPEN_ARCHIVE_SOURCES
+from domain.publications.metadata import OPEN_ARCHIVE_SOURCES, OaStatus
 
 # Publications à (re)vérifier : à DOI, jamais vérifiées ou périmées (> `:stale` jours).
 _STALE_WHERE = """
@@ -29,13 +29,13 @@ def fetch_publications_with_doi(
     """
     rows = conn.execute(
         text(
-            """
+            f"""
             SELECT id, doi, oa_status::text AS oa_status,
                    EXISTS (
                        SELECT 1 FROM source_publications s
                        WHERE s.publication_id = publications.id
                          AND s.source::text = ANY(:open_archive_sources)
-                         AND s.oa_status::text = 'green'
+                         AND s.oa_status::text = '{OaStatus.GREEN.value}'
                    ) AS has_open_deposit
             FROM publications
             WHERE """
@@ -66,8 +66,8 @@ def count_publications_by_oa_status(conn: Connection) -> dict[str, int]:
     """Répartition des publications par statut OA (`oa_status` → nombre)."""
     rows = conn.execute(
         text(
-            "SELECT COALESCE(oa_status::text, 'unknown') AS status, count(*) AS n "
-            "FROM publications GROUP BY COALESCE(oa_status::text, 'unknown')"
+            f"SELECT COALESCE(oa_status::text, '{OaStatus.UNKNOWN.value}') AS status, count(*) AS n "
+            f"FROM publications GROUP BY COALESCE(oa_status::text, '{OaStatus.UNKNOWN.value}')"
         )
     ).all()
     return {r.status: int(r.n) for r in rows}

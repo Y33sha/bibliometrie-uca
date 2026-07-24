@@ -13,7 +13,9 @@ from application.ports.pipeline.relations import (
     SharedKeyPair,
     TitleMatch,
 )
+from domain.publications.doc_types import DocType
 from domain.source_publications.keys import DISCRIMINANT_TITLE_MIN_LENGTH, ConfirmationKey
+from domain.sources.registry import Source
 
 # Écart d'années toléré entre une œuvre dépendante et son parent, dans les deux sens : un erratum suit son article (parent dans `[année − N … année]`), une version publiée suit son preprint (parent dans `[année … année + N]`).
 _TITLE_MATCH_YEAR_WINDOW = 2
@@ -21,13 +23,13 @@ _TITLE_MATCH_YEAR_WINDOW = 2
 
 def fetch_declared_relation_sources(conn: Connection) -> list[DeclaredRelationSource]:
     rows = conn.execute(
-        text("""
+        text(f"""
             SELECT sp.publication_id, sp.source::text AS source, sp.meta
             FROM source_publications sp
             WHERE sp.publication_id IS NOT NULL
               AND (
-                    (sp.source = 'datacite' AND sp.meta ? 'related_identifiers')
-                 OR (sp.source = 'crossref' AND sp.meta ? 'relation')
+                    (sp.source = '{Source.DATACITE.value}' AND sp.meta ? 'related_identifiers')
+                 OR (sp.source = '{Source.CROSSREF.value}' AND sp.meta ? 'relation')
               )
         """)
     ).all()
@@ -76,10 +78,11 @@ def fetch_shared_key_pairs(conn: Connection) -> list[SharedKeyPair]:
 def fetch_declared_related_pairs(conn: Connection) -> set[frozenset[int]]:
     """Paires de publications déjà reliées par une relation **déclarée** (signal #1), cibles résolues au corpus. Sert à écarter un `is_related_to` (signal #2) redondant sur une paire déjà typée précisément."""
     rows = conn.execute(
-        text("""
+        text(f"""
             SELECT from_publication_id AS a, target_publication_id AS b
             FROM publication_relations
-            WHERE source IN ('datacite', 'crossref') AND target_publication_id IS NOT NULL
+            WHERE source IN ('{Source.DATACITE.value}', '{Source.CROSSREF.value}')
+              AND target_publication_id IS NOT NULL
         """)
     ).all()
     return {frozenset((r.a, r.b)) for r in rows}
@@ -90,15 +93,17 @@ _ERRATUM_TITLE_MATCHES_SQL = text(f"""
     WITH child AS (
         SELECT id, title_normalized AS t, pub_year AS y
         FROM publications
-        WHERE doc_type = 'erratum' AND title_normalized IS NOT NULL AND pub_year IS NOT NULL
+        WHERE doc_type = '{DocType.ERRATUM.value}'
+          AND title_normalized IS NOT NULL AND pub_year IS NOT NULL
     ),
     candidate AS (
         SELECT c.id AS child_id, p.id AS parent_id, p.doi AS parent_doi,
-               (p.doc_type::text NOT IN ('preprint', 'dataset')) AS substantive
+               (p.doc_type::text NOT IN ('{DocType.PREPRINT.value}', '{DocType.DATASET.value}'))
+                   AS substantive
         FROM child c
         JOIN publications p
           ON p.id <> c.id
-         AND p.doc_type <> 'erratum'
+         AND p.doc_type <> '{DocType.ERRATUM.value}'
          AND length(p.title_normalized) > {DISCRIMINANT_TITLE_MIN_LENGTH}
          AND p.pub_year BETWEEN c.y - {_TITLE_MATCH_YEAR_WINDOW} AND c.y
          AND right(c.t, length(p.title_normalized)) = p.title_normalized
@@ -118,15 +123,15 @@ _PREPRINT_TITLE_MATCHES_SQL = text(f"""
     WITH child AS (
         SELECT id, title_normalized AS t, pub_year AS y
         FROM publications
-        WHERE doc_type = 'preprint' AND title_normalized IS NOT NULL
+        WHERE doc_type = '{DocType.PREPRINT.value}' AND title_normalized IS NOT NULL
           AND length(title_normalized) > {DISCRIMINANT_TITLE_MIN_LENGTH} AND pub_year IS NOT NULL
     ),
     candidate AS (
         SELECT c.id AS child_id, p.id AS parent_id, p.doi AS parent_doi,
-               (p.doc_type::text <> 'dataset') AS substantive
+               (p.doc_type::text <> '{DocType.DATASET.value}') AS substantive
         FROM child c
         JOIN publications p
-          ON p.doc_type <> 'preprint'
+          ON p.doc_type <> '{DocType.PREPRINT.value}'
          AND p.title_normalized = c.t
          AND length(p.title_normalized) > {DISCRIMINANT_TITLE_MIN_LENGTH}
          AND p.pub_year BETWEEN c.y AND c.y + {_TITLE_MATCH_YEAR_WINDOW}
