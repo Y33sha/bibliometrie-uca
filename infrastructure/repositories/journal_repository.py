@@ -12,7 +12,11 @@ from typing import Any, NamedTuple, cast
 from sqlalchemy import Connection, case, delete, func, literal, or_, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from application.ports.repositories.journal_repository import JournalIssnRow, JournalUpdate
+from application.ports.repositories.journal_repository import (
+    JournalIssnRow,
+    JournalRepository,
+    JournalUpdate,
+)
 from domain.errors import NotFoundError
 from domain.journals.journal import Journal, JournalType, OaModel
 from domain.normalize import normalize_text
@@ -67,7 +71,7 @@ def _journal_from_row(row: _JournalRow) -> Journal:
     )
 
 
-class PgJournalRepository:
+class PgJournalRepository(JournalRepository):
     """Accès PostgreSQL à l'agrégat Journal via une `Connection` SA."""
 
     def __init__(self, conn: Connection) -> None:

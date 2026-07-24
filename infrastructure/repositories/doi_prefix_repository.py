@@ -5,10 +5,13 @@ Implémente `DoiPrefixRepository`. Sert la phase `resolve_ra` (lecture des préf
 
 from sqlalchemy import Connection, text
 
-from application.ports.repositories.doi_prefix_repository import PendingPublisherPrefix
+from application.ports.repositories.doi_prefix_repository import (
+    DoiPrefixRepository,
+    PendingPublisherPrefix,
+)
 
 
-class PgDoiPrefixRepository:
+class PgDoiPrefixRepository(DoiPrefixRepository):
     """Accès PostgreSQL à `doi_prefixes` via une `Connection` SA."""
 
     def __init__(self, conn: Connection) -> None:

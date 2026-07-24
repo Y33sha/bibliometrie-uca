@@ -13,6 +13,7 @@ from application.ports.repositories.structure_repository import (
     StructureNameFormUpdateFields,
     StructureRelationDeletedRow,
     StructureRelationRow,
+    StructureRepository,
     StructureRow,
     StructureUpdateFields,
 )
@@ -121,7 +122,7 @@ def _structure_returning_columns() -> list:
     ]
 
 
-class PgStructureRepository:
+class PgStructureRepository(StructureRepository):
     """Accès PostgreSQL sync à l'agrégat Structure."""
 
     def __init__(self, conn: Connection) -> None:

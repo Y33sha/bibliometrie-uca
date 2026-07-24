@@ -2,11 +2,12 @@
 
 from sqlalchemy import Connection, update
 
+from application.ports.repositories.config_repository import ConfigRepository
 from domain.types import JsonValue
 from infrastructure.db.tables import config
 
 
-class PgConfigRepository:
+class PgConfigRepository(ConfigRepository):
     """Accès PostgreSQL sync à la table `config`."""
 
     def __init__(self, conn: Connection) -> None:
