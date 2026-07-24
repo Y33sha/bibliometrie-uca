@@ -137,7 +137,7 @@ class PgAuthorshipRepository:
     def recompute_authorship_in_perimeter(
         self, publication_id: int, person_id: int, sources: tuple[str, ...]
     ) -> None:
-        """Réagrège `authorships.in_perimeter` (OR des signatures) pour la paire.
+        """Recalcule `authorships.in_perimeter` (OR des signatures) pour la paire.
 
         Les structures dérivées vivent dans la matview `authorship_structures`, rafraîchie par le caller.
         """
@@ -158,8 +158,7 @@ class PgAuthorshipRepository:
             {"pub": publication_id, "pid": person_id},
         )
 
-    # ── source_authorships : lien personne ↔ signature ─────────────
-    # `source_authorships.person_id` pose qu'une signature est portée par une personne. Sa sémantique de suppression (`ON DELETE SET NULL`) le range côté signature : effacer la personne rend la signature orpheline ; la ligne survit.
+    # ── source_authorships : lien personne ↔ signature
 
     def link_authorship(
         self,

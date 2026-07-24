@@ -1,8 +1,6 @@
 """Query service : résolution des affiliations sur `source_authorships`, phase `affiliations`.
 
 Appelé par `application/pipeline/affiliations/populate_affiliations.py` : rafraîchit la matview `source_authorship_structures`, puis pose `in_perimeter` depuis celle-ci.
-
-Deux périmètres se composent. La matview est bornée au périmètre d'extraction, qu'elle lit par sa jointure sur `perimeter_structures` ; `sync_in_perimeter` la filtre ensuite sur les structures que l'appelant lui passe, celles du périmètre des personnes (`get_persons_structure_ids_list`).
 """
 
 from sqlalchemy import Connection, text
