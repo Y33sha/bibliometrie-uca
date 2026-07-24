@@ -1,12 +1,13 @@
 """Adapter PostgreSQL pour l'écriture dans `audit_log`."""
 
-from typing import Any
+from sqlalchemy import Connection, insert
 
-from sqlalchemy import Connection, text
+from domain.types import JsonValue
+from infrastructure.db.tables import audit_log
 
 
 class PgAuditRepository:
-    """Accès PostgreSQL sync à `audit_log` via une `Connection` SA."""
+    """Accès PostgreSQL sync à `audit_log` via une `Connection` SQLAlchemy."""
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
@@ -16,27 +17,15 @@ class PgAuditRepository:
         event_type: str,
         aggregate_type: str,
         aggregate_id: int | None,
-        payload: dict[str, Any],
+        payload: dict[str, JsonValue],
         user_id: str,
     ) -> None:
         self._conn.execute(
-            text(
-                "INSERT INTO audit_log "
-                "(event_type, aggregate_type, aggregate_id, payload, user_id) "
-                "VALUES (:event_type, :aggregate_type, :aggregate_id, "
-                "        CAST(:payload AS jsonb), :user_id)"
-            ),
-            {
-                "event_type": event_type,
-                "aggregate_type": aggregate_type,
-                "aggregate_id": aggregate_id,
-                "payload": _json_dumps(payload),
-                "user_id": user_id,
-            },
+            insert(audit_log).values(
+                event_type=event_type,
+                aggregate_type=aggregate_type,
+                aggregate_id=aggregate_id,
+                payload=payload,
+                user_id=user_id,
+            )
         )
-
-
-def _json_dumps(value: dict[str, Any]) -> str:
-    import json
-
-    return json.dumps(value)
