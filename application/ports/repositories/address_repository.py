@@ -11,7 +11,7 @@ from typing import Protocol
 class AddressCountryFilter:
     """Critères de sélection d'adresses pour une attribution de pays en masse.
 
-    Combinés en AND. `has_country` : True → `countries` renseigné, False → NULL, None → critère inactif. `country_code` / `suggested_country` : code présent dans la colonne correspondante."""
+    Combinés en AND. `search` : sous-chaîne cherchée dans `raw_text` (ILIKE, insensible à la casse et aux accents). `has_country` : True → `countries` renseigné, False → NULL, None → critère inactif. `country_code` / `suggested_country` : code présent dans la colonne correspondante."""
 
     search: str | None = None
     has_country: bool | None = None
@@ -32,16 +32,7 @@ class AddressCountryFilter:
 class AddressRepository(Protocol):
     """Contrat d'accès aux tables addresses, address_structures, et propagations vers source_publications/publications.countries."""
 
-    # ── Référentiel pays ───────────────────────────────────────────
-
-    def country_exists(self, code: str) -> bool:
-        """Le code figure-t-il au référentiel `countries` ?
-
-        `addresses.countries` est un tableau : aucune clé étrangère ne peut en garder les éléments, et les écritures de pays s'appuient sur cette lecture.
-        """
-        ...
-
-    # ── Liens address ↔ structure ──────────────────────────────────
+    # ── Liens adresse ↔ structure ──────────────────────────────────
 
     def reset_manual_link(self, address_id: int, structure_id: int) -> None:
         """Annule la décision manuelle sur un rattachement : supprime le lien s'il est purement manuel (`matched_form_id IS NULL` — aucune détection ne l'atteste), et repasse `is_confirmed` à NULL (pending) sur la détection qui subsiste."""
@@ -86,12 +77,19 @@ class AddressRepository(Protocol):
 
     # ── Pays ───────────────────────────────────────────────────────
 
+    def country_exists(self, code: str) -> bool:
+        """Le code figure-t-il au référentiel `countries` ?
+
+        `addresses.countries` est un tableau : aucune clé étrangère ne peut en garder les éléments, et les écritures de pays s'appuient sur cette lecture.
+        """
+        ...
+
     def set_countries(
         self,
         address_id: int,
         countries: list[str] | None,
     ) -> None:
-        """Écrit les `countries` d'une adresse. Liste vide ou `None` : la colonne repasse à NULL."""
+        """Écrit les `countries` d'une adresse. Liste vide ou `None` : la colonne repasse à NULL. Lève `NotFoundError` si l'adresse est introuvable."""
         ...
 
     def batch_add_country_by_ids(
