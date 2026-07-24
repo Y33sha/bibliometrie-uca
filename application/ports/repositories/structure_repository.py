@@ -119,7 +119,9 @@ class StructureRepository(Protocol):
         self,
         structure_id: int,
         fields: StructureUpdateFields,
-    ) -> StructureRow: ...
+    ) -> StructureRow:
+        """Applique une modification sélective (`StructureUpdateFields`) et retourne la ligne. Lève `NotFoundError` si la structure est introuvable."""
+        ...
 
     def delete_structure(self, structure_id: int) -> StructureDeletedRow | None: ...
 
@@ -135,7 +137,9 @@ class StructureRepository(Protocol):
         parent_id: int,
         child_id: int,
         relation_type: str,
-    ) -> StructureRelationRow | None: ...
+    ) -> StructureRelationRow | None:
+        """Crée une relation parent-enfant et retourne la ligne, ou `None` si elle existe déjà (`(parent_id, child_id, relation_type)` en conflit)."""
+        ...
 
     def delete_relation(self, relation_id: int) -> StructureRelationDeletedRow | None: ...
 
@@ -157,6 +161,8 @@ class StructureRepository(Protocol):
         self,
         form_id: int,
         fields: StructureNameFormUpdateFields,
-    ) -> StructureNameFormRow: ...
+    ) -> StructureNameFormRow:
+        """Applique une modification sélective (`StructureNameFormUpdateFields`) et retourne la ligne. Lève `NotFoundError` si la forme est introuvable."""
+        ...
 
     def delete_name_form(self, form_id: int) -> StructureNameFormDeletedRow | None: ...

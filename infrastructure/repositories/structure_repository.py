@@ -312,8 +312,10 @@ class PgStructureRepository(StructureRepository):
             .values(**fields)
             .returning(*_NAME_FORM_COLUMNS)
         )
-        result = self._conn.execute(stmt)
-        return cast(StructureNameFormRow, dict(result.one()._mapping))
+        row = self._conn.execute(stmt).one_or_none()
+        if row is None:
+            raise NotFoundError(f"Forme {form_id} introuvable")
+        return cast(StructureNameFormRow, dict(row._mapping))
 
     def delete_name_form(self, form_id: int) -> StructureNameFormDeletedRow | None:
         stmt = (
