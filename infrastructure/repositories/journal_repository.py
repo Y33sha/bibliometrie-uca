@@ -72,7 +72,7 @@ def _journal_from_row(row: _JournalRow) -> Journal:
 
 
 class PgJournalRepository(JournalRepository):
-    """Accès PostgreSQL à l'agrégat Journal via une `Connection` SA."""
+    """Accès PostgreSQL à l'agrégat Journal via une `Connection` SQLAlchemy."""
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
@@ -110,7 +110,6 @@ class PgJournalRepository(JournalRepository):
         form_normalized: str,
         publisher_id: int | None,
     ) -> None:
-        """Ajoute une forme de nom de journal si elle est absente (idempotent). No-op si form_normalized est vide."""
         if not form_normalized:
             return
         stmt = (
@@ -129,7 +128,6 @@ class PgJournalRepository(JournalRepository):
         form_normalized: str,
         publisher_id: int | None,
     ) -> int | None:
-        """Cherche un journal_id via une forme de nom normalisée, en privilégiant les journaux avec eISSN (plus fiable)."""
         stmt = (
             select(journal_name_forms.c.journal_id)
             .select_from(
@@ -154,16 +152,11 @@ class PgJournalRepository(JournalRepository):
     # ── journals ───────────────────────────────────────────────────
 
     def find_journal_by_openalex_id(self, openalex_id: str) -> int | None:
-        """Cherche un journal par son openalex_id."""
         return self._conn.execute(
             select(journals.c.id).where(journals.c.openalex_id == openalex_id)
         ).scalar_one_or_none()
 
     def find_journals_of_unknown_type(self, *, limit: int | None = None) -> list[tuple[int, str]]:
-        """`(id, openalex_id)` des revues à typer via OpenAlex.
-
-        Filtre : `openalex_id` renseigné ET `journal_type = 'unknown'`. Le type est stable par revue : une revue créée naît `unknown` (défaut DB), est typée au passage, puis sort de la file. L'APC est extrait opportunistement dans la même réponse OpenAlex.
-        """
         rows = self._conn.execute(
             select(journals.c.id, journals.c.openalex_id)
             .where(journals.c.openalex_id.is_not(None))
@@ -174,7 +167,6 @@ class PgJournalRepository(JournalRepository):
         return [(r.id, r.openalex_id) for r in rows]
 
     def find_journal_issn_index(self) -> list[JournalIssnRow]:
-        """Les revues portant au moins un ISSN, sous l'une des trois formes."""
         return [
             JournalIssnRow(r.id, r.issn, r.eissn, r.issnl)
             for r in self._conn.execute(
@@ -189,7 +181,6 @@ class PgJournalRepository(JournalRepository):
         ]
 
     def find_journal_by_issn_any(self, issn_value: str) -> int | None:
-        """Cherche un journal dont l'un des 3 champs issn/eissn/issnl correspond à la valeur. Permet de chercher indifféremment par ISSN, eISSN ou ISSN-L."""
         return self._conn.execute(
             select(journals.c.id)
             .where(
@@ -212,10 +203,7 @@ class PgJournalRepository(JournalRepository):
         openalex_id: str | None = None,
         oa_model: OaModel | None = None,
     ) -> None:
-        """Enrichit un journal existant avec les champs non-null fournis (COALESCE par champ : une valeur en place tient).
-
-        Garde anti-bloat : l'UPDATE n'est émis que si au moins une colonne actuellement NULL recevrait une valeur. Un journal populaire, partagé par des milliers de publications, est matché en masse pendant `normalize` ; borner l'écriture aux vrais remplissages épargne les tuples morts et garde les lookups rapides.
-        """
+        # L'UPDATE n'est émis que si au moins une colonne NULL recevrait une valeur.
         fillable = (
             (journals.c.issn, issn),
             (journals.c.eissn, eissn),
@@ -274,10 +262,6 @@ class PgJournalRepository(JournalRepository):
     # ── Updates génériques ─────────────────────────────────────────
 
     def update_journal_fields(self, journal_id: int, fields: JournalUpdate) -> None:
-        """UPDATE dynamique sur journals à partir des champs fournis, `title_normalized` dérivé de `title` quand il est présent.
-
-        L'`UPDATE` rapporte les lignes appariées : zéro dit l'absence, sans lecture préalable. La non-vacuité des champs est vérifiée par le service.
-        """
         data = fields.model_dump(exclude_unset=True)
         if data.get("title") is not None:
             data["title_normalized"] = normalize_text(data["title"])
@@ -295,7 +279,6 @@ class PgJournalRepository(JournalRepository):
         apc_amount: float | None = None,
         apc_currency: str | None = None,
     ) -> None:
-        """Met à jour les infos APC (COALESCE : champs None ignorés)."""
         stmt = (
             update(journals)
             .where(journals.c.id == journal_id)
@@ -314,7 +297,6 @@ class PgJournalRepository(JournalRepository):
         imported_at: datetime,
         is_in_doaj: bool,
     ) -> None:
-        """Pose `doaj_payload`/`doaj_imported_at`/`is_in_doaj` en bloc."""
         stmt = (
             update(journals)
             .where(journals.c.id == journal_id)
@@ -327,16 +309,11 @@ class PgJournalRepository(JournalRepository):
         self._conn.execute(stmt)
 
     def reset_is_in_doaj(self) -> int:
-        """Efface le drapeau `is_in_doaj` des revues qui le portent.
-
-        Le `WHERE is_in_doaj` donne un rowcount juste et épargne des dead tuples : sans lui, l'UPDATE réécrirait toute la table.
-        """
         return self._conn.execute(
             update(journals).where(journals.c.is_in_doaj).values(is_in_doaj=False)
         ).rowcount
 
     def doaj_last_import_at(self) -> datetime | None:
-        """Date du dernier import DOAJ, `None` si jamais importé."""
         return self._conn.execute(select(func.max(journals.c.doaj_imported_at))).scalar_one()
 
     # ── Fusion ─────────────────────────────────────────────────────
@@ -345,15 +322,7 @@ class PgJournalRepository(JournalRepository):
         self,
         target_publisher_id: int,
         source_publisher_id: int,
-    ) -> list[dict]:
-        """Retourne les paires de journaux (un du target, un du source)
-        qui partagent le même `title_normalized`.
-
-        Chaque ligne contient `target_journal_id`, `source_journal_id`,
-        et les 6 valeurs ISSN/eISSN/ISSN-L des deux côtés — tout est
-        récupéré en une seule requête pour permettre au service de
-        détecter les conflits ISSN sans SELECT additionnel.
-        """
+    ) -> list[dict[str, Any]]:
         jt = journals.alias("jt")
         js = journals.alias("js")
         stmt = (
@@ -376,17 +345,7 @@ class PgJournalRepository(JournalRepository):
         return [dict(r._mapping) for r in self._conn.execute(stmt)]
 
     def merge_journal_into(self, target_id: int, source_id: int) -> None:
-        """Fusion de journal (une transaction) :
-        1. Transfert des publications et source_publications
-        2. Transfert/dédup des journal_name_forms
-        3. Transfert des apc_payments
-        4. Suppression de la source
-        5. Enrichissement COALESCE de la cible depuis les valeurs capturées de la source
-
-        La source est supprimée avant l'enrichissement : la cible reprend alors son `openalex_id` (COALESCE) sans buter sur la contrainte `UNIQUE`, l'enrichissement lisant des valeurs déjà capturées.
-
-        Les UPDATEs cross-agrégat (publications, source_publications, apc_payments) restent en `text()` : leurs tables ne sont pas dans la MetaData côté `infrastructure/db/tables.py` (gérées par leurs propres repos).
-        """
+        # publications, source_publications et apc_payments vivent hors de la MetaData de `tables.py` : accès en `text()`.
         self._conn.execute(
             text("UPDATE publications SET journal_id = :t WHERE journal_id = :s"),
             {"t": target_id, "s": source_id},
