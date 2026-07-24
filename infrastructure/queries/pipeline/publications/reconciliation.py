@@ -9,7 +9,7 @@ from application.ports.pipeline.publications.reconciliation import (
     PublicationsReconciliationQueries,
     ReconcileRow,
 )
-from domain.source_publications.keys import DISCRIMINANT_TITLE_MIN_LENGTH
+from domain.source_publications.keys import DISCRIMINANT_TITLE_MIN_LENGTH, ConfirmationKey
 
 
 def fetch_dirty_source_publication_ids(conn: Connection) -> list[int]:
@@ -32,6 +32,20 @@ _COLS = (
     "EXISTS (SELECT 1 FROM source_authorships sa "
     "WHERE sa.source_publication_id = {a}.id AND sa.in_perimeter) AS in_perimeter"
 )
+
+# Un bras UNION par clé de confirmation scalaire d'`external_ids` : égalité directe (index btree). `hal_id` (array) a son propre bras.
+_SCALAR_CONFIRMATION_KEYS = (ConfirmationKey.NNT, ConfirmationKey.PMID, ConfirmationKey.ARXIV_ID)
+_SCALAR_KEY_ARMS = "".join(
+    f"""
+    UNION
+    SELECT {_COLS.format(a="o")}
+    FROM dirty d
+    JOIN source_publications o ON o.external_ids ->> '{k}' = d.external_ids ->> '{k}'
+    LEFT JOIN publications p ON p.id = o.publication_id
+    WHERE d.external_ids ? '{k}'"""
+    for k in _SCALAR_CONFIRMATION_KEYS
+)
+
 _UNIVERSE_SQL = text(f"""
     WITH dirty AS (
         SELECT {_COLS.format(a="sd")}
@@ -50,25 +64,14 @@ _UNIVERSE_SQL = text(f"""
     JOIN source_publications o ON o.doi IS NOT NULL AND o.doi = d.doi
     LEFT JOIN publications p ON p.id = o.publication_id
     WHERE d.doi IS NOT NULL
+    {_SCALAR_KEY_ARMS}
     UNION
     SELECT {_COLS.format(a="o")}
     FROM dirty d
-    JOIN source_publications o ON o.external_ids ->> 'nnt' = d.external_ids ->> 'nnt'
+    CROSS JOIN LATERAL jsonb_array_elements_text(d.external_ids -> '{ConfirmationKey.HAL_ID}') AS dh(hal)
+    JOIN source_publications o ON o.external_ids -> '{ConfirmationKey.HAL_ID}' @> jsonb_build_array(dh.hal)
     LEFT JOIN publications p ON p.id = o.publication_id
-    WHERE d.external_ids ? 'nnt'
-    UNION
-    SELECT {_COLS.format(a="o")}
-    FROM dirty d
-    JOIN source_publications o ON o.external_ids ->> 'pmid' = d.external_ids ->> 'pmid'
-    LEFT JOIN publications p ON p.id = o.publication_id
-    WHERE d.external_ids ? 'pmid'
-    UNION
-    SELECT {_COLS.format(a="o")}
-    FROM dirty d
-    CROSS JOIN LATERAL jsonb_array_elements_text(d.external_ids -> 'hal_id') AS dh(hal)
-    JOIN source_publications o ON o.external_ids -> 'hal_id' @> jsonb_build_array(dh.hal)
-    LEFT JOIN publications p ON p.id = o.publication_id
-    WHERE jsonb_typeof(d.external_ids -> 'hal_id') = 'array'
+    WHERE jsonb_typeof(d.external_ids -> '{ConfirmationKey.HAL_ID}') = 'array'
     UNION
     -- Token metadata_block : même doc_type + titre + année, pour tout doc_type, titre assez long.
     SELECT {_COLS.format(a="o")}
