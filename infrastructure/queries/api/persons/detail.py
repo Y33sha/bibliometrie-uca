@@ -19,6 +19,8 @@ from application.ports.api.persons_queries import (
     PersonThesis,
 )
 from application.ports.api.subjects_queries import SubjectFrequency
+from domain.sources.registry import Source
+from domain.structures.structure import StructureType
 from infrastructure.queries.api.filters import OA_DASHBOARD_COLS_SQL, entity_subjects_sql
 from infrastructure.queries.api.persons.identifiers import public_identifiers
 
@@ -55,9 +57,9 @@ def person_profile(conn: Connection, person_id: int) -> PersonProfileResponse | 
 
     # Reconstitution des « comptes HAL » depuis `source_authorships`, agrégés par hal_person_id (1 row par compte). MIN() sur les champs descriptifs : arbitraire mais déterministe, en théorie constants pour un même hal_person_id.
     hal_rows = conn.execute(
-        text("""
+        text(f"""
             SELECT MIN(sa.id) AS id,
-                   'hal' AS source,
+                   '{Source.HAL.value}' AS source,
                    MIN(sa.raw_author_name) AS full_name,
                    MIN(aik.person_identifiers->>'orcid') AS orcid,
                    MIN(aik.person_identifiers->>'idhal') AS idhal,
@@ -66,7 +68,7 @@ def person_profile(conn: Connection, person_id: int) -> PersonProfileResponse | 
                    COUNT(*) FILTER (WHERE sa.in_perimeter = TRUE) AS in_perimeter_signature_count
             FROM source_authorships sa
             JOIN author_identifying_keys aik ON aik.id = sa.identity_id
-            WHERE sa.source = 'hal'
+            WHERE sa.source = '{Source.HAL.value}'
               AND sa.person_id = :pid
               AND aik.person_identifiers->>'hal_person_id' IS NOT NULL
             GROUP BY aik.person_identifiers->>'hal_person_id'
@@ -75,15 +77,15 @@ def person_profile(conn: Connection, person_id: int) -> PersonProfileResponse | 
     ).all()
 
     oa_rows = conn.execute(
-        text("""
+        text(f"""
             SELECT MIN(sa.id) AS id,
                    sa.raw_author_name AS full_name,
-                   'openalex' AS source,
+                   '{Source.OPENALEX.value}' AS source,
                    NULL::text AS orcid, NULL::text AS idhal,
                    NULL::int AS hal_person_id, NULL::text AS openalex_id,
                    COUNT(*) FILTER (WHERE sa.in_perimeter = TRUE) AS in_perimeter_signature_count
             FROM source_authorships sa
-            WHERE sa.source = 'openalex' AND sa.person_id = :pid
+            WHERE sa.source = '{Source.OPENALEX.value}' AND sa.person_id = :pid
             GROUP BY sa.raw_author_name
         """),
         {"pid": person_id},
@@ -91,28 +93,28 @@ def person_profile(conn: Connection, person_id: int) -> PersonProfileResponse | 
 
     # WoS : group by raw_author_name comme OpenAlex. ORCID lu depuis l'identité de la signature (`author_identifying_keys.person_identifiers`).
     wos_rows = conn.execute(
-        text("""
+        text(f"""
             SELECT MIN(sa.id) AS id,
                    sa.raw_author_name AS full_name,
-                   'wos' AS source,
+                   '{Source.WOS.value}' AS source,
                    MAX(aik.person_identifiers->>'orcid') AS orcid,
                    NULL::text AS idhal, NULL::int AS hal_person_id, NULL::text AS openalex_id,
                    COUNT(*) FILTER (WHERE sa.in_perimeter = TRUE) AS in_perimeter_signature_count
             FROM source_authorships sa
             JOIN author_identifying_keys aik ON aik.id = sa.identity_id
-            WHERE sa.source = 'wos' AND sa.person_id = :pid
+            WHERE sa.source = '{Source.WOS.value}' AND sa.person_id = :pid
             GROUP BY sa.raw_author_name
         """),
         {"pid": person_id},
     ).all()
 
     theses_count_row = conn.execute(
-        text("""
+        text(f"""
             SELECT COUNT(*) AS n
             FROM source_authorships sa
             JOIN source_publications sd ON sd.id = sa.source_publication_id
             WHERE sa.person_id = :pid
-              AND sa.source = 'theses'
+              AND sa.source = '{Source.THESES.value}'
               AND NOT (sa.roles && ARRAY['author']::text[])
               AND sd.publication_id IS NOT NULL
         """),
@@ -153,7 +155,7 @@ def person_theses(conn: Connection, person_id: int) -> PersonThesesResponse:
     Les rôles proviennent de la table `authorships` canonique. Le périmètre se limite aux thèses (`source = 'theses'`, via `EXISTS`) : les autres sources portent des rôles non-auteur étrangers à cette page.
     """
     rows = conn.execute(
-        text("""
+        text(f"""
             SELECT p.id, p.title, p.pub_year, p.doi,
                    a.roles,
                    author.author_name,
@@ -163,7 +165,7 @@ def person_theses(conn: Connection, person_id: int) -> PersonThesesResponse:
                     JOIN authorship_structures aus ON aus.authorship_id = a2.id
                     JOIN structures st ON st.id = aus.structure_id
                     WHERE a2.publication_id = p.id AND a2.in_perimeter
-                      AND st.structure_type = 'labo'
+                      AND st.structure_type = '{StructureType.LABO.value}'
                    ) AS structure_ids
             FROM authorships a
             JOIN publications p ON p.id = a.publication_id
@@ -180,7 +182,7 @@ def person_theses(conn: Connection, person_id: int) -> PersonThesesResponse:
               AND NOT (a.roles && ARRAY['author']::text[])
               AND EXISTS (
                   SELECT 1 FROM source_authorships sa
-                  WHERE sa.authorship_id = a.id AND sa.source = 'theses'
+                  WHERE sa.authorship_id = a.id AND sa.source = '{Source.THESES.value}'
               )
             ORDER BY p.pub_year DESC NULLS LAST, p.title
         """),

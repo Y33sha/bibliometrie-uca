@@ -25,7 +25,10 @@ from application.ports.api.persons_queries import (
     OverlapCountsOut,
     SharingPersonOut,
 )
+from domain.persons.identifiers import PERSON_IDENTIFIER_TYPES, AttributionStatus
+from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE
 from domain.persons.name_matching import names_compatible
+from domain.structures.structure import StructureType
 from infrastructure.queries.sources_sql import AUTHOR_SOURCES_SQL
 
 # ── Name-form authorships ────────────────────────────────────────
@@ -92,7 +95,9 @@ def name_form_authorships(
 # ── File de triage : formes de nom ambiguës ──────────────────────
 
 # Une forme portée par ≥2 personnes, avec au moins un lien encore `pending` (les liens déjà tranchés confirmed/rejected sortent du travail à faire).
-_AMBIGUOUS_FORMS_HAVING = "HAVING count(*) >= 2 AND bool_or(status = 'pending')"
+_AMBIGUOUS_FORMS_HAVING = (
+    f"HAVING count(*) >= 2 AND bool_or(status = '{AttributionStatus.PENDING.value}')"
+)
 
 
 def ambiguous_name_forms_count(conn: Connection) -> int:
@@ -165,13 +170,16 @@ def ambiguous_name_forms(
 
 # ── Conflits d'identifiant (file de triage du hub) ───────────────
 
+# Liste SQL des types d'identifiant à examiner, dérivée du vocabulaire `PersonIdentifierType`.
+_ID_TYPES_ARRAY_SQL = "ARRAY[" + ", ".join(f"'{t.value}'" for t in PERSON_IDENTIFIER_TYPES) + "]"
+
 # Paires de personnes distinctes au même identifiant brut : le CTE projette `(person_id, id_type, id_value)` des signatures (via `author_identifying_keys`, hors `_dubious`), le self-join les apparie, hors paires déjà distinctes.
-_IDENTIFIER_CONFLICT_PAIRS = """
+_IDENTIFIER_CONFLICT_PAIRS = f"""
     WITH person_identifier_keys AS (
         SELECT DISTINCT sa.person_id, k.k AS id_type, (aik.person_identifiers ->> k.k) AS id_value
         FROM source_authorships sa
         JOIN author_identifying_keys aik ON aik.id = sa.identity_id
-        CROSS JOIN unnest(ARRAY['orcid', 'idref', 'hal_person_id', 'idhal']) k(k)
+        CROSS JOIN unnest({_ID_TYPES_ARRAY_SQL}) k(k)
         WHERE sa.person_id IS NOT NULL
           AND aik.person_identifiers ? k.k
           AND (aik.person_identifiers ->> k.k) NOT LIKE '%_dubious'
@@ -206,7 +214,7 @@ def _curation_persons(conn: Connection, ids: list[int]) -> dict[int, CurationPer
     if not ids:
         return {}
     rows = conn.execute(
-        text("""
+        text(f"""
             SELECT p.id, p.first_name, p.last_name,
                    EXISTS(SELECT 1 FROM persons_rh rh WHERE rh.person_id = p.id) AS has_rh,
                    (SELECT count(*) FROM authorships a WHERE a.person_id = p.id) AS signature_count,
@@ -214,7 +222,7 @@ def _curation_persons(conn: Connection, ids: list[int]) -> dict[int, CurationPer
                        SELECT array_agg(DISTINCT COALESCE(s.acronym, s.name)
                                         ORDER BY COALESCE(s.acronym, s.name))
                        FROM structures s
-                       WHERE s.structure_type = 'labo' AND s.id IN (
+                       WHERE s.structure_type = '{StructureType.LABO.value}' AND s.id IN (
                            SELECT sas.structure_id FROM source_authorship_structures sas
                            JOIN source_authorships sa ON sa.id = sas.source_authorship_id
                            WHERE sa.person_id = p.id
@@ -288,9 +296,11 @@ _REPEATED_OCCURRENCES_SQL = text("""
 """).bindparams(bindparam("spids"), bindparam("pids"))
 
 # Formes qui font ancre : confirmées par admin, ou dérivées du nom canonique de la personne (`'persons' ∈ sources`, confirmées d'office).
-_CONFIRMED_FORMS_SQL = text("""
+_CONFIRMED_FORMS_SQL = text(f"""
     SELECT person_id, name_form FROM person_name_forms
-    WHERE (status = 'confirmed' OR 'persons' = ANY(sources)) AND person_id = ANY(:pids)
+    WHERE (status = '{AttributionStatus.CONFIRMED.value}'
+           OR '{CANONICAL_NAME_FORM_SOURCE}' = ANY(sources))
+      AND person_id = ANY(:pids)
 """).bindparams(bindparam("pids"))
 
 _IDENTIFIER_KEYS = ("orcid", "idref", "hal_person_id", "idhal")
@@ -492,11 +502,11 @@ _OVERLAP_DIMENSIONS: dict[str, str] = {
         SELECT a.person_id AS person, a.publication_id AS val
         FROM authorships a WHERE a.person_id = ANY(:ids)
     """,
-    "labs": """
+    "labs": f"""
         SELECT a.person_id AS person, aus.structure_id AS val
         FROM authorships a
         JOIN authorship_structures aus ON aus.authorship_id = a.id
-        JOIN structures s ON s.id = aus.structure_id AND s.structure_type = 'labo'
+        JOIN structures s ON s.id = aus.structure_id AND s.structure_type = '{StructureType.LABO.value}'
         WHERE a.person_id = ANY(:ids)
     """,
     "journals": """

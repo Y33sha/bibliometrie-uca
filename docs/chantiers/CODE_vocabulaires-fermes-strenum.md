@@ -59,6 +59,8 @@ Principe (pipeline comme couche lecture API) : un **prédicat** sur une valeur d
 - [x] `infrastructure/queries/api/publications/detail.py` : flags de présence par source (quatre sources d'authorship, sans theses) inline ; prédicats `source = 'theses'` (×2) et le test Python `doc_type in {thesis, ongoing_thesis}` → membres `Source` / `DocType`.
 - [x] `infrastructure/queries/api/publications/facets.py` : prédicats `structure_type = 'labo'` (×2), `source = 'hal'` (×7), `oa_status = 'embargoed'` → membres.
 - [x] `infrastructure/queries/api/stats/summary.py` et `stats/pivot.py` : `structure_type = 'labo'` et le `CASE` oa_access (`'embargoed'` / `'closed'`) → membres. `doc_type_grouped_sql` génère déjà son `CASE` depuis `DOC_TYPE_FAMILIES`.
+- [x] `infrastructure/queries/api/persons/detail.py` : prédicats source (hal / openalex / wos / theses, en `WHERE` et en `'<source>' AS source`) et `structure_type = 'labo'` → membres `Source` / `StructureType`.
+- [x] `infrastructure/queries/api/persons/admin.py` : statuts (`pending` / `confirmed`), marqueur `'persons'` (`CANONICAL_NAME_FORM_SOURCE`), `structure_type = 'labo'` (×2) → membres ; l'array des types d'identifiant du CTE de conflits (`_ID_TYPES_ARRAY_SQL`) généré depuis `PERSON_IDENTIFIER_TYPES`.
 
 ## Sites recensés
 
