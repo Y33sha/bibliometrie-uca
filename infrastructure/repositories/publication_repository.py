@@ -5,6 +5,7 @@ Isole le SQL de la couche application. Implémente le port `PublicationRepositor
 Toutes les queries publications utilisent `text()` paramétré : trop intriquées en casts enum (oa_type, doc_type, source_type) et opérations array pour gagner à passer par MetaData.
 """
 
+import json
 from typing import Any, NamedTuple
 
 from sqlalchemy import Connection, text
@@ -66,7 +67,7 @@ def _view_from_row(row: _SourcePublicationViewRow) -> SourcePublication:
 
 
 class PgPublicationRepository(PublicationRepository):
-    """Accès PostgreSQL à l'agrégat Publication via une `Connection` SA."""
+    """Accès PostgreSQL à l'agrégat Publication via une `Connection` SQLAlchemy."""
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
@@ -74,7 +75,6 @@ class PgPublicationRepository(PublicationRepository):
     # ── Recherches ─────────────────────────────────────────────────
 
     def find_by_doi(self, doi: str) -> PubByDoi | None:
-        """Cherche une publication par DOI (case-insensitive)."""
         if not doi:
             return None
         row = self._conn.execute(
@@ -86,7 +86,6 @@ class PgPublicationRepository(PublicationRepository):
         return PubByDoi(id=row.id)
 
     def find_ids_by_journal_id(self, journal_id: int) -> list[int]:
-        """Ids des publications rattachées à ce journal."""
         result = self._conn.execute(
             text("SELECT id FROM publications WHERE journal_id = :jid ORDER BY id"),
             {"jid": journal_id},
@@ -94,7 +93,6 @@ class PgPublicationRepository(PublicationRepository):
         return [row.id for row in result]
 
     def find_doc_types_by_ids(self, pub_ids: list[int]) -> dict[int, str]:
-        """`doc_type` de chaque publication demandée. Une publication absente de la table manque de la réponse."""
         if not pub_ids:
             return {}
         result = self._conn.execute(
@@ -108,10 +106,6 @@ class PgPublicationRepository(PublicationRepository):
     # ── Chargement / persistance de l'aggregate Publication ────────
 
     def find_by_id(self, pub_id: int) -> Publication | None:
-        """Hydrate l'aggregate Publication depuis la ligne `publications`.
-
-        Charge tous les attributs canoniques de la publication (title, pub_year, doc_type, doi, oa_status, journal_id, container_title, language, abstract, is_retracted, countries, keywords, topics, biblio, meta). Les authorships ne sont pas chargées par défaut (projection lecture séparée si nécessaire).
-        """
         row = self._conn.execute(
             text("""
                 SELECT p.id, p.title, p.title_normalized,
@@ -152,10 +146,6 @@ class PgPublicationRepository(PublicationRepository):
         )
 
     def save(self, pub: Publication) -> None:
-        """Persiste l'état mutable de l'aggregate Publication.
-
-        Met à jour tous les champs éditables (title, title_normalized, doc_type, doi, oa_status, journal_id, container_title, language, abstract, is_retracted, countries, keywords, topics, biblio, meta). Le champ `pub_year` n'est pas mis à jour ici (immuable côté métier après création). `pub.id` doit être posé (entité persistée).
-        """
         if pub.id is None:
             raise ValueError("save(pub) : pub.id doit être posé (utiliser create pour insérer)")
         self._conn.execute(
@@ -215,7 +205,6 @@ class PgPublicationRepository(PublicationRepository):
     # ── Écritures simples ──────────────────────────────────────────
 
     def update_oa_status(self, pub_id: int, oa_status: str) -> None:
-        """Met à jour le statut OA d'une publication (vérification Unpaywall) et pose `unpaywall_checked_at` (staleness de l'enrichissement OA)."""
         self._conn.execute(
             text(
                 "UPDATE publications "
@@ -227,17 +216,12 @@ class PgPublicationRepository(PublicationRepository):
         )
 
     def mark_unpaywall_checked(self, pub_id: int) -> None:
-        """Pose `unpaywall_checked_at = now()` à statut constant — pour les vérifications Unpaywall neutres (statut inchangé, non trouvé, diamond préservé). Évite de re-interroger ce DOI au run suivant."""
         self._conn.execute(
             text("UPDATE publications SET unpaywall_checked_at = now() WHERE id = :id"),
             {"id": pub_id},
         )
 
     def update_sources(self, pub_id: int) -> None:
-        """Recalcule publications.sources depuis source_publications.
-
-        Pas de lecture préalable : agrégation SQL directe en une requête.
-        """
         self._conn.execute(
             text("""
                 UPDATE publications SET sources = COALESCE(sub.srcs, '{}'),
@@ -258,10 +242,7 @@ class PgPublicationRepository(PublicationRepository):
     # ── Agrégation depuis source_publications ──────────────────────
 
     def get_source_publications(self, pub_id: int) -> list[SourcePublication]:
-        """Retourne les `SourcePublication` attachées à une publication canonique, pour l'agrégation canonique (`refresh_from_sources`).
-
-        Le `doi` projeté est la colonne nue : la substitution Zenodo (concept au lieu de la version) est déjà persistée par `metadata_correction`, donc l'agrégation promeut le concept comme DOI canonique sans recalcul ici.
-        """
+        # Le `doi` projeté est la colonne nue ; la substitution Zenodo (concept plutôt que version) est déjà persistée par `metadata_correction`.
         result = self._conn.execute(
             text("""
                 SELECT sp.id, sp.source::text AS source, sp.source_id,
@@ -279,7 +260,6 @@ class PgPublicationRepository(PublicationRepository):
         return [_view_from_row(_SourcePublicationViewRow(**row._mapping)) for row in result]
 
     def get_converged_secondary_ids(self, pub_id: int) -> frozenset[int]:
-        """Ids des `source_publications` de `pub_id` dont le DOI a été substitué par une correction de convergence (`raw_metadata.doi.corrected_by` ∈ `CONVERGENCE_CASES`). Ces formes secondaires (version, variante, pièce) sont dépriorisées à l'agrégation."""
         result = self._conn.execute(
             text("""
                 SELECT id FROM source_publications
@@ -291,7 +271,6 @@ class PgPublicationRepository(PublicationRepository):
         return frozenset(row.id for row in result)
 
     def get_journal_type(self, journal_id: int) -> str | None:
-        """`journal_type` d'un journal (cast text). None si le journal n'existe pas ou son type est NULL."""
         return self._conn.execute(
             text("SELECT journal_type::text FROM journals WHERE id = :id"),
             {"id": journal_id},
@@ -309,10 +288,6 @@ class PgPublicationRepository(PublicationRepository):
         doi: str | None,
         oa_status: str,
     ) -> int:
-        """Insère une publication et retourne son id. INSERT brut : la déduplication relève du caller.
-
-        Les colonnes hors des NOT NULL et du DOI prennent leur valeur par défaut ; `save` les pose.
-        """
         return self._conn.execute(
             text("""
                 INSERT INTO publications
@@ -334,17 +309,6 @@ class PgPublicationRepository(PublicationRepository):
     # ── Fusion ─────────────────────────────────────────────────────
 
     def merge_into(self, target_id: int, source_id: int) -> None:
-        """Plumbing FK de fusion : `source_id` est absorbée par `target_id`.
-
-        Séquence SQL (atomique dans la transaction du caller) :
-
-        1. Transfert des `source_publications` (FK vers target).
-        2. Transfert des `authorships` vérité (avec déduplication par `person_id` : si target a déjà une row pour ce person, on supprime celle de source au lieu de la déplacer).
-        3. Repointage des paires `distinct_publications` de source vers target (la distinction est préservée, pas perdue).
-        4. Suppression de la ligne `publications` source.
-
-        Les métadonnées canoniques (doi, oa_status, countries, etc.) ne sont pas touchées ici : après ce transfert, la cible détient l'union des `source_publications`, et le caller (`application.services.publications.merge_publications`) les recompute via `refresh_from_sources(target)`.
-        """
         # 1. Transférer les source_publications
         self._conn.execute(
             text("UPDATE source_publications SET publication_id = :t WHERE publication_id = :s"),
@@ -393,7 +357,6 @@ class PgPublicationRepository(PublicationRepository):
     # ── Suppression ────────────────────────────────────────────────
 
     def delete(self, pub_id: int) -> None:
-        """Supprime une publication. Le cascade DB nettoie `authorships`, `distinct_publications`, `publication_subjects` (ON DELETE CASCADE) ; `apc_payments` et `source_publications.publication_id` passent à NULL (ON DELETE SET NULL)."""
         self._conn.execute(
             text("DELETE FROM publications WHERE id = :id"),
             {"id": pub_id},
@@ -402,10 +365,6 @@ class PgPublicationRepository(PublicationRepository):
     # ── distinct_publications ──────────────────────────────────────
 
     def mark_distinct(self, pub_id_a: int, pub_id_b: int) -> tuple[int, int] | None:
-        """Marque deux publications comme distinctes. Idempotent.
-
-        Retourne (a, b) si la paire vient d'être insérée, None sinon — le caller décide s'il émet un audit.
-        """
         row = self._conn.execute(
             text("""
                 INSERT INTO distinct_publications (pub_id_a, pub_id_b)
@@ -424,6 +383,4 @@ def _json_dumps_or_none(value: dict | None) -> str | None:
     """Sérialise un dict en string JSON pour `CAST(:p AS jsonb)`. None passé tel quel."""
     if value is None:
         return None
-    import json
-
     return json.dumps(value)
