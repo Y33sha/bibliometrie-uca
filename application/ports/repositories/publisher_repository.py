@@ -3,8 +3,6 @@
 Séparé de `JournalRepository` (principe ISP) : publishers et journals sont deux agrégats distincts, bien que liés par une FK. Un pipeline limité aux publishers s'engage sur le seul contrat éditeurs, et inversement.
 
 La fusion d'éditeurs (`merge_publisher_into`) vit ici : sémantiquement c'est une opération atomique sur un éditeur qui touche par effet de bord les tables liées (`journals.publisher_id`, `publisher_name_forms`, `journal_name_forms.publisher_id`, `apc_payments.publisher_id`). La détection des journaux à conflit avant fusion est exposée par `JournalRepository.find_shared_title_journal_pairs`, une query sur `journals`.
-
-Implémenté par `infrastructure/repositories/publisher_repository.py`.
 """
 
 from typing import Protocol
@@ -46,9 +44,13 @@ class PublisherRepository(Protocol):
         self,
         publisher_id: int,
         form_normalized: str,
-    ) -> None: ...
+    ) -> None:
+        """Ajoute une forme de nom normalisée pour un éditeur, si absente (idempotent)."""
+        ...
 
-    def find_publisher_by_name_form(self, form_normalized: str) -> int | None: ...
+    def find_publisher_by_name_form(self, form_normalized: str) -> int | None:
+        """Cherche un `publisher_id` par forme de nom normalisée. `None` si aucune."""
+        ...
 
     # ── publishers ─────────────────────────────────────────────────
 
@@ -62,7 +64,9 @@ class PublisherRepository(Protocol):
         self,
         publisher_id: int,
         openalex_id: str,
-    ) -> None: ...
+    ) -> None:
+        """Attribue un `openalex_id` à l'éditeur s'il n'en porte pas déjà un."""
+        ...
 
     def create_publisher(
         self,
@@ -70,14 +74,20 @@ class PublisherRepository(Protocol):
         name: str,
         name_normalized: str,
         openalex_id: str | None,
-    ) -> int: ...
+    ) -> int:
+        """Insère un éditeur et retourne son `id`."""
+        ...
 
     def match_or_create_by_name_form(self, name_raw: str, name_normalized: str) -> tuple[int, bool]:
         """`(id, created)` : l'éditeur dont la forme de nom normalisée existe déjà, sinon un éditeur créé et sa forme enregistrée."""
         ...
 
-    def update_publisher_fields(self, publisher_id: int, fields: PublisherUpdate) -> None: ...
+    def update_publisher_fields(self, publisher_id: int, fields: PublisherUpdate) -> None:
+        """Applique une modification sélective (`PublisherUpdate`) ; le service garantit au moins un champ fourni. `name_normalized` est re-dérivé quand `name` est présent. Lève `NotFoundError` si l'éditeur est introuvable."""
+        ...
 
     # ── Fusion ─────────────────────────────────────────────────────
 
-    def merge_publisher_into(self, target_id: int, source_id: int) -> None: ...
+    def merge_publisher_into(self, target_id: int, source_id: int) -> None:
+        """Fusionne l'éditeur `source_id` dans `target_id` : transfère journaux, formes de nom et paiements APC, enrichit la cible par COALESCE, puis supprime la source. La fusion préalable des journaux à titre partagé relève du service via `find_shared_title_journal_pairs`."""
+        ...

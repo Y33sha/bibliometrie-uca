@@ -40,7 +40,7 @@ def _publisher_from_row(row: _PublisherRow) -> Publisher:
 
 
 class PgPublisherRepository(PublisherRepository):
-    """Accès PostgreSQL à l'agrégat Publisher via une `Connection` SA."""
+    """Accès PostgreSQL à l'agrégat Publisher via une `Connection` SQLAlchemy."""
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
@@ -64,7 +64,6 @@ class PgPublisherRepository(PublisherRepository):
     # ── publisher_name_forms ───────────────────────────────────────
 
     def add_publisher_name_form(self, publisher_id: int, form_normalized: str) -> None:
-        """Ajoute une forme de nom d'éditeur si elle n'existe pas (idempotent)."""
         stmt = (
             pg_insert(publisher_name_forms)
             .values(publisher_id=publisher_id, form_normalized=form_normalized)
@@ -73,7 +72,6 @@ class PgPublisherRepository(PublisherRepository):
         self._conn.execute(stmt)
 
     def find_publisher_by_name_form(self, form_normalized: str) -> int | None:
-        """Cherche un publisher_id via une forme de nom normalisée."""
         return self._conn.execute(
             select(publisher_name_forms.c.publisher_id)
             .where(publisher_name_forms.c.form_normalized == form_normalized)
@@ -83,13 +81,11 @@ class PgPublisherRepository(PublisherRepository):
     # ── publishers ─────────────────────────────────────────────────
 
     def find_publisher_by_openalex_id(self, openalex_id: str) -> int | None:
-        """Cherche un publisher par son openalex_id."""
         return self._conn.execute(
             select(publishers.c.id).where(publishers.c.openalex_id == openalex_id)
         ).scalar_one_or_none()
 
     def find_needing_country_enrichment(self, *, limit: int | None = None) -> list[tuple[int, str]]:
-        """`(id, openalex_id)` des éditeurs enrichissables, triés par id. `.limit(None)` laisse la requête sans clause LIMIT."""
         rows = self._conn.execute(
             select(publishers.c.id, publishers.c.openalex_id)
             .where(publishers.c.openalex_id.is_not(None))
@@ -104,7 +100,6 @@ class PgPublisherRepository(PublisherRepository):
         publisher_id: int,
         openalex_id: str,
     ) -> None:
-        """Attribue un openalex_id au publisher s'il n'en a pas déjà un."""
         stmt = (
             update(publishers)
             .where(publishers.c.id == publisher_id)
@@ -120,7 +115,6 @@ class PgPublisherRepository(PublisherRepository):
         name_normalized: str,
         openalex_id: str | None,
     ) -> int:
-        """Insère un publisher et retourne son id."""
         stmt = (
             publishers.insert()
             .values(name=name, name_normalized=name_normalized, openalex_id=openalex_id)
@@ -129,7 +123,6 @@ class PgPublisherRepository(PublisherRepository):
         return self._conn.execute(stmt).scalar_one()
 
     def match_or_create_by_name_form(self, name_raw: str, name_normalized: str) -> tuple[int, bool]:
-        """Retourne `(id, created)` pour la forme de nom normalisée : l'éditeur existant si la forme est connue, sinon un éditeur créé et sa forme enregistrée. La forme insérée permet aux appels suivants de retomber dessus (dédoublonnage naturel)."""
         existing = self.find_publisher_by_name_form(name_normalized)
         if existing is not None:
             return existing, False
@@ -140,10 +133,6 @@ class PgPublisherRepository(PublisherRepository):
         return new_id, True
 
     def update_publisher_fields(self, publisher_id: int, fields: PublisherUpdate) -> None:
-        """UPDATE dynamique sur publishers à partir des champs fournis, `name_normalized` dérivé de `name` quand il est présent.
-
-        L'`UPDATE` rapporte les lignes appariées : zéro dit l'absence, sans lecture préalable. La non-vacuité des champs est vérifiée par le service.
-        """
         data = fields.model_dump(exclude_unset=True)
         if data.get("name") is not None:
             data["name_normalized"] = normalize_text(data["name"])
@@ -155,16 +144,6 @@ class PgPublisherRepository(PublisherRepository):
     # ── Fusion ─────────────────────────────────────────────────────
 
     def merge_publisher_into(self, target_id: int, source_id: int) -> None:
-        """Fusion d'éditeur — étapes 2-6 (le service a déjà traité les paires de journaux partageant un titre via `find_shared_title_journal_pairs` + merge_journals).
-
-        1. (fait côté service) fusion des journaux à titres partagés
-        2. Transfert des journaux restants vers la cible
-        3. Transfert/dédup des publisher_name_forms
-        3b. Transfert/dédup des journal_name_forms référençant le publisher
-        4. Transfert des apc_payments
-        5. Enrichissement des champs (openalex_id, country)
-        6. Suppression de l'éditeur source
-        """
         self._conn.execute(
             text("UPDATE journals SET publisher_id = :t WHERE publisher_id = :s"),
             {"t": target_id, "s": source_id},
