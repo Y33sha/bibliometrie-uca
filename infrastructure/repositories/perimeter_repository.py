@@ -88,10 +88,6 @@ class PgPerimeterRepository(PerimeterRepository):
         return result.scalar_one()
 
     def update_perimeter_fields(self, perimeter_id: int, fields: PerimeterUpdate) -> None:
-        """UPDATE dynamique sur `perimeters` à partir des champs fournis.
-
-        L'`UPDATE` rapporte les lignes appariées : zéro dit l'absence, sans lecture préalable. La non-vacuité des champs est vérifiée par le service.
-        """
         data = fields.model_dump(exclude_unset=True)
         stmt = update(perimeters).where(perimeters.c.id == perimeter_id).values(**data)
         result = self._conn.execute(stmt)
@@ -110,5 +106,4 @@ class PgPerimeterRepository(PerimeterRepository):
     # ── Matérialisation ────────────────────────────────────────────
 
     def refresh_structures(self) -> None:
-        """Reconstruit `perimeter_structures` (clôture récursive des racines de tous les périmètres). Commit laissé au caller (command handler)."""
         refresh_perimeter_structures(self._conn)

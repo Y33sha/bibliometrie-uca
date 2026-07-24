@@ -1,7 +1,4 @@
-"""Port PerimeterRepository — contrat d'accès à l'agrégat Perimeter.
-
-Implémenté par `infrastructure/repositories/perimeter_repository.py`.
-"""
+"""Port PerimeterRepository — contrat d'accès à l'agrégat Perimeter."""
 
 from typing import Annotated, Protocol
 
@@ -49,7 +46,9 @@ class PerimeterRepository(Protocol):
         root_structure_ids: list[int],
     ) -> int: ...
 
-    def update_perimeter_fields(self, perimeter_id: int, fields: PerimeterUpdate) -> None: ...
+    def update_perimeter_fields(self, perimeter_id: int, fields: PerimeterUpdate) -> None:
+        """Applique une modification sélective (`PerimeterUpdate`) ; le service garantit au moins un champ fourni. Lève `NotFoundError` si le périmètre est introuvable."""
+        ...
 
     def get_perimeter_code(self, perimeter_id: int) -> str | None: ...
 
