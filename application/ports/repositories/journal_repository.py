@@ -3,8 +3,6 @@
 L'agrégat Publisher est dans `publisher_repository.py` (principe ISP). Les deux agrégats sont liés par `journals.publisher_id` (FK) mais manipulés par des opérations distinctes — séparer les ports réduit la surface sur laquelle chaque call site s'engage.
 
 La méthode `find_shared_title_journal_pairs` vit ici : c'est une query sur la table `journals`, appelée par le service de fusion d'éditeurs pour détecter les conflits avant `merge_publisher_into`.
-
-Implémenté par `infrastructure/repositories/journal_repository.py`.
 """
 
 from datetime import datetime
@@ -60,19 +58,25 @@ class JournalRepository(Protocol):
         journal_id: int,
         form_normalized: str,
         publisher_id: int | None,
-    ) -> None: ...
+    ) -> None:
+        """Ajoute une forme de nom normalisée pour une revue, si absente (idempotent). No-op si `form_normalized` est vide."""
+        ...
 
     def find_journal_by_name_form(
         self,
         form_normalized: str,
         publisher_id: int | None,
-    ) -> int | None: ...
+    ) -> int | None:
+        """Cherche un `journal_id` par forme de nom normalisée. En cas d'ambiguïté, privilégie les revues à eISSN. `publisher_id` fourni : restreint aux formes de cet éditeur ou sans éditeur."""
+        ...
 
     # ── journals ───────────────────────────────────────────────────
 
     def find_journal_by_openalex_id(self, openalex_id: str) -> int | None: ...
 
-    def find_journal_by_issn_any(self, issn_value: str) -> int | None: ...
+    def find_journal_by_issn_any(self, issn_value: str) -> int | None:
+        """Cherche une revue dont l'un des trois champs ISSN (`issn`, `eissn`, `issnl`) vaut `issn_value`."""
+        ...
 
     def find_journals_of_unknown_type(self, *, limit: int | None = None) -> list[tuple[int, str]]:
         """`(id, openalex_id)` des revues au `journal_type` indéterminé qui portent un `openalex_id`, à typer via OpenAlex. Le type étant stable par revue, une revue typée sort de la file. `limit` cape le run."""
@@ -91,7 +95,9 @@ class JournalRepository(Protocol):
         publisher_id: int | None = None,
         openalex_id: str | None = None,
         oa_model: OaModel | None = None,
-    ) -> None: ...
+    ) -> None:
+        """Complète une revue existante avec les champs non nuls fournis, en COALESCE par champ : une valeur déjà en place est conservée."""
+        ...
 
     def create_journal(
         self,
@@ -103,11 +109,15 @@ class JournalRepository(Protocol):
         publisher_id: int | None,
         openalex_id: str | None,
         oa_model: OaModel | None,
-    ) -> int: ...
+    ) -> int:
+        """Insère une revue et retourne son `id`. `title_normalized` est dérivé de `title`."""
+        ...
 
     # ── Updates génériques ─────────────────────────────────────────
 
-    def update_journal_fields(self, journal_id: int, fields: JournalUpdate) -> None: ...
+    def update_journal_fields(self, journal_id: int, fields: JournalUpdate) -> None:
+        """Applique une modification sélective (`JournalUpdate`) ; le service garantit au moins un champ fourni. `title_normalized` est re-dérivé quand `title` est présent. Lève `NotFoundError` si la revue est introuvable."""
+        ...
 
     # ── APC / DOAJ ─────────────────────────────────────────────────
 
@@ -117,7 +127,9 @@ class JournalRepository(Protocol):
         *,
         apc_amount: float | None = None,
         apc_currency: str | None = None,
-    ) -> None: ...
+    ) -> None:
+        """Met à jour le montant et la devise d'APC. COALESCE : un argument `None` laisse la valeur en place."""
+        ...
 
     def update_journal_doaj(
         self,
@@ -147,6 +159,10 @@ class JournalRepository(Protocol):
         self,
         target_publisher_id: int,
         source_publisher_id: int,
-    ) -> list[dict[str, Any]]: ...
+    ) -> list[dict[str, Any]]:
+        """Paires de revues (une du `target_publisher_id`, une du `source_publisher_id`) partageant le même `title_normalized`. Chaque ligne porte `target_journal_id`, `source_journal_id` et les six valeurs ISSN/eISSN/ISSN-L des deux côtés, pour que le service détecte les conflits d'ISSN en une seule requête."""
+        ...
 
-    def merge_journal_into(self, target_id: int, source_id: int) -> None: ...
+    def merge_journal_into(self, target_id: int, source_id: int) -> None:
+        """Fusionne la revue `source_id` dans `target_id` : transfère publications, formes de nom et paiements APC, enrichit la cible par COALESCE, supprime la source, puis recalcule les compteurs de publications."""
+        ...
