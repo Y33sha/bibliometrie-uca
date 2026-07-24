@@ -34,8 +34,6 @@ class PerimeterRepository(Protocol):
 
     # ── CRUD ───────────────────────────────────────────────────────
 
-    def perimeter_exists(self, perimeter_id: int) -> bool: ...
-
     def perimeter_code_exists(self, code: str) -> bool: ...
 
     def create_perimeter(

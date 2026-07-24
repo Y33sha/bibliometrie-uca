@@ -64,10 +64,6 @@ class PgPerimeterRepository(PerimeterRepository):
 
     # ── CRUD ───────────────────────────────────────────────────────
 
-    def perimeter_exists(self, perimeter_id: int) -> bool:
-        result = self._conn.execute(select(perimeters.c.id).where(perimeters.c.id == perimeter_id))
-        return result.first() is not None
-
     def perimeter_code_exists(self, code: str) -> bool:
         result = self._conn.execute(select(perimeters.c.id).where(perimeters.c.code == code))
         return result.first() is not None
