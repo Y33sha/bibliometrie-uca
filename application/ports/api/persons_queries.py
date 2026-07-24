@@ -18,6 +18,7 @@ from application.ports.api._common import (
     YesNoCount,
 )
 from application.ports.api.subjects_queries import SubjectFrequency
+from domain.persons.identifiers import AttributionStatus
 
 # Vocabulaire de tri : le champ, puis le sens. Les trois dénombrements sont triables, comme
 # la fonction et le département.
@@ -72,7 +73,7 @@ class PersonIdentifierOut(BaseModel):
     id_type: str
     id_value: str
     source: str
-    status: Literal["pending", "confirmed", "rejected", "authenticated"]
+    status: AttributionStatus
 
 
 class NameFormSummaryOut(BaseModel):
@@ -84,7 +85,7 @@ class NameFormSummaryOut(BaseModel):
     name_form: str
     sources: list[str]
     ambiguous: bool
-    status: Literal["pending", "confirmed", "rejected"]
+    status: Literal[AttributionStatus.PENDING, AttributionStatus.CONFIRMED, AttributionStatus.REJECTED]
     shared_count: int
     pub_count: int
 
@@ -266,7 +267,7 @@ class AmbiguousFormPersonOut(BaseModel):
     person_id: int
     first_name: str
     last_name: str
-    status: Literal["pending", "confirmed", "rejected"]
+    status: Literal[AttributionStatus.PENDING, AttributionStatus.CONFIRMED, AttributionStatus.REJECTED]
     has_rh: bool
     # Nom canonique compatible (par tokens) avec la forme : homonyme/doublon si
     # vrai, erreur d'attribution probable si faux.
