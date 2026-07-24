@@ -40,7 +40,7 @@ Coûts concrets :
 ### source / oa_status / journal_type / oa_model
 
 - [x] `source` → StrEnum `Source` ; `ALL_SOURCES`, `SOURCE_PRIORITY`, `DOI_SEARCHABLE_SOURCES`, `STRUCTURE_API_SOURCES` et leurs sets dérivés des membres. Les helpers SQL (`sources_sql.py`) interpolent déjà via `f"'{s}'"`, intacts. Le remplacement des littéraux `"hal"`… épars (Python et SQL) relève de l'exploitation aval.
-- [ ] `oa_status` (chaînes + `OA_RANK` + `OA_STATUSES` + `_KNOWN_OA_STATUSES`) → StrEnum ; fusionner les deux listes.
+- [x] `oa_status` → StrEnum `OaStatus` (dans `metadata.py`). `OA_RANK` garde des clés-membres (annoté `dict[str, int]` pour que `best_oa_status.get(str)` tienne), `OA_STATUSES` et `ACCESS_LEVELS` dérivés des membres, `OA_STATUS_UNKNOWN_DEFAULT` = membre. `_KNOWN_OA_STATUSES` (OpenAlex) référence les membres : c'est un sous-ensemble curé (6 statuts, sans unknown/embargoed), **pas** un doublon d'`OA_STATUSES` (8) — donc pas de fusion, contrairement à ce que supposait le contexte.
 - [x] `journal_type` et `oa_model` Literal → StrEnum ; collections et labels FR dérivés des membres. Consommateurs Python alignés (normalize, enrich OpenAlex, règles de correction, hydratation `Journal`) ; mypy vert. La phase d'exploitation SQL reste à part.
 
 ### Exploitation en SQL

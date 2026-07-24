@@ -5,9 +5,24 @@ Catch-all pour les règles qui touchent aux métadonnées d'une publication (oa_
 
 import re
 from collections.abc import Iterable
+from enum import StrEnum
 from typing import Protocol
 
 from domain.normalize import normalize_text
+
+
+class OaStatus(StrEnum):
+    """Statut d'accès ouvert d'une publication — les membres portent les libellés de l'enum PostgreSQL `oa_type`."""
+
+    DIAMOND = "diamond"
+    GOLD = "gold"
+    HYBRID = "hybrid"
+    BRONZE = "bronze"
+    GREEN = "green"
+    EMBARGOED = "embargoed"
+    CLOSED = "closed"
+    UNKNOWN = "unknown"
+
 
 # ── Agrégation multi-sources du statut OA ───────────────────────────
 
@@ -15,14 +30,14 @@ from domain.normalize import normalize_text
 # statut est « ouvert ». Utilisé par `best_oa_status` pour choisir le
 # statut le plus ouvert entre plusieurs sources.
 OA_RANK: dict[str, int] = {
-    "diamond": 8,
-    "gold": 7,
-    "hybrid": 6,
-    "bronze": 5,
-    "green": 4,
-    "embargoed": 3,
-    "closed": 2,
-    "unknown": 1,
+    OaStatus.DIAMOND: 8,
+    OaStatus.GOLD: 7,
+    OaStatus.HYBRID: 6,
+    OaStatus.BRONZE: 5,
+    OaStatus.GREEN: 4,
+    OaStatus.EMBARGOED: 3,
+    OaStatus.CLOSED: 2,
+    OaStatus.UNKNOWN: 1,
 }
 
 # Vocabulaire de l'enum SQL `oa_status`. Chaque statut porte un rang dans `OA_RANK` :
@@ -37,15 +52,17 @@ OA_STATUSES: frozenset[str] = frozenset(OA_RANK)
 # valeur de l'enum, classée en queue d'`OA_RANK`). À utiliser comme
 # fallback après `best_oa_status(...)` ou pour défaut sur
 # `source_publications.oa_status` orphelin.
-OA_STATUS_UNKNOWN_DEFAULT = "unknown"
+OA_STATUS_UNKNOWN_DEFAULT = OaStatus.UNKNOWN
 
 # Ventilation des statuts en trois niveaux d'accès : `oa_status` est la forme fine,
 # l'accès la forme grossière. Chaque statut appartient à un niveau et à un seul, et les
 # trois niveaux couvrent `OA_RANK` — ce qu'un test du domaine vérifie.
 ACCESS_LEVELS: dict[str, frozenset[str]] = {
-    "open": frozenset({"diamond", "gold", "hybrid", "bronze", "green"}),
-    "embargo": frozenset({"embargoed"}),
-    "closed": frozenset({"closed", "unknown"}),
+    "open": frozenset(
+        {OaStatus.DIAMOND, OaStatus.GOLD, OaStatus.HYBRID, OaStatus.BRONZE, OaStatus.GREEN}
+    ),
+    "embargo": frozenset({OaStatus.EMBARGOED}),
+    "closed": frozenset({OaStatus.CLOSED, OaStatus.UNKNOWN}),
 }
 
 OA_OPEN_STATUSES: frozenset[str] = ACCESS_LEVELS["open"]
@@ -76,7 +93,7 @@ def has_open_archive_deposit(sources: Iterable[_OaSignalSource]) -> bool:
     """Vrai si une archive ouverte (`OPEN_ARCHIVE_SOURCES`) atteste un dépôt avec fichier (`green`).
 
     Un tel dépôt est un fait : il prime sur un `closed`/`unknown` d'Unpaywall (lequel ne voit pas le fichier sous le DOI). Le `hybrid` ne compte pas — c'est un lien éditeur relayé par l'archive, sans fichier déposé."""
-    return any(s.source in OPEN_ARCHIVE_SOURCES and s.oa_status == "green" for s in sources)
+    return any(s.source in OPEN_ARCHIVE_SOURCES and s.oa_status == OaStatus.GREEN for s in sources)
 
 
 def best_oa_status(statuses: Iterable[str | None]) -> str | None:
@@ -108,7 +125,7 @@ def decide_oa_status(current: str | None, fetched: str, has_open_deposit: bool) 
     """
     if fetched == current:
         return None
-    if current == "diamond" and fetched == "gold":
+    if current == OaStatus.DIAMOND and fetched == OaStatus.GOLD:
         return None
     if current == "embargoed" and fetched in OA_CLOSED_STATUSES:
         return None

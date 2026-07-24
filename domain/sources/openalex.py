@@ -16,6 +16,7 @@ from domain.publications.identifiers import (
     normalize_pmcid,
     normalize_pmid,
 )
+from domain.publications.metadata import OaStatus
 
 # =============================================================
 # IDENTIFIANT OPENALEX (court ↔ URL)
@@ -169,7 +170,16 @@ def extract_nnt_from_location(loc: OpenalexLocation) -> str | None:
 # utilise les mêmes labels que notre enum canonique, plus `diamond`
 # qu'ils ont commencé à exposer en 2023. Le set est utilisé pour
 # valider/dispatcher dans `map_openalex_oa_status`.
-_KNOWN_OA_STATUSES = frozenset({"gold", "diamond", "hybrid", "bronze", "green", "closed"})
+_KNOWN_OA_STATUSES = frozenset(
+    {
+        OaStatus.GOLD,
+        OaStatus.DIAMOND,
+        OaStatus.HYBRID,
+        OaStatus.BRONZE,
+        OaStatus.GREEN,
+        OaStatus.CLOSED,
+    }
+)
 
 
 def map_openalex_oa_status(raw: str | None) -> str | None:
