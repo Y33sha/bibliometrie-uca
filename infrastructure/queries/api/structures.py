@@ -44,18 +44,6 @@ _AUTHORED_PUBLICATION = f"""
     )
 """
 
-_LIST_ORDER_BY = """
-    ORDER BY CASE s.structure_type::text
-        WHEN 'labo' THEN 1
-        WHEN 'universite' THEN 2
-        WHEN 'onr' THEN 3
-        WHEN 'chu' THEN 4
-        WHEN 'ecole' THEN 5
-        WHEN 'site' THEN 6
-        ELSE 7
-    END, s.name
-"""
-
 
 def _list_structures_sql(
     *, types: list[str], search: str, perimeter_ids: list[int] | None
@@ -95,7 +83,6 @@ def _list_structures_sql(
         LEFT JOIN perimeter_structures ps ON ps.structure_id = s.id
         WHERE {where}
         GROUP BY s.id, s.code, s.name, s.acronym, s.structure_type, s.ror_id, s.hal_collection
-        {_LIST_ORDER_BY}
     """
     return sql, binds
 
@@ -135,7 +122,7 @@ class PgStructuresQueries(StructuresQueries):
     ) -> list[StructureListItem]:
         """Liste des structures, filtrable par types, recherche accent-insensible et périmètre.
 
-        `in_perimeter` restreint aux structures du périmètre `persons`, clôture comprise — ce que la page publique des laboratoires demande. Tri canonique par type (labo > universite > onr > chu > ecole > site > autres) puis nom.
+        `in_perimeter` restreint aux structures du périmètre `persons`, clôture comprise — ce que la page publique des laboratoires demande. L'ordre de la liste n'est pas garanti : les consommateurs trient à l'affichage.
         """
         perimeter_ids = get_persons_structure_ids_list(self._conn) if in_perimeter else None
         sql, binds = _list_structures_sql(types=types, search=search, perimeter_ids=perimeter_ids)
