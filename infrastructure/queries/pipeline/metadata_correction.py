@@ -19,8 +19,26 @@ from application.ports.pipeline.metadata_correction import (
     UnaryCorrectionRow,
 )
 from domain.publications.doc_types import DocType
-from domain.source_publications.correction import DoiClusterCase
+from domain.source_publications.correction import (
+    DATACITE_DIRECT_CONVERGENCE,
+    DATACITE_PACKAGE_PIECE_RELATION,
+    DoiClusterCase,
+)
 from domain.sources.registry import Source
+
+# Bras du `CASE` et liste `IN` des relations DataCite à convergence directe, dérivés du mapping
+# métier `DATACITE_DIRECT_CONVERGENCE`.
+_DATACITE_CASE_SQL = (
+    "CASE rel->>'relation_type' "
+    + " ".join(
+        f"WHEN '{relation}' THEN '{case.value}'"
+        for relation, case in DATACITE_DIRECT_CONVERGENCE.items()
+    )
+    + " END"
+)
+_DATACITE_DIRECT_RELATIONS_SQL = (
+    "(" + ", ".join(f"'{relation}'" for relation in DATACITE_DIRECT_CONVERGENCE) + ")"
+)
 
 # Projection partagée : chaque colonne porte le nom du champ d'`UnaryCorrectionRow` qu'elle
 # alimente (appariement par nom). Les booléens `embargo_expired` et `self_declared_preprint`
@@ -132,16 +150,11 @@ def fetch_doi_cluster_candidates(conn: Connection) -> list[DoiClusterRow]:
                     SELECT
                         sp.eff_doi AS secondary_doi,
                         lower(rel->>'doi') AS canonical_doi,
-                        CASE rel->>'relation_type'
-                            WHEN 'IsVersionOf'
-                                THEN '{DoiClusterCase.DATACITE_VERSION_TO_CONCEPT.value}'
-                            WHEN 'IsVariantFormOf'
-                                THEN '{DoiClusterCase.DATACITE_VARIANT_TO_PRIMARY.value}'
-                        END AS same_work_case
+                        {_DATACITE_CASE_SQL} AS same_work_case
                     FROM sp_eff sp
                     CROSS JOIN LATERAL jsonb_array_elements(sp.meta->'related_identifiers') rel
                     WHERE sp.source = '{Source.DATACITE.value}'
-                      AND rel->>'relation_type' IN ('IsVersionOf', 'IsVariantFormOf')
+                      AND rel->>'relation_type' IN {_DATACITE_DIRECT_RELATIONS_SQL}
                       AND rel->>'doi' IS NOT NULL
                       AND lower(rel->>'doi') <> sp.eff_doi
                     UNION ALL
@@ -158,7 +171,7 @@ def fetch_doi_cluster_candidates(conn: Connection) -> list[DoiClusterRow]:
                     CROSS JOIN LATERAL jsonb_array_elements(sp.meta->'related_identifiers') rel
                     WHERE sp.source = '{Source.DATACITE.value}'
                       AND sp.doc_type = '{DocType.DATASET.value}'
-                      AND rel->>'relation_type' = 'IsPartOf'
+                      AND rel->>'relation_type' = '{DATACITE_PACKAGE_PIECE_RELATION}'
                       AND rel->>'doi' IS NOT NULL
                       AND lower(rel->>'doi') <> sp.eff_doi
                       AND lower(rel->>'doi') IN (SELECT d FROM dataset_dois)
