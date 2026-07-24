@@ -19,6 +19,7 @@ from application.ports.api.perimeters_queries import (
     PerimeterStructureItem,
 )
 from application.ports.pipeline.perimeter_structures import PerimeterStructuresQueries
+from domain.structures.relations import StructureRelationType
 
 # ── Fonctions libres ──────────────────────────────────────────────
 
@@ -47,7 +48,7 @@ def refresh_perimeter_structures(conn: Connection) -> None:
     """
     conn.execute(text("DELETE FROM perimeter_structures"))
     conn.execute(
-        text("""
+        text(f"""
             INSERT INTO perimeter_structures (perimeter_id, structure_id)
             WITH RECURSIVE descendants AS (
                 SELECT p.id AS perimeter_id, s.structure_id
@@ -57,7 +58,7 @@ def refresh_perimeter_structures(conn: Connection) -> None:
                 SELECT d.perimeter_id, sr.child_id
                 FROM descendants d
                 JOIN structure_relations sr ON sr.parent_id = d.structure_id
-                WHERE sr.relation_type = 'est_tutelle_de'
+                WHERE sr.relation_type = '{StructureRelationType.EST_TUTELLE_DE.value}'
             )
             SELECT DISTINCT d.perimeter_id, d.structure_id
             FROM descendants d

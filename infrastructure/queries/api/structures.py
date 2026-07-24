@@ -22,6 +22,7 @@ from application.ports.api.structures_queries import (
 from application.ports.api.subjects_queries import SubjectFrequency
 from domain.countries import NON_INTERNATIONAL_COUNTRY_CODES
 from domain.publications.doc_types import DocType
+from domain.structures.relations import StructureRelationType
 from infrastructure.queries.api.filters import OA_DASHBOARD_COLS_SQL, entity_subjects_sql
 from infrastructure.queries.perimeter import get_persons_structure_ids_list
 
@@ -78,7 +79,7 @@ def _list_structures_sql(
                 ) ORDER BY sp.name)
                 FROM structure_relations sr
                 JOIN structures sp ON sp.id = sr.parent_id
-                WHERE sr.child_id = s.id AND sr.relation_type = 'est_tutelle_de'
+                WHERE sr.child_id = s.id AND sr.relation_type = '{StructureRelationType.EST_TUTELLE_DE.value}'
                ) AS tutelles
         FROM structures s
         LEFT JOIN perimeter_structures ps ON ps.structure_id = s.id
