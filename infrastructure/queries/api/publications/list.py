@@ -15,6 +15,8 @@ from application.ports.api.publications_queries import (
     PublicationListResponse,
 )
 from domain.normalize import normalize_text, strip_markup
+from domain.sources.registry import Source
+from domain.structures.structure import StructureType
 from infrastructure.queries.api.filters import (
     OA_OPEN_STATUSES,
     PUBLICATION_IS_IN_PERIMETER,
@@ -51,6 +53,15 @@ _SOURCE_URL = {
     "scanr": "https://scanr.enseignementsup-recherche.gouv.fr/publications/{}",
     "theses": "https://theses.fr/{}",
 }
+
+
+# Pivot des identifiants source (alias `sd` sur `source_publications`) : une colonne `<source>_id`
+# par source d'extraction. Partagé par les deux listes qui exposent cinq identifiants ; l'export
+# thèses n'en expose que quatre (pas `wos`) et garde son pivot en clair.
+_SOURCE_ID_COLUMNS = ",\n                    ".join(
+    f"max(CASE WHEN sd.source = '{source.value}' THEN sd.source_id END) AS {source.value}_id"
+    for source in (Source.HAL, Source.OPENALEX, Source.SCANR, Source.WOS, Source.THESES)
+)
 
 
 def _source_links(ids: dict[str, str | None]) -> dict[str, str]:
@@ -210,7 +221,7 @@ def list_publications(
                     SELECT DISTINCT s.id, COALESCE(s.acronym, s.name) AS label
                     FROM authorships a4
                     JOIN authorship_structures aus4 ON aus4.authorship_id = a4.id
-                    JOIN structures s ON s.id = aus4.structure_id AND s.structure_type = 'labo'
+                    JOIN structures s ON s.id = aus4.structure_id AND s.structure_type = '{StructureType.LABO.value}'
                     WHERE a4.publication_id = p.id AND a4.in_perimeter = TRUE
                       {person_lab_filter_a4}
                  ) sub
@@ -231,14 +242,10 @@ def list_publications(
             LEFT JOIN publishers pub ON pub.id = j.publisher_id
             LEFT JOIN LATERAL (
                 SELECT
-                    max(CASE WHEN sd.source = 'hal' THEN sd.source_id END) AS hal_id,
-                    max(CASE WHEN sd.source = 'openalex' THEN sd.source_id END) AS openalex_id,
-                    max(CASE WHEN sd.source = 'scanr' THEN sd.source_id END) AS scanr_id,
-                    max(CASE WHEN sd.source = 'wos' THEN sd.source_id END) AS wos_id,
-                    max(CASE WHEN sd.source = 'theses' THEN sd.source_id END) AS theses_id,
+                    {_SOURCE_ID_COLUMNS},
                     (SELECT array_agg(DISTINCT col) FROM source_publications sd2,
                             unnest(COALESCE(sd2.hal_collections, '{{}}'::text[])) AS col
-                     WHERE sd2.publication_id = p.id AND sd2.source = 'hal') AS hal_collections
+                     WHERE sd2.publication_id = p.id AND sd2.source = '{Source.HAL.value}') AS hal_collections
                 FROM source_publications sd WHERE sd.publication_id = p.id
             ) src_ids ON TRUE
             WHERE {where_clause}
@@ -341,7 +348,7 @@ def export_publications_csv(
                          ORDER BY COALESCE(s.acronym, s.name))
                  FROM authorships a3
                  JOIN authorship_structures aus3 ON aus3.authorship_id = a3.id
-                 JOIN structures s ON s.id = aus3.structure_id AND s.structure_type = 'labo'
+                 JOIN structures s ON s.id = aus3.structure_id AND s.structure_type = '{StructureType.LABO.value}'
                  WHERE a3.publication_id = p.id AND a3.in_perimeter = TRUE
                    {person_lab_filter_a3}
                 ) AS labs
@@ -350,11 +357,7 @@ def export_publications_csv(
             LEFT JOIN publishers pub ON pub.id = j.publisher_id
             LEFT JOIN LATERAL (
                 SELECT
-                    max(CASE WHEN sd.source = 'hal' THEN sd.source_id END) AS hal_id,
-                    max(CASE WHEN sd.source = 'openalex' THEN sd.source_id END) AS openalex_id,
-                    max(CASE WHEN sd.source = 'scanr' THEN sd.source_id END) AS scanr_id,
-                    max(CASE WHEN sd.source = 'wos' THEN sd.source_id END) AS wos_id,
-                    max(CASE WHEN sd.source = 'theses' THEN sd.source_id END) AS theses_id
+                    {_SOURCE_ID_COLUMNS}
                 FROM source_publications sd WHERE sd.publication_id = p.id
             ) src_ids ON TRUE
             WHERE {where_clause}
@@ -459,16 +462,16 @@ def export_theses_csv(
                          ORDER BY COALESCE(s.acronym, s.name))
                  FROM authorships a3
                  JOIN authorship_structures aus3 ON aus3.authorship_id = a3.id
-                 JOIN structures s ON s.id = aus3.structure_id AND s.structure_type = 'labo'
+                 JOIN structures s ON s.id = aus3.structure_id AND s.structure_type = '{StructureType.LABO.value}'
                  WHERE a3.publication_id = p.id AND a3.in_perimeter = TRUE
                 ) AS labs
             FROM publications p
             LEFT JOIN LATERAL (
                 SELECT
-                    max(CASE WHEN sd.source = 'hal' THEN sd.source_id END) AS hal_id,
-                    max(CASE WHEN sd.source = 'openalex' THEN sd.source_id END) AS openalex_id,
-                    max(CASE WHEN sd.source = 'scanr' THEN sd.source_id END) AS scanr_id,
-                    max(CASE WHEN sd.source = 'theses' THEN sd.source_id END) AS theses_id
+                    max(CASE WHEN sd.source = '{Source.HAL.value}' THEN sd.source_id END) AS hal_id,
+                    max(CASE WHEN sd.source = '{Source.OPENALEX.value}' THEN sd.source_id END) AS openalex_id,
+                    max(CASE WHEN sd.source = '{Source.SCANR.value}' THEN sd.source_id END) AS scanr_id,
+                    max(CASE WHEN sd.source = '{Source.THESES.value}' THEN sd.source_id END) AS theses_id
                 FROM source_publications sd WHERE sd.publication_id = p.id
             ) src_ids ON TRUE
             WHERE {where_clause}
