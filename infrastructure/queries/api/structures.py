@@ -21,6 +21,7 @@ from application.ports.api.structures_queries import (
 )
 from application.ports.api.subjects_queries import SubjectFrequency
 from domain.countries import NON_INTERNATIONAL_COUNTRY_CODES
+from domain.publications.doc_types import DocType
 from infrastructure.queries.api.filters import OA_DASHBOARD_COLS_SQL, entity_subjects_sql
 from infrastructure.queries.perimeter import get_persons_structure_ids_list
 
@@ -316,7 +317,7 @@ class PgStructuresQueries(StructuresQueries):
                 FROM publications p
                 JOIN authorships a ON a.publication_id = p.id
                 WHERE {_AUTHOR_SIGNATURE}
-                  AND p.doc_type = 'article'
+                  AND p.doc_type = '{DocType.ARTICLE.value}'
             """),
             {"structure_id": structure_id, "non_international": _NON_INTERNATIONAL},
         ).one()
@@ -328,7 +329,7 @@ class PgStructuresQueries(StructuresQueries):
                 FROM (
                     SELECT p.id, unnest(p.countries) AS cc
                     FROM publications p
-                    WHERE p.doc_type = 'article'
+                    WHERE p.doc_type = '{DocType.ARTICLE.value}'
                       AND {_AUTHORED_PUBLICATION}
                 ) sub
                 JOIN countries co ON co.code = sub.cc
