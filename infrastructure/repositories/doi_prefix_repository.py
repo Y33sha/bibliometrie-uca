@@ -1,6 +1,6 @@
 """Adapter PostgreSQL pour la table `doi_prefixes`.
 
-Implémente `DoiPrefixRepository`. Sert la phase `resolve_ra` (lecture des préfixes à résoudre, insertion de leur Registration Agency) et le volet publisher de `publishers_journals` (attache de l'éditeur Crossref / repository DataCite).
+Sert la phase `resolve_ra` (lecture des préfixes à résoudre, insertion de leur Registration Agency) et le volet publisher de `publishers_journals` (attache de l'éditeur Crossref / repository DataCite).
 """
 
 from sqlalchemy import Connection, text
@@ -12,7 +12,7 @@ from application.ports.repositories.doi_prefix_repository import (
 
 
 class PgDoiPrefixRepository(DoiPrefixRepository):
-    """Accès PostgreSQL à `doi_prefixes` via une `Connection` SA."""
+    """Accès PostgreSQL à `doi_prefixes` via une `Connection` SQLAlchemy."""
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
@@ -20,7 +20,7 @@ class PgDoiPrefixRepository(DoiPrefixRepository):
     def get_unresolved_prefixes_with_samples(
         self, *, n_samples_per_prefix: int
     ) -> list[tuple[str, list[str]]]:
-        """Renvoie `[(prefix, [doi1, doi2, ...]), ...]` pour chaque préfixe DOI absent de `doi_prefixes`. Les DOI proviennent de la vue `candidate_dois` — le même pool que le cross-import par DOI (DOI primaires des source_publications in-périmètre, related_dois, cibles de relations, arXiv-dérivés), pour que tout préfixe interrogé par cross-import soit résolu ici. Au plus `n_samples_per_prefix` DOIs par préfixe, ordonnés par longueur croissante pour minimiser la complexité d'encodage URL côté client doi.org/ra."""
+        """Les DOI proviennent de la vue `candidate_dois` — le même pool que le cross-import par DOI (DOI primaires des source_publications in-périmètre, related_dois, cibles de relations, arXiv-dérivés), pour que tout préfixe interrogé par cross-import soit résolu ici."""
         result = self._conn.execute(
             text(
                 """
@@ -58,7 +58,6 @@ class PgDoiPrefixRepository(DoiPrefixRepository):
         return [(row.prefix, list(row.dois)) for row in result]
 
     def insert_ra(self, *, prefix: str, ra: str) -> bool:
-        """Insère `(prefix, ra)` seul (publisher non déterminé). Retourne True si inséré, False si déjà présent."""
         result = self._conn.execute(
             text(
                 "INSERT INTO doi_prefixes (prefix, ra) VALUES (:prefix, :ra) "
@@ -69,7 +68,6 @@ class PgDoiPrefixRepository(DoiPrefixRepository):
         return result.rowcount > 0
 
     def breakdown_by_registration_agency(self) -> list[tuple[str, int, int]]:
-        """`(ra, DOI distincts, préfixes distincts)` par RA, trié par DOI décroissant. Le préfixe est extrait comme à l'insertion (`split_part(doi, '/', 1)`) pour joindre `doi_prefixes` ; un préfixe absent (non résolu) compte comme `unknown`."""
         result = self._conn.execute(
             text(
                 """
@@ -87,7 +85,6 @@ class PgDoiPrefixRepository(DoiPrefixRepository):
         return [(row.ra, int(row.dois), int(row.prefixes)) for row in result]
 
     def get_prefixes_pending_publisher(self) -> list[PendingPublisherPrefix]:
-        """Rows `publisher_id IS NULL`, `publisher_checked_at IS NULL`, RA gérée. Ordre par prefix ASC."""
         result = self._conn.execute(
             text(
                 """
@@ -122,7 +119,6 @@ class PgDoiPrefixRepository(DoiPrefixRepository):
         client_name_normalized: str | None,
         datacite_client_symbol: str | None,
     ) -> None:
-        """Renseigne les métadonnées publisher (et corrige `ra`) après fetch `/prefixes`."""
         self._conn.execute(
             text(
                 """
@@ -150,14 +146,12 @@ class PgDoiPrefixRepository(DoiPrefixRepository):
         )
 
     def update_publisher_id(self, prefix: str, publisher_id: int) -> None:
-        """Attache un publisher à un préfixe."""
         self._conn.execute(
             text("UPDATE doi_prefixes SET publisher_id = :pid WHERE prefix = :prefix"),
             {"pid": publisher_id, "prefix": prefix},
         )
 
     def mark_publisher_checked(self, prefix: str) -> None:
-        """Pose `publisher_checked_at = now()` (tentative `/prefixes` effectuée)."""
         self._conn.execute(
             text("UPDATE doi_prefixes SET publisher_checked_at = now() WHERE prefix = :prefix"),
             {"prefix": prefix},

@@ -3,8 +3,6 @@
 Cette table sert de cache `prefix → Registration Agency + publisher`. Elle est peuplée en deux temps : la phase `resolve_ra` (avant cross_imports) insère `(prefix, ra)` via `insert_ra` ; le volet publisher de la phase `publishers_journals` interroge `/prefixes` pour les rows non encore vérifiées (`publisher_checked_at IS NULL`), renseigne les métadonnées et attache le publisher.
 
 Pour les rows `ra='DataCite'`, on stocke aussi le nom du DataCite client (= repository) et son symbole stable dans des colonnes dédiées (`client_name_*`, `datacite_client_symbol`). Le provider DataCite (organisation-mère) occupe les mêmes colonnes `publisher_*` que le publisher Crossref, et passe par le même matching/création.
-
-Implémenté par `infrastructure/repositories/doi_prefix_repository.py`.
 """
 
 from typing import NamedTuple, Protocol
