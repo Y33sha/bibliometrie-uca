@@ -96,7 +96,7 @@ class PgAddressRepository(AddressRepository):
             index_elements=["address_id", "structure_id"],
             set_={"is_confirmed": stmt.excluded.is_confirmed},
         )
-        # SA exécute en mode "executemany" si on passe une liste de dicts.
+        # SQLAlchemy exécute en mode "executemany" si on passe une liste de dicts.
         self._conn.execute(
             stmt,
             [
