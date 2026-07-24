@@ -8,8 +8,17 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from application.ports.repositories.address_repository import AddressCountryFilter
 from domain.errors import NotFoundError
-from infrastructure.db.tables import address_structures, addresses
+from infrastructure.db.tables import address_structures, addresses, countries
 from infrastructure.queries.pipeline import countries as country_queries
+
+# Ajout idempotent d'un code pays à `addresses.countries` : ni doublon, ni écrasement des codes déjà posés. Le code à ajouter est lié au paramètre `:cc`.
+_ADD_COUNTRY_SET_CLAUSE = """
+    SET countries = CASE
+        WHEN countries IS NULL THEN ARRAY[:cc]::char(2)[]
+        WHEN :cc = ANY(countries) THEN countries
+        ELSE array_append(countries, CAST(:cc AS char(2)))
+    END
+"""
 
 
 class PgAddressRepository:
@@ -18,7 +27,7 @@ class PgAddressRepository:
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
 
-    # ── Validation des liens adresse ↔ structure ───────────────────
+    # ── Liens adresse ↔ structure ──────────────────────────────────
 
     def reset_manual_link(self, address_id: int, structure_id: int) -> None:
         self._conn.execute(
@@ -116,8 +125,7 @@ class PgAddressRepository:
 
     def country_exists(self, code: str) -> bool:
         row = self._conn.execute(
-            text("SELECT code FROM countries WHERE code = :code"),
-            {"code": code},
+            select(countries.c.code).where(countries.c.code == code)
         ).one_or_none()
         return row is not None
 
@@ -142,13 +150,9 @@ class PgAddressRepository:
         if not address_ids:
             return []
         result = self._conn.execute(
-            text("""
+            text(f"""
                 UPDATE addresses
-                SET countries = CASE
-                    WHEN countries IS NULL THEN ARRAY[:cc]::char(2)[]
-                    WHEN :cc = ANY(countries) THEN countries
-                    ELSE array_append(countries, CAST(:cc AS char(2)))
-                END
+                {_ADD_COUNTRY_SET_CLAUSE}
                 WHERE id = ANY(:ids)
                 RETURNING id
             """),
@@ -184,11 +188,7 @@ class PgAddressRepository:
         result = self._conn.execute(
             text(f"""
                 UPDATE addresses
-                SET countries = CASE
-                    WHEN countries IS NULL THEN ARRAY[:cc]::char(2)[]
-                    WHEN :cc = ANY(countries) THEN countries
-                    ELSE array_append(countries, CAST(:cc AS char(2)))
-                END
+                {_ADD_COUNTRY_SET_CLAUSE}
                 WHERE {where_clause}
                 RETURNING id
             """),
