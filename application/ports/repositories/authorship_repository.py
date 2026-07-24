@@ -4,7 +4,22 @@ Un seul port pour `authorships` et `source_authorships` : leurs opérations sont
 """
 
 from datetime import datetime
-from typing import Any, Protocol
+from typing import Protocol, TypedDict
+
+
+class AuthorshipPersonRow(TypedDict):
+    """Ligne renvoyée par `get_authorship_person` : identité d'une ligne consolidée `authorships`."""
+
+    id: int
+    person_id: int | None
+    publication_id: int
+
+
+class AssignedSignatureRow(TypedDict):
+    """Ligne renvoyée par `assign_orphan_source_authorship` : source et forme de nom de la signature rattachée."""
+
+    source: str
+    author_name_normalized: str | None
 
 
 class AuthorshipRepository(Protocol):
@@ -29,11 +44,11 @@ class AuthorshipRepository(Protocol):
         source_authorship_id: int,
     ) -> None: ...
 
-    def assign_orphan_sa(
+    def assign_orphan_source_authorship(
         self,
         person_id: int,
         source_authorship_id: int,
-    ) -> dict[str, Any] | None:
+    ) -> AssignedSignatureRow | None:
         """Pose `person_id` sur une signature source orpheline. Retourne `{source, author_name_normalized}`, ou `None` si la signature n'existe pas ou porte déjà un `person_id` — `find_source_authorship_owner` départage."""
         ...
 
@@ -76,7 +91,7 @@ class AuthorshipRepository(Protocol):
 
     # ── authorships ────────────────────────────────────────────────
 
-    def get_authorship_person(self, authorship_id: int) -> dict[str, Any] | None:
+    def get_authorship_person(self, authorship_id: int) -> AuthorshipPersonRow | None:
         """La ligne `authorships` (`id`, `person_id`, `publication_id`), ou `None` si l'id n'existe pas."""
         ...
 
@@ -157,7 +172,7 @@ class AuthorshipRepository(Protocol):
     def create_authorships_from_sources(
         self,
         person_id: int,
-        sa_ids: list[int],
+        source_authorship_ids: list[int],
         source_priority: tuple[str, ...],
     ) -> None:
         """Crée les lignes consolidées manquantes pour la personne, une par publication couverte par le lot, depuis la signature la plus prioritaire."""
@@ -174,7 +189,7 @@ class AuthorshipRepository(Protocol):
     def link_source_authorships_to_authorships(
         self,
         person_id: int,
-        sa_ids: list[int],
+        source_authorship_ids: list[int],
     ) -> None:
         """Même pose de FK, cantonnée aux signatures du lot."""
         ...

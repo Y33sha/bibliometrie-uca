@@ -1,11 +1,15 @@
 """Adapter PostgreSQL sync pour les authorships et source_authorships."""
 
 from datetime import datetime
-from typing import Any
+from typing import cast
 
 from sqlalchemy import Connection, text
 
-from application.ports.repositories.authorship_repository import AuthorshipRepository
+from application.ports.repositories.authorship_repository import (
+    AssignedSignatureRow,
+    AuthorshipPersonRow,
+    AuthorshipRepository,
+)
 from infrastructure.queries.sources_sql import source_case_sql
 
 
@@ -32,10 +36,10 @@ class PgAuthorshipRepository(AuthorshipRepository):
         )
 
     def create_authorships_from_sources(
-        self, person_id: int, sa_ids: list[int], source_priority: tuple[str, ...]
+        self, person_id: int, source_authorship_ids: list[int], source_priority: tuple[str, ...]
     ) -> None:
         """Les structures dérivées vivent dans la matview `authorship_structures`, rafraîchie par le caller."""
-        if not sa_ids:
+        if not source_authorship_ids:
             return
         self._conn.execute(
             text(f"""
@@ -48,7 +52,7 @@ class PgAuthorshipRepository(AuthorshipRepository):
                 WHERE sa.id = ANY(:ids) AND sd.publication_id IS NOT NULL
                 ORDER BY sd.publication_id, {source_case_sql(source_priority)}
             """),
-            {"ids": sa_ids},
+            {"ids": source_authorship_ids},
         )
         self._conn.execute(
             text("""
@@ -83,8 +87,8 @@ class PgAuthorshipRepository(AuthorshipRepository):
             {"pub": publication_id, "pid": person_id},
         )
 
-    def link_source_authorships_to_authorships(self, person_id: int, sa_ids: list[int]) -> None:
-        if not sa_ids:
+    def link_source_authorships_to_authorships(self, person_id: int, source_authorship_ids: list[int]) -> None:
+        if not source_authorship_ids:
             return
         self._conn.execute(
             text("""
@@ -96,7 +100,7 @@ class PgAuthorshipRepository(AuthorshipRepository):
                   AND a.person_id = :pid
                   AND sa.authorship_id IS NULL
             """),
-            {"ids": sa_ids, "pid": person_id},
+            {"ids": source_authorship_ids, "pid": person_id},
         )
 
     def recompute_authorship_author_position_and_corresponding(
@@ -178,7 +182,9 @@ class PgAuthorshipRepository(AuthorshipRepository):
             {"aid": source_authorship_id},
         ).scalar_one_or_none()
 
-    def assign_orphan_sa(self, person_id: int, source_authorship_id: int) -> dict[str, Any] | None:
+    def assign_orphan_source_authorship(
+        self, person_id: int, source_authorship_id: int
+    ) -> AssignedSignatureRow | None:
         row = self._conn.execute(
             text("""
                 UPDATE source_authorships sa SET person_id = :pid
@@ -189,7 +195,7 @@ class PgAuthorshipRepository(AuthorshipRepository):
             """),
             {"pid": person_id, "aid": source_authorship_id},
         ).first()
-        return dict(row._mapping) if row else None
+        return cast(AssignedSignatureRow, dict(row._mapping)) if row else None
 
     def assign_orphan_source_authorships_to_person(
         self, person_id: int, source_authorship_ids: list[int]
@@ -260,13 +266,13 @@ class PgAuthorshipRepository(AuthorshipRepository):
 
     # ── authorships ────────────────────────────────────────────────
 
-    def get_authorship_person(self, authorship_id: int) -> dict[str, Any] | None:
+    def get_authorship_person(self, authorship_id: int) -> AuthorshipPersonRow | None:
         result = self._conn.execute(
             text("SELECT id, person_id, publication_id FROM authorships WHERE id = :id"),
             {"id": authorship_id},
         )
         row = result.first()
-        return dict(row._mapping) if row else None
+        return cast(AuthorshipPersonRow, dict(row._mapping)) if row else None
 
     def reject_authorship(self, publication_id: int, person_id: int) -> None:
         self._conn.execute(
@@ -422,9 +428,9 @@ class PgAuthorshipRepository(AuthorshipRepository):
                       AND ast.structure_id = ANY(:struct_ids)
                       AND ast.is_confirmed IS DISTINCT FROM FALSE
                 )
-                WHERE sa.id = ANY(:sa_ids)
+                WHERE sa.id = ANY(:source_authorship_ids)
             """),
-            {"sa_ids": source_authorship_ids, "struct_ids": perimeter_structure_ids},
+            {"source_authorship_ids": source_authorship_ids, "struct_ids": perimeter_structure_ids},
         )
 
     def propagate_in_perimeter_to_authorships(
