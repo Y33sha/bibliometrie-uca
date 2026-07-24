@@ -54,7 +54,7 @@ def list_structures(
 ) -> list[StructureListItem]:
     """Liste des structures, filtrable par types, par texte libre et par appartenance au périmètre.
 
-    `structure_type` accepte plusieurs valeurs de l'énumération `structure_type` séparées par des virgules. `search` : matching accent-insensible sur nom / acronyme / code. `in_perimeter` restreint aux structures du périmètre `persons`, clôture comprise : la page publique des laboratoires s'en sert, avec les types que sa configuration lui donne. Tri canonique par type (labo > universite > onr > chu > ecole > site > autre) puis nom.
+    `structure_type` accepte plusieurs valeurs de l'énumération `structure_type` séparées par des virgules. `search` : matching accent-insensible sur nom / acronyme / code. `in_perimeter` restreint aux structures du périmètre `persons`, clôture comprise : la page publique des laboratoires s'en sert, avec les types que sa configuration lui donne. L'ordre de la liste n'est pas garanti : les consommateurs trient à l'affichage.
     """
     return queries.list_structures(
         types=parse_vocabulary_csv(
