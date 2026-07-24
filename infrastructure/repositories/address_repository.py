@@ -6,7 +6,10 @@ Les méthodes de propagation (`refresh_publications_countries_for_addresses`, en
 from sqlalchemy import Connection, delete, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from application.ports.repositories.address_repository import AddressCountryFilter
+from application.ports.repositories.address_repository import (
+    AddressCountryFilter,
+    AddressRepository,
+)
 from domain.errors import NotFoundError
 from infrastructure.db.tables import address_structures, addresses, countries
 from infrastructure.queries.pipeline import countries as country_queries
@@ -21,7 +24,7 @@ _ADD_COUNTRY_SET_CLAUSE = """
 """
 
 
-class PgAddressRepository:
+class PgAddressRepository(AddressRepository):
     """Accès PostgreSQL sync à l'agrégat Address."""
 
     def __init__(self, conn: Connection) -> None:

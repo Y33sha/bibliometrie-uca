@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING
 
 from sqlalchemy import Connection
 
+from application.ports.repositories.person_repository import PersonRepository
 from infrastructure.repositories.person_repository import (
     _core,
     _identifiers,
@@ -27,7 +28,7 @@ if TYPE_CHECKING:
     from domain.persons.person_identifier import PersonIdentifier
 
 
-class PgPersonRepository:
+class PgPersonRepository(PersonRepository):
     """Accès PostgreSQL à l'agrégat Person via une `Connection` SA."""
 
     def __init__(self, conn: Connection) -> None:

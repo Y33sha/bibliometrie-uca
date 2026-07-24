@@ -2,11 +2,12 @@
 
 from sqlalchemy import Connection, insert
 
+from application.ports.repositories.audit_repository import AuditRepository
 from domain.types import JsonValue
 from infrastructure.db.tables import audit_log
 
 
-class PgAuditRepository:
+class PgAuditRepository(AuditRepository):
     """Accès PostgreSQL sync à `audit_log` via une `Connection` SQLAlchemy."""
 
     def __init__(self, conn: Connection) -> None:

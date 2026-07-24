@@ -9,7 +9,7 @@ from typing import Any, NamedTuple
 
 from sqlalchemy import Connection, text
 
-from application.ports.repositories.publication_repository import PubByDoi
+from application.ports.repositories.publication_repository import PubByDoi, PublicationRepository
 from domain.publications.identifiers import DOI
 from domain.publications.publication import Publication
 from domain.source_publications.correction import CONVERGENCE_CASES
@@ -65,7 +65,7 @@ def _view_from_row(row: _SourcePublicationViewRow) -> SourcePublication:
     )
 
 
-class PgPublicationRepository:
+class PgPublicationRepository(PublicationRepository):
     """Accès PostgreSQL à l'agrégat Publication via une `Connection` SA."""
 
     def __init__(self, conn: Connection) -> None:

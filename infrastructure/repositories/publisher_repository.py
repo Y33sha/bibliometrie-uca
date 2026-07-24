@@ -10,7 +10,7 @@ from typing import NamedTuple, cast
 from sqlalchemy import Connection, delete, func, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from application.ports.repositories.publisher_repository import PublisherUpdate
+from application.ports.repositories.publisher_repository import PublisherRepository, PublisherUpdate
 from domain.errors import NotFoundError
 from domain.normalize import normalize_text
 from domain.publishers.publisher import Publisher, PublisherType
@@ -39,7 +39,7 @@ def _publisher_from_row(row: _PublisherRow) -> Publisher:
     )
 
 
-class PgPublisherRepository:
+class PgPublisherRepository(PublisherRepository):
     """Accès PostgreSQL à l'agrégat Publisher via une `Connection` SA."""
 
     def __init__(self, conn: Connection) -> None:

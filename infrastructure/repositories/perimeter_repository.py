@@ -4,7 +4,7 @@ from typing import NamedTuple
 
 from sqlalchemy import Connection, delete, func, select, update
 
-from application.ports.repositories.perimeter_repository import PerimeterUpdate
+from application.ports.repositories.perimeter_repository import PerimeterRepository, PerimeterUpdate
 from domain.errors import NotFoundError
 from domain.perimeters.perimeter import Perimeter
 from infrastructure.db.tables import perimeters
@@ -30,7 +30,7 @@ def _perimeter_from_row(row: _PerimeterRow) -> Perimeter:
     )
 
 
-class PgPerimeterRepository:
+class PgPerimeterRepository(PerimeterRepository):
     """Accès PostgreSQL sync à la table `perimeters`."""
 
     def __init__(self, conn: Connection) -> None:
