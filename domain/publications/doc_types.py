@@ -64,7 +64,7 @@ ARTICLE_SUBTYPES: frozenset[str] = frozenset(
 
 # Famille → types fins. Mémoires/thèses en cours filtrés ailleurs, mais classés ici pour
 # l'exhaustivité de la couverture de l'enum. L'ordre est celui d'affichage.
-DOC_TYPE_FAMILIES: dict[str, tuple[str, ...]] = {
+DOC_TYPE_FAMILIES: dict[str, tuple[DocType, ...]] = {
     "publications": (
         DocType.ARTICLE,
         DocType.CONFERENCE_PAPER,
