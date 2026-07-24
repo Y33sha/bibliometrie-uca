@@ -22,6 +22,7 @@ from typing import Any
 from sqlalchemy import Connection, bindparam, text
 
 from domain.persons.name_matching import names_compatible
+from domain.structures.structure import StructureType
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.queries.api.persons.admin import PERSON_DUP_QUERIES
 
@@ -34,11 +35,11 @@ _DIMENSIONS: dict[str, str] = {
         JOIN authorships a2 ON a2.publication_id = a1.publication_id AND a2.person_id <> a1.person_id
         WHERE a1.person_id = ANY(:ids) AND a2.person_id IS NOT NULL
     """,
-    "labos": """
+    "labos": f"""
         SELECT a.person_id AS person, aus.structure_id AS val
         FROM authorships a
         JOIN authorship_structures aus ON aus.authorship_id = a.id
-        JOIN structures s ON s.id = aus.structure_id AND s.structure_type = 'labo'
+        JOIN structures s ON s.id = aus.structure_id AND s.structure_type = '{StructureType.LABO.value}'
         WHERE a.person_id = ANY(:ids)
     """,
     "revues": """

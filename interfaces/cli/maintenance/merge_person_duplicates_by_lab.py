@@ -22,6 +22,7 @@ from typing import Any
 from sqlalchemy import Connection, text
 
 from application.services.persons.core import merge_person
+from domain.structures.structure import StructureType
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.repositories import person_repository
 
@@ -44,7 +45,7 @@ def c(text: object, *styles: str) -> str:
     return f"{prefix}{text}{COLORS['reset']}"
 
 
-LAB_PERSONS_CTE = """
+LAB_PERSONS_CTE = f"""
     WITH lab_persons AS (
         SELECT DISTINCT s.id AS lab_id, s.name AS lab_name, p.id AS person_id,
                p.last_name_normalized, p.first_name_normalized
@@ -54,7 +55,7 @@ LAB_PERSONS_CTE = """
         JOIN persons p ON p.id = sa.person_id
         WHERE sa.in_perimeter = TRUE
           AND sa.person_id IS NOT NULL
-          AND s.structure_type = 'labo'
+          AND s.structure_type = '{StructureType.LABO.value}'
     )
 """
 
