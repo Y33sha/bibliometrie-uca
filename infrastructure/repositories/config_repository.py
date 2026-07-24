@@ -1,14 +1,13 @@
-"""Adapter SA du port `application.ports.repositories.config_repository.ConfigRepository`."""
+"""Adapter PostgreSQL sync pour la table `config`."""
 
 from sqlalchemy import Connection, update
 
-from application.ports.repositories.config_repository import ConfigRepository
 from domain.types import JsonValue
 from infrastructure.db.tables import config
 
 
-class PgConfigRepository(ConfigRepository):
-    """Adapter SA pour `application.ports.repositories.config_repository.ConfigRepository`."""
+class PgConfigRepository:
+    """Accès PostgreSQL sync à la table `config`."""
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
