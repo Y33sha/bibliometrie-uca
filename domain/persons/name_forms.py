@@ -65,3 +65,10 @@ def compute_person_name_forms(last_name: str, first_name: str) -> set[str]:
         forms.add(ln)
 
     return forms
+
+
+# Marqueur de provenance inscrit dans `person_name_forms.sources` pour les formes calculées
+# par `compute_person_name_forms` depuis la table `persons`, par opposition aux formes attestées
+# par une source d'extraction (`hal`, `openalex`…). Sa présence dans `sources` signale
+# l'appartenance de la forme au nom canonique de la personne.
+CANONICAL_NAME_FORM_SOURCE = "persons"
