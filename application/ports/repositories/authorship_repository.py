@@ -203,11 +203,6 @@ class AuthorshipRepository(Protocol):
         """Réagrège `author_position` (par priorité de source) et `is_corresponding` (OR des signatures) sur la ligne consolidée."""
         ...
 
-    def recompute_authorship_in_perimeter(
-        self,
-        publication_id: int,
-        person_id: int,
-        sources: tuple[str, ...],
-    ) -> None:
+    def recompute_authorship_in_perimeter(self, publication_id: int, person_id: int) -> None:
         """Réagrège `in_perimeter` (OR des signatures) sur la ligne consolidée d'une paire. `recompute_in_perimeter_on_source_authorships` couvre le cas ensembliste, par adresses."""
         ...

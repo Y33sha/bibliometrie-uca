@@ -12,6 +12,18 @@ from application.ports.repositories.authorship_repository import (
 )
 from infrastructure.queries.sources_sql import source_case_sql
 
+# Vrai dès qu'une signature de la paire (publication, personne) de `authorships a` est elle-même in-perimeter.
+_AUTHORSHIP_IN_PERIMETER_EXPR = """
+    EXISTS (
+        SELECT 1
+        FROM source_authorships sa
+        JOIN source_publications sd ON sd.id = sa.source_publication_id
+        WHERE sd.publication_id = a.publication_id
+          AND sa.person_id = a.person_id
+          AND sa.in_perimeter = TRUE
+    )
+"""
+
 
 class PgAuthorshipRepository(AuthorshipRepository):
     """Accès PostgreSQL sync aux authorships canoniques et à leurs signatures sources."""
@@ -128,22 +140,12 @@ class PgAuthorshipRepository(AuthorshipRepository):
             {"pub": publication_id, "pid": person_id},
         )
 
-    def recompute_authorship_in_perimeter(
-        self, publication_id: int, person_id: int, sources: tuple[str, ...]
-    ) -> None:
+    def recompute_authorship_in_perimeter(self, publication_id: int, person_id: int) -> None:
         """Les structures dérivées vivent dans la matview `authorship_structures`, rafraîchie par le caller."""
-        sources_sql = "(" + ", ".join(f"'{s}'" for s in sources) + ")"
         self._conn.execute(
             text(f"""
                 UPDATE authorships a
-                SET in_perimeter = COALESCE((
-                        SELECT bool_or(sa.in_perimeter)
-                        FROM source_authorships sa
-                        JOIN source_publications sd ON sd.id = sa.source_publication_id
-                        WHERE sa.source IN {sources_sql}
-                          AND sd.publication_id = :pub
-                          AND sa.person_id = :pid
-                    ), FALSE)
+                SET in_perimeter = {_AUTHORSHIP_IN_PERIMETER_EXPR}
                 WHERE a.publication_id = :pub AND a.person_id = :pid
             """),
             {"pub": publication_id, "pid": person_id},
@@ -458,16 +460,9 @@ class PgAuthorshipRepository(AuthorshipRepository):
         )
 
         self._conn.execute(
-            text("""
+            text(f"""
             UPDATE authorships a
-            SET in_perimeter = EXISTS (
-                    SELECT 1 FROM source_publications sd
-                    JOIN source_authorships sa ON sa.source_publication_id = sd.id
-                                              AND sa.person_id = a.person_id
-                                              AND sa.source = sd.source
-                    WHERE sd.publication_id = a.publication_id
-                      AND sa.in_perimeter = TRUE
-                )
+            SET in_perimeter = {_AUTHORSHIP_IN_PERIMETER_EXPR}
             FROM _affected_authorships af
             WHERE a.id = af.authorship_id
         """)
