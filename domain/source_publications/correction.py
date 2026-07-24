@@ -21,6 +21,7 @@ from itertools import combinations
 from typing import NamedTuple, TypedDict
 
 from domain.normalize import normalize_text
+from domain.publications.doc_types import DocType
 from domain.types import JsonValue
 
 
@@ -115,7 +116,7 @@ _SUPPLEMENTARY_CONTENT_TITLE_PREFIXES = (
 
 # Pattern textuel très spécifique, univoque dans les corpus observés.
 _ERRATUM_TITLE_PREFIXES = (
-    "erratum",
+    DocType.ERRATUM,
     "errata",
     "corrigendum",
     "author correction",
@@ -206,6 +207,10 @@ class _RuleDefinition(TypedDict):
     applies_correction: _AppliesCorrection
 
 
+# Whitelist récurrente : sources brutes plausibles pour une reclassification par titre.
+_ARTICLE_OR_OTHER = frozenset({DocType.ARTICLE, DocType.OTHER})
+
+
 # ── Table des règles ────────────────────────────────────────────────────
 # Ordre = priorité de la cascade (signaux forts d'abord : URL > journal_type > titre). Les whitelists `doc_type` sont calibrées pour être quasi disjointes entre règles d'une même famille, donc l'ordre intra-famille importe peu en pratique. La règle ISBN évaluée avant la règle année-pages : un titre porteur d'un ISBN explicite est plus fiable.
 
@@ -213,12 +218,12 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
     # theses.fr fait autorité sur les thèses françaises (OpenAlex classe parfois ces thèses en `article` ou `dissertation`). Gardée par `journal_id_present: False` : une SP theses.fr AVEC un journal_id est une conflation thèse↔article publié — c'est l'aspect article qui prime (`THESIS_WITH_JOURNAL_TO_ARTICLE`), pas l'URL theses.fr. La règle ne corrige donc en `thesis` que les SP theses.fr **sans** journal.
     MetadataCorrectionRule.THESES_FR_URL_TO_THESIS: {
         "applies_to": {"url_contains": "theses.fr/", "journal_id_present": False},
-        "applies_correction": {"doc_type": "thesis"},
+        "applies_correction": {"doc_type": DocType.THESIS},
     },
     # DUMAS (dumas.ccsd) n'héberge que des mémoires : URL-only, même garde `journal_id_present: False` que theses.fr (une SP DUMAS avec journal_id = article publié → prime sur le mémoire).
     MetadataCorrectionRule.DUMAS_URL_TO_MEMOIR: {
         "applies_to": {"url_contains": "dumas.ccsd", "journal_id_present": False},
-        "applies_correction": {"doc_type": "memoir"},
+        "applies_correction": {"doc_type": DocType.MEMOIR},
     },
     # Famille thèse + `journal_id` présent ⇒ `article`, SAUF si le DOI est celui d'un registre de
     # thèses (`doi_prefix_not_in`). Une vraie thèse a un DOI ABES (ou pas de DOI) ; un DOI d'éditeur
@@ -231,32 +236,32 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
     # part (mutation `external_ids`, hors DSL colonne).
     MetadataCorrectionRule.THESIS_WITH_JOURNAL_TO_ARTICLE: {
         "applies_to": {
-            "doc_type": frozenset({"thesis", "ongoing_thesis", "memoir"}),
+            "doc_type": frozenset({DocType.THESIS, DocType.ONGOING_THESIS, DocType.MEMOIR}),
             "journal_id_present": True,
             "doi_prefix_not_in": _THESIS_REGISTRY_DOI_PREFIXES,
         },
-        "applies_correction": {"doc_type": "article"},
+        "applies_correction": {"doc_type": DocType.ARTICLE},
     },
     # Journal typé `media` (typage manuel admin) ⇒ `media` quel que soit le `doc_type` brut.
     MetadataCorrectionRule.JOURNAL_TYPE_MEDIA_TO_MEDIA: {
-        "applies_to": {"journal_type": "media"},
-        "applies_correction": {"doc_type": "media"},
+        "applies_to": {"journal_type": DocType.MEDIA},
+        "applies_correction": {"doc_type": DocType.MEDIA},
     },
     # Journal d'actes + doc_type plausible ⇒ `conference_paper`. `book` exclu : un volume entier d'actes peut légitimement rester `book`.
     MetadataCorrectionRule.JOURNAL_TYPE_PROCEEDINGS_TO_CONFERENCE_PAPER: {
         "applies_to": {
             "journal_type": "proceedings",
-            "doc_type": frozenset({"article", "book_chapter"}),
+            "doc_type": frozenset({DocType.ARTICLE, DocType.BOOK_CHAPTER}),
         },
-        "applies_correction": {"doc_type": "conference_paper"},
+        "applies_correction": {"doc_type": DocType.CONFERENCE_PAPER},
     },
     # Serveur de preprints (arXiv, bioRxiv, ChemRxiv, EGUsphere, SSRN, …) + doc_type ∈ {article, other} ⇒ `preprint`. Whitelist étroite : les SPs CrossRef ont `journal-article`, l'arbitrage canonique efface parfois le `preprint` brut OA. `dataset`/`software`/`poster` épargnés.
     MetadataCorrectionRule.JOURNAL_TYPE_PREPRINT_SERVER_TO_PREPRINT: {
         "applies_to": {
             "journal_type": "preprint_server",
-            "doc_type": frozenset({"article", "other"}),
+            "doc_type": _ARTICLE_OR_OTHER,
         },
-        "applies_correction": {"doc_type": "preprint"},
+        "applies_correction": {"doc_type": DocType.PREPRINT},
     },
     # La SP déclare elle-même une relation `is-preprint-of` (Crossref `meta.relation`) : elle EST
     # le preprint, signal source-autoritaire et indépendant du `doc_type` (donc acyclique vis-à-vis
@@ -265,76 +270,76 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
     # d'OpenAlex faute de mieux ; Crossref étant prioritaire, le `preprint` corrigé gagne).
     MetadataCorrectionRule.PREPRINT_RELATION_TO_PREPRINT: {
         "applies_to": {"self_declared_preprint": True},
-        "applies_correction": {"doc_type": "preprint"},
+        "applies_correction": {"doc_type": DocType.PREPRINT},
     },
     # Titre `interview`/`reportage`/`podcast` + `doc_type` ∈ {article, other} ⇒ `media`. Patterns univoques et récurrents dans le corpus UCA.
     MetadataCorrectionRule.TITLE_MEDIA_PREFIX_TO_MEDIA: {
         "applies_to": {
-            "doc_type": frozenset({"article", "other"}),
+            "doc_type": _ARTICLE_OR_OTHER,
             "title_prefix_normalized": _MEDIA_TITLE_PREFIXES,
         },
-        "applies_correction": {"doc_type": "media"},
+        "applies_correction": {"doc_type": DocType.MEDIA},
     },
     # Collection figshare (`10.6084/m9.figshare.c.<id>` — le `.c.` marque un bundle de suppléments, vs un item `m9.figshare.<id>`) + doc_type ∈ {article, other} ⇒ `dataset`. Le titre d'une collection = le titre du papier parent, donc inattrapable par la règle titre supplément → discrimination par DOI. Fallback hardcodé ; une détection RA DataCite (figshare-as-client) généraliserait aux instances figshare sous d'autres préfixes.
     MetadataCorrectionRule.DOI_FIGSHARE_COLLECTION_TO_DATASET: {
         "applies_to": {
-            "doc_type": frozenset({"article", "other"}),
+            "doc_type": _ARTICLE_OR_OTHER,
             "doi_contains": "m9.figshare.c.",
         },
-        "applies_correction": {"doc_type": "dataset"},
+        "applies_correction": {"doc_type": DocType.DATASET},
     },
     # Titre suppléments / données complémentaires + doc_type ∈ {article, other} ⇒ `dataset`. DataCite et certaines plateformes (Dryad, Zenodo, IFREMER) exposent les fichiers complémentaires comme entités à part. `dataset` lui-même exclu (no-op naturel).
     MetadataCorrectionRule.TITLE_SUPPLEMENTARY_CONTENT_TO_DATASET: {
         "applies_to": {
-            "doc_type": frozenset({"article", "other"}),
+            "doc_type": _ARTICLE_OR_OTHER,
             "title_prefix_normalized": _SUPPLEMENTARY_CONTENT_TITLE_PREFIXES,
         },
-        "applies_correction": {"doc_type": "dataset"},
+        "applies_correction": {"doc_type": DocType.DATASET},
     },
     # Titre `erratum`/`errata`/`corrigendum` + doc_type publication-like ⇒ `erratum`. OpenAlex reclasse fréquemment ces corrections en `article`/`preprint`/`data_paper`. Types-référents (thesis, book, dataset, …) épargnés.
     MetadataCorrectionRule.TITLE_ERRATUM_PREFIX_TO_ERRATUM: {
         "applies_to": {
             "doc_type": frozenset(
                 {
-                    "article",
-                    "preprint",
-                    "review",
-                    "conference_paper",
-                    "data_paper",
-                    "letter",
-                    "other",
+                    DocType.ARTICLE,
+                    DocType.PREPRINT,
+                    DocType.REVIEW,
+                    DocType.CONFERENCE_PAPER,
+                    DocType.DATA_PAPER,
+                    DocType.LETTER,
+                    DocType.OTHER,
                 }
             ),
             "title_prefix_normalized": _ERRATUM_TITLE_PREFIXES,
         },
-        "applies_correction": {"doc_type": "erratum"},
+        "applies_correction": {"doc_type": DocType.ERRATUM},
     },
     # Titre `retraction notice/note` + doc_type ∈ {article, other} ⇒ `retraction`. Préfixes stricts pour éviter un faux positif sur un article *sur* la rétractation.
     MetadataCorrectionRule.TITLE_RETRACTION_PREFIX_TO_RETRACTION: {
         "applies_to": {
-            "doc_type": frozenset({"article", "other"}),
+            "doc_type": _ARTICLE_OR_OTHER,
             "title_prefix_normalized": _RETRACTION_TITLE_PREFIXES,
         },
-        "applies_correction": {"doc_type": "retraction"},
+        "applies_correction": {"doc_type": DocType.RETRACTION},
     },
     # Titre « Editorial: … » + doc_type ∈ {article, other} ⇒ `editorial`. Frontiers & co.
     # publient les éditoriaux sous ce préfixe, qu'OpenAlex/ScanR/CrossRef typent souvent
     # `article`. Ancré sur le « : » (cf. `_EDITORIAL_PREFIX_PATTERN`).
     MetadataCorrectionRule.TITLE_EDITORIAL_PREFIX_TO_EDITORIAL: {
         "applies_to": {
-            "doc_type": frozenset({"article", "other"}),
+            "doc_type": _ARTICLE_OR_OTHER,
             "title_regex": _EDITORIAL_PREFIX_PATTERN,
         },
-        "applies_correction": {"doc_type": "editorial"},
+        "applies_correction": {"doc_type": DocType.EDITORIAL},
     },
     # Titre « Letter: … » + doc_type ∈ {article, other} ⇒ `letter`. Courriers à l'éditeur /
     # research letters mal typés `article`.
     MetadataCorrectionRule.TITLE_LETTER_PREFIX_TO_LETTER: {
         "applies_to": {
-            "doc_type": frozenset({"article", "other"}),
+            "doc_type": _ARTICLE_OR_OTHER,
             "title_regex": _LETTER_PREFIX_PATTERN,
         },
-        "applies_correction": {"doc_type": "letter"},
+        "applies_correction": {"doc_type": DocType.LETTER},
     },
     # « systematic review » en tête ou en sous-titre + doc_type ∈ {article} ⇒ `review`.
     # Ancré (cf. `_SYSTEMATIC_REVIEW_PATTERN`) pour ne prendre que la forme document-type, pas
@@ -342,34 +347,34 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
     # memoir/dataset (une revue systématique peut légitimement être l'un d'eux).
     MetadataCorrectionRule.TITLE_SYSTEMATIC_REVIEW_TO_REVIEW: {
         "applies_to": {
-            "doc_type": frozenset({"article"}),
+            "doc_type": frozenset({DocType.ARTICLE}),
             "title_regex": _SYSTEMATIC_REVIEW_PATTERN,
         },
-        "applies_correction": {"doc_type": "review"},
+        "applies_correction": {"doc_type": DocType.REVIEW},
     },
     # Titre porteur d'un ISBN explicite + doc_type ∈ {article, review, other} ⇒ `book_review`. `book`/`book_chapter` exclus (un ouvrage ou un chapitre peut légitimement porter son propre ISBN dans le titre — saisie HAL fréquente).
     MetadataCorrectionRule.TITLE_ISBN_TO_BOOK_REVIEW: {
         "applies_to": {
-            "doc_type": frozenset({"article", "review", "other"}),
+            "doc_type": frozenset({DocType.ARTICLE, DocType.REVIEW, DocType.OTHER}),
             "title_regex": _ISBN_PATTERN,
         },
-        "applies_correction": {"doc_type": "book_review"},
+        "applies_correction": {"doc_type": DocType.BOOK_REVIEW},
     },
     # Titre terminé par « (19|20)YY, N p[.|ages] » + même whitelist que la règle ISBN ⇒ `book_review`. Plus bruité que ISBN, évaluée après.
     MetadataCorrectionRule.TITLE_YEAR_PAGES_END_TO_BOOK_REVIEW: {
         "applies_to": {
-            "doc_type": frozenset({"article", "review", "other"}),
+            "doc_type": frozenset({DocType.ARTICLE, DocType.REVIEW, DocType.OTHER}),
             "title_regex": _YEAR_PAGES_END_PATTERN,
         },
-        "applies_correction": {"doc_type": "book_review"},
+        "applies_correction": {"doc_type": DocType.BOOK_REVIEW},
     },
     # Titre commençant par « Recension » ou « Compte(s) rendu(s) : » ⇒ `book_review`. Marqueurs univoques en usage académique français ; `preprint` inclus dans la whitelist (typage OpenAlex fréquent). `book`/`book_chapter` épargnés : la recension est l'article, pas l'ouvrage recensé.
     MetadataCorrectionRule.TITLE_RECENSION_TO_BOOK_REVIEW: {
         "applies_to": {
-            "doc_type": frozenset({"article", "review", "other", "preprint"}),
+            "doc_type": frozenset({DocType.ARTICLE, DocType.REVIEW, DocType.OTHER, DocType.PREPRINT}),
             "title_regex": _RECENSION_TITLE_PATTERN,
         },
-        "applies_correction": {"doc_type": "book_review"},
+        "applies_correction": {"doc_type": DocType.BOOK_REVIEW},
     },
     # Embargo HAL levé : un dépôt typé `embargoed` dont la date de fin est passée
     # (`embargo_expired`, calculé au fetch) devient `green`. Promotion à l'échéance sans
@@ -628,9 +633,9 @@ def resolve_cluster_doi_corrections(
         case = canonical.same_work_case
         return [DoiClusterDecision(m.id, canonical.canonical_doi, case) for m in group]
 
-    book_family = [m for m in group if m.doc_type in ("book", "book_chapter")]
-    chapters = [m for m in book_family if m.doc_type == "book_chapter"]
-    has_book = any(m.doc_type == "book" for m in book_family)
+    book_family = [m for m in group if m.doc_type in (DocType.BOOK, DocType.BOOK_CHAPTER)]
+    chapters = [m for m in book_family if m.doc_type == DocType.BOOK_CHAPTER]
+    has_book = any(m.doc_type == DocType.BOOK for m in book_family)
     if has_book and chapters:
         return [
             DoiClusterDecision(m.id, None, DoiClusterCase.OUVRAGE_VS_CHAPITRE) for m in chapters

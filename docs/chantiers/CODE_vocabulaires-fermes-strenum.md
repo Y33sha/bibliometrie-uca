@@ -34,8 +34,8 @@ Coûts concrets :
 ### doc_type (pilote)
 
 - [x] `DocType` Literal → StrEnum ; `DOC_TYPES` et `DOC_TYPES_SET` dérivés de l'enum ; `ARTICLE_SUBTYPES` et `DOC_TYPE_FAMILIES` référencent les membres. `pivot.py` SQL-quotait via `repr` (cassé par le StrEnum), corrigé vers `.value`.
-- [ ] Remplacer les chaînes doc_type en dur du DSL `_RULES` et de `resolve_cluster_doi_corrections` par des membres (ou une constante référençable pour la famille ouvrage).
-- [ ] `fetch_doi_cluster_candidates` : `'book'` / `'book_chapter'` / `'dataset'` → membres.
+- [x] Chaînes doc_type du DSL `_RULES` et de `resolve_cluster_doi_corrections` → membres `DocType` ; la whitelist récurrente `{article, other}` (7×) repliée sur la constante `_ARTICLE_OR_OTHER`.
+- [x] `fetch_doi_cluster_candidates` : `'book'` / `'book_chapter'` / `'dataset'` → `{DocType.X.value}` (SQL déjà en f-string, patron `DoiClusterCase`).
 
 ### source / oa_status / journal_type / oa_model
 
