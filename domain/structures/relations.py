@@ -5,7 +5,16 @@ Fonctions libres (domain services) validant le graphe `structure_relations` : la
 Pattern caller : le service applicatif prefetche les ancêtres du `parent_id` candidat via le repo (`WITH RECURSIVE`) et passe le set ici. Le domaine reste pur (zéro I/O).
 """
 
+from enum import StrEnum
+
 from domain.errors import ValidationError
+
+
+class StructureRelationType(StrEnum):
+    """Type d'une arête du graphe `structure_relations` (colonne texte `relation_type`). `EST_TUTELLE_DE` porte la hiérarchie parent → enfant, dont la clôture récursive définit le périmètre ; `EST_PARTENAIRE_DE` relie deux structures sans les inclure dans le périmètre l'une de l'autre."""
+
+    EST_TUTELLE_DE = "est_tutelle_de"
+    EST_PARTENAIRE_DE = "est_partenaire_de"
 
 
 def check_can_create_relation(
