@@ -18,6 +18,7 @@ from application.ports.pipeline.metadata_correction import (
     MetadataCorrectionQueries,
     UnaryCorrectionRow,
 )
+from domain.publications.doc_types import DocType
 from domain.source_publications.correction import DoiClusterCase
 
 # Projection partagée : chaque colonne porte le nom du champ d'`UnaryCorrectionRow` qu'elle
@@ -122,7 +123,7 @@ def fetch_doi_cluster_candidates(conn: Connection) -> list[DoiClusterRow]:
             dataset_dois AS (
                 SELECT DISTINCT eff_doi AS d
                 FROM sp_eff
-                WHERE doc_type = 'dataset' AND eff_doi IS NOT NULL
+                WHERE doc_type = '{DocType.DATASET.value}' AND eff_doi IS NOT NULL
             ),
             same_work AS (
                 SELECT DISTINCT ON (secondary_doi) secondary_doi, canonical_doi, same_work_case
@@ -155,7 +156,7 @@ def fetch_doi_cluster_candidates(conn: Connection) -> list[DoiClusterRow]:
                     FROM sp_eff sp
                     CROSS JOIN LATERAL jsonb_array_elements(sp.meta->'related_identifiers') rel
                     WHERE sp.source = 'datacite'
-                      AND sp.doc_type = 'dataset'
+                      AND sp.doc_type = '{DocType.DATASET.value}'
                       AND rel->>'relation_type' = 'IsPartOf'
                       AND rel->>'doi' IS NOT NULL
                       AND lower(rel->>'doi') <> sp.eff_doi
@@ -167,7 +168,7 @@ def fetch_doi_cluster_candidates(conn: Connection) -> list[DoiClusterRow]:
                 SELECT secondary_doi AS d FROM same_work
                 UNION
                 SELECT eff_doi AS d FROM sp_eff
-                WHERE doc_type IN ('book', 'book_chapter') AND eff_doi IS NOT NULL
+                WHERE doc_type IN ('{DocType.BOOK.value}', '{DocType.BOOK_CHAPTER.value}') AND eff_doi IS NOT NULL
                 UNION
                 SELECT eff_doi AS d FROM sp_eff WHERE raw_metadata ? 'doi'
             )
