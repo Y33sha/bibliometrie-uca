@@ -20,6 +20,7 @@ from application.ports.pipeline.metadata_correction import (
 )
 from domain.publications.doc_types import DocType
 from domain.source_publications.correction import DoiClusterCase
+from domain.sources.registry import Source
 
 # Projection partagée : chaque colonne porte le nom du champ d'`UnaryCorrectionRow` qu'elle
 # alimente (appariement par nom). Les booléens `embargo_expired` et `self_declared_preprint`
@@ -139,7 +140,7 @@ def fetch_doi_cluster_candidates(conn: Connection) -> list[DoiClusterRow]:
                         END AS same_work_case
                     FROM sp_eff sp
                     CROSS JOIN LATERAL jsonb_array_elements(sp.meta->'related_identifiers') rel
-                    WHERE sp.source = 'datacite'
+                    WHERE sp.source = '{Source.DATACITE.value}'
                       AND rel->>'relation_type' IN ('IsVersionOf', 'IsVariantFormOf')
                       AND rel->>'doi' IS NOT NULL
                       AND lower(rel->>'doi') <> sp.eff_doi
@@ -155,7 +156,7 @@ def fetch_doi_cluster_candidates(conn: Connection) -> list[DoiClusterRow]:
                         '{DoiClusterCase.DATACITE_PACKAGE_PIECE.value}' AS same_work_case
                     FROM sp_eff sp
                     CROSS JOIN LATERAL jsonb_array_elements(sp.meta->'related_identifiers') rel
-                    WHERE sp.source = 'datacite'
+                    WHERE sp.source = '{Source.DATACITE.value}'
                       AND sp.doc_type = '{DocType.DATASET.value}'
                       AND rel->>'relation_type' = 'IsPartOf'
                       AND rel->>'doi' IS NOT NULL
