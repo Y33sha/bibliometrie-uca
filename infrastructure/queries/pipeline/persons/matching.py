@@ -10,7 +10,14 @@ from application.ports.pipeline.persons.matching import (
     LinkedAuthorshipRow,
     PersonsMatchingQueries,
 )
-from domain.persons.matching import ORCID_MATCH_SOURCES, IdentifiedPerson, PersonNameForms
+from domain.persons.identifiers import AttributionStatus, PersonIdentifierType
+from domain.persons.matching import (
+    ORCID_MATCH_SOURCES,
+    IdentifiedPerson,
+    PersonNameForms,
+    ResolutionMode,
+)
+from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE
 
 
 def fetch_unlinked_authorships(conn: Connection) -> list[BareUnlinkedAuthorship]:
@@ -104,7 +111,7 @@ def _oop_identifier_branch(id_type: str, *, source_filter: str = "") -> str:
         JOIN source_publications sd ON sd.id = sa_auth.source_publication_id
         JOIN publications pub ON pub.id = sd.publication_id
         WHERE pi.id_type = '{id_type}'
-          AND pi.status <> 'rejected'
+          AND pi.status <> '{AttributionStatus.REJECTED.value}'
           AND aik.person_identifiers ? '{id_type}'
           {source_filter}
           AND {_OOP_COMMON_WHERE}
@@ -135,9 +142,11 @@ _OOP_CROSS_SOURCE_BRANCH = f"""
 # signal de matching.
 _OOP_CANDIDATES_SQL = " UNION ".join(
     [
-        _oop_identifier_branch("orcid", source_filter="AND sa_auth.source = ANY(:orcid_sources)"),
-        _oop_identifier_branch("idref"),
-        _oop_identifier_branch("hal_person_id"),
+        _oop_identifier_branch(
+            PersonIdentifierType.ORCID, source_filter="AND sa_auth.source = ANY(:orcid_sources)"
+        ),
+        _oop_identifier_branch(PersonIdentifierType.IDREF),
+        _oop_identifier_branch(PersonIdentifierType.HAL_PERSON_ID),
         _OOP_CROSS_SOURCE_BRANCH,
     ]
 )
@@ -162,7 +171,7 @@ def fetch_linked_authorships(conn: Connection) -> list[LinkedAuthorshipRow]:
     Sert d'index d'ancrage au matching cross-source. Les liens cross-source eux-mêmes en sont exclus (`resolution_mode <> 'cross_source'`) : un résultat cross-source n'en ancre aucun autre. Ramène `raw_author_name` ; le caller parse via `parse_raw_author_name` uniformément.
     """
     rows = conn.execute(
-        text("""
+        text(f"""
             SELECT sa_auth.person_id, sa_auth.author_position,
                    sd.publication_id,
                    sa_auth.raw_author_name AS full_name,
@@ -170,7 +179,7 @@ def fetch_linked_authorships(conn: Connection) -> list[LinkedAuthorshipRow]:
             FROM source_authorships sa_auth
             JOIN source_publications sd ON sd.id = sa_auth.source_publication_id
             WHERE sa_auth.person_id IS NOT NULL
-              AND sa_auth.resolution_mode IS DISTINCT FROM 'cross_source'
+              AND sa_auth.resolution_mode IS DISTINCT FROM '{ResolutionMode.CROSS_SOURCE.value}'
               AND sd.publication_id IS NOT NULL
         """)
     ).all()
@@ -199,7 +208,7 @@ def fetch_cross_source_linked(conn: Connection) -> list[BareUnlinkedAuthorship]:
             FROM source_authorships sa_auth
             JOIN author_identifying_keys aik ON aik.id = sa_auth.identity_id
             JOIN source_publications sd ON sd.id = sa_auth.source_publication_id
-            WHERE sa_auth.resolution_mode = 'cross_source'
+            WHERE sa_auth.resolution_mode = '{ResolutionMode.CROSS_SOURCE.value}'
               AND sd.publication_id IS NOT NULL
               AND sa_auth.raw_author_name IS NOT NULL
               AND NOT EXISTS (
@@ -217,13 +226,13 @@ def fetch_identifier_to_person_map(conn: Connection, id_type: str) -> dict[str, 
     Le nom normalisé de la personne ciblée accompagne le `person_id` : la cascade corrobore le match identifiant par le nom (`decide_match_by_identifier`), refusant un identifiant porté par une signature étrangère.
     """
     rows = conn.execute(
-        text("""
+        text(f"""
             SELECT pi.id_value, pi.person_id,
                    p.last_name_normalized AS ln, p.first_name_normalized AS fn
             FROM person_identifiers pi
             JOIN persons p ON p.id = pi.person_id
             WHERE pi.id_type = :id_type
-              AND pi.status != 'rejected'
+              AND pi.status != '{AttributionStatus.REJECTED.value}'
         """),
         {"id_type": id_type},
     ).all()
@@ -238,11 +247,11 @@ def fetch_name_form_map(conn: Connection) -> dict[str, list[int]]:
     Les liens `status = 'rejected'` sont exclus : une forme de nom rejetée pour une personne reste écartée du matching par nom (verrou de non-retour).
     """
     rows = conn.execute(
-        text("""
+        text(f"""
             SELECT name_form,
                    array_agg(person_id ORDER BY person_id) AS person_ids
             FROM person_name_forms
-            WHERE status <> 'rejected'
+            WHERE status <> '{AttributionStatus.REJECTED.value}'
             GROUP BY name_form
         """)
     ).all()
@@ -257,11 +266,15 @@ def fetch_name_form_status_map(conn: Connection) -> dict[tuple[str, int], str]:
     Le verdict combine le statut admin et l'appartenance au nom canonique : un rejet admin l'emporte ; une confirmation admin (`status = 'confirmed'`) ou une forme dérivée du nom canonique (`'persons' ∈ sources`) corrobore. Les formes seulement `pending` et non canoniques sont omises.
     """
     rows = conn.execute(
-        text("""
+        text(f"""
             SELECT name_form, person_id,
-                   CASE WHEN status = 'rejected' THEN 'rejected' ELSE 'confirmed' END AS status
+                   CASE WHEN status = '{AttributionStatus.REJECTED.value}'
+                        THEN '{AttributionStatus.REJECTED.value}'
+                        ELSE '{AttributionStatus.CONFIRMED.value}' END AS status
             FROM person_name_forms
-            WHERE status = 'rejected' OR status = 'confirmed' OR 'persons' = ANY(sources)
+            WHERE status = '{AttributionStatus.REJECTED.value}'
+               OR status = '{AttributionStatus.CONFIRMED.value}'
+               OR '{CANONICAL_NAME_FORM_SOURCE}' = ANY(sources)
         """)
     ).all()
     return {(r.name_form, r.person_id): r.status for r in rows}
@@ -289,9 +302,11 @@ def fetch_identifier_consensus(conn: Connection, id_type: str, values: list[str]
     """
     if not values:
         return {}
-    source_filter = "AND sa.source = ANY(:orcid_sources)" if id_type == "orcid" else ""
+    source_filter = (
+        "AND sa.source = ANY(:orcid_sources)" if id_type == PersonIdentifierType.ORCID else ""
+    )
     params: dict[str, object] = {"id_type": id_type, "values": list(values)}
-    if id_type == "orcid":
+    if id_type == PersonIdentifierType.ORCID:
         params["orcid_sources"] = list(ORCID_MATCH_SOURCES)
     rows = conn.execute(
         text(f"""
@@ -322,12 +337,13 @@ def fetch_person_name_forms(conn: Connection, person_ids: list[int]) -> dict[int
     if not person_ids:
         return {}
     rows = conn.execute(
-        text("""
+        text(f"""
             SELECT p.id,
                    p.last_name_normalized AS ln,
                    p.first_name_normalized AS fn,
                    COALESCE(
-                       array_agg(nf.name_form) FILTER (WHERE nf.status = 'confirmed'),
+                       array_agg(nf.name_form)
+                           FILTER (WHERE nf.status = '{AttributionStatus.CONFIRMED.value}'),
                        ARRAY[]::text[]
                    ) AS confirmed_forms
             FROM persons p
@@ -346,10 +362,10 @@ def fetch_identifier_owners(conn: Connection, id_type: str) -> dict[str, tuple[i
     Sert au balayage frontal des conflits d'attribution : le propriétaire attribué d'une valeur, à confronter aux personnes qui en portent des signatures.
     """
     rows = conn.execute(
-        text("""
+        text(f"""
             SELECT id_value, person_id, status
             FROM person_identifiers
-            WHERE id_type = :t AND status <> 'rejected'
+            WHERE id_type = :t AND status <> '{AttributionStatus.REJECTED.value}'
         """),
         {"t": id_type},
     ).all()
@@ -390,13 +406,13 @@ def null_identifier_signatures(
     Après réattribution d'une valeur de l'ancien propriétaire vers la personne du consensus, les signatures portées sur l'ancien propriétaire, résolues **par identifiant** (`resolution_mode = 'identifier'`), dont l'identité porte cette valeur et non épinglées, repassent à NULL : la cascade les re-résout contre la carte corrigée. Les signatures nominales portant la valeur ne bougent pas (leur `person_id` ne dépend pas d'elle). Retourne le nombre de signatures détachées.
     """
     return conn.execute(
-        text("""
+        text(f"""
             UPDATE source_authorships sa
             SET person_id = NULL, resolution_mode = NULL
             FROM author_identifying_keys aik
             WHERE sa.identity_id = aik.id
               AND sa.person_id = :old_owner
-              AND sa.resolution_mode = 'identifier'
+              AND sa.resolution_mode = '{ResolutionMode.IDENTIFIER.value}'
               AND aik.person_identifiers->>:id_type = :id_value
               AND NOT EXISTS (
                   SELECT 1 FROM confirmed_authorships ca WHERE ca.source_authorship_id = sa.id
@@ -412,19 +428,19 @@ def reorphan_ambiguous_nominal(conn: Connection) -> int:
     Réinitialisation ordre-indépendante du canal nominal : une signature résolue par forme de nom (`resolution_mode = 'name'`), non épinglée par l'admin (`confirmed_authorships`), dont l'`author_name_normalized` désigne au moins deux personnes dans `person_name_forms` (hors `rejected`), repasse à NULL — `person_id` et mode. Le sur-regroupement (une forme réduite collée au seul candidat présent avant l'arrivée de l'homonyme qui la départage) se défait ainsi dès que l'homonyme coexiste, quel que soit l'ordre d'ingestion. Retourne le nombre de signatures re-orphelinées.
     """
     return conn.execute(
-        text("""
+        text(f"""
             UPDATE source_authorships sa
             SET person_id = NULL, resolution_mode = NULL
             FROM author_identifying_keys aik
             WHERE sa.identity_id = aik.id
-              AND sa.resolution_mode = 'name'
+              AND sa.resolution_mode = '{ResolutionMode.NAME.value}'
               AND NOT EXISTS (
                   SELECT 1 FROM confirmed_authorships ca WHERE ca.source_authorship_id = sa.id
               )
               AND aik.author_name_normalized IN (
                   SELECT name_form
                   FROM person_name_forms
-                  WHERE status <> 'rejected'
+                  WHERE status <> '{AttributionStatus.REJECTED.value}'
                   GROUP BY name_form
                   HAVING count(DISTINCT person_id) >= 2
               )

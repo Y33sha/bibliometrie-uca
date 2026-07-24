@@ -16,7 +16,7 @@ import logging
 from sqlalchemy import Connection
 
 from application.ports.pipeline.persons.name_forms import PersonNameFormsQueries, RawFormBatchItem
-from domain.persons.name_forms import compute_person_name_forms
+from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE, compute_person_name_forms
 
 BATCH_SIZE = 5000
 
@@ -30,7 +30,9 @@ def populate(conn: Connection, queries: PersonNameFormsQueries, logger: logging.
         fn = (r.first_name or "").strip()
         ln = r.last_name.strip()
         for form in compute_person_name_forms(ln, fn):
-            batch.append({"raw_text": form, "person_id": r.id, "source": "persons"})
+            batch.append(
+                {"raw_text": form, "person_id": r.id, "source": CANONICAL_NAME_FORM_SOURCE}
+            )
             n_persons_rows += 1
             if len(batch) >= BATCH_SIZE:
                 queries.insert_raw_forms_batch(conn, batch)

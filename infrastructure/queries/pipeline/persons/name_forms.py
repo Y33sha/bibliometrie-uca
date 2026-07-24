@@ -14,6 +14,8 @@ from application.ports.pipeline.persons.name_forms import (
     RawFormBatchItem,
     SyncCounts,
 )
+from domain.persons.identifiers import AttributionStatus
+from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE
 
 
 def fetch_persons_names(conn: Connection) -> list[PersonNameRow]:
@@ -94,21 +96,23 @@ def sync_from_raw_forms(conn: Connection) -> SyncCounts:
 
     # La purge retire les `pending` orphelins et les formes `'persons'` absentes de l'état attendu (édition du nom) ; les verdicts `confirmed`/`rejected` sur des formes non-canoniques (bibliographiques) survivent.
     deleted = conn.execute(
-        text("""
+        text(f"""
             DELETE FROM person_name_forms p
             WHERE NOT EXISTS (
                 SELECT 1 FROM _expected_pnf e
                 WHERE e.name_form = p.name_form AND e.person_id = p.person_id
             )
-            AND (p.status = 'pending' OR 'persons' = ANY(p.sources))
+            AND (p.status = '{AttributionStatus.PENDING.value}'
+                 OR '{CANONICAL_NAME_FORM_SOURCE}' = ANY(p.sources))
         """)
     ).rowcount
 
     # Toute forme insérée entre en `pending` ; seule une action admin tranche. L'appartenance au nom canonique se lit dans `sources` (`'persons'`).
     inserted = conn.execute(
-        text("""
+        text(f"""
             INSERT INTO person_name_forms (name_form, person_id, sources, status)
-            SELECT e.name_form, e.person_id, e.sources, 'pending'::identifier_status
+            SELECT e.name_form, e.person_id, e.sources,
+                   '{AttributionStatus.PENDING.value}'::identifier_status
             FROM _expected_pnf e
             WHERE NOT EXISTS (
                 SELECT 1 FROM person_name_forms p
