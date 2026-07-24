@@ -37,55 +37,44 @@ from .structure_repository import PgStructureRepository
 
 
 def address_repository(conn: Connection) -> AddressRepository:
-    """Retourne un AddressRepository lié à la Connection SQLAlchemy donnée."""
     return PgAddressRepository(conn)
 
 
 def audit_repository(conn: Connection) -> AuditRepository:
-    """Retourne un AuditRepository lié à la Connection SQLAlchemy donnée."""
     return PgAuditRepository(conn)
 
 
 def authorship_repository(conn: Connection) -> AuthorshipRepository:
-    """Retourne un AuthorshipRepository lié à la Connection SQLAlchemy donnée."""
     return PgAuthorshipRepository(conn)
 
 
 def config_repository(conn: Connection) -> ConfigRepository:
-    """Retourne un ConfigRepository lié à la Connection SQLAlchemy donnée."""
     return PgConfigRepository(conn)
 
 
 def doi_prefix_repository(conn: Connection) -> DoiPrefixRepository:
-    """Retourne un DoiPrefixRepository lié à la Connection SQLAlchemy donnée."""
     return PgDoiPrefixRepository(conn)
 
 
 def journal_repository(conn: Connection) -> JournalRepository:
-    """Retourne un JournalRepository lié à la Connection SQLAlchemy donnée."""
     return PgJournalRepository(conn)
 
 
 def perimeter_repository(conn: Connection) -> PerimeterRepository:
-    """Retourne un PerimeterRepository lié à la Connection SQLAlchemy donnée."""
     return PgPerimeterRepository(conn)
 
 
 def person_repository(conn: Connection) -> PersonRepository:
-    """Retourne un PersonRepository lié à la Connection SQLAlchemy donnée."""
     return PgPersonRepository(conn)
 
 
 def publication_repository(conn: Connection) -> PublicationRepository:
-    """Retourne un PublicationRepository lié à la Connection SQLAlchemy donnée."""
     return PgPublicationRepository(conn)
 
 
 def publisher_repository(conn: Connection) -> PublisherRepository:
-    """Retourne un PublisherRepository lié à la Connection SQLAlchemy donnée."""
     return PgPublisherRepository(conn)
 
 
 def structure_repository(conn: Connection) -> StructureRepository:
-    """Retourne un StructureRepository lié à la Connection SQLAlchemy donnée."""
     return PgStructureRepository(conn)
