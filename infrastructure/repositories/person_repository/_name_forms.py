@@ -14,12 +14,7 @@ from infrastructure.queries.sources_sql import AUTHOR_SOURCES_SQL
 
 
 def refresh_name_forms(conn: Connection, person_id: int, forms: set[str]) -> None:
-    """Recalcule les formes de nom source `'persons'` d'une personne.
-
-    Retire `'persons'` des sources de toutes les rows de cette personne, supprime les rows dont la liste de sources devient vide, puis pose les formes calculées (avec source `'persons'`) via un UPSERT qui fusionne avec les sources existantes (cross-source).
-
-    `forms` : l'ensemble des formes normalisées calculées par le domaine (voir `compute_person_name_forms`).
-    """
+    """Retire `'persons'` des sources de toutes les rows de la personne, supprime celles dont la liste de sources devient vide, puis pose les formes calculées (source `'persons'`) via un UPSERT qui fusionne avec les sources existantes."""
     conn.execute(
         text("""
             UPDATE person_name_forms
@@ -39,10 +34,7 @@ def refresh_name_forms(conn: Connection, person_id: int, forms: set[str]) -> Non
 def add_name_form(
     conn: Connection, person_id: int, full_name: str, source: str | None = None
 ) -> None:
-    """Ajoute une forme de nom (normalisée) à une personne, idempotent.
-
-    Normalise `full_name`, puis pose le couple `(name_form, person_id)` avec `sources = [source]` (vide si `source` est None). Sur conflit, fusionne avec les sources existantes.
-    """
+    """Pose le couple `(name_form, person_id)` avec `sources = [source]` (vide si `source` est None) ; sur conflit, fusionne avec les sources existantes."""
     if not full_name or not full_name.strip():
         return
     norm = normalize_name(full_name)
@@ -54,10 +46,6 @@ def add_name_form(
 def update_name_form_status(
     conn: Connection, person_id: int, name_form: str, status: str
 ) -> NameFormStatusRow:
-    """Change le statut d'une forme de nom. Retourne {person_id, name_form, status}.
-
-    `rejected` bloque durablement le retour de la forme au matching par nom (le recompute préserve le verdict, `fetch_name_form_map` l'exclut) ; `confirmed` corrobore les matchs par identifiant et court-circuite le test de nom. Lève `NotFoundError` si le couple `(name_form, person_id)` n'existe pas.
-    """
     row = conn.execute(
         text(
             "UPDATE person_name_forms SET status = CAST(:st AS identifier_status) "
@@ -72,14 +60,6 @@ def update_name_form_status(
 
 
 def delete_orphan_name_forms_for_person(conn: Connection, person_id: int) -> int:
-    """Élague les formes de nom issues des sources : garde celles qu'au moins une `source_authorship` active de la personne porte encore, supprime les autres.
-
-    Sert après un rejet de contribution, où détacher les sources d'une paire peut laisser une forme de nom que toute source a cessé d'attester. Les formes calculées depuis le nom de la personne (source `'persons'`) restent : elles tiennent à la personne, indépendamment des sources.
-
-    Se limite aux formes `pending` : un verdict `confirmed`/`rejected` survit à l'orphelinage — supprimer une forme `rejected` effacerait le blocage de non-retour qu'elle matérialise.
-
-    Retourne le nombre de formes supprimées.
-    """
     result = conn.execute(
         text(f"""
             DELETE FROM person_name_forms pnf
