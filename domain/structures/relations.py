@@ -17,6 +17,18 @@ class StructureRelationType(StrEnum):
     EST_PARTENAIRE_DE = "est_partenaire_de"
 
 
+_KNOWN_RELATION_TYPES: frozenset[str] = frozenset(StructureRelationType)
+
+
+def require_known_relation_type(relation_type: str) -> None:
+    """Vérifie qu'un type de relation appartient au vocabulaire `StructureRelationType`. Lève `ValidationError` sinon."""
+    if relation_type not in _KNOWN_RELATION_TYPES:
+        raise ValidationError(
+            f"Type de relation inconnu : {relation_type!r}. "
+            f"Valides : {', '.join(sorted(StructureRelationType))}."
+        )
+
+
 def check_can_create_relation(
     *,
     parent_id: int,

@@ -19,7 +19,7 @@ from domain.errors import NotFoundError, ValidationError
 from domain.normalize import normalize_text
 from domain.structures.identifiers import RorId
 from domain.structures.name_forms import is_short_form
-from domain.structures.relations import check_can_create_relation
+from domain.structures.relations import check_can_create_relation, require_known_relation_type
 from domain.types import JsonValue
 
 # ── Mapping des champs UI → colonnes SQL pour la table structures ──
@@ -157,8 +157,9 @@ def create_relation(
 ) -> StructureRelationRow | None:
     """Crée une relation. Retourne la ligne insérée, ou None si elle existait déjà.
 
-    Lève `ValidationError` si la relation viole l'invariant de graphe (auto-référence `parent_id == child_id` ou cycle : `child_id` est déjà un ancêtre de `parent_id`). Les ancêtres sont préchargés via `repo.get_ancestor_ids` et la validation est déléguée au domaine.
+    Lève `ValidationError` si `relation_type` n'appartient pas à `StructureRelationType`, ou si la relation viole l'invariant de graphe (auto-référence `parent_id == child_id` ou cycle : `child_id` est déjà un ancêtre de `parent_id`). Les ancêtres sont préchargés via `repo.get_ancestor_ids` et la validation est déléguée au domaine.
     """
+    require_known_relation_type(relation_type)
     check_can_create_relation(
         parent_id=parent_id,
         child_id=child_id,

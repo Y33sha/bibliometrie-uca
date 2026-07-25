@@ -277,15 +277,26 @@ class TestCreateRelation:
                 repo=repo,
             )
 
+    def test_rejects_unknown_relation_type(self, sa_sync_conn, repo):
+        parent = create_structure(code="P", name="P", type="universite", repo=repo)
+        child = create_structure(code="C", name="C", type="labo", repo=repo)
+        with pytest.raises(ValidationError, match="Type de relation inconnu"):
+            create_relation(
+                parent_id=parent["id"],
+                child_id=child["id"],
+                relation_type="est_cousin_de",
+                repo=repo,
+            )
+
     def test_rejects_indirect_cycle(self, sa_sync_conn, repo):
         """A → B → C ; tenter C → A doit échouer."""
         a = create_structure(code="A", name="A", type="universite", repo=repo)
         b = create_structure(code="B", name="B", type="labo", repo=repo)
         c = create_structure(code="C", name="C", type="equipe", repo=repo)
-        create_relation(parent_id=a["id"], child_id=b["id"], relation_type="x", repo=repo)
-        create_relation(parent_id=b["id"], child_id=c["id"], relation_type="x", repo=repo)
+        create_relation(parent_id=a["id"], child_id=b["id"], relation_type="est_tutelle_de", repo=repo)
+        create_relation(parent_id=b["id"], child_id=c["id"], relation_type="est_tutelle_de", repo=repo)
         with pytest.raises(ValidationError, match="Cycle"):
-            create_relation(parent_id=c["id"], child_id=a["id"], relation_type="x", repo=repo)
+            create_relation(parent_id=c["id"], child_id=a["id"], relation_type="est_tutelle_de", repo=repo)
 
 
 class TestDeleteRelation:
