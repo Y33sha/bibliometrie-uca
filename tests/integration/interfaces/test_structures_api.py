@@ -52,7 +52,7 @@ def _seed_structure(code: str | None = None, type_: str = "labo") -> int:
         return cur.fetchone()["id"]
 
 
-def _seed_relation(parent_id: int, child_id: int, rel_type: str = "tutelle") -> int:
+def _seed_relation(parent_id: int, child_id: int, rel_type: str = "est_tutelle_de") -> int:
     with _pool() as cur:
         cur.execute(
             "INSERT INTO structure_relations (parent_id, child_id, relation_type) "
@@ -241,7 +241,7 @@ class TestCreateRelation:
     def test_requires_admin(self, client):
         r = client.post(
             "/api/structures/relations",
-            json={"parent_id": 1, "child_id": 2, "relation_type": "tutelle"},
+            json={"parent_id": 1, "child_id": 2, "relation_type": "est_tutelle_de"},
         )
         assert r.status_code == 401
 
@@ -253,7 +253,7 @@ class TestCreateRelation:
             json={
                 "parent_id": parent,
                 "child_id": child,
-                "relation_type": "tutelle",
+                "relation_type": "est_tutelle_de",
             },
         )
         assert r.status_code == 200
@@ -264,13 +264,13 @@ class TestCreateRelation:
     def test_duplicate_already_exists(self, auth_client):
         parent = _seed_structure(type_="universite")
         child = _seed_structure(type_="labo")
-        _seed_relation(parent, child, "tutelle")
+        _seed_relation(parent, child, "est_tutelle_de")
         r = auth_client.post(
             "/api/structures/relations",
             json={
                 "parent_id": parent,
                 "child_id": child,
-                "relation_type": "tutelle",
+                "relation_type": "est_tutelle_de",
             },
         )
         assert r.status_code == 200
@@ -281,7 +281,7 @@ class TestCreateRelation:
         child = _seed_structure(type_="labo")
         r = auth_client.post(
             "/api/structures/relations",
-            json={"parent_id": 999999999, "child_id": child, "relation_type": "tutelle"},
+            json={"parent_id": 999999999, "child_id": child, "relation_type": "est_tutelle_de"},
         )
         assert r.status_code == 409
 
