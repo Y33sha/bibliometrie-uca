@@ -70,7 +70,7 @@ def _create_test_db():
 
     # `alembic upgrade head` sur la base fraîche. Alembic est la source
     # de vérité du schéma — `schema.sql` n'est qu'un snapshot descriptif
-    # régénéré par `python -m infrastructure.db.dump_schema`.
+    # régénéré par `python -m interfaces.cli.dev.dump_schema`.
     cfg = Config(str(ALEMBIC_INI))
     cfg.set_main_option("sqlalchemy.url", _sa_url().render_as_string(hide_password=False))
     command.upgrade(cfg, "head")

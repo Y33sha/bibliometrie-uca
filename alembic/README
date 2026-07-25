@@ -4,7 +4,7 @@ Alembic est la source de vérité du schéma DB du projet
 (`bibliometrie`). La MetaData explicite vit dans
 `infrastructure/db/tables.py` ; le snapshot lisible reste
 `infrastructure/db/schema.sql` (régénéré à la main par
-`python -m infrastructure.db.dump_schema`).
+`python -m interfaces.cli.dev.dump_schema`).
 
 ## Cycle typique
 
@@ -31,7 +31,7 @@ Alembic est la source de vérité du schéma DB du projet
    ```
 5. Régénérer le snapshot pour relecture :
    ```bash
-   python -m infrastructure.db.dump_schema
+   python -m interfaces.cli.dev.dump_schema
    ```
 
 ## Commandes utiles

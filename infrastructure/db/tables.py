@@ -4,7 +4,7 @@ Décrit tables, colonnes, contraintes uniques, CHECK et comments, pour deux usag
 - le query-building côté SQLAlchemy Core (`select(config.c.key)…`),
 - servir de référence à `alembic revision --autogenerate` (comparaison MetaData ↔ DB).
 
-Ce modèle n'est pas la source de vérité du schéma : les migrations Alembic (`alembic/versions/`, écrites à la main) font foi, et `infrastructure/db/schema.sql` en est un snapshot descriptif régénéré par `python -m infrastructure.db.dump_schema`. Le fichier est maintenu à la main en miroir de la base ; `alembic check`, joué par `tests/integration/infrastructure/db/test_sqlalchemy_smoke.py` sur une base montée par les migrations, tient l'accord entre les deux.
+Ce modèle n'est pas la source de vérité du schéma : les migrations Alembic (`alembic/versions/`, écrites à la main) font foi, et `infrastructure/db/schema.sql` en est un snapshot descriptif régénéré par `python -m interfaces.cli.dev.dump_schema`. Le fichier est maintenu à la main en miroir de la base ; `alembic check`, joué par `tests/integration/infrastructure/db/test_sqlalchemy_smoke.py` sur une base montée par les migrations, tient l'accord entre les deux.
 
 Le périmètre du metadata s'arrête aux tables et à leurs colonnes. Index, clés étrangères et vues matérialisées (`authorship_structures`, `publication_structures`, `source_authorship_structures`, `subject_cooccurrences`) appartiennent aux seules migrations ; le filtre `include_object` d'`alembic/env.py` les écarte de la comparaison.
 """

@@ -1,7 +1,8 @@
+# STATUS: recurring (dev)
 """Régénère `infrastructure/db/schema.sql` depuis la base courante.
 
 Usage:
-    python -m infrastructure.db.dump_schema
+    python -m interfaces.cli.dev.dump_schema
 
 `schema.sql` est un snapshot descriptif du schéma, utile pour la relecture et pour le bootstrap rapide des tests d'intégration (cf. `tests/integration/conftest.py`). Il n'est PAS la source de vérité — ce sont les migrations Alembic dans `alembic/versions/`.
 
@@ -18,10 +19,8 @@ from pathlib import Path
 
 from infrastructure.settings import settings
 
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
-sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
-
-SCHEMA_PATH = Path(__file__).parent / "schema.sql"
+# `parents[3]` remonte interfaces/cli/dev/ → racine du dépôt ; schema.sql vit sous infrastructure/db/.
+SCHEMA_PATH = Path(__file__).resolve().parents[3] / "infrastructure" / "db" / "schema.sql"
 
 
 def _resolve_pg_dump() -> str:
@@ -45,6 +44,10 @@ def _resolve_pg_dump() -> str:
 
 
 def main() -> None:
+    # Force la sortie en UTF-8 : sous Windows la console est souvent en cp1252, alors que le schéma porte des accents.
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
+
     result = subprocess.run(
         [
             _resolve_pg_dump(),
