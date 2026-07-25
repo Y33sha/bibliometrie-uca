@@ -264,7 +264,7 @@ def get_cross_import_dois(conn: Connection, target: str) -> list[str]:
     Pour les cibles présentes dans `_TARGET_RA`, ajoute un LEFT JOIN sur `doi_prefixes` pour filtrer les DOIs dont la RA résolue ne correspond pas (les NULL — préfixe non résolu — sont conservés).
 
     Args:
-        conn: `Connection` SA ou cur psycopg.
+        conn: `Connection` SA.
         target: clé source cible (hal, openalex, wos, scanr, crossref)
     """
     if target not in VALID_SOURCES:
@@ -275,65 +275,25 @@ def get_cross_import_dois(conn: Connection, target: str) -> list[str]:
         "LEFT JOIN doi_prefixes dp ON dp.prefix = split_part(c.doi, '/', 1)" if target_ra else ""
     )
     # Exclusion du target : `source IS DISTINCT FROM` (relations à source NULL candidates pour toutes les cibles) + `NOT IN (staging du target)`.
-    if isinstance(conn, Connection):
-        prefix_filter = " AND (dp.ra = :target_ra OR dp.ra IS NULL)" if target_ra else ""
-        query = f"""
-            SELECT DISTINCT c.doi
-            FROM candidate_dois c
-            {join_clause}
-            WHERE c.source IS DISTINCT FROM :target
-              AND c.doi NOT IN (
-                      SELECT doi FROM staging WHERE source = :target AND doi IS NOT NULL
-                  ){prefix_filter}
-              AND NOT EXISTS (
-                  SELECT 1 FROM doi_lookups l
-                  WHERE l.source = :target AND l.doi = c.doi
-                    AND (l.next_retry IS NULL OR l.next_retry > now())
-              )
-            ORDER BY c.doi
-        """
-        params: dict[str, str] = {"target": target}
-        if target_ra:
-            params["target_ra"] = target_ra
-        rows = conn.execute(text(query), params).scalars()
-        # Re-nettoyage des candidats (idempotent) : `staging.doi` peut porter des DOI non normalisés ; `dict.fromkeys` dédoublonne en préservant l'ordre.
-        return list(dict.fromkeys(c for d in rows if (c := clean_doi(d))))
-
-    pg_prefix_filter = " AND (dp.ra = %(target_ra)s OR dp.ra IS NULL)" if target_ra else ""
-    query_pg = f"""
+    prefix_filter = " AND (dp.ra = :target_ra OR dp.ra IS NULL)" if target_ra else ""
+    query = f"""
         SELECT DISTINCT c.doi
         FROM candidate_dois c
         {join_clause}
-        WHERE c.source IS DISTINCT FROM %(target)s
+        WHERE c.source IS DISTINCT FROM :target
           AND c.doi NOT IN (
-                  SELECT doi FROM staging WHERE source = %(target)s AND doi IS NOT NULL
-              ){pg_prefix_filter}
+                  SELECT doi FROM staging WHERE source = :target AND doi IS NOT NULL
+              ){prefix_filter}
           AND NOT EXISTS (
               SELECT 1 FROM doi_lookups l
-              WHERE l.source = %(target)s AND l.doi = c.doi
+              WHERE l.source = :target AND l.doi = c.doi
                 AND (l.next_retry IS NULL OR l.next_retry > now())
           )
         ORDER BY c.doi
     """
-    pg_params = {"target": target, "target_ra": target_ra} if target_ra else {"target": target}
-    with conn.cursor() as cur:
-        cur.execute(query_pg, pg_params)
-        # Cf. branche SA : re-nettoyage idempotent + dédoublonnage avant le lookup HTTP.
-        return list(dict.fromkeys(c for row in cur.fetchall() if (c := clean_doi(row["doi"]))))
-
-
-def get_existing_ids(conn: Connection, source: str) -> set:
-    """Récupère les source_id déjà en staging pour une source donnée."""
-    if source not in VALID_SOURCES:
-        raise ValueError(f"Source inconnue : {source}. Valides : {', '.join(VALID_SOURCES)}")
-
-    if isinstance(conn, Connection):
-        return set(
-            conn.execute(
-                text("SELECT source_id FROM staging WHERE source = :src"), {"src": source}
-            ).scalars()
-        )
-
-    with conn.cursor() as cur:
-        cur.execute("SELECT source_id FROM staging WHERE source = %s", (source,))
-        return {row["source_id"] for row in cur.fetchall()}
+    params: dict[str, str] = {"target": target}
+    if target_ra:
+        params["target_ra"] = target_ra
+    rows = conn.execute(text(query), params).scalars()
+    # Re-nettoyage des candidats (idempotent) : `staging.doi` peut porter des DOI non normalisés ; `dict.fromkeys` dédoublonne en préservant l'ordre.
+    return list(dict.fromkeys(c for d in rows if (c := clean_doi(d))))

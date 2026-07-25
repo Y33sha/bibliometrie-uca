@@ -8,7 +8,6 @@ from infrastructure.sources.common import (
     change_detection_hash,
     compute_hash,
     get_cross_import_dois,
-    get_existing_ids,
     get_stale_rows,
     record_doi_not_found,
     set_disappeared_by_source_id,
@@ -136,57 +135,23 @@ class TestCleanDoi:
         assert clean_doi("HTTPS://DOI.ORG/10.1234/test") == "10.1234/test"
 
 
-# ── get_existing_ids ─────────────────────────────────────────────
-
-
-class TestGetExistingIds:
-    def test_rejects_unknown_source(self):
-        with pytest.raises(ValueError, match="Source inconnue"):
-            get_existing_ids(None, "unknown")
-
-    def test_returns_set(self, db):
-        """Avec une base vide, retourne un set vide."""
-        conn = db.connection
-        result = get_existing_ids(conn, "hal")
-        assert result == set()
-
-    def test_reads_dict_row_cursor(self, db):
-        """Régression : `row[0]` sur une row dict_row lève KeyError.
-
-        La connexion du pipeline utilise `row_factory=dict_row` — il faut
-        accéder aux colonnes par nom, pas par index.
-        """
-        db.execute(
-            "INSERT INTO staging (source, source_id, raw_data) VALUES (%s, %s, %s)",
-            ("hal", "hal-42", "{}"),
-        )
-        db.execute(
-            "INSERT INTO staging (source, source_id, raw_data) VALUES (%s, %s, %s)",
-            ("hal", "hal-43", "{}"),
-        )
-        db.execute(
-            "INSERT INTO staging (source, source_id, raw_data) VALUES (%s, %s, %s)",
-            ("openalex", "W1", "{}"),
-        )
-        result = get_existing_ids(db.connection, "hal")
-        assert result == {"hal-42", "hal-43"}
-
-
-def _add_inperim_sp(db, source, sid, *, doi=None, external_ids="{}"):
+def _add_inperim_sp(conn, source, sid, *, doi=None, external_ids="{}"):
     """Publication `in_perimeter` + source_publication `source` rattaché.
 
-    Le pool de cross-import ne part que des `source_publications` in-périmètre, donc
-    un DOI candidat doit être porté par un tel record (et non par un simple
-    `staging.doi`, retiré du pool)."""
-    db.execute(
-        "INSERT INTO publications (title, pub_year, in_perimeter) VALUES ('T', 2020, TRUE) "
-        "RETURNING id"
-    )
-    pub_id = db.fetchone()["id"]
-    db.execute(
-        "INSERT INTO source_publications (source, source_id, title, doi, publication_id, "
-        "external_ids) VALUES (%s, %s, 'T', %s, %s, %s::jsonb)",
-        (source, sid, doi, pub_id, external_ids),
+    Le pool de cross-import ne part que des `source_publications` in-périmètre, donc un DOI candidat doit être porté par un tel record (et non par un simple `staging.doi`, retiré du pool)."""
+    pub_id = conn.execute(
+        text(
+            "INSERT INTO publications (title, pub_year, in_perimeter) VALUES ('T', 2020, TRUE) "
+            "RETURNING id"
+        )
+    ).scalar_one()
+    conn.execute(
+        text(
+            "INSERT INTO source_publications (source, source_id, title, doi, publication_id, "
+            "external_ids) VALUES (CAST(:source AS source_type), :sid, 'T', :doi, :pub, "
+            "CAST(:ext AS jsonb))"
+        ),
+        {"source": source, "sid": sid, "doi": doi, "pub": pub_id, "ext": external_ids},
     )
 
 
@@ -195,148 +160,162 @@ class TestGetCrossImportDois:
         with pytest.raises(ValueError, match="Source inconnue"):
             get_cross_import_dois(None, "unknown")
 
-    def test_reads_dict_row_cursor(self, db):
-        """Régression : `row[0]` sur une row dict_row lève KeyError."""
-        _add_inperim_sp(db, "openalex", "W1", doi="10.1234/a")
-        _add_inperim_sp(db, "hal", "hal-1", doi="10.1234/b")
-        result = get_cross_import_dois(db.connection, "hal")
-        assert result == ["10.1234/a"]
-
-    def test_excludes_out_of_perimeter_source_publications(self, db):
+    def test_excludes_out_of_perimeter_source_publications(self, sa_sync_conn):
         """Un DOI porté par une publication hors-périmètre ne remonte pas dans le pool."""
-        db.execute(
-            "INSERT INTO publications (title, pub_year, in_perimeter) VALUES ('T', 2020, FALSE) "
-            "RETURNING id"
+        pub_id = sa_sync_conn.execute(
+            text(
+                "INSERT INTO publications (title, pub_year, in_perimeter) VALUES ('T', 2020, FALSE) "
+                "RETURNING id"
+            )
+        ).scalar_one()
+        sa_sync_conn.execute(
+            text(
+                "INSERT INTO source_publications (source, source_id, title, doi, publication_id) "
+                "VALUES ('openalex', 'W1', 'T', '10.1234/out', :pub)"
+            ),
+            {"pub": pub_id},
         )
-        pub_id = db.fetchone()["id"]
-        db.execute(
-            "INSERT INTO source_publications (source, source_id, title, doi, publication_id) "
-            "VALUES ('openalex', 'W1', 'T', '10.1234/out', %s)",
-            (pub_id,),
-        )
-        assert get_cross_import_dois(db.connection, "hal") == []
+        assert get_cross_import_dois(sa_sync_conn, "hal") == []
 
-    def test_crossref_target_filters_non_crossref_prefixes(self, db):
+    def test_crossref_target_filters_non_crossref_prefixes(self, sa_sync_conn):
         """target='crossref' : DOIs DataCite/mEDRA filtrés via doi_prefixes."""
-        db.execute("INSERT INTO doi_prefixes (prefix, ra) VALUES ('10.5281', 'DataCite')")
-        db.execute("INSERT INTO doi_prefixes (prefix, ra) VALUES ('10.1038', 'Crossref')")
+        sa_sync_conn.execute(
+            text("INSERT INTO doi_prefixes (prefix, ra) VALUES ('10.5281', 'DataCite')")
+        )
+        sa_sync_conn.execute(
+            text("INSERT INTO doi_prefixes (prefix, ra) VALUES ('10.1038', 'Crossref')")
+        )
         # Trois DOIs non-crossref in-périmètre : DataCite, Crossref, préfixe inconnu.
-        _add_inperim_sp(db, "hal", "h1", doi="10.5281/zenodo.1")
-        _add_inperim_sp(db, "hal", "h2", doi="10.1038/nature.1")
-        _add_inperim_sp(db, "hal", "h3", doi="10.99999/x.1")  # préfixe absent
+        _add_inperim_sp(sa_sync_conn, "hal", "h1", doi="10.5281/zenodo.1")
+        _add_inperim_sp(sa_sync_conn, "hal", "h2", doi="10.1038/nature.1")
+        _add_inperim_sp(sa_sync_conn, "hal", "h3", doi="10.99999/x.1")  # préfixe absent
 
-        result = get_cross_import_dois(db.connection, "crossref")
+        result = get_cross_import_dois(sa_sync_conn, "crossref")
 
         # DataCite éliminé, Crossref gardé, NULL gardé (best-effort).
         assert "10.5281/zenodo.1" not in result
         assert "10.1038/nature.1" in result
         assert "10.99999/x.1" in result
 
-    def test_includes_related_dois_from_source_publications(self, db):
-        """Les related_dois d'un source_publication in-périmètre (source != cible)
-        entrent dans le pool, comme le DOI primaire."""
+    def test_includes_related_dois_from_source_publications(self, sa_sync_conn):
+        """Les related_dois d'un source_publication in-périmètre (source != cible) entrent dans le pool, comme le DOI primaire."""
         _add_inperim_sp(
-            db,
+            sa_sync_conn,
             "openalex",
             "W1",
             doi="10.1234/primary",
             external_ids='{"related_dois": ["10.9999/preprint"]}',
         )
-        result = get_cross_import_dois(db.connection, "hal")
+        result = get_cross_import_dois(sa_sync_conn, "hal")
         assert "10.1234/primary" in result
         assert "10.9999/preprint" in result
 
-    def test_includes_arxiv_derived_datacite_doi(self, db):
-        """Un arxiv_id d'un SP in-périmètre (source != cible) entre dans le pool sous la
-        forme du DOI DataCite `10.48550/arxiv.<id>`, en minuscules."""
-        _add_inperim_sp(db, "openalex", "W1", external_ids='{"arxiv_id": "2605.02321"}')
-        result = get_cross_import_dois(db.connection, "hal")
+    def test_includes_arxiv_derived_datacite_doi(self, sa_sync_conn):
+        """Un arxiv_id d'un source_publication in-périmètre (source != cible) entre dans le pool sous la forme du DOI DataCite `10.48550/arxiv.<id>`, en minuscules."""
+        _add_inperim_sp(sa_sync_conn, "openalex", "W1", external_ids='{"arxiv_id": "2605.02321"}')
+        result = get_cross_import_dois(sa_sync_conn, "hal")
         assert "10.48550/arxiv.2605.02321" in result
 
-    def test_arxiv_derived_doi_excluded_for_same_source(self, db):
-        """L'arxiv_id d'un record de la cible elle-même ne génère pas de candidat
-        (même logique `source != cible` que les autres branches du pool)."""
-        _add_inperim_sp(db, "hal", "H1", external_ids='{"arxiv_id": "2605.02321"}')
-        result = get_cross_import_dois(db.connection, "hal")
+    def test_arxiv_derived_doi_excluded_for_same_source(self, sa_sync_conn):
+        """L'arxiv_id d'un record de la cible elle-même ne génère pas de candidat (même logique `source != cible` que les autres branches du pool)."""
+        _add_inperim_sp(sa_sync_conn, "hal", "H1", external_ids='{"arxiv_id": "2605.02321"}')
+        result = get_cross_import_dois(sa_sync_conn, "hal")
         assert "10.48550/arxiv.2605.02321" not in result
 
-    def test_includes_relation_targets(self, db):
-        """Les cibles des relations depuis une publication in-périmètre
-        (`publication_relations.target_doi`) entrent dans le pool."""
-        db.execute(
-            "INSERT INTO publications (id, title, pub_year, in_perimeter) "
-            "VALUES (1, 'Parent', 2020, TRUE)"
+    def test_includes_relation_targets(self, sa_sync_conn):
+        """Les cibles des relations depuis une publication in-périmètre (`publication_relations.target_doi`) entrent dans le pool."""
+        sa_sync_conn.execute(
+            text(
+                "INSERT INTO publications (id, title, pub_year, in_perimeter) "
+                "VALUES (1, 'Parent', 2020, TRUE)"
+            )
         )
-        db.execute(
-            "INSERT INTO publication_relations "
-            "(from_publication_id, relation_type, target_doi, source) "
-            "VALUES (1, 'is_preprint_of', '10.9999/related', 'crossref')"
+        sa_sync_conn.execute(
+            text(
+                "INSERT INTO publication_relations "
+                "(from_publication_id, relation_type, target_doi, source) "
+                "VALUES (1, 'is_preprint_of', '10.9999/related', 'crossref')"
+            )
         )
-        result = get_cross_import_dois(db.connection, "hal")
+        result = get_cross_import_dois(sa_sync_conn, "hal")
         assert "10.9999/related" in result
 
-    def test_relation_targets_excluded_when_parent_out_of_perimeter(self, db):
+    def test_relation_targets_excluded_when_parent_out_of_perimeter(self, sa_sync_conn):
         """Une relation depuis une publication hors-périmètre n'entre pas dans le pool."""
-        db.execute(
-            "INSERT INTO publications (id, title, pub_year, in_perimeter) "
-            "VALUES (1, 'Parent', 2020, FALSE)"
+        sa_sync_conn.execute(
+            text(
+                "INSERT INTO publications (id, title, pub_year, in_perimeter) "
+                "VALUES (1, 'Parent', 2020, FALSE)"
+            )
         )
-        db.execute(
-            "INSERT INTO publication_relations "
-            "(from_publication_id, relation_type, target_doi, source) "
-            "VALUES (1, 'is_preprint_of', '10.9999/related', 'crossref')"
+        sa_sync_conn.execute(
+            text(
+                "INSERT INTO publication_relations "
+                "(from_publication_id, relation_type, target_doi, source) "
+                "VALUES (1, 'is_preprint_of', '10.9999/related', 'crossref')"
+            )
         )
-        assert get_cross_import_dois(db.connection, "hal") == []
+        assert get_cross_import_dois(sa_sync_conn, "hal") == []
 
-    def test_hal_target_no_prefix_filter(self, db):
+    def test_hal_target_no_prefix_filter(self, sa_sync_conn):
         """target='hal' : aucun filtre par RA, tous les DOIs candidats remontent."""
-        db.execute("INSERT INTO doi_prefixes (prefix, ra) VALUES ('10.5281', 'DataCite')")
-        _add_inperim_sp(db, "openalex", "W1", doi="10.5281/zenodo.1")
+        sa_sync_conn.execute(
+            text("INSERT INTO doi_prefixes (prefix, ra) VALUES ('10.5281', 'DataCite')")
+        )
+        _add_inperim_sp(sa_sync_conn, "openalex", "W1", doi="10.5281/zenodo.1")
 
-        result = get_cross_import_dois(db.connection, "hal")
+        result = get_cross_import_dois(sa_sync_conn, "hal")
 
         assert result == ["10.5281/zenodo.1"]
 
-    def test_excludes_dois_in_backoff(self, db):
+    def test_excludes_dois_in_backoff(self, sa_sync_conn):
         """Un DOI en backoff `doi_lookups` (next_retry futur) sort du pool."""
-        _add_inperim_sp(db, "openalex", "W1", doi="10.1234/a")
-        _add_inperim_sp(db, "openalex", "W2", doi="10.1234/b")
-        db.execute(
-            "INSERT INTO doi_lookups (source, doi, not_found_at, next_retry) "
-            "VALUES ('hal', '10.1234/a', now(), now() + interval '30 days')"
+        _add_inperim_sp(sa_sync_conn, "openalex", "W1", doi="10.1234/a")
+        _add_inperim_sp(sa_sync_conn, "openalex", "W2", doi="10.1234/b")
+        sa_sync_conn.execute(
+            text(
+                "INSERT INTO doi_lookups (source, doi, not_found_at, next_retry) "
+                "VALUES ('hal', '10.1234/a', now(), now() + interval '30 days')"
+            )
         )
-        result = get_cross_import_dois(db.connection, "hal")
+        result = get_cross_import_dois(sa_sync_conn, "hal")
         assert result == ["10.1234/b"]
 
-    def test_retries_dois_with_expired_backoff(self, db):
+    def test_retries_dois_with_expired_backoff(self, sa_sync_conn):
         """Backoff expiré (next_retry passé) → le DOI repasse dans le pool."""
-        _add_inperim_sp(db, "openalex", "W1", doi="10.1234/a")
-        db.execute(
-            "INSERT INTO doi_lookups (source, doi, not_found_at, next_retry) "
-            "VALUES ('hal', '10.1234/a', now() - interval '60 days', now() - interval '1 day')"
+        _add_inperim_sp(sa_sync_conn, "openalex", "W1", doi="10.1234/a")
+        sa_sync_conn.execute(
+            text(
+                "INSERT INTO doi_lookups (source, doi, not_found_at, next_retry) "
+                "VALUES ('hal', '10.1234/a', now() - interval '60 days', now() - interval '1 day')"
+            )
         )
-        result = get_cross_import_dois(db.connection, "hal")
+        result = get_cross_import_dois(sa_sync_conn, "hal")
         assert result == ["10.1234/a"]
 
-    def test_backoff_is_per_target_source(self, db):
+    def test_backoff_is_per_target_source(self, sa_sync_conn):
         """Le backoff d'un DOI sur `hal` n'affecte pas le pool de `openalex`."""
-        _add_inperim_sp(db, "scanr", "S1", doi="10.1234/a")
-        db.execute(
-            "INSERT INTO doi_lookups (source, doi, not_found_at, next_retry) "
-            "VALUES ('hal', '10.1234/a', now(), now() + interval '30 days')"
+        _add_inperim_sp(sa_sync_conn, "scanr", "S1", doi="10.1234/a")
+        sa_sync_conn.execute(
+            text(
+                "INSERT INTO doi_lookups (source, doi, not_found_at, next_retry) "
+                "VALUES ('hal', '10.1234/a', now(), now() + interval '30 days')"
+            )
         )
-        assert get_cross_import_dois(db.connection, "hal") == []
-        assert get_cross_import_dois(db.connection, "openalex") == ["10.1234/a"]
+        assert get_cross_import_dois(sa_sync_conn, "hal") == []
+        assert get_cross_import_dois(sa_sync_conn, "openalex") == ["10.1234/a"]
 
-    def test_excludes_dois_with_permanent_miss(self, db):
+    def test_excludes_dois_with_permanent_miss(self, sa_sync_conn):
         """Un DOI avec un miss définitif (`next_retry NULL`) sort du pool pour toujours."""
-        _add_inperim_sp(db, "openalex", "W1", doi="10.1234/a")
-        _add_inperim_sp(db, "openalex", "W2", doi="10.1234/b")
-        db.execute(
-            "INSERT INTO doi_lookups (source, doi, not_found_at, next_retry) "
-            "VALUES ('hal', '10.1234/a', now(), NULL)"
+        _add_inperim_sp(sa_sync_conn, "openalex", "W1", doi="10.1234/a")
+        _add_inperim_sp(sa_sync_conn, "openalex", "W2", doi="10.1234/b")
+        sa_sync_conn.execute(
+            text(
+                "INSERT INTO doi_lookups (source, doi, not_found_at, next_retry) "
+                "VALUES ('hal', '10.1234/a', now(), NULL)"
+            )
         )
-        result = get_cross_import_dois(db.connection, "hal")
+        result = get_cross_import_dois(sa_sync_conn, "hal")
         assert result == ["10.1234/b"]
 
 
