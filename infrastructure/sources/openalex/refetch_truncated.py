@@ -1,10 +1,8 @@
 """Adapter OpenAlex pour `application.pipeline.extract.refetch_truncated`.
 
-HTTP (un appel par work) + SELECT (works marqués `staging.authors_truncated`) +
-UPDATE staging.raw_data (efface le flag, sans recalcul de raw_hash).
+HTTP (un appel par work) + SELECT (works marqués `staging.authors_truncated`) + UPDATE staging.raw_data (efface le flag, sans recalcul de raw_hash).
 
-L'orchestration (boucle async, sémaphore, commits intermédiaires) vit
-côté `application.pipeline.extract.refetch_truncated`.
+L'orchestration (boucle async, sémaphore, commits intermédiaires) vit côté `application.pipeline.extract.refetch_truncated`.
 """
 
 from __future__ import annotations
@@ -34,7 +32,7 @@ MAX_CONCURRENT = 3
 # préservation (cf. orchestrateur). Tant que le bulk renvoie le même
 # payload tronqué, son hash matchera celui en base et l'UPSERT bulk ne
 # touchera pas `raw_data` (qui contient pourtant les auteurs complets).
-# Efface `authors_truncated` (le work est désormais complet et vérifié) et
+# Efface `authors_truncated` (le work est complet et vérifié) et
 # repasse `processed = FALSE` pour que normalize ré-écrive les authorships complètes.
 _UPDATE_SQL = text(
     """
@@ -47,9 +45,7 @@ _UPDATE_SQL = text(
 # Genuine 100 auteurs : pas tronqué, on lève juste le drapeau (pas de réécriture).
 _CLEAR_TRUNCATED_SQL = text("UPDATE staging SET authors_truncated = FALSE WHERE id = :id")
 
-# Détection par le marqueur explicite posé à l'extraction : indépendant de l'ordre
-# des phases (survit à normalize, qui purge `raw_data`) et de la source des auteurs.
-# `source_id` (l'ID OpenAlex) reste sur la ligne staging même après purge du brut.
+# Détection par le marqueur explicite posé à l'extraction : indépendant de l'ordre des phases (survit à normalize, qui purge `raw_data`) et de la source des auteurs. `source_id` (l'ID OpenAlex) reste sur la ligne staging même après purge du brut.
 _SELECT_TRUNCATED_SQL = text(
     """
     SELECT id, source_id
@@ -63,9 +59,7 @@ _SELECT_TRUNCATED_SQL = text(
 class PgOpenalexRefetchAdapter(OpenalexRefetchAdapter):
     """Adapter PostgreSQL + HTTP pour `OpenalexRefetchAdapter`.
 
-    `base_url` est résolu lors de `configure()` (depuis la BDD), au
-    même endroit que `init_auth()` — la connexion DB est nécessaire
-    aux deux et l'orchestrateur la passe déjà.
+    `base_url` est résolu lors de `configure()` (depuis la BDD), au même endroit que `init_auth()` — la connexion DB est nécessaire aux deux et l'orchestrateur la passe déjà.
     """
 
     max_concurrent: int = MAX_CONCURRENT
@@ -88,8 +82,7 @@ class PgOpenalexRefetchAdapter(OpenalexRefetchAdapter):
     ) -> dict[str, Any] | None:
         """Fetch un work individuel par son ID OpenAlex (retourne tous les auteurs).
 
-        Retourne le dict ou None si l'API renvoie 404 ou si la requête
-        a échoué après tous les retries.
+        Retourne le dict ou None si l'API renvoie 404 ou si la requête a échoué après tous les retries.
         """
         url = f"{self._base_url}/{openalex_id}"
         params = {"select": SELECT_FIELDS, **auth_params()}

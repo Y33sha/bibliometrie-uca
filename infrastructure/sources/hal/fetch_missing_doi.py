@@ -2,8 +2,7 @@
 
 HAL fournit une API Solr ; on interroge par DOI (un appel par DOI).
 
-Adapter async (`AsyncFetchMissingDoiAdapter`), parallélisme
-embarrassingly parallel par DOI via `httpx.AsyncClient`.
+Adapter async (`AsyncFetchMissingDoiAdapter`), parallélisme embarrassingly parallel par DOI via `httpx.AsyncClient`.
 """
 
 from __future__ import annotations

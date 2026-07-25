@@ -1,11 +1,8 @@
 """Adapter HAL pour `application.pipeline.cross_imports.fetch_missing_hal`.
 
-Implémente les lookups SQL (depuis OpenAlex, ScanR, NNT theses),
-les fetchs HTTP async (par halId et par NNT) et les inserts staging.
+Implémente les lookups SQL (depuis OpenAlex, ScanR, NNT theses), les fetchs HTTP async (par halId et par NNT) et les inserts staging.
 
-L'orchestration (combinaison des refs, dedup, boucles async, commits
-intermédiaires) vit côté
-`application.pipeline.cross_imports.fetch_missing_hal`.
+L'orchestration (combinaison des refs, dedup, boucles async, commits intermédiaires) vit côté `application.pipeline.cross_imports.fetch_missing_hal`.
 """
 
 from __future__ import annotations
@@ -29,22 +26,16 @@ from infrastructure.sources.hal.fields import HAL_FIELDS_STR
 from infrastructure.sources.http_retry_async import http_request_with_retry_async
 
 # HAL ne publie pas de seuil officiel : on combine concurrence (5 workers)
-# + délai par worker (HAL_DELAY = 0.5 s) → ~6-7 req/s sustained (5× le débit
-# de la variante sync précédente), sans burst.
+# + délai par worker (HAL_DELAY = 0.5 s) → ~6-7 req/s sustained, sans burst.
 HAL_MAX_CONCURRENT = 5
 
 
 def find_hal_ids_from_openalex(conn: Connection) -> list[dict[str, Any]]:
     """halIds référencés par des `source_publications` OpenAlex in-périmètre, absents de staging HAL.
 
-    Source : `source_publications` OpenAlex des publications `in_perimeter`
-    (`external_ids.hal_id`, liste ; toutes locations, pas seulement la primary),
-    normalisés à un run antérieur. Ne cross-importer que des hal-ids portés par
-    des publications confirmées UCA coupe la propagation hors-périmètre ; les
-    docs fraîchement extraits sont rattrapés au run suivant (pipeline convergent).
+    Source : `source_publications` OpenAlex des publications `in_perimeter` (`external_ids.hal_id`, liste ; toutes locations, pas seulement la primary), normalisés à un run antérieur. Ne cross-importer que des hal-ids portés par des publications confirmées UCA coupe la propagation hors-périmètre ; les documents fraîchement extraits sont rattrapés au run suivant (pipeline convergent).
 
-    Retourne `[{openalex_id, hal_id, landing_url}, ...]`. Le filtre
-    `NOT EXISTS staging_hal` écarte les hal-ids déjà stagés.
+    Retourne `[{openalex_id, hal_id, landing_url}, ...]`. Le filtre `NOT EXISTS staging_hal` écarte les hal-ids déjà stagés.
     """
     rows = conn.execute(
         text(
@@ -77,13 +68,9 @@ def find_hal_ids_from_openalex(conn: Connection) -> list[dict[str, Any]]:
 def find_hal_ids_from_scanr(conn: Connection) -> list[dict[str, Any]]:
     """halIds référencés par des `source_publications` ScanR in-périmètre, absents de staging HAL.
 
-    Source : `source_publications` ScanR des publications `in_perimeter`
-    (`external_ids.hal_id`, liste), normalisés à un run antérieur. Cf.
-    `find_hal_ids_from_openalex` pour le choix du périmètre et le lag n+1.
+    Source : `source_publications` ScanR des publications `in_perimeter` (`external_ids.hal_id`, liste), normalisés à un run antérieur. Cf. `find_hal_ids_from_openalex` pour le choix du périmètre et le lag n+1.
 
-    Retourne `[{source: "scanr", hal_id, scanr_id}, ...]`. Conservé comme fonction
-    libre pour permettre des tests d'intégration ciblés (cf.
-    `tests/integration/infrastructure/sources/hal/test_fetch_missing_hal.py`).
+    Retourne `[{source: "scanr", hal_id, scanr_id}, ...]`. Fonction libre, référencée par des tests d'intégration ciblés (cf. `tests/integration/infrastructure/sources/hal/test_fetch_missing_hal.py`).
     """
     rows = conn.execute(
         text(
@@ -111,9 +98,7 @@ def find_hal_ids_from_scanr(conn: Connection) -> list[dict[str, Any]]:
 def find_nnt_without_hal(conn: Connection) -> list[dict[str, Any]]:
     """NNT (thèses soutenues) sans document HAL associé.
 
-    Recherche via `source_publications.external_ids->>'nnt'` pour les
-    publications `in_perimeter` qui n'ont pas `'hal'` dans leurs sources et ne
-    sont pas de type `ongoing_thesis`.
+    Recherche via `source_publications.external_ids->>'nnt'` pour les publications `in_perimeter` qui n'ont pas `'hal'` dans leurs sources et ne sont pas de type `ongoing_thesis`.
 
     Retourne `[{source: "nnt", nnt, theses_id}, ...]`.
     """
@@ -140,8 +125,7 @@ def find_nnt_without_hal(conn: Connection) -> list[dict[str, Any]]:
 def insert_staging_hal(conn: Connection, hal_id: str, doi: str | None, doc: dict[str, Any]) -> None:
     """Insère un document dans staging HAL.
 
-    Si le document existe et a changé (hash différent), met à jour et
-    remet `processed = FALSE`.
+    Si le document existe et a changé (hash différent), met à jour et remet `processed = FALSE`.
     """
     upsert_staging(
         conn,

@@ -1,7 +1,6 @@
 """Adapter CrossRef pour `application.pipeline.extract.refresh_stale`.
 
-CrossRef est native du DOI : son `staging.source_id` **est** le DOI. Le refetch
-par id natif revient donc à `GET /works/{doi}`. Un 404 = DOI confirmé absent.
+CrossRef est native du DOI : son `staging.source_id` **est** le DOI. Le refetch par id natif revient à `GET /works/{doi}`. Un 404 = DOI confirmé absent.
 """
 
 from __future__ import annotations

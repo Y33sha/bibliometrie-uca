@@ -1,9 +1,6 @@
 """Adapter HAL pour la phase extract : HTTP (Solr search API) + écritures staging + config.
 
-Implémente le port `application.ports.pipeline.extract.hal.HalExtractAdapter`.
-L'orchestration de la phase (requête unique sur l'union des collections,
-pagination `cursorMark`, batch commits) vit côté
-`application.pipeline.extract.extract_hal`.
+Implémente le port `application.ports.pipeline.extract.hal.HalExtractAdapter`. L'orchestration de la phase (requête unique sur l'union des collections, pagination `cursorMark`, batch commits) vit côté `application.pipeline.extract.extract_hal`.
 """
 
 from __future__ import annotations
@@ -35,9 +32,7 @@ def _build_url(base_url: str) -> str:
 def extract_doi(doc: dict[str, Any]) -> str | None:
     """Extrait le DOI nettoyé d'un document HAL (champ `doiId_s`).
 
-    `doiId_s` arrive en scalaire depuis l'extraction bulk Solr, mais en liste
-    depuis l'API de recherche par hal-id (cross-import) : les deux formes sont
-    gérées avant nettoyage.
+    `doiId_s` arrive en scalaire depuis l'extraction bulk Solr, mais en liste depuis l'API de recherche par hal-id (cross-import) : les deux formes sont gérées avant nettoyage.
     """
     doi = doc.get("doiId_s")
     if isinstance(doi, list):
@@ -48,10 +43,7 @@ def extract_doi(doc: dict[str, Any]) -> str | None:
 class PgHalExtractAdapter(HalExtractAdapter):
     """Adapter PostgreSQL + HTTP pour `HalExtractAdapter`.
 
-    Construit avec une `base_url` (URL Solr HAL). Les méthodes HTTP
-    formatent les paramètres Solr et délèguent à `http_request_with_retry`.
-    Les méthodes SQL écrivent dans `staging` via les statements préparés
-    ci-dessus.
+    Construit avec une `base_url` (URL Solr HAL). Les méthodes HTTP formatent les paramètres Solr et délèguent à `http_request_with_retry`. L'écriture dans `staging` passe par le helper `upsert_staging`.
     """
 
     def __init__(self, base_url: str) -> None:
@@ -61,10 +53,7 @@ class PgHalExtractAdapter(HalExtractAdapter):
     def _get(self, params: dict[str, Any], label: str) -> dict[str, Any]:
         """GET Solr HAL, auto rate-limité : au moins `HAL_DELAY` entre deux appels.
 
-        L'adapter se rate-limite seul, quel que soit l'appelant — l'orchestrateur
-        n'ordonnance aucun `sleep`. On mesure l'écart depuis la dernière requête au
-        lieu de dormir systématiquement après coup : le temps de traitement entre
-        deux fetchs (parsing, upsert, commit) est déjà décompté du délai.
+        L'adapter se rate-limite seul, quel que soit l'appelant — l'orchestrateur n'ordonnance aucun `sleep`. On mesure l'écart depuis la dernière requête : le temps de traitement entre deux fetchs (parsing, upsert, commit) est déjà décompté du délai.
         """
         if self._last_request_at is not None:
             wait = HAL_DELAY - (time.monotonic() - self._last_request_at)
@@ -94,12 +83,8 @@ class PgHalExtractAdapter(HalExtractAdapter):
         """Construit la requête Solr HAL (paramètre `q`).
 
         - `years` borne `producedDateY_i:[min TO max]` (année de publication).
-        - `since` (format `YYYY-MM-DD`) borne `submittedDate_tdate:[since TO *]`
-          (date de dépôt HAL).
-        Les deux filtres se combinent en AND : indispensable en mode daily,
-        où l'on ne veut que les dépôts HAL récents *qui concernent aussi*
-        la fenêtre d'années courante — sinon un dépôt tardif d'une vieille
-        publication passe le filtre et pollue la base.
+        - `since` (format `YYYY-MM-DD`) borne `submittedDate_tdate:[since TO *]` (date de dépôt HAL).
+        Les deux filtres se combinent en AND : indispensable en mode daily, où l'on ne veut que les dépôts HAL récents *qui concernent aussi* la fenêtre d'années courante — sinon un dépôt tardif d'une vieille publication passe le filtre et pollue la base.
         Au moins un des deux paramètres doit être fourni.
         """
         if not years and not since:
@@ -124,9 +109,7 @@ class PgHalExtractAdapter(HalExtractAdapter):
         return extract_doi(doc)
 
     def build_collections_fq(self, collection_codes: list[str]) -> str:
-        """Filtre Solr `collCode_s:("C1" OR "C2" …)` couvrant toutes les collections
-        configurées en une requête. Les codes sont quotés : certains portent un tiret
-        (ex. `CHU-CLERMONTFERRAND`) que Solr interpréterait sinon comme un opérateur."""
+        """Filtre Solr `collCode_s:("C1" OR "C2" …)` couvrant toutes les collections configurées en une requête. Les codes sont quotés : certains portent un tiret (ex. `CHU-CLERMONTFERRAND`) que Solr interpréterait sinon comme un opérateur."""
         terms = " OR ".join(f'"{code}"' for code in collection_codes)
         return f"collCode_s:({terms})"
 
@@ -135,10 +118,7 @@ class PgHalExtractAdapter(HalExtractAdapter):
     def fetch_page_cursor(self, query: str, fq: str, cursor_mark: str) -> dict[str, Any]:
         """Une page Solr en pagination `cursorMark` (full payload `HAL_FIELDS`).
 
-        `cursor_mark` vaut `"*"` au premier appel, puis le `nextCursorMark` renvoyé par
-        la réponse précédente. La réponse porte `response.docs` et `nextCursorMark` ;
-        l'appelant boucle jusqu'à ce que le marqueur se stabilise. `sort=docid asc`
-        (clé unique) est requis par cursorMark."""
+        `cursor_mark` vaut `"*"` au premier appel, puis le `nextCursorMark` renvoyé par la réponse précédente. La réponse porte `response.docs` et `nextCursorMark` ; l'appelant boucle jusqu'à ce que le marqueur se stabilise. `sort=docid asc` (clé unique) est requis par cursorMark."""
         params = {
             "q": query,
             "fq": fq,

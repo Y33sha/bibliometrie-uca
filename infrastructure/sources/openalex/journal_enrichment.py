@@ -42,9 +42,7 @@ def fetch_sources_batch(
 ) -> dict[str, tuple[float | None, str, str | None]]:
     """Interroge OpenAlex Sources pour un lot d'IDs.
 
-    Retourne `short_id → (apc_amount, apc_currency, raw_type)`. En cas d'échec (le
-    circuit-breaker de source a enregistré l'échec via `http_request_with_retry`),
-    retourne `{}` — l'appelant consulte l'état du breaker pour décider d'arrêter.
+    Retourne `short_id → (apc_amount, apc_currency, raw_type)`. En cas d'échec (le circuit-breaker de source a enregistré l'échec via `http_request_with_retry`), retourne `{}` — l'appelant consulte l'état du breaker pour décider d'arrêter.
     """
     full_ids = [full_openalex_id(oid) for oid in openalex_ids]
     params: dict[str, str] = {

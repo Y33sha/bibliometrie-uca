@@ -2,9 +2,7 @@
 
 Un appel par DOI sur le filtre `doi:...` de l'API Works.
 
-Chemin async (`run_async`). La boucle embarrassingly parallel des
-DOIs manquants exploite le polite pool OpenAlex (10 req/s) via un
-sémaphore.
+Chemin async (`run_async`). La boucle embarrassingly parallel des DOIs manquants exploite le polite pool OpenAlex (10 req/s) via un sémaphore.
 """
 
 from __future__ import annotations
@@ -67,8 +65,7 @@ class OpenalexFetchMissingDoiAdapter:
                 label=f"DOI {doi}",
             )
         except (httpx.RequestError, httpx.HTTPStatusError):
-            # Erreur réseau ou HTTP (429/5xx après retries, 4xx) : lot ignoré, les
-            # DOI restent candidats au prochain run (leur absence n'est pas prouvée).
+            # Erreur réseau ou HTTP (429/5xx après retries, 4xx) : lot ignoré, les DOI restent candidats au prochain run (leur absence n'est pas prouvée).
             return []
         results = data.get("results", [])
         if not results:

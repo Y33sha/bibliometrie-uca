@@ -1,8 +1,6 @@
 """Adapter DataCite pour `application.pipeline.extract.refresh_stale`.
 
-DataCite est native du DOI pour ses préfixes : son `staging.source_id` **est** le
-DOI. Le refetch par id natif revient donc à `GET /dois/{doi}` (nœud JSON:API
-unique). Un 404 = DOI confirmé absent.
+DataCite est native du DOI pour ses préfixes : son `staging.source_id` **est** le DOI. Le refetch par id natif revient à `GET /dois/{doi}` (nœud JSON:API unique). Un 404 = DOI confirmé absent.
 """
 
 from __future__ import annotations

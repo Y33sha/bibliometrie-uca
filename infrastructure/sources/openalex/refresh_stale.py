@@ -1,8 +1,6 @@
 """Adapter OpenAlex pour `application.pipeline.extract.refresh_stale`.
 
-Refetch d'une row par son id OpenAlex (`staging.source_id`) via `GET /works/{id}`,
-qui renvoie le work complet (tous les auteurs). Un 404 = work confirmé absent
-(supprimé ou fusionné côté OpenAlex).
+Refetch d'une row par son id OpenAlex (`staging.source_id`) via `GET /works/{id}`, qui renvoie le work complet (tous les auteurs). Un 404 = work confirmé absent (supprimé ou fusionné côté OpenAlex).
 """
 
 from __future__ import annotations

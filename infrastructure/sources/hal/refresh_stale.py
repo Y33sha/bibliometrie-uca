@@ -1,7 +1,6 @@
 """Adapter HAL pour `application.pipeline.extract.refresh_stale`.
 
-Refetch d'une row par son hal-id (`staging.source_id`) via une requête Solr
-`halId_s:<id>`. Absence confirmée = réponse Solr valide, zéro doc.
+Refetch d'une row par son hal-id (`staging.source_id`) via une requête Solr `halId_s:<id>`. Absence confirmée = réponse Solr valide, zéro doc.
 """
 
 from __future__ import annotations

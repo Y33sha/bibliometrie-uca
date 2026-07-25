@@ -1,16 +1,10 @@
 """Adapter WoS pour `application.pipeline.cross_imports.fetch_missing_doi`.
 
-WoS accepte une requête groupée par DOI (`DO=("doi1" OR "doi2" OR ...)`).
-Lot de 20 DOI par requête pour éviter des URLs trop longues, pagination
-interne de `WOS_PER_PAGE` records, retries exponentiels sur 429/erreurs.
+WoS accepte une requête groupée par DOI (`DO=("doi1" OR "doi2" OR ...)`). Lot de 20 DOI par requête pour éviter des URLs trop longues, pagination interne de `WOS_PER_PAGE` records, retries exponentiels sur 429/erreurs.
 
-Certains DOI (preprints Zenodo, arXiv, SSRN, Research Square...) sont
-systématiquement absents de WoS : on les filtre côté client pour éviter
-les appels inutiles.
+Certains DOI (preprints Zenodo, arXiv, SSRN, Research Square...) sont systématiquement absents de WoS : on les filtre côté client pour éviter les appels inutiles.
 
-Adapter async (`AsyncFetchMissingDoiAdapter`). Les requêtes DOI
-individuelles (via batch de 20 et WOS_PER_PAGE=10) sont stables ;
-les pages larges de l'API WoS le sont moins.
+Adapter async (`AsyncFetchMissingDoiAdapter`). Les requêtes DOI individuelles (via batch de 20 et WOS_PER_PAGE=10) sont stables ; les pages larges de l'API WoS le sont moins.
 """
 
 from __future__ import annotations
@@ -40,7 +34,7 @@ class WosFetchMissingDoiAdapter:
 
     source_key = "wos"
     batch_size = 20
-    # WoS API Clarivate : instable historiquement et rate-limit serré
+    # WoS API Clarivate : instable et rate-limit serré
     # (variable selon contrat, généralement 2-5 req/s). 2 workers + 500 ms
     # de pause par worker garantissent un débit ≈ 2 req/s peak (avec
     # latence WoS typique ~500 ms), sous le seuil habituel et sans burst
@@ -56,16 +50,12 @@ class WosFetchMissingDoiAdapter:
         self.headers = {"X-ApiKey": get_wos_api_key(conn), "Accept": "application/json"}
 
     async def fetch_async(self, client: httpx.AsyncClient, dois: list[str]) -> Iterable[dict]:
-        # (doi d'origine, forme envoyable à WoS ou None si filtré). Les DOI
-        # preprints filtrés (c=None) ne sont pas interrogeables, donc jamais
-        # enregistrés comme not-found (le filtre client les écarte gratuitement).
+        # (doi d'origine, forme envoyable à WoS ou None si filtré). Les DOI preprints filtrés (c=None) ne sont pas interrogeables, donc jamais enregistrés comme not-found (le filtre client les écarte gratuitement).
         queried = [(d, filter_doi_for_wos(d)) for d in dois]
         clean = [c for _, c in queried if c]
 
         records: list[dict] = []
-        # complete : a-t-on un résultat fiable pour calculer les not-found ?
-        # Mis à False sur tout arrêt prématuré (erreur réseau, corps vide,
-        # réponse mal formée) où l'absence d'un DOI ne prouve rien.
+        # complete : a-t-on un résultat fiable pour calculer les not-found ? Mis à False sur tout arrêt prématuré (erreur réseau, corps vide, réponse mal formée) où l'absence d'un DOI ne prouve rien.
         complete = True
         first_record = 1
         while clean:
@@ -84,15 +74,13 @@ class WosFetchMissingDoiAdapter:
                     headers=self.headers,
                     params=params,
                     timeout=60,
-                    # Backoff initial 4s pour matcher le comportement sync historique
-                    # (2^(attempt+2) = 4, 8, 16, 32, 64)
+                    # Backoff initial 4s : séquence 2^(attempt+2) = 4, 8, 16, 32, 64.
                     initial_backoff=4.0,
                     retry_on_empty_body=True,
                     label=f"rec {first_record}",
                 )
             except httpx.HTTPStatusError as e:
-                # WoS 400 = lot sans correspondance : zéro match, le lot entier
-                # est confirmé absent (résultat fiable → on garde complete=True).
+                # WoS 400 = lot sans correspondance : zéro match, le lot entier est confirmé absent (résultat fiable → on garde complete=True).
                 if e.response.status_code == 400:
                     log.warning("WoS 400 rec %d, lot ignoré", first_record)
                     break
@@ -136,9 +124,7 @@ class WosFetchMissingDoiAdapter:
 
         if not complete:
             return records
-        # Lot complet : tout DOI interrogé sans record correspondant est
-        # confirmé absent de WoS. `extract_doi` et les candidats sont tous deux
-        # normalisés par `clean_doi`, donc comparables directement.
+        # Lot complet : tout DOI interrogé sans record correspondant est confirmé absent de WoS. `extract_doi` et les candidats sont tous deux normalisés par `clean_doi`, donc comparables directement.
         found = {d for r in records if (d := extract_doi(r))}
         missed = [not_found_marker(orig) for orig, c in queried if c and c not in found]
         return records + missed

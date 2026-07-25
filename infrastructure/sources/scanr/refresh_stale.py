@@ -1,8 +1,6 @@
 """Adapter ScanR pour `application.pipeline.extract.refresh_stale`.
 
-Refetch d'une row par son id ScanR (`staging.source_id`) via une requête
-ElasticSearch `term` sur `id.keyword`. Une réponse ES valide sans hit = id
-confirmé absent.
+Refetch d'une row par son id ScanR (`staging.source_id`) via une requête ElasticSearch `term` sur `id.keyword`. Une réponse ES valide sans hit = id confirmé absent.
 """
 
 from __future__ import annotations

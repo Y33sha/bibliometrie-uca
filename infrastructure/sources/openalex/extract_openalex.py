@@ -1,10 +1,6 @@
-"""Adapter OpenAlex pour la phase extract : HTTP (`/works` paginé par
-cursor) + écritures staging + config.
+"""Adapter OpenAlex pour la phase extract : HTTP (`/works` paginé par cursor) + écritures staging + config.
 
-Implémente le port
-`application.ports.pipeline.extract.openalex.OpenalexExtractAdapter`.
-L'orchestration de la phase (boucle par année, agrégation des métriques)
-vit côté `application.pipeline.extract.extract_openalex`.
+Implémente le port `application.ports.pipeline.extract.openalex.OpenalexExtractAdapter`. L'orchestration de la phase (boucle par année, agrégation des métriques) vit côté `application.pipeline.extract.extract_openalex`.
 """
 
 from __future__ import annotations
@@ -42,9 +38,7 @@ def build_params(
 ) -> dict[str, Any]:
     """Construit les paramètres de requête pour l'API OpenAlex `/works`.
 
-    Si `since` est fourni (format `YYYY-MM-DD`), filtre sur
-    `from_updated_date`. Sinon filtre sur `publication_year`. Le
-    `lineage:` agrège les institutions par `|` (OR).
+    Si `since` est fourni (format `YYYY-MM-DD`), filtre sur `from_updated_date`. Sinon filtre sur `publication_year`. Le `lineage:` agrège les institutions par `|` (OR).
     """
     lineage_filter = "|".join(institution_ids or [])
     if since:
@@ -63,10 +57,7 @@ def build_params(
 class PgOpenalexExtractAdapter(OpenalexExtractAdapter):
     """Adapter PostgreSQL + HTTP pour `OpenalexExtractAdapter`.
 
-    Construit avec une `base_url` (endpoint `/works`). L'auth (api_key
-    ou email polite pool) est initialisée via `init_auth(...)` lors du
-    `load_config` — état global du module `infrastructure.sources.openalex`
-    partagé avec `refetch_truncated` et `fetch_missing_doi`.
+    Construit avec une `base_url` (endpoint `/works`). L'auth (api_key ou email polite pool) est initialisée via `init_auth(...)` lors du `load_config` — état global du module `infrastructure.sources.openalex` partagé avec `refetch_truncated` et `fetch_missing_doi`.
     """
 
     def __init__(self, base_url: str) -> None:
@@ -76,10 +67,7 @@ class PgOpenalexExtractAdapter(OpenalexExtractAdapter):
     def _get(self, params: dict[str, Any], label: str) -> dict[str, Any]:
         """GET `/works`, auto rate-limité : au moins `OPENALEX_DELAY` entre deux appels.
 
-        L'adapter se rate-limite seul, quel que soit l'appelant — l'orchestrateur
-        n'ordonnance aucun `sleep`. On mesure l'écart depuis la dernière requête au
-        lieu de dormir systématiquement après coup : le temps de traitement entre
-        deux pages (insert batch, commit) est déjà décompté du délai.
+        L'adapter se rate-limite seul, quel que soit l'appelant — l'orchestrateur n'ordonnance aucun `sleep`. On mesure l'écart depuis la dernière requête : le temps de traitement entre deux pages (insert batch, commit) est déjà décompté du délai.
         """
         if self._last_request_at is not None:
             wait = OPENALEX_DELAY - (time.monotonic() - self._last_request_at)
@@ -131,24 +119,17 @@ class PgOpenalexExtractAdapter(OpenalexExtractAdapter):
     def insert_batch(self, conn: Connection, works: list[dict[str, Any]]) -> BatchInsertCounts:
         """UPSERT bulk d'un batch de works, ventilé new/updated/unchanged.
 
-        La préservation des authorships complètes obtenues par `refetch_truncated`
-        repose sur le fait que **refetch ne recalcule pas `raw_hash`** : la ligne
-        refetchée garde le hash du payload bulk initial. Tant que le bulk renvoie ce
-        même payload, la comparaison `raw_hash` reste équivalente et l'UPSERT ne touche
-        pas `raw_data`.
+        La préservation des authorships complètes obtenues par `refetch_truncated` repose sur le fait que **refetch ne recalcule pas `raw_hash`** : la ligne refetchée garde le hash du payload bulk initial. Tant que le bulk renvoie ce même payload, la comparaison `raw_hash` reste équivalente et l'UPSERT ne touche pas `raw_data`.
 
         Le caller est responsable du `conn.commit()` après cette méthode.
 
-        Sémantique des compteurs : `new` = vraies insertions (`xmax = 0`), `updated` =
-        contenu réécrit (hash changé), `unchanged` = re-vu à hash identique (seul
-        `last_seen_at` bumpé).
+        Sémantique des compteurs : `new` = vraies insertions (`xmax = 0`), `updated` = contenu réécrit (hash changé), `unchanged` = re-vu à hash identique (seul `last_seen_at` bumpé).
         """
         new_count = 0
         updated_count = 0
         unchanged_count = 0
         for work in works:
-            # 100 authorships = plafond bulk OpenAlex → tronqué probable (`refetch_truncated`
-            # vérifiera et complétera). Posé seulement quand le hash change (cf. upsert_staging).
+            # 100 authorships = plafond bulk OpenAlex → tronqué probable (`refetch_truncated` vérifiera et complétera). Posé seulement quand le hash change (cf. upsert_staging).
             authorships = work.get("authorships")
             authors_truncated = isinstance(authorships, list) and len(authorships) == 100
             inserted, changed = upsert_staging(

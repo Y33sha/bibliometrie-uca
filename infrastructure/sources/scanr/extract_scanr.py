@@ -1,11 +1,6 @@
-"""Adapter ScanR pour la phase extract : HTTP (Elasticsearch
-search_after) + écritures staging + config.
+"""Adapter ScanR pour la phase extract : HTTP (Elasticsearch search_after) + écritures staging + config.
 
-Implémente le port
-`application.ports.pipeline.extract.scanr.ScanrExtractAdapter`.
-L'orchestration de la phase (boucle par année, pagination
-`search_after`, commits intermédiaires) vit côté
-`application.pipeline.extract.extract_scanr`.
+Implémente le port `application.ports.pipeline.extract.scanr.ScanrExtractAdapter`. L'orchestration de la phase (boucle par année, pagination `search_after`, commits intermédiaires) vit côté `application.pipeline.extract.extract_scanr`.
 """
 
 from __future__ import annotations
@@ -43,8 +38,7 @@ def extract_doi(doc: dict[str, Any]) -> str | None:
 class PgScanrExtractAdapter(ScanrExtractAdapter):
     """Adapter PostgreSQL + HTTP pour `ScanrExtractAdapter`.
 
-    Construit avec une `base_url` (endpoint `_search`) et des
-    `credentials` (basic auth Elasticsearch).
+    Construit avec une `base_url` (endpoint `_search`) et des `credentials` (basic auth Elasticsearch).
     """
 
     def __init__(self, base_url: str, credentials: tuple[str, str]) -> None:
@@ -55,10 +49,7 @@ class PgScanrExtractAdapter(ScanrExtractAdapter):
     def _search(self, query: dict[str, Any]) -> dict[str, Any]:
         """POST Elasticsearch, auto rate-limité : au moins `SCANR_DELAY` entre deux appels.
 
-        L'adapter se rate-limite seul, quel que soit l'appelant — l'orchestrateur
-        n'ordonnance aucun `sleep`. On mesure l'écart depuis la dernière requête au
-        lieu de dormir systématiquement après coup : le temps de traitement entre
-        deux pages (upserts, commits intermédiaires) est déjà décompté du délai.
+        L'adapter se rate-limite seul, quel que soit l'appelant — l'orchestrateur n'ordonnance aucun `sleep`. On mesure l'écart depuis la dernière requête : le temps de traitement entre deux pages (upserts, commits intermédiaires) est déjà décompté du délai.
         """
         if self._last_request_at is not None:
             wait = SCANR_DELAY - (time.monotonic() - self._last_request_at)
@@ -70,8 +61,7 @@ class PgScanrExtractAdapter(ScanrExtractAdapter):
                 self._url,
                 json_body=query,
                 auth=self._auth,
-                # Pages de SCANR_PER_PAGE (1000) : un fetch à froid peut dépasser
-                # 30s. Marge à 60s pour ne pas déclencher un retry inutile.
+                # Pages de SCANR_PER_PAGE (1000) : un fetch à froid peut dépasser 30s. Marge à 60s pour ne pas déclencher un retry inutile.
                 timeout=60,
                 label="ScanR search",
             )
@@ -103,20 +93,9 @@ class PgScanrExtractAdapter(ScanrExtractAdapter):
     ) -> dict[str, Any]:
         """Construit la requête Elasticsearch pour ScanR.
 
-        Tout est en **contexte `filter`** : un `term` sur l'année et un `terms`
-        sur les affiliations (« au moins une de la liste » — équivalent strict du
-        `minimum_should_match: 1` d'un `should`). Le contexte `filter` ne calcule
-        aucun `_score` et est cacheable côté cluster ; mesuré ~9× plus rapide que
-        l'équivalent `must`/`should` scoré (≈1 s vs ≈9,5 s par page de 200 sur le
-        cluster ScanR), pour un résultat identique puisque le tri se fait sur
-        `id.keyword` ASC — le score ne sert pas. Ce tri permet la pagination
-        `search_after`.
+        Tout est en **contexte `filter`** : un `term` sur l'année et un `terms` sur les affiliations (« au moins une de la liste » — équivalent strict du `minimum_should_match: 1` d'un `should`). Le contexte `filter` ne calcule aucun `_score` et est cacheable côté cluster ; mesuré ~9× plus rapide que l'équivalent `must`/`should` scoré (≈1 s vs ≈9,5 s par page de 200 sur le cluster ScanR), pour un résultat identique : le tri se fait sur `id.keyword` ASC, le score ne sert pas. Ce tri permet la pagination `search_after`.
 
-        `track_total` ne demande le comptage exact du set (`track_total_hits`)
-        que sur la première page : Elasticsearch recompte sinon l'intégralité
-        des résultats à *chaque* page, alors que le total n'est consommé qu'une
-        fois (log + dénominateur de progression). Les pages suivantes le coupent
-        (`False`), ce qui évite un full-count par page sur des sets de ~15k docs.
+        `track_total` ne demande le comptage exact du set (`track_total_hits`) que sur la première page : Elasticsearch recompte sinon l'intégralité des résultats à *chaque* page, alors que le total n'est consommé qu'une fois (log + dénominateur de progression). Les pages suivantes le coupent (`False`), ce qui évite un full-count par page sur des sets de ~15k docs.
         """
         query: dict[str, Any] = {
             "size": SCANR_PER_PAGE,

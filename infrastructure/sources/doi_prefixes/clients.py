@@ -3,8 +3,8 @@
 Trois endpoints, appelés par la résolution des préfixes DOI (`doi.org/ra` par la phase `resolve_ra` ; les `/prefixes` par `publishers_journals`) :
 
 - `doi.org/ra/<doi>` : Registration Agency d'un DOI donné. Une RA est permanente à l'échelle d'un préfixe (un préfixe = un registrant = une RA), donc un seul appel par préfixe suffit côté pipeline — mais en pratique on essaie plusieurs DOI samples par préfixe pour se prémunir d'un DOI erroné dans le staging.
-- `api.crossref.org/prefixes/<prefix>` : nom du publisher + ID member Crossref. Appelé uniquement quand la RA résolue précédemment est `'Crossref'`.
-- `api.datacite.org/prefixes/<prefix>?include=clients,providers` : nom du provider DataCite (= organisation-mère, occupe le slot `publisher_*`) + nom et symbole du client DataCite (= repository : Zenodo, NAKALA, INRAE, …). Appelé uniquement quand la RA est `'DataCite'`. Spike Phase 0 a vérifié 1 préfixe = 1 client sur 105/105.
+- `api.crossref.org/prefixes/<prefix>` : nom du publisher + ID member Crossref. Appelé uniquement quand la RA est `'Crossref'`.
+- `api.datacite.org/prefixes/<prefix>?include=clients,providers` : nom du provider DataCite (= organisation-mère, occupe le slot `publisher_*`) + nom et symbole du client DataCite (= repository : Zenodo, NAKALA, INRAE, …). Appelé uniquement quand la RA est `'DataCite'`.
 
 Polite pool via header `User-Agent` (mailto). Pas de polite pool documenté côté doi.org ni côté DataCite, on l'inclut par cohérence.
 """
@@ -46,14 +46,9 @@ def parse_member_id(member: Any) -> int | None:
 def resolve_ra(doi: str, *, user_agent: str) -> str | None:
     """Interroge `doi.org/ra` pour récupérer la Registration Agency d'un DOI.
 
-    Renvoie le nom de la RA (`'Crossref'`, `'DataCite'`, `'mEDRA'`,
-    `'unknown'`, …) ou `None` si la résolution échoue (DOI inconnu,
-    erreur réseau/HTTP). Le caller doit retenter avec un autre DOI du
-    même préfixe si `None`.
+    Renvoie le nom de la RA (`'Crossref'`, `'DataCite'`, `'mEDRA'`, `'unknown'`, …) ou `None` si la résolution échoue (DOI inconnu, erreur réseau/HTTP). Le caller doit retenter avec un autre DOI du même préfixe si `None`.
 
-    Note : `'unknown'` est une valeur **valide** renvoyée par doi.org
-    pour un préfixe enregistré chez une RA hors du set principal — c'est
-    distinct de la non-résolution (qui renvoie ici `None`).
+    Note : `'unknown'` est une valeur **valide** renvoyée par doi.org pour un préfixe enregistré chez une RA hors du set principal — c'est distinct de la non-résolution (qui renvoie ici `None`).
     """
     cleaned = clean_doi(doi)
     if not cleaned:
@@ -78,9 +73,7 @@ def resolve_ra(doi: str, *, user_agent: str) -> str | None:
 def fetch_crossref_prefix(prefix: str, *, user_agent: str) -> tuple[str, int | None] | None:
     """Interroge `api.crossref.org/prefixes/<prefix>` pour récupérer name + member.
 
-    Renvoie `(publisher_name, member_id)` ou `None` si l'appel échoue
-    ou si `name` est absent. `member_id` peut être `None` si l'API ne le
-    renvoie pas pour ce préfixe.
+    Renvoie `(publisher_name, member_id)` ou `None` si l'appel échoue ou si `name` est absent. `member_id` peut être `None` si l'API ne le renvoie pas pour ce préfixe.
     """
     cleaned = clean_doi_prefix(prefix)
     if not cleaned:
@@ -108,7 +101,7 @@ def fetch_datacite_prefix(prefix: str, *, user_agent: str) -> tuple[str, str, st
 
     Endpoint `GET /prefixes/{p}?include=clients,providers`, réponse JSON:API. Renvoie `(provider_name, client_name, client_symbol)` ou `None` si l'appel échoue ou si la structure attendue est incomplète.
 
-    Hiérarchie DataCite : `provider → client → prefix → DOI`. Un préfixe est alloué à un seul client (validé Phase 0 sur 105/105 prefixes UCA). Le `client_symbol` (ex. `cern.zenodo`, `inist.inra`) est l'identifiant stable assigné par DataCite, distinct du nom et persistant au-delà des renommages.
+    Hiérarchie DataCite : `provider → client → prefix → DOI`. Un préfixe est alloué à un seul client. Le `client_symbol` (ex. `cern.zenodo`, `inist.inra`) est l'identifiant stable assigné par DataCite, distinct du nom et persistant au-delà des renommages.
     """
     cleaned = clean_doi_prefix(prefix)
     if not cleaned:

@@ -1,10 +1,8 @@
 """Adapter ScanR pour `application.pipeline.cross_imports.fetch_missing_doi`.
 
-API ElasticSearch — requête `terms` sur `externalIds.id.keyword` pour un
-lot de 50 DOI en un seul appel. Authentification basic.
+API ElasticSearch — requête `terms` sur `externalIds.id.keyword` pour un lot de 50 DOI en un seul appel. Authentification basic.
 
-ScanR stocke les DOI en casse variable ; le matching est case-insensitive
-côté `get_cross_import_dois` (cf. `infrastructure.sources.common`).
+ScanR stocke les DOI en casse variable ; le matching est case-insensitive côté `get_cross_import_dois` (cf. `infrastructure.sources.common`).
 
 Adapter async (`AsyncFetchMissingDoiAdapter`).
 """
@@ -30,8 +28,7 @@ class ScanrFetchMissingDoiAdapter:
 
     source_key = "scanr"
     batch_size = 50
-    # API ElasticSearch publique, pas de rate limit documenté — 5 req
-    # concurrentes reste courtois sur une API interne DataESR.
+    # API ElasticSearch publique, pas de rate limit documenté — 5 req concurrentes reste courtois sur une API interne DataESR.
     max_concurrent = 5
 
     url: str
@@ -55,14 +52,10 @@ class ScanrFetchMissingDoiAdapter:
                 label=f"batch {len(dois)} DOI",
             )
         except (httpx.RequestError, httpx.HTTPStatusError):
-            # Erreur réseau ou HTTP (401 sur credentials rejetés, 429/5xx après
-            # retries, 4xx) : lot ignoré, repris au prochain run (l'absence d'un DOI
-            # n'est pas prouvée). Comportement uniforme à toutes les sources.
+            # Erreur réseau ou HTTP (401 sur credentials rejetés, 429/5xx après retries, 4xx) : lot ignoré, repris au prochain run (l'absence d'un DOI n'est pas prouvée). Comportement uniforme à toutes les sources.
             return []
         records = [hit["_source"] for hit in data.get("hits", {}).get("hits", [])]
-        # Diff requêtés / trouvés : les DOI du lot sans hit sont confirmés
-        # absents de ScanR (réponse ES valide). Comparaison sur DOI nettoyé,
-        # cohérente avec les DOI lowercase de `get_cross_import_dois`.
+        # Diff requêtés / trouvés : les DOI du lot sans hit sont confirmés absents de ScanR (réponse ES valide). Comparaison sur DOI nettoyé, cohérente avec les DOI lowercase de `get_cross_import_dois`.
         found = {
             clean_doi(ext.get("id"))
             for rec in records
