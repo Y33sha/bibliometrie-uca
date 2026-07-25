@@ -2,7 +2,7 @@
 
 Un compteur d'échecs **consécutifs** par source, partagé au sein d'une phase via une `ContextVar` : `+1` sur requête échouée (429 / 5xx / réseau après retries), **remis à 0 au premier succès**. Au seuil, le breaker est `tripped` : les deux helpers HTTP — `http_request_with_retry` et sa variante async — court-circuitent les requêtes suivantes (`SourceUnavailableError`) et la boucle de fetch saute le reste de la source ; les items non traités sont retentés au run suivant (phases de rattrapage idempotentes).
 
-Le helper HTTP infra le manipule (check / record) ; les orchestrateurs `application/` ne consultent que l'état `tripped` via le protocole `application.ports.pipeline.circuit_breaker.CircuitBreaker` (implémenté ici en duck typing). Le câblage (création, pose de la ContextVar) est fait par la composition root `run_pipeline`.
+Le helper HTTP infra le manipule (check / record) ; les orchestrateurs `application/` ne consultent que l'état `tripped` via le protocole `application.ports.pipeline.circuit_breaker.CircuitBreaker` (implémenté ici). Le câblage (création, pose de la ContextVar) est fait par la composition root `run_pipeline`.
 
 Seuil à 10 échecs consécutifs : encaisse un batch d'échecs concurrents ponctuel avant de couper la source.
 
@@ -12,6 +12,8 @@ Concurrence : `record_*` sont sans `await`, atomiques vis-à-vis des autres coro
 from __future__ import annotations
 
 from contextvars import ContextVar, Token
+
+from application.ports.pipeline.circuit_breaker import CircuitBreaker
 
 DEFAULT_THRESHOLD = 10
 
@@ -24,10 +26,10 @@ class SourceUnavailableError(Exception):
         self.source = source
 
 
-class SourceCircuitBreaker:
+class SourceCircuitBreaker(CircuitBreaker):
     """Compteur d'échecs consécutifs d'une source. `tripped` à `threshold`.
 
-    Implémente structurellement `application.ports.pipeline.circuit_breaker.CircuitBreaker` (attribut `tripped`)."""
+    Implémente le port `application.ports.pipeline.circuit_breaker.CircuitBreaker`."""
 
     def __init__(self, source: str, *, threshold: int = DEFAULT_THRESHOLD) -> None:
         self.source = source
