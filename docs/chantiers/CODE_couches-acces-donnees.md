@@ -56,9 +56,11 @@ Inventaire complet : [`CODE_couches-acces-donnees_inventaire.md`](CODE_couches-a
 
 ### E — Audit des repositories
 
-- [ ] Inventorier les méthodes de repositories, comme les tables en phase A.
-- [ ] Classer chaque méthode : nature pipeline / vraie commande d'agrégat / CRUD plat appelé par l'API.
-- [ ] Appliquer : méthodes de nature pipeline → `pipeline/` ; CRUD plat de l'API → opération sur agrégat hydraté.
+- [x] Inventorier les méthodes de repositories, comme les tables en phase A.
+- [x] Classer chaque méthode par consommateur réel et nature.
+- [ ] Appliquer (cf. les quatre chantiers ci-dessous).
+
+Audit complet : [`CODE_couches-acces-donnees_audit-repositories.md`](CODE_couches-acces-donnees_audit-repositories.md). Il établit **trois** consommateurs (pipeline / commande admin / bulk déclenché par l'humain), et un motif uniforme **command-service + data-mapper** : les invariants vivent dans `application/services/`, pas dans les repositories, et l'hydratation d'agrégat est vestigiale (`find_by_id` souvent inutilisé). Quatre chantiers d'application en découlent : (1) **descente pipeline** — `doi_prefix` en bloc, `journal`/`publisher` scindés (find-or-create + enrichissement → `pipeline/`, fusion → repository mince), plus `publication.update_oa_status`/`create` et `authorship.enforce_confirmed_authorships` ; (2) **catégorie bulk-admin** — trouver une maison aux opérations ensemblistes déclenchées par l'humain (pays, batch-assign, propagation de périmètre), ni phase pipeline ni commande d'agrégat ; (3) **ménage** — code mort, homonymes pipeline/admin, doublon `perimeter_structures`, contournement direct `journals.py:185` ; (4) **nommage** — repositories réservés aux vrais agrégats curés, gateways pour le reste.
 
 ### F — CLI
 
