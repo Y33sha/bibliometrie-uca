@@ -20,8 +20,16 @@ Le déclencheur est le chantier `CODE_perimetre-infrastructure-sources` : sa der
 
 ## Décisions
 
-- L'organisation par consommateur (API de lecture / phases pipeline / agrégats) est conservée : le chantier vise les deux frictions (vocabulaire, placement des tables de service), pas une refonte du découpage.
-- `queries/api` reste tel quel : lecture seule, cohérent avec le vocabulaire CQRS.
+- **Nature de l'application.** L'appli est hybride : un pipeline d'ingestion et de conformité — données externes sales, traitées par passes ensemblistes convergentes — qui alimente un domaine bibliométrique curé, où publications, personnes et structures sont corrigées à la main via l'admin et l'API. Le premier relève du data engineering (zones de raffinage, gateways, transformations SQL) ; le second du DDD tactique (agrégats, invariants garantis à l'écriture). Les fondre sous un vocabulaire unique — « repository » partout, « query » y compris quand ça écrit — est la source des incohérences. La cible nomme chaque partie selon sa nature.
+
+- **Trois familles d'accès aux données dans `infrastructure/`**, nommées par leur rôle, chacune avec son miroir de ports dans `application/` :
+  - `repositories/` — agrégats métier curés (person, publication, structure, journal, publisher) : lecture et écriture, invariants garantis à l'écriture.
+  - `pipeline/` — gateways des phases du pipeline (staging, normalize, consolidation, tables de contrôle) : lecture et écriture ensemblistes, sans agrégat. Absorbe `queries/pipeline` et la persistance d'extraction logée dans `sources/common`.
+  - `read_models/` — projections de lecture pour l'API et le frontend, en remplacement de `queries/api` : read side du CQRS, strictement en lecture.
+
+- **Les 4 layers sont conservés.** Le changement se concentre dans `infrastructure/` (les familles d'accès) et son miroir `application/ports/`. `domain/` — value objects et règles de conformité — ne bouge pas : le pipeline l'applique pour nettoyer, les repositories le font respecter à la curation. `interfaces/` ne bouge pas non plus, hors le nettoyage indépendant des CLI.
+
+- **La double écriture des agrégats cœur est assumée.** `source_publications`, `publications`, `persons` et consorts sont écrites par `pipeline/` (construction ETL) et par `repositories/` (correction admin/API). Deux voies légitimes, nommées chacune pour ce qu'elle est.
 
 ## Phasage
 
@@ -34,16 +42,30 @@ Inventaire complet : [`CODE_couches-acces-donnees_inventaire.md`](CODE_couches-a
 
 ### B — Règle-cible
 
-- [ ] Trancher le vocabulaire de la couche pipeline : renommer pour dire qu'elle écrit, ou assumer et documenter « queries » comme accès BDD d'une phase.
-- [ ] Poser le critère de placement d'une table (agrégat métier → repository ; service de pipeline → couche pipeline) et l'appliquer aux cas litigieux, `doi_prefixes` en tête.
+- [x] Trois familles d'accès nommées par leur rôle — `repositories/`, `pipeline/`, `read_models/` (cf. Décisions).
 
-### C — Application
+### C — `read_models`
 
-- [ ] Aligner les modules mal placés sur la règle.
-- [ ] Reloger la persistance d'extraction sortie de `infrastructure/sources` (phase E en attente du chantier `CODE_perimetre-infrastructure-sources`).
+- [ ] Renommer `infrastructure/queries/api` → `infrastructure/read_models`, et le miroir `application/ports/api` → `application/ports/read_models`.
+- [ ] Repointer les call-sites (interfaces API, composition root).
+
+### D — Couche `pipeline`
+
+- [ ] `infrastructure/queries/pipeline` → `infrastructure/pipeline`.
+- [ ] Rapatrier la persistance d'extraction de `sources/common` (écritures `staging`, pool cross-import, sélection stale, `doi_lookups`) vers `pipeline/`. Reprend la phase E en pause du chantier `CODE_perimetre-infrastructure-sources`.
+
+### E — Audit des repositories
+
+- [ ] Inventorier les méthodes de repositories, comme les tables en phase A.
+- [ ] Classer chaque méthode : nature pipeline / vraie commande d'agrégat / CRUD plat appelé par l'API.
+- [ ] Appliquer : méthodes de nature pipeline → `pipeline/` ; CRUD plat de l'API → opération sur agrégat hydraté.
+
+### F — CLI
+
+- [ ] Router les scripts `maintenance/` et `imports/` permanents qui écrivent en base via les couches ; laisser les `oneshot/` jetables.
 
 ## Questions ouvertes
 
-- **Renommer ou assumer ?** Renommer `queries/pipeline` (et ses ports) touche beaucoup de fichiers pour un gain de clarté à peser contre le churn. L'alternative est de documenter que « queries » y désigne l'accès BDD d'une phase, écritures comprises.
-- **Critère de placement.** Qu'est-ce qui fait qu'une table relève d'un repository plutôt que de la couche pipeline ? `doi_prefixes`, `staging`, `doi_lookups`, `phase_executions` sont les cas à classer.
-- **Granularité côté pipeline.** Un module par table ou par phase ? Le dossier mêle les deux : sous-packages (`normalize/`, `authorships/`…) et modules plats (`subjects.py`, `oa_status.py`).
+- **`doi_prefixes`.** Peuplé par le pipeline (`resolve_ra`, `publishers_journals`) mais porteur de sens (préfixe → agence d'enregistrement → éditeur) et lu par l'API : table de service rangée en `pipeline/`, ou donnée de référence traitée à part ? À trancher en phase D.
+- **Granularité de `pipeline/`.** Modules par phase (`normalize/`, `authorships/`…) ou par table ? L'existant mêle les deux.
+- **Forme des conversions (phase E).** Quelles méthodes de repositories appelées par l'API sont des mutations plates à reconvertir en opérations d'agrégat, et sous quelle forme ? Dépend de l'inventaire des méthodes.

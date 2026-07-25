@@ -49,7 +49,7 @@
 
 ### E — Dissolution de `common.py`
 
-> En pause : le relogement de la persistance dépend de la décision d'architecture du chantier `CODE_couches-acces-donnees`. Les items ci-dessous s'exécutent une fois la couche cible arrêtée.
+> En pause. Le chantier `CODE_couches-acces-donnees` arrête la couche cible : la persistance d'extraction descend dans `infrastructure/pipeline/` (et non `queries/pipeline`). Le relogement y est tracké en phase D ; les items ci-dessous reprennent à ce moment-là.
 
 - [ ] Déplacer les fonctions de persistance (`upsert_staging`, `upsert_not_found_stub`, `record_doi_not_found`, `get_stale_rows`, `set_disappeared_by_source_id`, `get_cross_import_dois`, `get_existing_ids`), leur SQL et leurs constantes (`DOI_LOOKUP_RETRY_DAYS`, `STALE_REFRESH_AFTER_DAYS`, `_TARGET_RA`) vers `infrastructure/queries/pipeline`.
 - [ ] Replacer le calcul du hash de détection (`canonical_json_bytes`, `compute_hash`, `change_detection_hash`, `_HASH_NORMALIZERS`) auprès des écritures staging.
