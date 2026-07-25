@@ -23,7 +23,7 @@ from application.ports.pipeline.cross_imports.fetch_missing_doi import (
 from domain.publications.identifiers import clean_doi
 from infrastructure.sources.common import record_doi_not_found, upsert_staging
 from infrastructure.sources.config import get_api_base_urls, get_polite_pool_email
-from infrastructure.sources.http_retry_async import http_request_with_retry_async
+from infrastructure.sources.http_retry import http_request_with_retry_async
 
 _USER_AGENT_TEMPLATE = "BibliometrieUCA-pipeline/1.0 (mailto:{email})"
 

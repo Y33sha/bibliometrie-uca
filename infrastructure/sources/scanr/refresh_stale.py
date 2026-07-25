@@ -15,7 +15,7 @@ from application.ports.pipeline.extract.refresh_stale import (
 )
 from infrastructure.sources.common import clean_doi
 from infrastructure.sources.config import get_api_base_urls, get_scanr_credentials
-from infrastructure.sources.http_retry_async import http_request_with_retry_async
+from infrastructure.sources.http_retry import http_request_with_retry_async
 from infrastructure.sources.refresh_stale_base import BaseRefreshStaleAdapter
 
 

@@ -14,7 +14,7 @@ from application.ports.pipeline.extract.refresh_stale import (
     FetchOutcome,
 )
 from infrastructure.sources.config import get_api_base_urls, get_wos_api_key
-from infrastructure.sources.http_retry_async import http_request_with_retry_async
+from infrastructure.sources.http_retry import http_request_with_retry_async
 from infrastructure.sources.refresh_stale_base import BaseRefreshStaleAdapter
 from infrastructure.sources.wos.parsing import extract_doi, get_records
 

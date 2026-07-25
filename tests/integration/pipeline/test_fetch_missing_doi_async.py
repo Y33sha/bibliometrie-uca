@@ -1,11 +1,8 @@
 """Tests pour `application.pipeline.cross_imports.fetch_missing_doi.run_async`.
 
 Deux angles :
-1. **Orchestrateur** : via un fake adapter, vérifie la parallélisation
-   (pool de workers), le lock DB, et la remontée des stats.
-2. **Adapter OpenAlex + helper async** : via `respx` (mocks httpx),
-   vérifie que `fetch_async` et `http_request_with_retry_async`
-   parlent à l'API correctement (happy path, 429 retry, erreur).
+1. **Orchestrateur** : via un fake adapter, vérifie la parallélisation (pool de workers), le lock DB et la remontée des stats.
+2. **Adapters** : via `respx` (mocks httpx), vérifie que `fetch_async` parle à l'API correctement (happy path, absence de résultat, erreurs réseau et HTTP).
 """
 
 from __future__ import annotations
@@ -26,7 +23,6 @@ from application.ports.pipeline.cross_imports.fetch_missing_doi import (
 )
 from infrastructure.sources.datacite.fetch_missing_doi import DataciteFetchMissingDoiAdapter
 from infrastructure.sources.hal.fetch_missing_doi import HalFetchMissingDoiAdapter
-from infrastructure.sources.http_retry_async import http_request_with_retry_async
 from infrastructure.sources.openalex.fetch_missing_doi import OpenalexFetchMissingDoiAdapter
 from infrastructure.sources.scanr.fetch_missing_doi import ScanrFetchMissingDoiAdapter
 from infrastructure.sources.wos.fetch_missing_doi import WosFetchMissingDoiAdapter
@@ -159,80 +155,6 @@ class TestRunAsyncOrchestrator:
         assert result.total == 3
         assert result.extras["fetched"] == 2  # seulement les 2 OK
         assert result.new == 2
-
-
-# ── helper api_retry_async ───────────────────────────────────────
-
-
-class TestApiRetryAsync:
-    @pytest.mark.asyncio
-    @respx.mock
-    async def test_success_returns_json(self):
-        route = respx.get("https://api.example/foo").mock(
-            return_value=httpx.Response(200, json={"ok": True})
-        )
-        async with httpx.AsyncClient() as client:
-            data = await http_request_with_retry_async(
-                client, "GET", "https://api.example/foo", label="test"
-            )
-        assert data == {"ok": True}
-        assert route.call_count == 1
-
-    @pytest.mark.asyncio
-    @respx.mock
-    async def test_retries_on_429_then_succeeds(self):
-        route = respx.get("https://api.example/foo").mock(
-            side_effect=[
-                httpx.Response(429),
-                httpx.Response(200, json={"ok": True}),
-            ]
-        )
-        async with httpx.AsyncClient() as client:
-            data = await http_request_with_retry_async(
-                client,
-                "GET",
-                "https://api.example/foo",
-                initial_backoff=0.01,  # rapide pour les tests
-                label="test",
-            )
-        assert data == {"ok": True}
-        assert route.call_count == 2
-
-    @pytest.mark.asyncio
-    @respx.mock
-    async def test_raises_on_persistent_network_error(self):
-        respx.get("https://api.example/foo").mock(side_effect=httpx.ConnectError("refused"))
-        async with httpx.AsyncClient() as client:
-            with pytest.raises(httpx.ConnectError):
-                await http_request_with_retry_async(
-                    client,
-                    "GET",
-                    "https://api.example/foo",
-                    max_retries=2,
-                    initial_backoff=0.01,
-                    label="test",
-                )
-
-    @pytest.mark.asyncio
-    @respx.mock
-    async def test_retries_on_empty_body_when_enabled(self):
-        route = respx.get("https://api.example/foo").mock(
-            side_effect=[
-                httpx.Response(200, text=""),
-                httpx.Response(200, json={"ok": True}),
-            ]
-        )
-        async with httpx.AsyncClient() as client:
-            data = await http_request_with_retry_async(
-                client,
-                "GET",
-                "https://api.example/foo",
-                retry_on_empty_body=True,
-                initial_backoff=0.01,
-                label="test",
-            )
-        assert data == {"ok": True}
-        assert route.call_count == 2
 
 
 # ── adapter OpenAlex : fetch_async via respx ─────────────────────
