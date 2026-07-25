@@ -25,8 +25,7 @@ from infrastructure.sources.common import (
 class BaseRefreshStaleAdapter(ABC):
     """Base commune : `find_stale`, `save_refreshed`, `mark_disappeared`.
 
-    Les sous-classes fixent `source_key`, `max_concurrent`, `configure` et
-    implémentent `fetch_by_native_id`.
+    Les sous-classes fixent `source_key`, `max_concurrent`, `configure` et implémentent `fetch_by_native_id`.
     """
 
     source_key: str

@@ -247,8 +247,7 @@ def get_stale_rows(
 def set_disappeared_by_source_id(conn: Connection, source: str, source_id: str) -> None:
     """Marque `disappeared_at` sur la row `(source, source_id)` confirmée absente.
 
-    Appelé par la phase refresh quand le refetch par id natif renvoie une absence
-    confirmée (réponse valide, zéro record). Ne commit pas — l'appelant s'en charge.
+    Appelé par la phase refresh quand le refetch par id natif renvoie une absence confirmée (réponse valide, zéro record). Ne commit pas — l'appelant s'en charge.
     """
     conn.execute(_SET_DISAPPEARED_BY_SOURCE_ID_SQL, {"source": source, "source_id": source_id})
 

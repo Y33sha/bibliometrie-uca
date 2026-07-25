@@ -83,7 +83,7 @@ async def http_request_with_retry_async(
             try:
                 resp.raise_for_status()
             except httpx.HTTPStatusError:
-                # 5xx = source en panne → compte pour le breaker ; 4xx (404…) = résultat normal (non trouvé), on ne compte pas. On propage dans les deux cas (comportement inchangé).
+                # 5xx = source en panne → compte pour le breaker ; 4xx (404…) = résultat normal (non trouvé), on ne compte pas. On propage dans les deux cas.
                 if breaker is not None and 500 <= resp.status_code < 600:
                     breaker.record_failure()
                 raise
