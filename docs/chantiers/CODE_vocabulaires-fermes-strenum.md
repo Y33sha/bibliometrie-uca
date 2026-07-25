@@ -27,9 +27,9 @@ Coûts concrets :
 
 ### Audit
 
-- [ ] Recenser tous les vocabulaires fermés du domaine et leur forme (StrEnum / Literal / chaînes), avec leurs collections parallèles.
-- [ ] Cartographier les usages de chacun (domaine, infrastructure SQL, interfaces, sérialisation frontend) pour dimensionner chaque migration.
-- [ ] Confirmer la correspondance exacte membres ↔ libellés des enums PostgreSQL (un écart casserait comparaisons et casts).
+- [x] Recenser tous les vocabulaires fermés du domaine et leur forme (StrEnum / Literal / chaînes), avec leurs collections parallèles.
+- [x] Cartographier les usages de chacun (domaine, infrastructure SQL, interfaces, sérialisation frontend) pour dimensionner chaque migration.
+- [x] Confirmer la correspondance exacte membres ↔ libellés des enums PostgreSQL (comparaisons et casts couverts par la suite d'intégration).
 
 ### doc_type (pilote)
 
@@ -63,6 +63,8 @@ Principe (pipeline comme couche lecture API) : un **prédicat** sur une valeur d
 - [x] `infrastructure/queries/api/persons/admin.py` : statuts (`pending` / `confirmed`), marqueur `'persons'` (`CANONICAL_NAME_FORM_SOURCE`), `structure_type = 'labo'` (×2) → membres ; l'array des types d'identifiant du CTE de conflits (`_ID_TYPES_ARRAY_SQL`) généré depuis `PERSON_IDENTIFIER_TYPES`.
 - [x] `infrastructure/queries/api/structures.py` : `doc_type = 'article'` (×2) → `DocType.ARTICLE.value` ; `relation_type = 'est_tutelle_de'` → `StructureRelationType.EST_TUTELLE_DE.value`.
 - [x] `structure_relations.relation_type` (colonne texte, deux valeurs endogènes `est_tutelle_de` / `est_partenaire_de`) reçoit un StrEnum `StructureRelationType` (`domain/structures/relations.py`), référencé par `structures.py` et `perimeter.py`. La colonne reste `text` (pas d'enum PostgreSQL) et l'écriture n'est pas encore validée contre l'enum — validation à l'écriture laissée hors chantier.
+- [x] `place_name_forms.kind` (colonne texte, contrainte `CHECK` à trois valeurs `country` / `institution` / `city`) reçoit un StrEnum `PlaceNameKind` (`domain/countries.py`), référencé par les requêtes de la phase `countries` (`load_country_forms`, `load_place_forms`) et par le `CHECK` de `tables.py`, généré depuis l'enum. Les CLI oneshot de gestion des noms de lieux gardent leurs littéraux (transitoires, hors périmètre maintenu).
+- [x] Codes ISO pays : hors périmètre — standard externe (ISO 3166) stocké en `text` (`publications.countries`, `place_name_forms.iso_code`), pas un vocabulaire fermé endogène. Les seules valeurs propres au projet sont les sentinelles `NO_COUNTRY_CODE` (`"xx"`) et `DOMESTIC_COUNTRY_CODE` (`"fr"`), déjà des constantes nommées de `domain/countries.py`.
 - [x] CLI `merge_person_duplicates_by_lab.py` et `oneshot/audit_name_pair_overlaps.py` : `structure_type = 'labo'` → `StructureType.LABO.value`.
 
 ## Sites recensés
@@ -82,5 +84,4 @@ Littéraux de vocabulaires fermés repérés dans le code (SQL du pipeline et po
 ## Questions ouvertes
 
 - **Frontière base.** Rester sur l'égalité `str` de StrEnum (donnée = `str`, littéraux = membres), ou convertir en membres à l'ingestion pour un typage strict ? La première voie est la moins coûteuse et suffit aux comparaisons.
-- **Périmètre.** Les clés de confirmation JSONB sont incluses. Reste à arbitrer les vocabulaires purement applicatifs sans colonne dédiée (codes ISO pays, `kind` de `place_name_forms`).
 - **Articulation avec l'archivé `METIER_doc-types`.** Ce chantier ne touche que la représentation (Literal → StrEnum), pas la taxonomie des types ni les règles de mapping des sources, déjà traitées.

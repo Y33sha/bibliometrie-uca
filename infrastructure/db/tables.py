@@ -31,6 +31,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import ARRAY, ENUM as PgEnum, JSONB
 
+from domain.countries import PlaceNameKind
 from domain.journals.journal import JOURNAL_TYPES, OA_MODELS
 from domain.persons.identifiers import AttributionStatus
 from domain.persons.matching import ResolutionMode
@@ -368,11 +369,12 @@ place_name_forms = Table(
     # `country` (noms de pays, détectés en fin d'adresse) | `institution` /
     # `city` (lieux détectés n'importe où, via la passe place). Défaut `country` :
     # cas d'usage principal (résolution d'un nom de pays vers son code ISO).
-    Column("kind", Text, nullable=False, server_default="country"),
+    Column("kind", Text, nullable=False, server_default=PlaceNameKind.COUNTRY.value),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     UniqueConstraint("form_normalized", name="place_name_forms_form_normalized_key"),
     CheckConstraint(
-        "kind IN ('country', 'institution', 'city')", name="place_name_forms_kind_check"
+        f"kind IN ({', '.join(repr(kind.value) for kind in PlaceNameKind)})",
+        name="place_name_forms_kind_check",
     ),
 )
 

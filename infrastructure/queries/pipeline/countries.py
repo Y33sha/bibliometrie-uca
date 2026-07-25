@@ -21,6 +21,7 @@ from application.ports.pipeline.countries import (
     CountryQueries,
     SuggestEligibleCounts,
 )
+from domain.countries import PlaceNameKind
 
 # CTE des signatures à recalculer : celles marquées `countries_dirty` (posé par normalize), ou liées à une adresse dont `countries` a changé. Dérivées par JOIN, sans marquage de masse ; seules celles qui changent sont réécrites.
 _DIRTY_SA = """
@@ -285,7 +286,10 @@ def write_countries(
 def load_country_forms(conn: Connection) -> dict[str, str]:
     """Noms de pays (`place_name_forms`, `kind = 'country'`) : `{form_normalized: iso_code}`."""
     rows = conn.execute(
-        text("SELECT form_normalized, iso_code FROM place_name_forms WHERE kind = 'country'")
+        text(
+            f"SELECT form_normalized, iso_code FROM place_name_forms "
+            f"WHERE kind = '{PlaceNameKind.COUNTRY.value}'"
+        )
     ).all()
     return {r.form_normalized: r.iso_code for r in rows}
 
@@ -294,8 +298,8 @@ def load_place_forms(conn: Connection) -> dict[str, str]:
     """Noms de lieux (`place_name_forms`, `kind IN ('institution', 'city')`) : `{form_normalized: iso_code}`."""
     rows = conn.execute(
         text(
-            "SELECT form_normalized, iso_code FROM place_name_forms "
-            "WHERE kind IN ('institution', 'city')"
+            f"SELECT form_normalized, iso_code FROM place_name_forms "
+            f"WHERE kind IN ('{PlaceNameKind.INSTITUTION.value}', '{PlaceNameKind.CITY.value}')"
         )
     ).all()
     return {r.form_normalized: r.iso_code for r in rows}
