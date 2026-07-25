@@ -35,15 +35,24 @@ Méthodes dont l'unique appelant est `application/pipeline/` :
 - **Édition d'agrégat** : `publication.save`/`delete`, `person` (identifiants, formes de nom), `journal.update_journal_fields` / `publisher.update_publisher_fields` (via service).
 - **Sous-opérations atomiques de trois commandes admin** (`reject_pair`, `assign_orphan_authorship`, `update_name_form_status`) : le gros d'`authorship_repository` (`reject_authorship`, `pin/unpin`, `assign_orphan_source_authorship`, `insert_authorship_if_missing`, `null_person_id_for_name_form`, `delete_orphan_authorships_for_person`…).
 
-### 3. Bulk déclenché par l'humain — la catégorie que le barème ratait
+### 3. Déclenché par l'humain, ensembliste — deux natures à ne pas confondre
 
-Opérations **ensemblistes** (elles *ressemblent* à du pipeline) mais dont l'appelant réel est l'**admin/API** ou une **tâche de fond post-review**, jamais une phase du pipeline :
+Des opérations ensemblistes dont l'appelant réel est l'admin/API ou une tâche de fond post-review, jamais une phase du pipeline. Leur *forme* (recompute en masse) ne dit rien de leur *nature* : deux cas opposés s'y cachent.
 
-- **`address_repository`, bloc pays** : `batch_add_country_by_ids`, `batch_add_country_by_filter`, `propagate_countries_across_similar_addresses`, `refresh_source_publications_countries`, `refresh_publications_countries_for_addresses`. Les `refresh_*` sont même de simples façades sur `queries/pipeline/countries.py`. Déclenché par l'attribution manuelle d'un pays + sa propagation en tâche de fond.
-- **`authorship_repository`, bloc batch-assign** : `create_authorships_from_sources`, `link_source_authorships_to_authorships` (pluriel), `assign_orphan_source_authorships_to_person`, `recompute_in_perimeter_on_source_authorships`, `propagate_in_perimeter_to_authorships`. Déclenché par l'assignation par lot depuis l'UI admin + la tâche de fond de propagation d'affiliation.
-- **`perimeter.refresh_structures`** : matérialise `perimeter_structures`, appelé par la couche command API.
+**3a — L'admin rejoue une chaîne d'ETL.** Le travail ensembliste réexécute, hors run, une logique dont le pipeline est propriétaire.
 
-Ces méthodes n'ont de maison évidente ni en `pipeline/` (ce ne sont pas des phases) ni en « commande d'agrégat » (elles sont ensemblistes, multi-agrégats). Il leur faut une règle propre — c'est le vrai point ouvert de la phase E.
+- `address_repository`, bloc pays : `propagate_countries_across_similar_addresses`, `refresh_source_publications_countries`, `refresh_publications_countries_for_addresses` (ces deux dernières, simples façades sur `queries/pipeline/countries.py`), `batch_add_country_*`. L'admin pose un pays d'adresse, puis rejoue la propagation adresse → publications.
+- `authorship_repository`, bloc batch-assign : `create_authorships_from_sources`, `link_source_authorships_to_authorships`, `assign_orphan_source_authorships_to_person`, `recompute_in_perimeter_on_source_authorships`, `propagate_in_perimeter_to_authorships`. La décision d'assigner est une curation admin, mais le recompute qui suit rejoue la construction d'authorships et la propagation d'affiliation du pipeline.
+
+Cible : le SQL ensembliste a sa maison dans le gateway pipeline ; l'admin l'appelle, il ne s'en fabrique pas une copie côté repository.
+
+**3b — L'admin maintient une table dérivée du domaine.** L'opération recalcule un invariant métier matérialisé, directement depuis des tables métier de base. Le domaine en est propriétaire.
+
+- `perimeter.refresh_structures` : recompute `perimeter_structures`, la clôture récursive (`est_tutelle_de`) des racines de chaque périmètre. L'appartenance d'une structure à un périmètre est un concept métier ; sa maintenance après édition d'une racine, d'une relation de tutelle ou suppression d'une structure est un invariant du write-side, pas un ETL.
+
+Cible : la surface autoritative est celle du domaine (les command handlers). Le refresh que le pipeline joue en tête de run est une redondance défensive — un filet contre les mutations hors write-side (migrations, imports) — superflue dès lors que toute écriture concernée passe par le domaine.
+
+La forme SQL ne classe donc pas : c'est la sémantique — rejouer un ETL (3a) vs tenir un invariant du domaine (3b) — qui décide.
 
 ### 4. Briques partagées pipeline + admin
 
@@ -57,12 +66,12 @@ Ces méthodes n'ont de maison évidente ni en `pipeline/` (ce ne sont pas des ph
 
 - **Code mort — vérifié et retiré** : `publication.find_by_doi` (+ la dataclass `PubByDoi`), `authorship.unlink_authorship` (repo + port + service `persons.core.unlink_authorship` + son test), `person.remove_person_source`, `person.is_ambiguous`. Deux méthodes restent : `structure.find_by_id` et `perimeter.find_by_id` sont mortes en production mais servent de read-back aux tests — leur retrait suppose de recâbler ces tests sur le read-model, à traiter à part. `publisher.find_publisher_by_name_form` n'est finalement pas morte (appelée en interne par `match_or_create_by_name_form`).
 - **Collisions de noms pipeline/admin** : `link_source_authorships_to_authorships` existe comme méthode d'`AuthorshipRepository` (admin) *et* comme fonction d'`AuthorshipBuildQueries` (`queries/pipeline/authorships/build.py`, pipeline) — opérations distinctes. Idem `get_name_form` (repo structure vs `StructuresQueries`).
-- **Doublon de matérialisation** : `perimeter_structures` est reconstruite par deux chemins — `perimeter.refresh_structures` (API) et `PerimeterStructuresQueries` (pipeline `affiliations`) — façades du même SQL.
+- **`perimeter_structures`, deux ports pour une opération** : la clôture s'écrit une seule fois (`refresh_perimeter_structures`, `queries/perimeter.py`), mais elle est exposée par deux ports — `PerimeterStructuresQueries` (pipeline) et `PerimeterRepository.refresh_structures` (admin) — plus une fonction libre. La surface autoritative est celle du domaine (l'admin tient l'invariant à chaque édition) ; la copie que le pipeline joue en tête de run est un filet défensif, probablement superflu en pratique.
 - **Le seul contournement API→repo direct** : `interfaces/api/routers/journals.py:185` appelle `update_journal_fields` sans passer par le service (aperçu d'impact dans un SAVEPOINT annulé). Cas particulier, mais c'est l'unique « flat CRUD API » au sens strict.
 
 ## Chantiers qui en sortent
 
 1. **Descente pipeline.** `doi_prefix_repository` en bloc → `pipeline/`. `journal`/`publisher` **se scindent** : bloc find-or-create + enrichissement → `pipeline/`, fusion → repository mince. `publication.update_oa_status`/`mark_unpaywall_checked`/`create`, `authorship.enforce_confirmed_authorships` → `pipeline/`.
-2. **La catégorie bulk-admin.** Décider où logent les opérations ensemblistes déclenchées par l'humain (pays, batch-assign, propagation de périmètre). Ni phase pipeline, ni commande d'agrégat.
+2. **Ensembliste déclenché par l'humain — deux traitements.** *L'admin rejoue un ETL* (pays, batch-assign d'authorships) : le SQL a sa maison dans le gateway pipeline, l'admin l'appelle. *L'admin maintient une table dérivée du domaine* (clôture de périmètre) : le domaine possède l'opération, la copie pipeline est un filet à retirer une fois la discipline d'écriture garantie.
 3. **Ménage.** Retirer le code mort ; désambiguïser les homonymes ; dédoublonner la matérialisation `perimeter_structures` ; router `journals.py:185` par le service.
 4. **Nommage.** Assumer que ces « repositories » sont, pour l'essentiel, des data-mappers sous des command-services — le vocabulaire cible (`repositories/` pour les vrais agrégats curés, gateways pour le reste) découle de là.
