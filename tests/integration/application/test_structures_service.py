@@ -293,10 +293,16 @@ class TestCreateRelation:
         a = create_structure(code="A", name="A", type="universite", repo=repo)
         b = create_structure(code="B", name="B", type="labo", repo=repo)
         c = create_structure(code="C", name="C", type="equipe", repo=repo)
-        create_relation(parent_id=a["id"], child_id=b["id"], relation_type="est_tutelle_de", repo=repo)
-        create_relation(parent_id=b["id"], child_id=c["id"], relation_type="est_tutelle_de", repo=repo)
+        create_relation(
+            parent_id=a["id"], child_id=b["id"], relation_type="est_tutelle_de", repo=repo
+        )
+        create_relation(
+            parent_id=b["id"], child_id=c["id"], relation_type="est_tutelle_de", repo=repo
+        )
         with pytest.raises(ValidationError, match="Cycle"):
-            create_relation(parent_id=c["id"], child_id=a["id"], relation_type="est_tutelle_de", repo=repo)
+            create_relation(
+                parent_id=c["id"], child_id=a["id"], relation_type="est_tutelle_de", repo=repo
+            )
 
 
 class TestDeleteRelation:
