@@ -102,7 +102,7 @@ alembic upgrade head     # applique toutes les migrations
 structure d'un coup d'œil), pas la source de vérité — la vérité, ce
 sont les migrations Alembic dans `alembic/versions/`. Pour
 rafraîchir le snapshot après une série de migrations :
-`python -m infrastructure.db.dump_schema`.
+`python -m interfaces.cli.dev.dump_schema`.
 
 Deux options pour initialiser les données :
 
