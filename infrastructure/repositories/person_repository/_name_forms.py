@@ -101,34 +101,3 @@ def add_person_source(
         """),
         {"nf": name_form, "pid": person_id, "new_sources": new_sources},
     )
-
-
-def remove_person_source(conn: Connection, *, name_form: str, person_id: int, source: str) -> None:
-    """Retire une source du couple `(name_form, person_id)`.
-
-    Si la liste devient vide, supprime la row (le couple disparaît). No-op quand la row est absente ou la source absente de la liste.
-    """
-    conn.execute(
-        text("""
-            UPDATE person_name_forms
-            SET sources = array_remove(sources, :source)
-            WHERE name_form = :nf AND person_id = :pid AND :source = ANY(sources)
-        """),
-        {"nf": name_form, "pid": person_id, "source": source},
-    )
-    conn.execute(
-        text("""
-            DELETE FROM person_name_forms
-            WHERE name_form = :nf AND person_id = :pid AND sources = '{}'
-        """),
-        {"nf": name_form, "pid": person_id},
-    )
-
-
-def is_ambiguous(conn: Connection, name_form: str) -> bool:
-    """True si la forme est associée à plus d'une personne."""
-    row = conn.execute(
-        text("SELECT COUNT(*) AS n FROM person_name_forms WHERE name_form = :nf"),
-        {"nf": name_form},
-    ).one()
-    return int(row.n) > 1
