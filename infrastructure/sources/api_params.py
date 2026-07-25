@@ -14,6 +14,8 @@ API_BASE_URLS: dict[str, str] = {
     "crossref": "https://api.crossref.org",
     # DataCite : racine, l'adapter compose `/dois` (query batch) ou `/dois/<doi>`.
     "datacite": "https://api.datacite.org",
+    # doi.org : résolution de Registration Agency, l'adapter compose `/<doi>`.
+    "doi_org": "https://doi.org/ra",
     # Endpoints secondaires
     "openalex_sources": "https://api.openalex.org/sources",
     "openalex_publishers": "https://api.openalex.org/publishers",

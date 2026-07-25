@@ -169,7 +169,8 @@ def phase_resolve_ra(**kw: Any) -> PhaseMetrics:
         set_current_breaker,
     )
     from infrastructure.sources.config import get_polite_pool_email_optional
-    from infrastructure.sources.doi_prefixes.clients import build_user_agent, resolve_ra
+    from infrastructure.sources.doi_org.registration_agency import resolve_ra
+    from infrastructure.sources.polite_pool import build_user_agent
 
     conn = get_sync_engine().connect()
     # Circuit-breaker sur doi.org/ra : la ContextVar est lue par le helper HTTP,
@@ -464,11 +465,9 @@ def _run_resolve_publishers() -> PhaseMetrics:
         set_current_breaker,
     )
     from infrastructure.sources.config import get_polite_pool_email_optional
-    from infrastructure.sources.doi_prefixes.clients import (
-        build_user_agent,
-        fetch_crossref_prefix,
-        fetch_datacite_prefix,
-    )
+    from infrastructure.sources.crossref.prefixes import fetch_crossref_prefix
+    from infrastructure.sources.datacite.prefixes import fetch_datacite_prefix
+    from infrastructure.sources.polite_pool import build_user_agent
 
     log.info("▶ resolve_publishers")
     t0 = time.time()

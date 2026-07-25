@@ -19,9 +19,8 @@ from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.config import get_polite_pool_email
 from infrastructure.sources.datacite.fetch_missing_doi import _record_doi
 from infrastructure.sources.http_retry import http_request_with_retry_async
+from infrastructure.sources.polite_pool import build_user_agent
 from infrastructure.sources.refresh_stale_base import BaseRefreshStaleAdapter
-
-_USER_AGENT_TEMPLATE = "BibliometrieUCA-pipeline/1.0 (mailto:{email})"
 
 
 class DataciteRefreshStaleAdapter(BaseRefreshStaleAdapter):
@@ -37,7 +36,7 @@ class DataciteRefreshStaleAdapter(BaseRefreshStaleAdapter):
         self.base_url = API_BASE_URLS["datacite"]
         email = get_polite_pool_email(conn)
         self.headers = {
-            "User-Agent": _USER_AGENT_TEMPLATE.format(email=email),
+            "User-Agent": build_user_agent(email),
             "Accept": "application/vnd.api+json",
         }
 
