@@ -27,8 +27,10 @@ Le déclencheur est le chantier `CODE_perimetre-infrastructure-sources` : sa der
 
 ### A — État des lieux détaillé
 
-- [ ] Inventorier, table par table, qui lit et qui écrit, et depuis quelle couche.
-- [ ] Séparer les tables d'agrégat métier des tables de service du pipeline.
+- [x] Inventorier, table par table, qui lit et qui écrit, et depuis quelle couche.
+- [x] Séparer les tables d'agrégat métier des tables de service du pipeline.
+
+Inventaire complet : [`CODE_couches-acces-donnees_inventaire.md`](CODE_couches-acces-donnees_inventaire.md). Constats pour la phase B : `queries/api` est strictement en lecture seule ; les agrégats cœur (`source_publications`, `source_authorships`, `publications`, `persons`, `authorships`, `addresses`, `journals`, `publishers`…) sont écrits par **deux** couches — `repositories/` pour l'admin/API, `queries/pipeline/` pour l'ETL ; `doi_prefixes` (service pipeline) est derrière un repository quand `staging` et `doi_lookups`, de même nature, ne le sont pas ; `doi_lookups` n'a pas de maison hors `sources/common.py` ; ~27 scripts `interfaces/cli/` écrivent en base directement.
 
 ### B — Règle-cible
 
