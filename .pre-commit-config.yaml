@@ -35,15 +35,6 @@ repos:
       - id: ruff-format
         args: [--check]
 
-  - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
-    hooks:
-      - id: check-yaml
-      - id: check-toml
-      - id: check-merge-conflict
-      - id: check-added-large-files
-        args: [--maxkb=500]
-
   # Hooks locaux : outils installés dans l'env Python du projet.
   # mypy et lint-imports résolvent les imports sur tout le projet : ils exigent
   # un arbre cohérent, que le commit d'un sous-ensemble de fichiers ne garantit
@@ -56,6 +47,34 @@ repos:
   # de point d'entrée module.
   - repo: local
     hooks:
+      # Hygiène de fichiers reprise de pre-commit/pre-commit-hooks, lancée via
+      # `python -m` dans l'env du projet plutôt que par le venv que pre-commit se
+      # fabriquerait : ce venv expose un `python.exe` sans réputation que le
+      # contrôle d'application de Windows bloque (« os error 4551 »).
+      - id: check-yaml
+        name: check-yaml
+        entry: uv run python -m pre_commit_hooks.check_yaml
+        language: system
+        types: [yaml]
+
+      - id: check-toml
+        name: check-toml
+        entry: uv run python -m pre_commit_hooks.check_toml
+        language: system
+        types: [toml]
+
+      - id: check-merge-conflict
+        name: check-merge-conflict
+        entry: uv run python -m pre_commit_hooks.check_merge_conflict
+        language: system
+        types: [text]
+
+      - id: check-added-large-files
+        name: check-added-large-files
+        entry: uv run python -m pre_commit_hooks.check_added_large_files
+        args: [--maxkb=500]
+        language: system
+
       # Lance uniquement les tests unitaires (sans BDD, ~1-2s).
       # Les tests d'intégration (avec BDD) sont lancés en CI, pas ici.
       - id: pytest-unit
