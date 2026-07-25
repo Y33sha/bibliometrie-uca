@@ -23,7 +23,7 @@ from application.pipeline.publishers_journals.import_journals_from_doaj_dump imp
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from infrastructure.repositories import journal_repository
-from infrastructure.sources.doaj import read_doaj_dump_rows
+from infrastructure.sources.doaj.client import read_doaj_dump_rows
 
 log = setup_logger(
     "import_doaj_csv", os.path.join(os.path.dirname(__file__), "../../processing/logs")
