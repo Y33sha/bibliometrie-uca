@@ -1,22 +1,19 @@
 # STATUS: recurring (imports)
-"""Import APC payment data from CSV files into apc_payments table.
+"""Importe les données de paiement APC (frais de publication) depuis des fichiers CSV vers la table `apc_payments`.
 
-Usage:
+Usage :
     python -m interfaces.cli.imports.import_apc
 """
 
 import csv
-import os
+from pathlib import Path
 
 from sqlalchemy import Connection, text
 
 from infrastructure.db.engine import get_sync_engine
 
-DATA_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-    "imports_manuels",
-    "APC",
-)
+# `parents[3]` remonte interfaces/cli/imports/ → racine du dépôt ; les CSV d'import vivent sous data/.
+DATA_DIR = Path(__file__).resolve().parents[3] / "data"
 
 INSERT_APC_PAYMENT = text("""
     INSERT INTO apc_payments (
@@ -59,16 +56,12 @@ def clean(s: str | None) -> str | None:
 
 def import_main_file(conn: Connection) -> int:
     """Importe le fichier principal APC."""
-    fname = None
-    for name in os.listdir(DATA_DIR):
-        if name.startswith("APC") and name.endswith(".csv"):
-            fname = name
-            break
-    if not fname:
+    matches = sorted(DATA_DIR.glob("APC*.csv"))
+    if not matches:
         print("Fichier principal APC introuvable")
         return 0
 
-    path = os.path.join(DATA_DIR, fname)
+    path = matches[0]
     with open(path, encoding="utf-8-sig") as f:
         reader = csv.DictReader(f)
         rows = []
@@ -111,8 +104,8 @@ def import_main_file(conn: Connection) -> int:
 
 def import_fp_hors_oa(conn: Connection) -> int:
     """Importe FP hors OA."""
-    path = os.path.join(DATA_DIR, "FP hors OA.csv")
-    if not os.path.exists(path):
+    path = DATA_DIR / "FP hors OA.csv"
+    if not path.exists():
         return 0
 
     with open(path, encoding="utf-8-sig") as f:
