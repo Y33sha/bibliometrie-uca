@@ -1,17 +1,9 @@
 """Port PublicationRepository — contrat d'accès à l'agrégat Publication."""
 
-from dataclasses import dataclass
 from typing import Protocol
 
 from domain.publications.publication import Publication
 from domain.source_publications.source_publication import SourcePublication
-
-
-@dataclass(frozen=True, slots=True)
-class PubByDoi:
-    """Projection de lecture retournée par `find_by_doi` : l'id de la publication portant ce DOI, sans hydrater l'agrégat complet."""
-
-    id: int
 
 
 class PublicationRepository(Protocol):
@@ -28,10 +20,6 @@ class PublicationRepository(Protocol):
         ...
 
     # ── Recherches (projections de lecture) ────────────────────────
-
-    def find_by_doi(self, doi: str) -> PubByDoi | None:
-        """Cherche une publication par DOI (insensible à la casse). `None` si aucune."""
-        ...
 
     def find_ids_by_journal_id(self, journal_id: int) -> list[int]:
         """Ids des publications rattachées à ce journal. Utilisé pour requalifier le stock quand un input éditable du journal (ex. `journal_type`) change."""

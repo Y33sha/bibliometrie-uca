@@ -37,13 +37,6 @@ class AuthorshipRepository(Protocol):
         """Rattache une signature source à une personne et marque le canal de résolution. `resolution_mode` (`identifier` / `name` / `cross_source`) enregistre par quel canal le `person_id` a été posé."""
         ...
 
-    def unlink_authorship(
-        self,
-        person_id: int,
-        source: str,
-        source_authorship_id: int,
-    ) -> None: ...
-
     def assign_orphan_source_authorship(
         self,
         person_id: int,

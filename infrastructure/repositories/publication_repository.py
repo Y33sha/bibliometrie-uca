@@ -10,7 +10,7 @@ from typing import Any, NamedTuple
 
 from sqlalchemy import Connection, text
 
-from application.ports.repositories.publication_repository import PubByDoi, PublicationRepository
+from application.ports.repositories.publication_repository import PublicationRepository
 from domain.publications.identifiers import DOI
 from domain.publications.publication import Publication
 from domain.source_publications.correction import CONVERGENCE_CASES
@@ -73,17 +73,6 @@ class PgPublicationRepository(PublicationRepository):
         self._conn = conn
 
     # ── Recherches ─────────────────────────────────────────────────
-
-    def find_by_doi(self, doi: str) -> PubByDoi | None:
-        if not doi:
-            return None
-        row = self._conn.execute(
-            text("SELECT id FROM publications WHERE lower(doi) = lower(:doi)"),
-            {"doi": doi},
-        ).first()
-        if not row:
-            return None
-        return PubByDoi(id=row.id)
 
     def find_ids_by_journal_id(self, journal_id: int) -> list[int]:
         result = self._conn.execute(

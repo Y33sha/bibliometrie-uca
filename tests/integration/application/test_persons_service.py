@@ -28,7 +28,6 @@ from application.services.persons.core import (
     reassign_identifier,
     remove_identifier,
     set_rejected,
-    unlink_authorship,
     update_identifier_status,
     update_name,
     update_name_form_status,
@@ -136,7 +135,7 @@ def _scalar(conn, sql_text: str, **params):
     return conn.execute(text(sql_text), params).scalar_one_or_none()
 
 
-# ── link_authorship / unlink_authorship ────────────────────────────
+# ── link_authorship ────────────────────────────────────────────────
 
 
 class TestLinkAuthorship:
@@ -164,40 +163,6 @@ class TestLinkAuthorship:
                 i=sa_id,
             )
             == "name"
-        )
-
-
-class TestUnlinkAuthorship:
-    def test_rejects_unknown_source(self, sa_sync_conn, authorship_repo):
-        with pytest.raises(ValidationError):
-            unlink_authorship(1, "invalid", 1, repo=authorship_repo)
-
-    def test_unsets_person_id(self, sa_sync_conn, repo, authorship_repo):
-        person_id = _insert_person(sa_sync_conn)
-        pub_id = _insert_publication(sa_sync_conn)
-        sp_id = _insert_source_publication(sa_sync_conn, pub_id)
-        sa_id = _insert_source_authorship(sa_sync_conn, sp_id, person_id=person_id)
-
-        unlink_authorship(person_id, "hal", sa_id, repo=authorship_repo)
-
-        assert (
-            _scalar(sa_sync_conn, "SELECT person_id FROM source_authorships WHERE id = :i", i=sa_id)
-            is None
-        )
-
-    def test_noop_if_person_id_mismatch(self, sa_sync_conn, repo, authorship_repo):
-        """Ne détache pas si l'authorship est liée à une autre personne."""
-        p1 = _insert_person(sa_sync_conn, "Dupont", "Jean")
-        p2 = _insert_person(sa_sync_conn, "Martin", "Sophie")
-        pub_id = _insert_publication(sa_sync_conn)
-        sp_id = _insert_source_publication(sa_sync_conn, pub_id)
-        sa_id = _insert_source_authorship(sa_sync_conn, sp_id, person_id=p1)
-
-        unlink_authorship(p2, "hal", sa_id, repo=authorship_repo)
-
-        assert (
-            _scalar(sa_sync_conn, "SELECT person_id FROM source_authorships WHERE id = :i", i=sa_id)
-            == p1
         )
 
 

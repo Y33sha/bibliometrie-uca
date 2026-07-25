@@ -171,15 +171,6 @@ class PgAuthorshipRepository(AuthorshipRepository):
             {"pid": person_id, "aid": source_authorship_id, "src": source, "mode": resolution_mode},
         )
 
-    def unlink_authorship(self, person_id: int, source: str, source_authorship_id: int) -> None:
-        self._conn.execute(
-            text(
-                "UPDATE source_authorships SET person_id = NULL "
-                "WHERE id = :aid AND person_id = :pid AND source = :src"
-            ),
-            {"aid": source_authorship_id, "pid": person_id, "src": source},
-        )
-
     def find_source_authorship_owner(self, source_authorship_id: int) -> int | None:
         return self._conn.execute(
             text("SELECT person_id FROM source_authorships WHERE id = :aid"),

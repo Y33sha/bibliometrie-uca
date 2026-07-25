@@ -119,14 +119,6 @@ def link_authorship(
     repo.link_authorship(person_id, source, source_authorship_id, resolution_mode)
 
 
-def unlink_authorship(
-    person_id: int, source: str, source_authorship_id: int, *, repo: AuthorshipRepository
-) -> None:
-    """Détache une signature source d'une personne (met person_id à NULL). Lève `ValidationError` sur une source hors registre."""
-    require_known_source(source)
-    repo.unlink_authorship(person_id, source, source_authorship_id)
-
-
 # ── Identifiants ──
 
 
