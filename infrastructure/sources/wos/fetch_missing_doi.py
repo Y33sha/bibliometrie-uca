@@ -34,11 +34,8 @@ class WosFetchMissingDoiAdapter:
 
     source_key = "wos"
     batch_size = 20
-    # WoS API Clarivate : instable et rate-limit serré
-    # (variable selon contrat, généralement 2-5 req/s). 2 workers + 500 ms
-    # de pause par worker garantissent un débit ≈ 2 req/s peak (avec
-    # latence WoS typique ~500 ms), sous le seuil habituel et sans burst
-    # initial.
+    # WoS Clarivate : instable, rate-limit serré (~2-5 req/s selon contrat).
+    # `max_concurrent=2` × pause 500 ms, latence ~500 ms → ≈ 2 req/s (sous le seuil).
     max_concurrent = 2
     request_delay_s = 0.5
 
