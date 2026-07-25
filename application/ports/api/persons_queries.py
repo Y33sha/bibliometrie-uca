@@ -85,7 +85,9 @@ class NameFormSummaryOut(BaseModel):
     name_form: str
     sources: list[str]
     ambiguous: bool
-    status: Literal[AttributionStatus.PENDING, AttributionStatus.CONFIRMED, AttributionStatus.REJECTED]
+    status: Literal[
+        AttributionStatus.PENDING, AttributionStatus.CONFIRMED, AttributionStatus.REJECTED
+    ]
     shared_count: int
     pub_count: int
 
@@ -267,7 +269,9 @@ class AmbiguousFormPersonOut(BaseModel):
     person_id: int
     first_name: str
     last_name: str
-    status: Literal[AttributionStatus.PENDING, AttributionStatus.CONFIRMED, AttributionStatus.REJECTED]
+    status: Literal[
+        AttributionStatus.PENDING, AttributionStatus.CONFIRMED, AttributionStatus.REJECTED
+    ]
     has_rh: bool
     # Nom canonique compatible (par tokens) avec la forme : homonyme/doublon si
     # vrai, erreur d'attribution probable si faux.

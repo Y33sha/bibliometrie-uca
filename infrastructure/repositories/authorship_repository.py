@@ -99,7 +99,9 @@ class PgAuthorshipRepository(AuthorshipRepository):
             {"pub": publication_id, "pid": person_id},
         )
 
-    def link_source_authorships_to_authorships(self, person_id: int, source_authorship_ids: list[int]) -> None:
+    def link_source_authorships_to_authorships(
+        self, person_id: int, source_authorship_ids: list[int]
+    ) -> None:
         if not source_authorship_ids:
             return
         self._conn.execute(

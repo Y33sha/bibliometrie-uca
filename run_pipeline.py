@@ -931,9 +931,7 @@ def _extractors() -> dict[str, Callable[[Any, Any], Any]]:
     def scanr(conn: Any, source_log: Any) -> Any:
         with get_sync_engine().connect() as bootstrap:
             credentials = get_scanr_credentials_from_db(bootstrap)
-        adapter = PgScanrExtractAdapter(
-            base_url=API_BASE_URLS["scanr"], credentials=credentials
-        )
+        adapter = PgScanrExtractAdapter(base_url=API_BASE_URLS["scanr"], credentials=credentials)
         return ScanrExtractor(conn, source_log, adapter)
 
     def theses(conn: Any, source_log: Any) -> Any:
