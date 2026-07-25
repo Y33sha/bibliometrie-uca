@@ -1,0 +1,63 @@
+# Recentrer `infrastructure/sources` sur le dialogue avec les API
+
+## Contexte
+
+`infrastructure/sources` doit contenir le code qui dialogue avec les API HTTP tierces (extraction, cross-import, refresh, enrichissements) et lui seul. Le dossier mélange aujourd'hui ce rôle avec de la persistance base, du code mort, des helpers transverses dupliqués et une structure inégale.
+
+- **Persistance DB logée dans `common.py`.** `common.py` est surtout de la persistance : UPSERT staging (`upsert_staging`, `upsert_not_found_stub`), pool de DOI cross-import (`get_cross_import_dois`), sélection des rows périmées (`get_stale_rows`, `set_disappeared_by_source_id`), mémorisation des DOI introuvables (`record_doi_not_found`), lecture des identifiants déjà en staging (`get_existing_ids`). Ces requêtes SQL relèvent de `infrastructure/queries/pipeline`, pas du dialogue API.
+- **Code mort.** `get_cross_import_dois` et `get_existing_ids` portent chacune une branche `else: with conn.cursor()` (accès psycopg brut) jamais atteinte : la boucle `run_async` et tous les appelants passent une `Connection` SQLAlchemy. Ce sont les seules traces psycopg de tout le dossier.
+- **Helpers HTTP dupliqués et divergents.** `http_retry.py` (sync, `requests`) et `http_retry_async.py` (async, `httpx`) réimplémentent le même retry/backoff/circuit-breaker, et leur comportement a dérivé : le sync retente les 5xx (jusqu'à `max_retries`), l'async lève immédiatement sur toute `HTTPStatusError`, 5xx compris.
+- **Structure inégale.** Chaque source d'extraction est un sous-package (`hal/`, `openalex/`, …), mais `unpaywall.py` est un fichier plat à la racine et `doaj/` un package réduit à son `__init__`. `doi_prefixes/` porte un nom de phase pipeline, pas de source, et regroupe trois clients de sources distinctes (Crossref, DataCite, doi.org).
+- **Paramètres d'API éclatés.** Les URLs de base (`_API_BASE_URLS`) vivent dans `config.py` (lecture de la table `config`), alors que ce sont des invariants codés en dur, de même nature que les délais de `api_limits.py`. `config.py` avale par ailleurs des `except Exception` larges qui masquent les vraies erreurs.
+- **Port implémenté en duck typing.** `circuit_breaker.SourceCircuitBreaker` satisfait le port `CircuitBreaker` structurellement, sans l'hériter, à rebours de la convention d'héritage explicite des adapters.
+
+## Décisions
+
+- **Périmètre.** `infrastructure/sources` ne garde que le dialogue avec les API HTTP. La persistance base (staging, cross-import, stale, `doi_lookups`) descend dans `infrastructure/queries/pipeline`. Après extraction de la DB, `common.py` n'a plus de raison d'être et disparaît.
+- **`http_retry`.** Sync et async sont regroupés dans un même module, logique de décision factorisée. Comportement unifié : 429 et 5xx sont retentés jusqu'à `max_retries` puis le circuit breaker trippe ; les autres 4xx (404…) ne sont pas retentés (échec immédiat, déterministe).
+- **Code mort retiré systématiquement** (branches psycopg).
+- **Un package par source.** `unpaywall/` ; le code de `doaj` sort de son `__init__` vers un fichier dédié ; `doi_prefixes` est dissous et réparti par source réelle : client préfixe Crossref → `crossref/`, client préfixe DataCite → `datacite/`, résolution de Registration Agency `doi.org/ra` → `doi_org/` (doi.org est de facto une source).
+- **Paramètres d'API regroupés.** Les URLs sortent de `config.py` (ce sont des invariants, pas de la config) et rejoignent les limites dans un module de paramètres d'API. `config.py` se limite aux paramètres réellement lus en base (années, périmètres, clés API, credentials).
+- **Exceptions.** Les `except Exception` larges de `config.py` sont resserrés. Le choix entre exception ciblée générique et exception métier se fait au cas par cas, avec une préférence pour l'exception métier quand elle porte un sens.
+- **`circuit_breaker`.** `SourceCircuitBreaker` hérite explicitement du port `CircuitBreaker`.
+- **`refresh_stale_base`.** L'orchestration `refresh_stale` vit déjà dans `application/pipeline/extract/refresh_stale.py`. `BaseRefreshStaleAdapter` reste une base fine côté `infrastructure/sources` (contrat de fetch HTTP + délégation), ses méthodes de persistance pointant vers les requêtes déplacées.
+
+## Phasage
+
+### A — Quick-wins indépendants
+
+- [ ] Retirer les branches psycopg mortes de `get_cross_import_dois` et `get_existing_ids`, simplifier vers une `Connection` SQLAlchemy unique (docstrings allégées d'autant).
+- [ ] `SourceCircuitBreaker` : héritage explicite du port `CircuitBreaker`.
+- [ ] `config.py` : docstring corrigée (les URLs d'API ne sont pas de la config).
+
+### B — `http_retry` unifié
+
+- [ ] Regrouper sync et async dans un module unique ; factoriser la logique de décision (barème de backoff, classification des codes HTTP, interaction avec le circuit breaker).
+- [ ] Converger le comportement 5xx : retry de 429 et 5xx jusqu'à `max_retries` puis trip du breaker, échec immédiat sur les autres 4xx.
+- [ ] Tests couvrant, pour les deux variantes, le retry des 5xx et le non-retry des 4xx.
+
+### C — Paramètres d'API regroupés
+
+- [ ] Sortir `_API_BASE_URLS` et `get_api_base_urls` de `config.py`.
+- [ ] Regrouper URLs et limites dans un module de paramètres d'API.
+
+### D — Un package par source
+
+- [ ] `unpaywall.py` → `unpaywall/` (fichier dédié + `__init__`).
+- [ ] Sortir le code de `doaj/__init__.py` vers un fichier dédié.
+- [ ] Dissoudre `doi_prefixes` : client Crossref → `crossref/`, client DataCite → `datacite/`, résolution RA doi.org → `doi_org/`. Adapter les appelants (phase `resolve_ra`, `publishers_journals`).
+
+### E — Dissolution de `common.py`
+
+- [ ] Déplacer les fonctions de persistance (`upsert_staging`, `upsert_not_found_stub`, `record_doi_not_found`, `get_stale_rows`, `set_disappeared_by_source_id`, `get_cross_import_dois`, `get_existing_ids`), leur SQL et leurs constantes (`DOI_LOOKUP_RETRY_DAYS`, `STALE_REFRESH_AFTER_DAYS`, `_TARGET_RA`) vers `infrastructure/queries/pipeline`.
+- [ ] Replacer le calcul du hash de détection (`canonical_json_bytes`, `compute_hash`, `change_detection_hash`, `_HASH_NORMALIZERS`) auprès des écritures staging.
+- [ ] `BaseRefreshStaleAdapter` : ses méthodes de persistance appellent les requêtes déplacées.
+- [ ] Retirer `common.py`.
+- [ ] Resserrer les `except Exception` de `config.py` sur des exceptions ciblées.
+
+## Questions ouvertes
+
+- **Exceptions.** Au cas par cas, fichier par fichier : une exception métier (par exemple une erreur « paramètre de config absent/invalide ») quand elle porte un sens exploitable par l'appelant, une exception ciblée générique (erreur base, HTTP) sinon.
+- **Hash de détection.** Le calcul du hash accompagne les écritures staging (il en produit le `raw_hash`). Reste à trancher s'il vit dans le module d'écriture staging ou dans un utilitaire neutre partagé.
+- **Découpage cible dans `queries/pipeline`.** Un module unique pour toute la persistance d'extraction, ou plusieurs (écritures staging, pool cross-import, sélection stale) ?
+- **Périmètre du module de paramètres d'API.** Absorbe-t-il aussi la présence des credentials (`source_credentials_missing`), ou celle-ci reste-t-elle en `config.py` avec les lectures base dont elle dépend ?
