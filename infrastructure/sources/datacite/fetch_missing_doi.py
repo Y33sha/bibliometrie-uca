@@ -25,8 +25,7 @@ from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.common import record_doi_not_found, upsert_staging
 from infrastructure.sources.config import get_polite_pool_email
 from infrastructure.sources.http_retry import http_request_with_retry_async
-
-_USER_AGENT_TEMPLATE = "BibliometrieUCA-pipeline/1.0 (mailto:{email})"
+from infrastructure.sources.polite_pool import build_user_agent
 
 
 def _record_doi(record: dict) -> str | None:
@@ -56,7 +55,7 @@ class DataciteFetchMissingDoiAdapter:
         self.base_url = API_BASE_URLS["datacite"]
         email = get_polite_pool_email(conn)
         self.headers = {
-            "User-Agent": _USER_AGENT_TEMPLATE.format(email=email),
+            "User-Agent": build_user_agent(email),
             "Accept": "application/vnd.api+json",
         }
 

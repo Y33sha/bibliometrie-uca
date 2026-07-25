@@ -45,7 +45,7 @@
 
 - [ ] `unpaywall.py` → `unpaywall/` (fichier dédié + `__init__`).
 - [ ] Sortir le code de `doaj/__init__.py` vers un fichier dédié.
-- [ ] Dissoudre `doi_prefixes` : client Crossref → `crossref/`, client DataCite → `datacite/`, résolution RA doi.org → `doi_org/`. Adapter les appelants (phase `resolve_ra`, `publishers_journals`).
+- [x] Dissoudre `doi_prefixes` : client Crossref → `crossref/prefixes`, DataCite → `datacite/prefixes`, résolution RA doi.org → `doi_org/registration_agency`. Appelants adaptés (`resolve_ra`, `publishers_journals`). Le User-Agent polite pool, dupliqué dans cinq clients, est unifié dans `polite_pool.build_user_agent` ; `doi.org` rejoint `API_BASE_URLS`.
 
 ### E — Dissolution de `common.py`
 

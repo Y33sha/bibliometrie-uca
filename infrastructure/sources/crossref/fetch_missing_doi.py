@@ -24,8 +24,7 @@ from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.common import record_doi_not_found, upsert_staging
 from infrastructure.sources.config import get_polite_pool_email
 from infrastructure.sources.http_retry import http_request_with_retry_async
-
-_USER_AGENT_TEMPLATE = "BibliometrieUCA-pipeline/1.0 (mailto:{email})"
+from infrastructure.sources.polite_pool import build_user_agent
 
 
 class CrossrefFetchMissingDoiAdapter:
@@ -43,7 +42,7 @@ class CrossrefFetchMissingDoiAdapter:
     def configure(self, conn: Connection) -> None:
         self.base_url = API_BASE_URLS["crossref"]
         email = get_polite_pool_email(conn)
-        self.headers = {"User-Agent": _USER_AGENT_TEMPLATE.format(email=email)}
+        self.headers = {"User-Agent": build_user_agent(email)}
 
     async def fetch_async(self, client: httpx.AsyncClient, dois: list[str]) -> Iterable[dict]:
         doi = dois[0]

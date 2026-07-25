@@ -19,9 +19,8 @@ from domain.publications.identifiers import clean_doi
 from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.config import get_polite_pool_email
 from infrastructure.sources.http_retry import http_request_with_retry_async
+from infrastructure.sources.polite_pool import build_user_agent
 from infrastructure.sources.refresh_stale_base import BaseRefreshStaleAdapter
-
-_USER_AGENT_TEMPLATE = "BibliometrieUCA-pipeline/1.0 (mailto:{email})"
 
 
 class CrossrefRefreshStaleAdapter(BaseRefreshStaleAdapter):
@@ -36,7 +35,7 @@ class CrossrefRefreshStaleAdapter(BaseRefreshStaleAdapter):
     def configure(self, conn: Connection) -> None:
         self.base_url = API_BASE_URLS["crossref"]
         email = get_polite_pool_email(conn)
-        self.headers = {"User-Agent": _USER_AGENT_TEMPLATE.format(email=email)}
+        self.headers = {"User-Agent": build_user_agent(email)}
 
     async def fetch_by_native_id(self, client: httpx.AsyncClient, source_id: str) -> FetchOutcome:
         url = f"{self.base_url}/works/{urllib.parse.quote(source_id, safe='/()')}"

@@ -32,7 +32,7 @@ from sqlalchemy import text
 from domain.normalize import normalize_text
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from infrastructure.sources.doi_prefixes.clients import parse_member_id
+from infrastructure.sources.crossref.prefixes import parse_member_id
 
 log = setup_logger("seed_doi_prefixes", os.path.dirname(__file__))
 
