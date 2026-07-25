@@ -32,9 +32,9 @@
 
 ### B — `http_retry` unifié
 
-- [ ] Regrouper sync et async dans un module unique ; factoriser la logique de décision (barème de backoff, classification des codes HTTP, interaction avec le circuit breaker).
-- [ ] Converger le comportement 5xx : retry de 429 et 5xx jusqu'à `max_retries` puis trip du breaker, échec immédiat sur les autres 4xx.
-- [ ] Tests couvrant, pour les deux variantes, le retry des 5xx et le non-retry des 4xx.
+- [x] Regrouper sync et async dans un module unique ; factoriser la logique de décision (barème de backoff, classification des codes HTTP, interaction avec le circuit breaker).
+- [x] Converger le comportement 5xx : retry de 429 et 5xx jusqu'à `max_retries` puis trip du breaker, échec immédiat sur les autres 4xx.
+- [x] Tests couvrant, pour les deux variantes, le retry des 5xx et le non-retry des 4xx.
 
 ### C — Paramètres d'API regroupés
 

@@ -1,16 +1,24 @@
-"""Helper générique pour les requêtes HTTP avec retry + backoff exponentiel.
+"""Requêtes HTTP avec retry, backoff exponentiel et circuit-breaker, en versions synchrone et asynchrone.
 
-Encapsule le pattern commun aux extracteurs :
-  - retry sur HTTP 429 (Too Many Requests)
-  - retry sur les erreurs réseau (RequestException)
-  - optionnellement retry sur body vide (certaines API comme WoS renvoient parfois un body vide sans 429, typiquement sous rate-limit silencieux)
+`http_request_with_retry` s'appuie sur `requests` (extracteurs page à page, clients de préfixes DOI) ; `http_request_with_retry_async` sur un `httpx.AsyncClient` partagé entre coroutines (cross-import par DOI, enrichissements concurrents). Les deux appliquent la même politique.
 
-Les scripts d'extraction s'appuient sur ce module pour leur logique de retry commune.
+Politique de retry :
+  - 429 (Too Many Requests) et 5xx (panne source) : pause `initial_backoff * 2^attempt` puis retry, jusqu'à `max_retries` ; l'épuisement compte un échec au circuit-breaker.
+  - autres 4xx (404…) : échec immédiat, sans retry ni comptage (résultat normal « non trouvé », déterministe).
+  - erreur réseau : retry ; l'épuisement compte un échec.
+  - corps vide (si `retry_on_empty_body`) ou JSON invalide : retry.
+
+Circuit-breaker : un `SourceCircuitBreaker` posé en ContextVar par la composition root court-circuite les requêtes quand la source cumule trop d'échecs consécutifs, et se remet à zéro au succès.
 """
 
+from __future__ import annotations
+
+import asyncio
+import json
 import logging
 import time
 
+import httpx
 import requests
 
 from infrastructure.sources.circuit_breaker import get_current_breaker
@@ -18,11 +26,13 @@ from infrastructure.sources.circuit_breaker import get_current_breaker
 logger = logging.getLogger(__name__)
 
 
-def _counts_as_source_failure(error: Exception) -> bool:
-    """Un échec qui suggère que la source est indisponible (budget/panne) : 5xx ou réseau/timeout. Les 4xx (404 « non trouvé »…) sont des résultats normaux, non comptés par le circuit-breaker."""
-    if isinstance(error, requests.exceptions.HTTPError) and error.response is not None:
-        return error.response.status_code >= 500
-    return True
+def _backoff_delay(initial_backoff: float, attempt: int) -> float:
+    return initial_backoff * (2**attempt)
+
+
+def _is_retryable_status(status: int) -> bool:
+    """429 (rate-limit) et 5xx (panne source) sont retentés ; les autres codes ≥ 400 échouent immédiatement."""
+    return status == 429 or 500 <= status < 600
 
 
 def http_request_with_retry(
@@ -39,32 +49,19 @@ def http_request_with_retry(
     retry_on_empty_body: bool = False,
     label: str = "",
 ) -> dict:
-    """Effectue une requête HTTP avec retry et backoff exponentiel.
+    """Requête HTTP synchrone avec retry, backoff et circuit-breaker (politique cf. docstring du module).
 
-    Stratégie :
-      - status 429 → pause `initial_backoff * 2^attempt` puis retry
-      - 4xx (≠ 429) → échec immédiat (déterministe : retenter ne changerait rien)
-      - 5xx / erreur réseau → pause puis retry (sauf au dernier essai, où on raise)
-      - body vide (si retry_on_empty_body) → pause puis retry
-      - succès → retourne response.json()
-
-    `max_retries=3` : avec le backoff par défaut, les pauses sont de 1, 2, 4 s ; pousser plus loin ferait attendre 8, 16 s pour un seul document, inutile.
-
-    Circuit-breaker : si un `SourceCircuitBreaker` est posé (ContextVar), on court-circuite quand il s'est déclenché, on lui compte les échecs 429/5xx/réseau (pas les 4xx) et on le remet à zéro au succès.
-
-    `label` : chaîne courte (ex: "year 2024, rec 100") insérée dans les logs.
-
-    Lève la dernière exception rencontrée si max_retries est atteint sans succès.
+    `max_retries=3` avec le backoff par défaut donne des pauses de 1, 2, 4 s. `label` : chaîne courte (ex. "year 2024, rec 100") insérée dans les logs. Lève la dernière exception rencontrée si `max_retries` est atteint sans succès.
     """
     breaker = get_current_breaker()
     if breaker is not None:
-        breaker.check()  # court-circuite si le breaker s'est déjà déclenché
-        # Préfixe la source dans tous les logs de retry/échec ci-dessous : sans ça, un message comme « 429 Too Many Requests rec 1 » ne dit pas *quelle* source rate-limite. Le breaker (ContextVar) porte le nom de la source.
+        breaker.check()
+        # Préfixe le nom de la source (porté par le breaker) dans les logs de retry.
         label = f"{breaker.source} {label}".rstrip()
 
     last_error: Exception | None = None
     for attempt in range(max_retries):
-        wait = initial_backoff * (2**attempt)
+        wait = _backoff_delay(initial_backoff, attempt)
         try:
             resp = requests.request(
                 method,
@@ -75,44 +72,152 @@ def http_request_with_retry(
                 auth=auth,
                 timeout=timeout,
             )
-            if resp.status_code == 429:
-                logger.warning(
-                    f"429 Too Many Requests {label} — attente {wait}s (tentative {attempt + 1}/{max_retries})"
-                )
-                time.sleep(wait)
-                continue
-            resp.raise_for_status()
-            if retry_on_empty_body and not resp.text.strip():
-                logger.warning(
-                    f"Body vide {label} — attente {wait}s (tentative {attempt + 1}/{max_retries})"
-                )
-                time.sleep(wait)
-                continue
-            if breaker is not None:
-                breaker.record_success()
-            return resp.json()
-        except requests.exceptions.JSONDecodeError as e:
-            last_error = e
-            logger.warning(
-                f"JSON invalide {label} — attente {wait}s (tentative {attempt + 1}/{max_retries})"
-            )
-            time.sleep(wait)
         except requests.RequestException as e:
             last_error = e
-            # 4xx déterministe (≠ 429, déjà géré plus haut) : retenter ne changera rien (préfixe inconnu, requête malformée…) → échec immédiat. On ne retente que les 5xx et les erreurs réseau.
-            status = getattr(getattr(e, "response", None), "status_code", None)
-            client_error = status is not None and 400 <= status < 500
-            if client_error or attempt == max_retries - 1:
-                # HTTPError (4xx/5xx) ⊂ RequestException : seuls 5xx/réseau comptent.
-                if breaker is not None and _counts_as_source_failure(e):
+            if attempt == max_retries - 1:
+                if breaker is not None:
                     breaker.record_failure()
                 raise
             logger.warning(
                 f"Erreur réseau {label}: {e} — attente {wait}s (tentative {attempt + 1}/{max_retries})"
             )
             time.sleep(wait)
+            continue
 
-    # Boucle épuisée : 429 répétés ou JSON invalide répété → échec source.
+        if _is_retryable_status(resp.status_code):
+            if attempt == max_retries - 1:
+                if breaker is not None:
+                    breaker.record_failure()
+                resp.raise_for_status()
+            logger.warning(
+                f"HTTP {resp.status_code} {label} — attente {wait}s (tentative {attempt + 1}/{max_retries})"
+            )
+            time.sleep(wait)
+            continue
+
+        try:
+            resp.raise_for_status()  # autres 4xx : échec immédiat, non compté
+        except requests.HTTPError:
+            raise
+
+        if retry_on_empty_body and not resp.text.strip():
+            logger.warning(
+                f"Body vide {label} — attente {wait}s (tentative {attempt + 1}/{max_retries})"
+            )
+            time.sleep(wait)
+            continue
+
+        try:
+            data = resp.json()
+        except requests.exceptions.JSONDecodeError as e:
+            last_error = e
+            logger.warning(
+                f"JSON invalide {label} — attente {wait}s (tentative {attempt + 1}/{max_retries})"
+            )
+            time.sleep(wait)
+            continue
+
+        if breaker is not None:
+            breaker.record_success()
+        return data
+
+    # Boucle épuisée sur body vide ou JSON invalide répété.
+    if breaker is not None:
+        breaker.record_failure()
+    logger.error(f"Échec après {max_retries} tentatives {label}")
+    if last_error:
+        raise last_error
+    return {}
+
+
+async def http_request_with_retry_async(
+    client: httpx.AsyncClient,
+    method: str,
+    url: str,
+    *,
+    params: dict | None = None,
+    json_body: dict | None = None,
+    headers: dict | None = None,
+    auth: tuple | None = None,
+    timeout: float = 30.0,  # noqa: ASYNC109 — wrapper httpx, le timeout est passé au client
+    max_retries: int = 3,
+    initial_backoff: float = 1.0,
+    retry_on_empty_body: bool = False,
+    label: str = "",
+) -> dict:
+    """Requête HTTP asynchrone avec retry, backoff et circuit-breaker (politique cf. docstring du module).
+
+    Le `httpx.AsyncClient` est partagé entre les coroutines d'un même run (connexions poolées). `label` : chaîne courte (ex. "DOI 10.xxx") pour distinguer les requêtes concurrentes dans les logs.
+    """
+    breaker = get_current_breaker()
+    if breaker is not None:
+        breaker.check()
+        # Préfixe le nom de la source (porté par le breaker) dans les logs de retry.
+        label = f"{breaker.source} {label}".rstrip()
+
+    last_error: Exception | None = None
+    for attempt in range(max_retries):
+        wait = _backoff_delay(initial_backoff, attempt)
+        try:
+            resp = await client.request(
+                method,
+                url,
+                params=params,
+                json=json_body,
+                headers=headers,
+                auth=auth,
+                timeout=timeout,
+            )
+        except httpx.RequestError as e:
+            last_error = e
+            if attempt == max_retries - 1:
+                if breaker is not None:
+                    breaker.record_failure()
+                raise
+            logger.warning(
+                f"Erreur réseau {label}: {e} — attente {wait}s (tentative {attempt + 1}/{max_retries})"
+            )
+            await asyncio.sleep(wait)
+            continue
+
+        if _is_retryable_status(resp.status_code):
+            if attempt == max_retries - 1:
+                if breaker is not None:
+                    breaker.record_failure()
+                resp.raise_for_status()
+            logger.warning(
+                f"HTTP {resp.status_code} {label} — attente {wait}s (tentative {attempt + 1}/{max_retries})"
+            )
+            await asyncio.sleep(wait)
+            continue
+
+        try:
+            resp.raise_for_status()  # autres 4xx : échec immédiat, non compté
+        except httpx.HTTPStatusError:
+            raise
+
+        if retry_on_empty_body and not resp.text.strip():
+            logger.warning(
+                f"Body vide {label} — attente {wait}s (tentative {attempt + 1}/{max_retries})"
+            )
+            await asyncio.sleep(wait)
+            continue
+
+        try:
+            data = resp.json()
+        except json.JSONDecodeError as e:
+            last_error = e
+            logger.warning(
+                f"JSON invalide {label} — attente {wait}s (tentative {attempt + 1}/{max_retries})"
+            )
+            await asyncio.sleep(wait)
+            continue
+
+        if breaker is not None:
+            breaker.record_success()
+        return data
+
+    # Boucle épuisée sur body vide ou JSON invalide répété.
     if breaker is not None:
         breaker.record_failure()
     logger.error(f"Échec après {max_retries} tentatives {label}")

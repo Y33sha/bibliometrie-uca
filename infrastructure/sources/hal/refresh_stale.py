@@ -16,7 +16,7 @@ from application.ports.pipeline.extract.refresh_stale import (
 from infrastructure.sources.config import get_api_base_urls
 from infrastructure.sources.hal.extract_hal import extract_doi
 from infrastructure.sources.hal.fields import HAL_FIELDS_STR
-from infrastructure.sources.http_retry_async import http_request_with_retry_async
+from infrastructure.sources.http_retry import http_request_with_retry_async
 from infrastructure.sources.refresh_stale_base import BaseRefreshStaleAdapter
 
 

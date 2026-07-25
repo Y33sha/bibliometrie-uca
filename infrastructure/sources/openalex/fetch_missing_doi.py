@@ -22,7 +22,7 @@ from infrastructure.sources.config import (
     get_openalex_api_key,
     get_polite_pool_email,
 )
-from infrastructure.sources.http_retry_async import http_request_with_retry_async
+from infrastructure.sources.http_retry import http_request_with_retry_async
 from infrastructure.sources.openalex import SELECT_FIELDS, auth_params, init_auth
 from infrastructure.sources.openalex.parsing import extract_doi, extract_openalex_id
 

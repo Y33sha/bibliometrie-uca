@@ -13,7 +13,7 @@ import logging
 import httpx
 
 from domain.publications.identifiers import clean_doi
-from infrastructure.sources.http_retry_async import http_request_with_retry_async
+from infrastructure.sources.http_retry import http_request_with_retry_async
 
 # Mapping Unpaywall oa_status → notre enum oa_type
 OA_MAP = {

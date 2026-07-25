@@ -15,7 +15,7 @@ from application.ports.pipeline.extract.refresh_stale import (
 )
 from infrastructure.sources.api_limits import THESES_DELAY
 from infrastructure.sources.config import get_api_base_urls
-from infrastructure.sources.http_retry_async import http_request_with_retry_async
+from infrastructure.sources.http_retry import http_request_with_retry_async
 from infrastructure.sources.refresh_stale_base import BaseRefreshStaleAdapter
 from infrastructure.sources.theses.extract_theses import extract_doi
 

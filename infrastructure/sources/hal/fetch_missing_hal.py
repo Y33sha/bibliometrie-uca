@@ -23,7 +23,7 @@ from infrastructure.sources.common import upsert_not_found_stub, upsert_staging
 from infrastructure.sources.config import get_api_base_urls
 from infrastructure.sources.hal.extract_hal import extract_doi
 from infrastructure.sources.hal.fields import HAL_FIELDS_STR
-from infrastructure.sources.http_retry_async import http_request_with_retry_async
+from infrastructure.sources.http_retry import http_request_with_retry_async
 
 # HAL ne publie pas de seuil officiel : on combine concurrence (5 workers)
 # + délai par worker (HAL_DELAY = 0.5 s) → ~6-7 req/s sustained, sans burst.

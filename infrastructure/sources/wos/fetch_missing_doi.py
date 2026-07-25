@@ -23,7 +23,7 @@ from application.ports.pipeline.cross_imports.fetch_missing_doi import (
 from infrastructure.sources.api_limits import WOS_DELAY, WOS_PER_PAGE
 from infrastructure.sources.common import record_doi_not_found, upsert_staging
 from infrastructure.sources.config import get_api_base_urls, get_wos_api_key
-from infrastructure.sources.http_retry_async import http_request_with_retry_async
+from infrastructure.sources.http_retry import http_request_with_retry_async
 from infrastructure.sources.wos.parsing import extract_doi, extract_ut, filter_doi_for_wos
 
 log = logging.getLogger(__name__)
