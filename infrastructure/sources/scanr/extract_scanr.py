@@ -16,7 +16,7 @@ from application.ports.pipeline.extract.scanr import (
     ScanrExtractConfig,
 )
 from domain.publications.identifiers import clean_doi
-from infrastructure.sources.api_limits import SCANR_DELAY, SCANR_PER_PAGE
+from infrastructure.sources.api_params import SCANR_DELAY, SCANR_PER_PAGE
 from infrastructure.sources.common import upsert_staging
 from infrastructure.sources.config import (
     get_extraction_api_ids,

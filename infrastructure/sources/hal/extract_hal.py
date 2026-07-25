@@ -13,10 +13,9 @@ from sqlalchemy import Connection
 from application.ports.pipeline.extract._common import UpsertOutcome
 from application.ports.pipeline.extract.hal import HalExtractAdapter, HalExtractConfig
 from domain.publications.identifiers import clean_doi
-from infrastructure.sources.api_limits import HAL_DELAY, hal_per_page_for
+from infrastructure.sources.api_params import API_BASE_URLS, HAL_DELAY, hal_per_page_for
 from infrastructure.sources.common import upsert_staging
 from infrastructure.sources.config import (
-    get_api_base_urls,
     get_hal_collections,
     get_years,
 )
@@ -69,7 +68,7 @@ class PgHalExtractAdapter(HalExtractAdapter):
     def load_config(self, conn: Connection) -> HalExtractConfig:
         collections = get_hal_collections(conn)
         return HalExtractConfig(
-            base_url=get_api_base_urls()["hal"],
+            base_url=API_BASE_URLS["hal"],
             all_collections=dict(collections),
             n_collections=len(collections),
         )
@@ -97,7 +96,7 @@ class PgHalExtractAdapter(HalExtractAdapter):
         return " AND ".join(parts)
 
     def per_page_for(self, collection_code: str | None) -> int:
-        """Taille de page Solr à utiliser pour une collection (cf. `api_limits`)."""
+        """Taille de page Solr à utiliser pour une collection (cf. `api_params`)."""
         return hal_per_page_for(collection_code)
 
     def extract_id(self, doc: dict[str, Any]) -> str:

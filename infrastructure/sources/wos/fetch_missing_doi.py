@@ -20,9 +20,9 @@ from application.ports.pipeline.cross_imports.fetch_missing_doi import (
     is_not_found_marker,
     not_found_marker,
 )
-from infrastructure.sources.api_limits import WOS_DELAY, WOS_PER_PAGE
+from infrastructure.sources.api_params import API_BASE_URLS, WOS_DELAY, WOS_PER_PAGE
 from infrastructure.sources.common import record_doi_not_found, upsert_staging
-from infrastructure.sources.config import get_api_base_urls, get_wos_api_key
+from infrastructure.sources.config import get_wos_api_key
 from infrastructure.sources.http_retry import http_request_with_retry_async
 from infrastructure.sources.wos.parsing import extract_doi, extract_ut, filter_doi_for_wos
 
@@ -43,7 +43,7 @@ class WosFetchMissingDoiAdapter:
     headers: dict[str, str]
 
     def configure(self, conn: Connection) -> None:
-        self.base_url = get_api_base_urls()["wos"]
+        self.base_url = API_BASE_URLS["wos"]
         self.headers = {"X-ApiKey": get_wos_api_key(conn), "Accept": "application/json"}
 
     async def fetch_async(self, client: httpx.AsyncClient, dois: list[str]) -> Iterable[dict]:

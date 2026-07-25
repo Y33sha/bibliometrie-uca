@@ -21,8 +21,9 @@ from application.ports.pipeline.cross_imports.fetch_missing_doi import (
     not_found_marker,
 )
 from domain.publications.identifiers import clean_doi
+from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.common import record_doi_not_found, upsert_staging
-from infrastructure.sources.config import get_api_base_urls, get_polite_pool_email
+from infrastructure.sources.config import get_polite_pool_email
 from infrastructure.sources.http_retry import http_request_with_retry_async
 
 _USER_AGENT_TEMPLATE = "BibliometrieUCA-pipeline/1.0 (mailto:{email})"
@@ -52,7 +53,7 @@ class DataciteFetchMissingDoiAdapter:
     headers: dict[str, str]
 
     def configure(self, conn: Connection) -> None:
-        self.base_url = get_api_base_urls()["datacite"]
+        self.base_url = API_BASE_URLS["datacite"]
         email = get_polite_pool_email(conn)
         self.headers = {
             "User-Agent": _USER_AGENT_TEMPLATE.format(email=email),

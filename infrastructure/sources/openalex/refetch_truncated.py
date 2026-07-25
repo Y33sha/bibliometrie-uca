@@ -17,8 +17,8 @@ from application.ports.pipeline.extract.refetch_truncated import (
     OpenalexRefetchAdapter,
     TruncatedWork,
 )
+from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.config import (
-    get_api_base_urls,
     get_openalex_api_key,
     get_polite_pool_email,
 )
@@ -69,7 +69,7 @@ class PgOpenalexRefetchAdapter(OpenalexRefetchAdapter):
 
     def configure(self, conn: Connection) -> None:
         init_auth(api_key=get_openalex_api_key(conn), email=get_polite_pool_email(conn))
-        self._base_url = get_api_base_urls()["openalex"]
+        self._base_url = API_BASE_URLS["openalex"]
 
     def find_truncated(self, conn: Connection, *, limit: int | None = None) -> list[TruncatedWork]:
         rows = conn.execute(_SELECT_TRUNCATED_SQL).all()

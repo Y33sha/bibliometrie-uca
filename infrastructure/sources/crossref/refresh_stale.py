@@ -16,7 +16,8 @@ from application.ports.pipeline.extract.refresh_stale import (
     FetchOutcome,
 )
 from domain.publications.identifiers import clean_doi
-from infrastructure.sources.config import get_api_base_urls, get_polite_pool_email
+from infrastructure.sources.api_params import API_BASE_URLS
+from infrastructure.sources.config import get_polite_pool_email
 from infrastructure.sources.http_retry import http_request_with_retry_async
 from infrastructure.sources.refresh_stale_base import BaseRefreshStaleAdapter
 
@@ -33,7 +34,7 @@ class CrossrefRefreshStaleAdapter(BaseRefreshStaleAdapter):
     headers: dict[str, str]
 
     def configure(self, conn: Connection) -> None:
-        self.base_url = get_api_base_urls()["crossref"]
+        self.base_url = API_BASE_URLS["crossref"]
         email = get_polite_pool_email(conn)
         self.headers = {"User-Agent": _USER_AGENT_TEMPLATE.format(email=email)}
 

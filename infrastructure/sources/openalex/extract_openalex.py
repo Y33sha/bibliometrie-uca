@@ -15,7 +15,7 @@ from application.ports.pipeline.extract.openalex import (
     OpenalexExtractAdapter,
     OpenalexExtractConfig,
 )
-from infrastructure.sources.api_limits import OPENALEX_DELAY, OPENALEX_PER_PAGE
+from infrastructure.sources.api_params import OPENALEX_DELAY, OPENALEX_PER_PAGE
 from infrastructure.sources.common import upsert_staging
 from infrastructure.sources.config import (
     get_extraction_api_ids,

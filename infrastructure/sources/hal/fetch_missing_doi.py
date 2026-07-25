@@ -16,8 +16,8 @@ from application.ports.pipeline.cross_imports.fetch_missing_doi import (
     is_not_found_marker,
     not_found_marker,
 )
+from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.common import record_doi_not_found, upsert_staging
-from infrastructure.sources.config import get_api_base_urls
 from infrastructure.sources.hal.fields import HAL_FIELDS_STR
 from infrastructure.sources.http_retry import http_request_with_retry_async
 
@@ -34,7 +34,7 @@ class HalFetchMissingDoiAdapter:
     base_url: str
 
     def configure(self, conn: Connection) -> None:
-        self.base_url = get_api_base_urls()["hal"]
+        self.base_url = API_BASE_URLS["hal"]
 
     async def fetch_async(self, client: httpx.AsyncClient, dois: list[str]) -> Iterable[dict]:
         doi = dois[0]

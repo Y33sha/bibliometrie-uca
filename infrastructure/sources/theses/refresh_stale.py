@@ -13,8 +13,7 @@ from application.ports.pipeline.extract.refresh_stale import (
     FetchedRecord,
     FetchOutcome,
 )
-from infrastructure.sources.api_limits import THESES_DELAY
-from infrastructure.sources.config import get_api_base_urls
+from infrastructure.sources.api_params import API_BASE_URLS, THESES_DELAY
 from infrastructure.sources.http_retry import http_request_with_retry_async
 from infrastructure.sources.refresh_stale_base import BaseRefreshStaleAdapter
 from infrastructure.sources.theses.extract_theses import extract_doi
@@ -32,7 +31,7 @@ class ThesesRefreshStaleAdapter(BaseRefreshStaleAdapter):
     url: str
 
     def configure(self, conn: Connection) -> None:
-        self.url = get_api_base_urls()["theses"]
+        self.url = API_BASE_URLS["theses"]
 
     async def fetch_by_native_id(self, client: httpx.AsyncClient, source_id: str) -> FetchOutcome:
         try:
