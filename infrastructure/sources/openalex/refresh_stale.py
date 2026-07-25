@@ -13,8 +13,8 @@ from application.ports.pipeline.extract.refresh_stale import (
     FetchedRecord,
     FetchOutcome,
 )
+from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.config import (
-    get_api_base_urls,
     get_openalex_api_key,
     get_polite_pool_email,
 )
@@ -34,7 +34,7 @@ class OpenalexRefreshStaleAdapter(BaseRefreshStaleAdapter):
 
     def configure(self, conn: Connection) -> None:
         init_auth(api_key=get_openalex_api_key(conn), email=get_polite_pool_email(conn))
-        self.base_url = get_api_base_urls()["openalex"]
+        self.base_url = API_BASE_URLS["openalex"]
 
     async def fetch_by_native_id(self, client: httpx.AsyncClient, source_id: str) -> FetchOutcome:
         try:

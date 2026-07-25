@@ -13,7 +13,7 @@ from application.ports.pipeline.extract.refresh_stale import (
     FetchedRecord,
     FetchOutcome,
 )
-from infrastructure.sources.config import get_api_base_urls
+from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.hal.extract_hal import extract_doi
 from infrastructure.sources.hal.fields import HAL_FIELDS_STR
 from infrastructure.sources.http_retry import http_request_with_retry_async
@@ -27,7 +27,7 @@ class HalRefreshStaleAdapter(BaseRefreshStaleAdapter):
     base_url: str
 
     def configure(self, conn: Connection) -> None:
-        self.base_url = get_api_base_urls()["hal"]
+        self.base_url = API_BASE_URLS["hal"]
 
     async def fetch_by_native_id(self, client: httpx.AsyncClient, source_id: str) -> FetchOutcome:
         try:

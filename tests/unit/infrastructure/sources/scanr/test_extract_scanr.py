@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from infrastructure.sources.api_limits import SCANR_PER_PAGE
+from infrastructure.sources.api_params import SCANR_PER_PAGE
 from infrastructure.sources.scanr.extract_scanr import PgScanrExtractAdapter
 
 

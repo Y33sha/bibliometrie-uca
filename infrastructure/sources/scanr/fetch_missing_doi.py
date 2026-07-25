@@ -18,8 +18,9 @@ from application.ports.pipeline.cross_imports.fetch_missing_doi import (
     is_not_found_marker,
     not_found_marker,
 )
+from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.common import clean_doi, record_doi_not_found, upsert_staging
-from infrastructure.sources.config import get_api_base_urls, get_scanr_credentials
+from infrastructure.sources.config import get_scanr_credentials
 from infrastructure.sources.http_retry import http_request_with_retry_async
 
 
@@ -35,7 +36,7 @@ class ScanrFetchMissingDoiAdapter:
     auth: tuple[str, str]
 
     def configure(self, conn: Connection) -> None:
-        self.url = get_api_base_urls()["scanr"]
+        self.url = API_BASE_URLS["scanr"]
         username, password = get_scanr_credentials(conn)
         self.auth = (username, password)
 

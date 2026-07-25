@@ -1,6 +1,6 @@
 """Lecture de la configuration applicative.
 
-Lit depuis la table `config` en base les paramètres externalisés (années, collections, affiliations, clés API, credentials ScanR). Expose aussi les URLs de base des API (`get_api_base_urls`) : invariants codés en dur, pas des valeurs de config.
+Lit depuis la table `config` en base les paramètres externalisés (années, collections, affiliations, clés API, credentials ScanR).
 """
 
 import datetime
@@ -92,32 +92,6 @@ def get_openalex_api_key(conn: Connection) -> str | None:
     if val and isinstance(val, str):
         return val
     return None
-
-
-_API_BASE_URLS: dict[str, str] = {
-    # Extracteurs principaux (un endpoint par source)
-    "hal": "https://api.archives-ouvertes.fr/search/",
-    "openalex": "https://api.openalex.org/works",
-    "wos": "https://api.clarivate.com/api/wos",
-    "scanr": "https://cluster-production.elasticsearch.dataesr.ovh/scanr-publications/_search",
-    "theses": "https://theses.fr/api/v1/theses/recherche/",
-    # CrossRef : racine sans /works, l'adapter compose le chemin selon l'usage (/works/<doi>, /works?filter=orcid:...)
-    "crossref": "https://api.crossref.org",
-    # DataCite : racine, l'adapter compose `/dois` (query batch) ou `/dois/<doi>`.
-    "datacite": "https://api.datacite.org",
-    # Endpoints secondaires
-    "openalex_sources": "https://api.openalex.org/sources",
-    "openalex_publishers": "https://api.openalex.org/publishers",
-    "unpaywall": "https://api.unpaywall.org/v2",
-    "zenodo": "https://zenodo.org/api/records",
-    # DOAJ : racine de l'API, l'adapter compose `/search/journals/issn:{issn}`.
-    "doaj": "https://doaj.org/api",
-}
-
-
-def get_api_base_urls() -> dict[str, str]:
-    """URLs de base des API, par source (extracteurs + endpoints secondaires)."""
-    return dict(_API_BASE_URLS)
 
 
 def get_extraction_api_ids(conn: Connection, source: str) -> list[str]:

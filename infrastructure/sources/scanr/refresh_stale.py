@@ -13,8 +13,9 @@ from application.ports.pipeline.extract.refresh_stale import (
     FetchedRecord,
     FetchOutcome,
 )
+from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.common import clean_doi
-from infrastructure.sources.config import get_api_base_urls, get_scanr_credentials
+from infrastructure.sources.config import get_scanr_credentials
 from infrastructure.sources.http_retry import http_request_with_retry_async
 from infrastructure.sources.refresh_stale_base import BaseRefreshStaleAdapter
 
@@ -27,7 +28,7 @@ class ScanrRefreshStaleAdapter(BaseRefreshStaleAdapter):
     auth: tuple[str, str]
 
     def configure(self, conn: Connection) -> None:
-        self.url = get_api_base_urls()["scanr"]
+        self.url = API_BASE_URLS["scanr"]
         username, password = get_scanr_credentials(conn)
         self.auth = (username, password)
 

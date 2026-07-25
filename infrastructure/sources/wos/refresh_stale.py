@@ -13,7 +13,8 @@ from application.ports.pipeline.extract.refresh_stale import (
     FetchedRecord,
     FetchOutcome,
 )
-from infrastructure.sources.config import get_api_base_urls, get_wos_api_key
+from infrastructure.sources.api_params import API_BASE_URLS
+from infrastructure.sources.config import get_wos_api_key
 from infrastructure.sources.http_retry import http_request_with_retry_async
 from infrastructure.sources.refresh_stale_base import BaseRefreshStaleAdapter
 from infrastructure.sources.wos.parsing import extract_doi, get_records
@@ -29,7 +30,7 @@ class WosRefreshStaleAdapter(BaseRefreshStaleAdapter):
     headers: dict[str, str]
 
     def configure(self, conn: Connection) -> None:
-        self.base_url = get_api_base_urls()["wos"]
+        self.base_url = API_BASE_URLS["wos"]
         self.headers = {"X-ApiKey": get_wos_api_key(conn), "Accept": "application/json"}
 
     async def fetch_by_native_id(self, client: httpx.AsyncClient, source_id: str) -> FetchOutcome:

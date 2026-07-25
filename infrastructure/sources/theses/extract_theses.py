@@ -16,7 +16,7 @@ from application.ports.pipeline.extract.theses import (
     ThesesExtractConfig,
 )
 from domain.publications.identifiers import clean_doi
-from infrastructure.sources.api_limits import THESES_DELAY, THESES_PER_PAGE
+from infrastructure.sources.api_params import THESES_DELAY, THESES_PER_PAGE
 from infrastructure.sources.common import upsert_staging
 from infrastructure.sources.config import get_extraction_api_ids
 from infrastructure.sources.http_retry import http_request_with_retry
@@ -65,7 +65,7 @@ class PgThesesExtractAdapter(ThesesExtractAdapter):
         return f"etabSoutenancePpn:({ppn})"
 
     def per_page(self) -> int:
-        """Taille de page theses.fr (max accepté par l'API ; cf. `api_limits`)."""
+        """Taille de page theses.fr (max accepté par l'API ; cf. `api_params`)."""
         return THESES_PER_PAGE
 
     def extract_id(self, these: dict[str, Any]) -> str:

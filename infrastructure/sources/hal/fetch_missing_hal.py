@@ -18,9 +18,8 @@ from application.ports.pipeline.cross_imports.fetch_missing_hal import (
     NntInsertResult,
     NntRef,
 )
-from infrastructure.sources.api_limits import HAL_DELAY
+from infrastructure.sources.api_params import API_BASE_URLS, HAL_DELAY
 from infrastructure.sources.common import upsert_not_found_stub, upsert_staging
-from infrastructure.sources.config import get_api_base_urls
 from infrastructure.sources.hal.extract_hal import extract_doi
 from infrastructure.sources.hal.fields import HAL_FIELDS_STR
 from infrastructure.sources.http_retry import http_request_with_retry_async
@@ -147,7 +146,7 @@ class PgHalFetchMissingAdapter(HalFetchMissingAdapter):
         self._base_url: str = ""
 
     def configure(self, conn: Connection) -> None:
-        self._base_url = get_api_base_urls()["hal"]
+        self._base_url = API_BASE_URLS["hal"]
 
     # ── Lookups SQL ────────────────────────────────────────────
 

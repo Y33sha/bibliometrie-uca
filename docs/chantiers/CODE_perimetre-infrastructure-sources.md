@@ -38,8 +38,8 @@
 
 ### C — Paramètres d'API regroupés
 
-- [ ] Sortir `_API_BASE_URLS` et `get_api_base_urls` de `config.py`.
-- [ ] Regrouper URLs et limites dans un module de paramètres d'API.
+- [x] Sortir `_API_BASE_URLS` et `get_api_base_urls` de `config.py`.
+- [x] Regrouper URLs et limites dans un module de paramètres d'API (`api_params`). Les URLs, invariants, passent en constante `API_BASE_URLS` ; le getter et sa copie défensive disparaissent.
 
 ### D — Un package par source
 
@@ -60,4 +60,3 @@
 - **Exceptions.** Au cas par cas, fichier par fichier : une exception métier (par exemple une erreur « paramètre de config absent/invalide ») quand elle porte un sens exploitable par l'appelant, une exception ciblée générique (erreur base, HTTP) sinon.
 - **Hash de détection.** Le calcul du hash accompagne les écritures staging (il en produit le `raw_hash`). Reste à trancher s'il vit dans le module d'écriture staging ou dans un utilitaire neutre partagé.
 - **Découpage cible dans `queries/pipeline`.** Un module unique pour toute la persistance d'extraction, ou plusieurs (écritures staging, pool cross-import, sélection stale) ?
-- **Périmètre du module de paramètres d'API.** Absorbe-t-il aussi la présence des credentials (`source_credentials_missing`), ou celle-ci reste-t-elle en `config.py` avec les lectures base dont elle dépend ?

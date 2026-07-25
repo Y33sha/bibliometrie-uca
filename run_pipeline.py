@@ -778,14 +778,13 @@ def _run_enrich_journals_from_openalex() -> PhaseMetrics:
     )
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.repositories import journal_repository
-    from infrastructure.sources.api_limits import DOAJ_DELAY
+    from infrastructure.sources.api_params import API_BASE_URLS, DOAJ_DELAY
     from infrastructure.sources.circuit_breaker import (
         SourceCircuitBreaker,
         reset_current_breaker,
         set_current_breaker,
     )
     from infrastructure.sources.config import (
-        get_api_base_urls,
         get_openalex_api_key,
         get_polite_pool_email_optional,
     )
@@ -801,7 +800,7 @@ def _run_enrich_journals_from_openalex() -> PhaseMetrics:
     try:
         api_key = get_openalex_api_key(conn)
         mailto = get_polite_pool_email_optional(conn) or ""
-        sources_api = get_api_base_urls()["openalex_sources"]
+        sources_api = API_BASE_URLS["openalex_sources"]
         metrics = run_enrich_journals_from_openalex(
             conn,
             log,
@@ -908,7 +907,8 @@ def _extractors() -> dict[str, Callable[[Any, Any], Any]]:
     from application.pipeline.extract.extract_theses import ThesesExtractor
     from application.pipeline.extract.extract_wos import WosExtractor
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.sources.config import get_api_base_urls, get_wos_api_key
+    from infrastructure.sources.api_params import API_BASE_URLS
+    from infrastructure.sources.config import get_wos_api_key
     from infrastructure.sources.hal.extract_hal import PgHalExtractAdapter
     from infrastructure.sources.openalex.extract_openalex import PgOpenalexExtractAdapter
     from infrastructure.sources.scanr.extract_scanr import (
@@ -919,29 +919,29 @@ def _extractors() -> dict[str, Callable[[Any, Any], Any]]:
     from infrastructure.sources.wos.extract_wos import PgWosExtractAdapter
 
     def hal(conn: Any, source_log: Any) -> Any:
-        adapter = PgHalExtractAdapter(base_url=get_api_base_urls()["hal"])
+        adapter = PgHalExtractAdapter(base_url=API_BASE_URLS["hal"])
         return HalExtractor(conn, source_log, adapter)
 
     def openalex(conn: Any, source_log: Any) -> Any:
-        adapter = PgOpenalexExtractAdapter(base_url=get_api_base_urls()["openalex"])
+        adapter = PgOpenalexExtractAdapter(base_url=API_BASE_URLS["openalex"])
         return OpenalexExtractor(conn, source_log, adapter)
 
     def wos(conn: Any, source_log: Any) -> Any:
         with get_sync_engine().connect() as bootstrap:
             api_key = get_wos_api_key(bootstrap)
-        adapter = PgWosExtractAdapter(base_url=get_api_base_urls()["wos"], api_key=api_key)
+        adapter = PgWosExtractAdapter(base_url=API_BASE_URLS["wos"], api_key=api_key)
         return WosExtractor(conn, source_log, adapter)
 
     def scanr(conn: Any, source_log: Any) -> Any:
         with get_sync_engine().connect() as bootstrap:
             credentials = get_scanr_credentials_from_db(bootstrap)
         adapter = PgScanrExtractAdapter(
-            base_url=get_api_base_urls()["scanr"], credentials=credentials
+            base_url=API_BASE_URLS["scanr"], credentials=credentials
         )
         return ScanrExtractor(conn, source_log, adapter)
 
     def theses(conn: Any, source_log: Any) -> Any:
-        adapter = PgThesesExtractAdapter(base_url=get_api_base_urls()["theses"])
+        adapter = PgThesesExtractAdapter(base_url=API_BASE_URLS["theses"])
         return ThesesExtractor(conn, source_log, adapter)
 
     return {"hal": hal, "openalex": openalex, "wos": wos, "scanr": scanr, "theses": theses}
@@ -1170,7 +1170,8 @@ def phase_oa_status(**kw: Any) -> PhaseMetrics:
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.queries.pipeline.oa_status import PgOaStatusQueries
     from infrastructure.repositories import publication_repository
-    from infrastructure.sources.config import get_api_base_urls, get_polite_pool_email_optional
+    from infrastructure.sources.api_params import API_BASE_URLS
+    from infrastructure.sources.config import get_polite_pool_email_optional
     from infrastructure.sources.unpaywall import fetch_oa_status
 
     metrics = PhaseMetrics()
@@ -1185,7 +1186,7 @@ def phase_oa_status(**kw: Any) -> PhaseMetrics:
 
     conn = get_sync_engine().connect()
     try:
-        base_url = get_api_base_urls()["unpaywall"]
+        base_url = API_BASE_URLS["unpaywall"]
         email = get_polite_pool_email_optional(conn) or ""
 
         async def fetcher(client: httpx.AsyncClient, doi: str) -> str | None:

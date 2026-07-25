@@ -15,7 +15,8 @@ from application.ports.pipeline.extract.refresh_stale import (
     FetchedRecord,
     FetchOutcome,
 )
-from infrastructure.sources.config import get_api_base_urls, get_polite_pool_email
+from infrastructure.sources.api_params import API_BASE_URLS
+from infrastructure.sources.config import get_polite_pool_email
 from infrastructure.sources.datacite.fetch_missing_doi import _record_doi
 from infrastructure.sources.http_retry import http_request_with_retry_async
 from infrastructure.sources.refresh_stale_base import BaseRefreshStaleAdapter
@@ -33,7 +34,7 @@ class DataciteRefreshStaleAdapter(BaseRefreshStaleAdapter):
     headers: dict[str, str]
 
     def configure(self, conn: Connection) -> None:
-        self.base_url = get_api_base_urls()["datacite"]
+        self.base_url = API_BASE_URLS["datacite"]
         email = get_polite_pool_email(conn)
         self.headers = {
             "User-Agent": _USER_AGENT_TEMPLATE.format(email=email),
