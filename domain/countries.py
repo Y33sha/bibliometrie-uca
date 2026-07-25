@@ -3,6 +3,17 @@
 Les pays d'une publication se lisent dans `publications.countries`, alimenté depuis les adresses de ses signatures. Deux codes y portent une sémantique propre, que ce module nomme.
 """
 
+from enum import StrEnum
+
+
+class PlaceNameKind(StrEnum):
+    """Nature d'une forme de `place_name_forms` (colonne `kind`). `COUNTRY` désigne un nom de pays, détecté en fin de segment d'adresse ; `INSTITUTION` et `CITY` désignent des expressions multi-mots (universités, CHU, villes), cherchées comme sous-chaînes et chacune associée à un pays."""
+
+    COUNTRY = "country"
+    INSTITUTION = "institution"
+    CITY = "city"
+
+
 # Code du référentiel réservé aux adresses dont aucun pays ne peut se déduire. Il occupe une
 # ligne de `countries` pour qu'une adresse arbitrée « sans pays » se distingue d'une adresse
 # non encore arbitrée, mais ne désigne aucun pays : les décomptes géographiques l'écartent.
