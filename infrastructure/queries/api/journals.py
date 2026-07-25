@@ -32,7 +32,7 @@ from domain.journals.journal import (
 )
 from domain.normalize import normalize_text
 from infrastructure.queries.api.filters import entity_subjects_sql, publication_in_perimeter
-from infrastructure.sources.doaj import resolve_doaj_url
+from infrastructure.sources.doaj.client import resolve_doaj_url
 
 # Colonnes de la ligne de liste d'une revue. `doaj_id` et `doaj_url_csv` sont les deux entrées de `resolve_doaj_url` ; la jointure `publishers p` est attendue par `pub_name`.
 _JOURNAL_LIST_COLUMNS = """

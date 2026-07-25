@@ -1,7 +1,7 @@
 """Tests pour `application.pipeline.oa_status.phase.run` (async).
 
 Couvre la version async via `httpx.AsyncClient` + `asyncio.Semaphore`,
-end-to-end avec le `fetcher` concret depuis `infrastructure.sources.unpaywall` :
+end-to-end avec le `fetcher` concret depuis `infrastructure.sources.unpaywall.client` :
 - happy path (3 publis, statuts mappés, update DB)
 - 404 Unpaywall → `not_found`
 - préservation `diamond` quand Unpaywall renvoie `gold`
@@ -24,7 +24,7 @@ import pytest
 import respx
 
 from application.pipeline.oa_status import phase as module
-from infrastructure.sources.unpaywall import fetch_oa_status
+from infrastructure.sources.unpaywall.client import fetch_oa_status
 
 UNPAYWALL_BASE = "https://api.unpaywall.org/v2"
 TEST_EMAIL = "test@example.com"

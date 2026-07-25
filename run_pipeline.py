@@ -831,11 +831,8 @@ def _run_enrich_journals_from_doaj() -> PhaseMetrics:
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.repositories import journal_repository
     from infrastructure.sources.config import get_polite_pool_email_optional
-    from infrastructure.sources.doaj import (
-        build_doaj_user_agent,
-        fetch_doaj_dump,
-        read_doaj_dump_rows,
-    )
+    from infrastructure.sources.doaj.client import fetch_doaj_dump, read_doaj_dump_rows
+    from infrastructure.sources.polite_pool import build_user_agent
 
     log.info("▶ enrich_journals_from_doaj")
     t0 = time.time()
@@ -854,7 +851,7 @@ def _run_enrich_journals_from_doaj() -> PhaseMetrics:
 
         _DOAJ_DUMP_PATH.parent.mkdir(parents=True, exist_ok=True)
         # DOAJ : dump CSV public (aucun credential) ; l'email polite pool est facultatif.
-        user_agent = build_doaj_user_agent(get_polite_pool_email_optional(conn) or "")
+        user_agent = build_user_agent(get_polite_pool_email_optional(conn) or "")
         fetch_doaj_dump(str(_DOAJ_DUMP_PATH), user_agent=user_agent, logger=log)
         stats = run_import_doaj_dump(
             conn,
@@ -1171,7 +1168,7 @@ def phase_oa_status(**kw: Any) -> PhaseMetrics:
     from infrastructure.repositories import publication_repository
     from infrastructure.sources.api_params import API_BASE_URLS
     from infrastructure.sources.config import get_polite_pool_email_optional
-    from infrastructure.sources.unpaywall import fetch_oa_status
+    from infrastructure.sources.unpaywall.client import fetch_oa_status
 
     metrics = PhaseMetrics()
     if not filter_configured(
