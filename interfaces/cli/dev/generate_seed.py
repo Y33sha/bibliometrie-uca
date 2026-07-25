@@ -1,11 +1,10 @@
 # STATUS: recurring (dev)
-"""
-Génère infrastructure/db/seed.sql à partir des données de référence de la base courante.
+"""Génère infrastructure/db/seed.sql à partir des données de référence de la base courante.
 
 Tables exportées :
   - config              (paramètres applicatifs)
   - countries           (référentiel pays)
-  - place_name_forms    (noms de pays, et plus tard de lieux/institutions)
+  - place_name_forms    (formes normalisées de noms de lieux : pays, institutions, villes)
   - structures          (structures UCA, labos, partenaires)
   - structure_relations  (relations entre structures)
   - perimeters          (périmètres UCA, UCA élargi)
@@ -15,12 +14,11 @@ Usage :
     python -m interfaces.cli.dev.generate_seed
     python -m interfaces.cli.dev.generate_seed --output infrastructure/db/seed.sql
 
-Le fichier produit est un SQL pur (INSERT) avec gestion des séquences.
-Il suppose que le schéma (tables, enums, séquences) est déjà appliqué
-via infrastructure/db/schema.sql + migrations.
+Le fichier produit est un SQL pur (INSERT) avec gestion des séquences. Il suppose que le schéma (tables, enums, séquences) est déjà appliqué via infrastructure/db/schema.sql + migrations.
 """
 
 import argparse
+import json
 from pathlib import Path
 from typing import Any
 
@@ -34,18 +32,13 @@ from infrastructure.db.engine import get_sync_engine
 DEFAULT_SEED_PATH = Path(__file__).resolve().parents[3] / "infrastructure" / "db" / "seed.sql"
 
 # Tables à exporter, dans l'ordre d'insertion (respect des FK).
-# Valeurs hétérogènes (str, list, dict) — TypedDict ferait sens à terme.
 TABLES: list[dict[str, Any]] = [
     {
         "table": "config",
         "columns": ["key", "value", "description"],
         "order": "key",
         "jsonb_columns": ["value"],
-        # Clés contenant des credentials — mises à NULL dans le seed. Un credential
-        # bidon non vide serait envoyé aux vraies API (échec d'authentification, et
-        # pour l'email un faux `mailto` polite pool exposé à un blacklist serveur) ;
-        # NULL est honnête et laisse les sources concernées être sautées proprement
-        # tant qu'aucun credential réel n'est renseigné.
+        # Clés contenant des credentials — mises à NULL dans le seed.
         "null_credentials": {
             "wos_api_key",
             "scanr_password",
@@ -85,7 +78,7 @@ TABLES: list[dict[str, Any]] = [
     },
     {
         "table": "perimeters",
-        "columns": ["id", "code", "name", "structure_ids"],
+        "columns": ["id", "code", "name", "root_structure_ids"],
         "order": "id",
     },
     {
@@ -106,11 +99,8 @@ TABLES: list[dict[str, Any]] = [
 def escape_sql(value: JsonValue, is_jsonb: bool = False) -> str:
     """Échappe une valeur pour insertion SQL.
 
-    Si is_jsonb=True, la valeur est sérialisée en JSON valide
-    (nécessaire pour les colonnes JSONB de PostgreSQL).
+    Si is_jsonb=True, la valeur est sérialisée en JSON valide (nécessaire pour les colonnes JSONB de PostgreSQL).
     """
-    import json
-
     if value is None:
         return "NULL"
     if is_jsonb:
@@ -121,7 +111,7 @@ def escape_sql(value: JsonValue, is_jsonb: bool = False) -> str:
     if isinstance(value, (int, float)):
         return str(value)
     if isinstance(value, list):
-        # Arrays PostgreSQL : '{1,2,3}' ou '{"a","b"}'
+        # Array PostgreSQL en forme non quotée '{1,2,3}' ; les seules colonnes array du seed sont des integer[].
         elements = ", ".join(str(v).replace("'", "''") for v in value)
         return "'{" + elements + "}'"
     if isinstance(value, dict):
