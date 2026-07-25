@@ -1,8 +1,6 @@
 """Adapter WoS pour `application.pipeline.extract.refresh_stale`.
 
-Refetch d'une row par son UT WoS (`staging.source_id`) via une requête Advanced
-Search `UT=(<ut>)`. Un lot sans correspondance (HTTP 400) ou une réponse valide
-sans record = UT confirmé absent.
+Refetch d'une row par son UT WoS (`staging.source_id`) via une requête Advanced Search `UT=(<ut>)`. Un lot sans correspondance (HTTP 400) ou une réponse valide sans record = UT confirmé absent.
 """
 
 from __future__ import annotations

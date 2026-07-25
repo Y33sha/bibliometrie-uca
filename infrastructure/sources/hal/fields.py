@@ -1,8 +1,6 @@
 """Configuration de l'adapter HAL Solr.
 
-Liste des champs Solr à récupérer lors des requêtes HAL (staging).
-Si un champ est ajouté, il doit être référencé ici pour être extrait
-de l'API.
+Liste des champs Solr à récupérer lors des requêtes HAL (staging). Si un champ est ajouté, il doit être référencé ici pour être extrait de l'API.
 """
 
 HAL_FIELDS = [

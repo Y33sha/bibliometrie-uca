@@ -1,17 +1,10 @@
 """Adapter CrossRef pour `application.pipeline.cross_imports.fetch_missing_doi`.
 
-CrossRef est ingérée DOI-driven : pour chaque DOI présent dans une autre
-source mais absent du staging CrossRef, on interroge l'endpoint
-`GET /works/{doi}` et on insère le `message` dans `staging` avec
-`source='crossref'`.
+CrossRef est ingérée DOI-driven : pour chaque DOI présent dans une autre source mais absent du staging CrossRef, on interroge l'endpoint `GET /works/{doi}` et on insère le `message` dans `staging` avec `source='crossref'`.
 
-Polite pool obtenu via le header `User-Agent` qui inclut un mailto.
-Doc CrossRef : polite = 10 req/s + 3 concurrentes. On colle exactement à
-ces limites (max_concurrent=3, request_delay=0.1 s) pour éviter les 429.
+Polite pool obtenu via le header `User-Agent` qui inclut un mailto. Doc CrossRef : polite = 10 req/s + 3 concurrentes. On colle exactement à ces limites (max_concurrent=3, request_delay=0.1 s) pour éviter les 429.
 
-Crossref est la source native du DOI : un 404 est définitif (DOI erroné ou non
-Crossref). Le miss est mémorisé dans `doi_lookups` avec `next_retry = NULL`
-(jamais retenté), ce qui l'exclut définitivement du pool de cross-import.
+Crossref est la source native du DOI : un 404 est définitif (DOI erroné ou non Crossref). Le miss est mémorisé dans `doi_lookups` avec `next_retry = NULL` (jamais retenté), ce qui l'exclut définitivement du pool de cross-import.
 """
 
 from __future__ import annotations
@@ -39,9 +32,7 @@ class CrossrefFetchMissingDoiAdapter:
 
     source_key = "crossref"
     batch_size = 1
-    # Polite pool CrossRef : 10 req/s, 3 concurrentes max. Avec sem=3 et
-    # ~200 ms de latence par requête, request_delay=0.1 plafonne à
-    # 3 / (0.1 + 0.2) ≈ 10 req/s sustained, juste sous la limite.
+    # Polite pool CrossRef : 10 req/s, 3 concurrentes max. Avec sem=3 et ~200 ms de latence par requête, request_delay=0.1 plafonne à 3 / (0.1 + 0.2) ≈ 10 req/s sustained, juste sous la limite.
     max_concurrent = 3
     request_delay_s = 0.1
 
@@ -55,9 +46,7 @@ class CrossrefFetchMissingDoiAdapter:
 
     async def fetch_async(self, client: httpx.AsyncClient, dois: list[str]) -> Iterable[dict]:
         doi = dois[0]
-        # CrossRef accepte le DOI tel quel dans le path (slashes inclus, qui
-        # font partie d'à peu près 100 % des DOI). On ne quote que les
-        # caractères vraiment dangereux.
+        # CrossRef accepte le DOI tel quel dans le path (slashes inclus, qui font partie d'à peu près 100 % des DOI). On ne quote que les caractères vraiment dangereux.
         url = f"{self.base_url}/works/{urllib.parse.quote(doi, safe='/()')}"
         try:
             data = await http_request_with_retry_async(
@@ -70,8 +59,7 @@ class CrossrefFetchMissingDoiAdapter:
             )
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 404:
-                # 404 = DOI confirmé absent de Crossref (source native du DOI, miss
-                # définitif). insert() le mémorise dans doi_lookups (permanent).
+                # 404 = DOI confirmé absent de Crossref (source native du DOI, miss définitif). insert() le mémorise dans doi_lookups (permanent).
                 return [not_found_marker(doi)]
             return []
         except httpx.RequestError:
@@ -88,9 +76,7 @@ class CrossrefFetchMissingDoiAdapter:
             record_doi_not_found(conn, "crossref", record["_doi"], permanent=True)
             return False
 
-        # DOI = identifiant CrossRef. On le passe par `clean_doi` (normalisation
-        # canonique partagée : lowercase, strip URL/ponctuation/suffixes) pour
-        # rester cohérent avec les autres sources et la colonne `doi`.
+        # DOI = identifiant CrossRef. On le passe par `clean_doi` (normalisation canonique partagée : lowercase, strip URL/ponctuation/suffixes) pour rester cohérent avec les autres sources et la colonne `doi`.
         doi = clean_doi(record.get("DOI"))
         if not doi:
             return False

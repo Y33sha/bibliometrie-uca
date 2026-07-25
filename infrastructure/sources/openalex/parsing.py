@@ -1,8 +1,6 @@
 """Parsing pur des works OpenAlex (sans I/O).
 
-Partagé par l'adapter d'extraction (`extract_openalex`) et l'adapter
-fetch-missing-doi (`fetch_missing_doi`) : ne dépend que du format JSON
-OpenAlex, ni de la connexion ni de l'auth.
+Partagé par l'adapter d'extraction (`extract_openalex`) et l'adapter fetch-missing-doi (`fetch_missing_doi`) : ne dépend que du format JSON OpenAlex, ni de la connexion ni de l'auth.
 """
 
 from __future__ import annotations

@@ -1,10 +1,6 @@
-"""Adapter theses.fr pour la phase extract : HTTP (recherche paginée
-par `debut`/`nombre`) + écritures staging + config.
+"""Adapter theses.fr pour la phase extract : HTTP (recherche paginée par `debut`/`nombre`) + écritures staging + config.
 
-Implémente le port
-`application.ports.pipeline.extract.theses.ThesesExtractAdapter`.
-L'orchestration de la phase (boucle par PPN × statut, filtre année
-post-fetch) vit côté `application.pipeline.extract.extract_theses`.
+Implémente le port `application.ports.pipeline.extract.theses.ThesesExtractAdapter`. L'orchestration de la phase (boucle par PPN × statut, filtre année post-fetch) vit côté `application.pipeline.extract.extract_theses`.
 """
 
 from __future__ import annotations
@@ -45,10 +41,7 @@ class PgThesesExtractAdapter(ThesesExtractAdapter):
     def _get(self, params: dict[str, Any], label: str) -> dict[str, Any]:
         """GET theses.fr, auto rate-limité : au moins `THESES_DELAY` entre deux appels.
 
-        L'adapter se rate-limite seul, quel que soit l'appelant — l'orchestrateur
-        n'ordonnance aucun `sleep`. On mesure l'écart depuis la dernière requête au
-        lieu de dormir systématiquement après coup : le temps de traitement entre
-        deux pages (upserts, commit) est déjà décompté du délai.
+        L'adapter se rate-limite seul, quel que soit l'appelant — l'orchestrateur n'ordonnance aucun `sleep`. On mesure l'écart depuis la dernière requête : le temps de traitement entre deux pages (upserts, commit) est déjà décompté du délai.
         """
         if self._last_request_at is not None:
             wait = THESES_DELAY - (time.monotonic() - self._last_request_at)
@@ -78,9 +71,7 @@ class PgThesesExtractAdapter(ThesesExtractAdapter):
     def extract_id(self, these: dict[str, Any]) -> str:
         """Extrait l'identifiant unique d'une thèse (champ `id`).
 
-        Pour les thèses soutenues, c'est le NNT (ex: `2021UCFAC022`) ; pour les
-        thèses en cours, c'est un id theses.fr (ex: `s367812`). Les deux vivent
-        dans la même colonne `id` de l'API recherche.
+        Pour les thèses soutenues, c'est le NNT (ex: `2021UCFAC022`) ; pour les thèses en cours, c'est un id theses.fr (ex: `s367812`). Les deux vivent dans la même colonne `id` de l'API recherche.
         """
         return these.get("id", "")
 

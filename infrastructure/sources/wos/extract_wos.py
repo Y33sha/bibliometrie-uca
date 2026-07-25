@@ -1,9 +1,6 @@
-"""Adapter WoS pour la phase extract : HTTP (API Expanded) +
-écritures staging + config.
+"""Adapter WoS pour la phase extract : HTTP (API Expanded) + écritures staging + config.
 
-Implémente le port `application.ports.pipeline.extract.wos.WosExtractAdapter`.
-L'orchestration de la phase (boucle par année, pauses, breather) vit
-côté `application.pipeline.extract.extract_wos`.
+Implémente le port `application.ports.pipeline.extract.wos.WosExtractAdapter`. L'orchestration de la phase (boucle par année, pauses, breather) vit côté `application.pipeline.extract.extract_wos`.
 """
 
 from __future__ import annotations
@@ -30,10 +27,7 @@ from infrastructure.sources.wos import parsing
 class PgWosExtractAdapter(WosExtractAdapter):
     """Adapter PostgreSQL + HTTP pour `WosExtractAdapter`.
 
-    Construit avec une `base_url` et une `api_key`. Les méthodes HTTP
-    formatent les paramètres et délèguent à `http_request_with_retry`
-    avec un backoff conservateur (`initial_backoff=2.0`) — WoS est plus
-    sensible aux 429.
+    Construit avec une `base_url` et une `api_key`. Les méthodes HTTP formatent les paramètres et délèguent à `http_request_with_retry` avec un backoff conservateur (`initial_backoff=2.0`) — WoS est plus sensible aux 429.
     """
 
     def __init__(self, base_url: str, api_key: str) -> None:
@@ -44,11 +38,7 @@ class PgWosExtractAdapter(WosExtractAdapter):
     def _get(self, params: dict[str, Any], label: str) -> dict[str, Any]:
         """GET WoS Expanded, auto rate-limité : au moins `WOS_DELAY` entre deux appels.
 
-        L'adapter se rate-limite seul, quel que soit l'appelant — l'orchestrateur
-        n'ordonnance plus le délai de politesse (il garde en revanche ses pauses
-        propres : breather périodique, backoff sur page vide, pause inter-années).
-        On mesure l'écart depuis la dernière requête au lieu de dormir
-        systématiquement après coup.
+        L'adapter se rate-limite seul, quel que soit l'appelant ; l'orchestrateur garde ses pauses propres (breather périodique, backoff sur page vide, pause inter-années). On mesure l'écart depuis la dernière requête et on n'attend que le temps restant.
         """
         if self._last_request_at is not None:
             wait = WOS_DELAY - (time.monotonic() - self._last_request_at)
@@ -100,8 +90,7 @@ class PgWosExtractAdapter(WosExtractAdapter):
     def fetch_page(self, year: int, first_record: int, affiliations: list[str]) -> dict[str, Any]:
         """Récupère une page de résultats via une recherche complète.
 
-        Note : la pagination via queryId ne fonctionne pas de façon fiable
-        (réponses vides), on refait une recherche avec firstRecord à chaque page.
+        Note : la pagination via queryId ne fonctionne pas de façon fiable (réponses vides), on refait une recherche avec firstRecord à chaque page.
         """
         params = {
             "databaseId": "WOS",
