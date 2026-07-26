@@ -73,10 +73,10 @@ _UPDATE_SQL = text(
     """
 ).bindparams(bindparam("raw_data", type_=JSONB))
 
-# Mode --full : réinsère les orphelins et force la réhydratation des existants
-# (le `raw_hash` inchangé d'une ligne déjà normalisée interdit de passer par
-# `upsert_staging`, qui ne réécrit que sur changement de hash). `doi` n'est posé
-# qu'à l'insertion ; une ligne existante garde son `doi` d'origine.
+# Mode --full : réinsère les orphelins et écrase inconditionnellement les existants
+# — réhydratation forcée pour rejouer normalize, distincte du moissonnage idempotent
+# de l'extraction. `doi` n'est posé qu'à l'insertion ; une ligne existante garde son
+# `doi` d'origine.
 _UPSERT_SQL = text(
     """
     INSERT INTO staging (source, source_id, doi, raw_data, raw_hash, processed)
