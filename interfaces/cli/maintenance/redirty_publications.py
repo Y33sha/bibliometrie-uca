@@ -1,22 +1,15 @@
 # STATUS: maintenance
 """Re-marque `keys_dirty` sur les source_publications pour forcer une re-réconciliation.
 
-Quand une règle de clés de confirmation évolue (nouveau token, seuil de garde, projection revue
-dans `domain/source_publications/keys.py`), le stock déjà réconcilié ne reflète plus la règle :
-les fusions/scissions qu'elle implique ne sont pas matérialisées. Ce script re-marque `keys_dirty`
-sur les SP concernées ; la phase `publications` (réconciliation) les retraite au prochain run —
-sur tout le stock, c'est le *cluster-then-materialize* complet.
+Quand une règle de clés de confirmation évolue (ajout d'un token, seuil de garde, projection revue dans `domain/source_publications/keys.py`), le stock déjà réconcilié ne reflète pas la règle courante : les fusions/scissions qu'elle implique ne sont pas matérialisées. Ce script re-marque `keys_dirty` sur les source_publications concernées ; la phase `publications` (réconciliation) les retraite au prochain run — sur tout le stock, c'est le *cluster-then-materialize* complet.
 
-Sans `--where`, marque **tout le stock** (rebuild complet). `--where` cible un sous-ensemble
-(fragment SQL de confiance, ex. la condition d'une règle précise) :
+Sans `--where`, marque **tout le stock** (rebuild complet). `--where` cible un sous-ensemble (fragment SQL de confiance, ex. la condition d'une règle précise) :
 
     python -m interfaces.cli.maintenance.redirty_publications
     python -m interfaces.cli.maintenance.redirty_publications --where "doc_type = 'book_chapter'"
     python -m interfaces.cli.maintenance.redirty_publications --dry-run
 
-Puis matérialiser : `python run_pipeline.py --only publications` (ou directement
-`run_pipeline.py --only publications --rebuild-publications`, qui enchaîne le re-dirty total et la
-réconciliation).
+Puis matérialiser : `python run_pipeline.py --only publications` (ou directement `run_pipeline.py --only publications --rebuild-publications`, qui enchaîne le re-dirty total et la réconciliation).
 """
 
 from __future__ import annotations
