@@ -86,9 +86,7 @@ Il est nécessaire, en particulier apès les premiers runs, de **fusionner** les
 
 Un garde-fou empêche de fusionner ensemble deux personnes présentes dans l'[extraction RH](../sources/10-imports-manuels.md).
 
-Des scripts en ligne de commande permettent d'accélérer le travail:
-- [merge_duplicate_persons_by_publication](https://github.com/Y33sha/bibliometrie-uca/blob/master/interfaces/cli/maintenance/merge_duplicate_persons_by_publication.py) : personnes distinctes figurant comme auteur de la même publication (repérée sur différentes sources), en même position auteur, avec des noms compatibles (au sens de la fonction [names_compatible](https://github.com/Y33sha/bibliometrie-uca/blob/master/domain/persons/name_matching.py))
-- [merge_person_duplicates_by_lab](https://github.com/Y33sha/bibliometrie-uca/blob/master/interfaces/cli/maintenance/merge_person_duplicates_by_lab.py) : personnes distinctes ayant signé des publications pour le même laboratoire et portant un nom compatible<!--TODO: corriger le script pour qu'il utilise la fonction names_compatible et pas une identité stricte; accessoirement, harmoniser le nommage des deux scripts--> (validation requise au cas par cas)
+La fusion s'opère depuis `admin/persons`: la file des doublons par nom (doublons probables en tête, homonymes en fin) présente les paires candidates; pour chacune, on fusionne vers la personne à conserver, ou on la marque comme distincte — elle sort alors de la file.
 
 #### Détachement des authorships attribuées à tort
 
