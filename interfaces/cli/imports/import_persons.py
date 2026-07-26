@@ -6,7 +6,7 @@ Usage:
     python -m interfaces.cli.imports.import_persons fichier_rh.csv
     python -m interfaces.cli.imports.import_persons fichier_rh.xlsx
     python -m interfaces.cli.imports.import_persons fichier_rh.tsv --dry-run
-    python -m interfaces.cli.imports.import_persons fichier_rh.csv --clear   # vide la table avant import
+    python -m interfaces.cli.imports.import_persons fichier_rh.csv --clear   # vide la table persons avant import
 
 Colonnes attendues (noms flexibles, détection automatique) :
     nom, prenom, email, department-name, role-title, start-date, end-date
@@ -14,10 +14,9 @@ Colonnes attendues (noms flexibles, détection automatique) :
 
 import argparse
 import csv
-import logging
 import os
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from sqlalchemy import Connection, text
@@ -25,13 +24,34 @@ from sqlalchemy import Connection, text
 from application.services.persons.core import refresh_person_name_forms
 from domain.normalize import normalize_name
 from infrastructure.db.engine import get_sync_engine
+from infrastructure.observability.log import setup_logger
 from infrastructure.repositories import person_repository
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-)
-logger = logging.getLogger(__name__)
+log = setup_logger("import_persons", os.path.dirname(__file__))
+
+
+SELECT_DUPLICATE_PERSON = text("""
+    SELECT p.id FROM persons p
+    LEFT JOIN persons_rh prh ON prh.person_id = p.id
+    WHERE p.last_name_normalized = :ln
+      AND p.first_name_normalized = :fn
+      AND prh.department_name IS NOT DISTINCT FROM :dept
+      AND prh.role_title IS NOT DISTINCT FROM :role
+""")
+
+INSERT_PERSON = text("""
+    INSERT INTO persons
+        (last_name, first_name, last_name_normalized, first_name_normalized)
+    VALUES (:last, :first, :ln, :fn)
+    RETURNING id
+""")
+
+INSERT_PERSON_RH = text("""
+    INSERT INTO persons_rh
+        (person_id, email, role_title, department_name,
+         start_date, end_date, hr_export_date)
+    VALUES (:pid, :email, :role, :dept, :start, :end, :exp)
+""")
 
 
 def parse_date(val: object) -> str | None:
@@ -44,23 +64,18 @@ def parse_date(val: object) -> str | None:
             return datetime.strptime(val, fmt).date().isoformat()
         except ValueError:
             continue
-    # Tenter un format numérique Excel (nombre de jours depuis 1900-01-01)
+    # Sérialisation numérique Excel : nombre de jours depuis la base 1899-12-30
+    # (décalée d'un jour pour compenser le faux bissextile 1900 d'Excel).
     try:
         n = int(float(val))
         if 30000 < n < 60000:
-            from datetime import timedelta
-
             base = datetime(1899, 12, 30)
             return (base + timedelta(days=n)).date().isoformat()
     except (ValueError, OverflowError):
         pass
-    logger.warning(f"Date non parsable: '{val}'")
+    log.warning(f"Date non parsable: '{val}'")
     return None
 
-
-# =============================================================
-# LECTURE DU FICHIER
-# =============================================================
 
 # Mapping flexible des noms de colonnes
 COLUMN_ALIASES = {
@@ -142,8 +157,8 @@ def read_csv_tsv(filepath: str) -> list[dict[str, str]]:
             headers = next(reader)
             col_map = resolve_columns(headers)
 
-        logger.info(f"Colonnes détectées: {col_map}")
-        logger.info(f"En-têtes: {headers}")
+        log.info(f"Colonnes détectées: {col_map}")
+        log.info(f"En-têtes: {headers}")
 
         if "last_name" not in col_map:
             raise ValueError(f"Colonne 'nom' introuvable. En-têtes: {headers}")
@@ -167,7 +182,7 @@ def read_excel(filepath: str) -> list[dict[str, Any]]:
     try:
         import openpyxl
     except ImportError:
-        logger.error("openpyxl requis pour les fichiers Excel: pip install openpyxl")
+        log.error("openpyxl requis pour les fichiers Excel: pip install openpyxl")
         sys.exit(1)
 
     wb = openpyxl.load_workbook(filepath, read_only=True)
@@ -176,8 +191,8 @@ def read_excel(filepath: str) -> list[dict[str, Any]]:
     headers = [str(h or "") for h in next(rows_iter)]
     col_map = resolve_columns(headers)
 
-    logger.info(f"Colonnes détectées: {col_map}")
-    logger.info(f"En-têtes: {headers}")
+    log.info(f"Colonnes détectées: {col_map}")
+    log.info(f"En-têtes: {headers}")
 
     if "last_name" not in col_map:
         raise ValueError(f"Colonne 'nom' introuvable. En-têtes: {headers}")
@@ -205,11 +220,6 @@ def read_file(filepath: str) -> list[dict[str, Any]]:
         return read_excel(filepath)
     else:
         return read_csv_tsv(filepath)
-
-
-# =============================================================
-# IMPORT EN BASE
-# =============================================================
 
 
 def import_persons(
@@ -244,18 +254,9 @@ def import_persons(
             inserted += 1
             continue
 
-        # Vérifier doublon (même nom normalisé + même department + même role)
+        # Doublon = même nom normalisé, même département et même rôle (comparaison NULL-safe).
         existing = conn.execute(
-            text(
-                """
-                SELECT p.id FROM persons p
-                LEFT JOIN persons_rh prh ON prh.person_id = p.id
-                WHERE p.last_name_normalized = :ln
-                  AND p.first_name_normalized = :fn
-                  AND prh.department_name IS NOT DISTINCT FROM :dept
-                  AND prh.role_title IS NOT DISTINCT FROM :role
-                """
-            ),
+            SELECT_DUPLICATE_PERSON,
             {"ln": last_norm, "fn": first_norm, "dept": department, "role": role},
         ).first()
         if existing:
@@ -263,27 +264,13 @@ def import_persons(
             continue
 
         person_id = conn.execute(
-            text(
-                """
-                INSERT INTO persons
-                    (last_name, first_name, last_name_normalized, first_name_normalized)
-                VALUES (:last, :first, :ln, :fn)
-                RETURNING id
-                """
-            ),
+            INSERT_PERSON,
             {"last": last_name, "first": first_name, "ln": last_norm, "fn": first_norm},
         ).scalar_one()
         refresh_person_name_forms(person_id, last_name, first_name, repo=person_repository(conn))
 
         conn.execute(
-            text(
-                """
-                INSERT INTO persons_rh
-                    (person_id, email, role_title, department_name,
-                     start_date, end_date, hr_export_date)
-                VALUES (:pid, :email, :role, :dept, :start, :end, :exp)
-                """
-            ),
+            INSERT_PERSON_RH,
             {
                 "pid": person_id,
                 "email": email,
@@ -298,21 +285,16 @@ def import_persons(
 
         if inserted % 500 == 0:
             conn.commit()
-            logger.info(f"  {inserted} personnes insérées…")
+            log.info(f"  {inserted} personnes insérées…")
 
     conn.commit()
 
     if skipped:
-        logger.warning(f"  {skipped} lignes ignorées (nom ou prénom manquant)")
+        log.warning(f"  {skipped} lignes ignorées (nom ou prénom manquant)")
     if duplicates:
-        logger.info(f"  {duplicates} doublons ignorés")
+        log.info(f"  {duplicates} doublons ignorés")
 
     return inserted
-
-
-# =============================================================
-# MAIN
-# =============================================================
 
 
 def main() -> None:
@@ -329,49 +311,44 @@ def main() -> None:
     args = parser.parse_args()
 
     if not os.path.exists(args.file):
-        logger.error(f"Fichier introuvable: {args.file}")
+        log.error(f"Fichier introuvable: {args.file}")
         sys.exit(1)
 
-    logger.info(f"=== Import personnes depuis {args.file} ===")
+    log.info(f"=== Import personnes depuis {args.file} ===")
 
-    # Lire le fichier
     records = read_file(args.file)
-    logger.info(f"  {len(records)} lignes lues")
+    log.info(f"  {len(records)} lignes lues")
 
     if not records:
-        logger.warning("Aucune donnée à importer.")
+        log.warning("Aucune donnée à importer.")
         return
 
-    # Aperçu
     sample = records[0]
-    logger.info(f"  Exemple: {sample}")
+    log.info(f"  Exemple: {sample}")
 
-    # Stats rapides
     departments = set(r.get("department_name", "") for r in records if r.get("department_name"))
     roles = set(r.get("role_title", "") for r in records if r.get("role_title"))
-    logger.info(f"  {len(departments)} départements distincts, {len(roles)} rôles distincts")
+    log.info(f"  {len(departments)} départements distincts, {len(roles)} rôles distincts")
 
     if args.dry_run:
-        logger.info("  (dry-run, pas d'insertion)")
-        # Lister les départements
+        log.info("  (dry-run, pas d'insertion)")
         for d in sorted(departments):
             count = sum(1 for r in records if r.get("department_name") == d)
-            logger.info(f"    {d}: {count}")
+            log.info(f"    {d}: {count}")
         return
 
     conn = get_sync_engine().connect()
     try:
         if args.clear:
             n_deleted = conn.execute(text("DELETE FROM persons")).rowcount
-            logger.info(f"  Table persons vidée ({n_deleted} lignes supprimées)")
+            log.info(f"  Table persons vidée ({n_deleted} lignes supprimées)")
             conn.commit()
 
         inserted = import_persons(conn, records, export_date=args.export_date)
-        logger.info(f"\n=== Terminé : {inserted} personnes insérées ===")
+        log.info(f"\n=== Terminé : {inserted} personnes insérées ===")
 
-        # Compter
         total = conn.execute(text("SELECT COUNT(*) AS n FROM persons")).scalar_one()
-        logger.info(f"  Total en base : {total} personnes")
+        log.info(f"  Total en base : {total} personnes")
 
     finally:
         conn.close()
