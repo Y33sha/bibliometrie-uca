@@ -1,9 +1,12 @@
 # STATUS: oneshot (2026-06-17)
-"""Dump (chantier dedup-pairwise) des couples openalex+scanr réunis par métadonnées (sans DOI)
-SANS recouvrement d'auteurs sous `names_compatible` — pour qualifier l'excédent à la main
-(artefact d'ordre des noms OpenAlex vs vraie sur-fusion book_chapter).
+"""Audit (lecture seule) : échantillon de couples openalex+scanr réunis par métadonnées sans DOI et SANS recouvrement d'auteurs.
 
-Lance : python -m interfaces.cli.oneshot.audit_dedup_overmerge_examples
+Sélectionne les couples de `source_publications` openalex+scanr regroupés par (`doc_type`, `title_normalized`, `pub_year`) dont les listes d'auteurs ne se recouvrent pas sous `names_compatible`, et en affiche un échantillon pour qualification manuelle : distinguer l'artefact d'ordre des noms (OpenAlex liste parfois le nom avant le prénom) d'une vraie sur-fusion (typiquement des `book_chapter` au titre commun mais aux auteurs distincts).
+
+N'écrit rien.
+
+Usage :
+    python -m interfaces.cli.oneshot.audit_dedup_overmerge_examples
 """
 
 from collections import defaultdict
