@@ -1,13 +1,17 @@
 # STATUS: oneshot (2026-06-17)
-"""Audit (chantier dedup-pairwise) : non-recouvrement d'auteurs sous `names_compatible`.
+"""Audit (lecture seule) : non-recouvrement d'auteurs entre couples de `source_publications` compatibles.
 
-Compare, par paire de sources, le % de couples de SPs SANS recouvrement d'auteurs (matching
-compatible : initiales, accents, ordre nom/prénom) entre :
-- couples réunis par DOI (vérité terrain « même œuvre ») = bruit de fond ;
-- couples réunis par métadonnées sans DOI (token metadata_block) = à valider.
+Mesure, par paire de sources, le pourcentage de couples de `source_publications` SANS recouvrement d'auteurs (matching tolérant via `names_compatible` : initiales, accents, ordre nom/prénom), pour deux populations de couples :
 
-Si méta ≈ DOI par paire de sources → pas d'excédent de collision (le résidu = artefacts de
-matching de noms + vraies collisions). Lance : python -m interfaces.cli.oneshot.audit_dedup_author_overlap
+- réunis par DOI partagé (vérité terrain « même œuvre ») — bruit de fond de référence ;
+- réunis par métadonnées sans DOI (même `doc_type`, `title_normalized` et `pub_year`) — à valider.
+
+Un taux « métadonnées » proche du taux « DOI » pour une paire de sources signale que le regroupement par métadonnées n'introduit pas d'excédent de collision (le résidu se réduit aux artefacts de matching de noms et aux vraies collisions). Sert à mesurer la pureté d'un token de déduplication candidat avant de l'adopter.
+
+N'écrit rien.
+
+Usage :
+    python -m interfaces.cli.oneshot.audit_dedup_author_overlap
 """
 
 from collections import defaultdict
