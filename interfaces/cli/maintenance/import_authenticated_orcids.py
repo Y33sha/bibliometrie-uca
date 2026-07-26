@@ -23,8 +23,9 @@ from __future__ import annotations
 import argparse
 import csv
 import os
+from pathlib import Path
 
-from sqlalchemy import text
+from sqlalchemy import Connection, text
 
 from application.ports.repositories.person_repository import AuthenticateOrcidOutcome
 from application.services.persons.core import authenticate_orcids
@@ -35,10 +36,11 @@ from infrastructure.repositories import person_repository
 
 log = setup_logger("import_authenticated_orcids", os.path.dirname(__file__))
 
-_DEFAULT_FILE = "data/authenticated_orcids.csv"
+# `parents[3]` remonte interfaces/cli/maintenance/ → racine du dépôt ; le fichier vit sous data/.
+_DEFAULT_FILE = Path(__file__).resolve().parents[3] / "data" / "authenticated_orcids.csv"
 
 
-def _load_rows(path: str) -> list[tuple[str, str]]:
+def _load_rows(path: str | Path) -> list[tuple[str, str]]:
     """Lit le CSV `email,orcid` (sans en-tête). Ignore les lignes vides."""
     rows: list[tuple[str, str]] = []
     with open(path, newline="", encoding="utf-8") as f:
@@ -47,6 +49,33 @@ def _load_rows(path: str) -> list[tuple[str, str]]:
                 continue
             rows.append((record[0].strip(), record[1].strip()))
     return rows
+
+
+def resolve_email_to_persons(conn: Connection) -> dict[str, list[int]]:
+    """Emails RH (minusculisés) → liste des person_id qui les portent."""
+    return {
+        r.email: list(r.pids)
+        for r in conn.execute(
+            text(
+                "SELECT lower(email) AS email, array_agg(DISTINCT person_id) AS pids "
+                "FROM persons_rh WHERE email IS NOT NULL GROUP BY lower(email)"
+            )
+        )
+    }
+
+
+def fetch_current_orcid_holders(conn: Connection, orcids: list[str]) -> dict[str, tuple[int, str]]:
+    """Pour chaque ORCID déjà en base parmi ceux fournis : (person_id, statut) de son porteur actuel."""
+    return {
+        r.id_value: (r.person_id, r.status)
+        for r in conn.execute(
+            text(
+                "SELECT id_value, person_id, CAST(status AS text) AS status "
+                "FROM person_identifiers WHERE id_type = 'orcid' AND id_value = ANY(:v)"
+            ),
+            {"v": orcids},
+        )
+    }
 
 
 def main() -> int:
@@ -64,15 +93,7 @@ def main() -> int:
 
     engine = get_sync_engine()
     with engine.connect() as conn:
-        # Résolution email → person_id (via persons_rh), insensible à la casse.
-        email_to_persons: dict[str, list[int]] = {}
-        for r in conn.execute(
-            text(
-                "SELECT lower(email) AS email, array_agg(DISTINCT person_id) AS pids "
-                "FROM persons_rh WHERE email IS NOT NULL GROUP BY lower(email)"
-            )
-        ):
-            email_to_persons[r.email] = list(r.pids)
+        email_to_persons = resolve_email_to_persons(conn)
 
         # État courant des ORCID du fichier, pour prévoir l'issue et détecter les déplacements.
         entries: list[tuple[int, str]] = []
@@ -93,17 +114,7 @@ def main() -> int:
                 continue
             entries.append((persons[0], orcid))
 
-        # Déplacements à venir : ORCID actuellement sur une autre personne.
-        current = {
-            r.id_value: (r.person_id, r.status)
-            for r in conn.execute(
-                text(
-                    "SELECT id_value, person_id, CAST(status AS text) AS status "
-                    "FROM person_identifiers WHERE id_type = 'orcid' AND id_value = ANY(:v)"
-                ),
-                {"v": [o for _, o in entries]},
-            )
-        }
+        current = fetch_current_orcid_holders(conn, [o for _, o in entries])
         reassignments = [
             (orcid, current[orcid][0], person_id)
             for person_id, orcid in entries
