@@ -14,7 +14,7 @@ Cascade FK mobilisée :
   - `persons` → `person_identifiers`, `person_name_forms`
 
 Usage :
-    python -m interfaces.cli.maintenance.cleanup_publications_out_of_window [--dry-run]
+    python -m interfaces.cli.maintenance.delete_publications_out_of_window [--dry-run]
 """
 
 from __future__ import annotations
@@ -27,7 +27,7 @@ from sqlalchemy import Connection, text
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 
-log = setup_logger("cleanup_publications_out_of_window", os.path.dirname(__file__))
+log = setup_logger("delete_publications_out_of_window", os.path.dirname(__file__))
 
 
 def fetch_cutoff(conn: Connection) -> int:

@@ -1,12 +1,12 @@
 # STATUS: maintenance
-"""Élague les payloads orphelins d'un raw store : fichiers dont le `source_id` est absent de `staging`.
+"""Supprime les payloads orphelins d'un raw store : fichiers dont le `source_id` est absent de `staging`.
 
 Le raw store ne fait que croître — `mark_done` n'y écrit que des `put`, aucune suppression. Au fil des re-imports, changements d'identifiants et purges de staging, des payloads y subsistent sans ligne `staging` correspondante. Ce script confronte chaque clé du store au set des `source_id` présents en staging (par source) et supprime celles absentes. La base reste la source de vérité : un payload supprimé du store est ré-archivé au prochain passage de normalisation s'il revient en staging.
 
 `--root` cible un store arbitraire (défaut : `data/raw_store`), ce qui permet de l'appliquer aussi à une copie hors ligne (snapshot pour diagnostic de churn).
 
 Usage :
-    python -m interfaces.cli.maintenance.prune_raw_store_orphans [--root CHEMIN] [--source SRC] [--dry-run]
+    python -m interfaces.cli.maintenance.delete_raw_store_orphans [--root CHEMIN] [--source SRC] [--dry-run]
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ from infrastructure.observability.log import setup_logger
 from infrastructure.queries.pipeline.normalize.staging import fetch_existing_source_ids
 from infrastructure.raw_store.factory import get_raw_store
 
-log = setup_logger("prune_raw_store_orphans", os.path.dirname(__file__))
+log = setup_logger("delete_raw_store_orphans", os.path.dirname(__file__))
 
 _DEFAULT_ROOT = PROJECT_ROOT / "data" / "raw_store"
 
