@@ -1,31 +1,16 @@
+# STATUS: maintenance
 """Réhydrate `staging.raw_data` depuis le raw store, pour renormaliser une source.
 
-Opération inverse de `mark_done` (`infrastructure/queries/pipeline/staging.py`),
-qui archive le payload au raw store puis vide `staging.raw_data` (`= '{}'`) et
-pose `processed = TRUE`. Une fois une source normalisée, son payload brut ne
-survit plus qu'au raw store ; ce script le réinjecte en base pour permettre une
-nouvelle passe de normalisation.
+Opération inverse de `mark_done` (`infrastructure/queries/pipeline/staging.py`), qui archive le payload au raw store puis vide `staging.raw_data` (`= '{}'`) et pose `processed = TRUE`. Une fois une source normalisée, son payload brut ne subsiste qu'au raw store ; ce script le réinjecte en base pour rejouer la normalisation.
 
-Pour chaque source demandée, parcourt les clés du raw store
-(`data/raw_store/{source}/{source_id}.json.gz`), lit chaque payload et
-réhydrate la ligne `(source, source_id)` : `raw_data = <payload>`, `raw_hash`
-recalculé via `change_detection_hash` (même empreinte que l'UPSERT d'extraction,
-pour qu'une ligne réhydratée ne re-diverge pas au moissonnage suivant),
-`processed = FALSE`.
+Pour chaque source demandée, parcourt les clés du raw store (`data/raw_store/{source}/{source_id}.json.gz`), lit chaque payload et réhydrate la ligne `(source, source_id)` : `raw_data = <payload>`, `raw_hash` recalculé via `change_detection_hash` (même empreinte que l'UPSERT d'extraction, pour qu'une ligne réhydratée ne re-diverge pas au moissonnage suivant), `processed = FALSE`.
 
 Deux modes :
 
-- défaut : ne met à jour que les lignes `staging` déjà présentes. Une clé du
-  store sans ligne correspondante est comptée comme orpheline et signalée.
-- `--full` : réinsère aussi les orphelins (cas d'un `TRUNCATE staging`, où tout
-  est orphelin par définition). Le `source_id` est la clé du store et le `doi`
-  est ré-extrait du payload par la logique propre à chaque source. Les drapeaux
-  de provenance non reconstructibles depuis le seul payload (`entry_mode`,
-  `authors_truncated`) reprennent leur défaut et se recalculent au prochain
-  extract bulk réel.
+- défaut : ne met à jour que les lignes `staging` déjà présentes. Une clé du store sans ligne correspondante est comptée comme orpheline et signalée.
+- `--full` : réinsère aussi les orphelins (cas d'un `TRUNCATE staging`, où tout est orphelin par définition). Le `source_id` est la clé du store et le `doi` est ré-extrait du payload par la logique propre à chaque source. Les drapeaux de provenance non reconstructibles depuis le seul payload (`entry_mode`, `authors_truncated`) reprennent leur défaut et se recalculent au prochain extract bulk réel.
 
-Ne lance PAS la normalisation : une fois réhydraté, relancer le pipeline
-depuis la normalisation (qui réenchaîne toutes les phases aval) :
+Ne lance PAS la normalisation : une fois réhydraté, relancer le pipeline depuis la normalisation (qui réenchaîne toutes les phases aval) :
     python run_pipeline.py --from normalize --sources <sources>
 
 Usage :
