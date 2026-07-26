@@ -46,9 +46,7 @@ Fusion et scission découlent du même regroupement :
 Recalculer tout le graphe à chaque run serait inutilement coûteux. Une `source_publication` modifiée (insérée, re-normalisée, corrigée) est marquée *à recalculer*, et la phase ne traite que le **voisinage direct** de ces `source_publications` — elles et celles avec lesquelles elles partagent une clé. C'est suffisant puisque toute nouvelle relation a forcément une extrémité parmi les `source_publications` modifiées.
 
 > **Conséquence** :
-> En cas de modification de la logique de déduplication, pour que les changements soient pris en compte au prochain run du pipeline, il faut marquer toutes les publications *à recalculer*, ce qui peut se faire:
-> - en lançant le script `interfaces/cli/maintenance/redirty_publications.py`;
-> - ou en lançant le pipeline suivant avec l'option `--rebuild-publications`;
+> En cas de modification de la logique de déduplication, pour que les changements soient pris en compte au prochain run du pipeline, il faut marquer toutes les publications *à recalculer* : lancer le pipeline avec l'option `--rebuild-publications`.
 
 ## Rafraîchissement des métadonnées canoniques
 
