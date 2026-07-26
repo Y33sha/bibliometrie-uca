@@ -11,15 +11,9 @@ Pré-filtrage outliers : on retire des DOIs d'entrée ceux qui correspondent
 à des préfixes preprint server / aggregateur connus (`OUTLIER_DOI_PREFIXES`).
 Sinon une publi avec un DOI bioRxiv `10.1101/...` posée sur Nature
 Communications effondrerait la LCP au niveau `10.`. Ces DOIs outliers sont
-précisément ce que la Phase 4a (cohérence DOI ↔ journal) doit flagger comme
+précisément ce que l'audit de cohérence DOI ↔ journal doit flagger comme
 incohérence — ils n'ont pas vocation à entrer dans la définition du
 `doi_prefix` du journal.
-
-À terme, un filtre publisher (DOIs dont le préfixe résout vers le publisher
-du journal via `doi_prefixes`) serait plus robuste — pas implémenté car
-`journals.publisher_id` (issu des sources HAL/OA/WoS) et
-`doi_prefixes.publisher_id` (issu de Crossref) ne sont pas alignés tant que
-le dédoublonnage publishers n'a pas été fait sur cette base.
 
 Cas typiques bien gérés :
 - PLOS ONE : `10.1371/journal.pone.0271233`, `.0135715`, ... → LCP `10.1371/journal.pone.0` → trim → `10.1371/journal.pone`
@@ -35,13 +29,13 @@ Cas qui tombent en « ambigu » (écrits dans le CSV de sortie pour analyse manu
 - Aucun DOI ne reste après filtrage outliers (journal qui *est* un serveur
   de preprints : bioRxiv, Research Square, Preprints.org, ...).
 
-Stratégie C-stricte : on n'écrit pas de préfixe publisher-only (`10.1103/`,
-`10.4000/`, ...). Pour les revues sans subprefix journal-spécifique (APS new
-format, OpenEdition opaque IDs), `doi_prefix` reste NULL — la cohérence DOI
-↔ journal en Phase 4a se fera via `doi_prefixes.publisher_id`.
+On n'écrit pas de préfixe publisher-only (`10.1103/`, `10.4000/`, ...). Pour les
+revues sans sous-préfixe journal-spécifique (APS, OpenEdition à IDs opaques),
+`doi_prefix` reste NULL — la cohérence DOI ↔ journal se fait alors via
+`doi_prefixes.publisher_id`.
 
 Écrase systématiquement la valeur existante pour les journaux non-ambigus
-de l'échantillon analysé. Ne touche pas les ambigus (ancienne valeur conservée).
+de l'échantillon analysé. Ne touche pas les ambigus (valeur existante conservée).
 
 Usage :
     python -m interfaces.cli.oneshot.seed_journals_doi_prefix
@@ -56,6 +50,7 @@ import csv
 import json
 import os
 import re
+from pathlib import Path
 
 from sqlalchemy import text
 
@@ -63,6 +58,9 @@ from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 
 log = setup_logger("seed_journals_doi_prefix", os.path.dirname(__file__))
+
+# `parents[3]` remonte interfaces/cli/oneshot/ → racine du dépôt ; le CSV des cas ambigus vit sous data/.
+_DEFAULT_CSV = Path(__file__).resolve().parents[3] / "data" / "doi_prefix_seed_ambiguous.csv"
 
 # Trim en 2 passes pour éviter qu'un code journal numérique (Taylor & Francis
 # `10408398`) ou un segment alphanumérique (Springer Nature `s41597`) soit
@@ -97,6 +95,19 @@ OUTLIER_DOI_PREFIXES: tuple[str, ...] = (
     "10.22541/au.",  # Authorea preprints
     "10.31223/",  # EarthArXiv
 )
+
+# Journaux avec ≥ min_pubs DOIs distincts, et l'ensemble de leurs DOIs.
+SELECT_JOURNAL_DOIS = text("""
+    SELECT j.id, j.title,
+           array_agg(DISTINCT p.doi ORDER BY p.doi) AS dois
+    FROM journals j
+    JOIN publications p ON p.journal_id = j.id
+    WHERE p.doi IS NOT NULL
+    GROUP BY j.id, j.title
+    HAVING COUNT(DISTINCT p.doi) >= :min_pubs
+""")
+
+UPDATE_JOURNAL_PREFIX = text("UPDATE journals SET doi_prefix = :p WHERE id = :id")
 
 
 def is_outlier(doi: str) -> bool:
@@ -159,8 +170,8 @@ def main() -> None:
     )
     parser.add_argument(
         "--csv-out",
-        default="data/doi_prefix_seed_ambiguous.csv",
-        help="Chemin du CSV pour les cas ambigus (relatif à la racine du repo).",
+        default=str(_DEFAULT_CSV),
+        help=f"Chemin du CSV pour les cas ambigus (défaut : {_DEFAULT_CSV}).",
     )
     parser.add_argument(
         "--min-pubs",
@@ -172,21 +183,8 @@ def main() -> None:
 
     engine = get_sync_engine()
     with engine.connect() as conn, conn.begin():
-        rows = conn.execute(
-            text("""
-                SELECT j.id, j.title,
-                       array_agg(DISTINCT p.doi ORDER BY p.doi) AS dois
-                FROM journals j
-                JOIN publications p ON p.journal_id = j.id
-                WHERE p.doi IS NOT NULL
-                GROUP BY j.id, j.title
-                HAVING COUNT(DISTINCT p.doi) >= :min_pubs
-            """),
-            {"min_pubs": args.min_pubs},
-        ).all()
+        rows = conn.execute(SELECT_JOURNAL_DOIS, {"min_pubs": args.min_pubs}).all()
         log.info("Journaux à analyser (≥%d publis DOI) : %d", args.min_pubs, len(rows))
-
-        update_stmt = text("UPDATE journals SET doi_prefix = :p WHERE id = :id")
 
         seeded = 0
         ambiguous: list[dict] = []
@@ -228,7 +226,7 @@ def main() -> None:
                 )
                 continue
             if not args.dry_run:
-                conn.execute(update_stmt, {"p": trimmed, "id": r.id})
+                conn.execute(UPDATE_JOURNAL_PREFIX, {"p": trimmed, "id": r.id})
             seeded += 1
 
         if ambiguous:
