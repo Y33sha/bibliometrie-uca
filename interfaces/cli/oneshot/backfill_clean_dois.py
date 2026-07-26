@@ -1,41 +1,21 @@
 # STATUS: oneshot (2026-07-05)
-"""Backfill : normalise les DOI du stock et purge les négatifs de lookup périmés.
+"""Re-normalise le stock de DOI et purge les négatifs de lookup non canoniques.
 
-`clean_doi` est appliqué à toutes les écritures de DOI et avant chaque appel HTTP
-par DOI ; il a aussi été durci (encodage pourcent, tirets Unicode, markup de fin,
-listes au point-virgule, préfixe de schéma `doi:`, idempotence par point fixe). Le
-stock déjà en base porte encore des formes non normalisées (legacy). Ce one-shot
-les rattrape sans re-fetcher les sources. Idempotent (`clean_doi` l'est).
+`clean_doi` normalise chaque DOI aux frontières d'écriture et avant chaque appel HTTP par DOI (encodage pourcent, tirets Unicode, markup de fin, listes au point-virgule, préfixe de schéma `doi:`, idempotence par point fixe). Le stock peut porter des DOI écrits sous une forme non canonique ; ce script les re-normalise en place sans re-fetcher les sources, et se relance après tout changement de `clean_doi`. Idempotent.
 
 Deux opérations :
 
-1. **Purge des négatifs de lookup périmés.** Un DOI « non trouvé » mémorisé sous
-   une forme sale n'a jamais été interrogé sous sa forme propre : le négatif est
-   invalide. On le supprime pour que la forme propre soit re-tentée au prochain
-   run (les candidats cross-import sont maintenant nettoyés en amont). Ne concerne que
-   `doi_lookups`, où vivent tous les négatifs de cross-import par DOI. Les négatifs déjà
-   propres sont conservés (vrai miss).
+1. **Purge des négatifs de lookup non canoniques.** Un négatif de `doi_lookups` (les misses de cross-import par DOI) mémorisé sous une forme de DOI sale porte sur cette forme, pas sur la forme propre : il est invalide et supprimé, pour que la forme propre soit re-tentée au prochain run. Les négatifs déjà propres sont conservés (vrai miss).
 
 2. **Normalisation en place des colonnes source de vérité :**
    - `staging.doi` (records réels) ;
-   - `source_publications.doi` — avec `keys_dirty = true` : un DOI est une clé de
-     confirmation, sa correction doit re-déclencher la réconciliation de
-     composante (c'est elle qui fusionnera les publications devenues doublons une
-     fois leurs DOI identiques) ;
+   - `source_publications.doi` — avec `keys_dirty = true` : un DOI est une clé de confirmation, sa correction doit re-déclencher la réconciliation de composante (elle fusionne les publications que la forme canonique révèle doublons, une fois leurs DOI identiques) ;
    - `source_publications.external_ids.related_dois` (nettoyage + dédoublonnage) ;
-   - `source_publications.meta.related_identifiers` (DOI des relations DataCite lues
-     par la sous-étape cluster de `metadata_correction` pour faire converger versions,
-     variantes et pièces de datasets sur l'œuvre canonique).
+   - `source_publications.meta.related_identifiers` (DOI des relations DataCite lues par la sous-étape cluster de `metadata_correction` pour faire converger versions, variantes et pièces de datasets sur l'œuvre canonique).
 
-Les colonnes **dérivées** ne sont pas écrites ici : `publications.doi` (contrainte
-UNIQUE, recomposé par `refresh_from_sources`) et `publication_relations.target_doi`
-(table reconstruite par la phase `relations`). Elles se propagent au prochain run
-des phases `publications` (réconciliation), `relations` et le refresh — leur volume
-encore sale est seulement journalisé.
+Les colonnes **dérivées** ne sont pas écrites ici : `publications.doi` (contrainte UNIQUE, recomposé par `refresh_from_sources`) et `publication_relations.target_doi` (table reconstruite par la phase `relations`). Elles se propagent au prochain run des phases `publications` (réconciliation), `relations` et le refresh — leur volume non canonique est seulement journalisé.
 
-Après ce backfill, relancer les phases `metadata_correction` / `publications` /
-`relations` (ou un run complet) pour propager aux dérivées et matérialiser les
-fusions (dont les pièces de datasets absorbées par leur parent).
+Après ce nettoyage, relancer les phases `metadata_correction` / `publications` / `relations` (ou un run complet) pour propager aux dérivées et matérialiser les fusions (dont les pièces de datasets absorbées par leur parent).
 
 Usage :
     python -m interfaces.cli.oneshot.backfill_clean_dois            # exécution
