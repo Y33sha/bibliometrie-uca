@@ -1,16 +1,9 @@
-"""Élague les payloads orphelins d'un raw store : fichiers dont le `source_id`
-n'est plus référencé dans `staging`.
+# STATUS: maintenance
+"""Élague les payloads orphelins d'un raw store : fichiers dont le `source_id` est absent de `staging`.
 
-Le raw store ne fait que croître — `mark_done` n'y écrit jamais que des `put`,
-jamais de suppression. Au fil des re-imports, changements d'identifiants et
-purges de staging, des payloads y subsistent sans ligne `staging` correspondante.
-Ce script confronte chaque clé du store au set des `source_id` présents en
-staging (par source) et supprime celles qui n'y figurent plus. La base reste la
-source de vérité : un payload supprimé du store sera re-archivé au prochain
-passage de normalisation s'il revient en staging.
+Le raw store ne fait que croître — `mark_done` n'y écrit que des `put`, aucune suppression. Au fil des re-imports, changements d'identifiants et purges de staging, des payloads y subsistent sans ligne `staging` correspondante. Ce script confronte chaque clé du store au set des `source_id` présents en staging (par source) et supprime celles absentes. La base reste la source de vérité : un payload supprimé du store est ré-archivé au prochain passage de normalisation s'il revient en staging.
 
-`--root` cible un store arbitraire (défaut : `data/raw_store`), ce qui permet de
-l'appliquer aussi à une copie hors ligne (snapshot pour diagnostic de churn).
+`--root` cible un store arbitraire (défaut : `data/raw_store`), ce qui permet de l'appliquer aussi à une copie hors ligne (snapshot pour diagnostic de churn).
 
 Usage :
     python -m interfaces.cli.maintenance.prune_raw_store_orphans [--root CHEMIN] [--source SRC] [--dry-run]
