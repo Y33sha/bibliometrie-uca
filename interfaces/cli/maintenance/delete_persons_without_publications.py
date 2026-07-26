@@ -20,7 +20,7 @@ from __future__ import annotations
 import argparse
 import os
 
-from sqlalchemy import text
+from sqlalchemy import Connection, text
 
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
@@ -35,6 +35,38 @@ _TARGET = """
 """
 
 
+def count_targets(conn: Connection) -> tuple[int, int, int, int]:
+    """Comptes de prévisualisation : personnes cibles, puis leurs source_authorships, person_identifiers et person_name_forms."""
+    n_persons = conn.execute(text(f"SELECT count(*) {_TARGET}")).scalar_one()
+    n_sa = conn.execute(
+        text(
+            f"SELECT count(*) FROM source_authorships sa WHERE sa.person_id IN (SELECT p.id {_TARGET})"
+        )
+    ).scalar_one()
+    n_ids = conn.execute(
+        text(
+            f"SELECT count(*) FROM person_identifiers pi WHERE pi.person_id IN (SELECT p.id {_TARGET})"
+        )
+    ).scalar_one()
+    n_forms = conn.execute(
+        text(
+            f"SELECT count(*) FROM person_name_forms pnf WHERE pnf.person_id IN (SELECT p.id {_TARGET})"
+        )
+    ).scalar_one()
+    return n_persons, n_sa, n_ids, n_forms
+
+
+def purge_targets(conn: Connection) -> tuple[int, int]:
+    """Détache les source_authorships des personnes cibles (person_id NULL), puis supprime les personnes (cascade). Retourne (détachées, supprimées)."""
+    detached = conn.execute(
+        text(
+            f"UPDATE source_authorships SET person_id = NULL WHERE person_id IN (SELECT p.id {_TARGET})"
+        )
+    ).rowcount
+    deleted = conn.execute(text(f"DELETE {_TARGET}")).rowcount
+    return detached, deleted
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -44,22 +76,7 @@ def main() -> int:
 
     engine = get_sync_engine()
     with engine.connect() as conn:
-        n_persons = conn.execute(text(f"SELECT count(*) {_TARGET}")).scalar_one()
-        n_sa = conn.execute(
-            text(
-                f"SELECT count(*) FROM source_authorships sa WHERE sa.person_id IN (SELECT p.id {_TARGET})"
-            )
-        ).scalar_one()
-        n_ids = conn.execute(
-            text(
-                f"SELECT count(*) FROM person_identifiers pi WHERE pi.person_id IN (SELECT p.id {_TARGET})"
-            )
-        ).scalar_one()
-        n_forms = conn.execute(
-            text(
-                f"SELECT count(*) FROM person_name_forms pnf WHERE pnf.person_id IN (SELECT p.id {_TARGET})"
-            )
-        ).scalar_one()
+        n_persons, n_sa, n_ids, n_forms = count_targets(conn)
 
     log.info("Personnes sans publication (hors RH) : %d", n_persons)
     log.info("  → source_authorships à détacher (person_id NULL) : %d", n_sa)
@@ -74,14 +91,8 @@ def main() -> int:
         return 0
 
     with engine.begin() as conn:
-        detached = conn.execute(
-            text(
-                f"UPDATE source_authorships SET person_id = NULL WHERE person_id IN (SELECT p.id {_TARGET})"
-            )
-        ).rowcount
+        detached, deleted = purge_targets(conn)
         log.info("1/2 — source_authorships détachées : %d", detached)
-
-        deleted = conn.execute(text(f"DELETE {_TARGET}")).rowcount
         log.info("2/2 — personnes supprimées (+ cascade) : %d", deleted)
 
     log.info("✓ Terminé.")
