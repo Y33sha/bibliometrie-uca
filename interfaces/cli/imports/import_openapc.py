@@ -1,11 +1,9 @@
-#!/usr/bin/env python3
 # STATUS: recurring (imports)
-"""
-Import des données Open APC : ne garde que les DOI qui coïncident avec la base.
+"""Import des données Open APC : ne garde que les DOI qui coïncident avec la base.
 
-Usage:
-    python -m interfaces.cli.imports.import_openapc imports_manuels/APC/2026-04-16_apc_de.csv
-    python -m interfaces.cli.imports.import_openapc file.csv --dry-run
+Usage :
+    python -m interfaces.cli.imports.import_openapc data/2026-04-16_apc_de.csv
+    python -m interfaces.cli.imports.import_openapc data/fichier.csv --dry-run
 """
 
 import argparse
@@ -18,9 +16,7 @@ from domain.publications.identifiers import clean_doi
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 
-log = setup_logger(
-    "import_openapc", os.path.join(os.path.dirname(__file__), "../../processing/logs")
-)
+log = setup_logger("import_openapc", os.path.dirname(__file__))
 
 
 def main() -> None:
