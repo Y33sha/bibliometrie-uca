@@ -1,13 +1,9 @@
 # STATUS: recurring (imports)
 """Import d'un dump CSV DOAJ **local** dans `journals.doaj_payload`.
 
-Le pipeline télécharge et importe le dump automatiquement tous les ~30 jours
-(cf. `_run_enrich_journals_from_doaj`). Cette CLI sert à forcer l'import d'un
-fichier déjà téléchargé (https://doaj.org/csv), hors cadence pipeline.
+Le pipeline télécharge et importe le dump automatiquement tous les ~30 jours (cf. `_run_enrich_journals_from_doaj`). Cette CLI sert à forcer l'import d'un fichier déjà téléchargé (https://doaj.org/csv), hors cadence pipeline.
 
-La logique (index ISSN, reset `is_in_doaj`, match, écriture `doaj_payload`) vit
-dans `application/pipeline/publishers_journals/import_journals_from_doaj_dump` ;
-ce script n'est qu'un point d'entrée CLI.
+La logique (index ISSN, reset `is_in_doaj`, match, écriture `doaj_payload`) vit dans `application/pipeline/publishers_journals/import_journals_from_doaj_dump` ; ce script n'est qu'un point d'entrée CLI.
 
 Usage :
     python -m interfaces.cli.imports.import_doaj_csv data/doaj/doaj_dump.csv
@@ -25,9 +21,7 @@ from infrastructure.observability.log import setup_logger
 from infrastructure.repositories import journal_repository
 from infrastructure.sources.doaj.client import read_doaj_dump_rows
 
-log = setup_logger(
-    "import_doaj_csv", os.path.join(os.path.dirname(__file__), "../../processing/logs")
-)
+log = setup_logger("import_doaj_csv", os.path.dirname(__file__))
 
 
 def main() -> None:
