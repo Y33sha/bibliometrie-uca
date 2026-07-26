@@ -1,6 +1,6 @@
 """Tests de `same_person_name` — prédicat « même personne » à la graphie près.
 
-Cas réels tirés de l'audit du canal identifiant (`audit_identifier_consensus`).
+Cas réels observés sur le canal identifiant (noms des porteurs d'une valeur vs son propriétaire).
 """
 
 import pytest
