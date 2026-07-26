@@ -6,7 +6,6 @@ Usage:
     python -m interfaces.cli.imports.import_persons fichier_rh.csv
     python -m interfaces.cli.imports.import_persons fichier_rh.xlsx
     python -m interfaces.cli.imports.import_persons fichier_rh.tsv --dry-run
-    python -m interfaces.cli.imports.import_persons fichier_rh.csv --clear   # vide la table persons avant import
 
 Colonnes attendues (noms flexibles, détection automatique) :
     nom, prenom, email, department-name, role-title, start-date, end-date
@@ -307,7 +306,6 @@ def main() -> None:
         help="Date de l'export RH (YYYY-MM-DD), ex: 2025-12-15",
     )
     parser.add_argument("--dry-run", action="store_true", help="Lire et valider sans insérer")
-    parser.add_argument("--clear", action="store_true", help="Vider la table persons avant import")
     args = parser.parse_args()
 
     if not os.path.exists(args.file):
@@ -339,11 +337,6 @@ def main() -> None:
 
     conn = get_sync_engine().connect()
     try:
-        if args.clear:
-            n_deleted = conn.execute(text("DELETE FROM persons")).rowcount
-            log.info(f"  Table persons vidée ({n_deleted} lignes supprimées)")
-            conn.commit()
-
         inserted = import_persons(conn, records, export_date=args.export_date)
         log.info(f"\n=== Terminé : {inserted} personnes insérées ===")
 
