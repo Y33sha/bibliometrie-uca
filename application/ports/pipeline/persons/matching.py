@@ -104,6 +104,10 @@ class PersonsMatchingQueries(Protocol):
         """Couples `(id_value, person_id)` : les personnes portant des signatures rattachées d'une valeur d'identifiant, optionnellement restreint à `sources`."""
         ...
 
+    def enforce_confirmed_authorships(self, conn: Connection) -> int:
+        """Réapplique les épinglages admin (`confirmed_authorships`, must-link) : pose `source_authorships.person_id` sur la personne épinglée là où il diverge. Retourne le nombre de signatures recalées."""
+        ...
+
     def null_identifier_signatures(
         self, conn: Connection, id_type: str, id_value: str, old_owner_person_id: int
     ) -> int:

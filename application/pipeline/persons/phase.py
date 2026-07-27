@@ -49,7 +49,7 @@ def run(
         person_repo = person_repo_factory(conn)
         authorship_repo = authorship_repo_factory(conn)
 
-        n_enforced = authorship_repo.enforce_confirmed_authorships()
+        n_enforced = persons_queries.enforce_confirmed_authorships(conn)
         if n_enforced:
             logger.info("Épinglages réappliqués : %d signatures recalées", n_enforced)
 

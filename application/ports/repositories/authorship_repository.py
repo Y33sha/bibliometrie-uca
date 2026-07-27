@@ -128,10 +128,6 @@ class AuthorshipRepository(Protocol):
         """Retire les épinglages des signatures d'une personne portant une forme de nom donnée — rejet de forme. Retourne le nombre d'épinglages retirés."""
         ...
 
-    def enforce_confirmed_authorships(self) -> int:
-        """Réapplique les épinglages : pose `source_authorships.person_id` = personne épinglée là où ils divergent. Lecture pipeline du must-link (une signature épinglée reste sur sa personne). Retourne le nombre de signatures recalées."""
-        ...
-
     # ── Propagation UCA depuis les adresses ────────────────────────
 
     def find_source_authorships_by_addresses(

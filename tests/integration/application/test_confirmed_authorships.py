@@ -97,5 +97,7 @@ def test_enforce_restores_pinned_signature(sa_sync_conn):
     )
     assert _sa_person(sa_sync_conn, sa) is None
 
-    assert repo.enforce_confirmed_authorships() == 1
+    from infrastructure.pipeline.persons.matching import PgPersonsMatchingQueries
+
+    assert PgPersonsMatchingQueries().enforce_confirmed_authorships(sa_sync_conn) == 1
     assert _sa_person(sa_sync_conn, sa) == pid

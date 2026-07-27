@@ -398,6 +398,19 @@ def fetch_identifier_bearer_persons(
     return [(r.id_value, r.person_id) for r in rows]
 
 
+def enforce_confirmed_authorships(conn: Connection) -> int:
+    """Réapplique les épinglages admin (`confirmed_authorships`, must-link) : pose `source_authorships.person_id` sur la personne épinglée là où il diverge. Retourne le nombre de signatures recalées."""
+    return conn.execute(
+        text("""
+            UPDATE source_authorships sa
+            SET person_id = ca.person_id
+            FROM confirmed_authorships ca
+            WHERE ca.source_authorship_id = sa.id
+              AND sa.person_id IS DISTINCT FROM ca.person_id
+        """)
+    ).rowcount
+
+
 def null_identifier_signatures(
     conn: Connection, id_type: str, id_value: str, old_owner_person_id: int
 ) -> int:
@@ -528,6 +541,9 @@ class PgPersonsMatchingQueries(PersonsMatchingQueries):
         self, conn: Connection, id_type: str, sources: tuple[str, ...] | None = None
     ) -> list[tuple[str, int]]:
         return fetch_identifier_bearer_persons(conn, id_type, sources)
+
+    def enforce_confirmed_authorships(self, conn: Connection) -> int:
+        return enforce_confirmed_authorships(conn)
 
     def null_identifier_signatures(
         self, conn: Connection, id_type: str, id_value: str, old_owner_person_id: int
