@@ -377,18 +377,6 @@ class PgAuthorshipRepository(AuthorshipRepository):
         )
         return result.rowcount
 
-    def enforce_confirmed_authorships(self) -> int:
-        result = self._conn.execute(
-            text("""
-                UPDATE source_authorships sa
-                SET person_id = ca.person_id
-                FROM confirmed_authorships ca
-                WHERE ca.source_authorship_id = sa.id
-                  AND sa.person_id IS DISTINCT FROM ca.person_id
-            """)
-        )
-        return result.rowcount
-
     # ── Propagation périmètre UCA depuis les adresses ──────────────
 
     def find_source_authorships_by_addresses(
