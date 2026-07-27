@@ -46,8 +46,8 @@ from application.services.addresses import countries as countries_service
 from application.services.authorships.core import propagate_in_perimeter_for_addresses
 from infrastructure.db.dml_guard import has_uncommitted_dml, reset_dml_flag
 from infrastructure.db.engine import get_sync_engine
+from infrastructure.pipeline.metadata_correction import PgMetadataCorrectionQueries
 from infrastructure.queries.perimeter import PgPerimetersQueries, PgPerimeterStructuresQueries
-from infrastructure.queries.pipeline.metadata_correction import PgMetadataCorrectionQueries
 from infrastructure.read_models.addresses import PgAddressesQueries
 from infrastructure.read_models.authorships import PgAuthorshipsQueries
 from infrastructure.read_models.config import PgConfigQueries

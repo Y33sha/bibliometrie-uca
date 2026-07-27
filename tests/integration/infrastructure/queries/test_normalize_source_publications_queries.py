@@ -1,9 +1,9 @@
-"""Tests d'intégration pour `infrastructure.queries.pipeline.normalize.source_publications`."""
+"""Tests d'intégration pour `infrastructure.pipeline.normalize.source_publications`."""
 
 from sqlalchemy import Connection, text
 
 from application.ports.pipeline.normalize.source_publications import SourcePublicationRow
-from infrastructure.queries.pipeline.normalize.source_publications import (
+from infrastructure.pipeline.normalize.source_publications import (
     upsert_source_publication,
 )
 

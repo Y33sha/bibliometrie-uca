@@ -64,11 +64,11 @@ def run_normalize_wos(conn):
     import logging
 
     from application.pipeline.normalize.normalize_wos import process_record
-    from infrastructure.queries.pipeline.normalize.authorships import PgAuthorshipsBatchQueries
-    from infrastructure.queries.pipeline.normalize.source_publications import (
+    from infrastructure.pipeline.normalize.authorships import PgAuthorshipsBatchQueries
+    from infrastructure.pipeline.normalize.source_publications import (
         PgSourcePublicationQueries,
     )
-    from infrastructure.queries.pipeline.normalize.staging import PgStagingQueries
+    from infrastructure.pipeline.normalize.staging import PgStagingQueries
     from infrastructure.repositories import (
         journal_repository,
         publication_repository,

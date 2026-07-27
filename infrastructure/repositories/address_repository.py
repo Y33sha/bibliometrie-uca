@@ -12,7 +12,7 @@ from application.ports.repositories.address_repository import (
 )
 from domain.errors import NotFoundError
 from infrastructure.db.tables import address_structures, addresses, countries
-from infrastructure.queries.pipeline import countries as country_queries
+from infrastructure.pipeline import countries as country_queries
 
 # Ajout idempotent d'un code pays à `addresses.countries` : ni doublon, ni écrasement des codes déjà posés. Le code à ajouter est lié au paramètre `:cc`.
 _ADD_COUNTRY_SET_CLAUSE = """

@@ -16,7 +16,7 @@ from application.pipeline.subjects.extractors import (
     wos_labels,
 )
 from application.pipeline.subjects.ingestion import run
-from infrastructure.queries.pipeline.subjects import PgSubjectsIngestionQueries
+from infrastructure.pipeline.subjects import PgSubjectsIngestionQueries
 
 
 class TestExtractors:

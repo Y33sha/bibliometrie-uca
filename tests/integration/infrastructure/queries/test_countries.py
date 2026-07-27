@@ -1,8 +1,8 @@
-"""Tests d'intégration pour `infrastructure.queries.pipeline.countries`."""
+"""Tests d'intégration pour `infrastructure.pipeline.countries`."""
 
 from sqlalchemy import text
 
-from infrastructure.queries.pipeline.countries import (
+from infrastructure.pipeline.countries import (
     clear_countries_dirty,
     count_suggest_eligible,
     fetch_suggest_targets_chunk,

@@ -5,7 +5,7 @@ from sqlalchemy import text
 from application.pipeline.metadata_correction import journal_by_doi
 from application.pipeline.metadata_correction.correct_by_cluster import compute_updates
 from application.pipeline.metadata_correction.correct_unary import compute_update
-from infrastructure.queries.pipeline.metadata_correction import (
+from infrastructure.pipeline.metadata_correction import (
     fetch_doi_cluster_candidates,
     fetch_for_unary_correction,
     fetch_journal_by_doi_candidates,

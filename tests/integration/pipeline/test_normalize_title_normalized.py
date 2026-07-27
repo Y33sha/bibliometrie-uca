@@ -4,7 +4,7 @@ from sqlalchemy import text
 
 from application.ports.pipeline.normalize.source_publications import SourcePublicationRow
 from domain.publications.metadata import normalized_title
-from infrastructure.queries.pipeline.normalize.source_publications import (
+from infrastructure.pipeline.normalize.source_publications import (
     upsert_source_publication,
 )
 

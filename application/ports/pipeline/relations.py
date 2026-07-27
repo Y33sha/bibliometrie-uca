@@ -1,6 +1,6 @@
 """Port : SQL de la phase `relations` (population de `publication_relations`).
 
-Implémenté par `infrastructure.queries.pipeline.relations.PgPublicationRelationsQueries`.
+Implémenté par `infrastructure.pipeline.relations.PgPublicationRelationsQueries`.
 """
 
 from typing import NamedTuple, Protocol

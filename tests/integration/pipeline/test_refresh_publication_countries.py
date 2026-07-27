@@ -13,7 +13,7 @@ import pytest
 from sqlalchemy import text
 
 from application.pipeline.countries.refresh_publication_countries import refresh
-from infrastructure.queries.pipeline.countries import PgCountryQueries
+from infrastructure.pipeline.countries import PgCountryQueries
 from tests.integration.helpers.authorships import upsert_identity
 
 

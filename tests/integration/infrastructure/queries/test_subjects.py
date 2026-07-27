@@ -1,9 +1,9 @@
-"""Tests d'intégration pour `infrastructure.queries.pipeline.subjects`."""
+"""Tests d'intégration pour `infrastructure.pipeline.subjects`."""
 
 from sqlalchemy import text
 
 from application.ports.pipeline.subjects import PublicationSubjectLink
-from infrastructure.queries.pipeline.subjects import (
+from infrastructure.pipeline.subjects import (
     clear_publication_subjects_for_pubs,
     link_publication_subjects_bulk,
     upsert_subject,

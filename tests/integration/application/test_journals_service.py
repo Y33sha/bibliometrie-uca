@@ -28,7 +28,7 @@ from domain.errors import (
     PublisherMergeBlockedError,
     ValidationError,
 )
-from infrastructure.queries.pipeline.metadata_correction import PgMetadataCorrectionQueries
+from infrastructure.pipeline.metadata_correction import PgMetadataCorrectionQueries
 from infrastructure.repositories import (
     journal_repository,
     publication_repository,

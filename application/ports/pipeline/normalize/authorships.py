@@ -1,6 +1,6 @@
 """Port : SQL batch partagé pour l'écriture des `source_authorships`.
 
-Implémenté par `infrastructure.queries.pipeline.normalize.authorships.PgAuthorshipsBatchQueries`.
+Implémenté par `infrastructure.pipeline.normalize.authorships.PgAuthorshipsBatchQueries`.
 
 Les colonnes de `source_authorships` / `addresses` / `source_authorship_addresses` sont identiques pour toutes les sources : seul le *parsing* du payload diffère.
 Ce port regroupe les opérations d'écriture communes (batchs `executemany`), paramétrées par `source`. Consommé par le writer partagé `application.pipeline.normalize._authorships_batch.write_source_authorships`.
