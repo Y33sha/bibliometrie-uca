@@ -16,7 +16,6 @@ from sqlalchemy import Connection
 
 from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.oa_status import OaStatusQueries
-from application.ports.repositories.publication_repository import PublicationRepository
 from domain.publications.metadata import decide_oa_status
 
 type OaStatusFetcher = Callable[[httpx.AsyncClient, str], Awaitable[str | None]]
@@ -36,7 +35,6 @@ async def run(
     queries: OaStatusQueries,
     logger: logging.Logger,
     *,
-    publication_repo: PublicationRepository,
     fetcher: OaStatusFetcher,
     max_concurrent: int = MAX_CONCURRENT,
 ) -> PhaseMetrics:
@@ -126,9 +124,9 @@ async def run(
 
             async with db_lock:
                 if new_status is not None:
-                    await asyncio.to_thread(publication_repo.update_oa_status, pub_id, new_status)
+                    await asyncio.to_thread(queries.update_oa_status, conn, pub_id, new_status)
                 else:
-                    await asyncio.to_thread(publication_repo.mark_unpaywall_checked, pub_id)
+                    await asyncio.to_thread(queries.mark_unpaywall_checked, conn, pub_id)
 
         # Traitement par paquets : chaque paquet part en concurrence (débit borné par `sem`) puis est committé.
         for start in range(0, total, BATCH_SIZE):

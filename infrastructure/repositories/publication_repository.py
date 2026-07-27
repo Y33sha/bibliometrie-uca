@@ -193,23 +193,6 @@ class PgPublicationRepository(PublicationRepository):
 
     # ── Écritures simples ──────────────────────────────────────────
 
-    def update_oa_status(self, pub_id: int, oa_status: str) -> None:
-        self._conn.execute(
-            text(
-                "UPDATE publications "
-                "SET oa_status = CAST(:os AS oa_type), unpaywall_checked_at = now(), "
-                "updated_at = now() "
-                "WHERE id = :id"
-            ),
-            {"os": oa_status, "id": pub_id},
-        )
-
-    def mark_unpaywall_checked(self, pub_id: int) -> None:
-        self._conn.execute(
-            text("UPDATE publications SET unpaywall_checked_at = now() WHERE id = :id"),
-            {"id": pub_id},
-        )
-
     def update_sources(self, pub_id: int) -> None:
         self._conn.execute(
             text("""

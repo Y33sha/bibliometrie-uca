@@ -31,14 +31,6 @@ class PublicationRepository(Protocol):
 
     # ── Écritures simples ──────────────────────────────────────────
 
-    def update_oa_status(self, pub_id: int, oa_status: str) -> None:
-        """Met à jour le statut OA d'une publication (vérification Unpaywall) et pose `unpaywall_checked_at`."""
-        ...
-
-    def mark_unpaywall_checked(self, pub_id: int) -> None:
-        """Pose `unpaywall_checked_at = now()` à statut inchangé (vérification Unpaywall neutre : statut identique, DOI non trouvé, ou diamond préservé)."""
-        ...
-
     def update_sources(self, pub_id: int) -> None:
         """Recalcule `publications.sources` par agrégation des `source_publications` rattachées."""
         ...

@@ -1,4 +1,4 @@
-"""Port : file de vérification Unpaywall de la phase `oa_status`.
+"""Port de la phase `oa_status` : file de vérification Unpaywall (lecture) et écriture du statut OA.
 
 Implémenté par `infrastructure.pipeline.oa_status.PgOaStatusQueries`, consommé par `application/pipeline/oa_status/phase.py`.
 """
@@ -18,7 +18,7 @@ class PublicationOaCheck(NamedTuple):
 
 
 class OaStatusQueries(Protocol):
-    """Lectures de la file de vérification Unpaywall, et de la répartition OA du stock pour le bilan de phase."""
+    """Accès pipeline de la phase `oa_status` : lecture de la file de vérification Unpaywall et de la répartition OA du stock, écriture du statut OA vérifié."""
 
     def fetch_publications_with_doi(
         self, conn: Connection, *, limit: int | None = None, staleness_days: int
@@ -32,4 +32,12 @@ class OaStatusQueries(Protocol):
 
     def count_publications_by_oa_status(self, conn: Connection) -> dict[str, int]:
         """Répartition des publications par statut OA (`oa_status` → nombre)."""
+        ...
+
+    def update_oa_status(self, conn: Connection, pub_id: int, oa_status: str) -> None:
+        """Écrit le statut OA vérifié d'une publication et marque la vérification Unpaywall (`unpaywall_checked_at = now()`)."""
+        ...
+
+    def mark_unpaywall_checked(self, conn: Connection, pub_id: int) -> None:
+        """Marque la publication vérifiée sur Unpaywall (`unpaywall_checked_at = now()`) sans changer son statut — sortie de la file jusqu'à péremption."""
         ...
