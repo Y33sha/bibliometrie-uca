@@ -30,6 +30,7 @@ from domain.errors import (
 )
 from infrastructure.pipeline.journals import PgJournalGatewayQueries
 from infrastructure.pipeline.metadata_correction import PgMetadataCorrectionQueries
+from infrastructure.pipeline.publishers import PgPublisherGatewayQueries
 from infrastructure.repositories import (
     journal_repository,
     publication_repository,
@@ -53,6 +54,11 @@ def gateway(sa_sync_conn):
 @pytest.fixture
 def publisher_repo(sa_sync_conn):
     return publisher_repository(sa_sync_conn)
+
+
+@pytest.fixture
+def publisher_gateway(sa_sync_conn):
+    return PgPublisherGatewayQueries(sa_sync_conn)
 
 
 @pytest.fixture
@@ -173,31 +179,31 @@ class TestJournalFindById:
 
 
 class TestFindOrCreatePublisher:
-    def test_returns_none_on_empty_name(self, sa_sync_conn, publisher_repo):
-        assert find_or_create_publisher(None, repo=publisher_repo) is None
-        assert find_or_create_publisher("", repo=publisher_repo) is None
+    def test_returns_none_on_empty_name(self, sa_sync_conn, publisher_gateway):
+        assert find_or_create_publisher(None, repo=publisher_gateway) is None
+        assert find_or_create_publisher("", repo=publisher_gateway) is None
 
-    def test_creates_new_publisher(self, sa_sync_conn, publisher_repo):
-        pub_id = find_or_create_publisher("Elsevier", repo=publisher_repo)
+    def test_creates_new_publisher(self, sa_sync_conn, publisher_gateway):
+        pub_id = find_or_create_publisher("Elsevier", repo=publisher_gateway)
         assert pub_id is not None
         row = _fetch_one(sa_sync_conn, "SELECT name FROM publishers WHERE id = :id", id=pub_id)
         assert row.name == "Elsevier"
 
-    def test_finds_existing_by_openalex_id(self, sa_sync_conn, publisher_repo):
+    def test_finds_existing_by_openalex_id(self, sa_sync_conn, publisher_gateway):
         existing = _insert_publisher(sa_sync_conn, "Elsevier", openalex_id="P4310310871")
         found = find_or_create_publisher(
-            "Elsevier BV", openalex_id="P4310310871", repo=publisher_repo
+            "Elsevier BV", openalex_id="P4310310871", repo=publisher_gateway
         )
         assert found == existing
 
-    def test_finds_existing_by_name_form(self, sa_sync_conn, publisher_repo):
-        existing = find_or_create_publisher("Elsevier", repo=publisher_repo)
-        found = find_or_create_publisher("elsevier", repo=publisher_repo)
+    def test_finds_existing_by_name_form(self, sa_sync_conn, publisher_gateway):
+        existing = find_or_create_publisher("Elsevier", repo=publisher_gateway)
+        found = find_or_create_publisher("elsevier", repo=publisher_gateway)
         assert found == existing
 
-    def test_attaches_openalex_id_if_missing(self, sa_sync_conn, publisher_repo):
-        existing = find_or_create_publisher("Elsevier", repo=publisher_repo)
-        find_or_create_publisher("Elsevier", openalex_id="P123", repo=publisher_repo)
+    def test_attaches_openalex_id_if_missing(self, sa_sync_conn, publisher_gateway):
+        existing = find_or_create_publisher("Elsevier", repo=publisher_gateway)
+        find_or_create_publisher("Elsevier", openalex_id="P123", repo=publisher_gateway)
         row = _fetch_one(
             sa_sync_conn, "SELECT openalex_id FROM publishers WHERE id = :id", id=existing
         )
@@ -247,10 +253,10 @@ class TestFindOrCreateJournal:
         assert n == 1
         assert found is not None
 
-    def test_enriches_metadata_on_match(self, sa_sync_conn, gateway, publisher_repo):
+    def test_enriches_metadata_on_match(self, sa_sync_conn, gateway, publisher_gateway):
         """Si on trouve par ISSN, les champs vides (eissn, publisher_id) sont remplis."""
         existing = _insert_journal(sa_sync_conn, "Nature", issn="0028-0836")
-        pub_id = find_or_create_publisher("Springer", repo=publisher_repo)
+        pub_id = find_or_create_publisher("Springer", repo=publisher_gateway)
         find_or_create_journal(
             "Nature",
             issn="0028-0836",

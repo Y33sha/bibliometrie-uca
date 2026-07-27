@@ -13,6 +13,7 @@ from sqlalchemy import Connection
 
 from application.audit_log import emit_event
 from application.ports.pipeline.metadata_correction import MetadataCorrectionQueries
+from application.ports.pipeline.publishers import PublisherFindOrCreateQueries
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.journal_repository import JournalRepository
 from application.ports.repositories.publication_repository import PublicationRepository
@@ -34,7 +35,7 @@ def find_or_create_publisher(
     name: str | None,
     *,
     openalex_id: str | None = None,
-    repo: PublisherRepository,
+    repo: PublisherFindOrCreateQueries,
 ) -> int | None:
     """Trouve ou crée un éditeur.
 

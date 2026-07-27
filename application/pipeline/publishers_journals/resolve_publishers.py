@@ -16,7 +16,7 @@ from application.ports.pipeline.doi_prefixes import (
     DoiPrefixesQueries,
     PendingPublisherPrefix,
 )
-from application.ports.repositories.publisher_repository import PublisherRepository
+from application.ports.pipeline.publishers import PublisherFindOrCreateQueries
 from domain.normalize import normalize_text
 
 FetchCrossrefPrefixFn = Callable[[str], tuple[str, int | None] | None]
@@ -30,7 +30,7 @@ def run_resolve_publishers(
     log: logging.Logger,
     *,
     repo: DoiPrefixesQueries,
-    publisher_repo: PublisherRepository,
+    publisher_repo: PublisherFindOrCreateQueries,
     fetch_crossref_prefix_fn: FetchCrossrefPrefixFn,
     fetch_datacite_prefix_fn: FetchDataCitePrefixFn,
     breaker: CircuitBreaker | None = None,

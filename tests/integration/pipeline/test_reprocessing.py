@@ -64,16 +64,14 @@ def _run_normalize_hal(conn):
         PgSourcePublicationQueries,
     )
     from infrastructure.pipeline.normalize.staging import PgStagingQueries
-    from infrastructure.repositories import (
-        publisher_repository,
-    )
+    from infrastructure.pipeline.publishers import PgPublisherGatewayQueries
 
     queries = PgSourcePublicationQueries()
     staging_queries = PgStagingQueries()
     authorship_queries = PgAuthorshipsBatchQueries()
     logger = logging.getLogger("test")
     journal_repo = PgJournalGatewayQueries(conn)
-    publisher_repo = publisher_repository(conn)
+    publisher_repo = PgPublisherGatewayQueries(conn)
     publication_repo = publication_repository(conn)
 
     rows = conn.execute(
