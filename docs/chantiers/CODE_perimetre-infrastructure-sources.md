@@ -49,7 +49,7 @@
 
 ### E — Dissolution de `common.py`
 
-La persistance d'extraction descend dans `infrastructure/pipeline/` (chantier `CODE_couches-acces-donnees`, phase D), pas dans `queries/pipeline`.
+La persistance d'extraction descend dans `infrastructure/pipeline/` (chantier `CODE_couches-acces-donnees`, phase D).
 
 - [x] Déplacer les fonctions de persistance (`upsert_staging`, `upsert_not_found_stub`, `record_doi_not_found`, `get_stale_rows`, `set_disappeared_by_source_id`, `get_cross_import_dois`), leur SQL et leurs constantes (`DOI_LOOKUP_RETRY_DAYS`, `STALE_REFRESH_AFTER_DAYS`, `_TARGET_RA`) vers le package `infrastructure/pipeline/extract/` (`staging.py`, `cross_import.py`, `stale.py`). `get_existing_ids`, morte, a disparu en phase A.
 - [x] Replacer le calcul du hash de détection (`canonical_json_bytes`, `compute_hash`, `change_detection_hash`, `_HASH_NORMALIZERS`) dans l'utilitaire neutre `infrastructure/pipeline/change_detection.py`.

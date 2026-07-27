@@ -67,7 +67,7 @@ Routeur `interfaces/api/routers/addresses.py`, couche commande transactionnelle 
 
 ## Lecture — API
 
-Routeur `interfaces/api/routers/addresses.py`, port `application/ports/api/addresses_queries.py`, adaptateur `PgAddressesQueries` — **distinct** des modules SQL de résolution/pays du pipeline (séparation lecture-API vs écriture-pipeline). Le référentiel des pays est servi à part, par `interfaces/api/routers/countries.py`.
+Routeur `interfaces/api/routers/addresses.py`, port `application/ports/read_models/addresses_queries.py`, adaptateur `PgAddressesQueries` — **distinct** des modules SQL de résolution/pays du pipeline (séparation lecture-API vs écriture-pipeline). Le référentiel des pays est servi à part, par `interfaces/api/routers/countries.py`.
 
 - **Listing / curation** (`GET /addresses`) : `addresses ⋈ address_structures` filtré sur une structure, avec prédicats détecté / validation / texte ; agrégat JSON des structures par adresse.
 - **Inspection** (`GET /addresses/{id}/publications`) : texte brut + publications de l'adresse (pivot ⋈ sa ⋈ sp ⋈ publications ⋈ journals) ; les structures d'un rattachement exposent `is_confirmed` et `is_detected` (= `matched_form_id IS NOT NULL`).
@@ -78,7 +78,7 @@ Routeur `interfaces/api/routers/addresses.py`, port `application/ports/api/addre
 
 Dette assumée et décisions d'architecture propres à cet agrégat, gardées explicites.
 
-1. **Recompute d'un cache dénormalisé déclenché depuis l'agrégat adresses (décision d'archi assumée).** Le recalcul de `source_publications.countries` / `publications.countries` — cross-table par nature — vit dans le module de cache pays `infrastructure/queries/pipeline/countries.py` ; `PgAddressRepository` y délègue pour propager après une édition de pays côté API. Conforme au pattern « queries mutualisées, ports par contexte » (cf. [03-application.md](../architecture/03-application.md)).
+1. **Recompute d'un cache dénormalisé déclenché depuis l'agrégat adresses (décision d'archi assumée).** Le recalcul de `source_publications.countries` / `publications.countries` — cross-table par nature — vit dans le module de cache pays `infrastructure/pipeline/countries.py` ; `PgAddressRepository` y délègue pour propager après une édition de pays côté API. Conforme au pattern « queries mutualisées, ports par contexte » (cf. [03-application.md](../architecture/03-application.md)).
 2. **Péremption des matviews assumée.** Le chemin de review de l'API recalcule `in_perimeter` depuis les tables de base mais ne rafraîchit pas `source_authorship_structures` / `authorship_structures` : elles attendent le prochain run pipeline.
 
 ## Invariants métier

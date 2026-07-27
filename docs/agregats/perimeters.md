@@ -48,7 +48,7 @@ Le pipeline n'édite pas les périmètres (curation admin), mais **rematérialis
 
 ## Lecture — API
 
-Port `application/ports/api/perimeters_queries.py`, adaptateur `PgPerimetersAdminQueries` (co-localisé avec l'adaptateur pipeline dans `infrastructure/queries/perimeter.py` — un module, deux ports par contexte).
+Port `application/ports/read_models/perimeters_queries.py`, adaptateur `PgPerimetersQueries` dans `infrastructure/read_models/perimeters.py` (l'adaptateur pipeline `PgPerimeterStructuresQueries` vit à part dans `infrastructure/pipeline/perimeter.py`).
 
 - **Listing** (`list_perimeters_with_structures`) : chaque périmètre avec ses structures racines et le décompte après descente récursive.
 - Les routeurs structures / laboratoires exposent l'appartenance d'une structure à un périmètre.

@@ -38,7 +38,7 @@ Un `commands.py` importe le `core` de son agrégat sous l'alias `<agrégat>_serv
 
 ### Scinder le contrat des règles de correction de sa projection de lecture
 
-`SourcePublicationForCorrection` (`domain/source_publications/correction.py`) confond deux choses. Elle est construite par splat positionnel — `SourcePublicationForCorrection(*row)` — depuis le `_SELECT` de `infrastructure/queries/pipeline/metadata_correction.py` : ses 19 champs et leur ordre sont les colonnes de ce SELECT. C'est une projection de lecture de la phase `metadata_correction`, et c'est la seule de cette phase à vivre hors du port `application/ports/pipeline/metadata_correction.py`, où logent ses cinq homologues (`DoiClusterRow`, `JournalByDoiRow`, `CorrectionUpdate`, `DoiCorrectionUpdate`, `JournalCorrectionUpdate`). C'est aussi, par ailleurs, le contrat d'entrée de `effective_metadata`, fonction pure du domaine.
+`SourcePublicationForCorrection` (`domain/source_publications/correction.py`) confond deux choses. Elle est construite par splat positionnel — `SourcePublicationForCorrection(*row)` — depuis le `_SELECT` de `infrastructure/pipeline/metadata_correction.py` : ses 19 champs et leur ordre sont les colonnes de ce SELECT. C'est une projection de lecture de la phase `metadata_correction`, et c'est la seule de cette phase à vivre hors du port `application/ports/pipeline/metadata_correction.py`, où logent ses cinq homologues (`DoiClusterRow`, `JournalByDoiRow`, `CorrectionUpdate`, `DoiCorrectionUpdate`, `JournalCorrectionUpdate`). C'est aussi, par ailleurs, le contrat d'entrée de `effective_metadata`, fonction pure du domaine.
 
 De cette confusion découlent les deux symptômes. Cinq champs (`source_id`, `pub_year`, `container_title`, `language`, `apc_amount`) sont sélectionnés en SQL, portés par la dataclass, et lus par personne. Et le second appelant, `_apply_canonical_doc_type_correction`, doit se faire passer pour une ligne du SELECT : il invente `id=pub.id or 0`, `source="canonical"`, `source_id=str(pub.id)` et six autres valeurs de remplissage.
 
@@ -104,7 +104,7 @@ Passes de relecture des neuf services d'agrégat.
 
 ##### 1.2.1 - Vue de correction des métadonnées
 
-Traverse `domain/`, `application/ports`, `application/pipeline/metadata_correction` et `infrastructure/queries` : le service publications n'en est que le symptôme visible.
+Traverse `domain/`, `application/ports`, `application/pipeline/metadata_correction` et `infrastructure/pipeline` : le service publications n'en est que le symptôme visible.
 
 - [x] Contrat des règles (`MetadataForCorrection`) réduit aux dix champs lus, dans `domain/source_publications/correction.py` (`71337ec6`).
 - [x] Projection de ligne de la phase (`UnaryCorrectionRow`) déplacée dans `application/ports/pipeline/metadata_correction.py` ; les cinq champs morts sortent du `_SELECT` et des deux types (`71337ec6`).

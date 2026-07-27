@@ -99,7 +99,7 @@ Les corrections se propagent automatiquement aux publications liées, sans besoi
 
 `/admin/duplicates`
 
-Paires de publications potentiellement identiques (logique de détection dans [infrastructure/queries/publication_duplicates.py](https://github.com/Y33sha/bibliometrie-uca/blob/master/infrastructure/queries/publication_duplicates.py)).<!--TODO: à réviser et documenter-->
+Paires de publications potentiellement identiques (logique de détection dans [infrastructure/read_models/publications/duplicates.py](https://github.com/Y33sha/bibliometrie-uca/blob/master/infrastructure/read_models/publications/duplicates.py)).<!--TODO: à réviser et documenter-->
 
 Pour chaque paire, on peut :
 

@@ -11,7 +11,7 @@ Les fichiers qui jouent ce rôle :
 - `run_pipeline.py` — orchestrateur pipeline complet ; ses wrappers `_run_*` sont les composition roots de chaque phase (ouverture de connexion, instanciation des adapters, appel de l'orchestrateur applicatif)
 - `interfaces/cli/oneshot/*` — scripts de remédiation ponctuelle
 
-**Seuls** ces fichiers importent `infrastructure.repositories`, `infrastructure.queries.*` ou toute classe `Pg*` concrète.
+**Seuls** ces fichiers importent `infrastructure.repositories`, `infrastructure.read_models`, `infrastructure.pipeline` ou toute classe `Pg*` concrète.
 
 - **Côté API** : `app.py` / `deps.py` sont les composition roots ; les routers individuels (`interfaces/api/routers/*`) reçoivent leurs dépendances via `Depends(...)` et **n'importent pas** `infrastructure.*` directement. Verrouillé par le contrat `import-linter` "Routers : pas d'import direct de infrastructure".
 - **Côté pipeline** : chaque phase est câblée par son wrapper `_run_*` dans `run_pipeline.py`, qui ouvre la connexion, instancie les adapters concrets et appelle l'orchestrateur applicatif de la phase. Les scripts de remédiation ponctuelle (`interfaces/cli/oneshot/*`) suivent le même principe, chacun **étant** son propre composition root. Pas de séparation construct/appel comme côté API ; cohérent avec leur nature one-shot. Pas de contrat `import-linter` sur ces entry points, la discipline reste manuelle : `application/` et `domain/` ne doivent jamais importer `infrastructure/`, et un entry point doit rester un thin wrapper (imports + instanciations + appel d'un use case ; pas de logique métier).
