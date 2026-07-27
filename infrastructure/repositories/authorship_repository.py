@@ -99,7 +99,7 @@ class PgAuthorshipRepository(AuthorshipRepository):
             {"pub": publication_id, "pid": person_id},
         )
 
-    def link_source_authorships_to_authorships(
+    def link_source_authorships_batch(
         self, person_id: int, source_authorship_ids: list[int]
     ) -> None:
         if not source_authorship_ids:

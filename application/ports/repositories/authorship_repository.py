@@ -175,12 +175,12 @@ class AuthorshipRepository(Protocol):
         """Pose `source_authorships.authorship_id` vers la ligne consolidée de la paire, sur les signatures encore non liées."""
         ...
 
-    def link_source_authorships_to_authorships(
+    def link_source_authorships_batch(
         self,
         person_id: int,
         source_authorship_ids: list[int],
     ) -> None:
-        """Même pose de FK, cantonnée aux signatures du lot."""
+        """Pose `source_authorships.authorship_id` vers la ligne consolidée, pour un lot de signatures désignées par id (attribution d'orphelines à une personne) — variante par lot de `link_source_authorships_to_authorship`."""
         ...
 
     def recompute_authorship_author_position_and_corresponding(
