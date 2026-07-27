@@ -1,8 +1,8 @@
-"""Tests d'intégration pour `infrastructure.queries.api.persons.admin`."""
+"""Tests d'intégration pour `infrastructure.read_models.persons.admin`."""
 
 from sqlalchemy import text
 
-from infrastructure.queries.api.persons.admin import (
+from infrastructure.read_models.persons.admin import (
     detachable_intruders,
     detachable_intruders_count,
     identifier_conflicts,

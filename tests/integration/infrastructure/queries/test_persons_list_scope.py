@@ -5,8 +5,8 @@ Vérifie que `PersonFilters.lab_id` restreint aux personnes ayant une signature 
 
 from sqlalchemy import text
 
-from application.ports.api.persons_queries import PersonFilters
-from infrastructure.queries.api.persons import PgPersonsQueries
+from application.ports.read_models.persons_queries import PersonFilters
+from infrastructure.read_models.persons import PgPersonsQueries
 from tests.integration.helpers.structures import add_authorship_structure
 
 

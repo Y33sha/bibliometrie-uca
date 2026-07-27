@@ -1,9 +1,9 @@
-"""Tests d'intégration pour `infrastructure.queries.api.hal_problems`."""
+"""Tests d'intégration pour `infrastructure.read_models.hal_problems`."""
 
 from sqlalchemy import text
 
-from application.ports.api.hal_problems_queries import NoMissingCollections
-from infrastructure.queries.api.hal_problems import PgHalProblemsQueries
+from application.ports.read_models.hal_problems_queries import NoMissingCollections
+from infrastructure.read_models.hal_problems import PgHalProblemsQueries
 from tests.integration.helpers.authorships import upsert_identity
 from tests.integration.helpers.structures import add_authorship_structure
 

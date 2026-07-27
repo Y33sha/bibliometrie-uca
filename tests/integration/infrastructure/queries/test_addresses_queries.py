@@ -1,14 +1,14 @@
-"""Tests d'intégration pour `infrastructure.queries.api.addresses`."""
+"""Tests d'intégration pour `infrastructure.read_models.addresses`."""
 
 from sqlalchemy import text
 
-from application.ports.api.addresses_queries import (
+from application.ports.read_models.addresses_queries import (
     AddressCountriesFilters,
     AddressListFilters,
     StructurePredicate,
     TextPredicate,
 )
-from infrastructure.queries.api.addresses import PgAddressesQueries
+from infrastructure.read_models.addresses import PgAddressesQueries
 from tests.integration.helpers.authorships import upsert_identity
 
 

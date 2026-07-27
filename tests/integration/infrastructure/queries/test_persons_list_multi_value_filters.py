@@ -7,8 +7,8 @@ reflétaient la sélection pendant que la liste montrait tout le monde.
 
 from sqlalchemy import text
 
-from application.ports.api.persons_queries import PersonFilters
-from infrastructure.queries.api.persons.list import list_persons
+from application.ports.read_models.persons_queries import PersonFilters
+from infrastructure.read_models.persons.list import list_persons
 
 
 def _create_person(conn, last, department=None, role=None):

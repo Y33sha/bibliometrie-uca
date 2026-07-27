@@ -11,27 +11,27 @@ from collections.abc import Callable, Iterator
 from fastapi import Depends, HTTPException, Request
 from sqlalchemy import Connection
 
-from application.ports.api.addresses_queries import AddressesQueries
-from application.ports.api.authorships_queries import AuthorshipsQueries
-from application.ports.api.config_queries import ConfigQueries
-from application.ports.api.countries_queries import CountriesQueries
-from application.ports.api.entity_labels_queries import EntityLabelQueries
-from application.ports.api.feedback_queries import FeedbackQueries
-from application.ports.api.hal_problems_queries import HalProblemsQueries
-from application.ports.api.journals_queries import JournalQueries
-from application.ports.api.perimeters_queries import PerimetersQueries
-from application.ports.api.persons_queries import PersonsQueries
-from application.ports.api.pipeline_runs_queries import PipelineRunsQueries
-from application.ports.api.publications_queries import (
+from application.ports.pipeline.metadata_correction import MetadataCorrectionQueries
+from application.ports.pipeline.perimeter_structures import PerimeterStructuresQueries
+from application.ports.read_models.addresses_queries import AddressesQueries
+from application.ports.read_models.authorships_queries import AuthorshipsQueries
+from application.ports.read_models.config_queries import ConfigQueries
+from application.ports.read_models.countries_queries import CountriesQueries
+from application.ports.read_models.entity_labels_queries import EntityLabelQueries
+from application.ports.read_models.feedback_queries import FeedbackQueries
+from application.ports.read_models.hal_problems_queries import HalProblemsQueries
+from application.ports.read_models.journals_queries import JournalQueries
+from application.ports.read_models.perimeters_queries import PerimetersQueries
+from application.ports.read_models.persons_queries import PersonsQueries
+from application.ports.read_models.pipeline_runs_queries import PipelineRunsQueries
+from application.ports.read_models.publications_queries import (
     PublicationDuplicatesQueries,
     PublicationsQueries,
 )
-from application.ports.api.publishers_queries import PublisherQueries
-from application.ports.api.stats_queries import StatsQueries
-from application.ports.api.structures_queries import StructuresQueries
-from application.ports.api.subjects_queries import SubjectsQueries
-from application.ports.pipeline.metadata_correction import MetadataCorrectionQueries
-from application.ports.pipeline.perimeter_structures import PerimeterStructuresQueries
+from application.ports.read_models.publishers_queries import PublisherQueries
+from application.ports.read_models.stats_queries import StatsQueries
+from application.ports.read_models.structures_queries import StructuresQueries
+from application.ports.read_models.subjects_queries import SubjectsQueries
 from application.ports.repositories.address_repository import AddressRepository
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.authorship_repository import AuthorshipRepository
@@ -46,24 +46,24 @@ from application.services.addresses import countries as countries_service
 from application.services.authorships.core import propagate_in_perimeter_for_addresses
 from infrastructure.db.dml_guard import has_uncommitted_dml, reset_dml_flag
 from infrastructure.db.engine import get_sync_engine
-from infrastructure.queries.api.addresses import PgAddressesQueries
-from infrastructure.queries.api.authorships import PgAuthorshipsQueries
-from infrastructure.queries.api.config import PgConfigQueries
-from infrastructure.queries.api.countries import PgCountriesQueries
-from infrastructure.queries.api.entity_labels import PgEntityLabelQueries
-from infrastructure.queries.api.feedback import PgFeedbackQueries
-from infrastructure.queries.api.hal_problems import PgHalProblemsQueries
-from infrastructure.queries.api.journals import PgJournalQueries
-from infrastructure.queries.api.persons import PgPersonsQueries
-from infrastructure.queries.api.pipeline_runs import PgPipelineRunsQueries
-from infrastructure.queries.api.publications import PgPublicationsQueries
-from infrastructure.queries.api.publications.duplicates import PgPublicationDuplicatesQueries
-from infrastructure.queries.api.publishers import PgPublisherQueries
-from infrastructure.queries.api.stats import PgStatsQueries
-from infrastructure.queries.api.structures import PgStructuresQueries
-from infrastructure.queries.api.subjects import PgSubjectsQueries
 from infrastructure.queries.perimeter import PgPerimetersQueries, PgPerimeterStructuresQueries
 from infrastructure.queries.pipeline.metadata_correction import PgMetadataCorrectionQueries
+from infrastructure.read_models.addresses import PgAddressesQueries
+from infrastructure.read_models.authorships import PgAuthorshipsQueries
+from infrastructure.read_models.config import PgConfigQueries
+from infrastructure.read_models.countries import PgCountriesQueries
+from infrastructure.read_models.entity_labels import PgEntityLabelQueries
+from infrastructure.read_models.feedback import PgFeedbackQueries
+from infrastructure.read_models.hal_problems import PgHalProblemsQueries
+from infrastructure.read_models.journals import PgJournalQueries
+from infrastructure.read_models.persons import PgPersonsQueries
+from infrastructure.read_models.pipeline_runs import PgPipelineRunsQueries
+from infrastructure.read_models.publications import PgPublicationsQueries
+from infrastructure.read_models.publications.duplicates import PgPublicationDuplicatesQueries
+from infrastructure.read_models.publishers import PgPublisherQueries
+from infrastructure.read_models.stats import PgStatsQueries
+from infrastructure.read_models.structures import PgStructuresQueries
+from infrastructure.read_models.subjects import PgSubjectsQueries
 from infrastructure.repositories import (
     address_repository,
     audit_repository,

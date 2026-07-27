@@ -6,8 +6,8 @@ Un périmètre (table `perimeters`) nomme des structures racines dans sa colonne
 from fastapi import APIRouter, Depends
 from sqlalchemy import Connection
 
-from application.ports.api.config_queries import ConfigQueries
-from application.ports.api.perimeters_queries import PerimeterOut, PerimetersQueries
+from application.ports.read_models.config_queries import ConfigQueries
+from application.ports.read_models.perimeters_queries import PerimeterOut, PerimetersQueries
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.perimeter_repository import (
     PerimeterRepository,

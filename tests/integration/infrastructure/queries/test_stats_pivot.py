@@ -1,9 +1,9 @@
-"""Tests d'intégration du moteur de pivot (`infrastructure.queries.api.stats.pivot`)."""
+"""Tests d'intégration du moteur de pivot (`infrastructure.read_models.stats.pivot`)."""
 
 from sqlalchemy import text
 
-from application.ports.api.stats_queries import StatsFilters
-from infrastructure.queries.api.stats.pivot import run_pivot
+from application.ports.read_models.stats_queries import StatsFilters
+from infrastructure.read_models.stats.pivot import run_pivot
 
 
 def _pub(conn, *, oa_status, sources, year=2024, doc_type="article"):

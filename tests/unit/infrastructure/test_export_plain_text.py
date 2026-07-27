@@ -2,7 +2,7 @@
 parasite (cf. chantier export-csv-fidele : balises HTML/MathML + sauts de ligne
 dans les titres)."""
 
-from infrastructure.queries.api.publications.list import _plain_text
+from infrastructure.read_models.publications.list import _plain_text
 
 
 def test_strips_html_tags():

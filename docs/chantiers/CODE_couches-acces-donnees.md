@@ -46,8 +46,10 @@ Inventaire complet : [`CODE_couches-acces-donnees_inventaire.md`](CODE_couches-a
 
 ### C — `read_models`
 
-- [ ] Renommer `infrastructure/queries/api` → `infrastructure/read_models`, et le miroir `application/ports/api` → `application/ports/read_models`.
-- [ ] Repointer les call-sites (interfaces API, composition root).
+- [x] Renommer `infrastructure/queries/api` → `infrastructure/read_models`, et le miroir `application/ports/api` → `application/ports/read_models`.
+- [x] Repointer les call-sites (interfaces API, composition root).
+
+Contrats `pyproject.toml` étendus à `read_models` : import-linter (module interdit aux routers + exception `deps.py`) et override mypy couche SQL. `infrastructure/queries/perimeter.py` (ni api ni pipeline) voit ses imports repointés ; sa relocation reste à trancher en phase D/E.
 
 ### D — Couche `pipeline`
 

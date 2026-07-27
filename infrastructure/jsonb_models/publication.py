@@ -8,7 +8,7 @@ from typing import Any, Protocol
 
 from pydantic import BaseModel, ConfigDict, ValidationInfo, field_validator
 
-from application.ports.api.publications_queries import EcoleDoctorale, PartenaireThese
+from application.ports.read_models.publications_queries import EcoleDoctorale, PartenaireThese
 from domain.publications.identifiers import DOI, NNT, PMCID, PMID, ArxivId, HALId
 from infrastructure.jsonb_models._base import JsonbModel
 

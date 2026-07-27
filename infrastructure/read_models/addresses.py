@@ -1,0 +1,352 @@
+"""Query services pour `/api/addresses/*`."""
+
+from typing import Any
+
+from sqlalchemy import Connection, text
+
+from application.ports.read_models._common import FacetOption
+from application.ports.read_models.addresses_queries import (
+    AddressCountriesFilters,
+    AddressesCountriesResponse,
+    AddressesQueries,
+    AddressForCountryAttribution,
+    AddressListFilters,
+    AddressListResponse,
+    AddressOut,
+    AddressPublicationItem,
+    AddressStatsResponse,
+    AddressStructureSummary,
+    StructureLinkState,
+)
+
+# « Reconnue » comme une structure = lien pending (détecté, non revu) ou confirmé ; exclut le rejeté (is_confirmed = FALSE) et l'absence de lien. Utilisé par les prédicats Structure de `list_addresses`.
+_RECOGNIZED_LINK = (
+    "((asx.matched_form_id IS NOT NULL AND asx.is_confirmed IS NULL) OR asx.is_confirmed = TRUE)"
+)
+
+
+def _countries_where(
+    filters: AddressCountriesFilters, *, with_country_code: bool, extra: str | None = None
+) -> tuple[str, dict[str, Any]]:
+    """Clause WHERE partagée par la liste des adresses à attribuer et ses deux facettes.
+
+    `with_country_code=False` retire le filtre pays de la clause : c'est la dimension que la facette pays écarte pour compter ses options (comptes exclusifs, comme les autres facettes). `extra` ajoute une condition finale de présence (`a.countries` ou `a.suggested_countries` selon la requête).
+    """
+    parts: list[str] = []
+    binds: dict[str, Any] = {}
+    if filters.search:
+        parts.append("unaccent(a.raw_text) ILIKE unaccent(:search)")
+        binds["search"] = f"%{filters.search}%"
+    if filters.has_country is not None:
+        parts.append("a.countries IS NOT NULL" if filters.has_country else "a.countries IS NULL")
+    # Match insensible à la casse : les codes sont canoniquement en minuscules (`countries.code`), mais les arrays peuvent porter des variantes majuscules (codes ISO OpenAlex).
+    if with_country_code and filters.country_code:
+        parts.append(
+            "EXISTS (SELECT 1 FROM unnest(a.countries) x WHERE lower(x) = lower(:country_code))"
+        )
+        binds["country_code"] = filters.country_code
+    if filters.suggested_country:
+        parts.append(
+            "EXISTS (SELECT 1 FROM unnest(a.suggested_countries) x "
+            "WHERE lower(x) = lower(:suggested_country))"
+        )
+        binds["suggested_country"] = filters.suggested_country
+    if extra:
+        parts.append(extra)
+    where = "WHERE " + " AND ".join(parts) if parts else ""
+    return where, binds
+
+
+def address_structures_json(addr_ref: str) -> str:
+    """Projection JSON des structures liées à une adresse, au format `AddressStructureSummary`.
+
+    `addr_ref` est l'expression SQL désignant l'id d'adresse : `a.id` en sous-requête corrélée d'une liste, `:id` en requête autonome.
+    """
+    return f"""
+        SELECT json_agg(json_build_object(
+                   'id', s.id, 'name', s.name, 'acronym', s.acronym,
+                   'is_confirmed', ast2.is_confirmed,
+                   'is_detected', (ast2.matched_form_id IS NOT NULL)
+               ) ORDER BY COALESCE(s.acronym, s.name))
+        FROM address_structures ast2
+        JOIN structures s ON s.id = ast2.structure_id
+        WHERE ast2.address_id = {addr_ref}
+    """
+
+
+class PgAddressesQueries(AddressesQueries):
+    """Adapter SA pour `application.ports.read_models.addresses_queries.AddressesQueries`."""
+
+    def __init__(self, conn: Connection) -> None:
+        self._conn = conn
+
+    def list_addresses(
+        self,
+        *,
+        structure_id: int,
+        filters: AddressListFilters,
+        page: int,
+        per_page: int,
+    ) -> AddressListResponse:
+        """Liste paginée des adresses avec filtres détection/validation."""
+        offset = (page - 1) * per_page
+        use_inner_join = filters.detected == "yes"
+
+        parts: list[str] = []
+        binds: dict[str, Any] = {"sid": structure_id}
+
+        if filters.detected == "yes":
+            parts.append("ast_filter.matched_form_id IS NOT NULL")
+        elif filters.detected == "no":
+            parts.append("(ast_filter.id IS NULL OR ast_filter.matched_form_id IS NULL)")
+
+        if filters.validation == "pending":
+            if use_inner_join:
+                parts.append("ast_filter.is_confirmed IS NULL")
+            else:
+                parts.append("(ast_filter.id IS NULL OR ast_filter.is_confirmed IS NULL)")
+        elif filters.validation == "confirmed":
+            parts.append("ast_filter.is_confirmed = TRUE")
+        elif filters.validation == "rejected":
+            parts.append("ast_filter.is_confirmed = FALSE")
+
+        for i, tp in enumerate(filters.text_predicates):
+            if not tp.term:
+                continue
+            op = "NOT ILIKE" if tp.mode == "not_contains" else "ILIKE"
+            bind = f"txt{i}"
+            parts.append(f"unaccent(a.raw_text) {op} unaccent(:{bind})")
+            binds[bind] = f"%{tp.term}%"
+
+        for i, sp in enumerate(filters.structure_predicates):
+            if not sp.structure_ids:
+                continue
+            bind = f"sids{i}"
+            binds[bind] = list(sp.structure_ids)
+            exists = (
+                "EXISTS (SELECT 1 FROM address_structures asx "
+                f"WHERE asx.address_id = a.id AND asx.structure_id = ANY(:{bind}) "
+                f"AND {_RECOGNIZED_LINK})"
+            )
+            # recognized = reconnue comme au moins une des structures (OR) ; not_recognized = reconnue comme aucune (De Morgan → NOT EXISTS).
+            parts.append(exists if sp.operator == "recognized" else f"NOT {exists}")
+
+        where_clause = (" AND " + " AND ".join(parts)) if parts else ""
+        join_type = "JOIN" if use_inner_join else "LEFT JOIN"
+
+        from_clause = f"""
+            FROM addresses a
+            {join_type} address_structures ast_filter
+                ON ast_filter.address_id = a.id AND ast_filter.structure_id = :sid
+            WHERE TRUE {where_clause}
+        """
+
+        total_row = self._conn.execute(text(f"SELECT COUNT(*) AS total {from_clause}"), binds).one()
+        total = total_row.total
+
+        rows = self._conn.execute(
+            text(f"""
+                SELECT a.id, a.raw_text, a.pub_count,
+                       ast_filter.is_confirmed,
+                       (ast_filter.matched_form_id IS NOT NULL) AS is_detected,
+                       ({address_structures_json("a.id")}) AS structures
+                {from_clause}
+                ORDER BY a.pub_count DESC, a.id
+                LIMIT :pg_limit OFFSET :pg_offset
+            """),
+            {**binds, "pg_limit": per_page, "pg_offset": offset},
+        ).all()
+
+        addresses = [
+            AddressOut(
+                id=r.id,
+                raw_text=r.raw_text,
+                is_confirmed=r.is_confirmed,
+                is_detected=r.is_detected or False,
+                structures=[
+                    AddressStructureSummary.model_validate(s) for s in (r.structures or [])
+                ],
+                pub_count=r.pub_count,
+            )
+            for r in rows
+        ]
+
+        return AddressListResponse(
+            total=total,
+            page=page,
+            per_page=per_page,
+            addresses=addresses,
+        )
+
+    def address_exists(self, addr_id: int) -> bool:
+        row = self._conn.execute(
+            text("SELECT 1 FROM addresses WHERE id = :id"), {"id": addr_id}
+        ).one_or_none()
+        return row is not None
+
+    def get_address_raw_text(self, addr_id: int) -> str | None:
+        row = self._conn.execute(
+            text("SELECT raw_text FROM addresses WHERE id = :id"),
+            {"id": addr_id},
+        ).one_or_none()
+        return row.raw_text if row else None
+
+    def get_address_publications(self, addr_id: int, limit: int) -> list[AddressPublicationItem]:
+        rows = self._conn.execute(
+            text("""
+                SELECT DISTINCT ON (p.id)
+                    p.id, p.title, p.pub_year, p.doi,
+                    p.doc_type::text AS doc_type,
+                    j.title AS journal_title,
+                    sa.raw_author_name AS author_name,
+                    sd.source_id
+                FROM source_authorship_addresses saa
+                JOIN source_authorships sa ON sa.id = saa.source_authorship_id
+                JOIN source_publications sd ON sd.id = sa.source_publication_id
+                JOIN publications p ON p.id = sd.publication_id
+                LEFT JOIN journals j ON j.id = p.journal_id
+                WHERE saa.address_id = :id AND sd.publication_id IS NOT NULL
+                ORDER BY p.id, p.pub_year DESC
+                LIMIT :lim
+            """),
+            {"id": addr_id, "lim": limit},
+        ).all()
+        return [
+            AddressPublicationItem(
+                id=r.id,
+                title=r.title,
+                pub_year=r.pub_year,
+                doi=r.doi,
+                doc_type=r.doc_type,
+                journal_title=r.journal_title,
+                author_name=r.author_name,
+                source_id=r.source_id,
+            )
+            for r in rows
+        ]
+
+    def get_address_structures(self, addr_id: int) -> list[AddressStructureSummary]:
+        structures_json = self._conn.execute(
+            text(address_structures_json(":id")), {"id": addr_id}
+        ).scalar_one_or_none()
+        return [AddressStructureSummary.model_validate(s) for s in (structures_json or [])]
+
+    def get_structure_link(self, addr_id: int, structure_id: int) -> StructureLinkState | None:
+        row = self._conn.execute(
+            text("""
+                SELECT is_confirmed,
+                       (matched_form_id IS NOT NULL) AS is_detected
+                FROM address_structures
+                WHERE address_id = :aid AND structure_id = :sid
+            """),
+            {"aid": addr_id, "sid": structure_id},
+        ).one_or_none()
+        return StructureLinkState.model_validate(row._mapping) if row else None
+
+    def addresses_countries(
+        self, *, filters: AddressCountriesFilters, page: int, per_page: int
+    ) -> AddressesCountriesResponse:
+        offset = (page - 1) * per_page
+        where, binds = _countries_where(filters, with_country_code=True)
+
+        total_row = self._conn.execute(
+            text(f"SELECT COUNT(*) AS total FROM addresses a {where}"), binds
+        ).one()
+        total = total_row.total
+
+        rows = self._conn.execute(
+            text(f"""
+                SELECT a.id, a.raw_text, a.countries, a.suggested_countries, a.pub_count
+                FROM addresses a
+                {where}
+                ORDER BY a.pub_count DESC, a.raw_text
+                LIMIT :pg_limit OFFSET :pg_offset
+            """),
+            {**binds, "pg_limit": per_page, "pg_offset": offset},
+        ).all()
+
+        addresses: list[AddressForCountryAttribution] = []
+        for r in rows:
+            sc = r.suggested_countries
+            # Dédup + normalisation casse (un code peut apparaître en 'FR' et 'fr').
+            suggestions = (
+                sorted({c.strip().lower() for c in sc if c.strip()})
+                if filters.suggest and not r.countries and sc
+                else []
+            )
+            addresses.append(
+                AddressForCountryAttribution(
+                    id=r.id,
+                    raw_text=r.raw_text,
+                    countries=(
+                        sorted({c.strip().lower() for c in r.countries}) if r.countries else None
+                    ),
+                    suggested_countries=suggestions,
+                    pub_count=r.pub_count,
+                )
+            )
+
+        suggestion_facets: list[FacetOption] | None = None
+        if filters.suggest and not filters.suggested_country:
+            sug_where, sug_binds = _countries_where(
+                filters, with_country_code=True, extra="a.suggested_countries IS NOT NULL"
+            )
+            sug_rows = self._conn.execute(
+                text(f"""
+                    SELECT lower(c) AS code, COUNT(*) AS cnt
+                    FROM addresses a, unnest(a.suggested_countries) AS c
+                    {sug_where}
+                    GROUP BY lower(c) ORDER BY cnt DESC LIMIT 20
+                """),
+                sug_binds,
+            ).all()
+            suggestion_facets = [FacetOption(value=r.code, count=r.cnt) for r in sug_rows]
+
+        # Facette pays : écarte sa propre dimension (country_code), garde le reste, exige un pays.
+        cf_where, cf_binds = _countries_where(
+            filters, with_country_code=False, extra="a.countries IS NOT NULL"
+        )
+        cf_rows = self._conn.execute(
+            text(f"""
+                SELECT lower(c) AS code, COUNT(*) AS cnt
+                FROM addresses a, unnest(a.countries) AS c
+                {cf_where}
+                GROUP BY lower(c) ORDER BY cnt DESC
+            """),
+            cf_binds,
+        ).all()
+        country_facets = [FacetOption(value=r.code, count=r.cnt) for r in cf_rows]
+
+        return AddressesCountriesResponse(
+            total=total,
+            page=page,
+            per_page=per_page,
+            addresses=addresses,
+            suggestion_facets=suggestion_facets,
+            country_facets=country_facets,
+        )
+
+    def address_stats(self, structure_id: int) -> AddressStatsResponse:
+        total_row = self._conn.execute(text("SELECT COUNT(*) AS total FROM addresses")).one()
+        total = total_row.total
+
+        row = self._conn.execute(
+            text("""
+                SELECT
+                    COUNT(*) FILTER (WHERE ast.matched_form_id IS NOT NULL) AS detected,
+                    COUNT(*) FILTER (WHERE ast.is_confirmed IS NULL) AS pending,
+                    COUNT(*) FILTER (WHERE ast.is_confirmed = FALSE) AS rejected,
+                    COUNT(*) FILTER (WHERE ast.is_confirmed = TRUE) AS confirmed
+                FROM address_structures ast
+                WHERE ast.structure_id = :sid
+            """),
+            {"sid": structure_id},
+        ).one()
+
+        return AddressStatsResponse(
+            total=total,
+            detected=row.detected,
+            pending=row.pending,
+            rejected=row.rejected,
+            confirmed=row.confirmed,
+        )

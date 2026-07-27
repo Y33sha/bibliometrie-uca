@@ -5,7 +5,7 @@ Alimente le tableau de bord qui confronte la détection automatique aux arbitrag
 
 from fastapi import APIRouter, Depends, Query
 
-from application.ports.api.feedback_queries import (
+from application.ports.read_models.feedback_queries import (
     FeedbackAddressesResponse,
     FeedbackQueries,
     FeedbackStats,

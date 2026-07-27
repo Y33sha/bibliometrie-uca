@@ -5,7 +5,7 @@
 
 from sqlalchemy import Connection
 
-from application.ports.api.config_queries import ConfigQueries
+from application.ports.read_models.config_queries import ConfigQueries
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.perimeter_repository import (
     PerimeterRepository,

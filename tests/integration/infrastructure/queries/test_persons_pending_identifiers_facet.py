@@ -5,9 +5,9 @@ faire remonter la personne ni dans le compteur de la facette, ni dans la liste f
 
 from sqlalchemy import text
 
-from application.ports.api.persons_queries import PersonFilters
-from infrastructure.queries.api.persons.facets import persons_facets
-from infrastructure.queries.api.persons.list import list_persons
+from application.ports.read_models.persons_queries import PersonFilters
+from infrastructure.read_models.persons.facets import persons_facets
+from infrastructure.read_models.persons.list import list_persons
 
 
 def _create_person(conn, last, first="Z"):

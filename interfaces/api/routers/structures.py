@@ -8,7 +8,7 @@ Les chemins littéraux se déclarent avant `/{structure_id}` : un segment fixe p
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import Connection
 
-from application.ports.api.structures_queries import (
+from application.ports.read_models.structures_queries import (
     NameFormOut,
     StructureAddressesResponse,
     StructureDashboardResponse,
@@ -17,7 +17,7 @@ from application.ports.api.structures_queries import (
     StructureOut,
     StructuresQueries,
 )
-from application.ports.api.subjects_queries import SubjectFrequency
+from application.ports.read_models.subjects_queries import SubjectFrequency
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.perimeter_repository import PerimeterRepository
 from application.ports.repositories.structure_repository import StructureRepository

@@ -2,8 +2,8 @@
 
 from sqlalchemy import text
 
-from infrastructure.queries.api.structures import PgStructuresQueries
 from infrastructure.queries.perimeter import refresh_perimeter_structures
+from infrastructure.read_models.structures import PgStructuresQueries
 from tests.integration.helpers.structures import add_authorship_structure
 
 
