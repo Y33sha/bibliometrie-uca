@@ -10,6 +10,7 @@ from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.journal_repository import JournalRepository, JournalUpdate
 from application.ports.repositories.publication_repository import PublicationRepository
 from application.services.journals import core as journals_service
+from domain.journals.journal import JournalType
 
 
 def update_journal(
@@ -43,6 +44,34 @@ def update_journal(
             audit_repo=audit_repo,
         )
     conn.commit()
+
+
+def preview_type_change_impact(
+    conn: Connection,
+    journal_id: int,
+    *,
+    journal_type: JournalType,
+    repo: JournalRepository,
+    publication_repo: PublicationRepository,
+    correction_queries: MetadataCorrectionQueries,
+) -> int:
+    """Compte les publications de la revue dont le `doc_type` changerait si son `journal_type` passait à `journal_type`.
+
+    Applique réellement l'édition (écriture du type puis requalification) dans un `SAVEPOINT` annulé : l'aperçu emprunte le chemin exact de l'édition (`update_journal`), et aucune écriture ne survit. Lève `NotFoundError` sur une revue inconnue, comme l'édition simulée.
+    """
+    savepoint = conn.begin_nested()
+    try:
+        journals_service.update_journal(
+            journal_id, update=JournalUpdate(journal_type=journal_type), repo=repo
+        )
+        return journals_service.requalify_publications_for_journal(
+            journal_id,
+            conn=conn,
+            correction_queries=correction_queries,
+            publication_repo=publication_repo,
+        )
+    finally:
+        savepoint.rollback()
 
 
 def merge_journals(
