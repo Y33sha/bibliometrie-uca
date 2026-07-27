@@ -1,6 +1,6 @@
 """Classe de base des adapters `refresh_stale` : opérations DB génériques.
 
-Seul `fetch_by_native_id` (l'appel HTTP par identifiant natif) et la configuration (URL, auth) sont source-spécifiques. La sélection des rows stale, la persistance du refresh et le marquage de disparition sont identiques d'une source à l'autre : ils vivent ici, factorisés depuis `infrastructure.sources.common`.
+Seul `fetch_by_native_id` (l'appel HTTP par identifiant natif) et la configuration (URL, auth) sont source-spécifiques. La sélection des rows stale, la persistance du refresh et le marquage de disparition sont identiques d'une source à l'autre : ils vivent ici, adossés aux requêtes de `infrastructure.pipeline.extract`.
 """
 
 from __future__ import annotations
@@ -15,11 +15,8 @@ from application.ports.pipeline.extract.refresh_stale import (
     FetchOutcome,
     StaleRow,
 )
-from infrastructure.sources.common import (
-    get_stale_rows,
-    set_disappeared_by_source_id,
-    upsert_staging,
-)
+from infrastructure.pipeline.extract.staging import upsert_staging
+from infrastructure.pipeline.extract.stale import get_stale_rows, set_disappeared_by_source_id
 
 
 class BaseRefreshStaleAdapter(ABC):

@@ -12,7 +12,7 @@ préservée).
 
 from sqlalchemy import text
 
-from infrastructure.sources.common import upsert_staging
+from infrastructure.pipeline.extract.staging import upsert_staging
 
 
 def _insert_existing(conn, source_id, doi):

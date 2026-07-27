@@ -49,16 +49,14 @@
 
 ### E — Dissolution de `common.py`
 
-> En pause. Le chantier `CODE_couches-acces-donnees` arrête la couche cible : la persistance d'extraction descend dans `infrastructure/pipeline/` (et non `queries/pipeline`). Le relogement y est tracké en phase D ; les items ci-dessous reprennent à ce moment-là.
+La persistance d'extraction descend dans `infrastructure/pipeline/` (chantier `CODE_couches-acces-donnees`, phase D), pas dans `queries/pipeline`.
 
-- [ ] Déplacer les fonctions de persistance (`upsert_staging`, `upsert_not_found_stub`, `record_doi_not_found`, `get_stale_rows`, `set_disappeared_by_source_id`, `get_cross_import_dois`, `get_existing_ids`), leur SQL et leurs constantes (`DOI_LOOKUP_RETRY_DAYS`, `STALE_REFRESH_AFTER_DAYS`, `_TARGET_RA`) vers `infrastructure/queries/pipeline`.
-- [ ] Replacer le calcul du hash de détection (`canonical_json_bytes`, `compute_hash`, `change_detection_hash`, `_HASH_NORMALIZERS`) auprès des écritures staging.
-- [ ] `BaseRefreshStaleAdapter` : ses méthodes de persistance appellent les requêtes déplacées.
-- [ ] Retirer `common.py`.
+- [x] Déplacer les fonctions de persistance (`upsert_staging`, `upsert_not_found_stub`, `record_doi_not_found`, `get_stale_rows`, `set_disappeared_by_source_id`, `get_cross_import_dois`), leur SQL et leurs constantes (`DOI_LOOKUP_RETRY_DAYS`, `STALE_REFRESH_AFTER_DAYS`, `_TARGET_RA`) vers le package `infrastructure/pipeline/extract/` (`staging.py`, `cross_import.py`, `stale.py`). `get_existing_ids`, morte, a disparu en phase A.
+- [x] Replacer le calcul du hash de détection (`canonical_json_bytes`, `compute_hash`, `change_detection_hash`, `_HASH_NORMALIZERS`) dans l'utilitaire neutre `infrastructure/pipeline/change_detection.py`.
+- [x] `BaseRefreshStaleAdapter` : ses méthodes de persistance appellent les requêtes déplacées.
+- [x] Retirer `common.py`.
 - [ ] Resserrer les `except Exception` de `config.py` sur des exceptions ciblées.
 
 ## Questions ouvertes
 
 - **Exceptions.** Au cas par cas, fichier par fichier : une exception métier (par exemple une erreur « paramètre de config absent/invalide ») quand elle porte un sens exploitable par l'appelant, une exception ciblée générique (erreur base, HTTP) sinon.
-- **Hash de détection.** Le calcul du hash accompagne les écritures staging (il en produit le `raw_hash`). Reste à trancher s'il vit dans le module d'écriture staging ou dans un utilitaire neutre partagé.
-- **Découpage cible dans `queries/pipeline`.** Un module unique pour toute la persistance d'extraction, ou plusieurs (écritures staging, pool cross-import, sélection stale) ?

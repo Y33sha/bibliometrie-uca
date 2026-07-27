@@ -1,17 +1,15 @@
-"""Tests pour extraction/common.py — fonctions partagées d'extraction."""
+"""Tests de la persistance et du hash de détection de l'extraction (infrastructure/pipeline)."""
 
 import pytest
 from sqlalchemy import text
 
 from domain.publications.identifiers import clean_doi
-from infrastructure.sources.common import (
-    change_detection_hash,
-    compute_hash,
+from infrastructure.pipeline.change_detection import change_detection_hash, compute_hash
+from infrastructure.pipeline.extract.cross_import import (
     get_cross_import_dois,
-    get_stale_rows,
     record_doi_not_found,
-    set_disappeared_by_source_id,
 )
+from infrastructure.pipeline.extract.stale import get_stale_rows, set_disappeared_by_source_id
 from infrastructure.sources.hal.hash_normalize import strip_volatile_for_hash
 
 # ── compute_hash ─────────────────────────────────────────────────

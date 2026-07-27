@@ -15,7 +15,7 @@ refetch suivant (dans le même run pipeline) ré-amorce le cycle.
 from sqlalchemy import bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
-from infrastructure.sources.common import compute_hash
+from infrastructure.pipeline.change_detection import compute_hash
 from infrastructure.sources.openalex.extract_openalex import PgOpenalexExtractAdapter
 
 _adapter = PgOpenalexExtractAdapter(base_url="https://api.openalex.org/works")
