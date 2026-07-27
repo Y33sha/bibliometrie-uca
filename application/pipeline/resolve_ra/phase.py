@@ -13,7 +13,7 @@ from collections.abc import Callable
 
 from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.circuit_breaker import CircuitBreaker
-from application.ports.repositories.doi_prefix_repository import DoiPrefixRepository
+from application.ports.pipeline.doi_prefixes import DoiPrefixesQueries
 
 ResolveRaFn = Callable[[str], str | None]
 """Signature : `(doi) -> ra_name | None`. `None` = DOI inexistant ou erreur HTTP."""
@@ -22,7 +22,7 @@ ResolveRaFn = Callable[[str], str | None]
 def run(
     log: logging.Logger,
     *,
-    repo: DoiPrefixRepository,
+    repo: DoiPrefixesQueries,
     resolve_ra_fn: ResolveRaFn,
     n_samples: int = 3,
     breaker: CircuitBreaker | None = None,

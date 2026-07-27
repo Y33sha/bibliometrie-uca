@@ -12,8 +12,8 @@ from collections.abc import Callable
 
 from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.circuit_breaker import CircuitBreaker
-from application.ports.repositories.doi_prefix_repository import (
-    DoiPrefixRepository,
+from application.ports.pipeline.doi_prefixes import (
+    DoiPrefixesQueries,
     PendingPublisherPrefix,
 )
 from application.ports.repositories.publisher_repository import PublisherRepository
@@ -29,7 +29,7 @@ FetchDataCitePrefixFn = Callable[[str], tuple[str, str, str] | None]
 def run_resolve_publishers(
     log: logging.Logger,
     *,
-    repo: DoiPrefixRepository,
+    repo: DoiPrefixesQueries,
     publisher_repo: PublisherRepository,
     fetch_crossref_prefix_fn: FetchCrossrefPrefixFn,
     fetch_datacite_prefix_fn: FetchDataCitePrefixFn,
@@ -86,7 +86,7 @@ def run_resolve_publishers(
 def _fetch_and_store_publisher_metadata(
     row: PendingPublisherPrefix,
     *,
-    repo: DoiPrefixRepository,
+    repo: DoiPrefixesQueries,
     fetch_crossref_prefix_fn: FetchCrossrefPrefixFn,
     fetch_datacite_prefix_fn: FetchDataCitePrefixFn,
 ) -> tuple[str | None, str | None]:

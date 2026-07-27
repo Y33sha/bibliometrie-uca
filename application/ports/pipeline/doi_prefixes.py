@@ -1,4 +1,4 @@
-"""Port DoiPrefixRepository — contrat d'accès à la table `doi_prefixes`.
+"""Port DoiPrefixesQueries — contrat d'accès à la table `doi_prefixes`.
 
 Cette table sert de cache `prefix → Registration Agency + publisher`. Elle est peuplée en deux temps : la phase `resolve_ra` (avant cross_imports) insère `(prefix, ra)` via `insert_ra` ; le volet publisher de la phase `publishers_journals` interroge `/prefixes` pour les rows non encore vérifiées (`publisher_checked_at IS NULL`), renseigne les métadonnées et attache le publisher.
 
@@ -17,7 +17,7 @@ class PendingPublisherPrefix(NamedTuple):
     publisher_name_normalized: str | None
 
 
-class DoiPrefixRepository(Protocol):
+class DoiPrefixesQueries(Protocol):
     """Contrat d'accès à la table `doi_prefixes`."""
 
     def get_unresolved_prefixes_with_samples(
