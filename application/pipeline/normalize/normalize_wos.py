@@ -18,8 +18,8 @@ from application.ports.pipeline.normalize.source_publications import (
     SourcePublicationRow,
 )
 from application.ports.pipeline.normalize.staging import StagingQueries, StagingRow
+from application.ports.pipeline.publishers import PublisherFindOrCreateQueries
 from application.ports.repositories.publication_repository import PublicationRepository
-from application.ports.repositories.publisher_repository import PublisherRepository
 from application.services.journals.core import find_or_create_journal
 from application.services.publishers.core import find_or_create_publisher
 from domain.persons.identifiers import (
@@ -339,7 +339,7 @@ def extract_from_api(raw: dict, staging_doi: str | None) -> dict:
 
 
 def upsert_publisher(
-    publisher_name: str | None, *, publisher_repo: PublisherRepository
+    publisher_name: str | None, *, publisher_repo: PublisherFindOrCreateQueries
 ) -> int | None:
     """Trouve ou crée un éditeur. Délègue au service journals."""
     return find_or_create_publisher(publisher_name, repo=publisher_repo)
@@ -504,7 +504,7 @@ def process_record(
     staging_row: StagingRow,
     *,
     journal_repo: JournalFindOrCreateQueries,
-    publisher_repo: PublisherRepository,
+    publisher_repo: PublisherFindOrCreateQueries,
     publication_repo: PublicationRepository,
     staging_queries: StagingQueries,
     authorship_queries: AuthorshipsBatchQueries,

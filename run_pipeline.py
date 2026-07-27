@@ -459,7 +459,7 @@ def _run_resolve_publishers() -> PhaseMetrics:
     )
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.pipeline.doi_prefixes import PgDoiPrefixesQueries
-    from infrastructure.repositories import publisher_repository
+    from infrastructure.pipeline.publishers import PgPublisherGatewayQueries
     from infrastructure.sources.circuit_breaker import (
         SourceCircuitBreaker,
         reset_current_breaker,
@@ -480,7 +480,7 @@ def _run_resolve_publishers() -> PhaseMetrics:
         metrics = run_resolve_publishers(
             log,
             repo=PgDoiPrefixesQueries(conn),
-            publisher_repo=publisher_repository(conn),
+            publisher_repo=PgPublisherGatewayQueries(conn),
             fetch_crossref_prefix_fn=lambda prefix: fetch_crossref_prefix(
                 prefix, user_agent=user_agent
             ),
@@ -722,10 +722,8 @@ def _normalize_builders() -> dict[str, Callable[[Any], Any]]:
         PgSourcePublicationQueries,
     )
     from infrastructure.pipeline.normalize.staging import PgStagingQueries
-    from infrastructure.repositories import (
-        publication_repository,
-        publisher_repository,
-    )
+    from infrastructure.pipeline.publishers import PgPublisherGatewayQueries
+    from infrastructure.repositories import publication_repository
 
     def _biblio(cls: Any) -> Callable[[Any], Any]:
         return lambda conn: cls(
@@ -734,7 +732,7 @@ def _normalize_builders() -> dict[str, Callable[[Any], Any]]:
             PgStagingQueries(),
             PgSourcePublicationQueries(),
             journal_repo_factory=PgJournalGatewayQueries,
-            publisher_repo_factory=publisher_repository,
+            publisher_repo_factory=PgPublisherGatewayQueries,
             publication_repo_factory=publication_repository,
             authorship_queries=PgAuthorshipsBatchQueries(),
         )

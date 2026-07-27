@@ -170,17 +170,15 @@ def run_normalize_scanr(conn):
         PgSourcePublicationQueries,
     )
     from infrastructure.pipeline.normalize.staging import PgStagingQueries
-    from infrastructure.repositories import (
-        publication_repository,
-        publisher_repository,
-    )
+    from infrastructure.pipeline.publishers import PgPublisherGatewayQueries
+    from infrastructure.repositories import publication_repository
 
     queries = PgSourcePublicationQueries()
     staging_queries = PgStagingQueries()
     authorship_queries = PgAuthorshipsBatchQueries()
     logger = logging.getLogger("test")
     journal_repo = PgJournalGatewayQueries(conn)
-    publisher_repo = publisher_repository(conn)
+    publisher_repo = PgPublisherGatewayQueries(conn)
     publication_repo = publication_repository(conn)
 
     rows = conn.execute(

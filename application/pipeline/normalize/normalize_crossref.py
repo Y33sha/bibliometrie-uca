@@ -26,8 +26,8 @@ from application.ports.pipeline.normalize.source_publications import (
     SourcePublicationRow,
 )
 from application.ports.pipeline.normalize.staging import StagingQueries, StagingRow
+from application.ports.pipeline.publishers import PublisherFindOrCreateQueries
 from application.ports.repositories.publication_repository import PublicationRepository
-from application.ports.repositories.publisher_repository import PublisherRepository
 from application.services.journals.core import find_or_create_journal
 from application.services.publishers.core import find_or_create_publisher
 from domain.persons.identifiers import (
@@ -171,7 +171,7 @@ def get_meta(msg: dict) -> dict | None:
 # =============================================================
 
 
-def upsert_publisher(msg: dict, *, publisher_repo: PublisherRepository) -> int | None:
+def upsert_publisher(msg: dict, *, publisher_repo: PublisherFindOrCreateQueries) -> int | None:
     name = get_publisher_name(msg)
     if not name:
         return None
@@ -290,7 +290,7 @@ def process_work(
     staging_row: StagingRow,
     *,
     journal_repo: JournalFindOrCreateQueries,
-    publisher_repo: PublisherRepository,
+    publisher_repo: PublisherFindOrCreateQueries,
     publication_repo: PublicationRepository,
     staging_queries: StagingQueries,
     authorship_queries: AuthorshipsBatchQueries,

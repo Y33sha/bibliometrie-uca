@@ -1,6 +1,8 @@
-"""Port PublisherRepository — contrat d'accès à l'agrégat Publisher.
+"""Port PublisherRepository — édition, enrichissement pays et fusion de l'agrégat Publisher.
 
-Séparé de `JournalRepository` (principe ISP) : publishers et journals sont deux agrégats distincts, bien que liés par une FK. Un pipeline limité aux publishers s'engage sur le seul contrat éditeurs, et inversement.
+Séparé de `JournalRepository` (principe ISP) : publishers et journals sont deux agrégats distincts, bien que liés par une FK. Un appelant limité aux publishers s'engage sur le seul contrat éditeurs, et inversement.
+
+Le trouve-ou-crée, alimenté par le pipeline, vit à part dans `application/ports/pipeline/publishers.py`.
 
 La fusion d'éditeurs (`merge_publisher_into`) vit ici : sémantiquement c'est une opération atomique sur un éditeur qui touche par effet de bord les tables liées (`journals.publisher_id`, `publisher_name_forms`, `journal_name_forms.publisher_id`, `apc_payments.publisher_id`). La détection des journaux à conflit avant fusion est exposée par `JournalRepository.find_shared_title_journal_pairs`, une query sur `journals`.
 """
@@ -30,57 +32,21 @@ class PublisherUpdate(BaseModel):
 
 
 class PublisherRepository(Protocol):
-    """Contrat d'accès à l'agrégat Publisher."""
+    """Contrat d'édition, d'enrichissement pays et de fusion de l'agrégat Publisher."""
 
     # ── Chargement de l'aggregate ──────────────────────────────────
 
     def find_by_id(self, publisher_id: int) -> Publisher | None:
-        """Hydrate l'aggregate `Publisher` complet. Retourne None si l'éditeur n'existe pas. Les `publisher_name_forms` restent une projection séparée, hors de l'aggregate (voir `find_publisher_by_name_form` pour les lookups par forme)."""
+        """Hydrate l'aggregate `Publisher` complet. Retourne None si l'éditeur n'existe pas. Les `publisher_name_forms` restent une projection séparée, hors de l'aggregate."""
         ...
 
-    # ── publisher_name_forms ───────────────────────────────────────
-
-    def add_publisher_name_form(
-        self,
-        publisher_id: int,
-        form_normalized: str,
-    ) -> None:
-        """Ajoute une forme de nom normalisée pour un éditeur, si absente (idempotent)."""
-        ...
-
-    def find_publisher_by_name_form(self, form_normalized: str) -> int | None:
-        """Cherche un `publisher_id` par forme de nom normalisée. `None` si aucune."""
-        ...
-
-    # ── publishers ─────────────────────────────────────────────────
-
-    def find_publisher_by_openalex_id(self, openalex_id: str) -> int | None: ...
+    # ── Enrichissement pays (maintenance) ──────────────────────────
 
     def find_needing_country_enrichment(self, *, limit: int | None = None) -> list[tuple[int, str]]:
         """`(id, openalex_id)` des éditeurs à `openalex_id` connu et `country` absent, triés par id (batching stable). `limit=None` les rend tous."""
         ...
 
-    def set_publisher_openalex_id_if_missing(
-        self,
-        publisher_id: int,
-        openalex_id: str,
-    ) -> None:
-        """Attribue un `openalex_id` à l'éditeur s'il n'en porte pas déjà un."""
-        ...
-
-    def create_publisher(
-        self,
-        *,
-        name: str,
-        name_normalized: str,
-        openalex_id: str | None,
-    ) -> int:
-        """Insère un éditeur et retourne son `id`."""
-        ...
-
-    def match_or_create_by_name_form(self, name_raw: str, name_normalized: str) -> tuple[int, bool]:
-        """`(id, created)` : l'éditeur dont la forme de nom normalisée existe déjà, sinon un éditeur créé et sa forme enregistrée."""
-        ...
+    # ── Édition sélective ──────────────────────────────────────────
 
     def update_publisher_fields(self, publisher_id: int, fields: PublisherUpdate) -> None:
         """Applique une modification sélective (`PublisherUpdate`) ; le service garantit au moins un champ fourni. `name_normalized` est re-dérivé quand `name` est présent. Lève `NotFoundError` si l'éditeur est introuvable."""
