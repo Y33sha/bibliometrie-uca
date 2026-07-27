@@ -10,7 +10,8 @@ from sqlalchemy import Connection, text
 from application.ports.repositories.person_repository import NameFormStatusRow
 from domain.errors import NotFoundError
 from domain.normalize import normalize_name
-from infrastructure.queries.sources_sql import AUTHOR_SOURCES_SQL
+from domain.sources.registry import AUTHOR_SOURCES
+from infrastructure.db.sql_fragments import in_clause
 
 
 def refresh_name_forms(conn: Connection, person_id: int, forms: set[str]) -> None:
@@ -71,7 +72,7 @@ def delete_orphan_name_forms_for_person(conn: Connection, person_id: int) -> int
                   JOIN author_identifying_keys aik ON aik.id = sa.identity_id
                   WHERE sa.person_id = :pid
                     AND aik.author_name_normalized = pnf.name_form
-                    AND sa.source IN {AUTHOR_SOURCES_SQL}
+                    AND sa.source IN {in_clause(AUTHOR_SOURCES)}
               )
         """),
         {"pid": person_id},

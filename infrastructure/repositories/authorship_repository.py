@@ -10,7 +10,7 @@ from application.ports.repositories.authorship_repository import (
     AuthorshipPersonRow,
     AuthorshipRepository,
 )
-from infrastructure.queries.sources_sql import source_case_sql
+from infrastructure.db.sql_fragments import case_priority
 
 # Vrai dès qu'une signature de la paire (publication, personne) de `authorships a` est elle-même in-perimeter.
 _AUTHORSHIP_IN_PERIMETER_EXPR = """
@@ -62,7 +62,7 @@ class PgAuthorshipRepository(AuthorshipRepository):
                 FROM source_authorships sa
                 JOIN source_publications sd ON sd.id = sa.source_publication_id
                 WHERE sa.id = ANY(:ids) AND sd.publication_id IS NOT NULL
-                ORDER BY sd.publication_id, {source_case_sql(source_priority)}
+                ORDER BY sd.publication_id, {case_priority(source_priority, "sa.source")}
             """),
             {"ids": source_authorship_ids},
         )
@@ -129,7 +129,7 @@ class PgAuthorshipRepository(AuthorshipRepository):
                 FROM (
                     SELECT sa.authorship_id,
                            (array_agg(sa.author_position ORDER BY
-                               {source_case_sql(source_priority)})
+                               {case_priority(source_priority, "sa.source")})
                                FILTER (WHERE sa.author_position IS NOT NULL))[1] AS pos,
                            bool_or(sa.is_corresponding) AS is_corr
                     FROM source_authorships sa

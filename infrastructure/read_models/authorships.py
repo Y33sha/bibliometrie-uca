@@ -11,12 +11,13 @@ from application.ports.read_models.authorships_queries import (
     OrphanCountResponse,
 )
 from domain.persons.name_matching import parse_raw_author_name
-from infrastructure.queries.sources_sql import AUTHOR_SOURCES_SQL
+from domain.sources.registry import AUTHOR_SOURCES
+from infrastructure.db.sql_fragments import in_clause
 
 # Une signature est orpheline quand aucune personne ne la porte, dans le périmètre et sous un rôle d'auteur d'une source principale : c'est la matière que la file de rattachement présente.
 _ORPHAN_BASE = f"""
     sa.person_id IS NULL AND sa.in_perimeter = TRUE
-    AND sa.source IN {AUTHOR_SOURCES_SQL}
+    AND sa.source IN {in_clause(AUTHOR_SOURCES)}
     AND 'author' = ANY(sa.roles)
 """
 
