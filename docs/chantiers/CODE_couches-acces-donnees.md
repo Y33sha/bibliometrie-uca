@@ -58,7 +58,7 @@ Contrats `pyproject.toml` étendus à `read_models` : import-linter (module inte
 
 `common.py` est dissous : le hash de détection va dans `infrastructure/pipeline/change_detection.py` (utilitaire neutre, partagé extract/normalize/CLI) ; la persistance dans le package `infrastructure/pipeline/extract/` (`staging.py`, `cross_import.py`, `stale.py`). Sans port applicatif : les adapters `sources/*`, `refresh_stale_base` et `run_pipeline` appellent ces requêtes directement.
 
-`infrastructure/queries/` conserve provisoirement `perimeter.py` (implémente à la fois un port pipeline et un port read_models — relocation à trancher) et `sources_sql.py`.
+`infrastructure/queries/` est dissous : `perimeter.py` scindé (reads + projection admin → `read_models/perimeters`, recompute du matview + adapter pipeline → `pipeline/perimeter`) ; `sources_sql.py` généralisé en helper neutre `db/sql_fragments`.
 
 ### E — Audit des repositories
 

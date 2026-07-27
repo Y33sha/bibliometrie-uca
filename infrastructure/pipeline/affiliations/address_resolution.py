@@ -2,7 +2,7 @@
 
 Appelé par `application/pipeline/affiliations/resolve_addresses.py`. Regroupe le SQL de la boucle de détection automatique via `structure_name_forms` : chargement des formes, parcours des adresses par tranches, écriture des seules détections qui changent.
 
-Séparé de `infrastructure/queries/addresses.py`, qui sert la couche API (lecture/CRUD des adresses).
+Séparé de `infrastructure/read_models/addresses.py`, qui sert la couche API (lecture/CRUD des adresses).
 """
 
 from sqlalchemy import Connection, text

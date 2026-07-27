@@ -111,7 +111,6 @@ type = "forbidden"
 source_modules = ["interfaces.api"]
 forbidden_modules = [
     "infrastructure.repositories",
-    "infrastructure.queries",
     "infrastructure.read_models",
     "infrastructure.pipeline",
 ]
@@ -121,7 +120,6 @@ forbidden_modules = [
 # via `Depends(...)`.
 ignore_imports = [
     "interfaces.api.deps -> infrastructure.repositories.**",
-    "interfaces.api.deps -> infrastructure.queries.**",
     "interfaces.api.deps -> infrastructure.read_models.**",
     "interfaces.api.deps -> infrastructure.pipeline.**",
 ]
@@ -327,9 +325,8 @@ exclude = [
 #   `domain.sources.*`).
 # - `application.pipeline.subjects._common` : `_PushedOntology` interne au
 #   cache (dict mutable avec sets, difficile à typer).
-# - `infrastructure.repositories.*`, `infrastructure.queries.*`,
-#   `infrastructure.read_models.*` et `infrastructure.pipeline.*` : couche SQL —
-#   Row, records DB, batchs hétérogènes.
+# - `infrastructure.repositories.*`, `infrastructure.read_models.*` et
+#   `infrastructure.pipeline.*` : couche SQL — Row, records DB, batchs hétérogènes.
 # - `interfaces.cli.{imports,maintenance,oneshot}.*` : scripts touchant des
 #   records DB / payloads JSONB — `Any` délibéré, comme les couches SQL. Ils
 #   restent annotés et leurs corps vérifiés (≠ exclusion : cf. `exclude` plus haut).
@@ -359,7 +356,6 @@ module = [
     "domain.sources.*",
     "infrastructure.jsonb_models.*",
     "infrastructure.pipeline.*",
-    "infrastructure.queries.*",
     "infrastructure.read_models.*",
     "infrastructure.repositories.*",
     "infrastructure.settings",

@@ -47,7 +47,7 @@ from application.services.authorships.core import propagate_in_perimeter_for_add
 from infrastructure.db.dml_guard import has_uncommitted_dml, reset_dml_flag
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.pipeline.metadata_correction import PgMetadataCorrectionQueries
-from infrastructure.queries.perimeter import PgPerimetersQueries, PgPerimeterStructuresQueries
+from infrastructure.pipeline.perimeter import PgPerimeterStructuresQueries
 from infrastructure.read_models.addresses import PgAddressesQueries
 from infrastructure.read_models.authorships import PgAuthorshipsQueries
 from infrastructure.read_models.config import PgConfigQueries
@@ -56,6 +56,7 @@ from infrastructure.read_models.entity_labels import PgEntityLabelQueries
 from infrastructure.read_models.feedback import PgFeedbackQueries
 from infrastructure.read_models.hal_problems import PgHalProblemsQueries
 from infrastructure.read_models.journals import PgJournalQueries
+from infrastructure.read_models.perimeters import PgPerimetersQueries
 from infrastructure.read_models.persons import PgPersonsQueries
 from infrastructure.read_models.pipeline_runs import PgPipelineRunsQueries
 from infrastructure.read_models.publications import PgPublicationsQueries

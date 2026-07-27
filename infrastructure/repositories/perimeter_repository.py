@@ -8,7 +8,7 @@ from application.ports.repositories.perimeter_repository import PerimeterReposit
 from domain.errors import NotFoundError
 from domain.perimeters.perimeter import Perimeter
 from infrastructure.db.tables import perimeters
-from infrastructure.queries.perimeter import refresh_perimeter_structures
+from infrastructure.pipeline.perimeter import refresh_perimeter_structures
 
 
 class _PerimeterRow(NamedTuple):

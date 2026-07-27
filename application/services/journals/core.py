@@ -1,6 +1,6 @@
 """Service Journaux — écritures sur l'agrégat Journal, transaction-agnostiques.
 
-Toute écriture éditoriale passe par ce service, pipeline compris (`find_or_create_journal` au normalize). Les colonnes dérivées que le pipeline recalcule en bloc — `pub_count`, drapeau `is_in_doaj` — s'écrivent en SQL ensembliste (`infrastructure/queries/pipeline/`), hors de ce service qui traite une revue à la fois.
+Toute écriture éditoriale passe par ce service, pipeline compris (`find_or_create_journal` au normalize). Les colonnes dérivées que le pipeline recalcule en bloc — `pub_count`, drapeau `is_in_doaj` — s'écrivent en SQL ensembliste (`infrastructure/pipeline/`), hors de ce service qui traite une revue à la fois.
 
 Les opérations sur l'agrégat Publisher vivent dans `application/services/publishers/core.py` ; les deux agrégats restent liés par `journals.publisher_id` (FK), chacun manipulé par son propre service et son propre port.
 

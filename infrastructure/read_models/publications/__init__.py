@@ -5,7 +5,7 @@ Le package est organisé par thème :
 - `facets` : `publications_facets`
 - `detail` : `get_publication_detail`
 
-Les adapters d'écriture pipeline (`pipeline.publications_reconciliation`, `pipeline.metadata_correction`) vivent côté `infrastructure/queries/pipeline/`.
+Les adapters d'écriture pipeline (`pipeline.publications_reconciliation`, `pipeline.metadata_correction`) vivent côté `infrastructure/pipeline/`.
 
 `PgPublicationsQueries` agrège les 5 fonctions de lecture sous le port `application.ports.read_models.publications_queries.PublicationsQueries`. Les fonctions libres retournent des dicts (réutilisables hors API) ; la conversion vers les DTOs Pydantic est faite ici à la sortie de l'adapter.
 """
@@ -26,7 +26,7 @@ from application.ports.read_models.publications_queries import (
     PublicationsFacetsResponse,
     PublicationsQueries,
 )
-from infrastructure.queries.perimeter import get_persons_structure_ids_list
+from infrastructure.read_models.perimeters import get_persons_structure_ids_list
 from infrastructure.read_models.publications.detail import (
     get_publication_detail as _get_publication_detail,
 )
