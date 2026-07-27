@@ -7,6 +7,7 @@ import datetime
 import logging
 
 from sqlalchemy import Connection, text
+from sqlalchemy.exc import SQLAlchemyError
 
 from domain.types import JsonValue
 
@@ -23,7 +24,7 @@ def _get_from_db(conn: Connection, key: str) -> JsonValue:
             text("SELECT value FROM config WHERE key = :key"), {"key": key}
         ).one_or_none()
         return row.value if row else None
-    except Exception:
+    except SQLAlchemyError:
         return None
 
 
@@ -76,7 +77,7 @@ def get_hal_collections(conn: Connection) -> dict[str, str]:
             ).all()
             if rows:
                 return {r.hal_collection: r.label for r in rows}
-    except Exception as e:
+    except SQLAlchemyError as e:
         logger.warning(f"Impossible de dériver les collections HAL depuis le périmètre : {e}")
 
     val = _get_from_db(conn, "hal_collections")
@@ -124,7 +125,7 @@ def get_extraction_api_ids(conn: Connection, source: str) -> list[str]:
                 # Tolérance d'un scalaire (cf. `StructureApiIds._ensure_list`).
                 result.append(ids)
         return list(dict.fromkeys(result))  # dédupliqué, ordre préservé
-    except Exception as e:
+    except SQLAlchemyError as e:
         logger.warning(f"Impossible de dériver api_ids depuis le périmètre : {e}")
         return []
 
