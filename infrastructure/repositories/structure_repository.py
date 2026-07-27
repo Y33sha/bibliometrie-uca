@@ -272,7 +272,7 @@ class PgStructureRepository(StructureRepository):
 
     # ── structure_name_forms ───────────────────────────────────────
 
-    def get_name_form(self, form_id: int) -> StructureNameFormRow | None:
+    def find_name_form(self, form_id: int) -> StructureNameFormRow | None:
         result = self._conn.execute(
             select(*_NAME_FORM_COLUMNS).where(structure_name_forms.c.id == form_id)
         )
