@@ -162,7 +162,7 @@ def phase_resolve_ra(**kw: Any) -> PhaseMetrics:
     """
     from application.pipeline.resolve_ra.phase import run
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.repositories import doi_prefix_repository
+    from infrastructure.pipeline.doi_prefixes import PgDoiPrefixesQueries
     from infrastructure.sources.circuit_breaker import (
         SourceCircuitBreaker,
         reset_current_breaker,
@@ -183,7 +183,7 @@ def phase_resolve_ra(**kw: Any) -> PhaseMetrics:
         user_agent = build_user_agent(get_polite_pool_email_optional(conn) or "")
         metrics = run(
             log,
-            repo=doi_prefix_repository(conn),
+            repo=PgDoiPrefixesQueries(conn),
             resolve_ra_fn=lambda doi: resolve_ra(doi, user_agent=user_agent),
             breaker=breaker,
         )
@@ -458,7 +458,8 @@ def _run_resolve_publishers() -> PhaseMetrics:
         run_resolve_publishers,
     )
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.repositories import doi_prefix_repository, publisher_repository
+    from infrastructure.pipeline.doi_prefixes import PgDoiPrefixesQueries
+    from infrastructure.repositories import publisher_repository
     from infrastructure.sources.circuit_breaker import (
         SourceCircuitBreaker,
         reset_current_breaker,
@@ -478,7 +479,7 @@ def _run_resolve_publishers() -> PhaseMetrics:
         user_agent = build_user_agent(get_polite_pool_email_optional(conn) or "")
         metrics = run_resolve_publishers(
             log,
-            repo=doi_prefix_repository(conn),
+            repo=PgDoiPrefixesQueries(conn),
             publisher_repo=publisher_repository(conn),
             fetch_crossref_prefix_fn=lambda prefix: fetch_crossref_prefix(
                 prefix, user_agent=user_agent

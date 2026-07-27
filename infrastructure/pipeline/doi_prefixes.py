@@ -5,13 +5,13 @@ Sert la phase `resolve_ra` (lecture des préfixes à résoudre, insertion de leu
 
 from sqlalchemy import Connection, text
 
-from application.ports.repositories.doi_prefix_repository import (
-    DoiPrefixRepository,
+from application.ports.pipeline.doi_prefixes import (
+    DoiPrefixesQueries,
     PendingPublisherPrefix,
 )
 
 
-class PgDoiPrefixRepository(DoiPrefixRepository):
+class PgDoiPrefixesQueries(DoiPrefixesQueries):
     """Accès PostgreSQL à `doi_prefixes` via une `Connection` SQLAlchemy."""
 
     def __init__(self, conn: Connection) -> None:

@@ -449,7 +449,7 @@ class TestGetUnresolvedPrefixes:
     laissant leur RA jamais résolue et cross-import en best-effort sur les deux RA."""
 
     def test_pool_covers_relation_and_arxiv_prefixes(self, sa_sync_conn):
-        from infrastructure.repositories.doi_prefix_repository import PgDoiPrefixRepository
+        from infrastructure.pipeline.doi_prefixes import PgDoiPrefixesQueries
 
         # Préfixe vu UNIQUEMENT via publication_relations.target_doi (parent in-périmètre).
         sa_sync_conn.execute(
@@ -474,7 +474,7 @@ class TestGetUnresolvedPrefixes:
         )
 
         prefixes = dict(
-            PgDoiPrefixRepository(sa_sync_conn).get_unresolved_prefixes_with_samples(
+            PgDoiPrefixesQueries(sa_sync_conn).get_unresolved_prefixes_with_samples(
                 n_samples_per_prefix=3
             )
         )
