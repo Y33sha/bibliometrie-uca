@@ -23,8 +23,8 @@ from application.ports.read_models.subjects_queries import SubjectFrequency
 from domain.countries import NON_INTERNATIONAL_COUNTRY_CODES
 from domain.publications.doc_types import DocType
 from domain.structures.relations import StructureRelationType
-from infrastructure.queries.perimeter import get_persons_structure_ids_list
 from infrastructure.read_models.filters import OA_DASHBOARD_COLS_SQL, entity_subjects_sql
+from infrastructure.read_models.perimeters import get_persons_structure_ids_list
 
 _NON_INTERNATIONAL = sorted(NON_INTERNATIONAL_COUNTRY_CODES)
 

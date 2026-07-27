@@ -1,6 +1,6 @@
 """Lecture des paramètres de requête portant plusieurs valeurs séparées par des virgules.
 
-Les constructeurs de filtres SQL vivent dans `infrastructure/queries/filters.py`, la construction de SQL étant l'affaire de l'infrastructure.
+Les constructeurs de filtres SQL vivent dans `infrastructure/read_models/filters.py`, la construction de SQL étant l'affaire de l'infrastructure.
 """
 
 from collections.abc import Collection

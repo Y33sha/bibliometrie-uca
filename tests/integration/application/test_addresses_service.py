@@ -18,7 +18,7 @@ from application.services.addresses.structure_links import (
     review_structure_link,
 )
 from domain.errors import NotFoundError, ValidationError
-from infrastructure.queries.perimeter import PgPerimeterStructuresQueries
+from infrastructure.pipeline.perimeter import PgPerimeterStructuresQueries
 from infrastructure.repositories import address_repository, authorship_repository
 from tests.integration.helpers.authorships import upsert_identity
 

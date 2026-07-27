@@ -9,7 +9,7 @@ Le package est organisé par thème :
 - `admin` : authorships par forme de nom, files de triage des formes et des identifiants
 
 L'adapter d'écriture pipeline (`pipeline.persons_matching`) vit côté
-`infrastructure/queries/pipeline/`.
+`infrastructure/pipeline/`.
 
 `PgPersonsQueries` agrège l'ensemble des fonctions de lecture + admin
 sous le port `application.ports.read_models.persons_queries.PersonsQueries` et se

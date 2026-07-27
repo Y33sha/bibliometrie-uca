@@ -1,6 +1,6 @@
 """Port : lectures sur les périmètres pour le router /api/perimeters/.
 
-Implémenté par `infrastructure.queries.perimeter.PgPerimetersQueries`.
+Implémenté par `infrastructure.read_models.perimeters.PgPerimetersQueries`.
 """
 
 from typing import Protocol

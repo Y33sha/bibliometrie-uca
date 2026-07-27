@@ -104,7 +104,7 @@ def _setup_affiliations_test_data(conn):
 
     # `source_authorship_structures` (matview) filtre par `perimeter_structures` :
     # peupler la clôture du périmètre depuis les perimeters/relations semés.
-    from infrastructure.queries.perimeter import refresh_perimeter_structures
+    from infrastructure.pipeline.perimeter import refresh_perimeter_structures
 
     refresh_perimeter_structures(conn)
 
@@ -115,7 +115,7 @@ def _run_populate_affiliations(conn):
 
     from application.pipeline.affiliations.populate_affiliations import run_populate
     from infrastructure.pipeline.affiliations.in_perimeter import PgAffiliationsQueries
-    from infrastructure.queries.perimeter import get_persons_structure_ids
+    from infrastructure.read_models.perimeters import get_persons_structure_ids
 
     run_populate(
         conn,
@@ -187,7 +187,7 @@ class TestPopulateAffiliationsIdempotence:
 
         from application.pipeline.affiliations.populate_affiliations import run_populate
         from infrastructure.pipeline.affiliations.in_perimeter import PgAffiliationsQueries
-        from infrastructure.queries.perimeter import get_persons_structure_ids
+        from infrastructure.read_models.perimeters import get_persons_structure_ids
 
         _setup_affiliations_test_data(sa_sync_conn)
 

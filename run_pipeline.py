@@ -507,7 +507,7 @@ def phase_affiliations(**kw: Any) -> PhaseMetrics:
         PgAddressResolutionQueries,
     )
     from infrastructure.pipeline.affiliations.in_perimeter import PgAffiliationsQueries
-    from infrastructure.queries.perimeter import PgPerimeterStructuresQueries
+    from infrastructure.pipeline.perimeter import PgPerimeterStructuresQueries
 
     return run(
         _open_tx,
@@ -1467,7 +1467,7 @@ def _execute_phases(
     # Matérialise `perimeter_structures` avant toute phase : l'extraction lit le périmètre
     # d'extraction dès la première phase ; `affiliations` la rematérialise ensuite, à son démarrage.
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.perimeter import refresh_perimeter_structures
+    from infrastructure.pipeline.perimeter import refresh_perimeter_structures
 
     with get_sync_engine().connect() as perimeter_conn:
         refresh_perimeter_structures(perimeter_conn)

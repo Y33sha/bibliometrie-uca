@@ -16,7 +16,7 @@ from application.services.authorships.core import (
     reject_pair,
 )
 from domain.errors import NotFoundError
-from infrastructure.queries.perimeter import PgPerimeterStructuresQueries
+from infrastructure.pipeline.perimeter import PgPerimeterStructuresQueries
 from infrastructure.repositories import authorship_repository
 from tests.integration.helpers.authorships import upsert_identity
 from tests.integration.helpers.structures import refresh_structure_matviews
@@ -613,7 +613,7 @@ class TestPropagateUcaForAddresses:
         `perimeter_extraction` + `perimeter_structures` sont requis pour que la
         matview `source_authorship_structures` rattache les structures du périmètre.
         """
-        from infrastructure.queries.perimeter import refresh_perimeter_structures
+        from infrastructure.pipeline.perimeter import refresh_perimeter_structures
 
         uca_id = _create_structure(conn, code="UCA", name="UCA")
         _create_perimeter(conn, "uca", "UCA", [uca_id])

@@ -1,7 +1,7 @@
 # STATUS: maintenance
 """Réhydrate `staging.raw_data` depuis le raw store, pour renormaliser une source.
 
-Opération inverse de `mark_done` (`infrastructure/queries/pipeline/staging.py`), qui archive le payload au raw store puis vide `staging.raw_data` (`= '{}'`) et pose `processed = TRUE`. Une fois une source normalisée, son payload brut ne subsiste qu'au raw store ; ce script le réinjecte en base pour rejouer la normalisation.
+Opération inverse de `mark_done` (`infrastructure/pipeline/normalize/staging.py`), qui archive le payload au raw store puis vide `staging.raw_data` (`= '{}'`) et pose `processed = TRUE`. Une fois une source normalisée, son payload brut ne subsiste qu'au raw store ; ce script le réinjecte en base pour rejouer la normalisation.
 
 Pour chaque source demandée, parcourt les clés du raw store (`data/raw_store/{source}/{source_id}.json.gz`), lit chaque payload et réhydrate la ligne `(source, source_id)` : `raw_data = <payload>`, `raw_hash` recalculé via `change_detection_hash` (même empreinte que l'UPSERT d'extraction, pour qu'une ligne réhydratée ne re-diverge pas au moissonnage suivant), `processed = FALSE`.
 

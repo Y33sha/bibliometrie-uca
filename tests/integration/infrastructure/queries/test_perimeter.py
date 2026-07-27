@@ -7,7 +7,7 @@ elle : pas de descente `est_partenaire_de`), et que le refresh est idempotent.
 
 from sqlalchemy import text
 
-from infrastructure.queries.perimeter import refresh_perimeter_structures
+from infrastructure.pipeline.perimeter import refresh_perimeter_structures
 
 
 def _structure(conn, code: str, stype: str = "labo") -> int:

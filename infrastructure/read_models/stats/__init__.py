@@ -27,7 +27,7 @@ from application.ports.read_models.stats_queries import (
     StatsQueries,
 )
 from domain.stats import DIMENSIONS, MEASURES
-from infrastructure.queries.perimeter import get_persons_structure_ids_list
+from infrastructure.read_models.perimeters import get_persons_structure_ids_list
 from infrastructure.read_models.stats.collaborations import (
     run_collaborations as _run_collaborations,
 )

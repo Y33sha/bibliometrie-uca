@@ -59,7 +59,7 @@ def get_hal_collections(conn: Connection) -> dict[str, str]:
     Dérivé des structures du périmètre qui ont un hal_collection renseigné, avec fallback sur la clé `hal_collections` de la table config.
     """
     try:
-        from infrastructure.queries.perimeter import get_perimeter_structure_ids
+        from infrastructure.read_models.perimeters import get_perimeter_structure_ids
 
         raw_perim = _get_from_db(conn, "perimeter_extraction")
         perim_code = raw_perim if isinstance(raw_perim, str) and raw_perim else "alliance_uca"
@@ -103,7 +103,7 @@ def get_extraction_api_ids(conn: Connection, source: str) -> list[str]:
     if not (perim_code and isinstance(perim_code, str)):
         return []
     try:
-        from infrastructure.queries.perimeter import get_perimeter_structure_ids
+        from infrastructure.read_models.perimeters import get_perimeter_structure_ids
 
         struct_ids = get_perimeter_structure_ids(conn, perim_code)
         if not struct_ids:

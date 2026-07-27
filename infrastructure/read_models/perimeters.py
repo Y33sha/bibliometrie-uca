@@ -1,25 +1,17 @@
-"""Calcul des périmètres de structures + adapter SQL pour les ports.
+"""Lecture du périmètre : clôture de structures (matview `perimeter_structures`) et projection de la page admin.
 
-Lit les périmètres depuis la table `perimeters` (colonne `root_structure_ids`). Chaque structure racine inclut récursivement ses sous-structures (via `est_tutelle_de` dans `structure_relations`).
+Le périmètre associe des phases à des ensembles de structures, lu depuis `config` (`perimeter_extraction` : structures interrogées à l'extraction et reconnues dans les affiliations ; `perimeter_persons` : périmètre de création des personnes). La clôture récursive (`est_tutelle_de`) est matérialisée dans `perimeter_structures` par `refresh_perimeter_structures` (côté pipeline) ; ces fonctions ne font que la restituer.
 
-L'association phase → périmètre est lue depuis la table `config` :
-- `perimeter_extraction` : structures interrogées à l'extraction et reconnues dans les affiliations
-- `perimeter_persons` : périmètre pour la création des personnes
-
-Expose :
-- Fonctions libres (`get_perimeter_structure_ids`, `get_persons_structure_ids`, …) partagées par l'extraction, le bootstrap de l'orchestrateur, un repository et les adapters api.
-- `PgPerimeterStructuresQueries` / `PgPerimetersQueries` : adapters pour les ports `application.ports.pipeline.perimeter_structures` et `application.ports.read_models.perimeters_queries`.
+Les fonctions libres sont partagées par l'extraction, le pipeline et les adapters : tout lecteur du périmètre passe par cette couche de lecture. `PgPerimetersQueries` implémente le port `application.ports.read_models.perimeters_queries`.
 """
 
 from sqlalchemy import Connection, text
 
-from application.ports.pipeline.perimeter_structures import PerimeterStructuresQueries
 from application.ports.read_models.perimeters_queries import (
     PerimeterOut,
     PerimetersQueries,
     PerimeterStructureItem,
 )
-from domain.structures.relations import StructureRelationType
 
 # ── Fonctions libres ──────────────────────────────────────────────
 
@@ -39,32 +31,6 @@ def get_perimeter_structure_ids(conn: Connection, perimeter_code: str) -> set[in
         {"code": perimeter_code},
     )
     return {row.structure_id for row in result}
-
-
-def refresh_perimeter_structures(conn: Connection) -> None:
-    """Recompute la table matérialisée `perimeter_structures` : pour chaque périmètre, la clôture récursive (`est_tutelle_de`) de ses racines `perimeters.root_structure_ids`, filtrée aux structures existantes. Idempotent (DELETE + réinsertion complète). Commit laissé au caller.
-
-    Seule implémentation de la clôture d'un périmètre — `get_perimeter_structure_ids` lit cette table. À rejouer à chaque édition de `perimeters.root_structure_ids` ou `structure_relations`.
-    """
-    conn.execute(text("DELETE FROM perimeter_structures"))
-    conn.execute(
-        text(f"""
-            INSERT INTO perimeter_structures (perimeter_id, structure_id)
-            WITH RECURSIVE descendants AS (
-                SELECT p.id AS perimeter_id, s.structure_id
-                FROM perimeters p
-                CROSS JOIN LATERAL unnest(p.root_structure_ids) AS s(structure_id)
-                UNION
-                SELECT d.perimeter_id, sr.child_id
-                FROM descendants d
-                JOIN structure_relations sr ON sr.parent_id = d.structure_id
-                WHERE sr.relation_type = '{StructureRelationType.EST_TUTELLE_DE.value}'
-            )
-            SELECT DISTINCT d.perimeter_id, d.structure_id
-            FROM descendants d
-            WHERE EXISTS (SELECT 1 FROM structures st WHERE st.id = d.structure_id)
-        """)
-    )
 
 
 def _config_perimeter_code(conn: Connection, config_key: str, default: str) -> str:
@@ -105,17 +71,7 @@ def get_persons_perimeter_root_ids(conn: Connection) -> list[int]:
     return list(row.root_structure_ids) if row.root_structure_ids else []
 
 
-# ── Adapters Pg* pour les ports ───────────────────────────────────
-
-
-class PgPerimeterStructuresQueries(PerimeterStructuresQueries):
-    """Adapter PostgreSQL pour `application.ports.pipeline.perimeter_structures.PerimeterStructuresQueries`."""
-
-    def get_persons_structure_ids_list(self, conn: Connection) -> list[int]:
-        return get_persons_structure_ids_list(conn)
-
-    def refresh_perimeter_structures(self, conn: Connection) -> None:
-        refresh_perimeter_structures(conn)
+# ── Adapter Pg* pour le port read_models ──────────────────────────
 
 
 class PgPerimetersQueries(PerimetersQueries):

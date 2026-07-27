@@ -28,7 +28,7 @@ from application.ports.read_models.hal_problems_queries import (
     NoMissingCollections,
 )
 from domain.source_publications.keys import DISCRIMINANT_TITLE_MIN_LENGTH
-from infrastructure.queries.perimeter import (
+from infrastructure.read_models.perimeters import (
     get_persons_perimeter_root_ids,
     get_persons_structure_ids_list,
 )
