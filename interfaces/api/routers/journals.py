@@ -21,7 +21,6 @@ from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.journal_repository import JournalRepository, JournalUpdate
 from application.ports.repositories.publication_repository import PublicationRepository
 from application.services.journals import commands as journal_commands
-from application.services.journals.core import requalify_publications_for_journal
 from domain.journals.journal import (
     JOURNAL_TYPE_LABELS_FR,
     JOURNAL_TYPES,
@@ -180,17 +179,14 @@ def get_type_change_impact(
 
     La méthode est POST bien qu'aucune écriture ne survive : l'aperçu écrit, pose les verrous de l'édition et en coûte le prix. Un GET s'annonce sans effet, et la garde d'authentification, qui s'applique aux méthodes d'écriture, laisserait passer une action admin.
     """
-    savepoint = conn.begin_nested()
-    try:
-        repo.update_journal_fields(journal_id, JournalUpdate(journal_type=body.journal_type))
-        count = requalify_publications_for_journal(
-            journal_id,
-            conn=conn,
-            correction_queries=correction_queries,
-            publication_repo=publications,
-        )
-    finally:
-        savepoint.rollback()
+    count = journal_commands.preview_type_change_impact(
+        conn,
+        journal_id,
+        journal_type=body.journal_type,
+        repo=repo,
+        publication_repo=publications,
+        correction_queries=correction_queries,
+    )
     return JournalTypeChangeImpact(count=count)
 
 
