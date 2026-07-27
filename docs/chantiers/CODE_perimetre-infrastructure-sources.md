@@ -55,7 +55,7 @@ La persistance d'extraction descend dans `infrastructure/pipeline/` (chantier `C
 - [x] Replacer le calcul du hash de détection (`canonical_json_bytes`, `compute_hash`, `change_detection_hash`, `_HASH_NORMALIZERS`) dans l'utilitaire neutre `infrastructure/pipeline/change_detection.py`.
 - [x] `BaseRefreshStaleAdapter` : ses méthodes de persistance appellent les requêtes déplacées.
 - [x] Retirer `common.py`.
-- [ ] Resserrer les `except Exception` de `config.py` sur des exceptions ciblées.
+- [x] Resserrer les `except Exception` de `config.py` sur des exceptions ciblées (`SQLAlchemyError`).
 
 ## Questions ouvertes
 
