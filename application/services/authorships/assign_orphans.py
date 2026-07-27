@@ -156,7 +156,7 @@ def batch_assign_orphan_authorships(
     assigned = authorship_repo.assign_orphan_source_authorships_to_person(person_id, sa_ids)
     authorship_repo.pin_authorships(sa_ids, person_id)
     authorship_repo.create_authorships_from_sources(person_id, sa_ids, SOURCE_PRIORITY)
-    authorship_repo.link_source_authorships_to_authorships(person_id, sa_ids)
+    authorship_repo.link_source_authorships_batch(person_id, sa_ids)
 
     for name_form in authorship_repo.get_distinct_name_forms_from_source_authorships(sa_ids):
         repo.add_name_form(person_id, name_form)
