@@ -1,6 +1,6 @@
 """Port : SQL de la phase countries (détection, suggestion, recalcul des caches).
 
-Implémenté par `infrastructure.queries.pipeline.countries.PgCountryQueries`, utilisé par les orchestrateurs de `application.pipeline.countries`.
+Implémenté par `infrastructure.pipeline.countries.PgCountryQueries`, utilisé par les orchestrateurs de `application.pipeline.countries`.
 """
 
 from typing import NamedTuple, Protocol

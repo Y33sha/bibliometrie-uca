@@ -366,7 +366,7 @@ def phase_normalize(**kw: Any) -> PhaseMetrics:
 
 def _run_cleanup_orphan_identities() -> None:
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.pipeline.normalize.authorships import delete_orphan_identities
+    from infrastructure.pipeline.normalize.authorships import delete_orphan_identities
 
     log.info("▶ nettoyage des identités orphelines")
     t0 = time.time()
@@ -503,11 +503,11 @@ def phase_affiliations(**kw: Any) -> PhaseMetrics:
     Séquence, transactions et métriques dans `application/pipeline/affiliations/phase.py`.
     """
     from application.pipeline.affiliations.phase import run
-    from infrastructure.queries.perimeter import PgPerimeterStructuresQueries
-    from infrastructure.queries.pipeline.affiliations.address_resolution import (
+    from infrastructure.pipeline.affiliations.address_resolution import (
         PgAddressResolutionQueries,
     )
-    from infrastructure.queries.pipeline.affiliations.in_perimeter import PgAffiliationsQueries
+    from infrastructure.pipeline.affiliations.in_perimeter import PgAffiliationsQueries
+    from infrastructure.queries.perimeter import PgPerimeterStructuresQueries
 
     return run(
         _open_tx,
@@ -524,7 +524,7 @@ def phase_metadata_correction(**kw: Any) -> PhaseMetrics:
     Séquence, transactions et métriques dans `application/pipeline/metadata_correction/phase.py`.
     """
     from application.pipeline.metadata_correction.phase import run
-    from infrastructure.queries.pipeline.metadata_correction import PgMetadataCorrectionQueries
+    from infrastructure.pipeline.metadata_correction import PgMetadataCorrectionQueries
 
     return run(_open_tx, PgMetadataCorrectionQueries(), log)
 
@@ -553,10 +553,10 @@ def phase_publications(**kw: Any) -> PhaseMetrics:
     Séquence, transactions et métriques dans `application/pipeline/publications/phase.py`.
     """
     from application.pipeline.publications.phase import run
-    from infrastructure.queries.pipeline.publications.address_pub_count import (
+    from infrastructure.pipeline.publications.address_pub_count import (
         PgAddressPubCountQueries,
     )
-    from infrastructure.queries.pipeline.publications.reconciliation import (
+    from infrastructure.pipeline.publications.reconciliation import (
         PgPublicationsReconciliationQueries,
     )
     from infrastructure.repositories import publication_repository
@@ -581,7 +581,7 @@ def phase_relations(**kw: Any) -> PhaseMetrics:
     la déduplication (`metadata_correction`), pas d'ici.
     """
     from application.pipeline.relations.phase import run
-    from infrastructure.queries.pipeline.relations import PgPublicationRelationsQueries
+    from infrastructure.pipeline.relations import PgPublicationRelationsQueries
 
     return run(_open_tx, PgPublicationRelationsQueries(), log)
 
@@ -599,8 +599,8 @@ def phase_persons(**kw: Any) -> PhaseMetrics:
     Séquence, transaction et métriques dans `application/pipeline/persons/phase.py`.
     """
     from application.pipeline.persons.phase import run
-    from infrastructure.queries.pipeline.persons.matching import PgPersonsMatchingQueries
-    from infrastructure.queries.pipeline.persons.name_forms import PgPersonNameFormsQueries
+    from infrastructure.pipeline.persons.matching import PgPersonsMatchingQueries
+    from infrastructure.pipeline.persons.name_forms import PgPersonNameFormsQueries
     from infrastructure.repositories import authorship_repository, person_repository
 
     return run(
@@ -625,9 +625,9 @@ def phase_authorships(**kw: Any) -> PhaseMetrics:
     Séquence, transactions et métriques dans `application/pipeline/authorships/phase.py`.
     """
     from application.pipeline.authorships.phase import run
-    from infrastructure.queries.pipeline.authorships.build import PgAuthorshipsBuildQueries
-    from infrastructure.queries.pipeline.authorships.pub_counts import PgPubCountsQueries
-    from infrastructure.queries.pipeline.authorships.purge_orphan_publications import (
+    from infrastructure.pipeline.authorships.build import PgAuthorshipsBuildQueries
+    from infrastructure.pipeline.authorships.pub_counts import PgPubCountsQueries
+    from infrastructure.pipeline.authorships.purge_orphan_publications import (
         PgPurgeOrphanPublicationsQueries,
     )
 
@@ -647,7 +647,7 @@ def phase_countries(mode: Any = "full", **kw: Any) -> PhaseMetrics:
     Séquence, transactions et métriques dans `application/pipeline/countries/phase.py`.
     """
     from application.pipeline.countries.phase import run
-    from infrastructure.queries.pipeline.countries import PgCountryQueries
+    from infrastructure.pipeline.countries import PgCountryQueries
 
     return run(
         _open_tx,
@@ -685,7 +685,7 @@ def phase_subjects(**kw: Any) -> PhaseMetrics:
     Séquence, transactions et métriques dans `application/pipeline/subjects/phase.py`.
     """
     from application.pipeline.subjects.phase import run
-    from infrastructure.queries.pipeline.subjects import PgSubjectsIngestionQueries
+    from infrastructure.pipeline.subjects import PgSubjectsIngestionQueries
 
     return run(
         _open_tx, PgSubjectsIngestionQueries(), log, rebuild=bool(kw.get("rebuild_subjects"))
@@ -715,11 +715,11 @@ def _normalize_builders() -> dict[str, Callable[[Any], Any]]:
     from application.pipeline.normalize.normalize_scanr import ScanrNormalizer
     from application.pipeline.normalize.normalize_theses import ThesesNormalizer
     from application.pipeline.normalize.normalize_wos import WosNormalizer
-    from infrastructure.queries.pipeline.normalize.authorships import PgAuthorshipsBatchQueries
-    from infrastructure.queries.pipeline.normalize.source_publications import (
+    from infrastructure.pipeline.normalize.authorships import PgAuthorshipsBatchQueries
+    from infrastructure.pipeline.normalize.source_publications import (
         PgSourcePublicationQueries,
     )
-    from infrastructure.queries.pipeline.normalize.staging import PgStagingQueries
+    from infrastructure.pipeline.normalize.staging import PgStagingQueries
     from infrastructure.repositories import (
         journal_repository,
         publication_repository,
@@ -1162,7 +1162,7 @@ def phase_oa_status(**kw: Any) -> PhaseMetrics:
     from application.pipeline.oa_status.phase import run
     from application.pipeline.signals import filter_configured
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.pipeline.oa_status import PgOaStatusQueries
+    from infrastructure.pipeline.oa_status import PgOaStatusQueries
     from infrastructure.repositories import publication_repository
     from infrastructure.sources.api_params import API_BASE_URLS
     from infrastructure.sources.config import get_polite_pool_email_optional

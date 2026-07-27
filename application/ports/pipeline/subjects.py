@@ -1,6 +1,6 @@
 """Port : opérations SQL pour la phase d'ingestion des sujets et le recalcul des co-occurrences.
 
-Implémenté par `infrastructure.queries.pipeline.subjects.PgSubjectsIngestionQueries`. Les lectures que servent les routes `/api/subjects/*` passent par `application.ports.read_models.subjects_queries.SubjectsQueries`.
+Implémenté par `infrastructure.pipeline.subjects.PgSubjectsIngestionQueries`. Les lectures que servent les routes `/api/subjects/*` passent par `application.ports.read_models.subjects_queries.SubjectsQueries`.
 """
 
 from typing import NamedTuple, Protocol

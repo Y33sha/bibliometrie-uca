@@ -6,7 +6,7 @@ import logging
 from sqlalchemy import text
 
 from application.pipeline.subjects.cooccurrences import run
-from infrastructure.queries.pipeline.subjects import (
+from infrastructure.pipeline.subjects import (
     PgSubjectsIngestionQueries,
     recompute_usage_counts,
     refresh_cooccurrences,

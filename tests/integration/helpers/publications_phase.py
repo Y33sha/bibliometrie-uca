@@ -14,8 +14,8 @@ from application.pipeline.metadata_correction.correct_unary import (
     compute_update as compute_unary_update,
 )
 from application.pipeline.publications.reconcile_components import reconcile
-from infrastructure.queries.pipeline.metadata_correction import PgMetadataCorrectionQueries
-from infrastructure.queries.pipeline.publications.reconciliation import (
+from infrastructure.pipeline.metadata_correction import PgMetadataCorrectionQueries
+from infrastructure.pipeline.publications.reconciliation import (
     PgPublicationsReconciliationQueries,
 )
 from infrastructure.repositories import publication_repository

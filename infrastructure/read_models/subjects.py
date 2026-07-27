@@ -1,6 +1,6 @@
 """Query service : lectures des sujets servies par les routes `/api/subjects/*`.
 
-Les écritures du référentiel appartiennent à la phase d'ingestion, dont l'adaptateur vit dans `infrastructure.queries.pipeline.subjects`.
+Les écritures du référentiel appartiennent à la phase d'ingestion, dont l'adaptateur vit dans `infrastructure.pipeline.subjects`.
 """
 
 from typing import Any

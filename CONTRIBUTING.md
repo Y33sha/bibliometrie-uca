@@ -121,7 +121,7 @@ Si la phase fait du SQL non trivial :
 def _run_<name>() -> PhaseMetrics:
     from application.pipeline.<catégorie>.<script> import run
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.pipeline.<phase> import Pg<Phase>Queries
+    from infrastructure.pipeline.<phase> import Pg<Phase>Queries
 
     log.info("▶ <name>")
     t0 = time.time()

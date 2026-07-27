@@ -10,7 +10,7 @@ import json
 
 from sqlalchemy import text
 
-from infrastructure.queries.pipeline.relations import (
+from infrastructure.pipeline.relations import (
     count_by_relation_type,
     fetch_erratum_title_matches,
     fetch_preprint_title_matches,

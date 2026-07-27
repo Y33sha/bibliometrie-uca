@@ -1,6 +1,6 @@
 """Port : SQL de la phase `metadata_correction`.
 
-Implémenté par `infrastructure.queries.pipeline.metadata_correction.PgMetadataCorrectionQueries`.
+Implémenté par `infrastructure.pipeline.metadata_correction.PgMetadataCorrectionQueries`.
 
 La phase persiste sur `source_publications` les valeurs corrigées par les règles de `domain.source_publications.correction`, pour que le matching aval lise des colonnes déjà corrigées. Trois sous-étapes s'appuient sur ce port : la correction unaire, qui traite chaque `source_publication` isolément ; le rattachement d'un journal par préfixe de DOI ; et la correction de DOI par groupe de `source_publications` partageant un même DOI.
 """

@@ -1,6 +1,6 @@
 """Port : file de vérification Unpaywall de la phase `oa_status`.
 
-Implémenté par `infrastructure.queries.pipeline.oa_status.PgOaStatusQueries`, consommé par `application/pipeline/oa_status/phase.py`.
+Implémenté par `infrastructure.pipeline.oa_status.PgOaStatusQueries`, consommé par `application/pipeline/oa_status/phase.py`.
 """
 
 from typing import NamedTuple, Protocol

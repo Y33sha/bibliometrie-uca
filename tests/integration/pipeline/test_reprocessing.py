@@ -58,11 +58,11 @@ def _run_normalize_hal(conn):
 
     from application.pipeline.normalize.normalize_hal import process_work
     from application.ports.pipeline.normalize.staging import StagingRow
-    from infrastructure.queries.pipeline.normalize.authorships import PgAuthorshipsBatchQueries
-    from infrastructure.queries.pipeline.normalize.source_publications import (
+    from infrastructure.pipeline.normalize.authorships import PgAuthorshipsBatchQueries
+    from infrastructure.pipeline.normalize.source_publications import (
         PgSourcePublicationQueries,
     )
-    from infrastructure.queries.pipeline.normalize.staging import PgStagingQueries
+    from infrastructure.pipeline.normalize.staging import PgStagingQueries
     from infrastructure.repositories import (
         journal_repository,
         publisher_repository,
@@ -128,7 +128,7 @@ def _refresh_stale_publications(conn):
     Rejoue d'abord `metadata_correction` : le re-normalize a réécrit les colonnes SP avec le brut source (`THESE`, `ART`…), or `refresh_from_sources` lit le canonique corrigé en place sans re-mapper. C'est l'ordre du pipeline (phase `metadata_correction` avant la phase `publications`).
     """
     from application.pipeline.publications.reconcile_components import reconcile
-    from infrastructure.queries.pipeline.publications.reconciliation import (
+    from infrastructure.pipeline.publications.reconciliation import (
         PgPublicationsReconciliationQueries,
     )
 

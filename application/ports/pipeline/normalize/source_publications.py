@@ -1,6 +1,6 @@
 """Port : écriture d'un enregistrement source dans `source_publications`, commun aux normaliseurs.
 
-Implémenté par `infrastructure.queries.pipeline.normalize.source_publications.PgSourcePublicationQueries`.
+Implémenté par `infrastructure.pipeline.normalize.source_publications.PgSourcePublicationQueries`.
 """
 
 from dataclasses import dataclass

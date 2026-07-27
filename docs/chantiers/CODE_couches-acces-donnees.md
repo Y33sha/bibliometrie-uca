@@ -53,8 +53,10 @@ Contrats `pyproject.toml` étendus à `read_models` : import-linter (module inte
 
 ### D — Couche `pipeline`
 
-- [ ] `infrastructure/queries/pipeline` → `infrastructure/pipeline`.
+- [x] `infrastructure/queries/pipeline` → `infrastructure/pipeline`.
 - [ ] Rapatrier la persistance d'extraction de `sources/common` (écritures `staging`, pool cross-import, sélection stale, `doi_lookups`) vers `pipeline/`. Reprend la phase E en pause du chantier `CODE_perimetre-infrastructure-sources`.
+
+`infrastructure/queries/` conserve provisoirement `perimeter.py` (implémente à la fois un port pipeline et un port read_models — relocation à trancher) et `sources_sql.py`.
 
 ### E — Audit des repositories
 
