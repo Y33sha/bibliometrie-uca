@@ -8,7 +8,7 @@ Les routes sont groupées par sujet, et les chemins littéraux précèdent celui
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import Connection
 
-from application.ports.api.authorships_queries import (
+from application.ports.read_models.authorships_queries import (
     AuthorshipsQueries,
     OrphanAuthorshipsResponse,
     OrphanCountResponse,

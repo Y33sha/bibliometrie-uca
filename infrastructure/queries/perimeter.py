@@ -8,17 +8,17 @@ L'association phase → périmètre est lue depuis la table `config` :
 
 Expose :
 - Fonctions libres (`get_perimeter_structure_ids`, `get_persons_structure_ids`, …) partagées par l'extraction, le bootstrap de l'orchestrateur, un repository et les adapters api.
-- `PgPerimeterStructuresQueries` / `PgPerimetersQueries` : adapters pour les ports `application.ports.pipeline.perimeter_structures` et `application.ports.api.perimeters_queries`.
+- `PgPerimeterStructuresQueries` / `PgPerimetersQueries` : adapters pour les ports `application.ports.pipeline.perimeter_structures` et `application.ports.read_models.perimeters_queries`.
 """
 
 from sqlalchemy import Connection, text
 
-from application.ports.api.perimeters_queries import (
+from application.ports.pipeline.perimeter_structures import PerimeterStructuresQueries
+from application.ports.read_models.perimeters_queries import (
     PerimeterOut,
     PerimetersQueries,
     PerimeterStructureItem,
 )
-from application.ports.pipeline.perimeter_structures import PerimeterStructuresQueries
 from domain.structures.relations import StructureRelationType
 
 # ── Fonctions libres ──────────────────────────────────────────────
@@ -119,7 +119,7 @@ class PgPerimeterStructuresQueries(PerimeterStructuresQueries):
 
 
 class PgPerimetersQueries(PerimetersQueries):
-    """Adapter SA pour `application.ports.api.perimeters_queries.PerimetersQueries`."""
+    """Adapter SA pour `application.ports.read_models.perimeters_queries.PerimetersQueries`."""
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn

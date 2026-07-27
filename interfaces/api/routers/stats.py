@@ -2,8 +2,8 @@
 
 from fastapi import APIRouter, Depends, Query
 
-from application.ports.api._common import EntityFacetResponse, EntityKind
-from application.ports.api.stats_queries import (
+from application.ports.read_models._common import EntityFacetResponse, EntityKind
+from application.ports.read_models.stats_queries import (
     CollaborationsResponse,
     PivotResponse,
     PivotSchemaResponse,

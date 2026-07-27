@@ -1,6 +1,6 @@
 """Query service : écritures du référentiel des sujets et de la liaison `publication_subjects`.
 
-Sert les phases `subjects` et `cooccurrences`. Les lectures des routes `/api/subjects/*` vivent dans `infrastructure.queries.api.subjects`.
+Sert les phases `subjects` et `cooccurrences`. Les lectures des routes `/api/subjects/*` vivent dans `infrastructure.read_models.subjects`.
 """
 
 from sqlalchemy import Connection, bindparam, text

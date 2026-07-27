@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from application.ports.api.subjects_queries import (
+from application.ports.read_models.subjects_queries import (
     SubjectDetailResponse,
     SubjectListResponse,
     SubjectsQueries,

@@ -6,7 +6,7 @@ hors-périmètre au lieu de tout. Le découpage se fait côté routeur ; la clau
 reçoit une `list[str]`.
 """
 
-from infrastructure.queries.api.filters import (
+from infrastructure.read_models.filters import (
     corresponding_clause,
     in_perimeter_person_clause,
 )

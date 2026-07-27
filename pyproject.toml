@@ -112,6 +112,7 @@ source_modules = ["interfaces.api"]
 forbidden_modules = [
     "infrastructure.repositories",
     "infrastructure.queries",
+    "infrastructure.read_models",
 ]
 # Verrouillage de la règle 5 de docs/architecture/01-vue-d-ensemble.md :
 # seul `interfaces/api/deps.py` instancie les `Pg*` concrets ; les
@@ -120,6 +121,7 @@ forbidden_modules = [
 ignore_imports = [
     "interfaces.api.deps -> infrastructure.repositories.**",
     "interfaces.api.deps -> infrastructure.queries.**",
+    "interfaces.api.deps -> infrastructure.read_models.**",
 ]
 
 [[tool.importlinter.contracts]]
@@ -305,7 +307,7 @@ exclude = [
 # délibérés. Documentés au cas par cas :
 # - `domain.sources.*`, `infrastructure.sources.*`, `infrastructure.jsonb_models.*` :
 #   payloads JSON bruts d'APIs externes / colonnes JSONB libres.
-# - `application.ports.api.*` : DTOs Pydantic co-localisés — `BaseModel`
+# - `application.ports.read_models.*` : DTOs Pydantic co-localisés — `BaseModel`
 #   propage `Any` via ses stubs (`__init__: **data: Any`), ce qui déclenche
 #   `explicit-any` à chaque héritage `class X(BaseModel)`. Le `Any` côté
 #   projet reste par ailleurs strict ; l'override ne couvre que la surface
@@ -323,8 +325,8 @@ exclude = [
 #   `domain.sources.*`).
 # - `application.pipeline.subjects._common` : `_PushedOntology` interne au
 #   cache (dict mutable avec sets, difficile à typer).
-# - `infrastructure.repositories.*` et `infrastructure.queries.*` :
-#   couche SQL — Row, records DB, batchs hétérogènes.
+# - `infrastructure.repositories.*`, `infrastructure.queries.*` et
+#   `infrastructure.read_models.*` : couche SQL — Row, records DB, batchs hétérogènes.
 # - `interfaces.cli.{imports,maintenance,oneshot}.*` : scripts touchant des
 #   records DB / payloads JSONB — `Any` délibéré, comme les couches SQL. Ils
 #   restent annotés et leurs corps vérifiés (≠ exclusion : cf. `exclude` plus haut).
@@ -344,7 +346,7 @@ module = [
     "application.pipeline.oa_status.*",
     "application.pipeline.publishers_journals.*",
     "application.pipeline.subjects._common",
-    "application.ports.api.*",
+    "application.ports.read_models.*",
     "application.ports.pipeline.cross_imports.*",
     "application.ports.pipeline.extract.*",
     "application.ports.pipeline.normalize.staging",
@@ -354,6 +356,7 @@ module = [
     "domain.sources.*",
     "infrastructure.jsonb_models.*",
     "infrastructure.queries.*",
+    "infrastructure.read_models.*",
     "infrastructure.repositories.*",
     "infrastructure.settings",
     "infrastructure.sources.*",

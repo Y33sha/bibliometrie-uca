@@ -1,9 +1,9 @@
-"""Tests d'intégration pour `infrastructure.queries.api.countries`."""
+"""Tests d'intégration pour `infrastructure.read_models.countries`."""
 
 from sqlalchemy import text
 
 from domain.countries import NO_COUNTRY_CODE
-from infrastructure.queries.api.countries import PgCountriesQueries
+from infrastructure.read_models.countries import PgCountriesQueries
 
 
 def _ensure_country(conn, code, name="Test"):

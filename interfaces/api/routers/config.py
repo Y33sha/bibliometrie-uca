@@ -6,7 +6,7 @@ La table `config` porte les réglages globaux : années couvertes, identifiants 
 from fastapi import APIRouter, Depends
 from sqlalchemy import Connection
 
-from application.ports.api.config_queries import ConfigItem, ConfigQueries
+from application.ports.read_models.config_queries import ConfigItem, ConfigQueries
 from application.ports.repositories.config_repository import ConfigRepository
 from application.services.config import commands as config_commands
 from interfaces.api.deps import config_queries, config_repository, current_admin_user, db_conn

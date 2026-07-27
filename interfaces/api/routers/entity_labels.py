@@ -2,8 +2,8 @@
 
 from fastapi import APIRouter, Depends, Query
 
-from application.ports.api._common import EntityKind
-from application.ports.api.entity_labels_queries import (
+from application.ports.read_models._common import EntityKind
+from application.ports.read_models.entity_labels_queries import (
     EntityLabelQueries,
     EntityLabelResponse,
 )

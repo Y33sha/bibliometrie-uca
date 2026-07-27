@@ -6,7 +6,8 @@ Les chemins littéraux — `/oa-models`, `/types`, `/facets` — précèdent `/{
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import Connection
 
-from application.ports.api.journals_queries import (
+from application.ports.pipeline.metadata_correction import MetadataCorrectionQueries
+from application.ports.read_models.journals_queries import (
     JournalDashboardResponse,
     JournalDetailResponse,
     JournalFilters,
@@ -15,8 +16,7 @@ from application.ports.api.journals_queries import (
     JournalsFacetsResponse,
     JournalSort,
 )
-from application.ports.api.subjects_queries import SubjectFrequency
-from application.ports.pipeline.metadata_correction import MetadataCorrectionQueries
+from application.ports.read_models.subjects_queries import SubjectFrequency
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.journal_repository import JournalRepository, JournalUpdate
 from application.ports.repositories.publication_repository import PublicationRepository

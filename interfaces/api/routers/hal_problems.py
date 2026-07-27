@@ -5,7 +5,7 @@ Alimente le tableau de bord qualité HAL : comptes d'auteur dupliqués, dépôts
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from application.ports.api.hal_problems_queries import (
+from application.ports.read_models.hal_problems_queries import (
     HalAffiliationConflictsResponse,
     HalCollectionLab,
     HalDoiDuplicatesResponse,

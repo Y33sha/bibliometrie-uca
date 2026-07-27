@@ -8,7 +8,7 @@ L'ordre de déclaration porte une contrainte : les chemins littéraux — `/sear
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import Connection
 
-from application.ports.api.persons_queries import (
+from application.ports.read_models.persons_queries import (
     AmbiguousNameFormsResponse,
     DetachableIntrudersResponse,
     IdentifierConflictsResponse,
@@ -28,7 +28,7 @@ from application.ports.api.persons_queries import (
     PersonThesesResponse,
     SharingPersonOut,
 )
-from application.ports.api.subjects_queries import SubjectFrequency
+from application.ports.read_models.subjects_queries import SubjectFrequency
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.authorship_repository import AuthorshipRepository
 from application.ports.repositories.person_repository import PersonRepository

@@ -1,8 +1,8 @@
-"""Tests d'intégration pour `infrastructure.queries.api.persons.detail`."""
+"""Tests d'intégration pour `infrastructure.read_models.persons.detail`."""
 
 from sqlalchemy import text
 
-from infrastructure.queries.api.persons.detail import person_theses
+from infrastructure.read_models.persons.detail import person_theses
 from tests.integration.helpers.authorships import upsert_identity
 
 

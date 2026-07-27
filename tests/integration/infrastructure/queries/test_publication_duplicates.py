@@ -1,8 +1,8 @@
-"""Tests d'intégration pour `infrastructure.queries.api.publications.duplicates`."""
+"""Tests d'intégration pour `infrastructure.read_models.publications.duplicates`."""
 
 from sqlalchemy import text
 
-from infrastructure.queries.api.publications.duplicates import PgPublicationDuplicatesQueries
+from infrastructure.read_models.publications.duplicates import PgPublicationDuplicatesQueries
 
 
 def _q(conn) -> PgPublicationDuplicatesQueries:

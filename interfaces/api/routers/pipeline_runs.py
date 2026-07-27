@@ -6,7 +6,7 @@ Deux origines pour ces lectures. Le statut du run en cours vient de `logs/status
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from application.pipeline.phase_order import PHASE_ORDER
-from application.ports.api.pipeline_runs_queries import (
+from application.ports.read_models.pipeline_runs_queries import (
     PipelineRunsQueries,
     RunDetail,
     RunSummary,

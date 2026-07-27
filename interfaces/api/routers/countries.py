@@ -5,7 +5,7 @@ Le référentiel alimente les listes de choix partout où un pays s'attribue ou 
 
 from fastapi import APIRouter, Depends
 
-from application.ports.api.countries_queries import CountriesQueries, CountryOut
+from application.ports.read_models.countries_queries import CountriesQueries, CountryOut
 from interfaces.api.deps import countries_queries
 
 router = APIRouter(prefix="/api/countries", tags=["countries"])

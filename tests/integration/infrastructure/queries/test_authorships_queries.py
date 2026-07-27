@@ -1,8 +1,8 @@
-"""Tests d'intégration pour `infrastructure.queries.api.authorships`."""
+"""Tests d'intégration pour `infrastructure.read_models.authorships`."""
 
 from sqlalchemy import text
 
-from infrastructure.queries.api.authorships import (
+from infrastructure.read_models.authorships import (
     list_orphan_authorships,
     orphan_authorships_count,
 )

@@ -10,7 +10,7 @@ from typing import Annotated, cast
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy import Connection
 
-from application.ports.api.addresses_queries import (
+from application.ports.read_models.addresses_queries import (
     AddressCountriesFilters,
     AddressDetected,
     AddressesCountriesResponse,

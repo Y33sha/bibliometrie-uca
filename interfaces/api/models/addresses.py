@@ -2,7 +2,7 @@
 
 from pydantic import BaseModel
 
-from application.ports.api.addresses_queries import (
+from application.ports.read_models.addresses_queries import (
     AddressPublicationItem,
     AddressStructureSummary,
 )
