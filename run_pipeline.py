@@ -716,13 +716,13 @@ def _normalize_builders() -> dict[str, Callable[[Any], Any]]:
     from application.pipeline.normalize.normalize_scanr import ScanrNormalizer
     from application.pipeline.normalize.normalize_theses import ThesesNormalizer
     from application.pipeline.normalize.normalize_wos import WosNormalizer
+    from infrastructure.pipeline.journals import PgJournalGatewayQueries
     from infrastructure.pipeline.normalize.authorships import PgAuthorshipsBatchQueries
     from infrastructure.pipeline.normalize.source_publications import (
         PgSourcePublicationQueries,
     )
     from infrastructure.pipeline.normalize.staging import PgStagingQueries
     from infrastructure.repositories import (
-        journal_repository,
         publication_repository,
         publisher_repository,
     )
@@ -733,7 +733,7 @@ def _normalize_builders() -> dict[str, Callable[[Any], Any]]:
             log,
             PgStagingQueries(),
             PgSourcePublicationQueries(),
-            journal_repo_factory=journal_repository,
+            journal_repo_factory=PgJournalGatewayQueries,
             publisher_repo_factory=publisher_repository,
             publication_repo_factory=publication_repository,
             authorship_queries=PgAuthorshipsBatchQueries(),
@@ -777,7 +777,7 @@ def _run_enrich_journals_from_openalex() -> PhaseMetrics:
         run_enrich_journals_from_openalex,
     )
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.repositories import journal_repository
+    from infrastructure.pipeline.journals import PgJournalGatewayQueries
     from infrastructure.sources.api_params import API_BASE_URLS, DOAJ_DELAY
     from infrastructure.sources.circuit_breaker import (
         SourceCircuitBreaker,
@@ -804,7 +804,7 @@ def _run_enrich_journals_from_openalex() -> PhaseMetrics:
         metrics = run_enrich_journals_from_openalex(
             conn,
             log,
-            journal_repo=journal_repository(conn),
+            journal_repo=PgJournalGatewayQueries(conn),
             fetch_batch=lambda oa_ids: fetch_sources_batch(
                 oa_ids, openalex_sources_api=sources_api, api_key=api_key, mailto=mailto
             ),
@@ -830,7 +830,7 @@ def _run_enrich_journals_from_doaj() -> PhaseMetrics:
         run_import_doaj_dump,
     )
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.repositories import journal_repository
+    from infrastructure.pipeline.journals import PgJournalGatewayQueries
     from infrastructure.sources.config import get_polite_pool_email_optional
     from infrastructure.sources.doaj.client import fetch_doaj_dump, read_doaj_dump_rows
     from infrastructure.sources.polite_pool import build_user_agent
@@ -839,7 +839,7 @@ def _run_enrich_journals_from_doaj() -> PhaseMetrics:
     t0 = time.time()
     conn = get_sync_engine().connect()
     try:
-        journal_repo = journal_repository(conn)
+        journal_repo = PgJournalGatewayQueries(conn)
         last = journal_repo.doaj_last_import_at()
         threshold = datetime.datetime.now(datetime.UTC) - datetime.timedelta(days=_DOAJ_STALE_DAYS)
         if last is not None and last > threshold:

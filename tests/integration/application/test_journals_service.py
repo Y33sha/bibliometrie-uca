@@ -28,6 +28,7 @@ from domain.errors import (
     PublisherMergeBlockedError,
     ValidationError,
 )
+from infrastructure.pipeline.journals import PgJournalGatewayQueries
 from infrastructure.pipeline.metadata_correction import PgMetadataCorrectionQueries
 from infrastructure.repositories import (
     journal_repository,
@@ -42,6 +43,11 @@ _CORRECTION_QUERIES = PgMetadataCorrectionQueries()
 @pytest.fixture
 def repo(sa_sync_conn):
     return journal_repository(sa_sync_conn)
+
+
+@pytest.fixture
+def gateway(sa_sync_conn):
+    return PgJournalGatewayQueries(sa_sync_conn)
 
 
 @pytest.fixture
@@ -202,46 +208,46 @@ class TestFindOrCreatePublisher:
 
 
 class TestFindOrCreateJournal:
-    def test_returns_none_on_empty_title(self, sa_sync_conn, repo):
-        assert find_or_create_journal(None, repo=repo) is None
-        assert find_or_create_journal("", repo=repo) is None
+    def test_returns_none_on_empty_title(self, sa_sync_conn, gateway):
+        assert find_or_create_journal(None, repo=gateway) is None
+        assert find_or_create_journal("", repo=gateway) is None
 
-    def test_creates_new_journal(self, sa_sync_conn, repo):
-        j_id = find_or_create_journal("Nature", issn="0028-0836", repo=repo)
+    def test_creates_new_journal(self, sa_sync_conn, gateway):
+        j_id = find_or_create_journal("Nature", issn="0028-0836", repo=gateway)
         row = _fetch_one(sa_sync_conn, "SELECT title, issn FROM journals WHERE id = :id", id=j_id)
         assert row.title == "Nature"
         assert row.issn == "0028-0836"
 
-    def test_finds_by_openalex_id(self, sa_sync_conn, repo):
+    def test_finds_by_openalex_id(self, sa_sync_conn, gateway):
         existing = _insert_journal(sa_sync_conn, "Nature", openalex_id="S137773608")
-        found = find_or_create_journal("Nature Journal", openalex_id="S137773608", repo=repo)
+        found = find_or_create_journal("Nature Journal", openalex_id="S137773608", repo=gateway)
         assert found == existing
 
-    def test_finds_by_issn(self, sa_sync_conn, repo):
+    def test_finds_by_issn(self, sa_sync_conn, gateway):
         existing = _insert_journal(sa_sync_conn, "Nature", issn="0028-0836")
-        found = find_or_create_journal("Nature Variant", issn="0028-0836", repo=repo)
+        found = find_or_create_journal("Nature Variant", issn="0028-0836", repo=gateway)
         assert found == existing
 
-    def test_finds_by_eissn(self, sa_sync_conn, repo):
+    def test_finds_by_eissn(self, sa_sync_conn, gateway):
         existing = _insert_journal(sa_sync_conn, "Nature", eissn="1476-4687")
-        found = find_or_create_journal("Nature", eissn="1476-4687", repo=repo)
+        found = find_or_create_journal("Nature", eissn="1476-4687", repo=gateway)
         assert found == existing
 
-    def test_finds_by_issnl(self, sa_sync_conn, repo):
+    def test_finds_by_issnl(self, sa_sync_conn, gateway):
         existing = _insert_journal(sa_sync_conn, "Nature", issnl="0028-0836")
-        found = find_or_create_journal("Other Title", issnl="0028-0836", repo=repo)
+        found = find_or_create_journal("Other Title", issnl="0028-0836", repo=gateway)
         assert found == existing
 
-    def test_finds_by_name_form(self, sa_sync_conn, repo):
-        find_or_create_journal("Nature", repo=repo)
-        found = find_or_create_journal("nature", repo=repo)
+    def test_finds_by_name_form(self, sa_sync_conn, gateway):
+        find_or_create_journal("Nature", repo=gateway)
+        found = find_or_create_journal("nature", repo=gateway)
         n = sa_sync_conn.execute(
             text("SELECT COUNT(*) AS n FROM journals WHERE title_normalized = 'nature'")
         ).scalar_one()
         assert n == 1
         assert found is not None
 
-    def test_enriches_metadata_on_match(self, sa_sync_conn, repo, publisher_repo):
+    def test_enriches_metadata_on_match(self, sa_sync_conn, gateway, publisher_repo):
         """Si on trouve par ISSN, les champs vides (eissn, publisher_id) sont remplis."""
         existing = _insert_journal(sa_sync_conn, "Nature", issn="0028-0836")
         pub_id = find_or_create_publisher("Springer", repo=publisher_repo)
@@ -250,7 +256,7 @@ class TestFindOrCreateJournal:
             issn="0028-0836",
             eissn="1476-4687",
             publisher_id=pub_id,
-            repo=repo,
+            repo=gateway,
         )
         row = _fetch_one(
             sa_sync_conn, "SELECT eissn, publisher_id FROM journals WHERE id = :id", id=existing
@@ -263,9 +269,9 @@ class TestFindOrCreateJournal:
 
 
 class TestUpdateJournalApc:
-    def test_updates_fields(self, sa_sync_conn, repo):
+    def test_updates_fields(self, sa_sync_conn, gateway):
         j_id = _insert_journal(sa_sync_conn, "Nature")
-        update_journal_apc(j_id, apc_amount=3000.0, apc_currency="EUR", repo=repo)
+        update_journal_apc(j_id, apc_amount=3000.0, apc_currency="EUR", repo=gateway)
         row = _fetch_one(
             sa_sync_conn,
             "SELECT apc_amount, apc_currency FROM journals WHERE id = :id",
@@ -274,13 +280,13 @@ class TestUpdateJournalApc:
         assert float(row.apc_amount) == 3000.0
         assert row.apc_currency == "EUR"
 
-    def test_coalesce_preserves_existing_and_leaves_is_in_doaj(self, sa_sync_conn, repo):
+    def test_coalesce_preserves_existing_and_leaves_is_in_doaj(self, sa_sync_conn, gateway):
         """Sans nouvelle valeur, l'APC existant est conservé ; `is_in_doaj` (autorité
         DOAJ) n'est jamais touché par l'enrichissement APC."""
         j_id = _insert_journal(
             sa_sync_conn, "Nature", apc_amount=2000.0, apc_currency="USD", is_in_doaj=True
         )
-        update_journal_apc(j_id, apc_currency="EUR", repo=repo)
+        update_journal_apc(j_id, apc_currency="EUR", repo=gateway)
         row = _fetch_one(
             sa_sync_conn,
             "SELECT apc_amount, apc_currency, is_in_doaj FROM journals WHERE id = :id",

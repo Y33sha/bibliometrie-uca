@@ -11,6 +11,10 @@ from sqlalchemy import Connection
 
 from application.audit_log import emit_event
 from application.pipeline.metadata_correction.correct_unary import compute_update
+from application.ports.pipeline.journals import (
+    JournalFindOrCreateQueries,
+    JournalOpenAlexEnrichmentQueries,
+)
 from application.ports.pipeline.metadata_correction import MetadataCorrectionQueries
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.journal_repository import JournalRepository, JournalUpdate
@@ -30,7 +34,7 @@ def find_or_create_journal(
     publisher_id: int | None = None,
     openalex_id: str | None = None,
     oa_model: OaModel | None = None,
-    repo: JournalRepository,
+    repo: JournalFindOrCreateQueries,
 ) -> int | None:
     """Trouve ou crée un journal. Retourne son id, ou `None` si le titre est vide.
 
@@ -117,7 +121,7 @@ def update_journal_apc(
     *,
     apc_amount: float | None = None,
     apc_currency: str | None = None,
-    repo: JournalRepository,
+    repo: JournalOpenAlexEnrichmentQueries,
 ) -> None:
     """Met à jour les informations APC d'un journal.
 

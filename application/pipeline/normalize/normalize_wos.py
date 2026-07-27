@@ -11,13 +11,13 @@ from application.pipeline.normalize._authorships_batch import (
 )
 from application.pipeline.normalize.bibliographic import BibliographicNormalizer
 from application.pipeline.timings import StepTimer
+from application.ports.pipeline.journals import JournalFindOrCreateQueries
 from application.ports.pipeline.normalize.authorships import AuthorshipsBatchQueries
 from application.ports.pipeline.normalize.source_publications import (
     SourcePublicationQueries,
     SourcePublicationRow,
 )
 from application.ports.pipeline.normalize.staging import StagingQueries, StagingRow
-from application.ports.repositories.journal_repository import JournalRepository
 from application.ports.repositories.publication_repository import PublicationRepository
 from application.ports.repositories.publisher_repository import PublisherRepository
 from application.services.journals.core import find_or_create_journal
@@ -346,7 +346,7 @@ def upsert_publisher(
 
 
 def upsert_journal(
-    rec: dict, publisher_id: int | None, *, journal_repo: JournalRepository
+    rec: dict, publisher_id: int | None, *, journal_repo: JournalFindOrCreateQueries
 ) -> int | None:
     """Trouve ou crée une revue depuis les données WoS."""
     title = rec.get("journal_title")
@@ -503,7 +503,7 @@ def process_record(
     logger: logging.Logger,
     staging_row: StagingRow,
     *,
-    journal_repo: JournalRepository,
+    journal_repo: JournalFindOrCreateQueries,
     publisher_repo: PublisherRepository,
     publication_repo: PublicationRepository,
     staging_queries: StagingQueries,

@@ -11,13 +11,13 @@ from application.pipeline.normalize._authorships_batch import (
 )
 from application.pipeline.normalize.bibliographic import BibliographicNormalizer
 from application.pipeline.timings import StepTimer
+from application.ports.pipeline.journals import JournalFindOrCreateQueries
 from application.ports.pipeline.normalize.authorships import AuthorshipsBatchQueries
 from application.ports.pipeline.normalize.source_publications import (
     SourcePublicationQueries,
     SourcePublicationRow,
 )
 from application.ports.pipeline.normalize.staging import StagingQueries, StagingRow
-from application.ports.repositories.journal_repository import JournalRepository
 from application.ports.repositories.publication_repository import PublicationRepository
 from application.ports.repositories.publisher_repository import PublisherRepository
 from application.services.journals.core import find_or_create_journal
@@ -75,7 +75,7 @@ def _extract_journal_issns(source: dict) -> tuple[str | None, str | None]:
 
 
 def upsert_journal(
-    doc: dict, publisher_id: int | None, *, journal_repo: JournalRepository
+    doc: dict, publisher_id: int | None, *, journal_repo: JournalFindOrCreateQueries
 ) -> int | None:
     source = doc.get("source") or {}
     title = source.get("title")
@@ -309,7 +309,7 @@ def process_work(
     logger: logging.Logger,
     staging_row: StagingRow,
     *,
-    journal_repo: JournalRepository,
+    journal_repo: JournalFindOrCreateQueries,
     publisher_repo: PublisherRepository,
     publication_repo: PublicationRepository,
     staging_queries: StagingQueries,

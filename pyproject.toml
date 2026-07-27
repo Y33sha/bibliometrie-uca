@@ -349,6 +349,7 @@ module = [
     "application.ports.read_models.*",
     "application.ports.pipeline.cross_imports.*",
     "application.ports.pipeline.extract.*",
+    "application.ports.pipeline.journals",
     "application.ports.pipeline.normalize.staging",
     "application.ports.pipeline.subjects",
     "application.ports.repositories.*",
