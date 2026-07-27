@@ -255,7 +255,7 @@ def update_name_form(
     Lève NotFoundError si la forme n'existe pas.
     Lève ValidationError si `fields` ne contient aucun champ valide.
     """
-    existing = repo.get_name_form(form_id)
+    existing = repo.find_name_form(form_id)
     if existing is None:
         raise NotFoundError(f"Forme {form_id} introuvable")
 

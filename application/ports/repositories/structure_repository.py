@@ -145,7 +145,9 @@ class StructureRepository(Protocol):
 
     # ── structure_name_forms ───────────────────────────────────────
 
-    def get_name_form(self, form_id: int) -> StructureNameFormRow | None: ...
+    def find_name_form(self, form_id: int) -> StructureNameFormRow | None:
+        """Charge la ligne d'agrégat d'une forme de nom de structure, pour édition. La lecture-projection pour l'API vit dans les read-models (`StructuresQueries.get_name_form`)."""
+        ...
 
     def create_name_form(
         self,
