@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import datetime
 import logging
-from collections.abc import Callable
 from typing import Any
 
 from sqlalchemy import Connection
@@ -22,7 +21,7 @@ from application.pipeline.normalize._authorships_batch import (
     AuthorRecord,
     write_source_authorships,
 )
-from application.pipeline.normalize.base import SourceNormalizer
+from application.pipeline.normalize.bibliographic import BibliographicNormalizer
 from application.pipeline.timings import StepTimer
 from application.ports.pipeline.normalize.authorships import AuthorshipsBatchQueries
 from application.ports.pipeline.normalize.source_publications import (
@@ -298,50 +297,20 @@ def process_work(
     return True
 
 
-class DataciteNormalizer(SourceNormalizer):
+class DataciteNormalizer(BibliographicNormalizer):
     SOURCE = "datacite"
     DEFAULT_BATCH_SIZE = 100
 
-    def __init__(
-        self,
-        conn: Connection,
-        logger: logging.Logger,
-        staging_queries: StagingQueries,
-        queries: SourcePublicationQueries,
-        journal_repo_factory: Callable[[Connection], JournalRepository],
-        publisher_repo_factory: Callable[[Connection], PublisherRepository],
-        publication_repo_factory: Callable[[Connection], PublicationRepository],
-        authorship_queries: AuthorshipsBatchQueries,
-    ) -> None:
-        super().__init__(conn, logger, staging_queries)
-        self._queries = queries
-        self._journal_repo_factory = journal_repo_factory
-        self._journal_repo: JournalRepository | None = None
-        self._publisher_repo_factory = publisher_repo_factory
-        self._publisher_repo: PublisherRepository | None = None
-        self._publication_repo_factory = publication_repo_factory
-        self._publication_repo: PublicationRepository | None = None
-        self._authorship_queries = authorship_queries
-
-    def preload_caches(self, conn: Connection) -> None:
-        self._journal_repo = self._journal_repo_factory(conn)
-        self._publisher_repo = self._publisher_repo_factory(conn)
-        self._publication_repo = self._publication_repo_factory(conn)
-
     def process_work(self, conn: Connection, row: StagingRow) -> bool | None:
-        assert (
-            self._journal_repo is not None
-            and self._publisher_repo is not None
-            and self._publication_repo is not None
-        )
+        journal_repo, publisher_repo, publication_repo = self._require_repos()
         return process_work(
             conn,
             self._queries,
             self.logger,
             row,
-            journal_repo=self._journal_repo,
-            publisher_repo=self._publisher_repo,
-            publication_repo=self._publication_repo,
+            journal_repo=journal_repo,
+            publisher_repo=publisher_repo,
+            publication_repo=publication_repo,
             staging_queries=self._staging,
             authorship_queries=self._authorship_queries,
         )
