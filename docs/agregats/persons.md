@@ -67,11 +67,11 @@ Aucun endpoint n'écrit `persons_rh` : la fiche RH est alimentée hors API (impo
 
 ## Lecture — pipeline
 
-La cascade lit en bloc, via le port `PersonsMatchingQueries` (`infrastructure/queries/pipeline/persons_matching.py`) : les maps `idref` / `orcid` / `hal_account` → personne (statuts non-`rejected`, nom normalisé joint pour corroborer le match), `name_form` → personnes, les verdicts `(name_form, person_id)` (`confirmed` / `rejected`, formes canoniques incluses), les personnes rejetées par publication (`rejected_authorships`), et l'index d'ancres `(publication, position)`. C'est la boucle producteur/consommateur inter-runs qui porte la convergence.
+La cascade lit en bloc, via le port `PersonsMatchingQueries` (`infrastructure/pipeline/persons/matching.py`) : les maps `idref` / `orcid` / `hal_account` → personne (statuts non-`rejected`, nom normalisé joint pour corroborer le match), `name_form` → personnes, les verdicts `(name_form, person_id)` (`confirmed` / `rejected`, formes canoniques incluses), les personnes rejetées par publication (`rejected_authorships`), et l'index d'ancres `(publication, position)`. C'est la boucle producteur/consommateur inter-runs qui porte la convergence.
 
 ## Lecture — API
 
-Port `PersonsQueries` (`infrastructure/queries/api/persons/`, modules `list` / `facets` / `detail` / `admin`).
+Port `PersonsQueries` (`infrastructure/read_models/persons/`, modules `list` / `facets` / `detail` / `admin`).
 
 - **Fiche personne** : profil, thèses, adresses, dashboard, sujets — croisant `persons`, `persons_rh`, `person_identifiers`, `source_authorships`, `authorships`, publications et sujets.
 - **Annuaire / liste / recherche / facettes / stats** : listes publiques et admin scopables par laboratoire.

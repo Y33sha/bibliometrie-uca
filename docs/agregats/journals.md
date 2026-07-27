@@ -47,7 +47,7 @@ Routeur `interfaces/api/routers/journals.py`, command handlers `application/serv
 
 ## Lecture — pipeline
 
-**`pub_count`** : `infrastructure/queries/pipeline/pub_counts.py` recalcule `journals.pub_count` (puis `publishers.pub_count`) — variante bulk `refresh_pub_counts` (phase `authorships`, après pose de `in_perimeter`), variante scopée `refresh_journal_pub_count` (fusions admin). Un module de requêtes unique sert pipeline et API, conforme au pattern « queries mutualisées, ports par contexte » (cf. [03-application.md](../architecture/03-application.md)).
+**`pub_count`** : `infrastructure/pipeline/authorships/pub_counts.py` recalcule `journals.pub_count` (puis `publishers.pub_count`) — variante bulk `refresh_pub_counts` (phase `authorships`, après pose de `in_perimeter`), variante scopée `refresh_journal_pub_count` (fusions admin). Un module de requêtes unique sert pipeline et API, conforme au pattern « queries mutualisées, ports par contexte » (cf. [03-application.md](../architecture/03-application.md)).
 
 **`journal_type`** : `refresh_from_sources` (`application/services/publications/core.py`) lit `get_journal_type` pour rejouer les règles de `doc_type` dépendantes de la revue.
 
@@ -55,7 +55,7 @@ Routeur `interfaces/api/routers/journals.py`, command handlers `application/serv
 
 ## Lecture — API
 
-Port `application/ports/api/journals_queries.py` (DTOs co-localisés), adaptateur `PgJournalQueries`, routeur `interfaces/api/routers/journals.py`.
+Port `application/ports/read_models/journals_queries.py` (DTOs co-localisés), adaptateur `PgJournalQueries`, routeur `interfaces/api/routers/journals.py`.
 
 - **Listing / facettes** (`GET /api/journals`, `/facets`) : `list_journals` (WHERE composé par `_build_journal_where`), `journals_facets` (comptes exclusifs par dimension). Le filtre « avec publications » s'appuie sur le cache `journals.pub_count`.
 - **Détail / dashboard** (`GET /{id}`, `/{id}/dashboard`) : le dashboard **consomme `domain/journals/expected.py`** (`is_doc_type_expected` / `is_oa_status_expected`) pour signaler les publications hors du cadre annoncé, et recompte l'appartenance au périmètre en direct.

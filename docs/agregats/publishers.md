@@ -44,11 +44,11 @@ Routeur `interfaces/api/routers/publishers.py`, command handlers `commands.py`, 
 
 ## Lecture — pipeline
 
-**`publishers.pub_count`** : cache à deux étages — `refresh_pub_counts` (`queries/pipeline/pub_counts.py`) recalcule `journals.pub_count` puis `publishers.pub_count = SUM(journals.pub_count)`, en phase `authorships`. Variante scopée `refresh_publisher_pub_count` pour les fusions admin. Le module de requêtes est partagé pipeline/API (pattern « queries mutualisées », le repo y délègue).
+**`publishers.pub_count`** : cache à deux étages — `refresh_pub_counts` (`infrastructure/pipeline/authorships/pub_counts.py`) recalcule `journals.pub_count` puis `publishers.pub_count = SUM(journals.pub_count)`, en phase `authorships`. Variante scopée `refresh_publisher_pub_count` pour les fusions admin. Le module de requêtes est partagé pipeline/API (pattern « queries mutualisées », le repo y délègue).
 
 ## Lecture — API
 
-Port `application/ports/api/publishers_queries.py`, adaptateur `PgPublisherQueries`, routeur `interfaces/api/routers/publishers.py` : listing (filtres + `journal_count` + `pub_count` + préfixes DOI agrégés), facettes (`publisher_type`, `country`), détail, dashboard (types de revues, doc_types / oa_status des publications in-perimeter), sujets.
+Port `application/ports/read_models/publishers_queries.py`, adaptateur `PgPublisherQueries`, routeur `interfaces/api/routers/publishers.py` : listing (filtres + `journal_count` + `pub_count` + préfixes DOI agrégés), facettes (`publisher_type`, `country`), détail, dashboard (types de revues, doc_types / oa_status des publications in-perimeter), sujets.
 
 ## Points d'attention
 

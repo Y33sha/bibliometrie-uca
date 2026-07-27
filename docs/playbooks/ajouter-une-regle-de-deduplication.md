@@ -13,7 +13,7 @@ La déduplication est un record-linkage par graphe. Chaque `source_publication` 
 - **Projection des tokens** : [`project_confirmation_keys`](../../domain/source_publications/keys.py) lit une SP (colonnes corrigées + `external_ids`) et renvoie son jeu de tokens. Tokens en place : `doi`, `nnt`, `hal_id` (multivalué), `pmid`, et `metadata_block` (`<doc_type>|<title_normalized>|<pub_year>`, gardé par une longueur minimale de titre).
 - **Clustering** : [`connected_components`](../../domain/entity_resolution.py) regroupe les SP reliées par token partagé (fermeture transitive).
 - **Assignation** : [`plan_reconciliation`](../../domain/publications/reconciliation.py) assigne chaque SP au pub-ancre de sa partition `(composante ∩ DOI)`. La passe applicative est [`reconcile_components`](../../application/pipeline/publications/reconcile_components.py) (phase `publications`).
-- **Univers SQL** : [`publications_reconciliation.py`](../../infrastructure/queries/pipeline/publications_reconciliation.py) construit le voisinage 1-hop des SP `keys_dirty` — une branche `UNION` par type de token, qui ramène les SP partageant ce token avec une SP dirty.
+- **Univers SQL** : [`reconciliation.py`](../../infrastructure/pipeline/publications/reconciliation.py) construit le voisinage 1-hop des SP `keys_dirty` — une branche `UNION` par type de token, qui ramène les SP partageant ce token avec une SP dirty.
 
 Un token est une **égalité** : deux SP au même token sont la même œuvre, sans comparaison. C'est ce qui le rend `GROUP BY`-able et le fait entrer nativement dans le clustering.
 
@@ -71,7 +71,7 @@ La projection est l'**unique définition** de « quelles clés porte cette SP »
 
 #### 5.2 Branche d'univers
 
-Dans [`publications_reconciliation.py`](../../infrastructure/queries/pipeline/publications_reconciliation.py), ajouter une branche `UNION` à `_UNIVERSE_SQL` qui joint les SP partageant le token avec une SP dirty :
+Dans [`reconciliation.py`](../../infrastructure/pipeline/publications/reconciliation.py), ajouter une branche `UNION` à `_UNIVERSE_SQL` qui joint les SP partageant le token avec une SP dirty :
 
 ```sql
 UNION

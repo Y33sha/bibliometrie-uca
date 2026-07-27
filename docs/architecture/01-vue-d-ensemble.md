@@ -73,7 +73,7 @@ Cette vue par couches se superpose à la vue par runtime : `application/` et `in
    - `run_pipeline.py` — pipeline complet
    - `interfaces/cli/*` — scripts CLI
 
-   Ces fichiers sont les **seuls** qui ont légitimement le droit d'importer `infrastructure.repositories`, `infrastructure.queries.*` ou toute classe `Pg*` concrète. Partout ailleurs, on passe par un port.
+   Ces fichiers sont les **seuls** qui ont légitimement le droit d'importer `infrastructure.repositories`, `infrastructure.read_models`, `infrastructure.pipeline` ou toute classe `Pg*` concrète. Partout ailleurs, on passe par un port.
 
 Le contrat `layers` d'`import-linter` (voir `pyproject.toml`, section `[tool.importlinter]`) vérifie les règles 1 à 3. Le contrat `forbidden` "Routers : pas d'import direct de infrastructure" applique la règle 4. Le contrat `forbidden` "Composition root : Pg* concrets uniquement dans app et deps" applique la règle 5 pour `interfaces/api/` (les CLIs restent discipline-only — ils sont leur propre composition root par nature, cf. règle 5).
 

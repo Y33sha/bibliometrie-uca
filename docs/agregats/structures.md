@@ -45,13 +45,13 @@ Les commandes de relation (création / suppression) et la suppression d'une stru
 
 ## Lecture — pipeline
 
-- **Matching d'adresses** (phase `affiliations`) : `infrastructure/queries/pipeline/address_resolution.py` charge les `structure_name_forms` dans un `AddressMatcher` (Aho-Corasick) qui balaie le `normalized_text` des adresses. Les options de la forme pilotent le match : `is_word_boundary` (frontière de mot exigée), `is_excluding` (la forme provoque un rejet), `requires_context_of` (le match ne vaut que si les structures citées matchent aussi la même adresse).
+- **Matching d'adresses** (phase `affiliations`) : `infrastructure/pipeline/affiliations/address_resolution.py` charge les `structure_name_forms` dans un `AddressMatcher` (Aho-Corasick) qui balaie le `normalized_text` des adresses. Les options de la forme pilotent le match : `is_word_boundary` (frontière de mot exigée), `is_excluding` (la forme provoque un rejet), `requires_context_of` (le match ne vaut que si les structures citées matchent aussi la même adresse).
 - **Clôture de périmètre** : `structure_relations` (`est_tutelle_de`) fournit la descente récursive qui matérialise `perimeter_structures` à partir des racines `perimeters.structure_ids` — le mécanisme qui, in fine, pilote `source_authorships.in_perimeter` (cf. perimeters.md).
 
 ## Lecture — API
 
-- **Admin** : port `application/ports/api/structures_queries.py`, adaptateur `PgStructuresQueries`. Listing (filtre type + recherche accent-insensible sur nom/acronyme/code, tri canonique par type), détail (`{structure, parents, children, forms}`), lecture d'une forme de nom.
-- **Laboratoires** (page publique) : lecture des structures `labo` du périmètre, avec leurs tutelles — `infrastructure/queries/api/laboratories.py`, filtrée via `get_perimeter_structure_ids`. Types affichés configurables (`laboratories_display_types`).
+- **Admin** : port `application/ports/read_models/structures_queries.py`, adaptateur `PgStructuresQueries`. Listing (filtre type + recherche accent-insensible sur nom/acronyme/code, tri canonique par type), détail (`{structure, parents, children, forms}`), lecture d'une forme de nom.
+- **Laboratoires** (page publique) : lecture des structures `labo` du périmètre, avec leurs tutelles — `infrastructure/read_models/structures.py`, filtrée via `get_perimeter_structure_ids`. Types affichés configurables (`laboratories_display_types`).
 
 ## Points d'attention
 

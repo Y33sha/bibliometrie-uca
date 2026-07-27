@@ -12,7 +12,7 @@ Prérequis : comprendre l'architecture DDD en 4 couches — voir [`docs/architec
 
 ## Conventions transverses
 
-- **SQL** : toujours des requêtes paramétrées. Le code applicatif passe par SQLAlchemy Core (`text(...).bindparams(...)`, `select(...).where(...)`, `update(...).values(...)`) avec des paramètres nommés `:name`. Le shim psycopg direct (`cur.execute(...)`, encore utilisé dans quelques tests d'intégration et helpers low-level) reste en `%s`. Aucune interpolation f-string pour des valeurs. Le seul cas de f-string toléré est la construction dynamique d'un `WHERE` ou d'un `ORDER BY` à partir de fragments **figés** (cf. `infrastructure/queries/persons/`).
+- **SQL** : toujours des requêtes paramétrées. Le code applicatif passe par SQLAlchemy Core (`text(...).bindparams(...)`, `select(...).where(...)`, `update(...).values(...)`) avec des paramètres nommés `:name`. Le shim psycopg direct (`cur.execute(...)`, encore utilisé dans quelques tests d'intégration et helpers low-level) reste en `%s`. Aucune interpolation f-string pour des valeurs. Le seul cas de f-string toléré est la construction dynamique d'un `WHERE` ou d'un `ORDER BY` à partir de fragments **figés** (cf. `infrastructure/read_models/persons/`).
 - **Logging** : `setup_logger` de `infrastructure/log.py` pour les scripts CLI (`interfaces/cli/`) et les extracteurs ; `logging.getLogger(__name__)` dans le code applicatif (routers, services, queries) — le root logger est configuré au démarrage de l'app.
 - **Noms de personnes / DOI** : `names_compatible`, `parse_raw_author_name` de `domain/names.py` ; `DOI`, `DOI.try_parse` de `domain/publication.py`.
 - **Couches DDD** : le contrat `import-linter` interdit certaines directions d'import (`domain/` ne peut rien importer, `application/` ne peut pas importer `infrastructure/`, etc.). Un import interdit fera échouer le pre-commit et la CI.
@@ -109,8 +109,8 @@ Si la phase touche plusieurs entités et mérite un sous-package, la découper c
 
 Si la phase fait du SQL non trivial :
 
-- Protocol `application/ports/pipeline/<phase>.py` (ou `application/ports/api/<phase>_queries.py` côté lecture) définissant l'interface.
-- Adapter `infrastructure/queries/<phase>.py` qui l'implémente.
+- Protocol `application/ports/pipeline/<phase>.py` (ou `application/ports/read_models/<phase>_queries.py` côté lecture) définissant l'interface.
+- Adapter `infrastructure/pipeline/<phase>.py` (ou `infrastructure/read_models/<phase>.py` côté lecture) qui l'implémente.
 - Le port est injecté par le composition root (le CLI one-shot, l'orchestrateur `run_pipeline.py`, ou les dépendances FastAPI), jamais instancié dans la couche application.
 
 ### 3. Brancher dans `run_pipeline.py`
@@ -155,7 +155,7 @@ Ajouter une entrée dans [`docs/pipeline.md`](docs/pipeline.md) qui décrit : ce
 
 ## Ajouter un endpoint API
 
-Architecture DDD-lite : le router délègue à un service d'`application/`, qui délègue à un repository (`application/ports/repositories/`) ou à un query adapter (`application/ports/api/`) d'`infrastructure/`. L'app est **sync** (Starlette threadpool sous le capot) : pas de `async def` dans les routers et les services.
+Architecture DDD-lite : le router délègue à un service d'`application/`, qui délègue à un repository (`application/ports/repositories/`) ou à un query adapter (`application/ports/read_models/`) d'`infrastructure/`. L'app est **sync** (Starlette threadpool sous le capot) : pas de `async def` dans les routers et les services.
 
 ### 1. Modèle Pydantic (obligatoire pour POST/PUT/PATCH)
 
