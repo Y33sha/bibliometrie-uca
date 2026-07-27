@@ -12,7 +12,8 @@ from application.ports.read_models.persons_queries import (
     PersonOut,
     PersonSearchResult,
 )
-from infrastructure.queries.sources_sql import AUTHOR_SOURCES_SQL
+from domain.sources.registry import AUTHOR_SOURCES
+from infrastructure.db.sql_fragments import in_clause
 from infrastructure.read_models.filters import (
     WhereClause,
     assemble_where,
@@ -190,7 +191,7 @@ def person_name_forms(conn: Connection, person_id: int) -> list[NameFormSummaryO
                     JOIN source_publications sd ON sd.id = sa.source_publication_id
                     WHERE sa.person_id = pnf.person_id
                       AND aik.author_name_normalized = pnf.name_form
-                      AND sa.source IN {AUTHOR_SOURCES_SQL}
+                      AND sa.source IN {in_clause(AUTHOR_SOURCES)}
                    ) AS pub_count
             FROM person_name_forms pnf
             WHERE pnf.person_id = :pid

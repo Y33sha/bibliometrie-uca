@@ -7,7 +7,7 @@ from sqlalchemy import Connection, text
 
 from application.ports.pipeline.authorships.build import AuthorshipsBuildQueries
 from domain.sources.registry import SOURCE_PRIORITY
-from infrastructure.queries.sources_sql import source_case_sql
+from infrastructure.db.sql_fragments import case_priority
 
 
 def insert_missing_authorships(conn: Connection) -> int:
@@ -96,7 +96,7 @@ def propagate_authorship_attributes(conn: Connection) -> int:
             WITH scal AS (
                 SELECT sa.authorship_id AS aid,
                        (array_agg(sa.author_position ORDER BY
-                           {source_case_sql(SOURCE_PRIORITY)})
+                           {case_priority(SOURCE_PRIORITY, "sa.source")})
                            FILTER (WHERE sa.author_position IS NOT NULL))[1] AS pos,
                        bool_or(sa.is_corresponding)              AS is_corr,
                        COALESCE(bool_or(sa.in_perimeter), FALSE) AS in_perim

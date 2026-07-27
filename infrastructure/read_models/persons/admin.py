@@ -28,8 +28,9 @@ from application.ports.read_models.persons_queries import (
 from domain.persons.identifiers import PERSON_IDENTIFIER_TYPES, AttributionStatus
 from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE
 from domain.persons.name_matching import names_compatible
+from domain.sources.registry import AUTHOR_SOURCES
 from domain.structures.structure import StructureType
-from infrastructure.queries.sources_sql import AUTHOR_SOURCES_SQL
+from infrastructure.db.sql_fragments import in_clause
 
 # ── Name-form authorships ────────────────────────────────────────
 
@@ -46,7 +47,7 @@ def name_form_authorships(
             JOIN author_identifying_keys aik ON aik.id = sa.identity_id
             JOIN source_publications sd ON sd.id = sa.source_publication_id
             WHERE sa.person_id = :pid AND aik.author_name_normalized = :nf
-              AND sa.source IN {AUTHOR_SOURCES_SQL}
+              AND sa.source IN {in_clause(AUTHOR_SOURCES)}
             ORDER BY sd.pub_year DESC, sd.title
         """),
         {"pid": person_id, "nf": name_form},
