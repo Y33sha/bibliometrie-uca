@@ -1162,7 +1162,6 @@ def phase_oa_status(**kw: Any) -> PhaseMetrics:
     from application.pipeline.signals import filter_configured
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.pipeline.oa_status import PgOaStatusQueries
-    from infrastructure.repositories import publication_repository
     from infrastructure.sources.api_params import API_BASE_URLS
     from infrastructure.sources.config import get_polite_pool_email_optional
     from infrastructure.sources.unpaywall.client import fetch_oa_status
@@ -1191,7 +1190,6 @@ def phase_oa_status(**kw: Any) -> PhaseMetrics:
                     conn,
                     PgOaStatusQueries(),
                     log,
-                    publication_repo=publication_repository(conn),
                     fetcher=fetcher,
                 )
             )

@@ -10,7 +10,7 @@ end-to-end avec le `fetcher` concret depuis `infrastructure.sources.unpaywall.cl
 - 429 retry transparent (géré par `http_request_with_retry_async`)
 - semaphore plafonne les fetches concurrents
 
-Mocks : port `OaStatusQueries`, `PublicationRepository` ; httpx via `respx`.
+Mocks : port `OaStatusQueries` (lectures + écritures capturées) ; httpx via `respx`.
 """
 
 from __future__ import annotations
@@ -55,6 +55,8 @@ def _route(doi: str, *, status: str | None = None, http_status: int = 200):
 
 
 class _FakeQueries:
+    """Lectures de la file OA et capture des écritures (`update_oa_status`, `mark_unpaywall_checked`)."""
+
     def __init__(
         self,
         pubs: list[tuple[int, str, str | None, bool]],
@@ -65,6 +67,8 @@ class _FakeQueries:
         self._pubs = pubs
         self._stale_total = stale_total if stale_total is not None else len(pubs)
         self._oa_distribution = oa_distribution or {}
+        self.updates: list[tuple[int, str]] = []
+        self.checked: list[int] = []
 
     def fetch_publications_with_doi(self, conn, *, limit=None, staleness_days):  # noqa: ARG002
         return self._pubs[:limit] if limit else self._pubs
@@ -75,18 +79,10 @@ class _FakeQueries:
     def count_publications_by_oa_status(self, conn) -> dict[str, int]:  # noqa: ARG002
         return dict(self._oa_distribution)
 
-
-class _FakeRepo:
-    """Capture les `update_oa_status` et les `mark_unpaywall_checked`."""
-
-    def __init__(self) -> None:
-        self.updates: list[tuple[int, str]] = []
-        self.checked: list[int] = []
-
-    def update_oa_status(self, pub_id: int, status: str) -> None:
+    def update_oa_status(self, conn, pub_id: int, status: str) -> None:  # noqa: ARG002
         self.updates.append((pub_id, status))
 
-    def mark_unpaywall_checked(self, pub_id: int) -> None:
+    def mark_unpaywall_checked(self, conn, pub_id: int) -> None:  # noqa: ARG002
         self.checked.append(pub_id)
 
 
@@ -107,17 +103,16 @@ async def test_happy_path_updates_each_pub(logger):
     _route("10.1/b", status="green")
     _route("10.1/c", status="bronze")
 
-    repo = _FakeRepo()
+    queries = _FakeQueries(pubs, stale_total=42, oa_distribution={"gold": 7, "closed": 3})
     metrics = await module.run(
         MagicMock(),
-        _FakeQueries(pubs, stale_total=42, oa_distribution={"gold": 7, "closed": 3}),
+        queries,
         logger,
-        publication_repo=repo,
         fetcher=_make_fetcher(logger),
     )
 
     # pub 3 inchangée (bronze→bronze), 1 et 2 mises à jour
-    assert sorted(repo.updates) == [(1, "gold"), (2, "green")]
+    assert sorted(queries.updates) == [(1, "gold"), (2, "green")]
     # Indicateurs remontés : compteurs du run, backlog stale, ventilation + table OA.
     assert metrics.total == 3
     assert metrics.updated == 2
@@ -138,16 +133,15 @@ async def test_404_marks_as_not_found(logger):
     pubs = [(1, "10.1/x", "closed", False)]
     _route("10.1/x", http_status=404)
 
-    repo = _FakeRepo()
+    queries = _FakeQueries(pubs)
     await module.run(
         MagicMock(),
-        _FakeQueries(pubs),
+        queries,
         logger,
-        publication_repo=repo,
         fetcher=_make_fetcher(logger),
     )
-    assert repo.updates == []
-    assert repo.checked == [1]  # marqué vérifié même si non trouvé (pas re-tiré demain)
+    assert queries.updates == []
+    assert queries.checked == [1]  # marqué vérifié même si non trouvé (pas re-tiré demain)
 
 
 @pytest.mark.asyncio
@@ -157,15 +151,14 @@ async def test_diamond_not_replaced_by_gold(logger):
     pubs = [(1, "10.1/diamond", "diamond", False)]
     _route("10.1/diamond", status="gold")
 
-    repo = _FakeRepo()
+    queries = _FakeQueries(pubs)
     await module.run(
         MagicMock(),
-        _FakeQueries(pubs),
+        queries,
         logger,
-        publication_repo=repo,
         fetcher=_make_fetcher(logger),
     )
-    assert repo.updates == []
+    assert queries.updates == []
 
 
 @pytest.mark.asyncio
@@ -175,15 +168,14 @@ async def test_diamond_replaced_by_other_status(logger):
     pubs = [(1, "10.1/diamond", "diamond", False)]
     _route("10.1/diamond", status="bronze")
 
-    repo = _FakeRepo()
+    queries = _FakeQueries(pubs)
     await module.run(
         MagicMock(),
-        _FakeQueries(pubs),
+        queries,
         logger,
-        publication_repo=repo,
         fetcher=_make_fetcher(logger),
     )
-    assert repo.updates == [(1, "bronze")]
+    assert queries.updates == [(1, "bronze")]
 
 
 @pytest.mark.asyncio
@@ -194,15 +186,14 @@ async def test_embargoed_not_downgraded_to_closed(logger):
     pubs = [(1, "10.1/emb", "embargoed", False)]
     _route("10.1/emb", status="closed")
 
-    repo = _FakeRepo()
+    queries = _FakeQueries(pubs)
     await module.run(
         MagicMock(),
-        _FakeQueries(pubs),
+        queries,
         logger,
-        publication_repo=repo,
         fetcher=_make_fetcher(logger),
     )
-    assert repo.updates == []
+    assert queries.updates == []
 
 
 @pytest.mark.asyncio
@@ -212,15 +203,14 @@ async def test_embargoed_replaced_by_open_status(logger):
     pubs = [(1, "10.1/emb", "embargoed", False)]
     _route("10.1/emb", status="green")
 
-    repo = _FakeRepo()
+    queries = _FakeQueries(pubs)
     await module.run(
         MagicMock(),
-        _FakeQueries(pubs),
+        queries,
         logger,
-        publication_repo=repo,
         fetcher=_make_fetcher(logger),
     )
-    assert repo.updates == [(1, "green")]
+    assert queries.updates == [(1, "green")]
 
 
 @pytest.mark.asyncio
@@ -231,16 +221,15 @@ async def test_open_archive_deposit_not_downgraded_to_closed(logger):
     pubs = [(1, "10.1/deposit", "green", True)]
     _route("10.1/deposit", status="closed")
 
-    repo = _FakeRepo()
+    queries = _FakeQueries(pubs)
     await module.run(
         MagicMock(),
-        _FakeQueries(pubs),
+        queries,
         logger,
-        publication_repo=repo,
         fetcher=_make_fetcher(logger),
     )
-    assert repo.updates == []
-    assert repo.checked == [1]
+    assert queries.updates == []
+    assert queries.checked == [1]
 
 
 @pytest.mark.asyncio
@@ -251,15 +240,14 @@ async def test_open_archive_deposit_upgraded_by_unpaywall(logger):
     pubs = [(1, "10.1/deposit", "green", True)]
     _route("10.1/deposit", status="gold")
 
-    repo = _FakeRepo()
+    queries = _FakeQueries(pubs)
     await module.run(
         MagicMock(),
-        _FakeQueries(pubs),
+        queries,
         logger,
-        publication_repo=repo,
         fetcher=_make_fetcher(logger),
     )
-    assert repo.updates == [(1, "gold")]
+    assert queries.updates == [(1, "gold")]
 
 
 @pytest.mark.asyncio
@@ -268,16 +256,15 @@ async def test_unchanged_status_skipped(logger):
     pubs = [(1, "10.1/same", "gold", False)]
     _route("10.1/same", status="gold")
 
-    repo = _FakeRepo()
+    queries = _FakeQueries(pubs)
     await module.run(
         MagicMock(),
-        _FakeQueries(pubs),
+        queries,
         logger,
-        publication_repo=repo,
         fetcher=_make_fetcher(logger),
     )
-    assert repo.updates == []
-    assert repo.checked == [1]  # statut inchangé mais marqué vérifié
+    assert queries.updates == []
+    assert queries.checked == [1]  # statut inchangé mais marqué vérifié
 
 
 @pytest.mark.asyncio
@@ -291,15 +278,14 @@ async def test_429_retries_transparently(logger):
         ]
     )
 
-    repo = _FakeRepo()
+    queries = _FakeQueries([(1, "10.1/r", "closed", False)])
     await module.run(
         MagicMock(),
-        _FakeQueries([(1, "10.1/r", "closed", False)]),
+        queries,
         logger,
-        publication_repo=repo,
         fetcher=_make_fetcher(logger),
     )
-    assert repo.updates == [(1, "green")]
+    assert queries.updates == [(1, "green")]
 
 
 @pytest.mark.asyncio
@@ -326,7 +312,6 @@ async def test_semaphore_caps_concurrent_fetches(logger):
         MagicMock(),
         _FakeQueries(pubs),
         logger,
-        publication_repo=_FakeRepo(),
         fetcher=tracked_fetcher,
         max_concurrent=3,
     )

@@ -73,6 +73,25 @@ def count_publications_by_oa_status(conn: Connection) -> dict[str, int]:
     return {r.status: int(r.n) for r in rows}
 
 
+def update_oa_status(conn: Connection, pub_id: int, oa_status: str) -> None:
+    conn.execute(
+        text(
+            "UPDATE publications "
+            "SET oa_status = CAST(:os AS oa_type), unpaywall_checked_at = now(), "
+            "updated_at = now() "
+            "WHERE id = :id"
+        ),
+        {"os": oa_status, "id": pub_id},
+    )
+
+
+def mark_unpaywall_checked(conn: Connection, pub_id: int) -> None:
+    conn.execute(
+        text("UPDATE publications SET unpaywall_checked_at = now() WHERE id = :id"),
+        {"id": pub_id},
+    )
+
+
 class PgOaStatusQueries(OaStatusQueries):
     """Adapter PostgreSQL pour `application.ports.pipeline.oa_status.OaStatusQueries`."""
 
@@ -86,3 +105,9 @@ class PgOaStatusQueries(OaStatusQueries):
 
     def count_publications_by_oa_status(self, conn: Connection) -> dict[str, int]:
         return count_publications_by_oa_status(conn)
+
+    def update_oa_status(self, conn: Connection, pub_id: int, oa_status: str) -> None:
+        update_oa_status(conn, pub_id, oa_status)
+
+    def mark_unpaywall_checked(self, conn: Connection, pub_id: int) -> None:
+        mark_unpaywall_checked(conn, pub_id)
