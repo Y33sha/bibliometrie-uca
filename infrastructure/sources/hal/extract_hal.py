@@ -13,8 +13,8 @@ from sqlalchemy import Connection
 from application.ports.pipeline.extract._common import UpsertOutcome
 from application.ports.pipeline.extract.hal import HalExtractAdapter, HalExtractConfig
 from domain.publications.identifiers import clean_doi
+from infrastructure.pipeline.extract.staging import upsert_staging
 from infrastructure.sources.api_params import API_BASE_URLS, HAL_DELAY, hal_per_page_for
-from infrastructure.sources.common import upsert_staging
 from infrastructure.sources.config import (
     get_hal_collections,
     get_years,

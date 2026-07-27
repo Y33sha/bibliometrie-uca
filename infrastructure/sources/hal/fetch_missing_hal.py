@@ -18,8 +18,8 @@ from application.ports.pipeline.cross_imports.fetch_missing_hal import (
     NntInsertResult,
     NntRef,
 )
+from infrastructure.pipeline.extract.staging import upsert_not_found_stub, upsert_staging
 from infrastructure.sources.api_params import API_BASE_URLS, HAL_DELAY
-from infrastructure.sources.common import upsert_not_found_stub, upsert_staging
 from infrastructure.sources.hal.extract_hal import extract_doi
 from infrastructure.sources.hal.fields import HAL_FIELDS_STR
 from infrastructure.sources.http_retry import http_request_with_retry_async

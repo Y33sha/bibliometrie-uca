@@ -16,8 +16,9 @@ from application.ports.pipeline.cross_imports.fetch_missing_doi import (
     is_not_found_marker,
     not_found_marker,
 )
+from infrastructure.pipeline.extract.cross_import import record_doi_not_found
+from infrastructure.pipeline.extract.staging import upsert_staging
 from infrastructure.sources.api_params import API_BASE_URLS
-from infrastructure.sources.common import record_doi_not_found, upsert_staging
 from infrastructure.sources.config import (
     get_openalex_api_key,
     get_polite_pool_email,

@@ -13,8 +13,8 @@ from application.ports.pipeline.normalize.staging import (
     StagingQueries,
     StagingRow,
 )
+from infrastructure.pipeline.change_detection import canonical_json_bytes
 from infrastructure.raw_store import RawStore, get_raw_store
-from infrastructure.sources.common import canonical_json_bytes
 
 logger = logging.getLogger(__name__)
 

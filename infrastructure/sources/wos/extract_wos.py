@@ -13,8 +13,8 @@ from sqlalchemy import Connection
 
 from application.ports.pipeline.extract._common import BatchInsertCounts
 from application.ports.pipeline.extract.wos import WosExtractAdapter, WosExtractConfig
+from infrastructure.pipeline.extract.staging import upsert_staging
 from infrastructure.sources.api_params import WOS_DELAY, WOS_PER_PAGE
-from infrastructure.sources.common import upsert_staging
 from infrastructure.sources.config import (
     get_extraction_api_ids,
     get_years,

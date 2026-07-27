@@ -2,7 +2,7 @@
 
 API ElasticSearch — requête `terms` sur `externalIds.id.keyword` pour un lot de 50 DOI en un seul appel. Authentification basic.
 
-ScanR stocke les DOI en casse variable ; le matching est case-insensitive côté `get_cross_import_dois` (cf. `infrastructure.sources.common`).
+ScanR stocke les DOI en casse variable ; le matching est case-insensitive côté `get_cross_import_dois` (cf. `infrastructure.pipeline.extract.cross_import`).
 
 Adapter async (`AsyncFetchMissingDoiAdapter`).
 """
@@ -18,8 +18,10 @@ from application.ports.pipeline.cross_imports.fetch_missing_doi import (
     is_not_found_marker,
     not_found_marker,
 )
+from domain.publications.identifiers import clean_doi
+from infrastructure.pipeline.extract.cross_import import record_doi_not_found
+from infrastructure.pipeline.extract.staging import upsert_staging
 from infrastructure.sources.api_params import API_BASE_URLS
-from infrastructure.sources.common import clean_doi, record_doi_not_found, upsert_staging
 from infrastructure.sources.config import get_scanr_credentials
 from infrastructure.sources.http_retry import http_request_with_retry_async
 

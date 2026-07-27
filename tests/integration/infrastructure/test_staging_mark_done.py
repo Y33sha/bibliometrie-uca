@@ -5,9 +5,9 @@ import json
 
 from sqlalchemy import text
 
+from infrastructure.pipeline.change_detection import canonical_json_bytes, compute_hash
 from infrastructure.pipeline.normalize.staging import PgStagingQueries
 from infrastructure.raw_store.local import LocalFileRawStore
-from infrastructure.sources.common import canonical_json_bytes, compute_hash
 
 
 def _insert(conn, raw_json: str, *, processed: bool = False) -> int:

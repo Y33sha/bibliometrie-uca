@@ -32,8 +32,8 @@ from sqlalchemy.dialects.postgresql import JSONB
 from domain.sources.registry import ALL_SOURCES_SET
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
+from infrastructure.pipeline.change_detection import change_detection_hash
 from infrastructure.raw_store import get_raw_store
-from infrastructure.sources.common import change_detection_hash
 from infrastructure.sources.hal.extract_hal import extract_doi as hal_extract_doi
 from infrastructure.sources.openalex.parsing import extract_doi as openalex_extract_doi
 from infrastructure.sources.scanr.extract_scanr import extract_doi as scanr_extract_doi
