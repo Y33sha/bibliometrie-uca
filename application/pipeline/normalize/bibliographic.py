@@ -11,10 +11,10 @@ from collections.abc import Callable
 from sqlalchemy import Connection
 
 from application.pipeline.normalize.base import SourceNormalizer
+from application.ports.pipeline.journals import JournalFindOrCreateQueries
 from application.ports.pipeline.normalize.authorships import AuthorshipsBatchQueries
 from application.ports.pipeline.normalize.source_publications import SourcePublicationQueries
 from application.ports.pipeline.normalize.staging import StagingQueries
-from application.ports.repositories.journal_repository import JournalRepository
 from application.ports.repositories.publication_repository import PublicationRepository
 from application.ports.repositories.publisher_repository import PublisherRepository
 
@@ -28,7 +28,7 @@ class BibliographicNormalizer(SourceNormalizer):
         logger: logging.Logger,
         staging_queries: StagingQueries,
         queries: SourcePublicationQueries,
-        journal_repo_factory: Callable[[Connection], JournalRepository],
+        journal_repo_factory: Callable[[Connection], JournalFindOrCreateQueries],
         publisher_repo_factory: Callable[[Connection], PublisherRepository],
         publication_repo_factory: Callable[[Connection], PublicationRepository],
         authorship_queries: AuthorshipsBatchQueries,
@@ -36,7 +36,7 @@ class BibliographicNormalizer(SourceNormalizer):
         super().__init__(conn, logger, staging_queries)
         self._queries = queries
         self._journal_repo_factory = journal_repo_factory
-        self._journal_repo: JournalRepository | None = None
+        self._journal_repo: JournalFindOrCreateQueries | None = None
         self._publisher_repo_factory = publisher_repo_factory
         self._publisher_repo: PublisherRepository | None = None
         self._publication_repo_factory = publication_repo_factory
@@ -51,7 +51,7 @@ class BibliographicNormalizer(SourceNormalizer):
 
     def _require_repos(
         self,
-    ) -> tuple[JournalRepository, PublisherRepository, PublicationRepository]:
+    ) -> tuple[JournalFindOrCreateQueries, PublisherRepository, PublicationRepository]:
         """Les trois repositories, garantis chargés par `preload_caches`."""
         assert (
             self._journal_repo is not None

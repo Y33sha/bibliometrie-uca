@@ -18,7 +18,7 @@ from application.pipeline.publishers_journals.import_journals_from_doaj_dump imp
 )
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from infrastructure.repositories import journal_repository
+from infrastructure.pipeline.journals import PgJournalGatewayQueries
 from infrastructure.sources.doaj.client import read_doaj_dump_rows
 
 log = setup_logger("import_doaj_csv", os.path.dirname(__file__))
@@ -37,7 +37,7 @@ def main() -> None:
         run_import_doaj_dump(
             conn,
             log,
-            journal_repo=journal_repository(conn),
+            journal_repo=PgJournalGatewayQueries(conn),
             rows=read_doaj_dump_rows(args.csv_file),
             dry_run=args.dry_run,
         )

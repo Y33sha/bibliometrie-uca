@@ -1,4 +1,4 @@
-"""Tests d'intégration de `PgJournalRepository` : files d'enrichissement et index DOAJ."""
+"""Tests d'intégration de `PgJournalGatewayQueries` : files d'enrichissement et index DOAJ."""
 
 from __future__ import annotations
 
@@ -7,12 +7,12 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from sqlalchemy import text
 
-from infrastructure.repositories.journal_repository import PgJournalRepository
+from infrastructure.pipeline.journals import PgJournalGatewayQueries
 
 
 @pytest.fixture
 def repo(sa_sync_conn):
-    return PgJournalRepository(sa_sync_conn)
+    return PgJournalGatewayQueries(sa_sync_conn)
 
 
 def _create_journal(conn, *, openalex_id=None, issn=None, eissn=None, issnl=None, imported_at=None):

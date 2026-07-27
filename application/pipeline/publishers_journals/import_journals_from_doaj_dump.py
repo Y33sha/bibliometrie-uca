@@ -12,7 +12,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy import Connection
 
-from application.ports.repositories.journal_repository import JournalRepository
+from application.ports.pipeline.journals import JournalDoajQueries
 
 # Colonnes ISSN du dump CSV DOAJ.
 ISSN_KEYS = (
@@ -57,7 +57,7 @@ def run_import_doaj_dump(
     conn: Connection,
     logger: logging.Logger,
     *,
-    journal_repo: JournalRepository,
+    journal_repo: JournalDoajQueries,
     rows: Iterable[dict[str, str]],
     dry_run: bool = False,
     commit: bool = True,
