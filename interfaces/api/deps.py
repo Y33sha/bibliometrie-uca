@@ -11,6 +11,7 @@ from collections.abc import Callable, Iterator
 from fastapi import Depends, HTTPException, Request
 from sqlalchemy import Connection
 
+from application.ports.pipeline.authorships.build import AuthorshipsBuildQueries
 from application.ports.pipeline.countries import CountryQueries
 from application.ports.pipeline.metadata_correction import MetadataCorrectionQueries
 from application.ports.pipeline.perimeter_structures import PerimeterStructuresQueries
@@ -48,6 +49,7 @@ from application.services.authorships.core import propagate_in_perimeter_for_add
 from infrastructure.db.dml_guard import has_uncommitted_dml, reset_dml_flag
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.pipeline.affiliations.in_perimeter import PgAffiliationsQueries
+from infrastructure.pipeline.authorships.build import PgAuthorshipsBuildQueries
 from infrastructure.pipeline.countries import PgCountryQueries
 from infrastructure.pipeline.metadata_correction import PgMetadataCorrectionQueries
 from infrastructure.pipeline.perimeter import PgPerimeterStructuresQueries
@@ -292,6 +294,15 @@ _country_queries_singleton: CountryQueries = PgCountryQueries()
 def country_gateway() -> CountryQueries:
     """Gateway ensembliste des pays — attribution admin par lot et propagations — consommé par les écritures d'adresses."""
     return _country_queries_singleton
+
+
+# `PgAuthorshipsBuildQueries` est sans état (connexion passée aux méthodes) : un singleton par processus suffit.
+_authorships_build_queries_singleton: AuthorshipsBuildQueries = PgAuthorshipsBuildQueries()
+
+
+def authorships_build_queries() -> AuthorshipsBuildQueries:
+    """Gateway de construction des authorships — variantes par lot consommées par l'attribution admin d'orphelines."""
+    return _authorships_build_queries_singleton
 
 
 # ----- Tâches de fond (BackgroundTasks) -----

@@ -9,7 +9,7 @@ from sqlalchemy import Connection
 
 
 class AuthorshipsBuildQueries(Protocol):
-    """Promotion des `source_authorships` en `authorships` consolidées."""
+    """Promotion des `source_authorships` en `authorships` consolidées (phase `authorships`), et variantes par lot de cette construction pour l'attribution admin d'orphelines à une personne."""
 
     def purge_authorships(self, conn: Connection) -> int:
         """Vide `authorships` et délie les `source_authorships` qui y pointaient. Retourne le nombre de lignes purgées.
@@ -78,4 +78,28 @@ class AuthorshipsBuildQueries(Protocol):
 
         À appeler après `propagate_authorship_attributes`, qui pose `authorships.in_perimeter`. Idempotent.
         """
+        ...
+
+    # ── Variantes par lot pour l'attribution admin d'orphelines ────
+
+    def assign_orphan_source_authorships_to_person(
+        self, conn: Connection, person_id: int, source_authorship_ids: list[int]
+    ) -> int:
+        """Pose `person_id` sur les signatures orphelines du lot et retourne le nombre rattaché ; les signatures déjà liées restent intactes."""
+        ...
+
+    def create_authorships_from_sources(
+        self,
+        conn: Connection,
+        person_id: int,
+        source_authorship_ids: list[int],
+        source_priority: tuple[str, ...],
+    ) -> None:
+        """Crée les lignes consolidées manquantes pour la personne, une par publication couverte par le lot, depuis la signature la plus prioritaire (`source_priority`) — variante par lot de la construction. Écarte les paires figurant dans `rejected_authorships`."""
+        ...
+
+    def link_source_authorships_batch(
+        self, conn: Connection, person_id: int, source_authorship_ids: list[int]
+    ) -> None:
+        """Pose `source_authorships.authorship_id` vers la ligne consolidée de la personne, pour un lot de signatures désignées par id."""
         ...

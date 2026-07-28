@@ -38,11 +38,14 @@ from domain.errors import (
     RejectedPairError,
     ValidationError,
 )
+from infrastructure.pipeline.authorships.build import PgAuthorshipsBuildQueries
 from infrastructure.repositories import (
     authorship_repository,
     person_repository,
 )
 from tests.integration.helpers.authorships import upsert_identity
+
+_BUILD_QUERIES = PgAuthorshipsBuildQueries()
 
 
 @pytest.fixture
@@ -477,7 +480,12 @@ class TestBatchAssignOrphanAuthorships:
         person_id = _insert_person(sa_sync_conn)
         assert (
             batch_assign_orphan_authorships(
-                person_id, [], repo=repo, authorship_repo=authorship_repo
+                person_id,
+                [],
+                repo=repo,
+                authorship_repo=authorship_repo,
+                conn=sa_sync_conn,
+                build_queries=_BUILD_QUERIES,
             )
             == 0
         )
@@ -499,7 +507,12 @@ class TestBatchAssignOrphanAuthorships:
         )
 
         assigned = batch_assign_orphan_authorships(
-            person_id, [sa1, sa2], repo=repo, authorship_repo=authorship_repo
+            person_id,
+            [sa1, sa2],
+            repo=repo,
+            authorship_repo=authorship_repo,
+            conn=sa_sync_conn,
+            build_queries=_BUILD_QUERIES,
         )
 
         assert assigned == 2
@@ -523,7 +536,12 @@ class TestBatchAssignOrphanAuthorships:
         sa1 = _insert_source_authorship(sa_sync_conn, sp_id, person_id=p1)
 
         assigned = batch_assign_orphan_authorships(
-            p2, [sa1], repo=repo, authorship_repo=authorship_repo
+            p2,
+            [sa1],
+            repo=repo,
+            authorship_repo=authorship_repo,
+            conn=sa_sync_conn,
+            build_queries=_BUILD_QUERIES,
         )
 
         assert assigned == 0
@@ -686,7 +704,10 @@ class TestDetachAuthorships:
         person_id = create_person("Dupont", "Jean", repo=repo)
 
         result = detach_authorships(
-            person_id, authorships=[], repo=repo, authorship_repo=authorship_repo
+            person_id,
+            authorships=[],
+            repo=repo,
+            authorship_repo=authorship_repo,
         )
         assert result["cleaned_forms"] == 0
         assert (
@@ -1023,7 +1044,12 @@ class TestReassignRejectedPairUnit:
 
         with pytest.raises(RejectedPairError) as exc:
             batch_assign_orphan_authorships(
-                person_id, [sa1, sa2], repo=repo, authorship_repo=authorship_repo
+                person_id,
+                [sa1, sa2],
+                repo=repo,
+                authorship_repo=authorship_repo,
+                conn=sa_sync_conn,
+                build_queries=_BUILD_QUERIES,
             )
         assert {p["publication_id"] for p in exc.value.rejected_pairs} == {pub1}
         # Rien d'assigné : on a levé avant la pose.
@@ -1044,7 +1070,13 @@ class TestReassignRejectedPairUnit:
         _reject_pair(sa_sync_conn, pub1, person_id)
 
         assigned = batch_assign_orphan_authorships(
-            person_id, [sa1], repo=repo, authorship_repo=authorship_repo, force=True
+            person_id,
+            [sa1],
+            repo=repo,
+            authorship_repo=authorship_repo,
+            conn=sa_sync_conn,
+            build_queries=_BUILD_QUERIES,
+            force=True,
         )
 
         assert assigned == 1

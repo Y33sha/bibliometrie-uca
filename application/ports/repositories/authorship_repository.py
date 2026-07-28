@@ -49,14 +49,6 @@ class AuthorshipRepository(Protocol):
         """`person_id` d'une signature source. `None` si elle est orpheline ou n'existe pas."""
         ...
 
-    def assign_orphan_source_authorships_to_person(
-        self,
-        person_id: int,
-        source_authorship_ids: list[int],
-    ) -> int:
-        """Pose `person_id` sur les signatures du lot qui sont orphelines et retourne le nombre touché ; les signatures déjà rattachées restent intactes."""
-        ...
-
     def get_distinct_name_forms_from_source_authorships(
         self,
         source_authorship_ids: list[int],
@@ -143,29 +135,12 @@ class AuthorshipRepository(Protocol):
         """Crée la ligne consolidée de la paire si elle manque. Écarte les paires figurant dans `rejected_authorships`."""
         ...
 
-    def create_authorships_from_sources(
-        self,
-        person_id: int,
-        source_authorship_ids: list[int],
-        source_priority: tuple[str, ...],
-    ) -> None:
-        """Crée les lignes consolidées manquantes pour la personne, une par publication couverte par le lot, depuis la signature la plus prioritaire."""
-        ...
-
     def link_source_authorships_to_authorship(
         self,
         publication_id: int,
         person_id: int,
     ) -> None:
         """Pose `source_authorships.authorship_id` vers la ligne consolidée de la paire, sur les signatures encore non liées."""
-        ...
-
-    def link_source_authorships_batch(
-        self,
-        person_id: int,
-        source_authorship_ids: list[int],
-    ) -> None:
-        """Pose `source_authorships.authorship_id` vers la ligne consolidée, pour un lot de signatures désignées par id (attribution d'orphelines à une personne) — variante par lot de `link_source_authorships_to_authorship`."""
         ...
 
     def recompute_authorship_author_position_and_corresponding(

@@ -35,42 +35,6 @@ class PgAuthorshipRepository(AuthorshipRepository):
             {"pub": publication_id, "pid": person_id},
         )
 
-    def create_authorships_from_sources(
-        self, person_id: int, source_authorship_ids: list[int], source_priority: tuple[str, ...]
-    ) -> None:
-        """Les structures dérivées vivent dans la matview `authorship_structures`, rafraîchie par le caller."""
-        if not source_authorship_ids:
-            return
-        self._conn.execute(
-            text(f"""
-                CREATE TEMP TABLE _chosen_sa AS
-                SELECT DISTINCT ON (sd.publication_id)
-                    sd.publication_id, sa.id AS sa_id,
-                    sa.author_position, sa.in_perimeter, sa.is_corresponding
-                FROM source_authorships sa
-                JOIN source_publications sd ON sd.id = sa.source_publication_id
-                WHERE sa.id = ANY(:ids) AND sd.publication_id IS NOT NULL
-                ORDER BY sd.publication_id, {case_priority(source_priority, "sa.source")}
-            """),
-            {"ids": source_authorship_ids},
-        )
-        self._conn.execute(
-            text("""
-                INSERT INTO authorships (publication_id, person_id,
-                    author_position, in_perimeter, is_corresponding)
-                SELECT cs.publication_id, :pid, cs.author_position, cs.in_perimeter,
-                       cs.is_corresponding
-                FROM _chosen_sa cs
-                WHERE NOT EXISTS (
-                    SELECT 1 FROM rejected_authorships rj
-                    WHERE rj.publication_id = cs.publication_id AND rj.person_id = :pid
-                )
-                ON CONFLICT (publication_id, person_id) DO NOTHING
-            """),
-            {"pid": person_id},
-        )
-        self._conn.execute(text("DROP TABLE _chosen_sa"))
-
     def link_source_authorships_to_authorship(self, publication_id: int, person_id: int) -> None:
         self._conn.execute(
             text("""
@@ -85,24 +49,6 @@ class PgAuthorshipRepository(AuthorshipRepository):
                   AND sa.authorship_id IS NULL
             """),
             {"pub": publication_id, "pid": person_id},
-        )
-
-    def link_source_authorships_batch(
-        self, person_id: int, source_authorship_ids: list[int]
-    ) -> None:
-        if not source_authorship_ids:
-            return
-        self._conn.execute(
-            text("""
-                UPDATE source_authorships sa SET authorship_id = a.id
-                FROM source_publications sd, authorships a
-                WHERE sa.id = ANY(:ids)
-                  AND sd.id = sa.source_publication_id
-                  AND a.publication_id = sd.publication_id
-                  AND a.person_id = :pid
-                  AND sa.authorship_id IS NULL
-            """),
-            {"ids": source_authorship_ids, "pid": person_id},
         )
 
     def recompute_authorship_author_position_and_corresponding(
@@ -179,20 +125,6 @@ class PgAuthorshipRepository(AuthorshipRepository):
             {"pid": person_id, "aid": source_authorship_id},
         ).first()
         return cast(AssignedSignatureRow, dict(row._mapping)) if row else None
-
-    def assign_orphan_source_authorships_to_person(
-        self, person_id: int, source_authorship_ids: list[int]
-    ) -> int:
-        if not source_authorship_ids:
-            return 0
-        return self._conn.execute(
-            text("""
-                UPDATE source_authorships SET person_id = :pid
-                WHERE id = ANY(:ids) AND person_id IS NULL
-                RETURNING id
-            """),
-            {"pid": person_id, "ids": source_authorship_ids},
-        ).rowcount
 
     def get_distinct_name_forms_from_source_authorships(
         self, source_authorship_ids: list[int]

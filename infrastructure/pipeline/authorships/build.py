@@ -183,6 +183,85 @@ def refresh_publications_in_perimeter(conn: Connection) -> int:
     ).rowcount
 
 
+# ── Variantes par lot pour l'attribution admin d'orphelines ────────
+
+
+def assign_orphan_source_authorships_to_person(
+    conn: Connection, person_id: int, source_authorship_ids: list[int]
+) -> int:
+    """Pose `person_id` sur les signatures orphelines du lot ; retourne le nombre rattaché."""
+    if not source_authorship_ids:
+        return 0
+    return conn.execute(
+        text("""
+            UPDATE source_authorships SET person_id = :pid
+            WHERE id = ANY(:ids) AND person_id IS NULL
+            RETURNING id
+        """),
+        {"pid": person_id, "ids": source_authorship_ids},
+    ).rowcount
+
+
+def create_authorships_from_sources(
+    conn: Connection,
+    person_id: int,
+    source_authorship_ids: list[int],
+    source_priority: tuple[str, ...],
+) -> None:
+    """Crée les authorships consolidées manquantes pour la personne, une par publication du lot, depuis la signature la plus prioritaire. Les structures dérivées (matview) sont laissées au caller."""
+    if not source_authorship_ids:
+        return
+    conn.execute(
+        text(f"""
+            CREATE TEMP TABLE _chosen_sa AS
+            SELECT DISTINCT ON (sd.publication_id)
+                sd.publication_id, sa.id AS sa_id,
+                sa.author_position, sa.in_perimeter, sa.is_corresponding
+            FROM source_authorships sa
+            JOIN source_publications sd ON sd.id = sa.source_publication_id
+            WHERE sa.id = ANY(:ids) AND sd.publication_id IS NOT NULL
+            ORDER BY sd.publication_id, {case_priority(source_priority, "sa.source")}
+        """),
+        {"ids": source_authorship_ids},
+    )
+    conn.execute(
+        text("""
+            INSERT INTO authorships (publication_id, person_id,
+                author_position, in_perimeter, is_corresponding)
+            SELECT cs.publication_id, :pid, cs.author_position, cs.in_perimeter,
+                   cs.is_corresponding
+            FROM _chosen_sa cs
+            WHERE NOT EXISTS (
+                SELECT 1 FROM rejected_authorships rj
+                WHERE rj.publication_id = cs.publication_id AND rj.person_id = :pid
+            )
+            ON CONFLICT (publication_id, person_id) DO NOTHING
+        """),
+        {"pid": person_id},
+    )
+    conn.execute(text("DROP TABLE _chosen_sa"))
+
+
+def link_source_authorships_batch(
+    conn: Connection, person_id: int, source_authorship_ids: list[int]
+) -> None:
+    """Pose `source_authorships.authorship_id` vers la ligne consolidée de la personne, pour un lot de signatures par id."""
+    if not source_authorship_ids:
+        return
+    conn.execute(
+        text("""
+            UPDATE source_authorships sa SET authorship_id = a.id
+            FROM source_publications sd, authorships a
+            WHERE sa.id = ANY(:ids)
+              AND sd.id = sa.source_publication_id
+              AND a.publication_id = sd.publication_id
+              AND a.person_id = :pid
+              AND sa.authorship_id IS NULL
+        """),
+        {"ids": source_authorship_ids, "pid": person_id},
+    )
+
+
 class PgAuthorshipsBuildQueries(AuthorshipsBuildQueries):
     """Adapter PostgreSQL pour `application.ports.pipeline.authorships.build.AuthorshipsBuildQueries`."""
 
@@ -218,3 +297,22 @@ class PgAuthorshipsBuildQueries(AuthorshipsBuildQueries):
 
     def refresh_publications_in_perimeter(self, conn: Connection) -> int:
         return refresh_publications_in_perimeter(conn)
+
+    def assign_orphan_source_authorships_to_person(
+        self, conn: Connection, person_id: int, source_authorship_ids: list[int]
+    ) -> int:
+        return assign_orphan_source_authorships_to_person(conn, person_id, source_authorship_ids)
+
+    def create_authorships_from_sources(
+        self,
+        conn: Connection,
+        person_id: int,
+        source_authorship_ids: list[int],
+        source_priority: tuple[str, ...],
+    ) -> None:
+        create_authorships_from_sources(conn, person_id, source_authorship_ids, source_priority)
+
+    def link_source_authorships_batch(
+        self, conn: Connection, person_id: int, source_authorship_ids: list[int]
+    ) -> None:
+        link_source_authorships_batch(conn, person_id, source_authorship_ids)
