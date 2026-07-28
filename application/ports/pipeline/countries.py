@@ -3,9 +3,32 @@
 Implémenté par `infrastructure.pipeline.countries.PgCountryQueries`, utilisé par les orchestrateurs de `application.pipeline.countries`.
 """
 
+from dataclasses import dataclass
 from typing import NamedTuple, Protocol
 
 from sqlalchemy import Connection
+
+
+@dataclass(frozen=True, slots=True)
+class AddressCountryFilter:
+    """Critères de sélection d'adresses pour une attribution de pays en masse.
+
+    Combinés en AND. `search` : sous-chaîne cherchée dans `raw_text` (ILIKE, insensible à la casse et aux accents). `has_country` : True → `countries` renseigné, False → NULL, None → critère inactif. `country_code` / `suggested_country` : code présent dans la colonne correspondante."""
+
+    search: str | None = None
+    has_country: bool | None = None
+    country_code: str | None = None
+    suggested_country: str | None = None
+
+    @property
+    def is_empty(self) -> bool:
+        """Vrai si aucun critère n'est renseigné."""
+        return not (
+            self.search
+            or self.has_country is not None
+            or self.country_code
+            or self.suggested_country
+        )
 
 
 class SuggestEligibleCounts(NamedTuple):
@@ -26,7 +49,7 @@ class AddressCountryStatus(NamedTuple):
 
 
 class CountryQueries(Protocol):
-    """Opérations SQL de la phase countries : détection du pays des adresses (par nom de pays ou de lieu), suggestion floue, et recalcul des caches dénormalisés (source_publications, publications) à partir de `addresses.countries`."""
+    """Opérations SQL ensemblistes sur les pays des adresses : la phase countries (détection par nom de pays ou de lieu, suggestion floue, recalcul des caches dénormalisés `source_publications` / `publications`) et l'attribution manuelle admin (ajout par lot, propagation horizontale et verticale)."""
 
     # ── Bilan (début / fin de phase) ───────────────────────────────
 
@@ -91,4 +114,36 @@ class CountryQueries(Protocol):
 
         Écrire `countries` pose aussi `countries_dirty` sur les lignes touchées : le refresh des caches en dérive les documents à recalculer.
         """
+        ...
+
+    # ── Attribution manuelle et propagation (admin) ────────────────
+
+    def batch_add_country_by_ids(
+        self, conn: Connection, country_code: str, address_ids: list[int]
+    ) -> list[int]:
+        """Ajoute `country_code` aux `countries` des adresses données, sans doublon ni écrasement des codes déjà posés. Retourne les ids atteints."""
+        ...
+
+    def batch_add_country_by_filter(
+        self, conn: Connection, country_code: str, criteria: AddressCountryFilter
+    ) -> list[int]:
+        """Comme `batch_add_country_by_ids`, sur les adresses retenues par `criteria`. Retourne les ids modifiés ; critères tous vides : aucune écriture, `[]`."""
+        ...
+
+    def propagate_countries_across_similar_addresses(
+        self, conn: Connection, source_ids: list[int]
+    ) -> list[int]:
+        """Propage `countries` depuis les adresses `source_ids` vers celles qui partagent leur `normalized_text` et portent un `countries` différent (ou NULL). Retourne les ids propagés ; `source_ids` vide : `[]`. La source doit avoir un `countries` non NULL."""
+        ...
+
+    def refresh_source_publications_countries_for_addresses(
+        self, conn: Connection, address_ids: list[int]
+    ) -> int:
+        """Recalcule `source_publications.countries` (union des pays des adresses de leurs signatures) pour les documents rattachés à l'une des `address_ids`. Idempotent. Retourne le nombre de documents mis à jour."""
+        ...
+
+    def refresh_publications_countries_for_addresses(
+        self, conn: Connection, address_ids: list[int]
+    ) -> int:
+        """Recalcule `publications.countries` (union des `source_publications.countries`) pour les publications rattachées à l'une des `address_ids`. Idempotent. Retourne le nombre de publications mises à jour."""
         ...

@@ -18,9 +18,12 @@ from application.services.addresses.structure_links import (
     review_structure_link,
 )
 from domain.errors import NotFoundError, ValidationError
+from infrastructure.pipeline.countries import PgCountryQueries
 from infrastructure.pipeline.perimeter import PgPerimeterStructuresQueries
 from infrastructure.repositories import address_repository, authorship_repository
 from tests.integration.helpers.authorships import upsert_identity
+
+_GATEWAY = PgCountryQueries()
 
 
 @pytest.fixture
@@ -242,7 +245,7 @@ class TestSetCountry:
     def test_assigns_countries(self, sa_sync_conn, repo):
         _ensure_country(sa_sync_conn, "FR")
         addr = _create_address(sa_sync_conn)
-        affected = set_country(addr, ["FR"], repo=repo)
+        affected = set_country(sa_sync_conn, addr, ["FR"], repo=repo, country_queries=_GATEWAY)
         assert affected == [addr]
         assert _get_countries(sa_sync_conn, addr) == ["FR"]
 
@@ -250,27 +253,27 @@ class TestSetCountry:
         """`addresses.countries` est un tableau : aucune clé étrangère n'en garde les éléments."""
         addr = _create_address(sa_sync_conn)
         with pytest.raises(ValidationError, match="Code pays inconnu"):
-            set_country(addr, ["ZZ"], repo=repo)
+            set_country(sa_sync_conn, addr, ["ZZ"], repo=repo, country_queries=_GATEWAY)
         assert _get_countries(sa_sync_conn, addr) is None
 
     def test_raises_on_unknown_address(self, sa_sync_conn, repo):
         """L'`UPDATE` n'apparie aucune ligne : sans cette garde, l'API répondrait 200 sans rien faire."""
         _ensure_country(sa_sync_conn, "FR")
         with pytest.raises(NotFoundError):
-            set_country(999999, ["FR"], repo=repo)
+            set_country(sa_sync_conn, 999999, ["FR"], repo=repo, country_queries=_GATEWAY)
 
     def test_raises_on_one_unknown_among_known(self, sa_sync_conn, repo):
         _ensure_country(sa_sync_conn, "FR")
         addr = _create_address(sa_sync_conn)
         with pytest.raises(ValidationError, match="ZZ"):
-            set_country(addr, ["FR", "ZZ"], repo=repo)
+            set_country(sa_sync_conn, addr, ["FR", "ZZ"], repo=repo, country_queries=_GATEWAY)
         assert _get_countries(sa_sync_conn, addr) is None
 
     def test_none_clears_countries(self, sa_sync_conn, repo):
         _ensure_country(sa_sync_conn, "FR")
         addr = _create_address(sa_sync_conn)
-        set_country(addr, ["FR"], repo=repo)
-        set_country(addr, None, repo=repo)
+        set_country(sa_sync_conn, addr, ["FR"], repo=repo, country_queries=_GATEWAY)
+        set_country(sa_sync_conn, addr, None, repo=repo, country_queries=_GATEWAY)
         assert _get_countries(sa_sync_conn, addr) is None
 
     def test_propagates_to_same_normalized_text(self, sa_sync_conn, repo):
@@ -286,7 +289,7 @@ class TestSetCountry:
             ),
             {"ids": [a1, a2]},
         )
-        set_country(a1, ["FR"], repo=repo)
+        set_country(sa_sync_conn, a1, ["FR"], repo=repo, country_queries=_GATEWAY)
         assert _get_countries(sa_sync_conn, a1) == ["FR"]
         assert _get_countries(sa_sync_conn, a2) == ["FR"]  # propagé
 
@@ -299,7 +302,7 @@ class TestSetCountry:
             text("UPDATE addresses SET normalized_text = 'lyon' WHERE id = ANY(:ids)"),
             {"ids": [a1, a2]},
         )
-        set_country(a1, ["FR"], repo=repo)
+        set_country(sa_sync_conn, a1, ["FR"], repo=repo, country_queries=_GATEWAY)
         assert _get_countries(sa_sync_conn, a2) == ["FR"]
 
 
@@ -310,7 +313,9 @@ class TestBatchSetCountryByIds:
     def test_adds_to_empty_countries(self, sa_sync_conn, repo):
         _ensure_country(sa_sync_conn, "FR")
         addrs = [_create_address(sa_sync_conn, raw_text=f"a{i}") for i in range(3)]
-        modified = batch_set_country_by_ids("FR", addrs, repo=repo)
+        modified = batch_set_country_by_ids(
+            sa_sync_conn, "FR", addrs, repo=repo, country_queries=_GATEWAY
+        )
         assert set(modified) == set(addrs)
         for a in addrs:
             assert _get_countries(sa_sync_conn, a) == ["FR"]
@@ -318,28 +323,30 @@ class TestBatchSetCountryByIds:
     def test_raises_on_unknown_country(self, sa_sync_conn, repo):
         addr = _create_address(sa_sync_conn)
         with pytest.raises(ValidationError, match="Code pays inconnu"):
-            batch_set_country_by_ids("ZZ", [addr], repo=repo)
+            batch_set_country_by_ids(
+                sa_sync_conn, "ZZ", [addr], repo=repo, country_queries=_GATEWAY
+            )
 
     def test_raises_on_empty_country_code(self, sa_sync_conn, repo):
         """La chaîne vide ne figure pas au référentiel : le contrôle référentiel la couvre."""
         addr = _create_address(sa_sync_conn)
         with pytest.raises(ValidationError, match="Code pays inconnu"):
-            batch_set_country_by_ids("", [addr], repo=repo)
+            batch_set_country_by_ids(sa_sync_conn, "", [addr], repo=repo, country_queries=_GATEWAY)
 
     def test_appends_to_existing_countries(self, sa_sync_conn, repo):
         _ensure_country(sa_sync_conn, "FR")
         _ensure_country(sa_sync_conn, "US")
         addr = _create_address(sa_sync_conn)
-        set_country(addr, ["FR"], repo=repo)
-        batch_set_country_by_ids("US", [addr], repo=repo)
+        set_country(sa_sync_conn, addr, ["FR"], repo=repo, country_queries=_GATEWAY)
+        batch_set_country_by_ids(sa_sync_conn, "US", [addr], repo=repo, country_queries=_GATEWAY)
         countries = _get_countries(sa_sync_conn, addr)
         assert "FR" in countries and "US" in countries
 
     def test_idempotent_if_already_present(self, sa_sync_conn, repo):
         _ensure_country(sa_sync_conn, "FR")
         addr = _create_address(sa_sync_conn)
-        set_country(addr, ["FR"], repo=repo)
-        batch_set_country_by_ids("FR", [addr], repo=repo)
+        set_country(sa_sync_conn, addr, ["FR"], repo=repo, country_queries=_GATEWAY)
+        batch_set_country_by_ids(sa_sync_conn, "FR", [addr], repo=repo, country_queries=_GATEWAY)
         assert _get_countries(sa_sync_conn, addr) == ["FR"]  # pas de doublon
 
 
@@ -351,29 +358,35 @@ class TestBatchSetCountryByFilter:
         _ensure_country(sa_sync_conn, "FR")
         match = _create_address(sa_sync_conn, raw_text="Université Clermont")
         other = _create_address(sa_sync_conn, raw_text="MIT Boston")
-        modified = batch_set_country_by_filter("FR", search="Clermont", repo=repo)
+        modified = batch_set_country_by_filter(
+            sa_sync_conn, "FR", search="Clermont", repo=repo, country_queries=_GATEWAY
+        )
         assert match in modified
         assert other not in modified
 
     def test_raises_on_unknown_country(self, sa_sync_conn, repo):
         _create_address(sa_sync_conn, raw_text="Université Clermont")
         with pytest.raises(ValidationError, match="Code pays inconnu"):
-            batch_set_country_by_filter("ZZ", search="Clermont", repo=repo)
+            batch_set_country_by_filter(
+                sa_sync_conn, "ZZ", search="Clermont", repo=repo, country_queries=_GATEWAY
+            )
 
     def test_filter_has_country_no(self, sa_sync_conn, repo):
         _ensure_country(sa_sync_conn, "FR")
         _ensure_country(sa_sync_conn, "US")
         addr_no = _create_address(sa_sync_conn, raw_text="sans pays")
         addr_yes = _create_address(sa_sync_conn, raw_text="avec pays")
-        set_country(addr_yes, ["US"], repo=repo)
-        modified = batch_set_country_by_filter("FR", has_country=False, repo=repo)
+        set_country(sa_sync_conn, addr_yes, ["US"], repo=repo, country_queries=_GATEWAY)
+        modified = batch_set_country_by_filter(
+            sa_sync_conn, "FR", has_country=False, repo=repo, country_queries=_GATEWAY
+        )
         assert addr_no in modified
         assert addr_yes not in modified
 
-    def test_empty_filter_raises(self, repo):
+    def test_empty_filter_raises(self, sa_sync_conn, repo):
         """Aucun filtre → refus (garde-fou : ne pas viser toutes les adresses)."""
         with pytest.raises(ValidationError):
-            batch_set_country_by_filter("FR", repo=repo)
+            batch_set_country_by_filter(sa_sync_conn, "FR", repo=repo, country_queries=_GATEWAY)
 
 
 # ── propagate_countries_to_similar ──────────────────────────────────
@@ -399,7 +412,9 @@ class TestPropagateCountriesToSimilar:
             {"c": ["FR"], "id": a1},
         )
 
-        propagated = propagate_countries_to_similar(modified_ids=[a1], repo=repo)
+        propagated = propagate_countries_to_similar(
+            sa_sync_conn, modified_ids=[a1], country_queries=_GATEWAY
+        )
 
         assert a2 in propagated
         assert _get_countries(sa_sync_conn, a2) == ["FR"]
@@ -422,13 +437,18 @@ class TestPropagateCountriesToSimilar:
         )
 
         # On passe un id qui n'a aucun pays : pas de propagation depuis lui.
-        propagated = propagate_countries_to_similar(modified_ids=[a2], repo=repo)
+        propagated = propagate_countries_to_similar(
+            sa_sync_conn, modified_ids=[a2], country_queries=_GATEWAY
+        )
 
         assert propagated == []
         assert _get_countries(sa_sync_conn, a2) is None
 
-    def test_empty_modified_ids_is_noop(self, repo):
-        assert propagate_countries_to_similar(modified_ids=[], repo=repo) == []
+    def test_empty_modified_ids_is_noop(self, sa_sync_conn, repo):
+        assert (
+            propagate_countries_to_similar(sa_sync_conn, modified_ids=[], country_queries=_GATEWAY)
+            == []
+        )
 
 
 # ── propagate_countries_to_publications ─────────────────────────────
@@ -436,7 +456,9 @@ class TestPropagateCountriesToSimilar:
 
 class TestPropagateCountriesToPublications:
     def test_empty_is_noop(self, sa_sync_conn, repo):
-        propagate_countries_to_publications([], repo=repo)  # pas d'exception
+        propagate_countries_to_publications(
+            sa_sync_conn, [], country_queries=_GATEWAY
+        )  # pas d'exception
 
     def test_propagates_to_source_pub_and_publication(self, sa_sync_conn, repo):
         """Test d'intégration minimal : une adresse avec countries liée à
@@ -474,7 +496,7 @@ class TestPropagateCountriesToPublications:
             {"sa": sa_id, "a": addr},
         )
 
-        propagate_countries_to_publications([addr], repo=repo)
+        propagate_countries_to_publications(sa_sync_conn, [addr], country_queries=_GATEWAY)
 
         # source_publications.countries mis à jour
         sp_countries = sa_sync_conn.execute(

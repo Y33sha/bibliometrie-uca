@@ -17,6 +17,7 @@ import json
 from sqlalchemy import Connection, text
 
 from application.ports.pipeline.countries import (
+    AddressCountryFilter,
     AddressCountryStatus,
     CountryQueries,
     SuggestEligibleCounts,
@@ -313,6 +314,95 @@ def fetch_addresses_missing_country_normalized(conn: Connection) -> list[tuple[i
     return [(r.id, r.normalized_text) for r in rows]
 
 
+# ── Attribution manuelle et propagation (admin) ────────────────────
+
+# Ajout idempotent d'un code pays à `addresses.countries` : ni doublon, ni écrasement des codes déjà posés. Le code à ajouter est lié au paramètre `:cc`.
+_ADD_COUNTRY_SET_CLAUSE = """
+    SET countries = CASE
+        WHEN countries IS NULL THEN ARRAY[:cc]::char(2)[]
+        WHEN :cc = ANY(countries) THEN countries
+        ELSE array_append(countries, CAST(:cc AS char(2)))
+    END
+"""
+
+
+def batch_add_country_by_ids(
+    conn: Connection, country_code: str, address_ids: list[int]
+) -> list[int]:
+    """Ajoute `country_code` à `addresses.countries` pour la liste d'ids, sans doublon ni écrasement. Retourne les ids atteints."""
+    if not address_ids:
+        return []
+    result = conn.execute(
+        text(f"""
+            UPDATE addresses
+            {_ADD_COUNTRY_SET_CLAUSE}
+            WHERE id = ANY(:ids)
+            RETURNING id
+        """),
+        {"cc": country_code, "ids": address_ids},
+    )
+    return [row.id for row in result]
+
+
+def batch_add_country_by_filter(
+    conn: Connection, country_code: str, criteria: AddressCountryFilter
+) -> list[int]:
+    """Comme `batch_add_country_by_ids`, sur les adresses retenues par `criteria`. Retourne les ids modifiés ; critères tous vides : `[]`."""
+    conditions: list[str] = []
+    params: dict = {"cc": country_code}
+    if criteria.search:
+        conditions.append("unaccent(raw_text) ILIKE unaccent(:search)")
+        params["search"] = f"%{criteria.search}%"
+    if criteria.has_country is True:
+        conditions.append("countries IS NOT NULL")
+    elif criteria.has_country is False:
+        conditions.append("countries IS NULL")
+    if criteria.country_code:
+        conditions.append(":country_code = ANY(countries)")
+        params["country_code"] = criteria.country_code
+    if criteria.suggested_country:
+        conditions.append(":suggested_country = ANY(suggested_countries)")
+        params["suggested_country"] = criteria.suggested_country
+
+    if not conditions:
+        return []
+
+    where_clause = " AND ".join(conditions)
+    result = conn.execute(
+        text(f"""
+            UPDATE addresses
+            {_ADD_COUNTRY_SET_CLAUSE}
+            WHERE {where_clause}
+            RETURNING id
+        """),
+        params,
+    )
+    return [row.id for row in result]
+
+
+def propagate_countries_across_similar_addresses(
+    conn: Connection, source_ids: list[int]
+) -> list[int]:
+    """Propage `countries` des `source_ids` vers les adresses de même `normalized_text` portant un `countries` différent (ou NULL). Retourne les ids propagés ; `source_ids` vide : `[]`. La source doit avoir un `countries` non NULL."""
+    if not source_ids:
+        return []
+    result = conn.execute(
+        text("""
+            UPDATE addresses a2
+            SET countries = a1.countries
+            FROM addresses a1
+            WHERE a1.id = ANY(:source_ids)
+              AND a1.countries IS NOT NULL
+              AND a2.normalized_text = a1.normalized_text
+              AND a2.countries IS DISTINCT FROM a1.countries
+              AND a2.id <> a1.id
+            RETURNING a2.id
+        """),
+        {"source_ids": source_ids},
+    )
+    return [row.id for row in result]
+
+
 class PgCountryQueries(CountryQueries):
     """Adapter PostgreSQL implémentant `application.ports.pipeline.countries.CountryQueries`."""
 
@@ -358,3 +448,28 @@ class PgCountryQueries(CountryQueries):
         target_column: str = "suggested_countries",
     ) -> None:
         write_countries(conn, rows, target_column=target_column)
+
+    def batch_add_country_by_ids(
+        self, conn: Connection, country_code: str, address_ids: list[int]
+    ) -> list[int]:
+        return batch_add_country_by_ids(conn, country_code, address_ids)
+
+    def batch_add_country_by_filter(
+        self, conn: Connection, country_code: str, criteria: AddressCountryFilter
+    ) -> list[int]:
+        return batch_add_country_by_filter(conn, country_code, criteria)
+
+    def propagate_countries_across_similar_addresses(
+        self, conn: Connection, source_ids: list[int]
+    ) -> list[int]:
+        return propagate_countries_across_similar_addresses(conn, source_ids)
+
+    def refresh_source_publications_countries_for_addresses(
+        self, conn: Connection, address_ids: list[int]
+    ) -> int:
+        return refresh_source_publications_countries_for_addresses(conn, address_ids)
+
+    def refresh_publications_countries_for_addresses(
+        self, conn: Connection, address_ids: list[int]
+    ) -> int:
+        return refresh_publications_countries_for_addresses(conn, address_ids)

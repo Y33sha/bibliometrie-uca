@@ -1,27 +1,14 @@
-"""Adapter PostgreSQL sync pour `addresses` et ses propagations.
+"""Adapter PostgreSQL sync pour le cluster `addresses` : liens adresse ↔ structure et pays d'une adresse.
 
-Les méthodes de propagation (`refresh_publications_countries_for_addresses`, entre autres) débordent l'agrégat : elles écrivent `publications.countries` et `source_publications.countries`, que les pays d'une adresse alimentent.
+Les propagations ensemblistes des pays (adresses jumelles, `source_publications`, `publications`) vivent dans `infrastructure/pipeline/countries.py`.
 """
 
-from sqlalchemy import Connection, delete, select, text, update
+from sqlalchemy import Connection, delete, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from application.ports.repositories.address_repository import (
-    AddressCountryFilter,
-    AddressRepository,
-)
+from application.ports.repositories.address_repository import AddressRepository
 from domain.errors import NotFoundError
 from infrastructure.db.tables import address_structures, addresses, countries
-from infrastructure.pipeline import countries as country_queries
-
-# Ajout idempotent d'un code pays à `addresses.countries` : ni doublon, ni écrasement des codes déjà posés. Le code à ajouter est lié au paramètre `:cc`.
-_ADD_COUNTRY_SET_CLAUSE = """
-    SET countries = CASE
-        WHEN countries IS NULL THEN ARRAY[:cc]::char(2)[]
-        WHEN :cc = ANY(countries) THEN countries
-        ELSE array_append(countries, CAST(:cc AS char(2)))
-    END
-"""
 
 
 class PgAddressRepository(AddressRepository):
@@ -144,95 +131,3 @@ class PgAddressRepository(AddressRepository):
         )
         if result.rowcount == 0:
             raise NotFoundError(f"Adresse {address_id} introuvable")
-
-    def batch_add_country_by_ids(
-        self,
-        country_code: str,
-        address_ids: list[int],
-    ) -> list[int]:
-        if not address_ids:
-            return []
-        result = self._conn.execute(
-            text(f"""
-                UPDATE addresses
-                {_ADD_COUNTRY_SET_CLAUSE}
-                WHERE id = ANY(:ids)
-                RETURNING id
-            """),
-            {"cc": country_code, "ids": address_ids},
-        )
-        return [row.id for row in result]
-
-    def batch_add_country_by_filter(
-        self,
-        country_code: str,
-        criteria: AddressCountryFilter,
-    ) -> list[int]:
-        conditions: list[str] = []
-        params: dict = {"cc": country_code}
-        if criteria.search:
-            conditions.append("unaccent(raw_text) ILIKE unaccent(:search)")
-            params["search"] = f"%{criteria.search}%"
-        if criteria.has_country is True:
-            conditions.append("countries IS NOT NULL")
-        elif criteria.has_country is False:
-            conditions.append("countries IS NULL")
-        if criteria.country_code:
-            conditions.append(":country_code = ANY(countries)")
-            params["country_code"] = criteria.country_code
-        if criteria.suggested_country:
-            conditions.append(":suggested_country = ANY(suggested_countries)")
-            params["suggested_country"] = criteria.suggested_country
-
-        if not conditions:
-            return []
-
-        where_clause = " AND ".join(conditions)
-        result = self._conn.execute(
-            text(f"""
-                UPDATE addresses
-                {_ADD_COUNTRY_SET_CLAUSE}
-                WHERE {where_clause}
-                RETURNING id
-            """),
-            params,
-        )
-        return [row.id for row in result]
-
-    def propagate_countries_across_similar_addresses(
-        self,
-        source_ids: list[int],
-    ) -> list[int]:
-        if not source_ids:
-            return []
-        result = self._conn.execute(
-            text("""
-                UPDATE addresses a2
-                SET countries = a1.countries
-                FROM addresses a1
-                WHERE a1.id = ANY(:source_ids)
-                  AND a1.countries IS NOT NULL
-                  AND a2.normalized_text = a1.normalized_text
-                  AND a2.countries IS DISTINCT FROM a1.countries
-                  AND a2.id <> a1.id
-                RETURNING a2.id
-            """),
-            {"source_ids": source_ids},
-        )
-        return [row.id for row in result]
-
-    # ── Propagation vers source_publications et publications ──
-
-    def refresh_source_publications_countries(
-        self,
-        address_ids: list[int],
-    ) -> int:
-        return country_queries.refresh_source_publications_countries_for_addresses(
-            self._conn, address_ids
-        )
-
-    def refresh_publications_countries_for_addresses(
-        self,
-        address_ids: list[int],
-    ) -> int:
-        return country_queries.refresh_publications_countries_for_addresses(self._conn, address_ids)

@@ -1,11 +1,14 @@
-"""Pays des adresses — attribution manuelle, propagation horizontale (adresses jumelles) et verticale (vers `source_publications` / `publications`)."""
+"""Pays des adresses — attribution manuelle, propagation horizontale (adresses jumelles) et verticale (vers `source_publications` / `publications`).
+
+Les opérations ensemblistes (ajout par lot, propagations) passent par le gateway `CountryQueries` ; le référentiel (`country_exists`) et l'écriture unitaire d'une adresse (`set_countries`) restent sur `AddressRepository`.
+"""
 
 import logging
 
-from application.ports.repositories.address_repository import (
-    AddressCountryFilter,
-    AddressRepository,
-)
+from sqlalchemy import Connection
+
+from application.ports.pipeline.countries import AddressCountryFilter, CountryQueries
+from application.ports.repositories.address_repository import AddressRepository
 from domain.errors import ValidationError
 
 logger = logging.getLogger(__name__)
@@ -19,10 +22,12 @@ def _require_known_countries(codes: list[str], *, repo: AddressRepository) -> No
 
 
 def set_country(
+    conn: Connection,
     address_id: int,
     countries: list[str] | None,
     *,
     repo: AddressRepository,
+    country_queries: CountryQueries,
 ) -> list[int]:
     """Attribue une liste de pays à une adresse.
 
@@ -35,15 +40,19 @@ def set_country(
     repo.set_countries(address_id, countries)
     affected = [address_id]
     if countries:
-        affected.extend(repo.propagate_countries_across_similar_addresses([address_id]))
+        affected.extend(
+            country_queries.propagate_countries_across_similar_addresses(conn, [address_id])
+        )
     return affected
 
 
 def batch_set_country_by_ids(
+    conn: Connection,
     country_code: str,
     address_ids: list[int],
     *,
     repo: AddressRepository,
+    country_queries: CountryQueries,
 ) -> list[int]:
     """Ajoute `country_code` à `addresses.countries` pour la liste d'IDs donnée.
 
@@ -54,10 +63,11 @@ def batch_set_country_by_ids(
     Retourne les IDs effectivement modifiés (= tous ceux passés en entrée). Lève `ValidationError` sur un code absent du référentiel.
     """
     _require_known_countries([country_code], repo=repo)
-    return repo.batch_add_country_by_ids(country_code, address_ids)
+    return country_queries.batch_add_country_by_ids(conn, country_code, address_ids)
 
 
 def batch_set_country_by_filter(
+    conn: Connection,
     country_code: str,
     *,
     search: str | None = None,
@@ -65,6 +75,7 @@ def batch_set_country_by_filter(
     country_code_filter: str | None = None,
     suggested_country: str | None = None,
     repo: AddressRepository,
+    country_queries: CountryQueries,
 ) -> list[int]:
     """Ajoute `country_code` aux adresses correspondant aux filtres.
 
@@ -85,20 +96,22 @@ def batch_set_country_by_filter(
             "(search / has_country / country_code_filter / suggested_country) : "
             "refus d'appliquer un pays à toutes les adresses."
         )
-    return repo.batch_add_country_by_filter(country_code, criteria)
+    return country_queries.batch_add_country_by_filter(conn, country_code, criteria)
 
 
 def propagate_countries_to_similar(
-    *, modified_ids: list[int], repo: AddressRepository
+    conn: Connection, *, modified_ids: list[int], country_queries: CountryQueries
 ) -> list[int]:
     """Propage les `countries` des adresses `modified_ids` vers leurs jumelles (même `normalized_text`).
 
     Appelée après un `batch_set_country_by_*` pour propager les modifications fraîches aux adresses similaires. Cible explicitement les sources de propagation pour rester sub-seconde (vs un balayage global O(n²) sur les ~475k adresses sans index btree sur `normalized_text`).
     """
-    return repo.propagate_countries_across_similar_addresses(modified_ids)
+    return country_queries.propagate_countries_across_similar_addresses(conn, modified_ids)
 
 
-def propagate_countries_to_publications(address_ids: list[int], *, repo: AddressRepository) -> None:
+def propagate_countries_to_publications(
+    conn: Connection, address_ids: list[int], *, country_queries: CountryQueries
+) -> None:
     """Propage addresses.countries → source_publications.countries → publications.countries.
 
     Appelée après une modification de pays sur les adresses (typiquement en tâche de fond). Recalcule depuis les adresses, idempotent.
@@ -106,8 +119,8 @@ def propagate_countries_to_publications(address_ids: list[int], *, repo: Address
     if not address_ids:
         return
 
-    docs = repo.refresh_source_publications_countries(address_ids)
-    pubs = repo.refresh_publications_countries_for_addresses(address_ids)
+    docs = country_queries.refresh_source_publications_countries_for_addresses(conn, address_ids)
+    pubs = country_queries.refresh_publications_countries_for_addresses(conn, address_ids)
 
     if docs or pubs:
         logger.info(f"Propagation pays : {docs} docs source, {pubs} publications")
