@@ -28,9 +28,10 @@ def update_journal(
     même transaction."""
     new_type = update.journal_type
     type_changed = False
-    if new_type is not None:
-        old_type = repo.get_journal_type(journal_id)
-        type_changed = old_type is not None and old_type != new_type
+    if isinstance(new_type, str):
+        existing = repo.find_by_id(journal_id)
+        if existing is not None and existing.journal_type != new_type:
+            type_changed = True
 
     journals_service.update_journal(journal_id, update=update, repo=repo)
 

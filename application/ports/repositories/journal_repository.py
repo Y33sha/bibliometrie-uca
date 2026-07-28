@@ -11,7 +11,7 @@ from typing import Any, Protocol
 
 from pydantic import BaseModel
 
-from domain.journals.journal import JournalType, OaModel
+from domain.journals.journal import Journal, JournalType, OaModel
 
 
 class JournalUpdate(BaseModel):
@@ -37,12 +37,8 @@ class JournalUpdate(BaseModel):
 class JournalRepository(Protocol):
     """Contrat d'édition et de fusion curées de l'agrégat Journal."""
 
-    def exists(self, journal_id: int) -> bool:
-        """Vrai si la revue existe. Garde-fou d'existence avant fusion, sans hydrater l'agrégat."""
-        ...
-
-    def get_journal_type(self, journal_id: int) -> JournalType | None:
-        """Type courant de la revue (`UNKNOWN` si la colonne est nulle), ou `None` si la revue n'existe pas. Sert à détecter un changement de type avant requalification, sans hydrater l'agrégat."""
+    def find_by_id(self, journal_id: int) -> Journal | None:
+        """Hydrate l'aggregate `Journal` complet. Retourne None si le journal n'existe pas. Les `journal_name_forms` restent une projection séparée, hors de l'aggregate."""
         ...
 
     def update_journal_fields(self, journal_id: int, fields: JournalUpdate) -> None:
