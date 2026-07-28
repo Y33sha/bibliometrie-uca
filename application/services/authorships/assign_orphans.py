@@ -7,7 +7,10 @@ Le helper privé `_refresh_authorship_from_sources` chaîne les cinq opérations
 Les deux opérations vérifient l'existence de la personne cible : elles écrivent des lignes qui la référencent, et sans cette garde une cible absente se traduirait en violation de clé étrangère.
 """
 
+from sqlalchemy import Connection
+
 from application.audit_log import emit_event
+from application.ports.pipeline.authorships.build import AuthorshipsBuildQueries
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.authorship_repository import AuthorshipRepository
 from application.ports.repositories.person_repository import PersonRepository
@@ -125,8 +128,10 @@ def batch_assign_orphan_authorships(
     person_id: int,
     sa_ids: list[int],
     *,
+    conn: Connection,
     repo: PersonRepository,
     authorship_repo: AuthorshipRepository,
+    build_queries: AuthorshipsBuildQueries,
     audit_repo: AuditRepository | None = None,
     force: bool = False,
 ) -> int:
@@ -153,10 +158,10 @@ def batch_assign_orphan_authorships(
         force=force,
     )
 
-    assigned = authorship_repo.assign_orphan_source_authorships_to_person(person_id, sa_ids)
+    assigned = build_queries.assign_orphan_source_authorships_to_person(conn, person_id, sa_ids)
     authorship_repo.pin_authorships(sa_ids, person_id)
-    authorship_repo.create_authorships_from_sources(person_id, sa_ids, SOURCE_PRIORITY)
-    authorship_repo.link_source_authorships_batch(person_id, sa_ids)
+    build_queries.create_authorships_from_sources(conn, person_id, sa_ids, SOURCE_PRIORITY)
+    build_queries.link_source_authorships_batch(conn, person_id, sa_ids)
 
     for name_form in authorship_repo.get_distinct_name_forms_from_source_authorships(sa_ids):
         repo.add_name_form(person_id, name_form)
