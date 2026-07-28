@@ -4,6 +4,8 @@ from typing import Annotated, Protocol
 
 from pydantic import BaseModel, StringConstraints
 
+from domain.perimeters.perimeter import Perimeter
+
 
 class PerimeterUpdate(BaseModel):
     """Champs éditables d'un périmètre, en modification sélective.
@@ -17,6 +19,12 @@ class PerimeterUpdate(BaseModel):
 
 class PerimeterRepository(Protocol):
     """Contrat d'accès à la table `perimeters`."""
+
+    # ── Chargement de l'aggregate ──────────────────────────────────
+
+    def find_by_id(self, perimeter_id: int) -> Perimeter | None:
+        """Hydrate l'aggregate `Perimeter` complet (code, name, `root_structure_ids`). Retourne None si le perimeter n'existe pas. `root_structure_ids` reste sous forme d'ids (références par id à l'aggregate Structure)."""
+        ...
 
     # ── Liens structure ↔ perimeter ────────────────────────────────
 
