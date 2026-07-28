@@ -5,37 +5,13 @@ Séparé de `journal_repository.py` (principe ISP). Le trouve-ou-crée, aliment�
 La méthode `merge_publisher_into` réalise les étapes 2-6 d'une fusion d'éditeurs ; la détection préalable des journaux à titre partagé (étape 1) est dans `JournalRepository.find_shared_title_journal_pairs`, le service de fusion d'éditeurs orchestrant les deux.
 """
 
-from typing import NamedTuple, cast
-
 from sqlalchemy import Connection, delete, func, select, text, update
 
 from application.ports.repositories.publisher_repository import PublisherRepository, PublisherUpdate
 from domain.errors import NotFoundError
 from domain.normalize import normalize_text
-from domain.publishers.publisher import Publisher, PublisherType
 from infrastructure.db.tables import publisher_name_forms, publishers
 from infrastructure.pipeline.authorships.pub_counts import refresh_publisher_pub_count
-
-
-class _PublisherRow(NamedTuple):
-    """Projection SQL `find_by_id` sur `publishers`."""
-
-    id: int
-    name: str
-    country: str | None
-    openalex_id: str | None
-    publisher_type: str
-
-
-def _publisher_from_row(row: _PublisherRow) -> Publisher:
-    """Mapping d'une row `publishers` SQL vers l'aggregate `Publisher`."""
-    return Publisher(
-        id=row.id,
-        name=row.name,
-        country=row.country,
-        openalex_id=row.openalex_id,
-        publisher_type=cast(PublisherType, row.publisher_type),
-    )
 
 
 class PgPublisherRepository(PublisherRepository):
@@ -44,21 +20,15 @@ class PgPublisherRepository(PublisherRepository):
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
 
-    # ── Chargement de l'aggregate ──────────────────────────────────
+    # ── Lecture de commande ────────────────────────────────────────
 
-    def find_by_id(self, publisher_id: int) -> Publisher | None:
-        row = self._conn.execute(
-            select(
-                publishers.c.id,
-                publishers.c.name,
-                publishers.c.country,
-                publishers.c.openalex_id,
-                publishers.c.publisher_type,
-            ).where(publishers.c.id == publisher_id)
-        ).first()
-        if row is None:
-            return None
-        return _publisher_from_row(_PublisherRow(**row._mapping))
+    def exists(self, publisher_id: int) -> bool:
+        return (
+            self._conn.execute(
+                select(publishers.c.id).where(publishers.c.id == publisher_id)
+            ).first()
+            is not None
+        )
 
     # ── Enrichissement pays (maintenance) ──────────────────────────
 
