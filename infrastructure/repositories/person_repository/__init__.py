@@ -48,6 +48,35 @@ class PgPersonRepository(PersonRepository):
     def set_rejected(self, person_id: int, rejected: bool) -> None:
         _core.set_rejected(self._conn, person_id, rejected)
 
+    # ── persons_rh (fiches RH) ─────────────────────────────────────
+
+    def find_rh_person_duplicate(
+        self, last_name: str, first_name: str, department: str | None, role: str | None
+    ) -> int | None:
+        return _core.find_rh_person_duplicate(self._conn, last_name, first_name, department, role)
+
+    def insert_rh_record(
+        self,
+        person_id: int,
+        *,
+        email: str | None,
+        role: str | None,
+        department: str | None,
+        start_date: str | None,
+        end_date: str | None,
+        export_date: str | None,
+    ) -> None:
+        _core.insert_rh_record(
+            self._conn,
+            person_id,
+            email=email,
+            role=role,
+            department=department,
+            start_date=start_date,
+            end_date=end_date,
+            export_date=export_date,
+        )
+
     # ── Fusion ─────────────────────────────────────────────────────
 
     def has_distinct_rh(self, id_a: int, id_b: int) -> bool:

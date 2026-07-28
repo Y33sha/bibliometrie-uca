@@ -20,37 +20,12 @@ from typing import Any
 
 from sqlalchemy import Connection, text
 
-from application.services.persons.core import refresh_person_name_forms
-from domain.normalize import normalize_name
+from application.services.persons.core import RhImportOutcome, import_rh_person
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from infrastructure.repositories import person_repository
 
 log = setup_logger("import_persons", os.path.dirname(__file__))
-
-
-SELECT_DUPLICATE_PERSON = text("""
-    SELECT p.id FROM persons p
-    LEFT JOIN persons_rh prh ON prh.person_id = p.id
-    WHERE p.last_name_normalized = :ln
-      AND p.first_name_normalized = :fn
-      AND prh.department_name IS NOT DISTINCT FROM :dept
-      AND prh.role_title IS NOT DISTINCT FROM :role
-""")
-
-INSERT_PERSON = text("""
-    INSERT INTO persons
-        (last_name, first_name, last_name_normalized, first_name_normalized)
-    VALUES (:last, :first, :ln, :fn)
-    RETURNING id
-""")
-
-INSERT_PERSON_RH = text("""
-    INSERT INTO persons_rh
-        (person_id, email, role_title, department_name,
-         start_date, end_date, hr_export_date)
-    VALUES (:pid, :email, :role, :dept, :start, :end, :exp)
-""")
 
 
 def parse_date(val: object) -> str | None:
@@ -233,6 +208,7 @@ def import_persons(
     duplicates = 0
 
     export_dt = parse_date(export_date) if export_date else None
+    repo = person_repository(conn)
 
     for rec in records:
         last_name = rec.get("last_name", "").strip()
@@ -241,47 +217,26 @@ def import_persons(
             skipped += 1
             continue
 
-        last_norm = normalize_name(last_name)
-        first_norm = normalize_name(first_name)
-        email = rec.get("email", "").strip() or None
-        department = rec.get("department_name", "").strip() or None
-        role = rec.get("role_title", "").strip() or None
-        start = parse_date(rec.get("start_date", ""))
-        end = parse_date(rec.get("end_date", ""))
-
         if dry_run:
             inserted += 1
             continue
 
-        # Doublon = même nom normalisé, même département et même rôle (comparaison NULL-safe).
-        existing = conn.execute(
-            SELECT_DUPLICATE_PERSON,
-            {"ln": last_norm, "fn": first_norm, "dept": department, "role": role},
-        ).first()
-        if existing:
+        outcome = import_rh_person(
+            last_name,
+            first_name,
+            email=rec.get("email", "").strip() or None,
+            department=rec.get("department_name", "").strip() or None,
+            role=rec.get("role_title", "").strip() or None,
+            start_date=parse_date(rec.get("start_date", "")),
+            end_date=parse_date(rec.get("end_date", "")),
+            export_date=export_dt,
+            repo=repo,
+        )
+        if outcome is RhImportOutcome.DUPLICATE:
             duplicates += 1
             continue
 
-        person_id = conn.execute(
-            INSERT_PERSON,
-            {"last": last_name, "first": first_name, "ln": last_norm, "fn": first_norm},
-        ).scalar_one()
-        refresh_person_name_forms(person_id, last_name, first_name, repo=person_repository(conn))
-
-        conn.execute(
-            INSERT_PERSON_RH,
-            {
-                "pid": person_id,
-                "email": email,
-                "role": role,
-                "dept": department,
-                "start": start,
-                "end": end,
-                "exp": export_dt,
-            },
-        )
         inserted += 1
-
         if inserted % 500 == 0:
             conn.commit()
             log.info(f"  {inserted} personnes insérées…")

@@ -53,6 +53,28 @@ class PersonRepository(Protocol):
         """Pose le drapeau `rejected` d'une personne et recalcule `publications.in_perimeter` pour ses publications (une personne rejetée en est exclue). Lève `NotFoundError` si la personne est introuvable."""
         ...
 
+    # ── persons_rh (fiches RH) ─────────────────────────────────────
+
+    def find_rh_person_duplicate(
+        self, last_name: str, first_name: str, department: str | None, role: str | None
+    ) -> int | None:
+        """`id` d'une personne portant les mêmes nom et prénom normalisés et la même fiche RH (`department`, `role`, comparaison NULL-safe), ou `None`. Clé de déduplication de l'import RH : une même personne, même service, même fonction, n'est pas réinsérée."""
+        ...
+
+    def insert_rh_record(
+        self,
+        person_id: int,
+        *,
+        email: str | None,
+        role: str | None,
+        department: str | None,
+        start_date: str | None,
+        end_date: str | None,
+        export_date: str | None,
+    ) -> None:
+        """Ajoute une fiche RH (`persons_rh`) à une personne : email, fonction, service, période et date d'export du fichier RH."""
+        ...
+
     # ── Fusion ─────────────────────────────────────────────────────
 
     def has_distinct_rh(self, id_a: int, id_b: int) -> bool:
