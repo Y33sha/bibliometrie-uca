@@ -164,9 +164,9 @@ def merge_journals(
     """
     if target_id == source_id:
         raise ValidationError("Impossible de fusionner un journal avec lui-même")
-    if repo.find_by_id(target_id) is None:
+    if not repo.exists(target_id):
         raise NotFoundError("Revue cible introuvable")
-    if repo.find_by_id(source_id) is None:
+    if not repo.exists(source_id):
         raise NotFoundError("Revue source introuvable")
 
     # Capturer les publications du source avant le repoint, pour les rafraîchir.

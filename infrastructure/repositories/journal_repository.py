@@ -5,8 +5,7 @@ L'agrégat Publisher est dans `publisher_repository.py` (principe ISP). Le trouv
 Même contrat que les autres PgXxxRepository : exceptions du domaine, l'orchestration métier restant dans `application/services/journals/`.
 """
 
-from decimal import Decimal
-from typing import Any, NamedTuple, cast
+from typing import Any
 
 from sqlalchemy import Connection, delete, func, select, text, update
 
@@ -15,7 +14,7 @@ from application.ports.repositories.journal_repository import (
     JournalUpdate,
 )
 from domain.errors import NotFoundError
-from domain.journals.journal import Journal, JournalType, OaModel
+from domain.journals.journal import JournalType
 from domain.normalize import normalize_text
 from infrastructure.db.tables import journal_name_forms, journals
 from infrastructure.pipeline.authorships.pub_counts import (
@@ -24,80 +23,27 @@ from infrastructure.pipeline.authorships.pub_counts import (
 )
 
 
-class _JournalRow(NamedTuple):
-    """Projection SQL `find_by_id` sur `journals`."""
-
-    id: int
-    title: str
-    issn: str | None
-    eissn: str | None
-    issnl: str | None
-    publisher_id: int | None
-    openalex_id: str | None
-    is_in_doaj: bool
-    apc_amount: Decimal | None
-    apc_currency: str | None
-    oa_model: str | None
-    journal_type: str | None
-    is_academic: bool | None
-    doi_prefix: str | None
-
-
-def _journal_from_row(row: _JournalRow) -> Journal:
-    """Mappe une row `journals` SQL vers l'aggregate `Journal`.
-
-    Coerce les valeurs vers les types du domaine : `journal_type` et `is_academic`, nullables au schéma, retombent sur leur défaut (`unknown` / `True`). Les enums SQL `journal_type` et `oa_model` reprennent le vocabulaire du domaine, d'où la simple assertion de type.
-    """
-    return Journal(
-        id=row.id,
-        title=row.title,
-        issn=row.issn,
-        eissn=row.eissn,
-        issnl=row.issnl,
-        publisher_id=row.publisher_id,
-        openalex_id=row.openalex_id,
-        is_in_doaj=row.is_in_doaj,
-        apc_amount=row.apc_amount,
-        apc_currency=row.apc_currency,
-        oa_model=cast(OaModel | None, row.oa_model),
-        journal_type=cast(JournalType, row.journal_type)
-        if row.journal_type is not None
-        else JournalType.UNKNOWN,
-        is_academic=row.is_academic if row.is_academic is not None else True,
-        doi_prefix=row.doi_prefix,
-    )
-
-
 class PgJournalRepository(JournalRepository):
     """Accès PostgreSQL à l'agrégat Journal via une `Connection` SQLAlchemy."""
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
 
-    # ── Chargement de l'aggregate ──────────────────────────────────
+    # ── Lectures de commande ───────────────────────────────────────
 
-    def find_by_id(self, journal_id: int) -> Journal | None:
+    def exists(self, journal_id: int) -> bool:
+        return (
+            self._conn.execute(select(journals.c.id).where(journals.c.id == journal_id)).first()
+            is not None
+        )
+
+    def get_journal_type(self, journal_id: int) -> JournalType | None:
         row = self._conn.execute(
-            select(
-                journals.c.id,
-                journals.c.title,
-                journals.c.issn,
-                journals.c.eissn,
-                journals.c.issnl,
-                journals.c.publisher_id,
-                journals.c.openalex_id,
-                journals.c.is_in_doaj,
-                journals.c.apc_amount,
-                journals.c.apc_currency,
-                journals.c.oa_model,
-                journals.c.journal_type,
-                journals.c.is_academic,
-                journals.c.doi_prefix,
-            ).where(journals.c.id == journal_id)
+            select(journals.c.journal_type).where(journals.c.id == journal_id)
         ).first()
         if row is None:
             return None
-        return _journal_from_row(_JournalRow(**row._mapping))
+        return JournalType(row[0]) if row[0] is not None else JournalType.UNKNOWN
 
     # ── Édition sélective ──────────────────────────────────────────
 
