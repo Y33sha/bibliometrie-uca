@@ -26,13 +26,13 @@ import os
 from collections.abc import Callable
 from typing import Any
 
-from sqlalchemy import bindparam, text
-from sqlalchemy.dialects.postgresql import JSONB
-
 from domain.sources.registry import ALL_SOURCES_SET
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from infrastructure.pipeline.change_detection import change_detection_hash
+from infrastructure.pipeline.normalize.staging import (
+    rehydrate_or_create_staging_row,
+    rehydrate_staging_row,
+)
 from infrastructure.raw_store import get_raw_store
 from infrastructure.sources.hal.extract_hal import extract_doi as hal_extract_doi
 from infrastructure.sources.openalex.parsing import extract_doi as openalex_extract_doi
@@ -62,32 +62,6 @@ def _doi_for(source: str, source_id: str, raw_data: dict[str, Any]) -> str | Non
     if source in ("crossref", "datacite"):
         return source_id  # sources DOI-natives : source_id == doi
     return _DOI_EXTRACTORS[source](raw_data)
-
-
-# Mode défaut : ne touche que les lignes déjà présentes (rowcount = 0 → orpheline).
-_UPDATE_SQL = text(
-    """
-    UPDATE staging
-    SET raw_data = :raw_data, raw_hash = :raw_hash, processed = FALSE
-    WHERE source = :source AND source_id = :source_id
-    """
-).bindparams(bindparam("raw_data", type_=JSONB))
-
-# Mode --full : réinsère les orphelins et écrase inconditionnellement les existants
-# — réhydratation forcée pour rejouer normalize, distincte du moissonnage idempotent
-# de l'extraction. `doi` n'est posé qu'à l'insertion ; une ligne existante garde son
-# `doi` d'origine.
-_UPSERT_SQL = text(
-    """
-    INSERT INTO staging (source, source_id, doi, raw_data, raw_hash, processed)
-    VALUES (:source, :source_id, :doi, :raw_data, :raw_hash, FALSE)
-    ON CONFLICT (source, source_id) DO UPDATE SET
-        raw_data = EXCLUDED.raw_data,
-        raw_hash = EXCLUDED.raw_hash,
-        processed = FALSE
-    RETURNING (xmax = 0) AS inserted
-    """
-).bindparams(bindparam("raw_data", type_=JSONB))
 
 
 def _parse_sources(raw: str) -> list[str]:
@@ -139,27 +113,19 @@ def main() -> None:
             seen = 0
             for source_id in store.iter_keys(source):
                 raw_data = json.loads(store.get(source, source_id))
-                params = {
-                    "raw_data": raw_data,
-                    "raw_hash": change_detection_hash(source, raw_data),
-                    "source": source,
-                    "source_id": source_id,
-                }
                 if args.full:
-                    params["doi"] = _doi_for(source, source_id, raw_data)
-                    row = conn.execute(_UPSERT_SQL, params).one()
-                    if row.inserted:
+                    doi = _doi_for(source, source_id, raw_data)
+                    if rehydrate_or_create_staging_row(conn, source, source_id, doi, raw_data):
                         inserted += 1
                     else:
                         updated += 1
+                elif rehydrate_staging_row(conn, source, source_id, raw_data):
+                    updated += 1
                 else:
-                    if conn.execute(_UPDATE_SQL, params).rowcount:
-                        updated += 1
-                    else:
-                        orphans += 1
-                        log.warning(
-                            "%s/%s : aucune ligne staging (orpheline, ignorée)", source, source_id
-                        )
+                    orphans += 1
+                    log.warning(
+                        "%s/%s : aucune ligne staging (orpheline, ignorée)", source, source_id
+                    )
 
                 seen += 1
                 if seen % _COMMIT_BATCH == 0:

@@ -7,13 +7,14 @@ La table `staging` stocke les raw_data téléchargées par les extracteurs, avec
 
 import logging
 
-from sqlalchemy import Connection, Row, text
+from sqlalchemy import Connection, Row, bindparam, text
+from sqlalchemy.dialects.postgresql import JSONB
 
 from application.ports.pipeline.normalize.staging import (
     StagingQueries,
     StagingRow,
 )
-from infrastructure.pipeline.change_detection import canonical_json_bytes
+from infrastructure.pipeline.change_detection import canonical_json_bytes, change_detection_hash
 from infrastructure.raw_store import RawStore, get_raw_store
 
 logger = logging.getLogger(__name__)
@@ -116,6 +117,69 @@ def fetch_existing_source_ids(conn: Connection, source: str) -> set[str]:
         {"source": source},
     ).scalars()
     return set(rows)
+
+
+# ── Réhydratation depuis le raw store (inverse de mark_done) ────
+
+_REHYDRATE_UPDATE_SQL = text(
+    """
+    UPDATE staging
+    SET raw_data = :raw_data, raw_hash = :raw_hash, processed = FALSE
+    WHERE source = :source AND source_id = :source_id
+    """
+).bindparams(bindparam("raw_data", type_=JSONB))
+
+_REHYDRATE_UPSERT_SQL = text(
+    """
+    INSERT INTO staging (source, source_id, doi, raw_data, raw_hash, processed)
+    VALUES (:source, :source_id, :doi, :raw_data, :raw_hash, FALSE)
+    ON CONFLICT (source, source_id) DO UPDATE SET
+        raw_data = EXCLUDED.raw_data,
+        raw_hash = EXCLUDED.raw_hash,
+        processed = FALSE
+    RETURNING (xmax = 0) AS inserted
+    """
+).bindparams(bindparam("raw_data", type_=JSONB))
+
+
+def rehydrate_staging_row(conn: Connection, source: str, source_id: str, raw_data: dict) -> bool:
+    """Réinjecte un payload archivé dans une ligne `staging` existante, prête à renormaliser.
+
+    Inverse de `mark_done` : repose `raw_data`, recalcule `raw_hash` (`change_detection_hash`, même empreinte que l'UPSERT d'extraction, pour qu'une ligne réhydratée ne re-diverge pas au moissonnage suivant) et remet `processed = FALSE`. Ne touche que les lignes déjà présentes : retourne `False` si `(source, source_id)` est absent (clé orpheline au raw store).
+    """
+    return (
+        conn.execute(
+            _REHYDRATE_UPDATE_SQL,
+            {
+                "raw_data": raw_data,
+                "raw_hash": change_detection_hash(source, raw_data),
+                "source": source,
+                "source_id": source_id,
+            },
+        ).rowcount
+        > 0
+    )
+
+
+def rehydrate_or_create_staging_row(
+    conn: Connection, source: str, source_id: str, doi: str | None, raw_data: dict
+) -> bool:
+    """Réhydrate une ligne `staging`, en la créant si elle manque (après un `TRUNCATE staging`, où tout est orphelin).
+
+    Upsert : réinsère les clés orphelines et écrase inconditionnellement les existantes. `doi` n'est posé qu'à l'insertion — une ligne préexistante garde son `doi` d'origine. Retourne `True` si la ligne vient d'être insérée, `False` si elle existait et a été mise à jour.
+    """
+    return bool(
+        conn.execute(
+            _REHYDRATE_UPSERT_SQL,
+            {
+                "raw_data": raw_data,
+                "raw_hash": change_detection_hash(source, raw_data),
+                "source": source,
+                "source_id": source_id,
+                "doi": doi,
+            },
+        ).scalar_one()
+    )
 
 
 class PgStagingQueries(StagingQueries):
