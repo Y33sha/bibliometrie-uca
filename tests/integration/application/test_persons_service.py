@@ -18,10 +18,12 @@ from application.services.authorships.assign_orphans import (
 )
 from application.services.persons.core import (
     AddIdentifierOutcome,
+    RhImportOutcome,
     add_identifier,
     add_identifiers_from_authorships,
     create_person,
     detach_authorships,
+    import_rh_person,
     link_authorship,
     mark_distinct,
     merge_person,
@@ -749,6 +751,58 @@ class TestDetachAuthorships:
                 p=person_id,
             )
             == 1
+        )
+
+
+class TestImportRhPerson:
+    """Import RH : création + fiche persons_rh, déduplication, garde nom/prénom.
+
+    Couvre le couplage au schéma des méthodes `insert_rh_record` (colonnes de `persons_rh`) et `find_rh_person_duplicate` (jointure de dédup NULL-safe sur nom normalisé + service + fonction).
+    """
+
+    def test_inserts_person_and_rh_record(self, sa_sync_conn, repo):
+        outcome = import_rh_person(
+            "Durand",
+            "Marie",
+            email="marie.durand@uca.fr",
+            department="LMBP",
+            role="MCF",
+            start_date="2020-09-01",
+            export_date="2026-01-15",
+            repo=repo,
+        )
+        assert outcome is RhImportOutcome.INSERTED
+        row = sa_sync_conn.execute(
+            text("""
+                SELECT prh.email, prh.role_title, prh.department_name, prh.hr_export_date
+                FROM persons p JOIN persons_rh prh ON prh.person_id = p.id
+                WHERE p.last_name_normalized = 'durand' AND p.first_name_normalized = 'marie'
+            """)
+        ).one()
+        assert row.email == "marie.durand@uca.fr"
+        assert row.role_title == "MCF"
+        assert row.department_name == "LMBP"
+
+    def test_same_name_and_rh_is_duplicate(self, repo):
+        import_rh_person("Durand", "Marie", department="LMBP", role="MCF", repo=repo)
+        again = import_rh_person("Durand", "Marie", department="LMBP", role="MCF", repo=repo)
+        assert again is RhImportOutcome.DUPLICATE
+
+    def test_same_name_other_department_is_inserted(self, repo):
+        import_rh_person("Durand", "Marie", department="LMBP", role="MCF", repo=repo)
+        other = import_rh_person("Durand", "Marie", department="LPC", role="MCF", repo=repo)
+        assert other is RhImportOutcome.INSERTED
+
+    def test_missing_first_name_is_skipped(self, sa_sync_conn, repo):
+        assert import_rh_person("Durand", "  ", department="LMBP", repo=repo) is (
+            RhImportOutcome.SKIPPED
+        )
+        assert (
+            _scalar(
+                sa_sync_conn,
+                "SELECT COUNT(*) FROM persons WHERE last_name_normalized = 'durand'",
+            )
+            == 0
         )
 
 
