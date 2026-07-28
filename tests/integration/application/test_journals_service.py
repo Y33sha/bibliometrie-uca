@@ -123,17 +123,13 @@ def _insert_publication(conn, title="Pub", pub_year=2024, journal_id=None):
 # ── Lectures de commande (find_by_id d'hydratation supprimé) ────────
 
 
-class TestPublisherFindById:
-    def test_returns_none_if_missing(self, publisher_repo):
-        assert publisher_repo.find_by_id(999999) is None
+class TestPublisherExists:
+    def test_false_if_missing(self, publisher_repo):
+        assert publisher_repo.exists(999999) is False
 
-    def test_hydrates(self, sa_sync_conn, publisher_repo):
+    def test_true_if_present(self, sa_sync_conn, publisher_repo):
         pub_id = _insert_publisher(sa_sync_conn, "Elsevier", openalex_id="P123")
-        p = publisher_repo.find_by_id(pub_id)
-        assert p is not None
-        assert p.id == pub_id
-        assert p.name == "Elsevier"
-        assert p.openalex_id == "P123"
+        assert publisher_repo.exists(pub_id) is True
 
 
 class TestJournalExists:

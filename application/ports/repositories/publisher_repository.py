@@ -11,8 +11,6 @@ from typing import Protocol
 
 from pydantic import BaseModel, field_validator
 
-from domain.publishers.publisher import Publisher
-
 
 class PublisherUpdate(BaseModel):
     """Champs éditables d'un éditeur, en modification sélective.
@@ -34,10 +32,10 @@ class PublisherUpdate(BaseModel):
 class PublisherRepository(Protocol):
     """Contrat d'édition, d'enrichissement pays et de fusion de l'agrégat Publisher."""
 
-    # ── Chargement de l'aggregate ──────────────────────────────────
+    # ── Lecture de commande ────────────────────────────────────────
 
-    def find_by_id(self, publisher_id: int) -> Publisher | None:
-        """Hydrate l'aggregate `Publisher` complet. Retourne None si l'éditeur n'existe pas. Les `publisher_name_forms` restent une projection séparée, hors de l'aggregate."""
+    def exists(self, publisher_id: int) -> bool:
+        """Vrai si l'éditeur existe. Garde-fou d'existence avant fusion, sans hydrater l'agrégat."""
         ...
 
     # ── Enrichissement pays (maintenance) ──────────────────────────

@@ -102,9 +102,9 @@ def merge_publishers(
     """
     if target_id == source_id:
         raise ValidationError("Impossible de fusionner un éditeur avec lui-même")
-    if publisher_repo.find_by_id(target_id) is None:
+    if not publisher_repo.exists(target_id):
         raise NotFoundError("Éditeur cible introuvable")
-    if publisher_repo.find_by_id(source_id) is None:
+    if not publisher_repo.exists(source_id):
         raise NotFoundError("Éditeur source introuvable")
 
     # 1. Détecter les journaux partageant un titre entre les deux éditeurs.

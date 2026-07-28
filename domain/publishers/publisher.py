@@ -1,11 +1,8 @@
-"""Aggregate root `Publisher` — un éditeur.
+"""Vocabulaire métier des éditeurs — type d'éditeur.
 
-Identité = `id` (clé surrogate). Identifiant naturel : `name`, via la normalisation de `publisher_name_forms`.
-
-`PUBLISHER_TYPES` reste synchronisé avec l'enum SQL `publisher_type` — cohérence vérifiée par `tests/integration/test_scenarios.py::TestPublisherTypesEnum`.
+`PublisherType` porte le jeu de valeurs de l'enum PostgreSQL `publisher_type`, avec ses libellés FR pour l'UI. L'édition d'un éditeur passe par le CRUD sélectif du port `publisher_repository` (`PublisherUpdate`), la lecture par les read-models. `PublisherType` reste synchronisé avec l'enum SQL — cohérence vérifiée par `tests/integration/test_scenarios.py::TestPgEnumsMatchDb`.
 """
 
-from dataclasses import dataclass
 from typing import Literal, get_args
 
 PublisherType = Literal[
@@ -28,14 +25,3 @@ PUBLISHER_TYPE_LABELS_FR: dict[PublisherType, str] = {
     "aggregator": "Agrégateur",
     "unknown": "Type inconnu",
 }
-
-
-@dataclass(slots=True)
-class Publisher:
-    """Éditeur (aggregate root)."""
-
-    id: int | None
-    name: str
-    country: str | None = None
-    openalex_id: str | None = None
-    publisher_type: PublisherType = "unknown"

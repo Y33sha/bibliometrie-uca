@@ -1,5 +1,5 @@
-"""Concept métier Publisher — aggregate root et règles associées.
+"""Concept métier Publisher — vocabulaire.
 
 Sous-modules :
-- `publisher` : aggregate root `Publisher` (table `publishers`), enums de type et labels.
+- `publisher` : types d'éditeur (`PublisherType` et labels de la table `publishers`).
 """

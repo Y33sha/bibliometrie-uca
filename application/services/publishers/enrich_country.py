@@ -102,9 +102,9 @@ def _enrich_batch(
     publisher_repo: PublisherRepository,
     dry_run: bool,
 ) -> _BatchOutcome:
-    """Applique le `country` OpenAlex aux éditeurs d'un batch, en « NULL only ».
+    """Applique le `country` OpenAlex aux éditeurs d'un batch.
 
-    `id_map` associe openalex_id → publisher_id. Un éditeur absent de `sources` ou disparu de la base compte comme `no_response` ; un éditeur au `country` déjà renseigné est ignoré.
+    `id_map` associe openalex_id → publisher_id. Les candidats viennent de `find_needing_country_enrichment` (`country` déjà NULL) : seuls des éditeurs sans pays reçoivent une valeur (politique « NULL only »). Un éditeur absent de `sources` ou disparu de la base compte comme `no_response`.
     """
     updated = with_country = no_response = 0
     countries: Counter[str] = Counter()
@@ -114,11 +114,10 @@ def _enrich_batch(
             no_response += 1
             continue
         country = extract_country(source)
-        current = publisher_repo.find_by_id(publisher_id)
-        if current is None:
+        if not publisher_repo.exists(publisher_id):
             no_response += 1
             continue
-        if country and current.country is None:
+        if country:
             with_country += 1
             countries[country] += 1
             if not dry_run:
