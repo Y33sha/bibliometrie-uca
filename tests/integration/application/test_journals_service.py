@@ -28,7 +28,6 @@ from domain.errors import (
     PublisherMergeBlockedError,
     ValidationError,
 )
-from domain.journals.journal import JournalType
 from infrastructure.pipeline.journals import PgJournalGatewayQueries
 from infrastructure.pipeline.metadata_correction import PgMetadataCorrectionQueries
 from infrastructure.pipeline.publishers import PgPublisherGatewayQueries
@@ -120,40 +119,60 @@ def _insert_publication(conn, title="Pub", pub_year=2024, journal_id=None):
     ).scalar_one()
 
 
-# ── Lectures de commande (find_by_id d'hydratation supprimé) ────────
+# ── find_by_id (hydratation aggregates) ────────────────────────────
 
 
-class TestPublisherExists:
-    def test_false_if_missing(self, publisher_repo):
-        assert publisher_repo.exists(999999) is False
+class TestPublisherFindById:
+    def test_returns_none_if_missing(self, publisher_repo):
+        assert publisher_repo.find_by_id(999999) is None
 
-    def test_true_if_present(self, sa_sync_conn, publisher_repo):
+    def test_hydrates(self, sa_sync_conn, publisher_repo):
         pub_id = _insert_publisher(sa_sync_conn, "Elsevier", openalex_id="P123")
-        assert publisher_repo.exists(pub_id) is True
+        p = publisher_repo.find_by_id(pub_id)
+        assert p is not None
+        assert p.id == pub_id
+        assert p.name == "Elsevier"
+        assert p.openalex_id == "P123"
 
 
-class TestJournalExists:
-    def test_false_if_missing(self, repo):
-        assert repo.exists(999999) is False
+class TestJournalFindById:
+    def test_returns_none_if_missing(self, repo):
+        assert repo.find_by_id(999999) is None
 
-    def test_true_if_present(self, sa_sync_conn, repo):
+    def test_hydrates_minimal(self, sa_sync_conn, repo):
         jid = _insert_journal(sa_sync_conn, "Nature")
-        assert repo.exists(jid) is True
+        j = repo.find_by_id(jid)
+        assert j is not None
+        assert j.id == jid
+        assert j.title == "Nature"
+        assert j.publisher_id is None
+        assert j.apc_currency is None
+        assert j.is_in_doaj is False
 
-
-class TestJournalGetType:
-    def test_none_if_missing(self, repo):
-        assert repo.get_journal_type(999999) is None
-
-    def test_unknown_when_type_null(self, sa_sync_conn, repo):
-        # `_insert_journal` laisse `journal_type` nul → défaut domaine UNKNOWN.
-        jid = _insert_journal(sa_sync_conn, "Nature")
-        assert repo.get_journal_type(jid) is JournalType.UNKNOWN
-
-    def test_returns_set_type(self, sa_sync_conn, repo):
-        jid = _insert_journal(sa_sync_conn, "Le Monde")
-        repo.update_journal_fields(jid, JournalUpdate(journal_type=JournalType.MEDIA))
-        assert repo.get_journal_type(jid) is JournalType.MEDIA
+    def test_hydrates_full(self, sa_sync_conn, repo):
+        pub_id = _insert_publisher(sa_sync_conn, "PLOS")
+        jid = _insert_journal(
+            sa_sync_conn,
+            title="PLOS ONE",
+            publisher_id=pub_id,
+            issn="1932-6203",
+            eissn="1932-6203",
+            issnl="1932-6203",
+            openalex_id="S202381698",
+            apc_amount=1700,
+            apc_currency="USD",
+            is_in_doaj=True,
+            oa_model="full_oa",
+        )
+        j = repo.find_by_id(jid)
+        assert j is not None
+        assert j.title == "PLOS ONE"
+        assert j.publisher_id == pub_id
+        assert j.issn == "1932-6203"
+        assert j.eissn == "1932-6203"
+        assert j.openalex_id == "S202381698"
+        assert j.is_in_doaj is True
+        assert j.oa_model == "full_oa"
 
 
 # ── find_or_create_publisher ───────────────────────────────────────

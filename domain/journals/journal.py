@@ -1,8 +1,12 @@
-"""Vocabulaire métier des revues — type de support et modèle d'accès ouvert.
+"""Aggregate root `Journal` — un journal, une conférence ou un autre support de publication.
 
-`JournalType` et `OaModel` portent les jeux de valeurs des enums PostgreSQL `journal_type` et `oa_model`, avec leurs libellés FR pour l'UI. L'édition d'une revue passe par le CRUD sélectif du port `journal_repository` (`JournalUpdate`), la lecture par les read-models. `JournalType` reste synchronisé avec l'enum SQL — cohérence vérifiée par `tests/integration/test_scenarios.py::TestPgEnumsMatchDb`.
+Identité = `id` (clé surrogate). Identifiant naturel : `title`, via la normalisation de `journal_name_forms`. Les ISSN sont fortement discriminants mais facultatifs. `publisher_id` référence l'aggregate `Publisher` par son id.
+
+`JOURNAL_TYPES` reste synchronisé avec l'enum SQL `journal_type` — cohérence vérifiée par `tests/integration/test_scenarios.py::TestPgEnumsMatchDb`.
 """
 
+from dataclasses import dataclass
+from decimal import Decimal
 from enum import StrEnum
 
 
@@ -51,3 +55,23 @@ OA_MODEL_LABELS_FR: dict[OaModel, str] = {
     OaModel.FULL_OA: "Full OA (gold/diamond)",
     OaModel.REPOSITORY: "Archive / dépôt",
 }
+
+
+@dataclass(slots=True)
+class Journal:
+    """Journal, conférence ou autre support de publication (aggregate root)."""
+
+    id: int | None
+    title: str
+    issn: str | None = None
+    eissn: str | None = None
+    issnl: str | None = None
+    publisher_id: int | None = None
+    openalex_id: str | None = None
+    is_in_doaj: bool = False
+    apc_amount: Decimal | None = None
+    apc_currency: str | None = None
+    oa_model: OaModel | None = None
+    journal_type: JournalType = JournalType.UNKNOWN
+    is_academic: bool = True
+    doi_prefix: str | None = None
