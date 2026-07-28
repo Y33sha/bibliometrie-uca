@@ -3,8 +3,6 @@
 from datetime import datetime
 from typing import Protocol, TypedDict
 
-from domain.structures.structure import Structure
-
 
 class StructureUpdateFields(TypedDict, total=False):
     """Partial update sur la table `structures`.
@@ -92,12 +90,6 @@ class StructureNameFormDeletedRow(TypedDict):
 
 class StructureRepository(Protocol):
     """Contrat d'accès aux 3 tables du concept Structure (structures, structure_relations, structure_name_forms)."""
-
-    # ── Chargement de l'aggregate ──────────────────────────────────
-
-    def find_by_id(self, structure_id: int) -> Structure | None:
-        """Hydrate l'aggregate `Structure` complet (champs scalaires + VOs `name_forms`). Retourne None si la structure n'existe pas. Les `structure_relations` restent un graphe externe à l'aggregate (voir `get_ancestor_ids` pour les remontées ciblées)."""
-        ...
 
     # ── structures ─────────────────────────────────────────────────
 
