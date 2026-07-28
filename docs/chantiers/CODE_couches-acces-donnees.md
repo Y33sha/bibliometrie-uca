@@ -70,7 +70,9 @@ Audit complet : [`CODE_couches-acces-donnees_audit-repositories.md`](CODE_couche
 
 ### F — CLI
 
-- [ ] Router les scripts `maintenance/` et `imports/` permanents qui écrivent en base via les couches ; laisser les `oneshot/` jetables.
+- [x] Router les CLI `maintenance/` et `imports/` permanents dont l'écriture relève d'une couche ; laisser les `oneshot/` jetables.
+
+Règle appliquée : router ce qui touche un agrégat (→ repository) ou constitue une opération durable réutilisable (→ gateway) ; laisser en CLI les opérations autonomes, rares, à appelant unique, qui ne gagneraient que de la cérémonie — leur SQL couplé au schéma est déjà tenu par des smoke tests d'intégration, sans angle mort. Routés : `rehydrate_staging_from_raw_store` (gateway staging, inverse de `mark_done`) et `import_persons` (repository + service `import_rh_person`). Laissés en CLI : `import_apc`/`import_openapc` et `delete_publications_out_of_window` (ETL autonome sans agrégat), plus les lectures de préparation d'`import_authenticated_orcids` (écritures déjà routées).
 
 ## Questions ouvertes
 
