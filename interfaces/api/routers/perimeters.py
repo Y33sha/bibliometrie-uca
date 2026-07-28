@@ -6,6 +6,7 @@ Un périmètre (table `perimeters`) nomme des structures racines dans sa colonne
 from fastapi import APIRouter, Depends
 from sqlalchemy import Connection
 
+from application.ports.pipeline.perimeter_structures import PerimeterStructuresQueries
 from application.ports.read_models.config_queries import ConfigQueries
 from application.ports.read_models.perimeters_queries import PerimeterOut, PerimetersQueries
 from application.ports.repositories.audit_repository import AuditRepository
@@ -18,6 +19,7 @@ from interfaces.api.deps import (
     audit_repo,
     config_queries,
     db_conn,
+    get_perimeter_queries,
     perimeter_repo,
     perimeters_queries,
 )
@@ -46,6 +48,7 @@ def create_perimeter(
     body: PerimeterCreate,
     conn: Connection = Depends(db_conn),
     repo: PerimeterRepository = Depends(perimeter_repo),
+    perimeter_queries: PerimeterStructuresQueries = Depends(get_perimeter_queries),
 ) -> CreatedIdResponse:
     """Crée un périmètre avec ses structures racines, la liste pouvant être vide.
 
@@ -57,6 +60,7 @@ def create_perimeter(
         name=body.name,
         root_structure_ids=body.root_structure_ids,
         repo=repo,
+        perimeter_queries=perimeter_queries,
     )
     return CreatedIdResponse(id=pid)
 
@@ -67,12 +71,15 @@ def update_perimeter(
     body: PerimeterUpdate,
     conn: Connection = Depends(db_conn),
     repo: PerimeterRepository = Depends(perimeter_repo),
+    perimeter_queries: PerimeterStructuresQueries = Depends(get_perimeter_queries),
 ) -> OkResponse:
     """Met à jour un périmètre (nom, structures racines).
 
     Seuls les champs fournis sont écrits ; un corps vide rend 400, un périmètre inconnu 404. La clôture matérialisée suit le changement de racines.
     """
-    perimeter_commands.update_perimeter(conn, perimeter_id, update=body, repo=repo)
+    perimeter_commands.update_perimeter(
+        conn, perimeter_id, update=body, repo=repo, perimeter_queries=perimeter_queries
+    )
     return OkResponse()
 
 

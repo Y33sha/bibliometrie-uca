@@ -8,6 +8,7 @@ Les chemins littéraux se déclarent avant `/{structure_id}` : un segment fixe p
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import Connection
 
+from application.ports.pipeline.perimeter_structures import PerimeterStructuresQueries
 from application.ports.read_models.structures_queries import (
     NameFormOut,
     StructureAddressesResponse,
@@ -26,6 +27,7 @@ from domain.structures.structure import StructureType
 from interfaces.api.deps import (
     audit_repo,
     db_conn,
+    get_perimeter_queries,
     perimeter_repo,
     structure_repo,
     structures_queries,
@@ -98,7 +100,7 @@ def create_relation(
     data: RelationCreate,
     conn: Connection = Depends(db_conn),
     repo: StructureRepository = Depends(structure_repo),
-    perimeters: PerimeterRepository = Depends(perimeter_repo),
+    perimeter_queries: PerimeterStructuresQueries = Depends(get_perimeter_queries),
     audit: AuditRepository = Depends(audit_repo),
 ) -> StructureRelationCreateResponse:
     """Crée une relation parent-enfant entre deux structures.
@@ -111,7 +113,7 @@ def create_relation(
         child_id=data.child_id,
         relation_type=data.relation_type,
         repo=repo,
-        perimeter_repo=perimeters,
+        perimeter_queries=perimeter_queries,
         audit_repo=audit,
     )
     if row is None:
@@ -124,12 +126,12 @@ def delete_relation(
     relation_id: int,
     conn: Connection = Depends(db_conn),
     repo: StructureRepository = Depends(structure_repo),
-    perimeters: PerimeterRepository = Depends(perimeter_repo),
+    perimeter_queries: PerimeterStructuresQueries = Depends(get_perimeter_queries),
     audit: AuditRepository = Depends(audit_repo),
 ) -> DeletedResponse:
     """Supprime une relation structure. 404 si l'id n'existe pas."""
     structure_commands.delete_relation(
-        conn, relation_id, repo=repo, perimeter_repo=perimeters, audit_repo=audit
+        conn, relation_id, repo=repo, perimeter_queries=perimeter_queries, audit_repo=audit
     )
     return DeletedResponse()
 
@@ -279,10 +281,16 @@ def delete_structure(
     conn: Connection = Depends(db_conn),
     repo: StructureRepository = Depends(structure_repo),
     perimeters: PerimeterRepository = Depends(perimeter_repo),
+    perimeter_queries: PerimeterStructuresQueries = Depends(get_perimeter_queries),
     audit: AuditRepository = Depends(audit_repo),
 ) -> DeletedResponse:
     """Supprime une structure. Cascade sur les relations et formes de noms liées. 404 si inconnue."""
     structure_commands.delete_structure(
-        conn, structure_id, repo=repo, perimeter_repo=perimeters, audit_repo=audit
+        conn,
+        structure_id,
+        repo=repo,
+        perimeter_repo=perimeters,
+        perimeter_queries=perimeter_queries,
+        audit_repo=audit,
     )
     return DeletedResponse()

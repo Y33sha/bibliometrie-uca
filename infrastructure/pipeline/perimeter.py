@@ -1,6 +1,6 @@
-"""Recompute du matview de périmètre + adapter de la phase persons.
+"""Matérialisation de la clôture des périmètres et lecture pour la phase persons.
 
-`refresh_perimeter_structures` matérialise dans `perimeter_structures` la clôture récursive (`est_tutelle_de`) des racines `perimeters.root_structure_ids`. `PgPerimeterStructuresQueries` fournit à la phase persons la clôture du périmètre (lue via `read_models`) et son recompute.
+`refresh_perimeter_structures` matérialise dans la table `perimeter_structures` la clôture récursive (`est_tutelle_de`) des racines `perimeters.root_structure_ids` — recompute rejoué en tête de pipeline, au début de la phase `affiliations`, et par les command handlers admin après édition d'un périmètre, d'une structure ou d'une relation de tutelle. `PgPerimeterStructuresQueries` expose ce recompute et la lecture de la clôture du périmètre `persons` (déléguée aux `read_models`), que consomme la phase persons.
 """
 
 from sqlalchemy import Connection, text
