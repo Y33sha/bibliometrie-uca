@@ -8,6 +8,7 @@ La construction du stock relève du pipeline, qui écrit en SQL ensembliste : la
 from sqlalchemy import Connection
 
 from application.audit_log import emit_event
+from application.ports.pipeline.affiliations.in_perimeter import AffiliationsQueries
 from application.ports.pipeline.perimeter_structures import PerimeterStructuresQueries
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.authorship_repository import AuthorshipRepository
@@ -85,6 +86,7 @@ def propagate_in_perimeter_for_addresses(
     *,
     repo: AuthorshipRepository,
     perimeter_queries: PerimeterStructuresQueries,
+    affiliations_queries: AffiliationsQueries,
 ) -> None:
     """Recalcule `in_perimeter` sur les `source_authorships` et les `authorships` canoniques liés aux adresses données.
 
@@ -101,8 +103,10 @@ def propagate_in_perimeter_for_addresses(
     if not affected_sa_ids:
         return
 
-    repo.recompute_in_perimeter_on_source_authorships(affected_sa_ids, perimeter_ids)
-    repo.propagate_in_perimeter_to_authorships(affected_sa_ids)
+    affiliations_queries.recompute_in_perimeter_on_source_authorships(
+        conn, affected_sa_ids, perimeter_ids
+    )
+    affiliations_queries.propagate_in_perimeter_to_authorships(conn, affected_sa_ids)
     # `in_perimeter` ci-dessus est recalculé en direct depuis les tables de base
     # (`address_structures`, modifiée par la review) — synchrone et correct. Les
     # matviews `source_authorship_structures` / `authorship_structures`, qui ne
