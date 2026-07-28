@@ -8,7 +8,6 @@ from application.ports.repositories.perimeter_repository import PerimeterReposit
 from domain.errors import NotFoundError
 from domain.perimeters.perimeter import Perimeter
 from infrastructure.db.tables import perimeters
-from infrastructure.pipeline.perimeter import refresh_perimeter_structures
 
 
 class _PerimeterRow(NamedTuple):
@@ -98,8 +97,3 @@ class PgPerimeterRepository(PerimeterRepository):
 
     def delete_perimeter(self, perimeter_id: int) -> None:
         self._conn.execute(delete(perimeters).where(perimeters.c.id == perimeter_id))
-
-    # ── Matérialisation ────────────────────────────────────────────
-
-    def refresh_structures(self) -> None:
-        refresh_perimeter_structures(self._conn)

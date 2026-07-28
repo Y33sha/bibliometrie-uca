@@ -1,6 +1,6 @@
 """Service Périmètres — écritures sur l'agrégat Perimeter, transaction-agnostiques.
 
-Un périmètre porte des structures **racines** (`perimeters.root_structure_ids`) ; la clôture récursive de ces racines est matérialisée dans `perimeter_structures`, que `repo.refresh_structures` reconstruit. Toute écriture qui touche aux racines laisse la clôture à recalculer : les command handlers s'en chargent.
+Un périmètre porte des structures **racines** (`perimeters.root_structure_ids`) ; la clôture récursive de ces racines est matérialisée dans `perimeter_structures`, reconstruite par le gateway pipeline. Toute écriture qui touche aux racines laisse la clôture à recalculer : les command handlers déclenchent ce recompute.
 
 `delete_perimeter` consulte la table `config` (via `ConfigQueries`) pour refuser la suppression d'un périmètre encore référencé par la configuration pipeline.
 """
