@@ -5,6 +5,7 @@ Les briques d'écriture agnostiques vivent dans `structures.py` et `countries.py
 
 from sqlalchemy import Connection
 
+from application.ports.pipeline.countries import CountryQueries
 from application.ports.repositories.address_repository import AddressRepository
 from application.services.addresses import (
     countries as countries_service,
@@ -52,10 +53,13 @@ def set_country(
     countries: list[str] | None,
     *,
     repo: AddressRepository,
+    country_queries: CountryQueries,
 ) -> list[int]:
     """Attribue des pays à une adresse. Retourne les adresses affectées (l'adresse
     et ses jumelles), à propager vers les publications en tâche de fond."""
-    affected = countries_service.set_country(address_id, countries, repo=repo)
+    affected = countries_service.set_country(
+        conn, address_id, countries, repo=repo, country_queries=country_queries
+    )
     conn.commit()
     return affected
 
@@ -70,6 +74,7 @@ def batch_set_country(
     country_code_filter: str,
     suggested_country: str,
     repo: AddressRepository,
+    country_queries: CountryQueries,
 ) -> tuple[int, int, list[int]]:
     """Ajoute un pays à des adresses (par identifiants ou par filtre), puis le
     propage aux adresses jumelles, en une seule transaction.
@@ -79,19 +84,21 @@ def batch_set_country(
     """
     if address_ids:
         modified_ids = countries_service.batch_set_country_by_ids(
-            country_code, address_ids, repo=repo
+            conn, country_code, address_ids, repo=repo, country_queries=country_queries
         )
     else:
         modified_ids = countries_service.batch_set_country_by_filter(
+            conn,
             country_code,
             search=search,
             has_country=has_country,
             country_code_filter=country_code_filter,
             suggested_country=suggested_country,
             repo=repo,
+            country_queries=country_queries,
         )
     propagated_ids = countries_service.propagate_countries_to_similar(
-        modified_ids=modified_ids, repo=repo
+        conn, modified_ids=modified_ids, country_queries=country_queries
     )
     conn.commit()
     return len(modified_ids), len(propagated_ids), modified_ids + propagated_ids

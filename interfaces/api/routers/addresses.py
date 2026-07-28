@@ -10,6 +10,7 @@ from typing import Annotated, cast
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy import Connection
 
+from application.ports.pipeline.countries import CountryQueries
 from application.ports.read_models.addresses_queries import (
     AddressCountriesFilters,
     AddressDetected,
@@ -31,6 +32,7 @@ from interfaces.api.deps import (
     addresses_queries,
     bg_propagate_countries,
     bg_propagate_in_perimeter,
+    country_gateway,
     db_conn,
 )
 from interfaces.api.models import (
@@ -231,6 +233,7 @@ def batch_set_country(
     bg: BackgroundTasks,
     conn: Connection = Depends(db_conn),
     addr_repo: AddressRepository = Depends(address_repo),
+    country_queries: CountryQueries = Depends(country_gateway),
 ) -> BatchCountryResponse:
     """Ajoute un pays à des adresses (par IDs ou par filtre).
 
@@ -245,6 +248,7 @@ def batch_set_country(
         country_code_filter=body.country_code_filter,
         suggested_country=body.suggested_country,
         repo=addr_repo,
+        country_queries=country_queries,
     )
     bg.add_task(bg_propagate_countries, all_ids)
     return BatchCountryResponse(updated=updated, propagated=propagated)
@@ -257,11 +261,14 @@ def set_address_country(
     bg: BackgroundTasks,
     conn: Connection = Depends(db_conn),
     addr_repo: AddressRepository = Depends(address_repo),
+    country_queries: CountryQueries = Depends(country_gateway),
 ) -> OkResponse:
     """Attribue des pays à une adresse.
 
     Renvoie 400 sur un code pays absent du référentiel, 404 sur une adresse introuvable (`set_country`).
     """
-    affected = address_commands.set_country(conn, addr_id, body.countries, repo=addr_repo)
+    affected = address_commands.set_country(
+        conn, addr_id, body.countries, repo=addr_repo, country_queries=country_queries
+    )
     bg.add_task(bg_propagate_countries, affected)
     return OkResponse()
