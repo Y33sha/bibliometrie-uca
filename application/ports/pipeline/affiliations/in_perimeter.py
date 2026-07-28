@@ -16,7 +16,7 @@ class InPerimeterSyncCounts(NamedTuple):
 
 
 class AffiliationsQueries(Protocol):
-    """Pose `in_perimeter` sur les `source_authorships` depuis leurs adresses résolues, et rafraîchit la matview qui l'alimente."""
+    """Pose `in_perimeter` sur les `source_authorships` depuis leurs adresses résolues (alignement de phase via la matview, ou recompute admin ciblé par ids), rafraîchit la matview qui l'alimente, et propage `in_perimeter` vers les `authorships` consolidées."""
 
     def sync_in_perimeter(
         self, conn: Connection, *, perimeter_ids: list[int]
@@ -29,4 +29,19 @@ class AffiliationsQueries(Protocol):
 
         À appeler après la matérialisation de `perimeter_structures` et la résolution des adresses, et avant le refresh de `authorship_structures`, qui en dérive.
         """
+        ...
+
+    def recompute_in_perimeter_on_source_authorships(
+        self,
+        conn: Connection,
+        source_authorship_ids: list[int],
+        perimeter_structure_ids: list[int],
+    ) -> None:
+        """Recalcule `source_authorships.in_perimeter` pour les signatures données, directement depuis leurs adresses résolues (`address_structures`, lien `is_confirmed IS DISTINCT FROM FALSE`) filtrées par `perimeter_structure_ids`. Variante ciblée par ids, en temps réel après une édition admin d'adresse — sans passer par la matview."""
+        ...
+
+    def propagate_in_perimeter_to_authorships(
+        self, conn: Connection, source_authorship_ids: list[int]
+    ) -> None:
+        """Propage `in_perimeter` des signatures données vers les lignes consolidées `authorships` des paires (publication, personne) impactées."""
         ...

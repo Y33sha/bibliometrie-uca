@@ -16,10 +16,13 @@ from application.services.authorships.core import (
     reject_pair,
 )
 from domain.errors import NotFoundError
+from infrastructure.pipeline.affiliations.in_perimeter import PgAffiliationsQueries
 from infrastructure.pipeline.perimeter import PgPerimeterStructuresQueries
 from infrastructure.repositories import authorship_repository
 from tests.integration.helpers.authorships import upsert_identity
 from tests.integration.helpers.structures import refresh_structure_matviews
+
+_AFFILIATIONS = PgAffiliationsQueries()
 
 
 @pytest.fixture
@@ -625,7 +628,11 @@ class TestPropagateUcaForAddresses:
     def test_noop_on_empty_address_ids(self, sa_sync_conn, repo, perimeter_queries):
         self._setup_uca(sa_sync_conn)
         propagate_in_perimeter_for_addresses(
-            sa_sync_conn, [], repo=repo, perimeter_queries=perimeter_queries
+            sa_sync_conn,
+            [],
+            repo=repo,
+            perimeter_queries=perimeter_queries,
+            affiliations_queries=_AFFILIATIONS,
         )
         # Pas d'assertion négative utile : on vérifie juste qu'aucune exception
 
@@ -634,7 +641,11 @@ class TestPropagateUcaForAddresses:
         addr_id = _create_address(sa_sync_conn)
         # Aucun set_config perimeter_persons
         propagate_in_perimeter_for_addresses(
-            sa_sync_conn, [addr_id], repo=repo, perimeter_queries=perimeter_queries
+            sa_sync_conn,
+            [addr_id],
+            repo=repo,
+            perimeter_queries=perimeter_queries,
+            affiliations_queries=_AFFILIATIONS,
         )
 
     def test_sets_in_perimeter_when_address_confirmed(self, sa_sync_conn, repo, perimeter_queries):
@@ -651,7 +662,11 @@ class TestPropagateUcaForAddresses:
         _link_sa_address(sa_sync_conn, sa_id, addr_id)
 
         propagate_in_perimeter_for_addresses(
-            sa_sync_conn, [addr_id], repo=repo, perimeter_queries=perimeter_queries
+            sa_sync_conn,
+            [addr_id],
+            repo=repo,
+            perimeter_queries=perimeter_queries,
+            affiliations_queries=_AFFILIATIONS,
         )
         # `in_perimeter` est synchrone ; `structure_ids` vient des matviews que la
         # propagation ne rafraîchit plus (cf. docstring) → refresh explicite.
@@ -703,7 +718,11 @@ class TestPropagateUcaForAddresses:
         _link_sa_address(sa_sync_conn, sa_id, addr_id)
 
         propagate_in_perimeter_for_addresses(
-            sa_sync_conn, [addr_id], repo=repo, perimeter_queries=perimeter_queries
+            sa_sync_conn,
+            [addr_id],
+            repo=repo,
+            perimeter_queries=perimeter_queries,
+            affiliations_queries=_AFFILIATIONS,
         )
         refresh_structure_matviews(sa_sync_conn)
 

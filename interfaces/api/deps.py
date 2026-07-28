@@ -47,6 +47,7 @@ from application.services.addresses import countries as countries_service
 from application.services.authorships.core import propagate_in_perimeter_for_addresses
 from infrastructure.db.dml_guard import has_uncommitted_dml, reset_dml_flag
 from infrastructure.db.engine import get_sync_engine
+from infrastructure.pipeline.affiliations.in_perimeter import PgAffiliationsQueries
 from infrastructure.pipeline.countries import PgCountryQueries
 from infrastructure.pipeline.metadata_correction import PgMetadataCorrectionQueries
 from infrastructure.pipeline.perimeter import PgPerimeterStructuresQueries
@@ -332,5 +333,6 @@ def bg_propagate_in_perimeter(address_ids: list[int]) -> None:
             address_ids,
             repo=authorship_repository(conn),
             perimeter_queries=get_perimeter_queries(),
+            affiliations_queries=PgAffiliationsQueries(),
         ),
     )

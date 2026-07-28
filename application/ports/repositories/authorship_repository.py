@@ -137,21 +137,6 @@ class AuthorshipRepository(Protocol):
         """Ids des signatures liées à l'une des adresses données (via `source_authorship_addresses`)."""
         ...
 
-    def recompute_in_perimeter_on_source_authorships(
-        self,
-        source_authorship_ids: list[int],
-        perimeter_structure_ids: list[int],
-    ) -> None:
-        """Recalcule `source_authorships.in_perimeter` pour les signatures données : vrai si l'une de leurs adresses résout vers une structure du périmètre (lien `is_confirmed IS DISTINCT FROM FALSE`)."""
-        ...
-
-    def propagate_in_perimeter_to_authorships(
-        self,
-        source_authorship_ids: list[int],
-    ) -> None:
-        """Propage `in_perimeter` des signatures vers les lignes consolidées `authorships` des paires (publication, personne) impactées."""
-        ...
-
     # ── Recomposition d'une authorship depuis ses signatures ───────
 
     def insert_authorship_if_missing(self, publication_id: int, person_id: int) -> None:

@@ -10,19 +10,7 @@ from application.ports.repositories.authorship_repository import (
     AuthorshipPersonRow,
     AuthorshipRepository,
 )
-from infrastructure.db.sql_fragments import case_priority
-
-# Vrai dès qu'une signature de la paire (publication, personne) de `authorships a` est elle-même in-perimeter.
-_AUTHORSHIP_IN_PERIMETER_EXPR = """
-    EXISTS (
-        SELECT 1
-        FROM source_authorships sa
-        JOIN source_publications sd ON sd.id = sa.source_publication_id
-        WHERE sd.publication_id = a.publication_id
-          AND sa.person_id = a.person_id
-          AND sa.in_perimeter = TRUE
-    )
-"""
+from infrastructure.db.sql_fragments import AUTHORSHIP_IN_PERIMETER_EXPR, case_priority
 
 
 class PgAuthorshipRepository(AuthorshipRepository):
@@ -147,7 +135,7 @@ class PgAuthorshipRepository(AuthorshipRepository):
         self._conn.execute(
             text(f"""
                 UPDATE authorships a
-                SET in_perimeter = {_AUTHORSHIP_IN_PERIMETER_EXPR}
+                SET in_perimeter = {AUTHORSHIP_IN_PERIMETER_EXPR}
                 WHERE a.publication_id = :pub AND a.person_id = :pid
             """),
             {"pub": publication_id, "pid": person_id},
@@ -392,61 +380,3 @@ class PgAuthorshipRepository(AuthorshipRepository):
             {"ids": address_ids},
         )
         return [row.source_authorship_id for row in result]
-
-    def recompute_in_perimeter_on_source_authorships(
-        self,
-        source_authorship_ids: list[int],
-        perimeter_structure_ids: list[int],
-    ) -> None:
-        # `source_authorship_structures` est une matview (réalignée par le pipeline).
-        # Le calcul lit directement les adresses résolues des signatures données, filtrées par le périmètre restreint.
-        self._conn.execute(
-            text("""
-                UPDATE source_authorships sa
-                SET in_perimeter = EXISTS (
-                    SELECT 1
-                    FROM source_authorship_addresses saa
-                    JOIN address_structures ast ON ast.address_id = saa.address_id
-                    WHERE saa.source_authorship_id = sa.id
-                      AND ast.structure_id = ANY(:struct_ids)
-                      AND ast.is_confirmed IS DISTINCT FROM FALSE
-                )
-                WHERE sa.id = ANY(:source_authorship_ids)
-            """),
-            {"source_authorship_ids": source_authorship_ids, "struct_ids": perimeter_structure_ids},
-        )
-
-    def propagate_in_perimeter_to_authorships(
-        self,
-        source_authorship_ids: list[int],
-    ) -> None:
-        # Identifie les (publication_id, person_id) impactées par les
-        # source_authorships modifiées, puis resync le booléen `in_perimeter`
-        # sur les authorships correspondantes. Les structures dérivées vivent
-        # dans la matview `authorship_structures` : le caller la rafraîchit
-        # (`refresh_authorship_structures`) après cette propagation.
-        self._conn.execute(
-            text("""
-            CREATE TEMP TABLE _affected_authorships AS
-            SELECT DISTINCT a.id AS authorship_id
-            FROM source_authorships sa
-            JOIN source_publications sd ON sd.id = sa.source_publication_id
-            JOIN authorships a ON a.publication_id = sd.publication_id
-                              AND a.person_id = sa.person_id
-            WHERE sa.id = ANY(:ids)
-              AND sd.publication_id IS NOT NULL
-              AND sa.person_id IS NOT NULL
-        """),
-            {"ids": source_authorship_ids},
-        )
-
-        self._conn.execute(
-            text(f"""
-            UPDATE authorships a
-            SET in_perimeter = {_AUTHORSHIP_IN_PERIMETER_EXPR}
-            FROM _affected_authorships af
-            WHERE a.id = af.authorship_id
-        """)
-        )
-
-        self._conn.execute(text("DROP TABLE _affected_authorships"))
