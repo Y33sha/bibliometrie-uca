@@ -2,8 +2,8 @@
 
 Couvre le savoir adapter sans I/O : construction de requête Solr
 (`build_query`), parsing de documents (`extract_id`, `extract_doi`) et
-taille de page par collection (`per_page_for`). La plomberie HTTP/SQL
-est couverte ailleurs (helper retry + tests d'intégration adapter).
+taille de page (`per_page`). La plomberie HTTP/SQL est couverte ailleurs
+(helper retry + tests d'intégration adapter).
 """
 
 from __future__ import annotations
@@ -70,14 +70,9 @@ class TestExtractDoi:
         assert adapter.extract_doi({"doiId_s": ""}) is None
 
 
-class TestPerPageFor:
-    def test_default_per_page(self, adapter):
-        assert adapter.per_page_for(None) == 200
-        assert adapter.per_page_for("UNKNOWN-COLL") == 200
-
-    def test_override_for_megaauthorship_collection(self, adapter):
-        # LPC-CLERMONT : physique des particules, payloads label_xml énormes → per_page réduit.
-        assert adapter.per_page_for("LPC-CLERMONT") == 50
+class TestPerPage:
+    def test_per_page(self, adapter):
+        assert adapter.per_page() == 100
 
 
 class TestBuildCollectionsFq:

@@ -28,19 +28,8 @@ API_BASE_URLS: dict[str, str] = {
 
 # Archives ouvertes HAL — API SolR (https://api.archives-ouvertes.fr/search/)
 HAL_DELAY = 0.5
-HAL_PER_PAGE = 200  # max 10 000 ; 200 retenu empiriquement (un peu mieux que 100 et 500 au fetch)
-
-# Collections de physique des particules à méga-authorships (collabs CERN/ATLAS/CMS) : leurs payloads label_xml font time-out le serveur HAL à 500 records/page. Un per_page réduit stabilise l'extraction.
-HAL_PER_PAGE_OVERRIDES: dict[str, int] = {
-    "LPC-CLERMONT": 50,
-}
-
-
-def hal_per_page_for(collection_code: str | None) -> int:
-    """Retourne le `per_page` HAL à utiliser pour une collection donnée."""
-    if collection_code and collection_code in HAL_PER_PAGE_OVERRIDES:
-        return HAL_PER_PAGE_OVERRIDES[collection_code]
-    return HAL_PER_PAGE
+# 100 records/page (union de toutes les collections en une requête). Au-delà, les payloads label_xml (TEI) des collections à méga-authorships (CERN/ATLAS/CMS) font time-out le serveur HAL.
+HAL_PER_PAGE = 100
 
 
 # OpenAlex — polite pool (~5 req/s, 10 req/s toléré)

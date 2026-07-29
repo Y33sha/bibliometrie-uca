@@ -14,7 +14,7 @@ from application.ports.pipeline.extract._common import UpsertOutcome
 from application.ports.pipeline.extract.hal import HalExtractAdapter, HalExtractConfig
 from domain.publications.identifiers import clean_doi
 from infrastructure.pipeline.extract.staging import upsert_staging
-from infrastructure.sources.api_params import API_BASE_URLS, HAL_DELAY, hal_per_page_for
+from infrastructure.sources.api_params import API_BASE_URLS, HAL_DELAY, HAL_PER_PAGE
 from infrastructure.sources.config import (
     get_hal_collections,
     get_years,
@@ -95,9 +95,9 @@ class PgHalExtractAdapter(HalExtractAdapter):
             parts.append(f"submittedDate_tdate:[{since}T00:00:00Z TO *]")
         return " AND ".join(parts)
 
-    def per_page_for(self, collection_code: str | None) -> int:
-        """Taille de page Solr à utiliser pour une collection (cf. `api_params`)."""
-        return hal_per_page_for(collection_code)
+    def per_page(self) -> int:
+        """Taille de page Solr (`HAL_PER_PAGE`)."""
+        return HAL_PER_PAGE
 
     def extract_id(self, doc: dict[str, Any]) -> str:
         """Extrait le halId depuis un document HAL (champ `halId_s`)."""
@@ -122,7 +122,7 @@ class PgHalExtractAdapter(HalExtractAdapter):
             "q": query,
             "fq": fq,
             "fl": ",".join(HAL_FIELDS),
-            "rows": self.per_page_for(None),
+            "rows": self.per_page(),
             "sort": "docid asc",
             "cursorMark": cursor_mark,
             "wt": "json",
