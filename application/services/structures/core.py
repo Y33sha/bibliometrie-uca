@@ -13,40 +13,35 @@ from application.ports.repositories.structure_repository import (
     StructureRelationRow,
     StructureRepository,
     StructureRow,
-    StructureUpdateFields,
 )
 from domain.errors import NotFoundError, ValidationError
 from domain.normalize import normalize_text
-from domain.structures.identifiers import RorId
 from domain.structures.name_forms import is_short_form
 from domain.structures.relations import check_can_create_relation, require_known_relation_type
+from domain.structures.structure import Structure
 from domain.types import JsonValue
 
-# ── Mapping des champs UI → colonnes SQL pour la table structures ──
-_STRUCTURE_FIELD_MAP = {
-    "name": "name",
-    "acronym": "acronym",
-    "type": "structure_type",
-    "ror_id": "ror_id",
-    "rnsr_id": "rnsr_id",
-    "hal_collection": "hal_collection",
-}
+# ── structures : charger-muter-sauver l'agrégat ────────────────────
 
 
-def _normalize_ror_id(raw: str | None) -> str | None:
-    """Forme canonique courte du ror_id (le VO `RorId` retire l'URL `https://ror.org/`), ou `None` si vide. Lève `ValidationError` si une valeur non vide n'est pas un ROR valide.
-
-    Tout chemin d'écriture (formulaire admin, import) passe par le service : une URL complète envoyée par un client est ramenée à l'ID court ici.
-    """
-    if not raw or not raw.strip():
-        return None
-    parsed = RorId.try_parse(raw)
-    if parsed is None:
-        raise ValidationError(f"ror_id invalide : {raw!r}")
-    return parsed.value
+def _as_str(value: JsonValue | None) -> str | None:
+    """Valeur de champ ramenée à `str | None` : les champs de structure (nom, acronyme, type, identifiants) sont textuels ; toute autre forme vaut « non fourni »."""
+    return value if isinstance(value, str) else None
 
 
-# ── structures ────────────────────────────────────────────────────
+def _to_row(structure: Structure) -> StructureRow:
+    """Sérialise l'agrégat vers la ligne de réponse : `structure_type` sous l'alias `type`, VOs `ror_id`/`hal_collection` rendus en chaînes canoniques."""
+    return {
+        "id": cast("int", structure.id),
+        "code": structure.code,
+        "name": structure.name,
+        "acronym": structure.acronym,
+        "type": structure.structure_type.value,
+        "ror_id": structure.ror_id.value if structure.ror_id else None,
+        "rnsr_id": structure.rnsr_id,
+        "hal_collection": structure.hal_collection.value if structure.hal_collection else None,
+        "api_ids": structure.api_ids,
+    }
 
 
 def create_structure(
@@ -62,25 +57,26 @@ def create_structure(
     repo: StructureRepository,
     audit_repo: AuditRepository | None = None,
 ) -> StructureRow:
-    """Crée une structure. Retourne la ligne insérée."""
-    row = repo.create_structure(
+    """Crée une structure. Retourne la ligne insérée. Lève `ValidationError` si un champ est invalide (`type` hors énumération, `ror_id`/`hal_collection` mal formés, `api_ids` non conforme)."""
+    structure = Structure.create(
         code=code,
         name=name,
-        acronym=acronym,
         type=type,
-        ror_id=_normalize_ror_id(ror_id),
+        acronym=acronym,
+        ror_id=ror_id,
         rnsr_id=rnsr_id,
         hal_collection=hal_collection,
         api_ids=api_ids,
     )
+    structure.id = repo.add(structure)
     emit_event(
         audit_repo,
         "structure.created",
         "structure",
-        row["id"],
+        structure.id,
         {"code": code, "name": name, "type": type},
     )
-    return row
+    return _to_row(structure)
 
 
 def update_structure(
@@ -90,36 +86,36 @@ def update_structure(
     repo: StructureRepository,
     audit_repo: AuditRepository | None = None,
 ) -> StructureRow:
-    """Met à jour une structure. Retourne la ligne modifiée.
+    """Met à jour une structure. Charge l'agrégat, applique les champs fournis (validés), persiste.
 
-    Lève `ValidationError` si `fields` ne contient aucun champ valide, `NotFoundError` si la structure n'existe pas — l'`UPDATE` du repository n'apparie alors aucune ligne.
+    Lève `NotFoundError` si la structure n'existe pas, `ValidationError` si aucun champ valide n'est fourni ou si une valeur est invalide.
     """
-    update_fields: StructureUpdateFields = {}
-    for field_name, col_name in _STRUCTURE_FIELD_MAP.items():
-        val = fields.get(field_name)
-        if val is not None:
-            update_fields[col_name] = val  # type: ignore[literal-required]
-
-    if "ror_id" in update_fields:
-        update_fields["ror_id"] = _normalize_ror_id(update_fields["ror_id"])
+    structure = repo.find_by_id(structure_id)
+    if structure is None:
+        raise NotFoundError(f"Structure {structure_id} introuvable")
 
     api_ids = fields.get("api_ids")
-    if isinstance(api_ids, dict):
-        # SQLAlchemy sérialise le dict Python en JSONB ; validation appliquée côté repo.
-        update_fields["api_ids"] = cast("dict[str, str | list[str]]", api_ids)
-
-    if not update_fields:
+    applied = structure.apply(
+        name=_as_str(fields.get("name")),
+        acronym=_as_str(fields.get("acronym")),
+        type=_as_str(fields.get("type")),
+        ror_id=_as_str(fields.get("ror_id")),
+        rnsr_id=_as_str(fields.get("rnsr_id")),
+        hal_collection=_as_str(fields.get("hal_collection")),
+        api_ids=cast("dict[str, str | list[str]]", api_ids) if isinstance(api_ids, dict) else None,
+    )
+    if not applied:
         raise ValidationError("Aucun champ à mettre à jour")
 
-    row = repo.update_structure_fields(structure_id, update_fields)
+    repo.save(structure)
     emit_event(
         audit_repo,
         "structure.updated",
         "structure",
         structure_id,
-        {"fields": sorted(update_fields)},
+        {"fields": sorted(applied)},
     )
-    return row
+    return _to_row(structure)
 
 
 def delete_structure(

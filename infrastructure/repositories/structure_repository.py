@@ -14,8 +14,6 @@ from application.ports.repositories.structure_repository import (
     StructureRelationDeletedRow,
     StructureRelationRow,
     StructureRepository,
-    StructureRow,
-    StructureUpdateFields,
 )
 from domain.errors import NotFoundError, ValidationError
 from domain.structures.identifiers import HalCollection, RorId
@@ -50,7 +48,7 @@ class _StructureNameFormRow(NamedTuple):
 
 
 class _StructureRow(NamedTuple):
-    """Projection SQL `find_by_id` sur `structures` (sans `rnsr_id`, non utilisé par l'hydratation aggregate)."""
+    """Projection SQL `find_by_id` sur `structures`."""
 
     id: int
     code: str
@@ -58,6 +56,7 @@ class _StructureRow(NamedTuple):
     acronym: str | None
     structure_type: str
     ror_id: str | None
+    rnsr_id: str | None
     hal_collection: str | None
     api_ids: dict[str, Any] | None
 
@@ -84,6 +83,7 @@ def _structure_from_row(row: _StructureRow, name_forms: tuple[StructureNameForm,
         structure_type=StructureType(row.structure_type),
         acronym=row.acronym,
         ror_id=RorId(row.ror_id) if row.ror_id else None,
+        rnsr_id=row.rnsr_id,
         hal_collection=HalCollection(row.hal_collection) if row.hal_collection else None,
         api_ids=row.api_ids,
         name_forms=name_forms,
@@ -107,20 +107,6 @@ def _normalize_api_ids(raw: dict[str, Any] | None) -> dict[str, Any] | None:
         raise ValidationError(f"api_ids invalide : {e}") from e
 
 
-# Colonnes RETURNING pour les opérations create / update sur `structures`.
-_STRUCTURE_RETURNING_COLUMNS = (
-    structures.c.id,
-    structures.c.code,
-    structures.c.name,
-    structures.c.acronym,
-    sql_cast(structures.c.structure_type, Text).label("type"),
-    structures.c.ror_id,
-    structures.c.rnsr_id,
-    structures.c.hal_collection,
-    structures.c.api_ids,
-)
-
-
 class PgStructureRepository(StructureRepository):
     """Accès PostgreSQL sync à l'agrégat Structure."""
 
@@ -138,6 +124,7 @@ class PgStructureRepository(StructureRepository):
                 structures.c.acronym,
                 sql_cast(structures.c.structure_type, Text).label("structure_type"),
                 structures.c.ror_id,
+                structures.c.rnsr_id,
                 structures.c.hal_collection,
                 structures.c.api_ids,
             ).where(structures.c.id == structure_id)
@@ -159,51 +146,42 @@ class PgStructureRepository(StructureRepository):
 
     # ── structures ─────────────────────────────────────────────────
 
-    def create_structure(
-        self,
-        *,
-        code: str,
-        name: str,
-        acronym: str | None,
-        type: str,
-        ror_id: str | None,
-        rnsr_id: str | None,
-        hal_collection: str | None,
-        api_ids: dict | None,
-    ) -> StructureRow:
-        stmt = (
+    def add(self, structure: Structure) -> int:
+        """Insère une structure neuve et retourne son id. Canonise `api_ids` (validation du schéma JSONB), posé sous sa forme canonique sur l'entité."""
+        structure.api_ids = _normalize_api_ids(structure.api_ids)
+        return self._conn.execute(
             structures.insert()
             .values(
-                code=code,
-                name=name,
-                acronym=acronym,
-                structure_type=type,
-                ror_id=ror_id,
-                rnsr_id=rnsr_id,
-                hal_collection=hal_collection,
-                api_ids=_normalize_api_ids(api_ids),
+                code=structure.code,
+                name=structure.name,
+                structure_type=structure.structure_type.value,
+                acronym=structure.acronym,
+                ror_id=structure.ror_id.value if structure.ror_id else None,
+                rnsr_id=structure.rnsr_id,
+                hal_collection=structure.hal_collection.value if structure.hal_collection else None,
+                api_ids=structure.api_ids,
             )
-            .returning(*_STRUCTURE_RETURNING_COLUMNS)
-        )
-        result = self._conn.execute(stmt)
-        return cast(StructureRow, dict(result.one()._mapping))
+            .returning(structures.c.id)
+        ).scalar_one()
 
-    def update_structure_fields(
-        self, structure_id: int, fields: StructureUpdateFields
-    ) -> StructureRow:
-        if "api_ids" in fields:
-            fields = {**fields, "api_ids": _normalize_api_ids(fields["api_ids"])}
-        stmt = (
+    def save(self, structure: Structure) -> None:
+        """Persiste une structure chargée : UPDATE de ses champs éditables (`code` immuable exclu). Canonise `api_ids`. Lève `NotFoundError` si l'id est absent."""
+        structure.api_ids = _normalize_api_ids(structure.api_ids)
+        result = self._conn.execute(
             update(structures)
-            .where(structures.c.id == structure_id)
-            .values(**fields)
-            .returning(*_STRUCTURE_RETURNING_COLUMNS)
+            .where(structures.c.id == structure.id)
+            .values(
+                name=structure.name,
+                structure_type=structure.structure_type.value,
+                acronym=structure.acronym,
+                ror_id=structure.ror_id.value if structure.ror_id else None,
+                rnsr_id=structure.rnsr_id,
+                hal_collection=structure.hal_collection.value if structure.hal_collection else None,
+                api_ids=structure.api_ids,
+            )
         )
-        result = self._conn.execute(stmt)
-        row = result.one_or_none()
-        if row is None:
-            raise NotFoundError(f"Structure {structure_id} introuvable")
-        return cast(StructureRow, dict(row._mapping))
+        if result.rowcount == 0:
+            raise NotFoundError(f"Structure {structure.id} introuvable")
 
     def delete_structure(self, structure_id: int) -> StructureDeletedRow | None:
         stmt = (
