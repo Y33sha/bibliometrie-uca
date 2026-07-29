@@ -4,7 +4,7 @@ from typing import NamedTuple
 
 from sqlalchemy import Connection, delete, func, select, update
 
-from application.ports.repositories.perimeter_repository import PerimeterRepository, PerimeterUpdate
+from application.ports.repositories.perimeter_repository import PerimeterRepository
 from domain.errors import NotFoundError
 from domain.perimeters.perimeter import Perimeter
 from infrastructure.db.tables import perimeters
@@ -67,27 +67,30 @@ class PgPerimeterRepository(PerimeterRepository):
         result = self._conn.execute(select(perimeters.c.id).where(perimeters.c.code == code))
         return result.first() is not None
 
-    def create_perimeter(
-        self,
-        *,
-        code: str,
-        name: str,
-        root_structure_ids: list[int],
-    ) -> int:
-        stmt = (
+    def add(self, perimeter: Perimeter) -> int:
+        """Insère un périmètre neuf et retourne son id."""
+        return self._conn.execute(
             perimeters.insert()
-            .values(code=code, name=name, root_structure_ids=root_structure_ids)
+            .values(
+                code=perimeter.code,
+                name=perimeter.name,
+                root_structure_ids=list(perimeter.root_structure_ids),
+            )
             .returning(perimeters.c.id)
-        )
-        result = self._conn.execute(stmt)
-        return result.scalar_one()
+        ).scalar_one()
 
-    def update_perimeter_fields(self, perimeter_id: int, fields: PerimeterUpdate) -> None:
-        data = fields.model_dump(exclude_unset=True)
-        stmt = update(perimeters).where(perimeters.c.id == perimeter_id).values(**data)
-        result = self._conn.execute(stmt)
+    def save(self, perimeter: Perimeter) -> None:
+        """Persiste un périmètre chargé : UPDATE de ses champs éditables (`code` immuable exclu). Lève `NotFoundError` si l'id est absent."""
+        result = self._conn.execute(
+            update(perimeters)
+            .where(perimeters.c.id == perimeter.id)
+            .values(
+                name=perimeter.name,
+                root_structure_ids=list(perimeter.root_structure_ids),
+            )
+        )
         if result.rowcount == 0:
-            raise NotFoundError(f"Périmètre {perimeter_id} introuvable")
+            raise NotFoundError(f"Périmètre {perimeter.id} introuvable")
 
     def get_perimeter_code(self, perimeter_id: int) -> str | None:
         result = self._conn.execute(

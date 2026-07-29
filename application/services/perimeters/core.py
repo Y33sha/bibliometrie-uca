@@ -13,6 +13,7 @@ from application.ports.repositories.perimeter_repository import (
     PerimeterUpdate,
 )
 from domain.errors import ConflictError, NotFoundError, ValidationError
+from domain.perimeters.perimeter import Perimeter
 
 
 def create_perimeter(
@@ -26,12 +27,10 @@ def create_perimeter(
 
     Lève `ValidationError` si le code ou le nom est vide, `ConflictError` si le code existe déjà.
     """
-    if not code or not name:
-        raise ValidationError("Code et nom requis")
-
-    if repo.perimeter_code_exists(code):
-        raise ConflictError(f"Le code '{code}' existe déjà")
-    return repo.create_perimeter(code=code, name=name, root_structure_ids=root_structure_ids)
+    perimeter = Perimeter.create(code=code, name=name, root_structure_ids=root_structure_ids)
+    if repo.perimeter_code_exists(perimeter.code):
+        raise ConflictError(f"Le code '{perimeter.code}' existe déjà")
+    return repo.add(perimeter)
 
 
 def update_perimeter(
@@ -40,14 +39,22 @@ def update_perimeter(
     update: PerimeterUpdate,
     repo: PerimeterRepository,
 ) -> None:
-    """Met à jour un périmètre à partir des champs explicitement fournis.
+    """Charge le périmètre, applique les champs explicitement fournis (validés), persiste.
 
-    Lève `ValidationError` si aucun champ n'est fourni, `NotFoundError` si le périmètre n'existe pas — l'`UPDATE` du repository n'apparie alors aucune ligne.
+    Lève `ValidationError` si aucun champ n'est fourni, `NotFoundError` si le périmètre n'existe pas.
     """
     if not update.model_fields_set:
         raise ValidationError("Aucun champ à mettre à jour")
 
-    repo.update_perimeter_fields(perimeter_id, update)
+    perimeter = repo.find_by_id(perimeter_id)
+    if perimeter is None:
+        raise NotFoundError(f"Périmètre {perimeter_id} introuvable")
+
+    if "name" in update.model_fields_set:
+        perimeter.set_name(update.name)
+    if "root_structure_ids" in update.model_fields_set:
+        perimeter.set_root_structure_ids(update.root_structure_ids)
+    repo.save(perimeter)
 
 
 def delete_perimeter(

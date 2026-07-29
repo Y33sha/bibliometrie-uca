@@ -20,10 +20,18 @@ class PerimeterUpdate(BaseModel):
 class PerimeterRepository(Protocol):
     """Contrat d'accès à la table `perimeters`."""
 
-    # ── Chargement de l'aggregate ──────────────────────────────────
+    # ── perimeters : charger-muter-sauver l'agrégat ────────────────
 
     def find_by_id(self, perimeter_id: int) -> Perimeter | None:
         """Hydrate l'aggregate `Perimeter` complet (code, name, `root_structure_ids`). Retourne None si le perimeter n'existe pas. `root_structure_ids` reste sous forme d'ids (références par id à l'aggregate Structure)."""
+        ...
+
+    def add(self, perimeter: Perimeter) -> int:
+        """Insère un périmètre neuf et retourne son id."""
+        ...
+
+    def save(self, perimeter: Perimeter) -> None:
+        """Persiste un périmètre chargé : UPDATE de ses champs éditables (`code` immuable exclu). Lève `NotFoundError` si l'id est absent."""
         ...
 
     # ── Liens structure ↔ perimeter ────────────────────────────────
@@ -32,21 +40,9 @@ class PerimeterRepository(Protocol):
         """Retire une structure des racines (`root_structure_ids`) de tout périmètre, après sa suppression."""
         ...
 
-    # ── CRUD ───────────────────────────────────────────────────────
+    # ── Autres accès ───────────────────────────────────────────────
 
     def perimeter_code_exists(self, code: str) -> bool: ...
-
-    def create_perimeter(
-        self,
-        *,
-        code: str,
-        name: str,
-        root_structure_ids: list[int],
-    ) -> int: ...
-
-    def update_perimeter_fields(self, perimeter_id: int, fields: PerimeterUpdate) -> None:
-        """Applique une modification sélective (`PerimeterUpdate`) ; le service garantit au moins un champ fourni. Lève `NotFoundError` si le périmètre est introuvable."""
-        ...
 
     def get_perimeter_code(self, perimeter_id: int) -> str | None: ...
 
