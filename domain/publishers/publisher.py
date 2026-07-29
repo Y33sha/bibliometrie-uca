@@ -6,27 +6,31 @@ Identité = `id` (clé surrogate). Identifiant naturel : `name`, via la normalis
 """
 
 from dataclasses import dataclass
-from typing import Literal, get_args
+from enum import StrEnum
 
-PublisherType = Literal[
-    "commercial",
-    "learned_society",
-    "academic_institution",
-    "repository",
-    "aggregator",
-    "unknown",
-]
-PUBLISHER_TYPES: tuple[PublisherType, ...] = get_args(PublisherType)
-PUBLISHER_TYPES_SET: frozenset[str] = frozenset(PUBLISHER_TYPES)
+
+class PublisherType(StrEnum):
+    """Type d'éditeur — les membres portent les libellés de l'enum PostgreSQL `publisher_type`."""
+
+    COMMERCIAL = "commercial"
+    LEARNED_SOCIETY = "learned_society"
+    ACADEMIC_INSTITUTION = "academic_institution"
+    REPOSITORY = "repository"
+    AGGREGATOR = "aggregator"
+    UNKNOWN = "unknown"
+
+
+PUBLISHER_TYPES: tuple[PublisherType, ...] = tuple(PublisherType)
+PUBLISHER_TYPES_SET: frozenset[str] = frozenset(PublisherType)
 
 # Labels FR des valeurs d'enum, source de vérité Python pour l'UI (dropdowns admin, badges publics), exposés via `/api/publishers/types`.
 PUBLISHER_TYPE_LABELS_FR: dict[PublisherType, str] = {
-    "commercial": "Éditeur commercial",
-    "learned_society": "Société savante",
-    "academic_institution": "Établissement d'enseignement",
-    "repository": "Archive / dépôt",
-    "aggregator": "Agrégateur",
-    "unknown": "Type inconnu",
+    PublisherType.COMMERCIAL: "Éditeur commercial",
+    PublisherType.LEARNED_SOCIETY: "Société savante",
+    PublisherType.ACADEMIC_INSTITUTION: "Établissement d'enseignement",
+    PublisherType.REPOSITORY: "Archive / dépôt",
+    PublisherType.AGGREGATOR: "Agrégateur",
+    PublisherType.UNKNOWN: "Type inconnu",
 }
 
 
@@ -38,4 +42,4 @@ class Publisher:
     name: str
     country: str | None = None
     openalex_id: str | None = None
-    publisher_type: PublisherType = "unknown"
+    publisher_type: PublisherType = PublisherType.UNKNOWN

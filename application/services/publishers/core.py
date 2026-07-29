@@ -71,14 +71,21 @@ def find_or_create_publisher(
 def update_publisher(
     publisher_id: int, *, update: PublisherUpdate, repo: PublisherRepository
 ) -> None:
-    """Met à jour un éditeur à partir des champs explicitement fournis.
+    """Charge l'éditeur, applique les champs explicitement fournis, persiste.
 
-    Lève `ValidationError` si aucun champ n'est fourni, `NotFoundError` si l'éditeur n'existe pas — l'`UPDATE` du repository n'apparie alors aucune ligne.
+    Lève `ValidationError` si aucun champ n'est fourni, `NotFoundError` si l'éditeur n'existe pas.
     """
     if not update.model_fields_set:
         raise ValidationError("Aucun champ à mettre à jour")
 
-    repo.update_publisher_fields(publisher_id, update)
+    publisher = repo.find_by_id(publisher_id)
+    if publisher is None:
+        raise NotFoundError(f"Éditeur {publisher_id} introuvable")
+
+    # Les champs de `PublisherUpdate` portent les noms des attributs de l'agrégat.
+    for field_name, value in update.model_dump(exclude_unset=True).items():
+        setattr(publisher, field_name, value)
+    repo.save(publisher)
 
 
 def merge_publishers(

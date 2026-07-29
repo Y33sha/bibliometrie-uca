@@ -5,11 +5,11 @@ Séparé de `journal_repository.py` (principe ISP). Le trouve-ou-crée, aliment�
 La méthode `merge_publisher_into` réalise les étapes 2-6 d'une fusion d'éditeurs ; la détection préalable des journaux à titre partagé (étape 1) est dans `JournalRepository.find_shared_title_journal_pairs`, le service de fusion d'éditeurs orchestrant les deux.
 """
 
-from typing import NamedTuple, cast
+from typing import NamedTuple
 
 from sqlalchemy import Connection, delete, func, select, text, update
 
-from application.ports.repositories.publisher_repository import PublisherRepository, PublisherUpdate
+from application.ports.repositories.publisher_repository import PublisherRepository
 from domain.errors import NotFoundError
 from domain.normalize import normalize_text
 from domain.publishers.publisher import Publisher, PublisherType
@@ -34,7 +34,7 @@ def _publisher_from_row(row: _PublisherRow) -> Publisher:
         name=row.name,
         country=row.country,
         openalex_id=row.openalex_id,
-        publisher_type=cast(PublisherType, row.publisher_type),
+        publisher_type=PublisherType(row.publisher_type),
     )
 
 
@@ -72,16 +72,22 @@ class PgPublisherRepository(PublisherRepository):
         ).all()
         return [(r.id, r.openalex_id) for r in rows]
 
-    # ── Édition sélective ──────────────────────────────────────────
+    # ── Persistance de l'agrégat ───────────────────────────────────
 
-    def update_publisher_fields(self, publisher_id: int, fields: PublisherUpdate) -> None:
-        data = fields.model_dump(exclude_unset=True)
-        if data.get("name") is not None:
-            data["name_normalized"] = normalize_text(data["name"])
-        stmt = update(publishers).where(publishers.c.id == publisher_id).values(**data)
-        result = self._conn.execute(stmt)
+    def save(self, publisher: Publisher) -> None:
+        """Persiste un éditeur chargé : UPDATE de ses champs éditables par l'API. `name_normalized` est re-dérivé du nom ; `openalex_id` (géré par le pipeline) n'est pas touché. Lève `NotFoundError` si l'id est absent."""
+        result = self._conn.execute(
+            update(publishers)
+            .where(publishers.c.id == publisher.id)
+            .values(
+                name=publisher.name,
+                name_normalized=normalize_text(publisher.name),
+                country=publisher.country,
+                publisher_type=publisher.publisher_type,
+            )
+        )
         if result.rowcount == 0:
-            raise NotFoundError(f"Éditeur {publisher_id} introuvable")
+            raise NotFoundError(f"Éditeur {publisher.id} introuvable")
 
     # ── Fusion ─────────────────────────────────────────────────────
 
