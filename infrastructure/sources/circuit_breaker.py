@@ -13,17 +13,19 @@ from __future__ import annotations
 
 from contextvars import ContextVar, Token
 
-from application.ports.pipeline.circuit_breaker import CircuitBreaker
+from application.ports.pipeline.circuit_breaker import CircuitBreaker, SourceUnavailableError
 
 DEFAULT_THRESHOLD = 10
 
-
-class SourceUnavailableError(Exception):
-    """Le breaker d'une source s'est déclenché : source à bout (budget/panne), à sauter pour la phase en cours."""
-
-    def __init__(self, source: str) -> None:
-        super().__init__(f"source {source} indisponible (circuit-breaker déclenché)")
-        self.source = source
+# `SourceUnavailableError` est définie au port (attrapable par `application/`) et re-exportée ici, où le helper HTTP la manipule.
+__all__ = [
+    "DEFAULT_THRESHOLD",
+    "SourceCircuitBreaker",
+    "SourceUnavailableError",
+    "get_current_breaker",
+    "reset_current_breaker",
+    "set_current_breaker",
+]
 
 
 class SourceCircuitBreaker(CircuitBreaker):

@@ -23,7 +23,12 @@ from datetime import date, timedelta
 from application.pipeline.extract.base import ExtractionConfigError
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.modes import MODES
-from application.pipeline.signals import signal_source_unconfigured, timed_metrics
+from application.pipeline.signals import (
+    signal_source_unavailable,
+    signal_source_unconfigured,
+    timed_metrics,
+)
+from application.ports.pipeline.circuit_breaker import SourceUnavailableError
 from application.ports.pipeline.parallel import RunParallel
 
 ExtractOne = Callable[[str, argparse.Namespace], PhaseMetrics]
@@ -56,11 +61,12 @@ def _source_summary(metrics: PhaseMetrics, duration_s: float) -> dict[str, float
 
 @dataclass
 class _SourceOutcome:
-    """Issue d'une extraction de source : métriques + durée, ou motif de non-configuration."""
+    """Issue d'une extraction de source : métriques + durée, ou motif de non-configuration / d'indisponibilité."""
 
     metrics: PhaseMetrics | None
     duration: float
-    unconfigured: str | None
+    unconfigured: str | None = None
+    unavailable: str | None = None
 
 
 def run(
@@ -121,6 +127,9 @@ def _run_since_last(
     except ExtractionConfigError as exc:
         signal_source_unconfigured(metrics, "hal", str(exc), logger=logger, phase="extract")
         return {}
+    except SourceUnavailableError:
+        signal_source_unavailable(metrics, "hal", logger=logger, phase="extract")
+        return {}
     metrics.merge(hal_metrics)
     return {"hal": _source_summary(hal_metrics, hal_duration)}
 
@@ -162,6 +171,9 @@ def _run_parallel_sources(
                 metrics, source, outcome.unconfigured, logger=logger, phase="extract"
             )
             continue
+        if outcome.unavailable is not None:
+            signal_source_unavailable(metrics, source, logger=logger, phase="extract")
+            continue
         assert outcome.metrics is not None
         metrics.merge(outcome.metrics)
         by_source[source] = _source_summary(outcome.metrics, outcome.duration)
@@ -177,7 +189,9 @@ def _extraction_thunk(
         try:
             source_metrics, duration = timed_metrics(lambda: extract_one(source, args))
         except ExtractionConfigError as exc:
-            return _SourceOutcome(None, 0.0, str(exc))
-        return _SourceOutcome(source_metrics, duration, None)
+            return _SourceOutcome(None, 0.0, unconfigured=str(exc))
+        except SourceUnavailableError as exc:
+            return _SourceOutcome(None, 0.0, unavailable=str(exc))
+        return _SourceOutcome(source_metrics, duration)
 
     return thunk

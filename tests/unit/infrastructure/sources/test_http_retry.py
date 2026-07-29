@@ -50,6 +50,31 @@ def test_5xx_is_retried():
     assert req.call_count == 3  # 5xx retenté jusqu'au dernier essai
 
 
+def test_5xx_with_breaker_raises_source_unavailable():
+    """Sous circuit-breaker, un 5xx qui épuise ses retries lève `SourceUnavailableError` et compte un échec au breaker."""
+    from infrastructure.sources.circuit_breaker import (
+        SourceCircuitBreaker,
+        SourceUnavailableError,
+        reset_current_breaker,
+        set_current_breaker,
+    )
+
+    breaker = SourceCircuitBreaker("hal", threshold=1)
+    token = set_current_breaker(breaker)
+    try:
+        resp = _resp(503)
+        with (
+            patch.object(http_retry.requests, "request", return_value=resp) as req,
+            patch.object(http_retry.time, "sleep"),
+        ):
+            with pytest.raises(SourceUnavailableError):
+                http_retry.http_request_with_retry("GET", "http://x", label="t", max_retries=3)
+        assert req.call_count == 3  # 3 tentatives, puis coupure
+        assert breaker.tripped  # l'échec est compté au breaker
+    finally:
+        reset_current_breaker(token)
+
+
 def test_success_returns_json():
     with (
         patch.object(http_retry.requests, "request", return_value=_resp(200)),
