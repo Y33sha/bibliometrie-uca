@@ -22,7 +22,6 @@ https://developers.openalex.org/
 - **Publications** : identifiant OpenAlex, titre, DOI, année et date de publication, type, langue, OA status, nombre de citations, indication de rétractation, résumé (reconstruit depuis l'inverted index), mots-clés, topics (hiérarchie domain/field/subfield/topic + score), biblio (volume/numéro/pages), URLs des copies de l'article
 - **Auteurs** : nom tel qu'il apparaît dans la signature, drapeau corresponding, ORCID si présent. Le nom unifié de l'entité auteur OpenAlex est conservé séparément, utilisé uniquement pour vérifier que l'ORCID attribué par OA correspond bien à notre auteur (cf. Particularités).
 - **Affiliations** : adresse textuelle + identifiants OpenAlex des institutions
-<!--TODO: changer source_structures en JSONB pour conserver ROR et pays-->
 - **Journaux/éditeurs** : titre, ISSN, eISSN, ISSN-L, type, modèle OA, identifiants OpenAlex du journal et de l'éditeur
 
 > Côté base, l'identifiant OpenAlex est notre appellation pour le champ `id` natif (URL `https://openalex.org/W…` pour les works, `A…` auteurs, `S…` sources/journaux, `I…` institutions) une fois short-prefixé. On le stocke pour les publications, journaux, éditeurs et institutions. L'identifiant de l'entité auteur OpenAlex est dans le payload mais pas conservé.
