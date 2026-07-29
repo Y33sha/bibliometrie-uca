@@ -128,7 +128,7 @@ Dans [`tests/unit/domain/source_publications/test_correction.py`](../../tests/un
 Si la règle consomme un champ que l'admin modifie en base via l'UI (`journal.journal_type`, `journal.oa_model`) :
 
 1. **Recompute des corrections** : `_correct_for_journal` (`application/services/journals/core.py`) recompute et persiste les corrections des source_publications du journal, à enchaîner avec `refresh_from_sources` des publications impactées.
-2. **Service de requalification** dans `application/<table>.py`, modèle [`requalify_publications_for_journal`](../../application/journals.py) (mode `dry_run` pour le preview, mode apply qui recompute + refresh + audit).
+2. **Service de requalification** dans `application/services/<table>/core.py`, modèle [`requalify_publications_for_journal`](../../application/services/journals/core.py) (mode `dry_run` pour le preview, mode apply qui recompute + refresh + audit).
 3. **Repo** : `PublicationRepository.find_ids_by_<key>` (lecture de `publications` par le repo publications — discipline ISP).
 4. **Endpoints API** : `GET /api/<table>/{id}/<field>-change-impact?new_<field>=X` → `{count: N}` (preview, `dry_run=True`) ; `PUT /api/<table>/{id}` détecte le changement et déclenche la requalification synchrone dans la même transaction.
 5. **Modèles Pydantic** dédiés dans `interfaces/api/models/<table>.py` (jamais `body: dict`).
@@ -174,7 +174,7 @@ Pour un nouveau cas : ajouter un membre `DoiClusterCase` (l'énoncé métier dan
 **`JOURNAL_TYPE_MEDIA_TO_MEDIA`** — `journal.journal_type = 'media'` ⇒ `doc_type = media`.
 
 - Input : `sp.journal_type` (joint via `SourcePublication`).
-- Hook admin : oui — service [`requalify_publications_for_journal`](../../application/journals.py), endpoint `GET /api/journals/{id}/type-change-impact`, requalification synchrone dans le `PUT`, modale frontend.
+- Hook admin : oui — service [`requalify_publications_for_journal`](../../application/services/journals/core.py), endpoint `GET /api/journals/{id}/type-change-impact`, requalification synchrone dans le `PUT`, modale frontend.
 - Référence : [`correction.py` — entrée `JOURNAL_TYPE_MEDIA_TO_MEDIA`](../../domain/source_publications/correction.py)
 
 ## Anti-patterns
@@ -182,7 +182,7 @@ Pour un nouveau cas : ajouter un membre `DoiClusterCase` (l'énoncé métier dan
 - **Muter `source_publications` à l'ingestion** (dans le normalizer) : casse l'auditabilité et la réversibilité. La correction est une dérivation dans `correction.py`, persistée par la phase `metadata_correction` qui conserve le brut dans `raw_metadata`.
 - **Encoder la règle en SQL pur** (vue, trigger, UPDATE non audité) : perd la trace `raw_metadata.<champ>.corrected_by` et le brut réversible.
 - **Cascade implicite** : deux règles touchant le même champ sans ordre explicite → non-déterministe. L'ordre des entrées dans `_RULES` est la convention.
-- **Hook admin sans service** : déclencher `refresh_from_sources` depuis le router. Le service propriétaire (`application/<table>.py`) reste l'unique point d'écriture côté pubs.
+- **Hook admin sans service** : déclencher `refresh_from_sources` depuis le router. Le service propriétaire (`application/services/<table>/`) reste l'unique point d'écriture côté pubs.
 
 ## Limites du périmètre
 
