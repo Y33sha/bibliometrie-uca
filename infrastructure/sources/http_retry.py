@@ -21,6 +21,7 @@ import time
 import httpx
 import requests
 
+from application.ports.pipeline.circuit_breaker import SourceUnavailableError
 from infrastructure.sources.circuit_breaker import get_current_breaker
 
 logger = logging.getLogger(__name__)
@@ -76,7 +77,11 @@ def http_request_with_retry(
             last_error = e
             if attempt == max_retries - 1:
                 if breaker is not None:
+                    # Retries épuisés sous breaker : l'appelant sync (extracteur page à page, client de préfixes)
+                    # ne peut pas avancer, on court-circuite la source. La variante async, elle, laisse remonter
+                    # l'erreur brute (les appelants concurrents l'attrapent par requête et accumulent vers le seuil).
                     breaker.record_failure()
+                    raise SourceUnavailableError(breaker.source) from e
                 raise
             logger.warning(
                 f"Erreur réseau {label}: {e} — attente {wait}s (tentative {attempt + 1}/{max_retries})"
@@ -88,6 +93,7 @@ def http_request_with_retry(
             if attempt == max_retries - 1:
                 if breaker is not None:
                     breaker.record_failure()
+                    raise SourceUnavailableError(breaker.source)
                 resp.raise_for_status()
             logger.warning(
                 f"HTTP {resp.status_code} {label} — attente {wait}s (tentative {attempt + 1}/{max_retries})"
