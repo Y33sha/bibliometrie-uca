@@ -6,21 +6,6 @@ from typing import Protocol, TypedDict
 from domain.structures.structure import Structure
 
 
-class StructureUpdateFields(TypedDict, total=False):
-    """Partial update sur la table `structures`.
-
-    Le service mappe le champ API `type` vers la colonne DB `structure_type` avant d'appeler le repo.
-    """
-
-    name: str
-    acronym: str | None
-    structure_type: str
-    ror_id: str | None
-    rnsr_id: str | None
-    hal_collection: str | None
-    api_ids: dict[str, str | list[str]] | None
-
-
 class StructureNameFormUpdateFields(TypedDict, total=False):
     """Partial update sur la table `structure_name_forms`.
 
@@ -93,34 +78,18 @@ class StructureNameFormDeletedRow(TypedDict):
 class StructureRepository(Protocol):
     """Contrat d'accès aux 3 tables du concept Structure (structures, structure_relations, structure_name_forms)."""
 
-    # ── Chargement de l'aggregate ──────────────────────────────────
+    # ── structures : charger-muter-sauver l'agrégat ────────────────
 
     def find_by_id(self, structure_id: int) -> Structure | None:
         """Hydrate l'aggregate `Structure` complet (champs scalaires + VOs `name_forms`). Retourne None si la structure n'existe pas. Les `structure_relations` restent un graphe externe à l'aggregate (voir `get_ancestor_ids` pour les remontées ciblées)."""
         ...
 
-    # ── structures ─────────────────────────────────────────────────
+    def add(self, structure: Structure) -> int:
+        """Insère une structure neuve et retourne son id. Canonise `api_ids` (validation du schéma JSONB) et pose la forme canonique sur l'entité."""
+        ...
 
-    def create_structure(
-        self,
-        *,
-        code: str,
-        name: str,
-        acronym: str | None,
-        type: str,
-        ror_id: str | None,
-        rnsr_id: str | None,
-        hal_collection: str | None,
-        # Pré-coercion : `str` toléré, normalisé en `list[str]` par le repo via `StructureApiIds`. Le post-coercion (DB / aggregate) est `dict[str, list[str]]`.
-        api_ids: dict[str, str | list[str]] | None,
-    ) -> StructureRow: ...
-
-    def update_structure_fields(
-        self,
-        structure_id: int,
-        fields: StructureUpdateFields,
-    ) -> StructureRow:
-        """Applique une modification sélective (`StructureUpdateFields`) et retourne la ligne. Lève `NotFoundError` si la structure est introuvable."""
+    def save(self, structure: Structure) -> None:
+        """Persiste une structure chargée : UPDATE de ses champs éditables (`code` immuable exclu). Lève `NotFoundError` si l'id est absent."""
         ...
 
     def delete_structure(self, structure_id: int) -> StructureDeletedRow | None: ...
