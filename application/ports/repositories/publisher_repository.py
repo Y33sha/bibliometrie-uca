@@ -11,7 +11,7 @@ from typing import Protocol
 
 from pydantic import BaseModel, field_validator
 
-from domain.publishers.publisher import Publisher
+from domain.publishers.publisher import Publisher, PublisherType
 
 
 class PublisherUpdate(BaseModel):
@@ -22,7 +22,7 @@ class PublisherUpdate(BaseModel):
 
     name: str | None = None
     country: str | None = None
-    publisher_type: str | None = None
+    publisher_type: PublisherType | None = None
 
     @field_validator("country")
     @classmethod
@@ -46,10 +46,10 @@ class PublisherRepository(Protocol):
         """`(id, openalex_id)` des éditeurs à `openalex_id` connu et `country` absent, triés par id (batching stable). `limit=None` les rend tous."""
         ...
 
-    # ── Édition sélective ──────────────────────────────────────────
+    # ── Persistance de l'agrégat ───────────────────────────────────
 
-    def update_publisher_fields(self, publisher_id: int, fields: PublisherUpdate) -> None:
-        """Applique une modification sélective (`PublisherUpdate`) ; le service garantit au moins un champ fourni. `name_normalized` est re-dérivé quand `name` est présent. Lève `NotFoundError` si l'éditeur est introuvable."""
+    def save(self, publisher: Publisher) -> None:
+        """Persiste un éditeur chargé : UPDATE de ses champs éditables par l'API. `name_normalized` est re-dérivé du nom ; les colonnes gérées par le pipeline ne sont pas touchées. Lève `NotFoundError` si l'id est absent."""
         ...
 
     # ── Fusion ─────────────────────────────────────────────────────

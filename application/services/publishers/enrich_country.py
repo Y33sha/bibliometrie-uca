@@ -13,10 +13,7 @@ from typing import NamedTuple, NotRequired, TypedDict, cast
 import requests
 from sqlalchemy import Connection
 
-from application.ports.repositories.publisher_repository import (
-    PublisherRepository,
-    PublisherUpdate,
-)
+from application.ports.repositories.publisher_repository import PublisherRepository
 from domain.sources.openalex import full_openalex_id, short_openalex_id
 
 BATCH_SIZE = 50
@@ -121,10 +118,9 @@ def _enrich_batch(
         if country and current.country is None:
             with_country += 1
             countries[country] += 1
+            current.country = country
             if not dry_run:
-                publisher_repo.update_publisher_fields(
-                    publisher_id, PublisherUpdate(country=country)
-                )
+                publisher_repo.save(current)
             updated += 1
     return _BatchOutcome(updated, with_country, no_response, countries)
 
