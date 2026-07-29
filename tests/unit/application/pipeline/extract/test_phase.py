@@ -11,6 +11,7 @@ from datetime import date
 from application.pipeline.extract import phase
 from application.pipeline.extract.base import ExtractionConfigError
 from application.pipeline.metrics import PhaseMetrics
+from application.ports.pipeline.circuit_breaker import SourceUnavailableError
 
 _LOG = logging.getLogger("test")
 
@@ -89,3 +90,50 @@ def test_theses_ignores_year_range_bound():
 
     assert seen["hal"] == (2020, None)  # borne large appliquée
     assert seen["theses"] == (None, None)  # theses ramène tout l'historique des PPN
+
+
+def test_parallel_skips_unavailable_source():
+    """Une source qui lève `SourceUnavailableError` (500 répétés sous circuit-breaker) est sautée : la phase se termine en ambre et les autres sources aboutissent."""
+
+    def extract_one(source, _args):
+        if source == "hal":
+            raise SourceUnavailableError("hal")
+        return PhaseMetrics(new=3)
+
+    metrics = phase.run(
+        mode="full",
+        sources={"hal", "theses"},
+        year=None,
+        start_year=None,
+        include_wos=False,
+        extract_one=extract_one,
+        run_parallel=_sync_run_parallel,
+        get_last_extract_date=lambda _s: None,
+        logger=_LOG,
+    )
+
+    assert {r["key"] for r in metrics.details["table"]["rows"]} == {"theses"}  # theses aboutit
+    assert metrics.new == 3
+    assert [s["code"] for s in metrics.signals] == ["source_unavailable"]
+
+
+def test_since_last_marks_hal_unavailable():
+    """En quotidien, une source HAL qui lève `SourceUnavailableError` termine la phase en ambre."""
+
+    def extract_one(_source, _args):
+        raise SourceUnavailableError("hal")
+
+    metrics = phase.run(
+        mode="daily",
+        sources=None,
+        year=None,
+        start_year=None,
+        include_wos=False,
+        extract_one=extract_one,
+        run_parallel=_sync_run_parallel,
+        get_last_extract_date=lambda _s: None,
+        logger=_LOG,
+    )
+
+    assert [s["code"] for s in metrics.signals] == ["source_unavailable"]
+    assert "table" not in metrics.details  # aucune source aboutie

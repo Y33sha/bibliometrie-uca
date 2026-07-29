@@ -72,6 +72,8 @@ from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.modes import MODE_NAMES, MODES
 from application.pipeline.normalize.base import NormalizeStats
 from application.pipeline.phase_order import PHASE_ORDER
+from application.pipeline.signals import signal_source_unavailable
+from application.ports.pipeline.circuit_breaker import SourceUnavailableError
 from domain.sources.registry import ALL_SOURCES_SET
 from infrastructure.observability.log import (
     PHASE_MARKER,
@@ -188,6 +190,10 @@ def phase_resolve_ra(**kw: Any) -> PhaseMetrics:
             breaker=breaker,
         )
         conn.commit()
+    except SourceUnavailableError:
+        conn.commit()  # préserve les préfixes résolus avant l'indisponibilité (erreur HTTP, pas SQL)
+        metrics = PhaseMetrics()
+        signal_source_unavailable(metrics, "doi.org/ra", logger=log, phase="resolve_ra")
     finally:
         reset_current_breaker(token)
         conn.close()
@@ -490,6 +496,12 @@ def _run_resolve_publishers() -> PhaseMetrics:
             breaker=breaker,
         )
         conn.commit()
+    except SourceUnavailableError:
+        conn.commit()  # préserve les préfixes résolus avant l'indisponibilité (erreur HTTP, pas SQL)
+        metrics = PhaseMetrics()
+        signal_source_unavailable(
+            metrics, "crossref/datacite prefixes", logger=log, phase="publishers_journals"
+        )
     finally:
         reset_current_breaker(token)
         conn.close()
@@ -809,6 +821,11 @@ def _run_enrich_journals_from_openalex() -> PhaseMetrics:
             breaker=breaker,
             rate_delay=DOAJ_DELAY,
         )
+    except SourceUnavailableError:
+        metrics = PhaseMetrics()
+        signal_source_unavailable(
+            metrics, "openalex sources", logger=log, phase="publishers_journals"
+        )
     finally:
         reset_current_breaker(token)
         conn.close()
@@ -1065,6 +1082,9 @@ def _run_fetch_missing_doi(target: str) -> PhaseMetrics:
                 breaker=breaker,
             )
         )
+    except SourceUnavailableError:
+        metrics = PhaseMetrics()
+        signal_source_unavailable(metrics, target, logger=log, phase="cross_imports")
     finally:
         reset_current_breaker(token)
         conn.close()
@@ -1131,6 +1151,9 @@ def _run_refresh_stale(target: str, years: list[int] | None) -> PhaseMetrics:
     token = set_current_breaker(breaker)
     try:
         metrics = asyncio.run(refresh(conn, adapter, log, years=years, breaker=breaker))
+    except SourceUnavailableError:
+        metrics = PhaseMetrics()
+        signal_source_unavailable(metrics, target, logger=log, phase="refresh_stale")
     finally:
         reset_current_breaker(token)
         conn.close()
