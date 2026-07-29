@@ -2,6 +2,8 @@
 
 from pydantic import BaseModel
 
+from domain.structures.structure import StructureType
+
 # ----- Corps des requêtes -----
 
 
@@ -9,7 +11,7 @@ class StructureCreate(BaseModel):
     code: str
     name: str
     acronym: str | None = None
-    type: str
+    type: StructureType
     ror_id: str | None = None
     rnsr_id: str | None = None
     hal_collection: str | None = None
@@ -20,7 +22,7 @@ class StructureCreate(BaseModel):
 class StructureUpdate(BaseModel):
     name: str | None = None
     acronym: str | None = None
-    type: str | None = None
+    type: StructureType | None = None
     ror_id: str | None = None
     rnsr_id: str | None = None
     hal_collection: str | None = None
