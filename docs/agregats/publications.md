@@ -13,7 +13,7 @@ Une `publication` est la référence canonique unifiée d'un document (`domain/p
 | `publication_relations` | Arête dirigée entre publications distinctes | `from_publication_id`, `relation_type` (enum), `target_publication_id` **ou** `target_doi` (CHECK : au moins un), `source` |
 | `distinct_publications` | Paires marquées « pas la même œuvre » | `(pub_id_a, pub_id_b)` ordonné (`a < b`) |
 | `apc_payments` | Frais de publication (APC), import curé | `publication_id` (FK `ON DELETE SET NULL`), `doi`, `amount_eur_ht`, `billing_year`… |
-| `publications_detail` | Matview de détail pour l'API | `publication_id` (PK), rafraîchie à chaque `refresh_from_sources` |
+| `publications_detail` | Table satellite de détail pour l'API | `publication_id` (PK), recalculée à chaque `refresh_from_sources` |
 
 En amont : `source_publications` (via `publication_id`, cf. [source_publications](source_publications.md)). `authorships` est le pivot vers les [personnes](persons.md) ; ce bilan la couvre comme table de liaison produite en aval, sa construction relève du bilan authorships.
 
