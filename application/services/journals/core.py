@@ -105,15 +105,24 @@ def find_or_create_journal(
     return journal_id
 
 
-def update_journal(journal_id: int, *, update: JournalUpdate, repo: JournalRepository) -> None:
-    """Met à jour une revue à partir des champs explicitement fournis.
+def update_journal(journal_id: int, *, update: JournalUpdate, repo: JournalRepository) -> bool:
+    """Charge la revue, applique les champs explicitement fournis, persiste. Retourne `True` si le `journal_type` a effectivement changé — déclencheur de la requalification des publications, orchestrée par le command handler.
 
-    Lève `ValidationError` si aucun champ n'est fourni, `NotFoundError` si la revue n'existe pas — l'`UPDATE` du repository ne trouve alors aucune ligne à apparier.
+    Lève `ValidationError` si aucun champ n'est fourni, `NotFoundError` si la revue n'existe pas.
     """
     if not update.model_fields_set:
         raise ValidationError("Aucun champ à mettre à jour")
 
-    repo.update_journal_fields(journal_id, update)
+    journal = repo.find_by_id(journal_id)
+    if journal is None:
+        raise NotFoundError(f"Revue {journal_id} introuvable")
+
+    old_type = journal.journal_type
+    # Les champs de `JournalUpdate` portent les noms des attributs de l'agrégat.
+    for field_name, value in update.model_dump(exclude_unset=True).items():
+        setattr(journal, field_name, value)
+    repo.save(journal)
+    return journal.journal_type != old_type
 
 
 def update_journal_apc(

@@ -41,8 +41,8 @@ class JournalRepository(Protocol):
         """Hydrate l'aggregate `Journal` complet. Retourne None si le journal n'existe pas. Les `journal_name_forms` restent une projection séparée, hors de l'aggregate."""
         ...
 
-    def update_journal_fields(self, journal_id: int, fields: JournalUpdate) -> None:
-        """Applique une modification sélective (`JournalUpdate`) ; le service garantit au moins un champ fourni. `title_normalized` est re-dérivé quand `title` est présent. Lève `NotFoundError` si la revue est introuvable."""
+    def save(self, journal: Journal) -> None:
+        """Persiste une revue chargée : UPDATE de ses champs éditables par l'API. `title_normalized` est re-dérivé du titre ; les colonnes gérées par le pipeline ne sont pas touchées. Lève `NotFoundError` si l'id est absent."""
         ...
 
     def find_shared_title_journal_pairs(

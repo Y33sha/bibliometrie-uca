@@ -10,10 +10,7 @@ from typing import Any, NamedTuple, cast
 
 from sqlalchemy import Connection, delete, func, select, text, update
 
-from application.ports.repositories.journal_repository import (
-    JournalRepository,
-    JournalUpdate,
-)
+from application.ports.repositories.journal_repository import JournalRepository
 from domain.errors import NotFoundError
 from domain.journals.journal import Journal, JournalType, OaModel
 from domain.normalize import normalize_text
@@ -99,16 +96,29 @@ class PgJournalRepository(JournalRepository):
             return None
         return _journal_from_row(_JournalRow(**row._mapping))
 
-    # ── Édition sélective ──────────────────────────────────────────
+    # ── Persistance de l'agrégat ───────────────────────────────────
 
-    def update_journal_fields(self, journal_id: int, fields: JournalUpdate) -> None:
-        data = fields.model_dump(exclude_unset=True)
-        if data.get("title") is not None:
-            data["title_normalized"] = normalize_text(data["title"])
-        stmt = update(journals).where(journals.c.id == journal_id).values(**data)
-        result = self._conn.execute(stmt)
+    def save(self, journal: Journal) -> None:
+        """Persiste une revue chargée : UPDATE de ses champs éditables par l'API. `title_normalized` est re-dérivé du titre ; les colonnes gérées par le pipeline (`publisher_id`, `openalex_id`, `apc_currency`) ne sont pas touchées. Lève `NotFoundError` si l'id est absent."""
+        result = self._conn.execute(
+            update(journals)
+            .where(journals.c.id == journal.id)
+            .values(
+                title=journal.title,
+                title_normalized=normalize_text(journal.title),
+                issn=journal.issn,
+                eissn=journal.eissn,
+                issnl=journal.issnl,
+                doi_prefix=journal.doi_prefix,
+                oa_model=journal.oa_model,
+                journal_type=journal.journal_type,
+                is_academic=journal.is_academic,
+                is_in_doaj=journal.is_in_doaj,
+                apc_amount=journal.apc_amount,
+            )
+        )
         if result.rowcount == 0:
-            raise NotFoundError(f"Revue {journal_id} introuvable")
+            raise NotFoundError(f"Revue {journal.id} introuvable")
 
     # ── Fusion ─────────────────────────────────────────────────────
 

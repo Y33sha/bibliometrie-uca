@@ -26,14 +26,7 @@ def update_journal(
     """Met à jour une revue (champs sélectifs). Si `journal_type` change
     effectivement, requalifie le `doc_type` des publications rattachées dans la
     même transaction."""
-    new_type = update.journal_type
-    type_changed = False
-    if isinstance(new_type, str):
-        existing = repo.find_by_id(journal_id)
-        if existing is not None and existing.journal_type != new_type:
-            type_changed = True
-
-    journals_service.update_journal(journal_id, update=update, repo=repo)
+    type_changed = journals_service.update_journal(journal_id, update=update, repo=repo)
 
     if type_changed:
         journals_service.requalify_publications_for_journal(
