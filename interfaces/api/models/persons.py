@@ -4,18 +4,23 @@ from typing import Literal
 
 from pydantic import BaseModel
 
+from domain.persons.identifiers import AttributionStatus, PersonIdentifierType
 from interfaces.api.models.authorships import SourceAuthorshipRef
 
 # ----- Corps des requêtes -----
 
 
 class AddIdentifier(BaseModel):
-    id_type: str  # 'orcid' ou 'idhal'
+    # Le service restreint l'ajout manuel aux types publics (`PUBLIC_PERSON_IDENTIFIER_TYPES`).
+    id_type: PersonIdentifierType
     id_value: str
 
 
 class UpdateIdentifierStatus(BaseModel):
-    status: Literal["pending", "confirmed", "rejected"]
+    # `authenticated` est exclu : posé seulement par l'import ORCID, protégé par un trigger.
+    status: Literal[
+        AttributionStatus.PENDING, AttributionStatus.CONFIRMED, AttributionStatus.REJECTED
+    ]
 
 
 class ReassignIdentifier(BaseModel):
@@ -42,7 +47,9 @@ class DetachAuthorships(BaseModel):
 
 class UpdateNameFormStatus(BaseModel):
     name_form: str
-    status: Literal["pending", "confirmed", "rejected"]
+    status: Literal[
+        AttributionStatus.PENDING, AttributionStatus.CONFIRMED, AttributionStatus.REJECTED
+    ]
 
 
 # ----- Réponses composées par le router -----
