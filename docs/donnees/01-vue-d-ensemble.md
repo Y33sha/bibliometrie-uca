@@ -37,7 +37,7 @@ flowchart LR
     direction LR
         source_publications-->source_authorships
         source_authorships-->addresses
-        source_authorships-->author_identifiying_keys
+        source_authorships-->author_identifying_keys
     end
     subgraph vérité
         direction LR
@@ -46,13 +46,13 @@ flowchart LR
         structures---authorships
     end
     source_publications--->publications
-    author_identifiying_keys--->persons
+    author_identifying_keys--->persons
     addresses---structures
 
     classDef manuel  fill:#8e5,stroke:#5a3
     classDef auto fill:#adf,stroke:#58c
     class structures manuel;
-    class source_authorships,source_publications,publications,authorships,persons,addresses,author_identifiying_keys auto
+    class source_authorships,source_publications,publications,authorships,persons,addresses,author_identifying_keys auto
 ```
 > **Pourquoi pas de symétrie dans le nommage des tables source *vs* vérité**
 >
