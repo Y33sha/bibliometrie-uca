@@ -4,9 +4,9 @@
 
 Contenu :
 
-- **Services métier**, un sous-package par agrégat exposant un module `core.py` : `persons/core.py`, `publications/core.py`, `journals/core.py`, `structures/core.py`, `publishers/core.py`, `config/core.py`, auxquels s'ajoutent `authorships/core.py` et `authorships/assign_orphans.py`, `addresses/countries.py`, et `audit.py` (module plat). Ces services reçoivent leurs dépendances par injection (kwarg `repo=`, `audit_repo=`, `queries=`).
+- **Services métier**, un sous-package par agrégat exposant un module `core.py` : `persons/core.py`, `publications/core.py`, `journals/core.py`, `structures/core.py`, `publishers/core.py`, `perimeters/core.py`, auxquels s'ajoutent `authorships/core.py` et `authorships/assign_orphans.py`, `addresses/countries.py`, et `audit.py` (module plat). Ces services reçoivent leurs dépendances par injection (kwarg `repo=`, `audit_repo=`, `queries=`).
 - **Orchestrateurs pipeline** dans `application/pipeline/` : un sous-package par phase. Chaque orchestrateur séquence sa phase et délègue HTTP et SQL à des adapters via des ports (`application/ports/pipeline/*`), sans jamais importer `infrastructure/` directement. L'inventaire phase par phase, avec entrées et sorties, vit dans la [documentation du pipeline](../pipeline/01-vue-d-ensemble.md).
-- **Ports** (`application/ports/*`) : interfaces Protocol pour les query services (adapters de lecture dans `infrastructure/read_models/`, gateways de pipeline dans `infrastructure/pipeline/`) et pour les repositories (`application/ports/repositories/*`, implémentés dans `infrastructure/repositories/*`). Un repository charge et persiste un agrégat du domaine quand il y en a un ; sinon il fait du CRUD de table ou de l'append (`Config`, `AuditLog`, `DoiPrefix`, `Address`).
+- **Ports** (`application/ports/*`) : interfaces Protocol pour les query services (adapters de lecture dans `infrastructure/read_models/`, gateways de pipeline dans `infrastructure/pipeline/`) et pour les repositories (`application/ports/repositories/*`, implémentés dans `infrastructure/repositories/*`). Un repository charge et persiste un agrégat du domaine quand il y en a un ; sinon il fait du CRUD de table ou de l'append (`Config`, `AuditLog`, `Address`).
 
 ## Patterns d'injection
 
