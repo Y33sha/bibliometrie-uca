@@ -6,9 +6,9 @@ Contenu :
 
 - **`api/`** — FastAPI :
   - `app.py` — entry point (routers, middlewares, gestion d'erreurs)
-  - `routers/` — un module par agrégat (publications, persons, laboratories, addresses, …)
+  - `routers/` — un module par agrégat (publications, persons, structures, addresses, …)
   - `models/` — Pydantic pour les bodies POST/PUT/PATCH (un module par agrégat)
-  - `deps.py` — dépendances (Engine SA sync, factories de query services et de repositories, auth)
+  - `deps.py` — dépendances (Engine SA sync ; factories de read-models, de repositories et de gateways pipeline sans état ; lanceurs de tâches de fond ; auth)
   - middlewares inline dans `app.py` (auth, strip-prefix, timing)
 - **`frontend/`** — SvelteKit (Svelte 5)
 - **`cli/`** — scripts (imports manuels, debug, corrections ponctuelles). Exclus de la couverture pytest (`[tool.coverage.run]` omit).

@@ -33,11 +33,11 @@ flowchart LR
 
 Routeur `interfaces/api/routers/structures.py`, command handlers `application/services/structures/commands.py`, cœur `core.py`, adaptateur `PgStructureRepository`. **Seul chemin d'écriture** du cluster.
 
-- **Structures** (`POST` / `PUT` / `DELETE /api/structures/{id}`) : `create_structure` / `update_structure` / `delete_structure`. Le service normalise `ror_id` (VO `RorId`), mappe les champs UI → colonnes, et le repo valide `api_ids` contre le modèle JSONB `StructureApiIds`. La suppression cascade en base sur `authorship_structures` et `source_authorship_structures` (FK `ON DELETE CASCADE`).
+- **Structures** (`POST` / `PUT` / `DELETE /api/structures/{id}`) : `create_structure` / `update_structure` / `delete_structure`. Les fabriques de domaine `Structure.create` / `Structure.apply` valident type, `ror_id` et `hal_collection` (VOs) ; le repo valide `api_ids` contre le modèle JSONB `StructureApiIds`. La suppression cascade en base sur `authorship_structures` et `source_authorship_structures` (FK `ON DELETE CASCADE`).
 - **Relations** (`POST /api/structures/relations`, `DELETE /…/{id}`) : `create_relation` prefetche les ancêtres du parent (`repo.get_ancestor_ids`, `WITH RECURSIVE`) et délègue au domaine `check_can_create_relation` (refus auto-référence / cycle) ; idempotent (`already_exists` si la relation existe).
 - **Formes de nom** (`POST` / `PUT` / `DELETE /api/name-forms`) : `create_name_form` / `update_name_form` normalisent `form_text` (`normalize_text`) et forcent `is_word_boundary` sur les formes courtes.
 
-Les commandes de relation (création / suppression) et la suppression d'une structure rafraîchissent la clôture `perimeter_structures` via le `PerimeterRepository` ; la suppression retire en plus la structure des racines de tout périmètre (`remove_structure_from_all_perimeters`). Créer ou éditer les attributs d'une structure n'y touche pas (cf. perimeters.md). Chaque opération émet un événement d'audit.
+Les commandes de relation (création / suppression) et la suppression d'une structure rafraîchissent la clôture `perimeter_structures` via le gateway `PerimeterStructuresQueries` (`refresh_perimeter_structures`) ; la suppression retire en plus la structure des racines de tout périmètre (`PerimeterRepository.remove_structure_from_all_perimeters`). Créer ou éditer les attributs d'une structure n'y touche pas (cf. perimeters.md). Chaque opération émet un événement d'audit.
 
 ## Écriture — pipeline
 
@@ -46,7 +46,7 @@ Les commandes de relation (création / suppression) et la suppression d'une stru
 ## Lecture — pipeline
 
 - **Matching d'adresses** (phase `affiliations`) : `infrastructure/pipeline/affiliations/address_resolution.py` charge les `structure_name_forms` dans un `AddressMatcher` (Aho-Corasick) qui balaie le `normalized_text` des adresses. Les options de la forme pilotent le match : `is_word_boundary` (frontière de mot exigée), `is_excluding` (la forme provoque un rejet), `requires_context_of` (le match ne vaut que si les structures citées matchent aussi la même adresse).
-- **Clôture de périmètre** : `structure_relations` (`est_tutelle_de`) fournit la descente récursive qui matérialise `perimeter_structures` à partir des racines `perimeters.structure_ids` — le mécanisme qui, in fine, pilote `source_authorships.in_perimeter` (cf. perimeters.md).
+- **Clôture de périmètre** : `structure_relations` (`est_tutelle_de`) fournit la descente récursive qui matérialise `perimeter_structures` à partir des racines `perimeters.root_structure_ids` — le mécanisme qui, in fine, pilote `source_authorships.in_perimeter` (cf. perimeters.md).
 
 ## Lecture — API
 
@@ -57,7 +57,7 @@ Les commandes de relation (création / suppression) et la suppression d'une stru
 
 Dette assumée et décisions d'architecture propres à cet agrégat, gardées explicites.
 
-1. **Écritures cross-agrégat vers le périmètre (décision d'archi assumée).** Les commandes de relation et la suppression de structure rematérialisent `perimeter_structures` via le `PerimeterRepository` injecté dans le command handler ; la couche service reste, elle, agnostique du périmètre.
+1. **Écritures cross-agrégat vers le périmètre (décision d'archi assumée).** Les commandes de relation et la suppression de structure rematérialisent `perimeter_structures` via le gateway `PerimeterStructuresQueries` injecté dans le command handler ; la couche service reste, elle, agnostique du périmètre.
 2. **Hydratation stricte des VOs.** `find_by_id` parse `ror_id` / `hal_collection` en VO strict : une valeur non canonique en base fait lever `ValidationError` à l'hydratation. Délibéré — un échec signale une corruption à investiguer, pas à masquer.
 
 ## Invariants métier

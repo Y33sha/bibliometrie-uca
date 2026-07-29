@@ -2,7 +2,7 @@
 
 *À jour le 2026-07-14.*
 
-L'aggregate root `Publisher` (`domain/publishers/publisher.py`) représente un éditeur. Entité mince (id, nom, pays, `openalex_id`, `publisher_type`) : comme `Journal`, elle ne porte ni comportement ni invariant riche — matching, fusion et enrichissement vivent dans `application/services/publishers/`. Identité = `id` (surrogate) ; identifiant naturel = `name` via la normalisation de `publisher_name_forms`.
+L'aggregate root `Publisher` (`domain/publishers/publisher.py`) représente un éditeur. Entité mince (id, nom, pays, `openalex_id`, `publisher_type`) : comme `Journal`, elle ne porte ni comportement ni invariant riche — matching, fusion et enrichissement vivent dans les services et leurs adaptateurs SQL. Identité = `id` (surrogate) ; identifiant naturel = `name` via la normalisation de `publisher_name_forms`.
 
 ## Tables du cluster
 
@@ -29,9 +29,9 @@ flowchart LR
 
 ## Écriture — pipeline
 
-**Rattachement (`normalize`)** : chaque normaliseur appelle `find_or_create_publisher` (`application/services/publishers/core.py`) — cascade `openalex_id`, sinon la primitive repo `match_or_create_by_name_form` (forme de nom → éditeur existant ou créé) — puis passe le `publisher_id` à `find_or_create_journal`. Seul OpenAlex fournit un `openalex_id` (via `host_organization`).
+**Rattachement (`normalize`)** : chaque normaliseur appelle `find_or_create_publisher` (`application/services/publishers/core.py`) — cascade `openalex_id`, sinon la primitive de gateway `match_or_create_by_name_form` (forme de nom → éditeur existant ou créé) — puis passe le `publisher_id` à `find_or_create_journal`. Seul OpenAlex fournit un `openalex_id` (via `host_organization`).
 
-**Résolution par préfixe DOI (`publishers_journals` → `resolve_publishers`)** : pour chaque `doi_prefixes` non résolu, route par Registration Agency, interroge le préfixe Crossref/DataCite, persiste les métadonnées, matche ou crée l'éditeur via `match_or_create_by_name_form` (la même primitive repo que l'axe `normalize`), et pose `doi_prefixes.publisher_id`. Une seule tentative (`publisher_checked_at`).
+**Résolution par préfixe DOI (`publishers_journals` → `resolve_publishers`)** : pour chaque `doi_prefixes` non résolu, route par Registration Agency, interroge le préfixe Crossref/DataCite, persiste les métadonnées, matche ou crée l'éditeur via `match_or_create_by_name_form` (la même primitive de gateway que l'axe `normalize`), et pose `doi_prefixes.publisher_id`. Une seule tentative (`publisher_checked_at`).
 
 **Enrichissement — hors pipeline (maintenance)** : le CLI `interfaces/cli/maintenance/enrich_publishers.py` renseigne le `country` des éditeurs depuis OpenAlex Publishers. Politique « NULL only » : une valeur saisie à la main est préservée.
 

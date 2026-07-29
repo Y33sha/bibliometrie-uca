@@ -2,7 +2,7 @@
 
 *À jour le 2026-07-13.*
 
-L'aggregate root `Journal` (`domain/journals/journal.py`) représente une revue, une conférence, un dépôt ou un autre support de publication. Identité = `id` (clé surrogate) ; identifiant naturel = `title` via la normalisation de `journal_name_forms` ; les ISSN sont fortement discriminants mais facultatifs. `publisher_id` référence l'aggregate `Publisher` par son id. L'objet de domaine est un simple porteur de données : la logique de matching, de fusion et d'enrichissement vit dans `application/services/journals/`.
+L'aggregate root `Journal` (`domain/journals/journal.py`) représente une revue, une conférence, un dépôt ou un autre support de publication. Identité = `id` (clé surrogate) ; identifiant naturel = `title` via la normalisation de `journal_name_forms` ; les ISSN sont fortement discriminants mais facultatifs. `publisher_id` référence l'aggregate `Publisher` par son id. L'objet de domaine est un simple porteur de données ; la logique de matching, de fusion et d'enrichissement vit dans les services et leurs adaptateurs SQL.
 
 ## Tables du cluster
 
@@ -35,13 +35,13 @@ flowchart LR
 
 **Rattachement tardif par préfixe DOI (`metadata_correction`)** : `journal_by_doi.py` pose `source_publications.journal_id` quand un préfixe DOI unique désigne une revue (décision pure dans `domain/source_publications/correction.py`).
 
-**Enrichissement du référentiel (`publishers_journals`)** : l'orchestrateur `phase.py` enchaîne, sous gardes de config, la résolution des éditeurs (`resolve_publishers.py`), l'enrichissement OpenAlex (`enrich_journals_from_openalex.py` : APC + `journal_type` sur les revues `unknown`, via `map_openalex_source_type`), et l'import du dump DOAJ (`import_journals_from_doaj_dump.py` : `doaj_payload` + `is_in_doaj`). Adapter d'écriture : `PgJournalRepository`, qui porte aussi les files de ces sous-étapes (`find_journals_of_unknown_type`, `find_journal_issn_index`, `reset_is_in_doaj`, `doaj_last_import_at`).
+**Enrichissement du référentiel (`publishers_journals`)** : l'orchestrateur `phase.py` enchaîne, sous gardes de config, la résolution des éditeurs (`resolve_publishers.py`), l'enrichissement OpenAlex (`enrich_journals_from_openalex.py` : APC + `journal_type` sur les revues `unknown`, via `map_openalex_source_type`), et l'import du dump DOAJ (`import_journals_from_doaj_dump.py` : `doaj_payload` + `is_in_doaj`). Adapter d'écriture : le gateway `PgJournalGatewayQueries` (`infrastructure/pipeline/journals.py`), qui porte les files de ces sous-étapes (`find_journals_of_unknown_type`, `find_journal_issn_index`, `reset_is_in_doaj`, `doaj_last_import_at`).
 
 ## Écriture — API (curation admin)
 
 Routeur `interfaces/api/routers/journals.py`, command handlers `application/services/journals/commands.py`, cœur métier `core.py`, adaptateur `PgJournalRepository`.
 
-- **Édition** (`PUT /api/journals/{id}`) : `update_journal` normalise `title` → `title_normalized` ; si `journal_type` change, `requalify_publications_for_journal` rejoue le `doc_type` des publications de la revue et émet un audit `journal.type_requalified`.
+- **Édition** (`PUT /api/journals/{id}`) : `update_journal` charge-mute-sauve la revue (le repo re-dérive `title_normalized` au `save`) ; si `journal_type` change, `requalify_publications_for_journal` rejoue le `doc_type` des publications de la revue et émet un audit `journal.type_requalified`.
 - **Fusion** (`POST /api/journals/{id}/merge`) : `merge_journals` → `merge_journal_into`, cinq étapes SQL qui repointent `publications`, `source_publications`, `apc_payments`, `journal_name_forms` puis recalent `pub_count`.
 - **Prévisualisation** (`GET .../type-change-impact`) : exécute le chemin d'écriture réel dans un `SAVEPOINT` annulé (`begin_nested` + `rollback`).
 
@@ -51,7 +51,7 @@ Routeur `interfaces/api/routers/journals.py`, command handlers `application/serv
 
 **`journal_type`** : `refresh_from_sources` (`application/services/publications/core.py`) lit `get_journal_type` pour rejouer les règles de `doc_type` dépendantes de la revue.
 
-**Matching** : `find_journal_by_openalex_id`, `find_journal_by_issn_any`, `find_journal_by_name_form`, `find_by_id` (`PgJournalRepository`).
+**Matching** : `find_journal_by_openalex_id`, `find_journal_by_issn_any`, `find_journal_by_name_form` (`PgJournalGatewayQueries`) ; `find_by_id` (`PgJournalRepository`).
 
 ## Lecture — API
 

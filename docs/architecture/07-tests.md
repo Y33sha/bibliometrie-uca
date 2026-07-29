@@ -2,8 +2,8 @@
 
 *À jour le 2026-06-30.*
 
-- **Unit** (`tests/unit/`) — pas de DB. Couvre `domain/`, `application/` (services avec mocks), le parsing des normalizers et des adapters sources (logique pure rangée selon la source : `parsing.py`, `fields.py`, ou le module d'extraction), l'infrastructure pure (log, métriques).
-- **Intégration** (`tests/integration/`) — base `bibliometrie_test` créée à la volée (`alembic upgrade head` sur DB vierge), fixtures `db` (curseur psycopg avec rollback) et `sa_sync_conn` (Connection SA avec rollback). Couvre les routers, les orchestrateurs pipeline, et les adapters repositories.
+- **Unit** (`tests/unit/`) — pas de DB. Couvre `domain/`, `application/` (services avec mocks), le parsing des normalizers et des adapters sources (logique pure rangée selon la source : `parsing.py`, `fields.py`, ou le module d'extraction), l'infrastructure pure (log, métriques) et les interfaces (`tests/unit/interfaces/`).
+- **Intégration** (`tests/integration/`) — base `bibliometrie_test` créée à la volée (`alembic upgrade head` sur DB vierge), fixtures `db` (curseur psycopg avec rollback) et `sa_sync_conn` (Connection SA avec rollback). Couvre les routers, les orchestrateurs pipeline, les adapters (repositories et gateways pipeline) et des smoke tests des CLI permanents (`tests/integration/cli/`).
 
 Conftest splitté :
 
