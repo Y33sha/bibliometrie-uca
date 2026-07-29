@@ -19,7 +19,7 @@ Phase `countries`: Associe des pays aux adresses pour permettre l'analyse des co
 Phase `subjects`: deux étapes enchaînées :
 
 **Étape 1 — Ingestion.**
-Incrémentale et centrée publication : seules les publications dont le contenu canonique a changé depuis leur dernière ingestion sont retraitées. Pour ces publications, les liens `publication_subjects` existants sont purgés (**sauf ceux marqués `rejected = TRUE`** — rejet manuel via l'UI à venir), puis les sujets/mots-clés de leurs `source_publications` sont ré-ingérés, source par source. Dispatch dans `application/pipeline/subjects/ingest_<source>.py` ; un `SubjectCache` partagé évite les UPSERT répétés sur les sujets récurrents.
+Incrémentale et centrée publication : seules les publications dont le contenu canonique a changé depuis leur dernière ingestion sont retraitées. Pour ces publications, les liens `publication_subjects` existants sont purgés (**sauf ceux marqués `rejected = TRUE`** — rejet manuel via l'UI à venir), puis les sujets/mots-clés de leurs `source_publications` sont ré-ingérés, source par source. Dispatch par source dans `application/pipeline/subjects/ingestion.py` (via `SUBJECT_EXTRACTORS` de `extractors.py`) ; un `SubjectCache` partagé évite les UPSERT répétés sur les sujets récurrents.
 
 Le référentiel `subjects` n'est jamais purgé : un sujet peut rester orphelin si plus aucune publication ne le référence (historique des labels observés).
 
