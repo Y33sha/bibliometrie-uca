@@ -64,9 +64,11 @@ Contrats `pyproject.toml` étendus à `read_models` : import-linter (module inte
 
 - [x] Inventorier les méthodes de repositories, comme les tables en phase A.
 - [x] Classer chaque méthode par consommateur réel et nature.
-- [ ] Appliquer (cf. les quatre chantiers ci-dessous).
+- [x] Appliquer (cf. les quatre chantiers ci-dessous).
 
 Audit complet : [`CODE_couches-acces-donnees_audit-repositories.md`](CODE_couches-acces-donnees_audit-repositories.md). Il établit **trois** consommateurs (pipeline / commande admin / bulk déclenché par l'humain), et un motif uniforme **command-service + data-mapper** : les invariants vivent dans `application/services/`, pas dans les repositories, et l'hydratation d'agrégat est vestigiale (`find_by_id` souvent inutilisé). Quatre chantiers d'application en découlent : (1) **descente pipeline** — `doi_prefix` en bloc, `journal`/`publisher` scindés (find-or-create + enrichissement → `pipeline/`, fusion → repository mince), plus `publication.update_oa_status`/`create` et `authorship.enforce_confirmed_authorships` ; (2) **catégorie bulk-admin** — trouver une maison aux opérations ensemblistes déclenchées par l'humain (pays, batch-assign, propagation de périmètre), ni phase pipeline ni commande d'agrégat ; (3) **ménage** — code mort, homonymes pipeline/admin, doublon `perimeter_structures`, contournement direct `journals.py:185` ; (4) **nommage** — repositories réservés aux vrais agrégats curés, gateways pour le reste.
+
+Application : (1) **descente pipeline** — `doi_prefix` en bloc, `journal`/`publisher` scindés, `oa_status` et `enforce_confirmed_authorships` descendus ; `publication.create` reste au repository (agrégat hydraté). (2) **bulk-admin** — pays, `in_perimeter`, batch-assign d'orphelines descendus dans les gateways `pipeline/`, appelés par le write-side admin ; leur **nature** ensembliste décide, pas leur appelant. La clôture de périmètre (`perimeter_structures`) reste en `pipeline/` : matérialisation cross-agrégat (racines des périmètres × graphe de tutelles) servant d'entrée au pipeline, irréductible à la persistance d'un seul agrégat. (3) **ménage** — code mort retiré, homonymes désambiguïsés, `journals.py:185` routé par un command handler, façade `perimeter_repo.refresh_structures` retirée (le service injecte le gateway pipeline). (4) **nommage** — `repositories/` réservé aux agrégats curés ; `config` et `audit` y restent (tables techniques derrière un port, « repository » y est un terme générique acceptable) — pas de 4e famille pour deux tables.
 
 ### F — CLI
 
@@ -74,8 +76,15 @@ Audit complet : [`CODE_couches-acces-donnees_audit-repositories.md`](CODE_couche
 
 Règle appliquée : router ce qui touche un agrégat (→ repository) ou constitue une opération durable réutilisable (→ gateway) ; laisser en CLI les opérations autonomes, rares, à appelant unique, qui ne gagneraient que de la cérémonie — leur SQL couplé au schéma est déjà tenu par des smoke tests d'intégration, sans angle mort. Routés : `rehydrate_staging_from_raw_store` (gateway staging, inverse de `mark_done`) et `import_persons` (repository + service `import_rh_person`). Laissés en CLI : `import_apc`/`import_openapc` et `delete_publications_out_of_window` (ETL autonome sans agrégat), plus les lectures de préparation d'`import_authenticated_orcids` (écritures déjà routées).
 
+### G — Agrégats riches pour les écritures API
+
+- [x] Rapatrier les invariants des services vers les agrégats ; écritures API en charger-muter-sauver.
+- [x] Les DTO d'entrée consomment les énums du domaine.
+
+L'audit E décrit des agrégats anémiques (invariants aux services, hydratation vestigiale). La direction retenue applique la décision « invariants garantis à l'écriture » plutôt que de retirer cette hydratation : côté **écritures API**, l'agrégat porte ses invariants et le chemin d'écriture charge-mute-sauve (`find_by_id` → méthodes de domaine → `repo.save`) ; côté **pipeline**, le data-mapper ensembliste reste (hydrater un agrégat par ligne aurait un coût prohibitif). `structure`, `perimeter`, `journal` et `publisher` sont convertis ; `publication` et `person` étaient déjà la référence (`refresh_publication_metadata`, `can_merge_with`).
+
+Frontière des vocabulaires fermés : le DTO d'entrée type ses champs d'énum avec l'énum du domaine (Pydantic valide au bord, source unique) — `StructureType`, `PublisherType`, `StructureRelationType`, `PersonIdentifierType`, `AttributionStatus`. `PublisherType` passe de `Literal` à `StrEnum` (reliquat du chantier `vocabulaires-fermes-strenum`). Les DTO de lecture (sortie) restent en `str`, faute de gain pour un frontend interne.
+
 ## Questions ouvertes
 
-- **`doi_prefixes`.** Peuplé par le pipeline (`resolve_ra`, `publishers_journals`) mais porteur de sens (préfixe → agence d'enregistrement → éditeur) et lu par l'API : table de service rangée en `pipeline/`, ou donnée de référence traitée à part ? À trancher en phase D.
-- **Granularité de `pipeline/`.** Modules par phase (`normalize/`, `authorships/`…) ou par table ? L'existant mêle les deux.
-- **Forme des conversions (phase E).** Quelles méthodes de repositories appelées par l'API sont des mutations plates à reconvertir en opérations d'agrégat, et sous quelle forme ? Dépend de l'inventaire des méthodes.
+Tranchées en cours de chantier : `doi_prefixes` descend en `pipeline/` (table de service alimentée par le pipeline, lue aussi par l'API) ; granularité de `pipeline/` — modules par phase, plus des gateways top-level pour les références cross-phase (`journals`, `publishers`, `doi_prefixes`) ; forme des conversions des écritures API — charger-muter-sauver (phase G).
