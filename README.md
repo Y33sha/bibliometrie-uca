@@ -1,8 +1,8 @@
 # Bibliométrie UCA
 
 Suivi de la production scientifique de l'Université Clermont Auvergne.
-Intègre cinq sources bibliographiques (HAL, OpenAlex, Web of Science,
-ScanR, theses.fr) dans un référentiel dédupliqué de publications,
+Intègre sept sources (HAL, OpenAlex, Web of Science, ScanR, theses.fr,
+Crossref, DataCite) dans un référentiel dédupliqué de publications,
 personnes et laboratoires.
 
 ## Stack technique
@@ -58,7 +58,7 @@ docker cp bibliometrie.dump bibliometrie-uca-db-1:/tmp/
 docker compose exec db bash -c 'pg_restore -U "$POSTGRES_USER" -d bibliometrie --no-owner -j 4 /tmp/bibliometrie.dump'
 ```
 
-Ou créer une base vide (le pipeline applique toutes les migrations<!--TODO: what?-->) :
+Ou créer une base vide, en appliquant les migrations Alembic :
 
 ```bash
 docker compose exec backend alembic upgrade head
@@ -180,7 +180,7 @@ python run_pipeline.py --start-year 2024  # Extraction depuis une année de déb
 python run_pipeline.py --sources hal,openalex  # Sources spécifiques
 ```
 
-Voir [docs/pipeline.md](docs/pipeline.md) pour le détail des phases.
+Voir [docs/pipeline/](docs/pipeline/) pour le détail des phases.
 
 ## Tests
 
@@ -203,13 +203,15 @@ bibliometrie-uca/
 ├── application/         Services métier, orchestrateurs
 │   └── pipeline/        Phases du pipeline (normalize, build, enrich, …)
 ├── infrastructure/      Adapters sortants (SQL, API sources, settings)
-│   ├── db/              Schéma SQL, MetaData SA, query services
+│   ├── db/              Schéma SQL, MetaData SA, engine
 │   ├── sources/         Extracteurs API (hal, openalex, wos, scanr, theses)
-│   └── repositories/    Adapters PostgreSQL pour les ports domain/
+│   ├── repositories/    Agrégats métier curés (écriture + invariants)
+│   ├── pipeline/        Gateways SQL des phases du pipeline
+│   └── read_models/     Projections de lecture pour l'API
 ├── interfaces/          Adapters entrants
 │   ├── api/             FastAPI (routers, models Pydantic, middlewares)
 │   ├── frontend/        SvelteKit
-│   └── cli/             Scripts one-shot (imports, debug, corrections)
+│   └── cli/             Scripts CLI (imports, maintenance, oneshot, dev)
 ├── tests/               pytest (unit + integration)
 ├── logs/                Logs consolidés (JSON), status.json, rapports pipeline
 ├── run_pipeline.py      Orchestrateur du pipeline
@@ -225,7 +227,7 @@ d'import entre couches (vérifiées par import-linter en pre-commit + CI).
 - [Architecture logicielle](docs/architecture/) — couches DDD, ports/adapters, règles d'import
 - [Modèle de données](docs/donnees/) — schéma, domaines fonctionnels, relations
 - [Sources de données](docs/sources/) — API, imports manuels, particularités par source
-- [Pipeline](docs/pipeline/) — les 9 phases de traitement
+- [Pipeline](docs/pipeline/) — les phases de traitement
 - [Guide d'exploitation](docs/exploitation/) — initialisation, déploiement, lancement, supervision
 - [Guide utilisateur](docs/guide-utilisateur/) — pages publiques, pages admin, workflows
 - [Glossaire](docs/glossaire.md) — définitions des termes métier
