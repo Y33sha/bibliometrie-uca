@@ -69,7 +69,7 @@ Légende :
 | `perimeters` | admin | `application/services/perimeters/core.py` |
 | `config` | admin | `application/services/config/commands.py` |
 | `perimeter_structures` | pipeline | rematérialisée par la phase `affiliations` (`refresh_perimeter_structures`) |
-| `addresses` | mixte | créées par le pipeline (`resolve_addresses.py`) ; colonne `country` éditable en admin (`addresses/commands.py`) |
+| `addresses` | mixte | créées par le pipeline (`resolve_addresses.py`) ; colonne `countries` éditable en admin (`addresses/commands.py`) |
 | `address_structures` | mixte | liens posés par le pipeline (`resolve_addresses.py`) ; colonne `is_confirmed` posée en admin (`addresses/commands.py`) |
 | `apc_payments` | import | `interfaces/cli/imports/import_apc.py`, `import_openapc.py` |
 | `countries`, `place_name_forms` | référence | `seed.sql` |

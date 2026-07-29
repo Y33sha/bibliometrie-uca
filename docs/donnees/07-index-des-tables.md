@@ -68,9 +68,11 @@ Les vues matérialisées sont signalées comme telles ; les tables purement tech
 | `addresses` | adresses normalisées issues des signatures | [Structures](02-structures.md) |
 | `apc_payments` | frais de publication (import CSV) | [Structures](02-structures.md) |
 | `audit_log` | journal des événements (actions admin, fusions) — technique | — |
+| `author_identifying_keys` | attributs d'identité d'une signature source (nom normalisé, identifiants), partagés via `identity_id` | [Authorships et sources](05-authorships-et-sources.md) |
 | `authorship_structures` | *vue matérialisée* : structures d'un authorship canonique | [Données dérivées](06-donnees-derivees.md) |
 | `authorships` | table de vérité personne × publication | [Authorships et sources](05-authorships-et-sources.md) |
 | `config` | configuration (périmètres actifs, clés API…) | [Structures](02-structures.md) |
+| `confirmed_authorships` | épinglages admin (must-link) signature source ↔ personne, réappliqués à chaque run | [Authorships et sources](05-authorships-et-sources.md) |
 | `countries` | référentiel des pays | [Structures](02-structures.md) |
 | `distinct_persons` | paires marquées distinctes malgré un nom commun | [Personnes](04-personnes.md) |
 | `distinct_publications` | paires marquées distinctes malgré un titre identique | [Publications](03-publications.md) |
@@ -80,7 +82,6 @@ Les vues matérialisées sont signalées comme telles ; les tables purement tech
 | `journals` | référentiel des revues | [Publications](03-publications.md) |
 | `perimeter_structures` | appartenance au périmètre, recalculée par le pipeline | [Structures](02-structures.md) |
 | `perimeters` | définition des périmètres | [Structures](02-structures.md) |
-| `person_identifier_keys` | *vue matérialisée* : substrat de la file admin « conflits d'identifiant » | [Données dérivées](06-donnees-derivees.md) |
 | `person_identifiers` | identifiants persistants (ORCID, idHAL, IdRef) | [Personnes](04-personnes.md) |
 | `person_name_forms` | formes de noms pour le matching des personnes | [Personnes](04-personnes.md) |
 | `persons` | référentiel des personnes (périmètre UCA) | [Personnes](04-personnes.md) |
