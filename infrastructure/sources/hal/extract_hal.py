@@ -24,8 +24,8 @@ from infrastructure.sources.http_retry import http_request_with_retry
 
 
 def _build_url(base_url: str) -> str:
-    """Construit l'URL de recherche HAL à partir de la base API."""
-    return f"{base_url}/"
+    """Construit l'URL de recherche HAL : une seule barre oblique finale, que la base la porte ou non."""
+    return f"{base_url.rstrip('/')}/"
 
 
 def extract_doi(doc: dict[str, Any]) -> str | None:
