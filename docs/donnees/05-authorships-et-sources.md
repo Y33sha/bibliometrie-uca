@@ -24,12 +24,16 @@ Colonnes notables :
 
 Store univoque `(publication_id, person_id, created_at)`, PK composite, FK `ON DELETE CASCADE` vers `publications` et `persons`. Écrit par l'exclusion canonique (croix de la page personne → `PATCH /api/authorships/{id}/exclude`), qui y insère la paire et supprime la row `authorships`. Tous les sites de création d'`authorships` (build + assignation d'orphelins) anti-joignent ce store, de sorte que le rejet survit aux rebuilds — contrairement à un drapeau sur la table dérivée, purgé en mode `full`. Une fusion de personnes transfère les rejets de l'absorbée vers l'absorbante (dédoublonnage sur conflit de PK).
 
+### `confirmed_authorships` — épinglages must-link
+
+Pendant du rejet : store `(source_authorship_id, person_id)` des attributions épinglées à la main. `enforce_confirmed_authorships` (phase `persons`) réapplique l'épingle à chaque run — `source_authorships.person_id` est recalé sur la personne épinglée — et le matching la respecte : une signature épinglée n'est ni re-orphelinée ni réattribuée. Durable aux reconstructions, comme `rejected_authorships`.
+
 ## Tables sources
 
-Toutes les sources partagent les mêmes tables, discriminées par la colonne `source` (enum `source_type` : hal, openalex, wos, scanr, theses, crossref).
+Toutes les sources partagent les mêmes tables, discriminées par la colonne `source` (enum `source_type` : hal, openalex, wos, scanr, theses, crossref, datacite).
 
 - **`source_publications`** : un enregistrement par document par source. Relié à `publications` via `publication_id` (peut être NULL si pas encore rattaché). Contient les métadonnées (doc_type non mappé, oa_status, abstract, keywords, topics, biblio, meta). Le champ `hal_collections` (text[]) est spécifique à HAL.
-- **`source_authorships`** : contribution d'un auteur source à un document source. Porte `person_id` (rattachement à une personne canonique), `authorship_id` (FK vers l'authorship canonique), `in_perimeter`, `source_structures` (ARRAY[TEXT] des IDs natifs des structures côté source : numérique HAL, `I****` OpenAlex, noms d'institutions WoS, etc.), `raw_author_name`, `author_name_normalized`, `person_identifiers` (JSONB : `orcid`, `idhal`, `idref`, `hal_person_id`, `researcher_id`), `countries` (ARRAY[CHAR(2)]), `roles`. Les affiliations canoniques résolues sont exposées par la matview `source_authorship_structures (source_authorship_id, structure_id)`, dérivée des `source_authorship_addresses` via les liens `address_structures` confirmés du périmètre actif. Les affiliations textuelles brutes sont reliées via `source_authorship_addresses` → `addresses.raw_text`.
+- **`source_authorships`** : contribution d'un auteur source à un document source. Porte `person_id` (rattachement à une personne canonique), `authorship_id` (FK vers l'authorship canonique), `in_perimeter`, `is_corresponding`, `author_position`, `raw_author_name`, `roles`, `countries_dirty` (drapeau de recalcul des pays) et `resolution_mode`. Les attributs d'identité de l'auteur source — `author_name_normalized` et `person_identifiers` (JSONB : `orcid`, `idhal`, `idref`, `hal_person_id`, `researcher_id`) — vivent sur `author_identifying_keys`, référencée par `identity_id` : plusieurs signatures de même identité normalisée partagent une clé. Les affiliations canoniques résolues sont exposées par la matview `source_authorship_structures (source_authorship_id, structure_id)`, dérivée des `source_authorship_addresses` via les liens `address_structures` confirmés du périmètre actif. Les affiliations textuelles brutes sont reliées via `source_authorship_addresses` → `addresses.raw_text`.
 - **`source_authorship_addresses`** : table de liaison `source_authorships ↔ addresses`. Permet aux normalizers de partager une même chaîne d'adresse normalisée (`addresses.raw_text` → `addresses.normalized_text`) entre plusieurs authorships, et alimente la résolution structure ↔ adresse de la phase `affiliations`.
 
 ## `staging` — ingestion par source
@@ -40,7 +44,7 @@ Table d'ingestion par source. Cycle de vie en 3 états explicites :
 |---|---|---|---|---|
 | **À traiter** | FALSE | NULL | plein (payload source) | extracteurs sources |
 | **Normalisée** | TRUE | NULL | `{}` (vidé) | normalizers après traitement |
-| **Non trouvée** | TRUE | timestamp | `{}` (jamais peuplé) | `fetch_missing_hal_id` (hal-id 404), `crossref/fetch_missing_doi` (DOI 404 sur source native) |
+| **Non trouvée** | TRUE | timestamp | `{}` (jamais peuplé) | `fetch_missing_hal` (hal-id 404), `crossref/fetch_missing_doi` (DOI 404 sur source native) |
 
 Transitions valides :
 

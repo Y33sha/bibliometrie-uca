@@ -14,7 +14,6 @@ Toutes sont déclarées `WITH NO DATA` et rafraîchies par le pipeline (la plupa
 | `authorship_structures` | `source_authorship_structures` ⋈ `source_authorships` | phase `authorships` |
 | `publication_structures` | `authorships` ⋈ `authorship_structures` | phase `authorships` |
 | `subject_cooccurrences` | paires de sujets co-présents sur une même publication (`publication_subjects`) | phase `subjects` |
-| `person_identifier_keys` | `person_identifiers` (substrat de la file admin « conflits d'identifiant ») | phase `persons` |
 
 ## Tables dérivées
 
@@ -26,7 +25,7 @@ Toutes sont déclarées `WITH NO DATA` et rafraîchies par le pipeline (la plupa
 Certaines colonnes dupliquent une information calculable, pour éviter une jointure ou une agrégation en lecture :
 
 - `in_perimeter` sur `source_authorships`, `authorships` et `publications` (rollup d'affiliation).
-- `countries[]` sur `source_authorships`, `source_publications` et `publications`.
+- `countries[]` sur `source_publications` et `publications`.
 - `pub_count` sur `journals`, `publishers` et `addresses`.
 - `usage_count` sur `subjects`.
 
