@@ -16,7 +16,7 @@ Le pipeline interroge DataCite pour les DOI déjà découverts par les autres so
 
 - *polite pool* obtenu via `User-Agent: BibliometrieUCA-pipeline/1.0 (mailto:<email>)` (email lu via `polite_pool_email`)
 - Pas de quota contractuel. L'adapter reste conservateur (`max_concurrent=3`, `request_delay_s=0.2`) pour ne pas se faire limiter
-- Les 404 sont matérialisés dans `staging` avec `not_found=TRUE` + `processed=TRUE` pour ne pas être réinterrogés à chaque run
+- Les 404 sont matérialisés dans `staging` par `not_found_at` (avec `processed=TRUE`) pour ne pas être réinterrogés à chaque run
 
 **Prefixes API** (`https://api.datacite.org/prefixes/{prefix}`) — identification du *provider* et du *client* (l'entrepôt) rattachés à un préfixe DOI. Consommée par le sub-step `resolve_publishers` de la phase [`publishers_journals`](../pipeline/05-publishers-journals.md), qui complète la table `doi_prefixes` (préfixe → entrepôt + provider) une fois sa Registration Agency résolue en amont par [`resolve_ra`](../pipeline/02-extract.md#agences-denregistrement-doi).
 
