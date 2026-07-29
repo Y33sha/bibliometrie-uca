@@ -1,6 +1,6 @@
 # Sources supplémentaires
 
-Sources externes interrogées pour **enrichir** les entités du référentiel (publications, revues, éditeurs). Différence avec les sources principales : elles ne moissonnent pas, n'alimentent pas la table `staging`, et n'ont pas de `source_publications.source=...` dédié. Les données récupérées sont écrites directement sur les tables canoniques via le repository concerné.
+Sources externes interrogées pour **enrichir** les entités du référentiel (publications, revues, éditeurs). Différence avec les sources principales : elles ne moissonnent pas, n'alimentent pas la table `staging`, et n'ont pas de `source_publications.source=...` dédié. Les données récupérées sont écrites directement sur les tables canoniques par la phase d'enrichissement concernée du pipeline.
 
 ## Unpaywall
 
@@ -16,7 +16,7 @@ Source d'enrichissement consultée par DOI pour affiner `publications.oa_status`
 
 - Polite pool obtenu via le paramètre `?email=...` (lu via `polite_pool_email`).
 - Limites Unpaywall : 100 000 requêtes/jour, ~10 req/s recommandé. L'adapter limite à 5 requêtes concurrentes (`asyncio.Semaphore(5)`).
-- Implémentation async (`httpx.AsyncClient`), comme tous les extracteurs unitaires par DOI (HAL/OpenAlex/WoS/ScanR/CrossRef `fetch_missing_doi`, `refetch_truncated`).
+- Implémentation async (`httpx.AsyncClient`), comme tous les extracteurs unitaires par DOI (HAL/OpenAlex/WoS/ScanR/CrossRef/DataCite `fetch_missing_doi`, `refetch_truncated`).
 
 ### Données récupérées
 
