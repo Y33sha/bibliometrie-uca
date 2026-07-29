@@ -53,7 +53,7 @@ def extract_union(
         logger.info(f"{total} docs (dry-run)")
         return metrics
 
-    page_size = adapter.per_page_for(None)
+    page_size = adapter.per_page()
     logger.info("interrogation HAL…")
     cursor = "*"
     page = 0
