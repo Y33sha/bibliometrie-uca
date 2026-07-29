@@ -301,12 +301,13 @@ class TestAddIdentifier:
         assert r.status_code == 401
 
     def test_invalid_id_type(self, auth_client):
+        # Valeur hors de l'énum `PersonIdentifierType` : rejetée au bord par Pydantic (422).
         pid = _seed_person()
         r = auth_client.post(
             f"/api/persons/{pid}/identifiers",
             json={"id_type": "unknown", "id_value": "whatever"},
         )
-        assert r.status_code == 400
+        assert r.status_code == 422
 
     def test_empty_value_rejected(self, auth_client):
         pid = _seed_person()

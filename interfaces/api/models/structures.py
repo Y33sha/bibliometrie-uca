@@ -2,6 +2,7 @@
 
 from pydantic import BaseModel
 
+from domain.structures.relations import StructureRelationType
 from domain.structures.structure import StructureType
 
 # ----- Corps des requêtes -----
@@ -32,7 +33,7 @@ class StructureUpdate(BaseModel):
 class RelationCreate(BaseModel):
     parent_id: int
     child_id: int
-    relation_type: str
+    relation_type: StructureRelationType
 
 
 class NameFormCreate(BaseModel):
