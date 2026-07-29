@@ -46,7 +46,7 @@ cp .env.example .env
 docker compose up
 ```
 
-- Frontend : http://localhost:5176/
+- Frontend : http://localhost:5176/bibliometrie
 - API : http://localhost:8003
 
 Le code est monté en volume : hot reload backend + frontend.
