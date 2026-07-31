@@ -2,16 +2,10 @@
 
 from sqlalchemy import text
 
-from infrastructure.pipeline.countries import (
-    clear_countries_dirty,
-    count_suggest_eligible,
-    fetch_suggest_targets_chunk,
-    load_country_pool,
-    refresh_address_source_countries,
-    refresh_publication_countries,
-    write_countries,
-)
+from infrastructure.pipeline.countries import PgCountryQueries
 from tests.integration.helpers.authorships import upsert_identity
+
+_Q = PgCountryQueries()
 
 
 def _create_pub(conn, title="X"):
@@ -78,7 +72,7 @@ class TestRefreshAddressSourceCountries:
             {"sa": sa, "addr": addr},
         )
 
-        updated = refresh_address_source_countries(sa_sync_conn)
+        updated = _Q.refresh_address_source_countries(sa_sync_conn)
         assert updated == 1
 
         result = sa_sync_conn.execute(
@@ -100,7 +94,7 @@ class TestRefreshAddressSourceCountries:
             {"sa": sa, "addr": addr},
         )
 
-        updated = refresh_address_source_countries(sa_sync_conn)
+        updated = _Q.refresh_address_source_countries(sa_sync_conn)
         assert updated == 0
 
 
@@ -113,7 +107,7 @@ class TestRefreshPublicationCountries:
         _create_sa(sa_sync_conn, sd1, "hal")
         _create_sa(sa_sync_conn, sd2, "openalex")
 
-        updated = refresh_publication_countries(sa_sync_conn)
+        updated = _Q.refresh_publication_countries(sa_sync_conn)
         assert updated == 1
 
         result = sa_sync_conn.execute(
@@ -124,7 +118,7 @@ class TestRefreshPublicationCountries:
 
     def test_ignores_source_pubs_without_publication_id(self, sa_sync_conn):
         _create_sd(sa_sync_conn, None, "hal", "hal-orphan", countries=["FR"])
-        updated = refresh_publication_countries(sa_sync_conn)
+        updated = _Q.refresh_publication_countries(sa_sync_conn)
         assert updated == 0
 
     def test_noop_when_already_up_to_date(self, sa_sync_conn):
@@ -136,7 +130,7 @@ class TestRefreshPublicationCountries:
             {"pid": pub_id},
         )
 
-        updated = refresh_publication_countries(sa_sync_conn)
+        updated = _Q.refresh_publication_countries(sa_sync_conn)
         assert updated == 0
 
 
@@ -186,7 +180,7 @@ class TestDirtyDrivenSourceCountries:
         _link_sa_address(sa_sync_conn, dirty_sa, _create_address(sa_sync_conn, "Lyon", ["FR"]))
         _link_sa_address(sa_sync_conn, clean_sa, _create_address(sa_sync_conn, "Boston", ["US"]))
 
-        refresh_address_source_countries(sa_sync_conn)
+        _Q.refresh_address_source_countries(sa_sync_conn)
         assert _sp_countries(sa_sync_conn, dirty_sd) == ["FR"]
         assert _sp_countries(sa_sync_conn, clean_sd) is None  # aucun sa dirty → pas recalculé
 
@@ -196,7 +190,7 @@ class TestDirtyDrivenSourceCountries:
         sa = _create_sa(sa_sync_conn, sd, "openalex")  # dirty, adresse sans pays
         _link_sa_address(sa_sync_conn, sa, _create_address(sa_sync_conn, "X", None))
 
-        refresh_address_source_countries(sa_sync_conn)
+        _Q.refresh_address_source_countries(sa_sync_conn)
         assert _sp_countries(sa_sync_conn, sd) is None  # orphelin → NULL
 
     def test_dirty_address_drives_source_recompute(self, sa_sync_conn):
@@ -211,9 +205,9 @@ class TestDirtyDrivenSourceCountries:
         _link_sa_address(sa_sync_conn, sa, addr)
 
         # write_countries(countries) pose addresses.countries_dirty sur la ligne changée.
-        write_countries(sa_sync_conn, [(addr, ["FR"])], target_column="countries")
+        _Q.write_countries(sa_sync_conn, [(addr, ["FR"])], target_column="countries")
         assert _addr_dirty(sa_sync_conn, addr) is True
-        refresh_address_source_countries(sa_sync_conn)
+        _Q.refresh_address_source_countries(sa_sync_conn)
         assert _sp_countries(sa_sync_conn, sd) == ["FR"]  # recalculé via l'adresse dirty
 
     def test_clear_dirty_clears_both_flags(self, sa_sync_conn):
@@ -221,8 +215,8 @@ class TestDirtyDrivenSourceCountries:
         sd = _create_sd(sa_sync_conn, pub, "openalex", "oa-c")
         sa = _create_sa(sa_sync_conn, sd, "openalex")  # sa dirty par défaut
         addr = _create_address(sa_sync_conn, "Paris", None)
-        write_countries(sa_sync_conn, [(addr, ["FR"])], target_column="countries")  # addr dirty
-        clear_countries_dirty(sa_sync_conn)
+        _Q.write_countries(sa_sync_conn, [(addr, ["FR"])], target_column="countries")  # addr dirty
+        _Q.clear_countries_dirty(sa_sync_conn)
         assert _sa_dirty(sa_sync_conn, sa) is False
         assert _addr_dirty(sa_sync_conn, addr) is False
 
@@ -260,9 +254,9 @@ class TestSuggestCountryQueries:
         countried = _create_address_full_sa(sa_sync_conn, "Done", "already done", countries=["FR"])
         short = _create_address_full_sa(sa_sync_conn, "Sh", "lyon")
         suggested = _create_address_full_sa(sa_sync_conn, "Sug", "sug done")
-        write_countries(sa_sync_conn, [(suggested, ["FR"])])
+        _Q.write_countries(sa_sync_conn, [(suggested, ["FR"])])
 
-        ids = {i for i, _ in fetch_suggest_targets_chunk(sa_sync_conn, after_id=0, limit=1000)}
+        ids = {i for i, _ in _Q.fetch_suggest_targets_chunk(sa_sync_conn, after_id=0, limit=1000)}
         assert eligible in ids
         assert short in ids  # la longueur du texte ne conditionne pas l'éligibilité
         assert countried not in ids  # a déjà des pays
@@ -271,19 +265,19 @@ class TestSuggestCountryQueries:
     def test_fetch_targets_keyset_after_id(self, sa_sync_conn):
         a = _create_address_full_sa(sa_sync_conn, "A", "lab aaa seul")
         b = _create_address_full_sa(sa_sync_conn, "B", "lab bbb seul")
-        ids = {i for i, _ in fetch_suggest_targets_chunk(sa_sync_conn, after_id=a, limit=1000)}
+        ids = {i for i, _ in _Q.fetch_suggest_targets_chunk(sa_sync_conn, after_id=a, limit=1000)}
         assert a not in ids and b in ids
 
     def test_fetch_retry_empty_includes_empties_not_positives(self, sa_sync_conn):
         fresh = _create_address_full_sa(sa_sync_conn, "Fresh", "lab fresh seul")
         empty = _create_address_full_sa(sa_sync_conn, "Empty", "lab empty seul")
         positive = _create_address_full_sa(sa_sync_conn, "Pos", "lab positive seul")
-        write_countries(sa_sync_conn, [(empty, []), (positive, ["FR"])])
-        inc = {i for i, _ in fetch_suggest_targets_chunk(sa_sync_conn, after_id=0, limit=1000)}
+        _Q.write_countries(sa_sync_conn, [(empty, []), (positive, ["FR"])])
+        inc = {i for i, _ in _Q.fetch_suggest_targets_chunk(sa_sync_conn, after_id=0, limit=1000)}
         assert fresh in inc and empty not in inc and positive not in inc  # incrémental : nouvelles
         full = {
             i
-            for i, _ in fetch_suggest_targets_chunk(
+            for i, _ in _Q.fetch_suggest_targets_chunk(
                 sa_sync_conn, after_id=0, limit=1000, retry_empty=True
             )
         }
@@ -293,21 +287,21 @@ class TestSuggestCountryQueries:
     def test_load_pool_returns_only_countried(self, sa_sync_conn):
         _create_address_full_sa(sa_sync_conn, "P", "lab pool a", countries=["FR"])
         _create_address_full_sa(sa_sync_conn, "N", "lab no country")
-        texts = {t for t, _ in load_country_pool(sa_sync_conn)}
+        texts = {t for t, _ in _Q.load_country_pool(sa_sync_conn)}
         assert "lab pool a" in texts
         assert "lab no country" not in texts
 
     def test_write_suggested_array_and_empty(self, sa_sync_conn):
         a = _create_address_full_sa(sa_sync_conn, "A", "lab a seul")
         b = _create_address_full_sa(sa_sync_conn, "B", "lab b seul")
-        write_countries(sa_sync_conn, [(a, ["FR"]), (b, [])])
+        _Q.write_countries(sa_sync_conn, [(a, ["FR"]), (b, [])])
         assert _get_address_field_sa(sa_sync_conn, a, "suggested_countries") == ["FR"]
         # array vide (et non NULL) : marque « tentée sans match » pour la sauter ensuite.
         assert _get_address_field_sa(sa_sync_conn, b, "suggested_countries") == []
 
     def test_write_direct_to_countries(self, sa_sync_conn):
         a = _create_address_full_sa(sa_sync_conn, "A", "lab a seul")
-        write_countries(sa_sync_conn, [(a, ["FR"])], target_column="countries")
+        _Q.write_countries(sa_sync_conn, [(a, ["FR"])], target_column="countries")
         assert _get_address_field_sa(sa_sync_conn, a, "countries") == ["FR"]
         assert _get_address_field_sa(sa_sync_conn, a, "suggested_countries") is None
 
@@ -315,20 +309,20 @@ class TestSuggestCountryQueries:
         import pytest
 
         with pytest.raises(ValueError):
-            write_countries(sa_sync_conn, [(1, ["FR"])], target_column="bogus")
+            _Q.write_countries(sa_sync_conn, [(1, ["FR"])], target_column="bogus")
 
     def test_write_idempotent_same_value_then_overwrite(self, sa_sync_conn):
         a = _create_address_full_sa(sa_sync_conn, "A", "lab a seul")
-        write_countries(sa_sync_conn, [(a, ["FR"])])
-        write_countries(sa_sync_conn, [(a, ["FR"])])  # même valeur : no-op
+        _Q.write_countries(sa_sync_conn, [(a, ["FR"])])
+        _Q.write_countries(sa_sync_conn, [(a, ["FR"])])  # même valeur : no-op
         assert _get_address_field_sa(sa_sync_conn, a, "suggested_countries") == ["FR"]
-        write_countries(sa_sync_conn, [(a, ["BE"])])  # valeur différente : écrase
+        _Q.write_countries(sa_sync_conn, [(a, ["BE"])])  # valeur différente : écrase
         assert _get_address_field_sa(sa_sync_conn, a, "suggested_countries") == ["BE"]
 
     def test_count_eligible(self, sa_sync_conn):
         _create_address_full_sa(sa_sync_conn, "E", "lab eligible seul")
         attempted = _create_address_full_sa(sa_sync_conn, "A", "lab attempted seul")
-        write_countries(sa_sync_conn, [(attempted, [])])  # tentée sans match
-        counts = count_suggest_eligible(sa_sync_conn)
+        _Q.write_countries(sa_sync_conn, [(attempted, [])])  # tentée sans match
+        counts = _Q.count_suggest_eligible(sa_sync_conn)
         assert counts.eligible >= 1  # la fraîche (suggested_countries IS NULL)
         assert counts.empty_attempted >= 1  # la tentée sans match (`= []`)
