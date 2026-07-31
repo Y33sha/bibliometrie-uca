@@ -179,6 +179,19 @@ def insert_rh_record(
     )
 
 
+def map_rh_emails_to_person_ids(conn: Connection) -> dict[str, list[int]]:
+    """`{email minusculisé: [person_id, ...]}` depuis `persons_rh` (emails renseignés). Résout les emails de l'import des ORCID authentifiés vers les personnes qui les portent."""
+    return {
+        r.email: list(r.pids)
+        for r in conn.execute(
+            text(
+                "SELECT lower(email) AS email, array_agg(DISTINCT person_id) AS pids "
+                "FROM persons_rh WHERE email IS NOT NULL GROUP BY lower(email)"
+            )
+        )
+    }
+
+
 def has_distinct_rh(conn: Connection, id_a: int, id_b: int) -> bool:
     return (
         conn.execute(

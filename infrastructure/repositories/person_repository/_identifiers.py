@@ -35,6 +35,22 @@ def find_identifier(conn: Connection, id_type: str, id_value: str) -> PersonIden
     )
 
 
+def find_identifier_holders(
+    conn: Connection, id_type: str, id_values: list[str]
+) -> dict[str, tuple[int, str]]:
+    """Pour chaque valeur de `id_values` déjà présente sous ce type : `{id_value: (person_id, statut)}` de son porteur actuel. Sert à prévoir les déplacements avant l'import des ORCID authentifiés."""
+    return {
+        r.id_value: (r.person_id, r.status)
+        for r in conn.execute(
+            text(
+                "SELECT id_value, person_id, CAST(status AS text) AS status "
+                "FROM person_identifiers WHERE id_type = :it AND id_value = ANY(:v)"
+            ),
+            {"it": id_type, "v": id_values},
+        )
+    }
+
+
 def insert_identifier(conn: Connection, ident: PersonIdentifier) -> int:
     row = conn.execute(
         text("""

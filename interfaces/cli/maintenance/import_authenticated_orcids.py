@@ -25,8 +25,6 @@ import csv
 import os
 from pathlib import Path
 
-from sqlalchemy import Connection, text
-
 from application.ports.repositories.person_repository import AuthenticateOrcidOutcome
 from application.services.persons.core import authenticate_orcids
 from domain.persons.identifiers import normalize_orcid
@@ -51,33 +49,6 @@ def _load_rows(path: str | Path) -> list[tuple[str, str]]:
     return rows
 
 
-def resolve_email_to_persons(conn: Connection) -> dict[str, list[int]]:
-    """Emails RH (minusculisés) → liste des person_id qui les portent."""
-    return {
-        r.email: list(r.pids)
-        for r in conn.execute(
-            text(
-                "SELECT lower(email) AS email, array_agg(DISTINCT person_id) AS pids "
-                "FROM persons_rh WHERE email IS NOT NULL GROUP BY lower(email)"
-            )
-        )
-    }
-
-
-def fetch_current_orcid_holders(conn: Connection, orcids: list[str]) -> dict[str, tuple[int, str]]:
-    """Pour chaque ORCID déjà en base parmi ceux fournis : (person_id, statut) de son porteur actuel."""
-    return {
-        r.id_value: (r.person_id, r.status)
-        for r in conn.execute(
-            text(
-                "SELECT id_value, person_id, CAST(status AS text) AS status "
-                "FROM person_identifiers WHERE id_type = 'orcid' AND id_value = ANY(:v)"
-            ),
-            {"v": orcids},
-        )
-    }
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -93,7 +64,8 @@ def main() -> int:
 
     engine = get_sync_engine()
     with engine.connect() as conn:
-        email_to_persons = resolve_email_to_persons(conn)
+        repo = person_repository(conn)
+        email_to_persons = repo.map_rh_emails_to_person_ids()
 
         # État courant des ORCID du fichier, pour prévoir l'issue et détecter les déplacements.
         entries: list[tuple[int, str]] = []
@@ -114,7 +86,7 @@ def main() -> int:
                 continue
             entries.append((persons[0], orcid))
 
-        current = fetch_current_orcid_holders(conn, [o for _, o in entries])
+        current = repo.find_identifier_holders("orcid", [o for _, o in entries])
         reassignments = [
             (orcid, current[orcid][0], person_id)
             for person_id, orcid in entries
