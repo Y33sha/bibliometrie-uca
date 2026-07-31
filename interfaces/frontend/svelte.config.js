@@ -32,8 +32,7 @@ const config = {
 			// Les liens doc→code source sont réécrits vers GitHub (cf.
 			// `resolveDocLink`) ; un lien interne cassé reste une erreur de build.
 			// `handleMissingId` en `warn` : une ancre écrite à la main et non
-			// résolue (ex. accents) n'avorte pas le build (à fiabiliser côté
-			// `makeAnchor` ultérieurement).
+			// résolue (ex. accents) émet un avertissement plutôt qu'une erreur.
 			handleMissingId: 'warn'
 		}
 	}
