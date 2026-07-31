@@ -24,105 +24,39 @@ _DELTA_CTE = """
 """
 
 
-def sync_in_perimeter(conn: Connection, *, perimeter_ids: list[int]) -> InPerimeterSyncCounts:
-    """Aligne `in_perimeter` sur le périmètre, en n'écrivant que les changements.
-
-    Dérivé de la matview `source_authorship_structures` (à rafraîchir en amont) : `in_perimeter = TRUE` ssi l'authorship y figure pour une structure du périmètre restreint. Delta par différence d'ensembles d'ids (index-only), pas de balayage des `source_authorships`.
-    """
-    params = {"perimeter_ids": perimeter_ids}
-    added = conn.execute(
-        text(
-            _DELTA_CTE
-            + """
-            UPDATE source_authorships
-            SET in_perimeter = TRUE
-            WHERE id IN (SELECT id FROM should EXCEPT SELECT id FROM currently)
-        """
-        ),
-        params,
-    ).rowcount
-    removed = conn.execute(
-        text(
-            _DELTA_CTE
-            + """
-            UPDATE source_authorships
-            SET in_perimeter = FALSE
-            WHERE id IN (SELECT id FROM currently EXCEPT SELECT id FROM should)
-        """
-        ),
-        params,
-    ).rowcount
-    return InPerimeterSyncCounts(added=added, removed=removed)
-
-
-def refresh_source_authorship_structures(conn: Connection) -> None:
-    """Rafraîchit la matview `source_authorship_structures`, dérivée de `source_authorship_addresses ⋈ address_structures ⋈ perimeter_structures` et bornée au périmètre d'extraction (code lu dans la clé de config `perimeter_extraction`). `CONCURRENTLY` pour ne pas bloquer les lectures.
-
-    À appeler après `perimeter_structures` et la résolution des adresses, avant le refresh de `authorship_structures` (matview-sur-matview).
-    """
-    conn.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY source_authorship_structures"))
-
-
-def recompute_in_perimeter_on_source_authorships(
-    conn: Connection, source_authorship_ids: list[int], perimeter_structure_ids: list[int]
-) -> None:
-    """Recompute ciblé par ids de `source_authorships.in_perimeter`, depuis les adresses résolues (base, pas la matview) filtrées par le périmètre — temps réel après édition admin d'adresse."""
-    conn.execute(
-        text("""
-            UPDATE source_authorships sa
-            SET in_perimeter = EXISTS (
-                SELECT 1
-                FROM source_authorship_addresses saa
-                JOIN address_structures ast ON ast.address_id = saa.address_id
-                WHERE saa.source_authorship_id = sa.id
-                  AND ast.structure_id = ANY(:struct_ids)
-                  AND ast.is_confirmed IS DISTINCT FROM FALSE
-            )
-            WHERE sa.id = ANY(:source_authorship_ids)
-        """),
-        {"source_authorship_ids": source_authorship_ids, "struct_ids": perimeter_structure_ids},
-    )
-
-
-def propagate_in_perimeter_to_authorships(
-    conn: Connection, source_authorship_ids: list[int]
-) -> None:
-    """Propage `in_perimeter` des signatures données vers les `authorships` consolidées des paires impactées. Les structures dérivées (matview `authorship_structures`) sont laissées au pipeline."""
-    conn.execute(
-        text("""
-            CREATE TEMP TABLE _affected_authorships AS
-            SELECT DISTINCT a.id AS authorship_id
-            FROM source_authorships sa
-            JOIN source_publications sd ON sd.id = sa.source_publication_id
-            JOIN authorships a ON a.publication_id = sd.publication_id
-                              AND a.person_id = sa.person_id
-            WHERE sa.id = ANY(:ids)
-              AND sd.publication_id IS NOT NULL
-              AND sa.person_id IS NOT NULL
-        """),
-        {"ids": source_authorship_ids},
-    )
-    conn.execute(
-        text(f"""
-            UPDATE authorships a
-            SET in_perimeter = {AUTHORSHIP_IN_PERIMETER_EXPR}
-            FROM _affected_authorships af
-            WHERE a.id = af.authorship_id
-        """)
-    )
-    conn.execute(text("DROP TABLE _affected_authorships"))
-
-
 class PgAffiliationsQueries(AffiliationsQueries):
     """Adapter PostgreSQL pour `application.ports.pipeline.affiliations.in_perimeter.AffiliationsQueries`."""
 
     def sync_in_perimeter(
         self, conn: Connection, *, perimeter_ids: list[int]
     ) -> InPerimeterSyncCounts:
-        return sync_in_perimeter(conn, perimeter_ids=perimeter_ids)
+        params = {"perimeter_ids": perimeter_ids}
+        added = conn.execute(
+            text(
+                _DELTA_CTE
+                + """
+                UPDATE source_authorships
+                SET in_perimeter = TRUE
+                WHERE id IN (SELECT id FROM should EXCEPT SELECT id FROM currently)
+            """
+            ),
+            params,
+        ).rowcount
+        removed = conn.execute(
+            text(
+                _DELTA_CTE
+                + """
+                UPDATE source_authorships
+                SET in_perimeter = FALSE
+                WHERE id IN (SELECT id FROM currently EXCEPT SELECT id FROM should)
+            """
+            ),
+            params,
+        ).rowcount
+        return InPerimeterSyncCounts(added=added, removed=removed)
 
     def refresh_source_authorship_structures(self, conn: Connection) -> None:
-        refresh_source_authorship_structures(conn)
+        conn.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY source_authorship_structures"))
 
     def recompute_in_perimeter_on_source_authorships(
         self,
@@ -130,11 +64,46 @@ class PgAffiliationsQueries(AffiliationsQueries):
         source_authorship_ids: list[int],
         perimeter_structure_ids: list[int],
     ) -> None:
-        recompute_in_perimeter_on_source_authorships(
-            conn, source_authorship_ids, perimeter_structure_ids
+        conn.execute(
+            text("""
+                UPDATE source_authorships sa
+                SET in_perimeter = EXISTS (
+                    SELECT 1
+                    FROM source_authorship_addresses saa
+                    JOIN address_structures ast ON ast.address_id = saa.address_id
+                    WHERE saa.source_authorship_id = sa.id
+                      AND ast.structure_id = ANY(:struct_ids)
+                      AND ast.is_confirmed IS DISTINCT FROM FALSE
+                )
+                WHERE sa.id = ANY(:source_authorship_ids)
+            """),
+            {"source_authorship_ids": source_authorship_ids, "struct_ids": perimeter_structure_ids},
         )
 
     def propagate_in_perimeter_to_authorships(
         self, conn: Connection, source_authorship_ids: list[int]
     ) -> None:
-        propagate_in_perimeter_to_authorships(conn, source_authorship_ids)
+        # Propage `in_perimeter` vers les `authorships` consolidées ; les structures dérivées (matview `authorship_structures`) restent au pipeline.
+        conn.execute(
+            text("""
+                CREATE TEMP TABLE _affected_authorships AS
+                SELECT DISTINCT a.id AS authorship_id
+                FROM source_authorships sa
+                JOIN source_publications sd ON sd.id = sa.source_publication_id
+                JOIN authorships a ON a.publication_id = sd.publication_id
+                                  AND a.person_id = sa.person_id
+                WHERE sa.id = ANY(:ids)
+                  AND sd.publication_id IS NOT NULL
+                  AND sa.person_id IS NOT NULL
+            """),
+            {"ids": source_authorship_ids},
+        )
+        conn.execute(
+            text(f"""
+                UPDATE authorships a
+                SET in_perimeter = {AUTHORSHIP_IN_PERIMETER_EXPR}
+                FROM _affected_authorships af
+                WHERE a.id = af.authorship_id
+            """)
+        )
+        conn.execute(text("DROP TABLE _affected_authorships"))
