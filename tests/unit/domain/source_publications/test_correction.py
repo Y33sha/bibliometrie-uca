@@ -1,13 +1,13 @@
 """Tests de `effective_metadata` (correction des métadonnées canoniques)."""
 
-from domain.source_publications.correction import (
+from domain.source_publications.metadata_correction.journal_by_doi import resolve_journal_by_doi
+from domain.source_publications.metadata_correction.rules import (
     _SOURCE_ONLY_PREDICATES,
     MetadataCorrectionRule,
     MetadataForCorrection,
     _AppliesTo,
     effective_doc_type_for_publication,
     effective_metadata,
-    resolve_journal_by_doi,
 )
 
 

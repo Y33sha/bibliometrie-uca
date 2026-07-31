@@ -20,7 +20,7 @@ from application.ports.pipeline.metadata_correction import (
     MetadataCorrectionQueries,
     UnaryCorrectionRow,
 )
-from domain.source_publications.correction import (
+from domain.source_publications.metadata_correction.rules import (
     MetadataCorrectionRule,
     effective_metadata,
     strip_dissertation_keys,

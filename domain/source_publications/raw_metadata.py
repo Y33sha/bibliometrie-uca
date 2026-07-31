@@ -4,7 +4,7 @@ Quand une correction écrit la valeur **effective** dans une colonne typée de `
 
     {"<champ>": {"raw": <valeur source d'origine>, "corrected_by": "<règle ou marqueur>"}}
 
-Ce module centralise **lecture** (reconstruction du brut) et **écriture** (stash) de ce format, de sorte que le contrat de réversibilité — `COALESCE(raw_metadata->'<champ>'->>'raw', <colonne>)` côté SQL, `hydrate_raw_view` côté Python — soit défini en un seul endroit. Inverse des corrections (`domain/source_publications/correction.py`).
+Ce module centralise **lecture** (reconstruction du brut) et **écriture** (stash) de ce format, de sorte que le contrat de réversibilité — `COALESCE(raw_metadata->'<champ>'->>'raw', <colonne>)` côté SQL, `hydrate_raw_view` côté Python — soit défini en un seul endroit. Inverse des corrections (`domain/source_publications/metadata_correction/`).
 """
 
 from dataclasses import replace

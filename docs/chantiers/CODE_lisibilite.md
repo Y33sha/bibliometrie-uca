@@ -106,7 +106,7 @@ Passes de relecture des neuf services d'agrégat.
 
 Traverse `domain/`, `application/ports`, `application/pipeline/metadata_correction` et `infrastructure/pipeline` : le service publications n'en est que le symptôme visible.
 
-- [x] Contrat des règles (`MetadataForCorrection`) réduit aux dix champs lus, dans `domain/source_publications/correction.py` (`71337ec6`).
+- [x] Contrat des règles (`MetadataForCorrection`) réduit aux dix champs lus, dans `domain/source_publications/metadata_correction/rules.py` (`71337ec6`).
 - [x] Projection de ligne de la phase (`UnaryCorrectionRow`) déplacée dans `application/ports/pipeline/metadata_correction.py` ; les cinq champs morts sortent du `_SELECT` et des deux types (`71337ec6`).
 - [x] `declares_preprint` → `self_declared_preprint` (`71337ec6`).
 - [x] Appariement des lignes par nom plutôt que par rang, qui supprime le couplage entre l'ordre des champs et celui des colonnes (`b229c3ed`). Le reste du motif est noté en 2.6 et 2.7.
@@ -226,8 +226,8 @@ Deux findings ont leur fiche dédiée, tous deux traités : [Périmètre APC](ar
 
 ### Phase 4 - `domain/`
 
-- [ ] `source_publications/correction.py` (680 lignes) porte trois sujets, qui sont les trois sous-étapes de la phase `metadata_correction` — le module le documente déjà (« unaire : `doc_type`/`oa_status`/`external_ids` ; cluster : `doi` ; `journal_by_doi` : `journal_id` ») : le moteur de règles unaire (contrat, table `_RULES`, `effective_metadata`), la correction relationnelle par cluster DOI (`DoiClusterMember`, `resolve_cluster_doi_corrections`, `CONVERGENCE_CASES`), et le rattachement du journal par préfixe DOI (`resolve_journal_by_doi`). Candidat à la scission ; les deux derniers sujets raisonnent sur des `source_publications` et restent en place.
-- [ ] Placement du moteur de règles unaire, seul sujet bi-niveau (alimenté par une `source_publication` comme par une publication canonique), à trancher après la scission. À noter : ce n'est pas une question de couches, `publications/` et `source_publications/` s'important déjà mutuellement (`source_publications/doc_types.py` et `keys.py` vers `publications/` ; `publications/aggregation.py` vers `source_publications/`). Aucun cycle créé ni supprimé par un déplacement.
+- [x] `source_publications/correction.py` scindé en package `domain/source_publications/metadata_correction/`, un module par sous-étape de la phase homonyme : `rules.py` (moteur unaire — contrat `MetadataForCorrection`, table `_RULES`, `effective_metadata`), `shared_doi.py` (correction du DOI d'un groupe partageant un DOI — `DoiClusterMember`, `resolve_cluster_doi_corrections`, `CONVERGENCE_CASES`), `journal_by_doi.py` (rattachement de la revue par préfixe — `resolve_journal_by_doi`). Le nom du package porte la parenté à la phase ; les imports consommateurs pointent la sous-étape.
+- [x] Placement du moteur unaire : il reste sous `source_publications/` (dans le package `metadata_correction/`). Il s'applique d'abord sur les `source_publications` ; le rejeu canonique (`effective_doc_type_for_publication`) en est un emprunt. La flèche inverse `services` → `pipeline` du primitif applicatif `compute_update` (question ouverte, couche application) est un sujet distinct, laissé de côté.
 
 ### Phase 5 - `tests/`
 

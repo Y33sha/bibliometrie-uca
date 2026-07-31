@@ -12,7 +12,7 @@ from domain.publications.aggregation import refresh_from_sources as _refresh_agg
 from domain.publications.metadata import OA_STATUS_UNKNOWN_DEFAULT
 from domain.publications.publication import Publication
 from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES
-from domain.source_publications.correction import (
+from domain.source_publications.metadata_correction.rules import (
     MetadataForCorrection,
     effective_doc_type_for_publication,
 )

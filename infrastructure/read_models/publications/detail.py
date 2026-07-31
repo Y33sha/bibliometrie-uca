@@ -17,7 +17,7 @@ from application.ports.read_models.publications_queries import (
 from application.ports.read_models.subjects_queries import SubjectOut
 from domain.publications.doc_types import DocType
 from domain.publications.relations import RelationType, inverse_relation
-from domain.source_publications.correction import CONVERGENCE_CASES
+from domain.source_publications.metadata_correction.shared_doi import CONVERGENCE_CASES
 from domain.sources.registry import Source
 
 

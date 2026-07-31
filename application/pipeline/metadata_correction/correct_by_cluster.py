@@ -20,7 +20,7 @@ from application.ports.pipeline.metadata_correction import (
     DoiCorrectionUpdate,
     MetadataCorrectionQueries,
 )
-from domain.source_publications.correction import (
+from domain.source_publications.metadata_correction.shared_doi import (
     DoiClusterDecision,
     DoiClusterMember,
     resolve_cluster_doi_corrections,

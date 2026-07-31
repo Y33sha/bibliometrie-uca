@@ -2,14 +2,15 @@
 
 Implémenté par `infrastructure.pipeline.metadata_correction.PgMetadataCorrectionQueries`.
 
-La phase persiste sur `source_publications` les valeurs corrigées par les règles de `domain.source_publications.correction`, pour que le matching aval lise des colonnes déjà corrigées. Trois sous-étapes s'appuient sur ce port : la correction unaire, qui traite chaque `source_publication` isolément ; le rattachement d'un journal par préfixe de DOI ; et la correction de DOI par groupe de `source_publications` partageant un même DOI.
+La phase persiste sur `source_publications` les valeurs corrigées par les règles de `domain.source_publications.metadata_correction`, pour que le matching aval lise des colonnes déjà corrigées. Trois sous-étapes s'appuient sur ce port : la correction unaire, qui traite chaque `source_publication` isolément ; le rattachement d'un journal par préfixe de DOI ; et la correction de DOI par groupe de `source_publications` partageant un même DOI.
 """
 
 from typing import NamedTuple, Protocol
 
 from sqlalchemy import Connection
 
-from domain.source_publications.correction import DoiClusterCase, MetadataForCorrection
+from domain.source_publications.metadata_correction.rules import MetadataForCorrection
+from domain.source_publications.metadata_correction.shared_doi import DoiClusterCase
 from domain.types import JsonValue
 
 
