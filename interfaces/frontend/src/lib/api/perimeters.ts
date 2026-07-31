@@ -1,13 +1,17 @@
 import { del, post, put } from './client';
+import type { components } from './schema';
 
-export function create(body: Record<string, unknown>): Promise<{ id: number }> {
-	return post<{ id: number }>('/api/perimeters', body);
+type CreatedIdResponse = components['schemas']['CreatedIdResponse'];
+type OkResponse = components['schemas']['OkResponse'];
+
+export function create(body: Record<string, unknown>): Promise<CreatedIdResponse> {
+	return post<CreatedIdResponse>('/api/perimeters', body);
 }
 
-export function update(id: number, body: Record<string, unknown>): Promise<unknown> {
-	return put(`/api/perimeters/${id}`, body);
+export function update(id: number, body: Record<string, unknown>): Promise<OkResponse> {
+	return put<OkResponse>(`/api/perimeters/${id}`, body);
 }
 
-export function remove(id: number): Promise<null> {
-	return del<null>(`/api/perimeters/${id}`);
+export function remove(id: number): Promise<OkResponse> {
+	return del<OkResponse>(`/api/perimeters/${id}`);
 }

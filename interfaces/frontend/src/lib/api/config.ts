@@ -1,5 +1,8 @@
 import { put } from './client';
+import type { components } from './schema';
 
-export function setValue(key: string, value: unknown): Promise<unknown> {
-	return put(`/api/config/${key}`, { value });
+type ConfigItem = components['schemas']['ConfigItem'];
+
+export function setValue(key: string, value: unknown): Promise<ConfigItem> {
+	return put<ConfigItem>(`/api/config/${key}`, { value });
 }
