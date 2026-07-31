@@ -27,56 +27,6 @@ def _row(r: Row) -> StagingRow:  # type: ignore[type-arg]
     return StagingRow(id=r.id, source_id=r.source_id, doi=r.doi, raw_data=r.raw_data)
 
 
-def count_pending_staging(conn: Connection, source: str) -> int:
-    """Nombre de `staging` avec `processed=FALSE` pour la source donnée."""
-    row = conn.execute(
-        text("SELECT COUNT(*) AS cnt FROM staging WHERE source = :source AND processed = FALSE"),
-        {"source": source},
-    ).one_or_none()
-    return row.cnt if row else 0
-
-
-def fetch_pending_staging(conn: Connection, source: str, *, limit: int) -> list[StagingRow]:
-    """Charge les `limit` premiers `staging` non traités pour la source."""
-    rows = conn.execute(
-        text(f"""
-            SELECT {_COLUMNS}
-            FROM staging
-            WHERE source = :source AND processed = FALSE
-            ORDER BY id
-            LIMIT :lim
-        """),
-        {"source": source, "lim": limit},
-    ).all()
-    return [_row(r) for r in rows]
-
-
-def fetch_pending_staging_ids(conn: Connection, source: str) -> list[int]:
-    """Charge les `id` de tous les `staging` non traités de la source (pour fetch par sous-lots)."""
-    rows = conn.execute(
-        text("""
-            SELECT id FROM staging
-            WHERE source = :source AND processed = FALSE
-            ORDER BY id
-        """),
-        {"source": source},
-    ).all()
-    return [r.id for r in rows]
-
-
-def fetch_staging_by_ids(conn: Connection, staging_ids: list[int]) -> list[StagingRow]:
-    """Charge les `staging` dont l'id est dans la liste donnée."""
-    rows = conn.execute(
-        text(f"""
-            SELECT {_COLUMNS}
-            FROM staging WHERE id = ANY(:ids)
-            ORDER BY id
-        """),
-        {"ids": staging_ids},
-    ).all()
-    return [_row(r) for r in rows]
-
-
 _MARK_DONE_SQL = text(
     """
     UPDATE staging s
@@ -89,25 +39,6 @@ _MARK_DONE_SQL = text(
     RETURNING old.source AS source, old.source_id AS source_id, old.raw_data AS raw_data
     """
 )
-
-
-def mark_done(conn: Connection, staging_id: int, raw_store: RawStore) -> None:
-    """Marque un staging comme traité, archive son `raw_data` au raw store, puis le vide.
-
-    La sous-requête `old` capture le payload AVANT vidange (snapshot pré-UPDATE), écrit au raw store en best-effort (un échec ne casse pas la normalisation — la BDD reste la source de vérité), puis `raw_data` est vidé dans le même statement.
-    """
-    row = conn.execute(_MARK_DONE_SQL, {"sid": staging_id}).one_or_none()
-    if row is None or not row.raw_data:  # `{}` (stub not-found) → rien à archiver
-        return
-    try:
-        raw_store.put(row.source, row.source_id, canonical_json_bytes(row.raw_data))
-    except Exception:
-        logger.warning(
-            "raw_store.put a échoué pour %s/%s (payload non archivé)",
-            row.source,
-            row.source_id,
-            exc_info=True,
-        )
 
 
 def fetch_existing_source_ids(conn: Connection, source: str) -> set[str]:
@@ -192,18 +123,62 @@ class PgStagingQueries(StagingQueries):
         self._raw_store = raw_store if raw_store is not None else get_raw_store()
 
     def count_pending_staging(self, conn: Connection, source: str) -> int:
-        return count_pending_staging(conn, source)
+        row = conn.execute(
+            text(
+                "SELECT COUNT(*) AS cnt FROM staging WHERE source = :source AND processed = FALSE"
+            ),
+            {"source": source},
+        ).one_or_none()
+        return row.cnt if row else 0
 
     def fetch_pending_staging(
         self, conn: Connection, source: str, *, limit: int
     ) -> list[StagingRow]:
-        return fetch_pending_staging(conn, source, limit=limit)
+        rows = conn.execute(
+            text(f"""
+                SELECT {_COLUMNS}
+                FROM staging
+                WHERE source = :source AND processed = FALSE
+                ORDER BY id
+                LIMIT :lim
+            """),
+            {"source": source, "lim": limit},
+        ).all()
+        return [_row(r) for r in rows]
 
     def fetch_pending_staging_ids(self, conn: Connection, source: str) -> list[int]:
-        return fetch_pending_staging_ids(conn, source)
+        rows = conn.execute(
+            text("""
+                SELECT id FROM staging
+                WHERE source = :source AND processed = FALSE
+                ORDER BY id
+            """),
+            {"source": source},
+        ).all()
+        return [r.id for r in rows]
 
     def fetch_staging_by_ids(self, conn: Connection, staging_ids: list[int]) -> list[StagingRow]:
-        return fetch_staging_by_ids(conn, staging_ids)
+        rows = conn.execute(
+            text(f"""
+                SELECT {_COLUMNS}
+                FROM staging WHERE id = ANY(:ids)
+                ORDER BY id
+            """),
+            {"ids": staging_ids},
+        ).all()
+        return [_row(r) for r in rows]
 
     def mark_done(self, conn: Connection, staging_id: int) -> None:
-        mark_done(conn, staging_id, self._raw_store)
+        # `old` capture le payload avant vidange ; l'archivage au raw store est best-effort (un échec ne casse pas la normalisation, la base reste la source de vérité).
+        row = conn.execute(_MARK_DONE_SQL, {"sid": staging_id}).one_or_none()
+        if row is None or not row.raw_data:  # `{}` (stub not-found) → rien à archiver
+            return
+        try:
+            self._raw_store.put(row.source, row.source_id, canonical_json_bytes(row.raw_data))
+        except Exception:
+            logger.warning(
+                "raw_store.put a échoué pour %s/%s (payload non archivé)",
+                row.source,
+                row.source_id,
+                exc_info=True,
+            )
