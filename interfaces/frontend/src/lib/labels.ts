@@ -1,7 +1,7 @@
 /** Libellés FR (singulier) des types de documents, codés en dur.
  * Source de vérité de la liste canonique : l'enum PG `doc_type` /
  * `DOC_TYPES` du domain backend. La cohérence des clés est vérifiée
- * par un test pytest (tests/unit/domain/publications/test_doc_types.py)
+ * par un test pytest (tests/unit/domain/source_publications/test_doc_types.py)
  * qui lit ce fichier et casse si une valeur de l'enum n'a pas son libellé. */
 export const docTypeSingular: Record<string, string> = {
 	article: 'Article',
