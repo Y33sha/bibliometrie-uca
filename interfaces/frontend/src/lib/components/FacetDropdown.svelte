@@ -14,8 +14,7 @@
 		selected?: string[];
 		allLabel?: string;
 		tooltip?: string;
-		/** Regroupe les options sous des en-têtes (ex. familles de doc_types). Les options hors
-		 *  groupe sont rendues sans en-tête à la fin. La logique de sélection est inchangée. */
+		/** Regroupe les options sous des en-têtes (ex. familles de doc_types). Les options hors groupe sont rendues sans en-tête à la fin ; le regroupement est purement visuel, la sélection fonctionne à l'identique. */
 		groups?: { label: string; values: string[] }[];
 		onchange?: (selected: string[]) => void;
 	}
@@ -28,7 +27,7 @@
 	let filterText = $state('');
 	let allMode = $state(true);
 
-	// Sync allMode when selected is set externally (e.g. from URL params)
+	// Resynchronise allMode quand selected est posé de l'extérieur (ex. paramètres d'URL)
 	$effect(() => {
 		if (selected.length > 0 && allMode) {
 			allMode = false;
@@ -47,12 +46,12 @@
 
 	function toggleAll() {
 		if (allMode) {
-			// Uncheck "Tous" → uncheck everything visually
+			// Décoche « Tous » → tout décocher visuellement
 			allMode = false;
 			selected = [];
-			// No onchange: filter doesn't change (empty = no filter)
+			// Pas d'onchange : le filtre ne change pas (vide = aucun filtre)
 		} else {
-			// Check "Tous" → back to all
+			// Coche « Tous » → retour à tout
 			const hadFilter = selected.length > 0;
 			allMode = true;
 			selected = [];
@@ -62,12 +61,12 @@
 
 	function toggle(value: string) {
 		if (allMode) {
-			// Was in "all" mode → uncheck this one = select everything except it
+			// En mode « tous » → décocher celui-ci = sélectionner tout sauf lui
 			allMode = false;
 			selected = options.filter((o) => o.value !== value).map((o) => o.value);
 		} else if (selected.includes(value)) {
 			selected = selected.filter((v) => v !== value);
-			// Don't auto-switch to allMode when empty
+			// Pas de bascule auto vers allMode quand vide
 		} else {
 			selected = [...selected, value];
 			if (selected.length === options.length) {
@@ -302,8 +301,7 @@
 	.facet-options label:hover {
 		background: #f5f5f2;
 	}
-	/* Le texte de l'option tronque au lieu d'élargir le panneau (min-width: 0 pour autoriser le
-	   rétrécissement dans le flex ; le titre complet reste en `title` au survol). */
+	/* Le texte de l'option tronque au lieu d'élargir le panneau (min-width: 0 pour autoriser le rétrécissement dans le flex ; le titre complet reste en `title` au survol). */
 	.facet-opt-text {
 		overflow: hidden;
 		text-overflow: ellipsis;
