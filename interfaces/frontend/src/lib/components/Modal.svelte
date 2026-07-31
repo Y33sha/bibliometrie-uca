@@ -23,9 +23,7 @@
 
 	let dialog: HTMLDivElement | undefined = $state();
 
-	// Focus le premier champ de saisie à l'ouverture, pour démarrer la frappe
-	// sans cliquer ; à défaut (modale sans champ) le conteneur, qui capte échap.
-	// Trap complet de Tab non implémenté — usage admin, quick-win a11y.
+	// Focus le premier champ de saisie à l'ouverture, pour démarrer la frappe sans cliquer ; à défaut (modale sans champ) le conteneur, qui capte échap. Trap complet de Tab non implémenté (usage admin).
 	onMount(() => {
 		const field = dialog?.querySelector<HTMLElement>(
 			'input:not([type="hidden"]):not(:disabled), textarea:not(:disabled), select:not(:disabled)'
@@ -39,8 +37,7 @@
 			onclose();
 			return;
 		}
-		// Entrée valide, sauf si le focus est sur un champ multiligne ou un
-		// contrôle qui gère déjà Entrée (bouton, lien, select).
+		// Entrée valide, sauf si le focus est sur un champ multiligne ou un contrôle qui gère déjà Entrée (bouton, lien, select).
 		if (e.key === 'Enter' && onsubmit) {
 			const tag = (e.target as HTMLElement | null)?.tagName;
 			if (tag === 'TEXTAREA' || tag === 'BUTTON' || tag === 'A' || tag === 'SELECT') return;

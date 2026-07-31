@@ -12,10 +12,7 @@
 
 	let { columns, visibleColumns, showMenu, onToggle, onClose, onOpen }: Props = $props();
 
-	// Le tableau vit dans un conteneur `.table-scroll` en `overflow-x: auto` : son
-	// `overflow-y` calculé vaut `auto`, ce qui rognerait un dropdown en position
-	// absolue. On l'ancre donc en position fixe sur le bouton (recalculée à chaque
-	// ouverture), pour qu'il déborde librement sous le tableau.
+	// Le tableau vit dans un conteneur `.table-scroll` en `overflow-x: auto` : son `overflow-y` calculé vaut `auto`, ce qui rognerait un dropdown en position absolue. On l'ancre donc en position fixe sur le bouton (recalculée à chaque ouverture), pour qu'il déborde librement sous le tableau.
 	let btnEl: HTMLButtonElement | undefined = $state();
 	let menuPos = $state({ top: 0, right: 0 });
 

@@ -1,7 +1,5 @@
 <script lang="ts">
-	// Ligne d'état d'un tableau quand il n'a aucune donnée à afficher : message de
-	// chargement tant que la requête est en vol, message « vide » une fois chargé.
-	// Mutualise le libellé et le markup entre tous les tableaux paginés.
+	// Ligne d'état d'un tableau quand il n'a aucune donnée à afficher : message de chargement tant que la requête est en vol, message « vide » une fois chargé. Mutualise le libellé et le markup entre tous les tableaux paginés.
 	let {
 		loading = false,
 		colspan,

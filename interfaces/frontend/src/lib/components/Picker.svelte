@@ -27,11 +27,7 @@
     element?: HTMLDivElement;
   } = $props();
 
-  // Le focus arrive dans la recherche (use:autofocus). La navigation entre
-  // résultats se fait au Tab natif — ce sont des boutons — et la sélection à
-  // Entrée/Espace sur le bouton focalisé. On ne gère donc au clavier qu'Échap,
-  // au niveau du conteneur (capté que le focus soit sur la recherche ou un
-  // résultat). stopPropagation : ne pas fermer un Modal englobant au passage.
+  // Le focus arrive dans la recherche (use:autofocus). La navigation entre résultats se fait au Tab natif — ce sont des boutons — et la sélection à Entrée/Espace sur le bouton focalisé. On ne gère donc au clavier qu'Échap, au niveau du conteneur (capté que le focus soit sur la recherche ou un résultat). stopPropagation : ne pas fermer un Modal englobant au passage.
   function onkeydown(e: KeyboardEvent) {
     if (e.key === "Escape") {
       e.preventDefault();
@@ -100,8 +96,7 @@
   .picker-item:hover {
     background: var(--accent-light);
   }
-  /* Option atteinte au Tab : même fond bleu pâle que le survol (le cadre bleu
-     par défaut est peu lisible, voire invisible quand il n'y a qu'un résultat). */
+  /* Option atteinte au Tab : même fond bleu pâle que le survol (le cadre bleu par défaut est peu lisible, voire invisible quand il n'y a qu'un résultat). */
   .picker-item:focus-visible {
     background: var(--accent-light);
     outline: none;
