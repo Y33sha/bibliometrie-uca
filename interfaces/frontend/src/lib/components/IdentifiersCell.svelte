@@ -7,9 +7,7 @@
 	let { identifiers = [] }: { identifiers?: Identifier[] } = $props();
 
 	/**
-	 * Identifiants d'un type, regroupés par valeur : une même valeur peut être attribuée par
-	 * plusieurs sources, et la valeur est confirmée dès que l'une de ses attributions l'est.
-	 * Les attributions que la curation a rejetées ne s'affichent pas.
+	 * Identifiants d'un type, regroupés par valeur : une même valeur peut être attribuée par plusieurs sources, et la valeur est confirmée dès que l'une de ses attributions l'est. Les attributions que la curation a rejetées ne s'affichent pas.
 	 */
 	function grouped(type: string) {
 		const byValue = new Map<string, boolean>();

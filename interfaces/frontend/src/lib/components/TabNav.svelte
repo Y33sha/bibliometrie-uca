@@ -9,9 +9,9 @@
 
 	interface Props {
 		tabs: TabDef[];
-		/** Called after the URL is updated. Use for lazy loading. */
+		/** Appelé après la mise à jour de l'URL. Sert au chargement paresseux. */
 		onswitch?: (tab: string) => void;
-		/** Called after goto completes (e.g. to syncUrl). */
+		/** Appelé une fois la navigation terminée (ex. resynchroniser l'URL). */
 		afterNavigate?: () => void;
 	}
 

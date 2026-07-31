@@ -13,11 +13,7 @@
 		items: Item[];
 		states?: Record<string, ToggleState>;
 		counts?: Record<string, { yes: number; no: number }>;
-		/** Si true (défaut), affiche toujours le décompte des « présents »
-		 *  (counts.yes) quel que soit l'état du toggle. Garde une référence
-		 *  stable pendant que l'utilisateur cycle ses filtres. Passer false
-		 *  pour faire suivre le décompte (yes → présents, no → absents,
-		 *  all → total). */
+		/** Si true (défaut), affiche toujours le décompte des « présents » (counts.yes) quel que soit l'état du toggle. Garde une référence stable pendant que l'utilisateur cycle ses filtres. Passer false pour faire suivre le décompte (yes → présents, no → absents, all → total). */
 		staticPresentCount?: boolean;
 		onchange?: (states: Record<string, ToggleState>) => void;
 	}
