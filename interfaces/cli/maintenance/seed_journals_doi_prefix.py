@@ -1,4 +1,4 @@
-# STATUS: oneshot (2026-05-22)
+# STATUS: maintenance
 """Seed `journals.doi_prefix` via la LCP (longest common prefix) des DOIs des publis rattachées.
 
 Pour chaque revue avec ≥`MIN_PUBS_PER_JOURNAL` publications avec DOI
@@ -38,9 +38,9 @@ revues sans sous-préfixe journal-spécifique (APS, OpenEdition à IDs opaques),
 de l'échantillon analysé. Ne touche pas les ambigus (valeur existante conservée).
 
 Usage :
-    python -m interfaces.cli.oneshot.seed_journals_doi_prefix
-    python -m interfaces.cli.oneshot.seed_journals_doi_prefix --dry-run
-    python -m interfaces.cli.oneshot.seed_journals_doi_prefix --min-pubs 3
+    python -m interfaces.cli.maintenance.seed_journals_doi_prefix
+    python -m interfaces.cli.maintenance.seed_journals_doi_prefix --dry-run
+    python -m interfaces.cli.maintenance.seed_journals_doi_prefix --min-pubs 3
 """
 
 from __future__ import annotations
@@ -59,7 +59,7 @@ from infrastructure.observability.log import setup_logger
 
 log = setup_logger("seed_journals_doi_prefix", os.path.dirname(__file__))
 
-# `parents[3]` remonte interfaces/cli/oneshot/ → racine du dépôt ; le CSV des cas ambigus vit sous data/.
+# `parents[3]` remonte interfaces/cli/maintenance/ → racine du dépôt ; le CSV des cas ambigus vit sous data/.
 _DEFAULT_CSV = Path(__file__).resolve().parents[3] / "data" / "doi_prefix_seed_ambiguous.csv"
 
 # Trim en 2 passes pour éviter qu'un code journal numérique (Taylor & Francis
