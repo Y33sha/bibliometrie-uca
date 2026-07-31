@@ -6,7 +6,8 @@ Quatre opérations : création, recalcul des métadonnées canoniques depuis les
 from application.audit_log import emit_event
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.publication_repository import PublicationRepository
-from domain.errors import DistinctDoiError, NotFoundError, ValidationError
+from application.services._merge import load_merge_pair
+from domain.errors import DistinctDoiError, ValidationError
 from domain.publications.aggregation import refresh_from_sources as _refresh_aggregate
 from domain.publications.metadata import OA_STATUS_UNKNOWN_DEFAULT
 from domain.publications.publication import Publication
@@ -156,14 +157,7 @@ def merge_publications(
 
     Lève `ValidationError` sur deux identifiants égaux ; `NotFoundError` si target ou source n'existe pas ; `DistinctDoiError` si les deux portent des DOI non-nuls différents.
     """
-    if target_id == source_id:
-        raise ValidationError("Impossible de fusionner une publication avec elle-même")
-    target = repo.find_by_id(target_id)
-    source = repo.find_by_id(source_id)
-    if target is None:
-        raise NotFoundError(f"Publication target #{target_id} introuvable")
-    if source is None:
-        raise NotFoundError(f"Publication source #{source_id} introuvable")
+    target, source = load_merge_pair(target_id, source_id, repo.find_by_id, label="Publication")
 
     if target.doi and source.doi and target.doi != source.doi:
         raise DistinctDoiError(target_id, source_id, str(target.doi), str(source.doi))

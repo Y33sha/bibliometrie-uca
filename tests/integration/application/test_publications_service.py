@@ -187,7 +187,7 @@ def _oa_status(conn, pub_id):
 class TestMergePublications:
     def test_raises_on_self_merge(self, sa_sync_conn, repo):
         pub = _seed_publication(sa_sync_conn, title="Seule", source_id="h-self")
-        with pytest.raises(ValidationError, match="elle-même"):
+        with pytest.raises(ValidationError, match="identiques"):
             merge_publications(pub, pub, repo=repo)
 
     def test_raises_not_found(self, sa_sync_conn, repo):

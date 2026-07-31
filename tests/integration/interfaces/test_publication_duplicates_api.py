@@ -121,7 +121,7 @@ class TestMergeDuplicatePublications:
             json={"pub_id_a": 1, "pub_id_b": 1},
         )
         assert r.status_code == 400
-        assert "elle-même" in r.json()["detail"]
+        assert "identiques" in r.json()["detail"]
 
     def test_404_when_both_missing(self, auth_client):
         r = auth_client.post(

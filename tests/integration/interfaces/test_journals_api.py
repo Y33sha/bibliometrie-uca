@@ -558,13 +558,13 @@ class TestMergeJournals:
         src = _seed_journal()
         r = auth_client.post("/api/journals/999999999/merge", json={"source_id": src})
         assert r.status_code == 404
-        assert "cible" in r.json()["detail"]
+        assert "introuvable" in r.json()["detail"]
 
     def test_404_when_source_missing(self, auth_client):
         dst = _seed_journal()
         r = auth_client.post(f"/api/journals/{dst}/merge", json={"source_id": 999999998})
         assert r.status_code == 404
-        assert "source" in r.json()["detail"]
+        assert "introuvable" in r.json()["detail"]
 
     def test_happy_path(self, auth_client):
         src = _seed_journal("MergeSrc")

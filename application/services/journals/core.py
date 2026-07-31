@@ -19,6 +19,7 @@ from application.ports.pipeline.metadata_correction import MetadataCorrectionQue
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.journal_repository import JournalRepository, JournalUpdate
 from application.ports.repositories.publication_repository import PublicationRepository
+from application.services._merge import load_merge_pair
 from application.services.publications.core import refresh_from_sources
 from domain.errors import NotFoundError, ValidationError
 from domain.journals.journal import OaModel
@@ -171,12 +172,7 @@ def merge_journals(
 
     Lève `ValidationError` sur deux identifiants égaux, `NotFoundError` sur une revue introuvable.
     """
-    if target_id == source_id:
-        raise ValidationError("Impossible de fusionner un journal avec lui-même")
-    if repo.find_by_id(target_id) is None:
-        raise NotFoundError("Revue cible introuvable")
-    if repo.find_by_id(source_id) is None:
-        raise NotFoundError("Revue source introuvable")
+    load_merge_pair(target_id, source_id, repo.find_by_id, label="Revue")
 
     # Capturer les publications du source avant le repoint, pour les rafraîchir.
     absorbed_pub_ids = publication_repo.find_ids_by_journal_id(source_id)

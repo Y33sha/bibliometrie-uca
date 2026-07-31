@@ -21,6 +21,7 @@ from application.ports.repositories.publisher_repository import (
     PublisherRepository,
     PublisherUpdate,
 )
+from application.services._merge import load_merge_pair
 from application.services.journals.core import merge_journals
 from domain.errors import (
     BlockingJournal,
@@ -107,12 +108,7 @@ def merge_publishers(
 
     Lève `ValidationError` sur deux identifiants égaux, `NotFoundError` sur un éditeur introuvable.
     """
-    if target_id == source_id:
-        raise ValidationError("Impossible de fusionner un éditeur avec lui-même")
-    if publisher_repo.find_by_id(target_id) is None:
-        raise NotFoundError("Éditeur cible introuvable")
-    if publisher_repo.find_by_id(source_id) is None:
-        raise NotFoundError("Éditeur source introuvable")
+    load_merge_pair(target_id, source_id, publisher_repo.find_by_id, label="Éditeur")
 
     # 1. Détecter les journaux partageant un titre entre les deux éditeurs.
     #    Collecter toutes les paires bloquantes en une passe pour lever
