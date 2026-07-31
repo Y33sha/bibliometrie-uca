@@ -16,15 +16,15 @@ export function esc(s: string | null | undefined): string {
 }
 
 /* ── sanitizeTitle ─────────────────────────────────────────────
- * Renders publication titles that may contain:
- *  - MathML with mml: namespace prefix  (<mml:msup>, <mml:mi>, …)
- *  - LaTeX inline/display math          ($...$, $$...$$)
- *  - Plain HTML formatting              (<sub>, <sup>, <i>)
+ * Rend les titres de publication, qui peuvent contenir :
+ *  - du MathML au préfixe de namespace mml:  (<mml:msup>, <mml:mi>, …)
+ *  - des maths LaTeX en ligne ou hors-texte   ($...$, $$...$$)
+ *  - du formatage HTML simple                 (<sub>, <sup>, <i>)
  *
- * LaTeX segments are rendered via KaTeX.
- * MathML: strips the mml: prefix for native browser rendering.
- * Keeps only an allowlist of safe tags/attributes, and escapes
- * everything else (XSS-safe → use with {@html}).
+ * Les segments LaTeX sont rendus via KaTeX ; le MathML voit son
+ * préfixe mml: retiré pour un rendu natif par le navigateur. Seule
+ * une liste blanche de balises/attributs sûrs est conservée, le reste
+ * est échappé (sûr vis-à-vis du XSS → à utiliser avec {@html}).
  * ────────────────────────────────────────────────────────────── */
 
 const TITLE_ALLOWED_TAGS = new Set([
@@ -45,12 +45,12 @@ function escapeHtml(s: string): string {
 		.replace(/"/g, '&quot;');
 }
 
-/* Render LaTeX $...$ and $$...$$ segments via KaTeX,
- * escape all non-LaTeX text. */
+/* Rend les segments LaTeX $...$ et $$...$$ via KaTeX,
+ * échappe tout le texte hors-LaTeX. */
 function renderLatex(s: string): string {
 	const parts: string[] = [];
 	let lastIdx = 0;
-	// Match $$...$$ (display) then $...$ (inline)
+	// Repère $$...$$ (hors-texte) puis $...$ (en ligne)
 	const re = /\$\$([\s\S]+?)\$\$|\$([^$]+?)\$/g;
 	let m;
 
@@ -72,7 +72,7 @@ function renderLatex(s: string): string {
 	return parts.join('');
 }
 
-/* Sanitize MathML + HTML formatting tags. */
+/* Assainit le MathML et les balises de formatage HTML. */
 function sanitizeMathML(s: string): string {
 	const input = s.replace(/<(\/?)\s*mml:/g, '<$1');
 
@@ -110,7 +110,7 @@ const ENTITY_MAP: Record<string, string> = {
 	amp: '&', lt: '<', gt: '>', quot: '"', apos: "'"
 };
 
-/* Decode one layer of HTML entities (named + numeric). */
+/* Décode une couche d'entités HTML (nommées + numériques). */
 function decodeEntitiesOnce(s: string): string {
 	return s.replace(
 		/&(amp|lt|gt|quot|apos|#\d+|#x[0-9a-f]+);/gi,
