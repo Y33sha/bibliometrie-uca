@@ -22,81 +22,6 @@ _ORPHAN_BASE = f"""
 """
 
 
-def orphan_authorships_count(conn: Connection) -> OrphanCountResponse:
-    """Nombre de signatures du périmètre qu'aucune personne ne porte."""
-    row = conn.execute(
-        text(f"""
-            SELECT COUNT(*) AS total
-            FROM source_authorships sa
-            JOIN source_publications sd ON sd.id = sa.source_publication_id
-            JOIN publications p ON p.id = sd.publication_id
-            WHERE {_ORPHAN_BASE}
-        """)
-    ).one()
-    return OrphanCountResponse(total=row.total)
-
-
-def list_orphan_authorships(
-    conn: Connection, *, search: str, page: int, per_page: int
-) -> OrphanAuthorshipsResponse:
-    """Liste paginée des signatures orphelines, avec la publication qu'elles signent."""
-    offset = (page - 1) * per_page
-    search_cond = ""
-    binds: dict[str, Any] = {}
-    if search.strip():
-        binds["search_pat"] = f"%{search.strip()}%"
-        search_cond = "AND unaccent(lower(sa.raw_author_name)) LIKE unaccent(lower(:search_pat))"
-
-    count_row = conn.execute(
-        text(f"""
-            SELECT COUNT(*) AS total FROM source_authorships sa
-            JOIN source_publications sd ON sd.id = sa.source_publication_id
-            JOIN publications p ON p.id = sd.publication_id
-            WHERE {_ORPHAN_BASE}
-              {search_cond}
-        """),
-        binds,
-    ).one()
-    total = count_row.total
-
-    rows = conn.execute(
-        text(f"""
-            SELECT sa.source, sa.id AS source_authorship_id,
-                   sa.raw_author_name AS full_name,
-                   sd.publication_id,
-                   p.title AS pub_title, p.pub_year
-            FROM source_authorships sa
-            JOIN source_publications sd ON sd.id = sa.source_publication_id
-            JOIN publications p ON p.id = sd.publication_id
-            WHERE {_ORPHAN_BASE}
-              {search_cond}
-            ORDER BY sa.raw_author_name, p.pub_year DESC
-            LIMIT :pg_limit OFFSET :pg_offset
-        """),
-        {**binds, "pg_limit": per_page, "pg_offset": offset},
-    ).all()
-    # Décompose `raw_author_name` en last_name/first_name via `parse_raw_author_name`, la règle de parsing unique du domaine.
-    authorships: list[OrphanAuthorshipOut] = []
-    for row in rows:
-        last_name, first_name = parse_raw_author_name(row.full_name)
-        authorships.append(
-            OrphanAuthorshipOut(
-                source=row.source,
-                source_authorship_id=row.source_authorship_id,
-                full_name=row.full_name,
-                last_name=last_name,
-                first_name=first_name,
-                publication_id=row.publication_id,
-                pub_title=row.pub_title,
-                pub_year=row.pub_year,
-            )
-        )
-
-    return OrphanAuthorshipsResponse(
-        total=total, page=page, per_page=per_page, authorships=authorships
-    )
-
-
 class PgAuthorshipsQueries(AuthorshipsQueries):
     """Adapter SA pour `application.ports.read_models.authorships_queries.AuthorshipsQueries`."""
 
@@ -104,12 +29,77 @@ class PgAuthorshipsQueries(AuthorshipsQueries):
         self._conn = conn
 
     def orphan_authorships_count(self) -> OrphanCountResponse:
-        return orphan_authorships_count(self._conn)
+        row = self._conn.execute(
+            text(f"""
+                SELECT COUNT(*) AS total
+                FROM source_authorships sa
+                JOIN source_publications sd ON sd.id = sa.source_publication_id
+                JOIN publications p ON p.id = sd.publication_id
+                WHERE {_ORPHAN_BASE}
+            """)
+        ).one()
+        return OrphanCountResponse(total=row.total)
 
     def list_orphan_authorships(
         self, *, search: str, page: int, per_page: int
     ) -> OrphanAuthorshipsResponse:
-        return list_orphan_authorships(self._conn, search=search, page=page, per_page=per_page)
+        offset = (page - 1) * per_page
+        search_cond = ""
+        binds: dict[str, Any] = {}
+        if search.strip():
+            binds["search_pat"] = f"%{search.strip()}%"
+            search_cond = (
+                "AND unaccent(lower(sa.raw_author_name)) LIKE unaccent(lower(:search_pat))"
+            )
+
+        count_row = self._conn.execute(
+            text(f"""
+                SELECT COUNT(*) AS total FROM source_authorships sa
+                JOIN source_publications sd ON sd.id = sa.source_publication_id
+                JOIN publications p ON p.id = sd.publication_id
+                WHERE {_ORPHAN_BASE}
+                  {search_cond}
+            """),
+            binds,
+        ).one()
+        total = count_row.total
+
+        rows = self._conn.execute(
+            text(f"""
+                SELECT sa.source, sa.id AS source_authorship_id,
+                       sa.raw_author_name AS full_name,
+                       sd.publication_id,
+                       p.title AS pub_title, p.pub_year
+                FROM source_authorships sa
+                JOIN source_publications sd ON sd.id = sa.source_publication_id
+                JOIN publications p ON p.id = sd.publication_id
+                WHERE {_ORPHAN_BASE}
+                  {search_cond}
+                ORDER BY sa.raw_author_name, p.pub_year DESC
+                LIMIT :pg_limit OFFSET :pg_offset
+            """),
+            {**binds, "pg_limit": per_page, "pg_offset": offset},
+        ).all()
+        # Décompose `raw_author_name` en last_name/first_name via `parse_raw_author_name`, la règle de parsing unique du domaine.
+        authorships: list[OrphanAuthorshipOut] = []
+        for row in rows:
+            last_name, first_name = parse_raw_author_name(row.full_name)
+            authorships.append(
+                OrphanAuthorshipOut(
+                    source=row.source,
+                    source_authorship_id=row.source_authorship_id,
+                    full_name=row.full_name,
+                    last_name=last_name,
+                    first_name=first_name,
+                    publication_id=row.publication_id,
+                    pub_title=row.pub_title,
+                    pub_year=row.pub_year,
+                )
+            )
+
+        return OrphanAuthorshipsResponse(
+            total=total, page=page, per_page=per_page, authorships=authorships
+        )
 
 
 __all__ = ["PgAuthorshipsQueries"]
