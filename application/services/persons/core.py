@@ -19,6 +19,7 @@ from application.ports.repositories.person_repository import (
     NameFormStatusRow,
     PersonRepository,
 )
+from application.services._merge import load_merge_pair
 from application.services.authorships.core import reject_pair
 from domain.errors import CannotAttributeConflict, NotFoundError, ValidationError
 from domain.persons.identifiers import (
@@ -526,14 +527,7 @@ def merge_person(
 
     Lève `ValidationError` sur deux identifiants égaux, `NotFoundError` si target ou source n'existe pas, `ConflictError` si l'invariant RH est violé. Émet un événement d'audit `person.merged` si un utilisateur est dans le contexte.
     """
-    if target_id == source_id:
-        raise ValidationError("Impossible de fusionner une personne avec elle-même")
-    target = repo.find_by_id(target_id)
-    source = repo.find_by_id(source_id)
-    if target is None:
-        raise NotFoundError(f"Personne #{target_id} introuvable")
-    if source is None:
-        raise NotFoundError(f"Personne #{source_id} introuvable")
+    target, source = load_merge_pair(target_id, source_id, repo.find_by_id, label="Personne")
     target.can_merge_with(source, has_distinct_rh=repo.has_distinct_rh(target_id, source_id))
     repo.merge_into(target_id, source_id)
     emit_event(audit_repo, "person.merged", "person", target_id, {"source_id": source_id})

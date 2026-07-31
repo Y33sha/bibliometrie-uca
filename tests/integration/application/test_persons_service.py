@@ -464,7 +464,7 @@ class TestCreatePerson:
 class TestMergePerson:
     def test_raises_on_self_merge(self, sa_sync_conn, repo):
         p = _insert_person(sa_sync_conn)
-        with pytest.raises(ValidationError, match="elle-même"):
+        with pytest.raises(ValidationError, match="identiques"):
             merge_person(p, p, repo=repo)
 
     def test_raises_not_found(self, sa_sync_conn, repo):
