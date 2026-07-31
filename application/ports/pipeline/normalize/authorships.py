@@ -59,11 +59,15 @@ class AuthorshipsBatchQueries(Protocol):
 
     def clear_source_authorships_for_publication(
         self, conn: Connection, source_publication_id: int
-    ) -> None: ...
+    ) -> None:
+        """Supprime toutes les `source_authorships` d'une `source_publication` (pré-normalisation, avant réécriture du document)."""
+        ...
 
     def upsert_source_authorships_batch(
         self, conn: Connection, values: list[SourceAuthorshipItem]
-    ) -> None: ...
+    ) -> None:
+        """Batch UPSERT des signatures d'un document dans `source_authorships` (`source` par ligne), avec upsert des identités dédupliquées d'`author_identifying_keys`."""
+        ...
 
     def upsert_source_authorship(self, conn: Connection, item: SourceAuthorshipItem) -> int:
         """Écrit une signature seule et retourne son id.
@@ -74,22 +78,34 @@ class AuthorshipsBatchQueries(Protocol):
 
     def fetch_source_authorship_ids_by_position(
         self, conn: Connection, *, source: str, source_publication_id: int, positions: list[int]
-    ) -> dict[int, int]: ...
+    ) -> dict[int, int]:
+        """`{author_position: source_authorship_id}` pour un document `(source, source_publication_id)`."""
+        ...
 
-    def upsert_addresses_batch(self, conn: Connection, values: list[AddressBatchItem]) -> None: ...
+    def upsert_addresses_batch(self, conn: Connection, values: list[AddressBatchItem]) -> None:
+        """Batch INSERT d'`addresses` (texte brut + forme normalisée), sans écraser les existantes."""
+        ...
 
     def fetch_address_ids_by_raw_text(
         self, conn: Connection, raw_texts: list[str]
-    ) -> dict[str, int]: ...
+    ) -> dict[str, int]:
+        """`{raw_text: id}` pour un lot d'adresses."""
+        ...
 
     def apply_address_countries_batch(
         self, conn: Connection, values: list[AddressCountryItem]
-    ) -> None: ...
+    ) -> None:
+        """Pose le pays fourni par la source sur `addresses.countries`, uniquement là où l'adresse n'en a pas (jamais d'écrasement)."""
+        ...
 
     def apply_address_suggested_countries_batch(
         self, conn: Connection, values: list[AddressCountryItem]
-    ) -> None: ...
+    ) -> None:
+        """Pose une suggestion de pays sur `addresses.suggested_countries`, uniquement sur les adresses sans pays confirmé ni suggestion déjà posée (jamais d'écrasement)."""
+        ...
 
     def insert_source_authorship_addresses_batch(
         self, conn: Connection, values: list[AuthorshipAddressItem]
-    ) -> None: ...
+    ) -> None:
+        """Batch INSERT des liens `source_authorship_addresses` (pivot authorship↔adresse)."""
+        ...
