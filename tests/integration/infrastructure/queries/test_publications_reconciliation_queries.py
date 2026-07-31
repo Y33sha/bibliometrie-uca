@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-from infrastructure.pipeline.publications.reconciliation import count_publications
+from infrastructure.pipeline.publications.reconciliation import PgPublicationsReconciliationQueries
+
+_Q = PgPublicationsReconciliationQueries()
 
 
 def test_count_publications_s_execute(sa_sync_conn):
     """`(SP in-périmètre, publications)` via l'EXISTS sur source_authorships ; base vide → (0, 0)."""
-    assert count_publications(sa_sync_conn) == 0
+    assert _Q.count_publications(sa_sync_conn) == 0

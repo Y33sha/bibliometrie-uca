@@ -11,17 +11,6 @@ from application.ports.pipeline.publications.reconciliation import (
 )
 from domain.source_publications.keys import DISCRIMINANT_TITLE_MIN_LENGTH, ConfirmationKey
 
-
-def fetch_dirty_source_publication_ids(conn: Connection) -> list[int]:
-    # Orphelins **compris** : la réconciliation est aussi l'assignation (un orphelin dirty
-    # se fait matcher/créer/skipper). Les source_publications traitées sont ensuite
-    # nettoyées (`clear_keys_dirty`).
-    rows = conn.execute(
-        text("SELECT id FROM source_publications WHERE keys_dirty ORDER BY id")
-    ).all()
-    return [row.id for row in rows]
-
-
 # Voisinage 1-hop : les `source_publications` dirty (orphelines comprises) et celles qui
 # partagent une clé de confirmation avec elles. Une branche UNION par type de clé (chacune
 # annotée en ligne). `publication_doi` (via LEFT JOIN) choisit l'ancre ; `in_perimeter`
@@ -87,81 +76,6 @@ _UNIVERSE_SQL = text(f"""
 """)
 
 
-def fetch_reconciliation_universe(conn: Connection) -> list[ReconcileRow]:
-    rows = conn.execute(_UNIVERSE_SQL).all()
-    return [
-        ReconcileRow(
-            r.id,
-            r.doi,
-            r.external_ids,
-            r.publication_id,
-            r.doc_type,
-            r.title_normalized,
-            r.pub_year,
-            r.publication_doi,
-            r.in_perimeter,
-        )
-        for r in rows
-    ]
-
-
-def fetch_publication_ids_by_doi(conn: Connection) -> dict[str, int]:
-    # Map `lower(doi) → id` des publications portant un DOI. Clé sur `lower(doi)` :
-    # l'index unique `publications_doi_lower_key` garantit l'unicité, et le DOI de
-    # partition (`effective_doi`, via `clean_doi`) est déjà en minuscule.
-    rows = conn.execute(
-        text("SELECT id, lower(doi) AS doi FROM publications WHERE doi IS NOT NULL")
-    ).all()
-    return {row.doi: row.id for row in rows}
-
-
-def repoint_source_publications(
-    conn: Connection, source_publication_ids: list[int], publication_id: int
-) -> None:
-    if not source_publication_ids:
-        return
-    stmt = text(
-        "UPDATE source_publications SET publication_id = :pid WHERE id = ANY(:ids)"
-    ).bindparams(bindparam("ids"))
-    conn.execute(stmt, {"pid": publication_id, "ids": source_publication_ids})
-
-
-def repoint_dependents(conn: Connection, from_publication_id: int, to_publication_id: int) -> None:
-    # distinct_publications : re-pointer chaque paire (from, autre) en (autre, to) réordonnée,
-    # écarter l'auto-paire, dédupliquer, puis supprimer les paires de `from`.
-    conn.execute(
-        text("""
-            INSERT INTO distinct_publications (pub_id_a, pub_id_b)
-            SELECT LEAST(other_id, :t), GREATEST(other_id, :t)
-            FROM (
-                SELECT CASE WHEN pub_id_a = :s THEN pub_id_b ELSE pub_id_a END AS other_id
-                FROM distinct_publications
-                WHERE pub_id_a = :s OR pub_id_b = :s
-            ) pairs
-            WHERE other_id <> :t
-            ON CONFLICT (pub_id_a, pub_id_b) DO NOTHING
-        """),
-        {"s": from_publication_id, "t": to_publication_id},
-    )
-    conn.execute(
-        text("DELETE FROM distinct_publications WHERE pub_id_a = :s OR pub_id_b = :s"),
-        {"s": from_publication_id},
-    )
-    conn.execute(
-        text("UPDATE apc_payments SET publication_id = :t WHERE publication_id = :s"),
-        {"s": from_publication_id, "t": to_publication_id},
-    )
-
-
-def clear_keys_dirty(conn: Connection, source_publication_ids: list[int]) -> int:
-    if not source_publication_ids:
-        return 0
-    stmt = text(
-        "UPDATE source_publications SET keys_dirty = false WHERE id = ANY(:ids)"
-    ).bindparams(bindparam("ids"))
-    return conn.execute(stmt, {"ids": source_publication_ids}).rowcount
-
-
 def mark_keys_dirty(conn: Connection, where: str | None = None, *, dry_run: bool = False) -> int:
     """Pose `keys_dirty = true` sur les source_publications — toutes, ou le sous-ensemble `where`.
 
@@ -177,11 +91,6 @@ def mark_keys_dirty(conn: Connection, where: str | None = None, *, dry_run: bool
     ).rowcount
 
 
-def count_publications(conn: Connection) -> int:
-    # Toutes les publications sont in-périmètre par construction : la réconciliation gate leur création sur le périmètre.
-    return int(conn.execute(text("SELECT count(*) FROM publications")).scalar_one())
-
-
 class PgPublicationsReconciliationQueries(PublicationsReconciliationQueries):
     """Adapter PostgreSQL pour `PublicationsReconciliationQueries`."""
 
@@ -189,26 +98,86 @@ class PgPublicationsReconciliationQueries(PublicationsReconciliationQueries):
         return mark_keys_dirty(conn)
 
     def fetch_dirty_source_publication_ids(self, conn: Connection) -> list[int]:
-        return fetch_dirty_source_publication_ids(conn)
+        # Orphelins **compris** : la réconciliation est aussi l'assignation (un orphelin dirty
+        # se fait matcher/créer/skipper). Les source_publications traitées sont ensuite
+        # nettoyées (`clear_keys_dirty`).
+        rows = conn.execute(
+            text("SELECT id FROM source_publications WHERE keys_dirty ORDER BY id")
+        ).all()
+        return [row.id for row in rows]
 
     def fetch_reconciliation_universe(self, conn: Connection) -> list[ReconcileRow]:
-        return fetch_reconciliation_universe(conn)
+        rows = conn.execute(_UNIVERSE_SQL).all()
+        return [
+            ReconcileRow(
+                r.id,
+                r.doi,
+                r.external_ids,
+                r.publication_id,
+                r.doc_type,
+                r.title_normalized,
+                r.pub_year,
+                r.publication_doi,
+                r.in_perimeter,
+            )
+            for r in rows
+        ]
 
     def fetch_publication_ids_by_doi(self, conn: Connection) -> dict[str, int]:
-        return fetch_publication_ids_by_doi(conn)
+        # Map `lower(doi) → id` des publications portant un DOI. Clé sur `lower(doi)` :
+        # l'index unique `publications_doi_lower_key` garantit l'unicité, et le DOI de
+        # partition (`effective_doi`, via `clean_doi`) est déjà en minuscule.
+        rows = conn.execute(
+            text("SELECT id, lower(doi) AS doi FROM publications WHERE doi IS NOT NULL")
+        ).all()
+        return {row.doi: row.id for row in rows}
 
     def repoint_source_publications(
         self, conn: Connection, source_publication_ids: list[int], publication_id: int
     ) -> None:
-        repoint_source_publications(conn, source_publication_ids, publication_id)
+        if not source_publication_ids:
+            return
+        stmt = text(
+            "UPDATE source_publications SET publication_id = :pid WHERE id = ANY(:ids)"
+        ).bindparams(bindparam("ids"))
+        conn.execute(stmt, {"pid": publication_id, "ids": source_publication_ids})
 
     def repoint_dependents(
         self, conn: Connection, from_publication_id: int, to_publication_id: int
     ) -> None:
-        repoint_dependents(conn, from_publication_id, to_publication_id)
+        # distinct_publications : re-pointer chaque paire (from, autre) en (autre, to) réordonnée,
+        # écarter l'auto-paire, dédupliquer, puis supprimer les paires de `from`.
+        conn.execute(
+            text("""
+                INSERT INTO distinct_publications (pub_id_a, pub_id_b)
+                SELECT LEAST(other_id, :t), GREATEST(other_id, :t)
+                FROM (
+                    SELECT CASE WHEN pub_id_a = :s THEN pub_id_b ELSE pub_id_a END AS other_id
+                    FROM distinct_publications
+                    WHERE pub_id_a = :s OR pub_id_b = :s
+                ) pairs
+                WHERE other_id <> :t
+                ON CONFLICT (pub_id_a, pub_id_b) DO NOTHING
+            """),
+            {"s": from_publication_id, "t": to_publication_id},
+        )
+        conn.execute(
+            text("DELETE FROM distinct_publications WHERE pub_id_a = :s OR pub_id_b = :s"),
+            {"s": from_publication_id},
+        )
+        conn.execute(
+            text("UPDATE apc_payments SET publication_id = :t WHERE publication_id = :s"),
+            {"s": from_publication_id, "t": to_publication_id},
+        )
 
     def clear_keys_dirty(self, conn: Connection, source_publication_ids: list[int]) -> int:
-        return clear_keys_dirty(conn, source_publication_ids)
+        if not source_publication_ids:
+            return 0
+        stmt = text(
+            "UPDATE source_publications SET keys_dirty = false WHERE id = ANY(:ids)"
+        ).bindparams(bindparam("ids"))
+        return conn.execute(stmt, {"ids": source_publication_ids}).rowcount
 
     def count_publications(self, conn: Connection) -> int:
-        return count_publications(conn)
+        # Toutes les publications sont in-périmètre par construction : la réconciliation gate leur création sur le périmètre.
+        return int(conn.execute(text("SELECT count(*) FROM publications")).scalar_one())
