@@ -1,6 +1,6 @@
-"""Port AuthorshipRepository — contrat d'accès aux agrégats Authorship.
+"""Port AuthorshipRepository — accès aux tables `authorships` et `source_authorships`.
 
-Un seul port pour `authorships` et `source_authorships` : leurs opérations sont étroitement couplées.
+Un seul port pour les deux : leurs opérations sont étroitement couplées.
 """
 
 from datetime import datetime
