@@ -6,11 +6,9 @@ import logging
 from sqlalchemy import text
 
 from application.pipeline.subjects.cooccurrences import run
-from infrastructure.pipeline.subjects import (
-    PgSubjectsIngestionQueries,
-    recompute_usage_counts,
-    refresh_cooccurrences,
-)
+from infrastructure.pipeline.subjects import PgSubjectsIngestionQueries
+
+_Q = PgSubjectsIngestionQueries()
 
 
 def _create_pub(conn, title="X"):
@@ -53,7 +51,7 @@ class TestRecomputeUsageCounts:
         _link(sa_sync_conn, pub_id=p1, subject_id=s_id, source="openalex")
         _link(sa_sync_conn, pub_id=p2, subject_id=s_id, source="hal")
 
-        recompute_usage_counts(sa_sync_conn)
+        _Q.recompute_usage_counts(sa_sync_conn)
         usage = sa_sync_conn.execute(
             text("SELECT usage_count FROM subjects WHERE id = :id"), {"id": s_id}
         ).scalar_one()
@@ -65,7 +63,7 @@ class TestRecomputeUsageCounts:
         sa_sync_conn.execute(
             text("UPDATE subjects SET usage_count = 5 WHERE id = :id"), {"id": s_id}
         )
-        recompute_usage_counts(sa_sync_conn)
+        _Q.recompute_usage_counts(sa_sync_conn)
         usage = sa_sync_conn.execute(
             text("SELECT usage_count FROM subjects WHERE id = :id"), {"id": s_id}
         ).scalar_one()
@@ -85,7 +83,7 @@ class TestRefreshCooccurrences:
         for s in (a, b, c):
             _link(sa_sync_conn, pub_id=p2, subject_id=s)
 
-        n = refresh_cooccurrences(sa_sync_conn)
+        n = _Q.refresh_cooccurrences(sa_sync_conn)
         assert n == 1  # Seule la paire (a,b) avec count=2 passe le seuil de la matview.
 
         row = sa_sync_conn.execute(
@@ -106,7 +104,7 @@ class TestRefreshCooccurrences:
         _link(sa_sync_conn, pub_id=p1, subject_id=s, source="hal")
         _link(sa_sync_conn, pub_id=p2, subject_id=s, source="hal")
 
-        n = refresh_cooccurrences(sa_sync_conn)
+        n = _Q.refresh_cooccurrences(sa_sync_conn)
         assert n == 0
 
     def test_idempotent(self, sa_sync_conn):
@@ -117,8 +115,8 @@ class TestRefreshCooccurrences:
         for p in (p1, p2):
             _link(sa_sync_conn, pub_id=p, subject_id=a)
             _link(sa_sync_conn, pub_id=p, subject_id=b)
-        refresh_cooccurrences(sa_sync_conn)
-        refresh_cooccurrences(sa_sync_conn)
+        _Q.refresh_cooccurrences(sa_sync_conn)
+        _Q.refresh_cooccurrences(sa_sync_conn)
         n = sa_sync_conn.execute(
             text("SELECT count(*) AS n FROM subject_cooccurrences")
         ).scalar_one()
