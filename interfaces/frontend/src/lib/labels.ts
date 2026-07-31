@@ -62,7 +62,7 @@ export const docTypePlural: Record<string, string> = {
 
 /** Familles de doc_types : un niveau grossier au-dessus du `doc_type` fin, pour grouper et filtrer
  * les listes (distinguer les publications au sens strict des autres objets). Couvre exhaustivement
- * l'enum `doc_type` ; l'ordre est celui d'affichage. Découpage de première intention, ajustable.
+ * l'enum `doc_type` ; l'ordre est celui d'affichage.
  * Mémoires exclus des listes par ailleurs et thèses en cours invisibles → la famille académique
  * s'intitule « Thèses » (ses membres visibles sont thèses + HDR). */
 export const docTypeFamilies: { key: string; label: string; types: string[] }[] = [
