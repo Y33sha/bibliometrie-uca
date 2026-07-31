@@ -4,12 +4,9 @@ forme de nom devenue ambiguë, puis GC des personnes vidées.
 
 from sqlalchemy import text
 
-from infrastructure.pipeline.persons.matching import (
-    delete_empty_persons,
-    detach_authorships,
-    null_identifier_signatures,
-    reorphan_ambiguous_nominal,
-)
+from infrastructure.pipeline.persons.matching import PgPersonsMatchingQueries
+
+_Q = PgPersonsMatchingQueries()
 from tests.integration.helpers.authorships import upsert_identity
 
 
@@ -87,7 +84,7 @@ def test_reorphan_only_ambiguous_unpinned_nominal(sa_sync_conn):
     )
     by_identifier = _signature(conn, form="j martin", person_id=a, mode="identifier")
 
-    assert reorphan_ambiguous_nominal(conn) == 1
+    assert _Q.reorphan_ambiguous_nominal(conn) == 1
 
     assert _row(conn, ambiguous) == (None, None)  # forme ambiguë, nominale, non épinglée
     assert _row(conn, unambiguous).person_id == b  # forme non ambiguë
@@ -107,7 +104,7 @@ def test_detach_authorships_by_id_protects_confirmed(sa_sync_conn):
     )
 
     # Détache le lot demandé, mais jamais un épinglage admin.
-    assert detach_authorships(conn, [cross, pinned_cross]) == 1
+    assert _Q.detach_authorships(conn, [cross, pinned_cross]) == 1
 
     assert _row(conn, cross) == (None, None)  # détachée
     assert _row(conn, pinned_cross).person_id == p  # épinglée admin, protégée
@@ -135,7 +132,7 @@ def test_null_identifier_signatures_targets_old_owner_only(sa_sync_conn):
         conn, form="jean martin", person_id=old, mode="identifier", identifiers={"idref": "222"}
     )
 
-    assert null_identifier_signatures(conn, "idref", "111", old) == 1
+    assert _Q.null_identifier_signatures(conn, "idref", "111", old) == 1
 
     assert _row(conn, affected) == (None, None)  # portée sur l'ancien propriétaire, identifiant
     assert _row(conn, nominal).person_id == old  # nominale : ne dépend pas de la valeur
@@ -152,7 +149,7 @@ def test_delete_empty_persons_spares_signed_and_rh(sa_sync_conn):
     rh = _person(conn, "Prof", "P")
     conn.execute(text("INSERT INTO persons_rh (person_id) VALUES (:p)"), {"p": rh})
 
-    delete_empty_persons(conn)
+    _Q.delete_empty_persons(conn)
 
     assert _person_exists(conn, empty) is False
     assert _person_exists(conn, signed) is True
