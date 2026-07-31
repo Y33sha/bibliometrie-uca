@@ -1,9 +1,6 @@
 import katex from 'katex';
 
-/** Sérialise des paramètres en query string en gardant les virgules littérales.
- * `URLSearchParams.toString()` percent-encode la virgule en `%2C` ; or elle est
- * licite dans une query (RFC 3986) et sépare nos listes de valeurs — on la restaure
- * pour des URL lisibles. Retourne la chaîne sans le `?` initial (vide si aucun paramètre). */
+/** Sérialise des paramètres en query string en gardant les virgules littérales. `URLSearchParams.toString()` percent-encode la virgule en `%2C` ; or elle est licite dans une query (RFC 3986) et sépare nos listes de valeurs — on la restaure pour des URL lisibles. Retourne la chaîne sans le `?` initial (vide si aucun paramètre). */
 export function paramsToQuery(params: URLSearchParams): string {
 	return params.toString().replace(/%2C/g, ',');
 }
@@ -21,10 +18,7 @@ export function esc(s: string | null | undefined): string {
  *  - des maths LaTeX en ligne ou hors-texte   ($...$, $$...$$)
  *  - du formatage HTML simple                 (<sub>, <sup>, <i>)
  *
- * Les segments LaTeX sont rendus via KaTeX ; le MathML voit son
- * préfixe mml: retiré pour un rendu natif par le navigateur. Seule
- * une liste blanche de balises/attributs sûrs est conservée, le reste
- * est échappé (sûr vis-à-vis du XSS → à utiliser avec {@html}).
+ * Les segments LaTeX sont rendus via KaTeX ; le MathML voit son préfixe mml: retiré pour un rendu natif par le navigateur. Seule une liste blanche de balises/attributs sûrs est conservée, le reste est échappé (sûr vis-à-vis du XSS → à utiliser avec {@html}).
  * ────────────────────────────────────────────────────────────── */
 
 const TITLE_ALLOWED_TAGS = new Set([
@@ -45,8 +39,7 @@ function escapeHtml(s: string): string {
 		.replace(/"/g, '&quot;');
 }
 
-/* Rend les segments LaTeX $...$ et $$...$$ via KaTeX,
- * échappe tout le texte hors-LaTeX. */
+/* Rend les segments LaTeX $...$ et $$...$$ via KaTeX, échappe tout le texte hors-LaTeX. */
 function renderLatex(s: string): string {
 	const parts: string[] = [];
 	let lastIdx = 0;
@@ -126,10 +119,7 @@ function decodeEntitiesOnce(s: string): string {
 	);
 }
 
-/* Décode les entités HTML d'un titre jusqu'à stabilisation (`&lt;sub&gt;` →
- * `<sub>`, `&amp;` → `&`, `&#233;` → `é`). La boucle (bornée) absorbe le
- * double-encodage (`&amp;lt;`). Le markup brut obtenu est ensuite sanitizé ; un
- * `&` de contenu est ré-échappé par `escapeHtml`. */
+/* Décode les entités HTML d'un titre jusqu'à stabilisation (`&lt;sub&gt;` → `<sub>`, `&amp;` → `&`, `&#233;` → `é`). La boucle (bornée) absorbe le double-encodage (`&amp;lt;`). Le markup brut obtenu est ensuite sanitizé ; un `&` de contenu est ré-échappé par `escapeHtml`. */
 function decodeHtmlEntities(s: string): string {
 	let out = s;
 	for (let i = 0; i < 4; i++) {
@@ -187,8 +177,7 @@ export function rorFullUrl(rorId: string): string {
 	return `https://ror.org/${rorId}`;
 }
 
-/** Dérive le statut de détection d'une structure à partir des flags
- * `is_confirmed` (tri-state nullable) et `is_detected` (booléen).
+/** Dérive le statut de détection d'une structure à partir des flags `is_confirmed` (tri-state nullable) et `is_detected` (booléen).
  *
  * Règle : confirmed > rejected > detected > manual.
  *  - `is_confirmed === true`  → confirmed (validée manuellement)

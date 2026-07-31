@@ -1,8 +1,4 @@
-/** Libellés FR (singulier) des types de documents, codés en dur.
- * Source de vérité de la liste canonique : l'enum PG `doc_type` /
- * `DOC_TYPES` du domain backend. La cohérence des clés est vérifiée
- * par un test pytest (tests/unit/domain/source_publications/test_doc_types.py)
- * qui lit ce fichier et casse si une valeur de l'enum n'a pas son libellé. */
+/** Libellés FR (singulier) des types de documents, codés en dur. Source de vérité de la liste canonique : l'enum PG `doc_type` / `DOC_TYPES` du domain backend. La cohérence des clés est vérifiée par un test pytest (tests/unit/domain/source_publications/test_doc_types.py) qui lit ce fichier et casse si une valeur de l'enum n'a pas son libellé. */
 export const docTypeSingular: Record<string, string> = {
 	article: 'Article',
 	conference_paper: 'Conference paper',
@@ -60,11 +56,7 @@ export const docTypePlural: Record<string, string> = {
 	media: 'Interventions média'
 };
 
-/** Familles de doc_types : un niveau grossier au-dessus du `doc_type` fin, pour grouper et filtrer
- * les listes (distinguer les publications au sens strict des autres objets). Couvre exhaustivement
- * l'enum `doc_type` ; l'ordre est celui d'affichage.
- * Mémoires exclus des listes par ailleurs et thèses en cours invisibles → la famille académique
- * s'intitule « Thèses » (ses membres visibles sont thèses + HDR). */
+/** Familles de doc_types : un niveau grossier au-dessus du `doc_type` fin, pour grouper et filtrer les listes (distinguer les publications au sens strict des autres objets). Couvre exhaustivement l'enum `doc_type` ; l'ordre est celui d'affichage. Mémoires exclus des listes par ailleurs et thèses en cours invisibles → la famille académique s'intitule « Thèses » (ses membres visibles sont thèses + HDR). */
 export const docTypeFamilies: { key: string; label: string; types: string[] }[] = [
 	{
 		key: 'publications',
@@ -97,15 +89,12 @@ export const docTypeFamilyOf: Record<string, string> = Object.fromEntries(
 	docTypeFamilies.flatMap((f) => f.types.map((t) => [t, f.key]))
 );
 
-/** Types de la famille « publications » stricte : défaut du filtre de types sur les listes générales
- * (statistiques et publications), appliqué quand l'URL ne porte pas de filtre de types explicite. */
+/** Types de la famille « publications » stricte : défaut du filtre de types sur les listes générales (statistiques et publications), appliqué quand l'URL ne porte pas de filtre de types explicite. */
 export const publicationsDocTypes: string[] =
 	docTypeFamilies.find((f) => f.key === 'publications')?.types ?? [];
 
 /**
- * Sérialisation du filtre de types dans l'URL. Une sélection vide signifie « tous les types »
- * (aucun filtre) : on l'écrit avec le token `all` pour la distinguer de l'absence de filtre (qui,
- * elle, déclenche le défaut « publications »). Même convention que le filtre `has_rh` de l'annuaire.
+ * Sérialisation du filtre de types dans l'URL. Une sélection vide signifie « tous les types » (aucun filtre) : on l'écrit avec le token `all` pour la distinguer de l'absence de filtre (qui, elle, déclenche le défaut « publications »). Même convention que le filtre `has_rh` de l'annuaire.
  */
 export const DOC_TYPE_FILTER_ALL = 'all';
 export function docTypeFilterToken(selected: string[]): string {
@@ -128,8 +117,7 @@ export const docTypeGroupedColors: Record<string, string> = {
 	misc: '#cfd3d6'
 };
 
-/** Libellés FR des types de relation entre publications, lus depuis la publication courante
- * (sujet). Miroir de l'enum PG `relation_type` / `RelationType` du domain backend. */
+/** Libellés FR des types de relation entre publications, lus depuis la publication courante (sujet). Miroir de l'enum PG `relation_type` / `RelationType` du domain backend. */
 export const relationTypeLabel: Record<string, string> = {
 	is_preprint_of: 'Préprint de',
 	has_preprint: 'A pour préprint',
@@ -150,12 +138,10 @@ export const relationTypeLabel: Record<string, string> = {
 	is_related_to: 'Apparenté à'
 };
 
-/** Niveau de signalement d'une relation, vu depuis la publication courante : décide sa couleur et
- * son ordre dans le bandeau du header (le plus critique en premier).
+/** Niveau de signalement d'une relation, vu depuis la publication courante : décide sa couleur et son ordre dans le bandeau du header (le plus critique en premier).
  *  - `danger`    : rétractation — l'œuvre est invalidée (rouge) ;
  *  - `warning`   : correction/erratum, avis de préoccupation — à lire avec réserve (ambre) ;
- *  - `parent`    : la publi est une pièce rattachée à une œuvre principale (préprint, supplément,
- *                  partie, traduction…) — teal ;
+ *  - `parent`    : la publi est une pièce rattachée à une œuvre principale (préprint, supplément, partie, traduction…) — teal ;
  *  - `secondary` : pièces dépendantes (la publi a un préprint, des données…) et apparentées — gris.
  * Les types absents tombent en `secondary`. */
 export type RelationTier = 'danger' | 'warning' | 'parent' | 'secondary';
@@ -186,9 +172,7 @@ export const relationTierRank: Record<RelationTier, number> = {
 	secondary: 3
 };
 
-/** Accès générique pour la fiche détail, sans le jargon OA (gold/green/diamond/…) : on ne dit que
- * « ouvert / fermé / sous embargo ». Retourne `null` si indéterminé (rien à afficher). Le cas
- * « thèse en cours » est porté par le `doc_type`, pas ici. `cls` = classe de pastille colorée. */
+/** Accès générique pour la fiche détail, sans le jargon OA (gold/green/diamond/…) : on ne dit que « ouvert / fermé / sous embargo ». Retourne `null` si indéterminé (rien à afficher). Le cas « thèse en cours » est porté par le `doc_type`, pas ici. `cls` = classe de pastille colorée. */
 export function accessTag(oaStatus: string | null | undefined): { label: string; cls: string } | null {
 	if (!oaStatus || oaStatus === 'unknown') return null;
 	if (oaStatus === 'closed') return { label: 'Fermé', cls: 'access-closed' };
@@ -216,9 +200,7 @@ export const identifierStatusClasses: Record<string, string> = {
 	pending: 'id-pending'
 };
 
-/** Classes CSS associées aux statuts de détection d'une structure
- * dans le tableau de bord feedback. Le statut est dérivé de
- * `is_confirmed` + `is_detected` via `deriveStructDetectionStatus`. */
+/** Classes CSS associées aux statuts de détection d'une structure dans le tableau de bord feedback. Le statut est dérivé de `is_confirmed` + `is_detected` via `deriveStructDetectionStatus`. */
 export const structDetectionClasses: Record<string, string> = {
 	confirmed: 'struct-tag struct-confirmed',
 	rejected: 'struct-tag struct-rejected',
@@ -226,8 +208,7 @@ export const structDetectionClasses: Record<string, string> = {
 	manual: 'struct-tag struct-manual'
 };
 
-/** Libellés courts des statuts de détection d'une structure
- * (tooltip des badges feedback). */
+/** Libellés courts des statuts de détection d'une structure (tooltip des badges feedback). */
 export const structDetectionLabels: Record<string, string> = {
 	confirmed: 'confirmé',
 	rejected: 'rejeté',
