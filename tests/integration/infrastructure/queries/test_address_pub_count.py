@@ -2,7 +2,9 @@
 
 from sqlalchemy import text
 
-from infrastructure.pipeline.publications.address_pub_count import recompute_pub_count
+from infrastructure.pipeline.publications.address_pub_count import PgAddressPubCountQueries
+
+_Q = PgAddressPubCountQueries()
 from tests.integration.helpers.authorships import upsert_identity
 
 
@@ -62,7 +64,7 @@ class TestRecomputePubCount:
         for sid, pub in (("h1", p1), ("h2", p1), ("h3", p2)):
             _link_address(sa_sync_conn, _sa_for_pub(sa_sync_conn, pub, sid), "Shared Address")
 
-        recompute_pub_count(sa_sync_conn)
+        _Q.recompute_pub_count(sa_sync_conn)
 
         assert (
             sa_sync_conn.execute(
@@ -80,7 +82,7 @@ class TestRecomputePubCount:
             )
         ).scalar_one()
 
-        recompute_pub_count(sa_sync_conn)
+        _Q.recompute_pub_count(sa_sync_conn)
 
         assert (
             sa_sync_conn.execute(
@@ -106,7 +108,7 @@ class TestRecomputePubCount:
         ).scalar_one()
         _link_address(sa_sync_conn, sa_id, "Orphan Address")
 
-        recompute_pub_count(sa_sync_conn)
+        _Q.recompute_pub_count(sa_sync_conn)
 
         assert (
             sa_sync_conn.execute(

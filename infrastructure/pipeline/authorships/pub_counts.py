@@ -11,46 +11,6 @@ from sqlalchemy import Connection, text
 from application.ports.pipeline.authorships.pub_counts import PubCountChanges, PubCountsQueries
 
 
-def refresh_pub_counts(conn: Connection) -> PubCountChanges:
-    """Recalcule tous les `pub_count` (journals puis publishers). Retourne le nombre de lignes changées de chaque côté."""
-    n_journals = conn.execute(
-        text("""
-            WITH counts AS (
-                SELECT journal_id, COUNT(*) AS n
-                FROM publications
-                WHERE in_perimeter
-                  AND journal_id IS NOT NULL
-                GROUP BY journal_id
-            )
-            UPDATE journals j
-            SET pub_count = COALESCE(c.n, 0)
-            FROM journals j2
-            LEFT JOIN counts c ON c.journal_id = j2.id
-            WHERE j2.id = j.id AND j.pub_count IS DISTINCT FROM COALESCE(c.n, 0)
-        """)
-    ).rowcount
-    n_publishers = _refresh_all_publishers(conn)
-    return PubCountChanges(journals=n_journals, publishers=n_publishers)
-
-
-def _refresh_all_publishers(conn: Connection) -> int:
-    return conn.execute(
-        text("""
-            WITH counts AS (
-                SELECT publisher_id, SUM(pub_count) AS n
-                FROM journals
-                WHERE publisher_id IS NOT NULL
-                GROUP BY publisher_id
-            )
-            UPDATE publishers p
-            SET pub_count = COALESCE(c.n, 0)
-            FROM publishers p2
-            LEFT JOIN counts c ON c.publisher_id = p2.id
-            WHERE p2.id = p.id AND p.pub_count IS DISTINCT FROM COALESCE(c.n, 0)
-        """)
-    ).rowcount
-
-
 def refresh_journal_pub_count(conn: Connection, journal_id: int) -> None:
     """Recalcule le `pub_count` d'une seule revue (fusion admin)."""
     conn.execute(
@@ -82,4 +42,35 @@ class PgPubCountsQueries(PubCountsQueries):
     """Adapter PostgreSQL pour le port `PubCountsQueries`."""
 
     def refresh_pub_counts(self, conn: Connection) -> PubCountChanges:
-        return refresh_pub_counts(conn)
+        n_journals = conn.execute(
+            text("""
+                WITH counts AS (
+                    SELECT journal_id, COUNT(*) AS n
+                    FROM publications
+                    WHERE in_perimeter
+                      AND journal_id IS NOT NULL
+                    GROUP BY journal_id
+                )
+                UPDATE journals j
+                SET pub_count = COALESCE(c.n, 0)
+                FROM journals j2
+                LEFT JOIN counts c ON c.journal_id = j2.id
+                WHERE j2.id = j.id AND j.pub_count IS DISTINCT FROM COALESCE(c.n, 0)
+            """)
+        ).rowcount
+        n_publishers = conn.execute(
+            text("""
+                WITH counts AS (
+                    SELECT publisher_id, SUM(pub_count) AS n
+                    FROM journals
+                    WHERE publisher_id IS NOT NULL
+                    GROUP BY publisher_id
+                )
+                UPDATE publishers p
+                SET pub_count = COALESCE(c.n, 0)
+                FROM publishers p2
+                LEFT JOIN counts c ON c.publisher_id = p2.id
+                WHERE p2.id = p.id AND p.pub_count IS DISTINCT FROM COALESCE(c.n, 0)
+            """)
+        ).rowcount
+        return PubCountChanges(journals=n_journals, publishers=n_publishers)

@@ -3,9 +3,9 @@
 from sqlalchemy import Connection, text
 
 from application.ports.pipeline.normalize.source_publications import SourcePublicationRow
-from infrastructure.pipeline.normalize.source_publications import (
-    upsert_source_publication,
-)
+from infrastructure.pipeline.normalize.source_publications import PgSourcePublicationQueries
+
+_Q = PgSourcePublicationQueries()
 
 
 def _create_staging(conn: Connection, source_id: str = "t-stg") -> int:
@@ -33,7 +33,7 @@ def _row(staging_id: int, **overrides) -> SourcePublicationRow:
 class TestUpsertSourcePublication:
     def test_inserts_new(self, sa_sync_conn):
         staging_id = _create_staging(sa_sync_conn)
-        sp_id = upsert_source_publication(sa_sync_conn, _row(staging_id, language="fr"))
+        sp_id = _Q.upsert_source_publication(sa_sync_conn, _row(staging_id, language="fr"))
         row = sa_sync_conn.execute(
             text("SELECT title, language FROM source_publications WHERE id = :id"),
             {"id": sp_id},
@@ -44,16 +44,16 @@ class TestUpsertSourcePublication:
     def test_reimport_keeps_row_identity(self, sa_sync_conn):
         """La clé `(source, source_id)` traverse les imports : l'id reste stable pour les tables qui la référencent."""
         staging_id = _create_staging(sa_sync_conn)
-        first = upsert_source_publication(sa_sync_conn, _row(staging_id))
-        second = upsert_source_publication(sa_sync_conn, _row(staging_id, language="fr"))
+        first = _Q.upsert_source_publication(sa_sync_conn, _row(staging_id))
+        second = _Q.upsert_source_publication(sa_sync_conn, _row(staging_id, language="fr"))
         assert first == second
 
     def test_reimport_overwrites_metadata(self, sa_sync_conn):
         staging_id = _create_staging(sa_sync_conn)
-        sp_id = upsert_source_publication(
+        sp_id = _Q.upsert_source_publication(
             sa_sync_conn, _row(staging_id, title="Titre initial", language="en")
         )
-        upsert_source_publication(
+        _Q.upsert_source_publication(
             sa_sync_conn, _row(staging_id, title="Titre corrigé", language="fr")
         )
         row = sa_sync_conn.execute(
@@ -66,10 +66,10 @@ class TestUpsertSourcePublication:
     def test_reimport_without_a_value_clears_it(self, sa_sync_conn):
         """Le dernier import fait autorité : une valeur absente de l'import courant est effacée."""
         staging_id = _create_staging(sa_sync_conn)
-        sp_id = upsert_source_publication(
+        sp_id = _Q.upsert_source_publication(
             sa_sync_conn, _row(staging_id, cited_by_count=500, abstract="Un résumé", language="fr")
         )
-        upsert_source_publication(sa_sync_conn, _row(staging_id))
+        _Q.upsert_source_publication(sa_sync_conn, _row(staging_id))
         row = sa_sync_conn.execute(
             text(
                 "SELECT cited_by_count, abstract, language FROM source_publications WHERE id = :id"
@@ -83,12 +83,12 @@ class TestUpsertSourcePublication:
     def test_reimport_marks_keys_dirty(self, sa_sync_conn):
         """`keys_dirty` signale la ligne à la phase `publications`, qui recalcule son rattachement."""
         staging_id = _create_staging(sa_sync_conn)
-        sp_id = upsert_source_publication(sa_sync_conn, _row(staging_id))
+        sp_id = _Q.upsert_source_publication(sa_sync_conn, _row(staging_id))
         sa_sync_conn.execute(
             text("UPDATE source_publications SET keys_dirty = false WHERE id = :id"),
             {"id": sp_id},
         )
-        upsert_source_publication(sa_sync_conn, _row(staging_id))
+        _Q.upsert_source_publication(sa_sync_conn, _row(staging_id))
         assert sa_sync_conn.execute(
             text("SELECT keys_dirty FROM source_publications WHERE id = :id"),
             {"id": sp_id},
@@ -97,7 +97,7 @@ class TestUpsertSourcePublication:
     def test_external_ids_defaults_to_empty_object(self, sa_sync_conn):
         """La colonne est `NOT NULL` et contrainte à un objet JSON."""
         staging_id = _create_staging(sa_sync_conn)
-        sp_id = upsert_source_publication(sa_sync_conn, _row(staging_id, external_ids=None))
+        sp_id = _Q.upsert_source_publication(sa_sync_conn, _row(staging_id, external_ids=None))
         assert (
             sa_sync_conn.execute(
                 text("SELECT external_ids FROM source_publications WHERE id = :id"),

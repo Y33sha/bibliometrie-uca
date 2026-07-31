@@ -9,8 +9,10 @@ filtre propre.
 from sqlalchemy import text
 
 from infrastructure.pipeline.authorships.purge_orphan_publications import (
-    purge_orphan_publications,
+    PgPurgeOrphanPublicationsQueries,
 )
+
+_Q = PgPurgeOrphanPublicationsQueries()
 
 
 def _create_pub(conn, title="X"):
@@ -43,7 +45,7 @@ def _add_authorship(conn, *, pub_id, person_id):
 class TestPurgeOrphanPublications:
     def test_deletes_pub_without_authorship(self, sa_sync_conn):
         orphan = _create_pub(sa_sync_conn, "orphan")
-        purge_orphan_publications(sa_sync_conn)
+        _Q.purge_orphan_publications(sa_sync_conn)
         still_there = sa_sync_conn.execute(
             text("SELECT 1 FROM publications WHERE id = :id"), {"id": orphan}
         ).scalar_one_or_none()
@@ -53,7 +55,7 @@ class TestPurgeOrphanPublications:
         kept = _create_pub(sa_sync_conn, "kept")
         person = _create_person(sa_sync_conn)
         _add_authorship(sa_sync_conn, pub_id=kept, person_id=person)
-        purge_orphan_publications(sa_sync_conn)
+        _Q.purge_orphan_publications(sa_sync_conn)
         still_there = sa_sync_conn.execute(
             text("SELECT 1 FROM publications WHERE id = :id"), {"id": kept}
         ).scalar_one_or_none()
@@ -62,12 +64,12 @@ class TestPurgeOrphanPublications:
     def test_limit_caps_batch(self, sa_sync_conn):
         # On vide d'abord les orphelines existantes (rollback en fin de test) pour
         # un compte déterministe, puis on batche 3 nouvelles par chunks de 2.
-        purge_orphan_publications(sa_sync_conn)
+        _Q.purge_orphan_publications(sa_sync_conn)
         for title in ("a", "b", "c"):
             _create_pub(sa_sync_conn, title)
-        assert purge_orphan_publications(sa_sync_conn, limit=2) == 2
-        assert purge_orphan_publications(sa_sync_conn, limit=2) == 1
-        assert purge_orphan_publications(sa_sync_conn, limit=2) == 0
+        assert _Q.purge_orphan_publications(sa_sync_conn, limit=2) == 2
+        assert _Q.purge_orphan_publications(sa_sync_conn, limit=2) == 1
+        assert _Q.purge_orphan_publications(sa_sync_conn, limit=2) == 0
 
     def test_cascades_publication_subjects(self, sa_sync_conn):
         # Les sujets d'une orpheline disparaissent par CASCADE : c'est ce qui
@@ -83,7 +85,7 @@ class TestPurgeOrphanPublications:
             ),
             {"p": orphan, "s": s_id},
         )
-        purge_orphan_publications(sa_sync_conn)
+        _Q.purge_orphan_publications(sa_sync_conn)
         n_links = sa_sync_conn.execute(
             text("SELECT count(*) FROM publication_subjects WHERE publication_id = :p"),
             {"p": orphan},
