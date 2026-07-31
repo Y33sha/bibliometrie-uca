@@ -48,17 +48,12 @@ _UPSERT_SQL = text(
 ).bindparams(*(bindparam(c, type_=JSONB) for c in _JSONB_COLUMNS))
 
 
-def upsert_source_publication(conn: Connection, row: SourcePublicationRow) -> int:
-    """UPSERT d'un enregistrement source sur la clé `(source, source_id)`. Retourne l'id de la ligne."""
-    params: dict[str, Any] = {name: getattr(row, name) for name in _ROW_FIELDS}
-    params["title_normalized"] = normalized_title(row.title)
-    # `external_ids` est `NOT NULL` et contraint à un objet JSON.
-    params["external_ids"] = {} if row.external_ids is None else row.external_ids
-    return conn.execute(_UPSERT_SQL, params).one().id
-
-
 class PgSourcePublicationQueries(SourcePublicationQueries):
     """Adapter PostgreSQL pour `application.ports.pipeline.normalize.source_publications.SourcePublicationQueries`."""
 
     def upsert_source_publication(self, conn: Connection, row: SourcePublicationRow) -> int:
-        return upsert_source_publication(conn, row)
+        params: dict[str, Any] = {name: getattr(row, name) for name in _ROW_FIELDS}
+        params["title_normalized"] = normalized_title(row.title)
+        # `external_ids` est `NOT NULL` et contraint à un objet JSON.
+        params["external_ids"] = {} if row.external_ids is None else row.external_ids
+        return conn.execute(_UPSERT_SQL, params).one().id
