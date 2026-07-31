@@ -32,8 +32,12 @@ class OrphanAuthorshipsResponse(PaginatedResponse):
 class AuthorshipsQueries(Protocol):
     """Lectures sync pour `/api/authorships/*`."""
 
-    def orphan_authorships_count(self) -> OrphanCountResponse: ...
+    def orphan_authorships_count(self) -> OrphanCountResponse:
+        """Nombre de signatures du périmètre qu'aucune personne ne porte."""
+        ...
 
     def list_orphan_authorships(
         self, *, search: str, page: int, per_page: int
-    ) -> OrphanAuthorshipsResponse: ...
+    ) -> OrphanAuthorshipsResponse:
+        """Liste paginée des signatures orphelines, avec la publication qu'elles signent."""
+        ...

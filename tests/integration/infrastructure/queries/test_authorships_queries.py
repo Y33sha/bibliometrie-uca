@@ -2,10 +2,7 @@
 
 from sqlalchemy import text
 
-from infrastructure.read_models.authorships import (
-    list_orphan_authorships,
-    orphan_authorships_count,
-)
+from infrastructure.read_models.authorships import PgAuthorshipsQueries
 from tests.integration.helpers.authorships import upsert_identity
 
 
@@ -81,13 +78,13 @@ class TestOrphanAuthorshipsCount:
         pid = _create_person(sa_sync_conn)
         _create_sa(sa_sync_conn, sd, author_position=1, person_id=pid)  # attribuée
 
-        assert orphan_authorships_count(sa_sync_conn).total >= 1
+        assert PgAuthorshipsQueries(sa_sync_conn).orphan_authorships_count().total >= 1
 
     def test_excludes_out_of_perimeter(self, sa_sync_conn):
         pub = _create_pub(sa_sync_conn)
         sd = _create_sd(sa_sync_conn, pub)
         _create_sa(sa_sync_conn, sd, person_id=None, in_perimeter=False)
-        assert orphan_authorships_count(sa_sync_conn).total == 0
+        assert PgAuthorshipsQueries(sa_sync_conn).orphan_authorships_count().total == 0
 
     def test_excludes_non_author_roles(self, sa_sync_conn):
         pub = _create_pub(sa_sync_conn)
@@ -101,7 +98,7 @@ class TestOrphanAuthorshipsCount:
             person_id=None,
             roles=["jury_member"],
         )
-        assert orphan_authorships_count(sa_sync_conn).total == 0
+        assert PgAuthorshipsQueries(sa_sync_conn).orphan_authorships_count().total == 0
 
 
 class TestListOrphanAuthorships:
@@ -110,7 +107,9 @@ class TestListOrphanAuthorships:
         sd = _create_sd(sa_sync_conn, pub)
         sa = _create_sa(sa_sync_conn, sd, person_id=None, raw_author_name="Dupond Jean")
 
-        res = list_orphan_authorships(sa_sync_conn, search="", page=1, per_page=50)
+        res = PgAuthorshipsQueries(sa_sync_conn).list_orphan_authorships(
+            search="", page=1, per_page=50
+        )
         assert res.total >= 1
         assert any(a.source_authorship_id == sa for a in res.authorships)
 
@@ -122,5 +121,7 @@ class TestListOrphanAuthorships:
         )
         _create_sa(sa_sync_conn, sd, author_position=1, person_id=None, raw_author_name="Autre")
 
-        res = list_orphan_authorships(sa_sync_conn, search="Special", page=1, per_page=50)
+        res = PgAuthorshipsQueries(sa_sync_conn).list_orphan_authorships(
+            search="Special", page=1, per_page=50
+        )
         assert sa_match in [a.source_authorship_id for a in res.authorships]
