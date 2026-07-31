@@ -16,9 +16,7 @@
   let width = $state(800);
   let height = $state(420);
 
-  // Palette douce ; couleur stable par sujet via hash de l'id (palette
-  // tournante). À garder visuelle, non-sémantique : on évite de mêler
-  // type concept/libre ou ontologie pour ne pas surcharger le sens visuel.
+  // Palette douce ; couleur stable par sujet via hash de l'id (palette tournante). À garder visuelle, non-sémantique : on évite de mêler type concept/libre ou ontologie pour ne pas surcharger le sens visuel.
   const PALETTE = ["#075985", "#0369a1", "#7c3aed", "#9333ea", "#be123c", "#b45309"];
   function colorFor(id: number): string {
     return PALETTE[id % PALETTE.length];
@@ -73,8 +71,7 @@
     if (container) {
       const rect = container.getBoundingClientRect();
       width = Math.max(400, rect.width);
-      // Hauteur compacte : tous les mots sont horizontaux, pas la peine
-      // de gaspiller de la hauteur sur du vide.
+      // Hauteur compacte : tous les mots sont horizontaux, pas la peine de gaspiller de la hauteur sur du vide.
       height = Math.max(140, Math.round(rect.width * 0.22));
     }
     buildLayout();

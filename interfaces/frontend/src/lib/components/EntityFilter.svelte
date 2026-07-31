@@ -2,18 +2,12 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { api } from '$lib/api';
 
-	/** Facette d'entité à forte cardinalité (éditeur, revue) : recherche serveur **contextuelle**.
-	 *  Le parent fournit `buildParams` (les filtres actifs) ; le composant y ajoute le `kind` et le
-	 *  terme de recherche pour lister les N premières entités sous ces filtres, avec décompte.
+	/** Facette d'entité à forte cardinalité (éditeur, revue) : recherche serveur **contextuelle**. Le parent fournit `buildParams` (les filtres actifs) ; le composant y ajoute le `kind` et le terme de recherche pour lister les N premières entités sous ces filtres, avec décompte.
 	 *
-	 *  L'état canonique côté parent est le seul **id** sélectionné. Le libellé de la pastille est de la
-	 *  donnée dérivée, gérée ici : connu d'emblée quand l'utilisateur choisit une option, sinon résolu
-	 *  par `/api/entity-labels` quand un id est restauré depuis l'URL sans son nom. Ce libellé ne
-	 *  dépend d'aucun filtre, là où les options proposées en dépendent. */
+	 * L'état canonique côté parent est le seul **id** sélectionné. Le libellé de la pastille est de la donnée dérivée, gérée ici : connu d'emblée quand l'utilisateur choisit une option, sinon résolu par `/api/entity-labels` quand un id est restauré depuis l'URL sans son nom. Ce libellé ne dépend d'aucun filtre, là où les options proposées en dépendent. */
 	interface Props {
 		label: string;
-		/** Base de la facette contextuelle (ex. /api/stats/facets) : `${endpoint}/entities` liste les
-		 *  premières entités sous les filtres actifs. */
+		/** Base de la facette contextuelle (ex. /api/stats/facets) : `${endpoint}/entities` liste les premières entités sous les filtres actifs. */
 		endpoint: string;
 		kind: 'publisher' | 'journal';
 		/** Filtres actifs du contexte (l'endpoint saute de lui-même celui de `kind`). */
@@ -40,9 +34,7 @@
 	let debounce: ReturnType<typeof setTimeout>;
 	const instanceId = Symbol();
 
-	// Résolution du libellé de la pastille. Quand un id est présélectionné (restauré de l'URL) dont on
-	// ne connaît pas encore le nom, on le demande à l'endpoint. Idempotent (mémoïsé par `resolvedId`),
-	// et tolérant aux changements rapides (on n'applique la réponse que si l'id n'a pas changé entre-temps).
+	// Résolution du libellé de la pastille. Quand un id est présélectionné (restauré de l'URL) dont on ne connaît pas encore le nom, on le demande à l'endpoint. Idempotent (mémoïsé par `resolvedId`), et tolérant aux changements rapides (on n'applique la réponse que si l'id n'a pas changé entre-temps).
 	$effect(() => {
 		if (!selectedId) {
 			selectedLabel = null;
@@ -229,8 +221,7 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
-		/* Indispensable pour que l'ellipse s'applique à un enfant flex (sinon min-width: auto
-		   empêche le rétrécissement et le panneau s'élargit au plus long nom). */
+		/* Indispensable pour que l'ellipse s'applique à un enfant flex (sinon min-width: auto empêche le rétrécissement et le panneau s'élargit au plus long nom). */
 		min-width: 0;
 	}
 	.facet-count {
