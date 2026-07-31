@@ -2,13 +2,9 @@
 
 from sqlalchemy import text
 
-from infrastructure.pipeline.persons.name_forms import (
-    create_temp_raw_forms_table,
-    drop_temp_raw_forms_table,
-    fetch_persons_names,
-    insert_raw_forms_batch,
-    sync_from_raw_forms,
-)
+from infrastructure.pipeline.persons.name_forms import PgPersonNameFormsQueries
+
+_Q = PgPersonNameFormsQueries()
 from tests.integration.helpers.authorships import upsert_identity
 
 
@@ -89,14 +85,14 @@ class TestFetchPersonsNames:
         active = _create_person(sa_sync_conn, last="A")
         rejected = _create_person(sa_sync_conn, last="B", rejected=True)
 
-        rows = fetch_persons_names(sa_sync_conn)
+        rows = _Q.fetch_persons_names(sa_sync_conn)
         ids = [r.id for r in rows]
         assert active in ids
         assert rejected in ids
 
     def test_trims_names(self, sa_sync_conn):
         pid = _create_person(sa_sync_conn, last="  Dupond", first="Jean  ")
-        rows = fetch_persons_names(sa_sync_conn)
+        rows = _Q.fetch_persons_names(sa_sync_conn)
         row = next(r for r in rows if r.id == pid)
         assert row.last_name == "Dupond"
         assert row.first_name == "Jean"
@@ -108,13 +104,13 @@ class TestSyncFromRawForms:
         après sync, avec `sources = ['persons']` et normalisée par SQL."""
         pid = _create_person(sa_sync_conn)
 
-        create_temp_raw_forms_table(sa_sync_conn)
-        insert_raw_forms_batch(
+        _Q.create_temp_raw_forms_table(sa_sync_conn)
+        _Q.insert_raw_forms_batch(
             sa_sync_conn,
             [{"raw_text": "  DUPOND J  ", "person_id": pid, "source": "persons"}],
         )
-        inserted, updated, deleted = sync_from_raw_forms(sa_sync_conn)
-        drop_temp_raw_forms_table(sa_sync_conn)
+        inserted, updated, deleted = _Q.sync_from_raw_forms(sa_sync_conn)
+        _Q.drop_temp_raw_forms_table(sa_sync_conn)
 
         rows = _fetch_pnf_for(sa_sync_conn, pid)
         assert len(rows) == 1
@@ -130,13 +126,13 @@ class TestSyncFromRawForms:
         sd = _create_sd(sa_sync_conn)
         _create_sa(sa_sync_conn, sd, person_id=pid, author_name_normalized="dupond j", source="hal")
 
-        create_temp_raw_forms_table(sa_sync_conn)
-        insert_raw_forms_batch(
+        _Q.create_temp_raw_forms_table(sa_sync_conn)
+        _Q.insert_raw_forms_batch(
             sa_sync_conn,
             [{"raw_text": "dupond j", "person_id": pid, "source": "persons"}],
         )
-        sync_from_raw_forms(sa_sync_conn)
-        drop_temp_raw_forms_table(sa_sync_conn)
+        _Q.sync_from_raw_forms(sa_sync_conn)
+        _Q.drop_temp_raw_forms_table(sa_sync_conn)
 
         rows = _fetch_pnf_for(sa_sync_conn, pid)
         assert ("dupond j", ["hal", "persons"]) in rows
@@ -147,10 +143,10 @@ class TestSyncFromRawForms:
         pid = _create_person(sa_sync_conn)
         _insert_pnf(sa_sync_conn, "obsolete", pid, ["persons"])
 
-        create_temp_raw_forms_table(sa_sync_conn)
+        _Q.create_temp_raw_forms_table(sa_sync_conn)
         # _raw_forms vide + aucune source_authorship → l'attendu est vide
-        inserted, updated, deleted = sync_from_raw_forms(sa_sync_conn)
-        drop_temp_raw_forms_table(sa_sync_conn)
+        inserted, updated, deleted = _Q.sync_from_raw_forms(sa_sync_conn)
+        _Q.drop_temp_raw_forms_table(sa_sync_conn)
 
         assert deleted >= 1
         rows = _fetch_pnf_for(sa_sync_conn, pid)
@@ -171,9 +167,9 @@ class TestSyncFromRawForms:
         # Base : sources = ['hal'] (obsolète vs source_authorships qui dit openalex)
         _insert_pnf(sa_sync_conn, "dupond j", pid, ["hal"])
 
-        create_temp_raw_forms_table(sa_sync_conn)
-        inserted, updated, deleted = sync_from_raw_forms(sa_sync_conn)
-        drop_temp_raw_forms_table(sa_sync_conn)
+        _Q.create_temp_raw_forms_table(sa_sync_conn)
+        inserted, updated, deleted = _Q.sync_from_raw_forms(sa_sync_conn)
+        _Q.drop_temp_raw_forms_table(sa_sync_conn)
 
         assert updated >= 1
         rows = _fetch_pnf_for(sa_sync_conn, pid)
