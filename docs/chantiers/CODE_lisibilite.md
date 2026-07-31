@@ -223,7 +223,6 @@ Deux findings ont leur fiche dédiée, tous deux traités : [Périmètre APC](ar
 - [x] `imports/import_persons.py` : délègue à `import_rh_person` (service applicatif), qui crée la personne et attache sa fiche RH avec déduplication — plus d'`INSERT INTO persons` ni de `refresh_person_name_forms` réécrits en SQL. Reste un `SELECT COUNT(*) FROM persons` de bilan en fin de `main()`, ligne d'affichage sans logique.
 - [ ] `oneshot/seed_journals_doi_prefix.py` : à promouvoir en `maintenance/`, ou à intégrer au pipeline. Les préfixes DOI des revues alimentent la correction de métadonnées (`resolve_journal_by_doi`, sous-step `journal_by_doi` de la phase `metadata_correction`), or aucune phase n'écrit `journals.doi_prefix` : la colonne est semée une fois puis se périme — dette. Le script écrit la colonne en SQL brut dans une boucle ; son passage par `journals` service ne coûte rien.
 - [x] `maintenance/merge_publications.py` n'existe plus : la fusion de publications est une opération de service et d'API (`merge_duplicate_publications`), le script CLI a disparu. Marqueur sans objet.
-- [ ] Passe des CLI `maintenance/` et `oneshot/`.
 
 ### Phase 4 - `domain/`
 
