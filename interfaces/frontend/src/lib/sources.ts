@@ -11,9 +11,7 @@ interface SourceMeta {
 }
 
 /**
- * Métadonnées d'affichage par source : libellé, logo et lien externe.
- * Source unique de vérité pour le rendu des sources (composant `SourceTag`,
- * en-tête de publication, listes de doublons…). Ajouter une source = une entrée ici.
+ * Métadonnées d'affichage par source : libellé, logo et lien externe. Source unique de vérité pour le rendu des sources (composant `SourceTag`, en-tête de publication, listes de doublons…). Ajouter une source = une entrée ici.
  */
 export const SOURCES: Record<string, SourceMeta> = {
 	hal: { label: 'HAL', icon: `${base}/icons/hal.ico`, externalUrl: (id, oa) => halDocUrl(id, oa) },

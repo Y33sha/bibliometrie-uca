@@ -1,8 +1,4 @@
-/** Facettes des toggles de filtre par présence : items `{ key, label }` fournis au composant
- * de filtre pour les sources (liste des publications), les identifiants et les éléments de
- * curation en attente (annuaire et admin des personnes). La `key` indexe l'état du filtre et
- * les comptes de facettes renvoyés par le backend — d'où `oa` pour OpenAlex, distinct du
- * `openalex` d'affichage de `sources.ts`. */
+/** Facettes des toggles de filtre par présence : items `{ key, label }` fournis au composant de filtre pour les sources (liste des publications), les identifiants et les éléments de curation en attente (annuaire et admin des personnes). La `key` indexe l'état du filtre et les comptes de facettes renvoyés par le backend — d'où `oa` pour OpenAlex, distinct du `openalex` d'affichage de `sources.ts`. */
 export const SOURCE_ITEMS = [
 	{ key: 'hal', label: 'HAL' },
 	{ key: 'oa', label: 'OpenAlex' },

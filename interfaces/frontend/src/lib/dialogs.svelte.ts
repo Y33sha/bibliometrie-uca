@@ -1,7 +1,5 @@
 /**
- * Dialogues UI globaux : confirmation (remplace `confirm()`) et toasts
- * (remplacent `alert()`). Un seul `<DialogHost>` monté dans le layout rend
- * l'état exposé ici.
+ * Dialogues UI globaux : confirmation (remplace `confirm()`) et toasts (remplacent `alert()`). Un seul `<DialogHost>` monté dans le layout rend l'état exposé ici.
  *
  * Usage :
  *   if (!(await confirmDialog({ message: '…', danger: true }))) return;
