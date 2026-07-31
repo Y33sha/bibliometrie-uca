@@ -6,13 +6,9 @@ from application.ports.pipeline.affiliations.address_resolution import (
     DetectedStructure,
     KeptPair,
 )
-from infrastructure.pipeline.affiliations.address_resolution import (
-    delete_obsolete_detections_bulk,
-    fetch_addresses_chunk,
-    load_name_forms,
-    unflag_obsolete_detections_bulk,
-    upsert_detected_structures_bulk,
-)
+from infrastructure.pipeline.affiliations.address_resolution import PgAddressResolutionQueries
+
+_Q = PgAddressResolutionQueries()
 
 
 def _create_structure(conn, code="X"):
@@ -46,7 +42,7 @@ class TestLoadNameForms:
     def test_returns_all_forms(self, sa_sync_conn):
         s = _create_structure(sa_sync_conn)
         f = _create_form(sa_sync_conn, s, form_text="uca")
-        rows = load_name_forms(sa_sync_conn)
+        rows = _Q.load_name_forms(sa_sync_conn)
         assert any(r.id == f for r in rows)
         ours = next(r for r in rows if r.id == f)
         assert ours.structure_id == s
@@ -57,7 +53,7 @@ class TestFetchAddressesChunk:
     def test_returns_all_addresses(self, sa_sync_conn):
         a1 = _create_address(sa_sync_conn, raw_text="A1")
         a2 = _create_address(sa_sync_conn, raw_text="A2")
-        rows = fetch_addresses_chunk(sa_sync_conn, after_id=0, limit=1000)
+        rows = _Q.fetch_addresses_chunk(sa_sync_conn, after_id=0, limit=1000)
         ids = [addr_id for addr_id, _ in rows]
         assert a1 in ids and a2 in ids
 
@@ -66,14 +62,14 @@ class TestFetchAddressesChunk:
         a1 = _create_address(sa_sync_conn, raw_text="A1")
         a2 = _create_address(sa_sync_conn, raw_text="A2")
         a3 = _create_address(sa_sync_conn, raw_text="A3")
-        rows = fetch_addresses_chunk(sa_sync_conn, after_id=a1, limit=1)
+        rows = _Q.fetch_addresses_chunk(sa_sync_conn, after_id=a1, limit=1)
         ids = [addr_id for addr_id, _ in rows]
         assert ids == [a2]  # a1 exclu (id <= after_id), a3 hors limite
         assert a3 > a2  # ordre par id garanti
 
     def test_returns_normalized_text_tuples(self, sa_sync_conn):
         addr_id = _create_address(sa_sync_conn, raw_text="Some address")
-        rows = fetch_addresses_chunk(sa_sync_conn, after_id=0, limit=1000)
+        rows = _Q.fetch_addresses_chunk(sa_sync_conn, after_id=0, limit=1000)
         assert all(isinstance(r, tuple) and len(r) == 2 for r in rows)
         row = next(r for r in rows if r[0] == addr_id)
         assert isinstance(row[0], int)
@@ -95,7 +91,7 @@ class TestDeleteObsoleteDetectionsBulk:
                 {"addr": addr, "struct": struct, "form": f},
             )
 
-        count = delete_obsolete_detections_bulk(
+        count = _Q.delete_obsolete_detections_bulk(
             sa_sync_conn, [addr], kept_pairs=[KeptPair(addr, s1)]
         )
         assert count == 1
@@ -117,7 +113,7 @@ class TestDeleteObsoleteDetectionsBulk:
             ),
             {"addr": addr, "struct": s, "form": f},
         )
-        count = delete_obsolete_detections_bulk(sa_sync_conn, [addr], kept_pairs=[])
+        count = _Q.delete_obsolete_detections_bulk(sa_sync_conn, [addr], kept_pairs=[])
         assert count == 1
 
     def test_preserves_manually_confirmed_links(self, sa_sync_conn):
@@ -132,7 +128,7 @@ class TestDeleteObsoleteDetectionsBulk:
             ),
             {"addr": addr, "struct": s, "form": f},
         )
-        count = delete_obsolete_detections_bulk(sa_sync_conn, [addr], kept_pairs=[])
+        count = _Q.delete_obsolete_detections_bulk(sa_sync_conn, [addr], kept_pairs=[])
         assert count == 0  # lien manuel non supprimé
 
     def test_pair_scoped_not_structure_scoped(self, sa_sync_conn):
@@ -150,7 +146,7 @@ class TestDeleteObsoleteDetectionsBulk:
                 {"addr": addr, "struct": s, "form": f},
             )
         # On garde (addr1, s) ; (addr2, s) devient obsolète bien que même structure.
-        count = delete_obsolete_detections_bulk(
+        count = _Q.delete_obsolete_detections_bulk(
             sa_sync_conn, [addr1, addr2], kept_pairs=[KeptPair(addr1, s)]
         )
         assert count == 1
@@ -180,7 +176,7 @@ class TestUnflagObsoleteDetectionsBulk:
             {"addr": addr, "struct": s2, "form": f},
         )
 
-        unflag_obsolete_detections_bulk(sa_sync_conn, [addr], kept_pairs=[KeptPair(addr, s1)])
+        _Q.unflag_obsolete_detections_bulk(sa_sync_conn, [addr], kept_pairs=[KeptPair(addr, s1)])
         row = sa_sync_conn.execute(
             text(
                 "SELECT matched_form_id, is_confirmed FROM address_structures "
@@ -197,7 +193,7 @@ class TestUpsertDetectedStructuresBulk:
         s = _create_structure(sa_sync_conn)
         f = _create_form(sa_sync_conn, s)
         addr = _create_address(sa_sync_conn)
-        upsert_detected_structures_bulk(sa_sync_conn, [DetectedStructure(addr, s, f)])
+        _Q.upsert_detected_structures_bulk(sa_sync_conn, [DetectedStructure(addr, s, f)])
         result = sa_sync_conn.execute(
             text(
                 "SELECT matched_form_id FROM address_structures "
@@ -212,8 +208,8 @@ class TestUpsertDetectedStructuresBulk:
         f1 = _create_form(sa_sync_conn, s, form_text="x1")
         f2 = _create_form(sa_sync_conn, s, form_text="x2")
         addr = _create_address(sa_sync_conn)
-        upsert_detected_structures_bulk(sa_sync_conn, [DetectedStructure(addr, s, f1)])
-        upsert_detected_structures_bulk(sa_sync_conn, [DetectedStructure(addr, s, f2)])
+        _Q.upsert_detected_structures_bulk(sa_sync_conn, [DetectedStructure(addr, s, f1)])
+        _Q.upsert_detected_structures_bulk(sa_sync_conn, [DetectedStructure(addr, s, f2)])
         result = sa_sync_conn.execute(
             text(
                 "SELECT matched_form_id FROM address_structures "
@@ -229,7 +225,7 @@ class TestUpsertDetectedStructuresBulk:
         f1 = _create_form(sa_sync_conn, s1)
         f2 = _create_form(sa_sync_conn, s2, form_text="y")
         addr = _create_address(sa_sync_conn)
-        upsert_detected_structures_bulk(
+        _Q.upsert_detected_structures_bulk(
             sa_sync_conn, [DetectedStructure(addr, s1, f1), DetectedStructure(addr, s2, f2)]
         )
         count = sa_sync_conn.execute(
@@ -243,13 +239,13 @@ class TestUpsertDetectedStructuresBulk:
         s = _create_structure(sa_sync_conn)
         f = _create_form(sa_sync_conn, s)
         addr = _create_address(sa_sync_conn)
-        upsert_detected_structures_bulk(sa_sync_conn, [DetectedStructure(addr, s, f)])
+        _Q.upsert_detected_structures_bulk(sa_sync_conn, [DetectedStructure(addr, s, f)])
         xmin_before = sa_sync_conn.execute(
             text("SELECT xmin FROM address_structures WHERE address_id = :a AND structure_id = :s"),
             {"a": addr, "s": s},
         ).scalar_one()
         # Même détection : l'ON CONFLICT ... WHERE IS DISTINCT FROM ne réécrit rien.
-        upsert_detected_structures_bulk(sa_sync_conn, [DetectedStructure(addr, s, f)])
+        _Q.upsert_detected_structures_bulk(sa_sync_conn, [DetectedStructure(addr, s, f)])
         xmin_after = sa_sync_conn.execute(
             text("SELECT xmin FROM address_structures WHERE address_id = :a AND structure_id = :s"),
             {"a": addr, "s": s},
