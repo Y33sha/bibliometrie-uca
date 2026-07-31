@@ -4,9 +4,9 @@ from sqlalchemy import text
 
 from application.ports.pipeline.normalize.source_publications import SourcePublicationRow
 from domain.publications.metadata import normalized_title
-from infrastructure.pipeline.normalize.source_publications import (
-    upsert_source_publication,
-)
+from infrastructure.pipeline.normalize.source_publications import PgSourcePublicationQueries
+
+_Q = PgSourcePublicationQueries()
 
 
 def test_upsert_writes_title_normalized(sa_sync_conn):
@@ -18,7 +18,7 @@ def test_upsert_writes_title_normalized(sa_sync_conn):
         )
     ).scalar_one()
     raw_title = "Les Cœurs <b>simples</b> &amp;amp; complexes"
-    sp_id = upsert_source_publication(
+    sp_id = _Q.upsert_source_publication(
         conn,
         SourcePublicationRow(
             source="openalex",
