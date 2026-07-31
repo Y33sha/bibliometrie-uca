@@ -5,15 +5,9 @@ from sqlalchemy import text
 from application.pipeline.metadata_correction import journal_by_doi
 from application.pipeline.metadata_correction.correct_by_cluster import compute_updates
 from application.pipeline.metadata_correction.correct_unary import compute_update
-from infrastructure.pipeline.metadata_correction import (
-    fetch_doi_cluster_candidates,
-    fetch_for_unary_correction,
-    fetch_journal_by_doi_candidates,
-    fetch_journal_doi_prefixes,
-    persist_corrections,
-    persist_doi_corrections,
-    persist_journal_corrections,
-)
+from infrastructure.pipeline.metadata_correction import PgMetadataCorrectionQueries
+
+_Q = PgMetadataCorrectionQueries()
 
 
 def _seed_journal(conn, journal_type: str, doi_prefix: str | None = None) -> int:
@@ -55,16 +49,16 @@ def _seed_sp(
 
 def _apply(conn) -> int:
     """Joue la passe unaire sans committer (transaction de test rollbackée)."""
-    rows = fetch_for_unary_correction(conn)
+    rows = _Q.fetch_for_unary_correction(conn)
     updates = [u for r in rows if (u := compute_update(r)) is not None]
-    return persist_corrections(conn, updates)
+    return _Q.persist_corrections(conn, updates)
 
 
 def _apply_journal_by_doi(conn) -> int:
     """Joue le sous-step journal_by_doi sans committer."""
-    prefixes = fetch_journal_doi_prefixes(conn)
-    rows = fetch_journal_by_doi_candidates(conn)
-    return persist_journal_corrections(conn, journal_by_doi.compute_updates(rows, prefixes))
+    prefixes = _Q.fetch_journal_doi_prefixes(conn)
+    rows = _Q.fetch_journal_by_doi_candidates(conn)
+    return _Q.persist_journal_corrections(conn, journal_by_doi.compute_updates(rows, prefixes))
 
 
 def test_journal_by_doi_attaches_then_doc_type_converges_same_run(sa_sync_conn):
@@ -293,8 +287,8 @@ def _seed_typed_sp(conn, *, source_id, doc_type, doi, title="T", title_normalize
 
 
 def _apply_cluster(conn) -> int:
-    rows = fetch_doi_cluster_candidates(conn)
-    return persist_doi_corrections(conn, compute_updates(rows))
+    rows = _Q.fetch_doi_cluster_candidates(conn)
+    return _Q.persist_doi_corrections(conn, compute_updates(rows))
 
 
 def test_chapter_loses_doi_of_its_book(sa_sync_conn):
