@@ -80,8 +80,8 @@ export function reassignIdentifier(
 export function markDistinct(
 	personIdA: number,
 	personIdB: number
-): Promise<unknown> {
-	return post('/api/persons/mark-distinct', {
+): Promise<OkResponse> {
+	return post<OkResponse>('/api/persons/mark-distinct', {
 		person_id_a: personIdA,
 		person_id_b: personIdB
 	});
