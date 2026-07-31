@@ -16,7 +16,7 @@ Le chantier [METIER_publishers-journals](../chantiers/archived/2026-05-29_METIER
 
 - Accès psql à la base de prod (`DB_NAME=bibliometrie`).
 - Accès à l'UI admin (`/admin/journals`, `/admin/publishers`) avec session active.
-- Le script de seed est à jour : `interfaces/cli/oneshot/seed_journals_doi_prefix.py` (commit ≥ `bb2aa232`).
+- Le script de seed est à jour : `interfaces/cli/maintenance/seed_journals_doi_prefix.py` (commit ≥ `bb2aa232`).
 
 ## Cas 1 — Doublons de journaux
 
@@ -193,7 +193,7 @@ Audit manuel par paire (journal_publi, journal_match_DOI) :
 Après chaque session de nettoyage (Cas 1-4), re-runner le seed pour bénéficier des données dédoublonnées :
 
 ```bash
-python -m interfaces.cli.oneshot.seed_journals_doi_prefix --min-pubs 3
+python -m interfaces.cli.maintenance.seed_journals_doi_prefix --min-pubs 3
 ```
 
 Le script écrase systématiquement les préfixes calculables et laisse intacts les ambigus (les valeurs manuelles éventuelles posées via l'admin sont préservées si le journal n'est plus calculable — sinon écrasées). Inspecter `data/doi_prefix_seed_ambiguous.csv` pour les cas résiduels qui demanderont curation manuelle via l'admin.
@@ -204,4 +204,4 @@ Re-lancer ensuite la query Cas 5 pour mesurer la baisse d'incohérences.
 
 - [METIER_publishers-journals](../chantiers/archived/2026-05-29_METIER_publishers-journals.md) — fiche chantier (Phase 4a, contexte global).
 - [METIER_doi-ra-datacite](../chantiers/archived/2026-06-20_METIER_doi-ra-datacite.md) — table `doi_prefixes` (préfixes ↔ Registration Agency ↔ publisher).
-- `interfaces/cli/oneshot/seed_journals_doi_prefix.py` — script de seed des `journals.doi_prefix`.
+- `interfaces/cli/maintenance/seed_journals_doi_prefix.py` — script de seed des `journals.doi_prefix`.

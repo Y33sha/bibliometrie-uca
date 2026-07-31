@@ -1,9 +1,9 @@
 """Smoke test de `seed_journals_doi_prefix` : les requêtes couplées au schéma tournent sans buter sur une colonne périmée.
 
-CLI récurrent (cf. playbook nettoyer-journals-publishers) qui code en dur `journals.id`/`title`/`doi_prefix` et `publications.journal_id`/`doi` : un renommage les casserait en silence. Le calcul du préfixe (LCP, trim, filtres) relève de la logique Python, testée séparément. Sur une base vide, la sélection et l'UPDATE ne touchent aucune ligne mais valident tables et colonnes.
+CLI de maintenance (cf. playbook nettoyer-journals-publishers) qui code en dur `journals.id`/`title`/`doi_prefix` et `publications.journal_id`/`doi` : un renommage les casserait en silence. Le calcul du préfixe (LCP, trim, filtres) relève de la logique Python, testée séparément. Sur une base vide, la sélection et l'UPDATE ne touchent aucune ligne mais valident tables et colonnes.
 """
 
-from interfaces.cli.oneshot.seed_journals_doi_prefix import (
+from interfaces.cli.maintenance.seed_journals_doi_prefix import (
     SELECT_JOURNAL_DOIS,
     UPDATE_JOURNAL_PREFIX,
 )
