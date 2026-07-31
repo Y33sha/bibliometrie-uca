@@ -17,12 +17,14 @@ from application.services.authorships.core import (
 )
 from domain.errors import NotFoundError
 from infrastructure.pipeline.affiliations.in_perimeter import PgAffiliationsQueries
+from infrastructure.pipeline.authorships.build import PgAuthorshipsBuildQueries
 from infrastructure.pipeline.perimeter import PgPerimeterStructuresQueries
 from infrastructure.repositories import authorship_repository
 from tests.integration.helpers.authorships import upsert_identity
 from tests.integration.helpers.structures import refresh_structure_matviews
 
 _AFFILIATIONS = PgAffiliationsQueries()
+_BUILD = PgAuthorshipsBuildQueries()
 
 
 @pytest.fixture
@@ -212,8 +214,6 @@ class TestExcludeAuthorship:
 
     def test_rebuild_does_not_recreate_rejected_pair(self, sa_sync_conn, repo):
         """Après rejet, l'insertion canonique re-skippe la paire (anti-join)."""
-        from infrastructure.pipeline.authorships.build import insert_missing_authorships
-
         person_id = _create_person(sa_sync_conn)
         pub_id = _create_publication(sa_sync_conn)
         sp_id = _create_source_publication(sa_sync_conn, pub_id)
@@ -224,7 +224,7 @@ class TestExcludeAuthorship:
 
         exclude_authorship(authorship_id, repo=repo)
         # La source est détachée, mais même réattribuée l'anti-join skippe l'INSERT.
-        insert_missing_authorships(sa_sync_conn)
+        _BUILD.insert_missing_authorships(sa_sync_conn)
 
         assert (
             sa_sync_conn.execute(
@@ -326,8 +326,6 @@ class TestRejectPair:
 
     def test_not_recreated_on_rerun(self, sa_sync_conn, repo):
         """Même si une source ressuscite person_id, l'anti-join skippe l'INSERT."""
-        from infrastructure.pipeline.authorships.build import insert_missing_authorships
-
         person_id = _create_person(sa_sync_conn)
         pub_id = _create_publication(sa_sync_conn)
         sp_id = _create_source_publication(sa_sync_conn, pub_id)
@@ -339,7 +337,7 @@ class TestRejectPair:
             text("UPDATE source_authorships SET person_id = :pid WHERE id = :i"),
             {"pid": person_id, "i": sa_id},
         )
-        insert_missing_authorships(sa_sync_conn)
+        _BUILD.insert_missing_authorships(sa_sync_conn)
 
         assert (
             sa_sync_conn.execute(
@@ -441,20 +439,16 @@ class TestPruneOrphanAuthorships:
     source_authorship n'atteste — inverse d'`insert_missing_authorships`."""
 
     def test_deletes_orphan(self, sa_sync_conn):
-        from infrastructure.pipeline.authorships.build import prune_orphan_authorships
-
         person_id = _create_person(sa_sync_conn)
         pub_id = _create_publication(sa_sync_conn)
         _create_authorship(sa_sync_conn, pub_id, person_id)
 
-        n = prune_orphan_authorships(sa_sync_conn)
+        n = _BUILD.prune_orphan_authorships(sa_sync_conn)
 
         assert n == 1
         assert sa_sync_conn.execute(text("SELECT id FROM authorships")).first() is None
 
     def test_keeps_attested_pair(self, sa_sync_conn):
-        from infrastructure.pipeline.authorships.build import prune_orphan_authorships
-
         person_id = _create_person(sa_sync_conn)
         pub_id = _create_publication(sa_sync_conn)
         sp_id = _create_source_publication(sa_sync_conn, pub_id)
@@ -463,7 +457,7 @@ class TestPruneOrphanAuthorships:
             sa_sync_conn, sp_id, person_id=person_id, authorship_id=authorship_id
         )
 
-        n = prune_orphan_authorships(sa_sync_conn)
+        n = _BUILD.prune_orphan_authorships(sa_sync_conn)
 
         assert n == 0
         assert (
@@ -476,8 +470,6 @@ class TestPruneOrphanAuthorships:
     def test_global_scope_across_persons(self, sa_sync_conn):
         """Prune toutes les orphelines, pas seulement celles d'une personne ;
         une authorship attestée (autre personne, même pub) est préservée."""
-        from infrastructure.pipeline.authorships.build import prune_orphan_authorships
-
         pub_id = _create_publication(sa_sync_conn)
         sp_id = _create_source_publication(sa_sync_conn, pub_id)
         p_attested = _create_person(sa_sync_conn, "Martin", "Sophie")
@@ -493,7 +485,7 @@ class TestPruneOrphanAuthorships:
         pub2 = _create_publication(sa_sync_conn, title="Autre")
         _create_authorship(sa_sync_conn, pub2, p_orphan2)
 
-        n = prune_orphan_authorships(sa_sync_conn)
+        n = _BUILD.prune_orphan_authorships(sa_sync_conn)
 
         assert n == 2
         rows = sa_sync_conn.execute(text("SELECT person_id FROM authorships")).all()
@@ -516,10 +508,6 @@ class TestPropagateAuthorshipAttributes:
         ).one()
 
     def test_is_corresponding_is_bool_or(self, sa_sync_conn):
-        from infrastructure.pipeline.authorships.build import (
-            propagate_authorship_attributes,
-        )
-
         person_id = _create_person(sa_sync_conn)
         pub_id = _create_publication(sa_sync_conn)
         sp_id = _create_source_publication(sa_sync_conn, pub_id)
@@ -547,14 +535,10 @@ class TestPropagateAuthorshipAttributes:
             {"w": sa_wos, "h": sa_hal},
         )
 
-        propagate_authorship_attributes(sa_sync_conn)
+        _BUILD.propagate_authorship_attributes(sa_sync_conn)
         assert self._attrs(sa_sync_conn, aid).is_corresponding is True
 
     def test_converges_when_sources_drop_signal(self, sa_sync_conn):
-        from infrastructure.pipeline.authorships.build import (
-            propagate_authorship_attributes,
-        )
-
         person_id = _create_person(sa_sync_conn)
         pub_id = _create_publication(sa_sync_conn)
         sp_id = _create_source_publication(sa_sync_conn, pub_id)
@@ -570,7 +554,7 @@ class TestPropagateAuthorshipAttributes:
             {"id": sa_id},
         )
 
-        propagate_authorship_attributes(sa_sync_conn)
+        _BUILD.propagate_authorship_attributes(sa_sync_conn)
         before = self._attrs(sa_sync_conn, aid)
         assert (before.is_corresponding, before.in_perimeter, before.roles) == (
             True,
@@ -586,7 +570,7 @@ class TestPropagateAuthorshipAttributes:
             ),
             {"id": sa_id},
         )
-        propagate_authorship_attributes(sa_sync_conn)
+        _BUILD.propagate_authorship_attributes(sa_sync_conn)
         after = self._attrs(sa_sync_conn, aid)
         # Convergence : tout retombe (le garde `IS NULL` historique figeait ces valeurs).
         assert (after.is_corresponding, after.in_perimeter, after.roles) == (
