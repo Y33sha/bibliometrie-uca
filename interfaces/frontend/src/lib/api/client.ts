@@ -24,9 +24,7 @@ async function parseError(res: Response): Promise<unknown> {
 }
 
 /**
- * GET avec annulation automatique des requêtes précédentes.
- * Si `key` est fourni, toute requête précédente avec la même clé est annulée.
- * Une requête annulée ne résout ni ne rejette — elle disparaît silencieusement.
+ * GET avec annulation automatique des requêtes précédentes. Si `key` est fourni, toute requête précédente avec la même clé est annulée. Une requête annulée ne résout ni ne rejette — elle disparaît silencieusement.
  *
  * Usage : api('/api/publications?...', { key: 'pub-list' })
  */
@@ -58,8 +56,7 @@ export async function api<T>(url: string, opts?: { key?: string }): Promise<T> {
 type Method = 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 /**
- * Helper interne pour les mutations. Gère le JSON body, les erreurs HTTP
- * avec extraction du `detail`, et le cas "204 No Content" (retourne null).
+ * Helper interne pour les mutations. Gère le JSON body, les erreurs HTTP avec extraction du `detail`, et le cas "204 No Content" (retourne null).
  */
 async function mutate<T>(method: Method, url: string, body?: unknown): Promise<T> {
 	const init: RequestInit = { method };

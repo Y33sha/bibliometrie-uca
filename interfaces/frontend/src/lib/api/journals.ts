@@ -9,9 +9,7 @@ export function merge(targetId: number, sourceId: number): Promise<unknown> {
 }
 
 /**
- * Preview de l'impact d'un changement de `journal_type` sur le `doc_type` canonique
- * des publications rattachées. Le backend applique le changement puis l'annule :
- * rien ne persiste, mais l'appel est une action admin, d'où le POST.
+ * Preview de l'impact d'un changement de `journal_type` sur le `doc_type` canonique des publications rattachées. Le backend applique le changement puis l'annule : rien ne persiste, mais l'appel est une action admin, d'où le POST.
  */
 export function typeChangeImpact(id: number, newType: string): Promise<{ count: number }> {
 	return post(`/api/journals/${id}/type-change-impact`, { journal_type: newType });
