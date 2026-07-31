@@ -138,8 +138,8 @@ Traverse `domain/`, `application/ports`, `application/pipeline/metadata_correcti
 Racine (transverse) : passe docstrings/commentaires faite. Findings structurels remontés à la relecture :
 
 - [x] `common.py` éclaté par préoccupation et supprimé : hash de détection dans `pipeline/change_detection.py`, persistance (staging, pool cross-import, sélection stale) dans `pipeline/extract/` (chantier couches).
-- [ ] `http_retry.py` + `http_retry_async.py` — factoriser la logique de décision pure (backoff, classification 429/4xx/5xx/body vide, règles breaker) ; les deux boucles d'I/O minces (sync `requests` / async `httpx`) cohabitent dans un seul fichier.
-- [ ] `_API_BASE_URLS` (+ `get_api_base_urls`) sort de `config.py` vers un module dédié `api_urls.py` : ni des limites, ni de la config d'environnement.
+- [x] `http_retry.py` : la politique de décision (backoff, classification des statuts, corps vide, label du breaker) est factorisée en helpers purs partagés (`_prepared_label`, `_retry_reason`) ; les deux boucles ne portent que l'I/O de leur client et l'attente. La coupure sur retry épuisé diverge à dessein — sync `SourceUnavailableError`, async brut.
+- [x] `API_BASE_URLS` sorti de `config.py` vers le module dédié `api_params.py` (paramètres d'API invariants par source : URLs, délais, tailles de page).
 - [x] Un dossier par source : `unpaywall/client.py` et `doaj/client.py` (`__init__` mince) ; racine = transverse seulement.
 - [x] `openalex/__init__.py` : la docstring pointe la constante `api_params.API_BASE_URLS` pour l'URL de base.
 
