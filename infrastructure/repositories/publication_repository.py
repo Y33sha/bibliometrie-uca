@@ -13,7 +13,7 @@ from sqlalchemy import Connection, text
 from application.ports.repositories.publication_repository import PublicationRepository
 from domain.publications.identifiers import DOI
 from domain.publications.publication import Publication
-from domain.source_publications.correction import CONVERGENCE_CASES
+from domain.source_publications.metadata_correction.shared_doi import CONVERGENCE_CASES
 from domain.source_publications.source_publication import SourcePublication
 
 

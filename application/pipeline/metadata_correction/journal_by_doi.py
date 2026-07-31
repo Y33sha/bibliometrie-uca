@@ -17,7 +17,10 @@ from application.ports.pipeline.metadata_correction import (
     JournalDoiPrefixRow,
     MetadataCorrectionQueries,
 )
-from domain.source_publications.correction import JOURNAL_BY_DOI_PREFIX, resolve_journal_by_doi
+from domain.source_publications.metadata_correction.journal_by_doi import (
+    JOURNAL_BY_DOI_PREFIX,
+    resolve_journal_by_doi,
+)
 from domain.source_publications.raw_metadata import raw_value, stash_entry
 
 

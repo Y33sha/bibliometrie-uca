@@ -19,7 +19,7 @@ from application.ports.pipeline.metadata_correction import (
     UnaryCorrectionRow,
 )
 from domain.publications.doc_types import DocType
-from domain.source_publications.correction import (
+from domain.source_publications.metadata_correction.shared_doi import (
     DATACITE_DIRECT_CONVERGENCE,
     DATACITE_PACKAGE_PIECE_RELATION,
     DoiClusterCase,

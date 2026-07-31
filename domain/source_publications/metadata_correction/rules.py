@@ -1,8 +1,6 @@
-"""Règles de correction des métadonnées de publication.
+"""Correction unaire des métadonnées d'un enregistrement, par table de règles.
 
-Expose `effective_metadata`, fonction pure qui applique des règles de correction sur des métadonnées de publication, à partir de `MetadataForCorrection` — son contrat d'entrée, qui porte les champs lus par les prédicats des règles, dont `journal_type` et `oa_model` joints depuis `journals`. La fonction couvre les règles intrinsèques à un enregistrement (URL) comme les règles journal-dépendantes, sans threader de repo.
-
-Distincte de l'agrégation (`aggregation.py` arbitre entre sources) et du normalizer (qui ne mute pas `source_publications`, trace inviolable des sources). La phase `metadata_correction` persiste les valeurs corrigées sur les `source_publications`, pour que le matching et l'agrégation lisent des colonnes déjà corrigées ; `refresh_from_sources` rejoue les règles sur la publication canonique, dont l'arbitrage croise des champs de sources différentes.
+Expose `effective_metadata`, fonction pure qui applique des règles de correction à partir de `MetadataForCorrection` — son contrat d'entrée, qui porte les champs lus par les prédicats des règles, dont `journal_type` et `oa_model` joints depuis `journals`. Couvre les règles intrinsèques à un enregistrement (URL, titre) comme les règles journal-dépendantes, sans threader de repo. Sert les deux niveaux : la `source_publication` entrante (dédup) comme la publication canonique (refresh, via `effective_doc_type_for_publication`).
 
 Architecture : chaque règle est une entrée du dict `_RULES`, mappant un membre de `MetadataCorrectionRule` à sa définition `{applies_to, applies_correction}` où :
 - `applies_to` est un dict de prédicats AND-és sur la `source_publication` (clés typées par `_AppliesTo`).
@@ -10,14 +8,12 @@ Architecture : chaque règle est une entrée du dict `_RULES`, mappant un membre
 
 Le moteur `_check_predicate` interprète chaque clé d'`applies_to` selon une convention fixe (voir le TypedDict `_AppliesTo` pour la liste exhaustive). `_correct_field(sp, "doc_type")` parcourt les règles dans l'ordre du dict et retourne la première qui (a) corrige le champ demandé et (b) dont tous les prédicats matchent.
 
-Champs corrigés : `doc_type` et `oa_status` (le rattachement du `journal_id` manquant vit dans un sous-step distinct de la phase, pas dans ce moteur de règles). La provenance (le membre `MetadataCorrectionRule` ayant produit la correction) est tracée par le caller, à un emplacement propre à chaque niveau : une `source_publication` la stashe dans `raw_metadata.<champ>.corrected_by`, **avec la valeur brute écrasée** (réversibilité, la colonne est mutée en place) ; une publication canonique l'inscrit dans `meta.corrections.<champ>` (provenance seule — le canonique est recalculé à chaque refresh, sans brut à préserver).
+Champs corrigés : `doc_type` et `oa_status` (le rattachement du `journal_id` manquant et la correction du DOI de groupe vivent dans les modules frères `journal_by_doi` et `shared_doi`).
 """
 
 import re
-from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum
-from itertools import combinations
 from typing import NamedTuple, TypedDict
 
 from domain.journals.journal import JournalType, OaModel
@@ -521,177 +517,3 @@ def strip_dissertation_keys(external_ids: dict[str, JsonValue]) -> dict[str, Jso
         else:
             result.pop("hal_id", None)
     return result
-
-
-# ── Corrections relationnelles : le DOI effectif d'un cluster ────────────
-#
-# Les corrections unaires ci-dessus décident d'un record seul. Certaines corrections
-# demandent au contraire de regarder le **groupe de source_publications partageant un
-# DOI** et d'en déduire le DOI effectif de chaque membre. Deux familles de cas, opposées :
-#
-# - **convergence (même œuvre)** : une forme secondaire DataCite converge sur le DOI de
-#   l'œuvre canonique, exposé par un `relatedIdentifiers` → substitution `doi = canonique`.
-#   Trois cas : version → concept (`IsVersionOf`) ; forme variante, ex. copie repository →
-#   version publiée (`IsVariantFormOf`) ; pièce d'un dataset → dataset parent (`IsPartOf` vers
-#   un DOI présent en base comme dataset — forme du DOI indifférente) ;
-# - **divergence (œuvres distinctes)** : un DOI partagé par des œuvres en réalité distinctes
-#   (ouvrage/chapitre, chapitres de titres différents) est erroné sur le ou les mauvais
-#   côtés → nullage du DOI, sinon le matching les fusionnerait à tort.
-#
-# La décision est **agnostique de la source** ; le caller applicatif regroupe par DOI (brut
-# reconstruit) et persiste la cible de chaque membre. La famille de cas est extensible — on
-# peut en ajouter d'autres, comme la passe unaire empile ses règles.
-
-
-class DoiClusterCase(StrEnum):
-    """Cas de correction du DOI d'un membre d'un groupe partageant un DOI. Inscrit dans `raw_metadata.doi.corrected_by`."""
-
-    # Formes secondaires DataCite → convergence sur l'œuvre canonique.
-    DATACITE_VERSION_TO_CONCEPT = "DATACITE_VERSION_TO_CONCEPT"  # version → concept (IsVersionOf)
-    DATACITE_VARIANT_TO_PRIMARY = (
-        "DATACITE_VARIANT_TO_PRIMARY"  # copie repository → version publiée (IsVariantFormOf)
-    )
-    DATACITE_PACKAGE_PIECE = (
-        "DATACITE_PACKAGE_PIECE"  # pièce d'un dataset → dataset parent présent (IsPartOf)
-    )
-
-    # Ouvrage et chapitre partageant un DOI : le DOI appartient à l'ouvrage (`book`), le
-    # chapitre (`book_chapter`) le porte par erreur → le chapitre le perd.
-    OUVRAGE_VS_CHAPITRE = "OUVRAGE_VS_CHAPITRE"
-
-    # Plusieurs chapitres (`book_chapter`) partageant un DOI mais de titres réellement
-    # différents : le DOI est celui de l'ouvrage hôte (absent du groupe), recopié à tort sur
-    # ses chapitres → tous le perdent.
-    CHAPITRES_TITRES_DIFFERENTS = "CHAPITRES_TITRES_DIFFERENTS"
-
-
-# Cas de **convergence** : le DOI du membre est substitué par celui de l'œuvre canonique (le
-# membre décrit une forme secondaire — version, variante, pièce). À l'opposé des cas de
-# divergence (ouvrage/chapitre), qui nullent le DOI. L'agrégation canonique relègue ces membres
-# en fin de priorité pour que le titre vienne de l'enregistrement canonique, pas d'une pièce.
-CONVERGENCE_CASES: frozenset[str] = frozenset(
-    {
-        DoiClusterCase.DATACITE_VERSION_TO_CONCEPT,
-        DoiClusterCase.DATACITE_VARIANT_TO_PRIMARY,
-        DoiClusterCase.DATACITE_PACKAGE_PIECE,
-    }
-)
-
-
-# Rapprochement des formes secondaires DataCite : la valeur `relation_type` d'un `relatedIdentifiers`
-# (vocabulaire externe DataCite, gardé en chaîne) désigne le cas de correction du DOI. La requête de
-# candidats au clustering consomme ce mapping pour former son `CASE` et son filtre.
-#
-# Convergence directe : le `relatedIdentifiers` pointe le DOI de l'œuvre canonique, pris tel quel.
-DATACITE_DIRECT_CONVERGENCE: dict[str, DoiClusterCase] = {
-    "IsVersionOf": DoiClusterCase.DATACITE_VERSION_TO_CONCEPT,
-    "IsVariantFormOf": DoiClusterCase.DATACITE_VARIANT_TO_PRIMARY,
-}
-# Pièce d'un package : la requête exige en plus que le parent soit un dataset présent en base. Vaut
-# le cas `DATACITE_PACKAGE_PIECE`.
-DATACITE_PACKAGE_PIECE_RELATION = "IsPartOf"
-
-
-class DoiClusterMember(NamedTuple):
-    """Un membre d'un groupe de `source_publications` partageant un DOI : son id, son `doc_type` **canonique** (corrigé par la passe unaire) et son `title_normalized` (matérialisé). `canonical_doi` est le DOI de l'œuvre canonique vers laquelle converger, présent si ce membre (typiquement une `source_publication` `datacite`) est une **forme secondaire** déclarant la relation ; `same_work_case` porte alors le `DoiClusterCase` correspondant (version/variante/pièce de package)."""
-
-    id: int
-    doc_type: str | None
-    title_normalized: str | None
-    canonical_doi: str | None = None
-    same_work_case: DoiClusterCase | None = None
-
-
-class DoiClusterDecision(NamedTuple):
-    """Cible de correction du DOI d'un membre : `target_doi` (`None` = nullage, sinon le DOI substitué) et le cas qui l'a produite."""
-
-    id: int
-    target_doi: str | None
-    case: DoiClusterCase
-
-
-# Marqueurs structurels de titre de chapitre, retirés avant comparaison : un chapitre est
-# fréquemment saisi avec son numéro (« chapitre 14 … ») par une source et sans par une autre.
-_CHAPTER_TITLE_MARKERS = re.compile(
-    r"\b(chapitre|chapter|chap|ch|section|sec|partie|part|vol|tome|pp|p)\b"
-)
-
-
-def _clean_chapter_title(title_normalized: str | None) -> str:
-    """Retire le bruit structurel d'un titre normalisé (chiffres = numéros de chapitre/page,
-    mots-marqueurs) et re-collapse les espaces, pour comparer des **chapitres** sans qu'un
-    numéro ou un marqueur fasse paraître distincts deux enregistrements du même chapitre.
-    Déterministe (aucune similarité floue)."""
-    cleaned = re.sub(r"\d+", " ", title_normalized or "")
-    cleaned = _CHAPTER_TITLE_MARKERS.sub(" ", cleaned)
-    return re.sub(r"\s+", " ", cleaned).strip()
-
-
-def _group_has_distinct_chapters(titles: list[str | None]) -> bool:
-    """True si le groupe contient deux chapitres **réellement distincts** : après nettoyage, une paire de titres qui ne sont ni égaux ni l'un contenu dans l'autre (la containment couvre les troncatures de sous-titre). Identité stricte sur le résidu — pas de seuil flou."""
-    cleaned = [c for c in (_clean_chapter_title(t) for t in titles) if c]
-    return any(a != b and a not in b and b not in a for a, b in combinations(cleaned, 2))
-
-
-def resolve_cluster_doi_corrections(
-    group: list[DoiClusterMember],
-) -> list[DoiClusterDecision]:
-    """Pour un groupe de `source_publications` partageant un DOI, renvoie les corrections `(sp_id, target_doi, cas)`. Pur, déterministe, sans effet de bord, agnostique de la source — c'est le caller qui forme le groupe par DOI.
-
-    - **Même œuvre DataCite** (un membre porte un `canonical_doi`) : tous les membres convergent sur l'œuvre canonique (`target_doi = canonical_doi`), avec le cas porté par ce membre (version → concept, variante → version publiée, fichier → dépôt parent). Prime sur les cas ci-dessous — ces œuvres (datasets, preprints, copies repository) ne sont pas des ouvrages.
-    - **Ouvrage + chapitre** : les `book_chapter` perdent le DOI (`target_doi = None`, celui de l'ouvrage). Signal = le mix de `doc_type`, sans comparaison de titre.
-    - **Chapitres seuls, titres réellement différents** : tous les `book_chapter` perdent le DOI (celui de l'ouvrage hôte absent). Détection par nettoyage + containment + identité stricte (`_group_has_distinct_chapters`) — pas de similarité floue. Les faux positifs résiduels (coquilles) relèvent d'une correction admin.
-
-    Les membres hors famille ouvrage (article partageant le DOI par accident) ne reçoivent aucune décision : la détection ouvrage/chapitre raisonne sur le sous-ensemble book/chapter.
-
-    Différé : thèse/article (souvent un mistype → correction de `doc_type`, pas du DOI)."""
-    canonical = next((m for m in group if m.canonical_doi), None)
-    if canonical is not None and canonical.same_work_case is not None:
-        case = canonical.same_work_case
-        return [DoiClusterDecision(m.id, canonical.canonical_doi, case) for m in group]
-
-    book_family = [m for m in group if m.doc_type in (DocType.BOOK, DocType.BOOK_CHAPTER)]
-    chapters = [m for m in book_family if m.doc_type == DocType.BOOK_CHAPTER]
-    has_book = any(m.doc_type == DocType.BOOK for m in book_family)
-    if has_book and chapters:
-        return [
-            DoiClusterDecision(m.id, None, DoiClusterCase.OUVRAGE_VS_CHAPITRE) for m in chapters
-        ]
-    if (
-        chapters
-        and not has_book
-        and _group_has_distinct_chapters([m.title_normalized for m in chapters])
-    ):
-        return [
-            DoiClusterDecision(m.id, None, DoiClusterCase.CHAPITRES_TITRES_DIFFERENTS)
-            for m in chapters
-        ]
-    return []
-
-
-# ── Rattachement du journal manquant par préfixe DOI ─────────────────────
-#
-# Une `source_publication` à DOI mais sans `journal_id` (sa source n'a fourni ni ISSN ni
-# titre de conteneur rapprochable) est rattachée au journal dont le `doi_prefix` préfixe son
-# DOI. Recherche inverse contre la table journals, à cible data-dépendante : hors du DSL des
-# règles unaires (cibles constantes), traitement à part comme la correction par cluster.
-
-# Provenance inscrite dans `raw_metadata.journal_id.corrected_by`.
-JOURNAL_BY_DOI_PREFIX = "JOURNAL_BY_DOI_PREFIX"
-
-
-def resolve_journal_by_doi(doi: str, journal_prefixes: Sequence[tuple[str, int]]) -> int | None:
-    """Rattache un DOI au journal dont le `doi_prefix` le préfixe, le plus spécifique.
-
-    `journal_prefixes` = une suite de `(doi_prefix, journal_id)`, lue sans être modifiée. Renvoie le `journal_id` du préfixe le plus long qui préfixe `doi`, à condition qu'il désigne un **unique** journal à cette longueur (abstention si deux journaux portent ce même préfixe). `None` si aucun préfixe ne matche. Pur et déterministe. `doi` et les préfixes sont comparés tels quels (DOIs et `doi_prefix` stockés en minuscules). Les préfixes emboîtés (registrant nu `10.5194` et namespace `10.5194/acp`) sont départagés par le plus long.
-    """
-    matches = [
-        (prefix, journal_id) for prefix, journal_id in journal_prefixes if doi.startswith(prefix)
-    ]
-    if not matches:
-        return None
-    max_len = max(len(prefix) for prefix, _ in matches)
-    most_specific = {journal_id for prefix, journal_id in matches if len(prefix) == max_len}
-    if len(most_specific) == 1:
-        return next(iter(most_specific))
-    return None

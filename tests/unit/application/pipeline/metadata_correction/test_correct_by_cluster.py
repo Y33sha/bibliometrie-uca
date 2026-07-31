@@ -6,7 +6,7 @@ from application.pipeline.metadata_correction.correct_by_cluster import (
     tally_doi_corrections,
 )
 from application.ports.pipeline.metadata_correction import DoiClusterRow, DoiCorrectionUpdate
-from domain.source_publications.correction import (
+from domain.source_publications.metadata_correction.shared_doi import (
     DoiClusterCase,
     DoiClusterDecision,
     DoiClusterMember,

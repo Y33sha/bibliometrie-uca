@@ -1,6 +1,6 @@
 # Ajouter une règle de correction de métadonnées
 
-Procédure d'écriture, branchement et déploiement d'une règle dans `domain/source_publications/correction.py`.
+Procédure d'écriture, branchement et déploiement d'une règle dans `domain/source_publications/metadata_correction/rules.py`.
 
 Ce playbook est le *comment*, écrit pour être réutilisé à chaque nouvelle règle.
 
@@ -8,7 +8,7 @@ Ce playbook est le *comment*, écrit pour être réutilisé à chaque nouvelle r
 
 Une correction est une règle déterministe « si tel signal, alors le champ canonique vaut telle valeur ». La phase `metadata_correction` calcule l'effective de chaque `source_publication` et l'écrit **en place** dans ses colonnes typées, le brut source écrasé étant conservé dans le sidecar `raw_metadata`. Le matching et l'agrégation lisent ensuite des colonnes corrigées, sans recalcul.
 
-- **Source unique** : la règle vit dans [`domain/source_publications/correction.py`](../../domain/source_publications/correction.py) (fonction pure, zéro I/O), comme entrée du dict `_RULES`. `effective_metadata(view)` parcourt la cascade et renvoie un `CorrectedFields` (valeur corrigée + règle d'origine par champ).
+- **Source unique** : la règle vit dans [`domain/source_publications/metadata_correction/rules.py`](../../domain/source_publications/metadata_correction/rules.py) (fonction pure, zéro I/O), comme entrée du dict `_RULES`. `effective_metadata(view)` parcourt la cascade et renvoie un `CorrectedFields` (valeur corrigée + règle d'origine par champ).
 - **Forme déclarative** : une règle = `{applies_to: {prédicats AND-és}, applies_correction: {champ: valeur cible}}`. Le moteur `_check_predicate` interprète chaque prédicat selon le TypedDict `_AppliesTo`. Une règle qui rentre dans les prédicats listés n'est *que* cette entrée — pas de logique supplémentaire.
 - **Réversibilité** : la sous-étape unaire ([`correct_unary.py`](../../application/pipeline/metadata_correction/correct_unary.py)) reconstruit le brut depuis `raw_metadata`, **mappe** le `doc_type` source vers le canonique (`map_doc_type`), applique `effective_metadata`, écrit l'effective dans les colonnes et stashe le brut écrasé sous `raw_metadata.<champ>` avec sa provenance `corrected_by` (le membre `MetadataCorrectionRule`, ou le marqueur `DOC_TYPE_MAP` quand seul le mapping a changé la valeur).
 - **Idempotence** : la correction repart toujours du **brut reconstruit**, jamais de la valeur déjà corrigée. Un re-normalize qui réécrit le brut, ou un changement de `journal_type` qui (dé)clenche une règle, est rattrapé au run suivant sans état à entretenir.
@@ -106,7 +106,7 @@ return CorrectedFields(
 
 Si l'input est absent de `MetadataForCorrection` :
 
-1. champ ajouté au contrat ([`correction.py`](../../domain/source_publications/correction.py)), avec son prédicat dans `_AppliesTo` et sa branche dans `_check_predicate` ;
+1. champ ajouté au contrat ([`metadata_correction/rules.py`](../../domain/source_publications/metadata_correction/rules.py)), avec son prédicat dans `_AppliesTo` et sa branche dans `_check_predicate` ;
 2. champ ajouté à `UnaryCorrectionRow` et à sa méthode `for_correction` ([`metadata_correction.py`](../../application/ports/pipeline/metadata_correction.py)) ;
 3. colonne ajoutée au `_SELECT` de l'adapter ([`metadata_correction.py`](../../infrastructure/pipeline/metadata_correction.py)), **sous le nom du champ** : les lignes sont construites par appariement de noms ;
 4. si le champ est un fait propre à un enregistrement source, sans contrepartie sur une publication canonique, inscrire son prédicat dans `_SOURCE_ONLY_PREDICATES` : les règles qui le lisent sont écartées du rejeu canonique. Sinon, le renseigner dans `_apply_canonical_doc_type_correction` ([`core.py`](../../application/services/publications/core.py)) depuis la valeur arbitrée.
@@ -160,14 +160,14 @@ Pour un nouveau cas : ajouter un membre `DoiClusterCase` (l'énoncé métier dan
 
 - Input : `sp.urls` + `journal_id_present: False` (une SP theses.fr *avec* journal est un article publié, traité par `THESIS_WITH_JOURNAL_TO_ARTICLE`).
 - Hook admin : non (URL non éditable).
-- Référence : [`correction.py` — entrée `THESES_FR_URL_TO_THESIS`](../../domain/source_publications/correction.py)
+- Référence : [`metadata_correction/rules.py` — entrée `THESES_FR_URL_TO_THESIS`](../../domain/source_publications/metadata_correction/rules.py)
 
 ### Règle SP-intrinsèque multi-critères avec whitelist + set de signaux
 
 **`TITLE_SUPPLEMENTARY_CONTENT_TO_DATASET`** — titre dans `_SUPPLEMENTARY_CONTENT_TITLE_PREFIXES` + `doc_type ∈ {article, other}` ⇒ `dataset`.
 
 - Set de préfixes ciblé (pas `'supplementary '` brut, qui matcherait « Supplementary roles of X »). `dataset` exclu (no-op naturel) ; types-référents épargnés.
-- Référence : [`correction.py` — entrée `TITLE_SUPPLEMENTARY_CONTENT_TO_DATASET`](../../domain/source_publications/correction.py)
+- Référence : [`metadata_correction/rules.py` — entrée `TITLE_SUPPLEMENTARY_CONTENT_TO_DATASET`](../../domain/source_publications/metadata_correction/rules.py)
 
 ### Règle journal-jointe + admin-éditable
 
@@ -175,7 +175,7 @@ Pour un nouveau cas : ajouter un membre `DoiClusterCase` (l'énoncé métier dan
 
 - Input : `sp.journal_type` (joint via `SourcePublication`).
 - Hook admin : oui — service [`requalify_publications_for_journal`](../../application/services/journals/core.py), endpoint `GET /api/journals/{id}/type-change-impact`, requalification synchrone dans le `PUT`, modale frontend.
-- Référence : [`correction.py` — entrée `JOURNAL_TYPE_MEDIA_TO_MEDIA`](../../domain/source_publications/correction.py)
+- Référence : [`metadata_correction/rules.py` — entrée `JOURNAL_TYPE_MEDIA_TO_MEDIA`](../../domain/source_publications/metadata_correction/rules.py)
 
 ## Anti-patterns
 
