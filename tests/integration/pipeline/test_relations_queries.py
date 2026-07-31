@@ -10,12 +10,10 @@ import json
 
 from sqlalchemy import text
 
-from infrastructure.pipeline.relations import (
-    count_by_relation_type,
-    fetch_erratum_title_matches,
-    fetch_preprint_title_matches,
-)
+from infrastructure.pipeline.relations import PgPublicationRelationsQueries
 from infrastructure.repositories import publication_repository
+
+_Q = PgPublicationRelationsQueries()
 
 # Titre de parent assez long pour franchir la garde de longueur (> 30 caractères).
 PARENT_TITLE = "measurement of differential cross sections in proton collisions"
@@ -43,7 +41,7 @@ class TestFetchErratumTitleMatches:
             title_normalized=f"erratum to {PARENT_TITLE}",
             doi="10.1/err",
         )
-        matches = fetch_erratum_title_matches(sa_sync_conn)
+        matches = _Q.fetch_erratum_title_matches(sa_sync_conn)
         assert [(m.child_id, m.parent_id, m.parent_doi) for m in matches] == [
             (err, parent, "10.1/parent")
         ]
@@ -57,7 +55,7 @@ class TestFetchErratumTitleMatches:
             title_normalized=f"erratum to {PARENT_TITLE}",
             doi="10.1/err",
         )
-        matches = fetch_erratum_title_matches(sa_sync_conn)
+        matches = _Q.fetch_erratum_title_matches(sa_sync_conn)
         assert [(m.child_id, m.parent_id, m.parent_doi) for m in matches] == [(err, parent, None)]
 
     def test_two_substantive_same_title_blocked(self, sa_sync_conn):
@@ -70,7 +68,7 @@ class TestFetchErratumTitleMatches:
             title_normalized=f"erratum to {PARENT_TITLE}",
             doi="10.1/err",
         )
-        assert fetch_erratum_title_matches(sa_sync_conn) == []
+        assert _Q.fetch_erratum_title_matches(sa_sync_conn) == []
 
     def test_preprint_does_not_block_and_article_chosen(self, sa_sync_conn):
         # Le preprint partage le titre mais n'est pas un parent substantiel : on relie l'article.
@@ -84,7 +82,7 @@ class TestFetchErratumTitleMatches:
             title_normalized=f"erratum to {PARENT_TITLE}",
             doi="10.1/err",
         )
-        matches = fetch_erratum_title_matches(sa_sync_conn)
+        matches = _Q.fetch_erratum_title_matches(sa_sync_conn)
         assert [(m.child_id, m.parent_id) for m in matches] == [(err, article)]
 
     def test_parent_outside_year_window_not_matched(self, sa_sync_conn):
@@ -102,7 +100,7 @@ class TestFetchErratumTitleMatches:
             doi="10.1/err",
             pub_year=2024,
         )
-        assert fetch_erratum_title_matches(sa_sync_conn) == []
+        assert _Q.fetch_erratum_title_matches(sa_sync_conn) == []
 
     def test_short_title_not_matched(self, sa_sync_conn):
         short = "short title"  # <= 30 caractères → sous la garde de longueur
@@ -110,7 +108,7 @@ class TestFetchErratumTitleMatches:
         _pub(
             sa_sync_conn, doc_type="erratum", title_normalized=f"erratum to {short}", doi="10.1/err"
         )
-        assert fetch_erratum_title_matches(sa_sync_conn) == []
+        assert _Q.fetch_erratum_title_matches(sa_sync_conn) == []
 
 
 class TestFetchPreprintTitleMatches:
@@ -130,7 +128,7 @@ class TestFetchPreprintTitleMatches:
             doi="10.1/pre",
             pub_year=2024,
         )
-        matches = fetch_preprint_title_matches(sa_sync_conn)
+        matches = _Q.fetch_preprint_title_matches(sa_sync_conn)
         assert [(m.child_id, m.parent_id, m.parent_doi) for m in matches] == [
             (pre, parent, "10.1/pub")
         ]
@@ -144,7 +142,7 @@ class TestFetchPreprintTitleMatches:
             doi="10.1/b",
         )
         _pub(sa_sync_conn, doc_type="preprint", title_normalized=PARENT_TITLE, doi="10.1/pre")
-        assert fetch_preprint_title_matches(sa_sync_conn) == []
+        assert _Q.fetch_preprint_title_matches(sa_sync_conn) == []
 
     def test_dataset_does_not_block(self, sa_sync_conn):
         article = _pub(
@@ -152,7 +150,7 @@ class TestFetchPreprintTitleMatches:
         )
         _pub(sa_sync_conn, doc_type="dataset", title_normalized=PARENT_TITLE, doi="10.1/data")
         pre = _pub(sa_sync_conn, doc_type="preprint", title_normalized=PARENT_TITLE, doi="10.1/pre")
-        matches = fetch_preprint_title_matches(sa_sync_conn)
+        matches = _Q.fetch_preprint_title_matches(sa_sync_conn)
         assert [(m.child_id, m.parent_id) for m in matches] == [(pre, article)]
 
     def test_parent_before_preprint_not_matched(self, sa_sync_conn):
@@ -171,7 +169,7 @@ class TestFetchPreprintTitleMatches:
             doi="10.1/pre",
             pub_year=2024,
         )
-        assert fetch_preprint_title_matches(sa_sync_conn) == []
+        assert _Q.fetch_preprint_title_matches(sa_sync_conn) == []
 
 
 class TestRelationTargetDeletionCascades:
@@ -227,7 +225,7 @@ class TestCountByRelationType:
             {"p": parent},
         )
 
-        result = count_by_relation_type(sa_sync_conn)
+        result = _Q.count_by_relation_type(sa_sync_conn)
 
         # Types natifs (pas de Row) → sérialisable, condition de l'enregistrement.
         assert all(isinstance(t, str) and isinstance(n, int) for t, n in result)

@@ -20,22 +20,6 @@ from domain.sources.registry import Source
 # Écart d'années toléré entre une œuvre dépendante et son parent, dans les deux sens : un erratum suit son article (parent dans `[année − N … année]`), une version publiée suit son preprint (parent dans `[année … année + N]`).
 _TITLE_MATCH_YEAR_WINDOW = 2
 
-
-def fetch_declared_relation_sources(conn: Connection) -> list[DeclaredRelationSource]:
-    rows = conn.execute(
-        text(f"""
-            SELECT sp.publication_id, sp.source::text AS source, sp.meta
-            FROM source_publications sp
-            WHERE sp.publication_id IS NOT NULL
-              AND (
-                    (sp.source = '{Source.DATACITE.value}' AND sp.meta ? 'related_identifiers')
-                 OR (sp.source = '{Source.CROSSREF.value}' AND sp.meta ? 'relation')
-              )
-        """)
-    ).all()
-    return [DeclaredRelationSource(r.publication_id, r.source, r.meta) for r in rows]
-
-
 # Une ligne `pub_keys` par clé de confirmation scalaire d'`external_ids` ; `hal_id` (array) a son propre bras.
 _SCALAR_KEY_ROWS = "".join(
     f"""
@@ -66,27 +50,6 @@ _SHARED_KEY_PAIRS_SQL = text(f"""
     WHERE p1.doi IS NOT NULL AND p2.doi IS NOT NULL
       AND lower(p1.doi) <> lower(p2.doi)
 """)
-
-
-def fetch_shared_key_pairs(conn: Connection) -> list[SharedKeyPair]:
-    rows = conn.execute(_SHARED_KEY_PAIRS_SQL).all()
-    return [
-        SharedKeyPair(r.a_id, r.a_doc_type, r.a_doi, r.b_id, r.b_doc_type, r.b_doi) for r in rows
-    ]
-
-
-def fetch_declared_related_pairs(conn: Connection) -> set[frozenset[int]]:
-    """Paires de publications déjà reliées par une relation **déclarée** (signal #1), cibles résolues au corpus. Sert à écarter un `is_related_to` (signal #2) redondant sur une paire déjà typée précisément."""
-    rows = conn.execute(
-        text(f"""
-            SELECT from_publication_id AS a, target_publication_id AS b
-            FROM publication_relations
-            WHERE source IN ('{Source.DATACITE.value}', '{Source.CROSSREF.value}')
-              AND target_publication_id IS NOT NULL
-        """)
-    ).all()
-    return {frozenset((r.a, r.b)) for r in rows}
-
 
 # Signal #3 — rapprochement par titre de l'œuvre dépendante (erratum, preprint) à son parent. Erratum : titre parent = suffixe du titre erratum. Preprint : titre identique. Garde d'ambiguïté : un seul candidat substantiel, sinon abstention.
 _ERRATUM_TITLE_MATCHES_SQL = text(f"""
@@ -147,77 +110,80 @@ _PREPRINT_TITLE_MATCHES_SQL = text(f"""
 """)
 
 
-def fetch_erratum_title_matches(conn: Connection) -> list[TitleMatch]:
-    rows = conn.execute(_ERRATUM_TITLE_MATCHES_SQL).all()
-    return [TitleMatch(r.child_id, r.parent_id, r.parent_doi) for r in rows]
-
-
-def fetch_preprint_title_matches(conn: Connection) -> list[TitleMatch]:
-    rows = conn.execute(_PREPRINT_TITLE_MATCHES_SQL).all()
-    return [TitleMatch(r.child_id, r.parent_id, r.parent_doi) for r in rows]
-
-
-def rebuild_relations(conn: Connection, edges: list[RelationEdge]) -> int:
-    """Reconstruit `publication_relations` (table dérivée) : purge la table, puis insère `edges`.
-
-    Chaque arête porte sa propre `source`. La cible est désignée soit directement par `target_publication_id` (cible au corpus connue, ex. rapprochement par titre), soit résolue par LEFT JOIN sur le DOI (relations déclarées). Écarte les auto-relations, dédoublonne par la contrainte d'unicité — l'ordre de `edges` fixe la priorité en cas de collision. Un seul aller-retour bulk via `jsonb_to_recordset`. Retourne le nombre inséré."""
-    conn.execute(text("DELETE FROM publication_relations"))
-    if not edges:
-        return 0
-    payload = [
-        {
-            "f": e.from_publication_id,
-            "t": e.relation_type,
-            "d": e.target_doi,
-            "p": e.target_publication_id,
-            "s": e.source,
-        }
-        for e in edges
-    ]
-    stmt = text("""
-        INSERT INTO publication_relations
-            (from_publication_id, relation_type, target_doi, target_publication_id, source)
-        SELECT e.f, e.t::relation_type, e.d, COALESCE(e.p, p.id), e.s
-        FROM jsonb_to_recordset(:payload) AS e(f int, t text, d text, p int, s text)
-        LEFT JOIN publications p ON e.p IS NULL AND e.d IS NOT NULL AND lower(p.doi) = e.d
-        WHERE COALESCE(e.p, p.id) IS NULL OR COALESCE(e.p, p.id) <> e.f
-        ON CONFLICT ON CONSTRAINT publication_relations_uq DO NOTHING
-    """).bindparams(bindparam("payload", type_=JSONB))
-    return conn.execute(stmt, {"payload": payload}).rowcount
-
-
-def count_by_relation_type(conn: Connection) -> list[tuple[str, int]]:
-    """`(relation_type, nombre)` par type, décroissant — distribution de `publication_relations`."""
-    # Alias `rel_type` / `cnt` : nommer une colonne `t` heurterait l'attribut déprécié `Row.t` de SQLAlchemy (`r.t` renverrait la Row entière, non la colonne).
-    rows = conn.execute(
-        text(
-            "SELECT relation_type::text AS rel_type, count(*) AS cnt FROM publication_relations "
-            "GROUP BY relation_type ORDER BY cnt DESC"
-        )
-    ).all()
-    return [(r.rel_type, r.cnt) for r in rows]
-
-
 class PgPublicationRelationsQueries(PublicationRelationsQueries):
     """Adapter PostgreSQL pour `application.ports.pipeline.relations.PublicationRelationsQueries`."""
 
     def fetch_declared_relation_sources(self, conn: Connection) -> list[DeclaredRelationSource]:
-        return fetch_declared_relation_sources(conn)
+        rows = conn.execute(
+            text(f"""
+                SELECT sp.publication_id, sp.source::text AS source, sp.meta
+                FROM source_publications sp
+                WHERE sp.publication_id IS NOT NULL
+                  AND (
+                        (sp.source = '{Source.DATACITE.value}' AND sp.meta ? 'related_identifiers')
+                     OR (sp.source = '{Source.CROSSREF.value}' AND sp.meta ? 'relation')
+                  )
+            """)
+        ).all()
+        return [DeclaredRelationSource(r.publication_id, r.source, r.meta) for r in rows]
 
     def fetch_shared_key_pairs(self, conn: Connection) -> list[SharedKeyPair]:
-        return fetch_shared_key_pairs(conn)
+        rows = conn.execute(_SHARED_KEY_PAIRS_SQL).all()
+        return [
+            SharedKeyPair(r.a_id, r.a_doc_type, r.a_doi, r.b_id, r.b_doc_type, r.b_doi)
+            for r in rows
+        ]
 
     def fetch_declared_related_pairs(self, conn: Connection) -> set[frozenset[int]]:
-        return fetch_declared_related_pairs(conn)
+        rows = conn.execute(
+            text(f"""
+                SELECT from_publication_id AS a, target_publication_id AS b
+                FROM publication_relations
+                WHERE source IN ('{Source.DATACITE.value}', '{Source.CROSSREF.value}')
+                  AND target_publication_id IS NOT NULL
+            """)
+        ).all()
+        return {frozenset((r.a, r.b)) for r in rows}
 
     def fetch_erratum_title_matches(self, conn: Connection) -> list[TitleMatch]:
-        return fetch_erratum_title_matches(conn)
+        rows = conn.execute(_ERRATUM_TITLE_MATCHES_SQL).all()
+        return [TitleMatch(r.child_id, r.parent_id, r.parent_doi) for r in rows]
 
     def fetch_preprint_title_matches(self, conn: Connection) -> list[TitleMatch]:
-        return fetch_preprint_title_matches(conn)
+        rows = conn.execute(_PREPRINT_TITLE_MATCHES_SQL).all()
+        return [TitleMatch(r.child_id, r.parent_id, r.parent_doi) for r in rows]
 
     def rebuild_relations(self, conn: Connection, edges: list[RelationEdge]) -> int:
-        return rebuild_relations(conn, edges)
+        conn.execute(text("DELETE FROM publication_relations"))
+        if not edges:
+            return 0
+        payload = [
+            {
+                "f": e.from_publication_id,
+                "t": e.relation_type,
+                "d": e.target_doi,
+                "p": e.target_publication_id,
+                "s": e.source,
+            }
+            for e in edges
+        ]
+        stmt = text("""
+            INSERT INTO publication_relations
+                (from_publication_id, relation_type, target_doi, target_publication_id, source)
+            SELECT e.f, e.t::relation_type, e.d, COALESCE(e.p, p.id), e.s
+            FROM jsonb_to_recordset(:payload) AS e(f int, t text, d text, p int, s text)
+            LEFT JOIN publications p ON e.p IS NULL AND e.d IS NOT NULL AND lower(p.doi) = e.d
+            WHERE COALESCE(e.p, p.id) IS NULL OR COALESCE(e.p, p.id) <> e.f
+            ON CONFLICT ON CONSTRAINT publication_relations_uq DO NOTHING
+        """).bindparams(bindparam("payload", type_=JSONB))
+        return conn.execute(stmt, {"payload": payload}).rowcount
 
     def count_by_relation_type(self, conn: Connection) -> list[tuple[str, int]]:
-        return count_by_relation_type(conn)
+        # Alias `rel_type` / `cnt` : nommer une colonne `t` heurterait l'attribut déprécié `Row.t` de SQLAlchemy (`r.t` renverrait la Row entière, non la colonne).
+        rows = conn.execute(
+            text(
+                "SELECT relation_type::text AS rel_type, count(*) AS cnt FROM publication_relations "
+                "GROUP BY relation_type ORDER BY cnt DESC"
+            )
+        ).all()
+        return [(r.rel_type, r.cnt) for r in rows]
