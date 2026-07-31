@@ -77,6 +77,9 @@ class PgPersonRepository(PersonRepository):
             export_date=export_date,
         )
 
+    def map_rh_emails_to_person_ids(self) -> dict[str, list[int]]:
+        return _core.map_rh_emails_to_person_ids(self._conn)
+
     # ── Fusion ─────────────────────────────────────────────────────
 
     def has_distinct_rh(self, id_a: int, id_b: int) -> bool:
@@ -94,6 +97,11 @@ class PgPersonRepository(PersonRepository):
 
     def find_identifier(self, id_type: str, id_value: str) -> "PersonIdentifier | None":
         return _identifiers.find_identifier(self._conn, id_type, id_value)
+
+    def find_identifier_holders(
+        self, id_type: str, id_values: list[str]
+    ) -> dict[str, tuple[int, str]]:
+        return _identifiers.find_identifier_holders(self._conn, id_type, id_values)
 
     def insert_identifier(self, ident: "PersonIdentifier") -> int:
         return _identifiers.insert_identifier(self._conn, ident)

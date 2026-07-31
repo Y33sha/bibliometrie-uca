@@ -75,6 +75,10 @@ class PersonRepository(Protocol):
         """Ajoute une fiche RH (`persons_rh`) à une personne : email, fonction, service, période et date d'export du fichier RH."""
         ...
 
+    def map_rh_emails_to_person_ids(self) -> dict[str, list[int]]:
+        """`{email minusculisé: [person_id, ...]}` depuis `persons_rh` — résout les emails de l'import des ORCID authentifiés vers les personnes qui les portent."""
+        ...
+
     # ── Fusion ─────────────────────────────────────────────────────
 
     def has_distinct_rh(self, id_a: int, id_b: int) -> bool:
@@ -99,6 +103,12 @@ class PersonRepository(Protocol):
 
     def find_identifier(self, id_type: str, id_value: str) -> PersonIdentifier | None:
         """Charge le `PersonIdentifier` d'une paire `(id_type, id_value)` (unique dans la table), ou `None` si absent."""
+        ...
+
+    def find_identifier_holders(
+        self, id_type: str, id_values: list[str]
+    ) -> dict[str, tuple[int, str]]:
+        """`{id_value: (person_id, statut)}` des porteurs actuels des valeurs `id_values` déjà présentes sous ce type d'identifiant — pour prévoir les déplacements avant l'import des ORCID authentifiés."""
         ...
 
     def insert_identifier(self, ident: PersonIdentifier) -> int:
