@@ -12,10 +12,10 @@ from application.pipeline.publications.reconcile_components import reconcile, ru
 from domain.source_publications.keys import project_confirmation_keys
 from infrastructure.pipeline.publications.reconciliation import (
     PgPublicationsReconciliationQueries,
-    fetch_dirty_source_publication_ids,
-    fetch_reconciliation_universe,
     mark_keys_dirty,
 )
+
+_Q = PgPublicationsReconciliationQueries()
 from infrastructure.repositories import publication_repository
 from tests.integration.helpers.authorships import upsert_identity
 
@@ -95,7 +95,7 @@ class TestUniverse:
         )
         _seed_sp(conn, source_id="c", publication_id=unrelated_pub, doi="10.9/z", keys_dirty=False)
 
-        universe = {r.id for r in fetch_reconciliation_universe(conn)}
+        universe = {r.id for r in _Q.fetch_reconciliation_universe(conn)}
         assert universe == {dirty, neighbor}
 
     def test_neighbor_by_hal_id(self, sa_sync_conn):
@@ -112,7 +112,7 @@ class TestUniverse:
             external_ids={"hal_id": ["hal-1", "hal-2"]},
             keys_dirty=False,
         )
-        assert {r.id for r in fetch_reconciliation_universe(conn)} == {dirty, neighbor}
+        assert {r.id for r in _Q.fetch_reconciliation_universe(conn)} == {dirty, neighbor}
 
     def test_neighbor_by_metadata_block(self, sa_sync_conn):
         """Voisinage par token bloc métadonnée : deux SP de même doc_type + titre (long) + année, sans clé d'identifiant partagée (ici des thèses)."""
@@ -134,7 +134,7 @@ class TestUniverse:
             title_normalized="ma these de doctorat au titre suffisamment long",
             keys_dirty=False,
         )
-        assert {r.id for r in fetch_reconciliation_universe(conn)} == {dirty, neighbor}
+        assert {r.id for r in _Q.fetch_reconciliation_universe(conn)} == {dirty, neighbor}
 
     def test_dirty_orphan_included(self, sa_sync_conn):
         """Une SP orpheline dirty EST un seed : l'assignation est unifiée dans la réconciliation
@@ -143,7 +143,7 @@ class TestUniverse:
         orphan = _seed_sp(
             conn, source_id="orphan", publication_id=None, doi="10.1/x", keys_dirty=True
         )
-        assert fetch_dirty_source_publication_ids(conn) == [orphan]
+        assert _Q.fetch_dirty_source_publication_ids(conn) == [orphan]
 
 
 class TestEndToEnd:
@@ -499,7 +499,7 @@ class TestUniverseMatchesPythonTokens:
                 ).bindparams(bindparam("ids")),
                 {"i": i, "ids": ids},
             )
-            sql_neighbors = {r.id for r in fetch_reconciliation_universe(conn)} & seeded - {i}
+            sql_neighbors = {r.id for r in _Q.fetch_reconciliation_universe(conn)} & seeded - {i}
             py_neighbors = {j for j in ids if j != i and toks[i] & toks[j]}
             assert sql_neighbors == py_neighbors, (
                 f"divergence SP {i} : SQL={sql_neighbors} Python={py_neighbors}"
