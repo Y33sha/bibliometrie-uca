@@ -331,9 +331,7 @@
   /* ── Edit modal ── */
 
   function normalizeRor(): boolean {
-    // Forme canonique stockée = ID court 9-char. On accepte une URL complète ou
-    // un ID nu en saisie, mais on envoie toujours l'ID court (le backend
-    // re-normalise de toute façon via le VO RorId).
+    // Forme canonique stockée = ID court 9-char. On accepte une URL complète ou un ID nu en saisie, mais on envoie toujours l'ID court (le backend re-normalise de toute façon via le VO RorId).
     const ror = mRor.trim().replace(/^https?:\/\/ror\.org\//, "");
     if (!ror) return true;
     if (!/^0[a-z0-9]{8}$/.test(ror)) {
