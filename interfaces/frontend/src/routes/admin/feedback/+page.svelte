@@ -28,8 +28,7 @@
 
   // ---------- Constants ----------
 
-  // Libellés d'affichage pour les groupes de structures. L'ordre des clés sert aussi d'ordre
-  // d'affichage dans le picker ; un type absent d'ici s'affiche après, sous son code.
+  // Libellés d'affichage pour les groupes de structures. L'ordre des clés sert aussi d'ordre d'affichage dans le picker ; un type absent d'ici s'affiche après, sous son code.
   const TYPE_LABELS: Record<string, string> = {
     universite: "Universités",
     onr: "Organismes de recherche",
@@ -106,8 +105,7 @@
   // ---------- Data loading ----------
 
   async function loadStructures(): Promise<void> {
-    // Un site porte les formes de nom d'un lieu pour servir de contexte au matching : une
-    // adresse qui le mentionne n'atteste d'aucun rattachement, il n'a pas de détection à juger.
+    // Un site porte les formes de nom d'un lieu pour servir de contexte au matching : une adresse qui le mentionne n'atteste d'aucun rattachement, il n'a pas de détection à juger.
     allStructures = (await api<Structure[]>("/api/structures")).filter((s) => s.type !== "site");
 
     const grouped: GroupedStructures = {};
