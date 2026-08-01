@@ -28,9 +28,7 @@
 
 	import type { components } from '$lib/api/schema';
 	type Publication = components['schemas']['PublicationListItem'] & {
-		// Champs présents quand l'API est appelée avec `person_id` (cf. routes
-		// /api/publications côté backend qui enrichit la réponse). Optionnels
-		// car non garantis hors contexte personne.
+		// Champs présents quand l'API est appelée avec `person_id` (cf. routes /api/publications côté backend qui enrichit la réponse). Optionnels car non garantis hors contexte personne.
 		is_corresponding?: boolean | null;
 		authorship_id?: number | null;
 		hal_collections?: string[] | null;
@@ -49,8 +47,7 @@
 		subjectLabel?: string;
 		labId?: number;
 		labLabel?: string;
-		/** Collection HAL du laboratoire (ex 'lmbp'). Requis pour calculer
-		 *  la colonne « Statut HAL ». */
+		/** Collection HAL du laboratoire (ex 'lmbp'). Requis pour calculer la colonne « Statut HAL ». */
 		halCollection?: string;
 		personId?: number;
 		personLabel?: string;
@@ -78,18 +75,13 @@
 		urlSync?: boolean;
 		basePath?: string;
 		showFilterBanner?: boolean;
-		/** Affiche la colonne et la facet « Statut HAL ». Requiert
-		 *  `externalFilters.halCollection` pour le calcul du badge. */
+		/** Affiche la colonne et la facet « Statut HAL ». Requiert `externalFilters.halCollection` pour le calcul du badge. */
 		showHalStatusColumn?: boolean;
 		/** Affiche la colonne et la facet « Auteur correspondant ». */
 		showCorrespondingColumn?: boolean;
 		/** Affiche la facet « UCA » (in_perimeter). */
 		showPerimeterFacet?: boolean;
-		/** Affiche la 1ère colonne avec un bouton ✕ pour exclure l'authorship.
-		 *  Le parent gère l'auth check et passe le callback. Si le callback
-		 *  retourne `true` (ou void), la ligne est retirée du tableau ;
-		 *  retourne `false` pour annuler (ex. user a cliqué Annuler dans un
-		 *  confirm). */
+		/** Affiche la 1ère colonne avec un bouton ✕ pour exclure l'authorship. Le parent gère l'auth check et passe le callback. Si le callback retourne `true` (ou void), la ligne est retirée du tableau ; retourne `false` pour annuler (ex. l'utilisatrice a cliqué Annuler dans un confirm). */
 		showAdminExclude?: boolean;
 		/** Mode de rendu du tag APC :
 		 *  - 'uca' : filtre par budget_structure_id === 169 (défaut)
@@ -98,9 +90,7 @@
 		apcMode?: ApcMode;
 		/** Nombre d'éléments par page (50 pour les onglets, 100 pour /publications). */
 		perPage?: number;
-		/** Par défaut, restreint la liste à la famille « Publications » (au sens strict) tant
-		 *  qu'aucun type n'est coché. Réservé à la liste générale ; les listes embarquées (journal,
-		 *  éditeur, personne…) restent permissives. L'utilisatrice élargit via la facet « Types ». */
+		/** Par défaut, restreint la liste à la famille « Publications » (au sens strict) tant qu'aucun type n'est coché. Réservé à la liste générale ; les listes embarquées (journal, éditeur, personne…) restent permissives. L'utilisatrice élargit via la facet « Types ». */
 		restrictToPublications?: boolean;
 		onExcludeAuthorship?: (authorshipId: number, pubId: number) => void | boolean | Promise<void | boolean>;
 	} = $props();
@@ -124,10 +114,7 @@
 	}
 
 	// --- Column visibility ---
-	// Ordre des colonnes = ordre dans le tableau. Les colonnes optionnelles
-	// (hal_status, corr) ne sont incluses dans la liste que si la prop
-	// correspondante est activée — sinon l'utilisatrice n'a pas à les voir
-	// dans le menu de visibilité.
+	// Ordre des colonnes = ordre dans le tableau. Les colonnes optionnelles (hal_status, corr) ne sont incluses dans la liste que si la prop correspondante est activée — sinon l'utilisatrice n'a pas à les voir dans le menu de visibilité.
 	const columnDefs = [
 		{ key: 'type',       label: 'Type' },
 		{ key: 'year',       label: 'Année' },
@@ -166,8 +153,7 @@
 	let selectedCorr: string[] = $state([]);
 	let selectedPerimeter: string[] = $state([]);
 
-	// Facettes éditeur / revue (recherche serveur) : seul l'id sélectionné est conservé — état
-	// canonique. Le libellé de la pastille est résolu par le composant EntityFilter.
+	// Facettes éditeur / revue (recherche serveur) : seul l'id sélectionné est conservé — état canonique. Le libellé de la pastille est résolu par le composant EntityFilter.
 	let filterPublisherId: string | null = $state(null);
 	let filterJournalId: string | null = $state(null);
 
@@ -187,10 +173,7 @@
 		onFilterChange();
 	}
 
-	// Lien vers le tableau de bord, pendant inverse du bouton « Voir les publications ». Transmet les
-	// filtres que le tableau de bord sait représenter (les facettes propres à la liste — accès, pays,
-	// sources, statut HAL, correspondance, périmètre — n'y ont pas d'équivalent). Masqué quand la
-	// route fixe une dimension hors de sa portée (personne, sujet).
+	// Lien vers le tableau de bord, pendant inverse du bouton « Voir les publications ». Transmet les filtres que le tableau de bord sait représenter (les facettes propres à la liste — accès, pays, sources, statut HAL, correspondance, périmètre — n'y ont pas d'équivalent). Masqué quand la route fixe une dimension hors de sa portée (personne, sujet).
 	const showStatsLink = $derived(!externalFilters?.personId && !externalFilters?.subjectId);
 	const statsUrl = $derived.by(() => {
 		const p = new URLSearchParams();
@@ -225,9 +208,7 @@
 		const params = new URLSearchParams();
 		params.set('excluded_doc_type', 'ongoing_thesis');
 		if (selectedYears.length) params.set('year', selectedYears.join(','));
-		// `lab_id` : soit imposé par la route (externalFilters.labId), soit
-		// choisi par l'utilisatrice via la facet "Laboratoires". Les deux
-		// modes sont exclusifs (la facet est masquée si labId est fixe).
+		// `lab_id` : soit imposé par la route (externalFilters.labId), soit choisi par l'utilisatrice via la facet "Laboratoires". Les deux modes sont exclusifs (la facet est masquée si labId est fixe).
 		if (externalFilters?.labId != null) {
 			params.set('lab_id', String(externalFilters.labId));
 		} else if (selectedLabs.length) {
@@ -250,9 +231,7 @@
 		} else if (filterPublisherId) {
 			params.set('publisher_id', filterPublisherId);
 		}
-		// `journal_id` : soit imposé par la route (/journals/[id]), soit choisi
-		// par l'utilisatrice via l'URL (?journal_id=). Les deux modes sont
-		// exclusifs ; externalFilters l'emporte sur le filtre URL.
+		// `journal_id` : soit imposé par la route (/journals/[id]), soit choisi par l'utilisatrice via l'URL (?journal_id=). Les deux modes sont exclusifs ; externalFilters l'emporte sur le filtre URL.
 		if (externalFilters?.journalId != null) {
 			params.set('journal_id', String(externalFilters.journalId));
 		} else if (filterJournalId) {
@@ -281,8 +260,7 @@
 	const facets = useFacets({
 		endpoint: '/api/publications/facets',
 		apiKey: () => `${apiKey}-facets`,
-		// Inclut le terme de recherche pour que les comptes de facettes suivent le
-		// champ de recherche (comme la liste), pas seulement les autres filtres.
+		// Inclut le terme de recherche pour que les comptes de facettes suivent le champ de recherche (comme la liste), pas seulement les autres filtres.
 		buildParams() {
 			const params = buildFilterParams();
 			const q = search.trim();
@@ -398,8 +376,7 @@
 	async function onExcludeClick(p: Publication) {
 		if (!onExcludeAuthorship || p.authorship_id == null) return;
 		const result = await onExcludeAuthorship(p.authorship_id, p.id);
-		// `false` = annulé par le parent (ex. user a cliqué Annuler) ;
-		// `true` ou `undefined` = succès → on retire la ligne du tableau.
+		// `false` = annulé par le parent (ex. l'utilisatrice a cliqué Annuler) ; `true` ou `undefined` = succès → on retire la ligne du tableau.
 		if (result === false) return;
 		pubs.items = pubs.items.filter((item) => item.id !== p.id);
 	}
@@ -426,10 +403,7 @@
 			if (restored.filterJournalId) filterJournalId = restored.filterJournalId as string;
 		}
 
-		// Défaut « Publications » (liste générale uniquement) : sans filtre de type explicite dans
-		// l'URL, on pré-sélectionne la famille Publications. La sélection est réelle (et non un
-		// filtre caché), donc la facet « Types » la reflète ; cocher d'autres types ou « Tous »
-		// l'élargit. Le token `all` dans l'URL (« Tous » explicite) laisse la sélection vide.
+		// Défaut « Publications » (liste générale uniquement) : sans filtre de type explicite dans l'URL, on pré-sélectionne la famille Publications. La sélection est réelle (et non un filtre caché), donc la facet « Types » la reflète ; cocher d'autres types ou « Tous » l'élargit. Le token `all` dans l'URL (« Tous » explicite) laisse la sélection vide.
 		if (restrictToPublications && !(urlSync && $page.url.searchParams.has('doc_type'))) {
 			selectedDocTypes = [...publicationsDocTypes];
 		}
@@ -694,9 +668,7 @@
 		background: var(--card);
 		border: 1px solid var(--border);
 		border-radius: 6px;
-		/* pas d'overflow: hidden → le dropdown ColumnMenu peut déborder
-		   sous la dernière ligne sans être clippé (coins arrondis
-		   restent visuellement corrects grâce à border-collapse). */
+		/* pas d'overflow: hidden → le dropdown ColumnMenu peut déborder sous la dernière ligne sans être clippé (coins arrondis restent visuellement corrects grâce à border-collapse). */
 	}
 	.pub-table th {
 		background: var(--surface);
