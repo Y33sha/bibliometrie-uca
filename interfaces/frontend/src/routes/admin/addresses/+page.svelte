@@ -19,10 +19,7 @@
 	type Publication = components['schemas']['AddressPublicationItem'];
 	type PublicationsResponse = components['schemas']['AddressPublicationsResponse'];
 
-	// Structure : forme propre au front (utilisée par le picker de
-	// structure pour assigner manuellement). Côté API, l'endpoint qui
-	// liste les structures cibles est dans le router structures, pas
-	// addresses — type local conservé.
+	// Structure : forme propre au front (utilisée par le picker de structure pour assigner manuellement). Côté API, l'endpoint qui liste les structures cibles est dans le router structures, pas addresses — type local conservé.
 	interface Structure {
 		id: number;
 		name: string;
@@ -35,7 +32,7 @@
 		[type: string]: Structure[];
 	}
 
-	// Prédicats composables (cf. chantier filtres-adresses-composables).
+	// Prédicats composables.
 	interface TextPredicate {
 		mode: 'contains' | 'not_contains';
 		term: string;
@@ -132,8 +129,7 @@
 	let currentStructureId = $state<number | null>(null);
 
 	let structures = $state<GroupedStructures>({});
-	// Liste plate de toutes les structures (hors `site`) pour le picker des
-	// prédicats Structure — distincte du scope (limité aux ALLOWED_TYPES).
+	// Liste plate de toutes les structures (hors `site`) pour le picker des prédicats Structure — distincte du scope (limité aux ALLOWED_TYPES).
 	let allStructures = $state<Structure[]>([]);
 	let stats = $state<Stats>({ total: 0, detected: 0, pending: 0, rejected: 0, confirmed: 0 });
 	let addresses = $state<Address[]>([]);
