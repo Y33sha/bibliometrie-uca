@@ -10,8 +10,7 @@ import { paramsToQuery } from '$lib/utils';
  * - Restauration de l'état depuis les URLSearchParams au montage
  * - Debounce pour la recherche texte
  *
- * Le composable ne possède PAS l'état des filtres — il fournit des utilitaires
- * pour le sérialiser/désérialiser. Chaque page garde ses propres variables $state.
+ * Le composable ne possède PAS l'état des filtres — il fournit des utilitaires pour le sérialiser/désérialiser. Chaque page garde ses propres variables $state.
  */
 
 // --- Filter definition types ---
@@ -40,17 +39,12 @@ interface PageFilter {
 type FilterDef = StringArrayFilter | SingleValueFilter | SourceStatesFilter | PageFilter;
 
 interface UrlFiltersConfig {
-	/** Chemin de la page propriétaire. Accepte un getter `() => ...` quand il
-	 *  dérive d'un prop/route réactif (ex. `/persons/${personId}`) : il est alors
-	 *  relu à chaque `syncUrl` au lieu d'être capturé au montage. */
+	/** Chemin de la page propriétaire. Accepte un getter `() => ...` quand il dérive d'un prop/route réactif (ex. `/persons/${personId}`) : il est alors relu à chaque `syncUrl` au lieu d'être capturé au montage. */
 	basePath: string | (() => string);
 	filters: Record<string, FilterDef>;
 	debounceMs?: number;
 	/**
-	 * Source des params URL actuellement présents. Utilisé pour préserver les
-	 * keys non gérées par cette instance lors d'un `syncUrl` (additivité, cf.
-	 * cas où plusieurs `useUrlFilters` cohabitent sur une même page).
-	 * Par défaut lit `window.location.search`.
+	 * Source des params URL actuellement présents. Utilisé pour préserver les keys non gérées par cette instance lors d'un `syncUrl` (additivité, cf. cas où plusieurs `useUrlFilters` cohabitent sur une même page). Par défaut lit `window.location.search`.
 	 */
 	getCurrentParams?: () => URLSearchParams;
 }
@@ -72,9 +66,7 @@ export function useUrlFilters(config: UrlFiltersConfig) {
 		const state = getState();
 		const p = new URLSearchParams();
 
-		// Préserve les keys de l'URL courante qui ne sont pas gérées par
-		// cette instance (permet la cohabitation de plusieurs `useUrlFilters`
-		// ou la coexistence avec d'autres écritures URL).
+		// Préserve les keys de l'URL courante qui ne sont pas gérées par cette instance (permet la cohabitation de plusieurs `useUrlFilters` ou la coexistence avec d'autres écritures URL).
 		for (const [k, v] of readCurrentParams()) {
 			if (!managedKeys.has(k)) p.append(k, v);
 		}
@@ -108,20 +100,9 @@ export function useUrlFilters(config: UrlFiltersConfig) {
 		const qs = paramsToQuery(p);
 		const targetPath =
 			base + (typeof config.basePath === 'function' ? config.basePath() : config.basePath);
-		// Garde anti-navigation parasite : `syncUrl` est parfois appelé après un
-		// chargement async (cf. `onMount` des pages qui `await` puis `syncUrl()`).
-		// Si l'utilisateur a changé de route entre-temps, le `goto` ci-dessous —
-		// qui cible `basePath` en dur — le ramènerait sur cette page. On ne
-		// synchronise donc l'URL que si on est encore sur la page propriétaire.
+		// Garde anti-navigation parasite : `syncUrl` est parfois appelé après un chargement async (cf. `onMount` des pages qui `await` puis `syncUrl()`). Si l'utilisateur a changé de route entre-temps, le `goto` ci-dessous — qui cible `basePath` en dur — le ramènerait sur cette page. On ne synchronise donc l'URL que si on est encore sur la page propriétaire.
 		if (typeof window !== 'undefined' && window.location.pathname !== targetPath) return;
-		// `goto({ replaceState: true })` plutôt que le `replaceState` bas niveau
-		// de `$app/navigation` : `replaceState` ne mettait pas correctement à
-		// jour l'entrée d'historique du navigateur, et au back, le navigateur
-		// ramenait à l'URL d'origine (pré-modifications) tandis que le
-		// composant restauré depuis bfcache gardait son `$state` JS d'avant la
-		// navigation — désynchro URL bar ↔ UI. `goto` synchronise history,
-		// store `$page` et bfcache. `noScroll` + `keepFocus` évitent les sauts
-		// quand on coche/décoche un filtre.
+		// `goto({ replaceState: true })` plutôt que le `replaceState` bas niveau de `$app/navigation` : `replaceState` ne met pas correctement à jour l'entrée d'historique du navigateur, et au back, le navigateur ramène à l'URL d'origine (pré-modifications) tandis que le composant restauré depuis bfcache garde son `$state` JS d'avant la navigation — désynchro URL bar ↔ UI. `goto` synchronise history, store `$page` et bfcache. `noScroll` + `keepFocus` évitent les sauts quand on coche/décoche un filtre.
 		void goto(targetPath + (qs ? '?' + qs : ''), {
 			replaceState: true,
 			noScroll: true,

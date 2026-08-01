@@ -19,8 +19,7 @@ export interface PaginatedFetchOptions {
 	endpoint: string;
 	itemsKey: string;
 	perPage?: number;
-	/** Clé de cache `api()`. Passer un getter `() => ...` pour qu'un changement
-	 *  (ex. invalidation après édition admin) déclenche un rechargement. */
+	/** Clé de cache `api()`. Passer un getter `() => ...` pour qu'un changement (ex. invalidation après édition admin) déclenche un rechargement. */
 	apiKey: string | (() => string);
 	buildParams: () => URLSearchParams;
 }
@@ -31,8 +30,7 @@ export function usePaginatedFetch<T>(opts: PaginatedFetchOptions) {
 	let page = $state(1);
 	let pages = $state(1);
 	let loaded = $state(false);
-	// `true` dès la création : tant que le premier `load()` n'a pas abouti, on
-	// n'a pas de données — les tableaux affichent « Chargement… », pas « vide ».
+	// `true` dès la création : tant que le premier `load()` n'a pas abouti, on n'a pas de données — les tableaux affichent « Chargement… », pas « vide ».
 	let loading = $state(true);
 
 	const perPage = opts.perPage ?? 50;
@@ -62,10 +60,7 @@ export function usePaginatedFetch<T>(opts: PaginatedFetchOptions) {
 		}
 	}
 
-	// Recharge quand la clé d'API change (ex. après une édition/fusion admin qui
-	// incrémente une version pour invalider le cache). Nécessite que `apiKey`
-	// soit passé en getter `() => ...` pour être suivi réactivement. La garde
-	// `lastKey` évite un double-chargement au montage.
+	// Recharge quand la clé d'API change (ex. après une édition/fusion admin qui incrémente une version pour invalider le cache). Nécessite que `apiKey` soit passé en getter `() => ...` pour être suivi réactivement. La garde `lastKey` évite un double-chargement au montage.
 	$effect(() => {
 		const key = currentKey();
 		if (loaded && key !== lastKey) load();
