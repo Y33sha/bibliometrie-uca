@@ -25,8 +25,7 @@
 
 	// Couleur d'alerte des valeurs inattendues (segment + libellé de légende).
 	const ANOMALY_COLOR = '#c0392b';
-	// Palette neutre tournante pour les distributions sans couleur sémantique
-	// (doc_types, journal_types). Stable par position.
+	// Palette neutre tournante pour les distributions sans couleur sémantique (doc_types, journal_types). Stable par position.
 	const PALETTE = [
 		'#3b6b9e',
 		'#2a7d4f',
