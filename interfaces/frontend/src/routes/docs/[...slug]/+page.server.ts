@@ -11,9 +11,7 @@ export const entries: EntryGenerator = () => {
 	const slugs: string[] = [];
 	for (const node of NAV) {
 		if (isSection(node)) {
-			// Le slug nu de la section (ex. `donnees`) est prérendu comme redirection
-			// vers son premier enfant, pour que les liens vers l'index d'un dossier
-			// (`[…](../donnees/)`) résolvent, comme sur GitHub.
+			// Le slug nu de la section (ex. `donnees`) est prérendu comme redirection vers son premier enfant, pour que les liens vers l'index d'un dossier (`[…](../donnees/)`) résolvent, comme sur GitHub.
 			slugs.push(node.section);
 			for (const childSlug of listSectionSlugs(node.section)) slugs.push(childSlug);
 		} else {
