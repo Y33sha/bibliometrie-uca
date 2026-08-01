@@ -14,10 +14,7 @@ export interface ParsedDoc {
 }
 
 /**
- * Calcule l'ancre d'un titre à partir de son texte, selon la convention GitHub :
- * lowercase, ponctuation supprimée (lettres accentuées et underscores conservés),
- * espaces → tirets. Une ancre ainsi dérivée du texte fonctionne à l'identique dans
- * l'UI et sur GitHub, sans marqueur d'ancre explicite dans le Markdown source.
+ * Calcule l'ancre d'un titre à partir de son texte, selon la convention GitHub : lowercase, ponctuation supprimée (lettres accentuées et underscores conservés), espaces → tirets. Une ancre ainsi dérivée du texte fonctionne à l'identique dans l'UI et sur GitHub, sans marqueur d'ancre explicite dans le Markdown source.
  */
 export function makeAnchor(text: string): string {
 	return text
@@ -40,9 +37,7 @@ function makeAnchorDedupe(): (baseAnchor: string) => string {
 }
 
 /**
- * Ancres effectives d'un document, dans l'ordre du rendu : chaque titre (tous
- * niveaux) produit son slug auto-généré, dédupliqué comme dans le HTML rendu.
- * Sert au contrôle d'intégrité des liens internes de la doc.
+ * Ancres effectives d'un document, dans l'ordre du rendu : chaque titre (tous niveaux) produit son slug auto-généré, dédupliqué comme dans le HTML rendu. Sert au contrôle d'intégrité des liens internes de la doc.
  */
 export function documentAnchors(content: string): string[] {
 	const dedupe = makeAnchorDedupe();
@@ -143,9 +138,7 @@ function extractGlossaryRefs(content: string): { processed: string; refs: Glossa
 }
 
 function injectGlossaryRefs(html: string, refs: GlossaryRef[], base: string): string {
-	// Markdown inline rendu APRÈS escape HTML : permet `[[slug|voie *open access*]]`
-	// → `<em>open access</em>`, sans rouvrir une injection XSS (les `<` éventuels
-	// dans le texte ont déjà été échappés en `&lt;`, que marked passe tel quel).
+	// Markdown inline rendu APRÈS escape HTML : permet `[[slug|voie *open access*]]` → `<em>open access</em>`, sans rouvrir une injection XSS (les `<` éventuels dans le texte ont déjà été échappés en `&lt;`, que marked passe tel quel).
 	const inlineMarked = new Marked();
 	return html.replace(GLOSS_PLACEHOLDER_RE, (_match, idxStr: string) => {
 		const ref = refs[parseInt(idxStr, 10)];
@@ -161,9 +154,7 @@ export function parseMarkdown(content: string, base: string, currentSlug: string
 	const { processed, refs } = extractGlossaryRefs(content);
 	const { title, toc } = extractHeadings(processed);
 
-	// Compteur indépendant pour le rendu HTML, qui suit la même logique de dédup
-	// qu'`extractHeadings` (cf. `makeAnchorDedupe`) — convention GitHub `-1`, `-2`, etc.
-	// pour les collisions d'ancres auto-générées.
+	// Compteur indépendant pour le rendu HTML, qui suit la même logique de dédup qu'`extractHeadings` (cf. `makeAnchorDedupe`) — convention GitHub `-1`, `-2`, etc. pour les collisions d'ancres auto-générées.
 	const renderDedupe = makeAnchorDedupe();
 
 	const renderer: RendererObject = {
@@ -176,11 +167,7 @@ export function parseMarkdown(content: string, base: string, currentSlug: string
 			const resolved = resolveDocLink(href, base, currentSlug);
 			const text = this.parser.parseInline(tokens);
 			const titleAttr = linkTitle ? ` title="${escapeHtmlAttr(linkTitle)}"` : '';
-			// Lien vers le glossaire de la forme `…/docs/glossaire#slug` :
-			// émet `class="gloss" data-glossary="slug"` pour que
-			// <GlossaryPopover /> intercepte au clic. Si le slug n'existe pas
-			// dans la map glossaire, le composant laisse passer le clic et la
-			// navigation vers le glossaire se fait normalement.
+			// Lien vers le glossaire de la forme `…/docs/glossaire#slug` : émet `class="gloss" data-glossary="slug"` pour que <GlossaryPopover /> intercepte au clic. Si le slug n'existe pas dans la map glossaire, le composant laisse passer le clic et la navigation vers le glossaire se fait normalement.
 			const glossaryMatch = /\/docs\/glossaire#([\w-]+)$/.exec(resolved);
 			if (glossaryMatch) {
 				const slug = glossaryMatch[1];
@@ -189,12 +176,7 @@ export function parseMarkdown(content: string, base: string, currentSlug: string
 			return `<a href="${escapeHtmlAttr(resolved)}"${titleAttr}>${text}</a>`;
 		},
 		image({ href, title, text }) {
-			// Images de doc : source unique sous `docs/img/screenshots/`, lisible
-			// sur GitHub via chemin relatif (`![](../img/screenshots/foo.png)` depuis
-			// une page de section). Côté doc déployée, le script
-			// `scripts/copy-doc-images.mjs` copie ces fichiers vers
-			// `static/docs-screenshots/`, et on réécrit ici l'URL relative en
-			// URL absolue préfixée par `${base}/docs-screenshots/`.
+			// Images de doc : source unique sous `docs/img/screenshots/`, lisible sur GitHub via chemin relatif (`![](../img/screenshots/foo.png)` depuis une page de section). Côté doc déployée, le script `scripts/copy-doc-images.mjs` copie ces fichiers vers `static/docs-screenshots/`, et on réécrit ici l'URL relative en URL absolue préfixée par `${base}/docs-screenshots/`.
 			const resolved = resolveImageHref(href, base);
 			const titleAttr = title ? ` title="${escapeHtmlAttr(title)}"` : '';
 			return `<img src="${escapeHtmlAttr(resolved)}" alt="${escapeHtmlAttr(text)}"${titleAttr} />`;

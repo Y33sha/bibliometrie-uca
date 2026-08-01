@@ -11,10 +11,7 @@ export function isSection(node: NavNode): node is Section {
  * Structure ordonnée de la documentation.
  *
  * - Un `FlatPage` correspond à un `.md` à plat (slug = nom de fichier sans extension).
- * - Une `Section` correspond à un dossier (`docs/<section>/`) qui contient
- *   plusieurs `.md` préfixés `NN-`. Le titre s'affiche comme en-tête non
- *   cliquable dans la sidebar, et le filesystem fournit la liste ordonnée
- *   des enfants à partir du dossier.
+ * - Une `Section` correspond à un dossier (`docs/<section>/`) qui contient plusieurs `.md` préfixés `NN-`. Le titre s'affiche comme en-tête non cliquable dans la sidebar, et le filesystem fournit la liste ordonnée des enfants à partir du dossier.
  */
 export const NAV: NavNode[] = [
 	{ section: 'exploitation', title: 'Guide d’exploitation' },

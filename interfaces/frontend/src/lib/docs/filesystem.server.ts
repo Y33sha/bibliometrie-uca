@@ -1,8 +1,7 @@
 // Charge tous les .md de `docs/` au build via Vite (récursif).
 // - Le contenu est embarqué dans le bundle serveur (`?raw`)
 // - HMR automatique en dev quand un .md est édité
-// - Les `.md` sous `docs/chantiers/` sont exclus (fiches de chantier
-//   non exposées en ligne)
+// - Les `.md` sous `docs/chantiers/` sont exclus (fiches de chantier non exposées en ligne)
 const rawDocs = import.meta.glob('../../../../../docs/**/*.md', {
 	query: '?raw',
 	import: 'default',
@@ -46,8 +45,7 @@ for (const [filePath, content] of Object.entries(rawDocs)) {
 	}
 }
 
-// Préserver l'ordre des sections : trier par filePath (qui contient le préfixe
-// numérique NN-) pour que `01-foo` < `02-bar` < `10-baz`.
+// Préserver l'ordre des sections : trier par filePath (qui contient le préfixe numérique NN-) pour que `01-foo` < `02-bar` < `10-baz`.
 for (const section of Object.keys(slugsBySection)) {
 	slugsBySection[section].sort((a, b) => {
 		return docsBySlug[a].filePath.localeCompare(docsBySlug[b].filePath);
@@ -67,8 +65,7 @@ export function hasDocFile(slug: string): boolean {
 }
 
 /**
- * Retourne les slugs des `.md` d'une section, dans l'ordre des préfixes numériques.
- * Renvoie un tableau vide si la section n'existe pas (ou n'a pas de fichiers).
+ * Retourne les slugs des `.md` d'une section, dans l'ordre des préfixes numériques. Renvoie un tableau vide si la section n'existe pas (ou n'a pas de fichiers).
  */
 export function listSectionSlugs(section: string): string[] {
 	return slugsBySection[section] ?? [];

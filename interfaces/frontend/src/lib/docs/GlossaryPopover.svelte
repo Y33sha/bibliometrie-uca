@@ -42,10 +42,7 @@
 	}
 
 	$effect(() => {
-		// Intercepte en phase capture pour passer DEVANT SvelteKit, qui
-		// gère lui-même les clics sur les `<a>` internes (bubble phase).
-		// Sans ça, SvelteKit déclenche `goto()` avant que le popover puisse
-		// afficher (l'infobulle apparaît brièvement puis la page change).
+		// Intercepte en phase capture pour passer DEVANT SvelteKit, qui gère lui-même les clics sur les `<a>` internes (bubble phase). Sans ça, SvelteKit déclenche `goto()` avant que le popover puisse afficher (l'infobulle apparaît brièvement puis la page change).
 		function onClickCapture(e: MouseEvent) {
 			const target = e.target as HTMLElement | null;
 			if (!target) return;
@@ -60,8 +57,7 @@
 			}
 		}
 		function onClickBubble(e: MouseEvent) {
-			// Fermer le popover sur clic en dehors. En bubble phase pour ne pas
-			// se déclencher avant que l'ouverture (capture) ait positionné le popover.
+			// Fermer le popover sur clic en dehors. En bubble phase pour ne pas se déclencher avant que l'ouverture (capture) ait positionné le popover.
 			const target = e.target as HTMLElement | null;
 			if (!target) return;
 			if (activeEntry && popoverEl && !popoverEl.contains(target)) {
