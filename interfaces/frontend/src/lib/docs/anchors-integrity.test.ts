@@ -7,19 +7,12 @@ import { documentAnchors } from './parser';
 /**
  * Contrôle d'intégrité des liens internes de la documentation :
  *
- * - un lien vers un fichier `.md` de la doc (`chemin.md` ou `chemin.md#fragment`)
- *   doit pointer vers un fichier existant ;
- * - son ancre `#fragment` éventuelle, et toute référence glossaire `[[slug]]`,
- *   doivent exister dans le fichier cible.
+ * - un lien vers un fichier `.md` de la doc (`chemin.md` ou `chemin.md#fragment`) doit pointer vers un fichier existant ;
+ * - son ancre `#fragment` éventuelle, et toute référence glossaire `[[slug]]`, doivent exister dans le fichier cible.
  *
- * Garde-fou contre les liens cassés qu'aucun autre outil ne détecte (svelte-check
- * ne vérifie que le typage). Les liens hors doc (code source via `.py`/`.svelte`,
- * externes) sont ignorés ; les liens sans extension `.md` (routes de l'UI) ne sont
- * vérifiés que sur leur ancre, pas sur l'existence d'un fichier.
+ * Garde-fou contre les liens cassés qu'aucun autre outil ne détecte (svelte-check ne vérifie que le typage). Les liens hors doc (code source via `.py`/`.svelte`, externes) sont ignorés ; les liens sans extension `.md` (routes de l'UI) ne sont vérifiés que sur leur ancre, pas sur l'existence d'un fichier.
  *
- * Les fiches de `chantiers/` sont indexées comme *cibles* (un lien vers une fiche
- * doit rester valide) mais ne sont pas scannées comme *sources* : leurs propres
- * liens internes ne sont pas contrôlés.
+ * Les fiches de `chantiers/` sont indexées comme *cibles* (un lien vers une fiche doit rester valide) mais ne sont pas scannées comme *sources* : leurs propres liens internes ne sont pas contrôlés.
  */
 
 const DOCS_ROOT = path.resolve(fileURLToPath(import.meta.url), '../../../../../../docs');
@@ -72,8 +65,7 @@ describe('intégrité des ancres de la documentation', () => {
 				const frag = hash < 0 ? null : href.slice(hash + 1);
 
 				if (base.endsWith('.md')) {
-					// Lien vers un fichier de doc explicite : la cible doit exister,
-					// et son ancre éventuelle aussi.
+					// Lien vers un fichier de doc explicite : la cible doit exister, et son ancre éventuelle aussi.
 					const target = path.resolve(path.dirname(file), base);
 					if (path.relative(DOCS_ROOT, target).startsWith('..')) continue; // hors doc
 					const set = anchors.get(target);
@@ -83,9 +75,7 @@ describe('intégrité des ancres de la documentation', () => {
 						dangling.push(`${rel} : #${frag} absent de ${path.relative(DOCS_ROOT, target)}`);
 					}
 				} else if (frag !== null) {
-					// Ancre sans fichier explicite : même page (`#frag`) ou route sans
-					// `.md` (`../glossaire#frag`). On vérifie l'ancre si la cible est une
-					// doc connue, sans juger l'existence d'un fichier (c'est une route).
+					// Ancre sans fichier explicite : même page (`#frag`) ou route sans `.md` (`../glossaire#frag`). On vérifie l'ancre si la cible est une doc connue, sans juger l'existence d'un fichier (c'est une route).
 					const target = base === '' ? file : path.resolve(path.dirname(file), `${base}.md`);
 					const set = anchors.get(target);
 					if (set && !set.has(frag)) {

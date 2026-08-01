@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// Le composable importe `api` depuis `$lib/api` ; on le remplace par un mock
-// configurable que chaque test renseigne via `apiResponse`.
+// Le composable importe `api` depuis `$lib/api` ; on le remplace par un mock configurable que chaque test renseigne via `apiResponse`.
 let apiResponse: Record<string, unknown> = {};
 const apiSpy = vi.fn(async (..._args: unknown[]) => apiResponse);
 vi.mock('$lib/api', () => ({ api: (...args: unknown[]) => apiSpy(...args) }));

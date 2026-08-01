@@ -4,16 +4,13 @@ import { runInEffectRoot } from './effectRoot.svelte';
 import type { PaginatedFetchOptions } from './usePaginatedFetch.svelte';
 
 let apiResponse: Record<string, unknown> = {};
-// `(..._args: unknown[])` plutôt que `()` : permet à TS de typer
-// `apiSpy.mock.calls[0][0]` lors des assertions.
+// `(..._args: unknown[])` plutôt que `()` : permet à TS de typer `apiSpy.mock.calls[0][0]` lors des assertions.
 const apiSpy = vi.fn(async (..._args: unknown[]) => apiResponse);
 vi.mock('$lib/api', () => ({ api: (...args: unknown[]) => apiSpy(...args) }));
 
 const { usePaginatedFetch } = await import('./usePaginatedFetch.svelte');
 
-// `usePaginatedFetch` utilise `$effect` (rechargement réactif sur changement de
-// clé) : il doit être instancié dans un scope d'effet, sinon `effect_orphan`.
-// `mount` enveloppe la création ; les scopes sont disposés après chaque test.
+// `usePaginatedFetch` utilise `$effect` (rechargement réactif sur changement de clé) : il doit être instancié dans un scope d'effet, sinon `effect_orphan`. `mount` enveloppe la création ; les scopes sont disposés après chaque test.
 const cleanups: Array<() => void> = [];
 afterEach(() => {
 	for (const c of cleanups) c();
