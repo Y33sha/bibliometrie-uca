@@ -93,21 +93,6 @@ repos:
         pass_filenames: false
         files: ^(pyproject\.toml|uv\.lock)$
 
-      # schema.ts (types TypeScript du frontend) est généré depuis l'OpenAPI de
-      # l'API FastAPI par `npm run types:gen`. Rien ne garantit qu'il suive : ce
-      # contrôle le régénère dans un fichier temporaire et échoue si la version
-      # commitée a dérivé, sans la modifier (même principe qu'uv-lock pour le
-      # lockfile). Correction : `npm run types:gen` (dans interfaces/frontend)
-      # puis re-stager. Ne tourne qu'aux commits touchant du Python (une réponse
-      # d'API peut changer de forme) ou schema.ts lui-même.
-      - id: openapi-types-fresh
-        name: schema.ts (types frontend) suit l'OpenAPI
-        entry: |-
-          bash -c 'json=$(mktemp) && ts=$(mktemp) && uv run python -m interfaces.cli.dev.dump_openapi "$json" && ( cd interfaces/frontend && npx openapi-typescript "$json" -o "$ts" >/dev/null ) && if diff -q interfaces/frontend/src/lib/api/schema.ts "$ts" >/dev/null; then rm -f "$json" "$ts"; else rm -f "$json" "$ts"; echo schema.ts a dérivé de OpenAPI, régénérer via npm run types:gen puis re-stager; exit 1; fi'
-        language: system
-        pass_filenames: false
-        files: \.py$|^interfaces/frontend/src/lib/api/schema\.ts$
-
       # --------------------------------------------------------
       # Étage pre-push : les contrôles de la CI (.github/workflows/ci.yml) qui
       # tiennent en quelques secondes et se passent d'une base. Tourne avant
@@ -179,6 +164,20 @@ repos:
       - id: ci-frontend-audit
         name: npm audit (vulnérabilités du bundle)
         entry: bash -c 'cd interfaces/frontend && npm audit --omit=dev --audit-level=moderate'
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
+
+      # Contrat OpenAPI → types TypeScript : schema.ts est généré depuis
+      # l'OpenAPI de l'API par `npm run types:gen`, sans garde-fou de fraîcheur.
+      # Ce contrôle le régénère dans un fichier temporaire et échoue si la
+      # version commitée a dérivé, sans la modifier. Correction :
+      # `npm run types:gen` (dans interfaces/frontend) puis commiter.
+      - id: ci-openapi-types
+        name: schema.ts (types frontend) suit l'OpenAPI
+        entry: |-
+          bash -c 'json=$(mktemp) && ts=$(mktemp) && uv run python -m interfaces.cli.dev.dump_openapi "$json" && ( cd interfaces/frontend && npx openapi-typescript "$json" -o "$ts" >/dev/null ) && if diff -q interfaces/frontend/src/lib/api/schema.ts "$ts" >/dev/null; then rm -f "$json" "$ts"; else rm -f "$json" "$ts"; echo schema.ts a dérivé de OpenAPI, régénérer via npm run types:gen puis commiter; exit 1; fi'
         language: system
         pass_filenames: false
         always_run: true
