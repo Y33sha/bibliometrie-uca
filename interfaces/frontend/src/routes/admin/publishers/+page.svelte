@@ -16,8 +16,7 @@
 	let publisherTypes: EnumOption[] = $state([]);
 	let countries: Country[] = $state([]);
 
-	// Clé d'API utilisée pour forcer le reload de PublishersListView après
-	// une édition ou fusion (incrément invalide le cache).
+	// Clé d'API utilisée pour forcer le reload de PublishersListView après une édition ou fusion (incrément invalide le cache).
 	let viewVersion = $state(0);
 	const apiKey = $derived(`admin-publishers-${viewVersion}`);
 	function reload() { viewVersion += 1; }
