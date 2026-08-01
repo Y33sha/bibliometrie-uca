@@ -1,6 +1,5 @@
 <script lang="ts">
-  // Label de section de la fiche détail : petite icône discrète (stroke = couleur du label) + texte.
-  // Les tracés sont des icônes simples (style Feather), faciles à remplacer par les icônes finales.
+  // Label de section de la fiche détail : petite icône discrète (stroke = couleur du label) + texte. Les tracés sont des icônes simples de style Feather.
   let {
     icon,
     text,

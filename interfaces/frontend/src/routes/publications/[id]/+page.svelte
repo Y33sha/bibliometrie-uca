@@ -103,9 +103,7 @@
     data = await api<PubResponse>(`/api/publications/${id}`);
   }
 
-  // Recharge à chaque changement d'`id`. La navigation d'une publication à une autre réutilise la
-  // même route `[id]`, donc le composant n'est pas remonté : `onMount` ne suffit pas, il faut un
-  // effet réactif sur `pubId` (sinon l'URL change mais le contenu reste).
+  // Recharge à chaque changement d'`id`. La navigation d'une publication à une autre réutilise la même route `[id]` sans remonter le composant : `onMount` ne suffit pas, il faut un effet réactif sur `pubId` (sinon l'URL change mais le contenu reste).
   $effect(() => {
     const id = pubId;
     if (!id) return;
@@ -205,8 +203,7 @@
     padding: 20px 24px;
     margin-bottom: 16px;
   }
-  /* Deux colonnes : contenu à gauche, accès & identité à droite. Replie en une colonne (sidebar
-     sous le contenu) en dessous de 860px. */
+  /* Deux colonnes : contenu à gauche, accès & identité à droite. Replie en une colonne (sidebar sous le contenu) en dessous de 860px. */
   .detail-layout {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 300px;
@@ -221,8 +218,7 @@
       grid-template-columns: 1fr;
     }
   }
-  /* Panneau unique regroupant les sections plates (structures, personnes, relations, sujets,
-     résumé), séparées par des filets fins plutôt qu'un encadré par section. */
+  /* Panneau unique regroupant les sections plates (structures, personnes, relations, sujets, résumé), séparées par des filets fins. */
   .detail-body {
     background: var(--card);
     border: 1px solid var(--border);

@@ -2,8 +2,7 @@
   import { base } from "$app/paths";
   import { structIsLabo, structLabel, type StructInfo } from "./types";
 
-  // Tag d'une structure liée à une publication : lien vers la fiche labo si
-  // c'en est un, sinon span non cliquable (ombrelle UCA, partenaires…).
+  // Tag d'une structure liée à une publication : lien vers la fiche labo si c'en est un, sinon span non cliquable (ombrelle UCA, partenaires…).
   // `tab` : onglet ciblé sur la fiche labo (ex. "theses").
   let {
     structures,

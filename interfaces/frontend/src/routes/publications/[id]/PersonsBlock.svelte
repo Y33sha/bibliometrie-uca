@@ -6,8 +6,7 @@
 
   let { authorships }: { authorships: Authorship[] } = $props();
 
-  // Une personne par lien, dédupliquée (un même `person_id` peut apparaître sur deux signatures),
-  // ordre d'apparition conservé.
+  // Une personne par lien, dédupliquée (un même `person_id` peut apparaître sur deux signatures), ordre d'apparition conservé.
   const persons = $derived.by(() => {
     const seen = new Set<number>();
     const out: Authorship[] = [];

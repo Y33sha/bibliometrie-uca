@@ -6,8 +6,7 @@
 
   const { pub, relations = [] }: { pub: PubDetail; relations?: RelatedPublication[] } = $props();
 
-  // Trié par niveau de gravité (rétractation, erratum, rattachement, secondaire) ; l'ordre d'origine
-  // est conservé à l'intérieur d'un niveau (le tri JS est stable).
+  // Trié par niveau de gravité (rétractation, erratum, rattachement, secondaire) ; l'ordre d'origine est conservé à l'intérieur d'un niveau (le tri JS est stable).
   const sortedRelations = $derived(
     [...relations].sort(
       (a, b) =>
@@ -16,9 +15,7 @@
     ),
   );
 
-  // Un jeu de données rattachant chacune de ses pièces génère une longue liste de relations. On
-  // n'en affiche que les premières (les plus graves, le tri les remonte) et on plie le reste
-  // derrière une bascule pour garder le header lisible.
+  // Un jeu de données rattachant chacune de ses pièces génère une longue liste de relations. On n'en affiche que les premières (les plus graves, le tri les remonte) et on plie le reste derrière une bascule pour garder le header lisible.
   const RELATION_CAP = 5;
   let showAllRelations = $state(false);
   const visibleRelations = $derived(
@@ -130,9 +127,7 @@
     font-weight: 500;
   }
 
-  /* Bandeau des relations, en pied de header : volontairement voyant (fond teinté + filet d'accent
-     épais), hiérarchisé par niveau de gravité (couleur + ordre) pour qu'on saisisse au premier coup
-     d'œil qu'une publi est rattachée, corrigée ou rétractée. */
+  /* Bandeau des relations, en pied de header : volontairement voyant (fond teinté + filet d'accent épais), hiérarchisé par niveau de gravité (couleur + ordre) pour qu'on saisisse au premier coup d'œil qu'une publication est rattachée, corrigée ou rétractée. */
   .rel-banner {
     display: flex;
     flex-direction: column;
@@ -148,9 +143,7 @@
     border-radius: 4px;
     text-decoration: none;
   }
-  /* Icône + type de relation forment un bloc « libellé » centré ensemble ; il s'aligne sur la
-     première ligne du titre (via `align-items: baseline` du `.rel-item`) et ne dérive plus au
-     milieu du bloc quand le titre passe sur plusieurs lignes. */
+  /* Icône + type de relation forment un bloc « libellé » centré ensemble ; il s'aligne sur la première ligne du titre (via `align-items: baseline` du `.rel-item`) et y reste quand le titre passe sur plusieurs lignes. */
   .rel-label {
     display: inline-flex;
     align-items: center;
