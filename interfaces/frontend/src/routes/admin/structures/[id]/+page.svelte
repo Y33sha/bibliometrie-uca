@@ -8,8 +8,11 @@
   import { confirmDialog, toast } from "$lib/dialogs.svelte";
   import {
     API_SOURCES,
+    ROR_FORMAT_ERROR,
     SHORT_FORM_MAX_LENGTH,
+    buildApiIds,
     halCollectionUrl,
+    normalizeRorId,
     type EditFormState,
     type NameForm,
     type Structure,
@@ -331,11 +334,9 @@
   /* ── Edit modal ── */
 
   function normalizeRor(): boolean {
-    // Forme canonique stockée = ID court 9-char. On accepte une URL complète ou un ID nu en saisie, mais on envoie toujours l'ID court (le backend re-normalise de toute façon via le VO RorId).
-    const ror = mRor.trim().replace(/^https?:\/\/ror\.org\//, "");
-    if (!ror) return true;
-    if (!/^0[a-z0-9]{8}$/.test(ror)) {
-      toast("Format ROR invalide. Attendu : 0xxxxxxxxx (ou https://ror.org/0xxxxxxxxx)", "error");
+    const ror = normalizeRorId(mRor);
+    if (ror === null) {
+      toast(ROR_FORMAT_ERROR, "error");
       return false;
     }
     mRor = ror;
@@ -358,22 +359,6 @@
     editModalOpen = true;
   }
 
-  function buildApiIds(): Record<string, string[]> | null {
-    const result: Record<string, string[]> = {};
-    let hasAny = false;
-    for (const src of API_SOURCES) {
-      const raw = (mApiIds[src] || "").trim();
-      if (raw) {
-        result[src] = raw
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean);
-        hasAny = true;
-      }
-    }
-    return hasAny ? result : null;
-  }
-
   async function submitEdit() {
     if (!normalizeRor()) return;
     const data: Record<string, any> = {};
@@ -384,7 +369,7 @@
     if (mRor.trim() !== (detail?.structure.ror_id || "")) data.ror_id = mRor.trim() || null;
     if (mHal.trim() !== (detail?.structure.hal_collection || ""))
       data.hal_collection = mHal.trim() || null;
-    data.api_ids = buildApiIds();
+    data.api_ids = buildApiIds(mApiIds);
 
     try {
       await structuresApi.update(id, data);

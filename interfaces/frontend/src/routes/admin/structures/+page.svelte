@@ -5,7 +5,14 @@
   import { goto } from "$app/navigation";
   import { api, ApiError, structures as structuresApi } from "$lib/api";
   import { toast } from "$lib/dialogs.svelte";
-  import { API_SOURCES, type StructureListItem, type Perimeter } from "./types";
+  import {
+    API_SOURCES,
+    ROR_FORMAT_ERROR,
+    buildApiIds,
+    normalizeRorId,
+    type StructureListItem,
+    type Perimeter,
+  } from "./types";
   import { STRUCTURE_TYPES } from "$lib/structureTypes";
   import StructureFormModal from "./StructureFormModal.svelte";
 
@@ -57,31 +64,13 @@
   }
 
   function normalizeRor(): boolean {
-    // Forme canonique stockée = ID court 9-char. On accepte une URL complète ou un ID nu en saisie, mais on envoie toujours l'ID court (le backend re-normalise de toute façon via le VO RorId).
-    const ror = mRor.trim().replace(/^https?:\/\/ror\.org\//, "");
-    if (!ror) return true;
-    if (!/^0[a-z0-9]{8}$/.test(ror)) {
-      toast("Format ROR invalide. Attendu : 0xxxxxxxxx (ou https://ror.org/0xxxxxxxxx)", "error");
+    const ror = normalizeRorId(mRor);
+    if (ror === null) {
+      toast(ROR_FORMAT_ERROR, "error");
       return false;
     }
     mRor = ror;
     return true;
-  }
-
-  function buildApiIds(): Record<string, string[]> | null {
-    const result: Record<string, string[]> = {};
-    let hasAny = false;
-    for (const src of API_SOURCES) {
-      const raw = (mApiIds[src] || "").trim();
-      if (raw) {
-        result[src] = raw
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean);
-        hasAny = true;
-      }
-    }
-    return hasAny ? result : null;
   }
 
   function openCreateModal() {
@@ -105,7 +94,7 @@
       type: mType,
       ror_id: mRor.trim() || null,
       hal_collection: mHal.trim() || null,
-      api_ids: buildApiIds(),
+      api_ids: buildApiIds(mApiIds),
     };
     if (!data.code || !data.name) {
       toast("Code et nom requis", "error");
