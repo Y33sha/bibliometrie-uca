@@ -1,9 +1,7 @@
 /**
  * Composable pour une recherche à saisie avec debounce.
  *
- * Encapsule le pattern récurrent : champ de recherche → délai → fetch →
- * affichage de résultats, avec annulation des requêtes en vol quand
- * l'utilisateur continue de taper.
+ * Encapsule le pattern récurrent : champ de recherche → délai → fetch → affichage de résultats, avec annulation des requêtes en vol quand l'utilisateur continue de taper.
  *
  * Usage minimal :
  *   const search = useDebouncedSearch<Person>({
@@ -21,9 +19,7 @@
  *   // Pour nettoyer à la fermeture d'un formulaire :
  *   search.clear();
  *
- * Les requêtes concurrentes sont gérées par `api()` lui-même (option `key`)
- * si on passe un `apiKey`. Sinon on se contente d'ignorer les résultats
- * obsolètes via un compteur interne.
+ * Les requêtes concurrentes sont gérées par `api()` lui-même (option `key`) si on passe un `apiKey`. Sinon on se contente d'ignorer les résultats obsolètes via un compteur interne.
  */
 
 interface DebouncedSearchOptions<R> {

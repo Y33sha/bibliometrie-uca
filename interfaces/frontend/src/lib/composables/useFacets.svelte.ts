@@ -42,8 +42,7 @@ export type FacetDef = SimpleFacet | LabelMapFacet | LabeledFacet | BooleanFacet
 
 interface FacetsConfig<K extends string> {
 	endpoint: string;
-	/** Clé de cache `api()`. Passer un getter `() => ...` pour qu'un changement
-	 *  (invalidation après édition admin) recharge les facettes. */
+	/** Clé de cache `api()`. Passer un getter `() => ...` pour qu'un changement (invalidation après édition admin) recharge les facettes. */
 	apiKey: string | (() => string);
 	buildParams: () => URLSearchParams;
 	facets: Record<K, FacetDef>;
@@ -63,9 +62,7 @@ export function useFacets<K extends string>(config: FacetsConfig<K>) {
 		typeof config.apiKey === 'function' ? config.apiKey() : config.apiKey;
 	let lastKey: string | undefined;
 
-	// Recharge les facettes quand la clé d'API change (invalidation après
-	// édition/fusion admin). `apiKey` doit être un getter pour être suivi ;
-	// la garde `lastKey` évite un double-chargement au montage.
+	// Recharge les facettes quand la clé d'API change (invalidation après édition/fusion admin). `apiKey` doit être un getter pour être suivi ; la garde `lastKey` évite un double-chargement au montage.
 	$effect(() => {
 		const key = currentKey();
 		if (lastKey !== undefined && key !== lastKey) load();
