@@ -160,9 +160,7 @@
 	.docs-sidebar .section-title {
 		display: block;
 	}
-	/* Active sur un FlatPage top-level : la spécificité du sélecteur niveau 1
-	   ci-dessus bat `.docs-sidebar a.active` ; il faut donc re-spécifier la
-	   couleur blanche pour que le fond accent reste lisible. */
+	/* Active sur un FlatPage top-level : la spécificité du sélecteur niveau 1 ci-dessus bat `.docs-sidebar a.active` ; il faut re-spécifier la couleur blanche pour que le fond accent reste lisible. */
 	.docs-sidebar > ul > li:not(.section) > a.active {
 		color: white;
 	}
@@ -172,8 +170,7 @@
 		margin-top: 6px;
 		padding-top: 6px;
 	}
-	/* Children d'une Section : indentés, plus petits. Couleur héritée de
-	   `.docs-sidebar a` pour ne pas écraser `a.active` (qui passe en blanc). */
+	/* Children d'une Section : indentés, plus petits. Couleur héritée de `.docs-sidebar a` pour ne pas écraser `a.active` (qui passe en blanc). */
 	.docs-sidebar li.section > ul > li > a {
 		padding-left: 22px;
 		font-size: 0.88rem;
@@ -224,8 +221,7 @@
 	.doc-content :global(a[data-glossary]:hover) {
 		color: var(--accent);
 	}
-	/* Images de doc : adaptation auto à la largeur du contenant + clic-pour-agrandir
-	   (lightbox géré par <ImageLightbox />). */
+	/* Images de doc : adaptation auto à la largeur du contenant + clic-pour-agrandir (lightbox géré par <ImageLightbox />). */
 	.doc-content :global(img) {
 		max-width: 100%;
 		height: auto;
