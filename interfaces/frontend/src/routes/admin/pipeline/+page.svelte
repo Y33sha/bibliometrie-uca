@@ -14,8 +14,7 @@
   let wasRunning = false;
 
   const PAGE_SIZE = 50;
-  // Cadence de suivi : serrée tant qu'un run tourne (phase courante et
-  // avancement à la seconde), relâchée à l'arrêt (rien à observer).
+  // Cadence de suivi : serrée tant qu'un run tourne (phase courante et avancement à la seconde), relâchée à l'arrêt (rien à observer).
   const STATUS_POLL_RUNNING_MS = 1000;
   const STATUS_POLL_IDLE_MS = 10000;
 
@@ -34,8 +33,7 @@
       pipelineStatus = null;
     }
     const running = pipelineStatus !== null;
-    // Transition fin de run (naturelle, exception ou interruption) : le ruban
-    // fraîchement enregistré n'apparaît qu'au rechargement de la liste.
+    // Transition fin de run (naturelle, exception ou interruption) : le ruban fraîchement enregistré n'apparaît qu'au rechargement de la liste.
     if (wasRunning && !running) {
       await loadRuns();
       if (selectedRunId !== null) await selectRun(selectedRunId);
