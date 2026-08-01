@@ -15,10 +15,7 @@
  * | …    | …           |
  * ```
  *
- * Le slug de chaque entrée est dérivé du terme par `makeAnchor` (même convention
- * GitHub que les ancres de titres) : le lien `#slug` fonctionne dans l'UI comme sur
- * GitHub sans marqueur d'ancre explicite. Le contenu de chaque entrée s'étend
- * jusqu'au prochain `## ` (ou la fin du fichier).
+ * Le slug de chaque entrée est dérivé du terme par `makeAnchor` (même convention GitHub que les ancres de titres) : le lien `#slug` fonctionne dans l'UI comme sur GitHub sans marqueur d'ancre explicite. Le contenu de chaque entrée s'étend jusqu'au prochain `## ` (ou la fin du fichier).
  *
  * L'index est utilisé par `<GlossaryPopover />` pour afficher la définition d'un terme au clic sur un lien `[[slug]]` ailleurs dans la doc.
  */
@@ -41,8 +38,7 @@ export function buildGlossary(base: string): Record<string, GlossaryEntry> {
 	const content = readDocFile('glossaire');
 	const entries: Record<string, GlossaryEntry> = {};
 
-	// Sépare le contenu en blocs commençant par "## " en début de ligne.
-	// Le premier bloc avant le premier `##` (typiquement le h1 + intro) est ignoré.
+	// Sépare le contenu en blocs commençant par "## " en début de ligne. Le premier bloc avant le premier `##` (typiquement le h1 + intro) est ignoré.
 	const blocks = content.split(/(?=^##\s)/m);
 	for (const block of blocks) {
 		const firstLineEnd = block.indexOf('\n');
@@ -52,8 +48,7 @@ export function buildGlossary(base: string): Record<string, GlossaryEntry> {
 		const term = m[1].trim();
 		const slug = makeAnchor(term);
 		const body = firstLineEnd >= 0 ? block.slice(firstLineEnd + 1).trim() : '';
-		// `parseMarkdown` renvoie aussi un titre et une TOC mais on n'en a pas l'usage ici —
-		// seul le HTML rendu compte pour le popover.
+		// `parseMarkdown` renvoie aussi un titre et une TOC mais on n'en a pas l'usage ici — seul le HTML rendu compte pour le popover.
 		const { html } = parseMarkdown(body, base, 'glossaire');
 		entries[slug] = { term, html };
 	}
