@@ -16,8 +16,7 @@
 	let sortCol: "acronym" | "name" | "tutelles" = $state("acronym");
 	let sortAsc = $state(true);
 
-	// Options de la facette « tutelles » : tutelles distinctes de tous les labos, avec le nombre de
-	// labos rattachés, triées par fréquence décroissante.
+	// Options de la facette « tutelles » : tutelles distinctes de tous les labos, avec le nombre de labos rattachés, triées par fréquence décroissante.
 	const tutelleOptions = $derived.by(() => {
 		const byId = new Map<string, { text: string; count: number }>();
 		for (const lab of labs) {
@@ -84,8 +83,7 @@
 	}
 
 	onMount(async () => {
-		// Les types affiches suivent la configuration : la page demande ce qu'elle montre,
-		// et la route des structures ne filtre rien d'elle-meme.
+		// Les types affichés suivent la configuration : la page demande ce qu'elle montre, et la route des structures ne filtre rien d'elle-même.
 		const config = await api<ConfigItem[]>("/api/config");
 		const displayTypes = (config.find((c) => c.key === "laboratories_display_types")?.value ?? [
 			"labo"

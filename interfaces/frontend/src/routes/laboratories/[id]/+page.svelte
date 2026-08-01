@@ -70,8 +70,7 @@
 	const partenaires = $derived(parents.filter((p) => p.relation_type === 'est_partenaire_de'));
 
 
-	// `useUrlFilters` ne gère ici que les keys cross-onglets (tab, addresses).
-	// Les filtres publications/thèses/personnes sont gérés par leurs ListView.
+	// `useUrlFilters` ne gère ici que les keys cross-onglets (tab, addresses). Les filtres publications/thèses/personnes sont gérés par leurs ListView.
 	const url = useUrlFilters({
 		basePath: () => `/laboratories/${labId}`,
 		filters: {
@@ -123,8 +122,7 @@
 	}
 
 	function onTabSwitch(tab: string) {
-		// Les onglets "publications" et "theses" sont gérés par leurs ListView
-		// respectives, qui chargent leurs données dans leur propre onMount.
+		// Les onglets "publications" et "theses" sont gérés par leurs ListView respectives, qui chargent leurs données dans leur propre onMount.
 		if (tab === 'dashboard') loadDashboard();
 		if (tab === 'addresses' && !addrLoaded) loadAddresses();
 	}
@@ -132,8 +130,7 @@
 	onMount(async () => {
 		canGoBack = ((window as any).navigation?.canGoBack ?? document.referrer.startsWith(window.location.origin));
 
-		// Restore cross-tab state from URL (les filtres publications sont
-		// restaurés par PublicationsListView lui-même).
+		// Restore cross-tab state from URL (les filtres publications sont restaurés par PublicationsListView lui-même).
 		const restored = url.restoreFromUrl($page.url.searchParams);
 		if (restored.addrPage) addrPage = restored.addrPage as number;
 
@@ -408,9 +405,7 @@
 		background: var(--card);
 		border: 1px solid var(--border);
 		border-radius: 6px;
-		/* pas d'overflow: hidden → le dropdown ColumnMenu peut déborder
-		   sous la dernière ligne sans être clippé. Les coins arrondis
-		   restent visuellement corrects grâce à border-collapse. */
+		/* pas d'overflow: hidden → le dropdown ColumnMenu peut déborder sous la dernière ligne sans être clippé. Les coins arrondis restent visuellement corrects grâce à border-collapse. */
 	}
 	.tab-content thead th {
 		background: var(--surface);
