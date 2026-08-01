@@ -60,9 +60,7 @@ describe('useDebouncedSearch', () => {
 	});
 
 	it('ignore une réponse obsolète si une nouvelle query est partie', async () => {
-		// Les deux fetchs partent (debounce dépassé pour les deux), mais le 1er
-		// est plus lent. Le 2e arrive avant et doit être conservé ; le 1er est
-		// ignoré quand il finit.
+		// Les deux fetchs partent (debounce dépassé pour les deux), mais le 1er est plus lent. Le 2e arrive avant et doit être conservé ; le 1er est ignoré quand il finit.
 		const responses: Record<string, Promise<string[]>> = {};
 		const search = vi.fn((q: string) => responses[q]);
 

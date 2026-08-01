@@ -90,8 +90,7 @@ describe('parseMarkdown — ancres dérivées du texte (parité GitHub)', () => 
 	});
 
 	it('traite un marqueur {#…} comme du texte littéral, sans ancre custom', () => {
-		// Comme sur GitHub : `{#slug}` n'est pas une syntaxe d'ancre, il est
-		// rendu tel quel et compte dans le slug auto-généré.
+		// Comme sur GitHub : `{#slug}` n'est pas une syntaxe d'ancre, il est rendu tel quel et compte dans le slug auto-généré.
 		const { toc, html } = parseMarkdown('## Foo {#bar}', BASE, 'test');
 		expect(toc[0].anchor).toBe('foo-bar');
 		expect(html).toContain('<h2 id="foo-bar">');

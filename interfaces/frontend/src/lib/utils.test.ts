@@ -11,8 +11,7 @@ import {
 } from './utils';
 
 // ── esc (HTML escaping) ────────────────────────────────────────
-// esc() utilise document.createElement, non testable sans DOM.
-// Seul le cas null/undefined est testé ici.
+// esc() utilise document.createElement, non testable sans DOM. Seul le cas null/undefined est testé ici.
 
 describe('esc', () => {
 	it('retourne une chaîne vide pour null/undefined', () => {
