@@ -1,8 +1,7 @@
 /**
  * Types partagés par la page `admin/persons` et ses sous-composants.
  *
- * Les types de réponses API proviennent du schéma OpenAPI généré
- * (`$lib/api/schema.ts`) ; seuls les états d'UI locaux restent définis ici.
+ * Les types de réponses API proviennent du schéma OpenAPI généré (`$lib/api/schema.ts`) ; seuls les états d'UI locaux restent définis ici.
  */
 
 import type { components } from "$lib/api/schema";
@@ -19,9 +18,7 @@ export type PersonSearchResult = components["schemas"]["PersonSearchResult"];
 type NameFormAuthorshipRef = components["schemas"]["NameFormAuthorshipRef"];
 
 /**
- * Publication regroupant toutes ses sources observées sous une même forme de
- * nom. Le rejet porte sur la publication entière (toutes ses sources), donc la
- * modale affiche une ligne par publication, pas par source.
+ * Publication regroupant toutes ses sources observées sous une même forme de nom. Le rejet porte sur la publication entière (toutes ses sources) : la modale affiche une ligne par publication, pas par source.
  */
 export interface DetachPublication {
   pub_id: number;

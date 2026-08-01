@@ -3,10 +3,7 @@ import { confirmDialog } from "$lib/dialogs.svelte";
 import { titleCase } from "$lib/utils";
 
 /**
- * Confirmation avant fusion de deux personnes. Signale le nombre de publications
- * réattribuées (celles de la personne absorbée, `sourceId`) et le caractère
- * irréversible de l'action. Récupère le compte à jour depuis l'API pour rester
- * exact quel que soit le point d'appel.
+ * Confirmation avant fusion de deux personnes. Signale le nombre de publications réattribuées (celles de la personne absorbée, `sourceId`) et le caractère irréversible de l'action. Récupère le compte à jour depuis l'API pour rester exact quel que soit le point d'appel.
  */
 export async function confirmMerge(sourceId: number): Promise<boolean> {
   const p = await api<{ last_name: string; first_name: string; signature_count: number }>(

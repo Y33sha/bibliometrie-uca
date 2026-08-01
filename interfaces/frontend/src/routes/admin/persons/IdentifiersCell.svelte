@@ -160,8 +160,7 @@
     font-family: "SF Mono", SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
     font-size: 0.72rem;
   }
-  /* Identifiant authentifié par le chercheur : statut protégé, aucune action —
-     le bouclier remplace les boutons confirmer/rejeter. */
+  /* Identifiant authentifié par le chercheur : statut protégé, aucune action — le bouclier remplace les boutons confirmer/rejeter. */
   .authenticated-badge {
     display: inline-flex;
     align-items: center;

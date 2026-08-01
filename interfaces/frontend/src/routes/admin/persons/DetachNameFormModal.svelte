@@ -120,9 +120,7 @@
     background: #f5f5f5;
   }
   .detach-item input[type="checkbox"] {
-    /* Annule le `.modal-content input { width: 100% }` global qui étirait la case
-       sur toute la largeur et écrasait le titre. Marges à 0 (sauf le top) pour aligner
-       sur la case « tout cocher » (`.checkbox-row input { margin: 0 }`). */
+    /* Annule le `.modal-content input { width: 100% }` global qui étirerait la case sur toute la largeur et écraserait le titre. Marges à 0 (sauf le top) pour aligner sur la case « tout cocher » (`.checkbox-row input { margin: 0 }`). */
     width: auto;
     flex-shrink: 0;
     margin: 2px 0 0;

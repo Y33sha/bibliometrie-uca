@@ -40,8 +40,7 @@
     window.scrollTo(0, 0);
   }
 
-  // Détacher l'intrus = rejeter sa forme de nom pour cette personne (verrou de non-retour
-  // + détachement effectif des signatures).
+  // Détacher l'intrus = rejeter sa forme de nom pour cette personne (verrou de non-retour + détachement effectif des signatures).
   async function detach(personId: number, nameForm: string) {
     acting = true;
     error = "";
