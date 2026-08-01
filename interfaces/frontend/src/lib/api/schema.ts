@@ -649,7 +649,7 @@ export interface paths {
          * List Structures
          * @description Liste des structures, filtrable par types, par texte libre et par appartenance au périmètre.
          *
-         *     `structure_type` accepte plusieurs valeurs de l'énumération `structure_type` séparées par des virgules. `search` : matching accent-insensible sur nom / acronyme / code. `in_perimeter` restreint aux structures du périmètre `persons`, clôture comprise : la page publique des laboratoires s'en sert, avec les types que sa configuration lui donne. Tri canonique par type (labo > universite > onr > chu > ecole > site > autre) puis nom.
+         *     `structure_type` accepte plusieurs valeurs de l'énumération `structure_type` séparées par des virgules. `search` : matching accent-insensible sur nom / acronyme / code. `in_perimeter` restreint aux structures du périmètre `persons`, clôture comprise : la page publique des laboratoires s'en sert, avec les types que sa configuration lui donne. L'ordre de la liste n'est pas garanti : les consommateurs trient à l'affichage.
          */
         get: operations["list_structures_api_structures_get"];
         put?: never;
@@ -2326,8 +2326,7 @@ export interface components {
     schemas: {
         /** AddIdentifier */
         AddIdentifier: {
-            /** Id Type */
-            id_type: string;
+            id_type: components["schemas"]["PersonIdentifierType"];
             /** Id Value */
             id_value: string;
         };
@@ -2568,6 +2567,21 @@ export interface components {
              */
             force: boolean;
         };
+        /**
+         * AttributionStatus
+         * @description Statut d'une attribution `PersonIdentifier ↔ Person`.
+         *
+         *     Mappe sur l'enum Postgres `identifier_status`. `StrEnum` garde la valeur sérialisable telle quelle vers SQL et API.
+         *
+         *     Transitions valides :
+         *     - `PENDING → CONFIRMED` (validation) ou `→ REJECTED` (rejet)
+         *     - `CONFIRMED → REJECTED` (rejet d'une attribution validée)
+         *     - `REJECTED → PENDING` lors d'une réattribution à une autre personne (seule transition portée par une méthode du domaine, `PersonIdentifier.reattribute_to` ; les autres passent par `update_identifier_status`, validées par l'enum Postgres).
+         *
+         *     `AUTHENTICATED` est un statut à part : il atteste que le chercheur a lui-même authentifié son ORCID en se connectant à son compte. Seul un ORCID peut le porter. C'est le statut le plus fort et le seul immuable : un trigger Postgres interdit d'en sortir (aucune dégradation, même par l'admin) et de le poser hors de l'import dédié des ORCID authentifiés. Il ne participe à aucune transition applicative.
+         * @enum {string}
+         */
+        AttributionStatus: "pending" | "confirmed" | "rejected" | "authenticated";
         /**
          * AuthCheckResponse
          * @description Résultat de la vérification de session : `authenticated` dit si la requête porte une session valide.
@@ -3359,9 +3373,9 @@ export interface components {
             /** Total Publications */
             total_publications: number;
             /** Doc Types */
-            doc_types: components["schemas"]["application__ports__api__journals_queries__DocTypeCount"][];
+            doc_types: components["schemas"]["application__ports__read_models__journals_queries__DocTypeCount"][];
             /** Oa Statuses */
-            oa_statuses: components["schemas"]["application__ports__api__journals_queries__OaStatusCount"][];
+            oa_statuses: components["schemas"]["application__ports__read_models__journals_queries__OaStatusCount"][];
             /** Expected Doc Types */
             expected_doc_types: string[];
             /** Expected Oa Statuses */
@@ -3388,8 +3402,7 @@ export interface components {
             pub_name: string | null;
             /** Is In Doaj */
             is_in_doaj: boolean;
-            /** Journal Type */
-            journal_type: ("journal" | "proceedings" | "repository" | "book_series" | "ebook_platform" | "preprint_server" | "media" | "unknown") | null;
+            journal_type: components["schemas"]["JournalType"] | null;
             /** Pub Count */
             pub_count: number;
             /** Doaj Url */
@@ -3402,8 +3415,7 @@ export interface components {
             apc_amount: number | null;
             /** Apc Currency */
             apc_currency: string | null;
-            /** Oa Model */
-            oa_model: ("subscription" | "full_oa" | "repository") | null;
+            oa_model: components["schemas"]["OaModel"] | null;
             /** Is Academic */
             is_academic: boolean | null;
             /** Doi Prefix */
@@ -3436,8 +3448,7 @@ export interface components {
             pub_name: string | null;
             /** Is In Doaj */
             is_in_doaj: boolean;
-            /** Journal Type */
-            journal_type: ("journal" | "proceedings" | "repository" | "book_series" | "ebook_platform" | "preprint_server" | "media" | "unknown") | null;
+            journal_type: components["schemas"]["JournalType"] | null;
             /** Pub Count */
             pub_count: number;
             /** Doaj Url */
@@ -3457,15 +3468,17 @@ export interface components {
             readonly pages: number;
         };
         /**
+         * JournalType
+         * @description Type de support de publication — les membres portent les libellés de l'enum PostgreSQL `journal_type`.
+         * @enum {string}
+         */
+        JournalType: "journal" | "proceedings" | "repository" | "book_series" | "ebook_platform" | "preprint_server" | "media" | "unknown";
+        /**
          * JournalTypeChange
          * @description Valeur de `journal_type` dont la modale admin demande l'impact avant de confirmer l'édition.
          */
         JournalTypeChange: {
-            /**
-             * Journal Type
-             * @enum {string}
-             */
-            journal_type: "journal" | "proceedings" | "repository" | "book_series" | "ebook_platform" | "preprint_server" | "media" | "unknown";
+            journal_type: components["schemas"]["JournalType"];
         };
         /**
          * JournalTypeChangeImpact
@@ -3504,10 +3517,8 @@ export interface components {
             issnl?: string | null;
             /** Doi Prefix */
             doi_prefix?: string | null;
-            /** Oa Model */
-            oa_model?: ("subscription" | "full_oa" | "repository") | null;
-            /** Journal Type */
-            journal_type?: ("journal" | "proceedings" | "repository" | "book_series" | "ebook_platform" | "preprint_server" | "media" | "unknown") | null;
+            oa_model?: components["schemas"]["OaModel"] | null;
+            journal_type?: components["schemas"]["JournalType"] | null;
             /** Is Academic */
             is_academic?: boolean | null;
             /** Is In Doaj */
@@ -3706,6 +3717,12 @@ export interface components {
             /** Requires Context Of */
             requires_context_of?: number[] | null;
         };
+        /**
+         * OaModel
+         * @description Modèle OA d'un journal — les membres portent les libellés de l'enum PostgreSQL `oa_model`.
+         * @enum {string}
+         */
+        OaModel: "subscription" | "full_oa" | "repository";
         /**
          * OkResponse
          * @description Réponse minimale d'acquittement (pas de données).
@@ -3923,12 +3940,14 @@ export interface components {
             id_value: string;
             /** Source */
             source: string;
-            /**
-             * Status
-             * @enum {string}
-             */
-            status: "pending" | "confirmed" | "rejected" | "authenticated";
+            status: components["schemas"]["AttributionStatus"];
         };
+        /**
+         * PersonIdentifierType
+         * @description Type d'un identifiant de personne, valeur de `person_identifiers.id_type`. `hal_person_id` est l'identifiant interne HAL, conservé pour la dédup cross-source mais jamais exposé en UI.
+         * @enum {string}
+         */
+        PersonIdentifierType: "orcid" | "idhal" | "idref" | "hal_person_id";
         /** PersonListResponse */
         PersonListResponse: {
             /** Total */
@@ -3977,28 +3996,6 @@ export interface components {
             identifiers: components["schemas"]["PersonIdentifierOut"][];
         };
         /**
-         * PersonProfileAuthor
-         * @description Auteur source dans `/api/persons/{id}` (vue publique enrichie).
-         */
-        PersonProfileAuthor: {
-            /** Id */
-            id: number;
-            /** Source */
-            source: string;
-            /** Full Name */
-            full_name: string | null;
-            /** Orcid */
-            orcid: string | null;
-            /** Idhal */
-            idhal: string | null;
-            /** Hal Person Id */
-            hal_person_id: number | null;
-            /** Openalex Id */
-            openalex_id: string | null;
-            /** In Perimeter Signature Count */
-            in_perimeter_signature_count: number;
-        };
-        /**
          * PersonProfileCore
          * @description Bloc `person` de `/api/persons/{id}`.
          */
@@ -4023,8 +4020,6 @@ export interface components {
             person: components["schemas"]["PersonProfileCore"];
             /** Identifiers */
             identifiers: components["schemas"]["PersonIdentifierOut"][];
-            /** Authors */
-            authors: components["schemas"]["PersonProfileAuthor"][];
             /** Theses Count */
             theses_count: number;
         };
@@ -4497,9 +4492,9 @@ export interface components {
             /** Journal Types */
             journal_types: components["schemas"]["JournalTypeCount"][];
             /** Doc Types */
-            doc_types: components["schemas"]["application__ports__api__publishers_queries__DocTypeCount"][];
+            doc_types: components["schemas"]["application__ports__read_models__publishers_queries__DocTypeCount"][];
             /** Oa Statuses */
-            oa_statuses: components["schemas"]["application__ports__api__publishers_queries__OaStatusCount"][];
+            oa_statuses: components["schemas"]["application__ports__read_models__publishers_queries__OaStatusCount"][];
         };
         /**
          * PublisherListItem
@@ -4547,6 +4542,12 @@ export interface components {
             blocking_journals: components["schemas"]["BlockingJournalItem"][];
         };
         /**
+         * PublisherType
+         * @description Type d'éditeur — les membres portent les libellés de l'enum PostgreSQL `publisher_type`.
+         * @enum {string}
+         */
+        PublisherType: "commercial" | "learned_society" | "academic_institution" | "repository" | "aggregator" | "unknown";
+        /**
          * PublisherUpdate
          * @description Champs éditables d'un éditeur, en modification sélective.
          *
@@ -4557,8 +4558,7 @@ export interface components {
             name?: string | null;
             /** Country */
             country?: string | null;
-            /** Publisher Type */
-            publisher_type?: string | null;
+            publisher_type?: components["schemas"]["PublisherType"] | null;
         };
         /**
          * PublishersFacetsResponse
@@ -4655,8 +4655,7 @@ export interface components {
             parent_id: number;
             /** Child Id */
             child_id: number;
-            /** Relation Type */
-            relation_type: string;
+            relation_type: components["schemas"]["StructureRelationType"];
         };
         /**
          * RemovedResponse
@@ -4880,8 +4879,7 @@ export interface components {
             name: string;
             /** Acronym */
             acronym?: string | null;
-            /** Type */
-            type: string;
+            type: components["schemas"]["StructureType"];
             /** Ror Id */
             ror_id?: string | null;
             /** Rnsr Id */
@@ -5002,6 +5000,12 @@ export interface components {
             /** Status */
             status?: string | null;
         };
+        /**
+         * StructureRelationType
+         * @description Type d'une arête du graphe `structure_relations` (colonne texte `relation_type`). `EST_TUTELLE_DE` porte la hiérarchie parent → enfant, dont la clôture récursive définit le périmètre ; `EST_PARTENAIRE_DE` relie deux structures sans les inclure dans le périmètre l'une de l'autre.
+         * @enum {string}
+         */
+        StructureRelationType: "est_tutelle_de" | "est_partenaire_de";
         /** StructureTopCountry */
         StructureTopCountry: {
             /** Code */
@@ -5011,14 +5015,21 @@ export interface components {
             /** Count */
             count: number;
         };
+        /**
+         * StructureType
+         * @description Type d'une structure de recherche / d'enseignement.
+         *
+         *     Mappe sur l'enum Postgres `structure_type`. `StrEnum` garde la valeur sérialisable telle quelle vers SQL et API.
+         * @enum {string}
+         */
+        StructureType: "universite" | "chu" | "ecole" | "labo" | "equipe" | "site" | "onr" | "admin" | "autre";
         /** StructureUpdate */
         StructureUpdate: {
             /** Name */
             name?: string | null;
             /** Acronym */
             acronym?: string | null;
-            /** Type */
-            type?: string | null;
+            type?: components["schemas"]["StructureType"] | null;
             /** Ror Id */
             ror_id?: string | null;
             /** Rnsr Id */
@@ -5196,7 +5207,7 @@ export interface components {
          *
          *     `expected` est vrai si ce `doc_type` figure parmi les valeurs attendues pour le `journal_type` de la revue (`domain.journals.expected`), ce qui laisse le frontend signaler les autres.
          */
-        application__ports__api__journals_queries__DocTypeCount: {
+        application__ports__read_models__journals_queries__DocTypeCount: {
             /** Doc Type */
             doc_type: string | null;
             /** Count */
@@ -5210,7 +5221,7 @@ export interface components {
          *
          *     `expected` est vrai si ce `oa_status` figure parmi les valeurs attendues pour le `oa_model` de la revue (`domain.journals.expected`).
          */
-        application__ports__api__journals_queries__OaStatusCount: {
+        application__ports__read_models__journals_queries__OaStatusCount: {
             /** Oa Status */
             oa_status: string | null;
             /** Count */
@@ -5222,7 +5233,7 @@ export interface components {
          * DocTypeCount
          * @description Compteur de publications par `doc_type` pour un éditeur.
          */
-        application__ports__api__publishers_queries__DocTypeCount: {
+        application__ports__read_models__publishers_queries__DocTypeCount: {
             /** Doc Type */
             doc_type: string | null;
             /** Count */
@@ -5232,7 +5243,7 @@ export interface components {
          * OaStatusCount
          * @description Compteur de publications par `oa_status` pour un éditeur.
          */
-        application__ports__api__publishers_queries__OaStatusCount: {
+        application__ports__read_models__publishers_queries__OaStatusCount: {
             /** Oa Status */
             oa_status: string | null;
             /** Count */

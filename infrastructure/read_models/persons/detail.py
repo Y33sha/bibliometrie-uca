@@ -1,7 +1,6 @@
-"""Détail d'une personne (sync) : profil et auteurs liés, thèses encadrées, adresses, sujets, dashboard Open Access."""
+"""Détail d'une personne (sync) : profil, thèses encadrées, adresses, sujets, dashboard Open Access."""
 
 import datetime
-from typing import Any
 
 from sqlalchemy import Connection, text
 
@@ -16,7 +15,6 @@ from application.ports.read_models.persons_queries import (
     PersonAddressOut,
     PersonAddressStruct,
     PersonDashboardResponse,
-    PersonProfileAuthor,
     PersonProfileCore,
     PersonProfileResponse,
     PersonThesesResponse,
@@ -30,21 +28,8 @@ from infrastructure.read_models.filters import OA_DASHBOARD_COLS_SQL, entity_sub
 from infrastructure.read_models.persons.identifiers import public_identifiers
 
 
-def _profile_author(row: Any) -> PersonProfileAuthor:
-    return PersonProfileAuthor(
-        id=row.id,
-        source=row.source,
-        full_name=row.full_name,
-        orcid=row.orcid,
-        idhal=row.idhal,
-        hal_person_id=row.hal_person_id,
-        openalex_id=row.openalex_id,
-        in_perimeter_signature_count=row.in_perimeter_signature_count,
-    )
-
-
 def person_profile(conn: Connection, person_id: int) -> PersonProfileResponse | None:
-    """Profil public : infos + identifiants + auteurs liés."""
+    """Profil public : infos + identifiants."""
     person_row = conn.execute(
         text("""
             SELECT p.id, p.last_name, p.first_name,
@@ -59,59 +44,6 @@ def person_profile(conn: Connection, person_id: int) -> PersonProfileResponse | 
     if not person_row:
         return None
     identifiers = public_identifiers(conn, [person_id], include_rejected=False).get(person_id, [])
-
-    # Reconstitution des « comptes HAL » depuis `source_authorships`, agrégés par hal_person_id (1 row par compte). MIN() sur les champs descriptifs : arbitraire mais déterministe, en théorie constants pour un même hal_person_id.
-    hal_rows = conn.execute(
-        text(f"""
-            SELECT MIN(sa.id) AS id,
-                   '{Source.HAL.value}' AS source,
-                   MIN(sa.raw_author_name) AS full_name,
-                   MIN(aik.person_identifiers->>'orcid') AS orcid,
-                   MIN(aik.person_identifiers->>'idhal') AS idhal,
-                   (aik.person_identifiers->>'hal_person_id')::int AS hal_person_id,
-                   NULL::text AS openalex_id,
-                   COUNT(*) FILTER (WHERE sa.in_perimeter = TRUE) AS in_perimeter_signature_count
-            FROM source_authorships sa
-            JOIN author_identifying_keys aik ON aik.id = sa.identity_id
-            WHERE sa.source = '{Source.HAL.value}'
-              AND sa.person_id = :pid
-              AND aik.person_identifiers->>'hal_person_id' IS NOT NULL
-            GROUP BY aik.person_identifiers->>'hal_person_id'
-        """),
-        {"pid": person_id},
-    ).all()
-
-    oa_rows = conn.execute(
-        text(f"""
-            SELECT MIN(sa.id) AS id,
-                   sa.raw_author_name AS full_name,
-                   '{Source.OPENALEX.value}' AS source,
-                   NULL::text AS orcid, NULL::text AS idhal,
-                   NULL::int AS hal_person_id, NULL::text AS openalex_id,
-                   COUNT(*) FILTER (WHERE sa.in_perimeter = TRUE) AS in_perimeter_signature_count
-            FROM source_authorships sa
-            WHERE sa.source = '{Source.OPENALEX.value}' AND sa.person_id = :pid
-            GROUP BY sa.raw_author_name
-        """),
-        {"pid": person_id},
-    ).all()
-
-    # WoS : group by raw_author_name comme OpenAlex. ORCID lu depuis l'identité de la signature (`author_identifying_keys.person_identifiers`).
-    wos_rows = conn.execute(
-        text(f"""
-            SELECT MIN(sa.id) AS id,
-                   sa.raw_author_name AS full_name,
-                   '{Source.WOS.value}' AS source,
-                   MAX(aik.person_identifiers->>'orcid') AS orcid,
-                   NULL::text AS idhal, NULL::int AS hal_person_id, NULL::text AS openalex_id,
-                   COUNT(*) FILTER (WHERE sa.in_perimeter = TRUE) AS in_perimeter_signature_count
-            FROM source_authorships sa
-            JOIN author_identifying_keys aik ON aik.id = sa.identity_id
-            WHERE sa.source = '{Source.WOS.value}' AND sa.person_id = :pid
-            GROUP BY sa.raw_author_name
-        """),
-        {"pid": person_id},
-    ).all()
 
     theses_count_row = conn.execute(
         text(f"""
@@ -137,7 +69,6 @@ def person_profile(conn: Connection, person_id: int) -> PersonProfileResponse | 
             end_date=person_row.end_date,
         ),
         identifiers=identifiers,
-        authors=[_profile_author(r) for r in (*hal_rows, *oa_rows, *wos_rows)],
         theses_count=theses_count_row.n,
     )
 

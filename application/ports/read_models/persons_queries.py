@@ -170,23 +170,9 @@ class PersonProfileCore(BaseModel):
     end_date: date | None
 
 
-class PersonProfileAuthor(BaseModel):
-    """Auteur source dans `/api/persons/{id}` (vue publique enrichie)."""
-
-    id: int
-    source: str
-    full_name: str | None
-    orcid: str | None
-    idhal: str | None
-    hal_person_id: int | None
-    openalex_id: str | None
-    in_perimeter_signature_count: int
-
-
 class PersonProfileResponse(BaseModel):
     person: PersonProfileCore
     identifiers: list[PersonIdentifierOut]
-    authors: list[PersonProfileAuthor]
     theses_count: int
 
 
