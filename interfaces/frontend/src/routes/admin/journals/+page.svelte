@@ -16,8 +16,7 @@
 	let journalTypes: EnumOption[] = $state([]);
 	let oaModels: EnumOption[] = $state([]);
 
-	// Clé d'API utilisée pour invalider le cache de JournalsListView après
-	// une édition ou fusion (force un reload via incrément).
+	// Clé d'API utilisée pour invalider le cache de JournalsListView après une édition ou fusion (force un reload via incrément).
 	let viewVersion = $state(0);
 	const apiKey = $derived(`admin-journals-${viewVersion}`);
 	function reload() { viewVersion += 1; }
@@ -121,11 +120,7 @@
 
 	async function doMerge(sourceId: number) {
 		if (!mergeTargetId) return;
-		// Prévisualiser la requalification : fusionner dans un journal d'un autre
-		// type re-dérive le doc_type des publications absorbées contre le type de la
-		// cible (cf. merge_journals). Compte exact via le même endpoint que le
-		// changement de type, appliqué au journal source avec le type de la cible
-		// (count = 0 si même type → pas de confirmation).
+		// Prévisualiser la requalification : fusionner dans un journal d'un autre type re-dérive le doc_type des publications absorbées contre le type de la cible (cf. merge_journals). Compte exact via le même endpoint que le changement de type, appliqué au journal source avec le type de la cible (count = 0 si même type → pas de confirmation).
 		try {
 			const impact = await journalsApi.typeChangeImpact(sourceId, mergeTargetType);
 			if (impact.count > 0) {
