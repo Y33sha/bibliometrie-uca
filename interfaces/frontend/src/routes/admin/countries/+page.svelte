@@ -34,8 +34,7 @@
 		{ value: 'yes', text: 'Avec pays' },
 		{ value: 'no', text: 'Sans pays' },
 	];
-	// Code du référentiel marquant l'absence de pays : la facette l'ouvre, c'est l'arbitrage
-	// le plus fréquent et le seul qui ne se cherche pas par son nom.
+	// Code du référentiel marquant l'absence de pays : la facette l'ouvre, c'est l'arbitrage le plus fréquent et le seul qui ne se cherche pas par son nom.
 	const NO_COUNTRY_CODE = 'xx';
 	let countryFacets: { value: string; count: number }[] = $state([]);
 	const countryOptions = $derived.by(() => {
@@ -156,10 +155,7 @@
 	let sugFacetOptions: FacetOption[] = $state([]);
 	let selectedSugCountry: string[] = $state([]);
 
-	// Vrai ssi au moins un filtre est actif. Garde l'« Ajouter à tout le filtre »
-	// (mêmes conditions que le body construit dans batchAddCountry) : sans filtre,
-	// l'action viserait toutes les adresses — le backend la refuse (400), on
-	// masque le bouton côté UI. Aligné sur le garde-fou serveur.
+	// Vrai ssi au moins un filtre est actif. Garde l'« Ajouter à tout le filtre » (mêmes conditions que le body construit dans batchAddCountry) : sans filtre, l'action viserait toutes les adresses — le backend la refuse (400), on masque le bouton côté UI. Aligné sur le garde-fou serveur.
 	const hasActiveFilter = $derived(
 		search.trim() !== '' ||
 			selectedHasCountry.length === 1 ||
