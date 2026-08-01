@@ -12,8 +12,7 @@
 
   const subjectId = $derived(Number($page.params.id));
 
-  // Onglet actif synchronisé avec `?tab=...` (graphe par défaut). TabNav
-  // gère lui-même la lecture de l'URL et la navigation via goto.
+  // Onglet actif synchronisé avec `?tab=...` (graphe par défaut). TabNav gère lui-même la lecture de l'URL et la navigation via goto.
   const activeTab = $derived(
     $page.url.searchParams.get("tab") === "publications" ? "publications" : "graph",
   );
@@ -24,8 +23,7 @@
   let data = $state<SubjectDetailResponse | null>(null);
   let loading = $state(false);
   let error = $state(false);
-  // Compteur incrémenté à chaque appel : on ignore les réponses obsolètes
-  // si l'utilisateur a re-cliqué entre-temps.
+  // Compteur incrémenté à chaque appel : on ignore les réponses obsolètes si l'utilisateur a re-cliqué entre-temps.
   let requestId = 0;
 
   async function loadFor(id: number, limit: number, min: number) {
