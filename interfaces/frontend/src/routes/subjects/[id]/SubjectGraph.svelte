@@ -20,8 +20,7 @@
   let container: HTMLDivElement | undefined = $state();
   let network: Network | undefined;
 
-  /** Palette identique à SubjectsCloud, pour cohérence visuelle entre le
-   *  nuage et le graphe. Couleur stable par sujet via hash de l'id. */
+  /** Palette identique à SubjectsCloud, pour cohérence visuelle entre le nuage et le graphe. Couleur stable par sujet via hash de l'id. */
   const PALETTE = ["#075985", "#0369a1", "#7c3aed", "#9333ea", "#be123c", "#b45309"];
   function colorFor(id: number): string {
     return PALETTE[id % PALETTE.length];
@@ -42,9 +41,7 @@
     return minSize + t * (maxSize - minSize);
   }
 
-  /** Wrap un label sur les espaces (jamais en milieu de mot).
-   *  vis-network respecte les `\n` dans les labels ; on précalcule les
-   *  retours à la ligne plutôt que de laisser `widthConstraint` couper. */
+  /** Wrap un label sur les espaces (jamais en milieu de mot). vis-network respecte les `\n` dans les labels ; on précalcule les retours à la ligne plutôt que de laisser `widthConstraint` couper. */
   function wrapLabel(label: string, maxCharsPerLine = 18): string {
     const words = label.split(/\s+/).filter(Boolean);
     if (words.length === 0) return label;
@@ -66,18 +63,14 @@
    *
    *      spec = cooc / usage_neighbor
    *
-   *  C'est la fraction des publications du voisin qui touchent au sujet
-   *  central. Asymétrique, dévalorise les sujets ubiquitous (ex un parent
-   *  très large a peu de spécificité côté lui-même), qui sont alors
-   *  relégués à la périphérie du graphe sans être filtrés.
+   *  C'est la fraction des publications du voisin qui touchent au sujet central. Asymétrique, dévalorise les sujets omniprésents (ex. un parent très large a peu de spécificité côté lui-même), qui sont alors relégués à la périphérie du graphe sans être filtrés.
    *
    *  Échelle log pour ne pas écraser les faibles spécificités. */
   function edgeLength(spec: number, minSpec: number, maxSpec: number): number {
     const minLen = 120;
     const maxLen = 500;
     if (maxSpec === minSpec) return (minLen + maxLen) / 2;
-    // log(0) → −∞, on ajoute un epsilon ; on a déjà spec > 0 puisque
-    // cooc >= min_cooccurrence >= 1 et usage > 0.
+    // log(0) → −∞, on ajoute un epsilon ; on a déjà spec > 0 puisque cooc >= min_cooccurrence >= 1 et usage > 0.
     const eps = 1e-6;
     const t =
       (Math.log(spec + eps) - Math.log(minSpec + eps)) /
@@ -87,14 +80,11 @@
 
 
   function buildData(): { nodes: Node[]; edges: Edge[] } {
-    // Min/max sur tous les nœuds visibles (centre + voisins) pour calibrer
-    // les tailles relativement au graphe courant.
+    // Min/max sur tous les nœuds visibles (centre + voisins) pour calibrer les tailles relativement au graphe courant.
     const allUsages = [subject.usage_count, ...neighbors.map((n) => n.usage_count)];
     const minUsage = Math.min(...allUsages);
     const maxUsage = Math.max(...allUsages);
-    // Texte nu : la couleur vient de la palette stable par id (mêmes
-    // règles que SubjectsCloud) ; le centre est agrandi pour rester
-    // identifiable une fois la physique figée.
+    // Texte nu : la couleur vient de la palette stable par id (mêmes règles que SubjectsCloud) ; le centre est agrandi pour rester identifiable une fois la physique figée.
     const fontFor = (id: number, usageCount: number, isCenter: boolean) => ({
       size: nodeFontSize(usageCount, minUsage, maxUsage) + (isCenter ? 6 : 0),
       color: colorFor(id),
@@ -135,9 +125,7 @@
   function buildOptions(): Options {
     return {
       nodes: {
-        // Texte nu, sans cercle ni rectangle : aligne visuellement le
-        // graphe avec le nuage de mots du dashboard. Les arêtes
-        // connectent au centre du label.
+        // Texte nu, sans cercle ni rectangle : aligne visuellement le graphe avec le nuage de mots du dashboard. Les arêtes connectent au centre du label.
         shape: "text",
       },
       edges: {
@@ -189,10 +177,7 @@
       const clickedId = Number(params.nodes[0]);
       if (clickedId !== subject.id) onSelect(clickedId);
     });
-    // Une fois la physique stabilisée : recentre + désactive la physique pour
-    // figer le graphe (les nœuds restent draggables manuellement, mais plus
-    // de rebond infini). vis-network réactive la physique à un drag, on la
-    // re-coupe à la fin via le bus d'événements.
+    // Une fois la physique stabilisée : recentre + désactive la physique pour figer le graphe (les nœuds restent draggables manuellement, sans rebond infini). vis-network réactive la physique à un drag, on la re-coupe à la fin via le bus d'événements.
     network.once("stabilizationIterationsDone", () => {
       network?.fit({ animation: false });
       network?.setOptions({ physics: { enabled: false } });
