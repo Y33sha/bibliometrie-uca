@@ -36,10 +36,7 @@
 		$state(null);
 
 	/**
-	 * Exécute une réassignation en interceptant le 409 « paire déjà rejetée » :
-	 * ouvre la modale de confirmation avec une closure qui rejoue l'opération
-	 * en `force=true` (lève le rejet puis réassigne). Les autres erreurs
-	 * remontent normalement.
+	 * Exécute une réassignation en interceptant le 409 « paire déjà rejetée » : ouvre la modale de confirmation avec une closure qui rejoue l'opération en `force=true` (lève le rejet puis réassigne). Les autres erreurs remontent normalement.
 	 */
 	async function withRejectGuard(run: (force: boolean) => Promise<void>) {
 		try {
