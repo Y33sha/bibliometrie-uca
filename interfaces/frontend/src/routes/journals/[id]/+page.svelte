@@ -30,10 +30,7 @@
 	let subjects = $state<SubjectFrequency[]>([]);
 	let dashboardLoaded = $state(false);
 
-	// Distributions en segments pour les doughnuts ; `expected=false` (valeur
-	// inattendue pour le type de revue / modèle OA) est signalé visuellement
-	// par le composant (couleur d'alerte + ⚠ en légende), sans énumérer les
-	// valeurs attendues.
+	// Distributions en segments pour les doughnuts ; `expected=false` (valeur inattendue pour le type de revue / modèle OA) est signalé visuellement par le composant (couleur d'alerte + ⚠ en légende), sans énumérer les valeurs attendues.
 	const docTypeSegments = $derived(
 		(dashboard?.doc_types ?? []).map((d) => ({
 			label: d.doc_type ? (docTypeSingular[d.doc_type] ?? d.doc_type) : '(non renseigné)',
@@ -54,9 +51,7 @@
 
 	let journalTypeLabels: Record<string, string> = $state({});
 
-	// Sélection des champs DOAJ « lisibles ». Le payload complet est exposé
-	// via le toggle (« Voir payload brut ») pour permettre l'exploration
-	// au-delà de cette sélection.
+	// Sélection des champs DOAJ « lisibles ». Le payload complet est exposé via le toggle (« Voir payload brut ») pour permettre l'exploration au-delà de cette sélection.
 	const READABLE_DOAJ_FIELDS: { key: string; label: string }[] = [
 		{ key: 'Journal license', label: 'Licence' },
 		{ key: 'Country of publisher', label: 'Pays' },
