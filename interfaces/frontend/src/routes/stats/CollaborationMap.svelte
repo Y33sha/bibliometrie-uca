@@ -14,15 +14,12 @@
 
 	type CollaborationsResponse = components['schemas']['CollaborationsResponse'];
 
-	// Fraction du corpus filtré à laquelle l'échelle de couleur sature (teinte la plus foncée). En
-	// indexant le maximum sur la taille du corpus plutôt que sur le pays le plus collaborateur, les
-	// collaborations d'un ensemble peu ouvert restent claires au lieu de saturer. À régler ici.
+	// Fraction du corpus filtré à laquelle l'échelle de couleur sature (teinte la plus foncée). En indexant le maximum sur la taille du corpus plutôt que sur le pays le plus collaborateur, les collaborations d'un ensemble peu ouvert restent claires plutôt que de saturer. À régler ici.
 	const SCALE_MAX_SHARE = 0.5;
 
 	let { params = '' }: { params?: string } = $props();
 
-	// Arrondit un maximum d'échelle à une borne lisible : centaine supérieure au-delà de 100, dizaine
-	// supérieure en deçà. Plancher à 10 pour un corpus minuscule.
+	// Arrondit un maximum d'échelle à une borne lisible : centaine supérieure au-delà de 100, dizaine supérieure en deçà. Plancher à 10 pour un corpus minuscule.
 	function niceCeil(value: number): number {
 		if (value <= 10) return 10;
 		const step = value < 100 ? 10 : 100;
@@ -35,8 +32,7 @@
 	let internationalCount = $state(0);
 	let pctLabel = $state('');
 
-	// Géométrie du monde : convertie une fois depuis le TopoJSON vers des entités GeoJSON. Les entités
-	// sont indexées par code ISO 3166-1 numérique (`feature.id`), d'où le mapping alpha-2 → numérique.
+	// Géométrie du monde : convertie une fois depuis le TopoJSON vers des entités GeoJSON. Les entités sont indexées par code ISO 3166-1 numérique (`feature.id`), d'où le mapping alpha-2 → numérique.
 	const topology = world as unknown as Topology;
 	const features = (
 		topoFeature(topology, topology.objects.countries) as unknown as {
@@ -52,8 +48,7 @@
 
 	async function render(query: string) {
 		const res = await api<CollaborationsResponse>('/api/stats/collaborations?' + query);
-		// Décomptes indexés par code numérique (comparaison sur `Number`, pour ignorer les zéros de
-		// tête : `alpha2ToNumeric` renvoie « 004 » là où la carte porte « 4 »).
+		// Décomptes indexés par code numérique (comparaison sur `Number`, pour ignorer les zéros de tête : `alpha2ToNumeric` renvoie « 004 » là où la carte porte « 4 »).
 		const byNumeric = new Map<number, number>();
 		for (const row of res.rows) {
 			const numeric = iso.alpha2ToNumeric(row.code.toUpperCase());
@@ -67,13 +62,11 @@
 				})
 			: '0';
 
-		// Échelle de couleur : départ à 0, graduations entières, maximum proportionnel à la taille du
-		// corpus filtré et arrondi à une borne lisible.
+		// Échelle de couleur : départ à 0, graduations entières, maximum proportionnel à la taille du corpus filtré et arrondi à une borne lisible.
 		const colorMax = niceCeil(res.total_count * SCALE_MAX_SHARE);
 
 		const labels = features.map((f) => frenchName(String(f.id), f.properties.name));
-		// Les pays sans collaboration reçoivent `null` : la couleur « missing » (neutre) les distingue
-		// du dégradé, qui ne s'applique qu'aux pays effectivement co-affiliés.
+		// Les pays sans collaboration reçoivent `null` : la couleur « missing » (neutre) les distingue du dégradé, qui ne s'applique qu'aux pays effectivement co-affiliés.
 		const data = features.map((f) => ({ feature: f, value: byNumeric.get(Number(f.id)) ?? null }));
 
 		if (chart) chart.destroy();
