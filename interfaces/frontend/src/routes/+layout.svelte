@@ -153,13 +153,7 @@
   :global(*, *::before, *::after) {
     box-sizing: border-box;
   }
-  /* Socle uniforme des champs `type="search"` (sémantique correcte, et évite que
-     les gestionnaires de mots de passe les prennent pour des champs de connexion).
-     On retire l'apparence native du navigateur — forme « pilule », bouton
-     d'effacement — et on reproduit le champ texte standard de l'application.
-     `:where()` donne une spécificité nulle : ce socle s'applique aux barres de
-     recherche nues sans écraser les champs volontairement stylés (inputs de
-     fusion thémés, recherche du composant Picker). */
+  /* Socle uniforme des champs `type="search"` (sémantique correcte, et évite que les gestionnaires de mots de passe les prennent pour des champs de connexion). On retire l'apparence native du navigateur — forme « pilule », bouton d'effacement — et on reproduit le champ texte standard de l'application. `:where()` donne une spécificité nulle : ce socle s'applique aux barres de recherche nues sans écraser les champs volontairement stylés (inputs de fusion thémés, recherche du composant Picker). */
   :global(:where(input[type="search"])) {
     appearance: none;
     -webkit-appearance: none;
@@ -194,10 +188,7 @@
     height: var(--header-height);
     position: sticky;
     top: 0;
-    /* Au-dessus des dropdowns de page (facettes, filtres d'entité… tous à z-index 100) :
-       la navigation globale reste toujours visible, y compris quand un panneau déployé
-       recouvre la zone d'en-tête sur un viewport scrollable. Les surcouches modales
-       (dialogues, tooltips, lightbox) restent volontairement au-dessus (z-index ≥ 1000). */
+    /* Au-dessus des dropdowns de page (facettes, filtres d'entité… tous à z-index 100) : la navigation globale reste toujours visible, y compris quand un panneau déployé recouvre la zone d'en-tête sur un viewport scrollable. Les surcouches modales (dialogues, tooltips, lightbox) restent volontairement au-dessus (z-index ≥ 1000). */
     z-index: 300;
   }
   .site-header.admin {
@@ -349,8 +340,7 @@
     }
     .site-nav.open {
       display: flex;
-      /* Sur écran court, le menu déplié peut dépasser le bas du viewport :
-         on borne sa hauteur et on le rend défilable pour atteindre le bas. */
+      /* Sur écran court, le menu déplié peut dépasser le bas du viewport : on borne sa hauteur et on le rend défilable pour atteindre le bas. */
       max-height: calc(100vh - var(--header-height));
       overflow-y: auto;
     }
