@@ -38,8 +38,7 @@
 	// Label FR du publisher_type, affiché dans l'en-tête de la page.
 	let publisherTypeLabels: Record<string, string> = $state({});
 
-	// Distributions en segments pour les doughnuts (palette neutre ; pas de
-	// notion d'« attendu » au niveau éditeur, agrégat multi-revues).
+	// Distributions en segments pour les doughnuts (palette neutre ; pas de notion d'« attendu » au niveau éditeur, agrégat multi-revues).
 	const docTypeSegments = $derived(
 		(dashboard?.doc_types ?? []).map((d) => ({
 			label: d.doc_type ? (docTypeSingular[d.doc_type] ?? d.doc_type) : '(non renseigné)',
