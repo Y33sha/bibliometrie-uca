@@ -31,8 +31,7 @@
 		urlSync?: boolean;
 		basePath?: string;
 		perPage?: number;
-		/** Si true, n'expose que les éditeurs avec ≥ 1 publication rattachée
-		 *  (mode page publique, masque les orphelines). Défaut false = admin. */
+		/** Si true, n'expose que les éditeurs avec ≥ 1 publication rattachée (mode page publique, masque les orphelines). Défaut false = admin. */
 		withPubs?: boolean;
 		/** Snippet rendu dans la colonne actions (1 row → 1 cell). */
 		actionCell?: Snippet<[Publisher]>;
@@ -71,8 +70,7 @@
 	const facets = useFacets({
 		endpoint: '/api/publishers/facets',
 		apiKey: () => `${apiKey}-facets`,
-		// Inclut le terme de recherche pour que les comptes de facettes suivent le
-		// champ de recherche (comme la liste).
+		// Inclut le terme de recherche pour que les comptes de facettes suivent le champ de recherche (comme la liste).
 		buildParams() {
 			const params = buildFilterParams();
 			const q = search.trim();

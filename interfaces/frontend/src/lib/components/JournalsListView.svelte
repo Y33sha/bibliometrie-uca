@@ -39,14 +39,11 @@
 		urlSync?: boolean;
 		basePath?: string;
 		perPage?: number;
-		/** Si true, n'expose que les revues avec ≥ 1 publication rattachée
-		 *  (mode page publique, masque les orphelines). Défaut false = admin. */
+		/** Si true, n'expose que les revues avec ≥ 1 publication rattachée (mode page publique, masque les orphelines). Défaut false = admin. */
 		withPubs?: boolean;
-		/** Masque la colonne Éditeur (utile sur `publishers/[id]?tab=journals`
-		 *  où toutes les lignes ont le même éditeur). */
+		/** Masque la colonne Éditeur (utile sur `publishers/[id]?tab=journals` où toutes les lignes ont le même éditeur). */
 		hidePublisherColumn?: boolean;
-		/** Snippet rendu dans la colonne actions (1 row → 1 cell). Si fourni,
-		 *  une colonne Actions est ajoutée à droite du tableau. */
+		/** Snippet rendu dans la colonne actions (1 row → 1 cell). Si fourni, une colonne Actions est ajoutée à droite du tableau. */
 		actionCell?: Snippet<[Journal]>;
 		/** En-tête de la colonne actions (vide par défaut, comme admin). */
 		actionColumnHeader?: string;
@@ -67,8 +64,7 @@
 		}
 		if (selectedJournalTypes.length) params.set('journal_type', selectedJournalTypes.join(','));
 		if (selectedOaModels.length) params.set('oa_model', selectedOaModels.join(','));
-		// DOAJ : un seul ['true'] / ['false'] est interprétable côté API
-		// (bool unique). Les autres cas (vide, ou les 2) = pas de filtre.
+		// DOAJ : un seul ['true'] / ['false'] est interprétable côté API (bool unique). Les autres cas (vide, ou les 2) = pas de filtre.
 		if (selectedDoaj.length === 1) params.set('is_in_doaj', selectedDoaj[0]);
 		if (withPubs) params.set('with_pubs', 'true');
 		return params;
@@ -92,8 +88,7 @@
 	const facets = useFacets({
 		endpoint: '/api/journals/facets',
 		apiKey: () => `${apiKey}-facets`,
-		// Inclut le terme de recherche pour que les comptes de facettes suivent le
-		// champ de recherche (comme la liste).
+		// Inclut le terme de recherche pour que les comptes de facettes suivent le champ de recherche (comme la liste).
 		buildParams() {
 			const params = buildFilterParams();
 			const q = search.trim();

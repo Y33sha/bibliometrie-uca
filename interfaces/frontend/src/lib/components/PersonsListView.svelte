@@ -77,8 +77,7 @@
 	const facets = useFacets({
 		endpoint: '/api/persons/facets',
 		apiKey: () => `${apiKey}-facets`,
-		// Inclut le terme de recherche pour que les comptes de facettes suivent le
-		// champ de recherche (comme l'annuaire).
+		// Inclut le terme de recherche pour que les comptes de facettes suivent le champ de recherche (comme l'annuaire).
 		buildParams() {
 			const params = buildFilterParams();
 			const q = search.trim();
