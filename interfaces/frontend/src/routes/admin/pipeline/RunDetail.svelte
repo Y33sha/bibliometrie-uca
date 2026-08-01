@@ -18,13 +18,11 @@
 
   let { detail, allPhases }: { detail: RunDetail; allPhases: string[] } = $props();
 
-  // Une ligne de phase déroule soit ses métriques (clic sur la ligne), soit son
-  // log (clic sur le bouton « log ») ; jamais les deux à la fois.
+  // Une ligne de phase déroule soit ses métriques (clic sur la ligne), soit son log (clic sur le bouton « log ») ; jamais les deux à la fois.
   let expanded = $state<{ phase: string; kind: "metrics" | "log" } | null>(null);
   let logs = $state<Record<string, PhaseLog | "loading">>({});
 
-  // Le composant est réutilisé d'un run à l'autre : réinitialiser l'ouverture et
-  // le cache de logs (indexé par phase, mais propre au run) au changement de run.
+  // Le composant est réutilisé d'un run à l'autre : réinitialiser l'ouverture et le cache de logs (indexé par phase, mais propre au run) au changement de run.
   $effect(() => {
     detail.run_id;
     expanded = null;
@@ -476,8 +474,7 @@
     padding: 1px 8px;
     border: 1px solid var(--border);
     border-radius: 4px;
-    /* Fond blanc opaque : le bouton reste blanc même quand la ligne est
-       survolée ou dépliée (le fond de survol de la ligne ne transparaît pas). */
+    /* Fond blanc opaque : le bouton reste blanc même quand la ligne est survolée ou dépliée (le fond de survol de la ligne ne transparaît pas). */
     background: var(--card);
     color: var(--muted);
     cursor: pointer;
@@ -509,9 +506,7 @@
     font-family: "JetBrains Mono", monospace;
     font-size: 0.75rem;
     line-height: 1.45;
-    /* Largeur constante : les longues lignes wrappent à l'intérieur (indentation
-       préservée), les tokens interminables (URLs) sont cassés, aucun débordement
-       horizontal qui élargirait la colonne de détail. */
+    /* Largeur constante : les longues lignes wrappent à l'intérieur (indentation préservée), les tokens interminables (URLs) sont cassés, aucun débordement horizontal qui élargirait la colonne de détail. */
     white-space: pre-wrap;
     overflow-wrap: anywhere;
   }

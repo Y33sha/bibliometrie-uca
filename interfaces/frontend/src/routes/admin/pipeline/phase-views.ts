@@ -1,22 +1,14 @@
 /**
  * Présentation des indicateurs sur-mesure par phase.
  *
- * La couche données (`details` en base) reste neutre : clés techniques, chiffres,
- * et valeurs métier (noms de Registration Agency, statuts OA…). Les libellés et la
- * mise en forme vivent ici, ce qui les rend modifiables sans relancer le pipeline
- * (et donc rétroactifs sur les anciens runs).
+ * La couche données (`details` en base) reste neutre : clés techniques, chiffres, et valeurs métier (noms de Registration Agency, statuts OA…). Les libellés et la mise en forme vivent ici, ce qui les rend modifiables sans relancer le pipeline, rétroactivement sur les runs déjà enregistrés.
  *
  * Conventions d'affichage, combinables sur une même phase :
  * - `summary` : une liste verticale de métriques indépendantes (`details.summary`).
- * - `matrix` : un croisé qui arrange des chiffres plats de `details.summary` en
- *   lignes × colonnes (chaque cellule = `summary[`${row.key}_${col.key}`]`). Pur
- *   agencement de présentation : la donnée en base reste les chiffres plats.
- * - `tables` : un ou plusieurs tableaux, chacun alimenté par `details[source].rows`
- *   (chaque ligne porte une `key`, premier en-tête de colonne). Un tableau s'ajuste
- *   à son contenu plutôt que d'occuper toute la largeur.
+ * - `matrix` : un croisé qui arrange des chiffres plats de `details.summary` en lignes × colonnes (chaque cellule = `summary[`${row.key}_${col.key}`]`). Pur agencement de présentation : la donnée en base reste les chiffres plats.
+ * - `tables` : un ou plusieurs tableaux, chacun alimenté par `details[source].rows` (chaque ligne porte une `key`, premier en-tête de colonne). Un tableau s'ajuste à son contenu plutôt que d'occuper toute la largeur.
  *
- * Une phase sans entrée ici retombe sur l'affichage générique des compteurs
- * `PhaseMetrics` (total / new / updated / unchanged / errors / extras).
+ * Une phase sans entrée ici retombe sur l'affichage générique des compteurs `PhaseMetrics` (total / new / updated / unchanged / errors / extras).
  */
 
 export type SummaryItem = { key: string; label: string };
@@ -32,11 +24,9 @@ export type TableColumn = {
 export type TableView = {
   // Clé dans `details` portant `{ rows: [...] }`.
   source: string;
-  // En-tête de la première colonne (les `key` des lignes). Vide pour une matrice
-  // dont les lignes sont elles-mêmes des en-têtes.
+  // En-tête de la première colonne (les `key` des lignes). Vide pour une matrice dont les lignes sont elles-mêmes des en-têtes.
   firstColumnLabel: string;
-  // Libellés d'affichage des `key` techniques des lignes. Clé absente → `key` brute.
-  // Garde la donnée en base neutre tout en présentant des intitulés lisibles.
+  // Libellés d'affichage des `key` techniques des lignes. Clé absente → `key` brute. Garde la donnée en base neutre tout en présentant des intitulés lisibles.
   rowLabels?: Record<string, string>;
   columns: TableColumn[];
   total?: boolean;
@@ -48,8 +38,7 @@ export type MatrixView = {
 };
 export type PhaseView = {
   summary?: SummaryItem[];
-  // Lignes de texte libres ; chaque `{clé}` est remplacé par `summary[clé]`. Pour les
-  // phases dont le résumé se lit mieux en phrases qu'en couples libellé/valeur.
+  // Lignes de texte libres ; chaque `{clé}` est remplacé par `summary[clé]`. Pour les phases dont le résumé se lit mieux en phrases qu'en couples libellé/valeur.
   lines?: string[];
   matrix?: MatrixView;
   tables?: TableView[];
