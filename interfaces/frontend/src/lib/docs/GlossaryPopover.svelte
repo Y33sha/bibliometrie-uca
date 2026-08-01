@@ -8,7 +8,7 @@
 	 * - Fermeture sur Esc, clic ailleurs, ou scroll de la page (la position devient incorrecte).
 	 * - Lien « Voir dans le glossaire → » en bas du popover pour les définitions longues / riches que l'utilisateur veut consulter en plein.
 	 *
-	 * MVP volontairement minimal : positionnement basique sous le lien target, pas de flip/collision (à ajouter avec Floating UI si nécessaire plus tard).
+	 * Positionnement basique sous le lien cible : pas de détection de collision ni de repositionnement.
 	 */
 	import { page } from '$app/stores';
 	import { base } from '$app/paths';
