@@ -48,8 +48,7 @@
 	font-family: inherit;
 }
 
-/* Un bouton dans une barre d'outils s'aligne sur le gabarit des champs/
-   dropdowns voisins (même hauteur). `.btn-sm` reste petit volontairement. */
+/* Un bouton dans une barre d'outils s'aligne sur le gabarit des champs/dropdowns voisins (même hauteur). `.btn-sm` reste petit volontairement. */
 .toolbar .btn:not(.btn-sm) {
 	padding: 6px 10px;
 	font-size: 0.95rem;
@@ -79,9 +78,7 @@
 	overflow-x: auto;
 }
 
-/* En petit écran, on borne la hauteur pour que la barre de scroll horizontale
-   reste dans le viewport (sinon elle est tout en bas d'un tableau long), et on
-   fige les en-têtes pendant le scroll vertical interne. */
+/* En petit écran, on borne la hauteur pour que la barre de scroll horizontale reste dans le viewport (sinon elle est tout en bas d'un tableau long), et on fige les en-têtes pendant le scroll vertical interne. */
 @media (max-width: 760px) {
 	.table-scroll {
 		max-height: 75vh;
@@ -127,7 +124,7 @@
 	background: var(--card);
 	border: 1px solid var(--border);
 	border-radius: 6px;
-	/* overflow: hidden supprimé — clippait les dropdowns positionnés en absolute */
+	/* Pas d'overflow: hidden : clipperait les dropdowns positionnés en absolute. */
 }
 
 .data-table thead tr:first-child th:first-child {
@@ -312,17 +309,12 @@ th.sorted .sort-arrow {
 }
 
 /* ── Pub table column widths ── */
-/* width: 100% sur le th = idiome HTML table « cette colonne absorbe
-   tout le restant ». Combiné avec width: 1px sur Revue (shrink) et
-   widths fixes sur les autres, le titre prend la place résiduelle. */
+/* width: 100% sur le th = idiome HTML table « cette colonne absorbe tout le restant » : les autres colonnes gardent leur largeur, le titre prend la place résiduelle. */
 .pub-col-title {
 	width: 100%;
 }
 
-/* Min-width : `width` seul est une simple hint en table-layout: auto et la
-   colonne Titre (width: 100%) la grignotait jusqu'à la min-content-width
-   (4 lignes pour « Journal of High Energy Physics » sur 56px). `min-width`
-   est la seule contrainte que l'auto-layout respecte vraiment. */
+/* Min-width : `width` seul est une simple hint en table-layout: auto et la colonne Titre (width: 100%) la grignoterait jusqu'à la min-content-width (4 lignes pour « Journal of High Energy Physics » sur 56px). `min-width` est la seule contrainte que l'auto-layout respecte vraiment. */
 .pub-col-journal {
 	font-size: 0.9em;
 	min-width: 180px;
@@ -965,8 +957,7 @@ th.sorted .sort-arrow {
 }
 
 /* ── Page détail publication : sections plates + rangées de tags ──
-   Plutôt qu'un encadré bordé par section (effet « boîtes empilées »), des sections plates
-   séparées par un filet fin : petit label gris capitales + contenu. */
+   Sections plates séparées par un filet fin : petit label gris capitales + contenu. */
 .detail-section {
 	padding: 14px 2px;
 	border-top: 1px solid var(--border-subtle);
@@ -1004,8 +995,7 @@ th.sorted .sort-arrow {
 	background: var(--section-heading-light);
 	color: var(--section-heading);
 }
-/* Sous-titre d'une section (ex. « Mots-clés libres », type de relation) : même teal que le titre,
-   plus petit, subordonné. */
+/* Sous-titre d'une section (ex. « Mots-clés libres », type de relation) : même teal que le titre, plus petit, subordonné. */
 .detail-sublabel {
 	font-size: 0.8rem;
 	font-weight: 600;
@@ -1052,8 +1042,7 @@ button.status-chip {
 button.status-chip:hover {
 	filter: brightness(0.97);
 }
-/* Bouton icône carré ; compose avec .btn + une variante outline
-   (.btn-confirm-outline / .btn-danger-outline). */
+/* Bouton icône carré ; compose avec .btn + une variante outline (.btn-confirm-outline / .btn-danger-outline). */
 .btn-icon-sm {
 	width: 22px;
 	height: 22px;
@@ -1064,8 +1053,7 @@ button.status-chip:hover {
 	line-height: 1;
 }
 
-/* Bouton bascule de statut ✓ (.confirm) / ✗ (.reject), carré.
-   Inactif grisé, actif coloré discret (texte + bordure), rempli au survol. */
+/* Bouton bascule de statut ✓ (.confirm) / ✗ (.reject), carré. Inactif grisé, actif coloré discret (texte + bordure), rempli au survol. */
 .toggle-btn {
 	display: inline-flex;
 	align-items: center;
@@ -1102,8 +1090,7 @@ button.status-chip:hover {
 	color: #fff;
 }
 
-/* Colonne de contrôles (boutons ✓/✗ ou tag « nom ») à gauche d'une puce,
-   largeur fixe pour aligner verticalement les puces entre les lignes. */
+/* Colonne de contrôles (boutons ✓/✗ ou tag « nom ») à gauche d'une puce, largeur fixe pour aligner verticalement les puces entre les lignes. */
 .chip-controls {
 	display: inline-flex;
 	align-items: center;
