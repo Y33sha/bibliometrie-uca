@@ -32,8 +32,7 @@
     ...sources.filter((s) => !SOURCE_ORDER.includes(s.source)),
   ]);
 
-  // Les formes secondaires convergées (pièces d'un jeu de données, versions, variantes) sont
-  // repliées : un jeu de données rattachant chacun de ses fichiers en aligne des dizaines.
+  // Les formes secondaires convergées (pièces d'un jeu de données, versions, variantes) sont repliées : un jeu de données rattachant chacun de ses fichiers en aligne des dizaines.
   const primarySources = $derived(orderedSources.filter((s) => !s.is_secondary));
   const secondarySources = $derived(orderedSources.filter((s) => s.is_secondary));
 
@@ -41,9 +40,7 @@
 
   // Lien d'accès, dérivé (pas de champ URL unique en base) :
   //   closed / embargoed → aucun lien ; green → dépôt HAL ; sinon → DOI.
-  // Exception green : un DOI DataCite (Zenodo, figshare, arXiv…) pointe vers le
-  // dépôt réel ; le dépôt HAL correspondant est souvent une coquille vide, donc
-  // on préfère le DOI dans ce cas.
+  // Exception green : un DOI DataCite (Zenodo, figshare, arXiv…) pointe vers le dépôt réel ; le dépôt HAL correspondant est souvent une coquille vide : on préfère alors le DOI.
   const accessUrl = $derived.by(() => {
     const oa = pub.oa_status;
     if (oa === "closed" || oa === "embargoed") return null;
@@ -216,8 +213,7 @@
   .source-row:hover {
     background: var(--surface-hover);
   }
-  /* Le lien couvre toute la ligne : l'icône gonfle au survol de la ligne entière,
-     pas seulement au survol de l'icône. */
+  /* Le lien couvre toute la ligne : l'icône gonfle au survol de la ligne entière, pas seulement au survol de l'icône. */
   .source-row:hover :global(.source-tag) {
     transform: scale(1.15);
   }
@@ -228,8 +224,7 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  /* Groupe replié des sources secondaires (pièces / versions convergées) : discret, fermé par
-     défaut, mêmes lignes que les sources primaires une fois déplié. */
+  /* Groupe replié des sources secondaires (pièces / versions convergées) : discret, fermé par défaut, mêmes lignes que les sources primaires une fois déplié. */
   .secondary-sources {
     margin-top: 6px;
   }

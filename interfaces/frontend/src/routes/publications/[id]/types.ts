@@ -1,10 +1,7 @@
 /**
- * Types partagés par la page `publications/[id]` et ses sous-composants.
- * Co-localisés avec la route car ils ne sont pas réutilisés ailleurs.
+ * Types partagés par la page `publications/[id]` et ses sous-composants. Co-localisés avec la route car ils ne sont pas réutilisés ailleurs.
  *
- * Les types de réponse API sont alias des types générés depuis OpenAPI
- * (`$lib/api/schema`). `SourceRow` est propre au front (construit côté
- * client pour comparer les sources HAL/OA/WoS).
+ * Les types de réponse API sont alias des types générés depuis OpenAPI (`$lib/api/schema`). `SourceRow` est propre au front (construit côté client pour comparer les sources HAL/OA/WoS).
  */
 
 import type { components } from "$lib/api/schema";
