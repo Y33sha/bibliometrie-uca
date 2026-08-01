@@ -2,22 +2,25 @@
 	import { base } from '$app/paths';
 	import { sanitizeTitle, halDocUrl, scanrPubUrl, titleCase } from '$lib/utils';
 	import TableStatusRow from '$lib/components/TableStatusRow.svelte';
+	import type { components } from '$lib/api/schema';
 
-	export type ThesisRow = {
-		id: number;
-		title: string;
-		doc_type: string | null;
-		oa_status: string | null;
-		hal_id: string | null;
-		openalex_id: string | null;
-		scanr_id: string | null;
-		theses_id: string | null;
-		date_soutenance: string | null;
-		date_inscription: string | null;
-		thesis_author_name: string | null;
-		thesis_author_person_id: number | null;
-		lab_items?: { id: number; label: string }[] | null;
-	};
+	// Ligne servie par `/api/publications` (mode thèses) : le sous-ensemble de `PublicationListItem` que ce tableau consomme.
+	export type ThesisRow = Pick<
+		components['schemas']['PublicationListItem'],
+		| 'id'
+		| 'title'
+		| 'doc_type'
+		| 'oa_status'
+		| 'hal_id'
+		| 'openalex_id'
+		| 'scanr_id'
+		| 'theses_id'
+		| 'date_soutenance'
+		| 'date_inscription'
+		| 'thesis_author_name'
+		| 'thesis_author_person_id'
+		| 'lab_items'
+	>;
 
 	let {
 		items,

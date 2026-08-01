@@ -1,6 +1,10 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import { api } from '$lib/api';
+	import type { components } from '$lib/api/schema';
+
+	type EntityLabelResponse = components['schemas']['EntityLabelResponse'];
+	type EntityFacetResponse = components['schemas']['EntityFacetResponse'];
 
 	/** Facette d'entité à forte cardinalité (éditeur, revue) : recherche serveur **contextuelle**. Le parent fournit `buildParams` (les filtres actifs) ; le composant y ajoute le `kind` et le terme de recherche pour lister les N premières entités sous ces filtres, avec décompte.
 	 *
@@ -44,7 +48,7 @@
 		if (selectedId === resolvedId) return;
 		resolvedId = selectedId;
 		const id = selectedId;
-		api<{ label: string | null }>(`/api/entity-labels?kind=${kind}&entity_id=${id}`)
+		api<EntityLabelResponse>(`/api/entity-labels?kind=${kind}&entity_id=${id}`)
 			.then((d) => {
 				if (resolvedId === id) selectedLabel = d.label;
 			})
@@ -57,9 +61,7 @@
 		p.set('kind', kind);
 		if (query.trim().length >= 2) p.set('entity_search', query.trim());
 		try {
-			const data = await api<{ entities: { id: number; label: string; count: number }[] }>(
-				`${endpoint}/entities?` + p,
-			);
+			const data = await api<EntityFacetResponse>(`${endpoint}/entities?` + p);
 			results = data.entities.map((e) => ({ value: String(e.id), text: e.label, count: e.count }));
 		} catch {
 			results = [];
