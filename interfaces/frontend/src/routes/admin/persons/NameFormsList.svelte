@@ -18,8 +18,7 @@
     ) => void | Promise<void>;
   } = $props();
 
-  // Une forme dérivée du nom canonique (source 'persons') est confirmée d'office
-  // et le recompute la rétablirait : pas d'action de statut dessus.
+  // Une forme dérivée du nom canonique (source 'persons') est confirmée d'office et le recompute la rétablirait : pas d'action de statut dessus.
   function isCanonical(nf: NameForm): boolean {
     return nf.sources?.includes("persons") ?? false;
   }

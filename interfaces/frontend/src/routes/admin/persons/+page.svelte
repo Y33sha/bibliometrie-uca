@@ -98,9 +98,7 @@
 
   let detachModal: DetachModalState | null = $state(null);
 
-  // Drawer-personne : ouvert quand `?person=:id` est dans l'URL. La personne vient
-  // de la liste chargée si elle y est, sinon d'un fetch dédié (ouverture depuis une
-  // file de triage, où la liste maîtresse n'est pas chargée).
+  // Drawer-personne : ouvert quand `?person=:id` est dans l'URL. La personne vient de la liste chargée si elle y est, sinon d'un fetch dédié (ouverture depuis une file de triage, où la liste maîtresse n'est pas chargée).
   let selectedPersonId: number | null = $state(null);
   let fetchedPerson: Person | null = $state(null);
   const selectedPerson = $derived.by(() => {
@@ -367,8 +365,7 @@
 
   function selectTab(t: TabKey) {
     tab = t;
-    // Compteur « Doublons par nom » paresseux : sa détection (4 self-joins sur les personnes)
-    // coûte ~3 s, on ne la paie qu'à l'ouverture de l'onglet, pas au montage du hub.
+    // Compteur « Doublons par nom » paresseux : sa détection (4 self-joins sur les personnes) coûte ~3 s, on ne la paie qu'à l'ouverture de l'onglet, pas au montage du hub.
     if (t === "name-duplicates") loadNameDuplicateCount();
     updateUrl();
   }
@@ -406,8 +403,7 @@
     const data = await api<{ authorships: NameFormAuthorshipRef[]; other_persons: OtherPerson[] }>(
       `/api/persons/${personId}/name-form-authorships?name_form=${encodeURIComponent(nameForm)}`,
     );
-    // Le rejet porte sur la publication entière : on regroupe les sources par
-    // publication pour n'afficher qu'une ligne par publi.
+    // Le rejet porte sur la publication entière : on regroupe les sources par publication pour n'afficher qu'une ligne par publication.
     const byPub = new Map<number, DetachPublication>();
     for (const r of data.authorships) {
       let pub = byPub.get(r.publication_id);
@@ -433,8 +429,7 @@
       detachModal = null;
       return;
     }
-    // Une référence de source par publication suffit : le backend détache
-    // toutes les sources de la publication.
+    // Une référence de source par publication suffit : le backend détache toutes les sources de la publication.
     await personsApi.detachAuthorships(detachModal.personId, {
       authorships: toDetach.map((p) => p.sources[0]),
     });
@@ -513,8 +508,7 @@
     }
   }
 
-  // Rafraîchit la personne du drawer après une mutation, quand elle ne vient pas
-  // de la liste maîtresse (sinon `loadTable` s'en charge via le derived).
+  // Rafraîchit la personne du drawer après une mutation, quand elle ne vient pas de la liste maîtresse (sinon `loadTable` s'en charge via le derived).
   async function refreshSelected() {
     if (selectedPersonId !== null && !persons.some((p) => p.id === selectedPersonId)) {
       fetchedPerson = await api<Person>(`/api/persons/${selectedPersonId}/curation`);
@@ -540,8 +534,7 @@
     loadAmbiguousCount();
     loadIdentifierConflictCount();
     loadDetachableCount();
-    // Compteur « Doublons par nom » : seulement si l'onglet est l'onglet courant (restauré
-    // depuis l'URL) — sinon il se charge à l'ouverture de l'onglet (cf. `selectTab`).
+    // Compteur « Doublons par nom » : seulement si l'onglet est l'onglet courant (restauré depuis l'URL) — sinon il se charge à l'ouverture de l'onglet (cf. `selectTab`).
     if (tab === "name-duplicates") loadNameDuplicateCount();
     // Deep-link `?person=` vers une personne hors de la page courante.
     await refreshSelected();
