@@ -1,8 +1,7 @@
 /**
  * Types et helpers partagés par la page `admin/structures` et ses sous-composants.
  *
- * Les types de réponses API proviennent du schéma OpenAPI généré
- * (`$lib/api/schema.ts`) ; seuls les états d'UI locaux et helpers restent ici.
+ * Les types de réponses API proviennent du schéma OpenAPI généré (`$lib/api/schema.ts`) ; seuls les états d'UI locaux et helpers restent ici.
  */
 
 import type { components } from "$lib/api/schema";
@@ -34,9 +33,7 @@ export const API_SOURCE_LABELS: Record<string, string> = {
   theses: "theses.fr (PPN IdRef)",
 };
 
-// Longueur (caractères) au-dessous de laquelle une forme de nom exige une frontière de mot.
-// Alignée sur `domain.structures.name_forms.SHORT_FORM_MAX_LENGTH` (invariant verrouillé
-// côté base par une contrainte CHECK).
+// Longueur (caractères) au-dessous de laquelle une forme de nom exige une frontière de mot. Alignée sur `domain.structures.name_forms.SHORT_FORM_MAX_LENGTH` (invariant verrouillé côté base par une contrainte CHECK).
 export const SHORT_FORM_MAX_LENGTH = 6;
 
 // ── Helpers ──
