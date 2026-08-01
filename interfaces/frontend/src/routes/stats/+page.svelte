@@ -38,8 +38,7 @@
 
 	let chartCanvas: HTMLCanvasElement | undefined = $state();
 	let yearChart: Chart | null = null;
-	// Dernières lignes du pivot renvoyées par l'API : source du tracé, réutilisée par les contrôles
-	// d'affichage (mode, tri, page) qui re-tracent sans re-solliciter le serveur.
+	// Dernières lignes du pivot renvoyées par l'API : source du tracé, réutilisée par les contrôles d'affichage (mode, tri, page) qui re-tracent sans re-solliciter le serveur.
 	let pivotRows: Record<string, unknown>[] = [];
 	let initialYearsApplied = false;
 
@@ -50,25 +49,21 @@
 	let chartMode = $state<'absolu' | 'part'>('absolu'); // part = empilement aplati à 100 %
 	let chartPage = $state(1); // page de l'axe de comparaison à forte cardinalité (laboratoires)
 	let chartCatTotal = $state(0); // total des valeurs sur cet axe (0 si faible cardinalité)
-	// Tri de l'axe de comparaison. '' = ordre par défaut (total décroissant) ; sinon la valeur d'une
-	// série empilée (p. ex. 'ouvert') : les catégories sont classées par la part de cette série.
+	// Tri de l'axe de comparaison. '' = ordre par défaut (total décroissant) ; sinon la valeur d'une série empilée (p. ex. 'ouvert') : les catégories sont classées par la part de cette série.
 	let chartSort = $state('');
 	let chartSortDir = $state<'desc' | 'asc'>('desc');
 	// Séries proposées au sélecteur de tri, dérivées de l'empilement courant (mises à jour au tracé).
 	let sortableSeries = $state<{ value: string; label: string }[]>([]);
 	const CHART_PAGE_SIZE = 10;
 	let legendItems: { label: string; color: string }[] = $state([]);
-	// Le graphe par année est toujours le simple compte de publications (barres empilées). Le taux
-	// d'accès ouvert n'est pas une mesure : il se lit via le découpage par accès. Pas de sélecteur de mesure.
+	// Le graphe par année est toujours le simple compte de publications (barres empilées). Le taux d'accès ouvert n'est pas une mesure : il se lit via le découpage par accès. Pas de sélecteur de mesure.
 	const measure = 'pub_count';
 
-	// Entrée spéciale du sélecteur d'indicateur : remplace l'histogramme par la carte des
-	// collaborations internationales. Ce n'est pas une dimension du pivot, d'où les gardes dédiées.
+	// Entrée spéciale du sélecteur d'indicateur : remplace l'histogramme par la carte des collaborations internationales. Ce n'est pas une dimension du pivot, d'où les gardes dédiées.
 	const COLLAB_VIEW = 'collaborations';
 	const isCollab = $derived(primaryBy === COLLAB_VIEW);
 
-	// Groupement primaire : catégories à analyser, faible cardinalité, non ordinales (accès, voie,
-	// type). L'année ne se groupe pas (elle se compare) ; le laboratoire non plus (forte cardinalité).
+	// Groupement primaire : catégories à analyser, faible cardinalité, non ordinales (accès, voie, type). L'année ne se groupe pas (elle se compare) ; le laboratoire non plus (forte cardinalité).
 	const groupingDims = $derived(
 		pivotSchema
 			? pivotSchema.dimensions
@@ -79,15 +74,12 @@
 					)
 			: []
 	);
-	// Comparaison : les dimensions déclarées `comparable` (année et les entités à forte cardinalité
-	// — labo, éditeur, revue ; pas l'accès ni la voie, qui s'empilent), moins celle déjà prise comme
-	// groupement primaire.
+	// Comparaison : les dimensions déclarées `comparable` (année et les entités à forte cardinalité — labo, éditeur, revue ; pas l'accès ni la voie, qui s'empilent), moins celle déjà prise comme groupement primaire.
 	const comparableDims = $derived(
 		pivotSchema ? pivotSchema.dimensions.filter((d) => d.comparable && d.key !== primaryBy) : []
 	);
 
-	// Barre de facettes dérivée du registre `pivotSchema` : ensemble des dimensions filtrables, moins
-	// un groupement catégoriel déjà visible (l'année, ordinale, reste filtrable). Règle de présentation.
+	// Barre de facettes dérivée du registre `pivotSchema` : ensemble des dimensions filtrables, moins un groupement catégoriel déjà visible (l'année, ordinale, reste filtrable). Règle de présentation.
 	const facetKeys = $derived.by(() => {
 		if (!pivotSchema) return new Set(['year', 'lab', 'oa_voie', 'apc']);
 		// La carte des collaborations ne groupe sur rien : toutes les facettes filtrables restent offertes.
@@ -101,8 +93,7 @@
 		return out;
 	});
 
-	// Couleurs / libellés / ordre par dimension de découpage. Les valeurs OA réutilisent les
-	// variables CSS existantes ; les autres dimensions piochent dans une palette catégorielle.
+	// Couleurs / libellés / ordre par dimension de découpage. Les valeurs OA réutilisent les variables CSS existantes ; les autres dimensions piochent dans une palette catégorielle.
 	const OA_VOIE_ORDER = ['diamond', 'gold', 'hybrid', 'bronze', 'green', 'embargoed', 'closed', 'unknown'];
 	const OA_ACCESS_ORDER = ['ouvert', 'embargo', 'ferme', 'indetermine'];
 	const OA_ACCESS_LABELS: Record<string, string> = {
@@ -148,10 +139,7 @@
 		return [...totals.entries()].sort((a, b) => b[1] - a[1]).map(([v]) => v);
 	}
 
-	// Ordonne les catégories de l'axe `dim` par la part de la série `seriesValue` (lue sur `stackDim`)
-	// dans chaque catégorie : numérateur = valeur de cette série, dénominateur = total de la catégorie.
-	// Trier sur la part (et non la valeur brute) donne le classement « du plus au moins <série> »
-	// indépendamment de la taille de la catégorie, cohérent avec la vue en pourcentage.
+	// Ordonne les catégories de l'axe `dim` par la part de la série `seriesValue` (lue sur `stackDim`) dans chaque catégorie : numérateur = valeur de cette série, dénominateur = total de la catégorie. Trier sur la part (et non la valeur brute) donne le classement « du plus au moins <série> » indépendamment de la taille de la catégorie, cohérent avec la vue en pourcentage.
 	function orderBySeriesShare(
 		dim: string,
 		stackDim: string,
@@ -275,8 +263,7 @@
 		return base + '/publications?' + paramsToQuery(p);
 	});
 
-	// Filtres courants sérialisés : pilotent la carte des collaborations, qui suit les mêmes filtres
-	// que le graphe mais ignore l'axe, le mode et la pagination.
+	// Filtres courants sérialisés : pilotent la carte des collaborations, qui suit les mêmes filtres que le graphe mais ignore l'axe, le mode et la pagination.
 	const collabParams = $derived(chartParams().toString());
 
 	// --- Data loading ---
@@ -284,12 +271,9 @@
 		await Promise.all([loadChart(), facets.load()]);
 	}
 
-	// Récupère les lignes du pivot depuis l'API, puis délègue le tracé. La requête ne dépend que des
-	// filtres, du groupement primaire et de la comparaison ; les contrôles d'affichage (mode, tri, page)
-	// re-tracent depuis ce cache sans nouvel appel réseau (voir `renderChart`).
+	// Récupère les lignes du pivot depuis l'API, puis délègue le tracé. La requête ne dépend que des filtres, du groupement primaire et de la comparaison ; les contrôles d'affichage (mode, tri, page) re-tracent depuis ce cache sans nouvel appel réseau (voir `renderChart`).
 	async function loadChart() {
-		// Vue Collaborations : la carte se dessine seule (composant dédié). On détruit l'histogramme
-		// éventuel et on n'interroge pas le pivot (`collaborations` n'est pas une dimension valide).
+		// Vue Collaborations : la carte se dessine seule (composant dédié). On détruit l'histogramme éventuel et on n'interroge pas le pivot (`collaborations` n'est pas une dimension valide).
 		if (isCollab) {
 			if (yearChart) {
 				yearChart.destroy();
@@ -317,27 +301,20 @@
 		if (!rows.length || !chartCanvas) { yearChart = null; legendItems = []; return; }
 		const comparison = groupBy && groupBy !== primaryBy ? groupBy : '';
 
-		// La comparaison occupe l'abscisse (on compare le long de l'axe des x ; l'année y va
-		// naturellement) ; le groupement est l'empilement (la catégorie lue dans chaque barre). Sans
-		// comparaison, le groupement passe en abscisse, en barres simples.
+		// La comparaison occupe l'abscisse (on compare le long de l'axe des x ; l'année y va naturellement) ; le groupement est l'empilement (la catégorie lue dans chaque barre). Sans comparaison, le groupement passe en abscisse, en barres simples.
 		const xDim = comparison || primaryBy;
 		const stackDim = comparison ? primaryBy : '';
 		const cs = getComputedStyle(document.documentElement);
 
 		const stackValues = stackDim ? orderedValues(stackDim, rows) : [];
 
-		// Tri par part d'une série : n'a de sens que sur un axe entité à forte cardinalité (labo,
-		// éditeur, revue) avec un empilement. L'axe année reste chronologique, les axes à faible
-		// cardinalité gardent leur ordre métier. Le sélecteur n'apparaît que dans ce cas, et une clé
-		// devenue caduque (changement d'empilement ou d'axe) est réinitialisée.
+		// Tri par part d'une série : n'a de sens que sur un axe entité à forte cardinalité (labo, éditeur, revue) avec un empilement. L'axe année reste chronologique, les axes à faible cardinalité gardent leur ordre métier. Le sélecteur n'apparaît que dans ce cas, et une clé devenue caduque (changement d'empilement ou d'axe) est réinitialisée.
 		const highCard = dimCard(xDim) === 'high';
 		const canSort = highCard && !!stackDim;
 		sortableSeries = canSort ? stackValues.map((sv) => ({ value: sv, label: dimLabel(stackDim, sv) })) : [];
 		if (chartSort && (!canSort || !stackValues.includes(chartSort))) chartSort = '';
 
-		// Abscisse : à forte cardinalité, on pagine les valeurs au lieu de les tronquer — l'axe reste
-		// lisible, le détail reste atteignable. Ordre par défaut : total décroissant ; si une clé de tri
-		// est choisie, on classe par la part de la série correspondante.
+		// Abscisse : à forte cardinalité, on pagine les valeurs plutôt que de les tronquer — l'axe reste lisible, le détail reste atteignable. Ordre par défaut : total décroissant ; si une clé de tri est choisie, on classe par la part de la série correspondante.
 		const allCats =
 			chartSort && canSort
 				? orderBySeriesShare(xDim, stackDim, chartSort, chartSortDir, rows)
@@ -355,10 +332,7 @@
 		};
 		const series = stackDim ? stackValues : ['__all__'];
 
-		// Échelle partagée entre pages : le maximum de l'axe des valeurs couvre toutes les catégories
-		// (pas seulement la page affichée), afin que l'échelle reste stable d'une page à l'autre et que
-		// les exports PNG soient comparables. `suggestedMax` laisse Chart.js arrondir les graduations ;
-		// comme ce maximum domine celui de chaque page, l'arrondi est identique partout.
+		// Échelle partagée entre pages : le maximum de l'axe des valeurs couvre toutes les catégories (pas seulement la page affichée), afin que l'échelle reste stable d'une page à l'autre et que les exports PNG soient comparables. `suggestedMax` laisse Chart.js arrondir les graduations ; comme ce maximum domine celui de chaque page, l'arrondi est identique partout.
 		const catTotal = (cv: string) => series.reduce((s, sv) => s + cell(cv, sv), 0);
 		const valueMax = Math.max(0, ...allCats.map(catTotal));
 
@@ -371,8 +345,7 @@
 		}));
 		legendItems = datasets.map((d) => ({ label: d.label, color: d.backgroundColor }));
 
-		// Mode « part » sans comparaison : un camembert des parts de chaque catégorie du groupement
-		// primaire (l'empilement à 100 % d'une barre unique, déroulé en secteurs lisibles).
+		// Mode « part » sans comparaison : un camembert des parts de chaque catégorie du groupement primaire (l'empilement à 100 % d'une barre unique, déroulé en secteurs lisibles).
 		if (chartMode === 'part' && !stackDim) {
 			const values = datasets[0].data as number[];
 			const colors = cats.map((cv, i) => dimColor(xDim, cv, i, cs));
@@ -417,8 +390,7 @@
 			return;
 		}
 
-		// Mode « part » avec comparaison : aplatir chaque colonne (abscisse) à 100 % en remplaçant les
-		// comptes par leur proportion.
+		// Mode « part » avec comparaison : aplatir chaque colonne (abscisse) à 100 % en remplaçant les comptes par leur proportion.
 		const part = chartMode === 'part' && !!stackDim;
 		if (part) {
 			const totals = labels.map((_, ci) => datasets.reduce((s, d) => s + ((d.data[ci] as number) || 0), 0));
@@ -546,14 +518,12 @@
 		if (restored.chartSort !== undefined) chartSort = restored.chartSort as string;
 		if (restored.chartSortDir !== undefined) chartSortDir = restored.chartSortDir as 'desc' | 'asc';
 
-		// Vocabulaire du pivot : dimensions graphables (faible cardinalité, hors l'axe année)
-		// proposées au sélecteur de découpage. Ajouter une dimension au registre l'y fait apparaître.
+		// Vocabulaire du pivot : dimensions graphables (faible cardinalité, hors l'axe année) proposées au sélecteur de découpage. Ajouter une dimension au registre l'y fait apparaître.
 		try {
 			pivotSchema = await api<components['schemas']['PivotSchemaResponse']>('/api/stats/pivot/schema');
 		} catch { pivotSchema = null; }
 
-		// Défaut du type de document : la famille « Publications ». Appliqué uniquement quand l'URL ne
-		// porte pas de filtre de types ; le token `all` (sélection « Tous » explicite) le laisse vide.
+		// Défaut du type de document : la famille « Publications ». Appliqué uniquement quand l'URL ne porte pas de filtre de types ; le token `all` (sélection « Tous » explicite) le laisse vide.
 		if (!u.has('doc_type')) {
 			selectedDocTypes = [...publicationsDocTypes];
 		}
@@ -589,8 +559,7 @@
 		</label>
 		{#if !isCollab}
 		<span class="sep" aria-hidden="true"></span>
-		<!-- {#key primaryBy} : recrée le select quand le groupement change, pour que sa valeur
-		     affichée reste synchronisée avec `groupBy` malgré le recalcul des options. -->
+		<!-- {#key primaryBy} : recrée le select quand le groupement change, pour que sa valeur affichée reste synchronisée avec `groupBy` malgré le recalcul des options. -->
 		{#key primaryBy}
 			<label class="groupby">
 				Comparer par&nbsp;:
@@ -767,9 +736,7 @@
 		vertical-align: middle;
 	}
 
-	/* Colonne pleine hauteur : barres d'outils, légende et pagination gardent
-	   leur hauteur naturelle, le diagramme occupe l'espace restant du viewport.
-	   Hauteur = viewport moins l'en-tête fixe et le padding vertical du conteneur. */
+	/* Colonne pleine hauteur : barres d'outils, légende et pagination gardent leur hauteur naturelle, le diagramme occupe l'espace restant du viewport. Hauteur = viewport moins l'en-tête fixe et le padding vertical du conteneur. */
 	.stats-page {
 		display: flex;
 		flex-direction: column;
