@@ -20,7 +20,6 @@
 	// --- Types ---
 	type Person = components['schemas']['PersonProfileCore'];
 	type Identifier = components['schemas']['PersonIdentifierOut'];
-	type Author = components['schemas']['PersonProfileAuthor'];
 	type ProfileResponse = components['schemas']['PersonProfileResponse'];
 	type Address = components['schemas']['PersonAddressOut'];
 	type ThesisSection = components['schemas']['PersonThesesSection'];
@@ -30,7 +29,6 @@
 	// --- State ---
 	let profile = $state<Person | null>(null);
 	let identifiers = $state<Identifier[]>([]);
-	let authors = $state<Author[]>([]);
 	let thesesCount = $state(0);
 	let error = $state(false);
 	let isAdmin = $state(false);
@@ -108,8 +106,6 @@
 		dashOa = data.oa;
 		dashSubjects = subjects;
 		dashboardLoaded = true;
-		// Le rendu Chart.js est piloté par le $effect en bas du script :
-		// il se déclenche quand le canvas est (re)monté.
 	}
 
 	async function excludeAuthorship(authorshipId: number) {
@@ -121,8 +117,7 @@
 	}
 
 	function onTabSwitch(tab: string) {
-		// L'onglet "publications" est géré par <PublicationsListView> qui
-		// charge ses données dans son propre onMount à chaque (re)montage.
+		// L'onglet "publications" est géré par <PublicationsListView> qui charge ses données dans son propre onMount à chaque (re)montage.
 		if (tab === 'dashboard' && !dashboardLoaded) loadDashboard();
 		if (tab === 'theses' && !thesesLoaded) loadTheses();
 		if (tab === 'addresses' && !addrLoaded) loadAddresses();
@@ -142,7 +137,6 @@
 			const profileData = await api<ProfileResponse>(`/api/persons/${id}`);
 			profile = profileData.person;
 			identifiers = profileData.identifiers;
-			authors = profileData.authors;
 			thesesCount = profileData.theses_count;
 		} catch {
 			error = true;
@@ -214,9 +208,6 @@
 			{ id: 'dashboard', label: 'Dashboard' },
 			{ id: 'publications', label: 'Publications' },
 			...(thesesCount > 0 ? [{ id: 'theses', label: 'Thèses' }] : []),
-			// TODO: onglet « Identités » désactivé — à déplacer côté admin
-			// ou à supprimer définitivement (cf. PersonProfileResponse.authors).
-			// { id: 'identities', label: 'Identités' },
 			{ id: 'addresses', label: 'Adresses' },
 		]}
 		onswitch={onTabSwitch}
@@ -311,15 +302,6 @@
 			{/if}
 		</div>
 	{/if}
-
-	<!--
-		TODO: l'onglet « Identités » a été désactivé (cf. tabs ci-dessus, le
-		HTML précédent est dans git). À ressortir côté admin si on a besoin du
-		diagnostic « auteurs sources liés à la personne » (entité par entité,
-		HAL / OpenAlex / WoS), sinon à supprimer définitivement avec
-		PersonProfileResponse.authors et les types associés.
-	-->
-
 
 	<!-- Tab: Adresses -->
 	{#if activeTab === 'addresses'}
