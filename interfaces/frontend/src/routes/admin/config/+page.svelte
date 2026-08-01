@@ -12,8 +12,7 @@
 
   type ConfigItem = components["schemas"]["ConfigItem"];
 
-  // Rôles des périmètres : quel périmètre pilote chaque phase. Descriptions en langage
-  // utilisateur (schéma masqué), affichées en infobulle au survol du libellé.
+  // Rôles des périmètres : quel périmètre pilote chaque phase. Descriptions en langage utilisateur (schéma masqué), affichées en infobulle au survol du libellé.
   const PERIMETER_ROLES = [
     {
       key: "perimeter_extraction",
@@ -134,7 +133,7 @@
     return configs.find((c) => c.key === key);
   }
 
-  // Types de structure affichés sur la page publique des laboratoires (clé de config editable).
+  // Types de structure affichés sur la page publique des laboratoires (clé de config éditable).
   const labDisplayTypes = $derived.by(() => {
     const v = configByKey("laboratories_display_types")?.value;
     return Array.isArray(v) ? (v as string[]) : [];
@@ -203,8 +202,7 @@
 <h2>Configuration du pipeline</h2>
 <p class="subtitle">Les modifications prennent effet au prochain lancement du pipeline.</p>
 
-<!-- Éditeur inline partagé par toutes les valeurs de configuration scalaires :
-     focus + sélection à l'ouverture, Entrée valide, Échap annule. -->
+<!-- Éditeur inline partagé par toutes les valeurs de configuration scalaires : focus + sélection à l'ouverture, Entrée valide, Échap annule. -->
 {#snippet inlineEdit(key: string)}
   <input class="config-editor-inline" bind:value={editValue} use:autofocus={{ select: true }} onkeydown={(e) => editKeydown(e, key)} />
   <span class="config-actions-inline">
@@ -513,8 +511,7 @@
     color: var(--accent);
     white-space: nowrap;
   }
-  /* La colonne des structures racines absorbe la largeur disponible : les colonnes suivantes
-     (Total, actions) se réduisent à leur contenu et se collent au bord droit. */
+  /* La colonne des structures racines absorbe la largeur disponible : les colonnes suivantes (Total, actions) se réduisent à leur contenu et se collent au bord droit. */
   .perimeters-table .perim-structs {
     width: 100%;
   }
