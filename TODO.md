@@ -1,7 +1,7 @@
 # Pipeline
 ## Extraction
 * [ ] ajouter extraction par ORCID: vérifier pertinence (tester différentes sources, auditer le gain)
-* [ ] bioRxiv, medRxiv: identifiants différents de arxiv? cf publi 2757 (voir si on moissonne ces identifiants; possibilité de récupérer les DOI à partir des identifiants comme dans ArXiv)
+* [ ] bioRxiv, medRxiv: voir si on moissonne ces identifiants; possibilité de récupérer les DOI à partir des identifiants comme dans ArXiv? (ex. publi 2757)
 * [ ] chercher dans ScanR par hal-id? (généraliser cross-import à tous les identifiants et toutes les sources; ajouter système de backoff)
 * [ ] cross_import: max 10k par source par run? (pour lisser dans le temps)
 ## Suite du traitement
@@ -12,6 +12,8 @@
 * [ ] arrêter d'utiliser hal_person_id pour matching: remplacer par idhal / ou rendre hal_person_id visible et confirmable/rejetable via UI admin?
 
 # Données
+* [ ] 2 scripts pour importer APC: factoriser; supprimer colonnes jamais lues
+* [ ] relations structures: supprimer est_partenaire_de? renommer table "tutelles_structures"?
 * [ ] distinguer conference_paper et conférence (présence d'un journal_id?)
 * [ ] DUMAS: comment distinguer mémoires et thèses d'exercice?
 * publi 106296: gérer les adresses résultant d'une erreur de parsing (à quel niveau: exclure adresses? exclure source_authorships? - gestion manuelle, détection automatisée)
