@@ -20,12 +20,12 @@ from application.ports.pipeline.metadata_correction import (
     MetadataCorrectionQueries,
     UnaryCorrectionRow,
 )
+from domain.source_publications.doc_types import map_doc_type
 from domain.source_publications.metadata_correction.rules import (
     MetadataCorrectionRule,
     effective_metadata,
     strip_dissertation_keys,
 )
-from domain.source_publications.doc_types import map_doc_type
 from domain.source_publications.raw_metadata import (
     CORRECTED_BY,
     hydrate_raw_view,

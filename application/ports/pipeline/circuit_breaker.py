@@ -13,7 +13,9 @@ class SourceUnavailableError(Exception):
     """
 
     def __init__(self, source: str) -> None:
-        super().__init__(f"source {source} indisponible (retries épuisés ou circuit-breaker déclenché)")
+        super().__init__(
+            f"source {source} indisponible (retries épuisés ou circuit-breaker déclenché)"
+        )
         self.source = source
 
 
