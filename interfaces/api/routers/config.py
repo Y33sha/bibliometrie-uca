@@ -3,6 +3,8 @@
 La table `config` porte les réglages globaux : années couvertes, identifiants d'accès aux sources, choix des périmètres par phase. La définition des périmètres eux-mêmes appartient au router `perimeters.py`.
 """
 
+from typing import cast
+
 from fastapi import APIRouter, Depends
 from sqlalchemy import Connection
 
@@ -40,5 +42,7 @@ def update_config(
     """
     row = config_commands.update_config_value(conn, key, body.value, config=config)
     return ConfigItem.from_stored(
-        key=row["key"], value=row["value"], description=row["description"]
+        key=cast(str, row["key"]),
+        value=row["value"],
+        description=cast("str | None", row["description"]),
     )
