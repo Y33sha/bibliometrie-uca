@@ -108,3 +108,16 @@ normalize_name = normalize_text
 
 # Équivalent Python de la fonction SQL normalize_name_form()
 normalize_name_form = normalize_text
+
+
+_PAREN_NUMERIC_ID_RE = re.compile(r"\s*\(\d+\)")
+
+
+def clean_raw_author_name(raw: str) -> str:
+    """Retire d'un nom d'auteur brut les identifiants numériques entre parenthèses.
+
+    Certaines signatures portent un identifiant de source recopié dans le nom lui-même (« Emmanuel Moreau (1278759) »). Un groupe purement numérique entre parenthèses n'a pas de sens dans un nom : laissé en place, il contamine le nom affiché, le nom normalisé (qui sert de clé d'identité au rapprochement cross-source) et les formes de nom dérivées. Ce nettoyage neutralise le parasite à l'entrée, quelle que soit la source.
+    """
+    if not raw:
+        return raw
+    return re.sub(r" +", " ", _PAREN_NUMERIC_ID_RE.sub(" ", raw)).strip()

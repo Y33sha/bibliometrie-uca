@@ -5,7 +5,7 @@ Utilisées par le pipeline (matching cross-source dans `domain/persons/matching.
 
 import re
 
-from domain.normalize import normalize_name
+from domain.normalize import clean_raw_author_name, normalize_name
 
 
 def parse_raw_author_name(raw_name: str | None) -> tuple[str, str]:
@@ -17,7 +17,8 @@ def parse_raw_author_name(raw_name: str | None) -> tuple[str, str]:
     """
     if not raw_name:
         return "", ""
-    raw = raw_name.strip()
+    # Filet générique : une signature non passée par le writer (nom brut jamais assaini) ne doit pas transformer un identifiant parenthésé en nom de famille.
+    raw = clean_raw_author_name(raw_name).strip()
     if "," in raw:
         parts = raw.split(",", 1)
         return parts[0].strip(), parts[1].strip()
