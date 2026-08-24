@@ -1,9 +1,8 @@
 """Garde-régression du chemin de sortie par défaut de `generate_seed`.
 
-Le script a été déplacé (scripts/ → interfaces/cli/dev/) sans réajuster le calcul
-du chemin, qui pointait alors sur `interfaces/db/seed.sql` (dossier inexistant) →
-`FileNotFoundError`. On vérifie que le défaut résout bien le fichier seed
-canonique, compagnon de `infrastructure/db/schema.sql`, et que son dossier existe.
+Le défaut doit résoudre le fichier seed canonique, compagnon de
+`infrastructure/db/schema.sql`, et son dossier doit exister : un chemin pointant
+sur un dossier absent lèverait `FileNotFoundError` à l'écriture.
 """
 
 from pathlib import Path
@@ -16,5 +15,5 @@ def test_default_seed_path_is_canonical():
     assert path.name == "seed.sql"
     assert path.parent.name == "db"
     assert path.parent.parent.name == "infrastructure"
-    # Aurait échoué avec l'ancien chemin (interfaces/db/ n'existe pas).
+    # Le dossier de sortie doit exister : sinon l'écriture lève FileNotFoundError.
     assert path.parent.is_dir(), f"dossier de sortie absent : {path.parent}"
