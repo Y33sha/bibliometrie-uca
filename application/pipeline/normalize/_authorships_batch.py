@@ -17,7 +17,12 @@ from application.ports.pipeline.normalize.authorships import (
     AuthorshipsBatchQueries,
     SourceAuthorshipItem,
 )
-from domain.normalize import normalize_name_form, normalize_text, sanitize_raw_text
+from domain.normalize import (
+    clean_raw_author_name,
+    normalize_name_form,
+    normalize_text,
+    sanitize_raw_text,
+)
 from domain.types import JsonValue
 
 
@@ -73,19 +78,21 @@ def write_source_authorships(
     if not records:
         return
 
-    sa_values: list[SourceAuthorshipItem] = [
-        {
+    def _to_item(rec: AuthorRecord) -> SourceAuthorshipItem:
+        # Nom nettoyé une fois : sert de nom brut stocké et de base au nom normalisé (clé d'identité), pour qu'aucun parasite ne franchisse le writer.
+        clean_name = clean_raw_author_name(rec.raw_name)
+        return {
             "source": source,
             "source_publication_id": source_publication_id,
             "author_position": rec.position,
-            "author_name_normalized": normalize_name_form(rec.raw_name),
+            "author_name_normalized": normalize_name_form(clean_name),
             "is_corresponding": rec.is_corresponding,
             "roles": rec.roles,
-            "raw_author_name": rec.raw_name,
+            "raw_author_name": clean_name,
             "person_identifiers": rec.person_identifiers,
         }
-        for rec in records
-    ]
+
+    sa_values: list[SourceAuthorshipItem] = [_to_item(rec) for rec in records]
     queries.upsert_source_authorships_batch(conn, sa_values)
 
     sa_id_by_position = queries.fetch_source_authorship_ids_by_position(
