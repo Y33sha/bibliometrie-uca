@@ -25,7 +25,7 @@ class PgConfigQueries(ConfigQueries):
         if public_only:
             stmt = stmt.where(config.c.key.in_(PUBLIC_CONFIG_KEYS))
         return [
-            ConfigItem(key=r.key, value=r.value, description=r.description)
+            ConfigItem.from_stored(key=r.key, value=r.value, description=r.description)
             for r in self._conn.execute(stmt)
         ]
 

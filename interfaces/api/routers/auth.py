@@ -5,10 +5,15 @@ Le jeton et son format appartiennent à `interfaces.api.session` ; le router le 
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Response
 
-from infrastructure.settings import settings
 from interfaces.api.deps import get_admin_user
 from interfaces.api.models import AuthCheckResponse, LoginRequest, OkResponse
-from interfaces.api.session import SESSION_MAX_AGE, check_password, issue_token, read_session
+from interfaces.api.session import (
+    SESSION_MAX_AGE,
+    check_password,
+    issue_token,
+    read_session,
+    session_cookie_secure,
+)
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -29,7 +34,7 @@ def auth_login(
         key="session",
         value=issue_token(admin_user),
         httponly=True,
-        secure=settings.cookie_secure,
+        secure=session_cookie_secure(),
         samesite="strict",
         max_age=SESSION_MAX_AGE,
         path="/",
