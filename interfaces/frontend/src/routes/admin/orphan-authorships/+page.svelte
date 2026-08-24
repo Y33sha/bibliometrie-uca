@@ -24,6 +24,8 @@
 	let totalPages = $state(1);
 	let total = $state(0);
 	let orphans: OrphanAuthorship[] = $state([]);
+	// `true` tant que le premier chargement n'a pas abouti : le tableau affiche « Chargement… », pas « vide ».
+	let loading = $state(true);
 	// Une seule ligne peut avoir son panneau "attribuer" ouvert à la fois.
 	let activeAssignIdx: number | null = $state(null);
 	const assignSearch = useDebouncedSearch<PersonResult>({ search: searchPersons });
@@ -71,15 +73,20 @@
 	};
 
 	async function loadOrphans() {
-		const params = new URLSearchParams({ page: String(currentPage), per_page: '50' });
-		if (search.trim()) params.set('search', search.trim());
-		const data = await api<OrphansResponse>(
-			'/api/authorships/orphans?' + params, { key: 'orphans' }
-		);
-		orphans = data.authorships;
-		total = data.total;
-		totalPages = data.pages;
-		currentPage = data.page;
+		loading = true;
+		try {
+			const params = new URLSearchParams({ page: String(currentPage), per_page: '50' });
+			if (search.trim()) params.set('search', search.trim());
+			const data = await api<OrphansResponse>(
+				'/api/authorships/orphans?' + params, { key: 'orphans' }
+			);
+			orphans = data.authorships;
+			total = data.total;
+			totalPages = data.pages;
+			currentPage = data.page;
+		} finally {
+			loading = false;
+		}
 	}
 
 	function openAssign(idx: number) {
@@ -241,7 +248,11 @@
 {/if}
 
 {#if orphans.length === 0}
-	<p class="empty">Aucune authorship orpheline{search.trim() ? ' pour ce filtre' : ''}.</p>
+	{#if loading}
+		<p class="loading-msg">Chargement des résultats en cours…</p>
+	{:else}
+		<p class="empty">Aucune authorship orpheline{search.trim() ? ' pour ce filtre' : ''}.</p>
+	{/if}
 {:else}
 	<table class="data-table">
 		<thead>
