@@ -210,7 +210,10 @@ combine-as-imports = true
 # ----------------------------------------------------------------------
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q"
+# Mode d'import `importlib` : le nom de module dérive du chemin complet,
+# ce qui autorise des fichiers de test homonymes dans des répertoires
+# distincts sans exiger un `__init__.py` dans chacun.
+addopts = "-q --import-mode=importlib"
 # pytest-asyncio mode auto — les fonctions `async def test_*` sont
 # reconnues automatiquement sans décorateur. Loop scope par fonction
 # (défaut) : chaque test async a sa propre boucle.
