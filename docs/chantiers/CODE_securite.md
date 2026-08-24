@@ -33,10 +33,10 @@ La base contient des données personnelles de chercheurs (`persons` : identité 
 ### Phase 1 — Durcissement de l'API (code applicatif)
 
 - [ ] **Rate limiting entrant** — aucun throttling sur l'API. Expose le login au bruteforce (`interfaces/api/routers/auth.py:15`) et les lectures lourdes non authentifiées au DoS : exports CSV pleins (`routers/publications.py:149,169`), agrégations (`routers/stats.py:59,73,93`). Poser un limiteur (applicatif type slowapi, ou au reverse-proxy) et borner le volume des exports.
-- [ ] **Cookie de session `Secure`** — `routers/auth.py:27-34` pose le cookie `httponly`+`samesite=strict` sans `secure=True`, interceptable sur un accès en clair. Ajouter `secure=True` (implique service derrière TLS).
-- [ ] **Docs OpenAPI privées** — `interfaces/api/app.py` crée `FastAPI(...)` sans désactiver `/docs`, `/redoc`, `/openapi.json`, qui cartographient la surface admin. Les couper en production (ou les réserver à l'admin authentifié).
+- [x] **Cookie de session `Secure`** — réglage `cookie_secure` (défaut vrai), desserré en HTTP local via `.env`. Commit `5b2469b5`.
+- [x] **Docs OpenAPI privées** — réglage `expose_api_docs` (défaut faux) coupe `/docs`, `/redoc`, `/openapi.json` ; la génération du schéma frontend passe par `app.openapi()`. Commit `5b2469b5`.
 - [ ] **Révocabilité de session** — jeton HMAC stateless valide 7 jours, non révocable (`interfaces/api/session.py:25-46`, `routers/auth.py:47-51` ne supprime que le cookie client). Prévoir un mécanisme de révocation (identifiant serveur, ou rotation de `session_secret`).
-- [ ] **Credentials sources non restitués en clair** — `routers/config.py:18-27` renvoie à l'admin toutes les clés `config`, valeurs comprises (clés WoS/OpenAlex, mot de passe ScanR) ; le masquage n'existe que côté frontend. Rendre ces clés *write-only* côté API (indicateur « défini / non défini » au lieu de la valeur).
+- [x] **Credentials sources write-only** — `SECRET_CONFIG_KEYS` (`domain/config.py`) : la lecture masque la valeur (`value: null` + `is_set`), l'écriture reste ouverte. Frontend : ronds noirs si défini, `(non défini)` sinon, édition qui ne réécrit pas un secret laissé vide. Piste future non prioritaire : un bouton « Tester la connexion » par source (exerce la clé côté serveur, renvoie vert/rouge) comme équivalent sûr d'un affichage en clair.
 
 ### Phase 2 — En-têtes de sécurité et défense en profondeur frontend
 

@@ -133,6 +133,11 @@
     return configs.find((c) => c.key === key);
   }
 
+  // Clés dont la valeur est un secret : l'API ne renvoie que `is_set`, l'affichage masque
+  // par des ronds et l'édition part d'un champ vide (aligné sur `domain.config.SECRET_CONFIG_KEYS`).
+  const SECRET_KEYS = new Set(["openalex_api_key", "wos_api_key", "scanr_password"]);
+  const isSecretKey = (key: string): boolean => SECRET_KEYS.has(key);
+
   // Types de structure affichés sur la page publique des laboratoires (clé de config éditable).
   const labDisplayTypes = $derived.by(() => {
     const v = configByKey("laboratories_display_types")?.value;
@@ -154,7 +159,10 @@
     const item = configByKey(key);
     if (!item) return;
     editingKey = key;
-    if (typeof item.value === "string") {
+    if (isSecretKey(key)) {
+      // La valeur n'est jamais restituée : on repart d'un champ vide.
+      editValue = "";
+    } else if (typeof item.value === "string") {
       editValue = item.value;
     } else {
       editValue = JSON.stringify(item.value, null, typeof item.value === "object" ? 2 : undefined);
@@ -177,6 +185,11 @@
   }
 
   async function save(key: string) {
+    // Un secret laissé vide conserve la valeur en place plutôt que de l'effacer.
+    if (isSecretKey(key) && editValue.trim() === "") {
+      cancelEdit();
+      return;
+    }
     saving = true;
     try {
       let parsed;
@@ -204,7 +217,9 @@
 
 <!-- Éditeur inline partagé par toutes les valeurs de configuration scalaires : focus + sélection à l'ouverture, Entrée valide, Échap annule. -->
 {#snippet inlineEdit(key: string)}
-  <input class="config-editor-inline" bind:value={editValue} use:autofocus={{ select: true }} onkeydown={(e) => editKeydown(e, key)} />
+  <input class="config-editor-inline" bind:value={editValue} use:autofocus={{ select: true }}
+    placeholder={isSecretKey(key) ? "Nouvelle valeur (vide = inchangée)" : ""}
+    onkeydown={(e) => editKeydown(e, key)} />
   <span class="config-actions-inline">
     <button class="btn btn-sm btn-primary" onclick={() => save(key)} disabled={saving}>OK</button>
     <button class="btn btn-sm" onclick={cancelEdit}>Annuler</button>
@@ -215,7 +230,7 @@
 <h3 class="section-title">API</h3>
 <div class="config-grid">
   {#each ["polite_pool_email", "openalex_api_key", "wos_api_key", "scanr_username", "scanr_password"] as key}
-    {@const isSecret = key === "wos_api_key" || key === "scanr_password" || key === "openalex_api_key"}
+    {@const isSecret = isSecretKey(key)}
     {#if configByKey(key)}
       <div class="config-row">
         <span class="config-label"
@@ -234,7 +249,13 @@
         {#if editingKey === key}
           {@render inlineEdit(key)}
         {:else}
-          <span class="config-value-inline">{isSecret ? "••••••••" : configByKey(key)?.value || "(non défini)"}</span>
+          <span class="config-value-inline"
+            >{isSecret
+              ? configByKey(key)?.is_set
+                ? "••••••••"
+                : "(non défini)"
+              : configByKey(key)?.value || "(non défini)"}</span
+          >
           <button class="btn btn-sm" onclick={() => startEdit(key)}>Modifier</button>
         {/if}
       </div>

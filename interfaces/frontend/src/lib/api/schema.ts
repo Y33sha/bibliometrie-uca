@@ -1740,7 +1740,7 @@ export interface paths {
          * Update Config
          * @description Met à jour la valeur d'un paramètre applicatif, identifiants d'accès aux sources compris.
          *
-         *     L'écriture exige une session : le middleware garde toutes les méthodes autres que `GET`. La clé doit préexister — les clés sont déclarées dans les migrations, cet endpoint n'en crée pas —, et une clé inconnue rend 404.
+         *     L'écriture exige une session : le middleware garde toutes les méthodes autres que `GET`. La clé doit préexister — les clés sont déclarées dans les migrations, cet endpoint n'en crée pas —, et une clé inconnue rend 404. La réponse masque la valeur d'une clé secrète, comme la lecture.
          */
         put: operations["update_config_api_config__key__put"];
         post?: never;
@@ -2689,6 +2689,8 @@ export interface components {
         /**
          * ConfigItem
          * @description Ligne de la table `config` (paramètres applicatifs clé/valeur).
+         *
+         *     Pour une clé secrète (`SECRET_CONFIG_KEYS`), `value` reste `None` et `is_set` indique la présence d'un secret enregistré.
          */
         ConfigItem: {
             /** Key */
@@ -2697,6 +2699,11 @@ export interface components {
             value: unknown;
             /** Description */
             description: string | null;
+            /**
+             * Is Set
+             * @default true
+             */
+            is_set: boolean;
         };
         /**
          * ConfigValueUpdate

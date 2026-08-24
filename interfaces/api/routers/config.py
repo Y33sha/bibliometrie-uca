@@ -36,8 +36,9 @@ def update_config(
 ) -> ConfigItem:
     """Met à jour la valeur d'un paramètre applicatif, identifiants d'accès aux sources compris.
 
-    L'écriture exige une session : le middleware garde toutes les méthodes autres que `GET`. La clé doit préexister — les clés sont déclarées dans les migrations, cet endpoint n'en crée pas —, et une clé inconnue rend 404.
+    L'écriture exige une session : le middleware garde toutes les méthodes autres que `GET`. La clé doit préexister — les clés sont déclarées dans les migrations, cet endpoint n'en crée pas —, et une clé inconnue rend 404. La réponse masque la valeur d'une clé secrète, comme la lecture.
     """
-    return ConfigItem.model_validate(
-        config_commands.update_config_value(conn, key, body.value, config=config)
+    row = config_commands.update_config_value(conn, key, body.value, config=config)
+    return ConfigItem.from_stored(
+        key=row["key"], value=row["value"], description=row["description"]
     )

@@ -14,3 +14,18 @@ PUBLIC_CONFIG_KEYS: frozenset[str] = frozenset(
         "pipeline_start_year_full",
     }
 )
+
+# Clés dont la valeur est un secret d'accès à une source. Elles s'écrivent mais ne se relisent
+# pas : la lecture ne rend qu'un indicateur « défini / non défini », jamais la valeur en clair.
+SECRET_CONFIG_KEYS: frozenset[str] = frozenset(
+    {
+        "openalex_api_key",
+        "wos_api_key",
+        "scanr_password",
+    }
+)
+
+
+def is_secret_config_key(key: str) -> bool:
+    """Vrai si la clé porte un secret d'accès à une source (valeur jamais restituée en lecture)."""
+    return key in SECRET_CONFIG_KEYS

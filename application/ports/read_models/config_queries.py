@@ -9,9 +9,14 @@ from typing import Any, Protocol
 
 from pydantic import BaseModel
 
+from domain.config import is_secret_config_key
+
 
 class ConfigItem(BaseModel):
-    """Ligne de la table `config` (paramètres applicatifs clé/valeur)."""
+    """Ligne de la table `config` (paramètres applicatifs clé/valeur).
+
+    Pour une clé secrète (`SECRET_CONFIG_KEYS`), `value` reste `None` et `is_set` indique la présence d'un secret enregistré.
+    """
 
     key: str
     # `Any` plutôt que `JsonValue` (récursif PEP 695) : le schéma JSON
@@ -21,6 +26,15 @@ class ConfigItem(BaseModel):
     # ce que TypeScript refuse d'instancier. Frontière JSONB libre côté API.
     value: Any
     description: str | None
+    is_set: bool = True
+
+    @classmethod
+    def from_stored(cls, key: str, value: Any, description: str | None) -> "ConfigItem":
+        """Construit l'item depuis une ligne stockée, en masquant la valeur des clés secrètes."""
+        is_set = value not in (None, "")
+        if is_secret_config_key(key):
+            return cls(key=key, value=None, description=description, is_set=is_set)
+        return cls(key=key, value=value, description=description, is_set=is_set)
 
 
 class ConfigQueries(Protocol):

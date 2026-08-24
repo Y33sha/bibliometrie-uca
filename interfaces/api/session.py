@@ -15,6 +15,12 @@ from infrastructure.settings import settings
 
 SESSION_MAX_AGE = 86400 * 7  # 7 jours
 
+
+def session_cookie_secure() -> bool:
+    """Attribut `Secure` du cookie de session (transmis uniquement sur HTTPS), lu depuis la configuration."""
+    return settings.cookie_secure
+
+
 _PAYLOAD_SEPARATOR = "|"
 
 
