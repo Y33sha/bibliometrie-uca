@@ -40,6 +40,9 @@ _UPSERT_STAGING_SQL = text(
             ELSE staging.authors_truncated
         END,
         -- `entry_mode` n'est PAS réécrit : il garde la provenance de première création.
+        -- Un document trouvé avec un vrai contenu n'est ni introuvable ni disparu : la réapparition efface les deux marqueurs d'absence, sans quoi un stub `not_found_at` (cross-import) violerait `staging_not_found_at_implies_processed` dès que `processed` repasse à FALSE.
+        not_found_at = NULL,
+        disappeared_at = NULL,
         last_seen_at = now()
     RETURNING (xmax = 0) AS inserted,
               ((SELECT old_hash FROM old) IS DISTINCT FROM :raw_hash) AS changed
