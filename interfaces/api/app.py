@@ -31,6 +31,7 @@ from domain.errors import (
 )
 from infrastructure.db.engine import build_sync_engine, set_sync_engine
 from infrastructure.observability.log import configure_root_logging
+from infrastructure.settings import settings
 from interfaces.api.models.errors import (
     PublisherMergeBlockedResponse,
     RejectedPairsResponse,
@@ -87,10 +88,18 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 # d'environnement `UVICORN_ROOT_PATH`) avant que FastAPI route ; la valeur sert ici
 # à générer les URLs absolues d'OpenAPI et les redirections. Vide par défaut : en
 # développement local, ou derrière un reverse proxy qui le retire en amont.
+# Docs interactives coupées par défaut (`expose_api_docs`) : elles cartographient toute la
+# surface d'API, admin comprise. Activées en développement, absentes en production.
+_docs_urls = (
+    {"docs_url": "/docs", "redoc_url": "/redoc", "openapi_url": "/openapi.json"}
+    if settings.expose_api_docs
+    else {"docs_url": None, "redoc_url": None, "openapi_url": None}
+)
 app = FastAPI(
     title="Bibliométrie UCA",
     lifespan=lifespan,
     root_path=os.environ.get("ROOT_PATH", ""),
+    **_docs_urls,
 )
 
 

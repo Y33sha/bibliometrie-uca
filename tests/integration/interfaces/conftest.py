@@ -53,6 +53,10 @@ _app_module.build_sync_engine = _build_test_sync_engine
 
 from infrastructure.settings import settings as _settings  # noqa: E402
 
+# Les tests s'exécutent sur http://testserver : un cookie de session marqué Secure ne serait
+# pas renvoyé par le client, ce qui casserait le parcours d'authentification par login.
+_settings.cookie_secure = False
+
 
 @pytest.fixture(autouse=True)
 def _fail_on_escaped_dml():

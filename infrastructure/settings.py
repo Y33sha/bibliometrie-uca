@@ -31,6 +31,14 @@ class Settings(BaseSettings):
     admin_hash: str
     session_secret: str
 
+    # ----- Sécurité HTTP -----
+    # Cookie de session marqué `Secure` (transmis uniquement sur HTTPS). Vrai par défaut ;
+    # passer à false pour un développement local servi en HTTP clair.
+    cookie_secure: bool = True
+    # Exposition des docs interactives (`/docs`, `/redoc`, `/openapi.json`), qui cartographient
+    # toute la surface d'API. Faux par défaut ; activer en développement.
+    expose_api_docs: bool = False
+
     # ----- Base de données -----
     db_host: str = "localhost"
     db_port: int = 5432
