@@ -37,19 +37,23 @@ export function structIsLabo(structures: Record<string, StructInfo>, id: number)
   return structures[String(id)]?.type === "labo";
 }
 
-/** Tooltip résumé des affiliations brutes + structures identifiées. */
+/**
+ * Tooltip résumé des affiliations brutes + structures identifiées, en texte simple.
+ *
+ * L'affiliation brute et les libellés de structures proviennent des sources externes : le résultat est du texte rendu tel quel par `Tooltip` (jamais interprété comme HTML), les lignes séparées par des sauts de ligne.
+ */
 export function structsTooltip(
   a: SourceAuthorship,
   structures: Record<string, StructInfo>,
 ): string {
   const parts: string[] = [];
   if (a.raw_affiliation) {
-    parts.push(`<em>${a.raw_affiliation}</em>`);
+    parts.push(a.raw_affiliation);
   }
   if (a.structure_ids?.length) {
     parts.push(
       `Structures identifiées : ${a.structure_ids.map((sid) => structLabel(structures, sid)).join(", ")}`,
     );
   }
-  return parts.join("<br>") || "";
+  return parts.join("\n");
 }

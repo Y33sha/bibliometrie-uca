@@ -54,7 +54,7 @@
 {#if show && text}
 	<div class="tooltip-box" class:tooltip-below={below} bind:this={boxEl}
 		style="left:{left}px; top:{y}px; --arrow-left:{arrowLeft}px;">
-		{@html text.replace(/\n/g, '<br>')}
+		{text}
 	</div>
 {/if}
 
@@ -72,7 +72,7 @@
 		padding: 6px 10px;
 		border-radius: 5px;
 		max-width: 500px;
-		white-space: normal;
+		white-space: pre-line;
 		word-wrap: break-word;
 		z-index: 9999;
 		pointer-events: none;
