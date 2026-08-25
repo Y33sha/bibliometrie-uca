@@ -62,7 +62,6 @@ from interfaces.api.models.persons import (
 )
 from interfaces.api.models.pipeline import (
     PipelinePhaseLog,
-    PipelineStatus,
 )
 from interfaces.api.models.publications import (
     MarkDistinctPublications,
@@ -115,7 +114,6 @@ __all__ = [
     "OrphanBatchAssignResponse",
     "PerimeterCreate",
     "PipelinePhaseLog",
-    "PipelineStatus",
     "PublisherMergeBlockedResponse",
     "ReassignIdentifier",
     "RejectPerson",

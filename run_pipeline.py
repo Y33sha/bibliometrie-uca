@@ -49,7 +49,6 @@ Phases (dans l'ordre d'execution):
 
 import argparse
 import asyncio
-import atexit
 import datetime
 import signal
 import sys
@@ -83,7 +82,6 @@ from infrastructure.observability.log import (
     set_log_phase,
     setup_logger,
 )
-from infrastructure.observability.pipeline_status import clear_status, read_status, write_status
 from infrastructure.pipeline_lock import PipelineAlreadyRunningError, acquire_pipeline_lock
 
 BASE = Path(__file__).resolve().parent
@@ -92,10 +90,6 @@ BASE = Path(__file__).resolve().parent
 # sur `logs/pipeline.log` quand `LOG_TO_FILE=true` : les logs des phases qui
 # réutilisent ce logger parent (subjects, cooccurrences, enrich) sont persistés.
 log = setup_logger("pipeline", str(BASE / "logs"))
-
-
-# Garantir le nettoyage même en cas de Ctrl+C ou crash
-atexit.register(clear_status)
 
 
 # ---------------------------------------------------------------------------
@@ -1379,14 +1373,11 @@ def _run_one_phase(
     name: str,
     fn: Callable[..., PhaseMetrics],
     *,
-    index: int,
-    total: int,
     args: argparse.Namespace,
     sources: set[str],
     recorder: Any,
-    pipeline_started_at: str,
 ) -> tuple[str, float]:
-    """Exécute une phase : statut, appel, capture d'observabilité. Rend `(nom, durée)`.
+    """Exécute une phase : appel, capture d'observabilité. Rend `(nom, durée)`.
 
     Une interruption utilisateur ou une `RuntimeError` est enregistrée puis termine le process
     (reprise possible via `--from <phase>`)."""
@@ -1397,14 +1388,6 @@ def _run_one_phase(
         log.info("─" * 40)
         log.info("%s%s", PHASE_MARKER, name)
         log.info("─" * 40)
-        write_status(
-            mode=args.mode,
-            phase=name,
-            started_at=pipeline_started_at,
-            phases_done=index,
-            phases_total=total,
-        )
-
         phase_started_at = datetime.datetime.now(datetime.UTC)
         t0_phase = time.time()
         try:
@@ -1435,7 +1418,6 @@ def _run_one_phase(
                 ],
                 details={},
             )
-            clear_status()
             sys.exit(130)
         except RuntimeError as e:
             log.error("Pipeline interrompu à la phase '%s' : %s", name, e)
@@ -1448,7 +1430,6 @@ def _run_one_phase(
                 signals=[{"level": "error", "code": "exception", "message": str(e)}],
                 details={},
             )
-            clear_status()
             sys.exit(1)
 
         duration = time.time() - t0_phase
@@ -1495,25 +1476,13 @@ def _execute_phases(
     log.info("perimeter_structures matérialisées")
 
     t0_total = time.time()
-    pipeline_started_at = datetime.datetime.now().isoformat(timespec="seconds")
-    total = len(phases_to_run)
     phase_results = [
-        _run_one_phase(
-            name,
-            fn,
-            index=i,
-            total=total,
-            args=args,
-            sources=sources,
-            recorder=recorder,
-            pipeline_started_at=pipeline_started_at,
-        )
-        for i, (name, fn) in enumerate(phases_to_run)
+        _run_one_phase(name, fn, args=args, sources=sources, recorder=recorder)
+        for name, fn in phases_to_run
     ]
 
     elapsed_total = time.time() - t0_total
     recorder.close()
-    clear_status()
     log.info("=" * 60)
     log.info("%s en %.0fs (%.1f min)", RUN_END_MARKER, elapsed_total, elapsed_total / 60)
     if recorder.run_id is not None:
@@ -1525,9 +1494,6 @@ def _execute_phases(
 
 def main() -> None:
     _install_sigterm_handler()
-    # Nettoie un status.json orphelin (PID mort : SIGKILL, crash, OOM) laissé par un run précédent —
-    # sinon le prochain lecteur verrait un statut fantôme jusqu'à notre premier write_status().
-    read_status()
     args = _build_arg_parser().parse_args()
 
     if args.list:

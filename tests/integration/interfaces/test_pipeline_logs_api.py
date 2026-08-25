@@ -1,64 +1,20 @@
-"""Tests d'intégration pour les endpoints de log du router `interfaces.api.routers.pipeline`.
+"""Tests d'intégration de l'endpoint de log de phase du router `interfaces.api.routers.pipeline_runs`.
 
-Couvre :
-- GET /api/pipeline/status (avec / sans pipeline en cours)
-- GET /api/pipeline/runs/{run_id}/phases/{phase}/log (découpe, fichier absent)
+Couvre GET /api/pipeline/runs/{run_id}/phases/{phase}/log : découpe de la section, fichier absent, section absente.
 """
 
 from __future__ import annotations
-
-import json
-import os
 
 import pytest
 
 
 @pytest.fixture
 def _isolate_paths(tmp_path, monkeypatch):
-    """Redirige les chemins disque des routers vers un dossier temp."""
+    """Redirige le chemin du log de pipeline vers un dossier temp."""
     import infrastructure.observability.phase_logs as pl
-    import infrastructure.observability.pipeline_status as ps
 
-    monkeypatch.setattr(ps, "STATUS_FILE", tmp_path / "status.json")
     monkeypatch.setattr(pl, "PIPELINE_LOG", tmp_path / "pipeline.log")
     return tmp_path
-
-
-class TestPipelineStatus:
-    def test_returns_null_when_no_status_file(self, client, _isolate_paths):
-        r = client.get("/api/pipeline/status")
-        assert r.status_code == 200
-        assert r.json() is None
-
-    def test_returns_status_when_alive(self, client, _isolate_paths, monkeypatch):
-        # `read_status` valide le PID — on stub `is_pid_alive` pour
-        # éviter de devoir spawner un vrai process.
-        import infrastructure.observability.pipeline_status as ps
-
-        monkeypatch.setattr(ps, "is_pid_alive", lambda pid: True)
-
-        status_file = _isolate_paths / "status.json"
-        status_file.write_text(
-            json.dumps(
-                {
-                    "mode": "full",
-                    "phase": "extract",
-                    "started_at": "2026-05-17T10:00:00",
-                    "phase_started_at": "2026-05-17T10:00:00",
-                    "phases_done": 0,
-                    "phases_total": 10,
-                    "pid": os.getpid(),
-                }
-            ),
-            encoding="utf-8",
-        )
-
-        r = client.get("/api/pipeline/status")
-        assert r.status_code == 200
-        body = r.json()
-        assert body is not None
-        assert body["mode"] == "full"
-        assert body["phase"] == "extract"
 
 
 class TestPhaseLog:

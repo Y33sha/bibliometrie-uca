@@ -213,7 +213,7 @@ bibliometrie-uca/
 │   ├── frontend/        SvelteKit
 │   └── cli/             Scripts CLI (imports, maintenance, oneshot, dev)
 ├── tests/               pytest (unit + integration)
-├── logs/                Logs consolidés (JSON), status.json, rapports pipeline
+├── logs/                Logs consolidés (JSON), rapports pipeline
 ├── run_pipeline.py      Orchestrateur du pipeline
 ├── start.sh             Lancement dev (backend + frontend)
 └── docs/                Documentation
