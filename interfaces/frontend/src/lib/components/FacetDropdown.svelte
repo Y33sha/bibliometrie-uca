@@ -138,7 +138,7 @@
 		<span class="facet-arrow">&#9662;</span>
 	</button>
 	{#if showTooltip && tooltip}
-		<div class="facet-tooltip facet-tooltip-below">{@html tooltip}</div>
+		<div class="facet-tooltip facet-tooltip-below">{tooltip}</div>
 	{/if}
 
 	{#if open}
@@ -232,7 +232,7 @@
 		line-height: 1.4;
 		padding: 6px 10px;
 		border-radius: 5px;
-		white-space: nowrap;
+		white-space: pre-line;
 		z-index: 200;
 		pointer-events: none;
 		box-shadow: 0 2px 8px rgba(0,0,0,0.2);
