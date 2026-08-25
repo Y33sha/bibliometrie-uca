@@ -47,10 +47,12 @@ La base contient des données personnelles de chercheurs (`persons` : identité 
 
 ### Phase 3 — Cloisonnement infrastructure (déploiement)
 
-- [ ] **Conteneurs non-root** — les trois Dockerfile n'ont pas de directive `USER` ; les conteneurs tournent en root. Ajouter un utilisateur non privilégié (répond directement au risque d'escalade / latéralisation cité par le RSSI).
-- [ ] **Publication des ports sur loopback** — `docker-compose.prod.yml:41` publie `8003:8000` sur `0.0.0.0` de l'hôte. Restreindre à `127.0.0.1:8003:8000` derrière le reverse-proxy.
-- [ ] **TLS vers la base** — `infrastructure/db/engine.py:21-29` et `alembic/env.py` construisent l'URL Postgres sans `sslmode`. Exiger `sslmode=require`/`verify-full` dès que la base n'est pas colocalisée.
-- [ ] **Défauts de mot de passe compose** — `docker-compose.yml` / `docker-compose.prod.yml` utilisent `${...:-changeme}`. Retirer les valeurs par défaut faibles pour forcer l'injection explicite des secrets.
+La DSI gère le conteneur et la machine virtuelle (isolation réseau, exposition des ports, cloisonnement de l'hôte) selon ses propres exigences. Ce volet se limite donc à ce qui vit dans le dépôt : l'image de référence, la connexion applicative et les défauts de configuration.
+
+- [x] **Image de production non-root** — utilisateur `appuser` (uid 10001) et bascule `USER` dans le `Dockerfile` de production ; l'API ne tourne plus en root. Commit `09372bd0`. Les Dockerfile de dev restent en root (écriture via bind-mount, usage local uniquement).
+- [x] **TLS vers la base** — réglage `db_sslmode` injecté dans la connexion (`infrastructure/db/engine.py`), réutilisé par Alembic. Commit `09372bd0`.
+- [x] **Défauts de mot de passe compose** — `${...:-changeme}` remplacé par la forme fail-safe `${...:?}` : refus de démarrage sans secret explicite. Commit `731c18ee`.
+- Exposition réseau des ports, reverse-proxy et cloisonnement de l'hôte : ressort de la DSI.
 
 ### Phase 4 — Suivi dynamique dans le temps
 
