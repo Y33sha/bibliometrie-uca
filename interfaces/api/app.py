@@ -180,12 +180,13 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
 
 
 # ----- CORS -----
-# CORS_ORIGINS est obligatoire (défini dans .env en dev, injecté en prod).
-_cors_origins = [o.strip() for o in os.environ.get("CORS_ORIGINS", "").split(",") if o.strip()]
-
+# Origines énumérées par `cors_origins`, qui refuse le joker : les appels portent le cookie
+# de session, et `*` reviendrait à autoriser toute origine à s'en servir. Vide en production,
+# où le frontend est servi par l'API elle-même ; renseigné en développement, le serveur de
+# développement du frontend vivant sur un autre port.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_cors_origins,
+    allow_origins=settings.cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
