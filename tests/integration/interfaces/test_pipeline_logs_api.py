@@ -90,10 +90,10 @@ class TestPhaseLog:
         # Pas de pipeline.log (LOG_TO_FILE désactivé).
         r = client.get("/api/pipeline/runs/5/phases/extract/log")
         assert r.status_code == 200
-        assert r.json() == {"available": False, "content": ""}
+        assert r.json() == {"available": False, "content": "", "omitted_lines": 0}
 
     def test_unavailable_when_section_absent(self, client, _isolate_paths):
         self._write_log(_isolate_paths / "pipeline.log")
         r = client.get("/api/pipeline/runs/5/phases/subjects/log")
         assert r.status_code == 200
-        assert r.json() == {"available": False, "content": ""}
+        assert r.json() == {"available": False, "content": "", "omitted_lines": 0}

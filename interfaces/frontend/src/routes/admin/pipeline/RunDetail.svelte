@@ -47,7 +47,7 @@
           `/api/pipeline/runs/${detail.run_id}/phases/${phase}/log`,
         );
       } catch {
-        logs[phase] = { available: false, content: "" };
+        logs[phase] = { available: false, content: "", omitted_lines: 0 };
       }
     }
   }
@@ -195,6 +195,12 @@
                   Log indisponible (fichier logs/pipeline.log absent ou section purgée).
                 </p>
               {:else}
+                {#if entry.omitted_lines}
+                  <p class="log-status">
+                    Fin de la phase ; les {entry.omitted_lines.toLocaleString("fr-FR")} lignes
+                    précédentes ne sont pas affichées.
+                  </p>
+                {/if}
                 <pre class="log-view">{entry.content}</pre>
               {/if}
             </div>
