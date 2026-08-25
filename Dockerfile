@@ -57,6 +57,13 @@ ENV PATH="/app/.venv/bin:${PATH}"
 # Frontend buildé (servi par l'API via SPAStaticFiles)
 COPY --from=frontend-build /build/interfaces/frontend/build ./interfaces/frontend/build
 
+# Exécution sous un utilisateur non privilégié : l'API ne requiert aucun droit root
+# (port 8000 > 1024, logs sur stdout). Un montage volume pour le pipeline
+# (data/raw_store, logs) doit appartenir à cet uid.
+RUN useradd --uid 10001 --home-dir /app --shell /usr/sbin/nologin --no-create-home appuser \
+    && chown -R appuser:appuser /app
+USER appuser
+
 EXPOSE 8000
 
 # Shell form pour interpoler $ROOT_PATH (default défini en haut, surchargeable
