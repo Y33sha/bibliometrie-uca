@@ -42,6 +42,7 @@ from interfaces.api.models import (
     MergeResponse,
     OkResponse,
 )
+from interfaces.api.rate_limit import export_rate_limit
 
 router = APIRouter(prefix="/api/publications", tags=["publications"])
 
@@ -152,8 +153,11 @@ def export_publications_csv(
     sort: PublicationSort = Query("year_desc"),
     columns: str = Query(""),
     queries: PublicationsQueries = Depends(publications_queries),
+    _rate_limit: None = Depends(export_rate_limit),
 ) -> Response:
-    """Export CSV des publications, fidèle au tableau affiché : mêmes filtres, et mêmes colonnes que celles listées dans `columns`."""
+    """Export CSV des publications, fidèle au tableau affiché : mêmes filtres, et mêmes colonnes que celles listées dans `columns`.
+
+    Le nombre de lignes est plafonné, et la fréquence des demandes l'est aussi (429 au-delà) : l'export balaie la table sous les seuls filtres reçus, et rien n'oblige un appelant à s'arrêter."""
     csv_content = queries.export_publications_csv(
         filters=filters.to_filters(),
         sort=sort,
@@ -176,8 +180,11 @@ def export_theses_csv(
     doc_type: str = Query(""),
     sort: PublicationSort = Query("soutenance_desc"),
     queries: PublicationsQueries = Depends(publications_queries),
+    _rate_limit: None = Depends(export_rate_limit),
 ) -> Response:
     """Export CSV de la page thèses, aux mêmes filtres et au même tri que sa liste.
+
+    Plafonné en nombre de lignes et en fréquence, comme l'export des publications.
 
     La surface de filtres est plus étroite que celle des publications, et n'annonce que ce que l'export honore. Sans `doc_type`, il porte sur les thèses soutenues et en cours.
     """
