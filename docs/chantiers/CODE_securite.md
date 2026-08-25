@@ -10,18 +10,15 @@ L'hébergement de l'application par l'UCA est conditionné par le RSSI à une an
 
 Un audit interne a balayé six angles (surface d'API et authentification, dépendances, secrets et configuration, injections, posture infra et trafic sortant, sécurité frontend). Verdict d'ensemble : posture au-dessus de la moyenne, **aucune faille critique**. Le socle est sain — authentification sur les mutations, injections SQL maîtrisées (bind params, tris et dimensions de pivot en liste blanche), sortant borné par liste blanche d'hôtes et sans URL paramétrable (pas de SSRF ; l'API elle-même n'émet aucune requête réseau, tout le trafic sortant vit dans le pipeline lancé en ligne de commande), déni de service sortant tenu par circuit-breaker et sémaphores, dépendances épinglées et scannées, aucune primitive d'exécution (`subprocess`, `eval`, désérialisation) sur le chemin serveur. Ce chantier regroupe les points à traiter avant mise en production, à régler un par un.
 
-### Données personnelles
+### Ce que la base contient de sensible
 
-La base contient des données personnelles de chercheurs : `persons` (identité), `person_identifiers` (ORCID/idHAL/idref), `persons_rh` (email, poste, service, dates de contrat). Trois constats :
+Une seule catégorie : les **identifiants d'accès aux sources** — clés d'API OpenAlex et Web of Science, compte ScanR. Ils sont write-only, une liste blanche de clés bornant ce que la lecture de la configuration rend (`domain/config.py`). Les journaux du pipeline ne les portent pas davantage : aucune trace n'écrit une valeur de configuration secrète ni une URL qui en contienne une.
 
-- ces données sont **publiques** — postes et dates sont poussés par l'UCA sur les profils ORCID des chercheurs ;
-- les adresses email sont stockées en base mais **aucune requête de lecture ne les sélectionne** : elles ne sortent pas de l'application ;
-- le poste, le service et les dates de contrat, eux, sortent par les lectures des personnes, qui sont ouvertes.
-
-L'argument « accès réservé aux personnels UCA » s'appuie sur une restriction qui ne vit pas dans le dépôt : aucune authentification ne garde les lectures. Elle est donc portée par l'hébergement (filtrage réseau, ou authentification au reverse-proxy) et doit être énoncée comme telle au dossier RSSI — ou implémentée dans l'application (phase 5).
+Le reste des données est **public par nature** : publications, revues, éditeurs, structures, et les personnes qui les signent. La base porte des données personnelles de chercheurs — `persons` (identité), `person_identifiers` (ORCID/idHAL/idref), `persons_rh` (poste, service, dates de contrat) —, mais ce sont celles que l'UCA pousse elle-même sur les profils ORCID publics. Les adresses email, seule donnée de contact, sont stockées sans qu'aucune requête de lecture ne les sélectionne : elles ne sortent pas de l'application.
 
 ## Décisions
 
+- **La lecture reste ouverte ; sa restriction relève de l'hébergement.** Aucune des données servies n'est sensible, et rien dans l'application ne pourrait fonder une restriction : il n'existe pas de système d'authentification en dehors du compte d'administration, donc pas d'identité à laquelle rattacher un droit de lecture. Réserver l'accès aux personnels de l'université est un contrôle d'hébergement — filtrage réseau ou authentification au reverse-proxy —, à énoncer comme tel au dossier RSSI. Les écritures, elles, restent gardées par la session d'administration, et les pages d'administration derrière une vérification de session.
 - **Terminaison TLS par reverse-proxy** en frontal de l'application. Point d'ancrage de plusieurs corrections (chiffrement en transit, cookie `Secure`, en-têtes de sécurité, rate limiting réseau, cloisonnement) : à privilégier plutôt que de réimplémenter ces protections dans l'application.
 - **Confiance dans les en-têtes de proxy : au serveur, pas dans l'application.** uvicorn embarque `ProxyHeadersMiddleware`, qui ne lit `X-Forwarded-For` que si le pair de la connexion figure dans `FORWARDED_ALLOW_IPS`, et qui remonte la liste des maillons de droite à gauche en écartant les proxys connus. L'application ne lit jamais l'en-tête : elle se contente de `request.client.host`, qu'uvicorn a déjà réécrit quand il y a lieu.
 - **Mise à jour automatisée des dépendances** (Dependabot ou Renovate) sur les écosystèmes pip et npm, en complément des scans `pip-audit` / `npm audit` déjà bloquants au push. La détection existe ; la remédiation devient un flux de pull requests plutôt qu'une veille manuelle.
@@ -70,14 +67,12 @@ La DSI gère le conteneur et la machine virtuelle (isolation réseau, exposition
 - [x] **Blocage des secrets au push** — GitHub push protection activée : bloque côté serveur les secrets reconnus (motifs de fournisseurs) avant qu'ils n'atteignent le dépôt. Complément optionnel non retenu pour l'instant : gitleaks en pre-commit, qui ajoute la détection par entropie (secrets génériques : mot de passe DB, `SESSION_SECRET`) et un blocage local plus précoce.
 - [x] **Alignement des postes de dev sur Node 22** — `interfaces/frontend/.nvmrc` fixe Node 22 (aligné sur la CI, `.github/workflows/ci.yml:88`) ; `nvm use` cale le poste dessus.
 
-### Phase 5 — Surface de lecture anonyme
+### Phase 5 — Coût des lectures ouvertes
 
-Toutes les lectures sont ouvertes : le middleware d'`interfaces/api/app.py` ne garde que les méthodes d'écriture, et la dépendance `require_admin` d'`interfaces/api/deps.py` n'est posée sur aucune route. Le premier point commande les deux autres, qui en sont les conséquences les plus coûteuses.
+La lecture reste ouverte (cf. Décisions) : ce qui subsiste n'est pas une question de confidentialité, mais de ressources. Une lecture que n'importe qui peut répéter doit coûter un montant borné.
 
-- [ ] **Frontière d'authentification en lecture** — trancher : la lecture reste ouverte et sa restriction est portée par l'hébergement, ou une session devient nécessaire, au moins sur les pages d'administration et sur les lectures qui rendent des données issues du fichier RH (poste, service, dates de contrat).
-- [ ] **Export CSV sans plafond** — les deux exports de publications s'exécutent sans pagination et matérialisent le résultat entier en mémoire avant de l'envoyer. Ouverts et répétables, ils forment le vecteur de déni de service entrant le plus direct, et le moyen le plus simple d'extraire la base en masse. Plafonner le nombre de lignes rendues, ou réserver l'export à une session.
 - [x] **Lecture bornée du log de phase** — la lecture parcourt le fichier ligne à ligne et ne retient que la fin de la section demandée : la mémoire consommée tient au plafond de lignes, non à la taille du fichier. La troncature s'annonce, le nombre de lignes non rendues accompagnant l'extrait jusque dans la page. En amont, la phase personnes ne trace plus un refus de corroboration par occurrence — la même signature revenant sur chaque publication d'une collaboration, ces lignes formaient à elles seules 80 % du volume du fichier.
-- [ ] **Accès au log de phase** — la lecture reste ouverte et rend des traces d'exploitation. Relève de la décision sur la frontière d'authentification, premier item de cette phase.
+- [ ] **Export CSV sans plafond** — les deux exports de publications s'exécutent sans pagination et matérialisent le résultat entier en mémoire avant de l'envoyer. Répétables à volonté, ils forment le vecteur de déni de service entrant le plus direct. Plafonner le nombre de lignes rendues, et dire le plafond quand il coupe.
 
 ## Questions ouvertes
 
