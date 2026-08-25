@@ -58,9 +58,13 @@ ENV PATH="/app/.venv/bin:${PATH}"
 COPY --from=frontend-build /build/interfaces/frontend/build ./interfaces/frontend/build
 
 # Exécution sous un utilisateur non privilégié : l'API ne requiert aucun droit root
-# (port 8000 > 1024, logs sur stdout). Un montage volume pour le pipeline
-# (data/raw_store, logs) doit appartenir à cet uid.
-RUN useradd --uid 10001 --home-dir /app --shell /usr/sbin/nologin --no-create-home appuser \
+# (port 8000 > 1024, logs sur stdout).
+#
+# `data/` et `logs/` sont créés ici pour qu'un volume monté dessus hérite de leur
+# propriétaire : un volume créé sur un chemin absent de l'image appartiendrait à root, et
+# l'uid applicatif ne pourrait pas y écrire.
+RUN mkdir -p /app/data /app/logs \
+    && useradd --uid 10001 --home-dir /app --shell /usr/sbin/nologin --no-create-home appuser \
     && chown -R appuser:appuser /app
 USER appuser
 
