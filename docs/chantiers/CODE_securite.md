@@ -32,10 +32,10 @@ La base contient des données personnelles de chercheurs (`persons` : identité 
 
 ### Phase 1 — Durcissement de l'API (code applicatif)
 
-- [ ] **Rate limiting entrant** — aucun throttling sur l'API. Expose le login au bruteforce (`interfaces/api/routers/auth.py:15`) et les lectures lourdes non authentifiées au DoS : exports CSV pleins (`routers/publications.py:149,169`), agrégations (`routers/stats.py:59,73,93`). Poser un limiteur (applicatif type slowapi, ou au reverse-proxy) et borner le volume des exports.
+- [x] **Rate limiting du login** — limiteur applicatif à fenêtre fixe par IP sur `/api/auth/login` (`interfaces/api/rate_limit.py`, 10 tentatives / 5 min, 429 au-delà), sans dépendance externe. Le DoS sur les lectures lourdes (exports CSV, agrégations) relève de la fréquence des requêtes, traité au reverse-proxy réseau (phase 3), pas d'un plafond par requête. Commit `5b2313df`.
 - [x] **Cookie de session `Secure`** — réglage `cookie_secure` (défaut vrai), desserré en HTTP local via `.env`. Commit `5b2469b5`.
 - [x] **Docs OpenAPI privées** — réglage `expose_api_docs` (défaut faux) coupe `/docs`, `/redoc`, `/openapi.json` ; la génération du schéma frontend passe par `app.openapi()`. Commit `5b2469b5`.
-- [ ] **Révocabilité de session** — jeton HMAC stateless valide 7 jours, non révocable (`interfaces/api/session.py:25-46`, `routers/auth.py:47-51` ne supprime que le cookie client). Prévoir un mécanisme de révocation (identifiant serveur, ou rotation de `session_secret`).
+- [x] **Révocabilité de session (globale)** — le jeton étant signé par `SESSION_SECRET`, en changer la valeur invalide tous les jetons émis : c'est la déconnexion globale, documentée dans `.env.example`. Suffisant pour l'unique compte admin actuel. La révocation fine (par session) via sessions à état se reposera à l'arrivée de plusieurs comptes.
 - [x] **Credentials sources write-only** — `SECRET_CONFIG_KEYS` (`domain/config.py`) : la lecture masque la valeur (`value: null` + `is_set`), l'écriture reste ouverte. Frontend : ronds noirs si défini, `(non défini)` sinon, édition qui ne réécrit pas un secret laissé vide. Piste future non prioritaire : un bouton « Tester la connexion » par source (exerce la clé côté serveur, renvoie vert/rouge) comme équivalent sûr d'un affichage en clair.
 
 ### Phase 2 — En-têtes de sécurité et défense en profondeur frontend
