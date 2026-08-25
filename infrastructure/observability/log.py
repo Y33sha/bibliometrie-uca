@@ -130,7 +130,7 @@ def setup_logger(name: str, log_dir: str) -> logging.Logger:
 
     Le FileHandler est **opt-in** via `LOG_TO_FILE=true` : par défaut l'app n'écrit pas sur disque (logs sur stdout, 12-factor). Activer en dev local pour garder un historique.
 
-    Quand activé, le `log_dir` passé par le caller est rebasé vers `PROJECT_ROOT/logs/<relpath>/` (voir `_rebase_log_dir`), regroupant tous les fichiers `.log` sous une arborescence unique. Crée le répertoire si nécessaire.
+    Quand activé, le `log_dir` passé par le caller est rebasé vers `PROJECT_ROOT/logs/<relpath>/` (voir `_rebase_log_dir`), regroupant tous les fichiers `.log` sous une arborescence unique. Crée le répertoire si nécessaire, et se rabat sur la seule sortie standard si le disque le refuse (voir `_attach_file_handler`).
 
     Configure uniquement le logger nommé (pas le root logger). Format : JSON par défaut, texte si LOG_FORMAT=text.
     """
@@ -153,14 +153,33 @@ def setup_logger(name: str, log_dir: str) -> logging.Logger:
     logger.addHandler(console)
 
     if os.environ.get("LOG_TO_FILE", "").lower() == "true":
-        target_dir = _rebase_log_dir(log_dir)
-        target_dir.mkdir(parents=True, exist_ok=True)
-        file_handler = logging.FileHandler(str(target_dir / f"{name}.log"), encoding="utf-8")
-        file_handler.setFormatter(fmt)
-        file_handler.addFilter(_PhaseNameFilter())
-        logger.addHandler(file_handler)
+        _attach_file_handler(logger, name, log_dir, fmt)
 
     return logger
+
+
+def _attach_file_handler(
+    logger: logging.Logger, name: str, log_dir: str, fmt: logging.Formatter
+) -> None:
+    """Ajoute au logger un fichier sous `PROJECT_ROOT/logs/`, ou s'en passe si le disque le refuse.
+
+    Un système de fichiers en lecture seule — le conteneur de production est cloisonné ainsi — ou un répertoire fermé en écriture rend le fichier impossible. La journalisation retombe alors sur la seule sortie standard, que le runtime collecte de toute façon, et un avertissement dit ce qui manque : une destination de logs indisponible n'est pas une raison d'empêcher l'application de démarrer.
+    """
+    target_dir = _rebase_log_dir(log_dir)
+    try:
+        target_dir.mkdir(parents=True, exist_ok=True)
+        file_handler = logging.FileHandler(str(target_dir / f"{name}.log"), encoding="utf-8")
+    except OSError as e:
+        logger.warning(
+            "LOG_TO_FILE est demandé mais %s n'est pas accessible en écriture (%s) : "
+            "journalisation sur la sortie standard seule.",
+            target_dir,
+            e,
+        )
+        return
+    file_handler.setFormatter(fmt)
+    file_handler.addFilter(_PhaseNameFilter())
+    logger.addHandler(file_handler)
 
 
 def configure_root_logging(level: int = logging.INFO) -> None:
