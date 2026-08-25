@@ -29,7 +29,7 @@ def sync_config(sa_sync_conn):
 # ── Helpers ────────────────────────────────────────────────────────
 
 
-def _insert_config_sync(conn, key, value, description="desc"):
+def _insert_config(conn, key, value, description="desc"):
     conn.execute(
         text(
             "INSERT INTO config (key, value, description) "
@@ -39,7 +39,7 @@ def _insert_config_sync(conn, key, value, description="desc"):
     )
 
 
-def _insert_perimeter_sync(conn, code="test", name="Test", root_structure_ids=None):
+def _insert_perimeter(conn, code="test", name="Test", root_structure_ids=None):
     result = conn.execute(
         text(
             "INSERT INTO perimeters (code, name, root_structure_ids) "
@@ -58,7 +58,7 @@ class TestPerimeterFindById:
         assert repo.find_by_id(999999) is None
 
     def test_hydrates_minimal(self, sa_sync_conn, repo):
-        pid = _insert_perimeter_sync(sa_sync_conn, code="P1", name="Périmètre 1")
+        pid = _insert_perimeter(sa_sync_conn, code="P1", name="Périmètre 1")
         p = repo.find_by_id(pid)
         assert p is not None
         assert p.id == pid
@@ -67,7 +67,7 @@ class TestPerimeterFindById:
         assert p.root_structure_ids == ()
 
     def test_hydrates_with_structure_ids(self, sa_sync_conn, repo):
-        pid = _insert_perimeter_sync(
+        pid = _insert_perimeter(
             sa_sync_conn,
             code="P2",
             name="P2",
@@ -95,7 +95,7 @@ class TestCreatePerimeter:
         assert row.name == "New Perimeter"
 
     def test_raises_on_code_conflict(self, sa_sync_conn, repo):
-        _insert_perimeter_sync(sa_sync_conn, code="existing")
+        _insert_perimeter(sa_sync_conn, code="existing")
         with pytest.raises(ConflictError):
             create_perimeter(code="existing", name="X", root_structure_ids=[], repo=repo)
 
@@ -115,18 +115,18 @@ class TestUpdatePerimeter:
             update_perimeter(999999, update=PerimeterUpdate(name="X"), repo=repo)
 
     def test_raises_on_empty_fields(self, sa_sync_conn, repo):
-        p = _insert_perimeter_sync(sa_sync_conn)
+        p = _insert_perimeter(sa_sync_conn)
         with pytest.raises(ValidationError):
             update_perimeter(p, update=PerimeterUpdate(), repo=repo)
 
     def test_updates_name(self, sa_sync_conn, repo):
-        p = _insert_perimeter_sync(sa_sync_conn, name="Old")
+        p = _insert_perimeter(sa_sync_conn, name="Old")
         update_perimeter(p, update=PerimeterUpdate(name="New"), repo=repo)
         result = sa_sync_conn.execute(text("SELECT name FROM perimeters WHERE id = :p"), {"p": p})
         assert result.scalar_one() == "New"
 
     def test_updates_structure_ids(self, sa_sync_conn, repo):
-        p = _insert_perimeter_sync(sa_sync_conn, root_structure_ids=[1])
+        p = _insert_perimeter(sa_sync_conn, root_structure_ids=[1])
         update_perimeter(p, update=PerimeterUpdate(root_structure_ids=[4, 5, 6]), repo=repo)
         result = sa_sync_conn.execute(
             text("SELECT root_structure_ids FROM perimeters WHERE id = :p"), {"p": p}
@@ -143,15 +143,15 @@ class TestDeletePerimeter:
             delete_perimeter(999999, repo=repo, config=sync_config)
 
     def test_deletes(self, sa_sync_conn, repo, sync_config):
-        p = _insert_perimeter_sync(sa_sync_conn, code="disposable")
+        p = _insert_perimeter(sa_sync_conn, code="disposable")
         delete_perimeter(p, repo=repo, config=sync_config)
         result = sa_sync_conn.execute(text("SELECT id FROM perimeters WHERE id = :p"), {"p": p})
         assert result.first() is None
 
     def test_raises_if_used_by_config(self, sa_sync_conn, repo, sync_config):
         """Si le périmètre est référencé dans config (perimeter_*), refus."""
-        p = _insert_perimeter_sync(sa_sync_conn, code="used_perim")
-        _insert_config_sync(sa_sync_conn, "perimeter_extraction", "used_perim")
+        p = _insert_perimeter(sa_sync_conn, code="used_perim")
+        _insert_config(sa_sync_conn, "perimeter_extraction", "used_perim")
 
         with pytest.raises(ConflictError, match="utilisé par"):
             delete_perimeter(p, repo=repo, config=sync_config)
