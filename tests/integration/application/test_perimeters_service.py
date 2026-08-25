@@ -1,7 +1,5 @@
 """Tests de caractérisation pour application/services/perimeters/core.py et l'hydratation du PerimeterRepository."""
 
-import json
-
 import pytest
 from sqlalchemy import text
 
@@ -14,6 +12,7 @@ from application.services.perimeters.core import (
 from domain.errors import ConflictError, NotFoundError, ValidationError
 from infrastructure.read_models.config import PgConfigQueries
 from infrastructure.repositories import perimeter_repository
+from tests.integration.helpers.config import insert_config
 
 
 @pytest.fixture
@@ -27,16 +26,6 @@ def sync_config(sa_sync_conn):
 
 
 # ── Helpers ────────────────────────────────────────────────────────
-
-
-def _insert_config(conn, key, value, description="desc"):
-    conn.execute(
-        text(
-            "INSERT INTO config (key, value, description) "
-            "VALUES (:key, CAST(:value AS jsonb), :description)"
-        ),
-        {"key": key, "value": json.dumps(value), "description": description},
-    )
 
 
 def _insert_perimeter(conn, code="test", name="Test", root_structure_ids=None):
@@ -151,7 +140,7 @@ class TestDeletePerimeter:
     def test_raises_if_used_by_config(self, sa_sync_conn, repo, sync_config):
         """Si le périmètre est référencé dans config (perimeter_*), refus."""
         p = _insert_perimeter(sa_sync_conn, code="used_perim")
-        _insert_config(sa_sync_conn, "perimeter_extraction", "used_perim")
+        insert_config(sa_sync_conn, "perimeter_extraction", "used_perim")
 
         with pytest.raises(ConflictError, match="utilisé par"):
             delete_perimeter(p, repo=repo, config=sync_config)
