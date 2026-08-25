@@ -40,9 +40,10 @@ La base contient des données personnelles de chercheurs (`persons` : identité 
 
 ### Phase 2 — En-têtes de sécurité et défense en profondeur frontend
 
-- [ ] **Content-Security-Policy et en-têtes de sécurité** — l'application est une SPA statique servie par FastAPI (`interfaces/api/app.py`), aucun en-tête de sécurité posé hormis `X-Response-Time`. Ajouter CSP, `X-Frame-Options`/`frame-ancestors` (anti-clickjacking), `X-Content-Type-Options: nosniff`, `Referrer-Policy`, HSTS — au reverse-proxy ou via un middleware FastAPI.
-- [ ] **Assainissement des titres par bibliothèque** — `lib/utils.ts:133-142` (`sanitizeTitle`) parse le HTML des titres/résumés de publications (données externes) par expressions régulières maison, rendu via `{@html}` sur plusieurs pages publiques. DOMPurify (`dompurify@3.4.14`) est déjà dans l'arbre de dépendances : router ce HTML par DOMPurify.
-- [ ] **Second point d'injection HTML latent** — `lib/components/FacetDropdown.svelte:141` rend une prop via `{@html}`, aujourd'hui alimentée par des littéraux statiques. Même piège que l'ancien `Tooltip` : convertir en rendu texte pour fermer le risque avant qu'un appelant y passe une donnée dynamique.
+- [x] **En-têtes de sécurité** — middleware FastAPI posant `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` (anti-clickjacking) et `Referrer-Policy` sur chaque réponse. HSTS reste au reverse-proxy TLS. Commit `1c0602bd`.
+- [x] **Content-Security-Policy** — CSP native SvelteKit en mode hash, injectée en `<meta>` par page (`script-src 'self'` + empreinte du bootstrap inline, sans `unsafe-inline`). Vérifiée en local (Chrome headless, zéro violation) ; le bundle client ne fait ni `eval` ni Worker/WASM. `frame-ancestors` non exprimable en meta, couvert par `X-Frame-Options`. Commit `284c9b97`.
+- [x] **Assainissement des titres par DOMPurify** — `sanitizeTitle` remplace son sanitiseur regex par DOMPurify (même liste blanche) ; dompurify déclaré en dépendance directe. Commit `7e17d9fa`.
+- [x] **Point d'injection HTML latent `FacetDropdown`** — `{@html}` converti en rendu texte, comme `Tooltip`. Commit `279442a4`.
 
 ### Phase 3 — Cloisonnement infrastructure (déploiement)
 
