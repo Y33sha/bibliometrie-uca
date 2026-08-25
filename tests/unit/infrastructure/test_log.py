@@ -134,6 +134,34 @@ class TestSetupLoggerFileLocation:
                 h.close()
                 logger.removeHandler(h)
 
+    def test_unwritable_directory_falls_back_to_stdout(self, tmp_path, monkeypatch, caplog):
+        """Racine en lecture seule : le logger démarre quand même, sur la seule sortie standard."""
+        import importlib.util
+
+        import infrastructure.observability.log as log_module
+
+        spec = importlib.util.spec_from_file_location(
+            "infrastructure_log_readonly", log_module.__file__
+        )
+        fresh = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(fresh)
+        monkeypatch.setattr(fresh, "_PROJECT_ROOT", tmp_path)
+        monkeypatch.setenv("LOG_TO_FILE", "true")
+        monkeypatch.setattr(
+            fresh.Path, "mkdir", lambda *a, **k: (_ for _ in ()).throw(OSError("read-only"))
+        )
+
+        with caplog.at_level(logging.WARNING):
+            logger = fresh.setup_logger("pytest_readonly_logger", str(tmp_path / "logs"))
+        try:
+            assert not [h for h in logger.handlers if isinstance(h, logging.FileHandler)]
+            assert logger.handlers  # la console reste
+            assert "sortie standard" in caplog.text
+        finally:
+            for h in list(logger.handlers):
+                h.close()
+                logger.removeHandler(h)
+
 
 class TestMakeFormatter:
     def test_json_default(self, monkeypatch):

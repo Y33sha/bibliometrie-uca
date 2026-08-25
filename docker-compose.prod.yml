@@ -55,11 +55,11 @@ services:
     cap_drop:
       - ALL
     # Racine en lecture seule : du code qui parviendrait à s'exécuter ne laisse rien derrière
-    # lui. Deux conditions à tenir. Les logs partent sur la sortie standard, que le runtime
-    # collecte (`LOG_TO_FILE` inactif, qui est le défaut) : l'activer ferait échouer le
-    # démarrage. Et une exécution du pipeline dans ce conteneur réclame des volumes
-    # accessibles en écriture sur `/app/data` (stockage des données brutes) et `/app/logs`,
-    # appartenant à l'uid 10001 de l'image.
+    # lui. Deux conditions à tenir. Les logs partent sur la seule sortie standard, que le
+    # runtime collecte : `LOG_TO_FILE` y reste sans effet, l'application signalant par un
+    # avertissement qu'elle n'a pas pu ouvrir son fichier. Et une exécution du pipeline dans
+    # ce conteneur réclame des volumes accessibles en écriture sur `/app/data` (stockage des
+    # données brutes) et `/app/logs`, appartenant à l'uid 10001 de l'image.
     read_only: true
     tmpfs:
       - /tmp
