@@ -41,7 +41,7 @@
 		"dompurify": "^3.4.14",
 		"i18n-iso-countries": "^7.14.0",
 		"katex": "^0.16.44",
-		"marked": "^17.0.6",
+		"marked": "^18.0.10",
 		"mermaid": "^11.14.0",
 		"topojson-client": "^3.1.0",
 		"vis-network": "^10.0.2",
