@@ -254,6 +254,26 @@ async def timing_middleware(request: Request, call_next: RequestResponseEndpoint
     return response
 
 
+# En-têtes de sécurité posés sur toute réponse. La Content-Security-Policy, plus délicate
+# (une politique trop stricte casse la SPA), est traitée à part ; HSTS relève du reverse-proxy TLS.
+_SECURITY_HEADERS = {
+    "X-Content-Type-Options": "nosniff",  # interdit le MIME-sniffing
+    "X-Frame-Options": "DENY",  # anti-clickjacking (l'appli ne s'iframe jamais)
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+}
+
+
+@app.middleware("http")
+async def security_headers_middleware(
+    request: Request, call_next: RequestResponseEndpoint
+) -> Response:
+    """Pose les en-têtes de sécurité (anti-sniffing, anti-clickjacking, politique de référent) sur chaque réponse."""
+    response = await call_next(request)
+    for name, value in _SECURITY_HEADERS.items():
+        response.headers.setdefault(name, value)
+    return response
+
+
 # ----- Include routers -----
 
 app.include_router(auth.router)
