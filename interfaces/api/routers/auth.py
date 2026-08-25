@@ -7,6 +7,7 @@ from fastapi import APIRouter, Cookie, Depends, HTTPException, Response
 
 from interfaces.api.deps import get_admin_user
 from interfaces.api.models import AuthCheckResponse, LoginRequest, OkResponse
+from interfaces.api.rate_limit import login_rate_limit
 from interfaces.api.session import (
     SESSION_MAX_AGE,
     check_password,
@@ -23,10 +24,11 @@ def auth_login(
     data: LoginRequest,
     response: Response,
     admin_user: str = Depends(get_admin_user),
+    _rate_limit: None = Depends(login_rate_limit),
 ) -> OkResponse:
     """Authentifie l'admin et pose un cookie de session signé.
 
-    Renvoie 401 si les identifiants ne correspondent pas à ceux configurés côté serveur (`ADMIN_USER` et `ADMIN_HASH`). Sur succès, un cookie `session` (httponly, samesite=strict, durée `SESSION_MAX_AGE`) est posé et autorise les écritures, que le middleware garde.
+    Renvoie 401 si les identifiants ne correspondent pas à ceux configurés côté serveur (`ADMIN_USER` et `ADMIN_HASH`), 429 au-delà du plafond de tentatives par IP (`login_rate_limit`). Sur succès, un cookie `session` (httponly, samesite=strict, durée `SESSION_MAX_AGE`) est posé et autorise les écritures, que le middleware garde.
     """
     if data.username != admin_user or not check_password(data.password):
         raise HTTPException(status_code=401, detail="Identifiants incorrects")

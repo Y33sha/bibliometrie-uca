@@ -59,6 +59,15 @@ _settings.cookie_secure = False
 
 
 @pytest.fixture(autouse=True)
+def _reset_login_rate_limiter():
+    """Isole chaque test du compteur global du limiteur de connexion."""
+    from interfaces.api.rate_limit import reset_login_limiter
+
+    reset_login_limiter()
+    yield
+
+
+@pytest.fixture(autouse=True)
 def _fail_on_escaped_dml():
     """Échoue si une écriture API échappe à un command handler.
 

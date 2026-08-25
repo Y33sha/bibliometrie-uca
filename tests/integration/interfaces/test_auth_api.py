@@ -23,6 +23,15 @@ class TestLogin:
         r = client.post("/api/auth/login", json={"username": settings.admin_user})
         assert r.status_code == 422
 
+    def test_throttles_repeated_attempts(self, client):
+        from interfaces.api.rate_limit import _MAX_ATTEMPTS
+
+        payload = {"username": "inconnu", "password": "x"}
+        for _ in range(_MAX_ATTEMPTS):
+            assert client.post("/api/auth/login", json=payload).status_code == 401
+        # Au-delà du plafond, le limiteur coupe avant même la vérification des identifiants.
+        assert client.post("/api/auth/login", json=payload).status_code == 429
+
 
 class TestCheck:
     def test_reports_anonymous_visitor(self, client):
