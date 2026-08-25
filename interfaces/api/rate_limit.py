@@ -67,10 +67,12 @@ def reset_login_limiter() -> None:
 
 
 def _client_key(request: Request) -> str:
-    """Identifie le client par IP : premier maillon de `X-Forwarded-For` (posé par le reverse-proxy) sinon IP de connexion directe."""
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
+    """Identifie le client par l'adresse de connexion portée par la requête.
+
+    `X-Forwarded-For` n'est pas lu ici. Le serveur ASGI s'en charge en amont (`ProxyHeadersMiddleware` d'uvicorn) : il ne consulte l'en-tête que si le pair de la connexion figure dans `FORWARDED_ALLOW_IPS`, remonte la liste des maillons de droite à gauche en écartant les proxys déclarés, et réécrit l'adresse du client dans la requête. Le relire à ce niveau reviendrait à croire une valeur que tout appelant compose : une valeur différente à chaque tentative ouvrirait un compteur neuf, et le plafond ne retiendrait rien.
+
+    Sans proxy déclaré, l'adresse est celle du dernier maillon réseau — les clients derrière un même proxy partagent alors un compteur.
+    """
     return request.client.host if request.client else "unknown"
 
 
