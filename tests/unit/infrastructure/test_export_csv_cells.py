@@ -1,9 +1,16 @@
-"""Assainissement des cellules des exports CSV : une valeur venue d'une source externe ne doit pas être évaluée comme formule par le tableur qui ouvre le fichier."""
+"""Écriture des exports CSV : assainissement des cellules et plafond de lignes.
+
+Une valeur venue d'une source externe ne doit pas être évaluée comme formule par le tableur qui ouvre le fichier, et un export coupé au plafond doit le dire — le fichier est le seul canal vers qui l'a demandé.
+"""
 
 import csv
 import io
 
-from infrastructure.read_models.publications.list import _CsvWriter, _neutralize_formula
+from infrastructure.read_models.publications.list import (
+    _cap_export_rows,
+    _CsvWriter,
+    _neutralize_formula,
+)
 
 
 class TestNeutralizeFormula:
@@ -37,3 +44,22 @@ class TestCsvWriter:
         assert list(csv.reader(io.StringIO(buf.getvalue()))) == [
             ["'=cmd|' /C calc'!A0", "2024", "Nature"]
         ]
+
+
+class TestExportCap:
+    def test_rows_within_the_cap_pass_through_whole(self):
+        rows, truncated = _cap_export_rows([1, 2, 3], 3)
+        assert list(rows) == [1, 2, 3]
+        assert truncated is False
+
+    def test_the_extra_row_reveals_the_overflow_without_being_emitted(self):
+        # Les requêtes demandent une ligne de plus que le plafond : sa présence signale
+        # le dépassement, elle ne sort pas du fichier.
+        rows, truncated = _cap_export_rows([1, 2, 3, 4], 3)
+        assert list(rows) == [1, 2, 3]
+        assert truncated is True
+
+    def test_the_notice_names_the_cap(self):
+        buf = io.StringIO()
+        _CsvWriter(buf).write_truncation_notice(500_000)
+        assert "500 000 lignes" in buf.getvalue()
