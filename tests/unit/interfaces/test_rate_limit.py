@@ -1,6 +1,19 @@
 """Limiteur de débit à fenêtre fixe (anti-bruteforce du login)."""
 
-from interfaces.api.rate_limit import FixedWindowRateLimiter
+from fastapi import Request
+
+from interfaces.api.rate_limit import FixedWindowRateLimiter, _client_key
+
+
+def _request(client_host: str | None, **headers: str) -> Request:
+    """Requête minimale portant une adresse de connexion et des en-têtes."""
+    return Request(
+        {
+            "type": "http",
+            "headers": [(k.replace("_", "-").encode(), v.encode()) for k, v in headers.items()],
+            "client": (client_host, 51234) if client_host else None,
+        }
+    )
 
 
 class _Clock:
@@ -50,3 +63,15 @@ class TestFixedWindowRateLimiter:
         clock.t = 60
         limiter.allow("c")
         assert limiter._hits.keys() == {"c"}
+
+
+class TestClientKey:
+    """La clé du limiteur suit l'adresse de connexion, jamais un en-tête fourni par l'appelant."""
+
+    def test_forged_forwarded_header_does_not_change_the_key(self):
+        forged = _request("10.0.0.7", x_forwarded_for="1.2.3.4, 5.6.7.8")
+        assert _client_key(forged) == "10.0.0.7"
+        assert _client_key(forged) == _client_key(_request("10.0.0.7"))
+
+    def test_missing_client_falls_back_to_a_stable_key(self):
+        assert _client_key(_request(None)) == "unknown"
