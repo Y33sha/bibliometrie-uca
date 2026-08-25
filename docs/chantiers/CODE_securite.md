@@ -54,7 +54,7 @@ La base contient des données personnelles de chercheurs (`persons` : identité 
 ### Phase 4 — Suivi dynamique dans le temps
 
 - [x] **Mise à jour automatisée des dépendances** — `.github/dependabot.yml` : PR hebdomadaires sur pip (racine), npm (`interfaces/frontend`) et github-actions, mineures/correctives groupées par écosystème, majeures individuelles. Complète les scans `pip-audit` / `npm audit` bloquants au push.
-- [ ] **Scan de secrets** — ajouter gitleaks ou trufflehog en pre-commit, pour compléter la couverture (aucun secret commité à ce jour, garde-fou préventif).
+- [x] **Blocage des secrets au push** — GitHub push protection activée : bloque côté serveur les secrets reconnus (motifs de fournisseurs) avant qu'ils n'atteignent le dépôt. Complément optionnel non retenu pour l'instant : gitleaks en pre-commit, qui ajoute la détection par entropie (secrets génériques : mot de passe DB, `SESSION_SECRET`) et un blocage local plus précoce.
 - [ ] **Alignement des postes de dev sur Node 22** — la CI utilise Node 22 (`.github/workflows/ci.yml:88`) ; les postes locaux sont sur Node 20, proche de sa fin de support.
 
 ## Questions ouvertes
