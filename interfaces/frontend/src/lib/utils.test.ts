@@ -1,3 +1,5 @@
+// @vitest-environment happy-dom
+// (sanitizeTitle passe le MathML/HTML par DOMPurify, qui requiert un DOM ; esc() aussi.)
 import { describe, it, expect } from 'vitest';
 import {
 	esc,

@@ -1,3 +1,4 @@
+import DOMPurify from 'dompurify';
 import katex from 'katex';
 
 /** Sérialise des paramètres en query string en gardant les virgules littérales. `URLSearchParams.toString()` percent-encode la virgule en `%2C` ; or elle est licite dans une query (RFC 3986) et sépare nos listes de valeurs — on la restaure pour des URL lisibles. Retourne la chaîne sans le `?` initial (vide si aucun paramètre). */
@@ -65,35 +66,14 @@ function renderLatex(s: string): string {
 	return parts.join('');
 }
 
-/* Assainit le MathML et les balises de formatage HTML. */
+/* Assainit le MathML et les balises de formatage HTML par liste blanche, via DOMPurify. */
 function sanitizeMathML(s: string): string {
+	// Retire le préfixe de namespace `mml:` pour un rendu MathML natif par le navigateur.
 	const input = s.replace(/<(\/?)\s*mml:/g, '<$1');
-
-	const parts: string[] = [];
-	let lastIdx = 0;
-	const re = /<(\/?)(\w+)(\s[^>]*)?\s*\/?>/g;
-	let m;
-
-	while ((m = re.exec(input)) !== null) {
-		parts.push(escapeHtml(input.slice(lastIdx, m.index)));
-
-		const [full, slash, tag, rawAttrs] = m;
-		if (TITLE_ALLOWED_TAGS.has(tag.toLowerCase())) {
-			let attrs = '';
-			if (!slash && rawAttrs) {
-				for (const am of rawAttrs.matchAll(/([\w-]+)\s*=\s*"([^"]*)"/g)) {
-					if (TITLE_ALLOWED_ATTRS.has(am[1].toLowerCase())) {
-						attrs += ` ${am[1].toLowerCase()}="${escapeHtml(am[2])}"`;
-					}
-				}
-			}
-			parts.push(`<${slash}${tag.toLowerCase()}${attrs}>`);
-		}
-		lastIdx = m.index + full.length;
-	}
-
-	parts.push(escapeHtml(input.slice(lastIdx)));
-	return parts.join('');
+	return DOMPurify.sanitize(input, {
+		ALLOWED_TAGS: [...TITLE_ALLOWED_TAGS],
+		ALLOWED_ATTR: [...TITLE_ALLOWED_ATTRS]
+	});
 }
 
 const HAS_LATEX = /\$\$[\s\S]+?\$\$|\$[^$]+?\$/;
