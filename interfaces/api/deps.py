@@ -8,7 +8,7 @@ La session admin vit dans `session.py` ; ce module n'en expose que le nom d'util
 import logging
 from collections.abc import Callable, Iterator
 
-from fastapi import Depends, HTTPException, Request
+from fastapi import Depends, Request
 from sqlalchemy import Connection
 
 from application.ports.pipeline.authorships.build import AuthorshipsBuildQueries
@@ -106,18 +106,6 @@ def current_admin_user(request: Request) -> str | None:
     """
     token = request.cookies.get("session")
     return read_session(token) if token else None
-
-
-def require_admin(request: Request) -> str:
-    """Exige une session valide et rend l'utilisateur qu'elle porte, ou lève un 401.
-
-    Le middleware d'`app.py` garde les écritures en filtrant sur la méthode HTTP ; toute lecture est donc ouverte. Cette dépendance couvre les rares lectures qui ne peuvent pas l'être, et se pose sur la route qu'elle protège plutôt que sur un préfixe d'URL.
-    """
-    token = request.cookies.get("session")
-    admin_user = read_session(token) if token else None
-    if not admin_user:
-        raise HTTPException(status_code=401, detail="Non authentifié")
-    return admin_user
 
 
 # ----- Factories DB -----
