@@ -446,7 +446,7 @@
 		{#if showHalStatusColumn && col('hal_status')}<FacetDropdown label="Statut HAL" options={facets.options.halStatus} bind:selected={selectedHalStatus} onchange={onFilterChange} />{/if}
 		{#if showCorrespondingColumn && col('corr') && facets.options.corresponding.length}<FacetDropdown label="Corresp." options={facets.options.corresponding} bind:selected={selectedCorr} onchange={onFilterChange} />{/if}
 		{#if showPerimeterFacet && facets.options.perimeter.length}<FacetDropdown label="UCA" options={facets.options.perimeter} bind:selected={selectedPerimeter} onchange={onFilterChange} />{/if}
-		{#if col('apc')}<FacetDropdown label="APC" options={facets.options.apc} bind:selected={selectedApc} onchange={onFilterChange} tooltip="Pas d'info après 2024<br>Sans APC = ou APC non documentés" />{/if}
+		{#if col('apc')}<FacetDropdown label="APC" options={facets.options.apc} bind:selected={selectedApc} onchange={onFilterChange} tooltip={"Pas d'info après 2024\nSans APC = ou APC non documentés"} />{/if}
 		<FacetDropdown label="Pays" options={facets.options.countries} searchable bind:selected={selectedCountries} onchange={onFilterChange} />
 		<PresenceFilterToggle label="Sources" items={SOURCE_ITEMS} bind:states={sourceStates} counts={facets.sourceCounts} onchange={onFilterChange} />
 	</div>

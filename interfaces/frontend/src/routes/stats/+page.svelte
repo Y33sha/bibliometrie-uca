@@ -621,7 +621,7 @@
 		<EntityFilter label="Éditeur" endpoint="/api/stats/facets" kind="publisher" buildParams={chartParams} selectedId={selectedPublisherId} onchange={onPublisherFilter} />
 	{/if}
 	{#if facetKeys.has('apc')}
-		<FacetDropdown label="APC" options={facets.options.apc} bind:selected={selectedApc} onchange={onFilterChange} tooltip="Pas d'info après 2024<br>Sans APC = ou APC non documentés" />
+		<FacetDropdown label="APC" options={facets.options.apc} bind:selected={selectedApc} onchange={onFilterChange} tooltip={"Pas d'info après 2024\nSans APC = ou APC non documentés"} />
 	{/if}
 </div>
 
