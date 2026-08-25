@@ -69,12 +69,10 @@ class _Cascade:
         self,
         conn: Connection,
         queries: PersonsMatchingQueries,
-        logger: logging.Logger,
         *,
         person_repo: PersonRepository,
         authorship_repo: AuthorshipRepository,
     ) -> None:
-        self._logger = logger
         self._person_repo = person_repo
         self._authorship_repo = authorship_repo
 
@@ -101,6 +99,10 @@ class _Cascade:
         self.created = 0
         self.out_of_perimeter_matched = 0
         self.corroboration_rejected = 0
+        # Identifiants distincts refusés. Une même signature revient sur chaque publication
+        # d'une collaboration : le compteur d'occurrences en dit surtout la fréquence, pas
+        # l'ampleur — c'est le nombre d'identifiants concernés qui la mesure.
+        self.corroboration_rejected_ids: set[tuple[str, str]] = set()
 
     def _cross_and_name(
         self, a: EnrichedAuthorship
@@ -134,7 +136,7 @@ class _Cascade:
         return cross_source_match, name_form_outcome, rejected_for_pub
 
     def decide_full(self, a: EnrichedAuthorship) -> PersonMatchDecision:
-        """Décision complète, identifiants compris ; journalise la corroboration. Pour `match`."""
+        """Décision complète, identifiants compris ; compte les refus de corroboration. Pour `match`."""
         cross_source_match, name_form_outcome, rejected_for_pub = self._cross_and_name(a)
         form = a.author_name_normalized
         idref_decision = decide_match_by_identifier(
@@ -154,16 +156,9 @@ class _Cascade:
             ("idref", a.idref, idref_decision),
         ):
             if id_decision.rejection is not None:
-                rejected_pid, target_name = id_decision.rejection
-                self._logger.info(
-                    "  corroboration : identifiant %s=%s rejeté — « %s » incompatible avec la personne #%d (« %s »)",
-                    id_type,
-                    id_value,
-                    a.full_name,
-                    rejected_pid,
-                    target_name,
-                )
                 self.corroboration_rejected += 1
+                if id_value is not None:
+                    self.corroboration_rejected_ids.add((id_type, id_value))
         return decide_person_match(
             orcid_match=orcid_decision.person_id,
             hal_match=hal_decision.person_id,
@@ -242,6 +237,7 @@ class _Cascade:
             skipped_counts=dict(self.skipped_counts),
             created=self.created,
             corroboration_rejected=self.corroboration_rejected,
+            corroboration_rejected_distinct=len(self.corroboration_rejected_ids),
             out_of_perimeter_matched=self.out_of_perimeter_matched,
             in_perimeter_total=self.in_perimeter_total,
             out_of_perimeter_total=self.out_of_perimeter_total,
@@ -263,7 +259,7 @@ def run_cascade(
     Passe `match` (`decide_full`) : rattachement ferme (identifiant, nom) et cross-source contre les ancres présentes ; les signatures non rattachées sont reprises en passe suivante. Passe `create` (`decide_cross_and_name`) sur ces seules restantes : cross-source de rattrapage contre l'état ferme complet, puis création des inconnues — une création ancre le cross-source d'une co-signature traitée juste après, dans la même passe.
     """
     logger.info("▶ chargement des index de la cascade...")
-    c = _Cascade(conn, queries, logger, person_repo=person_repo, authorship_repo=authorship_repo)
+    c = _Cascade(conn, queries, person_repo=person_repo, authorship_repo=authorship_repo)
     total = len(c.authorships)
     logger.info("  %d signatures à traiter", total)
 

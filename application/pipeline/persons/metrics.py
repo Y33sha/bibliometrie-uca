@@ -19,6 +19,7 @@ class CascadeResult(NamedTuple):
     skipped_counts: dict[str, int]
     created: int
     corroboration_rejected: int
+    corroboration_rejected_distinct: int
     out_of_perimeter_matched: int
     in_perimeter_total: int
     out_of_perimeter_total: int
@@ -28,10 +29,19 @@ class CascadeResult(NamedTuple):
 
 
 def log_matching_breakdown(logger: logging.Logger, result: CascadeResult) -> None:
-    """Loggue le nombre de rattachements par méthode et le nombre de créations."""
+    """Loggue le nombre de rattachements par méthode, le nombre de créations et les refus de corroboration."""
     matched = result.matched_counts
     breakdown = ", ".join(f"{method}={matched.get(method, 0)}" for method in _MATCHING_METHODS)
     logger.info("Rattachements par méthode : %s | créées : %d", breakdown, result.created)
+    # Une même signature revient sur chaque publication d'une collaboration : le nombre
+    # d'identifiants distincts dit l'ampleur du désaccord, là où les occurrences n'en disent
+    # que la fréquence. Le détail de chaque cas se relit en base, par le nom normalisé de la
+    # signature et l'identifiant qu'elle porte.
+    logger.info(
+        "Refus de corroboration : %d (%d identifiants distincts)",
+        result.corroboration_rejected,
+        result.corroboration_rejected_distinct,
+    )
 
 
 def build_metrics(
@@ -58,6 +68,7 @@ def build_metrics(
         "created": created,
         "skipped_ambiguous": skipped.get("ambiguous_name_form", 0),
         "corroboration_rejected": result.corroboration_rejected,
+        "corroboration_rejected_distinct": result.corroboration_rejected_distinct,
         "identifiers_transferred": transferred,
         "cross_source_detached": cross_source_detached,
         "reorphaned_nominal": reorphaned,
