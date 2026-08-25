@@ -1,20 +1,6 @@
-"""Modèles Pydantic pour la page admin pipeline (statut en cours + log par phase)."""
+"""Modèles Pydantic pour la page admin pipeline (log par phase)."""
 
 from pydantic import BaseModel
-
-
-class PipelineStatus(BaseModel):
-    """État du pipeline en cours (lu depuis logs/status.json).
-
-    L'objet n'est rendu que lorsqu'un run tourne : sa seule présence dit « en cours », inutile de porter un drapeau qui vaudrait toujours vrai.
-    """
-
-    mode: str
-    phase: str
-    started_at: str
-    phase_started_at: str
-    phases_done: int
-    phases_total: int
 
 
 class PipelinePhaseLog(BaseModel):

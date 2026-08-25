@@ -2176,28 +2176,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/pipeline/status": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Pipeline Status
-         * @description Statut du pipeline en cours, ou null si aucun ne tourne.
-         *
-         *     Un `status.json` orphelin (PID mort) est traité comme inactif et nettoyé par `read_status`.
-         */
-        get: operations["pipeline_status_api_pipeline_status_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/pipeline/phases": {
         parameters: {
             query?: never;
@@ -4188,26 +4166,6 @@ export interface components {
              * @default 0
              */
             omitted_lines: number;
-        };
-        /**
-         * PipelineStatus
-         * @description État du pipeline en cours (lu depuis logs/status.json).
-         *
-         *     L'objet n'est rendu que lorsqu'un run tourne : sa seule présence dit « en cours », inutile de porter un drapeau qui vaudrait toujours vrai.
-         */
-        PipelineStatus: {
-            /** Mode */
-            mode: string;
-            /** Phase */
-            phase: string;
-            /** Started At */
-            started_at: string;
-            /** Phase Started At */
-            phase_started_at: string;
-            /** Phases Done */
-            phases_done: number;
-            /** Phases Total */
-            phases_total: number;
         };
         /**
          * PivotDimensionOut
@@ -8826,26 +8784,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    pipeline_status_api_pipeline_status_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PipelineStatus"] | null;
                 };
             };
         };

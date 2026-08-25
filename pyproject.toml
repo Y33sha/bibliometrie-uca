@@ -98,10 +98,9 @@ forbidden_modules = ["infrastructure"]
 # imports directs.
 allow_indirect_imports = "true"
 ignore_imports = [
-    # Lecture filesystem (statut du run, log par phase découpé de
-    # logs/pipeline.log) : pas une query / repo, ne dépend pas d'une
-    # connexion DB — l'interdiction d'accès infra direct ne s'y applique pas.
-    "interfaces.api.routers.pipeline_runs -> infrastructure.observability.pipeline_status",
+    # Lecture filesystem (log d'une phase découpé de logs/pipeline.log) : pas une
+    # query / repo, ne dépend pas d'une connexion DB — l'interdiction d'accès
+    # infra direct ne s'y applique pas.
     "interfaces.api.routers.pipeline_runs -> infrastructure.observability.phase_logs",
 ]
 

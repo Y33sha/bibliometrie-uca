@@ -1,6 +1,6 @@
-"""Router du pipeline : statut du run en cours, historique des exécutions, logs de phase. Sert `/api/pipeline/*`.
+"""Router du pipeline : historique des exécutions et logs de phase. Sert `/api/pipeline/*`.
 
-Deux origines pour ces lectures. Le statut du run en cours vient de `logs/status.json`, écrit par l'orchestrateur, et le log d'une phase est découpé de `logs/pipeline.log` par `infrastructure.observability.phase_logs` : ces deux-là ne passent par aucun port, les fichiers étant l'état que l'orchestrateur laisse derrière lui. L'historique des runs, lui, est servi en base par `PipelineRunsQueries` ; il agrège les exécutions de phase par run, et le détail d'un run rend ses phases dans l'ordre, chacune avec son rendement et son écart de durée au médian historique, recalculés à la lecture.
+Deux origines pour ces lectures. L'historique des runs est servi en base par `PipelineRunsQueries` ; il agrège les exécutions de phase par run, et le détail d'un run rend ses phases dans l'ordre, chacune avec son rendement et son écart de durée au médian historique, recalculés à la lecture. Le log d'une phase, lui, est découpé de `logs/pipeline.log` par `infrastructure.observability.phase_logs` : il ne passe par aucun port, le fichier étant la trace que l'orchestrateur laisse derrière lui.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -12,21 +12,10 @@ from application.ports.read_models.pipeline_runs_queries import (
     RunSummary,
 )
 from infrastructure.observability.phase_logs import read_phase_log
-from infrastructure.observability.pipeline_status import read_status
 from interfaces.api.deps import pipeline_runs_queries
-from interfaces.api.models import PipelinePhaseLog, PipelineStatus
+from interfaces.api.models import PipelinePhaseLog
 
 router = APIRouter(prefix="/api/pipeline", tags=["pipeline"])
-
-
-@router.get("/status", response_model=PipelineStatus | None)
-def pipeline_status() -> PipelineStatus | None:
-    """Statut du pipeline en cours, ou null si aucun ne tourne.
-
-    Un `status.json` orphelin (PID mort) est traité comme inactif et nettoyé par `read_status`.
-    """
-    status = read_status()
-    return PipelineStatus.model_validate(status) if status else None
 
 
 @router.get("/phases", response_model=list[str])
