@@ -4,8 +4,9 @@ import csv
 import html
 import io
 import json
+import logging
 import re
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from typing import Any
 
 from sqlalchemy import Connection, text
@@ -297,6 +298,8 @@ def list_publications(
     )
 
 
+logger = logging.getLogger(__name__)
+
 # ── Export CSV ────────────────────────────────────────────────────
 
 
@@ -331,6 +334,32 @@ class _CsvWriter:
 
     def writerow(self, row: Iterable[object]) -> None:
         self._writer.writerow([_neutralize_formula(cell) for cell in row])
+
+    def write_truncation_notice(self, cap: int) -> None:
+        """Écrit une dernière ligne disant que l'export s'arrête au plafond.
+
+        Le fichier est le seul canal vers qui l'a demandé — il arrive par un lien de téléchargement, hors de toute page qui pourrait l'avertir. Un export incomplet qui se présente comme complet induit en erreur bien plus qu'une ligne étrangère aux données.
+        """
+        milliers = f"{cap:,}".replace(",", " ")
+        self.writerow(
+            [f"— Export tronqué à {milliers} lignes : affiner les filtres pour l'obtenir entier."]
+        )
+
+
+# Plafond de lignes d'un export. Assez haut pour qu'un export légitime ne l'approche jamais —
+# à ce compte, requête et fichier tiennent confortablement en mémoire — et assez bas pour
+# qu'une demande sans filtre, que n'importe qui peut répéter, ne puisse pas la saturer.
+MAX_EXPORT_ROWS = 500_000
+
+
+def _cap_export_rows(rows: Sequence[Any], cap: int) -> tuple[Sequence[Any], bool]:
+    """Rend les lignes ramenées au plafond, et si la coupe a eu lieu.
+
+    Les requêtes demandent une ligne de plus que le plafond : sa présence signale le dépassement sans qu'un `COUNT` séparé soit nécessaire. La coupe suit le tri demandé, appliqué avant elle en base.
+    """
+    if len(rows) <= cap:
+        return rows, False
+    return rows[:cap], True
 
 
 def _plain_text(s: str | None) -> str:
@@ -393,9 +422,22 @@ def export_publications_csv(
             ) src_ids ON TRUE
             WHERE {where_clause}
             ORDER BY {order}
+            LIMIT :export_limit
         """),
-        {**binds, "person_lab_a3": filters.person_id, "focus_person": filters.person_id},
+        {
+            **binds,
+            "person_lab_a3": filters.person_id,
+            "focus_person": filters.person_id,
+            "export_limit": MAX_EXPORT_ROWS + 1,
+        },
     ).all()
+    rows, truncated = _cap_export_rows(rows, MAX_EXPORT_ROWS)
+    if truncated:
+        logger.warning(
+            "Export des publications tronqué au plafond de %d lignes (filtres : %s)",
+            MAX_EXPORT_ROWS,
+            filters,
+        )
 
     # Colonnes émises = colonnes visibles à l'affichage, dans l'ordre d'affichage. Titre et liens (DOI + Sources) toujours présents ; « Éditeur » suit « Revue » (clé `journal`). `columns` vide => toutes (compat ascendante).
     requested = (
@@ -449,6 +491,9 @@ def export_publications_csv(
             "Sources": json.dumps(sources, ensure_ascii=False) if sources else "",
         }
         writer.writerow([cell[header] for _, header in emitted])
+
+    if truncated:
+        writer.write_truncation_notice(MAX_EXPORT_ROWS)
 
     return "﻿" + buf.getvalue()
 
@@ -507,9 +552,17 @@ def export_theses_csv(
             ) src_ids ON TRUE
             WHERE {where_clause}
             ORDER BY {order}
+            LIMIT :export_limit
         """),
-        binds,
+        {**binds, "export_limit": MAX_EXPORT_ROWS + 1},
     ).all()
+    rows, truncated = _cap_export_rows(rows, MAX_EXPORT_ROWS)
+    if truncated:
+        logger.warning(
+            "Export des thèses tronqué au plafond de %d lignes (filtres : %s)",
+            MAX_EXPORT_ROWS,
+            filters,
+        )
 
     buf = io.StringIO()
     writer = _CsvWriter(buf)
@@ -550,5 +603,8 @@ def export_theses_csv(
                 json.dumps(sources, ensure_ascii=False) if sources else "",
             ]
         )
+
+    if truncated:
+        writer.write_truncation_notice(MAX_EXPORT_ROWS)
 
     return "﻿" + buf.getvalue()
