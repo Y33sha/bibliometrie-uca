@@ -1,0 +1,40 @@
+# Mises à jour automatisées des dépendances (pull requests hebdomadaires).
+# Complète les scans bloquants pip-audit / npm audit : la détection reste au push,
+# la remédiation arrive en PR à réviser. Les mises à jour mineures et correctives
+# sont groupées par écosystème pour limiter le nombre de PR ; les majeures, plus
+# risquées, ouvrent une PR chacune.
+version: 2
+updates:
+  # ---- Backend Python (pyproject.toml + uv.lock à la racine) ----
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      python-mineures:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+  # ---- Frontend SvelteKit (package.json + package-lock.json) ----
+  - package-ecosystem: "npm"
+    directory: "/interfaces/frontend"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      npm-mineures:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+  # ---- Actions GitHub épinglées dans les workflows CI ----
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore(ci)"
