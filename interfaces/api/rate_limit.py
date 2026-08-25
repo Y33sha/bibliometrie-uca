@@ -1,6 +1,8 @@
-"""Limiteur de débit en mémoire, appliqué à l'endpoint de connexion (anti-bruteforce).
+"""Limiteurs de débit en mémoire, posés sur la connexion et sur les exports.
 
-Fenêtre fixe par client : au plus `max_attempts` tentatives par `window_seconds`, au-delà l'appel rend 429. L'état vit dans le processus (un compteur par clé client) ; il suffit à ralentir le devinage de mot de passe sur l'unique compte admin, en défense en profondeur du rate limiting réseau du reverse-proxy.
+Fenêtre fixe par client : au plus `max_attempts` appels par `window_seconds`, au-delà l'appel rend 429. L'état vit dans le processus (un compteur par clé client), en défense en profondeur du rate limiting réseau du reverse-proxy.
+
+Deux usages, deux compteurs indépendants — un export refusé ne doit pas empêcher de se connecter. Sur la connexion, le plafond ralentit le devinage de mot de passe. Sur les exports, il borne le coût d'une rafale : le plafond de lignes borne celui d'un appel, pas celui de mille.
 """
 
 from __future__ import annotations
@@ -12,8 +14,12 @@ from fastapi import HTTPException, Request
 
 # Généreux pour ne pas gêner l'admin (une connexion tient en 1-2 tentatives), assez bas pour
 # rendre le bruteforce impraticable.
-_MAX_ATTEMPTS = 10
-_WINDOW_SECONDS = 300
+_LOGIN_MAX_ATTEMPTS = 10
+_LOGIN_WINDOW_SECONDS = 300
+# Un export se demande à la main, en cliquant : quelques-uns par session de travail, jamais
+# vingt en cinq minutes. Le plafond laisse passer l'usage humain et arrête la rafale.
+_EXPORT_MAX_ATTEMPTS = 20
+_EXPORT_WINDOW_SECONDS = 300
 # Plafond du nombre de clés suivies : borne la mémoire même sous un flot d'IP variées.
 _MAX_KEYS = 4096
 
@@ -58,12 +64,14 @@ class FixedWindowRateLimiter:
         self._hits.clear()
 
 
-_login_limiter = FixedWindowRateLimiter(_MAX_ATTEMPTS, _WINDOW_SECONDS)
+_login_limiter = FixedWindowRateLimiter(_LOGIN_MAX_ATTEMPTS, _LOGIN_WINDOW_SECONDS)
+_export_limiter = FixedWindowRateLimiter(_EXPORT_MAX_ATTEMPTS, _EXPORT_WINDOW_SECONDS)
 
 
-def reset_login_limiter() -> None:
-    """Réinitialise le limiteur de connexion global (isolation entre tests)."""
+def reset_rate_limiters() -> None:
+    """Vide les compteurs de tous les limiteurs (isolation entre tests)."""
     _login_limiter.reset()
+    _export_limiter.reset()
 
 
 def _client_key(request: Request) -> str:
@@ -76,9 +84,19 @@ def _client_key(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
-def login_rate_limit(request: Request) -> None:
-    """Dépendance FastAPI : rejette en 429 les tentatives de connexion au-delà du plafond par IP."""
-    if not _login_limiter.allow(_client_key(request)):
-        raise HTTPException(
-            status_code=429, detail="Trop de tentatives de connexion. Réessayez plus tard."
-        )
+def _rate_limited(limiter: FixedWindowRateLimiter, detail: str) -> Callable[[Request], None]:
+    """Dépendance FastAPI qui rejette en 429 les appels dépassant le plafond de `limiter`, par IP."""
+
+    def dependency(request: Request) -> None:
+        if not limiter.allow(_client_key(request)):
+            raise HTTPException(status_code=429, detail=detail)
+
+    return dependency
+
+
+login_rate_limit = _rate_limited(
+    _login_limiter, "Trop de tentatives de connexion. Réessayez plus tard."
+)
+export_rate_limit = _rate_limited(
+    _export_limiter, "Trop d'exports demandés. Réessayez dans quelques minutes."
+)
