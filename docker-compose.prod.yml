@@ -55,14 +55,16 @@ services:
     cap_drop:
       - ALL
     # Racine en lecture seule : du code qui parviendrait à s'exécuter ne laisse rien derrière
-    # lui. Deux conditions à tenir. Les logs partent sur la seule sortie standard, que le
-    # runtime collecte : `LOG_TO_FILE` y reste sans effet, l'application signalant par un
-    # avertissement qu'elle n'a pas pu ouvrir son fichier. Et une exécution du pipeline dans
-    # ce conteneur réclame des volumes accessibles en écriture sur `/app/data` (stockage des
-    # données brutes) et `/app/logs`, appartenant à l'uid 10001 de l'image.
+    # lui. Les logs partent sur la seule sortie standard, que le runtime collecte, et ce que
+    # le pipeline écrit vraiment vit dans le volume déclaré ci-dessous.
     read_only: true
     tmpfs:
       - /tmp
+    volumes:
+      # Stockage des payloads bruts des sources (`data/raw_store`), écrit par le pipeline :
+      # de la donnée, qu'une racine en lecture seule ne peut pas se contenter de perdre.
+      # Seul emplacement ouvert en écriture du conteneur.
+      - rawstore:/app/data
     # Plafonds de ressources : bornent au conteneur l'effet d'une requête coûteuse, d'une
     # boucle emballée ou d'un afflux d'appels, plutôt que de le laisser atteindre la machine
     # hôte. Valeurs de départ, à relever si une exécution du pipeline s'y heurte.
@@ -88,3 +90,4 @@ services:
 
 volumes:
   pgdata:
+  rawstore:
