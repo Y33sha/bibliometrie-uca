@@ -9,7 +9,10 @@ Usage :
 Les paramètres externalisés dynamiques (périmètres, clés API, credentials ScanR, collections HAL, années pipeline) sont lus depuis la table `config` en base.
 """
 
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from typing import Annotated
+
+from pydantic import field_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 from infrastructure import PROJECT_ROOT
 
@@ -20,7 +23,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=PROJECT_ROOT / ".env",
         env_file_encoding="utf-8",
-        extra="ignore",  # ignore les env vars non déclarées (POSTGRES_*, CORS_ORIGINS, etc.)
+        extra="ignore",  # ignore les env vars non déclarées (POSTGRES_*, FORWARDED_ALLOW_IPS, etc.)
         case_sensitive=False,
     )
 
@@ -38,6 +41,10 @@ class Settings(BaseSettings):
     # Exposition des docs interactives (`/docs`, `/redoc`, `/openapi.json`), qui cartographient
     # toute la surface d'API. Faux par défaut ; activer en développement.
     expose_api_docs: bool = False
+    # Origines autorisées à appeler l'API depuis un navigateur, énumérées et séparées par des
+    # virgules. Vide → aucune origine tierce, ce qui suffit quand le frontend est servi par
+    # l'API elle-même (même origine).
+    cors_origins: Annotated[list[str], NoDecode] = []
 
     # ----- Base de données -----
     db_host: str = "localhost"
@@ -58,6 +65,23 @@ class Settings(BaseSettings):
     # ----- Raw store (payloads bruts hors BDD) -----
     # Vide → store local par défaut (`data/raw_store`). Sinon un `file:///chemin` absolu.
     biblio_raw_store_url: str = ""
+
+    @field_validator("cors_origins", mode="before")
+    @classmethod
+    def _parse_cors_origins(cls, value: object) -> object:
+        """Découpe la liste d'origines et refuse le joker.
+
+        `*` est inconciliable avec les requêtes portant un cookie : le middleware CORS répond alors en renvoyant l'`Origin` de l'appelant, si bien que n'importe quel site autorise ses visiteurs à appeler l'API avec leur session. Le refus tombe au démarrage plutôt qu'à la première requête, où il passerait inaperçu.
+        """
+        if not isinstance(value, str):
+            return value
+        origins = [o.strip() for o in value.split(",") if o.strip()]
+        if "*" in origins:
+            raise ValueError(
+                "CORS_ORIGINS n'accepte pas `*` : les appels portent un cookie de session, "
+                "et toute origine serait autorisée à s'en servir. Énumérer les origines."
+            )
+        return origins
 
     @property
     def db_args(self) -> dict[str, str | int]:
