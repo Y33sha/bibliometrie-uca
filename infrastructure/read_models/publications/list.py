@@ -5,6 +5,7 @@ import html
 import io
 import json
 import re
+from collections.abc import Iterable
 from typing import Any
 
 from sqlalchemy import Connection, text
@@ -301,6 +302,36 @@ def list_publications(
 
 _WS_RE = re.compile(r"\s+")
 
+# Caractères par lesquels un tableur reconnaît le début d'une formule. Une cellule qui
+# commence par l'un d'eux est évaluée à l'ouverture du fichier — avec le contenu qu'une
+# source externe y a déposé, titres et noms de revues venant de HAL et OpenAlex.
+_FORMULA_STARTERS = ("=", "+", "-", "@", "\t", "\r")
+
+
+def _neutralize_formula(value: object) -> object:
+    """Valeur préfixée d'une apostrophe si un tableur y lirait une formule, rendue intacte sinon.
+
+    L'apostrophe marque la cellule comme texte sans amputer la valeur : un titre qui commence par un tiret garde son tiret. Le test porte aussi sur la valeur débarrassée de ses espaces de tête, qui ne servent donc pas d'échappatoire. Les valeurs non textuelles (année, montant) traversent sans préfixe, qui leur ferait perdre leur type à la lecture — une année en texte ne se trie plus, un montant ne s'additionne plus.
+    """
+    if not isinstance(value, str):
+        return value
+    if value.startswith(_FORMULA_STARTERS) or value.lstrip().startswith(_FORMULA_STARTERS):
+        return f"'{value}"
+    return value
+
+
+class _CsvWriter:
+    """Writer CSV dont chaque cellule passe par `_neutralize_formula` avant d'être écrite.
+
+    L'assainissement tient dans le writer plutôt que dans la construction de chaque ligne : une colonne ajoutée à un export en hérite sans qu'on ait à y penser.
+    """
+
+    def __init__(self, buf: io.StringIO) -> None:
+        self._writer = csv.writer(buf)
+
+    def writerow(self, row: Iterable[object]) -> None:
+        self._writer.writerow([_neutralize_formula(cell) for cell in row])
+
 
 def _plain_text(s: str | None) -> str:
     """Texte brut pour le CSV : retire les balises HTML/MathML (via `strip_markup`, qui préserve les indices de Miller `<111>`), dé-échappe les entités, et collapse le whitespace en un seul espace. Reflète le titre affiché, sans markup."""
@@ -390,7 +421,7 @@ def export_publications_csv(
     emitted = [(key, header) for key, header in spec if key in requested]
 
     buf = io.StringIO()
-    writer = csv.writer(buf)
+    writer = _CsvWriter(buf)
     writer.writerow([header for _, header in emitted])
     for row in rows:
         doi_url = f"https://doi.org/{row.doi}" if row.doi else ""
@@ -481,7 +512,7 @@ def export_theses_csv(
     ).all()
 
     buf = io.StringIO()
-    writer = csv.writer(buf)
+    writer = _CsvWriter(buf)
     writer.writerow(
         [
             "Inscription",
