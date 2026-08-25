@@ -18,7 +18,12 @@ from infrastructure.settings import settings
 _sync_engine: Engine | None = None
 
 
-def _db_url() -> URL:
+def db_url() -> URL:
+    """URL de connexion Postgres construite depuis les settings (réutilisée par Alembic).
+
+    `db_sslmode`, s'il est défini, est passé en paramètre de connexion `sslmode`.
+    """
+    query = {"sslmode": settings.db_sslmode} if settings.db_sslmode else {}
     return URL.create(
         drivername="postgresql+psycopg",
         username=settings.db_user,
@@ -26,6 +31,7 @@ def _db_url() -> URL:
         host=settings.db_host,
         port=settings.db_port,
         database=settings.db_name,
+        query=query,
     )
 
 
@@ -45,7 +51,7 @@ def build_sync_engine() -> Engine:
             f"(suffixe '_test' requis). Vérifier le monkey-patch dans le conftest."
         )
     engine = create_engine(
-        _db_url(),
+        db_url(),
         pool_size=settings.db_pool_min,
         max_overflow=settings.db_pool_max - settings.db_pool_min,
         pool_pre_ping=True,

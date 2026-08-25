@@ -45,6 +45,10 @@ class Settings(BaseSettings):
     db_name: str = "bibliometrie"
     db_user: str
     db_password: str
+    # Mode SSL de la connexion (valeurs libpq : disable/prefer/require/verify-ca/verify-full).
+    # Vide → défaut du driver. Poser `require` ou `verify-full` dès que la base est déportée
+    # (le mot de passe et les données personnelles circulent sinon en clair sur le réseau).
+    db_sslmode: str = ""
 
     # ----- Pool de connexions -----
     # Ratio max/min recommandé : ~1:15. Monter db_pool_max à 50+ si l'API admin charge plusieurs facettes en parallèle et qu'on observe des TimeoutError côté pool. Cf. `.env.example` pour la note opérationnelle.
