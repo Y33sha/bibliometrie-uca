@@ -58,7 +58,7 @@ La DSI gère le conteneur et la machine virtuelle (isolation réseau, exposition
 
 - [x] **Mise à jour automatisée des dépendances** — `.github/dependabot.yml` : PR hebdomadaires sur pip (racine), npm (`interfaces/frontend`) et github-actions, mineures/correctives groupées par écosystème, majeures individuelles. Complète les scans `pip-audit` / `npm audit` bloquants au push.
 - [x] **Blocage des secrets au push** — GitHub push protection activée : bloque côté serveur les secrets reconnus (motifs de fournisseurs) avant qu'ils n'atteignent le dépôt. Complément optionnel non retenu pour l'instant : gitleaks en pre-commit, qui ajoute la détection par entropie (secrets génériques : mot de passe DB, `SESSION_SECRET`) et un blocage local plus précoce.
-- [ ] **Alignement des postes de dev sur Node 22** — la CI utilise Node 22 (`.github/workflows/ci.yml:88`) ; les postes locaux sont sur Node 20, proche de sa fin de support.
+- [x] **Alignement des postes de dev sur Node 22** — `interfaces/frontend/.nvmrc` fixe Node 22 (aligné sur la CI, `.github/workflows/ci.yml:88`) ; `nvm use` cale le poste dessus.
 
 ## Questions ouvertes
 
