@@ -19,7 +19,7 @@ _MEMBER_URL_RE = re.compile(r"/member/(\d+)\b")
 
 
 def parse_member_id(member: Any) -> int | None:
-    """`https://id.crossref.org/member/10` → `10`. Accepte aussi un int brut."""
+    """Numéro de membre Crossref, extrait de la forme `…/member/10` qu'il prend dans les réponses. Accepte aussi un int brut."""
     if member is None:
         return None
     if isinstance(member, int):
