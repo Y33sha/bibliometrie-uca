@@ -52,6 +52,12 @@ class Settings(BaseSettings):
     db_name: str = "bibliometrie"
     db_user: str
     db_password: str
+    # Identité restreinte dont l'API se sert pour se connecter, quand elle est configurée :
+    # un rôle limité à la lecture et à l'écriture des données, sans droit sur le schéma.
+    # Vide → l'API se connecte comme le reste (migrations, pipeline, scripts), avec
+    # l'identité principale.
+    db_app_user: str = ""
+    db_app_password: str = ""
     # Mode SSL de la connexion (valeurs libpq : disable/prefer/require/verify-ca/verify-full).
     # Vide → défaut du driver. Poser `require` ou `verify-full` dès que la base est déportée
     # (le mot de passe et les données personnelles circulent sinon en clair sur le réseau).

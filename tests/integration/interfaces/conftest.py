@@ -21,8 +21,11 @@ DB_HOST = os.environ.get("DB_HOST", "127.0.0.1")
 DB_PORT = int(os.environ.get("DB_PORT", "5432"))
 
 
-def _build_test_sync_engine() -> Engine:
-    """Engine SA sync sur bibliometrie_test, garde-fou DML installé comme le vrai."""
+def _build_test_sync_engine(*, application: bool = False) -> Engine:
+    """Engine SA sync sur bibliometrie_test, garde-fou DML installé comme le vrai.
+
+    `application` est accepté pour épouser la signature du vrai constructeur — l'API le passe — et ignoré : la base de test n'a qu'une identité de connexion.
+    """
     from infrastructure.db.dml_guard import install_dml_guard
 
     url = URL.create(
