@@ -76,7 +76,8 @@ Toutes les lectures sont ouvertes : le middleware d'`interfaces/api/app.py` ne g
 
 - [ ] **Frontière d'authentification en lecture** — trancher : la lecture reste ouverte et sa restriction est portée par l'hébergement, ou une session devient nécessaire, au moins sur les pages d'administration et sur les lectures qui rendent des données issues du fichier RH (poste, service, dates de contrat).
 - [ ] **Export CSV sans plafond** — les deux exports de publications s'exécutent sans pagination et matérialisent le résultat entier en mémoire avant de l'envoyer. Ouverts et répétables, ils forment le vecteur de déni de service entrant le plus direct, et le moyen le plus simple d'extraire la base en masse. Plafonner le nombre de lignes rendues, ou réserver l'export à une session.
-- [ ] **Log de phase du pipeline** — la lecture du log d'une phase relit `logs/pipeline.log` en entier à chaque appel et rend la section brute. Amplification mémoire proportionnelle à la taille du fichier, et exposition des traces d'exploitation. Borner la lecture (taille maximale, parcours par la fin) et réserver l'accès à une session. Sans portée tant que `LOG_TO_FILE` reste inactif, ce qui est le défaut en production.
+- [x] **Lecture bornée du log de phase** — la lecture parcourt le fichier ligne à ligne et ne retient que la fin de la section demandée : la mémoire consommée tient au plafond de lignes, non à la taille du fichier. La troncature s'annonce, le nombre de lignes non rendues accompagnant l'extrait jusque dans la page. En amont, la phase personnes ne trace plus un refus de corroboration par occurrence — la même signature revenant sur chaque publication d'une collaboration, ces lignes formaient à elles seules 80 % du volume du fichier.
+- [ ] **Accès au log de phase** — la lecture reste ouverte et rend des traces d'exploitation. Relève de la décision sur la frontière d'authentification, premier item de cette phase.
 
 ## Questions ouvertes
 

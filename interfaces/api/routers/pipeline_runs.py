@@ -61,9 +61,11 @@ def get_run(
 def phase_log(run_id: int, phase: str) -> PipelinePhaseLog:
     """Log d'une phase, découpé depuis `logs/pipeline.log`.
 
-    `available` vaut vrai quand la section de la phase a été retrouvée ; sinon `content` est vide, que le fichier soit absent (`LOG_TO_FILE` inactif) ou que la section ait été purgée.
+    `available` vaut vrai quand la section de la phase a été retrouvée ; sinon `content` est vide, que le fichier soit absent (`LOG_TO_FILE` inactif) ou que la section ait été purgée. D'une section longue, seule la fin est rendue, `omitted_lines` disant combien de lignes la précèdent.
     """
-    content = read_phase_log(run_id, phase)
-    if content is None:
+    excerpt = read_phase_log(run_id, phase)
+    if excerpt is None:
         return PipelinePhaseLog(available=False, content="")
-    return PipelinePhaseLog(available=True, content=content)
+    return PipelinePhaseLog(
+        available=True, content=excerpt.content, omitted_lines=excerpt.omitted_lines
+    )

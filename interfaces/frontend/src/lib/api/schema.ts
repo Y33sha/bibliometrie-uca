@@ -2269,7 +2269,7 @@ export interface paths {
          * Phase Log
          * @description Log d'une phase, découpé depuis `logs/pipeline.log`.
          *
-         *     `available` vaut vrai quand la section de la phase a été retrouvée ; sinon `content` est vide, que le fichier soit absent (`LOG_TO_FILE` inactif) ou que la section ait été purgée.
+         *     `available` vaut vrai quand la section de la phase a été retrouvée ; sinon `content` est vide, que le fichier soit absent (`LOG_TO_FILE` inactif) ou que la section ait été purgée. D'une section longue, seule la fin est rendue, `omitted_lines` disant combien de lignes la précèdent.
          */
         get: operations["phase_log_api_pipeline_runs__run_id__phases__phase__log_get"];
         put?: never;
@@ -4175,12 +4175,19 @@ export interface components {
          * @description Log d'une phase, découpé depuis logs/pipeline.log.
          *
          *     `available` est faux quand le fichier est absent (LOG_TO_FILE désactivé) ou quand la section de la phase est introuvable (log purgé) ; `content` est alors vide.
+         *
+         *     `content` porte la fin de la section, la plus parlante sur la façon dont la phase s'est terminée. `omitted_lines` compte celles qui la précèdent sans être rendues, et vaut zéro quand la section tient entière : une troncature s'annonce, elle ne se devine pas.
          */
         PipelinePhaseLog: {
             /** Available */
             available: boolean;
             /** Content */
             content: string;
+            /**
+             * Omitted Lines
+             * @default 0
+             */
+            omitted_lines: number;
         };
         /**
          * PipelineStatus
