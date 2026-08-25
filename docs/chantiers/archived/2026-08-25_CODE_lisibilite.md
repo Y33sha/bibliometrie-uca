@@ -232,7 +232,7 @@ Deux findings ont leur fiche dédiée, tous deux traités : [Périmètre APC](ar
 ### Phase 5 - `tests/`
 
 - [x] `integration/infrastructure/queries/test_address_resolution.py` : sept tests passaient des tuples positionnels aux fonctions de résolution d'adresses, dont le contrat veut les `NamedTuple` `KeptPair` et `DetectedStructure`. Ils levaient `AttributeError` ; ceux qui passaient une liste vide n'y coupaient que parce que la fonction retourne avant la lecture (`b5055298`).
-- [ ] Helpers locaux à suffixe `_sync` fossile : `_insert_config_sync`, `_insert_perimeter_sync`, `_create_struct_sync` (`integration/application/test_config_service.py`, `test_perimeters_service.py`). Même fossile qu'en 2.6 et qu'aux dépendances de l'API (`85f4c974`).
+- [x] Helpers locaux à suffixe `_sync` fossile : `_insert_config_sync` et `_insert_perimeter_sync` (`integration/application/test_config_service.py`, `test_perimeters_service.py`) renommés sans le suffixe. `_create_struct_sync` n'existait pas. La définition de `_insert_config` reste dupliquée dans les deux fichiers (factorisation en conftest hors périmètre de ce chantier).
 
 ## Questions ouvertes
 

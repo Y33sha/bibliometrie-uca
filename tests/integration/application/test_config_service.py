@@ -18,7 +18,7 @@ def sync_config(sa_sync_conn):
 # ── Helpers ────────────────────────────────────────────────────────
 
 
-def _insert_config_sync(conn, key, value, description="desc"):
+def _insert_config(conn, key, value, description="desc"):
     conn.execute(
         text(
             "INSERT INTO config (key, value, description) "
@@ -37,12 +37,12 @@ class TestUpdateConfigValue:
             update_config_value(sa_sync_conn, "nonexistent", "x", config=sync_config)
 
     def test_updates_existing(self, sa_sync_conn, sync_config):
-        _insert_config_sync(sa_sync_conn, "test_key", "old")
+        _insert_config(sa_sync_conn, "test_key", "old")
         row = sync_config.update_config_value("test_key", "new")
         assert row is not None
         assert row["value"] == "new"
 
     def test_updates_with_dict_value(self, sa_sync_conn, sync_config):
-        _insert_config_sync(sa_sync_conn, "test_key", {})
+        _insert_config(sa_sync_conn, "test_key", {})
         row = sync_config.update_config_value("test_key", {"a": 1, "b": 2})
         assert row["value"] == {"a": 1, "b": 2}

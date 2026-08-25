@@ -4,7 +4,7 @@
 
 ### En cours
 
-- [Lisibilité](CODE_lisibilite.md)
+_(aucun)_
 
 ### En pause
 
@@ -19,6 +19,7 @@
 ## Chantiers archivés
 
 - 2026-08-25 — [Durcissement pour l'hébergement universitaire](archived/2026-08-25_CODE_securite.md)
+- 2026-08-25 — [Lisibilité](archived/2026-08-25_CODE_lisibilite.md)
 - 2026-07-19 — [Projections de lecture des personnes : deux endpoints pour une entité](archived/2026-07-19_CODE_projections-de-lecture-des-personnes.md)
 - 2026-07-19 — [Structures et laboratoires : une entité, deux piles de lecture](archived/2026-07-19_CODE_structures-et-laboratoires.md)
 - 2026-07-19 — [Typage des paramètres de requête : ce que `str` ne dit pas](archived/2026-07-19_CODE_typage-des-parametres-de-requete.md)
