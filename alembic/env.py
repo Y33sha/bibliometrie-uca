@@ -13,8 +13,8 @@ from logging.config import fileConfig
 from sqlalchemy import engine_from_config, pool
 
 from alembic import context
+from infrastructure.db.engine import db_url
 from infrastructure.db.tables import metadata
-from infrastructure.settings import settings
 
 config = context.config
 
@@ -47,10 +47,7 @@ def _build_url() -> str:
     configured = config.get_main_option("sqlalchemy.url")
     if configured:
         return configured
-    return (
-        f"postgresql+psycopg://{settings.db_user}:{settings.db_password}"
-        f"@{settings.db_host}:{settings.db_port}/{settings.db_name}"
-    )
+    return db_url().render_as_string(hide_password=False)
 
 
 def run_migrations_offline() -> None:
