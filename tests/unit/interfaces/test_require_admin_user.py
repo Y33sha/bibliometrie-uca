@@ -1,6 +1,6 @@
 """Les deux lectures de la session côté API : celle qui adapte, et celle qui refuse.
 
-`current_admin_user` rend l'utilisateur ou `None`, laissant l'appelant décider quoi servir. `require_admin_user` ferme la porte. La seconde manquait : une lecture qu'on voulait réserver n'avait aucun moyen de l'être.
+`admin_user_or_none` rend l'utilisateur ou `None`, laissant l'appelant décider quoi servir. `require_admin_user` ferme la porte. La seconde manquait : une lecture qu'on voulait réserver n'avait aucun moyen de l'être.
 """
 
 import pytest
@@ -25,13 +25,13 @@ def session_reader(monkeypatch):
 
 class TestCurrentAdminUser:
     def test_rend_l_utilisateur_de_la_session(self, session_reader):
-        assert deps.current_admin_user(_request("jeton-valide")) == "admin"
+        assert deps.admin_user_or_none(_request("jeton-valide")) == "admin"
 
     def test_rend_none_sans_cookie(self, session_reader):
-        assert deps.current_admin_user(_request()) is None
+        assert deps.admin_user_or_none(_request()) is None
 
     def test_rend_none_sur_un_jeton_invalide(self, session_reader):
-        assert deps.current_admin_user(_request("jeton-forge")) is None
+        assert deps.admin_user_or_none(_request("jeton-forge")) is None
 
 
 class TestRequireAdminUser:

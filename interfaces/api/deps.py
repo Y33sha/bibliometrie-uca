@@ -99,10 +99,10 @@ def get_admin_user() -> str:
     return settings.admin_user
 
 
-def current_admin_user(request: Request) -> str | None:
-    """Utilisateur porté par la session en cours, ou `None` sans session valide.
+def admin_user_or_none(request: Request) -> str | None:
+    """Utilisateur porté par la session en cours, ou `None` faute de session valide — sans jamais refuser l'appel.
 
-    Sert les lectures dont le contenu dépend de l'appelant sans lui être interdit — la configuration, dont une part est publique et le reste réservé.
+    Sert les lectures dont le contenu dépend de l'appelant sans lui être interdit : la configuration, dont une part est publique et le reste réservé à une session. Pour refuser l'appel, voir `require_admin_user`.
     """
     token = request.cookies.get("session")
     return read_session(token) if token else None
@@ -111,11 +111,11 @@ def current_admin_user(request: Request) -> str | None:
 def require_admin_user(request: Request) -> str:
     """Utilisateur porté par la session en cours ; refuse l'appel (401) à défaut.
 
-    Pendant contraignant de `current_admin_user` : la première adapte le contenu servi selon l'appelant, celle-ci refuse de servir. Les lectures de données restent ouvertes — c'est une décision d'ensemble, et leur restriction éventuelle relève de l'hébergement. Cette dépendance vise ce qui n'est pas de la donnée bibliométrique : la trace d'exploitation, dont le contenu n'a de sens que pour qui administre l'application.
+    Pendant contraignant d'`admin_user_or_none` : celle-là adapte le contenu servi selon l'appelant, celle-ci refuse de servir. Les lectures de données restent ouvertes — c'est une décision d'ensemble, et leur restriction éventuelle relève de l'hébergement. Cette dépendance vise ce qui n'est pas de la donnée bibliométrique : la trace d'exploitation, dont le contenu n'a de sens que pour qui administre l'application.
 
     Les écritures, elles, sont gardées au transport par le middleware d'`app.py`, qui filtre sur la méthode HTTP : elles n'ont pas à la déclarer.
     """
-    admin_user = current_admin_user(request)
+    admin_user = admin_user_or_none(request)
     if not admin_user:
         raise HTTPException(status_code=401, detail="Non authentifié")
     return admin_user
