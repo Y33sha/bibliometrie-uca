@@ -1,11 +1,8 @@
 """Coupe-circuit OpenAlex : arrêt de l'enrichissement quand la source est à bout de budget (429).
 
-`enrich_journals_from_openalex` s'appuie sur le circuit-breaker de source partagé : le fetch
-(infra) alimente le breaker via `http_request_with_retry`, et la boucle du worker s'arrête dès que
-`breaker.tripped`. On teste ici cet arrêt.
-
-`enrich_publishers_from_openalex` garde encore son mécanisme maison (`_OpenAlexRateLimited` sur 429
-répétés) — testé tel quel en attendant son propre passage.
+Les enrichissements des revues et des éditeurs s'appuient sur le même circuit-breaker de source :
+le fetch (infra) l'alimente via `http_request_with_retry`, et la boucle de l'orchestrateur s'arrête
+dès que `breaker.tripped`. On teste ici cet arrêt, et le parcours complet quand la source tient.
 """
 
 from types import SimpleNamespace
@@ -24,21 +21,48 @@ def _no_sleep(monkeypatch):
     monkeypatch.setattr(publishers_mod.time, "sleep", lambda *_: None)
 
 
-def _resp(status, payload=None):
-    r = MagicMock()
-    r.status_code = status
-    r.json.return_value = payload or {"results": []}
-    return r
+class TestPublishersWorkerStopsOnTrippedBreaker:
+    def _run(self, fetch_batch, breaker, n_batches):
+        conn = MagicMock()
+        publisher_repo = MagicMock()
+        # row = (publisher_id, oa_id) ; BATCH_SIZE éditeurs par batch.
+        rows = [(i, f"P{i}") for i in range(n_batches * publishers_mod.BATCH_SIZE)]
+        publisher_repo.find_needing_country_enrichment.return_value = rows
+        publishers_mod.run_enrich_publishers_from_openalex(
+            conn,
+            MagicMock(),
+            publisher_repo=publisher_repo,
+            fetch_batch=fetch_batch,
+            breaker=breaker,
+        )
+        return conn
 
+    def test_stops_when_breaker_trips(self):
+        """L'orchestrateur s'arrête au tour où le breaker est tripé, sans parcourir tout le stock."""
+        breaker = SimpleNamespace(tripped=False)
+        calls = {"n": 0}
 
-class TestPublishersFetchSignalsRateLimit:
-    def test_sustained_429_raises(self, monkeypatch):
-        """enrich_publishers : 3 × 429 → `_OpenAlexRateLimited`."""
-        monkeypatch.setattr(publishers_mod.httpx, "get", lambda *a, **k: _resp(429))
-        with pytest.raises(publishers_mod._OpenAlexRateLimited):
-            publishers_mod.fetch_publishers_batch(
-                ["P1"], MagicMock(), openalex_publishers_api="x", api_key=None, mailto="m"
-            )
+        def fetch_batch(_oa_ids):
+            calls["n"] += 1
+            if calls["n"] >= 3:
+                breaker.tripped = True  # le 3e batch épuise le budget
+            return {}
+
+        conn = self._run(fetch_batch, breaker, n_batches=20)
+        assert calls["n"] == 3  # arrêt au tour suivant (breaker.tripped), pas les 20 batches
+        conn.commit.assert_called()  # le déjà-fait est committé avant de couper
+
+    def test_runs_all_batches_when_breaker_stays_up(self):
+        """Sans trip, tous les batches sont parcourus."""
+        breaker = SimpleNamespace(tripped=False)
+        calls = {"n": 0}
+
+        def fetch_batch(_oa_ids):
+            calls["n"] += 1
+            return {}
+
+        self._run(fetch_batch, breaker, n_batches=4)
+        assert calls["n"] == 4
 
 
 class TestJournalsWorkerStopsOnTrippedBreaker:
