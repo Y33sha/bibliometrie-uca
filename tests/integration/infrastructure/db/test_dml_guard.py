@@ -24,8 +24,8 @@ from infrastructure.db.dml_guard import has_uncommitted_dml, install_dml_guard, 
 def _test_url() -> URL:
     return URL.create(
         drivername="postgresql+psycopg",
-        username=os.environ["DB_USER"],
-        password=os.environ.get("DB_PASSWORD") or None,
+        username=os.environ["DB_OWNER_USER"],
+        password=os.environ.get("DB_OWNER_PASSWORD") or None,
         host=os.environ.get("DB_HOST", "127.0.0.1"),
         port=int(os.environ.get("DB_PORT", "5432")),
         database="bibliometrie_test",

@@ -15,8 +15,8 @@ import os
 import pytest
 from sqlalchemy import URL, Engine, create_engine
 
-DB_USER = os.environ["DB_USER"]
-DB_PASSWORD = os.environ.get("DB_PASSWORD", "")
+DB_OWNER_USER = os.environ["DB_OWNER_USER"]
+DB_OWNER_PASSWORD = os.environ.get("DB_OWNER_PASSWORD", "")
 DB_HOST = os.environ.get("DB_HOST", "127.0.0.1")
 DB_PORT = int(os.environ.get("DB_PORT", "5432"))
 
@@ -30,8 +30,8 @@ def _build_test_sync_engine(*, application: bool = False) -> Engine:
 
     url = URL.create(
         drivername="postgresql+psycopg",
-        username=DB_USER,
-        password=DB_PASSWORD or None,
+        username=DB_OWNER_USER,
+        password=DB_OWNER_PASSWORD or None,
         host=DB_HOST,
         port=DB_PORT,
         database="bibliometrie_test",

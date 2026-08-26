@@ -16,12 +16,12 @@ from psycopg.rows import dict_row
 
 _DB_ARGS = {
     "dbname": "bibliometrie_test",
-    "user": os.environ["DB_USER"],
+    "user": os.environ["DB_OWNER_USER"],
     "host": os.environ.get("DB_HOST", "127.0.0.1"),
     "port": int(os.environ.get("DB_PORT", "5432")),
 }
-if os.environ.get("DB_PASSWORD"):
-    _DB_ARGS["password"] = os.environ["DB_PASSWORD"]
+if os.environ.get("DB_OWNER_PASSWORD"):
+    _DB_ARGS["password"] = os.environ["DB_OWNER_PASSWORD"]
 
 
 @contextmanager

@@ -108,7 +108,7 @@ Deux options pour initialiser les données :
 
 **Option A — Restaurer un dump complet** :
 ```bash
-pg_restore -U "$DB_USER" -d bibliometrie --clean --if-exists bibliometrie.dump
+pg_restore -U "$DB_OWNER_USER" -d bibliometrie --clean --if-exists bibliometrie.dump
 ```
 
 **Option B — Démarrer de zéro** :
@@ -185,7 +185,7 @@ Voir [docs/pipeline/](docs/pipeline/) pour le détail des phases.
 ## Tests
 
 ```bash
-export DB_PASSWORD=...                      # Requis pour les tests d'intégration
+export DB_OWNER_PASSWORD=...                      # Requis pour les tests d'intégration
 python -m pytest tests/ -v                  # Tout
 python -m pytest tests/unit/ -q             # Unitaires seuls (~1s)
 python -m pytest tests/integration/ -q      # Intégration (~10s, base bibliometrie_test)

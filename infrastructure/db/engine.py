@@ -28,7 +28,7 @@ def db_url(*, application: bool = False) -> URL:
     if application and settings.db_app_user:
         username, password = settings.db_app_user, settings.db_app_password
     else:
-        username, password = settings.db_user, settings.db_password
+        username, password = settings.db_owner_user, settings.db_owner_password
     query = {"sslmode": settings.db_sslmode} if settings.db_sslmode else {}
     return URL.create(
         drivername="postgresql+psycopg",
