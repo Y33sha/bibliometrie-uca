@@ -8,8 +8,6 @@
 
 `/admin/config`
 
-![Formes de nom](../img/screenshots/admin_config.png)
-
 Configuration du [moissonnage](../pipeline/02-extract.md) :
 - années interrogées (modes *weekly* et *full*);
 - définition et CRUD des périmètres (`uca`, `alliance_uca`);
