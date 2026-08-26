@@ -34,7 +34,7 @@ def _resp(status, payload=None):
 class TestPublishersFetchSignalsRateLimit:
     def test_sustained_429_raises(self, monkeypatch):
         """enrich_publishers : 3 × 429 → `_OpenAlexRateLimited`."""
-        monkeypatch.setattr(publishers_mod.requests, "get", lambda *a, **k: _resp(429))
+        monkeypatch.setattr(publishers_mod.httpx, "get", lambda *a, **k: _resp(429))
         with pytest.raises(publishers_mod._OpenAlexRateLimited):
             publishers_mod.fetch_publishers_batch(
                 ["P1"], MagicMock(), openalex_publishers_api="x", api_key=None, mailto="m"

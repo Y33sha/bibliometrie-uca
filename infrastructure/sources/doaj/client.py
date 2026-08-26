@@ -11,7 +11,7 @@ import csv
 import logging
 from collections.abc import Iterator
 
-import requests
+import httpx
 
 DOAJ_CSV_DUMP_URL = "https://doaj.org/csv"
 """Dump CSV public de toutes les revues DOAJ (généré à la volée par DOAJ)."""
@@ -27,17 +27,20 @@ def fetch_doaj_dump(
 ) -> None:
     """Télécharge le dump CSV DOAJ en streaming vers `dest_path`.
 
-    Lève `requests.RequestException` en cas d'échec — pas de fallback gracieux ici, le caller décide (on ne veut pas importer un dump tronqué).
+    Lève `httpx.HTTPError` en cas d'échec — pas de fallback gracieux ici, le caller décide (on ne veut pas importer un dump tronqué).
     """
     logger.info("Téléchargement du dump DOAJ depuis %s …", url)
-    with requests.get(
-        url, headers={"User-Agent": user_agent}, timeout=timeout, stream=True
+    with httpx.stream(
+        "GET",
+        url,
+        headers={"User-Agent": user_agent},
+        timeout=timeout,
+        follow_redirects=True,
     ) as resp:
         resp.raise_for_status()
         with open(dest_path, "wb") as f:
-            for chunk in resp.iter_content(chunk_size=1 << 16):
-                if chunk:
-                    f.write(chunk)
+            for chunk in resp.iter_bytes(chunk_size=1 << 16):
+                f.write(chunk)
     logger.info("Dump DOAJ téléchargé : %s", dest_path)
 
 

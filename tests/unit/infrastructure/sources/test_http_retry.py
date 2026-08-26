@@ -7,20 +7,21 @@ from unittest.mock import MagicMock, patch
 
 import httpx
 import pytest
-import requests
 import respx
 
 from infrastructure.sources import http_retry
 from infrastructure.sources.http_retry import http_request_with_retry_async
 
-# ── variante synchrone (requests) ────────────────────────────────
+# ── variante synchrone (httpx) ────────────────────────────────
 
 
 def _resp(status: int) -> MagicMock:
     r = MagicMock()
     r.status_code = status
     if status >= 400:
-        r.raise_for_status.side_effect = requests.HTTPError(response=r)
+        r.raise_for_status.side_effect = httpx.HTTPStatusError(
+            f"HTTP {status}", request=MagicMock(), response=r
+        )
     else:
         r.raise_for_status.return_value = None
         r.text = "{}"
@@ -31,10 +32,10 @@ def _resp(status: int) -> MagicMock:
 def test_4xx_fails_fast_without_retry():
     resp = _resp(404)
     with (
-        patch.object(http_retry.requests, "request", return_value=resp) as req,
+        patch.object(http_retry.httpx, "request", return_value=resp) as req,
         patch.object(http_retry.time, "sleep"),
     ):
-        with pytest.raises(requests.HTTPError):
+        with pytest.raises(httpx.HTTPStatusError):
             http_retry.http_request_with_retry("GET", "http://x", label="t", max_retries=3)
     assert req.call_count == 1  # aucun retry sur 4xx
 
@@ -42,10 +43,10 @@ def test_4xx_fails_fast_without_retry():
 def test_5xx_is_retried():
     resp = _resp(503)
     with (
-        patch.object(http_retry.requests, "request", return_value=resp) as req,
+        patch.object(http_retry.httpx, "request", return_value=resp) as req,
         patch.object(http_retry.time, "sleep"),
     ):
-        with pytest.raises(requests.HTTPError):
+        with pytest.raises(httpx.HTTPStatusError):
             http_retry.http_request_with_retry("GET", "http://x", label="t", max_retries=3)
     assert req.call_count == 3  # 5xx retenté jusqu'au dernier essai
 
@@ -64,7 +65,7 @@ def test_5xx_with_breaker_raises_source_unavailable():
     try:
         resp = _resp(503)
         with (
-            patch.object(http_retry.requests, "request", return_value=resp) as req,
+            patch.object(http_retry.httpx, "request", return_value=resp) as req,
             patch.object(http_retry.time, "sleep"),
         ):
             with pytest.raises(SourceUnavailableError):
@@ -77,7 +78,7 @@ def test_5xx_with_breaker_raises_source_unavailable():
 
 def test_success_returns_json():
     with (
-        patch.object(http_retry.requests, "request", return_value=_resp(200)),
+        patch.object(http_retry.httpx, "request", return_value=_resp(200)),
         patch.object(http_retry.time, "sleep"),
     ):
         assert http_retry.http_request_with_retry("GET", "http://x", label="t") == {}
