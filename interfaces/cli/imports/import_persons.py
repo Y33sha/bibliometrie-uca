@@ -1,10 +1,10 @@
 # STATUS: recurring (imports)
 """
-Import des personnes depuis un fichier RH (CSV/TSV/Excel).
+Import des personnes depuis un fichier RH (CSV ou TSV).
 
 Usage:
     python -m interfaces.cli.imports.import_persons fichier_rh.csv
-    python -m interfaces.cli.imports.import_persons fichier_rh.xlsx
+    python -m interfaces.cli.imports.import_persons fichier_rh.csv
     python -m interfaces.cli.imports.import_persons fichier_rh.tsv --dry-run
 
 Colonnes attendues (noms flexibles, détection automatique) :
@@ -151,51 +151,6 @@ def read_csv_tsv(filepath: str) -> list[dict[str, str]]:
         return rows
 
 
-def read_excel(filepath: str) -> list[dict[str, Any]]:
-    """Lit un fichier Excel (.xlsx/.xls)."""
-    try:
-        import openpyxl
-    except ImportError:
-        log.error("openpyxl requis pour les fichiers Excel: pip install openpyxl")
-        sys.exit(1)
-
-    wb = openpyxl.load_workbook(filepath, read_only=True)
-    ws = wb.active
-    rows_iter = ws.iter_rows(values_only=True)
-    headers = [str(h or "") for h in next(rows_iter)]
-    col_map = resolve_columns(headers)
-
-    log.info(f"Colonnes détectées: {col_map}")
-    log.info(f"En-têtes: {headers}")
-
-    if "last_name" not in col_map:
-        raise ValueError(f"Colonne 'nom' introuvable. En-têtes: {headers}")
-    if "first_name" not in col_map:
-        raise ValueError(f"Colonne 'prenom' introuvable. En-têtes: {headers}")
-
-    rows = []
-    for row in rows_iter:
-        cells = [str(c) if c is not None else "" for c in row]
-        if not any(c.strip() for c in cells):
-            continue
-        record = {}
-        for field, idx in col_map.items():
-            record[field] = cells[idx].strip() if idx < len(cells) else ""
-        rows.append(record)
-
-    wb.close()
-    return rows
-
-
-def read_file(filepath: str) -> list[dict[str, Any]]:
-    """Lit un fichier selon son extension."""
-    ext = os.path.splitext(filepath)[1].lower()
-    if ext in (".xlsx", ".xls"):
-        return read_excel(filepath)
-    else:
-        return read_csv_tsv(filepath)
-
-
 def import_persons(
     conn: Connection,
     records: list[dict[str, Any]],
@@ -253,7 +208,7 @@ def import_persons(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Import personnes RH → base")
-    parser.add_argument("file", help="Fichier RH (CSV, TSV, ou Excel)")
+    parser.add_argument("file", help="Fichier RH (CSV ou TSV)")
     parser.add_argument(
         "--export-date",
         type=str,
@@ -269,7 +224,7 @@ def main() -> None:
 
     log.info(f"=== Import personnes depuis {args.file} ===")
 
-    records = read_file(args.file)
+    records = read_csv_tsv(args.file)
     log.info(f"  {len(records)} lignes lues")
 
     if not records:
