@@ -11,7 +11,7 @@ from sqlalchemy import Connection
 from application.ports.read_models.config_queries import ConfigItem, ConfigQueries
 from application.ports.repositories.config_repository import ConfigRepository
 from application.services.config import commands as config_commands
-from interfaces.api.deps import config_queries, config_repository, current_admin_user, db_conn
+from interfaces.api.deps import admin_user_or_none, config_queries, config_repository, db_conn
 from interfaces.api.models import ConfigValueUpdate
 
 router = APIRouter(prefix="/api/config", tags=["config"])
@@ -19,7 +19,7 @@ router = APIRouter(prefix="/api/config", tags=["config"])
 
 @router.get("", response_model=list[ConfigItem])
 def list_config(
-    admin_user: str | None = Depends(current_admin_user),
+    admin_user: str | None = Depends(admin_user_or_none),
     queries: ConfigQueries = Depends(config_queries),
 ) -> list[ConfigItem]:
     """Paramètres applicatifs (clé, valeur JSON, description), triés par clé.
