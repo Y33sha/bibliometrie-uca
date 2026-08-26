@@ -8,6 +8,7 @@ Deux usages, deux compteurs indépendants — un export refusé ne doit pas emp�
 from __future__ import annotations
 
 import time
+from collections import OrderedDict
 from collections.abc import Callable
 
 from fastapi import HTTPException, Request
@@ -20,12 +21,17 @@ _LOGIN_WINDOW_SECONDS = 300
 # vingt en cinq minutes. Le plafond laisse passer l'usage humain et arrête la rafale.
 _EXPORT_MAX_ATTEMPTS = 20
 _EXPORT_WINDOW_SECONDS = 300
-# Plafond du nombre de clés suivies : borne la mémoire même sous un flot d'IP variées.
+# Plafond du nombre de compteurs suivis : borne la mémoire même sous un flot d'adresses variées.
 _MAX_KEYS = 4096
 
 
 class FixedWindowRateLimiter:
-    """Compteur à fenêtre fixe par clé, sans dépendance externe."""
+    """Compteur à fenêtre fixe par clé, sans dépendance externe.
+
+    Les compteurs sont rangés par ordre d'ouverture de fenêtre, du plus ancien au plus récent : une fenêtre qui repart passe en queue. Cet ordre sert deux fois — la purge des fenêtres écoulées s'arrête au premier compteur encore vivant, et faire de la place quand rien n'est écoulé revient à retirer le premier, dont la fenêtre allait de toute façon expirer avant les autres.
+
+    L'éviction a un prix, assumé : sous un flot d'adresses distinctes, le compteur d'un client peut être retiré avant la fin de sa fenêtre, ce qui lui rend ses tentatives. Un plafond qui borne la mémoire ne peut pas en même temps garantir le suivi de tous les clients ; entre laisser la table croître sans fin et perdre en précision sous flot, la mémoire prime — le plafond de tentatives est une défense en profondeur, celle du reverse-proxy tient devant.
+    """
 
     def __init__(
         self,
@@ -39,25 +45,49 @@ class FixedWindowRateLimiter:
         self._window = window_seconds
         self._max_keys = max_keys
         self._clock = clock
-        self._hits: dict[str, tuple[float, int]] = {}
+        self._hits: OrderedDict[str, tuple[float, int]] = OrderedDict()
 
-    def _prune(self, now: float) -> None:
-        """Retire les fenêtres expirées ; borne la mémoire sous un flot de clés distinctes."""
-        expired = [k for k, (start, _) in self._hits.items() if now - start >= self._window]
-        for k in expired:
-            del self._hits[k]
+    def _discard_expired(self, now: float) -> None:
+        """Retire les compteurs dont la fenêtre est écoulée.
+
+        S'arrête au premier compteur encore vivant : l'ordre garantit que les suivants le sont aussi.
+        """
+        while self._hits:
+            key, (start, _) = next(iter(self._hits.items()))
+            if now - start < self._window:
+                return
+            del self._hits[key]
+
+    def _make_room(self, now: float) -> None:
+        """Ramène la table sous son plafond avant d'y ajouter un compteur."""
+        if len(self._hits) < self._max_keys:
+            return
+        self._discard_expired(now)
+        while self._hits and len(self._hits) >= self._max_keys:
+            self._hits.popitem(last=False)
 
     def allow(self, key: str) -> bool:
         """Enregistre une tentative pour `key` et renvoie `True` si elle reste sous le plafond."""
         now = self._clock()
-        if len(self._hits) >= self._max_keys:
-            self._prune(now)
-        start, count = self._hits.get(key, (now, 0))
+        counter = self._hits.get(key)
+
+        if counter is None:
+            self._make_room(now)
+            self._hits[key] = (now, 1)
+            return 1 <= self._max
+
+        start, count = counter
         if now - start >= self._window:
-            start, count = now, 0
-        count += 1
-        self._hits[key] = (start, count)
-        return count <= self._max
+            # La fenêtre repart : le compteur reprend son rang à la fin, derrière les fenêtres
+            # ouvertes avant la sienne. Le retirer d'abord est ce qui le déplace.
+            del self._hits[key]
+            self._hits[key] = (now, 1)
+            return 1 <= self._max
+
+        # Fenêtre en cours : seul le décompte change, et réassigner une clé connue lui laisse
+        # son rang — l'ordre des débuts de fenêtre est préservé sans rien déplacer.
+        self._hits[key] = (start, count + 1)
+        return count + 1 <= self._max
 
     def reset(self) -> None:
         """Vide l'état enregistré (tous les compteurs de fenêtre)."""

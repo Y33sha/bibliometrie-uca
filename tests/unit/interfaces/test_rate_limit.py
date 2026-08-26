@@ -54,15 +54,80 @@ class TestFixedWindowRateLimiter:
         limiter.reset()
         assert limiter.allow("ip") is True
 
-    def test_prune_bounds_tracked_keys(self):
+    def test_expired_counters_are_purged_before_inserting(self):
         clock = _Clock()
         limiter = FixedWindowRateLimiter(1, 60, max_keys=2, clock=clock)
         limiter.allow("a")
         limiter.allow("b")
-        # Fenêtres expirées : la clé suivante déclenche l'élagage avant insertion.
+        # Fenêtres écoulées : la clé suivante déclenche la purge avant insertion.
         clock.t = 60
         limiter.allow("c")
         assert limiter._hits.keys() == {"c"}
+
+
+class TestMemoryBound:
+    """Non-régression : le plafond de compteurs suivis ne bornait rien tant qu'aucune fenêtre n'était écoulée.
+
+    La purge ne retirait que les fenêtres écoulées, et le compteur du nouvel arrivant était enregistré dans tous les cas : sous un flot d'adresses distinctes tombant dans une même fenêtre, la table grossissait sans limite — ce que le code annonçait impossible.
+    """
+
+    def test_a_flood_of_fresh_counters_stays_under_the_cap(self):
+        limiter = FixedWindowRateLimiter(1, 60, max_keys=4, clock=_Clock())
+        for i in range(1000):
+            limiter.allow(f"adresse-{i}")
+        assert len(limiter._hits) == 4
+
+    def test_the_oldest_window_is_the_one_dropped(self):
+        """Celle qui allait expirer la première : son oubli coûte le moins."""
+        clock = _Clock()
+        limiter = FixedWindowRateLimiter(5, 60, max_keys=3, clock=clock)
+        for nom in ("a", "b", "c"):
+            limiter.allow(nom)
+            clock.t += 1
+        limiter.allow("d")
+        assert list(limiter._hits) == ["b", "c", "d"]
+
+    def test_counting_again_does_not_change_a_rank(self):
+        """Recompter dans une fenêtre en cours n'en déplace pas le début : `a` reste le plus ancien."""
+        clock = _Clock()
+        limiter = FixedWindowRateLimiter(5, 60, max_keys=3, clock=clock)
+        limiter.allow("a")
+        clock.t += 1
+        limiter.allow("b")
+        clock.t += 1
+        limiter.allow("a")
+        limiter.allow("c")
+        limiter.allow("d")
+        assert list(limiter._hits) == ["b", "c", "d"]
+
+    def test_a_restarted_window_goes_to_the_back(self):
+        clock = _Clock()
+        limiter = FixedWindowRateLimiter(5, 60, max_keys=3, clock=clock)
+        limiter.allow("a")
+        clock.t += 1
+        limiter.allow("b")
+        clock.t += 1
+        limiter.allow("c")
+        clock.t = 100  # la fenêtre de `a` est écoulée, elle repart
+        limiter.allow("a")
+        assert list(limiter._hits) == ["b", "c", "a"]
+
+    def test_an_evicted_client_gets_its_attempts_back(self):
+        """Contrepartie assumée du plafond : sous flot, un client suivi peut perdre son compteur avant la fin de sa fenêtre."""
+        limiter = FixedWindowRateLimiter(1, 60, max_keys=2, clock=_Clock())
+        assert limiter.allow("victime") is True
+        assert limiter.allow("victime") is False
+        limiter.allow("flot-1")
+        limiter.allow("flot-2")
+        assert limiter.allow("victime") is True
+
+    def test_a_tracked_client_does_not_evict_anyone(self):
+        """Une adresse déjà suivie n'ajoute pas de compteur : rien à libérer pour l'accueillir."""
+        limiter = FixedWindowRateLimiter(5, 60, max_keys=2, clock=_Clock())
+        limiter.allow("a")
+        limiter.allow("b")
+        limiter.allow("a")
+        assert list(limiter._hits) == ["a", "b"]
 
 
 class TestClientKey:
