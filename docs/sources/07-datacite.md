@@ -14,7 +14,7 @@ Le pipeline interroge DataCite pour les DOI déjà découverts par les autres so
 
 **DOIs API** (`https://api.datacite.org/dois/{doi}`) — interrogation unitaire par DOI, réponse au format JSON:API (les métadonnées sont dans `data.attributes`).
 
-- *polite pool* obtenu via `User-Agent: BibliometrieUCA-pipeline/1.0 (mailto:<email>)` (email lu via `polite_pool_email`)
+- *polite pool* obtenu via `User-Agent: BibliometrieUCA-pipeline/1.0 (mailto:<email>)` (adresse lue via `POLITE_POOL_EMAIL`)
 - Pas de quota contractuel. L'adapter reste conservateur (`max_concurrent=3`, `request_delay_s=0.2`) pour ne pas se faire limiter
 - Les 404 sont matérialisés dans `staging` par `not_found_at` (avec `processed=TRUE`) pour ne pas être réinterrogés à chaque run
 

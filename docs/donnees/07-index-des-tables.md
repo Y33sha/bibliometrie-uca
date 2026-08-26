@@ -71,7 +71,7 @@ Les vues matérialisées sont signalées comme telles ; les tables purement tech
 | `author_identifying_keys` | attributs d'identité d'une signature source (nom normalisé, identifiants), partagés via `identity_id` | [Authorships et sources](05-authorships-et-sources.md) |
 | `authorship_structures` | *vue matérialisée* : structures d'un authorship canonique | [Données dérivées](06-donnees-derivees.md) |
 | `authorships` | table de vérité personne × publication | [Authorships et sources](05-authorships-et-sources.md) |
-| `config` | configuration (périmètres actifs, clés API…) | [Structures](02-structures.md) |
+| `config` | réglages d'exploitation du pipeline (périmètres actifs, années couvertes…) | [Structures](02-structures.md) |
 | `confirmed_authorships` | épinglages admin (must-link) signature source ↔ personne, réappliqués à chaque run | [Authorships et sources](05-authorships-et-sources.md) |
 | `countries` | référentiel des pays | [Structures](02-structures.md) |
 | `distinct_persons` | paires marquées distinctes malgré un nom commun | [Personnes](04-personnes.md) |

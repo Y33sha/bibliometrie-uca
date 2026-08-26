@@ -11,11 +11,11 @@
 ![Formes de nom](../img/screenshots/admin_config.png)
 
 Configuration du [moissonnage](../pipeline/02-extract.md) :
-- email (*polite pool*);
-- clés API;
 - années interrogées (modes *weekly* et *full*);
 - définition et CRUD des périmètres (`uca`, `alliance_uca`);
 - périmètre utilisé à différentes étapes du pipeline (extraction, détection des affiliations, création de personnes).
+
+Les identifiants d'accès aux sources (clés API, compte ScanR, adresse du *polite pool*) sont des secrets et se règlent dans l'environnement du serveur, hors de l'interface : cf. [workflow admin](03-workflow-admin.md#identifiants-daccès-aux-sources).
 
 ## Logs
 TODO: à compléter
