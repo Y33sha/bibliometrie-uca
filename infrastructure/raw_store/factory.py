@@ -18,9 +18,25 @@ from infrastructure.settings import settings
 
 _DEFAULT_LOCAL_DIR = PROJECT_ROOT / "data" / "raw_store"
 
+_override: RawStore | None = None
+
+
+def set_raw_store(store: RawStore | None) -> None:
+    """Impose le store que `get_raw_store()` rendra, ou lève la surcharge avec `None`.
+
+    Le composition root s'en sert pour désigner un store que la configuration ne décrit pas — un `NullRawStore` quand un déploiement n'archive pas —, sur le modèle de l'engine SQLAlchemy.
+    """
+    global _override
+    _override = store
+
 
 def get_raw_store(url: str | None = None) -> RawStore:
-    """Retourne le `RawStore` configuré (`url` explicite, sinon settings/env)."""
+    """Retourne le `RawStore` configuré : la surcharge si elle est posée, sinon celui que décrit `url` ou les settings.
+
+    Une `url` explicite l'emporte sur la surcharge : les scripts qui ciblent un store précis (inspection d'un instantané hors ligne) le désignent par son chemin.
+    """
+    if url is None and _override is not None:
+        return _override
     raw_url = settings.biblio_raw_store_url if url is None else url
     if not raw_url:
         return LocalFileRawStore(_DEFAULT_LOCAL_DIR)

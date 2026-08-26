@@ -1322,6 +1322,12 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         "depuis zéro (filet anti-divergence, en récupération).",
     )
     parser.add_argument(
+        "--no-raw-store",
+        action="store_true",
+        help="N'archive pas les réponses brutes des sources. Le pipeline n'écrit alors "
+        "rien sur disque ; rejouer la normalisation exigera de réinterroger les sources.",
+    )
+    parser.add_argument(
         "--rebuild-subjects",
         action="store_true",
         help="À la phase subjects, ré-ingère toutes les publications (pas seulement les "
@@ -1493,6 +1499,13 @@ def main() -> None:
     if args.list:
         _print_phase_list()
         return
+
+    if args.no_raw_store:
+        # Composition root : le store que toute la normalisation obtiendra.
+        from infrastructure.raw_store import NullRawStore, set_raw_store
+
+        set_raw_store(NullRawStore())
+        log.info("Archivage des réponses brutes désactivé (--no-raw-store)")
 
     # Mutex pipeline (évite deadlocks cron vs lancement manuel).
     try:
