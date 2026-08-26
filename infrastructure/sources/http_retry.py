@@ -22,7 +22,7 @@ import httpx
 
 from application.ports.pipeline.circuit_breaker import SourceUnavailableError
 from infrastructure.sources.circuit_breaker import SourceCircuitBreaker, get_current_breaker
-from infrastructure.sources.redaction import raise_for_status
+from infrastructure.sources.http_status import raise_for_status
 
 logger = logging.getLogger(__name__)
 
