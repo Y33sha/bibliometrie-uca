@@ -12,7 +12,7 @@ Le pipeline n'interroge CrossRef que pour les DOI déjà découverts par les aut
 
 **Works API** (`https://api.crossref.org/works/{doi}`) — interrogation unitaire par DOI.
 
-- Polite pool obtenu via `User-Agent: BibliometrieUCA-pipeline/1.0 (mailto:<email>)` (email lu via `polite_pool_email`)
+- Polite pool obtenu via `User-Agent: BibliometrieUCA-pipeline/1.0 (mailto:<email>)` (adresse lue via `POLITE_POOL_EMAIL`)
 - Limites du polite pool CrossRef : 10 req/s + 3 concurrentes. L'adapter colle exactement à ces limites (`max_concurrent=3`, `request_delay_s=0.1`)
 - Les 404 sont matérialisés dans `staging` par `not_found_at` (avec `processed=TRUE`) pour ne pas être réinterrogés à chaque run
 

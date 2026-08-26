@@ -34,11 +34,13 @@
 
 ### Configuration du pipeline
 
-Tout se passe dans `admin/config`.
+Les périmètres et les années se règlent dans `admin/config` ; les identifiants d'accès aux sources, dans l'environnement du serveur.
 
-#### Credentials
+#### Identifiants d'accès aux sources
 
 Certaines sources requièrent une clé API ([WoS](../sources/04-wos.md)) ou un couple d'identifiants ([ScanR](../sources/05-scanr.md)). D'autres requièrent une adresse mail pour le polite pool ([OpenAlex](../sources/03-openalex.md), [Crossref](../sources/06-crossref.md)). Voir la doc de chaque source pour l'obtention des *credentials*.
+
+Ce sont des secrets : ils vivent dans l'environnement du serveur, pas en base, et ne se règlent donc pas depuis l'interface. Procédure dans la [documentation d'exploitation](../exploitation/02-initialisation-base.md#identifiants-daccès-aux-sources). Une source non renseignée est sautée au lancement, avec un avertissement, sans interrompre le run.
 
 #### Années
 

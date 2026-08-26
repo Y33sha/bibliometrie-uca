@@ -14,7 +14,7 @@ Source d'enrichissement consultée par DOI pour affiner `publications.oa_status`
 
 **v2** (`https://api.unpaywall.org/v2/{doi}`) — interrogation unitaire par DOI.
 
-- Polite pool obtenu via le paramètre `?email=...` (lu via `polite_pool_email`).
+- Polite pool obtenu via le paramètre `?email=...` (lue via `POLITE_POOL_EMAIL`).
 - Limites Unpaywall : 100 000 requêtes/jour, ~10 req/s recommandé. L'adapter limite à 5 requêtes concurrentes (`asyncio.Semaphore(5)`).
 - Implémentation async (`httpx.AsyncClient`), comme tous les extracteurs unitaires par DOI (HAL/OpenAlex/WoS/ScanR/CrossRef/DataCite `fetch_missing_doi`, `refetch_truncated`).
 
@@ -42,7 +42,7 @@ Source d'enrichissement pour les revues, consultée par ISSN. Sa donnée canoniq
 
 `GET https://doaj.org/api/search/journals/issn:{issn}` — interrogation unitaire par ISSN. Retourne un wrapper `{total, results[]}` ; `total == 0` = revue absente de DOAJ.
 
-- Polite pool via `User-Agent: bibliometrie-uca/1.0 (mailto:...)` (lu via `polite_pool_email`).
+- Polite pool via `User-Agent: bibliometrie-uca/1.0 (mailto:...)` (lue via `POLITE_POOL_EMAIL`).
 - Pas de quota documenté ; throttle `DOAJ_DELAY = 0.15s` (~6 req/s).
 - Implémentation sync (requests), comme les autres sub-steps publishers/journals.
 - Pas de retry élaboré : sur erreur réseau, on skip la revue (elle sera retentée à la prochaine fenêtre de stale).
