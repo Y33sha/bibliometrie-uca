@@ -176,7 +176,7 @@ def phase_resolve_ra(**kw: Any) -> PhaseMetrics:
     try:
         # doi.org/ra est une API publique (aucun credential) : l'email polite pool
         # est facultatif, on ne saute pas la résolution s'il manque.
-        user_agent = build_user_agent(get_polite_pool_email_optional(conn) or "")
+        user_agent = build_user_agent(get_polite_pool_email_optional() or "")
         metrics = run(
             log,
             repo=PgDoiPrefixesQueries(conn),
@@ -282,13 +282,11 @@ def phase_refresh_stale(
 
 
 def _credentials_missing(source: str) -> str | None:
-    """Motif d'absence de credentials d'une source (None si configurée). Ouvre une connexion
-    courte pour consulter le détecteur central. Injecté aux orchestrateurs des phases API."""
-    from infrastructure.db.engine import get_sync_engine
+    """Motif d'absence des identifiants d'une source (None si configurée), depuis le détecteur
+    central. Injecté aux orchestrateurs des phases qui interrogent une API tierce."""
     from infrastructure.sources.config import source_credentials_missing
 
-    with get_sync_engine().connect() as conn:
-        return source_credentials_missing(conn, source)
+    return source_credentials_missing(source)
 
 
 def _get_years_for_window(start_year: int | None) -> list[int] | None:
@@ -476,7 +474,7 @@ def _run_resolve_publishers() -> PhaseMetrics:
     breaker = SourceCircuitBreaker("crossref/datacite prefixes")
     token = set_current_breaker(breaker)
     try:
-        user_agent = build_user_agent(get_polite_pool_email_optional(conn) or "")
+        user_agent = build_user_agent(get_polite_pool_email_optional() or "")
         metrics = run_resolve_publishers(
             log,
             repo=PgDoiPrefixesQueries(conn),
@@ -802,8 +800,8 @@ def _run_enrich_journals_from_openalex() -> PhaseMetrics:
     breaker = SourceCircuitBreaker("openalex sources", threshold=3)
     token = set_current_breaker(breaker)
     try:
-        api_key = get_openalex_api_key(conn)
-        mailto = get_polite_pool_email_optional(conn) or ""
+        api_key = get_openalex_api_key()
+        mailto = get_polite_pool_email_optional() or ""
         sources_api = API_BASE_URLS["openalex_sources"]
         metrics = run_enrich_journals_from_openalex(
             conn,
@@ -861,7 +859,7 @@ def _run_enrich_journals_from_doaj() -> PhaseMetrics:
 
         _DOAJ_DUMP_PATH.parent.mkdir(parents=True, exist_ok=True)
         # DOAJ : dump CSV public (aucun credential) ; l'email polite pool est facultatif.
-        user_agent = build_user_agent(get_polite_pool_email_optional(conn) or "")
+        user_agent = build_user_agent(get_polite_pool_email_optional() or "")
         fetch_doaj_dump(str(_DOAJ_DUMP_PATH), user_agent=user_agent, logger=log)
         stats = run_import_doaj_dump(
             conn,
@@ -912,14 +910,12 @@ def _extractors() -> dict[str, Callable[[Any, Any], Any]]:
     from application.pipeline.extract.extract_scanr import ScanrExtractor
     from application.pipeline.extract.extract_theses import ThesesExtractor
     from application.pipeline.extract.extract_wos import WosExtractor
-    from infrastructure.db.engine import get_sync_engine
     from infrastructure.sources.api_params import API_BASE_URLS
-    from infrastructure.sources.config import get_wos_api_key
+    from infrastructure.sources.config import get_scanr_credentials, get_wos_api_key
     from infrastructure.sources.hal.extract_hal import PgHalExtractAdapter
     from infrastructure.sources.openalex.extract_openalex import PgOpenalexExtractAdapter
     from infrastructure.sources.scanr.extract_scanr import (
         PgScanrExtractAdapter,
-        get_scanr_credentials_from_db,
     )
     from infrastructure.sources.theses.extract_theses import PgThesesExtractAdapter
     from infrastructure.sources.wos.extract_wos import PgWosExtractAdapter
@@ -933,15 +929,13 @@ def _extractors() -> dict[str, Callable[[Any, Any], Any]]:
         return OpenalexExtractor(conn, source_log, adapter)
 
     def wos(conn: Any, source_log: Any) -> Any:
-        with get_sync_engine().connect() as bootstrap:
-            api_key = get_wos_api_key(bootstrap)
-        adapter = PgWosExtractAdapter(base_url=API_BASE_URLS["wos"], api_key=api_key)
+        adapter = PgWosExtractAdapter(base_url=API_BASE_URLS["wos"], api_key=get_wos_api_key())
         return WosExtractor(conn, source_log, adapter)
 
     def scanr(conn: Any, source_log: Any) -> Any:
-        with get_sync_engine().connect() as bootstrap:
-            credentials = get_scanr_credentials_from_db(bootstrap)
-        adapter = PgScanrExtractAdapter(base_url=API_BASE_URLS["scanr"], credentials=credentials)
+        adapter = PgScanrExtractAdapter(
+            base_url=API_BASE_URLS["scanr"], credentials=get_scanr_credentials()
+        )
         return ScanrExtractor(conn, source_log, adapter)
 
     def theses(conn: Any, source_log: Any) -> Any:
@@ -1196,7 +1190,7 @@ def phase_oa_status(**kw: Any) -> PhaseMetrics:
     conn = get_sync_engine().connect()
     try:
         base_url = API_BASE_URLS["unpaywall"]
-        email = get_polite_pool_email_optional(conn) or ""
+        email = get_polite_pool_email_optional() or ""
 
         async def fetcher(client: httpx.AsyncClient, doi: str) -> str | None:
             return await fetch_oa_status(client, doi, base_url=base_url, email=email, logger=log)

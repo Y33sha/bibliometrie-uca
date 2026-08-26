@@ -19,13 +19,13 @@ class PgConfigQueries(ConfigQueries):
     def list_config(self, *, public_only: bool) -> list[ConfigItem]:
         """Paramètres applicatifs triés par clé.
 
-        `public_only` restreint à `PUBLIC_CONFIG_KEYS` : la table porte aussi les clés d'API et les comptes de service des sources, qu'une lecture sans session ne doit pas rendre.
+        `public_only` restreint à `PUBLIC_CONFIG_KEYS` : une clé absente de cette liste blanche reste réservée à une session.
         """
         stmt = select(config.c.key, config.c.value, config.c.description).order_by(config.c.key)
         if public_only:
             stmt = stmt.where(config.c.key.in_(PUBLIC_CONFIG_KEYS))
         return [
-            ConfigItem.from_stored(key=r.key, value=r.value, description=r.description)
+            ConfigItem(key=r.key, value=r.value, description=r.description)
             for r in self._conn.execute(stmt)
         ]
 

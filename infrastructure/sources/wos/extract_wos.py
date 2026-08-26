@@ -65,7 +65,7 @@ class PgWosExtractAdapter(WosExtractAdapter):
         return WosExtractConfig(
             base_url=self._url,
             affiliations=affiliations,
-            credentials_missing=source_credentials_missing(conn, "wos"),
+            credentials_missing=source_credentials_missing("wos"),
         )
 
     def get_years(self, conn: Connection, *, start_year: int | None = None) -> list[int]:

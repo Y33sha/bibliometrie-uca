@@ -34,7 +34,7 @@ class DataciteRefreshStaleAdapter(BaseRefreshStaleAdapter):
 
     def configure(self, conn: Connection) -> None:
         self.base_url = API_BASE_URLS["datacite"]
-        email = get_polite_pool_email(conn)
+        email = get_polite_pool_email()
         self.headers = {
             "User-Agent": build_user_agent(email),
             "Accept": "application/vnd.api+json",

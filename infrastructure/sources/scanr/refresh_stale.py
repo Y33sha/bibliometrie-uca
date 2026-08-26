@@ -29,7 +29,7 @@ class ScanrRefreshStaleAdapter(BaseRefreshStaleAdapter):
 
     def configure(self, conn: Connection) -> None:
         self.url = API_BASE_URLS["scanr"]
-        username, password = get_scanr_credentials(conn)
+        username, password = get_scanr_credentials()
         self.auth = (username, password)
 
     async def fetch_by_native_id(self, client: httpx.AsyncClient, source_id: str) -> FetchOutcome:

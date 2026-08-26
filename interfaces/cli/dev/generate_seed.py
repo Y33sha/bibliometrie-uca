@@ -38,14 +38,6 @@ TABLES: list[dict[str, Any]] = [
         "columns": ["key", "value", "description"],
         "order": "key",
         "jsonb_columns": ["value"],
-        # Clés contenant des credentials — mises à NULL dans le seed.
-        "null_credentials": {
-            "wos_api_key",
-            "scanr_password",
-            "scanr_username",
-            "openalex_api_key",
-            "polite_pool_email",
-        },
     },
     {
         "table": "countries",
@@ -148,17 +140,10 @@ def generate_seed(conn: Connection, output_path: str | Path) -> None:
         lines.append(f"-- {table} ({len(rows)} lignes)")
         lines.append(f"DELETE FROM {table};")
 
-        null_credentials = spec.get("null_credentials", set())
         jsonb_cols = set(spec.get("jsonb_columns", []))
-        key_idx = columns.index("key") if "key" in columns else None
-        value_idx = columns.index("value") if "value" in columns else None
 
         for row in rows:
             row_values = list(row)
-            # Mettre les credentials à NULL (jamais de placeholder envoyé aux API)
-            if null_credentials and key_idx is not None and value_idx is not None:
-                if row_values[key_idx] in null_credentials:
-                    row_values[value_idx] = None
             values = ", ".join(
                 escape_sql(row_values[i], is_jsonb=(columns[i] in jsonb_cols))
                 for i in range(len(columns))
