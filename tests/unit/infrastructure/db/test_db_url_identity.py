@@ -25,10 +25,15 @@ class TestConnectionIdentity:
         assert url.username == "proprietaire"
         assert url.password == "secret-proprietaire"
 
-    def test_unconfigured_restricted_identity_falls_back_to_the_owner(self, monkeypatch):
-        # Poste de développement : une seule identité, l'API se connecte comme le reste.
+    def test_unconfigured_restricted_identity_is_refused(self, monkeypatch):
+        # Un repli silencieux sur le propriétaire ferait tourner l'API avec ses droits.
         monkeypatch.setattr(settings, "db_owner_user", "proprietaire")
         monkeypatch.setattr(settings, "db_owner_password", "secret-proprietaire")
         monkeypatch.setattr(settings, "db_app_user", "")
-        monkeypatch.setattr(settings, "db_app_password", "")
-        assert db_url(application=True).username == "proprietaire"
+        with pytest.raises(RuntimeError, match="DB_APP_USER"):
+            db_url(application=True)
+
+    def test_the_refusal_says_how_to_create_the_role(self, monkeypatch):
+        monkeypatch.setattr(settings, "db_app_user", "")
+        with pytest.raises(RuntimeError, match="roles.sql"):
+            db_url(application=True)
