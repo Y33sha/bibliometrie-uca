@@ -20,8 +20,8 @@ const basePath = process.env.BASE_PATH ?? '';
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
 	kit: {
-		// adapter-static : la SPA (ssr=false) et les docs prérendues sont servies
-		// en fichiers statiques par FastAPI (cf. interfaces/api/deps SPAStaticFiles).
+		// adapter-static : la SPA (ssr=false) est servie en fichiers statiques par
+		// FastAPI (cf. interfaces/api/spa.py).
 		// `fallback` : les routes non prérendues retombent sur index.html (routage
 		// client-side).
 		adapter: adapter({ fallback: 'index.html' }),
@@ -32,7 +32,7 @@ const config = {
 		// calcule l'empreinte des scripts inline de SvelteKit (bootstrap par page) et les
 		// autorise nommément, sans `unsafe-inline` : un script injecté (XSS) reste refusé.
 		// `style-src` garde `unsafe-inline` : les styles sont injectés au runtime par les
-		// libs de visualisation (chart.js, mermaid, katex, vis-network), non hachables.
+		// libs de visualisation (chart.js, katex, vis-network), non hachables.
 		csp: {
 			mode: 'hash',
 			directives: {
@@ -46,13 +46,6 @@ const config = {
 				'base-uri': ['self'],
 				'form-action': ['self']
 			}
-		},
-		prerender: {
-			// Les liens doc→code source sont réécrits vers GitHub (cf.
-			// `resolveDocLink`) ; un lien interne cassé reste une erreur de build.
-			// `handleMissingId` en `warn` : une ancre écrite à la main et non
-			// résolue (ex. accents) émet un avertissement plutôt qu'une erreur.
-			handleMissingId: 'warn'
 		}
 	}
 };
