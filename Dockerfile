@@ -20,14 +20,10 @@ FROM node:22-slim AS frontend-build
 ARG ROOT_PATH
 ENV BASE_PATH=$ROOT_PATH
 
-# Préserve l'arborescence repo (interfaces/frontend + docs/) : la route /docs
-# lit les markdown de `docs/` via un glob Vite remontant à la racine du repo
-# (`../../../../../docs`). Sans `docs/` à la bonne position, la doc serait vide.
-WORKDIR /build/interfaces/frontend
+WORKDIR /app/interfaces/frontend
 COPY interfaces/frontend/package*.json ./
 RUN npm ci
 COPY interfaces/frontend/ .
-COPY docs/ /build/docs/
 RUN npm run build
 
 # ---- Étape 2 : image Python finale ----
@@ -55,7 +51,7 @@ RUN uv sync --frozen --no-dev
 ENV PATH="/app/.venv/bin:${PATH}"
 
 # Frontend buildé (servi par l'API via SPAStaticFiles)
-COPY --from=frontend-build /build/interfaces/frontend/build ./interfaces/frontend/build
+COPY --from=frontend-build /app/interfaces/frontend/build ./interfaces/frontend/build
 
 # Exécution sous un utilisateur non privilégié : l'API ne requiert aucun droit root
 # (port 8000 > 1024, logs sur stdout).
