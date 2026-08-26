@@ -18,11 +18,10 @@ _API_KEY = "cle-secrete-de-test"
 
 
 def _resp(status: int) -> MagicMock:
-    """Réponse simulée. `is_success`, `url` et `reason_phrase` sont ce que lit `raise_for_status`, qui compose lui-même le message d'erreur à partir de l'URL assainie."""
+    """Réponse simulée. `is_success` et `reason_phrase` sont ce que lit `raise_for_status`, qui compose lui-même le message d'erreur."""
     r = MagicMock()
     r.status_code = status
     r.is_success = 200 <= status < 300
-    r.url = httpx.URL(f"https://api.example/foo?api_key={_API_KEY}")
     r.reason_phrase = "Error" if status >= 400 else "OK"
     if not r.is_success:
         r.text = ""
@@ -41,8 +40,8 @@ def test_4xx_fails_fast_without_retry():
         with pytest.raises(httpx.HTTPStatusError) as excinfo:
             http_retry.http_request_with_retry("GET", "http://x", label="t", max_retries=3)
     assert req.call_count == 1  # aucun retry sur 4xx
-    # Non-régression : le paramètre de requête porteur de la clé d'API ne ressort pas
-    # dans l'erreur, que les appelants journalisent telle quelle.
+    # Non-régression : l'erreur que les appelants journalisent ne porte pas la requête,
+    # dont les paramètres transportent la clé d'API.
     assert _API_KEY not in str(excinfo.value)
 
 

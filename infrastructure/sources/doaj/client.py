@@ -13,7 +13,7 @@ from collections.abc import Iterator
 
 import httpx
 
-from infrastructure.sources.redaction import raise_for_status
+from infrastructure.sources.http_status import raise_for_status
 
 DOAJ_CSV_DUMP_URL = "https://doaj.org/csv"
 """Dump CSV public de toutes les revues DOAJ (généré à la volée par DOAJ)."""
