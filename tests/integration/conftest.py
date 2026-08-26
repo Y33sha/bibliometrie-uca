@@ -71,9 +71,18 @@ def _create_test_db():
     # `alembic upgrade head` sur la base fraîche. Alembic est la source
     # de vérité du schéma — `schema.sql` n'est qu'un snapshot descriptif
     # régénéré par `python -m interfaces.cli.dev.dump_schema`.
+    command.upgrade(_alembic_config(), "head")
+
+
+def _alembic_config() -> Config:
+    """Configuration Alembic pointée sur la base de test.
+
+    L'URL passe par `set_main_option`, qui la range dans un `configparser` : le `%` y ouvre une interpolation. Or le rendu d'une URL encode en `%XX` tout caractère non alphanumérique d'un mot de passe — un mot de passe solide en produit forcément. Doubler le `%` le rend littéral.
+    """
     cfg = Config(str(ALEMBIC_INI))
-    cfg.set_main_option("sqlalchemy.url", _sa_url().render_as_string(hide_password=False))
-    command.upgrade(cfg, "head")
+    url = _sa_url().render_as_string(hide_password=False)
+    cfg.set_main_option("sqlalchemy.url", url.replace("%", "%%"))
+    return cfg
 
 
 def pytest_configure(config):
@@ -124,8 +133,7 @@ def alembic_config() -> Config:
     `configure_logger` à faux laisse le logging de la session pytest en place : `env.py` le
     reconfigurerait sinon en pleine session, désactivant les loggers que les tests observent.
     """
-    cfg = Config(str(ALEMBIC_INI))
-    cfg.set_main_option("sqlalchemy.url", _sa_url().render_as_string(hide_password=False))
+    cfg = _alembic_config()
     cfg.attributes["configure_logger"] = False
     return cfg
 
