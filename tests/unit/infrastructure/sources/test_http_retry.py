@@ -12,18 +12,21 @@ import respx
 from infrastructure.sources import http_retry
 from infrastructure.sources.http_retry import http_request_with_retry_async
 
+_API_KEY = "cle-secrete-de-test"
+
 # ── variante synchrone (httpx) ────────────────────────────────
 
 
 def _resp(status: int) -> MagicMock:
+    """Réponse simulée. `is_success`, `url` et `reason_phrase` sont ce que lit `raise_for_status`, qui compose lui-même le message d'erreur à partir de l'URL assainie."""
     r = MagicMock()
     r.status_code = status
-    if status >= 400:
-        r.raise_for_status.side_effect = httpx.HTTPStatusError(
-            f"HTTP {status}", request=MagicMock(), response=r
-        )
+    r.is_success = 200 <= status < 300
+    r.url = httpx.URL(f"https://api.example/foo?api_key={_API_KEY}")
+    r.reason_phrase = "Error" if status >= 400 else "OK"
+    if not r.is_success:
+        r.text = ""
     else:
-        r.raise_for_status.return_value = None
         r.text = "{}"
         r.json.return_value = {}
     return r
@@ -35,9 +38,12 @@ def test_4xx_fails_fast_without_retry():
         patch.object(http_retry.httpx, "request", return_value=resp) as req,
         patch.object(http_retry.time, "sleep"),
     ):
-        with pytest.raises(httpx.HTTPStatusError):
+        with pytest.raises(httpx.HTTPStatusError) as excinfo:
             http_retry.http_request_with_retry("GET", "http://x", label="t", max_retries=3)
     assert req.call_count == 1  # aucun retry sur 4xx
+    # Non-régression : le paramètre de requête porteur de la clé d'API ne ressort pas
+    # dans l'erreur, que les appelants journalisent telle quelle.
+    assert _API_KEY not in str(excinfo.value)
 
 
 def test_5xx_is_retried():
@@ -188,3 +194,21 @@ class TestAsync:
             )
         assert data == {"ok": True}
         assert route.call_count == 2
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_le_parametre_secret_ne_sort_pas_dans_l_erreur(self):
+        """Non-régression : une clé d'API passée en paramètre de requête n'apparaît pas dans l'erreur levée, que les appelants journalisent."""
+        respx.get("https://api.example/foo").mock(return_value=httpx.Response(403))
+        async with httpx.AsyncClient() as client:
+            with pytest.raises(httpx.HTTPStatusError) as excinfo:
+                await http_request_with_retry_async(
+                    client,
+                    "GET",
+                    "https://api.example/foo",
+                    params={"api_key": _API_KEY},
+                    initial_backoff=0.01,
+                    label="test",
+                )
+        assert _API_KEY not in str(excinfo.value)
+        assert _API_KEY not in repr(excinfo.value)

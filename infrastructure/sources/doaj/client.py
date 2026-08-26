@@ -13,6 +13,8 @@ from collections.abc import Iterator
 
 import httpx
 
+from infrastructure.sources.redaction import raise_for_status
+
 DOAJ_CSV_DUMP_URL = "https://doaj.org/csv"
 """Dump CSV public de toutes les revues DOAJ (généré à la volée par DOAJ)."""
 
@@ -37,7 +39,7 @@ def fetch_doaj_dump(
         timeout=timeout,
         follow_redirects=True,
     ) as resp:
-        resp.raise_for_status()
+        raise_for_status(resp)
         with open(dest_path, "wb") as f:
             for chunk in resp.iter_bytes(chunk_size=1 << 16):
                 f.write(chunk)

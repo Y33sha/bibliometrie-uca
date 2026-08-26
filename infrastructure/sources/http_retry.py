@@ -22,6 +22,7 @@ import httpx
 
 from application.ports.pipeline.circuit_breaker import SourceUnavailableError
 from infrastructure.sources.circuit_breaker import SourceCircuitBreaker, get_current_breaker
+from infrastructure.sources.redaction import raise_for_status
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +55,7 @@ def _retry_reason(resp: httpx.Response, *, retry_on_empty_body: bool) -> str | N
     """
     if _is_retryable_status(resp.status_code):
         return f"HTTP {resp.status_code}"
-    resp.raise_for_status()  # 4xx : échec immédiat, non compté
+    raise_for_status(resp)  # 4xx : échec immédiat, non compté
     if retry_on_empty_body and not resp.text.strip():
         return "corps vide"
     return None
@@ -123,7 +124,7 @@ def http_request_with_retry(
             if breaker is not None:
                 breaker.record_failure()
                 raise SourceUnavailableError(breaker.source)
-            resp.raise_for_status()
+            raise_for_status(resp)
         logger.warning(
             f"{reason} {label} — attente {wait}s (tentative {attempt + 1}/{max_retries})"
         )
@@ -199,7 +200,7 @@ async def http_request_with_retry_async(
         if _is_retryable_status(resp.status_code) and is_last:
             if breaker is not None:
                 breaker.record_failure()
-            resp.raise_for_status()
+            raise_for_status(resp)
         logger.warning(
             f"{reason} {label} — attente {wait}s (tentative {attempt + 1}/{max_retries})"
         )

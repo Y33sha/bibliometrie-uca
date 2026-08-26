@@ -76,11 +76,19 @@ def fetch_publishers_batch(
             results = cast("list[_OpenAlexPublisher]", resp.json().get("results", []))
             return {short_openalex_id(source["id"]): source for source in results}
         except httpx.HTTPError as e:
+            # Le message d'une erreur de statut httpx porte l'URL entière, clé d'API comprise :
+            # seul le statut est journalisé. Les requêtes qui passent par le helper HTTP partagé
+            # tiennent cette précaution elles-mêmes (`infrastructure/sources/redaction.py`).
+            reason = (
+                f"HTTP {e.response.status_code}"
+                if isinstance(e, httpx.HTTPStatusError)
+                else repr(e)
+            )
             if attempt < 2:
-                logger.warning(f"Erreur requête (tentative {attempt + 1}/3): {e}")
+                logger.warning("Erreur requête (tentative %d/3) : %s", attempt + 1, reason)
                 time.sleep(2 ** (attempt + 1))
             else:
-                logger.error(f"Échec après 3 tentatives: {e}")
+                logger.error("Échec après 3 tentatives : %s", reason)
                 return {}
     raise _OpenAlexRateLimited()
 
