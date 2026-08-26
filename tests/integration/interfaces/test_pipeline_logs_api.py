@@ -1,6 +1,6 @@
 """Tests d'intégration de l'endpoint de log de phase du router `interfaces.api.routers.pipeline_runs`.
 
-Couvre GET /api/pipeline/runs/{run_id}/phases/{phase}/log : découpe de la section, fichier absent, section absente.
+Couvre GET /api/pipeline/runs/{run_id}/phases/{phase}/log : découpe de la section, fichier absent, section absente. La lecture exige une session d'administration, d'où `auth_client` ; le refus qu'elle oppose sans session est couvert par `test_pipeline_runs_api`.
 """
 
 from __future__ import annotations
@@ -33,23 +33,23 @@ class TestPhaseLog:
             encoding="utf-8",
         )
 
-    def test_returns_phase_slice(self, client, _isolate_paths):
+    def test_returns_phase_slice(self, auth_client, _isolate_paths):
         self._write_log(_isolate_paths / "pipeline.log")
-        r = client.get("/api/pipeline/runs/5/phases/extract/log")
+        r = auth_client.get("/api/pipeline/runs/5/phases/extract/log")
         assert r.status_code == 200
         body = r.json()
         assert body["available"] is True
         assert "extract line" in body["content"]
         assert "normalize line" not in body["content"]
 
-    def test_unavailable_when_file_missing(self, client, _isolate_paths):
+    def test_unavailable_when_file_missing(self, auth_client, _isolate_paths):
         # Pas de pipeline.log (LOG_TO_FILE désactivé).
-        r = client.get("/api/pipeline/runs/5/phases/extract/log")
+        r = auth_client.get("/api/pipeline/runs/5/phases/extract/log")
         assert r.status_code == 200
         assert r.json() == {"available": False, "content": "", "omitted_lines": 0}
 
-    def test_unavailable_when_section_absent(self, client, _isolate_paths):
+    def test_unavailable_when_section_absent(self, auth_client, _isolate_paths):
         self._write_log(_isolate_paths / "pipeline.log")
-        r = client.get("/api/pipeline/runs/5/phases/subjects/log")
+        r = auth_client.get("/api/pipeline/runs/5/phases/subjects/log")
         assert r.status_code == 200
         assert r.json() == {"available": False, "content": "", "omitted_lines": 0}
