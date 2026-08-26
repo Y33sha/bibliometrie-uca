@@ -346,7 +346,7 @@ def phase_normalize(**kw: Any) -> PhaseMetrics:
 
     # Ordre d'exécution : source la plus autoritative en premier (cf. SOURCE_PRIORITY).
     # Les suivantes n'écrasent pas les métadonnées déjà posées lors de `refresh_from_sources`.
-    registry = _normalize_builders()
+    registry = _normalize_builders(archive=not kw.get("no_raw_store"))
 
     def normalize_one(source: str) -> dict[str, object]:
         return _run_normalize(source, registry[source])
@@ -708,7 +708,7 @@ def _normalize_row(source: str, stats: NormalizeStats, duration_s: float) -> dic
     }
 
 
-def _normalize_builders() -> dict[str, Callable[[Any], Any]]:
+def _normalize_builders(*, archive: bool = True) -> dict[str, Callable[[Any], Any]]:
     """Constructeur du normalizer par source, dans l'ordre de priorité (source la plus
     autoritative en premier — cf. SOURCE_PRIORITY) : les suivantes n'écrasent pas les
     métadonnées déjà posées. Les six sources bibliographiques partagent le câblage
@@ -727,13 +727,17 @@ def _normalize_builders() -> dict[str, Callable[[Any], Any]]:
     )
     from infrastructure.pipeline.normalize.staging import PgStagingQueries
     from infrastructure.pipeline.publishers import PgPublisherGatewayQueries
+    from infrastructure.raw_store import NullRawStore, get_raw_store
     from infrastructure.repositories import publication_repository
+
+    # Sans archivage, les payloads sont oubliés au lieu d'être écrits sur disque.
+    raw_store = get_raw_store() if archive else NullRawStore()
 
     def _biblio(cls: Any) -> Callable[[Any], Any]:
         return lambda conn: cls(
             conn,
             log,
-            PgStagingQueries(),
+            PgStagingQueries(raw_store),
             PgSourcePublicationQueries(),
             journal_repo_factory=PgJournalGatewayQueries,
             publisher_repo_factory=PgPublisherGatewayQueries,
@@ -745,7 +749,7 @@ def _normalize_builders() -> dict[str, Callable[[Any], Any]]:
         "theses": lambda conn: ThesesNormalizer(
             conn,
             log,
-            PgStagingQueries(),
+            PgStagingQueries(raw_store),
             PgSourcePublicationQueries(),
             publication_repo_factory=publication_repository,
             batch_queries=PgAuthorshipsBatchQueries(),
@@ -1400,6 +1404,7 @@ def _run_one_phase(
                 rebuild_publications=args.rebuild_publications,
                 rebuild_authorships=args.rebuild_authorships,
                 rebuild_subjects=args.rebuild_subjects,
+                no_raw_store=args.no_raw_store,
             )
         except KeyboardInterrupt:
             log.warning("Pipeline interrompu par l'utilisateur à la phase '%s'", name)
@@ -1499,13 +1504,6 @@ def main() -> None:
     if args.list:
         _print_phase_list()
         return
-
-    if args.no_raw_store:
-        # Composition root : le store que toute la normalisation obtiendra.
-        from infrastructure.raw_store import NullRawStore, set_raw_store
-
-        set_raw_store(NullRawStore())
-        log.info("Archivage des réponses brutes désactivé (--no-raw-store)")
 
     # Mutex pipeline (évite deadlocks cron vs lancement manuel).
     try:

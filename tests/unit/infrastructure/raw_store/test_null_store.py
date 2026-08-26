@@ -1,12 +1,11 @@
 """Store nul : un déploiement qui n'archive pas les réponses brutes.
 
-Ce qui y entre n'en ressort pas, et la lecture se comporte comme sur un store vide — sans lever autrement que le contrat ne le prévoit.
+Ce qui y entre n'en ressort pas, et la lecture se comporte comme sur un store vide — sans lever autrement que le contrat ne le prévoit. La phase de normalisation le reçoit à la place du store sur disque quand le pipeline tourne avec `--no-raw-store`.
 """
 
 import pytest
 
-from infrastructure.raw_store import NullRawStore, get_raw_store, set_raw_store
-from infrastructure.raw_store.local import LocalFileRawStore
+from infrastructure.raw_store import NullRawStore
 
 
 class TestNullRawStore:
@@ -22,26 +21,3 @@ class TestNullRawStore:
 
     def test_aucune_cle_a_parcourir(self):
         assert list(NullRawStore().iter_keys("hal")) == []
-
-
-class TestSurcharge:
-    def test_la_surcharge_est_rendue_a_tous(self, tmp_path):
-        nul = NullRawStore()
-        set_raw_store(nul)
-        try:
-            assert get_raw_store() is nul
-        finally:
-            set_raw_store(None)
-
-    def test_une_url_explicite_l_emporte(self, tmp_path):
-        # Les scripts qui ciblent un store précis ne doivent pas tomber sur la surcharge.
-        set_raw_store(NullRawStore())
-        try:
-            assert isinstance(get_raw_store(tmp_path.as_uri()), LocalFileRawStore)
-        finally:
-            set_raw_store(None)
-
-    def test_la_surcharge_se_leve(self, tmp_path):
-        set_raw_store(NullRawStore())
-        set_raw_store(None)
-        assert not isinstance(get_raw_store(), NullRawStore)
