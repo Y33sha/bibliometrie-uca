@@ -21,11 +21,20 @@ _sync_engine: Engine | None = None
 def db_url(*, application: bool = False) -> URL:
     """URL de connexion Postgres construite depuis les settings (réutilisée par Alembic).
 
-    `application` demande l'identité restreinte de l'API (`db_app_user`), un rôle limité à la lecture et à l'écriture des données. Sans elle configurée, ou pour tout autre appelant — migrations, pipeline, scripts de maintenance —, la connexion se fait avec l'identité principale, propriétaire du schéma : eux seuls modifient sa structure, rafraîchissent les vues matérialisées et vident des tables.
+    `application` demande l'identité restreinte de l'API (`db_app_user`), un rôle limité à la lecture et à l'écriture des données ; elle est exigée, faute de quoi la construction échoue. Se replier en silence sur l'identité principale ferait tourner l'API avec les droits du propriétaire du schéma sans que rien ne le signale.
+
+    Les autres appelants — migrations, pipeline, scripts de maintenance — se connectent avec l'identité principale : eux seuls modifient la structure du schéma, rafraîchissent les vues matérialisées et vident des tables.
 
     `db_sslmode`, s'il est défini, est passé en paramètre de connexion `sslmode`.
     """
-    if application and settings.db_app_user:
+    if application:
+        if not settings.db_app_user:
+            raise RuntimeError(
+                "DB_APP_USER est requis pour la connexion de l'API : elle doit se connecter "
+                "sous un rôle limité à la lecture et à l'écriture des données. Créer le rôle "
+                "avec `infrastructure/db/roles.sql`, puis renseigner DB_APP_USER et "
+                "DB_APP_PASSWORD."
+            )
         username, password = settings.db_app_user, settings.db_app_password
     else:
         username, password = settings.db_owner_user, settings.db_owner_password

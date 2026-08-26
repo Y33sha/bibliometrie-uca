@@ -38,7 +38,7 @@ Ou, installation sans Docker :
 cp .env.example .env
 ```
 
-Éditer `.env` avec vos valeurs (credentials DB, admin).
+Éditer `.env` avec vos valeurs (identités de la base, compte d'administration). L'API se connecte sous un rôle restreint et refuse de démarrer sans lui : cf. [Rôles de connexion](docs/exploitation/02-initialisation-base.md#rôles-de-connexion).
 
 ### 2. Lancement (dev)
 
