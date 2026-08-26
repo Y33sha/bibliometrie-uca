@@ -1,35 +1,25 @@
 """Enrichissement (cosmétique) du `country` des éditeurs depuis l'API OpenAlex Publishers.
 
-Maintenance hors pipeline, lancé à la demande par `interfaces/cli/maintenance/enrich_publishers.py`. Met à jour `country` quand la valeur en base est NULL, depuis `country_codes[0]` : un éditeur peut opérer dans plusieurs pays côté OpenAlex, on prend le premier, qui correspond généralement au siège social. Politique « NULL only » : une valeur saisie à la main est préservée ; idempotent.
+Maintenance hors pipeline, lancée à la demande par `interfaces/cli/maintenance/enrich_publishers.py`. Politique « NULL only » : le pays n'est écrit que là où la base n'en porte pas, si bien qu'une valeur saisie à la main est préservée et que deux exécutions successives donnent le même résultat.
 
-L'API Publishers filtre par `ids.openalex:P1|P2|...`.
+Le fetch OpenAlex et le circuit-breaker de source sont injectés — le HTTP vit dans `infrastructure/sources/openalex/publisher_enrichment.py`, avec ses retries et son backoff. Cet orchestrateur ne consulte que l'état du breaker, pour s'arrêter quand la source est à bout de budget et reporter le reste à l'exécution suivante.
 """
 
 import logging
 import time
 from collections import Counter
-from typing import NamedTuple, NotRequired, TypedDict, cast
+from collections.abc import Callable
+from typing import NamedTuple
 
-import httpx
 from sqlalchemy import Connection
 
+from application.ports.pipeline.circuit_breaker import CircuitBreaker
 from application.ports.repositories.publisher_repository import PublisherRepository
-from domain.sources.openalex import full_openalex_id, short_openalex_id
 
 BATCH_SIZE = 50
-# Coupe-circuit : N batches consécutifs en 429 (budget API OpenAlex épuisé) avant coupure.
-RATE_LIMIT_STRIKES_MAX = 3
 
-
-class _OpenAlexPublisher(TypedDict):
-    """Sous-ensemble de la payload OpenAlex Publishers consommé ici."""
-
-    id: str
-    country_codes: NotRequired[list[str]]
-
-
-class _OpenAlexRateLimited(Exception):
-    """429 répétés sur un batch (3 tentatives épuisées) : budget API probablement épuisé."""
+FetchPublishersBatch = Callable[[list[str]], dict[str, str | None]]
+"""Signature du fetch injecté : `(openalex_ids) -> {short_id: pays}`. Le pays vaut `None` quand la source n'en donne pas ; un éditeur sur lequel elle ne répond rien est absent du dictionnaire."""
 
 
 class _BatchOutcome(NamedTuple):
@@ -41,86 +31,24 @@ class _BatchOutcome(NamedTuple):
     countries: Counter[str]
 
 
-def fetch_publishers_batch(
-    openalex_ids: list[str],
-    logger: logging.Logger,
-    *,
-    openalex_publishers_api: str,
-    api_key: str | None,
-    mailto: str,
-) -> dict[str, _OpenAlexPublisher]:
-    """Interroge l'API OpenAlex Publishers pour un lot d'IDs et retourne un dict short_id → données. Select restreint aux champs consommés."""
-    full_ids = [full_openalex_id(oid) for oid in openalex_ids]
-    filter_value = "|".join(full_ids)
-    params = {
-        "filter": f"ids.openalex:{filter_value}",
-        "per_page": str(len(openalex_ids)),
-        "select": "id,country_codes",
-    }
-    if api_key:
-        params["api_key"] = api_key
-    else:
-        params["mailto"] = mailto
-
-    for attempt in range(3):
-        try:
-            resp = httpx.get(
-                openalex_publishers_api, params=params, timeout=30, follow_redirects=True
-            )
-            if resp.status_code == 429:
-                wait = 2 ** (attempt + 1)
-                logger.warning(f"Rate limited (429), attente {wait}s...")
-                time.sleep(wait)
-                continue
-            resp.raise_for_status()
-            results = cast("list[_OpenAlexPublisher]", resp.json().get("results", []))
-            return {short_openalex_id(source["id"]): source for source in results}
-        except httpx.HTTPError as e:
-            # Le message d'une erreur de statut httpx porte l'URL entière, clé d'API comprise :
-            # seul le statut est journalisé. Les requêtes qui passent par le helper HTTP partagé
-            # tiennent cette précaution elles-mêmes (`infrastructure/sources/redaction.py`).
-            reason = (
-                f"HTTP {e.response.status_code}"
-                if isinstance(e, httpx.HTTPStatusError)
-                else repr(e)
-            )
-            if attempt < 2:
-                logger.warning("Erreur requête (tentative %d/3) : %s", attempt + 1, reason)
-                time.sleep(2 ** (attempt + 1))
-            else:
-                logger.error("Échec après 3 tentatives : %s", reason)
-                return {}
-    raise _OpenAlexRateLimited()
-
-
-def extract_country(source: _OpenAlexPublisher) -> str | None:
-    """Extrait le `country` depuis la payload OpenAlex Publishers.
-
-    Premier code de `country_codes`, en minuscule (canonique ; OpenAlex renvoie de la majuscule). Vide → None.
-    """
-    country_codes = source.get("country_codes") or []
-    return country_codes[0].lower() if country_codes else None
-
-
 def _enrich_batch(
     id_map: dict[str, int],
-    sources: dict[str, _OpenAlexPublisher],
+    countries_by_id: dict[str, str | None],
     *,
     publisher_repo: PublisherRepository,
     dry_run: bool,
 ) -> _BatchOutcome:
-    """Applique le `country` OpenAlex aux éditeurs d'un batch, en « NULL only ».
+    """Applique le pays OpenAlex aux éditeurs d'un batch, en « NULL only ».
 
-    `id_map` associe openalex_id → publisher_id. Un éditeur absent de `sources` ou disparu de la base compte comme `no_response` ; un éditeur au `country` déjà renseigné est ignoré.
+    `id_map` associe openalex_id → publisher_id. Un éditeur sur lequel la source n'a rien répondu, ou disparu de la base, compte comme `no_response` ; un éditeur au `country` déjà renseigné est ignoré.
     """
     updated = with_country = no_response = 0
     countries: Counter[str] = Counter()
     for oa_id, publisher_id in id_map.items():
-        source = sources.get(oa_id)
-        if source is None:
+        if oa_id not in countries_by_id:
             no_response += 1
             continue
-        country = extract_country(source)
+        country = countries_by_id[oa_id]
         current = publisher_repo.find_by_id(publisher_id)
         if current is None:
             no_response += 1
@@ -140,9 +68,8 @@ def run_enrich_publishers_from_openalex(
     logger: logging.Logger,
     *,
     publisher_repo: PublisherRepository,
-    api_key: str | None,
-    mailto: str,
-    openalex_publishers_api: str,
+    fetch_batch: FetchPublishersBatch,
+    breaker: CircuitBreaker,
     limit: int = 0,
     dry_run: bool = False,
     rate_delay: float = 0.1,
@@ -156,40 +83,28 @@ def run_enrich_publishers_from_openalex(
             logger.info("Rien à faire.")
             return
 
-        updated = with_country = no_response = processed = strikes = 0
+        updated = with_country = no_response = processed = 0
         country_counter: Counter[str] = Counter()
 
         for i in range(0, total, BATCH_SIZE):
-            batch = publishers[i : i + BATCH_SIZE]
-            oa_ids = [row[1] for row in batch]
-            id_map = {row[1]: row[0] for row in batch}
-
-            try:
-                sources = fetch_publishers_batch(
-                    oa_ids,
-                    logger,
-                    openalex_publishers_api=openalex_publishers_api,
-                    api_key=api_key,
-                    mailto=mailto,
+            if breaker.tripped:
+                if not dry_run:
+                    conn.commit()
+                logger.warning(
+                    "⚡ Coupe-circuit OpenAlex : enrichissement éditeurs interrompu à %d/%d. "
+                    "Reste retenté à la prochaine exécution.",
+                    processed,
+                    total,
                 )
-            except _OpenAlexRateLimited:
-                strikes += 1
-                if strikes >= RATE_LIMIT_STRIKES_MAX:
-                    if not dry_run:
-                        conn.commit()
-                    logger.warning(
-                        "⚡ Coupe-circuit OpenAlex (429 sur %d batches consécutifs) : "
-                        "enrichissement publishers interrompu à %d/%d. Reste retenté au prochain run.",
-                        strikes,
-                        processed,
-                        total,
-                    )
-                    return
-                continue
-            strikes = 0
+                return
+
+            id_map = {row[1]: row[0] for row in publishers[i : i + BATCH_SIZE]}
+            countries_by_id = fetch_batch(list(id_map))
             time.sleep(rate_delay)
 
-            outcome = _enrich_batch(id_map, sources, publisher_repo=publisher_repo, dry_run=dry_run)
+            outcome = _enrich_batch(
+                id_map, countries_by_id, publisher_repo=publisher_repo, dry_run=dry_run
+            )
             updated += outcome.updated
             with_country += outcome.with_country
             no_response += outcome.no_response
