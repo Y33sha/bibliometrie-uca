@@ -6,7 +6,7 @@ Usage :
     from infrastructure.settings import settings
     print(settings.db_host)
 
-Les paramètres externalisés dynamiques (périmètres, clés API, credentials ScanR, collections HAL, années pipeline) sont lus depuis la table `config` en base.
+Les paramètres d'exploitation externalisés (périmètres, collections HAL, années couvertes) sont lus depuis la table `config` en base. Les identifiants d'accès aux sources, eux, sont des secrets : ils viennent de l'environnement comme les autres.
 """
 
 from typing import Annotated
@@ -30,9 +30,12 @@ class Settings(BaseSettings):
     # ----- Authentification admin -----
     # Hash bcrypt : python -c 'import bcrypt; print(bcrypt.hashpw(b"MOT_DE_PASSE", bcrypt.gensalt()).decode())'
     # Session secret : python -c "import secrets; print(secrets.token_hex(32))"
+    # Exigés du processus qui sert l'API, et de lui seul : le pipeline et les scripts de
+    # maintenance partagent cette configuration sans jamais ouvrir de session. Le contrôle vit
+    # donc au démarrage de l'API (`interfaces.api.session.check_auth_config`).
     admin_user: str = "admin"
-    admin_hash: str
-    session_secret: str
+    admin_hash: str = ""
+    session_secret: str = ""
 
     # ----- Sécurité HTTP -----
     # Cookie de session marqué `Secure` (transmis uniquement sur HTTPS). Vrai par défaut ;
@@ -50,8 +53,12 @@ class Settings(BaseSettings):
     db_host: str = "localhost"
     db_port: int = 5432
     db_name: str = "bibliometrie"
-    db_owner_user: str
-    db_owner_password: str
+    # Identité principale, propriétaire du schéma : migrations, pipeline et scripts de
+    # maintenance s'en servent, eux seuls. Vide, ces connexions sont refusées (cf.
+    # `infrastructure.db.engine.db_url`) ; le processus qui sert l'API n'a pas à la porter,
+    # puisqu'il se connecte sous l'identité restreinte ci-dessous.
+    db_owner_user: str = ""
+    db_owner_password: str = ""
     # Identité restreinte dont l'API se sert pour se connecter : un rôle limité à la lecture
     # et à l'écriture des données, sans droit sur le schéma. Vide, la connexion de l'API est
     # refusée (cf. `infrastructure.db.engine.db_url`) ; migrations, pipeline et scripts, eux,
@@ -101,17 +108,6 @@ class Settings(BaseSettings):
                 "et toute origine serait autorisée à s'en servir. Énumérer les origines."
             )
         return origins
-
-    @property
-    def db_args(self) -> dict[str, str | int]:
-        """Arguments pour psycopg.connect()."""
-        return {
-            "dbname": self.db_name,
-            "user": self.db_owner_user,
-            "password": self.db_owner_password,
-            "host": self.db_host,
-            "port": self.db_port,
-        }
 
 
 # pydantic-settings lit les champs required depuis l'environnement / .env ; mypy ne le voit pas et les exige comme kwargs explicites.

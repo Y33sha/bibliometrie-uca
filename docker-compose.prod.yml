@@ -29,6 +29,11 @@ services:
       retries: 5
 
   # ---- Application (backend + frontend buildé) ----
+  #
+  # Seul composant exposé au réseau, et le seul dont l'environnement soit énuméré : il ne
+  # reçoit que ce qu'il lit. Ni le mot de passe du propriétaire du schéma, ni les identifiants
+  # d'accès aux sources n'y figurent — l'API se connecte sous le rôle restreint et n'émet
+  # aucune requête sortante. Le service `pipeline` ci-dessous porte l'un et les autres.
   app:
     build:
       context: .
@@ -38,31 +43,50 @@ services:
       # doit être identique au build (frontend) et au runtime (uvicorn).
       args:
         ROOT_PATH: ${ROOT_PATH:-}
+    # Image nommée : le service `pipeline` la reprend telle quelle, sans reconstruire.
+    image: bibliometrie-uca:latest
     restart: unless-stopped
     # Publication sur la loopback : seul un reverse-proxy tournant sur la même machine
     # atteint l'application. Un proxy hébergé ailleurs demande d'ouvrir l'interface qui le
     # dessert, en la nommant — non de retirer l'adresse, ce qui publierait le port sur toutes.
     ports:
       - "127.0.0.1:8003:8000"
-    env_file: .env
+    # Pas d'`env_file` : l'environnement est énuméré, si bien qu'une variable ajoutée au
+    # fichier d'environnement n'atterrit pas ici sans qu'on l'ait voulu.
     environment:
       DB_HOST: db
+      DB_PORT: ${DB_PORT:-5432}
+      DB_NAME: ${POSTGRES_DB:-bibliometrie}
+      DB_APP_USER: ${DB_APP_USER:?rôle restreint requis (cf. infrastructure/db/roles.sql)}
+      DB_APP_PASSWORD: ${DB_APP_PASSWORD:?}
+      DB_SSLMODE: ${DB_SSLMODE:-}
+      DB_POOL_MIN: ${DB_POOL_MIN:-2}
+      DB_POOL_MAX: ${DB_POOL_MAX:-30}
+      ADMIN_USER: ${ADMIN_USER:-admin}
+      ADMIN_HASH: ${ADMIN_HASH:?empreinte bcrypt requise (aucune connexion sans elle)}
+      SESSION_SECRET: ${SESSION_SECRET:?clé de signature des sessions requise}
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      EXPOSE_API_DOCS: ${EXPOSE_API_DOCS:-false}
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
       ROOT_PATH: ${ROOT_PATH:-}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+      # Adresses depuis lesquelles les en-têtes de proxy font foi, lues par uvicorn. Absente,
+      # le limiteur de connexion compte tous les clients dans un même seau.
+      FORWARDED_ALLOW_IPS: ${FORWARDED_ALLOW_IPS:-127.0.0.1}
     security_opt:
       - no-new-privileges:true
     # L'API tourne sous un utilisateur non privilégié et écoute au-dessus du port 1024 :
     # aucune capacité du noyau ne lui est nécessaire.
     cap_drop:
       - ALL
-    # Racine en lecture seule, et aucun emplacement en écriture : du code qui parviendrait à
-    # s'exécuter ne laisse rien derrière lui. Les logs partent sur la sortie standard, et le
-    # pipeline s'exécute avec `--no-raw-store`, donc sans archiver les réponses des sources.
+    # Racine en lecture seule : du code qui parviendrait à s'exécuter ne laisse rien derrière
+    # lui. Les logs partent sur la sortie standard, seul `/tmp` est monté en mémoire.
     read_only: true
     tmpfs:
       - /tmp
     # Plafonds de ressources : bornent au conteneur l'effet d'une requête coûteuse, d'une
     # boucle emballée ou d'un afflux d'appels, plutôt que de le laisser atteindre la machine
-    # hôte. Valeurs de départ, à relever si une exécution du pipeline s'y heurte.
+    # hôte.
     mem_limit: 2g
     cpus: 2.0
     pids_limit: 256
@@ -82,6 +106,66 @@ services:
     depends_on:
       db:
         condition: service_healthy
+
+  # ---- Pipeline (collecte et traitement) ----
+  #
+  # Même image que l'application, environnement distinct. Lui seul porte le mot de passe du
+  # propriétaire du schéma — il modifie la structure, rafraîchit les vues matérialisées et vide
+  # des tables — et les identifiants d'accès aux sources, qu'il est seul à interroger. C'est ce
+  # qui donne sa portée au rôle restreint de l'API : le conteneur exposé au réseau ne porte
+  # aucun des deux, et qui en obtiendrait l'exécution de code n'y trouverait rien à reprendre.
+  #
+  # Hors du cycle web, comme le pipeline lui-même : `profiles` le tient à l'écart de `up`, et
+  # il s'exécute à la demande ou par tâche planifiée.
+  #
+  #   docker compose -f docker-compose.prod.yml --profile pipeline run --rm pipeline
+  #
+  # Arguments de l'orchestrateur passés après le nom du service ; sans rien, le run complet
+  # défini par `command` ci-dessous.
+  pipeline:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        ROOT_PATH: ${ROOT_PATH:-}
+    image: bibliometrie-uca:latest
+    profiles:
+      - pipeline
+    # `--no-raw-store` : sans archivage des réponses des sources, le conteneur n'a besoin
+    # d'aucun emplacement en écriture. Rejouer la normalisation demande alors de réinterroger
+    # les sources.
+    command: ["python", "run_pipeline.py", "--no-raw-store"]
+    environment:
+      DB_HOST: db
+      DB_PORT: ${DB_PORT:-5432}
+      DB_NAME: ${POSTGRES_DB:-bibliometrie}
+      DB_OWNER_USER: ${DB_OWNER_USER:?propriétaire du schéma requis}
+      DB_OWNER_PASSWORD: ${DB_OWNER_PASSWORD:?}
+      DB_SSLMODE: ${DB_SSLMODE:-}
+      # Identifiants d'accès aux sources : une source non configurée est sautée au lancement,
+      # avec un avertissement, sans interrompre le run.
+      OPENALEX_API_KEY: ${OPENALEX_API_KEY:-}
+      WOS_API_KEY: ${WOS_API_KEY:-}
+      SCANR_USERNAME: ${SCANR_USERNAME:-}
+      SCANR_PASSWORD: ${SCANR_PASSWORD:-}
+      POLITE_POOL_EMAIL: ${POLITE_POOL_EMAIL:-}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+    # Un run est plus gourmand qu'une requête : c'est ce plafond-ci qu'une exécution qui s'y
+    # heurte demande de relever.
+    mem_limit: 2g
+    cpus: 2.0
+    pids_limit: 256
+    depends_on:
+      db:
+        condition: service_healthy
+
 
 volumes:
   pgdata:

@@ -15,6 +15,28 @@ from infrastructure.settings import settings
 
 SESSION_MAX_AGE = 86400 * 7  # 7 jours
 
+MIN_SESSION_SECRET_LENGTH = 32
+"""Plancher de longueur de la clé de signature. `secrets.token_hex(32)`, la recette documentée, en rend 64 ; sous ce plancher, la clé se retrouve par force brute hors ligne et un jeton de session se forge alors sans connaître le mot de passe."""
+
+
+def check_auth_config() -> None:
+    """Refuse le démarrage de l'API sans de quoi authentifier une session d'administration.
+
+    Le contrôle vit ici plutôt que dans les settings parce qu'il porte sur ce que l'API exerce : le pipeline et les scripts de maintenance lisent la même configuration sans jamais ouvrir de session, et n'ont donc pas à porter ces deux secrets. Le refus tombe au démarrage, où il se voit, et non à la première tentative de connexion.
+    """
+    if not settings.admin_hash:
+        raise RuntimeError(
+            "ADMIN_HASH est requis pour servir l'API : sans empreinte de mot de passe, aucune "
+            "connexion d'administration n'aboutit et les écritures restent inaccessibles. "
+            "Générer l'empreinte avec bcrypt (recette dans `.env.example`)."
+        )
+    if len(settings.session_secret) < MIN_SESSION_SECRET_LENGTH:
+        raise RuntimeError(
+            f"SESSION_SECRET doit faire au moins {MIN_SESSION_SECRET_LENGTH} caractères : il "
+            "signe les jetons de session, et une clé plus courte se retrouve hors ligne. En "
+            "tirer une avec `secrets.token_hex(32)` (recette dans `.env.example`)."
+        )
+
 
 def session_cookie_secure() -> bool:
     """Attribut `Secure` du cookie de session (transmis uniquement sur HTTPS), lu depuis la configuration."""
