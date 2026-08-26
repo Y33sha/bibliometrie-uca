@@ -147,6 +147,9 @@
       interaction: {
         hover: true,
         tooltipDelay: 150,
+        // Déplacement de la vue et zoom conservés ; celui des nœuds non : la disposition
+        // est figée après stabilisation, et `avoidOverlap` écarte déjà les chevauchements.
+        dragNodes: false,
       },
     };
   }
@@ -177,12 +180,9 @@
       const clickedId = Number(params.nodes[0]);
       if (clickedId !== subject.id) onSelect(clickedId);
     });
-    // Une fois la physique stabilisée : recentre + désactive la physique pour figer le graphe (les nœuds restent draggables manuellement, sans rebond infini). vis-network réactive la physique à un drag, on la re-coupe à la fin via le bus d'événements.
+    // Une fois la physique stabilisée : recentre puis la désactive, ce qui fige la disposition.
     network.once("stabilizationIterationsDone", () => {
       network?.fit({ animation: false });
-      network?.setOptions({ physics: { enabled: false } });
-    });
-    network.on("dragEnd", () => {
       network?.setOptions({ physics: { enabled: false } });
     });
   });
