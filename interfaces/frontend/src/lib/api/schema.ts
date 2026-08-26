@@ -2249,7 +2249,7 @@ export interface paths {
         };
         /**
          * Phase Log
-         * @description Log d'une phase, découpé depuis `logs/pipeline.log`.
+         * @description Log d'une phase, découpé depuis `logs/pipeline.log`. Réservé à une session d'administration (401 sans elle).
          *
          *     `available` vaut vrai quand la section de la phase a été retrouvée ; sinon `content` est vide, que le fichier soit absent (`LOG_TO_FILE` inactif) ou que la section ait été purgée. D'une section longue, seule la fin est rendue, `omitted_lines` disant combien de lignes la précèdent.
          */

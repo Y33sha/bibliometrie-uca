@@ -4,6 +4,7 @@ Couvre :
 - GET /api/pipeline/runs (liste agrégée par run, statut global, ordre)
 - GET /api/pipeline/runs/{run_id} (phases ordonnées, details avant/après et
   by_source, médian de durée historique, écart de durée ; statut warning ; 404)
+- GET /api/pipeline/runs/{run_id}/phases/{phase}/log (réservé à une session)
 """
 
 from __future__ import annotations
@@ -183,3 +184,27 @@ def test_get_run_detail(client, seeded_runs):
 
 def test_get_run_404(client):
     assert client.get("/api/pipeline/runs/999999999").status_code == 404
+
+
+class TestPhaseLogReserveALUneSession:
+    """Le log d'une phase est la seule lecture du projet à exiger une session.
+
+    Non-régression : il servait le contenu brut de `logs/pipeline.log` à qui le demandait — traces d'erreur, chemins, volumétries. Sa discrétion tenait à ce que le fichier soit absent du déploiement de référence, c'est-à-dire à ce que la fonction ne marche pas, non à ce qu'elle soit gardée.
+    """
+
+    _PATH = "/api/pipeline/runs/1/phases/normalize/log"
+
+    def test_refuse_sans_session(self, client):
+        response = client.get(self._PATH)
+        assert response.status_code == 401
+        assert response.json()["detail"] == "Non authentifié"
+
+    def test_sert_avec_une_session(self, auth_client):
+        response = auth_client.get(self._PATH)
+        assert response.status_code == 200
+        assert "available" in response.json()
+
+    def test_les_autres_lectures_du_routeur_restent_ouvertes(self, client):
+        """La décision d'ouvrir la lecture porte sur les données ; la sonde de vie du conteneur interroge `phases` sans session."""
+        assert client.get("/api/pipeline/phases").status_code == 200
+        assert client.get("/api/pipeline/runs").status_code == 200
