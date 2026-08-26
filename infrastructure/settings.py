@@ -59,8 +59,10 @@ class Settings(BaseSettings):
     db_app_user: str = ""
     db_app_password: str = ""
     # Mode SSL de la connexion (valeurs libpq : disable/prefer/require/verify-ca/verify-full).
-    # Vide → défaut du driver. Poser `require` ou `verify-full` dès que la base est déportée
-    # (le mot de passe et les données personnelles circulent sinon en clair sur le réseau).
+    # Vide → défaut du driver, soit `prefer` : chiffré si le serveur le propose, certificat non
+    # vérifié. `require` impose le chiffrement sans authentifier le serveur pour autant. Poser
+    # `verify-full` dès que la base est déportée : c'est la seule valeur qui écarte une
+    # interception, en vérifiant la chaîne du certificat et le nom d'hôte.
     db_sslmode: str = ""
 
     # ----- Pool de connexions -----
