@@ -13,6 +13,8 @@ Les adapters d'écriture pipeline (`pipeline.publications_reconciliation`, `pipe
 # Annotations différées : sinon `list[int]` est résolu comme le sous-module `.list` (le `from .list import …` ci-dessous l'attache au package, et le namespace global du __init__ shadow le builtin `list`).
 from __future__ import annotations
 
+from collections.abc import Iterator
+
 from sqlalchemy import Connection
 
 from application.ports.read_models._common import (
@@ -97,7 +99,7 @@ class PgPublicationsQueries(PublicationsQueries):
         filters: PublicationFilters,
         sort: str,
         columns: list[str],
-    ) -> str:
+    ) -> Iterator[str]:
         return _export_publications_csv(
             self._conn,
             filters=filters,
@@ -106,7 +108,7 @@ class PgPublicationsQueries(PublicationsQueries):
             columns=columns,
         )
 
-    def export_theses_csv(self, *, filters: PublicationFilters, sort: str) -> str:
+    def export_theses_csv(self, *, filters: PublicationFilters, sort: str) -> Iterator[str]:
         return _export_theses_csv(
             self._conn,
             filters=filters,

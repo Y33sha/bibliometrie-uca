@@ -2,12 +2,11 @@
 
 import csv
 import html
-import io
 import json
 import logging
 import re
-from collections.abc import Iterable, Sequence
-from typing import Any
+from collections.abc import Iterable, Iterator, Sequence
+from typing import Any, cast
 
 from sqlalchemy import Connection, text
 
@@ -323,27 +322,63 @@ def _neutralize_formula(value: object) -> object:
     return value
 
 
+class _EchoStream:
+    """Flux de sortie qui rend ce qu'on lui écrit, au lieu de l'accumuler.
+
+    `csv.writer` rend ce que son flux a rendu à l'écriture : branché là-dessus, `writerow` cesse d'écrire quelque part pour devenir « formate cette ligne et donne-la ». C'est ce qui permet de rendre l'export ligne à ligne sans tampon qui grossit.
+    """
+
+    def write(self, value: str) -> str:
+        return value
+
+
 class _CsvWriter:
-    """Writer CSV dont chaque cellule passe par `_neutralize_formula` avant d'être écrite.
+    """Formateur de lignes CSV dont chaque cellule passe par `_neutralize_formula`.
 
     L'assainissement tient dans le writer plutôt que dans la construction de chaque ligne : une colonne ajoutée à un export en hérite sans qu'on ait à y penser.
     """
 
-    def __init__(self, buf: io.StringIO) -> None:
-        self._writer = csv.writer(buf)
+    def __init__(self) -> None:
+        self._writer = csv.writer(_EchoStream())
 
-    def writerow(self, row: Iterable[object]) -> None:
-        self._writer.writerow([_neutralize_formula(cell) for cell in row])
+    def line(self, row: Iterable[object]) -> str:
+        """Ligne CSV terminée par un saut de ligne, cellules assainies."""
+        return cast("str", self._writer.writerow([_neutralize_formula(cell) for cell in row]))
 
-    def write_truncation_notice(self, cap: int) -> None:
-        """Écrit une dernière ligne disant que l'export s'arrête au plafond.
+    def truncation_notice(self, cap: int) -> str:
+        """Dernière ligne disant que l'export s'arrête au plafond.
 
         Le fichier est le seul canal vers qui l'a demandé — il arrive par un lien de téléchargement, hors de toute page qui pourrait l'avertir. Un export incomplet qui se présente comme complet induit en erreur bien plus qu'une ligne étrangère aux données.
         """
         milliers = f"{cap:,}".replace(",", " ")
-        self.writerow(
+        return self.line(
             [f"— Export tronqué à {milliers} lignes : affiner les filtres pour l'obtenir entier."]
         )
+
+
+# Taille visée d'un bloc rendu au client. Une ligne par bloc ferait des dizaines de milliers
+# d'envois pour un export ; un bloc trop gros ramènerait le tampon qu'on cherche à supprimer.
+EXPORT_CHUNK_SIZE = 64 * 1024
+
+
+def _chunked(lines: Iterator[str], size: int = EXPORT_CHUNK_SIZE) -> Iterator[str]:
+    """Regroupe des lignes en blocs d'au moins `size` caractères, le dernier plus court."""
+    pending: list[str] = []
+    pending_size = 0
+    for line in lines:
+        pending.append(line)
+        pending_size += len(line)
+        if pending_size >= size:
+            yield "".join(pending)
+            pending.clear()
+            pending_size = 0
+    if pending:
+        yield "".join(pending)
+
+
+# Marque d'ordre des octets, en tête du premier bloc : sans elle, un tableur lit l'UTF-8 comme
+# de l'ANSI et les accents ressortent en mojibake.
+_BOM = "\ufeff"
 
 
 # Plafond de lignes d'un export. Assez haut pour qu'un export légitime ne l'approche jamais —
@@ -376,10 +411,12 @@ def export_publications_csv(
     perimeter_structure_ids: list[int],
     sort: str,
     columns: list[str],
-) -> str:
+) -> Iterator[str]:
     """Export CSV (sans pagination) qui reflète le tableau affiché : mêmes filtres que list_publications (même constructeur de WHERE) ET mêmes colonnes (`columns` = clés des colonnes visibles ; si vide, toutes). Titre et liens (DOI + Sources) toujours présents ; « Éditeur » suit la visibilité de « Revue ».
 
-    Retourne la string CSV (préfixée d'un BOM UTF-8 pour Excel). Le caller (router) est responsable d'emballer la réponse HTTP.
+    Rend le CSV par blocs, à emballer dans une réponse en flux : composer le fichier entier en mémoire coûtait une quinzaine de fois son poids, entre le tampon qui double en croissant, la copie de sa relecture et l'ajout du BOM en tête.
+
+    **Cette fonction n'est pas un générateur**, et ne doit pas le devenir : la requête s'exécute à l'appel, sous la connexion que la dépendance FastAPI tient ouverte pour la durée du traitement. Cette connexion est refermée avant que le corps de la réponse ne parte ; un générateur qui interrogerait la base pendant l'envoi la trouverait fermée. Seules les lignes déjà en mémoire sont parcourues ensuite.
     """
     conn.execute(text("SET LOCAL jit = off"))
     where_clause, binds = _build_list_clauses(conn, filters, perimeter_structure_ids)
@@ -462,9 +499,15 @@ def export_publications_csv(
     ]
     emitted = [(key, header) for key, header in spec if key in requested]
 
-    buf = io.StringIO()
-    writer = _CsvWriter(buf)
-    writer.writerow([header for _, header in emitted])
+    return _chunked(_publication_lines(rows, emitted, truncated=truncated))
+
+
+def _publication_lines(
+    rows: Sequence[Any], emitted: list[tuple[str, str]], *, truncated: bool
+) -> Iterator[str]:
+    """Lignes CSV de l'export des publications, en-tête comprise."""
+    writer = _CsvWriter()
+    yield _BOM + writer.line([header for _, header in emitted])
     for row in rows:
         doi_url = f"https://doi.org/{row.doi}" if row.doi else ""
         sources = _source_links(
@@ -490,12 +533,10 @@ def export_publications_csv(
             "DOI": doi_url,
             "Sources": json.dumps(sources, ensure_ascii=False) if sources else "",
         }
-        writer.writerow([cell[header] for _, header in emitted])
+        yield writer.line([cell[header] for _, header in emitted])
 
     if truncated:
-        writer.write_truncation_notice(MAX_EXPORT_ROWS)
-
-    return "﻿" + buf.getvalue()
+        yield writer.truncation_notice(MAX_EXPORT_ROWS)
 
 
 def _build_theses_export_clauses(filters: PublicationFilters) -> tuple[str, dict[str, Any]]:
@@ -517,10 +558,10 @@ def _build_theses_export_clauses(filters: PublicationFilters) -> tuple[str, dict
 
 def export_theses_csv(
     conn: Connection, *, filters: PublicationFilters, perimeter_structure_ids: list[int], sort: str
-) -> str:
+) -> Iterator[str]:
     """Export CSV dédié à la page thèses.
 
-    Colonnes spécifiques à la thèse (Inscription, Soutenance, Statut, theses.fr). Tri par défaut `soutenance_desc` (cohérent avec l'affichage).
+    Colonnes spécifiques à la thèse (Inscription, Soutenance, Statut, theses.fr). Tri par défaut `soutenance_desc` (cohérent avec l'affichage). Rendu par blocs, aux mêmes conditions que l'export des publications : la requête s'exécute à l'appel, le parcours qui suit ne touche plus la base.
     """
     conn.execute(text("SET LOCAL jit = off"))
     where_clause, binds = _build_theses_export_clauses(filters)
@@ -564,9 +605,13 @@ def export_theses_csv(
             filters,
         )
 
-    buf = io.StringIO()
-    writer = _CsvWriter(buf)
-    writer.writerow(
+    return _chunked(_these_lines(rows, truncated=truncated))
+
+
+def _these_lines(rows: Sequence[Any], *, truncated: bool) -> Iterator[str]:
+    """Lignes CSV de l'export des thèses, en-tête comprise."""
+    writer = _CsvWriter()
+    yield _BOM + writer.line(
         [
             "Inscription",
             "Soutenance",
@@ -590,7 +635,7 @@ def export_theses_csv(
             }
         )
         access = "ouvert" if row.oa_status in OA_OPEN_STATUSES else "fermé"
-        writer.writerow(
+        yield writer.line(
             [
                 row.date_inscription or "",
                 row.date_soutenance or "",
@@ -605,6 +650,4 @@ def export_theses_csv(
         )
 
     if truncated:
-        writer.write_truncation_notice(MAX_EXPORT_ROWS)
-
-    return "﻿" + buf.getvalue()
+        yield writer.truncation_notice(MAX_EXPORT_ROWS)

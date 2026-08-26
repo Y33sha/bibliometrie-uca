@@ -8,6 +8,7 @@ import io
 
 from infrastructure.read_models.publications.list import (
     _cap_export_rows,
+    _chunked,
     _CsvWriter,
     _neutralize_formula,
 )
@@ -38,12 +39,15 @@ class TestNeutralizeFormula:
 
 
 class TestCsvWriter:
-    def test_writes_a_neutralized_row(self):
-        buf = io.StringIO()
-        _CsvWriter(buf).writerow(["=cmd|' /C calc'!A0", 2024, "Nature"])
-        assert list(csv.reader(io.StringIO(buf.getvalue()))) == [
-            ["'=cmd|' /C calc'!A0", "2024", "Nature"]
-        ]
+    def test_renders_a_neutralized_row(self):
+        line = _CsvWriter().line(["=cmd|' /C calc'!A0", 2024, "Nature"])
+        assert list(csv.reader(io.StringIO(line))) == [["'=cmd|' /C calc'!A0", "2024", "Nature"]]
+
+    def test_returns_the_line_instead_of_accumulating_it(self):
+        """Le writer rend chaque ligne au lieu de l'écrire dans un tampon : c'est ce qui permet de servir l'export en flux, sans tenir le fichier entier en mémoire."""
+        writer = _CsvWriter()
+        assert writer.line(["a"]) == "a\r\n"
+        assert writer.line(["b"]) == "b\r\n"
 
 
 class TestExportCap:
@@ -60,6 +64,24 @@ class TestExportCap:
         assert truncated is True
 
     def test_the_notice_names_the_cap(self):
-        buf = io.StringIO()
-        _CsvWriter(buf).write_truncation_notice(500_000)
-        assert "500 000 lignes" in buf.getvalue()
+        assert "500 000 lignes" in _CsvWriter().truncation_notice(500_000)
+
+
+class TestChunked:
+    """Les lignes partent groupées : une ligne par envoi ferait des dizaines de milliers d'allers-retours pour un export, un groupe trop gros ramènerait le tampon qu'on supprime."""
+
+    def test_groups_lines_up_to_the_target_size(self):
+        assert list(_chunked(iter(["ab", "cd", "ef", "gh"]), size=4)) == ["abcd", "efgh"]
+
+    def test_flushes_the_remainder(self):
+        assert list(_chunked(iter(["ab", "cd", "ef"]), size=4)) == ["abcd", "ef"]
+
+    def test_preserves_the_content_whole(self):
+        lines = [f"ligne {i}\r\n" for i in range(100)]
+        assert "".join(_chunked(iter(lines), size=32)) == "".join(lines)
+
+    def test_yields_nothing_on_no_lines(self):
+        assert list(_chunked(iter([]))) == []
+
+    def test_a_line_longer_than_the_target_goes_out_alone(self):
+        assert list(_chunked(iter(["x" * 100, "y"]), size=8)) == ["x" * 100, "y"]

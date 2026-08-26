@@ -4,7 +4,11 @@ from sqlalchemy import text
 
 from application.ports.read_models.publications_queries import PublicationFilters
 from infrastructure.read_models.publications.facets import _PublicationFacetsBuilder
-from infrastructure.read_models.publications.list import export_theses_csv, list_publications
+from infrastructure.read_models.publications.list import (
+    export_publications_csv,
+    export_theses_csv,
+    list_publications,
+)
 from tests.integration.helpers.structures import add_authorship_structure
 
 
@@ -309,11 +313,13 @@ class TestThesesExport:
                 {"pid": pub, "src": src, "sid": sid},
             )
 
-        csv_text = export_theses_csv(
-            sa_sync_conn,
-            filters=PublicationFilters(lab_ids=[lab], doc_types=["thesis"]),
-            perimeter_structure_ids=[],
-            sort="soutenance_desc",
+        csv_text = "".join(
+            export_theses_csv(
+                sa_sync_conn,
+                filters=PublicationFilters(lab_ids=[lab], doc_types=["thesis"]),
+                perimeter_structure_ids=[],
+                sort="soutenance_desc",
+            )
         )
 
         line = next(row for row in csv_text.splitlines() if "Ma these" in row)
@@ -321,3 +327,33 @@ class TestThesesExport:
         assert "openalex.org/W1" in line
         assert "scanr.enseignementsup-recherche.gouv.fr/publications/sc-1" in line
         assert "theses.fr/2024NNT" in line
+
+
+class TestExportsRunTheirQueryBeforeStreaming:
+    """Les exports rendent des blocs, mais interrogent la base à l'appel.
+
+    Non-régression sur une subtilité qui casserait en production sans faire échouer un test naïf : FastAPI referme la connexion de la requête *avant* d'envoyer le corps de la réponse. Si ces fonctions devenaient des générateurs, la requête ne partirait qu'à la première itération, c'est-à-dire une fois la connexion fermée. Le contenu doit donc rester lisible après la fermeture.
+
+    Chaque test ouvre sa propre connexion sur le même engine, et la ferme : celle du fixture porte la transaction des autres tests.
+    """
+
+    def test_theses_export_survives_a_closed_connection(self, sa_sync_conn):
+        with sa_sync_conn.engine.connect() as conn:
+            chunks = export_theses_csv(
+                conn,
+                filters=PublicationFilters(doc_types=["thesis"]),
+                perimeter_structure_ids=[],
+                sort="soutenance_desc",
+            )
+        assert "Soutenance" in "".join(chunks)
+
+    def test_publications_export_survives_a_closed_connection(self, sa_sync_conn):
+        with sa_sync_conn.engine.connect() as conn:
+            chunks = export_publications_csv(
+                conn,
+                filters=PublicationFilters(),
+                perimeter_structure_ids=[],
+                sort="year_desc",
+                columns=[],
+            )
+        assert "Titre" in "".join(chunks)

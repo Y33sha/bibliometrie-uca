@@ -5,6 +5,7 @@ Implémenté par `infrastructure.read_models.publications.PgPublicationsQueries`
 La dataclass `PublicationFilters` fait ici référence ; l'infrastructure l'importe pour typer ses signatures.
 """
 
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import Literal, Protocol
 
@@ -332,9 +333,11 @@ class PublicationsQueries(Protocol):
         filters: PublicationFilters,
         sort: PublicationSort,
         columns: list[str],
-    ) -> str: ...
+    ) -> Iterator[str]: ...
 
-    def export_theses_csv(self, *, filters: PublicationFilters, sort: PublicationSort) -> str: ...
+    def export_theses_csv(
+        self, *, filters: PublicationFilters, sort: PublicationSort
+    ) -> Iterator[str]: ...
 
     def get_publication_detail(self, pub_id: int) -> PublicationDetailResponse | None: ...
 

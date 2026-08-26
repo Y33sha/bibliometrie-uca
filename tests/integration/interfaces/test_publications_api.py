@@ -205,11 +205,29 @@ class TestPublicationsExports:
         assert "Laboratoires" not in header
         assert "Accès" not in header
 
+    def test_csv_export_is_streamed(self, client):
+        """La réponse part en flux : composer le fichier entier en mémoire coûtait une quinzaine de fois son poids, entre le tampon qui double en croissant et les copies de sa relecture."""
+        with client.stream("GET", "/api/publications/export.csv") as r:
+            assert r.status_code == 200
+            assert "content-length" not in r.headers  # taille inconnue à l'envoi
+            assert next(r.iter_raw())  # le premier bloc part sans attendre le dernier
+
+    def test_csv_export_opens_with_a_byte_order_mark(self, client):
+        """Sans elle, un tableur lit l'UTF-8 comme de l'ANSI et les accents ressortent en mojibake."""
+        r = client.get("/api/publications/export.csv")
+        assert r.text.startswith("\ufeff")
+
 
 class TestThesesExport:
     def test_csv_export(self, client):
         r = client.get("/api/publications/export-theses.csv")
         assert r.status_code == 200
+
+    def test_csv_export_is_streamed(self, client):
+        with client.stream("GET", "/api/publications/export-theses.csv") as r:
+            assert r.status_code == 200
+            assert "content-length" not in r.headers
+            assert "theses.csv" in r.headers.get("content-disposition", "")
         assert "text/csv" in r.headers.get("content-type", "")
 
     def test_csv_export_with_filters(self, client):
