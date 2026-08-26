@@ -25,6 +25,7 @@ from domain.source_publications.metadata_correction.shared_doi import (
     DoiClusterCase,
 )
 from domain.sources.registry import Source
+from infrastructure.db.tables import source_publications
 
 # Bras du `CASE` et liste `IN` des relations DataCite à convergence directe, dérivés du mapping
 # métier `DATACITE_DIRECT_CONVERGENCE`.
@@ -58,6 +59,20 @@ _SELECT = """
 """
 
 
+# Colonnes que les corrections de métadonnées ont le droit de poser. Un nom de colonne
+# s'interpole dans le SQL — un paramètre lié ne peut porter qu'une valeur, jamais un
+# identifiant —, donc il ne vient d'aucune autre origine que cette liste.
+_CORRECTABLE_COLUMNS: frozenset[str] = frozenset(
+    {"doc_type", "oa_status", "external_ids", "raw_metadata", "journal_id", "doi"}
+)
+
+# Garde-fou de dérive : une colonne renommée dans le schéma fait échouer l'import, plutôt que
+# de laisser la liste désigner un nom qui n'existe plus.
+assert _CORRECTABLE_COLUMNS <= {c.name for c in source_publications.c}, (
+    "liste des colonnes corrigibles désynchronisée de la table source_publications"
+)
+
+
 def _persist_updates(
     conn: Connection,
     rows: list[dict[str, Any]],
@@ -65,11 +80,18 @@ def _persist_updates(
     set_columns: tuple[str, ...],
     jsonb_params: tuple[str, ...] = (),
 ) -> int:
-    """UPDATE en lot sur `source_publications` : pose les `set_columns` de chaque row (avec sa clé `id`), marque `keys_dirty`, bump `updated_at`. Retourne le nombre de lignes."""
+    """UPDATE en lot sur `source_publications` : pose les `set_columns` de chaque row (avec sa clé `id`), marque `keys_dirty`, bump `updated_at`. Retourne le nombre de lignes.
+
+    `set_columns` est confronté à `_CORRECTABLE_COLUMNS` avant toute composition : le nom d'une colonne s'écrit dans le texte de la requête, et cette liste est la seule origine qu'il puisse avoir.
+    """
+    inconnues = sorted(set(set_columns) - _CORRECTABLE_COLUMNS)
+    if inconnues:
+        raise ValueError(f"Colonnes non corrigibles : {', '.join(inconnues)}")
     if not rows:
         return 0
     assignments = [f"{c} = :{c}" for c in set_columns]
     assignments += ["keys_dirty = true", "updated_at = clock_timestamp()"]
+    # noqa S608 : requête composée, dont les seuls identifiants viennent de la liste blanche.
     sql = f"UPDATE source_publications SET {', '.join(assignments)} WHERE id = :id"  # noqa: S608
     stmt = text(sql)
     if jsonb_params:
