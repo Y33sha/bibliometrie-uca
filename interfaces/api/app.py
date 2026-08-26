@@ -36,7 +36,7 @@ from interfaces.api.models.errors import (
     PublisherMergeBlockedResponse,
     RejectedPairsResponse,
 )
-from interfaces.api.session import read_session
+from interfaces.api.session import check_auth_config, read_session
 from interfaces.api.spa import BUILD_DIR, SPAStaticFiles
 
 # Configure le root logger (format JSON par défaut, texte si LOG_FORMAT=text).
@@ -74,6 +74,7 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    check_auth_config()
     sync_engine = build_sync_engine(application=True)
     set_sync_engine(sync_engine)
     try:

@@ -30,9 +30,11 @@ jobs:
       DB_NAME: postgres
       DB_OWNER_USER: postgres
       DB_OWNER_PASSWORD: postgres
-      # Valeurs bidon pour satisfaire la validation pydantic-settings — les tests ne touchent pas à l'auth
+      # Valeurs bidon : les tests n'exercent pas l'authentification, mais l'API refuse de
+      # démarrer sans empreinte de mot de passe ni clé de signature d'au moins 32 caractères,
+      # et les tests d'intégration déclenchent son cycle de vie.
       ADMIN_HASH: ci-placeholder-not-used
-      SESSION_SECRET: ci-placeholder-not-used
+      SESSION_SECRET: ci-placeholder-session-secret-of-sufficient-length
 
     steps:
       - uses: actions/checkout@v5

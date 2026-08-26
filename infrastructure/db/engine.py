@@ -23,7 +23,7 @@ def db_url(*, application: bool = False) -> URL:
 
     `application` demande l'identité restreinte de l'API (`db_app_user`), un rôle limité à la lecture et à l'écriture des données ; elle est exigée, faute de quoi la construction échoue. Se replier en silence sur l'identité principale ferait tourner l'API avec les droits du propriétaire du schéma sans que rien ne le signale.
 
-    Les autres appelants — migrations, pipeline, scripts de maintenance — se connectent avec l'identité principale : eux seuls modifient la structure du schéma, rafraîchissent les vues matérialisées et vident des tables.
+    Les autres appelants — migrations, pipeline, scripts de maintenance — se connectent avec l'identité principale : eux seuls modifient la structure du schéma, rafraîchissent les vues matérialisées et vident des tables. Elle est exigée de la même façon, et pour la même raison symétrique : un processus qui ne sert que l'API n'a pas à porter le mot de passe du propriétaire du schéma, et son absence doit se voir plutôt que d'ouvrir une connexion anonyme.
 
     `db_sslmode`, s'il est défini, est passé en paramètre de connexion `sslmode`.
     """
@@ -37,6 +37,13 @@ def db_url(*, application: bool = False) -> URL:
             )
         username, password = settings.db_app_user, settings.db_app_password
     else:
+        if not settings.db_owner_user:
+            raise RuntimeError(
+                "DB_OWNER_USER est requis pour cette connexion : migrations, pipeline et "
+                "scripts de maintenance se connectent sous le propriétaire du schéma. "
+                "Renseigner DB_OWNER_USER et DB_OWNER_PASSWORD. Un processus qui ne sert que "
+                "l'API n'en a pas besoin : il lui suffit de DB_APP_USER et DB_APP_PASSWORD."
+            )
         username, password = settings.db_owner_user, settings.db_owner_password
     query = {"sslmode": settings.db_sslmode} if settings.db_sslmode else {}
     return URL.create(
