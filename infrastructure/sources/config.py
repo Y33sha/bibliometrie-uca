@@ -1,6 +1,6 @@
-"""Lecture de la configuration applicative.
+"""Lecture de la configuration du pipeline.
 
-Lit depuis la table `config` en base les paramètres externalisés (années, collections, affiliations, clés API, credentials ScanR).
+Deux origines, selon la nature du réglage. Les paramètres d'exploitation — années couvertes, périmètre d'extraction, collections HAL, identifiants de structure par source — vivent dans la table `config` et se modifient depuis l'interface d'administration. Les identifiants d'accès aux sources externes, eux, sont des secrets : ils viennent de l'environnement du processus, comme les autres secrets de l'application.
 """
 
 import datetime
@@ -10,6 +10,7 @@ from sqlalchemy import Connection, text
 from sqlalchemy.exc import SQLAlchemyError
 
 from domain.types import JsonValue
+from infrastructure.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -87,12 +88,9 @@ def get_hal_collections(conn: Connection) -> dict[str, str]:
     return {}
 
 
-def get_openalex_api_key(conn: Connection) -> str | None:
-    """Retourne la clé API OpenAlex (None si non configurée)."""
-    val = _get_from_db(conn, "openalex_api_key")
-    if val and isinstance(val, str):
-        return val
-    return None
+def get_openalex_api_key() -> str | None:
+    """Clé d'API OpenAlex, ou `None` si elle n'est pas configurée."""
+    return settings.openalex_api_key or None
 
 
 def get_extraction_api_ids(conn: Connection, source: str) -> list[str]:
@@ -130,70 +128,61 @@ def get_extraction_api_ids(conn: Connection, source: str) -> list[str]:
         return []
 
 
-def get_polite_pool_email_optional(conn: Connection) -> str | None:
-    """Retourne l'email polite pool, ou `None` si non configuré (sans lever).
+def get_polite_pool_email_optional() -> str | None:
+    """Adresse annoncée en polite pool, ou `None` si elle n'est pas configurée (sans lever).
 
-    Pour les consommateurs qui traitent l'email comme facultatif : OpenAlex, dont l'accès au polite pool peut aussi passer par une clé API. Les consommateurs qui exigent l'email utilisent `get_polite_pool_email`.
+    Pour les consommateurs qui la traitent comme facultative : OpenAlex, dont l'accès au polite pool peut aussi passer par une clé d'API. Ceux qui l'exigent utilisent `get_polite_pool_email`.
     """
-    val = _get_from_db(conn, "polite_pool_email")
-    if val and isinstance(val, str):
-        return val
-    return None
+    return settings.polite_pool_email or None
 
 
-def get_polite_pool_email(conn: Connection) -> str:
-    """Retourne l'email envoyé en polite pool aux APIs externes (Crossref, DataCite, Unpaywall, …).
+def get_polite_pool_email() -> str:
+    """Adresse annoncée en polite pool aux API externes (Crossref, DataCite, Unpaywall, …).
 
-    Raise si la row `polite_pool_email` n'est pas configurée. Un email invalide ou inventé risque un blacklist côté serveur.
+    Lève si elle n'est pas configurée. Une adresse inventée expose à un blocage côté serveur.
     """
-    email = get_polite_pool_email_optional(conn)
+    email = get_polite_pool_email_optional()
     if email is not None:
         return email
     raise RuntimeError(
-        "polite_pool_email manquant dans la table `config` — requis pour le polite pool "
-        "des APIs (Crossref, DataCite, Unpaywall, etc.)."
+        "POLITE_POOL_EMAIL manquant dans l'environnement — requis pour le polite pool "
+        "des API (Crossref, DataCite, Unpaywall, etc.)."
     )
 
 
-def get_wos_api_key(conn: Connection) -> str:
-    """Retourne la clé API WoS."""
-    val = _get_from_db(conn, "wos_api_key")
-    if val and isinstance(val, str):
-        return val
-    return ""
+def get_wos_api_key() -> str:
+    """Clé d'API Web of Science, chaîne vide si elle n'est pas configurée."""
+    return settings.wos_api_key
 
 
-def get_scanr_credentials(conn: Connection) -> tuple[str, str]:
-    """Retourne (username, password) pour l'API ScanR."""
-    user = _get_from_db(conn, "scanr_username")
-    pwd = _get_from_db(conn, "scanr_password")
-    if isinstance(user, str) and isinstance(pwd, str) and user and pwd:
-        return user, pwd
+def get_scanr_credentials() -> tuple[str, str]:
+    """Identifiants de l'API ScanR, `("", "")` si l'un des deux manque."""
+    user, password = settings.scanr_username, settings.scanr_password
+    if user and password:
+        return user, password
     return "", ""
 
 
-def source_credentials_missing(conn: Connection, source: str) -> str | None:
+def source_credentials_missing(source: str) -> str | None:
     """Motif d'absence des credentials d'API d'une source, ou `None` si utilisable.
 
-    Source unique de vérité de la présence des credentials par source, consultée par toutes les phases qui interrogent une API tierce (extraction, cross-import, refresh stale, enrichissements) : un accès dont cette fonction renvoie un motif est sauté proprement. HAL, theses.fr, DOI.org et DOAJ sont des API publiques sans credential (jamais de motif). L'email polite pool est traité comme un credential : Crossref, DataCite et Unpaywall en dépendent, et OpenAlex l'accepte à défaut de clé API. Le périmètre d'interrogation (collections, identifiants de structure, PPN) est un contrôle distinct, propre à l'extraction bulk.
+    Source unique de vérité de la présence des credentials par source, consultée par toutes les phases qui interrogent une API tierce (extraction, cross-import, refresh stale, enrichissements) : un accès dont cette fonction renvoie un motif est sauté proprement. HAL, theses.fr, DOI.org et DOAJ sont des API publiques sans credential (jamais de motif). L'adresse polite pool est traitée comme un identifiant : Crossref, DataCite et Unpaywall en dépendent, et OpenAlex l'accepte à défaut de clé d'API. Le périmètre d'interrogation (collections, identifiants de structure, PPN) est un contrôle distinct, propre à l'extraction bulk.
     """
     if source in ("hal", "theses"):
         return None
     if source == "openalex":
-        if get_openalex_api_key(conn) or get_polite_pool_email_optional(conn):
+        if get_openalex_api_key() or get_polite_pool_email_optional():
             return None
-        return (
-            "ni clé API ni email polite pool (config.openalex_api_key / config.polite_pool_email)"
-        )
+        return "ni clé d'API ni adresse polite pool (OPENALEX_API_KEY / POLITE_POOL_EMAIL)"
     if source == "wos":
-        return None if get_wos_api_key(conn) else "clé API absente (config.wos_api_key)"
+        return None if get_wos_api_key() else "clé d'API absente (WOS_API_KEY)"
     if source == "scanr":
-        user, password = get_scanr_credentials(conn)
+        user, password = get_scanr_credentials()
         if user and password:
             return None
-        return "credentials absents (config.scanr_username / config.scanr_password)"
+        return "identifiants absents (SCANR_USERNAME / SCANR_PASSWORD)"
     if source in ("crossref", "datacite", "unpaywall"):
-        if get_polite_pool_email_optional(conn):
+        if get_polite_pool_email_optional():
             return None
-        return "email polite pool absent (config.polite_pool_email)"
+        return "adresse polite pool absente (POLITE_POOL_EMAIL)"
     return None

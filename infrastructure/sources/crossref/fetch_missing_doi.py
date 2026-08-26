@@ -42,7 +42,7 @@ class CrossrefFetchMissingDoiAdapter:
 
     def configure(self, conn: Connection) -> None:
         self.base_url = API_BASE_URLS["crossref"]
-        email = get_polite_pool_email(conn)
+        email = get_polite_pool_email()
         self.headers = {"User-Agent": build_user_agent(email)}
 
     async def fetch_async(self, client: httpx.AsyncClient, dois: list[str]) -> Iterable[dict]:

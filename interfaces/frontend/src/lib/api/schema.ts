@@ -230,6 +230,8 @@ export interface paths {
         /**
          * Export Publications Csv
          * @description Export CSV des publications, fidèle au tableau affiché : mêmes filtres, et mêmes colonnes que celles listées dans `columns`.
+         *
+         *     Le nombre de lignes est plafonné, et la fréquence des demandes l'est aussi (429 au-delà) : l'export balaie la table sous les seuls filtres reçus, et rien n'oblige un appelant à s'arrêter.
          */
         get: operations["export_publications_csv_api_publications_export_csv_get"];
         put?: never;
@@ -250,6 +252,8 @@ export interface paths {
         /**
          * Export Theses Csv
          * @description Export CSV de la page thèses, aux mêmes filtres et au même tri que sa liste.
+         *
+         *     Plafonné en nombre de lignes et en fréquence, comme l'export des publications.
          *
          *     La surface de filtres est plus étroite que celle des publications, et n'annonce que ce que l'export honore. Sans `doc_type`, il porte sur les thèses soutenues et en cours.
          */
@@ -1717,7 +1721,7 @@ export interface paths {
          * List Config
          * @description Paramètres applicatifs (clé, valeur JSON, description), triés par clé.
          *
-         *     La table porte deux natures de réglages : des paramètres d'exploitation que les pages publiques consomment, et les identifiants d'accès aux sources — clés d'API OpenAlex et Web of Science, compte ScanR, adresse du polite pool. Sans session, la lecture se restreint donc à la liste blanche `PUBLIC_CONFIG_KEYS` ; une clé qu'on n'y inscrit pas reste réservée.
+         *     Sans session, la lecture se restreint à la liste blanche `PUBLIC_CONFIG_KEYS` ; une clé qu'on n'y inscrit pas reste réservée.
          */
         get: operations["list_config_api_config_get"];
         put?: never;
@@ -1738,9 +1742,9 @@ export interface paths {
         get?: never;
         /**
          * Update Config
-         * @description Met à jour la valeur d'un paramètre applicatif, identifiants d'accès aux sources compris.
+         * @description Met à jour la valeur d'un paramètre applicatif.
          *
-         *     L'écriture exige une session : le middleware garde toutes les méthodes autres que `GET`. La clé doit préexister — les clés sont déclarées dans les migrations, cet endpoint n'en crée pas —, et une clé inconnue rend 404. La réponse masque la valeur d'une clé secrète, comme la lecture.
+         *     L'écriture exige une session : le middleware garde toutes les méthodes autres que `GET`. La clé doit préexister — les clés sont déclarées dans les migrations, cet endpoint n'en crée pas —, et une clé inconnue rend 404.
          */
         put: operations["update_config_api_config__key__put"];
         post?: never;
@@ -2667,8 +2671,6 @@ export interface components {
         /**
          * ConfigItem
          * @description Ligne de la table `config` (paramètres applicatifs clé/valeur).
-         *
-         *     Pour une clé secrète (`SECRET_CONFIG_KEYS`), `value` reste `None` et `is_set` indique la présence d'un secret enregistré.
          */
         ConfigItem: {
             /** Key */
@@ -2677,11 +2679,6 @@ export interface components {
             value: unknown;
             /** Description */
             description: string | null;
-            /**
-             * Is Set
-             * @default true
-             */
-            is_set: boolean;
         };
         /**
          * ConfigValueUpdate

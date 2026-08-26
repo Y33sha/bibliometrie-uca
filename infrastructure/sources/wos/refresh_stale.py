@@ -31,7 +31,7 @@ class WosRefreshStaleAdapter(BaseRefreshStaleAdapter):
 
     def configure(self, conn: Connection) -> None:
         self.base_url = API_BASE_URLS["wos"]
-        self.headers = {"X-ApiKey": get_wos_api_key(conn), "Accept": "application/json"}
+        self.headers = {"X-ApiKey": get_wos_api_key(), "Accept": "application/json"}
 
     async def fetch_by_native_id(self, client: httpx.AsyncClient, source_id: str) -> FetchOutcome:
         try:

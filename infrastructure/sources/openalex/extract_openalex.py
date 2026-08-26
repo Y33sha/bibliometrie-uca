@@ -82,13 +82,11 @@ class PgOpenalexExtractAdapter(OpenalexExtractAdapter):
 
     def load_config(self, conn: Connection) -> OpenalexExtractConfig:
         institution_ids = get_extraction_api_ids(conn, "openalex")
-        init_auth(
-            api_key=get_openalex_api_key(conn), email=get_polite_pool_email_optional(conn) or ""
-        )
+        init_auth(api_key=get_openalex_api_key(), email=get_polite_pool_email_optional() or "")
         return OpenalexExtractConfig(
             base_url=self._url,
             institution_ids=institution_ids,
-            credentials_missing=source_credentials_missing(conn, "openalex"),
+            credentials_missing=source_credentials_missing("openalex"),
         )
 
     def get_years(self, conn: Connection, *, start_year: int | None = None) -> list[int]:

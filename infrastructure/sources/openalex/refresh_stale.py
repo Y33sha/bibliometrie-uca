@@ -33,7 +33,7 @@ class OpenalexRefreshStaleAdapter(BaseRefreshStaleAdapter):
     base_url: str
 
     def configure(self, conn: Connection) -> None:
-        init_auth(api_key=get_openalex_api_key(conn), email=get_polite_pool_email(conn))
+        init_auth(api_key=get_openalex_api_key(), email=get_polite_pool_email())
         self.base_url = API_BASE_URLS["openalex"]
 
     async def fetch_by_native_id(self, client: httpx.AsyncClient, source_id: str) -> FetchOutcome:

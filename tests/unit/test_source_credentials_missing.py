@@ -3,7 +3,7 @@
 `source_credentials_missing` est la seule source de vérité consultée par toutes
 les phases (extraction, cross-import, refresh stale, enrichissements). HAL et
 theses.fr sont des API publiques ; OpenAlex accepte clé API ou email ; WoS exige
-sa clé ; ScanR ses credentials ; Crossref/DataCite/Unpaywall l'email polite pool.
+sa clé ; ScanR ses identifiants ; Crossref/DataCite/Unpaywall l'adresse polite pool.
 """
 
 from unittest.mock import patch
@@ -14,8 +14,7 @@ from infrastructure.sources import config
 
 
 def _detect(source: str) -> str | None:
-    # `conn` inutilisé : les getters sont patchés ; None suffit.
-    return config.source_credentials_missing(None, source)
+    return config.source_credentials_missing(source)
 
 
 @pytest.mark.parametrize("source", ["hal", "theses"])

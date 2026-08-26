@@ -20,7 +20,6 @@ from infrastructure.pipeline.extract.staging import upsert_staging
 from infrastructure.sources.api_params import SCANR_DELAY, SCANR_PER_PAGE
 from infrastructure.sources.config import (
     get_extraction_api_ids,
-    get_scanr_credentials,
     get_years,
     source_credentials_missing,
 )
@@ -75,7 +74,7 @@ class PgScanrExtractAdapter(ScanrExtractAdapter):
         return ScanrExtractConfig(
             base_url=self._url,
             affiliation_ids=affiliation_ids,
-            credentials_missing=source_credentials_missing(conn, "scanr"),
+            credentials_missing=source_credentials_missing("scanr"),
         )
 
     def get_years(self, conn: Connection, *, start_year: int | None = None) -> list[int]:
@@ -140,9 +139,3 @@ class PgScanrExtractAdapter(ScanrExtractAdapter):
             raw_data=doc,
         )
         return UpsertOutcome.of(inserted=inserted, changed=changed)
-
-
-def get_scanr_credentials_from_db(conn: Connection) -> tuple[str, str]:
-    """Helper pour le composition root : lit les credentials Basic Auth."""
-    username, password = get_scanr_credentials(conn)
-    return (username, password)

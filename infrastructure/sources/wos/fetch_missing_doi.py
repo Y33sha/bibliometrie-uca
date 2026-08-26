@@ -45,7 +45,7 @@ class WosFetchMissingDoiAdapter:
 
     def configure(self, conn: Connection) -> None:
         self.base_url = API_BASE_URLS["wos"]
-        self.headers = {"X-ApiKey": get_wos_api_key(conn), "Accept": "application/json"}
+        self.headers = {"X-ApiKey": get_wos_api_key(), "Accept": "application/json"}
 
     async def fetch_async(self, client: httpx.AsyncClient, dois: list[str]) -> Iterable[dict]:
         # (doi d'origine, forme envoyable à WoS ou None si filtré). Les DOI preprints filtrés (c=None) ne sont pas interrogeables, donc jamais enregistrés comme not-found (le filtre client les écarte gratuitement).

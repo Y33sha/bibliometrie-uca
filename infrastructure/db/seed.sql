@@ -9,14 +9,9 @@ BEGIN;
 -- config (10 lignes)
 DELETE FROM config;
 INSERT INTO config (key, value, description) VALUES ('laboratories_display_types', '["labo"]', 'Types de structure affichés sur la page publique des laboratoires');
-INSERT INTO config (key, value, description) VALUES ('openalex_api_key', NULL, 'Clé API OpenAlex (remplace le polite pool par email)');
 INSERT INTO config (key, value, description) VALUES ('perimeter_extraction', '"alliance_uca"', 'Périmètre pour déterminer les structures à interroger lors de l''extraction');
 INSERT INTO config (key, value, description) VALUES ('perimeter_persons', '"uca"', 'Périmètre pour la création des personnes (authorships is_uca)');
 INSERT INTO config (key, value, description) VALUES ('pipeline_start_year_full', '2017', 'Mode full/monthly : extraire depuis cette année (incluse) jusqu''à l''année courante. Année absolue (ancre fixe), pas un offset — rétention cumulative.');
-INSERT INTO config (key, value, description) VALUES ('polite_pool_email', NULL, 'Email pour le polite pool OpenAlex');
-INSERT INTO config (key, value, description) VALUES ('scanr_password', NULL, 'Mot de passe API ScanR');
-INSERT INTO config (key, value, description) VALUES ('scanr_username', NULL, 'Identifiant API ScanR (Elasticsearch)');
-INSERT INTO config (key, value, description) VALUES ('wos_api_key', NULL, 'Clé API Web of Science (Clarivate)');
 
 -- countries (175 lignes)
 DELETE FROM countries;

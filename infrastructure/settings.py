@@ -68,6 +68,17 @@ class Settings(BaseSettings):
     db_pool_min: int = 2
     db_pool_max: int = 30
 
+    # ----- Identifiants d'accès aux sources externes -----
+    # Une source dont les identifiants manquent est sautée au lancement du pipeline, avec un
+    # avertissement, sans interrompre le run.
+    openalex_api_key: str = ""
+    wos_api_key: str = ""
+    scanr_username: str = ""
+    scanr_password: str = ""
+    # Adresse annoncée aux API qui pratiquent le polite pool. Requise par Crossref, DataCite et
+    # Unpaywall ; facultative pour OpenAlex, dont une clé d'API ouvre aussi le polite pool.
+    polite_pool_email: str = ""
+
     # ----- Raw store (payloads bruts hors BDD) -----
     # Vide → store local par défaut (`data/raw_store`). Sinon un `file:///chemin` absolu.
     biblio_raw_store_url: str = ""
