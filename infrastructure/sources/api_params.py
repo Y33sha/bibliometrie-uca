@@ -20,7 +20,6 @@ API_BASE_URLS: dict[str, str] = {
     "openalex_sources": "https://api.openalex.org/sources",
     "openalex_publishers": "https://api.openalex.org/publishers",
     "unpaywall": "https://api.unpaywall.org/v2",
-    "zenodo": "https://zenodo.org/api/records",
     # DOAJ : racine de l'API, l'adapter compose `/search/journals/issn:{issn}`.
     "doaj": "https://doaj.org/api",
 }
