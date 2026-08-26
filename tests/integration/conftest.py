@@ -22,13 +22,13 @@ from alembic import command
 
 # Charge .env avant lecture de os.environ — cohérent avec
 # infrastructure/__init__.py côté code applicatif. Sinon les commandes
-# `pytest` lancées depuis un shell qui n'a pas exporté DB_USER échouent
+# `pytest` lancées depuis un shell qui n'a pas exporté DB_OWNER_USER échouent
 # avec KeyError, alors que l'info est disponible dans le .env du projet.
 load_dotenv(pathlib.Path(__file__).resolve().parent.parent.parent / ".env")
 
 DB_NAME = "bibliometrie_test"
-DB_USER = os.environ["DB_USER"]
-DB_PASSWORD = os.environ.get("DB_PASSWORD", "")
+DB_OWNER_USER = os.environ["DB_OWNER_USER"]
+DB_OWNER_PASSWORD = os.environ.get("DB_OWNER_PASSWORD", "")
 DB_HOST = os.environ.get("DB_HOST", "127.0.0.1")
 DB_PORT = int(os.environ.get("DB_PORT", "5432"))
 PROJECT_ROOT = pathlib.Path(__file__).parent.parent.parent
@@ -37,17 +37,17 @@ ALEMBIC_INI = PROJECT_ROOT / "alembic.ini"
 
 def _admin_connect_args() -> dict:
     """Connexion à la base postgres (pour créer/supprimer des bases)."""
-    args = {"dbname": "postgres", "user": DB_USER, "host": DB_HOST, "port": DB_PORT}
-    if DB_PASSWORD:
-        args["password"] = DB_PASSWORD
+    args = {"dbname": "postgres", "user": DB_OWNER_USER, "host": DB_HOST, "port": DB_PORT}
+    if DB_OWNER_PASSWORD:
+        args["password"] = DB_OWNER_PASSWORD
     return args
 
 
 def _db_connect_args() -> dict:
     """Connexion à la base de test."""
-    args = {"dbname": DB_NAME, "user": DB_USER, "host": DB_HOST, "port": DB_PORT}
-    if DB_PASSWORD:
-        args["password"] = DB_PASSWORD
+    args = {"dbname": DB_NAME, "user": DB_OWNER_USER, "host": DB_HOST, "port": DB_PORT}
+    if DB_OWNER_PASSWORD:
+        args["password"] = DB_OWNER_PASSWORD
     return args
 
 
@@ -109,8 +109,8 @@ def _sa_url():
 
     return URL.create(
         drivername="postgresql+psycopg",
-        username=DB_USER,
-        password=DB_PASSWORD or None,
+        username=DB_OWNER_USER,
+        password=DB_OWNER_PASSWORD or None,
         host=DB_HOST,
         port=DB_PORT,
         database=DB_NAME,

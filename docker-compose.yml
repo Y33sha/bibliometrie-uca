@@ -12,8 +12,8 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-bibliometrie}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?à définir dans .env (aucun défaut)}
-      DB_USER: ${DB_USER:-postgres}
-      DB_PASSWORD: ${DB_PASSWORD:?à définir dans .env (aucun défaut)}
+      DB_OWNER_USER: ${DB_OWNER_USER:-postgres}
+      DB_OWNER_PASSWORD: ${DB_OWNER_PASSWORD:?à définir dans .env (aucun défaut)}
     volumes:
       - pgdata:/var/lib/postgresql
     ports:

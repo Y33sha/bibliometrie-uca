@@ -63,7 +63,7 @@ A jour au 2026-06-29
 - Frontend : SvelteKit (Svelte 5), routes dans `interfaces/frontend/src/routes/`
 - Pipeline : phases dans `application/pipeline/`, extracteurs dans `infrastructure/sources/`, orchestrateur `run_pipeline.py` à la racine
 - Migrations Alembic dans `alembic/versions/` (créer : `alembic revision --autogenerate -m "..."` ; appliquer : `alembic upgrade head` ; rollback : `alembic downgrade -1`). Snapshot `infrastructure/db/schema.sql` régénéré par `python -m interfaces.cli.dev.dump_schema`.
-- Tests backend : `python -m pytest tests/ -v` (nécessite `export DB_PASSWORD=...`)
+- Tests backend : `python -m pytest tests/ -v` (nécessite `export DB_OWNER_PASSWORD=...`)
 - Tests frontend : `cd interfaces/frontend && npm run check` (svelte-check, échoue sur les erreurs de types)
 - Lancement dev : `bash start.sh` (uvicorn port 8003 + vite port 5176)
 - Logging : utiliser `infrastructure/observability/log.py`

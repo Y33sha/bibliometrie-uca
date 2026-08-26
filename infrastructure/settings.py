@@ -50,8 +50,8 @@ class Settings(BaseSettings):
     db_host: str = "localhost"
     db_port: int = 5432
     db_name: str = "bibliometrie"
-    db_user: str
-    db_password: str
+    db_owner_user: str
+    db_owner_password: str
     # Identité restreinte dont l'API se sert pour se connecter, quand elle est configurée :
     # un rôle limité à la lecture et à l'écriture des données, sans droit sur le schéma.
     # Vide → l'API se connecte comme le reste (migrations, pipeline, scripts), avec
@@ -105,8 +105,8 @@ class Settings(BaseSettings):
         """Arguments pour psycopg.connect()."""
         return {
             "dbname": self.db_name,
-            "user": self.db_user,
-            "password": self.db_password,
+            "user": self.db_owner_user,
+            "password": self.db_owner_password,
             "host": self.db_host,
             "port": self.db_port,
         }
