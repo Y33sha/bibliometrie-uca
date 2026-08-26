@@ -28,7 +28,7 @@ dev = [
     "pytest-cov==7.1.0",
     "respx==0.22.0",                   # mocking httpx pour tests async
     "ruff==0.15.11",
-    "mypy==1.20.1",
+    "mypy==2.3.1",
     "deptry==0.25.1",
     "pip-audit==2.10.0",
     "pre-commit==4.4.0",
