@@ -16,14 +16,17 @@
 -- migrations** — `ALTER DEFAULT PRIVILEGES` ci-dessous ne porte que sur les objets
 -- créés par le rôle courant :
 --
---   psql -d bibliometrie -v app_password="motdepasse" -f infrastructure/db/roles.sql
+--   psql -d bibliometrie -v app_password='motdepasse' -f infrastructure/db/roles.sql
+--
+-- Les guillemets simples protègent la valeur du shell, qui interpréterait sinon `$` et
+-- les espaces ; la mise entre quotes SQL, elle, est faite par `:'app_password'` ci-dessous.
 --
 -- Le mot de passe se range ensuite dans `DB_APP_PASSWORD` (cf. `.env.example`), à
 -- côté de `DB_APP_USER`. Adapter le nom du rôle si l'hébergeur a ses conventions.
 
 \if :{?app_password}
 \else
-\echo 'Renseigner le mot de passe : psql -v app_password="…" -f infrastructure/db/roles.sql'
+\echo 'Renseigner le mot de passe : psql -v app_password=... -f infrastructure/db/roles.sql'
 \quit
 \endif
 
