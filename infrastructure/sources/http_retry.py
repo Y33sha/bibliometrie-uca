@@ -1,6 +1,6 @@
 """Requêtes HTTP avec retry, backoff exponentiel et circuit-breaker, en versions synchrone et asynchrone.
 
-`http_request_with_retry` s'appuie sur `requests` (extracteurs page à page, clients de préfixes DOI) ; `http_request_with_retry_async` sur un `httpx.AsyncClient` partagé entre coroutines (cross-import par DOI, enrichissements concurrents). La politique de décision — backoff, classification des statuts, corps vide, pose du label du breaker — est partagée (`_backoff_delay`, `_is_retryable_status`, `_prepared_label`, `_retry_reason`) ; chaque boucle ne porte que l'I/O de son client et l'attente (`time.sleep` / `asyncio.sleep`).
+`http_request_with_retry` émet une requête httpx synchrone (extracteurs page à page, clients de préfixes DOI) ; `http_request_with_retry_async` s'appuie sur un `httpx.AsyncClient` partagé entre coroutines (cross-import par DOI, enrichissements concurrents). La politique de décision — backoff, classification des statuts, corps vide, pose du label du breaker — est partagée (`_backoff_delay`, `_is_retryable_status`, `_prepared_label`, `_retry_reason`) ; chaque boucle ne porte que l'I/O de son client et l'attente (`time.sleep` / `asyncio.sleep`).
 
 Politique de retry :
   - 429 (Too Many Requests) et 5xx (panne source) : pause `initial_backoff * 2^attempt` puis retry, jusqu'à `max_retries` ; l'épuisement compte un échec au circuit-breaker. À l'épuisement sous breaker, la version sync coupe la source (`SourceUnavailableError`, l'appelant page à page ne peut pas avancer) ; la version async laisse remonter l'erreur brute, que les appelants concurrents attrapent par requête, l'accumulation coupant au seuil.
@@ -19,7 +19,6 @@ import logging
 import time
 
 import httpx
-import requests
 
 from application.ports.pipeline.circuit_breaker import SourceUnavailableError
 from infrastructure.sources.circuit_breaker import SourceCircuitBreaker, get_current_breaker
@@ -48,10 +47,8 @@ def _prepared_label(label: str) -> tuple[SourceCircuitBreaker | None, str]:
     return breaker, label
 
 
-def _retry_reason(
-    resp: requests.Response | httpx.Response, *, retry_on_empty_body: bool
-) -> str | None:
-    """Motif de retry d'une réponse aboutie (`requests` ou `httpx`, interface commune), ou `None` si elle est exploitable.
+def _retry_reason(resp: httpx.Response, *, retry_on_empty_body: bool) -> str | None:
+    """Motif de retry d'une réponse aboutie, ou `None` si elle est exploitable.
 
     Lève immédiatement sur un 4xx non-retryable (échec déterministe, non compté au breaker). Rend un motif pour un statut 429/5xx ou un corps vide.
     """
@@ -87,7 +84,7 @@ def http_request_with_retry(
         is_last = attempt == max_retries - 1
         wait = _backoff_delay(initial_backoff, attempt)
         try:
-            resp = requests.request(
+            resp = httpx.request(
                 method,
                 url,
                 params=params,
@@ -95,8 +92,9 @@ def http_request_with_retry(
                 headers=headers,
                 auth=auth,
                 timeout=timeout,
+                follow_redirects=True,
             )
-        except requests.RequestException as e:
+        except httpx.RequestError as e:
             last_error = e
             if is_last:
                 if breaker is not None:

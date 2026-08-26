@@ -1,13 +1,13 @@
 """Tests du client `api.crossref.org/prefixes` (`parse_member_id`, `fetch_crossref_prefix`).
 
-Mockent `requests.request` (utilisé par `http_request_with_retry`) pour ne pas dépendre du réseau.
+Mockent `httpx.request` (utilisé par `http_request_with_retry`) pour ne pas dépendre du réseau.
 """
 
 from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-import requests
+import httpx
 
 from infrastructure.sources.crossref.prefixes import fetch_crossref_prefix, parse_member_id
 
@@ -43,7 +43,7 @@ def test_parse_member_id_none_inputs():
 
 def test_fetch_crossref_prefix_ok(monkeypatch):
     monkeypatch.setattr(
-        requests,
+        httpx,
         "request",
         lambda *a, **kw: _mock_response(
             200,
@@ -63,7 +63,7 @@ def test_fetch_crossref_prefix_ok(monkeypatch):
 
 def test_fetch_crossref_prefix_no_member(monkeypatch):
     monkeypatch.setattr(
-        requests,
+        httpx,
         "request",
         lambda *a, **kw: _mock_response(200, {"message": {"name": "Foo"}}),
     )
@@ -72,7 +72,7 @@ def test_fetch_crossref_prefix_no_member(monkeypatch):
 
 def test_fetch_crossref_prefix_missing_name_returns_none(monkeypatch):
     monkeypatch.setattr(
-        requests,
+        httpx,
         "request",
         lambda *a, **kw: _mock_response(200, {"message": {}}),
     )
@@ -81,7 +81,7 @@ def test_fetch_crossref_prefix_missing_name_returns_none(monkeypatch):
 
 def test_fetch_crossref_prefix_http_error_returns_none(monkeypatch):
     def raising(*a, **kw):
-        raise requests.ConnectionError("boom")
+        raise httpx.ConnectError("boom")
 
-    monkeypatch.setattr(requests, "request", raising)
+    monkeypatch.setattr(httpx, "request", raising)
     assert fetch_crossref_prefix("10.1234", user_agent="ua") is None

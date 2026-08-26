@@ -1,13 +1,13 @@
 """Tests du client `api.datacite.org/prefixes` (`fetch_datacite_prefix`, `_parse_datacite_prefix_payload`).
 
-Mockent `requests.request` (utilisé par `http_request_with_retry`) pour ne pas dépendre du réseau.
+Mockent `httpx.request` (utilisé par `http_request_with_retry`) pour ne pas dépendre du réseau.
 """
 
 from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-import requests
+import httpx
 
 from infrastructure.sources.datacite.prefixes import (
     _parse_datacite_prefix_payload,
@@ -96,7 +96,7 @@ def test_fetch_datacite_prefix_ok(monkeypatch):
     payload = _datacite_payload(
         "10.14758", "inist.inra", "INRAE", "gkjj", "Institut national de recherche"
     )
-    monkeypatch.setattr(requests, "request", lambda *a, **kw: _mock_response(200, payload))
+    monkeypatch.setattr(httpx, "request", lambda *a, **kw: _mock_response(200, payload))
     assert fetch_datacite_prefix("10.14758", user_agent="ua") == (
         "Institut national de recherche",
         "INRAE",
@@ -106,7 +106,7 @@ def test_fetch_datacite_prefix_ok(monkeypatch):
 
 def test_fetch_datacite_prefix_http_error_returns_none(monkeypatch):
     def raising(*a, **kw):
-        raise requests.ConnectionError("boom")
+        raise httpx.ConnectError("boom")
 
-    monkeypatch.setattr(requests, "request", raising)
+    monkeypatch.setattr(httpx, "request", raising)
     assert fetch_datacite_prefix("10.5281", user_agent="ua") is None

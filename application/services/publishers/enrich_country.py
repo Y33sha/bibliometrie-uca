@@ -10,7 +10,7 @@ import time
 from collections import Counter
 from typing import NamedTuple, NotRequired, TypedDict, cast
 
-import requests
+import httpx
 from sqlalchemy import Connection
 
 from application.ports.repositories.publisher_repository import PublisherRepository
@@ -64,7 +64,9 @@ def fetch_publishers_batch(
 
     for attempt in range(3):
         try:
-            resp = requests.get(openalex_publishers_api, params=params, timeout=30)
+            resp = httpx.get(
+                openalex_publishers_api, params=params, timeout=30, follow_redirects=True
+            )
             if resp.status_code == 429:
                 wait = 2 ** (attempt + 1)
                 logger.warning(f"Rate limited (429), attente {wait}s...")
@@ -73,7 +75,7 @@ def fetch_publishers_batch(
             resp.raise_for_status()
             results = cast("list[_OpenAlexPublisher]", resp.json().get("results", []))
             return {short_openalex_id(source["id"]): source for source in results}
-        except requests.RequestException as e:
+        except httpx.HTTPError as e:
             if attempt < 2:
                 logger.warning(f"Erreur requête (tentative {attempt + 1}/3): {e}")
                 time.sleep(2 ** (attempt + 1))

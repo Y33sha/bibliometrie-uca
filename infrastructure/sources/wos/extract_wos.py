@@ -8,7 +8,7 @@ from __future__ import annotations
 import time
 from typing import Any
 
-import requests
+import httpx
 from sqlalchemy import Connection
 
 from application.ports.pipeline.extract._common import BatchInsertCounts
@@ -102,7 +102,7 @@ class PgWosExtractAdapter(WosExtractAdapter):
 
     def check_quota(self) -> str | None:
         """Probe l'API pour récupérer le header `X-REC-AmtPerYear-Remaining`."""
-        resp = requests.get(
+        resp = httpx.get(
             self._url,
             headers=self._headers,
             params={
@@ -112,6 +112,7 @@ class PgWosExtractAdapter(WosExtractAdapter):
                 "firstRecord": "1",
             },
             timeout=30,
+            follow_redirects=True,
         )
         if resp.status_code in (401, 403):
             raise RuntimeError(
