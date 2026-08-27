@@ -36,6 +36,10 @@ jobs:
       DB_NAME: postgres
       DB_OWNER_USER: postgres
       DB_OWNER_PASSWORD: postgres
+      # Identité restreinte sous laquelle les tests d'API se connectent, comme l'application
+      # en production. Le rôle est créé sur la base de test s'il n'existe pas.
+      DB_APP_USER: bibliometrie_app
+      DB_APP_PASSWORD: bibliometrie_app_ci
       # Valeurs bidon : les tests n'exercent pas l'authentification, mais l'API refuse de
       # démarrer sans empreinte de mot de passe ni clé de signature d'au moins 32 caractères,
       # et les tests d'intégration déclenchent son cycle de vie.

@@ -11,7 +11,13 @@ import pytest
 from sqlalchemy import text
 
 from domain.config import PUBLIC_CONFIG_KEYS
-from infrastructure.db.engine import get_sync_engine
+from tests.integration.interfaces.conftest import _build_test_sync_engine
+
+
+def _owner_engine():
+    """Engine sous l'identité propriétaire du schéma, pour les poses de jeu de données."""
+    return _build_test_sync_engine()
+
 
 CREDENTIAL_CONFIG_KEYS = frozenset(
     {"openalex_api_key", "wos_api_key", "scanr_username", "scanr_password", "polite_pool_email"}
@@ -25,7 +31,9 @@ def config_keys_seeded():
     Sans cette pose, une lecture qui ne rend aucun identifiant ne prouve rien : la base de test n'en porte pas. Les lectures de l'API passent par leur propre connexion, d'où une pose committée, reprise clé par clé.
     """
     keys = [*PUBLIC_CONFIG_KEYS, *CREDENTIAL_CONFIG_KEYS]
-    with get_sync_engine().begin() as conn:
+    # Pose sous l'identité propriétaire : l'API, qui se connecte sous le rôle restreint, met à
+    # jour la configuration sans jamais y ajouter de clé.
+    with _owner_engine().begin() as conn:
         added = [
             k
             for k in keys
@@ -39,7 +47,7 @@ def config_keys_seeded():
         ]
     yield
     if added:
-        with get_sync_engine().begin() as conn:
+        with _owner_engine().begin() as conn:
             conn.execute(text("DELETE FROM config WHERE key = ANY(:ks)"), {"ks": added})
 
 
@@ -48,12 +56,12 @@ def reserved_config_key():
     """Pose une clé de configuration absente de la liste blanche, et la retire ensuite."""
     key = "reglage_hors_liste_blanche"
     assert key not in PUBLIC_CONFIG_KEYS
-    with get_sync_engine().begin() as conn:
+    with _owner_engine().begin() as conn:
         conn.execute(
             text("INSERT INTO config (key, value) VALUES (:k, to_jsonb('x'::text))"), {"k": key}
         )
     yield key
-    with get_sync_engine().begin() as conn:
+    with _owner_engine().begin() as conn:
         conn.execute(text("DELETE FROM config WHERE key = :k"), {"k": key})
 
 
