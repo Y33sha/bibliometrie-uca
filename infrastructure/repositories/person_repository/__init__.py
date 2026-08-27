@@ -109,9 +109,6 @@ class PgPersonRepository(PersonRepository):
     def update_identifier(self, ident: "PersonIdentifier") -> None:
         _identifiers.update_identifier(self._conn, ident)
 
-    def remove_identifier(self, person_id: int, id_type: str, id_value: str) -> None:
-        _identifiers.remove_identifier(self._conn, person_id, id_type, id_value)
-
     def update_identifier_status(self, ident_id: int, status: str) -> "IdentifierStatusRow":
         return _identifiers.update_identifier_status(self._conn, ident_id, status)
 

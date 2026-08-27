@@ -1,4 +1,4 @@
-import { del, patch, post } from './client';
+import { patch, post } from './client';
 import type { components } from './schema';
 
 type AddIdentifierResponse = components['schemas']['AddIdentifierResponse'];
@@ -6,7 +6,6 @@ type IdentifierStatusResponse = components['schemas']['IdentifierStatusResponse'
 type IdentifierReassignResponse = components['schemas']['IdentifierReassignResponse'];
 type MergeResponse = components['schemas']['MergeResponse'];
 type OkResponse = components['schemas']['OkResponse'];
-type RemovedResponse = components['schemas']['RemovedResponse'];
 type NameFormStatusResponse = components['schemas']['NameFormStatusResponse'];
 type DetachAuthorshipsResponse = components['schemas']['DetachAuthorshipsResponse'];
 
@@ -52,15 +51,6 @@ export function addIdentifier(
 	body: Record<string, unknown>
 ): Promise<AddIdentifierResponse> {
 	return post<AddIdentifierResponse>(`/api/persons/${personId}/identifiers`, body);
-}
-
-export function deleteIdentifier(
-	personId: number,
-	idType: string,
-	idValue: string
-): Promise<RemovedResponse> {
-	const url = `/api/persons/${personId}/identifiers/${idType}/${encodeURIComponent(idValue)}`;
-	return del<RemovedResponse>(url);
 }
 
 export function setIdentifierStatus(

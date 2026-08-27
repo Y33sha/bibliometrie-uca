@@ -56,7 +56,6 @@ from interfaces.api.models import (
     OkResponse,
     ReassignIdentifier,
     RejectPerson,
-    RemovedResponse,
     TotalCountResponse,
     UpdateIdentifierStatus,
     UpdateNameFormStatus,
@@ -400,25 +399,6 @@ def add_person_identifier(
         id_value=result.id_value,
         reassigned=result.outcome is AddIdentifierOutcome.REASSIGNED or None,
     )
-
-
-@router.delete("/{person_id}/identifiers/{id_type}/{id_value:path}", response_model=RemovedResponse)
-def remove_person_identifier(
-    person_id: int,
-    id_type: str,
-    id_value: str,
-    conn: Connection = Depends(db_conn),
-    repo: PersonRepository = Depends(person_repo),
-    audit: AuditRepository = Depends(audit_repo),
-) -> RemovedResponse:
-    """Supprime un identifiant d'une personne.
-
-    Renvoie 404 sur un identifiant introuvable (`remove_identifier`).
-    """
-    person_commands.remove_identifier(
-        conn, person_id, id_type, id_value, repo=repo, audit_repo=audit
-    )
-    return RemovedResponse()
 
 
 # ── Une personne : rejet, renommage, fusion, détachement ─────────

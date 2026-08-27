@@ -119,10 +119,6 @@ class PersonRepository(Protocol):
         """Persiste les mutations d'un `PersonIdentifier` existant (`person_id`, `status`, `source`) ; `id_type` et `id_value` sont immuables. Requiert `ident.id` posé."""
         ...
 
-    def remove_identifier(self, person_id: int, id_type: str, id_value: str) -> None:
-        """Supprime l'identifiant `(person_id, id_type, id_value)`. Lève `NotFoundError` s'il est absent."""
-        ...
-
     def update_identifier_status(self, ident_id: int, status: str) -> IdentifierStatusRow:
         """Change le statut d'un identifiant et retourne la ligne. Lève `NotFoundError` s'il est absent."""
         ...

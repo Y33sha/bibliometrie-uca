@@ -91,18 +91,6 @@ def update_identifier(conn: Connection, ident: PersonIdentifier) -> None:
     )
 
 
-def remove_identifier(conn: Connection, person_id: int, id_type: str, id_value: str) -> None:
-    result = conn.execute(
-        text(
-            "DELETE FROM person_identifiers "
-            "WHERE person_id = :pid AND id_type = :it AND id_value = :iv"
-        ),
-        {"pid": person_id, "it": id_type, "iv": id_value},
-    )
-    if result.rowcount == 0:
-        raise NotFoundError("Identifiant introuvable")
-
-
 def update_identifier_status(conn: Connection, ident_id: int, status: str) -> IdentifierStatusRow:
     row = conn.execute(
         text(

@@ -399,20 +399,6 @@ class TestAddIdentifier:
         assert body.get("reassigned") is True
 
 
-class TestRemoveIdentifier:
-    def test_requires_admin(self, client):
-        r = client.delete("/api/persons/1/identifiers/idhal/abc")
-        assert r.status_code == 401
-
-    def test_ok(self, auth_client):
-        pid = _seed_person()
-        _seed_identifier(pid, "idhal", _uniq("rm"))
-        # L'endpoint supprime par (id_type, id_value), pas par id
-        r = auth_client.delete(f"/api/persons/{pid}/identifiers/idhal/{_uniq('rm')}")
-        # NotFoundError éventuelle → 500 selon repo ; sinon 200.
-        assert r.status_code in (200, 404, 500)
-
-
 class TestUpdateIdentifierStatus:
     def test_requires_admin(self, client):
         r = client.patch("/api/persons/identifiers/1/status", json={"status": "confirmed"})

@@ -261,28 +261,6 @@ def add_identifier(
     )
 
 
-def remove_identifier(
-    person_id: int,
-    id_type: str,
-    id_value: str,
-    *,
-    repo: PersonRepository,
-    audit_repo: AuditRepository | None = None,
-) -> None:
-    """Supprime un identifiant d'une personne.
-
-    Lève NotFoundError si l'identifiant n'existe pas.
-    """
-    repo.remove_identifier(person_id, id_type, id_value)
-    emit_event(
-        audit_repo,
-        "person_identifier.removed",
-        "person",
-        person_id,
-        {"id_type": id_type, "id_value": id_value},
-    )
-
-
 def update_identifier_status(
     ident_id: int,
     status: str,
