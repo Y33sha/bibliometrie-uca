@@ -16,8 +16,10 @@ services:
       DB_OWNER_PASSWORD: ${DB_OWNER_PASSWORD:?à définir dans .env (aucun défaut)}
     volumes:
       - pgdata:/var/lib/postgresql
+    # Publication sur la boucle locale : la base de développement n'a pas à être joignable
+    # depuis le réseau, où son mot de passe de superutilisateur serait exposé.
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
       interval: 5s
