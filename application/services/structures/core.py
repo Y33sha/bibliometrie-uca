@@ -49,7 +49,7 @@ def create_structure(
     code: str,
     name: str,
     acronym: str | None = None,
-    type: str,
+    structure_type: str,
     ror_id: str | None = None,
     rnsr_id: str | None = None,
     hal_collection: str | None = None,
@@ -61,7 +61,7 @@ def create_structure(
     structure = Structure.create(
         code=code,
         name=name,
-        type=type,
+        structure_type=structure_type,
         acronym=acronym,
         ror_id=ror_id,
         rnsr_id=rnsr_id,
@@ -74,7 +74,7 @@ def create_structure(
         "structure.created",
         "structure",
         structure.id,
-        {"code": code, "name": name, "type": type},
+        {"code": code, "name": name, "type": structure_type},
     )
     return _to_row(structure)
 
@@ -98,7 +98,7 @@ def update_structure(
     applied = structure.apply(
         name=_as_str(fields.get("name")),
         acronym=_as_str(fields.get("acronym")),
-        type=_as_str(fields.get("type")),
+        structure_type=_as_str(fields.get("type")),
         ror_id=_as_str(fields.get("ror_id")),
         rnsr_id=_as_str(fields.get("rnsr_id")),
         hal_collection=_as_str(fields.get("hal_collection")),

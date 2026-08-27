@@ -234,8 +234,8 @@ def main() -> None:
     sample = records[0]
     log.info(f"  Exemple: {sample}")
 
-    departments = set(r.get("department_name", "") for r in records if r.get("department_name"))
-    roles = set(r.get("role_title", "") for r in records if r.get("role_title"))
+    departments = {r.get("department_name", "") for r in records if r.get("department_name")}
+    roles = {r.get("role_title", "") for r in records if r.get("role_title")}
     log.info(f"  {len(departments)} départements distincts, {len(roles)} rôles distincts")
 
     if args.dry_run:

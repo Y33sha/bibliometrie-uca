@@ -81,7 +81,7 @@ def create_structure(
             code=data.code,
             name=data.name,
             acronym=data.acronym,
-            type=data.type,
+            structure_type=data.type,
             ror_id=data.ror_id,
             rnsr_id=data.rnsr_id,
             hal_collection=data.hal_collection,

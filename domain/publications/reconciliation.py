@@ -86,9 +86,9 @@ def _partitions(members: list[ReconcileMember]) -> list[list[ReconcileMember]]:
         if len(distinct_dois) <= 1:
             partitions.append(comp)
         else:
-            for doi in distinct_dois:
-                partitions.append([m for m in comp if m.effective_doi == doi])
-            # SP sans DOI d'une composante multi-DOI : résiduelles, non assignées.
+            # Les publications sources sans DOI d'une composante multi-DOI restent résiduelles,
+            # non assignées.
+            partitions.extend([m for m in comp if m.effective_doi == doi] for doi in distinct_dois)
     return partitions
 
 

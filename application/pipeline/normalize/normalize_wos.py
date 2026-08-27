@@ -73,16 +73,11 @@ def _parse_api_authors(static: dict, dynamic: dict) -> list[dict]:
             # Organizations structurées
             orgs_data = spec.get("organizations", {})
             org_list = _safe_list(orgs_data.get("organization"))
-            orgs = []
-            for o in org_list:
-                if isinstance(o, dict) and o.get("content"):
-                    orgs.append(
-                        {
-                            "name": o["content"],
-                            "ror_id": o.get("ror_id"),
-                            "pref": o.get("pref"),
-                        }
-                    )
+            orgs = [
+                {"name": o["content"], "ror_id": o.get("ror_id"), "pref": o.get("pref")}
+                for o in org_list
+                if isinstance(o, dict) and o.get("content")
+            ]
             if orgs:
                 addr_orgs_map[str(addr_no)] = orgs
 
@@ -374,16 +369,16 @@ def extract_pub_metadata(rec: dict, journal_id: int | None) -> dict:
     title = rec["title"]
     container_title = rec.get("journal_title") if not journal_id else None
 
-    return dict(
-        title=title,
-        pub_year=rec["pub_year"],
-        doc_type=rec["doc_type"],
-        doi=rec["doi"],
-        oa_status=rec["oa_status"],
-        journal_id=journal_id,
-        container_title=container_title,
-        language=rec.get("language"),
-    )
+    return {
+        "title": title,
+        "pub_year": rec["pub_year"],
+        "doc_type": rec["doc_type"],
+        "doi": rec["doi"],
+        "oa_status": rec["oa_status"],
+        "journal_id": journal_id,
+        "container_title": container_title,
+        "language": rec.get("language"),
+    }
 
 
 # =============================================================

@@ -161,6 +161,7 @@ pyahocorasick = "ahocorasick"
 line-length = 100
 target-version = "py312"
 extend-exclude = [
+    ".claude",  # hooks du harnais de développement, hors code applicatif
     "interfaces/frontend",
     "bibliometrie_uca.egg-info",
     ".venv",
@@ -181,6 +182,15 @@ select = [
     "C901",   # complexité cyclomatique
     "ASYNC",  # flake8-async : I/O bloquantes dans une async def, etc.
     "S",      # flake8-bandit : 73 règles de sécurité (cf. per-file-ignores pour les exceptions)
+    "A",      # flake8-builtins : un nom qui masque une fonction de base
+    "C4",     # flake8-comprehensions : compréhensions et appels de collection superflus
+    "ISC",    # flake8-implicit-str-concat : concaténation implicite de littéraux
+    "LOG",    # flake8-logging : usage du module de journalisation
+    "PERF",   # Perflint : boucles réécrivables en compréhension
+    "PIE",    # flake8-pie : tournures inutiles
+    "Q",      # flake8-quotes : cohérence des guillemets
+    "RET",    # flake8-return : chemins de retour superflus
+    "TID",    # flake8-tidy-imports : imports relatifs remontants
 ]
 # RUF029 (async def sans await) serait utile mais reste en preview chez
 # ruff à ce jour : l'activer exigerait `preview = true` qui allume

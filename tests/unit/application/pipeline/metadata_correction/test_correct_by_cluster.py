@@ -32,7 +32,7 @@ def test_tally_doi_corrections_par_cas():
 
 
 def _row(
-    id,
+    row_id,
     doc_type,
     doi,
     title="t",
@@ -42,12 +42,12 @@ def _row(
     same_work_case=None,
 ) -> DoiClusterRow:
     return DoiClusterRow(
-        id, doc_type, doi, title, raw_metadata or {}, raw_doi, canonical_doi, same_work_case
+        row_id, doc_type, doi, title, raw_metadata or {}, raw_doi, canonical_doi, same_work_case
     )
 
 
-def _m(id, doc_type, title="t", canonical_doi=None, same_work_case=None) -> DoiClusterMember:
-    return DoiClusterMember(id, doc_type, title, canonical_doi, same_work_case)
+def _m(member_id, doc_type, title="t", canonical_doi=None, same_work_case=None) -> DoiClusterMember:
+    return DoiClusterMember(member_id, doc_type, title, canonical_doi, same_work_case)
 
 
 # ── domaine pur : convergence même-œuvre ─────────────────────────────────

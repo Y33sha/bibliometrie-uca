@@ -39,8 +39,7 @@ def sp(orphan: bool = False) -> str:
 
 def cluster(size: int) -> list[str]:
     nodes = [sp() for _ in range(size)]
-    for i in range(1, len(nodes)):
-        L.append(f"  {nodes[i]} -- {nodes[random.randint(0, i - 1)]};")
+    L.extend(f"  {nodes[i]} -- {nodes[random.randint(0, i - 1)]};" for i in range(1, len(nodes)))
     for _ in range(max(0, size - 3)):
         a, b = random.sample(nodes, 2)
         L.append(f"  {a} -- {b};")
@@ -56,8 +55,7 @@ def publication(name: str) -> None:
 
 
 def attach(nodes: list[str], p: str) -> None:
-    for s in nodes:
-        L.append(f'  {s} -- {p} [color="{ATTACH}", style=dotted, penwidth=0.8];')
+    L.extend(f'  {s} -- {p} [color="{ATTACH}", style=dotted, penwidth=0.8];' for s in nodes)
 
 
 # ── composantes ordinaires : petit paquet -> une publication ──

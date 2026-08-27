@@ -94,7 +94,7 @@ class Structure:
         *,
         code: str,
         name: str,
-        type: str,
+        structure_type: str,
         acronym: str | None = None,
         ror_id: str | None = None,
         rnsr_id: str | None = None,
@@ -106,7 +106,7 @@ class Structure:
             id=None,
             code=code,
             name=name,
-            structure_type=_parse_type(type),
+            structure_type=_parse_type(structure_type),
             acronym=acronym,
             ror_id=_parse_ror(ror_id),
             rnsr_id=rnsr_id,
@@ -119,7 +119,7 @@ class Structure:
         *,
         name: str | None = None,
         acronym: str | None = None,
-        type: str | None = None,
+        structure_type: str | None = None,
         ror_id: str | None = None,
         rnsr_id: str | None = None,
         hal_collection: str | None = None,
@@ -133,8 +133,8 @@ class Structure:
         if acronym is not None:
             self.acronym = acronym
             applied.append("acronym")
-        if type is not None:
-            self.structure_type = _parse_type(type)
+        if structure_type is not None:
+            self.structure_type = _parse_type(structure_type)
             applied.append("structure_type")
         if ror_id is not None:
             self.ror_id = _parse_ror(ror_id)

@@ -36,7 +36,7 @@ class TestFindById:
         assert repo.find_by_id(999999) is None
 
     def test_hydrates_minimal_structure(self, sa_sync_conn, repo):
-        row = create_structure(code="MIN", name="Min", type="labo", repo=repo)
+        row = create_structure(code="MIN", name="Min", structure_type="labo", repo=repo)
         s = repo.find_by_id(row["id"])
         assert s is not None
         assert s.id == row["id"]
@@ -53,7 +53,7 @@ class TestFindById:
         row = create_structure(
             code="UMR-LIMOS",
             name="LIMOS",
-            type="labo",
+            structure_type="labo",
             acronym="LIMOS",
             ror_id="02feahw73",
             hal_collection="LIMOS",
@@ -67,7 +67,7 @@ class TestFindById:
         assert s.api_ids == {"openalex": ["I1"], "wos": ["W1"]}
 
     def test_hydrates_name_forms(self, sa_sync_conn, repo):
-        row = create_structure(code="S", name="S", type="labo", repo=repo)
+        row = create_structure(code="S", name="S", structure_type="labo", repo=repo)
         create_name_form(structure_id=row["id"], form_text="lab x", repo=repo)
         create_name_form(
             structure_id=row["id"],
@@ -84,7 +84,9 @@ class TestFindById:
 
 class TestCreateStructure:
     def test_minimal(self, sa_sync_conn, repo):
-        row = create_structure(code="UCA", name="Université", type="universite", repo=repo)
+        row = create_structure(
+            code="UCA", name="Université", structure_type="universite", repo=repo
+        )
         assert row["code"] == "UCA"
         assert row["name"] == "Université"
         assert row["type"] == "universite"
@@ -94,7 +96,7 @@ class TestCreateStructure:
         row = create_structure(
             code="TEST",
             name="Test",
-            type="labo",
+            structure_type="labo",
             api_ids={"openalex": ["I1"], "wos": ["WOS_TEST"]},
             repo=repo,
         )
@@ -106,7 +108,7 @@ class TestCreateStructure:
         row = create_structure(
             code="T2",
             name="T2",
-            type="labo",
+            structure_type="labo",
             api_ids={"openalex": "I1", "wos": []},
             repo=repo,
         )
@@ -118,7 +120,7 @@ class TestCreateStructure:
             create_structure(
                 code="T3",
                 name="T3",
-                type="labo",
+                structure_type="labo",
                 api_ids={"openalex": [123, 456]},
                 repo=repo,
             )
@@ -129,7 +131,7 @@ class TestCreateStructure:
         row = create_structure(
             code="ROR1",
             name="Ror1",
-            type="labo",
+            structure_type="labo",
             ror_id="https://ror.org/026tc4g97",
             repo=repo,
         )
@@ -137,7 +139,9 @@ class TestCreateStructure:
 
     def test_ror_id_invalid_raises(self, sa_sync_conn, repo):
         with pytest.raises(ValidationError, match="ror_id invalide"):
-            create_structure(code="ROR2", name="Ror2", type="labo", ror_id="pas-un-ror", repo=repo)
+            create_structure(
+                code="ROR2", name="Ror2", structure_type="labo", ror_id="pas-un-ror", repo=repo
+            )
 
 
 class TestUpdateStructure:
@@ -146,12 +150,12 @@ class TestUpdateStructure:
             update_structure(999999, fields={"name": "X"}, repo=repo)
 
     def test_raises_on_empty_fields(self, sa_sync_conn, repo):
-        row = create_structure(code="X", name="X", type="labo", repo=repo)
+        row = create_structure(code="X", name="X", structure_type="labo", repo=repo)
         with pytest.raises(ValidationError, match="Aucun champ"):
             update_structure(row["id"], fields={}, repo=repo)
 
     def test_updates_fields(self, sa_sync_conn, repo):
-        row = create_structure(code="X", name="Ancien", type="labo", repo=repo)
+        row = create_structure(code="X", name="Ancien", structure_type="labo", repo=repo)
         updated = update_structure(
             row["id"],
             fields={"name": "Nouveau", "acronym": "N"},
@@ -164,7 +168,7 @@ class TestUpdateStructure:
         row = create_structure(
             code="X",
             name="X",
-            type="labo",
+            structure_type="labo",
             api_ids={"openalex": ["OLD"]},
             repo=repo,
         )
@@ -173,7 +177,7 @@ class TestUpdateStructure:
 
     def test_none_fields_are_ignored(self, sa_sync_conn, repo):
         """Les champs à None dans le dict ne sont pas appliqués."""
-        row = create_structure(code="X", name="Original", type="labo", repo=repo)
+        row = create_structure(code="X", name="Original", structure_type="labo", repo=repo)
         updated = update_structure(
             row["id"],
             fields={"name": None, "acronym": "AC"},
@@ -186,7 +190,9 @@ class TestUpdateStructure:
         """Régression : éditer une structure en envoyant le ROR en URL complète
         (ce que faisait le form admin) ne doit plus stocker l'URL — le service la
         ramène à l'ID court via le VO RorId."""
-        row = create_structure(code="X", name="X", type="labo", ror_id="026tc4g97", repo=repo)
+        row = create_structure(
+            code="X", name="X", structure_type="labo", ror_id="026tc4g97", repo=repo
+        )
         updated = update_structure(
             row["id"],
             fields={"acronym": "X", "ror_id": "https://ror.org/026tc4g97"},
@@ -195,7 +201,7 @@ class TestUpdateStructure:
         assert updated["ror_id"] == "026tc4g97"
 
     def test_ror_id_invalid_raises(self, sa_sync_conn, repo):
-        row = create_structure(code="X", name="X", type="labo", repo=repo)
+        row = create_structure(code="X", name="X", structure_type="labo", repo=repo)
         with pytest.raises(ValidationError, match="ror_id invalide"):
             update_structure(row["id"], fields={"ror_id": "pas-un-ror"}, repo=repo)
 
@@ -206,7 +212,7 @@ class TestDeleteStructure:
             delete_structure(999999, repo=repo)
 
     def test_deletes_existing(self, sa_sync_conn, repo):
-        row = create_structure(code="X", name="X", type="labo", repo=repo)
+        row = create_structure(code="X", name="X", structure_type="labo", repo=repo)
         delete_structure(row["id"], repo=repo)
         result = sa_sync_conn.execute(
             text("SELECT id FROM structures WHERE id = :id"), {"id": row["id"]}
@@ -219,8 +225,8 @@ class TestDeleteStructure:
 
 class TestCreateRelation:
     def test_creates(self, sa_sync_conn, repo):
-        parent = create_structure(code="P", name="Parent", type="universite", repo=repo)
-        child = create_structure(code="C", name="Child", type="labo", repo=repo)
+        parent = create_structure(code="P", name="Parent", structure_type="universite", repo=repo)
+        child = create_structure(code="C", name="Child", structure_type="labo", repo=repo)
         rel = create_relation(
             parent_id=parent["id"],
             child_id=child["id"],
@@ -233,8 +239,8 @@ class TestCreateRelation:
 
     def test_returns_none_on_conflict(self, sa_sync_conn, repo):
         """Si la relation existe déjà, retourne None (ON CONFLICT DO NOTHING)."""
-        parent = create_structure(code="P", name="P", type="universite", repo=repo)
-        child = create_structure(code="C", name="C", type="labo", repo=repo)
+        parent = create_structure(code="P", name="P", structure_type="universite", repo=repo)
+        child = create_structure(code="C", name="C", structure_type="labo", repo=repo)
         create_relation(
             parent_id=parent["id"],
             child_id=child["id"],
@@ -250,7 +256,7 @@ class TestCreateRelation:
         assert again is None
 
     def test_rejects_self_reference(self, sa_sync_conn, repo):
-        s = create_structure(code="S", name="S", type="universite", repo=repo)
+        s = create_structure(code="S", name="S", structure_type="universite", repo=repo)
         with pytest.raises(ValidationError, match="Auto-référence"):
             create_relation(
                 parent_id=s["id"],
@@ -261,8 +267,8 @@ class TestCreateRelation:
 
     def test_rejects_cycle(self, sa_sync_conn, repo):
         """A → B existe ; tenter B → A doit échouer (cycle)."""
-        a = create_structure(code="A", name="A", type="universite", repo=repo)
-        b = create_structure(code="B", name="B", type="labo", repo=repo)
+        a = create_structure(code="A", name="A", structure_type="universite", repo=repo)
+        b = create_structure(code="B", name="B", structure_type="labo", repo=repo)
         create_relation(
             parent_id=a["id"],
             child_id=b["id"],
@@ -278,8 +284,8 @@ class TestCreateRelation:
             )
 
     def test_rejects_unknown_relation_type(self, sa_sync_conn, repo):
-        parent = create_structure(code="P", name="P", type="universite", repo=repo)
-        child = create_structure(code="C", name="C", type="labo", repo=repo)
+        parent = create_structure(code="P", name="P", structure_type="universite", repo=repo)
+        child = create_structure(code="C", name="C", structure_type="labo", repo=repo)
         with pytest.raises(ValidationError, match="Type de relation inconnu"):
             create_relation(
                 parent_id=parent["id"],
@@ -290,9 +296,9 @@ class TestCreateRelation:
 
     def test_rejects_indirect_cycle(self, sa_sync_conn, repo):
         """A → B → C ; tenter C → A doit échouer."""
-        a = create_structure(code="A", name="A", type="universite", repo=repo)
-        b = create_structure(code="B", name="B", type="labo", repo=repo)
-        c = create_structure(code="C", name="C", type="equipe", repo=repo)
+        a = create_structure(code="A", name="A", structure_type="universite", repo=repo)
+        b = create_structure(code="B", name="B", structure_type="labo", repo=repo)
+        c = create_structure(code="C", name="C", structure_type="equipe", repo=repo)
         create_relation(
             parent_id=a["id"], child_id=b["id"], relation_type="est_tutelle_de", repo=repo
         )
@@ -311,8 +317,8 @@ class TestDeleteRelation:
             delete_relation(999999, repo=repo)
 
     def test_deletes_existing(self, sa_sync_conn, repo):
-        parent = create_structure(code="P", name="P", type="universite", repo=repo)
-        child = create_structure(code="C", name="C", type="labo", repo=repo)
+        parent = create_structure(code="P", name="P", structure_type="universite", repo=repo)
+        child = create_structure(code="C", name="C", structure_type="labo", repo=repo)
         rel = create_relation(
             parent_id=parent["id"],
             child_id=child["id"],
@@ -331,7 +337,7 @@ class TestDeleteRelation:
 
 class TestCreateNameForm:
     def test_creates_with_normalization(self, sa_sync_conn, repo):
-        s = create_structure(code="X", name="X", type="labo", repo=repo)
+        s = create_structure(code="X", name="X", structure_type="labo", repo=repo)
         form = create_name_form(structure_id=s["id"], form_text="École UCA", repo=repo)
         # Le form_text est normalisé
         assert form["form_text"] == "ecole uca"
@@ -339,7 +345,7 @@ class TestCreateNameForm:
         assert form["is_excluding"] is False
 
     def test_creates_with_context(self, sa_sync_conn, repo):
-        s = create_structure(code="X", name="X", type="labo", repo=repo)
+        s = create_structure(code="X", name="X", structure_type="labo", repo=repo)
         form = create_name_form(
             structure_id=s["id"],
             form_text="U999",
@@ -351,7 +357,7 @@ class TestCreateNameForm:
         assert form["requires_context_of"] == [s["id"]]
 
     def test_forces_word_boundary_for_short_form(self, sa_sync_conn, repo):
-        s = create_structure(code="X", name="X", type="labo", repo=repo)
+        s = create_structure(code="X", name="X", structure_type="labo", repo=repo)
         # Forme normalisée courte (<= 6) : is_word_boundary forcé même non demandé.
         form = create_name_form(structure_id=s["id"], form_text="INRAE", repo=repo)
         assert form["form_text"] == "inrae"
@@ -364,19 +370,19 @@ class TestUpdateNameForm:
             update_name_form(999999, fields={"form_text": "x"}, repo=repo)
 
     def test_raises_on_empty_fields(self, sa_sync_conn, repo):
-        s = create_structure(code="X", name="X", type="labo", repo=repo)
+        s = create_structure(code="X", name="X", structure_type="labo", repo=repo)
         form = create_name_form(structure_id=s["id"], form_text="x", repo=repo)
         with pytest.raises(ValidationError):
             update_name_form(form["id"], fields={}, repo=repo)
 
     def test_updates_form_text_with_normalization(self, sa_sync_conn, repo):
-        s = create_structure(code="X", name="X", type="labo", repo=repo)
+        s = create_structure(code="X", name="X", structure_type="labo", repo=repo)
         form = create_name_form(structure_id=s["id"], form_text="old", repo=repo)
         updated = update_name_form(form["id"], fields={"form_text": "École NEW"}, repo=repo)
         assert updated["form_text"] == "ecole new"
 
     def test_updates_flags(self, sa_sync_conn, repo):
-        s = create_structure(code="X", name="X", type="labo", repo=repo)
+        s = create_structure(code="X", name="X", structure_type="labo", repo=repo)
         form = create_name_form(structure_id=s["id"], form_text="x", repo=repo)
         updated = update_name_form(
             form["id"],
@@ -387,7 +393,7 @@ class TestUpdateNameForm:
         assert updated["is_excluding"] is True
 
     def test_forces_word_boundary_when_shortened(self, sa_sync_conn, repo):
-        s = create_structure(code="X", name="X", type="labo", repo=repo)
+        s = create_structure(code="X", name="X", structure_type="labo", repo=repo)
         form = create_name_form(structure_id=s["id"], form_text="Institut Recherche", repo=repo)
         assert form["is_word_boundary"] is False  # forme longue
         updated = update_name_form(form["id"], fields={"form_text": "IGCNC"}, repo=repo)
@@ -399,7 +405,7 @@ class TestUpdateNameForm:
         Le forçage lit le form_text effectif (celui en base si le payload ne le change pas),
         pas seulement le texte fourni ; l'invariant tient sans dépendre de la CHECK DB.
         """
-        s = create_structure(code="X", name="X", type="labo", repo=repo)
+        s = create_structure(code="X", name="X", structure_type="labo", repo=repo)
         form = create_name_form(structure_id=s["id"], form_text="INRAE", repo=repo)
         assert form["is_word_boundary"] is True  # courte → forcé à la création
         updated = update_name_form(form["id"], fields={"is_word_boundary": False}, repo=repo)
@@ -412,7 +418,7 @@ class TestDeleteNameForm:
             delete_name_form(999999, repo=repo)
 
     def test_deletes_existing(self, sa_sync_conn, repo):
-        s = create_structure(code="X", name="X", type="labo", repo=repo)
+        s = create_structure(code="X", name="X", structure_type="labo", repo=repo)
         form = create_name_form(structure_id=s["id"], form_text="x", repo=repo)
         delete_name_form(form["id"], repo=repo)
         result = sa_sync_conn.execute(

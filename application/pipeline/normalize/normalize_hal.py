@@ -62,8 +62,7 @@ def get_title(doc: dict) -> str:
         return titles[0]
     if isinstance(titles, str):
         return titles
-    label = doc.get("label_s", "")
-    return label
+    return doc.get("label_s", "")
 
 
 # =============================================================
@@ -118,23 +117,23 @@ def extract_pub_metadata(doc: dict, journal_id: int | None) -> dict:
 
     embargo_until = active_embargo_until(doc.get("label_xml"), date.today())
 
-    return dict(
-        title=title,
-        pub_year=doc.get("producedDateY_i"),
-        doc_type=doc_type,
-        doi=clean_doi(as_str(doc.get("doiId_s"))),
-        nnt=normalize_nnt(as_str(doc.get("nntId_s"))),
-        oa_status=derive_hal_oa_status(
+    return {
+        "title": title,
+        "pub_year": doc.get("producedDateY_i"),
+        "doc_type": doc_type,
+        "doi": clean_doi(as_str(doc.get("doiId_s"))),
+        "nnt": normalize_nnt(as_str(doc.get("nntId_s"))),
+        "oa_status": derive_hal_oa_status(
             doc.get("openAccess_bool"),
             doc.get("fileMain_s"),
             doc.get("linkExtId_s"),
             embargo_until,
         ),
-        embargo_until=embargo_until,
-        journal_id=journal_id,
-        container_title=container_title,
-        language=language,
-    )
+        "embargo_until": embargo_until,
+        "journal_id": journal_id,
+        "container_title": container_title,
+        "language": language,
+    }
 
 
 # =============================================================

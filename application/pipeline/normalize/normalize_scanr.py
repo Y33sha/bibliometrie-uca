@@ -101,17 +101,17 @@ def extract_pub_metadata(doc: dict, journal_id: int | None, scanr_id: str | None
     if not journal_id:
         source = doc.get("source") or {}
         container_title = source.get("title")
-    return dict(
-        title=title,
-        pub_year=doc.get("year"),
-        doc_type=doc.get("type"),
-        doi=extract_doi(doc),
-        nnt=extract_nnt_from_scanr_id(scanr_id),
-        oa_status=derive_scanr_oa_status(doc.get("isOa"), doc.get("oaEvidence")),
-        journal_id=journal_id,
-        container_title=container_title,
-        language=None,
-    )
+    return {
+        "title": title,
+        "pub_year": doc.get("year"),
+        "doc_type": doc.get("type"),
+        "doi": extract_doi(doc),
+        "nnt": extract_nnt_from_scanr_id(scanr_id),
+        "oa_status": derive_scanr_oa_status(doc.get("isOa"), doc.get("oaEvidence")),
+        "journal_id": journal_id,
+        "container_title": container_title,
+        "language": None,
+    }
 
 
 # =============================================================

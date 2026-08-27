@@ -9,9 +9,9 @@ from domain.persons.person import Person
 from domain.persons.person_identifier import PersonIdentifier
 
 
-def _make_person(id: int | None = 1) -> Person:
+def _make_person(person_id: int | None = 1) -> Person:
     return Person(
-        id=id,
+        id=person_id,
         last_name="Dupont",
         first_name="Jean",
         last_name_normalized="dupont",
@@ -51,18 +51,18 @@ class TestPersonConstruction:
 
 class TestCanMergeWith:
     def test_ok_when_no_distinct_rh(self):
-        a = _make_person(id=1)
-        b = _make_person(id=2)
+        a = _make_person(person_id=1)
+        b = _make_person(person_id=2)
         a.can_merge_with(b, has_distinct_rh=False)  # ne lève pas
 
     def test_raises_when_distinct_rh(self):
-        a = _make_person(id=1)
-        b = _make_person(id=2)
+        a = _make_person(person_id=1)
+        b = _make_person(person_id=2)
         with pytest.raises(ConflictError, match="fiche RH"):
             a.can_merge_with(b, has_distinct_rh=True)
 
     def test_error_message_contains_both_ids(self):
-        a = _make_person(id=42)
-        b = _make_person(id=17)
+        a = _make_person(person_id=42)
+        b = _make_person(person_id=17)
         with pytest.raises(ConflictError, match="#42.*#17"):
             a.can_merge_with(b, has_distinct_rh=True)

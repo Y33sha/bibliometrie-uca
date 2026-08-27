@@ -52,17 +52,17 @@ def extract_pub_metadata(these: dict) -> dict:
     doi = clean_doi(these.get("doi"))
     nnt_clean = normalize_nnt(these.get("nnt"))
 
-    return dict(
-        title=title,
-        pub_year=pub_year,
-        doc_type=derive_theses_doc_type(date_soutenance),
-        doi=doi,
-        nnt=nnt_clean,
-        oa_status="closed",
-        journal_id=None,
-        container_title=None,
-        language=None,
-    )
+    return {
+        "title": title,
+        "pub_year": pub_year,
+        "doc_type": derive_theses_doc_type(date_soutenance),
+        "doi": doi,
+        "nnt": nnt_clean,
+        "oa_status": "closed",
+        "journal_id": None,
+        "container_title": None,
+        "language": None,
+    }
 
 
 # =============================================================
