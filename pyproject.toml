@@ -180,6 +180,7 @@ select = [
     "B",      # flake8-bugbear (pièges courants)
     "C901",   # complexité cyclomatique
     "ASYNC",  # flake8-async : I/O bloquantes dans une async def, etc.
+    "S",      # flake8-bandit : 73 règles de sécurité (cf. per-file-ignores pour les exceptions)
 ]
 # RUF029 (async def sans await) serait utile mais reste en preview chez
 # ruff à ce jour : l'activer exigerait `preview = true` qui allume
@@ -203,11 +204,42 @@ max-complexity = 15
 combine-as-imports = true
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["E402"] # imports après setup de conftest
-"interfaces/cli/*" = ["E402", "C901"] # scripts one-shot, complexité tolérée
+# `S101` : une assertion est le propos d'un test. `S105`/`S106` : les fixtures posent des
+# identifiants factices, nommés pour ce qu'ils sont. `S608` : les tests composent du SQL de
+# jeu de données.
+"tests/*" = ["E402", "S101", "S105", "S106", "S108", "S324", "S608"]
+# `S608` signale toute interpolation dans une chaîne SQL. Ces couches ont pour métier de
+# composer des requêtes à partir de fragments pris dans des listes blanches écrites en dur
+# (tris, dimensions, colonnes) ; les valeurs issues d'une requête HTTP, elles, passent
+# toujours par des paramètres liés. La règle reste active partout ailleurs — un SQL composé
+# à la main dans `interfaces/api` ou `application` doit se signaler.
+"infrastructure/read_models/*" = ["S608"]
+"infrastructure/pipeline/*" = ["S608"]
+"infrastructure/repositories/*" = ["S608"]
+"alembic/versions/*" = ["S608"]
+"run_pipeline.py" = ["S608"]
+# Scripts de développement : `dump_schema` lance `pg_dump`, dont il compose lui-même les
+# arguments.
+"interfaces/cli/dev/*" = ["S603", "S607"]
+# Génération d'illustrations : la disposition d'un graphe tire au sort des positions.
+"docs/img/graphs/*" = ["S311"]
+# `S101` vise l'assertion qui porte une décision de sécurité, effacée par l'interpréteur en
+# mode optimisé. Ces couches s'en servent pour des invariants internes — cohérence d'un
+# registre au chargement, resserrement d'un type — sans qu'aucune autorisation en dépende.
+# La règle reste active sur `interfaces/` et `application/services/`, où une décision
+# d'autorisation pourrait naître.
+"domain/*" = ["S101"]
+"infrastructure/*" = ["S101"]
+# Lecture du TEI que HAL joint à ses notices, par l'analyseur XML de la bibliothèque
+# standard : il ne résout pas les entités externes, mais reste exposé à l'expansion
+# d'entités d'un document forgé. Le contenu vient d'un dépôt tiers, et l'analyse s'exécute
+# dans le conteneur du pipeline, dont la mémoire est plafonnée.
+"application/pipeline/normalize/normalize_hal.py" = ["S101", "S314"]
+"interfaces/cli/*" = ["E402", "C901", "S608"] # scripts one-shot, complexité tolérée
 "application/pipeline/*" = [
-    "C901",
-] # normalisation par source, nombreuses branches métier
+    "C901",  # normalisation par source, nombreuses branches métier
+    "S101",
+]
 "infrastructure/sources/*" = ["C901"] # idem pour les extracteurs
 "interfaces/api/routers/*" = ["E402"] # imports tardifs fréquents
 

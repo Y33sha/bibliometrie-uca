@@ -144,8 +144,8 @@ class PhaseExecutionRecorder:
         if self._conn is not None:
             try:
                 self._conn.close()
-            except Exception:
-                pass
+            except Exception as exc:
+                log.debug("Fermeture de la connexion d'observabilité échouée : %s", exc)
 
 
 def start_run(*, mode: str, sources: list[str]) -> PhaseExecutionRecorder:

@@ -186,7 +186,7 @@ class PgAuthorshipsBatchQueries(AuthorshipsBatchQueries):
         """Filtre sur `md5(raw_text)` pour exploiter l'index unique fonctionnel `addresses_raw_text_key (md5(raw_text))` — celui-là même qui sert le `ON CONFLICT` de `upsert_addresses_batch`. Un `WHERE raw_text = ANY(...)` déclencherait un seq scan de toute la table `addresses` à chaque document (coût fixe ~0,5 s par publication, indépendant du nombre d'auteurs). `md5()` PostgreSQL et `hashlib.md5` sur l'UTF-8 coïncident."""
         if not raw_texts:
             return {}
-        md5s = [hashlib.md5(t.encode()).hexdigest() for t in raw_texts]
+        md5s = [hashlib.md5(t.encode(), usedforsecurity=False).hexdigest() for t in raw_texts]
         rows = conn.execute(
             text("SELECT raw_text, id FROM addresses WHERE md5(raw_text) = ANY(:md5s)"),
             {"md5s": md5s},
