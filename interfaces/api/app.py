@@ -36,6 +36,7 @@ from interfaces.api.models.errors import (
     PublisherMergeBlockedResponse,
     RejectedPairsResponse,
 )
+from interfaces.api.route_path import route_path
 from interfaces.api.session import check_auth_config, read_session
 from interfaces.api.spa import BUILD_DIR, SPAStaticFiles
 
@@ -200,12 +201,14 @@ app.add_middleware(
 async def auth_middleware(request: Request, call_next: RequestResponseEndpoint) -> Response:
     """Protège les endpoints d'écriture (POST/PUT/DELETE/PATCH), hors authentification.
 
-    Journalise les actions admin réussies (statut < 400) sous le record structuré `admin_action`, qui porte l'utilisateur, la méthode, le chemin et le statut.
+    Journalise les actions admin réussies (statut < 400) sous le record structuré `admin_action`, qui porte l'utilisateur, la méthode, le chemin et le statut. Le chemin journalisé est celui du routage, indépendant du préfixe sous lequel l'application est servie : une même action porte le même nom d'un déploiement à l'autre.
     """
     if request.method not in ("POST", "PUT", "DELETE", "PATCH"):
         return await call_next(request)
 
-    path = request.scope["path"]
+    # Chemin privé du préfixe de déploiement : le routage apparie sur celui-là, l'exemption
+    # ci-dessous doit donc porter sur le même, sans quoi elle ne joue plus sous un sous-chemin.
+    path = route_path(request.scope)
     if path.startswith("/api/auth/"):
         return await call_next(request)
 
@@ -248,7 +251,7 @@ async def timing_middleware(request: Request, call_next: RequestResponseEndpoint
         "request_completed",
         extra={
             "method": request.method,
-            "path": request.scope.get("path", ""),
+            "path": route_path(request.scope),
             "status": response.status_code,
             "duration_ms": duration_ms,
         },
