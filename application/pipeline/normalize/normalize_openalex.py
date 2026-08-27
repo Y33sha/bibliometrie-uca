@@ -198,17 +198,17 @@ def extract_pub_metadata(
     oa_info = work.get("open_access") or {}
     container_title = primary.source_display_name if (primary and not journal_id) else None
 
-    return dict(
-        title=title,
-        pub_year=work.get("publication_year"),
-        doc_type=work.get("type"),
-        doi=clean_doi(work.get("doi")),
-        nnt=nnt,
-        oa_status=map_openalex_oa_status(oa_info.get("oa_status")),
-        journal_id=journal_id,
-        container_title=container_title,
-        language=work.get("language"),
-    )
+    return {
+        "title": title,
+        "pub_year": work.get("publication_year"),
+        "doc_type": work.get("type"),
+        "doi": clean_doi(work.get("doi")),
+        "nnt": nnt,
+        "oa_status": map_openalex_oa_status(oa_info.get("oa_status")),
+        "journal_id": journal_id,
+        "container_title": container_title,
+        "language": work.get("language"),
+    }
 
 
 # =============================================================

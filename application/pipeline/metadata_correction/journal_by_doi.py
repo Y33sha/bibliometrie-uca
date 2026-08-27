@@ -47,8 +47,7 @@ def compute_updates(
     rows: list[JournalByDoiRow], journal_prefixes: list[JournalDoiPrefixRow]
 ) -> list[JournalCorrectionUpdate]:
     """Calcule les rattachements à persister. Pur (hors I/O) : la décision vit dans `resolve_journal_by_doi`, ici on reconstruit le brut, applique la garde « manquant » et forme l'état cible."""
-    updates = [u for row in rows if (u := _compute_update(row, journal_prefixes)) is not None]
-    return updates
+    return [u for row in rows if (u := _compute_update(row, journal_prefixes)) is not None]
 
 
 @dataclass

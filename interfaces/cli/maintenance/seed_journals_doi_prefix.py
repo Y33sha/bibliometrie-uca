@@ -132,8 +132,7 @@ def lcp(strings: list[str]) -> str:
 def trim_trailing_variable(s: str) -> str:
     """Retire les caractères variables typiques en fin de LCP."""
     s = _TRIM_DIGITS_RE.sub("", s)
-    s = _TRIM_SEPARATORS_RE.sub("", s)
-    return s
+    return _TRIM_SEPARATORS_RE.sub("", s)
 
 
 def is_ambiguous(trimmed_lcp: str) -> bool:

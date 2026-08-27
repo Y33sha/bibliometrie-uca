@@ -19,14 +19,14 @@ def _create_staging(conn: Connection, source_id: str = "t-stg") -> int:
 
 
 def _row(staging_id: int, **overrides) -> SourcePublicationRow:
-    defaults = dict(
-        source="theses",
-        source_id="2023ABC001",
-        staging_id=staging_id,
-        title="Ma thèse",
-        pub_year=2023,
-        doc_type="thesis",
-    )
+    defaults = {
+        "source": "theses",
+        "source_id": "2023ABC001",
+        "staging_id": staging_id,
+        "title": "Ma thèse",
+        "pub_year": 2023,
+        "doc_type": "thesis",
+    }
     return SourcePublicationRow(**{**defaults, **overrides})
 
 

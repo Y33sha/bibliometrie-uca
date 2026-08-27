@@ -115,7 +115,8 @@ _INVERSE_PAIRS: tuple[tuple[RelationType, RelationType], ...] = (
 )
 _INVERSE_RELATIONS: dict[RelationType, RelationType] = {
     RelationType.IS_RELATED_TO: RelationType.IS_RELATED_TO,
-    **{a: b for a, b in _INVERSE_PAIRS},
+    # Les deux sens s'écrivent en parallèle, ce qui se lit mieux que `dict(_INVERSE_PAIRS)`.
+    **{a: b for a, b in _INVERSE_PAIRS},  # noqa: C416
     **{b: a for a, b in _INVERSE_PAIRS},
 }
 

@@ -11,27 +11,27 @@ from domain.source_publications.source_publication import SourcePublication
 
 
 def _sp(**overrides) -> SourcePublication:
-    defaults = dict(
-        id=1,
-        source="datacite",
-        source_id="s",
-        title="Titre",
-        pub_year=2020,
-        doc_type="dataset",
-        doi="10.parent/set",
-        journal_id=None,
-        container_title=None,
-        language=None,
-        oa_status=None,
-        is_retracted=None,
-        abstract=None,
-        countries=(),
-        keywords=(),
-        urls=(),
-        topics=None,
-        biblio=None,
-        meta=None,
-    )
+    defaults = {
+        "id": 1,
+        "source": "datacite",
+        "source_id": "s",
+        "title": "Titre",
+        "pub_year": 2020,
+        "doc_type": "dataset",
+        "doi": "10.parent/set",
+        "journal_id": None,
+        "container_title": None,
+        "language": None,
+        "oa_status": None,
+        "is_retracted": None,
+        "abstract": None,
+        "countries": (),
+        "keywords": (),
+        "urls": (),
+        "topics": None,
+        "biblio": None,
+        "meta": None,
+    }
     defaults.update(overrides)
     return SourcePublication(**defaults)  # type: ignore[arg-type]
 

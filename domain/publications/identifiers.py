@@ -95,8 +95,7 @@ def _normalize_doi_step(s: str) -> str:
     if s.endswith("(") and s.count("(") > s.count(")"):
         s = s[:-1]
     s = _DOI_PDF_SUFFIX.sub("", s)
-    s = _DOI_VERSION_SUFFIX.sub("", s)
-    return s
+    return _DOI_VERSION_SUFFIX.sub("", s)
 
 
 @dataclass(frozen=True)
@@ -155,7 +154,7 @@ def _is_hal_host(host: str) -> bool:
     CCSD historique (`*.archives-ouvertes.fr`, `*.ccsd.cnrs.fr`) et les portails white-label
     institutionnels reconnaissables au label `hal` (`hal.inrae.fr`, `www.hal.inserm.fr`…)."""
     host = host.lower()
-    if host.endswith(".archives-ouvertes.fr") or host.endswith(".ccsd.cnrs.fr"):
+    if host.endswith((".archives-ouvertes.fr", ".ccsd.cnrs.fr")):
         return True
     return any(label == "hal" or label.startswith("hal-") for label in host.split("."))
 
