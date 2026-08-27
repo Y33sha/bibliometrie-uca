@@ -19,6 +19,7 @@ dependencies = [
     "pydantic==2.12.5",          # requis par pydantic-settings et utilisé directement
     "pydantic-settings==2.14.2",  # ≥2.14.2 corrige GHSA-4xgf-cpjx-pc3j
     "pyahocorasick==2.2.0",      # automate Aho-Corasick : matching multi-formes des adresses (phase affiliations)
+    "defusedxml==0.7.1",         # lecture du TEI joint aux notices HAL : refuse les déclarations d'entités, que l'analyseur standard développe
 ]
 
 [project.optional-dependencies]
@@ -242,11 +243,7 @@ combine-as-imports = true
 # d'autorisation pourrait naître.
 "domain/*" = ["S101"]
 "infrastructure/*" = ["S101"]
-# Lecture du TEI que HAL joint à ses notices, par l'analyseur XML de la bibliothèque
-# standard : il ne résout pas les entités externes, mais reste exposé à l'expansion
-# d'entités d'un document forgé. Le contenu vient d'un dépôt tiers, et l'analyse s'exécute
-# dans le conteneur du pipeline, dont la mémoire est plafonnée.
-"application/pipeline/normalize/normalize_hal.py" = ["S101", "S314"]
+"application/pipeline/normalize/normalize_hal.py" = ["S101"]
 "interfaces/cli/*" = ["E402", "S608"] # scripts one-shot
 "application/pipeline/*" = ["S101"]
 "interfaces/api/routers/*" = ["E402"] # imports tardifs fréquents
