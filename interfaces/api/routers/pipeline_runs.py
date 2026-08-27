@@ -1,8 +1,8 @@
-"""Router du pipeline : historique des exécutions et logs de phase. Sert `/api/pipeline/*`.
+"""Router du pipeline : historique des exécutions. Sert `/api/pipeline/*`.
 
-Deux origines pour ces lectures. L'historique des runs est servi en base par `PipelineRunsQueries` ; il agrège les exécutions de phase par run, et le détail d'un run rend ses phases dans l'ordre, chacune avec son rendement et son écart de durée au médian historique, recalculés à la lecture. Le log d'une phase, lui, est découpé de `logs/pipeline.log` par `infrastructure.observability.phase_logs` : il ne passe par aucun port, le fichier étant la trace que l'orchestrateur laisse derrière lui.
+L'historique des runs est servi en base par `PipelineRunsQueries` : il agrège les exécutions de phase par run, et le détail d'un run rend ses phases dans l'ordre, chacune avec son rendement et son écart de durée au médian historique, recalculés à la lecture. Un échec ou un avertissement y figure sous forme de signal, avec son code et son message.
 
-Cette dernière lecture est la seule du projet à exiger une session : elle ne sert pas de la donnée bibliométrique mais la trace brute d'une exécution — messages d'erreur, chemins, volumétries —, dont le contenu n'a de sens que pour qui administre l'application.
+La trace brute d'une exécution vit dans le flux de sortie standard de l'orchestrateur, que le collecteur de l'hébergement recueille.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -13,9 +13,7 @@ from application.ports.read_models.pipeline_runs_queries import (
     RunDetail,
     RunSummary,
 )
-from infrastructure.observability.phase_logs import read_phase_log
-from interfaces.api.deps import pipeline_runs_queries, require_admin_user
-from interfaces.api.models import PipelinePhaseLog
+from interfaces.api.deps import pipeline_runs_queries
 
 router = APIRouter(prefix="/api/pipeline", tags=["pipeline"])
 
@@ -46,21 +44,3 @@ def get_run(
     if detail is None:
         raise HTTPException(status_code=404, detail="Run introuvable")
     return detail
-
-
-@router.get("/runs/{run_id}/phases/{phase}/log", response_model=PipelinePhaseLog)
-def phase_log(
-    run_id: int,
-    phase: str,
-    _admin_user: str = Depends(require_admin_user),
-) -> PipelinePhaseLog:
-    """Log d'une phase, découpé depuis `logs/pipeline.log`. Réservé à une session d'administration (401 sans elle).
-
-    `available` vaut vrai quand la section de la phase a été retrouvée ; sinon `content` est vide, que le fichier soit absent (`LOG_TO_FILE` inactif) ou que la section ait été purgée. D'une section longue, seule la fin est rendue, `omitted_lines` disant combien de lignes la précèdent.
-    """
-    excerpt = read_phase_log(run_id, phase)
-    if excerpt is None:
-        return PipelinePhaseLog(available=False, content="")
-    return PipelinePhaseLog(
-        available=True, content=excerpt.content, omitted_lines=excerpt.omitted_lines
-    )

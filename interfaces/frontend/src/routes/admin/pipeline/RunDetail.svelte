@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { api } from "$lib/api";
   import type { components } from "$lib/api/schema";
   import PhaseRibbon from "./PhaseRibbon.svelte";
   import { CELL_COLOR, fmtDate, fmtDuration, STATUS_LABEL, type Status } from "./helpers";
@@ -7,7 +6,6 @@
 
   type RunDetail = components["schemas"]["RunDetail"];
   type PhaseExecutionDetail = components["schemas"]["PhaseExecutionDetail"];
-  type PhaseLog = components["schemas"]["PipelinePhaseLog"];
 
   type TableBlock = { rows?: Record<string, string | number>[] };
   type Details = {
@@ -18,38 +16,17 @@
 
   let { detail, allPhases }: { detail: RunDetail; allPhases: string[] } = $props();
 
-  // Une ligne de phase déroule soit ses métriques (clic sur la ligne), soit son log (clic sur le bouton « log ») ; jamais les deux à la fois.
-  let expanded = $state<{ phase: string; kind: "metrics" | "log" } | null>(null);
-  let logs = $state<Record<string, PhaseLog | "loading">>({});
+  // Un clic sur une ligne de phase déroule ses métriques.
+  let expanded = $state<string | null>(null);
 
-  // Le composant est réutilisé d'un run à l'autre : réinitialiser l'ouverture et le cache de logs (indexé par phase, mais propre au run) au changement de run.
+  // Le composant est réutilisé d'un run à l'autre : refermer au changement de run.
   $effect(() => {
     detail.run_id;
     expanded = null;
-    logs = {};
   });
 
   function toggleMetrics(phase: string) {
-    expanded =
-      expanded?.phase === phase && expanded.kind === "metrics" ? null : { phase, kind: "metrics" };
-  }
-
-  async function toggleLog(phase: string) {
-    if (expanded?.phase === phase && expanded.kind === "log") {
-      expanded = null;
-      return;
-    }
-    expanded = { phase, kind: "log" };
-    if (logs[phase] === undefined) {
-      logs[phase] = "loading";
-      try {
-        logs[phase] = await api<PhaseLog>(
-          `/api/pipeline/runs/${detail.run_id}/phases/${phase}/log`,
-        );
-      } catch {
-        logs[phase] = { available: false, content: "", omitted_lines: 0 };
-      }
-    }
+    expanded = expanded === phase ? null : phase;
   }
 
   const statuses = $derived.by(() => {
@@ -156,14 +133,13 @@
       <th>Phase</th>
       <th class="num">Durée</th>
       <th>Statut</th>
-      <th></th>
     </tr>
   </thead>
   <tbody>
     {#each detail.phases as p (p.phase)}
       <tr
         class="phase-row"
-        class:open={expanded?.phase === p.phase}
+        class:open={expanded === p.phase}
         onclick={() => toggleMetrics(p.phase)}
       >
         <td class="ph-name">{p.phase}</td>
@@ -172,45 +148,12 @@
           <span class="dot" style="background:{CELL_COLOR[p.status as Status]}"></span>
           {STATUS_LABEL[p.status as Status]}
         </td>
-        <td class="log-cell">
-          <button
-            class="log-btn"
-            class:on={expanded?.phase === p.phase && expanded.kind === "log"}
-            onclick={(e) => {
-              e.stopPropagation();
-              toggleLog(p.phase);
-            }}>log</button
-          >
-        </td>
       </tr>
-      {#if expanded?.phase === p.phase && expanded.kind === "log"}
-        {@const entry = logs[p.phase]}
-        <tr class="expand-row">
-          <td colspan="4">
-            <div class="expand">
-              {#if entry === undefined || entry === "loading"}
-                <p class="log-status">Chargement du log…</p>
-              {:else if !entry.available}
-                <p class="log-status">
-                  Log indisponible (fichier logs/pipeline.log absent ou section purgée).
-                </p>
-              {:else}
-                {#if entry.omitted_lines}
-                  <p class="log-status">
-                    Fin de la phase ; les {entry.omitted_lines.toLocaleString("fr-FR")} lignes
-                    précédentes ne sont pas affichées.
-                  </p>
-                {/if}
-                <pre class="log-view">{entry.content}</pre>
-              {/if}
-            </div>
-          </td>
-        </tr>
-      {:else if expanded?.phase === p.phase}
+      {#if expanded === p.phase}
         {@const view = PHASE_VIEWS[p.phase]}
         {@const lines = summaryLines(view, detailSummary(p.details))}
         <tr class="expand-row">
-          <td colspan="4">
+          <td colspan="3">
             <div class="expand">
               {#if view?.lines}
                 {@const dsummary = detailSummary(p.details)}
@@ -470,50 +413,5 @@
     border: 1px solid;
     border-radius: 10px;
     font-size: 0.78rem;
-  }
-  .log-cell {
-    width: 1%;
-    text-align: right;
-    white-space: nowrap;
-  }
-  .log-btn {
-    padding: 1px 8px;
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    /* Fond blanc opaque : le bouton reste blanc même quand la ligne est survolée ou dépliée (le fond de survol de la ligne ne transparaît pas). */
-    background: var(--card);
-    color: var(--muted);
-    cursor: pointer;
-    font: inherit;
-    font-size: 0.75rem;
-    font-family: "JetBrains Mono", monospace;
-  }
-  .log-btn:hover {
-    color: var(--accent);
-    border-color: var(--accent);
-  }
-  .log-btn.on {
-    border-color: var(--accent);
-    color: var(--accent);
-  }
-  .log-status {
-    color: var(--muted);
-    font-size: 0.82rem;
-    margin: 0;
-  }
-  .log-view {
-    max-height: 420px;
-    overflow-y: auto;
-    margin: 0;
-    padding: 8px 10px;
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    font-family: "JetBrains Mono", monospace;
-    font-size: 0.75rem;
-    line-height: 1.45;
-    /* Largeur constante : les longues lignes wrappent à l'intérieur (indentation préservée), les tokens interminables (URLs) sont cassés, aucun débordement horizontal qui élargirait la colonne de détail. */
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
   }
 </style>
