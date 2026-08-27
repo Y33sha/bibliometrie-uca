@@ -216,7 +216,7 @@ def extract_pub_metadata(
 # =============================================================
 
 
-def insert_openalex_document(
+def insert_openalex_document(  # noqa: C901
     conn: Connection,
     queries: SourcePublicationQueries,
     work: dict,

@@ -247,12 +247,8 @@ combine-as-imports = true
 # d'entités d'un document forgé. Le contenu vient d'un dépôt tiers, et l'analyse s'exécute
 # dans le conteneur du pipeline, dont la mémoire est plafonnée.
 "application/pipeline/normalize/normalize_hal.py" = ["S101", "S314"]
-"interfaces/cli/*" = ["E402", "C901", "S608"] # scripts one-shot, complexité tolérée
-"application/pipeline/*" = [
-    "C901",  # normalisation par source, nombreuses branches métier
-    "S101",
-]
-"infrastructure/sources/*" = ["C901"] # idem pour les extracteurs
+"interfaces/cli/*" = ["E402", "S608"] # scripts one-shot
+"application/pipeline/*" = ["S101"]
 "interfaces/api/routers/*" = ["E402"] # imports tardifs fréquents
 
 # ----------------------------------------------------------------------

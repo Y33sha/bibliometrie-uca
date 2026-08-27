@@ -174,7 +174,7 @@ def _get_api_issn(dynamic: dict, issn_type: str = "issn") -> str | None:
     return None
 
 
-def extract_from_api(raw: dict, staging_doi: str | None) -> dict:
+def extract_from_api(raw: dict, staging_doi: str | None) -> dict:  # noqa: C901
     """Extrait un record structuré depuis le format API."""
     static = raw.get("static_data", {})
     dynamic = raw.get("dynamic_data", {})

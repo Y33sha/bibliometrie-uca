@@ -119,7 +119,7 @@ def extract_pub_metadata(doc: dict, journal_id: int | None, scanr_id: str | None
 # =============================================================
 
 
-def insert_scanr_document(
+def insert_scanr_document(  # noqa: C901
     conn: Connection,
     queries: SourcePublicationQueries,
     doc: dict,
