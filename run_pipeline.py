@@ -52,6 +52,7 @@ import asyncio
 import datetime
 import signal
 import sys
+import tempfile
 import time
 from collections.abc import Callable
 from pathlib import Path
@@ -831,9 +832,8 @@ def _run_enrich_journals_from_openalex() -> PhaseMetrics:
 
 
 # DOAJ : le dump CSV (source de vérité) est ré-importé au plus une fois tous les
-# N jours (DOAJ publie ~hebdo) ; le dump téléchargé est conservé dans data/doaj/.
+# N jours (DOAJ publie ~hebdo).
 _DOAJ_STALE_DAYS = 30
-_DOAJ_DUMP_PATH = Path(__file__).parent / "data" / "doaj" / "doaj_dump.csv"
 
 
 def _run_enrich_journals_from_doaj() -> PhaseMetrics:
@@ -861,16 +861,24 @@ def _run_enrich_journals_from_doaj() -> PhaseMetrics:
             )
             return PhaseMetrics(extras={"skipped": 1})
 
-        _DOAJ_DUMP_PATH.parent.mkdir(parents=True, exist_ok=True)
         # DOAJ : dump CSV public (aucun credential) ; l'email polite pool est facultatif.
         user_agent = build_user_agent(get_polite_pool_email_optional() or "")
-        fetch_doaj_dump(str(_DOAJ_DUMP_PATH), user_agent=user_agent, logger=log)
-        stats = run_import_doaj_dump(
-            conn,
-            log,
-            journal_repo=journal_repo,
-            rows=read_doaj_dump_rows(str(_DOAJ_DUMP_PATH)),
-        )
+        # Le dump transite par un fichier temporaire : le module CSV y lit les
+        # enregistrements que des sauts de ligne pourraient traverser, ce qu'une lecture
+        # du flux ligne à ligne ne saurait pas reconstituer. Le répertoire temporaire est
+        # le seul emplacement en écriture du conteneur (`tmpfs` sur `/tmp`).
+        with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as tmp:
+            dump_path = tmp.name
+        try:
+            fetch_doaj_dump(dump_path, user_agent=user_agent, logger=log)
+            stats = run_import_doaj_dump(
+                conn,
+                log,
+                journal_repo=journal_repo,
+                rows=read_doaj_dump_rows(dump_path),
+            )
+        finally:
+            Path(dump_path).unlink(missing_ok=True)
     finally:
         conn.close()
     log.info("✓ enrich_journals_from_doaj terminé en %.1fs", time.time() - t0)
