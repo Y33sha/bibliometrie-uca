@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [master]
 
+# Le jeton fourni aux jobs ne lit que le contenu du dépôt. Sans cette déclaration, il porte
+# les droits par défaut de l'organisation, qui peuvent inclure l'écriture : une action tierce
+# compromise s'en servirait pour pousser du code ou publier une release.
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -37,10 +43,10 @@ jobs:
       SESSION_SECRET: ci-placeholder-session-secret-of-sufficient-length
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: "3.12"
 
@@ -82,10 +88,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       - name: Set up Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: "22"
 
@@ -107,6 +113,14 @@ jobs:
         working-directory: interfaces/frontend
         run: npm audit --omit=dev --audit-level=moderate
 
+      # L'outillage de construction ne part pas dans le navigateur, mais c'est lui qui produit
+      # le bundle servi : une de ses dépendances compromise atteint l'application par la
+      # chaîne d'approvisionnement. Le signalement n'arrête pas l'intégration — l'outillage
+      # traîne des avis que ses auteurs ne corrigent pas toujours — mais il se voit.
+      - name: Vulnerability scan (arbre de construction, non bloquant)
+        working-directory: interfaces/frontend
+        run: npm audit --audit-level=moderate || true
+
       - name: Type check
         working-directory: interfaces/frontend
         run: npm run check
@@ -118,3 +132,26 @@ jobs:
       - name: Build
         working-directory: interfaces/frontend
         run: npm run build
+
+  image:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      # Construire l'image vérifie aussi que le `Dockerfile` tient : rien d'autre ne le fait.
+      - name: Build production image
+        run: docker build -t bibliometrie-uca:ci .
+
+      # `pip-audit` et `npm audit` couvrent les dépendances applicatives, jamais la couche
+      # système de l'image. `--ignore-unfixed` réserve l'échec aux failles pour lesquelles un
+      # correctif existe : celles-là se corrigent par la mise à jour des paquets que la
+      # construction applique, les autres n'ont pas de remède à opposer.
+      - name: Vulnerability scan (image de production)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: bibliometrie-uca:ci
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"

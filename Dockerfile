@@ -34,6 +34,14 @@ ENV ROOT_PATH=$ROOT_PATH
 
 WORKDIR /app
 
+# Correctifs de sécurité des paquets système : l'image de base est publiée à intervalles
+# espacés, et porte entre deux publications les failles corrigées depuis. La mise à jour les
+# applique à la construction ; l'analyse d'image de l'intégration continue vérifie qu'il n'en
+# reste aucune de gravité haute pour laquelle un correctif existe.
+RUN apt-get update \
+    && apt-get upgrade -y --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/*
+
 # Installer uv (utilisé pour `uv sync --frozen` qui installe
 # exactement les versions de uv.lock — mêmes versions que CI + dev).
 RUN pip install --no-cache-dir uv
