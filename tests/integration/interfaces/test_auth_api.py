@@ -63,3 +63,27 @@ class TestLogout:
         """La déconnexion ne garde rien : le middleware exempte `/api/auth/`."""
         r = client.post("/api/auth/logout")
         assert r.status_code == 200
+
+
+class TestDureeDeReponse:
+    """La vérification du mot de passe a lieu même quand le nom d'utilisateur ne correspond pas.
+
+    Elle coûte quelques centaines de millisecondes, là où comparer deux noms en coûte une fraction de microseconde : un refus immédiat désignerait un nom inconnu, et permettrait de trouver le nom du compte sans dépenser les tentatives que le plafond accorde.
+    """
+
+    def test_le_mot_de_passe_est_verifie_sur_un_nom_inconnu(self, client, monkeypatch):
+        appels = []
+        import interfaces.api.routers.auth as auth_module
+
+        monkeypatch.setattr(auth_module, "check_password", lambda mdp: appels.append(mdp) or False)
+        r = client.post("/api/auth/login", json={"username": "inconnu", "password": "x"})
+        assert r.status_code == 401
+        assert appels == ["x"]
+
+    def test_le_nom_est_compare_en_temps_constant(self):
+        """La comparaison passe par `hmac.compare_digest`, dont la durée ne dépend pas du nombre de caractères justes."""
+        import inspect
+
+        from interfaces.api.session import check_username
+
+        assert "compare_digest" in inspect.getsource(check_username)
