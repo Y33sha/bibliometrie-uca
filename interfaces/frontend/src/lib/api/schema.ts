@@ -2240,28 +2240,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/pipeline/runs/{run_id}/phases/{phase}/log": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Phase Log
-         * @description Log d'une phase, découpé depuis `logs/pipeline.log`. Réservé à une session d'administration (401 sans elle).
-         *
-         *     `available` vaut vrai quand la section de la phase a été retrouvée ; sinon `content` est vide, que le fichier soit absent (`LOG_TO_FILE` inactif) ou que la section ait été purgée. D'une section longue, seule la fin est rendue, `omitted_lines` disant combien de lignes la précèdent.
-         */
-        get: operations["phase_log_api_pipeline_runs__run_id__phases__phase__log_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/subjects": {
         parameters: {
             query?: never;
@@ -4144,25 +4122,6 @@ export interface components {
             };
             /** Duration S */
             duration_s: number;
-        };
-        /**
-         * PipelinePhaseLog
-         * @description Log d'une phase, découpé depuis logs/pipeline.log.
-         *
-         *     `available` est faux quand le fichier est absent (LOG_TO_FILE désactivé) ou quand la section de la phase est introuvable (log purgé) ; `content` est alors vide.
-         *
-         *     `content` porte la fin de la section, la plus parlante sur la façon dont la phase s'est terminée. `omitted_lines` compte celles qui la précèdent sans être rendues, et vaut zéro quand la section tient entière : une troncature s'annonce, elle ne se devine pas.
-         */
-        PipelinePhaseLog: {
-            /** Available */
-            available: boolean;
-            /** Content */
-            content: string;
-            /**
-             * Omitted Lines
-             * @default 0
-             */
-            omitted_lines: number;
         };
         /**
          * PivotDimensionOut
@@ -8855,38 +8814,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RunDetail"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    phase_log_api_pipeline_runs__run_id__phases__phase__log_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                run_id: number;
-                phase: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PipelinePhaseLog"];
                 };
             };
             /** @description Validation Error */

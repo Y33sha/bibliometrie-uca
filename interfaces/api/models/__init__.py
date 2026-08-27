@@ -60,9 +60,6 @@ from interfaces.api.models.persons import (
     UpdateNameFormStatus,
     UpdatePersonName,
 )
-from interfaces.api.models.pipeline import (
-    PipelinePhaseLog,
-)
 from interfaces.api.models.publications import (
     MarkDistinctPublications,
     MergePublications,
@@ -113,7 +110,6 @@ __all__ = [
     "OrphanAssignResponse",
     "OrphanBatchAssignResponse",
     "PerimeterCreate",
-    "PipelinePhaseLog",
     "PublisherMergeBlockedResponse",
     "ReassignIdentifier",
     "RejectPerson",

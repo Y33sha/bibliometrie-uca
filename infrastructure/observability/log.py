@@ -16,7 +16,7 @@ from pathlib import Path
 
 from infrastructure import PROJECT_ROOT as _PROJECT_ROOT
 
-# Marqueurs délimitant runs et phases dans le flux de log : `run_pipeline` les émet, `phase_logs` les parse pour découper le log par phase.
+# Marqueurs délimitant runs et phases dans le flux de log, émis par `run_pipeline` : ils situent une ligne dans son run et sa phase pour qui lit le flux.
 RUN_MARKER = "Run pipeline #"
 PHASE_MARKER = "PHASE : "
 RUN_END_MARKER = "PIPELINE TERMINÉ"
