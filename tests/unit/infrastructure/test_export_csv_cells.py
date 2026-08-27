@@ -44,7 +44,7 @@ class TestCsvWriter:
         assert list(csv.reader(io.StringIO(line))) == [["'=cmd|' /C calc'!A0", "2024", "Nature"]]
 
     def test_returns_the_line_instead_of_accumulating_it(self):
-        """Le writer rend chaque ligne au lieu de l'écrire dans un tampon : c'est ce qui permet de servir l'export en flux, sans tenir le fichier entier en mémoire."""
+        """Le writer rend chaque ligne formatée, ce qui permet de servir l'export en flux."""
         writer = _CsvWriter()
         assert writer.line(["a"]) == "a\r\n"
         assert writer.line(["b"]) == "b\r\n"

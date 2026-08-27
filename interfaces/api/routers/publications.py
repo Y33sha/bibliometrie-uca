@@ -152,9 +152,9 @@ def publications_entity_facet(
 def _csv_stream(chunks: Iterator[str], *, filename: str) -> StreamingResponse:
     """Emballe les blocs d'un export en réponse de téléchargement, envoyés au fil de leur production.
 
-    Le fichier n'est jamais tenu entier en mémoire : composer un export de quelques dizaines de milliers de lignes coûtait une quinzaine de fois son poids, quand l'envoi en flux n'y ajoute qu'un bloc à la fois.
+    La mémoire tenue pendant l'envoi vaut un bloc à la fois.
 
-    La contrepartie tient au protocole : le statut et les en-têtes partent avant la première ligne, si bien qu'une erreur survenant en cours d'envoi tronque le fichier au lieu de le refuser. Les lignes étant déjà en mémoire à ce stade — la requête s'exécute avant que la réponse ne commence —, il ne reste guère qu'un client qui raccroche pour interrompre l'envoi, et un fichier tronqué se voit.
+    Le statut et les en-têtes partent avec le premier bloc : une erreur survenant pendant l'envoi ferme la connexion sur un fichier tronqué, sous un statut 200. Les lignes sont en mémoire à ce stade, la requête s'étant exécutée avant que la réponse ne commence.
     """
     return StreamingResponse(
         chunks,

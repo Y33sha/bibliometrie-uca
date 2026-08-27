@@ -66,10 +66,11 @@ USER appuser
 
 EXPOSE 8000
 
-# `--root-path` n'est délibérément pas passé au serveur : il **ajoute** le préfixe au chemin
-# reçu, en supposant qu'un reverse-proxy l'ait retiré. Sur un proxy qui le transmet tel quel,
-# le chemin se retrouve doublé et ne correspond plus à aucune route. L'application porte
-# elle-même le préfixe (variable `ROOT_PATH`, lue à sa construction), et le routage l'ôte du
-# chemin s'il y est, le laisse intact s'il n'y est pas : les deux sortes de proxy fonctionnent
-# alors sans réglage supplémentaire.
+# L'application porte elle-même le préfixe de déploiement (variable `ROOT_PATH`, lue à sa
+# construction), et son routage l'ôte du chemin quand il y est, le laisse intact quand il est
+# absent : les deux sortes de reverse-proxy, celui qui retire le préfixe et celui qui le
+# transmet, fonctionnent sans réglage supplémentaire.
+#
+# Le serveur ASGI, lui, reçoit son adresse et son port, rien d'autre. `--root-path` ajoute le
+# préfixe au chemin reçu, ce qui le doublerait derrière un proxy qui le transmet.
 CMD uvicorn interfaces.api.app:app --host 0.0.0.0 --port 8000

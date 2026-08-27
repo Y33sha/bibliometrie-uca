@@ -1,6 +1,6 @@
 """Identités de connexion : chaque usage exige la sienne, et refuse de se replier sur l'autre.
 
-Non-régression : `DB_OWNER_USER` n'est plus exigé par les settings, pour qu'un processus qui ne sert que l'API n'ait pas à porter le mot de passe du propriétaire du schéma. L'exigence tient donc au point d'usage, symétriquement à celle qui pesait déjà sur l'identité restreinte.
+L'API se connecte sous le rôle restreint ; migrations, pipeline et scripts de maintenance sous le propriétaire du schéma. Chaque exigence tient au point d'usage, de sorte qu'un processus porte les seuls identifiants qu'il exerce.
 """
 
 import pytest

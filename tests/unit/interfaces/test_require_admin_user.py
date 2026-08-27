@@ -17,7 +17,7 @@ def _request(cookie: str | None = None) -> Request:
 
 @pytest.fixture
 def session_reader(monkeypatch):
-    """Remplace la lecture du jeton : seul `jeton-valide` porte un utilisateur."""
+    """Lecture de jeton simulée : seul `jeton-valide` porte un utilisateur."""
     monkeypatch.setattr(
         deps, "read_session", lambda token: "admin" if token == "jeton-valide" else None
     )

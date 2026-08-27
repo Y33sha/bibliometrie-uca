@@ -2,11 +2,11 @@
 
 Le serveur ASGI ne retire pas le préfixe du chemin : conformément à la spécification, il le laisse dans `scope["path"]` et signale à part, dans `scope["root_path"]`, la part qui relève du montage. C'est le routage qui l'ôte, juste avant d'apparier les routes — donc après les middlewares.
 
-Tout code qui décide sur le chemin avant le routage doit donc l'ôter lui-même. Le middleware d'authentification en dépend : il exempte la connexion des écritures gardées, et cette exemption ne joue plus si elle porte sur un chemin encore préfixé — auquel cas personne ne peut ouvrir de session, et l'administration devient inaccessible.
+Le middleware d'authentification décide sur le chemin, et exempte la connexion des écritures qu'il garde : cette exemption porte sur le chemin de routage, celui privé du préfixe. La connexion en dépend, et l'ouverture de toute session avec elle.
 
-Deux sortes de reverse-proxy existent : celui qui retire le préfixe avant de transmettre, et celui qui le transmet tel quel. L'application fonctionne sous les deux — le routage ôte le préfixe s'il est là, laisse le chemin intact s'il n'y est pas. Ce que le serveur ne doit surtout pas faire, c'est ajouter le préfixe de son côté (`--root-path`) : le chemin se retrouverait doublé chez le second, et ne correspondrait plus à aucune route.
+Deux sortes de reverse-proxy existent : celui qui retire le préfixe avant de transmettre, et celui qui le transmet tel quel. L'application répond à l'identique sous les deux, le routage ôtant le préfixe quand il est là et laissant le chemin intact quand il est absent.
 
-Aucun autre test ne monte l'application sous un préfixe ; c'est ici qu'elle se vérifie.
+Ces tests sont les seuls à monter l'application sous un préfixe.
 """
 
 import pytest
@@ -30,7 +30,7 @@ def client_prefixe() -> TestClient:
 
 class TestConnexionSousPrefixe:
     def test_la_connexion_atteint_sa_route(self, client_prefixe):
-        """Non-régression : l'exemption d'authentification portait sur le chemin préfixé, qu'aucune requête ne présente jamais. La connexion était refusée par le middleware avant d'atteindre sa route, et aucune session ne pouvait plus s'ouvrir.
+        """La requête traverse le middleware qui garde les écritures et atteint la route de connexion.
 
         Le message distingue les deux refus : « Identifiants incorrects » vient de la route, « Non authentifié » du middleware.
         """

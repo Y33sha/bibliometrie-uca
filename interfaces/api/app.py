@@ -206,8 +206,7 @@ async def auth_middleware(request: Request, call_next: RequestResponseEndpoint) 
     if request.method not in ("POST", "PUT", "DELETE", "PATCH"):
         return await call_next(request)
 
-    # Chemin privé du préfixe de déploiement : le routage apparie sur celui-là, l'exemption
-    # ci-dessous doit donc porter sur le même, sans quoi elle ne joue plus sous un sous-chemin.
+    # Chemin privé du préfixe de déploiement, celui sur lequel le routage apparie ses routes.
     path = route_path(request.scope)
     if path.startswith("/api/auth/"):
         return await call_next(request)

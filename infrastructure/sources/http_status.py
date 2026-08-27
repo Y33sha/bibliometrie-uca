@@ -1,8 +1,8 @@
-"""Levée d'une erreur de statut sur une requête vers une source, sans exposer la requête.
+"""Levée d'une erreur de statut sur une requête vers une source.
 
-Plusieurs API de sources attendent leur identifiant en paramètre de requête : la clé OpenAlex, l'adresse annoncée à Unpaywall. Le message que compose `httpx.Response.raise_for_status` porte l'URL entière, paramètres compris, et l'appelant qui journalise l'erreur écrit l'identifiant en clair — un 403 sur une clé révoquée suffit.
+Plusieurs API de sources attendent leur identifiant en paramètre de requête : la clé OpenAlex, l'adresse annoncée à Unpaywall. Le message porte le seul statut, si bien qu'un appelant peut journaliser l'erreur telle quelle.
 
-Le message se réduit donc au statut. Rien n'est perdu : les adapters qui attrapent l'erreur lisent le statut sur la réponse et n'ont jamais regardé le message, et les trois endroits qui le journalisent écrivent déjà de quelle source et de quel lot il s'agit — le nom d'hôte n'y ajoute rien, et le chemin pas davantage, chaque appelant passant un `label` qui situe sa requête.
+Les adapters qui l'attrapent lisent le statut sur la réponse ; le contexte de la requête — source et lot — vient du `label` que chaque appelant passe au helper HTTP.
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ import httpx
 def raise_for_status(response: httpx.Response) -> None:
     """Lève `httpx.HTTPStatusError` si le statut n'est pas un succès.
 
-    Remplace la méthode d'httpx sur le chemin des requêtes vers les sources. Le type levé est le sien, que les adapters attrapent nommément et dont ils lisent `response.status_code` ; seul le message change.
+    Le type levé est celui d'httpx, que les adapters de sources attrapent nommément et dont ils lisent `response.status_code`. Le message porte le statut et sa phrase-raison.
     """
     if response.is_success:
         return
