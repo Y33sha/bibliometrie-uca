@@ -8,6 +8,8 @@ Politique de retry :
   - erreur réseau : retry ; l'épuisement compte un échec.
   - corps vide (si `retry_on_empty_body`) ou JSON invalide : retry.
 
+Les redirections ne sont pas suivies : les points d'entrée des sources répondent directement, et un statut 3xx est traité comme une erreur. L'hôte joint est donc celui qu'`api_params` désigne, et les en-têtes d'authentification ne quittent pas leur destinataire.
+
 Circuit-breaker : un `SourceCircuitBreaker` posé en ContextVar par la composition root court-circuite les requêtes quand la source cumule trop d'échecs consécutifs, et se remet à zéro au succès.
 """
 
@@ -93,7 +95,6 @@ def http_request_with_retry(
                 headers=headers,
                 auth=auth,
                 timeout=timeout,
-                follow_redirects=True,
             )
         except httpx.RequestError as e:
             last_error = e

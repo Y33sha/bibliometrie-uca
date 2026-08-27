@@ -37,6 +37,8 @@ def fetch_doaj_dump(
         url,
         headers={"User-Agent": user_agent},
         timeout=timeout,
+        # Le dump n'est pas servi par doaj.org : la requête est redirigée vers un lien
+        # signé, à durée limitée, sur le stockage objet d'Amazon Web Services.
         follow_redirects=True,
     ) as resp:
         raise_for_status(resp)
