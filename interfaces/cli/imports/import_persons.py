@@ -48,7 +48,7 @@ def parse_date(val: object) -> str | None:
             return (base + timedelta(days=n)).date().isoformat()
     except (ValueError, OverflowError):
         pass
-    log.warning(f"Date non parsable: '{val}'")
+    log.warning("Date non parsable: '%s'", val)
     return None
 
 
@@ -132,8 +132,8 @@ def read_csv_tsv(filepath: str) -> list[dict[str, str]]:
             headers = next(reader)
             col_map = resolve_columns(headers)
 
-        log.info(f"Colonnes détectées: {col_map}")
-        log.info(f"En-têtes: {headers}")
+        log.info("Colonnes détectées: %s", col_map)
+        log.info("En-têtes: %s", headers)
 
         if "last_name" not in col_map:
             raise ValueError(f"Colonne 'nom' introuvable. En-têtes: {headers}")
@@ -195,14 +195,14 @@ def import_persons(
         inserted += 1
         if inserted % 500 == 0:
             conn.commit()
-            log.info(f"  {inserted} personnes insérées…")
+            log.info("  %s personnes insérées…", inserted)
 
     conn.commit()
 
     if skipped:
-        log.warning(f"  {skipped} lignes ignorées (nom ou prénom manquant)")
+        log.warning("  %s lignes ignorées (nom ou prénom manquant)", skipped)
     if duplicates:
-        log.info(f"  {duplicates} doublons ignorés")
+        log.info("  %s doublons ignorés", duplicates)
 
     return inserted
 
@@ -220,39 +220,39 @@ def main() -> None:
     args = parser.parse_args()
 
     if not os.path.exists(args.file):
-        log.error(f"Fichier introuvable: {args.file}")
+        log.error("Fichier introuvable: %s", args.file)
         sys.exit(1)
 
-    log.info(f"=== Import personnes depuis {args.file} ===")
+    log.info("=== Import personnes depuis %s ===", args.file)
 
     records = read_csv_tsv(args.file)
-    log.info(f"  {len(records)} lignes lues")
+    log.info("  %s lignes lues", len(records))
 
     if not records:
         log.warning("Aucune donnée à importer.")
         return
 
     sample = records[0]
-    log.info(f"  Exemple: {sample}")
+    log.info("  Exemple: %s", sample)
 
     departments = {r.get("department_name", "") for r in records if r.get("department_name")}
     roles = {r.get("role_title", "") for r in records if r.get("role_title")}
-    log.info(f"  {len(departments)} départements distincts, {len(roles)} rôles distincts")
+    log.info("  %s départements distincts, %s rôles distincts", len(departments), len(roles))
 
     if args.dry_run:
         log.info("  (dry-run, pas d'insertion)")
         for d in sorted(departments):
             count = sum(1 for r in records if r.get("department_name") == d)
-            log.info(f"    {d}: {count}")
+            log.info("    %s: %s", d, count)
         return
 
     conn = get_sync_engine().connect()
     try:
         inserted = import_persons(conn, records, export_date=args.export_date)
-        log.info(f"\n=== Terminé : {inserted} personnes insérées ===")
+        log.info("\n=== Terminé : %s personnes insérées ===", inserted)
 
         total = conn.execute(text("SELECT COUNT(*) AS n FROM persons")).scalar_one()
-        log.info(f"  Total en base : {total} personnes")
+        log.info("  Total en base : %s personnes", total)
 
     finally:
         conn.close()

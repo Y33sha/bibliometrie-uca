@@ -50,7 +50,7 @@ def extract_union(
         data = adapter.fetch_page_cursor(query, fq, "*")
         total = int(data.get("response", {}).get("numFound", 0))
         metrics.add(total=total)
-        logger.info(f"{total} docs (dry-run)")
+        logger.info("%s docs (dry-run)", total)
         return metrics
 
     page_size = adapter.per_page()
@@ -73,7 +73,7 @@ def extract_union(
         if total_pages is None:
             num_found = int(resp.get("numFound", 0))
             total_pages = (num_found + page_size - 1) // page_size if num_found else 0
-            logger.info(f"{num_found} documents → ~{total_pages} pages de {page_size}")
+            logger.info("%s documents → ~%s pages de %s", num_found, total_pages, page_size)
 
         for doc in docs:
             hal_id = adapter.extract_id(doc)
@@ -95,9 +95,15 @@ def extract_union(
         if docs:
             page += 1
             logger.info(
-                f"page {page}/{total_pages} : {len(docs)} docs — "
-                f"{metrics.new} nouveaux, {metrics.updated} mis à jour, "
-                f"{metrics.unchanged} inchangés ({metrics.total}/{num_found})"
+                "page %s/%s : %s docs — %s nouveaux, %s mis à jour, %s inchangés (%s/%s)",
+                page,
+                total_pages,
+                len(docs),
+                metrics.new,
+                metrics.updated,
+                metrics.unchanged,
+                metrics.total,
+                num_found,
             )
 
         # Fin de pagination cursorMark : Solr renvoie le même marqueur que celui
@@ -126,11 +132,11 @@ class HalExtractor(SourceExtractor[HalExtractConfig, HalExtractAdapter]):
 
     def setup_logging(self, args: argparse.Namespace, config: HalExtractConfig) -> None:
         if args.since:
-            self.logger.info(f"Mode incrémental : documents soumis depuis {args.since}")
+            self.logger.info("Mode incrémental : documents soumis depuis %s", args.since)
         else:
             years = [args.year] if args.year else None  # recalculé dans extract_all
-            self.logger.info(f"Année(s) : {years or 'toutes (config)'}")
-        self.logger.info(f"Collections : {config.n_collections} structures du périmètre")
+            self.logger.info("Année(s) : %s", years or "toutes (config)")
+        self.logger.info("Collections : %s structures du périmètre", config.n_collections)
 
     def extract_all(self, args: argparse.Namespace, config: HalExtractConfig) -> PhaseMetrics:
         """Extraction de l'union des collections, périmètre temporel par périmètre.
@@ -171,8 +177,10 @@ class HalExtractor(SourceExtractor[HalExtractConfig, HalExtractAdapter]):
             metrics.merge(year_metrics)
             if not args.dry_run:
                 slog.info(
-                    f"terminé : {year_metrics.new} nouveaux, "
-                    f"{year_metrics.updated} mis à jour, {year_metrics.unchanged} inchangés"
+                    "terminé : %s nouveaux, %s mis à jour, %s inchangés",
+                    year_metrics.new,
+                    year_metrics.updated,
+                    year_metrics.unchanged,
                 )
         return metrics
 

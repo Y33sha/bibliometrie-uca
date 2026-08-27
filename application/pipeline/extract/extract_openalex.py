@@ -45,7 +45,7 @@ def extract_year(
 
     first_page = adapter.fetch_page(institution_ids, year=year, cursor=cursor, since=since)
     total_count = first_page["meta"]["count"]
-    logger.info(f"{total_count} works trouvés")
+    logger.info("%s works trouvés", total_count)
 
     if dry_run:
         return 0, 0, 0
@@ -70,9 +70,14 @@ def extract_year(
 
         total_fetched += len(results)
         logger.info(
-            f"page {page_num} : {len(results)} works — "
-            f"{counts.new} nouveaux, {counts.updated} mis à jour, {counts.unchanged} inchangés "
-            f"({total_fetched}/{total_count})"
+            "page %s : %s works — %s nouveaux, %s mis à jour, %s inchangés (%s/%s)",
+            page_num,
+            len(results),
+            counts.new,
+            counts.updated,
+            counts.unchanged,
+            total_fetched,
+            total_count,
         )
 
         next_cursor = data["meta"].get("next_cursor")
@@ -81,8 +86,12 @@ def extract_year(
         cursor = next_cursor
 
     logger.info(
-        f"terminé : {total_new} nouveaux, {total_updated} mis à jour, "
-        f"{total_unchanged} inchangés (sur {total_fetched} récupérés, {total_count} au total)"
+        "terminé : %s nouveaux, %s mis à jour, %s inchangés (sur %s récupérés, %s au total)",
+        total_new,
+        total_updated,
+        total_unchanged,
+        total_fetched,
+        total_count,
     )
     return total_new, total_updated, total_unchanged
 
@@ -104,16 +113,16 @@ class OpenalexExtractor(SourceExtractor[OpenalexExtractConfig, OpenalexExtractAd
 
     def setup_logging(self, args: argparse.Namespace, config: OpenalexExtractConfig) -> None:
         self.logger.info(
-            f"Institutions OpenAlex : {', '.join(config.institution_ids)} (lineage OR)"
+            "Institutions OpenAlex : %s (lineage OR)", ", ".join(config.institution_ids)
         )
         if args.since:
-            self.logger.info(f"Mode incrémental : documents modifiés depuis {args.since}")
+            self.logger.info("Mode incrémental : documents modifiés depuis %s", args.since)
 
     def extract_all(self, args: argparse.Namespace, config: OpenalexExtractConfig) -> PhaseMetrics:
         config_years = self._adapter.get_years(self.conn, start_year=args.start_year)
         years = [args.year] if args.year else config_years
         if not args.since:
-            self.logger.info(f"Années : {years}")
+            self.logger.info("Années : %s", years)
 
         stats = PhaseMetrics()
         if args.since:

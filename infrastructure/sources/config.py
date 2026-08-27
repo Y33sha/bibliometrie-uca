@@ -38,7 +38,7 @@ def _config_int(conn: Connection, key: str) -> int | None:
         except (ValueError, TypeError):
             pass
     if value is not None:
-        logger.warning(f"Valeur invalide pour {key}: {value}")
+        logger.warning("Valeur invalide pour %s: %s", key, value)
     return None
 
 
@@ -79,7 +79,7 @@ def get_hal_collections(conn: Connection) -> dict[str, str]:
             if rows:
                 return {r.hal_collection: r.label for r in rows}
     except SQLAlchemyError as e:
-        logger.warning(f"Impossible de dériver les collections HAL depuis le périmètre : {e}")
+        logger.warning("Impossible de dériver les collections HAL depuis le périmètre : %s", e)
 
     val = _get_from_db(conn, "hal_collections")
     if val and isinstance(val, dict):
@@ -124,7 +124,7 @@ def get_extraction_api_ids(conn: Connection, source: str) -> list[str]:
                 result.append(ids)
         return list(dict.fromkeys(result))  # dédupliqué, ordre préservé
     except SQLAlchemyError as e:
-        logger.warning(f"Impossible de dériver api_ids depuis le périmètre : {e}")
+        logger.warning("Impossible de dériver api_ids depuis le périmètre : %s", e)
         return []
 
 

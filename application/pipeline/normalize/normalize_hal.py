@@ -520,14 +520,14 @@ def process_work(
     title = get_title(doc)
     pub_year = doc.get("producedDateY_i")
     if not has_minimal_publication_metadata(title, pub_year):
-        logger.warning(f"Impossible d'insérer {hal_id} — titre ou année manquant")
+        logger.warning("Impossible d'insérer %s — titre ou année manquant", hal_id)
         staging_queries.mark_done(conn, staging_id)
         return False
 
     if not doc.get("authFullNameFormIDPersonIDIDHal_fs"):
         logger.error(
-            f"{hal_id} : champ authFullNameFormIDPersonIDIDHal_fs absent du payload "
-            "— doc HAL inexploitable, marqué traité"
+            "%s : champ authFullNameFormIDPersonIDIDHal_fs absent du payload — doc HAL inexploitable, marqué traité",
+            hal_id,
         )
         staging_queries.mark_done(conn, staging_id)
         return False

@@ -41,7 +41,7 @@ async def refetch(
 
     truncated = adapter.find_truncated(conn)
     total = len(truncated)
-    log.info(f"{total} works marqués tronqués (à vérifier/compléter)")
+    log.info("%s works marqués tronqués (à vérifier/compléter)", total)
 
     metrics = PhaseMetrics(seen=total)
     if not truncated:
@@ -72,8 +72,11 @@ async def refetch(
         processed += 1
         if processed % COMMIT_EVERY == 0 or processed == total:
             log.info(
-                f"  {processed}/{total} — {metrics.updated} mis à jour, "
-                f"{metrics.extras.get('already_complete', 0)} déjà complets"
+                "  %s/%s — %s mis à jour, %s déjà complets",
+                processed,
+                total,
+                metrics.updated,
+                metrics.extras.get("already_complete", 0),
             )
 
     await run_fetch_pool(

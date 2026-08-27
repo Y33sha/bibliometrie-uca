@@ -238,20 +238,20 @@ def process_work(
     # Le staging stocke le nœud JSON:API `data` ; les métadonnées sont dans `attributes`.
     attributes = raw.get("attributes")
     if not isinstance(attributes, dict):
-        logger.warning(f"DataCite staging {staging_id} sans attributes")
+        logger.warning("DataCite staging %s sans attributes", staging_id)
         staging_queries.mark_done(conn, staging_id)
         return False
 
     doi = clean_doi(attributes.get("doi")) or staging_row.doi
     if not doi:
-        logger.warning(f"DataCite staging {staging_id} sans DOI exploitable")
+        logger.warning("DataCite staging %s sans DOI exploitable", staging_id)
         staging_queries.mark_done(conn, staging_id)
         return False
 
     title = get_title(attributes)
     pub_year = extract_datacite_pub_year(attributes, max_year=today().year + 1)
     if not has_minimal_publication_metadata(title, pub_year):
-        logger.warning(f"DataCite {doi} : titre ou année manquant")
+        logger.warning("DataCite %s : titre ou année manquant", doi)
         staging_queries.mark_done(conn, staging_id)
         return False
     assert isinstance(title, str) and isinstance(pub_year, int)  # narrowing

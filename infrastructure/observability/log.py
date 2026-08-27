@@ -81,7 +81,7 @@ _STD_RECORD_ATTRS = {
 class JsonFormatter(logging.Formatter):
     """Formatter produisant une ligne JSON par record.
 
-    Champs : timestamp (ISO UTC), level, logger, message. Les `extra={...}` passés au logger sont fusionnés à la racine ; les exceptions (`exc_info`) sont formatées dans `exception`.
+    Champs : timestamp (ISO UTC), level, logger, message, et `template` quand le message est formaté à l'émission. Le gabarit reste identique d'une occurrence à l'autre là où le message porte les valeurs du moment : un collecteur y regroupe les lignes d'un même événement, les compte et les surveille sans lire le texte. Les `extra={...}` passés au logger sont fusionnés à la racine ; les exceptions (`exc_info`) sont formatées dans `exception`.
     """
 
     def format(self, record: logging.LogRecord) -> str:
@@ -91,6 +91,8 @@ class JsonFormatter(logging.Formatter):
             "logger": record.name,
             "message": record.getMessage(),
         }
+        if record.args:
+            data["template"] = str(record.msg)
         if record.exc_info:
             data["exception"] = self.formatException(record.exc_info)
         # Fusionne les champs `extra={...}` passés au logger

@@ -23,14 +23,14 @@ def run_populate(
     2. Sync de `in_perimeter` (BOOL) depuis cette matview.
     """
     t0 = time.perf_counter()
-    logger.info(f"Périmètre restreint : {len(perimeter_ids)} structures")
+    logger.info("Périmètre restreint : %s structures", len(perimeter_ids))
 
     logger.info("Refresh matview source_authorship_structures...")
     queries.refresh_source_authorship_structures(conn)
 
     added, removed = queries.sync_in_perimeter(conn, perimeter_ids=list(perimeter_ids))
-    logger.info(f"in_perimeter : +{added} / -{removed}")
+    logger.info("in_perimeter : +%s / -%s", added, removed)
 
     elapsed = time.perf_counter() - t0
-    logger.info(f"\nTerminé en {elapsed:.1f}s")
+    logger.info("\nTerminé en %.1fs", elapsed)
     # Commit laissé au caller (CLI commit, tests d'intégration restent dans leur transaction rollbackée).

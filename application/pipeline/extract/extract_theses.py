@@ -44,7 +44,7 @@ def extract_ppn(
 
     data = adapter.fetch_page(query, debut=0, nombre=1)
     total = data["totalHits"]
-    logger.info(f"{total} thèses")
+    logger.info("%s thèses", total)
 
     if dry_run or total == 0:
         return total, 0, 0, 0
@@ -82,8 +82,12 @@ def extract_ppn(
 
         if debut % 1000 == 0 or debut >= total:
             logger.info(
-                f"{debut}/{total} traités "
-                f"({inserted} nouveaux, {updated} mis à jour, {unchanged} inchangés)"
+                "%s/%s traités (%s nouveaux, %s mis à jour, %s inchangés)",
+                debut,
+                total,
+                inserted,
+                updated,
+                unchanged,
             )
 
     return total, inserted, updated, unchanged
@@ -103,9 +107,9 @@ class ThesesExtractor(SourceExtractor[ThesesExtractConfig, ThesesExtractAdapter]
         return config
 
     def setup_logging(self, args: argparse.Namespace, config: ThesesExtractConfig) -> None:
-        self.logger.info(f"Établissements PPN : {config.ppns}")
+        self.logger.info("Établissements PPN : %s", config.ppns)
         if args.year is not None:
-            self.logger.info(f"Filtre année (NNT préfixe) : {args.year}")
+            self.logger.info("Filtre année (NNT préfixe) : %s", args.year)
 
     def extract_all(self, args: argparse.Namespace, config: ThesesExtractConfig) -> PhaseMetrics:
         stats = PhaseMetrics()
@@ -124,7 +128,10 @@ class ThesesExtractor(SourceExtractor[ThesesExtractConfig, ThesesExtractAdapter]
             stats.add(new=inserted, updated=updated, unchanged=unchanged, total=total)
             if not args.dry_run:
                 slog.info(
-                    f"terminé : {inserted} nouveaux, {updated} mis à jour, {unchanged} inchangés"
+                    "terminé : %s nouveaux, %s mis à jour, %s inchangés",
+                    inserted,
+                    updated,
+                    unchanged,
                 )
         return stats
 

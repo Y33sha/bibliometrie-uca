@@ -37,4 +37,4 @@ class StepTimer:
         total = self.total()
         if total > self._threshold:
             breakdown = " | ".join(f"{k}:{v:.3f}s" for k, v in self._steps)
-            logger.info(f"  SLOW {doc_id} ({total:.3f}s) : {breakdown}")
+            logger.info("  SLOW %s (%.3fs) : %s", doc_id, total, breakdown)

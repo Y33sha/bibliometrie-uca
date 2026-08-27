@@ -35,7 +35,7 @@ def resolve_ra(doi: str, *, user_agent: str) -> str | None:
             "GET", url, headers=headers, timeout=15, max_retries=3, label=f"DOI {doi}"
         )
     except Exception as exc:
-        logger.warning(f"doi.org/ra {doi} : {exc!r}")
+        logger.warning("doi.org/ra %s : %r", doi, exc)
         return None
     if not isinstance(data, list) or not data:
         return None

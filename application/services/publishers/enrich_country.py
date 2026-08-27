@@ -77,7 +77,7 @@ def run_enrich_publishers_from_openalex(
     try:
         publishers = publisher_repo.find_needing_country_enrichment(limit=limit or None)
         total = len(publishers)
-        logger.info(f"{total} publishers à enrichir (avec openalex_id, manque country).")
+        logger.info("%s publishers à enrichir (avec openalex_id, manque country).", total)
 
         if total == 0:
             logger.info("Rien à faire.")
@@ -114,18 +114,23 @@ def run_enrich_publishers_from_openalex(
             if not dry_run:
                 conn.commit()
 
-            logger.info(f"  {min(i + BATCH_SIZE, total)}/{total} — {with_country} countries écrits")
+            logger.info(
+                "  %s/%s — %s countries écrits", min(i + BATCH_SIZE, total), total, with_country
+            )
 
         if not dry_run:
             conn.commit()
 
         logger.info(
-            f"Terminé : {updated}/{total} publishers mis à jour "
-            f"({with_country} countries, {no_response} sans réponse)."
+            "Terminé : %s/%s publishers mis à jour (%s countries, %s sans réponse).",
+            updated,
+            total,
+            with_country,
+            no_response,
         )
         if country_counter:
             distrib = ", ".join(f"{c}={n}" for c, n in country_counter.most_common(10))
-            logger.info(f"Top 10 countries posés : {distrib}")
+            logger.info("Top 10 countries posés : %s", distrib)
 
     except KeyboardInterrupt:
         # Ctrl+C peut frapper en plein execute (transaction avortée → `commit()`
@@ -136,5 +141,5 @@ def run_enrich_publishers_from_openalex(
         raise
     except Exception as e:
         conn.rollback()
-        logger.error(f"Erreur fatale : {e}")
+        logger.error("Erreur fatale : %s", e)
         raise

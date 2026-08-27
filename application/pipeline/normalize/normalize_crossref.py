@@ -305,14 +305,14 @@ def process_work(
     msg = raw  # CrossRef stocke directement le 'message'
     doi = get_doi(msg)
     if not doi:
-        logger.warning(f"CrossRef staging {staging_id} sans DOI exploitable")
+        logger.warning("CrossRef staging %s sans DOI exploitable", staging_id)
         staging_queries.mark_done(conn, staging_id)
         return False
 
     title = get_title(msg)
     pub_year = get_pub_year(msg)
     if not has_minimal_publication_metadata(title, pub_year):
-        logger.warning(f"CrossRef {doi} : titre ou année manquant")
+        logger.warning("CrossRef %s : titre ou année manquant", doi)
         staging_queries.mark_done(conn, staging_id)
         return False
     assert isinstance(title, str) and isinstance(pub_year, int)  # narrowing

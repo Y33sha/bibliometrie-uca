@@ -123,9 +123,9 @@ def run_resolution(
     """Recalcul complet idempotent des affiliations (commit par lot, d'où le `conn`)."""
     logger.info("Chargement des structures et formes...")
     forms = queries.load_name_forms(conn)
-    logger.info(f"  {len(forms)} formes chargées")
+    logger.info("  %s formes chargées", len(forms))
     matcher = AddressMatcher(forms)
-    logger.info(f"  {len(perimeter_ids)} structures dans le périmètre")
+    logger.info("  %s structures dans le périmètre", len(perimeter_ids))
 
     return process_addresses(conn, queries, matcher, perimeter_ids, logger)
 
@@ -178,21 +178,25 @@ def process_addresses(
         processed += len(rows)
         elapsed = time.perf_counter() - t_start
         logger.info(
-            f"  {processed} traitées "
-            f"({in_perimeter_count} in_perimeter, {affil_count} affiliations, "
-            f"{removed_count} obsolètes supprimés) "
-            f"— {processed / elapsed:.0f} addr/s"
+            "  %s traitées (%s in_perimeter, %s affiliations, %s obsolètes supprimés) "
+            "— %.0f addr/s",
+            processed,
+            in_perimeter_count,
+            affil_count,
+            removed_count,
+            processed / elapsed,
         )
 
     elapsed = time.perf_counter() - t_start
     if processed > 0:
-        logger.info(f"\n=== Terminé en {elapsed:.1f}s ===")
-        logger.info(f"  Adresses traitées    : {processed}")
+        logger.info("\n=== Terminé en %.1fs ===", elapsed)
+        logger.info("  Adresses traitées    : %s", processed)
         logger.info(
-            f"  in_perimeter         : {in_perimeter_count} "
-            f"({100 * in_perimeter_count / processed:.1f}%)"
+            "  in_perimeter         : %s (%.1f%%)",
+            in_perimeter_count,
+            100 * in_perimeter_count / processed,
         )
-        logger.info(f"  Affiliations créées  : {affil_count}")
-        logger.info(f"  Obsolètes supprimés  : {removed_count}")
+        logger.info("  Affiliations créées  : %s", affil_count)
+        logger.info("  Obsolètes supprimés  : %s", removed_count)
 
     return ResolutionStats(processed, in_perimeter_count, affil_count)

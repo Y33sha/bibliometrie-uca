@@ -38,7 +38,7 @@ def fetch_datacite_prefix(prefix: str, *, user_agent: str) -> tuple[str, str, st
             label=f"datacite prefix {cleaned}",
         )
     except Exception as exc:
-        logger.warning(f"api.datacite.org/prefixes/{cleaned} : {exc!r}")
+        logger.warning("api.datacite.org/prefixes/%s : %r", cleaned, exc)
         return None
     return _parse_datacite_prefix_payload(data)
 

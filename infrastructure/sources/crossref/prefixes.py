@@ -46,7 +46,7 @@ def fetch_crossref_prefix(prefix: str, *, user_agent: str) -> tuple[str, int | N
             "GET", url, headers=headers, timeout=15, max_retries=3, label=f"prefix {cleaned}"
         )
     except Exception as exc:
-        logger.warning(f"api.crossref.org/prefixes/{cleaned} : {exc!r}")
+        logger.warning("api.crossref.org/prefixes/%s : %r", cleaned, exc)
         return None
     msg = data.get("message") if isinstance(data, dict) else None
     if not isinstance(msg, dict):
