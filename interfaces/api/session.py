@@ -74,6 +74,11 @@ def read_session(token: str) -> str | None:
     return admin_user
 
 
+def check_username(username: str) -> bool:
+    """Confronte un nom d'utilisateur à celui configuré, en temps indépendant du nombre de caractères justes."""
+    return hmac.compare_digest(username.encode(), settings.admin_user.encode())
+
+
 def check_password(password: str) -> bool:
     """Confronte un mot de passe au hash bcrypt configuré. Sans hash configuré, ou si le hash est mal formé, aucune connexion n'aboutit.
 
