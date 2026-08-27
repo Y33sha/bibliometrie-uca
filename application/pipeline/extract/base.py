@@ -111,8 +111,8 @@ class SourceExtractor[ConfigT, AdapterT](ABC):
             args = argparse.Namespace(dry_run=False)
         self._breaker = breaker
         config = self.load_config(self.conn)
-        self.logger.info(f"=== Extraction {self.SOURCE} démarrée ===")
+        self.logger.info("=== Extraction %s démarrée ===", self.SOURCE)
         self.setup_logging(args, config)
         metrics = self.extract_all(args, config)
-        self.logger.info(f"=== Terminé : {metrics.as_summary()} ===")
+        self.logger.info("=== Terminé : %s ===", metrics.as_summary())
         return metrics

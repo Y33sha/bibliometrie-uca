@@ -49,8 +49,11 @@ async def run(
     stale_total = queries.count_stale_publications(conn, staleness_days=STALENESS_DAYS)
     before_dist = queries.count_publications_by_oa_status(conn)
     logger.info(
-        f"{total} publications à (re)vérifier sur Unpaywall "
-        f"(max {MAX_PER_RUN}, staleness {STALENESS_DAYS}j) — {stale_total} stale au total"
+        "%s publications à (re)vérifier sur Unpaywall (max %s, staleness %sj) — %s stale au total",
+        total,
+        MAX_PER_RUN,
+        STALENESS_DAYS,
+        stale_total,
     )
 
     progress = {"updated": 0, "skipped": 0, "not_found": 0}
@@ -135,13 +138,19 @@ async def run(
             await asyncio.to_thread(conn.commit)
             done = min(start + BATCH_SIZE, total)
             logger.info(
-                f"  {done}/{total} — {progress['updated']} mis à jour, "
-                f"{progress['skipped']} inchangés, {progress['not_found']} non trouvés"
+                "  %s/%s — %s mis à jour, %s inchangés, %s non trouvés",
+                done,
+                total,
+                progress["updated"],
+                progress["skipped"],
+                progress["not_found"],
             )
 
     logger.info(
-        f"Terminé : {progress['updated']} mis à jour, {progress['skipped']} inchangés, "
-        f"{progress['not_found']} non trouvés sur Unpaywall"
+        "Terminé : %s mis à jour, %s inchangés, %s non trouvés sur Unpaywall",
+        progress["updated"],
+        progress["skipped"],
+        progress["not_found"],
     )
 
     return _result()

@@ -296,3 +296,29 @@ class TestConfigureRootLogging:
         finally:
             for h in list(root.handlers):
                 root.removeHandler(h)
+
+
+class TestGabaritDuMessage:
+    """Le format JSON porte le gabarit du message à côté du message formaté.
+
+    Le gabarit reste identique d'une occurrence à l'autre d'un même événement, là où le message porte les valeurs du moment : c'est sur lui qu'un collecteur regroupe, compte et surveille.
+    """
+
+    def _rendu(self, msg, args):
+        import json
+        import logging
+
+        from infrastructure.observability.log import JsonFormatter
+
+        record = logging.LogRecord("extract:hal", logging.INFO, "x", 1, msg, args, None)
+        return json.loads(JsonFormatter().format(record))
+
+    def test_le_gabarit_accompagne_le_message_formate(self):
+        rendu = self._rendu("page %s/%s : %s docs", (3, 12, 100))
+        assert rendu["message"] == "page 3/12 : 100 docs"
+        assert rendu["template"] == "page %s/%s : %s docs"
+
+    def test_un_message_sans_argument_n_a_pas_de_gabarit(self):
+        rendu = self._rendu("Rien à faire.", ())
+        assert rendu["message"] == "Rien à faire."
+        assert "template" not in rendu

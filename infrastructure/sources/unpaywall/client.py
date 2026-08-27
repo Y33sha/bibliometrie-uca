@@ -50,10 +50,10 @@ async def fetch_oa_status(
         )
     except httpx.HTTPStatusError as e:
         if e.response.status_code != 404:
-            logger.warning(f"  HTTP {e.response.status_code} pour {doi}")
+            logger.warning("  HTTP %s pour %s", e.response.status_code, doi)
         return None
     except httpx.RequestError as e:
-        logger.warning(f"  Erreur réseau pour {doi}: {e}")
+        logger.warning("  Erreur réseau pour %s: %s", doi, e)
         return None
 
     raw_status = data.get("oa_status")

@@ -103,7 +103,12 @@ def http_request_with_retry(
                     raise SourceUnavailableError(breaker.source) from e
                 raise
             logger.warning(
-                f"Erreur réseau {label}: {e} — attente {wait}s (tentative {attempt + 1}/{max_retries})"
+                "Erreur réseau %s: %s — attente %ss (tentative %s/%s)",
+                label,
+                e,
+                wait,
+                attempt + 1,
+                max_retries,
             )
             time.sleep(wait)
             continue
@@ -126,14 +131,14 @@ def http_request_with_retry(
                 raise SourceUnavailableError(breaker.source)
             raise_for_status(resp)
         logger.warning(
-            f"{reason} {label} — attente {wait}s (tentative {attempt + 1}/{max_retries})"
+            "%s %s — attente %ss (tentative %s/%s)", reason, label, wait, attempt + 1, max_retries
         )
         time.sleep(wait)
 
     # Boucle épuisée sur corps vide ou JSON invalide répété.
     if breaker is not None:
         breaker.record_failure()
-    logger.error(f"Échec après {max_retries} tentatives {label}")
+    logger.error("Échec après %s tentatives %s", max_retries, label)
     if last_error:
         raise last_error
     return {}
@@ -180,7 +185,12 @@ async def http_request_with_retry_async(
                     breaker.record_failure()
                 raise
             logger.warning(
-                f"Erreur réseau {label}: {e} — attente {wait}s (tentative {attempt + 1}/{max_retries})"
+                "Erreur réseau %s: %s — attente %ss (tentative %s/%s)",
+                label,
+                e,
+                wait,
+                attempt + 1,
+                max_retries,
             )
             await asyncio.sleep(wait)
             continue
@@ -202,14 +212,14 @@ async def http_request_with_retry_async(
                 breaker.record_failure()
             raise_for_status(resp)
         logger.warning(
-            f"{reason} {label} — attente {wait}s (tentative {attempt + 1}/{max_retries})"
+            "%s %s — attente %ss (tentative %s/%s)", reason, label, wait, attempt + 1, max_retries
         )
         await asyncio.sleep(wait)
 
     # Boucle épuisée sur corps vide ou JSON invalide répété.
     if breaker is not None:
         breaker.record_failure()
-    logger.error(f"Échec après {max_retries} tentatives {label}")
+    logger.error("Échec après %s tentatives %s", max_retries, label)
     if last_error:
         raise last_error
     return {}

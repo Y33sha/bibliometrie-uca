@@ -71,7 +71,7 @@ async def _fetch_refs_async[Ref](
         counts["not_found"] += not_found
         counts["done"] += 1
         if counts["done"] % _COMMIT_EVERY == 0:
-            log.info(f"  {counts['done']}/{total} — {counts['fetched']} récupérés")
+            log.info("  %s/%s — %s récupérés", counts["done"], total, counts["fetched"])
 
     await run_fetch_pool(
         refs,

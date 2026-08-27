@@ -123,4 +123,4 @@ def propagate_countries_to_publications(
     pubs = country_queries.refresh_publications_countries_for_addresses(conn, address_ids)
 
     if docs or pubs:
-        logger.info(f"Propagation pays : {docs} docs source, {pubs} publications")
+        logger.info("Propagation pays : %s docs source, %s publications", docs, pubs)

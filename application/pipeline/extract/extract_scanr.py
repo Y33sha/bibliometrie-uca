@@ -46,7 +46,7 @@ def extract_year(
 
         if first_page:
             total = data["hits"]["total"]["value"]
-            logger.info(f"{total} publications")
+            logger.info("%s publications", total)
             if dry_run:
                 return total, 0, 0, 0
 
@@ -74,8 +74,12 @@ def extract_year(
         if seen % 500 == 0:
             conn.commit()
             logger.info(
-                f"{seen}/{total} traités "
-                f"({inserted} nouveaux, {updated} mis à jour, {unchanged} inchangés)"
+                "%s/%s traités (%s nouveaux, %s mis à jour, %s inchangés)",
+                seen,
+                total,
+                inserted,
+                updated,
+                unchanged,
             )
 
     conn.commit()
@@ -98,12 +102,12 @@ class ScanrExtractor(SourceExtractor[ScanrExtractConfig, ScanrExtractAdapter]):
         return config
 
     def setup_logging(self, args: argparse.Namespace, config: ScanrExtractConfig) -> None:
-        self.logger.info(f"Structures : {len(config.affiliation_ids)}")
+        self.logger.info("Structures : %s", len(config.affiliation_ids))
 
     def extract_all(self, args: argparse.Namespace, config: ScanrExtractConfig) -> PhaseMetrics:
         config_years = self._adapter.get_years(self.conn, start_year=args.start_year)
         years = [args.year] if args.year else config_years
-        self.logger.info(f"Années : {years}")
+        self.logger.info("Années : %s", years)
         stats = PhaseMetrics()
         for year in years:
             if self._stop_on_tripped("années restantes sautées"):
@@ -118,7 +122,9 @@ class ScanrExtractor(SourceExtractor[ScanrExtractConfig, ScanrExtractAdapter]):
                 dry_run=args.dry_run,
             )
             stats.add(new=inserted, updated=updated, unchanged=unchanged, total=total)
-            slog.info(f"terminé : {inserted} nouveaux, {updated} mis à jour, {unchanged} inchangés")
+            slog.info(
+                "terminé : %s nouveaux, %s mis à jour, %s inchangés", inserted, updated, unchanged
+            )
         return stats
 
 

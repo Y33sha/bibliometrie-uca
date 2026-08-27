@@ -19,7 +19,7 @@ def refresh(conn: Connection, queries: CountryQueries, logger: logging.Logger) -
 
     # Étape 1 : source_publications.countries (documents dont un source_authorship est dirty)
     sp_updated = queries.refresh_address_source_countries(conn)
-    logger.info(f"source_publications.countries : {sp_updated} mis à jour")
+    logger.info("source_publications.countries : %s mis à jour", sp_updated)
 
     # Étape 2 : publications.countries (dont un source_publication a un source_authorship dirty)
     updated = queries.refresh_publication_countries(conn)
@@ -28,5 +28,5 @@ def refresh(conn: Connection, queries: CountryQueries, logger: logging.Logger) -
     queries.clear_countries_dirty(conn)
 
     elapsed = time.perf_counter() - t0
-    logger.info(f"{updated} publications mises à jour en {elapsed:.1f}s")
+    logger.info("%s publications mises à jour en %.1fs", updated, elapsed)
     return updated

@@ -228,7 +228,7 @@ def process_work(
 
     title = these.get("titrePrincipal")
     if not title:
-        logger.warning(f"Thèse {theses_id} sans titre — ignorée")
+        logger.warning("Thèse %s sans titre — ignorée", theses_id)
         staging_queries.mark_done(conn, staging_id)
         return False
 

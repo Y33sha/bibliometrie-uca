@@ -38,7 +38,7 @@ def extract_year(
     """Extrait toutes les publications d'une année.
 
     Retourne `(new, updated, unchanged)`."""
-    logger.info(f"requête : {adapter.build_query(year, affiliations)}")
+    logger.info("requête : %s", adapter.build_query(year, affiliations))
 
     data = adapter.fetch_page(year, 1, affiliations)
     if not data:
@@ -46,7 +46,7 @@ def extract_year(
         return 0, 0, 0
 
     total_count = adapter.get_records_found(data)
-    logger.info(f"{total_count} records trouvés")
+    logger.info("%s records trouvés", total_count)
 
     if dry_run or total_count == 0:
         return 0, 0, 0
@@ -66,10 +66,10 @@ def extract_year(
         if not records:
             consecutive_failures += 1
             if consecutive_failures >= 3:
-                logger.error(f"3 pages vides consécutives à firstRecord={first_record}, arrêt")
+                logger.error("3 pages vides consécutives à firstRecord=%s, arrêt", first_record)
                 break
             logger.warning(
-                f"Page vide à firstRecord={first_record}, nouvelle tentative après pause..."
+                "Page vide à firstRecord=%s, nouvelle tentative après pause...", first_record
             )
             time.sleep(5)
             continue
@@ -85,28 +85,36 @@ def extract_year(
             total_unchanged += counts.unchanged
 
         logger.info(
-            f"page {page_num} : {len(records)} records, "
-            f"{counts.new} nouveaux, {counts.updated} mis à jour, {counts.unchanged} inchangés "
-            f"({min(first_record + len(records) - 1, total_count)}/{total_count})"
+            "page %s : %s records, %s nouveaux, %s mis à jour, %s inchangés (%s/%s)",
+            page_num,
+            len(records),
+            counts.new,
+            counts.updated,
+            counts.unchanged,
+            min(first_record + len(records) - 1, total_count),
+            total_count,
         )
 
         first_record += len(records)
 
         # Pause longue toutes les N pages pour laisser l'API souffler
         if page_num % _BREATHER_EVERY == 0 and first_record <= total_count:
-            logger.info(f"pause de {_BREATHER_SECS}s (toutes les {_BREATHER_EVERY} pages)…")
+            logger.info("pause de %ss (toutes les %s pages)…", _BREATHER_SECS, _BREATHER_EVERY)
             time.sleep(_BREATHER_SECS)
 
         if first_record > _WOS_FIRST_RECORD_LIMIT:
             logger.warning(
-                f"Limite API atteinte ({_WOS_FIRST_RECORD_LIMIT} records). "
-                "Réduire la requête si des résultats manquent."
+                "Limite API atteinte (%s records). Réduire la requête si des résultats manquent.",
+                _WOS_FIRST_RECORD_LIMIT,
             )
             break
 
     logger.info(
-        f"terminé : {total_new} nouveaux, {total_updated} mis à jour, "
-        f"{total_unchanged} inchangés sur {total_count} trouvés"
+        "terminé : %s nouveaux, %s mis à jour, %s inchangés sur %s trouvés",
+        total_new,
+        total_updated,
+        total_unchanged,
+        total_count,
     )
     return total_new, total_updated, total_unchanged
 
@@ -127,19 +135,19 @@ class WosExtractor(SourceExtractor[WosExtractConfig, WosExtractAdapter]):
         return config
 
     def setup_logging(self, args: argparse.Namespace, config: WosExtractConfig) -> None:
-        self.logger.info(f"Affiliations : {config.affiliations}")
+        self.logger.info("Affiliations : %s", config.affiliations)
         try:
             remaining = self._adapter.check_quota()
         except Exception as e:
-            self.logger.warning(f"Impossible de vérifier le quota : {e}")
+            self.logger.warning("Impossible de vérifier le quota : %s", e)
             return
         if remaining:
-            self.logger.info(f"Quota annuel restant : {remaining} records")
+            self.logger.info("Quota annuel restant : %s records", remaining)
 
     def extract_all(self, args: argparse.Namespace, config: WosExtractConfig) -> PhaseMetrics:
         config_years = self._adapter.get_years(self.conn, start_year=args.start_year)
         years = [args.year] if args.year else config_years
-        self.logger.info(f"Années : {years}")
+        self.logger.info("Années : %s", years)
 
         stats = PhaseMetrics()
         for i, year in enumerate(years):
@@ -157,7 +165,7 @@ class WosExtractor(SourceExtractor[WosExtractConfig, WosExtractAdapter]):
                 )
                 stats.add(new=new, updated=updated, unchanged=unchanged)
             except Exception as e:
-                slog.error(f"erreur : {e} — passage à la suivante")
+                slog.error("erreur : %s — passage à la suivante", e)
             # Pas de pause si le breaker vient de tripper : la boucle s'arrête au tour suivant.
             if i < len(years) - 1 and not self._breaker_tripped():
                 self.logger.info("Pause de 30s avant l'année suivante...")
