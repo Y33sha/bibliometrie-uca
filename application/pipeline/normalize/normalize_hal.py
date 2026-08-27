@@ -24,6 +24,7 @@ from application.ports.pipeline.publishers import PublisherFindOrCreateQueries
 from application.ports.repositories.publication_repository import PublicationRepository
 from application.services.journals.core import find_or_create_journal
 from application.services.publishers.core import find_or_create_publisher
+from domain.dates import today
 from domain.persons.identifiers import (
     compact_identifiers,
     mark_shared_identifiers_dubious,
@@ -115,7 +116,7 @@ def extract_pub_metadata(doc: dict, journal_id: int | None) -> dict:
     if not journal_id:
         container_title = as_str(doc.get("bookTitle_s")) or as_str(doc.get("conferenceTitle_s"))
 
-    embargo_until = active_embargo_until(doc.get("label_xml"), date.today())
+    embargo_until = active_embargo_until(doc.get("label_xml"), today())
 
     return {
         "title": title,

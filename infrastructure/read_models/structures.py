@@ -1,6 +1,5 @@
 """Query services pour /api/structures/* (structures et leurs formes de nom)."""
 
-import datetime
 from typing import Any
 
 from sqlalchemy import Connection, text
@@ -21,6 +20,7 @@ from application.ports.read_models.structures_queries import (
 )
 from application.ports.read_models.subjects_queries import SubjectFrequency
 from domain.countries import NON_INTERNATIONAL_COUNTRY_CODES
+from domain.dates import today
 from domain.publications.doc_types import DocType
 from domain.structures.relations import StructureRelationType
 from infrastructure.read_models.filters import OA_DASHBOARD_COLS_SQL, entity_subjects_sql
@@ -279,7 +279,7 @@ class PgStructuresQueries(StructuresQueries):
 
     def get_structure_dashboard(self, structure_id: int) -> StructureDashboardResponse:
         """Agrégats d'une structure : publications par année sur sept ans, répartition des statuts d'accès ouvert, part de collaboration internationale et pays les plus fréquents."""
-        current_year = datetime.date.today().year
+        current_year = today().year
 
         pubs_year_rows = self._conn.execute(
             text(f"""
