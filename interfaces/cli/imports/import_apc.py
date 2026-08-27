@@ -1,6 +1,8 @@
 # STATUS: recurring (imports)
 """Importe les données de paiement APC (frais de publication) depuis des fichiers CSV vers la table `apc_payments`.
 
+La colonne `institution` désigne l'établissement **payeur**, qui est le plus souvent un organisme tiers cofinançant une copublication — CNRS, INSERM, INRAE et d'autres. Les paiements de l'université elle-même y sont minoritaires ; ce sont eux, et eux seuls, que le jeu de données Open APC recense (cf. `import_openapc`).
+
 Usage :
     python -m interfaces.cli.imports.import_apc
 """

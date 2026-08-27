@@ -21,12 +21,16 @@ La FK sur la table `persons_rh` permet:
 Données datées du 11/03/2026.
 
 Fichier CSV importé via `python -m interfaces.cli.imports.import_apc` → table `apc_payments`.
-- Contient : DOI, montant en €, éditeur, labo payeur, année
+- Contient : DOI, montant en €, éditeur, établissement payeur, labo, année
 - Rattaché aux publications par DOI et aux structures par nom
+
+**La colonne `institution` désigne le payeur, pas l'université.** Cette extraction est une enquête nationale filtrée sur les publications de la base : elle recense ce que des organismes tiers ont réglé sur des copublications de l'UCA. Le CNRS y pèse 6 167 lignes, l'INSERM 3 507, l'INRAE 2 349, puis viennent l'Institut Pasteur, Aix-Marseille, Sorbonne. L'UCA elle-même n'en compte que 219, et les 11 743 lignes de `fp_hors_oa` n'ont pas de payeur renseigné.
 
 **Incomplet**. Cette extraction ne contient pas les APC payés après 2024, et contient des trous dans la colonne DOI.
 
 Complété par une extraction des [raw data](https://github.com/OpenAPC/openapc-de/blob/master/data/apc_de.csv) de [OpenAPC](../glossaire.md#openapc). (OpenAPC ne propose pas d'API.) Quelques manques ont été comblés, mais les données s'arrêtent aussi en 2024.
+
+**Les deux sources ne se recouvrent pas.** OpenAPC agrège ce que les établissements lui déclarent, et les organismes tiers ne lui déclarent pas leurs paiements : sur 268 999 lignes du fichier, 1 212 DOI correspondent à des publications de la base. Restreints aux paiements de l'UCA, les deux relevés coïncident à 98 % — 211 DOI communs, 4 connus du seul fichier d'enquête, 123 du seul OpenAPC. L'enquête nationale reste donc la seule source des paiements tiers, qui font l'essentiel du volume de la table.
 
 https://treemaps.openapc.net/apcdata/clermont-u/
 
