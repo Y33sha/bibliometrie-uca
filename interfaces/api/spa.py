@@ -27,6 +27,8 @@ class SPAStaticFiles(StaticFiles):
     Seul le fichier absent (404) déclenche ces reprises ; les autres erreurs remontent, plutôt que de servir `index.html` à leur place.
 
     Le repli s'arrête à la frontière de l'API. Monté à la racine, ce service reçoit tout ce qu'aucun router n'a pris, `/api/*` compris : un chemin d'API inconnu doit rendre un 404, non la page d'accueil du frontend sous un code 200.
+
+    Le segment `api` est cherché partout dans le chemin, et pas seulement en tête. Un préfixe de déploiement mal retiré décale le chemin d'un cran ou deux, et un appel d'API qui recevrait la page d'accueil avec un code 200 est une panne muette — le client attend du JSON, reçoit du HTML, et rien ne signale l'erreur. Aucune page du frontend ne porte de segment `api`, la garde ne peut donc rien intercepter d'autre.
     """
 
     async def get_response(self, path: str, scope: Scope) -> Response:
@@ -37,6 +39,6 @@ class SPAStaticFiles(StaticFiles):
             except HTTPException as exc:
                 if exc.status_code != 404:
                     raise
-        if pathlib.PurePath(path).parts[:1] == (_API_SEGMENT,):
+        if _API_SEGMENT in pathlib.PurePath(path).parts:
             raise HTTPException(status_code=404, detail="Not Found")
         return await super().get_response("index.html", scope)
