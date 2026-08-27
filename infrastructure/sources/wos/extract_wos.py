@@ -112,7 +112,6 @@ class PgWosExtractAdapter(WosExtractAdapter):
                 "firstRecord": "1",
             },
             timeout=30,
-            follow_redirects=True,
         )
         if resp.status_code in (401, 403):
             raise RuntimeError(

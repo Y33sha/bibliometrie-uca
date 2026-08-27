@@ -211,3 +211,26 @@ class TestAsync:
                 )
         assert _API_KEY not in str(excinfo.value)
         assert _API_KEY not in repr(excinfo.value)
+
+
+class TestRedirections:
+    """Le helper ne suit pas les redirections : l'hôte joint est celui que la requête désigne.
+
+    Les points d'entrée des sources répondent directement. Un statut 3xx signale donc une réponse inattendue, non une étape à franchir — et les en-têtes d'authentification propres à un fournisseur, que le client HTTP ne retire pas comme il retire `Authorization`, ne quittent pas leur destinataire.
+    """
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_une_redirection_est_une_erreur(self):
+        respx.get("https://api.example/foo").mock(
+            return_value=httpx.Response(302, headers={"location": "https://ailleurs.example/foo"})
+        )
+        ailleurs = respx.get("https://ailleurs.example/foo").mock(
+            return_value=httpx.Response(200, json={"ok": True})
+        )
+        async with httpx.AsyncClient() as client:
+            with pytest.raises(httpx.HTTPStatusError):
+                await http_request_with_retry_async(
+                    client, "GET", "https://api.example/foo", initial_backoff=0.01, label="test"
+                )
+        assert ailleurs.call_count == 0  # la destination n'est pas jointe
