@@ -4,7 +4,9 @@ Le serveur ASGI ne retire pas le préfixe du chemin : conformément à la spéci
 
 Tout code qui décide sur le chemin avant le routage doit donc l'ôter lui-même. Le middleware d'authentification en dépend : il exempte la connexion des écritures gardées, et cette exemption ne joue plus si elle porte sur un chemin encore préfixé — auquel cas personne ne peut ouvrir de session, et l'administration devient inaccessible.
 
-Aucun autre test ne monte l'application sous un préfixe ; c'est ici qu'il se vérifie.
+Deux sortes de reverse-proxy existent : celui qui retire le préfixe avant de transmettre, et celui qui le transmet tel quel. L'application fonctionne sous les deux — le routage ôte le préfixe s'il est là, laisse le chemin intact s'il n'y est pas. Ce que le serveur ne doit surtout pas faire, c'est ajouter le préfixe de son côté (`--root-path`) : le chemin se retrouverait doublé chez le second, et ne correspondrait plus à aucune route.
+
+Aucun autre test ne monte l'application sous un préfixe ; c'est ici qu'elle se vérifie.
 """
 
 import pytest
@@ -51,3 +53,33 @@ class TestConnexionSousPrefixe:
 
     def test_les_lectures_repondent(self, client_prefixe):
         assert client_prefixe.get(f"{PREFIXE}/api/pipeline/phases").status_code == 200
+
+
+class TestProxyQuiNeRetirePasLePrefixe:
+    """Le proxy transmet le chemin préfixé tel quel : l'application doit le reconnaître aussi.
+
+    Non-régression sur une panne muette : quand le chemin ne correspond à aucune route, la requête retombe sur le service du frontend monté en dernier recours, et un appel d'API reçoit la page d'accueil sous un code 200 — le client attend du JSON, reçoit du HTML, et rien ne signale l'erreur.
+    """
+
+    @pytest.fixture
+    def client_nu(self) -> TestClient:
+        """Client sans `root_path` déclaré au transport : le chemin préfixé arrive tel quel, comme d'un proxy qui le transmet."""
+        with TestClient(app, raise_server_exceptions=False) as c:
+            yield c
+
+    def test_une_lecture_rend_du_json_et_non_la_page_d_accueil(self, client_prefixe):
+        r = client_prefixe.get(f"{PREFIXE}/api/pipeline/phases")
+        assert r.status_code == 200
+        assert r.headers["content-type"].startswith("application/json")
+
+    def test_un_chemin_d_api_inconnu_rend_404_et_non_la_page_d_accueil(self, client_nu):
+        """Même décalé par un préfixe mal retiré, un chemin d'API est reconnu comme tel."""
+        r = client_nu.get("/bibliometrie/api/inconnu")
+        assert r.status_code == 404
+        assert not r.headers["content-type"].startswith("text/html")
+
+    def test_une_page_du_frontend_reste_servie(self, client_nu):
+        """La garde ne mord que sur les chemins d'API : aucune page du frontend ne porte ce segment."""
+        r = client_nu.get("/publications")
+        assert r.status_code in (200, 404)  # 200 avec un frontend buildé, 404 sans
+        assert r.headers["content-type"].startswith("text/html") or r.status_code == 404

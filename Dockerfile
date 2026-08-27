@@ -66,6 +66,10 @@ USER appuser
 
 EXPOSE 8000
 
-# Shell form pour interpoler $ROOT_PATH (default défini en haut, surchargeable
-# via `docker run -e ROOT_PATH=...`).
-CMD uvicorn interfaces.api.app:app --host 0.0.0.0 --port 8000 --root-path "$ROOT_PATH"
+# `--root-path` n'est délibérément pas passé au serveur : il **ajoute** le préfixe au chemin
+# reçu, en supposant qu'un reverse-proxy l'ait retiré. Sur un proxy qui le transmet tel quel,
+# le chemin se retrouve doublé et ne correspond plus à aucune route. L'application porte
+# elle-même le préfixe (variable `ROOT_PATH`, lue à sa construction), et le routage l'ôte du
+# chemin s'il y est, le laisse intact s'il n'y est pas : les deux sortes de proxy fonctionnent
+# alors sans réglage supplémentaire.
+CMD uvicorn interfaces.api.app:app --host 0.0.0.0 --port 8000
