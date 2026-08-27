@@ -54,8 +54,14 @@ GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO bibliometrie_app;
 -- d'entrée écrivant hors de ces droits échoue en erreur de permission avant d'être déployé.
 
 GRANT INSERT, UPDATE, DELETE ON
-    address_structures, authorships, perimeters, person_identifiers, person_name_forms,
+    address_structures, authorships, perimeters, person_name_forms,
     persons, rejected_authorships, structure_name_forms, structures
+TO bibliometrie_app;
+
+-- Un identifiant de personne s'ajoute et se rejette ; il ne se supprime pas, le rejet
+-- gardant la trace qu'une attribution a été envisagée.
+GRANT INSERT, UPDATE ON
+    person_identifiers
 TO bibliometrie_app;
 
 GRANT INSERT, DELETE ON

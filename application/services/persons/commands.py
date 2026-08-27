@@ -33,22 +33,6 @@ def add_identifier(
     return result
 
 
-def remove_identifier(
-    conn: Connection,
-    person_id: int,
-    id_type: str,
-    id_value: str,
-    *,
-    repo: PersonRepository,
-    audit_repo: AuditRepository,
-) -> None:
-    """Supprime un identifiant d'une personne."""
-    persons_service.remove_identifier(
-        person_id, id_type, id_value, repo=repo, audit_repo=audit_repo
-    )
-    conn.commit()
-
-
 def update_identifier_status(
     conn: Connection,
     ident_id: int,

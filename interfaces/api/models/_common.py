@@ -11,12 +11,6 @@ class DeletedResponse(BaseModel):
     deleted: bool = True
 
 
-class RemovedResponse(BaseModel):
-    """Acquittement de retrait d'un lien ou d'un élément : `{removed: true}`."""
-
-    removed: bool = True
-
-
 class OkResponse(BaseModel):
     """Réponse minimale d'acquittement (pas de données)."""
 
@@ -76,6 +70,5 @@ __all__ = [
     "MergeRequest",
     "MergeResponse",
     "OkResponse",
-    "RemovedResponse",
     "TotalCountResponse",
 ]

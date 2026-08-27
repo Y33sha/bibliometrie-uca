@@ -28,7 +28,6 @@ from application.services.persons.core import (
     mark_distinct,
     merge_person,
     reassign_identifier,
-    remove_identifier,
     set_rejected,
     update_identifier_status,
     update_name,
@@ -265,28 +264,6 @@ class TestAddIdentifier:
         ).one()
         assert row.person_id == p
         assert row.status == "pending"
-
-
-class TestRemoveIdentifier:
-    def test_removes_existing(self, sa_sync_conn, repo):
-        p = _insert_person(sa_sync_conn)
-        sa_sync_conn.execute(
-            text(
-                "INSERT INTO person_identifiers (person_id, id_type, id_value, source, status) "
-                "VALUES (:p, 'orcid', '0000-0001', 'auto', 'pending')"
-            ),
-            {"p": p},
-        )
-        remove_identifier(p, "orcid", "0000-0001", repo=repo)
-        row = sa_sync_conn.execute(
-            text("SELECT id FROM person_identifiers WHERE id_value = '0000-0001'")
-        ).first()
-        assert row is None
-
-    def test_raises_not_found(self, sa_sync_conn, repo):
-        p = _insert_person(sa_sync_conn)
-        with pytest.raises(NotFoundError):
-            remove_identifier(p, "orcid", "unknown", repo=repo)
 
 
 class TestUpdateIdentifierStatus:

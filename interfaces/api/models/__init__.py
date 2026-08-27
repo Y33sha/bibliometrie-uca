@@ -13,7 +13,6 @@ from interfaces.api.models._common import (
     MergeRequest,
     MergeResponse,
     OkResponse,
-    RemovedResponse,
     TotalCountResponse,
 )
 from interfaces.api.models.addresses import (
@@ -116,7 +115,6 @@ __all__ = [
     "RejectedPairItem",
     "RejectedPairsResponse",
     "RelationCreate",
-    "RemovedResponse",
     "ReviewAction",
     "SetCountry",
     "SourceAuthorshipRef",

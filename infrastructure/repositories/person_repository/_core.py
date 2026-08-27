@@ -246,16 +246,6 @@ def merge_into(conn: Connection, target_id: int, source_id: int) -> None:
         {"t": target_id, "s": source_id},
     )
     conn.execute(
-        text("""
-            DELETE FROM person_identifiers
-            WHERE person_id = :s
-              AND (id_type, id_value) IN (
-                  SELECT id_type, id_value FROM person_identifiers WHERE person_id = :t
-              )
-        """),
-        {"s": source_id, "t": target_id},
-    )
-    conn.execute(
         text("UPDATE person_identifiers SET person_id = :t WHERE person_id = :s"),
         {"t": target_id, "s": source_id},
     )

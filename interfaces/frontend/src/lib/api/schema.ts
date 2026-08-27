@@ -1352,28 +1352,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/persons/{person_id}/identifiers/{id_type}/{id_value}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /**
-         * Remove Person Identifier
-         * @description Supprime un identifiant d'une personne.
-         *
-         *     Renvoie 404 sur un identifiant introuvable (`remove_identifier`).
-         */
-        delete: operations["remove_person_identifier_api_persons__person_id__identifiers__id_type___id_value__delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/persons/{person_id}/reject": {
         parameters: {
             query?: never;
@@ -4585,17 +4563,6 @@ export interface components {
             child_id: number;
             relation_type: components["schemas"]["StructureRelationType"];
         };
-        /**
-         * RemovedResponse
-         * @description Acquittement de retrait d'un lien ou d'un élément : `{removed: true}`.
-         */
-        RemovedResponse: {
-            /**
-             * Removed
-             * @default true
-             */
-            removed: boolean;
-        };
         /** ReviewAction */
         ReviewAction: {
             /** Structure Id */
@@ -7420,39 +7387,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AddIdentifierResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    remove_person_identifier_api_persons__person_id__identifiers__id_type___id_value__delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                person_id: number;
-                id_type: string;
-                id_value: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RemovedResponse"];
                 };
             };
             /** @description Validation Error */
