@@ -35,18 +35,63 @@ CREATE ROLE bibliometrie_app LOGIN PASSWORD :'app_password';
 -- Traverser le schéma, sans rien y créer.
 GRANT USAGE ON SCHEMA public TO bibliometrie_app;
 
--- Lecture et écriture des données existantes. `ALL TABLES` couvre les vues
--- matérialisées, que l'API lit sans jamais les rafraîchir.
-GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO bibliometrie_app;
+-- Lecture de tout : l'API sert des données bibliométriques, et aucune n'est réservée.
+-- `ALL TABLES` couvre les vues matérialisées, qu'elle lit sans jamais les rafraîchir.
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO bibliometrie_app;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO bibliometrie_app;
 
--- Mêmes droits sur ce que les migrations futures créeront, sans avoir à y repenser.
+-- Écriture sur les seules tables que les points d'entrée d'administration modifient, et
+-- pour la seule opération que chacune reçoit. Une table qu'on ne fait que mettre à jour
+-- n'accorde pas la suppression ; une table où l'on n'ajoute que des lignes n'accorde ni
+-- l'une ni l'autre. Vider une colonne vaut presque une suppression : les deux droits se
+-- refusent de la même façon.
+--
+-- Les autres tables — celles que le pipeline calcule, celles où il dépose ce qu'il extrait,
+-- et la table des migrations — restent en lecture pour l'API : une écriture qui les viserait
+-- échouerait au lieu d'aboutir.
+--
+-- Cette liste est vérifiée : les tests d'API se connectent sous ce rôle, si bien qu'un point
+-- d'entrée écrivant hors de ces droits échoue en erreur de permission avant d'être déployé.
+
+GRANT INSERT, UPDATE, DELETE ON
+    address_structures, authorships, perimeters, person_identifiers, person_name_forms,
+    persons, rejected_authorships, structure_name_forms, structures
+TO bibliometrie_app;
+
+GRANT INSERT, DELETE ON
+    perimeter_structures, structure_relations
+TO bibliometrie_app;
+
+-- `INSERT … ON CONFLICT DO UPDATE` exige le droit de mise à jour, que la ligne entre en
+-- conflit ou non.
+GRANT INSERT, UPDATE, DELETE ON
+    confirmed_authorships, distinct_publications
+TO bibliometrie_app;
+
+GRANT UPDATE, DELETE ON
+    journal_name_forms, journals, publications, publisher_name_forms, publishers
+TO bibliometrie_app;
+
+GRANT INSERT ON
+    audit_log
+TO bibliometrie_app;
+
+GRANT INSERT, UPDATE ON
+    distinct_persons, publications_detail
+TO bibliometrie_app;
+
+GRANT UPDATE ON
+    addresses, apc_payments, config, persons_rh, source_authorships, source_publications
+TO bibliometrie_app;
+
+-- Une table créée par une migration future est lisible, et rien de plus : sa nature se
+-- tranche en l'ajoutant nommément ci-dessus, plutôt qu'en la découvrant écrite.
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
-    GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO bibliometrie_app;
+    GRANT SELECT ON TABLES TO bibliometrie_app;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
     GRANT USAGE, SELECT ON SEQUENCES TO bibliometrie_app;
 
--- Ce qui n'est délibérément pas accordé : TRUNCATE, la propriété des objets, et
--- CREATE sur le schéma. `CONNECT` sur la base et `TEMPORARY` (l'API crée des tables
--- temporaires en tâche de fond) viennent du rôle PUBLIC ; les rétablir nommément si
--- l'hébergeur les retire à PUBLIC.
+-- Ce qui n'est délibérément pas accordé : TRUNCATE, l'écriture sur les tables du pipeline,
+-- la propriété des objets, et CREATE sur le schéma. `CONNECT` sur la base et `TEMPORARY`
+-- (l'API crée des tables temporaires en tâche de fond) viennent du rôle PUBLIC ; les
+-- rétablir nommément si l'hébergeur les retire à PUBLIC.
