@@ -38,3 +38,14 @@ updates:
       interval: "weekly"
     commit-message:
       prefix: "chore(ci)"
+
+  # ---- Images de base du Dockerfile ----
+  # Suit les étiquettes des images (`python:3.12-slim`, `node:22-slim`), dont le changement
+  # est rare et structurant. La fraîcheur des paquets système, elle, tient à la mise à jour
+  # que la construction applique.
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore(docker)"
