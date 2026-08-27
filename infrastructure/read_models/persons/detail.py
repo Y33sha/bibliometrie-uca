@@ -1,7 +1,5 @@
 """Détail d'une personne (sync) : profil, thèses encadrées, adresses, sujets, dashboard Open Access."""
 
-import datetime
-
 from sqlalchemy import Connection, text
 
 from application.ports.read_models._common import (
@@ -22,6 +20,7 @@ from application.ports.read_models.persons_queries import (
     PersonThesis,
 )
 from application.ports.read_models.subjects_queries import SubjectFrequency
+from domain.dates import today
 from domain.sources.registry import Source
 from domain.structures.structure import StructureType
 from infrastructure.read_models.filters import OA_DASHBOARD_COLS_SQL, entity_subjects_sql
@@ -241,7 +240,7 @@ def person_subjects(conn: Connection, person_id: int, *, limit: int) -> list[Sub
 
 def person_dashboard(conn: Connection, person_id: int) -> PersonDashboardResponse:
     """Dashboard personne : publis/an + répartition Open Access."""
-    current_year = datetime.date.today().year
+    current_year = today().year
 
     pubs_year_rows = conn.execute(
         text("""

@@ -7,7 +7,6 @@ Particularités CrossRef :
 
 from __future__ import annotations
 
-import datetime
 import logging
 
 from sqlalchemy import Connection
@@ -30,6 +29,7 @@ from application.ports.pipeline.publishers import PublisherFindOrCreateQueries
 from application.ports.repositories.publication_repository import PublicationRepository
 from application.services.journals.core import find_or_create_journal
 from application.services.publishers.core import find_or_create_publisher
+from domain.dates import today
 from domain.persons.identifiers import (
     compact_identifiers,
     mark_shared_identifiers_dubious,
@@ -67,7 +67,7 @@ def get_title(msg: dict) -> str | None:
 
 
 def get_pub_year(msg: dict) -> int | None:
-    return extract_crossref_pub_year(msg, max_year=datetime.date.today().year + 1)
+    return extract_crossref_pub_year(msg, max_year=today().year + 1)
 
 
 def get_container_title(msg: dict) -> str | None:

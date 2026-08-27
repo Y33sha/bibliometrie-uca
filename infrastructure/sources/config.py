@@ -3,12 +3,12 @@
 Deux origines, selon la nature du réglage. Les paramètres d'exploitation — années couvertes, périmètre d'extraction, collections HAL, identifiants de structure par source — vivent dans la table `config` et se modifient depuis l'interface d'administration. Les identifiants d'accès aux sources externes, eux, sont des secrets : ils viennent de l'environnement du processus, comme les autres secrets de l'application.
 """
 
-import datetime
 import logging
 
 from sqlalchemy import Connection, text
 from sqlalchemy.exc import SQLAlchemyError
 
+from domain.dates import today
 from domain.types import JsonValue
 from infrastructure.settings import settings
 
@@ -47,7 +47,7 @@ def get_years(conn: Connection, start_year: int | None = None) -> list[int]:
 
     `start_year` est l'ancre absolue du range. Si `None`, on lit la config `pipeline_start_year_full`. Rétention cumulative. Fallback `[année courante]` si l'ancre est absente, invalide ou dans le futur.
     """
-    current_year = datetime.date.today().year
+    current_year = today().year
     if start_year is None:
         start_year = _config_int(conn, "pipeline_start_year_full")
     if start_year is not None and start_year <= current_year:

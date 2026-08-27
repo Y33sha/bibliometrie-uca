@@ -33,9 +33,10 @@ def parse_date(val: object) -> str | None:
     if not val or str(val).strip() == "":
         return None
     val = str(val).strip()
+    # Des dates sans heure : le fuseau n'entre ni dans leur lecture ni dans leur arithmétique.
     for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%Y/%m/%d", "%m/%d/%Y"):
         try:
-            return datetime.strptime(val, fmt).date().isoformat()
+            return datetime.strptime(val, fmt).date().isoformat()  # noqa: DTZ007
         except ValueError:
             continue
     # Sérialisation numérique Excel : nombre de jours depuis la base 1899-12-30
@@ -43,7 +44,7 @@ def parse_date(val: object) -> str | None:
     try:
         n = int(float(val))
         if 30000 < n < 60000:
-            base = datetime(1899, 12, 30)
+            base = datetime(1899, 12, 30)  # noqa: DTZ001
             return (base + timedelta(days=n)).date().isoformat()
     except (ValueError, OverflowError):
         pass

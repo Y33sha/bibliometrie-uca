@@ -10,7 +10,6 @@ Particularités DataCite :
 
 from __future__ import annotations
 
-import datetime
 import logging
 from typing import Any
 
@@ -34,6 +33,7 @@ from application.ports.pipeline.publishers import PublisherFindOrCreateQueries
 from application.ports.repositories.publication_repository import PublicationRepository
 from application.services.journals.core import find_or_create_journal
 from application.services.publishers.core import find_or_create_publisher
+from domain.dates import today
 from domain.persons.identifiers import (
     compact_identifiers,
     mark_shared_identifiers_dubious,
@@ -249,7 +249,7 @@ def process_work(
         return False
 
     title = get_title(attributes)
-    pub_year = extract_datacite_pub_year(attributes, max_year=datetime.date.today().year + 1)
+    pub_year = extract_datacite_pub_year(attributes, max_year=today().year + 1)
     if not has_minimal_publication_metadata(title, pub_year):
         logger.warning(f"DataCite {doi} : titre ou année manquant")
         staging_queries.mark_done(conn, staging_id)

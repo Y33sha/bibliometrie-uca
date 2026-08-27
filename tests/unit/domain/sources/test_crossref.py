@@ -1,7 +1,6 @@
 """Tests unitaires de domain.sources.crossref (helpers purs)."""
 
-import datetime
-
+from domain.dates import today
 from domain.sources.crossref import (
     extract_crossref_meta,
     extract_crossref_pub_year,
@@ -14,7 +13,7 @@ def _date_field(year: int) -> dict:
     return {"date-parts": [[year, 6, 15]]}
 
 
-_NEXT_YEAR = datetime.date.today().year + 1
+_NEXT_YEAR = today().year + 1
 
 
 class TestExtractCrossrefPubYearOrder:

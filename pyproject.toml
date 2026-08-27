@@ -184,6 +184,7 @@ select = [
     "S",      # flake8-bandit : 73 règles de sécurité (cf. per-file-ignores pour les exceptions)
     "A",      # flake8-builtins : un nom qui masque une fonction de base
     "C4",     # flake8-comprehensions : compréhensions et appels de collection superflus
+    "DTZ",    # flake8-datetimez : instants sans fuseau (cf. `domain.dates.today`)
     "ISC",    # flake8-implicit-str-concat : concaténation implicite de littéraux
     "LOG",    # flake8-logging : usage du module de journalisation
     "PERF",   # Perflint : boucles réécrivables en compréhension
