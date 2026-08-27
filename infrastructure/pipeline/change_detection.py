@@ -22,7 +22,7 @@ def canonical_json_bytes(raw_data: dict) -> bytes:
 
 def compute_hash(raw_data: dict) -> str:
     """Calcule le hash MD5 du JSON canonique (clés triées, compact)."""
-    return hashlib.md5(canonical_json_bytes(raw_data)).hexdigest()
+    return hashlib.md5(canonical_json_bytes(raw_data), usedforsecurity=False).hexdigest()
 
 
 # Neutralisation, par source, du bruit volatil avant calcul du hash de détection de changement. Une source absente n'est pas normalisée (hash sur le payload fidèle).
