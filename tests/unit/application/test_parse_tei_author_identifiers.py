@@ -122,3 +122,26 @@ def test_idhal_without_notation_is_ignored():
       </author>
     """)
     assert parse_tei_author_identifiers(xml) == [{}]
+
+
+class TestDocumentForge:
+    """Le TEI joint aux notices HAL est déposé par un tiers : sa lecture refuse les déclarations d'entités.
+
+    L'analyseur de la bibliothèque standard les développe, et quelques centaines d'octets suffisent à en produire des milliards — de quoi épuiser la mémoire du processus qui normalise.
+    """
+
+    @staticmethod
+    def _bombe(niveaux: int) -> str:
+        """Document dont chaque niveau d'entité multiplie le précédent par dix."""
+        entites = '<!ENTITY a0 "AAAAAAAAAA">'
+        for i in range(1, niveaux):
+            entites += f'<!ENTITY a{i} "{f"&a{i - 1};" * 10}">'
+        return f'<?xml version="1.0"?><!DOCTYPE r [{entites}]><r>&a{niveaux - 1};</r>'
+
+    def test_les_entites_ne_sont_pas_developpees(self):
+        # Neuf niveaux tiennent en un demi-kilo-octet et vaudraient un milliard de caractères.
+        assert parse_tei_author_identifiers(self._bombe(9)) == []
+
+    def test_un_document_ordinaire_est_lu(self):
+        tei = '<?xml version="1.0"?><TEI xmlns="http://www.tei-c.org/ns/1.0"><text/></TEI>'
+        assert parse_tei_author_identifiers(tei) == []

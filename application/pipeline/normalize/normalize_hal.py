@@ -1,9 +1,12 @@
 """Normalisation des données HAL : staging → tables structurées."""
 
 import logging
-import xml.etree.ElementTree as ET
 from datetime import date
+from typing import cast
+from xml.etree.ElementTree import Element, ParseError
 
+import defusedxml.ElementTree as ET
+from defusedxml.common import DefusedXmlException
 from sqlalchemy import Connection
 
 from application.pipeline.normalize._authorships_batch import (
@@ -264,6 +267,14 @@ def insert_hal_document(
 _TEI_NS = {"tei": "http://www.tei-c.org/ns/1.0"}
 
 
+def _parse_tei(label_xml: str) -> Element:
+    """Lit le TEI joint à une notice HAL.
+
+    L'analyseur refuse les déclarations de type de document et d'entités, que l'analyseur de la bibliothèque standard développe : quelques centaines d'octets y suffisent à en produire des milliards. Lève `ParseError` sur un document mal formé, une sous-classe de `DefusedXmlException` sur un document qui en porte.
+    """
+    return cast("Element", ET.fromstring(label_xml))
+
+
 def active_embargo_until(label_xml: str | None, today: date) -> date | None:
     """Date de fin d'un embargo HAL **encore actif** (future), sinon None.
 
@@ -272,8 +283,8 @@ def active_embargo_until(label_xml: str | None, today: date) -> date | None:
     if not label_xml:
         return None
     try:
-        root = ET.fromstring(label_xml)
-    except ET.ParseError:
+        root = _parse_tei(label_xml)
+    except (ParseError, DefusedXmlException):
         return None
     dates: list[date] = []
     for ref in root.iter(f"{{{_TEI_NS['tei']}}}ref"):
@@ -304,8 +315,8 @@ def parse_tei_author_identifiers(label_xml: str | None) -> list[dict[str, str]]:
     if not label_xml:
         return []
     try:
-        root = ET.fromstring(label_xml)
-    except ET.ParseError:
+        root = _parse_tei(label_xml)
+    except (ParseError, DefusedXmlException):
         return []
     title_stmt = root.find(".//tei:biblFull/tei:titleStmt", _TEI_NS)
     if title_stmt is None:
