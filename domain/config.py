@@ -7,12 +7,11 @@ Les identifiants d'accès aux sources n'y figurent pas : ce sont des secrets, lu
 
 # Clés que la lecture publique de la configuration rend. Liste blanche : une clé qu'on n'y
 # inscrit pas reste réservée à une session, ce qui protège par défaut tout réglage ajouté
-# sans que quiconque ait tranché sa nature.
+# sans que quiconque ait tranché sa nature. Une clé y figure quand une page publique la
+# consomme, et pour cette raison seule.
 PUBLIC_CONFIG_KEYS: frozenset[str] = frozenset(
     {
+        # Types de structure affichés par la page des laboratoires.
         "laboratories_display_types",
-        "perimeter_extraction",
-        "perimeter_persons",
-        "pipeline_start_year_full",
     }
 )

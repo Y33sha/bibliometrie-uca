@@ -154,6 +154,12 @@ class TestConfig:
         r = client.get("/api/config")
         assert {item["key"] for item in r.json()} == set(PUBLIC_CONFIG_KEYS)
 
+    def test_read_with_session_renders_the_reserved_keys(self, auth_client, config_keys_seeded):
+        """Une session rend aussi les clés que la liste blanche retient : c'est là que la distinction porte."""
+        keys = {item["key"] for item in auth_client.get("/api/config").json()}
+        assert keys >= set(PUBLIC_CONFIG_KEYS)
+        assert keys >= CREDENTIAL_CONFIG_KEYS
+
     def test_write_requires_auth(self, client):
         """Les écritures config sans session renvoient 401."""
         r = client.put("/api/config/pipeline_start_year_full", json={"value": 2020})
