@@ -323,9 +323,9 @@ def _neutralize_formula(value: object) -> object:
 
 
 class _EchoStream:
-    """Flux de sortie qui rend ce qu'on lui écrit, au lieu de l'accumuler.
+    """Flux de sortie qui rend le texte qu'on lui écrit.
 
-    `csv.writer` rend ce que son flux a rendu à l'écriture : branché là-dessus, `writerow` cesse d'écrire quelque part pour devenir « formate cette ligne et donne-la ». C'est ce qui permet de rendre l'export ligne à ligne sans tampon qui grossit.
+    `csv.writer` rend ce que son flux a rendu à l'écriture : branché là-dessus, `writerow` formate une ligne et la retourne.
     """
 
     def write(self, value: str) -> str:
@@ -561,7 +561,7 @@ def export_theses_csv(
 ) -> Iterator[str]:
     """Export CSV dédié à la page thèses.
 
-    Colonnes spécifiques à la thèse (Inscription, Soutenance, Statut, theses.fr). Tri par défaut `soutenance_desc` (cohérent avec l'affichage). Rendu par blocs, aux mêmes conditions que l'export des publications : la requête s'exécute à l'appel, le parcours qui suit ne touche plus la base.
+    Colonnes spécifiques à la thèse (Inscription, Soutenance, Statut, theses.fr). Tri par défaut `soutenance_desc` (cohérent avec l'affichage). Rendu par blocs, aux mêmes conditions que l'export des publications : la requête s'exécute à l'appel, le parcours qui suit lit des lignes en mémoire.
     """
     conn.execute(text("SET LOCAL jit = off"))
     where_clause, binds = _build_theses_export_clauses(filters)

@@ -1,6 +1,6 @@
 """Contrôle au démarrage de l'API : de quoi authentifier une session d'administration.
 
-Non-régression : `ADMIN_HASH` et `SESSION_SECRET` ne sont plus exigés par les settings, que le pipeline et les scripts de maintenance partagent sans jamais ouvrir de session. L'exigence tient donc au démarrage de l'API, qui seule s'en sert.
+`ADMIN_HASH` et `SESSION_SECRET` sont exigés du processus qui sert l'API, seul à ouvrir des sessions. Le pipeline et les scripts de maintenance lisent la même configuration et démarrent sans eux.
 """
 
 import pytest

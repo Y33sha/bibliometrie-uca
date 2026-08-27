@@ -28,7 +28,7 @@ class SPAStaticFiles(StaticFiles):
 
     Le repli s'arrête à la frontière de l'API. Monté à la racine, ce service reçoit tout ce qu'aucun router n'a pris, `/api/*` compris : un chemin d'API inconnu doit rendre un 404, non la page d'accueil du frontend sous un code 200.
 
-    Le segment `api` est cherché partout dans le chemin, et pas seulement en tête. Un préfixe de déploiement mal retiré décale le chemin d'un cran ou deux, et un appel d'API qui recevrait la page d'accueil avec un code 200 est une panne muette — le client attend du JSON, reçoit du HTML, et rien ne signale l'erreur. Aucune page du frontend ne porte de segment `api`, la garde ne peut donc rien intercepter d'autre.
+    Le segment `api` est reconnu où qu'il se trouve dans le chemin : un préfixe de déploiement laissé en place le décale d'un cran, et un appel d'API qui recevrait la page d'accueil sous un code 200 serait une panne muette. Aucune page du frontend ne porte ce segment.
     """
 
     async def get_response(self, path: str, scope: Scope) -> Response:

@@ -1,6 +1,6 @@
 """Composition des URL de fiche DOAJ, à partir de ce qu'un payload en porte.
 
-Purement textuel : rien n'est interrogé ici. Ces fonctions servent l'affichage d'une revue — la lecture qui compose la ligne d'une liste s'en sert —, là où `client.py` télécharge le dump et parle au réseau. Les deux vivent séparément pour qu'une lecture servie par l'API n'ait jamais à importer un client HTTP, fût-ce pour une fonction qui n'en fait rien.
+Purement textuel : ce module manipule des chaînes et rien d'autre. Le téléchargement du dump DOAJ vit à côté, dans `client.py`.
 """
 
 from __future__ import annotations

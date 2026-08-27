@@ -38,9 +38,9 @@ def test_sans_prefixe_declare():
 
 @pytest.mark.parametrize(("root_path", "path", "_attendu"), CAS)
 def test_accorde_avec_le_routage_de_starlette(root_path: str, path: str, _attendu: str):
-    """Garde-fou contre une divergence introduite par une montée de version.
+    """Les deux implémentations s'accordent sur chaque cas.
 
-    Starlette range ce calcul dans un module privé, que le projet n'importe pas — il peut être déplacé sans préavis. Ce test le confronte à notre implémentation : le jour où les deux cessent de s'accorder, il le dit, plutôt que de laisser le middleware décider sur un chemin que le routage ne reconnaît plus.
+    Starlette range ce calcul dans un module privé, que le projet n'importe pas. Une divergence entre les deux ferait décider le middleware sur un chemin étranger au routage ; ce test la signale.
     """
     scope = _scope(root_path, path)
     assert route_path(scope) == _starlette_route_path(scope)
