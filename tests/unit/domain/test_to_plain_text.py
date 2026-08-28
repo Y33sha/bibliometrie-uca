@@ -31,6 +31,12 @@ class TestEntites:
         )
         assert to_plain_text("a &amp; b") == "a & b"
 
+    def test_decode_les_entites_reechappees(self):
+        # Relevé en base : des signatures arrivent doublement échappées (`&amp;amp;`), qu'une
+        # passe unique laisserait à moitié décodées.
+        assert to_plain_text("OVPF, OVSG &amp;amp; OVSM Teams") == "OVPF, OVSG & OVSM Teams"
+        assert to_plain_text("a &amp;amp;amp; b") == "a & b"
+
     def test_une_balise_echappee_subit_le_sort_de_la_balise(self):
         # Les entités sont décodées avant le retrait : `&lt;p&gt;` ne survit pas plus que `<p>`.
         assert to_plain_text("&lt;p&gt;Adresse&lt;/p&gt;") == "Adresse"

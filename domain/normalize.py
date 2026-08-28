@@ -40,20 +40,34 @@ _MARKUP_RE = re.compile(r"</?[A-Za-z][^>]*>")
 
 _COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
 
+# Nombre de passes de décodage des entités. Chaque passe raccourcit strictement la chaîne, donc
+# la stabilisation vient d'elle-même ; la borne évite d'en dépendre.
+_MAX_UNESCAPE_PASSES = 4
+
+
+def _unescape_fully(text: str) -> str:
+    """Décode les entités HTML jusqu'à ce que la chaîne ne bouge plus, au plus `_MAX_UNESCAPE_PASSES` fois."""
+    for _ in range(_MAX_UNESCAPE_PASSES):
+        decoded = html.unescape(text)
+        if decoded == text:
+            break
+        text = decoded
+    return text
+
 
 def to_plain_text(text: str | None) -> str:
     """Texte brut d'une valeur reçue d'une source : commentaires, balises et entités HTML retirés, espacement réduit à un espace simple.
 
     Les sources déposent du balisage dans des champs dont il ne porte pas le sens — une adresse d'affiliation enveloppée dans un paragraphe, un libellé de sujet en italique, un nom d'auteur portant une entité. Ce balisage n'a aucun consommateur : l'interface affiche ces champs en texte, l'export les écrit en texte, et le rapprochement les normalise. Le retirer à l'entrée évite de le retirer dans chacun d'eux.
 
-    Les entités sont décodées avant le retrait des balises, si bien qu'une balise échappée (`&lt;p&gt;`) subit le même sort que la balise elle-même. Le retrait suit `strip_markup`, qui épargne les indices de Miller.
+    Les entités sont décodées avant le retrait des balises, si bien qu'une balise échappée (`&lt;p&gt;`) subit le même sort que la balise elle-même. Le décodage se répète jusqu'à stabilisation : certaines sources ré-échappent une valeur déjà échappée (`&amp;amp;`), qu'une passe unique laisserait à moitié décodée. Le retrait suit `strip_markup`, qui épargne les indices de Miller.
 
     À ne pas appliquer aux titres ni aux résumés de publication, dont le balisage porte du sens — exposants, indices, MathML — et que l'interface rend. Leur mise à plat pour un tableur, elle, passe bien par ici.
     """
     if not text:
         return ""
-    without_comments = _COMMENT_RE.sub(" ", text)
-    return " ".join(strip_markup(html.unescape(without_comments)).split())
+    without_comments = _COMMENT_RE.sub(" ", _unescape_fully(text))
+    return " ".join(strip_markup(without_comments).split())
 
 
 def strip_markup(text: str) -> str:
