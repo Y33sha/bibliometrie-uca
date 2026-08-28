@@ -1,17 +1,26 @@
 """Limiteur de débit à fenêtre fixe (anti-bruteforce du login)."""
 
+import logging
+
 from fastapi import Request
 
-from interfaces.api.rate_limit import FixedWindowRateLimiter, _client_key
+from interfaces.api.rate_limit import (
+    FixedWindowRateLimiter,
+    _client_key,
+    reset_rate_limiters,
+)
 
 
-def _request(client_host: str | None, **headers: str) -> Request:
-    """Requête minimale portant une adresse de connexion et des en-têtes."""
+def _request(client_host: str | None, port: int = 51234, **headers: str) -> Request:
+    """Requête minimale portant une adresse de connexion, un port et des en-têtes.
+
+    Le port vaut 0 quand le serveur ASGI a réécrit l'adresse depuis `X-Forwarded-For` : il perd l'information à cette occasion, et c'est à cela qu'on reconnaît un en-tête pris en compte.
+    """
     return Request(
         {
             "type": "http",
             "headers": [(k.replace("_", "-").encode(), v.encode()) for k, v in headers.items()],
-            "client": (client_host, 51234) if client_host else None,
+            "client": (client_host, port) if client_host else None,
         }
     )
 
@@ -140,3 +149,36 @@ class TestClientKey:
 
     def test_missing_client_falls_back_to_a_stable_key(self):
         assert _client_key(_request(None)) == "unknown"
+
+
+class TestProxyHeaderIgnoredWarning:
+    """Un en-tête de proxy écarté par le serveur ASGI se signale au journal.
+
+    Le plafond de tentatives compte alors tous les clients dans un même seau, ce qui laisse un tiers interdire la connexion d'administration à tout le monde. Le signalement nomme le pair, valeur à porter dans `FORWARDED_ALLOW_IPS`.
+    """
+
+    def setup_method(self):
+        reset_rate_limiters()
+
+    def test_signale_un_pair_non_declare(self, caplog):
+        with caplog.at_level(logging.WARNING):
+            _client_key(_request("172.17.0.1", x_forwarded_for="203.0.113.9"))
+        assert "proxy_headers_ignored" in caplog.text
+        assert "172.17.0.1" in caplog.records[0].detail
+
+    def test_ne_signale_qu_une_fois_par_pair(self, caplog):
+        with caplog.at_level(logging.WARNING):
+            for _ in range(5):
+                _client_key(_request("172.17.0.1", x_forwarded_for="203.0.113.9"))
+        assert len(caplog.records) == 1
+
+    def test_silence_quand_le_serveur_a_pris_l_en_tete(self, caplog):
+        # Port nul : le serveur a réécrit l'adresse, le réglage est donc correct.
+        with caplog.at_level(logging.WARNING):
+            _client_key(_request("203.0.113.9", port=0, x_forwarded_for="203.0.113.9"))
+        assert caplog.records == []
+
+    def test_silence_sans_en_tete_de_proxy(self, caplog):
+        with caplog.at_level(logging.WARNING):
+            _client_key(_request("172.17.0.1"))
+        assert caplog.records == []

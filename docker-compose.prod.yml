@@ -88,9 +88,17 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:-}
       ROOT_PATH: ${ROOT_PATH:-}
       LOG_FORMAT: ${LOG_FORMAT:-json}
-      # Adresses depuis lesquelles les en-têtes de proxy font foi, lues par uvicorn. Absente,
-      # le limiteur de connexion compte tous les clients dans un même seau.
-      FORWARDED_ALLOW_IPS: ${FORWARDED_ALLOW_IPS:-127.0.0.1}
+      # Adresses depuis lesquelles les en-têtes de proxy font foi, lues par uvicorn.
+      #
+      # Le défaut vaut la passerelle du réseau déclaré en bas de fichier : le port est publié
+      # sur la boucle locale de l'hôte, mais une connexion qui l'emprunte entre dans le
+      # conteneur avec l'adresse de cette passerelle, non `127.0.0.1`. Une valeur qui ne la
+      # couvre pas fait écarter l'en-tête, et le limiteur compte tous les clients dans un même
+      # seau — dix échecs de connexion interdisent alors l'administration à tout le monde.
+      #
+      # Un reverse-proxy joignant l'application autrement (autre machine, conteneur voisin sur
+      # un réseau distinct) demande de renseigner son adresse à la place.
+      FORWARDED_ALLOW_IPS: ${FORWARDED_ALLOW_IPS:-172.30.0.1}
     security_opt:
       - no-new-privileges:true
     # L'API tourne sous un utilisateur non privilégié et écoute au-dessus du port 1024 :
@@ -184,6 +192,15 @@ services:
       db:
         condition: service_healthy
 
+
+# Réseau du déploiement, à sous-réseau fixe : l'adresse de sa passerelle est ce que voient les
+# conteneurs comme pair d'une connexion venue de l'hôte, et `FORWARDED_ALLOW_IPS` la nomme.
+# Un sous-réseau déjà pris sur la machine hôte demande d'en choisir un autre, ici et là-bas.
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
 
 volumes:
   pgdata:

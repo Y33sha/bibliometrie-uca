@@ -7,11 +7,14 @@ Deux usages, deux compteurs indépendants — un export refusé ne doit pas emp�
 
 from __future__ import annotations
 
+import logging
 import time
 from collections import OrderedDict
 from collections.abc import Callable
 
 from fastapi import HTTPException, Request
+
+logger = logging.getLogger(__name__)
 
 # Généreux pour ne pas gêner l'admin (une connexion tient en 1-2 tentatives), assez bas pour
 # rendre le bruteforce impraticable.
@@ -23,6 +26,10 @@ _EXPORT_MAX_ATTEMPTS = 20
 _EXPORT_WINDOW_SECONDS = 300
 # Plafond du nombre de compteurs suivis : borne la mémoire même sous un flot d'adresses variées.
 _MAX_KEYS = 4096
+# Adresses déjà signalées comme pair de proxy non déclaré : un avertissement par adresse suffit.
+# Bornée, comme la table des compteurs — sous un flot d'adresses variées, les suivantes se taisent.
+_MAX_WARNED_PEERS = 64
+_warned_peers: set[str] = set()
 
 
 class FixedWindowRateLimiter:
@@ -99,9 +106,38 @@ _export_limiter = FixedWindowRateLimiter(_EXPORT_MAX_ATTEMPTS, _EXPORT_WINDOW_SE
 
 
 def reset_rate_limiters() -> None:
-    """Vide les compteurs de tous les limiteurs (isolation entre tests)."""
+    """Vide les compteurs de tous les limiteurs et la mémoire des pairs signalés (isolation entre tests)."""
     _login_limiter.reset()
     _export_limiter.reset()
+    _warned_peers.clear()
+
+
+def _warn_if_proxy_header_ignored(request: Request) -> None:
+    """Signale une requête portant un en-tête de proxy dont le serveur ASGI a écarté la valeur.
+
+    `ProxyHeadersMiddleware` d'uvicorn réécrit l'adresse du client à partir de `X-Forwarded-For` quand le pair de la connexion figure dans `FORWARDED_ALLOW_IPS`, et pose alors un port nul — l'information étant perdue. Un en-tête présent en regard d'un port non nul désigne donc un pair que le serveur tient pour quelconque : la vraie adresse du client se perd, et le plafond de tentatives compte tous les clients dans un même seau.
+
+    Le message nomme le pair, valeur à porter dans `FORWARDED_ALLOW_IPS`.
+    """
+    if "x-forwarded-for" not in request.headers or request.client is None:
+        return
+    if request.client.port == 0:
+        return
+    peer = request.client.host
+    if peer in _warned_peers or len(_warned_peers) >= _MAX_WARNED_PEERS:
+        return
+    _warned_peers.add(peer)
+    logger.warning(
+        "proxy_headers_ignored",
+        extra={
+            "peer": peer,
+            "detail": (
+                f"Une requête porte X-Forwarded-For depuis {peer}, adresse absente de "
+                "FORWARDED_ALLOW_IPS : le serveur écarte l'en-tête et le plafond de tentatives "
+                f"compte tous les clients ensemble. Déclarer {peer} ou son réseau."
+            ),
+        },
+    )
 
 
 def _client_key(request: Request) -> str:
@@ -109,8 +145,11 @@ def _client_key(request: Request) -> str:
 
     `X-Forwarded-For` n'est pas lu ici. Le serveur ASGI s'en charge en amont (`ProxyHeadersMiddleware` d'uvicorn) : il ne consulte l'en-tête que si le pair de la connexion figure dans `FORWARDED_ALLOW_IPS`, remonte la liste des maillons de droite à gauche en écartant les proxys déclarés, et réécrit l'adresse du client dans la requête. Le relire à ce niveau reviendrait à croire une valeur que tout appelant compose : une valeur différente à chaque tentative ouvrirait un compteur neuf, et le plafond ne retiendrait rien.
 
+    Un réglage absent ou trop étroit se signale au journal plutôt que de dégrader en silence (`_warn_if_proxy_header_ignored`).
+
     Sans proxy déclaré, l'adresse est celle du dernier maillon réseau — les clients derrière un même proxy partagent alors un compteur.
     """
+    _warn_if_proxy_header_ignored(request)
     return request.client.host if request.client else "unknown"
 
 
