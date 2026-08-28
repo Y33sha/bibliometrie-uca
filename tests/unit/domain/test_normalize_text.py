@@ -86,6 +86,13 @@ class TestSanitizeRawText:
             ("Paris‎‏", "Paris"),
             # Contrôle C0 supprimé
             ("a\x00b", "ab"),
+            # Balisage déposé par la source autour de l'adresse : retiré, texte conservé.
+            ("<p>Institut Pascal, Clermont-Ferrand</p>", "Institut Pascal, Clermont-Ferrand"),
+            ("Universit&eacute; Clermont Auvergne", "Université Clermont Auvergne"),
+            (
+                "<!--<label>3</label>--> DRCI, CHU de Clermont-Ferrand",
+                "DRCI, CHU de Clermont-Ferrand",
+            ),
         ],
     )
     def test_sanitize_raw_text(self, raw: str, expected: str) -> None:

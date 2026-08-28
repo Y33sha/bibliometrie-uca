@@ -28,6 +28,9 @@ class TestCleanRawAuthorName:
             # Parenthèses non numériques : préservées (ce n'est pas un identifiant).
             ("Smith (Jr.)", "Smith (Jr.)"),
             ("Durand (né Martin)", "Durand (né Martin)"),
+            # Balisage et entités déposés dans la signature : retirés.
+            ("<i>Emmanuel Moreau</i>", "Emmanuel Moreau"),
+            ("Fran&ccedil;ois Durand", "François Durand"),
         ],
     )
     def test_clean(self, raw: str, expected: str) -> None:

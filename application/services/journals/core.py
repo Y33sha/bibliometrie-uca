@@ -23,7 +23,7 @@ from application.services._merge import load_merge_pair
 from application.services.publications.core import refresh_from_sources
 from domain.errors import NotFoundError, ValidationError
 from domain.journals.journal import OaModel
-from domain.normalize import normalize_text
+from domain.normalize import normalize_text, to_plain_text
 
 
 def find_or_create_journal(
@@ -94,7 +94,7 @@ def find_or_create_journal(
 
     # 6. Créer + enregistrer la forme de nom
     journal_id = repo.create_journal(
-        title=title.strip(),
+        title=to_plain_text(title),
         issn=issn,
         eissn=eissn,
         issnl=issnl,

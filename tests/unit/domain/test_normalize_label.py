@@ -19,3 +19,12 @@ class TestNormalizeLabel:
 
     def test_empty_string(self):
         assert normalize_label("") == ""
+
+    def test_strips_markup_deposited_by_sources(self):
+        # Relevé en base : les noms d'espèces arrivent en italique depuis les sources.
+        assert normalize_label("<italic>Corynebacterium bovis</italic>") == (
+            "Corynebacterium bovis"
+        )
+        assert normalize_label(
+            "<italic>Pseudomonas syringae</italic> pv. <italic>tomato</italic>"
+        ) == ("Pseudomonas syringae pv. tomato")
