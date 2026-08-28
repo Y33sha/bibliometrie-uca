@@ -26,8 +26,11 @@ class TestExtractors:
     def test_hal_all_levels_flat(self):
         topics = {
             "hal_domains": [
-                "sdv.bbm.bm_FacetSep_Sciences du Vivant [q-bio]"
-                "/Biochimie, Biologie Moléculaire/Biologie moléculaire"
+                # Une seule entrée, coupée sur deux lignes : le chemin complet des trois niveaux.
+                (
+                    "sdv.bbm.bm_FacetSep_Sciences du Vivant [q-bio]"
+                    "/Biochimie, Biologie Moléculaire/Biologie moléculaire"
+                )
             ]
         }
         assert hal_labels(topics) == [

@@ -196,6 +196,7 @@ structure_relations = Table(
         "relation_type",
         name="structure_relations_parent_id_child_id_relation_type_key",
     ),
+    CheckConstraint("parent_id <> child_id", name="structure_relations_no_self_reference"),
 )
 
 
@@ -210,6 +211,12 @@ structure_name_forms = Table(
     Column("requires_context_of", ARRAY(Integer)),
     Column("is_excluding", Boolean, nullable=False, server_default="false"),
     UniqueConstraint("structure_id", "form_text", name="uq_snf_structure_form"),
+    # Une forme courte ne s'apparie qu'aux frontières de mot : sans cela, un acronyme de
+    # quelques lettres se retrouverait au milieu de n'importe quel mot d'une adresse.
+    CheckConstraint(
+        "char_length(form_text) > 6 OR is_word_boundary",
+        name="ck_structure_name_forms_short_word_boundary",
+    ),
 )
 
 
@@ -833,6 +840,11 @@ staging = Table(
     CheckConstraint(
         "not_found_at IS NULL OR processed",
         name="staging_not_found_at_implies_processed",
+    ),
+    CheckConstraint(
+        "entry_mode = ANY (ARRAY['bulk'::text, 'cross_import_doi'::text, "
+        "'cross_import_hal'::text])",
+        name="staging_entry_mode_check",
     ),
 )
 
