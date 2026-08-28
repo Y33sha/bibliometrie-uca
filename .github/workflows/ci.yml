@@ -129,6 +129,13 @@ jobs:
         working-directory: interfaces/frontend
         run: npm run check
 
+      # `svelte/no-at-html-tags` : un `{@html}` ajouté hors des points d'insertion recensés fait
+      # échouer l'intégration. C'est le seul endroit du frontend où une valeur reçue d'une source
+      # peut devenir du code exécutable ; la liste des dérogations vit dans `eslint.config.js`.
+      - name: Lint (eslint)
+        working-directory: interfaces/frontend
+        run: npm run lint
+
       - name: Tests
         working-directory: interfaces/frontend
         run: npm test
