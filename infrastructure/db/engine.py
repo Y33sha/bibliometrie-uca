@@ -35,7 +35,8 @@ def db_url(*, application: bool = False) -> URL:
                 "avec `infrastructure/db/roles.sql`, puis renseigner DB_APP_USER et "
                 "DB_APP_PASSWORD."
             )
-        username, password = settings.db_app_user, settings.db_app_password
+        username = settings.db_app_user
+        password = settings.db_app_password.get_secret_value()
     else:
         if not settings.db_owner_user:
             raise RuntimeError(
@@ -44,7 +45,8 @@ def db_url(*, application: bool = False) -> URL:
                 "Renseigner DB_OWNER_USER et DB_OWNER_PASSWORD. Un processus qui ne sert que "
                 "l'API n'en a pas besoin : il lui suffit de DB_APP_USER et DB_APP_PASSWORD."
             )
-        username, password = settings.db_owner_user, settings.db_owner_password
+        username = settings.db_owner_user
+        password = settings.db_owner_password.get_secret_value()
     query = {"sslmode": settings.db_sslmode} if settings.db_sslmode else {}
     return URL.create(
         drivername="postgresql+psycopg",

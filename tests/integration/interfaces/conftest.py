@@ -32,7 +32,8 @@ def _build_test_sync_engine(*, application: bool = False) -> Engine:
     url = URL.create(
         drivername="postgresql+psycopg",
         username=_s.db_app_user if application else DB_OWNER_USER,
-        password=(_s.db_app_password if application else DB_OWNER_PASSWORD) or None,
+        password=(_s.db_app_password.get_secret_value() if application else DB_OWNER_PASSWORD)
+        or None,
         host=DB_HOST,
         port=DB_PORT,
         database="bibliometrie_test",

@@ -6,12 +6,14 @@ Usage :
     from infrastructure.settings import settings
     print(settings.db_host)
 
+Les valeurs secrètes sont typées `SecretStr` : leur représentation et leur sérialisation rendent `**********`, et la valeur se lit par `.get_secret_value()`. Un relevé de la configuration, une trace d'erreur ou un journal qui traverserait l'objet ne les expose donc pas.
+
 Les paramètres d'exploitation externalisés (périmètres, collections HAL, années couvertes) sont lus depuis la table `config` en base. Les identifiants d'accès aux sources, eux, sont des secrets : ils viennent de l'environnement comme les autres.
 """
 
 from typing import Annotated
 
-from pydantic import field_validator
+from pydantic import SecretStr, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 from infrastructure import PROJECT_ROOT
@@ -34,8 +36,8 @@ class Settings(BaseSettings):
     # maintenance partagent cette configuration sans jamais ouvrir de session. Le contrôle vit
     # donc au démarrage de l'API (`interfaces.api.session.check_auth_config`).
     admin_user: str = "admin"
-    admin_hash: str = ""
-    session_secret: str = ""
+    admin_hash: SecretStr = SecretStr("")
+    session_secret: SecretStr = SecretStr("")
 
     # ----- Sécurité HTTP -----
     # Cookie de session marqué `Secure` (transmis uniquement sur HTTPS). Vrai par défaut ;
@@ -58,13 +60,13 @@ class Settings(BaseSettings):
     # `infrastructure.db.engine.db_url`) ; le processus qui sert l'API n'a pas à la porter,
     # puisqu'il se connecte sous l'identité restreinte ci-dessous.
     db_owner_user: str = ""
-    db_owner_password: str = ""
+    db_owner_password: SecretStr = SecretStr("")
     # Identité restreinte dont l'API se sert pour se connecter : un rôle limité à la lecture
     # et à l'écriture des données, sans droit sur le schéma. Vide, la connexion de l'API est
     # refusée (cf. `infrastructure.db.engine.db_url`) ; migrations, pipeline et scripts, eux,
     # se connectent avec l'identité principale.
     db_app_user: str = ""
-    db_app_password: str = ""
+    db_app_password: SecretStr = SecretStr("")
     # Mode SSL de la connexion (valeurs libpq : disable/prefer/require/verify-ca/verify-full).
     # Vide → défaut du driver, soit `prefer` : chiffré si le serveur le propose, certificat non
     # vérifié. `require` impose le chiffrement sans authentifier le serveur pour autant. Poser
@@ -80,10 +82,10 @@ class Settings(BaseSettings):
     # ----- Identifiants d'accès aux sources externes -----
     # Une source dont les identifiants manquent est sautée au lancement du pipeline, avec un
     # avertissement, sans interrompre le run.
-    openalex_api_key: str = ""
-    wos_api_key: str = ""
+    openalex_api_key: SecretStr = SecretStr("")
+    wos_api_key: SecretStr = SecretStr("")
     scanr_username: str = ""
-    scanr_password: str = ""
+    scanr_password: SecretStr = SecretStr("")
     # Adresse annoncée aux API qui pratiquent le polite pool. Requise par Crossref, DataCite et
     # Unpaywall ; facultative pour OpenAlex, dont une clé d'API ouvre aussi le polite pool.
     polite_pool_email: str = ""

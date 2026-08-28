@@ -4,6 +4,7 @@ L'API se connecte sous le rôle restreint ; migrations, pipeline et scripts de m
 """
 
 import pytest
+from pydantic import SecretStr
 
 from infrastructure.db import engine as engine_mod
 from infrastructure.db.engine import db_url
@@ -19,7 +20,10 @@ def db_settings(monkeypatch):
             "db_owner_password": "owner-pw",
         }
         for name, value in {**defaults, **overrides}.items():
-            monkeypatch.setattr(engine_mod.settings, name, value)
+            # Les mots de passe sont typés `SecretStr` : les poser en clair les rendrait
+            # inutilisables par le constructeur d'URL, qui lit par `.get_secret_value()`.
+            posee = SecretStr(value) if name.endswith("_password") else value
+            monkeypatch.setattr(engine_mod.settings, name, posee)
 
     return _apply
 

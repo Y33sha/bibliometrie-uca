@@ -24,13 +24,13 @@ def check_auth_config() -> None:
 
     Le contrôle vit ici plutôt que dans les settings parce qu'il porte sur ce que l'API exerce : le pipeline et les scripts de maintenance lisent la même configuration sans jamais ouvrir de session, et n'ont donc pas à porter ces deux secrets. Le refus tombe au démarrage, où il se voit, et non à la première tentative de connexion.
     """
-    if not settings.admin_hash:
+    if not settings.admin_hash.get_secret_value():
         raise RuntimeError(
             "ADMIN_HASH est requis pour servir l'API : sans empreinte de mot de passe, aucune "
             "connexion d'administration n'aboutit et les écritures restent inaccessibles. "
             "Générer l'empreinte avec bcrypt (recette dans `.env.example`)."
         )
-    if len(settings.session_secret) < MIN_SESSION_SECRET_LENGTH:
+    if len(settings.session_secret.get_secret_value()) < MIN_SESSION_SECRET_LENGTH:
         raise RuntimeError(
             f"SESSION_SECRET doit faire au moins {MIN_SESSION_SECRET_LENGTH} caractères : il "
             "signe les jetons de session, et une clé plus courte se retrouve hors ligne. En "
@@ -47,7 +47,8 @@ _PAYLOAD_SEPARATOR = "|"
 
 
 def _sign(payload: str) -> str:
-    return hmac.new(settings.session_secret.encode(), payload.encode(), hashlib.sha256).hexdigest()
+    key = settings.session_secret.get_secret_value().encode()
+    return hmac.new(key, payload.encode(), hashlib.sha256).hexdigest()
 
 
 def issue_token(admin_user: str) -> str:
@@ -84,9 +85,10 @@ def check_password(password: str) -> bool:
 
     `bcrypt.checkpw` lève `ValueError` quand le hash n'est pas un hash bcrypt valide : un mauvais mot de passe reste un refus, pas une erreur serveur.
     """
-    if not settings.admin_hash:
+    admin_hash = settings.admin_hash.get_secret_value()
+    if not admin_hash:
         return False
     try:
-        return bcrypt.checkpw(password.encode(), settings.admin_hash.encode())
+        return bcrypt.checkpw(password.encode(), admin_hash.encode())
     except ValueError:
         return False

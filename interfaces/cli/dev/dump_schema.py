@@ -66,7 +66,7 @@ def main() -> None:
         capture_output=True,
         text=True,
         encoding="utf-8",
-        env={**os.environ, "PGPASSWORD": settings.db_owner_password},
+        env={**os.environ, "PGPASSWORD": settings.db_owner_password.get_secret_value()},
     )
     if result.returncode != 0:
         print(f"ERREUR pg_dump : {result.stderr}", file=sys.stderr)

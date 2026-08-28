@@ -90,7 +90,7 @@ def get_hal_collections(conn: Connection) -> dict[str, str]:
 
 def get_openalex_api_key() -> str | None:
     """Clé d'API OpenAlex, ou `None` si elle n'est pas configurée."""
-    return settings.openalex_api_key or None
+    return settings.openalex_api_key.get_secret_value() or None
 
 
 def get_extraction_api_ids(conn: Connection, source: str) -> list[str]:
@@ -152,12 +152,12 @@ def get_polite_pool_email() -> str:
 
 def get_wos_api_key() -> str:
     """Clé d'API Web of Science, chaîne vide si elle n'est pas configurée."""
-    return settings.wos_api_key
+    return settings.wos_api_key.get_secret_value()
 
 
 def get_scanr_credentials() -> tuple[str, str]:
     """Identifiants de l'API ScanR, `("", "")` si l'un des deux manque."""
-    user, password = settings.scanr_username, settings.scanr_password
+    user, password = settings.scanr_username, settings.scanr_password.get_secret_value()
     if user and password:
         return user, password
     return "", ""

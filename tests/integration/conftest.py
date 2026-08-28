@@ -101,7 +101,7 @@ def _apply_app_role_grants() -> None:
         if cur.fetchone() is None:
             cur.execute(
                 f"CREATE ROLE {settings.db_app_user} LOGIN PASSWORD %s",
-                (settings.db_app_password,),
+                (settings.db_app_password.get_secret_value(),),
             )
         for ordre in ordres:
             cur.execute(ordre)

@@ -4,6 +4,7 @@
 """
 
 import pytest
+from pydantic import SecretStr
 
 from interfaces.api import session as session_mod
 from interfaces.api.session import MIN_SESSION_SECRET_LENGTH, check_auth_config
@@ -18,7 +19,9 @@ def auth_settings(monkeypatch):
 
     def _apply(**overrides):
         for name, value in {"admin_hash": _HASH, "session_secret": _SECRET, **overrides}.items():
-            monkeypatch.setattr(session_mod.settings, name, value)
+            # Les champs secrets sont typés `SecretStr` : les poser en clair les rendrait
+            # inutilisables par le code testé, qui lit par `.get_secret_value()`.
+            monkeypatch.setattr(session_mod.settings, name, SecretStr(value))
 
     return _apply
 

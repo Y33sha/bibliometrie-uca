@@ -4,6 +4,7 @@ import time
 
 import bcrypt
 import pytest
+from pydantic import SecretStr
 
 from interfaces.api import session as session_module
 from interfaces.api.session import (
@@ -27,7 +28,7 @@ class TestReadSession:
 
     def test_rejects_a_foreign_signature(self, monkeypatch):
         token = issue_token("admin")
-        monkeypatch.setattr(session_module.settings, "session_secret", "autre-secret")
+        monkeypatch.setattr(session_module.settings, "session_secret", SecretStr("autre-secret"))
         assert read_session(token) is None
 
     def test_rejects_an_expired_token(self, monkeypatch):
@@ -48,15 +49,15 @@ class TestReadSession:
 class TestCheckPassword:
     def test_accepts_the_matching_password_and_rejects_others(self, monkeypatch):
         hashed = bcrypt.hashpw(b"secret", bcrypt.gensalt()).decode()
-        monkeypatch.setattr(session_module.settings, "admin_hash", hashed)
+        monkeypatch.setattr(session_module.settings, "admin_hash", SecretStr(hashed))
         assert check_password("secret") is True
         assert check_password("mauvais") is False
 
     def test_rejects_a_malformed_hash_without_erroring(self, monkeypatch):
         """Un hash mal formé (placeholder de config) refuse la connexion, sans erreur serveur."""
-        monkeypatch.setattr(session_module.settings, "admin_hash", "pas-un-hash-bcrypt")
+        monkeypatch.setattr(session_module.settings, "admin_hash", SecretStr("pas-un-hash-bcrypt"))
         assert check_password("peu importe") is False
 
     def test_rejects_when_no_hash_configured(self, monkeypatch):
-        monkeypatch.setattr(session_module.settings, "admin_hash", "")
+        monkeypatch.setattr(session_module.settings, "admin_hash", SecretStr(""))
         assert check_password("peu importe") is False
