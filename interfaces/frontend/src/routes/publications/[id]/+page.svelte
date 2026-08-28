@@ -2,7 +2,7 @@
   import { page } from "$app/stores";
   import { onMount } from "svelte";
   import { api, auth } from "$lib/api";
-  import { sanitizeTitle } from "$lib/utils";
+  import { sanitizeAbstract } from "$lib/utils";
   import type { PubResponse, SourceAuthorship, SourceRow } from "./types";
   import PublicationHeader from "./PublicationHeader.svelte";
   import PublicationSidebar from "./PublicationSidebar.svelte";
@@ -172,7 +172,7 @@
         {#if pub.abstract}
           <div class="detail-section">
             <div class="detail-label">Résumé</div>
-            <p class="abstract-text">{@html sanitizeTitle(pub.abstract)}</p>
+            <div class="abstract-text">{@html sanitizeAbstract(pub.abstract)}</div>
           </div>
         {/if}
       </div>
@@ -234,5 +234,15 @@
     line-height: 1.6;
     color: var(--text);
     margin: 0;
+  }
+
+  /* Le résumé garde les paragraphes que la source y dépose : conteneur en `div`, un `p` ne
+     pouvant pas en contenir un autre. Le dernier ne pousse pas la bordure de la section. */
+  .abstract-text :global(p) {
+    margin: 0 0 0.75rem;
+  }
+
+  .abstract-text :global(p:last-child) {
+    margin-bottom: 0;
   }
 </style>
