@@ -1,6 +1,3 @@
-# Imports manuels (RH, APC, exports WoS)
-imports_manuels/
-
 # Logs, rapports pipeline et status.json
 logs/
 
@@ -19,7 +16,7 @@ dist/
 *.stackdump
 
 # Frontend (SvelteKit)
-interfaces/frontend/node_modules/
+node_modules/
 interfaces/frontend/build/
 interfaces/frontend/.svelte-kit/
 # OpenAPI dump intermédiaire (schema.ts généré via types:gen)
