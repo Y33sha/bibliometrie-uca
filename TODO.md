@@ -4,6 +4,7 @@
 * [ ] bioRxiv, medRxiv: voir si on moissonne ces identifiants; possibilité de récupérer les DOI à partir des identifiants comme dans ArXiv? (ex. publi 2757)
 * [ ] chercher dans ScanR par hal-id? (généraliser cross-import à tous les identifiants et toutes les sources; ajouter système de backoff)
 * [ ] cross_import: max 10k par source par run? (pour lisser dans le temps)
+* [ ] refresh_stale: pas de logs d'avancement (seulement début et fin) => gênant quand beaucoup de lignes stale
 ## Suite du traitement
 * [ ] CLI `seed_journals_doi_prefix`: intégrer au pipeline? + recalculer les anciens pour tenir compte des nouveaux (chaque doi_prefix de journal doit être unique et aussi précis que possible; à cette occasion, réécrire la fonction resolve_journal_by_doi de manière moins alambiquée)
 * [ ] tester la nouvelle logique de matching personnes: faire une copie de la base, vider les `persons`, `person_name_forms` et `person_identifiers`, relancer le pipeline, comparer le résultat à la base canonique; étudier le diff, retravailler la logique, itérer jusqu'à convergence.
@@ -34,6 +35,7 @@
 * [ ] admin/persons, facette "à confirmer": décomptes aberrants
 * [ ] recherche personnes par nom+prénom: interroger les 2 colonnes
 * [ ] journals/expected.py: faire quelque chose de ça, ou supprimer
+* [ ] distinct_persons: créer circuit DELETE
 ## Publique
 * [ ] page "affiliations suspectes hal": requête incorrecte, capture trop de publis + problème de perf
 * [ ] Filtres supplémentaires possibles: langue; `has_doi` (crossref, datacite, other, none); `corresponding_is_in_perimeter`; `peer_reviewed`? (suppose de posséder la donnée ou de pouvoir la déduire des sources); licence
@@ -42,6 +44,7 @@
 * [ ] Montants APC consultables via /stats (à envisager une fois que les problèmes de données seront résolus)
 * [ ] Publications: facette sujets?
 * [ ] Facettes: tester l'option "caché par défaut" / + harmoniser singulier/pluriel
+* [ ] mots-clés libres: ajouter séparateurs + harmoniser style avec "sujets"
 
 # Cas particuliers, bizarreries à élucider
 * [ ] 164107: pourquoi type autre?
@@ -50,9 +53,9 @@
 * [ ] 182637 et 182636: vérifier si DataCite indique relation
 * [ ] 107270 et 869915 Computing Pivot-Minors: un article faussement typé preprint par openalex; + question des arxiv_id (déduire le DOI et vice-versa)
 * [ ] fusion entre article et conference_paper: 12362
-* [ ] 205492 et 205499: pourquoi pas de fusion? (lesdeux résolvent vers le même DOI)
 * [ ] 165425: fusion d'un article et d'un dataset
 * [ ] « Daniel Régnier-Roux » incompatible avec la personne 2958 (« daniel roux ») Identifiant hal_person_id='1169' déjà attribué à person_id=2958 avec statut 'pending' ; impossible d'attribuer à person_id=44830. (Correct par hasard; mais l'incompatibilité est anormale)
+* [ ] "Total phase persons : 3 new, 51333 updated" comment est-ce possible, avec 14k personnes en base?
 
 # Idées pour plus tard, éventuellement
 ## Fonctionnalités
@@ -70,9 +73,3 @@
 
 # Pas nécessaire de le régler, du moment qu'on le documente quelque part
 * [ ] re-tester le circuit des imports RH => pas urgent, pas d'imports csv à terme en prod
-
-# Qualité / Doc
-* [ ] Audit complet "nommage des variables/fonctions/classes/méthodes/tables/colonnes". S'assurer que le code est structure-agnostique. Supprimer abréviations cryptiques. Revoir certains noms trop restrictifs (publication->document? journal->container?) ou incohérents (extract/cross_import)
-* [ ] Audit complet "documentation/docstrings/commentaires". S'assurer que tout est à jour et non-jargonneux.
-* [ ] Documenter la duplication de données (vues matérialisées, tables et colonnes dérivées) et leur cycle de vie + quantifier poids vs gain de performance en lecture
-* [ ] Documenter les process incrémentaux (flag `dirty`) vs recalcul complet, et les arbitrages entre gain de temps et risque de drift; chaque process incrémental doit avoir un mode `--full-rebuild`
