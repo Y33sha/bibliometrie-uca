@@ -33,8 +33,15 @@ services:
     restart: unless-stopped
     volumes:
       - .:/app
+    # Publication sur la boucle locale, comme la base : le serveur de développement sert des
+    # docs d'API ouvertes et un cookie de session sans l'attribut `Secure`, réglages qui
+    # supposent qu'il ne quitte pas la machine. Ouvrir à une autre machine — un téléphone sur
+    # le même réseau, par exemple — demande de nommer l'interface qui la dessert.
     ports:
-      - "8003:8000"
+      - "127.0.0.1:8003:8000"
+    # Le fichier d'environnement entier, à la différence de la composition de production : ce
+    # conteneur sert l'API, mais porte aussi l'outillage de test et de vérification, qui se
+    # connecte sous le propriétaire du schéma.
     env_file: .env
     environment:
       # Override pour le réseau docker : le conteneur db est accessible via l'hôte "db"
@@ -58,8 +65,9 @@ services:
       - /app/node_modules
       - /app/.svelte-kit
       - /app/build
+    # Boucle locale, comme le backend qu'il proxifie.
     ports:
-      - "5176:5173"
+      - "127.0.0.1:5176:5173"
     environment:
       API_TARGET: http://backend:8000
     depends_on:
