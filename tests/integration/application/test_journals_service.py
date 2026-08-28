@@ -196,6 +196,14 @@ class TestFindOrCreatePublisher:
         )
         assert found == existing
 
+    def test_un_nom_encode_rejoint_le_meme_editeur_que_le_nom_en_clair(
+        self, sa_sync_conn, publisher_gateway
+    ):
+        """Régression : même cause et même correction que pour les revues (cf. `TestFindOrCreateJournal`)."""
+        premier = find_or_create_publisher("Taylor & Francis", repo=publisher_gateway)
+        second = find_or_create_publisher("TAYLOR &amp; FRANCIS", repo=publisher_gateway)
+        assert second == premier
+
     def test_finds_existing_by_name_form(self, sa_sync_conn, publisher_gateway):
         existing = find_or_create_publisher("Elsevier", repo=publisher_gateway)
         found = find_or_create_publisher("elsevier", repo=publisher_gateway)
@@ -223,6 +231,27 @@ class TestFindOrCreateJournal:
         row = _fetch_one(sa_sync_conn, "SELECT title, issn FROM journals WHERE id = :id", id=j_id)
         assert row.title == "Nature"
         assert row.issn == "0028-0836"
+
+    def test_un_titre_encode_rejoint_le_meme_journal_que_le_titre_en_clair(
+        self, sa_sync_conn, gateway
+    ):
+        """Régression : le titre affiché et la clé de rapprochement dérivent de la même valeur.
+
+        Les sources livrent le même titre tantôt en clair, tantôt avec des entités HTML. Tant
+        que la clé se calculait sur le titre reçu et le titre affiché sur sa mise à plat, les
+        deux formes portaient des clés distinctes (`... amp ...`) et la revue naissait en deux
+        exemplaires — quatre cas relevés en base.
+        """
+        premier = find_or_create_journal("Wood & Fire Safety", repo=gateway)
+        second = find_or_create_journal("Wood &amp; Fire Safety", repo=gateway)
+        assert second == premier
+        row = _fetch_one(
+            sa_sync_conn,
+            "SELECT title, title_normalized FROM journals WHERE id = :id",
+            id=premier,
+        )
+        assert row.title == "Wood & Fire Safety"
+        assert "amp" not in row.title_normalized
 
     def test_finds_by_openalex_id(self, sa_sync_conn, gateway):
         existing = _insert_journal(sa_sync_conn, "Nature", openalex_id="S137773608")
