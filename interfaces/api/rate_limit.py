@@ -8,11 +8,13 @@ Deux usages, deux compteurs indépendants — un export refusé ne doit pas emp�
 from __future__ import annotations
 
 import logging
+import threading
 import time
 from collections import OrderedDict
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 
 from fastapi import HTTPException, Request
+from infrastructure.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -169,3 +171,71 @@ login_rate_limit = _rate_limited(
 export_rate_limit = _rate_limited(
     _export_limiter, "Trop d'exports demandés. Réessayez dans quelques minutes."
 )
+
+
+# ── Simultanéité des exports ──────────────────────────────────────
+#
+# Un export compose sa réponse en mémoire avant de l'envoyer : la requête s'exécute d'un coup, et
+# les lignes tiennent en mémoire tant que le corps part. Le plafond de lignes borne ce qu'un export
+# coûte, le plafond de fréquence ce qu'une rafale coûte à un client ; celui-ci borne ce que le
+# processus porte à un instant donné, quel que soit le nombre de clients.
+
+_export_slots = threading.BoundedSemaphore(settings.max_concurrent_exports)
+
+
+class ExportSlot:
+    """Droit de mener un export, rendu quand son envoi s'achève.
+
+    La restitution suit l'envoi et non la fin du traitement : la mémoire reste prise tant que le corps de la réponse part, et le cycle de vie des dépendances s'achève avant. `stream_owns` marque le passage de ce droit au flux, qui le rend alors lui-même.
+    """
+
+    def __init__(self) -> None:
+        self._held = False
+        self.stream_owns = False
+
+    def acquire(self) -> bool:
+        """Prend un droit sans attendre. `False` si aucun n'est libre."""
+        self._held = _export_slots.acquire(blocking=False)
+        return self._held
+
+    def release(self) -> None:
+        """Rend le droit, une fois. Un second appel ne fait rien."""
+        if self._held:
+            self._held = False
+            _export_slots.release()
+
+
+def export_slot() -> Iterator[ExportSlot]:
+    """Dépendance FastAPI : réserve un droit d'export, ou rend 503.
+
+    Le refus dit une indisponibilité passagère, non un quota dépassé — d'où un statut distinct de celui du plafond de fréquence.
+
+    À la sortie, le droit n'est rendu que si le flux ne l'a pas repris : une erreur survenue avant la construction de la réponse ne doit pas immobiliser un droit, et un envoi en cours ne doit pas le voir disparaître sous lui.
+    """
+    slot = ExportSlot()
+    if not slot.acquire():
+        raise HTTPException(
+            status_code=503,
+            detail="Trop d'exports en cours. Réessayez dans un instant.",
+            headers={"Retry-After": "30"},
+        )
+    try:
+        yield slot
+    finally:
+        if not slot.stream_owns:
+            slot.release()
+
+
+def releasing(chunks: Iterator[str], slot: ExportSlot) -> Iterator[str]:
+    """Parcourt les blocs d'un export et rend le droit quand le parcours s'achève, abandon compris."""
+    slot.stream_owns = True
+    try:
+        yield from chunks
+    finally:
+        slot.release()
+
+
+def reset_export_slots() -> None:
+    """Rétablit un jeu de droits neuf, au nombre que la configuration porte (isolation entre tests)."""
+    global _export_slots
+    _export_slots = threading.BoundedSemaphore(settings.max_concurrent_exports)

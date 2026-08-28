@@ -66,9 +66,10 @@ _settings.cookie_secure = False
 @pytest.fixture(autouse=True)
 def _reset_rate_limiters():
     """Isole chaque test des compteurs globaux des limiteurs de débit."""
-    from interfaces.api.rate_limit import reset_rate_limiters
+    from interfaces.api.rate_limit import reset_export_slots, reset_rate_limiters
 
     reset_rate_limiters()
+    reset_export_slots()
     yield
 
 

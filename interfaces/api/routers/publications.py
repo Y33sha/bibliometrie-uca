@@ -9,10 +9,6 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import StreamingResponse
-from sqlalchemy import Connection
-
 from application.ports.read_models._common import EntityFacetResponse, EntityKind
 from application.ports.read_models.publications_queries import (
     DuplicatePairResponse,
@@ -30,6 +26,10 @@ from application.services.publications import commands as publication_commands
 from domain.publications.doc_types import DOC_TYPES
 from domain.publications.metadata import ACCESS_LEVELS, OA_STATUSES
 from domain.sources.hal import HAL_DEPOSIT_STATUSES
+from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
+from sqlalchemy import Connection
+
 from interfaces.api.deps import (
     audit_repo,
     db_conn,
@@ -44,7 +44,7 @@ from interfaces.api.models import (
     MergeResponse,
     OkResponse,
 )
-from interfaces.api.rate_limit import export_rate_limit
+from interfaces.api.rate_limit import ExportSlot, export_rate_limit, export_slot, releasing
 
 router = APIRouter(prefix="/api/publications", tags=["publications"])
 
@@ -149,15 +149,17 @@ def publications_entity_facet(
     )
 
 
-def _csv_stream(chunks: Iterator[str], *, filename: str) -> StreamingResponse:
+def _csv_stream(chunks: Iterator[str], *, filename: str, slot: ExportSlot) -> StreamingResponse:
     """Emballe les blocs d'un export en réponse de téléchargement, envoyés au fil de leur production.
 
-    La mémoire tenue pendant l'envoi vaut un bloc à la fois.
+    La mémoire tenue pendant l'envoi vaut un bloc à la fois, plus les lignes que la requête a ramenées.
+
+    Le droit d'export passe au flux, qui le rend quand le parcours s'achève : la mémoire reste prise tant que le corps part, et le cycle de vie des dépendances s'achève avant.
 
     Le statut et les en-têtes partent avec le premier bloc : une erreur survenant pendant l'envoi ferme la connexion sur un fichier tronqué, sous un statut 200. Les lignes sont en mémoire à ce stade, la requête s'étant exécutée avant que la réponse ne commence.
     """
     return StreamingResponse(
-        chunks,
+        releasing(chunks, slot),
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
@@ -170,6 +172,7 @@ def export_publications_csv(
     columns: str = Query(""),
     queries: PublicationsQueries = Depends(publications_queries),
     _rate_limit: None = Depends(export_rate_limit),
+    slot: ExportSlot = Depends(export_slot),
 ) -> StreamingResponse:
     """Export CSV des publications, fidèle au tableau affiché : mêmes filtres, et mêmes colonnes que celles listées dans `columns`.
 
@@ -181,6 +184,7 @@ def export_publications_csv(
             columns=parse_str_csv(columns),
         ),
         filename="publications.csv",
+        slot=slot,
     )
 
 
@@ -195,6 +199,7 @@ def export_theses_csv(
     sort: PublicationSort = Query("soutenance_desc"),
     queries: PublicationsQueries = Depends(publications_queries),
     _rate_limit: None = Depends(export_rate_limit),
+    slot: ExportSlot = Depends(export_slot),
 ) -> StreamingResponse:
     """Export CSV de la page thèses, aux mêmes filtres et au même tri que sa liste.
 
@@ -213,7 +218,9 @@ def export_theses_csv(
         doc_types=parse_vocabulary_csv(doc_type, allowed=DOC_TYPES, param="doc_type")
         or ["thesis", "ongoing_thesis"],
     )
-    return _csv_stream(queries.export_theses_csv(filters=filters, sort=sort), filename="theses.csv")
+    return _csv_stream(
+        queries.export_theses_csv(filters=filters, sort=sort), filename="theses.csv", slot=slot
+    )
 
 
 @router.get("/duplicates/next", response_model=DuplicatePairResponse)

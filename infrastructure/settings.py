@@ -82,6 +82,11 @@ class Settings(BaseSettings):
     # visées du début du résultat.
     max_pagination_offset: int = 500_000
 
+    # Nombre d'exports menés de front. Un export compose sa réponse en mémoire avant de l'envoyer :
+    # ce plafond borne ce que le processus porte à un instant donné, là où le plafond de lignes
+    # borne le coût d'un export et celui de fréquence le coût d'une rafale venue d'un même client.
+    max_concurrent_exports: int = 2
+
     # ----- Pool de connexions -----
     # Ratio max/min recommandé : ~1:15. Monter db_pool_max à 50+ si l'API admin charge plusieurs facettes en parallèle et qu'on observe des TimeoutError côté pool. Cf. `.env.example` pour la note opérationnelle.
     db_pool_min: int = 2
