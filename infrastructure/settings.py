@@ -85,7 +85,13 @@ class Settings(BaseSettings):
     # Nombre d'exports menés de front. Un export compose sa réponse en mémoire avant de l'envoyer :
     # ce plafond borne ce que le processus porte à un instant donné, là où le plafond de lignes
     # borne le coût d'un export et celui de fréquence le coût d'une rafale venue d'un même client.
-    max_concurrent_exports: int = 2
+    #
+    # La valeur se dimensionne sur le coût mesuré d'un export sans filtre — 59 Mo pour les 61 877
+    # publications d'août 2026 — rapporté à la mémoire du conteneur. À ce compte, cinq exports
+    # simultanés occupent de l'ordre de 300 Mo sur les deux gigaoctets qu'il porte. Une croissance
+    # du corpus déplace ce calcul : le plafond de lignes en donne la borne haute, et l'atteindre
+    # multiplierait par huit le coût d'un export.
+    max_concurrent_exports: int = 5
 
     # ----- Pool de connexions -----
     # Ratio max/min recommandé : ~1:15. Monter db_pool_max à 50+ si l'API admin charge plusieurs facettes en parallèle et qu'on observe des TimeoutError côté pool. Cf. `.env.example` pour la note opérationnelle.
