@@ -1,0 +1,12 @@
+# Exceptions de l'analyse de configuration, nommées et bornées à un fichier.
+
+misconfigurations:
+  - id: DS-0002
+    paths:
+      - "interfaces/api/Dockerfile"
+      - "interfaces/frontend/Dockerfile"
+    statement: >-
+      Ces deux descriptions de construction servent le développement local :
+      l'écriture passe par un montage depuis le poste, dont l'identité doit
+      correspondre. L'image de production, elle, bascule sur un compte non
+      privilégié (uid 10001) et le contrôle s'y applique.

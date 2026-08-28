@@ -81,4 +81,9 @@ EXPOSE 8000
 #
 # Le serveur ASGI, lui, reçoit son adresse et son port, rien d'autre. `--root-path` ajoute le
 # préfixe au chemin reçu, ce qui le doublerait derrière un proxy qui le transmet.
-CMD uvicorn interfaces.api.app:app --host 0.0.0.0 --port 8000
+#
+# Forme exec : le serveur tient le premier numéro de processus et reçoit le signal d'arrêt.
+# En forme shell, `/bin/sh` s'interpose, garde ce numéro, et n'ayant pas de gestionnaire pour
+# ce signal, ne le relaie pas — l'arrêt du conteneur consomme alors le délai de grâce entier
+# et coupe les connexions en cours.
+CMD ["uvicorn", "interfaces.api.app:app", "--host", "0.0.0.0", "--port", "8000"]

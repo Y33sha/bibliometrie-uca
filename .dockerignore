@@ -1,3 +1,12 @@
+# Secrets et données : la description de construction énumère ce qu'elle copie, et ces deux
+# emplacements en sont absents. Les inscrire ici rend la garantie indépendante de cette
+# énumération — le fichier d'environnement porte tous les secrets d'exploitation, et `data/`
+# le stockage local des payloads sources.
+.env
+.env.*
+!.env.example
+data
+
 # Git
 .git
 .gitignore

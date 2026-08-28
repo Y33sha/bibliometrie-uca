@@ -5,6 +5,13 @@ on:
     branches: [master]
   pull_request:
     branches: [master]
+  # Les analyses de vulnérabilité dépendent du calendrier des publications de failles, non du
+  # rythme des modifications du code. Un passage quotidien sur la branche par défaut leur donne
+  # cette cadence : une faille publiée contre une version en service se voit le lendemain, sans
+  # attendre qu'un envoi la révèle.
+  schedule:
+    - cron: "17 4 * * *"
+  workflow_dispatch:
 
 # Le jeton fourni aux jobs ne lit que le contenu du dépôt. Sans cette déclaration, il porte
 # les droits par défaut de l'organisation, qui peuvent inclure l'écriture : une action tierce
@@ -64,8 +71,18 @@ jobs:
       - name: Dependency hygiene (deptry)
         run: deptry .
 
-      - name: Vulnerability scan (pip-audit)
+      # Deux ensembles distincts : ce que l'intégration installe (outillage de développement
+      # compris) et ce que l'image embarque. Les dépendances directes sont épinglées à l'unité
+      # près et coïncident ; les transitives sont figées par `uv.lock`, qu'une résolution fraîche
+      # ne reflète pas.
+      - name: Vulnerability scan (pip-audit, arbre installé)
         run: pip-audit
+
+      - name: Vulnerability scan (pip-audit, fichier de verrouillage)
+        run: |
+          pip install uv
+          uv export --frozen --no-dev --no-hashes --no-emit-project > /tmp/lock-requirements.txt
+          pip-audit --requirement /tmp/lock-requirements.txt
 
       - name: Lint (ruff)
         run: ruff check .
@@ -149,6 +166,20 @@ jobs:
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Défauts de configuration des descriptions de construction et de déploiement, et secrets
+      # écrits dans les fichiers : deux jeux que ni l'analyse de dépendances ni l'analyse statique
+      # ne couvrent. Les exceptions vivent dans `.trivyignore.yaml`, nommées et bornées.
+      - name: Configuration et secrets (dépôt)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: misconfig,secret
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          trivyignores: .trivyignore.yaml
+          skip-dirs: node_modules,.venv,.git
 
       # Construire l'image vérifie aussi que le `Dockerfile` tient : rien d'autre ne le fait.
       - name: Build production image
