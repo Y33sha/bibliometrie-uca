@@ -1,8 +1,11 @@
-// @vitest-environment happy-dom
-// (sanitizeTitle passe le MathML/HTML par DOMPurify, qui requiert un DOM ; esc() aussi.)
+// @vitest-environment jsdom
+// DOMPurify exige un DOM, et pas n'importe lequel : sous happy-dom il reçoit un nom de balise
+// vide pour chaque nœud et n'évalue donc aucune liste blanche — les assertions d'assainissement
+// y passeraient sans rien vérifier. jsdom est l'environnement que DOMPurify prend en charge.
 import { describe, it, expect } from 'vitest';
 import {
 	esc,
+	sanitizeAbstract,
 	sanitizeTitle,
 	titleCase,
 	formatDate,
@@ -180,5 +183,61 @@ describe('deriveStructDetectionStatus', () => {
 		expect(deriveStructDetectionStatus(null, false)).toBe('manual');
 		expect(deriveStructDetectionStatus(null, null)).toBe('manual');
 		expect(deriveStructDetectionStatus(undefined, undefined)).toBe('manual');
+	});
+});
+
+// ── sanitizeAbstract ───────────────────────────────────────────
+describe('sanitizeAbstract', () => {
+	it('garde les paragraphes que les sources déposent dans un résumé', () => {
+		const result = sanitizeAbstract('<p>Premier.</p><p>Second.</p>');
+		expect(result).toContain('<p>');
+		expect(result).toContain('Premier.');
+		expect(result).toContain('Second.');
+	});
+
+	it('garde les sauts de ligne', () => {
+		expect(sanitizeAbstract('Avant<br>Après')).toContain('<br>');
+	});
+
+	it('retire les balises hors liste blanche en gardant leur texte', () => {
+		const result = sanitizeAbstract('<div onclick="x()">Texte</div>');
+		expect(result).toContain('Texte');
+		expect(result).not.toContain('onclick');
+		expect(result).not.toContain('<div');
+	});
+
+	it('rend le MathML comme un titre', () => {
+		expect(sanitizeAbstract('Soit <math><mi>x</mi></math> le seuil')).toContain('<math>');
+	});
+
+	it('échappe une injection', () => {
+		expect(sanitizeAbstract('<img src=x onerror=alert(1)>')).not.toContain('onerror');
+	});
+});
+
+// ── heuristique LaTeX : un montant en dollars n'est pas une formule ──
+describe('détection des segments LaTeX', () => {
+	it('rend en maths un segment qui porte une commande LaTeX', () => {
+		expect(sanitizeTitle('Mesure de $\\sqrt{s}=13$ TeV')).toContain('katex');
+	});
+
+	it('rend en maths un segment court sans commande', () => {
+		expect(sanitizeTitle('Le boson $Z$ et le photon')).toContain('katex');
+	});
+
+	it('laisse la prose entre deux montants intacte', () => {
+		// Deux dollars de monnaie encadrent de la prose : la passer à KaTeX la déformerait.
+		const result = sanitizeAbstract(
+			'Le coût atteint $39.43 for treatment. About 18% of patients paid $12 par acte.'
+		);
+		expect(result).not.toContain('katex');
+		expect(result).toContain('for treatment');
+		expect(result).toContain('$39.43');
+	});
+
+	it('garde les paragraphes quand la prose contient un montant', () => {
+		const result = sanitizeAbstract('<p>Un budget de $5 million sur trois ans.</p>');
+		expect(result).toContain('<p>');
+		expect(result).toContain('$5 million');
 	});
 });

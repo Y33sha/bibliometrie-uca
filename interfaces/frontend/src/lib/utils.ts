@@ -30,6 +30,10 @@ const TITLE_ALLOWED_TAGS = new Set([
 	'menclose', 'mstyle', 'merror'
 ]);
 
+/* Le résumé porte en plus la structure de paragraphe que les sources y déposent (JATS, Crossref).
+ * La perdre collerait tout le texte en un bloc. */
+const ABSTRACT_ALLOWED_TAGS = new Set([...TITLE_ALLOWED_TAGS, 'p', 'br']);
+
 const TITLE_ALLOWED_ATTRS = new Set(['mathvariant', 'display']);
 
 function escapeHtml(s: string): string {
@@ -40,43 +44,75 @@ function escapeHtml(s: string): string {
 		.replace(/"/g, '&quot;');
 }
 
-/* Rend les segments LaTeX $...$ et $$...$$ via KaTeX, échappe tout le texte hors-LaTeX. */
-function renderLatex(s: string): string {
+/* Segment délimité par des dollars : $$...$$ (hors-texte) ou $...$ (en ligne). */
+const LATEX_SEGMENT = /\$\$([\s\S]+?)\$\$|\$([^$]+?)\$/g;
+
+const WORD_RE = /[A-Za-zÀ-ÿ]{3,}/g;
+
+/* Vrai si le contenu délimité est de la prose prise entre deux dollars de monnaie, non une formule.
+ *
+ * Un abstract qui cite un montant (« $39.43 for treatment. About 18% of patients... $12 ») offre
+ * deux dollars au délimiteur, et tout ce qui les sépare partirait chez KaTeX. Une commande LaTeX
+ * (`\`) tranche la question ; à défaut, trois mots ou plus désignent de la prose. Mesuré sur le
+ * corpus : aucun titre écarté, trente segments d'abstract écartés, tous de la prose. */
+function isProse(content: string): boolean {
+	if (content.includes('\\')) return false;
+	return (content.match(WORD_RE) ?? []).length >= 3;
+}
+
+/* Vrai si la chaîne porte au moins un segment de maths — un montant en dollars n'en fait pas une. */
+function hasLatex(s: string): boolean {
+	LATEX_SEGMENT.lastIndex = 0;
+	let m;
+	while ((m = LATEX_SEGMENT.exec(s)) !== null) {
+		if (!isProse(m[1] || m[2])) return true;
+	}
+	return false;
+}
+
+/* Rend les segments LaTeX via KaTeX. Le texte qui les entoure passe par la liste blanche plutôt
+ * que par un échappement en bloc : un résumé qui porte à la fois des paragraphes et une formule
+ * garde les deux. Les segments de prose, eux, gardent leurs dollars — ce sont des caractères du
+ * texte, non des délimiteurs. */
+function renderLatex(s: string, allowedTags: Set<string>): string {
 	const parts: string[] = [];
 	let lastIdx = 0;
-	// Repère $$...$$ (hors-texte) puis $...$ (en ligne)
-	const re = /\$\$([\s\S]+?)\$\$|\$([^$]+?)\$/g;
+	LATEX_SEGMENT.lastIndex = 0;
 	let m;
 
-	while ((m = re.exec(s)) !== null) {
-		parts.push(escapeHtml(s.slice(lastIdx, m.index)));
-		const tex = (m[1] || m[2]).trim().replace(/\\\\/g, '\\');
-		try {
-			parts.push(katex.renderToString(tex, {
-				displayMode: false,
-				throwOnError: false
-			}));
-		} catch {
-			parts.push(escapeHtml(tex));
+	while ((m = LATEX_SEGMENT.exec(s)) !== null) {
+		parts.push(sanitizeMarkup(s.slice(lastIdx, m.index), allowedTags));
+		const content = m[1] || m[2];
+		if (isProse(content)) {
+			parts.push(escapeHtml(m[0]));
+		} else {
+			const tex = content.trim().replace(/\\\\/g, '\\');
+			try {
+				parts.push(katex.renderToString(tex, {
+					displayMode: false,
+					throwOnError: false
+				}));
+			} catch {
+				parts.push(escapeHtml(tex));
+			}
 		}
 		lastIdx = m.index + m[0].length;
 	}
 
-	parts.push(escapeHtml(s.slice(lastIdx)));
+	parts.push(sanitizeMarkup(s.slice(lastIdx), allowedTags));
 	return parts.join('');
 }
 
 /* Assainit le MathML et les balises de formatage HTML par liste blanche, via DOMPurify. */
-function sanitizeMathML(s: string): string {
+function sanitizeMarkup(s: string, allowedTags: Set<string>): string {
 	// Retire le préfixe de namespace `mml:` pour un rendu MathML natif par le navigateur.
 	const input = s.replace(/<(\/?)\s*mml:/g, '<$1');
 	return DOMPurify.sanitize(input, {
-		ALLOWED_TAGS: [...TITLE_ALLOWED_TAGS],
+		ALLOWED_TAGS: [...allowedTags],
 		ALLOWED_ATTR: [...TITLE_ALLOWED_ATTRS]
 	});
 }
 
-const HAS_LATEX = /\$\$[\s\S]+?\$\$|\$[^$]+?\$/;
 const HAS_MATHML = /<\/?mml:/;
 
 const ENTITY_MAP: Record<string, string> = {
@@ -110,15 +146,25 @@ function decodeHtmlEntities(s: string): string {
 	return out;
 }
 
-export function sanitizeTitle(s: string | null | undefined): string {
+/* Rend une chaîne reçue d'une source, sûre vis-à-vis du XSS, en n'autorisant que `allowedTags`. */
+function render(s: string | null | undefined, allowedTags: Set<string>): string {
 	if (!s) return '';
 
 	const input = decodeHtmlEntities(s);
 
-	if (HAS_LATEX.test(input)) return renderLatex(input);
-	if (HAS_MATHML.test(input) || /<\/?[a-z]/i.test(input)) return sanitizeMathML(input);
+	if (hasLatex(input)) return renderLatex(input, allowedTags);
+	if (HAS_MATHML.test(input) || /<\/?[a-z]/i.test(input)) return sanitizeMarkup(input, allowedTags);
 
 	return escapeHtml(input);
+}
+
+export function sanitizeTitle(s: string | null | undefined): string {
+	return render(s, TITLE_ALLOWED_TAGS);
+}
+
+/* Comme `sanitizeTitle`, en gardant les paragraphes : un résumé en porte, un titre non. */
+export function sanitizeAbstract(s: string | null | undefined): string {
+	return render(s, ABSTRACT_ALLOWED_TAGS);
 }
 
 export function titleCase(s: string | null | undefined): string {
