@@ -29,7 +29,7 @@ from domain.errors import (
     PublisherMergeBlockedError,
     ValidationError,
 )
-from domain.normalize import normalize_text
+from domain.normalize import normalize_text, to_plain_text
 
 
 def find_or_create_publisher(
@@ -63,7 +63,7 @@ def find_or_create_publisher(
 
     # 2-3. Match ou création par forme de nom, puis rattachement de l'openalex_id
     # (sur l'éditeur trouvé comme sur celui créé).
-    pub_id, _ = repo.match_or_create_by_name_form(name.strip(), name_normalized)
+    pub_id, _ = repo.match_or_create_by_name_form(to_plain_text(name), name_normalized)
     if openalex_id:
         repo.set_publisher_openalex_id_if_missing(pub_id, openalex_id)
     return pub_id

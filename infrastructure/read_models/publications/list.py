@@ -1,10 +1,8 @@
 """Liste paginée + export CSV des publications."""
 
 import csv
-import html
 import json
 import logging
-import re
 from collections.abc import Iterable, Iterator, Sequence
 from typing import Any, cast
 
@@ -15,7 +13,7 @@ from application.ports.read_models.publications_queries import (
     PublicationListItem,
     PublicationListResponse,
 )
-from domain.normalize import normalize_text, strip_markup
+from domain.normalize import normalize_text, to_plain_text
 from domain.sources.registry import Source
 from domain.structures.structure import StructureType
 from infrastructure.read_models.filters import (
@@ -302,8 +300,6 @@ logger = logging.getLogger(__name__)
 # ── Export CSV ────────────────────────────────────────────────────
 
 
-_WS_RE = re.compile(r"\s+")
-
 # Caractères par lesquels un tableur reconnaît le début d'une formule. Une cellule qui
 # commence par l'un d'eux est évaluée à l'ouverture du fichier — avec le contenu qu'une
 # source externe y a déposé, titres et noms de revues venant de HAL et OpenAlex.
@@ -398,10 +394,8 @@ def _cap_export_rows(rows: Sequence[Any], cap: int) -> tuple[Sequence[Any], bool
 
 
 def _plain_text(s: str | None) -> str:
-    """Texte brut pour le CSV : retire les balises HTML/MathML (via `strip_markup`, qui préserve les indices de Miller `<111>`), dé-échappe les entités, et collapse le whitespace en un seul espace. Reflète le titre affiché, sans markup."""
-    if not s:
-        return ""
-    return _WS_RE.sub(" ", html.unescape(strip_markup(s))).strip()
+    """Texte brut pour le CSV : mise à plat du titre par `to_plain_text`. Un tableur n'interprète pas le balisage — il l'afficherait tel quel dans la cellule."""
+    return to_plain_text(s)
 
 
 def export_publications_csv(

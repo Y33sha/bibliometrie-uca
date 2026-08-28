@@ -17,7 +17,7 @@ from application.ports.pipeline.doi_prefixes import (
     PendingPublisherPrefix,
 )
 from application.ports.pipeline.publishers import PublisherFindOrCreateQueries
-from domain.normalize import normalize_text
+from domain.normalize import normalize_text, to_plain_text
 
 FetchCrossrefPrefixFn = Callable[[str], tuple[str, int | None] | None]
 """Signature : `(prefix) -> (publisher_name, member_id) | None`."""
@@ -63,7 +63,7 @@ def run_resolve_publishers(
         if name_normalized is not None:
             assert name_raw is not None
             publisher_id, created = publisher_repo.match_or_create_by_name_form(
-                name_raw, name_normalized
+                to_plain_text(name_raw), name_normalized
             )
             repo.update_publisher_id(row.prefix, publisher_id)
             metrics.add(**{"publisher_created" if created else "publisher_matched": 1})
