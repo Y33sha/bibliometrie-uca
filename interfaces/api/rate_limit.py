@@ -14,6 +14,7 @@ from collections import OrderedDict
 from collections.abc import Callable, Iterator
 
 from fastapi import HTTPException, Request
+
 from infrastructure.settings import settings
 
 logger = logging.getLogger(__name__)

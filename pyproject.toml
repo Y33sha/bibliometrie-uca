@@ -215,6 +215,9 @@ ignore = [
 max-complexity = 15
 
 [tool.ruff.lint.isort]
+# Les couches du projet, déclarées pour que leur classement en premier rang ne dépende
+# pas de l'inférence de ruff, qui varie d'une version à l'autre.
+known-first-party = ["application", "domain", "infrastructure", "interfaces"]
 # Regroupe les imports d'un même module en un seul bloc, alias inclus
 # (sinon chaque `from x import (a as b)` aliasé occupe son propre bloc).
 combine-as-imports = true

@@ -9,6 +9,10 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Annotated
 
+from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
+from sqlalchemy import Connection
+
 from application.ports.read_models._common import EntityFacetResponse, EntityKind
 from application.ports.read_models.publications_queries import (
     DuplicatePairResponse,
@@ -26,10 +30,6 @@ from application.services.publications import commands as publication_commands
 from domain.publications.doc_types import DOC_TYPES
 from domain.publications.metadata import ACCESS_LEVELS, OA_STATUSES
 from domain.sources.hal import HAL_DEPOSIT_STATUSES
-from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import StreamingResponse
-from sqlalchemy import Connection
-
 from interfaces.api.deps import (
     audit_repo,
     db_conn,
