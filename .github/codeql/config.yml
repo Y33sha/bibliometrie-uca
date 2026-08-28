@@ -1,0 +1,9 @@
+# Configuration de l'analyse CodeQL.
+name: "Bibliométrie UCA"
+
+paths-ignore:
+  # Sorties de construction du frontend : du code produit, jamais écrit ni relu.
+  - interfaces/frontend/build
+  - interfaces/frontend/.svelte-kit
+  # Types engendrés depuis le schéma OpenAPI par `npm run types:gen`.
+  - interfaces/frontend/src/lib/api/schema.ts

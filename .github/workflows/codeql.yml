@@ -1,0 +1,56 @@
+# Analyse statique de sécurité par suivi des chemins de données.
+#
+# Complète le jeu de règles de sécurité de l'analyseur du dépôt, qui repère des tournures
+# dangereuses ligne à ligne : celle-ci suit une valeur depuis son entrée jusqu'à un point
+# sensible — une requête, une commande, un rendu — et signale les chemins qui les relient.
+#
+# Les résultats vivent dans l'onglet « Security » du dépôt, et apparaissent sur les propositions
+# de modification. Ils ne bloquent pas l'intégration : une montée de version des requêtes en
+# ferait échouer toutes les propositions en cours, et le tri d'un signalement demande de le lire.
+name: CodeQL
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  # Le code n'évolue qu'aux envois, mais les requêtes de l'analyseur, elles, sont publiées au fil
+  # de l'eau : un passage hebdomadaire confronte le code inchangé aux requêtes du moment.
+  schedule:
+    - cron: "41 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  analyse:
+    runs-on: ubuntu-latest
+    permissions:
+      # Dépôt des résultats dans l'onglet « Security ».
+      security-events: write
+      contents: read
+      actions: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [python, javascript-typescript]
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Initialisation
+        uses: github/codeql-action/init@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
+        with:
+          languages: ${{ matrix.language }}
+          config-file: ./.github/codeql/config.yml
+          # `security-extended` ajoute aux requêtes par défaut celles dont la précision est
+          # moindre mais la portée plus large.
+          queries: security-extended
+
+      # Ni Python ni TypeScript ne demandent de construction : l'analyseur lit les sources.
+      - name: Analyse
+        uses: github/codeql-action/analyze@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
+        with:
+          category: "/language:${{ matrix.language }}"
