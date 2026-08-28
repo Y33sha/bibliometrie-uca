@@ -15,7 +15,7 @@
 ARG ROOT_PATH=
 
 # ---- Étape 1 : build du frontend ----
-FROM node:22-slim AS frontend-build
+FROM node:25-slim AS frontend-build
 
 ARG ROOT_PATH
 ENV BASE_PATH=$ROOT_PATH
