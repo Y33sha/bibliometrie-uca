@@ -36,7 +36,7 @@ from interfaces.api.models.errors import (
     PublisherMergeBlockedResponse,
     RejectedPairsResponse,
 )
-from interfaces.api.params import MAX_PAGINATION_OFFSET, requested_offset
+from interfaces.api.params import requested_offset
 from interfaces.api.route_path import route_path
 from interfaces.api.session import check_auth_config, read_session
 from interfaces.api.spa import BUILD_DIR, SPAStaticFiles
@@ -246,15 +246,19 @@ async def pagination_bounds_middleware(
     """Refuse une lecture paginée dont le décalage dépasse `MAX_PAGINATION_OFFSET`.
 
     La garde est posée au niveau du transport plutôt que route par route : les listes déclarent leur pagination chacune de leur côté, et une route ajoutée plus tard hérite du plafond sans intervention. Le coût d'une lecture profonde tient au produit du rang par la taille de page, non au rang seul — c'est donc le décalage qui se borne.
+
+    Le recours qu'annonce le refus est le filtrage, seul moyen de rapprocher les lignes visées du début du résultat : l'export porte le même plafond et ne rend pas davantage.
     """
+    plafond = settings.max_pagination_offset
     offset = requested_offset(request.query_params)
-    if offset is not None and offset > MAX_PAGINATION_OFFSET:
+    if offset is not None and offset > plafond:
         return JSONResponse(
             status_code=422,
             content={
                 "detail": (
                     f"La pagination demandée saute {offset} lignes, au-delà du plafond de "
-                    f"{MAX_PAGINATION_OFFSET}. Affiner les filtres, ou passer par l'export."
+                    f"{plafond}. Affiner les filtres pour rapprocher les lignes visées du "
+                    "début du résultat."
                 )
             },
         )

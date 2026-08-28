@@ -13,13 +13,7 @@ TOP_SUBJECTS_LIMIT = 30
 
 TopSubjectsLimit = Annotated[int, Query(ge=1, le=200)]
 
-# Plafond du décalage qu'une lecture paginée peut demander, aligné sur celui des exports : aucune
-# lecture ne rend ni ne saute plus de 500 000 lignes. Un rang de page sans borne ferait trier à la
-# base l'ensemble du résultat pour n'en rendre aucune ligne, au prix le plus élevé qu'une lecture
-# ouverte puisse coûter. Le plafond passe au-delà du plus gros corpus servi, si bien qu'aucune
-# ligne ne devient inatteignable.
-MAX_PAGINATION_OFFSET = 500_000
-
+# Taille de page retenue par les listes qui n'en reçoivent pas.
 _DEFAULT_PER_PAGE = 50
 
 

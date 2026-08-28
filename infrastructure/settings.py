@@ -74,6 +74,14 @@ class Settings(BaseSettings):
     # interception, en vérifiant la chaîne du certificat et le nom d'hôte.
     db_sslmode: str = ""
 
+    # Plafond du décalage qu'une lecture paginée peut demander. Le coût d'une page profonde
+    # tient au produit du rang par la taille de page : sans borne, un rang arbitrairement grand
+    # fait trier à la base l'ensemble du résultat pour n'en rendre aucune ligne. La valeur passe
+    # au-delà du plus gros ensemble servi ; la relever est le geste à faire le jour où un
+    # ensemble la dépasse, la marche à suivre restant de filtrer pour rapprocher les lignes
+    # visées du début du résultat.
+    max_pagination_offset: int = 500_000
+
     # ----- Pool de connexions -----
     # Ratio max/min recommandé : ~1:15. Monter db_pool_max à 50+ si l'API admin charge plusieurs facettes en parallèle et qu'on observe des TimeoutError côté pool. Cf. `.env.example` pour la note opérationnelle.
     db_pool_min: int = 2

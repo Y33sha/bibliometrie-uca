@@ -5,7 +5,8 @@ Le coût d'une lecture profonde tient au produit du rang de page par la taille d
 
 import pytest
 
-from interfaces.api.params import MAX_PAGINATION_OFFSET, requested_offset
+from infrastructure.settings import settings
+from interfaces.api.params import requested_offset
 
 
 class TestDecalageDemande:
@@ -36,13 +37,15 @@ class TestDecalageDemande:
 
 
 class TestPlafond:
-    def test_le_plafond_passe_au_dela_du_plus_gros_corpus(self):
-        # Aucune ligne ne devient inatteignable : le plafond dépasse le nombre de lignes du
-        # plus gros ensemble servi, et rejoint celui des exports.
-        assert MAX_PAGINATION_OFFSET >= 500_000
+    def test_le_plafond_est_un_reglage(self):
+        # Le franchissement, le jour où un ensemble servi dépasse la valeur, se traite par la
+        # configuration plutôt que par une livraison.
+        assert isinstance(settings.max_pagination_offset, int)
+        assert settings.max_pagination_offset > 0
 
     def test_une_demande_ordinaire_reste_sous_le_plafond(self):
-        assert requested_offset({"page": "50", "per_page": "200"}) <= MAX_PAGINATION_OFFSET
+        assert requested_offset({"page": "50", "per_page": "200"}) <= settings.max_pagination_offset
 
     def test_une_demande_absurde_le_depasse(self):
-        assert requested_offset({"page": "100000000", "per_page": "200"}) > MAX_PAGINATION_OFFSET
+        demande = requested_offset({"page": "100000000", "per_page": "200"})
+        assert demande > settings.max_pagination_offset

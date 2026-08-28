@@ -3,7 +3,7 @@
 La garde vit au niveau du transport : une route paginée ajoutée plus tard en hérite sans intervention, comme les écritures héritent de la garde d'authentification.
 """
 
-from interfaces.api.params import MAX_PAGINATION_OFFSET
+from infrastructure.settings import settings
 
 
 class TestPlafondDeDecalage:
@@ -11,13 +11,13 @@ class TestPlafondDeDecalage:
         assert client.get("/api/publications?page=2&per_page=50").status_code == 200
 
     def test_une_demande_au_dela_du_plafond_est_refusee(self, client):
-        page = MAX_PAGINATION_OFFSET // 50 + 2
+        page = settings.max_pagination_offset // 50 + 2
         r = client.get(f"/api/publications?page={page}&per_page=50")
         assert r.status_code == 422
-        assert str(MAX_PAGINATION_OFFSET) in r.json()["detail"]
+        assert str(settings.max_pagination_offset) in r.json()["detail"]
 
     def test_le_refus_vaut_pour_les_autres_listes(self, client):
-        page = MAX_PAGINATION_OFFSET // 50 + 2
+        page = settings.max_pagination_offset // 50 + 2
         for chemin in ("/api/journals", "/api/publishers", "/api/subjects", "/api/persons"):
             r = client.get(f"{chemin}?page={page}&per_page=50")
             assert r.status_code == 422, chemin
@@ -27,3 +27,11 @@ class TestPlafondDeDecalage:
         # de la route qui le refuse, dans les termes du contrat d'API.
         r = client.get("/api/publications?page=deux")
         assert r.status_code == 422
+
+
+class TestPlafondReglable:
+    def test_un_plafond_abaisse_refuse_plus_tot(self, client, monkeypatch):
+        """Le franchissement se traite par la configuration : le middleware lit le réglage à chaque requête."""
+        monkeypatch.setattr(settings, "max_pagination_offset", 100)
+        assert client.get("/api/publications?page=2&per_page=50").status_code == 200
+        assert client.get("/api/publications?page=4&per_page=50").status_code == 422
