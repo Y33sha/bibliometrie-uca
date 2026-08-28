@@ -6,9 +6,9 @@ import tsParser from '@typescript-eslint/parser';
  *
  * `{@html}` insère du HTML sans échappement — c'est le seul endroit du frontend où une valeur
  * reçue d'une source externe peut devenir du code exécutable. Les valeurs qui y passent sont
- * assainies par liste blanche (`sanitizeTitle`, `sanitizeAbstract`) ou rendues en texte (`esc`),
- * mais rien n'obligeait le prochain appel à l'être. La règle renverse la charge : un `{@html}`
- * échoue à l'analyse, et l'admettre demande d'inscrire son fichier ci-dessous.
+ * assainies par liste blanche (`sanitizeTitle`, `sanitizeAbstract`), et deux composants sont
+ * seuls à les insérer. La règle tient cette concentration : un `{@html}` échoue à l'analyse,
+ * et l'admettre demande d'inscrire son fichier ci-dessous.
  *
  * Les dérogations sont portées par la configuration plutôt que par un commentaire au point
  * d'appel : le parseur Svelte n'expose pas les commentaires du gabarit à l'analyseur, si bien
@@ -23,20 +23,9 @@ import tsParser from '@typescript-eslint/parser';
  * est un geste délibéré : la valeur insérée doit passer par `$lib/utils`. */
 const RENDU_HTML_ASSAINI = [
 	// `sanitizeTitle` — titres de publication (formatage et MathML déposés par les sources).
-	'src/lib/components/PublicationsListView.svelte',
-	'src/lib/components/ThesesTable.svelte',
-	'src/routes/admin/duplicates/+page.svelte',
-	'src/routes/admin/persons/DetachNameFormModal.svelte',
-	'src/routes/hal-problems/affiliation-conflicts/+page.svelte',
-	'src/routes/hal-problems/duplicate-pubs/+page.svelte',
-	'src/routes/hal-problems/missing-collections/+page.svelte',
-	'src/routes/publications/\\[id\\]/PublicationHeader.svelte',
-	'src/routes/publications/\\[id\\]/RelatedPublications.svelte',
+	'src/lib/components/PublicationTitle.svelte',
 	// `sanitizeAbstract` — résumés (mêmes règles, paragraphes en plus).
-	'src/routes/publications/\\[id\\]/+page.svelte',
-	// `esc` — adresses brutes et libellés, rendus en texte : aucune balise ne survit.
-	'src/routes/admin/addresses/+page.svelte',
-	'src/routes/admin/feedback/+page.svelte'
+	'src/lib/components/PublicationAbstract.svelte'
 ];
 
 export default [

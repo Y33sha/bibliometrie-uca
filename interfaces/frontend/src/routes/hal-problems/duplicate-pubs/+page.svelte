@@ -5,7 +5,8 @@
 	import { onMount } from 'svelte';
 	import { api } from '$lib/api';
 	import { docTypeSingular } from '$lib/labels';
-	import { sanitizeTitle, halDocUrl } from '$lib/utils';
+	import { halDocUrl } from '$lib/utils';
+	import PublicationTitle from '$lib/components/PublicationTitle.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
 
 	import type { components } from '$lib/api/schema';
@@ -117,7 +118,7 @@
 					<div class="pub-meta-line">
 						{#if pair.publication.pub_year}<span class="meta-badge">{pair.publication.pub_year}</span>{/if}
 						{#if pair.publication.doc_type}<span class="meta-badge type-badge">{docTypeSingular[pair.publication.doc_type] || pair.publication.doc_type}</span>{/if}
-						<a href="{base}/publications/{pair.publication.id}" class="pub-link">{@html sanitizeTitle(pair.publication.title)}</a>
+						<a href="{base}/publications/{pair.publication.id}" class="pub-link"><PublicationTitle titre={pair.publication.title} /></a>
 					</div>
 					<div class="hal-list">
 						{#each pair.publication.hal_docs as hd}
@@ -154,7 +155,7 @@
 					<tr>
 						{#each [pair.pub_a, pair.pub_b] as pub}
 							<td>
-								<a href="{base}/publications/{pub.id}" class="pub-link">{@html sanitizeTitle(pub.title)}</a>
+								<a href="{base}/publications/{pub.id}" class="pub-link"><PublicationTitle titre={pub.title} /></a>
 								<div class="pub-meta-line">
 									{#if pub.pub_year}<span class="meta-badge">{pub.pub_year}</span>{/if}
 									{#if pub.doc_type}<span class="meta-badge type-badge">{docTypeSingular[pub.doc_type] || pub.doc_type}</span>{/if}

@@ -3,7 +3,8 @@
 	import { autofocus } from '$lib/actions/focus';
 	import { page } from '$app/stores';
 	import { base } from '$app/paths';
-	import { sanitizeTitle, halDocUrl, scanrPubUrl } from '$lib/utils';
+	import { halDocUrl, scanrPubUrl } from '$lib/utils';
+	import PublicationTitle from '$lib/components/PublicationTitle.svelte';
 	import FacetDropdown from '$lib/components/FacetDropdown.svelte';
 	import EntityFilter from '$lib/components/EntityFilter.svelte';
 	import PresenceFilterToggle from '$lib/components/PresenceFilterToggle.svelte';
@@ -501,7 +502,7 @@
 						<span class="type-label">{docTypeSingular[p.doc_type || ''] || p.doc_type || ''}</span>
 					</td>{/if}
 					{#if col('year')}<td>{p.pub_year || ''}</td>{/if}
-					<td><a href="{base}/publications/{p.id}" class="pub-title">{@html sanitizeTitle(p.title)}</a></td>
+					<td><a href="{base}/publications/{p.id}" class="pub-title"><PublicationTitle titre={p.title} /></a></td>
 					{#if col('journal')}<td class="journal-cell pub-col-journal">
 						{#if p.journal_id}
 							<a href="{base}/journals/{p.journal_id}">{p.journal}</a>

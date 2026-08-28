@@ -1,6 +1,6 @@
 <script lang="ts">
   import { base } from "$app/paths";
-  import { sanitizeTitle } from "$lib/utils";
+  import PublicationTitle from "$lib/components/PublicationTitle.svelte";
   import { docTypeSingular, relationTypeLabel, relationTier, relationTierRank } from "$lib/labels";
   import type { PubDetail, RelatedPublication } from "./types";
 
@@ -33,7 +33,7 @@
     {#if pub.doc_type}<span class="doc-type-tag">{docTypeSingular[pub.doc_type] || pub.doc_type}</span>{/if}
     {#if pub.pub_year}<span class="pub-year">{pub.pub_year}</span>{/if}
   </div>
-  <h1 class="pub-title-main">{@html sanitizeTitle(pub.title)}</h1>
+  <h1 class="pub-title-main"><PublicationTitle titre={pub.title} /></h1>
 
   {#if pub.journal_title || pub.container_title}
     <div class="pub-journal-line">
@@ -77,7 +77,7 @@
             {/if}
             <span class="rel-kind">{relationTypeLabel[r.relation_type] ?? r.relation_type}</span>
           </span>
-          <span class="rel-title">{@html sanitizeTitle(r.title ?? r.doi ?? "")}</span>
+          <span class="rel-title"><PublicationTitle titre={r.title ?? r.doi} /></span>
         </a>
       {/each}
       {#if sortedRelations.length > RELATION_CAP}

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { base } from "$app/paths";
   import Modal from "$lib/components/Modal.svelte";
-  import { sanitizeTitle } from "$lib/utils";
+  import PublicationTitle from "$lib/components/PublicationTitle.svelte";
   import { sourceLabel } from "$lib/sources";
   import type { DetachModalState } from "./types";
 
@@ -76,7 +76,7 @@
                 href="{base}/publications/{p.pub_id}"
                 target="_blank"
                 rel="noopener"
-              >{@html sanitizeTitle(p.title)}</a>
+              ><PublicationTitle titre={p.title} /></a>
               <span class="detach-sources">
                 {#each p.sources as s}
                   <span class="tag tag-source">{sourceLabel(s.source)}</span>

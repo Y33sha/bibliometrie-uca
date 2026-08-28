@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { base } from '$app/paths';
-	import { sanitizeTitle, halDocUrl, scanrPubUrl, titleCase } from '$lib/utils';
+	import { halDocUrl, scanrPubUrl, titleCase } from '$lib/utils';
+	import PublicationTitle from '$lib/components/PublicationTitle.svelte';
 	import TableStatusRow from '$lib/components/TableStatusRow.svelte';
 	import type { components } from '$lib/api/schema';
 
@@ -112,7 +113,7 @@
 					{/if}
 				</td>
 				<td class="col-title">
-					<a href="{base}/publications/{t.id}">{@html sanitizeTitle(t.title)}</a>
+					<a href="{base}/publications/{t.id}"><PublicationTitle titre={t.title} /></a>
 				</td>
 				<td class="col-status">
 					{#if t.doc_type === 'thesis'}

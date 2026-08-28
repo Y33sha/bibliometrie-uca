@@ -5,7 +5,8 @@
 	import { onMount } from 'svelte';
 	import { api } from '$lib/api';
 	import { docTypeSingular } from '$lib/labels';
-	import { sanitizeTitle, halDocUrl } from '$lib/utils';
+	import { halDocUrl } from '$lib/utils';
+	import PublicationTitle from '$lib/components/PublicationTitle.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
 
 	import type { components } from '$lib/api/schema';
@@ -73,7 +74,7 @@
 					{#if pub.pub_year}<span class="meta-badge">{pub.pub_year}</span>{/if}
 					{#if pub.doc_type}<span class="meta-badge type-badge">{docTypeSingular[pub.doc_type] || pub.doc_type}</span>{/if}
 					{#each pub.laboratories as lab}<span class="meta-badge lab-badge" title={lab.name}>{lab.acronym || lab.name}</span>{/each}
-					<a href="{base}/publications/{pub.id}" class="pub-link">{@html sanitizeTitle(pub.title)}</a>
+					<a href="{base}/publications/{pub.id}" class="pub-link"><PublicationTitle titre={pub.title} /></a>
 				</div>
 				<div class="hal-list">
 					{#if pub.halids}

@@ -6,13 +6,6 @@ export function paramsToQuery(params: URLSearchParams): string {
 	return params.toString().replace(/%2C/g, ',');
 }
 
-export function esc(s: string | null | undefined): string {
-	if (!s) return '';
-	const d = document.createElement('div');
-	d.textContent = s;
-	return d.innerHTML;
-}
-
 /* ── sanitizeTitle ─────────────────────────────────────────────
  * Rend les titres de publication, qui peuvent contenir :
  *  - du MathML au préfixe de namespace mml:  (<mml:msup>, <mml:mi>, …)

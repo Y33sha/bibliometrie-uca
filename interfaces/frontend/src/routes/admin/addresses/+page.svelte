@@ -4,7 +4,7 @@
 	import { page } from '$app/stores';
 	import { replaceState } from '$app/navigation';
 	import { addresses as addressesApi, api, ApiError } from '$lib/api';
-	import { esc, sanitizeTitle } from '$lib/utils';
+	import PublicationTitle from '$lib/components/PublicationTitle.svelte';
 	import { toast } from '$lib/dialogs.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
 	import { autofocus } from '$lib/actions/focus';
@@ -632,13 +632,13 @@
 							}}
 						/>
 						<div>
-							<div class="addr-text">{@html esc(addr.raw_text)}</div>
+							<div class="addr-text">{addr.raw_text}</div>
 							<div class="addr-meta">
 								<span class="pub-count-tag"
 									>{addr.pub_count} publi{addr.pub_count > 1 ? 's' : ''}</span
 								>
 								{#each addr.structures || [] as s}
-									<span class={structTagClass(s)}>{@html esc(s.acronym || s.name)}</span>
+									<span class={structTagClass(s)}>{s.acronym || s.name}</span>
 								{/each}
 							</div>
 						</div>
@@ -673,13 +673,13 @@
 								{#each publications as p}
 									<div class="pub-row">
 										<div class="pub-title-link">
-											{@html sanitizeTitle(p.title || '(sans titre)')}
+											<PublicationTitle titre={p.title || '(sans titre)'} />
 										</div>
 										<div class="pub-meta-inline">
 											{p.pub_year}
-											{#if p.doc_type}&middot; {@html esc(p.doc_type)}{/if}
-											{#if p.author_name}&middot; {@html esc(p.author_name)}{/if}
-											{#if p.journal_title}&middot; {@html esc(p.journal_title)}{/if}
+											{#if p.doc_type}&middot; {p.doc_type}{/if}
+											{#if p.author_name}&middot; {p.author_name}{/if}
+											{#if p.journal_title}&middot; {p.journal_title}{/if}
 											{#if p.doi}
 												<a
 													href="https://doi.org/{encodeURIComponent(p.doi)}"

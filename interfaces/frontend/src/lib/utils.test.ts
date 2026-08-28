@@ -4,7 +4,6 @@
 // y passeraient sans rien vérifier. jsdom est l'environnement que DOMPurify prend en charge.
 import { describe, it, expect } from 'vitest';
 import {
-	esc,
 	sanitizeAbstract,
 	sanitizeTitle,
 	titleCase,
@@ -14,16 +13,6 @@ import {
 	deriveStructDetectionStatus,
 	paramsToQuery
 } from './utils';
-
-// ── esc (HTML escaping) ────────────────────────────────────────
-// esc() utilise document.createElement, non testable sans DOM. Seul le cas null/undefined est testé ici.
-
-describe('esc', () => {
-	it('retourne une chaîne vide pour null/undefined', () => {
-		expect(esc(null)).toBe('');
-		expect(esc(undefined)).toBe('');
-	});
-});
 
 // ── paramsToQuery ──────────────────────────────────────────────
 

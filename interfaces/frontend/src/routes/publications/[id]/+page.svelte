@@ -2,7 +2,7 @@
   import { page } from "$app/stores";
   import { onMount } from "svelte";
   import { api, auth } from "$lib/api";
-  import { sanitizeAbstract } from "$lib/utils";
+  import PublicationAbstract from "$lib/components/PublicationAbstract.svelte";
   import type { PubResponse, SourceAuthorship, SourceRow } from "./types";
   import PublicationHeader from "./PublicationHeader.svelte";
   import PublicationSidebar from "./PublicationSidebar.svelte";
@@ -172,7 +172,7 @@
         {#if pub.abstract}
           <div class="detail-section">
             <div class="detail-label">Résumé</div>
-            <div class="abstract-text">{@html sanitizeAbstract(pub.abstract)}</div>
+            <div class="abstract-text"><PublicationAbstract resume={pub.abstract} /></div>
           </div>
         {/if}
       </div>

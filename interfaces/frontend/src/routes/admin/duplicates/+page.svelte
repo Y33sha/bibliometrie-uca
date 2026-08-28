@@ -4,7 +4,7 @@
   import { replaceState } from "$app/navigation";
   import { page } from "$app/stores";
   import { onMount } from "svelte";
-  import { sanitizeTitle } from "$lib/utils";
+  import PublicationTitle from "$lib/components/PublicationTitle.svelte";
   import { sourceExternalUrl } from "$lib/sources";
   import SourceTag from "$lib/components/SourceTag.svelte";
 
@@ -143,7 +143,7 @@
               {#if pub.language}<span class="pub-lang">{pub.language}</span>{/if}
             </div>
             <div class="pub-title">
-              <a href="{base}/publications/{pub.id}">{@html sanitizeTitle(pub.title)}</a>
+              <a href="{base}/publications/{pub.id}"><PublicationTitle titre={pub.title} /></a>
             </div>
             {#if pub.doi}
               <div class="pub-doi">DOI: {pub.doi}</div>

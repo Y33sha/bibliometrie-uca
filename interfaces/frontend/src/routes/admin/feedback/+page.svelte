@@ -3,7 +3,7 @@
   import { base } from "$app/paths";
   import { replaceState } from "$app/navigation";
   import { api, nameForms } from "$lib/api";
-  import { esc, deriveStructDetectionStatus } from "$lib/utils";
+  import { deriveStructDetectionStatus } from "$lib/utils";
   import { structDetectionClasses, structDetectionLabels } from "$lib/labels";
   import Pagination from "$lib/components/Pagination.svelte";
   import { autofocus } from "$lib/actions/focus";
@@ -364,7 +364,7 @@
       <tbody>
         {#each addresses as a (a.id)}
           <tr>
-            <td class="addr-text">{@html esc(a.raw_text)}</td>
+            <td class="addr-text">{a.raw_text}</td>
             <td class="num">{a.pub_count}</td>
             <td>
               {#if a.structures && a.structures.length > 0}
