@@ -163,6 +163,12 @@ class TestIsThesesFrLocation:
         assert not is_theses_fr_location(_loc(source_display_name="HAL"))
         assert not is_theses_fr_location(_loc())
 
+    def test_domain_outside_the_host(self):
+        """`theses.fr/` placé dans le chemin ne fait pas de la location une thèse."""
+        assert not is_theses_fr_location(
+            _loc(landing_page_url="https://exemple.fr/miroir/theses.fr/2023UCFAC123")
+        )
+
 
 class TestIsRepositoryLocation:
     def test_repository(self):
@@ -187,6 +193,18 @@ class TestIsHalLocation:
     def test_via_source_homepage(self):
         assert is_hal_location(
             _loc(source_type="repository", source_homepage_url="https://hal.science")
+        )
+        assert is_hal_location(
+            _loc(source_type="repository", source_homepage_url="https://hal.inrae.fr")
+        )
+        assert is_hal_location(
+            _loc(source_type="repository", source_homepage_url="https://tel.archives-ouvertes.fr")
+        )
+
+    def test_homepage_whose_host_is_not_a_hal_portal(self):
+        """Le label `hal` ailleurs que dans l'hôte ne désigne pas un portail."""
+        assert not is_hal_location(
+            _loc(source_type="repository", source_homepage_url="https://exemple.fr/halle")
         )
 
     def test_via_source_display_name(self):

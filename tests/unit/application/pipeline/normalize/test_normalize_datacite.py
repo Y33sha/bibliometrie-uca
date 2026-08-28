@@ -36,6 +36,44 @@ class TestAuthorRecords:
             {"orcid": "0000-0001-5109-3700"},
         ]
 
+    def test_orcid_via_scheme_uri(self):
+        """`schemeUri` désignant orcid.org tient lieu de `nameIdentifierScheme`."""
+        attrs = {
+            "creators": [
+                {
+                    "name": "Doe, J.",
+                    "nameType": "Personal",
+                    "nameIdentifiers": [
+                        {
+                            "nameIdentifier": "0000-0002-1825-0097",
+                            "schemeUri": "https://orcid.org",
+                        }
+                    ],
+                }
+            ]
+        }
+        assert build_datacite_author_records(attrs)[0].person_identifiers == {
+            "orcid": "0000-0002-1825-0097"
+        }
+
+    def test_scheme_uri_hosted_elsewhere(self):
+        """`orcid.org` dans le chemin d'un autre hôte ne qualifie pas l'identifiant."""
+        attrs = {
+            "creators": [
+                {
+                    "name": "Doe, J.",
+                    "nameType": "Personal",
+                    "nameIdentifiers": [
+                        {
+                            "nameIdentifier": "0000-0002-1825-0097",
+                            "schemeUri": "https://exemple.fr/orcid.org/",
+                        }
+                    ],
+                }
+            ]
+        }
+        assert build_datacite_author_records(attrs)[0].person_identifiers is None
+
     def test_shared_orcid_marked_dubious(self):
         """Même ORCID sur 2 creators (dépôt de collaboration) → requalifié `_dubious`."""
         attrs = {

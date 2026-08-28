@@ -11,12 +11,14 @@ from typing import Any
 
 from domain.publications.identifiers import (
     extract_hal_id_from_url,
+    is_hal_host,
     normalize_arxiv_id,
     normalize_nnt,
     normalize_pmcid,
     normalize_pmid,
 )
 from domain.publications.metadata import OaStatus
+from domain.urls import is_host, url_host
 
 # =============================================================
 # IDENTIFIANT OPENALEX (court ↔ URL)
@@ -102,7 +104,7 @@ def is_theses_fr_location(loc: OpenalexLocation) -> bool:
     """True si la location pointe vers theses.fr (display_name ou URL)."""
     if "theses.fr" in (loc.source_display_name or "").lower():
         return True
-    return "theses.fr/" in (loc.landing_page_url or "")
+    return is_host(loc.landing_page_url, "theses.fr")
 
 
 def is_repository_location(loc: OpenalexLocation) -> bool:
@@ -115,13 +117,14 @@ def is_hal_location(loc: OpenalexLocation) -> bool:
 
     Trois signaux :
     1. La landing page est un identifiant HAL reconnu (`extract_hal_id_from_url`).
-    2. `source.type == 'repository'` ET `source.homepage_url` contient 'hal'.
+    2. `source.type == 'repository'` ET `source.homepage_url` désigne un portail HAL.
     3. `source.type == 'repository'` ET `source.display_name` contient 'hal'.
     """
     if extract_hal_id_from_url(loc.landing_page_url) is not None:
         return True
     if loc.source_type == "repository":
-        if "hal" in (loc.source_homepage_url or "").lower():
+        host = url_host(loc.source_homepage_url)
+        if host and is_hal_host(host):
             return True
         if "hal" in (loc.source_display_name or "").lower():
             return True

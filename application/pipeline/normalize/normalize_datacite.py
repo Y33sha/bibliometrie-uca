@@ -55,6 +55,7 @@ from domain.sources.datacite import (
     get_title,
 )
 from domain.types import JsonValue
+from domain.urls import is_host
 
 # =============================================================
 # PUBLISHER + JOURNAL
@@ -139,8 +140,7 @@ def _creator_orcid(creator: dict) -> str | None:
         if not isinstance(identifier, dict):
             continue
         scheme = (identifier.get("nameIdentifierScheme") or "").strip().lower()
-        scheme_uri = (identifier.get("schemeUri") or "").lower()
-        if scheme == "orcid" or "orcid.org" in scheme_uri:
+        if scheme == "orcid" or is_host(identifier.get("schemeUri"), "orcid.org"):
             orcid = normalize_orcid(identifier.get("nameIdentifier"))
             if orcid:
                 return orcid

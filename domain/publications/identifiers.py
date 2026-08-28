@@ -20,6 +20,7 @@ from dataclasses import dataclass
 from urllib.parse import unquote, urlparse
 
 from domain.errors import ValidationError
+from domain.urls import is_host
 
 # ── DOI ────────────────────────────────────────────────────────────
 
@@ -149,7 +150,7 @@ _HAL_DOC_BASE = re.compile(r"([a-z][a-z0-9]*-\d{8,})", re.IGNORECASE)
 _OAI_AUTHORITY = re.compile(r"(?:^|:)oai:([^:]+):", re.IGNORECASE)
 
 
-def _is_hal_host(host: str) -> bool:
+def is_hal_host(host: str) -> bool:
     """True si l'hôte est un portail HAL : `hal.science` et ses sous-portails, l'infrastructure
     CCSD historique (`*.archives-ouvertes.fr`, `*.ccsd.cnrs.fr`) et les portails white-label
     institutionnels reconnaissables au label `hal` (`hal.inrae.fr`, `www.hal.inserm.fr`…)."""
@@ -181,7 +182,7 @@ def _normalize_hal_id(raw: str | None) -> str | None:
     s = raw.strip().lower()
     host = urlparse(s).hostname
     if host:
-        if not _is_hal_host(host):
+        if not is_hal_host(host):
             return None
     elif (oai := _OAI_AUTHORITY.search(s)) and oai.group(1) != "hal":
         return None
@@ -447,7 +448,7 @@ def extract_doi_from_url(url: str | None) -> str | None:
         return None
     if url.startswith("doi:"):
         return clean_doi(url[4:])
-    if "doi.org/" in url:
+    if is_host(url, "doi.org"):
         return clean_doi(url)
     return None
 

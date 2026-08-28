@@ -295,6 +295,7 @@ class TestExtractDoiFromUrl:
             ("doi:10.1234/X.v2", "10.1234/x"),  # nettoyé (lowercase + version)
             ("https://hal.science/hal-04123456", None),  # autre identifiant
             ("https://arxiv.org/abs/2401.00123", None),
+            ("https://exemple.fr/?ref=doi.org/10.1234/x", None),  # doi.org hors de l'hôte
             (None, None),
             ("", None),
         ],
