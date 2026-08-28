@@ -63,7 +63,7 @@ def run_resolve_publishers(
         if name_normalized is not None:
             assert name_raw is not None
             publisher_id, created = publisher_repo.match_or_create_by_name_form(
-                to_plain_text(name_raw), name_normalized
+                name_raw, name_normalized
             )
             repo.update_publisher_id(row.prefix, publisher_id)
             metrics.add(**{"publisher_created" if created else "publisher_matched": 1})
@@ -115,11 +115,16 @@ def _fetch_and_store_publisher_metadata(
     client_name_normalized: str | None = None
     datacite_client_symbol: str | None = None
 
+    # Noms mis à plat une fois : servent de nom stocké et de base au nom normalisé (clé de
+    # rapprochement), pour que les deux dérivent de la même valeur (cf. `find_or_create_journal`).
     if crossref_info is not None:
         publisher_name_raw, crossref_member_id = crossref_info
+        publisher_name_raw = to_plain_text(publisher_name_raw)
         publisher_name_normalized = normalize_text(publisher_name_raw) or None
     elif datacite_info is not None:
         publisher_name_raw, client_name_raw, datacite_client_symbol = datacite_info
+        publisher_name_raw = to_plain_text(publisher_name_raw)
+        client_name_raw = to_plain_text(client_name_raw)
         publisher_name_normalized = normalize_text(publisher_name_raw) or None
         client_name_normalized = normalize_text(client_name_raw) or None
 

@@ -23,7 +23,7 @@ from application.ports.pipeline.normalize.source_publications import (
 from application.ports.pipeline.normalize.staging import StagingQueries, StagingRow
 from application.ports.repositories.publication_repository import PublicationRepository
 from domain.dates import french_date_to_iso
-from domain.normalize import normalize_name_form
+from domain.normalize import clean_raw_author_name, normalize_name_form
 from domain.publications.identifiers import clean_doi, normalize_nnt
 from domain.sources.theses import (
     aggregate_thesis_persons,
@@ -187,16 +187,19 @@ def process_authorships(
     # Les `sa_id` récoltés portent tous les mêmes adresses document, écrites en un seul `write_addresses`.
     sa_addresses: list[tuple[int | None, list[AddressRecord]]] = []
     for a in authorships:
+        # Nom nettoyé une fois : sert de nom brut stocké et de base au nom normalisé (clé
+        # d'identité), comme sur les autres sources (cf. `_authorships_batch`).
+        clean_name = clean_raw_author_name(a.raw_author_name)
         sa_id = batch_queries.upsert_source_authorship(
             conn,
             {
                 "source": "theses",
                 "source_publication_id": source_publication_id,
                 "author_position": a.author_position,
-                "author_name_normalized": normalize_name_form(a.raw_author_name),
+                "author_name_normalized": normalize_name_form(clean_name),
                 "is_corresponding": False,
                 "roles": a.roles,
-                "raw_author_name": a.raw_author_name,
+                "raw_author_name": clean_name,
                 "person_identifiers": a.person_identifiers if a.person_identifiers else None,
             },
         )

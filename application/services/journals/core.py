@@ -46,6 +46,10 @@ def find_or_create_journal(
     if not title:
         return None
 
+    # La mise à plat précède tout : la clé de rapprochement et le titre affiché en dérivent
+    # tous deux, sans quoi un titre reçu avec des entités (`Wood &amp; Fire Safety`) porte une
+    # clé étrangère à celle du même titre reçu en clair, et la même revue naît deux fois.
+    title = to_plain_text(title)
     title_normalized = normalize_text(title)
 
     def _match_and_enrich(journal_id: int, *, with_openalex: bool = True) -> int:
@@ -94,7 +98,7 @@ def find_or_create_journal(
 
     # 6. Créer + enregistrer la forme de nom
     journal_id = repo.create_journal(
-        title=to_plain_text(title),
+        title=title,
         issn=issn,
         eissn=eissn,
         issnl=issnl,
