@@ -12,6 +12,8 @@ from infrastructure.db.engine import db_url
 
 @pytest.fixture
 def db_settings(monkeypatch):
+    """Pose les deux identités, que chaque test dégrade sur un point."""
+
     def _apply(**overrides):
         defaults = {
             "db_app_user": "bibliometrie_app",
@@ -28,31 +30,39 @@ def db_settings(monkeypatch):
     return _apply
 
 
-def test_connexion_de_l_api_sous_l_identite_restreinte(db_settings):
-    db_settings()
-    assert db_url(application=True).username == "bibliometrie_app"
+class TestIdentiteRetenue:
+    def test_l_api_se_connecte_sous_l_identite_restreinte(self, db_settings):
+        db_settings()
+        url = db_url(application=True)
+        assert url.username == "bibliometrie_app"
+        assert url.password == "app-pw"
+
+    def test_les_autres_usages_se_connectent_sous_le_proprietaire(self, db_settings):
+        db_settings()
+        url = db_url()
+        assert url.username == "bibliometrie_owner"
+        assert url.password == "owner-pw"
 
 
-def test_connexion_des_migrations_sous_le_proprietaire(db_settings):
-    db_settings()
-    assert db_url().username == "bibliometrie_owner"
+class TestRefusDUneIdentiteAbsente:
+    def test_l_api_refuse_de_demarrer_sans_identite_restreinte(self, db_settings):
+        """Se replier sur le propriétaire ferait tourner l'API avec les droits du schéma sans que rien ne le signale."""
+        db_settings(db_app_user="")
+        with pytest.raises(RuntimeError, match="DB_APP_USER"):
+            db_url(application=True)
 
+    def test_le_refus_indique_comment_creer_le_role(self, db_settings):
+        db_settings(db_app_user="")
+        with pytest.raises(RuntimeError, match="roles.sql"):
+            db_url(application=True)
 
-def test_l_api_refuse_de_demarrer_sans_identite_restreinte(db_settings):
-    """Se replier sur le propriétaire ferait tourner l'API avec les droits du schéma sans que rien ne le signale."""
-    db_settings(db_app_user="")
-    with pytest.raises(RuntimeError, match="DB_APP_USER"):
-        db_url(application=True)
+    def test_les_autres_usages_refusent_de_demarrer_sans_proprietaire(self, db_settings):
+        """Symétrique : un processus qui ne sert que l'API ne porte pas cette identité, et son absence doit se voir plutôt qu'ouvrir une connexion anonyme."""
+        db_settings(db_owner_user="")
+        with pytest.raises(RuntimeError, match="DB_OWNER_USER"):
+            db_url()
 
-
-def test_les_autres_usages_refusent_de_demarrer_sans_proprietaire(db_settings):
-    """Symétrique : un processus qui ne sert que l'API ne porte pas cette identité, et son absence doit se voir plutôt qu'ouvrir une connexion anonyme."""
-    db_settings(db_owner_user="")
-    with pytest.raises(RuntimeError, match="DB_OWNER_USER"):
-        db_url()
-
-
-def test_l_api_n_a_pas_besoin_du_proprietaire(db_settings):
-    """Le partage tient à cela : le conteneur qui sert l'API se passe du mot de passe du schéma."""
-    db_settings(db_owner_user="", db_owner_password="")
-    assert db_url(application=True).username == "bibliometrie_app"
+    def test_l_api_n_a_pas_besoin_du_proprietaire(self, db_settings):
+        """Le partage tient à cela : le conteneur qui sert l'API se passe du mot de passe du schéma."""
+        db_settings(db_owner_user="", db_owner_password="")
+        assert db_url(application=True).username == "bibliometrie_app"
