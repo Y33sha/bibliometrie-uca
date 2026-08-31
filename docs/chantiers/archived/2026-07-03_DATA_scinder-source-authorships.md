@@ -72,22 +72,22 @@ La migration suit le schéma *expand/contract* : on étend le schéma sans rien 
 
 ### Phase 2 — Expand : schéma et backfill
 
-- [x] Table `author_identifying_keys` + unique `NULLS NOT DISTINCT` sur la clé d'identité. (`031bc86c`)
-- [x] `source_authorships` : colonne `identity_id` **nullable**, backfill dédupliqué batché des ~19 M lignes vers les identités + pose de `identity_id`. Les deux colonnes d'origine restent en place, lues et écrites comme aujourd'hui. (`031bc86c`, backfill batché `2d0a44ed`)
+- [x] Table `author_identifying_keys` + unique `NULLS NOT DISTINCT` sur la clé d'identité. (`8d34d440`)
+- [x] `source_authorships` : colonne `identity_id` **nullable**, backfill dédupliqué batché des ~19 M lignes vers les identités + pose de `identity_id`. Les deux colonnes d'origine restent en place, lues et écrites comme aujourd'hui. (`8d34d440`, backfill batché `40dcfab0`)
 
 ### Phase 3 — Bascule des écrivains (normalize)
 
-- [x] `normalize` : upsert de l'identité (dédup par clé) + pose de `identity_id` résolu par `key_hash` (colonne générée indexée, NULL-safe ; le rapprochement d'une clé composite nullable n'est indexable ni par `=` ni par `IS NOT DISTINCT FROM`). Normalisation du nom des thèses alignée sur Python. (`8bace239`)
-- [x] `normalize` : balayage des identités orphelines en fin de phase (`DELETE FROM author_identifying_keys aik WHERE NOT EXISTS (SELECT 1 FROM source_authorships sa WHERE sa.identity_id = aik.id)`), appuyé sur l'index `idx_sa_identity`. (`f94199e7`)
+- [x] `normalize` : upsert de l'identité (dédup par clé) + pose de `identity_id` résolu par `key_hash` (colonne générée indexée, NULL-safe ; le rapprochement d'une clé composite nullable n'est indexable ni par `=` ni par `IS NOT DISTINCT FROM`). Normalisation du nom des thèses alignée sur Python. (`058726c1`)
+- [x] `normalize` : balayage des identités orphelines en fin de phase (`DELETE FROM author_identifying_keys aik WHERE NOT EXISTS (SELECT 1 FROM source_authorships sa WHERE sa.identity_id = aik.id)`), appuyé sur l'index `idx_sa_identity`. (`ebae2dc4`)
 
 Les Phases 3 et 4 sont livrées **ensemble**, en un seul déploiement — pas de dual-write. Les deux colonnes d'origine passent directement d'« écrites et lues » à supprimées (Phase 5), sans fenêtre intermédiaire où un écrivain aurait cessé de les remplir pendant qu'un lecteur les lit encore.
 
 ### Phase 4 — Bascule des lecteurs
 
-- [x] Matching (fetch de la phase persons) : joindre l'identité, cascade Python inchangée. (`3adc6bc8`)
+- [x] Matching (fetch de la phase persons) : joindre l'identité, cascade Python inchangée. (`d53ed3aa`)
 - [x] Matview `person_identifier_keys` : rediriger sa définition vers l'identité — `source_authorships` (⟶ `person_id`) ⋈ `author_identifying_keys` (⟶ identifiants) — via migration Alembic. (`d7a2f6b3e918`)
 - [x] **Matview supprimée au profit d'une lecture à la volée + index couvrant** (mesurée). Le coût de la projection `(person_id, id_type, id_value)` n'est pas l'`unnest` du jsonb (rapide sur les ~271 k identités porteuses d'identifiants) mais la jointure de retour vers `source_authorships` pour récupérer `person_id`, qui vit sur la signature et non sur l'identité : il faut passer sur les ~654 k signatures rattachées. L'index partiel `idx_sa_person` ne portait que `person_id` (non couvrant : accès heap pour lire `identity_id`), et le planificateur lui préférait un parcours complet — ≈ 5,4 s. Étendu à `(person_id, identity_id) WHERE person_id IS NOT NULL`, il autorise un index-only scan (0 heap fetch), faisant tomber la requête réelle de la file « conflits d'identifiant » (self-join complet) à ≈ 0,87 s. Une matview n'avait alors plus de sens : un seul consommateur, sous-la-seconde en live, et matérialiser un demi-calcul entre un index couvrant et une table serait un intermédiaire inutile. La matview `person_identifier_keys`, son `REFRESH` du pipeline et sa machinerie `REFRESH CONCURRENTLY` sont supprimés ; sa projection devient un CTE inline dans le seul consommateur (`_IDENTIFIER_CONFLICT_PAIRS`). File de triage toujours à jour (plus de staleness).
-- [x] API / admin / oneshots / `name_forms.py` : jointure à la place de la lecture inline. (`3adc6bc8`)
+- [x] API / admin / oneshots / `name_forms.py` : jointure à la place de la lecture inline. (`d53ed3aa`)
 - [x] Tests de non-régression : mêmes rattachements, mêmes lectures qu'avant. Les fixtures d'intégration sèment l'identité via un helper partagé (`tests/integration/helpers/authorships.py::upsert_identity`) et référencent `identity_id` ; aucun test n'écrit plus `author_name_normalized`/`person_identifiers` sur `source_authorships` (prêt pour le `DROP` de Phase 5).
 
 ### Phase 5 — Contract : verrouiller et nettoyer

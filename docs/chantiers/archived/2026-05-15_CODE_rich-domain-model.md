@@ -111,12 +111,12 @@ Le schéma de base est bâti autour de **3 entités métier clairement identifia
 **VOs (commencer par ici — plus simples, autonomes) :**
 
 - [x] `domain/persons/name_forms.py` — VO `PersonNameForm` (frozen,
-      identité = string normalisée). — `8675e10`
+      identité = string normalisée). — `1b4949a`
 - [x] `domain/structures/name_forms.py` — VO `StructureNameForm`
       (frozen ; attributs : `form_text`, `is_word_boundary`,
-      `is_excluding`, `requires_context_of: tuple[int, ...]`). — `8675e10`
+      `is_excluding`, `requires_context_of: tuple[int, ...]`). — `1b4949a`
 - [x] `domain/addresses/address.py` — VO `Address` (frozen, identité
-      = `normalized_text`). — `8675e10`
+      = `normalized_text`). — `1b4949a`
 - [x] `domain/publications/identifiers.py` — migrer `DOI`, `HALId`,
       `NNT` depuis `domain/publication.py` (miroir de
       `domain/persons/identifiers.py`). `domain/publication.py` reste
@@ -209,7 +209,7 @@ adéquat — pas à forcer en méthodes.
       comparaison entre deux publications, pas une action d'identité ;
       les callers actuels passent des projections et des strings, pas
       des `Publication` (forcer en méthode obligerait à affaiblir les
-      invariants de l'entité). — `6f231f5`
+      invariants de l'entité). — `602f3a8`
 - [x] `domain/publication.py:best_oa_status` (+ `OA_RANK`,
       `OA_STATUS_UNKNOWN_DEFAULT`) + `domain/publication.py:clean_publication_title`
       (+ helpers `_decode_html_entities_once`, regex internes) →
@@ -257,18 +257,18 @@ L'application charge un aggregate via le repository, appelle ses méthodes, sauv
       `repo.add_identifier` retiré du port + impl. Changement de
       comportement : cas pending/confirmed sur autre personne lève
       `CannotAttributeConflict` (sous-classe `ConflictError`, HTTP 409
-      via handler existant) au lieu du silent no-op précédent. — `bd6f587`
+      via handler existant) au lieu du silent no-op précédent. — `28687ba`
 - [x] `application/persons.py:add_identifiers_from_authorships` — itère désormais en déléguant chaque identifiant à `add_identifier` (qui charge / dispatche / sauvegarde via l'aggregate `PersonIdentifier`). Signature inchangée `(person_id, authorships: list[dict])` : le parsing dict→identifiant reste interne (path batch piloté par les dicts du pipeline). Tolérance au conflit : `CannotAttributeConflict` est loggé en warning et la promotion continue sur les autres identifiants — comportement adapté au batch pipeline, distinct du path strict de `add_identifier` utilisé par l'API admin.
 
 ### Phase 4 — Hydratation Publication et orchestrations larges autour de Publication
 
 Les use-cases orchestrant Publication (fusion, find_or_create, refresh_from_sources) ne peuvent pas être refactorés tant que l'entité Publication ne sait pas se charger / se sauvegarder. Le premier item débloque les suivants en étendant l'entité, en ajoutant les méthodes de chargement / persistance au repo, et en rapatriant la règle d'enrichissement métadonnées depuis le SQL vers `Publication.absorb()`. Les autres entités (Person, Structure, SourcePublication) ne sont pas hydratées ici : ce chantier ne touche que Publication parce que c'est elle qui débloque la fin des orchestrations Publication. La généralisation est différée (Phase 8).
 
-- [x] **Hydratation de l'aggregate Publication** : entité enrichie (`journal_id`, `language`, `container_title`, `countries`) ; helper pairwise `absorb_oa_status` dans `domain/publications/metadata.py` ; méthode `Publication.absorb(other)` (cf. `d55810a`). Ajout au repo de `find_by_id(id) -> Publication | None` et `save(pub) -> None` (cf. `4e57f38`). Simplification de `repo.merge_into` en plumbing FK pur (cf. `5924e06`).
-- [x] `application/publications.py:merge_publications` : load target + source via repo, `target.absorb(source)`, `repo.merge_into` (plumbing + DELETE), `repo.save(target)`. Order rationale : save APRÈS DELETE source pour éviter collision UNIQUE lower(doi). — `5924e06`
-- [x] `application/publications.py:find_or_create` — nouvelle signature `find_or_create(pub: Publication, *, nnt: str | None, allow_create, repo) -> tuple[Publication | None, bool]`. Helper `publication_from_meta(meta: dict) -> Publication` pour adapter les dicts des normalizers. Cascade interne (DOI → NNT → création) inchangée — son extraction vers `decide_publication_match` reste portée par `METIER_deduplication-fusion-publications`. — `7def852`
+- [x] **Hydratation de l'aggregate Publication** : entité enrichie (`journal_id`, `language`, `container_title`, `countries`) ; helper pairwise `absorb_oa_status` dans `domain/publications/metadata.py` ; méthode `Publication.absorb(other)` (cf. `38107d0`). Ajout au repo de `find_by_id(id) -> Publication | None` et `save(pub) -> None` (cf. `dd7437c`). Simplification de `repo.merge_into` en plumbing FK pur (cf. `75dfa3d`).
+- [x] `application/publications.py:merge_publications` : load target + source via repo, `target.absorb(source)`, `repo.merge_into` (plumbing + DELETE), `repo.save(target)`. Order rationale : save APRÈS DELETE source pour éviter collision UNIQUE lower(doi). — `75dfa3d`
+- [x] `application/publications.py:find_or_create` — nouvelle signature `find_or_create(pub: Publication, *, nnt: str | None, allow_create, repo) -> tuple[Publication | None, bool]`. Helper `publication_from_meta(meta: dict) -> Publication` pour adapter les dicts des normalizers. Cascade interne (DOI → NNT → création) inchangée — son extraction vers `decide_publication_match` reste portée par `METIER_deduplication-fusion-publications`. — `2db17bc`
 - [x] `application/publications.py:refresh_from_sources` — orchestration extraite : load → pré-merge DOI → agrégation domain → save. La fusion implicite sur collision DOI est tracée via l'audit event `publication.merged`.
-- [x] Helpers de `refresh_from_sources` (`_first_non_null`, `_merge_lists`, `_merge_jsonb`, `_first_doc_type`) — exfiltrés vers `domain/publications/merge.py` lors de Phase 1 du chantier `METIER_deduplication-fusion-publications`. — `8e30bcd`
+- [x] Helpers de `refresh_from_sources` (`_first_non_null`, `_merge_lists`, `_merge_jsonb`, `_first_doc_type`) — exfiltrés vers `domain/publications/merge.py` lors de Phase 1 du chantier `METIER_deduplication-fusion-publications`. — `34251de`
 
 ### Phase 5 — Orchestrations Person
 

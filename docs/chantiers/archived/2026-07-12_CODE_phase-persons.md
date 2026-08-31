@@ -12,24 +12,24 @@ La phase `persons` (`application/pipeline/persons/`) enchaîne enforce → reset
 
 ### cascade.py — désengorger
 
-- [x] Data-loading (`EnrichedAuthorship`, `_enrich`, les `get_*`, `load_linked_authorships_by_pub`) sorti dans `loading.py` ; `CascadeResult` + `build_metrics` dans `metrics.py`. `cascade.py` ne garde que `_Cascade` et les passes (`c68dc4eb`).
-- [x] `match`/`create` factorisés dans `_run_pass`, paramétré par `decide` et `on_create` ; le double `_Cascade` (double-fetch voulu) est conservé (`fd01fec4`).
-- [x] `_max_authors_per_pub` : le gate méga-paper est **supprimé**. Mesure faite (run persons complet, seuil relevé à 10000) : la durée reste dans la norme — le cross-source ne compare qu'à la position exacte, pas tout-contre-tout, donc le gate ne servait pas la perf. Constante `MAX_AUTHORS_CROSS_SOURCE`, paramètre `total_author_count` et agrégat Python retirés (`0a1e927e`). Le rework par-SP envisagé devient sans objet.
-- [x] Logs de phase dé-jargonnés (plus de nom de fonction Python, table temporaire, « GC » ni « SQL ») ; chaque étape annonce son départ (fin des longs silences) ; bilan par méthode de rattachement re-logué en fin de phase (`31dc69ce`).
+- [x] Data-loading (`EnrichedAuthorship`, `_enrich`, les `get_*`, `load_linked_authorships_by_pub`) sorti dans `loading.py` ; `CascadeResult` + `build_metrics` dans `metrics.py`. `cascade.py` ne garde que `_Cascade` et les passes (`5b29c0d0`).
+- [x] `match`/`create` factorisés dans `_run_pass`, paramétré par `decide` et `on_create` ; le double `_Cascade` (double-fetch voulu) est conservé (`14150697`).
+- [x] `_max_authors_per_pub` : le gate méga-paper est **supprimé**. Mesure faite (run persons complet, seuil relevé à 10000) : la durée reste dans la norme — le cross-source ne compare qu'à la position exacte, pas tout-contre-tout, donc le gate ne servait pas la perf. Constante `MAX_AUTHORS_CROSS_SOURCE`, paramètre `total_author_count` et agrégat Python retirés (`f42ef185`). Le rework par-SP envisagé devient sans objet.
+- [x] Logs de phase dé-jargonnés (plus de nom de fonction Python, table temporaire, « GC » ni « SQL ») ; chaque étape annonce son départ (fin des longs silences) ; bilan par méthode de rattachement re-logué en fin de phase (`fa6a475d`).
 
 ### Boundary services
 
-- [x] Moitié `link` levée : la cascade appelle le singulier typé `link_authorship(person_id, source, authorship_id, …)` ; le batch `link_authorships`, dont elle était l'unique appelant, est supprimé (`9b89934a`). `add_identifiers_from_authorships` reste en API batch dict, assumée : partagée avec les CLI de maintenance, et `BareUnlinkedAuthorship` n'a pas de champ `idhal` (la typer brasserait le futur matching idhal).
+- [x] Moitié `link` levée : la cascade appelle le singulier typé `link_authorship(person_id, source, authorship_id, …)` ; le batch `link_authorships`, dont elle était l'unique appelant, est supprimé (`013f5cb0`). `add_identifiers_from_authorships` reste en API batch dict, assumée : partagée avec les CLI de maintenance, et `BareUnlinkedAuthorship` n'a pas de champ `idhal` (la typer brasserait le futur matching idhal).
 
 ### Docstrings
 
-- [x] `phase.py` : pourquoi du mono-transaction énoncé, ordre-indépendance découplée (`afe969ec`). Docstrings-fleuves : le volume venait surtout de la taille du fichier d'avant-découpe ; une fois `cascade.py` scindé, sa docstring mappe exactement son contenu (les cinq signaux, les deux populations, la corroboration) au bon niveau, et `reset`/`purge`/`populate`/`resolve` portent du rationale substantiel. Pas de resserrage imposé — la matière relue est jugée à sa place.
+- [x] `phase.py` : pourquoi du mono-transaction énoncé, ordre-indépendance découplée (`6759947a`). Docstrings-fleuves : le volume venait surtout de la taille du fichier d'avant-découpe ; une fois `cascade.py` scindé, sa docstring mappe exactement son contenu (les cinq signaux, les deux populations, la corroboration) au bon niveau, et `reset`/`purge`/`populate`/`resolve` portent du rationale substantiel. Pas de resserrage imposé — la matière relue est jugée à sa place.
 
 ### Optimisation du matching cross-source
 
 Le `reset` détache en bloc toutes les signatures résolues en cross-source (~75 000 par run) pour les recalculer, alors que le cross-source est une **fonction pure des ancres fermes** : un résultat cross-source n'ancre jamais un autre (seuls identifiant / nom / création entrent dans l'index d'ancrage, cf. `apply_match`). L'écrasante majorité se ré-attache à l'identique — du churn à vide. Cible : recompute **incrémental** contre les ancres fermes, sans passer par la destruction. Inchangé → no-op ; ancre déplacée → update ; ancre disparue → détaché. Résultat identique à la reconstruction actuelle, churn réduit à ce qui change réellement.
 
-Livré : plumbing `current_person_id` (`2fcbb896`), logique incrémentale (`c8f387fd`).
+Livré : plumbing `current_person_id` (`4155dc1c`), logique incrémentale (`04ffcb4e`).
 
 #### Ancrage sur les liens fermes
 
@@ -61,7 +61,7 @@ Livré : plumbing `current_person_id` (`2fcbb896`), logique incrémentale (`c8f3
 
 `match` et `create` réinstancient chacun un `_Cascade` : deux fetch, deux chargements des huit index, deux parsings de noms. Sur la transaction unique de la phase, autant tout garder en mémoire. Cible : un seul `_Cascade`, deux passes internes qui partagent ses index vivants.
 
-Livré : `7535b43a`.
+Livré : `f3fd5c79`.
 
 - [x] `run_cascade` remplace `match` + `create` : un `_Cascade` (un fetch, un chargement d'index), passe 1 `decide_full` sur tout le pool (rattachements fermes + cross-source, non-résolues collectées), passe 2 `decide_cross_and_name` sur les seules non-résolues (cross-source de rattrapage + création), contre les mêmes index vivants.
 - [x] `phase.py` appelle `run_cascade` (un seul résultat) ; `build_metrics` et `log_matching_breakdown` prennent un `CascadeResult` au lieu de deux.

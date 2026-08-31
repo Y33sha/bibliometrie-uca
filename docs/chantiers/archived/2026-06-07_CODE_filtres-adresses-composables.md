@@ -40,22 +40,22 @@ Workflow faux négatifs visé : structure étudiée = X, `Détection = Non déte
 
 ### Phase 1 — Backend : modèle de filtres + query
 
-- [x] Étendre `AddressListFilters` : `search`/`search_mode` unique remplacés par des listes de prédicats Texte `(mode, terme)` et Structure `(operator, structure_ids[])` (`7e3fbf58`)
-- [x] Prédicats typés (`TextPredicate`/`StructurePredicate`, dataclasses du port) parsés dans le router depuis les params répétés ; pas de `dict` brut (`7e3fbf58`)
-- [x] WHERE dynamique dans `list_addresses` : `ILIKE`/`NOT ILIKE` par prédicat texte ; `EXISTS`/`NOT EXISTS` avec `structure_id = ANY(...)` par prédicat structure (le OR / « aucune » se réduit par De Morgan), paramétré, AND-combiné. Garde-fou « non détecté » levé par tout prédicat de réduction (`7e3fbf58`)
-- [x] Index : `idx_addr_struct_filter` `(structure_id, address_id) INCLUDE (matched_form_id, is_confirmed)` couvre déjà les `EXISTS`, rien à ajouter (`7e3fbf58`)
+- [x] Étendre `AddressListFilters` : `search`/`search_mode` unique remplacés par des listes de prédicats Texte `(mode, terme)` et Structure `(operator, structure_ids[])` (`bc6140f7`)
+- [x] Prédicats typés (`TextPredicate`/`StructurePredicate`, dataclasses du port) parsés dans le router depuis les params répétés ; pas de `dict` brut (`bc6140f7`)
+- [x] WHERE dynamique dans `list_addresses` : `ILIKE`/`NOT ILIKE` par prédicat texte ; `EXISTS`/`NOT EXISTS` avec `structure_id = ANY(...)` par prédicat structure (le OR / « aucune » se réduit par De Morgan), paramétré, AND-combiné. Garde-fou « non détecté » levé par tout prédicat de réduction (`bc6140f7`)
+- [x] Index : `idx_addr_struct_filter` `(structure_id, address_id) INCLUDE (matched_form_id, is_confirmed)` couvre déjà les `EXISTS`, rien à ajouter (`bc6140f7`)
 
 ### Phase 2 — Frontend : filter-builder
 
-- [x] Zone Filtres délimitée : ligne scope (structure étudiée + détection/validation) + pile de prédicats, boutons `+ Texte` / `+ Structure reconnue`, suppression par ligne (`ab6bd795`)
-- [x] Prédicat Structure : multi-sélection en tags supprimables, opérateur explicite `reconnue comme l'une de` / `non reconnue comme aucune de` (`ab6bd795`)
-- [x] Picker = toutes structures hors `site` (y compris l'étudiée) moins celles déjà posées (dédup global via `usedStructureIds`) (`ab6bd795`)
-- [x] Params répétés `text`/`struct` dans l'URL + restauration au montage ; debounce conservé sur les champs texte ; application live (`ab6bd795`)
+- [x] Zone Filtres délimitée : ligne scope (structure étudiée + détection/validation) + pile de prédicats, boutons `+ Texte` / `+ Structure reconnue`, suppression par ligne (`2e4e0813`)
+- [x] Prédicat Structure : multi-sélection en tags supprimables, opérateur explicite `reconnue comme l'une de` / `non reconnue comme aucune de` (`2e4e0813`)
+- [x] Picker = toutes structures hors `site` (y compris l'étudiée) moins celles déjà posées (dédup global via `usedStructureIds`) (`2e4e0813`)
+- [x] Params répétés `text`/`struct` dans l'URL + restauration au montage ; debounce conservé sur les champs texte ; application live (`2e4e0813`)
 
 ### Phase 3 — Tests
 
-- [x] Intégration query : prédicats structure (recognized pending+confirmed, not_recognized, multi-OR), texte multi-ET, non-régression du scope (`7e3fbf58`)
-- [x] Intégration API : params répétés `text`/`struct`, levée du garde-fou par prédicat structure (`7e3fbf58`)
+- [x] Intégration query : prédicats structure (recognized pending+confirmed, not_recognized, multi-OR), texte multi-ET, non-régression du scope (`bc6140f7`)
+- [x] Intégration API : params répétés `text`/`struct`, levée du garde-fou par prédicat structure (`bc6140f7`)
 
 ## Questions ouvertes
 

@@ -19,13 +19,13 @@ Le tableau de publications avec ses filtres facets (années, labos, types, accè
 
 ## Travail réalisé
 
-### Phase 1 — `useUrlFilters` additif (commit 8291720)
+### Phase 1 — `useUrlFilters` additif (commit f2516fc)
 
 `syncUrl` préserve désormais les keys URL non gérées par l'instance.
 Pré-requis pour faire cohabiter plusieurs `useUrlFilters` sur une même
 page (ex : la page parent gère `?tab=`, le composant gère ses filtres).
 
-### Phase 2 — Extension du composant (commit 4580afe)
+### Phase 2 — Extension du composant (commit cd1d1d9)
 
 Nouveaux props sur `<PublicationsListView>` :
 
@@ -41,20 +41,20 @@ Nouveaux props sur `<PublicationsListView>` :
 - `apcMode: 'uca' | 'lab' | 'person-uca'` : mode de rendu du tag APC.
 - `perPage` : 50 pour les onglets, 100 pour `/publications`.
 
-### Phase 3 — Migration `/laboratories/[id]` (commit 6282560)
+### Phase 3 — Migration `/laboratories/[id]` (commit b6776b9)
 
 -267 lignes net. La page utilise `<PublicationsListView>` configuré avec
 `labId, halCollection, showHalStatusColumn, apcMode='lab'`. Son
 `useUrlFilters` ne gère plus que les keys cross-onglets (`tab`,
 `persons`, `addresses`).
 
-### Phase 4 — Migration `/persons/[id]` (commit 3ec23cc)
+### Phase 4 — Migration `/persons/[id]` (commit 9457e9d)
 
 -257 lignes net. Configure `personId, showCorrespondingColumn,
 showPerimeterFacet, showAdminExclude, apcMode='person-uca'`. La page
 fournit `excludeAuthorship` (avec confirm + API) au composant.
 
-### Bonus — Pre-commit svelte-check (commit 1b0680f)
+### Bonus — Pre-commit svelte-check (commit c99a5a2)
 
 Ajout de `svelte-check` au pre-commit, déclenché uniquement quand des
 fichiers frontend sont staged. Bloque sur les vraies erreurs (pas les

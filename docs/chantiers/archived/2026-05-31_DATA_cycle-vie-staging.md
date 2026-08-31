@@ -144,7 +144,7 @@ Aujourd'hui l'étape 2 (DOI) a une scope policy `unprocessed` vs `all` parce que
 - [x] Refetch **par DOI** via réutilisation des adapters `fetch_missing_doi` (`run_async` + `marker_handler`) : trouvé → bump `last_seen_at` + refresh `raw_data` ; 404 confirmé → `disappeared_at` ; erreur transitoire → laissé (retenté plus tard). Rows stale **sans DOI** → `disappeared_at` direct (`mark_undiscoverable_stale_disappeared`).
 - [x] **Pas de filtre par source** : sous cadence normale theses (permanent) et wos (re-vu en full) ne sont jamais stale ; wos désabonné → erreur (pas 404) → non marqué.
 - [x] Colonne `staging.disappeared_at` (migration `a7e3f1c9b5d2`). On **marque seulement** — aucune propagation/exclusion/suppression en aval tant que des cas concrets n'ont pas été observés (décision empirique bottom-up).
-- [x] Pré-requis corrigé : ScanR/theses bumpent `last_seen_at` sur re-vu inchangé (commit séparé `614db8f5`).
+- [x] Pré-requis corrigé : ScanR/theses bumpent `last_seen_at` sur re-vu inchangé (commit séparé `28073e32`).
 
 ## Questions ouvertes
 

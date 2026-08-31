@@ -62,7 +62,7 @@ Une vérification d'existence a sa place quand l'écriture référence l'entité
 - [x] Existence d'un code pays et validité de `journal_type` descendues dans les services.
 - [x] Restriction des types d'identifiant portée par `add_identifier`, conditionnée à `source="manual"`.
 - [x] `set_countries` et `update_name` lèvent `NotFoundError` sur un `rowcount` nul.
-- [x] `update_publisher`, `update_perimeter` et `update_structure` détectent l'absence par le `rowcount` de l'`UPDATE` (ou le `RETURNING` vide), non plus par un `*_exists()` préalable ; `publisher_exists` et `structure_exists` disparaissent faute d'appelant, `perimeter_exists` reste pour l'ajout de structure à un périmètre (`dedc215f`).
+- [x] `update_publisher`, `update_perimeter` et `update_structure` détectent l'absence par le `rowcount` de l'`UPDATE` (ou le `RETURNING` vide), non plus par un `*_exists()` préalable ; `publisher_exists` et `structure_exists` disparaissent faute d'appelant, `perimeter_exists` reste pour l'ajout de structure à un périmètre (`a5ef2516`).
 - [x] Les vérifications d'existence des cibles de `reassign_identifier` et des assignations de signatures orphelines descendent dans les services.
 - [x] Les routers concernés retirent les contrôles correspondants ; les ports `person_exists` et `address_exists` disparaissent faute d'appelant.
 
@@ -76,7 +76,7 @@ Une vérification d'existence a sa place quand l'écriture référence l'entité
 - [x] `PublisherMergeBlockedResponse` et `RejectedPairsResponse` dans `interfaces/api/models/errors.py`, produits par les handlers d'`app.py`.
 - [x] Les trois routes concernées — fusion d'éditeurs, attribution et attribution en lot de signatures orphelines — déclarent leur 409 via `responses={}`.
 - [x] Le frontend (pages éditeurs et signatures orphelines) lit les types générés, plutôt que de réécrire `BlockingJournal` et `RejectedPair`.
-- [x] La docstring de la fusion d'éditeurs décrit le refus en bloc et son 409 ; le commentaire d'`app.py` distingue le mapping runtime du contrat (`5a8cfc99`).
+- [x] La docstring de la fusion d'éditeurs décrit le refus en bloc et son 409 ; le commentaire d'`app.py` distingue le mapping runtime du contrat (`8e27f579`).
 
 ## Questions ouvertes
 

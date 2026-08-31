@@ -35,14 +35,14 @@ Enum `doc_type` et mappings ([`domain/publications/doc_types.py`](../../domain/p
 
 Playbook [`ajouter-une-regle-de-correction.md`](../playbooks/ajouter-une-regle-de-correction.md) posé. Documente la procédure complète (caractérisation, audit, implémentation, tests, hooks admin si éditable, rattrapage du stock).
 
-**Hooks de requalification** (re-jouer la cascade de correction quand le contexte journal d'une publication change) : changement de `journal_type` via `update_journal` (preview `type-change-impact` + confirmation) **et** fusion de journaux — fusionner dans un journal d'un autre type requalifie les `doc_type` des publications absorbées contre le type de la cible (revue → média ⇒ `media`). Backend dans `merge_journals` (`1a9bce2c`, couvre le merge direct et la cascade de `merge_publishers`), preview + confirmation frontend symétrique du changement de type (`15bbfc4a`).
+**Hooks de requalification** (re-jouer la cascade de correction quand le contexte journal d'une publication change) : changement de `journal_type` via `update_journal` (preview `type-change-impact` + confirmation) **et** fusion de journaux — fusionner dans un journal d'un autre type requalifie les `doc_type` des publications absorbées contre le type de la cible (revue → média ⇒ `media`). Backend dans `merge_journals` (`13f3bcce`, couvre le merge direct et la cascade de `merge_publishers`), preview + confirmation frontend symétrique du changement de type (`613ede7f`).
 
 ## Reste à faire
 
 Pris dans l'ordre :
 
-- [x] Book reviews par titre — règles ISBN + année-pages posées (`27e7b1f7`)
-- [x] Préprints article + journal_id inconnu — audit fait, règle `JOURNAL_TYPE_PREPRINT_SERVER_TO_PREPRINT` posée (`c8be3409`)
+- [x] Book reviews par titre — règles ISBN + année-pages posées (`03c70fae`)
+- [x] Préprints article + journal_id inconnu — audit fait, règle `JOURNAL_TYPE_PREPRINT_SERVER_TO_PREPRINT` posée (`9a6935fb`)
 - [x] Préprints OA gold — juge de paix Crossref ⇒ vrais préprints (0 SP crossref typée `article`), pas de règle preprint→article ; contradictions = découplage d'arbitrage `doc_type`/`journal_id` → passe de re-correction canonique (journal-type) + renvoi relations (preprint↔revue réelle). Cf. section
 - [x] Types WoS composites — audit fait (sur raw store) : 388 composites ; réduction `doctype_list[0]` au normalize ; `Data Paper` perdu, `Book Chapter`/`Proceedings Paper` à trancher (cf. section)
 - [x] Review = poubelle — audit fait : **pas une poubelle**, mappings sains ; seule action = libellé FR « Article de synthèse »

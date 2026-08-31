@@ -80,7 +80,7 @@ La phase se scinde donc en deux gestes distincts que l'ancien code mélangeait :
 
 **Câblage des inputs** : une fois la règle dans `effective_metadata`, elle reçoit une `SourcePublication`, plus le `work` OpenAlex. Les signaux se reconstruisent depuis la SP persistée : theses.fr et dumas se détectent sur `sp.urls` (`theses.fr/`, `dumas.`). Le côté `refresh` charge déjà `urls` ; côté match_or_create, `_sp_from_row` ne le peuplait pas — ajout de `urls` à `SourcePublicationRow` + projection SQL + helper. La capture systématique des URL comme métadonnée vaut quelle que soit la source.
 
-- [x] Suppression du dead code `correct_openalex_doc_type` (fonction + appel + plumbing `doc_type` dans `extract_pub_metadata` + tests). `f24ddcac`
+- [x] Suppression du dead code `correct_openalex_doc_type` (fonction + appel + plumbing `doc_type` dans `extract_pub_metadata` + tests). `dc144262`
 - [x] Câblage `urls` sur `SourcePublicationRow`, sa projection SQL et `_sp_from_row`.
 - [x] Implémentation des règles `THESES_FR_URL_TO_THESIS` / `DUMAS_URL_TO_MEMOIR` dans `effective_metadata` + audit `meta.doc_type_corrected_by` (posé côté `refresh` seulement quand la valeur change réellement).
 - [x] Tests : règles `effective_metadata` + audit `_apply_corrections`.
@@ -92,10 +92,10 @@ Première règle dont les inputs sont éditables côté admin (typiquement `jour
 
 Pour fournir le `Journal` à `effective_metadata` aux deux call-sites (refresh + match_or_create), choix d'enrichir la projection de lecture SP via le DTO `SourcePublicationWithJournalView` (`domain/source_publications/views.py`), qui embarque `journal_type` / `oa_model` / `apc_amount` par JOIN. L'agrégat `SourcePublication` reste pur. Alternative écartée : threader un `journal_repo` dans toutes les signatures (refresh, match_or_create, merges) — plus invasif sans bénéfice métier.
 
-- [x] Règle retenue : `JOURNAL_TYPE_MEDIA_TO_MEDIA`. Ordre dans la cascade `doc_type` : theses.fr > dumas > media (une thèse/mémoire rattachée à un journal media reste thèse/mémoire). Commit `59db89d9`.
-- [x] Implémentation dans `effective_metadata` + audit `meta.doc_type_corrected_by`. Commit `59db89d9`.
-- [x] Hooks admin : `requalify_publications_for_journal` côté `application/journals.py` (dry-run pour preview, apply après confirmation modale). Endpoints `GET /api/journals/{id}/type-change-impact` + `PUT /api/journals/{id}` qui déclenche la requalification synchrone. Repo : `PublicationRepository.find_ids_by_journal_id`. Commit `16b98985`.
-- [x] Modale frontend : preview du compte avant apply. Commit `49d22cd7` ; message rendu générique le 2026-05-28 (un recalcul du `doc_type` est annoncé, pas une valeur cible — la cible dépend de l'agrégation complète des sources, pas seulement du journal_type).
+- [x] Règle retenue : `JOURNAL_TYPE_MEDIA_TO_MEDIA`. Ordre dans la cascade `doc_type` : theses.fr > dumas > media (une thèse/mémoire rattachée à un journal media reste thèse/mémoire). Commit `92c9239b`.
+- [x] Implémentation dans `effective_metadata` + audit `meta.doc_type_corrected_by`. Commit `92c9239b`.
+- [x] Hooks admin : `requalify_publications_for_journal` côté `application/journals.py` (dry-run pour preview, apply après confirmation modale). Endpoints `GET /api/journals/{id}/type-change-impact` + `PUT /api/journals/{id}` qui déclenche la requalification synchrone. Repo : `PublicationRepository.find_ids_by_journal_id`. Commit `70e3f6c7`.
+- [x] Modale frontend : preview du compte avant apply. Commit `bdd0d9c0` ; message rendu générique le 2026-05-28 (un recalcul du `doc_type` est annoncé, pas une valeur cible — la cible dépend de l'agrégation complète des sources, pas seulement du journal_type).
 - [x] Re-run ciblé sur le stock impacté : `interfaces/cli/maintenance/refresh_publications_for_journal_type.py` (paramétré par `--journal-type`, réutilisable pour les futures règles journal-dépendantes).
 - [x] Tests : règle media (`test_correction.py`), `apply_corrections` avec journal media (`test_publications.py`), service requalification dry-run + apply, endpoints API + PUT.
 

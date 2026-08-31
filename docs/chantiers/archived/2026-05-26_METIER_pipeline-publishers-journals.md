@@ -52,7 +52,7 @@ Ordre par dépendance. Les phases 2, 3, 4, 5 sont indépendantes une fois la pha
 
 ## Phase 1 — Refonte structurelle
 
-Livrée le 2026-05-26 (commit `d003bb9e`).
+Livrée le 2026-05-26 (commit `82824974`).
 
 - [x] Créer `application/pipeline/publishers_journals/`.
 - [x] Déplacer `application/pipeline/resolve_doi_prefixes.py` dedans.

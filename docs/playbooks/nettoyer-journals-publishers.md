@@ -16,7 +16,7 @@ Le chantier [METIER_publishers-journals](../chantiers/archived/2026-05-29_METIER
 
 - Accès psql à la base de prod (`DB_NAME=bibliometrie`).
 - Accès à l'UI admin (`/admin/journals`, `/admin/publishers`) avec session active.
-- Le script de seed est à jour : `interfaces/cli/maintenance/seed_journals_doi_prefix.py` (commit ≥ `bb2aa232`).
+- Le script de seed est à jour : `interfaces/cli/maintenance/seed_journals_doi_prefix.py` (commit ≥ `56cd4a49`).
 
 ## Cas 1 — Doublons de journaux
 
@@ -115,7 +115,7 @@ ORDER BY doi_prefix;
 UPDATE journals SET doi_prefix = NULL WHERE doi_prefix ~ '/97[89]';
 ```
 
-Le script de seed embarque depuis `bb2aa232` un guard `_ISBN_PREFIX_RE` qui empêche la réintroduction au prochain run.
+Le script de seed embarque depuis `56cd4a49` un guard `_ISBN_PREFIX_RE` qui empêche la réintroduction au prochain run.
 
 Note : pour les vraies séries de livres, `doi_prefix` reste structurellement non-discriminant (les DOIs ne distinguent pas les séries du même imprint). Laisser `NULL` est la bonne réponse — la cohérence DOI ↔ journal pour les *book_series* / *ebook_platform* se fera via un autre signal (titre + ISBN + métadonnées éditeur), pas via préfixe.
 

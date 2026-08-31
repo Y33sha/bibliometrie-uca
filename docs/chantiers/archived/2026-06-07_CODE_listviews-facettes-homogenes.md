@@ -30,34 +30,34 @@ Deux types échappent encore au patron : **thèses** et **personnes**. Leurs com
 
 ### Phase 1 — Aligner les ListView déjà extraites
 
-- [x] `JournalsListView` + `PublishersListView` : `toolbar-sticky` ajouté (recherche déjà présente dans les deux), alignés sur `PublicationsListView`. Pas de CSV (aucun endpoint, cf. YAGNI) (`afcca67a`)
+- [x] `JournalsListView` + `PublishersListView` : `toolbar-sticky` ajouté (recherche déjà présente dans les deux), alignés sur `PublicationsListView`. Pas de CSV (aucun endpoint, cf. YAGNI) (`d3b42665`)
 
 ### Phase 2 — Extraire `ThesesListView`
 
-- [x] Composant `ThesesListView` : barre `toolbar-card toolbar-sticky` + recherche + `ThesesTable` + pagination + Export CSV ; prop `labId` optionnelle (masque la facette Laboratoire + la colonne Labos, borne au labo) ; `urlSync` gatée comme `PublicationsListView` (`26af35f1`)
-- [x] `/theses` → wrapper ; onglet thèses de `laboratories/[id]` consomme `ThesesListView` (`labId`, `urlSync=false`) → carte/sticky/CSV homogènes, barre inline supprimée (`26af35f1`)
+- [x] Composant `ThesesListView` : barre `toolbar-card toolbar-sticky` + recherche + `ThesesTable` + pagination + Export CSV ; prop `labId` optionnelle (masque la facette Laboratoire + la colonne Labos, borne au labo) ; `urlSync` gatée comme `PublicationsListView` (`2e1c5f97`)
+- [x] `/theses` → wrapper ; onglet thèses de `laboratories/[id]` consomme `ThesesListView` (`labId`, `urlSync=false`) → carte/sticky/CSV homogènes, barre inline supprimée (`2e1c5f97`)
 
 ### Phase 3 — Personnes : homogénéité (sans extraction)
 
-- [x] Homogénéité onglet personnes `laboratories/[id]` : `toolbar-sticky` ajouté (aligné sur `/persons`) (`9053f1bc`)
-- [x] Nettoyage : retrait de la bannière « authorships non reliées » de la page labo (code vestigial, doublon de la page admin orphan-authorships) — front + back + `schema.ts` + test (`9053f1bc`)
+- [x] Homogénéité onglet personnes `laboratories/[id]` : `toolbar-sticky` ajouté (aligné sur `/persons`) (`a9d285d0`)
+- [x] Nettoyage : retrait de la bannière « authorships non reliées » de la page labo (code vestigial, doublon de la page admin orphan-authorships) — front + back + `schema.ts` + test (`a9d285d0`)
 
 **Pourquoi les personnes divergent (et le correctif retenu).** Contrairement aux thèses (deux contextes sur le même `/api/publications` filtré par `lab_id`), les personnes ont deux endpoints aux contrats divergents : `/api/persons/directory` (annuaire global `FROM persons`, `total`, facettes via endpoint séparé) vs `/api/laboratories/[id]/persons` (`FROM authorships` scopé labo, `total_persons`, facettes inline). Asymétrie de conception, pas fondamentale. **Décision (Laura) : on aligne — une entité = un endpoint.** On ajoute `lab_id` à l'annuaire et on supprime le bricolage labo, puis on extrait `PersonsListView` comme pour les publications.
 
 ### Phase 4 — Backend : aligner l'endpoint personnes sur le modèle publications
 
-- [x] Clause réutilisable `person_in_lab_clause(lab_id)` (`EXISTS authorships → authorship_structures = lab`, rôle author) dans `infrastructure/queries/filters.py` (`7f7b2fc7`)
-- [x] `lab_id` ajouté à `DirectoryFilters`/`FacetFilters` + param sur `/api/persons/directory` et `/api/persons/facets` ; `pub_count` scopé labo quand `lab_id` ; facettes scopées (`7f7b2fc7`)
-- [x] Tests : annuaire + facettes scopés par `lab_id` (`7f7b2fc7`)
+- [x] Clause réutilisable `person_in_lab_clause(lab_id)` (`EXISTS authorships → authorship_structures = lab`, rôle author) dans `infrastructure/queries/filters.py` (`5a9286cc`)
+- [x] `lab_id` ajouté à `DirectoryFilters`/`FacetFilters` + param sur `/api/persons/directory` et `/api/persons/facets` ; `pub_count` scopé labo quand `lab_id` ; facettes scopées (`5a9286cc`)
+- [x] Tests : annuaire + facettes scopés par `lab_id` (`5a9286cc`)
 
 ### Phase 5 — Extraire `PersonsListView`
 
-- [x] Composant `PersonsListView` (mirror `Publications`/`ThesesListView`) : barre `toolbar-card toolbar-sticky` + recherche + Identifiants + Fonction/Département/Base RH + `PersonsTable` + pagination ; prop `labId` ; `urlSync` gatée ; via `/api/persons/directory` + `/facets` (`a0163b8b`)
-- [x] `/persons` → wrapper ; onglet personnes de `laboratories/[id]` consomme le composant (`labId`, `urlSync=false`) ; barres inline supprimées (`a0163b8b`)
+- [x] Composant `PersonsListView` (mirror `Publications`/`ThesesListView`) : barre `toolbar-card toolbar-sticky` + recherche + Identifiants + Fonction/Département/Base RH + `PersonsTable` + pagination ; prop `labId` ; `urlSync` gatée ; via `/api/persons/directory` + `/facets` (`f6984aa4`)
+- [x] `/persons` → wrapper ; onglet personnes de `laboratories/[id]` consomme le composant (`labId`, `urlSync=false`) ; barres inline supprimées (`f6984aa4`)
 
 ### Phase 6 — Supprimer le bricolage `laboratories/[id]/persons`
 
-- [x] Retrait route + `get_laboratory_persons` + modèles `LaboratoryPersonsResponse`/`LabPersonOut`/`LabPersonsFacets`/`LabPersonsFilters` + `_lab_persons_extra_clauses` + imports + test + regen `schema.ts` (`bcb10dc8`, −500 lignes)
+- [x] Retrait route + `get_laboratory_persons` + modèles `LaboratoryPersonsResponse`/`LabPersonOut`/`LabPersonsFacets`/`LabPersonsFilters` + `_lab_persons_extra_clauses` + imports + test + regen `schema.ts` (`63a01b04`, −500 lignes)
 
 ### Vérification
 

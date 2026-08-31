@@ -50,15 +50,15 @@ transmettre à une autre fonction qui ne l'utilise pas non plus. En supprimant l
 
 ### Phase 2 — Sweep itératif
 
-- [x] Sweep modules `application/*` (commit `cfd4510`) :
+- [x] Sweep modules `application/*` (commit `9aeb030`) :
   `config.py`, `publishers.py`, `journals.py`, `structures.py`,
   `addresses_countries.py` (28 fonctions).
-- [x] Sweep modules `application/*` partie 2 (commit `50d35ec`) :
+- [x] Sweep modules `application/*` partie 2 (commit `6927ad1`) :
   `persons.py`, `publications.py`, `authorships/core.py`,
   `authorships/assign_orphans.py` (~30 fonctions). Callers
   patchés par AST en respectant les défs locales (helpers
   `_create_person`, etc.) et les aliases d'imports.
-- [x] Sweep finale routers + pipeline (commit `80270ec`) : retrait de
+- [x] Sweep finale routers + pipeline (commit `bb2351f`) : retrait de
   `conn: Connection = Depends(db_conn_sync)` dans 33 endpoints
   FastAPI (FastAPI résout la cascade via le repo) + 17 helpers
   internes pipeline (`upsert_publisher`, `upsert_journal`,
@@ -66,7 +66,7 @@ transmettre à une autre fonction qui ne l'utilise pas non plus. En supprimant l
 
 ### Phase 3 — Renommage `cur` → `conn`
 
-- [x] (commit `41ff74d`) Renommage AST-driven : 53 paramètres
+- [x] (commit `5a78e66`) Renommage AST-driven : 53 paramètres
   `cur: Connection` typés SA mais nommés `cur` par héritage psycopg,
   renommés en `conn` avec leurs références internes. 13 fichiers
   touchés.

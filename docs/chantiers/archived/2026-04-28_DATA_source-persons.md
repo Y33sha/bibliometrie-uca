@@ -160,7 +160,7 @@ Ne rien changer aux sources existantes, juste convenir que CrossRef ne crée pas
 
 ### Phase 1.5 — Préparation : nullable + suppression code mort ✅
 - [x] Migration `011_source_person_id_nullable.sql` : `ALTER TABLE source_authorships ALTER COLUMN source_person_id DROP NOT NULL`. Prérequis pour les normalizers qui n'écriront plus de `source_persons`.
-- [x] Suppression de l'endpoint admin authorships orphelin (cf. commit `f25f3b6`).
+- [x] Suppression de l'endpoint admin authorships orphelin (cf. commit `dcab320`).
 
 ### Phase 2 — Réécriture des normalizers concernés
 - [x] **OpenAlex** : `upsert_openalex_source_person` supprimé ; le normalizer met `source_person_id=NULL` et `identifiers={"orcid": ...}` sur les `source_authorships`. `fetch_unlinked_authorships` adapté en LEFT JOIN avec lecture de `sa_auth.identifiers->>'orcid'` et `sa_auth.raw_author_name` pour OA.

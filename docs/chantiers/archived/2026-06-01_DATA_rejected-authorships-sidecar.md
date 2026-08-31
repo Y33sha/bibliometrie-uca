@@ -64,7 +64,7 @@ Sites recensés : `insert_missing_authorships` (build principal) et le chemin d'
 
 ## Phasage
 
-Livré en un commit (`84b2dc83`, migration `f3b6d9c1a8e2`).
+Livré en un commit (`38becc17`, migration `f3b6d9c1a8e2`).
 
 - [x] **Migration + schéma + domaine** : créer `rejected_authorships` ; backfill depuis `authorships WHERE excluded AND person_id IS NOT NULL` (0 row en prod, idempotent) ; `DROP COLUMN excluded`, `DROP COLUMN source_manual`. `tables.py`, `domain/publications/authorship.py`, projection `_AuthorshipRow`.
 - [x] **Écriture** : `exclude_authorship` → sidecar + DELETE row. Port/repo : `mark_authorship_excluded` → `reject_authorship(publication_id, person_id)` + `delete_authorship` ; anti-join sidecar dans les 3 sites d'INSERT ; transfert du rejet dans `merge_into`.

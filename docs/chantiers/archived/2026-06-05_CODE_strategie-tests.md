@@ -8,7 +8,7 @@ Issu d'un audit QA de la suite de tests (2 394 tests : 1 373 unitaires, 1 021 d'
 
 ### Problème 1 — Le helper-fiction `find_or_create_for_tests`
 
-`tests/integration/helpers/publications.py::find_or_create_for_tests` réimplémente une cascade match-or-create de publications **retirée du code prod** (commit `23aac706`). En prod, la décision de matching est désormais portée par `decide_publication_match` (décideur pur, `domain/publications/deduplication.py`) et orchestrée par `application/pipeline/publications/match_or_create_publications.process_document` (qui consomme des rows SQL via les bulk-link queries). Le helper, lui, pilote la cascade depuis une `Publication` construite à la main — un chemin qui n'existe plus en prod. Les tests qui en dépendent testent donc une fiction.
+`tests/integration/helpers/publications.py::find_or_create_for_tests` réimplémente une cascade match-or-create de publications **retirée du code prod** (commit `c68eeeec`). En prod, la décision de matching est désormais portée par `decide_publication_match` (décideur pur, `domain/publications/deduplication.py`) et orchestrée par `application/pipeline/publications/match_or_create_publications.process_document` (qui consomme des rows SQL via les bulk-link queries). Le helper, lui, pilote la cascade depuis une `Publication` construite à la main — un chemin qui n'existe plus en prod. Les tests qui en dépendent testent donc une fiction.
 
 Méthode de tri retenue (rigoureuse, pas à l'œil) : **couverture différentielle** via `coverage` + `--cov-context=test`, qui associe chaque ligne prod aux tests qui la touchent. Un test-fiction qui couvre **0 ligne prod unique** est de la pure redondance (le comportement est déjà couvert par les décideurs unitaires + `test_match_or_create_queries.py` sur la vraie entrée) → suppressible. Un test qui couvre du vrai prod exclusif (`refresh_from_sources`, `find_by_nnt`, `repo.create`) est conservé mais re-seedé pour ne plus passer par la fiction. **Critère d'acceptation de chaque étape : re-run de la mesure montrant 0 ligne prod perdue.**
 
@@ -40,8 +40,8 @@ Cosmic Python conseille d'être parcimonieux sur les tests unitaires du domain *
 
 ### Problème 1 — Dé-fictionnaliser, puis supprimer le helper
 
-- [x] **`test_dedup_publications.py`** (commit `02f8779b`) : 21 tests-fiction supprimés (cascade DOI / conflit doc_type / NNT + 8 tautologiques sur un matching par titre inexistant), 14 tests conservés et re-seedés via `repo.create` (12 `refresh_from_sources` + 2 `find_by_nnt`). Mesure : 0 ligne prod perdue (publications.py 86 / aggregation 64 / publication_repository 145, inchangés).
-- [x] **`test_scenarios.py::TestPublicationService`** (commit `2a12d46c`) — même sac mixte que test_dedup (pas « pur cascade ») : 6 tests-fiction supprimés (create, dédup DOI, 2 tautologiques titre, allow_create), 2 tests `refresh_from_sources` re-seedés via `repo.create` dont celui qui couvre seul la branche auto-merge `publications.py:155-178`. Classe renommée `TestRefreshFromSources`. Mesure suite complète : 0 ligne prod perdue.
+- [x] **`test_dedup_publications.py`** (commit `3bf2f8b7`) : 21 tests-fiction supprimés (cascade DOI / conflit doc_type / NNT + 8 tautologiques sur un matching par titre inexistant), 14 tests conservés et re-seedés via `repo.create` (12 `refresh_from_sources` + 2 `find_by_nnt`). Mesure : 0 ligne prod perdue (publications.py 86 / aggregation 64 / publication_repository 145, inchangés).
+- [x] **`test_scenarios.py::TestPublicationService`** (commit `a4ed0ec2`) — même sac mixte que test_dedup (pas « pur cascade ») : 6 tests-fiction supprimés (create, dédup DOI, 2 tautologiques titre, allow_create), 2 tests `refresh_from_sources` re-seedés via `repo.create` dont celui qui couvre seul la branche auto-merge `publications.py:155-178`. Classe renommée `TestRefreshFromSources`. Mesure suite complète : 0 ligne prod perdue.
 - [ ] **`idempotence/_helpers.py::create_all_publications` + `test_reprocessing.py::_create_all_publications`** (nature b). Dépend du Problème 1-bis.
 - [ ] **Supprimer `find_or_create_for_tests`** (et `tests/integration/helpers/publications.py`) une fois zéro caller. Vérifier qu'aucune ligne prod ne perd sa couverture.
 
@@ -54,12 +54,12 @@ Cosmic Python conseille d'être parcimonieux sur les tests unitaires du domain *
 
 ### Problème 2 — Factoriser mocks et builders (clôturé)
 
-- [x] **Fixture `logger`** factorisée dans `tests/unit/application/pipeline/normalize/conftest.py` (commit `4995ea9e`) — elle était redéfinie à l'identique dans hal/openalex/theses/wos.
+- [x] **Fixture `logger`** factorisée dans `tests/unit/application/pipeline/normalize/conftest.py` (commit `f8aa15df`) — elle était redéfinie à l'identique dans hal/openalex/theses/wos.
 - [x] **Le reste laissé local, décision motivée.** `_FakeStagingQueries` (6 lignes, identique ×3) : l'arbo `tests/unit/` n'a pas de `__init__.py`, donc factoriser proprement demanderait soit du scaffolding `__init__.py`, soit des imports-depuis-conftest fragiles, pour un stub trivial instancié inline dans des helpers `_kwargs` — remède plus lourd que le mal. `_FakeQueries` : méthodes nommées par source (`upsert_hal_source_publication` vs `upsert_openalex_…`), une base unifiée serait de l'abstraction cérémonieuse. Les `_insert_*` d'intégration : la localité a une valeur en tests (chaque fichier se lit seul) et la duplication n'est que le reflet de la duplication prod (6 upserts `upsert_<source>_source_publication`, ~80 % identiques mais avec colonnes + règles de merge propres par source). Tuer la duplication à la racine = refactorer la prod, pas les tests (voir Questions ouvertes).
 
 ### Problème 3 — Parcimonie domain (clôturé)
 
-- [x] Normalisation des identifiants paramétrée (commit `47e18e6a`) : DOI, ORCID, IdHAL, IdRef, NNT, HALId, RorId, HalCollection. Variantes `strip(https/http/préfixe nu)` + lowercase + version suffix + cas de rejet fusionnées en `@pytest.mark.parametrize`, rationale conservé en commentaire de ligne. Aucun cas perdu. Conservés : les tests de contrat des VO (frozen/hashable — DOI clé de set) et le cas subtil `.v` non terminal.
+- [x] Normalisation des identifiants paramétrée (commit `30b8f2f8`) : DOI, ORCID, IdHAL, IdRef, NNT, HALId, RorId, HalCollection. Variantes `strip(https/http/préfixe nu)` + lowercase + version suffix + cas de rejet fusionnées en `@pytest.mark.parametrize`, rationale conservé en commentaire de ligne. Aucun cas perdu. Conservés : les tests de contrat des VO (frozen/hashable — DOI clé de set) et le cas subtil `.v` non terminal.
 
 ## Questions ouvertes
 

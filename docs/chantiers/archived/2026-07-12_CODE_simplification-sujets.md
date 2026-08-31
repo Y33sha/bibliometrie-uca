@@ -25,24 +25,24 @@ Sur la fiche publication, les mots-clés libres sont affichés **via `publicatio
 
 ### Phase A — Sortir les mots-clés libres
 
-- [x] Ingestors : n'ingérer que `topics` (concepts). Le champ `keywords` n'alimente plus `subjects` / `publication_subjects` ; l'ingestor CrossRef (libres seuls) est supprimé. (`6b85ac57`)
-- [x] Fiche publication : afficher les mots-clés libres depuis `publications_detail.keywords` (champ `keywords` de la réponse détail + `SubjectsBlock`), indépendamment de `publication_subjects`. (`b7db61df`)
-- [x] Le stock existant se nettoie par une ré-ingestion complète : le flag `--rebuild-subjects` repasse toutes les publications (efface + reconstruit les liens), et `purge_orphan_subjects` retire les sujets libres devenus orphelins. (`259f2cba`)
+- [x] Ingestors : n'ingérer que `topics` (concepts). Le champ `keywords` n'alimente plus `subjects` / `publication_subjects` ; l'ingestor CrossRef (libres seuls) est supprimé. (`d768d836`)
+- [x] Fiche publication : afficher les mots-clés libres depuis `publications_detail.keywords` (champ `keywords` de la réponse détail + `SubjectsBlock`), indépendamment de `publication_subjects`. (`e8db9510`)
+- [x] Le stock existant se nettoie par une ré-ingestion complète : le flag `--rebuild-subjects` repasse toutes les publications (efface + reconstruit les liens), et `purge_orphan_subjects` retire les sujets libres devenus orphelins. (`40100d5a`)
 
 ### Phase B — Supprimer le modèle d'ontologie
 
-- [x] Migration : `DROP COLUMN publication_subjects.score` **et** `DROP COLUMN subjects.ontologies` (+ index partiel `idx_subjects_oa_label_lower`). (`5031bb61`)
-- [x] Retirer `ontologies` / `OntologyEntry` de `upsert_subject` (SQL + port pipeline), de `SubjectCache`, des ingestors ; `upsert_subject` ne prend plus que `label` + `language`. (`6b85ac57`)
-- [x] Retirer `SubjectOntologyEntry` (port API) et le champ `ontologies` des DTO sujets et des `SELECT`. (`b7db61df`)
-- [x] `domain/subjects/subject.py` : retirer les constantes `ONTOLOGY_*` (dont `ONTOLOGY_OPENALEX_KEYWORD`), ne garder que `normalize_label` ; docstring recalé. (`6b85ac57`)
-- [x] Front : retirer les badges d'ontologie (pages `/subjects`, détail sujet, `SubjectsBlock`). Un sujet s'affiche par son libellé seul. (`b7db61df`)
-- [x] Supprimer `cleanup_oa_subjects`. (`6b85ac57`)
+- [x] Migration : `DROP COLUMN publication_subjects.score` **et** `DROP COLUMN subjects.ontologies` (+ index partiel `idx_subjects_oa_label_lower`). (`99147eec`)
+- [x] Retirer `ontologies` / `OntologyEntry` de `upsert_subject` (SQL + port pipeline), de `SubjectCache`, des ingestors ; `upsert_subject` ne prend plus que `label` + `language`. (`d768d836`)
+- [x] Retirer `SubjectOntologyEntry` (port API) et le champ `ontologies` des DTO sujets et des `SELECT`. (`e8db9510`)
+- [x] `domain/subjects/subject.py` : retirer les constantes `ONTOLOGY_*` (dont `ONTOLOGY_OPENALEX_KEYWORD`), ne garder que `normalize_label` ; docstring recalé. (`d768d836`)
+- [x] Front : retirer les badges d'ontologie (pages `/subjects`, détail sujet, `SubjectsBlock`). Un sujet s'affiche par son libellé seul. (`e8db9510`)
+- [x] Supprimer `cleanup_oa_subjects`. (`d768d836`)
 
 ### Phase C — Simplifier et factoriser le reste
 
-- [x] `SubjectCache` réduit à `label → subject_id` (plus de suivi ontologies, plus de `_covers`). (`6b85ac57`)
-- [x] Docstrings des ingestors recalés (format source décrit en clair, sans numéros de ligne ni renvoi chantier ni note de roadmap). `ingest_hal` garde la dérivation code CCSD → libellé (`hal_domain_label`), sans stocker le code. (`6b85ac57`)
-- [x] Cinq modules `ingest_<source>` réduits à cinq extracteurs purs `topics → list[str]` (`extractors.py`) + registre `SUBJECT_EXTRACTORS` ; l'upsert/liaison n'est plus écrit qu'une fois, dans l'orchestrateur. (`12009caa`)
+- [x] `SubjectCache` réduit à `label → subject_id` (plus de suivi ontologies, plus de `_covers`). (`d768d836`)
+- [x] Docstrings des ingestors recalés (format source décrit en clair, sans numéros de ligne ni renvoi chantier ni note de roadmap). `ingest_hal` garde la dérivation code CCSD → libellé (`hal_domain_label`), sans stocker le code. (`d768d836`)
+- [x] Cinq modules `ingest_<source>` réduits à cinq extracteurs purs `topics → list[str]` (`extractors.py`) + registre `SUBJECT_EXTRACTORS` ; l'upsert/liaison n'est plus écrit qu'une fois, dans l'orchestrateur. (`86fbd469`)
 
 ## Questions ouvertes
 

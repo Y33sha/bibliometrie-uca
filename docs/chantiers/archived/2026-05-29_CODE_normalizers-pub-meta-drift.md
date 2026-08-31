@@ -39,10 +39,10 @@ Enjeu : double extraction par source (deux fonctions à maintenir, qui peuvent d
 - [x] Audit : tableau source × champ confrontant valeur `pub_meta` vs valeur recalculée dans `insert_*` (cf. section Audit ci-dessus).
 - [x] Résorption des écarts documentés (chacun tranché dans la colonne « Tranchée » de l'audit).
 - [x] Collapse : `insert_*_document` consomme `pub_meta` en entier. Une source par commit.
-  - `5fe2957d` — WoS
-  - `0390181e` — Scanr
-  - `3727d56f` — HAL
-  - `0b07b3b7` — OpenAlex
+  - `50734df2` — WoS
+  - `0fa22d28` — Scanr
+  - `6f50e9bf` — HAL
+  - `09adcb88` — OpenAlex
 - [x] Tests : non-régression — les tests unitaires des 4 sources passent à l'identique sur ce qui est persisté dans `source_publications`.
 
 ## Liens

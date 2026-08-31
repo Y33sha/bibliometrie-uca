@@ -50,12 +50,12 @@ Migration `b7e3f9a1c4d8`.
 - [x] `OA_RANK` renuméroté : `embargoed` (3) entre `green` (4) et `closed` (2)
 - [x] Tests `best_oa_status` : `embargoed` > closed/unknown, perd face à green+, seul
 
-### 4. Normalize HAL — ✓ (`28faa81b`)
+### 4. Normalize HAL — ✓ (`36fdf9e6`)
 - [x] Extraction `ref[@type='file']/date/@notBefore` → `embargo_until` via `active_embargo_until` ; **date future seulement** (embargo actif ; date échue ⇒ NULL, pas d'historique)
 - [x] `derive_hal_oa_status` date-agnostique : fichier présent + `embargo_until` renseigné ⇒ `embargoed` (la levée est portée par la règle de correction, pas par le derive)
 - [x] Tests unitaires : `derive` (avec/sans embargo, avec/sans `fileMain_s`) + `active_embargo_until` (future / échue / multi-fichiers / non-file / malformé)
 
-### 5. Règle de correction `oa_status` — ✓ (`a1d28126`)
+### 5. Règle de correction `oa_status` — ✓ (`1bc4daba`)
 *La promotion `embargoed → green` est une règle de correction de métadonnées, pas une étape de pipeline dédiée (décision 6).*
 - [x] `embargo_expired` (`embargo_until <= current_date`) calculé dans le SQL de fetch — `effective_metadata` reste pure (lit un booléen)
 - [x] Prédicats `oa_status` (entrée) et `embargo_expired` ; règle `EMBARGO_EXPIRED_TO_GREEN` (`embargoed` + `embargo_expired` ⇒ `green`). `effective_metadata` corrige aussi `oa_status` (champs indépendants, pas de feed-forward — `# TODO` posé)

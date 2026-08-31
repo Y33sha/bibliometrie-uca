@@ -10,7 +10,7 @@ Commencé et terminé le 2026-06-02
 - **Reset périmètre gardé par `full_run`** : `reset_authorships_perimeter` ne tourne que si le run couvre *toutes* les sources — la correction du périmètre dépend des sources du pipeline, pas de l'état des données. Pourri.
 - **Garde `IS NULL` (fill-once)** : `propagate_author_position` et `propagate_is_corresponding` n'écrivent que `WHERE a.x IS NULL` → une valeur déjà posée n'est **jamais révisée**. Une source qui corrige une position / un corresponding sur une authorship existante est ignorée jusqu'au purge mensuel. `propagate_roles` n'a pas ce garde (`IS DISTINCT FROM`) et converge déjà.
 
-Le pruning des orphelines (commit `556b0819`) a fermé le gap sur *l'ensemble des paires* (add/delete). Ce chantier ferme le gap sur *les attributs et le périmètre*, et supprime la source-dépendance.
+Le pruning des orphelines (commit `1003e524`) a fermé le gap sur *l'ensemble des paires* (add/delete). Ce chantier ferme le gap sur *les attributs et le périmètre*, et supprime la source-dépendance.
 
 ### Audit empirique (base prod, 2026-06-02)
 

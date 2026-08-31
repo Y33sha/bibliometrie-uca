@@ -31,7 +31,7 @@ Identifiants visibles dans les URLs/`id` des locations OpenAlex : DOI, hal_id (t
 
 ## Phasage
 
-### Phase 1 — Extraction des identifiants (sans changement de structure) ✓ (`05971e95`)
+### Phase 1 — Extraction des identifiants (sans changement de structure) ✓ (`8b5dd673`)
 
 Capter `pmid`/`pmcid`/`arxiv_id` partout, en scalaires dans `external_ids`. VOs `PMID`/`PMCID`/`ArxivId` ajoutés (contrat DOI/NNT/HALId) + helpers `normalize_pmid`/`normalize_pmcid`/`normalize_arxiv_id` (URL ou id brut).
 
@@ -42,14 +42,14 @@ Capter `pmid`/`pmcid`/`arxiv_id` partout, en scalaires dans `external_ids`. VOs 
 
 **Stock à rafraîchir** (action Laura) : `pubmedid_s` n'étant pas moissonné auparavant, le PMID HAL n'apparaîtra qu'après refetch HAL ; les `external_ids.pmc` OpenAlex existants restent sous l'ancienne clé jusqu'au prochain normalize.
 
-### Phase 2 — PMID comme clé de déduplication ✓ (`09888363`)
+### Phase 2 — PMID comme clé de déduplication ✓ (`5e1a7248`)
 
 - [x] `find_by_pmid` (port + repo) : lookup `external_ids->>'pmid'`.
 - [x] `decide_publication_match` : cascade `DOI > NNT > HAL_ID > PMID > metadata` (PMID après les IDs exacts existants, avant le matching par métadonnées — conservateur).
 - [x] `bulk_link_orphans_by_pmid` : Phase B step 4/4, bump `updated_at` (staleness).
 - [x] Migration `idx_source_pubs_pmid` (index fonctionnel partiel, comme nnt/hal_id) — **à appliquer** (`alembic upgrade head` + `dump_schema`, action Laura).
 
-### Phase 3 — hal-id multivalué (changement de structure) ✓ (`c115eb0a`)
+### Phase 3 — hal-id multivalué (changement de structure) ✓ (`3861c036`)
 
 `external_ids.hal_id` scalaire → `list[str]`.
 

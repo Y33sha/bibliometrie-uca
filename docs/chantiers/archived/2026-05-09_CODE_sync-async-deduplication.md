@@ -127,7 +127,7 @@ Pour les raisons suivantes :
 ### Phase 1 — Préparation (non destructif)
 
 - [x] Bumper `db_pool_max` dans `.env.example` et la doc à 30
-  (audit-cto Phase 3, commit `1275236`). Préparation du pool sync
+  (audit-cto Phase 3, commit `03c7624`). Préparation du pool sync
   à absorber la concurrence threadpool.
 - [x] Vérifier qu'aucune route async actuelle n'utilise un pattern
   `async def` fonctionnellement obligatoire. Audit fait :
@@ -196,7 +196,7 @@ puis les CRUD admin, puis les gros (`publications`, `persons`,
 `laboratories`).
 
 **Routers migrés** :
-- [x] `subjects.py` — pilote (commit `6e9c8f8`).
+- [x] `subjects.py` — pilote (commit `1c0f011`).
 - [x] `subjects.py`, `config.py` (auth.py et docs.py étaient déjà
   natifs sync).
 - [x] `admin_pipeline.py` — déjà natif sync, rien à migrer.
@@ -237,18 +237,18 @@ ce code mort.
 Une fois tous les routers migrés :
 
 - [x] Supprimer les 8 fichiers `infrastructure/repositories/async_*.py`
-  (et le sous-package `async_person_repository/`) (16609d0)
+  (et le sous-package `async_person_repository/`) (69ee29e)
 - [x] Supprimer les factories `async_*_repository` dans
-  `infrastructure/repositories/__init__.py` (16609d0)
-- [x] Supprimer les classes `Async*Repository` dans `domain/ports/*` (c732dd5)
+  `infrastructure/repositories/__init__.py` (69ee29e)
+- [x] Supprimer les classes `Async*Repository` dans `domain/ports/*` (24dd65f)
 - [x] Supprimer `infrastructure/db/async_connection.py` et le
-  lifespan async de `interfaces/api/app.py` (e10bf83)
-- [x] Supprimer `interfaces/api/async_deps.py` (287e5b2)
+  lifespan async de `interfaces/api/app.py` (c0a59e1)
+- [x] Supprimer `interfaces/api/async_deps.py` (c22e0f9)
 - [x] Supprimer les query services async dans
   `infrastructure/db/queries/` + les Protocols `Async*Queries` côté
-  ports (e7093b3)
+  ports (b62ea56)
 - [x] Convertir les fixtures async (`async_db`, `sa_conn`) et leurs
-  consommateurs (de666a7). `pytest-asyncio` reste pour
+  consommateurs (7e26f8a). `pytest-asyncio` reste pour
   `test_fetch_missing_doi_async.py` (async ponctuel via `asyncio.run`).
 
 ### Phase 4 — Doc

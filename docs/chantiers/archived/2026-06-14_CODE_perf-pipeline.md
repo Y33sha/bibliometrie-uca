@@ -55,7 +55,7 @@ Effet attendu : ~6642 s (one-shot, backlog écoulé sur ~11 runs à 10k) → que
 
 **Fix retenu** : purge des publications zéro authorship en **fin de phase authorships** (`purge_orphan_publications`), pas de filtre dans subjects. `publication_subjects` (FK CASCADE) reste alors scopé périmètre → `usage_count` + matview en héritent. Le résidu hors-périmètre conservé (11 pubs / 146 liens) garde ses sujets sur les fiches → « les vues par personne montrent tout » préservé. Un gate au `create` a été écarté : non équivalent (25 571 sources sans auteur matché contribuent des métadonnées à 17 863 pubs in-perimeter via fusion par identifiant — un gate les perdrait ; la purge a posteriori tourne après toutes les passes de fusion, donc les garde).
 
-- [x] Purge `purge_orphan_publications` en fin d'authorships : DELETE batché (commit par chunk de 5000 → WAL étalé, progression durable) + `VACUUM ANALYZE` simple (réutilisation de l'espace, pas de FULL). La cascade des 1,4M `publication_subjects` est un coût **unique** (liens legacy) : la purge tournant avant subjects, les orphelines re-promues n'en reçoivent plus jamais — `234abaf6`
+- [x] Purge `purge_orphan_publications` en fin d'authorships : DELETE batché (commit par chunk de 5000 → WAL étalé, progression durable) + `VACUUM ANALYZE` simple (réutilisation de l'espace, pas de FULL). La cascade des 1,4M `publication_subjects` est un coût **unique** (liens legacy) : la purge tournant avant subjects, les orphelines re-promues n'en reçoivent plus jamais — `9e77b22c`
 - [x] Effet mesuré : publications 183k → 65k ; `publication_subjects` 2,45M → 1,04M (−58 %) ; ingest subjects 1991s → 577s
 
 **Incrémental (fait)** : après la purge, l'ingest tournait encore en full (clear-all + ré-ingestion des ~178k source_publications = 577s mesurées). Rendu **incrémental et publication-centré**, sans nouvelle colonne :
@@ -76,20 +76,20 @@ L'enrichissement interrogeait des API entité par entité (DOAJ par revue : 779s
 
 **DOAJ — dump CSV au lieu de l'API (fait)** : l'API par ISSN (779s) est remplacée par l'import du dump CSV public (`https://doaj.org/csv`), téléchargé dans `data/doaj/` au plus tous les 30 jours (staleness sur `max(doaj_imported_at)`). Le payload était déjà au format CSV — le dump est la source d'origine, l'API un détour. DOAJ devient seul maître de `is_in_doaj` (reset global + re-pose), import bulk O(1) par ISSN.
 
-- [x] `fetch_doaj_dump` + `read_doaj_dump_rows` + `run_import_doaj_dump` (mutualisé CLI/pipeline) ; retrait franc du chemin API — `78bdca4e`
-- [x] Retrait du `is_in_doaj` posé par OpenAlex Sources (redondant, DOAJ fait autorité) — `60e9980d`
+- [x] `fetch_doaj_dump` + `read_doaj_dump_rows` + `run_import_doaj_dump` (mutualisé CLI/pipeline) ; retrait franc du chemin API — `ca7ae496`
+- [x] Retrait du `is_in_doaj` posé par OpenAlex Sources (redondant, DOAJ fait autorité) — `a40eb7b6`
 
 **OpenAlex Sources — incrémental sur le type (fait)** : la requête était gatée sur `apc_amount IS NULL`, jamais rempli (le « 0/550 » ne porte que sur le résidu jamais trouvé par OpenAlex ; la gate excluait déjà les revues à APC) → re-interrogeait ~tout le catalogue à chaque full run pour rien. Le `journal_type` étant **stable**, on ajoute la valeur d'enum `unknown` (nouveau défaut DB = « inconnu » UI, **pas de colonne dédiée**) et on gate sur `journal_type = 'unknown' AND openalex_id IS NOT NULL` : un journal naît `unknown`, est typé une fois, sort de la file. APC **gardé** (extrait opportunistement dans la même réponse ; déjà non rafraîchi pour les revues qui en ont → aucune régression). `reset_journal_apc` + flag `--reset` supprimés (incohérents avec la gate type). Pas de backfill des `journal` existants → chantier qualité rétrospectif distinct.
 
-- [x] Enum `unknown` + défaut + gate `fetch_journals_of_unknown_type` ; sync enum domaine/tables.py/DB durcie — `81401b42`
+- [x] Enum `unknown` + défaut + gate `fetch_journals_of_unknown_type` ; sync enum domaine/tables.py/DB durcie — `67d60afe`
 
 **resolve_doi_prefixes — ne plus retenter les échecs (fait)** : les préfixes DOI tentés sans succès (RA non résolue, samples KO) n'étaient pas insérés → absents de `doi_prefixes`, retentés à chaque run (26, croissant). Fallback direct sur les endpoints prefix Crossref puis DataCite ; si rien nulle part, insertion avec RA sentinelle `'unknown'` (+ `fetched_at` défaut) → sortis de la file.
 
-- [x] Fallback Crossref/DataCite + sentinelle `'unknown'` à l'échec — `9618879d`
+- [x] Fallback Crossref/DataCite + sentinelle `'unknown'` à l'échec — `abe0503d`
 
 **Crossref Members + ROR — appels séquentiels lents (fait)** : `enrich_publishers_from_crossref_members` (~1080s) et `enrich_publishers_from_ror` (~770s) enchaînaient des appels API dont la latence (~4s et ~3,4s/appel) dominait. Fetches parallélisés (`ThreadPoolExecutor`, `max_workers=8`) ; traitement + écriture séquentiels (connexion sync non thread-safe).
 
-- [x] Parallélisation des fetches (`rate_delay` → `max_workers`) — `4bae5b70`
+- [x] Parallélisation des fetches (`rate_delay` → `max_workers`) — `b48dc7d7`
 
 - [ ] **Marqueurs « tenté » sur publishers (reporté)** : crossref_members (gate `country IS NULL`) et ror (gate `publisher_type='unknown'`) réinterrogent l'irrésoluble à chaque run (63 country, 127 type restent vides → retentés). Stopper ça demande un marqueur « tenté » par source (pas de colonne actuelle). Reporté — suppression complète de ces appels API à envisager.
 
@@ -97,7 +97,7 @@ L'enrichissement interrogeait des API entité par entité (DOAJ par revue : 779s
 
 Les 5 targets DOI (hal, openalex, wos, scanr, crossref) s'enchaînaient séquentiellement (~3600s sur un gros backlog). Parallélisés via `ThreadPoolExecutor` (comme les extracteurs) : chacun ouvre sa propre connexion, frappe une API distincte, écrit dans son staging — aucun état partagé. La propagation cross-source d'un DOI fraîchement importé peut glisser au run suivant (rattrapage idempotent et auto-borné).
 
-- [x] Parallélisation des targets DOI par `ThreadPoolExecutor` — `ab3f1240`
+- [x] Parallélisation des targets DOI par `ThreadPoolExecutor` — `629b6588`
 
 ### 5. Circuit-breaker 429/5xx — skip une source à bout de budget (fait)
 
@@ -105,8 +105,8 @@ Le budget API peut être dépassé en plein run (OpenAlex : budget quotidien, so
 
 **Design** : `SourceCircuitBreaker` (`infrastructure.sources.circuit_breaker`), compteur d'échecs **consécutifs** par source partagé via une `ContextVar`, `+1` sur requête échouée (429 / 5xx / réseau après retries — pas les 4xx), **remis à 0 au premier succès**. Les deux helpers HTTP (`http_retry` sync + `http_retry_async`) lui comptent les échecs, court-circuitent quand il a tripé, et les boucles consultent l'état pour sauter le reste de la source (retry au prochain run, phases idempotentes). Seuils : **10** en cross-import (async, requêtes concurrentes → ne pas tripper sur un batch ponctuel) ; **5** en extract (séquentiel). Découpage DDD : protocole `CircuitBreaker` dans `application.ports`, impl + ContextVar en `infrastructure`, câblage dans `run_pipeline` (root).
 
-- [x] Breaker + intégration `http_retry_async`, cross-import (`run_async`, seuil 10) — `c7066e94`
-- [x] Intégration `http_retry` sync + extracteurs (seuil 5, `_breaker_tripped()` dans la base) ; `max_retries` 5 → 3 (2,4,8s ; 16/32s inutiles) — `198ea7a7`
+- [x] Breaker + intégration `http_retry_async`, cross-import (`run_async`, seuil 10) — `0ed3ca71`
+- [x] Intégration `http_retry` sync + extracteurs (seuil 5, `_breaker_tripped()` dans la base) ; `max_retries` 5 → 3 (2,4,8s ; 16/32s inutiles) — `764b9202`
 
 ## Questions ouvertes
 

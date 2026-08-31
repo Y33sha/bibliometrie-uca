@@ -246,26 +246,26 @@ maximal là).
   ~17 fonctions `*_clause` remplacent les anciens `apply_*` mutateurs
   de `(conditions, params)`. Branche legacy supprimée à la fin de la
   Phase 1.
-- [x] **Pilote stats/publishers** *(commit `aa1d5be`)* — premier
+- [x] **Pilote stats/publishers** *(commit `8af9f37`)* — premier
   consommateur sur l'API SA (4 filtres + APC_SUM_SA en bind nommé).
-- [x] **stats/{journals,labs,summary}** *(commit `60d1c48`)* —
+- [x] **stats/{journals,labs,summary}** *(commit `0c71c39`)* —
   3 fichiers + 6 endpoints. Helper `_common_clauses(... skip=)` pour
   les facettes croisées de stats_summary.
-- [x] **persons/list** *(commit `c507a0b`)* — 3 endpoints (directory,
+- [x] **persons/list** *(commit `dc6708f`)* — 3 endpoints (directory,
   search, list admin) + variantes SA `person_*_clause`.
-- [x] **publications/list** *(commit `8b7e0f7`)* — 3 endpoints (list,
+- [x] **publications/list** *(commit `13ebc0a`)* — 3 endpoints (list,
   export.csv, export-theses.csv) avec ~10 nouvelles `*_clause`
   (access, doc_type, source, person, corresponding, hal_status, apc,
   no_lab, country, subject, publisher_id, journal_id).
-- [x] **laboratories** *(commit `edeab5a`)* — 6 endpoints. Bonus :
+- [x] **laboratories** *(commit `b3ef497`)* — 6 endpoints. Bonus :
   `infrastructure/perimeter.async_get_persons_perimeter_root_ids`
   passé en mode dispatch.
-- [x] **publications/facets** *(commit `5565d06`)* — le plus
+- [x] **publications/facets** *(commit `5456e2a`)* — le plus
   complexe : `_PublicationFacetsBuilder` réécrit, parallélisme
   préservé via `engine.begin()` (une AsyncConnection SA par facette).
   Bonus : persons/facets, publications/detail (all_years,
   get_publication_detail, get_publication_subjects).
-- [x] **persons/detail** *(commit `9c2a672`)* — 6 endpoints
+- [x] **persons/detail** *(commit `7807fac`)* — 6 endpoints
   (id/profile/theses/addresses/dashboard/subjects).
 - [x] **Nettoyage `apply_*` legacy** : tous les apply_* supprimés
   une fois plus aucun consommateur. `apply_stats_apc_filter` aussi.
@@ -284,7 +284,7 @@ dans les commits sont en réalité ici (cf. note de refactor de la
 fiche).
 
 - [x] **Sous-phase 2.1 — Module pilote `config` + `perimeters`**
-  *(commit `ef817a3`, marqué "sous-phase 1.1" dans l'historique git)* :
+  *(commit `082830e`, marqué "sous-phase 1.1" dans l'historique git)* :
   `PgAsyncConfig`, `PgAsyncPerimeterRepository`, `application/config.py`
   et les écritures des routers `config` et `perimeters` migrés en
   AsyncConnection SA (option B). `delete_perimeter` bascule
@@ -303,7 +303,7 @@ fiche).
     cette sous-phase : il dépend de la CTE récursive
     `infrastructure.perimeter`, à migrer avec ce module.
 - [x] **Sous-phase 2.2 — Module `structures`**
-  *(commit `5287818`, marqué "sous-phase 1.2" dans l'historique git)* :
+  *(commit `56411af`, marqué "sous-phase 1.2" dans l'historique git)* :
   3 tables ajoutées à MetaData (`structures`, `structure_relations`,
   `structure_name_forms`). Repo réécrit en SA Core (delete/select/update/insert/pg_insert
   pour `ON CONFLICT DO NOTHING`). Service migré en `AsyncConnection`,
@@ -312,7 +312,7 @@ fiche).
   `build_async_engine` (sinon les tests tombaient sur la base prod).
   Tests : 23/23 service + 32/32 API + suite complète 1322/1322.
 - [x] **Sous-phase 2.3 — Modules `journals` + `publishers`**
-  *(commit `d10b3f5`, marqué "sous-phase 1.3" dans l'historique git)* :
+  *(commit `b911384`, marqué "sous-phase 1.3" dans l'historique git)* :
   4 tables ajoutées (`journals`, `journal_name_forms`, `publishers`,
   `publisher_name_forms`). `Numeric` importé. Repo journal +
   publisher réécrits en SA Core ; cross-table updates
@@ -325,16 +325,16 @@ fiche).
   `get_sa_connection()`. `existing_journal_ids` et
   `existing_publisher_ids` en SA pour partager la transaction du
   merge. Tests : 34/34 service + suite complète 1322/1322.
-- [x] **Préalable bloc 2.4-2.7** *(commit `cf29b2e`)* — `tables.py`
+- [x] **Préalable bloc 2.4-2.7** *(commit `93c8288`)* — `tables.py`
   étendu avec toutes les tables nécessaires (addresses, authorships,
   source_authorships, persons*, publications*, etc.) et 4 enums
   Postgres (identifier_status, source_type, oa_type, doc_type).
   `infrastructure/perimeter.py` : helpers async dispatch-aware.
-- [x] **Préalable bloc 2.4-2.7** *(commit `d7c0031`)* —
+- [x] **Préalable bloc 2.4-2.7** *(commit `45ba43e`)* —
   `async_authorship_repository.py` en mode dispatch (cur psycopg |
   AsyncConnection SA), pour cohabiter avec les modules en cours de
   migration. Branche psycopg supprimée en Phase 4.
-- [x] **Sous-phase 2.4 — Module `addresses`** *(commit `b9f74a9`)* :
+- [x] **Sous-phase 2.4 — Module `addresses`** *(commit `583fe01`)* :
   `async_address_repository.py` migré SA Core (insert/update/delete/
   select via tables, `pg_insert.on_conflict_do_update`, `text()` pour
   les CTE cross-aggregate sur `source_publications`/`publications`).
@@ -344,27 +344,27 @@ fiche).
   cross-aggregate `address ↔ publications.countries` préservée.
   Tests : 34/34 service + suite complète 1322/1322.
 - [x] **Sous-phase 2.5 — Routers authorships en SA**
-  *(commit `2645140`)* : 2 endpoints
+  *(commit `9e034b8`)* : 2 endpoints
   (`PATCH /api/authorships/{id}/exclude` côté router persons,
   `PATCH /api/source-authorships/{src}/{id}/exclude` côté router
   publications) basculés sur `get_sa_connection()`. Les autres
   fonctions de `application/authorships.py` continuent d'accepter
   le dispatch (signatures `cur: Any`).
 - [x] **Préalable 2.6 — `async_person_repository/` en mode dispatch**
-  *(commit `789e688`)* : les 4 sous-modules `_core.py`,
+  *(commit `e0b8be9`)* : les 4 sous-modules `_core.py`,
   `_identifiers.py`, `_name_forms.py`, `_authorships.py` migrés en
   dispatch (pattern interne aux fonctions, cohérent avec
   `infrastructure/perimeter.py`). `__init__.py` non touché.
 - [x] **Sous-phase 2.6 — Services + routers persons en SA**
-  *(commit `727371b`)* : `application/persons.py` async fonctions
+  *(commit `5733ccf`)* : `application/persons.py` async fonctions
   signatures `cur → conn`. Router persons : ~10 endpoints write
   basculés sur `get_sa_connection()`. Tests : suite complète OK.
 - [x] **Préalable 2.7 — `async_publication_repository.py` en dispatch**
-  *(commit `4ca4c5f`)* : 14 méthodes en dispatch (find_by_doi/nnt/title,
+  *(commit `2211389`)* : 14 méthodes en dispatch (find_by_doi/nnt/title,
   update_*, create, merge_into, mark_distinct), helpers `_json_dumps_or_none`
   et `_merge_into_sa` pour la branche SA.
 - [x] **Sous-phase 2.7 — Routers admin_duplicates en SA**
-  *(commit `cf2389d`)* : `mark_distinct` et `async_merge_publications`
+  *(commit `49fca17`)* : `mark_distinct` et `async_merge_publications`
   signature `cur → conn`. `publication_duplicates.get_publications_basic`
   en dispatch. Routers `merge` + `mark-distinct` basculés sur
   `get_sa_connection()` ; SAVEPOINT via `conn.begin_nested()`.
@@ -438,11 +438,11 @@ Sous-lots, par étape du pipeline :
   en SA Connection. Infra partagée (`staging.py`, `_savepoint.py`,
   `base.py`, `source_authorships.py`, `addresses.py`) nettoyée du
   dispatch transitoire. `run_pipeline.py` phases normalize migrées.
-  Commits : `3edb300` (CrossRef + dispatch infra), `a22623e` (WoS),
-  `bdb677a` (OA), `cf4dd24` (ScanR), `951d91d` (theses), `cd149ad`
-  (HAL), `05bf493` (cleanup dispatch).
+  Commits : `a8c1cc5` (CrossRef + dispatch infra), `9e4f209` (WoS),
+  `d2bf905` (OA), `d0dee3f` (ScanR), `706c83b` (theses), `dc8a5dd`
+  (HAL), `ad9eb46` (cleanup dispatch).
 - [x] **Pipeline publications/staging/merge**  Commit
-  `ac06648`.
+  `9840480`.
 - [x] **Pipeline persons/authorships**
 - [x] **Pipeline addresses/structures**
 - [x] **`subjects.py`** migré ; port + orchestrators (`subjects/run.py`,
@@ -455,9 +455,9 @@ Sous-lots, par étape du pipeline :
 #### Lot 3.C — Reste du code applicatif (~13 occ.)
 
 - [x] `infrastructure/addresses.py` migré (suite Lot 3.B normalizers,
-  commit `05bf493`).
+  commit `ad9eb46`).
 - [x] `application/pipeline/_savepoint.py` migré (suite Lot 3.B sub-lot 2,
-  commit `ac06648`).
+  commit `9840480`).
 - [x] `infrastructure/app_config.py` — dispatch ajouté aux 2 fonctions
   qui restaient en raw `cur.execute` (`get_hal_collections`,
   `get_extraction_api_ids`).

@@ -61,12 +61,12 @@ Deux systèmes d'upsert staging coexistent : HAL, OpenAlex et WoS utilisent `INS
 
 Mené dans la foulée :
 
-- [x] **Drop `staging.hal_collections`** — colonne redondante (le normalizer la subsumait via `collCode_s` du `raw_data`) ; supprime aussi la machinerie `HalStagingRow` et simplifie le normalizer. Supersède la décision 3 : plus de portage par colonne staging, `source_publications.hal_collections` reste et se dérive du seul `raw_data`. `2ef27b72`
-- [x] **Mutualisation de l'upsert staging** des 5 sources dans un helper canonique unique ; theses.fr et ScanR quittent le routage `is_new` pour le `ON CONFLICT DO UPDATE` (ScanR récupère au passage le reset `processed=FALSE` qu'il omettait). `325a3e1b`
-- [x] **Suppression d'`existing_ids`** — mort sur les 5 sources une fois theses/ScanR convertis ; retiré de `base.py`, des orchestrateurs et du port `StagingQueries`. `ee3cbef1`
-- [x] **Retrait de l'injection `StagingQueries`** désormais morte dans les extracteurs (base + 5 orchestrateurs + sites de construction). `ea7b837b`
-- [x] **Extraction HAL année par année** — progression visible et reprise ciblée via `--year` après une coupure. `ba4e030f`
-- [x] **Débit docs/s par page + `HAL_PER_PAGE` à 200** — pour calibrer la taille de page (pages TEI lourdes) ; valeur à confirmer empiriquement au prochain import. `9782c30e`
+- [x] **Drop `staging.hal_collections`** — colonne redondante (le normalizer la subsumait via `collCode_s` du `raw_data`) ; supprime aussi la machinerie `HalStagingRow` et simplifie le normalizer. Supersède la décision 3 : plus de portage par colonne staging, `source_publications.hal_collections` reste et se dérive du seul `raw_data`. `aa4336ae`
+- [x] **Mutualisation de l'upsert staging** des 5 sources dans un helper canonique unique ; theses.fr et ScanR quittent le routage `is_new` pour le `ON CONFLICT DO UPDATE` (ScanR récupère au passage le reset `processed=FALSE` qu'il omettait). `ad588238`
+- [x] **Suppression d'`existing_ids`** — mort sur les 5 sources une fois theses/ScanR convertis ; retiré de `base.py`, des orchestrateurs et du port `StagingQueries`. `f96ca8a3`
+- [x] **Retrait de l'injection `StagingQueries`** désormais morte dans les extracteurs (base + 5 orchestrateurs + sites de construction). `a7a6450c`
+- [x] **Extraction HAL année par année** — progression visible et reprise ciblée via `--year` après une coupure. `7d4fd5d8`
+- [x] **Débit docs/s par page + `HAL_PER_PAGE` à 200** — pour calibrer la taille de page (pages TEI lourdes) ; valeur à confirmer empiriquement au prochain import. `b73433ce`
 
 ## Liens
 

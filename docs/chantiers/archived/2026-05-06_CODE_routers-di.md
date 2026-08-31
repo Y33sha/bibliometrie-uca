@@ -76,7 +76,7 @@ actuelle de `async with get_sa_connection() as conn:` est préservée.
 
 - [x] Décision actée (cf. `audit-cto.md`)
 - [x] Factories `Depends` dans `async_deps.py` pour les 9 repos qui
-  ont déjà un port *(commit `d522b5f`)* + helper `db_conn` (Async
+  ont déjà un port *(commit `905937f`)* + helper `db_conn` (Async
   Connection partagée par toutes les deps de la requête, FastAPI
   cache → même transaction).
 
@@ -87,41 +87,41 @@ Chaque router = 1 commit. Indépendants entre eux.
 Routers triés par taille (du plus petit au plus gros) pour valider le
 pattern progressivement :
 
-- [x] `publishers.py` *(commit `b617757`, pilote)*
-- [x] `journals.py` *(commit `9ce5ee8`)*
-- [x] `subjects.py` *(commit `a210947`)*
-- [x] `addresses.py` *(commit `1bdb3dd`)*
-- [x] `admin_feedback.py` *(commit `4a19525`)*
-- [x] `admin_person_duplicates.py` *(commit `af657f9`)*
-- [x] `admin_duplicates.py` *(commit `536122b`)*
-- [x] `hal_problems.py` *(commit `e0cf5d6`)*
-- [x] `config.py` *(commit `59a4181`)*
-- [x] `perimeters.py` *(commit `b930093`)*
-- [x] `structures.py` *(commit `291cbe3`)*
-- [x] `stats.py` *(commit `c882221`)*
-- [x] `laboratories.py` *(commit `48e618e`)*
-- [x] `publications.py` *(commit `7b354b3`)*
-- [x] `persons.py` (le plus gros — ~30 endpoints) *(commit `1c11602`)*
+- [x] `publishers.py` *(commit `c3c650f`, pilote)*
+- [x] `journals.py` *(commit `1b33f5f`)*
+- [x] `subjects.py` *(commit `0f45dc0`)*
+- [x] `addresses.py` *(commit `7f6a947`)*
+- [x] `admin_feedback.py` *(commit `f4c608c`)*
+- [x] `admin_person_duplicates.py` *(commit `101b738`)*
+- [x] `admin_duplicates.py` *(commit `14b88d0`)*
+- [x] `hal_problems.py` *(commit `6aa2df3`)*
+- [x] `config.py` *(commit `4043f43`)*
+- [x] `perimeters.py` *(commit `7cbe600`)*
+- [x] `structures.py` *(commit `194eee4`)*
+- [x] `stats.py` *(commit `775048c`)*
+- [x] `laboratories.py` *(commit `ec5aa2f`)*
+- [x] `publications.py` *(commit `94abb5d`)*
+- [x] `persons.py` (le plus gros — ~30 endpoints) *(commit `ca686e8`)*
 
 ### Phase 3 — Query services manquants
 
 Certains routers utilisent des query modules qui n'ont pas de port.
 À créer au fur et à mesure de la migration des routers :
 
-- [x] `subjects` query service *(commit `a210947`)*
-- [x] `admin_feedback` query service *(commit `4a19525`)*
-- [x] `hal_problems` query service *(commit `e0cf5d6`, inclut `hal_duplicate_accounts` déplacée depuis persons/admin)*
-- [x] `publication_duplicates` query service *(commit `536122b`)*
-- [x] `person_duplicates` query service *(commit `af657f9`)*
-- [x] `publishers` query service *(commit `b617757`)*
-- [x] `journals` query service *(commit `9ce5ee8`)*
-- [x] `structures` query service *(commit `291cbe3`)*
-- [x] `addresses` query service *(commit `1bdb3dd`)*
-- [x] `laboratories` query service *(commit `48e618e`)*
-- [x] `stats` query service *(commit `c882221` — agrège les 7 fonctions des 4 modules `stats/*` derrière `PgAsyncStatsQueries`)*
-- [x] `publications` query service (list, facets, detail, all_years) *(commit `7b354b3`)*
-- [x] `persons` query service (list, facets, directory, detail, admin) *(commit `1c11602`)*
-- [x] `config` query service *(commit `59a4181`, inclut `get_hal_collections` migré depuis app_config.py)*
+- [x] `subjects` query service *(commit `0f45dc0`)*
+- [x] `admin_feedback` query service *(commit `f4c608c`)*
+- [x] `hal_problems` query service *(commit `6aa2df3`, inclut `hal_duplicate_accounts` déplacée depuis persons/admin)*
+- [x] `publication_duplicates` query service *(commit `14b88d0`)*
+- [x] `person_duplicates` query service *(commit `101b738`)*
+- [x] `publishers` query service *(commit `c3c650f`)*
+- [x] `journals` query service *(commit `1b33f5f`)*
+- [x] `structures` query service *(commit `194eee4`)*
+- [x] `addresses` query service *(commit `7f6a947`)*
+- [x] `laboratories` query service *(commit `ec5aa2f`)*
+- [x] `stats` query service *(commit `775048c` — agrège les 7 fonctions des 4 modules `stats/*` derrière `PgAsyncStatsQueries`)*
+- [x] `publications` query service (list, facets, detail, all_years) *(commit `94abb5d`)*
+- [x] `persons` query service (list, facets, directory, detail, admin) *(commit `ca686e8`)*
+- [x] `config` query service *(commit `4043f43`, inclut `get_hal_collections` migré depuis app_config.py)*
 
 Chaque port = `Protocol` dans `application/ports/`. Implémentation =
 classe wrapper dans `infrastructure/db/queries/` qui délègue aux

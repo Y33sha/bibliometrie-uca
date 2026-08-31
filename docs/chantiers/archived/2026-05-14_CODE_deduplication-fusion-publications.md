@@ -30,7 +30,7 @@ Le pipeline contient aujourd'hui **5 cascades de matching/fusion disséminées**
 - `try_merge_by_doi` : sa propre cascade.
 - `process_work` HAL : fusion `old → new` (la nouvelle survit).
 
-**Préalable déjà fait** (commit `ce5cf4f`) : `refresh_from_sources(target)` est désormais appelé après chaque fusion dans les phases dédiées (`merge_pubs_by_hal_id`, `merge_pubs_by_nnt`) — auparavant les métadonnées canoniques de la cible restaient figées après absorption.
+**Préalable déjà fait** (commit `2c5d28a`) : `refresh_from_sources(target)` est désormais appelé après chaque fusion dans les phases dédiées (`merge_pubs_by_hal_id`, `merge_pubs_by_nnt`) — auparavant les métadonnées canoniques de la cible restaient figées après absorption.
 
 ## Décisions
 
@@ -65,7 +65,7 @@ Ferme le dernier item ouvert de Phase 4 du chantier `CODE_rich-domain-model`.
 - [x] Création de `domain/publications/merge.py`.
 - [x] Helpers publicisés (`first_non_null`, `merge_lists_dedup_ci`, `shallow_merge_jsonb`, `topics_by_source`, `arbitrate_doc_type_with_article_subtype`) et `merge_source_rows(pub, rows, *, source_priority) -> None` qui mute l'entité `Publication` en place (pas de `MergedPubFields` séparé : `Publication` étendue porte toutes les colonnes canoniques).
 - [x] Extension de `Publication` avec les 6 champs manquants : `abstract`, `is_retracted`, `keywords`, `topics`, `biblio`, `meta`.
-- [x] Extension de `repo.find_by_id` / `repo.save` pour charger/persister ces 6 champs ; retrait de `repo.update_aggregated` (redondant). — `8e30bcd`
+- [x] Extension de `repo.find_by_id` / `repo.save` pour charger/persister ces 6 champs ; retrait de `repo.update_aggregated` (redondant). — `34251de`
 - [x] Title et title_normalized inclus dans l'agrégation cross-sources. title_normalized recalculé via `normalize_text(pub.title)` après agrégation.
 - [x] `refresh_from_sources` orchestre désormais : load → pré-merge sur collision DOI → `merge_source_rows` → `save`. `RefreshResult.absorbed_publication_id` conservé.
 
@@ -109,5 +109,5 @@ Phase caduque. Le cleanup associé (suppression des helpers source-spécifiques 
 ## Liens
 
 - Chantier prérequis : `CODE_rich-domain-model.md` (Phase 4 — hydratation Publication, déjà faite).
-- Fix préalable du refresh post-fusion : commit `ce5cf4f`.
+- Fix préalable du refresh post-fusion : commit `2c5d28a`.
 - Pattern de référence (règle pure déjà en domain) : `resolve_doi_conflict` dans `domain/publications/deduplication.py` (après rename).

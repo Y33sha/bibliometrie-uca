@@ -23,7 +23,7 @@ L'export CSV (publications et thèses) diverge du tableau affiché sur trois pla
 
 ## Phasage
 
-- [x] **Phase 1 — Export fidèle aux filtres + titre nettoyé** (`121599c3`)
+- [x] **Phase 1 — Export fidèle aux filtres + titre nettoyé** (`cd8767f8`)
   - Routeur export publications : `ListFilters` identique à `list_publications` (params complets).
   - Query : `_build_export_clauses` → `_build_list_clauses` ; code mort `_build_export_clauses`/`_export_source_clause` supprimé (le source export ne gérait que hal/oa → WoS/ScanR/theses ignorés).
   - Titre : helper `_plain_text` (strip HTML/MathML + collapse whitespace) sur CSV publications + thèses ; test unitaire.

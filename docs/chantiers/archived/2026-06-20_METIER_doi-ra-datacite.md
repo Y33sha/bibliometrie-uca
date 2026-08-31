@@ -138,24 +138,24 @@ L'ingestion DataCite par DOI (Phase 3) s'ajoute comme cible de `fetch_missing_do
 
 Cross-import par DOI, calqué sur Crossref. Aucun extracteur natif, aucun sweep par affiliation.
 
-- [x] `_TARGET_RA["datacite"] = "DataCite"` dans `infrastructure/sources/common.py` : un appel DataCite ne reçoit que des DOI DataCite (filtre RA déjà en place pour crossref). (f5b3b0c0)
-- [x] Adapter `DataciteFetchMissingDoiAdapter` (`infrastructure/sources/datacite/fetch_missing_doi.py`), calqué sur `CrossrefFetchMissingDoiAdapter` : `GET api.datacite.org/dois/{doi}`, insert du payload en staging. 404 → stub `not_found` (DataCite est source native du DOI pour ses préfixes). (f5b3b0c0)
-- [x] Wiring de la cible `datacite` dans `_make_fetch_missing_doi_adapter` + `run_pipeline.py`. (f5b3b0c0)
-- [x] Enum SQL `source_type += 'datacite'` (migration Alembic), ajout aux constantes `domain/sources/`. (f5b3b0c0)
-- [x] Position de DataCite dans `SOURCE_PRIORITY` : hypothèse de travail symétrique à Crossref (chaque RA fait autorité pour son périmètre, jamais en concurrence sur la même publi). (f5b3b0c0)
-- [x] Normalizer DataCite (`application/pipeline/normalize/normalize_datacite.py` + ports + queries + CLI) : mapping vers `publications` / `source_publications` / `source_authorships`. (ce5a1abe)
-- [x] Mapping `doc_type` DataCite : token brut (`resourceTypeGeneral` spécifique, fallback `resourceType` libre) mappé par `_SOURCE_MAPS["datacite"]`, seedé sur la distribution réelle du corpus. (ce5a1abe)
-- [x] `relatedIdentifiers` de type DOI : `meta.related_identifiers` conserve la nature typée (`relationType`) ; `external_ids.related_dois` reçoit le sous-ensemble « œuvre à rapatrier » (versions / formes / parties / suppléments), citations exclues du pool cross-import. (ce5a1abe)
+- [x] `_TARGET_RA["datacite"] = "DataCite"` dans `infrastructure/sources/common.py` : un appel DataCite ne reçoit que des DOI DataCite (filtre RA déjà en place pour crossref). (e3438032)
+- [x] Adapter `DataciteFetchMissingDoiAdapter` (`infrastructure/sources/datacite/fetch_missing_doi.py`), calqué sur `CrossrefFetchMissingDoiAdapter` : `GET api.datacite.org/dois/{doi}`, insert du payload en staging. 404 → stub `not_found` (DataCite est source native du DOI pour ses préfixes). (e3438032)
+- [x] Wiring de la cible `datacite` dans `_make_fetch_missing_doi_adapter` + `run_pipeline.py`. (e3438032)
+- [x] Enum SQL `source_type += 'datacite'` (migration Alembic), ajout aux constantes `domain/sources/`. (e3438032)
+- [x] Position de DataCite dans `SOURCE_PRIORITY` : hypothèse de travail symétrique à Crossref (chaque RA fait autorité pour son périmètre, jamais en concurrence sur la même publi). (e3438032)
+- [x] Normalizer DataCite (`application/pipeline/normalize/normalize_datacite.py` + ports + queries + CLI) : mapping vers `publications` / `source_publications` / `source_authorships`. (db89ca43)
+- [x] Mapping `doc_type` DataCite : token brut (`resourceTypeGeneral` spécifique, fallback `resourceType` libre) mappé par `_SOURCE_MAPS["datacite"]`, seedé sur la distribution réelle du corpus. (db89ca43)
+- [x] `relatedIdentifiers` de type DOI : `meta.related_identifiers` conserve la nature typée (`relationType`) ; `external_ids.related_dois` reçoit le sous-ensemble « œuvre à rapatrier » (versions / formes / parties / suppléments), citations exclues du pool cross-import. (db89ca43)
 - **Livrable** : `source_publications` peuplée pour les DOI DataCite apportés par les autres sources, ingérées par le pipeline normal.
 
 ### Phase 4 — Résolution concept/version via DataCite
 
 Débloquée par la validation concept/version (recouvrement 100 % du chemin version→concept via `IsVersionOf`). La résolution ne tape plus l'API Zenodo : c'est un **cas de la correction de DOI par cluster** (au même titre que l'unaire empile ses règles).
 
-- [x] Le concept est dérivé d'un mapping `version_doi → concept_doi` (depuis `meta.related_identifiers` `IsVersionOf` des SP `datacite`) appliqué à **toutes** les SP partageant le DOI de version, toutes sources — convergence cross-SP par périmètre, sans cache. (6c5f9884)
-- [x] La branche cluster gère désormais plusieurs cas : convergence version→concept (substitution) + divergence ouvrage/chapitre (nullage). `detect_erroneous_key_holders` → `resolve_cluster_doi_corrections`, `DistinctMergeCase` → `DoiClusterCase`. (6c5f9884)
-- [x] Suppression de la phase `zenodo_doi`, de `resolve_zenodo_concept`, `correct_zenodo_concept`, `HttpZenodoResolver`, `domain/sources/zenodo.py` + ports/queries/CLI/tests. Migration de nettoyage de la clé obsolète `external_ids.zenodo_concept_doi`. (6c5f9884)
-- [x] Auto-cicatrisation : une SP dont le concept n'est plus dérivable restaure son DOI brut (versions très récentes au graphe DataCite incomplet → rattrapées au run suivant). (6c5f9884)
+- [x] Le concept est dérivé d'un mapping `version_doi → concept_doi` (depuis `meta.related_identifiers` `IsVersionOf` des SP `datacite`) appliqué à **toutes** les SP partageant le DOI de version, toutes sources — convergence cross-SP par périmètre, sans cache. (35298b6e)
+- [x] La branche cluster gère désormais plusieurs cas : convergence version→concept (substitution) + divergence ouvrage/chapitre (nullage). `detect_erroneous_key_holders` → `resolve_cluster_doi_corrections`, `DistinctMergeCase` → `DoiClusterCase`. (35298b6e)
+- [x] Suppression de la phase `zenodo_doi`, de `resolve_zenodo_concept`, `correct_zenodo_concept`, `HttpZenodoResolver`, `domain/sources/zenodo.py` + ports/queries/CLI/tests. Migration de nettoyage de la clé obsolète `external_ids.zenodo_concept_doi`. (35298b6e)
+- [x] Auto-cicatrisation : une SP dont le concept n'est plus dérivable restaure son DOI brut (versions très récentes au graphe DataCite incomplet → rattrapées au run suivant). (35298b6e)
 - **Livrable** : concept/version résolu pour tout fournisseur DataCite (Zenodo, figshare, Dryad…), sans phase ni API dédiée. Transition : les substitutions déjà en base se re-dérivent via l'ingestion DataCite ; un run complet (cross-import datacite avant `metadata_correction`) les reconverge.
 
 ### Phase 5 — UI

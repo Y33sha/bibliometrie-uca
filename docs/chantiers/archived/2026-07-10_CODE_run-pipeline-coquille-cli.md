@@ -49,13 +49,13 @@ La logique métier n'a pas fui vers le composition-root : le SQL brut ne subsist
 
 Un orchestrateur `application/pipeline/<phase>/phase.py` par phase : séquence, transactions (`open_tx`), logging `▶`/`✓` et assemblage des métriques rapatriés ; opérations infra auxiliaires passées en ports injectés. Frontières transactionnelles préservées à l'identique (commits par lots des phases à progression durable) ; chaque phase validée e2e. Les phases à interrogation externe sont traitées à part (phase 4).
 
-- [x] `metadata_correction` (`3a8d583b`)
-- [x] `affiliations` — port `PerimeterQueries.refresh_perimeter_structures` ajouté (`c133c07d`)
-- [x] `countries` — port `CountryQueries.count_address_country_status` ajouté, type `AddressCountryStatus` déplacé vers le port (`10227fbf`)
-- [x] `authorships` — ports neufs `PurgeOrphanPublicationsQueries`, `PubCountsQueries`. Le `VACUUM ANALYZE` (maintenance physique, autocommit) sort du périmètre de l'invariant « connexion injectée » : l'adapter de purge ouvre sa propre connexion autocommit, l'orchestrateur ne voit pas l'autocommit (`5b574748`)
-- [x] `publications` — port neuf `AddressPubCountQueries` (recompute `addresses.pub_count`), `mark_keys_dirty` ajouté à `PublicationsReconciliationQueries` ; repos injectés en factories (`5cf1514e`)
-- [x] `persons` — mono-transaction : `run(open_tx, …)` possède sa transaction, repos en factories, `dry_run` mort retiré. Le test de non-régression « commit avant close » est remplacé par un test de `managed_transaction` (commit-sur-succès / rollback / commits par lots) qui garde la propriété pour toutes les phases (`28c9ef87`)
-- [x] `subjects` — deux sous-étapes (ingestion, co-occurrences) sur le port existant `SubjectsQueries`, sans opération orpheline (`fced0c12`)
+- [x] `metadata_correction` (`6a087616`)
+- [x] `affiliations` — port `PerimeterQueries.refresh_perimeter_structures` ajouté (`78d233c0`)
+- [x] `countries` — port `CountryQueries.count_address_country_status` ajouté, type `AddressCountryStatus` déplacé vers le port (`be3e897b`)
+- [x] `authorships` — ports neufs `PurgeOrphanPublicationsQueries`, `PubCountsQueries`. Le `VACUUM ANALYZE` (maintenance physique, autocommit) sort du périmètre de l'invariant « connexion injectée » : l'adapter de purge ouvre sa propre connexion autocommit, l'orchestrateur ne voit pas l'autocommit (`01c0e2be`)
+- [x] `publications` — port neuf `AddressPubCountQueries` (recompute `addresses.pub_count`), `mark_keys_dirty` ajouté à `PublicationsReconciliationQueries` ; repos injectés en factories (`db667729`)
+- [x] `persons` — mono-transaction : `run(open_tx, …)` possède sa transaction, repos en factories, `dry_run` mort retiré. Le test de non-régression « commit avant close » est remplacé par un test de `managed_transaction` (commit-sur-succès / rollback / commits par lots) qui garde la propriété pour toutes les phases (`ff12fd0d`)
+- [x] `subjects` — deux sous-étapes (ingestion, co-occurrences) sur le port existant `SubjectsQueries`, sans opération orpheline (`9e9fa60f`)
 
 ### Phase 4 — Phases à interrogation externe
 

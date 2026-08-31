@@ -67,12 +67,12 @@ Vs aujourd'hui `WHERE a.in_perimeter = TRUE` (index lookup direct).
 
 ### Phase 1 — Table `perimeter_structures` matérialisée (autonome)
 
-- [x] Migration Alembic : créer la table avec FK CASCADE des deux côtés. (83a1fae9)
-- [x] Job de remplissage : `refresh_perimeter_structures` (CTE récursive `est_tutelle_de`, idempotent). (83a1fae9)
-- [x] Hook dans le pipeline (tête de phase `affiliations`) pour refresh à chaque run. (83a1fae9)
+- [x] Migration Alembic : créer la table avec FK CASCADE des deux côtés. (8280aedc)
+- [x] Job de remplissage : `refresh_perimeter_structures` (CTE récursive `est_tutelle_de`, idempotent). (8280aedc)
+- [x] Hook dans le pipeline (tête de phase `affiliations`) pour refresh à chaque run. (8280aedc)
 - [ ] Hook côté API admin : refresh quand `perimeters.structure_ids` ou `structure_relations` change. **Reporté** : le refresh pipeline couvre fonctionnellement (staleness bornée à un run entre deux éditions admin du périmètre, très rares) ; à câbler si gênant.
-- [x] Tests : invariants de cohérence (clôture `est_tutelle_de`, pas `est_partenaire_de` ; idempotence). (83a1fae9)
-- [x] Convertir `source_authorship_structures` en matview (`source_authorship_addresses ⋈ address_structures ⋈ perimeter_structures`, filtre `is_confirmed` embarqué). Maintenance impérative retirée (`set_structure_ids_from_addresses`, purge SAS de `reset_source_authorships_for`, resync chirurgical admin, FK `ON DELETE CASCADE`). Refresh réordonné `perimeter_structures → source_authorship_structures → authorship_structures` (pipeline + chemin admin). (176bae4f)
+- [x] Tests : invariants de cohérence (clôture `est_tutelle_de`, pas `est_partenaire_de` ; idempotence). (8280aedc)
+- [x] Convertir `source_authorship_structures` en matview (`source_authorship_addresses ⋈ address_structures ⋈ perimeter_structures`, filtre `is_confirmed` embarqué). Maintenance impérative retirée (`set_structure_ids_from_addresses`, purge SAS de `reset_source_authorships_for`, resync chirurgical admin, FK `ON DELETE CASCADE`). Refresh réordonné `perimeter_structures → source_authorship_structures → authorship_structures` (pipeline + chemin admin). (ac3f68ea)
 
 À ce stade, `in_perimeter` reste en base. `perimeter_structures` sert d'index supplémentaire (projections UI « structures d'un périmètre », audits) **et** de relation joignable qui déclarativise `source_authorship_structures`.
 

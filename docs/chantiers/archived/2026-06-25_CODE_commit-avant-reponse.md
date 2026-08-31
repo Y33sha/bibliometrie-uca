@@ -42,7 +42,7 @@ Surface : ~36 endpoints d'écriture (POST/PUT/PATCH/DELETE) sur 11 routers (publ
 
 ### Phase 0 — `db_conn_sync` en commit-as-you-go
 
-- [x] `db_conn_sync` : `engine.connect()` + commit de fin au succès (garde-fou) / rollback sur exception, autorisant un commit anticipé dans le caller. Docstring corrigé. Test de régression « écriture lisible au GET suivant ». (commit `3d27bd83`)
+- [x] `db_conn_sync` : `engine.connect()` + commit de fin au succès (garde-fou) / rollback sur exception, autorisant un commit anticipé dans le caller. Docstring corrigé. Test de régression « écriture lisible au GET suivant ». (commit `f7c0dd69`)
 
 ### Phase 1 — Mécanique du command handler + routeur pilote (addresses)
 

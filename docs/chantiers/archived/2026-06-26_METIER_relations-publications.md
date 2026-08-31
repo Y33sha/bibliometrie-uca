@@ -62,7 +62,7 @@ La détection vraiment **heuristique** (rapprochement par titre pour les orpheli
 
 ### Phase 0 — Audit + périmètre
 
-- [x] Vocabulaire canonique figé dans `domain/publications/relations.py` (in scope : preprint, supplement, part, correction, retraction, translation, describes ; hors scope : citations, même-œuvre, peer-review). (b1cd2df8)
+- [x] Vocabulaire canonique figé dans `domain/publications/relations.py` (in scope : preprint, supplement, part, correction, retraction, translation, describes ; hors scope : citations, même-œuvre, peer-review). (7b9543c8)
 - [x] Signal erratum/rétractation/correction : confirmé côté Crossref `relation` (familles `erratum` / `correction` / `retraction`, portées par l'article ; absent des `relatedIdentifiers` DataCite).
 - [x] Cibles `describes` (Crossref `is-part-of`) confirmées datasets (data paper → dataset).
 - [x] `IsVariantFormOf` tranché : **dédup** (copie repository → version publiée, DOI distincts mais même œuvre déclarée), traité en Phase 1 — pas une relation.
@@ -71,14 +71,14 @@ La détection vraiment **heuristique** (rapprochement par titre pour les orpheli
 
 ### Phase 1 — Dédup des formes secondaires DataCite
 
-- [x] Trois cas de convergence même-œuvre dans la correction de DOI par cluster (`metadata_correction`) : version → concept (`IsVersionOf`, déjà en place), forme variante → version publiée (`IsVariantFormOf`), fichier d'un dépôt → dépôt parent (`IsPartOf` dont le DOI porteur = parent + suffixe). Sur la base courante : 916 substitutions variante + 108 pièces de package. (f5c081dd)
+- [x] Trois cas de convergence même-œuvre dans la correction de DOI par cluster (`metadata_correction`) : version → concept (`IsVersionOf`, déjà en place), forme variante → version publiée (`IsVariantFormOf`), fichier d'un dépôt → dépôt parent (`IsPartOf` dont le DOI porteur = parent + suffixe). Sur la base courante : 916 substitutions variante + 108 pièces de package. (ec868d40)
 
 ### Phase 2 — Modèle + population
 
-- [x] Table `publication_relations` + enum `relation_type` (migration). (9e0a599a) Vocabulaire canonique `domain/publications/relations.py`. (b1cd2df8)
-- [x] Population signal #1 : relations déclarées (`meta.related_identifiers`, `meta.relation`), nouvelle phase `relations` après `publications`, cibles résolues en `publication_id`. Sur la base courante : 3372 relations (2102 cibles en corpus). (2e0d3951)
+- [x] Table `publication_relations` + enum `relation_type` (migration). (5d3a1294) Vocabulaire canonique `domain/publications/relations.py`. (7b9543c8)
+- [x] Population signal #1 : relations déclarées (`meta.related_identifiers`, `meta.relation`), nouvelle phase `relations` après `publications`, cibles résolues en `publication_id`. Sur la base courante : 3372 relations (2102 cibles en corpus). (8dbec4a5)
 - [x] Population signal #2 : paires de publications distinctes (DOI distincts) partageant une clé de confirmation (hal_id, arXiv, PMID, NNT), type déduit du couple de `doc_type` (`infer_shared_key_relation`). Couples typés → relation précise dirigée : `preprint` → `is_preprint_of`, `erratum` → `is_correction_of`, `dataset` → `is_supplement_to`, ouvrage ↔ chapitre → `is_part_of` ; couples contenant `peer_review` exclus ; tout le reste (dont deux exemplaires d'une même œuvre à DOI distincts non fusionnés) → `is_related_to`, type symétrique « apparenté, à qualifier » (nouvelle valeur d'enum, migration `f1a7c3e9b2d4`). `source = 'shared_key'`, recalculé indépendamment du signal #1. Un `is_related_to` n'est **pas** posé si la paire porte déjà une relation précise du signal #1 (`fetch_declared_related_pairs`) — sinon doublon vague redondant.
-- [x] Les `target_doi` rejoignent le pool moissonné par cross-import (`get_cross_import_dois`), pour rapatrier les œuvres liées absentes. Les types exclus n'étant pas dans la table, rien d'indésirable n'est rapatrié. (6db0e048)
+- [x] Les `target_doi` rejoignent le pool moissonné par cross-import (`get_cross_import_dois`), pour rapatrier les œuvres liées absentes. Les types exclus n'étant pas dans la table, rien d'indésirable n'est rapatrié. (3068ba79)
 
 ### Phase 3 — UI
 

@@ -9,7 +9,7 @@ Certaines actions admin en écriture peuvent franchir le timeout reverse-proxy (
 - **Refresh matview disproportionné.** Depuis le passage de `source_authorship_structures` (SAS) et `authorship_structures` (AS) en matview (cf. `2026-06-04_DATA_perimeter-materialise.md`), toute action admin touchant une affiliation déclenchait un `REFRESH` **complet** de la chaîne SAS → AS : ~3-4 s pour SAS (SELECT ~2,3 s sur 8,3 M `source_authorship_addresses`) + ~2 s pour AS = ~5-8 s par action, alors que le delta peut être minuscule. Le refresh full est massivement disproportionné — et async-ifier le même refresh gaspilleur ne le règle pas.
 - **Propagation / merge dont le coût croît avec le volume.** Rejeter une adresse associée à beaucoup d'auteurs (jusqu'à 67k source_authorships), batcher des pays sur beaucoup d'adresses, fusionner deux grosses revues. Là, le travail est intrinsèquement long → vrai candidat background-job.
 
-Le fix no-op sur `review_structure_link` (commit `9376bbd`) règle déjà le cas fréquent (confirmer une auto-détection = no-op, pas de propagation), et `batch_review` amortit le refresh à **un seul couple** par lot (un seul `propagate_in_perimeter_for_addresses` sur l'union des adresses dont la contribution change). Restaient le coût unitaire du refresh (traité Phase 2) et les vrais gros volumes.
+Le fix no-op sur `review_structure_link` (commit `bcbeb2f`) règle déjà le cas fréquent (confirmer une auto-détection = no-op, pas de propagation), et `batch_review` amortit le refresh à **un seul couple** par lot (un seul `propagate_in_perimeter_for_addresses` sur l'union des adresses dont la contribution change). Restaient le coût unitaire du refresh (traité Phase 2) et les vrais gros volumes.
 
 ## Audit (Phase 1) — actions en écriture UI
 
@@ -42,7 +42,7 @@ Le fix no-op sur `review_structure_link` (commit `9376bbd`) règle déjà le cas
 
 - [x] Recenser les 39 endpoints en écriture, classer POINT / MATVIEW / VOLUME (ci-dessus).
 
-### Phase 2 — Désamorcer le refresh matview (classe B) — `38418fbf`
+### Phase 2 — Désamorcer le refresh matview (classe B) — `0e1bcec3`
 
 - [x] Retirer les 4 refresh SAS/AS sur action admin (review, assign orphelin simple + batch).
 - [x] Acter pipeline-only : matviews maintenues par le pipeline (`populate_affiliations` + `build_authorships`). `in_perimeter` reste recalculé en direct depuis `address_structures` (synchrone) ; seule l'agrégation `*_structures` retarde d'un run — sans risque de fausse correction (ces liens ne se corrigent pas depuis l'UI).
@@ -51,18 +51,18 @@ Le fix no-op sur `review_structure_link` (commit `9376bbd`) règle déjà le cas
 
 ### Phase 3 — Garde-fou `batch_set_country` (classe C, pire cas)
 
-- [x] Serveur : refuser un filtre vide (→ 400 au lieu de `WHERE TRUE` sur ~475k adresses). `f74969a8`
-- [x] Frontend : masquer « Ajouter à tout le filtre » sans filtre actif. `c6999139`
+- [x] Serveur : refuser un filtre vide (→ 400 au lieu de `WHERE TRUE` sur ~475k adresses). `7396d187`
+- [x] Frontend : masquer « Ajouter à tout le filtre » sans filtre actif. `afe1b275`
 
 ### Phase 4 — Décorréler les écritures longues (classe C)
 
-- [x] Propagation `in_perimeter` des reviews d'affiliation → `BackgroundTasks` fire-and-forget (`bg_propagate_in_perimeter_sync`, connexion DB propre ; la réponse ne lit que `address_structures`, synchrone). `3b19adaf`
-- [x] **Merges — analyse de volume : pas un sujet perf.** `merge_duplicate_publications` jamais lourd ; `merge_persons` rarement (quelques centaines de publis max) ; merge journaux/publishers potentiellement lourd mais hypothétique. Le fire-and-forget n'est de toute façon pas applicable (réponse + navigation UI dépendent de la fusion *déjà faite*). → restent synchrones ; option B si un timeout réel apparaît. *(Le vrai trou des merges n'était pas la perf mais la requalification `doc_type` manquante sur merge de journaux — corrigé hors de ce chantier, commits `1a9bce2c` + `15bbfc4a`.)*
+- [x] Propagation `in_perimeter` des reviews d'affiliation → `BackgroundTasks` fire-and-forget (`bg_propagate_in_perimeter_sync`, connexion DB propre ; la réponse ne lit que `address_structures`, synchrone). `6b2cbc10`
+- [x] **Merges — analyse de volume : pas un sujet perf.** `merge_duplicate_publications` jamais lourd ; `merge_persons` rarement (quelques centaines de publis max) ; merge journaux/publishers potentiellement lourd mais hypothétique. Le fire-and-forget n'est de toute façon pas applicable (réponse + navigation UI dépendent de la fusion *déjà faite*). → restent synchrones ; option B si un timeout réel apparaît. *(Le vrai trou des merges n'était pas la perf mais la requalification `doc_type` manquante sur merge de journaux — corrigé hors de ce chantier, commits `13f3bcce` + `613ede7f`.)*
 - [ ] `update_journal` (changement de type → `requalify` boucle `refresh_from_sources` sur N publications) : encore synchrone, même statut (pas de besoin perf observé).
 
 ### Phase 5 — Hygiène
 
-- [x] **Confirmé** (commit `59cd52c6`). Les 2 BG tasks (`bg_propagate_countries_sync`, `bg_propagate_in_perimeter_sync`) ouvrent leur connexion via `with engine.begin()` + `try/except` → ni escalade d'erreur, ni transaction laissée ouverte (rollback + close en sortie même sur exception). Test de non-régression (la BG task avale l'erreur **et** rend sa connexion au pool, via `pool.checkedout()`) + contrat documenté au-dessus des BG tasks dans `deps.py`.
+- [x] **Confirmé** (commit `1e79ae52`). Les 2 BG tasks (`bg_propagate_countries_sync`, `bg_propagate_in_perimeter_sync`) ouvrent leur connexion via `with engine.begin()` + `try/except` → ni escalade d'erreur, ni transaction laissée ouverte (rollback + close en sortie même sur exception). Test de non-régression (la BG task avale l'erreur **et** rend sa connexion au pool, via `pool.checkedout()`) + contrat documenté au-dessus des BG tasks dans `deps.py`.
 
 ## Questions ouvertes
 

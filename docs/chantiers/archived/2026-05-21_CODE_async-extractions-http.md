@@ -53,9 +53,9 @@ Risques :
 
 ROI élevé : chaque appel est un round-trip indépendant, idéal pour `asyncio.gather` + `Semaphore`.
 
-- [x] `enrich_oa_status.py` → async (Unpaywall, ~10 req/s recommandé). Pattern identique aux `fetch_missing_doi`. (commit f357786f)
+- [x] `enrich_oa_status.py` → async (Unpaywall, ~10 req/s recommandé). Pattern identique aux `fetch_missing_doi`. (commit 1091b605)
 - [x] `enrich_journal_apc.py` : laissé sync — déjà batch de 50 IDs par requête via filtre `openalex:A|B|C` (API OpenAlex Sources), volume de revues bien inférieur aux publications. Alignement auth seulement : `api_key` prioritaire, fallback `mailto` (comme les autres modules OpenAlex).
-- [x] `refetch_truncated.py` → async (OpenAlex, `max_concurrent=3` polite pool). (commit faa5e486)
+- [x] `refetch_truncated.py` → async (OpenAlex, `max_concurrent=3` polite pool). (commit ef8649e3)
 
 Pattern à reproduire :
 
