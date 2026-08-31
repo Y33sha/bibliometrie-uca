@@ -4,7 +4,7 @@
 Tables exportées :
   - config              (paramètres applicatifs)
   - countries           (référentiel pays)
-  - place_name_forms    (formes normalisées de noms de lieux : pays, institutions, villes)
+  - place_name_forms    (formes normalisées de noms de pays et de villes)
   - structures          (structures UCA, labos, partenaires)
   - structure_relations  (relations entre structures)
   - perimeters          (périmètres UCA, UCA élargi)
@@ -48,6 +48,7 @@ TABLES: list[dict[str, Any]] = [
         "table": "place_name_forms",
         "columns": ["id", "iso_code", "form_normalized", "kind"],
         "order": "id",
+        "where": "kind <> 'institution'",
     },
     {
         "table": "structures",
@@ -130,7 +131,9 @@ def generate_seed(conn: Connection, output_path: str | Path) -> None:
         order = spec["order"]
 
         col_list = ", ".join(columns)
-        rows = conn.execute(text(f"SELECT {col_list} FROM {table} ORDER BY {order}")).all()
+        restriction = spec.get("where")
+        filtre = f" WHERE {restriction}" if restriction else ""
+        rows = conn.execute(text(f"SELECT {col_list} FROM {table}{filtre} ORDER BY {order}")).all()
 
         if not rows:
             lines.append(f"-- {table} : aucune donnée")
@@ -138,7 +141,7 @@ def generate_seed(conn: Connection, output_path: str | Path) -> None:
             continue
 
         lines.append(f"-- {table} ({len(rows)} lignes)")
-        lines.append(f"DELETE FROM {table};")
+        lines.append(f"DELETE FROM {table}{filtre};")
 
         jsonb_cols = set(spec.get("jsonb_columns", []))
 
@@ -167,7 +170,9 @@ def generate_seed(conn: Connection, output_path: str | Path) -> None:
 
     print(f"Seed généré : {output_path}")
     for spec in TABLES:
-        count = conn.execute(text(f"SELECT COUNT(*) FROM {spec['table']}")).scalar_one()
+        restriction = spec.get("where")
+        filtre = f" WHERE {restriction}" if restriction else ""
+        count = conn.execute(text(f"SELECT COUNT(*) FROM {spec['table']}{filtre}")).scalar_one()
         print(f"  {spec['table']}: {count} lignes")
 
 
