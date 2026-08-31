@@ -258,26 +258,6 @@ async def pagination_bounds_middleware(
 
 
 @app.middleware("http")
-async def timing_middleware(request: Request, call_next: RequestResponseEndpoint) -> Response:
-    """Mesure la durée de chaque requête, pose l'en-tête `X-Response-Time` et journalise un record structuré `request_completed`."""
-    start = time.perf_counter()
-    response = await call_next(request)
-    duration_ms = round((time.perf_counter() - start) * 1000, 2)
-    response.headers["X-Response-Time"] = f"{duration_ms}ms"
-
-    logger.info(
-        "request_completed",
-        extra={
-            "method": request.method,
-            "path": route_path(request.scope),
-            "status": response.status_code,
-            "duration_ms": duration_ms,
-        },
-    )
-    return response
-
-
-@app.middleware("http")
 async def read_rate_limit_middleware(
     request: Request, call_next: RequestResponseEndpoint
 ) -> Response:
@@ -295,6 +275,29 @@ async def read_rate_limit_middleware(
             content={"detail": "Trop de requêtes. Réessayez dans quelques minutes."},
         )
     return await call_next(request)
+
+
+@app.middleware("http")
+async def timing_middleware(request: Request, call_next: RequestResponseEndpoint) -> Response:
+    """Mesure la durée de chaque requête, pose l'en-tête `X-Response-Time` et journalise un record structuré `request_completed`.
+
+    Déclaré après les middlewares qui composent un refus sans laisser passer la requête, il les enveloppe donc et voit leurs réponses : les refus d'authentification, de pagination et de plafond de lectures paraissent au journal comme les requêtes servies. Un refus qui n'y paraîtrait pas serait invisible — un moissonnage bridé par le plafond ne laisserait aucune trace.
+    """
+    start = time.perf_counter()
+    response = await call_next(request)
+    duration_ms = round((time.perf_counter() - start) * 1000, 2)
+    response.headers["X-Response-Time"] = f"{duration_ms}ms"
+
+    logger.info(
+        "request_completed",
+        extra={
+            "method": request.method,
+            "path": route_path(request.scope),
+            "status": response.status_code,
+            "duration_ms": duration_ms,
+        },
+    )
+    return response
 
 
 # En-têtes de sécurité posés sur toute réponse. HSTS relève du reverse-proxy TLS.
