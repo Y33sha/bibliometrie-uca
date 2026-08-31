@@ -37,7 +37,12 @@ from interfaces.api.deps import (
     publication_repo,
     publications_queries,
 )
-from interfaces.api.filters import parse_int_csv, parse_str_csv, parse_vocabulary_csv
+from interfaces.api.filters import (
+    parse_int_csv,
+    parse_ints,
+    parse_str_csv,
+    parse_vocabulary_csv,
+)
 from interfaces.api.models import (
     MarkDistinctPublications,
     MergePublications,
@@ -55,7 +60,7 @@ def _parse_lab_id(lab_id: str) -> tuple[list[int], bool]:
     La sentinelle `none` se mêle aux identifiants dans la même liste : `lab_id=12,none` retient les publications que le laboratoire 12 signe et celles qu'aucun laboratoire ne signe.
     """
     parts = parse_str_csv(lab_id)
-    return [int(v) for v in parts if v != "none"], "none" in parts
+    return parse_ints([v for v in parts if v != "none"], param="lab_id"), "none" in parts
 
 
 @dataclass(frozen=True, slots=True)
@@ -94,7 +99,7 @@ class PublicationFilterParams:
             search=self.search,
             lab_ids=lab_ids,
             lab_none=lab_none,
-            years=parse_int_csv(self.year),
+            years=parse_int_csv(self.year, param="year"),
             publisher_id=self.publisher_id,
             journal_id=self.journal_id,
             person_id=self.person_id,
@@ -212,7 +217,7 @@ def export_theses_csv(
         search=search,
         lab_ids=lab_ids,
         lab_none=lab_none,
-        years=parse_int_csv(year),
+        years=parse_int_csv(year, param="year"),
         access=parse_vocabulary_csv(access, allowed=ACCESS_LEVELS, param="access"),
         source_values=parse_str_csv(source_filter),
         doc_types=parse_vocabulary_csv(doc_type, allowed=DOC_TYPES, param="doc_type")
