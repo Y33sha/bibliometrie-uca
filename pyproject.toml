@@ -28,7 +28,7 @@ dev = [
     "pytest-asyncio==1.4.0",           # tests des extractions HTTP async du pipeline
     "pytest-cov==7.1.0",
     "respx==0.23.1",                   # mocking httpx pour tests async
-    "ruff==0.16.4",
+    "ruff==0.16.5",
     "mypy==2.3.1",
     "deptry==0.25.1",
     "pip-audit==2.10.1",
