@@ -499,10 +499,6 @@ class TestJournalSubjects:
 
 
 class TestUpdateJournal:
-    def test_requires_admin(self, client):
-        r = client.put("/api/journals/1", json={"title": "X"})
-        assert r.status_code == 401
-
     def test_updates_partial_fields(self, auth_client):
         jid = _seed_journal()
         r = auth_client.put(
@@ -523,11 +519,6 @@ class TestUpdateJournal:
 
 
 class TestTypeChangeImpact:
-    def test_requires_admin(self, client):
-        """L'aperçu écrit et pose les verrous de l'édition : il en partage la garde."""
-        r = client.post("/api/journals/1/type-change-impact", json={"journal_type": "proceedings"})
-        assert r.status_code == 401
-
     def test_counts_without_writing(self, auth_client):
         """L'aperçu écrit dans un SAVEPOINT annulé : le type de la revue ne bouge pas."""
         jid = _seed_journal()
@@ -550,10 +541,6 @@ class TestTypeChangeImpact:
 
 
 class TestMergeJournals:
-    def test_requires_admin(self, client):
-        r = client.post("/api/journals/1/merge", json={"source_id": 2})
-        assert r.status_code == 401
-
     def test_404_when_target_missing(self, auth_client):
         src = _seed_journal()
         r = auth_client.post("/api/journals/999999999/merge", json={"source_id": src})

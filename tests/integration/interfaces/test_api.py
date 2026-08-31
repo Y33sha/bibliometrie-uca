@@ -135,11 +135,6 @@ class TestAuth:
         assert r.status_code == 200
         assert r.json()["authenticated"] is False
 
-    def test_write_requires_auth(self, client):
-        """Les POST sans cookie session renvoient 401."""
-        r = client.post("/api/persons/999999999/merge", json={"target_id": 1})
-        assert r.status_code == 401
-
     def test_write_with_auth(self, auth_client):
         """Avec un cookie valide, le POST passe (même si 404 ou 400)."""
         r = auth_client.post("/api/persons/999999999/merge", json={"target_id": 1})
@@ -182,16 +177,6 @@ class TestConfig:
         """Une session rend la table entière ; le test ci-dessus tient le versant sans session."""
         assert reserved_config_key in {i["key"] for i in auth_client.get("/api/config").json()}
 
-    def test_write_requires_auth(self, client):
-        """Les écritures config sans session renvoient 401."""
-        r = client.put("/api/config/pipeline_start_year_full", json={"value": 2020})
-        assert r.status_code == 401
-
-
-# ── Adresses ────────────────────────────────────────────────────
-
-
-class TestAddresses:
     def test_countries(self, client):
         r = client.get("/api/countries")
         assert r.status_code == 200

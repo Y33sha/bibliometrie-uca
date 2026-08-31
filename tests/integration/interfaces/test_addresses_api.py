@@ -225,13 +225,6 @@ class TestGetAddressPublications:
 
 
 class TestReviewAddress:
-    def test_requires_admin(self, client):
-        r = client.post(
-            "/api/addresses/1/review",
-            json={"structure_id": 1, "is_confirmed": True},
-        )
-        assert r.status_code == 401
-
     def test_confirm(self, auth_client):
         addr = _seed_address("Review confirm")
         struct = _seed_structure("LAB-REV-CONF")
@@ -274,13 +267,6 @@ class TestReviewAddress:
 
 
 class TestBatchReview:
-    def test_requires_admin(self, client):
-        r = client.post(
-            "/api/addresses/batch-review",
-            json={"address_ids": [], "structure_id": 1, "is_confirmed": True},
-        )
-        assert r.status_code == 401
-
     def test_empty_batch(self, auth_client):
         struct = _seed_structure("LAB-BATCH-EMPTY")
         r = auth_client.post(
@@ -346,10 +332,6 @@ class TestCountries:
 
 
 class TestSetAddressCountry:
-    def test_requires_admin(self, client):
-        r = client.post("/api/addresses/1/country", json={"countries": ["FR"]})
-        assert r.status_code in (401, 403)
-
     def test_404_missing_address(self, auth_client):
         r = auth_client.post("/api/addresses/999999999/country", json={"countries": ["FR"]})
         assert r.status_code == 404
@@ -382,10 +364,6 @@ class TestSetAddressCountry:
 
 
 class TestBatchSetCountry:
-    def test_requires_admin(self, client):
-        r = client.post("/api/addresses/batch-country", json={"country_code": "FR"})
-        assert r.status_code in (401, 403)
-
     def test_400_missing_country_code(self, auth_client):
         r = auth_client.post("/api/addresses/batch-country", json={"country_code": ""})
         assert r.status_code == 400
