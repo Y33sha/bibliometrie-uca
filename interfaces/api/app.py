@@ -183,20 +183,11 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
     return JSONResponse(status_code=500, content={"detail": "Erreur interne du serveur"})
 
 
-# ----- CORS -----
-# Origines énumérées par `cors_origins`, qui refuse le joker : les appels portent le cookie
-# de session, et `*` reviendrait à autoriser toute origine à s'en servir. Vide en production,
-# où le frontend est servi par l'API elle-même ; renseigné en développement, le serveur de
-# développement du frontend vivant sur un autre port.
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.cors_origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 # ----- Middleware -----
+#
+# Starlette empile les middlewares dans l'ordre inverse de leur déclaration : le dernier
+# déclaré enveloppe les précédents, et voit donc toutes les réponses, y compris celles qu'un
+# middleware intérieur compose sans laisser passer la requête.
 
 
 @app.middleware("http")
@@ -314,16 +305,46 @@ _SECURITY_HEADERS = {
     "Referrer-Policy": "strict-origin-when-cross-origin",
 }
 
+_NO_STORE = "no-store"
+"""Interdiction de conserver une copie de la réponse, adressée à tout cache du chemin.
+
+Faute de consigne, un cache applique ses propres heuristiques et peut ranger une réponse pour la resservir à un autre appelant. Or une même adresse d'API ne rend pas toujours le même corps : la configuration se restreint à une liste blanche de clés sans session et s'ouvre avec, sur la même URL. Un cache partagé — le reverse-proxy, un proxy d'entreprise sur le chemin — qui garderait la réponse servie à une session ouverte la rendrait ensuite à un appelant anonyme.
+
+L'interface, elle, garde son cache : ses fichiers portent leur empreinte dans leur nom, et c'est ce qui rend une page rapide au second chargement.
+"""
+
 
 @app.middleware("http")
 async def security_headers_middleware(
     request: Request, call_next: RequestResponseEndpoint
 ) -> Response:
-    """Pose les en-têtes de sécurité (anti-sniffing, anti-clickjacking, politique de référent) sur chaque réponse."""
+    """Pose les en-têtes de sécurité (anti-sniffing, anti-clickjacking, politique de référent) sur chaque réponse, et l'interdiction de mise en cache sur les réponses de l'API."""
     response = await call_next(request)
     for name, value in _SECURITY_HEADERS.items():
         response.headers.setdefault(name, value)
+    if route_path(request.scope).startswith("/api/"):
+        response.headers.setdefault("Cache-Control", _NO_STORE)
     return response
+
+
+# ----- CORS -----
+#
+# Origines énumérées par `cors_origins`, qui refuse le joker : les appels portent le cookie de
+# session, et `*` reviendrait à autoriser toute origine à s'en servir. Vide en production, où le
+# frontend est servi par l'API elle-même ; renseigné en développement, le serveur de
+# développement du frontend vivant sur un autre port.
+#
+# Déclaré en dernier, donc posé le plus à l'extérieur : les refus que composent les middlewares
+# ci-dessus — 401 d'authentification, 429 des plafonds, 422 de pagination — portent alors les
+# en-têtes CORS comme les autres réponses. Sans cela, le navigateur d'une origine autorisée les
+# reçoit comme une erreur CORS opaque au lieu de leur code, et le message de refus est perdu.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 # ----- Include routers -----
