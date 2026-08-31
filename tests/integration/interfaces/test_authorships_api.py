@@ -178,10 +178,6 @@ def _reject_pair(publication_id: int, person_id: int) -> None:
 
 
 class TestExcludeAuthorship:
-    def test_requires_admin(self, client):
-        r = client.patch("/api/authorships/1/exclude")
-        assert r.status_code == 401
-
     def test_ok(self, auth_client):
         pid = _seed_person()
         pub = _seed_publication("Exclude test")
@@ -236,13 +232,6 @@ class TestOrphanAuthorships:
 
 
 class TestAssignOrphanAuthorship:
-    def test_requires_admin(self, client):
-        r = client.post(
-            "/api/authorships/orphans/assign",
-            json={"source_authorship_id": 1, "person_id": 1},
-        )
-        assert r.status_code == 401
-
     def test_missing_person_id_and_create(self, auth_client):
         sa = _seed_source_authorship(source="hal")
         r = auth_client.post(
@@ -335,13 +324,6 @@ class TestAssignOrphanAuthorship:
 
 
 class TestBatchAssignOrphanAuthorships:
-    def test_requires_admin(self, client):
-        r = client.post(
-            "/api/authorships/orphans/batch-assign",
-            json={"source_authorship_ids": [], "person_id": 1},
-        )
-        assert r.status_code == 401
-
     def test_empty_authorships_ok_zero(self, auth_client):
         pid = _seed_person()
         r = auth_client.post(

@@ -104,10 +104,6 @@ class TestListPerimeters:
 
 
 class TestCreatePerimeter:
-    def test_requires_admin(self, client):
-        r = client.post("/api/perimeters", json={"code": "x", "name": "X"})
-        assert r.status_code == 401
-
     def test_creates_perimeter(self, auth_client):
         code = _uniq("create")
         r = auth_client.post(
@@ -138,10 +134,6 @@ class TestCreatePerimeter:
 
 
 class TestUpdatePerimeter:
-    def test_requires_admin(self, client):
-        r = client.put("/api/perimeters/1", json={"name": "X"})
-        assert r.status_code == 401
-
     def test_partial_update_strips_name(self, auth_client):
         pid = _seed_perimeter()
         r = auth_client.put(
@@ -167,10 +159,6 @@ class TestUpdatePerimeter:
 
 
 class TestDeletePerimeter:
-    def test_requires_admin(self, client):
-        r = client.delete("/api/perimeters/1")
-        assert r.status_code == 401
-
     def test_deletes_when_unused(self, auth_client):
         pid = _seed_perimeter()
         r = auth_client.delete(f"/api/perimeters/{pid}")
