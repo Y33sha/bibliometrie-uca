@@ -8,6 +8,7 @@ from application.ports.read_models.subjects_queries import (
     SubjectsQueries,
 )
 from interfaces.api.deps import subjects_queries
+from interfaces.api.params import MAX_SEARCH_LENGTH
 
 router = APIRouter(prefix="/api/subjects", tags=["subjects"])
 
@@ -17,7 +18,9 @@ def list_subjects(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=200),
     search: str | None = Query(
-        None, description="Recherche sur le libellé, insensible à la casse et aux accents"
+        None,
+        max_length=MAX_SEARCH_LENGTH,
+        description="Recherche sur le libellé, insensible à la casse et aux accents",
     ),
     min_count: int = Query(1, ge=1, description="Nombre minimal de publications portant le sujet"),
     queries: SubjectsQueries = Depends(subjects_queries),

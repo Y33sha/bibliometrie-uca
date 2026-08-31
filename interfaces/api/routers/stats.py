@@ -16,6 +16,7 @@ from domain.publications.doc_types import DOC_TYPES
 from domain.publications.metadata import OA_STATUSES
 from interfaces.api.deps import stats_queries
 from interfaces.api.filters import parse_int_csv, parse_str_csv, parse_vocabulary_csv
+from interfaces.api.params import SearchTerm
 
 router = APIRouter(prefix="/api/stats", tags=["stats"])
 
@@ -59,7 +60,7 @@ def stats_facets(
 @router.get("/facets/entities", response_model=EntityFacetResponse)
 def stats_entity_facet(
     kind: EntityKind = Query(...),
-    entity_search: str = Query(""),
+    entity_search: SearchTerm = "",
     filters: StatsFilters = Depends(stats_filters),
     queries: StatsQueries = Depends(stats_queries),
 ) -> EntityFacetResponse:

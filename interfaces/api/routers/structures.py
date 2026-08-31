@@ -42,7 +42,7 @@ from interfaces.api.models import (
     StructureRelationCreateResponse,
     StructureUpdate,
 )
-from interfaces.api.params import TOP_SUBJECTS_LIMIT, TopSubjectsLimit
+from interfaces.api.params import TOP_SUBJECTS_LIMIT, SearchTerm, TopSubjectsLimit
 
 router = APIRouter(prefix="/api/structures", tags=["structures"])
 
@@ -50,7 +50,7 @@ router = APIRouter(prefix="/api/structures", tags=["structures"])
 @router.get("", response_model=list[StructureListItem])
 def list_structures(
     structure_type: str = Query(""),
-    search: str = Query(""),
+    search: SearchTerm = "",
     in_perimeter: bool = Query(False),
     queries: StructuresQueries = Depends(structures_queries),
 ) -> list[StructureListItem]:

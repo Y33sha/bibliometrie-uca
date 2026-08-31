@@ -11,6 +11,7 @@ from application.ports.read_models.feedback_queries import (
     FeedbackStats,
 )
 from interfaces.api.deps import feedback_queries
+from interfaces.api.params import SearchTerm
 
 router = APIRouter(prefix="/api/feedback", tags=["feedback"])
 
@@ -29,7 +30,7 @@ def feedback_false_negatives(
     structure_id: int = Query(...),
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=200),
-    search: str = Query(""),
+    search: SearchTerm = "",
     queries: FeedbackQueries = Depends(feedback_queries),
 ) -> FeedbackAddressesResponse:
     """Adresses confirmées manuellement pour cette structure mais non détectées par le script."""
@@ -43,7 +44,7 @@ def feedback_false_positives(
     structure_id: int = Query(...),
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=200),
-    search: str = Query(""),
+    search: SearchTerm = "",
     queries: FeedbackQueries = Depends(feedback_queries),
 ) -> FeedbackAddressesResponse:
     """Adresses détectées pour cette structure mais rejetées manuellement."""

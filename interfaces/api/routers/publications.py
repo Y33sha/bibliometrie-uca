@@ -49,6 +49,7 @@ from interfaces.api.models import (
     MergeResponse,
     OkResponse,
 )
+from interfaces.api.params import SearchTerm
 from interfaces.api.rate_limit import ExportSlot, export_rate_limit, export_slot, releasing
 
 router = APIRouter(prefix="/api/publications", tags=["publications"])
@@ -74,7 +75,7 @@ class PublicationFilterParams:
     qui retient les publications qu'aucun laboratoire ne signe, et se combine aux identifiants.
     """
 
-    search: Annotated[str, Query()] = ""
+    search: SearchTerm = ""
     lab_id: Annotated[str, Query()] = ""
     year: Annotated[str, Query()] = ""
     publisher_id: Annotated[int | None, Query()] = None
@@ -140,7 +141,7 @@ def publications_facets(
 def publications_entity_facet(
     filters: Filters,
     kind: EntityKind = Query(...),
-    entity_search: str = Query(""),
+    entity_search: SearchTerm = "",
     queries: PublicationsQueries = Depends(publications_queries),
 ) -> EntityFacetResponse:
     """Facette contextuelle des éditeurs ou des revues : les premières entités sous les filtres actifs, avec leur décompte.
@@ -195,7 +196,7 @@ def export_publications_csv(
 
 @router.get("/export-theses.csv")
 def export_theses_csv(
-    search: str = Query(""),
+    search: SearchTerm = "",
     lab_id: str = Query(""),
     year: str = Query(""),
     access: str = Query(""),
