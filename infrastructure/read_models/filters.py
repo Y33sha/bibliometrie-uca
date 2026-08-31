@@ -15,7 +15,7 @@ from domain.publications.metadata import (
     OA_OPEN_STATUSES,
     OaStatus,
 )
-from domain.sources.registry import Source
+from domain.sources.registry import SOURCE_FILTER_PREFIXES, Source
 from domain.structures.structure import StructureType
 
 
@@ -224,26 +224,19 @@ def person_search_clause(search: str) -> WhereClause | None:
 def source_clause(source_values: list[str]) -> WhereClause | None:
     """Filtre source via publications.sources (GIN). `source_values` = liste
     `{prefix}_{yes|no}` (constantes côté front, sans bind nécessaire)."""
-    SOURCE_MAP = {
-        "hal": "hal",
-        "oa": "openalex",
-        "scanr": "scanr",
-        "wos": "wos",
-        "theses": "theses",
-    }
     parts: list[str] = []
     for sv in source_values:
         bits = sv.rsplit("_", 1)
         if len(bits) != 2:
             continue
         prefix, mode = bits
-        source = SOURCE_MAP.get(prefix)
+        source = SOURCE_FILTER_PREFIXES.get(prefix)
         if not source or mode not in ("yes", "no"):
             continue
         if mode == "yes":
-            parts.append(f"p.sources @> ARRAY['{source}'::source_type]")
+            parts.append(f"p.sources @> ARRAY['{source.value}'::source_type]")
         else:
-            parts.append(f"NOT p.sources @> ARRAY['{source}'::source_type]")
+            parts.append(f"NOT p.sources @> ARRAY['{source.value}'::source_type]")
     if not parts:
         return None
     return WhereClause(" AND ".join(parts), {})

@@ -9,6 +9,7 @@ from typing import Any, cast
 from sqlalchemy import Connection, text
 
 from application.ports.read_models.publications_queries import (
+    EXPORT_COLUMNS,
     PublicationFilters,
     PublicationListItem,
     PublicationListResponse,
@@ -471,11 +472,7 @@ def export_publications_csv(
         )
 
     # Colonnes émises = colonnes visibles à l'affichage, dans l'ordre d'affichage. Titre et liens (DOI + Sources) toujours présents ; « Éditeur » suit « Revue » (clé `journal`). `columns` vide => toutes (compat ascendante).
-    requested = (
-        set(columns)
-        if columns
-        else {"type", "year", "title", "journal", "labs", "corr", "apc", "oa", "oa_status", "links"}
-    )
+    requested = set(columns) if columns else set(EXPORT_COLUMNS)
     requested |= {"title", "links"}
     spec: list[tuple[str, str]] = [
         ("type", "Type"),

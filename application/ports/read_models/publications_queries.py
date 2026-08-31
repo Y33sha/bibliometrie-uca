@@ -35,6 +35,27 @@ PublicationSort = Literal[
 ]
 
 
+# Vocabulaire du filtre par origine du paiement des frais de publication. `uca` retient les
+# publications qu'une structure du périmètre a payées, `none` celles sans paiement connu ;
+# `this_lab` et `other_uca` situent le paiement par rapport aux laboratoires sélectionnés, et
+# n'ont donc de sens qu'avec une sélection de laboratoires. `non_uca` est l'écriture longue de
+# `other`, que l'interface a portée : les deux désignent un paiement extérieur au périmètre.
+APC_ORIGINS: frozenset[str] = frozenset(
+    {"uca", "other", "non_uca", "none", "this_lab", "other_uca"}
+)
+
+# Celles des origines qui situent le paiement par rapport aux laboratoires sélectionnés : sans
+# sélection, elles ne désignent rien.
+APC_ORIGINS_NEEDING_LAB: frozenset[str] = frozenset({"this_lab", "other_uca"})
+
+# Vocabulaire des colonnes que l'export des publications sait émettre, dans l'ordre où elles
+# paraissent. L'appelant nomme celles qu'il veut voir ; une liste vide les demande toutes. Le
+# titre et les liens paraissent quoi qu'il arrive, et l'éditeur suit la visibilité de la revue.
+EXPORT_COLUMNS: frozenset[str] = frozenset(
+    {"type", "year", "title", "journal", "labs", "corr", "apc", "oa", "oa_status", "links"}
+)
+
+
 @dataclass(frozen=True, slots=True)
 class PublicationFilters:
     """Filtres de la page publications, partagés par la liste, les facettes et l'export.

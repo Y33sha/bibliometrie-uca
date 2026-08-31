@@ -15,7 +15,7 @@ from domain.errors import ValidationError
 from domain.publications.doc_types import DOC_TYPES
 from domain.publications.metadata import OA_STATUSES
 from interfaces.api.deps import stats_queries
-from interfaces.api.filters import parse_int_csv, parse_str_csv, parse_vocabulary_csv
+from interfaces.api.filters import parse_apc_origins, parse_int_csv, parse_vocabulary_csv
 from interfaces.api.params import SearchTerm
 
 router = APIRouter(prefix="/api/stats", tags=["stats"])
@@ -32,15 +32,16 @@ def stats_filters(
 ) -> StatsFilters:
     """Dépendance : assemble les filtres communs des endpoints stats depuis les query params, en listes séparées par des virgules.
 
-    `oa_status` et `doc_type` sont pris dans leur vocabulaire fermé (mêmes valeurs que la liste des publications) ; une valeur inconnue rend 422. `has_apc` est une facette multi-sélection (`uca` / `non_uca` / `none`) non restreinte ici.
+    `oa_status` et `doc_type` sont pris dans leur vocabulaire fermé (mêmes valeurs que la liste des publications) ; une valeur inconnue rend 422. `has_apc` est pris de même dans son vocabulaire ; ses deux valeurs qui situent le paiement par rapport aux laboratoires demandés exigent un `lab_id`.
     """
+    lab_ids = parse_int_csv(lab_id, param="lab_id")
     return StatsFilters(
-        lab_ids=parse_int_csv(lab_id, param="lab_id"),
+        lab_ids=lab_ids,
         years=parse_int_csv(year, param="year"),
         publisher_ids=parse_int_csv(publisher_id, param="publisher_id"),
         journal_ids=parse_int_csv(journal_id, param="journal_id"),
         oa_status=parse_vocabulary_csv(oa_status, allowed=OA_STATUSES, param="oa_status"),
-        has_apc=parse_str_csv(has_apc),
+        has_apc=parse_apc_origins(has_apc, lab_ids=lab_ids),
         doc_types=parse_vocabulary_csv(doc_type, allowed=DOC_TYPES, param="doc_type"),
     )
 

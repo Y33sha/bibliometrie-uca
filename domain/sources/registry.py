@@ -28,6 +28,24 @@ ALL_SOURCES: tuple[Source, ...] = tuple(Source)
 # Sources comme set (pour les tests d'appartenance et les valeurs par défaut)
 ALL_SOURCES_SET: frozenset[str] = frozenset(Source)
 
+# Préfixe sous lequel une source se désigne dans une requête de lecture. Court, parce qu'il
+# voyage dans une URL ; distinct du libellé de l'enum SQL, que `Source` porte.
+SOURCE_FILTER_PREFIXES: dict[str, Source] = {
+    "hal": Source.HAL,
+    "oa": Source.OPENALEX,
+    "scanr": Source.SCANR,
+    "wos": Source.WOS,
+    "theses": Source.THESES,
+}
+
+# Vocabulaire du filtre par source : un préfixe suffixé de la présence attendue. `hal_yes`
+# retient les publications que HAL porte, `hal_no` les autres ; les deux ensemble ne
+# contraignent rien. Valide le filtre `source_filter` des lectures ; une valeur hors
+# vocabulaire est refusée.
+SOURCE_FILTER_VALUES: frozenset[str] = frozenset(
+    f"{prefixe}_{presence}" for prefixe in SOURCE_FILTER_PREFIXES for presence in ("yes", "no")
+)
+
 # Sources interrogeables par DOI pour le cross-import (`fetch_missing_doi`).
 # Theses absent car son API ne se requête pas par DOI mais par NNT.
 DOI_SEARCHABLE_SOURCES: tuple[Source, ...] = (
