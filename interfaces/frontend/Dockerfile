@@ -5,8 +5,9 @@ FROM node:22-slim
 # Vite de la route /docs via `../../../../../docs`).
 WORKDIR /repo/interfaces/frontend
 
+# `npm ci` installe les versions de `package-lock.json`, comme l'intégration.
 COPY package*.json ./
-RUN npm install
+RUN npm ci
 
 # En dev, le code source et docs/ sont montés en volume (pas copiés)
 EXPOSE 5173
