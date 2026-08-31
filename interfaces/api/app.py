@@ -303,6 +303,13 @@ _SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",  # interdit le MIME-sniffing
     "X-Frame-Options": "DENY",  # anti-clickjacking (l'appli ne s'iframe jamais)
     "Referrer-Policy": "strict-origin-when-cross-origin",
+    # Retire à la page l'accès aux capteurs et périphériques du navigateur. Aucune n'en
+    # demande ; le déclarer ferme la porte à du code qui parviendrait à s'exécuter dans la page.
+    "Permissions-Policy": "geolocation=(), camera=(), microphone=(), payment=(), usb=()",
+    # Isole le contexte de navigation : une page ouverte depuis l'application — fiche HAL,
+    # profil ORCID, identifiant ROR — perd la référence vers celle qui l'a ouverte. `rel="noopener"`
+    # pose la même garantie lien par lien ; celle-ci vaut pour tous, sans dépendre de l'attribut.
+    "Cross-Origin-Opener-Policy": "same-origin",
 }
 
 _NO_STORE = "no-store"

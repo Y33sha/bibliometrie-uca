@@ -8,6 +8,23 @@ class TestSecurityHeaders:
         assert r.headers["x-frame-options"] == "DENY"
         assert r.headers["referrer-policy"] == "strict-origin-when-cross-origin"
 
+    def test_les_capteurs_du_navigateur_sont_refuses(self, client):
+        """Aucune page n'en demande : les refuser ferme la porte à du code qui s'exécuterait dans la page."""
+        politique = client.get("/api/auth/check").headers["permissions-policy"]
+        for capacite in ("geolocation", "camera", "microphone", "payment", "usb"):
+            assert f"{capacite}=()" in politique
+
+    def test_le_contexte_de_navigation_est_isole(self, client):
+        """Une page ouverte depuis l'application perd la référence vers celle qui l'a ouverte, sans dépendre de `rel="noopener"` lien par lien."""
+        r = client.get("/api/auth/check")
+        assert r.headers["cross-origin-opener-policy"] == "same-origin"
+
+    def test_les_en_tetes_couvrent_aussi_l_interface(self, client):
+        """Le middleware les pose sur toute réponse, pages du frontend comprises."""
+        entetes = client.get("/").headers
+        assert entetes["x-frame-options"] == "DENY"
+        assert entetes["cross-origin-opener-policy"] == "same-origin"
+
 
 class TestMiseEnCache:
     """Aucun cache du chemin ne garde une réponse de l'API.
