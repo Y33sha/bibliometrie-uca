@@ -1,6 +1,6 @@
 # =============================================================
 # Docker Compose — mode développement
-# Usage : docker compose up
+# Usage : docker compose -f docker-compose.dev.yml up
 # =============================================================
 
 services:

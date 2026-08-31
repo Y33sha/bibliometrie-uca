@@ -16,7 +16,7 @@ _LANCEMENTS = [
     "Dockerfile",
     "interfaces/api/Dockerfile",
     "docker-compose.prod.yml",
-    "docker-compose.yml",
+    "docker-compose.dev.yml",
     "start.sh",
 ]
 """Descriptions qui lancent le serveur, ou lui composent son environnement."""
