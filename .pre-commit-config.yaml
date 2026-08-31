@@ -191,6 +191,16 @@ repos:
         always_run: true
         stages: [pre-push]
 
+      # `svelte/no-at-html-tags` recense les points d'insertion de HTML : la règle n'a de
+      # portée que si elle tourne avant l'envoi.
+      - id: ci-frontend-lint
+        name: eslint (frontend)
+        entry: bash -c 'cd interfaces/frontend && npm run lint'
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
+
       - id: ci-frontend-test
         name: vitest (tests frontend)
         entry: bash -c 'cd interfaces/frontend && npm test'
