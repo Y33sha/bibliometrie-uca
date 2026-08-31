@@ -84,13 +84,15 @@ def _apply_app_role_grants() -> None:
     """
     import re
 
+    from psycopg import sql
+
     from infrastructure import PROJECT_ROOT
     from infrastructure.settings import settings
 
-    sql = (PROJECT_ROOT / "infrastructure" / "db" / "roles.sql").read_text(encoding="utf-8")
+    fichier = (PROJECT_ROOT / "infrastructure" / "db" / "roles.sql").read_text(encoding="utf-8")
     ordres = [
         o.strip()
-        for o in re.findall(r"^(GRANT[^;]+|ALTER DEFAULT PRIVILEGES[^;]+);", sql, re.M | re.S)
+        for o in re.findall(r"^(GRANT[^;]+|ALTER DEFAULT PRIVILEGES[^;]+);", fichier, re.M | re.S)
     ]
     args = _admin_connect_args()
     args["dbname"] = DB_NAME
@@ -99,9 +101,13 @@ def _apply_app_role_grants() -> None:
     with conn.cursor() as cur:
         cur.execute("SELECT 1 FROM pg_roles WHERE rolname = %s", (settings.db_app_user,))
         if cur.fetchone() is None:
+            # `CREATE ROLE` est une instruction utilitaire : PostgreSQL n'y planifie
+            # aucun paramètre, la valeur est donc composée et échappée.
             cur.execute(
-                f"CREATE ROLE {settings.db_app_user} LOGIN PASSWORD %s",
-                (settings.db_app_password.get_secret_value(),),
+                sql.SQL("CREATE ROLE {} LOGIN PASSWORD {}").format(
+                    sql.Identifier(settings.db_app_user),
+                    sql.Literal(settings.db_app_password.get_secret_value()),
+                )
             )
         for ordre in ordres:
             cur.execute(ordre)
