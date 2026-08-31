@@ -297,8 +297,7 @@ async def read_rate_limit_middleware(
     return await call_next(request)
 
 
-# En-têtes de sécurité posés sur toute réponse. La Content-Security-Policy, plus délicate
-# (une politique trop stricte casse la SPA), est traitée à part ; HSTS relève du reverse-proxy TLS.
+# En-têtes de sécurité posés sur toute réponse. HSTS relève du reverse-proxy TLS.
 _SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",  # interdit le MIME-sniffing
     "X-Frame-Options": "DENY",  # anti-clickjacking (l'appli ne s'iframe jamais)
@@ -311,6 +310,20 @@ _SECURITY_HEADERS = {
     # pose la même garantie lien par lien ; celle-ci vaut pour tous, sans dépendre de l'attribut.
     "Cross-Origin-Opener-Policy": "same-origin",
 }
+
+_FRAME_ANCESTORS = "frame-ancestors 'none'"
+"""Politique de sécurité de contenu posée sur toute réponse : la page ne peut être insérée dans le cadre d'un autre site.
+
+C'est la formulation que les navigateurs traitent aujourd'hui comme la référence de l'anti-clickjacking, `X-Frame-Options` en étant l'ancêtre — les deux sont posés, le second pour les navigateurs qui ne lisent que lui.
+
+La directive n'a d'effet qu'en en-tête : une politique portée par une balise `<meta>` l'ignore. C'est ce qui la distingue de la politique des pages du frontend, que le générateur du frontend compose page par page — elle y autorise nommément les scripts de l'application par leur empreinte, ce que le serveur ne saurait pas reproduire. Les deux politiques s'appliquent alors ensemble sur une page, et une réponse doit satisfaire l'une comme l'autre ; celle-ci ne déclarant que `frame-ancestors`, elle ne restreint rien de ce que l'autre autorise.
+"""
+
+_API_CSP = f"default-src 'none'; base-uri 'none'; form-action 'none'; {_FRAME_ANCESTORS}"
+"""Politique des réponses de l'API, qui ne rendent que du JSON : aucune ressource, d'aucune sorte, d'aucune origine.
+
+Une réponse d'API n'est pas un document, et rien n'oblige un navigateur à la traiter comme telle : une navigation directe vers un point d'entrée, une réponse d'erreur, un point d'entrée qui rendrait un jour autre chose que du JSON. `X-Content-Type-Options` retire au navigateur la liberté de réinterpréter le type déclaré ; celle-ci retire au document qu'il en ferait quand même le droit de charger ou d'exécuter quoi que ce soit.
+"""
 
 _NO_STORE = "no-store"
 """Interdiction de conserver une copie de la réponse, adressée à tout cache du chemin.
@@ -325,12 +338,15 @@ L'interface, elle, garde son cache : ses fichiers portent leur empreinte dans le
 async def security_headers_middleware(
     request: Request, call_next: RequestResponseEndpoint
 ) -> Response:
-    """Pose les en-têtes de sécurité (anti-sniffing, anti-clickjacking, politique de référent) sur chaque réponse, et l'interdiction de mise en cache sur les réponses de l'API."""
+    """Pose les en-têtes de sécurité (anti-sniffing, anti-clickjacking, politique de référent, politique de sécurité de contenu) sur chaque réponse, et l'interdiction de mise en cache sur les réponses de l'API."""
     response = await call_next(request)
     for name, value in _SECURITY_HEADERS.items():
         response.headers.setdefault(name, value)
     if route_path(request.scope).startswith("/api/"):
         response.headers.setdefault("Cache-Control", _NO_STORE)
+        response.headers.setdefault("Content-Security-Policy", _API_CSP)
+    else:
+        response.headers.setdefault("Content-Security-Policy", _FRAME_ANCESTORS)
     return response
 
 

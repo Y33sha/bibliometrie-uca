@@ -26,6 +26,33 @@ class TestSecurityHeaders:
         assert entetes["cross-origin-opener-policy"] == "same-origin"
 
 
+class TestPolitiqueDeSecuriteDeContenu:
+    """Politique de sécurité de contenu posée en en-tête, en regard de celle que les pages du frontend portent en balise.
+
+    Une balise `<meta>` ne peut pas exprimer `frame-ancestors` : la directive n'a d'effet qu'en en-tête, et c'est la formulation dont `X-Frame-Options` est l'ancêtre. Les réponses de l'API, qui ne rendent que du JSON, portent en plus une politique qui n'autorise aucune ressource.
+    """
+
+    def test_toute_reponse_refuse_l_insertion_dans_un_cadre(self, client):
+        for chemin in ("/", "/api/auth/check"):
+            politique = client.get(chemin).headers["content-security-policy"]
+            assert "frame-ancestors 'none'" in politique, chemin
+
+    def test_une_reponse_d_api_n_autorise_aucune_ressource(self, client):
+        politique = client.get("/api/config").headers["content-security-policy"]
+        for directive in ("default-src 'none'", "base-uri 'none'", "form-action 'none'"):
+            assert directive in politique
+
+    def test_la_politique_de_l_interface_ne_restreint_que_le_cadre(self, client):
+        """Les pages portent leur propre politique en balise, qui autorise nommément les scripts de l'application : celle de l'en-tête ne doit pas la contredire."""
+        politique = client.get("/").headers["content-security-policy"]
+        assert politique == "frame-ancestors 'none'"
+
+    def test_un_refus_la_porte_aussi(self, client):
+        r = client.post("/api/perimeters", json={})
+        assert r.status_code == 401
+        assert "default-src 'none'" in r.headers["content-security-policy"]
+
+
 class TestMiseEnCache:
     """Aucun cache du chemin ne garde une réponse de l'API.
 
