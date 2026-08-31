@@ -34,10 +34,10 @@ def stats_filters(
     `oa_status` et `doc_type` sont pris dans leur vocabulaire fermé (mêmes valeurs que la liste des publications) ; une valeur inconnue rend 422. `has_apc` est une facette multi-sélection (`uca` / `non_uca` / `none`) non restreinte ici.
     """
     return StatsFilters(
-        lab_ids=parse_int_csv(lab_id),
-        years=parse_int_csv(year),
-        publisher_ids=parse_int_csv(publisher_id),
-        journal_ids=parse_int_csv(journal_id),
+        lab_ids=parse_int_csv(lab_id, param="lab_id"),
+        years=parse_int_csv(year, param="year"),
+        publisher_ids=parse_int_csv(publisher_id, param="publisher_id"),
+        journal_ids=parse_int_csv(journal_id, param="journal_id"),
         oa_status=parse_vocabulary_csv(oa_status, allowed=OA_STATUSES, param="oa_status"),
         has_apc=parse_str_csv(has_apc),
         doc_types=parse_vocabulary_csv(doc_type, allowed=DOC_TYPES, param="doc_type"),
