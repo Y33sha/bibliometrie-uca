@@ -61,49 +61,40 @@ jobs:
         with:
           python-version: "3.12"
 
+      # `--frozen` installe les versions de `uv.lock`, celles-là mêmes que le `Dockerfile`
+      # embarque : les tests s'exécutent sur l'arbre qui part en production, et l'analyse de
+      # vulnérabilités porte sur lui.
       - name: Install dependencies
         run: |
-          # Upgrade pip + setuptools (les versions bootstrap du venv ont
-          # des CVE documentées ; pip-audit les signalerait sinon).
-          pip install --upgrade pip setuptools
-          pip install ".[dev]"
+          pip install --no-cache-dir uv
+          uv sync --frozen --extra dev
 
       - name: Dependency hygiene (deptry)
-        run: deptry .
+        run: uv run deptry .
 
-      # Deux ensembles distincts : ce que l'intégration installe (outillage de développement
-      # compris) et ce que l'image embarque. Les dépendances directes sont épinglées à l'unité
-      # près et coïncident ; les transitives sont figées par `uv.lock`, qu'une résolution fraîche
-      # ne reflète pas.
-      - name: Vulnerability scan (pip-audit, arbre installé)
-        run: pip-audit
-
-      - name: Vulnerability scan (pip-audit, fichier de verrouillage)
-        run: |
-          pip install uv
-          uv export --frozen --no-dev --no-hashes --no-emit-project > /tmp/lock-requirements.txt
-          pip-audit --requirement /tmp/lock-requirements.txt
+      - name: Vulnerability scan (pip-audit)
+        run: uv run pip-audit
 
       - name: Lint (ruff)
-        run: ruff check .
+        run: uv run ruff check .
 
       - name: Format check (ruff)
-        run: ruff format --check .
+        run: uv run ruff format --check .
 
       - name: Architecture contracts (import-linter)
-        run: lint-imports
+        run: uv run lint-imports
 
       - name: Type check (mypy)
-        run: mypy .
+        run: uv run mypy .
 
       - name: Unit tests (garde rapide, sans BDD)
-        run: python -m pytest tests/unit/ -v
+        run: uv run python -m pytest tests/unit/ -v
 
       - name: Coverage (tous les tests, seuil via pyproject.toml)
         # Re-joue toute la suite (unitaires + intégration) sous instrumentation : couvre le pass/fail
         # ET le seuil de couverture. L'étape unitaire ci-dessus n'est qu'un fail-fast (~2 s) avant
         # cette passe complète ; pas d'étape intégration séparée, qui ne ferait que la rejouer.
-        run: python -m pytest tests/ --cov --cov-report=term-missing
+        run: uv run python -m pytest tests/ --cov --cov-report=term-missing
 
   build-frontend:
     runs-on: ubuntu-latest

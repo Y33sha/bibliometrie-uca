@@ -48,8 +48,8 @@ RUN apt-get update \
     && apt-get upgrade -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
-# Installer uv (utilisé pour `uv sync --frozen` qui installe
-# exactement les versions de uv.lock — mêmes versions que CI + dev).
+# Installer uv (utilisé pour `uv sync --frozen` qui installe exactement les versions
+# de uv.lock — celles sur lesquelles l'intégration exécute ses tests et ses analyses).
 RUN pip install --no-cache-dir uv
 
 COPY pyproject.toml uv.lock ./
