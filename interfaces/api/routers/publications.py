@@ -15,6 +15,7 @@ from sqlalchemy import Connection
 
 from application.ports.read_models._common import EntityFacetResponse, EntityKind
 from application.ports.read_models.publications_queries import (
+    EXPORT_COLUMNS,
     DuplicatePairResponse,
     PublicationDetailResponse,
     PublicationDuplicatesQueries,
@@ -30,6 +31,7 @@ from application.services.publications import commands as publication_commands
 from domain.publications.doc_types import DOC_TYPES
 from domain.publications.metadata import ACCESS_LEVELS, OA_STATUSES
 from domain.sources.hal import HAL_DEPOSIT_STATUSES
+from domain.sources.registry import SOURCE_FILTER_VALUES
 from interfaces.api.deps import (
     audit_repo,
     db_conn,
@@ -38,6 +40,8 @@ from interfaces.api.deps import (
     publications_queries,
 )
 from interfaces.api.filters import (
+    TOGGLE_VALUES,
+    parse_apc_origins,
     parse_int_csv,
     parse_ints,
     parse_str_csv,
@@ -107,18 +111,24 @@ class PublicationFilterParams:
             subject_id=self.subject_id,
             access=parse_vocabulary_csv(self.access, allowed=ACCESS_LEVELS, param="access"),
             oa_status=parse_vocabulary_csv(self.oa_status, allowed=OA_STATUSES, param="oa_status"),
-            source_values=parse_str_csv(self.source_filter),
+            source_values=parse_vocabulary_csv(
+                self.source_filter, allowed=SOURCE_FILTER_VALUES, param="source_filter"
+            ),
             doc_types=parse_vocabulary_csv(self.doc_type, allowed=DOC_TYPES, param="doc_type"),
             excluded_types=parse_vocabulary_csv(
                 self.excluded_doc_type, allowed=DOC_TYPES, param="excluded_doc_type"
             ),
-            is_corresponding=parse_str_csv(self.is_corresponding),
-            has_apc=parse_str_csv(self.has_apc),
+            is_corresponding=parse_vocabulary_csv(
+                self.is_corresponding, allowed=TOGGLE_VALUES, param="is_corresponding"
+            ),
+            has_apc=parse_apc_origins(self.has_apc, lab_ids=lab_ids),
             country_values=parse_str_csv(self.country),
             hal_status_values=parse_vocabulary_csv(
                 self.hal_status, allowed=HAL_DEPOSIT_STATUSES, param="hal_status"
             ),
-            in_perimeter=parse_str_csv(self.in_perimeter),
+            in_perimeter=parse_vocabulary_csv(
+                self.in_perimeter, allowed=TOGGLE_VALUES, param="in_perimeter"
+            ),
         )
 
 
@@ -187,7 +197,7 @@ def export_publications_csv(
         queries.export_publications_csv(
             filters=filters.to_filters(),
             sort=sort,
-            columns=parse_str_csv(columns),
+            columns=parse_vocabulary_csv(columns, allowed=EXPORT_COLUMNS, param="columns"),
         ),
         filename="publications.csv",
         slot=slot,
@@ -220,7 +230,9 @@ def export_theses_csv(
         lab_none=lab_none,
         years=parse_int_csv(year, param="year"),
         access=parse_vocabulary_csv(access, allowed=ACCESS_LEVELS, param="access"),
-        source_values=parse_str_csv(source_filter),
+        source_values=parse_vocabulary_csv(
+            source_filter, allowed=SOURCE_FILTER_VALUES, param="source_filter"
+        ),
         doc_types=parse_vocabulary_csv(doc_type, allowed=DOC_TYPES, param="doc_type")
         or ["thesis", "ongoing_thesis"],
     )
