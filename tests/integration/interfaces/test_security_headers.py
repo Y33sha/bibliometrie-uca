@@ -1,4 +1,4 @@
-"""En-têtes de sécurité posés sur toute réponse par le middleware."""
+"""En-têtes de sécurité posés sur toute réponse par le middleware, et ordre de la pile."""
 
 
 class TestSecurityHeaders:
@@ -7,3 +7,46 @@ class TestSecurityHeaders:
         assert r.headers["x-content-type-options"] == "nosniff"
         assert r.headers["x-frame-options"] == "DENY"
         assert r.headers["referrer-policy"] == "strict-origin-when-cross-origin"
+
+
+class TestMiseEnCache:
+    """Aucun cache du chemin ne garde une réponse de l'API.
+
+    Une même adresse ne rend pas toujours le même corps : la configuration se restreint à une liste blanche de clés sans session et s'ouvre avec. Un cache partagé qui rangerait la variante servie à une session ouverte la rendrait ensuite à un appelant anonyme.
+    """
+
+    def test_une_lecture_d_api_interdit_la_mise_en_cache(self, client):
+        assert client.get("/api/config").headers["cache-control"] == "no-store"
+
+    def test_l_interdiction_couvre_la_surface_d_api(self, client):
+        for chemin in ("/api/auth/check", "/api/publications", "/api/stats/summary"):
+            r = client.get(chemin)
+            assert r.headers.get("cache-control") == "no-store", chemin
+
+    def test_un_refus_la_porte_aussi(self, client):
+        """Le refus d'une écriture non authentifiée passe par le même middleware."""
+        r = client.post("/api/perimeters", json={})
+        assert r.status_code == 401
+        assert r.headers.get("cache-control") == "no-store"
+
+    def test_l_interface_garde_son_cache(self, client):
+        """Les fichiers du frontend portent leur empreinte dans leur nom : les mettre en cache est ce qui rend une page rapide au second chargement."""
+        r = client.get("/")
+        assert r.headers.get("cache-control") != "no-store"
+
+
+class TestOrdreDeLaPile:
+    """Le middleware CORS enveloppe les autres, et voit donc les réponses qu'ils composent.
+
+    Un refus dépourvu d'en-têtes CORS arrive au navigateur d'une origine autorisée comme une erreur CORS opaque : le code et le message de refus sont perdus, et la page ne peut rien en dire. Or les middlewares d'authentification, de plafond et de pagination composent leurs refus eux-mêmes, sans laisser passer la requête — d'où l'ordre.
+
+    L'ordre est vérifié sur la pile plutôt que sur une réponse : les origines autorisées se figent à la construction du middleware, si bien qu'un appel n'en montre les en-têtes que sur un déploiement qui en énumère, et la production n'en énumère aucune.
+    """
+
+    def test_cors_enveloppe_les_autres_middlewares(self):
+        from fastapi.middleware.cors import CORSMiddleware
+
+        from interfaces.api.app import app
+
+        # Starlette range la pile du plus extérieur au plus intérieur.
+        assert app.user_middleware[0].cls is CORSMiddleware
