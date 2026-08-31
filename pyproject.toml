@@ -35,6 +35,7 @@ dev = [
     "pre-commit==4.6.2",
     "pre-commit-hooks==6.0.0",         # check-yaml/toml/… lancés en local via `python -m`
     "import-linter==2.14",
+    "pyyaml==6.0.3",             # lecture des descriptions de déploiement par les tests
 ]
 
 [tool.setuptools]
