@@ -118,10 +118,13 @@ def _alembic_config() -> Config:
     """Configuration Alembic pointée sur la base de test.
 
     L'URL passe par `set_main_option`, qui la range dans un `configparser` : le `%` y ouvre une interpolation. Or le rendu d'une URL encode en `%XX` tout caractère non alphanumérique d'un mot de passe — un mot de passe solide en produit forcément. Doubler le `%` le rend littéral.
+
+    `configure_logger` à faux vaut pour tout usage d'Alembic dans une session de test. `env.py` appellerait sinon `fileConfig`, qui reconfigure le logging du processus et désactive tous les loggers déjà créés que `alembic.ini` ne nomme pas — c'est-à-dire ceux de l'application. Un test qui observe le journal ne verrait alors plus rien, et le silence passerait pour un succès partout où il vaut assertion.
     """
     cfg = Config(str(ALEMBIC_INI))
     url = _sa_url().render_as_string(hide_password=False)
     cfg.set_main_option("sqlalchemy.url", url.replace("%", "%%"))
+    cfg.attributes["configure_logger"] = False
     return cfg
 
 
@@ -168,14 +171,8 @@ def _sa_url():
 
 @pytest.fixture(scope="session")
 def alembic_config() -> Config:
-    """Configuration Alembic pointée sur la base de test, que `pytest_configure` monte à `head`.
-
-    `configure_logger` à faux laisse le logging de la session pytest en place : `env.py` le
-    reconfigurerait sinon en pleine session, désactivant les loggers que les tests observent.
-    """
-    cfg = _alembic_config()
-    cfg.attributes["configure_logger"] = False
-    return cfg
+    """Configuration Alembic pointée sur la base de test, que `pytest_configure` monte à `head`."""
+    return _alembic_config()
 
 
 @pytest.fixture

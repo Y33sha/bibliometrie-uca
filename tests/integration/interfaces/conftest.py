@@ -93,17 +93,11 @@ def _fail_on_escaped_dml():
 
     handler = _Capture()
     deps_logger = logging.getLogger("interfaces.api.deps")
-    # `setup_logger` (dictConfig) désactive les loggers existants ; on le réactive
-    # le temps du test, sinon `logger.warning` du garde-fou est un no-op et un
-    # éventuel DML échappé passerait inaperçu.
-    was_disabled = deps_logger.disabled
-    deps_logger.disabled = False
     deps_logger.addHandler(handler)
     try:
         yield
     finally:
         deps_logger.removeHandler(handler)
-        deps_logger.disabled = was_disabled
     assert not captured, "Écriture(s) hors command handler détectée(s) : " + " | ".join(captured)
 
 
