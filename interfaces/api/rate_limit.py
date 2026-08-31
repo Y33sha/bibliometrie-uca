@@ -34,10 +34,15 @@ _READ_MAX_REQUESTS = 1200
 _READ_WINDOW_SECONDS = 300
 # Plafond du nombre de compteurs suivis : borne la mémoire même sous un flot d'adresses variées.
 _MAX_KEYS = 4096
-# Adresses déjà signalées comme pair de proxy non déclaré : un avertissement par adresse suffit.
-# Bornée, comme la table des compteurs — sous un flot d'adresses variées, les suivantes se taisent.
+# Instant du dernier signalement, par adresse de pair de proxy non déclaré. Le réglage se
+# corrige à l'exploitation, et un déploiement qui l'oublie garde le symptôme des mois : le
+# signalement se répète donc à intervalle, assez espacé pour ne pas noyer le journal, assez
+# fréquent pour se trouver le jour où l'on cherche la cause.
+# La table est bornée, comme celle des compteurs — sous un flot d'adresses variées, la plus
+# anciennement signalée cède sa place.
+_WARN_INTERVAL_SECONDS = 3600.0
 _MAX_WARNED_PEERS = 64
-_warned_peers: set[str] = set()
+_warned_peers: OrderedDict[str, float] = OrderedDict()
 
 
 class FixedWindowRateLimiter:
@@ -127,16 +132,21 @@ def _warn_if_proxy_header_ignored(request: Request) -> None:
 
     `ProxyHeadersMiddleware` d'uvicorn réécrit l'adresse du client à partir de `X-Forwarded-For` quand le pair de la connexion figure dans `FORWARDED_ALLOW_IPS`, et pose alors un port nul — l'information étant perdue. Un en-tête présent en regard d'un port non nul désigne donc un pair que le serveur tient pour quelconque : la vraie adresse du client se perd, et le plafond de tentatives compte tous les clients dans un même seau.
 
-    Le message nomme le pair, valeur à porter dans `FORWARDED_ALLOW_IPS`.
+    Le message nomme le pair, valeur à porter dans `FORWARDED_ALLOW_IPS`. Il paraît au plus une fois par heure et par pair, tant que des requêtes de ce pair arrivent.
     """
     if "x-forwarded-for" not in request.headers or request.client is None:
         return
     if request.client.port == 0:
         return
     peer = request.client.host
-    if peer in _warned_peers or len(_warned_peers) >= _MAX_WARNED_PEERS:
+    now = time.monotonic()
+    dernier = _warned_peers.get(peer)
+    if dernier is not None and now - dernier < _WARN_INTERVAL_SECONDS:
         return
-    _warned_peers.add(peer)
+    if dernier is None and len(_warned_peers) >= _MAX_WARNED_PEERS:
+        _warned_peers.popitem(last=False)
+    _warned_peers[peer] = now
+    _warned_peers.move_to_end(peer)
     logger.warning(
         "proxy_headers_ignored",
         extra={

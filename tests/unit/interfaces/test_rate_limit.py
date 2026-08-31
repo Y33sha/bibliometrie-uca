@@ -4,6 +4,7 @@ import logging
 
 from fastapi import Request
 
+from interfaces.api import rate_limit
 from interfaces.api.rate_limit import (
     FixedWindowRateLimiter,
     _client_key,
@@ -166,11 +167,32 @@ class TestProxyHeaderIgnoredWarning:
         assert "proxy_headers_ignored" in caplog.text
         assert "172.17.0.1" in caplog.records[0].detail
 
-    def test_ne_signale_qu_une_fois_par_pair(self, caplog):
+    def test_ne_signale_qu_une_fois_par_pair_dans_l_intervalle(self, caplog):
         with caplog.at_level(logging.WARNING):
             for _ in range(5):
                 _client_key(_request("172.17.0.1", x_forwarded_for="203.0.113.9"))
         assert len(caplog.records) == 1
+
+    def test_se_repete_passe_l_intervalle(self, caplog, monkeypatch):
+        """Le réglage se corrige à l'exploitation, et le signalement reste disponible le jour où on le cherche."""
+        monkeypatch.setattr(rate_limit, "_WARN_INTERVAL_SECONDS", 0.0)
+        with caplog.at_level(logging.WARNING):
+            for _ in range(3):
+                _client_key(_request("172.17.0.1", x_forwarded_for="203.0.113.9"))
+        assert len(caplog.records) == 3
+
+    def test_signale_chaque_pair_distinct(self, caplog):
+        with caplog.at_level(logging.WARNING):
+            _client_key(_request("172.17.0.1", x_forwarded_for="203.0.113.9"))
+            _client_key(_request("172.18.0.1", x_forwarded_for="203.0.113.9"))
+        assert {r.peer for r in caplog.records} == {"172.17.0.1", "172.18.0.1"}
+
+    def test_la_table_des_pairs_signales_reste_bornee(self, caplog):
+        """Sous un flot d'adresses distinctes, la plus anciennement signalée cède sa place."""
+        with caplog.at_level(logging.WARNING):
+            for i in range(rate_limit._MAX_WARNED_PEERS + 10):
+                _client_key(_request(f"10.0.{i // 256}.{i % 256}", x_forwarded_for="203.0.113.9"))
+        assert len(rate_limit._warned_peers) <= rate_limit._MAX_WARNED_PEERS
 
     def test_silence_quand_le_serveur_a_pris_l_en_tete(self, caplog):
         # Port nul : le serveur a réécrit l'adresse, le réglage est donc correct.
