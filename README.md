@@ -43,7 +43,7 @@ cp .env.example .env
 ### 2. Lancement (dev)
 
 ```bash
-docker compose up
+docker compose -f docker-compose.dev.yml up
 ```
 
 - Frontend : http://localhost:5176/bibliometrie
