@@ -46,6 +46,7 @@ from interfaces.api.models import (
     ReviewAction,
     SetCountry,
 )
+from interfaces.api.params import SearchTerm
 
 router = APIRouter(prefix="/api/addresses", tags=["addresses"])
 
@@ -207,7 +208,7 @@ def review_address(
 
 @router.get("/countries", response_model=AddressesCountriesResponse)
 def list_addresses_countries(
-    search: str = Query(""),
+    search: SearchTerm = "",
     has_country: bool | None = Query(None),
     country_code: str = Query(""),
     suggested_country: str = Query(""),

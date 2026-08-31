@@ -61,7 +61,12 @@ from interfaces.api.models import (
     UpdateNameFormStatus,
     UpdatePersonName,
 )
-from interfaces.api.params import TOP_SUBJECTS_LIMIT, TopSubjectsLimit
+from interfaces.api.params import (
+    MAX_SEARCH_LENGTH,
+    TOP_SUBJECTS_LIMIT,
+    SearchTerm,
+    TopSubjectsLimit,
+)
 
 router = APIRouter(prefix="/api/persons", tags=["persons"])
 
@@ -70,7 +75,7 @@ router = APIRouter(prefix="/api/persons", tags=["persons"])
 
 
 def person_filters(
-    search: str = Query(""),
+    search: SearchTerm = "",
     department: str = Query(""),
     role: str = Query(""),
     has_orcid: bool | None = Query(None),
@@ -103,7 +108,7 @@ def person_filters(
 
 @router.get("/search", response_model=list[PersonSearchResult])
 def search_persons(
-    search: str = Query("", min_length=2),
+    search: str = Query("", min_length=2, max_length=MAX_SEARCH_LENGTH),
     limit: int = Query(10, ge=1, le=30),
     queries: PersonsQueries = Depends(persons_queries),
 ) -> list[PersonSearchResult]:

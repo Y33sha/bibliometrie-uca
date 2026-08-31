@@ -44,7 +44,7 @@ from interfaces.api.models import (
     MergeResponse,
     OkResponse,
 )
-from interfaces.api.params import TOP_SUBJECTS_LIMIT, TopSubjectsLimit
+from interfaces.api.params import TOP_SUBJECTS_LIMIT, SearchTerm, TopSubjectsLimit
 
 router = APIRouter(prefix="/api/journals", tags=["journals"])
 
@@ -68,7 +68,7 @@ def list_journal_types() -> list[EnumOption]:
 
 
 def journal_filters(
-    search: str = Query(""),
+    search: SearchTerm = "",
     publisher_id: int | None = Query(None),
     journal_type: str = Query(""),
     is_in_doaj: bool | None = Query(None),

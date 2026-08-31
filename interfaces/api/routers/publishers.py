@@ -43,7 +43,7 @@ from interfaces.api.models import (
     OkResponse,
     PublisherMergeBlockedResponse,
 )
-from interfaces.api.params import TOP_SUBJECTS_LIMIT, TopSubjectsLimit
+from interfaces.api.params import TOP_SUBJECTS_LIMIT, SearchTerm, TopSubjectsLimit
 
 router = APIRouter(prefix="/api/publishers", tags=["publishers"])
 
@@ -58,7 +58,7 @@ def list_publisher_types() -> list[EnumOption]:
 
 
 def publisher_filters(
-    search: str = Query(""),
+    search: SearchTerm = "",
     publisher_type: str = Query(""),
     country: str = Query(""),
     with_pubs: bool = Query(False),

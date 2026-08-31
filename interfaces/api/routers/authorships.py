@@ -34,6 +34,7 @@ from interfaces.api.models import (
     OrphanBatchAssignResponse,
     RejectedPairsResponse,
 )
+from interfaces.api.params import SearchTerm
 
 router = APIRouter(prefix="/api/authorships", tags=["authorships"])
 
@@ -53,7 +54,7 @@ def orphan_authorships_count(
 def list_orphan_authorships(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=200),
-    search: str = Query(""),
+    search: SearchTerm = "",
     queries: AuthorshipsQueries = Depends(authorships_queries),
 ) -> OrphanAuthorshipsResponse:
     """Liste les signatures du périmètre qu'aucune personne ne porte."""
