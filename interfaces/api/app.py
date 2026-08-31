@@ -37,6 +37,7 @@ from interfaces.api.models.errors import (
     RejectedPairsResponse,
 )
 from interfaces.api.params import requested_offset
+from interfaces.api.rate_limit import read_allowed
 from interfaces.api.route_path import route_path
 from interfaces.api.session import check_auth_config, read_session
 from interfaces.api.spa import BUILD_DIR, SPAStaticFiles
@@ -283,6 +284,26 @@ async def timing_middleware(request: Request, call_next: RequestResponseEndpoint
         },
     )
     return response
+
+
+@app.middleware("http")
+async def read_rate_limit_middleware(
+    request: Request, call_next: RequestResponseEndpoint
+) -> Response:
+    """Plafonne les lectures d'une même adresse, sur l'ensemble des points d'entrée de l'API.
+
+    Le plafond de lignes borne ce qu'une lecture coûte ; celui-ci borne ce que leur répétition coûte. Un point d'entrée en lecture ajouté plus tard en hérite sans intervention.
+
+    Les fichiers de l'interface sortent du décompte : une page en tire des dizaines, sans toucher la base.
+    """
+    if request.method != "GET" or not route_path(request.scope).startswith("/api/"):
+        return await call_next(request)
+    if not read_allowed(request):
+        return JSONResponse(
+            status_code=429,
+            content={"detail": "Trop de requêtes. Réessayez dans quelques minutes."},
+        )
+    return await call_next(request)
 
 
 # En-têtes de sécurité posés sur toute réponse. La Content-Security-Policy, plus délicate

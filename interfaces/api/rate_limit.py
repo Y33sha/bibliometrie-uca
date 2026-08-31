@@ -27,6 +27,11 @@ _LOGIN_WINDOW_SECONDS = 300
 # vingt en cinq minutes. Le plafond laisse passer l'usage humain et arrête la rafale.
 _EXPORT_MAX_ATTEMPTS = 20
 _EXPORT_WINDOW_SECONDS = 300
+# Une navigation humaine procède par rafales : une page à facettes compose plusieurs dizaines
+# d'appels, et un aller-retour dans l'écran d'administration en enchaîne autant. Le plafond
+# laisse passer ce rythme et borne le parcours automatique, qui l'enchaîne sans pause.
+_READ_MAX_REQUESTS = 1200
+_READ_WINDOW_SECONDS = 300
 # Plafond du nombre de compteurs suivis : borne la mémoire même sous un flot d'adresses variées.
 _MAX_KEYS = 4096
 # Adresses déjà signalées comme pair de proxy non déclaré : un avertissement par adresse suffit.
@@ -106,12 +111,14 @@ class FixedWindowRateLimiter:
 
 _login_limiter = FixedWindowRateLimiter(_LOGIN_MAX_ATTEMPTS, _LOGIN_WINDOW_SECONDS)
 _export_limiter = FixedWindowRateLimiter(_EXPORT_MAX_ATTEMPTS, _EXPORT_WINDOW_SECONDS)
+_read_limiter = FixedWindowRateLimiter(_READ_MAX_REQUESTS, _READ_WINDOW_SECONDS)
 
 
 def reset_rate_limiters() -> None:
     """Vide les compteurs de tous les limiteurs et la mémoire des pairs signalés (isolation entre tests)."""
     _login_limiter.reset()
     _export_limiter.reset()
+    _read_limiter.reset()
     _warned_peers.clear()
 
 
@@ -164,6 +171,14 @@ def _rate_limited(limiter: FixedWindowRateLimiter, detail: str) -> Callable[[Req
             raise HTTPException(status_code=429, detail=detail)
 
     return dependency
+
+
+def read_allowed(request: Request) -> bool:
+    """Vrai tant que l'adresse du client reste sous le plafond de lectures.
+
+    S'adresse au middleware qui couvre toutes les lectures, là où les dépendances de route ne couvrent que les points d'entrée qui les déclarent.
+    """
+    return _read_limiter.allow(_client_key(request))
 
 
 login_rate_limit = _rate_limited(
