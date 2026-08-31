@@ -49,3 +49,12 @@ updates:
       interval: "weekly"
     commit-message:
       prefix: "chore(docker)"
+
+  # Les descriptions de composition portent l'image de la base, que l'écosystème `docker`
+  # ci-dessus ne lit pas : il ne parcourt que les descriptions de construction.
+  - package-ecosystem: "docker-compose"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore(docker)"
