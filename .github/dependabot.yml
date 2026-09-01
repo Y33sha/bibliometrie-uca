@@ -44,28 +44,23 @@ updates:
   # vieillit sur place. La fraîcheur des paquets système, elle, tient à la mise à jour que la
   # construction applique.
   #
-  # L'écosystème `docker` ne lit qu'un répertoire à la fois, d'où une entrée par emplacement :
-  # la description de production à la racine, celles du développement dans les deux interfaces.
+  # Une même image de base sert à plusieurs endroits : la description de production à la racine,
+  # celles du développement dans les deux interfaces. `group-by: dependency-name` rassemble ses
+  # emplacements dans une seule proposition. Sans lui, chaque répertoire donnerait la sienne, et
+  # accepter l'une sans les autres ferait construire deux images sur deux versions du langage.
   - package-ecosystem: "docker"
-    directory: "/"
+    directories:
+      - "/"
+      - "/interfaces/api"
+      - "/interfaces/frontend"
     schedule:
       interval: "weekly"
     commit-message:
       prefix: "chore(docker)"
-
-  - package-ecosystem: "docker"
-    directory: "/interfaces/api"
-    schedule:
-      interval: "weekly"
-    commit-message:
-      prefix: "chore(docker)"
-
-  - package-ecosystem: "docker"
-    directory: "/interfaces/frontend"
-    schedule:
-      interval: "weekly"
-    commit-message:
-      prefix: "chore(docker)"
+    groups:
+      images-de-base:
+        patterns: ["*"]
+        group-by: "dependency-name"
 
   # Les descriptions de composition portent l'image de la base, que l'écosystème `docker`
   # ci-dessus ne lit pas : il ne parcourt que les descriptions de construction.
