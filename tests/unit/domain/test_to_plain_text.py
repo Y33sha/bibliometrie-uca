@@ -23,6 +23,21 @@ class TestBalises:
         # doit être une lettre pour qu'un fragment soit tenu pour du balisage.
         assert to_plain_text("Surface <111> orientation") == "Surface <111> orientation"
 
+    def test_preserve_les_inegalites(self):
+        # Le corps d'une balise exclut `<` : l'encadrement s'arrête au signe suivant, et la
+        # mesure survit à la mise à plat.
+        assert to_plain_text("mesuré pour 2.96<yCMS<3.53 et 0.5<pT<10 GeV/c") == (
+            "mesuré pour 2.96<yCMS<3.53 et 0.5<pT<10 GeV/c"
+        )
+
+    def test_une_suite_de_chevrons_ouvrants_se_parcourt_lineairement(self):
+        """Le parcours d'une suite de `<` sans fermeture reste proportionnel à sa longueur."""
+        import time
+
+        debut = time.perf_counter()
+        to_plain_text("<A" * 100_000)
+        assert time.perf_counter() - debut < 1.0
+
 
 class TestEntites:
     def test_decode_les_entites(self):
