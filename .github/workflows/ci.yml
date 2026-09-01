@@ -152,6 +152,23 @@ jobs:
         working-directory: interfaces/frontend
         run: npm run build
 
+      # `schema.ts` est produit depuis l'OpenAPI de l'API : les deux dérivent l'un de l'autre
+      # sans que rien ne les rapproche. Le contrôle régénère les types et refuse la version
+      # commitée si elle ne correspond plus.
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: schema.ts suit le contrat OpenAPI
+        run: |
+          pip install --no-cache-dir uv
+          uv sync --frozen --no-dev
+          uv run python -m interfaces.cli.dev.dump_openapi /tmp/openapi.json
+          ( cd interfaces/frontend && npx openapi-typescript /tmp/openapi.json -o /tmp/schema.ts )
+          diff -q interfaces/frontend/src/lib/api/schema.ts /tmp/schema.ts \
+            || { echo "schema.ts a dérivé de l'OpenAPI : lancer npm run types:gen puis commiter"; exit 1; }
+
   image:
     runs-on: ubuntu-latest
 
