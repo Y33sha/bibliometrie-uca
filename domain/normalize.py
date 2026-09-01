@@ -35,7 +35,7 @@ _LATIN_LETTERS = str.maketrans(
 )
 
 
-_MARKUP_RE = re.compile(r"</?[A-Za-z][^>]*>")
+_MARKUP_RE = re.compile(r"</?[A-Za-z][^<>]*>")
 
 
 _COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
@@ -74,6 +74,8 @@ def strip_markup(text: str) -> str:
     """Retire les balises HTML/MathML `<...>` (remplacées par un espace).
 
     Le premier caractère doit être une lettre (ou `/`) pour ne pas avaler les indices de Miller `<111>` / `< 110 >` (cristallographie), qui sont du contenu, pas du markup (audit titres bruts : seuls cas non-balise observés).
+
+    Le corps d'une balise exclut `<` : une inégalité de la notation scientifique (`2.96<yCMS<3.53`) s'arrête ainsi au signe suivant, et une suite de `<` sans fermeture se parcourt linéairement.
     Réutilisé par l'export CSV (titre brut) et par `normalize_text` (dédup).
     """
     return _MARKUP_RE.sub(" ", text)
