@@ -158,6 +158,23 @@ repos:
         always_run: true
         stages: [pre-push]
 
+      # Les contrôles du frontend s'exécutent sous le Node du terminal, que rien
+      # n'oblige à être celui des images. Une version antérieure fait échouer
+      # l'environnement de test au chargement d'`undici`, sur une trace sans
+      # rapport apparent avec la cause. Le refus vient donc d'abord, et la nomme.
+      # `interfaces/frontend/.nvmrc` porte la version ; `nvm use`, sans argument, la lit.
+      - id: ci-version-node
+        name: Node à la version des images
+        entry: >-
+          bash -c 'attendue=$(cat interfaces/frontend/.nvmrc);
+          courante=$(node --version | sed "s/^v//;s/\..*//");
+          [ "$courante" = "$attendue" ] || { echo "Node $courante dans ce terminal, $attendue
+          attendu par interfaces/frontend/.nvmrc. Jouer: nvm use"; exit 1; }'
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
+
       # Frontend : vulnérabilités, types, tests, puis build de production.
       # `--omit=dev` : seul `dependencies` part dans le bundle servi au
       # navigateur ; les failles de l'outillage de développement ne concernent
