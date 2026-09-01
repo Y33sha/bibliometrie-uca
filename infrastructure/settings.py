@@ -55,18 +55,22 @@ class Settings(BaseSettings):
     db_host: str = "localhost"
     db_port: int = 5432
     db_name: str = "bibliometrie"
-    # Identité principale, propriétaire du schéma : migrations, pipeline et scripts de
-    # maintenance s'en servent, eux seuls. Vide, ces connexions sont refusées (cf.
-    # `infrastructure.db.engine.db_url`) ; le processus qui sert l'API n'a pas à la porter,
-    # puisqu'il se connecte sous l'identité restreinte ci-dessous.
+    # Trois identités de connexion, une par processus (cf. `infrastructure/db/roles.sql`).
+    # Chacune est exigée de la connexion qui la demande : vide, cette connexion est refusée
+    # (cf. `infrastructure.db.engine.db_url`) plutôt que repliée en silence sur une autre.
+    #
+    # Propriétaire du schéma. Les migrations s'en servent, et elles seules : elles sont seules
+    # à modifier la structure. Aucun processus qui tourne n'a à la porter.
     db_owner_user: str = ""
     db_owner_password: SecretStr = SecretStr("")
-    # Identité restreinte dont l'API se sert pour se connecter : un rôle limité à la lecture
-    # et à l'écriture des données, sans droit sur le schéma. Vide, la connexion de l'API est
-    # refusée (cf. `infrastructure.db.engine.db_url`) ; migrations, pipeline et scripts, eux,
-    # se connectent avec l'identité principale.
+    # Identité de l'API : lecture, et écriture sur les seules tables que ses points d'entrée
+    # d'administration modifient.
     db_app_user: str = ""
     db_app_password: SecretStr = SecretStr("")
+    # Identité du pipeline et des scripts en ligne de commande : écriture sur les données,
+    # entretien des vues matérialisées et des statistiques, aucun droit sur le schéma.
+    db_pipeline_user: str = ""
+    db_pipeline_password: SecretStr = SecretStr("")
     # Mode SSL de la connexion (valeurs libpq : disable/prefer/require/verify-ca/verify-full).
     # Vide → défaut du driver, soit `prefer` : chiffré si le serveur le propose, certificat non
     # vérifié. `require` impose le chiffrement sans authentifier le serveur pour autant. Poser

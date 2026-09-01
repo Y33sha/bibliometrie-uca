@@ -47,7 +47,9 @@ def _build_url() -> str:
     configured = config.get_main_option("sqlalchemy.url")
     if configured:
         return configured
-    return db_url().render_as_string(hide_password=False)
+    # Les migrations sont seules à modifier la structure : elles se connectent sous le
+    # propriétaire du schéma, que rien d'autre ne porte.
+    return db_url("owner").render_as_string(hide_password=False)
 
 
 def run_migrations_offline() -> None:

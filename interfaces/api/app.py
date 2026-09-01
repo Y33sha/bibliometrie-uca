@@ -78,7 +78,7 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     check_auth_config()
-    sync_engine = build_sync_engine(application=True)
+    sync_engine = build_sync_engine("app")
     set_sync_engine(sync_engine)
     try:
         yield

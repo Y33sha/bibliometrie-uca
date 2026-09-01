@@ -22,7 +22,10 @@ class PgAuthorshipsBuildQueries(AuthorshipsBuildQueries):
         )
         # DELETE plutôt que TRUNCATE : Postgres refuse TRUNCATE dès qu'une FK existe (même `SET NULL`).
         conn.execute(text("DELETE FROM authorships"))
-        conn.execute(text("ALTER SEQUENCE authorships_id_seq RESTART WITH 1"))
+        # `setval` plutôt que `ALTER SEQUENCE … RESTART` : les deux remettent le compteur à un,
+        # mais l'altération d'une séquence exige d'en être propriétaire, sans droit accordable,
+        # là où `setval` s'accorde. Le troisième argument à faux rend `1` au prochain appel.
+        conn.execute(text("SELECT setval('authorships_id_seq', 1, false)"))
         return n
 
     def insert_missing_authorships(self, conn: Connection) -> int:

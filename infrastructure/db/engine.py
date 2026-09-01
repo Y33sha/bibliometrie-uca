@@ -8,8 +8,10 @@ Le driver `postgresql+psycopg` permet d'accéder aux features psycopg3 (server-s
 """
 
 import os
+from typing import Literal
 
 import psycopg  # noqa: F401 — driver chargé par SA via la URL postgresql+psycopg://
+from pydantic import SecretStr
 from sqlalchemy import URL, Engine, create_engine
 
 from infrastructure.db.dml_guard import install_dml_guard
@@ -18,35 +20,46 @@ from infrastructure.settings import settings
 _sync_engine: Engine | None = None
 
 
-def db_url(*, application: bool = False) -> URL:
+DbIdentity = Literal["owner", "app", "pipeline"]
+
+# Pour chaque identité : le réglage qui la porte, et ce qu'elle recouvre. Le message sert
+# l'appelant qui a oublié de la renseigner, en lui disant quel processus la demande.
+_IDENTITES: dict[str, str] = {
+    "owner": (
+        "propriétaire du schéma, dont les migrations se servent — elles seules modifient la "
+        "structure"
+    ),
+    "app": (
+        "rôle de l'API : lecture, et écriture sur les seules tables que ses points d'entrée "
+        "d'administration modifient"
+    ),
+    "pipeline": (
+        "rôle du pipeline et des scripts : écriture sur les données et entretien des vues "
+        "matérialisées, sans droit sur le schéma"
+    ),
+}
+
+
+def db_url(identity: DbIdentity = "pipeline") -> URL:
     """URL de connexion Postgres construite depuis les settings (réutilisée par Alembic).
 
-    `application` demande l'identité restreinte de l'API (`db_app_user`), un rôle limité à la lecture et à l'écriture des données ; elle est exigée, faute de quoi la construction échoue. Se replier en silence sur l'identité principale ferait tourner l'API avec les droits du propriétaire du schéma sans que rien ne le signale.
+    Trois identités, une par processus, décrites dans `infrastructure/db/roles.sql`. Le pipeline et les scripts en ligne de commande étant les appelants les plus nombreux, c'est leur identité qui vaut par défaut ; les migrations et l'API demandent la leur.
 
-    Les autres appelants — migrations, pipeline, scripts de maintenance — se connectent avec l'identité principale : eux seuls modifient la structure du schéma, rafraîchissent les vues matérialisées et vident des tables. Elle est exigée de la même façon, et pour la même raison symétrique : un processus qui ne sert que l'API n'a pas à porter le mot de passe du propriétaire du schéma, et son absence doit se voir plutôt que d'ouvrir une connexion anonyme.
+    L'identité demandée est exigée : sans elle, la construction échoue. Se replier en silence sur une autre ferait tourner un processus avec des droits qu'il n'a pas à porter — l'API avec ceux du propriétaire du schéma, par exemple — sans que rien ne le signale.
 
     `db_sslmode`, s'il est défini, est passé en paramètre de connexion `sslmode`.
     """
-    if application:
-        if not settings.db_app_user:
-            raise RuntimeError(
-                "DB_APP_USER est requis pour la connexion de l'API : elle doit se connecter "
-                "sous un rôle limité à la lecture et à l'écriture des données. Créer le rôle "
-                "avec `infrastructure/db/roles.sql`, puis renseigner DB_APP_USER et "
-                "DB_APP_PASSWORD."
-            )
-        username = settings.db_app_user
-        password = settings.db_app_password.get_secret_value()
-    else:
-        if not settings.db_owner_user:
-            raise RuntimeError(
-                "DB_OWNER_USER est requis pour cette connexion : migrations, pipeline et "
-                "scripts de maintenance se connectent sous le propriétaire du schéma. "
-                "Renseigner DB_OWNER_USER et DB_OWNER_PASSWORD. Un processus qui ne sert que "
-                "l'API n'en a pas besoin : il lui suffit de DB_APP_USER et DB_APP_PASSWORD."
-            )
-        username = settings.db_owner_user
-        password = settings.db_owner_password.get_secret_value()
+    username: str = getattr(settings, f"db_{identity}_user")
+    secret: SecretStr = getattr(settings, f"db_{identity}_password")
+    if not username:
+        variable = f"DB_{identity.upper()}_USER"
+        raise RuntimeError(
+            f"{variable} est requis pour cette connexion : {_IDENTITES[identity]}. Créer les "
+            f"rôles avec `infrastructure/db/roles.sql`, puis renseigner {variable} et "
+            f"{variable.replace('_USER', '_PASSWORD')}. Un processus n'a à porter que "
+            "l'identité dont il se sert."
+        )
+    password = secret.get_secret_value()
     query = {"sslmode": settings.db_sslmode} if settings.db_sslmode else {}
     return URL.create(
         drivername="postgresql+psycopg",
@@ -59,10 +72,10 @@ def db_url(*, application: bool = False) -> URL:
     )
 
 
-def build_sync_engine(*, application: bool = False) -> Engine:
+def build_sync_engine(identity: DbIdentity = "pipeline") -> Engine:
     """Construit l'Engine SQLAlchemy synchrone (driver psycopg3).
 
-    Utilisé par toute la surface (API, pipeline, CLI). `application` demande l'identité restreinte de l'API (cf. `db_url`). Paramètres pool :
+    Utilisé par toute la surface (API, pipeline, CLI). `identity` choisit le rôle de connexion (cf. `db_url`). Paramètres pool :
     - `pool_size = db_pool_min` : connexions persistantes
     - `max_overflow = db_pool_max - db_pool_min` : connexions supplémentaires sous charge, fermées au retour
     - `pool_pre_ping = True` : détecte les connexions perdues (timeout réseau, reset SGBD) avant de les remettre en service
@@ -75,7 +88,7 @@ def build_sync_engine(*, application: bool = False) -> Engine:
             f"(suffixe '_test' requis). Vérifier le monkey-patch dans le conftest."
         )
     engine = create_engine(
-        db_url(application=application),
+        db_url(identity),
         pool_size=settings.db_pool_min,
         max_overflow=settings.db_pool_max - settings.db_pool_min,
         pool_pre_ping=True,

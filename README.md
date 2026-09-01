@@ -193,7 +193,11 @@ python -m pytest tests/ --cov               # Avec couverture (seuil 85%)
 ```
 
 Les tests d'intégration utilisent une base `bibliometrie_test` créée
-automatiquement.
+automatiquement, et s'y connectent sous les rôles de production : ceux de
+l'API et du pipeline, que le harnais crée avec les droits de
+`infrastructure/db/roles.sql`. Une écriture hors de ces droits échoue donc
+en erreur de permission ici, plutôt qu'une fois déployée. Le propriétaire
+du schéma est réservé à la création de la base et aux migrations.
 
 ## Arborescence
 
