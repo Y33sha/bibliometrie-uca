@@ -87,7 +87,7 @@ jobs:
       - name: Type check (mypy)
         run: uv run mypy .
 
-      - name: Unit tests (garde rapide, sans BDD)
+      - name: Unit tests
         run: uv run python -m pytest tests/unit/ -v
 
       - name: Coverage (tous les tests, seuil via pyproject.toml)
