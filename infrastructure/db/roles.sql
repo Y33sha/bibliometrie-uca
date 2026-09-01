@@ -26,25 +26,30 @@
 -- migrations** — `ALTER DEFAULT PRIVILEGES` ci-dessous ne porte que sur les objets
 -- créés par le rôle courant :
 --
---   psql -d bibliometrie -v app_password='motdepasse' -v pipeline_password='autre' \
---        -f infrastructure/db/roles.sql
+--   set -a; . ./.env; set +a
+--   psql -d bibliometrie -f infrastructure/db/roles.sql
 --
--- Les guillemets simples protègent la valeur du shell, qui interpréterait sinon `$` et
--- les espaces ; la mise entre quotes SQL, elle, est faite par `:'app_password'` ci-dessous.
+-- Les mots de passe sont lus dans l'environnement, où `.env` vient de les poser, et non
+-- passés en argument : la ligne de commande d'un processus est lisible par tout compte de
+-- la machine, et elle se dépose dans l'historique du shell.
 --
--- Les mots de passe se rangent ensuite dans `DB_APP_PASSWORD` et `DB_PIPELINE_PASSWORD`
--- (cf. `.env.example`), à côté de `DB_APP_USER` et `DB_PIPELINE_USER`. Adapter le nom des
--- rôles si l'hébergeur a ses conventions.
+-- Le fichier se rejoue sans dommage. Un rôle absent est créé, un rôle présent voit son mot
+-- de passe réaligné sur l'environnement : changer une valeur dans `.env` puis rejouer suffit
+-- à la faire tourner. Les droits, eux, sont posés à chaque passage.
 
-\if :{?app_password}
-\else
-\echo 'Renseigner les mots de passe : psql -v app_password=... -v pipeline_password=... -f infrastructure/db/roles.sql'
-\quit
-\endif
+\set ON_ERROR_STOP on
 
-\if :{?pipeline_password}
-\else
-\echo 'Renseigner les mots de passe : psql -v app_password=... -v pipeline_password=... -f infrastructure/db/roles.sql'
+\set app_password `printenv DB_APP_PASSWORD`
+\set pipeline_password `printenv DB_PIPELINE_PASSWORD`
+
+-- Le test passe par une variable psql : à l'intérieur d'un littéral délimité par dollars,
+-- comme le corps d'un bloc `DO`, les variables ne sont pas substituées.
+SELECT CASE
+    WHEN :'app_password' = '' OR :'pipeline_password' = '' THEN 'on' ELSE 'off'
+END AS mots_de_passe_manquants \gset
+
+\if :mots_de_passe_manquants
+\echo 'DB_APP_PASSWORD et DB_PIPELINE_PASSWORD sont requis, et vides. Poser les valeurs dans .env, puis: set -a; . ./.env; set +a'
 \quit
 \endif
 
@@ -53,7 +58,14 @@
 -- Rôle applicatif : privilèges de l'API, et rien de plus
 -- =============================================================
 
-CREATE ROLE bibliometrie_app LOGIN PASSWORD :'app_password';
+SELECT format(
+    CASE
+        WHEN EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'bibliometrie_app')
+            THEN 'ALTER ROLE %I PASSWORD %L'
+        ELSE 'CREATE ROLE %I LOGIN PASSWORD %L'
+    END,
+    'bibliometrie_app', :'app_password')
+\gexec
 
 -- Traverser le schéma, sans rien y créer.
 GRANT USAGE ON SCHEMA public TO bibliometrie_app;
@@ -130,7 +142,14 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public
 -- Rôle du pipeline : construire les données, sans toucher au schéma
 -- =============================================================
 
-CREATE ROLE bibliometrie_pipeline LOGIN PASSWORD :'pipeline_password';
+SELECT format(
+    CASE
+        WHEN EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'bibliometrie_pipeline')
+            THEN 'ALTER ROLE %I PASSWORD %L'
+        ELSE 'CREATE ROLE %I LOGIN PASSWORD %L'
+    END,
+    'bibliometrie_pipeline', :'pipeline_password')
+\gexec
 
 -- Traverser le schéma, sans rien y créer.
 GRANT USAGE ON SCHEMA public TO bibliometrie_pipeline;
