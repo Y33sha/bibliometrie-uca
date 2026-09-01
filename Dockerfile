@@ -32,7 +32,14 @@ RUN npm ci
 COPY interfaces/frontend/ .
 RUN npm run build
 
-# ---- Étape 2 : image Python finale ----
+# ---- Étape 2 : binaire uv ----
+#
+# Image officielle réduite au binaire, épinglée par son empreinte comme les autres. La version y
+# est désignée : une installation par l'installateur de paquets prendrait celle publiée au moment
+# de la construction, sans que rien ne dise laquelle.
+FROM ghcr.io/astral-sh/uv:0.12.8@sha256:d1cbaeadc234fe19c0d93daabcf5e98738cd93c6d1dd4918ef6aa30735feb23a AS uv
+
+# ---- Étape 3 : image Python finale ----
 FROM python:3.12-slim@sha256:09f7da3bc104798d0afb40bc08d23ab2da20a76130cec1f2ef170848f5d85217
 
 ARG ROOT_PATH
@@ -48,9 +55,16 @@ RUN apt-get update \
     && apt-get upgrade -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
-# Installer uv (utilisé pour `uv sync --frozen` qui installe exactement les versions
-# de uv.lock — celles sur lesquelles l'intégration exécute ses tests et ses analyses).
-RUN pip install --no-cache-dir uv
+# `uv sync --frozen` plus bas installe exactement les versions de uv.lock, celles sur lesquelles
+# l'intégration exécute ses tests et ses analyses.
+COPY --from=uv /uv /usr/local/bin/uv
+
+# L'installation des dépendances passant par `uv`, l'image n'a pas d'emploi pour pip, que l'image
+# de base préinstalle. Le retirer ôte de l'exécution un installateur de paquets, et avec lui les
+# dépendances qu'il embarque — que l'analyse d'image compte parmi les paquets présents, et qui
+# vieillissent au rythme de l'image de base. Le retrait précède l'installation : la construction
+# échouerait si quoi que ce soit en dépendait encore.
+RUN python -m pip uninstall --yes pip
 
 COPY pyproject.toml uv.lock ./
 COPY application/     ./application/
