@@ -40,9 +40,9 @@ updates:
       prefix: "chore(ci)"
 
   # ---- Images de base des descriptions de construction ----
-  # Suit les images de base (`python:3.12-slim`, `node:25-slim`), désignées par leur empreinte :
-  # une empreinte se fige, et sans suivi elle vieillit sur place. La fraîcheur des paquets
-  # système, elle, tient à la mise à jour que la construction applique.
+  # Ces images sont désignées par leur empreinte : une empreinte se fige, et sans suivi elle
+  # vieillit sur place. La fraîcheur des paquets système, elle, tient à la mise à jour que la
+  # construction applique.
   #
   # L'écosystème `docker` ne lit qu'un répertoire à la fois, d'où une entrée par emplacement :
   # la description de production à la racine, celles du développement dans les deux interfaces.

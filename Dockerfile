@@ -21,7 +21,7 @@ ARG ROOT_PATH=
 # image ; l'empreinte désigne celle qui a été examinée. La construction reste non reproductible
 # à l'octet près — la mise à jour des paquets système appliquée plus bas prend ce qui est publié
 # au moment où elle tourne —, mais son point de départ, lui, est celui qu'on croit.
-FROM node:25-slim@sha256:81db02c4b671288a03915da9534dbd54f96d0e7c24d80ccc54f5b36b2e684370 AS frontend-build
+FROM node:24-slim@sha256:ba849c60be29959425b8734d57b8b4b7d56f98edd9504c9af091d5281095a71e AS frontend-build
 
 ARG ROOT_PATH
 ENV BASE_PATH=$ROOT_PATH

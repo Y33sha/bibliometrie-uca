@@ -106,7 +106,7 @@ jobs:
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           # Version des images de construction, pour que l'intégration exerce ce qui est livré.
-          node-version: "25"
+          node-version: "24"
 
       - name: Install dependencies
         working-directory: interfaces/frontend
