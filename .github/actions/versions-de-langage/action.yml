@@ -1,0 +1,32 @@
+name: Versions de langage
+description: >-
+  Lit dans la description de construction de production la version de Python et celle de Node,
+  pour que l'intégration continue installe les interpréteurs que l'image livre plutôt que de les
+  redéclarer. Le `Dockerfile` porte ces versions en clair, l'épinglage par empreinte l'exigeant ;
+  elles n'ont donc à être écrites nulle part ailleurs.
+
+outputs:
+  python:
+    description: Version de Python de l'image finale.
+    value: ${{ steps.lire.outputs.python }}
+  node:
+    description: Version de Node de l'étape de construction du frontend.
+    value: ${{ steps.lire.outputs.node }}
+
+runs:
+  using: composite
+  steps:
+    - id: lire
+      shell: bash
+      run: |
+        set -euo pipefail
+        python=$(sed -n 's|^FROM python:\([0-9][0-9.]*\)-.*|\1|p' Dockerfile | head -1)
+        node=$(sed -n 's|^FROM node:\([0-9][0-9.]*\)-.*|\1|p' Dockerfile | head -1)
+        for langage in python node; do
+          if [ -z "${!langage}" ]; then
+            echo "::error::Aucune image de base $langage lue dans Dockerfile." >&2
+            exit 1
+          fi
+        done
+        echo "python=$python" >> "$GITHUB_OUTPUT"
+        echo "node=$node" >> "$GITHUB_OUTPUT"

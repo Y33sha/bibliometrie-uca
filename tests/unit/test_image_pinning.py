@@ -4,7 +4,7 @@ Une étiquette (`python:3.12-slim`) se redéplace sur un autre contenu : deux co
 
 Chaque répertoire portant une description de construction figure dans la configuration du robot de mise à jour, qui propose la montée des empreintes qu'il y trouve.
 
-La version de langage que les images figent est celle sous laquelle l'intégration continue exécute les contrôles : sans quoi les tests et les analyses porteraient sur un interpréteur autre que celui qui est livré.
+Les descriptions de construction s'accordent sur une version de langage unique, et elles sont seules à la porter : l'intégration continue la lit chez elles, de sorte que les contrôles s'exécutent sur l'interpréteur qui est livré.
 """
 
 import re
@@ -17,6 +17,7 @@ _DEPENDABOT = PROJECT_ROOT / ".github" / "dependabot.yml"
 _CI = PROJECT_ROOT / ".github" / "workflows" / "ci.yml"
 # Nom de l'image de base, et paramètre par lequel l'intégration continue installe le langage.
 _LANGAGES = {"python": "python-version", "node": "node-version"}
+_EXPRESSION = re.compile(r"^\$\{\{.*\}\}$")
 _FROM = re.compile(r"^FROM\s+(\S+)", re.M)
 _EMPREINTE = re.compile(r"@sha256:[0-9a-f]{64}$")
 
@@ -81,36 +82,52 @@ def _versions_des_images() -> dict[str, set[str]]:
     return versions
 
 
-def _versions_de_l_integration() -> dict[str, set[str]]:
-    """Version de chaque langage que l'intégration continue installe."""
+def _versions_declarees_par_l_integration() -> dict[str, list[str]]:
+    """Versions de langage écrites en clair dans l'intégration continue, par langage.
+
+    Une valeur lue depuis les images est une expression `${{ … }}` ; toute autre est une version recopiée.
+    """
     config = yaml.safe_load(_CI.read_text(encoding="utf-8"))
-    versions: dict[str, set[str]] = {langage: set() for langage in _LANGAGES}
+    litterales: dict[str, list[str]] = {langage: [] for langage in _LANGAGES}
     for job in config["jobs"].values():
         for etape in job.get("steps", []):
             parametres = etape.get("with") or {}
             for langage, cle in _LANGAGES.items():
-                if cle in parametres:
-                    versions[langage].add(str(parametres[cle]))
-    return versions
+                valeur = str(parametres.get(cle, ""))
+                if valeur and not _EXPRESSION.match(valeur):
+                    litterales[langage].append(valeur)
+    return litterales
 
 
-def test_les_versions_de_langage_sont_reperees_des_deux_cotes():
-    """Garde-fou du parcours : deux relevés vides seraient égaux, donc verts."""
-    images, integration = _versions_des_images(), _versions_de_l_integration()
+def test_les_versions_de_langage_sont_reperees():
+    """Garde-fou du parcours : un relevé vide rendrait l'accord suivant vrai sans rien vérifier."""
+    versions = _versions_des_images()
     for langage in _LANGAGES:
-        assert images[langage], f"aucune image de base `{langage}` repérée"
-        assert integration[langage], f"aucune version `{langage}` repérée dans l'intégration"
+        assert versions[langage], f"aucune image de base `{langage}` repérée"
 
 
-def test_l_integration_s_execute_sous_la_version_des_images():
-    images, integration = _versions_des_images(), _versions_de_l_integration()
+def test_les_descriptions_de_construction_s_accordent_sur_la_version():
     divergences = {
-        langage: f"images {sorted(images[langage])} / intégration {sorted(integration[langage])}"
-        for langage in _LANGAGES
-        if images[langage] != integration[langage]
+        langage: sorted(versions)
+        for langage, versions in _versions_des_images().items()
+        if len(versions) > 1
     }
     assert not divergences, (
-        f"Versions de langage divergentes : {divergences}. Les contrôles s'exécuteraient sur "
-        "un interpréteur autre que celui que l'image livre. Aligner la version installée par "
-        "l'intégration continue sur celle des images de base."
+        f"Versions de langage divergentes entre descriptions de construction : {divergences}. "
+        "Le robot de mise à jour ne lit qu'un répertoire à la fois et propose une montée par "
+        "emplacement ; les accepter séparément ferait construire deux images sur deux "
+        "interpréteurs. Porter la montée sur toutes les descriptions à la fois."
+    )
+
+
+def test_l_integration_ne_redeclare_aucune_version():
+    litterales = {
+        langage: versions
+        for langage, versions in _versions_declarees_par_l_integration().items()
+        if versions
+    }
+    assert not litterales, (
+        f"Versions de langage écrites en clair dans `ci.yml` : {litterales}. Une valeur recopiée "
+        "se désaccorde en silence de l'image qu'elle est censée refléter. Les installer depuis "
+        "`./.github/actions/versions-de-langage`, qui les lit dans la description de construction."
     )

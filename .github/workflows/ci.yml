@@ -56,10 +56,15 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      # Les versions d'interpréteur viennent des images de base : l'intégration exerce
+      # ce qui est livré, sans qu'aucune valeur soit écrite deux fois.
+      - id: versions
+        uses: ./.github/actions/versions-de-langage
+
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          python-version: "3.12"
+          python-version: ${{ steps.versions.outputs.python }}
 
       # `--frozen` installe les versions de `uv.lock`, celles-là mêmes que le `Dockerfile`
       # embarque : les tests s'exécutent sur l'arbre qui part en production, et l'analyse de
@@ -102,11 +107,15 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      # Les versions d'interpréteur viennent des images de base : l'intégration exerce
+      # ce qui est livré, sans qu'aucune valeur soit écrite deux fois.
+      - id: versions
+        uses: ./.github/actions/versions-de-langage
+
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          # Version des images de construction, pour que l'intégration exerce ce qui est livré.
-          node-version: "24"
+          node-version: ${{ steps.versions.outputs.node }}
 
       - name: Install dependencies
         working-directory: interfaces/frontend
@@ -159,7 +168,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          python-version: "3.12"
+          python-version: ${{ steps.versions.outputs.python }}
 
       - name: schema.ts suit le contrat OpenAPI
         run: |
