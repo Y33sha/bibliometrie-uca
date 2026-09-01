@@ -3,6 +3,8 @@
 Une étiquette (`python:3.12-slim`) se redéplace sur un autre contenu : deux constructions à deux moments partent d'images différentes sans que rien ne le dise. L'empreinte désigne l'image qui a été examinée.
 
 Chaque répertoire portant une description de construction figure dans la configuration du robot de mise à jour, qui propose la montée des empreintes qu'il y trouve.
+
+La version de langage que les images figent est celle sous laquelle l'intégration continue exécute les contrôles : sans quoi les tests et les analyses porteraient sur un interpréteur autre que celui qui est livré.
 """
 
 import re
@@ -12,6 +14,9 @@ import yaml
 from infrastructure import PROJECT_ROOT
 
 _DEPENDABOT = PROJECT_ROOT / ".github" / "dependabot.yml"
+_CI = PROJECT_ROOT / ".github" / "workflows" / "ci.yml"
+# Nom de l'image de base, et paramètre par lequel l'intégration continue installe le langage.
+_LANGAGES = {"python": "python-version", "node": "node-version"}
 _FROM = re.compile(r"^FROM\s+(\S+)", re.M)
 _EMPREINTE = re.compile(r"@sha256:[0-9a-f]{64}$")
 
@@ -62,4 +67,50 @@ def test_chaque_description_de_construction_est_suivie_par_le_robot():
         f"Répertoires portant une description de construction hors du suivi : {sorted(manquants)}. "
         "Une empreinte se fige : sans suivi, elle vieillit sur place. Ajouter une entrée "
         "`docker` pour chacun dans `.github/dependabot.yml`."
+    )
+
+
+def _versions_des_images() -> dict[str, set[str]]:
+    """Version de chaque langage telle que les images de base la figent."""
+    versions: dict[str, set[str]] = {langage: set() for langage in _LANGAGES}
+    for _, contenu in _descriptions_de_construction():
+        for image in _FROM.findall(contenu):
+            nom, _, etiquette = image.split("@", 1)[0].partition(":")
+            if nom in versions:
+                versions[nom].add(etiquette.split("-", 1)[0])
+    return versions
+
+
+def _versions_de_l_integration() -> dict[str, set[str]]:
+    """Version de chaque langage que l'intégration continue installe."""
+    config = yaml.safe_load(_CI.read_text(encoding="utf-8"))
+    versions: dict[str, set[str]] = {langage: set() for langage in _LANGAGES}
+    for job in config["jobs"].values():
+        for etape in job.get("steps", []):
+            parametres = etape.get("with") or {}
+            for langage, cle in _LANGAGES.items():
+                if cle in parametres:
+                    versions[langage].add(str(parametres[cle]))
+    return versions
+
+
+def test_les_versions_de_langage_sont_reperees_des_deux_cotes():
+    """Garde-fou du parcours : deux relevés vides seraient égaux, donc verts."""
+    images, integration = _versions_des_images(), _versions_de_l_integration()
+    for langage in _LANGAGES:
+        assert images[langage], f"aucune image de base `{langage}` repérée"
+        assert integration[langage], f"aucune version `{langage}` repérée dans l'intégration"
+
+
+def test_l_integration_s_execute_sous_la_version_des_images():
+    images, integration = _versions_des_images(), _versions_de_l_integration()
+    divergences = {
+        langage: f"images {sorted(images[langage])} / intégration {sorted(integration[langage])}"
+        for langage in _LANGAGES
+        if images[langage] != integration[langage]
+    }
+    assert not divergences, (
+        f"Versions de langage divergentes : {divergences}. Les contrôles s'exécuteraient sur "
+        "un interpréteur autre que celui que l'image livre. Aligner la version installée par "
+        "l'intégration continue sur celle des images de base."
     )
