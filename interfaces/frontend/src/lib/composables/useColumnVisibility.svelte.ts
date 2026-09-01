@@ -1,10 +1,15 @@
 /**
  * Composable pour la visibilité des colonnes d'un tableau de publications.
  *
- * - Clé localStorage partagée entre toutes les pages (pub-table-columns)
+ * - Clé de stockage partagée entre toutes les pages (pub-table-columns)
  * - Colonnes fixes (non décochables) définies par `fixed: true`
  * - Colonnes masquées par défaut via `defaultHidden`
  * - Chaque page passe ses propres définitions de colonnes
+ *
+ * Le stockage est reçu en paramètre plutôt que lu dans les variables globales : l'application
+ * lui passe celui du navigateur, un test lui en passe un autre, et les règles de visibilité
+ * s'éprouvent sans simuler de navigateur. `null` désactive la persistance — cas d'un rendu hors
+ * navigateur, où l'API n'existe pas.
  */
 
 const STORAGE_KEY = 'pub-table-columns';
@@ -15,14 +20,29 @@ export interface ColumnDef {
 	fixed?: boolean;
 }
 
-export function useColumnVisibility(columns: ColumnDef[], defaultHidden: string[] = []) {
+/** Ce que le composable attend d'un stockage : les deux opérations de `Storage` qu'il exerce. */
+export interface ColumnStorage {
+	getItem(key: string): string | null;
+	setItem(key: string, value: string): void;
+}
+
+/** Stockage du navigateur là où il existe, `null` ailleurs. */
+function browserStorage(): ColumnStorage | null {
+	return typeof localStorage === 'undefined' ? null : localStorage;
+}
+
+export function useColumnVisibility(
+	columns: ColumnDef[],
+	defaultHidden: string[] = [],
+	storage: ColumnStorage | null = browserStorage(),
+) {
 	const allKeys = columns.map(c => c.key);
 	const fixedKeys = columns.filter(c => c.fixed).map(c => c.key);
 	const defaultVisible = allKeys.filter(k => !defaultHidden.includes(k));
 
 	function load(): string[] {
 		try {
-			const stored = localStorage.getItem(STORAGE_KEY);
+			const stored = storage?.getItem(STORAGE_KEY);
 			if (stored) {
 				const parsed = JSON.parse(stored) as string[];
 				// Garder uniquement les clés connues de cette page + toujours inclure les fixes
@@ -45,7 +65,7 @@ export function useColumnVisibility(columns: ColumnDef[], defaultHidden: string[
 			// Réinsérer dans l'ordre d'origine
 			visibleColumns = allKeys.filter(k => k === key || visibleColumns.includes(k));
 		}
-		localStorage.setItem(STORAGE_KEY, JSON.stringify(visibleColumns));
+		storage?.setItem(STORAGE_KEY, JSON.stringify(visibleColumns));
 	}
 
 	function col(key: string): boolean {
@@ -56,7 +76,7 @@ export function useColumnVisibility(columns: ColumnDef[], defaultHidden: string[
 		const toAdd = keys.filter(k => allKeys.includes(k) && !visibleColumns.includes(k));
 		if (toAdd.length) {
 			visibleColumns = allKeys.filter(k => visibleColumns.includes(k) || toAdd.includes(k));
-			localStorage.setItem(STORAGE_KEY, JSON.stringify(visibleColumns));
+			storage?.setItem(STORAGE_KEY, JSON.stringify(visibleColumns));
 		}
 	}
 
