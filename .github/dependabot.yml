@@ -30,6 +30,13 @@ updates:
       npm-mineures:
         patterns: ["*"]
         update-types: ["minor", "patch"]
+    # Les définitions de types de Node décrivent les interfaces d'une version majeure
+    # donnée : elles suivent l'exécution, non la dernière publication. Une majeure les
+    # porterait devant le Node des images, à décrire des interfaces absentes à
+    # l'exécution. Elle se prend à la main, avec la montée des images.
+    ignore:
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
 
   # ---- Actions GitHub épinglées dans les workflows CI ----
   - package-ecosystem: "github-actions"
