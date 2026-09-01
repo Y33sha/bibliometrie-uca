@@ -7,7 +7,7 @@ import csv
 
 import pytest
 
-from application.pipeline.publishers_journals.import_journals_from_doaj_dump import _clean_row
+from application.pipeline.publishers_journals.import_journals_from_doaj_dump import clean_doaj_row
 from interfaces.cli.imports.import_apc import clean
 from interfaces.cli.imports.import_persons import read_csv_tsv
 from interfaces.cli.maintenance.import_authenticated_orcids import _load_rows
@@ -63,7 +63,7 @@ class TestOrcidAuthentifies:
 
 class TestDumpDoaj:
     def test_met_a_plat_les_valeurs_du_payload(self):
-        payload = _clean_row(
+        payload = clean_doaj_row(
             {
                 "Journal title": "<i>Journal of Physics</i>",
                 "Publisher": "Universit&eacute; Clermont Auvergne",

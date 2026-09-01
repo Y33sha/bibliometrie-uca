@@ -32,7 +32,7 @@ class DoajImportStats:
     matched: int = 0  # journaux UCA mis à is_in_doaj = TRUE
 
 
-def _clean_row(row: dict[str, str]) -> dict[str, str]:
+def clean_doaj_row(row: dict[str, str]) -> dict[str, str]:
     """Met les valeurs à plat et retire les clés vides — réduit le bruit JSONB.
 
     Le payload alimente l'affichage d'une fiche de revue et les requêtes qui le lisent par clé : ses valeurs reçoivent la même mise à plat que les champs moissonnés (balises, entités HTML et caractères invisibles retirés).
@@ -100,7 +100,7 @@ def run_import_doaj_dump(
         stats.matched += 1
         if not dry_run:
             journal_repo.update_journal_doaj(
-                journal_id, payload=_clean_row(row), imported_at=now, is_in_doaj=True
+                journal_id, payload=clean_doaj_row(row), imported_at=now, is_in_doaj=True
             )
             if commit and stats.matched % COMMIT_EVERY == 0:
                 conn.commit()
