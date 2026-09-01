@@ -1,7 +1,7 @@
 # Image de base épinglée par empreinte, l'étiquette conservée à côté pour la lisibilité
 # et pour le robot de mise à jour, qui suit les deux. Une étiquette se redéplace sur une autre
 # image ; l'empreinte désigne celle qui a été examinée.
-FROM node:25-slim@sha256:81db02c4b671288a03915da9534dbd54f96d0e7c24d80ccc54f5b36b2e684370
+FROM node:24-slim@sha256:ba849c60be29959425b8734d57b8b4b7d56f98edd9504c9af091d5281095a71e
 
 # Répertoire de travail de la composition de développement, qui y monte les sources
 # depuis le poste et garde les dossiers générés dans des volumes anonymes.
