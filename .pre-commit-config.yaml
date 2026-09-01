@@ -75,15 +75,6 @@ repos:
         args: [--maxkb=500]
         language: system
 
-      # Lance uniquement les tests unitaires (sans BDD, ~1-2s).
-      # Les tests d'intégration (avec BDD) sont lancés en CI, pas ici.
-      - id: pytest-unit
-        name: pytest (tests unitaires)
-        entry: uv run python -m pytest tests/unit/ -q
-        language: system
-        pass_filenames: false
-        types: [python]
-
       # Vérifie que uv.lock est à jour avec pyproject.toml, sans le régénérer.
       # Si le lockfile est périmé, le commit échoue : lancer `uv lock` à la main.
       - id: uv-lock
@@ -143,6 +134,17 @@ repos:
       - id: ci-lint-imports
         name: lint-imports (architecture DDD)
         entry: uv run lint-imports
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
+
+      # Seize secondes : de quoi peser sur chaque commit, sans peser sur un push qui
+      # dure déjà une minute. Les tests d'intégration, qui demandent une base, restent
+      # à l'intégration.
+      - id: ci-pytest-unit
+        name: pytest (tests unitaires)
+        entry: uv run python -m pytest tests/unit/ -q
         language: system
         pass_filenames: false
         always_run: true
