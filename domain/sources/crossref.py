@@ -10,15 +10,13 @@ from __future__ import annotations
 import re
 from typing import Any
 
-_JATS_TAG_RE = re.compile(r"<[^<>]+>")
+_JATS_TAG_RE = re.compile(r"</?jats:[A-Za-z][^<>]*>")
 
 
 def strip_jats_tags(s: str) -> str:
     """Retire les balises XML JATS d'une chaîne.
 
-    CrossRef stocke l'abstract en JATS XML (balises `<jats:p>`, `<jats:sec>`, etc.) ; on les retire pour exposer le texte brut. Pas de désencodage HTML — les entités sont rares dans ce flux et seraient à traiter en aval si nécessaire.
-
-    Le corps d'une balise exclut `<` : une inégalité de la notation scientifique (`2.96<yCMS<3.53`) s'arrête au signe suivant, et une suite de `<` sans fermeture se parcourt linéairement.
+    CrossRef stocke l'abstract en JATS XML (balises `<jats:p>`, `<jats:sec>`, etc.) ; on les retire pour exposer le texte brut.
     """
     return _JATS_TAG_RE.sub("", s)
 
