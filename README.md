@@ -46,8 +46,8 @@ cp .env.example .env
 docker compose -f docker-compose.dev.yml up
 ```
 
-- Frontend : http://localhost:5176/bibliometrie
-- API : http://localhost:8003
+- Frontend : http://localhost:5173/bibliometrie
+- API : http://localhost:8000
 
 Le code est monté en volume : hot reload backend + frontend.
 
@@ -76,7 +76,7 @@ docker compose exec backend python run_pipeline.py
 docker compose -f docker-compose.prod.yml up -d
 ```
 
-Application servie sur http://localhost:8003/ (un seul conteneur sert l'API et le frontend buildé en SPA statique).
+Application servie sur http://localhost:8000/ (un seul conteneur sert l'API et le frontend buildé en SPA statique).
 
 Différences avec le compose de dev : un seul conteneur applicatif (backend + frontend statique, plus de vite dev server), pas de volume code, port DB non exposé. Pour un déploiement derrière un reverse-proxy sur un sous-chemin (ex. `/bibliometrie`), définir `ROOT_PATH=/bibliometrie` dans `.env` (consommé au build du frontend et au runtime uvicorn). Voir [docs/exploitation/03-deploiement.md](docs/exploitation/03-deploiement.md) pour les détails et les options de déploiement hors Docker.
 
@@ -147,7 +147,7 @@ npm install
 
 ### Développement
 
-Tout-en-un (backend port 8003 + frontend port 5176) :
+Tout-en-un (backend port 8000 + frontend port 5173) :
 
 ```bash
 bash start.sh
@@ -156,8 +156,8 @@ bash start.sh
 Ou séparément :
 
 ```bash
-python -m uvicorn interfaces.api.app:app --reload --port 8003
-cd interfaces/frontend && npm run dev -- --port 5176
+python -m uvicorn interfaces.api.app:app --reload --port 8000
+cd interfaces/frontend && npm run dev -- --port 5173
 ```
 
 ### Production
@@ -165,7 +165,7 @@ cd interfaces/frontend && npm run dev -- --port 5176
 Deux voies au choix :
 
 - **Docker** (recommandé pour la prod) : `docker compose -f docker-compose.prod.yml up -d` — un conteneur applicatif autoportant (backend + frontend buildé en SPA statique) + un conteneur Postgres. Voir [docs/exploitation/03-deploiement.md](docs/exploitation/03-deploiement.md).
-- **Sans Docker** : build du frontend (`cd interfaces/frontend && npm run build` — la SPA est ensuite servie par l'API), puis lancement d'uvicorn avec le gestionnaire de process de votre choix (systemd, supervisor, pm2…). Exemple uvicorn nu : `uvicorn interfaces.api.app:app --host 0.0.0.0 --port 8003`.
+- **Sans Docker** : build du frontend (`cd interfaces/frontend && npm run build` — la SPA est ensuite servie par l'API), puis lancement d'uvicorn avec le gestionnaire de process de votre choix (systemd, supervisor, pm2…). Exemple uvicorn nu : `uvicorn interfaces.api.app:app --host 0.0.0.0 --port 8000`.
 
 ## Pipeline de données
 

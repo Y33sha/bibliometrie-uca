@@ -16,8 +16,8 @@ def _settings(cors_origins: str) -> Settings:
 
 class TestCorsOrigins:
     def test_splits_a_comma_separated_list(self):
-        origins = _settings("http://localhost:5176, http://127.0.0.1:5176").cors_origins
-        assert origins == ["http://localhost:5176", "http://127.0.0.1:5176"]
+        origins = _settings("http://localhost:5173, http://127.0.0.1:5173").cors_origins
+        assert origins == ["http://localhost:5173", "http://127.0.0.1:5173"]
 
     def test_empty_value_authorizes_no_third_party_origin(self):
         assert _settings("").cors_origins == []
@@ -28,4 +28,4 @@ class TestCorsOrigins:
 
     def test_wildcard_among_others_is_refused(self):
         with pytest.raises(ValidationError, match="n'accepte pas"):
-            _settings("http://localhost:5176,*")
+            _settings("http://localhost:5173,*")

@@ -38,7 +38,7 @@ services:
     # supposent qu'il ne quitte pas la machine. Ouvrir à une autre machine — un téléphone sur
     # le même réseau, par exemple — demande de nommer l'interface qui la dessert.
     ports:
-      - "127.0.0.1:8003:8000"
+      - "127.0.0.1:8000:8000"
     # Le fichier d'environnement entier, à la différence de la composition de production : ce
     # conteneur sert l'API, mais porte aussi l'outillage de test et de vérification, qui se
     # connecte sous le propriétaire du schéma.
@@ -67,7 +67,7 @@ services:
       - /app/build
     # Boucle locale, comme le backend qu'il proxifie.
     ports:
-      - "127.0.0.1:5176:5173"
+      - "127.0.0.1:5173:5173"
     environment:
       API_TARGET: http://backend:8000
     depends_on:

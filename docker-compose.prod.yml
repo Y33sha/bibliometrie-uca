@@ -70,7 +70,7 @@ services:
     # atteint l'application. Un proxy hébergé ailleurs demande d'ouvrir l'interface qui le
     # dessert, en la nommant — non de retirer l'adresse, ce qui publierait le port sur toutes.
     ports:
-      - "127.0.0.1:8003:8000"
+      - "127.0.0.1:8000:8000"
     # Pas d'`env_file` : l'environnement est énuméré, si bien qu'une variable ajoutée au
     # fichier d'environnement n'atterrit pas ici sans qu'on l'ait voulu.
     environment:

@@ -15,8 +15,8 @@ const basePath = fileEnv.BASE_PATH ?? process.env.BASE_PATH ?? '';
 
 // `API_TARGET` : cible du proxy. L'environnement injecté prime (docker-compose passe
 // `http://backend:8000` au conteneur frontend) ; le `.env` sert de repli hors docker
-// (`http://127.0.0.1:8003`, backend uvicorn local).
-const apiTarget = process.env.API_TARGET || fileEnv.API_TARGET || 'http://127.0.0.1:8003';
+// (`http://127.0.0.1:8000`, backend uvicorn local).
+const apiTarget = process.env.API_TARGET || fileEnv.API_TARGET || 'http://127.0.0.1:8000';
 
 export default defineConfig({
 	plugins: [sveltekit()],
