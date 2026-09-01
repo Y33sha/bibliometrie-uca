@@ -27,6 +27,7 @@ from pathlib import Path
 
 from application.ports.repositories.person_repository import AuthenticateOrcidOutcome
 from application.services.persons.core import authenticate_orcids
+from domain.normalize import sanitize_optional_text
 from domain.persons.identifiers import normalize_orcid
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
@@ -43,9 +44,15 @@ def _load_rows(path: str | Path) -> list[tuple[str, str]]:
     rows: list[tuple[str, str]] = []
     with open(path, newline="", encoding="utf-8") as f:
         for record in csv.reader(f):
-            if len(record) < 2 or not record[0].strip():
+            if len(record) < 2:
                 continue
-            rows.append((record[0].strip(), record[1].strip()))
+            # Mise à plat des deux cellules : un fichier composé dans un tableur y glisse des
+            # espaces insécables et des caractères invisibles, qui feraient échouer en silence
+            # le rapprochement par email et la reconnaissance de l'ORCID.
+            email = sanitize_optional_text(record[0])
+            if not email:
+                continue
+            rows.append((email, sanitize_optional_text(record[1]) or ""))
     return rows
 
 

@@ -1,6 +1,6 @@
 """Import du dump CSV DOAJ dans `journals.doaj_payload` (DOAJ = source de vérité).
 
-Bulk, set-based : indexe les `journals` par ISSN (issn / eissn / issnl) en O(1), remet `is_in_doaj = FALSE` partout, puis pour chaque row du dump matchée par ISSN écrit `doaj_payload` (dict CSV strippé) + `doaj_imported_at` + `is_in_doaj = TRUE`.
+Bulk, set-based : indexe les `journals` par ISSN (issn / eissn / issnl) en O(1), remet `is_in_doaj = FALSE` partout, puis pour chaque row du dump matchée par ISSN écrit `doaj_payload` (dict CSV mis à plat) + `doaj_imported_at` + `is_in_doaj = TRUE`.
 
 Découplé de la source des rows : la CLI `import_doaj_csv` lit un fichier local, le pipeline télécharge le dump (cf. `infrastructure.sources.doaj.fetch_doaj_dump`) — les deux passent un itérable de dicts `{colonne CSV: valeur}`.
 """
@@ -13,6 +13,7 @@ from datetime import UTC, datetime
 from sqlalchemy import Connection
 
 from application.ports.pipeline.journals import JournalDoajQueries
+from domain.normalize import sanitize_optional_text
 
 # Colonnes ISSN du dump CSV DOAJ.
 ISSN_KEYS = (
@@ -32,14 +33,15 @@ class DoajImportStats:
 
 
 def _clean_row(row: dict[str, str]) -> dict[str, str]:
-    """Strip les valeurs et retire les clés vides — réduit le bruit JSONB."""
+    """Met les valeurs à plat et retire les clés vides — réduit le bruit JSONB.
+
+    Le payload alimente l'affichage d'une fiche de revue et les requêtes qui le lisent par clé : ses valeurs reçoivent la même mise à plat que les champs moissonnés (balises, entités HTML et caractères invisibles retirés).
+    """
     out: dict[str, str] = {}
     for k, v in row.items():
-        if not v:
-            continue
-        s = v.strip()
-        if s:
-            out[k] = s
+        cleaned = sanitize_optional_text(v)
+        if cleaned:
+            out[k] = cleaned
     return out
 
 
@@ -47,7 +49,7 @@ def _extract_issns(row: dict[str, str]) -> list[str]:
     """ISSN print + electronic non-vides de la row CSV."""
     issns: list[str] = []
     for key in ISSN_KEYS:
-        v = (row.get(key) or "").strip()
+        v = sanitize_optional_text(row.get(key))
         if v:
             issns.append(v)
     return issns

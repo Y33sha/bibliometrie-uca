@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from domain.normalize import normalize_text, sanitize_raw_text
+from domain.normalize import normalize_text, sanitize_optional_text, sanitize_raw_text
 
 
 class TestNormalizeText:
@@ -103,3 +103,17 @@ class TestSanitizeRawText:
         with_nbsp = "Université Clermont Auvergne"
         typed = "Université Clermont Auvergne"
         assert sanitize_raw_text(with_nbsp) == sanitize_raw_text(typed) == typed
+
+
+class TestSanitizeOptionalText:
+    """Variante des imports de fichiers : même mise à plat, absence rendue par `None`."""
+
+    def test_met_a_plat_comme_sanitize_raw_text(self) -> None:
+        assert sanitize_optional_text("<i>Journal of Physics</i>") == "Journal of Physics"
+        assert sanitize_optional_text("Universit&eacute; Clermont Auvergne") == (
+            "Université Clermont Auvergne"
+        )
+
+    @pytest.mark.parametrize("raw", [None, "", "   ", "\u200b", "<br/>", "<!-- vide -->"])
+    def test_rend_none_quand_la_valeur_ne_porte_rien(self, raw: str | None) -> None:
+        assert sanitize_optional_text(raw) is None

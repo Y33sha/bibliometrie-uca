@@ -12,6 +12,7 @@ import os
 
 from sqlalchemy import text
 
+from domain.normalize import sanitize_optional_text
 from domain.publications.identifiers import clean_doi
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
@@ -95,10 +96,12 @@ def main() -> None:
                 except (ValueError, TypeError):
                     billing_year = None
 
-                publisher = row.get("publisher") or None
-                journal = row.get("journal_full_title") or None
-                issn = row.get("issn") or row.get("issn_l") or None
-                institution = row.get("institution") or None
+                publisher = sanitize_optional_text(row.get("publisher"))
+                journal = sanitize_optional_text(row.get("journal_full_title"))
+                issn = sanitize_optional_text(row.get("issn")) or sanitize_optional_text(
+                    row.get("issn_l")
+                )
+                institution = sanitize_optional_text(row.get("institution"))
                 is_hybrid = row.get("is_hybrid", "").upper() == "TRUE"
 
                 conn.execute(
