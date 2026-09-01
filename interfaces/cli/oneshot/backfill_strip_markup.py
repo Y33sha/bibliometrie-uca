@@ -1,7 +1,7 @@
 # STATUS: oneshot (2026-08-28)
 """Retire du stock le balisage et les entités HTML des champs qui s'affichent en texte.
 
-`to_plain_text` fait cette mise à plat à l'entrée du pipeline (adresses, sujets, signatures, titres de revue, noms d'éditeur). Ce script corrige ce que les runs précédents ont déposé, en appliquant à chaque champ la fonction qui le garde désormais.
+Les deux voies d'entrée font cette mise à plat : le pipeline sur les champs moissonnés (adresses, sujets, signatures, titres de revue, noms d'éditeur), les imports de fichiers sur les cellules qu'ils lisent (paiements APC, fiches RH, dump DOAJ). Ce script corrige le stock, en appliquant à chaque champ la fonction qui le garde.
 
 Deux champs portent un index unique sur leur valeur affichée — `md5(raw_text)` pour les adresses, `lower(label)` pour les sujets. La mise à plat peut donc faire converger deux lignes : le script les fusionne, en repointant les tables de jonction vers la ligne survivante puis en supprimant la doublure. La survivante est la ligne de plus petit identifiant, arbitraire mais stable.
 
@@ -18,15 +18,20 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 import os
 from collections.abc import Callable
 
 from sqlalchemy import Connection, text
 
+from application.pipeline.publishers_journals.import_journals_from_doaj_dump import (
+    clean_doaj_row,
+)
 from domain.normalize import (
     clean_raw_author_name,
     normalize_label,
     normalize_text,
+    sanitize_optional_text,
     sanitize_raw_text,
     to_plain_text,
 )
@@ -40,15 +45,39 @@ log = setup_logger("backfill_strip_markup", os.path.dirname(__file__))
 _POLLUTED = r"~ '</?[A-Za-z][^>]*>|<!--|&[a-zA-Z]{2,8};|&#[0-9]+;'"
 
 # Champs sans index unique sur la valeur affichée : la mise à plat est une réécriture.
-_SIMPLES: list[tuple[str, str, Callable[[str], str]]] = [
-    ("journals", "title", to_plain_text),
-    ("publishers", "name", to_plain_text),
-    ("source_authorships", "raw_author_name", clean_raw_author_name),
+# Les colonnes alimentées par les imports de fichiers reçoivent `sanitize_optional_text`, qui
+# rend l'absence quand la cellule ne porte plus rien une fois le balisage retiré.
+_SIMPLES: list[tuple[str, tuple[str, ...], Callable[[str], str | None]]] = [
+    ("journals", ("title",), to_plain_text),
+    ("publishers", ("name",), to_plain_text),
+    ("source_authorships", ("raw_author_name",), clean_raw_author_name),
+    (
+        "apc_payments",
+        (
+            "lab_name",
+            "publisher_name",
+            "publisher_type",
+            "journal_name",
+            "issn",
+            "journal_type",
+            "doi",
+            "article_title",
+            "budget",
+            "institution",
+            "institution_type",
+            "all_surveys_answered",
+            "shared_payment",
+            "expense_type",
+            "remarks",
+        ),
+        sanitize_optional_text,
+    ),
+    ("persons_rh", ("email", "role_title", "department_name"), sanitize_optional_text),
 ]
 
 
 def _rewrite_simple(
-    conn: Connection, table: str, column: str, clean: Callable[[str], str], apply: bool
+    conn: Connection, table: str, column: str, clean: Callable[[str], str | None], apply: bool
 ) -> None:
     """Réécrit en place les valeurs mises à plat d'un champ sans contrainte d'unicité."""
     rows = list(
@@ -57,7 +86,8 @@ def _rewrite_simple(
     changed = [(r.id, clean(r.v)) for r in rows if clean(r.v) != r.v]
     log.info("%s.%s : %d lignes à mettre à plat", table, column, len(changed))
     for row_id, value in changed[:5]:
-        log.info("    %s → %r", row_id, value[:80])
+        # Une cellule réduite au balisage se met à plat en absence : le rapport l'affiche telle quelle.
+        log.info("    %s → %r", row_id, value[:80] if value else value)
     if apply and changed:
         conn.execute(
             text(f"UPDATE {table} SET {column} = :v WHERE id = :id"),
@@ -132,6 +162,30 @@ def _merge_and_rewrite(
         conn.execute(text(f"DELETE FROM {table} WHERE id = :id"), {"id": perdant})
 
 
+def _rewrite_doaj_payload(conn: Connection, apply: bool) -> None:
+    """Met à plat les valeurs du payload DOAJ d'une revue, dans la forme que l'import du dump écrit.
+
+    Le payload reproduit une ligne du dump, colonne par colonne : la mise à plat porte sur chaque valeur, et une clé dont la valeur ne porte plus rien disparaît. `clean_doaj_row` est la fonction que l'import applique, si bien que le stock converge sur ce qu'un import complet déposerait.
+    """
+    rows = list(
+        conn.execute(
+            text(
+                "SELECT id, doaj_payload AS payload FROM journals "
+                f"WHERE doaj_payload::text {_POLLUTED}"
+            )
+        )
+    )
+    changed = [(r.id, cleaned) for r in rows if (cleaned := clean_doaj_row(r.payload)) != r.payload]
+    log.info("journals.doaj_payload : %d payloads à mettre à plat", len(changed))
+    for row_id, payload in changed[:5]:
+        log.info("    %s → %r", row_id, sorted(payload.items())[:3])
+    if apply and changed:
+        conn.execute(
+            text("UPDATE journals SET doaj_payload = CAST(:payload AS jsonb) WHERE id = :id"),
+            [{"id": i, "payload": json.dumps(p, ensure_ascii=False)} for i, p in changed],
+        )
+
+
 def _key_of(key_sql: str, value: str) -> str:
     """Valeur de la clé unique côté Python, pour interroger l'index sans aller-retour."""
     if key_sql.startswith("md5"):
@@ -199,8 +253,10 @@ def main() -> int:
             [("publication_subjects", "subject_id")],
             apply,
         )
-        for table, column, clean in _SIMPLES:
-            _rewrite_simple(conn, table, column, clean, apply)
+        for table, columns, clean in _SIMPLES:
+            for column in columns:
+                _rewrite_simple(conn, table, column, clean, apply)
+        _rewrite_doaj_payload(conn, apply)
         _report_revealed_duplicates(conn)
         if apply:
             conn.commit()
