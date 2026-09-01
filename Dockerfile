@@ -73,7 +73,10 @@ COPY infrastructure/  ./infrastructure/
 COPY interfaces/      ./interfaces/
 COPY run_pipeline.py  .
 
-RUN uv sync --frozen --no-dev
+# `--no-cache` : le cache que l'installation remplit ne resservirait qu'à une installation
+# ultérieure, qui n'a pas lieu dans l'image. Sans lui, l'image transporte les archives des
+# paquets en plus des paquets eux-mêmes, et les fait passer sous l'analyse d'image.
+RUN uv sync --frozen --no-dev --no-cache
 
 # Ajouter le venv de uv au PATH (évite `uv run` à chaque invocation).
 ENV PATH="/app/.venv/bin:${PATH}"
