@@ -132,6 +132,18 @@ class TestStripJatsTags:
     def test_no_tags_unchanged(self):
         assert strip_jats_tags("Plain text.") == "Plain text."
 
+    def test_keeps_inequalities(self):
+        # Le corps d'une balise exclut `<` : l'encadrement s'arrête au signe suivant.
+        assert strip_jats_tags("mesuré pour 2.96<yCMS<3.53 GeV") == "mesuré pour 2.96<yCMS<3.53 GeV"
+
+    def test_runs_of_opening_angles_scan_linearly(self):
+        """Le parcours d'une suite de `<` sans fermeture reste proportionnel à sa longueur."""
+        import time
+
+        start = time.perf_counter()
+        strip_jats_tags("<A" * 100_000)
+        assert time.perf_counter() - start < 1.0
+
 
 class TestExtractCrossrefMeta:
     def test_keeps_whitelisted(self):
