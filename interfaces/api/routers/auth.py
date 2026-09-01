@@ -24,7 +24,6 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 def auth_login(
     data: LoginRequest,
     response: Response,
-    admin_user: str = Depends(get_admin_user),
     _rate_limit: None = Depends(login_rate_limit),
 ) -> OkResponse:
     """Authentifie l'admin et pose un cookie de session signé.
@@ -40,7 +39,7 @@ def auth_login(
         raise HTTPException(status_code=401, detail="Identifiants incorrects")
     response.set_cookie(
         key="session",
-        value=issue_token(admin_user),
+        value=issue_token(get_admin_user()),
         httponly=True,
         secure=session_cookie_secure(),
         samesite="strict",
