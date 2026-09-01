@@ -5,6 +5,7 @@ Vérifie deux comportements essentiels :
 2. Dans un contexte utilisateur (requête HTTP) → l'événement est persisté.
 """
 
+import pytest
 from sqlalchemy import text
 
 from application.audit_log import (
@@ -14,6 +15,15 @@ from application.audit_log import (
     set_current_user,
 )
 from infrastructure.repositories import audit_repository
+
+
+@pytest.fixture
+def sa_sync_conn(sa_sync_conn_app):
+    """La trace d'audit est écrite par l'API, seule à en porter le droit.
+
+    Ces tests se connectent donc sous son rôle. Le pipeline en est écarté : il ne prend aucune décision humaine, et pouvoir en déposer la trace ôterait à la table ce qu'elle vaut.
+    """
+    return sa_sync_conn_app
 
 
 class TestCurrentUserContext:
@@ -114,6 +124,14 @@ class TestEmitEvent:
 class TestEndToEndServiceIntegration:
     """Vérifie que les services destructifs émettent bien les événements
     attendus quand un utilisateur est dans le contexte."""
+
+    @pytest.fixture
+    def sa_sync_conn(self, sa_sync_conn_owner):
+        """Ces tests posent des publications, que le pipeline crée, puis exercent des opérations que l'API conduit — deux rôles dans une même transaction.
+
+        Ils se connectent donc sous le propriétaire du schéma. Ce qu'ils éprouvent est l'enchaînement des services et l'émission de la trace, non la frontière des droits, tenue par les tests d'API et ceux du pipeline, qui se connectent chacun sous le rôle exerçant l'opération.
+        """
+        return sa_sync_conn_owner
 
     def _create_person(self, conn, last="X", first="X"):
         return conn.execute(

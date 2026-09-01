@@ -21,19 +21,23 @@ DB_HOST = os.environ.get("DB_HOST", "127.0.0.1")
 DB_PORT = int(os.environ.get("DB_PORT", "5432"))
 
 
-def _build_test_sync_engine(*, application: bool = False) -> Engine:
+def _build_test_sync_engine(identity: str = "pipeline") -> Engine:
     """Engine SA sync sur bibliometrie_test, garde-fou DML installé comme le vrai.
 
-    `application` choisit l'identité de connexion, comme le vrai constructeur : le rôle restreint pour l'API, le propriétaire du schéma pour les fixtures et les migrations. Les tests d'API exercent donc les droits qu'ils auront en production.
+    `identity` choisit le rôle de connexion, comme le vrai constructeur : celui de l'API pour l'application, celui du pipeline pour les fixtures. Les tests exercent donc les droits qu'ils auront en production.
     """
     from infrastructure.db.dml_guard import install_dml_guard
     from infrastructure.settings import settings as _s
 
+    if identity == "owner":
+        username, password = DB_OWNER_USER, DB_OWNER_PASSWORD
+    else:
+        username = getattr(_s, f"db_{identity}_user")
+        password = getattr(_s, f"db_{identity}_password").get_secret_value()
     url = URL.create(
         drivername="postgresql+psycopg",
-        username=_s.db_app_user if application else DB_OWNER_USER,
-        password=(_s.db_app_password.get_secret_value() if application else DB_OWNER_PASSWORD)
-        or None,
+        username=username,
+        password=password or None,
         host=DB_HOST,
         port=DB_PORT,
         database="bibliometrie_test",

@@ -1,6 +1,6 @@
-"""Identités de connexion : chaque usage exige la sienne, et refuse de se replier sur l'autre.
+"""Identités de connexion : chaque usage exige la sienne, et refuse de se replier sur une autre.
 
-L'API se connecte sous le rôle restreint ; migrations, pipeline et scripts de maintenance sous le propriétaire du schéma. Chaque exigence tient au point d'usage, de sorte qu'un processus porte les seuls identifiants qu'il exerce.
+Les migrations se connectent sous le propriétaire du schéma, l'API sous son rôle restreint, le pipeline et les scripts en ligne de commande sous le leur. Chaque exigence tient au point d'usage, de sorte qu'un processus porte les seuls identifiants qu'il exerce.
 """
 
 import pytest
@@ -12,7 +12,7 @@ from infrastructure.db.engine import db_url
 
 @pytest.fixture
 def db_settings(monkeypatch):
-    """Pose les deux identités, que chaque test dégrade sur un point."""
+    """Pose les trois identités, que chaque test dégrade sur un point."""
 
     def _apply(**overrides):
         defaults = {
@@ -20,6 +20,8 @@ def db_settings(monkeypatch):
             "db_app_password": "app-pw",
             "db_owner_user": "bibliometrie_owner",
             "db_owner_password": "owner-pw",
+            "db_pipeline_user": "bibliometrie_pipeline",
+            "db_pipeline_password": "pipeline-pw",
         }
         for name, value in {**defaults, **overrides}.items():
             # Les mots de passe sont typés `SecretStr` : les poser en clair les rendrait
@@ -31,38 +33,56 @@ def db_settings(monkeypatch):
 
 
 class TestIdentiteRetenue:
-    def test_l_api_se_connecte_sous_l_identite_restreinte(self, db_settings):
+    def test_l_api_se_connecte_sous_son_role_restreint(self, db_settings):
         db_settings()
-        url = db_url(application=True)
+        url = db_url("app")
         assert url.username == "bibliometrie_app"
         assert url.password == "app-pw"
 
-    def test_les_autres_usages_se_connectent_sous_le_proprietaire(self, db_settings):
+    def test_les_migrations_se_connectent_sous_le_proprietaire(self, db_settings):
         db_settings()
-        url = db_url()
+        url = db_url("owner")
         assert url.username == "bibliometrie_owner"
         assert url.password == "owner-pw"
 
+    def test_le_pipeline_se_connecte_sous_son_role(self, db_settings):
+        db_settings()
+        url = db_url("pipeline")
+        assert url.username == "bibliometrie_pipeline"
+        assert url.password == "pipeline-pw"
+
+    def test_le_pipeline_est_l_identite_par_defaut(self, db_settings):
+        """Le pipeline et les scripts sont les appelants les plus nombreux ; l'API et les migrations demandent la leur."""
+        db_settings()
+        assert db_url().username == "bibliometrie_pipeline"
+
 
 class TestRefusDUneIdentiteAbsente:
-    def test_l_api_refuse_de_demarrer_sans_identite_restreinte(self, db_settings):
-        """Se replier sur le propriétaire ferait tourner l'API avec les droits du schéma sans que rien ne le signale."""
-        db_settings(db_app_user="")
-        with pytest.raises(RuntimeError, match="DB_APP_USER"):
-            db_url(application=True)
+    @pytest.mark.parametrize(
+        ("identite", "reglage", "variable"),
+        [
+            ("app", "db_app_user", "DB_APP_USER"),
+            ("owner", "db_owner_user", "DB_OWNER_USER"),
+            ("pipeline", "db_pipeline_user", "DB_PIPELINE_USER"),
+        ],
+    )
+    def test_une_identite_absente_est_refusee(self, db_settings, identite, reglage, variable):
+        """Se replier sur une autre ferait tourner un processus avec des droits qu'il n'exerce pas, sans que rien ne le signale."""
+        db_settings(**{reglage: ""})
+        with pytest.raises(RuntimeError, match=variable):
+            db_url(identite)
 
     def test_le_refus_indique_comment_creer_le_role(self, db_settings):
         db_settings(db_app_user="")
         with pytest.raises(RuntimeError, match="roles.sql"):
-            db_url(application=True)
+            db_url("app")
 
-    def test_les_autres_usages_refusent_de_demarrer_sans_proprietaire(self, db_settings):
-        """Symétrique : un processus qui ne sert que l'API ne porte pas cette identité, et son absence doit se voir plutôt qu'ouvrir une connexion anonyme."""
-        db_settings(db_owner_user="")
-        with pytest.raises(RuntimeError, match="DB_OWNER_USER"):
-            db_url()
+    def test_l_api_n_a_besoin_ni_du_proprietaire_ni_du_pipeline(self, db_settings):
+        """Le partage tient à cela : le conteneur qui sert l'API se passe des deux autres mots de passe."""
+        db_settings(db_owner_user="", db_owner_password="", db_pipeline_user="")
+        assert db_url("app").username == "bibliometrie_app"
 
-    def test_l_api_n_a_pas_besoin_du_proprietaire(self, db_settings):
-        """Le partage tient à cela : le conteneur qui sert l'API se passe du mot de passe du schéma."""
+    def test_le_pipeline_n_a_pas_besoin_du_proprietaire(self, db_settings):
+        """Symétrique, et c'est l'objet du rôle : le conteneur qui exécute le pipeline ne porte plus le mot de passe capable de modifier la structure."""
         db_settings(db_owner_user="", db_owner_password="")
-        assert db_url(application=True).username == "bibliometrie_app"
+        assert db_url("pipeline").username == "bibliometrie_pipeline"

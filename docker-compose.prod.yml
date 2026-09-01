@@ -150,6 +150,40 @@ services:
   #
   # Arguments de l'orchestrateur passés après le nom du service ; sans rien, le run complet
   # défini par `command` ci-dessous.
+  # Application des migrations. Seul emplacement où le propriétaire du schéma apparaît, et
+  # il n'y vit que le temps d'une commande : le profil tient le service hors de `up`, et
+  # `docker compose --profile migrate run --rm migrate` le crée, l'exécute, le supprime.
+  #
+  # Les deux services qui tournent en permanence ne portent pas cette identité. Une faille
+  # de l'un d'eux ne la lit donc pas dans son environnement, et n'atteint pas la structure
+  # du schéma.
+  migrate:
+    image: bibliometrie-uca:latest
+    profiles:
+      - migrate
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      DB_HOST: db
+      DB_PORT: ${DB_PORT:-5432}
+      DB_NAME: ${POSTGRES_DB:-bibliometrie}
+      DB_OWNER_USER: ${DB_OWNER_USER:?propriétaire du schéma requis}
+      DB_OWNER_PASSWORD: ${DB_OWNER_PASSWORD:?}
+      DB_SSLMODE: ${DB_SSLMODE:-}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+    mem_limit: 1g
+    cpus: 1.0
+    pids_limit: 256
+    depends_on:
+      db:
+        condition: service_healthy
+
   pipeline:
     build:
       context: .
@@ -167,8 +201,8 @@ services:
       DB_HOST: db
       DB_PORT: ${DB_PORT:-5432}
       DB_NAME: ${POSTGRES_DB:-bibliometrie}
-      DB_OWNER_USER: ${DB_OWNER_USER:?propriétaire du schéma requis}
-      DB_OWNER_PASSWORD: ${DB_OWNER_PASSWORD:?}
+      DB_PIPELINE_USER: ${DB_PIPELINE_USER:?rôle du pipeline requis (cf. infrastructure/db/roles.sql)}
+      DB_PIPELINE_PASSWORD: ${DB_PIPELINE_PASSWORD:?}
       DB_SSLMODE: ${DB_SSLMODE:-}
       # Identifiants d'accès aux sources : une source non configurée est sautée au lancement,
       # avec un avertissement, sans interrompre le run.
