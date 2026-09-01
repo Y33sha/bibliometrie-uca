@@ -2,7 +2,7 @@
 
 Câble le cycle de vie de l'engine SQLAlchemy, la traduction des erreurs métier en codes HTTP, les middlewares (authentification des écritures, mesure de durée), les routers, et le service du frontend buildé.
 
-Lancement en développement : `bash start.sh`, qui démarre uvicorn sur le port 8003 et le serveur de développement du frontend.
+Lancement en développement : `bash start.sh`, qui démarre uvicorn sur le port 8000 et le serveur de développement du frontend.
 """
 
 import logging
