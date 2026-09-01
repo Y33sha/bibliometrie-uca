@@ -55,9 +55,11 @@ def test_chaque_description_de_construction_est_suivie_par_le_robot():
     """Un répertoire portant une description de construction figure dans la configuration du robot de mise à jour."""
     config = yaml.safe_load(_DEPENDABOT.read_text(encoding="utf-8"))
     suivis = {
-        entree["directory"].rstrip("/") or "/"
+        chemin.rstrip("/") or "/"
         for entree in config["updates"]
         if entree["package-ecosystem"] == "docker"
+        # Une entrée désigne un répertoire (`directory`) ou plusieurs (`directories`).
+        for chemin in entree.get("directories") or [entree["directory"]]
     }
     repertoires = {
         "/" + chemin.rsplit("/", 1)[0] if "/" in chemin else "/"
