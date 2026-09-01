@@ -106,6 +106,16 @@ def sanitize_raw_text(text: str) -> str:
     return re.sub(r" +", " ", "".join(out)).strip()
 
 
+def sanitize_optional_text(text: str | None) -> str | None:
+    """Valeur d'un champ importé, mise à plat par `sanitize_raw_text`, ou `None` quand elle ne porte rien.
+
+    Point d'entrée des imports de fichiers : les colonnes d'un tableur ou d'un export tiers arrivent avec le même bruit que les champs moissonnés — balisage collé par un copier-coller, entités HTML, espaces insécables, caractères de format invisibles — et alimentent les mêmes rapprochements (nom d'éditeur, titre de revue, nom de personne). Les traiter comme les champs moissonnés fait converger les deux voies d'entrée sur la même forme.
+
+    Une cellule vide, ou vide une fois mise à plat, rend `None` plutôt qu'une chaîne vide : les colonnes concernées sont nullables et une chaîne vide y ferait un second cas d'absence.
+    """
+    return sanitize_raw_text(text or "") or None
+
+
 def normalize_text(text: str) -> str:
     """Normalise un texte pour comparaison / dédoublonnage / matching.
 

@@ -12,6 +12,7 @@ from pathlib import Path
 
 from sqlalchemy import Connection, text
 
+from domain.normalize import sanitize_optional_text
 from infrastructure.db.engine import get_sync_engine
 
 # `parents[3]` remonte interfaces/cli/imports/ → racine du dépôt ; les CSV d'import vivent sous data/.
@@ -51,9 +52,8 @@ def parse_year(s: str) -> int | None:
 
 
 def clean(s: str | None) -> str | None:
-    """Strip et retourne None si vide."""
-    s = (s or "").strip()
-    return s if s else None
+    """Met la cellule à plat — balises, entités HTML et caractères invisibles retirés — et rend None si elle ne porte rien."""
+    return sanitize_optional_text(s)
 
 
 def import_main_file(conn: Connection) -> int:
