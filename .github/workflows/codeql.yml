@@ -5,8 +5,10 @@
 # sensible — une requête, une commande, un rendu — et signale les chemins qui les relient.
 #
 # Les résultats vivent dans l'onglet « Security » du dépôt, et apparaissent sur les propositions
-# de modification. Ils ne bloquent pas l'intégration : une montée de version des requêtes en
-# ferait échouer toutes les propositions en cours, et le tri d'un signalement demande de le lire.
+# de modification. Une règle de la branche par défaut refuse la fusion tant qu'un signalement de
+# gravité haute ou critique reste ouvert, et tant que l'analyse n'a pas rendu ses résultats ; les
+# gravités moindres remontent sans bloquer. Les seuils vivent dans le jeu de règles du dépôt,
+# hors de ce fichier.
 name: CodeQL
 
 on:
