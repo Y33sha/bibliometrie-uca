@@ -12,6 +12,7 @@
 
 ### Non commencé
 
+- [Pagination par curseur](CODE_pagination-par-curseur.md)
 - [Qualité et cohérence des sujets](METIER_sujets-qualite.md)
 - [Signatures institutionnelles](METIER_signatures-institutionnelles.md)
 
