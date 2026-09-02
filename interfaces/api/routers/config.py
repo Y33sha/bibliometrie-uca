@@ -9,9 +9,16 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import Connection
 
 from application.ports.read_models.config_queries import ConfigItem, ConfigQueries
+from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.config_repository import ConfigRepository
 from application.services.config import commands as config_commands
-from interfaces.api.deps import admin_user_or_none, config_queries, config_repository, db_conn
+from interfaces.api.deps import (
+    admin_user_or_none,
+    audit_repo,
+    config_queries,
+    config_repository,
+    db_conn,
+)
 from interfaces.api.models import ConfigValueUpdate
 
 router = APIRouter(prefix="/api/config", tags=["config"])
@@ -35,12 +42,15 @@ def update_config(
     body: ConfigValueUpdate,
     conn: Connection = Depends(db_conn),
     config: ConfigRepository = Depends(config_repository),
+    audit: AuditRepository = Depends(audit_repo),
 ) -> ConfigItem:
     """Met à jour la valeur d'un paramètre applicatif.
 
     L'écriture exige une session : le middleware garde toutes les méthodes autres que `GET`. La clé doit préexister — les clés sont déclarées dans les migrations, cet endpoint n'en crée pas —, et une clé inconnue rend 404.
     """
-    row = config_commands.update_config_value(conn, key, body.value, config=config)
+    row = config_commands.update_config_value(
+        conn, key, body.value, config=config, audit_repo=audit
+    )
     return ConfigItem(
         key=cast(str, row["key"]),
         value=row["value"],

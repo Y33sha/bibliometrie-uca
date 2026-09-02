@@ -49,6 +49,7 @@ def create_perimeter(
     conn: Connection = Depends(db_conn),
     repo: PerimeterRepository = Depends(perimeter_repo),
     perimeter_queries: PerimeterStructuresQueries = Depends(get_perimeter_queries),
+    audit: AuditRepository = Depends(audit_repo),
 ) -> CreatedIdResponse:
     """Crée un périmètre avec ses structures racines, la liste pouvant être vide.
 
@@ -59,6 +60,7 @@ def create_perimeter(
         code=body.code,
         name=body.name,
         root_structure_ids=body.root_structure_ids,
+        audit_repo=audit,
         repo=repo,
         perimeter_queries=perimeter_queries,
     )
@@ -72,13 +74,19 @@ def update_perimeter(
     conn: Connection = Depends(db_conn),
     repo: PerimeterRepository = Depends(perimeter_repo),
     perimeter_queries: PerimeterStructuresQueries = Depends(get_perimeter_queries),
+    audit: AuditRepository = Depends(audit_repo),
 ) -> OkResponse:
     """Met à jour un périmètre (nom, structures racines).
 
     Seuls les champs fournis sont écrits ; un corps vide rend 400, un périmètre inconnu 404. La clôture matérialisée suit le changement de racines.
     """
     perimeter_commands.update_perimeter(
-        conn, perimeter_id, update=body, repo=repo, perimeter_queries=perimeter_queries
+        conn,
+        perimeter_id,
+        update=body,
+        repo=repo,
+        perimeter_queries=perimeter_queries,
+        audit_repo=audit,
     )
     return OkResponse()
 
