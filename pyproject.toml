@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "bibliometrie-uca"
 version = "0.1.0"
-requires-python = ">=3.12"
+requires-python = ">=3.14"
 dependencies = [
     "httpx==0.28.1",             # unique client HTTP : appels synchrones et asynchrones du pipeline
     "psycopg[binary]==3.3.4",     # driver Postgres pour SQLAlchemy ; import symbolique dans infrastructure/db/engine.py
