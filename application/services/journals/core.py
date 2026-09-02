@@ -110,8 +110,16 @@ def find_or_create_journal(
     return journal_id
 
 
-def update_journal(journal_id: int, *, update: JournalUpdate, repo: JournalRepository) -> bool:
+def update_journal(
+    journal_id: int,
+    *,
+    update: JournalUpdate,
+    repo: JournalRepository,
+    audit_repo: AuditRepository | None = None,
+) -> bool:
     """Charge la revue, applique les champs explicitement fournis, persiste. Retourne `True` si le `journal_type` a effectivement changé — déclencheur de la requalification des publications, orchestrée par le command handler.
+
+    L'événement d'audit ne porte que les champs soumis. Il vaut pour toute édition ; celle qui change le type en produit un second, `journal.type_requalified`, portant l'ampleur de la requalification.
 
     Lève `ValidationError` si aucun champ n'est fourni, `NotFoundError` si la revue n'existe pas.
     """
@@ -123,10 +131,12 @@ def update_journal(journal_id: int, *, update: JournalUpdate, repo: JournalRepos
         raise NotFoundError(f"Revue {journal_id} introuvable")
 
     old_type = journal.journal_type
+    champs = update.model_dump(exclude_unset=True, mode="json")
     # Les champs de `JournalUpdate` portent les noms des attributs de l'agrégat.
     for field_name, value in update.model_dump(exclude_unset=True).items():
         setattr(journal, field_name, value)
     repo.save(journal)
+    emit_event(audit_repo, "journal.updated", "journal", journal_id, champs)
     return journal.journal_type != old_type
 
 

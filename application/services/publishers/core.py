@@ -73,9 +73,15 @@ def find_or_create_publisher(
 
 
 def update_publisher(
-    publisher_id: int, *, update: PublisherUpdate, repo: PublisherRepository
+    publisher_id: int,
+    *,
+    update: PublisherUpdate,
+    repo: PublisherRepository,
+    audit_repo: AuditRepository | None = None,
 ) -> None:
     """Charge l'éditeur, applique les champs explicitement fournis, persiste.
+
+    L'événement d'audit ne porte que les champs soumis : y joindre les autres laisserait croire qu'ils ont été fournis.
 
     Lève `ValidationError` si aucun champ n'est fourni, `NotFoundError` si l'éditeur n'existe pas.
     """
@@ -87,9 +93,11 @@ def update_publisher(
         raise NotFoundError(f"Éditeur {publisher_id} introuvable")
 
     # Les champs de `PublisherUpdate` portent les noms des attributs de l'agrégat.
+    champs = update.model_dump(exclude_unset=True, mode="json")
     for field_name, value in update.model_dump(exclude_unset=True).items():
         setattr(publisher, field_name, value)
     repo.save(publisher)
+    emit_event(audit_repo, "publisher.updated", "publisher", publisher_id, champs)
 
 
 def merge_publishers(
