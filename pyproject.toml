@@ -248,6 +248,17 @@ ignore = [
 # export_publications_csv (23 → <15). Prochaine cible : 10.
 max-complexity = 15
 
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+# `httpx` est le client HTTP unique du projet. `urllib.request` ouvrirait un second chemin
+# sortant, hors des délais d'expiration, des tentatives bornées et du disjoncteur qui
+# encadrent le premier — et hors de la liste blanche d'hôtes qu'un test confronte au code.
+#
+# L'interdiction vaut pour tout le dépôt plutôt que pour la seule couche API : le contrat
+# d'architecture qui ferme les autres modules réseau à cette couche ne sait pas nommer le
+# sous-module d'un paquet qu'il tient pour externe. Fermer la source obtient la même
+# transitivité, sans avoir à suivre les chemins.
+"urllib.request".msg = "Le client HTTP du projet est httpx, et le trafic sortant appartient au pipeline (infrastructure/sources)."
+
 [tool.ruff.lint.isort]
 # Les couches du projet, déclarées pour que leur classement en premier rang ne dépende
 # pas de l'inférence de ruff, qui varie d'une version à l'autre.
