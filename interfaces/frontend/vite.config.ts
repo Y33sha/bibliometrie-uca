@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 // Lit le `.env` racine (cf. svelte.config.js) sans polluer `process.env` : les
 // deux variables consommées ici demandent des précédences opposées.
 const fileEnv =
-	loadEnv({ path: fileURLToPath(new URL('../../.env', import.meta.url)) }).parsed ?? {};
+	loadEnv({ path: fileURLToPath(new URL('../../.env', import.meta.url)), quiet: true }).parsed ?? {};
 
 // `BASE_PATH` : préfixe de déploiement, le `.env` fait autorité (cf. svelte.config.js).
 // Doit matcher `paths.base` dans svelte.config.js. Vide par défaut (app à la racine) ;
