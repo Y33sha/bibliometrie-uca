@@ -15,7 +15,13 @@ loadEnv({ path: fileURLToPath(new URL('../../.env', import.meta.url)), override:
 // `docker compose`). Définir un sous-chemin (ex. `/bibliometrie`) pour un
 // déploiement derrière un reverse-proxy. Lu au build ; à exporter avant
 // `npm run build` ou `npm run dev`.
-const basePath = process.env.BASE_PATH ?? '';
+const basePathBrut = process.env.BASE_PATH ?? '';
+if (basePathBrut !== '' && !basePathBrut.startsWith('/')) {
+	throw new Error(`BASE_PATH est vide ou commence par « / » ; reçu : « ${basePathBrut} »`);
+}
+// Le contrôle ci-dessus établit la forme que le typage de SvelteKit exige du préfixe.
+/** @type {'' | `/${string}`} */
+const basePath = /** @type {'' | `/${string}`} */ (basePathBrut);
 
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
