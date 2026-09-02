@@ -3,10 +3,43 @@
 La fixture `auth_client` forge son jeton directement, sans passer par `/api/auth/login` : le parcours complet — connexion, cookie posé, écriture autorisée, déconnexion — ne s'exerce donc que par ces tests.
 """
 
+import bcrypt
+from pydantic import SecretStr
+
 from infrastructure.settings import settings
+from interfaces.api.session import SESSION_MAX_AGE
 
 
 class TestLogin:
+    def test_pose_un_cookie_de_session_durci(self, client, monkeypatch):
+        """Le cookie qui porte la session est inaccessible au script, borné au site, réservé au canal chiffré et daté.
+
+        Ces quatre attributs sont ce qui sépare un jeton de session d'une valeur qu'un script injecté lirait, qu'une requête partie d'un autre site rejouerait, ou qu'un accès en clair révélerait. Le dossier de sécurité les énonce ; ce test les relit sur la réponse plutôt que dans le code qui les pose.
+
+        L'empreinte est posée ici, à faible coût : ce test porte sur les attributs du cookie, non sur la vérification du mot de passe.
+        """
+        from interfaces.api import session as session_module
+
+        empreinte = bcrypt.hashpw(b"mot-de-passe-de-test", bcrypt.gensalt(rounds=4)).decode()
+        monkeypatch.setattr(session_module.settings, "admin_hash", SecretStr(empreinte))
+        monkeypatch.setattr(session_module.settings, "cookie_secure", True)
+
+        r = client.post(
+            "/api/auth/login",
+            json={"username": settings.admin_user, "password": "mot-de-passe-de-test"},
+        )
+        assert r.status_code == 200, r.text
+
+        pose = r.headers["set-cookie"].lower()
+        assert "httponly" in pose
+        assert "samesite=strict" in pose
+        assert "secure" in pose
+        assert f"max-age={SESSION_MAX_AGE}" in pose
+
+    def test_la_session_dure_sept_jours(self):
+        """La durée annoncée par le dossier de sécurité, en secondes."""
+        assert SESSION_MAX_AGE == 7 * 24 * 3600
+
     def test_rejects_unknown_user(self, client):
         r = client.post("/api/auth/login", json={"username": "inconnu", "password": "x"})
         assert r.status_code == 401
