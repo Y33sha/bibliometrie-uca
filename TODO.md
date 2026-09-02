@@ -70,7 +70,3 @@
 * rendre les extracteurs interruptibles avec ctrl+C sous Windows
 * mettre en place des slugs pour les URL?
 * passer les grandes listes en pagination par curseur (plus de plafond nécessaire) + curseur pour les exports csv — suppose de faire passer la connexion de la dépendance au flux, FastAPI la refermant avant l'envoi du corps
-
-
-# Pas nécessaire de le régler, du moment qu'on le documente quelque part
-* [ ] re-tester le circuit des imports RH => pas urgent, pas d'imports csv à terme en prod
