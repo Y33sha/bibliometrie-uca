@@ -26,9 +26,12 @@ def add_identifier(
     *,
     source: str = "manual",
     repo: PersonRepository,
+    audit_repo: AuditRepository | None = None,
 ) -> AddIdentifierResult:
     """Ajoute un identifiant (ORCID/idHAL) à une personne. Retourne l'issue de la cascade."""
-    result = persons_service.add_identifier(person_id, id_type, id_value, source=source, repo=repo)
+    result = persons_service.add_identifier(
+        person_id, id_type, id_value, source=source, repo=repo, audit_repo=audit_repo
+    )
     conn.commit()
     return result
 
@@ -87,9 +90,10 @@ def update_name(
     first_name: str,
     *,
     repo: PersonRepository,
+    audit_repo: AuditRepository | None = None,
 ) -> None:
     """Modifie le nom/prénom d'une personne (et rafraîchit ses formes de nom)."""
-    persons_service.update_name(person_id, last_name, first_name, repo=repo)
+    persons_service.update_name(person_id, last_name, first_name, repo=repo, audit_repo=audit_repo)
     conn.commit()
 
 

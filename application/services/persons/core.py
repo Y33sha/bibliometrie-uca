@@ -94,14 +94,24 @@ def update_name(
     first_name: str,
     *,
     repo: PersonRepository,
+    audit_repo: AuditRepository | None = None,
 ) -> None:
     """Met à jour le nom/prénom d'une personne et rafraîchit ses formes de nom.
+
+    Le nom est ce par quoi les signatures reviennent à une personne : en changer déplace des publications d'une personne à une autre, d'où l'événement d'audit.
 
     Lève `ValidationError` sans patronyme : le rafraîchissement retirerait alors à la personne les formes de nom que seul son nom canonique porte. Lève `NotFoundError` si la personne n'existe pas.
     """
     last_name, first_name = _validated_name(last_name, first_name)
     repo.update_name(person_id, last_name, first_name)
     repo.refresh_name_forms(person_id, compute_person_name_forms(last_name, first_name))
+    emit_event(
+        audit_repo,
+        "person.name_updated",
+        "person",
+        person_id,
+        {"last_name": last_name, "first_name": first_name},
+    )
 
 
 # ── Import RH ──
@@ -186,6 +196,24 @@ class AddIdentifierResult(NamedTuple):
     id_value: str
 
 
+def _identifiant_ajoute(
+    audit_repo: AuditRepository | None,
+    person_id: int,
+    id_type: str,
+    id_value: str,
+    outcome: AddIdentifierOutcome,
+) -> AddIdentifierResult:
+    """Consigne l'attribution d'un identifiant, et rend l'issue à l'appelant."""
+    emit_event(
+        audit_repo,
+        "person_identifier.added",
+        "person",
+        person_id,
+        {"id_type": id_type, "id_value": id_value, "outcome": outcome.value},
+    )
+    return AddIdentifierResult(outcome, id_value)
+
+
 def add_identifier(
     person_id: int,
     id_type: str,
@@ -193,6 +221,7 @@ def add_identifier(
     *,
     source: str = "auto",
     repo: PersonRepository,
+    audit_repo: AuditRepository | None = None,
 ) -> AddIdentifierResult:
     """Ajoute un identifiant (ORCID, idHAL, IdRef...) à une personne.
 
@@ -241,15 +270,20 @@ def add_identifier(
             source=source,
         )
         repo.insert_identifier(ident)
-        return AddIdentifierResult(AddIdentifierOutcome.ADDED, id_value)
+        return _identifiant_ajoute(
+            audit_repo, person_id, id_type, id_value, AddIdentifierOutcome.ADDED
+        )
 
     if existing.person_id == person_id:
+        # Rien n'a changé : l'appel est idempotent, aucune décision n'a été prise.
         return AddIdentifierResult(AddIdentifierOutcome.ALREADY_EXISTS, id_value)
 
     if existing.status is AttributionStatus.REJECTED:
         existing.reattribute_to(person_id, source=source)
         repo.update_identifier(existing)
-        return AddIdentifierResult(AddIdentifierOutcome.REASSIGNED, id_value)
+        return _identifiant_ajoute(
+            audit_repo, person_id, id_type, id_value, AddIdentifierOutcome.REASSIGNED
+        )
 
     raise CannotAttributeConflict(
         f"Identifiant {id_type}={id_value!r} déjà attribué à person_id={existing.person_id} "

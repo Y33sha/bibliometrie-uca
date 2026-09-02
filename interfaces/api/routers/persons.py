@@ -388,13 +388,20 @@ def add_person_identifier(
     conn: Connection = Depends(db_conn),
     queries: PersonsQueries = Depends(persons_queries),
     repo: PersonRepository = Depends(person_repo),
+    audit: AuditRepository = Depends(audit_repo),
 ) -> AddIdentifierResponse:
     """Ajoute à la main un identifiant (ORCID, idHAL ou IdRef) à une personne.
 
     La cascade de décision — insertion, idempotence, réattribution, conflit — appartient à `add_identifier`, appelé avec `source="manual"` : il refuse alors les types qu'aucun humain n'attribue, et vérifie l'existence de la personne. Le router traduit l'issue en réponse. Les handlers globaux traduisent la personne absente (`NotFoundError`) en 404, le conflit (`CannotAttributeConflict`) en 409, le type ou la valeur refusés (`ValidationError`) en 400.
     """
     result = person_commands.add_identifier(
-        conn, person_id, data.id_type, data.id_value, source="manual", repo=repo
+        conn,
+        person_id,
+        data.id_type,
+        data.id_value,
+        source="manual",
+        repo=repo,
+        audit_repo=audit,
     )
     if result.outcome is AddIdentifierOutcome.ALREADY_EXISTS:
         return AddIdentifierResponse(added=False, reason="already_exists")
@@ -431,12 +438,15 @@ def update_person_name(
     body: UpdatePersonName,
     conn: Connection = Depends(db_conn),
     repo: PersonRepository = Depends(person_repo),
+    audit: AuditRepository = Depends(audit_repo),
 ) -> OkResponse:
     """Modifie le nom/prénom d'une personne.
 
     Renvoie 400 sans patronyme, 404 sur une personne introuvable (`update_name`).
     """
-    person_commands.update_name(conn, person_id, body.last_name, body.first_name, repo=repo)
+    person_commands.update_name(
+        conn, person_id, body.last_name, body.first_name, repo=repo, audit_repo=audit
+    )
     return OkResponse()
 
 
