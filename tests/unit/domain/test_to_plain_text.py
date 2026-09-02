@@ -30,6 +30,20 @@ class TestBalises:
             "mesuré pour 2.96<yCMS<3.53 et 0.5<pT<10 GeV/c"
         )
 
+    def test_retire_les_balises_imbriquees(self):
+        # Le retrait d'une balise peut en reconstituer une autre : `<ab<aa>a>` laisse `<ab a>`,
+        # qui est encore du balisage. Le retrait se répète jusqu'à ce qu'il n'en reste aucun.
+        assert to_plain_text("<ab<aa>a>") == ""
+        assert to_plain_text("&lt;ab&lt;aa&gt;a&gt;") == ""
+        assert to_plain_text("ca<c<b>>-=") == "ca -="
+
+    def test_la_mise_a_plat_est_idempotente(self):
+        # Une valeur déjà mise à plat ne bouge plus : le résultat ne porte aucun fragment
+        # qu'un second passage retirerait.
+        for brut in ("<ab<aa>a>", '</b!"<b=>>', "<i><b>Nature</b></i>", "<!--<a>x</a>--> y"):
+            une_passe = to_plain_text(brut)
+            assert to_plain_text(une_passe) == une_passe
+
     def test_une_suite_de_chevrons_ouvrants_se_parcourt_lineairement(self):
         """Le parcours d'une suite de `<` sans fermeture reste proportionnel à sa longueur."""
         import time
