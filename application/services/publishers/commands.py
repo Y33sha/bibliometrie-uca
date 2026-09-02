@@ -22,9 +22,12 @@ def update_publisher(
     *,
     update: PublisherUpdate,
     repo: PublisherRepository,
+    audit_repo: AuditRepository | None = None,
 ) -> None:
     """Met à jour un éditeur (champs sélectifs)."""
-    publishers_service.update_publisher(publisher_id, update=update, repo=repo)
+    publishers_service.update_publisher(
+        publisher_id, update=update, repo=repo, audit_repo=audit_repo
+    )
     conn.commit()
 
 

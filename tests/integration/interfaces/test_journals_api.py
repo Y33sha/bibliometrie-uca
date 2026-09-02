@@ -626,3 +626,31 @@ class TestJournalsFacets:
             },
         )
         assert r.status_code == 200
+
+
+# ── Traçabilité des écritures sur les revues ─────────────────
+
+
+class TestTracabiliteEdition:
+    """La requalification consécutive à un changement de type était consignée, l'édition qui la déclenche non.
+
+    Un changement d'ISSN ou de titre ne requalifie rien et ne laissait donc aucune trace, alors qu'il commande le rapprochement des publications avec leur revue.
+    """
+
+    def test_la_modification_ne_consigne_que_les_champs_fournis(self, auth_client):
+        jid = _seed_journal(_uniq("Audit revue"))
+
+        r = auth_client.put(f"/api/journals/{jid}", json={"issn": "1234-5679"})
+        assert r.status_code == 200, r.text
+
+        with _pool() as cur:
+            cur.execute(
+                "SELECT payload, user_id FROM audit_log "
+                "WHERE event_type = 'journal.updated' AND aggregate_id = %s ORDER BY id",
+                (jid,),
+            )
+            evenements = cur.fetchall()
+
+        assert len(evenements) == 1
+        assert evenements[0]["payload"] == {"issn": "1234-5679"}
+        assert evenements[0]["user_id"]

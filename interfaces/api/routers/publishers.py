@@ -153,12 +153,15 @@ def update_publisher(
     body: PublisherUpdate,
     conn: Connection = Depends(db_conn),
     repo: PublisherRepository = Depends(publisher_repo),
+    audit: AuditRepository = Depends(audit_repo),
 ) -> OkResponse:
     """Met à jour un éditeur, champ par champ.
 
     Seuls les champs présents dans le corps de la requête sont écrits (`exclude_unset=True`). Renvoie 404 sur un éditeur inconnu.
     """
-    publisher_commands.update_publisher(conn, publisher_id, update=body, repo=repo)
+    publisher_commands.update_publisher(
+        conn, publisher_id, update=body, repo=repo, audit_repo=audit
+    )
     return OkResponse()
 
 

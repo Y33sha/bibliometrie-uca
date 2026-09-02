@@ -463,3 +463,32 @@ class TestPublisherTypes:
             "unknown",
         ]
         assert all("label_fr" in opt and opt["label_fr"] for opt in body)
+
+
+# ── Traçabilité des écritures sur les éditeurs ───────────────
+
+
+class TestTracabilite:
+    """La fusion de deux éditeurs était consignée, la modification de l'un d'eux non.
+
+    Renommer un éditeur ou changer son pays déplace les décomptes qui s'agrègent par éditeur, et efface la valeur antérieure sans laisser dire qui l'a décidé.
+    """
+
+    def test_la_modification_ne_consigne_que_les_champs_fournis(self, auth_client):
+        pid = _seed_publisher(_uniq("Audit éditeur"))
+
+        r = auth_client.put(f"/api/publishers/{pid}", json={"country": "FR"})
+        assert r.status_code == 200, r.text
+
+        with _pool() as cur:
+            cur.execute(
+                "SELECT payload, user_id FROM audit_log "
+                "WHERE event_type = 'publisher.updated' AND aggregate_id = %s ORDER BY id",
+                (pid,),
+            )
+            evenements = cur.fetchall()
+
+        assert len(evenements) == 1
+        # Le pays est normalisé au bord : la trace porte la valeur écrite, non la casse reçue.
+        assert evenements[0]["payload"] == {"country": "fr"}
+        assert evenements[0]["user_id"]
