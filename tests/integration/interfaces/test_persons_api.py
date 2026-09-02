@@ -680,3 +680,62 @@ class TestMarkPersonsDistinct:
             "/api/persons/mark-distinct", json={"person_id_a": a, "person_id_b": a}
         )
         assert r.status_code == 400
+
+
+# ── Traçabilité des écritures sur les personnes ──────────────
+
+
+def _audit_personne(event_type: str, aggregate_id: int) -> list[dict]:
+    with _pool() as cur:
+        cur.execute(
+            "SELECT payload, user_id FROM audit_log "
+            "WHERE event_type = %s AND aggregate_id = %s ORDER BY id",
+            (event_type, aggregate_id),
+        )
+        return cur.fetchall()
+
+
+class TestTracabilite:
+    """Le nom d'une personne et ses identifiants sont ce par quoi les signatures lui reviennent.
+
+    Les changer déplace des publications d'une personne à une autre, sans que rien dans les données ne dise ensuite qui l'a décidé : le rejet et la réattribution d'un identifiant étaient consignés, l'attribution initiale et le changement de nom non.
+    """
+
+    def test_le_changement_de_nom_est_consigne(self, auth_client):
+        pid = _seed_person("AVANT", "A")
+
+        r = auth_client.patch(
+            f"/api/persons/{pid}/name", json={"last_name": "APRES", "first_name": "B"}
+        )
+        assert r.status_code == 200, r.text
+
+        evenements = _audit_personne("person.name_updated", pid)
+        assert len(evenements) == 1
+        assert evenements[0]["payload"] == {"last_name": "APRES", "first_name": "B"}
+        assert evenements[0]["user_id"]
+
+    def test_l_ajout_d_un_identifiant_est_consigne(self, auth_client):
+        pid = _seed_person()
+
+        r = auth_client.post(
+            f"/api/persons/{pid}/identifiers",
+            json={"id_type": "orcid", "id_value": "0000-0002-1825-0097"},
+        )
+        assert r.status_code == 200, r.text
+
+        evenements = _audit_personne("person_identifier.added", pid)
+        assert len(evenements) == 1
+        assert evenements[0]["payload"] == {
+            "id_type": "orcid",
+            "id_value": "0000-0002-1825-0097",
+            "outcome": "added",
+        }
+
+    def test_un_ajout_sans_effet_ne_consigne_rien(self, auth_client):
+        """Réattribuer le même identifiant à la même personne ne décide rien : l'appel est idempotent."""
+        pid = _seed_person()
+        corps = {"id_type": "idhal", "id_value": "audit-idempotent"}
+        assert auth_client.post(f"/api/persons/{pid}/identifiers", json=corps).status_code == 200
+        assert auth_client.post(f"/api/persons/{pid}/identifiers", json=corps).status_code == 200
+
+        assert len(_audit_personne("person_identifier.added", pid)) == 1
