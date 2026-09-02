@@ -413,3 +413,114 @@ class TestAddressStats:
         assert r.status_code == 200
         body = r.json()
         assert set(body.keys()) >= {"total", "detected", "pending", "rejected", "confirmed"}
+
+
+# ── Traçabilité des écritures sur les adresses ───────────────
+
+
+def _evenements(event_type: str) -> list[dict]:
+    """Lignes d'audit d'un type donné, dans l'ordre d'émission."""
+    with _pool() as cur:
+        cur.execute(
+            "SELECT aggregate_type, aggregate_id, payload, user_id "
+            "FROM audit_log WHERE event_type = %s ORDER BY id",
+            (event_type,),
+        )
+        return cur.fetchall()
+
+
+class TestTracabilite:
+    """Les écritures sur les adresses laissent une trace nominative.
+
+    L'arbitrage du rattachement d'une adresse à une structure est la décision dont dépend le compte de publications d'un laboratoire : c'est celle dont la trace importe le plus. L'attribution d'un pays commande de la même façon les décomptes par pays.
+
+    Un lot est une décision unique, et vaut donc un seul événement : la charge utile porte ce qui a été demandé — les identifiants quand l'appel en donne, le critère de sélection sinon — et le nombre de lignes touchées. Consigner une ligne par adresse enregistrerait un fait que personne n'a décidé, et perdrait le critère.
+    """
+
+    def test_l_arbitrage_d_un_rattachement_est_consigne(self, auth_client):
+        addr = _seed_address("Audit review unitaire")
+        struct = _seed_structure("LAB-AUDIT-REV")
+        avant = len(_evenements("address.link_reviewed"))
+
+        r = auth_client.post(
+            f"/api/addresses/{addr}/review",
+            json={"structure_id": struct, "is_confirmed": True},
+        )
+        assert r.status_code == 200
+
+        evenements = _evenements("address.link_reviewed")
+        assert len(evenements) == avant + 1
+        dernier = evenements[-1]
+        assert dernier["aggregate_type"] == "address"
+        assert dernier["aggregate_id"] == addr
+        assert dernier["payload"]["structure_id"] == struct
+        assert dernier["payload"]["is_confirmed"] is True
+        assert dernier["user_id"]
+
+    def test_un_lot_d_arbitrages_vaut_un_seul_evenement(self, auth_client):
+        a1 = _seed_address("Audit review lot 1")
+        a2 = _seed_address("Audit review lot 2")
+        struct = _seed_structure("LAB-AUDIT-BREV")
+        avant = len(_evenements("address.batch_link_reviewed"))
+
+        r = auth_client.post(
+            "/api/addresses/batch-review",
+            json={"address_ids": [a1, a2], "structure_id": struct, "is_confirmed": False},
+        )
+        assert r.status_code == 200
+
+        evenements = _evenements("address.batch_link_reviewed")
+        assert len(evenements) == avant + 1
+        dernier = evenements[-1]
+        assert dernier["aggregate_id"] is None
+        assert sorted(dernier["payload"]["address_ids"]) == sorted([a1, a2])
+        assert dernier["payload"]["structure_id"] == struct
+        assert dernier["payload"]["updated"] == 2
+
+    def test_l_attribution_d_un_pays_est_consignee(self, auth_client):
+        addr = _seed_address("Audit pays unitaire")
+        avant = len(_evenements("address.country_set"))
+
+        r = auth_client.post(f"/api/addresses/{addr}/country", json={"countries": ["FR"]})
+        assert r.status_code == 200
+
+        evenements = _evenements("address.country_set")
+        assert len(evenements) == avant + 1
+        dernier = evenements[-1]
+        assert dernier["aggregate_id"] == addr
+        assert dernier["payload"]["countries"] == ["FR"]
+
+    def test_un_lot_de_pays_par_identifiants_porte_les_identifiants(self, auth_client):
+        addr = _seed_address("Audit pays lot identifiants")
+        avant = len(_evenements("address.batch_country_set"))
+
+        r = auth_client.post(
+            "/api/addresses/batch-country",
+            json={"country_code": "FR", "address_ids": [addr]},
+        )
+        assert r.status_code == 200
+
+        evenements = _evenements("address.batch_country_set")
+        assert len(evenements) == avant + 1
+        dernier = evenements[-1]
+        assert dernier["aggregate_id"] is None
+        assert dernier["payload"]["country_code"] == "FR"
+        assert dernier["payload"]["address_ids"] == [addr]
+
+    def test_un_lot_de_pays_par_filtre_porte_le_critere(self, auth_client):
+        """Une sélection par filtre peut couvrir toute la table : c'est le critère qui est la décision, non la liste qu'il rend."""
+        _seed_address("Cible unique pour le filtre d audit")
+        avant = len(_evenements("address.batch_country_set"))
+
+        r = auth_client.post(
+            "/api/addresses/batch-country",
+            json={"country_code": "FR", "search": "Cible unique pour le filtre"},
+        )
+        assert r.status_code == 200
+
+        evenements = _evenements("address.batch_country_set")
+        assert len(evenements) == avant + 1
+        dernier = evenements[-1]
+        assert "address_ids" not in dernier["payload"]
+        assert dernier["payload"]["filtre"]["search"] == "Cible unique pour le filtre"
+        assert dernier["payload"]["updated"] >= 1
