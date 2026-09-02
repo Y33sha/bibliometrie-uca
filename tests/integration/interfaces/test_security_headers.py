@@ -20,10 +20,15 @@ class TestSecurityHeaders:
         assert r.headers["cross-origin-opener-policy"] == "same-origin"
 
     def test_les_en_tetes_couvrent_aussi_l_interface(self, client):
-        """Le middleware les pose sur toute réponse, pages du frontend comprises."""
+        """Le middleware les pose sur toute réponse, pages du frontend comprises.
+
+        L'attendu est lu dans le middleware lui-même : un en-tête qu'on y ajoute est couvert sans qu'on y pense, et un en-tête qu'on en retire cesse d'être exigé ici.
+        """
+        from interfaces.api.app import _SECURITY_HEADERS
+
         entetes = client.get("/").headers
-        assert entetes["x-frame-options"] == "DENY"
-        assert entetes["cross-origin-opener-policy"] == "same-origin"
+        for nom, valeur in _SECURITY_HEADERS.items():
+            assert entetes[nom.lower()] == valeur, nom
 
 
 class TestPolitiqueDeSecuriteDeContenu:
