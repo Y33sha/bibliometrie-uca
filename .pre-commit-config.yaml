@@ -225,7 +225,7 @@ repos:
         stages: [pre-push]
 
       - id: ci-frontend-build
-        name: build frontend (vite build)
+        name: vite build (construction du frontend)
         entry: bash -c 'cd interfaces/frontend && npm run build'
         language: system
         pass_filenames: false
