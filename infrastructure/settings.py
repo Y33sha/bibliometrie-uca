@@ -114,8 +114,9 @@ class Settings(BaseSettings):
     polite_pool_email: str = ""
 
     # ----- Raw store (payloads bruts hors BDD) -----
-    # Vide → store local par défaut (`data/raw_store`). Sinon un `file:///chemin` absolu.
-    biblio_raw_store_url: str = ""
+    # Répertoire où le pipeline archive les réponses des sources. Vide → `data/raw_store` à la
+    # racine du dépôt. Le pipeline de production s'exécute sans archivage (`--no-raw-store`).
+    biblio_raw_store_dir: str = ""
 
     @field_validator("cors_origins", mode="before")
     @classmethod
