@@ -1,15 +1,9 @@
 # Analyse de `interfaces/api/`, en plus des règles du dépôt.
 #
-# Les modules réseau et le lancement de programme sont fermés à cette couche par deux contrats
-# d'architecture, qui suivent les chaînes d'imports. Un seul nom leur échappe : `urllib.request`.
-# L'outil des contrats ne sait pas viser le sous-module d'un paquet qu'il tient pour externe, et
-# interdire `urllib` entier écarterait `urllib.parse`, dont le domaine se sert pour manipuler des
-# URL sans rien émettre.
+# Rien n'est ajouté ici pour l'instant : les modules réseau et le lancement de programme sont
+# fermés à cette couche par deux contrats d'architecture, qui suivent les chaînes d'imports, et
+# `urllib.request` — que ces contrats ne savent pas nommer — est refusé à tout le dépôt par la
+# règle `banned-api` de `pyproject.toml`.
 #
-# La règle `banned-api`, elle, nomme un module quel que soit son rang. Elle ne voit en revanche
-# que le fichier où l'import est écrit, là où les contrats déroulent les chaînes : c'est pourquoi
-# elle se réduit à ce que ceux-ci ne savent pas exprimer.
+# Le fichier reste pour porter une règle propre à la couche le jour où il en faudra une.
 extend = "../../pyproject.toml"
-
-[lint.flake8-tidy-imports.banned-api]
-"urllib.request".msg = "Le code qui sert les requêtes HTTP n'émet aucun appel sortant. Le trafic sortant appartient au pipeline (infrastructure/sources)."

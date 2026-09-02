@@ -94,7 +94,17 @@ def test_les_contrats_suivent_les_chaines_d_imports() -> None:
         assert contrat.get("allow_indirect_imports") != "true", contrat["name"]
 
 
-def test_la_fermeture_est_bornee_a_la_couche_api() -> None:
-    """Les autres couches gardent ces modules : le pipeline émet le trafic sortant, les scripts lancent `pg_dump`."""
-    sortie = _analyser("import urllib.request\n", "application/sonde.py")
+def test_le_pipeline_garde_son_client_reseau() -> None:
+    """La fermeture vise la couche qui sert les requêtes HTTP, non le projet : le trafic sortant appartient au pipeline."""
+    sortie = _analyser("import httpx\n", "infrastructure/sources/sonde.py")
     assert "is banned" not in sortie
+
+
+def test_le_second_chemin_sortant_est_refuse_partout() -> None:
+    """`urllib.request` ouvrirait un chemin sortant hors des garde-fous du client du projet.
+
+    Les contrats d'architecture ne savent pas nommer le sous-module d'un paquet qu'ils tiennent pour externe : fermer la source à tout le dépôt obtient la transitivité qu'ils donneraient.
+    """
+    for chemin in ("interfaces/api/sonde.py", "application/sonde.py", "infrastructure/sonde.py"):
+        sortie = _analyser("import urllib.request\n", chemin)
+        assert "`urllib.request` is banned" in sortie, chemin
