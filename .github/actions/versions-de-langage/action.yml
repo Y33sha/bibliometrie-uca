@@ -18,15 +18,4 @@ runs:
   steps:
     - id: lire
       shell: bash
-      run: |
-        set -euo pipefail
-        python=$(sed -n 's|^FROM python:\([0-9][0-9.]*\)-.*|\1|p' Dockerfile | head -1)
-        node=$(sed -n 's|^FROM node:\([0-9][0-9.]*\)-.*|\1|p' Dockerfile | head -1)
-        for langage in python node; do
-          if [ -z "${!langage}" ]; then
-            echo "::error::Aucune image de base $langage lue dans Dockerfile." >&2
-            exit 1
-          fi
-        done
-        echo "python=$python" >> "$GITHUB_OUTPUT"
-        echo "node=$node" >> "$GITHUB_OUTPUT"
+      run: ./scripts/versions-des-images.sh >> "$GITHUB_OUTPUT"
