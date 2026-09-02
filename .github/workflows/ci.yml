@@ -117,6 +117,14 @@ jobs:
         with:
           node-version: ${{ steps.versions.outputs.node }}
 
+      # `.python-version` et `interfaces/frontend/.nvmrc` redisent des versions que le
+      # Dockerfile porte déjà. Le contrôle d'avant envoi les confronte, mais un robot de mise à
+      # jour n'en joue aucun : il propose la montée d'une image de base sans toucher aux deux
+      # fichiers, et l'écart arriverait ici sans se voir. C'est après l'installation de Node que
+      # les trois déclarations se trouvent réunies.
+      - name: Versions de langage alignées sur les images
+        run: ./scripts/verifier-les-versions.sh
+
       - name: Install dependencies
         working-directory: interfaces/frontend
         run: npm ci
