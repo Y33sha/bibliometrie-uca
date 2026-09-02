@@ -62,9 +62,15 @@ def _resolve_rejection(
         )
     for pub_id, _ in rejected:
         authorship_repo.delete_rejected_authorship(pub_id, person_id)
-        emit_event(
-            audit_repo, "authorship.unrejected", "publication", pub_id, {"person_id": person_id}
-        )
+    # La levée procède d'une confirmation unique : un événement, portant les publications dont
+    # le rejet tombe, plutôt qu'un par paire.
+    emit_event(
+        audit_repo,
+        "authorship.unrejected",
+        "person",
+        person_id,
+        {"publication_ids": [pub_id for pub_id, _ in rejected]},
+    )
 
 
 def assign_orphan_authorship(
@@ -123,6 +129,14 @@ def assign_orphan_authorship(
     # `authorship_structures` (agrégation des structure_ids) maintenue uniquement
     # par le pipeline — pas de refresh sur action admin (staleness bornée à un run).
 
+    emit_event(
+        audit_repo,
+        "authorship.assigned",
+        "person",
+        person_id,
+        {"source_authorship_id": source_authorship_id, "publication_id": publication_id},
+    )
+
 
 def batch_assign_orphan_authorships(
     person_id: int,
@@ -168,6 +182,16 @@ def batch_assign_orphan_authorships(
 
     # `authorship_structures` (agrégation des structure_ids) maintenue uniquement
     # par le pipeline — pas de refresh sur action admin (staleness bornée à un run).
+
+    # Un lot est une décision unique : la charge utile porte les signatures visées et le
+    # nombre effectivement rattaché, celles qui portaient déjà une personne étant ignorées.
+    emit_event(
+        audit_repo,
+        "authorship.batch_assigned",
+        "person",
+        person_id,
+        {"source_authorship_ids": sa_ids, "assigned": assigned},
+    )
     return assigned
 
 
