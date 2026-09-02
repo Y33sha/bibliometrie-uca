@@ -133,6 +133,21 @@ forbidden_modules = ["httpx", "socket"]
 # `urllib.parse`, dont le domaine se sert pour manipuler des URL sans rien émettre.
 
 [[tool.importlinter.contracts]]
+name = "API : aucun lancement de programme"
+type = "forbidden"
+source_modules = ["interfaces.api"]
+forbidden_modules = ["subprocess", "multiprocessing", "pty"]
+# Le dossier de sécurité énonce que le code servant les requêtes HTTP ne lance aucun programme
+# externe. L'analyse statique signale les appels de lancement partout dans le dépôt, mais elle
+# ne voit qu'un appel écrit dans un fichier : ce contrat établit qu'aucun module atteignable
+# depuis la couche API ne joint un lanceur, fût-ce par une chaîne d'imports.
+#
+# `subprocess` est le module de lancement de la bibliothèque standard ; `multiprocessing` et
+# `pty` en lancent aussi, et échappent à l'analyse statique. `os.posix_spawn` reste hors de
+# portée des deux outils : l'un ne connaît pas cet appel, l'autre ne sait pas viser l'attribut
+# d'un module, et interdire `os` entier écarterait tout le reste de son usage.
+
+[[tool.importlinter.contracts]]
 name = "Domain : pas de framework externe"
 type = "forbidden"
 source_modules = ["domain"]
