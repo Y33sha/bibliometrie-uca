@@ -8,7 +8,12 @@ import { fileURLToPath } from 'node:url';
 // `override: true` : le `.env` fait autorité, même si l'environnement injecte
 // déjà `BASE_PATH` (cas de l'extension Python `useEnvFile`, dont la valeur est
 // par ailleurs corrompue par la conversion de chemin POSIX→Windows de Git Bash).
-loadEnv({ path: fileURLToPath(new URL('../../.env', import.meta.url)), override: true });
+// `quiet` : le chargeur écrit sinon dans la sortie des messages promotionnels pour des services tiers, qui varient d'une exécution à l'autre et brouillent les journaux d'intégration.
+loadEnv({
+	path: fileURLToPath(new URL('../../.env', import.meta.url)),
+	override: true,
+	quiet: true
+});
 
 // `BASE_PATH` : préfixe de déploiement (cf. ROOT_PATH côté backend).
 // Vide par défaut → app servie à la racine (cas du dépôt cloné lancé via
