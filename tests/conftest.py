@@ -51,7 +51,7 @@ def _isolate_raw_store(tmp_path_factory):
     """
     from infrastructure.settings import settings
 
-    settings.biblio_raw_store_url = tmp_path_factory.mktemp("raw_store").as_uri()
+    settings.biblio_raw_store_dir = str(tmp_path_factory.mktemp("raw_store"))
     yield
 
 

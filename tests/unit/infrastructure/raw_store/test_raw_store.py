@@ -80,15 +80,16 @@ class TestLocalFileRawStore:
 
 
 class TestFactory:
-    def test_file_url_builds_local_store(self, tmp_path):
-        store = get_raw_store(url=tmp_path.as_uri())
+    def test_un_repertoire_donne_recoit_les_payloads(self, tmp_path):
+        store = get_raw_store(tmp_path)
         assert isinstance(store, LocalFileRawStore)
         store.put("hal", "hal-1", b"ok")
         assert (tmp_path / "hal" / "hal-1.json.gz").is_file()
 
-    def test_empty_url_uses_default_local_store(self):
-        assert isinstance(get_raw_store(url=""), LocalFileRawStore)
+    def test_un_reglage_vide_retombe_sur_le_repertoire_par_defaut(self):
+        assert isinstance(get_raw_store(""), LocalFileRawStore)
 
-    def test_unknown_scheme_raises(self):
-        with pytest.raises(ValueError, match="non supporté"):
-            get_raw_store(url="ftp://host/path")
+    def test_le_repertoire_se_donne_aussi_en_chaine(self, tmp_path):
+        store = get_raw_store(str(tmp_path))
+        store.put("hal", "hal-2", b"ok")
+        assert (tmp_path / "hal" / "hal-2.json.gz").is_file()

@@ -1,15 +1,11 @@
-"""Sélection de l'implémentation `RawStore` selon `BIBLIO_RAW_STORE_URL`.
+"""Sélection de l'implémentation `RawStore` selon `BIBLIO_RAW_STORE_DIR`.
 
-- non défini → store local par défaut (`{PROJECT_ROOT}/data/raw_store`) ;
-- `file:///chemin/absolu` → `LocalFileRawStore` (chemin résolu cross-platform) ;
-- tout autre schéma → `ValueError`.
+Vide, le réglage laisse le stockage sous `data/raw_store` à la racine du dépôt ; renseigné, il porte le répertoire à employer.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
-from urllib.parse import urlparse
-from urllib.request import url2pathname
 
 from infrastructure import PROJECT_ROOT
 from infrastructure.raw_store.base import RawStore
@@ -19,14 +15,7 @@ from infrastructure.settings import settings
 _DEFAULT_LOCAL_DIR = PROJECT_ROOT / "data" / "raw_store"
 
 
-def get_raw_store(url: str | None = None) -> RawStore:
-    """Retourne le `RawStore` configuré (`url` explicite, sinon settings/env)."""
-    raw_url = settings.biblio_raw_store_url if url is None else url
-    if not raw_url:
-        return LocalFileRawStore(_DEFAULT_LOCAL_DIR)
-
-    parsed = urlparse(raw_url)
-    if parsed.scheme == "file":
-        # url2pathname gère le `/C:/...` de Windows comme le `/home/...` Unix.
-        return LocalFileRawStore(Path(url2pathname(parsed.path)))
-    raise ValueError(f"BIBLIO_RAW_STORE_URL : schéma non supporté ({raw_url!r})")
+def get_raw_store(directory: str | Path | None = None) -> RawStore:
+    """Retourne le `RawStore` configuré : le répertoire reçu, celui du réglage, ou celui par défaut."""
+    racine = directory if directory is not None else settings.biblio_raw_store_dir
+    return LocalFileRawStore(Path(racine) if racine else _DEFAULT_LOCAL_DIR)
