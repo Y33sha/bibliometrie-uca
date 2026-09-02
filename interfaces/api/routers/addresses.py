@@ -26,10 +26,12 @@ from application.ports.read_models.addresses_queries import (
     TextPredicateMode,
 )
 from application.ports.repositories.address_repository import AddressRepository
+from application.ports.repositories.audit_repository import AuditRepository
 from application.services.addresses import commands as address_commands
 from interfaces.api.deps import (
     address_repo,
     addresses_queries,
+    audit_repo,
     bg_propagate_countries,
     bg_propagate_in_perimeter,
     country_gateway,
@@ -139,6 +141,7 @@ def batch_review(
     bg: BackgroundTasks,
     conn: Connection = Depends(db_conn),
     addr_repo: AddressRepository = Depends(address_repo),
+    audit: AuditRepository = Depends(audit_repo),
 ) -> BatchUpdatedResponse:
     """Confirme, rejette ou réinitialise le lien d'un lot d'adresses à une même structure."""
     updated, changed = address_commands.batch_review_structure_link(
@@ -147,6 +150,7 @@ def batch_review(
         data.structure_id,
         data.is_confirmed,
         repo=addr_repo,
+        audit_repo=audit,
     )
     if changed:
         bg.add_task(bg_propagate_in_perimeter, changed)
@@ -177,6 +181,7 @@ def review_address(
     conn: Connection = Depends(db_conn),
     queries: AddressesQueries = Depends(addresses_queries),
     addr_repo: AddressRepository = Depends(address_repo),
+    audit: AuditRepository = Depends(audit_repo),
 ) -> AddressReviewResponse:
     """Confirme, rejette ou réinitialise le lien entre une adresse et une structure.
 
@@ -190,6 +195,7 @@ def review_address(
         action.structure_id,
         action.is_confirmed,
         repo=addr_repo,
+        audit_repo=audit,
     )
     if changed:
         bg.add_task(bg_propagate_in_perimeter, changed)
@@ -235,6 +241,7 @@ def batch_set_country(
     conn: Connection = Depends(db_conn),
     addr_repo: AddressRepository = Depends(address_repo),
     country_queries: CountryQueries = Depends(country_gateway),
+    audit: AuditRepository = Depends(audit_repo),
 ) -> BatchCountryResponse:
     """Ajoute un pays à des adresses (par IDs ou par filtre).
 
@@ -250,6 +257,7 @@ def batch_set_country(
         suggested_country=body.suggested_country,
         repo=addr_repo,
         country_queries=country_queries,
+        audit_repo=audit,
     )
     bg.add_task(bg_propagate_countries, all_ids)
     return BatchCountryResponse(updated=updated, propagated=propagated)
@@ -263,13 +271,19 @@ def set_address_country(
     conn: Connection = Depends(db_conn),
     addr_repo: AddressRepository = Depends(address_repo),
     country_queries: CountryQueries = Depends(country_gateway),
+    audit: AuditRepository = Depends(audit_repo),
 ) -> OkResponse:
     """Attribue des pays à une adresse.
 
     Renvoie 400 sur un code pays absent du référentiel, 404 sur une adresse introuvable (`set_country`).
     """
     affected = address_commands.set_country(
-        conn, addr_id, body.countries, repo=addr_repo, country_queries=country_queries
+        conn,
+        addr_id,
+        body.countries,
+        repo=addr_repo,
+        country_queries=country_queries,
+        audit_repo=audit,
     )
     bg.add_task(bg_propagate_countries, affected)
     return OkResponse()
