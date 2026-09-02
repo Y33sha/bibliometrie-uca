@@ -101,6 +101,29 @@ jobs:
         # cette passe complète ; pas d'étape intégration séparée, qui ne ferait que la rejouer.
         run: uv run python -m pytest tests/ --cov --cov-report=term-missing
 
+  # `.python-version` et `interfaces/frontend/.nvmrc` redisent des versions que le Dockerfile
+  # porte déjà. Le contrôle d'avant envoi les confronte, mais un robot de mise à jour n'en joue
+  # aucun : il propose la montée d'une image de base sans toucher aux deux fichiers, et l'écart
+  # traverserait l'intégration sans se voir, celle-ci lisant ses versions dans le Dockerfile.
+  versions:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - id: versions
+        uses: ./.github/actions/versions-de-langage
+
+      # Le script confronte aussi la version de Node en place : l'installer ici vérifie que
+      # l'action a posé celle qu'elle a lue.
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ steps.versions.outputs.node }}
+
+      - name: Versions de langage alignées sur les images
+        run: ./scripts/verifier-les-versions.sh
+
   build-frontend:
     runs-on: ubuntu-latest
 
@@ -116,14 +139,6 @@ jobs:
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ steps.versions.outputs.node }}
-
-      # `.python-version` et `interfaces/frontend/.nvmrc` redisent des versions que le
-      # Dockerfile porte déjà. Le contrôle d'avant envoi les confronte, mais un robot de mise à
-      # jour n'en joue aucun : il propose la montée d'une image de base sans toucher aux deux
-      # fichiers, et l'écart arriverait ici sans se voir. C'est après l'installation de Node que
-      # les trois déclarations se trouvent réunies.
-      - name: Versions de langage alignées sur les images
-        run: ./scripts/verifier-les-versions.sh
 
       - name: Install dependencies
         working-directory: interfaces/frontend
