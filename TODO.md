@@ -67,7 +67,6 @@
 * règles de correction de métadonnées et règles de déduplication de publications: actuellement logées dans le code; possibilité de les stocker en base et de les rendre configurables via l'UI?
 * OpenAPC: j'ai utilisé les données sur les APC UCA, mais il faudrait partir du dump complet et matcher tous les DOI des publis UCA pour voir quels établissements ont payé les APC quand ce n'est pas l'UCA
 ## Détails techniques
-* audit trail: uniformiser les types d'action qui génèrent un log ou pas + interface pour les consulter
 * rendre les extracteurs interruptibles avec ctrl+C sous Windows
 * mettre en place des slugs pour les URL?
 * passer les grandes listes en pagination par curseur (plus de plafond nécessaire) + curseur pour les exports csv — suppose de faire passer la connexion de la dépendance au flux, FastAPI la refermant avant l'envoi du corps
