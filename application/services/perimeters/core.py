@@ -22,6 +22,7 @@ def create_perimeter(
     name: str,
     root_structure_ids: list[int],
     repo: PerimeterRepository,
+    audit_repo: AuditRepository | None = None,
 ) -> int:
     """Crée un périmètre avec ses structures racines. Retourne l'id créé.
 
@@ -30,7 +31,19 @@ def create_perimeter(
     perimeter = Perimeter.create(code=code, name=name, root_structure_ids=root_structure_ids)
     if repo.perimeter_code_exists(perimeter.code):
         raise ConflictError(f"Le code '{perimeter.code}' existe déjà")
-    return repo.add(perimeter)
+    perimeter_id = repo.add(perimeter)
+    emit_event(
+        audit_repo,
+        "perimeter.created",
+        "perimeter",
+        perimeter_id,
+        {
+            "code": perimeter.code,
+            "name": perimeter.name,
+            "root_structure_ids": perimeter.root_structure_ids,
+        },
+    )
+    return perimeter_id
 
 
 def update_perimeter(
@@ -38,8 +51,11 @@ def update_perimeter(
     *,
     update: PerimeterUpdate,
     repo: PerimeterRepository,
+    audit_repo: AuditRepository | None = None,
 ) -> None:
     """Charge le périmètre, applique les champs explicitement fournis (validés), persiste.
+
+    L'événement d'audit ne porte que les champs soumis : y joindre les autres laisserait croire qu'ils ont été fournis.
 
     Lève `ValidationError` si aucun champ n'est fourni, `NotFoundError` si le périmètre n'existe pas.
     """
@@ -55,6 +71,17 @@ def update_perimeter(
     if "root_structure_ids" in update.model_fields_set:
         perimeter.set_root_structure_ids(update.root_structure_ids)
     repo.save(perimeter)
+    emit_event(
+        audit_repo,
+        "perimeter.updated",
+        "perimeter",
+        perimeter_id,
+        {
+            champ: getattr(perimeter, champ)
+            for champ in ("name", "root_structure_ids")
+            if champ in update.model_fields_set
+        },
+    )
 
 
 def delete_perimeter(

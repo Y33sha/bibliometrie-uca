@@ -235,3 +235,69 @@ class TestMaterializedPerimeterStructures:
         )
         assert r.status_code == 200
         assert _perimeter_structure_ids(pid) == {root, lab}
+
+
+# ── Traçabilité des écritures sur les périmètres ─────────────
+
+
+def _audit(event_type: str, aggregate_id: int) -> list[dict]:
+    with _pool() as cur:
+        cur.execute(
+            "SELECT payload, user_id FROM audit_log "
+            "WHERE event_type = %s AND aggregate_id = %s ORDER BY id",
+            (event_type, aggregate_id),
+        )
+        return cur.fetchall()
+
+
+class TestTracabilite:
+    """La suppression d'un périmètre était consignée, sa création et sa modification non.
+
+    Un périmètre décide quelles structures entrent dans les décomptes : le poser, en changer les racines ou le retirer sont trois décisions de même portée, et la première n'est pas moins traçable que la dernière.
+    """
+
+    def test_la_creation_est_consignee(self, auth_client):
+        code = _uniq("audit_create")
+        racine = _seed_structure()
+        r = auth_client.post(
+            "/api/perimeters",
+            json={"code": code, "name": "Audité", "root_structure_ids": [racine]},
+        )
+        assert r.status_code == 200
+        pid = r.json()["id"]
+
+        evenements = _audit("perimeter.created", pid)
+        assert len(evenements) == 1
+        assert evenements[0]["payload"] == {
+            "code": code,
+            "name": "Audité",
+            "root_structure_ids": [racine],
+        }
+        assert evenements[0]["user_id"]
+
+    def test_la_modification_ne_consigne_que_les_champs_fournis(self, auth_client):
+        code = _uniq("audit_update")
+        pid = auth_client.post("/api/perimeters", json={"code": code, "name": "Avant"}).json()["id"]
+
+        r = auth_client.put(f"/api/perimeters/{pid}", json={"name": "Après"})
+        assert r.status_code == 200
+
+        evenements = _audit("perimeter.updated", pid)
+        assert len(evenements) == 1
+        # Une mise à jour partielle n'écrit que ce qu'elle a reçu : consigner les autres champs
+        # laisserait croire qu'ils ont été soumis.
+        assert evenements[0]["payload"] == {"name": "Après"}
+
+    def test_un_changement_de_racines_est_consigne(self, auth_client):
+        code = _uniq("audit_roots")
+        pid = auth_client.post("/api/perimeters", json={"code": code, "name": "Racines"}).json()[
+            "id"
+        ]
+        racine = _seed_structure()
+
+        r = auth_client.put(f"/api/perimeters/{pid}", json={"root_structure_ids": [racine]})
+        assert r.status_code == 200
+
+        evenements = _audit("perimeter.updated", pid)
+        assert len(evenements) == 1
+        assert evenements[0]["payload"] == {"root_structure_ids": [racine]}

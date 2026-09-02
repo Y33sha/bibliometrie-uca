@@ -23,10 +23,15 @@ def create_perimeter(
     root_structure_ids: list[int],
     repo: PerimeterRepository,
     perimeter_queries: PerimeterStructuresQueries,
+    audit_repo: AuditRepository | None = None,
 ) -> int:
     """Crée un périmètre avec ses structures racines. Retourne l'id créé."""
     pid = perimeters_service.create_perimeter(
-        code=code, name=name, root_structure_ids=root_structure_ids, repo=repo
+        code=code,
+        name=name,
+        root_structure_ids=root_structure_ids,
+        repo=repo,
+        audit_repo=audit_repo,
     )
     perimeter_queries.refresh_perimeter_structures(conn)
     conn.commit()
@@ -40,9 +45,12 @@ def update_perimeter(
     update: PerimeterUpdate,
     repo: PerimeterRepository,
     perimeter_queries: PerimeterStructuresQueries,
+    audit_repo: AuditRepository | None = None,
 ) -> None:
     """Met à jour un périmètre à partir des champs explicitement fournis."""
-    perimeters_service.update_perimeter(perimeter_id, update=update, repo=repo)
+    perimeters_service.update_perimeter(
+        perimeter_id, update=update, repo=repo, audit_repo=audit_repo
+    )
     perimeter_queries.refresh_perimeter_structures(conn)
     conn.commit()
 
