@@ -164,7 +164,7 @@ repos:
       # confronte les deux fichiers au Dockerfile, et la version de Node du terminal aux
       # contrôles du frontend qui s'y jouent.
       - id: ci-versions-de-langage
-        name: Versions de langage à celles des images
+        name: versions de langage alignées sur les images
         entry: ./scripts/verifier-les-versions.sh
         language: system
         pass_filenames: false
