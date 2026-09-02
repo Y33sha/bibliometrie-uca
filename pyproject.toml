@@ -325,7 +325,9 @@ exclude_lines = [
 # Durcir module par module via overrides quand le code est stabilisé.
 # ----------------------------------------------------------------------
 [tool.mypy]
-python_version = "3.12"
+# Version des images de production (cf. `scripts/versions-des-images.sh`) : le typage se
+# vérifie sur la sémantique de l'interpréteur qui exécute, non sur un plancher de compatibilité.
+python_version = "3.14"
 # Imports : ignorer les libs tierces non typées plutôt que de polluer
 ignore_missing_imports = true
 # Mode strict : toutes les fonctions doivent être annotées, et leur corps

@@ -158,18 +158,14 @@ repos:
         always_run: true
         stages: [pre-push]
 
-      # Les contrôles du frontend s'exécutent sous le Node du terminal, que rien
-      # n'oblige à être celui des images. Une version antérieure fait échouer
-      # l'environnement de test au chargement d'`undici`, sur une trace sans
-      # rapport apparent avec la cause. Le refus vient donc d'abord, et la nomme.
-      # `interfaces/frontend/.nvmrc` porte la version ; `nvm use`, sans argument, la lit.
-      - id: ci-version-node
-        name: Node à la version des images
-        entry: >-
-          bash -c 'attendue=$(cat interfaces/frontend/.nvmrc);
-          courante=$(node --version | sed "s/^v//;s/\..*//");
-          [ "$courante" = "$attendue" ] || { echo "Node $courante dans ce terminal, $attendue
-          attendu par interfaces/frontend/.nvmrc. Jouer: nvm use"; exit 1; }'
+      # `.python-version` et `interfaces/frontend/.nvmrc` redisent des versions que le
+      # Dockerfile porte déjà, et que rien ne rapprochait de lui : l'interpréteur des
+      # contrôles locaux pouvait dériver de celui qui exécute en production. Le script
+      # confronte les deux fichiers au Dockerfile, et la version de Node du terminal aux
+      # contrôles du frontend qui s'y jouent.
+      - id: ci-versions-de-langage
+        name: Versions de langage à celles des images
+        entry: ./scripts/verifier-les-versions.sh
         language: system
         pass_filenames: false
         always_run: true
