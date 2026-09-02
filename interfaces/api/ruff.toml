@@ -1,24 +1,15 @@
 # Analyse de `interfaces/api/`, en plus des règles du dépôt.
 #
-# Le contrat d'architecture interdit à cette couche d'atteindre un client réseau, en suivant les
-# chaînes d'imports. Il vise `httpx`, client HTTP du projet, et `socket`, mais l'outil ne sait
-# pas nommer le sous-module d'un paquet qu'il tient pour externe : `urllib.request` lui échappe,
-# et interdire `urllib` entier écarterait `urllib.parse`, qui manipule des URL sans rien émettre.
+# Les modules réseau et le lancement de programme sont fermés à cette couche par deux contrats
+# d'architecture, qui suivent les chaînes d'imports. Un seul nom leur échappe : `urllib.request`.
+# L'outil des contrats ne sait pas viser le sous-module d'un paquet qu'il tient pour externe, et
+# interdire `urllib` entier écarterait `urllib.parse`, dont le domaine se sert pour manipuler des
+# URL sans rien émettre.
 #
-# La règle `banned-api` de l'analyseur, elle, nomme un module. Les deux se complètent : le
-# contrat suit les chaînes, celle-ci ferme les portes que le contrat ne sait pas désigner.
+# La règle `banned-api`, elle, nomme un module quel que soit son rang. Elle ne voit en revanche
+# que le fichier où l'import est écrit, là où les contrats déroulent les chaînes : c'est pourquoi
+# elle se réduit à ce que ceux-ci ne savent pas exprimer.
 extend = "../../pyproject.toml"
 
 [lint.flake8-tidy-imports.banned-api]
 "urllib.request".msg = "Le code qui sert les requêtes HTTP n'émet aucun appel sortant. Le trafic sortant appartient au pipeline (infrastructure/sources)."
-"http.client".msg = "Le code qui sert les requêtes HTTP n'émet aucun appel sortant. Le trafic sortant appartient au pipeline (infrastructure/sources)."
-"ftplib".msg = "Le code qui sert les requêtes HTTP n'émet aucun appel sortant."
-"smtplib".msg = "Le code qui sert les requêtes HTTP n'émet aucun appel sortant."
-"poplib".msg = "Le code qui sert les requêtes HTTP n'émet aucun appel sortant."
-"imaplib".msg = "Le code qui sert les requêtes HTTP n'émet aucun appel sortant."
-"telnetlib".msg = "Le code qui sert les requêtes HTTP n'émet aucun appel sortant."
-"socketserver".msg = "Le code qui sert les requêtes HTTP n'ouvre aucun service réseau."
-"requests".msg = "Le code qui sert les requêtes HTTP n'émet aucun appel sortant. Le client HTTP du projet est httpx, réservé au pipeline."
-"aiohttp".msg = "Le code qui sert les requêtes HTTP n'émet aucun appel sortant. Le client HTTP du projet est httpx, réservé au pipeline."
-"urllib3".msg = "Le code qui sert les requêtes HTTP n'émet aucun appel sortant. Le client HTTP du projet est httpx, réservé au pipeline."
-"subprocess".msg = "Le code qui sert les requêtes HTTP ne lance aucun programme externe."

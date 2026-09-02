@@ -120,17 +120,35 @@ ignore_imports = [
 name = "API : aucune requête réseau sortante"
 type = "forbidden"
 source_modules = ["interfaces.api"]
-forbidden_modules = ["httpx", "socket"]
+forbidden_modules = [
+    "httpx",
+    "socket",
+    "http",
+    "requests",
+    "aiohttp",
+    "urllib3",
+    "ftplib",
+    "smtplib",
+    "poplib",
+    "imaplib",
+    "telnetlib",
+    "socketserver",
+]
 # Le dossier de sécurité remis au RSSI énonce que l'API n'émet aucun appel sortant : elle lit
 # et écrit dans PostgreSQL, et rien d'autre. Tout le trafic sortant appartient au pipeline,
 # exécuté hors du cycle web. Ce contrat en fait une garantie mécanique plutôt qu'un constat :
 # aucun module servant une requête HTTP ne peut atteindre un client réseau, fût-ce par un
 # import indirect (les chaînes sont vérifiées, pas seulement les imports directs).
 #
-# `httpx` est le client HTTP unique du projet, et `socket` ferme la porte à un repli sur la
-# bibliothèque standard. `urllib.request` mériterait d'y figurer, mais l'outil ne sait pas
-# viser le sous-module d'un paquet externe, et interdire `urllib` entier écarterait aussi
-# `urllib.parse`, dont le domaine se sert pour manipuler des URL sans rien émettre.
+# `httpx` est le client HTTP unique du projet ; `socket` ferme la porte à un repli sur la
+# primitive de la bibliothèque standard, et `socketserver` à l'ouverture d'un service à
+# l'écoute. Les autres noms couvrent les clients tiers et les protocoles que la bibliothèque
+# standard sert : courrier, transfert de fichiers, terminal distant.
+#
+# `urllib.request` échappe seul à ce contrat : l'outil ne sait pas viser le sous-module d'un
+# paquet qu'il tient pour externe, et interdire `urllib` entier écarterait `urllib.parse`, dont
+# le domaine se sert pour manipuler des URL sans rien émettre. Il se ferme par la règle
+# `banned-api` d'`interfaces/api/ruff.toml`.
 
 [[tool.importlinter.contracts]]
 name = "API : aucun lancement de programme"
