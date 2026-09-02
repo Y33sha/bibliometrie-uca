@@ -190,7 +190,7 @@ repos:
       # version commitée a dérivé, sans la modifier. Correction :
       # `npm run types:gen` (dans interfaces/frontend) puis commiter.
       - id: ci-openapi-types
-        name: schema.ts (types frontend) suit l'OpenAPI
+        name: openapi-typescript (concordance des types et du contrat)
         entry: |-
           bash -c 'json=$(mktemp) && ts=$(mktemp) && uv run python -m interfaces.cli.dev.dump_openapi "$json" && ( cd interfaces/frontend && npx openapi-typescript "$json" -o "$ts" >/dev/null ) && if diff -q interfaces/frontend/src/lib/api/schema.ts "$ts" >/dev/null; then rm -f "$json" "$ts"; else rm -f "$json" "$ts"; echo schema.ts a dérivé de OpenAPI, régénérer via npm run types:gen puis commiter; exit 1; fi'
         language: system
