@@ -217,7 +217,7 @@ jobs:
           scan-type: fs
           scan-ref: .
           scanners: misconfig,secret
-          severity: HIGH,CRITICAL
+          severity: MEDIUM,HIGH,CRITICAL
           exit-code: "1"
           trivyignores: .trivyignore.yaml
           skip-dirs: node_modules,.venv,.git
@@ -228,13 +228,15 @@ jobs:
 
       # `pip-audit` et `npm audit` couvrent les dépendances applicatives, jamais la couche
       # système de l'image. `--ignore-unfixed` réserve l'échec aux failles pour lesquelles un
-      # correctif existe : la mise à jour des paquets que la construction applique les ferme.
+      # correctif existe : la mise à jour des paquets que la construction applique les ferme,
+      # ce qui rend le seuil moyen tenable — une faille corrigée en amont se referme d'elle-même
+      # à la construction suivante.
       - name: Vulnerability scan (image de production)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: bibliometrie-uca:ci
           scanners: vuln
-          severity: HIGH,CRITICAL
+          severity: MEDIUM,HIGH,CRITICAL
           ignore-unfixed: true
           exit-code: "1"
 
@@ -246,5 +248,5 @@ jobs:
         with:
           image-ref: bibliometrie-uca:ci
           scanners: vuln
-          severity: HIGH,CRITICAL
+          severity: MEDIUM,HIGH,CRITICAL
           exit-code: "0"
