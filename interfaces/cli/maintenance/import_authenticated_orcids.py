@@ -98,11 +98,11 @@ def plan_authentications(
 
 
 def find_reassignments(
-    entries: list[tuple[int, str]], current: dict[str, tuple[int, ...]]
+    entries: list[tuple[int, str]], current: dict[str, tuple[int, str]]
 ) -> list[tuple[str, int, int]]:
     """ORCID détenus par une autre personne que celle qui l'a authentifié, et vers qui les déplacer.
 
-    L'authentification fait autorité sur l'identité : le déplacement a lieu. Chacun révèle en général un doublon de personne à fusionner, d'où leur signalement.
+    `current` associe chaque ORCID à son porteur actuel — `(personne, statut)` —, tel que le référentiel le rend. L'authentification fait autorité sur l'identité : le déplacement a lieu. Chacun révèle en général un doublon de personne à fusionner, d'où leur signalement.
     """
     return [
         (orcid, current[orcid][0], person_id)
