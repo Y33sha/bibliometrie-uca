@@ -111,7 +111,7 @@ def admin_user_or_none(request: Request) -> str | None:
 # ----- Factories DB -----
 
 
-# Méthodes HTTP sans effet de bord attendu. Starlette sert `HEAD` par la route `GET` correspondante, et `OPTIONS` par le middleware CORS : les trois passent par les mêmes dépendances.
+# Méthodes HTTP sans effet de bord. Starlette sert `HEAD` par la route `GET` correspondante, qui traverse donc les mêmes dépendances. `OPTIONS` n'atteint aucune route — le contrôle préalable reçoit sa réponse du middleware CORS, et une requête nue tombe en 405 — et figure ici pour la route qui viendrait à le déclarer.
 _READ_ONLY_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 
 
