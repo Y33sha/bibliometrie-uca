@@ -3,6 +3,7 @@
 Chaque facette exclut son propre filtre mais applique tous les autres. Les facettes sont indépendantes et s'exécutent en parallèle, chacune sur sa propre connexion (cf. `publications_facets`).
 """
 
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
@@ -17,7 +18,6 @@ from domain.countries import NO_COUNTRY_CODE
 from domain.publications.metadata import OaStatus
 from domain.sources.registry import Source
 from domain.structures.structure import StructureType
-from infrastructure.db.engine import get_sync_engine
 from infrastructure.read_models.filters import (
     OA_CLOSED_SQL,
     OA_OPEN_SQL,
@@ -477,19 +477,24 @@ class _PublicationFacetsBuilder:
 
 
 def publications_facets(
-    conn: Connection, *, filters: PublicationFilters, perimeter_structure_ids: list[int]
+    conn: Connection,
+    *,
+    filters: PublicationFilters,
+    perimeter_structure_ids: list[int],
+    open_connection: Callable[[], Connection],
 ) -> PublicationsFacetsResponse:
     """Facettes dynamiques : chaque facette exclut son propre filtre mais applique tous les autres.
 
-    Les ~11 facettes sont **indépendantes** et chacune est un agrégat sur l'ensemble filtré (~0,5 s). On les exécute en **parallèle**, chacune dans un thread avec sa propre connexion (psycopg libère le GIL pendant la requête). Le `lab_hal_col` est préchargé une fois et partagé (lecture seule).
+    Les ~11 facettes sont **indépendantes** et chacune est un agrégat sur l'ensemble filtré (~0,5 s). On les exécute en **parallèle**, chacune dans un thread avec sa propre connexion (psycopg libère le GIL pendant la requête). Le `lab_hal_col` est préchargé une fois et partagé.
+
+    `open_connection` ouvre ces connexions supplémentaires. Elle vient de l'appelant, qui la construit avec les caractéristiques valant pour la requête en cours — la lecture seule, quand c'est une lecture qui est servie. Aller chercher l'engine ici ouvrirait des connexions hors de cette règle.
     """
     pre = _PublicationFacetsBuilder(conn, filters, perimeter_structure_ids)
     pre._preload_lab_hal_col()
     lab_hal_col = pre.lab_hal_col
-    engine = get_sync_engine()
 
     def run(method_name: str) -> Any:
-        with engine.connect() as facet_conn:
+        with open_connection() as facet_conn:
             facet_conn.execute(text("SET LOCAL jit = off"))
             builder = _PublicationFacetsBuilder(facet_conn, filters, perimeter_structure_ids)
             builder.lab_hal_col = lab_hal_col

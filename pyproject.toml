@@ -117,6 +117,24 @@ ignore_imports = [
 ]
 
 [[tool.importlinter.contracts]]
+name = "Adapters : la connexion se reçoit, elle ne s'ouvre pas"
+type = "forbidden"
+source_modules = [
+    "infrastructure.read_models",
+    "infrastructure.repositories",
+]
+forbidden_modules = ["infrastructure.db.engine"]
+# Un adapter travaille sur la connexion que son appelant lui remet : c'est elle qui porte la
+# transaction de la requête, et les caractéristiques que la composition root y a posées — la
+# lecture seule sur une méthode HTTP sans effet de bord. Atteindre l'engine ouvrirait une
+# connexion en marge de cette règle, et l'écriture qu'un point d'entrée de lecture émettrait
+# par ce chemin aboutirait.
+#
+# L'adapter dont la lecture se répartit sur plusieurs connexions — les facettes de
+# publications, calculées en parallèle — reçoit une fabrique de connexions à sa construction,
+# comme il reçoit sa connexion.
+
+[[tool.importlinter.contracts]]
 name = "API : aucune requête réseau sortante"
 type = "forbidden"
 source_modules = ["interfaces.api"]
