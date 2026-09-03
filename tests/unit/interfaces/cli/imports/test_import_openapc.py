@@ -58,6 +58,18 @@ class TestBuildPayment:
 
         assert paiement["amount"] is None
 
+    def test_colonnes_absentes_du_fichier(self):
+        """Un fichier privé de ses colonnes de montant et de période ne déclare ni zéro euro ni l'an zéro."""
+        ligne = self._ligne()
+        del ligne["euro"]
+        del ligne["period"]
+
+        paiement = build_payment(ligne, doi="10.1/a", publication_id=7, source_file="f")
+
+        assert paiement["amount"] is None
+        assert paiement["billing_year"] is None
+        assert paiement["pub_year"] is None
+
     def test_periode_illisible(self):
         paiement = build_payment(
             self._ligne(period="inconnue"), doi="10.1/a", publication_id=7, source_file="f"
