@@ -35,7 +35,7 @@ from domain.sources.scanr import (
     extract_nnt_from_scanr_id,
     select_leaf_affiliations,
 )
-from domain.types import JsonValue
+from domain.types import JsonValue, as_sequence, as_str
 
 # =============================================================
 # UTILITAIRES
@@ -269,10 +269,12 @@ def build_scanr_author_records(doc: dict) -> list[AuthorRecord]:
         addr_parts: list[str] = []
         detected_countries: set[str] = set()
         for aff in select_leaf_affiliations(author_data.get("affiliations") or []):
-            name = (aff.get("name") or "").strip()
+            name = (as_str(aff.get("name")) or "").strip()
             if name:
                 addr_parts.append(name)
-            detected_countries.update(aff.get("detected_countries") or [])
+            detected_countries.update(
+                pays for p in as_sequence(aff.get("detected_countries")) if (pays := as_str(p))
+            )
         countries = sorted(detected_countries) or None
 
         records.append(

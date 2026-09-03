@@ -2,13 +2,17 @@
 
 Interprétation des champs propres au schéma ScanR (élasticsearch dataesr) — prédicats et extracteurs qui encapsulent la connaissance de la sémantique ScanR pour le reste du pipeline.
 
-Les `dict[str, Any]` ici sont des payloads JSON bruts de l'API ScanR (frontière dynamique avec une source externe, schéma non typé).
+Les `Mapping[str, JsonValue]` ici sont des payloads JSON bruts de l'API ScanR (frontière dynamique avec une source externe, schéma non typé).
 """
 
-from typing import Any
+from collections.abc import Mapping
+
+from domain.types import JsonValue, as_mapping, as_str
 
 
-def select_leaf_affiliations(affiliations: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def select_leaf_affiliations(
+    affiliations: list[Mapping[str, JsonValue]],
+) -> list[Mapping[str, JsonValue]]:
     """Filtre les affiliations ScanR aux entrées marquées labo.
 
     ScanR renvoie côte à côte l'affiliation labo (champ `id_name_author_labo` rempli, c'est la seule affichée publiquement côté ScanR) et les pures tutelles, déjà dérivables via `structures_parents`. Ne garder que la labo évite la double-comptabilisation des tutelles parentes en aval.
@@ -31,7 +35,9 @@ def extract_nnt_from_scanr_id(scanr_id: str | None) -> str | None:
     return None
 
 
-def derive_scanr_oa_status(is_oa: bool | None, oa_evidence: dict[str, Any] | None) -> str | None:
+def derive_scanr_oa_status(
+    is_oa: bool | None, oa_evidence: Mapping[str, JsonValue] | None
+) -> str | None:
     """Mapping (isOa, oaEvidence) ScanR → enum oa_status canonique.
 
     ScanR n'expose pas de statut OA nuancé ; il faut l'inférer de `isOa` (bool) et de `oaEvidence.hostType` / `oaEvidence.license` :
@@ -46,9 +52,9 @@ def derive_scanr_oa_status(is_oa: bool | None, oa_evidence: dict[str, Any] | Non
         return None
     if not is_oa:
         return "closed"
-    ev = oa_evidence or {}
-    host_type = ev.get("hostType")
-    license_ = (ev.get("license") or "").lower()
+    ev = as_mapping(oa_evidence)
+    host_type = as_str(ev.get("hostType"))
+    license_ = (as_str(ev.get("license")) or "").lower()
     if host_type == "repository":
         return "green"
     if host_type == "publisher":

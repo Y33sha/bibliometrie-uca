@@ -2,12 +2,12 @@
 
 Interprétation des champs propres au schéma OpenAlex — prédicats et extracteurs qui encapsulent la connaissance de la sémantique OpenAlex pour le reste du pipeline.
 
-Les `dict[str, Any]` ici sont des payloads JSON bruts de l'API OpenAlex (frontière dynamique avec une source externe, schéma non typé).
+Les payloads reçus de l'API sont décrits par `JsonValue` : leur forme est celle qu'ils ont, non celle que le schéma annonce, et chaque champ lu passe par un accesseur qui la contrôle.
 """
 
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any
 
 from domain.publications.identifiers import (
     extract_hal_id_from_url,
@@ -18,6 +18,7 @@ from domain.publications.identifiers import (
     normalize_pmid,
 )
 from domain.publications.metadata import OaStatus
+from domain.types import JsonValue, as_mapping, as_str
 from domain.urls import is_host, url_host
 
 # =============================================================
@@ -76,21 +77,22 @@ class OpenalexLocation:
     source_homepage_url: str | None  # ex. 'https://hal.science'
 
 
-def _parse_one_location(loc: dict[str, Any] | None) -> OpenalexLocation | None:
-    if not loc:
+def _parse_one_location(loc: JsonValue) -> OpenalexLocation | None:
+    loc_fields = as_mapping(loc)
+    if not loc_fields:
         return None
-    src = loc.get("source") or {}
+    src = as_mapping(loc_fields.get("source"))
     return OpenalexLocation(
-        location_id=loc.get("id"),
-        landing_page_url=loc.get("landing_page_url"),
-        source_id=src.get("id"),
-        source_type=src.get("type"),
-        source_display_name=src.get("display_name"),
-        source_homepage_url=src.get("homepage_url"),
+        location_id=as_str(loc_fields.get("id")),
+        landing_page_url=as_str(loc_fields.get("landing_page_url")),
+        source_id=as_str(src.get("id")),
+        source_type=as_str(src.get("type")),
+        source_display_name=as_str(src.get("display_name")),
+        source_homepage_url=as_str(src.get("homepage_url")),
     )
 
 
-def parse_primary_location(work: dict[str, Any]) -> OpenalexLocation | None:
+def parse_primary_location(work: Mapping[str, JsonValue]) -> OpenalexLocation | None:
     """Vue structurée de `work.primary_location`. None si absent."""
     return _parse_one_location(work.get("primary_location"))
 

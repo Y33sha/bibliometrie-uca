@@ -482,7 +482,6 @@ module = [
     "application.ports.pipeline.normalize.staging",
     "application.ports.repositories.*",
     "domain.publications.aggregation",
-    "domain.sources.*",
     "infrastructure.jsonb_models.*",
     "infrastructure.pipeline.*",
     "infrastructure.read_models.*",
