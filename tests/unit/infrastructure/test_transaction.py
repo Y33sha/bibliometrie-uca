@@ -7,16 +7,23 @@ jour perdue côté phase personnes — 5 semaines de runs qui matchaient en mém
 erreur et la tolérance aux commits par lots (phases à progression durable).
 """
 
+import pytest
 from sqlalchemy import create_engine, text
 
 from infrastructure.db.transaction import managed_transaction
 
 
-def _fresh_engine():
+@pytest.fixture
+def engine():
+    """Base SQLite en mémoire, neuve à chaque test et fermée en sortie.
+
+    Sans la fermeture, la connexion du pool survit au test et le ramasse-miettes signale une ressource laissée ouverte.
+    """
     engine = create_engine("sqlite://")
     with engine.begin() as conn:
         conn.execute(text("CREATE TABLE t (id INTEGER)"))
-    return engine
+    yield engine
+    engine.dispose()
 
 
 def _ids(engine):
@@ -24,15 +31,13 @@ def _ids(engine):
         return [row[0] for row in conn.execute(text("SELECT id FROM t ORDER BY id"))]
 
 
-def test_commits_on_success():
-    engine = _fresh_engine()
+def test_commits_on_success(engine):
     with managed_transaction(engine) as conn:
         conn.execute(text("INSERT INTO t VALUES (1)"))
     assert _ids(engine) == [1]
 
 
-def test_rolls_back_on_error():
-    engine = _fresh_engine()
+def test_rolls_back_on_error(engine):
     try:
         with managed_transaction(engine) as conn:
             conn.execute(text("INSERT INTO t VALUES (1)"))
@@ -42,10 +47,9 @@ def test_rolls_back_on_error():
     assert _ids(engine) == []
 
 
-def test_tolerates_batch_commits_and_trailing_write():
+def test_tolerates_batch_commits_and_trailing_write(engine):
     # Phases à progression durable : commits par lots au fil de l'eau + une écriture résiduelle
     # entérinée par le commit de sortie. `Engine.begin` lèverait `InvalidRequestError` ici.
-    engine = _fresh_engine()
     with managed_transaction(engine) as conn:
         conn.execute(text("INSERT INTO t VALUES (1)"))
         conn.commit()
@@ -55,8 +59,7 @@ def test_tolerates_batch_commits_and_trailing_write():
     assert _ids(engine) == [1, 2, 3]
 
 
-def test_closes_connection_on_success():
-    engine = _fresh_engine()
+def test_closes_connection_on_success(engine):
     with managed_transaction(engine) as conn:
         conn.execute(text("INSERT INTO t VALUES (1)"))
     assert conn.closed
