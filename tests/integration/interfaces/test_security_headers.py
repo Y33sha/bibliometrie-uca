@@ -39,7 +39,7 @@ class TestSecurityHeaders:
 class TestPolitiqueDeSecuriteDeContenu:
     """Politique de sécurité de contenu posée en en-tête, en regard de celle que les pages du frontend portent en balise.
 
-    Une balise `<meta>` ne peut pas exprimer `frame-ancestors` : la directive n'a d'effet qu'en en-tête, et c'est la formulation dont `X-Frame-Options` est l'ancêtre. Les réponses de l'API, qui ne rendent que du JSON, portent en plus une politique qui n'autorise aucune ressource.
+    Une balise `<meta>` ne peut pas exprimer `frame-ancestors` : la directive n'a d'effet qu'en en-tête. Les réponses de l'API, qui ne rendent que du JSON, portent en plus une politique qui n'autorise aucune ressource.
     """
 
     def test_toute_reponse_refuse_l_insertion_dans_un_cadre(self, client):
