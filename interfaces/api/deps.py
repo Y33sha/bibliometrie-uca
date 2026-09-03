@@ -115,6 +115,29 @@ def admin_user_or_none(request: Request) -> str | None:
 _READ_ONLY_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 
 
+def _open_connection(request: Request) -> Connection:
+    """Connexion tirée de l'engine, portant les caractéristiques valant pour la requête en cours.
+
+    Sur une méthode de lecture, la transaction s'ouvre **en lecture seule** : PostgreSQL refuse alors tout INSERT, UPDATE, DELETE ou DDL par une erreur `25006`, y compris celui qu'un command handler committerait. La caractéristique se pose avant tout statement, sur une connexion dont la transaction n'est pas encore ouverte, et SQLAlchemy la remet à zéro au retour de la connexion dans le pool.
+
+    Point de passage unique des connexions ouvertes pendant une requête : celle que `db_conn` sert aux dépendances, et celles que `connection_factory` remet à une lecture parallélisée. La règle vaut donc pour toutes, quel que soit le code qui les consomme.
+    """
+    conn = get_sync_engine().connect()
+    if request.method in _READ_ONLY_METHODS:
+        conn.execution_options(postgresql_readonly=True)
+    return conn
+
+
+def connection_factory(request: Request) -> Callable[[], Connection]:
+    """Fabrique de connexions supplémentaires, sous les mêmes caractéristiques que celle de la requête.
+
+    Sert la lecture qui répartit son travail sur plusieurs connexions — les facettes de publications, calculées en parallèle. L'adapter la reçoit par sa construction au lieu d'atteindre l'engine : la lecture seule vaut alors pour toute connexion née pendant la requête, et un contrat d'import tient les adapters à l'écart de l'engine.
+
+    L'appelant referme chaque connexion qu'il ouvre, `Connection` étant son propre gestionnaire de contexte.
+    """
+    return lambda: _open_connection(request)
+
+
 def db_conn(request: Request) -> Iterator[Connection]:
     """Connection SQLAlchemy ouverte pour la durée de la requête, via `Depends(db_conn)`.
 
@@ -122,13 +145,9 @@ def db_conn(request: Request) -> Iterator[Connection]:
 
     En sortie, la transaction est **annulée** (`rollback`) : une session de lecture, ou une session dont le command handler a committé, n'a rien à persister. Du DML qui atteint cette sortie sans commit signale une écriture qui contourne les command handlers : le rollback la perd, et un warning la signale. Toute dépendance qui en dérive (repositories et query adapters) partage la même connexion.
 
-    Sur une méthode de lecture, la transaction s'ouvre **en lecture seule** : PostgreSQL refuse alors tout INSERT, UPDATE, DELETE ou DDL par une erreur `25006`, y compris celui qu'un command handler committerait. Le refus vient de la base et vaut pour toute la surface de lecture, là où le rollback de sortie ne rattrape que l'écriture restée non committée.
+    Sur une méthode de lecture, la connexion s'ouvre en lecture seule (cf. `_open_connection`) : la base refuse alors l'écriture, là où le rollback de sortie ne rattrape que celle restée non committée.
     """
-    engine = get_sync_engine()
-    with engine.connect() as conn:
-        if request.method in _READ_ONLY_METHODS:
-            # Posé avant tout statement : la caractéristique se règle sur une connexion dont la transaction n'est pas encore ouverte, et SQLAlchemy la remet à zéro au retour de la connexion dans le pool.
-            conn.execution_options(postgresql_readonly=True)
+    with _open_connection(request) as conn:
         reset_dml_flag(conn)
         try:
             yield conn
@@ -241,8 +260,9 @@ def structures_queries(conn: Connection = Depends(db_conn)) -> StructuresQueries
 
 def publications_queries(
     conn: Connection = Depends(db_conn),
+    open_connection: Callable[[], Connection] = Depends(connection_factory),
 ) -> PublicationsQueries:
-    return PgPublicationsQueries(conn)
+    return PgPublicationsQueries(conn, open_connection=open_connection)
 
 
 def authorship_repo(conn: Connection = Depends(db_conn)) -> AuthorshipRepository:

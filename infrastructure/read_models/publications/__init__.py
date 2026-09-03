@@ -13,7 +13,7 @@ Les adapters d'écriture pipeline (`pipeline.publications_reconciliation`, `pipe
 # Annotations différées : sinon `list[int]` est résolu comme le sous-module `.list` (le `from .list import …` ci-dessous l'attache au package, et le namespace global du __init__ shadow le builtin `list`).
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 
 from sqlalchemy import Connection
 
@@ -49,8 +49,10 @@ class PgPublicationsQueries(PublicationsQueries):
     Le filtre `has_apc` classe un paiement d'APC en « interne » quand sa structure de budget appartient au périmètre `persons`. L'adapter résout ce périmètre là où il sert : ses appelants n'ont pas à le connaître pour lister des publications.
     """
 
-    def __init__(self, conn: Connection) -> None:
+    def __init__(self, conn: Connection, *, open_connection: Callable[[], Connection]) -> None:
+        """`open_connection` ouvre les connexions supplémentaires dont le calcul parallèle des facettes se sert. Elle est fournie par la composition root, qui y met les caractéristiques de la requête en cours ; l'adapter reçoit ses connexions, il n'en ouvre pas de son propre chef."""
         self._conn = conn
+        self._open_connection = open_connection
 
     def list_publications(
         self,
@@ -74,6 +76,7 @@ class PgPublicationsQueries(PublicationsQueries):
             self._conn,
             filters=filters,
             perimeter_structure_ids=get_persons_structure_ids_list(self._conn),
+            open_connection=self._open_connection,
         )
 
     def publications_entity_facet(
