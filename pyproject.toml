@@ -277,6 +277,16 @@ max-complexity = 15
 # transitivité, sans avoir à suivre les chemins.
 "urllib.request".msg = "Le client HTTP du projet est httpx, et le trafic sortant appartient au pipeline (infrastructure/sources)."
 
+# Le projet n'a qu'un engine, construit par `infrastructure/db/engine.py`, seul endroit d'où
+# une connexion peut naître. C'est lui qui choisit l'identité de connexion selon le processus
+# et qui installe le suivi du DML ; un second engine fabriqué ailleurs porterait ni l'une ni
+# l'autre, et ouvrirait des connexions hors des caractéristiques que la composition root de
+# l'API pose sur les siennes — la lecture seule d'une requête de lecture, en particulier.
+#
+# L'interdiction porte sur tout le dépôt, les exceptions se lisant dans `per-file-ignores` :
+# le constructeur lui-même, et les tests, qui montent leur propre engine sur la base de test.
+"sqlalchemy.create_engine".msg = "L'engine du projet se construit dans infrastructure/db/engine.py, et s'obtient par get_sync_engine."
+
 [tool.ruff.lint.isort]
 # Les couches du projet, déclarées pour que leur classement en premier rang ne dépende
 # pas de l'inférence de ruff, qui varie d'une version à l'autre.
@@ -289,7 +299,10 @@ combine-as-imports = true
 # `S101` : une assertion est le propos d'un test. `S105`/`S106` : les fixtures posent des
 # identifiants factices, nommés pour ce qu'ils sont. `S608` : les tests composent du SQL de
 # jeu de données.
-"tests/*" = ["E402", "S101", "S105", "S106", "S108", "S324", "S608"]
+# `TID251` : les tests montent leur propre engine sur la base de test.
+"tests/*" = ["E402", "S101", "S105", "S106", "S108", "S324", "S608", "TID251"]
+# Le constructeur de l'engine, seul site légitime de `create_engine`.
+"infrastructure/db/engine.py" = ["TID251"]
 # `S608` signale toute interpolation dans une chaîne SQL. Ces couches ont pour métier de
 # composer des requêtes à partir de fragments pris dans des listes blanches écrites en dur
 # (tris, dimensions, colonnes) ; les valeurs issues d'une requête HTTP, elles, passent
