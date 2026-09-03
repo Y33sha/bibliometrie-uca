@@ -108,15 +108,23 @@ def _apply_role_grants() -> None:
         )
     ]
     roles = [
-        (settings.db_app_user, settings.db_app_password),
-        (settings.db_pipeline_user, settings.db_pipeline_password),
+        ("app", settings.db_app_user, settings.db_app_password),
+        ("pipeline", settings.db_pipeline_user, settings.db_pipeline_password),
     ]
+    for identite, nom, _ in roles:
+        if not nom:
+            variable = f"DB_{identite.upper()}_USER"
+            raise RuntimeError(
+                f"{variable} est requis : les tests se connectent sous les rôles de "
+                f"production, et celui du {identite} n'est pas renseigné. Le poser dans "
+                "l'environnement (cf. `.env.example`) ou dans le job d'intégration."
+            )
     args = _admin_connect_args()
     args["dbname"] = DB_NAME
     conn = psycopg.connect(**args)
     conn.autocommit = True
     with conn.cursor() as cur:
-        for nom, mot_de_passe in roles:
+        for _, nom, mot_de_passe in roles:
             cur.execute("SELECT 1 FROM pg_roles WHERE rolname = %s", (nom,))
             if cur.fetchone() is None:
                 # `CREATE ROLE` est une instruction utilitaire : PostgreSQL n'y planifie
