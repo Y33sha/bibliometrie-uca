@@ -19,6 +19,11 @@ class TestSecurityHeaders:
         r = client.get("/api/auth/check")
         assert r.headers["cross-origin-opener-policy"] == "same-origin"
 
+    def test_les_ressources_ne_se_chargent_pas_depuis_un_autre_site(self, client):
+        """Une requête sans CORS venue d'une origine tierce n'obtient rien : le pendant, pour les ressources, de l'isolement du contexte de navigation."""
+        r = client.get("/api/auth/check")
+        assert r.headers["cross-origin-resource-policy"] == "same-origin"
+
     def test_les_en_tetes_couvrent_aussi_l_interface(self, client):
         """Le middleware les pose sur toute réponse, pages du frontend comprises.
 

@@ -328,6 +328,11 @@ _SECURITY_HEADERS = {
     # profil ORCID, identifiant ROR — perd la référence vers celle qui l'a ouverte. `rel="noopener"`
     # pose la même garantie lien par lien ; celle-ci vaut pour tous, sans dépendre de l'attribut.
     "Cross-Origin-Opener-Policy": "same-origin",
+    # Refuse aux autres sites le chargement des ressources de l'application : une requête sans
+    # CORS — image, script, cadre — venue d'une origine tierce n'obtient rien. L'interface, qui
+    # appelle son API en mode CORS, n'est pas concernée : la règle ne porte que sur les requêtes
+    # qui se dispensent de la négociation d'origine.
+    "Cross-Origin-Resource-Policy": "same-origin",
 }
 
 _FRAME_ANCESTORS = "frame-ancestors 'none'"
