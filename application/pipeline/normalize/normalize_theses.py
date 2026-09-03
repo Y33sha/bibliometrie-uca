@@ -14,6 +14,7 @@ from sqlalchemy import Connection
 
 from application.pipeline.normalize._authorships_batch import AddressRecord, write_addresses
 from application.pipeline.normalize.base import SourceNormalizer
+from application.pipeline.normalize.pub_metadata import PublicationMetadata
 from application.pipeline.timings import StepTimer
 from application.ports.pipeline.normalize.authorships import AuthorshipsBatchQueries
 from application.ports.pipeline.normalize.source_publications import (
@@ -29,18 +30,15 @@ from domain.sources.theses import (
     aggregate_thesis_persons,
     derive_theses_doc_type,
 )
-from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str
+from domain.types import JsonValue, as_mapping, as_sequence, as_str
 
 # =============================================================
 # PUBLICATIONS
 # =============================================================
 
 
-def extract_pub_metadata(these: Mapping[str, JsonValue]) -> dict[str, JsonValue]:
-    """Extrait les métadonnées de publication d'une thèse.
-
-    Retourne un dict utilisable par `insert_source_document`.
-    """
+def extract_pub_metadata(these: Mapping[str, JsonValue]) -> PublicationMetadata:
+    """Extrait les métadonnées canoniques d'une thèse."""
     title = as_str(these.get("titrePrincipal"))
     date_soutenance = french_date_to_iso(as_str(these.get("dateSoutenance")))
     date_inscription = french_date_to_iso(as_str(these.get("datePremiereInscriptionDoctorat")))
@@ -52,17 +50,17 @@ def extract_pub_metadata(these: Mapping[str, JsonValue]) -> dict[str, JsonValue]
     doi = clean_doi(as_str(these.get("doi")))
     nnt_clean = normalize_nnt(as_str(these.get("nnt")))
 
-    return {
-        "title": title,
-        "pub_year": pub_year,
-        "doc_type": derive_theses_doc_type(date_soutenance),
-        "doi": doi,
-        "nnt": nnt_clean,
-        "oa_status": "closed",
-        "journal_id": None,
-        "container_title": None,
-        "language": None,
-    }
+    return PublicationMetadata(
+        title=title,
+        pub_year=pub_year,
+        doc_type=derive_theses_doc_type(date_soutenance),
+        doi=doi,
+        nnt=nnt_clean,
+        oa_status="closed",
+        journal_id=None,
+        container_title=None,
+        language=None,
+    )
 
 
 # =============================================================
@@ -112,13 +110,13 @@ def insert_source_document(
     these: Mapping[str, JsonValue],
     staging_id: int,
     theses_id: str,
-    pub_meta: Mapping[str, JsonValue],
+    pub_meta: PublicationMetadata,
 ) -> int:
     """Crée/retrouve l'entrée source_publications pour theses.fr.
 
     Les métadonnées canoniques (titre, doc_type, pub_year, doi, nnt, journal, oa_status, language, container_title) viennent toutes de `pub_meta`, construit en amont par `extract_pub_metadata`. `these` ne sert ici que pour les champs propres aux thèses (sujets, sujetsRameau, discipline, écoles doctorales, partenaires, dates).
     """
-    nnt = pub_meta["nnt"]
+    nnt = pub_meta.nnt
     external_ids = {"nnt": nnt} if nnt else None
 
     # Keywords : sujets (mots-clés auteur)
@@ -148,17 +146,17 @@ def insert_source_document(
             source="theses",
             source_id=theses_id,
             staging_id=staging_id,
-            doi=as_str(pub_meta["doi"]),
+            doi=pub_meta.doi,
             external_ids=external_ids,
-            title=as_str(pub_meta["title"]) or "",
-            pub_year=as_int(pub_meta["pub_year"]),
-            doc_type=as_str(pub_meta["doc_type"]),
-            journal_id=as_int(pub_meta["journal_id"]),
-            container_title=as_str(pub_meta["container_title"]),
-            language=as_str(pub_meta["language"]),
+            title=pub_meta.title or "",
+            pub_year=pub_meta.pub_year,
+            doc_type=pub_meta.doc_type,
+            journal_id=pub_meta.journal_id,
+            container_title=pub_meta.container_title,
+            language=pub_meta.language,
             keywords=keywords,
             topics=topics_json,
-            oa_status=as_str(pub_meta["oa_status"]),
+            oa_status=pub_meta.oa_status,
             meta=source_meta_json,
         ),
     )

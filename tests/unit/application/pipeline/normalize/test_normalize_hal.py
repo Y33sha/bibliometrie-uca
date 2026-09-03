@@ -28,6 +28,7 @@ from application.pipeline.normalize.normalize_hal import (
     upsert_journal,
     upsert_publisher,
 )
+from application.pipeline.normalize.pub_metadata import PublicationMetadata
 from tests.unit.application.pipeline.normalize.doubles import (
     FakeAuthorshipsBatchQueries,
     FakeSourcePublicationQueries,
@@ -131,31 +132,31 @@ class TestUpsertPublisher:
 class TestExtractPubMetadata:
     def test_minimal(self):
         meta = extract_pub_metadata({"title_s": ["T"], "producedDateY_i": 2024}, journal_id=42)
-        assert meta["title"] == "T"
-        assert meta["pub_year"] == 2024
-        assert meta["journal_id"] == 42
+        assert meta.title == "T"
+        assert meta.pub_year == 2024
+        assert meta.journal_id == 42
         # Pas de container_title si journal_id présent.
-        assert meta["container_title"] is None
+        assert meta.container_title is None
 
     def test_book_title_fallback_when_no_journal(self):
         meta = extract_pub_metadata({"bookTitle_s": "Book"}, journal_id=None)
-        assert meta["container_title"] == "Book"
+        assert meta.container_title == "Book"
 
     def test_conference_title_fallback(self):
         meta = extract_pub_metadata({"conferenceTitle_s": "Conf"}, journal_id=None)
-        assert meta["container_title"] == "Conf"
+        assert meta.container_title == "Conf"
 
     def test_language_from_list(self):
         meta = extract_pub_metadata({"language_s": ["fr", "en"]}, journal_id=None)
-        assert meta["language"] == "fr"
+        assert meta.language == "fr"
 
     def test_no_language(self):
         meta = extract_pub_metadata({}, journal_id=None)
-        assert meta["language"] is None
+        assert meta.language is None
 
     def test_nnt_normalized(self):
         meta = extract_pub_metadata({"nntId_s": "  2024CLFAC001  "}, journal_id=None)
-        assert meta["nnt"] == "2024CLFAC001"
+        assert meta.nnt == "2024CLFAC001"
 
 
 # ── active_embargo_until ─────────────────────────────────────────
@@ -334,18 +335,18 @@ class TestInsertHalDocument:
         captured = self._call(
             queries,
             {},
-            pub_meta={
-                "doi": None,
-                "title": None,
-                "pub_year": None,
-                "doc_type": None,
-                "nnt": None,
-                "journal_id": 7,
-                "oa_status": "gold",
-                "embargo_until": date(2027, 1, 1),
-                "language": "fr",
-                "container_title": "Book",
-            },
+            pub_meta=PublicationMetadata(
+                doi=None,
+                title=None,
+                pub_year=None,
+                doc_type=None,
+                nnt=None,
+                journal_id=7,
+                oa_status="gold",
+                embargo_until=date(2027, 1, 1),
+                language="fr",
+                container_title="Book",
+            ),
         )
         assert captured.journal_id == 7
         assert captured.oa_status == "gold"

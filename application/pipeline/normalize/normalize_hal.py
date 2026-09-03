@@ -1,6 +1,7 @@
 """Normalisation des données HAL : staging → tables structurées."""
 
 import logging
+from collections.abc import Mapping
 from datetime import date
 from typing import cast
 from xml.etree.ElementTree import Element, ParseError
@@ -15,6 +16,7 @@ from application.pipeline.normalize._authorships_batch import (
     write_source_authorships,
 )
 from application.pipeline.normalize.bibliographic import BibliographicNormalizer
+from application.pipeline.normalize.pub_metadata import PublicationMetadata
 from application.pipeline.timings import StepTimer
 from application.ports.pipeline.journals import JournalFindOrCreateQueries
 from application.ports.pipeline.normalize.authorships import AuthorshipsBatchQueries
@@ -43,15 +45,15 @@ from domain.publications.identifiers import (
 )
 from domain.publications.metadata import has_minimal_publication_metadata
 from domain.sources.hal import derive_hal_oa_status
-from domain.types import JsonValue
+from domain.types import JsonValue, as_int, as_sequence
 
 # =============================================================
 # UTILITAIRES
 # =============================================================
 
 
-def as_str(value: object) -> str | None:
-    """Extrait une chaîne depuis un champ HAL qui peut être str, list ou None."""
+def as_str(value: JsonValue) -> str | None:
+    """Extrait une chaîne depuis un champ HAL, qui arrive en texte ou en liste (convention Solr)."""
     if value is None:
         return None
     if isinstance(value, list):
@@ -59,14 +61,9 @@ def as_str(value: object) -> str | None:
     return str(value)
 
 
-def get_title(doc: dict) -> str:
+def get_title(doc: Mapping[str, JsonValue]) -> str:
     """Extrait le titre depuis les données HAL."""
-    titles = doc.get("title_s")
-    if isinstance(titles, list) and titles:
-        return titles[0]
-    if isinstance(titles, str):
-        return titles
-    return doc.get("label_s", "")
+    return as_str(doc.get("title_s")) or as_str(doc.get("label_s")) or ""
 
 
 # =============================================================
@@ -82,7 +79,10 @@ def upsert_publisher(
 
 
 def upsert_journal(
-    doc: dict, publisher_id: int | None, *, journal_repo: JournalFindOrCreateQueries
+    doc: Mapping[str, JsonValue],
+    publisher_id: int | None,
+    *,
+    journal_repo: JournalFindOrCreateQueries,
 ) -> int | None:
     """Extrait et trouve/crée la revue depuis les champs HAL."""
     title = as_str(doc.get("journalTitle_s"))
@@ -102,42 +102,44 @@ def upsert_journal(
 # =============================================================
 
 
-def extract_pub_metadata(doc: dict, journal_id: int | None) -> dict:
-    """Extrait les métadonnées de publication d'un document HAL.
+def extract_pub_metadata(
+    doc: Mapping[str, JsonValue], journal_id: int | None
+) -> PublicationMetadata:
+    """Extrait les métadonnées canoniques d'un document HAL.
 
-    Retourne un dict utilisable par `insert_hal_document`. Toutes les valeurs sont brutes — pas de transformation de cohérence. `doc_type` est le concat brut `docType_s_docSubType_s` (ex. `ART_review-article`), pas la valeur canonique : la résolution source→enum (`map_doc_type`) relève de la phase `metadata_correction`, pas du brut stocké dans `source_publications`.
+    Toutes les valeurs sont brutes — pas de transformation de cohérence. `doc_type` est le concat brut `docType_s_docSubType_s` (ex. `ART_review-article`), pas la valeur canonique : la résolution source→enum (`map_doc_type`) relève de la phase `metadata_correction`, pas du brut stocké dans `source_publications`.
     """
     title = get_title(doc)
-    raw_type = doc.get("docType_s") or ""
-    raw_sub = doc.get("docSubType_s") or ""
+    raw_type = as_str(doc.get("docType_s")) or ""
+    raw_sub = as_str(doc.get("docSubType_s")) or ""
     doc_type = f"{raw_type}_{raw_sub}" if raw_sub else raw_type or None
 
-    language_list = doc.get("language_s")
-    language = language_list[0] if isinstance(language_list, list) and language_list else None
+    language = as_str(doc.get("language_s"))
 
     container_title = None
     if not journal_id:
         container_title = as_str(doc.get("bookTitle_s")) or as_str(doc.get("conferenceTitle_s"))
 
-    embargo_until = active_embargo_until(doc.get("label_xml"), today())
+    embargo_until = active_embargo_until(as_str(doc.get("label_xml")), today())
 
-    return {
-        "title": title,
-        "pub_year": doc.get("producedDateY_i"),
-        "doc_type": doc_type,
-        "doi": clean_doi(as_str(doc.get("doiId_s"))),
-        "nnt": normalize_nnt(as_str(doc.get("nntId_s"))),
-        "oa_status": derive_hal_oa_status(
-            doc.get("openAccess_bool"),
-            doc.get("fileMain_s"),
-            doc.get("linkExtId_s"),
+    ouvert = doc.get("openAccess_bool")
+    return PublicationMetadata(
+        title=title,
+        pub_year=as_int(doc.get("producedDateY_i")),
+        doc_type=doc_type,
+        doi=clean_doi(as_str(doc.get("doiId_s"))),
+        nnt=normalize_nnt(as_str(doc.get("nntId_s"))),
+        oa_status=derive_hal_oa_status(
+            ouvert if isinstance(ouvert, bool) else None,
+            as_str(doc.get("fileMain_s")),
+            as_str(doc.get("linkExtId_s")),
             embargo_until,
         ),
-        "embargo_until": embargo_until,
-        "journal_id": journal_id,
-        "container_title": container_title,
-        "language": language,
-    }
+        embargo_until=embargo_until,
+        journal_id=journal_id,
+        container_title=container_title,
+        language=language,
+    )
 
 
 # =============================================================
@@ -145,7 +147,9 @@ def extract_pub_metadata(doc: dict, journal_id: int | None) -> dict:
 # =============================================================
 
 
-def build_hal_external_ids(doc: dict, hal_id: str, nnt: str | None) -> dict[str, JsonValue]:
+def build_hal_external_ids(
+    doc: Mapping[str, JsonValue], hal_id: str, nnt: str | None
+) -> dict[str, JsonValue]:
     """Construit `external_ids` (clés de déduplication cross-source) pour un doc HAL.
 
     `hal_id` est redondant avec `source_id` côté identité, mais on le pose aussi ici pour qu'il devienne un **token de confirmation** (cf. `domain.source_publications.keys`) et que HAL soit clusterisé comme les autres sources — symétrie avec ce que theses fait déjà pour NNT. `pmid` vient du champ `pubmedid_s` ; `pmcid`/`arxiv_id` des liens externes (`linkExtUrl_s`).
@@ -155,10 +159,10 @@ def build_hal_external_ids(doc: dict, hal_id: str, nnt: str | None) -> dict[str,
         external_ids["nnt"] = nnt
     if pmid := normalize_pmid(as_str(doc.get("pubmedid_s"))):
         external_ids["pmid"] = pmid
-    link_urls = doc.get("linkExtUrl_s")
-    if isinstance(link_urls, str):
-        link_urls = [link_urls]
-    for url in link_urls or []:
+    brut = doc.get("linkExtUrl_s")
+    link_urls = [brut] if isinstance(brut, str) else as_sequence(brut)
+    for entree in link_urls:
+        url = as_str(entree)
         if "pmcid" not in external_ids and (pmcid := normalize_pmcid(url)):
             external_ids["pmcid"] = pmcid
         if "arxiv_id" not in external_ids and (arxiv_id := normalize_arxiv_id(url)):
@@ -169,10 +173,10 @@ def build_hal_external_ids(doc: dict, hal_id: str, nnt: str | None) -> dict[str,
 def insert_hal_document(
     conn: Connection,
     queries: SourcePublicationQueries,
-    doc: dict,
+    doc: Mapping[str, JsonValue],
     staging_id: int,
     hal_id: str,
-    pub_meta: dict,
+    pub_meta: PublicationMetadata,
 ) -> int:
     """Crée/retrouve l'entrée source_publications pour HAL.
 
@@ -188,7 +192,7 @@ def insert_hal_document(
         sorted(set(coll_codes)) if isinstance(coll_codes, list) and coll_codes else None
     )
 
-    external_ids = build_hal_external_ids(doc, hal_id, pub_meta["nnt"])
+    external_ids = build_hal_external_ids(doc, hal_id, pub_meta.nnt)
 
     # Abstract
     abstract = as_str(doc.get("abstract_s"))
@@ -239,21 +243,21 @@ def insert_hal_document(
             source="hal",
             source_id=hal_id,
             staging_id=staging_id,
-            doi=pub_meta["doi"],
+            doi=pub_meta.doi,
             external_ids=external_ids,
-            title=pub_meta["title"] or "",
-            pub_year=pub_meta["pub_year"],
-            doc_type=pub_meta["doc_type"],
-            journal_id=pub_meta["journal_id"],
-            container_title=pub_meta["container_title"],
-            language=pub_meta["language"],
+            title=pub_meta.title or "",
+            pub_year=pub_meta.pub_year,
+            doc_type=pub_meta.doc_type,
+            journal_id=pub_meta.journal_id,
+            container_title=pub_meta.container_title,
+            language=pub_meta.language,
             biblio=biblio_json,
             abstract=abstract,
             keywords=keywords,
             topics=topics,
-            oa_status=pub_meta["oa_status"],
+            oa_status=pub_meta.oa_status,
             urls=urls,
-            embargo_until=pub_meta["embargo_until"],
+            embargo_until=pub_meta.embargo_until,
             hal_collections=collections_array,
         ),
     )
@@ -352,7 +356,7 @@ def parse_tei_author_identifiers(label_xml: str | None) -> list[dict[str, str]]:
 
 
 def parse_author_structures(
-    doc: dict,
+    doc: Mapping[str, JsonValue],
     struct_name_by_hal_id: dict[str, str] | None = None,
 ) -> dict[int, set[str]]:
     """Parse les structures d'affiliation pour extraire le mapping `form_id → {halId_s natifs (text)}`.
@@ -363,10 +367,15 @@ def parse_author_structures(
 
     Si `struct_name_by_hal_id` est fourni, est rempli avec le mapping `halId_s → nom_structure` parsé depuis le document (utile pour construire les adresses).
     """
-    entries = doc.get("authIdHasPrimaryStructure_fs") or doc.get("authIdHasStructure_fs") or []
+    entries = as_sequence(
+        doc.get("authIdHasPrimaryStructure_fs") or doc.get("authIdHasStructure_fs")
+    )
     form_structs: dict[int, set[str]] = {}
 
-    for entry in entries:
+    for entree in entries:
+        entry = as_str(entree)
+        if entry is None:
+            continue
         parts = entry.split("_JoinSep_")
         if len(parts) != 2:
             continue
@@ -400,7 +409,7 @@ def parse_author_structures(
     return form_structs
 
 
-def build_hal_author_records(doc: dict) -> list[AuthorRecord]:
+def build_hal_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecord]:
     """Parse les auteurs d'un document HAL en `AuthorRecord` (sans I/O).
 
     - Parse les champs alignés pour extraire hal_person_id, idhal et form_id
@@ -409,16 +418,20 @@ def build_hal_author_records(doc: dict) -> list[AuthorRecord]:
 
     Un `hal_person_id` listé sur plusieurs auteurs du même dépôt (erreur de saisie HAL) rend toute l'identité de ces signatures douteuse : tous les identifiants (hal_person_id/idref/idhal/orcid, attachés au compte HAL) sont alors rangés sous une clé suffixée `_dubious` — valeur conservée mais écartée du matching personnes.
     """
-    qualities = doc.get("authQuality_s") or []
+    qualities = [as_str(q) for q in as_sequence(doc.get("authQuality_s"))]
     # ORCID et IdRef par auteur : parsés depuis le TEI (label_xml), seul champ HAL qui les attache proprement à chaque position d'auteur.
-    tei_ids = parse_tei_author_identifiers(doc.get("label_xml"))
+    tei_ids = parse_tei_author_identifiers(as_str(doc.get("label_xml")))
 
     # authFullNameFormIDPersonIDIDHal_fs :
     #   "Nom_FacetSep_formId-personId_FacetSep_idhal" — aligné par position.
     # Présence validée par le caller ; on en extrait nom, form_id, person_id.
     # Le 3e segment (idhal) est IGNORÉ : non fiable — quand l'auteur n'a pas de slug, HAL y recopie le person_id numérique, ce qui injecterait de faux idhal numériques (== hal_person_id).
     # L'idhal vient du seul TEI (`parse_tei_author_identifiers`, qui ne garde que notation="string").
-    composite = doc.get("authFullNameFormIDPersonIDIDHal_fs") or []
+    composite = [
+        entry
+        for e in as_sequence(doc.get("authFullNameFormIDPersonIDIDHal_fs"))
+        if (entry := as_str(e))
+    ]
     names = [entry.split("_FacetSep_", 1)[0] for entry in composite]
     form_id_by_pos: dict[int, int | None] = {}
     hal_person_id_by_pos: dict[int, int | None] = {}
@@ -497,7 +510,7 @@ def build_hal_author_records(doc: dict) -> list[AuthorRecord]:
 def process_authorships(
     conn: Connection,
     authorship_queries: AuthorshipsBatchQueries,
-    doc: dict,
+    doc: Mapping[str, JsonValue],
     source_publication_id: int,
 ) -> None:
     """Parse les auteurs HAL puis écrit les authorships en batch."""

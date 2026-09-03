@@ -475,7 +475,6 @@ module = [
     "application.pipeline.extract.refetch_truncated",
     "application.pipeline.logging_scope",
     "application.pipeline.normalize.base",
-    "application.pipeline.normalize.normalize_hal",
     "application.pipeline.normalize.normalize_openalex",
     "application.pipeline.normalize.normalize_scanr",
     "application.pipeline.normalize.normalize_wos",
