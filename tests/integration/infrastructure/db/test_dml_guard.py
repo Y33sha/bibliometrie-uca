@@ -18,7 +18,13 @@ from types import SimpleNamespace
 import pytest
 from sqlalchemy import URL, Engine, create_engine, text
 
-from infrastructure.db.dml_guard import has_uncommitted_dml, install_dml_guard, reset_dml_flag
+from infrastructure.db.dml_guard import (
+    _on_release_savepoint,
+    _on_rollback_savepoint,
+    has_uncommitted_dml,
+    install_dml_guard,
+    reset_dml_flag,
+)
 
 
 def _test_url() -> URL:
@@ -121,6 +127,14 @@ class TestDmlFlag:
         probe_conn.execute(text("INSERT INTO _dml_probe VALUES (9)"))
         sp.rollback()
         assert has_uncommitted_dml(probe_conn)
+
+    @pytest.mark.parametrize("sortie", [_on_rollback_savepoint, _on_release_savepoint])
+    def test_fin_de_savepoint_sans_trace_est_sans_effet(self, probe_conn, sortie):
+        """Un commit efface la pile des savepoints : la fin d'un savepoint ouvert avant lui ne trouve plus sa trace, et passe sans erreur plutôt que d'échouer sur une pile vide."""
+        probe_conn.execute(text("INSERT INTO _dml_probe VALUES (11)"))
+        probe_conn.commit()  # efface le flag et la pile
+        sortie(probe_conn, "sp_oublie", None)
+        assert not has_uncommitted_dml(probe_conn)
 
     def test_savepoint_release_keeps_dirty(self, probe_conn):
         # Savepoint relâché (commit) : ses écritures sont conservées → reste dirty.

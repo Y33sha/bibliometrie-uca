@@ -41,6 +41,18 @@ class TestReadSession:
     def test_rejects_malformed_tokens(self, token):
         assert read_session(token) is None
 
+    def test_rejects_a_signed_payload_without_a_timestamp(self):
+        """Signature valable, payload amputé de son horodatage : le jeton est refusé.
+
+        Le jeton est forgé avec la clé du service : c'est le seul moyen d'atteindre le contrôle de forme, la signature étant vérifiée d'abord.
+        """
+        payload = "admin"
+        assert read_session(f"{payload}.{session_module._sign(payload)}") is None
+
+    def test_rejects_a_signed_payload_whose_timestamp_is_not_a_number(self):
+        payload = f"admin{session_module._PAYLOAD_SEPARATOR}hier"
+        assert read_session(f"{payload}.{session_module._sign(payload)}") is None
+
     def test_reads_a_user_bearing_the_payload_separator(self):
         """Le séparateur est cherché en partant de la fin : l'horodatage est le dernier champ, non le second."""
         assert read_session(issue_token("admin|prod")) == "admin|prod"
