@@ -19,6 +19,11 @@ from application.pipeline.normalize.normalize_datacite import (
     upsert_journal,
     upsert_publisher,
 )
+from tests.unit.application.pipeline.normalize.doubles import (
+    FakeSourcePublicationQueries,
+    FakeStagingQueries,
+    staging_row,
+)
 
 
 class TestAuthorRecords:
@@ -349,39 +354,31 @@ class TestProcessWork:
         monkeypatch.setattr(normalize_datacite, "upsert_journal", lambda a, p, **kw: None)
         monkeypatch.setattr(normalize_datacite, "process_authorships", lambda *a, **kw: None)
 
-    def _run(self, raw, source_publication_queries, staging_queries, staging_row, logger, doi=None):
-        row = staging_row(staging_id=42, raw=raw, doi=doi)
-        return process_work(
-            MagicMock(),
-            source_publication_queries,
-            logger,
-            row,
-            **self._kwargs(source_publication_queries, staging_queries),
-        )
+    @pytest.fixture
+    def queries(self) -> FakeSourcePublicationQueries:
+        return FakeSourcePublicationQueries()
 
-    def test_document_verse_et_ligne_marquee(
-        self, source_publication_queries, staging_queries, staging_row, logger
-    ):
-        rendu = self._run(
-            {"attributes": _attributs()},
-            source_publication_queries,
-            staging_queries,
-            staging_row,
-            logger,
-        )
+    @pytest.fixture
+    def staging(self) -> FakeStagingQueries:
+        return FakeStagingQueries()
+
+    def _run(self, raw, queries, staging, logger, doi=None):
+        row = staging_row(staging_id=42, raw=raw, doi=doi)
+        return process_work(MagicMock(), queries, logger, row, **self._kwargs(queries, staging))
+
+    def test_document_verse_et_ligne_marquee(self, queries, staging, logger):
+        rendu = self._run({"attributes": _attributs()}, queries, staging, logger)
 
         assert rendu is True
-        assert staging_queries.marked_done == [42]
-        (document,) = source_publication_queries.upserted_documents
+        assert staging.marked_done == [42]
+        (document,) = queries.upserted_documents
         assert document.source == "datacite"
         assert document.doi == "10.5281/zenodo.1"
         assert document.title == "Un jeu de données"
         assert document.pub_year == 2024
         assert document.oa_status is None  # DataCite ne renseigne pas l'accès ouvert
 
-    def test_dois_apparentes_rassembles(
-        self, source_publication_queries, staging_queries, staging_row, logger
-    ):
+    def test_dois_apparentes_rassembles(self, queries, staging, logger):
         attributs = _attributs(
             relatedIdentifiers=[
                 {
@@ -392,26 +389,18 @@ class TestProcessWork:
             ]
         )
 
-        self._run(
-            {"attributes": attributs},
-            source_publication_queries,
-            staging_queries,
-            staging_row,
-            logger,
-        )
+        self._run({"attributes": attributs}, queries, staging, logger)
 
-        (document,) = source_publication_queries.upserted_documents
+        (document,) = queries.upserted_documents
         assert document.external_ids == {"related_dois": ["10.5281/zenodo.0"]}
 
-    def test_payload_vide_est_passe(
-        self, source_publication_queries, staging_queries, staging_row, logger
-    ):
+    def test_payload_vide_est_passe(self, queries, staging, logger):
         """Une ligne sans contenu — souche d'un document introuvable — est marquée sans verdict."""
-        rendu = self._run(None, source_publication_queries, staging_queries, staging_row, logger)
+        rendu = self._run(None, queries, staging, logger)
 
         assert rendu is None
-        assert staging_queries.marked_done == [42]
-        assert source_publication_queries.upserted_documents == []
+        assert staging.marked_done == [42]
+        assert queries.upserted_documents == []
 
     @pytest.mark.parametrize(
         ("raw", "motif"),
@@ -422,35 +411,26 @@ class TestProcessWork:
             ({"attributes": {"doi": "10.1/a", "titles": [{"title": "T"}]}}, "sans année"),
         ],
     )
-    def test_document_refuse_mais_ligne_marquee(
-        self, raw, motif, source_publication_queries, staging_queries, staging_row, logger
-    ):
-        rendu = self._run(raw, source_publication_queries, staging_queries, staging_row, logger)
+    def test_document_refuse_mais_ligne_marquee(self, raw, motif, queries, staging, logger):
+        rendu = self._run(raw, queries, staging, logger)
 
         assert rendu is False, motif
-        assert staging_queries.marked_done == [42]  # sans quoi la ligne reviendrait à chaque passe
-        assert source_publication_queries.upserted_documents == []
+        assert staging.marked_done == [42]  # sans quoi la ligne reviendrait à chaque passe
+        assert queries.upserted_documents == []
 
-    def test_doi_repris_du_staging_a_defaut_des_metadonnees(
-        self, source_publication_queries, staging_queries, staging_row, logger
-    ):
+    def test_doi_repris_du_staging_a_defaut_des_metadonnees(self, queries, staging, logger):
         attributs = _attributs()
         del attributs["doi"]
 
         rendu = self._run(
-            {"attributes": attributs},
-            source_publication_queries,
-            staging_queries,
-            staging_row,
-            logger,
-            doi="10.5281/zenodo.9",
+            {"attributes": attributs}, queries, staging, logger, doi="10.5281/zenodo.9"
         )
 
         assert rendu is True
-        assert source_publication_queries.upserted_documents[0].doi == "10.5281/zenodo.9"
+        assert queries.upserted_documents[0].doi == "10.5281/zenodo.9"
 
 
-def test_le_normalizer_delegue_a_la_boucle(monkeypatch, staging_row):
+def test_le_normalizer_delegue_a_la_boucle(monkeypatch):
     """La classe ne fait que rassembler ses dépendances et passer la main."""
     vus: dict[str, object] = {}
     monkeypatch.setattr(

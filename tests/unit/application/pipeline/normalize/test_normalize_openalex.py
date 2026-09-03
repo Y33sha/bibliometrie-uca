@@ -2,7 +2,7 @@
 
 Couvre les helpers de parsing (extract_locations_data, reconstruct_abstract, extract_topics), les branches de `upsert_journal` / `insert_openalex_document`, le parsing auteurs `build_openalex_author_records`, l'orchestrateur `process_work`, et la classe `OpenalexNormalizer` (preload_caches / process_work wrapper / summary_stats).
 
-Pattern : `_FakeQueries` + `MagicMock` pour repos / authorship_queries. Pas de DB.
+Pattern : `FakeSourcePublicationQueries` + `MagicMock` pour repos / authorship_queries. Pas de DB.
 """
 
 from __future__ import annotations
@@ -26,33 +26,13 @@ from application.pipeline.normalize.normalize_openalex import (
     reconstruct_abstract,
     upsert_journal,
 )
-from application.ports.pipeline.normalize.source_publications import SourcePublicationRow
-from application.ports.pipeline.normalize.staging import StagingRow
+from tests.unit.application.pipeline.normalize.doubles import (
+    FakeSourcePublicationQueries,
+    FakeStagingQueries,
+    staging_row,
+)
 
 # ── Helpers de fabrication de données de test ────────────────────
-
-
-def _staging_row(staging_id=1, source_id="W:1", doi=None, raw=None):
-    return StagingRow(id=staging_id, source_id=source_id, doi=doi, raw_data=raw or {})
-
-
-class _FakeQueries:
-    """Stub minimal du port `SourcePublicationQueries`."""
-
-    def __init__(self) -> None:
-        self.upserted_documents: list[SourcePublicationRow] = []
-
-    def upsert_source_publication(self, conn, row) -> int:
-        self.upserted_documents.append(row)
-        return 999
-
-
-class _FakeStagingQueries:
-    def __init__(self) -> None:
-        self.marked_done: list[int] = []
-
-    def mark_done(self, conn, staging_id: int) -> None:
-        self.marked_done.append(staging_id)
 
 
 # ── extract_locations_data ───────────────────────────────────────
@@ -343,7 +323,9 @@ class TestExtractPubMetadata:
 
 
 class TestInsertOpenalexDocument:
-    def _call(self, queries: _FakeQueries, work: dict, *, pub_meta: dict | None = None) -> dict:
+    def _call(
+        self, queries: FakeSourcePublicationQueries, work: dict, *, pub_meta: dict | None = None
+    ) -> dict:
         # Par défaut, pub_meta est dérivé via extract_pub_metadata pour rester
         # cohérent avec le flux réel (extract → insert). Tests qui veulent
         # forcer une valeur passent un pub_meta explicite.
@@ -353,13 +335,13 @@ class TestInsertOpenalexDocument:
         return queries.upserted_documents[-1]
 
     def test_keywords_list_of_strings(self):
-        queries = _FakeQueries()
+        queries = FakeSourcePublicationQueries()
         work = {"id": "https://openalex.org/W1", "keywords": ["a", "b"]}
         captured = self._call(queries, work)
         assert captured.keywords == ["a", "b"]
 
     def test_keywords_list_of_dicts(self):
-        queries = _FakeQueries()
+        queries = FakeSourcePublicationQueries()
         work = {
             "id": "https://openalex.org/W1",
             "keywords": [{"keyword": "kw1"}, {"keyword": "kw2"}],
@@ -368,13 +350,13 @@ class TestInsertOpenalexDocument:
         assert captured.keywords == ["kw1", "kw2"]
 
     def test_keywords_not_a_list(self):
-        queries = _FakeQueries()
+        queries = FakeSourcePublicationQueries()
         work = {"id": "https://openalex.org/W1", "keywords": "scalar"}
         captured = self._call(queries, work)
         assert captured.keywords is None
 
     def test_biblio_extracted(self):
-        queries = _FakeQueries()
+        queries = FakeSourcePublicationQueries()
         work = {
             "id": "https://openalex.org/W1",
             "biblio": {"volume": "10", "issue": "2", "first_page": "100", "last_page": "120"},
@@ -388,18 +370,18 @@ class TestInsertOpenalexDocument:
         }
 
     def test_biblio_partial_drops_empty_keys(self):
-        queries = _FakeQueries()
+        queries = FakeSourcePublicationQueries()
         work = {"id": "https://openalex.org/W1", "biblio": {"volume": "10"}}
         captured = self._call(queries, work)
         assert captured.biblio == {"volume": "10"}
 
     def test_biblio_empty_is_none(self):
-        queries = _FakeQueries()
+        queries = FakeSourcePublicationQueries()
         captured = self._call(queries, {"id": "https://openalex.org/W1", "biblio": {}})
         assert captured.biblio is None
 
     def test_related_dois_excludes_primary(self):
-        queries = _FakeQueries()
+        queries = FakeSourcePublicationQueries()
         work = {
             "id": "https://openalex.org/W1",
             "doi": "https://doi.org/10.1/primary",
@@ -412,7 +394,7 @@ class TestInsertOpenalexDocument:
         assert captured.external_ids["related_dois"] == ["10.2/preprint"]
 
     def test_related_dois_absent_when_only_primary(self):
-        queries = _FakeQueries()
+        queries = FakeSourcePublicationQueries()
         work = {
             "id": "https://openalex.org/W1",
             "doi": "https://doi.org/10.1/primary",
@@ -422,7 +404,7 @@ class TestInsertOpenalexDocument:
         assert "related_dois" not in (captured.external_ids or {})
 
     def test_biblio_publisher_and_journal_from_primary_location(self):
-        queries = _FakeQueries()
+        queries = FakeSourcePublicationQueries()
         work = {
             "id": "https://openalex.org/W1",
             "primary_location": {
@@ -457,7 +439,7 @@ class TestInsertOpenalexDocument:
         monkeypatch.setattr(normalize_openalex, "parse_primary_location", lambda w: _PrimaryStub())
         monkeypatch.setattr(normalize_openalex, "is_theses_fr_location", lambda p: False)
         monkeypatch.setattr(normalize_openalex, "should_skip_publisher_journal", lambda p: True)
-        queries = _FakeQueries()
+        queries = FakeSourcePublicationQueries()
         work = {
             "id": "https://openalex.org/W1",
             "primary_location": {"source": {"host_organization_name": "HAL"}},
@@ -467,7 +449,7 @@ class TestInsertOpenalexDocument:
 
     def test_pub_meta_nnt_passed_through_to_external_ids(self):
         """insert lit pub_meta["nnt"] et le pose dans external_ids."""
-        queries = _FakeQueries()
+        queries = FakeSourcePublicationQueries()
         work = {"id": "https://openalex.org/W1"}
         pub_meta = extract_pub_metadata(work, journal_id=None)
         pub_meta["nnt"] = "2024CLFAC001"
@@ -477,7 +459,7 @@ class TestInsertOpenalexDocument:
 
     def test_pub_meta_source_doi_passed_through(self):
         """Si `pub_meta` contient `source_doi`, il est repris dans external_ids."""
-        queries = _FakeQueries()
+        queries = FakeSourcePublicationQueries()
         work = {"id": "https://openalex.org/W1"}
         pub_meta = extract_pub_metadata(work, journal_id=None)
         pub_meta["source_doi"] = "10.1234/abc"
@@ -621,19 +603,19 @@ def stub_orchestration_deps(monkeypatch):
 class TestProcessWork:
     def _kwargs(self, queries=None, staging_queries=None, logger_=None):
         return {
-            "queries": queries or _FakeQueries(),
+            "queries": queries or FakeSourcePublicationQueries(),
             "logger": logger_ or logging.getLogger("test"),
             "journal_repo": MagicMock(),
             "publisher_repo": MagicMock(),
             "publication_repo": MagicMock(),
-            "staging_queries": staging_queries or _FakeStagingQueries(),
+            "staging_queries": staging_queries or FakeStagingQueries(),
             "authorship_queries": MagicMock(),
         }
 
     def test_happy_path(self, stub_orchestration_deps):
-        queries = _FakeQueries()
-        sq = _FakeStagingQueries()
-        row = _staging_row(
+        queries = FakeSourcePublicationQueries()
+        sq = FakeStagingQueries()
+        row = staging_row(
             staging_id=1, source_id="W1", doi="10.1/a", raw={"id": "https://openalex.org/W1"}
         )
         kw = self._kwargs(queries=queries, staging_queries=sq)
@@ -653,7 +635,7 @@ class TestProcessWork:
         monkeypatch.setattr(normalize_openalex, "insert_openalex_document", lambda *a, **kw: 555)
         monkeypatch.setattr(normalize_openalex, "process_authorships", lambda *a, **kw: None)
 
-        row = _staging_row()
+        row = staging_row()
         result = process_work(MagicMock(), staging_row=row, **self._kwargs())
         assert result is True
 
@@ -664,7 +646,7 @@ class TestProcessWork:
             "parse_primary_location",
             lambda w: (_ for _ in ()).throw(RuntimeError("boom")),
         )
-        row = _staging_row(staging_id=1, source_id="W1")
+        row = staging_row(staging_id=1, source_id="W1")
         with pytest.raises(RuntimeError, match="boom"):
             process_work(MagicMock(), staging_row=row, **self._kwargs())
 
@@ -676,8 +658,8 @@ def _make_normalizer():
     return OpenalexNormalizer(
         conn=MagicMock(),
         logger=logging.getLogger("test"),
-        staging_queries=_FakeStagingQueries(),
-        queries=_FakeQueries(),
+        staging_queries=FakeStagingQueries(),
+        queries=FakeSourcePublicationQueries(),
         journal_repo_factory=lambda c: MagicMock(),
         publisher_repo_factory=lambda c: MagicMock(),
         publication_repo_factory=lambda c: MagicMock(),
@@ -703,7 +685,7 @@ class TestOpenalexNormalizerClass:
             return True
 
         monkeypatch.setattr(normalize_openalex, "process_work", fake_process)
-        result = norm.process_work(MagicMock(), _staging_row())
+        result = norm.process_work(MagicMock(), staging_row())
         assert result is True
         # Les dépendances injectées sont passées en kwargs.
         assert set(captured.keys()) >= {

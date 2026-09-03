@@ -2,7 +2,7 @@
 
 Couvre `extract_pub_metadata` (cascade pub_year soutenance/inscription, NNT, doc_type), `_build_source_meta` (date_soutenance, date_inscription, discipline, écoles doctorales, partenaires), `insert_source_document` (keywords sujets, topics discipline+rameau, NNT external_ids), `process_authorships` (aggregate_thesis_persons, partenaires + établissement → adresses partagées), `process_work` (skip sans titre, happy path, exception), et la classe `ThesesNormalizer` (preload, process_work wrapper, summary_stats).
 
-Pattern : `_FakeQueries` + `MagicMock`, pas de DB.
+Pattern : `FakeSourcePublicationQueries` + `MagicMock`, pas de DB.
 """
 
 from __future__ import annotations
@@ -22,23 +22,13 @@ from application.pipeline.normalize.normalize_theses import (
     process_authorships,
     process_work,
 )
-from application.ports.pipeline.normalize.source_publications import SourcePublicationRow
-from application.ports.pipeline.normalize.staging import StagingRow
+from tests.unit.application.pipeline.normalize.doubles import (
+    FakeSourcePublicationQueries,
+    FakeStagingQueries,
+    staging_row,
+)
 
 # ── Stubs ────────────────────────────────────────────────────────
-
-
-def _staging_row(staging_id=1, theses_id="2024CLFAC001", raw=None):
-    return StagingRow(id=staging_id, source_id=theses_id, doi=None, raw_data=raw or {})
-
-
-class _FakeQueries:
-    def __init__(self) -> None:
-        self.upserted_documents: list[SourcePublicationRow] = []
-
-    def upsert_source_publication(self, conn, row) -> int:
-        self.upserted_documents.append(row)
-        return 999
 
 
 class _FakeBatchQueries:
@@ -54,14 +44,6 @@ class _FakeBatchQueries:
     def upsert_source_authorship(self, conn, item) -> int:
         self.upserted_authorships.append(item)
         return 100 + len(self.upserted_authorships)
-
-
-class _FakeStagingQueries:
-    def __init__(self) -> None:
-        self.marked_done: list[int] = []
-
-    def mark_done(self, conn, staging_id: int) -> None:
-        self.marked_done.append(staging_id)
 
 
 # ── extract_pub_metadata ─────────────────────────────────────────
@@ -180,7 +162,9 @@ class TestInsertSourceDocument:
         base.update(overrides)
         return base
 
-    def _call(self, queries: _FakeQueries, these: dict, *, pub_meta: dict | None = None) -> dict:
+    def _call(
+        self, queries: FakeSourcePublicationQueries, these: dict, *, pub_meta: dict | None = None
+    ) -> dict:
         insert_source_document(
             MagicMock(),
             queries,
@@ -192,33 +176,33 @@ class TestInsertSourceDocument:
         return queries.upserted_documents[-1]
 
     def test_nnt_goes_in_external_ids(self):
-        queries = _FakeQueries()
+        queries = FakeSourcePublicationQueries()
         captured = self._call(queries, {}, pub_meta=self._pub_meta(nnt="2024CLFAC001"))
         assert captured.external_ids == {"nnt": "2024CLFAC001"}
 
     def test_no_nnt_no_external_ids(self):
-        queries = _FakeQueries()
+        queries = FakeSourcePublicationQueries()
         captured = self._call(queries, {})
         assert captured.external_ids is None
 
     def test_keywords_from_sujets(self):
-        queries = _FakeQueries()
+        queries = FakeSourcePublicationQueries()
         these = {"sujets": [{"libelle": "machine learning"}, {"libelle": "NLP"}, {}]}
         captured = self._call(queries, these)
         assert captured.keywords == ["machine learning", "NLP"]
 
     def test_no_keywords(self):
-        queries = _FakeQueries()
+        queries = FakeSourcePublicationQueries()
         captured = self._call(queries, {})
         assert captured.keywords is None
 
     def test_topics_discipline_only(self):
-        queries = _FakeQueries()
+        queries = FakeSourcePublicationQueries()
         captured = self._call(queries, {"discipline": "Informatique"})
         assert captured.topics == {"discipline": "Informatique"}
 
     def test_topics_with_rameau(self):
-        queries = _FakeQueries()
+        queries = FakeSourcePublicationQueries()
         these = {
             "discipline": "Informatique",
             "sujetsRameau": [{"libelle": "Apprentissage automatique"}, {}],
@@ -230,17 +214,17 @@ class TestInsertSourceDocument:
         }
 
     def test_no_topics(self):
-        queries = _FakeQueries()
+        queries = FakeSourcePublicationQueries()
         captured = self._call(queries, {})
         assert captured.topics is None
 
     def test_source_meta_passed(self):
-        queries = _FakeQueries()
+        queries = FakeSourcePublicationQueries()
         captured = self._call(queries, {"dateSoutenance": "15/03/2024"})
         assert captured.meta == {"date_soutenance": "2024-03-15"}
 
     def test_title_empty_string_when_none(self):
-        queries = _FakeQueries()
+        queries = FakeSourcePublicationQueries()
         captured = self._call(queries, {}, pub_meta=self._pub_meta(title=None))
         assert captured.title == ""
 
@@ -343,16 +327,16 @@ class TestProcessPersons:
 class TestProcessWork:
     def _kwargs(self, queries=None, staging_queries=None):
         return {
-            "queries": queries or _FakeQueries(),
+            "queries": queries or FakeSourcePublicationQueries(),
             "logger": logging.getLogger("test"),
             "publication_repo": MagicMock(),
-            "staging_queries": staging_queries or _FakeStagingQueries(),
+            "staging_queries": staging_queries or FakeStagingQueries(),
             "batch_queries": MagicMock(),
         }
 
     def test_skip_when_no_title(self, caplog):
-        sq = _FakeStagingQueries()
-        row = _staging_row(staging_id=7, theses_id="2024CLFAC001", raw={})
+        sq = FakeStagingQueries()
+        row = staging_row(staging_id=7, source_id="2024CLFAC001", raw={})
         with caplog.at_level(logging.WARNING):
             result = process_work(MagicMock(), staging_row=row, **self._kwargs(staging_queries=sq))
         assert result is False
@@ -362,8 +346,8 @@ class TestProcessWork:
 
     def test_happy_path(self, monkeypatch):
         monkeypatch.setattr(normalize_theses, "aggregate_thesis_persons", lambda these: [])
-        sq = _FakeStagingQueries()
-        row = _staging_row(staging_id=42, raw={"titrePrincipal": "T"})
+        sq = FakeStagingQueries()
+        row = staging_row(staging_id=42, raw={"titrePrincipal": "T"})
         result = process_work(MagicMock(), staging_row=row, **self._kwargs(staging_queries=sq))
         assert result is True
         assert sq.marked_done == [42]
@@ -375,7 +359,7 @@ class TestProcessWork:
             raise RuntimeError("kaboom")
 
         monkeypatch.setattr(normalize_theses, "insert_source_document", boom)
-        row = _staging_row(theses_id="hal-x", raw={"titrePrincipal": "T"})
+        row = staging_row(source_id="hal-x", raw={"titrePrincipal": "T"})
         with pytest.raises(RuntimeError, match="kaboom"):
             process_work(MagicMock(), staging_row=row, **self._kwargs())
 
@@ -387,8 +371,8 @@ def _make_normalizer():
     return ThesesNormalizer(
         conn=MagicMock(),
         logger=logging.getLogger("test"),
-        staging_queries=_FakeStagingQueries(),
-        queries=_FakeQueries(),
+        staging_queries=FakeStagingQueries(),
+        queries=FakeSourcePublicationQueries(),
         publication_repo_factory=lambda c: MagicMock(),
         batch_queries=MagicMock(),
     )
@@ -404,5 +388,5 @@ class TestThesesNormalizerClass:
         norm = _make_normalizer()
         norm.preload_caches(MagicMock())
         monkeypatch.setattr(normalize_theses, "process_work", lambda *a, **kw: True)
-        result = norm.process_work(MagicMock(), _staging_row())
+        result = norm.process_work(MagicMock(), staging_row())
         assert result is True
