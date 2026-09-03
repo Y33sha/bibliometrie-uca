@@ -111,15 +111,24 @@ def admin_user_or_none(request: Request) -> str | None:
 # ----- Factories DB -----
 
 
+# Méthodes HTTP sans effet de bord attendu. Starlette sert `HEAD` par la route `GET` correspondante, et `OPTIONS` par le middleware CORS : les trois passent par les mêmes dépendances.
+_READ_ONLY_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
+
+
 def db_conn(request: Request) -> Iterator[Connection]:
     """Connection SQLAlchemy ouverte pour la durée de la requête, via `Depends(db_conn)`.
 
     La persistance est la prérogative du use case : un command handler de la couche application appelle `conn.commit()` lui-même avant de retourner, ce qui persiste la donnée *avant* l'envoi de la réponse. FastAPI exécute le teardown des dépendances `yield` après cet envoi : un commit placé ici arriverait trop tard, et un GET ou une tâche de fond déclenchés dans l'intervalle liraient l'état antérieur.
 
     En sortie, la transaction est **annulée** (`rollback`) : une session de lecture, ou une session dont le command handler a committé, n'a rien à persister. Du DML qui atteint cette sortie sans commit signale une écriture qui contourne les command handlers : le rollback la perd, et un warning la signale. Toute dépendance qui en dérive (repositories et query adapters) partage la même connexion.
+
+    Sur une méthode de lecture, la transaction s'ouvre **en lecture seule** : PostgreSQL refuse alors tout INSERT, UPDATE, DELETE ou DDL par une erreur `25006`, y compris celui qu'un command handler committerait. Le refus vient de la base et vaut pour toute la surface de lecture, là où le rollback de sortie ne rattrape que l'écriture restée non committée.
     """
     engine = get_sync_engine()
     with engine.connect() as conn:
+        if request.method in _READ_ONLY_METHODS:
+            # Posé avant tout statement : la caractéristique se règle sur une connexion dont la transaction n'est pas encore ouverte, et SQLAlchemy la remet à zéro au retour de la connexion dans le pool.
+            conn.execution_options(postgresql_readonly=True)
         reset_dml_flag(conn)
         try:
             yield conn
