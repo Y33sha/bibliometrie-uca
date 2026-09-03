@@ -5,6 +5,15 @@
 # Le backend sert l'API + le frontend buildé (SPA).
 # Pas de conteneur frontend séparé.
 
+# Journal borné sur le disque de l'hôte : passé le plafond, Docker écarte les tranches les
+# plus anciennes. Sans lui, un afflux de requêtes journalisées remplit la partition et arrête
+# les services. La trace des actions d'administration, elle, vit dans la table d'audit.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 services:
   # ---- PostgreSQL ----
   db:
@@ -25,6 +34,7 @@ services:
     # propriétaire que l'image donne à `/var/lib/postgresql` ; un montage lié, lui, demanderait
     # que l'hôte l'ajuste d'abord.
     user: postgres
+    logging: *logging
     security_opt:
       - no-new-privileges:true
     # Aucune capacité du noyau : sans la bascule d'identité du point d'entrée, la base n'en
@@ -35,8 +45,8 @@ services:
     # temporaire et le répertoire de sockets vivent en mémoire.
     read_only: true
     tmpfs:
-      - /tmp
-      - /var/run/postgresql
+      - /tmp:nosuid
+      - /var/run/postgresql:nosuid
     # Plafonds de ressources : bornent au conteneur l'effet d'une requête coûteuse ou d'un
     # afflux de connexions. Valeurs de départ, à relever si une exécution du pipeline s'y
     # heurte.
@@ -101,6 +111,7 @@ services:
       # Un reverse-proxy joignant l'application autrement (autre machine, conteneur voisin sur
       # un réseau distinct) demande de renseigner son adresse à la place.
       FORWARDED_ALLOW_IPS: ${FORWARDED_ALLOW_IPS:-172.30.0.1}
+    logging: *logging
     security_opt:
       - no-new-privileges:true
     # L'API tourne sous un utilisateur non privilégié et écoute au-dessus du port 1024 :
@@ -111,7 +122,7 @@ services:
     # lui. Les logs partent sur la sortie standard, seul `/tmp` est monté en mémoire.
     read_only: true
     tmpfs:
-      - /tmp
+      - /tmp:nosuid
     # Plafonds de ressources : bornent au conteneur l'effet d'une requête coûteuse, d'une
     # boucle emballée ou d'un afflux d'appels, plutôt que de le laisser atteindre la machine
     # hôte.
@@ -170,13 +181,14 @@ services:
       DB_OWNER_PASSWORD: ${DB_OWNER_PASSWORD:?}
       DB_SSLMODE: ${DB_SSLMODE:-}
       LOG_FORMAT: ${LOG_FORMAT:-json}
+    logging: *logging
     security_opt:
       - no-new-privileges:true
     cap_drop:
       - ALL
     read_only: true
     tmpfs:
-      - /tmp
+      - /tmp:nosuid
     mem_limit: 1g
     cpus: 1.0
     pids_limit: 256
@@ -212,13 +224,14 @@ services:
       SCANR_PASSWORD: ${SCANR_PASSWORD:-}
       POLITE_POOL_EMAIL: ${POLITE_POOL_EMAIL:-}
       LOG_FORMAT: ${LOG_FORMAT:-json}
+    logging: *logging
     security_opt:
       - no-new-privileges:true
     cap_drop:
       - ALL
     read_only: true
     tmpfs:
-      - /tmp
+      - /tmp:nosuid
     # Un run est plus gourmand qu'une requête : c'est ce plafond-ci qu'une exécution qui s'y
     # heurte demande de relever.
     mem_limit: 2g
