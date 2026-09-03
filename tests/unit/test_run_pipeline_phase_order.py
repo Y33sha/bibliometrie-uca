@@ -7,8 +7,8 @@ import logging
 from contextlib import contextmanager
 from unittest.mock import MagicMock, patch
 
-import run_pipeline
 from application.pipeline.publications import phase as publications_phase
+from interfaces.cli import run_pipeline
 
 
 @contextmanager

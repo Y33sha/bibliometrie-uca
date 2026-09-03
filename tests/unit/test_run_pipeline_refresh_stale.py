@@ -10,12 +10,12 @@
 from contextlib import ExitStack
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import run_pipeline
 from application.pipeline.metrics import PhaseMetrics
 from infrastructure.sources.circuit_breaker import (
     SourceCircuitBreaker,
     get_current_breaker,
 )
+from interfaces.cli import run_pipeline
 
 
 def _called_targets(stack) -> MagicMock:

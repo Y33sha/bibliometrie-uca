@@ -5,8 +5,8 @@ Le drapeau descend du composition root à la phase de normalisation, seule à é
 
 import pytest
 
-import run_pipeline
 from infrastructure.raw_store import LocalFileRawStore
+from interfaces.cli import run_pipeline
 
 
 def test_sans_archivage_le_store_disque_n_est_pas_construit(monkeypatch):

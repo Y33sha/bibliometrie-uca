@@ -3,17 +3,17 @@
 Orchestrateur du pipeline bibliométrique.
 
 Usage:
-    python run_pipeline.py                    # Pipeline complet
-    python run_pipeline.py --from normalize   # Reprendre depuis la normalisation
-    python run_pipeline.py --only extract     # Exécuter une seule phase
-    python run_pipeline.py --list             # Lister les phases
-    python run_pipeline.py --dry-run          # Afficher sans exécuter
-    python run_pipeline.py --mode daily       # Import quotidien (HAL depuis dernier run)
-    python run_pipeline.py --mode full        # Repasse complète (toutes sources sauf WoS)
-    python run_pipeline.py --start-year 2024  # Repasse sur [2024 … année courante]
-    python run_pipeline.py --include-wos      # Inclure WoS (opt-in, crédit API limité)
-    python run_pipeline.py --sources hal,openalex  # Extraction HAL + OA seulement
-    python run_pipeline.py --only extract --sources scanr --year 2023  # ScanR 2023 seul
+    run_pipeline                    # Pipeline complet
+    run_pipeline --from normalize   # Reprendre depuis la normalisation
+    run_pipeline --only extract     # Exécuter une seule phase
+    run_pipeline --list             # Lister les phases
+    run_pipeline --dry-run          # Afficher sans exécuter
+    run_pipeline --mode daily       # Import quotidien (HAL depuis dernier run)
+    run_pipeline --mode full        # Repasse complète (toutes sources sauf WoS)
+    run_pipeline --start-year 2024  # Repasse sur [2024 … année courante]
+    run_pipeline --include-wos      # Inclure WoS (opt-in, crédit API limité)
+    run_pipeline --sources hal,openalex  # Extraction HAL + OA seulement
+    run_pipeline --only extract --sources scanr --year 2023  # ScanR 2023 seul
 
 Phases (dans l'ordre d'execution):
     extract             Extraction des sources vers staging (HAL, OpenAlex, WoS, ScanR, theses.fr)
@@ -75,6 +75,7 @@ from application.pipeline.phase_order import PHASE_ORDER
 from application.pipeline.signals import signal_source_unavailable
 from application.ports.pipeline.circuit_breaker import SourceUnavailableError
 from domain.sources.registry import ALL_SOURCES_SET
+from infrastructure import PROJECT_ROOT
 from infrastructure.observability.log import (
     PHASE_MARKER,
     RUN_END_MARKER,
@@ -85,12 +86,10 @@ from infrastructure.observability.log import (
 )
 from infrastructure.pipeline_lock import PipelineAlreadyRunningError, acquire_pipeline_lock
 
-BASE = Path(__file__).resolve().parent
-
 # `setup_logger` (au lieu d'un simple `getLogger`) attache un FileHandler
 # sur `logs/pipeline.log` quand `LOG_TO_FILE=true` : les logs des phases qui
 # réutilisent ce logger parent (subjects, cooccurrences, enrich) sont persistés.
-log = setup_logger("pipeline", str(BASE / "logs"))
+log = setup_logger("pipeline", str(PROJECT_ROOT / "logs"))
 
 
 # ---------------------------------------------------------------------------
@@ -966,7 +965,7 @@ def _run_extract(
 
     log.info("▶ extract_%s", source)
     t0 = time.time()
-    source_log = setup_logger(source, str(BASE / "logs"))
+    source_log = setup_logger(source, str(PROJECT_ROOT / "logs"))
     conn = get_sync_engine().connect()
     try:
         metrics = _run_extractor(make_extractor(conn, source_log), args)
@@ -1416,7 +1415,7 @@ def _run_one_phase(
             )
         except KeyboardInterrupt:
             log.warning("Pipeline interrompu par l'utilisateur à la phase '%s'", name)
-            log.info("Pour reprendre : python run_pipeline.py --from %s", name)
+            log.info("Pour reprendre : run_pipeline --from %s", name)
             recorder.record(
                 phase=name,
                 started_at=phase_started_at,
@@ -1434,7 +1433,7 @@ def _run_one_phase(
             sys.exit(130)
         except RuntimeError as e:
             log.error("Pipeline interrompu à la phase '%s' : %s", name, e)
-            log.error("Pour reprendre : python run_pipeline.py --from %s", name)
+            log.error("Pour reprendre : run_pipeline --from %s", name)
             recorder.record(
                 phase=name,
                 started_at=phase_started_at,

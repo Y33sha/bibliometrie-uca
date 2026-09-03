@@ -2,7 +2,7 @@
 
 Capture le boilerplate commun aux extracteurs : logs de header et de résumé, exécution sous circuit-breaker. Chaque source hérite et implémente `load_config()` et `extract_all()` ; l'itération (cursor / search_after / firstRecord / cursorMark × pages) reste spécifique à chaque source, sans template trop contraignant.
 
-Entry point unique `run()` : invoqué par `run_pipeline.py`, il laisse remonter les exceptions à l'orchestrateur et retourne les `PhaseMetrics`.
+Entry point unique `run()` : invoqué par `run_pipeline`, il laisse remonter les exceptions à l'orchestrateur et retourne les `PhaseMetrics`.
 """
 
 from __future__ import annotations
@@ -103,7 +103,7 @@ class SourceExtractor[ConfigT, AdapterT](ABC):
     ) -> PhaseMetrics:
         """Exécute l'extraction : `load_config` → `setup_logging` → `extract_all`, puis loggue le résumé.
 
-        Invoqué par `run_pipeline.py`. Les exceptions (`ExtractionConfigError`, HTTP, `KeyboardInterrupt`) remontent à l'orchestrateur, qui décide quoi en faire (rapport partiel, exit code).
+        Invoqué par `run_pipeline`. Les exceptions (`ExtractionConfigError`, HTTP, `KeyboardInterrupt`) remontent à l'orchestrateur, qui décide quoi en faire (rapport partiel, exit code).
 
         `breaker` : circuit-breaker de la source (posé via la ContextVar par le composition root) ; les boucles `extract_all` le consultent pour stopper une source à bout de budget.
         """

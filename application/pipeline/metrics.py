@@ -1,6 +1,6 @@
 """Métriques retournées par les phases du pipeline.
 
-Chaque `run(...)` de phase retourne un `PhaseMetrics` ; l'orchestrateur (`run_pipeline.py`) en mesure la durée et agrège les compteurs par phase. La consommation (rapport, dashboard) se fait côté observabilité, à partir du payload de `to_payload`.
+Chaque `run(...)` de phase retourne un `PhaseMetrics` ; l'orchestrateur (`run_pipeline`) en mesure la durée et agrège les compteurs par phase. La consommation (rapport, dashboard) se fait côté observabilité, à partir du payload de `to_payload`.
 """
 
 from __future__ import annotations

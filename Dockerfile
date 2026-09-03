@@ -71,7 +71,6 @@ COPY application/     ./application/
 COPY domain/          ./domain/
 COPY infrastructure/  ./infrastructure/
 COPY interfaces/      ./interfaces/
-COPY run_pipeline.py  .
 
 # `--no-cache` : le cache que l'installation remplit ne resservirait qu'à une installation
 # ultérieure, qui n'a pas lieu dans l'image. Sans lui, l'image transporte les archives des

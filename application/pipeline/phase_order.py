@@ -1,6 +1,6 @@
 """Ordre des phases du pipeline.
 
-Source de vérité unique de l'ordre d'exécution, consommée par l'orchestrateur (`run_pipeline.py`) et par la lecture d'observabilité (API, trame du ruban de l'interface). L'ordre de déclaration est l'ordre d'exécution. Module pur, sans I/O.
+Source de vérité unique de l'ordre d'exécution, consommée par l'orchestrateur (`run_pipeline`) et par la lecture d'observabilité (API, trame du ruban de l'interface). L'ordre de déclaration est l'ordre d'exécution. Module pur, sans I/O.
 """
 
 from __future__ import annotations

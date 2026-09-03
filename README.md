@@ -10,7 +10,7 @@ personnes et laboratoires.
 - **Frontend** : SvelteKit (Svelte 5) — `interfaces/frontend/`
 - **Backend** : FastAPI + PostgreSQL 18 (SQLAlchemy) — `interfaces/api/`
 - **Pipeline** : Python — `application/pipeline/` (orchestrateur
-  `run_pipeline.py`), extracteurs dans `infrastructure/sources/`
+  `run_pipeline`), extracteurs dans `infrastructure/sources/`
 - **Architecture** : DDD en 4 couches (`domain/`, `application/`,
   `infrastructure/`, `interfaces/`) — voir
   [docs/architecture/](docs/architecture/) (archi logicielle) et
@@ -67,7 +67,7 @@ docker compose exec backend alembic upgrade head
 ### 4. Pipeline
 
 ```bash
-docker compose exec backend python run_pipeline.py
+docker compose exec backend run_pipeline
 ```
 
 ### 5. Production
@@ -170,14 +170,14 @@ Deux voies au choix :
 ## Pipeline de données
 
 ```bash
-python run_pipeline.py                    # Complet
-python run_pipeline.py --from persons     # Reprise depuis une phase
-python run_pipeline.py --only authorships # Une seule phase
-python run_pipeline.py --list             # Liste des phases
-python run_pipeline.py --dry-run          # Sans exécuter
-python run_pipeline.py --mode daily       # Import quotidien (HAL seul, depuis le dernier run)
-python run_pipeline.py --start-year 2024  # Extraction depuis une année de début
-python run_pipeline.py --sources hal,openalex  # Sources spécifiques
+run_pipeline                    # Complet
+run_pipeline --from persons     # Reprise depuis une phase
+run_pipeline --only authorships # Une seule phase
+run_pipeline --list             # Liste des phases
+run_pipeline --dry-run          # Sans exécuter
+run_pipeline --mode daily       # Import quotidien (HAL seul, depuis le dernier run)
+run_pipeline --start-year 2024  # Extraction depuis une année de début
+run_pipeline --sources hal,openalex  # Sources spécifiques
 ```
 
 Voir [docs/pipeline/](docs/pipeline/) pour le détail des phases.
@@ -215,10 +215,10 @@ bibliometrie-uca/
 ├── interfaces/          Adapters entrants
 │   ├── api/             FastAPI (routers, models Pydantic, middlewares)
 │   ├── frontend/        SvelteKit
-│   └── cli/             Scripts CLI (imports, maintenance, oneshot, dev)
+│   └── cli/             Ligne de commande : orchestrateur du pipeline
+│                        (`run_pipeline.py`), imports, maintenance, oneshot, dev
 ├── tests/               pytest (unit + integration)
 ├── logs/                Logs consolidés (JSON), rapports pipeline
-├── run_pipeline.py      Orchestrateur du pipeline
 ├── start.sh             Lancement dev (backend + frontend)
 └── docs/                Documentation
 ```
