@@ -22,11 +22,11 @@ DB_PORT = int(os.environ.get("DB_PORT", "5432"))
 
 
 def _build_test_sync_engine(identity: str = "pipeline") -> Engine:
-    """Engine SA sync sur bibliometrie_test, garde-fou DML installé comme le vrai.
+    """Engine SA sync sur bibliometrie_test, garde-fous installés comme sur le vrai.
 
     `identity` choisit le rôle de connexion, comme le vrai constructeur : celui de l'API pour l'application, celui du pipeline pour les fixtures. Les tests exercent donc les droits qu'ils auront en production.
     """
-    from infrastructure.db.dml_guard import install_dml_guard
+    from infrastructure.db.engine import install_engine_guards
     from infrastructure.settings import settings as _s
 
     if identity == "owner":
@@ -43,7 +43,7 @@ def _build_test_sync_engine(identity: str = "pipeline") -> Engine:
         database="bibliometrie_test",
     )
     engine = create_engine(url, pool_size=1, max_overflow=2, pool_pre_ping=True)
-    install_dml_guard(engine)
+    install_engine_guards(engine)
     return engine
 
 

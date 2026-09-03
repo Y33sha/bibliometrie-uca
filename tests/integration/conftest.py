@@ -241,16 +241,16 @@ def sa_sync_conn_app():
 
 @pytest.fixture
 def sa_engine_app():
-    """Engine SQLAlchemy sous le rôle de l'API, garde-fou DML installé comme en production.
+    """Engine SQLAlchemy sous le rôle de l'API, garde-fous installés comme en production.
 
     Pour les tests qui pilotent une dépendance ouvrant elle-même sa connexion, `db_conn` en tête.
     """
     from sqlalchemy import create_engine
 
-    from infrastructure.db.dml_guard import install_dml_guard
+    from infrastructure.db.engine import install_engine_guards
 
     engine = create_engine(_sa_url(identity="app"))
-    install_dml_guard(engine)
+    install_engine_guards(engine)
     yield engine
     engine.dispose()
 
