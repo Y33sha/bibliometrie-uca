@@ -7,15 +7,12 @@ Le lock est un fichier `logs/pipeline.lock` qui contient le PID du process actue
 - Démarrage : si le fichier existe et le PID dedans est vivant → on abort (sauf `force=True` qui SIGTERM puis SIGKILL le précédent).
 - Fin (normale ou exception) : `atexit` supprime le lockfile.
 - Lockfile orphelin (crash brutal SIGKILL/OOM) : le PID dedans est mort → on l'écrase silencieusement au démarrage suivant.
-
-Sur Windows, la vivacité passe par `OpenProcess` (`infrastructure.process.is_pid_alive`) et le `--force` envoie `SIGTERM`, que Windows exécute en `TerminateProcess` (arrêt immédiat, sans l'escalade SIGKILL du POSIX).
 """
 
 import atexit
 import logging
 import os
 import signal
-import sys
 import time
 from pathlib import Path
 
@@ -53,8 +50,6 @@ def _terminate_existing(pid: int, *, grace_seconds: int = _SIGTERM_GRACE_SECONDS
             log.info("Pipeline précédent (PID %d) terminé proprement", pid)
             return
         time.sleep(1)
-    if sys.platform == "win32":
-        return  # Windows : le SIGTERM ci-dessus a déjà fait un TerminateProcess ; SIGKILL n'existe pas.
     log.warning("Pipeline précédent (PID %d) ne répond pas après %ds — SIGKILL", pid, grace_seconds)
     try:
         os.kill(pid, signal.SIGKILL)
