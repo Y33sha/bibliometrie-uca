@@ -127,11 +127,20 @@ def read_csv_tsv(filepath: str) -> list[dict[str, str]]:
         col_map = resolve_columns(headers)
 
         if "last_name" not in col_map or "first_name" not in col_map:
-            # Essayer avec le séparateur tab si la détection a échoué
+            # Le séparateur détecté peut être le mauvais : on retente en tabulations, et on ne
+            # retient ce second essai que s'il reconnaît davantage de colonnes. Sans cette
+            # comparaison, un fichier bien lu mais amputé d'une colonne attendue serait relu en
+            # une colonne unique, et le manque signalé porterait sur la mauvaise.
             f.seek(0)
-            reader = csv.reader(f, delimiter="\t")
-            headers = next(reader)
-            col_map = resolve_columns(headers)
+            reader_tab = csv.reader(f, delimiter="\t")
+            headers_tab = next(reader_tab)
+            col_map_tab = resolve_columns(headers_tab)
+            if len(col_map_tab) > len(col_map):
+                reader, headers, col_map = reader_tab, headers_tab, col_map_tab
+            else:
+                f.seek(0)
+                reader = csv.reader(f, dialect)
+                next(reader)
 
         log.info("Colonnes détectées: %s", col_map)
         log.info("En-têtes: %s", headers)

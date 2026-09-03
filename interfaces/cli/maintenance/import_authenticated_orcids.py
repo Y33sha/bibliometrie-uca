@@ -23,6 +23,7 @@ from __future__ import annotations
 import argparse
 import csv
 import os
+from dataclasses import dataclass
 from pathlib import Path
 
 from application.ports.repositories.person_repository import AuthenticateOrcidOutcome
@@ -56,6 +57,60 @@ def _load_rows(path: str | Path) -> list[tuple[str, str]]:
     return rows
 
 
+@dataclass(frozen=True, slots=True)
+class AuthenticationPlan:
+    """Ce que le fichier prescrit, une fois confronté aux personnes connues.
+
+    `entries` porte les couples à authentifier ; les trois autres listes portent les lignes écartées, décrites pour le journal. Une ligne écartée n'est jamais une erreur du fichier seul : un email inconnu peut signaler un export RH en retard, et un email partagé par deux personnes, un doublon à fusionner.
+    """
+
+    entries: list[tuple[int, str]]
+    malformed: list[str]
+    unmatched: list[str]
+    ambiguous: list[str]
+
+
+def plan_authentications(
+    rows: list[tuple[str, str]], email_to_persons: dict[str, list[int]]
+) -> AuthenticationPlan:
+    """Confronte les lignes du fichier aux personnes connues, et trie ce qui peut être authentifié.
+
+    Trois raisons d'écarter une ligne : un ORCID que sa forme rend inexploitable, un email qu'aucune fiche du personnel ne porte, un email que plusieurs personnes portent — l'identité visée étant alors indécidable.
+    """
+    entries: list[tuple[int, str]] = []
+    malformed: list[str] = []
+    unmatched: list[str] = []
+    ambiguous: list[str] = []
+    for raw_email, raw_orcid in rows:
+        orcid = normalize_orcid(raw_orcid)
+        if orcid is None:
+            malformed.append(f"{raw_email} → {raw_orcid!r}")
+            continue
+        persons = email_to_persons.get(raw_email.lower())
+        if not persons:
+            unmatched.append(raw_email)
+            continue
+        if len(persons) > 1:
+            ambiguous.append(f"{raw_email} → {persons}")
+            continue
+        entries.append((persons[0], orcid))
+    return AuthenticationPlan(entries, malformed, unmatched, ambiguous)
+
+
+def find_reassignments(
+    entries: list[tuple[int, str]], current: dict[str, tuple[int, ...]]
+) -> list[tuple[str, int, int]]:
+    """ORCID détenus par une autre personne que celle qui l'a authentifié, et vers qui les déplacer.
+
+    L'authentification fait autorité sur l'identité : le déplacement a lieu. Chacun révèle en général un doublon de personne à fusionner, d'où leur signalement.
+    """
+    return [
+        (orcid, current[orcid][0], person_id)
+        for person_id, orcid in entries
+        if orcid in current and current[orcid][0] != person_id
+    ]
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -74,43 +129,24 @@ def main() -> int:
         repo = person_repository(conn)
         email_to_persons = repo.map_rh_emails_to_person_ids()
 
-        # État courant des ORCID du fichier, pour prévoir l'issue et détecter les déplacements.
-        entries: list[tuple[int, str]] = []
-        malformed: list[str] = []
-        unmatched: list[str] = []
-        ambiguous: list[str] = []
-        for raw_email, raw_orcid in rows:
-            orcid = normalize_orcid(raw_orcid)
-            if orcid is None:
-                malformed.append(f"{raw_email} → {raw_orcid!r}")
-                continue
-            persons = email_to_persons.get(raw_email.lower())
-            if not persons:
-                unmatched.append(raw_email)
-                continue
-            if len(persons) > 1:
-                ambiguous.append(f"{raw_email} → {persons}")
-                continue
-            entries.append((persons[0], orcid))
+        plan = plan_authentications(rows, email_to_persons)
+        entries = plan.entries
 
+        # État courant des ORCID du fichier, pour prévoir les déplacements.
         current = repo.find_identifier_holders("orcid", [o for _, o in entries])
-        reassignments = [
-            (orcid, current[orcid][0], person_id)
-            for person_id, orcid in entries
-            if orcid in current and current[orcid][0] != person_id
-        ]
+        reassignments = find_reassignments(entries, current)
 
-    if malformed:
-        log.warning("ORCID malformés ignorés : %d", len(malformed))
-        for m in malformed:
+    if plan.malformed:
+        log.warning("ORCID malformés ignorés : %d", len(plan.malformed))
+        for m in plan.malformed:
             log.warning("  malformé : %s", m)
-    if unmatched:
-        log.warning("Emails sans personne RH (ignorés) : %d", len(unmatched))
-        for e in unmatched:
+    if plan.unmatched:
+        log.warning("Emails sans personne RH (ignorés) : %d", len(plan.unmatched))
+        for e in plan.unmatched:
             log.warning("  inconnu : %s", e)
-    if ambiguous:
-        log.warning("Emails rattachés à plusieurs personnes (ignorés) : %d", len(ambiguous))
-        for a in ambiguous:
+    if plan.ambiguous:
+        log.warning("Emails rattachés à plusieurs personnes (ignorés) : %d", len(plan.ambiguous))
+        for a in plan.ambiguous:
             log.warning("  ambigu : %s", a)
     if reassignments:
         log.warning(
