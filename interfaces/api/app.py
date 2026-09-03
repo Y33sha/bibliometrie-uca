@@ -338,8 +338,6 @@ _SECURITY_HEADERS = {
 _FRAME_ANCESTORS = "frame-ancestors 'none'"
 """Politique de sécurité de contenu posée sur toute réponse : la page ne peut être insérée dans le cadre d'un autre site.
 
-C'est la formulation que les navigateurs traitent aujourd'hui comme la référence de l'anti-clickjacking, `X-Frame-Options` en étant l'ancêtre — les deux sont posés, le second pour les navigateurs qui ne lisent que lui.
-
 La directive n'a d'effet qu'en en-tête : une politique portée par une balise `<meta>` l'ignore. C'est ce qui la distingue de la politique des pages du frontend, que le générateur du frontend compose page par page — elle y autorise nommément les scripts de l'application par leur empreinte, ce que le serveur ne saurait pas reproduire. Les deux politiques s'appliquent alors ensemble sur une page, et une réponse doit satisfaire l'une comme l'autre ; celle-ci ne déclarant que `frame-ancestors`, elle ne restreint rien de ce que l'autre autorise.
 """
 
