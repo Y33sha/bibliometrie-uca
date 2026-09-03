@@ -20,23 +20,21 @@ from infrastructure.observability.log import setup_logger
 log = setup_logger("import_openapc", os.path.dirname(__file__))
 
 
-# Colonne absente du fichier : la valeur vaut zéro. Cellule présente mais vide ou illisible :
-# la donnée est tenue pour absente. Les deux situations se distinguent, d'où le défaut de `get`
-# plutôt qu'un repli sur une chaîne vide.
-_COLONNE_ABSENTE = "0"
-
-
 def _parse_amount(cell: str | None) -> float | None:
-    """Montant en euros. Le fichier est produit hors de France : le séparateur décimal peut être l'un ou l'autre."""
+    """Montant en euros, ou `None` faute de valeur lisible.
+
+    Le fichier est produit hors de France : le séparateur décimal peut être l'un ou l'autre. Une colonne absente, une cellule vide et une valeur illisible se valent — la donnée manque, là où zéro euro serait un paiement.
+    """
     try:
-        return float(cell.replace(",", "."))  # type: ignore[union-attr]
-    except (ValueError, TypeError, AttributeError):
+        return float((cell or "").replace(",", "."))
+    except (ValueError, TypeError):
         return None
 
 
 def _parse_year(cell: str | None) -> int | None:
+    """Année déclarée, ou `None` faute de valeur lisible — une colonne absente ne vaut pas l'an zéro."""
     try:
-        return int(cell)  # type: ignore[arg-type]
+        return int(cell or "")
     except (ValueError, TypeError):
         return None
 
@@ -46,10 +44,10 @@ def build_payment(row: dict, *, doi: str, publication_id: int, source_file: str)
 
     Le fichier ne distingue pas l'année de facturation de l'année de publication : la période déclarée tient lieu des deux. L'ISSN retenu est celui de la revue, à défaut son ISSN de liaison. La mention `hybrid` signale une revue sur abonnement dont cet article a été ouvert.
     """
-    period = _parse_year(row.get("period", _COLONNE_ABSENTE))
+    period = _parse_year(row.get("period"))
     return {
         "doi": doi,
-        "amount": _parse_amount(row.get("euro", _COLONNE_ABSENTE)),
+        "amount": _parse_amount(row.get("euro")),
         "billing_year": period,
         "pub_year": period,
         "publisher": sanitize_optional_text(row.get("publisher")),
