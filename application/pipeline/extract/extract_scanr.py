@@ -18,6 +18,7 @@ from application.pipeline.extract.base import (
 from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.extract._common import UpsertOutcome
 from application.ports.pipeline.extract.scanr import ScanrExtractAdapter, ScanrExtractConfig
+from domain.types import JsonValue
 
 
 def extract_year(
@@ -32,7 +33,7 @@ def extract_year(
     """Extrait toutes les publications d'une année.
 
     Retourne (total, nouveaux, mis à jour, inchangés)."""
-    search_after: list | None = None
+    search_after: list[JsonValue] | None = None
     inserted = 0
     updated = 0
     unchanged = 0

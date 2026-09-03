@@ -186,7 +186,7 @@ def main() -> None:
         log.info("Journaux à analyser (≥%d publis DOI) : %d", args.min_pubs, len(rows))
 
         seeded = 0
-        ambiguous: list[dict] = []
+        ambiguous: list[dict[str, int | str]] = []
         empty_after_filter = 0
         for r in rows:
             filtered_dois = [doi for doi in r.dois if not is_outlier(doi)]

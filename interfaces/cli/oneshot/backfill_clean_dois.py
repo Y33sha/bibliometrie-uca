@@ -31,6 +31,7 @@ import os
 from sqlalchemy import Connection, text
 
 from domain.publications.identifiers import clean_doi
+from domain.types import JsonValue
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 
@@ -96,7 +97,7 @@ def _clean_related_dois(conn: Connection, apply: bool) -> None:
             "WHERE jsonb_typeof(external_ids -> 'related_dois') = 'array'"
         )
     ).all()
-    upd: list[dict] = []
+    upd: list[dict[str, int | str]] = []
     for r in rows:
         ext = dict(r.external_ids)
         rel = ext.get("related_dois") or []
@@ -132,9 +133,9 @@ def _clean_related_identifiers_meta(conn: Connection, apply: bool) -> None:
             "WHERE jsonb_typeof(meta -> 'related_identifiers') = 'array'"
         )
     ).all()
-    upd: list[dict] = []
+    upd: list[dict[str, int | str]] = []
     for r in rows:
-        new_rels: list = []
+        new_rels: list[JsonValue] = []
         changed = False
         for el in r.meta["related_identifiers"]:
             doi = el.get("doi") if isinstance(el, dict) else None

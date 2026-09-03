@@ -436,8 +436,10 @@ exclude = [
     "^alembic/",
 ]
 
-# Désactivation explicite pour les modules dont les `Any` sont
-# délibérés. Documentés au cas par cas :
+# Désactivation explicite pour les modules dont les `Any` sont délibérés. La liste est
+# tenue au plus juste : une entrée qui ne couvre plus aucune erreur est retirée, et une
+# entrée de paquet est resserrée sur ses modules quand elle en dépasse largement le besoin.
+# Documentées au cas par cas :
 # - `domain.sources.*`, `infrastructure.sources.*`, `infrastructure.jsonb_models.*` :
 #   payloads JSON bruts d'APIs externes / colonnes JSONB libres.
 # - `application.ports.read_models.*` : DTOs Pydantic co-localisés — `BaseModel`
@@ -448,21 +450,18 @@ exclude = [
 # - `application.ports.repositories.*` (sauf audit + les projections déjà
 #   typées des ports structures/persons) : records DB hydratés et partial
 #   updates encore exposés en `dict[str, Any]`.
-# - `application.ports.pipeline.{staging,subjects}` : `raw_data: dict[str, Any]`
-#   JSONB sur `StagingRow`, `list[Any]` sur
-#   `select_source_publications_with_subjects`.
+# - `application.ports.pipeline.normalize.staging` : `raw_data: dict[str, Any]`
+#   JSONB sur `StagingRow`.
 # - `domain.publications.aggregation` : `first_non_null` /
 #   `merge_lists_dedup_ci` polymorphiques sur `getattr(source, attr)`.
-# - `application.pipeline.normalize.*` (hors port `normalize.wos`, déjà strict) :
-#   consomment des payloads `dict[str, Any]` venant des APIs externes (cf.
-#   `domain.sources.*`).
-# - `application.pipeline.subjects._common` : `_PushedOntology` interne au
-#   cache (dict mutable avec sets, difficile à typer).
+# - `application.pipeline.normalize.*` (hors port `normalize.wos`, déjà strict) et
+#   `application.pipeline.extract.refetch_truncated` : consomment des payloads
+#   `dict[str, Any]` venant des APIs externes (cf. `domain.sources.*`).
 # - `infrastructure.repositories.*`, `infrastructure.read_models.*` et
 #   `infrastructure.pipeline.*` : couche SQL — Row, records DB, batchs hétérogènes.
-# - `interfaces.cli.{imports,maintenance,oneshot}.*` : scripts touchant des
-#   records DB / payloads JSONB — `Any` délibéré, comme les couches SQL. Ils
-#   restent annotés et leurs corps vérifiés (≠ exclusion : cf. `exclude` plus haut).
+# - `interfaces.cli.imports.*` et `interfaces.cli.maintenance.rehydrate_staging_from_raw_store` :
+#   scripts touchant des records DB / payloads JSONB — `Any` délibéré, comme les couches
+#   SQL. Ils restent annotés et leurs corps vérifiés (≠ exclusion : cf. `exclude` plus haut).
 # - `interfaces.api.models.*` : nombreux fields `Any` (payloads JSONB libres
 #   côté API, body dicts hétérogènes), tant que `JsonValue` ne couvre pas
 #   tous les cas.
@@ -473,18 +472,14 @@ exclude = [
 [[tool.mypy.overrides]]
 module = [
     "application.pipeline.cross_imports.*",
-    "application.pipeline.extract.*",
+    "application.pipeline.extract.refetch_truncated",
     "application.pipeline.logging_scope",
     "application.pipeline.normalize.*",
-    "application.pipeline.oa_status.*",
-    "application.pipeline.publishers_journals.*",
-    "application.pipeline.subjects._common",
     "application.ports.read_models.*",
     "application.ports.pipeline.cross_imports.*",
     "application.ports.pipeline.extract.*",
     "application.ports.pipeline.journals",
     "application.ports.pipeline.normalize.staging",
-    "application.ports.pipeline.subjects",
     "application.ports.repositories.*",
     "domain.publications.aggregation",
     "domain.sources.*",
@@ -494,12 +489,10 @@ module = [
     "infrastructure.repositories.*",
     "infrastructure.settings",
     "infrastructure.sources.*",
-    "interfaces.api.app",
     "interfaces.api.models.*",
     "interfaces.cli.dev.generate_seed",
     "interfaces.cli.imports.*",
-    "interfaces.cli.maintenance.*",
-    "interfaces.cli.oneshot.*",
+    "interfaces.cli.maintenance.rehydrate_staging_from_raw_store",
     "interfaces.cli.run_pipeline",
 ]
 disallow_any_explicit = false
