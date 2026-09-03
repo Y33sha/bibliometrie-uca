@@ -14,7 +14,13 @@ ici on ne fait que vérifier le wiring (1-2 cas par délégation).
 
 from __future__ import annotations
 
+from unittest.mock import MagicMock
+
+import pytest
+
+from application.pipeline.normalize import normalize_crossref
 from application.pipeline.normalize.normalize_crossref import (
+    CrossrefNormalizer,
     _author_affiliation_strings,
     _author_full_name,
     build_crossref_author_records,
@@ -31,6 +37,15 @@ from application.pipeline.normalize.normalize_crossref import (
     get_pub_year,
     get_publisher_name,
     get_title,
+    process_authorships,
+    process_work,
+    upsert_journal,
+    upsert_publisher,
+)
+from tests.unit.application.pipeline.normalize.doubles import (
+    FakeSourcePublicationQueries,
+    FakeStagingQueries,
+    staging_row,
 )
 
 
@@ -94,6 +109,10 @@ class TestGetContainerTitle:
 
     def test_none_when_empty_list(self):
         assert get_container_title({"container-title": []}) is None
+
+    def test_none_when_first_entry_is_blank(self):
+        # Une entrée vide en tête ne vaut pas un titre, et rien ne la remplace.
+        assert get_container_title({"container-title": ["  "]}) is None
 
     def test_none_when_absent(self):
         assert get_container_title({}) is None
@@ -396,3 +415,174 @@ class TestBuildCrossrefAuthorRecords:
             {"orcid_dubious": "0000-0001-2345-6789"},
             {"orcid_dubious": "0000-0001-2345-6789"},
         ]
+
+
+class TestUpsertPublisherEtJournal:
+    def test_sans_editeur_nomme_rien_n_est_cree(self):
+        assert upsert_publisher({}, publisher_repo=MagicMock()) is None
+
+    def test_editeur_nomme_est_cree(self, monkeypatch):
+        vus: list[str] = []
+        monkeypatch.setattr(
+            normalize_crossref,
+            "find_or_create_publisher",
+            lambda name, *, repo: vus.append(name) or 7,
+        )
+
+        assert upsert_publisher({"publisher": "Elsevier"}, publisher_repo=MagicMock()) == 7
+        assert vus == ["Elsevier"]
+
+    def test_sans_titre_de_contenant_aucune_revue(self):
+        """Un document sans revue ni série qui le porte ne crée pas d'entrée au référentiel."""
+        assert upsert_journal({}, None, journal_repo=MagicMock()) is None
+
+    def test_revue_creee_avec_ses_deux_issn(self, monkeypatch):
+        vus: dict[str, object] = {}
+        monkeypatch.setattr(
+            normalize_crossref,
+            "find_or_create_journal",
+            lambda title, **kw: vus.update(title=title, **kw) or 3,
+        )
+        msg = {
+            "container-title": ["J. Things"],
+            "issn-type": [
+                {"type": "print", "value": "1234-5678"},
+                {"type": "electronic", "value": "8765-4321"},
+            ],
+        }
+
+        assert upsert_journal(msg, 7, journal_repo=MagicMock()) == 3
+        assert vus["title"] == "J. Things"
+        assert (vus["issn"], vus["eissn"]) == ("1234-5678", "8765-4321")
+        assert vus["publisher_id"] == 7
+
+
+class TestAuteursIllisibles:
+    def test_auteur_qui_n_est_pas_un_objet(self):
+        recs = build_crossref_author_records({"author": ["Dupont, J.", {"family": "Roe"}]})
+
+        assert [r.raw_name for r in recs] == ["Roe"]
+
+    def test_auteur_sans_nom_ignore(self):
+        recs = build_crossref_author_records({"author": [{"ORCID": "x"}, {"family": "Roe"}]})
+
+        assert [r.raw_name for r in recs] == ["Roe"]
+
+
+class TestProcessAuthorships:
+    def test_confie_les_signatures_au_writer_partage(self, monkeypatch):
+        vus: dict[str, object] = {}
+        monkeypatch.setattr(
+            normalize_crossref,
+            "write_source_authorships",
+            lambda conn, queries, source, spid, records: vus.update(
+                source=source, spid=spid, records=records
+            ),
+        )
+
+        process_authorships(MagicMock(), MagicMock(), {"author": [{"family": "Dupont"}]}, 555)
+
+        assert (vus["source"], vus["spid"]) == ("crossref", 555)
+        assert [r.raw_name for r in vus["records"]] == ["Dupont"]
+
+
+def _message(**surcharges) -> dict:
+    """Notice Crossref minimale et acceptable, que chaque test dégrade à sa guise."""
+    return {
+        "DOI": "10.1000/abc",
+        "title": ["Un article"],
+        "issued": {"date-parts": [[2024, 3, 15]]},
+        "type": "journal-article",
+        "author": [{"given": "Jean", "family": "Dupont"}],
+        **surcharges,
+    }
+
+
+class TestProcessWork:
+    @pytest.fixture(autouse=True)
+    def _sans_editeur_ni_revue(self, monkeypatch):
+        """Les créations d'éditeur et de revue ont leurs propres tests : la boucle s'en passe."""
+        monkeypatch.setattr(normalize_crossref, "upsert_publisher", lambda m, **kw: None)
+        monkeypatch.setattr(normalize_crossref, "upsert_journal", lambda m, p, **kw: None)
+        monkeypatch.setattr(normalize_crossref, "process_authorships", lambda *a, **kw: None)
+
+    @pytest.fixture
+    def queries(self) -> FakeSourcePublicationQueries:
+        return FakeSourcePublicationQueries()
+
+    @pytest.fixture
+    def staging(self) -> FakeStagingQueries:
+        return FakeStagingQueries()
+
+    def _run(self, raw, queries, staging, logger):
+        return process_work(
+            MagicMock(),
+            queries,
+            logger,
+            staging_row(staging_id=42, raw=raw),
+            journal_repo=MagicMock(),
+            publisher_repo=MagicMock(),
+            publication_repo=MagicMock(),
+            staging_queries=staging,
+            authorship_queries=MagicMock(),
+        )
+
+    def test_document_verse_et_ligne_marquee(self, queries, staging, logger):
+        rendu = self._run(_message(), queries, staging, logger)
+
+        assert rendu is True
+        assert staging.marked_done == [42]
+        (document,) = queries.upserted_documents
+        assert document.source == "crossref"
+        assert document.doi == "10.1000/abc"
+        assert document.pub_year == 2024
+        assert document.doc_type == "journal-article"
+        assert document.oa_status is None  # Crossref ne renseigne pas l'accès ouvert
+
+    def test_payload_vide_est_passe(self, queries, staging, logger):
+        """Une ligne sans contenu — souche d'un document introuvable — est marquée sans verdict."""
+        rendu = self._run(None, queries, staging, logger)
+
+        assert rendu is None
+        assert staging.marked_done == [42]
+        assert queries.upserted_documents == []
+
+    @pytest.mark.parametrize(
+        ("raw", "motif"),
+        [
+            ({"title": ["T"], "issued": {"date-parts": [[2024]]}}, "sans DOI"),
+            ({"DOI": "10.1/a", "issued": {"date-parts": [[2024]]}}, "sans titre"),
+            ({"DOI": "10.1/a", "title": ["T"]}, "sans année"),
+        ],
+    )
+    def test_document_refuse_mais_ligne_marquee(self, raw, motif, queries, staging, logger):
+        rendu = self._run(raw, queries, staging, logger)
+
+        assert rendu is False, motif
+        assert staging.marked_done == [42]  # sans quoi la ligne reviendrait à chaque passe
+        assert queries.upserted_documents == []
+
+
+def test_le_normalizer_delegue_a_la_boucle(monkeypatch):
+    """La classe ne fait que rassembler ses dépendances et passer la main."""
+    vus: dict[str, object] = {}
+    monkeypatch.setattr(
+        normalize_crossref,
+        "process_work",
+        lambda conn, queries, logger, row, **kw: vus.update(row=row, **kw) or True,
+    )
+    normalizer = CrossrefNormalizer(
+        conn=MagicMock(),
+        logger=MagicMock(),
+        staging_queries=MagicMock(),
+        queries=MagicMock(),
+        journal_repo_factory=lambda c: MagicMock(),
+        publisher_repo_factory=lambda c: MagicMock(),
+        publication_repo_factory=lambda c: MagicMock(),
+        authorship_queries=MagicMock(),
+    )
+    normalizer.preload_caches(MagicMock())
+    row = staging_row()
+
+    assert normalizer.process_work(MagicMock(), row) is True
+    assert vus["row"] is row
