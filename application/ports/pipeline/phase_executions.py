@@ -1,6 +1,6 @@
 """Value objects d'une exécution de phase du pipeline.
 
-Une exécution de phase = une ligne de `pipeline_phase_executions`. Ces structures circulent entre la capture (orchestrateur `run_pipeline.py`), la persistance (`infrastructure/observability/`) et la lecture (API). Placées en zone neutre `application/ports/` : ni I/O ni dépendance framework.
+Une exécution de phase = une ligne de `pipeline_phase_executions`. Ces structures circulent entre la capture (orchestrateur `run_pipeline`), la persistance (`infrastructure/observability/`) et la lecture (API). Placées en zone neutre `application/ports/` : ni I/O ni dépendance framework.
 
 Le statut et les signaux portent la santé du run : `error` est décidé par l'orchestrateur sur exception, `warning` et les signaux sont remontés par la phase elle-même (source indisponible, série de 429, conflit d'identité…).
 """

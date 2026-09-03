@@ -138,7 +138,7 @@ Si la règle consomme un champ que l'admin modifie en base via l'UI (`journal.jo
 
 Une règle ajoutée à `_RULES` ne s'applique qu'aux SP retraitées. Pour l'appliquer au stock :
 
-- **Règle intrinsèque ou journal-jointe** : rejouer la phase `metadata_correction` (`run_pipeline.py --only metadata_correction`) — la sous-étape unaire recalcule l'effective de chaque SP depuis le brut, pose la correction, et marque `keys_dirty` si elle change `doc_type`/`doi`/`external_ids`. Enchaîner `run_pipeline.py --only publications` pour réconcilier les SP re-dirtiées et rafraîchir leurs publications.
+- **Règle intrinsèque ou journal-jointe** : rejouer la phase `metadata_correction` (`run_pipeline --only metadata_correction`) — la sous-étape unaire recalcule l'effective de chaque SP depuis le brut, pose la correction, et marque `keys_dirty` si elle change `doc_type`/`doi`/`external_ids`. Enchaîner `run_pipeline --only publications` pour réconcilier les SP re-dirtiées et rafraîchir leurs publications.
 
 ### 8. Documentation
 

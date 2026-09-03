@@ -92,7 +92,7 @@ La branche doit ramener exactement les voisins que la projection relie : même c
 
 ### 7. Rollout sur le stock
 
-Un token neuf ne s'applique qu'aux SP `keys_dirty`. Pour matérialiser les fusions sur le stock existant, re-dirtier tout le stock : `run_pipeline.py --only publications --rebuild-publications` (re-dirty complet → la réconciliation devient le clustering global).
+Un token neuf ne s'applique qu'aux SP `keys_dirty`. Pour matérialiser les fusions sur le stock existant, re-dirtier tout le stock : `run_pipeline --only publications --rebuild-publications` (re-dirty complet → la réconciliation devient le clustering global).
 
 Vérifier l'effet : reprendre le SQL d'audit de l'étape 3 — les blocs ciblés doivent être consolidés (une publication par bloc, hors séparations légitimes par DOI).
 

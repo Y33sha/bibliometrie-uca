@@ -8,9 +8,9 @@
 import logging
 from unittest.mock import AsyncMock, patch
 
-import run_pipeline
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.signals import filter_configured
+from interfaces.cli import run_pipeline
 
 _RUN_ENRICH = "application.pipeline.oa_status.phase.run"
 _LOG = logging.getLogger("test")

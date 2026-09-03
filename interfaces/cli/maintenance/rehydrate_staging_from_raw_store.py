@@ -11,7 +11,7 @@ Deux modes :
 - `--full` : réinsère aussi les orphelins (cas d'un `TRUNCATE staging`, où tout est orphelin par définition). Le `source_id` est la clé du store et le `doi` est ré-extrait du payload par la logique propre à chaque source. Les drapeaux de provenance non reconstructibles depuis le seul payload (`entry_mode`, `authors_truncated`) reprennent leur défaut et se recalculent au prochain extract bulk réel.
 
 Ne lance PAS la normalisation : une fois réhydraté, relancer le pipeline depuis la normalisation (qui réenchaîne toutes les phases aval) :
-    python run_pipeline.py --from normalize --sources <sources>
+    run_pipeline --from normalize --sources <sources>
 
 Usage :
     python -m interfaces.cli.maintenance.rehydrate_staging_from_raw_store \
@@ -147,7 +147,7 @@ def main() -> None:
 
     log.info(
         "Terminé. Relancer le pipeline depuis la normalisation : "
-        "python run_pipeline.py --from normalize --sources %s",
+        "run_pipeline --from normalize --sources %s",
         ",".join(sources),
     )
 

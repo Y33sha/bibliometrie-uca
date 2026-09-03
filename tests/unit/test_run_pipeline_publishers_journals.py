@@ -8,8 +8,8 @@ doivent remonter à la phase : sinon le log de fin et l'observabilité rapporten
 
 from unittest.mock import patch
 
-import run_pipeline
 from application.pipeline.metrics import PhaseMetrics
+from interfaces.cli import run_pipeline
 
 
 def _patch_credentials_present():

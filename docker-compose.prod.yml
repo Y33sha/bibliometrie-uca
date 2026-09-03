@@ -196,7 +196,7 @@ services:
     # `--no-raw-store` : sans archivage des réponses des sources, le conteneur n'a besoin
     # d'aucun emplacement en écriture. Rejouer la normalisation demande alors de réinterroger
     # les sources.
-    command: ["python", "run_pipeline.py", "--no-raw-store"]
+    command: ["run_pipeline", "--no-raw-store"]
     environment:
       DB_HOST: db
       DB_PORT: ${DB_PORT:-5432}

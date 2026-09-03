@@ -9,7 +9,7 @@ Le système se lit selon deux axes complémentaires : **deux runtimes** couplés
 Le code héberge deux programmes de natures différentes, qui ne s'appellent jamais directement : ils ne communiquent qu'à travers la base PostgreSQL, laquelle constitue leur **contrat d'intégration**.
 
 - **Le service en ligne** (`interfaces/api/` + `interfaces/frontend/`) : un processus FastAPI long, piloté par les requêtes des utilisateurs. Il est essentiellement une **couche de lecture** sur des données pré-calculées (projections plates, agrégations, facettes), avec une surface d'écriture restreinte à la **curation humaine**.
-- **Le pipeline** (`run_pipeline.py` + `application/pipeline/`) : un traitement par lots, déclenché par un ordonnanceur. Il **dérive** le référentiel : moissonnage des sources, normalisation, déduplication, rapprochement, enrichissements.
+- **Le pipeline** (`run_pipeline` + `application/pipeline/`) : un traitement par lots, déclenché par un ordonnanceur. Il **dérive** le référentiel : moissonnage des sources, normalisation, déduplication, rapprochement, enrichissements.
 
 ```
   sources externes (HAL, OpenAlex, WoS, ScanR, theses.fr)
@@ -70,8 +70,8 @@ Cette vue par couches se superpose à la vue par runtime : `application/` et `in
 5. **Le composition root est un endroit précis.** L'instanciation concrète des adapters et leur câblage aux use-cases se fait dans **un petit ensemble nommé de fichiers** :
 
    - `interfaces/api/app.py` + `interfaces/api/deps.py` — API HTTP
-   - `run_pipeline.py` — pipeline complet
-   - `interfaces/cli/*` — scripts CLI
+   - `interfaces/cli/run_pipeline.py` — pipeline complet
+   - `interfaces/cli/*` — scripts en ligne de commande
 
    Ces fichiers sont les **seuls** qui ont légitimement le droit d'importer `infrastructure.repositories`, `infrastructure.read_models`, `infrastructure.pipeline` ou toute classe `Pg*` concrète. Partout ailleurs, on passe par un port.
 
