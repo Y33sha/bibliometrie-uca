@@ -44,19 +44,19 @@ from domain.sources.crossref import (
     parse_crossref_issns,
     strip_jats_tags,
 )
-from domain.types import JsonValue
+from domain.types import JsonValue, as_mapping, as_sequence, as_str
 
 # =============================================================
 # EXTRACTEURS DE CHAMPS
 # =============================================================
 
 
-def get_doi(msg: dict) -> str | None:
+def get_doi(msg: Mapping[str, JsonValue]) -> str | None:
     """DOI normalisé en lowercase. CrossRef expose le DOI tel que déposé."""
-    return clean_doi(msg.get("DOI"))
+    return clean_doi(as_str(msg.get("DOI")))
 
 
-def get_title(msg: dict) -> str | None:
+def get_title(msg: Mapping[str, JsonValue]) -> str | None:
     titles = msg.get("title") or []
     if isinstance(titles, list) and titles:
         first = titles[0]
@@ -67,11 +67,11 @@ def get_title(msg: dict) -> str | None:
     return None
 
 
-def get_pub_year(msg: dict) -> int | None:
+def get_pub_year(msg: Mapping[str, JsonValue]) -> int | None:
     return extract_crossref_pub_year(msg, max_year=today().year + 1)
 
 
-def get_container_title(msg: dict) -> str | None:
+def get_container_title(msg: Mapping[str, JsonValue]) -> str | None:
     cts = msg.get("container-title") or []
     if isinstance(cts, list) and cts:
         first = cts[0]
@@ -82,18 +82,18 @@ def get_container_title(msg: dict) -> str | None:
     return None
 
 
-def get_issns(msg: dict) -> tuple[str | None, str | None]:
+def get_issns(msg: Mapping[str, JsonValue]) -> tuple[str | None, str | None]:
     return parse_crossref_issns(msg)
 
 
-def get_publisher_name(msg: dict) -> str | None:
+def get_publisher_name(msg: Mapping[str, JsonValue]) -> str | None:
     p = msg.get("publisher")
     if isinstance(p, str) and p.strip():
         return p.strip()
     return None
 
 
-def get_keywords(msg: dict) -> list[str] | None:
+def get_keywords(msg: Mapping[str, JsonValue]) -> list[str] | None:
     subjects = msg.get("subject") or []
     if not isinstance(subjects, list):
         return None
@@ -101,7 +101,7 @@ def get_keywords(msg: dict) -> list[str] | None:
     return cleaned or None
 
 
-def get_abstract(msg: dict) -> str | None:
+def get_abstract(msg: Mapping[str, JsonValue]) -> str | None:
     abstract = msg.get("abstract")
     if not isinstance(abstract, str) or not abstract.strip():
         return None
@@ -109,19 +109,19 @@ def get_abstract(msg: dict) -> str | None:
     return cleaned or None
 
 
-def get_cited_by_count(msg: dict) -> int | None:
+def get_cited_by_count(msg: Mapping[str, JsonValue]) -> int | None:
     val = msg.get("is-referenced-by-count")
     return val if isinstance(val, int) else None
 
 
-def get_language(msg: dict) -> str | None:
+def get_language(msg: Mapping[str, JsonValue]) -> str | None:
     lang = msg.get("language")
     if isinstance(lang, str) and lang.strip():
         return lang.strip().lower()
     return None
 
 
-def get_external_ids(msg: dict) -> dict | None:
+def get_external_ids(msg: Mapping[str, JsonValue]) -> dict[str, JsonValue] | None:
     """Identifiants secondaires (ISSN, ISBN). DOI vit dans la colonne dédiée."""
     ext: dict[str, JsonValue] = {}
     issns = msg.get("ISSN") or []
@@ -133,7 +133,7 @@ def get_external_ids(msg: dict) -> dict | None:
     return ext or None
 
 
-def get_biblio(msg: dict) -> dict | None:
+def get_biblio(msg: Mapping[str, JsonValue]) -> dict[str, JsonValue] | None:
     """Volume, issue, page, article-number + publisher/journal bruts.
 
     `publisher` et `journal` (object) tracent le nom tel que vu par CrossRef en parallèle des publishers/journals créés via `find_or_create_*`.
@@ -163,7 +163,7 @@ def get_biblio(msg: dict) -> dict | None:
     return biblio or None
 
 
-def get_meta(msg: dict) -> Mapping[str, JsonValue] | None:
+def get_meta(msg: Mapping[str, JsonValue]) -> Mapping[str, JsonValue] | None:
     return extract_crossref_meta(msg)
 
 
@@ -172,7 +172,9 @@ def get_meta(msg: dict) -> Mapping[str, JsonValue] | None:
 # =============================================================
 
 
-def upsert_publisher(msg: dict, *, publisher_repo: PublisherFindOrCreateQueries) -> int | None:
+def upsert_publisher(
+    msg: Mapping[str, JsonValue], *, publisher_repo: PublisherFindOrCreateQueries
+) -> int | None:
     name = get_publisher_name(msg)
     if not name:
         return None
@@ -180,7 +182,7 @@ def upsert_publisher(msg: dict, *, publisher_repo: PublisherFindOrCreateQueries)
 
 
 def upsert_journal(
-    msg: dict,
+    msg: Mapping[str, JsonValue],
     publisher_id: int | None,
     *,
     journal_repo: JournalFindOrCreateQueries,
@@ -204,27 +206,24 @@ def upsert_journal(
 # =============================================================
 
 
-def _author_full_name(author: dict) -> str:
-    given = (author.get("given") or "").strip()
-    family = (author.get("family") or "").strip()
+def _author_full_name(author: Mapping[str, JsonValue]) -> str:
+    given = (as_str(author.get("given")) or "").strip()
+    family = (as_str(author.get("family")) or "").strip()
     if given and family:
         return f"{given} {family}"
     return family or given or ""
 
 
-def _author_affiliation_strings(author: dict) -> list[str]:
-    affs = author.get("affiliation") or []
+def _author_affiliation_strings(author: Mapping[str, JsonValue]) -> list[str]:
     out: list[str] = []
-    for aff in affs:
-        if not isinstance(aff, dict):
-            continue
-        name = aff.get("name")
-        if isinstance(name, str) and name.strip():
+    for aff in as_sequence(author.get("affiliation")):
+        name = as_str(as_mapping(aff).get("name"))
+        if name and name.strip():
             out.append(name.strip())
     return out
 
 
-def build_crossref_author_records(msg: dict) -> list[AuthorRecord]:
+def build_crossref_author_records(msg: Mapping[str, JsonValue]) -> list[AuthorRecord]:
     """Parse les auteurs d'un message Crossref en `AuthorRecord` (sans I/O).
 
     - nom reconstruit via `_author_full_name` ;
@@ -271,7 +270,7 @@ def build_crossref_author_records(msg: dict) -> list[AuthorRecord]:
 def process_authorships(
     conn: Connection,
     authorship_queries: AuthorshipsBatchQueries,
-    msg: dict,
+    msg: Mapping[str, JsonValue],
     source_publication_id: int,
 ) -> None:
     """Parse les auteurs Crossref puis écrit les authorships en batch."""

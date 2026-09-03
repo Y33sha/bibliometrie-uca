@@ -11,7 +11,7 @@ Particularités DataCite :
 from __future__ import annotations
 
 import logging
-from typing import Any
+from collections.abc import Mapping
 
 from sqlalchemy import Connection
 
@@ -54,7 +54,7 @@ from domain.sources.datacite import (
     get_publisher_name,
     get_title,
 )
-from domain.types import JsonValue
+from domain.types import JsonValue, as_mapping, as_sequence, as_str
 from domain.urls import is_host
 
 # =============================================================
@@ -63,7 +63,7 @@ from domain.urls import is_host
 
 
 def upsert_publisher(
-    attributes: dict, *, publisher_repo: PublisherFindOrCreateQueries
+    attributes: Mapping[str, JsonValue], *, publisher_repo: PublisherFindOrCreateQueries
 ) -> int | None:
     name = get_publisher_name(attributes)
     if not name:
@@ -72,7 +72,7 @@ def upsert_publisher(
 
 
 def upsert_journal(
-    attributes: dict,
+    attributes: Mapping[str, JsonValue],
     publisher_id: int | None,
     *,
     journal_repo: JournalFindOrCreateQueries,
@@ -90,7 +90,7 @@ def upsert_journal(
     )
 
 
-def get_biblio(attributes: dict) -> dict | None:
+def get_biblio(attributes: Mapping[str, JsonValue]) -> dict[str, JsonValue] | None:
     """Volume / issue / pages depuis `container` + publisher/journal bruts.
 
     Trace le nom de l'éditeur et de la revue tels que vus par DataCite, en parallèle des publishers/journals créés via `find_or_create_*`.
@@ -125,42 +125,41 @@ def get_biblio(attributes: dict) -> dict | None:
 # =============================================================
 
 
-def _creator_full_name(creator: dict) -> str:
-    given = (creator.get("givenName") or "").strip()
-    family = (creator.get("familyName") or "").strip()
+def _creator_full_name(creator: Mapping[str, JsonValue]) -> str:
+    given = (as_str(creator.get("givenName")) or "").strip()
+    family = (as_str(creator.get("familyName")) or "").strip()
     if given and family:
         return f"{given} {family}"
-    name = (creator.get("name") or "").strip()
+    name = (as_str(creator.get("name")) or "").strip()
     return name or family or given or ""
 
 
-def _creator_orcid(creator: dict) -> str | None:
+def _creator_orcid(creator: Mapping[str, JsonValue]) -> str | None:
     """ORCID depuis `nameIdentifiers` (scheme ORCID ou schemeUri orcid.org)."""
-    for identifier in creator.get("nameIdentifiers") or []:
-        if not isinstance(identifier, dict):
+    for identifier in as_sequence(creator.get("nameIdentifiers")):
+        champs = as_mapping(identifier)
+        if not champs:
             continue
-        scheme = (identifier.get("nameIdentifierScheme") or "").strip().lower()
-        if scheme == "orcid" or is_host(identifier.get("schemeUri"), "orcid.org"):
-            orcid = normalize_orcid(identifier.get("nameIdentifier"))
+        scheme = (as_str(champs.get("nameIdentifierScheme")) or "").strip().lower()
+        if scheme == "orcid" or is_host(as_str(champs.get("schemeUri")), "orcid.org"):
+            orcid = normalize_orcid(as_str(champs.get("nameIdentifier")))
             if orcid:
                 return orcid
     return None
 
 
-def _creator_affiliation_strings(creator: dict) -> list[str]:
+def _creator_affiliation_strings(creator: Mapping[str, JsonValue]) -> list[str]:
     """Affiliations textuelles. `affiliation` est une liste de chaînes ou d'objets `{name, affiliationIdentifier, ...}` (ROR non exploité ici)."""
     out: list[str] = []
-    for aff in creator.get("affiliation") or []:
-        if isinstance(aff, str) and aff.strip():
-            out.append(aff.strip())
-        elif isinstance(aff, dict):
-            name = aff.get("name")
-            if isinstance(name, str) and name.strip():
-                out.append(name.strip())
+    for aff in as_sequence(creator.get("affiliation")):
+        if (texte := as_str(aff)) and texte.strip():
+            out.append(texte.strip())
+        elif (name := as_str(as_mapping(aff).get("name"))) and name.strip():
+            out.append(name.strip())
     return out
 
 
-def build_datacite_author_records(attributes: dict) -> list[AuthorRecord]:
+def build_datacite_author_records(attributes: Mapping[str, JsonValue]) -> list[AuthorRecord]:
     """Parse les `creators` DataCite en `AuthorRecord` (sans I/O).
 
     Ignore les creators `Organizational` (institutions comme auteur). ORCID sur `person_identifiers`, affiliations brutes → adresses (sans pays), `roles=['author']` explicite.
@@ -204,7 +203,7 @@ def build_datacite_author_records(attributes: dict) -> list[AuthorRecord]:
 def process_authorships(
     conn: Connection,
     authorship_queries: AuthorshipsBatchQueries,
-    attributes: dict,
+    attributes: Mapping[str, JsonValue],
     source_publication_id: int,
 ) -> None:
     records = build_datacite_author_records(attributes)
@@ -263,7 +262,7 @@ def process_work(
 
     container_title, _ = get_container(attributes)
     related_dois = extract_related_dois(attributes, doi)
-    external_ids: dict[str, Any] = {}
+    external_ids: dict[str, JsonValue] = {}
     if related_dois:
         external_ids["related_dois"] = related_dois
 

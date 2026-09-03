@@ -8,7 +8,7 @@ Particularités theses.fr :
 """
 
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 
 from sqlalchemy import Connection
 
@@ -29,28 +29,28 @@ from domain.sources.theses import (
     aggregate_thesis_persons,
     derive_theses_doc_type,
 )
-from domain.types import JsonValue
+from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str
 
 # =============================================================
 # PUBLICATIONS
 # =============================================================
 
 
-def extract_pub_metadata(these: dict) -> dict:
+def extract_pub_metadata(these: Mapping[str, JsonValue]) -> dict[str, JsonValue]:
     """Extrait les métadonnées de publication d'une thèse.
 
     Retourne un dict utilisable par `insert_source_document`.
     """
-    title = these.get("titrePrincipal")
-    date_soutenance = french_date_to_iso(these.get("dateSoutenance"))
-    date_inscription = french_date_to_iso(these.get("datePremiereInscriptionDoctorat"))
+    title = as_str(these.get("titrePrincipal"))
+    date_soutenance = french_date_to_iso(as_str(these.get("dateSoutenance")))
+    date_inscription = french_date_to_iso(as_str(these.get("datePremiereInscriptionDoctorat")))
 
     # pub_year = soutenance > première inscription (cascade theses.fr)
     year_source = date_soutenance or date_inscription
     pub_year = int(year_source[:4]) if year_source else None
 
-    doi = clean_doi(these.get("doi"))
-    nnt_clean = normalize_nnt(these.get("nnt"))
+    doi = clean_doi(as_str(these.get("doi")))
+    nnt_clean = normalize_nnt(as_str(these.get("nnt")))
 
     return {
         "title": title,
@@ -70,11 +70,11 @@ def extract_pub_metadata(these: dict) -> dict:
 # =============================================================
 
 
-def _build_source_meta(these: dict) -> dict | None:
+def _build_source_meta(these: Mapping[str, JsonValue]) -> dict[str, JsonValue] | None:
     """Construit le meta jsonb pour source_publications à partir des données brutes."""
     meta: dict[str, JsonValue] = {}
-    ds = french_date_to_iso(these.get("dateSoutenance"))
-    di = french_date_to_iso(these.get("datePremiereInscriptionDoctorat"))
+    ds = french_date_to_iso(as_str(these.get("dateSoutenance")))
+    di = french_date_to_iso(as_str(these.get("datePremiereInscriptionDoctorat")))
     if ds:
         meta["date_soutenance"] = ds
     if di:
@@ -87,14 +87,18 @@ def _build_source_meta(these: dict) -> dict | None:
     if etablissement := these.get("etabSoutenanceN"):
         meta["etablissement"] = etablissement
 
-    ecoles = these.get("ecolesDoctorale") or []
-    ecoles_clean = [{"nom": e["nom"], "ppn": e.get("ppn")} for e in ecoles if e.get("nom")]
+    ecoles = [as_mapping(e) for e in as_sequence(these.get("ecolesDoctorale"))]
+    ecoles_clean = [
+        {"nom": nom, "ppn": as_str(e.get("ppn"))} for e in ecoles if (nom := as_str(e.get("nom")))
+    ]
     if ecoles_clean:
         meta["ecoles_doctorales"] = ecoles_clean
 
-    partenaires = these.get("partenairesDeRecherche") or []
+    partenaires = [as_mapping(p) for p in as_sequence(these.get("partenairesDeRecherche"))]
     partenaires_clean = [
-        {"nom": p["nom"], "type": p.get("type")} for p in partenaires if p.get("nom")
+        {"nom": nom, "type": as_str(p.get("type"))}
+        for p in partenaires
+        if (nom := as_str(p.get("nom")))
     ]
     if partenaires_clean:
         meta["partenaires"] = partenaires_clean
@@ -105,10 +109,10 @@ def _build_source_meta(these: dict) -> dict | None:
 def insert_source_document(
     conn: Connection,
     queries: SourcePublicationQueries,
-    these: dict,
+    these: Mapping[str, JsonValue],
     staging_id: int,
     theses_id: str,
-    pub_meta: dict,
+    pub_meta: Mapping[str, JsonValue],
 ) -> int:
     """Crée/retrouve l'entrée source_publications pour theses.fr.
 
@@ -118,16 +122,18 @@ def insert_source_document(
     external_ids = {"nnt": nnt} if nnt else None
 
     # Keywords : sujets (mots-clés auteur)
-    sujets = these.get("sujets") or []
-    keywords = [s.get("libelle") for s in sujets if s.get("libelle")] or None
+    sujets = as_sequence(these.get("sujets"))
+    keywords = [
+        libelle for s in sujets if (libelle := as_str(as_mapping(s).get("libelle")))
+    ] or None
 
     # Topics : discipline + sujets Rameau
-    topics = {}
-    discipline = these.get("discipline")
+    topics: dict[str, JsonValue] = {}
+    discipline = as_str(these.get("discipline"))
     if discipline:
         topics["discipline"] = discipline
-    rameau = these.get("sujetsRameau") or []
-    rameau_list = [r.get("libelle") for r in rameau if r.get("libelle")]
+    rameau = as_sequence(these.get("sujetsRameau"))
+    rameau_list = [libelle for r in rameau if (libelle := as_str(as_mapping(r).get("libelle")))]
     if rameau_list:
         topics["rameau"] = rameau_list
     topics_json = topics if topics else None
@@ -142,17 +148,17 @@ def insert_source_document(
             source="theses",
             source_id=theses_id,
             staging_id=staging_id,
-            doi=pub_meta["doi"],
+            doi=as_str(pub_meta["doi"]),
             external_ids=external_ids,
-            title=pub_meta["title"] or "",
-            pub_year=pub_meta["pub_year"],
-            doc_type=pub_meta["doc_type"],
-            journal_id=pub_meta["journal_id"],
-            container_title=pub_meta["container_title"],
-            language=pub_meta["language"],
+            title=as_str(pub_meta["title"]) or "",
+            pub_year=as_int(pub_meta["pub_year"]),
+            doc_type=as_str(pub_meta["doc_type"]),
+            journal_id=as_int(pub_meta["journal_id"]),
+            container_title=as_str(pub_meta["container_title"]),
+            language=as_str(pub_meta["language"]),
             keywords=keywords,
             topics=topics_json,
-            oa_status=pub_meta["oa_status"],
+            oa_status=as_str(pub_meta["oa_status"]),
             meta=source_meta_json,
         ),
     )
@@ -165,7 +171,7 @@ def insert_source_document(
 
 def process_authorships(
     conn: Connection,
-    these: dict,
+    these: Mapping[str, JsonValue],
     source_publication_id: int,
     *,
     batch_queries: AuthorshipsBatchQueries,
@@ -177,9 +183,9 @@ def process_authorships(
 
     # Adresses partagées par toutes les personnes du document : laboratoires partenaires + établissement de soutenance.
     # Ce dernier rattache la thèse au périmètre — theses.fr ne porte pas d'adresses, et les laboratoires partenaires ne sont pas toujours des structures du périmètre.
-    partenaires = these.get("partenairesDeRecherche") or []
-    addr_parts = [p["nom"] for p in partenaires if p.get("nom")]
-    if etablissement := these.get("etabSoutenanceN"):
+    partenaires = as_sequence(these.get("partenairesDeRecherche"))
+    addr_parts = [nom for p in partenaires if (nom := as_str(as_mapping(p).get("nom")))]
+    if etablissement := as_str(these.get("etabSoutenanceN")):
         addr_parts.append(etablissement)
     shared_addresses = [AddressRecord(text=t) for t in addr_parts]
 
