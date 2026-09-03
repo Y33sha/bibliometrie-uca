@@ -22,6 +22,12 @@ def test_public_apis_never_missing(source):
     assert _detect(source) is None
 
 
+@pytest.mark.parametrize("source", ["doi.org", "doaj"])
+def test_sources_sans_credential_connu(source):
+    """Les API publiques que la fonction ne nomme pas ne réclament rien non plus."""
+    assert _detect(source) is None
+
+
 @pytest.mark.parametrize(
     ("api_key", "email", "expected_ok"),
     [("k", None, True), (None, "e@x", True), ("k", "e@x", True), (None, None, False)],
