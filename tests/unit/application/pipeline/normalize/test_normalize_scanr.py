@@ -4,7 +4,7 @@ Couvre la construction de `biblio` dans `insert_scanr_document` et le parsing
 auteurs pur `build_scanr_author_records` (orcid/idref, roles, affiliations →
 adresses + pays détectés).
 
-Pattern : `_FakeQueries` + `MagicMock`, pas de DB.
+Pattern : `FakeSourcePublicationQueries` + `MagicMock`, pas de DB.
 """
 
 from __future__ import annotations
@@ -16,17 +16,9 @@ from application.pipeline.normalize.normalize_scanr import (
     build_scanr_author_records,
     insert_scanr_document,
 )
-from application.ports.pipeline.normalize.source_publications import SourcePublicationRow
-
-
-class _FakeQueries:
-    def __init__(self) -> None:
-        self.upserted_documents: list[SourcePublicationRow] = []
-
-    def upsert_source_publication(self, conn, row) -> int:
-        self.upserted_documents.append(row)
-        return 999
-
+from tests.unit.application.pipeline.normalize.doubles import (
+    FakeSourcePublicationQueries,
+)
 
 _EMPTY_PUB_META: dict[str, Any] = {
     "doi": None,
@@ -54,16 +46,16 @@ class TestInsertScanrDocumentBiblio:
         return queries.upserted_documents[-1]
 
     def test_biblio_none_when_no_source_fields(self):
-        captured = self._call(_FakeQueries(), {})
+        captured = self._call(FakeSourcePublicationQueries(), {})
         assert captured.biblio is None
 
     def test_biblio_publisher_only(self):
-        captured = self._call(_FakeQueries(), {"source": {"publisher": "Elsevier"}})
+        captured = self._call(FakeSourcePublicationQueries(), {"source": {"publisher": "Elsevier"}})
         assert captured.biblio == {"publisher": "Elsevier"}
 
     def test_biblio_journal_built_from_title_and_journal_issns(self):
         captured = self._call(
-            _FakeQueries(),
+            FakeSourcePublicationQueries(),
             {
                 "source": {
                     "title": "Journal of Physics",
@@ -81,7 +73,7 @@ class TestInsertScanrDocumentBiblio:
 
     def test_biblio_publisher_and_journal_together(self):
         captured = self._call(
-            _FakeQueries(),
+            FakeSourcePublicationQueries(),
             {
                 "source": {
                     "publisher": "Elsevier",
@@ -96,13 +88,13 @@ class TestInsertScanrDocumentBiblio:
         }
 
     def test_biblio_journal_title_only(self):
-        captured = self._call(_FakeQueries(), {"source": {"title": "J. Phys."}})
+        captured = self._call(FakeSourcePublicationQueries(), {"source": {"title": "J. Phys."}})
         assert captured.biblio == {"journal": {"title": "J. Phys."}}
 
 
 class TestInsertScanrDocumentExternalIds:
     def _call(self, doc, pub_meta) -> dict[str, Any]:
-        queries = _FakeQueries()
+        queries = FakeSourcePublicationQueries()
         insert_scanr_document(
             MagicMock(),
             queries,

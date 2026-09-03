@@ -35,6 +35,9 @@ from application.pipeline.normalize.normalize_wos import (
     upsert_journal,
     upsert_publisher,
 )
+from tests.unit.application.pipeline.normalize.doubles import (
+    staging_row,
+)
 
 # ── _safe_list ───────────────────────────────────────────────────
 
@@ -899,13 +902,6 @@ class TestBuildWosAuthorRecords:
 # ── process_record ───────────────────────────────────────────────
 
 
-def _staging_row(staging_id=1, ut="WOS:1", doi=None, raw=None):
-    """Construit une `StagingRow` (NamedTuple) pour les tests de `process_record`."""
-    from application.ports.pipeline.normalize.staging import StagingRow
-
-    return StagingRow(id=staging_id, source_id=ut, doi=doi, raw_data=raw or {})
-
-
 class TestProcessRecord:
     def test_happy_path(self, logger, monkeypatch):
         # Stub les helpers internes pour ne tester que l'orchestration.
@@ -942,7 +938,7 @@ class TestProcessRecord:
         staging_queries = MagicMock()
         authorship_queries = MagicMock()
 
-        row = _staging_row(staging_id=1, ut="WOS:1", doi="10.1/x")
+        row = staging_row(staging_id=1, source_id="WOS:1", doi="10.1/x")
         result = process_record(
             None,
             queries,
@@ -993,7 +989,7 @@ class TestProcessRecord:
 
         queries.upsert_source_publication.side_effect = capture_ut
 
-        row = _staging_row(staging_id=1, ut="WOS:fallback", doi=None)
+        row = staging_row(staging_id=1, source_id="WOS:fallback", doi=None)
         process_record(
             None,
             queries,
@@ -1016,7 +1012,7 @@ class TestProcessRecord:
             lambda raw, doi: (_ for _ in ()).throw(ValueError("boom")),
         )
 
-        row = _staging_row(staging_id=1, ut="WOS:err", doi=None)
+        row = staging_row(staging_id=1, source_id="WOS:err", doi=None)
         with pytest.raises(ValueError, match="boom"):
             process_record(
                 None,
@@ -1082,7 +1078,7 @@ class TestWosNormalizer:
 
         monkeypatch.setattr(normalize_wos, "process_record", fake_process)
 
-        row = _staging_row(staging_id=7, ut="WOS:7")
+        row = staging_row(staging_id=7, source_id="WOS:7")
         result = norm.process_work(MagicMock(), row)
 
         assert result is True

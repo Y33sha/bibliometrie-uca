@@ -2,7 +2,7 @@
 
 Couvre les helpers (as_str, get_title, upsert_journal, extract_pub_metadata), `insert_hal_document` (collections, biblio, keywords, NNT, topics), le parsing TEI (`parse_tei_author_identifiers`), `parse_author_structures` (format `_FacetSep_`/`_JoinSep_`), le parsing auteurs `build_hal_author_records` (composite + TEI), l'orchestrateur `process_work` (métadonnées minimales, happy path), et la classe `HalNormalizer` (preload, délégation).
 
-Pattern : `_FakeQueries` + `_FakeAuthorshipQueries` + `MagicMock`, pas de DB.
+Pattern : `FakeSourcePublicationQueries` + `FakeAuthorshipsBatchQueries` + `MagicMock`, pas de DB.
 """
 
 from __future__ import annotations
@@ -28,62 +28,14 @@ from application.pipeline.normalize.normalize_hal import (
     upsert_journal,
     upsert_publisher,
 )
-from application.ports.pipeline.normalize.source_publications import SourcePublicationRow
-from application.ports.pipeline.normalize.staging import StagingRow
+from tests.unit.application.pipeline.normalize.doubles import (
+    FakeAuthorshipsBatchQueries,
+    FakeSourcePublicationQueries,
+    FakeStagingQueries,
+    staging_row,
+)
 
 # ── Stubs ────────────────────────────────────────────────────────
-
-
-def _staging_row(staging_id=1, hal_id="hal-1", doi=None, raw=None):
-    return StagingRow(
-        id=staging_id,
-        source_id=hal_id,
-        doi=doi,
-        raw_data=raw or {},
-    )
-
-
-class _FakeQueries:
-    def __init__(self) -> None:
-        self.upserted_documents: list[SourcePublicationRow] = []
-
-    def upsert_source_publication(self, conn, row) -> int:
-        self.upserted_documents.append(row)
-        return 999
-
-
-class _FakeAuthorshipQueries:
-    """Stub du port batch partagé — enregistre les appels du writer."""
-
-    def __init__(self) -> None:
-        self.cleared_for: list[int] = []
-
-    def clear_source_authorships_for_publication(self, conn, source_publication_id: int) -> None:
-        self.cleared_for.append(source_publication_id)
-
-    def upsert_source_authorships_batch(self, conn, values) -> None: ...
-
-    def fetch_source_authorship_ids_by_position(self, conn, **kw) -> dict[int, int]:
-        return {}
-
-    def upsert_addresses_batch(self, conn, values) -> None: ...
-
-    def fetch_address_ids_by_raw_text(self, conn, raw_texts) -> dict[str, int]:
-        return {}
-
-    def apply_address_countries_batch(self, conn, values) -> None: ...
-
-    def apply_address_suggested_countries_batch(self, conn, values) -> None: ...
-
-    def insert_source_authorship_addresses_batch(self, conn, values) -> None: ...
-
-
-class _FakeStagingQueries:
-    def __init__(self) -> None:
-        self.marked_done: list[int] = []
-
-    def mark_done(self, conn, staging_id: int) -> None:
-        self.marked_done.append(staging_id)
 
 
 # ── as_str ───────────────────────────────────────────────────────
@@ -271,50 +223,50 @@ class TestInsertHalDocument:
         return queries.upserted_documents[-1]
 
     def test_collections_from_coll_codes(self):
-        queries = _FakeQueries()
+        queries = FakeSourcePublicationQueries()
         captured = self._call(queries, {"collCode_s": ["UCA", "LIMOS", "UCA"]})
         # Dédupliquées, triées, depuis le seul `collCode_s` du raw_data.
         assert captured.hal_collections == ["LIMOS", "UCA"]
 
     def test_no_collections_returns_none(self):
-        queries = _FakeQueries()
+        queries = FakeSourcePublicationQueries()
         captured = self._call(queries, {})
         assert captured.hal_collections is None
 
     def test_doc_type_concatenated_with_subtype(self):
-        queries = _FakeQueries()
+        queries = FakeSourcePublicationQueries()
         captured = self._call(queries, {"docType_s": "ART", "docSubType_s": "review"})
         assert captured.doc_type == "ART_review"
 
     def test_doc_type_no_subtype(self):
-        queries = _FakeQueries()
+        queries = FakeSourcePublicationQueries()
         captured = self._call(queries, {"docType_s": "BOOK"})
         assert captured.doc_type == "BOOK"
 
     def test_nnt_goes_in_external_ids(self):
-        queries = _FakeQueries()
+        queries = FakeSourcePublicationQueries()
         captured = self._call(queries, {"nntId_s": "2024CLFAC001"})
         assert captured.external_ids == {"hal_id": ["h1"], "nnt": "2024CLFAC001"}
 
     def test_hal_id_always_in_external_ids(self):
         """Le normalizer pose `external_ids.hal_id = source_id` même hors thèse, pour que `hal_id` soit un token de confirmation et que HAL soit clusterisé comme les autres sources (symétrie avec ce que theses fait déjà pour NNT)."""
-        queries = _FakeQueries()
+        queries = FakeSourcePublicationQueries()
         captured = self._call(queries, {})
         assert captured.external_ids == {"hal_id": ["h1"]}
 
     def test_keywords_deduplicated(self):
-        queries = _FakeQueries()
+        queries = FakeSourcePublicationQueries()
         captured = self._call(queries, {"keyword_s": ["a", "b", "a", "c"]})
         assert captured.keywords == ["a", "b", "c"]
 
     def test_keywords_empty(self):
-        queries = _FakeQueries()
+        queries = FakeSourcePublicationQueries()
         captured = self._call(queries, {"keyword_s": []})
         assert captured.keywords is None
 
     def test_topics_from_domain(self):
         """Les domaines sont stockés tels que la source les expose ; la découpe en libellés vit dans la phase `subjects`."""
-        queries = _FakeQueries()
+        queries = FakeSourcePublicationQueries()
         entries = [
             "sdv.bibs_FacetSep_Sciences du Vivant [q-bio]/Biostatistiques",
             "info.algo_FacetSep_Informatique [cs]/Algorithme et structure de données",
@@ -323,34 +275,34 @@ class TestInsertHalDocument:
         assert captured.topics == {"hal_domains": entries}
 
     def test_biblio_built_from_volume_issue_pages(self):
-        queries = _FakeQueries()
+        queries = FakeSourcePublicationQueries()
         captured = self._call(queries, {"volume_s": "10", "issue_s": "2", "page_s": "100-120"})
         assert captured.biblio == {"volume": "10", "issue": "2", "pages": "100-120"}
 
     def test_biblio_empty(self):
-        queries = _FakeQueries()
+        queries = FakeSourcePublicationQueries()
         captured = self._call(queries, {})
         assert captured.biblio is None
 
     def test_biblio_publisher_from_journalPublisher_s(self):
-        queries = _FakeQueries()
+        queries = FakeSourcePublicationQueries()
         captured = self._call(queries, {"journalPublisher_s": "Elsevier"})
         assert captured.biblio == {"publisher": "Elsevier"}
 
     def test_biblio_publisher_fallback_to_publisher_s(self):
-        queries = _FakeQueries()
+        queries = FakeSourcePublicationQueries()
         captured = self._call(queries, {"publisher_s": "Springer"})
         assert captured.biblio == {"publisher": "Springer"}
 
     def test_biblio_journalPublisher_s_wins_over_publisher_s(self):
-        queries = _FakeQueries()
+        queries = FakeSourcePublicationQueries()
         captured = self._call(
             queries, {"journalPublisher_s": "Elsevier", "publisher_s": "Springer"}
         )
         assert captured.biblio == {"publisher": "Elsevier"}
 
     def test_biblio_journal_built_from_title_issn_eissn(self):
-        queries = _FakeQueries()
+        queries = FakeSourcePublicationQueries()
         captured = self._call(
             queries,
             {
@@ -368,17 +320,17 @@ class TestInsertHalDocument:
         }
 
     def test_biblio_journal_partial(self):
-        queries = _FakeQueries()
+        queries = FakeSourcePublicationQueries()
         captured = self._call(queries, {"journalTitle_s": "J. Phys."})
         assert captured.biblio == {"journal": {"title": "J. Phys."}}
 
     def test_url_from_uri(self):
-        queries = _FakeQueries()
+        queries = FakeSourcePublicationQueries()
         captured = self._call(queries, {"uri_s": "https://hal.science/hal-123"})
         assert captured.urls == ["https://hal.science/hal-123"]
 
     def test_pub_meta_propagates_journal_oa_lang(self):
-        queries = _FakeQueries()
+        queries = FakeSourcePublicationQueries()
         captured = self._call(
             queries,
             {},
@@ -579,7 +531,7 @@ class TestBuildHalAuthorRecords:
 
 class TestProcessAuthors:
     def test_clears_then_writes_even_when_empty(self):
-        authorship_queries = _FakeAuthorshipQueries()
+        authorship_queries = FakeAuthorshipsBatchQueries()
         normalize_hal.process_authorships(MagicMock(), authorship_queries, {}, 10)
         # Le writer clear toujours, même sans auteur (re-traitement → table blanche).
         assert authorship_queries.cleared_for == [10]
@@ -601,30 +553,30 @@ def stub_orchestration_deps(monkeypatch):
 class TestProcessWork:
     def _kwargs(self, queries=None, staging_queries=None):
         return {
-            "queries": queries or _FakeQueries(),
+            "queries": queries or FakeSourcePublicationQueries(),
             "logger": logging.getLogger("test"),
             "journal_repo": MagicMock(),
             "publisher_repo": MagicMock(),
             "publication_repo": MagicMock(),
-            "staging_queries": staging_queries or _FakeStagingQueries(),
-            "authorship_queries": _FakeAuthorshipQueries(),
+            "staging_queries": staging_queries or FakeStagingQueries(),
+            "authorship_queries": FakeAuthorshipsBatchQueries(),
         }
 
     def test_happy_path(self, stub_orchestration_deps):
-        sq = _FakeStagingQueries()
+        sq = FakeStagingQueries()
         raw = {
             "title_s": ["T"],
             "producedDateY_i": 2024,
             "authFullNameFormIDPersonIDIDHal_fs": ["T_FacetSep_0-0_FacetSep_"],
         }
-        row = _staging_row(staging_id=1, hal_id="hal-1", raw=raw)
+        row = staging_row(staging_id=1, source_id="hal-1", raw=raw)
         result = process_work(MagicMock(), staging_row=row, **self._kwargs(staging_queries=sq))
         assert result is True
         assert sq.marked_done == [1]
 
     def test_missing_minimal_metadata_returns_false(self, stub_orchestration_deps, caplog):
-        sq = _FakeStagingQueries()
-        row = _staging_row(staging_id=1, raw={"title_s": []})  # pas de titre / pas d'année
+        sq = FakeStagingQueries()
+        row = staging_row(staging_id=1, raw={"title_s": []})  # pas de titre / pas d'année
         with caplog.at_level(logging.WARNING):
             result = process_work(MagicMock(), staging_row=row, **self._kwargs(staging_queries=sq))
         assert result is False
@@ -633,10 +585,10 @@ class TestProcessWork:
         assert sq.marked_done == [1]
 
     def test_missing_author_field_marks_done(self, stub_orchestration_deps, caplog):
-        sq = _FakeStagingQueries()
+        sq = FakeStagingQueries()
         # Métadonnées minimales OK mais champ auteurs absent → doc inexploitable.
-        row = _staging_row(
-            staging_id=2, hal_id="hal-2", raw={"title_s": ["T"], "producedDateY_i": 2024}
+        row = staging_row(
+            staging_id=2, source_id="hal-2", raw={"title_s": ["T"], "producedDateY_i": 2024}
         )
         with caplog.at_level(logging.ERROR):
             result = process_work(MagicMock(), staging_row=row, **self._kwargs(staging_queries=sq))
@@ -663,7 +615,7 @@ class TestProcessWork:
             "producedDateY_i": 2024,
             "authFullNameFormIDPersonIDIDHal_fs": ["T_FacetSep_0-0_FacetSep_"],
         }
-        row = _staging_row(raw=raw)
+        row = staging_row(raw=raw)
         process_work(MagicMock(), staging_row=row, **self._kwargs())
         assert captured["called"] is False
 
@@ -682,7 +634,7 @@ class TestProcessWork:
             "journalPublisher_s": "Elsevier",
             "authFullNameFormIDPersonIDIDHal_fs": ["T_FacetSep_0-0_FacetSep_"],
         }
-        row = _staging_row(hal_id="hal-x", raw=raw)
+        row = staging_row(source_id="hal-x", raw=raw)
         with pytest.raises(RuntimeError, match="kaboom"):
             process_work(MagicMock(), staging_row=row, **self._kwargs())
 
@@ -694,12 +646,12 @@ def _make_normalizer():
     return HalNormalizer(
         conn=MagicMock(),
         logger=logging.getLogger("test"),
-        staging_queries=_FakeStagingQueries(),
-        queries=_FakeQueries(),
+        staging_queries=FakeStagingQueries(),
+        queries=FakeSourcePublicationQueries(),
         journal_repo_factory=lambda c: MagicMock(),
         publisher_repo_factory=lambda c: MagicMock(),
         publication_repo_factory=lambda c: MagicMock(),
-        authorship_queries=_FakeAuthorshipQueries(),
+        authorship_queries=FakeAuthorshipsBatchQueries(),
     )
 
 
@@ -715,5 +667,5 @@ class TestHalNormalizerClass:
         norm = _make_normalizer()
         norm.preload_caches(MagicMock())
         monkeypatch.setattr(normalize_hal, "process_work", lambda *a, **kw: True)
-        result = norm.process_work(MagicMock(), _staging_row())
+        result = norm.process_work(MagicMock(), staging_row())
         assert result is True
