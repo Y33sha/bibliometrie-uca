@@ -5,6 +5,7 @@ Chaque facette exclut son propre filtre mais applique tous les autres. Les facet
 
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
+from contextvars import copy_context
 from typing import Any
 
 from sqlalchemy import Connection, text
@@ -513,8 +514,14 @@ def publications_facets(
         "hal_status": "_facet_hal_status",
         "in_perimeter": "_facet_in_perimeter",
     }
+    # Chaque tâche emporte sa copie du contexte de la requête : ce qu'un contexte porte — la
+    # déclaration de requête de lecture, sur laquelle veille le garde-fou des connexions — ne
+    # traverse pas seul la frontière d'un thread. Une copie par tâche, un contexte ne pouvant
+    # pas être entré par deux threads à la fois.
     with ThreadPoolExecutor(max_workers=len(facet_methods)) as pool:
-        futures = {key: pool.submit(run, name) for key, name in facet_methods.items()}
+        futures = {
+            key: pool.submit(copy_context().run, run, name) for key, name in facet_methods.items()
+        }
         results = {key: future.result() for key, future in futures.items()}
 
     labs, no_lab_count = results.pop("labs")

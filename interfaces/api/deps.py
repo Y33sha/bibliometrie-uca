@@ -112,7 +112,7 @@ def admin_user_or_none(request: Request) -> str | None:
 
 
 # Méthodes HTTP sans effet de bord. Starlette sert `HEAD` par la route `GET` correspondante, qui traverse donc les mêmes dépendances. `OPTIONS` n'atteint aucune route — le contrôle préalable reçoit sa réponse du middleware CORS, et une requête nue tombe en 405 — et figure ici pour la route qui viendrait à le déclarer.
-_READ_ONLY_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
+READ_ONLY_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 
 
 def _open_connection(request: Request) -> Connection:
@@ -123,7 +123,7 @@ def _open_connection(request: Request) -> Connection:
     Point de passage unique des connexions ouvertes pendant une requête : celle que `db_conn` sert aux dépendances, et celles que `connection_factory` remet à une lecture parallélisée. La règle vaut donc pour toutes, quel que soit le code qui les consomme.
     """
     conn = get_sync_engine().connect()
-    if request.method in _READ_ONLY_METHODS:
+    if request.method in READ_ONLY_METHODS:
         conn.execution_options(postgresql_readonly=True)
     return conn
 

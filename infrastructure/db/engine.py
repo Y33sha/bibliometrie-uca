@@ -15,6 +15,7 @@ from pydantic import SecretStr
 from sqlalchemy import URL, Engine, create_engine
 
 from infrastructure.db.dml_guard import install_dml_guard
+from infrastructure.db.read_only_guard import install_read_only_guard
 from infrastructure.settings import settings
 
 _sync_engine: Engine | None = None
@@ -93,8 +94,17 @@ def build_sync_engine(identity: DbIdentity = "pipeline") -> Engine:
         max_overflow=settings.db_pool_max - settings.db_pool_min,
         pool_pre_ping=True,
     )
-    install_dml_guard(engine)
+    install_engine_guards(engine)
     return engine
+
+
+def install_engine_guards(engine: Engine) -> None:
+    """Attache les garde-fous que toute connexion du projet porte.
+
+    Réunis ici pour qu'un engine monté hors du constructeur — celui d'une suite de tests, sur la base de test — les reçoive tous en un appel, et qu'en ajouter un ne demande pas d'aller les compléter un par un.
+    """
+    install_dml_guard(engine)
+    install_read_only_guard(engine)
 
 
 def set_sync_engine(engine: Engine | None) -> None:

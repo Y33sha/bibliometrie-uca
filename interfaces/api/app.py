@@ -30,8 +30,10 @@ from domain.errors import (
     ValidationError,
 )
 from infrastructure.db.engine import build_sync_engine, set_sync_engine
+from infrastructure.db.read_only_guard import read_request
 from infrastructure.observability.log import configure_root_logging
 from infrastructure.settings import settings
+from interfaces.api.deps import READ_ONLY_METHODS
 from interfaces.api.models.errors import (
     PublisherMergeBlockedResponse,
     RejectedPairsResponse,
@@ -188,6 +190,20 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
 # Starlette empile les middlewares dans l'ordre inverse de leur déclaration : le dernier
 # déclaré enveloppe les précédents, et voit donc toutes les réponses, y compris celles qu'un
 # middleware intérieur compose sans laisser passer la requête.
+
+
+@app.middleware("http")
+async def read_only_guard_middleware(
+    request: Request, call_next: RequestResponseEndpoint
+) -> Response:
+    """Déclare la requête de lecture, pour le garde-fou qui refuse qu'une connexion pouvant écrire la serve.
+
+    Déclaré en premier, donc posé au plus près de la route : la déclaration couvre le traitement de la requête, où les connexions s'ouvrent.
+    """
+    if request.method not in READ_ONLY_METHODS:
+        return await call_next(request)
+    with read_request():
+        return await call_next(request)
 
 
 @app.middleware("http")
