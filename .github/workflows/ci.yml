@@ -47,6 +47,10 @@ jobs:
       # en production. Le rôle est créé sur la base de test s'il n'existe pas.
       DB_APP_USER: bibliometrie_app
       DB_APP_PASSWORD: bibliometrie_app_ci
+      # Identité du pipeline, sous laquelle les fixtures posent leurs données, comme le
+      # pipeline en production. Créée elle aussi sur la base de test si elle n'existe pas.
+      DB_PIPELINE_USER: bibliometrie_pipeline
+      DB_PIPELINE_PASSWORD: bibliometrie_pipeline_ci
       # Valeurs bidon : les tests n'exercent pas l'authentification, mais l'API refuse de
       # démarrer sans empreinte de mot de passe ni clé de signature d'au moins 32 caractères,
       # et les tests d'intégration déclenchent son cycle de vie.
