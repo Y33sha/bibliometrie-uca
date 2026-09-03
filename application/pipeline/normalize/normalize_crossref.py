@@ -8,6 +8,7 @@ Particularités CrossRef :
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 
 from sqlalchemy import Connection
 
@@ -162,7 +163,7 @@ def get_biblio(msg: dict) -> dict | None:
     return biblio or None
 
 
-def get_meta(msg: dict) -> dict | None:
+def get_meta(msg: dict) -> Mapping[str, JsonValue] | None:
     return extract_crossref_meta(msg)
 
 

@@ -2,13 +2,15 @@
 
 Interprétation des champs propres au schéma WoS Expanded API — prédicats et extracteurs qui encapsulent la connaissance de la sémantique WoS pour le reste du pipeline.
 
-Les `dict[str, Any]` ici sont des payloads JSON bruts de l'API WoS (frontière dynamique avec une source externe, schéma non typé).
+Les `Mapping[str, JsonValue]` ici sont des payloads JSON bruts de l'API WoS (frontière dynamique avec une source externe, schéma non typé).
 """
 
-from typing import Any
+from collections.abc import Mapping
+
+from domain.types import JsonValue
 
 
-def is_wos_author_exploitable(author: dict[str, Any]) -> bool:
+def is_wos_author_exploitable(author: Mapping[str, JsonValue]) -> bool:
     """Indique si une entrée auteur WoS est utilisable côté pipeline.
 
     `daisng_id` (Distinct Author Identification System) est l'identifiant interne WoS de l'auteur. Pas utilisé côté DB (entité algorithmique WoS, non fiable) mais c'est un signal de **qualité** : son absence indique un parsing API WoS douteux (typiquement les enregistrements mal indexés ou incomplets). Combiné à l'exigence d'un `full_name`, le filtre garde une bonne approximation « auteur réel exploitable » et écarte les fragments d'erreur.

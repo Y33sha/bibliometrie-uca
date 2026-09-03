@@ -2,13 +2,14 @@
 
 Interprétation des champs propres au schéma theses.fr — prédicats et extracteurs qui encapsulent la connaissance de la sémantique theses.fr pour le reste du pipeline.
 
-Les `dict[str, Any]` ici sont des payloads JSON bruts de l'API theses.fr (frontière dynamique avec une source externe, schéma non typé). Le champ `person` du dataclass `ThesisAuthorship` transmet tel quel le sous-objet personne au caller (notamment pour extraire les identifiants et le `raw_author_name` portés sur la `source_authorship`).
+Les `Mapping[str, JsonValue]` ici sont des payloads JSON bruts de l'API theses.fr (frontière dynamique avec une source externe, schéma non typé). Le champ `person` du dataclass `ThesisAuthorship` transmet tel quel le sous-objet personne au caller (notamment pour extraire les identifiants et le `raw_author_name` portés sur la `source_authorship`).
 """
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any
 
 from domain.publications.authorship_roles import THESES_FIELD_ROLES, merge_roles
+from domain.types import JsonValue, as_mapping, as_sequence, as_str
 
 
 def derive_theses_doc_type(date_soutenance: str | None) -> str:
@@ -28,7 +29,7 @@ class ThesisAuthorship:
     Produite par `aggregate_thesis_persons` à partir du dict `these` de l'API theses.fr. `person` est le dict brut, transmis tel quel au caller pour les effets (extraction d'identifiants, écriture sur `source_authorships`).
     """
 
-    person: dict[str, Any]
+    person: Mapping[str, JsonValue]
     roles: list[str]
     raw_author_name: str
     author_position: int | None
@@ -36,7 +37,7 @@ class ThesisAuthorship:
     is_author: bool
 
 
-def aggregate_thesis_persons(these: dict[str, Any]) -> list[ThesisAuthorship]:
+def aggregate_thesis_persons(these: Mapping[str, JsonValue]) -> list[ThesisAuthorship]:
     """Agrège les personnes d'une thèse depuis `these` (API theses.fr).
 
     Itère sur les champs `auteurs`, `directeurs`, `rapporteurs`, `examinateurs`, `president` (cf. `THESES_FIELD_ROLES`). Une personne qui apparaît dans plusieurs champs est dédupliquée (clé : PPN si présent, sinon `(nom, prenom)`) et ses rôles sont fusionnés via `merge_roles`.
@@ -45,34 +46,34 @@ def aggregate_thesis_persons(these: dict[str, Any]) -> list[ThesisAuthorship]:
 
     `author_position` est incrémenté seulement pour les personnes dont les rôles fusionnés contiennent `'author'` ; `None` pour les autres rôles (directeurs/rapporteurs/jury/président). Ordre des auteurs : celui de la liste `these["auteurs"]`.
     """
-    person_roles: dict[str, dict[str, Any]] = {}
+    # Une personne apparaissant dans plusieurs champs est retenue une fois, ses rôles cumulés.
+    personnes: dict[str, Mapping[str, JsonValue]] = {}
+    roles_par_personne: dict[str, list[str]] = {}
 
     for field, roles in THESES_FIELD_ROLES.items():
         if field == "president":
-            president = these.get("president")
-            persons = [president] if president and president.get("nom") else []
+            president = as_mapping(these.get("president"))
+            persons = [president] if as_str(president.get("nom")) else []
         else:
-            persons = these.get(field) or []
+            persons = [as_mapping(p) for p in as_sequence(these.get(field))]
 
         for person in persons:
-            nom = person.get("nom")
+            nom = as_str(person.get("nom"))
             if not nom:
                 continue
-            ppn = person.get("ppn")
-            key = ppn if ppn else f"name:{nom}:{person.get('prenom', '')}"
-            if key not in person_roles:
-                person_roles[key] = {"person": person, "roles": []}
-            person_roles[key]["roles"].extend(roles)
+            ppn = as_str(person.get("ppn"))
+            key = ppn if ppn else f"name:{nom}:{as_str(person.get('prenom')) or ''}"
+            personnes.setdefault(key, person)
+            roles_par_personne.setdefault(key, []).extend(roles)
 
     out: list[ThesisAuthorship] = []
     position = 0
-    for info in person_roles.values():
-        person = info["person"]
-        merged = merge_roles([info["roles"]])
+    for key, person in personnes.items():
+        merged = merge_roles([roles_par_personne[key]])
         is_author = "author" in merged
-        prenom = person.get("prenom") or ""
-        raw_author_name = (prenom + " " + person["nom"]).strip()
-        ppn = person.get("ppn")
+        prenom = as_str(person.get("prenom")) or ""
+        raw_author_name = (prenom + " " + (as_str(person.get("nom")) or "")).strip()
+        ppn = as_str(person.get("ppn"))
         person_identifiers = {"idref": ppn} if ppn else None
 
         out.append(
