@@ -96,7 +96,7 @@ def _fix_person_names(conn: Connection, apply: bool) -> None:
         text(r"SELECT id, last_name, first_name FROM persons WHERE last_name ~ '^\(\d+\)$'")
     ).all()
 
-    upd: list[dict] = []
+    upd: list[dict[str, int | str | None]] = []
     for r in rows:
         # Reconstitue le nom brut d'origine (prénom + identifiant capté comme nom) puis re-parse
         # avec le parser, qui écarte l'identifiant parenthésé.
