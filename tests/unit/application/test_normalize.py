@@ -460,13 +460,13 @@ class TestThesesExtractPubMetadata:
             "nnt": "2023ucfa0069",
         }
         meta = extract_pub_metadata(these)
-        assert meta["title"] == "Titre de la thèse"
-        assert meta["doc_type"] == "thesis"
-        assert meta["pub_year"] == 2023
-        assert meta["doi"] == "10.1234/test"
-        assert meta["nnt"] == "2023UCFA0069"
-        assert meta["oa_status"] == "closed"
-        assert meta["journal_id"] is None
+        assert meta.title == "Titre de la thèse"
+        assert meta.doc_type == "thesis"
+        assert meta.pub_year == 2023
+        assert meta.doi == "10.1234/test"
+        assert meta.nnt == "2023UCFA0069"
+        assert meta.oa_status == "closed"
+        assert meta.journal_id is None
 
     def test_en_cours_falls_back_to_inscription(self):
         these = {
@@ -474,24 +474,24 @@ class TestThesesExtractPubMetadata:
             "datePremiereInscriptionDoctorat": "01/09/2022",
         }
         meta = extract_pub_metadata(these)
-        assert meta["doc_type"] == "ongoing_thesis"
-        assert meta["pub_year"] == 2022
-        assert meta["doi"] is None
-        assert meta["nnt"] is None
+        assert meta.doc_type == "ongoing_thesis"
+        assert meta.pub_year == 2022
+        assert meta.doi is None
+        assert meta.nnt is None
 
     def test_no_dates(self):
         meta = extract_pub_metadata({"titrePrincipal": "X"})
-        assert meta["doc_type"] == "ongoing_thesis"
-        assert meta["pub_year"] is None
+        assert meta.doc_type == "ongoing_thesis"
+        assert meta.pub_year is None
 
     def test_malformed_date(self):
         """Date non parseable → pub_year reste None."""
         meta = extract_pub_metadata({"titrePrincipal": "X", "dateSoutenance": "date-invalide"})
-        assert meta["pub_year"] is None
+        assert meta.pub_year is None
 
     def test_no_title(self):
         meta = extract_pub_metadata({})
-        assert meta["title"] is None
+        assert meta.title is None
 
 
 class TestThesesBuildSourceMeta:

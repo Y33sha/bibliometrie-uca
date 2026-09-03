@@ -22,6 +22,7 @@ from application.pipeline.normalize.normalize_theses import (
     process_authorships,
     process_work,
 )
+from application.pipeline.normalize.pub_metadata import PublicationMetadata
 from tests.unit.application.pipeline.normalize.doubles import (
     FakeSourcePublicationQueries,
     FakeStagingQueries,
@@ -52,22 +53,22 @@ class _FakeBatchQueries:
 class TestExtractPubMetadata:
     def test_minimal(self):
         meta = extract_pub_metadata({"titrePrincipal": "T"})
-        assert meta["title"] == "T"
-        assert meta["pub_year"] is None
-        assert meta["nnt"] is None
-        assert meta["oa_status"] == "closed"
-        assert meta["journal_id"] is None
+        assert meta.title == "T"
+        assert meta.pub_year is None
+        assert meta.nnt is None
+        assert meta.oa_status == "closed"
+        assert meta.journal_id is None
 
     def test_pub_year_from_soutenance(self):
         meta = extract_pub_metadata({"titrePrincipal": "T", "dateSoutenance": "15/03/2024"})
-        assert meta["pub_year"] == 2024
+        assert meta.pub_year == 2024
 
     def test_pub_year_fallback_to_inscription(self):
         """Si pas de date_soutenance, on prend date_inscription."""
         meta = extract_pub_metadata(
             {"titrePrincipal": "T", "datePremiereInscriptionDoctorat": "10/09/2020"}
         )
-        assert meta["pub_year"] == 2020
+        assert meta.pub_year == 2020
 
     def test_pub_year_soutenance_wins_over_inscription(self):
         meta = extract_pub_metadata(
@@ -77,19 +78,19 @@ class TestExtractPubMetadata:
                 "datePremiereInscriptionDoctorat": "10/09/2020",
             }
         )
-        assert meta["pub_year"] == 2024
+        assert meta.pub_year == 2024
 
     def test_no_title(self):
         meta = extract_pub_metadata({})
-        assert meta["title"] is None
+        assert meta.title is None
 
     def test_nnt_normalized(self):
         meta = extract_pub_metadata({"titrePrincipal": "T", "nnt": "  2024clfac001  "})
-        assert meta["nnt"] == "2024CLFAC001"
+        assert meta.nnt == "2024CLFAC001"
 
     def test_doi_passthrough(self):
         meta = extract_pub_metadata({"titrePrincipal": "T", "doi": "10.1/abc"})
-        assert meta["doi"] == "10.1/abc"
+        assert meta.doi == "10.1/abc"
 
 
 # ── _build_source_meta ───────────────────────────────────────────
@@ -147,8 +148,8 @@ class TestBuildSourceMeta:
 
 
 class TestInsertSourceDocument:
-    def _pub_meta(self, **overrides) -> dict:
-        base = {
+    def _pub_meta(self, **overrides) -> PublicationMetadata:
+        base: dict[str, Any] = {
             "title": "T",
             "pub_year": 2024,
             "doc_type": "thesis",
@@ -160,10 +161,14 @@ class TestInsertSourceDocument:
             "language": None,
         }
         base.update(overrides)
-        return base
+        return PublicationMetadata(**base)
 
     def _call(
-        self, queries: FakeSourcePublicationQueries, these: dict, *, pub_meta: dict | None = None
+        self,
+        queries: FakeSourcePublicationQueries,
+        these: dict,
+        *,
+        pub_meta: PublicationMetadata | None = None,
     ) -> dict:
         insert_source_document(
             MagicMock(),
