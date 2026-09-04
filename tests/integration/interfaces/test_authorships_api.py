@@ -8,33 +8,11 @@ Stratégie : seed minimal via un pool dédié (hors pool API), ids uniques par
 test pour éviter les collisions.
 """
 
-import os
 import uuid
-from contextlib import contextmanager
 
-import psycopg
 import pytest
-from psycopg.rows import dict_row
 
-_DB_ARGS = {
-    "dbname": "bibliometrie_test",
-    "user": os.environ["DB_OWNER_USER"],
-    "host": os.environ.get("DB_HOST", "127.0.0.1"),
-    "port": int(os.environ.get("DB_PORT", "5432")),
-}
-if os.environ.get("DB_OWNER_PASSWORD"):
-    _DB_ARGS["password"] = os.environ["DB_OWNER_PASSWORD"]
-
-
-@contextmanager
-def _pool():
-    conn = psycopg.connect(**_DB_ARGS, row_factory=dict_row)
-    conn.autocommit = True
-    try:
-        with conn.cursor() as cur:
-            yield cur
-    finally:
-        conn.close()
+from tests.integration.helpers.db import owner_pool
 
 
 def _uniq(prefix: str) -> str:
@@ -61,7 +39,7 @@ def _upsert_identity(cur, raw_author_name: str) -> int:
 def _cleanup_after_module():
     """Truncate à la fin pour ne pas polluer les suites suivantes."""
     yield
-    with _pool() as cur:
+    with owner_pool() as cur:
         cur.execute(
             "TRUNCATE TABLE authorships, source_authorships, author_identifying_keys, "
             "source_publications, publications, persons, audit_log RESTART IDENTITY CASCADE"
@@ -69,7 +47,7 @@ def _cleanup_after_module():
 
 
 def _seed_person(last: str = "TESTA", first: str = "J") -> int:
-    with _pool() as cur:
+    with owner_pool() as cur:
         cur.execute(
             "INSERT INTO persons (last_name, first_name, last_name_normalized, first_name_normalized) "
             "VALUES (%s, %s, lower(%s), lower(%s)) RETURNING id",
@@ -79,7 +57,7 @@ def _seed_person(last: str = "TESTA", first: str = "J") -> int:
 
 
 def _seed_publication(title: str = "T", year: int = 2024) -> int:
-    with _pool() as cur:
+    with owner_pool() as cur:
         cur.execute(
             "INSERT INTO publications (title, title_normalized, pub_year) "
             "VALUES (%s, lower(%s), %s) RETURNING id",
@@ -89,7 +67,7 @@ def _seed_publication(title: str = "T", year: int = 2024) -> int:
 
 
 def _seed_authorship(publication_id: int, person_id: int | None = None) -> int:
-    with _pool() as cur:
+    with owner_pool() as cur:
         cur.execute(
             "INSERT INTO authorships (publication_id, person_id, in_perimeter) "
             "VALUES (%s, %s, true) RETURNING id",
@@ -100,7 +78,7 @@ def _seed_authorship(publication_id: int, person_id: int | None = None) -> int:
 
 def _seed_source_publication(source: str = "hal", source_id: str | None = None) -> int:
     sid = source_id or _uniq("sid")
-    with _pool() as cur:
+    with owner_pool() as cur:
         cur.execute(
             "INSERT INTO source_publications (source, source_id, title, pub_year) "
             "VALUES (%s, %s, 'T', 2024) RETURNING id",
@@ -116,7 +94,7 @@ def _seed_source_authorship(
     raw_author_name: str = "Test Author",
 ) -> int:
     sp = source_pub_id or _seed_source_publication(source=source)
-    with _pool() as cur:
+    with owner_pool() as cur:
         iid = _upsert_identity(cur, raw_author_name)
         cur.execute(
             "INSERT INTO source_authorships (source, source_publication_id, author_position, "
@@ -130,14 +108,14 @@ def _seed_source_authorship(
 def _seed_orphan_authorship(raw_author_name: str) -> int:
     """source_authorship orpheline (person_id NULL, in_perimeter TRUE)."""
     pub_id = _seed_publication(title=_uniq("Pub"))
-    with _pool() as cur:
+    with owner_pool() as cur:
         cur.execute(
             "INSERT INTO source_publications (source, source_id, title, pub_year, publication_id) "
             "VALUES ('hal', %s, 'T', 2024, %s) RETURNING id",
             (_uniq("sid"), pub_id),
         )
         sp_id = cur.fetchone()["id"]
-    with _pool() as cur:
+    with owner_pool() as cur:
         iid = _upsert_identity(cur, raw_author_name)
         cur.execute(
             "INSERT INTO source_authorships (source, source_publication_id, author_position, "
@@ -153,7 +131,7 @@ def _seed_orphan_with_pub(raw_author_name: str = "Reject Me") -> tuple[int, int]
 
     Renvoie (sa_id, publication_id) pour pouvoir rejeter la paire."""
     pub_id = _seed_publication(title=_uniq("Pub"))
-    with _pool() as cur:
+    with owner_pool() as cur:
         cur.execute(
             "INSERT INTO source_publications (source, source_id, title, pub_year, publication_id) "
             "VALUES ('hal', %s, 'T', 2024, %s) RETURNING id",
@@ -167,7 +145,7 @@ def _seed_orphan_with_pub(raw_author_name: str = "Reject Me") -> tuple[int, int]
 
 
 def _reject_pair(publication_id: int, person_id: int) -> None:
-    with _pool() as cur:
+    with owner_pool() as cur:
         cur.execute(
             "INSERT INTO rejected_authorships (publication_id, person_id) VALUES (%s, %s)",
             (publication_id, person_id),
@@ -281,7 +259,7 @@ class TestAssignOrphanAuthorship:
             json={"source_authorship_id": sa, "person_id": pid},
         )
         assert r.status_code == 200
-        with _pool() as cur:
+        with owner_pool() as cur:
             cur.execute("SELECT person_id FROM source_authorships WHERE id = %s", (sa,))
             assert cur.fetchone()["person_id"] == pid
 

@@ -7,33 +7,11 @@ Couvre :
 
 from __future__ import annotations
 
-import os
 import uuid
-from contextlib import contextmanager
 
-import psycopg
 import pytest
-from psycopg.rows import dict_row
 
-_DB_ARGS = {
-    "dbname": "bibliometrie_test",
-    "user": os.environ["DB_OWNER_USER"],
-    "host": os.environ.get("DB_HOST", "127.0.0.1"),
-    "port": int(os.environ.get("DB_PORT", "5432")),
-}
-if os.environ.get("DB_OWNER_PASSWORD"):
-    _DB_ARGS["password"] = os.environ["DB_OWNER_PASSWORD"]
-
-
-@contextmanager
-def _pool():
-    conn = psycopg.connect(**_DB_ARGS, row_factory=dict_row)
-    conn.autocommit = True
-    try:
-        with conn.cursor() as cur:
-            yield cur
-    finally:
-        conn.close()
+from tests.integration.helpers.db import owner_pool
 
 
 def _uniq(prefix: str) -> str:
@@ -42,7 +20,7 @@ def _uniq(prefix: str) -> str:
 
 def _seed_subject(label: str | None = None, usage_count: int = 1) -> int:
     label = label or _uniq("Subject")
-    with _pool() as cur:
+    with owner_pool() as cur:
         cur.execute(
             "INSERT INTO subjects (label, usage_count) VALUES (%s, %s) RETURNING id",
             (label, usage_count),
@@ -55,7 +33,7 @@ def _seed_cooccurrence(subject_a_id: int, subject_b_id: int, count: int) -> None
     matview pour produire la paire (a, b) avec ce count. Seuil de la matview
     `count >= 2` : passer un count < 2 ne fera pas apparaître la paire."""
     a, b = sorted([subject_a_id, subject_b_id])
-    with _pool() as cur:
+    with owner_pool() as cur:
         for _ in range(count):
             cur.execute(
                 "INSERT INTO publications (title, pub_year, doc_type) "
@@ -74,7 +52,7 @@ def _seed_cooccurrence(subject_a_id: int, subject_b_id: int, count: int) -> None
 @pytest.fixture(scope="module", autouse=True)
 def _cleanup_after_module():
     yield
-    with _pool() as cur:
+    with owner_pool() as cur:
         # Cascade vide publication_subjects ; publications 'cooc-seed' du
         # helper `_seed_cooccurrence` sont nettoyées explicitement.
         cur.execute("TRUNCATE TABLE subjects RESTART IDENTITY CASCADE")

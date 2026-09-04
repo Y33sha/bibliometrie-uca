@@ -6,33 +6,11 @@ Couvre :
 - /api/feedback/false-positives : idem
 """
 
-import os
 import uuid
-from contextlib import contextmanager
 
-import psycopg
 import pytest
-from psycopg.rows import dict_row
 
-_DB_ARGS = {
-    "dbname": "bibliometrie_test",
-    "user": os.environ["DB_OWNER_USER"],
-    "host": os.environ.get("DB_HOST", "127.0.0.1"),
-    "port": int(os.environ.get("DB_PORT", "5432")),
-}
-if os.environ.get("DB_OWNER_PASSWORD"):
-    _DB_ARGS["password"] = os.environ["DB_OWNER_PASSWORD"]
-
-
-@contextmanager
-def _pool():
-    conn = psycopg.connect(**_DB_ARGS, row_factory=dict_row)
-    conn.autocommit = True
-    try:
-        with conn.cursor() as cur:
-            yield cur
-    finally:
-        conn.close()
+from tests.integration.helpers.db import owner_pool
 
 
 def _uniq(prefix: str) -> str:
@@ -41,7 +19,7 @@ def _uniq(prefix: str) -> str:
 
 def _seed_structure(type_: str = "labo") -> int:
     code = _uniq("FBK")
-    with _pool() as cur:
+    with owner_pool() as cur:
         cur.execute(
             "INSERT INTO structures (code, name, structure_type) "
             "VALUES (%s, %s, %s::structure_type) RETURNING id",
@@ -51,7 +29,7 @@ def _seed_structure(type_: str = "labo") -> int:
 
 
 def _seed_name_form(structure_id: int) -> int:
-    with _pool() as cur:
+    with owner_pool() as cur:
         cur.execute(
             "INSERT INTO structure_name_forms (structure_id, form_text) "
             "VALUES (%s, %s) RETURNING id",
@@ -61,7 +39,7 @@ def _seed_name_form(structure_id: int) -> int:
 
 
 def _seed_address(raw_text: str, pub_count: int = 1) -> int:
-    with _pool() as cur:
+    with owner_pool() as cur:
         cur.execute(
             "INSERT INTO addresses (raw_text, normalized_text, pub_count) "
             "VALUES (%s, lower(%s), %s) RETURNING id",
@@ -76,7 +54,7 @@ def _seed_ast(
     matched_form_id: int | None = None,
     is_confirmed: bool | None = None,
 ) -> int:
-    with _pool() as cur:
+    with owner_pool() as cur:
         cur.execute(
             "INSERT INTO address_structures (address_id, structure_id, matched_form_id, is_confirmed) "
             "VALUES (%s, %s, %s, %s) RETURNING id",
@@ -88,7 +66,7 @@ def _seed_ast(
 @pytest.fixture(scope="module", autouse=True)
 def _cleanup_after_module():
     yield
-    with _pool() as cur:
+    with owner_pool() as cur:
         cur.execute(
             "TRUNCATE TABLE address_structures, addresses, structure_name_forms, "
             "structures, audit_log RESTART IDENTITY CASCADE"

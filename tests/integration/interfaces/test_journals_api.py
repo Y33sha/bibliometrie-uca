@@ -12,33 +12,11 @@ Couvre :
 from __future__ import annotations
 
 import json
-import os
 import uuid
-from contextlib import contextmanager
 
-import psycopg
 import pytest
-from psycopg.rows import dict_row
 
-_DB_ARGS = {
-    "dbname": "bibliometrie_test",
-    "user": os.environ["DB_OWNER_USER"],
-    "host": os.environ.get("DB_HOST", "127.0.0.1"),
-    "port": int(os.environ.get("DB_PORT", "5432")),
-}
-if os.environ.get("DB_OWNER_PASSWORD"):
-    _DB_ARGS["password"] = os.environ["DB_OWNER_PASSWORD"]
-
-
-@contextmanager
-def _pool():
-    conn = psycopg.connect(**_DB_ARGS, row_factory=dict_row)
-    conn.autocommit = True
-    try:
-        with conn.cursor() as cur:
-            yield cur
-    finally:
-        conn.close()
+from tests.integration.helpers.db import owner_pool
 
 
 def _uniq(prefix: str) -> str:
@@ -47,7 +25,7 @@ def _uniq(prefix: str) -> str:
 
 def _seed_publisher(name: str | None = None) -> int:
     name = name or _uniq("Publisher")
-    with _pool() as cur:
+    with owner_pool() as cur:
         cur.execute(
             "INSERT INTO publishers (name, name_normalized) "
             "VALUES (%s, normalize_name_form(%s)) RETURNING id",
@@ -58,7 +36,7 @@ def _seed_publisher(name: str | None = None) -> int:
 
 def _seed_journal(title: str | None = None, publisher_id: int | None = None) -> int:
     title = title or _uniq("Journal")
-    with _pool() as cur:
+    with owner_pool() as cur:
         cur.execute(
             "INSERT INTO journals (title, title_normalized, publisher_id) "
             "VALUES (%s, normalize_name_form(%s), %s) RETURNING id",
@@ -71,7 +49,7 @@ def _add_in_perimeter_authorships(journal_id: int) -> None:
     """Pose un authorship in_perimeter (personne non rejetée) sur chaque
     publication de la revue : les requêtes journals/publishers ne comptent que
     les publications du périmètre."""
-    with _pool() as cur:
+    with owner_pool() as cur:
         cur.execute("SELECT id FROM publications WHERE journal_id = %s", (journal_id,))
         pub_ids = [r["id"] for r in cur.fetchall()]
         for pid in pub_ids:
@@ -115,7 +93,7 @@ def _add_in_perimeter_authorships(journal_id: int) -> None:
 @pytest.fixture(scope="module", autouse=True)
 def _cleanup_after_module():
     yield
-    with _pool() as cur:
+    with owner_pool() as cur:
         cur.execute(
             "TRUNCATE TABLE journals, publishers, publications, "
             "publication_subjects, subjects, audit_log "
@@ -169,7 +147,7 @@ class TestListJournals:
 
     def test_filter_by_journal_type(self, client):
         jid = _seed_journal()
-        with _pool() as cur:
+        with owner_pool() as cur:
             cur.execute("UPDATE journals SET journal_type = 'proceedings' WHERE id = %s", (jid,))
         r = client.get("/api/journals", params={"journal_type": "proceedings", "per_page": 200})
         assert r.status_code == 200
@@ -178,7 +156,7 @@ class TestListJournals:
 
     def test_filter_by_is_in_doaj(self, client):
         jid = _seed_journal()
-        with _pool() as cur:
+        with owner_pool() as cur:
             cur.execute("UPDATE journals SET is_in_doaj = TRUE WHERE id = %s", (jid,))
         r = client.get("/api/journals", params={"is_in_doaj": "true", "per_page": 200})
         assert r.status_code == 200
@@ -189,7 +167,7 @@ class TestListJournals:
         # Revue sans publi rattachée → exclue si with_pubs=true.
         _seed_journal("OrphanJournal")
         with_data = _seed_journal("WithPubsJournal")
-        with _pool() as cur:
+        with owner_pool() as cur:
             cur.execute(
                 "INSERT INTO publications (title, pub_year, journal_id) VALUES ('p1', 2024, %s)",
                 (with_data,),
@@ -211,7 +189,7 @@ class TestListJournals:
     def test_filter_by_oa_model(self, client):
         matching = _seed_journal()
         other = _seed_journal()
-        with _pool() as cur:
+        with owner_pool() as cur:
             cur.execute("UPDATE journals SET oa_model = 'full_oa' WHERE id = %s", (matching,))
             cur.execute("UPDATE journals SET oa_model = 'subscription' WHERE id = %s", (other,))
         r = client.get("/api/journals", params={"oa_model": "full_oa", "per_page": 200})
@@ -244,7 +222,7 @@ class TestListJournals:
     def test_listing_exposes_doaj_url_from_payload(self, client):
         jid = _seed_journal()
         payload = {"DOAJ id": "abc123"}
-        with _pool() as cur:
+        with owner_pool() as cur:
             cur.execute(
                 "UPDATE journals SET doaj_payload = %s::jsonb, is_in_doaj = TRUE WHERE id = %s",
                 (json.dumps(payload), jid),
@@ -278,7 +256,7 @@ class TestGetJournal:
     def test_doaj_payload_exposed_when_present(self, client):
         jid = _seed_journal()
         payload = {"License": "CC BY", "Country of publisher": "France"}
-        with _pool() as cur:
+        with owner_pool() as cur:
             cur.execute(
                 "UPDATE journals SET doaj_payload = %s::jsonb, is_in_doaj = TRUE WHERE id = %s",
                 (json.dumps(payload), jid),
@@ -294,7 +272,7 @@ class TestGetJournal:
         pour que le front fallback sur `<span>`."""
         jid = _seed_journal()
         payload = {"License": "CC BY"}
-        with _pool() as cur:
+        with owner_pool() as cur:
             cur.execute(
                 "UPDATE journals SET doaj_payload = %s::jsonb, is_in_doaj = TRUE WHERE id = %s",
                 (json.dumps(payload), jid),
@@ -306,7 +284,7 @@ class TestGetJournal:
     def test_doaj_url_computed_when_doaj_id_present(self, client):
         jid = _seed_journal()
         payload = {"DOAJ id": "deadbeef1234"}
-        with _pool() as cur:
+        with owner_pool() as cur:
             cur.execute(
                 "UPDATE journals SET doaj_payload = %s::jsonb, is_in_doaj = TRUE WHERE id = %s",
                 (json.dumps(payload), jid),
@@ -320,7 +298,7 @@ class TestGetJournal:
         faite) mais pas `DOAJ id`."""
         jid = _seed_journal()
         payload = {"URL in DOAJ": "https://doaj.org/toc/csvurl42"}
-        with _pool() as cur:
+        with owner_pool() as cur:
             cur.execute(
                 "UPDATE journals SET doaj_payload = %s::jsonb, is_in_doaj = TRUE WHERE id = %s",
                 (json.dumps(payload), jid),
@@ -332,7 +310,7 @@ class TestGetJournal:
     def test_doaj_url_prefers_csv_url_over_doaj_id(self, client):
         jid = _seed_journal()
         payload = {"URL in DOAJ": "https://doaj.org/toc/fromcsv", "DOAJ id": "fromid"}
-        with _pool() as cur:
+        with owner_pool() as cur:
             cur.execute(
                 "UPDATE journals SET doaj_payload = %s::jsonb, is_in_doaj = TRUE WHERE id = %s",
                 (json.dumps(payload), jid),
@@ -351,7 +329,7 @@ class TestJournalDashboard:
         jid = _seed_journal()
         # Type explicite : le défaut DB est désormais 'unknown' (pas de mapping
         # doc_types) ; on teste ici le mapping d'un 'journal'.
-        with _pool() as cur:
+        with owner_pool() as cur:
             cur.execute("UPDATE journals SET journal_type = 'journal' WHERE id = %s", (jid,))
         r = client.get(f"/api/journals/{jid}/dashboard")
         assert r.status_code == 200
@@ -366,7 +344,7 @@ class TestJournalDashboard:
 
     def test_aggregates_publications(self, client):
         jid = _seed_journal()
-        with _pool() as cur:
+        with owner_pool() as cur:
             cur.execute(
                 "INSERT INTO publications (title, pub_year, doc_type, oa_status, journal_id) "
                 "VALUES ('p1', 2024, 'article', 'gold', %s), "
@@ -386,7 +364,7 @@ class TestJournalDashboard:
 
     def test_expected_flags_doc_types_against_journal_type(self, client):
         jid = _seed_journal()
-        with _pool() as cur:
+        with owner_pool() as cur:
             # `journal_type=proceedings` : article inattendu, conference_paper attendu.
             cur.execute("UPDATE journals SET journal_type = 'proceedings' WHERE id = %s", (jid,))
             cur.execute(
@@ -404,7 +382,7 @@ class TestJournalDashboard:
 
     def test_expected_flags_oa_statuses_against_oa_model(self, client):
         jid = _seed_journal()
-        with _pool() as cur:
+        with owner_pool() as cur:
             cur.execute("UPDATE journals SET oa_model = 'subscription' WHERE id = %s", (jid,))
             cur.execute(
                 "INSERT INTO publications (title, pub_year, oa_status, journal_id) "
@@ -426,7 +404,7 @@ class TestJournalDashboard:
         # oa_model NULL → pas de signal côté revue → expected_oa_statuses vide,
         # tous les counts retournent expected=True.
         jid = _seed_journal()
-        with _pool() as cur:
+        with owner_pool() as cur:
             cur.execute(
                 "INSERT INTO publications (title, pub_year, oa_status, journal_id) "
                 "VALUES ('p1', 2024, 'gold', %s), ('p2', 2024, 'closed', %s)",
@@ -448,7 +426,7 @@ class TestJournalSubjects:
 
     def test_returns_top_subjects_excluding_generic(self, client):
         jid = _seed_journal()
-        with _pool() as cur:
+        with owner_pool() as cur:
             cur.execute(
                 "INSERT INTO publications (title, pub_year, journal_id) "
                 "VALUES ('p1', 2024, %s), ('p2', 2024, %s) RETURNING id",
@@ -511,7 +489,7 @@ class TestUpdateJournal:
         assert r.status_code == 200
         assert r.json() == {"ok": True}
         # Vérifier en base que seuls les champs envoyés sont écrits.
-        with _pool() as cur:
+        with owner_pool() as cur:
             cur.execute("SELECT title, is_in_doaj FROM journals WHERE id = %s", (jid,))
             row = cur.fetchone()
             assert row["title"] == "UpdatedTitle"
@@ -528,7 +506,7 @@ class TestTypeChangeImpact:
         )
         assert r.status_code == 200
         assert "count" in r.json()
-        with _pool() as cur:
+        with owner_pool() as cur:
             cur.execute("SELECT journal_type FROM journals WHERE id = %s", (jid,))
             assert cur.fetchone()["journal_type"] == "journal"
 
@@ -561,7 +539,7 @@ class TestMergeJournals:
         body = r.json()
         assert body == {"merged": True, "source_id": src, "target_id": dst}
         # Source supprimée, target conservée.
-        with _pool() as cur:
+        with owner_pool() as cur:
             cur.execute("SELECT id FROM journals WHERE id IN (%s, %s)", (src, dst))
             ids = {row["id"] for row in cur.fetchall()}
             assert dst in ids
@@ -643,7 +621,7 @@ class TestTracabiliteEdition:
         r = auth_client.put(f"/api/journals/{jid}", json={"issn": "1234-5679"})
         assert r.status_code == 200, r.text
 
-        with _pool() as cur:
+        with owner_pool() as cur:
             cur.execute(
                 "SELECT payload, user_id FROM audit_log "
                 "WHERE event_type = 'journal.updated' AND aggregate_id = %s ORDER BY id",

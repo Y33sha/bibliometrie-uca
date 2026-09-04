@@ -8,33 +8,11 @@ Couvre :
 - GET/POST/PUT/DELETE /api/structures/name-forms (formes de noms, auth requise)
 """
 
-import os
 import uuid
-from contextlib import contextmanager
 
-import psycopg
 import pytest
-from psycopg.rows import dict_row
 
-_DB_ARGS = {
-    "dbname": "bibliometrie_test",
-    "user": os.environ["DB_OWNER_USER"],
-    "host": os.environ.get("DB_HOST", "127.0.0.1"),
-    "port": int(os.environ.get("DB_PORT", "5432")),
-}
-if os.environ.get("DB_OWNER_PASSWORD"):
-    _DB_ARGS["password"] = os.environ["DB_OWNER_PASSWORD"]
-
-
-@contextmanager
-def _pool():
-    conn = psycopg.connect(**_DB_ARGS, row_factory=dict_row)
-    conn.autocommit = True
-    try:
-        with conn.cursor() as cur:
-            yield cur
-    finally:
-        conn.close()
+from tests.integration.helpers.db import owner_pool
 
 
 def _uniq(prefix: str) -> str:
@@ -43,7 +21,7 @@ def _uniq(prefix: str) -> str:
 
 def _seed_structure(code: str | None = None, type_: str = "labo") -> int:
     code = code or _uniq("STR")
-    with _pool() as cur:
+    with owner_pool() as cur:
         cur.execute(
             "INSERT INTO structures (code, name, structure_type) "
             "VALUES (%s, %s, %s::structure_type) RETURNING id",
@@ -53,7 +31,7 @@ def _seed_structure(code: str | None = None, type_: str = "labo") -> int:
 
 
 def _seed_relation(parent_id: int, child_id: int, rel_type: str = "est_tutelle_de") -> int:
-    with _pool() as cur:
+    with owner_pool() as cur:
         cur.execute(
             "INSERT INTO structure_relations (parent_id, child_id, relation_type) "
             "VALUES (%s, %s, %s) RETURNING id",
@@ -64,7 +42,7 @@ def _seed_relation(parent_id: int, child_id: int, rel_type: str = "est_tutelle_d
 
 def _seed_name_form(structure_id: int, form_text: str | None = None) -> int:
     form_text = form_text or _uniq("form")
-    with _pool() as cur:
+    with owner_pool() as cur:
         cur.execute(
             "INSERT INTO structure_name_forms (structure_id, form_text, is_word_boundary) "
             "VALUES (%s, %s, char_length(%s) <= 6) RETURNING id",
@@ -76,7 +54,7 @@ def _seed_name_form(structure_id: int, form_text: str | None = None) -> int:
 @pytest.fixture(scope="module", autouse=True)
 def _cleanup_after_module():
     yield
-    with _pool() as cur:
+    with owner_pool() as cur:
         cur.execute(
             "TRUNCATE TABLE structure_name_forms, structure_relations, structures, "
             "audit_log RESTART IDENTITY CASCADE"
@@ -194,7 +172,7 @@ class TestCreateStructure:
             json={"code": code, "name": "Readback", "type": "labo"},
         )
         assert r.status_code == 200
-        with _pool() as cur:
+        with owner_pool() as cur:
             cur.execute("SELECT id FROM structures WHERE code = %s", (code,))
             assert cur.fetchone() is not None
 

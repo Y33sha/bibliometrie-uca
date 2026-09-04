@@ -7,33 +7,11 @@ Identique à test_addresses_api.py : seed minimal via un pool dédié
 collisions entre cas.
 """
 
-import os
 import uuid
-from contextlib import contextmanager
 
-import psycopg
 import pytest
-from psycopg.rows import dict_row
 
-_DB_ARGS = {
-    "dbname": "bibliometrie_test",
-    "user": os.environ["DB_OWNER_USER"],
-    "host": os.environ.get("DB_HOST", "127.0.0.1"),
-    "port": int(os.environ.get("DB_PORT", "5432")),
-}
-if os.environ.get("DB_OWNER_PASSWORD"):
-    _DB_ARGS["password"] = os.environ["DB_OWNER_PASSWORD"]
-
-
-@contextmanager
-def _pool():
-    conn = psycopg.connect(**_DB_ARGS, row_factory=dict_row)
-    conn.autocommit = True
-    try:
-        with conn.cursor() as cur:
-            yield cur
-    finally:
-        conn.close()
+from tests.integration.helpers.db import owner_pool
 
 
 def _uniq(prefix: str) -> str:
@@ -46,7 +24,7 @@ def _cleanup_after_module():
     + events admin). Truncate à la fin pour ne pas polluer les suites qui
     tournent derrière (pipeline, audit)."""
     yield
-    with _pool() as cur:
+    with owner_pool() as cur:
         cur.execute(
             "TRUNCATE TABLE authorships, source_authorships, author_identifying_keys, "
             "source_publications, publications, persons, person_identifiers, "
@@ -71,7 +49,7 @@ def _upsert_identity(cur, raw_author_name: str) -> int:
 
 
 def _seed_person(last: str = "TESTP", first: str = "J") -> int:
-    with _pool() as cur:
+    with owner_pool() as cur:
         cur.execute(
             "INSERT INTO persons (last_name, first_name, last_name_normalized, first_name_normalized) "
             "VALUES (%s, %s, lower(%s), lower(%s)) RETURNING id",
@@ -81,7 +59,7 @@ def _seed_person(last: str = "TESTP", first: str = "J") -> int:
 
 
 def _seed_identifier(person_id: int, id_type: str, id_value: str, status: str = "pending") -> int:
-    with _pool() as cur:
+    with owner_pool() as cur:
         cur.execute(
             "INSERT INTO person_identifiers (person_id, id_type, id_value, source, status) "
             "VALUES (%s, %s, %s, 'manual', %s::identifier_status) RETURNING id",
@@ -91,7 +69,7 @@ def _seed_identifier(person_id: int, id_type: str, id_value: str, status: str = 
 
 
 def _seed_publication(title: str = "T", year: int = 2024) -> int:
-    with _pool() as cur:
+    with owner_pool() as cur:
         cur.execute(
             "INSERT INTO publications (title, title_normalized, pub_year) "
             "VALUES (%s, lower(%s), %s) RETURNING id",
@@ -102,7 +80,7 @@ def _seed_publication(title: str = "T", year: int = 2024) -> int:
 
 def _seed_source_publication(source: str = "hal", source_id: str | None = None) -> int:
     sid = source_id or _uniq("sid")
-    with _pool() as cur:
+    with owner_pool() as cur:
         cur.execute(
             "INSERT INTO source_publications (source, source_id, title, pub_year) "
             "VALUES (%s, %s, 'T', 2024) RETURNING id",
@@ -121,7 +99,7 @@ def _seed_source_authorship(
     author_position: int = 0,
 ) -> int:
     sp = source_pub_id or _seed_source_publication(source=source)
-    with _pool() as cur:
+    with owner_pool() as cur:
         iid = _upsert_identity(cur, raw_author_name)
         cur.execute(
             "INSERT INTO source_authorships (source, source_publication_id, author_position, "
@@ -142,7 +120,7 @@ def _seed_source_authorship(
 
 
 def _seed_name_form(person_id: int, name_form: str, source: str = "persons") -> None:
-    with _pool() as cur:
+    with owner_pool() as cur:
         cur.execute(
             "INSERT INTO person_name_forms (name_form, person_id, sources) VALUES (%s, %s, %s)",
             (name_form, person_id, [source]),
@@ -484,7 +462,7 @@ class TestUpdatePersonName:
             f"/api/persons/{pid}/name", json={"last_name": marker, "first_name": "Z"}
         )
         assert r.status_code == 200
-        with _pool() as cur:
+        with owner_pool() as cur:
             cur.execute("SELECT last_name FROM persons WHERE id = %s", (pid,))
             assert cur.fetchone()["last_name"] == marker
 
@@ -686,7 +664,7 @@ class TestMarkPersonsDistinct:
 
 
 def _audit_personne(event_type: str, aggregate_id: int) -> list[dict]:
-    with _pool() as cur:
+    with owner_pool() as cur:
         cur.execute(
             "SELECT payload, user_id FROM audit_log "
             "WHERE event_type = %s AND aggregate_id = %s ORDER BY id",
