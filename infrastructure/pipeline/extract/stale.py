@@ -3,8 +3,6 @@
 `get_stale_rows` liste les rows dont `last_seen_at` a franchi le seuil ; `set_disappeared_by_source_id` marque celles dont le refetch a confirmé l'absence. Le commit est à la charge de l'appelant.
 """
 
-from typing import Any
-
 from sqlalchemy import Connection, text
 
 from domain.sources.registry import ALL_SOURCES_SET as VALID_SOURCES
@@ -49,7 +47,7 @@ def get_stale_rows(
     """
     if source not in VALID_SOURCES:
         raise ValueError(f"Source inconnue : {source}. Valides : {', '.join(VALID_SOURCES)}")
-    params: dict[str, Any] = {"source": source, "days": STALE_REFRESH_AFTER_DAYS}
+    params: dict[str, object] = {"source": source, "days": STALE_REFRESH_AFTER_DAYS}
     year_clause = ""
     if years is not None:
         year_clause = "AND (sp.pub_year IS NULL OR sp.pub_year = ANY(:years))"

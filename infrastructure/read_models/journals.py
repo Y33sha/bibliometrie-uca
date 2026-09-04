@@ -1,8 +1,6 @@
 """Query services pour les revues (table `journals`)."""
 
-from typing import Any
-
-from sqlalchemy import Connection, text
+from sqlalchemy import Connection, Row, text
 
 from application.ports.read_models._common import FacetOption
 from application.ports.read_models.journals_queries import (
@@ -51,7 +49,7 @@ _JOURNAL_DETAIL_COLUMNS = f"""
 """
 
 
-def _journal_list_item(row: Any) -> JournalListItem:
+def _journal_list_item(row: Row[tuple[object, ...]]) -> JournalListItem:
     """`JournalListItem` lu d'une ligne de `_JOURNAL_LIST_COLUMNS`."""
     return JournalListItem(
         id=row.id,
@@ -73,12 +71,12 @@ def _build_journal_where(
     skip_journal_types: bool = False,
     skip_doaj: bool = False,
     skip_oa_models: bool = False,
-) -> tuple[str, dict[str, Any]]:
+) -> tuple[str, dict[str, object]]:
     """Construit la clause WHERE pour `list_journals` et `journals_facets`.
 
     Les flags `skip_*` permettent à chaque facette d'exclure sa propre dimension du filtrage — convention « comptes exclusifs » identique à celle des facettes publications.
     """
-    binds: dict[str, Any] = {}
+    binds: dict[str, object] = {}
     parts: list[str] = []
     if filters.search and len(filters.search) >= 2:
         # title_normalized passe par `normalize_text` à l'ingestion ; la query doit subir la même normalisation pour matcher les titres contenant ponctuation ou accents.

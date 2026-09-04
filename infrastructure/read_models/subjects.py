@@ -3,9 +3,7 @@
 Les écritures du référentiel appartiennent à la phase d'ingestion, dont l'adaptateur vit dans `infrastructure.pipeline.subjects`.
 """
 
-from typing import Any
-
-from sqlalchemy import Connection, text
+from sqlalchemy import Connection, Row, text
 
 from application.ports.read_models.subjects_queries import (
     SubjectDetailResponse,
@@ -16,20 +14,20 @@ from application.ports.read_models.subjects_queries import (
 )
 
 
-def _search_clause(search: str | None, min_usage_count: int) -> tuple[str, dict[str, Any]]:
+def _search_clause(search: str | None, min_usage_count: int) -> tuple[str, dict[str, object]]:
     """Clause de recherche de l'annuaire des sujets, avec ses paramètres.
 
     La liste et son total la partagent : un critère ajouté d'un seul côté fausserait la pagination.
     """
     where = "usage_count >= :min_count"
-    binds: dict[str, Any] = {"min_count": min_usage_count}
+    binds: dict[str, object] = {"min_count": min_usage_count}
     if search:
         where += " AND unaccent(label) ILIKE unaccent(:search)"
         binds["search"] = f"%{search}%"
     return where, binds
 
 
-def _subject_list_item(row: Any) -> SubjectListItem:
+def _subject_list_item(row: Row[tuple[object, ...]]) -> SubjectListItem:
     return SubjectListItem(
         id=row.id, label=row.label, language=row.language, usage_count=row.usage_count
     )

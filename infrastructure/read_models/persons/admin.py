@@ -1,9 +1,10 @@
 """Query services admin pour les personnes : authorships par forme de nom, files de triage des formes et des identifiants."""
 
 from collections import defaultdict
-from typing import Any
+from collections.abc import Mapping
+from typing import NamedTuple
 
-from sqlalchemy import Connection, bindparam, text
+from sqlalchemy import Connection, Row, bindparam, text
 
 from application.ports.read_models.persons_queries import (
     AmbiguousFormPersonOut,
@@ -30,6 +31,7 @@ from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE
 from domain.persons.name_matching import names_compatible
 from domain.sources.registry import AUTHOR_SOURCES
 from domain.structures.structure import StructureType
+from domain.types import JsonValue
 from infrastructure.db.sql_fragments import in_clause
 
 # ── Name-form authorships ────────────────────────────────────────
@@ -307,7 +309,7 @@ _CONFIRMED_FORMS_SQL = text(f"""
 _IDENTIFIER_KEYS = ("orcid", "idref", "hal_person_id", "idhal")
 
 
-def _occurrence_identifiers(raw: Any) -> list[IdentifierRef]:
+def _occurrence_identifiers(raw: Mapping[str, JsonValue] | None) -> list[IdentifierRef]:
     """Identifiants bruts portés par une signature (hors valeurs neutralisées `_dubious`) — élément de décision : c'est souvent l'identifiant fautif qui a rattaché l'intrus."""
     if not raw:
         return []
@@ -318,7 +320,9 @@ def _occurrence_identifiers(raw: Any) -> list[IdentifierRef]:
     ]
 
 
-def _detachable_groups(conn: Connection) -> list[tuple[int, int, list[Any], list[Any]]]:
+def _detachable_groups(
+    conn: Connection,
+) -> list[tuple[int, int, list[Row[tuple[object, ...]]], list[Row[tuple[object, ...]]]]]:
     """Groupes `(source_publication, personne)` à ≥2 signatures dont au moins une est légitime (compatible avec une forme `confirmed`) et au moins une est intruse (incompatible).
 
     Reprend le départage de l'audit `audit_repeated_person_in_publication` : seules les formes `confirmed` servent d'ancre ; une occurrence sans aucune forme confirmée compatible est intruse. Retourne `(spid, person_id, ancres, intrus)`."""
@@ -332,11 +336,11 @@ def _detachable_groups(conn: Connection) -> list[tuple[int, int, list[Any], list
     for r in conn.execute(_CONFIRMED_FORMS_SQL, {"pids": sorted(set(pids))}):
         confirmed[r.person_id].append(r.name_form)
 
-    occurrences: dict[tuple[int, int], list[Any]] = defaultdict(list)
+    occurrences: dict[tuple[int, int], list[Row[tuple[object, ...]]]] = defaultdict(list)
     for r in conn.execute(_REPEATED_OCCURRENCES_SQL, {"spids": spids, "pids": pids}):
         occurrences[(r.spid, r.person_id)].append(r)
 
-    groups: list[tuple[int, int, list[Any], list[Any]]] = []
+    groups: list[tuple[int, int, list[Row[tuple[object, ...]]], list[Row[tuple[object, ...]]]]] = []
     for (spid, pid), occs in occurrences.items():
         forms = confirmed.get(pid, [])
         legit = [any(names_compatible(o.norm, "", f, "") for f in forms) for o in occs]
@@ -353,7 +357,18 @@ def detachable_intruders_count(conn: Connection) -> int:
     return len(_detachable_groups(conn))
 
 
-def _publications_for_spids(conn: Connection, spids: list[int]) -> dict[int, dict[str, Any]]:
+class _PublicationRef(NamedTuple):
+    """Publication portant une signature, telle qu'affichée à côté du groupe détachable."""
+
+    publication_id: int | None
+    title: str | None
+    pub_year: int | None
+
+
+_PUBLICATION_INCONNUE = _PublicationRef(None, None, None)
+
+
+def _publications_for_spids(conn: Connection, spids: list[int]) -> dict[int, _PublicationRef]:
     if not spids:
         return {}
     rows = conn.execute(
@@ -363,10 +378,7 @@ def _publications_for_spids(conn: Connection, spids: list[int]) -> dict[int, dic
         """).bindparams(bindparam("spids")),
         {"spids": spids},
     ).all()
-    return {
-        r.spid: {"publication_id": r.publication_id, "title": r.title, "pub_year": r.pub_year}
-        for r in rows
-    }
+    return {r.spid: _PublicationRef(r.publication_id, r.title, r.pub_year) for r in rows}
 
 
 def detachable_intruders(
@@ -386,9 +398,9 @@ def detachable_intruders(
     items = [
         DetachableIntruderGroupOut(
             source_publication_id=spid,
-            publication_id=pubs.get(spid, {}).get("publication_id"),
-            title=pubs.get(spid, {}).get("title"),
-            pub_year=pubs.get(spid, {}).get("pub_year"),
+            publication_id=pubs.get(spid, _PUBLICATION_INCONNUE).publication_id,
+            title=pubs.get(spid, _PUBLICATION_INCONNUE).title,
+            pub_year=pubs.get(spid, _PUBLICATION_INCONNUE).pub_year,
             person=persons[pid],
             anchors=[AnchorOccurrenceOut(source=o.source, raw_author_name=o.name) for o in anchors],
             intruders=[

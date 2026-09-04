@@ -8,7 +8,6 @@ L'écriture ne porte que sur les colonnes de la ligne : celles qu'aucun import n
 """
 
 from dataclasses import fields
-from typing import Any
 
 from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
@@ -52,7 +51,7 @@ class PgSourcePublicationQueries(SourcePublicationQueries):
     """Adapter PostgreSQL pour `application.ports.pipeline.normalize.source_publications.SourcePublicationQueries`."""
 
     def upsert_source_publication(self, conn: Connection, row: SourcePublicationRow) -> int:
-        params: dict[str, Any] = {name: getattr(row, name) for name in _ROW_FIELDS}
+        params: dict[str, object] = {name: getattr(row, name) for name in _ROW_FIELDS}
         params["title_normalized"] = normalized_title(row.title)
         # `external_ids` est `NOT NULL` et contraint à un objet JSON.
         params["external_ids"] = {} if row.external_ids is None else row.external_ids

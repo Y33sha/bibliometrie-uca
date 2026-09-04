@@ -269,7 +269,7 @@ class PgCountryQueries(CountryQueries):
         self, conn: Connection, country_code: str, criteria: AddressCountryFilter
     ) -> list[int]:
         conditions: list[str] = []
-        params: dict = {"cc": country_code}
+        params: dict[str, object] = {"cc": country_code}
         if criteria.search:
             conditions.append("unaccent(raw_text) ILIKE unaccent(:search)")
             params["search"] = f"%{criteria.search}%"

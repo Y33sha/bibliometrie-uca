@@ -2,7 +2,6 @@
 
 from pydantic import ConfigDict, field_validator
 
-from domain.types import JsonValue
 from infrastructure.jsonb_models._base import JsonbModel
 
 
@@ -34,6 +33,6 @@ class StructureApiIds(JsonbModel):
             return [v] if v else None
         return v
 
-    def to_dict(self) -> dict[str, JsonValue]:
+    def to_dict(self) -> dict[str, list[str]]:
         """Sérialise pour écriture en base (JSONB, `structures.api_ids`). Omet les clés None et les listes vides."""
         return {k: v for k, v in self.model_dump(exclude_none=True).items() if v}

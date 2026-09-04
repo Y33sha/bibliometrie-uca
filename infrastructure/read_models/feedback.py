@@ -1,7 +1,5 @@
 """Query services du tableau de bord admin : feedback sur la détection d'adresses."""
 
-from typing import Any
-
 from sqlalchemy import Connection, text
 
 from application.ports.read_models.addresses_queries import AddressStructureSummary
@@ -92,7 +90,7 @@ class PgFeedbackQueries(FeedbackQueries):
         with_matched_forms: bool,
     ) -> FeedbackAddressesResponse:
         offset = (page - 1) * per_page
-        binds: dict[str, Any] = {"sid": structure_id, "pg_limit": per_page, "pg_offset": offset}
+        binds: dict[str, object] = {"sid": structure_id, "pg_limit": per_page, "pg_offset": offset}
         parts = ["ast.structure_id = :sid", kind_where]
         if search:
             parts.append("unaccent(a.raw_text) ILIKE unaccent(:search)")

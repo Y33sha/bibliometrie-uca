@@ -1,6 +1,6 @@
 """Adapter PostgreSQL sync pour les 3 tables du concept Structure."""
 
-from typing import Any, NamedTuple, cast
+from typing import NamedTuple, cast
 
 from pydantic import ValidationError as PydanticValidationError
 from sqlalchemy import Connection, Text, bindparam, cast as sql_cast, delete, select, text, update
@@ -58,7 +58,7 @@ class _StructureRow(NamedTuple):
     ror_id: str | None
     rnsr_id: str | None
     hal_collection: str | None
-    api_ids: dict[str, Any] | None
+    api_ids: dict[str, list[str]] | None
 
 
 def _structure_name_form_from_row(row: _StructureNameFormRow) -> StructureNameForm:
@@ -90,7 +90,7 @@ def _structure_from_row(row: _StructureRow, name_forms: tuple[StructureNameForm,
     )
 
 
-def _normalize_api_ids(raw: dict[str, Any] | None) -> dict[str, Any] | None:
+def _normalize_api_ids(raw: dict[str, list[str]] | None) -> dict[str, list[str]] | None:
     """Valide et normalise `api_ids` via le modèle JSONB StructureApiIds.
 
     - Entrée : dict brut (côté API admin) ou None.
@@ -264,7 +264,7 @@ class PgStructureRepository(StructureRepository):
         form_text_normalized: str,
         is_word_boundary: bool,
         is_excluding: bool,
-        requires_context_of: list | None,
+        requires_context_of: list[int] | None,
     ) -> StructureNameFormRow:
         stmt = (
             structure_name_forms.insert()

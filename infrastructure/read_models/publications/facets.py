@@ -84,7 +84,7 @@ class _PublicationFacetsBuilder:
         out.append(search_clause(f.search))
         return out
 
-    def _clauses_skipping(self, skip: str) -> tuple[str, dict[str, Any]]:  # noqa: C901
+    def _clauses_skipping(self, skip: str) -> tuple[str, dict[str, object]]:  # noqa: C901
         """Conditions de base + tous les filtres sauf `skip`."""
         clauses: list[WhereClause | None] = list(self._base_clauses())
         f = self.filters
@@ -281,7 +281,7 @@ class _PublicationFacetsBuilder:
             return self._facet_apc_with_lab(where_sql, binds)
         return self._facet_apc_without_lab(where_sql, binds)
 
-    def _facet_apc_with_lab(self, where: str, binds: dict[str, Any]) -> list[FacetOption]:
+    def _facet_apc_with_lab(self, where: str, binds: dict[str, object]) -> list[FacetOption]:
         lab_ids = self.filters.lab_ids
         r = self.conn.execute(
             text(f"""
@@ -331,7 +331,7 @@ class _PublicationFacetsBuilder:
             FacetOption(value="none", label="Sans APC", count=r.apc_none),
         ]
 
-    def _facet_apc_without_lab(self, where: str, binds: dict[str, Any]) -> list[FacetOption]:
+    def _facet_apc_without_lab(self, where: str, binds: dict[str, object]) -> list[FacetOption]:
         r = self.conn.execute(
             text(f"""
                 SELECT

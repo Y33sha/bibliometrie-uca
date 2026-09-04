@@ -6,7 +6,8 @@ Toutes les queries publications utilisent `text()` paramétré : trop intriquée
 """
 
 import json
-from typing import Any, NamedTuple
+from collections.abc import Mapping
+from typing import NamedTuple
 
 from sqlalchemy import Connection, text
 
@@ -15,6 +16,7 @@ from domain.publications.identifiers import DOI
 from domain.publications.publication import Publication
 from domain.source_publications.metadata_correction.shared_doi import CONVERGENCE_CASES
 from domain.source_publications.source_publication import SourcePublication
+from domain.types import JsonValue
 
 
 class _SourcePublicationViewRow(NamedTuple):
@@ -36,9 +38,9 @@ class _SourcePublicationViewRow(NamedTuple):
     countries: list[str] | None
     urls: list[str] | None
     keywords: list[str] | None
-    topics: dict[str, Any] | None
-    biblio: dict[str, Any] | None
-    meta: dict[str, Any] | None
+    topics: dict[str, JsonValue] | None
+    biblio: dict[str, JsonValue] | None
+    meta: dict[str, JsonValue] | None
 
 
 def _view_from_row(row: _SourcePublicationViewRow) -> SourcePublication:
@@ -351,7 +353,7 @@ class PgPublicationRepository(PublicationRepository):
         return row.pub_id_a, row.pub_id_b
 
 
-def _json_dumps_or_none(value: dict | None) -> str | None:
+def _json_dumps_or_none(value: Mapping[str, JsonValue] | None) -> str | None:
     """Sérialise un dict en string JSON pour `CAST(:p AS jsonb)`. None passé tel quel."""
     if value is None:
         return None

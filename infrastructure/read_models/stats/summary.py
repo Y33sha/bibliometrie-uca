@@ -1,7 +1,6 @@
 """Années disponibles et facettes croisées des statistiques."""
 
 from collections.abc import Sequence
-from typing import Any
 
 from sqlalchemy import Connection, Row, text
 
@@ -16,7 +15,7 @@ def _facets_sqls(
     *,
     perimeter_structure_ids: list[int],
     filters: StatsFilters,
-) -> dict[str, tuple[str, dict[str, Any]]]:
+) -> dict[str, tuple[str, dict[str, object]]]:
     """Retourne {facet_name: (sql, binds)} pour les sous-requêtes de facettes."""
 
     def _clauses(skip: str) -> list[WhereClause | None]:
@@ -128,11 +127,11 @@ def stats_facets(
 
 
 def _build_facets_result(
-    year_rows: Sequence[Row[Any]],
-    lab_rows: Sequence[Row[Any]],
-    oa_rows: Sequence[Row[Any]],
-    apc_row: Row[Any],
-    doc_type_rows: Sequence[Row[Any]],
+    year_rows: Sequence[Row[tuple[object, ...]]],
+    lab_rows: Sequence[Row[tuple[object, ...]]],
+    oa_rows: Sequence[Row[tuple[object, ...]]],
+    apc_row: Row[tuple[object, ...]],
+    doc_type_rows: Sequence[Row[tuple[object, ...]]],
 ) -> StatsFacetsResponse:
     return StatsFacetsResponse(
         years=[FacetOption(value=str(r.pub_year), count=r.n) for r in year_rows],

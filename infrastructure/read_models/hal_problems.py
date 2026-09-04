@@ -4,7 +4,6 @@ Contrôles qualité HAL au niveau des publications (doublons de dépôts, manque
 """
 
 from collections import defaultdict
-from typing import Any
 
 from sqlalchemy import Connection, bindparam, text
 
@@ -310,7 +309,7 @@ class PgHalProblemsQueries(HalProblemsQueries):
 
         offset = (page - 1) * per_page
         col = lab_row.hal_collection
-        binds: dict[str, Any] = {
+        binds: dict[str, object] = {
             "lab_arr": [lab_id],
             "col": col,
             "root_cols": self._perimeter_root_collections(),
