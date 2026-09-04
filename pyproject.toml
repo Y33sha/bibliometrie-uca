@@ -476,7 +476,6 @@ module = [
     "application.pipeline.logging_scope",
     "application.pipeline.normalize.base",
     "application.pipeline.normalize.normalize_openalex",
-    "application.pipeline.normalize.normalize_scanr",
     "application.pipeline.normalize.normalize_wos",
     "application.ports.read_models.*",
     "application.ports.pipeline.cross_imports.*",

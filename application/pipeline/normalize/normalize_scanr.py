@@ -1,6 +1,7 @@
 """Normalisation des données ScanR : staging → tables structurées."""
 
 import logging
+from collections.abc import Mapping
 
 from sqlalchemy import Connection
 
@@ -10,6 +11,7 @@ from application.pipeline.normalize._authorships_batch import (
     write_source_authorships,
 )
 from application.pipeline.normalize.bibliographic import BibliographicNormalizer
+from application.pipeline.normalize.pub_metadata import PublicationMetadata
 from application.pipeline.timings import StepTimer
 from application.ports.pipeline.journals import JournalFindOrCreateQueries
 from application.ports.pipeline.normalize.authorships import AuthorshipsBatchQueries
@@ -35,50 +37,56 @@ from domain.sources.scanr import (
     extract_nnt_from_scanr_id,
     select_leaf_affiliations,
 )
-from domain.types import JsonValue, as_sequence, as_str
+from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str
 
 # =============================================================
 # UTILITAIRES
 # =============================================================
 
 
-def extract_doi(doc: dict) -> str | None:
-    for ext in doc.get("externalIds") or []:
-        if ext.get("type") == "doi":
-            return clean_doi(ext.get("id"))
+def extract_doi(doc: Mapping[str, JsonValue]) -> str | None:
+    for entree in as_sequence(doc.get("externalIds")):
+        ext = as_mapping(entree)
+        if as_str(ext.get("type")) == "doi":
+            return clean_doi(as_str(ext.get("id")))
     return None
 
 
-def get_title(doc: dict) -> str | None:
+def get_title(doc: Mapping[str, JsonValue]) -> str | None:
     title = doc.get("title")
-    if isinstance(title, dict):
-        return title.get("default")
-    return title
+    if isinstance(title, Mapping):
+        return as_str(title.get("default"))
+    return as_str(title)
 
 
-def upsert_publisher(doc: dict, *, publisher_repo: PublisherFindOrCreateQueries) -> int | None:
-    publisher_name = (doc.get("source") or {}).get("publisher")
+def upsert_publisher(
+    doc: Mapping[str, JsonValue], *, publisher_repo: PublisherFindOrCreateQueries
+) -> int | None:
+    publisher_name = as_str(as_mapping(doc.get("source")).get("publisher"))
     if not publisher_name:
         return None
     return find_or_create_publisher(publisher_name, repo=publisher_repo)
 
 
-def _extract_journal_issns(source: dict) -> tuple[str | None, str | None]:
+def _extract_journal_issns(source: Mapping[str, JsonValue]) -> tuple[str | None, str | None]:
     """Extrait (issn, eissn) depuis `source.journalIssns` (array ScanR).
 
     Heuristique : 1er = print/issn, 2e = electronic/eissn. Les éventuelles entrées supplémentaires (alias, ISSN-L, variantes historiques) sont ignorées. Cohérent avec ce qu'on fait pour OpenAlex.
     """
-    issns = source.get("journalIssns") or []
-    issn = issns[0] if len(issns) >= 1 else None
-    eissn = issns[1] if len(issns) >= 2 else None
+    issns = as_sequence(source.get("journalIssns"))
+    issn = as_str(issns[0]) if len(issns) >= 1 else None
+    eissn = as_str(issns[1]) if len(issns) >= 2 else None
     return issn, eissn
 
 
 def upsert_journal(
-    doc: dict, publisher_id: int | None, *, journal_repo: JournalFindOrCreateQueries
+    doc: Mapping[str, JsonValue],
+    publisher_id: int | None,
+    *,
+    journal_repo: JournalFindOrCreateQueries,
 ) -> int | None:
-    source = doc.get("source") or {}
-    title = source.get("title")
+    source = as_mapping(doc.get("source"))
+    title = as_str(source.get("title"))
     if not title:
         return None
     issn, eissn = _extract_journal_issns(source)
@@ -91,7 +99,9 @@ def upsert_journal(
     )
 
 
-def extract_pub_metadata(doc: dict, journal_id: int | None, scanr_id: str | None = None) -> dict:
+def extract_pub_metadata(
+    doc: Mapping[str, JsonValue], journal_id: int | None, scanr_id: str | None = None
+) -> PublicationMetadata:
     """Extrait les métadonnées de publication d'un document ScanR.
 
     Retourne un dict utilisable par `insert_scanr_document`. Toutes les valeurs sont brutes — pas de fallback (le brut de `source_publications.doc_type` est nullable text) ni de transformation de cohérence. `language` est posé à `None` : l'API ScanR ne l'expose pas.
@@ -99,19 +109,21 @@ def extract_pub_metadata(doc: dict, journal_id: int | None, scanr_id: str | None
     title = get_title(doc)
     container_title = None
     if not journal_id:
-        source = doc.get("source") or {}
-        container_title = source.get("title")
-    return {
-        "title": title,
-        "pub_year": doc.get("year"),
-        "doc_type": doc.get("type"),
-        "doi": extract_doi(doc),
-        "nnt": extract_nnt_from_scanr_id(scanr_id),
-        "oa_status": derive_scanr_oa_status(doc.get("isOa"), doc.get("oaEvidence")),
-        "journal_id": journal_id,
-        "container_title": container_title,
-        "language": None,
-    }
+        container_title = as_str(as_mapping(doc.get("source")).get("title"))
+    ouvert = doc.get("isOa")
+    return PublicationMetadata(
+        title=title,
+        pub_year=as_int(doc.get("year")),
+        doc_type=as_str(doc.get("type")),
+        doi=extract_doi(doc),
+        nnt=extract_nnt_from_scanr_id(scanr_id),
+        oa_status=derive_scanr_oa_status(
+            ouvert if isinstance(ouvert, bool) else None, as_mapping(doc.get("oaEvidence"))
+        ),
+        journal_id=journal_id,
+        container_title=container_title,
+        language=None,
+    )
 
 
 # =============================================================
@@ -122,48 +134,49 @@ def extract_pub_metadata(doc: dict, journal_id: int | None, scanr_id: str | None
 def insert_scanr_document(  # noqa: C901
     conn: Connection,
     queries: SourcePublicationQueries,
-    doc: dict,
+    doc: Mapping[str, JsonValue],
     staging_id: int,
     scanr_id: str,
-    pub_meta: dict,
+    pub_meta: PublicationMetadata,
 ) -> int:
     """Crée/retrouve l'entrée source_publications pour ScanR.
 
     Les métadonnées canoniques (doi, title, pub_year, doc_type, nnt, journal_id, oa_status, language, container_title) viennent toutes de `pub_meta`, construit en amont par `extract_pub_metadata`. `doc` ne sert ici que pour les champs propres à ScanR (hal_id, pmid, abstract, biblio, keywords, topics, urls).
     """
     ext: dict[str, JsonValue] = {}
-    if nnt := pub_meta["nnt"]:
+    if nnt := pub_meta.nnt:
         ext["nnt"] = nnt
     # hal_id et related_dois multivalués : un document ScanR peut référencer plusieurs dépôts HAL et plusieurs DOI (preprint/dépôt/édition).
     hal_ids: list[str] = []
     dois: list[str] = []
-    for eid in doc.get("externalIds") or []:
-        if not (isinstance(eid, dict) and eid.get("type") and eid.get("id")):
+    for entree in as_sequence(doc.get("externalIds")):
+        eid = as_mapping(entree)
+        etype = as_str(eid.get("type"))
+        valeur = as_str(eid.get("id"))
+        if not etype or not valeur:
             continue
-        etype = eid["type"].lower()
-        if etype == "hal" and eid["id"] not in hal_ids:
-            hal_ids.append(eid["id"])
+        etype = etype.lower()
+        if etype == "hal" and valeur not in hal_ids:
+            hal_ids.append(valeur)
         elif etype == "pmid":
-            ext["pmid"] = eid["id"]
-        elif etype == "doi" and (doi := clean_doi(eid["id"])) and doi not in dois:
+            ext["pmid"] = valeur
+        elif etype == "doi" and (doi := clean_doi(valeur)) and doi not in dois:
             dois.append(doi)
     if hal_ids:
         ext["hal_id"] = hal_ids
     # related_dois = DOI secondaires (autres que le primaire, qui vit sur `doi`).
     # Le doiUrl ScanR est toujours redondant avec un externalIds type=doi.
-    if related_dois := [d for d in dois if d != pub_meta["doi"]]:
+    if related_dois := [d for d in dois if d != pub_meta.doi]:
         ext["related_dois"] = related_dois
     external_ids = ext if ext else None
 
-    summary = doc.get("summary") or {}
-    abstract = summary.get("default")
+    abstract = as_str(as_mapping(doc.get("summary")).get("default"))
 
-    kw_raw = doc.get("keywords") or {}
-    kw_val = kw_raw.get("default")
-    if isinstance(kw_val, list):
-        keywords = [str(k).strip() for k in kw_val if k] or None
-    elif isinstance(kw_val, str) and kw_val:
+    kw_val = as_mapping(doc.get("keywords")).get("default")
+    if isinstance(kw_val, str) and kw_val:
         keywords = [k.strip() for k in kw_val.split(",") if k.strip()] or None
+    elif liste := as_sequence(kw_val):
+        keywords = [str(k).strip() for k in liste if k] or None
     else:
         keywords = None
 
@@ -174,30 +187,28 @@ def insert_scanr_document(  # noqa: C901
         if domains:
             topics = domains
 
-    cbc = doc.get("cited_by_counts_by_year") or {}
-    cited_by_count = sum(cbc.values()) if cbc else None
+    cbc = as_mapping(doc.get("cited_by_counts_by_year"))
+    annees = [n for v in cbc.values() if (n := as_int(v)) is not None]
+    cited_by_count = sum(annees) if annees else None
 
-    urls = []
-    seen = set()
-    for field in ("landingPage", "doiUrl", "pdfUrl"):
-        u = doc.get(field)
-        if u and u not in seen:
-            seen.add(u)
-            urls.append(u)
-    oa_ev = doc.get("oaEvidence") or {}
-    for field in ("landingPageUrl", "url", "pdfUrl"):
-        u = oa_ev.get(field)
+    urls: list[str] = []
+    seen: set[str] = set()
+    oa_ev = as_mapping(doc.get("oaEvidence"))
+    adresses = [doc.get(f) for f in ("landingPage", "doiUrl", "pdfUrl")]
+    adresses += [oa_ev.get(f) for f in ("landingPageUrl", "url", "pdfUrl")]
+    for brut in adresses:
+        u = as_str(brut)
         if u and u not in seen:
             seen.add(u)
             urls.append(u)
 
     # Publisher + journal bruts (traçabilité du nom tel que vu par ScanR, en parallèle des publishers/journals créés via find_or_create_*).
-    source = doc.get("source") or {}
+    source = as_mapping(doc.get("source"))
     biblio: dict[str, JsonValue] = {}
-    if publisher_raw := source.get("publisher"):
+    if publisher_raw := as_str(source.get("publisher")):
         biblio["publisher"] = publisher_raw
     journal_obj: dict[str, str] = {}
-    if jt := source.get("title"):
+    if jt := as_str(source.get("title")):
         journal_obj["title"] = jt
     jissn, jeissn = _extract_journal_issns(source)
     if jissn:
@@ -214,19 +225,19 @@ def insert_scanr_document(  # noqa: C901
             source="scanr",
             source_id=scanr_id,
             staging_id=staging_id,
-            doi=pub_meta["doi"],
+            doi=pub_meta.doi,
             external_ids=external_ids,
-            title=pub_meta["title"] or "",
-            pub_year=pub_meta["pub_year"],
-            doc_type=pub_meta["doc_type"],
-            journal_id=pub_meta["journal_id"],
-            container_title=pub_meta["container_title"],
-            language=pub_meta["language"],
+            title=pub_meta.title or "",
+            pub_year=pub_meta.pub_year,
+            doc_type=pub_meta.doc_type,
+            journal_id=pub_meta.journal_id,
+            container_title=pub_meta.container_title,
+            language=pub_meta.language,
             biblio=biblio_json,
             abstract=abstract,
             keywords=keywords,
             topics=topics,
-            oa_status=pub_meta["oa_status"],
+            oa_status=pub_meta.oa_status,
             urls=urls or None,
             cited_by_count=cited_by_count,
         ),
@@ -238,20 +249,20 @@ def insert_scanr_document(  # noqa: C901
 # =============================================================
 
 
-def build_scanr_author_records(doc: dict) -> list[AuthorRecord]:
+def build_scanr_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecord]:
     """Parse les auteurs d'un document ScanR en `AuthorRecord` (sans I/O).
 
     - identifiants `orcid`/`idref` (sous `denormalized`) ;
     - `roles` via `map_role('scanr', role)` ;
     - affiliations feuilles → adresses, avec `detected_countries` en `countries` (pays d'autorité détectés dans le texte de l'affiliation).
     """
-    authors = doc.get("authors") or []
+    authors = [as_mapping(a) for a in as_sequence(doc.get("authors"))]
     # Identifiant (orcid/idref) partagé entre ≥2 signatures du doc → `_dubious`.
     ids_by_position = mark_shared_identifiers_dubious(
         [
             compact_identifiers(
-                orcid=normalize_orcid((a.get("denormalized") or {}).get("orcid")),
-                idref=(a.get("denormalized") or {}).get("idref"),
+                orcid=normalize_orcid(as_str(as_mapping(a.get("denormalized")).get("orcid"))),
+                idref=as_str(as_mapping(a.get("denormalized")).get("idref")),
             )
             for a in authors
         ]
@@ -259,16 +270,17 @@ def build_scanr_author_records(doc: dict) -> list[AuthorRecord]:
 
     records: list[AuthorRecord] = []
     for position, author_data in enumerate(authors):
-        author_full_name = author_data.get("fullName")
+        author_full_name = as_str(author_data.get("fullName"))
         if not author_full_name:
             continue
 
         ids = ids_by_position[position]
-        roles, _ = map_role("scanr", author_data.get("role"))
+        roles, _ = map_role("scanr", as_str(author_data.get("role")))
 
         addr_parts: list[str] = []
         detected_countries: set[str] = set()
-        for aff in select_leaf_affiliations(author_data.get("affiliations") or []):
+        affiliations = [as_mapping(a) for a in as_sequence(author_data.get("affiliations"))]
+        for aff in select_leaf_affiliations(affiliations):
             name = (as_str(aff.get("name")) or "").strip()
             if name:
                 addr_parts.append(name)
@@ -292,7 +304,7 @@ def build_scanr_author_records(doc: dict) -> list[AuthorRecord]:
 def process_authorships(
     conn: Connection,
     authorship_queries: AuthorshipsBatchQueries,
-    doc: dict,
+    doc: Mapping[str, JsonValue],
     source_publication_id: int,
 ) -> None:
     """Parse les auteurs ScanR puis écrit les authorships en batch."""
