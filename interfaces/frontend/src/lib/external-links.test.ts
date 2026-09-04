@@ -8,9 +8,10 @@
 
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, it, expect } from 'vitest';
 
-const SRC = new URL('..', import.meta.url).pathname;
+const SRC = fileURLToPath(new URL('..', import.meta.url));
 
 /* Hôtes que l'interface donne à voir. Y ajouter une entrée est un geste délibéré : elle
  * apparaît alors dans le dossier de sécurité, qui les énumère. */
