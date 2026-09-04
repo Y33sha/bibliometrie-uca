@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { base } from '$app/paths';
-	import { ApiError, auth } from '$lib/api';
+	import { auth } from '$lib/api';
 
 	let username = $state('');
 	let password = $state('');
@@ -16,7 +16,7 @@
 			await auth.login(username, password);
 			goto(base + '/admin/addresses');
 		} catch (e) {
-			error = e instanceof ApiError ? 'Identifiants incorrects' : 'Erreur de connexion';
+			error = auth.loginErrorMessage(e);
 			loading = false;
 		}
 	}

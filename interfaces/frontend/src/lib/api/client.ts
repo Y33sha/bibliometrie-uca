@@ -13,6 +13,12 @@ export class ApiError extends Error {
 		this.status = status;
 		this.detail = detail;
 	}
+
+	/** Message porté par le corps de la réponse — le `detail` que composent les erreurs FastAPI —, ou `null` quand la réponse n'en porte pas d'exploitable. */
+	get detailMessage(): string | null {
+		const detail = (this.detail as { detail?: unknown } | null | undefined)?.detail;
+		return typeof detail === 'string' ? detail : null;
+	}
 }
 
 async function parseError(res: Response): Promise<unknown> {
