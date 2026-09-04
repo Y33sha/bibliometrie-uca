@@ -20,7 +20,7 @@ Deux libellés qui ne diffèrent que par la casse convergent vers un seul sujet,
 
 Une seule phase écrit ces tables, `subjects`, exécutée après `authorships`. Elle comporte deux étapes inséparables, chacune dans sa transaction.
 
-**Ingestion.** Sont retenues les publications dont le contenu a changé depuis le dernier passage, et celles jamais traitées. Leurs liens **non rejetés** sont effacés, puis reconstruits enregistrement source par enregistrement source : l'extracteur propre à chaque source réduit ses thématiques à une liste de libellés, un cache mutualise l'écriture d'un même libellé — y compris entre sources —, et les liens sont insérés en une fois avec leur source. Les sujets restés sans aucun lien sont supprimés en fin d'étape. `--rebuild-subjects` reprend l'intégralité du stock.
+**Ingestion.** Sont retenues les publications jamais traitées, et celles modifiées depuis le dernier enregistrement de leurs sujets. La sélection compare ces deux dates, sans colonne de marquage comme en portent d'autres phases. Leurs liens **non rejetés** sont effacés, puis reconstruits enregistrement source par enregistrement source : l'extracteur propre à chaque source réduit ses thématiques à une liste de libellés, un cache mutualise l'écriture d'un même libellé — y compris entre sources —, et les liens sont insérés en une fois avec leur source. Les sujets restés sans aucun lien sont supprimés en fin d'étape. `--rebuild-subjects` reprend l'intégralité du stock.
 
 **Extracteurs.** HAL fournit ses domaines, OpenAlex ses quatre niveaux de concepts mis à plat, le Web of Science ses catégories et ses vedettes, ScanR ses domaines, theses.fr la discipline et les vedettes RAMEAU.
 
@@ -50,8 +50,6 @@ Les sujets alimentent aussi les palmarès affichés ailleurs — tableaux de bor
 ## Points d'attention
 
 **Seuls les concepts d'ontologie deviennent des sujets.** Les mots-clés libres que fournissent les sources — c'est tout ce que Crossref propose — restent sur l'enregistrement source et s'affichent avec le détail de la publication, sans entrer dans ces tables. La distinction est délibérée : un vocabulaire contrôlé se compte et se recoupe, un mot-clé libre non.
-
-**Le caractère incrémental repose sur une comparaison de dates, sans colonne dédiée.** Une publication repasse à l'ingestion quand sa date de mise à jour dépasse la date du plus récent de ses liens. Il n'existe pas de marqueur explicite : la justesse du mécanisme dépend donc de ce que `refresh_from_sources` mette bien à jour cette date quand le contenu change.
 
 **La colonne `rejected` est respectée partout mais aucune interface ne la pose.** Elle exclut le lien du comptage d'usage et des co-occurrences, survit à l'effacement de l'ingestion, et empêche la suppression du sujet. Aucun point d'entrée ne permet aujourd'hui de la renseigner.
 
