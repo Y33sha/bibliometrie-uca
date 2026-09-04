@@ -57,7 +57,7 @@ Les sujets alimentent aussi les palmarès affichés ailleurs — tableaux de bor
 
 ## Invariants métier
 
-**Identité d'un sujet.** L'unicité porte sur le libellé en minuscules ; le libellé conservé est celui de la première insertion, et la langue retient la première valeur non nulle.
+**Identité d'un sujet.** L'unicité porte sur le libellé en minuscules. Le libellé conservé est celui de la première insertion, et la langue celle de la première source qui en déclare une : les suivantes ne l'écrasent pas.
 
 **Attribution par source.** Chaque lien retient la source qui l'a fourni ; un même sujet venu de deux sources donne deux liens. L'ingestion efface et reconstruit les liens non rejetés d'une publication modifiée, source comprise.
 
