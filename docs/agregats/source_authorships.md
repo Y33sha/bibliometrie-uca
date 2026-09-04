@@ -34,7 +34,7 @@ Aucune colonne structurelle n'est écrite par l'API. La curation, décrite côt�
 
 **Épingler une signature** l'inscrit dans `confirmed_authorships`. La décision porte sur cette signature précisément, et la phase `persons` la repose à chaque passage.
 
-**Détacher une personne d'une publication** met à nul le `person_id` de **toutes** les signatures de ce couple, quelle que soit leur source : « cette personne n'est pas l'auteur de ce document » ne vaut pas source par source. La paire est inscrite dans `rejected_authorships`.
+**Détacher une personne d'une publication** met à nul le `person_id` de **toutes** les signatures de ce couple, quelle que soit leur source, et inscrit la paire dans `rejected_authorships`.
 
 **Fusionner deux personnes** repointe simplement le `person_id`.
 
@@ -57,7 +57,7 @@ Le détail d'une publication montre les **auteurs tels que chaque source les don
 
 **Toute signature porte une identité.** `identity_id` ne peut être nul, et une identité est unique par son couple nom normalisé et identifiants.
 
-**Le détachement vaut pour le couple, pas pour la source.** Mettre à nul le `person_id` d'un couple publication–personne s'applique à toutes ses signatures, quelle que soit leur source.
+**Le détachement porte sur le couple publication–personne.** Il met à nul le `person_id` de toutes ses signatures, quelle que soit leur source.
 
 **Épinglage et rejet sont de portées différentes.** L'épinglage impose un rattachement pour une signature donnée, et il est reposé à chaque passage. Le rejet interdit durablement un couple publication–personne, que la phase `authorships` ne recrée jamais.
 
