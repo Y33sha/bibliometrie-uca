@@ -2,7 +2,7 @@
 
 *À jour le 2026-09-04.*
 
-Un `journal` est un support de publication : revue, conférence, dépôt ou autre. Il porte un identifiant interne, et se reconnaît par son `openalex_id`, par ses ISSN — très discriminants mais souvent absents — ou par son titre, via les formes de nom enregistrées. `domain/journals/journal.py` en décrit la structure sans logique : le rapprochement, la fusion et l'enrichissement vivent dans les services et leurs adaptateurs SQL.
+Un `journal` est un support de publication : revue, conférence, dépôt ou autre. Près de deux revues sur cinq n'ont aucun ISSN, et autant arrivent des sources sous plusieurs titres — d'où `journal_name_forms`, qui collecte ces formes pour reconnaître une revue déjà enregistrée. `domain/journals/journal.py` en décrit la structure sans logique : le rapprochement, la fusion et l'enrichissement vivent dans les services et leurs adaptateurs SQL.
 
 ## Tables
 
