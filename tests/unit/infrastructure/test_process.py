@@ -4,12 +4,17 @@ Deux exécutions concurrentes du pipeline se bloquent l'une l'autre en base : le
 """
 
 import os
+import sys
 
 import pytest
 
 from infrastructure.process import is_pid_alive
 
 
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="Sous Windows, le signal 0 vaut CTRL_C_EVENT : l'appel enverrait un Ctrl-C à toute la console au lieu d'interroger le processus.",
+)
 def test_le_processus_courant_est_vivant():
     assert is_pid_alive(os.getpid()) is True
 
