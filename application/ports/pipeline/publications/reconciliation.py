@@ -2,7 +2,7 @@
 
 Implémenté par `infrastructure.pipeline.publications.reconciliation.PgPublicationsReconciliationQueries`.
 
-La passe lit le **voisinage 1-hop** des `source_publications` marquées `keys_dirty` (les SP dirty + celles qui partagent une clé de confirmation avec elles), décide les assignations SP → pub-ancre (`domain.publications.reconciliation.plan_reconciliation` — assignation, merge et split unifiés : un orphelin se fait matcher/créer/skipper par le même primitif), les applique, puis efface le drapeau. Cf. le raisonnement 1-hop documenté côté domaine.
+La passe propage d'abord `keys_dirty` aux `source_publications` partageant une publication avec une SP dirty, lit le **voisinage 1-hop** des SP dirty (les SP dirty + celles qui partagent une clé de confirmation avec elles), décide les assignations SP → pub-ancre (`domain.publications.reconciliation.plan_reconciliation` — assignation, merge et split unifiés : un orphelin se fait matcher/créer/skipper par le même primitif), les applique, puis efface le drapeau. Cf. le raisonnement 1-hop documenté côté domaine.
 """
 
 from typing import NamedTuple, Protocol
@@ -36,6 +36,13 @@ class PublicationsReconciliationQueries(Protocol):
         """Pose `keys_dirty = true` sur toutes les `source_publications` (rebuild complet).
 
         Retourne le nombre de lignes marquées. Force la réconciliation à dégénérer en cluster-then-materialize global (après une évolution des règles de clés).
+        """
+        ...
+
+    def mark_publication_siblings_dirty(self, conn: Connection) -> int:
+        """Propage `keys_dirty` aux `source_publications` rattachées à la même publication qu'une SP déjà dirty. Retourne le nombre de lignes marquées.
+
+        Clôt le voisinage sur l'appartenance déjà matérialisée : sans cela, une SP rattachée par une clé de confirmation qui vient de disparaître (identifiant corrigé chez la source, par exemple un DOI de préversion remplacé par celui de la version publiée) ne figure dans aucun bras du voisinage 1-hop — calculé sur les clés d'après — et resterait indéfiniment sur une publication dont plus rien ne la rapproche.
         """
         ...
 
