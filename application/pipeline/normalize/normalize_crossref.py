@@ -336,7 +336,7 @@ def process_work(
             external_ids=external_ids,
             title=title,
             pub_year=pub_year,
-            doc_type=msg.get("type"),
+            doc_type=as_str(msg.get("type")),
             journal_id=journal_id,
             container_title=get_container_title(msg) if not journal_id else None,
             language=get_language(msg),
