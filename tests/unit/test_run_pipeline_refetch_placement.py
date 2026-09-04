@@ -22,7 +22,7 @@ def test_refetch_not_called_in_extract():
         patch.object(run_pipeline, "_run_extract", return_value=PhaseMetrics()),
         patch(_REFETCH, new_callable=AsyncMock) as refetch,
     ):
-        run_pipeline.phase_extract(mode="full")
+        run_pipeline.phase_extract(run_pipeline.RunOptions(mode="full"))
     assert refetch.call_count == 0
 
 
@@ -33,7 +33,9 @@ def test_refetch_not_called_in_normalize():
         patch.object(run_pipeline, "_run_cleanup_orphan_identities"),
         patch(_REFETCH, new_callable=AsyncMock) as refetch,
     ):
-        run_pipeline.phase_normalize(mode="full", sources={"openalex", "hal"})
+        run_pipeline.phase_normalize(
+            run_pipeline.RunOptions(mode="full", sources={"openalex", "hal"})
+        )
     assert refetch.call_count == 0
 
 
@@ -43,11 +45,15 @@ def test_refetch_called_in_own_phase_when_openalex_present():
         patch("infrastructure.sources.openalex.refetch_truncated.PgOpenalexRefetchAdapter"),
         patch(_REFETCH, new_callable=AsyncMock, return_value=PhaseMetrics()) as refetch,
     ):
-        run_pipeline.phase_refetch_truncated(mode="full", sources={"openalex", "hal"})
+        run_pipeline.phase_refetch_truncated(
+            run_pipeline.RunOptions(mode="full", sources={"openalex", "hal"})
+        )
     assert refetch.call_count == 1
 
 
 def test_refetch_skipped_in_own_phase_without_openalex():
     with patch(_REFETCH, new_callable=AsyncMock) as refetch:
-        run_pipeline.phase_refetch_truncated(mode="full", sources={"hal", "scanr"})
+        run_pipeline.phase_refetch_truncated(
+            run_pipeline.RunOptions(mode="full", sources={"hal", "scanr"})
+        )
     assert refetch.call_count == 0

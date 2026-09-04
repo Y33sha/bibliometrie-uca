@@ -36,7 +36,7 @@ def _called_targets(stack) -> MagicMock:
 def test_refresh_stale_excludes_wos_by_default():
     with ExitStack() as stack:
         run_one = _called_targets(stack)
-        run_pipeline.phase_refresh_stale()
+        run_pipeline.phase_refresh_stale(run_pipeline.RunOptions())
     targets = [c.args[0] for c in run_one.call_args_list]
     assert "wos" not in targets
     assert targets  # d'autres sources sont bien refetch
@@ -45,7 +45,7 @@ def test_refresh_stale_excludes_wos_by_default():
 def test_refresh_stale_includes_wos_when_opted_in():
     with ExitStack() as stack:
         run_one = _called_targets(stack)
-        run_pipeline.phase_refresh_stale(include_wos=True)
+        run_pipeline.phase_refresh_stale(run_pipeline.RunOptions(include_wos=True))
     targets = [c.args[0] for c in run_one.call_args_list]
     assert "wos" in targets
 
@@ -55,7 +55,7 @@ def test_refresh_stale_covers_theses():
     # cross-import par DOI qui l'excluait.
     with ExitStack() as stack:
         run_one = _called_targets(stack)
-        run_pipeline.phase_refresh_stale()
+        run_pipeline.phase_refresh_stale(run_pipeline.RunOptions())
     assert "theses" in [c.args[0] for c in run_one.call_args_list]
 
 
@@ -63,7 +63,7 @@ def test_refresh_stale_couples_years_per_source():
     # theses ramène tout l'historique (borne None) ; les autres suivent la fenêtre du run.
     with ExitStack() as stack:
         run_one = _called_targets(stack)
-        run_pipeline.phase_refresh_stale()
+        run_pipeline.phase_refresh_stale(run_pipeline.RunOptions())
     by_target = {c.args[0]: c.args[1] for c in run_one.call_args_list}
     assert by_target["theses"] is None
     assert by_target["hal"] == [2024]
@@ -73,7 +73,7 @@ def test_refresh_stale_year_narrows_all_including_theses():
     # `--year` cible une seule année pour toutes les sources, theses comprise.
     with ExitStack() as stack:
         run_one = _called_targets(stack)
-        run_pipeline.phase_refresh_stale(year=2023)
+        run_pipeline.phase_refresh_stale(run_pipeline.RunOptions(year=2023))
     by_target = {c.args[0]: c.args[1] for c in run_one.call_args_list}
     assert by_target["theses"] == [2023]
     assert by_target["hal"] == [2023]
@@ -82,7 +82,7 @@ def test_refresh_stale_year_narrows_all_including_theses():
 def test_refresh_stale_respects_sources_filter():
     with ExitStack() as stack:
         run_one = _called_targets(stack)
-        run_pipeline.phase_refresh_stale(sources={"hal"}, include_wos=True)
+        run_pipeline.phase_refresh_stale(run_pipeline.RunOptions(sources={"hal"}, include_wos=True))
     assert [c.args[0] for c in run_one.call_args_list] == ["hal"]
 
 

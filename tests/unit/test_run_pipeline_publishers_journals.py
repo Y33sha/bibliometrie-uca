@@ -32,7 +32,7 @@ def test_phase_aggregates_substep_counters():
         patch.object(run_pipeline, "_run_enrich_journals_from_openalex", return_value=openalex),
         patch.object(run_pipeline, "_run_enrich_journals_from_doaj", return_value=doaj),
     ):
-        metrics = run_pipeline.phase_publishers_journals()
+        metrics = run_pipeline.phase_publishers_journals(run_pipeline.RunOptions())
 
     # Les compteurs des sous-étapes sont remontés : le résumé n'est pas « no-op ».
     assert metrics.new == 1
@@ -58,6 +58,6 @@ def test_phase_propagates_substep_signals():
         ),
         patch.object(run_pipeline, "_run_enrich_journals_from_doaj", return_value=PhaseMetrics()),
     ):
-        metrics = run_pipeline.phase_publishers_journals()
+        metrics = run_pipeline.phase_publishers_journals(run_pipeline.RunOptions())
 
     assert [s["code"] for s in metrics.signals] == ["source_unavailable"]

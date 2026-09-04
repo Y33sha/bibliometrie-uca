@@ -86,7 +86,7 @@ class TestRunOnePhase:
         return resultat, recorder
 
     def test_phase_reussie_consignee(self):
-        (nom, duree), recorder = self._executer(lambda **kw: PhaseMetrics(new=3))
+        (nom, duree), recorder = self._executer(lambda options: PhaseMetrics(new=3))
 
         assert nom == "persons"
         assert duree >= 0
@@ -98,20 +98,20 @@ class TestRunOnePhase:
         metrics = PhaseMetrics()
         metrics.signals.append({"level": "warning", "code": "source_unconfigured", "message": ""})
 
-        _, recorder = self._executer(lambda **kw: metrics)
+        _, recorder = self._executer(lambda options: metrics)
 
         assert recorder.records[0]["status"] == "warning"
 
     def test_phase_sans_metriques(self):
         """Une phase qui ne rend rien est consignée avec des compteurs vides, non ignorée."""
-        _, recorder = self._executer(lambda **kw: None)
+        _, recorder = self._executer(lambda options: None)
 
         assert recorder.records[0]["status"] == "ok"
 
     def test_interruption_utilisateur(self, caplog):
         """L'arrêt demandé est un avertissement, non une erreur, et dit par où reprendre."""
 
-        def _interrompue(**kw):
+        def _interrompue(options):
             raise KeyboardInterrupt
 
         with pytest.raises(SystemExit) as sortie, caplog.at_level(logging.INFO):
@@ -121,7 +121,7 @@ class TestRunOnePhase:
         assert "run_pipeline --from persons" in caplog.text
 
     def test_echec_de_phase(self, caplog):
-        def _en_echec(**kw):
+        def _en_echec(options):
             raise RuntimeError("la source est à bout de budget")
 
         recorder = _FakeRecorder()
@@ -138,14 +138,15 @@ class TestRunOnePhase:
         recus: dict = {}
 
         self._executer(
-            lambda **kw: recus.update(kw) or PhaseMetrics(),
+            lambda options: recus.update(options=options) or PhaseMetrics(),
             args=_args(mode="daily", year=2024, include_wos=True),
         )
 
-        assert recus["mode"] == "daily"
-        assert recus["year"] == 2024
-        assert recus["include_wos"] is True
-        assert recus["sources"] == {"hal"}
+        options = recus["options"]
+        assert options.mode == "daily"
+        assert options.year == 2024
+        assert options.include_wos is True
+        assert options.sources == {"hal"}
 
 
 class TestExecutePhases:
@@ -174,7 +175,10 @@ class TestExecutePhases:
         return recorder
 
     def test_chaque_phase_consignee_et_journal_clos(self, run_prepare):
-        phases = [("une", lambda **kw: PhaseMetrics()), ("deux", lambda **kw: PhaseMetrics())]
+        phases = [
+            ("une", lambda options: PhaseMetrics()),
+            ("deux", lambda options: PhaseMetrics()),
+        ]
 
         run_pipeline._execute_phases(_args(), phases)
 

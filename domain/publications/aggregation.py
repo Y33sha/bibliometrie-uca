@@ -16,8 +16,6 @@ Priorité d'ordre : les enregistrements canoniques passent avant les formes seco
 `title_normalized` est recalculé à partir du `title` agrégé, pas pris d'une source (les sources ne fournissent pas ce champ).
 """
 
-from typing import Any
-
 from domain.normalize import normalize_text
 from domain.publications.doc_types import ARTICLE_SUBTYPES
 from domain.publications.identifiers import DOI
@@ -29,7 +27,7 @@ from domain.publications.metadata import (
 )
 from domain.publications.publication import Publication
 from domain.source_publications.source_publication import SourcePublication
-from domain.types import JsonValue
+from domain.types import JsonValue, as_int, as_str
 
 
 def refresh_from_sources(
@@ -55,16 +53,16 @@ def refresh_from_sources(
     rank = {s: i for i, s in enumerate(source_priority)}
     sorted_sources = sorted(sources, key=lambda s: (s.id in secondary_ids, rank.get(s.source, 99)))
 
-    new_title = first_non_null(sorted_sources, "title")
+    new_title = as_str(first_non_null(sorted_sources, "title"))
     pub.title = new_title if new_title is not None else pub.title
     pub.title_normalized = normalize_text(pub.title) if pub.title else None
     pub.doc_type = arbitrate_doc_type_with_article_subtype(sorted_sources)
-    pub.pub_year = first_non_null(sorted_sources, "pub_year") or pub.pub_year
+    pub.pub_year = as_int(first_non_null(sorted_sources, "pub_year")) or pub.pub_year
 
-    new_doi_str = first_non_null(sorted_sources, "doi")
+    new_doi_str = as_str(first_non_null(sorted_sources, "doi"))
     pub.doi = DOI(new_doi_str) if new_doi_str else None
 
-    pub.journal_id = first_non_null(sorted_sources, "journal_id")
+    pub.journal_id = as_int(first_non_null(sorted_sources, "journal_id"))
     # Unpaywall fait autorité sur l'OA une fois qu'il a été interrogé (cf.
     # `publications.unpaywall_checked_at`) : on ne ré-agrège `oa_status` depuis les
     # sources que tant que la publication ne l'a pas été. Sinon un réimport
@@ -82,11 +80,11 @@ def refresh_from_sources(
         pub.oa_status = (
             best_oa_status(s.oa_status for s in sorted_sources) or OA_STATUS_UNKNOWN_DEFAULT
         )
-    pub.container_title = first_non_null(sorted_sources, "container_title")
-    pub.language = first_non_null(sorted_sources, "language")
-    pub.abstract = first_non_null(sorted_sources, "abstract")
-    pub.keywords = tuple(merge_lists_dedup_ci(sorted_sources, "keywords") or ())
-    pub.countries = tuple(merge_lists_dedup_ci(sorted_sources, "countries") or ())
+    pub.container_title = as_str(first_non_null(sorted_sources, "container_title"))
+    pub.language = as_str(first_non_null(sorted_sources, "language"))
+    pub.abstract = as_str(first_non_null(sorted_sources, "abstract"))
+    pub.keywords = _textes(merge_lists_dedup_ci(sorted_sources, "keywords"))
+    pub.countries = _textes(merge_lists_dedup_ci(sorted_sources, "countries"))
     pub.topics = topics_by_source(sorted_sources)
     pub.biblio = shallow_merge_jsonb(sorted_sources, "biblio")
     pub.meta = shallow_merge_jsonb(sorted_sources, "meta")
@@ -96,10 +94,15 @@ def refresh_from_sources(
 # ── Helpers publics ────────────────────────────────────────────────
 
 
-def first_non_null(sources: list[SourcePublication], attr: str) -> Any:
+def _textes(valeurs: list[JsonValue] | None) -> tuple[str, ...]:
+    """Valeurs textuelles d'une liste fusionnée : mots-clés et pays sont du texte, le reste ne s'écrit pas."""
+    return tuple(texte for v in valeurs or () if (texte := as_str(v)))
+
+
+def first_non_null(sources: list[SourcePublication], attr: str) -> JsonValue:
     """Premier `getattr(source, attr)` non-null dans l'ordre des `sources`. None si tous absents.
 
-    Retour `Any` justifié : type polymorphique selon `attr` (str pour `title`, int pour `pub_year`, list pour `keywords`, …). Typer un générique via TypeVar serait excessif pour 1 helper utilisé en interne par `refresh_from_sources`.
+    La valeur rendue dépend de l'attribut lu — texte pour le titre, entier pour l'année, liste pour les mots-clés. Ce sont toutes des valeurs de colonne, donc des valeurs JSON : l'appelant les repose telles quelles sur la publication canonique.
     """
     for s in sources:
         v = getattr(s, attr)
@@ -108,13 +111,13 @@ def first_non_null(sources: list[SourcePublication], attr: str) -> Any:
     return None
 
 
-def merge_lists_dedup_ci(sources: list[SourcePublication], attr: str) -> list[Any] | None:
-    """Union dédupliquée des listes `source.<attr>`. Déduplication case-insensitive pour les strings, sinon par valeur. Préserve l'ordre d'apparition. None si toutes vides/null.
+def merge_lists_dedup_ci(sources: list[SourcePublication], attr: str) -> list[JsonValue] | None:
+    """Union dédupliquée des listes `source.<attr>`. Déduplication insensible à la casse pour le texte, par valeur sinon. Préserve l'ordre d'apparition. None si toutes vides ou nulles.
 
-    `list[Any]` justifié : les listes consommées sont `list[str]` (`keywords`, `countries`, …) en pratique, mais `getattr` est polymorphique — même justification que `first_non_null`.
+    Les listes consommées sont textuelles en pratique — mots-clés, pays —, mais l'attribut est lu par son nom : le type est celui d'une valeur de colonne.
     """
-    seen: set[Any] = set()
-    result: list[Any] = []
+    seen: set[JsonValue] = set()
+    result: list[JsonValue] = []
     for s in sources:
         for item in getattr(s, attr) or ():
             key = item.lower() if isinstance(item, str) else item
