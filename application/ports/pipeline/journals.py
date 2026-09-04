@@ -9,10 +9,12 @@ Trois contrats étroits, un par consommateur du pipeline, tous servis par un mê
 L'édition curée et la fusion (admin) vivent à part, dans `application/ports/repositories/journal_repository.py`.
 """
 
+from collections.abc import Mapping
 from datetime import datetime
-from typing import Any, NamedTuple, Protocol
+from typing import NamedTuple, Protocol
 
 from domain.journals.journal import JournalType, OaModel
+from domain.types import JsonValue
 
 
 class JournalIssnRow(NamedTuple):
@@ -111,7 +113,7 @@ class JournalDoajQueries(Protocol):
         self,
         journal_id: int,
         *,
-        payload: dict[str, Any] | None,
+        payload: Mapping[str, JsonValue] | None,
         imported_at: datetime,
         is_in_doaj: bool,
     ) -> None:

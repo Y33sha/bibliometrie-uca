@@ -6,11 +6,14 @@ Même contrat que les autres PgXxxRepository : exceptions du domaine, l'orchestr
 """
 
 from decimal import Decimal
-from typing import Any, NamedTuple, cast
+from typing import NamedTuple, cast
 
 from sqlalchemy import Connection, delete, func, select, text, update
 
-from application.ports.repositories.journal_repository import JournalRepository
+from application.ports.repositories.journal_repository import (
+    JournalRepository,
+    SharedTitleJournalPair,
+)
 from domain.errors import NotFoundError
 from domain.journals.journal import Journal, JournalType, OaModel
 from domain.normalize import normalize_text
@@ -126,7 +129,7 @@ class PgJournalRepository(JournalRepository):
         self,
         target_publisher_id: int,
         source_publisher_id: int,
-    ) -> list[dict[str, Any]]:
+    ) -> list[SharedTitleJournalPair]:
         jt = journals.alias("jt")
         js = journals.alias("js")
         stmt = (
@@ -146,7 +149,7 @@ class PgJournalRepository(JournalRepository):
             .where(jt.c.publisher_id == target_publisher_id)
             .where(js.c.publisher_id == source_publisher_id)
         )
-        return [dict(r._mapping) for r in self._conn.execute(stmt)]
+        return [cast("SharedTitleJournalPair", dict(r._mapping)) for r in self._conn.execute(stmt)]
 
     def merge_journal_into(self, target_id: int, source_id: int) -> None:
         # publications, source_publications et apc_payments vivent hors de la MetaData de `tables.py` : accès en `text()`.

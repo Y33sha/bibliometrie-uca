@@ -3,8 +3,8 @@
 Sert les trois contrats pipeline (`application/ports/pipeline/journals.py`) : trouve-ou-crée d'une revue à partir des sources, enrichissement OpenAlex (typage + APC) et import du dump DOAJ. La table étant mono-adapter, une seule classe implémente les trois Protocols. L'édition curée et la fusion (admin) vivent dans `infrastructure/repositories/journal_repository.py`.
 """
 
+from collections.abc import Mapping
 from datetime import datetime
-from typing import Any
 
 from sqlalchemy import Connection, case, func, literal, or_, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -17,6 +17,7 @@ from application.ports.pipeline.journals import (
 )
 from domain.journals.journal import JournalType, OaModel
 from domain.normalize import normalize_text
+from domain.types import JsonValue
 from infrastructure.db.tables import journal_name_forms, journals
 
 
@@ -215,7 +216,7 @@ class PgJournalGatewayQueries(
         self,
         journal_id: int,
         *,
-        payload: dict[str, Any] | None,
+        payload: Mapping[str, JsonValue] | None,
         imported_at: datetime,
         is_in_doaj: bool,
     ) -> None:

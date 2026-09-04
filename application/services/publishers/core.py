@@ -140,9 +140,11 @@ def merge_publishers(
             reasons.append("doublon interne dans l'éditeur cible (titre dédupliqué)")
         if source_seen[pair["source_journal_id"]] > 1:
             reasons.append("doublon interne dans l'éditeur source (titre dédupliqué)")
-        for field in ("issn", "eissn", "issnl"):
-            tv = pair[f"t_{field}"]
-            sv = pair[f"s_{field}"]
+        for field, tv, sv in (
+            ("issn", pair["t_issn"], pair["s_issn"]),
+            ("eissn", pair["t_eissn"], pair["s_eissn"]),
+            ("issnl", pair["t_issnl"], pair["s_issnl"]),
+        ):
             if tv and sv and tv != sv:
                 reasons.append(f"{field.upper()} différents : {tv} (cible) vs {sv} (source)")
                 break
