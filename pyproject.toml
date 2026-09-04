@@ -450,8 +450,6 @@ exclude = [
 # - `application.ports.repositories.*` (sauf audit + les projections déjà
 #   typées des ports structures/persons) : records DB hydratés et partial
 #   updates encore exposés en `dict[str, Any]`.
-# - `application.ports.pipeline.normalize.staging` : `raw_data: dict[str, Any]`
-#   JSONB sur `StagingRow`.
 # - `domain.publications.aggregation` : `first_non_null` /
 #   `merge_lists_dedup_ci` polymorphiques sur `getattr(source, attr)`.
 # - `application.pipeline.normalize.*` (hors port `normalize.wos`, déjà strict) et
@@ -475,7 +473,6 @@ module = [
     "application.pipeline.extract.refetch_truncated",
     "application.pipeline.logging_scope",
     "application.pipeline.normalize.base",
-    "application.pipeline.normalize.normalize_openalex",
     "application.pipeline.normalize.normalize_wos",
     "application.ports.read_models.*",
     "application.ports.pipeline.cross_imports.*",

@@ -8,6 +8,7 @@ Pattern : `FakeSourcePublicationQueries` + `MagicMock` pour repos / authorship_q
 from __future__ import annotations
 
 import logging
+from dataclasses import replace
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -299,15 +300,15 @@ class TestUpsertJournal:
 class TestExtractPubMetadata:
     def test_minimal_work(self):
         meta = extract_pub_metadata({"title": "T", "publication_year": 2024}, journal_id=None)
-        assert meta["title"] == "T"
-        assert meta["pub_year"] == 2024
-        assert meta["doi"] is None
-        assert meta["nnt"] is None
-        assert meta["journal_id"] is None
+        assert meta.title == "T"
+        assert meta.pub_year == 2024
+        assert meta.doi is None
+        assert meta.nnt is None
+        assert meta.journal_id is None
 
     def test_display_name_fallback(self):
         meta = extract_pub_metadata({"display_name": "DN"}, journal_id=None)
-        assert meta["title"] == "DN"
+        assert meta.title == "DN"
 
     def test_with_journal_id_no_container_title(self):
         """Si journal_id présent, container_title reste None (la revue identifie tout)."""
@@ -316,7 +317,7 @@ class TestExtractPubMetadata:
             "primary_location": {"source": {"display_name": "Some Source"}},
         }
         meta = extract_pub_metadata(work, journal_id=42)
-        assert meta["container_title"] is None
+        assert meta.container_title is None
 
 
 # ── insert_openalex_document (edge cases) ────────────────────────
@@ -451,20 +452,10 @@ class TestInsertOpenalexDocument:
         """insert lit pub_meta["nnt"] et le pose dans external_ids."""
         queries = FakeSourcePublicationQueries()
         work = {"id": "https://openalex.org/W1"}
-        pub_meta = extract_pub_metadata(work, journal_id=None)
-        pub_meta["nnt"] = "2024CLFAC001"
+        pub_meta = replace(extract_pub_metadata(work, journal_id=None), nnt="2024CLFAC001")
         captured = self._call(queries, work, pub_meta=pub_meta)
         assert captured.external_ids is not None
         assert captured.external_ids["nnt"] == "2024CLFAC001"
-
-    def test_pub_meta_source_doi_passed_through(self):
-        """Si `pub_meta` contient `source_doi`, il est repris dans external_ids."""
-        queries = FakeSourcePublicationQueries()
-        work = {"id": "https://openalex.org/W1"}
-        pub_meta = extract_pub_metadata(work, journal_id=None)
-        pub_meta["source_doi"] = "10.1234/abc"
-        captured = self._call(queries, work, pub_meta=pub_meta)
-        assert captured.external_ids["source_doi"] == "10.1234/abc"
 
 
 # ── build_openalex_author_records (parsing pur) ──────────────────
