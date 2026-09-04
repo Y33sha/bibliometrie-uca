@@ -1,90 +1,82 @@
 # Adresses — cycle de vie
 
-*À jour le 2026-07-13.*
+*À jour le 2026-09-04.*
 
-L'adresse n'a **pas d'objet de domaine** : elle vit comme texte normalisé et lignes SQL. Le mot « agrégat » désigne ici le cluster de tables qu'un repository possède, sans racine d'entité ni logique métier côté `domain/`. Toutes les invariances (autorité `countries` vs `suggested_countries`, états d'un rattachement) sont portées par le SQL et les services.
+Une adresse est le texte d'affiliation qu'une source attache à une signature : « Université Clermont Auvergne, CNRS, LMBP, F-63000 Clermont-Ferrand, France ». Le pipeline la résout en structures et lui attribue un pays. C'est de cette résolution que dépend l'appartenance d'une publication au périmètre de l'établissement.
 
-## Tables du cluster
+Aucun objet de domaine ne lui correspond : elle vit comme texte normalisé et lignes SQL.
 
-| Table | Rôle | Colonnes clés |
+## Tables
+
+| Table | Rôle | Colonnes notables |
 |---|---|---|
 | `addresses` | L'adresse normalisée | `raw_text`, `normalized_text`, `countries CHAR(2)[]`, `suggested_countries`, `countries_dirty`, `pub_count` |
-| `address_structures` | Rattachement adresse → structure | `address_id`, `structure_id`, `matched_form_id` (NULL = confirmé manuellement sans détection), `is_confirmed` (NULL pending / TRUE confirmé / FALSE rejeté) |
-| `source_authorship_addresses` | Pivot signature ↔ adresse | `source_authorship_id`, `address_id` |
-| `place_name_forms` | Formes de noms de lieux → code ISO | `iso_code`, `form_normalized`, `kind` (`country` / `institution` / `city`) |
+| `address_structures` | Rattachement d'une adresse à une structure | `address_id`, `structure_id`, `matched_form_id` (NULL : confirmé à la main sans détection), `is_confirmed` (NULL en attente, TRUE confirmé, FALSE rejeté) |
+| `source_authorship_addresses` | Table de liaison entre signature et adresse | `source_authorship_id`, `address_id` |
+| `place_name_forms` | Formes de noms de lieux et code ISO correspondant | `iso_code`, `form_normalized`, `kind` (`country`, `institution`, `city`) |
 
-Unicité d'une adresse : index sur `md5(raw_text)`. Unicité d'un rattachement : `(address_id, structure_id)`. Deux vues matérialisées dérivent du cluster (accès SQL brut) : `source_authorship_structures` (pivot ⋈ `address_structures` ⋈ `perimeter_structures`) et `authorship_structures`.
+Une adresse est unique par `md5(raw_text)`, un rattachement par `(address_id, structure_id)`. Deux vues matérialisées en dérivent, interrogées en SQL direct : `source_authorship_structures`, qui joint la table de liaison aux rattachements et aux structures du périmètre, et `authorship_structures`, qui en dérive à son tour.
 
-## Les deux axes
+## Écriture par le pipeline
 
-Le cycle de vie se lit selon deux axes orthogonaux : **écriture / lecture** et **pipeline / API**. Les quatre quadrants ci-dessous.
+Trois phases écrivent ces tables, dans cet ordre.
 
-```mermaid
-flowchart LR
-    N[normalize] -->|upsert| A[addresses]
-    N -->|pivot| SAA[source_authorship_addresses]
-    AF[affiliations] -->|résolution| AS[address_structures]
-    C[countries] -->|détection| A
-    A -->|countries_dirty| SP[source_publications.countries]
-    AS --> SASV[(source_authorship_structures)]
-    SASV --> IP[source_authorships.in_perimeter]
-    SP --> PUB[publications.countries]
-```
+| Phase | Ce qu'elle écrit |
+|---|---|
+| `normalize` | `addresses`, `source_authorship_addresses` |
+| `affiliations` | `address_structures` |
+| `countries` | `addresses.countries`, `addresses.suggested_countries` |
 
-## Écriture — pipeline
+### `normalize` — création des adresses
 
-Trois phases écrivent le cluster, dans l'ordre `normalize` → `affiliations` → `countries`.
+Les adresses extraites des sources sont dédoublonnées, insérées, puis reliées aux signatures par `application/pipeline/normalize/_authorships_batch.py`.
 
-**`normalize`** crée les adresses et le pivot. Six sources (hal, openalex, wos, scanr, crossref, datacite) partagent l'écriture batch dans `pipeline/normalize/_authorships_batch.py` (`write_source_authorships`) : déduplication des textes d'adresse → `upsert_addresses_batch` (`INSERT … ON CONFLICT (md5(raw_text)) DO NOTHING`) → récupération des ids → `apply_address_countries_batch` (écrit `countries` seulement si NULL — source autoritaire, ScanR) et `apply_address_suggested_countries_batch` (écrit `suggested_countries` — OpenAlex, faillible) → `insert_source_authorship_addresses_batch`. Les nouvelles `source_authorships` héritent du défaut `countries_dirty = true`, ce qui amorce la cascade pays.
+### `affiliations` — résolution en structures
 
-theses écrit ses `source_authorships` une par une (`upsert_theses_source_authorship`, `RETURNING`) : ses non-auteurs — jury, rapporteurs — ont `author_position` NULL, que le remap par position du writer batch ne saurait porter. L'écriture des adresses est partagée : theses appelle `write_addresses` avec les `sa_id` récoltés, tous porteurs des mêmes adresses de document (laboratoires partenaires + établissement de soutenance).
+`application/pipeline/affiliations/resolve_addresses.py` balaie les adresses et cherche dans leur texte normalisé les formes de noms déclarées par les structures, au moyen d'un automate Aho-Corasick.
 
-**`affiliations`** résout le texte d'adresse en structures (`pipeline/affiliations/resolve_addresses.py`, `run_resolution`). Un `AddressMatcher` Aho-Corasick chargé sur `structure_name_forms` balaie les `addresses` paginées par keyset sur `id`, matche `normalized_text`, et n'écrit que les diffs : suppression des détections obsolètes automatiques, passage de `matched_form_id` à NULL sur les liens manuels/confirmés devenus obsolètes (la ligne survit), upsert des nouvelles détections `(address_id, structure_id, matched_form_id)`.
+La résolution compare l'état détecté à l'état enregistré et n'écrit que l'écart. Un rattachement posé ou confirmé à la main survit.
 
-Les structures dont le type ne vaut pas affiliation — les sites, cf. `StructureType.is_affiliation` — participent à l'appariement sans produire de rattachement : elles portent les formes de nom d'un lieu pour satisfaire le `requires_context_of` d'autres structures, et sont écartées à la composition du résultat.
+### `countries` — détection des pays
 
-**`countries`** détecte et écrit les pays (`pipeline/countries/phase.py`) : par nom de pays en fin d'adresse (`detect_by_country_name`), par nom de lieu (`detect_by_place_name`, Aho-Corasick sur les formes `institution`/`city`, n'écrit `countries` que si un seul ISO ressort), puis suggestion inversée (`suggest_countries`, cible les adresses sans pays et écrit `suggested_countries`). `write_countries` pose `countries_dirty = true` dès qu'il écrit dans `countries` — c'est le crochet incrémental.
+`application/pipeline/countries/phase.py` procède par trois moyens : le nom de pays en fin d'adresse, le nom de lieu (automate sur les formes `institution` et `city`, qui n'écrit `countries` que si un seul code ISO ressort), et enfin la suggestion, qui vise les adresses restées sans pays et alimente `suggested_countries`.
 
-**Cascade `countries_dirty`** (étape finale de `countries`, `refresh_publication_countries.py`) : rassemble les `source_authorships` « sales » — soit `source_authorships.countries_dirty` posé par `normalize`, soit celles dont une `addresses.countries_dirty` a été posée par `write_countries` — recalcule `source_publications.countries` puis `publications.countries`, et remet les deux flags à zéro.
+Toute écriture dans `countries` pose `addresses.countries_dirty`, ce qui déclenche la propagation ci-dessous.
 
-## Écriture — API (curation admin)
+## Propagation
 
-Routeur `interfaces/api/routers/addresses.py`, couche commande transactionnelle `application/services/addresses/commands.py`, briques `structure_links.py` / `countries.py`, adaptateur `PgAddressRepository`.
+Deux chaînes portent une écriture de ces tables jusqu'aux colonnes que consultent les pages : `address_structures` → vue matérialisée → `source_authorships.in_perimeter`, et `addresses.countries` → `source_publications.countries` → `publications.countries`.
 
-**Confirmer / rejeter / réinitialiser un rattachement** : `POST /addresses/{id}/review` et `/batch-review` → `review_structure_link`. Le service lit l'appartenance au périmètre *avant*, applique soit `reset_manual_link` (supprime le lien s'il est purement manuel, et repasse `is_confirmed` à NULL sur la détection qui subsiste), soit `upsert_structure_link` (`is_confirmed` TRUE/FALSE), relit *après*, et renvoie le diff symétrique des `address_ids` réellement touchés (détection des no-op). En cas de changement, une tâche de fond propage `in_perimeter` (recompute sur les `source_authorships` des adresses, puis propagation aux `authorships`) sans rafraîchir les vues matérialisées.
+**Appartenance au périmètre.** Troisième étape d'`affiliations` (`populate_affiliations.py`) : la vue matérialisée est rafraîchie, puis comparée aux signatures actuellement marquées `in_perimeter`. Seul l'écart est écrit. C'est là que les rattachements décident finalement du périmètre.
 
-**Override de pays** : `POST /addresses/{id}/country` et `/batch-country` → `set_countries` / `batch_add_country_*`, avec propagation aux adresses de même `normalized_text`. Une tâche de fond recalcule directement `source_publications.countries` et `publications.countries` — chemin distinct de la cascade `countries_dirty` du pipeline.
+**Pays.** Étape finale de `countries` (`refresh_publication_countries.py`) : les signatures marquées sales — soit par `normalize` à leur création, soit par une adresse dont le pays vient de changer — voient leur publication source recalculée, puis la publication elle-même. Les deux marqueurs sont ensuite remis à zéro.
 
-## Lecture — pipeline
+## Écriture par l'API — curation
 
-**Rollup `in_perimeter`** (étape 3 de `affiliations`, `populate_affiliations.py`) : rafraîchit `source_authorship_structures` (`REFRESH MATERIALIZED VIEW CONCURRENTLY`) puis `sync_in_perimeter`, un delta CTE qui compare les `sa_id` présents dans la matview (pour les structures du périmètre) à ceux actuellement `in_perimeter`, et n'écrit que l'écart. C'est le point où les rattachements `address_structures` pilotent finalement `source_authorships.in_perimeter`.
+Routeur `interfaces/api/routers/addresses.py`, commandes transactionnelles dans `application/services/addresses/`, adaptateur `PgAddressRepository`.
 
-**Dérivation des pays** : la cascade `countries_dirty` lit `addresses.countries` (jointe aux `source_authorships` sales) pour écrire les pays des `source_publications` puis des `publications`.
+**Confirmer, rejeter ou réinitialiser un rattachement** (`POST /addresses/{id}/review` et `/batch-review`). Le service relève quelles adresses contribuent au périmètre avant l'opération, applique le changement, relève à nouveau après, et rend les seules adresses réellement touchées — ce qui écarte les opérations sans effet. Réinitialiser supprime le lien s'il est purement manuel, et rend son état d'attente à la détection qui subsiste. Quand quelque chose a changé, une tâche de fond recalcule `in_perimeter` sur les signatures concernées et le propage aux contributions.
 
-**pub_count** : la phase `publications` lit le pivot ⋈ `source_authorships` ⋈ `source_publications` pour recalculer `addresses.pub_count`.
+**Forcer un pays** (`POST /addresses/{id}/country` et `/batch-country`), avec propagation aux adresses partageant le même texte normalisé. Une tâche de fond recalcule directement les pays des publications sources puis des publications, sans passer par les marqueurs du pipeline.
 
-**Entrées de matching** : `resolve_addresses` lit `addresses(id, normalized_text)` + `structure_name_forms` ; la détection pays lit `addresses` + `place_name_forms`.
+## Lecture par le pipeline
 
-## Lecture — API
+- **Comptage.** La phase `publications` recalcule `addresses.pub_count` en joignant la table de liaison aux signatures et à leurs publications sources.
+- **Entrées d'appariement.** La résolution lit `addresses(id, normalized_text)` et `structure_name_forms` ; la détection de pays lit `addresses` et `place_name_forms`.
 
-Routeur `interfaces/api/routers/addresses.py`, port `application/ports/read_models/addresses_queries.py`, adaptateur `PgAddressesQueries` — **distinct** des modules SQL de résolution/pays du pipeline (séparation lecture-API vs écriture-pipeline). Le référentiel des pays est servi à part, par `interfaces/api/routers/countries.py`.
+## Lecture par l'API
 
-- **Listing / curation** (`GET /addresses`) : `addresses ⋈ address_structures` filtré sur une structure, avec prédicats détecté / validation / texte ; agrégat JSON des structures par adresse.
-- **Inspection** (`GET /addresses/{id}/publications`) : texte brut + publications de l'adresse (pivot ⋈ sa ⋈ sp ⋈ publications ⋈ journals) ; les structures d'un rattachement exposent `is_confirmed` et `is_detected` (= `matched_form_id IS NOT NULL`).
-- **Facettes pays** (`GET /addresses/countries`, `/suggest-countries`, `/countries`) : lit `countries`, `suggested_countries`, `pub_count` ; facettes construites par `unnest`.
-- **Stats** (`GET /addresses/stats`) : comptes sur `address_structures` (détecté / pending / rejeté / confirmé) pour une structure.
+Routeur `interfaces/api/routers/addresses.py`, port `application/ports/read_models/addresses_queries.py`, adaptateur `PgAddressesQueries` — distinct des modules d'écriture du pipeline. Le référentiel des pays est servi à part, par `interfaces/api/routers/countries.py`.
+
+| Point d'entrée | Ce qu'il sert |
+|---|---|
+| `GET /addresses` | Liste de curation pour une structure : adresses et leurs rattachements, filtrables sur la détection, la validation et le texte |
+| `GET /addresses/{id}/publications` | Texte brut de l'adresse et publications qui la portent ; chaque rattachement expose son état de validation et s'il vient d'une détection |
+| `GET /addresses/countries`, `/suggest-countries`, `/countries` | Facettes construites sur `countries`, `suggested_countries` et `pub_count` |
+| `GET /addresses/stats` | Comptes par état de rattachement pour une structure |
 
 ## Points d'attention
 
-Dette assumée et décisions d'architecture propres à cet agrégat, gardées explicites.
+**Le recalcul des pays des publications est déclenché depuis les adresses.** Il est cross-table par nature et vit dans `infrastructure/pipeline/countries.py` ; `PgAddressRepository` y délègue après une édition de pays.
 
-1. **Recompute d'un cache dénormalisé déclenché depuis l'agrégat adresses (décision d'archi assumée).** Le recalcul de `source_publications.countries` / `publications.countries` — cross-table par nature — vit dans le module de cache pays `infrastructure/pipeline/countries.py` ; `PgAddressRepository` y délègue pour propager après une édition de pays côté API. Conforme au pattern « queries mutualisées, ports par contexte » (cf. [03-application.md](../architecture/03-application.md)).
-2. **Péremption des matviews assumée.** Le chemin de review de l'API recalcule `in_perimeter` depuis les tables de base mais ne rafraîchit pas `source_authorship_structures` / `authorship_structures` : elles attendent le prochain run pipeline.
-
-## Invariants métier
-
-Règles métier de l'agrégat maintenues par discipline — ni par une contrainte de base, ni par un objet de domaine — et dispersées dans le SQL et les services. Leur recensement sert de base à l'évaluation d'un éventuel objet de domaine.
-
-- **Contribution au périmètre.** Un lien adresse→structure compte pour l'appartenance au périmètre sauf rejet explicite (`is_confirmed IS DISTINCT FROM FALSE` : pending ou confirmé comptent, rejeté non). La condition est écrite à l'identique dans six sites : la définition de la matview `source_authorship_structures`, le recalcul live `recompute_in_perimeter_on_source_authorships`, la détection de no-op `which_contribute_to_perimeter`, et les lectures API `laboratories` et `persons/detail`. Synchronisation garantie par convention seulement.
-- **Autorité des pays.** `countries` (source autoritaire : ScanR, détection) n'est jamais écrasé ; `suggested_countries` (faillible : OpenAlex) n'est posé qu'en l'absence de `countries`. Garanti par des clauses `WHERE` répétées à chaque écriture de pays (détection, suggestion, override admin, propagation aux jumelles).
-- **Lien détecté vs manuel.** `matched_form_id` non-NULL marque un lien issu du matching automatique (recalculé à chaque résolution, supprimé s'il disparaît) ; `NULL` marque un lien posé ou confirmé à la main, préservé par la résolution — qui repasse seulement son `matched_form_id` obsolète à NULL, sans supprimer la ligne.
+**Les vues matérialisées peuvent être en retard.** La curation par l'API recalcule `in_perimeter` depuis les tables de base sans rafraîchir `source_authorship_structures` ni `authorship_structures` : elles attendent le prochain passage du pipeline.
