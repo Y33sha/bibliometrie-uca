@@ -55,9 +55,9 @@ Deux chaînes portent une écriture de ces tables jusqu'aux colonnes que consult
 
 Routeur `interfaces/api/routers/addresses.py`, commandes transactionnelles dans `application/services/addresses/`, adaptateur `PgAddressRepository`.
 
-**Confirmer, rejeter ou réinitialiser un rattachement** (`POST /addresses/{id}/review` et `/batch-review`). Le service relève quelles adresses contribuent au périmètre avant l'opération, applique le changement, relève à nouveau après, et rend les seules adresses réellement touchées — ce qui écarte les opérations sans effet. Réinitialiser supprime le lien s'il est purement manuel, et rend son état d'attente à la détection qui subsiste. Quand quelque chose a changé, une tâche de fond recalcule `in_perimeter` sur les signatures concernées et le propage aux contributions.
+**Confirmer, rejeter ou réinitialiser un rattachement** (`POST /api/addresses/{id}/review` et `/batch-review`). Le service relève quelles adresses contribuent au périmètre avant l'opération, applique le changement, relève à nouveau après, et rend les seules adresses réellement touchées — ce qui écarte les opérations sans effet. Réinitialiser supprime le lien s'il est purement manuel, et rend son état d'attente à la détection qui subsiste. Quand quelque chose a changé, une tâche de fond recalcule `in_perimeter` sur les signatures concernées et le propage aux contributions.
 
-**Forcer un pays** (`POST /addresses/{id}/country` et `/batch-country`), avec propagation aux adresses partageant le même texte normalisé. Une tâche de fond recalcule directement les pays des publications sources puis des publications, sans passer par les marqueurs du pipeline.
+**Forcer un pays** (`POST /api/addresses/{id}/country` et `/batch-country`), avec propagation aux adresses partageant le même texte normalisé. Une tâche de fond recalcule directement les pays des publications sources puis des publications, sans passer par les marqueurs du pipeline.
 
 ## Lecture par le pipeline
 
@@ -70,10 +70,10 @@ Routeur `interfaces/api/routers/addresses.py`, port `application/ports/read_mode
 
 | Point d'entrée | Ce qu'il sert |
 |---|---|
-| `GET /addresses` | Liste de curation pour une structure : adresses et leurs rattachements, filtrables sur la détection, la validation et le texte |
-| `GET /addresses/{id}/publications` | Texte brut de l'adresse et publications qui la portent ; chaque rattachement expose son état de validation et s'il vient d'une détection |
-| `GET /addresses/countries`, `/suggest-countries`, `/countries` | Facettes construites sur `countries`, `suggested_countries` et `pub_count` |
-| `GET /addresses/stats` | Comptes par état de rattachement pour une structure |
+| `GET /api/addresses` | Liste de curation pour une structure : adresses et leurs rattachements, filtrables sur la détection, la validation et le texte |
+| `GET /api/addresses/{id}/publications` | Texte brut de l'adresse et publications qui la portent ; chaque rattachement expose son état de validation et s'il vient d'une détection |
+| `GET /api/addresses/countries`, `/suggest-countries`, `/countries` | Facettes construites sur `countries`, `suggested_countries` et `pub_count` |
+| `GET /api/addresses/stats` | Comptes par état de rattachement pour une structure |
 
 ## Points d'attention
 

@@ -1,84 +1,75 @@
 # Authorships — cycle de vie
 
-*À jour le 2026-07-14.*
+*À jour le 2026-09-04.*
 
-Une `authorship` est la table de liaison personne ↔ publication : une ligne par couple `(publication_id, person_id)`, consolidée depuis les signatures par-source (`source_authorships`). Au sens DDD, c'est l'entité fille de [publications](publications.md) (`domain/publications/authorship.py`) ; son vocabulaire de rôles et les mappings par source vivent dans `authorship_roles` (`map_role`, `merge_roles`). Contrairement à la publication (dérivée par réconciliation) ou à la personne (construite par matching), l'authorship est un pur **rollup** : la phase `persons` pose le `person_id` sur chaque signature, puis la phase `authorships` promeut les couples attestés dans la table `authorships` et en recompose les attributs.
+Une `authorship` relie une personne à une publication : une ligne par couple `(publication_id, person_id)`. Elle est entièrement dérivée des signatures relevées dans chaque source (`source_authorships`) — jamais saisie, jamais modifiée à la main. La phase `persons` attribue une personne à chaque signature ; la phase `authorships` promeut ensuite les couples attestés et recompose leurs attributs.
 
-## Tables du cluster
+C'est l'entité fille de [publications](publications.md), définie par `domain/publications/authorship.py`. Son vocabulaire de rôles et la correspondance des rôles propres à chaque source vivent dans `authorship_roles`.
 
-| Table | Rôle | Colonnes clés |
+## Tables
+
+| Table | Rôle | Colonnes notables |
 |---|---|---|
-| `authorships` | Table de liaison personne ↔ publication | `(publication_id, person_id)` unique, `publication_id` (FK NOT NULL), `author_position`, `roles`, `is_corresponding`, `in_perimeter` |
-| `source_authorships` | Signature par-source (amont) | `authorship_id` (→ `authorships`), `person_id`, `resolution_mode` (cf. [source_publications](source_publications.md)) |
-| `confirmed_authorships` | Épinglage humain d'une signature | `(source_authorship_id, person_id)` |
-| `rejected_authorships` | Rejet durable d'une paire | `(publication_id, person_id)` |
-| `authorship_structures` | Authorship ↔ structure UCA (matview) | `(authorship_id, structure_id)`, dérivée de `source_authorship_structures` |
-| `publication_structures` | Publication ↔ structure (matview) | `(publication_id, structure_id)`, dérivée d'`authorships` × `authorship_structures` |
+| `authorships` | Lien personne ↔ publication | `(publication_id, person_id)` unique, `author_position`, `roles`, `is_corresponding`, `in_perimeter` |
+| `source_authorships` | Signature relevée dans une source | `authorship_id`, `person_id`, `resolution_mode` |
+| `confirmed_authorships` | Signature épinglée par une décision humaine | `(source_authorship_id, person_id)` |
+| `rejected_authorships` | Paire écartée durablement | `(publication_id, person_id)` |
+| `authorship_structures` | Vue matérialisée : authorship ↔ structure | `(authorship_id, structure_id)` |
+| `publication_structures` | Vue matérialisée : publication ↔ structure | `(publication_id, structure_id)` |
 
-La signature par-source `source_authorships` (avec son identité d'auteur dédupliquée `author_identifying_keys`) relève du bilan [source_publications](source_publications.md) ; ce bilan la couvre comme source du rollup.
+Les signatures elles-mêmes relèvent de la fiche [source_publications](source_publications.md), qui les décrit comme amont de cette table.
 
-## Les deux axes
+## Écriture par le pipeline
 
-L'écriture de la table est **exclusivement pipeline** (un rollup convergent) ; la curation admin agit sur les stores en amont.
+La table n'est écrite que par la phase `authorships` (`application/pipeline/authorships/phase.py`), qui enchaîne la construction proprement dite, la suppression par lots des publications restées sans aucune authorship, puis le rafraîchissement des compteurs de publications des revues et des éditeurs, qui dépendent du périmètre.
 
-```mermaid
-flowchart LR
-    SA[(source_authorships)] -->|phase persons : pose person_id| SA
-    SA -->|phase authorships : build| AUTH[authorships]
-    RJ[rejected_authorships] -->|anti-join à l'insertion| AUTH
-    CF[confirmed_authorships] -->|épinglage respecté par persons| SA
-    AUTH -->|rollup| PIP[publications.in_perimeter]
-    AUTH -->|matviews| MS[authorship_structures / publication_structures]
-    ADM[API admin : détachement / fusion] -->|rejected_authorships| RJ
-    AUTH --> API[détail publi / fiche personne / facettes labo]
-```
+La construction (`build_authorships.py`) se rejoue sans dommage et converge vers le même état. Cinq étapes :
 
-## Écriture — pipeline (phase `authorships`)
+1. **Insertion et suppression.** Insère les couples attestés par au moins une signature portant une personne, en écartant ceux qu'une ligne de `rejected_authorships` interdit. Supprime les authorships qu'aucune source n'atteste plus.
+2. **Liaison.** Renseigne `source_authorships.authorship_id`, en une seule instruction valable pour toutes les sources.
+3. **Recomposition des attributs.** `author_position` vient de la source la mieux classée ; `is_corresponding` et `in_perimeter` sont vrais dès qu'une source l'affirme ; `roles` est l'union triée des rôles relevés. La comparaison porte sur la différence, sans garde d'absence : un attribut qu'aucune source n'atteste plus **retombe** — un rôle disparu est retiré, un périmètre perdu repasse à faux.
+4. **Report sur la publication.** `publications.in_perimeter` devient vrai si la publication porte au moins une authorship dans le périmètre, rattachée à une personne non écartée. C'est exactement le prédicat qu'emploie le filtre de périmètre.
+5. **Rafraîchissement** des deux vues matérialisées, sans bloquer les lectures.
 
-`application/pipeline/authorships/phase.py` enchaîne trois temps : le **build** (une transaction), puis la **purge** des publications restées à zéro authorship (par lots, maintenance physique hors transaction), puis le **refresh des `pub_count`** journaux/éditeurs (qui dérivent de `in_perimeter`).
+`run_pipeline --rebuild-authorships` vide d'abord la table : c'est la reconstruction de récupération, pas le mode courant.
 
-Le build (`build_authorships.py`) est idempotent et convergent — cinq étapes :
+Des `ANALYZE` sont intercalés entre les étapes, à l'intérieur de la transaction. Sans statistiques fraîches sur des colonnes tout juste peuplées, l'étape 3 part sur un plan d'exécution catastrophique — plusieurs heures là où il en faut quelques minutes.
 
-1. **Insertion + purge** : insère les couples `(publication_id, person_id)` attestés par au moins une `source_authorship` (avec `person_id`) et absents, en **anti-join sur `rejected_authorships`** (une paire rejetée n'est jamais recréée) ; supprime les authorships que plus aucune source n'atteste.
-2. **Liaison** : pose `source_authorships.authorship_id` (source-agnostique, un seul UPDATE).
-3. **Recomposition convergente** des attributs dérivés : `author_position` = valeur de la source la plus prioritaire (`SOURCE_PRIORITY`), `is_corresponding` et `in_perimeter` en `bool_or`, `roles` en union triée. Convergente (`IS DISTINCT FROM`, sans garde `IS NULL`) : un attribut que plus aucune source n'atteste **retombe** (rôle disparu retiré, périmètre perdu → `FALSE`).
-4. **Rollup** `publications.in_perimeter` : vrai si la publication a ≥1 authorship in-périmètre d'une personne **non rejetée** — exactement le prédicat du filtre de périmètre.
-5. **Refresh** des matviews `authorship_structures` puis `publication_structures` (`CONCURRENTLY`).
+## Écriture par l'API — curation
 
-`rebuild_full` (`run_pipeline --rebuild-authorships`) purge d'abord la table (reconstruction de récupération). Des `ANALYZE` intra-transaction sont intercalés entre les étapes : sans stats fraîches, l'UPDATE de l'étape 3 partirait en Nested Loop sur des estimations périmées (des heures sur ~100 k authorships fraîchement insérées).
+L'API n'écrit jamais `authorships`. La curation agit sur les tables en amont, décrites côté [personnes](persons.md), et la construction suivante en tire les conséquences.
 
-## Écriture — API
+**Détacher une personne d'une publication** (`POST /api/persons/{id}/detach-authorships`) inscrit la paire dans `rejected_authorships`, détache les signatures concernées et supprime l'authorship devenue orpheline. La paire ne sera plus jamais recréée.
 
-La table `authorships` n'est **jamais écrite directement par l'API** : elle est le produit du build. La curation admin agit sur les stores en amont, côté [personnes](persons.md) :
+**Épingler une signature** l'inscrit dans `confirmed_authorships`. La phase `persons` applique ces décisions avant tout nouveau rapprochement, si bien que la personne portée par la signature — et donc l'authorship promue — respecte le choix humain.
 
-- **Détachement** (`POST /api/persons/{id}/detach-authorships`) : inscrit la paire dans `rejected_authorships`, détache les signatures et supprime l'authorship devenue orpheline.
-- **Épinglage** : `confirmed_authorships` fige une signature ; la phase `persons` la repose en tête (`enforce_confirmed_authorships`) avant tout re-matching, si bien que le `person_id` porté par les signatures — et donc les authorships promues — respecte les décisions humaines.
-- **Fusion** (personnes ou publications) : `merge_into` déduplique et repointe les authorships vers la cible.
+**Fusionner** deux personnes ou deux publications déduplique les authorships et les repointe vers la cible.
 
-Le `person_id` des signatures vient de la cascade `persons` ; l'authorships build ne fait que promouvoir les couples et recomposer leurs attributs.
+## Lecture par le pipeline
 
-## Lecture — pipeline
+- `publications.in_perimeter`, posé à l'étape 4, est le drapeau que lit le filtre de périmètre dans tout le pipeline comme dans l'API.
+- La vue `publication_structures` sert la ventilation par laboratoire, qui compte par structure sans jointure ni dédoublonnage.
 
-- `publications.in_perimeter` (matérialisé à l'étape 4) est le drapeau lu par le filtre de périmètre dans tout le pipeline et l'API.
-- La matview `publication_structures` sert la ventilation par laboratoire (comptage par structure sans jointure ni `DISTINCT`).
+## Lecture par l'API
 
-## Lecture — API
-
-- **Détail publication** : auteurs canoniques via `authorships` ⨝ `persons` ⨝ `authorship_structures` (avec leurs structures et le drapeau de correspondance).
-- **Fiche / dashboard personne** : publications et thèses via `authorships` ⨝ `publications`.
-- **Listes / facettes / stats** : facette laboratoire via `publication_structures` ; décomptes de publications scopés `in_perimeter`.
+| Usage | Ce qui est joint |
+|---|---|
+| Détail d'une publication | `authorships`, `persons` et `authorship_structures` : les auteurs, leurs structures et l'auteur de correspondance |
+| Fiche et tableau de bord d'une personne | `authorships` et `publications` |
+| Listes, facettes et statistiques | `publication_structures` pour la facette laboratoire ; les décomptes se limitent au périmètre |
 
 ## Points d'attention
 
-1. **L'authorship est un pur dérivé.** Elle n'est jamais éditée à la main : tout l'état vient des `source_authorships` liées (leur `person_id`, leurs attributs). La curation passe par les stores `confirmed_authorships` / `rejected_authorships`, pas par la table canonique.
-2. **Recomposition sans garde `IS NULL`.** Un attribut (rôle, correspondance, périmètre) que plus aucune source n'atteste retombe au run suivant. Voulu (convergence), mais implique qu'aucune valeur ne survit à la disparition de sa source.
-3. **`ANALYZE` intra-transaction obligatoire** entre les étapes du build : dette de performance documentée dans l'adapter (sans elle, le planner s'effondre sur des colonnes fraîchement peuplées), pas un défaut.
+**Un attribut ne survit pas à la disparition de sa source.** L'étape 3 recompose sans garde d'absence : c'est ce qui rend la construction convergente, et c'est aussi ce qui fait qu'un rôle ou un périmètre cesse d'exister dès que plus aucune source ne l'atteste.
+
+**Les `ANALYZE` intra-transaction sont nécessaires**, et documentés comme tels dans l'adaptateur. Les retirer fait s'effondrer le plan d'exécution de l'étape 3.
 
 ## Invariants métier
 
-Portés par le domaine (`domain/publications/`), le SQL et la phase.
+**Identité.** Le couple `(publication_id, person_id)` est unique, et `publication_id` ne peut être nul : l'authorship n'existe pas sans sa publication.
 
-- **Identité.** `(publication_id, person_id)` unique ; la FK `publication_id NOT NULL` verrouille l'entité fille au root `Publication`.
-- **Rejet durable.** Une paire inscrite dans `rejected_authorships` n'est jamais recréée par le build (anti-join à l'insertion).
-- **Périmètre matérialisé.** `publications.in_perimeter` = « ≥1 authorship in-périmètre d'une personne non rejetée » — prédicat unique, recalculé à chaque build.
-- **Convergence.** Le build (insertion + purge + recomposition) est idempotent : un rejeu sans `rebuild_full` converge vers le même état.
+**Rejet durable.** Une paire inscrite dans `rejected_authorships` n'est jamais recréée par la construction.
+
+**Périmètre.** `publications.in_perimeter` vaut « au moins une authorship dans le périmètre, portée par une personne non écartée ». Ce prédicat est recalculé à chaque construction.
+
+**Convergence.** Insertion, suppression et recomposition se rejouent sans dommage : une exécution répétée aboutit au même état, sans reconstruction complète.
