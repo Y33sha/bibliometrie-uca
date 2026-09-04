@@ -37,7 +37,7 @@ RUN npm run build
 # Image officielle réduite au binaire, épinglée par son empreinte comme les autres. La version y
 # est désignée : une installation par l'installateur de paquets prendrait celle publiée au moment
 # de la construction, sans que rien ne dise laquelle.
-FROM ghcr.io/astral-sh/uv:0.12.8@sha256:d1cbaeadc234fe19c0d93daabcf5e98738cd93c6d1dd4918ef6aa30735feb23a AS uv
+FROM ghcr.io/astral-sh/uv:0.12.9@sha256:8b940d3a9d65bed080436972241af2e21c84b5e8c9193f7014ed71479ee795ff AS uv
 
 # ---- Étape 3 : image Python finale ----
 FROM python:3.14-slim@sha256:656d12e70054d5fda18a045e2494c96701e9792dd1445f95b3d038df954f57e9
