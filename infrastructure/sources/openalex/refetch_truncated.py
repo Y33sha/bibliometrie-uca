@@ -16,7 +16,7 @@ from application.ports.pipeline.extract.refetch_truncated import (
     OpenalexRefetchAdapter,
     TruncatedWork,
 )
-from domain.types import JsonValue
+from domain.types import JsonValue, as_mapping
 from infrastructure.db.jsonb import Jsonb
 from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.config import (
@@ -88,8 +88,10 @@ class PgOpenalexRefetchAdapter(OpenalexRefetchAdapter):
         url = f"{self._base_url}/{openalex_id}"
         params = {"select": SELECT_FIELDS, **auth_params()}
         try:
-            return await http_request_with_retry_async(
-                client, "GET", url, params=params, timeout=30, label=f"OA {openalex_id}"
+            return as_mapping(
+                await http_request_with_retry_async(
+                    client, "GET", url, params=params, timeout=30, label=f"OA {openalex_id}"
+                )
             )
         except httpx.HTTPStatusError as e:
             if e.response.status_code != 404:

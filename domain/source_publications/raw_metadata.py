@@ -8,7 +8,7 @@ Ce module centralise **lecture** (reconstruction du brut) et **écriture** (stas
 """
 
 from dataclasses import replace
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from domain.types import JsonValue
 
@@ -28,7 +28,7 @@ def raw_value[T](raw_metadata: dict[str, JsonValue] | None, field: str, current:
     """Valeur source d'origine d'un champ : le brut stashé si la `source_publication` a été corrigée sur ce champ, sinon la valeur courante de la colonne (jamais corrigée)."""
     entry = raw_metadata.get(field) if raw_metadata else None
     if isinstance(entry, dict) and RAW in entry:
-        return entry[RAW]  # type: ignore[return-value]
+        return cast("T", entry[RAW])
     return current
 
 

@@ -182,18 +182,20 @@ class PgHalFetchMissingAdapter(HalFetchMissingAdapter):
         self, client: httpx.AsyncClient, hal_id: str
     ) -> Mapping[str, JsonValue] | None:
         try:
-            data = await http_request_with_retry_async(
-                client,
-                "GET",
-                self._base_url,
-                params={
-                    "q": f"halId_s:{hal_id}",
-                    "fl": HAL_FIELDS_STR,
-                    "wt": "json",
-                    "rows": "1",
-                },
-                timeout=15,
-                label=f"halId {hal_id}",
+            data = as_mapping(
+                await http_request_with_retry_async(
+                    client,
+                    "GET",
+                    self._base_url,
+                    params={
+                        "q": f"halId_s:{hal_id}",
+                        "fl": HAL_FIELDS_STR,
+                        "wt": "json",
+                        "rows": "1",
+                    },
+                    timeout=15,
+                    label=f"halId {hal_id}",
+                )
             )
         except (httpx.HTTPStatusError, httpx.RequestError):
             return None
@@ -204,18 +206,20 @@ class PgHalFetchMissingAdapter(HalFetchMissingAdapter):
         self, client: httpx.AsyncClient, nnt: str
     ) -> Mapping[str, JsonValue] | None:
         try:
-            data = await http_request_with_retry_async(
-                client,
-                "GET",
-                self._base_url,
-                params={
-                    "q": f"nntId_s:{nnt}",
-                    "fl": HAL_FIELDS_STR,
-                    "wt": "json",
-                    "rows": "1",
-                },
-                timeout=15,
-                label=f"NNT {nnt}",
+            data = as_mapping(
+                await http_request_with_retry_async(
+                    client,
+                    "GET",
+                    self._base_url,
+                    params={
+                        "q": f"nntId_s:{nnt}",
+                        "fl": HAL_FIELDS_STR,
+                        "wt": "json",
+                        "rows": "1",
+                    },
+                    timeout=15,
+                    label=f"NNT {nnt}",
+                )
             )
         except (httpx.HTTPStatusError, httpx.RequestError):
             return None

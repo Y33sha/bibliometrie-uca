@@ -7,6 +7,7 @@ from sqlalchemy import Connection, delete, func, select, update
 from application.ports.repositories.perimeter_repository import PerimeterRepository
 from domain.errors import NotFoundError
 from domain.perimeters.perimeter import Perimeter
+from infrastructure.db.scalars import scalar_int
 from infrastructure.db.tables import perimeters
 
 
@@ -69,15 +70,17 @@ class PgPerimeterRepository(PerimeterRepository):
 
     def add(self, perimeter: Perimeter) -> int:
         """Insère un périmètre neuf et retourne son id."""
-        return self._conn.execute(
-            perimeters.insert()
-            .values(
-                code=perimeter.code,
-                name=perimeter.name,
-                root_structure_ids=list(perimeter.root_structure_ids),
+        return scalar_int(
+            self._conn.execute(
+                perimeters.insert()
+                .values(
+                    code=perimeter.code,
+                    name=perimeter.name,
+                    root_structure_ids=list(perimeter.root_structure_ids),
+                )
+                .returning(perimeters.c.id)
             )
-            .returning(perimeters.c.id)
-        ).scalar_one()
+        )
 
     def save(self, perimeter: Perimeter) -> None:
         """Persiste un périmètre chargé : UPDATE de ses champs éditables (`code` immuable exclu). Lève `NotFoundError` si l'id est absent."""

@@ -25,6 +25,7 @@ import os
 from sqlalchemy import Connection, text
 
 from infrastructure.db.engine import get_sync_engine
+from infrastructure.db.scalars import scalar_int
 from infrastructure.observability.log import setup_logger
 
 log = setup_logger("delete_publications_out_of_window", os.path.dirname(__file__))
@@ -32,9 +33,11 @@ log = setup_logger("delete_publications_out_of_window", os.path.dirname(__file__
 
 def fetch_cutoff(conn: Connection) -> int:
     """Année-ancre du pipeline (`config.pipeline_start_year_full`) : les publications antérieures sont hors fenêtre."""
-    return conn.execute(
-        text("SELECT (value #>> '{}')::int FROM config WHERE key = 'pipeline_start_year_full'")
-    ).scalar_one()
+    return scalar_int(
+        conn.execute(
+            text("SELECT (value #>> '{}')::int FROM config WHERE key = 'pipeline_start_year_full'")
+        )
+    )
 
 
 def select_target_pub_ids(conn: Connection, cutoff: int) -> list[int]:

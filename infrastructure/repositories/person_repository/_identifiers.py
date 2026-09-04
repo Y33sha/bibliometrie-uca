@@ -11,6 +11,7 @@ from application.ports.repositories.person_repository import (
 from domain.errors import NotFoundError
 from domain.persons.identifiers import AttributionStatus
 from domain.persons.person_identifier import PersonIdentifier
+from infrastructure.db.scalars import row_int
 
 
 def find_identifier(conn: Connection, id_type: str, id_value: str) -> PersonIdentifier | None:
@@ -67,8 +68,8 @@ def insert_identifier(conn: Connection, ident: PersonIdentifier) -> int:
         },
     ).first()
     assert row is not None  # RETURNING garantit une ligne
-    ident.id = row.id
-    return row.id
+    ident.id = row_int(row.id)
+    return ident.id
 
 
 def update_identifier(conn: Connection, ident: PersonIdentifier) -> None:

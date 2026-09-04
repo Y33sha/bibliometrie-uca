@@ -65,14 +65,16 @@ class DataciteFetchMissingDoiAdapter:
         clause = " OR ".join(f'doi:"{d}"' for d in dois)
         url = f"{self.base_url}/dois"
         try:
-            data = await http_request_with_retry_async(
-                client,
-                "GET",
-                url,
-                params={"query": clause, "page[size]": len(dois)},
-                headers=self.headers,
-                timeout=30,
-                label=f"{len(dois)} DOI",
+            data = as_mapping(
+                await http_request_with_retry_async(
+                    client,
+                    "GET",
+                    url,
+                    params={"query": clause, "page[size]": len(dois)},
+                    headers=self.headers,
+                    timeout=30,
+                    label=f"{len(dois)} DOI",
+                )
             )
         except (httpx.HTTPStatusError, httpx.RequestError):
             # Échec du batch entier : rien remonté, les DOI restent hors staging et seront retentés au prochain run (pool convergent).

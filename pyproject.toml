@@ -423,8 +423,9 @@ disallow_untyped_defs = true
 # porte son motif en regard du module.
 disallow_any_explicit = true
 disallow_any_generics = true
-# `-> Any` propagé toléré pragmatiquement.
-warn_return_any = false
+# Une fonction ne rend pas un `Any` sous une déclaration qui promet autre chose : le contrôle
+# se fait à l'endroit où la valeur entre, non chez l'appelant qui la croira acquise.
+warn_return_any = true
 # Afficher les codes d'erreur pour pouvoir ignorer précisément au besoin
 show_error_codes = true
 # Un paramètre qui accepte `None` le déclare : `x: str | None = None`, jamais `x: str = None`.

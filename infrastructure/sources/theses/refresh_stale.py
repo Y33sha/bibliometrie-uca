@@ -36,13 +36,15 @@ class ThesesRefreshStaleAdapter(BaseRefreshStaleAdapter):
 
     async def fetch_by_native_id(self, client: httpx.AsyncClient, source_id: str) -> FetchOutcome:
         try:
-            data = await http_request_with_retry_async(
-                client,
-                "GET",
-                self.url,
-                params={"q": source_id, "debut": 0, "nombre": _SEARCH_SIZE},
-                timeout=30,
-                label=f"these {source_id}",
+            data = as_mapping(
+                await http_request_with_retry_async(
+                    client,
+                    "GET",
+                    self.url,
+                    params={"q": source_id, "debut": 0, "nombre": _SEARCH_SIZE},
+                    timeout=30,
+                    label=f"these {source_id}",
+                )
             )
         except (httpx.RequestError, httpx.HTTPStatusError):
             return None

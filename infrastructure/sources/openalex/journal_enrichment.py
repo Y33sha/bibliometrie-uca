@@ -64,8 +64,10 @@ def fetch_sources_batch(
         params["mailto"] = mailto
 
     try:
-        data = http_request_with_retry(
-            "GET", openalex_sources_api, params=params, timeout=30, label="sources batch"
+        data = as_mapping(
+            http_request_with_retry(
+                "GET", openalex_sources_api, params=params, timeout=30, label="sources batch"
+            )
         )
     except Exception as exc:
         logger.warning("OpenAlex sources batch : %r", exc)

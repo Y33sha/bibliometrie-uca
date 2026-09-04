@@ -13,6 +13,7 @@ from application.ports.pipeline.extract.refresh_stale import (
     FetchedRecord,
     FetchOutcome,
 )
+from domain.types import as_mapping
 from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.config import get_wos_api_key
 from infrastructure.sources.http_retry import http_request_with_retry_async
@@ -35,21 +36,23 @@ class WosRefreshStaleAdapter(BaseRefreshStaleAdapter):
 
     async def fetch_by_native_id(self, client: httpx.AsyncClient, source_id: str) -> FetchOutcome:
         try:
-            data = await http_request_with_retry_async(
-                client,
-                "GET",
-                self.base_url,
-                headers=self.headers,
-                params={
-                    "databaseId": "WOS",
-                    "usrQuery": f"UT=({source_id})",
-                    "count": 1,
-                    "firstRecord": 1,
-                },
-                timeout=60,
-                initial_backoff=4.0,
-                retry_on_empty_body=True,
-                label=f"UT {source_id}",
+            data = as_mapping(
+                await http_request_with_retry_async(
+                    client,
+                    "GET",
+                    self.base_url,
+                    headers=self.headers,
+                    params={
+                        "databaseId": "WOS",
+                        "usrQuery": f"UT=({source_id})",
+                        "count": 1,
+                        "firstRecord": 1,
+                    },
+                    timeout=60,
+                    initial_backoff=4.0,
+                    retry_on_empty_body=True,
+                    label=f"UT {source_id}",
+                )
             )
         except httpx.HTTPStatusError as e:
             # 400 = requête sans correspondance : UT confirmé absent de WoS.

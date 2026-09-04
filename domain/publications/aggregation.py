@@ -16,6 +16,8 @@ Priorité d'ordre : les enregistrements canoniques passent avant les formes seco
 `title_normalized` est recalculé à partir du `title` agrégé, pas pris d'une source (les sources ne fournissent pas ce champ).
 """
 
+from typing import cast
+
 from domain.normalize import normalize_text
 from domain.publications.doc_types import ARTICLE_SUBTYPES
 from domain.publications.identifiers import DOI
@@ -107,7 +109,9 @@ def first_non_null(sources: list[SourcePublication], attr: str) -> JsonValue:
     for s in sources:
         v = getattr(s, attr)
         if v is not None:
-            return v
+            # `getattr` sur un nom calculé rend une valeur inconnue du vérificateur ; le
+            # docstring dit d'où elle vient et ce qu'elle vaut.
+            return cast("JsonValue", v)
     return None
 
 

@@ -51,14 +51,16 @@ class ScanrFetchMissingDoiAdapter:
             "query": {"terms": {"externalIds.id.keyword": dois}},
         }
         try:
-            data = await http_request_with_retry_async(
-                client,
-                "POST",
-                self.url,
-                json_body=query,
-                auth=self.auth,
-                timeout=30,
-                label=f"batch {len(dois)} DOI",
+            data = as_mapping(
+                await http_request_with_retry_async(
+                    client,
+                    "POST",
+                    self.url,
+                    json_body=query,
+                    auth=self.auth,
+                    timeout=30,
+                    label=f"batch {len(dois)} DOI",
+                )
             )
         except (httpx.RequestError, httpx.HTTPStatusError):
             # Erreur réseau ou HTTP (401 sur credentials rejetés, 429/5xx après retries, 4xx) : lot ignoré, repris au prochain run (l'absence d'un DOI n'est pas prouvée). Comportement uniforme à toutes les sources.

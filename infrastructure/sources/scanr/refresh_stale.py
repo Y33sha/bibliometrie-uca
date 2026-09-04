@@ -39,14 +39,16 @@ class ScanrRefreshStaleAdapter(BaseRefreshStaleAdapter):
             "query": {"term": {"id.keyword": source_id}},
         }
         try:
-            data = await http_request_with_retry_async(
-                client,
-                "POST",
-                self.url,
-                json_body=query,
-                auth=self.auth,
-                timeout=30,
-                label=f"id {source_id}",
+            data = as_mapping(
+                await http_request_with_retry_async(
+                    client,
+                    "POST",
+                    self.url,
+                    json_body=query,
+                    auth=self.auth,
+                    timeout=30,
+                    label=f"id {source_id}",
+                )
             )
         except httpx.RequestError:
             return None

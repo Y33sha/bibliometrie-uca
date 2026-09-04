@@ -7,6 +7,7 @@ from sqlalchemy import Connection, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from application.ports.pipeline.publishers import PublisherFindOrCreateQueries
+from infrastructure.db.scalars import scalar_int
 from infrastructure.db.tables import publisher_name_forms, publishers
 
 
@@ -73,4 +74,4 @@ class PgPublisherGatewayQueries(PublisherFindOrCreateQueries):
             .values(name=name, name_normalized=name_normalized, openalex_id=openalex_id)
             .returning(publishers.c.id)
         )
-        return self._conn.execute(stmt).scalar_one()
+        return scalar_int(self._conn.execute(stmt))

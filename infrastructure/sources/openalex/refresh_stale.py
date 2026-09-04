@@ -13,6 +13,7 @@ from application.ports.pipeline.extract.refresh_stale import (
     FetchedRecord,
     FetchOutcome,
 )
+from domain.types import as_mapping
 from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.config import (
     get_openalex_api_key,
@@ -38,13 +39,15 @@ class OpenalexRefreshStaleAdapter(BaseRefreshStaleAdapter):
 
     async def fetch_by_native_id(self, client: httpx.AsyncClient, source_id: str) -> FetchOutcome:
         try:
-            work = await http_request_with_retry_async(
-                client,
-                "GET",
-                f"{self.base_url}/{source_id}",
-                params={"select": SELECT_FIELDS, **auth_params()},
-                timeout=30,
-                label=f"OA {source_id}",
+            work = as_mapping(
+                await http_request_with_retry_async(
+                    client,
+                    "GET",
+                    f"{self.base_url}/{source_id}",
+                    params={"select": SELECT_FIELDS, **auth_params()},
+                    timeout=30,
+                    label=f"OA {source_id}",
+                )
             )
         except httpx.HTTPStatusError as e:
             return NOT_FOUND if e.response.status_code == 404 else None

@@ -20,7 +20,7 @@ from application.ports.pipeline.cross_imports.fetch_missing_doi import (
     not_found_marker,
 )
 from domain.publications.identifiers import clean_doi
-from domain.types import JsonValue, as_str
+from domain.types import JsonValue, as_mapping, as_str
 from infrastructure.pipeline.extract.cross_import import record_doi_not_found
 from infrastructure.pipeline.extract.staging import upsert_staging
 from infrastructure.sources.api_params import API_BASE_URLS
@@ -53,13 +53,15 @@ class CrossrefFetchMissingDoiAdapter:
         # CrossRef accepte le DOI tel quel dans le path (slashes inclus, qui font partie d'à peu près 100 % des DOI). On ne quote que les caractères vraiment dangereux.
         url = f"{self.base_url}/works/{urllib.parse.quote(doi, safe='/()')}"
         try:
-            data = await http_request_with_retry_async(
-                client,
-                "GET",
-                url,
-                headers=self.headers,
-                timeout=30,
-                label=f"DOI {doi}",
+            data = as_mapping(
+                await http_request_with_retry_async(
+                    client,
+                    "GET",
+                    url,
+                    headers=self.headers,
+                    timeout=30,
+                    label=f"DOI {doi}",
+                )
             )
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 404:

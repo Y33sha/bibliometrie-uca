@@ -10,6 +10,7 @@ from application.ports.pipeline.publications.reconciliation import (
     ReconcileRow,
 )
 from domain.source_publications.keys import DISCRIMINANT_TITLE_MIN_LENGTH, ConfirmationKey
+from infrastructure.db.scalars import scalar_int
 
 # Voisinage 1-hop : les `source_publications` dirty (orphelines comprises) et celles qui
 # partagent une clé de confirmation avec elles. Une branche UNION par type de clé (chacune
@@ -99,9 +100,11 @@ def mark_keys_dirty(conn: Connection, where: str | None = None, *, dry_run: bool
     """
     clause = f" WHERE {where}" if where else ""
     if dry_run:
-        return conn.execute(
-            text(f"SELECT count(*) FROM source_publications{clause}")  # noqa: S608
-        ).scalar_one()
+        return scalar_int(
+            conn.execute(
+                text(f"SELECT count(*) FROM source_publications{clause}")  # noqa: S608
+            )
+        )
     return conn.execute(
         text(f"UPDATE source_publications SET keys_dirty = true{clause}")  # noqa: S608
     ).rowcount

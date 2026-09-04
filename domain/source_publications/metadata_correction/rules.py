@@ -413,7 +413,7 @@ def _check_predicate(sp: MetadataForCorrection, key: str, value: object) -> bool
         return doc_type == value
     # Égalité simple sur l'attribut de même nom.
     if key in ("journal_type", "oa_model", "oa_status"):
-        return getattr(sp, key) == value
+        return bool(getattr(sp, key) == value)
     if key == "url_contains":
         assert isinstance(value, str)
         return any(value in (u or "") for u in (sp.urls or ()))

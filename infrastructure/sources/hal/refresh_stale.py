@@ -32,18 +32,20 @@ class HalRefreshStaleAdapter(BaseRefreshStaleAdapter):
 
     async def fetch_by_native_id(self, client: httpx.AsyncClient, source_id: str) -> FetchOutcome:
         try:
-            data = await http_request_with_retry_async(
-                client,
-                "GET",
-                self.base_url,
-                params={
-                    "q": f"halId_s:{source_id}",
-                    "fl": HAL_FIELDS_STR,
-                    "wt": "json",
-                    "rows": "1",
-                },
-                timeout=15,
-                label=f"halId {source_id}",
+            data = as_mapping(
+                await http_request_with_retry_async(
+                    client,
+                    "GET",
+                    self.base_url,
+                    params={
+                        "q": f"halId_s:{source_id}",
+                        "fl": HAL_FIELDS_STR,
+                        "wt": "json",
+                        "rows": "1",
+                    },
+                    timeout=15,
+                    label=f"halId {source_id}",
+                )
             )
         except (httpx.RequestError, httpx.HTTPStatusError):
             return None

@@ -16,6 +16,7 @@ from application.ports.pipeline.extract.refresh_stale import (
     FetchOutcome,
 )
 from domain.publications.identifiers import clean_doi
+from domain.types import as_mapping
 from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.config import get_polite_pool_email
 from infrastructure.sources.http_retry import http_request_with_retry_async
@@ -40,13 +41,15 @@ class CrossrefRefreshStaleAdapter(BaseRefreshStaleAdapter):
     async def fetch_by_native_id(self, client: httpx.AsyncClient, source_id: str) -> FetchOutcome:
         url = f"{self.base_url}/works/{urllib.parse.quote(source_id, safe='/()')}"
         try:
-            data = await http_request_with_retry_async(
-                client,
-                "GET",
-                url,
-                headers=self.headers,
-                timeout=30,
-                label=f"DOI {source_id}",
+            data = as_mapping(
+                await http_request_with_retry_async(
+                    client,
+                    "GET",
+                    url,
+                    headers=self.headers,
+                    timeout=30,
+                    label=f"DOI {source_id}",
+                )
             )
         except httpx.HTTPStatusError as e:
             return NOT_FOUND if e.response.status_code == 404 else None

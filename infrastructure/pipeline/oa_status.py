@@ -7,6 +7,7 @@ from sqlalchemy import Connection, text
 
 from application.ports.pipeline.oa_status import OaStatusQueries, PublicationOaCheck
 from domain.publications.metadata import OPEN_ARCHIVE_SOURCES, OaStatus
+from infrastructure.db.scalars import scalar_int
 
 # Publications à (re)vérifier : à DOI, jamais vérifiées ou périmées (> `:stale` jours).
 _STALE_WHERE = """
@@ -51,10 +52,12 @@ class PgOaStatusQueries(OaStatusQueries):
         return [PublicationOaCheck(r.id, r.doi, r.oa_status, r.has_open_deposit) for r in rows]
 
     def count_stale_publications(self, conn: Connection, *, staleness_days: int) -> int:
-        return conn.execute(
-            text("SELECT count(*) FROM publications WHERE " + _STALE_WHERE),
-            {"stale": staleness_days},
-        ).scalar_one()
+        return scalar_int(
+            conn.execute(
+                text("SELECT count(*) FROM publications WHERE " + _STALE_WHERE),
+                {"stale": staleness_days},
+            )
+        )
 
     def count_publications_by_oa_status(self, conn: Connection) -> dict[str, int]:
         rows = conn.execute(

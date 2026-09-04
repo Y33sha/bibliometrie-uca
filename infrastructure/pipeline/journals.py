@@ -18,6 +18,7 @@ from application.ports.pipeline.journals import (
 from domain.journals.journal import JournalType, OaModel
 from domain.normalize import normalize_text
 from domain.types import JsonValue
+from infrastructure.db.scalars import scalar_datetime_or_none, scalar_int
 from infrastructure.db.tables import journal_name_forms, journals
 
 
@@ -184,7 +185,7 @@ class PgJournalGatewayQueries(
             )
             .returning(journals.c.id)
         )
-        return self._conn.execute(stmt).scalar_one()
+        return scalar_int(self._conn.execute(stmt))
 
     # ── Enrichissement OpenAlex ────────────────────────────────────
 
@@ -237,4 +238,6 @@ class PgJournalGatewayQueries(
         ).rowcount
 
     def doaj_last_import_at(self) -> datetime | None:
-        return self._conn.execute(select(func.max(journals.c.doaj_imported_at))).scalar_one()
+        return scalar_datetime_or_none(
+            self._conn.execute(select(func.max(journals.c.doaj_imported_at)))
+        )

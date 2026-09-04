@@ -14,7 +14,7 @@ from application.ports.pipeline.extract._common import UpsertOutcome
 from application.ports.pipeline.extract.hal import HalExtractAdapter, HalExtractConfig
 from domain.publications.identifiers import clean_doi
 from domain.sources.hal import hal_text_field
-from domain.types import JsonValue
+from domain.types import JsonValue, as_mapping
 from infrastructure.pipeline.extract.staging import upsert_staging
 from infrastructure.sources.api_params import API_BASE_URLS, HAL_DELAY, HAL_PER_PAGE
 from infrastructure.sources.config import (
@@ -61,7 +61,9 @@ class PgHalExtractAdapter(HalExtractAdapter):
             if wait > 0:
                 time.sleep(wait)
         try:
-            return http_request_with_retry("GET", self._url, params=params, timeout=30, label=label)
+            return as_mapping(
+                http_request_with_retry("GET", self._url, params=params, timeout=30, label=label)
+            )
         finally:
             self._last_request_at = time.monotonic()
 

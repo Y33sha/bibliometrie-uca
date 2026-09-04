@@ -55,13 +55,15 @@ class OpenalexFetchMissingDoiAdapter:
             **auth_params(),
         }
         try:
-            data = await http_request_with_retry_async(
-                client,
-                "GET",
-                self.base_url,
-                params=params,
-                timeout=30,
-                label=f"DOI {doi}",
+            data = as_mapping(
+                await http_request_with_retry_async(
+                    client,
+                    "GET",
+                    self.base_url,
+                    params=params,
+                    timeout=30,
+                    label=f"DOI {doi}",
+                )
             )
         except (httpx.RequestError, httpx.HTTPStatusError):
             # Erreur réseau ou HTTP (429/5xx après retries, 4xx) : lot ignoré, les DOI restent candidats au prochain run (leur absence n'est pas prouvée).

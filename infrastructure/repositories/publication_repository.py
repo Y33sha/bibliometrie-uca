@@ -17,6 +17,7 @@ from domain.publications.publication import Publication
 from domain.source_publications.metadata_correction.shared_doi import CONVERGENCE_CASES
 from domain.source_publications.source_publication import SourcePublication
 from domain.types import JsonValue
+from infrastructure.db.scalars import scalar_int
 
 
 class _SourcePublicationViewRow(NamedTuple):
@@ -262,23 +263,25 @@ class PgPublicationRepository(PublicationRepository):
         doi: str | None,
         oa_status: str,
     ) -> int:
-        return self._conn.execute(
-            text("""
+        return scalar_int(
+            self._conn.execute(
+                text("""
                 INSERT INTO publications
                     (title, title_normalized, doc_type, pub_year, doi, oa_status)
                 VALUES (:title, :tn, CAST(:doc_type AS doc_type), :py, :doi,
                         CAST(:oa AS oa_type))
                 RETURNING id
             """),
-            {
-                "title": title,
-                "tn": title_normalized,
-                "doc_type": doc_type,
-                "py": pub_year,
-                "doi": doi,
-                "oa": oa_status,
-            },
-        ).scalar_one()
+                {
+                    "title": title,
+                    "tn": title_normalized,
+                    "doc_type": doc_type,
+                    "py": pub_year,
+                    "doi": doi,
+                    "oa": oa_status,
+                },
+            )
+        )
 
     # ── Fusion ─────────────────────────────────────────────────────
 

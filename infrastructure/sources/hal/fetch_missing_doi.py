@@ -43,18 +43,20 @@ class HalFetchMissingDoiAdapter:
     ) -> Iterable[Mapping[str, JsonValue]]:
         doi = dois[0]
         try:
-            data = await http_request_with_retry_async(
-                client,
-                "GET",
-                self.base_url,
-                params={
-                    "q": f'doiId_s:"{doi}"',
-                    "fl": HAL_FIELDS_STR,
-                    "wt": "json",
-                    "rows": "1",
-                },
-                timeout=15,
-                label=f"DOI {doi}",
+            data = as_mapping(
+                await http_request_with_retry_async(
+                    client,
+                    "GET",
+                    self.base_url,
+                    params={
+                        "q": f'doiId_s:"{doi}"',
+                        "fl": HAL_FIELDS_STR,
+                        "wt": "json",
+                        "rows": "1",
+                    },
+                    timeout=15,
+                    label=f"DOI {doi}",
+                )
             )
         except (httpx.RequestError, httpx.HTTPStatusError):
             return []
