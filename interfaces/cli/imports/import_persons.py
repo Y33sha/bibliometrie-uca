@@ -15,8 +15,8 @@ import argparse
 import csv
 import os
 import sys
+from collections.abc import Mapping, Sequence
 from datetime import datetime, timedelta
-from typing import Any
 
 from sqlalchemy import Connection, text
 
@@ -168,7 +168,7 @@ def read_csv_tsv(filepath: str) -> list[dict[str, str]]:
 
 def import_persons(
     conn: Connection,
-    records: list[dict[str, Any]],
+    records: Sequence[Mapping[str, str]],
     dry_run: bool = False,
     export_date: str | None = None,
 ) -> int:

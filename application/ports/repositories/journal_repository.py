@@ -7,11 +7,31 @@ Le trouve-ou-crée et l'enrichissement, alimentés par le pipeline, vivent à pa
 La méthode `find_shared_title_journal_pairs` vit ici : c'est une query sur la table `journals`, appelée par le service de fusion d'éditeurs pour détecter les conflits avant `merge_publisher_into`.
 """
 
-from typing import Any, Protocol
+from typing import Protocol, TypedDict
 
 from pydantic import BaseModel
 
 from domain.journals.journal import Journal, JournalType, OaModel
+
+
+class SharedTitleJournalPair(TypedDict):
+    """Paire de revues homonymes entre deux éditeurs, et leurs identifiants normalisés.
+
+    Rendue par `find_shared_title_journal_pairs` : chaque ligne porte les deux revues et les six valeurs ISSN des deux côtés, pour que le service détecte en une passe les conflits qui empêchent une fusion.
+    """
+
+    target_journal_id: int
+    target_title: str
+    source_journal_id: int
+    source_title: str
+    t_title: str
+    s_title: str
+    t_issn: str | None
+    s_issn: str | None
+    t_eissn: str | None
+    s_eissn: str | None
+    t_issnl: str | None
+    s_issnl: str | None
 
 
 class JournalUpdate(BaseModel):
@@ -49,7 +69,7 @@ class JournalRepository(Protocol):
         self,
         target_publisher_id: int,
         source_publisher_id: int,
-    ) -> list[dict[str, Any]]:
+    ) -> list[SharedTitleJournalPair]:
         """Paires de revues (une du `target_publisher_id`, une du `source_publisher_id`) partageant le même `title_normalized`. Chaque ligne porte `target_journal_id`, `source_journal_id` et les six valeurs ISSN/eISSN/ISSN-L des deux côtés, pour que le service détecte les conflits d'ISSN en une seule requête."""
         ...
 

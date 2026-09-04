@@ -9,6 +9,7 @@ Usage :
 import argparse
 import csv
 import os
+from collections.abc import Mapping
 
 from sqlalchemy import text
 
@@ -18,6 +19,9 @@ from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 
 log = setup_logger("import_openapc", os.path.dirname(__file__))
+
+
+from domain.types import JsonValue
 
 
 def _parse_amount(cell: str | None) -> float | None:
@@ -39,7 +43,9 @@ def _parse_year(cell: str | None) -> int | None:
         return None
 
 
-def build_payment(row: dict, *, doi: str, publication_id: int, source_file: str) -> dict:
+def build_payment(
+    row: Mapping[str, str], *, doi: str, publication_id: int, source_file: str
+) -> dict[str, JsonValue]:
     """Paramètres d'insertion d'un paiement, depuis une ligne du fichier Open APC.
 
     Le fichier ne distingue pas l'année de facturation de l'année de publication : la période déclarée tient lieu des deux. L'ISSN retenu est celui de la revue, à défaut son ISSN de liaison. La mention `hybrid` signale une revue sur abonnement dont cet article a été ouvert.
