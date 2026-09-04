@@ -44,12 +44,6 @@ Créer ou modifier un rattachement, comme supprimer une structure, recalcule les
 
 **Page des laboratoires.** Lecture des structures de type laboratoire appartenant au périmètre, avec leurs tutelles. Les types affichés sont réglables par configuration.
 
-## Points d'attention
-
-**Les commandes de structure recalculent les périmètres.** Les rattachements et la suppression passent par l'adaptateur des périmètres, injecté dans la commande ; la couche service, elle, ignore la notion de périmètre.
-
-**Les identifiants sont revalidés à la lecture.** L'écriture par l'API les valide déjà, mais elle n'est pas le seul chemin : `infrastructure/db/seed.sql` insère les structures directement en SQL, comme le ferait une migration ou un script ponctuel. Une valeur non conforme arrivée par là fait échouer le chargement de la structure au lieu d'être servie.
-
 ## Invariants métier
 
 **Identité.** Le `code` est unique.
