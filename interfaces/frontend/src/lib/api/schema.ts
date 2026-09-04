@@ -3360,7 +3360,7 @@ export interface components {
             doi_prefix: string | null;
             /** Doaj Payload */
             doaj_payload: {
-                [key: string]: unknown;
+                [key: string]: string;
             } | null;
             /** Doaj Imported At */
             doaj_imported_at: string | null;

@@ -442,14 +442,15 @@ exclude = [
 # Pydantic : `explicit-any` porte sur la ligne `class X(BaseModel)`, le `Any` en cause vivant
 # dans le corps de `pydantic`. Le taire demande `follow_imports = skip` sur `pydantic`, qui
 # rendrait `BaseModel` opaque ; le greffon `pydantic.mypy` n'y change rien.
-# Les champs nommés portent du JSON de forme libre, qu'un champ Pydantic ne peut pas annoter
-# par l'alias récursif `JsonValue`.
+# Les champs nommés portent du JSON de forme libre. Pydantic accepte l'alias récursif
+# `JsonValue`, mais le schéma OpenAPI qui en découle produit un type TypeScript circulaire,
+# que le compilateur refuse : `schema.ts` dérivant du contrat, le front ne compilerait plus.
 [[tool.mypy.overrides]]
 module = [
     "application.ports.repositories.journal_repository",    # Pydantic
     "application.ports.repositories.publisher_repository",  # Pydantic
     "application.ports.repositories.perimeter_repository",  # Pydantic
-    "application.ports.read_models.*",                      # Pydantic ; `value`, `details`, `doaj_payload`
+    "application.ports.read_models.*",                      # Pydantic ; `value`, `details`
     "infrastructure.jsonb_models.*",                        # Pydantic
     "infrastructure.settings",                              # Pydantic
     "interfaces.api.models.*",                              # Pydantic ; `value`

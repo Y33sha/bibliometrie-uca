@@ -5,7 +5,7 @@ Implémenté par `infrastructure.read_models.journals.PgJournalQueries`.
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Literal, Protocol
+from typing import Literal, Protocol
 
 from pydantic import BaseModel
 
@@ -69,7 +69,7 @@ class JournalDetailResponse(JournalListItem):
     oa_model: OaModel | None
     is_academic: bool | None
     doi_prefix: str | None
-    doaj_payload: dict[str, Any] | None
+    doaj_payload: dict[str, str] | None
     doaj_imported_at: datetime | None
 
 
