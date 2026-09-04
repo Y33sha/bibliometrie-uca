@@ -29,7 +29,7 @@ from sqlalchemy import (
     func,
     text,
 )
-from sqlalchemy.dialects.postgresql import ARRAY, ENUM as PgEnum, JSONB
+from sqlalchemy.dialects.postgresql import ARRAY, ENUM as PgEnum
 
 from domain.countries import PlaceNameKind
 from domain.journals.journal import JOURNAL_TYPES, OA_MODELS
@@ -41,6 +41,7 @@ from domain.publications.relations import RelationType
 from domain.publishers.publisher import PUBLISHER_TYPES
 from domain.sources.registry import ALL_SOURCES
 from domain.structures.structure import StructureType
+from infrastructure.db.jsonb import Jsonb
 
 metadata = MetaData()
 
@@ -81,7 +82,7 @@ audit_log = Table(
     ),
     Column(
         "payload",
-        JSONB,
+        Jsonb,
         nullable=False,
         server_default=text("'{}'::jsonb"),
         comment=(
@@ -109,7 +110,7 @@ config = Table(
     "config",
     metadata,
     Column("key", Text, primary_key=True),
-    Column("value", JSONB, nullable=False),
+    Column("value", Jsonb, nullable=False),
     Column("description", Text),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
 )
@@ -177,7 +178,7 @@ structures = Table(
     Column("rnsr_id", Text),
     Column("hal_collection", Text),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    Column("api_ids", JSONB),
+    Column("api_ids", Jsonb),
     UniqueConstraint("code", name="structures_code_key"),
 )
 
@@ -239,7 +240,7 @@ journals = Table(
     Column("journal_type", journal_type_enum, server_default="unknown"),
     Column("is_academic", Boolean, server_default="true"),
     Column("doi_prefix", Text),
-    Column("doaj_payload", JSONB),
+    Column("doaj_payload", Jsonb),
     Column("doaj_imported_at", DateTime(timezone=True)),
     # Compte matérialisé des publications in-perimeter de la revue. Maintenu par le
     # pipeline (après le rollup in_perimeter) + aux fusions admin. Évite de re-scanner
@@ -450,7 +451,7 @@ author_identifying_keys = Table(
     metadata,
     Column("id", Integer, primary_key=True),
     Column("author_name_normalized", Text),
-    Column("person_identifiers", JSONB),
+    Column("person_identifiers", Jsonb),
     # Hash de la clé d'identité, chemin de lookup indexé et NULL-safe (un `=` ne
     # matche pas les NULL, un `IS NOT DISTINCT FROM` n'est pas indexable). Les
     # sentinelles E'\x01' (NULL) et E'\x1f' (séparateur) sont impossibles dans un
@@ -626,7 +627,7 @@ publications = Table(
     Column("updated_at", DateTime(timezone=True), server_default=func.now()),
     Column("countries", ARRAY(Text)),
     Column("sources", ARRAY(source_type_enum), nullable=False, server_default="{}"),
-    Column("meta", JSONB),
+    Column("meta", Jsonb),
     Column("is_retracted", Boolean, nullable=False, server_default="false"),
     # abstract / keywords / topics / biblio sont dans `publications_detail` (1:1) :
     # colonnes grasses lues uniquement par la page détail, sorties pour garder
@@ -660,8 +661,8 @@ publications_detail = Table(
     Column("publication_id", Integer, primary_key=True),
     Column("abstract", Text),
     Column("keywords", ARRAY(Text)),
-    Column("topics", JSONB),
-    Column("biblio", JSONB),
+    Column("topics", Jsonb),
+    Column("biblio", Jsonb),
 )
 
 
@@ -689,7 +690,7 @@ source_publications = Table(
     Column("hal_collections", ARRAY(Text)),
     Column(
         "external_ids",
-        JSONB,
+        Jsonb,
         nullable=False,
         server_default=text("'{}'::jsonb"),
     ),
@@ -703,12 +704,12 @@ source_publications = Table(
     Column("is_retracted", Boolean),
     Column("abstract", Text),
     Column("keywords", ARRAY(Text)),
-    Column("topics", JSONB),
-    Column("biblio", JSONB),
-    Column("meta", JSONB),
+    Column("topics", Jsonb),
+    Column("biblio", Jsonb),
+    Column("meta", Jsonb),
     Column(
         "raw_metadata",
-        JSONB,
+        Jsonb,
         nullable=False,
         server_default=text("'{}'::jsonb"),
     ),
@@ -810,7 +811,7 @@ staging = Table(
     Column("source", source_type_enum, nullable=False),
     Column("source_id", Text, nullable=False),
     Column("doi", Text),
-    Column("raw_data", JSONB, nullable=False),
+    Column("raw_data", Jsonb, nullable=False),
     Column("processed", Boolean, server_default="false"),
     Column("imported_at", DateTime(timezone=True), server_default=func.now()),
     Column(
@@ -937,9 +938,9 @@ pipeline_phase_executions = Table(
     Column("mode", Text, nullable=False),
     Column("sources", ARRAY(Text), nullable=False, server_default=text("'{}'::text[]")),
     Column("status", Text, nullable=False),
-    Column("signals", JSONB, nullable=False, server_default=text("'[]'::jsonb")),
-    Column("metrics", JSONB, nullable=False, server_default=text("'{}'::jsonb")),
-    Column("details", JSONB, nullable=False, server_default=text("'{}'::jsonb")),
+    Column("signals", Jsonb, nullable=False, server_default=text("'[]'::jsonb")),
+    Column("metrics", Jsonb, nullable=False, server_default=text("'{}'::jsonb")),
+    Column("details", Jsonb, nullable=False, server_default=text("'{}'::jsonb")),
     CheckConstraint(
         "status = ANY (ARRAY['ok'::text, 'warning'::text, 'error'::text])",
         name="pipeline_phase_executions_status_check",

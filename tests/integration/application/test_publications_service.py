@@ -11,10 +11,10 @@ porte les mêmes métadonnées. C'est cette SP qui fait exister la publication, 
 
 import pytest
 from sqlalchemy import bindparam, text
-from sqlalchemy.dialects.postgresql import JSONB
 
 from application.services.publications.core import mark_distinct, merge_publications
 from domain.errors import DistinctDoiError, NotFoundError, ValidationError
+from infrastructure.db.jsonb import Jsonb
 from infrastructure.repositories import publication_repository
 
 
@@ -74,7 +74,7 @@ _INSERT_SOURCE_PUB_SQL = text(
             :doi, :doc_type, :oa_status, :journal_id, :language, :external_ids)
     RETURNING id
     """
-).bindparams(bindparam("external_ids", type_=JSONB))
+).bindparams(bindparam("external_ids", type_=Jsonb))
 
 
 def _insert_source_publication(

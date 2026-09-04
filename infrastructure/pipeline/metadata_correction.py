@@ -4,7 +4,6 @@ Appelé par `application/pipeline/metadata_correction/`. Implémente le port `ap
 """
 
 from sqlalchemy import Connection, bindparam, text
-from sqlalchemy.dialects.postgresql import JSONB
 
 from application.ports.pipeline.metadata_correction import (
     CorrectionUpdate,
@@ -23,6 +22,7 @@ from domain.source_publications.metadata_correction.shared_doi import (
     DoiClusterCase,
 )
 from domain.sources.registry import Source
+from infrastructure.db.jsonb import Jsonb
 from infrastructure.db.tables import source_publications
 
 # Bras du `CASE` et liste `IN` des relations DataCite à convergence directe, dérivés du mapping
@@ -93,7 +93,7 @@ def _persist_updates(
     sql = f"UPDATE source_publications SET {', '.join(assignments)} WHERE id = :id"  # noqa: S608
     stmt = text(sql)
     if jsonb_params:
-        stmt = stmt.bindparams(*(bindparam(p, type_=JSONB) for p in jsonb_params))
+        stmt = stmt.bindparams(*(bindparam(p, type_=Jsonb) for p in jsonb_params))
     conn.execute(stmt, rows)
     return len(rows)
 

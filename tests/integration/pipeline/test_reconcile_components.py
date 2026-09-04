@@ -6,10 +6,10 @@ Valide le SQL neuf (voisinage 1-hop, fetch dirty, clear) sur vraie base, et le b
 import logging
 
 from sqlalchemy import bindparam, text
-from sqlalchemy.dialects.postgresql import JSONB
 
 from application.pipeline.publications.reconcile_components import reconcile, run
 from domain.source_publications.keys import project_confirmation_keys
+from infrastructure.db.jsonb import Jsonb
 from infrastructure.pipeline.publications.reconciliation import (
     PgPublicationsReconciliationQueries,
     mark_keys_dirty,
@@ -50,7 +50,7 @@ def _seed_sp(
              publication_id, keys_dirty)
         VALUES ('openalex', :sid, 'T', :tn, 2024, :dt, :doi, :ext, :pid, :dirty)
         RETURNING id
-    """).bindparams(bindparam("ext", type_=JSONB))
+    """).bindparams(bindparam("ext", type_=Jsonb))
     return conn.execute(
         stmt,
         {

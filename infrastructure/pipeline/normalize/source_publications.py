@@ -10,7 +10,6 @@ L'écriture ne porte que sur les colonnes de la ligne : celles qu'aucun import n
 from dataclasses import fields
 
 from sqlalchemy import Connection, bindparam, text
-from sqlalchemy.dialects.postgresql import JSONB
 
 from application.ports.pipeline.normalize.source_publications import (
     SourcePublicationQueries,
@@ -18,6 +17,7 @@ from application.ports.pipeline.normalize.source_publications import (
 )
 from domain.publications.metadata import normalized_title
 from domain.types import JsonValue
+from infrastructure.db.jsonb import Jsonb
 
 _FIELDS = fields(SourcePublicationRow)
 
@@ -44,7 +44,7 @@ _UPSERT_SQL = text(
         updated_at = clock_timestamp()
     RETURNING id
     """  # noqa: S608 — listes de colonnes construites depuis le contrat, sans entrée externe
-).bindparams(*(bindparam(c, type_=JSONB) for c in _JSONB_COLUMNS))
+).bindparams(*(bindparam(c, type_=Jsonb) for c in _JSONB_COLUMNS))
 
 
 class PgSourcePublicationQueries(SourcePublicationQueries):

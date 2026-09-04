@@ -4,7 +4,6 @@ Sert les phases `subjects` et `cooccurrences`. Les lectures des routes `/api/sub
 """
 
 from sqlalchemy import Connection, bindparam, text
-from sqlalchemy.dialects.postgresql import JSONB
 
 from application.ports.pipeline.subjects import (
     PublicationSubjectLink,
@@ -12,6 +11,7 @@ from application.ports.pipeline.subjects import (
     SubjectsIngestionQueries,
 )
 from domain.normalize import normalize_label
+from infrastructure.db.jsonb import Jsonb
 
 _UPSERT_SUBJECT_SQL = text(
     """
@@ -57,7 +57,7 @@ class PgSubjectsIngestionQueries(SubjectsIngestionQueries):
                 FROM jsonb_to_recordset(:payload) AS t(pid int, sid int)
                 ON CONFLICT (publication_id, subject_id, source) DO NOTHING
                 """
-            ).bindparams(bindparam("payload", type_=JSONB)),
+            ).bindparams(bindparam("payload", type_=Jsonb)),
             {"payload": payload, "source": source},
         ).rowcount
 

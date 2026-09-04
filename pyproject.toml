@@ -291,6 +291,12 @@ max-complexity = 15
 # le constructeur lui-même, et les tests, qui montent leur propre engine sur la base de test.
 "sqlalchemy.create_engine".msg = "L'engine du projet se construit dans infrastructure/db/engine.py, et s'obtient par get_sync_engine."
 
+# Le type JSONB de SQLAlchemy écrit `None` en JSON `null` plutôt qu'en NULL SQL. Les deux se
+# relisent en `None` côté Python, mais SQL les distingue : une colonne qui mélange les deux
+# formes échappe aux contraintes et aux index qui raisonnent sur NULL. `infrastructure/db/jsonb.py`
+# en pose la variante du projet, seule autorisée, et l'interdiction empêche l'autre de revenir.
+"sqlalchemy.dialects.postgresql.JSONB".msg = "Le type JSONB du projet est Jsonb, dans infrastructure/db/jsonb.py : il écrit None en NULL SQL."
+
 [tool.ruff.lint.isort]
 # Les couches du projet, déclarées pour que leur classement en premier rang ne dépende
 # pas de l'inférence de ruff, qui varie d'une version à l'autre.
@@ -305,8 +311,10 @@ combine-as-imports = true
 # jeu de données.
 # `TID251` : les tests montent leur propre engine sur la base de test.
 "tests/*" = ["E402", "S101", "S105", "S106", "S108", "S324", "S608", "TID251"]
-# Le constructeur de l'engine, seul site légitime de `create_engine`.
+# Les sites légitimes de ce qui est interdit ailleurs : le constructeur de l'engine, et le
+# module qui pose le type JSONB du projet.
 "infrastructure/db/engine.py" = ["TID251"]
+"infrastructure/db/jsonb.py" = ["TID251"]
 # `S608` signale toute interpolation dans une chaîne SQL. Ces couches ont pour métier de
 # composer des requêtes à partir de fragments pris dans des listes blanches écrites en dur
 # (tris, dimensions, colonnes) ; les valeurs issues d'une requête HTTP, elles, passent

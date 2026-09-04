@@ -1,8 +1,8 @@
 """Tests d'intégration pour `infrastructure.sources.hal.fetch_missing_hal`."""
 
 from sqlalchemy import bindparam, text
-from sqlalchemy.dialects.postgresql import JSONB
 
+from infrastructure.db.jsonb import Jsonb
 from infrastructure.sources.hal.fetch_missing_hal import find_hal_ids_from_scanr
 
 _INSERT_SOURCE_PUB_SQL = text(
@@ -10,7 +10,7 @@ _INSERT_SOURCE_PUB_SQL = text(
     INSERT INTO source_publications (source, source_id, staging_id, publication_id, title, external_ids)
     VALUES (CAST(:source AS source_type), :sid, :staging_id, :pub_id, 'titre test', :external_ids)
     """
-).bindparams(bindparam("external_ids", type_=JSONB))
+).bindparams(bindparam("external_ids", type_=Jsonb))
 
 
 class TestFindHalIdsFromScanr:

@@ -4,7 +4,6 @@ Appelé par `application/pipeline/relations/phase.py`. Implémente le port `appl
 """
 
 from sqlalchemy import Connection, bindparam, text
-from sqlalchemy.dialects.postgresql import JSONB
 
 from application.ports.pipeline.relations import (
     DeclaredRelationSource,
@@ -16,6 +15,7 @@ from application.ports.pipeline.relations import (
 from domain.publications.doc_types import DocType
 from domain.source_publications.keys import DISCRIMINANT_TITLE_MIN_LENGTH, ConfirmationKey
 from domain.sources.registry import Source
+from infrastructure.db.jsonb import Jsonb
 
 # Écart d'années toléré entre une œuvre dépendante et son parent, dans les deux sens : un erratum suit son article (parent dans `[année − N … année]`), une version publiée suit son preprint (parent dans `[année … année + N]`).
 _TITLE_MATCH_YEAR_WINDOW = 2
@@ -175,7 +175,7 @@ class PgPublicationRelationsQueries(PublicationRelationsQueries):
             LEFT JOIN publications p ON e.p IS NULL AND e.d IS NOT NULL AND lower(p.doi) = e.d
             WHERE COALESCE(e.p, p.id) IS NULL OR COALESCE(e.p, p.id) <> e.f
             ON CONFLICT ON CONSTRAINT publication_relations_uq DO NOTHING
-        """).bindparams(bindparam("payload", type_=JSONB))
+        """).bindparams(bindparam("payload", type_=Jsonb))
         return conn.execute(stmt, {"payload": payload}).rowcount
 
     def count_by_relation_type(self, conn: Connection) -> list[tuple[str, int]]:

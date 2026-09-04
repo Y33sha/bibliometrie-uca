@@ -6,7 +6,6 @@ Modèle de table cible : `(name_form, person_id, sources text[])` avec PK compos
 """
 
 from sqlalchemy import Connection, bindparam, text
-from sqlalchemy.dialects.postgresql import JSONB
 
 from application.ports.pipeline.persons.name_forms import (
     PersonNameFormsQueries,
@@ -16,6 +15,7 @@ from application.ports.pipeline.persons.name_forms import (
 )
 from domain.persons.identifiers import AttributionStatus
 from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE
+from infrastructure.db.jsonb import Jsonb
 
 
 class PgPersonNameFormsQueries(PersonNameFormsQueries):
@@ -50,7 +50,7 @@ class PgPersonNameFormsQueries(PersonNameFormsQueries):
                 INSERT INTO _raw_forms (raw_text, person_id, source)
                 SELECT raw_text, person_id, source
                 FROM jsonb_to_recordset(:payload) AS t(raw_text text, person_id int, source text)
-            """).bindparams(bindparam("payload", type_=JSONB)),
+            """).bindparams(bindparam("payload", type_=Jsonb)),
             {"payload": list(rows)},
         )
 

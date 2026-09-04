@@ -88,14 +88,15 @@ OA_STAGING_DOCS = [
 
 def insert_oa_staging(conn, docs):
     from sqlalchemy import bindparam, text
-    from sqlalchemy.dialects.postgresql import JSONB
+
+    from infrastructure.db.jsonb import Jsonb
 
     stmt = text("""
         INSERT INTO staging (source, source_id, doi, raw_data, processed)
         VALUES ('openalex', :openalex_id, :doi, :raw_data, FALSE)
         ON CONFLICT (source, source_id) DO UPDATE SET
             processed = FALSE, raw_data = EXCLUDED.raw_data
-    """).bindparams(bindparam("raw_data", type_=JSONB))
+    """).bindparams(bindparam("raw_data", type_=Jsonb))
     for doc in docs:
         conn.execute(
             stmt,

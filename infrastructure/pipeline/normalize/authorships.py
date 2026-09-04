@@ -9,7 +9,6 @@ Consommé par le writer partagé `write_source_authorships` ; le `clear` en amon
 import hashlib
 
 from sqlalchemy import Connection, bindparam, text
-from sqlalchemy.dialects.postgresql import JSONB
 
 from application.ports.pipeline.normalize.authorships import (
     AddressBatchItem,
@@ -18,6 +17,7 @@ from application.ports.pipeline.normalize.authorships import (
     AuthorshipsBatchQueries,
     SourceAuthorshipItem,
 )
+from infrastructure.db.jsonb import Jsonb
 
 # Sentinelles du `key_hash`, alignées sur la colonne générée `author_identifying_keys.key_hash`
 # (migration `author_identity_key_hash`) : `E'\x01'` tient lieu de NULL, `E'\x1f'` sépare les deux
@@ -42,7 +42,7 @@ _UPSERT_IDENTITY_SQL = text("""
     INSERT INTO author_identifying_keys (author_name_normalized, person_identifiers)
     VALUES (:author_name_normalized, :person_identifiers)
     ON CONFLICT (author_name_normalized, person_identifiers) DO NOTHING
-""").bindparams(bindparam("person_identifiers", type_=JSONB))
+""").bindparams(bindparam("person_identifiers", type_=Jsonb))
 
 _INSERT_AUTHORSHIP_SQL = text(
     """
@@ -57,7 +57,7 @@ _INSERT_AUTHORSHIP_SQL = text(
     + """))
     RETURNING id
 """
-).bindparams(bindparam("person_identifiers", type_=JSONB))
+).bindparams(bindparam("person_identifiers", type_=Jsonb))
 
 
 def delete_orphan_identities(conn: Connection) -> int:
@@ -118,7 +118,7 @@ class PgAuthorshipsBatchQueries(AuthorshipsBatchQueries):
                 FROM jsonb_to_recordset(:payload) AS t(
                     author_name_normalized text, person_identifiers jsonb)
                 ON CONFLICT (author_name_normalized, person_identifiers) DO NOTHING
-            """).bindparams(bindparam("payload", type_=JSONB)),
+            """).bindparams(bindparam("payload", type_=Jsonb)),
             {"payload": payload},
         )
         # 2. Insert des signatures. Pas d'ON CONFLICT : le writer DELETE puis déduplique par
@@ -138,7 +138,7 @@ class PgAuthorshipsBatchQueries(AuthorshipsBatchQueries):
             JOIN author_identifying_keys aik
               ON aik.key_hash = """
             + key_hash_sql("t.author_name_normalized", "t.person_identifiers")
-        ).bindparams(bindparam("payload", type_=JSONB))
+        ).bindparams(bindparam("payload", type_=Jsonb))
         conn.execute(
             stmt,
             {
@@ -177,7 +177,7 @@ class PgAuthorshipsBatchQueries(AuthorshipsBatchQueries):
             SELECT t.raw, t.norm
             FROM jsonb_to_recordset(:payload) AS t(raw text, norm text)
             ON CONFLICT (md5(raw_text)) DO NOTHING
-        """).bindparams(bindparam("payload", type_=JSONB))
+        """).bindparams(bindparam("payload", type_=Jsonb))
         conn.execute(stmt, {"payload": list(values)})
 
     def fetch_address_ids_by_raw_text(
@@ -202,7 +202,7 @@ class PgAuthorshipsBatchQueries(AuthorshipsBatchQueries):
             UPDATE addresses a SET countries = t.countries::character(2)[]
             FROM jsonb_to_recordset(:payload) AS t(addr_id integer, countries text[])
             WHERE a.id = t.addr_id AND a.countries IS NULL
-        """).bindparams(bindparam("payload", type_=JSONB))
+        """).bindparams(bindparam("payload", type_=Jsonb))
         conn.execute(stmt, {"payload": list(values)})
 
     def apply_address_suggested_countries_batch(
@@ -214,7 +214,7 @@ class PgAuthorshipsBatchQueries(AuthorshipsBatchQueries):
             UPDATE addresses a SET suggested_countries = t.countries::character(2)[]
             FROM jsonb_to_recordset(:payload) AS t(addr_id integer, countries text[])
             WHERE a.id = t.addr_id AND a.countries IS NULL AND a.suggested_countries IS NULL
-        """).bindparams(bindparam("payload", type_=JSONB))
+        """).bindparams(bindparam("payload", type_=Jsonb))
         conn.execute(stmt, {"payload": list(values)})
 
     def insert_source_authorship_addresses_batch(

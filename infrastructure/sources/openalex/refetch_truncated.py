@@ -11,13 +11,13 @@ from collections.abc import Mapping
 
 import httpx
 from sqlalchemy import Connection, bindparam, text
-from sqlalchemy.dialects.postgresql import JSONB
 
 from application.ports.pipeline.extract.refetch_truncated import (
     OpenalexRefetchAdapter,
     TruncatedWork,
 )
 from domain.types import JsonValue
+from infrastructure.db.jsonb import Jsonb
 from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.config import (
     get_openalex_api_key,
@@ -41,7 +41,7 @@ _UPDATE_SQL = text(
     SET raw_data = :raw_data, processed = FALSE, authors_truncated = FALSE, last_seen_at = now()
     WHERE id = :id
     """
-).bindparams(bindparam("raw_data", type_=JSONB))
+).bindparams(bindparam("raw_data", type_=Jsonb))
 
 # Genuine 100 auteurs : pas tronqué, on lève juste le drapeau (pas de réécriture).
 _CLEAR_TRUNCATED_SQL = text("UPDATE staging SET authors_truncated = FALSE WHERE id = :id")
