@@ -13,8 +13,8 @@ refetch suivant (dans le même run pipeline) ré-amorce le cycle.
 """
 
 from sqlalchemy import bindparam, text
-from sqlalchemy.dialects.postgresql import JSONB
 
+from infrastructure.db.jsonb import Jsonb
 from infrastructure.pipeline.change_detection import compute_hash
 from infrastructure.sources.openalex.extract_openalex import PgOpenalexExtractAdapter
 
@@ -65,7 +65,7 @@ _SEED_REFETCHED_SQL = text(
     INSERT INTO staging (source, source_id, doi, raw_data, raw_hash, processed)
     VALUES ('openalex', :source_id, :doi, :raw_data, :raw_hash, :processed)
     """
-).bindparams(bindparam("raw_data", type_=JSONB))
+).bindparams(bindparam("raw_data", type_=Jsonb))
 
 
 def _seed_refetched(conn, *, source_id, full_work, bulk_payload, processed):

@@ -6,7 +6,6 @@ import logging
 
 import pytest
 from sqlalchemy import bindparam, text
-from sqlalchemy.dialects.postgresql import JSONB
 
 from application.pipeline.subjects.extractors import (
     hal_labels,
@@ -16,6 +15,7 @@ from application.pipeline.subjects.extractors import (
     wos_labels,
 )
 from application.pipeline.subjects.ingestion import run
+from infrastructure.db.jsonb import Jsonb
 from infrastructure.pipeline.subjects import PgSubjectsIngestionQueries
 
 
@@ -106,7 +106,7 @@ _CREATE_SOURCE_PUB_SQL = text(
     INSERT INTO source_publications (source, source_id, title, publication_id, topics)
     VALUES (:source, :source_id, 'X', :publication_id, :topics) RETURNING id
     """
-).bindparams(bindparam("topics", type_=JSONB))
+).bindparams(bindparam("topics", type_=Jsonb))
 
 
 def _create_source_pub(conn, *, source, source_id, publication_id, topics=None):

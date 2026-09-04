@@ -20,12 +20,12 @@ import argparse
 import os
 
 from sqlalchemy import Connection, bindparam, text
-from sqlalchemy.dialects.postgresql import JSONB
 
 from application.pipeline.persons.populate_person_name_forms import populate
 from domain.normalize import clean_raw_author_name, normalize_name, normalize_name_form
 from domain.persons.name_matching import parse_raw_author_name
 from infrastructure.db.engine import get_sync_engine
+from infrastructure.db.jsonb import Jsonb
 from infrastructure.observability.log import setup_logger
 from infrastructure.pipeline.normalize.authorships import (
     _UPSERT_IDENTITY_SQL,
@@ -49,7 +49,7 @@ _REPOINT_SIGNATURE_SQL = text(
     + """)
     WHERE id = :sa_id
 """
-).bindparams(bindparam("person_identifiers", type_=JSONB))
+).bindparams(bindparam("person_identifiers", type_=Jsonb))
 
 
 def _repoint_polluted_identities(conn: Connection, apply: bool) -> None:

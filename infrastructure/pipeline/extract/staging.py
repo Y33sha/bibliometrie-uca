@@ -6,10 +6,10 @@ Appelées par les adapters d'extraction et de cross-import (`infrastructure/sour
 from collections.abc import Mapping
 
 from sqlalchemy import Connection, bindparam, text
-from sqlalchemy.dialects.postgresql import JSONB
 
 from domain.publications.identifiers import clean_doi
 from domain.types import JsonValue
+from infrastructure.db.jsonb import Jsonb
 from infrastructure.pipeline.change_detection import change_detection_hash
 
 _UPSERT_STAGING_SQL = text(
@@ -48,7 +48,7 @@ _UPSERT_STAGING_SQL = text(
     RETURNING (xmax = 0) AS inserted,
               ((SELECT old_hash FROM old) IS DISTINCT FROM :raw_hash) AS changed
     """
-).bindparams(bindparam("raw_data", type_=JSONB))
+).bindparams(bindparam("raw_data", type_=Jsonb))
 
 
 def upsert_staging(

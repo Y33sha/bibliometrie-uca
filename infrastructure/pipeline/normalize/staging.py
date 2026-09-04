@@ -9,13 +9,13 @@ import logging
 from collections.abc import Mapping
 
 from sqlalchemy import Connection, Row, bindparam, text
-from sqlalchemy.dialects.postgresql import JSONB
 
 from application.ports.pipeline.normalize.staging import (
     StagingQueries,
     StagingRow,
 )
 from domain.types import JsonValue
+from infrastructure.db.jsonb import Jsonb
 from infrastructure.pipeline.change_detection import canonical_json_bytes, change_detection_hash
 from infrastructure.raw_store import RawStore, get_raw_store
 
@@ -60,7 +60,7 @@ _REHYDRATE_UPDATE_SQL = text(
     SET raw_data = :raw_data, raw_hash = :raw_hash, processed = FALSE
     WHERE source = :source AND source_id = :source_id
     """
-).bindparams(bindparam("raw_data", type_=JSONB))
+).bindparams(bindparam("raw_data", type_=Jsonb))
 
 _REHYDRATE_UPSERT_SQL = text(
     """
@@ -72,7 +72,7 @@ _REHYDRATE_UPSERT_SQL = text(
         processed = FALSE
     RETURNING (xmax = 0) AS inserted
     """
-).bindparams(bindparam("raw_data", type_=JSONB))
+).bindparams(bindparam("raw_data", type_=Jsonb))
 
 
 def rehydrate_staging_row(

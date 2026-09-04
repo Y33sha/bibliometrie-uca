@@ -127,13 +127,14 @@ SCANR_STAGING_DOCS = [
 def insert_scanr_staging(conn, docs):
     """Insère des documents dans staging (source='scanr')."""
     from sqlalchemy import bindparam, text
-    from sqlalchemy.dialects.postgresql import JSONB
+
+    from infrastructure.db.jsonb import Jsonb
 
     stmt = text("""
         INSERT INTO staging (source, source_id, doi, raw_data, processed)
         VALUES ('scanr', :scanr_id, :doi, :raw_data, FALSE)
         ON CONFLICT (source, source_id) DO UPDATE SET processed = FALSE
-    """).bindparams(bindparam("raw_data", type_=JSONB))
+    """).bindparams(bindparam("raw_data", type_=Jsonb))
     for doc in docs:
         conn.execute(
             stmt, {"scanr_id": doc["scanr_id"], "doi": doc["doi"], "raw_data": doc["raw_data"]}

@@ -10,8 +10,8 @@ la mise à jour des métadonnées lors d'un re-traitement.
 import copy
 
 from sqlalchemy import bindparam, text
-from sqlalchemy.dialects.postgresql import JSONB
 
+from infrastructure.db.jsonb import Jsonb
 from infrastructure.repositories import publication_repository
 from tests.integration.helpers.publications_phase import (
     apply_metadata_corrections,
@@ -41,7 +41,7 @@ def _insert_hal_staging(conn, doc):
         ON CONFLICT (source, source_id) DO UPDATE SET
             raw_data = EXCLUDED.raw_data,
             processed = FALSE
-    """).bindparams(bindparam("raw_data", type_=JSONB))
+    """).bindparams(bindparam("raw_data", type_=Jsonb))
     conn.execute(
         stmt,
         {
