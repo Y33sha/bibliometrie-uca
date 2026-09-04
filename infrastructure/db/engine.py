@@ -23,23 +23,6 @@ _sync_engine: Engine | None = None
 
 DbIdentity = Literal["owner", "app", "pipeline"]
 
-# Pour chaque identité : le réglage qui la porte, et ce qu'elle recouvre. Le message sert
-# l'appelant qui a oublié de la renseigner, en lui disant quel processus la demande.
-_IDENTITES: dict[str, str] = {
-    "owner": (
-        "propriétaire du schéma, dont les migrations se servent — elles seules modifient la "
-        "structure"
-    ),
-    "app": (
-        "rôle de l'API : lecture, et écriture sur les seules tables que ses points d'entrée "
-        "d'administration modifient"
-    ),
-    "pipeline": (
-        "rôle du pipeline et des scripts : écriture sur les données et entretien des vues "
-        "matérialisées, sans droit sur le schéma"
-    ),
-}
-
 
 def db_url(identity: DbIdentity = "pipeline") -> URL:
     """URL de connexion Postgres construite depuis les settings (réutilisée par Alembic).
@@ -55,10 +38,8 @@ def db_url(identity: DbIdentity = "pipeline") -> URL:
     if not username:
         variable = f"DB_{identity.upper()}_USER"
         raise RuntimeError(
-            f"{variable} est requis pour cette connexion : {_IDENTITES[identity]}. Créer les "
-            f"rôles avec `infrastructure/db/roles.sql`, puis renseigner {variable} et "
-            f"{variable.replace('_USER', '_PASSWORD')}. Un processus n'a à porter que "
-            "l'identité dont il se sert."
+            f"{variable} et {variable.replace('_USER', '_PASSWORD')} sont requis dans "
+            "l'environnement (rôles créés par `infrastructure/db/roles.sql`)."
         )
     password = secret.get_secret_value()
     query = {"sslmode": settings.db_sslmode} if settings.db_sslmode else {}
