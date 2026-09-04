@@ -442,11 +442,16 @@ exclude = [
 # Documentées au cas par cas :
 # - `domain.sources.*`, `infrastructure.sources.*`, `infrastructure.jsonb_models.*` :
 #   payloads JSON bruts d'APIs externes / colonnes JSONB libres.
-# - `application.ports.read_models.*` : DTOs Pydantic co-localisés — `BaseModel`
-#   propage `Any` via ses stubs (`__init__: **data: Any`), ce qui déclenche
-#   `explicit-any` à chaque héritage `class X(BaseModel)`. Le `Any` côté
-#   projet reste par ailleurs strict ; l'override ne couvre que la surface
-#   Pydantic. Idem pour `infrastructure.settings` qui hérite de `BaseSettings`.
+# - Modèles Pydantic (`application.ports.read_models.*`, `interfaces.api.models.*`,
+#   `infrastructure.jsonb_models.*`, `infrastructure.settings`, et les trois ports
+#   `repositories` qui portent des modèles de modification sélective) : `explicit-any`
+#   se déclenche sur la ligne `class X(BaseModel)` elle-même, dont aucun champ n'est
+#   `Any`. Le `Any` incriminé vit dans le corps de `pydantic`, que mypy analyse et
+#   dont il rapporte le signalement sur la classe fille : le rendre invisible demande
+#   `follow_imports = skip` sur `pydantic`, ce qui rendrait `BaseModel` opaque et
+#   supprimerait toute vérification des modèles. Vérifié : le greffon `pydantic.mypy`
+#   n'y change rien, et une classe de base intermédiaire non plus. Sur les fichiers
+#   couverts, le code du projet n'écrit que quatre `Any`.
 # - `application.ports.repositories.*` (sauf audit + les projections déjà
 #   typées des ports structures/persons) : records DB hydratés et partial
 #   updates encore exposés en `dict[str, Any]`.
@@ -463,10 +468,6 @@ exclude = [
 # - `interfaces.api.models.*` : nombreux fields `Any` (payloads JSONB libres
 #   côté API, body dicts hétérogènes), tant que `JsonValue` ne couvre pas
 #   tous les cas.
-# - `interfaces.cli.dev.generate_seed.TABLES` : schéma de seed,
-#   `list[dict[str, Any]]` délibéré.
-# - `interfaces.cli.run_pipeline` : entry-point CLI qui orchestre des subprocess
-#   + dict d'options hétérogènes (`Any` délibéré).
 [[tool.mypy.overrides]]
 module = [
     "application.ports.repositories.journal_repository",
@@ -479,7 +480,6 @@ module = [
     "infrastructure.repositories.*",
     "infrastructure.settings",
     "interfaces.api.models.*",
-    "interfaces.cli.dev.generate_seed",
 ]
 disallow_any_explicit = false
 disallow_any_generics = false
