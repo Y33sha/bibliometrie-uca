@@ -1,76 +1,56 @@
 # Journals — cycle de vie
 
-*À jour le 2026-07-13.*
+*À jour le 2026-09-04.*
 
-L'aggregate root `Journal` (`domain/journals/journal.py`) représente une revue, une conférence, un dépôt ou un autre support de publication. Identité = `id` (clé surrogate) ; identifiant naturel = `title` via la normalisation de `journal_name_forms` ; les ISSN sont fortement discriminants mais facultatifs. `publisher_id` référence l'aggregate `Publisher` par son id. L'objet de domaine est un simple porteur de données ; la logique de matching, de fusion et d'enrichissement vit dans les services et leurs adaptateurs SQL.
+Un `journal` est un support de publication : revue, conférence, dépôt ou autre. Il porte un identifiant interne, et se reconnaît par son `openalex_id`, par ses ISSN — très discriminants mais souvent absents — ou par son titre, via les formes de nom enregistrées. `domain/journals/journal.py` en décrit la structure sans logique : le rapprochement, la fusion et l'enrichissement vivent dans les services et leurs adaptateurs SQL.
 
-## Tables du cluster
+## Tables
 
-| Table | Rôle | Colonnes clés |
+| Table | Rôle | Colonnes notables |
 |---|---|---|
-| `journals` | La revue | `title` / `title_normalized`, `issn` / `eissn` / `issnl`, `publisher_id`, `openalex_id` (unique), `journal_type` (enum SQL), `oa_model` (text libre), `is_in_doaj`, `apc_amount` / `apc_currency`, `doaj_payload`, `pub_count` |
-| `journal_name_forms` | Formes de nom → revue, pour le matching par titre | `journal_id` (ON DELETE CASCADE), `form_normalized`, `publisher_id`, unicité `(form_normalized, publisher_id)` |
+| `journals` | La revue | `title` / `title_normalized`, `issn` / `eissn` / `issnl`, `publisher_id`, `openalex_id` (unique), `journal_type`, `oa_model`, `is_in_doaj`, `apc_amount` / `apc_currency`, `doaj_payload`, `pub_count` |
+| `journal_name_forms` | Formes de nom permettant de reconnaître une revue par son titre | `journal_id`, `form_normalized`, `publisher_id`, unicité `(form_normalized, publisher_id)` |
 
-Trois tables référencent `journals.id` sans faire partie du cluster : `publications.journal_id` et `source_publications.journal_id` (rattachement des publications), `apc_payments.journal_id` (ON DELETE SET NULL). Les politiques de suppression divergent, d'où la fusion manuelle en plusieurs étapes (cf. points d'attention).
+Trois tables extérieures référencent une revue, avec des politiques de suppression différentes : `journal_name_forms` disparaît avec elle, `apc_payments.journal_id` repasse à nul, tandis que `publications.journal_id` et `source_publications.journal_id` n'autorisent aucune suppression tant qu'ils pointent dessus.
 
-## Les deux axes
+## Écriture par le pipeline
 
-Le cycle de vie se lit selon deux axes orthogonaux : **écriture / lecture** et **pipeline / API**.
+**Création et rapprochement (`normalize`).** Les six normaliseurs appellent `find_or_create_journal` (`application/services/journals/core.py`), qui essaie successivement l'`openalex_id`, puis les ISSN sous leurs trois formes (`find_journal_by_issn_any`), puis le titre (`find_journal_by_name_form`, qui préfère les revues portant un eISSN), et crée la revue en dernier recours avec sa forme de nom. `enrich_journal` complète au passage les champs vides, sans jamais écraser une valeur existante. La publication reçoit son `journal_id` par `extract_pub_metadata`. `normalize_openalex` déduit en outre l'`oa_model` du caractère ouvert de la source.
 
-```mermaid
-flowchart LR
-    N[normalize] -->|find_or_create_journal| J[journals]
-    N -->|forme de nom| JNF[journal_name_forms]
-    PJ[publishers_journals] -->|APC, journal_type, DOAJ| J
-    MC[metadata_correction] -->|préfixe DOI| SPJ[source_publications.journal_id]
-    AU[authorships] -->|refresh_pub_counts| J
-    ADM[API admin] -->|update / merge| J
-    ADM -->|requalification| PUB[publications.doc_type]
-    J --> API[dashboard / facettes / détail]
-```
+**Rattachement tardif par préfixe de DOI (`metadata_correction`).** `journal_by_doi.py` renseigne `source_publications.journal_id` lorsqu'un préfixe de DOI désigne une revue sans ambiguïté. La décision elle-même est prise dans `domain/source_publications/metadata_correction/journal_by_doi.py`.
 
-## Écriture — pipeline
+**Enrichissement du référentiel (`publishers_journals`).** L'orchestrateur enchaîne, selon ce que la configuration autorise, la résolution des éditeurs, l'enrichissement depuis OpenAlex — frais de publication et type de revue pour celles restées indéterminées — puis l'import du référentiel DOAJ, qui renseigne `doaj_payload` et `is_in_doaj`. Les écritures passent par `PgJournalGatewayQueries` (`infrastructure/pipeline/journals.py`), qui porte aussi les requêtes de sélection de chaque sous-étape.
 
-**Création et matching (`normalize`)** : les six normaliseurs de sources appellent `find_or_create_journal` (`application/services/journals/core.py`), dont la cascade de résolution est `openalex_id` → ISSN / eISSN / ISSN-L (`find_journal_by_issn_any`) → titre (`find_journal_by_name_form`, qui priorise les revues avec eISSN) → création + `add_journal_name_form`. L'enrichissement opportuniste passe par `enrich_journal` (COALESCE, jamais de downgrade). Le `journal_id` est porté par la publication via `extract_pub_metadata`. `normalize_openalex` dérive aussi l'`oa_model` (`full_oa` / `subscription`) du `is_oa` de la source.
+## Écriture par l'API — curation
 
-**Rattachement tardif par préfixe DOI (`metadata_correction`)** : `journal_by_doi.py` pose `source_publications.journal_id` quand un préfixe DOI unique désigne une revue (décision pure dans `domain/source_publications/metadata_correction/journal_by_doi.py`).
+Routeur `interfaces/api/routers/journals.py`, commandes dans `application/services/journals/commands.py`, adaptateur `PgJournalRepository`.
 
-**Enrichissement du référentiel (`publishers_journals`)** : l'orchestrateur `phase.py` enchaîne, sous gardes de config, la résolution des éditeurs (`resolve_publishers.py`), l'enrichissement OpenAlex (`enrich_journals_from_openalex.py` : APC + `journal_type` sur les revues `unknown`, via `map_openalex_source_type`), et l'import du dump DOAJ (`import_journals_from_doaj_dump.py` : `doaj_payload` + `is_in_doaj`). Adapter d'écriture : le gateway `PgJournalGatewayQueries` (`infrastructure/pipeline/journals.py`), qui porte les files de ces sous-étapes (`find_journals_of_unknown_type`, `find_journal_issn_index`, `reset_is_in_doaj`, `doaj_last_import_at`).
+**Éditer une revue** (`PUT /api/journals/{id}`). Le dépôt re-dérive `title_normalized` à l'enregistrement. Si le type de revue change, `requalify_publications_for_journal` rejoue immédiatement le type de document de toutes ses publications et consigne un événement `journal.type_requalified`.
 
-## Écriture — API (curation admin)
+**Fusionner deux revues** (`POST /api/journals/{id}/merge`). `merge_journal_into` repointe successivement `publications`, `source_publications`, `apc_payments` et `journal_name_forms`, puis recale les compteurs de publications. Chaque table est traitée explicitement parce qu'aucune suppression en cascade ne peut faire le travail : la base refuse de supprimer une revue tant qu'une publication la référence.
 
-Routeur `interfaces/api/routers/journals.py`, command handlers `application/services/journals/commands.py`, cœur métier `core.py`, adaptateur `PgJournalRepository`.
+**Prévisualiser un changement de type** (`GET /api/journals/{id}/type-change-impact`). Le chemin d'écriture réel est exécuté puis annulé, ce qui donne l'impact exact sans rien modifier.
 
-- **Édition** (`PUT /api/journals/{id}`) : `update_journal` charge-mute-sauve la revue (le repo re-dérive `title_normalized` au `save`) ; si `journal_type` change, `requalify_publications_for_journal` rejoue le `doc_type` des publications de la revue et émet un audit `journal.type_requalified`.
-- **Fusion** (`POST /api/journals/{id}/merge`) : `merge_journals` → `merge_journal_into`, cinq étapes SQL qui repointent `publications`, `source_publications`, `apc_payments`, `journal_name_forms` puis recalent `pub_count`.
-- **Prévisualisation** (`GET .../type-change-impact`) : exécute le chemin d'écriture réel dans un `SAVEPOINT` annulé (`begin_nested` + `rollback`).
+## Lecture par le pipeline
 
-## Lecture — pipeline
+**Compteur de publications.** `infrastructure/pipeline/authorships/pub_counts.py` recalcule `journals.pub_count`, puis celui des éditeurs. La phase `authorships` le recalcule en totalité, une fois le périmètre posé ; une fusion administrative ne recalcule que les revues concernées.
 
-**`pub_count`** : `infrastructure/pipeline/authorships/pub_counts.py` recalcule `journals.pub_count` (puis `publishers.pub_count`) — variante bulk `refresh_pub_counts` (phase `authorships`, après pose de `in_perimeter`), variante scopée `refresh_journal_pub_count` (fusions admin). Un module de requêtes unique sert pipeline et API, conforme au pattern « queries mutualisées, ports par contexte » (cf. [03-application.md](../architecture/03-application.md)).
+**Type de revue.** `refresh_from_sources` lit `get_journal_type` pour rejouer les règles de type de document qui en dépendent.
 
-**`journal_type`** : `refresh_from_sources` (`application/services/publications/core.py`) lit `get_journal_type` pour rejouer les règles de `doc_type` dépendantes de la revue.
+## Lecture par l'API
 
-**Matching** : `find_journal_by_openalex_id`, `find_journal_by_issn_any`, `find_journal_by_name_form` (`PgJournalGatewayQueries`) ; `find_by_id` (`PgJournalRepository`).
+Port `application/ports/read_models/journals_queries.py`, adaptateur `PgJournalQueries`.
 
-## Lecture — API
-
-Port `application/ports/read_models/journals_queries.py` (DTOs co-localisés), adaptateur `PgJournalQueries`, routeur `interfaces/api/routers/journals.py`.
-
-- **Listing / facettes** (`GET /api/journals`, `/facets`) : `list_journals` (WHERE composé par `_build_journal_where`), `journals_facets` (comptes exclusifs par dimension). Le filtre « avec publications » s'appuie sur le cache `journals.pub_count`.
-- **Détail / dashboard** (`GET /{id}`, `/{id}/dashboard`) : le dashboard **consomme `domain/journals/expected.py`** (`is_doc_type_expected` / `is_oa_status_expected`) pour signaler les publications hors du cadre annoncé, et recompte l'appartenance au périmètre en direct.
-- **Enums** (`GET /api/journals/types`, `/api/journals/oa-models`) : exposent `JOURNAL_TYPE_LABELS_FR` / `OA_MODEL_LABELS_FR`, source de vérité Python de `domain/journals/journal.py`.
+| Point d'entrée | Ce qu'il sert |
+|---|---|
+| `GET /api/journals`, `/facets` | Liste filtrable et facettes ; le filtre « avec publications » s'appuie sur le compteur `pub_count` |
+| `GET /api/journals/{id}`, `/{id}/dashboard` | Détail de la revue ; le tableau de bord signale les publications hors du cadre annoncé par la revue (`domain/journals/expected.py`) et recompte l'appartenance au périmètre en direct |
+| `GET /api/journals/types`, `/oa-models` | Libellés des vocabulaires de type de revue et de modèle d'accès ouvert, définis dans `domain/journals/journal.py` |
 
 ## Points d'attention
 
-Dette assumée et décisions d'architecture propres à cet agrégat, gardées explicites.
-
-1. **Écritures cross-agrégat dans la fusion de revues (décision d'archi assumée).** `merge_journal_into` repointe `publications` / `source_publications` / `apc_payments` en `text()` — des tables d'autres agrégats, hors MetaData du repo journal. Une fusion est intrinsèquement cross-agrégat (repointer les dépendants *est* l'opération) et exige l'atomicité d'une seule transaction ; le repo journal l'assume.
+**La fusion écrit dans des tables d'autres agrégats.** `merge_journal_into` met à jour `publications`, `source_publications` et `apc_payments` en SQL littéral, hors du périmètre que le dépôt des revues déclare. L'opération demande une transaction unique, et repointer les dépendants en est le contenu même.
 
 ## Invariants métier
 
-Règles métier de l'agrégat maintenues par discipline — ni par une contrainte de base, ni par un objet de domaine — et dispersées dans le SQL et les services.
-
-- **Cohérence `journal_type` → `doc_type`.** Le `doc_type` canonique d'une publication dépend du `journal_type` de sa revue (règles journal-dépendantes d'`effective_metadata`). L'invariant est tenu par deux chemins selon le contexte : la phase pipeline `metadata_correction`, qui recalcule tous les `doc_type` depuis le brut reconstruit, en aval de `publishers_journals` (idempotente, auto-cicatrisante) ; et le hook API `requalify_publications_for_journal`, qui requalifie sur-le-champ les publications de la revue éditée, sans attendre le prochain run.
-
-`Journal` est délibérément un agrégat mince : sa seule règle transverse (`journal_type` → `doc_type`) vit dans la phase de correction et le service, et le concept reste un porteur de données — sans matière à en faire un objet de domaine riche.
+**Le type de document dépend du type de revue.** Le type canonique d'une publication se déduit en partie du type de sa revue. Deux chemins tiennent cette cohérence : la phase `metadata_correction`, qui recalcule tous les types de document en aval de `publishers_journals` et se rejoue sans dommage ; et `requalify_publications_for_journal`, appelé à l'édition d'une revue, qui requalifie ses publications sans attendre le passage suivant du pipeline.
