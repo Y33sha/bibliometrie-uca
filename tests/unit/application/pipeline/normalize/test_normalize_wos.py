@@ -35,6 +35,7 @@ from application.pipeline.normalize.normalize_wos import (
     upsert_journal,
     upsert_publisher,
 )
+from application.pipeline.normalize.pub_metadata import PublicationMetadata
 from tests.unit.application.pipeline.normalize.doubles import (
     staging_row,
 )
@@ -705,9 +706,9 @@ class TestExtractPubMetadata:
             "journal_title": "J Name",
         }
         meta = extract_pub_metadata(rec, journal_id=42)
-        assert meta["title"] == "T"
-        assert meta["journal_id"] == 42
-        assert meta["container_title"] is None  # journal_id résout, pas besoin du title
+        assert meta.title == "T"
+        assert meta.journal_id == 42
+        assert meta.container_title is None  # journal_id résout, pas besoin du title
 
     def test_container_title_falls_back_when_no_journal_id(self):
         """Si pas de journal_id (titre non matché), on garde `journal_title` comme `container_title`."""
@@ -721,7 +722,7 @@ class TestExtractPubMetadata:
             "journal_title": "Container Title",
         }
         meta = extract_pub_metadata(rec, journal_id=None)
-        assert meta["container_title"] == "Container Title"
+        assert meta.container_title == "Container Title"
 
 
 # ── upsert_publisher / upsert_journal ───────────────────────────
@@ -788,16 +789,17 @@ class TestInsertWosDocument:
             "urls": ["https://x"],
             "external_ids": {"pmid": "12345"},
         }
-        pub_meta = {
-            "doi": "10.1/x",
-            "title": "T",
-            "pub_year": 2024,
-            "doc_type": "article",
-            "journal_id": 42,
-            "oa_status": "gold",
-            "language": "en",
-            "container_title": None,
-        }
+        pub_meta = PublicationMetadata(
+            doi="10.1/x",
+            title="T",
+            pub_year=2024,
+            doc_type="article",
+            nnt=None,
+            journal_id=42,
+            oa_status="gold",
+            language="en",
+            container_title=None,
+        )
 
         result = insert_wos_document(None, queries, rec, staging_id=10, pub_meta=pub_meta)
 
@@ -819,16 +821,17 @@ class TestInsertWosDocument:
         queries = MagicMock()
         queries.upsert_source_publication.return_value = 1
         rec = {"ut": "WOS:1"}
-        pub_meta = {
-            "doi": None,
-            "title": "T",
-            "pub_year": None,
-            "doc_type": "other",
-            "journal_id": None,
-            "oa_status": None,
-            "language": None,
-            "container_title": None,
-        }
+        pub_meta = PublicationMetadata(
+            doi=None,
+            title="T",
+            pub_year=None,
+            doc_type="other",
+            nnt=None,
+            journal_id=None,
+            oa_status=None,
+            language=None,
+            container_title=None,
+        )
         insert_wos_document(None, queries, rec, staging_id=5, pub_meta=pub_meta)
 
         row_arg = queries.upsert_source_publication.call_args.args[1]

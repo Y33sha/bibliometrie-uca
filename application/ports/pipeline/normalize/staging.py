@@ -4,10 +4,13 @@ Implémenté par `infrastructure.pipeline.normalize.staging.PgStagingQueries`.
 Partagé par tous les normalizers via `SourceNormalizer`.
 """
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Protocol
 
 from sqlalchemy import Connection
+
+from domain.types import JsonValue
 
 
 @dataclass(frozen=True)
@@ -17,7 +20,7 @@ class StagingRow:
     id: int
     source_id: str
     doi: str | None
-    raw_data: dict[str, Any]
+    raw_data: Mapping[str, JsonValue]
 
 
 class StagingQueries(Protocol):
