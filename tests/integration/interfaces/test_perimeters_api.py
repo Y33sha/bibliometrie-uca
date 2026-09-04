@@ -10,33 +10,11 @@ Couvre :
 from __future__ import annotations
 
 import json
-import os
 import uuid
-from contextlib import contextmanager
 
-import psycopg
 import pytest
-from psycopg.rows import dict_row
 
-_DB_ARGS = {
-    "dbname": "bibliometrie_test",
-    "user": os.environ["DB_OWNER_USER"],
-    "host": os.environ.get("DB_HOST", "127.0.0.1"),
-    "port": int(os.environ.get("DB_PORT", "5432")),
-}
-if os.environ.get("DB_OWNER_PASSWORD"):
-    _DB_ARGS["password"] = os.environ["DB_OWNER_PASSWORD"]
-
-
-@contextmanager
-def _pool():
-    conn = psycopg.connect(**_DB_ARGS, row_factory=dict_row)
-    conn.autocommit = True
-    try:
-        with conn.cursor() as cur:
-            yield cur
-    finally:
-        conn.close()
+from tests.integration.helpers.db import owner_pool
 
 
 def _uniq(prefix: str) -> str:
@@ -45,7 +23,7 @@ def _uniq(prefix: str) -> str:
 
 def _seed_structure(code: str | None = None, type_: str = "universite") -> int:
     code = code or _uniq("STRUCT")
-    with _pool() as cur:
+    with owner_pool() as cur:
         cur.execute(
             "INSERT INTO structures (code, name, structure_type) "
             "VALUES (%s, %s, CAST(%s AS structure_type)) RETURNING id",
@@ -56,7 +34,7 @@ def _seed_structure(code: str | None = None, type_: str = "universite") -> int:
 
 def _seed_perimeter(code: str | None = None, root_structure_ids: list[int] | None = None) -> int:
     code = code or _uniq("perim")
-    with _pool() as cur:
+    with owner_pool() as cur:
         cur.execute(
             "INSERT INTO perimeters (code, name, root_structure_ids) VALUES (%s, %s, %s) RETURNING id",
             (code, code, root_structure_ids or []),
@@ -66,7 +44,7 @@ def _seed_perimeter(code: str | None = None, root_structure_ids: list[int] | Non
 
 def _set_config(key: str, value: str) -> None:
     """Inscrit une clé de config (utilisée pour bloquer la suppression d'un perimeter)."""
-    with _pool() as cur:
+    with owner_pool() as cur:
         cur.execute(
             "INSERT INTO config (key, value) VALUES (%s, CAST(%s AS jsonb)) "
             "ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
@@ -75,14 +53,14 @@ def _set_config(key: str, value: str) -> None:
 
 
 def _clear_config(key: str) -> None:
-    with _pool() as cur:
+    with owner_pool() as cur:
         cur.execute("DELETE FROM config WHERE key = %s", (key,))
 
 
 @pytest.fixture(scope="module", autouse=True)
 def _cleanup_after_module():
     yield
-    with _pool() as cur:
+    with owner_pool() as cur:
         cur.execute(
             "TRUNCATE TABLE perimeters, structures, audit_log, config RESTART IDENTITY CASCADE"
         )
@@ -113,7 +91,7 @@ class TestCreatePerimeter:
         assert r.status_code == 200
         body = r.json()
         assert "id" in body
-        with _pool() as cur:
+        with owner_pool() as cur:
             cur.execute("SELECT code, name FROM perimeters WHERE id = %s", (body["id"],))
             row = cur.fetchone()
             assert row["code"] == code
@@ -126,7 +104,7 @@ class TestCreatePerimeter:
             json={"code": f"  {code}  ", "name": "  TrimMe  "},
         )
         assert r.status_code == 200
-        with _pool() as cur:
+        with owner_pool() as cur:
             cur.execute("SELECT code, name FROM perimeters WHERE id = %s", (r.json()["id"],))
             row = cur.fetchone()
             assert row["code"] == code
@@ -142,7 +120,7 @@ class TestUpdatePerimeter:
         )
         assert r.status_code == 200
         assert r.json() == {"ok": True}
-        with _pool() as cur:
+        with owner_pool() as cur:
             cur.execute("SELECT name FROM perimeters WHERE id = %s", (pid,))
             row = cur.fetchone()
             assert row["name"] == "NewName"
@@ -153,7 +131,7 @@ class TestUpdatePerimeter:
         pid = _seed_perimeter(root_structure_ids=[s1])
         r = auth_client.put(f"/api/perimeters/{pid}", json={"root_structure_ids": [s1, s2]})
         assert r.status_code == 200
-        with _pool() as cur:
+        with owner_pool() as cur:
             cur.execute("SELECT root_structure_ids FROM perimeters WHERE id = %s", (pid,))
             assert sorted(cur.fetchone()["root_structure_ids"]) == sorted([s1, s2])
 
@@ -164,7 +142,7 @@ class TestDeletePerimeter:
         r = auth_client.delete(f"/api/perimeters/{pid}")
         assert r.status_code == 200
         assert r.json() == {"ok": True}
-        with _pool() as cur:
+        with owner_pool() as cur:
             cur.execute("SELECT 1 FROM perimeters WHERE id = %s", (pid,))
             assert cur.fetchone() is None
 
@@ -183,7 +161,7 @@ class TestDeletePerimeter:
 
 
 def _perimeter_structure_ids(perimeter_id: int) -> set[int]:
-    with _pool() as cur:
+    with owner_pool() as cur:
         cur.execute(
             "SELECT structure_id FROM perimeter_structures WHERE perimeter_id = %s",
             (perimeter_id,),
@@ -198,7 +176,7 @@ class TestMaterializedPerimeterStructures:
     def test_adding_root_materializes_closure(self, auth_client):
         root = _seed_structure()
         lab = _seed_structure(type_="labo")
-        with _pool() as cur:
+        with owner_pool() as cur:
             cur.execute(
                 "INSERT INTO structure_relations (parent_id, child_id, relation_type) "
                 "VALUES (%s, %s, 'est_tutelle_de')",
@@ -212,7 +190,7 @@ class TestMaterializedPerimeterStructures:
     def test_creating_with_roots_materializes_closure(self, auth_client):
         root = _seed_structure()
         lab = _seed_structure(type_="labo")
-        with _pool() as cur:
+        with owner_pool() as cur:
             cur.execute(
                 "INSERT INTO structure_relations (parent_id, child_id, relation_type) "
                 "VALUES (%s, %s, 'est_tutelle_de')",
@@ -241,7 +219,7 @@ class TestMaterializedPerimeterStructures:
 
 
 def _audit(event_type: str, aggregate_id: int) -> list[dict]:
-    with _pool() as cur:
+    with owner_pool() as cur:
         cur.execute(
             "SELECT payload, user_id FROM audit_log "
             "WHERE event_type = %s AND aggregate_id = %s ORDER BY id",

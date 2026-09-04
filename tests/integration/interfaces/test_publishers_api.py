@@ -10,33 +10,11 @@ Couvre :
 - POST /api/publishers/{id}/merge (fusion, auth requise, 404 target/source)
 """
 
-import os
 import uuid
-from contextlib import contextmanager
 
-import psycopg
 import pytest
-from psycopg.rows import dict_row
 
-_DB_ARGS = {
-    "dbname": "bibliometrie_test",
-    "user": os.environ["DB_OWNER_USER"],
-    "host": os.environ.get("DB_HOST", "127.0.0.1"),
-    "port": int(os.environ.get("DB_PORT", "5432")),
-}
-if os.environ.get("DB_OWNER_PASSWORD"):
-    _DB_ARGS["password"] = os.environ["DB_OWNER_PASSWORD"]
-
-
-@contextmanager
-def _pool():
-    conn = psycopg.connect(**_DB_ARGS, row_factory=dict_row)
-    conn.autocommit = True
-    try:
-        with conn.cursor() as cur:
-            yield cur
-    finally:
-        conn.close()
+from tests.integration.helpers.db import owner_pool
 
 
 def _uniq(prefix: str) -> str:
@@ -45,7 +23,7 @@ def _uniq(prefix: str) -> str:
 
 def _seed_publisher(name: str | None = None) -> int:
     name = name or _uniq("Publisher")
-    with _pool() as cur:
+    with owner_pool() as cur:
         cur.execute(
             "INSERT INTO publishers (name, name_normalized) "
             "VALUES (%s, normalize_name_form(%s)) RETURNING id",
@@ -56,7 +34,7 @@ def _seed_publisher(name: str | None = None) -> int:
 
 def _seed_journal(publisher_id: int, title: str | None = None) -> int:
     title = title or _uniq("Journal")
-    with _pool() as cur:
+    with owner_pool() as cur:
         cur.execute(
             "INSERT INTO journals (title, title_normalized, publisher_id) "
             "VALUES (%s, normalize_name_form(%s), %s) RETURNING id",
@@ -69,7 +47,7 @@ def _add_in_perimeter_authorships(journal_id: int) -> None:
     """Pose un authorship in_perimeter (personne non rejetée) sur chaque
     publication de la revue : les requêtes publishers ne comptent que les
     publications du périmètre."""
-    with _pool() as cur:
+    with owner_pool() as cur:
         cur.execute("SELECT id FROM publications WHERE journal_id = %s", (journal_id,))
         pub_ids = [r["id"] for r in cur.fetchall()]
         for pid in pub_ids:
@@ -113,7 +91,7 @@ def _add_in_perimeter_authorships(journal_id: int) -> None:
 @pytest.fixture(scope="module", autouse=True)
 def _cleanup_after_module():
     yield
-    with _pool() as cur:
+    with owner_pool() as cur:
         cur.execute(
             "TRUNCATE TABLE publishers, journals, publications, "
             "publication_subjects, subjects, audit_log "
@@ -185,7 +163,7 @@ class TestListPublishers:
 
     def test_filter_by_publisher_type(self, client):
         pid = _seed_publisher()
-        with _pool() as cur:
+        with owner_pool() as cur:
             cur.execute("UPDATE publishers SET publisher_type = 'commercial' WHERE id = %s", (pid,))
         r = client.get("/api/publishers", params={"publisher_type": "commercial", "per_page": 200})
         assert r.status_code == 200
@@ -195,7 +173,7 @@ class TestListPublishers:
     def test_filter_by_country(self, client):
         pid = _seed_publisher()
         country = _uniq("XX")[:5]  # code court unique
-        with _pool() as cur:
+        with owner_pool() as cur:
             cur.execute("UPDATE publishers SET country = %s WHERE id = %s", (country, pid))
         r = client.get("/api/publishers", params={"country": country, "per_page": 200})
         assert r.status_code == 200
@@ -208,7 +186,7 @@ class TestListPublishers:
         # Éditeur avec une revue et une publi → inclus.
         with_data = _seed_publisher("WithPubsPub")
         jid = _seed_journal(with_data)
-        with _pool() as cur:
+        with owner_pool() as cur:
             cur.execute(
                 "INSERT INTO publications (title, pub_year, journal_id) VALUES ('p1', 2024, %s)",
                 (jid,),
@@ -236,7 +214,7 @@ class TestPublishersFacets:
     def test_returns_2_dimensions(self, client):
         pid = _seed_publisher()
         country = _uniq("ZZ")[:5]
-        with _pool() as cur:
+        with owner_pool() as cur:
             cur.execute("UPDATE publishers SET country = %s WHERE id = %s", (country, pid))
         r = client.get("/api/publishers/facets")
         assert r.status_code == 200
@@ -273,7 +251,7 @@ class TestGetPublisher:
         """Les préfixes DOI rattachés à un éditeur sont remontés sur la page détail."""
         name = _uniq("PrefixedPub")
         pid = _seed_publisher(name)
-        with _pool() as cur:
+        with owner_pool() as cur:
             cur.execute(
                 "INSERT INTO doi_prefixes (prefix, ra, publisher_id, crossref_member_id) "
                 "VALUES (%s, %s, %s, %s), (%s, %s, %s, %s)",
@@ -312,7 +290,7 @@ class TestPublisherDashboard:
         pid = _seed_publisher()
         j_journal = _seed_journal(pid)
         j_proc = _seed_journal(pid)
-        with _pool() as cur:
+        with owner_pool() as cur:
             cur.execute(
                 "UPDATE journals SET journal_type = 'journal' WHERE id = %s",
                 (j_journal,),
@@ -355,7 +333,7 @@ class TestPublisherSubjects:
     def test_returns_top_subjects_excluding_generic(self, client):
         pid = _seed_publisher()
         jid = _seed_journal(pid)
-        with _pool() as cur:
+        with owner_pool() as cur:
             cur.execute(
                 "INSERT INTO publications (title, pub_year, journal_id) "
                 "VALUES ('p1', 2024, %s), ('p2', 2024, %s) RETURNING id",
@@ -480,7 +458,7 @@ class TestTracabilite:
         r = auth_client.put(f"/api/publishers/{pid}", json={"country": "FR"})
         assert r.status_code == 200, r.text
 
-        with _pool() as cur:
+        with owner_pool() as cur:
             cur.execute(
                 "SELECT payload, user_id FROM audit_log "
                 "WHERE event_type = 'publisher.updated' AND aggregate_id = %s ORDER BY id",

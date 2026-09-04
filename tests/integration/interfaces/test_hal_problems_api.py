@@ -11,33 +11,11 @@ Couvre :
 
 from __future__ import annotations
 
-import os
 import uuid
-from contextlib import contextmanager
 
-import psycopg
 import pytest
-from psycopg.rows import dict_row
 
-_DB_ARGS = {
-    "dbname": "bibliometrie_test",
-    "user": os.environ["DB_OWNER_USER"],
-    "host": os.environ.get("DB_HOST", "127.0.0.1"),
-    "port": int(os.environ.get("DB_PORT", "5432")),
-}
-if os.environ.get("DB_OWNER_PASSWORD"):
-    _DB_ARGS["password"] = os.environ["DB_OWNER_PASSWORD"]
-
-
-@contextmanager
-def _pool():
-    conn = psycopg.connect(**_DB_ARGS, row_factory=dict_row)
-    conn.autocommit = True
-    try:
-        with conn.cursor() as cur:
-            yield cur
-    finally:
-        conn.close()
+from tests.integration.helpers.db import owner_pool
 
 
 def _uniq(prefix: str) -> str:
@@ -46,7 +24,7 @@ def _uniq(prefix: str) -> str:
 
 def _seed_lab(code: str | None = None, hal_collection: str | None = None) -> int:
     code = code or _uniq("LAB")
-    with _pool() as cur:
+    with owner_pool() as cur:
         cur.execute(
             "INSERT INTO structures (code, name, structure_type, hal_collection) "
             "VALUES (%s, %s, 'labo'::structure_type, %s) RETURNING id",
@@ -71,7 +49,7 @@ def _seed_lab(code: str | None = None, hal_collection: str | None = None) -> int
 @pytest.fixture(scope="module", autouse=True)
 def _cleanup_after_module():
     yield
-    with _pool() as cur:
+    with owner_pool() as cur:
         cur.execute("TRUNCATE TABLE structures RESTART IDENTITY CASCADE")
 
 

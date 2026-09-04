@@ -9,32 +9,10 @@ Couvre :
 from __future__ import annotations
 
 import json
-import os
-from contextlib import contextmanager
 
-import psycopg
 import pytest
-from psycopg.rows import dict_row
 
-_DB_ARGS = {
-    "dbname": "bibliometrie_test",
-    "user": os.environ["DB_OWNER_USER"],
-    "host": os.environ.get("DB_HOST", "127.0.0.1"),
-    "port": int(os.environ.get("DB_PORT", "5432")),
-}
-if os.environ.get("DB_OWNER_PASSWORD"):
-    _DB_ARGS["password"] = os.environ["DB_OWNER_PASSWORD"]
-
-
-@contextmanager
-def _pool():
-    conn = psycopg.connect(**_DB_ARGS, row_factory=dict_row)
-    conn.autocommit = True
-    try:
-        with conn.cursor() as cur:
-            yield cur
-    finally:
-        conn.close()
+from tests.integration.helpers.db import owner_pool
 
 
 def _metrics(duration_s: float) -> dict:
@@ -50,7 +28,7 @@ def _metrics(duration_s: float) -> dict:
 
 
 def _next_run_id() -> int:
-    with _pool() as cur:
+    with owner_pool() as cur:
         cur.execute("SELECT nextval('pipeline_run_id_seq') AS id")
         return cur.fetchone()["id"]
 
@@ -64,7 +42,7 @@ def _seed_phase(
     details: dict | None = None,
     signals: list | None = None,
 ) -> None:
-    with _pool() as cur:
+    with owner_pool() as cur:
         cur.execute(
             """
             INSERT INTO pipeline_phase_executions

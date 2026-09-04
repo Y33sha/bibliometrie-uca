@@ -6,35 +6,9 @@ status code sur une base non-contrôlée, ajouter un seed minimal
 (module-scope) pour les endpoints qui exigent un pays ou un périmètre.
 """
 
-import os
-from contextlib import contextmanager
-
-import psycopg
 import pytest
-from psycopg.rows import dict_row
 
-_DB_ARGS = {
-    "dbname": "bibliometrie_test",
-    "user": os.environ["DB_OWNER_USER"],
-    "host": os.environ.get("DB_HOST", "127.0.0.1"),
-    "port": int(os.environ.get("DB_PORT", "5432")),
-}
-if os.environ.get("DB_OWNER_PASSWORD"):
-    _DB_ARGS["password"] = os.environ["DB_OWNER_PASSWORD"]
-
-
-@contextmanager
-def _pool():
-    """Connexion directe (hors pool) pour le seed. Évite les interactions
-    subtiles avec le pool partagé par l'API (qui peut fermer ses curseurs
-    à des moments inattendus)."""
-    conn = psycopg.connect(**_DB_ARGS, row_factory=dict_row)
-    conn.autocommit = True
-    try:
-        with conn.cursor() as cur:
-            yield cur
-    finally:
-        conn.close()
+from tests.integration.helpers.db import owner_pool
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -54,7 +28,7 @@ def _seed_addresses_api(client):
     fixtures (test_addresses_service, test_authorships_service,
     test_persons_service).
     """
-    with _pool() as cur:
+    with owner_pool() as cur:
         cur.execute(
             "INSERT INTO countries (code, name) VALUES ('FR', 'France') ON CONFLICT DO NOTHING"
         )
@@ -93,7 +67,7 @@ def _seed_addresses_api(client):
     # Teardown : nettoyer ce que ce module a committé (seed + état modifié
     # par les routes API mutantes). RESTART IDENTITY évite que les ids
     # autoincrémentés ne soient consultés par des tests ultérieurs.
-    with _pool() as cur:
+    with owner_pool() as cur:
         cur.execute(
             "TRUNCATE TABLE address_structures, source_authorship_addresses, addresses, "
             "structure_name_forms, structure_relations, structures, perimeters, "
@@ -103,7 +77,7 @@ def _seed_addresses_api(client):
 
 
 def _seed_address(raw_text, countries=None):
-    with _pool() as cur:
+    with owner_pool() as cur:
         cur.execute(
             "INSERT INTO addresses (raw_text, normalized_text, countries) "
             "VALUES (%s, lower(%s), %s) RETURNING id",
@@ -113,7 +87,7 @@ def _seed_address(raw_text, countries=None):
 
 
 def _seed_structure(code):
-    with _pool() as cur:
+    with owner_pool() as cur:
         cur.execute(
             "INSERT INTO structures (code, name, structure_type) "
             "VALUES (%s, %s, 'labo') RETURNING id",
@@ -420,7 +394,7 @@ class TestAddressStats:
 
 def _evenements(event_type: str) -> list[dict]:
     """Lignes d'audit d'un type donné, dans l'ordre d'émission."""
-    with _pool() as cur:
+    with owner_pool() as cur:
         cur.execute(
             "SELECT aggregate_type, aggregate_id, payload, user_id "
             "FROM audit_log WHERE event_type = %s ORDER BY id",

@@ -8,33 +8,11 @@ Couvre :
 
 from __future__ import annotations
 
-import os
 import uuid
-from contextlib import contextmanager
 
-import psycopg
 import pytest
-from psycopg.rows import dict_row
 
-_DB_ARGS = {
-    "dbname": "bibliometrie_test",
-    "user": os.environ["DB_OWNER_USER"],
-    "host": os.environ.get("DB_HOST", "127.0.0.1"),
-    "port": int(os.environ.get("DB_PORT", "5432")),
-}
-if os.environ.get("DB_OWNER_PASSWORD"):
-    _DB_ARGS["password"] = os.environ["DB_OWNER_PASSWORD"]
-
-
-@contextmanager
-def _pool():
-    conn = psycopg.connect(**_DB_ARGS, row_factory=dict_row)
-    conn.autocommit = True
-    try:
-        with conn.cursor() as cur:
-            yield cur
-    finally:
-        conn.close()
+from tests.integration.helpers.db import owner_pool
 
 
 def _uniq(prefix: str) -> str:
@@ -55,7 +33,7 @@ def _seed_publication(
     source est supprimée comme orpheline).
     """
     title = title or _uniq("Publi")
-    with _pool() as cur:
+    with owner_pool() as cur:
         cur.execute(
             "INSERT INTO publications (title, title_normalized, doc_type, pub_year) "
             "VALUES (%s, lower(%s), CAST(%s AS doc_type), %s) RETURNING id",
@@ -74,7 +52,7 @@ def _seed_publication(
 @pytest.fixture(scope="module", autouse=True)
 def _cleanup_after_module():
     yield
-    with _pool() as cur:
+    with owner_pool() as cur:
         cur.execute(
             "TRUNCATE TABLE publications, source_publications, distinct_publications, audit_log "
             "RESTART IDENTITY CASCADE"
@@ -151,7 +129,7 @@ class TestMergeDuplicatePublications:
         # La cible survivante est le plus petit id (direction implicite).
         survivor, absorbed = sorted((a, b))
         assert r.json() == {"merged": True, "source_id": absorbed, "target_id": survivor}
-        with _pool() as cur:
+        with owner_pool() as cur:
             cur.execute("SELECT id FROM publications WHERE id IN (%s, %s)", (a, b))
             ids = {row["id"] for row in cur.fetchall()}
             assert survivor in ids
@@ -186,7 +164,7 @@ class TestMarkDistinctPublications:
         assert r.json() == {"ok": True}
         # Vérifier que la paire est persistée dans distinct_publications
         # (les ids sont normalisés en ordre min/max par le port).
-        with _pool() as cur:
+        with owner_pool() as cur:
             cur.execute(
                 "SELECT 1 FROM distinct_publications WHERE pub_id_a = %s AND pub_id_b = %s",
                 (min(a, b), max(a, b)),
