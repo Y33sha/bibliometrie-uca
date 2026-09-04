@@ -23,7 +23,7 @@ En amont se trouvent les [enregistrements sources](source_publications.md). La c
 
 La phase `publications` constitue les publications ; les phases `relations`, `oa_status`, `countries` et `authorships` enrichissent ensuite certaines colonnes.
 
-**Regroupement (`application/pipeline/publications/`).** `reconcile_components` charge les enregistrements sources marqués à retraiter et leurs voisins immédiats, puis calcule un plan avant d'écrire quoi que ce soit. Le plan regroupe par composante et par DOI, sous une règle absolue : deux DOI distincts ne se rejoignent jamais. Un enregistrement sans DOI peut en revanche rejoindre un groupe qui en porte un. L'application du plan repointe les enregistrements, crée les publications manquantes, réunit celles qui doivent l'être — les dépendants sont repointés vers la publication conservée, puis la publication vidée est supprimée — et sépare celles qui ont été rapprochées à tort. Chaque publication conservée est ensuite rafraîchie.
+**Regroupement (`application/pipeline/publications/`).** `reconcile_components` charge les enregistrements sources marqués à reprendre et leurs voisins immédiats, puis calcule un plan avant d'écrire quoi que ce soit. Le plan regroupe par composante et par DOI, sous une règle absolue : deux DOI distincts ne se rejoignent jamais. Un enregistrement sans DOI peut en revanche rejoindre un groupe qui en porte un. L'application du plan repointe les enregistrements, crée les publications manquantes, réunit celles qui doivent l'être — les dépendants sont repointés vers la publication conservée, puis la publication vidée est supprimée — et sépare celles qui ont été rapprochées à tort. Chaque publication conservée est ensuite rafraîchie.
 
 **Recalcul de l'état canonique (`refresh_from_sources`).** L'état est recalculé en entier, jamais complété au coup par coup : première valeur non nulle selon le classement des sources, statut d'accès le plus ouvert, réunion dédoublonnée des listes, arbitrage entre sous-types d'article. La règle de type de document dépendant de la revue est rejouée, puis l'ensemble est enregistré avec la liste des sources contributrices et le complément de détail. Une publication qu'aucune source n'atteste plus, ou dont le type de document est exclu, est supprimée ; ses enregistrements sources s'en détachent.
 
@@ -46,7 +46,7 @@ Deux opérations seulement, dans `interfaces/api/routers/publications.py`. Une c
 ## Lecture par le pipeline
 
 - La phase `authorships` consolide les signatures en `authorships` et lit les publications pour y reporter le périmètre.
-- La phase `subjects` verse les thématiques des enregistrements sources vers les sujets, en ne retraitant que les publications dont le contenu a changé.
+- La phase `subjects` verse les thématiques des enregistrements sources vers les sujets, en ne reprenant que les publications dont le contenu a changé.
 - La phase `countries` lit la propagation venue des adresses.
 
 ## Lecture par l'API

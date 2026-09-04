@@ -40,7 +40,7 @@ Lors d'un réimport, le rattachement à la publication est préservé, les ident
 
 **Fusion en publication canonique.** `refresh_from_sources` lit tous les enregistrements d'une publication et recalcule son état en entier. Champ par champ : première valeur non nulle selon le classement des sources ; pour le type de document, un sous-type d'article précis venu d'une source moins fiable l'emporte sur le type générique de Crossref ; pour l'accès, le statut le plus ouvert ; pour les listes, leur réunion dédoublonnée. Les valeurs lues sont déjà corrigées.
 
-**Regroupement des doublons.** Chaque enregistrement marqué à retraiter est projeté en jetons de confirmation, les enregistrements partageant un jeton sont reliés, et le plan de réconciliation décide s'il faut rapprocher, créer, réunir ou séparer, puis repointe les rattachements.
+**Regroupement des doublons.** Chaque enregistrement marqué à reprendre est projeté en jetons de confirmation, les enregistrements partageant un jeton sont reliés, et le plan de réconciliation décide s'il faut rapprocher, créer, réunir ou séparer, puis repointe les rattachements.
 
 **Autres lectures.** La phase `subjects` lit les thématiques source par source, en conservant leur provenance ; la phase `authorships` consolide les signatures ; la phase `persons` lit les signatures du périmètre.
 
