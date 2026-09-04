@@ -51,7 +51,7 @@ Les sujets alimentent aussi les palmarès affichés ailleurs — tableaux de bor
 
 **Seuls les concepts d'ontologie deviennent des sujets.** Les mots-clés libres que fournissent les sources — c'est tout ce que Crossref propose — restent sur l'enregistrement source et s'affichent avec le détail de la publication, sans entrer dans ces tables. La distinction est délibérée : un vocabulaire contrôlé se compte et se recoupe, un mot-clé libre non.
 
-**Le caractère incrémental repose sur une comparaison de dates, sans colonne dédiée.** Une publication est retraitée quand sa date de mise à jour dépasse la date du plus récent de ses liens. Il n'existe pas de marqueur explicite : la justesse du mécanisme dépend donc de ce que `refresh_from_sources` mette bien à jour cette date quand le contenu change.
+**Le caractère incrémental repose sur une comparaison de dates, sans colonne dédiée.** Une publication repasse à l'ingestion quand sa date de mise à jour dépasse la date du plus récent de ses liens. Il n'existe pas de marqueur explicite : la justesse du mécanisme dépend donc de ce que `refresh_from_sources` mette bien à jour cette date quand le contenu change.
 
 **La colonne `rejected` est respectée partout mais aucune interface ne la pose.** Elle exclut le lien du comptage d'usage et des co-occurrences, survit à l'effacement de l'ingestion, et empêche la suppression du sujet. Aucun point d'entrée ne permet aujourd'hui de la renseigner.
 
