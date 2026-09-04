@@ -20,6 +20,7 @@ from application.ports.pipeline.extract.openalex import (
     OpenalexExtractAdapter,
     OpenalexExtractConfig,
 )
+from domain.types import as_int, as_mapping, as_sequence, as_str, at_path
 
 
 def extract_year(
@@ -44,7 +45,7 @@ def extract_year(
     page_num = 0
 
     first_page = adapter.fetch_page(institution_ids, year=year, cursor=cursor, since=since)
-    total_count = first_page["meta"]["count"]
+    total_count = as_int(at_path(first_page, "meta").get("count")) or 0
     logger.info("%s works trouvés", total_count)
 
     if dry_run:
@@ -58,11 +59,11 @@ def extract_year(
         else:
             data = adapter.fetch_page(institution_ids, year=year, cursor=cursor, since=since)
 
-        results = data.get("results", [])
+        results = [as_mapping(r) for r in as_sequence(data.get("results"))]
         if not results:
             break
 
-        counts = adapter.insert_batch(conn, list(results))
+        counts = adapter.insert_batch(conn, results)
         conn.commit()
         total_new += counts.new
         total_updated += counts.updated
@@ -80,7 +81,7 @@ def extract_year(
             total_count,
         )
 
-        next_cursor = data["meta"].get("next_cursor")
+        next_cursor = as_str(at_path(data, "meta").get("next_cursor"))
         if not next_cursor:
             break
         cursor = next_cursor

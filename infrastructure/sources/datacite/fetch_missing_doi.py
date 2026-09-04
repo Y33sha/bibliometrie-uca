@@ -11,7 +11,7 @@ DataCite est la source native du DOI pour ses préfixes : un miss (DOI absent de
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 
 import httpx
 from sqlalchemy import Connection
@@ -21,6 +21,7 @@ from application.ports.pipeline.cross_imports.fetch_missing_doi import (
     not_found_marker,
 )
 from domain.publications.identifiers import clean_doi
+from domain.types import JsonValue, as_mapping, as_str
 from infrastructure.pipeline.extract.cross_import import record_doi_not_found
 from infrastructure.pipeline.extract.staging import upsert_staging
 from infrastructure.sources.api_params import API_BASE_URLS
@@ -29,13 +30,10 @@ from infrastructure.sources.http_retry import http_request_with_retry_async
 from infrastructure.sources.polite_pool import build_user_agent
 
 
-def _record_doi(record: dict) -> str | None:
+def _record_doi(record: Mapping[str, JsonValue]) -> str | None:
     """DOI canonique d'un nœud JSON:API `data` : `attributes.doi`, sinon `id` (les deux portent le DOI). Passé par `clean_doi` (normalisation partagée). `None` si aucun des deux n'est présent ou exploitable."""
     attributes = record.get("attributes")
-    doi_raw = ""
-    if isinstance(attributes, dict):
-        doi_raw = attributes.get("doi") or ""
-    doi_raw = doi_raw or record.get("id") or ""
+    doi_raw = as_str(as_mapping(attributes).get("doi")) or as_str(record.get("id")) or ""
     return clean_doi(doi_raw)
 
 
@@ -60,7 +58,9 @@ class DataciteFetchMissingDoiAdapter:
             "Accept": "application/vnd.api+json",
         }
 
-    async def fetch_async(self, client: httpx.AsyncClient, dois: list[str]) -> Iterable[dict]:
+    async def fetch_async(
+        self, client: httpx.AsyncClient, dois: list[str]
+    ) -> Iterable[Mapping[str, JsonValue]]:
         # Batch : `query=doi:"a" OR doi:"b" …`. Le champ `doi` est requêté en phrase exacte ; on remappe ensuite les nœuds reçus aux DOI demandés par comparaison stricte (lowercase), sans se fier à l'ordre ni au volume.
         clause = " OR ".join(f'doi:"{d}"' for d in dois)
         url = f"{self.base_url}/dois"
@@ -83,20 +83,18 @@ class DataciteFetchMissingDoiAdapter:
             return []
 
         # DOI demandés non retournés = confirmés absents de DataCite (source native du DOI pour ses préfixes) : miss définitif, stub `staging`.
-        found: dict[str, dict] = {}
+        found: dict[str, Mapping[str, JsonValue]] = {}
         for rec in records:
-            if isinstance(rec, dict):
-                doi = _record_doi(rec)
-                if doi:
-                    found[doi] = rec
-        out: list[dict] = list(found.values())
+            if doi := _record_doi(as_mapping(rec)):
+                found[doi] = as_mapping(rec)
+        out: list[Mapping[str, JsonValue]] = list(found.values())
         out.extend(not_found_marker(d) for d in dois if clean_doi(d) not in found)
         return out
 
-    def insert(self, conn: Connection, record: dict) -> bool:
+    def insert(self, conn: Connection, record: Mapping[str, JsonValue]) -> bool:
         if is_not_found_marker(record):
             # Source native du DOI pour ses préfixes : miss définitif → doi_lookups permanent.
-            record_doi_not_found(conn, "datacite", record["_doi"], permanent=True)
+            record_doi_not_found(conn, "datacite", as_str(record["_doi"]) or "", permanent=True)
             return False
 
         # `record` est le nœud JSON:API `data` : son `id` est le DOI, dupliqué dans `attributes.doi`, normalisé en lowercase comme les autres sources.

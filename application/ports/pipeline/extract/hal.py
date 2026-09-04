@@ -12,11 +12,12 @@ Cette unification reflète l'usage : l'orchestrateur `HalExtractor` consomme les
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Protocol
 
 from sqlalchemy import Connection
 
 from application.ports.pipeline.extract._common import UpsertOutcome
+from domain.types import JsonValue
 
 
 @dataclass(frozen=True)
@@ -49,13 +50,13 @@ class HalExtractAdapter(Protocol):
         """Filtre Solr `collCode_s:(…)` couvrant l'union des collections configurées."""
         ...
 
-    def extract_id(self, doc: dict[str, Any]) -> str: ...
+    def extract_id(self, doc: Mapping[str, JsonValue]) -> str: ...
 
-    def extract_doi(self, doc: dict[str, Any]) -> str | None: ...
+    def extract_doi(self, doc: Mapping[str, JsonValue]) -> str | None: ...
 
     # ── HTTP (l'adapter connaît la base_url via sa construction) ──
 
-    def fetch_page_cursor(self, query: str, fq: str, cursor_mark: str) -> dict[str, Any]:
+    def fetch_page_cursor(self, query: str, fq: str, cursor_mark: str) -> Mapping[str, JsonValue]:
         """Une page Solr en pagination `cursorMark` (`cursor_mark="*"` au premier appel, puis le `nextCursorMark` de la réponse précédente)."""
         ...
 
@@ -66,7 +67,7 @@ class HalExtractAdapter(Protocol):
         conn: Connection,
         hal_id: str,
         doi: str | None,
-        raw_data: dict[str, Any],
+        raw_data: Mapping[str, JsonValue],
     ) -> UpsertOutcome:
         """UPSERT staging d'un document HAL."""
         ...

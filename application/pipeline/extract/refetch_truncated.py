@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Any
+from collections.abc import Mapping
 
 import httpx
 from sqlalchemy import Connection
@@ -22,6 +22,7 @@ from application.ports.pipeline.extract.refetch_truncated import (
     OpenalexRefetchAdapter,
     TruncatedWork,
 )
+from domain.types import JsonValue, as_sequence
 
 COMMIT_EVERY = 50
 
@@ -54,15 +55,17 @@ async def refetch(
 
     processed = 0
 
-    async def _fetch(client: httpx.AsyncClient, ref: TruncatedWork) -> dict[str, Any] | None:
+    async def _fetch(
+        client: httpx.AsyncClient, ref: TruncatedWork
+    ) -> Mapping[str, JsonValue] | None:
         return await adapter.fetch_work(client, ref.openalex_id)
 
-    def _write(conn: Connection, ref: TruncatedWork, work: dict[str, Any] | None) -> None:
+    def _write(conn: Connection, ref: TruncatedWork, work: Mapping[str, JsonValue] | None) -> None:
         nonlocal processed
         if not work:
             # Fetch échoué : on garde le flag → retry au prochain run (robuste à une indisponibilité OpenAlex / un 429).
             metrics.add(errors=1)
-        elif len(work.get("authorships", [])) <= 100:
+        elif len(as_sequence(work.get("authorships"))) <= 100:
             # Genuine 100 (ou moins) : pas tronqué → on efface juste le flag, sans réécrire raw_data ni forcer une re-normalisation.
             adapter.clear_truncated(conn, ref.staging_id)
             metrics.add(already_complete=1)

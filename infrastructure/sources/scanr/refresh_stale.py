@@ -14,6 +14,7 @@ from application.ports.pipeline.extract.refresh_stale import (
     FetchOutcome,
 )
 from domain.publications.identifiers import clean_doi
+from domain.types import JsonValue, as_mapping, as_sequence, as_str
 from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.config import get_scanr_credentials
 from infrastructure.sources.http_retry import http_request_with_retry_async
@@ -33,7 +34,10 @@ class ScanrRefreshStaleAdapter(BaseRefreshStaleAdapter):
         self.auth = (username, password)
 
     async def fetch_by_native_id(self, client: httpx.AsyncClient, source_id: str) -> FetchOutcome:
-        query = {"size": 1, "query": {"term": {"id.keyword": source_id}}}
+        query: dict[str, JsonValue] = {
+            "size": 1,
+            "query": {"term": {"id.keyword": source_id}},
+        }
         try:
             data = await http_request_with_retry_async(
                 client,
@@ -46,13 +50,14 @@ class ScanrRefreshStaleAdapter(BaseRefreshStaleAdapter):
             )
         except httpx.RequestError:
             return None
-        hits = data.get("hits", {}).get("hits", [])
+        hits = as_sequence(as_mapping(data.get("hits")).get("hits"))
         if not hits:
             return NOT_FOUND
-        record = hits[0]["_source"]
+        record = as_mapping(as_mapping(hits[0]).get("_source"))
         doi = None
-        for ext in record.get("externalIds") or []:
-            if ext.get("type") == "doi":
-                doi = clean_doi(ext.get("id"))
+        for entree in as_sequence(record.get("externalIds")):
+            ext = as_mapping(entree)
+            if as_str(ext.get("type")) == "doi":
+                doi = clean_doi(as_str(ext.get("id")))
                 break
         return FetchedRecord(doi=doi, raw_data=record)

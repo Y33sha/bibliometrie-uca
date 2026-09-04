@@ -8,12 +8,14 @@ Regroupe en un seul Protocol :
 - les écritures SQL dans `staging`
 """
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Protocol
 
 from sqlalchemy import Connection
 
 from application.ports.pipeline.extract._common import UpsertOutcome
+from domain.types import JsonValue
 
 
 @dataclass(frozen=True)
@@ -45,19 +47,19 @@ class ScanrExtractAdapter(Protocol):
         self,
         year: int,
         affiliation_ids: list[str],
-        search_after: list[Any] | None = None,
+        search_after: list[JsonValue] | None = None,
         *,
         track_total: bool = False,
-    ) -> dict[str, Any]: ...
+    ) -> Mapping[str, JsonValue]: ...
 
-    def extract_id(self, doc: dict[str, Any]) -> str: ...
+    def extract_id(self, doc: Mapping[str, JsonValue]) -> str: ...
 
     # ── HTTP ───────────────────────────────────────────────────
 
-    def fetch_page(self, query: dict[str, Any]) -> dict[str, Any]: ...
+    def fetch_page(self, query: Mapping[str, JsonValue]) -> Mapping[str, JsonValue]: ...
 
     # ── SQL ────────────────────────────────────────────────────
 
-    def upsert_doc(self, conn: Connection, doc: dict[str, Any]) -> UpsertOutcome:
+    def upsert_doc(self, conn: Connection, doc: Mapping[str, JsonValue]) -> UpsertOutcome:
         """UPSERT staging d'un document ScanR."""
         ...

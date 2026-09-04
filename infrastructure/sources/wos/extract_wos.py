@@ -6,13 +6,14 @@ Implémente le port `application.ports.pipeline.extract.wos.WosExtractAdapter`. 
 from __future__ import annotations
 
 import time
-from typing import Any
+from collections.abc import Mapping
 
 import httpx
 from sqlalchemy import Connection
 
 from application.ports.pipeline.extract._common import BatchInsertCounts
 from application.ports.pipeline.extract.wos import WosExtractAdapter, WosExtractConfig
+from domain.types import JsonValue
 from infrastructure.pipeline.extract.staging import upsert_staging
 from infrastructure.sources.api_params import WOS_DELAY, WOS_PER_PAGE
 from infrastructure.sources.config import (
@@ -35,7 +36,9 @@ class PgWosExtractAdapter(WosExtractAdapter):
         self._headers = {"X-ApiKey": api_key, "Accept": "application/json"}
         self._last_request_at: float | None = None
 
-    def _get(self, params: dict[str, Any], label: str) -> dict[str, Any]:
+    def _get(
+        self, params: Mapping[str, str | int | float | bool | None], label: str
+    ) -> Mapping[str, JsonValue]:
         """GET WoS Expanded, auto rate-limité : au moins `WOS_DELAY` entre deux appels.
 
         L'adapter se rate-limite seul, quel que soit l'appelant ; l'orchestrateur garde ses pauses propres (breather périodique, backoff sur page vide, pause inter-années). On mesure l'écart depuis la dernière requête et on n'attend que le temps restant.
@@ -77,22 +80,24 @@ class PgWosExtractAdapter(WosExtractAdapter):
         """Construit la requête WoS Advanced Search (cf. `parsing`)."""
         return parsing.build_query(year, affiliations)
 
-    def get_records(self, data: dict[str, Any]) -> list[dict[str, Any]]:
+    def get_records(self, data: Mapping[str, JsonValue]) -> list[Mapping[str, JsonValue]]:
         """Extrait la liste de records d'une réponse WoS (cf. `parsing`)."""
         return parsing.get_records(data)
 
-    def get_records_found(self, data: dict[str, Any]) -> int:
+    def get_records_found(self, data: Mapping[str, JsonValue]) -> int:
         """Extrait le nombre total de records trouvés (cf. `parsing`)."""
         return parsing.get_records_found(data)
 
     # ── HTTP ───────────────────────────────────────────────────
 
-    def fetch_page(self, year: int, first_record: int, affiliations: list[str]) -> dict[str, Any]:
+    def fetch_page(
+        self, year: int, first_record: int, affiliations: list[str]
+    ) -> Mapping[str, JsonValue]:
         """Récupère une page de résultats via une recherche complète.
 
         Note : la pagination via queryId ne fonctionne pas de façon fiable (réponses vides), on refait une recherche avec firstRecord à chaque page.
         """
-        params = {
+        params: dict[str, str | int | float | bool | None] = {
             "databaseId": "WOS",
             "usrQuery": parsing.build_query(year, affiliations),
             "count": WOS_PER_PAGE,
@@ -124,7 +129,9 @@ class PgWosExtractAdapter(WosExtractAdapter):
 
     # ── SQL ────────────────────────────────────────────────────
 
-    def insert_batch(self, conn: Connection, records: list[dict[str, Any]]) -> BatchInsertCounts:
+    def insert_batch(
+        self, conn: Connection, records: list[Mapping[str, JsonValue]]
+    ) -> BatchInsertCounts:
         """UPSERT bulk d'un batch de records WoS, ventilé new/updated via `xmax`.
 
         Le caller est responsable du `conn.commit()` après cette méthode.

@@ -63,10 +63,10 @@ def get_current_breaker() -> SourceCircuitBreaker | None:
     return _current_breaker.get()
 
 
-def set_current_breaker(breaker: SourceCircuitBreaker | None) -> Token:
+def set_current_breaker(breaker: SourceCircuitBreaker | None) -> Token[SourceCircuitBreaker | None]:
     """Pose le breaker courant ; retourne le token à passer à `reset_current_breaker`."""
     return _current_breaker.set(breaker)
 
 
-def reset_current_breaker(token: Token) -> None:
+def reset_current_breaker(token: Token[SourceCircuitBreaker | None]) -> None:
     _current_breaker.reset(token)

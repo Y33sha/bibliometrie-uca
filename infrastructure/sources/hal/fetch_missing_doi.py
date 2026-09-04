@@ -7,7 +7,7 @@ Adapter async (`AsyncFetchMissingDoiAdapter`), parallélisme embarrassingly para
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 
 import httpx
 from sqlalchemy import Connection
@@ -16,6 +16,7 @@ from application.ports.pipeline.cross_imports.fetch_missing_doi import (
     is_not_found_marker,
     not_found_marker,
 )
+from domain.types import JsonValue, as_mapping, as_sequence, as_str, at_path
 from infrastructure.pipeline.extract.cross_import import record_doi_not_found
 from infrastructure.pipeline.extract.staging import upsert_staging
 from infrastructure.sources.api_params import API_BASE_URLS
@@ -37,7 +38,9 @@ class HalFetchMissingDoiAdapter:
     def configure(self, conn: Connection) -> None:
         self.base_url = API_BASE_URLS["hal"]
 
-    async def fetch_async(self, client: httpx.AsyncClient, dois: list[str]) -> Iterable[dict]:
+    async def fetch_async(
+        self, client: httpx.AsyncClient, dois: list[str]
+    ) -> Iterable[Mapping[str, JsonValue]]:
         doi = dois[0]
         try:
             data = await http_request_with_retry_async(
@@ -55,26 +58,22 @@ class HalFetchMissingDoiAdapter:
             )
         except (httpx.RequestError, httpx.HTTPStatusError):
             return []
-        docs = data.get("response", {}).get("docs", [])
+        docs = [as_mapping(d) for d in as_sequence(at_path(data, "response").get("docs"))]
         if not docs:
             # Réponse Solr valide, zéro doc : DOI confirmé absent de HAL.
             return [not_found_marker(doi)]
         return docs[:1]
 
-    def insert(self, conn: Connection, record: dict) -> bool:
+    def insert(self, conn: Connection, record: Mapping[str, JsonValue]) -> bool:
         if is_not_found_marker(record):
-            record_doi_not_found(conn, "hal", record["_doi"])
+            record_doi_not_found(conn, "hal", as_str(record["_doi"]) or "")
             return False
 
-        hal_id = record.get("halId_s")
-        if isinstance(hal_id, list):
-            hal_id = hal_id[0] if hal_id else None
+        hal_id = hal_text_field(record.get("halId_s"))
         if not hal_id:
             return False
 
-        doi = record.get("doiId_s")
-        if isinstance(doi, list):
-            doi = doi[0] if doi else None
+        doi = hal_text_field(record.get("doiId_s"))
 
         inserted, _ = upsert_staging(
             conn,
@@ -85,3 +84,10 @@ class HalFetchMissingDoiAdapter:
             entry_mode="cross_import_doi",
         )
         return inserted
+
+
+def hal_text_field(valeur: JsonValue) -> str | None:
+    """Champ HAL, qui arrive en texte ou en liste de textes (convention Solr)."""
+    if elements := as_sequence(valeur):
+        return as_str(elements[0])
+    return as_str(valeur)

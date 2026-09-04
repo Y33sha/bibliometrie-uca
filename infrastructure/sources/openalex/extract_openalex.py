@@ -6,7 +6,7 @@ Implémente le port `application.ports.pipeline.extract.openalex.OpenalexExtract
 from __future__ import annotations
 
 import time
-from typing import Any
+from collections.abc import Mapping
 
 from sqlalchemy import Connection
 
@@ -15,6 +15,7 @@ from application.ports.pipeline.extract.openalex import (
     OpenalexExtractAdapter,
     OpenalexExtractConfig,
 )
+from domain.types import JsonValue
 from infrastructure.pipeline.extract.staging import upsert_staging
 from infrastructure.sources.api_params import OPENALEX_DELAY, OPENALEX_PER_PAGE
 from infrastructure.sources.config import (
@@ -35,7 +36,7 @@ def build_params(
     year: int | None = None,
     cursor: str = "*",
     since: str | None = None,
-) -> dict[str, Any]:
+) -> Mapping[str, str | int | float | bool | None]:
     """Construit les paramètres de requête pour l'API OpenAlex `/works`.
 
     Si `since` est fourni (format `YYYY-MM-DD`), filtre sur `from_updated_date`. Sinon filtre sur `publication_year`. Le `lineage:` agrège les institutions par `|` (OR).
@@ -64,7 +65,9 @@ class PgOpenalexExtractAdapter(OpenalexExtractAdapter):
         self._url = base_url
         self._last_request_at: float | None = None
 
-    def _get(self, params: dict[str, Any], label: str) -> dict[str, Any]:
+    def _get(
+        self, params: Mapping[str, str | int | float | bool | None], label: str
+    ) -> Mapping[str, JsonValue]:
         """GET `/works`, auto rate-limité : au moins `OPENALEX_DELAY` entre deux appels.
 
         L'adapter se rate-limite seul, quel que soit l'appelant — l'orchestrateur n'ordonnance aucun `sleep`. On mesure l'écart depuis la dernière requête : le temps de traitement entre deux pages (insert batch, commit) est déjà décompté du délai.
@@ -94,7 +97,7 @@ class PgOpenalexExtractAdapter(OpenalexExtractAdapter):
 
     # ── Parsing (pur, sans I/O) ────────────────────────────────
 
-    def extract_id(self, work: dict[str, Any]) -> str:
+    def extract_id(self, work: Mapping[str, JsonValue]) -> str:
         """Extrait l'ID OpenAlex court (`W...`) d'un work (cf. `parsing`)."""
         return extract_openalex_id(work)
 
@@ -107,14 +110,16 @@ class PgOpenalexExtractAdapter(OpenalexExtractAdapter):
         year: int | None = None,
         cursor: str = "*",
         since: str | None = None,
-    ) -> dict[str, Any]:
+    ) -> Mapping[str, JsonValue]:
         params = build_params(institution_ids, year=year, cursor=cursor, since=since)
         label = f"OpenAlex {since or year}"
         return self._get(params, label)
 
     # ── SQL ────────────────────────────────────────────────────
 
-    def insert_batch(self, conn: Connection, works: list[dict[str, Any]]) -> BatchInsertCounts:
+    def insert_batch(
+        self, conn: Connection, works: list[Mapping[str, JsonValue]]
+    ) -> BatchInsertCounts:
         """UPSERT bulk d'un batch de works, ventilé new/updated/unchanged.
 
         La préservation des authorships complètes obtenues par `refetch_truncated` repose sur le fait que **refetch ne recalcule pas `raw_hash`** : la ligne refetchée garde le hash du payload bulk initial. Tant que le bulk renvoie ce même payload, la comparaison `raw_hash` reste équivalente et l'UPSERT ne touche pas `raw_data`.

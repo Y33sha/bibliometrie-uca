@@ -40,6 +40,17 @@ def as_mapping(value: JsonValue) -> Mapping[str, JsonValue]:
     return value if isinstance(value, Mapping) else {}
 
 
+def at_path(root: JsonValue, *keys: str) -> Mapping[str, JsonValue]:
+    """Objet atteint en descendant `keys` depuis `root`, ou un objet vide.
+
+    Certaines sources nichent leurs champs sous plusieurs niveaux d'objets, dont chacun peut manquer. Descendre par cette fonction évite de le vérifier niveau par niveau.
+    """
+    courant = as_mapping(root)
+    for cle in keys:
+        courant = as_mapping(courant.get(cle))
+    return courant
+
+
 def as_sequence(value: JsonValue) -> Sequence[JsonValue]:
     """Liste portée par `value`, ou une liste vide.
 

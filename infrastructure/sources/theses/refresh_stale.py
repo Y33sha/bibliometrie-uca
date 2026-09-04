@@ -13,6 +13,7 @@ from application.ports.pipeline.extract.refresh_stale import (
     FetchedRecord,
     FetchOutcome,
 )
+from domain.types import as_mapping, as_sequence, as_str
 from infrastructure.sources.api_params import API_BASE_URLS, THESES_DELAY
 from infrastructure.sources.http_retry import http_request_with_retry_async
 from infrastructure.sources.refresh_stale_base import BaseRefreshStaleAdapter
@@ -45,7 +46,8 @@ class ThesesRefreshStaleAdapter(BaseRefreshStaleAdapter):
             )
         except (httpx.RequestError, httpx.HTTPStatusError):
             return None
-        for these in data.get("theses", []):
-            if these.get("id") == source_id:
+        for entree in as_sequence(data.get("theses")):
+            these = as_mapping(entree)
+            if as_str(these.get("id")) == source_id:
                 return FetchedRecord(doi=extract_doi(these), raw_data=these)
         return NOT_FOUND

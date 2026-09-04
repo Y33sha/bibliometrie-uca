@@ -1,6 +1,6 @@
 """Tests unitaires de `application.pipeline.normalize.normalize_hal`.
 
-Couvre les helpers (as_str, get_title, upsert_journal, extract_pub_metadata), `insert_hal_document` (collections, biblio, keywords, NNT, topics), le parsing TEI (`parse_tei_author_identifiers`), `parse_author_structures` (format `_FacetSep_`/`_JoinSep_`), le parsing auteurs `build_hal_author_records` (composite + TEI), l'orchestrateur `process_work` (métadonnées minimales, happy path), et la classe `HalNormalizer` (preload, délégation).
+Couvre les helpers ( get_title, upsert_journal, extract_pub_metadata), `insert_hal_document` (collections, biblio, keywords, NNT, topics), le parsing TEI (`parse_tei_author_identifiers`), `parse_author_structures` (format `_FacetSep_`/`_JoinSep_`), le parsing auteurs `build_hal_author_records` (composite + TEI), l'orchestrateur `process_work` (métadonnées minimales, happy path), et la classe `HalNormalizer` (preload, délégation).
 
 Pattern : `FakeSourcePublicationQueries` + `FakeAuthorshipsBatchQueries` + `MagicMock`, pas de DB.
 """
@@ -18,7 +18,6 @@ from application.pipeline.normalize import normalize_hal
 from application.pipeline.normalize.normalize_hal import (
     HalNormalizer,
     active_embargo_until,
-    as_str,
     build_hal_author_records,
     extract_pub_metadata,
     get_title,
@@ -29,6 +28,7 @@ from application.pipeline.normalize.normalize_hal import (
     upsert_publisher,
 )
 from application.pipeline.normalize.pub_metadata import PublicationMetadata
+from domain.sources.hal import hal_text_field
 from tests.unit.application.pipeline.normalize.doubles import (
     FakeAuthorshipsBatchQueries,
     FakeSourcePublicationQueries,
@@ -39,24 +39,24 @@ from tests.unit.application.pipeline.normalize.doubles import (
 # ── Stubs ────────────────────────────────────────────────────────
 
 
-# ── as_str ───────────────────────────────────────────────────────
+# ── hal_text_field ───────────────────────────────────────────────────────
 
 
 class TestAsStr:
     def test_none(self):
-        assert as_str(None) is None
+        assert hal_text_field(None) is None
 
     def test_empty_list(self):
-        assert as_str([]) is None
+        assert hal_text_field([]) is None
 
     def test_list_first(self):
-        assert as_str(["a", "b"]) == "a"
+        assert hal_text_field(["a", "b"]) == "a"
 
     def test_string_passthrough(self):
-        assert as_str("hello") == "hello"
+        assert hal_text_field("hello") == "hello"
 
     def test_non_str_coerced(self):
-        assert as_str(42) == "42"
+        assert hal_text_field(42) == "42"
 
 
 # ── get_title ────────────────────────────────────────────────────

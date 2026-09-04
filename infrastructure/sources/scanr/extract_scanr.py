@@ -6,7 +6,7 @@ Implémente le port `application.ports.pipeline.extract.scanr.ScanrExtractAdapte
 from __future__ import annotations
 
 import time
-from typing import Any
+from collections.abc import Mapping, Sequence
 
 from sqlalchemy import Connection
 
@@ -16,6 +16,7 @@ from application.ports.pipeline.extract.scanr import (
     ScanrExtractConfig,
 )
 from domain.publications.identifiers import clean_doi
+from domain.types import JsonValue, as_mapping, as_sequence, as_str
 from infrastructure.pipeline.extract.staging import upsert_staging
 from infrastructure.sources.api_params import SCANR_DELAY, SCANR_PER_PAGE
 from infrastructure.sources.config import (
@@ -26,11 +27,12 @@ from infrastructure.sources.config import (
 from infrastructure.sources.http_retry import http_request_with_retry
 
 
-def extract_doi(doc: dict[str, Any]) -> str | None:
+def extract_doi(doc: Mapping[str, JsonValue]) -> str | None:
     """Extrait le premier DOI nettoyé depuis `externalIds` d'un document ScanR."""
-    for ext in doc.get("externalIds") or []:
-        if ext.get("type") == "doi":
-            return clean_doi(ext.get("id"))
+    for entree in as_sequence(doc.get("externalIds")):
+        ext = as_mapping(entree)
+        if as_str(ext.get("type")) == "doi":
+            return clean_doi(as_str(ext.get("id")))
     return None
 
 
@@ -45,7 +47,7 @@ class PgScanrExtractAdapter(ScanrExtractAdapter):
         self._auth = credentials
         self._last_request_at: float | None = None
 
-    def _search(self, query: dict[str, Any]) -> dict[str, Any]:
+    def _search(self, query: Mapping[str, JsonValue]) -> Mapping[str, JsonValue]:
         """POST Elasticsearch, auto rate-limité : au moins `SCANR_DELAY` entre deux appels.
 
         L'adapter se rate-limite seul, quel que soit l'appelant — l'orchestrateur n'ordonnance aucun `sleep`. On mesure l'écart depuis la dernière requête : le temps de traitement entre deux pages (upserts, commits intermédiaires) est déjà décompté du délai.
@@ -86,17 +88,17 @@ class PgScanrExtractAdapter(ScanrExtractAdapter):
         self,
         year: int,
         affiliation_ids: list[str],
-        search_after: list[Any] | None = None,
+        search_after: Sequence[JsonValue] | None = None,
         *,
         track_total: bool = False,
-    ) -> dict[str, Any]:
+    ) -> Mapping[str, JsonValue]:
         """Construit la requête Elasticsearch pour ScanR.
 
         Tout est en **contexte `filter`** : un `term` sur l'année et un `terms` sur les affiliations (« au moins une de la liste » — équivalent strict du `minimum_should_match: 1` d'un `should`). Le contexte `filter` ne calcule aucun `_score` et est cacheable côté cluster ; mesuré ~9× plus rapide que l'équivalent `must`/`should` scoré (≈1 s vs ≈9,5 s par page de 200 sur le cluster ScanR), pour un résultat identique : le tri se fait sur `id.keyword` ASC, le score ne sert pas. Ce tri permet la pagination `search_after`.
 
         `track_total` ne demande le comptage exact du set (`track_total_hits`) que sur la première page : Elasticsearch recompte sinon l'intégralité des résultats à *chaque* page, alors que le total n'est consommé qu'une fois (log + dénominateur de progression). Les pages suivantes le coupent (`False`), ce qui évite un full-count par page sur des sets de ~15k docs.
         """
-        query: dict[str, Any] = {
+        query: dict[str, JsonValue] = {
             "size": SCANR_PER_PAGE,
             "track_total_hits": track_total,
             "query": {
@@ -110,26 +112,26 @@ class PgScanrExtractAdapter(ScanrExtractAdapter):
             "sort": [{"id.keyword": "asc"}],
         }
         if search_after:
-            query["search_after"] = search_after
+            query["search_after"] = list(search_after)
         return query
 
-    def extract_id(self, doc: dict[str, Any]) -> str:
+    def extract_id(self, doc: Mapping[str, JsonValue]) -> str:
         """Extrait l'identifiant ScanR (champ `id` du document)."""
-        return doc.get("id", "")
+        return as_str(doc.get("id")) or ""
 
-    def extract_doi(self, doc: dict[str, Any]) -> str | None:
+    def extract_doi(self, doc: Mapping[str, JsonValue]) -> str | None:
         """Extrait le premier DOI nettoyé depuis `externalIds`."""
         return extract_doi(doc)
 
     # ── HTTP ───────────────────────────────────────────────────
 
-    def fetch_page(self, query: dict[str, Any]) -> dict[str, Any]:
+    def fetch_page(self, query: Mapping[str, JsonValue]) -> Mapping[str, JsonValue]:
         """Exécute une requête Elasticsearch (avec retry/backoff)."""
         return self._search(query)
 
     # ── SQL ────────────────────────────────────────────────────
 
-    def upsert_doc(self, conn: Connection, doc: dict[str, Any]) -> UpsertOutcome:
+    def upsert_doc(self, conn: Connection, doc: Mapping[str, JsonValue]) -> UpsertOutcome:
         """UPSERT staging via le helper canonique."""
         inserted, changed = upsert_staging(
             conn,

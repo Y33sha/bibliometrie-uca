@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any
+from collections.abc import Mapping
 
 import httpx
 from sqlalchemy import Connection
@@ -78,7 +78,7 @@ async def run_async(
 
     async def _fetch(
         client: httpx.AsyncClient, item: tuple[int, list[str]]
-    ) -> list[dict[str, Any]]:
+    ) -> list[Mapping[str, JsonValue]]:
         batch_idx, batch = item
         try:
             records = list(await adapter.fetch_async(client, batch))
@@ -92,7 +92,7 @@ async def run_async(
         return records
 
     def _write(
-        conn: Connection, item: tuple[int, list[str]], records: list[dict[str, Any]]
+        conn: Connection, item: tuple[int, list[str]], records: list[Mapping[str, JsonValue]]
     ) -> None:
         batch_idx, batch = item
         real = [r for r in records if not is_not_found_marker(r)]
@@ -158,3 +158,6 @@ async def run_async(
         new=progress["inserted"],
         extras={"fetched": progress["fetched"], "not_found": progress["not_found"]},
     )
+
+
+from domain.types import JsonValue

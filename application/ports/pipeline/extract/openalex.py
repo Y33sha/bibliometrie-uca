@@ -10,11 +10,12 @@ Regroupe en un seul Protocol :
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Protocol
 
 from sqlalchemy import Connection
 
 from application.ports.pipeline.extract._common import BatchInsertCounts
+from domain.types import JsonValue
 
 
 @dataclass(frozen=True)
@@ -42,7 +43,7 @@ class OpenalexExtractAdapter(Protocol):
     # L'orchestrateur entretient `existing_ids` sans connaître le format
     # de l'ID OpenAlex (URL complète à raboter) : il délègue au port.
 
-    def extract_id(self, work: dict[str, Any]) -> str: ...
+    def extract_id(self, work: Mapping[str, JsonValue]) -> str: ...
 
     # ── HTTP (l'adapter connaît la base_url et l'auth via sa construction) ──
 
@@ -53,10 +54,12 @@ class OpenalexExtractAdapter(Protocol):
         year: int | None = None,
         cursor: str = "*",
         since: str | None = None,
-    ) -> Mapping[str, Any]: ...
+    ) -> Mapping[str, JsonValue]: ...
 
     # ── SQL ────────────────────────────────────────────────────
 
-    def insert_batch(self, conn: Connection, works: list[dict[str, Any]]) -> BatchInsertCounts:
+    def insert_batch(
+        self, conn: Connection, works: list[Mapping[str, JsonValue]]
+    ) -> BatchInsertCounts:
         """UPSERT staging d'un batch de works, ventilé new/updated via `xmax`."""
         ...

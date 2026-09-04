@@ -10,11 +10,13 @@ sources.
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable, Iterable
-from typing import Any, Protocol
+from collections.abc import Awaitable, Callable, Iterable, Mapping
+from typing import Protocol
 
 import httpx
 from sqlalchemy import Connection
+
+from domain.types import JsonValue
 
 CrossImportDoisReader = Callable[[Connection, str], list[str]]
 """Signature : `(conn, target) -> list[doi]`.
@@ -25,7 +27,7 @@ La fonction elle-même (`infrastructure.pipeline.extract.cross_import.get_cross_
 _NOT_FOUND_STATUS = "not_found"
 
 
-def not_found_marker(doi: str) -> dict[str, Any]:
+def not_found_marker(doi: str) -> Mapping[str, JsonValue]:
     """Sentinelle « DOI introuvable » émise par `fetch_async`.
 
     Un adapter émet ce marqueur (au lieu d'un record API) pour un DOI que
@@ -39,7 +41,7 @@ def not_found_marker(doi: str) -> dict[str, Any]:
     return {"_status": _NOT_FOUND_STATUS, "_doi": doi}
 
 
-def is_not_found_marker(record: dict[str, Any]) -> bool:
+def is_not_found_marker(record: Mapping[str, JsonValue]) -> bool:
     """True si `record` est une sentinelle `not_found_marker`."""
     return record.get("_status") == _NOT_FOUND_STATUS
 
@@ -64,11 +66,11 @@ class AsyncFetchMissingDoiAdapter(Protocol):
 
     def fetch_async(
         self, client: httpx.AsyncClient, dois: list[str]
-    ) -> Awaitable[Iterable[dict[str, Any]]]:
+    ) -> Awaitable[Iterable[Mapping[str, JsonValue]]]:
         """Interroge l'API pour un lot (1 à `batch_size` DOI) via le client
         async partagé. Retourne les records trouvés (vide si rien trouvé)."""
 
-    def insert(self, conn: Connection, record: dict[str, Any]) -> bool:
+    def insert(self, conn: Connection, record: Mapping[str, JsonValue]) -> bool:
         """Insère le record dans staging. Retourne True si nouveau, False
         si déjà présent (ON CONFLICT DO NOTHING) ou non inséré. Ne commite
         pas : `run_async` commite par lot."""

@@ -1,8 +1,8 @@
 """Base commune des modèles de colonne JSONB."""
 
-from typing import Any
-
 from pydantic import BaseModel
+
+from domain.types import JsonValue
 
 
 class JsonbModel(BaseModel):
@@ -11,6 +11,6 @@ class JsonbModel(BaseModel):
     `to_dict` sérialise pour l'écriture en base en omettant les clés None.
     """
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> dict[str, JsonValue]:
         """Sérialise pour écriture en base (colonne JSONB). Omet les clés None."""
         return self.model_dump(exclude_none=True)

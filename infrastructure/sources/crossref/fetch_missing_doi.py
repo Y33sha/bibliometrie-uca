@@ -10,7 +10,7 @@ Crossref est la source native du DOI : un 404 est définitif (DOI erroné ou non
 from __future__ import annotations
 
 import urllib.parse
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 
 import httpx
 from sqlalchemy import Connection
@@ -20,6 +20,7 @@ from application.ports.pipeline.cross_imports.fetch_missing_doi import (
     not_found_marker,
 )
 from domain.publications.identifiers import clean_doi
+from domain.types import JsonValue, as_str
 from infrastructure.pipeline.extract.cross_import import record_doi_not_found
 from infrastructure.pipeline.extract.staging import upsert_staging
 from infrastructure.sources.api_params import API_BASE_URLS
@@ -45,7 +46,9 @@ class CrossrefFetchMissingDoiAdapter:
         email = get_polite_pool_email()
         self.headers = {"User-Agent": build_user_agent(email)}
 
-    async def fetch_async(self, client: httpx.AsyncClient, dois: list[str]) -> Iterable[dict]:
+    async def fetch_async(
+        self, client: httpx.AsyncClient, dois: list[str]
+    ) -> Iterable[Mapping[str, JsonValue]]:
         doi = dois[0]
         # CrossRef accepte le DOI tel quel dans le path (slashes inclus, qui font partie d'à peu près 100 % des DOI). On ne quote que les caractères vraiment dangereux.
         url = f"{self.base_url}/works/{urllib.parse.quote(doi, safe='/()')}"
@@ -71,14 +74,14 @@ class CrossrefFetchMissingDoiAdapter:
             return []
         return [message]
 
-    def insert(self, conn: Connection, record: dict) -> bool:
+    def insert(self, conn: Connection, record: Mapping[str, JsonValue]) -> bool:
         if is_not_found_marker(record):
             # Source native du DOI : un 404 est définitif → doi_lookups permanent, jamais retenté.
-            record_doi_not_found(conn, "crossref", record["_doi"], permanent=True)
+            record_doi_not_found(conn, "crossref", as_str(record["_doi"]) or "", permanent=True)
             return False
 
         # DOI = identifiant CrossRef. On le passe par `clean_doi` (normalisation canonique partagée : lowercase, strip URL/ponctuation/suffixes) pour rester cohérent avec les autres sources et la colonne `doi`.
-        doi = clean_doi(record.get("DOI"))
+        doi = clean_doi(as_str(record.get("DOI")))
         if not doi:
             return False
         inserted, _ = upsert_staging(

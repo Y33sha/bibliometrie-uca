@@ -4,12 +4,13 @@ Validation à la construction (via les VO domain pour les identifiants), sérial
 """
 
 from collections.abc import Callable
-from typing import Any, Protocol
+from typing import Protocol
 
 from pydantic import BaseModel, ConfigDict, ValidationInfo, field_validator
 
 from application.ports.read_models.publications_queries import EcoleDoctorale, PartenaireThese
 from domain.publications.identifiers import DOI, NNT, PMCID, PMID, ArxivId, HALId
+from domain.types import JsonValue
 from infrastructure.jsonb_models._base import JsonbModel
 
 __all__ = [
@@ -190,4 +191,4 @@ class PublicationTopics(JsonbModel):
     openalex: list[OpenAlexTopic] | None = None
     theses: ThesesTopics | None = None
     # ScanR a un format variable côté API, non figé en sous-modèle Pydantic.
-    scanr: dict[str, Any] | None = None
+    scanr: dict[str, JsonValue] | None = None

@@ -6,7 +6,7 @@ Implémente le port `application.ports.pipeline.extract.theses.ThesesExtractAdap
 from __future__ import annotations
 
 import time
-from typing import Any
+from collections.abc import Mapping
 
 from sqlalchemy import Connection
 
@@ -16,13 +16,14 @@ from application.ports.pipeline.extract.theses import (
     ThesesExtractConfig,
 )
 from domain.publications.identifiers import clean_doi
+from domain.types import JsonValue, as_str
 from infrastructure.pipeline.extract.staging import upsert_staging
 from infrastructure.sources.api_params import THESES_DELAY, THESES_PER_PAGE
 from infrastructure.sources.config import get_extraction_api_ids
 from infrastructure.sources.http_retry import http_request_with_retry
 
 
-def extract_doi(these: dict[str, Any]) -> str | None:
+def extract_doi(these: Mapping[str, JsonValue]) -> str | None:
     """Extrait le DOI nettoyé d'une thèse (champ `doi`), ou `None`."""
     doi = these.get("doi")
     return clean_doi(doi) if isinstance(doi, str) else None
@@ -38,7 +39,9 @@ class PgThesesExtractAdapter(ThesesExtractAdapter):
         self._url = base_url
         self._last_request_at: float | None = None
 
-    def _get(self, params: dict[str, Any], label: str) -> dict[str, Any]:
+    def _get(
+        self, params: Mapping[str, str | int | float | bool | None], label: str
+    ) -> Mapping[str, JsonValue]:
         """GET theses.fr, auto rate-limité : au moins `THESES_DELAY` entre deux appels.
 
         L'adapter se rate-limite seul, quel que soit l'appelant — l'orchestrateur n'ordonnance aucun `sleep`. On mesure l'écart depuis la dernière requête : le temps de traitement entre deux pages (upserts, commit) est déjà décompté du délai.
@@ -68,22 +71,22 @@ class PgThesesExtractAdapter(ThesesExtractAdapter):
         """Taille de page theses.fr (max accepté par l'API ; cf. `api_params`)."""
         return THESES_PER_PAGE
 
-    def extract_id(self, these: dict[str, Any]) -> str:
+    def extract_id(self, these: Mapping[str, JsonValue]) -> str:
         """Extrait l'identifiant unique d'une thèse (champ `id`).
 
         Pour les thèses soutenues, c'est le NNT (ex: `2021UCFAC022`) ; pour les thèses en cours, c'est un id theses.fr (ex: `s367812`). Les deux vivent dans la même colonne `id` de l'API recherche.
         """
-        return these.get("id", "")
+        return as_str(these.get("id")) or ""
 
-    def extract_doi(self, these: dict[str, Any]) -> str | None:
+    def extract_doi(self, these: Mapping[str, JsonValue]) -> str | None:
         """Extrait le DOI s'il est présent et non vide, sinon `None`."""
         return extract_doi(these)
 
     # ── HTTP ───────────────────────────────────────────────────
 
-    def fetch_page(self, query: str, *, debut: int, nombre: int) -> dict[str, Any]:
+    def fetch_page(self, query: str, *, debut: int, nombre: int) -> Mapping[str, JsonValue]:
         """Récupère une page de résultats depuis l'API theses.fr."""
-        params = {
+        params: dict[str, str | int | float | bool | None] = {
             "q": query,
             "debut": debut,
             "nombre": nombre,
@@ -92,7 +95,7 @@ class PgThesesExtractAdapter(ThesesExtractAdapter):
 
     # ── SQL ────────────────────────────────────────────────────
 
-    def upsert_these(self, conn: Connection, these: dict[str, Any]) -> UpsertOutcome:
+    def upsert_these(self, conn: Connection, these: Mapping[str, JsonValue]) -> UpsertOutcome:
         """UPSERT staging via le helper canonique."""
         inserted, changed = upsert_staging(
             conn,

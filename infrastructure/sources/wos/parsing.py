@@ -5,9 +5,10 @@ Partagé par l'adapter d'extraction (`extract_wos`) et l'adapter fetch-missing-d
 
 from __future__ import annotations
 
-from typing import Any
+from collections.abc import Mapping
 
 from domain.publications.identifiers import clean_doi
+from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, at_path
 
 # ── Requête WoS Advanced Search ───────────────────────────────────
 
@@ -26,55 +27,40 @@ def build_query(year: int, affiliations: list[str]) -> str:
 # ── Parsing de records ─────────────────────────────────────────────
 
 
-def extract_ut(rec: dict[str, Any]) -> str:
+def extract_ut(rec: Mapping[str, JsonValue]) -> str:
     """Extrait le WoS UID (ex: `WOS:000819841500009`).
 
     Le champ est obligatoire dans la réponse WoS — `KeyError` si absent (cas anormal qui doit remonter à l'appelant).
     """
-    return rec["UID"]
+    return as_str(rec["UID"]) or ""
 
 
-def get_records(data: dict[str, Any]) -> list[dict[str, Any]]:
+def get_records(data: Mapping[str, JsonValue]) -> list[Mapping[str, JsonValue]]:
     """Extrait la liste de records depuis la réponse API WoS.
 
     Chemin profond `data.Data.Records.records.REC`. Retourne `[]` si n'importe quel niveau manque (réponse mal formée ou vide).
     """
-    try:
-        return data["Data"]["Records"]["records"]["REC"]
-    except (KeyError, TypeError):
-        return []
+    records = at_path(data, "Data", "Records", "records").get("REC")
+    return [as_mapping(r) for r in as_sequence(records)]
 
 
-def get_records_found(data: dict[str, Any]) -> int:
+def get_records_found(data: Mapping[str, JsonValue]) -> int:
     """Extrait le nombre total de records trouvés depuis la réponse API WoS."""
-    try:
-        return data["QueryResult"]["RecordsFound"]
-    except (KeyError, TypeError):
-        return 0
+    return as_int(as_mapping(data.get("QueryResult")).get("RecordsFound")) or 0
 
 
-def extract_doi(rec: dict[str, Any]) -> str | None:
+def extract_doi(rec: Mapping[str, JsonValue]) -> str | None:
     """Extrait le DOI depuis les identifiants WoS, ou `None`.
 
     L'API WoS retourne les identifiants à un emplacement profond (`dynamic_data.cluster_related.identifiers.identifier`) et de forme polymorphique : tantôt une liste de dicts, tantôt un dict unique quand il n'y a qu'un seul identifiant. Le code tolère les deux formes et les absences à chaque niveau.
     """
-    try:
-        identifiers = (
-            rec.get("dynamic_data", {})
-            .get("cluster_related", {})
-            .get("identifiers", {})
-            .get("identifier", [])
-        )
-        if isinstance(identifiers, dict):
-            identifiers = [identifiers]
-        if not isinstance(identifiers, list):
-            return None
-        for ident in identifiers:
-            if isinstance(ident, dict) and ident.get("type") == "doi":
-                val = ident.get("value")
-                return clean_doi(str(val)) if val is not None else None
-    except (KeyError, TypeError, AttributeError):
-        pass
+    brut = at_path(rec, "dynamic_data", "cluster_related", "identifiers").get("identifier")
+    identifiers = [brut] if isinstance(brut, Mapping) else as_sequence(brut)
+    for entree in identifiers:
+        ident = as_mapping(entree)
+        if as_str(ident.get("type")) == "doi":
+            val = ident.get("value")
+            return clean_doi(str(val)) if val is not None else None
     return None
 
 

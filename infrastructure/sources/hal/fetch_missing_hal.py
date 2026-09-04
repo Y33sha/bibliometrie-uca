@@ -7,7 +7,7 @@ L'orchestration (combinaison des refs, dedup, boucles async, commits intermédia
 
 from __future__ import annotations
 
-from typing import Any
+from collections.abc import Mapping
 
 import httpx
 from sqlalchemy import Connection, text
@@ -18,6 +18,7 @@ from application.ports.pipeline.cross_imports.fetch_missing_hal import (
     NntInsertResult,
     NntRef,
 )
+from domain.types import JsonValue, as_mapping, as_sequence, as_str
 from infrastructure.pipeline.extract.staging import upsert_not_found_stub, upsert_staging
 from infrastructure.sources.api_params import API_BASE_URLS, HAL_DELAY
 from infrastructure.sources.hal.extract_hal import extract_doi
@@ -29,7 +30,7 @@ from infrastructure.sources.http_retry import http_request_with_retry_async
 HAL_MAX_CONCURRENT = 5
 
 
-def find_hal_ids_from_openalex(conn: Connection) -> list[dict[str, Any]]:
+def find_hal_ids_from_openalex(conn: Connection) -> list[dict[str, str | None]]:
     """halIds référencés par des `source_publications` OpenAlex in-périmètre, absents de staging HAL.
 
     Source : `source_publications` OpenAlex des publications `in_perimeter` (`external_ids.hal_id`, liste ; toutes locations, pas seulement la primary), normalisés à un run antérieur. Ne cross-importer que des hal-ids portés par des publications confirmées UCA coupe la propagation hors-périmètre ; les documents fraîchement extraits sont rattrapés au run suivant (pipeline convergent).
@@ -49,7 +50,7 @@ def find_hal_ids_from_openalex(conn: Connection) -> list[dict[str, Any]]:
             """
         )
     ).all()
-    results: dict[str, dict[str, Any]] = {
+    results: dict[str, dict[str, str | None]] = {
         row.hal_id: {"openalex_id": row.openalex_id, "hal_id": row.hal_id, "landing_url": None}
         for row in rows
     }
@@ -64,7 +65,7 @@ def find_hal_ids_from_openalex(conn: Connection) -> list[dict[str, Any]]:
     return [r for hal_id, r in results.items() if hal_id not in already_staged]
 
 
-def find_hal_ids_from_scanr(conn: Connection) -> list[dict[str, Any]]:
+def find_hal_ids_from_scanr(conn: Connection) -> list[dict[str, str | None]]:
     """halIds référencés par des `source_publications` ScanR in-périmètre, absents de staging HAL.
 
     Source : `source_publications` ScanR des publications `in_perimeter` (`external_ids.hal_id`, liste), normalisés à un run antérieur. Cf. `find_hal_ids_from_openalex` pour le choix du périmètre et le lag n+1.
@@ -87,14 +88,14 @@ def find_hal_ids_from_scanr(conn: Connection) -> list[dict[str, Any]]:
             """
         )
     ).all()
-    results: dict[str, dict[str, Any]] = {
+    results: dict[str, dict[str, str | None]] = {
         row.hal_id: {"source": "scanr", "hal_id": row.hal_id, "scanr_id": row.scanr_id}
         for row in rows
     }
     return list(results.values())
 
 
-def find_nnt_without_hal(conn: Connection) -> list[dict[str, Any]]:
+def find_nnt_without_hal(conn: Connection) -> list[dict[str, str | None]]:
     """NNT (thèses soutenues) sans document HAL associé.
 
     Recherche via `source_publications.external_ids->>'nnt'` pour les publications `in_perimeter` qui n'ont pas `'hal'` dans leurs sources et ne sont pas de type `ongoing_thesis`.
@@ -121,7 +122,9 @@ def find_nnt_without_hal(conn: Connection) -> list[dict[str, Any]]:
     return [{"source": "nnt", "nnt": row.nnt, "theses_id": row.theses_id} for row in rows]
 
 
-def insert_staging_hal(conn: Connection, hal_id: str, doi: str | None, doc: dict[str, Any]) -> None:
+def insert_staging_hal(
+    conn: Connection, hal_id: str, doi: str | None, doc: Mapping[str, JsonValue]
+) -> None:
     """Insère un document dans staging HAL.
 
     Si le document existe et a changé (hash différent), met à jour et remet `processed = FALSE`.
@@ -154,8 +157,8 @@ class PgHalFetchMissingAdapter(HalFetchMissingAdapter):
         return [
             HalIdRef(
                 source="openalex",
-                hal_id=r["hal_id"],
-                foreign_id=r["openalex_id"],
+                hal_id=r["hal_id"] or "",
+                foreign_id=r["openalex_id"] or "",
                 landing_url=r.get("landing_url"),
             )
             for r in find_hal_ids_from_openalex(conn)
@@ -163,16 +166,21 @@ class PgHalFetchMissingAdapter(HalFetchMissingAdapter):
 
     def find_halid_refs_from_scanr(self, conn: Connection) -> list[HalIdRef]:
         return [
-            HalIdRef(source="scanr", hal_id=r["hal_id"], foreign_id=r["scanr_id"])
+            HalIdRef(source="scanr", hal_id=r["hal_id"] or "", foreign_id=r["scanr_id"] or "")
             for r in find_hal_ids_from_scanr(conn)
         ]
 
     def find_nnt_refs_from_theses(self, conn: Connection) -> list[NntRef]:
-        return [NntRef(nnt=r["nnt"], theses_id=r["theses_id"]) for r in find_nnt_without_hal(conn)]
+        return [
+            NntRef(nnt=r["nnt"] or "", theses_id=r["theses_id"] or "")
+            for r in find_nnt_without_hal(conn)
+        ]
 
     # ── HTTP ───────────────────────────────────────────────────
 
-    async def fetch_by_halid(self, client: httpx.AsyncClient, hal_id: str) -> dict[str, Any] | None:
+    async def fetch_by_halid(
+        self, client: httpx.AsyncClient, hal_id: str
+    ) -> Mapping[str, JsonValue] | None:
         try:
             data = await http_request_with_retry_async(
                 client,
@@ -189,10 +197,12 @@ class PgHalFetchMissingAdapter(HalFetchMissingAdapter):
             )
         except (httpx.HTTPStatusError, httpx.RequestError):
             return None
-        docs = data.get("response", {}).get("docs", [])
-        return docs[0] if docs else None
+        docs = as_sequence(as_mapping(data.get("response")).get("docs"))
+        return as_mapping(docs[0]) if docs else None
 
-    async def fetch_by_nnt(self, client: httpx.AsyncClient, nnt: str) -> dict[str, Any] | None:
+    async def fetch_by_nnt(
+        self, client: httpx.AsyncClient, nnt: str
+    ) -> Mapping[str, JsonValue] | None:
         try:
             data = await http_request_with_retry_async(
                 client,
@@ -209,13 +219,13 @@ class PgHalFetchMissingAdapter(HalFetchMissingAdapter):
             )
         except (httpx.HTTPStatusError, httpx.RequestError):
             return None
-        docs = data.get("response", {}).get("docs", [])
-        return docs[0] if docs else None
+        docs = as_sequence(as_mapping(data.get("response")).get("docs"))
+        return as_mapping(docs[0]) if docs else None
 
     # ── SQL (inserts) ──────────────────────────────────────────
 
     def insert_halid_result(
-        self, conn: Connection, hal_id: str, doc: dict[str, Any] | None
+        self, conn: Connection, hal_id: str, doc: Mapping[str, JsonValue] | None
     ) -> bool:
         if doc:
             insert_staging_hal(conn, hal_id, extract_doi(doc), doc)
@@ -224,11 +234,11 @@ class PgHalFetchMissingAdapter(HalFetchMissingAdapter):
         return False
 
     def insert_nnt_result(
-        self, conn: Connection, nnt: str, doc: dict[str, Any] | None
+        self, conn: Connection, nnt: str, doc: Mapping[str, JsonValue] | None
     ) -> NntInsertResult:
         if not doc:
             return NntInsertResult(api_found=False, inserted=False)
-        hal_id = doc.get("halId_s")
+        hal_id = as_str(doc.get("halId_s"))
         if not hal_id:
             return NntInsertResult(api_found=True, inserted=False)
         exists = conn.execute(
