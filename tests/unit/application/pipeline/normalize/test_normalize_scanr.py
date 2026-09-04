@@ -9,6 +9,7 @@ Pattern : `FakeSourcePublicationQueries` + `MagicMock`, pas de DB.
 
 from __future__ import annotations
 
+from dataclasses import replace as _remplacer
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -27,23 +28,24 @@ from application.pipeline.normalize.normalize_scanr import (
     upsert_journal,
     upsert_publisher,
 )
+from application.pipeline.normalize.pub_metadata import PublicationMetadata
 from tests.unit.application.pipeline.normalize.doubles import (
     FakeSourcePublicationQueries,
     FakeStagingQueries,
     staging_row,
 )
 
-_EMPTY_PUB_META: dict[str, Any] = {
-    "doi": None,
-    "title": None,
-    "pub_year": None,
-    "doc_type": None,
-    "nnt": None,
-    "journal_id": None,
-    "oa_status": None,
-    "language": None,
-    "container_title": None,
-}
+_EMPTY_PUB_META = PublicationMetadata(
+    doi=None,
+    title=None,
+    pub_year=None,
+    doc_type=None,
+    nnt=None,
+    journal_id=None,
+    oa_status=None,
+    language=None,
+    container_title=None,
+)
 
 
 class TestInsertScanrDocumentBiblio:
@@ -126,12 +128,12 @@ class TestInsertScanrDocumentExternalIds:
                 {"type": "hal", "id": "hal-1"},
             ]
         }
-        captured = self._call(doc, {**_EMPTY_PUB_META, "doi": "10.1/primary"})
+        captured = self._call(doc, _remplacer(_EMPTY_PUB_META, doi="10.1/primary"))
         assert captured.external_ids["related_dois"] == ["10.2/anie"]
 
     def test_related_dois_absent_when_only_primary(self):
         doc = {"externalIds": [{"type": "doi", "id": "10.1/primary"}]}
-        captured = self._call(doc, {**_EMPTY_PUB_META, "doi": "10.1/primary"})
+        captured = self._call(doc, _remplacer(_EMPTY_PUB_META, doi="10.1/primary"))
         assert "related_dois" not in (captured.external_ids or {})
 
 
@@ -264,26 +266,26 @@ class TestExtractPubMetadata:
 
         meta = extract_pub_metadata(doc, journal_id=3, scanr_id="doi10.1/a")
 
-        assert meta["title"] == "Un titre"
-        assert meta["pub_year"] == 2024
-        assert meta["doi"] == "10.1/a"
-        assert meta["oa_status"] == "closed"
-        assert meta["nnt"] is None
-        assert meta["container_title"] is None  # la revue est créée : son titre n'est pas recopié
-        assert meta["language"] is None  # la source ne l'expose pas
+        assert meta.title == "Un titre"
+        assert meta.pub_year == 2024
+        assert meta.doi == "10.1/a"
+        assert meta.oa_status == "closed"
+        assert meta.nnt is None
+        assert meta.container_title is None  # la revue est créée : son titre n'est pas recopié
+        assert meta.language is None  # la source ne l'expose pas
 
     def test_titre_de_contenant_conserve_faute_de_revue(self):
         doc = {"source": {"title": "Actes du colloque"}}
 
         meta = extract_pub_metadata(doc, journal_id=None)
 
-        assert meta["container_title"] == "Actes du colloque"
+        assert meta.container_title == "Actes du colloque"
 
     def test_these_reconnue_a_son_identifiant(self):
         """La source encode les thèses en préfixant leur numéro national."""
         meta = extract_pub_metadata({}, journal_id=None, scanr_id="these2021CLFAC030")
 
-        assert meta["nnt"] == "2021CLFAC030"
+        assert meta.nnt == "2021CLFAC030"
 
 
 class TestInsertScanrDocumentIdentifiants:
@@ -300,7 +302,7 @@ class TestInsertScanrDocumentIdentifiants:
         return queries.upserted_documents[-1]
 
     def test_numero_de_these_repris_des_metadonnees(self):
-        document = self._call({}, {**_EMPTY_PUB_META, "nnt": "2021CLFAC030"})
+        document = self._call({}, _remplacer(_EMPTY_PUB_META, nnt="2021CLFAC030"))
 
         assert document.external_ids == {"nnt": "2021CLFAC030"}
 
