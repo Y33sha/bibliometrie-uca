@@ -68,17 +68,19 @@ class WosFetchMissingDoiAdapter:
                 "firstRecord": first_record,
             }
             try:
-                data = await http_request_with_retry_async(
-                    client,
-                    "GET",
-                    self.base_url,
-                    headers=self.headers,
-                    params=params,
-                    timeout=60,
-                    # Backoff initial 4s : séquence 2^(attempt+2) = 4, 8, 16, 32, 64.
-                    initial_backoff=4.0,
-                    retry_on_empty_body=True,
-                    label=f"rec {first_record}",
+                data = as_mapping(
+                    await http_request_with_retry_async(
+                        client,
+                        "GET",
+                        self.base_url,
+                        headers=self.headers,
+                        params=params,
+                        timeout=60,
+                        # Backoff initial 4s : séquence 2^(attempt+2) = 4, 8, 16, 32, 64.
+                        initial_backoff=4.0,
+                        retry_on_empty_body=True,
+                        label=f"rec {first_record}",
+                    )
                 )
             except httpx.HTTPStatusError as e:
                 # WoS 400 = lot sans correspondance : zéro match, le lot entier est confirmé absent (résultat fiable → on garde complete=True).

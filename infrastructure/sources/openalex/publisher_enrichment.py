@@ -9,6 +9,7 @@ import logging
 from typing import NotRequired, TypedDict, cast
 
 from domain.sources.openalex import full_openalex_id, short_openalex_id
+from domain.types import as_mapping
 from infrastructure.sources.http_retry import http_request_with_retry
 
 logger = logging.getLogger(__name__)
@@ -55,8 +56,10 @@ def fetch_publishers_batch(
         params["mailto"] = mailto
 
     try:
-        data = http_request_with_retry(
-            "GET", openalex_publishers_api, params=params, timeout=30, label="publishers batch"
+        data = as_mapping(
+            http_request_with_retry(
+                "GET", openalex_publishers_api, params=params, timeout=30, label="publishers batch"
+            )
         )
     except Exception as exc:
         logger.warning("OpenAlex publishers batch : %r", exc)

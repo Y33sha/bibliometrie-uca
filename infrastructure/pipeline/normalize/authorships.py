@@ -18,6 +18,7 @@ from application.ports.pipeline.normalize.authorships import (
     SourceAuthorshipItem,
 )
 from infrastructure.db.jsonb import Jsonb
+from infrastructure.db.scalars import scalar_int
 
 # Sentinelles du `key_hash`, alignées sur la colonne générée `author_identifying_keys.key_hash`
 # (migration `author_identity_key_hash`) : `E'\x01'` tient lieu de NULL, `E'\x1f'` sépare les deux
@@ -151,7 +152,7 @@ class PgAuthorshipsBatchQueries(AuthorshipsBatchQueries):
     def upsert_source_authorship(self, conn: Connection, item: SourceAuthorshipItem) -> int:
         # Même mécanisme que le batch (upsert de l'identité, puis résolution de `identity_id` par `key_hash`) pour une seule ligne, dont l'id est rendu par `RETURNING`. Pas d'`ON CONFLICT` : le `clear` en amont vide le document.
         conn.execute(_UPSERT_IDENTITY_SQL, dict(item))
-        return conn.execute(_INSERT_AUTHORSHIP_SQL, dict(item)).one().id
+        return scalar_int(conn.execute(_INSERT_AUTHORSHIP_SQL, dict(item)))
 
     def fetch_source_authorship_ids_by_position(
         self, conn: Connection, *, source: str, source_publication_id: int, positions: list[int]

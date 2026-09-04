@@ -13,6 +13,7 @@ import logging
 import httpx
 
 from domain.publications.identifiers import clean_doi
+from domain.types import as_mapping
 from infrastructure.sources.http_retry import http_request_with_retry_async
 
 # Mapping Unpaywall oa_status → notre enum oa_type
@@ -40,13 +41,15 @@ async def fetch_oa_status(
         return None
     url = f"{base_url}/{cleaned}"
     try:
-        data = await http_request_with_retry_async(
-            client,
-            "GET",
-            url,
-            params={"email": email},
-            timeout=10,
-            label=f"DOI {doi}",
+        data = as_mapping(
+            await http_request_with_retry_async(
+                client,
+                "GET",
+                url,
+                params={"email": email},
+                timeout=10,
+                label=f"DOI {doi}",
+            )
         )
     except httpx.HTTPStatusError as e:
         if e.response.status_code != 404:

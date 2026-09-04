@@ -18,6 +18,7 @@ from application.ports.pipeline.normalize.source_publications import (
 from domain.publications.metadata import normalized_title
 from domain.types import JsonValue
 from infrastructure.db.jsonb import Jsonb
+from infrastructure.db.scalars import scalar_int
 
 _FIELDS = fields(SourcePublicationRow)
 
@@ -55,4 +56,4 @@ class PgSourcePublicationQueries(SourcePublicationQueries):
         params["title_normalized"] = normalized_title(row.title)
         # `external_ids` est `NOT NULL` et contraint à un objet JSON.
         params["external_ids"] = {} if row.external_ids is None else row.external_ids
-        return conn.execute(_UPSERT_SQL, params).one().id
+        return scalar_int(conn.execute(_UPSERT_SQL, params))

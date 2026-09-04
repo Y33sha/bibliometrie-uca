@@ -14,7 +14,7 @@ from infrastructure.sources.http_retry import http_request_with_retry
 
 logger = logging.getLogger(__name__)
 
-from domain.types import JsonValue
+from domain.types import JsonValue, as_mapping
 
 _MEMBER_URL_RE = re.compile(r"/member/(\d+)\b")
 
@@ -43,8 +43,10 @@ def fetch_crossref_prefix(prefix: str, *, user_agent: str) -> tuple[str, int | N
     url = f"{API_BASE_URLS['crossref']}/prefixes/{cleaned}"
     headers = {"User-Agent": user_agent, "Accept": "application/json"}
     try:
-        data = http_request_with_retry(
-            "GET", url, headers=headers, timeout=15, max_retries=3, label=f"prefix {cleaned}"
+        data = as_mapping(
+            http_request_with_retry(
+                "GET", url, headers=headers, timeout=15, max_retries=3, label=f"prefix {cleaned}"
+            )
         )
     except Exception as exc:
         logger.warning("api.crossref.org/prefixes/%s : %r", cleaned, exc)

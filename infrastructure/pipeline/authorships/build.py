@@ -7,6 +7,7 @@ from sqlalchemy import Connection, text
 
 from application.ports.pipeline.authorships.build import AuthorshipsBuildQueries
 from domain.sources.registry import SOURCE_PRIORITY
+from infrastructure.db.scalars import scalar_int
 from infrastructure.db.sql_fragments import case_priority
 
 
@@ -14,7 +15,7 @@ class PgAuthorshipsBuildQueries(AuthorshipsBuildQueries):
     """Adapter PostgreSQL pour `application.ports.pipeline.authorships.build.AuthorshipsBuildQueries`."""
 
     def purge_authorships(self, conn: Connection) -> int:
-        n = conn.execute(text("SELECT COUNT(*) FROM authorships")).scalar_one()
+        n = scalar_int(conn.execute(text("SELECT COUNT(*) FROM authorships")))
         conn.execute(
             text(
                 "UPDATE source_authorships SET authorship_id = NULL WHERE authorship_id IS NOT NULL"
@@ -128,9 +129,9 @@ class PgAuthorshipsBuildQueries(AuthorshipsBuildQueries):
         conn.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY publication_structures"))
 
     def count_authorships_in_perimeter(self, conn: Connection) -> int:
-        return conn.execute(
-            text("SELECT COUNT(*) AS n FROM authorships WHERE in_perimeter = TRUE")
-        ).scalar_one()
+        return scalar_int(
+            conn.execute(text("SELECT COUNT(*) AS n FROM authorships WHERE in_perimeter = TRUE"))
+        )
 
     def refresh_publications_in_perimeter(self, conn: Connection) -> int:
         return conn.execute(

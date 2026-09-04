@@ -31,14 +31,16 @@ def fetch_datacite_prefix(prefix: str, *, user_agent: str) -> tuple[str, str, st
     url = f"{API_BASE_URLS['datacite']}/prefixes/{cleaned}"
     headers = {"User-Agent": user_agent, "Accept": "application/vnd.api+json"}
     try:
-        data = http_request_with_retry(
-            "GET",
-            url,
-            params={"include": "clients,providers"},
-            headers=headers,
-            timeout=15,
-            max_retries=3,
-            label=f"datacite prefix {cleaned}",
+        data = as_mapping(
+            http_request_with_retry(
+                "GET",
+                url,
+                params={"include": "clients,providers"},
+                headers=headers,
+                timeout=15,
+                max_retries=3,
+                label=f"datacite prefix {cleaned}",
+            )
         )
     except Exception as exc:
         logger.warning("api.datacite.org/prefixes/%s : %r", cleaned, exc)

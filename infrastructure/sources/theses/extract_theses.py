@@ -16,7 +16,7 @@ from application.ports.pipeline.extract.theses import (
     ThesesExtractConfig,
 )
 from domain.publications.identifiers import clean_doi
-from domain.types import JsonValue, as_str
+from domain.types import JsonValue, as_mapping, as_str
 from infrastructure.pipeline.extract.staging import upsert_staging
 from infrastructure.sources.api_params import THESES_DELAY, THESES_PER_PAGE
 from infrastructure.sources.config import get_extraction_api_ids
@@ -51,7 +51,9 @@ class PgThesesExtractAdapter(ThesesExtractAdapter):
             if wait > 0:
                 time.sleep(wait)
         try:
-            return http_request_with_retry("GET", self._url, params=params, timeout=30, label=label)
+            return as_mapping(
+                http_request_with_retry("GET", self._url, params=params, timeout=30, label=label)
+            )
         finally:
             self._last_request_at = time.monotonic()
 

@@ -19,6 +19,7 @@ from domain.errors import NotFoundError, ValidationError
 from domain.structures.identifiers import HalCollection, RorId
 from domain.structures.name_forms import StructureNameForm
 from domain.structures.structure import Structure, StructureType
+from infrastructure.db.scalars import scalar_int
 from infrastructure.db.tables import (
     structure_name_forms,
     structure_relations,
@@ -149,20 +150,24 @@ class PgStructureRepository(StructureRepository):
     def add(self, structure: Structure) -> int:
         """Insère une structure neuve et retourne son id. Canonise `api_ids` (validation du schéma JSONB), posé sous sa forme canonique sur l'entité."""
         structure.api_ids = _normalize_api_ids(structure.api_ids)
-        return self._conn.execute(
-            structures.insert()
-            .values(
-                code=structure.code,
-                name=structure.name,
-                structure_type=structure.structure_type.value,
-                acronym=structure.acronym,
-                ror_id=structure.ror_id.value if structure.ror_id else None,
-                rnsr_id=structure.rnsr_id,
-                hal_collection=structure.hal_collection.value if structure.hal_collection else None,
-                api_ids=structure.api_ids,
+        return scalar_int(
+            self._conn.execute(
+                structures.insert()
+                .values(
+                    code=structure.code,
+                    name=structure.name,
+                    structure_type=structure.structure_type.value,
+                    acronym=structure.acronym,
+                    ror_id=structure.ror_id.value if structure.ror_id else None,
+                    rnsr_id=structure.rnsr_id,
+                    hal_collection=structure.hal_collection.value
+                    if structure.hal_collection
+                    else None,
+                    api_ids=structure.api_ids,
+                )
+                .returning(structures.c.id)
             )
-            .returning(structures.c.id)
-        ).scalar_one()
+        )
 
     def save(self, structure: Structure) -> None:
         """Persiste une structure chargée : UPDATE de ses champs éditables (`code` immuable exclu). Canonise `api_ids`. Lève `NotFoundError` si l'id est absent."""

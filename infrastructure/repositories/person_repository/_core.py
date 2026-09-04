@@ -8,6 +8,7 @@ from domain.persons.identifiers import AttributionStatus
 from domain.persons.name_forms import PersonNameForm, compute_person_name_forms
 from domain.persons.person import Person
 from domain.persons.person_identifier import PersonIdentifier
+from infrastructure.db.scalars import scalar_int
 from infrastructure.repositories.person_repository import _name_forms
 
 
@@ -66,19 +67,21 @@ def find_by_id(conn: Connection, person_id: int) -> Person | None:
 
 
 def create(conn: Connection, last_name: str, first_name: str = "") -> int:
-    return conn.execute(
-        text(
-            "INSERT INTO persons (last_name, first_name, "
-            "last_name_normalized, first_name_normalized) "
-            "VALUES (:ln, :fn, :lnn, :fnn) RETURNING id"
-        ),
-        {
-            "ln": last_name,
-            "fn": first_name,
-            "lnn": normalize_name(last_name),
-            "fnn": normalize_name(first_name),
-        },
-    ).scalar_one()
+    return scalar_int(
+        conn.execute(
+            text(
+                "INSERT INTO persons (last_name, first_name, "
+                "last_name_normalized, first_name_normalized) "
+                "VALUES (:ln, :fn, :lnn, :fnn) RETURNING id"
+            ),
+            {
+                "ln": last_name,
+                "fn": first_name,
+                "lnn": normalize_name(last_name),
+                "fnn": normalize_name(first_name),
+            },
+        )
+    )
 
 
 def update_name(conn: Connection, person_id: int, last_name: str, first_name: str) -> None:
@@ -194,10 +197,12 @@ def map_rh_emails_to_person_ids(conn: Connection) -> dict[str, list[int]]:
 
 def has_distinct_rh(conn: Connection, id_a: int, id_b: int) -> bool:
     return (
-        conn.execute(
-            text("SELECT COUNT(*) AS n FROM persons_rh WHERE person_id IN (:a, :b)"),
-            {"a": id_a, "b": id_b},
-        ).scalar_one()
+        scalar_int(
+            conn.execute(
+                text("SELECT COUNT(*) AS n FROM persons_rh WHERE person_id IN (:a, :b)"),
+                {"a": id_a, "b": id_b},
+            )
+        )
         >= 2
     )
 

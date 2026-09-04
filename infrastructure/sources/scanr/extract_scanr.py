@@ -57,14 +57,16 @@ class PgScanrExtractAdapter(ScanrExtractAdapter):
             if wait > 0:
                 time.sleep(wait)
         try:
-            return http_request_with_retry(
-                "POST",
-                self._url,
-                json_body=query,
-                auth=self._auth,
-                # Pages de SCANR_PER_PAGE (1000) : un fetch à froid peut dépasser 30s. Marge à 60s pour ne pas déclencher un retry inutile.
-                timeout=60,
-                label="ScanR search",
+            return as_mapping(
+                http_request_with_retry(
+                    "POST",
+                    self._url,
+                    json_body=query,
+                    auth=self._auth,
+                    # Pages de SCANR_PER_PAGE (1000) : un fetch à froid peut dépasser 30s. Marge à 60s pour ne pas déclencher un retry inutile.
+                    timeout=60,
+                    label="ScanR search",
+                )
             )
         finally:
             self._last_request_at = time.monotonic()

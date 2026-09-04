@@ -20,6 +20,7 @@ import json
 import logging
 import time
 from collections.abc import Mapping
+from typing import cast
 
 import httpx
 
@@ -32,7 +33,7 @@ logger = logging.getLogger(__name__)
 
 
 def _backoff_delay(initial_backoff: float, attempt: int) -> float:
-    return initial_backoff * (2**attempt)
+    return initial_backoff * float(2**attempt)
 
 
 def _is_retryable_status(status: int) -> bool:
@@ -78,10 +79,10 @@ def http_request_with_retry(
     initial_backoff: float = 1.0,
     retry_on_empty_body: bool = False,
     label: str = "",
-) -> Mapping[str, JsonValue]:
+) -> JsonValue:
     """Requête HTTP synchrone avec retry, backoff et circuit-breaker (politique cf. docstring du module).
 
-    `max_retries=3` avec le backoff par défaut donne des pauses de 1, 2, 4 s. `label` : chaîne courte (ex. "year 2024, rec 100") insérée dans les logs. Lève la dernière exception rencontrée si `max_retries` est atteint sans succès.
+    `max_retries=3` avec le backoff par défaut donne des pauses de 1, 2, 4 s. `label` : chaîne courte (ex. "year 2024, rec 100") insérée dans les logs. Lève la dernière exception rencontrée si `max_retries` est atteint sans succès. Le corps est rendu tel que la source l'a écrit : la plupart répondent par un objet, `doi.org/ra` par un tableau — l'appelant en tire la forme qu'il attend (`as_mapping`, `as_sequence`).
     """
     breaker, label = _prepared_label(label)
     last_error: Exception | None = None
@@ -126,7 +127,7 @@ def http_request_with_retry(
             else:
                 if breaker is not None:
                     breaker.record_success()
-                return data
+                return cast("JsonValue", data)
 
         if _is_retryable_status(resp.status_code) and is_last:
             if breaker is not None:
@@ -161,10 +162,10 @@ async def http_request_with_retry_async(
     initial_backoff: float = 1.0,
     retry_on_empty_body: bool = False,
     label: str = "",
-) -> Mapping[str, JsonValue]:
+) -> JsonValue:
     """Requête HTTP asynchrone avec retry, backoff et circuit-breaker (politique cf. docstring du module).
 
-    Le `httpx.AsyncClient` est partagé entre les coroutines d'un même run (connexions poolées). `label` : chaîne courte (ex. "DOI 10.xxx") pour distinguer les requêtes concurrentes dans les logs.
+    Le `httpx.AsyncClient` est partagé entre les coroutines d'un même run (connexions poolées). `label` : chaîne courte (ex. "DOI 10.xxx") pour distinguer les requêtes concurrentes dans les logs. Le corps est rendu tel que la source l'a écrit, comme pour la variante synchrone.
     """
     breaker, label = _prepared_label(label)
     last_error: Exception | None = None
@@ -208,7 +209,7 @@ async def http_request_with_retry_async(
             else:
                 if breaker is not None:
                     breaker.record_success()
-                return data
+                return cast("JsonValue", data)
 
         if _is_retryable_status(resp.status_code) and is_last:
             if breaker is not None:

@@ -13,7 +13,7 @@ from sqlalchemy import Connection
 
 from application.ports.pipeline.extract._common import BatchInsertCounts
 from application.ports.pipeline.extract.wos import WosExtractAdapter, WosExtractConfig
-from domain.types import JsonValue
+from domain.types import JsonValue, as_mapping
 from infrastructure.pipeline.extract.staging import upsert_staging
 from infrastructure.sources.api_params import WOS_DELAY, WOS_PER_PAGE
 from infrastructure.sources.config import (
@@ -48,15 +48,17 @@ class PgWosExtractAdapter(WosExtractAdapter):
             if wait > 0:
                 time.sleep(wait)
         try:
-            return http_request_with_retry(
-                "GET",
-                self._url,
-                params=params,
-                headers=self._headers,
-                timeout=60,
-                retry_on_empty_body=True,
-                initial_backoff=2.0,
-                label=label,
+            return as_mapping(
+                http_request_with_retry(
+                    "GET",
+                    self._url,
+                    params=params,
+                    headers=self._headers,
+                    timeout=60,
+                    retry_on_empty_body=True,
+                    initial_backoff=2.0,
+                    label=label,
+                )
             )
         finally:
             self._last_request_at = time.monotonic()
@@ -125,7 +127,8 @@ class PgWosExtractAdapter(WosExtractAdapter):
             )
         if resp.status_code != 200:
             return None
-        return resp.headers.get("X-REC-AmtPerYear-Remaining")
+        restant: str | None = resp.headers.get("X-REC-AmtPerYear-Remaining")
+        return restant
 
     # ── SQL ────────────────────────────────────────────────────
 

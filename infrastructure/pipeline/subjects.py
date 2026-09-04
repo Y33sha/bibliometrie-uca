@@ -12,6 +12,7 @@ from application.ports.pipeline.subjects import (
 )
 from domain.normalize import normalize_label
 from infrastructure.db.jsonb import Jsonb
+from infrastructure.db.scalars import scalar_int
 
 _UPSERT_SUBJECT_SQL = text(
     """
@@ -34,10 +35,12 @@ class PgSubjectsIngestionQueries(SubjectsIngestionQueries):
         label: str,
         language: str | None = None,
     ) -> int:
-        return conn.execute(
-            _UPSERT_SUBJECT_SQL,
-            {"label": normalize_label(label), "language": language},
-        ).scalar_one()
+        return scalar_int(
+            conn.execute(
+                _UPSERT_SUBJECT_SQL,
+                {"label": normalize_label(label), "language": language},
+            )
+        )
 
     def link_publication_subjects_bulk(
         self,
@@ -127,7 +130,7 @@ class PgSubjectsIngestionQueries(SubjectsIngestionQueries):
         ).rowcount
 
     def count_all_subjects(self, conn: Connection) -> int:
-        return conn.execute(text("SELECT COUNT(*) FROM subjects")).scalar_one()
+        return scalar_int(conn.execute(text("SELECT COUNT(*) FROM subjects")))
 
     def recompute_usage_counts(self, conn: Connection) -> int:
         n_reset = conn.execute(
@@ -152,4 +155,4 @@ class PgSubjectsIngestionQueries(SubjectsIngestionQueries):
 
     def refresh_cooccurrences(self, conn: Connection) -> int:
         conn.execute(text("REFRESH MATERIALIZED VIEW subject_cooccurrences"))
-        return conn.execute(text("SELECT COUNT(*) FROM subject_cooccurrences")).scalar_one()
+        return scalar_int(conn.execute(text("SELECT COUNT(*) FROM subject_cooccurrences")))
