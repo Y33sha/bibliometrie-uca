@@ -60,6 +60,8 @@ from interfaces.api.app import app  # noqa: E402
 # Patcher la copie locale dans app.py (import-time capture du nom)
 _app_module.build_sync_engine = _build_test_sync_engine
 
+from collections.abc import Iterator
+
 from infrastructure.settings import settings as _settings  # noqa: E402
 
 # Les tests s'exécutent sur http://testserver : un cookie de session marqué Secure ne serait
@@ -106,14 +108,14 @@ def _fail_on_escaped_dml():
 
 
 @pytest.fixture(scope="module")
-def client() -> TestClient:
+def client() -> Iterator[TestClient]:
     """TestClient FastAPI pointant vers bibliometrie_test."""
     with TestClient(app, raise_server_exceptions=False) as c:
         yield c
 
 
 @pytest.fixture(scope="module")
-def auth_client() -> TestClient:
+def auth_client() -> Iterator[TestClient]:
     """Client authentifié (cookie session valide)."""
     from interfaces.api.session import issue_token
 

@@ -9,6 +9,8 @@ Deux sortes de reverse-proxy existent : celui qui retire le préfixe avant de tr
 Ces tests sont les seuls à monter l'application sous un préfixe.
 """
 
+from collections.abc import Iterator
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -19,7 +21,7 @@ PREFIXE = "/bibliometrie"
 
 
 @pytest.fixture
-def client_prefixe() -> TestClient:
+def client_prefixe() -> Iterator[TestClient]:
     """Client visant l'application montée sous un préfixe, comme derrière un reverse-proxy qui le retire.
 
     `TestClient` compose le même `scope` qu'uvicorn lancé avec `--root-path` : chemin complet, préfixe signalé à part.
@@ -62,7 +64,7 @@ class TestProxyQuiNeRetirePasLePrefixe:
     """
 
     @pytest.fixture
-    def client_nu(self) -> TestClient:
+    def client_nu(self) -> Iterator[TestClient]:
         """Client sans `root_path` déclaré au transport : le chemin préfixé arrive tel quel, comme d'un proxy qui le transmet."""
         with TestClient(app, raise_server_exceptions=False) as c:
             yield c

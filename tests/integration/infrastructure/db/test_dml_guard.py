@@ -13,6 +13,7 @@ Deux niveaux :
 """
 
 import os
+from collections.abc import Iterator
 from types import SimpleNamespace
 
 import pytest
@@ -39,7 +40,7 @@ def _test_url() -> URL:
 
 
 @pytest.fixture(scope="module")
-def guarded_engine() -> Engine:
+def guarded_engine() -> Iterator[Engine]:
     engine = create_engine(_test_url())
     install_dml_guard(engine)
     yield engine
