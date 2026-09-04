@@ -115,7 +115,7 @@ jobs:
         # Le relevé est celui de l'étape précédente, relu sur cette seule liste.
         run: >
           uv run python -m coverage report --fail-under=100
-          --include="interfaces/api/session.py,interfaces/api/rate_limit.py,interfaces/api/deps.py,interfaces/api/params.py,interfaces/api/filters.py,interfaces/api/route_path.py,interfaces/api/spa.py,infrastructure/db/read_only_guard.py,infrastructure/db/dml_guard.py,application/audit_log.py"
+          --include="interfaces/api/app.py,interfaces/api/session.py,interfaces/api/rate_limit.py,interfaces/api/deps.py,interfaces/api/params.py,interfaces/api/filters.py,interfaces/api/route_path.py,interfaces/api/spa.py,interfaces/api/routers/auth.py,infrastructure/db/read_only_guard.py,infrastructure/db/dml_guard.py,application/audit_log.py"
 
   # `.python-version` et `interfaces/frontend/.nvmrc` redisent des versions que le Dockerfile
   # porte déjà. Le contrôle d'avant envoi les confronte, mais un robot de mise à jour n'en joue
