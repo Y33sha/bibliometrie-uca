@@ -1,73 +1,66 @@
 # Sujets — cycle de vie
 
-*À jour le 2026-07-14.*
+*À jour le 2026-09-04.*
 
-Le sujet n'a **pas d'objet de domaine** : il vit comme libellé normalisé et lignes SQL. La seule règle côté `domain/` est `normalize_label` (`domain/normalize.py`) — trim + collapse d'espaces, sans toucher casse ni accents. Le mot « agrégat » désigne ici le cluster de tables qu'un repository possède, sans racine d'entité. Les invariants (dédup sur `lower(label)`, attribution par source, caches dérivés) sont portés par le SQL et la phase pipeline.
+Un sujet est un concept thématique attaché à une publication par une source : domaine HAL, discipline de thèse, vedette-matière RAMEAU, concept OpenAlex. Le pipeline en est la seule autorité d'écriture ; l'API ne fait que les lire.
 
-## Tables du cluster
+Aucun objet de domaine ne lui correspond : un sujet vit comme libellé et lignes SQL. La seule règle venue de `domain/` est `normalize_label`, qui réduit les espaces sans toucher à la casse ni aux accents.
 
-| Table | Rôle | Colonnes clés |
+## Tables
+
+| Table | Rôle | Colonnes notables |
 |---|---|---|
-| `subjects` | Le sujet (libellé canonique) | `label` (forme du premier insert), `lower(label)` unique, `language`, `usage_count`, `created_at` |
-| `publication_subjects` | Lien publication ↔ sujet, par source | PK `(publication_id, subject_id, source)`, `rejected` (curation), `created_at` |
-| `subject_cooccurrences` (matview) | Paires de sujets co-présents sur une publication | `subject_a_id < subject_b_id`, `count` (publications distinctes), seuil `>= 2`, `NOT rejected` des deux côtés |
+| `subjects` | Le sujet | `label`, unique sur sa forme minuscule, `language`, `usage_count`, `created_at` |
+| `publication_subjects` | Lien entre une publication et un sujet, pour une source donnée | clé `(publication_id, subject_id, source)`, `rejected`, `created_at` |
+| `subject_cooccurrences` | Vue matérialisée : paires de sujets présents sur une même publication | les deux sujets ordonnés, le nombre de publications concernées, à partir de deux |
 
-Unicité d'un sujet : index unique sur `lower(label)` (deux libellés ne différant que par la casse convergent, la première forme est conservée). Un même sujet annoté par deux sources donne **deux** lignes `publication_subjects` (la PK inclut `source`).
+Deux libellés qui ne diffèrent que par la casse convergent vers un seul sujet, et c'est la première forme rencontrée qui est conservée. Un même sujet attribué par deux sources donne en revanche **deux** liens, la source faisant partie de la clé.
 
-## Les deux axes
+## Écriture par le pipeline
 
-```mermaid
-flowchart LR
-    SP[source_publications.topics] -->|extracteurs par source| ING[ingestion]
-    ING -->|upsert lower label| S[subjects]
-    ING -->|liens par source| PS[publication_subjects]
-    ING -->|purge orphelins| S
-    PS -->|recompute| UC[subjects.usage_count]
-    PS -->|refresh matview| CO[(subject_cooccurrences)]
-    S --> API[listing / détail / voisins]
-    CO --> API
-```
+Une seule phase écrit ces tables, `subjects`, exécutée après `authorships`. Elle comporte deux étapes inséparables, chacune dans sa transaction.
 
-## Écriture — pipeline
+**Ingestion.** Sont retenues les publications dont le contenu a changé depuis le dernier passage, et celles jamais traitées. Leurs liens **non rejetés** sont effacés, puis reconstruits enregistrement source par enregistrement source : l'extracteur propre à chaque source réduit ses thématiques à une liste de libellés, un cache mutualise l'écriture d'un même libellé — y compris entre sources —, et les liens sont insérés en une fois avec leur source. Les sujets restés sans aucun lien sont supprimés en fin d'étape. `--rebuild-subjects` reprend l'intégralité du stock.
 
-Une seule phase écrit le cluster : `subjects` (`application/pipeline/subjects/`), après `authorships`. Deux sous-étapes indissociables, chacune dans sa transaction.
+**Extracteurs.** HAL fournit ses domaines, OpenAlex ses quatre niveaux de concepts mis à plat, le Web of Science ses catégories et ses vedettes, ScanR ses domaines, theses.fr la discipline et les vedettes RAMEAU.
 
-**Ingestion** (`ingestion.py` → `subjects` + `publication_subjects`) : incrémentale et publication-centrée. Sélectionne les publications dont le contenu canonique a changé depuis la dernière ingestion de leurs liens — `publications.updated_at > max(publication_subjects.created_at)` par publication, ou jamais ingérées — efface leurs liens **non rejetés**, puis ré-ingère par `source_publication` : l'extracteur de chaque source (`extractors.py`) réduit le champ `topics` à une liste de libellés, un `SubjectCache` mutualise les UPSERTs d'un même `lower(label)` (y compris entre sources), et les liens sont insérés en bulk avec leur `source`. Purge finale des sujets sans aucun lien. `--rebuild-subjects` repasse tout le stock.
+**Co-occurrences.** `usage_count` est recalculé — le nombre de publications distinctes par sujet, rejets exclus — puis la vue des paires est rafraîchie. Le calcul ne dépend que de l'état courant des liens, et se rejoue donc sans dommage.
 
-**Extracteurs par source** (`extractors.py`, `SUBJECT_EXTRACTORS`) : hal (domaines CCSD), openalex (4 niveaux domain/field/subfield/topic à plat, `en`), wos (`subjects`+`headings`, `en`), scanr (domaines), theses (discipline + RAMEAU, `fr`). Seuls les concepts issus des **ontologies sources** (`topics`) alimentent `subjects` ; les mots-clés libres (`keywords`, dont CrossRef qui n'a que ça) restent sur `source_publications` et s'affichent via `publications_detail.keywords`, hors du cluster.
+## Écriture par l'API
 
-**Co-occurrences** (`cooccurrences.py` → `subjects.usage_count` + matview) : recalcule `usage_count` (publications distinctes par sujet, hors `rejected`) puis `REFRESH MATERIALIZED VIEW subject_cooccurrences`. Idempotent : ne dépend que de l'état courant de `publication_subjects`.
+**Aucune.** Ni création ni édition de sujet.
 
-## Écriture — API
+## Lecture par le pipeline
 
-**Aucune.** Les sujets ne sont ni créés ni édités par l'API — le pipeline en est la seule autorité d'écriture. La colonne `publication_subjects.rejected` provisionne une curation (elle est respectée partout : exclue de `usage_count` et des co-occurrences, préservée par le `clear` de ré-ingestion, empêche la purge du sujet), mais **aucun endpoint ne la pose** aujourd'hui.
+L'ingestion lit les thématiques dans les enregistrements source, et non dans le détail consolidé de la publication : c'est ce qui permet de retenir quelle source a fourni chaque lien. Les co-occurrences lisent les liens non rejetés.
 
-## Lecture — pipeline
+Aucun filtre de périmètre n'est appliqué, et il n'en faut pas : la phase `authorships` a déjà supprimé en amont les publications hors périmètre, si bien que les liens ne portent que sur le périmètre et que les deux valeurs dérivées en héritent.
 
-**Ingestion** lit `source_publications(id, publication_id, source, topics)` des publications à ré-ingérer — jamais `publications_detail`, pour conserver l'attribution `publication_subjects.source`. **Co-occurrences** lit `publication_subjects` (hors `rejected`) pour l'usage et le refresh de la matview. Aucun filtre périmètre : `authorships` a purgé en amont les publications orphelines, donc `publication_subjects` ne porte que du périmètre et les deux caches en héritent.
+## Lecture par l'API
 
-## Lecture — API
+Port `application/ports/read_models/subjects_queries.py`, adaptateur `PgSubjectsQueries`.
 
-Port `application/ports/read_models/subjects_queries.py`, adaptateur `PgSubjectsQueries` dans `infrastructure/read_models/subjects.py`.
+| Point d'entrée | Ce qu'il sert |
+|---|---|
+| `GET /api/subjects` | Liste paginée, triée par usage décroissant, avec recherche insensible aux accents et seuil d'usage minimal |
+| `GET /api/subjects/{id}` | Le sujet et ses voisins les plus fréquents, d'après la vue des co-occurrences |
 
-- **Listing** (`GET /api/subjects`) : liste paginée, tri `usage_count` décroissant, recherche `unaccent(label) ILIKE`, filtre `usage_count >= min_count`.
-- **Détail + voisins** (`GET /api/subjects/{id}`) : le sujet + ses voisins par co-occurrence (top N via `subject_cooccurrences`, symétrisée par `UNION ALL` sur les deux colonnes).
-
-Les sujets alimentent aussi les « top sujets » d'autres pages (dashboards éditeur et laboratoire, détail publication), via des lectures de `publication_subjects` portées par leurs propres query services.
+Les sujets alimentent aussi les palmarès affichés ailleurs — tableaux de bord d'éditeur et de laboratoire, détail d'une publication — par des lectures propres à ces pages.
 
 ## Points d'attention
 
-Dette assumée et décisions d'architecture propres à cet agrégat, gardées explicites.
+**Seuls les concepts d'ontologie deviennent des sujets.** Les mots-clés libres que fournissent les sources — c'est tout ce que Crossref propose — restent sur l'enregistrement source et s'affichent avec le détail de la publication, sans entrer dans ces tables. La distinction est délibérée : un vocabulaire contrôlé se compte et se recoupe, un mot-clé libre non.
 
-1. **Incrémental sans colonne d'état.** Le signal « à ré-ingérer » se dérive de `publications.updated_at > max(publication_subjects.created_at)` : pas de flag `dirty` dédié, la référence est le `created_at` des liens eux-mêmes. Économe mais subtil — la justesse dépend du bump conditionnel de `updated_at` par `refresh_from_sources`.
-2. **`rejected` provisionné, non câblé.** Le flag de curation est respecté par tout le pipeline mais sans chemin d'écriture API : une intention de fonctionnalité en attente, pas un mécanisme actif.
+**Le caractère incrémental repose sur une comparaison de dates, sans colonne dédiée.** Une publication est retraitée quand sa date de mise à jour dépasse la date du plus récent de ses liens. Il n'existe pas de marqueur explicite : la justesse du mécanisme dépend donc de ce que `refresh_from_sources` mette bien à jour cette date quand le contenu change.
+
+**La colonne `rejected` est respectée partout mais aucune interface ne la pose.** Elle exclut le lien du comptage d'usage et des co-occurrences, survit à l'effacement de l'ingestion, et empêche la suppression du sujet. Aucun point d'entrée ne permet aujourd'hui de la renseigner.
 
 ## Invariants métier
 
-Règles maintenues par le SQL et la phase, ni par une contrainte riche ni par un objet de domaine.
+**Identité d'un sujet.** L'unicité porte sur le libellé en minuscules ; le libellé conservé est celui de la première insertion, et la langue retient la première valeur non nulle.
 
-- **Identité d'un sujet.** Dédup sur `lower(label)` (index unique) ; `subjects.label` garde la forme du premier insert ; `language` retient le premier non-null (`COALESCE` au `ON CONFLICT`).
-- **Attribution par source.** `publication_subjects.source` dit quelle source a fourni chaque lien ; un même sujet issu de deux sources donne deux lignes. L'ingestion efface et reconstruit les liens **non rejetés** d'une publication modifiée, source comprise.
-- **Périmètre de vocabulaire.** Seuls les `topics` d'ontologie deviennent des sujets ; les mots-clés libres restent hors cluster.
-- **Caches dérivés.** `usage_count` et `subject_cooccurrences` se recalculent intégralement à chaque run depuis `publication_subjects` (hors `rejected`), sans état incrémental.
-- **Orphelins.** Un sujet sans aucun lien (tous statuts) est purgé ; un sujet ne portant que des liens rejetés survit (curation préservée).
+**Attribution par source.** Chaque lien retient la source qui l'a fourni ; un même sujet venu de deux sources donne deux liens. L'ingestion efface et reconstruit les liens non rejetés d'une publication modifiée, source comprise.
+
+**Valeurs dérivées recalculées en entier.** `usage_count` et la vue des co-occurrences se recalculent à chaque passage depuis les liens non rejetés, sans état conservé entre deux exécutions.
+
+**Sujets sans lien.** Un sujet qu'aucun lien ne porte est supprimé ; un sujet dont tous les liens sont rejetés subsiste, pour ne pas perdre la décision de curation.
