@@ -21,11 +21,14 @@ export class ApiError extends Error {
 	}
 }
 
+/** Corps d'une réponse en échec : l'objet que composent les erreurs FastAPI, le texte brut d'un intermédiaire réseau, ou `null` quand le corps est vide ou illisible. Le flux se lit une fois, l'analyse JSON portant ensuite sur le texte obtenu. */
 async function parseError(res: Response): Promise<unknown> {
+	const texte = await res.text().catch(() => null);
+	if (!texte) return null;
 	try {
-		return await res.json();
+		return JSON.parse(texte);
 	} catch {
-		return await res.text().catch(() => null);
+		return texte;
 	}
 }
 
