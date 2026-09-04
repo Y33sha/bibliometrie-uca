@@ -2,7 +2,7 @@
 
 *À jour le 2026-09-04.*
 
-Un `journal` est un support de publication : revue, conférence, dépôt ou autre. Près de deux revues sur cinq n'ont aucun ISSN, et autant arrivent des sources sous plusieurs titres — d'où `journal_name_forms`, qui collecte ces formes pour reconnaître une revue déjà enregistrée. `domain/journals/journal.py` en décrit la structure sans logique : le rapprochement, la fusion et l'enrichissement vivent dans les services et leurs adaptateurs SQL.
+Un `journal` est un support de publication : revue, conférence, dépôt ou autre. Près de deux revues sur cinq n'ont aucun ISSN, et autant portent plusieurs formes de leur titre selon la source qui les décrit ; `journal_name_forms` enregistre ces formes. `domain/journals/journal.py` définit sa structure ; le rapprochement, la fusion et l'enrichissement vivent dans les services et leurs adaptateurs SQL.
 
 ## Tables
 
