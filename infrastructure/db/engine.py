@@ -27,9 +27,7 @@ DbIdentity = Literal["owner", "app", "pipeline"]
 def db_url(identity: DbIdentity = "pipeline") -> URL:
     """URL de connexion Postgres construite depuis les settings (réutilisée par Alembic).
 
-    Trois identités, une par processus, décrites dans `infrastructure/db/roles.sql`. Le pipeline et les scripts en ligne de commande étant les appelants les plus nombreux, c'est leur identité qui vaut par défaut ; les migrations et l'API demandent la leur.
-
-    L'identité demandée est exigée : sans elle, la construction échoue. Se replier en silence sur une autre ferait tourner un processus avec des droits qu'il n'a pas à porter — l'API avec ceux du propriétaire du schéma, par exemple — sans que rien ne le signale.
+    Trois identités, une par processus, décrites dans `infrastructure/db/roles.sql`. Le pipeline et les scripts en ligne de commande étant les appelants les plus nombreux, c'est leur identité qui vaut par défaut ; les migrations et l'API demandent la leur. L'identité demandée est exigée : sans elle, la construction échoue.
 
     `db_sslmode`, s'il est défini, est passé en paramètre de connexion `sslmode`.
     """
