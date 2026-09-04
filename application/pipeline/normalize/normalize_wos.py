@@ -1,6 +1,7 @@
 """Normalisation des données WoS : staging → tables normalisées."""
 
 import logging
+from collections.abc import Mapping, Sequence
 
 from sqlalchemy import Connection
 
@@ -10,6 +11,7 @@ from application.pipeline.normalize._authorships_batch import (
     write_source_authorships,
 )
 from application.pipeline.normalize.bibliographic import BibliographicNormalizer
+from application.pipeline.normalize.pub_metadata import PublicationMetadata
 from application.pipeline.timings import StepTimer
 from application.ports.pipeline.journals import JournalFindOrCreateQueries
 from application.ports.pipeline.normalize.authorships import AuthorshipsBatchQueries
@@ -29,87 +31,100 @@ from domain.persons.identifiers import (
 from domain.publications.authorship_roles import map_role
 from domain.publications.identifiers import clean_doi
 from domain.sources.wos import derive_wos_api_oa_status, is_wos_author_exploitable
-from domain.types import JsonValue
+from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str
 
 # =============================================================
 # UTILITAIRES
 # =============================================================
 
 
-def _safe_list(obj: object) -> list:
-    """WoS API retourne parfois un dict au lieu d'une liste."""
+def _safe_list(obj: JsonValue) -> Sequence[JsonValue]:
+    """Suite de valeurs portée par `obj` : l'API rend un objet seul là où elle annonce une liste."""
     if obj is None:
         return []
-    if isinstance(obj, list):
+    if isinstance(obj, str | Mapping):
+        return [obj]
+    if isinstance(obj, Sequence):
         return obj
     return [obj]
 
 
-def _get_api_title(static: dict, title_type: str) -> str | None:
+def _chemin(racine: JsonValue, *cles: str) -> Mapping[str, JsonValue]:
+    """Objet atteint en descendant `cles` depuis `racine`, ou un objet vide.
+
+    Le format de l'API décalque un schéma XML : ses champs se nichent sous cinq ou six niveaux d'objets, dont chacun peut manquer. Descendre par cette fonction évite d'avoir à le vérifier niveau par niveau.
+    """
+    courant = as_mapping(racine)
+    for cle in cles:
+        courant = as_mapping(courant.get(cle))
+    return courant
+
+
+def _get_api_title(static: Mapping[str, JsonValue], title_type: str) -> str | None:
     """Extrait un titre depuis la structure API."""
-    titles = static.get("summary", {}).get("titles", {})
+    titles = _chemin(static, "summary", "titles")
     title_list = _safe_list(titles.get("title"))
-    for t in title_list:
-        if isinstance(t, dict) and t.get("type") == title_type:
-            return t.get("content")
+    for entree in title_list:
+        t = as_mapping(entree)
+        if as_str(t.get("type")) == title_type:
+            return as_str(t.get("content"))
     return None
 
 
-def _parse_api_authors(static: dict, dynamic: dict) -> list[dict]:
+def _parse_api_authors(
+    static: Mapping[str, JsonValue], dynamic: Mapping[str, JsonValue]
+) -> list[dict[str, JsonValue]]:
     """Extrait les auteurs depuis le format API."""
-    names_data = static.get("summary", {}).get("names", {})
+    names_data = _chemin(static, "summary", "names")
     name_list = _safe_list(names_data.get("name"))
 
     # Adresses pour le matching
-    addresses_data = static.get("fullrecord_metadata", {}).get("addresses", {})
+    addresses_data = _chemin(static, "fullrecord_metadata", "addresses")
     addr_list = _safe_list(addresses_data.get("address_name"))
-    addr_map = {}  # addr_no -> full_address
-    addr_orgs_map = {}  # addr_no -> [{name, ror_id, country}]
+    addr_map: dict[str, str] = {}  # addr_no -> full_address
+    addr_orgs_map: dict[str, list[dict[str, JsonValue]]] = {}  # addr_no -> [{name, ror_id, pref}]
     for addr_entry in addr_list:
-        spec = addr_entry.get("address_spec", {})
+        spec = _chemin(addr_entry, "address_spec")
         addr_no = spec.get("addr_no")
         if addr_no is not None:
-            addr_map[str(addr_no)] = spec.get("full_address", "")
+            addr_map[str(addr_no)] = as_str(spec.get("full_address")) or ""
             # Organizations structurées
-            orgs_data = spec.get("organizations", {})
-            org_list = _safe_list(orgs_data.get("organization"))
-            orgs = [
-                {"name": o["content"], "ror_id": o.get("ror_id"), "pref": o.get("pref")}
-                for o in org_list
-                if isinstance(o, dict) and o.get("content")
-            ]
+            org_list = _safe_list(_chemin(spec, "organizations").get("organization"))
+            orgs: list[dict[str, JsonValue]] = []
+            for entree in org_list:
+                o = as_mapping(entree)
+                if nom := as_str(o.get("content")):
+                    orgs.append({"name": nom, "ror_id": o.get("ror_id"), "pref": o.get("pref")})
             if orgs:
                 addr_orgs_map[str(addr_no)] = orgs
 
-    authors = []
-    for name_obj in name_list:
-        if not isinstance(name_obj, dict):
-            continue
-        wos_role = name_obj.get("role")
+    authors: list[dict[str, JsonValue]] = []
+    for entree in name_list:
+        name_obj = as_mapping(entree)
+        wos_role = as_str(name_obj.get("role"))
         if not wos_role:
             continue
 
-        full_name = name_obj.get("display_name") or name_obj.get("full_name") or ""
-        last_name = name_obj.get("last_name")
-        first_name = name_obj.get("first_name")
-        seq_no = name_obj.get("seq_no")
+        full_name = as_str(name_obj.get("display_name")) or as_str(name_obj.get("full_name")) or ""
+        last_name = as_str(name_obj.get("last_name"))
+        first_name = as_str(name_obj.get("first_name"))
+        seq_no = as_int(name_obj.get("seq_no")) or as_str(name_obj.get("seq_no"))
         position = int(seq_no) - 1 if seq_no else 0
 
-        daisng_id = name_obj.get("daisng_id")
-        if daisng_id:
-            daisng_id = str(daisng_id)
-        researcher_id = name_obj.get("r_id")
+        daisng = name_obj.get("daisng_id")
+        daisng_id = str(daisng) if daisng else None
+        researcher_id = as_str(name_obj.get("r_id"))
 
         # L'ORCID WoS (`PreferredORCID`) n'est pas moissonné : attribué par le matching algorithmique interne de Web of Science, il est trop peu fiable pour figurer sur l'identité d'auteur (où sa source serait perdue et où il deviendrait un faux signal de matching).
         # Les ORCID fiables viennent des sources à dépôt auteur (Crossref, OpenAlex `raw_orcid`, HAL).
 
-        is_corresponding = name_obj.get("reprint") == "Y"
+        is_corresponding = as_str(name_obj.get("reprint")) == "Y"
 
         # Affiliations via addr_no
         addr_nos = name_obj.get("addr_no")
         raw_affiliation = None
-        individual_addresses = []
-        author_orgs = []
+        individual_addresses: list[str] = []
+        author_orgs: list[dict[str, JsonValue]] = []
         if addr_nos:
             addr_no_list = str(addr_nos).split()
             affils = [addr_map[a] for a in addr_no_list if a in addr_map]
@@ -120,9 +135,10 @@ def _parse_api_authors(static: dict, dynamic: dict) -> list[dict]:
             seen_org_names = set()
             for a_no in addr_no_list:
                 for org in addr_orgs_map.get(a_no, []):
-                    if org["name"] not in seen_org_names:
+                    nom = as_str(org["name"])
+                    if nom and nom not in seen_org_names:
                         author_orgs.append(org)
-                        seen_org_names.add(org["name"])
+                        seen_org_names.add(nom)
 
         roles, is_corresponding_from_role = map_role("wos", wos_role)
         is_corresponding = is_corresponding or is_corresponding_from_role
@@ -146,12 +162,10 @@ def _parse_api_authors(static: dict, dynamic: dict) -> list[dict]:
     return authors
 
 
-def _get_api_doi(dynamic: dict) -> str | None:
+def _get_api_doi(dynamic: Mapping[str, JsonValue]) -> str | None:
     """Extrait le DOI depuis la structure API."""
     try:
-        identifiers = (
-            dynamic.get("cluster_related", {}).get("identifiers", {}).get("identifier", [])
-        )
+        identifiers = _chemin(dynamic, "cluster_related", "identifiers").get("identifier", [])
         for ident in _safe_list(identifiers):
             if isinstance(ident, dict) and ident.get("type") == "doi":
                 return clean_doi(str(ident.get("value", "")))
@@ -160,12 +174,10 @@ def _get_api_doi(dynamic: dict) -> str | None:
     return None
 
 
-def _get_api_issn(dynamic: dict, issn_type: str = "issn") -> str | None:
+def _get_api_issn(dynamic: Mapping[str, JsonValue], issn_type: str = "issn") -> str | None:
     """Extrait l'ISSN ou eISSN depuis la structure API."""
     try:
-        identifiers = (
-            dynamic.get("cluster_related", {}).get("identifiers", {}).get("identifier", [])
-        )
+        identifiers = _chemin(dynamic, "cluster_related", "identifiers").get("identifier", [])
         for ident in _safe_list(identifiers):
             if isinstance(ident, dict) and ident.get("type") == issn_type:
                 return str(ident.get("value", "")).strip() or None
@@ -174,59 +186,55 @@ def _get_api_issn(dynamic: dict, issn_type: str = "issn") -> str | None:
     return None
 
 
-def extract_from_api(raw: dict, staging_doi: str | None) -> dict:  # noqa: C901
+def extract_from_api(raw: Mapping[str, JsonValue], staging_doi: str | None) -> dict[str, JsonValue]:  # noqa: C901
     """Extrait un record structuré depuis le format API."""
-    static = raw.get("static_data", {})
-    dynamic = raw.get("dynamic_data", {})
-    summary = static.get("summary", {})
-    pub_info = summary.get("pub_info", {})
+    static = _chemin(raw, "static_data")
+    dynamic = _chemin(raw, "dynamic_data")
+    summary = _chemin(static, "summary")
+    pub_info = _chemin(summary, "pub_info")
 
     doi = _get_api_doi(dynamic) or clean_doi(staging_doi)
     title = _get_api_title(static, "item") or "(sans titre)"
 
-    pub_year = None
-    py = pub_info.get("pubyear")
-    if py:
+    pub_year = as_int(pub_info.get("pubyear"))
+    if pub_year is None and (py := as_str(pub_info.get("pubyear"))):
         try:
             pub_year = int(py)
         except ValueError:
             pass
 
     # Doc type
-    doctypes = summary.get("doctypes", {})
-    doctype_list = _safe_list(doctypes.get("doctype") if isinstance(doctypes, dict) else doctypes)
+    doctypes = _chemin(summary, "doctypes")
+    doctype_list = _safe_list(doctypes.get("doctype"))
     raw_doc_type = None
     if doctype_list:
-        if isinstance(doctype_list[0], dict):
-            raw_doc_type = doctype_list[0].get("content", "")
-        else:
-            raw_doc_type = str(doctype_list[0])
+        premier = doctype_list[0]
+        raw_doc_type = as_str(as_mapping(premier).get("content")) or as_str(premier)
 
     # Publisher
-    publishers = summary.get("publishers", {})
-    pub_data = publishers.get("publisher", {})
-    pub_names = pub_data.get("names", {})
-    pub_name_obj = pub_names.get("name", {})
-    if isinstance(pub_name_obj, list):
-        pub_name_obj = pub_name_obj[0] if pub_name_obj else {}
-    publisher_name = pub_name_obj.get("unified_name") or pub_name_obj.get("full_name")
+    publishers = _chemin(summary, "publishers")
+    pub_data = _chemin(publishers, "publisher")
+    pub_names = _chemin(pub_data, "names")
+    noms = _safe_list(pub_names.get("name"))
+    pub_name_obj = as_mapping(noms[0]) if noms else {}
+    publisher_name = as_str(pub_name_obj.get("unified_name")) or as_str(
+        pub_name_obj.get("full_name")
+    )
 
     # Journal
     journal_title = _get_api_title(static, "source")
 
-    oa_status = derive_wos_api_oa_status(pub_info.get("journal_oas_gold"))
+    oa_status = derive_wos_api_oa_status(as_str(pub_info.get("journal_oas_gold")))
 
     # Language
-    lang_data = static.get("fullrecord_metadata", {}).get("languages", {})
+    lang_data = _chemin(static, "fullrecord_metadata", "languages")
     lang_list = _safe_list(lang_data.get("language"))
     language = None
-    if lang_list and isinstance(lang_list[0], dict):
-        language = lang_list[0].get("content")
-    elif lang_list:
-        language = str(lang_list[0])
+    if lang_list:
+        language = as_str(as_mapping(lang_list[0]).get("content")) or as_str(lang_list[0])
 
     # Biblio
-    page = pub_info.get("page", {})
+    page = _chemin(pub_info, "page")
     if isinstance(page, str):
         page = {}
     biblio: dict[str, JsonValue] = {}
@@ -258,52 +266,47 @@ def extract_from_api(raw: dict, staging_doi: str | None) -> dict:  # noqa: C901
         biblio["journal"] = journal_obj
 
     # Abstract
-    frm = static.get("fullrecord_metadata", {})
+    frm = _chemin(static, "fullrecord_metadata")
     abstract = None
-    abstracts = frm.get("abstracts", {})
+    abstracts = _chemin(frm, "abstracts")
     if abstracts:
-        ab = abstracts.get("abstract", {})
-        p = ab.get("abstract_text", {}).get("p", "")
+        ab = _chemin(abstracts, "abstract")
+        p = _chemin(ab, "abstract_text").get("p", "")
         if isinstance(p, list):
             p = " ".join(str(x) for x in p)
         if p:
             abstract = str(p)
 
     # Keywords
-    kw_data = frm.get("keywords", {})
+    kw_data = _chemin(frm, "keywords")
     kw_list = kw_data.get("keyword", []) if isinstance(kw_data, dict) else []
     if isinstance(kw_list, str):
         kw_list = [kw_list]
     keywords = [str(k) for k in kw_list if k] or None
 
     # Topics : categories
-    cat = frm.get("category_info", {})
+    cat = _chemin(frm, "category_info")
     topics = {}
-    subjects = cat.get("subjects", {}).get("subject", [])
-    if isinstance(subjects, dict):
-        subjects = [subjects]
     subj_names = [
-        s.get("content") or s for s in subjects if isinstance(s, dict) and s.get("content")
+        nom
+        for s in _safe_list(_chemin(cat, "subjects").get("subject"))
+        if (nom := as_str(as_mapping(s).get("content")))
     ]
     if subj_names:
         topics["subjects"] = subj_names
-    headings = cat.get("headings", {}).get("heading", [])
-    if isinstance(headings, str):
-        headings = [headings]
-    if headings:
+    if headings := [
+        h for e in _safe_list(_chemin(cat, "headings").get("heading")) if (h := as_str(e))
+    ]:
         topics["headings"] = headings
 
     # Citations
-    tc_list = dynamic.get("citation_related", {}).get("tc_list", {}).get("silo_tc", [])
-    if isinstance(tc_list, dict):
-        tc_list = [tc_list]
     cited_by_count = None
-    for tc in tc_list:
-        if isinstance(tc, dict) and tc.get("coll_id") == "WOK":
-            try:
-                cited_by_count = int(tc.get("local_count", 0))
-            except (ValueError, TypeError):
-                pass
+    for entree in _safe_list(_chemin(dynamic, "citation_related", "tc_list").get("silo_tc")):
+        tc = as_mapping(entree)
+        if as_str(tc.get("coll_id")) == "WOK":
+            # Compte absent : zéro citation. Compte illisible : le décompte reste inconnu.
+            brut = tc.get("local_count")
+            cited_by_count = 0 if brut is None else as_int(brut)
 
     return {
         "ut": raw.get("UID", ""),
@@ -341,16 +344,19 @@ def upsert_publisher(
 
 
 def upsert_journal(
-    rec: dict, publisher_id: int | None, *, journal_repo: JournalFindOrCreateQueries
+    rec: Mapping[str, JsonValue],
+    publisher_id: int | None,
+    *,
+    journal_repo: JournalFindOrCreateQueries,
 ) -> int | None:
     """Trouve ou crée une revue depuis les données WoS."""
-    title = rec.get("journal_title")
+    title = as_str(rec.get("journal_title"))
     if not title:
         return None
     return find_or_create_journal(
         title,
-        issn=rec.get("issn"),
-        eissn=rec.get("eissn"),
+        issn=as_str(rec.get("issn")),
+        eissn=as_str(rec.get("eissn")),
         publisher_id=publisher_id,
         repo=journal_repo,
     )
@@ -361,24 +367,24 @@ def upsert_journal(
 # =============================================================
 
 
-def extract_pub_metadata(rec: dict, journal_id: int | None) -> dict:
-    """Extrait les métadonnées de publication d'un record WoS.
+def extract_pub_metadata(
+    rec: Mapping[str, JsonValue], journal_id: int | None
+) -> PublicationMetadata:
+    """Extrait les métadonnées canoniques d'un record WoS.
 
-    Retourne un dict utilisable par `insert_wos_document`.
+    Cette source ne porte pas de numéro national de thèse : elle ne moissonne pas les thèses.
     """
-    title = rec["title"]
-    container_title = rec.get("journal_title") if not journal_id else None
-
-    return {
-        "title": title,
-        "pub_year": rec["pub_year"],
-        "doc_type": rec["doc_type"],
-        "doi": rec["doi"],
-        "oa_status": rec["oa_status"],
-        "journal_id": journal_id,
-        "container_title": container_title,
-        "language": rec.get("language"),
-    }
+    return PublicationMetadata(
+        title=as_str(rec.get("title")),
+        pub_year=as_int(rec.get("pub_year")),
+        doc_type=as_str(rec.get("doc_type")),
+        doi=as_str(rec.get("doi")),
+        nnt=None,
+        oa_status=as_str(rec.get("oa_status")),
+        journal_id=journal_id,
+        container_title=as_str(rec.get("journal_title")) if not journal_id else None,
+        language=as_str(rec.get("language")),
+    )
 
 
 # =============================================================
@@ -389,9 +395,9 @@ def extract_pub_metadata(rec: dict, journal_id: int | None) -> dict:
 def insert_wos_document(
     conn: Connection,
     queries: SourcePublicationQueries,
-    rec: dict,
+    rec: Mapping[str, JsonValue],
     staging_id: int,
-    pub_meta: dict,
+    pub_meta: PublicationMetadata,
 ) -> int:
     """Crée/retrouve l'entrée source_publications pour WoS.
 
@@ -405,23 +411,23 @@ def insert_wos_document(
         conn,
         SourcePublicationRow(
             source="wos",
-            source_id=rec["ut"],
+            source_id=as_str(rec.get("ut")) or "",
             staging_id=staging_id,
-            doi=pub_meta["doi"],
-            external_ids=rec.get("external_ids"),
-            title=pub_meta["title"],
-            pub_year=pub_meta["pub_year"],
-            doc_type=pub_meta["doc_type"],
-            journal_id=pub_meta["journal_id"],
-            container_title=pub_meta["container_title"],
-            language=pub_meta["language"],
-            biblio=rec.get("biblio"),
-            abstract=rec.get("abstract"),
-            keywords=rec.get("keywords"),
-            topics=rec.get("topics"),
-            oa_status=pub_meta["oa_status"],
-            urls=rec.get("urls"),
-            cited_by_count=rec.get("cited_by_count"),
+            doi=pub_meta.doi,
+            external_ids=dict(as_mapping(rec.get("external_ids"))) or None,
+            title=pub_meta.title or "",
+            pub_year=pub_meta.pub_year,
+            doc_type=pub_meta.doc_type,
+            journal_id=pub_meta.journal_id,
+            container_title=pub_meta.container_title,
+            language=pub_meta.language,
+            biblio=dict(as_mapping(rec.get("biblio"))) or None,
+            abstract=as_str(rec.get("abstract")),
+            keywords=[k for e in as_sequence(rec.get("keywords")) if (k := as_str(e))] or None,
+            topics=dict(as_mapping(rec.get("topics"))) or None,
+            oa_status=pub_meta.oa_status,
+            urls=[u for e in as_sequence(rec.get("urls")) if (u := as_str(e))] or None,
+            cited_by_count=as_int(rec.get("cited_by_count")),
         ),
     )
 
@@ -433,26 +439,28 @@ def insert_wos_document(
 # Le `researcher_id` (ResearcherID Clarivate) — identifiant cross-source — vit sur l'identité de la signature (author_identifying_keys.person_identifiers).
 
 
-def build_wos_author_records(rec: dict, logger: logging.Logger) -> list[AuthorRecord]:
+def build_wos_author_records(
+    rec: Mapping[str, JsonValue], logger: logging.Logger
+) -> list[AuthorRecord]:
     """Parse les authorships d'un record WoS en `AuthorRecord` (sans I/O).
 
     Filtre les auteurs via `is_wos_author_exploitable` ; si aucun n'est exploitable alors que le record en porte, logge un warning (détecte une dérive éventuelle de l'API WoS — perte silencieuse de records sinon). Chaque auteur porte `person_identifiers` (researcher_id ; l'ORCID WoS n'est pas moissonné, cf. extraction) et ses adresses brutes. Les `author_position` du payload WoS peuvent se répéter ; elles sont dédoublonnées ici (première occurrence gagne), la clé `(source_publication_id, author_position)` interdisant les doublons en base.
     """
-    raw_authors = rec.get("authors", [])
+    raw_authors = [as_mapping(a) for a in as_sequence(rec.get("authors"))]
     authors_kept = [a for a in raw_authors if is_wos_author_exploitable(a)]
     if not authors_kept:
         if raw_authors:
             logger.warning(
                 "WoS record %s : %d auteurs présents mais aucun exploitable "
                 "(filtre is_wos_author_exploitable) — authorships ignorés",
-                rec.get("ut", "?"),
+                as_str(rec.get("ut")) or "?",
                 len(raw_authors),
             )
         return []
 
     # Identifiant (researcher_id) partagé entre ≥2 signatures du record → `_dubious`.
     ids_by_position = mark_shared_identifiers_dubious(
-        [compact_identifiers(researcher_id=a.get("researcher_id")) for a in authors_kept]
+        [compact_identifiers(researcher_id=as_str(a.get("researcher_id"))) for a in authors_kept]
     )
 
     records: list[AuthorRecord] = []
@@ -460,12 +468,17 @@ def build_wos_author_records(rec: dict, logger: logging.Logger) -> list[AuthorRe
         ids = ids_by_position[idx]
         records.append(
             AuthorRecord(
-                position=author["position"],
-                raw_name=author["full_name"],
-                is_corresponding=author["is_corresponding"],
-                roles=author.get("roles"),
+                position=as_int(author.get("position")) or 0,
+                raw_name=as_str(author.get("full_name")) or "",
+                is_corresponding=bool(author.get("is_corresponding")),
+                roles=[role for e in as_sequence(author.get("roles")) if (role := as_str(e))]
+                or None,
                 person_identifiers=ids if ids else None,
-                addresses=[AddressRecord(text=addr) for addr in (author.get("addresses") or [])],
+                addresses=[
+                    AddressRecord(text=adresse)
+                    for e in as_sequence(author.get("addresses"))
+                    if (adresse := as_str(e))
+                ],
             )
         )
     # `author_position` lue du payload WoS : dédup (première occurrence gagne).
@@ -479,7 +492,7 @@ def process_authorships(
     conn: Connection,
     authorship_queries: AuthorshipsBatchQueries,
     logger: logging.Logger,
-    rec: dict,
+    rec: Mapping[str, JsonValue],
     source_publication_id: int,
 ) -> None:
     """Parse les authorships WoS puis écrit en batch via le writer partagé."""
@@ -516,7 +529,9 @@ def process_record(
     if not rec["ut"]:
         rec["ut"] = ut
 
-    publisher_id = upsert_publisher(rec.get("publisher_name"), publisher_repo=publisher_repo)
+    publisher_id = upsert_publisher(
+        as_str(rec.get("publisher_name")), publisher_repo=publisher_repo
+    )
     journal_id = upsert_journal(rec, publisher_id, journal_repo=journal_repo)
     t.mark("publisher+journal")
 
