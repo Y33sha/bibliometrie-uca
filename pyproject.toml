@@ -8,7 +8,7 @@ version = "0.1.0"
 requires-python = ">=3.14"
 dependencies = [
     "httpx==0.28.1",             # unique client HTTP : appels synchrones et asynchrones du pipeline
-    "psycopg[binary]==3.3.4",    # driver Postgres pour SQLAlchemy ; import symbolique dans infrastructure/db/engine.py
+    "psycopg[binary]==3.3.5",    # driver Postgres pour SQLAlchemy ; import symbolique dans infrastructure/db/engine.py
     "sqlalchemy==2.0.52",        # query builder Core
     "alembic==1.19.1",           # migrations DB
     "fastapi==0.141.1",
