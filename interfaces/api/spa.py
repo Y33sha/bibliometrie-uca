@@ -19,10 +19,10 @@ _API_SEGMENT = "api"
 class SPAStaticFiles(StaticFiles):
     """Sert le build SvelteKit (adapter-static).
 
-    Deux particularités du format prérendu :
+    Deux reprises, dans cet ordre :
 
-    - les pages prérendues sont écrites en `<route>.html` (par exemple `docs/glossaire.html`) : le chemin nu introuvable est retenté avec l'extension `.html` ;
-    - les routes purement client-side (`ssr=false`, non prérendues) retombent sur `index.html`, qui les route côté client.
+    - un chemin sans extension introuvable est retenté en `<chemin>.html`, forme sous laquelle `adapter-static` écrit une route prérendue ;
+    - ce qui reste introuvable retombe sur `index.html`, qui route la demande côté client.
 
     Seul le fichier absent (404) déclenche ces reprises ; les autres erreurs remontent, plutôt que de servir `index.html` à leur place.
 
