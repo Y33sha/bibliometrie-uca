@@ -25,7 +25,7 @@ Docker, selon le système d'exploitation :
 - **Windows** : [Docker Desktop](https://www.docker.com/products/docker-desktop/) avec le backend WSL2.
 
 Ou, installation sans Docker :
-- Python 3.12+
+- Python 3.14+
 - Node.js 20+ / npm 10+
 - PostgreSQL 18+ avec extensions `pg_trgm`, `unaccent`
 - [`uv`](https://docs.astral.sh/uv/) recommandé pour l'install des deps
