@@ -407,8 +407,7 @@ exclude_lines = [
 ]
 
 # ----------------------------------------------------------------------
-# Mypy : type checker (mode permissif au démarrage)
-# Durcir module par module via overrides quand le code est stabilisé.
+# Mypy : type checker
 # ----------------------------------------------------------------------
 [tool.mypy]
 # Version des images de production (cf. `scripts/versions-des-images.sh`) : le typage se
@@ -420,9 +419,8 @@ ignore_missing_imports = true
 # est vérifié.
 check_untyped_defs = true
 disallow_untyped_defs = true
-# `Any` explicite interdit globalement. Exceptions explicites via
-# overrides ci-dessous, toutes documentées (frontières JSON/JSONB en
-# lecture, records DB hydratés, helpers polymorphiques, partial updates DB).
+# `Any` explicite interdit. Les exceptions se lisent dans les overrides plus bas, où chacune
+# porte son motif en regard du module.
 disallow_any_explicit = true
 disallow_any_generics = true
 # `-> Any` propagé toléré pragmatiquement.
