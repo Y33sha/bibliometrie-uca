@@ -389,10 +389,6 @@ omit = [
     # ci-dessus ; la logique utile de sélection vit côté queries/domain.
     "infrastructure/sources/refresh_stale_base.py",
     "infrastructure/sources/*/refresh_stale.py",
-    # Orchestrateurs CLI du pipeline d'extraction : wiring async
-    # (httpx + Semaphore + Lock) + branches mode/dry_run/stats_only.
-    # Même logique d'exclusion que les adapters HTTP ci-dessus.
-    "application/pipeline/extract/*",
 ]
 
 [tool.coverage.report]
@@ -400,7 +396,7 @@ skip_empty = true
 show_missing = true
 # Seuil progressif : ne jamais régresser. À faire remonter au fur et à
 # mesure qu'on ajoute des tests.
-fail_under = 89
+fail_under = 90
 exclude_lines = [
     "pragma: no cover",
     "raise NotImplementedError",
@@ -463,7 +459,7 @@ disallow_any_explicit = false
 
 # Les deux réglages tiennent ensemble : `init_typed` type le constructeur synthétisé,
 # `init_forbid_extra` lui retire son `**kwargs: Any`. Sans l'un des deux, ce `Any` est écrit
-# dans chaque classe de modèle : 209 erreurs `explicit-any` là où le code n'en écrit aucun.
+# dans chaque classe de modèle et génère des erreurs `explicit-any`.
 [tool.pydantic-mypy]
 init_forbid_extra = true
 init_typed = true
