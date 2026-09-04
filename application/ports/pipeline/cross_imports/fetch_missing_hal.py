@@ -10,11 +10,14 @@ ScanR) et `fetch_missing_hal_by_nnt` pour les NNT (theses).
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, NamedTuple, Protocol
+from typing import NamedTuple, Protocol
 
 import httpx
 from sqlalchemy import Connection
+
+from domain.types import JsonValue
 
 
 class NntInsertResult(NamedTuple):
@@ -68,16 +71,20 @@ class HalFetchMissingAdapter(Protocol):
 
     # ── HTTP ───────────────────────────────────────────────────
 
-    async def fetch_by_halid(self, client: httpx.AsyncClient, hal_id: str) -> dict[str, Any] | None:
+    async def fetch_by_halid(
+        self, client: httpx.AsyncClient, hal_id: str
+    ) -> Mapping[str, JsonValue] | None:
         """Fetch un document HAL par halId. Retourne `None` si introuvable."""
 
-    async def fetch_by_nnt(self, client: httpx.AsyncClient, nnt: str) -> dict[str, Any] | None:
+    async def fetch_by_nnt(
+        self, client: httpx.AsyncClient, nnt: str
+    ) -> Mapping[str, JsonValue] | None:
         """Fetch un document HAL par NNT (thèse). Retourne `None` si introuvable."""
 
     # ── SQL (inserts) ──────────────────────────────────────────
 
     def insert_halid_result(
-        self, conn: Connection, hal_id: str, doc: dict[str, Any] | None
+        self, conn: Connection, hal_id: str, doc: Mapping[str, JsonValue] | None
     ) -> bool:
         """Insère le doc, ou marque `not_found_at` si `doc is None`.
 
@@ -85,6 +92,6 @@ class HalFetchMissingAdapter(Protocol):
         """
 
     def insert_nnt_result(
-        self, conn: Connection, nnt: str, doc: dict[str, Any] | None
+        self, conn: Connection, nnt: str, doc: Mapping[str, JsonValue] | None
     ) -> NntInsertResult:
         """Insère le doc HAL trouvé par NNT. `inserted` est faux si son halId était déjà en staging."""

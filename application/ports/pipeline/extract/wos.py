@@ -8,12 +8,14 @@ Regroupe en un seul Protocol :
 - les écritures SQL dans `staging`
 """
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Protocol
 
 from sqlalchemy import Connection
 
 from application.ports.pipeline.extract._common import BatchInsertCounts
+from domain.types import JsonValue
 
 
 @dataclass(frozen=True)
@@ -43,15 +45,15 @@ class WosExtractAdapter(Protocol):
 
     def build_query(self, year: int, affiliations: list[str]) -> str: ...
 
-    def get_records(self, data: dict[str, Any]) -> list[dict[str, Any]]: ...
+    def get_records(self, data: Mapping[str, JsonValue]) -> list[Mapping[str, JsonValue]]: ...
 
-    def get_records_found(self, data: dict[str, Any]) -> int: ...
+    def get_records_found(self, data: Mapping[str, JsonValue]) -> int: ...
 
     # ── HTTP ───────────────────────────────────────────────────
 
     def fetch_page(
         self, year: int, first_record: int, affiliations: list[str]
-    ) -> dict[str, Any]: ...
+    ) -> Mapping[str, JsonValue]: ...
 
     def check_quota(self) -> str | None:
         """Retourne le quota annuel restant (header WoS), ou `None` si indisponible.
@@ -62,6 +64,8 @@ class WosExtractAdapter(Protocol):
 
     # ── SQL ────────────────────────────────────────────────────
 
-    def insert_batch(self, conn: Connection, records: list[dict[str, Any]]) -> BatchInsertCounts:
+    def insert_batch(
+        self, conn: Connection, records: list[Mapping[str, JsonValue]]
+    ) -> BatchInsertCounts:
         """UPSERT staging d'un batch de records. Retourne (new, updated) via xmax."""
         ...

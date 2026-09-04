@@ -31,7 +31,7 @@ from domain.persons.identifiers import (
 from domain.publications.authorship_roles import map_role
 from domain.publications.identifiers import clean_doi
 from domain.sources.wos import derive_wos_api_oa_status, is_wos_author_exploitable
-from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str
+from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, at_path
 
 # =============================================================
 # UTILITAIRES
@@ -49,20 +49,9 @@ def _safe_list(obj: JsonValue) -> Sequence[JsonValue]:
     return [obj]
 
 
-def _chemin(racine: JsonValue, *cles: str) -> Mapping[str, JsonValue]:
-    """Objet atteint en descendant `cles` depuis `racine`, ou un objet vide.
-
-    Le format de l'API décalque un schéma XML : ses champs se nichent sous cinq ou six niveaux d'objets, dont chacun peut manquer. Descendre par cette fonction évite d'avoir à le vérifier niveau par niveau.
-    """
-    courant = as_mapping(racine)
-    for cle in cles:
-        courant = as_mapping(courant.get(cle))
-    return courant
-
-
 def _get_api_title(static: Mapping[str, JsonValue], title_type: str) -> str | None:
     """Extrait un titre depuis la structure API."""
-    titles = _chemin(static, "summary", "titles")
+    titles = at_path(static, "summary", "titles")
     title_list = _safe_list(titles.get("title"))
     for entree in title_list:
         t = as_mapping(entree)
@@ -75,21 +64,21 @@ def _parse_api_authors(
     static: Mapping[str, JsonValue], dynamic: Mapping[str, JsonValue]
 ) -> list[dict[str, JsonValue]]:
     """Extrait les auteurs depuis le format API."""
-    names_data = _chemin(static, "summary", "names")
+    names_data = at_path(static, "summary", "names")
     name_list = _safe_list(names_data.get("name"))
 
     # Adresses pour le matching
-    addresses_data = _chemin(static, "fullrecord_metadata", "addresses")
+    addresses_data = at_path(static, "fullrecord_metadata", "addresses")
     addr_list = _safe_list(addresses_data.get("address_name"))
     addr_map: dict[str, str] = {}  # addr_no -> full_address
     addr_orgs_map: dict[str, list[dict[str, JsonValue]]] = {}  # addr_no -> [{name, ror_id, pref}]
     for addr_entry in addr_list:
-        spec = _chemin(addr_entry, "address_spec")
+        spec = at_path(addr_entry, "address_spec")
         addr_no = spec.get("addr_no")
         if addr_no is not None:
             addr_map[str(addr_no)] = as_str(spec.get("full_address")) or ""
             # Organizations structurées
-            org_list = _safe_list(_chemin(spec, "organizations").get("organization"))
+            org_list = _safe_list(at_path(spec, "organizations").get("organization"))
             orgs: list[dict[str, JsonValue]] = []
             for entree in org_list:
                 o = as_mapping(entree)
@@ -165,7 +154,7 @@ def _parse_api_authors(
 def _get_api_doi(dynamic: Mapping[str, JsonValue]) -> str | None:
     """Extrait le DOI depuis la structure API."""
     try:
-        identifiers = _chemin(dynamic, "cluster_related", "identifiers").get("identifier", [])
+        identifiers = at_path(dynamic, "cluster_related", "identifiers").get("identifier", [])
         for ident in _safe_list(identifiers):
             if isinstance(ident, dict) and ident.get("type") == "doi":
                 return clean_doi(str(ident.get("value", "")))
@@ -177,7 +166,7 @@ def _get_api_doi(dynamic: Mapping[str, JsonValue]) -> str | None:
 def _get_api_issn(dynamic: Mapping[str, JsonValue], issn_type: str = "issn") -> str | None:
     """Extrait l'ISSN ou eISSN depuis la structure API."""
     try:
-        identifiers = _chemin(dynamic, "cluster_related", "identifiers").get("identifier", [])
+        identifiers = at_path(dynamic, "cluster_related", "identifiers").get("identifier", [])
         for ident in _safe_list(identifiers):
             if isinstance(ident, dict) and ident.get("type") == issn_type:
                 return str(ident.get("value", "")).strip() or None
@@ -188,10 +177,10 @@ def _get_api_issn(dynamic: Mapping[str, JsonValue], issn_type: str = "issn") -> 
 
 def extract_from_api(raw: Mapping[str, JsonValue], staging_doi: str | None) -> dict[str, JsonValue]:  # noqa: C901
     """Extrait un record structuré depuis le format API."""
-    static = _chemin(raw, "static_data")
-    dynamic = _chemin(raw, "dynamic_data")
-    summary = _chemin(static, "summary")
-    pub_info = _chemin(summary, "pub_info")
+    static = at_path(raw, "static_data")
+    dynamic = at_path(raw, "dynamic_data")
+    summary = at_path(static, "summary")
+    pub_info = at_path(summary, "pub_info")
 
     doi = _get_api_doi(dynamic) or clean_doi(staging_doi)
     title = _get_api_title(static, "item") or "(sans titre)"
@@ -204,7 +193,7 @@ def extract_from_api(raw: Mapping[str, JsonValue], staging_doi: str | None) -> d
             pass
 
     # Doc type
-    doctypes = _chemin(summary, "doctypes")
+    doctypes = at_path(summary, "doctypes")
     doctype_list = _safe_list(doctypes.get("doctype"))
     raw_doc_type = None
     if doctype_list:
@@ -212,9 +201,9 @@ def extract_from_api(raw: Mapping[str, JsonValue], staging_doi: str | None) -> d
         raw_doc_type = as_str(as_mapping(premier).get("content")) or as_str(premier)
 
     # Publisher
-    publishers = _chemin(summary, "publishers")
-    pub_data = _chemin(publishers, "publisher")
-    pub_names = _chemin(pub_data, "names")
+    publishers = at_path(summary, "publishers")
+    pub_data = at_path(publishers, "publisher")
+    pub_names = at_path(pub_data, "names")
     noms = _safe_list(pub_names.get("name"))
     pub_name_obj = as_mapping(noms[0]) if noms else {}
     publisher_name = as_str(pub_name_obj.get("unified_name")) or as_str(
@@ -227,14 +216,14 @@ def extract_from_api(raw: Mapping[str, JsonValue], staging_doi: str | None) -> d
     oa_status = derive_wos_api_oa_status(as_str(pub_info.get("journal_oas_gold")))
 
     # Language
-    lang_data = _chemin(static, "fullrecord_metadata", "languages")
+    lang_data = at_path(static, "fullrecord_metadata", "languages")
     lang_list = _safe_list(lang_data.get("language"))
     language = None
     if lang_list:
         language = as_str(as_mapping(lang_list[0]).get("content")) or as_str(lang_list[0])
 
     # Biblio
-    page = _chemin(pub_info, "page")
+    page = at_path(pub_info, "page")
     if isinstance(page, str):
         page = {}
     biblio: dict[str, JsonValue] = {}
@@ -266,42 +255,42 @@ def extract_from_api(raw: Mapping[str, JsonValue], staging_doi: str | None) -> d
         biblio["journal"] = journal_obj
 
     # Abstract
-    frm = _chemin(static, "fullrecord_metadata")
+    frm = at_path(static, "fullrecord_metadata")
     abstract = None
-    abstracts = _chemin(frm, "abstracts")
+    abstracts = at_path(frm, "abstracts")
     if abstracts:
-        ab = _chemin(abstracts, "abstract")
-        p = _chemin(ab, "abstract_text").get("p", "")
+        ab = at_path(abstracts, "abstract")
+        p = at_path(ab, "abstract_text").get("p", "")
         if isinstance(p, list):
             p = " ".join(str(x) for x in p)
         if p:
             abstract = str(p)
 
     # Keywords
-    kw_data = _chemin(frm, "keywords")
+    kw_data = at_path(frm, "keywords")
     kw_list = kw_data.get("keyword", []) if isinstance(kw_data, dict) else []
     if isinstance(kw_list, str):
         kw_list = [kw_list]
     keywords = [str(k) for k in kw_list if k] or None
 
     # Topics : categories
-    cat = _chemin(frm, "category_info")
+    cat = at_path(frm, "category_info")
     topics = {}
     subj_names = [
         nom
-        for s in _safe_list(_chemin(cat, "subjects").get("subject"))
+        for s in _safe_list(at_path(cat, "subjects").get("subject"))
         if (nom := as_str(as_mapping(s).get("content")))
     ]
     if subj_names:
         topics["subjects"] = subj_names
     if headings := [
-        h for e in _safe_list(_chemin(cat, "headings").get("heading")) if (h := as_str(e))
+        h for e in _safe_list(at_path(cat, "headings").get("heading")) if (h := as_str(e))
     ]:
         topics["headings"] = headings
 
     # Citations
     cited_by_count = None
-    for entree in _safe_list(_chemin(dynamic, "citation_related", "tc_list").get("silo_tc")):
+    for entree in _safe_list(at_path(dynamic, "citation_related", "tc_list").get("silo_tc")):
         tc = as_mapping(entree)
         if as_str(tc.get("coll_id")) == "WOK":
             # Compte absent : zéro citation. Compte illisible : le décompte reste inconnu.

@@ -6,8 +6,10 @@ Interroge l'endpoint OpenAlex Sources par lots d'IDs (filtre à pipe `|`, jusqu'
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 
 from domain.sources.openalex import full_openalex_id, short_openalex_id
+from domain.types import JsonValue, as_mapping, as_sequence, as_str
 from infrastructure.sources.http_retry import http_request_with_retry
 
 logger = logging.getLogger(__name__)
@@ -15,22 +17,28 @@ logger = logging.getLogger(__name__)
 _SELECT = "id,apc_usd,apc_prices,type"
 
 
-def extract_apc(source: dict) -> tuple[float | None, str]:
+def extract_apc(source: Mapping[str, JsonValue]) -> tuple[float | None, str]:
     """Montant et devise APC d'un objet source OpenAlex.
 
     Priorité : EUR dans `apc_prices` > première devise disponible > `apc_usd` en USD.
     """
-    apc_prices = source.get("apc_prices") or []
+    apc_prices = [as_mapping(e) for e in as_sequence(source.get("apc_prices"))]
     for entry in apc_prices:
-        if entry.get("currency") == "EUR":
-            return entry["price"], "EUR"
+        if as_str(entry.get("currency")) == "EUR":
+            return _montant(entry.get("price")), "EUR"
     if apc_prices:
         entry = apc_prices[0]
-        return entry["price"], entry.get("currency", "USD")
-    apc_usd = source.get("apc_usd")
-    if apc_usd is not None:
+        return _montant(entry.get("price")), as_str(entry.get("currency")) or "USD"
+    if (apc_usd := _montant(source.get("apc_usd"))) is not None:
         return apc_usd, "USD"
     return None, "EUR"
+
+
+def _montant(valeur: JsonValue) -> float | None:
+    """Montant porté par `valeur` : l'API rend un entier ou un décimal selon la devise."""
+    if isinstance(valeur, bool):
+        return None
+    return float(valeur) if isinstance(valeur, int | float) else None
 
 
 def fetch_sources_batch(
@@ -64,7 +72,9 @@ def fetch_sources_batch(
         return {}
 
     result: dict[str, tuple[float | None, str, str | None]] = {}
-    for source in data.get("results", []):
+    for entree in as_sequence(data.get("results")):
+        source = as_mapping(entree)
         apc_amount, apc_currency = extract_apc(source)
-        result[short_openalex_id(source["id"])] = (apc_amount, apc_currency, source.get("type"))
+        identifiant = short_openalex_id(as_str(source.get("id")) or "")
+        result[identifiant] = (apc_amount, apc_currency, as_str(source.get("type")))
     return result

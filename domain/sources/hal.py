@@ -4,7 +4,10 @@ Interprétation des champs propres au schéma HAL — prédicats et extracteurs 
 """
 
 import re
+from collections.abc import Sequence
 from datetime import date
+
+from domain.types import JsonValue
 
 # Situation d'une publication vis-à-vis de HAL, du dépôt le plus complet au plus absent.
 # `ok` : déposée dans la collection d'un laboratoire, et son texte y est accessible.
@@ -96,3 +99,20 @@ def derive_hal_oa_status(
     if not open_access_bool:
         return "closed"
     return None
+
+
+def hal_text_field(value: JsonValue) -> str | None:
+    """Chaîne portée par un champ HAL, qui arrive en texte ou en liste de textes (convention Solr).
+
+    Les champs de l'index HAL sont multivalués par construction : un titre unique y arrive tout de même en liste. La première valeur fait foi.
+    """
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return value
+    if isinstance(value, Sequence):
+        premier = value[0] if value else None
+        if premier is None:
+            return None
+        return premier if isinstance(premier, str) else str(premier)
+    return str(value)

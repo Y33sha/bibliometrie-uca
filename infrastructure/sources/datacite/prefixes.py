@@ -8,13 +8,16 @@ Hiérarchie DataCite : `provider → client → prefix → DOI`. Un préfixe est
 from __future__ import annotations
 
 import logging
-from typing import Any
+from collections.abc import Mapping
 
 from domain.publications.identifiers import clean_doi_prefix
 from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.http_retry import http_request_with_retry
 
 logger = logging.getLogger(__name__)
+
+
+from domain.types import JsonValue, as_mapping, as_sequence, as_str
 
 
 def fetch_datacite_prefix(prefix: str, *, user_agent: str) -> tuple[str, str, str] | None:
@@ -43,7 +46,7 @@ def fetch_datacite_prefix(prefix: str, *, user_agent: str) -> tuple[str, str, st
     return _parse_datacite_prefix_payload(data)
 
 
-def _parse_datacite_prefix_payload(data: Any) -> tuple[str, str, str] | None:
+def _parse_datacite_prefix_payload(data: JsonValue) -> tuple[str, str, str] | None:
     """Extrait `(provider_name, client_name, client_symbol)` du payload JSON:API.
 
     Isolé pour la testabilité : pas de réseau, juste du parsing défensif.
@@ -59,16 +62,18 @@ def _parse_datacite_prefix_payload(data: Any) -> tuple[str, str, str] | None:
     provider_id = provider_refs[0].get("id") if isinstance(provider_refs[0], dict) else None
     if not client_symbol or not provider_id:
         return None
-    included_index: dict[tuple[str | None, str | None], dict] = {}
-    for item in data.get("included") or []:
-        if isinstance(item, dict):
-            included_index[(item.get("type"), item.get("id"))] = item
-    client_attrs = (included_index.get(("clients", client_symbol)) or {}).get("attributes") or {}
-    provider_attrs = (included_index.get(("providers", provider_id)) or {}).get("attributes") or {}
-    client_name = client_attrs.get("name")
-    provider_name = provider_attrs.get("name")
-    if not isinstance(client_name, str) or not client_name:
+    included_index: dict[tuple[str | None, str | None], Mapping[str, JsonValue]] = {}
+    for entree in as_sequence(data.get("included")):
+        item = as_mapping(entree)
+        included_index[(as_str(item.get("type")), as_str(item.get("id")))] = item
+    client_attrs = as_mapping(included_index.get(("clients", client_symbol), {}).get("attributes"))
+    provider_attrs = as_mapping(
+        included_index.get(("providers", provider_id), {}).get("attributes")
+    )
+    client_name = as_str(client_attrs.get("name"))
+    provider_name = as_str(provider_attrs.get("name"))
+    if not client_name:
         return None
-    if not isinstance(provider_name, str) or not provider_name:
+    if not provider_name:
         return None
     return provider_name, client_name, client_symbol

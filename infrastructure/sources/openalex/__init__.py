@@ -17,7 +17,7 @@ def init_auth(api_key: str | None = None, email: str = "") -> None:
     _email = email
 
 
-def auth_params() -> dict:
+def auth_params() -> dict[str, str]:
     """Retourne les paramètres d'authentification pour une requête OpenAlex."""
     params = {"include_xpac": "true"}
     if _api_key:

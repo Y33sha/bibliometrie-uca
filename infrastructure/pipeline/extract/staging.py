@@ -3,12 +3,13 @@
 Appelées par les adapters d'extraction et de cross-import (`infrastructure/sources/*`), et par la base de refresh stale. Le commit est à la charge de l'appelant.
 """
 
-from typing import Any
+from collections.abc import Mapping
 
 from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
 from domain.publications.identifiers import clean_doi
+from domain.types import JsonValue
 from infrastructure.pipeline.change_detection import change_detection_hash
 
 _UPSERT_STAGING_SQL = text(
@@ -56,7 +57,7 @@ def upsert_staging(
     source: str,
     source_id: str,
     doi: str | None,
-    raw_data: dict[str, Any],
+    raw_data: Mapping[str, JsonValue],
     authors_truncated: bool = False,
     entry_mode: str = "bulk",
 ) -> tuple[bool, bool]:

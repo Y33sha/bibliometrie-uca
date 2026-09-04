@@ -13,11 +13,14 @@ Seul `fetch_by_native_id` est source-spécifique. La sélection des rows stale, 
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Protocol
 
 import httpx
 from sqlalchemy import Connection
+
+from domain.types import JsonValue
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,7 +36,7 @@ class FetchedRecord:
     """Record ramené par la source : payload brut + DOI extrait (source-spécifique)."""
 
     doi: str | None
-    raw_data: dict[str, Any]
+    raw_data: Mapping[str, JsonValue]
 
 
 class _NotFound:

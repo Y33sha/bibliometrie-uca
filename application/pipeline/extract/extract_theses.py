@@ -23,6 +23,7 @@ from application.ports.pipeline.extract.theses import (
     ThesesExtractAdapter,
     ThesesExtractConfig,
 )
+from domain.types import as_int, as_mapping, as_sequence
 
 
 def extract_ppn(
@@ -43,7 +44,7 @@ def extract_ppn(
     query = adapter.build_query(ppn)
 
     data = adapter.fetch_page(query, debut=0, nombre=1)
-    total = data["totalHits"]
+    total = as_int(data.get("totalHits")) or 0
     logger.info("%s thèses", total)
 
     if dry_run or total == 0:
@@ -56,7 +57,7 @@ def extract_ppn(
 
     while debut < total:
         data = adapter.fetch_page(query, debut=debut, nombre=adapter.per_page())
-        theses = data.get("theses", [])
+        theses = [as_mapping(t) for t in as_sequence(data.get("theses"))]
 
         if not theses:
             break

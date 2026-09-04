@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 
 import httpx
 from sqlalchemy import Connection
@@ -20,6 +20,7 @@ from application.ports.pipeline.cross_imports.fetch_missing_doi import (
     is_not_found_marker,
     not_found_marker,
 )
+from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, at_path
 from infrastructure.pipeline.extract.cross_import import record_doi_not_found
 from infrastructure.pipeline.extract.staging import upsert_staging
 from infrastructure.sources.api_params import API_BASE_URLS, WOS_DELAY, WOS_PER_PAGE
@@ -47,18 +48,20 @@ class WosFetchMissingDoiAdapter:
         self.base_url = API_BASE_URLS["wos"]
         self.headers = {"X-ApiKey": get_wos_api_key(), "Accept": "application/json"}
 
-    async def fetch_async(self, client: httpx.AsyncClient, dois: list[str]) -> Iterable[dict]:
+    async def fetch_async(
+        self, client: httpx.AsyncClient, dois: list[str]
+    ) -> Iterable[Mapping[str, JsonValue]]:
         # (doi d'origine, forme envoyable à WoS ou None si filtré). Les DOI preprints filtrés (c=None) ne sont pas interrogeables, donc jamais enregistrés comme not-found (le filtre client les écarte gratuitement).
         queried = [(d, filter_doi_for_wos(d)) for d in dois]
         clean = [c for _, c in queried if c]
 
-        records: list[dict] = []
+        records: list[Mapping[str, JsonValue]] = []
         # complete : a-t-on un résultat fiable pour calculer les not-found ? Mis à False sur tout arrêt prématuré (erreur réseau, corps vide, réponse mal formée) où l'absence d'un DOI ne prouve rien.
         complete = True
         first_record = 1
         while clean:
             query = "DO=(" + " OR ".join(f'"{d}"' for d in clean) + ")"
-            params = {
+            params: dict[str, str | int | float] = {
                 "databaseId": "WOS",
                 "usrQuery": query,
                 "count": WOS_PER_PAGE,
@@ -95,26 +98,13 @@ class WosFetchMissingDoiAdapter:
             if not data:
                 complete = False
                 break
-            try:
-                recs_container = data.get("Data", {}).get("Records", {})
-                if not isinstance(recs_container, dict):
-                    complete = False
-                    break
-                recs = recs_container.get("records", {})
-                if not isinstance(recs, dict):
-                    complete = False
-                    break
-                recs = recs.get("REC", [])
-            except (AttributeError, TypeError):
-                complete = False
-                break
-            if isinstance(recs, dict):
-                recs = [recs]
+            brut = at_path(data, "Data", "Records", "records").get("REC")
+            recs = [brut] if isinstance(brut, Mapping) else as_sequence(brut)
             if not recs:
                 break
-            records.extend(recs)
+            records.extend(as_mapping(r) for r in recs)
 
-            total = int(data.get("QueryResult", {}).get("RecordsFound", 0))
+            total = as_int(at_path(data, "QueryResult").get("RecordsFound")) or 0
             if first_record + WOS_PER_PAGE - 1 >= total:
                 break
             first_record += WOS_PER_PAGE
@@ -127,9 +117,9 @@ class WosFetchMissingDoiAdapter:
         missed = [not_found_marker(orig) for orig, c in queried if c and c not in found]
         return records + missed
 
-    def insert(self, conn: Connection, record: dict) -> bool:
+    def insert(self, conn: Connection, record: Mapping[str, JsonValue]) -> bool:
         if is_not_found_marker(record):
-            record_doi_not_found(conn, "wos", record["_doi"])
+            record_doi_not_found(conn, "wos", as_str(record["_doi"]) or "")
             return False
 
         inserted, _ = upsert_staging(

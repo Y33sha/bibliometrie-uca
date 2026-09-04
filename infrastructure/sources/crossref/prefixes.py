@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any
 
 from domain.publications.identifiers import clean_doi_prefix
 from infrastructure.sources.api_params import API_BASE_URLS
@@ -15,10 +14,12 @@ from infrastructure.sources.http_retry import http_request_with_retry
 
 logger = logging.getLogger(__name__)
 
+from domain.types import JsonValue
+
 _MEMBER_URL_RE = re.compile(r"/member/(\d+)\b")
 
 
-def parse_member_id(member: Any) -> int | None:
+def parse_member_id(member: JsonValue) -> int | None:
     """Numéro de membre Crossref, extrait de la forme `…/member/10` qu'il prend dans les réponses. Accepte aussi un int brut."""
     if member is None:
         return None

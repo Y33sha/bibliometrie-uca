@@ -13,6 +13,7 @@ from application.ports.pipeline.extract.refresh_stale import (
     FetchedRecord,
     FetchOutcome,
 )
+from domain.types import as_mapping, as_sequence, at_path
 from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.hal.extract_hal import extract_doi
 from infrastructure.sources.hal.fields import HAL_FIELDS_STR
@@ -46,7 +47,7 @@ class HalRefreshStaleAdapter(BaseRefreshStaleAdapter):
             )
         except (httpx.RequestError, httpx.HTTPStatusError):
             return None
-        docs = data.get("response", {}).get("docs", [])
+        docs = [as_mapping(d) for d in as_sequence(at_path(data, "response").get("docs"))]
         if not docs:
             return NOT_FOUND
         return FetchedRecord(doi=extract_doi(docs[0]), raw_data=docs[0])

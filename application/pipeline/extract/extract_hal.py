@@ -21,6 +21,7 @@ from application.pipeline.extract.base import (
 from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.extract._common import UpsertOutcome
 from application.ports.pipeline.extract.hal import HalExtractAdapter, HalExtractConfig
+from domain.types import as_int, as_mapping, as_sequence, as_str, at_path
 
 
 def extract_union(
@@ -48,7 +49,7 @@ def extract_union(
 
     if dry_run:
         data = adapter.fetch_page_cursor(query, fq, "*")
-        total = int(data.get("response", {}).get("numFound", 0))
+        total = as_int(at_path(data, "response").get("numFound")) or 0
         metrics.add(total=total)
         logger.info("%s docs (dry-run)", total)
         return metrics
@@ -66,12 +67,12 @@ def extract_union(
             )
             break
         data = adapter.fetch_page_cursor(query, fq, cursor)
-        resp = data.get("response", {})
-        docs = resp.get("docs", [])
+        resp = at_path(data, "response")
+        docs = [as_mapping(d) for d in as_sequence(resp.get("docs"))]
 
         # `numFound` n'est connu qu'à la première réponse cursorMark : on logue alors le volume du périmètre et le nombre de pages attendu.
         if total_pages is None:
-            num_found = int(resp.get("numFound", 0))
+            num_found = as_int(resp.get("numFound")) or 0
             total_pages = (num_found + page_size - 1) // page_size if num_found else 0
             logger.info("%s documents → ~%s pages de %s", num_found, total_pages, page_size)
 
@@ -109,7 +110,7 @@ def extract_union(
         # Fin de pagination cursorMark : Solr renvoie le même marqueur que celui
         # envoyé une fois l'union épuisée. Le test `not docs` borne aussi la boucle
         # en cas d'incohérence serveur (page vide avant stabilisation).
-        next_cursor = data.get("nextCursorMark", cursor)
+        next_cursor = as_str(data.get("nextCursorMark")) or cursor
         if next_cursor == cursor or not docs:
             break
         cursor = next_cursor

@@ -44,7 +44,7 @@ from domain.publications.identifiers import (
     normalize_pmid,
 )
 from domain.publications.metadata import has_minimal_publication_metadata
-from domain.sources.hal import derive_hal_oa_status
+from domain.sources.hal import derive_hal_oa_status, hal_text_field
 from domain.types import JsonValue, as_int, as_sequence
 
 # =============================================================
@@ -52,18 +52,9 @@ from domain.types import JsonValue, as_int, as_sequence
 # =============================================================
 
 
-def as_str(value: JsonValue) -> str | None:
-    """Extrait une chaîne depuis un champ HAL, qui arrive en texte ou en liste (convention Solr)."""
-    if value is None:
-        return None
-    if isinstance(value, list):
-        return value[0] if value else None
-    return str(value)
-
-
 def get_title(doc: Mapping[str, JsonValue]) -> str:
     """Extrait le titre depuis les données HAL."""
-    return as_str(doc.get("title_s")) or as_str(doc.get("label_s")) or ""
+    return hal_text_field(doc.get("title_s")) or hal_text_field(doc.get("label_s")) or ""
 
 
 # =============================================================
@@ -85,13 +76,13 @@ def upsert_journal(
     journal_repo: JournalFindOrCreateQueries,
 ) -> int | None:
     """Extrait et trouve/crée la revue depuis les champs HAL."""
-    title = as_str(doc.get("journalTitle_s"))
+    title = hal_text_field(doc.get("journalTitle_s"))
     if not title:
         return None
     return find_or_create_journal(
         title,
-        issn=as_str(doc.get("journalIssn_s")),
-        eissn=as_str(doc.get("journalEissn_s")),
+        issn=hal_text_field(doc.get("journalIssn_s")),
+        eissn=hal_text_field(doc.get("journalEissn_s")),
         publisher_id=publisher_id,
         repo=journal_repo,
     )
@@ -110,29 +101,31 @@ def extract_pub_metadata(
     Toutes les valeurs sont brutes — pas de transformation de cohérence. `doc_type` est le concat brut `docType_s_docSubType_s` (ex. `ART_review-article`), pas la valeur canonique : la résolution source→enum (`map_doc_type`) relève de la phase `metadata_correction`, pas du brut stocké dans `source_publications`.
     """
     title = get_title(doc)
-    raw_type = as_str(doc.get("docType_s")) or ""
-    raw_sub = as_str(doc.get("docSubType_s")) or ""
+    raw_type = hal_text_field(doc.get("docType_s")) or ""
+    raw_sub = hal_text_field(doc.get("docSubType_s")) or ""
     doc_type = f"{raw_type}_{raw_sub}" if raw_sub else raw_type or None
 
-    language = as_str(doc.get("language_s"))
+    language = hal_text_field(doc.get("language_s"))
 
     container_title = None
     if not journal_id:
-        container_title = as_str(doc.get("bookTitle_s")) or as_str(doc.get("conferenceTitle_s"))
+        container_title = hal_text_field(doc.get("bookTitle_s")) or hal_text_field(
+            doc.get("conferenceTitle_s")
+        )
 
-    embargo_until = active_embargo_until(as_str(doc.get("label_xml")), today())
+    embargo_until = active_embargo_until(hal_text_field(doc.get("label_xml")), today())
 
     ouvert = doc.get("openAccess_bool")
     return PublicationMetadata(
         title=title,
         pub_year=as_int(doc.get("producedDateY_i")),
         doc_type=doc_type,
-        doi=clean_doi(as_str(doc.get("doiId_s"))),
-        nnt=normalize_nnt(as_str(doc.get("nntId_s"))),
+        doi=clean_doi(hal_text_field(doc.get("doiId_s"))),
+        nnt=normalize_nnt(hal_text_field(doc.get("nntId_s"))),
         oa_status=derive_hal_oa_status(
             ouvert if isinstance(ouvert, bool) else None,
-            as_str(doc.get("fileMain_s")),
-            as_str(doc.get("linkExtId_s")),
+            hal_text_field(doc.get("fileMain_s")),
+            hal_text_field(doc.get("linkExtId_s")),
             embargo_until,
         ),
         embargo_until=embargo_until,
@@ -157,12 +150,12 @@ def build_hal_external_ids(
     external_ids: dict[str, JsonValue] = {"hal_id": [hal_id]}
     if nnt:
         external_ids["nnt"] = nnt
-    if pmid := normalize_pmid(as_str(doc.get("pubmedid_s"))):
+    if pmid := normalize_pmid(hal_text_field(doc.get("pubmedid_s"))):
         external_ids["pmid"] = pmid
     brut = doc.get("linkExtUrl_s")
     link_urls = [brut] if isinstance(brut, str) else as_sequence(brut)
     for entree in link_urls:
-        url = as_str(entree)
+        url = hal_text_field(entree)
         if "pmcid" not in external_ids and (pmcid := normalize_pmcid(url)):
             external_ids["pmcid"] = pmcid
         if "arxiv_id" not in external_ids and (arxiv_id := normalize_arxiv_id(url)):
@@ -195,7 +188,7 @@ def insert_hal_document(
     external_ids = build_hal_external_ids(doc, hal_id, pub_meta.nnt)
 
     # Abstract
-    abstract = as_str(doc.get("abstract_s"))
+    abstract = hal_text_field(doc.get("abstract_s"))
 
     # Keywords
     kw_raw = doc.get("keyword_s")
@@ -207,26 +200,28 @@ def insert_hal_document(
 
     # Biblio
     biblio: dict[str, JsonValue] = {}
-    vol = as_str(doc.get("volume_s"))
+    vol = hal_text_field(doc.get("volume_s"))
     if vol:
         biblio["volume"] = vol
-    issue = as_str(doc.get("issue_s"))
+    issue = hal_text_field(doc.get("issue_s"))
     if issue:
         biblio["issue"] = issue
-    page = as_str(doc.get("page_s"))
+    page = hal_text_field(doc.get("page_s"))
     if page:
         biblio["pages"] = page
 
     # Publisher + journal bruts (traçabilité du nom tel que vu par HAL, en parallèle de publishers/journals créés via find_or_create_*).
-    publisher_raw = as_str(doc.get("journalPublisher_s")) or as_str(doc.get("publisher_s"))
+    publisher_raw = hal_text_field(doc.get("journalPublisher_s")) or hal_text_field(
+        doc.get("publisher_s")
+    )
     if publisher_raw:
         biblio["publisher"] = publisher_raw
     journal_obj: dict[str, str] = {}
-    if jt := as_str(doc.get("journalTitle_s")):
+    if jt := hal_text_field(doc.get("journalTitle_s")):
         journal_obj["title"] = jt
-    if jissn := as_str(doc.get("journalIssn_s")):
+    if jissn := hal_text_field(doc.get("journalIssn_s")):
         journal_obj["issn"] = jissn
-    if jeissn := as_str(doc.get("journalEissn_s")):
+    if jeissn := hal_text_field(doc.get("journalEissn_s")):
         journal_obj["eissn"] = jeissn
     if journal_obj:
         biblio["journal"] = journal_obj
@@ -234,7 +229,7 @@ def insert_hal_document(
     biblio_json = biblio if biblio else None
 
     # URLs
-    uri = as_str(doc.get("uri_s"))
+    uri = hal_text_field(doc.get("uri_s"))
     urls = [uri] if uri else None
 
     return queries.upsert_source_publication(
@@ -373,7 +368,7 @@ def parse_author_structures(
     form_structs: dict[int, set[str]] = {}
 
     for entree in entries:
-        entry = as_str(entree)
+        entry = hal_text_field(entree)
         if entry is None:
             continue
         parts = entry.split("_JoinSep_")
@@ -418,9 +413,9 @@ def build_hal_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecord]
 
     Un `hal_person_id` listé sur plusieurs auteurs du même dépôt (erreur de saisie HAL) rend toute l'identité de ces signatures douteuse : tous les identifiants (hal_person_id/idref/idhal/orcid, attachés au compte HAL) sont alors rangés sous une clé suffixée `_dubious` — valeur conservée mais écartée du matching personnes.
     """
-    qualities = [as_str(q) for q in as_sequence(doc.get("authQuality_s"))]
+    qualities = [hal_text_field(q) for q in as_sequence(doc.get("authQuality_s"))]
     # ORCID et IdRef par auteur : parsés depuis le TEI (label_xml), seul champ HAL qui les attache proprement à chaque position d'auteur.
-    tei_ids = parse_tei_author_identifiers(as_str(doc.get("label_xml")))
+    tei_ids = parse_tei_author_identifiers(hal_text_field(doc.get("label_xml")))
 
     # authFullNameFormIDPersonIDIDHal_fs :
     #   "Nom_FacetSep_formId-personId_FacetSep_idhal" — aligné par position.
@@ -430,7 +425,7 @@ def build_hal_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecord]
     composite = [
         entry
         for e in as_sequence(doc.get("authFullNameFormIDPersonIDIDHal_fs"))
-        if (entry := as_str(e))
+        if (entry := hal_text_field(e))
     ]
     names = [entry.split("_FacetSep_", 1)[0] for entry in composite]
     form_id_by_pos: dict[int, int | None] = {}
@@ -556,7 +551,9 @@ def process_work(
         staging_queries.mark_done(conn, staging_id)
         return False
 
-    publisher_name = as_str(doc.get("journalPublisher_s")) or as_str(doc.get("publisher_s"))
+    publisher_name = hal_text_field(doc.get("journalPublisher_s")) or hal_text_field(
+        doc.get("publisher_s")
+    )
     publisher_id = (
         upsert_publisher(publisher_name, publisher_repo=publisher_repo) if publisher_name else None
     )

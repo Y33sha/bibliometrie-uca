@@ -7,7 +7,7 @@ Chemin async (`run_async`). La boucle embarrassingly parallel des DOIs manquants
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 
 import httpx
 from sqlalchemy import Connection
@@ -16,6 +16,7 @@ from application.ports.pipeline.cross_imports.fetch_missing_doi import (
     is_not_found_marker,
     not_found_marker,
 )
+from domain.types import JsonValue, as_mapping, as_sequence, as_str
 from infrastructure.pipeline.extract.cross_import import record_doi_not_found
 from infrastructure.pipeline.extract.staging import upsert_staging
 from infrastructure.sources.api_params import API_BASE_URLS
@@ -44,9 +45,11 @@ class OpenalexFetchMissingDoiAdapter:
         init_auth(api_key=get_openalex_api_key(), email=get_polite_pool_email())
         self.base_url = API_BASE_URLS["openalex"]
 
-    async def fetch_async(self, client: httpx.AsyncClient, dois: list[str]) -> Iterable[dict]:
+    async def fetch_async(
+        self, client: httpx.AsyncClient, dois: list[str]
+    ) -> Iterable[Mapping[str, JsonValue]]:
         doi = dois[0]
-        params = {
+        params: dict[str, str | int | float] = {
             "filter": f"doi:{doi}",
             "select": SELECT_FIELDS,
             **auth_params(),
@@ -63,15 +66,15 @@ class OpenalexFetchMissingDoiAdapter:
         except (httpx.RequestError, httpx.HTTPStatusError):
             # Erreur réseau ou HTTP (429/5xx après retries, 4xx) : lot ignoré, les DOI restent candidats au prochain run (leur absence n'est pas prouvée).
             return []
-        results = data.get("results", [])
+        results = [as_mapping(r) for r in as_sequence(data.get("results"))]
         if not results:
             # Réponse OpenAlex valide, zéro résultat : DOI confirmé absent.
             return [not_found_marker(doi)]
         return results[:1]
 
-    def insert(self, conn: Connection, record: dict) -> bool:
+    def insert(self, conn: Connection, record: Mapping[str, JsonValue]) -> bool:
         if is_not_found_marker(record):
-            record_doi_not_found(conn, "openalex", record["_doi"])
+            record_doi_not_found(conn, "openalex", as_str(record["_doi"]) or "")
             return False
 
         inserted, _ = upsert_staging(

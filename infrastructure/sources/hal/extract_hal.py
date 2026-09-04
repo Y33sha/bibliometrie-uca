@@ -6,13 +6,15 @@ Implémente le port `application.ports.pipeline.extract.hal.HalExtractAdapter`. 
 from __future__ import annotations
 
 import time
-from typing import Any
+from collections.abc import Mapping
 
 from sqlalchemy import Connection
 
 from application.ports.pipeline.extract._common import UpsertOutcome
 from application.ports.pipeline.extract.hal import HalExtractAdapter, HalExtractConfig
 from domain.publications.identifiers import clean_doi
+from domain.sources.hal import hal_text_field
+from domain.types import JsonValue
 from infrastructure.pipeline.extract.staging import upsert_staging
 from infrastructure.sources.api_params import API_BASE_URLS, HAL_DELAY, HAL_PER_PAGE
 from infrastructure.sources.config import (
@@ -28,15 +30,13 @@ def _build_url(base_url: str) -> str:
     return f"{base_url.rstrip('/')}/"
 
 
-def extract_doi(doc: dict[str, Any]) -> str | None:
+def extract_doi(doc: Mapping[str, JsonValue]) -> str | None:
     """Extrait le DOI nettoyé d'un document HAL (champ `doiId_s`).
 
     `doiId_s` arrive en scalaire depuis l'extraction bulk Solr, mais en liste depuis l'API de recherche par hal-id (cross-import) : les deux formes sont gérées avant nettoyage.
     """
     doi = doc.get("doiId_s")
-    if isinstance(doi, list):
-        doi = doi[0] if doi else None
-    return clean_doi(doi)
+    return clean_doi(hal_text_field(doi))
 
 
 class PgHalExtractAdapter(HalExtractAdapter):
@@ -49,7 +49,9 @@ class PgHalExtractAdapter(HalExtractAdapter):
         self._url = _build_url(base_url)
         self._last_request_at: float | None = None
 
-    def _get(self, params: dict[str, Any], label: str) -> dict[str, Any]:
+    def _get(
+        self, params: Mapping[str, str | int | float | bool | None], label: str
+    ) -> Mapping[str, JsonValue]:
         """GET Solr HAL, auto rate-limité : au moins `HAL_DELAY` entre deux appels.
 
         L'adapter se rate-limite seul, quel que soit l'appelant — l'orchestrateur n'ordonnance aucun `sleep`. On mesure l'écart depuis la dernière requête : le temps de traitement entre deux fetchs (parsing, upsert, commit) est déjà décompté du délai.
@@ -99,11 +101,11 @@ class PgHalExtractAdapter(HalExtractAdapter):
         """Taille de page Solr (`HAL_PER_PAGE`)."""
         return HAL_PER_PAGE
 
-    def extract_id(self, doc: dict[str, Any]) -> str:
+    def extract_id(self, doc: Mapping[str, JsonValue]) -> str:
         """Extrait le halId depuis un document HAL (champ `halId_s`)."""
-        return doc.get("halId_s", "")
+        return hal_text_field(doc.get("halId_s")) or ""
 
-    def extract_doi(self, doc: dict[str, Any]) -> str | None:
+    def extract_doi(self, doc: Mapping[str, JsonValue]) -> str | None:
         """Extrait le DOI nettoyé depuis un document HAL (champ `doiId_s`)."""
         return extract_doi(doc)
 
@@ -114,11 +116,11 @@ class PgHalExtractAdapter(HalExtractAdapter):
 
     # ── HTTP ───────────────────────────────────────────────────
 
-    def fetch_page_cursor(self, query: str, fq: str, cursor_mark: str) -> dict[str, Any]:
+    def fetch_page_cursor(self, query: str, fq: str, cursor_mark: str) -> Mapping[str, JsonValue]:
         """Une page Solr en pagination `cursorMark` (full payload `HAL_FIELDS`).
 
         `cursor_mark` vaut `"*"` au premier appel, puis le `nextCursorMark` renvoyé par la réponse précédente. La réponse porte `response.docs` et `nextCursorMark` ; l'appelant boucle jusqu'à ce que le marqueur se stabilise. `sort=docid asc` (clé unique) est requis par cursorMark."""
-        params = {
+        params: dict[str, str | int | float | bool | None] = {
             "q": query,
             "fq": fq,
             "fl": ",".join(HAL_FIELDS),
@@ -136,7 +138,7 @@ class PgHalExtractAdapter(HalExtractAdapter):
         conn: Connection,
         hal_id: str,
         doi: str | None,
-        raw_data: dict[str, Any],
+        raw_data: Mapping[str, JsonValue],
     ) -> UpsertOutcome:
         """UPSERT staging via le helper canonique."""
         inserted, changed = upsert_staging(

@@ -101,11 +101,11 @@ class TestOADocTypeMap:
 # ── HAL ──────────────────────────────────────────────────────────
 
 from application.pipeline.normalize.normalize_hal import (
-    as_str,
     build_hal_external_ids,
     get_title,
     parse_author_structures,
 )
+from domain.sources.hal import hal_text_field
 
 
 class TestBuildHalExternalIds:
@@ -135,22 +135,22 @@ class TestBuildHalExternalIds:
 
 class TestHALAsStr:
     def test_none(self):
-        assert as_str(None) is None
+        assert hal_text_field(None) is None
 
     def test_string(self):
-        assert as_str("hello") == "hello"
+        assert hal_text_field("hello") == "hello"
 
     def test_list_single(self):
-        assert as_str(["hello"]) == "hello"
+        assert hal_text_field(["hello"]) == "hello"
 
     def test_list_multiple(self):
-        assert as_str(["first", "second"]) == "first"
+        assert hal_text_field(["first", "second"]) == "first"
 
     def test_list_empty(self):
-        assert as_str([]) is None
+        assert hal_text_field([]) is None
 
     def test_number(self):
-        assert as_str(42) == "42"
+        assert hal_text_field(42) == "42"
 
 
 class TestHALGetTitle:

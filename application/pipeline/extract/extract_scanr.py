@@ -18,7 +18,7 @@ from application.pipeline.extract.base import (
 from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.extract._common import UpsertOutcome
 from application.ports.pipeline.extract.scanr import ScanrExtractAdapter, ScanrExtractConfig
-from domain.types import JsonValue
+from domain.types import JsonValue, as_int, as_mapping, as_sequence, at_path
 
 
 def extract_year(
@@ -46,17 +46,17 @@ def extract_year(
         data = adapter.fetch_page(query)
 
         if first_page:
-            total = data["hits"]["total"]["value"]
+            total = as_int(at_path(data, "hits", "total").get("value")) or 0
             logger.info("%s publications", total)
             if dry_run:
                 return total, 0, 0, 0
 
-        hits = data["hits"]["hits"]
+        hits = [as_mapping(h) for h in as_sequence(at_path(data, "hits").get("hits"))]
         if not hits:
             break
 
         for hit in hits:
-            doc = hit["_source"]
+            doc = as_mapping(hit.get("_source"))
             scanr_id = adapter.extract_id(doc)
             if not scanr_id:
                 continue
@@ -70,7 +70,7 @@ def extract_year(
             else:
                 unchanged += 1
 
-        search_after = hits[-1]["sort"]
+        search_after = list(as_sequence(hits[-1].get("sort")))
 
         if seen % 500 == 0:
             conn.commit()

@@ -7,7 +7,7 @@ L'orchestration (boucle async, sémaphore, commits intermédiaires) vit côté `
 
 from __future__ import annotations
 
-from typing import Any
+from collections.abc import Mapping
 
 import httpx
 from sqlalchemy import Connection, bindparam, text
@@ -17,6 +17,7 @@ from application.ports.pipeline.extract.refetch_truncated import (
     OpenalexRefetchAdapter,
     TruncatedWork,
 )
+from domain.types import JsonValue
 from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.config import (
     get_openalex_api_key,
@@ -79,7 +80,7 @@ class PgOpenalexRefetchAdapter(OpenalexRefetchAdapter):
 
     async def fetch_work(
         self, client: httpx.AsyncClient, openalex_id: str
-    ) -> dict[str, Any] | None:
+    ) -> Mapping[str, JsonValue] | None:
         """Fetch un work individuel par son ID OpenAlex (retourne tous les auteurs).
 
         Retourne le dict ou None si l'API renvoie 404 ou si la requête a échoué après tous les retries.
@@ -98,7 +99,9 @@ class PgOpenalexRefetchAdapter(OpenalexRefetchAdapter):
         except httpx.RequestError:
             return None
 
-    def update_raw_data(self, conn: Connection, staging_id: int, work: dict[str, Any]) -> None:
+    def update_raw_data(
+        self, conn: Connection, staging_id: int, work: Mapping[str, JsonValue]
+    ) -> None:
         conn.execute(_UPDATE_SQL, {"raw_data": work, "id": staging_id})
 
     def clear_truncated(self, conn: Connection, staging_id: int) -> None:

@@ -7,11 +7,14 @@ L'orchestrateur (`application.pipeline.extract.refetch_truncated.refetch`) conso
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Protocol
 
 import httpx
 from sqlalchemy import Connection
+
+from domain.types import JsonValue
 
 
 @dataclass(frozen=True, slots=True)
@@ -38,10 +41,12 @@ class OpenalexRefetchAdapter(Protocol):
 
     async def fetch_work(
         self, client: httpx.AsyncClient, openalex_id: str
-    ) -> dict[str, Any] | None:
+    ) -> Mapping[str, JsonValue] | None:
         """Fetch un work individuel via l'API OpenAlex (auteurs complets)."""
 
-    def update_raw_data(self, conn: Connection, staging_id: int, work: dict[str, Any]) -> None:
+    def update_raw_data(
+        self, conn: Connection, staging_id: int, work: Mapping[str, JsonValue]
+    ) -> None:
         """UPDATE staging.raw_data = work refetché, processed = FALSE, authors_truncated = FALSE.
 
         Ne recalcule **pas** `raw_hash` (dissymétrie volontaire du mécanisme de préservation — cf. docstring de l'orchestrateur).

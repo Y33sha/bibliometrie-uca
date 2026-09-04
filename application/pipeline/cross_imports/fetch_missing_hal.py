@@ -12,8 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Awaitable, Callable, Sequence
-from typing import Any
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 
 import httpx
 from sqlalchemy import Connection
@@ -27,6 +26,8 @@ from application.ports.pipeline.cross_imports.fetch_missing_hal import (
 )
 
 __all__ = ["fetch_missing_hal_by_id", "fetch_missing_hal_by_nnt"]
+
+from domain.types import JsonValue
 
 _COMMIT_EVERY = 50
 
@@ -49,8 +50,8 @@ async def _fetch_refs_async[Ref](
     *,
     max_concurrent: int,
     delay_s: float,
-    fetch_one: Callable[[httpx.AsyncClient, Ref], Awaitable[dict[str, Any] | None]],
-    insert_one: Callable[[Connection, Ref, dict[str, Any] | None], tuple[int, int]],
+    fetch_one: Callable[[httpx.AsyncClient, Ref], Awaitable[Mapping[str, JsonValue] | None]],
+    insert_one: Callable[[Connection, Ref, Mapping[str, JsonValue] | None], tuple[int, int]],
 ) -> tuple[int, int]:
     """Fetch concurrent puis insert sérialisé, via `run_fetch_pool`.
 
@@ -59,13 +60,13 @@ async def _fetch_refs_async[Ref](
     counts = {"fetched": 0, "not_found": 0, "done": 0}
     total = len(refs)
 
-    async def _fetch(client: httpx.AsyncClient, ref: Ref) -> dict[str, Any] | None:
+    async def _fetch(client: httpx.AsyncClient, ref: Ref) -> Mapping[str, JsonValue] | None:
         doc = await fetch_one(client, ref)
         if delay_s:
             await asyncio.sleep(delay_s)
         return doc
 
-    def _write(conn: Connection, ref: Ref, doc: dict[str, Any] | None) -> None:
+    def _write(conn: Connection, ref: Ref, doc: Mapping[str, JsonValue] | None) -> None:
         fetched, not_found = insert_one(conn, ref, doc)
         counts["fetched"] += fetched
         counts["not_found"] += not_found
@@ -118,7 +119,9 @@ async def fetch_missing_hal_by_id(
             log.info("  ... et %d autres", len(missing) - 10)
         return metrics
 
-    def _insert(conn: Connection, ref: HalIdRef, doc: dict[str, Any] | None) -> tuple[int, int]:
+    def _insert(
+        conn: Connection, ref: HalIdRef, doc: Mapping[str, JsonValue] | None
+    ) -> tuple[int, int]:
         found = adapter.insert_halid_result(conn, ref.hal_id, doc)
         return (1, 0) if found else (0, 1)
 
@@ -165,7 +168,9 @@ async def fetch_missing_hal_by_nnt(
             log.info("  ... et %d autres", len(nnt_refs) - 10)
         return metrics
 
-    def _insert(conn: Connection, ref: NntRef, doc: dict[str, Any] | None) -> tuple[int, int]:
+    def _insert(
+        conn: Connection, ref: NntRef, doc: Mapping[str, JsonValue] | None
+    ) -> tuple[int, int]:
         api_found, inserted = adapter.insert_nnt_result(conn, ref.nnt, doc)
         return (1 if inserted else 0, 0 if api_found else 1)
 

@@ -8,12 +8,14 @@ Regroupe en un seul Protocol :
 - les écritures SQL dans `staging`
 """
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Protocol
 
 from sqlalchemy import Connection
 
 from application.ports.pipeline.extract._common import UpsertOutcome
+from domain.types import JsonValue
 
 
 @dataclass(frozen=True)
@@ -39,14 +41,14 @@ class ThesesExtractAdapter(Protocol):
 
     def per_page(self) -> int: ...
 
-    def extract_id(self, these: dict[str, Any]) -> str: ...
+    def extract_id(self, these: Mapping[str, JsonValue]) -> str: ...
 
     # ── HTTP ───────────────────────────────────────────────────
 
-    def fetch_page(self, query: str, *, debut: int, nombre: int) -> dict[str, Any]: ...
+    def fetch_page(self, query: str, *, debut: int, nombre: int) -> Mapping[str, JsonValue]: ...
 
     # ── SQL ────────────────────────────────────────────────────
 
-    def upsert_these(self, conn: Connection, these: dict[str, Any]) -> UpsertOutcome:
+    def upsert_these(self, conn: Connection, these: Mapping[str, JsonValue]) -> UpsertOutcome:
         """UPSERT staging d'une thèse."""
         ...

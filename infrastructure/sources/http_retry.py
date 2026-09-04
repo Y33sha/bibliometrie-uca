@@ -19,10 +19,12 @@ import asyncio
 import json
 import logging
 import time
+from collections.abc import Mapping
 
 import httpx
 
 from application.ports.pipeline.circuit_breaker import SourceUnavailableError
+from domain.types import JsonValue
 from infrastructure.sources.circuit_breaker import SourceCircuitBreaker, get_current_breaker
 from infrastructure.sources.http_status import raise_for_status
 
@@ -67,16 +69,16 @@ def http_request_with_retry(
     method: str,
     url: str,
     *,
-    params: dict | None = None,
-    json_body: dict | None = None,
-    headers: dict | None = None,
-    auth: tuple | None = None,
+    params: Mapping[str, str | int | float | bool | None] | None = None,
+    json_body: Mapping[str, JsonValue] | None = None,
+    headers: Mapping[str, str] | None = None,
+    auth: tuple[str, str] | None = None,
     timeout: int = 30,
     max_retries: int = 3,
     initial_backoff: float = 1.0,
     retry_on_empty_body: bool = False,
     label: str = "",
-) -> dict:
+) -> Mapping[str, JsonValue]:
     """Requête HTTP synchrone avec retry, backoff et circuit-breaker (politique cf. docstring du module).
 
     `max_retries=3` avec le backoff par défaut donne des pauses de 1, 2, 4 s. `label` : chaîne courte (ex. "year 2024, rec 100") insérée dans les logs. Lève la dernière exception rencontrée si `max_retries` est atteint sans succès.
@@ -150,16 +152,16 @@ async def http_request_with_retry_async(
     method: str,
     url: str,
     *,
-    params: dict | None = None,
-    json_body: dict | None = None,
-    headers: dict | None = None,
-    auth: tuple | None = None,
+    params: Mapping[str, str | int | float | bool | None] | None = None,
+    json_body: Mapping[str, JsonValue] | None = None,
+    headers: Mapping[str, str] | None = None,
+    auth: tuple[str, str] | None = None,
     timeout: float = 30.0,  # noqa: ASYNC109 — wrapper httpx, le timeout est passé au client
     max_retries: int = 3,
     initial_backoff: float = 1.0,
     retry_on_empty_body: bool = False,
     label: str = "",
-) -> dict:
+) -> Mapping[str, JsonValue]:
     """Requête HTTP asynchrone avec retry, backoff et circuit-breaker (politique cf. docstring du module).
 
     Le `httpx.AsyncClient` est partagé entre les coroutines d'un même run (connexions poolées). `label` : chaîne courte (ex. "DOI 10.xxx") pour distinguer les requêtes concurrentes dans les logs.
