@@ -427,8 +427,8 @@ disallow_any_generics = true
 warn_return_any = false
 # Afficher les codes d'erreur pour pouvoir ignorer précisément au besoin
 show_error_codes = true
-# Ne pas imposer l'absence d'Optional implicite
-implicit_optional = true
+# Un paramètre qui accepte `None` le déclare : `x: str | None = None`, jamais `x: str = None`.
+implicit_optional = false
 # Ignorer les erreurs dans les tests (focus sur le code de prod)
 exclude = [
     "^tests/",

@@ -416,8 +416,10 @@ app.include_router(subjects.router)
 # ----- Frontend SPA (prod) -----
 #
 # En prod, le frontend buildé (adapter-static) est servi par FastAPI : la SPA
-# (ssr=false) et les docs prérendues vivent dans interfaces/frontend/build.
+# (ssr=false) vit dans interfaces/frontend/build.
 # Monté en dernier — catch-all — pour que les routes /api/* matchent d'abord.
 # Absent en dev (vite sert le frontend) : on ne monte que si le build existe.
-if BUILD_DIR.is_dir():
+# Sans mesure de couverture : la branche prise dépend de la présence du build, un fait
+# d'environnement — un même relevé ne peut pas emprunter les deux.
+if BUILD_DIR.is_dir():  # pragma: no cover
     app.mount("/", SPAStaticFiles(directory=BUILD_DIR, html=True), name="spa")
