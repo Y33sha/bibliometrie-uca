@@ -8,7 +8,7 @@ version = "0.1.0"
 requires-python = ">=3.14"
 dependencies = [
     "httpx==0.28.1",             # unique client HTTP : appels synchrones et asynchrones du pipeline
-    "psycopg[binary]==3.3.4",     # driver Postgres pour SQLAlchemy ; import symbolique dans infrastructure/db/engine.py
+    "psycopg[binary]==3.3.4",    # driver Postgres pour SQLAlchemy ; import symbolique dans infrastructure/db/engine.py
     "sqlalchemy==2.0.52",        # query builder Core
     "alembic==1.19.1",           # migrations DB
     "fastapi==0.141.1",
@@ -17,7 +17,7 @@ dependencies = [
     "bcrypt==5.0.0",
     "python-dotenv==1.2.3",      # requis par pydantic-settings pour env_file ; CVE-2026-28684 fixed
     "pydantic==2.13.5",          # requis par pydantic-settings et utilisé directement
-    "pydantic-settings==2.15.0",  # ≥2.14.2 corrige GHSA-4xgf-cpjx-pc3j
+    "pydantic-settings==2.15.0", # ≥2.14.2 corrige GHSA-4xgf-cpjx-pc3j
     "pyahocorasick==2.3.1",      # automate Aho-Corasick : matching multi-formes des adresses (phase affiliations)
     "defusedxml==0.7.1",         # lecture du TEI joint aux notices HAL : refuse les déclarations d'entités, que l'analyseur standard développe
 ]
@@ -28,18 +28,18 @@ run_pipeline = "interfaces.cli.run_pipeline:main"
 
 [project.optional-dependencies]
 dev = [
-    "pytest==9.1.1",                   # CVE-2025-71176 fixed
-    "pytest-asyncio==1.4.0",           # tests des extractions HTTP async du pipeline
+    "pytest==9.1.1",           # CVE-2025-71176 fixed
+    "pytest-asyncio==1.4.0",   # tests des extractions HTTP async du pipeline
     "pytest-cov==7.1.0",
-    "respx==0.23.1",                   # mocking httpx pour tests async
+    "respx==0.23.1",           # mocking httpx pour tests async
     "ruff==0.16.5",
     "mypy==2.3.1",
     "deptry==0.25.1",
     "pip-audit==2.10.1",
     "pre-commit==4.6.2",
-    "pre-commit-hooks==6.0.0",         # check-yaml/toml/… lancés en local via `python -m`
+    "pre-commit-hooks==6.0.0", # check-yaml/toml/… lancés en local via `python -m`
     "import-linter==2.14",
-    "pyyaml==6.0.3",             # lecture des descriptions de déploiement par les tests
+    "pyyaml==6.0.3",           # lecture des descriptions de déploiement par les tests
 ]
 
 [tool.setuptools]
@@ -81,9 +81,7 @@ layers = ["interfaces", "infrastructure | application", "domain"]
 # importer les dataclasses de transport pour typer ses signatures
 # (cf. règle 3). Les Protocols restent implémentés via duck typing.
 #
-ignore_imports = [
-    "infrastructure.** -> application.ports.**",
-]
+ignore_imports = ["infrastructure.** -> application.ports.**"]
 
 [[tool.importlinter.contracts]]
 name = "Routers : pas d'import direct de infrastructure"
@@ -123,10 +121,7 @@ ignore_imports = [
 [[tool.importlinter.contracts]]
 name = "Adapters : la connexion se reçoit, elle ne s'ouvre pas"
 type = "forbidden"
-source_modules = [
-    "infrastructure.read_models",
-    "infrastructure.repositories",
-]
+source_modules = ["infrastructure.read_models", "infrastructure.repositories"]
 forbidden_modules = ["infrastructure.db.engine"]
 # Un adapter travaille sur la connexion que son appelant lui remet : c'est elle qui porte la
 # transaction de la requête, et les caractéristiques que la composition root y a posées — la
@@ -191,7 +186,13 @@ forbidden_modules = ["subprocess", "multiprocessing", "pty"]
 name = "Domain : pas de framework externe"
 type = "forbidden"
 source_modules = ["domain"]
-forbidden_modules = ["pydantic", "sqlalchemy", "fastapi", "starlette", "psycopg"]
+forbidden_modules = [
+    "pydantic",
+    "sqlalchemy",
+    "fastapi",
+    "starlette",
+    "psycopg",
+]
 # Le domaine ne dépend de rien : pas d'ORM, pas de validation
 # Pydantic, pas de framework web, pas de driver DB. Les modèles
 # d'I/O JSONB (BaseModel) vivent dans infrastructure/jsonb_models/.
@@ -221,7 +222,7 @@ extend-exclude = [
     # Les extraits de code de la documentation illustrent un propos : ils ne sont pas du code
     # à maintenir, et les fiches archivées sont un compte rendu qu'on ne réécrit pas.
     "*.md",
-    ".claude",  # hooks du harnais de développement, hors code applicatif
+    ".claude",                   # hooks du harnais de développement, hors code applicatif
     "interfaces/frontend",
     "bibliometrie_uca.egg-info",
     ".venv",
@@ -233,26 +234,26 @@ extend-exclude = [
 [tool.ruff.lint]
 # Règles activées — on démarre permissif, à durcir au fil du temps.
 select = [
-    "E",      # pycodestyle errors
-    "W",      # pycodestyle warnings
-    "F",      # pyflakes (undefined names, unused imports, etc.)
-    "I",      # isort (ordre des imports)
-    "UP",     # pyupgrade (syntaxe obsolète)
-    "B",      # flake8-bugbear (pièges courants)
-    "C901",   # complexité cyclomatique
-    "ASYNC",  # flake8-async : I/O bloquantes dans une async def, etc.
-    "S",      # flake8-bandit : 73 règles de sécurité (cf. per-file-ignores pour les exceptions)
-    "A",      # flake8-builtins : un nom qui masque une fonction de base
-    "C4",     # flake8-comprehensions : compréhensions et appels de collection superflus
-    "DTZ",    # flake8-datetimez : instants sans fuseau (cf. `domain.dates.today`)
-    "G",      # flake8-logging-format : message de journalisation formaté à l'émission
-    "ISC",    # flake8-implicit-str-concat : concaténation implicite de littéraux
-    "LOG",    # flake8-logging : usage du module de journalisation
-    "PERF",   # Perflint : boucles réécrivables en compréhension
-    "PIE",    # flake8-pie : tournures inutiles
-    "Q",      # flake8-quotes : cohérence des guillemets
-    "RET",    # flake8-return : chemins de retour superflus
-    "TID",    # flake8-tidy-imports : imports relatifs remontants
+    "E",     # pycodestyle errors
+    "W",     # pycodestyle warnings
+    "F",     # pyflakes (undefined names, unused imports, etc.)
+    "I",     # isort (ordre des imports)
+    "UP",    # pyupgrade (syntaxe obsolète)
+    "B",     # flake8-bugbear (pièges courants)
+    "C901",  # complexité cyclomatique
+    "ASYNC", # flake8-async : I/O bloquantes dans une async def, etc.
+    "S",     # flake8-bandit : 73 règles de sécurité (cf. per-file-ignores pour les exceptions)
+    "A",     # flake8-builtins : un nom qui masque une fonction de base
+    "C4",    # flake8-comprehensions : compréhensions et appels de collection superflus
+    "DTZ",   # flake8-datetimez : instants sans fuseau (cf. `domain.dates.today`)
+    "G",     # flake8-logging-format : message de journalisation formaté à l'émission
+    "ISC",   # flake8-implicit-str-concat : concaténation implicite de littéraux
+    "LOG",   # flake8-logging : usage du module de journalisation
+    "PERF",  # Perflint : boucles réécrivables en compréhension
+    "PIE",   # flake8-pie : tournures inutiles
+    "Q",     # flake8-quotes : cohérence des guillemets
+    "RET",   # flake8-return : chemins de retour superflus
+    "TID",   # flake8-tidy-imports : imports relatifs remontants
 ]
 # RUF029 (async def sans await) serait utile mais reste en preview chez
 # ruff à ce jour : l'activer exigerait `preview = true` qui allume
@@ -413,6 +414,7 @@ exclude_lines = [
 # Version des images de production (cf. `scripts/versions-des-images.sh`) : le typage se
 # vérifie sur la sémantique de l'interpréteur qui exécute, non sur un plancher de compatibilité.
 python_version = "3.14"
+plugins = ["pydantic.mypy"]
 # Imports : ignorer les libs tierces non typées plutôt que de polluer
 ignore_missing_imports = true
 # Mode strict : toutes les fonctions doivent être annotées, et leur corps
@@ -444,23 +446,24 @@ exclude = [
 ]
 
 # Désactivation d'`explicit-any`, tenue au plus juste : une entrée qui ne couvre plus aucune
-# erreur est retirée, et une entrée de paquet est resserrée sur ses modules.
+# erreur est retirée, et le motif se lit en regard du module.
 #
-# Pydantic : `explicit-any` porte sur la ligne `class X(BaseModel)`, le `Any` en cause vivant
-# dans le corps de `pydantic`. Le taire demande `follow_imports = skip` sur `pydantic`, qui
-# rendrait `BaseModel` opaque ; le greffon `pydantic.mypy` n'y change rien.
-# Les champs nommés portent du JSON de forme libre. Pydantic accepte l'alias récursif
-# `JsonValue`, mais le schéma OpenAPI qui en découle produit un type TypeScript circulaire,
-# que le compilateur refuse : `schema.ts` dérivant du contrat, le front ne compilerait plus.
+# Un JSON de forme libre ne se décrit pas par l'alias récursif `JsonValue` : le schéma OpenAPI
+# qui en découlerait produit un type TypeScript circulaire, que le compilateur refuse, et
+# `schema.ts` dérive du contrat.
 [[tool.mypy.overrides]]
 module = [
-    "application.ports.repositories.journal_repository",    # Pydantic
-    "application.ports.repositories.publisher_repository",  # Pydantic
-    "application.ports.repositories.perimeter_repository",  # Pydantic
-    "application.ports.read_models.*",                      # Pydantic ; `value`, `details`
-    "infrastructure.jsonb_models.*",                        # Pydantic
-    "infrastructure.settings",                              # Pydantic
-    "interfaces.api.models.*",                              # Pydantic ; `value`
-    "infrastructure.read_models.publications.facets",       # facette appelée par son nom (`getattr`)
+    "application.ports.read_models.config_queries",        # `value` : JSON de forme libre
+    "application.ports.read_models.pipeline_runs_queries", # `details` : JSON de forme libre
+    "interfaces.api.models.config",                        # `value` : JSON de forme libre
+    "infrastructure.jsonb_models.publication",             # validateur Pydantic prenant `ValidationInfo`
+    "infrastructure.read_models.publications.facets",      # facette appelée par son nom (`getattr`)
 ]
 disallow_any_explicit = false
+
+# Les deux réglages tiennent ensemble : `init_typed` type le constructeur synthétisé,
+# `init_forbid_extra` lui retire son `**kwargs: Any`. Sans l'un des deux, ce `Any` est écrit
+# dans chaque classe de modèle : 209 erreurs `explicit-any` là où le code n'en écrit aucun.
+[tool.pydantic-mypy]
+init_forbid_extra = true
+init_typed = true
