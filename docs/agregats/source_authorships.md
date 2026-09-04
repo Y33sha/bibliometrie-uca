@@ -1,75 +1,64 @@
 # Source_authorships — cycle de vie
 
-*À jour le 2026-07-14.*
+*À jour le 2026-09-04.*
 
-Une `source_authorship` est la signature d'un auteur telle qu'**une** source la porte sur un document : une ligne par `(source_publication × position d'auteur)`. C'est le **pivot** du corpus — elle relie une [source_publication](source_publications.md) à une identité d'auteur (`author_identifying_keys`), reçoit un `person_id` de la cascade [personnes](persons.md), puis un `authorship_id` du build [authorships](authorships.md). Elle n'a pas d'objet de domaine dédié : sa logique vit dans les règles de rôles (`domain/publications/authorship_roles`), l'extraction par source (`domain/sources/*`) et les identifiants (`domain/persons/identifiers`). Son cycle de vie traverse cinq phases du pipeline.
+Une signature est un auteur tel qu'**une** source le porte sur un document : une ligne par position d'auteur dans un [enregistrement source](source_publications.md). C'est la pièce qui relie tout le reste. Elle porte une identité d'auteur telle que la source la donne, reçoit une personne de la phase `persons`, puis un rattachement à l'[authorship](authorships.md) consolidée. Cinq phases du pipeline écrivent successivement dans sa ligne ; l'API n'y touche qu'à travers la curation des personnes.
 
-## Tables du cluster
+Aucun objet de domaine ne lui correspond. Ses règles sont réparties selon ce qu'elles concernent : les rôles dans `domain/publications/authorship_roles.py`, l'extraction propre à chaque source dans `domain/sources/`, les identifiants dans `domain/persons/`.
 
-| Table | Rôle | Colonnes clés |
+## Tables
+
+| Table | Rôle | Colonnes notables |
 |---|---|---|
-| `source_authorships` | Signature d'auteur par source | `source`, `source_publication_id`, `identity_id` (→ `author_identifying_keys`, NOT NULL), `person_id`, `authorship_id`, `author_position`, `roles`, `is_corresponding`, `in_perimeter`, `resolution_mode`, `raw_author_name`, `countries_dirty` |
-| `author_identifying_keys` | Identité d'auteur dédupliquée | `author_name_normalized` + `person_identifiers` (JSONB), `key_hash` (généré, unique) |
-| `source_authorship_addresses` | Signature ↔ adresse | `source_authorship_id`, `address_id` |
-| `source_authorship_structures` | Signature ↔ structure UCA (matview) | dérivée `addresses` → `address_structures` → `perimeter_structures` |
-| `confirmed_authorships` | Épinglage humain d'une signature | `(source_authorship_id, person_id)` |
+| `source_authorships` | La signature | `source`, `source_publication_id`, `identity_id`, `person_id`, `authorship_id`, `author_position`, `roles`, `is_corresponding`, `in_perimeter`, `resolution_mode`, `raw_author_name`, `countries_dirty` |
+| `author_identifying_keys` | Identité d'auteur dédoublonnée | `author_name_normalized`, `person_identifiers`, `key_hash` (calculé, unique) |
+| `source_authorship_addresses` | Lien entre une signature et ses adresses | `source_authorship_id`, `address_id` |
+| `source_authorship_structures` | Vue matérialisée : signature ↔ structure du périmètre | dérivée des adresses, de leurs rattachements et du périmètre |
+| `confirmed_authorships` | Signature épinglée par une décision humaine | `(source_authorship_id, person_id)` |
 
-Voisins couverts ailleurs : `source_publications` (le parent, cf. [source_publications](source_publications.md)), `authorships` (l'aval, cf. [authorships](authorships.md)). Le store `rejected_authorships` (grain paire publication ↔ personne) gouverne l'aval mais relève d'[authorships](authorships.md).
+L'enregistrement source parent est décrit dans [source_publications](source_publications.md), l'authorship consolidée en aval dans [authorships](authorships.md), qui porte aussi `rejected_authorships`.
 
-## Les deux axes
+## Écriture par le pipeline
 
-L'écriture est **exclusivement pipeline**, étalée sur cinq phases ; l'API ne fait que de la curation via les stores.
+Cinq phases écrivent tour à tour dans la même ligne.
 
-```mermaid
-flowchart LR
-    STG[(staging)] -->|normalize| SA[source_authorships]
-    STG -->|normalize| AIK[author_identifying_keys]
-    STG -->|normalize| ADR[source_authorship_addresses]
-    ADR -->|affiliations : in_perimeter| SA
-    PERS[phase persons] -->|person_id + resolution_mode| SA
-    CF[confirmed_authorships] -->|enforce en tête| SA
-    AUB[phase authorships] -->|authorship_id| SA
-    SA --> AUTH[(authorships)]
-    SA --> API[détail publi : auteurs par source]
-```
+1. **`normalize` — naissance.** Les signatures d'un enregistrement sont réécrites en bloc, avec leur source, leur position, leur rôle, le nom d'auteur brut et leur identité. L'identité est obtenue en dédoublonnant `author_identifying_keys` sur son empreinte calculée — nom normalisé et identifiants réunis ; celles que plus aucune signature ne porte sont supprimées en fin de phase. Les adresses sont créées au besoin et reliées à la signature. Un identifiant porté par deux positions ou plus du même enregistrement est suffixé `_dubious`, ce qui l'écarte du rapprochement.
+2. **`affiliations` — appartenance au périmètre.** `in_perimeter` devient vrai lorsqu'une adresse de la signature se résout en une structure du périmètre, le rattachement n'étant pas rejeté. La vue matérialisée `source_authorship_structures` est rafraîchie.
+3. **`persons` — attribution d'une personne.** La cascade de rapprochement pose `person_id` et retient dans `resolution_mode` par quel moyen : identifiant, nom, ou report depuis une autre source. Les signatures épinglées par la curation sont reposées en premier, et certaines remises à nul ciblées permettent à la phase de converger quel que soit l'ordre de traitement.
+4. **`authorships` — rattachement à l'authorship consolidée.** `authorship_id` relie la signature au couple personne–publication qu'elle atteste.
+5. **`countries` — pays.** `countries_dirty` déclenche le recalcul des pays de la signature depuis ses adresses.
 
-## Écriture — pipeline
+## Écriture par l'API — curation
 
-Le cycle de vie d'une signature s'écrit en cinq temps, un par phase :
+Aucune colonne structurelle n'est écrite par l'API. La curation, décrite côté [personnes](persons.md), n'agit que sur le rattachement à une personne.
 
-1. **`normalize`** — naissance. Clear+insert (theses en UPSERT unitaire) de `source`, `source_publication_id`, `author_position`, `is_corresponding`, `roles` (via `map_role` / `merge_roles`), `raw_author_name` et `identity_id`. Ce dernier est résolu par `key_hash` après upsert dédupliqué de `author_identifying_keys` (nom normalisé + identifiants ; GC des identités orphelines en fin de phase). Les adresses sont upsertées et reliées par `source_authorship_addresses`. Les identifiants partagés par ≥2 positions d'un même enregistrement sont suffixés `_dubious` (invisibles au matching).
-2. **`affiliations`** — `in_perimeter` recomputé (`recompute_in_perimeter_on_source_authorships`) : vrai si une adresse de la signature résout à une structure du périmètre (`source_authorship_addresses` ⨝ `address_structures`, filtré sur les structures du périmètre confirmées). Rafraîchit la matview `source_authorship_structures`.
-3. **`persons`** — la cascade de matching pose `person_id` et `resolution_mode` (`identifier` / `name` / `cross_source`) ; `enforce_confirmed_authorships` repose en tête les `person_id` épinglés (`confirmed_authorships`) ; les resets ordre-indépendants renullent des `person_id` ciblés.
-4. **`authorships`** — `authorship_id` posé (liaison de la signature à l'authorship canonique consolidée).
-5. **`countries`** — `countries_dirty` pilote le recompute des pays de la signature depuis ses adresses.
+**Épingler une signature** l'inscrit dans `confirmed_authorships`. La décision porte sur cette signature précisément, et la phase `persons` la repose à chaque passage.
 
-## Écriture — API
+**Détacher une personne d'une publication** met à nul le `person_id` de **toutes** les signatures de ce couple, quelle que soit leur source : « cette personne n'est pas l'auteur de ce document » ne vaut pas source par source. La paire est inscrite dans `rejected_authorships`.
 
-Aucune écriture directe des colonnes structurelles. La curation admin (côté [personnes](persons.md)) agit via les stores et le `person_id` :
+**Fusionner deux personnes** repointe simplement le `person_id`.
 
-- **Épinglage** (`pin_authorships`) : must-link au grain signature dans `confirmed_authorships`, reposé à chaque run par `enforce_confirmed_authorships`.
-- **Détachement** : nulle `person_id` sur **toutes** les signatures de la paire `(publication, personne)` et inscrit la paire dans `rejected_authorships` (« cette personne n'est pas l'auteur » vaut pour toutes ses sources).
-- **Fusion de personnes** : `merge_into` repointe le `person_id`.
+## Lecture par le pipeline
 
-## Lecture — pipeline
+- La phase `persons` lit les signatures du périmètre non encore rattachées, avec leur identité, leur nom normalisé et leurs rôles.
+- La phase `authorships` consolide les couples personne–publication attestés par les signatures rattachées et en recompose les attributs.
 
-- La cascade `persons` lit les signatures **in-périmètre non liées** (avec leurs identifiants extraits de `author_identifying_keys.person_identifiers`, leur nom normalisé et leurs rôles) pour poser `person_id`.
-- Le build `authorships` consolide les couples `(publication_id, person_id)` attestés par les signatures liées et en recompose les attributs.
+## Lecture par l'API
 
-## Lecture — API
-
-Le détail d'une publication expose les **auteurs par source** : pour chaque source, les signatures de l'import le plus récent (`source_authorships` ⨝ `source_authorship_structures` ⨝ `source_authorship_addresses` ⨝ `addresses`), avec leurs structures et leurs rôles. La fiche personne remonte, elle, aux authorships canoniques.
+Le détail d'une publication montre les **auteurs tels que chaque source les donne** : pour chaque source, les signatures de l'import le plus récent, avec leurs adresses, leurs structures et leurs rôles. La fiche personne, elle, s'appuie sur les authorships consolidées.
 
 ## Points d'attention
 
-1. **Pivot sans objet de domaine dédié.** La logique d'une signature est éclatée par concern : rôles (`authorship_roles`), extraction par source (`domain/sources/*`), identifiants (`domain/persons/identifiers`). Cohérent (chaque bout appartient à sa source ou à son concept), mais aucune classe ne modélise la signature elle-même — son cycle de vie ne se lit qu'en suivant les phases.
-2. **`identity_id` (identité de signature) ⊥ `person_id` (personne).** L'identité de signature — nom normalisé + identifiants, dédupliquée par `key_hash` dans `author_identifying_keys` — est un **fait source**, posé au normalize. Le `person_id` est le résultat du **matching**, posé plus tard. La première sert de clé de prefetch au matching et de facteur de dédup des signatures identiques ; ne pas confondre les deux.
+**Aucune classe ne modélise la signature.** Ses règles sont réparties entre les rôles, l'extraction par source et les identifiants. Chaque morceau est à sa place, mais le cycle de vie complet ne se lit qu'en suivant les cinq phases — c'est l'objet de cette fiche.
+
+**L'identité de signature et la personne sont deux choses distinctes.** L'identité — nom normalisé et identifiants, dédoublonnée dans `author_identifying_keys` — est un fait que la source fournit, enregistré dès `normalize`. La personne est le résultat du rapprochement, attribué plus tard. L'identité sert de clé pour charger les correspondances du rapprochement, et à dédoublonner des signatures identiques.
 
 ## Invariants métier
 
-Portés par le SQL, le domaine (`domain/publications/authorship_roles`, `domain/persons/identifiers`) et les phases.
+**Toute signature porte une identité.** `identity_id` ne peut être nul, et une identité est unique par son couple nom normalisé et identifiants.
 
-- **Identité de signature obligatoire.** `identity_id` NOT NULL : toute signature porte une identité d'auteur, unique sur `(author_name_normalized, person_identifiers)` via `key_hash`.
-- **Détachement au grain paire.** Nuller le `person_id` d'une paire `(publication, personne)` vaut pour **toutes** les signatures de la paire, quelle que soit la source.
-- **Épinglage ⊥ rejet.** `confirmed_authorships` est un must-link au grain signature (reposé chaque run) ; `rejected_authorships` un cannot-link durable au grain paire (jamais recréé par le build).
-- **Identifiant partagé = corruption.** Un identifiant porté par ≥2 positions d'auteur d'un même enregistrement source est suffixé `_dubious` : conservé, mais écarté du matching.
+**Le détachement vaut pour le couple, pas pour la source.** Mettre à nul le `person_id` d'un couple publication–personne s'applique à toutes ses signatures, quelle que soit leur source.
+
+**Épinglage et rejet sont de portées différentes.** L'épinglage impose un rattachement pour une signature donnée, et il est reposé à chaque passage. Le rejet interdit durablement un couple publication–personne, que la phase `authorships` ne recrée jamais.
+
+**Un identifiant partagé signale une corruption de la source.** Porté par deux positions ou plus du même enregistrement, il est suffixé `_dubious` : conservé, mais écarté du rapprochement.
