@@ -1,71 +1,63 @@
 # Structures — cycle de vie
 
-*À jour le 2026-07-14.*
+*À jour le 2026-09-04.*
 
-`Structure` est un agrégat à objet de domaine riche (`domain/structures/`) : l'aggregate root `Structure` (id, code, name, type, `RorId`, `HalCollection`, `api_ids`, formes de nom), les VOs `RorId` / `HalCollection` / `StructureNameForm`, et les règles de graphe (`check_can_create_relation`). C'est un **référentiel curé à la main** : les structures sont créées et éditées par l'admin, jamais par le pipeline, qui ne fait que les **lire** (matching d'adresses, clôture de périmètre).
+Une structure est une unité de l'établissement ou un partenaire : composante, laboratoire, tutelle, site. C'est un **référentiel saisi à la main** — les structures sont créées et modifiées par la curation, jamais par le pipeline, qui se contente de les lire pour reconnaître des adresses et pour composer les périmètres.
 
-## Tables du cluster
+`domain/structures/` valide le type, l'identifiant ROR et la collection HAL, et porte les règles du graphe de rattachement.
 
-| Table | Rôle | Colonnes clés |
+## Tables
+
+| Table | Rôle | Colonnes notables |
 |---|---|---|
-| `structures` | La structure | `code` (unique, identifiant naturel), `name`, `acronym`, `structure_type` (enum), `ror_id`, `rnsr_id`, `hal_collection`, `api_ids` (JSONB) |
-| `structure_relations` | Hiérarchie parent → enfant | `parent_id`, `child_id`, `relation_type` (`est_tutelle_de`, `est_partenaire_de`), unique `(parent, child, type)`, CHECK `parent <> child` |
-| `structure_name_forms` | Formes de nom pour le matching d'adresses | `structure_id`, `form_text` (normalisé), `is_word_boundary`, `is_excluding`, `requires_context_of` (int[]), CHECK `char_length > 6 OR is_word_boundary` |
+| `structures` | La structure | `code` (unique), `name`, `acronym`, `structure_type`, `ror_id`, `rnsr_id`, `hal_collection`, `api_ids` |
+| `structure_relations` | Rattachement d'une structure à une autre | `parent_id`, `child_id`, `relation_type` (`est_tutelle_de` ou `est_partenaire_de`), unicité du triplet, une structure ne pouvant se rattacher à elle-même |
+| `structure_name_forms` | Formes de nom servant à reconnaître une structure dans une adresse | `structure_id`, `form_text` normalisé, `is_word_boundary`, `is_excluding`, `requires_context_of` |
 
-Le périmètre (`perimeters`, `perimeter_structures`) est un cluster voisin dont les racines sont des `structures` : son cycle de vie propre est décrit dans [perimeters.md](perimeters.md).
+Les périmètres, dont les racines sont des structures, ont leur propre fiche : [perimeters](perimeters.md).
 
-## Les deux axes
+## Écriture par l'API — curation
 
-L'écriture est purement admin ; la lecture se partage entre pipeline et API.
+Routeur `interfaces/api/routers/structures.py`, commandes dans `application/services/structures/commands.py`, adaptateur `PgStructureRepository`. C'est le seul chemin d'écriture.
 
-```mermaid
-flowchart LR
-    ADM[API admin CRUD] -->|create / update / delete| S[structures]
-    ADM -->|relations| SR[structure_relations]
-    ADM -->|formes de nom| SNF[structure_name_forms]
-    SR -->|clôture récursive| PS[(perimeter_structures)]
-    SNF -->|AddressMatcher| AFF[phase affiliations]
-    S -->|racines| PER[perimeters]
-    S --> API[laboratoires / admin]
-```
+**Structures** (`POST`, `PUT`, `DELETE /api/structures/{id}`). Le domaine valide le type, l'identifiant ROR et la collection HAL ; le dépôt valide `api_ids` contre son modèle. La suppression entraîne en base celle des lignes qui rattachent la structure aux signatures et aux authorships.
 
-## Écriture — API (curation admin)
+**Rattachements** (`POST /api/structures/relations`, `DELETE`). La création charge d'abord les ancêtres du parent, puis le domaine refuse l'auto-rattachement et tout rattachement qui refermerait un cycle. Créer un rattachement qui existe déjà ne produit rien.
 
-Routeur `interfaces/api/routers/structures.py`, command handlers `application/services/structures/commands.py`, cœur `core.py`, adaptateur `PgStructureRepository`. **Seul chemin d'écriture** du cluster.
+**Formes de nom** (`POST`, `PUT`, `DELETE /api/name-forms`). Le texte est normalisé avant enregistrement, et la contrainte de frontière de mot est imposée d'office aux formes courtes.
 
-- **Structures** (`POST` / `PUT` / `DELETE /api/structures/{id}`) : `create_structure` / `update_structure` / `delete_structure`. Les fabriques de domaine `Structure.create` / `Structure.apply` valident type, `ror_id` et `hal_collection` (VOs) ; le repo valide `api_ids` contre le modèle JSONB `StructureApiIds`. La suppression cascade en base sur `authorship_structures` et `source_authorship_structures` (FK `ON DELETE CASCADE`).
-- **Relations** (`POST /api/structures/relations`, `DELETE /…/{id}`) : `create_relation` prefetche les ancêtres du parent (`repo.get_ancestor_ids`, `WITH RECURSIVE`) et délègue au domaine `check_can_create_relation` (refus auto-référence / cycle) ; idempotent (`already_exists` si la relation existe).
-- **Formes de nom** (`POST` / `PUT` / `DELETE /api/name-forms`) : `create_name_form` / `update_name_form` normalisent `form_text` (`normalize_text`) et forcent `is_word_boundary` sur les formes courtes.
+Créer ou modifier un rattachement, comme supprimer une structure, recalcule les périmètres ; une suppression retire en outre la structure des racines de tous les périmètres. Modifier les seuls attributs d'une structure ne les touche pas. Chaque opération est consignée dans le journal d'audit.
 
-Les commandes de relation (création / suppression) et la suppression d'une structure rafraîchissent la clôture `perimeter_structures` via le gateway `PerimeterStructuresQueries` (`refresh_perimeter_structures`) ; la suppression retire en plus la structure des racines de tout périmètre (`PerimeterRepository.remove_structure_from_all_perimeters`). Créer ou éditer les attributs d'une structure n'y touche pas (cf. perimeters.md). Chaque opération émet un événement d'audit.
+## Écriture par le pipeline
 
-## Écriture — pipeline
+**Aucune.** Le pipeline ne crée ni ne modifie de structure.
 
-**Aucune.** Le pipeline ne crée ni ne modifie de structure : le cluster est un référentiel d'entrée, alimenté à la main.
+## Lecture par le pipeline
 
-## Lecture — pipeline
+**Reconnaissance des adresses** (phase `affiliations`). `infrastructure/pipeline/affiliations/address_resolution.py` charge les formes de nom dans un automate Aho-Corasick qui balaie le texte normalisé des adresses. Trois options règlent la reconnaissance : `is_word_boundary` exige que la forme soit délimitée par des frontières de mot ; `is_excluding` fait de la forme un motif de rejet ; `requires_context_of` subordonne la reconnaissance à la présence, dans la même adresse, des structures citées.
 
-- **Matching d'adresses** (phase `affiliations`) : `infrastructure/pipeline/affiliations/address_resolution.py` charge les `structure_name_forms` dans un `AddressMatcher` (Aho-Corasick) qui balaie le `normalized_text` des adresses. Les options de la forme pilotent le match : `is_word_boundary` (frontière de mot exigée), `is_excluding` (la forme provoque un rejet), `requires_context_of` (le match ne vaut que si les structures citées matchent aussi la même adresse).
-- **Clôture de périmètre** : `structure_relations` (`est_tutelle_de`) fournit la descente récursive qui matérialise `perimeter_structures` à partir des racines `perimeters.root_structure_ids` — le mécanisme qui, in fine, pilote `source_authorships.in_perimeter` (cf. perimeters.md).
+**Composition des périmètres.** Les rattachements de type `est_tutelle_de` fournissent la descente récursive qui remplit `perimeter_structures` à partir des racines déclarées. C'est par là que les structures décident, au bout de la chaîne, de l'appartenance d'une signature au périmètre.
 
-## Lecture — API
+## Lecture par l'API
 
-- **Admin** : port `application/ports/read_models/structures_queries.py`, adaptateur `PgStructuresQueries`. Listing (filtre type + recherche accent-insensible sur nom/acronyme/code, tri canonique par type), détail (`{structure, parents, children, forms}`), lecture d'une forme de nom.
-- **Laboratoires** (page publique) : lecture des structures `labo` du périmètre, avec leurs tutelles — `infrastructure/read_models/structures.py`, filtrée via `get_perimeter_structure_ids`. Types affichés configurables (`laboratories_display_types`).
+**Administration.** Port `application/ports/read_models/structures_queries.py`, adaptateur `PgStructuresQueries` : liste filtrable par type, avec une recherche sur le nom, l'acronyme et le code qui ignore les accents ; détail d'une structure avec ses parents, ses enfants et ses formes de nom.
+
+**Page des laboratoires.** Lecture des structures de type laboratoire appartenant au périmètre, avec leurs tutelles. Les types affichés sont réglables par configuration.
 
 ## Points d'attention
 
-Dette assumée et décisions d'architecture propres à cet agrégat, gardées explicites.
+**Les commandes de structure recalculent les périmètres.** Les rattachements et la suppression passent par l'adaptateur des périmètres, injecté dans la commande ; la couche service, elle, ignore la notion de périmètre.
 
-1. **Écritures cross-agrégat vers le périmètre (décision d'archi assumée).** Les commandes de relation et la suppression de structure rematérialisent `perimeter_structures` via le gateway `PerimeterStructuresQueries` injecté dans le command handler ; la couche service reste, elle, agnostique du périmètre.
-2. **Hydratation stricte des VOs.** `find_by_id` parse `ror_id` / `hal_collection` en VO strict : une valeur non canonique en base fait lever `ValidationError` à l'hydratation. Délibéré — un échec signale une corruption à investiguer, pas à masquer.
+**Une valeur non conforme en base fait échouer la lecture.** L'identifiant ROR et la collection HAL sont revalidés au chargement d'une structure : une valeur qui ne respecte pas leur format lève une erreur au lieu d'être servie. C'est délibéré — un tel échec signale une donnée corrompue, qu'il vaut mieux voir que masquer.
 
 ## Invariants métier
 
-Portés par le domaine (`domain/structures/`), le SQL et le service.
+**Identité.** Le `code` est unique.
 
-- **Identité.** `code` unique (identifiant naturel) ; `id` surrogate.
-- **Graphe acyclique.** Une relation `parent → child` est refusée en auto-référence (CHECK DB + domaine) ou si elle referme un cycle (`check_can_create_relation` sur les ancêtres prefetchés).
-- **Forme courte ⇒ frontière de mot.** Une forme de ≤ 6 caractères (texte normalisé) exige `is_word_boundary`, pour éviter les faux positifs en sous-chaîne (« uca » dans « éducation »). Verrouillé par une CHECK et forcé par le service.
-- **Identifiants canoniques.** `ror_id` (forme courte 9-char, alphabet ROR) et `hal_collection` (`[A-Z0-9][A-Z0-9_-]*`) normalisés et validés par leur VO à l'écriture comme à l'hydratation ; `api_ids` validé contre le modèle JSONB `StructureApiIds`.
-- **Formes de nom normalisées.** `form_text` passe par `normalize_text` avant insertion, comme les textes matchés.
+**Le graphe reste sans cycle.** Une structure ne peut se rattacher à elle-même, ni à l'un de ses descendants. La contrainte est portée à la fois par la base et par le domaine, qui vérifie les ancêtres avant d'accepter.
+
+**Une forme courte exige une frontière de mot.** Une forme de six caractères normalisés ou moins ne peut être enregistrée sans `is_word_boundary`, faute de quoi elle serait reconnue à l'intérieur d'autres mots — « uca » dans « éducation ». La règle est imposée par une contrainte de base et par le service.
+
+**Identifiants normalisés.** L'identifiant ROR et la collection HAL sont validés et normalisés à l'écriture comme à la lecture ; `api_ids` est validé contre son modèle.
+
+**Formes de nom normalisées.** Le texte d'une forme passe par la même normalisation que les adresses auxquelles il sera confronté.
