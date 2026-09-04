@@ -1,64 +1,50 @@
 # Éditeurs — cycle de vie
 
-*À jour le 2026-07-14.*
+*À jour le 2026-09-04.*
 
-L'aggregate root `Publisher` (`domain/publishers/publisher.py`) représente un éditeur. Entité mince (id, nom, pays, `openalex_id`, `publisher_type`) : comme `Journal`, elle ne porte ni comportement ni invariant riche — matching, fusion et enrichissement vivent dans les services et leurs adaptateurs SQL. Identité = `id` (surrogate) ; identifiant naturel = `name` via la normalisation de `publisher_name_forms`.
+Un éditeur porte les revues et reçoit les frais de publication. Il se reconnaît par son identifiant OpenAlex quand une source en fournit un, sinon par son nom, via les formes enregistrées dans `publisher_name_forms`. `domain/publishers/publisher.py` définit sa structure — nom, pays, identifiant OpenAlex, type ; le rapprochement, la fusion et l'enrichissement vivent dans les services et leurs adaptateurs SQL.
 
-## Tables du cluster
+## Tables
 
-| Table | Rôle | Colonnes clés |
+| Table | Rôle | Colonnes notables |
 |---|---|---|
-| `publishers` | L'éditeur | `name` / `name_normalized`, `country`, `openalex_id` (unique), `publisher_type` (enum SQL), `pub_count` |
-| `publisher_name_forms` | Formes de nom → éditeur (match par nom) | `publisher_id` (ON DELETE CASCADE), `form_normalized` (unique **globale**) |
-| `doi_prefixes` | Jonction préfixe DOI → éditeur | `publisher_id` (ON DELETE SET NULL), `crossref_member_id`, `datacite_client_symbol`, `publisher_checked_at` |
+| `publishers` | L'éditeur | `name` / `name_normalized`, `country`, `openalex_id` (unique), `publisher_type`, `pub_count` |
+| `publisher_name_forms` | Formes de nom permettant de reconnaître un éditeur | `publisher_id`, `form_normalized` |
+| `doi_prefixes` | Correspondance entre un préfixe de DOI et un éditeur | `publisher_id`, `crossref_member_id`, `datacite_client_symbol`, `publisher_checked_at` |
 
-Trois tables référencent `publishers.id` hors cluster : `journals.publisher_id`, `journal_name_forms.publisher_id`, `apc_payments.publisher_id`.
+Une forme de nom d'éditeur est unique dans toute la table, là où une forme de titre de revue n'est unique que pour un éditeur donné : deux éditeurs ne peuvent pas revendiquer la même forme de nom.
 
-## Les deux axes
+Trois tables extérieures référencent un éditeur : `journals.publisher_id`, `journal_name_forms.publisher_id` et `apc_payments.publisher_id`.
 
-```mermaid
-flowchart LR
-    N[normalize] -->|find_or_create_publisher| P[publishers]
-    RP[publishers_journals : resolve_publishers] -->|préfixe DOI → éditeur| P
-    RP --> DP[doi_prefixes.publisher_id]
-    ENR[CLI maintenance enrich_publishers] -->|country| P
-    AU[authorships] -->|refresh_pub_counts| P
-    ADM[API admin] -->|update / merge| P
-    P --> API[listing / dashboard / facettes]
-```
+## Écriture par le pipeline
 
-## Écriture — pipeline
+**Rattachement (`normalize`).** Chaque normaliseur appelle `find_or_create_publisher` (`application/services/publishers/core.py`), qui essaie d'abord l'identifiant OpenAlex, puis se rabat sur la forme de nom — reconnue ou créée — avant de transmettre l'éditeur à la création de la revue. Seul OpenAlex fournit un identifiant d'éditeur.
 
-**Rattachement (`normalize`)** : chaque normaliseur appelle `find_or_create_publisher` (`application/services/publishers/core.py`) — cascade `openalex_id`, sinon la primitive de gateway `match_or_create_by_name_form` (forme de nom → éditeur existant ou créé) — puis passe le `publisher_id` à `find_or_create_journal`. Seul OpenAlex fournit un `openalex_id` (via `host_organization`).
+**Résolution par préfixe de DOI (`publishers_journals`).** Pour chaque préfixe non encore résolu, `resolve_publishers` détermine l'agence d'enregistrement du DOI, interroge Crossref ou DataCite, enregistre les métadonnées obtenues, reconnaît ou crée l'éditeur par sa forme de nom — la même opération que dans `normalize` — et renseigne `doi_prefixes.publisher_id`. Un préfixe n'est interrogé qu'une fois : `publisher_checked_at` retient la tentative, qu'elle ait abouti ou non.
 
-**Résolution par préfixe DOI (`publishers_journals` → `resolve_publishers`)** : pour chaque `doi_prefixes` non résolu, route par Registration Agency, interroge le préfixe Crossref/DataCite, persiste les métadonnées, matche ou crée l'éditeur via `match_or_create_by_name_form` (la même primitive de gateway que l'axe `normalize`), et pose `doi_prefixes.publisher_id`. Une seule tentative (`publisher_checked_at`).
+**Enrichissement du pays, hors pipeline.** `interfaces/cli/maintenance/enrich_publishers.py` renseigne le pays depuis OpenAlex, et seulement là où il est absent : une valeur saisie à la main est conservée.
 
-**Enrichissement — hors pipeline (maintenance)** : le CLI `interfaces/cli/maintenance/enrich_publishers.py` renseigne le `country` des éditeurs depuis OpenAlex Publishers. Politique « NULL only » : une valeur saisie à la main est préservée.
+## Écriture par l'API — curation
 
-## Écriture — API (curation admin)
+Routeur `interfaces/api/routers/publishers.py`, adaptateur `PgPublisherRepository`.
 
-Routeur `interfaces/api/routers/publishers.py`, command handlers `commands.py`, cœur `core.py`, adaptateur `PgPublisherRepository`.
+**Éditer un éditeur** (`PUT /api/publishers/{id}`). Seuls les champs transmis sont modifiés ; le dépôt re-dérive `name_normalized` depuis le nom.
 
-- **Édition** (`PUT /api/publishers/{id}`) : modification sélective via le contrat `PublisherUpdate` (Pydantic, porté par `PublisherRepository`, même patron que `JournalUpdate`) ; `name_normalized` dérivé de `name` par le repository.
-- **Fusion** (`POST /api/publishers/{id}/merge`) : `merge_publishers` bloque sur ISSN divergents ou doublon interne, fusionne d'abord les revues à titre partagé (`merge_journals`), puis `merge_publisher_into` repointe `journals` / `journal_name_forms` / `apc_payments` et recale `pub_count`.
+**Fusionner deux éditeurs** (`POST /api/publishers/{id}/merge`). L'opération est refusée si les deux éditeurs portent des ISSN divergents, ou si la fusion créerait un doublon interne. Les revues que les deux se partagent sous un même titre sont fusionnées d'abord, puis `merge_publisher_into` repointe `journals`, `journal_name_forms` et `apc_payments` avant de recaler les compteurs.
 
-## Lecture — pipeline
+## Lecture par le pipeline
 
-**`publishers.pub_count`** : cache à deux étages — `refresh_pub_counts` (`infrastructure/pipeline/authorships/pub_counts.py`) recalcule `journals.pub_count` puis `publishers.pub_count = SUM(journals.pub_count)`, en phase `authorships`. Variante scopée `refresh_publisher_pub_count` pour les fusions admin. Le module de requêtes est partagé pipeline/API (pattern « queries mutualisées », le repo y délègue).
+`journals.pub_count` est recalculé d'abord, puis `publishers.pub_count` en est la somme. La phase `authorships` fait ce calcul en totalité une fois le périmètre posé ; une fusion administrative ne recalcule que les éditeurs concernés.
 
-## Lecture — API
+## Lecture par l'API
 
-Port `application/ports/read_models/publishers_queries.py`, adaptateur `PgPublisherQueries`, routeur `interfaces/api/routers/publishers.py` : listing (filtres + `journal_count` + `pub_count` + préfixes DOI agrégés), facettes (`publisher_type`, `country`), détail, dashboard (types de revues, doc_types / oa_status des publications in-perimeter), sujets.
+Port `application/ports/read_models/publishers_queries.py`, adaptateur `PgPublisherQueries`.
+
+| Point d'entrée | Ce qu'il sert |
+|---|---|
+| Liste et facettes | Éditeurs filtrables, avec leur nombre de revues, leur nombre de publications et leurs préfixes de DOI ; facettes par type et par pays |
+| Détail et tableau de bord | Types des revues de l'éditeur, types de document et statuts d'accès de ses publications du périmètre, sujets |
 
 ## Points d'attention
 
-Dette assumée et décisions d'architecture propres à cet agrégat, gardées explicites.
-
-1. **Écritures cross-agrégat de la fusion (décision d'archi assumée).** `merge_publisher_into` repointe `journals` / `journal_name_forms` / `apc_payments` en `text()`, comme `merge_journal_into` : une fusion est intrinsèquement cross-agrégat.
-
-## Invariants métier
-
-- **`name_normalized` dérivé de `name`**, maintenu à chaque écriture (création par le service, édition par le repository, résolution par le pipeline).
-- **`pub_count` dérivé** : somme des `journals.pub_count`, recalculée par le pipeline et par les fusions.
-
-`Publisher` est délibérément un agrégat mince, comme `Journal` : ces règles sont portées par les services et le pipeline, pas par le concept — sans matière à un objet de domaine riche.
+**La fusion écrit dans des tables d'autres agrégats.** `merge_publisher_into` met à jour `journals`, `journal_name_forms` et `apc_payments` en SQL littéral, hors du périmètre que le dépôt des éditeurs déclare — comme la fusion de revues, et pour la même raison : repointer les dépendants est le contenu même de l'opération, et elle demande une transaction unique.
