@@ -48,7 +48,7 @@ Créer ou modifier un rattachement, comme supprimer une structure, recalcule les
 
 **Les commandes de structure recalculent les périmètres.** Les rattachements et la suppression passent par l'adaptateur des périmètres, injecté dans la commande ; la couche service, elle, ignore la notion de périmètre.
 
-**Une valeur non conforme en base fait échouer la lecture.** L'identifiant ROR et la collection HAL sont revalidés au chargement d'une structure : une valeur qui ne respecte pas leur format lève une erreur au lieu d'être servie. C'est délibéré — un tel échec signale une donnée corrompue, qu'il vaut mieux voir que masquer.
+**Les identifiants sont revalidés à la lecture.** L'écriture par l'API les valide déjà, mais elle n'est pas le seul chemin : `infrastructure/db/seed.sql` insère les structures directement en SQL, comme le ferait une migration ou un script ponctuel. Une valeur non conforme arrivée par là fait échouer le chargement de la structure au lieu d'être servie.
 
 ## Invariants métier
 
