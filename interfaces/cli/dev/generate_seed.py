@@ -20,7 +20,7 @@ Le fichier produit est un SQL pur (INSERT) avec gestion des séquences. Il suppo
 import argparse
 import json
 from pathlib import Path
-from typing import Any
+from typing import TypedDict
 
 from sqlalchemy import Connection, text
 
@@ -31,8 +31,25 @@ from infrastructure.db.engine import get_sync_engine
 # `parents[3]` remonte interfaces/cli/dev/ → racine du dépôt.
 DEFAULT_SEED_PATH = Path(__file__).resolve().parents[3] / "infrastructure" / "db" / "seed.sql"
 
+
+class _ColonnesExportees(TypedDict):
+    table: str
+    columns: list[str]
+    order: str
+
+
+class TableSpec(_ColonnesExportees, total=False):
+    """Table de référence à exporter.
+
+    `table`, `columns` et `order` composent la requête de lecture. `jsonb_columns` désigne les colonnes à sérialiser en JSON, `where` restreint les lignes exportées.
+    """
+
+    jsonb_columns: list[str]
+    where: str
+
+
 # Tables à exporter, dans l'ordre d'insertion (respect des FK).
-TABLES: list[dict[str, Any]] = [
+TABLES: list[TableSpec] = [
     {
         "table": "config",
         "columns": ["key", "value", "description"],
@@ -143,7 +160,7 @@ def generate_seed(conn: Connection, output_path: str | Path) -> None:
         lines.append(f"-- {table} ({len(rows)} lignes)")
         lines.append(f"DELETE FROM {table}{filtre};")
 
-        jsonb_cols = set(spec.get("jsonb_columns", []))
+        jsonb_cols = set(spec.get("jsonb_columns") or [])
 
         for row in rows:
             row_values = list(row)
