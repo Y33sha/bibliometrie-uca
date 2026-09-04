@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import logging
 from collections.abc import MutableMapping
-from typing import Any
 
 
 class _ScopedLogger(logging.LoggerAdapter[logging.Logger]):
@@ -20,8 +19,8 @@ class _ScopedLogger(logging.LoggerAdapter[logging.Logger]):
         self._prefix = prefix
 
     def process(
-        self, msg: str, kwargs: MutableMapping[str, Any]
-    ) -> tuple[str, MutableMapping[str, Any]]:
+        self, msg: str, kwargs: MutableMapping[str, object]
+    ) -> tuple[str, MutableMapping[str, object]]:
         return f"{self._prefix} {msg}", kwargs
 
 

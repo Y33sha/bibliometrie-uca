@@ -469,21 +469,17 @@ exclude = [
 #   + dict d'options hétérogènes (`Any` délibéré).
 [[tool.mypy.overrides]]
 module = [
-    "application.pipeline.logging_scope",
     "application.ports.repositories.journal_repository",
     "application.ports.repositories.publisher_repository",
     "application.ports.repositories.perimeter_repository",
     "application.ports.read_models.*",
-    "domain.publications.aggregation",
     "infrastructure.pipeline.*",
     "infrastructure.read_models.*",
     "infrastructure.jsonb_models.*",
     "infrastructure.repositories.*",
     "infrastructure.settings",
     "interfaces.api.models.*",
-    "interfaces.cli.maintenance.rehydrate_staging_from_raw_store",
     "interfaces.cli.dev.generate_seed",
-    "interfaces.cli.run_pipeline",
 ]
 disallow_any_explicit = false
 disallow_any_generics = false

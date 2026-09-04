@@ -50,13 +50,16 @@ Phases (dans l'ordre d'execution):
 import argparse
 import asyncio
 import datetime
+import logging
 import signal
 import sys
 import tempfile
 import time
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from types import FrameType
+from typing import TYPE_CHECKING, Protocol, cast
 
 if TYPE_CHECKING:
     from contextlib import AbstractContextManager
@@ -70,10 +73,11 @@ if TYPE_CHECKING:
 
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.modes import MODE_NAMES, MODES
-from application.pipeline.normalize.base import NormalizeStats
+from application.pipeline.normalize.base import NormalizeStats, SourceNormalizer
+from application.pipeline.normalize.bibliographic import BibliographicNormalizer
 from application.pipeline.phase_order import PHASE_ORDER
 from application.pipeline.signals import signal_source_unavailable
-from application.ports.pipeline.circuit_breaker import SourceUnavailableError
+from application.ports.pipeline.circuit_breaker import CircuitBreaker, SourceUnavailableError
 from domain.sources.registry import ALL_SOURCES_SET
 from infrastructure import PROJECT_ROOT
 from infrastructure.observability.log import (
@@ -84,7 +88,9 @@ from infrastructure.observability.log import (
     set_log_phase,
     setup_logger,
 )
+from infrastructure.observability.phase_executions import PhaseExecutionRecorder
 from infrastructure.pipeline_lock import PipelineAlreadyRunningError, acquire_pipeline_lock
+from infrastructure.sources.circuit_breaker import SourceCircuitBreaker
 
 # `setup_logger` (au lieu d'un simple `getLogger`) attache un FileHandler
 # sur `logs/pipeline.log` quand `LOG_TO_FILE=true` : les logs des phases qui
@@ -97,6 +103,53 @@ log = setup_logger("pipeline", str(PROJECT_ROOT / "logs"))
 # ---------------------------------------------------------------------------
 
 
+# Un normalizer se construit sur la connexion de sa phase : les adapters qu'il reçoit en
+# dépendent, et la phase en ouvre une par source.
+type ConstructeurNormalizer = Callable[[Connection], SourceNormalizer]
+
+
+class Extracteur(Protocol):
+    """Ce que l'orchestrateur consomme d'un extracteur : son exécution, rien d'autre.
+
+    Les extracteurs diffèrent par leur configuration et par l'adapter qu'ils pilotent, deux types propres à chaque source. Le composition root, lui, n'en appelle que le point d'entrée commun : le décrire ici évite de faire circuler ces deux types jusqu'à un endroit qui ne s'en sert pas.
+    """
+
+    def run(
+        self,
+        args: argparse.Namespace | None = None,
+        *,
+        breaker: CircuitBreaker | None = None,
+    ) -> PhaseMetrics: ...
+
+
+# Une phase reçoit les options du run et rend ses métriques : signature uniforme, que
+# l'orchestrateur appelle sans savoir ce que chacune consomme.
+type Phase = Callable[[RunOptions], PhaseMetrics]
+
+# Un extracteur se construit sur la connexion de sa phase et le journal scopé à sa source.
+type ConstructeurExtracteur = Callable[[Connection, logging.Logger], Extracteur]
+
+
+@dataclass(frozen=True, slots=True)
+class RunOptions:
+    """Options d'un run, telles que la ligne de commande les pose, remises à chaque phase.
+
+    Toutes les phases reçoivent les mêmes options et n'en lisent que ce qui les concerne : l'orchestrateur les appelle uniformément, sans savoir laquelle en consomme quoi.
+
+    `sources` vaut `None` quand le run n'en restreint aucune ; les phases qui ont besoin d'une liste explicite y substituent alors l'ensemble des sources connues.
+    """
+
+    mode: str = "full"
+    sources: set[str] | None = None
+    year: int | None = None
+    start_year: int | None = None
+    include_wos: bool = False
+    rebuild_publications: bool = False
+    rebuild_authorships: bool = False
+    rebuild_subjects: bool = False
+    no_raw_store: bool = False
+
+
 def _open_tx() -> "AbstractContextManager[Connection]":
     """Fabrique de transaction gérée (port `OpenTransaction`) injectée aux orchestrateurs de
     phase : commit-sur-succès / rollback / close, tolérant les commits par lots. Concentrée au
@@ -107,14 +160,7 @@ def _open_tx() -> "AbstractContextManager[Connection]":
     return managed_transaction(get_sync_engine())
 
 
-def phase_extract(
-    mode: Any = "full",
-    sources: Any = None,
-    year: Any = None,
-    start_year: Any = None,
-    include_wos: bool = False,
-    **kw: Any,
-) -> PhaseMetrics:
+def phase_extract(options: RunOptions) -> PhaseMetrics:
     """Phase 1 : Extraction des sources vers staging.
 
     La policy du mode (sources, stratégie d'années) vit dans `application/pipeline/modes.py`.
@@ -134,11 +180,11 @@ def phase_extract(
         return _run_extract(source, registry[source], args)
 
     return run(
-        mode=mode,
-        sources=set(sources) if sources else None,
-        year=year,
-        start_year=start_year,
-        include_wos=include_wos,
+        mode=options.mode,
+        sources=set(options.sources) if options.sources else None,
+        year=options.year,
+        start_year=options.start_year,
+        include_wos=options.include_wos,
         extract_one=extract_one,
         run_parallel=run_parallel,
         get_last_extract_date=get_last_extract_date,
@@ -146,7 +192,7 @@ def phase_extract(
     )
 
 
-def phase_resolve_ra(**kw: Any) -> PhaseMetrics:
+def phase_resolve_ra(options: RunOptions) -> PhaseMetrics:
     """Résout la Registration Agency des préfixes DOI (`doi.org/ra`) avant cross_imports.
 
     Permet à `cross_imports` de router les fetches par RA (Crossref vs DataCite) dès le
@@ -195,9 +241,7 @@ def phase_resolve_ra(**kw: Any) -> PhaseMetrics:
     return metrics
 
 
-def phase_cross_imports(
-    mode: Any = "full", sources: Any = None, include_wos: bool = False, **kw: Any
-) -> PhaseMetrics:
+def phase_cross_imports(options: RunOptions) -> PhaseMetrics:
     """Rattrapage des documents repérés dans une source mais absents d'une autre.
 
     Deux mécanismes complémentaires, exécutés dans cet ordre :
@@ -224,9 +268,9 @@ def phase_cross_imports(
     from infrastructure.parallel import run_parallel
 
     return run(
-        mode=mode,
-        sources=set(sources) if sources else None,
-        include_wos=include_wos,
+        mode=options.mode,
+        sources=set(options.sources) if options.sources else None,
+        include_wos=options.include_wos,
         fetch_hal_by_id=_run_fetch_missing_hal_by_id,
         fetch_hal_by_nnt=_run_fetch_missing_hal_by_nnt,
         fetch_doi_one=_run_fetch_missing_doi,
@@ -236,13 +280,7 @@ def phase_cross_imports(
     )
 
 
-def phase_refresh_stale(
-    sources: Any = None,
-    include_wos: bool = False,
-    start_year: Any = None,
-    year: Any = None,
-    **kw: Any,
-) -> PhaseMetrics:
+def phase_refresh_stale(options: RunOptions) -> PhaseMetrics:
     """Rafraîchit les rows à `last_seen_at` ancien et marque les disparues.
 
     Tourne à **chaque run** : le seuil `STALE_REFRESH_AFTER_DAYS` étale la
@@ -270,10 +308,10 @@ def phase_refresh_stale(
     from application.pipeline.extract.refresh_stale import run_phase
 
     return run_phase(
-        sources=set(sources) if sources else None,
-        include_wos=include_wos,
-        year=year,
-        start_year=start_year,
+        sources=set(options.sources) if options.sources else None,
+        include_wos=options.include_wos,
+        year=options.year,
+        start_year=options.start_year,
         refresh_one=_run_refresh_stale,
         credentials_missing=_credentials_missing,
         get_years_for_window=_get_years_for_window,
@@ -299,7 +337,7 @@ def _get_years_for_window(start_year: int | None) -> list[int] | None:
         return get_years(conn, start_year)
 
 
-def phase_refetch_truncated(**kw: Any) -> PhaseMetrics:
+def phase_refetch_truncated(options: RunOptions) -> PhaseMetrics:
     """Re-télécharge les works OpenAlex tronqués à 100 auteurs.
 
     L'API OpenAlex plafonne la liste des auteurs à 100 par réponse. Cette phase
@@ -318,7 +356,7 @@ def phase_refetch_truncated(**kw: Any) -> PhaseMetrics:
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.sources.openalex.refetch_truncated import PgOpenalexRefetchAdapter
 
-    sources = kw.get("sources", set(ALL_SOURCES_SET))
+    sources = options.sources if options.sources is not None else set(ALL_SOURCES_SET)
     # Toujours actif (incrémental : ne repère que les lignes openalex processed=FALSE
     # à 100 auteurs) ; ne dépend que de la présence d'openalex dans les sources.
     if "openalex" not in sources:
@@ -330,7 +368,7 @@ def phase_refetch_truncated(**kw: Any) -> PhaseMetrics:
         conn.close()
 
 
-def phase_normalize(**kw: Any) -> PhaseMetrics:
+def phase_normalize(options: RunOptions) -> PhaseMetrics:
     """Normalisation staging -> tables sources.
 
     Écrit les `source_publications` avec `publication_id = NULL` (aucun
@@ -346,14 +384,14 @@ def phase_normalize(**kw: Any) -> PhaseMetrics:
 
     # Ordre d'exécution : source la plus autoritative en premier (cf. SOURCE_PRIORITY).
     # Les suivantes n'écrasent pas les métadonnées déjà posées lors de `refresh_from_sources`.
-    registry = _normalize_builders(archive=not kw.get("no_raw_store"))
+    registry = _normalize_builders(archive=not options.no_raw_store)
 
     def normalize_one(source: str) -> dict[str, object]:
         return _run_normalize(source, registry[source])
 
     return run(
-        sources=kw.get("sources", set(ALL_SOURCES_SET)),
-        mode=kw.get("mode", "full"),
+        sources=options.sources if options.sources is not None else set(ALL_SOURCES_SET),
+        mode=options.mode,
         ordered_sources=list(registry),
         normalize_one=normalize_one,
         cleanup_orphan_identities=_run_cleanup_orphan_identities,
@@ -377,7 +415,7 @@ def _run_cleanup_orphan_identities() -> None:
     log.info("✓ %d identités orphelines supprimées en %.1fs", n, time.time() - t0)
 
 
-def _vacuum_staging(full: bool = False) -> Any:
+def _vacuum_staging(full: bool = False) -> None:
     """VACUUM sur staging. FULL en mode full/monthly, simple sinon.
 
     `staging.raw_data` est un JSONB potentiellement gros (payload brut
@@ -397,7 +435,7 @@ def _vacuum_staging(full: bool = False) -> Any:
         conn.execute(text(sql))
 
 
-def phase_publishers_journals(**kw: Any) -> PhaseMetrics:
+def phase_publishers_journals(options: RunOptions) -> PhaseMetrics:
     """Enrichissement du référentiel `journals`, positionné entre `affiliations`
     et `metadata_correction`. Trois sous-étapes, toutes incrémentales :
 
@@ -434,7 +472,7 @@ def phase_publishers_journals(**kw: Any) -> PhaseMetrics:
     )
 
 
-def _signal_if_tripped(metrics: PhaseMetrics, breaker: Any) -> None:
+def _signal_if_tripped(metrics: PhaseMetrics, breaker: SourceCircuitBreaker) -> None:
     """Quand un circuit-breaker source a coupé (série de 429/5xx), marque la phase en
     avertissement : son point passe ambre et le motif s'affiche au drill-down. Les items
     non traités sont repris au run suivant (phases de rattrapage idempotentes)."""
@@ -502,7 +540,7 @@ def _run_resolve_publishers() -> PhaseMetrics:
     return metrics
 
 
-def phase_affiliations(**kw: Any) -> PhaseMetrics:
+def phase_affiliations(options: RunOptions) -> PhaseMetrics:
     """Résolution des affiliations UCA sur les source_authorships.
 
     Séquence, transactions et métriques dans `application/pipeline/affiliations/phase.py`.
@@ -523,7 +561,7 @@ def phase_affiliations(**kw: Any) -> PhaseMetrics:
     )
 
 
-def phase_metadata_correction(**kw: Any) -> PhaseMetrics:
+def phase_metadata_correction(options: RunOptions) -> PhaseMetrics:
     """Persistance des corrections de métadonnées sur les source_publications.
 
     Séquence, transactions et métriques dans `application/pipeline/metadata_correction/phase.py`.
@@ -534,7 +572,7 @@ def phase_metadata_correction(**kw: Any) -> PhaseMetrics:
     return run(_open_tx, PgMetadataCorrectionQueries(), log)
 
 
-def phase_publications(**kw: Any) -> PhaseMetrics:
+def phase_publications(options: RunOptions) -> PhaseMetrics:
     """Assignation des `source_publications` aux publications, en une seule passe.
 
     `reconcile_components` clusterise le voisinage des SP dirty par composante
@@ -572,11 +610,11 @@ def phase_publications(**kw: Any) -> PhaseMetrics:
         PgAddressPubCountQueries(),
         log,
         publication_repo_factory=publication_repository,
-        rebuild_publications=bool(kw.get("rebuild_publications")),
+        rebuild_publications=options.rebuild_publications,
     )
 
 
-def phase_relations(**kw: Any) -> PhaseMetrics:
+def phase_relations(options: RunOptions) -> PhaseMetrics:
     """Population des relations sémantiques entre publications distinctes.
 
     Tourne après `publications` : les `source_publications` sont rattachées et les DOI
@@ -591,7 +629,7 @@ def phase_relations(**kw: Any) -> PhaseMetrics:
     return run(_open_tx, PgPublicationRelationsQueries(), log)
 
 
-def phase_persons(**kw: Any) -> PhaseMetrics:
+def phase_persons(options: RunOptions) -> PhaseMetrics:
     """Rattachement et création des personnes, phase ordre-indépendante.
 
     L'orchestrateur enchaîne, sur une seule transaction : `enforce` (réapplique les épinglages
@@ -618,7 +656,7 @@ def phase_persons(**kw: Any) -> PhaseMetrics:
     )
 
 
-def phase_authorships(**kw: Any) -> PhaseMetrics:
+def phase_authorships(options: RunOptions) -> PhaseMetrics:
     """Construction de la table de vérité `authorships`.
 
     Consolide les `source_authorships` en authorships canoniques (une entrée par couple publication × personne), avec `in_perimeter` consolidé ; les structures dérivent de la matview `authorship_structures`.
@@ -642,11 +680,11 @@ def phase_authorships(**kw: Any) -> PhaseMetrics:
         PgPurgeOrphanPublicationsQueries(),
         PgPubCountsQueries(),
         log,
-        rebuild_authorships=bool(kw.get("rebuild_authorships")),
+        rebuild_authorships=options.rebuild_authorships,
     )
 
 
-def phase_countries(mode: Any = "full", **kw: Any) -> PhaseMetrics:
+def phase_countries(options: RunOptions) -> PhaseMetrics:
     """Detection des pays des adresses et recalcul sur les publications.
 
     Séquence, transactions et métriques dans `application/pipeline/countries/phase.py`.
@@ -658,11 +696,11 @@ def phase_countries(mode: Any = "full", **kw: Any) -> PhaseMetrics:
         _open_tx,
         PgCountryQueries(),
         log,
-        retry_empty=MODES[mode].retry_empty_country_suggestions,
+        retry_empty=MODES[options.mode].retry_empty_country_suggestions,
     )
 
 
-def phase_subjects(**kw: Any) -> PhaseMetrics:
+def phase_subjects(options: RunOptions) -> PhaseMetrics:
     """Sujets / mots-clés : ingestion + recalcul des co-occurrences.
 
     Deux étapes enchaînées, indissociables :
@@ -692,9 +730,7 @@ def phase_subjects(**kw: Any) -> PhaseMetrics:
     from application.pipeline.subjects.phase import run
     from infrastructure.pipeline.subjects import PgSubjectsIngestionQueries
 
-    return run(
-        _open_tx, PgSubjectsIngestionQueries(), log, rebuild=bool(kw.get("rebuild_subjects"))
-    )
+    return run(_open_tx, PgSubjectsIngestionQueries(), log, rebuild=options.rebuild_subjects)
 
 
 def _normalize_row(source: str, stats: NormalizeStats, duration_s: float) -> dict[str, object]:
@@ -708,7 +744,7 @@ def _normalize_row(source: str, stats: NormalizeStats, duration_s: float) -> dic
     }
 
 
-def _normalize_builders(*, archive: bool = True) -> dict[str, Callable[[Any], Any]]:
+def _normalize_builders(*, archive: bool = True) -> dict[str, ConstructeurNormalizer]:
     """Constructeur du normalizer par source, dans l'ordre de priorité (source la plus
     autoritative en premier — cf. SOURCE_PRIORITY) : les suivantes n'écrasent pas les
     métadonnées déjà posées. Les six sources bibliographiques partagent le câblage
@@ -733,7 +769,7 @@ def _normalize_builders(*, archive: bool = True) -> dict[str, Callable[[Any], An
     # Sans archivage, les payloads sont oubliés au lieu d'être écrits sur disque.
     raw_store = get_raw_store() if archive else NullRawStore()
 
-    def _biblio(cls: Any) -> Callable[[Any], Any]:
+    def _biblio(cls: type[BibliographicNormalizer]) -> ConstructeurNormalizer:
         return lambda conn: cls(
             conn,
             log,
@@ -763,7 +799,7 @@ def _normalize_builders(*, archive: bool = True) -> dict[str, Callable[[Any], An
     }
 
 
-def _run_normalize(source: str, build: Callable[[Any], Any]) -> dict[str, object]:
+def _run_normalize(source: str, build: ConstructeurNormalizer) -> dict[str, object]:
     from infrastructure.db.engine import get_sync_engine
 
     log.info("▶ normalize_%s", source)
@@ -887,7 +923,7 @@ def _run_enrich_journals_from_doaj() -> PhaseMetrics:
 # ── Extracteurs sources (Volet 0 — sweep subprocess → imports) ──
 
 
-def _run_extractor(extractor: Any, args: Any) -> PhaseMetrics:
+def _run_extractor(source: str, extractor: Extracteur, args: argparse.Namespace) -> PhaseMetrics:
     """Exécute un extracteur avec un circuit-breaker de source (seuil 5).
 
     Pose le breaker dans la ContextVar (lu par le helper HTTP sync) et le passe à
@@ -901,7 +937,7 @@ def _run_extractor(extractor: Any, args: Any) -> PhaseMetrics:
         set_current_breaker,
     )
 
-    breaker = SourceCircuitBreaker(extractor.SOURCE, threshold=5)
+    breaker = SourceCircuitBreaker(source, threshold=5)
     token = set_current_breaker(breaker)
     try:
         metrics = extractor.run(args, breaker=breaker)
@@ -911,7 +947,7 @@ def _run_extractor(extractor: Any, args: Any) -> PhaseMetrics:
     return metrics
 
 
-def _extractors() -> dict[str, Callable[[Any, Any], Any]]:
+def _extractors() -> dict[str, ConstructeurExtracteur]:
     """Constructeur de l'extracteur par source : `(conn, source_log)` → extracteur câblé.
 
     `wos` et `scanr` ouvrent une connexion d'amorçage pour lire leur clé / identifiants
@@ -931,25 +967,25 @@ def _extractors() -> dict[str, Callable[[Any, Any], Any]]:
     from infrastructure.sources.theses.extract_theses import PgThesesExtractAdapter
     from infrastructure.sources.wos.extract_wos import PgWosExtractAdapter
 
-    def hal(conn: Any, source_log: Any) -> Any:
+    def hal(conn: Connection, source_log: logging.Logger) -> Extracteur:
         adapter = PgHalExtractAdapter(base_url=API_BASE_URLS["hal"])
         return HalExtractor(conn, source_log, adapter)
 
-    def openalex(conn: Any, source_log: Any) -> Any:
+    def openalex(conn: Connection, source_log: logging.Logger) -> Extracteur:
         adapter = PgOpenalexExtractAdapter(base_url=API_BASE_URLS["openalex"])
         return OpenalexExtractor(conn, source_log, adapter)
 
-    def wos(conn: Any, source_log: Any) -> Any:
+    def wos(conn: Connection, source_log: logging.Logger) -> Extracteur:
         adapter = PgWosExtractAdapter(base_url=API_BASE_URLS["wos"], api_key=get_wos_api_key())
         return WosExtractor(conn, source_log, adapter)
 
-    def scanr(conn: Any, source_log: Any) -> Any:
+    def scanr(conn: Connection, source_log: logging.Logger) -> Extracteur:
         adapter = PgScanrExtractAdapter(
             base_url=API_BASE_URLS["scanr"], credentials=get_scanr_credentials()
         )
         return ScanrExtractor(conn, source_log, adapter)
 
-    def theses(conn: Any, source_log: Any) -> Any:
+    def theses(conn: Connection, source_log: logging.Logger) -> Extracteur:
         adapter = PgThesesExtractAdapter(base_url=API_BASE_URLS["theses"])
         return ThesesExtractor(conn, source_log, adapter)
 
@@ -957,7 +993,7 @@ def _extractors() -> dict[str, Callable[[Any, Any], Any]]:
 
 
 def _run_extract(
-    source: str, make_extractor: Callable[[Any, Any], Any], args: argparse.Namespace
+    source: str, make_extractor: ConstructeurExtracteur, args: argparse.Namespace
 ) -> PhaseMetrics:
     """Squelette commun d'une extraction : logs `▶`/`✓`, connexion, circuit-breaker
     (`_run_extractor`), fermeture. Le câblage propre à la source vit dans `make_extractor`."""
@@ -968,7 +1004,7 @@ def _run_extract(
     source_log = setup_logger(source, str(PROJECT_ROOT / "logs"))
     conn = get_sync_engine().connect()
     try:
-        metrics = _run_extractor(make_extractor(conn, source_log), args)
+        metrics = _run_extractor(source, make_extractor(conn, source_log), args)
     finally:
         conn.close()
     log.info("✓ extract_%s terminé en %.1fs — %s", source, time.time() - t0, metrics.as_summary())
@@ -1166,7 +1202,7 @@ def _run_refresh_stale(target: str, years: list[int] | None) -> PhaseMetrics:
     return metrics
 
 
-def phase_oa_status(**kw: Any) -> PhaseMetrics:
+def phase_oa_status(options: RunOptions) -> PhaseMetrics:
     """Enrichissement `publications.oa_status` via Unpaywall (per-publication).
 
     Incrémentale et auto-bornée (staleness + cap `MAX_PER_RUN`) : le backlog des
@@ -1224,7 +1260,7 @@ def phase_oa_status(**kw: Any) -> PhaseMetrics:
 # Registre des phases : l'implémentation de chacune. L'ordre d'exécution vient de
 # `PHASE_ORDER`, source de vérité unique ; ce registre ne fournit que les fonctions,
 # validées comme couvrant exactement cet ordre.
-_PHASE_FUNCTIONS: dict[str, Callable[..., PhaseMetrics]] = {
+_PHASE_FUNCTIONS: dict[str, Phase] = {
     "extract": phase_extract,
     "resolve_ra": phase_resolve_ra,
     "cross_imports": phase_cross_imports,
@@ -1249,9 +1285,7 @@ if set(_PHASE_FUNCTIONS) != set(PHASE_ORDER):
         f"{set(_PHASE_FUNCTIONS) ^ set(PHASE_ORDER)}"
     )
 
-PHASES: list[tuple[str, Callable[..., PhaseMetrics]]] = [
-    (name, _PHASE_FUNCTIONS[name]) for name in PHASE_ORDER
-]
+PHASES: list[tuple[str, Phase]] = [(name, _PHASE_FUNCTIONS[name]) for name in PHASE_ORDER]
 
 PHASE_NAMES = list(PHASE_ORDER)
 
@@ -1266,7 +1300,7 @@ PHASE_NAMES = list(PHASE_ORDER)
 # ---------------------------------------------------------------------------
 
 
-def _sigterm_raises_keyboard_interrupt(_signum: int, _frame: Any) -> None:
+def _sigterm_raises_keyboard_interrupt(_signum: int, _frame: FrameType | None) -> None:
     raise KeyboardInterrupt
 
 
@@ -1357,7 +1391,7 @@ def _print_phase_list() -> None:
 
 def _select_phases_to_run(
     args: argparse.Namespace,
-) -> list[tuple[str, Callable[..., PhaseMetrics]]]:
+) -> list[tuple[str, Phase]]:
     """Phases à exécuter selon `--only` / `--from` (sinon toutes). Sort en erreur sur phase inconnue."""
     if args.only:
         if args.only not in PHASE_NAMES:
@@ -1372,7 +1406,7 @@ def _select_phases_to_run(
     return list(PHASES)
 
 
-def _print_dry_run(phases_to_run: list[tuple[str, Callable[..., PhaseMetrics]]]) -> None:
+def _print_dry_run(phases_to_run: list[tuple[str, Phase]]) -> None:
     """Affiche les phases qui seraient exécutées (`--dry-run`), sans rien lancer."""
     for name, fn in phases_to_run:
         doc = fn.__doc__.strip().split("\n")[0] if fn.__doc__ else ""
@@ -1382,11 +1416,11 @@ def _print_dry_run(phases_to_run: list[tuple[str, Callable[..., PhaseMetrics]]])
 
 def _run_one_phase(
     name: str,
-    fn: Callable[..., PhaseMetrics],
+    fn: Phase,
     *,
     args: argparse.Namespace,
     sources: set[str],
-    recorder: Any,
+    recorder: PhaseExecutionRecorder,
 ) -> tuple[str, float]:
     """Exécute une phase : appel, capture d'observabilité. Rend `(nom, durée)`.
 
@@ -1403,15 +1437,17 @@ def _run_one_phase(
         t0_phase = time.time()
         try:
             result = fn(
-                mode=args.mode,
-                sources=sources,
-                year=args.year,
-                start_year=args.start_year,
-                include_wos=args.include_wos,
-                rebuild_publications=args.rebuild_publications,
-                rebuild_authorships=args.rebuild_authorships,
-                rebuild_subjects=args.rebuild_subjects,
-                no_raw_store=args.no_raw_store,
+                RunOptions(
+                    mode=args.mode,
+                    sources=sources,
+                    year=args.year,
+                    start_year=args.start_year,
+                    include_wos=args.include_wos,
+                    rebuild_publications=args.rebuild_publications,
+                    rebuild_authorships=args.rebuild_authorships,
+                    rebuild_subjects=args.rebuild_subjects,
+                    no_raw_store=args.no_raw_store,
+                )
             )
         except KeyboardInterrupt:
             log.warning("Pipeline interrompu par l'utilisateur à la phase '%s'", name)
@@ -1461,9 +1497,7 @@ def _run_one_phase(
         reset_log_phase(phase_token)
 
 
-def _execute_phases(
-    args: argparse.Namespace, phases_to_run: list[tuple[str, Callable[..., PhaseMetrics]]]
-) -> None:
+def _execute_phases(args: argparse.Namespace, phases_to_run: list[tuple[str, Phase]]) -> None:
     """Déroule la séquence des phases avec observabilité par run, puis le récapitulatif de fin."""
     from infrastructure.observability.phase_executions import start_run
 

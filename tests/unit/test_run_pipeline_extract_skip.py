@@ -26,7 +26,9 @@ def test_phase_extract_full_skips_unconfigured_source():
         return PhaseMetrics(new=7)
 
     with patch.object(run_pipeline, "_run_extract", side_effect=_extract):
-        metrics = run_pipeline.phase_extract(mode="full", sources={"openalex", "theses"})
+        metrics = run_pipeline.phase_extract(
+            run_pipeline.RunOptions(mode="full", sources={"openalex", "theses"})
+        )
 
     assert _table_keys(metrics) == {"theses"}
     assert metrics.new == 7
@@ -44,7 +46,7 @@ def test_phase_extract_daily_hal_unconfigured():
         ),
         patch.object(run_pipeline, "_run_extract", side_effect=_extract),
     ):
-        metrics = run_pipeline.phase_extract(mode="daily")
+        metrics = run_pipeline.phase_extract(run_pipeline.RunOptions(mode="daily"))
 
     assert _table_keys(metrics) == set()
     assert [s["code"] for s in metrics.signals] == ["source_unconfigured"]

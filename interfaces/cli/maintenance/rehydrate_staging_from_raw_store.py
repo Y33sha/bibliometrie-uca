@@ -23,8 +23,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
-from collections.abc import Callable
-from typing import Any
+from collections.abc import Callable, Mapping
 
 from domain.sources.registry import ALL_SOURCES_SET
 from infrastructure.db.engine import get_sync_engine
@@ -42,13 +41,15 @@ from infrastructure.sources.wos.parsing import extract_doi as wos_extract_doi
 
 log = setup_logger("rehydrate_staging_from_raw_store", os.path.dirname(__file__))
 
+from domain.types import JsonValue
+
 _COMMIT_BATCH = 500
 
 # DOI ré-extrait du payload par la logique propre à chaque source (réutilise les
 # extracteurs des phases d'extraction, pas de réimplémentation). crossref et
 # datacite sont absents : ce sont des sources DOI-natives dont le `source_id`
 # (clé du store) est déjà le DOI — cf. `_doi_for`.
-_DOI_EXTRACTORS: dict[str, Callable[[dict[str, Any]], str | None]] = {
+_DOI_EXTRACTORS: dict[str, Callable[[Mapping[str, JsonValue]], str | None]] = {
     "hal": hal_extract_doi,
     "openalex": openalex_extract_doi,
     "wos": wos_extract_doi,
@@ -57,7 +58,7 @@ _DOI_EXTRACTORS: dict[str, Callable[[dict[str, Any]], str | None]] = {
 }
 
 
-def _doi_for(source: str, source_id: str, raw_data: dict[str, Any]) -> str | None:
+def _doi_for(source: str, source_id: str, raw_data: Mapping[str, JsonValue]) -> str | None:
     """DOI à poser en staging pour un payload réhydraté."""
     if source in ("crossref", "datacite"):
         return source_id  # sources DOI-natives : source_id == doi
