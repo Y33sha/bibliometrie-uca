@@ -1,98 +1,93 @@
 # Personnes — cycle de vie
 
-*À jour le 2026-07-14.*
+*À jour le 2026-09-04.*
 
-`Person` est un agrégat à domaine riche (`domain/persons/`) : l'aggregate root `Person`, l'aggregate séparé `PersonIdentifier` (attribution identifiant ↔ personne portant un statut), les value objects d'identifiants (`ORCID`, `IdHAL`, `IdRef`, `HalPersonId`) et de formes de nom (`PersonNameForm`), et les règles pures de rapprochement (`decide_person_match`, `names_compatible`, `same_person_name`). Contrairement à [structures](structures.md), référentiel curé à la main, `Person` est **construit par le pipeline** — la phase `persons` rattache les signatures (`source_authorships`) à des personnes et en crée au besoin — **puis curé par l'admin** (fusion, réattribution d'identifiants, rejet, détachement). Les deux axes écrivent.
+Une personne est un chercheur unifié à travers les sources : plusieurs signatures, venues de HAL, d'OpenAlex ou du Web of Science sous des graphies différentes, désignent la même personne. Contrairement aux [structures](structures.md), qui sont un référentiel saisi à la main, les personnes sont **construites par le pipeline** — la phase `persons` rattache chaque signature à une personne et en crée au besoin — **puis corrigées par la curation** : fusion, réattribution d'identifiant, rejet, détachement. Le pipeline et l'interface d'administration écrivent donc tous deux.
 
-## Tables du cluster
+`domain/persons/` porte les règles pures : la décision de rapprochement (`decide_person_match`), la comparaison des noms (`names_compatible`, `same_person_name`), et des types dédiés qui valident et normalisent chaque identifiant avant écriture.
 
-| Table | Rôle | Colonnes clés |
+## Tables
+
+| Table | Rôle | Colonnes notables |
 |---|---|---|
-| `persons` | Le chercheur unifié multi-sources | `id` (surrogate), `last_name` / `first_name` (+ `_normalized`), `rejected` |
-| `person_identifiers` | Attribution d'un identifiant externe à une personne, avec statut | `person_id` (FK CASCADE), `id_type`, `id_value`, `source` (`identifier_origin` : `manual` / `auto`), `status` (`identifier_status`), unique `(id_type, id_value)` |
-| `person_name_forms` | Index inverse forme de nom → personnes, pour le matching | PK `(name_form, person_id)`, `sources` (text[]), `status` (`identifier_status`) |
-| `persons_rh` | Fiche annuaire RH | `person_id` (unique, FK `ON DELETE RESTRICT`), `email`, `role_title`, `department_name`, `structure_id`, dates |
-| `distinct_persons` | Paires marquées « pas la même personne » | `(person_id_a, person_id_b)` unique, CHECK `a < b` |
-| `rejected_authorships` | Rejet durable d'une paire (publication, personne) | PK `(publication_id, person_id)` |
+| `persons` | La personne unifiée | `last_name` / `first_name` et leurs formes normalisées, `rejected` |
+| `person_identifiers` | Attribution d'un identifiant externe à une personne | `person_id`, `id_type`, `id_value`, `source` (`manual` ou `auto`), `status`, unicité `(id_type, id_value)` |
+| `person_name_forms` | Formes de nom sous lesquelles une personne apparaît | clé `(name_form, person_id)`, `sources`, `status` |
+| `persons_rh` | Fiche annuaire issue du système d'information | `person_id` unique, suppression refusée tant qu'elle existe, `email`, fonction, département, structure, dates |
+| `distinct_persons` | Paires déclarées comme deux personnes différentes | `(person_id_a, person_id_b)`, avec `a < b` |
+| `rejected_authorships` | Paires publication–personne écartées durablement | `(publication_id, person_id)` |
 
-Le rattachement d'une signature à une personne vit sur `source_authorships.person_id` + `resolution_mode` (enum `identifier` / `name` / `cross_source`), consolidé ensuite dans la table de liaison `authorships` par la phase suivante (cluster voisin).
+Le rattachement d'une signature à une personne est porté par `source_authorships.person_id`, accompagné de `resolution_mode`, qui retient par quel moyen le rapprochement a été fait : identifiant, nom, ou report d'une autre source.
 
-## Les deux axes
+## Écriture par le pipeline
 
-Le pipeline et l'admin écrivent tous deux ; les deux lisent aussi.
+`application/pipeline/persons/phase.py` exécute six étapes dans une transaction unique. La phase lit les signatures du périmètre non encore rattachées, avec leurs identifiants, leur nom normalisé, leurs rôles et leur position dans la publication, ainsi que des index chargés en mémoire au début du traitement. Elle écrit le rattachement des signatures, crée des personnes, inscrit les identifiants rencontrés et régénère les formes de nom.
 
-```mermaid
-flowchart LR
-    SA[(source_authorships)] -->|phase persons : cascade| PH{{phase persons}}
-    PH -->|link person_id + resolution_mode| SA
-    PH -->|create| P[persons]
-    PH -->|promotion pending| PI[person_identifiers]
-    PH -->|upsert| PNF[person_name_forms]
-    ADM[API admin] -->|merge / reject / rename| P
-    ADM -->|add / reassign / status| PI
-    ADM -->|confirm / reject| PNF
-    ADM -->|mark-distinct| DP[distinct_persons]
-    ADM -->|détachement| RA[rejected_authorships]
-    RHIMP[import RH hors API] --> RH[persons_rh]
-    P -->|person_id| AUTH[(authorships)]
-    P --> READ[annuaire / fiche / files de triage]
-```
+1. **Appliquer les décisions humaines.** Les rattachements épinglés par la curation sont reposés en premier ; les étapes suivantes ne les défont pas.
+2. **Arbitrer les identifiants disputés.** Quand une personne porte un identifiant sans en être la titulaire attribuée, le nom majoritaire — pondéré par le nombre de signatures — emporte le transfert. Seules les attributions non encore confirmées sont transférables. Les signatures qui tenaient leur rattachement de cet identifiant repassent à nul, pour être résolues à nouveau.
+3. **Rapprocher.** `decide_person_match` tranche par fiabilité décroissante : ORCID, identifiant de compte HAL, IdRef, nom unique, report depuis une autre source, et création en dernier recours. La cascade fait deux passes sur les mêmes index : la première ne fait que rapprocher, la création est repoussée à la seconde. Une signature qui appellerait une création peut ainsi rejoindre une personne rattachée plus loin dans la même passe, au lieu de créer un doublon selon l'ordre de traitement. Les rôles non-auteurs des thèses — jury, rapporteurs — n'autorisent aucune création.
+4. **Détacher ce qui a perdu son appui.** Un rattachement obtenu par report depuis une autre source, dont l'attache d'origine a disparu, repasse à nul.
+5. **Régénérer les formes de nom.** Les formes canoniques calculées depuis l'état civil de la personne rejoignent les formes bibliographiques observées dans ses signatures ; seules les différences sont écrites. Une forme canonique naît confirmée, une forme observée naît en attente, et les décisions humaines déjà prises sont conservées.
+6. **Purger.** Les rattachements par nom dont la forme désigne maintenant deux personnes ou plus sont détachés, puis les personnes devenues vides sont supprimées — sauf celles qui portent une fiche annuaire.
 
-## Écriture — pipeline (phase `persons`)
+Les identifiants rencontrés sont inscrits par un point unique, toujours en attente de confirmation et marqués comme automatiques. Un conflit y est consigné sans bloquer, et laissé à l'arbitrage de l'exécution suivante. Ce qu'une exécution inscrit devient ce que la suivante lit : c'est ce qui porte la convergence.
 
-`application/pipeline/persons/phase.py` : une transaction unique, six étapes atomiques. La phase lit les `source_authorships` in-périmètre non liées (avec leurs identifiants extraits de `author_identifying_keys`, le nom normalisé, les rôles, la publication et la position) plus des maps préfetchées ; elle écrit `source_authorships.person_id` + `resolution_mode`, crée des `persons`, promeut les identifiants en `person_identifiers` et upserte `person_name_forms`.
+## Écriture par l'API — curation
 
-1. **`enforce_confirmed_authorships`** — repose les rattachements épinglés par un humain (`confirmed`), point fixe que les resets suivants respectent.
-2. **`arbitrate_identifier_conflicts`** — arbitre par consensus les identifiants qu'une personne porte sans en être propriétaire attribué : le nom-autorité majoritaire (pondéré en signatures) décide le transfert (`PersonIdentifier.transfer_to`, seuls les `pending` sont transférables), puis les signatures identifiant captées repassent à NULL pour re-résolution.
-3. **`run_cascade`** — la cascade de rapprochement, deux passes sur un même jeu d'index vivants. La règle pure `decide_person_match` tranche par fiabilité décroissante : `orcid` → `hal_person_id` → `idref` → `single_name` → `cross_source` → `create`. La première passe ne fait que matcher ; la création est **différée** en seconde passe, ce qui laisse une signature à créer rejoindre une ancre cross-source posée plus loin dans la même passe (évite deux personnes pour deux graphies disjointes d'un même auteur selon l'ordre). `allow_person_creation` interdit la création aux rôles non-auteur des thèses.
-4. **Détachement cross-source** — les liens `cross_source` ayant perdu leur ancre ferme repassent à NULL.
-5. **`populate`** — régénère `person_name_forms` : formes canoniques (`compute_person_name_forms`, source `'persons'`) unies aux formes bibliographiques des signatures liées, par diff INSERT/UPDATE/DELETE. Une forme canonique naît `confirmed`, une forme bibliographique `pending` ; l'UPDATE ne touche que `sources`, jamais le statut ; les verdicts `confirmed` / `rejected` survivent.
-6. **`purge`** — re-orpheline les liens `name` dont la forme désigne désormais ≥ 2 personnes, puis supprime les personnes vidées (hors fiche RH → FK CASCADE retire leurs formes).
+Routeur `interfaces/api/routers/persons.py`, commandes dans `application/services/persons/commands.py`, adaptateur `PgPersonRepository`. Une commande vaut une transaction.
 
-`add_identifiers_from_authorships` est le promoteur unique des identifiants vers `person_identifiers` (toujours `pending`, `source='auto'`), appelé à chaque match et création ; tolérant aux conflits (loggés, laissés à l'arbitrage frontal du run suivant). Les identifiants promus et les formes régénérées d'un run deviennent les maps lues au run suivant.
+**Fusionner deux personnes** (`POST /api/persons/{id}/merge`). `merge_into` transfère six tables — signatures, authorships, rejets, identifiants, fiche annuaire si la cible n'en a pas, et formes de nom en réunissant leurs provenances — puis supprime la personne absorbée. La fusion est refusée si les deux portent chacune une fiche annuaire distincte.
 
-## Écriture — API (curation admin)
+**Gérer les identifiants.** Ajout manuel, limité aux types publics ; suppression ; confirmation ou rejet ; réattribution, qui ramène l'identifiant en attente.
 
-Routeur `interfaces/api/routers/persons.py` → command handlers `application/services/persons/commands.py` (frontière transactionnelle, `commit` au succès) → briques agnostiques `core.py` → `PgPersonRepository`. Une commande = une transaction.
+**Agir sur la personne.** Rejet et retour en arrière, avec recalcul de l'appartenance des publications au périmètre ; renommage, qui régénère les formes canoniques.
 
-- **Fusion** (`POST /api/persons/{id}/merge`) : `merge_into` transfère six tables (`source_authorships`, `authorships`, `rejected_authorships`, `person_identifiers`, `persons_rh` si la cible n'en a pas, `person_name_forms` avec union des `sources`) puis supprime la personne source. Gardée par l'invariant `can_merge_with`.
-- **Identifiants** : ajout manuel (`source='manual'`, types publics seulement), suppression, changement de statut (`confirm` / `reject`), réattribution (statut ramené à `pending`).
-- **Personne** : rejet / dé-rejet (`rejected`, avec recompute de `publications.in_perimeter`), renommage (avec régénération des formes canoniques).
-- **Formes de nom** : confirmation / rejet ; un rejet détache aussi les signatures portant cette forme et supprime les authorships devenues orphelines.
-- **Détachement d'authorships** (`POST /api/persons/{id}/detach-authorships`) : inscrit le rejet durable dans `rejected_authorships`, détache les signatures, supprime la ligne consolidée, nettoie les formes orphelines.
-- **Anti-doublon** : `mark-distinct` inscrit une paire dans `distinct_persons`.
-- **ORCID authentifié** : un import dédié pose le statut `authenticated` sous `SET LOCAL app.orcid_authenticated_import = 'on'`, borné à la transaction — seul contexte admis par le trigger.
+**Trancher une forme de nom.** La confirmer ou la rejeter ; un rejet détache aussi les signatures qui la portent et supprime les authorships devenues orphelines.
 
-Aucun endpoint n'écrit `persons_rh` : la fiche RH est alimentée hors API (import), et seulement transférée par la fusion.
+**Détacher des authorships** (`POST /api/persons/{id}/detach-authorships`). Inscrit le rejet durable, détache les signatures, supprime la ligne consolidée et nettoie les formes restées sans emploi.
 
-## Lecture — pipeline
+**Déclarer deux personnes distinctes** inscrit la paire dans `distinct_persons`, ce qui l'écarte des files de doublons.
 
-La cascade lit en bloc, via le port `PersonsMatchingQueries` (`infrastructure/pipeline/persons/matching.py`) : les maps `idref` / `orcid` / `hal_account` → personne (statuts non-`rejected`, nom normalisé joint pour corroborer le match), `name_form` → personnes, les verdicts `(name_form, person_id)` (`confirmed` / `rejected`, formes canoniques incluses), les personnes rejetées par publication (`rejected_authorships`), et l'index d'ancres `(publication, position)`. C'est la boucle producteur/consommateur inter-runs qui porte la convergence.
+**Importer un ORCID authentifié** pose un statut que rien ne peut dégrader ensuite. L'import s'annonce par un réglage de session borné à sa transaction, seul contexte que le déclencheur Postgres accepte.
 
-## Lecture — API
+Aucun point d'entrée n'écrit `persons_rh` : la fiche annuaire vient d'un import, et la fusion se contente de la transférer.
 
-Port `PersonsQueries` (`infrastructure/read_models/persons/`, modules `list` / `facets` / `detail` / `admin`).
+## Lecture par le pipeline
 
-- **Fiche personne** : profil, thèses, adresses, dashboard, sujets — croisant `persons`, `persons_rh`, `person_identifiers`, `source_authorships`, `authorships`, publications et sujets.
-- **Annuaire / liste / recherche / facettes / stats** : listes publiques et admin scopables par laboratoire.
-- **Files de triage doublons (admin)** : doublons par nom (`names_compatible`), conflits d'identifiant, intrus détachables, formes de nom ambiguës, candidates au partage d'une forme. Toutes excluent les paires de `distinct_persons` ; la file des doublons par nom écarte en plus les paires à double fiche RH.
+La cascade lit tout en bloc, par `PersonsMatchingQueries` (`infrastructure/pipeline/persons/matching.py`) : les correspondances identifiant vers personne pour IdRef, ORCID et compte HAL, avec le nom normalisé joint pour corroborer ; les correspondances forme de nom vers personnes ; les décisions humaines sur les couples forme–personne ; les personnes écartées d'une publication ; et l'index des rattachements déjà posés par publication et position, sur lequel s'appuie le report d'une source à l'autre.
+
+## Lecture par l'API
+
+Port `PersonsQueries`, adaptateurs dans `infrastructure/read_models/persons/`.
+
+| Usage | Ce qui est servi |
+|---|---|
+| Fiche personne | Profil, thèses, adresses, tableau de bord et sujets, en croisant les personnes, la fiche annuaire, les identifiants, les signatures, les authorships et les publications |
+| Annuaire, listes, recherche, facettes, statistiques | Listes publiques et d'administration, filtrables par laboratoire |
+| Files de curation des doublons | Doublons par nom, conflits d'identifiant, signatures détachables, formes de nom ambiguës, candidates au partage d'une forme |
+
+Toutes les files de doublons écartent les paires déclarées distinctes ; celle des doublons par nom écarte en outre les paires dont les deux personnes portent une fiche annuaire.
 
 ## Points d'attention
 
-Décisions d'architecture propres à cet agrégat, gardées explicites.
+**La convergence demande plusieurs exécutions.** L'indépendance à l'ordre de traitement ne vient pas de la transaction, mais de trois remises à nul décidées d'après l'état lu au début de la phase : les signatures dont l'identifiant a été transféré, les rattachements par nom devenus ambigus, et le recalcul complet des reports entre sources. Un homonyme ou un transfert apparu à une exécution se résout à la suivante ; deux passages suffisent en pratique.
 
-1. **Convergence en plusieurs runs, par resets ciblés.** L'ordre-indépendance ne repose pas sur la transaction mais sur trois resets lus depuis le snapshot (re-null des signatures identifiant après transfert, re-orphelinage des `name` devenus ambigus, recompute intégral des `cross_source`). Un homonyme ou un transfert apparu à un run se résout au suivant : le pipeline `persons` converge en environ deux passes.
-2. **Écritures cross-agrégat depuis la phase et la fusion.** La pose de `person_id` est la responsabilité de l'agrégat, mais la phase et `merge_into` touchent aussi `source_authorships`, `authorships` et `rejected_authorships` — tables de clusters voisins, mutées ici pour garder l'opération atomique.
-3. **`persons_rh` protège l'information RH.** Fiche 1:1 (`person_id` unique) en `ON DELETE RESTRICT` : une personne porteuse d'une fiche RH ne se supprime pas silencieusement. L'invariant de fusion refuse d'absorber deux fiches RH distinctes ; le même garde-fou est répliqué côté file de doublons pour ne pas proposer une fusion que le service refuserait (duplication assumée).
-4. **Statut `authenticated` immuable.** Réservé à l'auto-authentification d'un ORCID par le chercheur, posable par le seul import dédié et jamais dégradable — verrouillé par un trigger Postgres, hors de toute transition applicative.
+**La phase écrit dans des tables voisines.** Poser le rattachement relève des personnes, mais la phase et la fusion touchent aussi les signatures, les authorships et les rejets, pour que l'opération reste atomique.
+
+**La fiche annuaire protège une donnée sensible.** Une personne qui en porte une ne peut pas être supprimée en silence, et la fusion refuse d'en absorber deux distinctes. Le même garde-fou est répété du côté de la file de doublons, pour éviter de proposer une fusion que le service refuserait.
+
+**Le statut d'ORCID authentifié ne se dégrade pas.** Il est réservé au chercheur qui authentifie lui-même son identifiant, ne peut être posé que par l'import dédié, et un déclencheur Postgres interdit toute autre transition.
 
 ## Invariants métier
 
-Portés par le domaine (`domain/persons/`), le SQL et le service.
+**Identités.** `person_identifiers` est unique par `(id_type, id_value)` ; `person_name_forms` par `(name_form, person_id)` ; `distinct_persons` est ordonnée pour qu'une paire ne s'inscrive qu'une fois ; `persons_rh` est en relation de un à un.
 
-- **Identités.** `persons.id` surrogate ; `person_identifiers` a une identité naturelle unique `(id_type, id_value)` ; `person_name_forms` a pour PK `(name_form, person_id)` ; `distinct_persons` est ordonnée (`a < b`) ; `rejected_authorships` a pour clé `(publication, personne)` ; `persons_rh` est 1:1.
-- **Fusion.** Refusée si les deux personnes portent chacune une fiche RH distincte (`can_merge_with`, domaine + `has_distinct_rh`).
-- **Identifiant partagé = corruption.** Un identifiant porté par ≥ 2 positions d'auteur d'un même enregistrement source est suffixé `_dubious` (conservé, réversible, mais invisible au matching).
-- **ORCID comme signal borné.** L'ORCID ne sert de signal de matching que depuis les sources à dépôt auteur (`crossref`, `openalex`, `hal`) ; les ORCID dérivés (WoS, ScanR) sont enregistrés mais pas matchés.
-- **Rejet durable.** Une paire (publication, personne) inscrite dans `rejected_authorships` n'est jamais recréée par le matching, y compris quand l'élimination désambiguïse une forme partagée.
-- **Identifiants canoniques.** `ORCID` (format XXXX-XXXX-XXXX-XXXX), `IdRef` (PPN à 9 caractères), `IdHAL` (slug), `HalPersonId` (entier positif) validés et normalisés par leur VO avant écriture.
+**Fusion.** Refusée quand les deux personnes portent chacune une fiche annuaire distincte.
+
+**Un identifiant partagé signale une corruption de la source.** Un identifiant porté par deux positions d'auteur ou plus d'un même enregistrement source est suffixé `_dubious` : il est conservé, la marque est réversible, mais il ne sert plus au rapprochement.
+
+**L'ORCID n'est un signal que là où l'auteur l'a déposé.** Il ne sert au rapprochement que depuis Crossref, OpenAlex et HAL. Les ORCID venus du Web of Science ou de ScanR sont enregistrés sans être utilisés pour rapprocher.
+
+**Rejet durable.** Une paire publication–personne écartée n'est jamais recréée par le rapprochement, y compris quand ce retrait lève l'ambiguïté d'une forme partagée.
+
+**Identifiants normalisés avant écriture.** ORCID au format à seize chiffres groupés, IdRef à neuf caractères, IdHAL en abrégé littéral, identifiant de compte HAL entier positif : chacun est validé et normalisé par son type dédié.
