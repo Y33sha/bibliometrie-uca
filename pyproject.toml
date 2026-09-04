@@ -436,14 +436,8 @@ exclude = [
     "^alembic/",
 ]
 
-# Désactivation d'`explicit-any`, tenue au plus juste, avec le motif en regard du module :
-#
-#   application.ports.repositories.*_repository     Pydantic
-#   application.ports.read_models.*                 Pydantic ; `value`, `details`, `doaj_payload`
-#   infrastructure.jsonb_models.*                   Pydantic
-#   infrastructure.settings                         Pydantic
-#   interfaces.api.models.*                         Pydantic ; `value`
-#   infrastructure.read_models.publications.facets  facette appelée par son nom (`getattr`)
+# Désactivation d'`explicit-any`, tenue au plus juste : une entrée qui ne couvre plus aucune
+# erreur est retirée, et une entrée de paquet est resserrée sur ses modules.
 #
 # Pydantic : `explicit-any` porte sur la ligne `class X(BaseModel)`, le `Any` en cause vivant
 # dans le corps de `pydantic`. Le taire demande `follow_imports = skip` sur `pydantic`, qui
@@ -452,13 +446,13 @@ exclude = [
 # par l'alias récursif `JsonValue`.
 [[tool.mypy.overrides]]
 module = [
-    "application.ports.repositories.journal_repository",
-    "application.ports.repositories.publisher_repository",
-    "application.ports.repositories.perimeter_repository",
-    "application.ports.read_models.*",
-    "infrastructure.read_models.publications.facets",
-    "infrastructure.jsonb_models.*",
-    "infrastructure.settings",
-    "interfaces.api.models.*",
+    "application.ports.repositories.journal_repository",    # Pydantic
+    "application.ports.repositories.publisher_repository",  # Pydantic
+    "application.ports.repositories.perimeter_repository",  # Pydantic
+    "application.ports.read_models.*",                      # Pydantic ; `value`, `details`, `doaj_payload`
+    "infrastructure.jsonb_models.*",                        # Pydantic
+    "infrastructure.settings",                              # Pydantic
+    "interfaces.api.models.*",                              # Pydantic ; `value`
+    "infrastructure.read_models.publications.facets",       # facette appelée par son nom (`getattr`)
 ]
 disallow_any_explicit = false
