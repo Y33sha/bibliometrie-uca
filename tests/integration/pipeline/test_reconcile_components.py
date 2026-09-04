@@ -541,3 +541,80 @@ class TestExternalDoiCarrier:
             text("SELECT count(*) FROM publications WHERE lower(doi) = '10.70675/abc'")
         ).scalar_one()
         assert n == 1
+
+
+def _distinct_dois(conn, pub_id) -> set[str]:
+    return set(
+        conn.execute(
+            text(
+                "SELECT DISTINCT doi FROM source_publications "
+                "WHERE publication_id = :id AND doi IS NOT NULL"
+            ),
+            {"id": pub_id},
+        ).scalars()
+    )
+
+
+class TestStaleMembership:
+    """Régression : une source_publication rattachée par une clé de confirmation qui disparaît
+    ensuite doit être détachée, pas laissée sur une publication que plus rien ne lui associe.
+
+    Cas typique : une préversion arXiv rejoint la publication tant que l'enregistrement OpenAlex
+    porte le DOI de la préversion, puis la source bascule sur le DOI de la version publiée. Le
+    voisinage 1-hop se calcule sur les clés d'après : la préversion n'y figure dans aucun bras, et
+    seule la propagation de `keys_dirty` aux source_publications co-rattachées la ramène dans la
+    passe. Sans elle, la publication porte deux DOI distincts.
+    """
+
+    PREPRINT_DOI = "10.48550/arxiv.2409.20505"
+    PUBLISHED_DOI = "10.1016/j.tcs.2026.116186"
+
+    def _seed_drifted_pair(self, conn) -> tuple[int, int, int]:
+        """Une publication au DOI de préversion, ses deux SP, et plus aucune clé partagée entre
+        elles : DOI distincts, aucun identifiant commun, titres absents (pas de token bloc)."""
+        pub = _seed_pub(conn, doi=self.PREPRINT_DOI)
+        preprint = _seed_sp(
+            conn,
+            source_id="preprint",
+            publication_id=pub,
+            doi=self.PREPRINT_DOI,
+            doc_type="preprint",
+            keys_dirty=False,
+        )
+        published = _seed_sp(
+            conn,
+            source_id="published",
+            publication_id=pub,
+            doi=self.PUBLISHED_DOI,
+            doc_type="article",
+            keys_dirty=True,
+        )
+        return pub, preprint, published
+
+    def test_siblings_of_a_dirty_source_publication_are_marked(self, sa_sync_conn):
+        """La propagation marque les co-rattachées, et elles seules : ni les SP d'une autre
+        publication, ni les orphelines."""
+        conn = sa_sync_conn
+        _, preprint, _ = self._seed_drifted_pair(conn)
+        other = _seed_sp(conn, source_id="other", publication_id=_seed_pub(conn), keys_dirty=False)
+        orphan = _seed_sp(conn, source_id="orphan", publication_id=None, keys_dirty=False)
+
+        assert _Q.mark_publication_siblings_dirty(conn) == 1
+        assert _sp_state(conn, preprint)[1] is True
+        assert _sp_state(conn, other)[1] is False
+        assert _sp_state(conn, orphan)[1] is False
+
+    def test_source_publication_without_shared_key_is_split_off(self, sa_sync_conn):
+        conn = sa_sync_conn
+        pub, preprint, published = self._seed_drifted_pair(conn)
+
+        reconcile(conn, _Q, publication_repo=publication_repository(conn))
+
+        preprint_pub, preprint_dirty = _sp_state(conn, preprint)
+        published_pub, published_dirty = _sp_state(conn, published)
+        assert preprint_pub != published_pub
+        # Ancre = porteur du DOI : la publication reste à la préversion, dont elle porte le DOI.
+        assert preprint_pub == pub
+        assert (preprint_dirty, published_dirty) == (False, False)
+        assert _distinct_dois(conn, preprint_pub) == {self.PREPRINT_DOI}
+        assert _distinct_dois(conn, published_pub) == {self.PUBLISHED_DOI}

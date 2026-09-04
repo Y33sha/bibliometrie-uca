@@ -8,7 +8,7 @@ Recalcule les composantes connexes du voisinage 1-hop des `source_publications` 
 
 Les `authorships` canoniques sont laissées à la phase `authorships` (`insert_missing` + `prune_orphan`, set-based) — la réconciliation gère l'appartenance des SP et les métadonnées des publications, pas la projection authorships.
 
-Voisinage 1-hop, pas de fermeture transitive : l'invariant *dirty* garantit que toute arête neuve a une extrémité dirty (raisonnement détaillé dans `domain/publications/reconciliation.py`).
+Voisinage 1-hop, pas de fermeture transitive : l'invariant *dirty* garantit que toute arête neuve a une extrémité dirty (raisonnement détaillé dans `domain/publications/reconciliation.py`). La passe s'ouvre sur la propagation de `keys_dirty` aux source_publications co-rattachées à une publication avec une SP dirty, qui clôt le voisinage sur les arêtes **retirées** autant que sur les neuves.
 
 L'orchestrateur dépend du port `PublicationsReconciliationQueries` ; il est appelé par `run_pipeline`.
 """
@@ -91,9 +91,12 @@ def reconcile(
 
     Primitif partagé par le `run` du pipeline (qui commit) et le helper de tests d'intégration (qui rollback en fin de fixture) — d'où l'absence de `commit` ici. `logger` (optionnel) émet la progression : sur un full rerun, le rafraîchissement des survivants domine le temps, d'où le compteur `i/total`.
     """
+    spread = queries.mark_publication_siblings_dirty(conn)
     dirty_ids = queries.fetch_dirty_source_publication_ids(conn)
     if not dirty_ids:
         return None
+    if logger and spread:
+        logger.info("Réconciliation : %d source_publications co-rattachées marquées dirty", spread)
 
     if logger:
         logger.info(

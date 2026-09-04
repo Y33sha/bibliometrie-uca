@@ -76,6 +76,22 @@ _UNIVERSE_SQL = text(f"""
 """)
 
 
+# Clôture du voisinage sur l'appartenance déjà matérialisée : les `source_publications` rattachées
+# à la même publication qu'une SP dirty deviennent dirty à leur tour. Le voisinage 1-hop est calculé
+# sur les clés **d'après** ; une SP rattachée par une clé qui vient de disparaître n'y figure plus et
+# resterait sur sa publication sans être réexaminée. Marquer ces voisines plutôt que les injecter
+# directement dans l'univers leur donne leur propre 1-hop, donc un rattachement correct (à la
+# publication de leurs vraies voisines) plutôt qu'une publication neuve en doublon.
+_SPREAD_TO_SIBLINGS_SQL = text("""
+    UPDATE source_publications SET keys_dirty = true
+    WHERE NOT keys_dirty
+      AND publication_id IN (
+          SELECT publication_id FROM source_publications
+          WHERE keys_dirty AND publication_id IS NOT NULL
+      )
+""")
+
+
 def mark_keys_dirty(conn: Connection, where: str | None = None, *, dry_run: bool = False) -> int:
     """Pose `keys_dirty = true` sur les source_publications — toutes, ou le sous-ensemble `where`.
 
@@ -96,6 +112,9 @@ class PgPublicationsReconciliationQueries(PublicationsReconciliationQueries):
 
     def mark_keys_dirty(self, conn: Connection) -> int:
         return mark_keys_dirty(conn)
+
+    def mark_publication_siblings_dirty(self, conn: Connection) -> int:
+        return conn.execute(_SPREAD_TO_SIBLINGS_SQL).rowcount
 
     def fetch_dirty_source_publication_ids(self, conn: Connection) -> list[int]:
         # Orphelins **compris** : la réconciliation est aussi l'assignation (un orphelin dirty
