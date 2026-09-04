@@ -410,6 +410,10 @@ exclude_lines = [
 # Version des images de production (cf. `scripts/versions-des-images.sh`) : le typage se
 # vérifie sur la sémantique de l'interpréteur qui exécute, non sur un plancher de compatibilité.
 python_version = "3.14"
+# Système des images de production, pour la même raison. Sans cette ligne, mypy analyse pour la
+# plateforme qui le lance : depuis un poste Windows, il rejette les appels POSIX que le code
+# exécute en production (`signal.SIGKILL`).
+platform = "linux"
 plugins = ["pydantic.mypy"]
 # Imports : ignorer les libs tierces non typées plutôt que de polluer
 ignore_missing_imports = true
