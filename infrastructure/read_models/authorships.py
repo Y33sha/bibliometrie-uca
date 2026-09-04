@@ -1,7 +1,5 @@
 """Query service : lectures des signatures servies par les routes `/api/authorships/*`."""
 
-from typing import Any
-
 from sqlalchemy import Connection, text
 
 from application.ports.read_models.authorships_queries import (
@@ -45,7 +43,7 @@ class PgAuthorshipsQueries(AuthorshipsQueries):
     ) -> OrphanAuthorshipsResponse:
         offset = (page - 1) * per_page
         search_cond = ""
-        binds: dict[str, Any] = {}
+        binds: dict[str, object] = {}
         if search.strip():
             binds["search_pat"] = f"%{search.strip()}%"
             search_cond = (

@@ -3,8 +3,6 @@
 Appelé par `application/pipeline/metadata_correction/`. Implémente le port `application.ports.pipeline.metadata_correction.MetadataCorrectionQueries`.
 """
 
-from typing import Any
-
 from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
@@ -75,7 +73,7 @@ assert _CORRECTABLE_COLUMNS <= {c.name for c in source_publications.c}, (
 
 def _persist_updates(
     conn: Connection,
-    rows: list[dict[str, Any]],
+    rows: list[dict[str, object]],
     *,
     set_columns: tuple[str, ...],
     jsonb_params: tuple[str, ...] = (),

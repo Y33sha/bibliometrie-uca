@@ -1,7 +1,5 @@
 """Query services pour `/api/addresses/*`."""
 
-from typing import Any
-
 from sqlalchemy import Connection, text
 
 from application.ports.read_models._common import FacetOption
@@ -27,13 +25,13 @@ _RECOGNIZED_LINK = (
 
 def _countries_where(
     filters: AddressCountriesFilters, *, with_country_code: bool, extra: str | None = None
-) -> tuple[str, dict[str, Any]]:
+) -> tuple[str, dict[str, object]]:
     """Clause WHERE partagée par la liste des adresses à attribuer et ses deux facettes.
 
     `with_country_code=False` retire le filtre pays de la clause : c'est la dimension que la facette pays écarte pour compter ses options (comptes exclusifs, comme les autres facettes). `extra` ajoute une condition finale de présence (`a.countries` ou `a.suggested_countries` selon la requête).
     """
     parts: list[str] = []
-    binds: dict[str, Any] = {}
+    binds: dict[str, object] = {}
     if filters.search:
         parts.append("unaccent(a.raw_text) ILIKE unaccent(:search)")
         binds["search"] = f"%{filters.search}%"
@@ -93,7 +91,7 @@ class PgAddressesQueries(AddressesQueries):
         use_inner_join = filters.detected == "yes"
 
         parts: list[str] = []
-        binds: dict[str, Any] = {"sid": structure_id}
+        binds: dict[str, object] = {"sid": structure_id}
 
         if filters.detected == "yes":
             parts.append("ast_filter.matched_form_id IS NOT NULL")

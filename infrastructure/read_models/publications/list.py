@@ -4,9 +4,9 @@ import csv
 import json
 import logging
 from collections.abc import Iterable, Iterator, Sequence
-from typing import Any, cast
+from typing import cast
 
-from sqlalchemy import Connection, text
+from sqlalchemy import Connection, Row, text
 
 from application.ports.read_models.publications_queries import (
     EXPORT_COLUMNS,
@@ -107,7 +107,7 @@ def _hal_status_clause(conn: Connection, filters: PublicationFilters) -> WhereCl
 
 def _build_list_clauses(
     conn: Connection, filters: PublicationFilters, perimeter_structure_ids: list[int]
-) -> tuple[str, dict[str, Any]]:
+) -> tuple[str, dict[str, object]]:
     """Construit le WHERE complet pour list_publications."""
     clauses: list[WhereClause | None] = list(_initial_clauses(filters))
     clauses.extend(_inline_clauses(filters))
@@ -384,7 +384,9 @@ _BOM = "\ufeff"
 MAX_EXPORT_ROWS = 500_000
 
 
-def _cap_export_rows(rows: Sequence[Any], cap: int) -> tuple[Sequence[Any], bool]:
+def _cap_export_rows(
+    rows: Sequence[Row[tuple[object, ...]]], cap: int
+) -> tuple[Sequence[Row[tuple[object, ...]]], bool]:
     """Rend les lignes ramenées au plafond, et si la coupe a eu lieu.
 
     Les requêtes demandent une ligne de plus que le plafond : sa présence signale le dépassement sans qu'un `COUNT` séparé soit nécessaire. La coupe suit le tri demandé, appliqué avant elle en base.
@@ -494,7 +496,7 @@ def export_publications_csv(
 
 
 def _publication_lines(
-    rows: Sequence[Any], emitted: list[tuple[str, str]], *, truncated: bool
+    rows: Sequence[Row[tuple[object, ...]]], emitted: list[tuple[str, str]], *, truncated: bool
 ) -> Iterator[str]:
     """Lignes CSV de l'export des publications, en-tête comprise."""
     writer = _CsvWriter()
@@ -530,7 +532,7 @@ def _publication_lines(
         yield writer.truncation_notice(MAX_EXPORT_ROWS)
 
 
-def _build_theses_export_clauses(filters: PublicationFilters) -> tuple[str, dict[str, Any]]:
+def _build_theses_export_clauses(filters: PublicationFilters) -> tuple[str, dict[str, object]]:
     """Conditions WHERE pour l'export CSV des thèses.
 
     Spécifique à la page thèses : `source_clause` canonique (4 sources) + filtre `access` (open/closed, facette primaire) + `oa_clause`.
@@ -599,7 +601,7 @@ def export_theses_csv(
     return _chunked(_these_lines(rows, truncated=truncated))
 
 
-def _these_lines(rows: Sequence[Any], *, truncated: bool) -> Iterator[str]:
+def _these_lines(rows: Sequence[Row[tuple[object, ...]]], *, truncated: bool) -> Iterator[str]:
     """Lignes CSV de l'export des thèses, en-tête comprise."""
     writer = _CsvWriter()
     yield _BOM + writer.line(

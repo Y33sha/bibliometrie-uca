@@ -1,8 +1,6 @@
 """Query services pour les éditeurs (table `publishers`)."""
 
-from typing import Any
-
-from sqlalchemy import Connection, text
+from sqlalchemy import Connection, Row, text
 
 from application.ports.read_models._common import FacetOption
 from application.ports.read_models.publishers_queries import (
@@ -30,12 +28,12 @@ def _build_publisher_where(
     *,
     skip_publisher_types: bool = False,
     skip_countries: bool = False,
-) -> tuple[str, dict[str, Any]]:
+) -> tuple[str, dict[str, object]]:
     """Construit la clause WHERE pour `list_publishers` et `publishers_facets`.
 
     Les flags `skip_*` permettent à chaque facette d'exclure sa propre dimension du filtrage — convention « comptes exclusifs » identique à celle des facettes journals/publications.
     """
-    binds: dict[str, Any] = {}
+    binds: dict[str, object] = {}
     parts: list[str] = []
     if filters.search and len(filters.search) >= 2:
         normalized = normalize_text(filters.search)
@@ -91,7 +89,7 @@ _PUBLISHER_LIST_COLUMNS = """
 _PUBLISHER_DETAIL_COLUMNS = f"{_PUBLISHER_LIST_COLUMNS},\n    {_doi_prefixes_sql()} AS doi_prefixes"
 
 
-def _row_to_list_item(row: Any) -> PublisherListItem:
+def _row_to_list_item(row: Row[tuple[object, ...]]) -> PublisherListItem:
     return PublisherListItem(
         id=row.id,
         name=row.name,
@@ -103,7 +101,7 @@ def _row_to_list_item(row: Any) -> PublisherListItem:
     )
 
 
-def _row_to_publisher(row: Any) -> Publisher:
+def _row_to_publisher(row: Row[tuple[object, ...]]) -> Publisher:
     return Publisher(
         id=row.id,
         name=row.name,

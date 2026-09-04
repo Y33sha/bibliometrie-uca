@@ -1,8 +1,6 @@
 """Liste des personnes + autocomplete + lecture d'une personne (sync)."""
 
-from typing import Any
-
-from sqlalchemy import Connection, text
+from sqlalchemy import Connection, Row, text
 
 from application.ports.read_models.persons_queries import (
     NameFormSummaryOut,
@@ -152,7 +150,7 @@ def list_persons(
     return PersonListResponse(total=total, page=page, per_page=per_page, persons=persons)
 
 
-def _person_out(row: Any, identifiers: list[PersonIdentifierOut]) -> PersonOut:
+def _person_out(row: Row[tuple[object, ...]], identifiers: list[PersonIdentifierOut]) -> PersonOut:
     """`PersonOut` d'une ligne de la projection commune à la liste et à `person_curation`."""
     return PersonOut(
         id=row.id,

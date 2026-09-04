@@ -5,7 +5,6 @@ Chaque `*_clause(...)` retourne un `WhereClause | None`, composable via `assembl
 
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Any
 
 from domain.normalize import normalize_text
 from domain.persons.identifiers import PUBLIC_PERSON_IDENTIFIER_TYPES, AttributionStatus
@@ -105,10 +104,10 @@ class WhereClause:
     """
 
     sql: str
-    binds: dict[str, Any]
+    binds: dict[str, object]
 
 
-def assemble_where(clauses: list[WhereClause | None]) -> tuple[str, dict[str, Any]]:
+def assemble_where(clauses: list[WhereClause | None]) -> tuple[str, dict[str, object]]:
     """Assemble les fragments en un `WHERE ...` SQL + dict de binds.
 
     Retourne `("TRUE", {})` si aucune clause valide, ce qui permet au
@@ -118,7 +117,7 @@ def assemble_where(clauses: list[WhereClause | None]) -> tuple[str, dict[str, An
     if not valid:
         return "TRUE", {}
     sql = " AND ".join(c.sql for c in valid)
-    binds: dict[str, Any] = {}
+    binds: dict[str, object] = {}
     for c in valid:
         binds.update(c.binds)
     return sql, binds
@@ -164,7 +163,7 @@ def access_clause(access: list[str]) -> WhereClause | None:
     if not statuses and not include_null:
         return None
     conditions: list[str] = []
-    binds: dict[str, Any] = {}
+    binds: dict[str, object] = {}
     if statuses:
         conditions.append("p.oa_status::text = ANY(:flt_access_statuses)")
         binds["flt_access_statuses"] = sorted(statuses)
@@ -253,7 +252,7 @@ def person_clause(person_id: int) -> WhereClause:
 
 
 def _person_toggle_clause(
-    values: list[str], exists_sql: str, binds: dict[str, Any]
+    values: list[str], exists_sql: str, binds: dict[str, object]
 ) -> WhereClause | None:
     """Facette binaire `yes`/`no` sur un prédicat EXISTS lié à une personne.
 
@@ -338,7 +337,7 @@ def hal_status_clause(values: list[str], lab_hal_col: str | None) -> WhereClause
                 needs_collection = True
     if not parts:
         return None
-    binds: dict[str, Any] = {"flt_hal_collection": lab_hal_col} if needs_collection else {}
+    binds: dict[str, object] = {"flt_hal_collection": lab_hal_col} if needs_collection else {}
     if len(parts) == 1:
         return WhereClause(parts[0], binds)
     return WhereClause("(" + " OR ".join(parts) + ")", binds)
@@ -402,7 +401,7 @@ def apc_clause(
             needs_lab = True
     if not parts:
         return None
-    binds: dict[str, Any] = {}
+    binds: dict[str, object] = {}
     if needs_root:
         binds["flt_apc_root_ids"] = perimeter_structure_ids
     if needs_lab:

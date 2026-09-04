@@ -20,7 +20,7 @@ from domain.persons.matching import (
 from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE
 
 
-def _to_bare(r: Row) -> BareUnlinkedAuthorship:
+def _to_bare(r: Row[tuple[object, ...]]) -> BareUnlinkedAuthorship:
     """Mappe une ligne SQL (projection partagée) vers `BareUnlinkedAuthorship`."""
     return BareUnlinkedAuthorship(
         authorship_id=r.authorship_id,

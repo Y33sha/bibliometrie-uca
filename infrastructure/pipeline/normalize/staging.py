@@ -6,6 +6,7 @@ La table `staging` stocke les raw_data téléchargées par les extracteurs, avec
 """
 
 import logging
+from collections.abc import Mapping
 
 from sqlalchemy import Connection, Row, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
@@ -14,6 +15,7 @@ from application.ports.pipeline.normalize.staging import (
     StagingQueries,
     StagingRow,
 )
+from domain.types import JsonValue
 from infrastructure.pipeline.change_detection import canonical_json_bytes, change_detection_hash
 from infrastructure.raw_store import RawStore, get_raw_store
 
@@ -73,7 +75,9 @@ _REHYDRATE_UPSERT_SQL = text(
 ).bindparams(bindparam("raw_data", type_=JSONB))
 
 
-def rehydrate_staging_row(conn: Connection, source: str, source_id: str, raw_data: dict) -> bool:
+def rehydrate_staging_row(
+    conn: Connection, source: str, source_id: str, raw_data: Mapping[str, JsonValue]
+) -> bool:
     """Réinjecte un payload archivé dans une ligne `staging` existante, prête à renormaliser.
 
     Inverse de `mark_done` : repose `raw_data`, recalcule `raw_hash` (`change_detection_hash`, même empreinte que l'UPSERT d'extraction, pour qu'une ligne réhydratée ne re-diverge pas au moissonnage suivant) et remet `processed = FALSE`. Ne touche que les lignes déjà présentes : retourne `False` si `(source, source_id)` est absent (clé orpheline au raw store).
@@ -93,7 +97,11 @@ def rehydrate_staging_row(conn: Connection, source: str, source_id: str, raw_dat
 
 
 def rehydrate_or_create_staging_row(
-    conn: Connection, source: str, source_id: str, doi: str | None, raw_data: dict
+    conn: Connection,
+    source: str,
+    source_id: str,
+    doi: str | None,
+    raw_data: Mapping[str, JsonValue],
 ) -> bool:
     """Réhydrate une ligne `staging`, en la créant si elle manque (après un `TRUNCATE staging`, où tout est orphelin).
 

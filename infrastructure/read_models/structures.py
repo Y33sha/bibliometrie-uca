@@ -1,8 +1,6 @@
 """Query services pour /api/structures/* (structures et leurs formes de nom)."""
 
-from typing import Any
-
-from sqlalchemy import Connection, text
+from sqlalchemy import Connection, Row, text
 
 from application.ports.read_models._common import DashboardOa, PubYearCount
 from application.ports.read_models.structures_queries import (
@@ -49,9 +47,9 @@ _AUTHORED_PUBLICATION = f"""
 
 def _list_structures_sql(
     *, types: list[str], search: str, perimeter_ids: list[int] | None
-) -> tuple[str, dict[str, Any]]:
+) -> tuple[str, dict[str, object]]:
     parts: list[str] = []
-    binds: dict[str, Any] = {}
+    binds: dict[str, object] = {}
     if types:
         parts.append("s.structure_type::text = ANY(:types)")
         binds["types"] = types
@@ -89,7 +87,7 @@ def _list_structures_sql(
     return sql, binds
 
 
-def _related_from_row(row: Any) -> RelatedStructureOut:
+def _related_from_row(row: Row[tuple[object, ...]]) -> RelatedStructureOut:
     return RelatedStructureOut(
         id=row.id,
         code=row.code,
@@ -101,7 +99,7 @@ def _related_from_row(row: Any) -> RelatedStructureOut:
     )
 
 
-def _name_form_from_row(row: Any) -> NameFormOut:
+def _name_form_from_row(row: Row[tuple[object, ...]]) -> NameFormOut:
     return NameFormOut(
         id=row.id,
         structure_id=row.structure_id,

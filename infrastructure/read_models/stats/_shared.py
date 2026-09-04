@@ -1,7 +1,5 @@
 """Helpers partagés par les agrégats stats : périmètre de base, assemblage des filtres, filtre APC."""
 
-from typing import Any
-
 from application.ports.read_models.stats_queries import StatsFilters
 from infrastructure.read_models.filters import (
     PUBLICATION_IS_IN_PERIMETER,
@@ -93,7 +91,7 @@ def stats_apc_clause(has_apc: list[str], perimeter_structure_ids: list[int]) -> 
             )
     if not parts:
         return None
-    binds: dict[str, Any] = {"apc_root_ids": perimeter_structure_ids} if needs_root else {}
+    binds: dict[str, object] = {"apc_root_ids": perimeter_structure_ids} if needs_root else {}
     if len(parts) == 1:
         return WhereClause(parts[0], binds)
     return WhereClause("(" + " OR ".join(parts) + ")", binds)
