@@ -1,73 +1,65 @@
 # Source_publications — cycle de vie
 
-*À jour le 2026-07-14.*
+*À jour le 2026-09-04.*
 
-Une `source_publication` est l'image d'un document dans **une** source externe (HAL, OpenAlex, WoS, ScanR, theses.fr, CrossRef, DataCite), avant fusion dans la publication canonique. C'est la couche par-source du corpus (`domain/source_publications/`). Elle naît d'un import 1:1 : la phase `normalize` transforme le brut de `staging` en une ligne par `(source, source_id)`. Le domaine porte l'entité `SourcePublication` (lecture seule), les clés de confirmation (`ConfirmationKeys`) qui pilotent la déduplication, les règles de correction de métadonnées, le mapping des `doc_type` et le sidecar de réversibilité `raw_metadata`.
+Un enregistrement source est l'image d'un document dans **une** source — HAL, OpenAlex, Web of Science, ScanR, theses.fr, Crossref, DataCite — avant toute fusion. C'est la couche qui garde ce que chaque source a dit, une ligne par couple source et identifiant dans cette source. Elle naît d'un import direct : la phase `normalize` transforme les données brutes déposées dans `staging` en enregistrements typés. Le pipeline seul y écrit ; l'API ne fait que les lire.
 
-## Tables du cluster
+`domain/source_publications/` porte les clés qui pilotent le dédoublonnage, les règles de correction de métadonnées, la correspondance entre les nomenclatures de type de document, et la conservation des valeurs d'origine.
 
-| Table | Rôle | Colonnes clés |
+## Tables
+
+| Table | Rôle | Colonnes notables |
 |---|---|---|
-| `source_publications` | Image d'un document dans une source | `(source, source_id)` (identité naturelle), `publication_id` (→ canonique, posé par la phase `publications`), `doi`, `doc_type`, `external_ids` (JSONB), `title_normalized`, `raw_metadata` (sidecar correction), `meta` (sidecar source), `keys_dirty` |
-| `source_authorships` | Signature d'auteur par source | `source_publication_id`, `identity_id` (→ `author_identifying_keys`), `person_id`, `authorship_id`, `author_position`, `roles`, `in_perimeter`, `resolution_mode` |
-| `author_identifying_keys` | Identité d'auteur dédupliquée | `author_name_normalized` + `person_identifiers` (JSONB), `key_hash` (généré, unique) |
-| `source_authorship_addresses` | Signature ↔ adresse | `source_authorship_id`, `address_id` |
-| `source_authorship_structures` | Signature ↔ structure UCA (matview) | dérivée `addresses` → `address_structures` → `perimeter_structures` |
+| `source_publications` | Image d'un document dans une source | `(source, source_id)`, `publication_id`, `doi`, `doc_type`, `external_ids`, `title_normalized`, `raw_metadata`, `meta`, `keys_dirty` |
+| `source_authorships` | Signature d'auteur pour cette source | `source_publication_id`, `identity_id`, `person_id`, `authorship_id`, `author_position`, `roles`, `in_perimeter`, `resolution_mode` |
+| `author_identifying_keys` | Identité d'auteur dédoublonnée | `author_name_normalized`, `person_identifiers`, `key_hash` |
+| `source_authorship_addresses` | Lien entre une signature et ses adresses | `source_authorship_id`, `address_id` |
+| `source_authorship_structures` | Vue matérialisée : signature ↔ structure du périmètre | dérivée des adresses, de leurs rattachements et du périmètre |
 
-En amont : `staging.raw_data` (le brut moissonné, porteur de `raw_hash`). En aval : `publications` (via `publication_id`). `source_authorships` est le pivot vers les agrégats [personnes](persons.md) et authorships ; ce bilan le couvre comme satellite écrit par `normalize`, sa consolidation en `authorships` relève du bilan authorships.
+En amont se trouve `staging.raw_data`, qui conserve les données moissonnées et leur empreinte. En aval, `publications` reçoit le résultat de la fusion. Les signatures ont leur propre fiche, [source_authorships](source_authorships.md), et leur consolidation relève d'[authorships](authorships.md).
 
-## Les deux axes
+## Écriture par le pipeline
 
-L'écriture est **exclusivement pipeline** ; la lecture nourrit le canonique, la dédup et l'API.
+Une seule phase crée ces lignes, `normalize`, et une seule autre modifie leurs colonnes typées, `metadata_correction`.
 
-```mermaid
-flowchart LR
-    CI[cross_imports / refresh_stale] -->|rows| STG[(staging.raw_data)]
-    STG -->|normalize| SP[source_publications]
-    STG -->|normalize| SA[source_authorships + author_identifying_keys]
-    MC[metadata_correction] -->|doc_type / oa_status / doi / journal_id + raw_metadata| SP
-    SP -->|refresh_from_sources : agrégation SOURCE_PRIORITY| PUB[(publications)]
-    SP -->|ConfirmationKeys → composantes connexes| PUB
-    SP -->|topics par source| SUBJ[(subjects)]
-    SA -->|consolidation| AUTH[(authorships)]
-    SP --> API[détail publication : provenance par source]
-```
+**`normalize`.** Chaque ligne de `staging` non encore traitée devient un enregistrement, inséré ou mis à jour sur son couple source et identifiant. Les sources sont traitées de la plus fiable à la moins fiable, les suivantes complétant les champs vides sans écraser ce qui est déjà là. Aux colonnes communes — identité, titre, type de document, DOI, identifiants externes, revue, statut d'accès, langue — s'ajoutent des champs propres à chaque source : résumé, mots-clés, thématiques, données bibliographiques, adresses en ligne, collections HAL, embargo, nombre de citations, rétractation.
 
-## Écriture — pipeline
+Lors d'un réimport, le rattachement à la publication est préservé, les identifiants externes sont réunis, le DOI est conservé et le type de document cède la place au plus récent. La normalisation des identifiants et le calcul du titre normalisé ont lieu à la lecture de la source, pas en SQL.
 
-Le producteur de la couche est unique : la phase `normalize`. Un seul autre mutateur de ses colonnes typées : `metadata_correction`.
+`normalize` écrit aussi les tables satellites : les signatures sont réécrites en bloc, les identités d'auteur dédoublonnées, les adresses créées au besoin et reliées aux signatures. La vue matérialisée reliant signatures et structures, elle, est produite par la phase `affiliations`.
 
-- **`normalize`** (`application/pipeline/normalize/`) transforme chaque ligne `staging` (`processed=FALSE`) en un UPSERT `ON CONFLICT (source, source_id)`. Les sources sont traitées par `SOURCE_PRIORITY` (la plus fiable d'abord, les suivantes ne clobbent pas via les `COALESCE`). Colonnes communes (identité, titre, `title_normalized`, `doc_type`, `doi`, `external_ids`, `journal_id`, `oa_status`, `language`, `container_title`) plus des extras par source (`abstract`, `keywords`, `topics`, `biblio`, `urls`, `hal_collections`, `embargo_until`, `cited_by_count`, `is_retracted`, `meta`). Au ré-UPSERT : `publication_id` jamais clobbé, `external_ids` mergé, `doi` préservé, `doc_type` préférant le neuf. La normalisation d'identifiants (`clean_doi`, `normalize_nnt`…) et le calcul de `title_normalized` se font à l'étape de parsing / adapter, pas en SQL.
-- **Satellites de `normalize`** : `source_authorships` en clear+insert (theses en UPSERT unitaire), `author_identifying_keys` en upsert dédupliqué (identité factorisée nom + identifiants, GC des orphelines en fin de phase), `addresses` en upsert (pays propagés sans écrasement), pivot `source_authorship_addresses`. Le matview `source_authorship_structures` est produit ailleurs (phase `affiliations`).
-- **`metadata_correction`** (`application/pipeline/metadata_correction/`) : trois sous-étapes, chacune dans sa transaction, dans l'ordre `journal_by_doi` → unaire → cluster. Mute les colonnes typées (`journal_id`, `doc_type`, `oa_status`, `external_ids`, `doi`) et stashe le brut d'origine dans `raw_metadata` sous des clés disjointes. Idempotente et auto-cicatrisante : chaque passe repart du brut reconstruit (`hydrate_raw_view`). Chaque mutation pose `keys_dirty=true` pour re-déclencher la réconciliation.
-- **`cross_imports` / `refresh_stale`** s'exécutent **avant** `normalize` et n'écrivent pas la couche source : ils alimentent `staging` (nouvelles lignes cross-source, rafraîchissement des documents stale), que `normalize` consomme au même run. L'idempotence tient à `raw_hash` — colonne de `staging`, pas de `source_publications` : un hash inchangé laisse la ligne `processed`, un hash changé la repasse en `processed=FALSE` et `normalize` met à jour la **même** ligne `source_publications`.
+**`metadata_correction`.** Trois sous-étapes, chacune dans sa transaction : rattachement à une revue par préfixe de DOI, corrections portant sur un enregistrement isolé, puis corrections portant sur un groupe. Elles modifient les colonnes typées et conservent la valeur d'origine dans `raw_metadata`, sous des clés qui ne se recouvrent pas. Chaque passage repart des données brutes reconstituées, si bien qu'il se rejoue sans dommage et rattrape une correction devenue caduque. Toute modification pose `keys_dirty`, ce qui remet l'enregistrement dans la file de regroupement.
 
-## Écriture — API
+**`cross_imports` et `refresh_stale`** s'exécutent avant `normalize` et n'écrivent pas cette couche : elles alimentent `staging`, que `normalize` consomme dans le même passage. La reprise sans doublon tient à l'empreinte des données brutes, portée par `staging` : une empreinte inchangée laisse la ligne traitée, une empreinte différente la remet en file et `normalize` met à jour le **même** enregistrement.
 
-**Aucune.** Les images source sont une trace inviolable des sources : l'entité `SourcePublication` est frozen et lecture seule, jamais persistée via l'objet. La correction de métadonnées est une règle de pipeline (`metadata_correction`), pas une édition manuelle ; la curation admin porte sur le canonique (publication, journals), pas sur les images par-source.
+## Écriture par l'API
 
-## Lecture — pipeline
+**Aucune.** Ces enregistrements sont la trace de ce que les sources ont fourni : rien ne les édite à la main. Une métadonnée fausse se corrige par une règle de `metadata_correction`, et la curation porte sur la publication canonique ou sur les revues.
 
-- **Agrégation canonique** — `refresh_from_sources` (`application/services/publications/core.py`) lit **toutes** les `source_publications` d'une publication (recalcul complet, pas de `COALESCE` incrémental) et délègue l'arbitrage à `domain/publications/aggregation.py`. Champ par champ : scalaires en premier non-null par `SOURCE_PRIORITY` ; `doc_type` avec préférence au sous-type d'article précis d'une source moins prioritaire sur le `journal-article` générique CrossRef ; `oa_status` = statut le plus ouvert (`best_oa_status`, garde Unpaywall) ; listes en union dédupliquée. Les valeurs lues sont **déjà corrigées** (colonnes nues). Une correction journal-dépendante est rejouée sur le canonique quand `doc_type` et `journal_id` sont arbitrés depuis deux sources différentes.
-- **Déduplication** — `project_confirmation_keys` projette chaque `source_publication` dirty en tokens `(type, valeur)` ; `connected_components` relie les images partageant un token ; le primitif unifié `plan_reconciliation` (`domain/publications/reconciliation.py`) tranche match / create / merge / split et repointe les `publication_id`. L'univers de voisinage a un miroir SQL (`publications_reconciliation.py`) qui ré-encode les mêmes clés.
-- **Autres consommateurs** : `subjects` lit les `topics` par source (préserve l'attribution) ; `authorships` consolide `source_authorships` en table de liaison (`author_position` de la source prioritaire, `is_corresponding`/`in_perimeter` en `bool_or`, `roles` en union) ; la cascade `persons` lit les `source_authorships` in-périmètre.
+## Lecture par le pipeline
 
-## Lecture — API
+**Fusion en publication canonique.** `refresh_from_sources` lit tous les enregistrements d'une publication et recalcule son état en entier. Champ par champ : première valeur non nulle selon le classement des sources ; pour le type de document, un sous-type d'article précis venu d'une source moins fiable l'emporte sur le type générique de Crossref ; pour l'accès, le statut le plus ouvert ; pour les listes, leur réunion dédoublonnée. Les valeurs lues sont déjà corrigées.
 
-Le détail d'une publication expose la **provenance par source** : la liste des `source_publications` (avec un drapeau `is_secondary` pour les formes convergées), les auteurs de l'import le plus récent par source, et les identifiants externes agrégés depuis `external_ids`. Aucune page ne liste les images source pour elles-mêmes : elles apparaissent comme la traçabilité d'une publication canonique.
+**Regroupement des doublons.** Chaque enregistrement marqué à retraiter est projeté en jetons de confirmation, les enregistrements partageant un jeton sont reliés, et le plan de réconciliation décide s'il faut rapprocher, créer, réunir ou séparer, puis repointe les rattachements.
+
+**Autres lectures.** La phase `subjects` lit les thématiques source par source, en conservant leur provenance ; la phase `authorships` consolide les signatures ; la phase `persons` lit les signatures du périmètre.
+
+## Lecture par l'API
+
+Le détail d'une publication montre sa **provenance** : la liste de ses enregistrements source, les auteurs de l'import le plus récent pour chaque source, et les identifiants externes réunis. Aucune page ne présente ces enregistrements pour eux-mêmes — ils apparaissent comme la traçabilité d'une publication.
 
 ## Points d'attention
 
-**Le miroir SQL de la réconciliation duplique les types de clés.** L'univers de voisinage 1-hop (`publications_reconciliation`) ré-encode en branches `UNION` les mêmes types de clés que `keys.py` (DOI, NNT, PMID, HAL ID, token `metadata_block`) : duplication par nécessité — le voisinage se calcule côté base, et `keys.py` reste l'unique définition Python des clés.
-
-La taxonomie `doc_type` est répartie proprement : vocabulaire canonique (enum, `ARTICLE_SUBTYPES`, familles) dans `domain/publications/doc_types.py`, mapping des nomenclatures sources dans `domain/source_publications/doc_types.py`. Le `CASE` de ventilation du pivot est rendu côté infrastructure.
+**Les types de clés de dédoublonnage sont écrits à deux endroits.** Le calcul du voisinage se fait dans la base, ce qui oblige `publications_reconciliation.py` à réencoder en SQL les mêmes types de clés que la définition Python — DOI, numéro national de thèse, PMID, identifiant HAL, jeton de métadonnées. Cette dernière reste la référence ; les deux doivent être modifiées ensemble.
 
 ## Invariants métier
 
-Portés par le domaine (`domain/source_publications/`), le SQL et les phases.
+**Identités.** Un enregistrement est identifié par sa source et son identifiant dans cette source ; une identité d'auteur par son nom normalisé et ses identifiants. Un réimport met à jour la même ligne.
 
-- **Identités.** `source_publications` a pour identité naturelle `(source, source_id)` (`id` surrogate) ; `author_identifying_keys` est unique sur `(author_name_normalized, person_identifiers)` via `key_hash`. Un ré-import met à jour la même ligne.
-- **Trace inviolable des sources.** Une `source_publication` n'est jamais éditée à la main : seul le pipeline l'écrit (`normalize` puis `metadata_correction`). L'entité de domaine est frozen, lecture seule.
-- **Réversibilité des corrections.** Toute correction stashe la valeur source d'origine dans `raw_metadata` ; `effective_metadata` repart toujours du brut reconstruit — idempotente, auto-cicatrisante.
-- **Clés de confirmation.** `keys.py` est l'unique définition Python des clés de déduplication ; le `doc_type` dans le token impose l'égalité de type, sous garde de longueur minimale de titre.
-- **Non-matérialisé = détaché.** Une œuvre canonique orpheline, hors périmètre, ou de `doc_type` hors scope (`OUT_OF_SCOPE_DOC_TYPES`) n'a pas de ligne `publications` ; ses `source_publications` subsistent, détachées (`publication_id` nul), sans générer d'authorship ni de personne.
+**Trace des sources.** Un enregistrement source n'est écrit que par le pipeline, `normalize` puis `metadata_correction`. L'objet de domaine correspondant est immuable et ne sert qu'à la lecture.
+
+**Corrections réversibles.** Toute correction conserve la valeur d'origine dans `raw_metadata`, et chaque passage repart des données brutes reconstituées.
+
+**Clés de confirmation.** La définition Python des clés de dédoublonnage fait autorité. Le type de document entre dans le jeton, ce qui impose que deux documents rapprochés soient de même type, sous réserve d'un titre assez long.
+
+**Sans publication canonique, l'enregistrement subsiste détaché.** Une publication qu'aucune source n'atteste, hors périmètre, ou dont le type de document est exclu, n'existe pas ; ses enregistrements source restent en base, sans rattachement, et ne produisent ni authorship ni personne.
