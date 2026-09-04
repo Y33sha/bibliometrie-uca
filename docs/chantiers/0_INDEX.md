@@ -13,6 +13,7 @@
 ### Non commencé
 
 - [Pagination par curseur](CODE_pagination-par-curseur.md)
+- [Pays des adresses : candidats et résolution](DATA_pays-des-adresses.md)
 - [Qualité et cohérence des sujets](METIER_sujets-qualite.md)
 - [Signatures institutionnelles](METIER_signatures-institutionnelles.md)
 
