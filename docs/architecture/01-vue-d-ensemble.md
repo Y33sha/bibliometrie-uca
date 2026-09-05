@@ -83,7 +83,7 @@ Chaque règle est vérifiée par un contrat `import-linter`, déclaré dans `pyp
 
 - [`domain/`](02-domain.md) — entités et logique métier
 - [`application/`](03-application.md) — services, orchestrateurs, injection des dépendances
-- [`infrastructure/`](04-infrastructure.md) — adaptateurs sortants, discipline transactionnelle
+- [`infrastructure/`](04-infrastructure.md) — adaptateurs sortants, transactions
 - [`interfaces/`](05-interfaces.md) — adaptateurs entrants
 - [Composition roots](06-composition-roots.md) — instanciation et câblage des adaptateurs
 - [Tests](07-tests.md) — tests unitaires, tests d'intégration, couverture
