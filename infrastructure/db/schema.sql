@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict hSnsj5nQPa7VZUqA79dvVzmASIeXH9XmOJTiZt7MXkdUDdQHr8LscrwW02h2vQ5
+\restrict rEAUBTNWJPb6OPdftmht1gNeWoyhdwyEsHI1NPvg7YU7SzT0tvTl3gEntOzr7hE
 
 -- Dumped from database version 18.4
 -- Dumped by pg_dump version 18.4
@@ -1527,9 +1527,9 @@ ALTER SEQUENCE public.structure_name_forms_id_seq OWNED BY public.structure_name
 --
 
 CREATE TABLE public.structure_tutelles (
-    id integer CONSTRAINT structure_relations_id_not_null NOT NULL,
-    parent_id integer CONSTRAINT structure_relations_parent_id_not_null NOT NULL,
-    child_id integer CONSTRAINT structure_relations_child_id_not_null NOT NULL,
+    id integer NOT NULL,
+    parent_id integer NOT NULL,
+    child_id integer NOT NULL,
     created_at timestamp with time zone DEFAULT now(),
     CONSTRAINT structure_tutelles_no_self_reference CHECK ((parent_id <> child_id))
 );
@@ -3440,5 +3440,5 @@ ALTER TABLE ONLY public.structure_tutelles
 -- PostgreSQL database dump complete
 --
 
-\unrestrict hSnsj5nQPa7VZUqA79dvVzmASIeXH9XmOJTiZt7MXkdUDdQHr8LscrwW02h2vQ5
+\unrestrict rEAUBTNWJPb6OPdftmht1gNeWoyhdwyEsHI1NPvg7YU7SzT0tvTl3gEntOzr7hE
 
