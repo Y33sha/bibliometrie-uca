@@ -32,7 +32,7 @@ class IdentifierAttribution:
 
         Autorisée uniquement depuis le statut `REJECTED` : un identifiant rejeté pour une personne A peut être réattribué à une personne B avec statut `PENDING`. Lève `CannotAttributeConflict` sinon.
 
-        `source` trace l'origine de la réattribution (ex. "manual", "matching_cascade").
+        `source` trace l'origine de la réattribution : "manual" pour une décision humaine, "auto" pour une résolution du pipeline.
         """
         if self.status is not AttributionStatus.REJECTED:
             raise CannotAttributeConflict(
