@@ -1,6 +1,6 @@
 # Publications
 
-*À jour le 2026-06-30.*
+*À jour le 2026-09-05.*
 
 Référentiel dédupliqué des productions de recherche. Cf [doc pipeline](../pipeline/07-publications.md) pour la logique de déduplication.
 
@@ -46,7 +46,7 @@ Légende :
 
 ## Sujets / mots-clés
 
-Trois tables alimentées par les phases `subjects` et `cooccurrences` du pipeline :
+Trois tables alimentées par la phase `subjects` du pipeline :
 
 - **`subjects`** : référentiel des sujets/mots-clés indexés.
 - **`publication_subjects`** : table de liaison publication ↔ sujet (avec score / source).
@@ -54,7 +54,13 @@ Trois tables alimentées par les phases `subjects` et `cooccurrences` du pipelin
 
 ## Services propriétaires
 
-**Autorité** : *pipeline* (recalculée à chaque run), *admin* (saisie via l'interface admin, préservée — le pipeline ne l'écrase jamais), *mixte* (selon la colonne), *import* (chargement externe), *référence* (seed).
+La colonne **Autorité** dit qui détermine le contenu de la table :
+
+- **admin** — saisi depuis l'interface d'administration ; le pipeline ne l'écrase jamais
+- **pipeline** — recalculé à chaque exécution
+- **mixte** — l'un ou l'autre selon la colonne
+- **import** — chargé depuis un fichier externe
+- **référence** — posé par le seed
 
 | Table | Autorité | Écrit par |
 |---|---|---|
@@ -68,5 +74,3 @@ Trois tables alimentées par les phases `subjects` et `cooccurrences` du pipelin
 | `publishers`, `publisher_name_forms` | mixte | créés et enrichis par le pipeline ; édités et fusionnés en admin (`application/services/publishers/commands.py`) |
 | `distinct_publications` | admin | `application/services/publications/commands.py` |
 | `apc_payments` | import | `interfaces/cli/imports/import_apc.py`, `import_openapc.py` |
-
-La propriété n'est pas verrouillée (convention, pas de contrat import-linter ni de GRANT). Deux écritures transverses la franchissent : la **fusion de journaux** re-pointe `journal_id` sur `publications` et `source_publications` ; la **propagation des pays** écrit les colonnes `countries[]` sur `source_authorships`, `source_publications` et `publications`.
