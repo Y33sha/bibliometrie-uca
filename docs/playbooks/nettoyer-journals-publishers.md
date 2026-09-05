@@ -196,7 +196,7 @@ Après chaque session de nettoyage (Cas 1-4), re-runner le seed pour bénéficie
 python -m interfaces.cli.maintenance.seed_journals_doi_prefix --min-pubs 3
 ```
 
-Le script écrase systématiquement les préfixes calculables et laisse intacts les ambigus (les valeurs manuelles éventuelles posées via l'admin sont préservées si le journal n'est plus calculable — sinon écrasées). Inspecter `data/doi_prefix_seed_ambiguous.csv` pour les cas résiduels qui demanderont curation manuelle via l'admin.
+Le script écrase systématiquement les préfixes calculables et laisse intacts les ambigus (les valeurs manuelles éventuelles posées via l'admin sont préservées si le journal n'est plus calculable — sinon écrasées). Inspecter `data/doi_prefix_seed_ambiguous.csv` pour les cas résiduels qui demanderont une correction manuelle via l'admin.
 
 Re-lancer ensuite la query Cas 5 pour mesurer la baisse d'incohérences.
 

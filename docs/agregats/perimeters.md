@@ -15,7 +15,7 @@ Un périmètre nomme un ensemble de structures en ne désignant que ses **racine
 
 `perimeter_structures` est le résultat de la descente récursive dans `structure_relations`, en suivant la relation `est_tutelle_de`. Deux clés de la table `config` désignent les périmètres en service : `perimeter_extraction`, qui cadre l'extraction et les affiliations, et `perimeter_persons`, qui cadre la création des personnes.
 
-## Écriture par l'API — curation
+## Écriture par l'API — édition manuelle
 
 Routeur `interfaces/api/routers/perimeters.py`, services dans `application/services/perimeters/`, adaptateur `PgPerimeterRepository`.
 

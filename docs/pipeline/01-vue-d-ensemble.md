@@ -27,7 +27,7 @@ Le peuplement de la base s'effectue via un *pipeline* composé des étapes suiva
 - [Publishers & journals](05-publishers-journals.md) : enrichit les référentiels de revues et d'éditeurs à partir de sources externes — préfixes DOI (sources: Crossref + DataCite), montant d'APC et type des revues (sources: OpenAlex Sources, DOAJ). Ces informations sont consommées par la phase de correction des métadonnées.
 - [Corrections de métadonnées](06-metadata-correction.md) : prépare les `source_publications` avant leur rattachement, en posant sur leurs colonnes les valeurs corrigées sur lesquelles s'appuiera le matching. Les métadonnées brutes sont conservées, avec l'identifiant de la règle qui les a corrigées. Les métadonnées corrigées sont consommées par la logique de déduplication.
 - [Matching des publications](07-publications.md) : peuple et maintient la table canonique `publications` à partir des `source_publications`. Regroupe celles qui désignent le même document (par identifiants et par métadonnées), crée une publication pour chaque document du périmètre UCA, et fusionne ou scinde les publications existantes selon ce regroupement.
-- [Relations entre publications](08-relations.md) : peuple `publication_relations`, qui relie des publications distinctes mais apparentées (preprint ↔ version publiée, supplément ↔ article, chapitre ↔ ouvrage, erratum ↔ article corrigé…). (Enjolivement.)
+- [Relations entre publications](08-relations.md) : peuple `publication_relations`, qui relie des publications distinctes mais apparentées (preprint ↔ version publiée, supplément ↔ article, chapitre ↔ ouvrage, erratum ↔ article corrigé…).
 
 ## Rattachement/création des personnes
 

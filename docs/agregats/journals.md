@@ -21,7 +21,7 @@ Trois tables extérieures référencent une revue, avec des politiques de suppre
 
 **Enrichissement du référentiel (`publishers_journals`).** L'orchestrateur enchaîne, selon ce que la configuration autorise, la résolution des éditeurs, l'enrichissement depuis OpenAlex — frais de publication et type de revue pour celles restées indéterminées — puis l'import du référentiel DOAJ, qui renseigne `doaj_payload` et `is_in_doaj`. Les écritures passent par `PgJournalGatewayQueries` (`infrastructure/pipeline/journals.py`), qui porte aussi les requêtes de sélection de chaque sous-étape.
 
-## Écriture par l'API — curation
+## Écriture par l'API — édition manuelle
 
 Routeur `interfaces/api/routers/journals.py`, commandes dans `application/services/journals/commands.py`, adaptateur `PgJournalRepository`.
 

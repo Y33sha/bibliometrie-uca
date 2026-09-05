@@ -1,6 +1,6 @@
 """Écriture des exports CSV : assainissement des cellules et plafond de lignes.
 
-Une valeur venue d'une source externe ne doit pas être évaluée comme formule par le tableur qui ouvre le fichier, et un export coupé au plafond doit le dire — le fichier est le seul canal vers qui l'a demandé.
+Une valeur venue d'une source externe ne doit pas être évaluée comme formule par le tableur qui ouvre le fichier, et un export coupé au plafond doit le dire.
 """
 
 import csv

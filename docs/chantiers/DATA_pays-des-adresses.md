@@ -13,7 +13,7 @@ Cinq endroits écrivent l'un ou l'autre :
 | `application/pipeline/countries/detect_by_country_name.py` | nom de pays en fin d'adresse | `countries` |
 | `application/pipeline/countries/detect_by_place_name.py` | nom d'institution ou de ville, via `place_name_forms` | `countries` |
 | `application/pipeline/countries/suggest_countries.py` | emprunt du pays d'une adresse qui contient celle-ci | `suggested_countries` |
-| `application/services/addresses/countries.py` | saisie par la curation | `countries` |
+| `application/services/addresses/countries.py` | saisie à la main | `countries` |
 
 Couverture obtenue, sur 431 912 adresses : 415 397 ont un pays faisant autorité (96,2 %), 12 986 n'ont qu'une suggestion (3,0 %), 3 529 n'ont rien (0,8 %).
 
@@ -45,7 +45,7 @@ Les moyens deviennent les valeurs de `method` : `source_scanr`, `source_openalex
 
 Le tableau des colonnes `countries` reçoit sa contrepartie naturelle : une adresse à deux pays donne deux lignes. Un désaccord entre moyens donne deux lignes de `method` différentes, conservées au lieu d'être abandonnées.
 
-**La préséance s'écrit à un seul endroit.** Une étape de résolution lit les candidats d'une adresse et compose l'ensemble retenu : `manual` l'emporte sur tout ; les moyens tenus pour sûrs composent l'ensemble quand ils s'accordent ; `similarity` n'accède jamais seule à l'ensemble retenu et reste offerte à la curation. Le classement précis des moyens est fixé par la mesure de la phase 3, non a priori.
+**La préséance s'écrit à un seul endroit.** Une étape de résolution lit les candidats d'une adresse et compose l'ensemble retenu : `manual` l'emporte sur tout ; les moyens tenus pour sûrs composent l'ensemble quand ils s'accordent ; `similarity` n'accède jamais seule à l'ensemble retenu et reste offerte à la confirmation humaine. Le classement précis des moyens est fixé par la mesure de la phase 3, non a priori.
 
 **`addresses.countries` demeure**, comme cache dénormalisé lu par la cascade vers les publications et par les facettes de l'interface. Il change de statut : dérivé des candidats par la seule étape de résolution, au lieu d'être écrit par six sites.
 
@@ -78,7 +78,7 @@ Le tableau des colonnes `countries` reçoit sa contrepartie naturelle : une adre
 - [ ] Vérifier qu'elle reproduit `addresses.countries` à l'identique sur tout le stock, aux écarts près que la phase 3 justifie. Ce contrôle autorise la bascule.
 - [ ] Les moyens cessent d'écrire `addresses.countries` ; la résolution en devient seule écrivaine et pose `countries_dirty`.
 
-### 5. Curation et retrait de la seconde colonne
+### 5. Édition manuelle et retrait de la seconde colonne
 
 - [ ] La page d'administration des pays lit les candidats et leur moyen, au lieu de `suggested_countries`.
 - [ ] Une décision humaine s'enregistre en candidat `manual`, laissant en place ce que les moyens automatiques ont trouvé.
@@ -87,6 +87,6 @@ Le tableau des colonnes `countries` reçoit sa contrepartie naturelle : une adre
 ## Questions ouvertes
 
 - **Score.** La préséance entre moyens suffit-elle, ou faut-il une valeur numérique par candidat ? Un score n'a de sens que si un moyen produit des propositions de qualité inégale, ce que la phase 3 dira.
-- **Désaccords.** Une fois conservés, où sont-ils présentés ? Une adresse dont les moyens se contredisent est un cas de curation, pas un rejet silencieux — reste à décider si elle rejoint la file existante ou la sienne.
+- **Désaccords.** Une fois conservés, où sont-ils présentés ? Une adresse dont les moyens se contredisent demande une décision humaine, pas un rejet silencieux — reste à décider si elle rejoint la file existante ou la sienne.
 - **Rétention.** Les candidats d'un moyen retiré sont-ils supprimés, ou conservés comme trace de ce qui a été essayé ?
 - **Volume.** Le nombre de candidats par adresse conditionne la taille de la table ; à mesurer en phase 2 sur le stock réel.

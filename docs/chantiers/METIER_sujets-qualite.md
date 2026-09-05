@@ -6,7 +6,7 @@ Problèmes connexes sur `subjects` / `publication_subjects` repérés à l'usage
 
 1. **Sujets OpenAlex hors-sujet** : les sujets OpenAlex (`publication_subjects.source = 'openalex'`) sont fréquemment aberrants à l'inspection — bruit de l'algo OA sur les revues généralistes / pluridisciplinaires, ou attribution thématique retenue sans filtrage. Le champ `score` existe, aucun seuil n'est appliqué.
 
-2. **Pas de circuit de curation manuelle** : la colonne `publication_subjects.rejected` (boolean default false) n'est pas exposée à l'admin. Pas de voie ouverte pour marquer manuellement un sujet comme non pertinent.
+2. **Pas de circuit d'édition manuelle** : la colonne `publication_subjects.rejected` (boolean default false) n'est pas exposée à l'admin. Pas de voie ouverte pour marquer manuellement un sujet comme non pertinent.
 
 3. **Couverture sujets variable** : certaines publis sans sujet, origines à inventorier.
 
@@ -50,7 +50,7 @@ Conséquence : **le score OpenAlex n'est pas un proxy linéaire de pertinence**.
 
 **Contraintes UI** : tous les sujets `rejected = TRUE` doivent être exclus des décomptes et des listings — pages `/subjects`, `/subjects/[id]`, dashboards `/persons/[id]` et `/laboratories/[id]`. Seule la page `/publications/[id]` continue à les afficher (temporairement), avec un style barré + grisé pour permettre un contrôle visuel des rejets au fil de l'eau.
 
-**Pistes mises de côté** : seuil de score OA seul (invalidé empiriquement), lift cooccurrence sujets feuille (invalidé : les aberrations sont récurrentes), seuil « autre support ≥ 2 » sur cleanup (trade-off rappel/précision défavorable). UI curation manuelle des rejets : utile en complément ponctuel, traitée hors de ce chantier.
+**Pistes mises de côté** : seuil de score OA seul (invalidé empiriquement), lift cooccurrence sujets feuille (invalidé : les aberrations sont récurrentes), seuil « autre support ≥ 2 » sur cleanup (trade-off rappel/précision défavorable). UI d'édition manuelle des rejets : utile en complément ponctuel, traitée hors de ce chantier.
 
 ## Phasage
 

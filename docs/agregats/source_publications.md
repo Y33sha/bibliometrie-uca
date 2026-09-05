@@ -34,7 +34,7 @@ Lors d'un réimport, le rattachement à la publication est préservé, les ident
 
 ## Écriture par l'API
 
-**Aucune.** Ces enregistrements sont la trace de ce que les sources ont fourni : rien ne les édite à la main. Une métadonnée fausse se corrige par une règle de `metadata_correction`, et la curation porte sur la publication canonique ou sur les revues.
+**Aucune.** Ces enregistrements sont la trace de ce que les sources ont fourni : rien ne les édite à la main. Une métadonnée fausse se corrige par une règle de `metadata_correction`, et l'édition manuelle porte sur la publication canonique ou sur les revues.
 
 ## Lecture par le pipeline
 

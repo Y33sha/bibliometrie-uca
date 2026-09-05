@@ -2,7 +2,7 @@
 
 *À jour le 2026-09-04.*
 
-Une personne est un chercheur unifié à travers les sources : plusieurs signatures, venues de HAL, d'OpenAlex ou du Web of Science sous des graphies différentes, désignent la même personne. Contrairement aux [structures](structures.md), qui sont un référentiel saisi à la main, les personnes sont **construites par le pipeline** — la phase `persons` rattache chaque signature à une personne et en crée au besoin — **puis corrigées par la curation** : fusion, réattribution d'identifiant, rejet, détachement. Le pipeline et l'interface d'administration écrivent donc tous deux.
+Une personne est un chercheur unifié à travers les sources : plusieurs signatures, venues de HAL, d'OpenAlex ou du Web of Science sous des graphies différentes, désignent la même personne. Contrairement aux [structures](structures.md), qui sont un référentiel saisi à la main, les personnes sont **construites par le pipeline** — la phase `persons` rattache chaque signature à une personne et en crée au besoin — **puis corrigées à la main** : fusion, réattribution d'identifiant, rejet, détachement. Le pipeline et l'interface d'administration écrivent donc tous deux.
 
 `domain/persons/` porte les règles pures : la décision de rapprochement (`decide_person_match`), la comparaison des noms (`names_compatible`, `same_person_name`), et des types dédiés qui valident et normalisent chaque identifiant avant écriture.
 
@@ -23,8 +23,8 @@ Le rattachement d'une signature à une personne est porté par `source_authorshi
 
 `application/pipeline/persons/phase.py` exécute six étapes dans une transaction unique. La phase lit les signatures du périmètre non encore rattachées, avec leurs identifiants, leur nom normalisé, leurs rôles et leur position dans la publication, ainsi que des index chargés en mémoire au début du traitement. Elle écrit le rattachement des signatures, crée des personnes, inscrit les identifiants rencontrés et régénère les formes de nom.
 
-1. **Appliquer les décisions humaines.** Les rattachements épinglés par la curation sont reposés en premier ; les étapes suivantes ne les défont pas.
-2. **Arbitrer les identifiants disputés.** Un ORCID, un IdRef ou un identifiant de compte HAL peut être attribué à une personne alors que des signatures qui le portent sont rattachées à une autre. Le nom d'auteur majoritaire, parmi toutes les signatures portant cette valeur, tranche. Une attribution confirmée par la curation prévaut. Après un transfert, les signatures qui tenaient leur rattachement de cet identifiant repassent à nul et sont résolues à nouveau.
+1. **Appliquer les décisions humaines.** Les rattachements épinglés à la main sont reposés en premier ; les étapes suivantes ne les défont pas.
+2. **Arbitrer les identifiants disputés.** Un ORCID, un IdRef ou un identifiant de compte HAL peut être attribué à une personne alors que des signatures qui le portent sont rattachées à une autre. Le nom d'auteur majoritaire, parmi toutes les signatures portant cette valeur, tranche. Une attribution confirmée à la main prévaut. Après un transfert, les signatures qui tenaient leur rattachement de cet identifiant repassent à nul et sont résolues à nouveau.
 3. **Rapprocher.** `decide_person_match` tranche par fiabilité décroissante : ORCID, identifiant de compte HAL, IdRef, nom unique, report depuis une autre source, et création en dernier recours. La cascade fait deux passes sur les mêmes index : la première ne fait que rapprocher, la création est repoussée à la seconde. Les rôles non-auteurs des thèses — jury, rapporteurs — n'autorisent aucune création.
 4. **Détacher ce qui a perdu son appui.** Un rattachement obtenu par report depuis une autre source, dont l'attache d'origine a disparu, repasse à nul.
 5. **Régénérer les formes de nom.** Les formes canoniques calculées depuis l'état civil de la personne rejoignent les formes bibliographiques observées dans ses signatures ; seules les différences sont écrites. Une forme canonique naît confirmée, une forme observée naît en attente, et les décisions humaines déjà prises sont conservées.
@@ -32,7 +32,7 @@ Le rattachement d'une signature à une personne est porté par `source_authorshi
 
 Les identifiants rencontrés sont inscrits par un point unique, toujours en attente de confirmation et marqués comme automatiques. Un conflit y est consigné sans bloquer, et laissé à l'arbitrage de l'exécution suivante. Ce qu'une exécution inscrit devient ce que la suivante lit : c'est ce qui porte la convergence.
 
-## Écriture par l'API — curation
+## Écriture par l'API — édition manuelle
 
 Routeur `interfaces/api/routers/persons.py`, commandes dans `application/services/persons/commands.py`, adaptateur `PgPersonRepository`. Une commande vaut une transaction.
 
@@ -64,7 +64,7 @@ Port `PersonsQueries`, adaptateurs dans `infrastructure/read_models/persons/`.
 |---|---|
 | Fiche personne | Profil, thèses, adresses, tableau de bord et sujets, en croisant les personnes, la fiche annuaire, les identifiants, les signatures, les authorships et les publications |
 | Annuaire, listes, recherche, facettes, statistiques | Listes publiques et d'administration, filtrables par laboratoire |
-| Files de curation des doublons | Doublons par nom, conflits d'identifiant, signatures détachables, formes de nom ambiguës, candidates au partage d'une forme |
+| Files de doublons | Doublons par nom, conflits d'identifiant, signatures détachables, formes de nom ambiguës, candidates au partage d'une forme |
 
 Toutes les files de doublons écartent les paires déclarées distinctes ; celle des doublons par nom écarte en outre les paires dont les deux personnes portent une fiche annuaire.
 

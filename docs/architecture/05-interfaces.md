@@ -1,4 +1,4 @@
-# Interfaces — adapters entrants
+# Interfaces — adaptateurs entrants
 
 *À jour le 2026-06-30.*
 

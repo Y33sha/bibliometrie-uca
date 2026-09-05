@@ -51,7 +51,7 @@ Deux chaînes portent une écriture de ces tables jusqu'aux colonnes que consult
 
 **Pays.** Étape finale de `countries` (`refresh_publication_countries.py`) : les signatures marquées sales — soit par `normalize` à leur création, soit par une adresse dont le pays vient de changer — voient leur publication source recalculée, puis la publication elle-même. Les deux marqueurs sont ensuite remis à zéro.
 
-## Écriture par l'API — curation
+## Écriture par l'API — édition manuelle
 
 Routeur `interfaces/api/routers/addresses.py`, commandes transactionnelles dans `application/services/addresses/`, adaptateur `PgAddressRepository`.
 
@@ -70,7 +70,7 @@ Routeur `interfaces/api/routers/addresses.py`, port `application/ports/read_mode
 
 | Point d'entrée | Ce qu'il sert |
 |---|---|
-| `GET /api/addresses` | Liste de curation pour une structure : adresses et leurs rattachements, filtrables sur la détection, la validation et le texte |
+| `GET /api/addresses` | Liste de révision pour une structure : adresses et leurs rattachements, filtrables sur la détection, la validation et le texte |
 | `GET /api/addresses/{id}/publications` | Texte brut de l'adresse et publications qui la portent ; chaque rattachement expose son état de validation et s'il vient d'une détection |
 | `GET /api/addresses/countries`, `/suggest-countries`, `/countries` | Facettes construites sur `countries`, `suggested_countries` et `pub_count` |
 | `GET /api/addresses/stats` | Comptes par état de rattachement pour une structure |
@@ -79,4 +79,4 @@ Routeur `interfaces/api/routers/addresses.py`, port `application/ports/read_mode
 
 **Le recalcul des pays des publications est déclenché depuis les adresses.** Il est cross-table par nature et vit dans `infrastructure/pipeline/countries.py` ; `PgAddressRepository` y délègue après une édition de pays.
 
-**Les vues matérialisées peuvent être en retard.** La curation par l'API recalcule `in_perimeter` depuis les tables de base sans rafraîchir `source_authorship_structures` ni `authorship_structures` : elles attendent le prochain passage du pipeline.
+**Les vues matérialisées peuvent être en retard.** L'édition manuelle recalcule `in_perimeter` depuis les tables de base sans rafraîchir `source_authorship_structures` ni `authorship_structures` : elles attendent le prochain passage du pipeline.

@@ -6,7 +6,7 @@ Cette page donne deux entrées dans le schéma : une **vue macro** (les tables p
 
 ## Vue macro
 
-Vue globale du schéma : l'ingestion par source en haut, les référentiels canoniques au centre, et les satellites rattachés à leur entité-pivot. Sont omis ici : la curation (`distinct_*`, `rejected_authorships`), les caches et référentiels statiques (`doi_prefixes`, `doi_lookups`, `countries`, `place_name_forms`) et les tables techniques — tous présents dans l'index ci-dessous.
+Vue globale du schéma : l'ingestion par source en haut, les référentiels canoniques au centre, et les satellites rattachés à leur entité-pivot. Sont omis ici : les saisies manuelles (`distinct_*`, `rejected_authorships`), les caches et référentiels statiques (`doi_prefixes`, `doi_lookups`, `countries`, `place_name_forms`) et les tables techniques — tous présents dans l'index ci-dessous.
 
 ```mermaid
 flowchart TB
