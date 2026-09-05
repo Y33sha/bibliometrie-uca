@@ -20,7 +20,7 @@ Les périmètres, dont les racines sont des structures, ont leur propre fiche : 
 
 Routeur `interfaces/api/routers/structures.py`, commandes dans `application/services/structures/commands.py`, adaptateur `PgStructureRepository`. C'est le seul chemin d'écriture.
 
-**Structures** (`POST`, `PUT`, `DELETE /api/structures/{id}`). Le domaine valide le type, l'identifiant ROR et la collection HAL ; le dépôt valide `api_ids` contre son modèle. La suppression entraîne en base celle des lignes qui rattachent la structure aux signatures et aux authorships.
+**Structures** (`POST`, `PUT`, `DELETE /api/structures/{id}`). Le domaine valide le type, l'identifiant ROR et la collection HAL ; le repository valide `api_ids` contre son modèle. La suppression entraîne en base celle des lignes qui rattachent la structure aux signatures et aux authorships.
 
 **Rattachements** (`POST /api/structures/relations`, `DELETE`). La création charge d'abord les ancêtres du parent, puis le domaine refuse l'auto-rattachement et tout rattachement qui refermerait un cycle. Créer un rattachement qui existe déjà ne produit rien.
 
