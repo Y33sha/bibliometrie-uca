@@ -54,7 +54,9 @@ include = ["application*", "domain*", "infrastructure*", "interfaces*"]
 # ----------------------------------------------------------------------
 [tool.deptry]
 known_first_party = ["application", "domain", "infrastructure", "interfaces"]
-extend_exclude = ["frontend", ".venv", "venv"]
+# `scripts/` outille le dépôt sans être distribué : ses imports relèvent de l'environnement de
+# développement, pas des dépendances de l'application.
+extend_exclude = ["frontend", ".venv", "venv", "scripts"]
 # Le groupe `dev` de [project.optional-dependencies] est pour les outils
 # de dev/test — deptry ne doit pas exiger qu'ils soient importés.
 optional_dependencies_dev_groups = ["dev"]
@@ -65,9 +67,10 @@ optional_dependencies_dev_groups = ["dev"]
 # ----------------------------------------------------------------------
 [tool.importlinter]
 root_packages = ["domain", "application", "infrastructure", "interfaces"]
-# Nécessaire pour les contrats `forbidden` qui ciblent des modules
-# externes (cf. "Domain : pas de framework externe").
+# Nécessaire aux contrats qui ciblent des modules externes.
 include_external_packages = true
+# Type de contrat maison, défini dans `scripts/contrats_import.py`.
+contract_types = ["purete_du_noyau: scripts.contrats_import.PureteDuNoyau"]
 
 [[tool.importlinter.contracts]]
 name = "Couches DDD (layered)"
@@ -183,19 +186,14 @@ forbidden_modules = ["subprocess", "multiprocessing", "pty"]
 # d'un module, et interdire `os` entier écarterait tout le reste de son usage.
 
 [[tool.importlinter.contracts]]
-name = "Domain : pas de framework externe"
-type = "forbidden"
-source_modules = ["domain"]
-forbidden_modules = [
-    "pydantic",
-    "sqlalchemy",
-    "fastapi",
-    "starlette",
-    "psycopg",
-]
-# Le domaine ne dépend de rien : pas d'ORM, pas de validation
-# Pydantic, pas de framework web, pas de driver DB. Les modèles
-# d'I/O JSONB (BaseModel) vivent dans infrastructure/jsonb_models/.
+name = "Domain : rien hors bibliothèque standard"
+type = "purete_du_noyau"
+paquet = "domain"
+# `_typeshed` est fourni par les vérificateurs de types et n'existe pas à l'exécution.
+autorises = ["_typeshed"]
+# Le domaine ne dépend de rien : pas d'ORM, pas de validation Pydantic, pas de framework web,
+# pas de driver de base. Les modèles d'entrée-sortie JSONB vivent dans
+# `infrastructure/jsonb_models/`.
 
 [tool.deptry.per_rule_ignores]
 # Paquets que rien n'importe, et qui restent des dépendances de production.
