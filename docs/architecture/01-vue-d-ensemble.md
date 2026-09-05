@@ -58,7 +58,7 @@ Cette vue par couches se superpose à la vue par programme : `domain/` sert aux 
 
 Chaque règle est vérifiée par un contrat `import-linter`, déclaré dans `pyproject.toml`, section `[tool.importlinter]`, et nommé ici en regard.
 
-1. **Le noyau n'importe que la bibliothèque standard.** `domain/` n'atteint aucun paquet tiers et aucune autre couche. La liste des modules permis vient de l'interpréteur.
+1. **Le noyau n'importe que la bibliothèque standard.** `domain/` n'atteint aucun paquet tiers et aucune autre couche. Les modules permis sont ceux que Python publie pour sa version, dans `sys.stdlib_module_names`.
    → `Domain : rien hors bibliothèque standard`
 
 2. **Les couches ne s'importent que vers le bas.** `interfaces/` au-dessus, `infrastructure/` et `application/` au milieu, `domain/` en dessous. En particulier, `application/` n'importe pas `infrastructure/` : les services applicatifs reçoivent leurs dépendances par les **ports** (`Protocol`) de `application/ports/`, que `infrastructure/` implémente.
@@ -67,10 +67,10 @@ Chaque règle est vérifiée par un contrat `import-linter`, déclaré dans `pyp
 3. **Les routers n'atteignent pas `infrastructure/` directement.** Ils reçoivent leurs dépendances par `Depends(...)`, dont les fabriques vivent dans `interfaces/api/deps.py`. Le chemin indirect qui passe par ces fabriques reste permis.
    → `Routers : pas d'import direct de infrastructure`
 
-4. **Seul le composition root instancie les adapters concrets.** Pour l'application web, ce sont `interfaces/api/app.py` et `interfaces/api/deps.py` ; partout ailleurs sous `interfaces/api/`, on passe par un port. Chaque script de `interfaces/cli/` est en revanche son propre composition root, et instancie directement ce dont il a besoin.
+4. **Seul le composition root instancie les adapters concrets.** Pour l'application web, ce sont `interfaces/api/app.py` et `interfaces/api/deps.py` ; partout ailleurs sous `interfaces/api/`, on passe par un port. Chaque script de `interfaces/cli/` est son propre composition root.
    → `Composition root : Pg* concrets uniquement dans app et deps`
 
-5. **Un adapter reçoit sa connexion, il ne l'ouvre pas.** Les modules de lecture et les dépôts travaillent sur la connexion que leur appelant leur remet.
+5. **Un adapter reçoit sa connexion, il ne l'ouvre pas.** Les modules de lecture et les repositories travaillent sur la connexion que leur appelant leur remet.
    → `Adapters : la connexion se reçoit, elle ne s'ouvre pas`
 
 6. **L'API n'émet aucune requête réseau.** Aucun module servant une requête HTTP n'atteint un client réseau, y compris par une chaîne d'imports. Tout le trafic sortant appartient au pipeline.
