@@ -4,7 +4,7 @@ Couvre :
 - GET /api/structures (list + filtres)
 - GET /api/structures/{id} (detail, 404)
 - POST/PUT/DELETE /api/structures (mutations, auth requise)
-- POST/DELETE /api/structures/relations (relations, auth requise)
+- POST/DELETE /api/structures/tutelles (relations, auth requise)
 - GET/POST/PUT/DELETE /api/structures/name-forms (formes de noms, auth requise)
 """
 
@@ -30,12 +30,11 @@ def _seed_structure(code: str | None = None, type_: str = "labo") -> int:
         return cur.fetchone()["id"]
 
 
-def _seed_relation(parent_id: int, child_id: int, rel_type: str = "est_tutelle_de") -> int:
+def _seed_tutelle(parent_id: int, child_id: int) -> int:
     with owner_pool() as cur:
         cur.execute(
-            "INSERT INTO structure_relations (parent_id, child_id, relation_type) "
-            "VALUES (%s, %s, %s) RETURNING id",
-            (parent_id, child_id, rel_type),
+            "INSERT INTO structure_tutelles (parent_id, child_id) VALUES (%s, %s) RETURNING id",
+            (parent_id, child_id),
         )
         return cur.fetchone()["id"]
 
@@ -56,7 +55,7 @@ def _cleanup_after_module():
     yield
     with owner_pool() as cur:
         cur.execute(
-            "TRUNCATE TABLE structure_name_forms, structure_relations, structures, "
+            "TRUNCATE TABLE structure_name_forms, structure_tutelles, structures, "
             "audit_log RESTART IDENTITY CASCADE"
         )
 
@@ -114,7 +113,7 @@ class TestGetStructure:
     def test_ok_with_relations_and_forms(self, client):
         parent = _seed_structure(type_="universite")
         child = _seed_structure(type_="labo")
-        _seed_relation(parent, child)
+        _seed_tutelle(parent, child)
         _seed_name_form(child, _uniq("FormA"))
         _seed_name_form(child, _uniq("FormB"))
 
@@ -218,8 +217,8 @@ class TestDeleteStructure:
 class TestCreateRelation:
     def test_requires_admin(self, client):
         r = client.post(
-            "/api/structures/relations",
-            json={"parent_id": 1, "child_id": 2, "relation_type": "est_tutelle_de"},
+            "/api/structures/tutelles",
+            json={"parent_id": 1, "child_id": 2},
         )
         assert r.status_code == 401
 
@@ -227,11 +226,10 @@ class TestCreateRelation:
         parent = _seed_structure(type_="universite")
         child = _seed_structure(type_="labo")
         r = auth_client.post(
-            "/api/structures/relations",
+            "/api/structures/tutelles",
             json={
                 "parent_id": parent,
                 "child_id": child,
-                "relation_type": "est_tutelle_de",
             },
         )
         assert r.status_code == 200
@@ -242,13 +240,12 @@ class TestCreateRelation:
     def test_duplicate_already_exists(self, auth_client):
         parent = _seed_structure(type_="universite")
         child = _seed_structure(type_="labo")
-        _seed_relation(parent, child, "est_tutelle_de")
+        _seed_tutelle(parent, child)
         r = auth_client.post(
-            "/api/structures/relations",
+            "/api/structures/tutelles",
             json={
                 "parent_id": parent,
                 "child_id": child,
-                "relation_type": "est_tutelle_de",
             },
         )
         assert r.status_code == 200
@@ -258,26 +255,26 @@ class TestCreateRelation:
         """`parent_id` inexistant : la clé étrangère rend 409, non un 500 opaque."""
         child = _seed_structure(type_="labo")
         r = auth_client.post(
-            "/api/structures/relations",
-            json={"parent_id": 999999999, "child_id": child, "relation_type": "est_tutelle_de"},
+            "/api/structures/tutelles",
+            json={"parent_id": 999999999, "child_id": child},
         )
         assert r.status_code == 409
 
 
 class TestDeleteRelation:
     def test_requires_admin(self, client):
-        r = client.delete("/api/structures/relations/1")
+        r = client.delete("/api/structures/tutelles/1")
         assert r.status_code == 401
 
     def test_404(self, auth_client):
-        r = auth_client.delete("/api/structures/relations/999999999")
+        r = auth_client.delete("/api/structures/tutelles/999999999")
         assert r.status_code == 404
 
     def test_ok(self, auth_client):
         parent = _seed_structure(type_="universite")
         child = _seed_structure(type_="labo")
-        rid = _seed_relation(parent, child)
-        r = auth_client.delete(f"/api/structures/relations/{rid}")
+        rid = _seed_tutelle(parent, child)
+        r = auth_client.delete(f"/api/structures/tutelles/{rid}")
         assert r.status_code == 200
         assert r.json()["deleted"] is True
 

@@ -11,7 +11,7 @@ Une structure est une unité de l'établissement ou un partenaire : composante, 
 | Table | Rôle | Colonnes notables |
 |---|---|---|
 | `structures` | La structure | `code` (unique), `name`, `acronym`, `structure_type`, `ror_id`, `rnsr_id`, `hal_collection`, `api_ids` |
-| `structure_relations` | Rattachement d'une structure à une autre | `parent_id`, `child_id`, `relation_type` (`est_tutelle_de` ou `est_partenaire_de`), unicité du triplet, une structure ne pouvant se rattacher à elle-même |
+| `structure_tutelles` | Rattachement hiérarchique d'une structure à une autre | `parent_id`, `child_id`, unicité du couple, une structure ne pouvant se rattacher à elle-même |
 | `structure_name_forms` | Formes de nom servant à reconnaître une structure dans une adresse | `structure_id`, `form_text` normalisé, `is_word_boundary`, `is_excluding`, `requires_context_of` |
 
 Les périmètres, dont les racines sont des structures, ont leur propre fiche : [perimeters](perimeters.md).

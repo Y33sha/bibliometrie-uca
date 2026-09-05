@@ -1,6 +1,6 @@
 """Tests de caractérisation pour application/services/structures/core.py.
 
-Couvre create/update/delete sur structures, structure_relations,
+Couvre create/update/delete sur structures, structure_tutelles,
 structure_name_forms.
 """
 
@@ -9,11 +9,11 @@ from sqlalchemy import text
 
 from application.services.structures.core import (
     create_name_form,
-    create_relation,
     create_structure,
+    create_tutelle,
     delete_name_form,
-    delete_relation,
     delete_structure,
+    delete_tutelle,
     update_name_form,
     update_structure,
 )
@@ -220,17 +220,16 @@ class TestDeleteStructure:
         assert result.first() is None
 
 
-# ── structure_relations ───────────────────────────────────────────
+# ── structure_tutelles ───────────────────────────────────────────
 
 
-class TestCreateRelation:
+class TestCreateTutelle:
     def test_creates(self, sa_sync_conn, repo):
         parent = create_structure(code="P", name="Parent", structure_type="universite", repo=repo)
         child = create_structure(code="C", name="Child", structure_type="labo", repo=repo)
-        rel = create_relation(
+        rel = create_tutelle(
             parent_id=parent["id"],
             child_id=child["id"],
-            relation_type="est_tutelle_de",
             repo=repo,
         )
         assert rel is not None
@@ -241,16 +240,14 @@ class TestCreateRelation:
         """Si la relation existe déjà, retourne None (ON CONFLICT DO NOTHING)."""
         parent = create_structure(code="P", name="P", structure_type="universite", repo=repo)
         child = create_structure(code="C", name="C", structure_type="labo", repo=repo)
-        create_relation(
+        create_tutelle(
             parent_id=parent["id"],
             child_id=child["id"],
-            relation_type="est_tutelle_de",
             repo=repo,
         )
-        again = create_relation(
+        again = create_tutelle(
             parent_id=parent["id"],
             child_id=child["id"],
-            relation_type="est_tutelle_de",
             repo=repo,
         )
         assert again is None
@@ -258,10 +255,9 @@ class TestCreateRelation:
     def test_rejects_self_reference(self, sa_sync_conn, repo):
         s = create_structure(code="S", name="S", structure_type="universite", repo=repo)
         with pytest.raises(ValidationError, match="Auto-référence"):
-            create_relation(
+            create_tutelle(
                 parent_id=s["id"],
                 child_id=s["id"],
-                relation_type="est_tutelle_de",
                 repo=repo,
             )
 
@@ -269,28 +265,15 @@ class TestCreateRelation:
         """A → B existe ; tenter B → A doit échouer (cycle)."""
         a = create_structure(code="A", name="A", structure_type="universite", repo=repo)
         b = create_structure(code="B", name="B", structure_type="labo", repo=repo)
-        create_relation(
+        create_tutelle(
             parent_id=a["id"],
             child_id=b["id"],
-            relation_type="est_tutelle_de",
             repo=repo,
         )
         with pytest.raises(ValidationError, match="Cycle"):
-            create_relation(
+            create_tutelle(
                 parent_id=b["id"],
                 child_id=a["id"],
-                relation_type="est_tutelle_de",
-                repo=repo,
-            )
-
-    def test_rejects_unknown_relation_type(self, sa_sync_conn, repo):
-        parent = create_structure(code="P", name="P", structure_type="universite", repo=repo)
-        child = create_structure(code="C", name="C", structure_type="labo", repo=repo)
-        with pytest.raises(ValidationError, match="Type de relation inconnu"):
-            create_relation(
-                parent_id=parent["id"],
-                child_id=child["id"],
-                relation_type="est_cousin_de",
                 repo=repo,
             )
 
@@ -299,35 +282,28 @@ class TestCreateRelation:
         a = create_structure(code="A", name="A", structure_type="universite", repo=repo)
         b = create_structure(code="B", name="B", structure_type="labo", repo=repo)
         c = create_structure(code="C", name="C", structure_type="equipe", repo=repo)
-        create_relation(
-            parent_id=a["id"], child_id=b["id"], relation_type="est_tutelle_de", repo=repo
-        )
-        create_relation(
-            parent_id=b["id"], child_id=c["id"], relation_type="est_tutelle_de", repo=repo
-        )
+        create_tutelle(parent_id=a["id"], child_id=b["id"], repo=repo)
+        create_tutelle(parent_id=b["id"], child_id=c["id"], repo=repo)
         with pytest.raises(ValidationError, match="Cycle"):
-            create_relation(
-                parent_id=c["id"], child_id=a["id"], relation_type="est_tutelle_de", repo=repo
-            )
+            create_tutelle(parent_id=c["id"], child_id=a["id"], repo=repo)
 
 
-class TestDeleteRelation:
+class TestDeleteTutelle:
     def test_raises_not_found(self, sa_sync_conn, repo):
         with pytest.raises(NotFoundError):
-            delete_relation(999999, repo=repo)
+            delete_tutelle(999999, repo=repo)
 
     def test_deletes_existing(self, sa_sync_conn, repo):
         parent = create_structure(code="P", name="P", structure_type="universite", repo=repo)
         child = create_structure(code="C", name="C", structure_type="labo", repo=repo)
-        rel = create_relation(
+        rel = create_tutelle(
             parent_id=parent["id"],
             child_id=child["id"],
-            relation_type="est_tutelle_de",
             repo=repo,
         )
-        delete_relation(rel["id"], repo=repo)
+        delete_tutelle(rel["id"], repo=repo)
         result = sa_sync_conn.execute(
-            text("SELECT id FROM structure_relations WHERE id = :id"), {"id": rel["id"]}
+            text("SELECT id FROM structure_tutelles WHERE id = :id"), {"id": rel["id"]}
         )
         assert result.first() is None
 

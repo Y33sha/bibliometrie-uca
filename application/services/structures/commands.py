@@ -1,6 +1,6 @@
 """Command handlers des écritures API sur les structures : frontière transactionnelle de l'agrégat.
 
-Couvre `structures`, `structure_relations`, `structure_name_forms`. `delete_structure`, `create_relation` et `delete_relation` rafraîchissent en plus la clôture matérialisée des périmètres, qu'une tutelle modifiée fait bouger.
+Couvre `structures`, `structure_tutelles`, `structure_name_forms`. `delete_structure`, `create_tutelle` et `delete_tutelle` rafraîchissent en plus la clôture matérialisée des périmètres, qu'une tutelle modifiée fait bouger.
 """
 
 from sqlalchemy import Connection
@@ -10,9 +10,9 @@ from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.perimeter_repository import PerimeterRepository
 from application.ports.repositories.structure_repository import (
     StructureNameFormRow,
-    StructureRelationRow,
     StructureRepository,
     StructureRow,
+    StructureTutelleRow,
 )
 from application.services.structures import core as structures_service
 from domain.types import JsonValue
@@ -85,26 +85,24 @@ def delete_structure(
     conn.commit()
 
 
-# ── structure_relations ───────────────────────────────────────────
+# ── structure_tutelles ────────────────────────────────────────────
 
 
-def create_relation(
+def create_tutelle(
     conn: Connection,
     *,
     parent_id: int,
     child_id: int,
-    relation_type: str,
     repo: StructureRepository,
     perimeter_queries: PerimeterStructuresQueries,
     audit_repo: AuditRepository,
-) -> StructureRelationRow | None:
-    """Crée une relation parent-enfant. Retourne la ligne insérée, ou None si
-    elle existait déjà. Rafraîchit la clôture matérialisée des périmètres : une
-    relation `est_tutelle_de` en modifie la descente récursive."""
-    row = structures_service.create_relation(
+) -> StructureTutelleRow | None:
+    """Crée une tutelle parent-enfant. Retourne la ligne insérée, ou None si
+    elle existait déjà. Rafraîchit la clôture matérialisée des périmètres, dont
+    une tutelle modifie la descente récursive."""
+    row = structures_service.create_tutelle(
         parent_id=parent_id,
         child_id=child_id,
-        relation_type=relation_type,
         repo=repo,
         audit_repo=audit_repo,
     )
@@ -113,17 +111,17 @@ def create_relation(
     return row
 
 
-def delete_relation(
+def delete_tutelle(
     conn: Connection,
-    relation_id: int,
+    tutelle_id: int,
     *,
     repo: StructureRepository,
     perimeter_queries: PerimeterStructuresQueries,
     audit_repo: AuditRepository,
 ) -> None:
-    """Supprime une relation structure. Rafraîchit la clôture matérialisée des
-    périmètres (la descente `est_tutelle_de` peut changer)."""
-    structures_service.delete_relation(relation_id, repo=repo, audit_repo=audit_repo)
+    """Supprime une tutelle. Rafraîchit la clôture matérialisée des périmètres,
+    dont la descente peut changer."""
+    structures_service.delete_tutelle(tutelle_id, repo=repo, audit_repo=audit_repo)
     perimeter_queries.refresh_perimeter_structures(conn)
     conn.commit()
 

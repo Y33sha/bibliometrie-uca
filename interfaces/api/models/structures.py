@@ -2,7 +2,6 @@
 
 from pydantic import BaseModel
 
-from domain.structures.relations import StructureRelationType
 from domain.structures.structure import StructureType
 
 # ----- Corps des requêtes -----
@@ -30,10 +29,9 @@ class StructureUpdate(BaseModel):
     api_ids: dict[str, str | list[str]] | None = None
 
 
-class RelationCreate(BaseModel):
+class TutelleCreate(BaseModel):
     parent_id: int
     child_id: int
-    relation_type: StructureRelationType
 
 
 class NameFormCreate(BaseModel):
@@ -54,11 +52,10 @@ class NameFormUpdate(BaseModel):
 # ----- Réponses composées par le router -----
 
 
-class StructureRelationCreateResponse(BaseModel):
-    """Réponse de POST /api/structures/relations, polymorphe : soit la relation créée, soit `{status: "already_exists"}`."""
+class StructureTutelleCreateResponse(BaseModel):
+    """Réponse de POST /api/structures/tutelles, polymorphe : soit la tutelle créée, soit `{status: "already_exists"}`."""
 
     id: int | None = None
     parent_id: int | None = None
     child_id: int | None = None
-    relation_type: str | None = None
     status: str | None = None

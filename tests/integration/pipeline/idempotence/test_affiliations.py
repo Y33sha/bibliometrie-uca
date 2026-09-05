@@ -5,8 +5,8 @@ def _setup_affiliations_test_data(conn):
     """Crée des données pour tester populate_affiliations :
     structures + périmètres + adresses + source_authorships liées.
 
-    Scénario : une structure UCA (labo, id=80001) avec une relation
-    est_tutelle_de → UCA (id=80000). Un authorship OpenAlex est rattaché
+    Scénario : une structure UCA (labo, id=80001) sous la tutelle
+    d'UCA (id=80000). Un authorship OpenAlex est rattaché
     au labo via une adresse résolue. Un authorship HAL coexiste sans
     résolution d'adresse (sert pour l'idempotence des comptages).
     """
@@ -42,8 +42,8 @@ def _setup_affiliations_test_data(conn):
 
     conn.execute(
         text("""
-            INSERT INTO structure_relations (parent_id, child_id, relation_type)
-            VALUES (80000, 80001, 'est_tutelle_de')
+            INSERT INTO structure_tutelles (parent_id, child_id)
+            VALUES (80000, 80001)
         """)
     )
 

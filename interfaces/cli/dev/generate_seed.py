@@ -6,7 +6,7 @@ Tables exportées :
   - countries           (référentiel pays)
   - place_name_forms    (formes normalisées de noms de pays et de villes)
   - structures          (structures UCA, labos, partenaires)
-  - structure_relations  (relations entre structures)
+  - structure_tutelles  (tutelles entre structures)
   - perimeters          (périmètres UCA, UCA élargi)
   - structure_name_forms (formes de noms pour le matching d'adresses)
 
@@ -82,8 +82,8 @@ TABLES: list[TableSpec] = [
         "order": "id",
     },
     {
-        "table": "structure_relations",
-        "columns": ["id", "parent_id", "child_id", "relation_type"],
+        "table": "structure_tutelles",
+        "columns": ["id", "parent_id", "child_id"],
         "order": "id",
     },
     {

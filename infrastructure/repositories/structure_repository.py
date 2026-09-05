@@ -11,9 +11,9 @@ from application.ports.repositories.structure_repository import (
     StructureNameFormDeletedRow,
     StructureNameFormRow,
     StructureNameFormUpdateFields,
-    StructureRelationDeletedRow,
-    StructureRelationRow,
     StructureRepository,
+    StructureTutelleDeletedRow,
+    StructureTutelleRow,
 )
 from domain.errors import NotFoundError, ValidationError
 from domain.structures.identifiers import HalCollection, RorId
@@ -22,7 +22,7 @@ from domain.structures.structure import Structure, StructureType
 from infrastructure.db.scalars import scalar_int
 from infrastructure.db.tables import (
     structure_name_forms,
-    structure_relations,
+    structure_tutelles,
     structures,
 )
 from infrastructure.jsonb_models.structure import StructureApiIds
@@ -198,17 +198,17 @@ class PgStructureRepository(StructureRepository):
         row = result.first()
         return cast(StructureDeletedRow, dict(row._mapping)) if row else None
 
-    # ── structure_relations ────────────────────────────────────────
+    # ── structure_tutelles ─────────────────────────────────────────
 
     def get_ancestor_ids(self, structure_id: int) -> frozenset[int]:
-        # Remontée récursive `child → parent` à travers `structure_relations`, toutes `relation_type` confondues (un cycle est un cycle quel que soit le type d'arête). `structure_id` lui-même est exclu du résultat.
+        # Remontée récursive `child → parent` à travers `structure_tutelles`. `structure_id` lui-même est exclu du résultat.
         stmt = text(
             """
             WITH RECURSIVE ancestors(id) AS (
-                SELECT parent_id FROM structure_relations
+                SELECT parent_id FROM structure_tutelles
                 WHERE child_id = :sid
                 UNION
-                SELECT sr.parent_id FROM structure_relations sr
+                SELECT sr.parent_id FROM structure_tutelles sr
                 JOIN ancestors a ON a.id = sr.child_id
             )
             SELECT id FROM ancestors
@@ -217,41 +217,38 @@ class PgStructureRepository(StructureRepository):
         result = self._conn.execute(stmt)
         return frozenset(row[0] for row in result)
 
-    def create_relation(
+    def create_tutelle(
         self,
         *,
         parent_id: int,
         child_id: int,
-        relation_type: str,
-    ) -> StructureRelationRow | None:
+    ) -> StructureTutelleRow | None:
         stmt = (
-            pg_insert(structure_relations)
-            .values(parent_id=parent_id, child_id=child_id, relation_type=relation_type)
-            .on_conflict_do_nothing(index_elements=["parent_id", "child_id", "relation_type"])
+            pg_insert(structure_tutelles)
+            .values(parent_id=parent_id, child_id=child_id)
+            .on_conflict_do_nothing(index_elements=["parent_id", "child_id"])
             .returning(
-                structure_relations.c.id,
-                structure_relations.c.parent_id,
-                structure_relations.c.child_id,
-                structure_relations.c.relation_type,
+                structure_tutelles.c.id,
+                structure_tutelles.c.parent_id,
+                structure_tutelles.c.child_id,
             )
         )
         result = self._conn.execute(stmt)
         row = result.first()
-        return cast(StructureRelationRow, dict(row._mapping)) if row else None
+        return cast(StructureTutelleRow, dict(row._mapping)) if row else None
 
-    def delete_relation(self, relation_id: int) -> StructureRelationDeletedRow | None:
+    def delete_tutelle(self, tutelle_id: int) -> StructureTutelleDeletedRow | None:
         stmt = (
-            delete(structure_relations)
-            .where(structure_relations.c.id == relation_id)
+            delete(structure_tutelles)
+            .where(structure_tutelles.c.id == tutelle_id)
             .returning(
-                structure_relations.c.parent_id,
-                structure_relations.c.child_id,
-                structure_relations.c.relation_type,
+                structure_tutelles.c.parent_id,
+                structure_tutelles.c.child_id,
             )
         )
         result = self._conn.execute(stmt)
         row = result.first()
-        return cast(StructureRelationDeletedRow, dict(row._mapping)) if row else None
+        return cast(StructureTutelleDeletedRow, dict(row._mapping)) if row else None
 
     # ── structure_name_forms ───────────────────────────────────────
 

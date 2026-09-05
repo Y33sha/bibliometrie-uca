@@ -33,7 +33,6 @@
   // Relation picker state
   let relationPickerOpen = $state(false);
   let relationPickerSearch = $state("");
-  let pickerRelType = $state("");
   let pickerDirection = $state("");
   let pickerStructId: number | null = $state(null);
   let relationPickerEl: HTMLDivElement | undefined = $state();
@@ -107,23 +106,8 @@
       .slice(0, 10);
   });
 
-  const tutelles = $derived(
-    detail ? detail.parents.filter((p) => p.relation_type === "est_tutelle_de") : [],
-  );
-  const tutellesDe = $derived(
-    detail ? detail.children.filter((c) => c.relation_type === "est_tutelle_de") : [],
-  );
-  const partenaires = $derived.by(() => {
-    if (!detail) return [];
-    return [
-      ...detail.parents
-        .filter((p) => p.relation_type === "est_partenaire_de")
-        .map((p) => ({ ...p, id_struct: p.id })),
-      ...detail.children
-        .filter((c) => c.relation_type === "est_partenaire_de")
-        .map((c) => ({ ...c, id_struct: c.id })),
-    ];
-  });
+  const tutelles = $derived(detail ? detail.parents : []);
+  const tutellesDe = $derived(detail ? detail.children : []);
 
   /* ── Data loading ── */
 
@@ -161,8 +145,7 @@
 
   /* ── Relation picker ── */
 
-  function openPicker(relType: string, direction: string, structId: number) {
-    pickerRelType = relType;
+  function openPicker(direction: string, structId: number) {
     pickerDirection = direction;
     pickerStructId = structId;
     relationPickerSearch = "";
@@ -173,18 +156,17 @@
   async function pickStructure(otherId: number) {
     const parentId = pickerDirection === "parent" ? otherId : pickerStructId!;
     const childId = pickerDirection === "parent" ? pickerStructId! : otherId;
-    await structuresApi.createRelation({
+    await structuresApi.createTutelle({
       parent_id: parentId,
       child_id: childId,
-      relation_type: pickerRelType,
     });
     relationPickerOpen = false;
     await loadDetail();
     refreshCache();
   }
 
-  async function deleteRelation(relId: number) {
-    await structuresApi.deleteRelation(relId);
+  async function deleteTutelle(tutelleId: number) {
+    await structuresApi.deleteTutelle(tutelleId);
     await loadDetail();
     refreshCache();
   }
@@ -322,7 +304,7 @@
   async function deleteStructure() {
     if (
       !(await confirmDialog({
-        message: "Supprimer cette structure et toutes ses formes/relations ?",
+        message: "Supprimer cette structure, ses formes de nom et ses tutelles ?",
         danger: true,
       }))
     )
@@ -480,13 +462,12 @@
       structureId={s.id}
       {tutelles}
       {tutellesDe}
-      {partenaires}
       {relationPickerOpen}
       {relationPickerResults}
       bind:relationPickerSearch
       bind:relationPickerEl
       onselect={selectRelatedStructure}
-      ondeleteRelation={deleteRelation}
+      ondeleteTutelle={deleteTutelle}
       onopenPicker={openPicker}
       onpickStructure={pickStructure}
       onclosePicker={() => (relationPickerOpen = false)}

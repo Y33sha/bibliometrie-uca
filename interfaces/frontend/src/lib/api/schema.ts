@@ -668,7 +668,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/structures/relations": {
+    "/api/structures/tutelles": {
         parameters: {
             query?: never;
             header?: never;
@@ -678,19 +678,19 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Create Relation
-         * @description Crée une relation parent-enfant entre deux structures.
+         * Create Tutelle
+         * @description Crée une tutelle parent-enfant entre deux structures.
          *
-         *     Idempotent : une relation identique — même parent, même enfant, même type — laisse la table inchangée et rend `{"status": "already_exists"}`. Lève 400 si la relation viole l'invariant de graphe : structure liée à elle-même, ou cycle (l'enfant est déjà un ancêtre du parent). Lève 409 si `parent_id` ou `child_id` désigne une structure inexistante.
+         *     Idempotent : une tutelle identique — même parent, même enfant — laisse la table inchangée et rend `{"status": "already_exists"}`. Lève 400 si elle viole l'invariant de graphe : structure liée à elle-même, ou cycle (l'enfant est déjà un ancêtre du parent). Lève 409 si `parent_id` ou `child_id` désigne une structure inexistante.
          */
-        post: operations["create_relation_api_structures_relations_post"];
+        post: operations["create_tutelle_api_structures_tutelles_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/structures/relations/{relation_id}": {
+    "/api/structures/tutelles/{tutelle_id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -701,10 +701,10 @@ export interface paths {
         put?: never;
         post?: never;
         /**
-         * Delete Relation
-         * @description Supprime une relation structure. 404 si l'id n'existe pas.
+         * Delete Tutelle
+         * @description Supprime une tutelle. 404 si l'id n'existe pas.
          */
-        delete: operations["delete_relation_api_structures_relations__relation_id__delete"];
+        delete: operations["delete_tutelle_api_structures_tutelles__tutelle_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -771,7 +771,7 @@ export interface paths {
          * Get Structure
          * @description Détail complet d'une structure : identifiants + parents + enfants + formes de nom.
          *
-         *     Retourne `{structure, parents, children, forms}`. Les parents sont les structures qui ont cette structure comme `child_id` dans `structure_relations` ; les enfants inversement. 404 si la structure n'existe pas.
+         *     Retourne `{structure, parents, children, forms}`. Les parents sont les structures qui ont cette structure comme `child_id` dans `structure_tutelles` ; les enfants inversement. 404 si la structure n'existe pas.
          */
         get: operations["get_structure_api_structures__structure_id__get"];
         /**
@@ -784,7 +784,7 @@ export interface paths {
         post?: never;
         /**
          * Delete Structure
-         * @description Supprime une structure. Cascade sur les relations et formes de noms liées. 404 si inconnue.
+         * @description Supprime une structure. Cascade sur les tutelles et formes de noms liées. 404 si inconnue.
          */
         delete: operations["delete_structure_api_structures__structure_id__delete"];
         options?: never;
@@ -4552,16 +4552,6 @@ export interface components {
             type: string;
             /** Relation Id */
             relation_id: number;
-            /** Relation Type */
-            relation_type: string;
-        };
-        /** RelationCreate */
-        RelationCreate: {
-            /** Parent Id */
-            parent_id: number;
-            /** Child Id */
-            child_id: number;
-            relation_type: components["schemas"]["StructureRelationType"];
         };
         /** ReviewAction */
         ReviewAction: {
@@ -4879,28 +4869,6 @@ export interface components {
             /** Name */
             name: string;
         };
-        /**
-         * StructureRelationCreateResponse
-         * @description Réponse de POST /api/structures/relations, polymorphe : soit la relation créée, soit `{status: "already_exists"}`.
-         */
-        StructureRelationCreateResponse: {
-            /** Id */
-            id?: number | null;
-            /** Parent Id */
-            parent_id?: number | null;
-            /** Child Id */
-            child_id?: number | null;
-            /** Relation Type */
-            relation_type?: string | null;
-            /** Status */
-            status?: string | null;
-        };
-        /**
-         * StructureRelationType
-         * @description Type d'une arête du graphe `structure_relations` (colonne texte `relation_type`). `EST_TUTELLE_DE` porte la hiérarchie parent → enfant, dont la clôture récursive définit le périmètre ; `EST_PARTENAIRE_DE` relie deux structures sans les inclure dans le périmètre l'une de l'autre.
-         * @enum {string}
-         */
-        StructureRelationType: "est_tutelle_de" | "est_partenaire_de";
         /** StructureTopCountry */
         StructureTopCountry: {
             /** Code */
@@ -4909,6 +4877,20 @@ export interface components {
             name: string;
             /** Count */
             count: number;
+        };
+        /**
+         * StructureTutelleCreateResponse
+         * @description Réponse de POST /api/structures/tutelles, polymorphe : soit la tutelle créée, soit `{status: "already_exists"}`.
+         */
+        StructureTutelleCreateResponse: {
+            /** Id */
+            id?: number | null;
+            /** Parent Id */
+            parent_id?: number | null;
+            /** Child Id */
+            child_id?: number | null;
+            /** Status */
+            status?: string | null;
         };
         /**
          * StructureType
@@ -5047,6 +5029,13 @@ export interface components {
         TotalCountResponse: {
             /** Total */
             total: number;
+        };
+        /** TutelleCreate */
+        TutelleCreate: {
+            /** Parent Id */
+            parent_id: number;
+            /** Child Id */
+            child_id: number;
         };
         /** UpdateIdentifierStatus */
         UpdateIdentifierStatus: {
@@ -6262,7 +6251,7 @@ export interface operations {
             };
         };
     };
-    create_relation_api_structures_relations_post: {
+    create_tutelle_api_structures_tutelles_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -6271,7 +6260,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["RelationCreate"];
+                "application/json": components["schemas"]["TutelleCreate"];
             };
         };
         responses: {
@@ -6281,7 +6270,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["StructureRelationCreateResponse"];
+                    "application/json": components["schemas"]["StructureTutelleCreateResponse"];
                 };
             };
             /** @description Validation Error */
@@ -6295,12 +6284,12 @@ export interface operations {
             };
         };
     };
-    delete_relation_api_structures_relations__relation_id__delete: {
+    delete_tutelle_api_structures_tutelles__tutelle_id__delete: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                relation_id: number;
+                tutelle_id: number;
             };
             cookie?: never;
         };

@@ -66,10 +66,10 @@ from interfaces.api.models.publications import (
 from interfaces.api.models.structures import (
     NameFormCreate,
     NameFormUpdate,
-    RelationCreate,
     StructureCreate,
-    StructureRelationCreateResponse,
+    StructureTutelleCreateResponse,
     StructureUpdate,
+    TutelleCreate,
 )
 
 __all__ = [
@@ -114,12 +114,12 @@ __all__ = [
     "RejectPerson",
     "RejectedPairItem",
     "RejectedPairsResponse",
-    "RelationCreate",
+    "TutelleCreate",
     "ReviewAction",
     "SetCountry",
     "SourceAuthorshipRef",
     "StructureCreate",
-    "StructureRelationCreateResponse",
+    "StructureTutelleCreateResponse",
     "StructureUpdate",
     "TotalCountResponse",
     "UpdateIdentifierStatus",

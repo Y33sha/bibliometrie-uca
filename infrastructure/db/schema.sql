@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict QxAxZ5lmd417eXArV6RWlejjDk4fjL4I0gwZoS5GGfDlQHWGlg2rDwrNP2mlEw3
+\restrict hSnsj5nQPa7VZUqA79dvVzmASIeXH9XmOJTiZt7MXkdUDdQHr8LscrwW02h2vQ5
 
 -- Dumped from database version 18.4
 -- Dumped by pg_dump version 18.4
@@ -1523,24 +1523,23 @@ ALTER SEQUENCE public.structure_name_forms_id_seq OWNED BY public.structure_name
 
 
 --
--- Name: structure_relations; Type: TABLE; Schema: public; Owner: -
+-- Name: structure_tutelles; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.structure_relations (
-    id integer NOT NULL,
-    parent_id integer NOT NULL,
-    child_id integer NOT NULL,
-    relation_type text NOT NULL,
+CREATE TABLE public.structure_tutelles (
+    id integer CONSTRAINT structure_relations_id_not_null NOT NULL,
+    parent_id integer CONSTRAINT structure_relations_parent_id_not_null NOT NULL,
+    child_id integer CONSTRAINT structure_relations_child_id_not_null NOT NULL,
     created_at timestamp with time zone DEFAULT now(),
-    CONSTRAINT structure_relations_no_self_reference CHECK ((parent_id <> child_id))
+    CONSTRAINT structure_tutelles_no_self_reference CHECK ((parent_id <> child_id))
 );
 
 
 --
--- Name: structure_relations_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: structure_tutelles_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
-CREATE SEQUENCE public.structure_relations_id_seq
+CREATE SEQUENCE public.structure_tutelles_id_seq
     AS integer
     START WITH 1
     INCREMENT BY 1
@@ -1550,10 +1549,10 @@ CREATE SEQUENCE public.structure_relations_id_seq
 
 
 --
--- Name: structure_relations_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: structure_tutelles_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
-ALTER SEQUENCE public.structure_relations_id_seq OWNED BY public.structure_relations.id;
+ALTER SEQUENCE public.structure_tutelles_id_seq OWNED BY public.structure_tutelles.id;
 
 
 --
@@ -1805,10 +1804,10 @@ ALTER TABLE ONLY public.structure_name_forms ALTER COLUMN id SET DEFAULT nextval
 
 
 --
--- Name: structure_relations id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: structure_tutelles id; Type: DEFAULT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.structure_relations ALTER COLUMN id SET DEFAULT nextval('public.structure_relations_id_seq'::regclass);
+ALTER TABLE ONLY public.structure_tutelles ALTER COLUMN id SET DEFAULT nextval('public.structure_tutelles_id_seq'::regclass);
 
 
 --
@@ -2250,19 +2249,19 @@ ALTER TABLE ONLY public.structure_name_forms
 
 
 --
--- Name: structure_relations structure_relations_parent_id_child_id_relation_type_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: structure_tutelles structure_tutelles_parent_id_child_id_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.structure_relations
-    ADD CONSTRAINT structure_relations_parent_id_child_id_relation_type_key UNIQUE (parent_id, child_id, relation_type);
+ALTER TABLE ONLY public.structure_tutelles
+    ADD CONSTRAINT structure_tutelles_parent_id_child_id_key UNIQUE (parent_id, child_id);
 
 
 --
--- Name: structure_relations structure_relations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: structure_tutelles structure_tutelles_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.structure_relations
-    ADD CONSTRAINT structure_relations_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.structure_tutelles
+    ADD CONSTRAINT structure_tutelles_pkey PRIMARY KEY (id);
 
 
 --
@@ -2957,17 +2956,17 @@ CREATE INDEX idx_staging_source ON public.staging USING btree (source);
 
 
 --
--- Name: idx_struct_rel_child; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_struct_tut_child; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_struct_rel_child ON public.structure_relations USING btree (child_id);
+CREATE INDEX idx_struct_tut_child ON public.structure_tutelles USING btree (child_id);
 
 
 --
--- Name: idx_struct_rel_parent; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_struct_tut_parent; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_struct_rel_parent ON public.structure_relations USING btree (parent_id);
+CREATE INDEX idx_struct_tut_parent ON public.structure_tutelles USING btree (parent_id);
 
 
 --
@@ -3422,24 +3421,24 @@ ALTER TABLE ONLY public.structure_name_forms
 
 
 --
--- Name: structure_relations structure_relations_child_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: structure_tutelles structure_tutelles_child_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.structure_relations
-    ADD CONSTRAINT structure_relations_child_id_fkey FOREIGN KEY (child_id) REFERENCES public.structures(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.structure_tutelles
+    ADD CONSTRAINT structure_tutelles_child_id_fkey FOREIGN KEY (child_id) REFERENCES public.structures(id) ON DELETE CASCADE;
 
 
 --
--- Name: structure_relations structure_relations_parent_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: structure_tutelles structure_tutelles_parent_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.structure_relations
-    ADD CONSTRAINT structure_relations_parent_id_fkey FOREIGN KEY (parent_id) REFERENCES public.structures(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.structure_tutelles
+    ADD CONSTRAINT structure_tutelles_parent_id_fkey FOREIGN KEY (parent_id) REFERENCES public.structures(id) ON DELETE CASCADE;
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict QxAxZ5lmd417eXArV6RWlejjDk4fjL4I0gwZoS5GGfDlQHWGlg2rDwrNP2mlEw3
+\unrestrict hSnsj5nQPa7VZUqA79dvVzmASIeXH9XmOJTiZt7MXkdUDdQHr8LscrwW02h2vQ5
 

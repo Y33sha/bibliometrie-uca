@@ -183,21 +183,19 @@ structures = Table(
 )
 
 
-structure_relations = Table(
-    "structure_relations",
+structure_tutelles = Table(
+    "structure_tutelles",
     metadata,
     Column("id", Integer, primary_key=True),
     Column("parent_id", Integer, nullable=False),
     Column("child_id", Integer, nullable=False),
-    Column("relation_type", Text, nullable=False),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     UniqueConstraint(
         "parent_id",
         "child_id",
-        "relation_type",
-        name="structure_relations_parent_id_child_id_relation_type_key",
+        name="structure_tutelles_parent_id_child_id_key",
     ),
-    CheckConstraint("parent_id <> child_id", name="structure_relations_no_self_reference"),
+    CheckConstraint("parent_id <> child_id", name="structure_tutelles_no_self_reference"),
 )
 
 

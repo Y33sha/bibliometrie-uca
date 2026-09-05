@@ -70,7 +70,7 @@ def _seed_addresses_api(client):
     with owner_pool() as cur:
         cur.execute(
             "TRUNCATE TABLE address_structures, source_authorship_addresses, addresses, "
-            "structure_name_forms, structure_relations, structures, perimeters, "
+            "structure_name_forms, structure_tutelles, structures, perimeters, "
             "audit_log RESTART IDENTITY CASCADE"
         )
         cur.execute("DELETE FROM config WHERE key = 'perimeter_persons'")
