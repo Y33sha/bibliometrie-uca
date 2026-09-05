@@ -1,15 +1,20 @@
 # Tests
 
-*À jour le 2026-06-30.*
+*À jour le 2026-09-05.*
 
-- **Unit** (`tests/unit/`) — pas de DB. Couvre `domain/`, `application/` (services avec mocks), le parsing des normalizers et des adaptateurs sources (logique pure rangée selon la source : `parsing.py`, `fields.py`, ou le module d'extraction), l'infrastructure pure (log, métriques) et les interfaces (`tests/unit/interfaces/`).
-- **Intégration** (`tests/integration/`) — base `bibliometrie_test` créée à la volée (`alembic upgrade head` sur DB vierge), fixtures `db` (curseur psycopg avec rollback) et `sa_sync_conn` (Connection SA avec rollback). Couvre les routers, les orchestrateurs pipeline, les adaptateurs (repositories et gateways pipeline) et des smoke tests des CLI permanents (`tests/integration/cli/`).
+## Deux suites Python
 
-Conftest splitté :
+- **Unitaires** (`tests/unit/`) — sans base. Couvrent `domain/`, les services de `application/` sur mocks, la lecture des formats sources, l'infrastructure sans entrée-sortie, et les interfaces.
+- **Intégration** (`tests/integration/`) — sur une base `bibliometrie_test`, recréée par `alembic upgrade head` au début de la session. Chaque test travaille dans une transaction annulée à sa sortie. Couvrent les routers, les orchestrateurs de phase, les adaptateurs, et le démarrage des programmes en ligne de commande.
 
-- `tests/conftest.py` — cross-cutting (mock `setup_logger` pour éviter la pollution disque, caches)
-- `tests/integration/conftest.py` — setup BDD via Alembic, fixtures `db` / `sa_sync_conn`
+Les tests d'intégration se connectent sous les mêmes rôles que les processus en production, et les droits accordés à la base de test sont extraits de `infrastructure/db/roles.sql` plutôt que recopiés. Une écriture hors des droits d'un rôle échoue donc ici, nommément, au lieu d'aboutir et de casser une fois déployée.
 
-Seuil de couverture `fail_under = 90` (`[tool.coverage.report]` dans `pyproject.toml`).
+## Le frontend
 
-Les modules de wiring HTTP des adaptateurs sources sont exclus du calcul ; leur logique pure (parsing des payloads) est isolée dans des modules dédiés par source et couverte par tests unitaires.
+`npm test` lance vitest sur `interfaces/frontend/`. L'intégration continue y ajoute le contrôle de types (`npm run check`, qui échoue sur toute erreur) et eslint.
+
+## Couverture
+
+Le seuil global est `fail_under = 90`, sur une mesure qui compte les branches et pas seulement les lignes (`branch = true`). Une liste courte de modules — ceux qui décident d'un accès, bornent une entrée, ferment une connexion à l'écriture ou tracent une action d'administration — est tenue à `fail_under = 100`.
+
+Sont hors du calcul les scripts à usage unique et le dialogue HTTP des adaptateurs sources — pagination, attente, appels — dont la logique utile vit dans des modules mesurés.
