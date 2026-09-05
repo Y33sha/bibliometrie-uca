@@ -2,7 +2,7 @@
 
 Une `Publication` unifie les images qu'une ou plusieurs `SourcePublication` donnent d'un même document scientifique. Identité = `id` (clé surrogate). Identifiant naturel principal : `doi` (quand renseigné ; les autres identifiants — HALId, NNT — vivent côté `source_publications.external_ids`).
 
-Composition : `Publication.authorships` (entité fille `Authorship`). Les `source_publications` attachées sont lues en projection (`SourcePublication`), jamais comme un agrégat mutable.
+Les `source_publications` attachées sont lues en projection (`SourcePublication`), jamais comme un agrégat mutable.
 
 L'entité porte la forme et l'identité de la référence canonique. Les règles qui la calculent vivent dans les modules voisins du domaine : agrégation cross-sources (`aggregation`), arbitrage des statuts et canonicalisation des titres (`metadata`), assignation et réconciliation (`reconciliation`).
 """
@@ -10,7 +10,6 @@ L'entité porte la forme et l'identité de la référence canonique. Les règles
 from dataclasses import dataclass, field
 from datetime import datetime
 
-from domain.publications.authorship import Authorship
 from domain.publications.identifiers import DOI
 from domain.types import JsonValue
 
@@ -39,7 +38,6 @@ class Publication:
     topics: dict[str, JsonValue] | None = None
     biblio: dict[str, JsonValue] | None = None
     meta: dict[str, JsonValue] | None = None
-    authorships: tuple[Authorship, ...] = field(default=())
     # Date de la dernière vérification Unpaywall (None = jamais). Quand posée,
     # Unpaywall fait autorité sur `oa_status` : l'agrégation cross-sources ne le
     # ré-écrit pas (cf. `aggregation.refresh_from_sources`).

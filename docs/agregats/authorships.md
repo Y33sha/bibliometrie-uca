@@ -4,7 +4,7 @@
 
 Une `authorship` relie une personne à une publication : une ligne par couple `(publication_id, person_id)`. Elle est entièrement dérivée des signatures relevées dans chaque source (`source_authorships`) — jamais saisie, jamais modifiée à la main. La phase `persons` attribue une personne à chaque signature ; la phase `authorships` promeut ensuite les couples attestés et recompose leurs attributs.
 
-C'est l'entité fille de [publications](publications.md), définie par `domain/publications/authorship.py`. Son vocabulaire de rôles et la correspondance des rôles propres à chaque source vivent dans `authorship_roles`.
+Aucun objet de domaine ne lui correspond. Son vocabulaire de rôles et la correspondance des rôles propres à chaque source vivent dans `domain/publications/authorship_roles.py`.
 
 ## Tables
 
