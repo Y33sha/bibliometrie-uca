@@ -104,9 +104,11 @@ class Settings(BaseSettings):
     api_threadpool_size: int = 40
 
     # ----- Pool de connexions -----
-    # Ratio max/min recommandé : ~1:15. Monter db_pool_max à 50+ si l'API admin charge plusieurs facettes en parallèle et qu'on observe des TimeoutError côté pool. Cf. `.env.example` pour la note opérationnelle.
+    # `db_pool_min` : connexions tenues ouvertes en permanence. Le différentiel jusqu'à
+    # `db_pool_max` s'ouvre à la demande et se referme au retour. Le plafond égale
+    # `api_threadpool_size` : un thread qui sert une requête trouve une connexion.
     db_pool_min: int = 2
-    db_pool_max: int = 30
+    db_pool_max: int = 40
 
     # ----- Identifiants d'accès aux sources externes -----
     # Une source dont les identifiants manquent est sautée au lancement du pipeline, avec un
