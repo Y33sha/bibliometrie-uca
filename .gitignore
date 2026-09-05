@@ -45,5 +45,8 @@ docs/chantiers/datacite-vs-natives-spike-data/
 .env
 
 # Claude Code
-.claude/*.json
-.claude/projects
+.claude
+
+# Vale
+.vale.ini
+styles/
