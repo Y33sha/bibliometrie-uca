@@ -2,7 +2,7 @@
 
 Sous-modules :
 - `person` : aggregate root `Person` (l'invariant de fusion vit sur `Person.can_merge_with`)
-- `person_identifier` : aggregate `PersonIdentifier` (identité naturelle `(id_type, id_value)`)
+- `identifier_attribution` : aggregate `IdentifierAttribution` (identité naturelle `(id_type, id_value)`)
 - `identifiers` : VOs ORCID/IdHAL/IdRef + helpers de normalisation
 - `name_forms` : VO `PersonNameForm`
 - `name_matching` : compatibilité de noms entre signatures (`names_compatible`, `parse_raw_author_name`)

@@ -3,10 +3,10 @@
 import pytest
 
 from domain.errors import ConflictError
+from domain.persons.identifier_attribution import IdentifierAttribution
 from domain.persons.identifiers import AttributionStatus
 from domain.persons.name_forms import PersonNameForm
 from domain.persons.person import Person
-from domain.persons.person_identifier import PersonIdentifier
 
 
 def _make_person(person_id: int | None = 1) -> Person:
@@ -28,7 +28,7 @@ class TestPersonConstruction:
         assert p.name_forms == ()
 
     def test_accepts_identifiers_and_name_forms(self):
-        ident = PersonIdentifier(
+        ident = IdentifierAttribution(
             id=1,
             person_id=10,
             id_type="orcid",

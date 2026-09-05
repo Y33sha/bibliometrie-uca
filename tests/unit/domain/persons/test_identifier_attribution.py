@@ -1,14 +1,14 @@
-"""Tests de l'aggregate `PersonIdentifier` (scaffolding Phase 1)."""
+"""Tests de l'aggregate `IdentifierAttribution` (scaffolding Phase 1)."""
 
 import pytest
 
 from domain.errors import CannotAttributeConflict
+from domain.persons.identifier_attribution import IdentifierAttribution
 from domain.persons.identifiers import AttributionStatus
-from domain.persons.person_identifier import PersonIdentifier
 
 
-def _make(status: AttributionStatus = AttributionStatus.PENDING) -> PersonIdentifier:
-    return PersonIdentifier(
+def _make(status: AttributionStatus = AttributionStatus.PENDING) -> IdentifierAttribution:
+    return IdentifierAttribution(
         id=1,
         person_id=10,
         id_type="orcid",
@@ -18,9 +18,9 @@ def _make(status: AttributionStatus = AttributionStatus.PENDING) -> PersonIdenti
     )
 
 
-class TestPersonIdentifierConstruction:
+class TestIdentifierAttributionConstruction:
     def test_defaults_to_pending(self):
-        ident = PersonIdentifier(
+        ident = IdentifierAttribution(
             id=None, person_id=10, id_type="orcid", id_value="0000-0000-0000-0001"
         )
         assert ident.status is AttributionStatus.PENDING

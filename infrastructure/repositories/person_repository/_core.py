@@ -4,10 +4,10 @@ from sqlalchemy import Connection, text
 
 from domain.errors import NotFoundError
 from domain.normalize import normalize_name
+from domain.persons.identifier_attribution import IdentifierAttribution
 from domain.persons.identifiers import AttributionStatus
 from domain.persons.name_forms import PersonNameForm, compute_person_name_forms
 from domain.persons.person import Person
-from domain.persons.person_identifier import PersonIdentifier
 from infrastructure.db.scalars import scalar_int
 from infrastructure.repositories.person_repository import _name_forms
 
@@ -34,7 +34,7 @@ def find_by_id(conn: Connection, person_id: int) -> Person | None:
         {"pid": person_id},
     ).all()
     identifiers = tuple(
-        PersonIdentifier(
+        IdentifierAttribution(
             id=r.id,
             person_id=r.person_id,
             id_type=r.id_type,
