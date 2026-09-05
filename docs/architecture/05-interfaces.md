@@ -1,22 +1,26 @@
 # Interfaces — adaptateurs entrants
 
-*À jour le 2026-06-30.*
+*À jour le 2026-09-05.*
 
-Contenu :
+`interfaces/` reçoit les demandes extérieures et les traduit en appels aux use-cases : HTTP pour l'API et le frontend, ligne de commande pour le pipeline et les scripts.
 
-- **`api/`** — FastAPI :
-  - `app.py` — entry point (routers, middlewares, gestion d'erreurs)
-  - `routers/` — un module par agrégat (publications, persons, structures, addresses, …)
-  - `models/` — Pydantic pour les bodies POST/PUT/PATCH (un module par agrégat)
-  - `deps.py` — dépendances (Engine SA sync ; factories de read-models, de repositories et de gateways pipeline sans état ; lanceurs de tâches de fond ; auth)
-  - middlewares inline dans `app.py` (auth, strip-prefix, timing)
-- **`frontend/`** — SvelteKit (Svelte 5)
-- **`cli/`** — scripts (imports manuels, debug, corrections ponctuelles). Exclus de la couverture pytest (`[tool.coverage.run]` omit).
+## Contenu
 
-## Sync partout (FastAPI + threadpool)
+- **`api/`** — l'application FastAPI.
+  - `app.py` assemble les routers, la traduction des erreurs métier en codes HTTP, et les middlewares (authentification des écritures, plafonds de lecture, en-têtes de sécurité, journalisation des requêtes) ;
+  - `routers/` et `models/` contiennent un module par agrégat ;
+  - `deps.py` porte les fabriques que les routes reçoivent par `Depends`.
+  - S'y ajoutent la session d'administration (`session.py`), les limiteurs de débit (`rate_limit.py`) et le service du frontend buildé (`spa.py`).
+- **`frontend/`** — l'application SvelteKit (Svelte 5), servie par l'API une fois buildée.
+- **`cli/`** — les programmes lancés en ligne de commande :
+  - `run_pipeline.py` — l'orchestrateur du pipeline, installé comme commande `run_pipeline`
+  - `imports/` — imports de fichiers externes (frais de publication, DOAJ, personnes)
+  - `maintenance/` — opérations rejouables sur la base
+  - `dev/` — production des artefacts du dépôt : schéma SQL, contrat OpenAPI, jeu de données de démarrage
+  - `oneshot/` — scripts écrits pour une seule exécution, conservés comme trace ; exclus de la mesure de couverture `pytest`
 
-Toutes les routes API sont déclarées `def` (pas `async def`). FastAPI les exécute dans le threadpool Starlette (~40 workers par défaut), ce qui permet de partager **les mêmes** repositories et query services entre l'API et le pipeline. Une seule famille de code, un seul style de connexion (`Connection` SQLAlchemy).
+## Routes synchrones
 
-Aucun *handler* de route n'est `async` : les seules fonctions `async def` sont des constructions de framework dans `app.py` (lifespan, gestionnaires d'erreurs, middlewares d'authentification et de chronométrage), comme l'impose Starlette. Elles ne touchent pas la base.
+Aucune route n'est `async def`. FastAPI les exécute donc dans le threadpool de Starlette, ce qui permet à l'API et au pipeline de partager les mêmes repositories et query services, sur le même type de connexion. Les seules fonctions `async` sont les constructions qu'impose Starlette — cycle de vie, gestionnaires d'erreurs, middlewares — et aucune ne touche la base.
 
-Dimensionnement du pool DB : `db_pool_max = 30` (dans `infrastructure/settings.py`), pour absorber confortablement la concurrence threadpool × marge sur un usage admin (quelques utilisateurs concurrents max). Bumper si on observe des `TimeoutError` côté pool sous charge anormale (cf. `.env.example`).
+La concurrence de l'API est donc celle du threadpool, dimensionné par `API_THREADPOOL_SIZE`. Le plafond du pool de connexions (`DB_POOL_MAX`) doit être au moins égal.
