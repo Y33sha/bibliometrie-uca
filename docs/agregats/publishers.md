@@ -28,7 +28,7 @@ Trois tables extérieures référencent un éditeur : `journals.publisher_id`, `
 
 Routeur `interfaces/api/routers/publishers.py`, adaptateur `PgPublisherRepository`.
 
-**Éditer un éditeur** (`PUT /api/publishers/{id}`). Seuls les champs transmis sont modifiés ; le dépôt re-dérive `name_normalized` depuis le nom.
+**Éditer un éditeur** (`PUT /api/publishers/{id}`). Seuls les champs transmis sont modifiés ; le repository re-dérive `name_normalized` depuis le nom.
 
 **Fusionner deux éditeurs** (`POST /api/publishers/{id}/merge`). L'opération est refusée si les deux éditeurs portent des ISSN divergents, ou si la fusion créerait un doublon interne. Les revues que les deux se partagent sous un même titre sont fusionnées d'abord, puis `merge_publisher_into` repointe `journals`, `journal_name_forms` et `apc_payments` avant de recaler les compteurs.
 
@@ -47,4 +47,4 @@ Port `application/ports/read_models/publishers_queries.py`, adaptateur `PgPublis
 
 ## Points d'attention
 
-**La fusion écrit dans des tables d'autres agrégats.** `merge_publisher_into` met à jour `journals`, `journal_name_forms` et `apc_payments` en SQL littéral, hors du périmètre que le dépôt des éditeurs déclare — comme la fusion de revues, et pour la même raison : repointer les dépendants est le contenu même de l'opération, et elle demande une transaction unique.
+**La fusion écrit dans des tables d'autres agrégats.** `merge_publisher_into` met à jour `journals`, `journal_name_forms` et `apc_payments` en SQL littéral, hors du périmètre que le repository des éditeurs déclare — comme la fusion de revues, et pour la même raison : repointer les dépendants est le contenu même de l'opération, et elle demande une transaction unique.
