@@ -6,23 +6,23 @@ Le système se lit selon deux axes complémentaires : **deux programmes** coupl�
 
 ## Deux programmes, une base
 
-Le code héberge deux programmes de natures différentes, qui ne s'appellent jamais directement : ils ne communiquent qu'à travers la base PostgreSQL, laquelle constitue leur **contrat d'intégration**.
+Le code héberge deux programmes de natures différentes, qui ne s'appellent jamais directement : ils ne communiquent qu'à travers la base PostgreSQL.
 
-- **L'application web** (`interfaces/api/` + `interfaces/frontend/`) : un processus FastAPI permanent, piloté par les requêtes des utilisateurs. Elle sert les pages web et restitue les données sous forme de listes, tableaux de bord et exports csv.
+- **L'application web** (`interfaces/api/` + `interfaces/frontend/`) : un processus FastAPI permanent, piloté par les requêtes des utilisateurs. Elle sert les pages web et restitue les données sous forme de listes, tableaux de bord et exports CSV.
 - **Le pipeline** (`run_pipeline` + `application/pipeline/`) : un traitement par lots, déclenché par un ordonnanceur. Il **dérive** le référentiel : moissonnage des sources, normalisation, déduplication, rapprochement, enrichissements.
 
 ```
   sources externes
         │
         ▼  moissonnage
-  ┌──────────────┐                ┌──────────────────────────┐               ┌───────────────┐
-  │   pipeline   │ ── écrit ────► │        PostgreSQL        │ ── lit ─────► │  application  │ ◄── utilisateurs
-  │   (batch)    │   (dérive)     │  (contrat d'intégration) │               │  web (API     │
-  │              │ ◄── relit ──── │                          │ ◄── écrit ─── │  + frontend)  │
-  └──────────────┘   la curation  └──────────────────────────┘   curation    └───────────────┘
+  ┌──────────────┐                ┌──────────────┐               ┌───────────────┐
+  │   pipeline   │ ── écrit ────► │  base        │ ── lit ─────► │  application  │ ◄── utilisateurs
+  │   (batch)    │   (dérive)     │  PostgreSQL  │               │  web (API     │
+  │              │ ◄── relit ──── │              │ ◄── écrit ─── │  + frontend)  │
+  └──────────────┘   la curation  └──────────────┘   curation    └───────────────┘
 ```
 
-La curation forme une **boucle fermée** : les corrections saisies via l'API — données de référence (structures, périmètre, configuration) et arbitrages manuels(*cannot-link* entre personnes ou entre publications, identifiants confirmés ou rejetés…) — deviennent des **entrées** que le pipeline relit et **préserve** à chaque passe.
+La curation forme une **boucle fermée** : les corrections saisies via l'API — données de référence (structures, périmètre, configuration) et arbitrages manuels (*cannot-link* entre personnes ou entre publications, identifiants confirmés ou rejetés…) — deviennent des **entrées** que le pipeline relit et **préserve** à chaque passe.
 
 ## Vue par couches
 
@@ -58,19 +58,19 @@ Cette vue par couches se superpose à la vue par programme : `domain/` sert aux 
 
 Chaque règle est vérifiée par un contrat `import-linter`, déclaré dans `pyproject.toml`, section `[tool.importlinter]`, et nommé ici en regard.
 
-1. **Le noyau n'importe que la bibliothèque standard.** `domain/` n'atteint aucun paquet tiers et aucune autre couche. La liste des modules permis vient de l'interpréteur, si bien qu'une dépendance ajoutée au projet est refusée sans qu'on ait eu à la prévoir.
+1. **Le noyau n'importe que la bibliothèque standard.** `domain/` n'atteint aucun paquet tiers et aucune autre couche. La liste des modules permis vient de l'interpréteur.
    → `Domain : rien hors bibliothèque standard`
 
 2. **Les couches ne s'importent que vers le bas.** `interfaces/` au-dessus, `infrastructure/` et `application/` au milieu, `domain/` en dessous. En particulier, `application/` n'importe pas `infrastructure/` : les services applicatifs reçoivent leurs dépendances par les **ports** (`Protocol`) de `application/ports/`, que `infrastructure/` implémente.
    → `Couches DDD (layered)`
 
-3. **Les routers n'atteignent pas `infrastructure/` directement.** Ils reçoivent leurs dépendances par `Depends(...)`, dont les fabriques vivent dans `interfaces/api/deps.py`. Le chemin indirect qui passe par ces fabriques reste permis : c'est celui qu'on attend.
+3. **Les routers n'atteignent pas `infrastructure/` directement.** Ils reçoivent leurs dépendances par `Depends(...)`, dont les fabriques vivent dans `interfaces/api/deps.py`. Le chemin indirect qui passe par ces fabriques reste permis.
    → `Routers : pas d'import direct de infrastructure`
 
 4. **Seul le composition root instancie les adapters concrets.** Pour l'application web, ce sont `interfaces/api/app.py` et `interfaces/api/deps.py` ; partout ailleurs sous `interfaces/api/`, on passe par un port. Chaque script de `interfaces/cli/` est en revanche son propre composition root, et instancie directement ce dont il a besoin.
    → `Composition root : Pg* concrets uniquement dans app et deps`
 
-5. **Un adapter reçoit sa connexion, il ne l'ouvre pas.** Les modules de lecture et les dépôts travaillent sur la connexion que leur appelant leur remet — celle qui porte la transaction de la requête et les caractéristiques que la composition root y a posées.
+5. **Un adapter reçoit sa connexion, il ne l'ouvre pas.** Les modules de lecture et les dépôts travaillent sur la connexion que leur appelant leur remet.
    → `Adapters : la connexion se reçoit, elle ne s'ouvre pas`
 
 6. **L'API n'émet aucune requête réseau.** Aucun module servant une requête HTTP n'atteint un client réseau, y compris par une chaîne d'imports. Tout le trafic sortant appartient au pipeline.
