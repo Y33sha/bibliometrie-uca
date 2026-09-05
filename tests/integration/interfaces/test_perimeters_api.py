@@ -178,8 +178,7 @@ class TestMaterializedPerimeterStructures:
         lab = _seed_structure(type_="labo")
         with owner_pool() as cur:
             cur.execute(
-                "INSERT INTO structure_relations (parent_id, child_id, relation_type) "
-                "VALUES (%s, %s, 'est_tutelle_de')",
+                "INSERT INTO structure_tutelles (parent_id, child_id) VALUES (%s, %s)",
                 (root, lab),
             )
         pid = _seed_perimeter()
@@ -192,8 +191,7 @@ class TestMaterializedPerimeterStructures:
         lab = _seed_structure(type_="labo")
         with owner_pool() as cur:
             cur.execute(
-                "INSERT INTO structure_relations (parent_id, child_id, relation_type) "
-                "VALUES (%s, %s, 'est_tutelle_de')",
+                "INSERT INTO structure_tutelles (parent_id, child_id) VALUES (%s, %s)",
                 (root, lab),
             )
         code = _uniq("withroots")
@@ -208,8 +206,8 @@ class TestMaterializedPerimeterStructures:
         lab = _seed_structure(type_="labo")
         pid = _seed_perimeter(root_structure_ids=[root])
         r = auth_client.post(
-            "/api/structures/relations",
-            json={"parent_id": root, "child_id": lab, "relation_type": "est_tutelle_de"},
+            "/api/structures/tutelles",
+            json={"parent_id": root, "child_id": lab},
         )
         assert r.status_code == 200
         assert _perimeter_structure_ids(pid) == {root, lab}

@@ -20,7 +20,6 @@ from application.ports.read_models.subjects_queries import SubjectFrequency
 from domain.countries import NON_INTERNATIONAL_COUNTRY_CODES
 from domain.dates import today
 from domain.publications.doc_types import DocType
-from domain.structures.relations import StructureRelationType
 from infrastructure.read_models.filters import OA_DASHBOARD_COLS_SQL, entity_subjects_sql
 from infrastructure.read_models.perimeters import get_persons_structure_ids_list
 
@@ -73,11 +72,11 @@ def _list_structures_sql(
                (SELECT json_agg(json_build_object(
                     'id', sp.id, 'code', sp.code, 'name', sp.name, 'acronym', sp.acronym,
                     'type', sp.structure_type::text,
-                    'relation_id', sr.id, 'relation_type', sr.relation_type::text
+                    'relation_id', sr.id
                 ) ORDER BY sp.name)
-                FROM structure_relations sr
+                FROM structure_tutelles sr
                 JOIN structures sp ON sp.id = sr.parent_id
-                WHERE sr.child_id = s.id AND sr.relation_type = '{StructureRelationType.EST_TUTELLE_DE.value}'
+                WHERE sr.child_id = s.id
                ) AS tutelles
         FROM structures s
         LEFT JOIN perimeter_structures ps ON ps.structure_id = s.id
@@ -95,7 +94,6 @@ def _related_from_row(row: Row[tuple[object, ...]]) -> RelatedStructureOut:
         acronym=row.acronym,
         type=row.type,
         relation_id=row.relation_id,
-        relation_type=row.relation_type,
     )
 
 
@@ -160,24 +158,24 @@ class PgStructuresQueries(StructuresQueries):
 
         parent_rows = self._conn.execute(
             text("""
-                SELECT sr.id AS relation_id, sr.relation_type::text,
+                SELECT sr.id AS relation_id,
                        sp.id, sp.code, sp.name, sp.acronym, sp.structure_type::text AS type
-                FROM structure_relations sr
+                FROM structure_tutelles sr
                 JOIN structures sp ON sp.id = sr.parent_id
                 WHERE sr.child_id = :id
-                ORDER BY sr.relation_type, sp.name
+                ORDER BY sp.name
             """),
             {"id": structure_id},
         ).all()
 
         child_rows = self._conn.execute(
             text("""
-                SELECT sr.id AS relation_id, sr.relation_type::text,
+                SELECT sr.id AS relation_id,
                        sc.id, sc.code, sc.name, sc.acronym, sc.structure_type::text AS type
-                FROM structure_relations sr
+                FROM structure_tutelles sr
                 JOIN structures sc ON sc.id = sr.child_id
                 WHERE sr.parent_id = :id
-                ORDER BY sr.relation_type, sc.name
+                ORDER BY sc.name
             """),
             {"id": structure_id},
         ).all()

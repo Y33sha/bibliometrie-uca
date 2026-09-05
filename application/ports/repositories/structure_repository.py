@@ -39,21 +39,19 @@ class StructureDeletedRow(TypedDict):
     name: str
 
 
-class StructureRelationRow(TypedDict):
-    """Ligne `structure_relations` renvoyée par create."""
+class StructureTutelleRow(TypedDict):
+    """Ligne `structure_tutelles` renvoyée par create."""
 
     id: int
     parent_id: int
     child_id: int
-    relation_type: str
 
 
-class StructureRelationDeletedRow(TypedDict):
+class StructureTutelleDeletedRow(TypedDict):
     """Sous-ensemble renvoyé par delete (les ids pour l'audit)."""
 
     parent_id: int
     child_id: int
-    relation_type: str
 
 
 class StructureNameFormRow(TypedDict):
@@ -76,12 +74,12 @@ class StructureNameFormDeletedRow(TypedDict):
 
 
 class StructureRepository(Protocol):
-    """Contrat d'accès aux 3 tables du concept Structure (structures, structure_relations, structure_name_forms)."""
+    """Contrat d'accès aux 3 tables du concept Structure (structures, structure_tutelles, structure_name_forms)."""
 
     # ── structures : charger-muter-sauver l'agrégat ────────────────
 
     def find_by_id(self, structure_id: int) -> Structure | None:
-        """Hydrate l'aggregate `Structure` complet (champs scalaires + VOs `name_forms`). Retourne None si la structure n'existe pas. Les `structure_relations` restent un graphe externe à l'aggregate (voir `get_ancestor_ids` pour les remontées ciblées)."""
+        """Hydrate l'aggregate `Structure` complet (champs scalaires + VOs `name_forms`). Retourne None si la structure n'existe pas. Les `structure_tutelles` restent un graphe externe à l'aggregate (voir `get_ancestor_ids` pour les remontées ciblées)."""
         ...
 
     def add(self, structure: Structure) -> int:
@@ -94,23 +92,22 @@ class StructureRepository(Protocol):
 
     def delete_structure(self, structure_id: int) -> StructureDeletedRow | None: ...
 
-    # ── structure_relations ────────────────────────────────────────
+    # ── structure_tutelles ─────────────────────────────────────────
 
     def get_ancestor_ids(self, structure_id: int) -> frozenset[int]:
-        """Ancêtres stricts de `structure_id` dans le graphe `structure_relations` (toutes `relation_type` confondues). Exclut `structure_id` lui-même. Sert au service pour valider l'absence de cycle avant insertion d'une relation."""
+        """Ancêtres stricts de `structure_id` dans le graphe `structure_tutelles`. Exclut `structure_id` lui-même. Sert au service pour valider l'absence de cycle avant insertion d'une tutelle."""
         ...
 
-    def create_relation(
+    def create_tutelle(
         self,
         *,
         parent_id: int,
         child_id: int,
-        relation_type: str,
-    ) -> StructureRelationRow | None:
-        """Crée une relation parent-enfant et retourne la ligne, ou `None` si elle existe déjà (`(parent_id, child_id, relation_type)` en conflit)."""
+    ) -> StructureTutelleRow | None:
+        """Crée une tutelle parent-enfant et retourne la ligne, ou `None` si elle existe déjà (`(parent_id, child_id)` en conflit)."""
         ...
 
-    def delete_relation(self, relation_id: int) -> StructureRelationDeletedRow | None: ...
+    def delete_tutelle(self, tutelle_id: int) -> StructureTutelleDeletedRow | None: ...
 
     # ── structure_name_forms ───────────────────────────────────────
 

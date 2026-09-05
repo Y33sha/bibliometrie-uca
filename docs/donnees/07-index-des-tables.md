@@ -44,7 +44,7 @@ flowchart TB
     end
     subgraph satS["Structures & périmètre"]
         structure_name_forms
-        structure_relations
+        structure_tutelles
         perimeters --> perimeter_structures
     end
     subgraph satN["Satellites personne"]
@@ -102,7 +102,7 @@ Les vues matérialisées sont signalées comme telles ; les tables purement tech
 | `source_publications` | un enregistrement par document par source | [Authorships et sources](05-authorships-et-sources.md) |
 | `staging` | ingestion brute par source (cycle de vie en 3 états) | [Authorships et sources](05-authorships-et-sources.md) |
 | `structure_name_forms` | formes de noms pour la détection des structures | [Structures](02-structures.md) |
-| `structure_relations` | relations entre structures (tutelle, partenariat) | [Structures](02-structures.md) |
+| `structure_tutelles` | rattachement hiérarchique entre structures | [Structures](02-structures.md) |
 | `structures` | référentiel institutionnel | [Structures](02-structures.md) |
 | `subject_cooccurrences` | *vue matérialisée* : paires de sujets co-présents | [Données dérivées](06-donnees-derivees.md) |
 | `subjects` | référentiel des sujets / mots-clés | [Publications](03-publications.md) |

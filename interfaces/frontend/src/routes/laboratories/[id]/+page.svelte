@@ -66,8 +66,7 @@
 		{ label: 'Domestique', value: dashCollab.domestic, color: '#e0e0e0' }
 	]);
 
-	const tutelles = $derived(parents.filter((p) => p.relation_type === 'est_tutelle_de'));
-	const partenaires = $derived(parents.filter((p) => p.relation_type === 'est_partenaire_de'));
+	const tutelles = $derived(parents);
 
 
 	// `useUrlFilters` ne gère ici que les keys cross-onglets (tab, addresses). Les filtres publications/thèses/personnes sont gérés par leurs ListView.
@@ -209,14 +208,6 @@
 					{/each}
 				{/if}
 			</div>
-			{#if partenaires.length}
-				<div class="meta-row">
-					<span class="meta-label">Partenaires</span>
-					{#each partenaires as p (p.id)}
-						<span class="partner-tag">{p.acronym || p.name}</span>
-					{/each}
-				</div>
-			{/if}
 		</div>
 	</div>
 
@@ -379,7 +370,6 @@
 		text-transform: uppercase; letter-spacing: 0.3px;
 	}
 	.tutelle-tag { background: var(--accent-light); color: var(--accent); }
-	.partner-tag { background: var(--border-subtle); color: var(--muted); }
 	.id-badge { margin-right: 8px; }
 
 	/* Dashboard */

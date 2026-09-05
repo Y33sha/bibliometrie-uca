@@ -100,7 +100,7 @@ GRANT INSERT, UPDATE ON
 TO bibliometrie_app;
 
 GRANT INSERT, DELETE ON
-    perimeter_structures, structure_relations
+    perimeter_structures, structure_tutelles
 TO bibliometrie_app;
 
 -- `INSERT … ON CONFLICT DO UPDATE` exige le droit de mise à jour, que la ligne entre en

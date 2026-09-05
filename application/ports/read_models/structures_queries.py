@@ -53,7 +53,6 @@ class RelatedStructureOut(BaseModel):
     acronym: str | None
     type: str
     relation_id: int
-    relation_type: str
 
 
 class NameFormOut(BaseModel):

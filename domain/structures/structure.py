@@ -2,7 +2,7 @@
 
 Identité = `id` (clé surrogate) ; identifiant naturel : `code` (unique). Une structure agrège ses formes de noms (`name_forms`), ses identifiants externes (`RorId`, `HalCollection`) et un dict `api_ids` JSONB pour les identifiants de sources sans VO dédié (clés : `openalex`, `wos`, `scanr`, `theses`, `hal`).
 
-Les règles métier des structures (matching des formes de nom, hiérarchie `structure_relations`) vivent dans les modules voisins du package `domain/structures/`.
+Les règles métier des structures (matching des formes de nom, hiérarchie `structure_tutelles`) vivent dans les modules voisins du package `domain/structures/`.
 """
 
 from dataclasses import dataclass, field

@@ -34,7 +34,7 @@ Gestion du CRUD des structures, et de leurs relations et formes de noms.
 
 Pour chaque structure:
 - **Détails** (nom, acronyme, identifiant ROR, collection HAL, identifiants dans les sources);
-- **Relations** (2 relations: tutelle, partenaire);
+- **Tutelles**;
 - **Formes de noms** pour l'identification des structures dans les adresses.
 
 ### Personnes

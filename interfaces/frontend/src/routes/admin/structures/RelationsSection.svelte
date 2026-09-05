@@ -6,13 +6,12 @@
     structureId,
     tutelles,
     tutellesDe,
-    partenaires,
     relationPickerOpen,
     relationPickerResults,
     relationPickerSearch = $bindable(),
     relationPickerEl = $bindable(),
     onselect,
-    ondeleteRelation,
+    ondeleteTutelle,
     onopenPicker,
     onpickStructure,
     onclosePicker,
@@ -20,25 +19,24 @@
     structureId: number;
     tutelles: RelatedStructure[];
     tutellesDe: RelatedStructure[];
-    partenaires: (RelatedStructure & { id_struct: number })[];
     relationPickerOpen: boolean;
     relationPickerResults: Structure[];
     relationPickerSearch: string;
     relationPickerEl: HTMLDivElement | undefined;
     onselect: (id: number) => void | Promise<void>;
-    ondeleteRelation: (relId: number) => void | Promise<void>;
-    onopenPicker: (relType: string, direction: string, structId: number) => void;
+    ondeleteTutelle: (tutelleId: number) => void | Promise<void>;
+    onopenPicker: (direction: string, structId: number) => void;
     onpickStructure: (otherId: number) => void | Promise<void>;
     onclosePicker: () => void;
   } = $props();
 </script>
 
-<h3 class="section-title">Relations</h3>
+<h3 class="section-title">Tutelles</h3>
 
 <!-- Tutelles -->
 <h3>
   Tutelle{tutelles.length > 1 ? "s" : ""}
-  <button class="btn-add" onclick={() => onopenPicker("est_tutelle_de", "parent", structureId)}
+  <button class="btn-add" onclick={() => onopenPicker("parent", structureId)}
     >+</button
   >
 </h3>
@@ -51,7 +49,7 @@
         <button class="tag-name" onclick={() => onselect(p.id)}>
           {p.acronym || p.name}
         </button>
-        <button class="remove" onclick={() => ondeleteRelation(p.relation_id)} title="Supprimer"
+        <button class="remove" onclick={() => ondeleteTutelle(p.relation_id)} title="Supprimer"
           >x</button
         >
       </span>
@@ -62,7 +60,7 @@
 <!-- Est tutelle de -->
 <h3>
   Est tutelle de
-  <button class="btn-add" onclick={() => onopenPicker("est_tutelle_de", "child", structureId)}
+  <button class="btn-add" onclick={() => onopenPicker("child", structureId)}
     >+</button
   >
 </h3>
@@ -75,31 +73,7 @@
         <button class="tag-name" onclick={() => onselect(c.id)}>
           {c.acronym || c.name}
         </button>
-        <button class="remove" onclick={() => ondeleteRelation(c.relation_id)} title="Supprimer"
-          >x</button
-        >
-      </span>
-    {/each}
-  {/if}
-</div>
-
-<!-- Partenaires -->
-<h3>
-  Partenaire{partenaires.length > 1 ? "s" : ""}
-  <button class="btn-add" onclick={() => onopenPicker("est_partenaire_de", "parent", structureId)}
-    >+</button
-  >
-</h3>
-<div>
-  {#if partenaires.length === 0}
-    <span class="none-text">Aucun</span>
-  {:else}
-    {#each partenaires as p (p.relation_id)}
-      <span class="tag partenaire">
-        <button class="tag-name" onclick={() => onselect(p.id_struct)}>
-          {p.acronym || p.name}
-        </button>
-        <button class="remove" onclick={() => ondeleteRelation(p.relation_id)} title="Supprimer"
+        <button class="remove" onclick={() => ondeleteTutelle(c.relation_id)} title="Supprimer"
           >x</button
         >
       </span>
@@ -171,10 +145,6 @@
   .tag.tutelle {
     background: #d4e8f0;
     color: #2e6b8a;
-  }
-  .tag.partenaire {
-    background: #f0e8d4;
-    color: #8a6b2e;
   }
   .none-text {
     font-size: 0.85rem;

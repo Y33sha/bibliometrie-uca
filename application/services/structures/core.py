@@ -1,6 +1,6 @@
 """Service Structures — écritures sur l'agrégat Structure, transaction-agnostiques.
 
-Couvre les tables `structures`, `structure_relations` et `structure_name_forms`. La validation du JSONB `api_ids` se fait à la frontière infra (repo) : tout chemin d'écriture y passe, la validation s'y applique uniformément.
+Couvre les tables `structures`, `structure_tutelles` et `structure_name_forms`. La validation du JSONB `api_ids` se fait à la frontière infra (repo) : tout chemin d'écriture y passe, la validation s'y applique uniformément.
 """
 
 from typing import cast
@@ -10,15 +10,15 @@ from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.structure_repository import (
     StructureNameFormRow,
     StructureNameFormUpdateFields,
-    StructureRelationRow,
     StructureRepository,
     StructureRow,
+    StructureTutelleRow,
 )
 from domain.errors import NotFoundError, ValidationError
 from domain.normalize import normalize_text
 from domain.structures.name_forms import is_short_form
-from domain.structures.relations import check_can_create_relation, require_known_relation_type
 from domain.structures.structure import Structure
+from domain.structures.tutelles import check_can_create_tutelle
 from domain.types import JsonValue
 
 # ── structures : charger-muter-sauver l'agrégat ────────────────────
@@ -140,68 +140,57 @@ def delete_structure(
     )
 
 
-# ── structure_relations ───────────────────────────────────────────
+# ── structure_tutelles ────────────────────────────────────────────
 
 
-def create_relation(
+def create_tutelle(
     *,
     parent_id: int,
     child_id: int,
-    relation_type: str,
     repo: StructureRepository,
     audit_repo: AuditRepository | None = None,
-) -> StructureRelationRow | None:
-    """Crée une relation. Retourne la ligne insérée, ou None si elle existait déjà.
+) -> StructureTutelleRow | None:
+    """Crée une tutelle. Retourne la ligne insérée, ou None si elle existait déjà.
 
-    Lève `ValidationError` si `relation_type` n'appartient pas à `StructureRelationType`, ou si la relation viole l'invariant de graphe (auto-référence `parent_id == child_id` ou cycle : `child_id` est déjà un ancêtre de `parent_id`). Les ancêtres sont préchargés via `repo.get_ancestor_ids` et la validation est déléguée au domaine.
+    Lève `ValidationError` si la tutelle viole l'invariant de graphe (auto-référence `parent_id == child_id` ou cycle : `child_id` est déjà un ancêtre de `parent_id`). Les ancêtres sont préchargés via `repo.get_ancestor_ids` et la validation est déléguée au domaine.
     """
-    require_known_relation_type(relation_type)
-    check_can_create_relation(
+    check_can_create_tutelle(
         parent_id=parent_id,
         child_id=child_id,
         ancestors_of_parent=repo.get_ancestor_ids(parent_id),
     )
-    row = repo.create_relation(
-        parent_id=parent_id,
-        child_id=child_id,
-        relation_type=relation_type,
-    )
+    row = repo.create_tutelle(parent_id=parent_id, child_id=child_id)
     if row is not None:
+        # Nom d'événement conservé : il est écrit dans `audit_log`, où l'historique le porte.
         emit_event(
             audit_repo,
             "structure_relation.created",
             "structure",
             parent_id,
-            {
-                "relation_id": row["id"],
-                "parent_id": parent_id,
-                "child_id": child_id,
-                "relation_type": relation_type,
-            },
+            {"relation_id": row["id"], "parent_id": parent_id, "child_id": child_id},
         )
     return row
 
 
-def delete_relation(
-    relation_id: int,
+def delete_tutelle(
+    tutelle_id: int,
     *,
     repo: StructureRepository,
     audit_repo: AuditRepository | None = None,
 ) -> None:
-    """Supprime une relation. Lève NotFoundError si elle n'existe pas."""
-    row = repo.delete_relation(relation_id)
+    """Supprime une tutelle. Lève NotFoundError si elle n'existe pas."""
+    row = repo.delete_tutelle(tutelle_id)
     if not row:
-        raise NotFoundError(f"Relation {relation_id} introuvable")
+        raise NotFoundError(f"Tutelle {tutelle_id} introuvable")
     emit_event(
         audit_repo,
         "structure_relation.deleted",
         "structure",
         row["parent_id"],
         {
-            "relation_id": relation_id,
+            "relation_id": tutelle_id,
             "parent_id": row["parent_id"],
             "child_id": row["child_id"],
-            "relation_type": row["relation_type"],
         },
     )
 

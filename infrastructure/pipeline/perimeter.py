@@ -1,23 +1,22 @@
 """Matérialisation de la clôture des périmètres et lecture pour la phase persons.
 
-`refresh_perimeter_structures` matérialise dans la table `perimeter_structures` la clôture récursive (`est_tutelle_de`) des racines `perimeters.root_structure_ids` — recompute rejoué en tête de pipeline, au début de la phase `affiliations`, et par les command handlers admin après édition d'un périmètre, d'une structure ou d'une relation de tutelle. `PgPerimeterStructuresQueries` expose ce recompute et la lecture de la clôture du périmètre `persons` (déléguée aux `read_models`), que consomme la phase persons.
+`refresh_perimeter_structures` matérialise dans la table `perimeter_structures` la clôture récursive des racines `perimeters.root_structure_ids` — recompute rejoué en tête de pipeline, au début de la phase `affiliations`, et par les command handlers admin après édition d'un périmètre, d'une structure ou d'une tutelle. `PgPerimeterStructuresQueries` expose ce recompute et la lecture de la clôture du périmètre `persons` (déléguée aux `read_models`), que consomme la phase persons.
 """
 
 from sqlalchemy import Connection, text
 
 from application.ports.pipeline.perimeter_structures import PerimeterStructuresQueries
-from domain.structures.relations import StructureRelationType
 from infrastructure.read_models.perimeters import get_persons_structure_ids_list
 
 
 def refresh_perimeter_structures(conn: Connection) -> None:
     """Recompute la table matérialisée `perimeter_structures` : pour chaque périmètre, la clôture récursive (`est_tutelle_de`) de ses racines `perimeters.root_structure_ids`, filtrée aux structures existantes. Idempotent (DELETE + réinsertion complète). Commit laissé au caller.
 
-    Seule implémentation de la clôture d'un périmètre — `get_perimeter_structure_ids` lit cette table. À rejouer à chaque édition de `perimeters.root_structure_ids` ou `structure_relations`.
+    Seule implémentation de la clôture d'un périmètre — `get_perimeter_structure_ids` lit cette table. À rejouer à chaque édition de `perimeters.root_structure_ids` ou `structure_tutelles`.
     """
     conn.execute(text("DELETE FROM perimeter_structures"))
     conn.execute(
-        text(f"""
+        text("""
             INSERT INTO perimeter_structures (perimeter_id, structure_id)
             WITH RECURSIVE descendants AS (
                 SELECT p.id AS perimeter_id, s.structure_id
@@ -26,8 +25,7 @@ def refresh_perimeter_structures(conn: Connection) -> None:
                 UNION
                 SELECT d.perimeter_id, sr.child_id
                 FROM descendants d
-                JOIN structure_relations sr ON sr.parent_id = d.structure_id
-                WHERE sr.relation_type = '{StructureRelationType.EST_TUTELLE_DE.value}'
+                JOIN structure_tutelles sr ON sr.parent_id = d.structure_id
             )
             SELECT DISTINCT d.perimeter_id, d.structure_id
             FROM descendants d

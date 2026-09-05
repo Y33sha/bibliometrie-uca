@@ -13,7 +13,7 @@ Un périmètre nomme un ensemble de structures en ne désignant que ses **racine
 | `perimeters` | Le périmètre et ses racines | `code` (unique), `name`, `root_structure_ids` (tableau d'identifiants de structures) |
 | `perimeter_structures` | L'ensemble complet, calculé d'avance | `perimeter_id`, `structure_id` — les racines et tous leurs descendants |
 
-`perimeter_structures` est le résultat de la descente récursive dans `structure_relations`, en suivant la relation `est_tutelle_de`. Deux clés de la table `config` désignent les périmètres en service : `perimeter_extraction`, qui cadre l'extraction et les affiliations, et `perimeter_persons`, qui cadre la création des personnes.
+`perimeter_structures` est le résultat de la descente récursive dans `structure_tutelles`. Deux clés de la table `config` désignent les périmètres en service : `perimeter_extraction`, qui cadre l'extraction et les affiliations, et `perimeter_persons`, qui cadre la création des personnes.
 
 ## Écriture par l'API — édition manuelle
 
@@ -45,4 +45,4 @@ Port `application/ports/read_models/perimeters_queries.py`, adaptateur `PgPerime
 
 ## Invariants métier
 
-**Composition d'un périmètre.** `perimeter_structures` contient les racines déclarées dans `perimeters.root_structure_ids` et tous leurs descendants par `structure_relations.est_tutelle_de`. Cette règle est écrite une seule fois, dans la requête de `refresh_perimeter_structures` ; `get_perimeter_structure_ids` se contente de lire la table. L'objet de domaine ne la porte pas.
+**Composition d'un périmètre.** `perimeter_structures` contient les racines déclarées dans `perimeters.root_structure_ids` et tous leurs descendants dans `structure_tutelles`. Cette règle est écrite une seule fois, dans la requête de `refresh_perimeter_structures` ; `get_perimeter_structure_ids` se contente de lire la table. L'objet de domaine ne la porte pas.

@@ -17,7 +17,7 @@ flowchart LR
     persons---person_name_forms
 
     classDef manuel  fill:#8e5,stroke:#5a3
-    class structures,structure_name_forms,perimeters,structure_relations manuel;
+    class structures,structure_name_forms,perimeters,structure_tutelles manuel;
     classDef csv fill:#fa5
     class persons_rh csv
     classDef auto fill:#adf,stroke:#58c

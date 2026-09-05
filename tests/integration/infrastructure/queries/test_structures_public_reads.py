@@ -31,13 +31,10 @@ def _setup_perimeter(conn, lab_ids, code="uca"):
         ),
         {"c": code},
     )
-    # relation est_tutelle_de pour les descendants
+    # tutelle de la racine sur chaque descendant
     for lab in lab_ids:
         conn.execute(
-            text(
-                "INSERT INTO structure_relations (parent_id, child_id, relation_type) "
-                "VALUES (:p, :c, 'est_tutelle_de')"
-            ),
+            text("INSERT INTO structure_tutelles (parent_id, child_id) VALUES (:p, :c)"),
             {"p": root, "c": lab},
         )
     # Matérialise la clôture du périmètre : `get_perimeter_structure_ids` lit la table

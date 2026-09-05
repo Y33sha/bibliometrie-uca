@@ -1,6 +1,6 @@
 """Router du référentiel des entités organisationnelles et de leurs liens. Sert `/api/structures/*`.
 
-Une structure est un laboratoire, une composante, une université, un centre hospitalier, une école ou un site. La table `structure_relations` en exprime les liens : `est_tutelle_de` pour le rattachement hiérarchique, seul à peser dans la clôture d'un périmètre, et `est_partenaire_de` pour une association sans rattachement. Les formes de nom, qui servent à reconnaître les structures dans les adresses, s'éditent sous `/name-forms` — celles des personnes, homonymes mais sans rapport, vivent sous `/api/persons`.
+Une structure est un laboratoire, une composante, une université, un centre hospitalier, une école ou un site. La table `structure_tutelles` en exprime le rattachement hiérarchique, qui décide de la clôture d'un périmètre. Les formes de nom, qui servent à reconnaître les structures dans les adresses, s'éditent sous `/name-forms` — celles des personnes, homonymes mais sans rapport, vivent sous `/api/persons`.
 
 Les chemins littéraux se déclarent avant `/{structure_id}` : un segment fixe placé après serait capté par le paramètre.
 """
@@ -37,10 +37,10 @@ from interfaces.api.models import (
     DeletedResponse,
     NameFormCreate,
     NameFormUpdate,
-    RelationCreate,
     StructureCreate,
-    StructureRelationCreateResponse,
+    StructureTutelleCreateResponse,
     StructureUpdate,
+    TutelleCreate,
 )
 from interfaces.api.params import TOP_SUBJECTS_LIMIT, SearchTerm, TopSubjectsLimit
 
@@ -92,46 +92,45 @@ def create_structure(
     )
 
 
-# ── Relations entre structures ───────────────────────────────────
+# ── Tutelles entre structures ────────────────────────────────────
 
 
-@router.post("/relations", response_model=StructureRelationCreateResponse)
-def create_relation(
-    data: RelationCreate,
+@router.post("/tutelles", response_model=StructureTutelleCreateResponse)
+def create_tutelle(
+    data: TutelleCreate,
     conn: Connection = Depends(db_conn),
     repo: StructureRepository = Depends(structure_repo),
     perimeter_queries: PerimeterStructuresQueries = Depends(get_perimeter_queries),
     audit: AuditRepository = Depends(audit_repo),
-) -> StructureRelationCreateResponse:
-    """Crée une relation parent-enfant entre deux structures.
+) -> StructureTutelleCreateResponse:
+    """Crée une tutelle parent-enfant entre deux structures.
 
-    Idempotent : une relation identique — même parent, même enfant, même type — laisse la table inchangée et rend `{"status": "already_exists"}`. Lève 400 si la relation viole l'invariant de graphe : structure liée à elle-même, ou cycle (l'enfant est déjà un ancêtre du parent). Lève 409 si `parent_id` ou `child_id` désigne une structure inexistante.
+    Idempotent : une tutelle identique — même parent, même enfant — laisse la table inchangée et rend `{"status": "already_exists"}`. Lève 400 si elle viole l'invariant de graphe : structure liée à elle-même, ou cycle (l'enfant est déjà un ancêtre du parent). Lève 409 si `parent_id` ou `child_id` désigne une structure inexistante.
     """
-    row = structure_commands.create_relation(
+    row = structure_commands.create_tutelle(
         conn,
         parent_id=data.parent_id,
         child_id=data.child_id,
-        relation_type=data.relation_type,
         repo=repo,
         perimeter_queries=perimeter_queries,
         audit_repo=audit,
     )
     if row is None:
-        return StructureRelationCreateResponse.model_validate({"status": "already_exists"})
-    return StructureRelationCreateResponse.model_validate(row)
+        return StructureTutelleCreateResponse.model_validate({"status": "already_exists"})
+    return StructureTutelleCreateResponse.model_validate(row)
 
 
-@router.delete("/relations/{relation_id}", response_model=DeletedResponse)
-def delete_relation(
-    relation_id: int,
+@router.delete("/tutelles/{tutelle_id}", response_model=DeletedResponse)
+def delete_tutelle(
+    tutelle_id: int,
     conn: Connection = Depends(db_conn),
     repo: StructureRepository = Depends(structure_repo),
     perimeter_queries: PerimeterStructuresQueries = Depends(get_perimeter_queries),
     audit: AuditRepository = Depends(audit_repo),
 ) -> DeletedResponse:
-    """Supprime une relation structure. 404 si l'id n'existe pas."""
-    structure_commands.delete_relation(
-        conn, relation_id, repo=repo, perimeter_queries=perimeter_queries, audit_repo=audit
+    """Supprime une tutelle. 404 si l'id n'existe pas."""
+    structure_commands.delete_tutelle(
+        conn, tutelle_id, repo=repo, perimeter_queries=perimeter_queries, audit_repo=audit
     )
     return DeletedResponse()
 
@@ -217,7 +216,7 @@ def get_structure(
 ) -> StructureDetailResponse:
     """Détail complet d'une structure : identifiants + parents + enfants + formes de nom.
 
-    Retourne `{structure, parents, children, forms}`. Les parents sont les structures qui ont cette structure comme `child_id` dans `structure_relations` ; les enfants inversement. 404 si la structure n'existe pas.
+    Retourne `{structure, parents, children, forms}`. Les parents sont les structures qui ont cette structure comme `child_id` dans `structure_tutelles` ; les enfants inversement. 404 si la structure n'existe pas.
     """
     detail = queries.get_structure_detail(structure_id)
     if detail is None:
@@ -284,7 +283,7 @@ def delete_structure(
     perimeter_queries: PerimeterStructuresQueries = Depends(get_perimeter_queries),
     audit: AuditRepository = Depends(audit_repo),
 ) -> DeletedResponse:
-    """Supprime une structure. Cascade sur les relations et formes de noms liées. 404 si inconnue."""
+    """Supprime une structure. Cascade sur les tutelles et formes de noms liées. 404 si inconnue."""
     structure_commands.delete_structure(
         conn,
         structure_id,

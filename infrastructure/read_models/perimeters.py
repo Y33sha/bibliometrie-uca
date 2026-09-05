@@ -1,6 +1,6 @@
 """Lecture du périmètre : clôture de structures (matview `perimeter_structures`) et projection de la page admin.
 
-Le périmètre associe des phases à des ensembles de structures, lu depuis `config` (`perimeter_extraction` : structures interrogées à l'extraction et reconnues dans les affiliations ; `perimeter_persons` : périmètre de création des personnes). La clôture récursive (`est_tutelle_de`) est matérialisée dans `perimeter_structures` par `refresh_perimeter_structures` (côté pipeline) ; ces fonctions ne font que la restituer.
+Le périmètre associe des phases à des ensembles de structures, lu depuis `config` (`perimeter_extraction` : structures interrogées à l'extraction et reconnues dans les affiliations ; `perimeter_persons` : périmètre de création des personnes). La clôture récursive des tutelles est matérialisée dans `perimeter_structures` par `refresh_perimeter_structures` (côté pipeline) ; ces fonctions ne font que la restituer.
 
 Les fonctions libres sont partagées par l'extraction, le pipeline et les adapters : tout lecteur du périmètre passe par cette couche de lecture. `PgPerimetersQueries` implémente le port `application.ports.read_models.perimeters_queries`.
 """
@@ -17,7 +17,7 @@ from application.ports.read_models.perimeters_queries import (
 
 
 def get_perimeter_structure_ids(conn: Connection, perimeter_code: str) -> set[int]:
-    """Ensemble des `structure_id` du périmètre `perimeter_code` — racines et descendants (`est_tutelle_de`) — lu depuis la table matérialisée `perimeter_structures`.
+    """Ensemble des `structure_id` du périmètre `perimeter_code` — racines et descendants — lu depuis la table matérialisée `perimeter_structures`.
 
     La clôture est calculée par `refresh_perimeter_structures` (en tête de pipeline, à chaque édition admin, et au début d'`affiliations`) ; cette lecture ne fait que la restituer.
     """
@@ -57,7 +57,7 @@ def get_persons_structure_ids_list(conn: Connection) -> list[int]:
 
 
 def get_persons_perimeter_root_ids(conn: Connection) -> list[int]:
-    """Racines du périmètre "persons" (sans expansion par `est_tutelle_de`).
+    """Racines du périmètre "persons" (sans descente dans les tutelles).
 
     À distinguer de `get_persons_structure_ids(...)` qui retourne la clôture transitive (racines + tous les labos descendants). Utilisé quand un code appelant veut filtrer explicitement les racines du périmètre (ex. exclure l'UCA des tutelles affichées pour un labo).
     """
