@@ -97,6 +97,12 @@ class Settings(BaseSettings):
     # multiplierait par huit le coût d'un export.
     max_concurrent_exports: int = 5
 
+    # ----- Concurrence de l'API -----
+    # Les routes sont synchrones : FastAPI les exécute dans le threadpool d'anyio, dont le
+    # lifespan de l'API fixe la taille à cette valeur. `db_pool_max` doit la couvrir, faute de
+    # quoi des threads attendent une connexion.
+    api_threadpool_size: int = 40
+
     # ----- Pool de connexions -----
     # Ratio max/min recommandé : ~1:15. Monter db_pool_max à 50+ si l'API admin charge plusieurs facettes en parallèle et qu'on observe des TimeoutError côté pool. Cf. `.env.example` pour la note opérationnelle.
     db_pool_min: int = 2

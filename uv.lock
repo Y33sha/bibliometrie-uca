@@ -171,6 +171,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "alembic" },
+    { name = "anyio" },
     { name = "bcrypt" },
     { name = "defusedxml" },
     { name = "fastapi" },
@@ -204,6 +205,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "alembic", specifier = "==1.19.1" },
+    { name = "anyio", specifier = "==4.13.0" },
     { name = "bcrypt", specifier = "==5.0.0" },
     { name = "defusedxml", specifier = "==0.7.1" },
     { name = "deptry", marker = "extra == 'dev'", specifier = "==0.25.1" },

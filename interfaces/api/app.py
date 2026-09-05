@@ -12,6 +12,7 @@ import traceback
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
+import anyio.to_thread
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -80,6 +81,8 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     check_auth_config()
+    # Le limiteur est attaché à la boucle d'événements : il se règle une fois celle-ci démarrée.
+    anyio.to_thread.current_default_thread_limiter().total_tokens = settings.api_threadpool_size
     sync_engine = build_sync_engine("app")
     set_sync_engine(sync_engine)
     try:
