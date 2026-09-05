@@ -11,8 +11,11 @@
 ### Documentation, docstrings et commentaires
 
 - Utiliser le **présent intemporel**: ne jamais supposer connu l'état antérieur du code. Bannir tout vocabulaire ancré temporellement (`nouveau`, `désormais`, `ne plus`...). Ne jamais renvoyer à des fichiers transitoires (todo, roadmaps).
-- Ecrire d'une manière qui reste intelligible en dehors du contexte des conversations; **éviter le jargon** interne au projet et les abréviations maison (`SP` pour source_publication, `pub` pour publication...). Les anglicismes sont permis s'ils sont usuels dans le domaine.
-- Au fil des réécritures, lorsqu'un point devient non pertinent, **corriger en supprimant** le point plutôt qu'en soulignant sa non-pertinence.
+- Ecrire d'une manière qui reste intelligible en dehors du contexte des conversations; **éviter le jargon** interne au projet et les abréviations maison (`SP` pour source_publication, `pub` pour publication...).
+- **Eviter les redondances.** Quand une phrase a deux moitiés séparées par une virgule ou un deux-points, vérifier que la seconde apporte un fait, et non une reformulation de la première.
+- **Rester factuel.** La documentation ne doit pas plaider ni prêcher.
+- Ne pas sur-franciser. Les anglicismes sont souhaitables s'ils sont usuels dans le domaine. (*repository* et non "dépôt"...)
+- Viser la **concision maximale**. Adapter le niveau de détail à ce qui est strictement nécessaire. Lorsqu'un point devient non pertinent, corriger **en supprimant** le point plutôt qu'en soulignant sa non-pertinence.
 - Respecter l'accentuation du français.
 - Eviter les retours à la ligne non sémantiques (i.e. hors titres, listes et sauts de paragraphe).
 
@@ -22,12 +25,12 @@
 - Pour les décisions structurantes (impact sur le schéma de données ou la logique du pipeline), toujours **attendre la décision** de l'utilisatrice avant de commencer à coder.
 - Pas de mur de texte dans la conversation. Si tu dois cartographier le code avant de répondre, garde l'analyse pour toi, ou propose de générer un bilan au format *.md.
 - Vérifie avant d'affirmer.
-- Ne propose pas de pseudo-choix idiots (ex. deux options dont seulement une respecte la cible; ou des alternatives sur l'ordre des opérations, alors que le phasage est posé). Les alternatives creuses polluent la conversation et font perdre du temps.
+- Ne propose **pas de pseudo-choix** idiots (ex. deux options dont seulement une respecte la cible; ou des alternatives sur l'ordre des opérations, si l'ordre est indifférent et que le phasage est déjà posé). Les alternatives creuses polluent la conversation et font perdre du temps.
 
 ### Workflow
 
 - Pose tes questions en texte libre. Pas de QCM à choix limités.
-- Gère les commits git. Fais un commit à chaque changement cohérent (au minimum une fois par phase de chantier, voire à chaque item d'une phase)
+- Gère les commits git. Fais un commit à chaque changement cohérent (au minimum une fois par phase de chantier, voire à chaque item d'une phase).
 - Ne fais pas tourner la suite pytest plusieurs fois juste pour récupérer le résumé. Si c'est vert la première fois, c'est bon. Si tu veux le résumé, débrouille-toi pour le récupérer du premier coup, au lieu de tronquer l'output sans nécessité.
 
 ## Phases du pipeline
