@@ -2,7 +2,7 @@
 
 ## Contexte
 
-Les listes se paginent par `page` et `per_page`, que l'adapter traduit en `OFFSET`. Le coût d'une page tient au produit du rang par la taille de page : la base produit toutes les lignes précédentes et les jette. Un middleware refuse donc une lecture dont le décalage dépasse `max_pagination_offset`, fixé à 500 000 (`interfaces/api/app.py`).
+Les listes se paginent par `page` et `per_page`, que l'adaptateur traduit en `OFFSET`. Le coût d'une page tient au produit du rang par la taille de page : la base produit toutes les lignes précédentes et les jette. Un middleware refuse donc une lecture dont le décalage dépasse `max_pagination_offset`, fixé à 500 000 (`interfaces/api/app.py`).
 
 Le tri par clé remplace « saute N lignes » par « rends ce qui suit cette ligne ». Avec un index sur la clé de tri, la base se positionne directement : une page profonde coûte ce que coûte la première, et il n'y a plus de croissance à borner. La méthode garantit en outre qu'aucune ligne stable n'est sautée ni répétée pendant le parcours, là où `OFFSET` décale tout dès qu'une ligne s'insère avant la position courante.
 

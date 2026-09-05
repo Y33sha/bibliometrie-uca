@@ -24,7 +24,7 @@ Trois tables extérieures référencent un éditeur : `journals.publisher_id`, `
 
 **Enrichissement du pays, hors pipeline.** `interfaces/cli/maintenance/enrich_publishers.py` renseigne le pays depuis OpenAlex, et seulement là où il est absent : une valeur saisie à la main est conservée.
 
-## Écriture par l'API — curation
+## Écriture par l'API — édition manuelle
 
 Routeur `interfaces/api/routers/publishers.py`, adaptateur `PgPublisherRepository`.
 

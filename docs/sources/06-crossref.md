@@ -13,7 +13,7 @@ Le pipeline n'interroge CrossRef que pour les DOI déjà découverts par les aut
 **Works API** (`https://api.crossref.org/works/{doi}`) — interrogation unitaire par DOI.
 
 - Polite pool obtenu via `User-Agent: BibliometrieUCA-pipeline/1.0 (mailto:<email>)` (adresse lue via `POLITE_POOL_EMAIL`)
-- Limites du polite pool CrossRef : 10 req/s + 3 concurrentes. L'adapter colle exactement à ces limites (`max_concurrent=3`, `request_delay_s=0.1`)
+- Limites du polite pool CrossRef : 10 req/s + 3 concurrentes. L'adaptateur colle exactement à ces limites (`max_concurrent=3`, `request_delay_s=0.1`)
 - Les 404 sont matérialisés dans `staging` par `not_found_at` (avec `processed=TRUE`) pour ne pas être réinterrogés à chaque run
 
 **Prefixes API** (`https://api.crossref.org/prefixes/{prefix}`) — identification du Crossref Member (= éditeur déposant) associé à un préfixe DOI. Consommée par le sub-step `resolve_publishers` de la phase [`publishers_journals`](../pipeline/05-publishers-journals.md), qui complète la table `doi_prefixes` (préfixe → `crossref_member_id` + nom du déposant) une fois sa Registration Agency résolue en amont par [`resolve_ra`](../pipeline/02-extract.md#agences-denregistrement-doi).

@@ -108,7 +108,7 @@ Si l'input est absent de `MetadataForCorrection` :
 
 1. champ ajouté au contrat ([`metadata_correction/rules.py`](../../domain/source_publications/metadata_correction/rules.py)), avec son prédicat dans `_AppliesTo` et sa branche dans `_check_predicate` ;
 2. champ ajouté à `UnaryCorrectionRow` et à sa méthode `for_correction` ([`metadata_correction.py`](../../application/ports/pipeline/metadata_correction.py)) ;
-3. colonne ajoutée au `_SELECT` de l'adapter ([`metadata_correction.py`](../../infrastructure/pipeline/metadata_correction.py)), **sous le nom du champ** : les lignes sont construites par appariement de noms ;
+3. colonne ajoutée au `_SELECT` de l'adaptateur ([`metadata_correction.py`](../../infrastructure/pipeline/metadata_correction.py)), **sous le nom du champ** : les lignes sont construites par appariement de noms ;
 4. si le champ est un fait propre à un enregistrement source, sans contrepartie sur une publication canonique, inscrire son prédicat dans `_SOURCE_ONLY_PREDICATES` : les règles qui le lisent sont écartées du rejeu canonique. Sinon, le renseigner dans `_apply_canonical_doc_type_correction` ([`core.py`](../../application/services/publications/core.py)) depuis la valeur arbitrée.
 
 Alternative écartée : threader un repo dans toutes les signatures. Beaucoup plus invasif sans bénéfice métier — le contrat (champs joints à la lecture) garde `effective_metadata` pure.

@@ -2,7 +2,7 @@
 
 *À jour le 2026-09-04.*
 
-Une signature est un auteur tel qu'**une** source le porte sur un document : une ligne par position d'auteur dans un [enregistrement source](source_publications.md). C'est la pièce qui relie tout le reste. Elle porte une identité d'auteur telle que la source la donne, reçoit une personne de la phase `persons`, puis un rattachement à l'[authorship](authorships.md) consolidée. Cinq phases du pipeline écrivent successivement dans sa ligne ; l'API n'y touche qu'à travers la curation des personnes.
+Une signature est un auteur tel qu'**une** source le porte sur un document : une ligne par position d'auteur dans un [enregistrement source](source_publications.md). C'est la pièce qui relie tout le reste. Elle porte une identité d'auteur telle que la source la donne, reçoit une personne de la phase `persons`, puis un rattachement à l'[authorship](authorships.md) consolidée. Cinq phases du pipeline écrivent successivement dans sa ligne ; l'API n'y touche qu'en éditant les personnes.
 
 Aucun objet de domaine ne lui correspond. Ses règles sont réparties selon ce qu'elles concernent : les rôles dans `domain/publications/authorship_roles.py`, l'extraction propre à chaque source dans `domain/sources/`, les identifiants dans `domain/persons/`.
 
@@ -24,13 +24,13 @@ Cinq phases écrivent tour à tour dans la même ligne.
 
 1. **`normalize` — naissance.** Les signatures d'un enregistrement sont réécrites en bloc, avec leur source, leur position, leur rôle, le nom d'auteur brut et leur identité. L'identité est obtenue en dédoublonnant `author_identifying_keys` sur son empreinte calculée — nom normalisé et identifiants réunis ; celles que plus aucune signature ne porte sont supprimées en fin de phase. Les adresses sont créées au besoin et reliées à la signature. Un identifiant porté par deux positions ou plus du même enregistrement est suffixé `_dubious`, ce qui l'écarte du rapprochement.
 2. **`affiliations` — appartenance au périmètre.** `in_perimeter` devient vrai lorsqu'une adresse de la signature se résout en une structure du périmètre, le rattachement n'étant pas rejeté. La vue matérialisée `source_authorship_structures` est rafraîchie.
-3. **`persons` — attribution d'une personne.** La cascade de rapprochement pose `person_id` et retient dans `resolution_mode` par quel moyen : identifiant, nom, ou report depuis une autre source. Les signatures épinglées par la curation sont reposées en premier, et certaines remises à nul ciblées permettent à la phase de converger quel que soit l'ordre de traitement.
+3. **`persons` — attribution d'une personne.** La cascade de rapprochement pose `person_id` et retient dans `resolution_mode` par quel moyen : identifiant, nom, ou report depuis une autre source. Les signatures épinglées à la main sont reposées en premier, et certaines remises à nul ciblées permettent à la phase de converger quel que soit l'ordre de traitement.
 4. **`authorships` — rattachement à l'authorship consolidée.** `authorship_id` relie la signature au couple personne–publication qu'elle atteste.
 5. **`countries` — pays.** `countries_dirty` déclenche le recalcul des pays de la signature depuis ses adresses.
 
-## Écriture par l'API — curation
+## Écriture par l'API — édition manuelle
 
-Aucune colonne structurelle n'est écrite par l'API. La curation, décrite côté [personnes](persons.md), n'agit que sur le rattachement à une personne.
+Aucune colonne structurelle n'est écrite par l'API. L'édition manuelle, décrite côté [personnes](persons.md), n'agit que sur le rattachement à une personne.
 
 **Épingler une signature** l'inscrit dans `confirmed_authorships`. La décision porte sur cette signature précisément, et la phase `persons` la repose à chaque passage.
 

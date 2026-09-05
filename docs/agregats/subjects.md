@@ -61,4 +61,4 @@ Les sujets alimentent aussi les palmarès affichés ailleurs — tableaux de bor
 
 **Valeurs dérivées recalculées en entier.** `usage_count` et la vue des co-occurrences se recalculent à chaque passage depuis les liens non rejetés, sans état conservé entre deux exécutions.
 
-**Sujets sans lien.** Un sujet qu'aucun lien ne porte est supprimé ; un sujet dont tous les liens sont rejetés subsiste, pour ne pas perdre la décision de curation.
+**Sujets sans lien.** Un sujet qu'aucun lien ne porte est supprimé ; un sujet dont tous les liens sont rejetés subsiste, pour ne pas perdre la décision humaine.

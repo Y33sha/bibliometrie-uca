@@ -27,7 +27,7 @@
 - 2026-07-18 — [Routes API par ressource : supprimer le dossier `admin`](archived/2026-07-18_CODE_routes-par-ressource.md)
 - 2026-07-18 — [Les liens adresse ↔ site ne s'écrivent pas en base](archived/2026-07-18_DATA_liens-adresse-site-non-persistes.md)
 - 2026-07-17 — [Exceptions : démêler les `HTTPException` des routers](archived/2026-07-17_CODE_exceptions-des-routers.md)
-- 2026-07-17 — [Périmètre APC : le résoudre dans l'adapter au lieu de le faire descendre du router](archived/2026-07-17_CODE_apc-perimetre-au-router.md)
+- 2026-07-17 — [Périmètre APC : le résoudre dans l'adaptateur au lieu de le faire descendre du router](archived/2026-07-17_CODE_apc-perimetre-au-router.md)
 - 2026-07-17 — [Domaines HAL : libellés depuis la source, suppression de la table](archived/2026-07-17_CODE_hal-domaines-libelles.md)
 - 2026-07-17 — [Normalize : factoriser l'upsert des `source_publications`](archived/2026-07-17_CODE_normalize-upsert-source-publications.md)
 - 2026-07-12 — [Phase personnes — lisibilité et refonte](archived/2026-07-12_CODE_phase-persons.md)

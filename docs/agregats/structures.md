@@ -2,7 +2,7 @@
 
 *À jour le 2026-09-04.*
 
-Une structure est une unité de l'établissement ou un partenaire : composante, laboratoire, tutelle, site. C'est un **référentiel saisi à la main** — les structures sont créées et modifiées par la curation, jamais par le pipeline, qui se contente de les lire pour reconnaître des adresses et pour composer les périmètres.
+Une structure est une unité de l'établissement ou un partenaire : composante, laboratoire, tutelle, site. C'est un **référentiel saisi à la main** — les structures sont créées et modifiées à la main, jamais par le pipeline, qui se contente de les lire pour reconnaître des adresses et pour composer les périmètres.
 
 `domain/structures/` valide le type, l'identifiant ROR et la collection HAL, et porte les règles du graphe de rattachement.
 
@@ -16,7 +16,7 @@ Une structure est une unité de l'établissement ou un partenaire : composante, 
 
 Les périmètres, dont les racines sont des structures, ont leur propre fiche : [perimeters](perimeters.md).
 
-## Écriture par l'API — curation
+## Écriture par l'API — édition manuelle
 
 Routeur `interfaces/api/routers/structures.py`, commandes dans `application/services/structures/commands.py`, adaptateur `PgStructureRepository`. C'est le seul chemin d'écriture.
 

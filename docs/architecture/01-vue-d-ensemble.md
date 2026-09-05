@@ -19,14 +19,14 @@ Le code héberge deux programmes de natures différentes, qui ne s'appellent jam
   │   pipeline   │ ── écrit ────► │  base        │ ── lit ─────► │  application  │ ◄── utilisateurs
   │   (batch)    │   (dérive)     │  PostgreSQL  │               │  web (API     │
   │              │ ◄── relit ──── │              │ ◄── écrit ─── │  + frontend)  │
-  └──────────────┘   la curation  └──────────────┘   curation    └───────────────┘
+  └──────────────┘                └──────────────┘               └───────────────┘
 ```
 
-La curation forme une **boucle fermée** : les corrections saisies via l'API — données de référence (structures, périmètre, configuration) et arbitrages manuels (*cannot-link* entre personnes ou entre publications, identifiants confirmés ou rejetés…) — deviennent des **entrées** que le pipeline relit et **préserve** à chaque passe.
+Les données saisies manuellement via l'API — données de référence (structures, périmètre, configuration) et arbitrages (*cannot-link* entre personnes ou entre publications, identifiants confirmés ou rejetés…) — deviennent des **entrées** que le pipeline relit et **préserve** à chaque passe.
 
 ## Vue par couches
 
-Le projet suit une architecture **hexagonale (DDD)**. Le cœur du système est `application/` (use-cases et orchestrateurs), qui dépend de `domain/` (noyau pur). Autour de ce cœur, deux familles d'adapters : `interfaces/` (entrants — HTTP, CLI) et `infrastructure/` (sortants — base, APIs externes, logs). Aucune des deux n'importe l'autre ; leur neutralité repose sur les **ports** (`Protocol`) définis dans `application/ports/`, dont dépendent tous les autres modules.
+Le projet suit une architecture **hexagonale (DDD)**. Le cœur du système est `application/` (use-cases et orchestrateurs), qui dépend de `domain/` (noyau pur). Autour de ce cœur, deux familles d'adaptateurs : `interfaces/` (entrants — HTTP, CLI) et `infrastructure/` (sortants — base, APIs externes, logs). Aucune des deux n'importe l'autre ; leur neutralité repose sur les **ports** (`Protocol`) définis dans `application/ports/`, dont dépendent tous les autres modules.
 
 Cette vue par couches se superpose à la vue par programme : `domain/` sert aux deux programmes, tandis que les couches extérieures se répartissent entre l'application web et le pipeline, quelques modules restant partagés. Le détail se lit dans les fiches de chaque couche.
 
@@ -46,12 +46,12 @@ Cette vue par couches se superpose à la vue par programme : `domain/` sert aux 
                         │                │
             ┌───────────┘                └──────────────┐
             │                                           │
-    ┌───────┴─────────┐                       ┌─────────┴─────────┐
-    │  interfaces/    │    ─── ⊥ ───          │  infrastructure/  │
-    │  adapters       │   (pas d'import       │  adapters sortants│
-    │  entrants :     │   direct l'un de      │  (SQL, APIs       │
-    │  routers, CLI   │   l'autre)            │  externes, logs)  │
-    └─────────────────┘                       └───────────────────┘
+    ┌───────┴─────────┐                       ┌─────────┴────────────┐
+    │  interfaces/    │    ─── ⊥ ───          │  infrastructure/     │
+    │  adaptateurs    │   (pas d'import       │  adaptateurs sortants│
+    │  entrants :     │   direct l'un de      │  (SQL, APIs          │
+    │  routers, CLI   │   l'autre)            │  externes, logs)     │
+    └─────────────────┘                       └──────────────────────┘
 ```
 
 ## Contrats d'architecture
@@ -67,10 +67,10 @@ Chaque règle est vérifiée par un contrat `import-linter`, déclaré dans `pyp
 3. **Les routers n'atteignent pas `infrastructure/` directement.** Ils reçoivent leurs dépendances par `Depends(...)`, dont les fabriques vivent dans `interfaces/api/deps.py`. Le chemin indirect qui passe par ces fabriques reste permis.
    → `Routers : pas d'import direct de infrastructure`
 
-4. **Seul le composition root instancie les adapters concrets.** Pour l'application web, ce sont `interfaces/api/app.py` et `interfaces/api/deps.py` ; partout ailleurs sous `interfaces/api/`, on passe par un port. Chaque script de `interfaces/cli/` est son propre composition root.
+4. **Seul le composition root instancie les adaptateurs concrets.** Pour l'application web, ce sont `interfaces/api/app.py` et `interfaces/api/deps.py` ; partout ailleurs sous `interfaces/api/`, on passe par un port. Chaque script de `interfaces/cli/` est son propre composition root.
    → `Composition root : Pg* concrets uniquement dans app et deps`
 
-5. **Un adapter reçoit sa connexion, il ne l'ouvre pas.** Les modules de lecture et les repositories travaillent sur la connexion que leur appelant leur remet.
+5. **Un adaptateur reçoit sa connexion, il ne l'ouvre pas.** Les modules de lecture et les repositories travaillent sur la connexion que leur appelant leur remet.
    → `Adapters : la connexion se reçoit, elle ne s'ouvre pas`
 
 6. **L'API n'émet aucune requête réseau.** Aucun module servant une requête HTTP n'atteint un client réseau, y compris par une chaîne d'imports. Tout le trafic sortant appartient au pipeline.
@@ -83,7 +83,7 @@ Chaque règle est vérifiée par un contrat `import-linter`, déclaré dans `pyp
 
 - [`domain/`](02-domain.md) — entités et logique métier
 - [`application/`](03-application.md) — services, orchestrateurs, injection des dépendances
-- [`infrastructure/`](04-infrastructure.md) — adapters sortants, discipline transactionnelle
-- [`interfaces/`](05-interfaces.md) — adapters entrants
-- [Composition roots](06-composition-roots.md) — instanciation et câblage des adapters
+- [`infrastructure/`](04-infrastructure.md) — adaptateurs sortants, discipline transactionnelle
+- [`interfaces/`](05-interfaces.md) — adaptateurs entrants
+- [Composition roots](06-composition-roots.md) — instanciation et câblage des adaptateurs
 - [Tests](07-tests.md) — tests unitaires, tests d'intégration, couverture

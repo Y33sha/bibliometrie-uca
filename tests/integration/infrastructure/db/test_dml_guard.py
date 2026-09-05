@@ -104,7 +104,7 @@ class TestDmlFlag:
         assert not has_uncommitted_dml(probe_conn)
 
     def test_rearms_after_commit(self, probe_conn):
-        # Formulation robuste : écrire, committer, puis ré-écrire ré-arme le flag
+        # Ecrire, committer, puis ré-écrire ré-arme le flag
         # (un handler qui écrit, commit, puis ré-écrit sans recommitter est rattrapé).
         probe_conn.execute(text("INSERT INTO _dml_probe VALUES (5)"))
         probe_conn.commit()

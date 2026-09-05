@@ -2,7 +2,7 @@
 
 *À jour le 2026-09-04.*
 
-Une publication est la référence unifiée d'un document : plusieurs enregistrements sources décrivant le même article ne donnent qu'une publication. Elle est **entièrement dérivée, jamais saisie** — la phase `publications` regroupe les enregistrements sources, et `refresh_from_sources` recalcule l'état canonique depuis leur union. La curation se limite à réunir deux publications ou à déclarer qu'elles sont distinctes.
+Une publication est la référence unifiée d'un document : plusieurs enregistrements sources décrivant le même article ne donnent qu'une publication. Elle est **entièrement dérivée, jamais saisie** — la phase `publications` regroupe les enregistrements sources, et `refresh_from_sources` recalcule l'état canonique depuis leur union. L'édition manuelle se limite à réunir deux publications ou à déclarer qu'elles sont distinctes.
 
 `domain/publications/` porte les règles pures : les types d'identifiants qui valident et normalisent DOI, identifiant HAL, numéro national de thèse, PMID, PMCID et identifiant arXiv ; la nomenclature des types de document ; l'agrégation des métadonnées entre sources ; les règles de regroupement ; et le choix du statut d'accès ouvert.
 
@@ -14,7 +14,7 @@ Une publication est la référence unifiée d'un document : plusieurs enregistre
 | `authorships` | Lien personne ↔ publication | `publication_id`, `person_id`, `author_position`, `roles`, `is_corresponding`, `in_perimeter` |
 | `publication_relations` | Lien orienté entre deux publications | `from_publication_id`, `relation_type`, `target_publication_id` **ou** `target_doi`, `source` |
 | `distinct_publications` | Paires déclarées comme deux documents différents | `(pub_id_a, pub_id_b)`, avec `a < b` |
-| `apc_payments` | Frais de publication, importés et curés | `publication_id`, `doi`, `amount_eur_ht`, `billing_year` |
+| `apc_payments` | Frais de publication, importés puis corrigés à la main | `publication_id`, `doi`, `amount_eur_ht`, `billing_year` |
 | `publications_detail` | Complément de métadonnées servi au détail | `publication_id`, recalculé à chaque `refresh_from_sources` |
 
 En amont se trouvent les [enregistrements sources](source_publications.md). La construction des `authorships` relève de la fiche [authorships](authorships.md) ; ils apparaissent ici comme le lien vers les [personnes](persons.md).
@@ -33,7 +33,7 @@ La phase `publications` constitue les publications ; les phases `relations`, `oa
 
 **Pays et périmètre.** La phase `countries` propage les pays des adresses jusqu'à la publication ; la phase `authorships` y reporte l'appartenance au périmètre.
 
-## Écriture par l'API — curation
+## Écriture par l'API — édition manuelle
 
 Deux opérations seulement, dans `interfaces/api/routers/publications.py`. Une commande vaut une transaction.
 

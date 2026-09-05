@@ -35,9 +35,9 @@ La construction (`build_authorships.py`) se rejoue sans dommage et converge vers
 
 Des `ANALYZE` sont intercalés entre les étapes, à l'intérieur de la transaction. Sans statistiques fraîches sur des colonnes tout juste peuplées, l'étape 3 part sur un plan d'exécution catastrophique — plusieurs heures là où il en faut quelques minutes.
 
-## Écriture par l'API — curation
+## Écriture par l'API — édition manuelle
 
-L'API n'écrit jamais `authorships`. La curation agit sur les tables en amont, décrites côté [personnes](persons.md), et la construction suivante en tire les conséquences.
+L'API n'écrit jamais `authorships`. L'édition manuelle agit sur les tables en amont, décrites côté [personnes](persons.md), et la construction suivante en tire les conséquences.
 
 **Détacher une personne d'une publication** (`POST /api/persons/{id}/detach-authorships`) inscrit la paire dans `rejected_authorships`, détache les signatures concernées et supprime l'authorship devenue orpheline. La paire ne sera plus jamais recréée.
 

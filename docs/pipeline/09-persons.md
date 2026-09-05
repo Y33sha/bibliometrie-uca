@@ -29,7 +29,7 @@ Phase `persons` — une cascade en 5 signaux, du plus fiable au moins fiable (d�
 
 ## Indépendance de l'ordre d'ingestion
 
-La cascade ne fige pas ses rattachements : à chaque exécution, elle **ré-évalue les attributions dérivées** contre l'état ferme de tout le corpus, pour que le résultat ne dépende pas de l'ordre d'ingestion des sources. Ce qui reste valide n'est pas ré-écrit ; seul ce qui a changé est mis à jour. La curation (épinglage d'une signature à une personne, formes de nom `confirmed`/`rejected`, personnes déclarées distinctes, notices du référentiel RH) est une entrée fixe, jamais réinitialisée.
+La cascade ne fige pas ses rattachements : à chaque exécution, elle **ré-évalue les attributions dérivées** contre l'état ferme de tout le corpus, pour que le résultat ne dépende pas de l'ordre d'ingestion des sources. Ce qui reste valide n'est pas ré-écrit ; seul ce qui a changé est mis à jour. Les saisies manuelles (épinglage d'une signature à une personne, formes de nom `confirmed`/`rejected`, personnes déclarées distinctes, notices du référentiel RH) sont des entrées fixes, jamais réinitialisées.
 
 Trois situations que l'ordre d'arrivée fausserait sont corrigées à chaque passe :
 
