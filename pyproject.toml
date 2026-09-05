@@ -13,6 +13,7 @@ dependencies = [
     "alembic==1.19.1",           # migrations DB
     "fastapi==0.141.1",
     "starlette==1.6.0",          # importé directement (Response, Scope, RequestResponseEndpoint) ; ≥1.3.1 corrige CVE-2026-54282/54283 (≥1.0.1 corrigeait déjà CVE-2026-48710)
+    "anyio==4.13.0",             # importé directement : taille du threadpool posée au démarrage de l'API
     "uvicorn==0.52.4",           # serveur ASGI ; lancé en ligne de commande, jamais importé
     "bcrypt==5.0.0",
     "python-dotenv==1.2.3",      # requis par pydantic-settings pour env_file ; CVE-2026-28684 fixed
