@@ -12,6 +12,9 @@
 * [ ] suggested countries: jamais remis à null
 * [ ] arrêter d'utiliser hal_person_id pour matching: remplacer par idhal / ou rendre hal_person_id visible et confirmable/rejetable via UI admin?
 
+# Code
+* [ ] modules partagés app/pipeline: à sortir plutôt que d'autoriser l'app à importer des modules du pipeline?
+
 # Données
 * [ ] 2 scripts pour importer APC: factoriser; supprimer colonnes jamais lues
 * [ ] relations structures: supprimer est_partenaire_de? renommer table "tutelles_structures"?
