@@ -3,8 +3,8 @@
 from enum import StrEnum
 from typing import Protocol, TypedDict
 
+from domain.persons.identifier_attribution import IdentifierAttribution
 from domain.persons.person import Person
-from domain.persons.person_identifier import PersonIdentifier
 
 
 class AuthenticateOrcidOutcome(StrEnum):
@@ -101,8 +101,8 @@ class PersonRepository(Protocol):
 
     # ── person_identifiers ─────────────────────────────────────────
 
-    def find_identifier(self, id_type: str, id_value: str) -> PersonIdentifier | None:
-        """Charge le `PersonIdentifier` d'une paire `(id_type, id_value)` (unique dans la table), ou `None` si absent."""
+    def find_identifier(self, id_type: str, id_value: str) -> IdentifierAttribution | None:
+        """Charge le `IdentifierAttribution` d'une paire `(id_type, id_value)` (unique dans la table), ou `None` si absent."""
         ...
 
     def find_identifier_holders(
@@ -111,12 +111,12 @@ class PersonRepository(Protocol):
         """`{id_value: (person_id, statut)}` des porteurs actuels des valeurs `id_values` déjà présentes sous ce type d'identifiant — pour prévoir les déplacements avant l'import des ORCID authentifiés."""
         ...
 
-    def insert_identifier(self, ident: PersonIdentifier) -> int:
-        """Insère le `PersonIdentifier` et retourne son id (posé aussi sur `ident.id`). Lève si `(id_type, id_value)` existe déjà ; l'unicité est vérifiée en amont via `find_identifier`."""
+    def insert_identifier(self, ident: IdentifierAttribution) -> int:
+        """Insère le `IdentifierAttribution` et retourne son id (posé aussi sur `ident.id`). Lève si `(id_type, id_value)` existe déjà ; l'unicité est vérifiée en amont via `find_identifier`."""
         ...
 
-    def update_identifier(self, ident: PersonIdentifier) -> None:
-        """Persiste les mutations d'un `PersonIdentifier` existant (`person_id`, `status`, `source`) ; `id_type` et `id_value` sont immuables. Requiert `ident.id` posé."""
+    def update_identifier(self, ident: IdentifierAttribution) -> None:
+        """Persiste les mutations d'un `IdentifierAttribution` existant (`person_id`, `status`, `source`) ; `id_type` et `id_value` sont immuables. Requiert `ident.id` posé."""
         ...
 
     def update_identifier_status(self, ident_id: int, status: str) -> IdentifierStatusRow:

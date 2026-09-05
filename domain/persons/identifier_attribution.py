@@ -1,8 +1,8 @@
-"""Aggregate root `PersonIdentifier` — relation Personne ↔ identifiant externe avec statut.
+"""Aggregate root `IdentifierAttribution` — relation Personne ↔ identifiant externe avec statut.
 
 Aggregate à part (pas un VO, pas une entité fille de `Person`) : le `status` (`pending` / `confirmed` / `rejected`) porte sur la *relation* identifier ↔ person, et la réattribution charge et mute le seul identifier (load + save), pas les deux personnes. Identité naturelle : `(id_type, id_value)` ; identité surrogate : `id`.
 
-`Person.identifiers: tuple[PersonIdentifier, ...]` est une projection en lecture hydratée par le repository à la demande, pas la source de vérité des mutations.
+`Person.identifiers: tuple[IdentifierAttribution, ...]` est une projection en lecture hydratée par le repository à la demande, pas la source de vérité des mutations.
 
 La logique métier touchant aux attributions d'identifiants (transitions de statut, réattribution) vit ici.
 """
@@ -14,7 +14,7 @@ from domain.persons.identifiers import AttributionStatus
 
 
 @dataclass(slots=True)
-class PersonIdentifier:
+class IdentifierAttribution:
     """Attribution d'un identifiant externe (ORCID, idHAL, IdRef, hal_person_id) à une personne, avec statut.
 
     `id_type` ∈ `PERSON_IDENTIFIER_TYPES`. `id_value` est la valeur canonique stockée en base (déjà normalisée par les VOs ORCID/IdHAL/IdRef à la construction ; `hal_person_id` est stocké tel quel).

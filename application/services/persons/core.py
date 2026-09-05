@@ -22,6 +22,7 @@ from application.ports.repositories.person_repository import (
 from application.services._merge import load_merge_pair
 from application.services.authorships.core import reject_pair
 from domain.errors import CannotAttributeConflict, NotFoundError, ValidationError
+from domain.persons.identifier_attribution import IdentifierAttribution
 from domain.persons.identifiers import (
     PERSON_IDENTIFIER_TYPES,
     PUBLIC_PERSON_IDENTIFIER_TYPES,
@@ -29,7 +30,6 @@ from domain.persons.identifiers import (
     normalized_identifier_value,
 )
 from domain.persons.name_forms import compute_person_name_forms
-from domain.persons.person_identifier import PersonIdentifier
 from domain.sources.registry import require_known_source
 from domain.types import JsonValue
 
@@ -225,13 +225,13 @@ def add_identifier(
 ) -> AddIdentifierResult:
     """Ajoute un identifiant (ORCID, idHAL, IdRef...) à une personne.
 
-    Charge l'éventuel `PersonIdentifier` existant pour `(id_type, id_value)`
+    Charge l'éventuel `IdentifierAttribution` existant pour `(id_type, id_value)`
     et dispatche, en renvoyant l'issue (`AddIdentifierResult`) :
 
     - **absent** → insertion en `pending` (`ADDED`)
     - **existant sur cette personne** → idempotent, no-op (`ALREADY_EXISTS`)
     - **existant sur autre personne en `rejected`** → réattribution
-      (statut → `pending`, via `PersonIdentifier.reattribute_to` ; `REASSIGNED`)
+      (statut → `pending`, via `IdentifierAttribution.reattribute_to` ; `REASSIGNED`)
     - **existant sur autre personne en `pending` ou `confirmed`** →
       lève `CannotAttributeConflict`. Pour réattribuer, le statut
       existant doit d'abord être passé à `rejected` (via
@@ -261,7 +261,7 @@ def add_identifier(
     existing = repo.find_identifier(id_type, id_value)
 
     if existing is None:
-        ident = PersonIdentifier(
+        ident = IdentifierAttribution(
             id=None,
             person_id=person_id,
             id_type=id_type,

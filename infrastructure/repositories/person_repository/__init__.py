@@ -24,8 +24,8 @@ if TYPE_CHECKING:
         IdentifierStatusRow,
         NameFormStatusRow,
     )
+    from domain.persons.identifier_attribution import IdentifierAttribution
     from domain.persons.person import Person
-    from domain.persons.person_identifier import PersonIdentifier
 
 
 class PgPersonRepository(PersonRepository):
@@ -95,7 +95,7 @@ class PgPersonRepository(PersonRepository):
 
     # ── person_identifiers ─────────────────────────────────────────
 
-    def find_identifier(self, id_type: str, id_value: str) -> "PersonIdentifier | None":
+    def find_identifier(self, id_type: str, id_value: str) -> "IdentifierAttribution | None":
         return _identifiers.find_identifier(self._conn, id_type, id_value)
 
     def find_identifier_holders(
@@ -103,10 +103,10 @@ class PgPersonRepository(PersonRepository):
     ) -> dict[str, tuple[int, str]]:
         return _identifiers.find_identifier_holders(self._conn, id_type, id_values)
 
-    def insert_identifier(self, ident: "PersonIdentifier") -> int:
+    def insert_identifier(self, ident: "IdentifierAttribution") -> int:
         return _identifiers.insert_identifier(self._conn, ident)
 
-    def update_identifier(self, ident: "PersonIdentifier") -> None:
+    def update_identifier(self, ident: "IdentifierAttribution") -> None:
         _identifiers.update_identifier(self._conn, ident)
 
     def update_identifier_status(self, ident_id: int, status: str) -> "IdentifierStatusRow":

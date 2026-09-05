@@ -9,12 +9,12 @@ from application.ports.repositories.person_repository import (
     IdentifierStatusRow,
 )
 from domain.errors import NotFoundError
+from domain.persons.identifier_attribution import IdentifierAttribution
 from domain.persons.identifiers import AttributionStatus
-from domain.persons.person_identifier import PersonIdentifier
 from infrastructure.db.scalars import row_int
 
 
-def find_identifier(conn: Connection, id_type: str, id_value: str) -> PersonIdentifier | None:
+def find_identifier(conn: Connection, id_type: str, id_value: str) -> IdentifierAttribution | None:
     row = conn.execute(
         text("""
             SELECT id, person_id, id_type, id_value, source, CAST(status AS text) AS status
@@ -26,7 +26,7 @@ def find_identifier(conn: Connection, id_type: str, id_value: str) -> PersonIden
     if not row:
         return None
     m = row._mapping
-    return PersonIdentifier(
+    return IdentifierAttribution(
         id=m["id"],
         person_id=m["person_id"],
         id_type=m["id_type"],
@@ -52,7 +52,7 @@ def find_identifier_holders(
     }
 
 
-def insert_identifier(conn: Connection, ident: PersonIdentifier) -> int:
+def insert_identifier(conn: Connection, ident: IdentifierAttribution) -> int:
     row = conn.execute(
         text("""
             INSERT INTO person_identifiers (person_id, id_type, id_value, source, status)
@@ -72,7 +72,7 @@ def insert_identifier(conn: Connection, ident: PersonIdentifier) -> int:
     return ident.id
 
 
-def update_identifier(conn: Connection, ident: PersonIdentifier) -> None:
+def update_identifier(conn: Connection, ident: IdentifierAttribution) -> None:
     if ident.id is None:
         raise ValueError("update_identifier : ident.id doit être posé (utiliser insert_identifier)")
     conn.execute(

@@ -3,10 +3,10 @@
 Une `Person` rassemble sous une identité unique les signatures d'auteur qu'un même chercheur porte à travers les sources (HAL, OpenAlex, WoS, …). Identité = `id` (clé surrogate).
 
 Composition / associations :
-- `identifiers: tuple[PersonIdentifier, ...]` — projection lecture (chaque `PersonIdentifier` est un aggregate séparé).
+- `identifiers: tuple[IdentifierAttribution, ...]` — projection lecture (chaque `IdentifierAttribution` est un aggregate séparé).
 - `name_forms: tuple[PersonNameForm, ...]` — formes textuelles connues (VOs).
 
-`hal_person_id` n'est pas un attribut nu : c'est un `PersonIdentifier` d'`id_type` = `"hal_person_id"`. Jamais exposé en UI.
+`hal_person_id` n'est pas un attribut nu : c'est un `IdentifierAttribution` d'`id_type` = `"hal_person_id"`. Jamais exposé en UI.
 
 La logique métier touchant à une personne (fusion, matching cross-source, création contrôlée, normalisation des noms) vit ici.
 """
@@ -14,8 +14,8 @@ La logique métier touchant à une personne (fusion, matching cross-source, cré
 from dataclasses import dataclass, field
 
 from domain.errors import ConflictError
+from domain.persons.identifier_attribution import IdentifierAttribution
 from domain.persons.name_forms import PersonNameForm
-from domain.persons.person_identifier import PersonIdentifier
 
 
 @dataclass(slots=True)
@@ -28,7 +28,7 @@ class Person:
     last_name_normalized: str
     first_name_normalized: str
     rejected: bool = False
-    identifiers: tuple[PersonIdentifier, ...] = field(default=())
+    identifiers: tuple[IdentifierAttribution, ...] = field(default=())
     name_forms: tuple[PersonNameForm, ...] = field(default=())
 
     def can_merge_with(self, other: "Person", *, has_distinct_rh: bool) -> None:
