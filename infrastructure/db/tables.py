@@ -845,6 +845,13 @@ staging = Table(
         "'cross_import_hal'::text])",
         name="staging_entry_mode_check",
     ),
+    comment=(
+        "Documents moissonnés, en transit vers les tables sources. Trois états : à traiter "
+        "(processed FALSE, raw_data porte le payload de la source), normalisée (processed "
+        "TRUE, raw_data vidé), introuvable (processed TRUE, not_found_at horodaté, raw_data "
+        "jamais peuplé). Le dernier est posé par la phase fetch_missing quand HAL ne rend "
+        "pas un document demandé par hal-id ou NNT."
+    ),
 )
 
 
