@@ -16,9 +16,11 @@ Colonnes notables :
 - `is_corresponding` : auteur correspondant
 - `roles` (text[]) : rôles (auteur, directeur, rapporteur — pour theses.fr)
 
-`authorship_structures (authorship_id, structure_id)` porte les affiliations résolues. C'est une **`MATERIALIZED VIEW`** (pas une table) : union des `source_authorship_structures` des `source_authorships` reliées à l'authorship, rafraîchie (`REFRESH … CONCURRENTLY`) **uniquement par le pipeline** (fin de phase `authorships`). Les actions admin (review adresse↔structure, assign orphelin) recalculent `in_perimeter` en direct sans toucher à la matview : l'agrégation des structures dérivées reste sur l'état du dernier run. Index unique `(authorship_id, structure_id)` + index `(structure_id)` ; pas de FK (le nettoyage d'une authorship supprimée se fait au refresh).
+`authorship_structures (authorship_id, structure_id)` porte les affiliations résolues. C'est une **vue matérialisée**, réunion des `source_authorship_structures` des signatures reliées à l'authorship, rafraîchie par le pipeline en fin de phase `authorships`.
 
-**Cohérence avec les sources** : la table est **entièrement dérivée** des `source_authorships` — `in_perimeter`, les liens via `authorship_structures`, `is_corresponding`, `author_position`, `roles` sont des consolidations (union ou priorité par source) des authorships sources. Le build (`application/pipeline/authorships/build_authorships.py`) est idempotent en mode incrémental ; le mode pipeline `full` exécute en plus une purge complète + rebuild from scratch (TRUNCATE + reset des FK), pour garantir la convergence absolue à intervalle mensuel. Aucun état natif sur la table : le rejet manuel d'une paire (« cette personne n'est pas l'auteur ») vit dans le store `rejected_authorships`, lu en anti-join par les sites de création pour ne jamais recréer la paire.
+**Une édition d'administration ne la rafraîchit pas.** La review d'un lien adresse ↔ structure et l'assignation d'une signature orpheline recalculent `in_perimeter` en direct, mais l'agrégation des structures reste sur l'état de la dernière exécution du pipeline.
+
+**Cohérence avec les sources** : la table est **entièrement dérivée** des `source_authorships`. `in_perimeter`, les liens via `authorship_structures`, `is_corresponding`, `author_position` et `roles` en sont des consolidations, par union ou par priorité de source. Elle ne porte aucun état propre : les décisions humaines vivent dans les deux stores ci-dessous.
 
 ### Décisions humaines
 
@@ -74,6 +76,6 @@ Cache des tentatives négatives de cross-import par DOI, pour toutes les sources
 | `author_identifying_keys` | pipeline | `normalize_*.py` (via `_authorships_batch.py`) |
 | `source_authorships` | mixte | `normalize_*.py` (pipeline) ; `in_perimeter` par la phase `affiliations`, `authorship_id` par la phase `authorships` ; `person_id` par le pipeline ou en admin (orphan-assign) |
 | `source_authorship_addresses` | pipeline | `normalize_*.py` (via `_authorships_batch.py`) |
-| `authorships` | pipeline | `build_authorships.py` (dédupliquée, dérivée des sources) |
+| `authorships` | pipeline | `build_authorships.py` (consolidée depuis les sources) |
 | `rejected_authorships` | admin | `application/services/authorships/core.py` |
 | `confirmed_authorships` | admin | `application/services/authorships/assign_orphans.py` |

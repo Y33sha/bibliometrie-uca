@@ -18,7 +18,7 @@ flowchart TB
         journals --> publishers
     end
 
-    subgraph canon["Référentiels canoniques (vérité)"]
+    subgraph canon["Référentiel consolidé"]
         publications
         authorships
         structures
@@ -69,7 +69,7 @@ Les vues matérialisées sont signalées comme telles ; les tables purement tech
 | `audit_log` | journal des événements (actions admin, fusions) — technique | — |
 | `author_identifying_keys` | attributs d'identité d'une signature source (nom normalisé, identifiants), partagés via `identity_id` | [Authorships et sources](05-authorships-et-sources.md) |
 | `authorship_structures` | *vue matérialisée* : structures d'un authorship canonique | [Données dérivées](06-donnees-derivees.md) |
-| `authorships` | table de vérité personne × publication | [Authorships et sources](05-authorships-et-sources.md) |
+| `authorships` | table consolidée personne × publication | [Authorships et sources](05-authorships-et-sources.md) |
 | `config` | réglages d'exploitation du pipeline (périmètres actifs, années couvertes…) | [Structures](02-structures.md) |
 | `confirmed_authorships` | épinglages admin (must-link) signature source ↔ personne, réappliqués à chaque exécution | [Authorships et sources](05-authorships-et-sources.md) |
 | `countries` | référentiel des pays | [Structures](02-structures.md) |
@@ -77,12 +77,12 @@ Les vues matérialisées sont signalées comme telles ; les tables purement tech
 | `distinct_publications` | paires marquées distinctes malgré un titre identique | [Publications](03-publications.md) |
 | `doi_lookups` | temporisation des échecs de cross-import par DOI | [Authorships et sources](05-authorships-et-sources.md) |
 | `doi_prefixes` | cache préfixe DOI → agence + éditeur | [Publications](03-publications.md) |
-| `journal_name_forms` | formes de noms pour le matching des revues | [Publications](03-publications.md) |
+| `journal_name_forms` | formes de noms pour reconnaître une revue | [Publications](03-publications.md) |
 | `journals` | référentiel des revues | [Publications](03-publications.md) |
 | `perimeter_structures` | appartenance au périmètre, recalculée par le pipeline | [Structures](02-structures.md) |
 | `perimeters` | définition des périmètres | [Structures](02-structures.md) |
 | `person_identifiers` | identifiants persistants (ORCID, idHAL, IdRef) | [Personnes](04-personnes.md) |
-| `person_name_forms` | formes de noms pour le matching des personnes | [Personnes](04-personnes.md) |
+| `person_name_forms` | formes de noms pour reconnaître une personne | [Personnes](04-personnes.md) |
 | `persons` | référentiel des personnes du périmètre | [Personnes](04-personnes.md) |
 | `persons_rh` | satellite des données RH (import CSV) | [Personnes](04-personnes.md) |
 | `pipeline_phase_executions` | historique d'exécution des phases — technique | — |
@@ -90,9 +90,9 @@ Les vues matérialisées sont signalées comme telles ; les tables purement tech
 | `publication_relations` | relations sémantiques entre publications | [Publications](03-publications.md) |
 | `publication_structures` | *vue matérialisée* : structures d'une publication | [Données dérivées](06-donnees-derivees.md) |
 | `publication_subjects` | liaison publication ↔ sujet | [Publications](03-publications.md) |
-| `publications` | référentiel dédupliqué des productions | [Publications](03-publications.md) |
+| `publications` | référentiel consolidé des productions | [Publications](03-publications.md) |
 | `publications_detail` | satellite 1:1 (abstract, keywords, topics, biblio) | [Publications](03-publications.md) |
-| `publisher_name_forms` | formes de noms pour le matching des éditeurs | [Publications](03-publications.md) |
+| `publisher_name_forms` | formes de noms pour reconnaître un éditeur | [Publications](03-publications.md) |
 | `publishers` | référentiel des éditeurs | [Publications](03-publications.md) |
 | `rejected_authorships` | rejets manuels de paires personne × publication | [Authorships et sources](05-authorships-et-sources.md) |
 | `source_authorship_addresses` | liaison authorship source ↔ adresse | [Authorships et sources](05-authorships-et-sources.md) |

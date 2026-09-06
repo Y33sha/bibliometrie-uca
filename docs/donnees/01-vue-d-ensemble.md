@@ -22,10 +22,10 @@ erDiagram
 
 ## Séparation sources / vue consolidée
 
-Le schéma repose sur la séparation stricte entre tables "canoniques" et tables "sources".
+Le schéma repose sur la séparation stricte entre les tables **sources** et le **référentiel** que le pipeline en consolide.
 
 - Les tables sources contiennent les *records* non dédupliqués, normalisés à partir des payloads des API tierces.
-- Les tables canoniques contiennent les référentiels **publications** et **personnes** obtenus par déduplication depuis les sources, ainsi que le référentiel **structures**, saisi manuellement.
+- Le référentiel contient les **publications** et les **personnes**, obtenues des sources par résolution d'entités, ainsi que les **structures**, saisies manuellement.
 
 Légende:
 - **vert** : table peuplée manuellement
@@ -39,7 +39,7 @@ flowchart LR
         source_authorships-->addresses
         source_authorships-->author_identifying_keys
     end
-    subgraph vérité
+    subgraph consolidé
         direction LR
         publications---authorships
         persons---authorships
@@ -61,8 +61,8 @@ flowchart LR
 Détail par domaine fonctionnel :
 
 - [Structures](02-structures.md) — référentiel institutionnel + adresses + périmètres
-- [Publications](03-publications.md) — référentiel dédupliqué + journals + publishers + APC + sujets
-- [Personnes](04-personnes.md) — référentiel dédupliqué + identifiants + name forms + données RH
+- [Publications](03-publications.md) — référentiel consolidé + journals + publishers + APC + sujets
+- [Personnes](04-personnes.md) — référentiel consolidé + identifiants + name forms + données RH
 - [Authorships et sources](05-authorships-et-sources.md) — table de liaison + tables source + staging
 - [Données dérivées](06-donnees-derivees.md) — vues matérialisées, tables et colonnes dérivées, et leur fraîcheur (incrémental ou recalcul complet)
 - [Index des tables](07-index-des-tables.md) — vue macro du schéma et catalogue complet des tables et vues matérialisées
