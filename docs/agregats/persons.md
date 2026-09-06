@@ -1,6 +1,6 @@
 # Personnes — cycle de vie
 
-*À jour le 2026-09-04.*
+*À jour le 2026-09-06.*
 
 Une personne est un chercheur unifié à travers les sources : plusieurs signatures, venues de HAL, d'OpenAlex ou du Web of Science sous des graphies différentes, désignent la même personne. Contrairement aux [structures](structures.md), qui sont un référentiel saisi à la main, les personnes sont **construites par le pipeline** — la phase `persons` rattache chaque signature à une personne et en crée au besoin — **puis corrigées à la main** : fusion, réattribution d'identifiant, rejet, détachement. Le pipeline et l'interface d'administration écrivent donc tous deux.
 
@@ -27,10 +27,12 @@ Le rattachement d'une signature à une personne est porté par `source_authorshi
 2. **Arbitrer les identifiants disputés.** Un ORCID, un IdRef ou un identifiant de compte HAL peut être attribué à une personne alors que des signatures qui le portent sont rattachées à une autre. Le nom d'auteur majoritaire, parmi toutes les signatures portant cette valeur, tranche. Une attribution confirmée à la main prévaut. Après un transfert, les signatures qui tenaient leur rattachement de cet identifiant repassent à nul et sont résolues à nouveau.
 3. **Rapprocher.** `decide_person_match` tranche par fiabilité décroissante : ORCID, identifiant de compte HAL, IdRef, nom unique, report depuis une autre source, et création en dernier recours. La cascade fait deux passes sur les mêmes index : la première ne fait que rapprocher, la création est repoussée à la seconde. Les rôles non-auteurs des thèses — jury, rapporteurs — n'autorisent aucune création.
 4. **Détacher ce qui a perdu son appui.** Un rattachement obtenu par report depuis une autre source, dont l'attache d'origine a disparu, repasse à nul.
-5. **Régénérer les formes de nom.** Les formes canoniques calculées depuis l'état civil de la personne rejoignent les formes bibliographiques observées dans ses signatures ; seules les différences sont écrites. Une forme canonique naît confirmée, une forme observée naît en attente, et les décisions humaines déjà prises sont conservées.
+5. **Régénérer les formes de nom.** Les formes calculées depuis l'état civil de la personne rejoignent celles observées dans ses signatures ; seules les différences sont écrites. Une forme calculée naît confirmée, une forme observée naît en attente, et les décisions humaines déjà prises sont conservées.
 6. **Purger.** Les rattachements par nom dont la forme désigne maintenant deux personnes ou plus sont détachés, puis les personnes devenues vides sont supprimées — sauf celles qui portent une fiche annuaire.
 
-Les identifiants rencontrés sont inscrits par un point unique, toujours en attente de confirmation et marqués comme automatiques. Un conflit y est consigné sans bloquer, et laissé à l'arbitrage de l'exécution suivante. Ce qu'une exécution inscrit devient ce que la suivante lit : c'est ce qui porte la convergence.
+Les identifiants rencontrés sont inscrits par un point unique, toujours en attente de confirmation et marqués comme automatiques. Un conflit y est consigné sans bloquer, et laissé à l'arbitrage de l'exécution suivante.
+
+Ce qu'une exécution inscrit devient ce que la suivante lit, si bien que la convergence demande plusieurs exécutions. Trois remises à nul se décident d'après l'état lu au début de la phase : la signature dont l'identifiant a été transféré, le rattachement par nom devenu ambigu, et le report entre sources recalculé. Un homonyme apparu à une exécution se résout donc à la suivante ; deux passages suffisent en pratique.
 
 ## Écriture par l'API — édition manuelle
 
@@ -40,7 +42,7 @@ Routeur `interfaces/api/routers/persons.py`, commandes dans `application/service
 
 **Gérer les identifiants.** Ajout manuel, limité aux types publics ; suppression ; confirmation ou rejet ; réattribution, qui ramène l'identifiant en attente.
 
-**Agir sur la personne.** Rejet et retour en arrière, avec recalcul de l'appartenance des publications au périmètre ; renommage, qui régénère les formes canoniques.
+**Agir sur la personne.** Rejet et retour en arrière, avec recalcul de l'appartenance des publications au périmètre ; renommage, qui régénère les formes calculées.
 
 **Trancher une forme de nom.** La confirmer ou la rejeter ; un rejet détache aussi les signatures qui la portent et supprime les authorships devenues orphelines.
 
@@ -54,7 +56,12 @@ Aucun point d'entrée n'écrit `persons_rh` : la fiche annuaire vient d'un impor
 
 ## Lecture par le pipeline
 
-La cascade lit tout en bloc, par `PersonsMatchingQueries` (`infrastructure/pipeline/persons/matching.py`) : les correspondances identifiant vers personne pour IdRef, ORCID et compte HAL, avec le nom normalisé joint pour corroborer ; les correspondances forme de nom vers personnes ; les décisions humaines sur les couples forme–personne ; les personnes écartées d'une publication ; et l'index des rattachements déjà posés par publication et position, sur lequel s'appuie le report d'une source à l'autre.
+La cascade lit tout en bloc, par `PersonsMatchingQueries` (`infrastructure/pipeline/persons/matching.py`) :
+
+- les correspondances identifiant → personne pour IdRef, ORCID et compte HAL, avec le nom normalisé joint pour corroborer ;
+- les correspondances forme de nom → personnes, et les décisions humaines sur les couples forme–personne ;
+- les personnes écartées d'une publication ;
+- l'index des rattachements déjà posés par publication et position, sur lequel s'appuie le report d'une source à l'autre.
 
 ## Lecture par l'API
 
@@ -67,27 +74,3 @@ Port `PersonsQueries`, adaptateurs dans `infrastructure/read_models/persons/`.
 | Files de doublons | Doublons par nom, conflits d'identifiant, signatures détachables, formes de nom ambiguës, candidates au partage d'une forme |
 
 Toutes les files de doublons écartent les paires déclarées distinctes ; celle des doublons par nom écarte en outre les paires dont les deux personnes portent une fiche annuaire.
-
-## Points d'attention
-
-**La convergence demande plusieurs exécutions.** L'indépendance à l'ordre de traitement ne vient pas de la transaction, mais de trois remises à nul décidées d'après l'état lu au début de la phase : les signatures dont l'identifiant a été transféré, les rattachements par nom devenus ambigus, et le recalcul complet des reports entre sources. Un homonyme ou un transfert apparu à une exécution se résout à la suivante ; deux passages suffisent en pratique.
-
-**La phase écrit dans des tables voisines.** Poser le rattachement relève des personnes, mais la phase et la fusion touchent aussi les signatures, les authorships et les rejets, pour que l'opération reste atomique.
-
-**La fiche annuaire protège une donnée sensible.** Une personne qui en porte une ne peut pas être supprimée en silence, et la fusion refuse d'en absorber deux distinctes. Le même garde-fou est répété du côté de la file de doublons, pour éviter de proposer une fusion que le service refuserait.
-
-**Le statut d'ORCID authentifié ne se dégrade pas.** Il est réservé au chercheur qui authentifie lui-même son identifiant, ne peut être posé que par l'import dédié, et un déclencheur Postgres interdit toute autre transition.
-
-## Invariants métier
-
-**Identités.** `person_identifiers` est unique par `(id_type, id_value)` ; `person_name_forms` par `(name_form, person_id)` ; `distinct_persons` est ordonnée pour qu'une paire ne s'inscrive qu'une fois ; `persons_rh` est en relation de un à un.
-
-**Fusion.** Refusée quand les deux personnes portent chacune une fiche annuaire distincte.
-
-**Un identifiant partagé signale une corruption de la source.** Un identifiant porté par deux positions d'auteur ou plus d'un même enregistrement source est suffixé `_dubious` : il est conservé, la marque est réversible, mais il ne sert plus à la résolution.
-
-**L'ORCID n'est un signal que là où l'auteur l'a déposé.** Il ne sert à la résolution que depuis Crossref, OpenAlex et HAL. Les ORCID venus du Web of Science ou de ScanR sont enregistrés sans être utilisés pour rapprocher.
-
-**Rejet durable.** Une paire publication–personne écartée n'est jamais recréée par la résolution, y compris quand ce retrait lève l'ambiguïté d'une forme partagée.
-
-**Identifiants normalisés avant écriture.** ORCID au format à seize chiffres groupés, IdRef à neuf caractères, IdHAL en abrégé littéral, identifiant de compte HAL entier positif : chacun est validé et normalisé par son type dédié.

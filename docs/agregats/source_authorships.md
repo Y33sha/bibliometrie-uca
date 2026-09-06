@@ -1,6 +1,6 @@
 # Source_authorships — cycle de vie
 
-*À jour le 2026-09-04.*
+*À jour le 2026-09-06.*
 
 Une signature est un auteur tel qu'**une** source le porte sur un document : une ligne par position d'auteur dans un [enregistrement source](source_publications.md). C'est la pièce qui relie tout le reste. Elle porte une identité d'auteur telle que la source la donne, reçoit une personne de la phase `persons`, puis un rattachement à l'[authorship](authorships.md) consolidée. Cinq phases du pipeline écrivent successivement dans sa ligne ; l'API n'y touche qu'en éditant les personnes.
 
@@ -18,9 +18,9 @@ Aucun objet de domaine ne lui correspond. Ses règles sont réparties selon ce q
 
 L'enregistrement source parent est décrit dans [source_publications](source_publications.md), l'authorship consolidée en aval dans [authorships](authorships.md), qui porte aussi `rejected_authorships`.
 
-## Écriture par le pipeline
+`identity_id` et `person_id` répondent à deux questions différentes. L'identité — nom normalisé et identifiants — est un fait que la source fournit, enregistré dès `normalize`. La personne est le résultat de la résolution, attribué plus tard par la phase `persons`. L'identité sert de clé pour charger les correspondances de la résolution, et à dédoublonner des signatures identiques.
 
-Cinq phases écrivent tour à tour dans la même ligne.
+## Écriture par le pipeline
 
 1. **`normalize` — naissance.** Les signatures d'un enregistrement sont réécrites en bloc, avec leur source, leur position, leur rôle, le nom d'auteur brut et leur identité. L'identité est obtenue en dédoublonnant `author_identifying_keys` sur son empreinte calculée — nom normalisé et identifiants réunis ; celles que plus aucune signature ne porte sont supprimées en fin de phase. Les adresses sont créées au besoin et reliées à la signature. Un identifiant porté par deux positions ou plus du même enregistrement est suffixé `_dubious`, ce qui l'écarte de la résolution.
 2. **`affiliations` — appartenance au périmètre.** `in_perimeter` devient vrai lorsqu'une adresse de la signature se résout en une structure du périmètre, le rattachement n'étant pas rejeté. La vue matérialisée `source_authorship_structures` est rafraîchie.
@@ -46,19 +46,3 @@ Aucune colonne structurelle n'est écrite par l'API. L'édition manuelle, décri
 ## Lecture par l'API
 
 Le détail d'une publication montre les **auteurs tels que chaque source les donne** : pour chaque source, les signatures de l'import le plus récent, avec leurs adresses, leurs structures et leurs rôles. La fiche personne, elle, s'appuie sur les authorships consolidées.
-
-## Points d'attention
-
-**Aucune classe ne modélise la signature.** Ses règles sont réparties entre les rôles, l'extraction par source et les identifiants. Chaque morceau est à sa place, mais le cycle de vie complet ne se lit qu'en suivant les cinq phases — c'est l'objet de cette fiche.
-
-**L'identité de signature et la personne sont deux choses distinctes.** L'identité — nom normalisé et identifiants, dédoublonnée dans `author_identifying_keys` — est un fait que la source fournit, enregistré dès `normalize`. La personne est le résultat de la résolution, attribué plus tard. L'identité sert de clé pour charger les correspondances de la résolution, et à dédoublonner des signatures identiques.
-
-## Invariants métier
-
-**Toute signature porte une identité.** `identity_id` ne peut être nul, et une identité est unique par son couple nom normalisé et identifiants.
-
-**Le détachement porte sur le couple publication–personne.** Il met à nul le `person_id` de toutes ses signatures, quelle que soit leur source.
-
-**Épinglage et rejet sont de portées différentes.** L'épinglage impose un rattachement pour une signature donnée, et il est reposé à chaque passage. Le rejet interdit durablement un couple publication–personne, que la phase `authorships` ne recrée jamais.
-
-**Un identifiant partagé signale une corruption de la source.** Porté par deux positions ou plus du même enregistrement, il est suffixé `_dubious` : conservé, mais écarté de la résolution.

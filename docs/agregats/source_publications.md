@@ -1,6 +1,6 @@
 # Source_publications — cycle de vie
 
-*À jour le 2026-09-04.*
+*À jour le 2026-09-06.*
 
 Un enregistrement source est l'image d'un document dans **une** source — HAL, OpenAlex, Web of Science, ScanR, theses.fr, Crossref, DataCite — avant toute fusion. C'est la couche qui garde ce que chaque source a dit, une ligne par couple source et identifiant dans cette source. Elle naît d'un import direct : la phase `normalize` transforme les données brutes déposées dans `staging` en enregistrements typés. Le pipeline seul y écrit ; l'API ne fait que les lire.
 
@@ -34,11 +34,18 @@ Lors d'un réimport, le rattachement à la publication est préservé, les ident
 
 ## Écriture par l'API
 
-**Aucune.** Ces enregistrements sont la trace de ce que les sources ont fourni : rien ne les édite à la main. Une métadonnée fausse se corrige par une règle de `metadata_correction`, et l'édition manuelle porte sur la publication canonique ou sur les revues.
+**Aucune.** Ces enregistrements sont la trace de ce que les sources ont fourni : rien ne les édite à la main. Une métadonnée fausse se corrige par une règle de `metadata_correction`, et l'édition manuelle porte sur la publication consolidée ou sur les revues.
 
 ## Lecture par le pipeline
 
-**Consolidation en publication canonique.** `refresh_from_sources` lit tous les enregistrements d'une publication et recalcule son état en entier. Champ par champ : première valeur non nulle selon le classement des sources ; pour le type de document, un sous-type d'article précis venu d'une source moins fiable l'emporte sur le type générique de Crossref ; pour l'accès, le statut le plus ouvert ; pour les listes, leur réunion dédoublonnée. Les valeurs lues sont déjà corrigées.
+**Consolidation en publication.** `refresh_from_sources` lit tous les enregistrements d'une publication et recalcule son état en entier. Champ par champ :
+
+- la première valeur non nulle, selon le classement des sources ;
+- pour le type de document, un sous-type d'article précis venu d'une source moins fiable l'emporte sur le type générique de Crossref ;
+- pour l'accès, le statut le plus ouvert ;
+- pour les listes, leur réunion dédoublonnée.
+
+Les valeurs lues sont déjà corrigées.
 
 **Regroupement des doublons.** Chaque enregistrement marqué à reprendre est projeté en jetons de confirmation, les enregistrements partageant un jeton sont reliés, et la décision porte ensuite sur ce qu'il faut en faire : rapprocher, créer, réunir ou séparer, puis repointer les rattachements.
 
@@ -50,16 +57,6 @@ Le détail d'une publication montre sa **provenance** : la liste de ses enregist
 
 ## Points d'attention
 
-**Les types de clés de résolution sont écrits à deux endroits.** Le calcul du voisinage se fait dans la base, ce qui oblige `publications_reconciliation.py` à réencoder en SQL les mêmes types de clés que la définition Python — DOI, numéro national de thèse, PMID, identifiant HAL, jeton de métadonnées. Cette dernière reste la référence ; les deux doivent être modifiées ensemble.
+**Les clés de résolution sont décrites à deux endroits.** Le voisinage se calcule en SQL : `infrastructure/pipeline/publications/reconciliation.py` réunit par `UNION` un `SELECT` par famille de clé — DOI, clés scalaires d'`external_ids`, identifiant HAL, jeton de métadonnées.
 
-## Invariants métier
-
-**Identités.** Un enregistrement est identifié par sa source et son identifiant dans cette source ; une identité d'auteur par son nom normalisé et ses identifiants. Un réimport met à jour la même ligne.
-
-**Trace des sources.** Un enregistrement source n'est écrit que par le pipeline, `normalize` puis `metadata_correction`. L'objet de domaine correspondant est immuable et ne sert qu'à la lecture.
-
-**Corrections réversibles.** Toute correction conserve la valeur d'origine dans `raw_metadata`, et chaque passage repart des données brutes reconstituées.
-
-**Clés de confirmation.** La définition Python des clés de résolution fait autorité. Le type de document entre dans le jeton, ce qui impose que deux documents rapprochés soient de même type, sous réserve d'un titre assez long.
-
-**Sans publication canonique, l'enregistrement subsiste détaché.** Une publication qu'aucune source n'atteste, hors périmètre, ou dont le type de document est exclu, n'existe pas ; ses enregistrements source restent en base, sans rattachement, et ne produisent ni authorship ni personne.
+Le `SELECT` des clés scalaires est engendré depuis l'énumération du domaine. Les trois autres sont écrits à la main, chaque famille demandant sa propre jointure : égalité sur une colonne pour le DOI, appartenance à un tableau pour l'identifiant HAL, égalité sur trois colonnes pour le jeton. Ajouter une clé de confirmation demande donc de toucher aussi ce fichier.

@@ -1,6 +1,6 @@
 # Périmètres — cycle de vie
 
-*À jour le 2026-09-04.*
+*À jour le 2026-09-06.*
 
 Un périmètre nomme un ensemble de structures en ne désignant que ses **racines** : tout ce qui descend d'une racine par une relation de tutelle en fait partie. C'est ce qui permet de dire « l'UCA » sans énumérer ses laboratoires, et de suivre automatiquement une réorganisation. L'ensemble ainsi obtenu détermine ce que le pipeline interroge aux sources, quelles adresses il considère comme internes, et pour quelles signatures il crée des personnes.
 
@@ -42,7 +42,3 @@ Port `application/ports/read_models/perimeters_queries.py`, adaptateur `PgPerime
 ## Points d'attention
 
 **Les racines sont un tableau d'identifiants sans clé étrangère.** Rien en base n'empêche `root_structure_ids` de désigner une structure supprimée. La cohérence tient aux points d'écriture — édition d'un périmètre, suppression d'une structure, ajout ou retrait d'une tutelle — qui nettoient les racines et recalculent l'ensemble.
-
-## Invariants métier
-
-**Composition d'un périmètre.** `perimeter_structures` contient les racines déclarées dans `perimeters.root_structure_ids` et tous leurs descendants dans `structure_tutelles`. Cette règle est écrite une seule fois, dans la requête de `refresh_perimeter_structures` ; `get_perimeter_structure_ids` se contente de lire la table. L'objet de domaine ne la porte pas.

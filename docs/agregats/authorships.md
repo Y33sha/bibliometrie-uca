@@ -1,6 +1,6 @@
 # Authorships — cycle de vie
 
-*À jour le 2026-09-04.*
+*À jour le 2026-09-06.*
 
 Une `authorship` relie une personne à une publication : une ligne par couple `(publication_id, person_id)`. Elle est entièrement dérivée des signatures relevées dans chaque source (`source_authorships`) — jamais saisie, jamais modifiée à la main. La phase `persons` attribue une personne à chaque signature ; la phase `authorships` promeut ensuite les couples attestés et recompose leurs attributs.
 
@@ -23,7 +23,7 @@ Les signatures elles-mêmes relèvent de la fiche [source_publications](source_p
 
 La table n'est écrite que par la phase `authorships` (`application/pipeline/authorships/phase.py`), qui enchaîne la construction proprement dite, la suppression par lots des publications restées sans aucune authorship, puis le rafraîchissement des compteurs de publications des revues et des éditeurs, qui dépendent du périmètre.
 
-La construction (`build_authorships.py`) se rejoue sans dommage et converge vers le même état. Cinq étapes :
+La construction (`build_authorships.py`) se rejoue sans dommage et converge vers le même état.
 
 1. **Insertion et suppression.** Insère les couples attestés par au moins une signature portant une personne, en écartant ceux qu'une ligne de `rejected_authorships` interdit. Supprime les authorships qu'aucune source n'atteste plus.
 2. **Liaison.** Renseigne `source_authorships.authorship_id`, en une seule instruction valable pour toutes les sources.
@@ -32,8 +32,6 @@ La construction (`build_authorships.py`) se rejoue sans dommage et converge vers
 5. **Rafraîchissement** des deux vues matérialisées, sans bloquer les lectures.
 
 `run_pipeline --rebuild-authorships` vide d'abord la table : c'est la reconstruction de récupération, pas le mode courant.
-
-Des `ANALYZE` sont intercalés entre les étapes, à l'intérieur de la transaction. Sans statistiques fraîches sur des colonnes tout juste peuplées, l'étape 3 part sur un plan d'exécution catastrophique — plusieurs heures là où il en faut quelques minutes.
 
 ## Écriture par l'API — édition manuelle
 
@@ -57,19 +55,3 @@ L'API n'écrit jamais `authorships`. L'édition manuelle agit sur les tables en 
 | Détail d'une publication | `authorships`, `persons` et `authorship_structures` : les auteurs, leurs structures et l'auteur de correspondance |
 | Fiche et tableau de bord d'une personne | `authorships` et `publications` |
 | Listes, facettes et statistiques | `publication_structures` pour la facette laboratoire ; les décomptes se limitent au périmètre |
-
-## Points d'attention
-
-**Un attribut ne survit pas à la disparition de sa source.** L'étape 3 recompose sans garde d'absence : c'est ce qui rend la construction convergente, et c'est aussi ce qui fait qu'un rôle ou un périmètre cesse d'exister dès que plus aucune source ne l'atteste.
-
-**Les `ANALYZE` intra-transaction sont nécessaires**, et documentés comme tels dans l'adaptateur. Les retirer fait s'effondrer le plan d'exécution de l'étape 3.
-
-## Invariants métier
-
-**Identité.** Le couple `(publication_id, person_id)` est unique, et `publication_id` ne peut être nul : l'authorship n'existe pas sans sa publication.
-
-**Rejet durable.** Une paire inscrite dans `rejected_authorships` n'est jamais recréée par la construction.
-
-**Périmètre.** `publications.in_perimeter` vaut « au moins une authorship dans le périmètre, portée par une personne non écartée ». Ce prédicat est recalculé à chaque construction.
-
-**Convergence.** Insertion, suppression et recomposition se rejouent sans dommage : une exécution répétée aboutit au même état, sans reconstruction complète.
