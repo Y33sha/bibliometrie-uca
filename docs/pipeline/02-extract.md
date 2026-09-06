@@ -26,6 +26,18 @@ flowchart LR
 - Même sans changement, la colonne `last_seen_at` est bumpée à chaque fois qu'un doc est re-vu (moisson bulk ou refetch).
 > Une publication qui cesse d'apparaître dans sa source (par ex. dédoublonnage dans HAL) est détectée puis confirmée par la phase [Refresh & disparitions](#refresh-disparitions), qui pose un marqueur `disappeared_at`.
 
+## États d'une ligne de staging
+
+| État | `processed` | `not_found_at` | `raw_data` | Posé par |
+|---|---|---|---|---|
+| **À traiter** | FALSE | NULL | payload de la source | les extracteurs |
+| **Normalisée** | TRUE | NULL | vidé | `normalize` |
+| **Non trouvée** | TRUE | horodatage | jamais peuplé | `fetch_missing_hal` |
+
+Un CHECK interdit la combinaison impossible, `not_found_at IS NULL OR processed` : une ligne ne peut pas être à la fois marquée introuvable et en attente de traitement.
+
+Si la source publie le document plus tard, le moissonnage efface le marqueur en même temps qu'il repose le payload — l'ordre inverse violerait le CHECK.
+
 ## Agences d'enregistrement DOI
 
 Phase `resolve_ra`, enchaînée entre le moissonnage initial et les imports croisés. Elle résout la Registration Agency (Crossref ou DataCite) des préfixes DOI, pour que l'[import croisé par DOI](#imports-croisés) route chaque DOI vers la bonne API au lieu de l'interroger contre les deux.
@@ -46,14 +58,14 @@ Télécharge depuis HAL les documents référencés (par hal-id ou NNT) dans d'a
 **Étape 2 — `fetch_missing_doi` : DOI manquants par source.**
 Pour chaque source cible (OpenAlex, HAL, WoS, ScanR, Crossref), recherche par DOI les records trouvés dans les autres sources mais absents de celle-ci. La plupart sont effectivement absents ; certains sont repêchés (cause : affiliations différentes selon source). Dispatcher dans `application/pipeline/cross_imports/fetch_missing_doi.py`, adaptateur par source dans `infrastructure/sources/<source>/fetch_missing_doi.py`. Sources cibles déterminées par la policy du mode (`application/pipeline/modes.py`) ; le pool de DOI est auto-borné par le backoff `doi_lookups`.
 
-**Les deux étapes sont auto-bornées et convergentes.** Le pool de hal-ids/NNT à re-tenter est fini par construction (un hal-id 404 sort définitivement via `not_found_at`, HAL étant source native). Le pool de DOI l'est aussi grâce au backoff : un DOI absent d'une source *non native* (HAL/OpenAlex/WoS/ScanR) est enregistré dans `doi_lookups` avec `next_retry = now() + 30 jours` ; `get_cross_import_dois` ne le ressort qu'une fois ce délai écoulé. Le 1er pass tente tout, les passes suivantes ne reprennent que les nouveaux DOI et ceux dont le backoff a expiré.
+**Les deux étapes sont auto-bornées et convergentes.** Le pool de hal-ids/NNT à re-tenter est fini par construction (un hal-id 404 sort définitivement via `not_found_at`, HAL étant source native). Le pool de DOI l'est aussi grâce au backoff : un DOI absent d'une source *non native* (HAL/OpenAlex/WoS/ScanR) est enregistré dans `doi_lookups` avec `next_retry = now() + 30 jours` ; `get_cross_import_dois` ne le ressort qu'une fois ce délai écoulé. Chez Crossref et DataCite, dont le DOI est l'identifiant natif, l'absence est définitive : `next_retry` reste NULL et le DOI ne ressort jamais. Le 1er pass tente tout, les passes suivantes ne reprennent que les nouveaux DOI et ceux dont le backoff a expiré.
 
 
 ## Refresh & disparitions
 
 Phase `refresh_stale`, enchaînée après les imports croisés, **à chaque run**. Elle rafraîchit les documents dont la dernière vue (`last_seen_at`) dépasse `STALE_REFRESH_AFTER_DAYS` (90 j) et détecte les disparitions.
 
-Pour chaque DOI stale, refetch via l'adaptateur `fetch_missing_doi` de sa source : trouvé → `raw_data` rafraîchi (re-traité si le hash a changé) + `last_seen_at` bumpé ; 404 confirmé → `disappeared_at` posé ; erreur transitoire → laissé, re-tenté plus tard. Les rows stale **sans DOI** (non refetchables, mais re-moissonnées par le bulk) sont marquées disparues directement.
+Chaque ligne périmée est réinterrogée par son identifiant natif : trouvée → `raw_data` rafraîchi (re-traité si l'empreinte a changé) et `last_seen_at` repoussé ; absence confirmée → `disappeared_at` posé ; erreur transitoire → laissée, retentée plus tard.
 
 Tournant à chaque run, le seuil étale la charge : une passe ne ramasse que ce qui vient de franchir 90 j. La fenêtre fixe du mode `full` (rétention cumulative) garde la plupart des natifs frais via le bulk, donc le lot stale reste petit (cross-imports + natifs réellement disparus). Pas de filtre par source : sous cadence normale theses et wos ne deviennent jamais stale.
 
