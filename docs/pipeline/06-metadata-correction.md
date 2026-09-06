@@ -4,7 +4,7 @@
 
 La phase `metadata_correction` prépare les `source_publications` pour que le [rattachement des publications](07-publications.md) s'appuie sur des valeurs propres. Elle tourne après [`publishers_journals`](05-publishers-journals.md), dont le typage des revues alimente les règles dépendantes de la revue.
 
-Les corrections sont écrites sur les colonnes des `source_publications` ; la valeur d'origine est conservée dans `raw_metadata`, et chaque correction est recalculée à partir d'elle à chaque exécution. Un re-moissonnage ou un changement de type de revue est donc rattrapé à l'exécution suivante, sans état à entretenir.
+Les corrections sont écrites sur les colonnes des `source_publications` ; la valeur d'origine est conservée dans `raw_metadata`, et chaque correction est recalculée à partir d'elle à chaque exécution.
 
 1. **`journal_by_doi`** — renseigne `journal_id` lorsqu'il est vide et que le DOI permet d'identifier la revue.
 

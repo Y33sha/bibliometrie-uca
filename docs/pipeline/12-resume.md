@@ -1,4 +1,4 @@
-# Résumé : peuplement des tables canoniques
+# Résumé : peuplement des référentiels
 
 *À jour le 2026-06-30.*
 
@@ -41,7 +41,7 @@ flowchart LR
     class structures,publications valid;
 ```
 
-3. La phase [`persons`](09-persons.md) rattache les *authorships* du périmètre aux personnes existantes ou crée de nouvelles personnes.
+3. La phase [`persons`](08-persons.md) rattache les *authorships* du périmètre aux personnes existantes ou crée de nouvelles personnes.
 
 ```mermaid
 flowchart LR
@@ -62,7 +62,7 @@ flowchart LR
 ```
 
 
-4. La phase [`authorships`](10-authorships.md) crée les liens entre publications, personnes et structures canoniques. L'information portée par les `source_authorships` — l'auteur (`person_id`) et ses structures de rattachement — est agrégée dans la table `authorships` par union des sources.
+4. La phase [`authorships`](09-authorships.md) crée les liens entre les publications, les personnes et les structures. L'information portée par les `source_authorships` — l'auteur (`person_id`) et ses structures de rattachement — est agrégée dans la table `authorships` par union des sources.
 
 ```mermaid
 flowchart LR
