@@ -1743,7 +1743,7 @@ export interface paths {
          * List Perimeters
          * @description Liste les périmètres avec leurs structures racines.
          *
-         *     `structures` porte les seules racines ; `structure_count` compte l'ensemble effectif, racines et descendants par `est_tutelle_de` réunis.
+         *     `structures` porte les seules racines ; `structure_count` compte l'ensemble effectif, racines et descendants réunis.
          */
         get: operations["list_perimeters_api_perimeters_get"];
         put?: never;
