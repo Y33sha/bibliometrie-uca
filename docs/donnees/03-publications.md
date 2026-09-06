@@ -2,7 +2,7 @@
 
 *À jour le 2026-09-05.*
 
-Référentiel dédupliqué des productions de recherche. Cf [doc pipeline](../pipeline/07-publications.md) pour la logique de déduplication.
+Référentiel consolidé des productions de recherche. Cf [doc pipeline](../pipeline/07-publications.md) pour la logique de résolution d'entités.
 
 ```mermaid
 flowchart LR
@@ -35,9 +35,9 @@ Légende :
 ## Tables associées
 
 - **`journals`** : référentiel des revues.
-- **`journal_name_forms`** : formes de noms normalisées pour le matching journaux (parallèle à `person_name_forms` et `structure_name_forms`).
+- **`journal_name_forms`** : formes de noms normalisées pour reconnaître une revue (parallèle à `person_name_forms` et `structure_name_forms`).
 - **`publishers`** : référentiel des éditeurs.
-- **`publisher_name_forms`** : formes de noms normalisées pour le matching éditeurs.
+- **`publisher_name_forms`** : formes de noms normalisées pour reconnaître un éditeur.
 - **`apc_payments`** : données issues d'un import CSV (cf. [doc sources](../sources/10-imports-manuels.md#données-apc)).
 - **`distinct_publications`** : paires de publications marquées comme **distinctes malgré un titre identique**, évite de les re-suggérer dans l'interface de dédoublonnage `admin/duplicates`.
 - **`publications_detail`** : satellite 1:1 de `publications` portant les métadonnées volumineuses. Cf. [données dérivées](06-donnees-derivees.md).
