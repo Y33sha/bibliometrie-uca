@@ -4,7 +4,7 @@
 
 Un enregistrement source est l'image d'un document dans **une** source — HAL, OpenAlex, Web of Science, ScanR, theses.fr, Crossref, DataCite — avant toute fusion. C'est la couche qui garde ce que chaque source a dit, une ligne par couple source et identifiant dans cette source. Elle naît d'un import direct : la phase `normalize` transforme les données brutes déposées dans `staging` en enregistrements typés. Le pipeline seul y écrit ; l'API ne fait que les lire.
 
-`domain/source_publications/` porte les clés qui pilotent le dédoublonnage, les règles de correction de métadonnées, la correspondance entre les nomenclatures de type de document, et la conservation des valeurs d'origine.
+`domain/source_publications/` porte les clés qui pilotent la résolution, les règles de correction de métadonnées, la correspondance entre les nomenclatures de type de document, et la conservation des valeurs d'origine.
 
 ## Tables
 
@@ -38,9 +38,9 @@ Lors d'un réimport, le rattachement à la publication est préservé, les ident
 
 ## Lecture par le pipeline
 
-**Fusion en publication canonique.** `refresh_from_sources` lit tous les enregistrements d'une publication et recalcule son état en entier. Champ par champ : première valeur non nulle selon le classement des sources ; pour le type de document, un sous-type d'article précis venu d'une source moins fiable l'emporte sur le type générique de Crossref ; pour l'accès, le statut le plus ouvert ; pour les listes, leur réunion dédoublonnée. Les valeurs lues sont déjà corrigées.
+**Consolidation en publication canonique.** `refresh_from_sources` lit tous les enregistrements d'une publication et recalcule son état en entier. Champ par champ : première valeur non nulle selon le classement des sources ; pour le type de document, un sous-type d'article précis venu d'une source moins fiable l'emporte sur le type générique de Crossref ; pour l'accès, le statut le plus ouvert ; pour les listes, leur réunion dédoublonnée. Les valeurs lues sont déjà corrigées.
 
-**Regroupement des doublons.** Chaque enregistrement marqué à reprendre est projeté en jetons de confirmation, les enregistrements partageant un jeton sont reliés, et le plan de réconciliation décide s'il faut rapprocher, créer, réunir ou séparer, puis repointe les rattachements.
+**Regroupement des doublons.** Chaque enregistrement marqué à reprendre est projeté en jetons de confirmation, les enregistrements partageant un jeton sont reliés, et le plan de résolution décide s'il faut rapprocher, créer, réunir ou séparer, puis repointe les rattachements.
 
 **Autres lectures.** La phase `subjects` lit les thématiques source par source, en conservant leur provenance ; la phase `authorships` consolide les signatures ; la phase `persons` lit les signatures du périmètre.
 
@@ -50,7 +50,7 @@ Le détail d'une publication montre sa **provenance** : la liste de ses enregist
 
 ## Points d'attention
 
-**Les types de clés de dédoublonnage sont écrits à deux endroits.** Le calcul du voisinage se fait dans la base, ce qui oblige `publications_reconciliation.py` à réencoder en SQL les mêmes types de clés que la définition Python — DOI, numéro national de thèse, PMID, identifiant HAL, jeton de métadonnées. Cette dernière reste la référence ; les deux doivent être modifiées ensemble.
+**Les types de clés de résolution sont écrits à deux endroits.** Le calcul du voisinage se fait dans la base, ce qui oblige `publications_reconciliation.py` à réencoder en SQL les mêmes types de clés que la définition Python — DOI, numéro national de thèse, PMID, identifiant HAL, jeton de métadonnées. Cette dernière reste la référence ; les deux doivent être modifiées ensemble.
 
 ## Invariants métier
 
@@ -60,6 +60,6 @@ Le détail d'une publication montre sa **provenance** : la liste de ses enregist
 
 **Corrections réversibles.** Toute correction conserve la valeur d'origine dans `raw_metadata`, et chaque passage repart des données brutes reconstituées.
 
-**Clés de confirmation.** La définition Python des clés de dédoublonnage fait autorité. Le type de document entre dans le jeton, ce qui impose que deux documents rapprochés soient de même type, sous réserve d'un titre assez long.
+**Clés de confirmation.** La définition Python des clés de résolution fait autorité. Le type de document entre dans le jeton, ce qui impose que deux documents rapprochés soient de même type, sous réserve d'un titre assez long.
 
 **Sans publication canonique, l'enregistrement subsiste détaché.** Une publication qu'aucune source n'atteste, hors périmètre, ou dont le type de document est exclu, n'existe pas ; ses enregistrements source restent en base, sans rattachement, et ne produisent ni authorship ni personne.
