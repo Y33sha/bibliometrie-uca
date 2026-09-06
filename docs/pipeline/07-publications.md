@@ -28,8 +28,8 @@ Chaque partition aboutit sur une seule publication. L'assignation choisit laquel
 
 - **Rattachement** : la partition contient déjà une publication existante → toutes ses `source_publications` y sont rattachées.
 - **Fusion** : la partition réunit plusieurs publications existantes → une seule est conservée, les autres sont absorbées.
-- **Création** : la partition ne contient aucune publication existante → une publication est créée si au moins une `source_publication` de la partition est dans le périmètre.
 - **Scission** : une publication existante se retrouve à cheval sur plusieurs partitions → elle reste sur une seule d'entre elles, et une publication est créée pour chacune des autres.
+- **Création** : la partition ne contient aucune publication existante → une publication est créée si au moins une `source_publication` de la partition est dans le périmètre.
 - **Sans suite** : à défaut, les `source_publications` de la partition restent orphelines.
 
 Le périmètre ne conditionne que la création : une `source_publication` hors périmètre peut se rattacher à une publication existante.
