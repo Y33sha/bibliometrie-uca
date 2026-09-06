@@ -1,0 +1,16 @@
+extends: existence
+message: "Métadiscours : « %s ». Dis la chose, ou supprime la phrase."
+level: error
+ignorecase: true
+tokens:
+  - "il (est|serait) important de (noter|souligner|préciser|comprendre)"
+  - "il convient de (noter|souligner|préciser)"
+  - "il (est|faut) (à )?noter que"
+  - "à noter que"
+  - "notez que"
+  - "il faut (bien )?(comprendre|garder à l'esprit) que"
+  - "en d'autres termes"
+  - "autrement dit"
+  - "cela signifie (donc )?que"
+  - "comme (mentionné|indiqué|expliqué) (ci-dessus|précédemment|plus haut)"
+  - "cette (fonction|méthode|classe) (a pour but|sert) (de|à)"

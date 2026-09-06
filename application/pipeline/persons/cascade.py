@@ -60,9 +60,9 @@ from domain.persons.name_forms import compute_person_name_forms
 
 
 class _Cascade:
-    """État d'une passe de cascade : signatures non liées, index préchargés, compteurs, effets.
+    """État de la cascade : signatures non liées, index préchargés, compteurs, effets.
 
-    `match` et `create` en instancient chacun une (fetch + prefetch frais) : aucune mémoire n'est partagée entre les deux étapes, `create` relit depuis la base l'état ferme posé par `match`. Les index sont tenus à jour en vif pendant la passe pour qu'une signature voie ce qu'une signature précédente de la **même** passe vient de poser.
+    Un seul `_Cascade` sert aux deux passes : un fetch, un chargement d'index. Les index sont tenus à jour en vif, si bien qu'une signature voit ce qu'une signature précédente vient de poser, y compris depuis la passe `match`.
     """
 
     def __init__(

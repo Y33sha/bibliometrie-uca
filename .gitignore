@@ -28,15 +28,6 @@ db/backup/
 # Raw store local : snapshots gzippés des payloads sources (cf. chantier DATA_raw-data-store)
 data/
 
-# Cache local du spike CrossRef (réponses brutes API)
-docs/chantiers/crossref-spike-data/
-
-# Cache local du spike DOI prefixes / RA / DataCite
-docs/chantiers/doi-prefixes-spike-data/
-
-# Cache local du spike DataCite vs APIs natives (Phase 3)
-docs/chantiers/datacite-vs-natives-spike-data/
-
 # IDE
 .vscode/
 .idea/
@@ -45,8 +36,8 @@ docs/chantiers/datacite-vs-natives-spike-data/
 .env
 
 # Claude Code
-.claude
+# .claude
 
 # Vale
-.vale.ini
-styles/
+# .vale.ini
+# styles/

@@ -8,7 +8,7 @@ Les corrections sont écrites sur les colonnes des `source_publications` ; la va
 
 1. **`journal_by_doi`** — renseigne `journal_id` lorsqu'il est vide et que le DOI permet d'identifier la revue.
 
-2. **`correct_unary`** — mappe le type de document de la source vers le vocabulaire canonique, puis applique les règles de correction qui s'appliquent à un enregistrement isolé. Ces règles corrigent le type de document, le statut *open access* et les identifiants associés au document.
+2. **`correct_unary`** — mappe le type de document de la source vers le vocabulaire unifié, puis applique les règles de correction qui s'appliquent à un enregistrement isolé. Ces règles corrigent le type de document, le statut *open access* et les identifiants associés au document.
     *Exemples : un document typé « thèse » paru dans une revue est retypé en article, et perd les identifiants de thèse que la source lui avait attribués ; un article avec un titre préfixé « Erratum: » est retypé en erratum ; un statut `embargoed` dont la date d'embargo est échue passe à `green`.*
 
 3. **`correct_by_cluster`** — rapproche les `source_publications` partageant un même DOI et déduit le DOI que doit porter chaque membre du groupe.
