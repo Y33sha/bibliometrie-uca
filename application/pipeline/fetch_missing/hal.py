@@ -19,7 +19,7 @@ from sqlalchemy import Connection
 
 from application.pipeline._fetch_pool import run_fetch_pool
 from application.pipeline.metrics import PhaseMetrics
-from application.ports.pipeline.cross_imports.fetch_missing_hal import (
+from application.ports.pipeline.fetch_missing.hal import (
     HalFetchMissingAdapter,
     HalIdRef,
     NntRef,

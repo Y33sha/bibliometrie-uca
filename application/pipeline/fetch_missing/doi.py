@@ -2,11 +2,11 @@
 
 Pour chaque DOI présent dans d'autres sources mais absent de la cible, interroge l'API de la cible et insère le record dans `staging`.
 
-Le comportement spécifique à chaque source (endpoint, auth, format de requête/réponse, SQL d'insertion) est délégué à un adapter qui implémente `AsyncFetchMissingDoiAdapter` (`application/ports/pipeline/cross_imports/fetch_missing_doi.py`).
+Le comportement spécifique à chaque source (endpoint, auth, format de requête/réponse, SQL d'insertion) est délégué à un adapter qui implémente `AsyncFetchMissingDoiAdapter` (`application/ports/pipeline/fetch_missing/fetch_missing_doi.py`).
 
 Implémentation async via `run_fetch_pool` (pool de `max_concurrent` workers par source) pour saturer les rate-limits autorisés.
 
-Utilisé par la phase `cross_imports` du pipeline, une fois par source cible.
+Utilisé par la phase `fetch_missing` du pipeline, une fois par source cible.
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ from application.pipeline._fetch_pool import run_fetch_pool
 from application.pipeline.logging_scope import scoped_logger
 from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.circuit_breaker import CircuitBreaker
-from application.ports.pipeline.cross_imports.fetch_missing_doi import (
+from application.ports.pipeline.fetch_missing.doi import (
     AsyncFetchMissingDoiAdapter,
     CrossImportDoisReader,
     is_not_found_marker,

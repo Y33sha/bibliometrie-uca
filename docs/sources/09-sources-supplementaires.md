@@ -16,7 +16,7 @@ Source d'enrichissement consultée par DOI pour affiner `publications.oa_status`
 
 - Polite pool obtenu via le paramètre `?email=...` (lue via `POLITE_POOL_EMAIL`).
 - Limites Unpaywall : 100 000 requêtes/jour, ~10 req/s recommandé. L'adaptateur limite à 5 requêtes concurrentes (`asyncio.Semaphore(5)`).
-- Implémentation async (`httpx.AsyncClient`), comme tous les extracteurs unitaires par DOI (HAL/OpenAlex/WoS/ScanR/CrossRef/DataCite `fetch_missing_doi`, `refetch_truncated`).
+- Implémentation async (`httpx.AsyncClient`), comme tous les extracteurs unitaires par DOI (HAL/OpenAlex/WoS/ScanR/CrossRef/DataCite `fetch_missing_doi`, `fetch_truncated`).
 
 ### Données récupérées
 

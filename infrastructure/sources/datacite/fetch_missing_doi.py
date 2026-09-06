@@ -1,4 +1,4 @@
-"""Adapter DataCite pour `application.pipeline.cross_imports.fetch_missing_doi`.
+"""Adapter DataCite pour `application.pipeline.fetch_missing.doi`.
 
 DataCite est ingérée DOI-driven : pour les DOI présents dans une autre source mais absents du staging DataCite, on interroge l'endpoint `GET /dois` en **batch** via `query=doi:"a" OR doi:"b" …` (réponse JSON:API, liste de nœuds `data`) et on insère chaque nœud (id + `attributes` + `relationships`) dans `staging` avec `source='datacite'`.
 
@@ -16,7 +16,7 @@ from collections.abc import Iterable, Mapping
 import httpx
 from sqlalchemy import Connection
 
-from application.ports.pipeline.cross_imports.fetch_missing_doi import (
+from application.ports.pipeline.fetch_missing.doi import (
     is_not_found_marker,
     not_found_marker,
 )

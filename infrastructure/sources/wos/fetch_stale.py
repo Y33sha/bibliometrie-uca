@@ -1,4 +1,4 @@
-"""Adapter WoS pour `application.pipeline.extract.refresh_stale`.
+"""Adapter WoS pour `application.pipeline.extract.fetch_stale`.
 
 Refetch d'une row par son UT WoS (`staging.source_id`) via une requête Advanced Search `UT=(<ut>)`. Un lot sans correspondance (HTTP 400) ou une réponse valide sans record = UT confirmé absent.
 """
@@ -8,7 +8,7 @@ from __future__ import annotations
 import httpx
 from sqlalchemy import Connection
 
-from application.ports.pipeline.extract.refresh_stale import (
+from application.ports.pipeline.extract.fetch_stale import (
     NOT_FOUND,
     FetchedRecord,
     FetchOutcome,
@@ -16,12 +16,12 @@ from application.ports.pipeline.extract.refresh_stale import (
 from domain.types import as_mapping
 from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.config import get_wos_api_key
+from infrastructure.sources.fetch_stale_base import BaseFetchStaleAdapter
 from infrastructure.sources.http_retry import http_request_with_retry_async
-from infrastructure.sources.refresh_stale_base import BaseRefreshStaleAdapter
 from infrastructure.sources.wos.parsing import extract_doi, get_records
 
 
-class WosRefreshStaleAdapter(BaseRefreshStaleAdapter):
+class WosFetchStaleAdapter(BaseFetchStaleAdapter):
     source_key = "wos"
     # API Clarivate rate-limitée (cf. fetch_missing_doi) : 2 workers + 500 ms.
     max_concurrent = 2

@@ -1,4 +1,4 @@
-"""Orchestrateur de la phase `cross_imports` : rattrapage des documents repérés dans une source mais absents d'une autre. Deux mécanismes, dans cet ordre :
+"""Orchestrateur de la phase `fetch_missing` : rattrapage des documents repérés dans une source mais absents d'une autre. Deux mécanismes, dans cet ordre :
 
 1. **Cross-import HAL** — deux canaux séquentiels : par hal-id (repéré dans OpenAlex/ScanR) et par NNT (thèses sans document HAL).
 2. **Cross-import par DOI** — pour chaque source cible configurée, en parallèle : cherche les DOI vus ailleurs mais absents de la source et les fetche.
@@ -65,7 +65,7 @@ def run(
         metrics,
         credentials_missing=credentials_missing,
         logger=logger,
-        phase="cross_imports",
+        phase="fetch_missing",
     )
 
     if configured:

@@ -1,4 +1,4 @@
-"""Adapter OpenAlex pour `application.pipeline.extract.refresh_stale`.
+"""Adapter OpenAlex pour `application.pipeline.extract.fetch_stale`.
 
 Refetch d'une row par son id OpenAlex (`staging.source_id`) via `GET /works/{id}`, qui renvoie le work complet (tous les auteurs). Un 404 = work confirmé absent (supprimé ou fusionné côté OpenAlex).
 """
@@ -8,7 +8,7 @@ from __future__ import annotations
 import httpx
 from sqlalchemy import Connection
 
-from application.ports.pipeline.extract.refresh_stale import (
+from application.ports.pipeline.extract.fetch_stale import (
     NOT_FOUND,
     FetchedRecord,
     FetchOutcome,
@@ -19,13 +19,13 @@ from infrastructure.sources.config import (
     get_openalex_api_key,
     get_polite_pool_email,
 )
+from infrastructure.sources.fetch_stale_base import BaseFetchStaleAdapter
 from infrastructure.sources.http_retry import http_request_with_retry_async
 from infrastructure.sources.openalex import SELECT_FIELDS, auth_params, init_auth
 from infrastructure.sources.openalex.parsing import extract_doi
-from infrastructure.sources.refresh_stale_base import BaseRefreshStaleAdapter
 
 
-class OpenalexRefreshStaleAdapter(BaseRefreshStaleAdapter):
+class OpenalexFetchStaleAdapter(BaseFetchStaleAdapter):
     source_key = "openalex"
     # Plafond OpenAlex 10 req/s (cf. fetch_missing_doi) : 3 workers + 100 ms de pause.
     max_concurrent = 3

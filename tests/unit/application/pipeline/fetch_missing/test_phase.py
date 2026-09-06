@@ -1,4 +1,4 @@
-"""Orchestrateur de la phase `cross_imports` : canaux HAL séquentiels + DOI parallèle, skip config.
+"""Orchestrateur de la phase `fetch_missing` : canaux HAL séquentiels + DOI parallèle, skip config.
 
 Dépendances techniques injectées (runners par canal / par source, parallélisme, détection de
 config), donc l'orchestrateur se teste sans I/O ni threads : `run_parallel` est remplacé par une
@@ -7,7 +7,7 @@ exécution synchrone déterministe.
 
 import logging
 
-from application.pipeline.cross_imports import phase
+from application.pipeline.fetch_missing import phase
 from application.pipeline.metrics import PhaseMetrics
 
 _LOG = logging.getLogger("test")

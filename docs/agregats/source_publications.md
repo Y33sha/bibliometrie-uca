@@ -30,7 +30,7 @@ Lors d'un réimport, le rattachement à la publication est préservé, les ident
 
 **`metadata_correction`.** Trois sous-étapes, chacune dans sa transaction : rattachement à une revue par préfixe de DOI, corrections portant sur un enregistrement isolé, puis corrections portant sur un groupe. Elles modifient les colonnes typées et conservent la valeur d'origine dans `raw_metadata`, sous des clés qui ne se recouvrent pas. Chaque passage repart des données brutes reconstituées, si bien qu'il se rejoue sans dommage et rattrape une correction devenue caduque. Toute modification pose `keys_dirty`, ce qui remet l'enregistrement dans la file de regroupement.
 
-**`cross_imports` et `refresh_stale`** s'exécutent avant `normalize` et n'écrivent pas cette couche : elles alimentent `staging`, que `normalize` consomme dans le même passage. La reprise sans doublon tient à l'empreinte des données brutes, portée par `staging` : une empreinte inchangée laisse la ligne traitée, une empreinte différente la remet en file et `normalize` met à jour le **même** enregistrement.
+**`fetch_missing` et `fetch_stale`** s'exécutent avant `normalize` et n'écrivent pas cette couche : elles alimentent `staging`, que `normalize` consomme dans le même passage. La reprise sans doublon tient à l'empreinte des données brutes, portée par `staging` : une empreinte inchangée laisse la ligne traitée, une empreinte différente la remet en file et `normalize` met à jour le **même** enregistrement.
 
 ## Écriture par l'API
 

@@ -1,6 +1,6 @@
 """Chronométrage et signaux partagés des phases qui ventilent par source / canal.
 
-Utilisés par les phases à interrogation externe (`extract`, `cross_imports`, `refresh_stale`, `oa_status`) : `timed_metrics` mesure la durée d'une sous-tâche (distincte de la durée totale de la phase), `signal_source_unconfigured` marque un accès API non configuré comme sauté sans interrompre le run.
+Utilisés par les phases à interrogation externe (`extract`, `fetch_missing`, `fetch_stale`, `oa_status`) : `timed_metrics` mesure la durée d'une sous-tâche (distincte de la durée totale de la phase), `signal_source_unconfigured` marque un accès API non configuré comme sauté sans interrompre le run.
 """
 
 import logging

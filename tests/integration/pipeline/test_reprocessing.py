@@ -118,7 +118,7 @@ def _get_pub_oa_status(conn, hal_id):
     ).scalar_one_or_none()
 
 
-def _refresh_stale_publications(conn):
+def _fetch_stale_publications(conn):
     """Rejoue la phase publications après un re-normalize, pour propager les métadonnées modifiées.
 
     Le re-normalize a re-marqué les SP touchées `keys_dirty` ; la réconciliation les reprend donc et `refresh_from_sources` recompute les métadonnées canoniques de leurs publications. Il n'y a plus de « 2e passe stale » dédiée : la réconciliation la subsume (toute SP modifiée est dirty, donc reprise).
@@ -162,7 +162,7 @@ class TestHalReprocessingUpdatesOaStatus:
         updated_doc["fileMain_s"] = "https://hal.science/tel-99990001/document"
         _insert_hal_staging(sa_sync_conn, updated_doc)  # remet processed = FALSE
         _run_normalize_hal(sa_sync_conn)
-        _refresh_stale_publications(sa_sync_conn)
+        _fetch_stale_publications(sa_sync_conn)
 
         assert _get_pub_oa_status(sa_sync_conn, hal_id) == "green"
 
@@ -189,7 +189,7 @@ class TestHalReprocessingUpdatesOaStatus:
         #    → refresh_from_sources recalcule en closed.
         _insert_hal_staging(sa_sync_conn, HAL_DOC_CLOSED)
         _run_normalize_hal(sa_sync_conn)
-        _refresh_stale_publications(sa_sync_conn)
+        _fetch_stale_publications(sa_sync_conn)
 
         assert _get_pub_oa_status(sa_sync_conn, hal_id) == "closed"
 
@@ -222,6 +222,6 @@ class TestHalReprocessingUpdatesOaStatus:
         # Re-dirty la SP et rejouer la seule phase publications : le plancher rouvre.
         _insert_hal_staging(sa_sync_conn, open_doc)
         _run_normalize_hal(sa_sync_conn)
-        _refresh_stale_publications(sa_sync_conn)
+        _fetch_stale_publications(sa_sync_conn)
 
         assert _get_pub_oa_status(sa_sync_conn, hal_id) == "green"

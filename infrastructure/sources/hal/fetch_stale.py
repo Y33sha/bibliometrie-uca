@@ -1,4 +1,4 @@
-"""Adapter HAL pour `application.pipeline.extract.refresh_stale`.
+"""Adapter HAL pour `application.pipeline.extract.fetch_stale`.
 
 Refetch d'une row par son hal-id (`staging.source_id`) via une requête Solr `halId_s:<id>`. Absence confirmée = réponse Solr valide, zéro doc.
 """
@@ -8,20 +8,20 @@ from __future__ import annotations
 import httpx
 from sqlalchemy import Connection
 
-from application.ports.pipeline.extract.refresh_stale import (
+from application.ports.pipeline.extract.fetch_stale import (
     NOT_FOUND,
     FetchedRecord,
     FetchOutcome,
 )
 from domain.types import as_mapping, as_sequence, at_path
 from infrastructure.sources.api_params import API_BASE_URLS
+from infrastructure.sources.fetch_stale_base import BaseFetchStaleAdapter
 from infrastructure.sources.hal.extract_hal import extract_doi
 from infrastructure.sources.hal.fields import HAL_FIELDS_STR
 from infrastructure.sources.http_retry import http_request_with_retry_async
-from infrastructure.sources.refresh_stale_base import BaseRefreshStaleAdapter
 
 
-class HalRefreshStaleAdapter(BaseRefreshStaleAdapter):
+class HalFetchStaleAdapter(BaseFetchStaleAdapter):
     source_key = "hal"
     max_concurrent = 5
 

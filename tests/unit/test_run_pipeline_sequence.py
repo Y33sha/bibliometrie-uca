@@ -12,6 +12,7 @@ import sys
 import pytest
 
 from application.pipeline.metrics import PhaseMetrics
+from application.pipeline.phase_order import EXTRA_PHASES
 from interfaces.cli import run_pipeline
 
 
@@ -19,6 +20,7 @@ def _args(**surcharges) -> argparse.Namespace:
     base = {
         "only": None,
         "from_phase": None,
+        "no_extras": False,
         "mode": "full",
         "sources": "hal,openalex,wos",
         "year": None,
@@ -54,6 +56,18 @@ class _FakeRecorder:
 class TestSelectPhasesToRun:
     def test_sans_option_toutes_les_phases(self):
         assert run_pipeline._select_phases_to_run(_args()) == list(run_pipeline.PHASES)
+
+    def test_sans_extras_omet_les_enrichissements(self):
+        noms = [n for n, _ in run_pipeline._select_phases_to_run(_args(no_extras=True))]
+
+        assert not (set(noms) & EXTRA_PHASES)
+        assert noms == [n for n in run_pipeline.PHASE_NAMES if n not in EXTRA_PHASES]
+
+    def test_sans_extras_laisse_passer_une_phase_nommee(self):
+        """`--only` désigne explicitement : un enrichissement demandé est rendu."""
+        choisies = run_pipeline._select_phases_to_run(_args(only="subjects", no_extras=True))
+
+        assert [n for n, _ in choisies] == ["subjects"]
 
     def test_une_seule_phase(self):
         choisies = run_pipeline._select_phases_to_run(_args(only="persons"))

@@ -1,9 +1,9 @@
-"""Régressions sur `phase_refresh_stale` / `_run_refresh_stale`.
+"""Régressions sur `phase_fetch_stale` / `_run_fetch_stale`.
 
 1. WoS est opt-in (`--include-wos`) : exclu par défaut du refresh, comme
-   `extract` et `cross_imports`.
+   `extract` et `fetch_missing`.
 2. Le refetch d'une source pose un circuit-breaker (coupe sur 429 répétés),
-   au même titre que le cross-import — sinon refresh_stale martèle une source
+   au même titre que le cross-import — sinon fetch_stale martèle une source
    à bout de budget API.
 """
 
@@ -19,9 +19,9 @@ from interfaces.cli import run_pipeline
 
 
 def _called_targets(stack) -> MagicMock:
-    """Patche les I/O de `phase_refresh_stale` et retourne le mock des sources refetch."""
+    """Patche les I/O de `phase_fetch_stale` et retourne le mock des sources refetch."""
     run_one = stack.enter_context(
-        patch.object(run_pipeline, "_run_refresh_stale", return_value=PhaseMetrics())
+        patch.object(run_pipeline, "_run_fetch_stale", return_value=PhaseMetrics())
     )
     # Neutralise le gate de configuration (testé ailleurs) : ici on vérifie la
     # sélection des sources (opt-in WoS, filtre `sources`), pas la présence des
@@ -33,64 +33,64 @@ def _called_targets(stack) -> MagicMock:
     return run_one
 
 
-def test_refresh_stale_excludes_wos_by_default():
+def test_fetch_stale_excludes_wos_by_default():
     with ExitStack() as stack:
         run_one = _called_targets(stack)
-        run_pipeline.phase_refresh_stale(run_pipeline.RunOptions())
+        run_pipeline.phase_fetch_stale(run_pipeline.RunOptions())
     targets = [c.args[0] for c in run_one.call_args_list]
     assert "wos" not in targets
     assert targets  # d'autres sources sont bien refetch
 
 
-def test_refresh_stale_includes_wos_when_opted_in():
+def test_fetch_stale_includes_wos_when_opted_in():
     with ExitStack() as stack:
         run_one = _called_targets(stack)
-        run_pipeline.phase_refresh_stale(run_pipeline.RunOptions(include_wos=True))
+        run_pipeline.phase_fetch_stale(run_pipeline.RunOptions(include_wos=True))
     targets = [c.args[0] for c in run_one.call_args_list]
     assert "wos" in targets
 
 
-def test_refresh_stale_covers_theses():
+def test_fetch_stale_covers_theses():
     # theses entre dans le refresh (refetch par id natif), contrairement au
     # cross-import par DOI qui l'excluait.
     with ExitStack() as stack:
         run_one = _called_targets(stack)
-        run_pipeline.phase_refresh_stale(run_pipeline.RunOptions())
+        run_pipeline.phase_fetch_stale(run_pipeline.RunOptions())
     assert "theses" in [c.args[0] for c in run_one.call_args_list]
 
 
-def test_refresh_stale_couples_years_per_source():
+def test_fetch_stale_couples_years_per_source():
     # theses ramène tout l'historique (borne None) ; les autres suivent la fenêtre du run.
     with ExitStack() as stack:
         run_one = _called_targets(stack)
-        run_pipeline.phase_refresh_stale(run_pipeline.RunOptions())
+        run_pipeline.phase_fetch_stale(run_pipeline.RunOptions())
     by_target = {c.args[0]: c.args[1] for c in run_one.call_args_list}
     assert by_target["theses"] is None
     assert by_target["hal"] == [2024]
 
 
-def test_refresh_stale_year_narrows_all_including_theses():
+def test_fetch_stale_year_narrows_all_including_theses():
     # `--year` cible une seule année pour toutes les sources, theses comprise.
     with ExitStack() as stack:
         run_one = _called_targets(stack)
-        run_pipeline.phase_refresh_stale(run_pipeline.RunOptions(year=2023))
+        run_pipeline.phase_fetch_stale(run_pipeline.RunOptions(year=2023))
     by_target = {c.args[0]: c.args[1] for c in run_one.call_args_list}
     assert by_target["theses"] == [2023]
     assert by_target["hal"] == [2023]
 
 
-def test_refresh_stale_respects_sources_filter():
+def test_fetch_stale_respects_sources_filter():
     with ExitStack() as stack:
         run_one = _called_targets(stack)
-        run_pipeline.phase_refresh_stale(run_pipeline.RunOptions(sources={"hal"}, include_wos=True))
+        run_pipeline.phase_fetch_stale(run_pipeline.RunOptions(sources={"hal"}, include_wos=True))
     assert [c.args[0] for c in run_one.call_args_list] == ["hal"]
 
 
-def test_run_refresh_stale_installs_circuit_breaker():
+def test_run_fetch_stale_installs_circuit_breaker():
     with ExitStack() as stack:
         refresh = stack.enter_context(
             patch(
-                "application.pipeline.extract.refresh_stale.refresh",
+                "application.pipeline.extract.fetch_stale.refresh",
                 new=AsyncMock(return_value=PhaseMetrics()),
             )
         )
@@ -98,9 +98,9 @@ def test_run_refresh_stale_installs_circuit_breaker():
             patch("infrastructure.db.engine.get_sync_engine", return_value=MagicMock())
         )
         stack.enter_context(
-            patch.object(run_pipeline, "_make_refresh_stale_adapter", return_value=MagicMock())
+            patch.object(run_pipeline, "_make_fetch_stale_adapter", return_value=MagicMock())
         )
-        run_pipeline._run_refresh_stale("hal", None)
+        run_pipeline._run_fetch_stale("hal", None)
 
     breaker = refresh.call_args.kwargs["breaker"]
     assert isinstance(breaker, SourceCircuitBreaker)

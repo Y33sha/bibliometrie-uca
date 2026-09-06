@@ -15,7 +15,7 @@ def test_total_derives_from_breakdown_without_explicit_denominator():
 
 
 def test_total_uses_explicit_denominator_when_larger():
-    # cross_imports : `total=` (DOI interrogés) dépasse les catégorisés (insérés).
+    # fetch_missing : `total=` (DOI interrogés) dépasse les catégorisés (insérés).
     m = PhaseMetrics()
     m.add(new=10, total=100)
     assert m.total == 100

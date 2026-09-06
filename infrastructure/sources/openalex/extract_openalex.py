@@ -58,7 +58,7 @@ def build_params(
 class PgOpenalexExtractAdapter(OpenalexExtractAdapter):
     """Adapter PostgreSQL + HTTP pour `OpenalexExtractAdapter`.
 
-    Construit avec une `base_url` (endpoint `/works`). L'auth (api_key ou email polite pool) est initialisée via `init_auth(...)` lors du `load_config` — état global du module `infrastructure.sources.openalex` partagé avec `refetch_truncated` et `fetch_missing_doi`.
+    Construit avec une `base_url` (endpoint `/works`). L'auth (api_key ou email polite pool) est initialisée via `init_auth(...)` lors du `load_config` — état global du module `infrastructure.sources.openalex` partagé avec `fetch_truncated` et `fetch_missing_doi`.
     """
 
     def __init__(self, base_url: str) -> None:
@@ -124,7 +124,7 @@ class PgOpenalexExtractAdapter(OpenalexExtractAdapter):
     ) -> BatchInsertCounts:
         """UPSERT bulk d'un batch de works, ventilé new/updated/unchanged.
 
-        La préservation des authorships complètes obtenues par `refetch_truncated` repose sur le fait que **refetch ne recalcule pas `raw_hash`** : la ligne refetchée garde le hash du payload bulk initial. Tant que le bulk renvoie ce même payload, la comparaison `raw_hash` reste équivalente et l'UPSERT ne touche pas `raw_data`.
+        La préservation des authorships complètes obtenues par `fetch_truncated` repose sur le fait que **refetch ne recalcule pas `raw_hash`** : la ligne refetchée garde le hash du payload bulk initial. Tant que le bulk renvoie ce même payload, la comparaison `raw_hash` reste équivalente et l'UPSERT ne touche pas `raw_data`.
 
         Le caller est responsable du `conn.commit()` après cette méthode.
 
@@ -134,7 +134,7 @@ class PgOpenalexExtractAdapter(OpenalexExtractAdapter):
         updated_count = 0
         unchanged_count = 0
         for work in works:
-            # 100 authorships = plafond bulk OpenAlex → tronqué probable (`refetch_truncated` vérifiera et complétera). Posé seulement quand le hash change (cf. upsert_staging).
+            # 100 authorships = plafond bulk OpenAlex → tronqué probable (`fetch_truncated` vérifiera et complétera). Posé seulement quand le hash change (cf. upsert_staging).
             authorships = work.get("authorships")
             authors_truncated = isinstance(authorships, list) and len(authorships) == 100
             inserted, changed = upsert_staging(

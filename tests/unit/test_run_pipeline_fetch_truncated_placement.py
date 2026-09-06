@@ -1,9 +1,9 @@
-"""Régression : `refetch_truncated` est une phase distincte, placée entre
-`refresh_stale` et `normalize` (ni dans `phase_extract`, ni dans `phase_normalize`).
+"""Régression : `fetch_truncated` est une phase distincte, placée entre
+`fetch_stale` et `normalize` (ni dans `phase_extract`, ni dans `phase_normalize`).
 
 Elle cible les works OpenAlex staging à 100 auteurs `processed=FALSE` juste avant
 que normalize ne les consomme — placement qui capte aussi les tronqués ramenés
-par cross_imports et refresh_stale. La placer en extract (état antérieur) les
+par fetch_missing et fetch_stale. La placer en extract (état antérieur) les
 ratait ; la garder dans normalize mêlait un fetch réseau à une phase de
 transformation.
 """
@@ -13,8 +13,8 @@ from unittest.mock import AsyncMock, patch
 from application.pipeline.metrics import PhaseMetrics
 from interfaces.cli import run_pipeline
 
-# L'orchestrateur applicatif du refetch, câblé par `phase_refetch_truncated` via `asyncio.run`.
-_REFETCH = "application.pipeline.extract.refetch_truncated.refetch"
+# L'orchestrateur applicatif du refetch, câblé par `phase_fetch_truncated` via `asyncio.run`.
+_REFETCH = "application.pipeline.extract.fetch_truncated.refetch"
 
 
 def test_refetch_not_called_in_extract():
@@ -42,10 +42,10 @@ def test_refetch_not_called_in_normalize():
 def test_refetch_called_in_own_phase_when_openalex_present():
     with (
         patch("infrastructure.db.engine.get_sync_engine"),
-        patch("infrastructure.sources.openalex.refetch_truncated.PgOpenalexRefetchAdapter"),
+        patch("infrastructure.sources.openalex.fetch_truncated.PgOpenalexFetchTruncatedAdapter"),
         patch(_REFETCH, new_callable=AsyncMock, return_value=PhaseMetrics()) as refetch,
     ):
-        run_pipeline.phase_refetch_truncated(
+        run_pipeline.phase_fetch_truncated(
             run_pipeline.RunOptions(mode="full", sources={"openalex", "hal"})
         )
     assert refetch.call_count == 1
@@ -53,7 +53,7 @@ def test_refetch_called_in_own_phase_when_openalex_present():
 
 def test_refetch_skipped_in_own_phase_without_openalex():
     with patch(_REFETCH, new_callable=AsyncMock) as refetch:
-        run_pipeline.phase_refetch_truncated(
+        run_pipeline.phase_fetch_truncated(
             run_pipeline.RunOptions(mode="full", sources={"hal", "scanr"})
         )
     assert refetch.call_count == 0

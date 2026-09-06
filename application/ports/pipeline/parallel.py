@@ -1,6 +1,6 @@
 """Port : primitif d'exécution parallèle de tâches indépendantes.
 
-Injecté par le composition-root aux orchestrateurs des phases qui lancent plusieurs sous-tâches concurrentes (`extract`, `cross_imports`). L'application ordonne « lance ces N thunks » sans connaître le mécanisme (thread pool, propagation du contexte de log).
+Injecté par le composition-root aux orchestrateurs des phases qui lancent plusieurs sous-tâches concurrentes (`extract`, `fetch_missing`). L'application ordonne « lance ces N thunks » sans connaître le mécanisme (thread pool, propagation du contexte de log).
 
 Satisfait par `infrastructure.parallel.run_parallel`.
 """

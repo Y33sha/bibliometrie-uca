@@ -375,7 +375,7 @@ omit = [
     "infrastructure/sources/hal/fetch_missing_doi.py",
     "infrastructure/sources/openalex/extract_openalex.py",
     "infrastructure/sources/openalex/fetch_missing_doi.py",
-    "infrastructure/sources/openalex/refetch_truncated.py",
+    "infrastructure/sources/openalex/fetch_truncated.py",
     "infrastructure/sources/scanr/extract_scanr.py",
     "infrastructure/sources/scanr/fetch_missing_doi.py",
     "infrastructure/sources/theses/extract_theses.py",
@@ -383,10 +383,10 @@ omit = [
     "infrastructure/sources/wos/fetch_missing_doi.py",
     "infrastructure/sources/crossref/fetch_missing_doi.py",
     # Refetch des documents stale par source : même nature d'adapter HTTP
-    # (httpx + pagination + impl du port refresh_stale) que l'extraction
+    # (httpx + pagination + impl du port fetch_stale) que l'extraction
     # ci-dessus ; la logique utile de sélection vit côté queries/domain.
-    "infrastructure/sources/refresh_stale_base.py",
-    "infrastructure/sources/*/refresh_stale.py",
+    "infrastructure/sources/fetch_stale_base.py",
+    "infrastructure/sources/*/fetch_stale.py",
 ]
 
 [tool.coverage.report]

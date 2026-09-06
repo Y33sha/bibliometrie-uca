@@ -1,4 +1,4 @@
-"""Adapter CrossRef pour `application.pipeline.cross_imports.fetch_missing_doi`.
+"""Adapter CrossRef pour `application.pipeline.fetch_missing.doi`.
 
 CrossRef est ingérée DOI-driven : pour chaque DOI présent dans une autre source mais absent du staging CrossRef, on interroge l'endpoint `GET /works/{doi}` et on insère le `message` dans `staging` avec `source='crossref'`.
 
@@ -15,7 +15,7 @@ from collections.abc import Iterable, Mapping
 import httpx
 from sqlalchemy import Connection
 
-from application.ports.pipeline.cross_imports.fetch_missing_doi import (
+from application.ports.pipeline.fetch_missing.doi import (
     is_not_found_marker,
     not_found_marker,
 )
