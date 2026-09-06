@@ -6,11 +6,11 @@ Ce fichier présente la logique du pipeline de traitement. Pour les modalités d
 
 ## Moissonnage
 
-- [Moissonnage initial](02-extract.md) : récupère les données brutes depuis les API et les stocke en JSONB dans la table de *staging*.
-- [Identification des agences d'enregistrement des DOI](02-extract.md#agences-denregistrement-doi) : résout l'agence d'enregistrement ([Crossref](../glossaire.md#crossref) ou [DataCite](../glossaire.md#datacite)) des préfixes [DOI](../glossaire.md#doi), pour que l'étape suivante route chaque DOI vers la bonne API plutôt que de l'interroger contre les deux.
-- [Imports croisés](02-extract.md#imports-croisés) : deux mécanismes de rattrapage cross-source enchaînés — (1) docs HAL manquants repérés par hal-id ou NNT dans d'autres sources, (2) recherche par DOI des documents absents d'une source mais présents dans une autre.
-- [Refresh & disparitions](02-extract.md#refresh-disparitions) : refetch des documents à `last_seen_at` ancien (> 90 j) — rafraîchit les métadonnées vieillissantes et marque (`disappeared_at`) ceux qui ont disparu de leur source.
-- [Works OpenAlex tronqués à 100 auteurs](02-extract.md#works-openalex-tronqués) : re-télécharge un par un les works OpenAlex de 100 auteurs, suspects d'avoir été tronqués par le plafond de l'API.
+- [Moissonnage par lots](02-extract.md#moissonnage-par-lots-extract) : récupère les données brutes depuis les API et les stocke en JSONB dans la table de *staging*.
+- [Identification des agences d'enregistrement des DOI](02-extract.md#agences-denregistrement-doi-resolve_ra) : résout l'agence d'enregistrement ([Crossref](../glossaire.md#crossref) ou [DataCite](../glossaire.md#datacite)) des préfixes [DOI](../glossaire.md#doi), pour que l'étape suivante route chaque DOI vers la bonne API plutôt que de l'interroger contre les deux.
+- [Documents absents d'une source](02-extract.md#documents-absents-dune-source-fetch_missing) : demande à chaque source les documents que les autres sources ont et qu'elle n'a pas — par hal-id ou NNT pour HAL, par DOI pour les six sources interrogeables ainsi.
+- [Documents périmés et disparus](02-extract.md#documents-périmés-et-disparus-fetch_stale) : réinterroge les documents vus pour la dernière fois il y a plus de 90 jours, rafraîchit leurs métadonnées et marque (`disappeared_at`) ceux que leur source ne rend plus.
+- [Listes d'auteurs tronquées](02-extract.md#listes-dauteurs-tronquées-fetch_truncated) : retélécharge un par un les documents OpenAlex de cent auteurs, que le plafond de l'API a pu tronquer.
 
 ## Normalisation
 
