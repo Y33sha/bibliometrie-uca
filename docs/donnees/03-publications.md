@@ -54,15 +54,7 @@ Trois tables alimentées par la phase `subjects` du pipeline :
 
 ## Propriété des tables
 
-La colonne **Autorité** dit qui a le dernier mot sur le contenu de la table :
-
-- **admin** — saisi depuis l'interface d'administration ; le pipeline ne l'écrase jamais
-- **pipeline** — recalculé à chaque exécution
-- **mixte** — l'un ou l'autre selon la colonne
-- **import** — chargé depuis un fichier externe
-- **référence** — posé par le seed
-
-| Table | Autorité | Écrit par |
+| Table | Auteur | Écrit par |
 |---|---|---|
 | `publications` | pipeline | `application/services/publications/core.py` (`refresh_from_sources` recalcule depuis les sources) |
 | `publications_detail` | pipeline | `application/services/publications/core.py` |
@@ -73,4 +65,4 @@ La colonne **Autorité** dit qui a le dernier mot sur le contenu de la table :
 | `journals`, `journal_name_forms` | mixte | créés et enrichis par le pipeline ; édités et fusionnés en admin (`application/services/journals/commands.py`) |
 | `publishers`, `publisher_name_forms` | mixte | créés et enrichis par le pipeline ; édités et fusionnés en admin (`application/services/publishers/commands.py`) |
 | `distinct_publications` | admin | `application/services/publications/commands.py` |
-| `apc_payments` | import | `interfaces/cli/imports/import_apc.py`, `import_openapc.py` |
+| `apc_payments` | import CSV | `interfaces/cli/imports/import_apc.py`, `import_openapc.py` |

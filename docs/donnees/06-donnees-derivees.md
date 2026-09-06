@@ -17,7 +17,7 @@ Toutes sont déclarées `WITH NO DATA` et rafraîchies par le pipeline (la plupa
 
 ## Tables dérivées
 
-- **`perimeter_structures`** : appartenance au périmètre, matérialisée par clôture récursive des tutelles. Cf. [données dérivées](06-donnees-derivees.md).
+- **`perimeter_structures`** : appartenance au périmètre, matérialisée par clôture récursive de `structure_tutelles`. Rematérialisée avant la première phase du pipeline, au démarrage de la phase `affiliations`, et à chaque édition admin qui touche une tutelle ou un périmètre.
 - **`publications_detail`** : satellite 1:1 de `publications` (`abstract`, `keywords`, `topics`, `biblio`), recalculé depuis les `source_publications` rattachées.
 
 ## Colonnes dérivées

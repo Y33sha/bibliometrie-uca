@@ -59,15 +59,7 @@ Légende :
 
 ## Propriété des tables
 
-La colonne **Autorité** dit qui a le dernier mot sur le contenu de la table :
-
-- **admin** — saisi depuis l'interface d'administration ; le pipeline ne l'écrase jamais
-- **pipeline** — recalculé à chaque exécution
-- **mixte** — l'un ou l'autre selon la colonne
-- **import** — chargé depuis un fichier externe
-- **référence** — posé par le seed
-
-| Table | Autorité | Écrit par |
+| Table | Auteur | Écrit par |
 |---|---|---|
 | `structures` | admin | `application/services/structures/core.py` |
 | `structure_tutelles` | admin | `application/services/structures/core.py` |
@@ -77,5 +69,5 @@ La colonne **Autorité** dit qui a le dernier mot sur le contenu de la table :
 | `perimeter_structures` | pipeline | `refresh_perimeter_structures`, jamais saisie |
 | `addresses` | mixte | créées par le pipeline (`resolve_addresses.py`) ; colonne `countries` éditable en admin (`addresses/commands.py`) |
 | `address_structures` | mixte | liens posés par le pipeline (`resolve_addresses.py`) ; colonne `is_confirmed` posée en admin (`addresses/commands.py`) |
-| `apc_payments` | import | `interfaces/cli/imports/import_apc.py`, `import_openapc.py` |
-| `countries`, `place_name_forms` | référence | `seed.sql` |
+| `apc_payments` | import CSV | `interfaces/cli/imports/import_apc.py`, `import_openapc.py` |
+| `countries`, `place_name_forms` | seed | `seed.sql` |
