@@ -1,0 +1,11 @@
+extends: existence
+message: "Double négation : « %s ». Formule à l'affirmatif."
+level: error
+ignorecase: true
+tokens:
+  - "n'est pas sans"
+  - "ne (peut|peuvent|faut) pas ne pas"
+  - "non (négligeable|dénué|dépourvu|dénuée|dépourvue)"
+  - "pas (inutile|impossible|inhabituel|rare|dénué|dénuée|sans intérêt)"
+  - "n'est pas (inutile|impossible|inhabituel|sans intérêt|dénué)"
+  - "ne (sera|serait) pas (inutile|superflu)"

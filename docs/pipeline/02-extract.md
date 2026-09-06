@@ -4,7 +4,7 @@
 
 Récupère les données brutes depuis les API et les stocke en JSONB dans le *staging*.
 
-## Moissonnage par lots (`extract`)
+## Moissonnage (`extract`)
 
 **Critères de requête**:
 - **années** de publication : de l'année de début à l'année courante. L'année de début est l'argument `--start-year`, à défaut la valeur [configurable](../guide-utilisateur/03-workflow-admin.md#années) dans `admin/config` (par défaut 2017, année de la fusion UCA) ;

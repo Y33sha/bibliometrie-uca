@@ -10,12 +10,15 @@
 
 ### Documentation, docstrings et commentaires
 
+- **Une affirmation fausse est d'abord une candidate à la suppression.** Avant de la rectifier, se demander si le lecteur a besoin du fait.
 - Utiliser le **présent intemporel**: ne jamais supposer connu l'état antérieur du code. Bannir tout vocabulaire ancré temporellement (`nouveau`, `désormais`, `ne plus`...). Ne jamais renvoyer à des fichiers transitoires (todo, roadmaps).
-- Ecrire d'une manière qui reste intelligible en dehors du contexte des conversations; **éviter le jargon** interne au projet et les abréviations maison (`SP` pour source_publication, `pub` pour publication...).
-- **Eviter les redondances.** Quand une phrase a deux moitiés séparées par une virgule ou un deux-points, vérifier que la seconde apporte un fait, et non une reformulation de la première.
-- **Rester factuel.** La documentation ne doit pas plaider ni prêcher.
+- Ecrire d'une manière intelligible en dehors du contexte des conversations; **éviter le jargon** interne au projet et les abréviations maison (`SP` pour source_publication, `pub` pour publication...).
+- **Rester factuel.** La documentation ne doit pas plaider ni argumenter.
+- Viser la **concision maximale**. Adapter le niveau de détail à ce qui est strictement nécessaire. Lorsqu'un point devient non pertinent, corriger **en supprimant** le point plutôt qu'en soulignant sa non-pertinence ("ce n'est pas X mais Y…").
+- **Eviter les redondances.** Quand une phrase a deux parties séparées par deux-points, supprimer l'une des deux si elle ne fait que reformuler l'autre.
+- **Un mot par notion.** Ne pas chercher l'élégance littéraire. Ne pas varier le vocabulaire pour éviter une répétition : en documentation technique, répéter le même mot est un service rendu au lecteur, pas une faiblesse de style.
+- **Simplicité et précision.** Remplacer les mots vagues par des équivalents précis ("la source atteste d'un document" => "le document est présent dans la source"; "la source ignore le document" => "le document est absent de la source").
 - Ne pas sur-franciser. Les anglicismes sont souhaitables s'ils sont usuels dans le domaine. (*repository* et non "dépôt"...)
-- Viser la **concision maximale**. Adapter le niveau de détail à ce qui est strictement nécessaire. Lorsqu'un point devient non pertinent, corriger **en supprimant** le point plutôt qu'en soulignant sa non-pertinence.
 - Respecter l'accentuation du français.
 - Eviter les retours à la ligne non sémantiques (i.e. hors titres, listes et sauts de paragraphe).
 

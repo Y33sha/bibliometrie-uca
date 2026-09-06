@@ -1,0 +1,6 @@
+extends: repetition
+message: "« %s » répété."
+level: warning
+alpha: true
+tokens:
+  - '[^\s]+'

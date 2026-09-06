@@ -1,0 +1,15 @@
+extends: existence
+message: "Éloge : « %s ». Le code n'a pas à se vanter."
+level: warning
+ignorecase: true
+tokens:
+  - "robuste"
+  - "élégant(e|es|s)?"
+  - "puissant(e|es|s)?"
+  - "sophistiqué(e|es|s)?"
+  - "de manière (transparente|élégante|optimale)"
+  - "prêt pour la production"
+  - "riche en fonctionnalités"
+  - "il est (crucial|primordial|impératif|essentiel)"
+  - "cette approche (permet|offre|garantit|assure)"
+  - "ce qui (garantit|assure) (une|la|un)"

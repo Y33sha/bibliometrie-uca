@@ -1,0 +1,6 @@
+extends: occurrence
+message: "Phrase de %d mots. Coupe."
+scope: sentence
+level: warning
+max: 40
+token: '\b\w+\b'

@@ -1,4 +1,4 @@
-"""Construit la table `authorships` (table de vérité) à partir des `source_authorships`.
+"""Construit la table consolidée `authorships` à partir des `source_authorships`.
 
 Étape 1 : insérer les authorships manquantes puis supprimer les orphelines (paires `publication_id, person_id` que plus aucune source n'atteste).
 Étape 2 : peupler les FK (`source_authorships.authorship_id` → `authorships.id`).
