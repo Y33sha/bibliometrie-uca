@@ -21,6 +21,6 @@ Un port est un `Protocol` déclaré par `application/` et implémenté par un ad
 
 - **Repositories** (`ports/repositories/`) — chargent et persistent un agrégat du domaine quand il y en a un. Quatre n'en ont pas : `Address`, `Authorship`, `AuditLog` et `Config` font du CRUD simple.
 - **Read models** (`ports/read_models/`) — projections plates que l'API sert aux pages.
-- **Gateways de pipeline** (`ports/pipeline/`) — lectures et écritures ensemblistes des tables d'une phase.
+- **Query services de pipeline** (`ports/pipeline/`) — lectures et écritures ensemblistes des tables d'une phase.
 
 Une même donnée se lit et s'écrit depuis deux contextes : le pipeline la recalcule en masse, l'API la sert ou la retouche après une édition manuelle. Chacun a ses ports et ses adaptateurs.
