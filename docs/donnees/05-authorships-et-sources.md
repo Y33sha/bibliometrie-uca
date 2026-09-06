@@ -66,13 +66,7 @@ Cache des tentatives négatives de cross-import par DOI, pour toutes les sources
 
 ## Propriété des tables
 
-La colonne **Autorité** dit qui a le dernier mot sur le contenu de la table :
-
-- **admin** — saisi depuis l'interface d'administration ; le pipeline ne l'écrase jamais
-- **pipeline** — recalculé à chaque exécution
-- **mixte** — l'un ou l'autre selon la colonne
-
-| Table | Autorité | Écrit par |
+| Table | Auteur | Écrit par |
 |---|---|---|
 | `staging` | pipeline | extracteurs (`infrastructure/sources/*/extract_*.py`, cross-imports) |
 | `doi_lookups` | pipeline | cross-imports DOI (`infrastructure/sources/*/fetch_missing_doi.py`) |

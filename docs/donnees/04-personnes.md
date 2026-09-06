@@ -40,17 +40,11 @@ Légende :
 
 ## Propriété des tables
 
-La colonne **Autorité** dit qui a le dernier mot sur le contenu de la table :
-
-- **admin** — saisi depuis l'interface d'administration ; le pipeline ne l'écrase jamais
-- **mixte** — l'un ou l'autre selon la colonne
-- **import** — chargé depuis un fichier externe
-
-| Table | Autorité | Écrit par |
+| Table | Auteur | Écrit par |
 |---|---|---|
 | `persons` | mixte | créées par le pipeline (phase persons, `application/pipeline/persons/cascade.py`) ou par l'import RH (`import_persons.py`) ; fusions, renommage et rejet en admin (`application/services/persons/commands.py`) |
 | `author_identifying_keys` | pipeline | `normalize_*.py` (via `_authorships_batch.py`) |
 | `person_identifiers` | mixte | moissonnés par le pipeline ; ajout manuel et statut en admin (`application/services/persons/commands.py`) |
 | `person_name_forms` | mixte | peuplées par le pipeline (`populate_person_name_forms.py`) ; statut en admin |
 | `distinct_persons` | admin | `application/services/persons/commands.py` |
-| `persons_rh` | import | `interfaces/cli/imports/import_persons.py` |
+| `persons_rh` | import CSV | `interfaces/cli/imports/import_persons.py` |
