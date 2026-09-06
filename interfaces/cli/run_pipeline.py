@@ -447,7 +447,7 @@ def phase_publishers_journals(options: RunOptions) -> PhaseMetrics:
        Ne traite que les revues à `journal_type='unknown'` (converge à zéro,
        OpenAlex typant ses sources).
     3. `enrich_journals_from_doaj` : dump CSV DOAJ (téléchargé au plus tous les
-       ~30 jours dans `data/doaj/`) → `doaj_payload` + `is_in_doaj`. DOAJ fait
+       ~30 jours) → `doaj_payload` + `is_in_doaj`. DOAJ fait
        autorité et est seul à poser `is_in_doaj` (reset global puis re-pose des
        TRUE). Ne se déclenche que si le dernier `doaj_imported_at` est null ou
        plus vieux que la fenêtre de stale.
@@ -867,8 +867,7 @@ def _run_enrich_journals_from_openalex() -> PhaseMetrics:
     return metrics
 
 
-# DOAJ : le dump CSV (source de vérité) est ré-importé au plus une fois tous les
-# N jours (DOAJ publie ~hebdo).
+# DOAJ : le dump CSV (source de vérité) est ré-importé au plus une fois tous les N jours.
 _DOAJ_STALE_DAYS = 30
 
 
