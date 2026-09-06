@@ -29,7 +29,7 @@ Les données saisies manuellement via l'API — données de référence (structu
 Le projet suit une architecture **hexagonale (DDD)**.
 
 - Le cœur du système est `application/` (use-cases et orchestrateurs), qui dépend de `domain/` (noyau pur).
-- Autour de ce cœur, deux familles d'adaptateurs : `interfaces/` (entrants — HTTP, CLI) et `infrastructure/` (sortants — base, APIs externes, logs). Aucune des deux n'importe l'autre.
+- Autour de ce cœur, deux familles d'adaptateurs : `interfaces/` (entrants — HTTP, CLI) et `infrastructure/` (sortants — base, APIs externes, logs).
 - `application/` déclare des ports (`Protocol`) dans `application/ports/`, `infrastructure/` en fournit les implémentations, et les use-cases reçoivent un port en paramètre — jamais une classe concrète.
 - Seul le composition root de `interfaces/` instancie ces implémentations.
 
@@ -54,10 +54,9 @@ Cette vue par couches se superpose à la vue par programme : `domain/` sert aux 
     │  adaptateurs entrants   │           │  adaptateurs sortants│
     │  (routers, CLI)         │           │  (PostgreSQL,        │
     │  ┌───────────────────┐  │ instancie │  APIs externes,      │
-    │  │ composition root  ├──├──────────►│  logs)               │
+    │  │ composition root  ├──┼──────────►│  logs)               │
     │  └───────────────────┘  │           │                      │
     └─────────────────────────┘           └──────────────────────┘
-
 ```
 
 ## Contrats d'architecture
