@@ -6,6 +6,7 @@ ignorecase: true
 # y désigne une écriture unique, pas le référentiel.
 exceptions:
   - forme canonique
+  - source de vérité
 swap:
   "est en charge de": "gère"
   "est responsable de": "gère"

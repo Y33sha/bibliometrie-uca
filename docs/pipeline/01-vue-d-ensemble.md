@@ -2,7 +2,7 @@
 
 *À jour le 2026-09-06.*
 
-Ce fichier présente la logique du pipeline de traitement. Pour les modalités d'exécution, voir [Guide d'exploitation](../exploitation/04-pipeline.md).
+Ce fichier présente la logique du pipeline de traitement. Pour les modalités d'exécution, voir [Guide d'exploitation](../exploitation/03-pipeline.md).
 
 ## Moissonnage
 

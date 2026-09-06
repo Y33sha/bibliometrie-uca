@@ -13,11 +13,11 @@ Récupère les données brutes depuis les API et les stocke en JSONB dans le *st
 **Gestion des changements**:
 - Chaque *payload* est hashé (MD5) pour détecter les changements lors des réexécutions. Une publication dont les métadonnées ont changé sera ré-importée et re-traitée.
 - Même sans changement, `last_seen_at` est repoussée chaque fois qu'un document est revu.
-> Une publication qui cesse d'apparaître dans sa source — parce que la source l'a dédoublonnée, par exemple — est détectée puis confirmée par la phase [la phase qui les repère](#documents-périmés-et-disparus), qui pose un marqueur `disappeared_at`.
+> Une publication qui cesse d'apparaître dans sa source — parce que la source l'a dédoublonnée, par exemple — est détectée puis confirmée par la phase [la phase qui les repère](#documents-périmés-et-disparus-fetch_stale), qui pose un marqueur `disappeared_at`.
 
 ## Agences d'enregistrement DOI (`resolve_ra`)
 
-Résolution de l'agence d'enregistrement (Crossref ou DataCite) de chaque DOI, pour que [la recherche par DOI](#documents-quune-source-ignore) route chaque DOI vers la bonne API au lieu de l'interroger contre les deux.
+Résolution de l'agence d'enregistrement (Crossref ou DataCite) de chaque DOI, pour que [la recherche par DOI](#documents-absents-dune-source-fetch_missing) route chaque DOI vers la bonne API au lieu de l'interroger contre les deux.
 
 Crossref et DataCite gèrent des ensembles de DOI disjoints. Sans la RA du préfixe, chaque DOI candidat devrait être tenté contre les deux API, générant 50% d'erreurs 404.
 

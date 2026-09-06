@@ -1,244 +1,65 @@
 # Bibliométrie UCA
 
 Suivi de la production scientifique de l'Université Clermont Auvergne.
-Intègre sept sources (HAL, OpenAlex, Web of Science, ScanR, theses.fr,
-Crossref, DataCite) dans un référentiel dédupliqué de publications,
-personnes et laboratoires.
+
+Le pipeline collecte auprès de sources en ligne les métadonnées de publications scientifiques rattachées à l'université, les dédoublonne et les relie à leurs auteurs et structures de rattachement. — L'application web les restitue sous forme de listes et de tableaux de bord.
 
 ## Stack technique
 
 - **Frontend** : SvelteKit (Svelte 5) — `interfaces/frontend/`
 - **Backend** : FastAPI + PostgreSQL 18 (SQLAlchemy) — `interfaces/api/`
-- **Pipeline** : Python — `application/pipeline/` (orchestrateur
-  `run_pipeline`), extracteurs dans `infrastructure/sources/`
-- **Architecture** : DDD en 4 couches (`domain/`, `application/`,
-  `infrastructure/`, `interfaces/`) — voir
-  [docs/architecture/](docs/architecture/) (archi logicielle) et
-  [docs/donnees/](docs/donnees/) (modèle de données)
+- **Pipeline** : Python — `application/pipeline/` (orchestrateur `run_pipeline`), extracteurs dans `infrastructure/sources/`
+- **Architecture** : DDD en 4 couches (`domain/`, `application/`, `infrastructure/`, `interfaces/`)
 
-## Prérequis
+## Démarrer
 
-Docker, selon le système d'exploitation :
+Prérequis : Docker et le plugin Compose.
 
-- **Linux** : Docker Engine + plugin Compose via le [dépôt officiel](https://docs.docker.com/engine/install/) — **pas** Docker Desktop, qui y tourne dans une VM (plus lourd, compte requis). Sur une distribution dérivée (Linux Mint, Pop!_OS…), forcer dans le dépôt le codename Ubuntu sous-jacent et non celui de la distribution (ex. `jammy` pour Mint 21.x, exposé dans `/etc/os-release` via `UBUNTU_CODENAME`), car Docker ne publie pas de paquets pour ces distributions. Penser à `sudo usermod -aG docker $USER` puis se reconnecter pour utiliser `docker` sans `sudo`.
+- **Linux** : Docker Engine + plugin Compose via le [dépôt officiel](https://docs.docker.com/engine/install/).
 - **macOS** : [Docker Desktop](https://www.docker.com/products/docker-desktop/).
 - **Windows** : [Docker Desktop](https://www.docker.com/products/docker-desktop/) avec le backend WSL2.
 
-Ou, installation sans Docker :
-- Python 3.14+
-- Node.js 20+ / npm 10+
-- PostgreSQL 18+ avec extensions `pg_trgm`, `unaccent`
-- [`uv`](https://docs.astral.sh/uv/) recommandé pour l'install des deps
-
-## Installation avec Docker (recommandé)
-
-### 1. Configuration
-
 ```bash
-cp .env.example .env
+cp .env.example .env    # puis renseigner les variables
+docker compose up
 ```
 
-Éditer `.env` avec vos valeurs (identités de la base, compte d'administration). L'API se connecte sous un rôle restreint et refuse de démarrer sans lui : cf. [Rôles de connexion](docs/exploitation/02-initialisation-base.md#rôles-de-connexion).
+- Frontend : <http://localhost:5173/bibliometrie>
+- API : <http://localhost:8000>
 
-### 2. Lancement (dev)
-
-```bash
-docker compose -f docker-compose.dev.yml up
-```
-
-- Frontend : http://localhost:5173/bibliometrie
-- API : http://localhost:8000
-
-Le code est monté en volume : hot reload backend + frontend.
-
-### 3. Importer une base existante
-
-```bash
-docker cp bibliometrie.dump bibliometrie-uca-db-1:/tmp/
-docker compose exec db bash -c 'pg_restore -U "$POSTGRES_USER" -d bibliometrie --no-owner -j 4 /tmp/bibliometrie.dump'
-```
-
-Ou créer une base vide, en appliquant les migrations Alembic :
-
-```bash
-docker compose exec backend alembic upgrade head
-```
-
-### 4. Pipeline
-
-```bash
-docker compose exec backend run_pipeline
-```
-
-### 5. Production
-
-```bash
-docker compose -f docker-compose.prod.yml up -d
-```
-
-Application servie sur http://localhost:8000/ (un seul conteneur sert l'API et le frontend buildé en SPA statique).
-
-Différences avec le compose de dev : un seul conteneur applicatif (backend + frontend statique, plus de vite dev server), pas de volume code, port DB non exposé. Pour un déploiement derrière un reverse-proxy sur un sous-chemin (ex. `/bibliometrie`), définir `ROOT_PATH=/bibliometrie` dans `.env` (consommé au build du frontend et au runtime uvicorn). Voir [docs/exploitation/03-deploiement.md](docs/exploitation/03-deploiement.md) pour les détails et les options de déploiement hors Docker.
-
-### Commandes utiles
-
-```bash
-docker compose down        # Arrêter les conteneurs
-docker compose down -v     # + supprimer le volume PostgreSQL
-docker compose logs -f     # Suivre les logs
-docker compose exec backend bash   # Shell dans le conteneur backend
-```
-
-## Installation sans Docker
-
-### Base de données
-
-```bash
-createdb bibliometrie
-alembic upgrade head     # applique toutes les migrations
-```
-
-`schema.sql` est un snapshot descriptif (utile pour relire la
-structure d'un coup d'œil), pas la source de vérité — la vérité, ce
-sont les migrations Alembic dans `alembic/versions/`. Pour
-rafraîchir le snapshot après une série de migrations :
-`python -m interfaces.cli.dev.dump_schema`.
-
-Deux options pour initialiser les données :
-
-**Option A — Restaurer un dump complet** :
-```bash
-pg_restore -U "$DB_OWNER_USER" -d bibliometrie --clean --if-exists bibliometrie.dump
-```
-
-**Option B — Démarrer de zéro** :
-```bash
-psql -d bibliometrie -f infrastructure/db/seed.sql
-```
-Le seed contient les données de référence (structures, relations, pays,
-config). Les credentials API sont des placeholders : à renseigner dans
-la table `config` avant le pipeline.
-
-Pour régénérer le seed depuis une base existante :
-`python -m interfaces.cli.dev.generate_seed`.
-
-### Backend
-
-```bash
-# Avec uv (recommandé)
-uv sync --extra dev
-
-# Ou avec pip
-pip install ".[dev]"   # runtime + dev tools (pytest, ruff, mypy, …)
-
-# Hooks git : garde rapide au commit + miroir de la CI au push
-pre-commit install                       # étage pre-commit (ruff, mypy, lint-imports, pytest-unit)
-pre-commit install --hook-type pre-push  # étage pre-push (checks CI : deptry, pip-audit, lint, types, build front ; hors tests)
-```
-
-### Frontend
-
-```bash
-cd interfaces/frontend
-npm install
-```
-
-## Lancement sans Docker
-
-### Développement
-
-Tout-en-un (backend port 8000 + frontend port 5173) :
-
-```bash
-bash start.sh
-```
-
-Ou séparément :
-
-```bash
-python -m uvicorn interfaces.api.app:app --reload --port 8000
-cd interfaces/frontend && npm run dev -- --port 5173
-```
-
-### Production
-
-Deux voies au choix :
-
-- **Docker** (recommandé pour la prod) : `docker compose -f docker-compose.prod.yml up -d` — un conteneur applicatif autoportant (backend + frontend buildé en SPA statique) + un conteneur Postgres. Voir [docs/exploitation/03-deploiement.md](docs/exploitation/03-deploiement.md).
-- **Sans Docker** : build du frontend (`cd interfaces/frontend && npm run build` — la SPA est ensuite servie par l'API), puis lancement d'uvicorn avec le gestionnaire de process de votre choix (systemd, supervisor, pm2…). Exemple uvicorn nu : `uvicorn interfaces.api.app:app --host 0.0.0.0 --port 8000`.
-
-## Pipeline de données
-
-```bash
-run_pipeline                    # Complet
-run_pipeline --from persons     # Reprise depuis une phase
-run_pipeline --only authorships # Une seule phase
-run_pipeline --list             # Liste des phases
-run_pipeline --dry-run          # Sans exécuter
-run_pipeline --mode daily       # Import quotidien (HAL seul, depuis le dernier run)
-run_pipeline --start-year 2024  # Extraction depuis une année de début
-run_pipeline --sources hal,openalex  # Sources spécifiques
-```
-
-Voir [docs/pipeline/](docs/pipeline/) pour le détail des phases.
-
-## Tests
-
-```bash
-export DB_OWNER_PASSWORD=...                      # Requis pour les tests d'intégration
-python -m pytest tests/ -v                  # Tout
-python -m pytest tests/unit/ -q             # Unitaires seuls (~1s)
-python -m pytest tests/integration/ -q      # Intégration (~10s, base bibliometrie_test)
-python -m pytest tests/ --cov               # Avec couverture (seuil 85%)
-```
-
-Les tests d'intégration utilisent une base `bibliometrie_test` créée
-automatiquement, et s'y connectent sous les rôles de production : ceux de
-l'API et du pipeline, que le harnais crée avec les droits de
-`infrastructure/db/roles.sql`. Une écriture hors de ces droits échoue donc
-en erreur de permission ici, plutôt qu'une fois déployée. Le propriétaire
-du schéma est réservé à la création de la base et aux migrations.
+L'application a besoin d'une base initialisée : la marche à suivre, du `.env` aux rôles de connexion, est dans [Développement local](docs/exploitation/01-developpement-local.md). Pour un déploiement, voir [Production](docs/exploitation/02-production.md), et pour remplir la base, [Pipeline](docs/exploitation/03-pipeline.md).
 
 ## Arborescence
 
 ```
 bibliometrie-uca/
 ├── domain/              Entités, value objects, règles pures (zéro I/O)
-├── application/         Services métier, orchestrateurs
-│   └── pipeline/        Phases du pipeline (normalize, build, enrich, …)
-├── infrastructure/      Adapters sortants (SQL, API sources, settings)
+├── application/         Orchestration métier
+│   ├── pipeline/        Phases du pipeline
+│   ├── services/        Cas d'usage appelés par l'API
+│   └── ports/           Interfaces que l'infrastructure implémente
+├── infrastructure/      Adaptateurs sortants
 │   ├── db/              Schéma SQL, MetaData SA, engine
-│   ├── sources/         Extracteurs API (hal, openalex, wos, scanr, theses)
-│   ├── repositories/    Agrégats métier curés (écriture + invariants)
-│   ├── pipeline/        Gateways SQL des phases du pipeline
-│   └── read_models/     Projections de lecture pour l'API
-├── interfaces/          Adapters entrants
+│   ├── sources/         Extracteurs API (hal, openalex, wos, scanr, theses…)
+│   ├── repositories/    Lecture et écriture des agrégats du domaine
+│   ├── pipeline/        Requêtes SQL des phases du pipeline
+│   ├── read_models/     Projections de lecture pour l'API
+│   └── raw_store/       Archivage des réponses brutes des sources
+├── interfaces/          Adaptateurs entrants
 │   ├── api/             FastAPI (routers, models Pydantic, middlewares)
 │   ├── frontend/        SvelteKit
-│   └── cli/             Ligne de commande : orchestrateur du pipeline
-│                        (`run_pipeline.py`), imports, maintenance, oneshot, dev
+│   └── cli/             Orchestrateur du pipeline, imports, maintenance
+├── alembic/             Migrations
 ├── tests/               pytest (unit + integration)
-├── logs/                Logs consolidés (JSON), rapports pipeline
-├── start.sh             Lancement dev (backend + frontend)
 └── docs/                Documentation
 ```
 
-Voir [docs/architecture/](docs/architecture/) pour les règles
-d'import entre couches (vérifiées par import-linter en pre-commit + CI).
-
 ## Documentation
 
-- [Architecture logicielle](docs/architecture/) — couches DDD, ports/adapters, règles d'import
+- [Guide d'exploitation](docs/exploitation/) — développement local, production, pipeline
+- [Architecture](docs/architecture/) — couches DDD, ports/adaptateurs, règles d'import
 - [Modèle de données](docs/donnees/) — schéma, domaines fonctionnels, relations
-- [Sources de données](docs/sources/) — API, imports manuels, particularités par source
 - [Pipeline](docs/pipeline/) — les phases de traitement
-- [Guide d'exploitation](docs/exploitation/) — initialisation, déploiement, lancement, supervision
+- [Sources de données](docs/sources/) — API, imports manuels, particularités par source
 - [Guide utilisateur](docs/guide-utilisateur/) — pages publiques, pages admin, workflows
 - [Glossaire](docs/glossaire.md) — définitions des termes métier
-
-## Chantiers
-
-Les chantiers en cours et terminés sont documentés dans
-[docs/chantiers/](docs/chantiers/). Chaque fiche porte un préfixe :
-`METIER_` (nouvelles fonctionnalités, changements de comportement), `DATA_` (révision du schéma ou du traitement des données) ou `CODE_` (refactor / chantier qualité). Les fiches datées
-correspondent aux chantiers terminés ; les fiches non datées sont en cours.
