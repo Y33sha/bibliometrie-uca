@@ -1,46 +1,23 @@
 # Moissonnage
 
-*À jour le 2026-06-30.*
+*À jour le 2026-09-06.*
 
 Récupère les données brutes depuis les API et les stocke en JSONB dans le *staging*.
 
-```mermaid
-flowchart LR
-  A[API HAL]-->|extract_hal|B[staging]
-  C[API OpenAlex]-->|extract_openalex|B
-  E[API WOS]-->|extract_wos|B
-  G[API ScanR]-->|extract_scanr|B
-  H[API theses.fr]-->|extract_theses|B
-  classDef new  fill:#bbf
-  class B new;
-```
-
-## Moissonnage initial
+## Moissonnage par lots (`extract`)
 
 **Critères de requête**:
 - **années** de publication : de l'année de début à l'année courante. L'année de début est l'argument `--start-year`, à défaut la valeur [configurable](../guide-utilisateur/03-workflow-admin.md#années) dans `admin/config` (par défaut 2017, année de la fusion UCA) ;
 - **affiliation** des publications ([périmètre configurable](../guide-utilisateur/03-workflow-admin.md#périmètres) dans `admin/config`). Il s'agit des affiliations *telles qu'elles sont renseignées dans chaque source*. Elles peuvent varier d'une source à l'autre et être incomplètes ou erronées. Ce point est géré dans les étapes ultérieures.
 
 **Gestion des changements**:
-- Chaque *record* est hashé (MD5) pour détecter les changements lors des réexécutions. Une publication dont les métadonnées ont changé sera ré-importée et re-traitée.
-- Même sans changement, la colonne `last_seen_at` est bumpée à chaque fois qu'un doc est re-vu (moisson bulk ou refetch).
-> Une publication qui cesse d'apparaître dans sa source (par ex. dédoublonnage dans HAL) est détectée puis confirmée par la phase [Refresh & disparitions](#refresh-disparitions), qui pose un marqueur `disappeared_at`.
+- Chaque *payload* est hashé (MD5) pour détecter les changements lors des réexécutions. Une publication dont les métadonnées ont changé sera ré-importée et re-traitée.
+- Même sans changement, `last_seen_at` est repoussée chaque fois qu'un document est revu.
+> Une publication qui cesse d'apparaître dans sa source — parce que la source l'a dédoublonnée, par exemple — est détectée puis confirmée par la phase [la phase qui les repère](#documents-périmés-et-disparus), qui pose un marqueur `disappeared_at`.
 
-## États d'une ligne de staging
+## Agences d'enregistrement DOI (`resolve_ra`)
 
-| État | `processed` | `not_found_at` | `raw_data` | Posé par |
-|---|---|---|---|---|
-| **À traiter** | FALSE | NULL | payload de la source | les extracteurs |
-| **Normalisée** | TRUE | NULL | vidé | `normalize` |
-| **Non trouvée** | TRUE | horodatage | jamais peuplé | `fetch_missing_hal` |
-
-Un CHECK interdit la combinaison impossible, `not_found_at IS NULL OR processed` : une ligne ne peut pas être à la fois marquée introuvable et en attente de traitement.
-
-Si la source publie le document plus tard, le moissonnage efface le marqueur en même temps qu'il repose le payload — l'ordre inverse violerait le CHECK.
-
-## Agences d'enregistrement DOI
-
-Phase `resolve_ra`, enchaînée entre le moissonnage initial et les imports croisés. Elle résout la Registration Agency (Crossref ou DataCite) des préfixes DOI, pour que l'[import croisé par DOI](#imports-croisés) route chaque DOI vers la bonne API au lieu de l'interroger contre les deux.
+Résolution de l'agence d'enregistrement (Crossref ou DataCite) de chaque DOI, pour que [la recherche par DOI](#documents-quune-source-ignore) route chaque DOI vers la bonne API au lieu de l'interroger contre les deux.
 
 Crossref et DataCite gèrent des ensembles de DOI disjoints. Sans la RA du préfixe, chaque DOI candidat devrait être tenté contre les deux API, générant 50% d'erreurs 404.
 
@@ -48,33 +25,33 @@ Pour chaque préfixe pas encore résolu, interroge `doi.org/ra` et enregistre la
 
 Une row `doi_prefixes` naît ici avec sa seule RA ; le [volet éditeur](05-publishers-journals.md) la complète ensuite (nom et `publisher_id` via les API `/prefixes`), une fois que `normalize` a créé les éditeurs mentionnés par les sources.
 
-## Imports croisés
+## Documents absents d'une source (`fetch_missing`)
 
-Phase `fetch_missing`: deux étapes enchaînées, chacune adressant un cas distinct de "doc visible dans une source mais absent d'une autre".
+Le moissonnage interroge les sources sur le critère de l'affiliation  : un document peut être présent dans une source et ne pas être trouvé par moissonnage, si l'affiliation n'y est pas correctement renseignée. On essaie donc de retrouver dans chaque source les documents trouvés seulement dans les autres.
 
 **Étape 1 — `fetch_missing_hal` : HAL ids manquants.**
 Télécharge depuis HAL les documents référencés (par hal-id ou NNT) dans d'autres sources mais absents de notre staging HAL. Orchestrateur dans `application/pipeline/fetch_missing/hal.py`, adaptateur HAL dans `infrastructure/sources/hal/fetch_missing_hal.py`. Auto-borné, tourne dans tous les modes : les hal-ids/NNT introuvables sont marqués `not_found_at` dans staging et ne sont jamais re-interrogés (HAL = source native pour les hal-ids, un 404 est définitif).
 
 **Étape 2 — `fetch_missing_doi` : DOI manquants par source.**
-Pour chaque source cible (OpenAlex, HAL, WoS, ScanR, Crossref), recherche par DOI les records trouvés dans les autres sources mais absents de celle-ci. La plupart sont effectivement absents ; certains sont repêchés (cause : affiliations différentes selon source). Dispatcher dans `application/pipeline/fetch_missing/doi.py`, adaptateur par source dans `infrastructure/sources/<source>/fetch_missing_doi.py`. Sources cibles déterminées par la policy du mode (`application/pipeline/modes.py`) ; le pool de DOI est auto-borné par le backoff `doi_lookups`.
+Pour chacune des six sources interrogeables par DOI — HAL, OpenAlex, WoS, ScanR, Crossref, DataCite —, recherche les documents que les autres attestent et qu'elle ignore. La plupart sont effectivement absents ; certains sont repêchés (cause : affiliations différentes selon source). Dispatcher dans `application/pipeline/fetch_missing/doi.py`, adaptateur par source dans `infrastructure/sources/<source>/fetch_missing_doi.py`. Le mode d'exécution décide des sources retenues (`application/pipeline/modes.py`), et `doi_lookups` borne le lot en écartant les DOI dont la tentative précédente est trop récente.
 
-**Les deux étapes sont auto-bornées et convergentes.** Le pool de hal-ids/NNT à re-tenter est fini par construction (un hal-id 404 sort définitivement via `not_found_at`, HAL étant source native). Le pool de DOI l'est aussi grâce au backoff : un DOI absent d'une source *non native* (HAL/OpenAlex/WoS/ScanR) est enregistré dans `doi_lookups` avec `next_retry = now() + 30 jours` ; `get_cross_import_dois` ne le ressort qu'une fois ce délai écoulé. Chez Crossref et DataCite, dont le DOI est l'identifiant natif, l'absence est définitive : `next_retry` reste NULL et le DOI ne ressort jamais. Le 1er pass tente tout, les passes suivantes ne reprennent que les nouveaux DOI et ceux dont le backoff a expiré.
+**Les deux étapes sont auto-bornées et convergentes.** Le pool de hal-ids/NNT à re-tenter est fini par construction (un hal-id 404 sort définitivement via `not_found_at`, HAL étant source native). Le pool de DOI l'est aussi grâce à ce délai : un DOI absent d'une source *non native* (HAL/OpenAlex/WoS/ScanR) est enregistré dans `doi_lookups` avec `next_retry = now() + 30 jours` ; `get_cross_import_dois` ne le ressort qu'une fois ce délai écoulé. Chez Crossref et DataCite, dont le DOI est l'identifiant natif, l'absence est définitive : `next_retry` reste NULL et le DOI ne ressort jamais. La première passe tente tout ; les suivantes ne reprennent que les DOI neufs et ceux dont le délai est écoulé.
 
 
-## Refresh & disparitions
+## Documents périmés et disparus (`fetch_stale`)
 
-Phase `fetch_stale`, enchaînée après les imports croisés, **à chaque run**. Elle rafraîchit les documents dont la dernière vue (`last_seen_at`) dépasse `STALE_REFRESH_AFTER_DAYS` (90 j) et détecte les disparitions.
+Jouée à chaque exécution, cette phase rafraîchit les documents vus pour la dernière fois il y a plus de `STALE_REFRESH_AFTER_DAYS` (90 jours) et repère ceux qui ont disparu de leur source.
 
 Chaque ligne périmée est réinterrogée par son identifiant natif : trouvée → `raw_data` rafraîchi (re-traité si l'empreinte a changé) et `last_seen_at` repoussé ; absence confirmée → `disappeared_at` posé ; erreur transitoire → laissée, retentée plus tard.
 
-Tournant à chaque run, le seuil étale la charge : une passe ne ramasse que ce qui vient de franchir 90 j. La fenêtre fixe du mode `full` (rétention cumulative) garde la plupart des natifs frais via le bulk, donc le lot stale reste petit (cross-imports + natifs réellement disparus). Pas de filtre par source : sous cadence normale theses et wos ne deviennent jamais stale.
+La sélection se borne aux années de la fenêtre courante, lues sur `source_publications.pub_year` — `theses` faisant exception, tout son historique restant éligible. Le seuil étale la charge : une passe ne ramasse que ce qui vient de franchir les 90 jours.
 
-`disappeared_at` est pour l'instant un **marqueur seul** — aucune suppression / exclusion / propagation en aval (à décider plus tard sur cas concrets).
+`disappeared_at` est un **marqueur seul** : rien en aval ne l'exploite, ni suppression, ni exclusion, ni propagation.
 
-## Works OpenAlex tronqués
+## Listes d'auteurs tronquées (`fetch_truncated`)
 
-Phase `fetch_truncated`, enchaînée après `fetch_stale` et avant `normalize`. L'[API OpenAlex](../sources/03-openalex.md) plafonne la liste des auteurs à 100 par réponse ; au-delà, les auteurs surnuméraires sont absents du payload moissonné.
+L'[API OpenAlex](../sources/03-openalex.md) plafonne la liste des auteurs à 100 par réponse ; au-delà, les auteurs surnuméraires sont absents du payload moissonné.
 
-Les works concernés sont marqués à l'extraction par le drapeau `staging.authors_truncated` (payload bulk à exactement 100 auteurs). Cette phase re-télécharge un par un les works marqués, récupère la liste complète des auteurs et lève le drapeau (genuine 100 auteurs : levé sans réécriture). Le marqueur étant explicite, il survit à la normalisation (qui purge `raw_data`) : un work qui échappe à cette phase — OpenAlex indisponible, budget API épuisé — reste marqué et est repris au run suivant. Placée après les imports croisés et le refresh pour voir aussi les works qu'ils ramènent, et avant `normalize` pour qu'il écrive directement les auteurs complets.
+Les works concernés sont marqués à l'extraction par le drapeau `staging.authors_truncated` (payload du lot comptant exactement 100 auteurs). Cette phase retélécharge un par un les works marqués et récupère la liste complète des auteurs. Un work qui compte réellement cent auteurs voit son drapeau levé sans réécriture. Le marqueur étant explicite, il survit à la normalisation (qui purge `raw_data`) : un work qui échappe à cette phase — OpenAlex indisponible, budget API épuisé — reste marqué et repris à l'exécution suivante.
 
-Pour éviter d'être écrasé par un moissonnage bulk ultérieur, le refetch met à jour `raw_data` mais conserve `raw_hash` (hash du payload bulk initial) ; tant que le bulk renvoie le même payload, l'UPSERT bulk ne touche pas `raw_data`.
+Pour que le résultat ne soit pas écrasé par le prochain moissonnage, on met à jour `raw_data` sans toucher à `raw_hash`, qui reste l'empreinte du payload initial : tant que le moissonnage renvoie ce même payload, l'UPSERT laisse `raw_data` en place.
