@@ -1,6 +1,6 @@
 # Éditeurs — cycle de vie
 
-*À jour le 2026-09-04.*
+*À jour le 2026-09-06.*
 
 Un éditeur porte les revues et reçoit les frais de publication. Il se reconnaît par son identifiant OpenAlex quand une source en fournit un, sinon par son nom, via les formes enregistrées dans `publisher_name_forms`. `domain/publishers/publisher.py` définit sa structure — nom, pays, identifiant OpenAlex, type ; la résolution, la fusion et l'enrichissement vivent dans les services et leurs adaptateurs SQL.
 
@@ -30,7 +30,9 @@ Routeur `interfaces/api/routers/publishers.py`, adaptateur `PgPublisherRepositor
 
 **Éditer un éditeur** (`PUT /api/publishers/{id}`). Seuls les champs transmis sont modifiés ; le repository re-dérive `name_normalized` depuis le nom.
 
-**Fusionner deux éditeurs** (`POST /api/publishers/{id}/merge`). L'opération est refusée si les deux éditeurs portent des ISSN divergents, ou si la fusion créerait un doublon interne. Les revues que les deux se partagent sous un même titre sont fusionnées d'abord, puis `merge_publisher_into` repointe `journals`, `journal_name_forms` et `apc_payments` avant de recaler les compteurs.
+**Fusionner deux éditeurs** (`POST /api/publishers/{id}/merge`). Les revues que les deux se partagent sous un même titre sont fusionnées d'abord, puis `merge_publisher_into` repointe `journals`, `journal_name_forms` et `apc_payments` avant de recaler les compteurs.
+
+L'opération est refusée quand deux revues de même titre, une chez chaque éditeur, portent des ISSN différents : leurs identités sont distinctes. Elle l'est aussi quand un même titre apparaît deux fois chez l'un des deux éditeurs.
 
 ## Lecture par le pipeline
 
@@ -44,7 +46,3 @@ Port `application/ports/read_models/publishers_queries.py`, adaptateur `PgPublis
 |---|---|
 | Liste et facettes | Éditeurs filtrables, avec leur nombre de revues, leur nombre de publications et leurs préfixes de DOI ; facettes par type et par pays |
 | Détail et tableau de bord | Types des revues de l'éditeur, types de document et statuts d'accès de ses publications du périmètre, sujets |
-
-## Points d'attention
-
-**La fusion écrit dans des tables d'autres agrégats.** `merge_publisher_into` met à jour `journals`, `journal_name_forms` et `apc_payments` en SQL littéral, hors du périmètre que le repository des éditeurs déclare — comme la fusion de revues, et pour la même raison : repointer les dépendants est le contenu même de l'opération, et elle demande une transaction unique.

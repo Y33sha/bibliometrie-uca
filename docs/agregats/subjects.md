@@ -1,8 +1,8 @@
 # Sujets — cycle de vie
 
-*À jour le 2026-09-04.*
+*À jour le 2026-09-06.*
 
-Un sujet est un concept thématique attaché à une publication par une source : domaine HAL, discipline de thèse, vedette-matière RAMEAU, concept OpenAlex. Le pipeline en est la seule autorité d'écriture ; l'API ne fait que les lire.
+Un sujet est un concept thématique attaché à une publication par une source : domaine HAL, discipline de thèse, vedette-matière RAMEAU, concept OpenAlex. Seuls les concepts venus d'une ontologie deviennent des sujets — les mots-clés libres, c'est tout ce que Crossref propose, restent sur l'enregistrement source et s'affichent avec le détail de la publication. Le pipeline en est la seule autorité d'écriture ; l'API ne fait que les lire.
 
 Aucun objet de domaine ne lui correspond : un sujet vit comme libellé et lignes SQL. La seule règle venue de `domain/` est `normalize_label`, qui réduit les espaces sans toucher à la casse ni aux accents.
 
@@ -14,7 +14,7 @@ Aucun objet de domaine ne lui correspond : un sujet vit comme libellé et lignes
 | `publication_subjects` | Lien entre une publication et un sujet, pour une source donnée | clé `(publication_id, subject_id, source)`, `rejected`, `created_at` |
 | `subject_cooccurrences` | Vue matérialisée : paires de sujets présents sur une même publication | les deux sujets ordonnés, le nombre de publications concernées, à partir de deux |
 
-Deux libellés qui ne diffèrent que par la casse convergent vers un seul sujet, et c'est la première forme rencontrée qui est conservée. Un même sujet attribué par deux sources donne en revanche **deux** liens, la source faisant partie de la clé.
+Deux libellés qui ne diffèrent que par la casse convergent vers un seul sujet, et c'est la première forme rencontrée qui est conservée — de même que la langue, prise à la première source qui en déclare une. Un même sujet attribué par deux sources donne en revanche **deux** liens, la source faisant partie de la clé.
 
 ## Écriture par le pipeline
 
@@ -49,16 +49,4 @@ Les sujets alimentent aussi les palmarès affichés ailleurs — tableaux de bor
 
 ## Points d'attention
 
-**Seuls les concepts d'ontologie deviennent des sujets.** Les mots-clés libres que fournissent les sources — c'est tout ce que Crossref propose — restent sur l'enregistrement source et s'affichent avec le détail de la publication, sans entrer dans ces tables. La distinction est délibérée : un vocabulaire contrôlé se compte et se recoupe, un mot-clé libre non.
-
-**La colonne `rejected` est respectée partout mais aucune interface ne la pose.** Elle exclut le lien du comptage d'usage et des co-occurrences, survit à l'effacement de l'ingestion, et empêche la suppression du sujet. Aucun point d'entrée ne permet aujourd'hui de la renseigner.
-
-## Invariants métier
-
-**Identité d'un sujet.** L'unicité porte sur le libellé en minuscules. Le libellé conservé est celui de la première insertion, et la langue celle de la première source qui en déclare une : les suivantes ne l'écrasent pas.
-
-**Attribution par source.** Chaque lien retient la source qui l'a fourni ; un même sujet venu de deux sources donne deux liens. L'ingestion efface et reconstruit les liens non rejetés d'une publication modifiée, source comprise.
-
-**Valeurs dérivées recalculées en entier.** `usage_count` et la vue des co-occurrences se recalculent à chaque passage depuis les liens non rejetés, sans état conservé entre deux exécutions.
-
-**Sujets sans lien.** Un sujet qu'aucun lien ne porte est supprimé ; un sujet dont tous les liens sont rejetés subsiste, pour ne pas perdre la décision humaine.
+**La colonne `rejected` est respectée partout, mais aucun point d'entrée ne la pose.** Elle exclut le lien du comptage d'usage et des co-occurrences, survit à l'effacement de l'ingestion, et empêche la suppression du sujet. Il n'existe pas d'interface pour la renseigner.

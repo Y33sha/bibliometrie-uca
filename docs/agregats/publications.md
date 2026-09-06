@@ -1,10 +1,10 @@
 # Publications — cycle de vie
 
-*À jour le 2026-09-04.*
+*À jour le 2026-09-06.*
 
-Une publication est la référence unifiée d'un document : plusieurs enregistrements sources décrivant le même article ne donnent qu'une publication. Elle est **entièrement dérivée, jamais saisie** — la phase `publications` regroupe les enregistrements sources, et `refresh_from_sources` recalcule l'état canonique depuis leur union. L'édition manuelle se limite à réunir deux publications ou à déclarer qu'elles sont distinctes.
+Une publication est la référence unifiée d'un document : plusieurs enregistrements sources décrivant le même article ne donnent qu'une publication. Elle est **entièrement dérivée, jamais saisie** — la phase `publications` regroupe les enregistrements sources, et `refresh_from_sources` recalcule l'état consolidé depuis leur union. L'édition manuelle se limite à réunir deux publications ou à déclarer qu'elles sont distinctes.
 
-`domain/publications/` porte les règles pures : les types d'identifiants qui valident et normalisent DOI, identifiant HAL, numéro national de thèse, PMID, PMCID et identifiant arXiv ; la nomenclature des types de document ; l'agrégation des métadonnées entre sources ; les règles de regroupement ; et le choix du statut d'accès ouvert.
+`domain/publications/` porte les règles pures : les types d'identifiants qui valident et normalisent DOI, identifiant HAL, numéro national de thèse, PMID, PMCID et identifiant arXiv ; la nomenclature des types de document ; l'agrégation des métadonnées entre sources ; les règles de regroupement ; et le choix du statut *open access*.
 
 ## Tables
 
@@ -25,11 +25,17 @@ La phase `publications` constitue les publications ; les phases `relations`, `oa
 
 **Regroupement (`application/pipeline/publications/`).** `reconcile_components` charge les enregistrements sources marqués à reprendre et leurs voisins immédiats, puis calcule un plan avant d'écrire quoi que ce soit. Le plan regroupe par composante et par DOI, sous une règle absolue : deux DOI distincts ne se rejoignent jamais. Un enregistrement sans DOI peut en revanche rejoindre un groupe qui en porte un. L'application du plan repointe les enregistrements, crée les publications manquantes, réunit celles qui doivent l'être — les dépendants sont repointés vers la publication conservée, puis la publication vidée est supprimée — et sépare celles qui ont été rapprochées à tort. Chaque publication conservée est ensuite rafraîchie.
 
-**Recalcul de l'état canonique (`refresh_from_sources`).** L'état est recalculé en entier, jamais complété au coup par coup : première valeur non nulle selon le classement des sources, statut d'accès le plus ouvert, réunion dédoublonnée des listes, arbitrage entre sous-types d'article. La règle de type de document dépendant de la revue est rejouée, puis l'ensemble est enregistré avec la liste des sources contributrices et le complément de détail. Une publication qu'aucune source n'atteste plus, ou dont le type de document est exclu, est supprimée ; ses enregistrements sources s'en détachent.
+**Recalcul de l'état consolidé (`refresh_from_sources`).** L'état est recalculé en entier, jamais complété au coup par coup : première valeur non nulle selon le classement des sources, statut d'accès le plus ouvert, réunion dédoublonnée des listes, arbitrage entre sous-types d'article. La règle de type de document dépendant de la revue est rejouée, puis l'ensemble est enregistré avec la liste des sources contributrices et le complément de détail. Une publication qu'aucune source n'atteste plus, ou dont le type de document est exclu, est supprimée ; ses enregistrements sources s'en détachent.
 
-**Relations (`application/pipeline/relations/`).** La table est reconstruite à chaque passage, signal par signal, à partir de trois éléments : les relations déclarées par DataCite et Crossref, les clés de confirmation partagées entre deux DOI distincts — le type se déduisant alors du couple de types de document —, et la proximité des titres, qui relie un erratum à son article ou une prépublication à sa version publiée. Les liens vont du dépendant vers le parent ; les liens inverses sont dédoublonnés, et un type imprécis cède la place à une relation précise déjà déclarée.
+**Relations (`application/pipeline/relations/`).** La table est reconstruite à chaque passage, à partir de trois signaux :
 
-**Statut d'accès ouvert (`application/pipeline/oa_status/`).** Unpaywall est interrogé pour les publications à DOI jamais vérifiées ou dont la vérification a vieilli, et fait autorité — à une exception près : une archive ouverte détenant le fichier rouvre une publication annoncée fermée ou indéterminée.
+- les relations déclarées par DataCite et Crossref ;
+- les clés de confirmation partagées entre deux DOI distincts, dont le type se déduit du couple de types de document ;
+- la proximité des titres, qui relie un erratum à son article ou une prépublication à sa version publiée.
+
+Les liens vont du dépendant vers le parent, et les liens inverses sont dédoublonnés. Le type imprécis `is_related_to` marque une paire à clé partagée que le couple de types de document ne permet pas de qualifier ; une relation précise déjà déclarée le remplace.
+
+**Statut *open access* (`application/pipeline/oa_status/`).** Unpaywall est interrogé pour les publications à DOI jamais vérifiées ou dont la vérification a vieilli, et fait autorité — à une exception près : une archive ouverte détenant le fichier rouvre une publication annoncée fermée ou indéterminée.
 
 **Pays et périmètre.** La phase `countries` propage les pays des adresses jusqu'à la publication ; la phase `authorships` y reporte l'appartenance au périmètre.
 
@@ -41,7 +47,7 @@ Deux opérations seulement, dans `interfaces/api/routers/publications.py`. Une c
 
 **Déclarer deux publications distinctes** (`POST /api/publications/duplicates/mark-distinct`) inscrit la paire, sans effet si elle y figure déjà.
 
-**Aucune métadonnée canonique ne s'édite.** Une valeur fausse se corrige en amont, par une règle de `metadata_correction` sur l'enregistrement source, ou en réunissant ou séparant des doublons. Les frais de publication arrivent par un import en ligne de commande (`interfaces/cli/imports/import_apc.py`) et l'API ne fait que les lire.
+**Aucune métadonnée consolidée ne s'édite.** Une valeur fausse se corrige en amont, par une règle de `metadata_correction` sur l'enregistrement source, ou en réunissant ou séparant des doublons. Les frais de publication arrivent par un import en ligne de commande (`interfaces/cli/imports/import_apc.py`) et l'API ne fait que les lire.
 
 ## Lecture par le pipeline
 
@@ -53,25 +59,7 @@ Deux opérations seulement, dans `interfaces/api/routers/publications.py`. Une c
 
 | Usage | Ce qui est servi |
 |---|---|
-| Détail (`GET /api/publications/{id}`) | Métadonnées canoniques jointes à la revue et à l'éditeur, provenance par source, auteurs canoniques et auteurs tels que chaque source les donne, relations entrantes et sortantes, sujets, identifiants externes |
+| Détail (`GET /api/publications/{id}`) | Métadonnées consolidées jointes à la revue et à l'éditeur, provenance par source, auteurs consolidés et auteurs tels que chaque source les donne, relations entrantes et sortantes, sujets, identifiants externes |
 | Listes, facettes, export | Liste paginée et export CSV, avec une douzaine de facettes dont le laboratoire, le statut de dépôt HAL et les frais de publication |
 | Statistiques et tableaux croisés | Ventilations par année, statut d'accès, type de document, laboratoire, éditeur et revue ; collaborations d'après les pays |
 | Candidat au dédoublonnage (`GET /api/publications/duplicates/next`) | Paires proches par le titre, l'année et le DOI, hors paires déclarées distinctes — c'est cette lecture qui alimente la fusion manuelle |
-
-## Points d'attention
-
-**Rien ne permet de corriger une métadonnée sur la publication.** C'est délibéré : la publication est un dérivé de ses sources, et la réparation se fait en amont. Il n'existe donc pas de correction rapide côté administration.
-
-**Les relations sont reconstruites en entier à chaque passage**, signal par signal, sans traitement incrémental. Le type imprécis `is_related_to` sert d'attente : il marque une paire à clé partagée dont le couple de types de document ne permet pas encore de conclure.
-
-## Invariants métier
-
-**Un DOI, une publication.** Trois garde-fous : le regroupement ne réunit jamais deux DOI distincts, un index unique sur le DOI en minuscules l'interdit en base, et la fusion manuelle la refuse. Une publication sans DOI peut en revanche rejoindre une publication qui en porte un.
-
-**La publication est dérivée.** Hors fusion et déclaration de distinction, elle n'est jamais écrite à la main : `refresh_from_sources` recalcule tout depuis l'union de ses sources.
-
-**Ce qui n'est plus attesté disparaît.** Une publication qu'aucune source n'atteste, ou dont le type de document est exclu, est supprimée ; ses enregistrements sources s'en détachent sans produire ni authorship ni personne.
-
-**Unpaywall fait autorité sur l'accès ouvert.** Une fois la vérification faite, l'agrégation cesse de recalculer le statut depuis les sources, sauf lorsqu'une archive ouverte détient le fichier.
-
-**Identité des authorships.** Le couple `(publication_id, person_id)` est unique, et une authorship n'existe pas sans sa publication.

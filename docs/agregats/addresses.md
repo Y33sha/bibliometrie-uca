@@ -1,6 +1,6 @@
 # Adresses — cycle de vie
 
-*À jour le 2026-09-04.*
+*À jour le 2026-09-06.*
 
 Une adresse est le texte d'affiliation qu'une source attache à une signature : « Université Clermont Auvergne, CNRS, LMBP, F-63000 Clermont-Ferrand, France ». Le pipeline la résout en structures et lui attribue un pays. C'est de cette résolution que dépend l'appartenance d'une publication au périmètre de l'établissement.
 
@@ -19,12 +19,13 @@ Une adresse est unique par `md5(raw_text)`, un rattachement par `(address_id, st
 
 ## Écriture par le pipeline
 
-Trois phases écrivent ces tables, dans cet ordre.
+Quatre phases écrivent ces tables, dans l'ordre où le pipeline les enchaîne.
 
 | Phase | Ce qu'elle écrit |
 |---|---|
 | `normalize` | `addresses`, `source_authorship_addresses` |
 | `affiliations` | `address_structures` |
+| `publications` | `addresses.pub_count` |
 | `countries` | `addresses.countries`, `addresses.suggested_countries` |
 
 ### `normalize` — création des adresses
@@ -39,7 +40,11 @@ La résolution compare l'état détecté à l'état enregistré et n'écrit que 
 
 ### `countries` — détection des pays
 
-`application/pipeline/countries/phase.py` procède par trois moyens : le nom de pays en fin d'adresse, le nom de lieu (automate sur les formes `institution` et `city`, qui n'écrit `countries` que si un seul code ISO ressort), et enfin la suggestion, qui vise les adresses restées sans pays et alimente `suggested_countries`.
+`application/pipeline/countries/phase.py` détecte le pays, du signal le plus sûr au moins sûr :
+
+- le nom de pays en fin d'adresse ;
+- le nom de lieu, par automate sur les formes `institution` et `city` — le pays n'est écrit que si un seul code ISO ressort ;
+- la suggestion, qui reprend les adresses restées sans pays et alimente `suggested_countries`.
 
 Toute écriture dans `countries` pose `addresses.countries_dirty`, ce qui déclenche la propagation ci-dessous.
 
@@ -61,8 +66,7 @@ Routeur `interfaces/api/routers/addresses.py`, commandes transactionnelles dans 
 
 ## Lecture par le pipeline
 
-- **Comptage.** La phase `publications` recalcule `addresses.pub_count` en joignant la table de liaison aux signatures et à leurs publications sources.
-- **Entrées d'appariement.** La résolution lit `addresses(id, normalized_text)` et `structure_name_forms` ; la détection de pays lit `addresses` et `place_name_forms`.
+La résolution lit `addresses(id, normalized_text)` et `structure_name_forms` ; la détection de pays lit `addresses` et `place_name_forms`. Le recompte de `pub_count`, en fin de phase `publications`, joint la table de liaison aux signatures et à leurs publications sources.
 
 ## Lecture par l'API
 

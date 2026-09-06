@@ -1,6 +1,6 @@
 # Journals — cycle de vie
 
-*À jour le 2026-09-04.*
+*À jour le 2026-09-06.*
 
 Un `journal` est un support de publication : revue, conférence, dépôt ou autre. Près de deux revues sur cinq n'ont aucun ISSN, et autant portent plusieurs formes de leur titre selon la source qui les décrit ; `journal_name_forms` enregistre ces formes. `domain/journals/journal.py` définit sa structure ; la résolution, la fusion et l'enrichissement vivent dans les services et leurs adaptateurs SQL.
 
@@ -19,7 +19,7 @@ Trois tables extérieures référencent une revue, avec des politiques de suppre
 
 **Rattachement tardif par préfixe de DOI (`metadata_correction`).** `journal_by_doi.py` renseigne `source_publications.journal_id` lorsqu'un préfixe de DOI désigne une revue sans ambiguïté. La décision elle-même est prise dans `domain/source_publications/metadata_correction/journal_by_doi.py`.
 
-**Enrichissement du référentiel (`publishers_journals`).** L'orchestrateur enchaîne, selon ce que la configuration autorise, la résolution des éditeurs, l'enrichissement depuis OpenAlex — frais de publication et type de revue pour celles restées indéterminées — puis l'import du référentiel DOAJ, qui renseigne `doaj_payload` et `is_in_doaj`. Les écritures passent par `PgJournalGatewayQueries` (`infrastructure/pipeline/journals.py`), qui porte aussi les requêtes de sélection de chaque sous-étape.
+**Enrichissement du référentiel (`publishers_journals`).** L'orchestrateur enchaîne, pour les sources dont les identifiants sont renseignés, la résolution des éditeurs, l'enrichissement depuis OpenAlex — frais de publication et type de revue pour celles restées indéterminées — puis l'import du référentiel DOAJ, qui renseigne `doaj_payload` et `is_in_doaj`. Les écritures passent par `PgJournalGatewayQueries` (`infrastructure/pipeline/journals.py`), qui porte aussi les requêtes de sélection de chaque sous-étape.
 
 ## Écriture par l'API — édition manuelle
 
@@ -45,12 +45,4 @@ Port `application/ports/read_models/journals_queries.py`, adaptateur `PgJournalQ
 |---|---|
 | `GET /api/journals`, `/facets` | Liste filtrable et facettes ; le filtre « avec publications » s'appuie sur le compteur `pub_count` |
 | `GET /api/journals/{id}`, `/{id}/dashboard` | Détail de la revue ; le tableau de bord signale les publications hors du cadre annoncé par la revue (`domain/journals/expected.py`) et recompte l'appartenance au périmètre en direct |
-| `GET /api/journals/types`, `/oa-models` | Libellés des vocabulaires de type de revue et de modèle d'accès ouvert, définis dans `domain/journals/journal.py` |
-
-## Points d'attention
-
-**La fusion écrit dans des tables d'autres agrégats.** `merge_journal_into` met à jour `publications`, `source_publications` et `apc_payments` en SQL littéral, hors du périmètre que le repository des revues déclare. L'opération demande une transaction unique, et repointer les dépendants en est le contenu même.
-
-## Invariants métier
-
-**Le type de document dépend du type de revue.** Le type canonique d'une publication se déduit en partie du type de sa revue. Deux chemins tiennent cette cohérence : la phase `metadata_correction`, qui recalcule tous les types de document en aval de `publishers_journals` et se rejoue sans dommage ; et `requalify_publications_for_journal`, appelé à l'édition d'une revue, qui requalifie ses publications sans attendre le passage suivant du pipeline.
+| `GET /api/journals/types`, `/oa-models` | Libellés des vocabulaires de type de revue et de modèle *open access*, définis dans `domain/journals/journal.py` |
