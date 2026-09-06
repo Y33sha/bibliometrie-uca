@@ -8,7 +8,7 @@
 
 `admin/structures`
 
-- Le moissonnage nécessite des **structures**. Pour les sources bibliographiques où les structures sont désignées par des identifiants ([OpenAlex](../glossaire#openalex), [ScanR](../glossaire#scanr)) ou des formes de nom standardisées ([WoS](../glossaire.md#web-of-science-wos), intitulés de [collection HAL](../glossaire#collection-hal)), il faut connaître les identifiants en question et les ajouter aux structures qu'on souhaite moissonner.
+- Le moissonnage nécessite des **structures**. Pour les sources bibliographiques où les structures sont désignées par des identifiants ([OpenAlex](../glossaire.md#openalex), [ScanR](../glossaire.md#scanr)) ou des formes de nom standardisées ([WoS](../glossaire.md#web-of-science-wos), intitulés de [collection HAL](../glossaire.md#collection-hal)), il faut connaître les identifiants en question et les ajouter aux structures qu'on souhaite moissonner.
 
 ![Informations Structure](../img/screenshots/admin_structures_id_modifier.png)
 
