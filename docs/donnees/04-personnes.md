@@ -4,7 +4,7 @@
 
 Référentiel des individus.
 
-**Périmètre** : `persons` couvre les personnes ayant cosigné au moins une publication UCA — pas un référentiel mondial des co-auteurs. Conséquence : les co-auteurs externes des publications UCA n'ont pas de `person_id` ; leurs signatures restent uniquement dans `source_authorships`.
+**Périmètre** : `persons` couvre les personnes ayant cosigné au moins une publication avec une signature UCA. Conséquence : les co-auteurs externes des publications UCA n'ont pas de `person_id`.
 
 ```mermaid
 flowchart LR
@@ -17,7 +17,7 @@ flowchart LR
     persons---person_name_forms
 
     classDef manuel  fill:#8e5,stroke:#5a3
-    class structures,structure_name_forms,perimeters,structure_tutelles manuel;
+    class structures manuel;
     classDef csv fill:#fa5
     class persons_rh csv
     classDef auto fill:#adf,stroke:#58c
@@ -38,9 +38,9 @@ Légende :
 - **`person_name_forms`** : formes de noms normalisées, utilisées pour le matching lors de la création de personnes.
 - **`distinct_persons`** : paires de personnes marquées comme **distinctes malgré une forme de nom commune** — symétrique de `distinct_publications`, évite de les re-suggérer dans l'interface de dédoublonnage `admin/person-duplicates`.
 
-## Services propriétaires
+## Propriété des tables
 
-La colonne **Autorité** dit qui détermine le contenu de la table :
+La colonne **Autorité** dit qui a le dernier mot sur le contenu de la table :
 
 - **admin** — saisi depuis l'interface d'administration ; le pipeline ne l'écrase jamais
 - **mixte** — l'un ou l'autre selon la colonne
@@ -49,6 +49,7 @@ La colonne **Autorité** dit qui détermine le contenu de la table :
 | Table | Autorité | Écrit par |
 |---|---|---|
 | `persons` | mixte | créées par le pipeline (phase persons, `application/pipeline/persons/cascade.py`) ou par l'import RH (`import_persons.py`) ; fusions, renommage et rejet en admin (`application/services/persons/commands.py`) |
+| `author_identifying_keys` | pipeline | `normalize_*.py` (via `_authorships_batch.py`) |
 | `person_identifiers` | mixte | moissonnés par le pipeline ; ajout manuel et statut en admin (`application/services/persons/commands.py`) |
 | `person_name_forms` | mixte | peuplées par le pipeline (`populate_person_name_forms.py`) ; statut en admin |
 | `distinct_persons` | admin | `application/services/persons/commands.py` |

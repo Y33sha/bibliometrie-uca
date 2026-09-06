@@ -20,7 +20,7 @@ erDiagram
     Authorships }o--|{ Structures : est_affilie_a
 ```
 
-## Séparation sources / vérité
+## Séparation sources / vue consolidée
 
 Le schéma repose sur la séparation stricte entre tables "canoniques" et tables "sources".
 
@@ -43,7 +43,8 @@ flowchart LR
         direction LR
         publications---authorships
         persons---authorships
-        structures---authorships
+        authorships-.->|via matview authorship_structures|structures
+
     end
     source_publications--->publications
     author_identifying_keys--->persons

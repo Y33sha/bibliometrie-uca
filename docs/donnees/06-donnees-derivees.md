@@ -17,17 +17,22 @@ Toutes sont déclarées `WITH NO DATA` et rafraîchies par le pipeline (la plupa
 
 ## Tables dérivées
 
-- **`perimeter_structures`** : appartenance au périmètre, matérialisée par clôture récursive de `structure_tutelles`. Rematérialisée avant la première phase du pipeline, au démarrage de la phase `affiliations`, et à chaque édition admin qui touche une tutelle ou un périmètre.
+- **`perimeter_structures`** : appartenance au périmètre, matérialisée par clôture récursive des tutelles. Cf. [données dérivées](06-donnees-derivees.md).
 - **`publications_detail`** : satellite 1:1 de `publications` (`abstract`, `keywords`, `topics`, `biblio`), recalculé depuis les `source_publications` rattachées.
 
 ## Colonnes dérivées
 
 Certaines colonnes dupliquent une information calculable, pour éviter une jointure ou une agrégation en lecture :
 
-- `in_perimeter` sur `source_authorships`, `authorships` et `publications` (rollup d'affiliation).
-- `countries[]` sur `source_publications` et `publications`.
-- `pub_count` sur `journals`, `publishers` et `addresses`.
-- `usage_count` sur `subjects`.
+| Colonne | Portée par | Rafraîchie par |
+|---|---|---|
+| `in_perimeter` | `source_authorships` | phase `affiliations` |
+| `in_perimeter` | `authorships`, `publications` | phase `authorships` |
+| `countries[]` | `source_publications`, `publications` | phase `countries` |
+| `pub_count` | `journals`, `publishers` | phase `authorships` |
+| `pub_count` | `addresses` | phase `publications` |
+| `usage_count` | `subjects` | phase `subjects` |
+
 
 ## Incrémental ou recalcul complet
 
