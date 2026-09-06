@@ -10,7 +10,7 @@ La phase tourne après `publications` : les `source_publications` sont rattaché
 
 La table est reconstruite à chaque run, à partir de deux signaux indépendants.
 
-**Relations déclarées par les sources.** DataCite et Crossref publient des relations typées entre DOI (preprint, supplément, partie, correction, traduction…). La phase les lit dans les métadonnées des `source_publications` et les traduit vers un vocabulaire de types unifié. Elle écarte ce qui sort du périmètre : les citations (qui relèvent du graphe bibliographique), les versions d'une même œuvre (traitées en déduplication, phase `metadata_correction`) et les rapports d'évaluation.
+**Relations déclarées par les sources.** DataCite et Crossref publient des relations typées entre DOI (preprint, supplément, partie, correction, traduction…). La phase les lit dans les métadonnées des `source_publications` et les traduit vers un vocabulaire de types unifié. Elle écarte ce qui sort du périmètre : les citations (qui relèvent du graphe bibliographique), les versions d'une même œuvre (traitées par la résolution d'entités, phase `metadata_correction`) et les rapports d'évaluation.
 
 **Clés de confirmation partagées.** Deux publications qui partagent une clé d'identité (HAL id, arXiv, PMID, NNT) mais portent des DOI distincts n'ont pas fusionné — la règle « deux DOI distincts ne désignent jamais le même document » l'interdit. Elles n'en sont pas moins apparentées : c'est typiquement un preprint et sa version publiée. Le type de la relation se déduit du couple de types (preprint + article → preprint ↔ version publiée). Quand le couple ne permet pas de conclure, la relation est posée sans type précis, en attendant d'être qualifiée.
 

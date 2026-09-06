@@ -6,14 +6,14 @@ Ce playbook est le *comment*, écrit pour être réutilisé à chaque nouvelle r
 
 ## Modèle : corrections persistées sur la source_publication
 
-Une correction est une règle déterministe « si tel signal, alors le champ canonique vaut telle valeur ». La phase `metadata_correction` calcule l'effective de chaque `source_publication` et l'écrit **en place** dans ses colonnes typées, le brut source écrasé étant conservé dans le sidecar `raw_metadata`. Le matching et l'agrégation lisent ensuite des colonnes corrigées, sans recalcul.
+Une correction est une règle déterministe « si tel signal, alors le champ canonique vaut telle valeur ». La phase `metadata_correction` calcule l'effective de chaque `source_publication` et l'écrit **en place** dans ses colonnes typées, le brut source écrasé étant conservé dans le sidecar `raw_metadata`. La résolution et l'agrégation lisent ensuite des colonnes corrigées, sans recalcul.
 
 - **Source unique** : la règle vit dans [`domain/source_publications/metadata_correction/rules.py`](../../domain/source_publications/metadata_correction/rules.py) (fonction pure, zéro I/O), comme entrée du dict `_RULES`. `effective_metadata(view)` parcourt la cascade et renvoie un `CorrectedFields` (valeur corrigée + règle d'origine par champ).
 - **Forme déclarative** : une règle = `{applies_to: {prédicats AND-és}, applies_correction: {champ: valeur cible}}`. Le moteur `_check_predicate` interprète chaque prédicat selon le TypedDict `_AppliesTo`. Une règle qui rentre dans les prédicats listés n'est *que* cette entrée — pas de logique supplémentaire.
 - **Réversibilité** : la sous-étape unaire ([`correct_unary.py`](../../application/pipeline/metadata_correction/correct_unary.py)) reconstruit le brut depuis `raw_metadata`, **mappe** le `doc_type` source vers le canonique (`map_doc_type`), applique `effective_metadata`, écrit l'effective dans les colonnes et stashe le brut écrasé sous `raw_metadata.<champ>` avec sa provenance `corrected_by` (le membre `MetadataCorrectionRule`, ou le marqueur `DOC_TYPE_MAP` quand seul le mapping a changé la valeur).
 - **Idempotence** : la correction repart toujours du **brut reconstruit**, jamais de la valeur déjà corrigée. Un re-normalize qui réécrit le brut, ou un changement de `journal_type` qui (dé)clenche une règle, est rattrapé au run suivant sans état à entretenir.
 - **Cascade par champ** (ordre des dépendances) : `journal_id` → `doc_type` → `oa_status`. `_correct_field(sp, "<field>")` parcourt `_RULES` dans l'ordre d'insertion et retourne la première règle qui (a) corrige le champ demandé et (b) dont tous les prédicats matchent. L'ordre intra-cascade traduit la spécificité du signal (signaux forts d'abord : URL > `journal_type` > titre).
-- **Mutation de clé ⇒ réconciliation** : persister une correction qui change `doc_type`, `external_ids` ou `doi` pose `keys_dirty` sur la SP — `doc_type` entre dans le token `metadata_block`, le `doi` est un token. La phase `publications` re-réconcilie ces SP au run suivant.
+- **Mutation de clé ⇒ résolution** : persister une correction qui change `doc_type`, `external_ids` ou `doi` pose `keys_dirty` sur la SP — `doc_type` entre dans le token `metadata_block`, le `doi` est un token. La phase `publications` résout à nouveau ces SP au run suivant.
 
 ## Quand utiliser ce playbook
 
@@ -36,7 +36,7 @@ Avant d'ouvrir un fichier, expliciter :
   - hors du contrat → l'étendre (cf. § 4).
 - **Rejouable sur la publication canonique ?** Rien à câbler : `effective_doc_type_for_publication` écarte d'elle-même toute règle dont un prédicat figure dans `_SOURCE_ONLY_PREDICATES` (`url_contains`, `embargo_expired`, `self_declared_preprint` — des faits d'un enregistrement source, sans contrepartie canonique). Une règle qui n'en lit aucun se rejoue sur le canonique, ce qui répare les combinaisons nées de l'arbitrage (`doc_type` d'une source, `journal_id` d'une autre).
 - **Input admin-éditable ?** Détermine s'il faut un hook (cf. § 6).
-- **Output qui change le clustering ?** Une correction de `doc_type` change le token `metadata_block` de la SP : tester que le rapprochement utilise la valeur corrigée (la persistance pose `keys_dirty`, la réconciliation suit).
+- **Output qui change le clustering ?** Une correction de `doc_type` change le token `metadata_block` de la SP : tester que la résolution utilise la valeur corrigée (la persistance pose `keys_dirty`, le regroupement suit).
 
 ### 2. Audit avant de coder
 
@@ -138,7 +138,7 @@ Si la règle consomme un champ que l'admin modifie en base via l'UI (`journal.jo
 
 Une règle ajoutée à `_RULES` ne s'applique qu'aux SP retraitées. Pour l'appliquer au stock :
 
-- **Règle intrinsèque ou journal-jointe** : rejouer la phase `metadata_correction` (`run_pipeline --only metadata_correction`) — la sous-étape unaire recalcule l'effective de chaque SP depuis le brut, pose la correction, et marque `keys_dirty` si elle change `doc_type`/`doi`/`external_ids`. Enchaîner `run_pipeline --only publications` pour réconcilier les SP re-dirtiées et rafraîchir leurs publications.
+- **Règle intrinsèque ou journal-jointe** : rejouer la phase `metadata_correction` (`run_pipeline --only metadata_correction`) — la sous-étape unaire recalcule l'effective de chaque SP depuis le brut, pose la correction, et marque `keys_dirty` si elle change `doc_type`/`doi`/`external_ids`. Enchaîner `run_pipeline --only publications` pour résoudre à nouveau les SP re-dirtiées et rafraîchir leurs publications.
 
 ### 8. Documentation
 
@@ -146,7 +146,7 @@ Le catalogue des règles actives est le dict `_RULES` lui-même (entrées + comm
 
 ## Corrections par grappe de DOI (cluster)
 
-Les règles `_RULES` décident d'une SP **seule**. D'autres corrections demandent de regarder le **groupe de SP partageant un DOI** et d'en déduire le DOI effectif de chaque membre. Deux familles : **convergence** (les versions DataCite d'une même œuvre convergent sur le DOI concept stable) et **divergence** (un DOI partagé par des œuvres distinctes est neutralisé sur le mauvais côté, sinon le matching les fusionnerait à tort).
+Les règles `_RULES` décident d'une SP **seule**. D'autres corrections demandent de regarder le **groupe de SP partageant un DOI** et d'en déduire le DOI effectif de chaque membre. Deux familles : **convergence** (les versions DataCite d'une même œuvre convergent sur le DOI concept stable) et **divergence** (un DOI partagé par des œuvres distinctes est neutralisé sur le mauvais côté, sinon la résolution les fusionnerait à tort).
 
 La décision est dans `resolve_cluster_doi_corrections` (`correction.py`) — pure, agnostique de la source. La sous-étape [`correct_by_cluster.py`](../../application/pipeline/metadata_correction/correct_by_cluster.py) regroupe par DOI brut, demande au domaine le DOI cible de chaque membre, substitue ou nulle le DOI et stashe le brut sous la provenance `DoiClusterCase`. Cas couverts : versions DataCite → DOI concept ; ouvrage + chapitre au même DOI (le chapitre perd le DOI) ; chapitres de titres réellement distincts au même DOI (tous le perdent).
 

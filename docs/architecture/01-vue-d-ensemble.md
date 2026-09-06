@@ -9,7 +9,7 @@ Le système se lit selon deux axes complémentaires : **deux programmes** coupl�
 Le code héberge deux programmes de natures différentes, qui ne s'appellent jamais directement : ils ne communiquent qu'à travers la base PostgreSQL.
 
 - **L'application web** (`interfaces/api/` + `interfaces/frontend/`) : un processus FastAPI permanent, piloté par les requêtes des utilisateurs. Elle sert les pages web et restitue les données sous forme de listes, tableaux de bord et exports CSV.
-- **Le pipeline** (`run_pipeline` + `application/pipeline/`) : un traitement par lots, déclenché par un ordonnanceur. Il **dérive** le référentiel : moissonnage des sources, normalisation, déduplication, rapprochement, enrichissements.
+- **Le pipeline** (`run_pipeline` + `application/pipeline/`) : un traitement par lots, déclenché par un ordonnanceur. Il **dérive** le référentiel : moissonnage des sources, normalisation, résolution d'entités, enrichissements.
 
 ```
   sources externes

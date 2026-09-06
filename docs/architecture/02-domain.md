@@ -11,7 +11,7 @@ Les invariants de chaque agrégat, ses tables et son cycle de vie sont décrits 
 Entités avec identité, comportement et invariants métier.
 
 - **`SourcePublication`** (`domain/source_publications/`) est une publication telle que moissonnée depuis une source.
-- **`Publication`** (`domain/publications/`) est l'entité unifiée que le pipeline dérive de plusieurs `SourcePublication` désignant le même document. Le dédoublonnage consiste à décider quels enregistrements désignent le même document.
+- **`Publication`** (`domain/publications/`) est l'entité unifiée que le pipeline dérive de plusieurs `SourcePublication`. Décider lesquelles désignent le même document est le travail de la résolution d'entités.
 - **`Person`** (`domain/persons/`) est l'entité unifiée que le pipeline dérive de plusieurs signatures désignant la même personne.
 - **`IdentifierAttribution`** (`domain/persons/`) est l'attribution d'un identifiant à une personne : un même couple `(id_type, id_value)` ne peut être attribué qu'à une seule. La valeur elle-même est un value object ; c'est l'attribution qui porte un statut, et qu'on confirme, rejette ou transfère.
 - **`Structure`** (`domain/structures/`) est un établissement ou unité de recherche. Les relations de tutelle entre structures forment un graphe acyclique.
@@ -30,7 +30,7 @@ Immuables, identité par contenu.
 
 ## Utilitaires partagés
 
-- `entity_resolution.py` — regroupement en composantes connexes, primitive du dédoublonnage
+- `entity_resolution.py` — regroupement en composantes connexes, primitive de la résolution d'entités
 - `sources/` — référentiel des 7 sources et des règles qui leur sont propres
 - `normalize.py`, `dates.py` — normalisation des textes et des dates
 - `countries.py` — règles sur les pays des publications
@@ -44,7 +44,7 @@ Immuables, identité par contenu.
 
 L'hydratation sert là où le traitement porte sur une entité à la fois : les corrections manuelles, qui chargent, modifient et enregistrent l'entité éditée, et `refresh_from_sources`, qui recalcule les métadonnées canoniques d'une publication depuis ses sources.
 
-Les traitements effectués en masse par le pipeline — résolution des affiliations, dédoublonnage des publications et des personnes… — opèrent en SQL sur tout le corpus.
+Les traitements effectués en masse par le pipeline — résolution des affiliations, des publications et des personnes… — opèrent en SQL sur tout le corpus.
 
 - Chaque repository d'agrégat expose `find_by_id(id) -> Entity | None` qui charge l'*aggregate root*. Pour les agrégats riches (`Publication`, `Person`, `Structure`), les value objects internes — formes de nom, identifiants — sont chargés avec lui.
 - Les références entre agrégats sont **par id**, pas par objet : `Journal.publisher_id`, `Perimeter.root_structure_ids` — pas d'hydratation transitive.

@@ -2,13 +2,13 @@
 
 *Obsolète, à réécrire*
 
-Procédure d'écriture, validation et déploiement d'une règle de rapprochement de `source_publications`.
+Procédure d'écriture, validation et déploiement d'une règle de résolution de `source_publications`.
 
 Ce playbook est le *comment*. Le cadre conceptuel et le catalogue des décisions par type vivent dans la fiche [DATA_dedup-pairwise-gated](../chantiers/archived/2026-06-26_DATA_dedup-pairwise-gated.md).
 
 ## Modèle : clustering par tokens de confirmation
 
-La déduplication est un record-linkage par graphe. Chaque `source_publication` est un nœud ; deux SP sont reliées si elles partagent une **clé de confirmation** (un *token*). Une publication canonique est une **composante connexe** de ce graphe, partitionnée par DOI.
+La résolution d'entités est un record-linkage par graphe. Chaque `source_publication` est un nœud ; deux SP sont reliées si elles partagent une **clé de confirmation** (un *token*). Une publication canonique est une **composante connexe** de ce graphe, partitionnée par DOI.
 
 - **Projection des tokens** : [`project_confirmation_keys`](../../domain/source_publications/keys.py) lit une SP (colonnes corrigées + `external_ids`) et renvoie son jeu de tokens. Tokens en place : `doi`, `nnt`, `hal_id` (multivalué), `pmid`, et `metadata_block` (`<doc_type>|<title_normalized>|<pub_year>`, gardé par une longueur minimale de titre).
 - **Clustering** : [`connected_components`](../../domain/entity_resolution.py) regroupe les SP reliées par token partagé (fermeture transitive).
@@ -23,7 +23,7 @@ Un token est une **égalité** : deux SP au même token sont la même œuvre, sa
 
 Un signal devient un token quand l'**égalité** d'une valeur dérivable de la SP vaut identité d'œuvre — assez sélective pour ne pas regrouper des œuvres distinctes. Les identifiants (DOI, NNT, hal_id, pmid) le sont par nature. Une clé composite de métadonnées (`metadata_block`) l'est pour les classes où l'audit le démontre.
 
-Un token est une **valeur unique** que la SP porte : on range les SP par elle (`GROUP BY`), sans comparaison. Un signal qui n'est pas une telle valeur — l'accord d'auteurs est un *recouvrement* entre deux listes, pas une valeur à ranger — ne peut pas être un token ; le rapprochement par auteurs relève d'un autre mécanisme (cf. fiche chantier). Ce playbook couvre les tokens.
+Un token est une **valeur unique** que la SP porte : on range les SP par elle (`GROUP BY`), sans comparaison. Un signal qui n'est pas une telle valeur — l'accord d'auteurs est un *recouvrement* entre deux listes, pas une valeur à ranger — ne peut pas être un token ; la résolution par auteurs relève d'un autre mécanisme (cf. fiche chantier). Ce playbook couvre les tokens.
 
 ## Procédure pas-à-pas
 
@@ -56,7 +56,7 @@ Revue du résidu suspect (couples sans recouvrement d'auteurs). Trois sorties :
 
 - **Excédent nul ou négligeable** vs la référence DOI → le token est mûr.
 - **Excédent identifiable** → durcir la garde (longueur, restreindre les `doc_type`) et reprendre en 3.
-- **Excédent irréductible par durcissement de la garde** (il faut comparer les listes d'auteurs pour trancher) → ce n'est pas un token ; le rapprochement passe par le mécanisme décrit dans la fiche chantier (hors playbook).
+- **Excédent irréductible par durcissement de la garde** (il faut comparer les listes d'auteurs pour trancher) → ce n'est pas un token ; la résolution passe par le mécanisme décrit dans la fiche chantier (hors playbook).
 
 ### 5. Matérialiser le token
 
@@ -92,7 +92,7 @@ La branche doit ramener exactement les voisins que la projection relie : même c
 
 ### 7. Rollout sur le stock
 
-Un token neuf ne s'applique qu'aux SP `keys_dirty`. Pour matérialiser les fusions sur le stock existant, re-dirtier tout le stock : `run_pipeline --only publications --rebuild-publications` (re-dirty complet → la réconciliation devient le clustering global).
+Un token neuf ne s'applique qu'aux SP `keys_dirty`. Pour matérialiser les fusions sur le stock existant, re-dirtier tout le stock : `run_pipeline --only publications --rebuild-publications` (re-dirty complet → la résolution devient le clustering global).
 
 Vérifier l'effet : reprendre le SQL d'audit de l'étape 3 — les blocs ciblés doivent être consolidés (une publication par bloc, hors séparations légitimes par DOI).
 
@@ -104,4 +104,4 @@ Vérifier l'effet : reprendre le SQL d'audit de l'étape 3 — les blocs ciblés
 
 ## Limites du périmètre
 
-Les œuvres sans clé d'égalité fiable, dont le rapprochement exige de comparer les listes d'auteurs (types à titre faible, dépôts multiples au typage incertain), relèvent du mécanisme décrit dans la fiche chantier, pas d'un token. Les collisions résiduelles d'un token validé relèvent de la revue admin.
+Les œuvres sans clé d'égalité fiable, dont la résolution exige de comparer les listes d'auteurs (types à titre faible, dépôts multiples au typage incertain), relèvent du mécanisme décrit dans la fiche chantier, pas d'un token. Les collisions résiduelles d'un token validé relèvent de la revue admin.
