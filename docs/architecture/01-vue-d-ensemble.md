@@ -22,36 +22,42 @@ Le code héberge deux programmes de natures différentes, qui ne s'appellent jam
   └──────────────┘                └──────────────┘               └───────────────┘
 ```
 
-Les données saisies manuellement via l'API — données de référence (structures, périmètre, configuration) et arbitrages (*cannot-link* entre personnes ou entre publications, identifiants confirmés ou rejetés…) — deviennent des **entrées** que le pipeline relit et **préserve** à chaque passe.
+Les données saisies manuellement via l'API — données de référence (structures, périmètre, configuration) et arbitrages admin — deviennent des **entrées** que le pipeline relit et **préserve** à chaque passe.
 
-## Vue par couches
+## Vue logicielle
 
-Le projet suit une architecture **hexagonale (DDD)**. Le cœur du système est `application/` (use-cases et orchestrateurs), qui dépend de `domain/` (noyau pur). Autour de ce cœur, deux familles d'adaptateurs : `interfaces/` (entrants — HTTP, CLI) et `infrastructure/` (sortants — base, APIs externes, logs). Aucune des deux n'importe l'autre ; leur neutralité repose sur les **ports** (`Protocol`) définis dans `application/ports/`, dont dépendent tous les autres modules.
+Le projet suit une architecture **hexagonale (DDD)**.
+
+- Le cœur du système est `application/` (use-cases et orchestrateurs), qui dépend de `domain/` (noyau pur).
+- Autour de ce cœur, deux familles d'adaptateurs : `interfaces/` (entrants — HTTP, CLI) et `infrastructure/` (sortants — base, APIs externes, logs). Aucune des deux n'importe l'autre.
+- `application/` déclare des ports (`Protocol`) dans `application/ports/`, `infrastructure/` en fournit les implémentations, et les use-cases reçoivent un port en paramètre — jamais une classe concrète.
+- Seul le composition root de `interfaces/` instancie ces implémentations.
 
 Cette vue par couches se superpose à la vue par programme : `domain/` sert aux deux programmes, tandis que les couches extérieures se répartissent entre l'application web et le pipeline, quelques modules restant partagés. Le détail se lit dans les fiches de chaque couche.
 
 
 ```
-                  ┌─────────────────────────────┐
-                  │  domain/                    │
-                  │  entités, value objects,    │
-                  │  règles métier pures        │  (zéro I/O)
-                  └──────────────▲──────────────┘
-                                 │
-                  ┌──────────────┴──────────────┐
-                  │  application/               │
-                  │  ├─ ports/    (Protocol)    │  ← zone neutre
-                  │  └─ use-cases, orchestrateurs
-                  └─────▲────────────────▲──────┘
-                        │                │
-            ┌───────────┘                └──────────────┐
-            │                                           │
-    ┌───────┴─────────┐                       ┌─────────┴────────────┐
-    │  interfaces/    │    ─── ⊥ ───          │  infrastructure/     │
-    │  adaptateurs    │   (pas d'import       │  adaptateurs sortants│
-    │  entrants :     │   direct l'un de      │  (SQL, APIs          │
-    │  routers, CLI   │   l'autre)            │  externes, logs)     │
-    └─────────────────┘                       └──────────────────────┘
+                    ┌─────────────────────────────┐
+                    │  domain/                    │
+                    │  entités, value objects,    │
+                    │  règles métier pures        │  (zéro I/O)
+                    └──────────────▲──────────────┘
+                                   │
+    ┌──────────────────────────────┴─────────────────────────────┐
+    │  application/                    ┌───────────────────────┐ │
+    │  use-cases, orchestrateurs       │  ports/  (Protocol)   │ │
+    │                                  └─────────────▲─────────┘ │
+    └───────────▲────────────────────────────────────┼───────────┘
+                │ use-cases et ports                 │ implémente
+    ┌───────────┴─────────────┐           ┌──────────┴───────────┐
+    │  interfaces/            │           │  infrastructure/     │
+    │  adaptateurs entrants   │           │  adaptateurs sortants│
+    │  (routers, CLI)         │           │  (PostgreSQL,        │
+    │  ┌───────────────────┐  │ instancie │  APIs externes,      │
+    │  │ composition root  ├──├──────────►│  logs)               │
+    │  └───────────────────┘  │           │                      │
+    └─────────────────────────┘           └──────────────────────┘
+
 ```
 
 ## Contrats d'architecture
@@ -64,7 +70,7 @@ Chaque règle est vérifiée par un contrat `import-linter`, déclaré dans `pyp
 2. **Les couches ne s'importent que vers le bas.** `interfaces/` au-dessus, `infrastructure/` et `application/` au milieu, `domain/` en dessous. En particulier, `application/` n'importe pas `infrastructure/` : les services applicatifs reçoivent leurs dépendances par les **ports** (`Protocol`) de `application/ports/`, que `infrastructure/` implémente.
    → `Couches DDD (layered)`
 
-3. **Les routers n'atteignent pas `infrastructure/` directement.** Ils reçoivent leurs dépendances par `Depends(...)`, dont les fabriques vivent dans `interfaces/api/deps.py`. Le chemin indirect qui passe par ces fabriques reste permis.
+3. **Les routers n'importent pas `infrastructure/` directement.** Ils reçoivent leurs dépendances par `Depends(...)`, dont les fabriques vivent dans `interfaces/api/deps.py`. Le chemin indirect qui passe par ces fabriques reste permis.
    → `Routers : pas d'import direct de infrastructure`
 
 4. **Seul le composition root instancie les adaptateurs concrets.** Pour l'application web, ce sont `interfaces/api/app.py` et `interfaces/api/deps.py` ; partout ailleurs sous `interfaces/api/`, on passe par un port. Chaque script de `interfaces/cli/` est son propre composition root.
