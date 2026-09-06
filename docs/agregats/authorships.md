@@ -41,7 +41,7 @@ L'API n'écrit jamais `authorships`. L'édition manuelle agit sur les tables en 
 
 **Détacher une personne d'une publication** (`POST /api/persons/{id}/detach-authorships`) inscrit la paire dans `rejected_authorships`, détache les signatures concernées et supprime l'authorship devenue orpheline. La paire ne sera plus jamais recréée.
 
-**Épingler une signature** l'inscrit dans `confirmed_authorships`. La phase `persons` applique ces décisions avant tout nouveau rapprochement, si bien que la personne portée par la signature — et donc l'authorship promue — respecte le choix humain.
+**Épingler une signature** l'inscrit dans `confirmed_authorships`. La phase `persons` applique ces décisions avant toute nouvelle résolution, si bien que la personne portée par la signature — et donc l'authorship promue — respecte le choix humain.
 
 **Fusionner** deux personnes ou deux publications déduplique les authorships et les repointe vers la cible.
 

@@ -2,7 +2,7 @@
 
 *À jour le 2026-09-04.*
 
-Un éditeur porte les revues et reçoit les frais de publication. Il se reconnaît par son identifiant OpenAlex quand une source en fournit un, sinon par son nom, via les formes enregistrées dans `publisher_name_forms`. `domain/publishers/publisher.py` définit sa structure — nom, pays, identifiant OpenAlex, type ; le rapprochement, la fusion et l'enrichissement vivent dans les services et leurs adaptateurs SQL.
+Un éditeur porte les revues et reçoit les frais de publication. Il se reconnaît par son identifiant OpenAlex quand une source en fournit un, sinon par son nom, via les formes enregistrées dans `publisher_name_forms`. `domain/publishers/publisher.py` définit sa structure — nom, pays, identifiant OpenAlex, type ; la résolution, la fusion et l'enrichissement vivent dans les services et leurs adaptateurs SQL.
 
 ## Tables
 

@@ -4,7 +4,7 @@
 
 Une personne est un chercheur unifié à travers les sources : plusieurs signatures, venues de HAL, d'OpenAlex ou du Web of Science sous des graphies différentes, désignent la même personne. Contrairement aux [structures](structures.md), qui sont un référentiel saisi à la main, les personnes sont **construites par le pipeline** — la phase `persons` rattache chaque signature à une personne et en crée au besoin — **puis corrigées à la main** : fusion, réattribution d'identifiant, rejet, détachement. Le pipeline et l'interface d'administration écrivent donc tous deux.
 
-`domain/persons/` porte les règles pures : la décision de rapprochement (`decide_person_match`), la comparaison des noms (`names_compatible`, `same_person_name`), et des types dédiés qui valident et normalisent chaque identifiant avant écriture.
+`domain/persons/` porte les règles pures : la décision de résolution (`decide_person_match`), la comparaison des noms (`names_compatible`, `same_person_name`), et des types dédiés qui valident et normalisent chaque identifiant avant écriture.
 
 ## Tables
 
@@ -17,7 +17,7 @@ Une personne est un chercheur unifié à travers les sources : plusieurs signatu
 | `distinct_persons` | Paires déclarées comme deux personnes différentes | `(person_id_a, person_id_b)`, avec `a < b` |
 | `rejected_authorships` | Paires publication–personne écartées durablement | `(publication_id, person_id)` |
 
-Le rattachement d'une signature à une personne est porté par `source_authorships.person_id`, accompagné de `resolution_mode`, qui retient par quel moyen le rapprochement a été fait : identifiant, nom, ou report d'une autre source.
+Le rattachement d'une signature à une personne est porté par `source_authorships.person_id`, accompagné de `resolution_mode`, qui retient par quel moyen la résolution a été faite : identifiant, nom, ou report d'une autre source.
 
 ## Écriture par le pipeline
 
@@ -84,10 +84,10 @@ Toutes les files de doublons écartent les paires déclarées distinctes ; celle
 
 **Fusion.** Refusée quand les deux personnes portent chacune une fiche annuaire distincte.
 
-**Un identifiant partagé signale une corruption de la source.** Un identifiant porté par deux positions d'auteur ou plus d'un même enregistrement source est suffixé `_dubious` : il est conservé, la marque est réversible, mais il ne sert plus au rapprochement.
+**Un identifiant partagé signale une corruption de la source.** Un identifiant porté par deux positions d'auteur ou plus d'un même enregistrement source est suffixé `_dubious` : il est conservé, la marque est réversible, mais il ne sert plus à la résolution.
 
-**L'ORCID n'est un signal que là où l'auteur l'a déposé.** Il ne sert au rapprochement que depuis Crossref, OpenAlex et HAL. Les ORCID venus du Web of Science ou de ScanR sont enregistrés sans être utilisés pour rapprocher.
+**L'ORCID n'est un signal que là où l'auteur l'a déposé.** Il ne sert à la résolution que depuis Crossref, OpenAlex et HAL. Les ORCID venus du Web of Science ou de ScanR sont enregistrés sans être utilisés pour rapprocher.
 
-**Rejet durable.** Une paire publication–personne écartée n'est jamais recréée par le rapprochement, y compris quand ce retrait lève l'ambiguïté d'une forme partagée.
+**Rejet durable.** Une paire publication–personne écartée n'est jamais recréée par la résolution, y compris quand ce retrait lève l'ambiguïté d'une forme partagée.
 
 **Identifiants normalisés avant écriture.** ORCID au format à seize chiffres groupés, IdRef à neuf caractères, IdHAL en abrégé littéral, identifiant de compte HAL entier positif : chacun est validé et normalisé par son type dédié.

@@ -22,9 +22,9 @@ L'enregistrement source parent est décrit dans [source_publications](source_pub
 
 Cinq phases écrivent tour à tour dans la même ligne.
 
-1. **`normalize` — naissance.** Les signatures d'un enregistrement sont réécrites en bloc, avec leur source, leur position, leur rôle, le nom d'auteur brut et leur identité. L'identité est obtenue en dédoublonnant `author_identifying_keys` sur son empreinte calculée — nom normalisé et identifiants réunis ; celles que plus aucune signature ne porte sont supprimées en fin de phase. Les adresses sont créées au besoin et reliées à la signature. Un identifiant porté par deux positions ou plus du même enregistrement est suffixé `_dubious`, ce qui l'écarte du rapprochement.
+1. **`normalize` — naissance.** Les signatures d'un enregistrement sont réécrites en bloc, avec leur source, leur position, leur rôle, le nom d'auteur brut et leur identité. L'identité est obtenue en dédoublonnant `author_identifying_keys` sur son empreinte calculée — nom normalisé et identifiants réunis ; celles que plus aucune signature ne porte sont supprimées en fin de phase. Les adresses sont créées au besoin et reliées à la signature. Un identifiant porté par deux positions ou plus du même enregistrement est suffixé `_dubious`, ce qui l'écarte de la résolution.
 2. **`affiliations` — appartenance au périmètre.** `in_perimeter` devient vrai lorsqu'une adresse de la signature se résout en une structure du périmètre, le rattachement n'étant pas rejeté. La vue matérialisée `source_authorship_structures` est rafraîchie.
-3. **`persons` — attribution d'une personne.** La cascade de rapprochement pose `person_id` et retient dans `resolution_mode` par quel moyen : identifiant, nom, ou report depuis une autre source. Les signatures épinglées à la main sont reposées en premier, et certaines remises à nul ciblées permettent à la phase de converger quel que soit l'ordre de traitement.
+3. **`persons` — attribution d'une personne.** La cascade de résolution pose `person_id` et retient dans `resolution_mode` par quel moyen : identifiant, nom, ou report depuis une autre source. Les signatures épinglées à la main sont reposées en premier, et certaines remises à nul ciblées permettent à la phase de converger quel que soit l'ordre de traitement.
 4. **`authorships` — rattachement à l'authorship consolidée.** `authorship_id` relie la signature au couple personne–publication qu'elle atteste.
 5. **`countries` — pays.** `countries_dirty` déclenche le recalcul des pays de la signature depuis ses adresses.
 
@@ -51,7 +51,7 @@ Le détail d'une publication montre les **auteurs tels que chaque source les don
 
 **Aucune classe ne modélise la signature.** Ses règles sont réparties entre les rôles, l'extraction par source et les identifiants. Chaque morceau est à sa place, mais le cycle de vie complet ne se lit qu'en suivant les cinq phases — c'est l'objet de cette fiche.
 
-**L'identité de signature et la personne sont deux choses distinctes.** L'identité — nom normalisé et identifiants, dédoublonnée dans `author_identifying_keys` — est un fait que la source fournit, enregistré dès `normalize`. La personne est le résultat du rapprochement, attribué plus tard. L'identité sert de clé pour charger les correspondances du rapprochement, et à dédoublonner des signatures identiques.
+**L'identité de signature et la personne sont deux choses distinctes.** L'identité — nom normalisé et identifiants, dédoublonnée dans `author_identifying_keys` — est un fait que la source fournit, enregistré dès `normalize`. La personne est le résultat de la résolution, attribué plus tard. L'identité sert de clé pour charger les correspondances de la résolution, et à dédoublonner des signatures identiques.
 
 ## Invariants métier
 
@@ -61,4 +61,4 @@ Le détail d'une publication montre les **auteurs tels que chaque source les don
 
 **Épinglage et rejet sont de portées différentes.** L'épinglage impose un rattachement pour une signature donnée, et il est reposé à chaque passage. Le rejet interdit durablement un couple publication–personne, que la phase `authorships` ne recrée jamais.
 
-**Un identifiant partagé signale une corruption de la source.** Porté par deux positions ou plus du même enregistrement, il est suffixé `_dubious` : conservé, mais écarté du rapprochement.
+**Un identifiant partagé signale une corruption de la source.** Porté par deux positions ou plus du même enregistrement, il est suffixé `_dubious` : conservé, mais écarté de la résolution.
