@@ -42,7 +42,7 @@ Immuables, identité par contenu.
 
 ## Hydratation des agrégats
 
-L'hydratation sert là où le traitement porte sur une entité à la fois : les corrections manuelles, qui chargent, modifient et enregistrent l'entité éditée, et `refresh_from_sources`, qui recalcule les métadonnées canoniques d'une publication depuis ses sources.
+L'hydratation sert là où le traitement porte sur une entité à la fois : les corrections manuelles, qui chargent, modifient et enregistrent l'entité éditée, et `refresh_from_sources`, qui recalcule les métadonnées consolidées d'une publication depuis ses sources.
 
 Les traitements effectués en masse par le pipeline — résolution des affiliations, des publications et des personnes… — opèrent en SQL sur tout le corpus.
 
