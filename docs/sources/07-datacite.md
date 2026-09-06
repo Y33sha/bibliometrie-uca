@@ -89,7 +89,7 @@ DataCite porte le type sur deux champs : `resourceTypeGeneral` (vocabulaire cont
 
 ### Affiliations textuelles
 
-Les affiliations des `creators` sont des chaînes de texte (parfois accompagnées d'un identifiant ROR). Elles sont routées vers `addresses` / `source_authorship_addresses` comme HAL/OpenAlex/ScanR/Crossref : la phase [`affiliations`](../pipeline/04-affiliations.md) y détecte `in_perimeter`, ce qui fait entrer les `source_authorships` DataCite dans la cascade de matching personnes.
+Les affiliations des `creators` sont des chaînes de texte (parfois accompagnées d'un identifiant ROR). Elles sont routées vers `addresses` / `source_authorship_addresses` comme HAL/OpenAlex/ScanR/Crossref : la phase [`affiliations`](../pipeline/04-affiliations.md) y détecte `in_perimeter`, ce qui fait entrer les `source_authorships` DataCite dans la cascade de résolution des personnes.
 
 ### DOI liés et concept/version
 

@@ -6,7 +6,7 @@
 
 ```mermaid
 flowchart TB
-    subgraph vérité
+    subgraph consolidé
     structures
     end
     subgraph sources
@@ -19,11 +19,11 @@ flowchart TB
     class structures valid;
 ```
 
-2. La phase [`publications`](07-publications.md) peuple la table **publications** par déduplication à partir des sources.
+2. La phase [`publications`](07-publications.md) peuple la table **publications** par résolution d'entités à partir des sources.
 
 ```mermaid
 flowchart LR
-    subgraph vérité
+    subgraph consolidé
         publications
         structures
 
@@ -45,7 +45,7 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-    subgraph vérité
+    subgraph consolidé
         publications
         structures
         persons
@@ -66,7 +66,7 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-    subgraph vérité
+    subgraph consolidé
         publications---authorships
         persons---authorships
         structures---authorships

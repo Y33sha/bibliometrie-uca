@@ -79,7 +79,7 @@ Les ajouts ou suppressions de formes de noms deviennent effectifs au *run* suiva
 
 #### Fusion des doublons
 
-Lorsque les auteurs des publications ne sont pas identifiés par un [PID](../glossaire.md#pid), la phase de [matching personnes](../pipeline/09-persons.md) recourt aux formes de noms pour identifier les auteurs. Des formes de noms multiples pour la même personne conduiront donc à créer des doublons de personnes.
+Lorsque les auteurs des publications ne sont pas identifiés par un [PID](../glossaire.md#pid), la phase de [résolution des personnes](../pipeline/09-persons.md) recourt aux formes de noms pour identifier les auteurs. Des formes de noms multiples pour la même personne conduiront donc à créer des doublons de personnes.
 
 Il est nécessaire, en particulier apès les premiers runs, de **fusionner** les doublons de personnes. Une fusion de personnes entraîne:
 - le transfert des formes de noms vers la personne cible (tous les futurs matchs par forme de nom aboutiront à cette personne);
@@ -102,7 +102,7 @@ Pour réattribuer les authorships en question: cf [Authorships orphelines](#auth
 
 Travail au long cours.
 
-Les PIDs présents dans les publications sont rattachés aux personnes pendant la phase de [matching personnes](../pipeline/09-persons.md).
+Les PIDs présents dans les publications sont rattachés aux personnes pendant la phase de [résolution des personnes](../pipeline/09-persons.md).
 
 Un PID se définit par: un **type** (`orcid`, `idref`, `idhal`) et une **valeur**.
 
@@ -130,7 +130,7 @@ La page `admin/orphan-authorships` donne accès aux [authorships](../glossaire.m
 
 Il y a deux raisons possibles à cela:
 - Soit ces authorships ont été détachées manuellement d'un auteur;
-- Soit le pipeline n'a pas réussi à les attribuer, ce qui se produit dans un seul cas de figure: aucun matching par PID n'était possible *et* la forme normalisée du nom d'auteur est ambiguë (au moins 2 personnes peuvent y correspondre, ce qui est souvent le cas pour les publications où le prénom est réduit à l'initiale).
+- Soit le pipeline n'a pas réussi à les attribuer, ce qui se produit dans un seul cas de figure: aucune résolution par PID n'était possible *et* la forme normalisée du nom d'auteur est ambiguë (au moins 2 personnes peuvent y correspondre, ce qui est souvent le cas pour les publications où le prénom est réduit à l'initiale).
 
 La page `admin/orphan-authorships` permet de rattacher les authorships en question, individuellement ou par batch, soit à une personne existante, soit à une nouvelle personne créée manuellement.
 

@@ -62,7 +62,7 @@ Deux cas de figure:
 | CrossRef | rien | ❌ | `orcid` (fiable, article-level) |
 | DataCite | rien | ❌ | `orcid` (fiable, article-level) |
 
-Les informations d'identification récupérées depuis les sources (forme de nom, identifiants éventuels) sont stockées dans la table `author_identifying_keys`. La déduplication / création des personnes canoniques se fait dans la [phase `persons`](../pipeline/09-persons.md) du pipeline à partir de ces éléments.
+Les informations d'identification récupérées depuis les sources (forme de nom, identifiants éventuels) sont stockées dans la table `author_identifying_keys`. La résolution / création des personnes canoniques se fait dans la [phase `persons`](../pipeline/09-persons.md) du pipeline à partir de ces éléments.
 
 ## Sources complémentaires
 
