@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict rEAUBTNWJPb6OPdftmht1gNeWoyhdwyEsHI1NPvg7YU7SzT0tvTl3gEntOzr7hE
+\restrict miecXcaqu04J2rssq3LEoe2Hm5GNclBOxuBiNnW0DsrYbaRpcpZiqkVIRQxnaE0
 
 -- Dumped from database version 18.4
 -- Dumped by pg_dump version 18.4
@@ -1460,10 +1460,17 @@ CREATE TABLE public.staging (
 
 
 --
+-- Name: TABLE staging; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.staging IS 'Documents moissonnés, en transit vers les tables sources. Trois états : à traiter (processed FALSE, raw_data porte le payload de la source), normalisée (processed TRUE, raw_data vidé), introuvable (processed TRUE, not_found_at horodaté, raw_data jamais peuplé). Le dernier est posé par la phase fetch_missing quand HAL ne rend pas un document demandé par hal-id ou NNT.';
+
+
+--
 -- Name: COLUMN staging.raw_hash; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON COLUMN public.staging.raw_hash IS 'Empreinte md5 servant de clé de détection de changement à l''UPSERT. Calculée via `change_detection_hash`, qui neutralise le bruit volatil propre à la source avant l''empreinte (HAL : horodatage de génération du TEI `label_xml`) — le payload stocké reste, lui, fidèle à la source. L''empreinte ne coïncide donc pas avec `md5(raw_data)` pour les sources normalisées. Cas particulier OpenAlex : `refetch_truncated` n''écrit PAS `raw_hash` quand il complète les authorships d''une publication tronquée à 100 — la ligne garde le hash du payload bulk pour que le bulk suivant ne déclenche pas de réécriture inutile.';
+COMMENT ON COLUMN public.staging.raw_hash IS 'Empreinte md5 servant de clé de détection de changement à l''UPSERT. Calculée via `change_detection_hash`, qui neutralise le bruit volatil propre à la source avant l''empreinte (HAL : horodatage de génération du TEI `label_xml`) — le payload stocké reste, lui, fidèle à la source. L''empreinte ne coïncide donc pas avec `md5(raw_data)` pour les sources normalisées. Cas particulier OpenAlex : `fetch_truncated` n''écrit PAS `raw_hash` quand il complète les authorships d''une publication tronquée à 100 — la ligne garde le hash du payload bulk pour que le bulk suivant ne déclenche pas de réécriture inutile.';
 
 
 --
@@ -3440,5 +3447,5 @@ ALTER TABLE ONLY public.structure_tutelles
 -- PostgreSQL database dump complete
 --
 
-\unrestrict rEAUBTNWJPb6OPdftmht1gNeWoyhdwyEsHI1NPvg7YU7SzT0tvTl3gEntOzr7hE
+\unrestrict miecXcaqu04J2rssq3LEoe2Hm5GNclBOxuBiNnW0DsrYbaRpcpZiqkVIRQxnaE0
 
