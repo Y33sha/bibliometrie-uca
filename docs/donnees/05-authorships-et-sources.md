@@ -48,13 +48,13 @@ Table d'ingestion par source. Cycle de vie en 3 états explicites :
 Transitions valides :
 
 - `[INSERT extracteur]` → **À traiter** → (`normalize`) → **Normalisée**
-- `[INSERT fetch_missing_hal]` → **Non trouvée**, ré-armée à chaque tentative infructueuse
+- `[INSERT fetch_missing_hal]` → **Non trouvée**
 
 `not_found_at` ne porte que les échecs du cross-import HAL, identifiés par hal-id ou NNT. L'échec n'est pas définitif : HAL peut publier le document plus tard, et sa réapparition efface le marqueur. Les échecs par DOI, eux, vivent tous dans `doi_lookups` (cf. ci-dessous).
 
 `raw_data` vidé après normalisation pour libérer l'espace TOAST. `last_seen_at` est mis à jour à chaque fois qu'un doc est re-vu (extraction bulk ou refetch).
 
-`disappeared_at` marque une row dont la source ne renvoie plus le document. Posé par la phase `refresh_stale` (à chaque run) : les rows à `last_seen_at` ancien (`> STALE_REFRESH_AFTER_DAYS`, 90 j) sont refetchées par id ; un 404 confirmé → `disappeared_at`, sinon `last_seen_at` est bumpé. Les rows stale **sans DOI** (non refetchables mais re-moissonnées par le bulk) sont marquées directement. Conservateur : on **marque seulement**, aucun effet aval (exclusion / suppression / propagation) pour l'instant.
+`disappeared_at` marque une ligne dont la source ne renvoie plus le document. À chaque exécution, la phase `refresh_stale` réinterroge les lignes vues pour la dernière fois il y a plus de 90 jours (`STALE_REFRESH_AFTER_DAYS`) ; une absence confirmée pose `disappeared_at`. Le marquage reste sans conséquence : ni exclusion, ni suppression, ni propagation.
 
 CHECK SQL `staging_not_found_at_implies_processed` : `not_found_at IS NULL OR processed`. Verrouille la transition impossible « non trouvée à re-traiter ». Les autres invariants (corrélation `processed` ↔ `raw_data` vidé) ne sont pas verrouillés en SQL — laissés en discipline pour ne pas bloquer les évolutions futures.
 
@@ -64,9 +64,9 @@ Cache des tentatives négatives de cross-import par DOI, pour toutes les sources
 
 `get_cross_import_dois` écarte les deux cas — délai non écoulé ou échec définitif — ce qui borne le pool de re-tentatives : sans lui, ces DOI seraient réinterrogés à chaque exécution. Ce ne sont pas des `staging` : pas de payload, pas de cycle de normalisation.
 
-## Services propriétaires
+## Propriété des tables
 
-La colonne **Autorité** dit qui détermine le contenu de la table :
+La colonne **Autorité** dit qui a le dernier mot sur le contenu de la table :
 
 - **admin** — saisi depuis l'interface d'administration ; le pipeline ne l'écrase jamais
 - **pipeline** — recalculé à chaque exécution
@@ -77,6 +77,7 @@ La colonne **Autorité** dit qui détermine le contenu de la table :
 | `staging` | pipeline | extracteurs (`infrastructure/sources/*/extract_*.py`, cross-imports) |
 | `doi_lookups` | pipeline | cross-imports DOI (`infrastructure/sources/*/fetch_missing_doi.py`) |
 | `source_publications` | pipeline | `application/pipeline/normalize/normalize_*.py` |
+| `author_identifying_keys` | pipeline | `normalize_*.py` (via `_authorships_batch.py`) |
 | `source_authorships` | mixte | `normalize_*.py` (pipeline) ; `in_perimeter` par la phase `affiliations`, `authorship_id` par la phase `authorships` ; `person_id` par le pipeline ou en admin (orphan-assign) |
 | `source_authorship_addresses` | pipeline | `normalize_*.py` (via `_authorships_batch.py`) |
 | `authorships` | pipeline | `build_authorships.py` (dédupliquée, dérivée des sources) |

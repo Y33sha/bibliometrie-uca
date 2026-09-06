@@ -46,7 +46,7 @@ Légende :
 - **`perimeters`** : un périmètre est un ensemble de structures, incluant récursivement les sous-structures. Les périmètres se saisissent en admin, et le pipeline lit dans `config` celui qui vaut à chaque étape. Un périmètre décide :
   - des critères d'affiliation utilisés en paramètre des requêtes API lors du moissonnage ;
   - des `source_authorships` qui fournissent les candidats au matching `publications` et `persons`.
-- **`perimeter_structures`** : appartenance au périmètre **matérialisée** — pour chaque périmètre, la liste des structures incluses après clôture récursive des tutelles. Rematérialisée par `refresh_perimeter_structures` à trois moments : avant la première phase du pipeline, puisque l'extraction lit déjà le périmètre ; au démarrage de la phase `affiliations` ; et à chaque édition admin qui touche une tutelle ou un périmètre. Elle sert de base de jointure aux résolutions d'affiliation et aux vues matérialisées `*_structures` (cf. [données dérivées](06-donnees-derivees.md)).
+- **`perimeter_structures`** : appartenance au périmètre, matérialisée par clôture récursive des tutelles. Cf. [données dérivées](06-donnees-derivees.md).
 - **`structure_tutelles`** : rattachement hiérarchique d'une structure à une autre. C'est la seule relation entre structures que le modèle porte, et sa clôture récursive décide des **structures incluses ou non dans un périmètre**. Le graphe reste sans cycle : une structure ne peut se rattacher à elle-même ni à l'un de ses descendants.
 - **`structure_name_forms`** : formes de noms pour la détection automatique des structures dans les adresses liées aux publications. Le champ `requires_context_of` (= liste d'id structures) permet de rendre une forme de nom *conditionnellement* valide. Cette table est utilisée dans la phase `affiliations` du [pipeline](../pipeline/04-affiliations.md) pour peupler la table de liaison `address_structures`.
 - **`address_structures`** : table de liaison. Les adresses proviennent des authorships sources (peuplées via `source_authorship_addresses` lors de la phase `normalize`, exploitées lors de la phase `affiliations`). Les structures identifiées sont ensuite propagées aux authorships sources.
@@ -57,9 +57,9 @@ Légende :
 - [**admin/structures**](../guide-utilisateur/02-pages-admin.md#structures) : CRUD des structures, de leurs tutelles et de leurs formes de nom.
 - [**admin/config**](../guide-utilisateur/02-pages-admin.md#configuration) : CRUD des périmètres et choix du périmètre actif aux différentes étapes du pipeline.
 
-## Services propriétaires
+## Propriété des tables
 
-La colonne **Autorité** dit qui détermine le contenu de la table :
+La colonne **Autorité** dit qui a le dernier mot sur le contenu de la table :
 
 - **admin** — saisi depuis l'interface d'administration ; le pipeline ne l'écrase jamais
 - **pipeline** — recalculé à chaque exécution

@@ -18,7 +18,7 @@ flowchart LR
 
 
     classDef manuel  fill:#8e5,stroke:#5a3
-    class structures,structure_name_forms,perimeters,structure_tutelles manuel;
+    class structures manuel;
     classDef csv fill:#fa5
     class apc_payments csv
     classDef auto fill:#adf,stroke:#58c
@@ -40,7 +40,7 @@ Légende :
 - **`publisher_name_forms`** : formes de noms normalisées pour le matching éditeurs.
 - **`apc_payments`** : données issues d'un import CSV (cf. [doc sources](../sources/10-imports-manuels.md#données-apc)).
 - **`distinct_publications`** : paires de publications marquées comme **distinctes malgré un titre identique**, évite de les re-suggérer dans l'interface de dédoublonnage `admin/duplicates`.
-- **`publications_detail`** : satellite 1:1 de `publications` portant les métadonnées volumineuses (`abstract`, `keywords`, `topics`, `biblio`), séparées de la table principale pour la garder légère en lecture.
+- **`publications_detail`** : satellite 1:1 de `publications` portant les métadonnées volumineuses. Cf. [données dérivées](06-donnees-derivees.md).
 - **`publication_relations`** : relations sémantiques entre publications distinctes mais apparentées (preprint ↔ version publiée, supplément ↔ article, erratum ↔ article corrigé…). Peuplée par la phase `relations`.
 - **`doi_prefixes`** : cache préfixe DOI → agence d'enregistrement (Crossref / DataCite) et éditeur, alimenté par les phases `resolve_ra` et `publishers_journals`.
 
@@ -52,9 +52,9 @@ Trois tables alimentées par la phase `subjects` du pipeline :
 - **`publication_subjects`** : table de liaison publication ↔ sujet (avec score / source).
 - **`subject_cooccurrences`** : matrice de co-occurrences entre sujets, alimentée à partir de `publication_subjects`.
 
-## Services propriétaires
+## Propriété des tables
 
-La colonne **Autorité** dit qui détermine le contenu de la table :
+La colonne **Autorité** dit qui a le dernier mot sur le contenu de la table :
 
 - **admin** — saisi depuis l'interface d'administration ; le pipeline ne l'écrase jamais
 - **pipeline** — recalculé à chaque exécution
