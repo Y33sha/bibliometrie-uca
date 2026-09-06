@@ -1,18 +1,17 @@
 # Correction des métadonnées
 
-*À jour le 2026-06-30.*
+*À jour le 2026-09-06.*
 
-La phase `metadata_correction` tourne après [`publishers_journals`](05-publishers-journals.md) — les revues sont typées, donc les règles dépendantes de la revue disposent de données fraîches — et juste avant le [rattachement des publications](07-publications.md), qui lit les colonnes corrigées. Elle prépare les `source_publications` pour que la résolution s'appuie sur des valeurs propres et cohérentes.
+La phase `metadata_correction` prépare les `source_publications` pour que le [rattachement des publications](07-publications.md) s'appuie sur des valeurs propres. Elle tourne après [`publishers_journals`](05-publishers-journals.md), dont le typage des revues alimente les règles dépendantes de la revue.
 
-Les corrections sont écrites sur les colonnes des `source_publications` ; la valeur source d'origine est conservée (dans `raw_metadata`) et chaque correction est recalculée à partir d'elle à chaque run — la passe est ainsi idempotente et se corrige d'elle-même, sans état à entretenir (un re-moissonnage ou un changement de type de revue est rattrapé au run suivant). Deux sous-étapes.
+Les corrections sont écrites sur les colonnes des `source_publications` ; la valeur d'origine est conservée dans `raw_metadata`, et chaque correction est recalculée à partir d'elle à chaque exécution. Un re-moissonnage ou un changement de type de revue est donc rattrapé à l'exécution suivante, sans état à entretenir.
 
-## Par enregistrement
+1. **`journal_by_doi`** — renseigne `journal_id` lorsqu'il est vide et que le DOI permet d'identifier la revue.
 
-Mappe le type de document de la source vers le vocabulaire canonique, puis applique les règles décidables sur un enregistrement seul — propres à l'enregistrement ou dépendantes de la revue. Par exemple : un document de type « thèse » paru dans une revue est reclassé en article ; un titre préfixé « Erratum: » est reclassé en erratum.
+2. **`correct_unary`** — mappe le type de document de la source vers le vocabulaire canonique, puis applique les règles de correction qui s'appliquent à un enregistrement isolé. Ces règles corrigent le type de document, le statut *open access* et les identifiants associés au document.
+    *Exemples : un document typé « thèse » paru dans une revue est retypé en article, et perd les identifiants de thèse que la source lui avait attribués ; un article avec un titre préfixé « Erratum: » est retypé en erratum ; un statut `embargoed` dont la date d'embargo est échue passe à `green`.*
 
-## Par grappe de DOI
+3. **`correct_by_cluster`** — rapproche les `source_publications` partageant un même DOI et déduit le DOI que doit porter chaque membre du groupe.
 
-Regroupe les `source_publications` partageant un même DOI et déduit, pour chaque groupe, le DOI que doit porter chacun de ses membres. Deux familles de cas :
-
-1. **Convergence** — un entrepôt comme Zenodo attribue un DOI distinct à chaque version d'un dépôt, plus un **DOI concept** stable qui couvre toutes les versions. Le DOI concept est lu dans les métadonnées DataCite du dépôt (relation « est une version de ») et appliqué à toutes les `source_publications` portant un DOI de version : concept et versions convergent ainsi vers une seule publication.
-2. **Divergence** — un DOI partagé par des documents en réalité distincts (un chapitre qui porte le DOI de l'ouvrage qui le contient ; des chapitres de titres différents portant le DOI de leur ouvrage hôte) est neutralisé sur le ou les mauvais documents, afin qu'ils cessent d'être rapprochés.
+   - **Convergence** — un entrepôt comme Zenodo attribue un DOI distinct à chaque version d'un dépôt, plus un **DOI concept** stable couvrant toutes les versions. Le DOI concept est lu dans les métadonnées DataCite du dépôt (relation « est une version de »). Il remplace le DOI de version sur chaque `source_publication`, qui convergent ainsi vers une seule publication.
+   - **Divergence** — un même DOI porté par des documents en réalité distincts, comme un chapitre qui porte le DOI de l'ouvrage qui le contient. Le DOI est retiré des documents qui le portent à tort, pour éviter qu'ils fusionnent.

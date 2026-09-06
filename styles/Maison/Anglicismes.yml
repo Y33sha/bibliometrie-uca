@@ -1,0 +1,9 @@
+# Termes du domaine à écrire dans leur forme usuelle, dans les deux sens : sur-francisation d'un
+# terme anglais installé, ou anglicisme là où le français est l'usage.
+extends: substitution
+message: "Terme du domaine : écrire « %s » plutôt que « %s »."
+level: warning
+ignorecase: true
+swap:
+  "accès ouvert": "open access"
+  "libre accès": "open access"
