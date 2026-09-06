@@ -36,7 +36,7 @@ Créer ou modifier un rattachement, comme supprimer une structure, recalcule les
 
 **Reconnaissance des adresses** (phase `affiliations`). `infrastructure/pipeline/affiliations/address_resolution.py` charge les formes de nom dans un automate Aho-Corasick qui balaie le texte normalisé des adresses. Trois options règlent la reconnaissance : `is_word_boundary` exige que la forme soit délimitée par des frontières de mot ; `is_excluding` fait de la forme un motif de rejet ; `requires_context_of` subordonne la reconnaissance à la présence, dans la même adresse, des structures citées.
 
-**Composition des périmètres.** Les rattachements de type `est_tutelle_de` fournissent la descente récursive qui remplit `perimeter_structures` à partir des racines déclarées. C'est par là que les structures décident, au bout de la chaîne, de l'appartenance d'une signature au périmètre.
+**Composition des périmètres.** Les tutelles fournissent la descente récursive qui remplit `perimeter_structures` à partir des racines déclarées. C'est par là que les structures décident, au bout de la chaîne, de l'appartenance d'une signature au périmètre.
 
 ## Lecture par l'API
 
