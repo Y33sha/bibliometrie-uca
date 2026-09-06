@@ -1,0 +1,26 @@
+extends: substitution
+message: "Vocabulaire : préférer « %s » à « %s »."
+level: warning
+ignorecase: true
+# « forme canonique » est le vocabulaire standard de la normalisation d'un identifiant : le mot
+# y désigne une écriture unique, pas le référentiel.
+exceptions:
+  - forme canonique
+swap:
+  "est en charge de": "gère"
+  "est responsable de": "gère"
+  "a la (capacité|possibilité) de": "peut"
+  "a pour rôle de": "<verbe direct>"
+  "a pour objectif de": "<verbe direct>"
+  "est susceptible de": "peut"
+  "est en mesure de": "peut"
+  "afin de pouvoir": "pour"
+  "dans le but de": "pour"
+  "procéder à (la|une) vérification": "vérifier"
+  "un certain nombre de": "plusieurs"
+  "curation": "édition manuelle, correction à la main, décision humaine"
+  "cur(at)?ée?s?": "saisi à la main, corrigé à la main"
+  "canoniques?": "référentiel"
+  "vérité": "référentiel"
+  "keyée?s?": "identifié par"
+  "retriable": "qui n'est pas définitif"
