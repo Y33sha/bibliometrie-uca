@@ -1,12 +1,10 @@
 # Index des tables
 
-*À jour le 2026-06-30.*
-
-Cette page donne deux entrées dans le schéma : une **vue macro** (les tables porteuses et leurs liens, niveau intermédiaire entre le schéma conceptuel sources/vérité et le détail de chaque page) puis un **index alphabétique** de toutes les tables et vues matérialisées, avec une courte description et un renvoi vers la page qui documente chacune.
+*À jour le 2026-09-05.*
 
 ## Vue macro
 
-Vue globale du schéma : l'ingestion par source en haut, les référentiels canoniques au centre, et les satellites rattachés à leur entité-pivot. Sont omis ici : les saisies manuelles (`distinct_*`, `rejected_authorships`), les caches et référentiels statiques (`doi_prefixes`, `doi_lookups`, `countries`, `place_name_forms`) et les tables techniques — tous présents dans l'index ci-dessous.
+Vue globale du schéma : l'ingestion par source en haut, les référentiels canoniques au centre, et les satellites rattachés à leur entité-pivot. Seules les tables porteuses y figurent ; l'index ci-dessous est exhaustif.
 
 ```mermaid
 flowchart TB
@@ -66,17 +64,18 @@ Les vues matérialisées sont signalées comme telles ; les tables purement tech
 |---|---|---|
 | `address_structures` | liaison adresse ↔ structure (avec confirmation) | [Structures](02-structures.md) |
 | `addresses` | adresses normalisées issues des signatures | [Structures](02-structures.md) |
+| `alembic_version` | révision de schéma appliquée — technique | — |
 | `apc_payments` | frais de publication (import CSV) | [Structures](02-structures.md) |
 | `audit_log` | journal des événements (actions admin, fusions) — technique | — |
 | `author_identifying_keys` | attributs d'identité d'une signature source (nom normalisé, identifiants), partagés via `identity_id` | [Authorships et sources](05-authorships-et-sources.md) |
 | `authorship_structures` | *vue matérialisée* : structures d'un authorship canonique | [Données dérivées](06-donnees-derivees.md) |
 | `authorships` | table de vérité personne × publication | [Authorships et sources](05-authorships-et-sources.md) |
 | `config` | réglages d'exploitation du pipeline (périmètres actifs, années couvertes…) | [Structures](02-structures.md) |
-| `confirmed_authorships` | épinglages admin (must-link) signature source ↔ personne, réappliqués à chaque run | [Authorships et sources](05-authorships-et-sources.md) |
+| `confirmed_authorships` | épinglages admin (must-link) signature source ↔ personne, réappliqués à chaque exécution | [Authorships et sources](05-authorships-et-sources.md) |
 | `countries` | référentiel des pays | [Structures](02-structures.md) |
 | `distinct_persons` | paires marquées distinctes malgré un nom commun | [Personnes](04-personnes.md) |
 | `distinct_publications` | paires marquées distinctes malgré un titre identique | [Publications](03-publications.md) |
-| `doi_lookups` | backoff des miss de cross-import par DOI | [Authorships et sources](05-authorships-et-sources.md) |
+| `doi_lookups` | temporisation des échecs de cross-import par DOI | [Authorships et sources](05-authorships-et-sources.md) |
 | `doi_prefixes` | cache préfixe DOI → agence + éditeur | [Publications](03-publications.md) |
 | `journal_name_forms` | formes de noms pour le matching des revues | [Publications](03-publications.md) |
 | `journals` | référentiel des revues | [Publications](03-publications.md) |
@@ -84,7 +83,7 @@ Les vues matérialisées sont signalées comme telles ; les tables purement tech
 | `perimeters` | définition des périmètres | [Structures](02-structures.md) |
 | `person_identifiers` | identifiants persistants (ORCID, idHAL, IdRef) | [Personnes](04-personnes.md) |
 | `person_name_forms` | formes de noms pour le matching des personnes | [Personnes](04-personnes.md) |
-| `persons` | référentiel des personnes (périmètre UCA) | [Personnes](04-personnes.md) |
+| `persons` | référentiel des personnes du périmètre | [Personnes](04-personnes.md) |
 | `persons_rh` | satellite des données RH (import CSV) | [Personnes](04-personnes.md) |
 | `pipeline_phase_executions` | historique d'exécution des phases — technique | — |
 | `place_name_forms` | formes de noms pour la détection des pays | [Structures](02-structures.md) |
