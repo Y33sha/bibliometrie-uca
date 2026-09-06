@@ -821,7 +821,7 @@ staging = Table(
             "propre à la source avant l'empreinte (HAL : horodatage de génération "
             "du TEI `label_xml`) — le payload stocké reste, lui, fidèle à la source. "
             "L'empreinte ne coïncide donc pas avec `md5(raw_data)` pour les sources "
-            "normalisées. Cas particulier OpenAlex : `refetch_truncated` n'écrit PAS "
+            "normalisées. Cas particulier OpenAlex : `fetch_truncated` n'écrit PAS "
             "`raw_hash` quand il complète les authorships d'une publication tronquée "
             "à 100 — la ligne garde le hash du payload bulk pour que le bulk suivant "
             "ne déclenche pas de réécriture inutile."
@@ -831,7 +831,7 @@ staging = Table(
     Column("not_found_at", DateTime(timezone=True)),
     Column("disappeared_at", DateTime(timezone=True)),
     # OpenAlex : payload bulk plafonné à 100 auteurs → work probablement tronqué.
-    # Posé à l'extraction, consommé puis effacé par `refetch_truncated`.
+    # Posé à l'extraction, consommé puis effacé par `fetch_truncated`.
     Column("authors_truncated", Boolean, nullable=False, server_default="false"),
     # Provenance d'entrée : 'bulk' (extraction) ou 'cross_import_doi' / 'cross_import_hal'.
     Column("entry_mode", Text, nullable=False, server_default="bulk"),

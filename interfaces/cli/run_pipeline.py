@@ -7,6 +7,7 @@ Usage:
     run_pipeline --from normalize   # Reprendre depuis la normalisation
     run_pipeline --only extract     # Exécuter une seule phase
     run_pipeline --list             # Lister les phases
+    run_pipeline --no-extras        # Sans les enrichissements terminaux
     run_pipeline --dry-run          # Afficher sans exécuter
     run_pipeline --mode daily       # Import quotidien (HAL depuis dernier run)
     run_pipeline --mode full        # Repasse complète (toutes sources sauf WoS)
@@ -17,13 +18,13 @@ Usage:
 
 Phases (dans l'ordre d'execution):
     extract             Extraction des sources vers staging (HAL, OpenAlex, WoS, ScanR, theses.fr)
-    cross_imports       Rattrapage cross-source : (1) docs HAL manquants par hal-id/NNT
+    fetch_missing       Rattrapage cross-source : (1) docs HAL manquants par hal-id/NNT
                         (auto-borné, tourne toujours), puis (2) par DOI dans chaque source
                         cible (auto-borné par le backoff doi_lookups)
-    refresh_stale       Refetch par identifiant natif des rows à last_seen_at ancien
+    fetch_stale       Refetch par identifiant natif des rows à last_seen_at ancien
                         (> STALE_REFRESH_AFTER_DAYS) : trouvé -> bump last_seen_at + refresh ;
                         absence confirmée -> disappeared_at. Marque seulement, aucun effet aval.
-    refetch_truncated   Re-fetch des works OpenAlex tronqués à 100 auteurs, avant que
+    fetch_truncated   Re-fetch des works OpenAlex tronqués à 100 auteurs, avant que
                         normalize ne les consomme.
     normalize           Normalisation staging -> tables sources (source_publications,
                         source_authorships) avec publication_id=NULL (le rattachement aux
@@ -66,16 +67,16 @@ if TYPE_CHECKING:
 
     from sqlalchemy import Connection
 
-    from application.ports.pipeline.cross_imports.fetch_missing_doi import (
+    from application.ports.pipeline.extract.fetch_stale import FetchStaleAdapter
+    from application.ports.pipeline.fetch_missing.doi import (
         AsyncFetchMissingDoiAdapter,
     )
-    from application.ports.pipeline.extract.refresh_stale import RefreshStaleAdapter
 
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.modes import MODE_NAMES, MODES
 from application.pipeline.normalize.base import NormalizeStats, SourceNormalizer
 from application.pipeline.normalize.bibliographic import BibliographicNormalizer
-from application.pipeline.phase_order import PHASE_ORDER
+from application.pipeline.phase_order import EXTRA_PHASES, PHASE_ORDER
 from application.pipeline.signals import signal_source_unavailable
 from application.ports.pipeline.circuit_breaker import CircuitBreaker, SourceUnavailableError
 from domain.sources.registry import ALL_SOURCES_SET
@@ -164,8 +165,8 @@ def phase_extract(options: RunOptions) -> PhaseMetrics:
     """Phase 1 : Extraction des sources vers staging.
 
     La policy du mode (sources, stratégie d'années) vit dans `application/pipeline/modes.py`.
-    Le refetch des works OpenAlex tronqués est une phase distincte (`refetch_truncated`), placée
-    après `refresh_stale` et avant `normalize`.
+    Le refetch des works OpenAlex tronqués est une phase distincte (`fetch_truncated`), placée
+    après `fetch_stale` et avant `normalize`.
 
     Séquence, parallélisme et métriques dans `application/pipeline/extract/phase.py` ; ici, le
     câblage : registre des adapters, primitif de parallélisme, lecture de la dernière extraction.
@@ -193,9 +194,9 @@ def phase_extract(options: RunOptions) -> PhaseMetrics:
 
 
 def phase_resolve_ra(options: RunOptions) -> PhaseMetrics:
-    """Résout la Registration Agency des préfixes DOI (`doi.org/ra`) avant cross_imports.
+    """Résout la Registration Agency des préfixes DOI (`doi.org/ra`) avant fetch_missing.
 
-    Permet à `cross_imports` de router les fetches par RA (Crossref vs DataCite) dès le
+    Permet à `fetch_missing` de router les fetches par RA (Crossref vs DataCite) dès le
     run courant, au lieu de tenter chaque DOI contre les deux APIs (ensembles disjoints).
     Le volet publisher (phase `publishers_journals`) complète ensuite les rows via les
     API `/prefixes`.
@@ -241,7 +242,7 @@ def phase_resolve_ra(options: RunOptions) -> PhaseMetrics:
     return metrics
 
 
-def phase_cross_imports(options: RunOptions) -> PhaseMetrics:
+def phase_fetch_missing(options: RunOptions) -> PhaseMetrics:
     """Rattrapage des documents repérés dans une source mais absents d'une autre.
 
     Deux mécanismes complémentaires, exécutés dans cet ordre :
@@ -262,9 +263,9 @@ def phase_cross_imports(options: RunOptions) -> PhaseMetrics:
        `DOI_LOOKUP_RETRY_DAYS`), ceux absents de Crossref (source native) un stub
        `staging` définitif.
 
-    Séquence, parallélisme et métriques dans `application/pipeline/cross_imports/phase.py`.
+    Séquence, parallélisme et métriques dans `application/pipeline/fetch_missing/phase.py`.
     """
-    from application.pipeline.cross_imports.phase import run
+    from application.pipeline.fetch_missing.phase import run
     from infrastructure.parallel import run_parallel
 
     return run(
@@ -280,7 +281,7 @@ def phase_cross_imports(options: RunOptions) -> PhaseMetrics:
     )
 
 
-def phase_refresh_stale(options: RunOptions) -> PhaseMetrics:
+def phase_fetch_stale(options: RunOptions) -> PhaseMetrics:
     """Rafraîchit les rows à `last_seen_at` ancien et marque les disparues.
 
     Tourne à **chaque run** : le seuil `STALE_REFRESH_AFTER_DAYS` étale la
@@ -291,7 +292,7 @@ def phase_refresh_stale(options: RunOptions) -> PhaseMetrics:
     `raw_data` ; absence confirmée par la source → `disappeared_at` ; échec
     transitoire → no-op. Toute row est ainsi re-vérifiée directement, avec ou
     sans DOI. WoS est opt-in (`--include-wos`) : exclu par défaut, comme
-    `extract` et `cross_imports`.
+    `extract` et `fetch_missing`.
 
     Le refresh est **couplé à la fenêtre d'années du run** (`start_year`/`year`,
     via `source_publications.pub_year`) : un run sur une période glissante ne
@@ -300,19 +301,19 @@ def phase_refresh_stale(options: RunOptions) -> PhaseMetrics:
     à l'extraction : elle ramène tout l'historique (aucune borne), sauf `--year`.
 
     Conservateur : on **marque seulement** (`disappeared_at`), aucun effet
-    aval. Placée après `cross_imports` (qui a fini de peupler `staging` et
+    aval. Placée après `fetch_missing` (qui a fini de peupler `staging` et
     `last_seen_at`) et avant `normalize` (qui consomme le `raw_data` rafraîchi).
 
-    Séquence et métriques dans `application/pipeline/extract/refresh_stale.py::run_phase`.
+    Séquence et métriques dans `application/pipeline/extract/fetch_stale.py::run_phase`.
     """
-    from application.pipeline.extract.refresh_stale import run_phase
+    from application.pipeline.extract.fetch_stale import run_phase
 
     return run_phase(
         sources=set(options.sources) if options.sources else None,
         include_wos=options.include_wos,
         year=options.year,
         start_year=options.start_year,
-        refresh_one=_run_refresh_stale,
+        refresh_one=_run_fetch_stale,
         credentials_missing=_credentials_missing,
         get_years_for_window=_get_years_for_window,
         logger=log,
@@ -337,24 +338,24 @@ def _get_years_for_window(start_year: int | None) -> list[int] | None:
         return get_years(conn, start_year)
 
 
-def phase_refetch_truncated(options: RunOptions) -> PhaseMetrics:
+def phase_fetch_truncated(options: RunOptions) -> PhaseMetrics:
     """Re-télécharge les works OpenAlex tronqués à 100 auteurs.
 
     L'API OpenAlex plafonne la liste des auteurs à 100 par réponse. Cette phase
     repère les lignes staging openalex `processed=FALSE` à 100 auteurs et les
     re-télécharge intégralement (pagination des auteurs).
 
-    Placée après `refresh_stale` (pour capter aussi les works tronqués ramenés
-    par `cross_imports` et `refresh_stale`) et avant `normalize` (qui passe les
+    Placée après `fetch_stale` (pour capter aussi les works tronqués ramenés
+    par `fetch_missing` et `fetch_stale`) et avant `normalize` (qui passe les
     lignes à `processed=TRUE`, après quoi elles sont invisibles à la détection).
 
-    Séquence et métriques dans `application/pipeline/extract/refetch_truncated.py`.
+    Séquence et métriques dans `application/pipeline/extract/fetch_truncated.py`.
     """
     import asyncio
 
-    from application.pipeline.extract.refetch_truncated import refetch
+    from application.pipeline.extract.fetch_truncated import refetch
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.sources.openalex.refetch_truncated import PgOpenalexRefetchAdapter
+    from infrastructure.sources.openalex.fetch_truncated import PgOpenalexFetchTruncatedAdapter
 
     sources = options.sources if options.sources is not None else set(ALL_SOURCES_SET)
     # Toujours actif (incrémental : ne repère que les lignes openalex processed=FALSE
@@ -363,7 +364,7 @@ def phase_refetch_truncated(options: RunOptions) -> PhaseMetrics:
         return PhaseMetrics()
     conn = get_sync_engine().connect()
     try:
-        return asyncio.run(refetch(conn, PgOpenalexRefetchAdapter(), log))
+        return asyncio.run(refetch(conn, PgOpenalexFetchTruncatedAdapter(), log))
     finally:
         conn.close()
 
@@ -455,7 +456,7 @@ def phase_publishers_journals(options: RunOptions) -> PhaseMetrics:
     hors pipeline, lancé à la demande via
     `interfaces/cli/maintenance/enrich_publishers.py`.
 
-    Placée **après normalize** : (a) `cross_imports` (en amont) peut introduire de
+    Placée **après normalize** : (a) `fetch_missing` (en amont) peut introduire de
     nouveaux DOIs via `fetch_missing_hal`, (b) `normalize` crée les
     `publishers`/`journals` qu'on veut enrichir.
 
@@ -1013,7 +1014,7 @@ def _run_extract(
 
 def _run_fetch_missing_hal_by_id() -> PhaseMetrics:
     """Cross-import HAL par hal-id (OpenAlex/ScanR) : documents absents du staging."""
-    from application.pipeline.cross_imports.fetch_missing_hal import fetch_missing_hal_by_id
+    from application.pipeline.fetch_missing.hal import fetch_missing_hal_by_id
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.sources.hal.fetch_missing_hal import PgHalFetchMissingAdapter
 
@@ -1035,7 +1036,7 @@ def _run_fetch_missing_hal_by_id() -> PhaseMetrics:
 
 def _run_fetch_missing_hal_by_nnt() -> PhaseMetrics:
     """Cross-import HAL par NNT (theses.fr) : thèses soutenues sans document HAL."""
-    from application.pipeline.cross_imports.fetch_missing_hal import fetch_missing_hal_by_nnt
+    from application.pipeline.fetch_missing.hal import fetch_missing_hal_by_nnt
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.sources.hal.fetch_missing_hal import PgHalFetchMissingAdapter
 
@@ -1062,7 +1063,7 @@ def _make_fetch_missing_doi_adapter(target: str) -> "AsyncFetchMissingDoiAdapter
     """
     from typing import cast
 
-    from application.ports.pipeline.cross_imports.fetch_missing_doi import (
+    from application.ports.pipeline.fetch_missing.doi import (
         AsyncFetchMissingDoiAdapter,
     )
     from infrastructure.sources.crossref.fetch_missing_doi import CrossrefFetchMissingDoiAdapter
@@ -1089,7 +1090,7 @@ def _make_fetch_missing_doi_adapter(target: str) -> "AsyncFetchMissingDoiAdapter
 
 
 def _run_fetch_missing_doi(target: str) -> PhaseMetrics:
-    from application.pipeline.cross_imports.fetch_missing_doi import run_async
+    from application.pipeline.fetch_missing.doi import run_async
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.pipeline.extract.cross_import import get_cross_import_dois
     from infrastructure.sources.circuit_breaker import (
@@ -1119,7 +1120,7 @@ def _run_fetch_missing_doi(target: str) -> PhaseMetrics:
         )
     except SourceUnavailableError:
         metrics = PhaseMetrics()
-        signal_source_unavailable(metrics, target, logger=log, phase="cross_imports")
+        signal_source_unavailable(metrics, target, logger=log, phase="fetch_missing")
     finally:
         reset_current_breaker(token)
         conn.close()
@@ -1133,39 +1134,39 @@ def _run_fetch_missing_doi(target: str) -> PhaseMetrics:
     return metrics
 
 
-def _make_refresh_stale_adapter(source: str) -> "RefreshStaleAdapter":
-    """Construit l'adapter `refresh_stale` d'une source (refetch par id natif)."""
-    from infrastructure.sources.crossref.refresh_stale import CrossrefRefreshStaleAdapter
-    from infrastructure.sources.datacite.refresh_stale import DataciteRefreshStaleAdapter
-    from infrastructure.sources.hal.refresh_stale import HalRefreshStaleAdapter
-    from infrastructure.sources.openalex.refresh_stale import OpenalexRefreshStaleAdapter
-    from infrastructure.sources.scanr.refresh_stale import ScanrRefreshStaleAdapter
-    from infrastructure.sources.theses.refresh_stale import ThesesRefreshStaleAdapter
-    from infrastructure.sources.wos.refresh_stale import WosRefreshStaleAdapter
+def _make_fetch_stale_adapter(source: str) -> "FetchStaleAdapter":
+    """Construit l'adapter `fetch_stale` d'une source (refetch par id natif)."""
+    from infrastructure.sources.crossref.fetch_stale import CrossrefFetchStaleAdapter
+    from infrastructure.sources.datacite.fetch_stale import DataciteFetchStaleAdapter
+    from infrastructure.sources.hal.fetch_stale import HalFetchStaleAdapter
+    from infrastructure.sources.openalex.fetch_stale import OpenalexFetchStaleAdapter
+    from infrastructure.sources.scanr.fetch_stale import ScanrFetchStaleAdapter
+    from infrastructure.sources.theses.fetch_stale import ThesesFetchStaleAdapter
+    from infrastructure.sources.wos.fetch_stale import WosFetchStaleAdapter
 
     # Cast : mypy ne reconnaît pas la conformité structurelle d'une classe concrète
     # à un Protocol via `type[Protocol]` (cf. `_make_fetch_missing_doi_adapter`).
-    adapter_classes: dict[str, type[RefreshStaleAdapter]] = cast(
-        "dict[str, type[RefreshStaleAdapter]]",
+    adapter_classes: dict[str, type[FetchStaleAdapter]] = cast(
+        "dict[str, type[FetchStaleAdapter]]",
         {
-            "hal": HalRefreshStaleAdapter,
-            "openalex": OpenalexRefreshStaleAdapter,
-            "wos": WosRefreshStaleAdapter,
-            "scanr": ScanrRefreshStaleAdapter,
-            "theses": ThesesRefreshStaleAdapter,
-            "crossref": CrossrefRefreshStaleAdapter,
-            "datacite": DataciteRefreshStaleAdapter,
+            "hal": HalFetchStaleAdapter,
+            "openalex": OpenalexFetchStaleAdapter,
+            "wos": WosFetchStaleAdapter,
+            "scanr": ScanrFetchStaleAdapter,
+            "theses": ThesesFetchStaleAdapter,
+            "crossref": CrossrefFetchStaleAdapter,
+            "datacite": DataciteFetchStaleAdapter,
         },
     )
     return adapter_classes[source]()
 
 
-def _run_refresh_stale(target: str, years: list[int] | None) -> PhaseMetrics:
+def _run_fetch_stale(target: str, years: list[int] | None) -> PhaseMetrics:
     """Refetch par id natif des rows stale d'une source : trouvé → bump, absence → disappeared.
 
     `years` borne le refresh à la fenêtre d'années du run (None = tout le stale).
     """
-    from application.pipeline.extract.refresh_stale import refresh
+    from application.pipeline.extract.fetch_stale import refresh
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.sources.circuit_breaker import (
         SourceCircuitBreaker,
@@ -1173,9 +1174,9 @@ def _run_refresh_stale(target: str, years: list[int] | None) -> PhaseMetrics:
         set_current_breaker,
     )
 
-    adapter = _make_refresh_stale_adapter(target)
+    adapter = _make_fetch_stale_adapter(target)
 
-    log.info("▶ refresh_stale --target %s", target)
+    log.info("▶ fetch_stale --target %s", target)
     t0 = time.time()
     conn = get_sync_engine().connect()
     # Circuit-breaker par source (cf. `_run_fetch_missing_doi`) : coupe le refetch
@@ -1188,12 +1189,12 @@ def _run_refresh_stale(target: str, years: list[int] | None) -> PhaseMetrics:
         metrics = asyncio.run(refresh(conn, adapter, log, years=years, breaker=breaker))
     except SourceUnavailableError:
         metrics = PhaseMetrics()
-        signal_source_unavailable(metrics, target, logger=log, phase="refresh_stale")
+        signal_source_unavailable(metrics, target, logger=log, phase="fetch_stale")
     finally:
         reset_current_breaker(token)
         conn.close()
     log.info(
-        "✓ refresh_stale (%s) terminé en %.1fs — %s",
+        "✓ fetch_stale (%s) terminé en %.1fs — %s",
         target,
         time.time() - t0,
         metrics.as_summary(),
@@ -1263,9 +1264,9 @@ def phase_oa_status(options: RunOptions) -> PhaseMetrics:
 _PHASE_FUNCTIONS: dict[str, Phase] = {
     "extract": phase_extract,
     "resolve_ra": phase_resolve_ra,
-    "cross_imports": phase_cross_imports,
-    "refresh_stale": phase_refresh_stale,
-    "refetch_truncated": phase_refetch_truncated,
+    "fetch_missing": phase_fetch_missing,
+    "fetch_stale": phase_fetch_stale,
+    "fetch_truncated": phase_fetch_truncated,
     "normalize": phase_normalize,
     "affiliations": phase_affiliations,
     "publishers_journals": phase_publishers_journals,
@@ -1325,6 +1326,11 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--only", metavar="PHASE", help="Exécuter uniquement cette phase")
     parser.add_argument("--list", action="store_true", help="Lister les phases disponibles")
+    parser.add_argument(
+        "--no-extras",
+        action="store_true",
+        help="Omettre les enrichissements terminaux (relations, subjects, countries, oa_status)",
+    )
     parser.add_argument("--dry-run", action="store_true", help="Afficher les étapes sans exécuter")
     parser.add_argument(
         "--mode", choices=list(MODE_NAMES), default="full", help="Mode d'exécution (défaut: full)"
@@ -1392,7 +1398,11 @@ def _print_phase_list() -> None:
 def _select_phases_to_run(
     args: argparse.Namespace,
 ) -> list[tuple[str, Phase]]:
-    """Phases à exécuter selon `--only` / `--from` (sinon toutes). Sort en erreur sur phase inconnue."""
+    """Phases à exécuter selon `--only` / `--from` (sinon toutes), moins les enrichissements si `--no-extras`.
+
+    `--only` nomme une phase explicitement : elle est rendue même si c'est un enrichissement.
+    Sort en erreur sur phase inconnue.
+    """
     if args.only:
         if args.only not in PHASE_NAMES:
             print(f"Phase inconnue : {args.only}. Phases : {', '.join(PHASE_NAMES)}")
@@ -1402,8 +1412,12 @@ def _select_phases_to_run(
         if args.from_phase not in PHASE_NAMES:
             print(f"Phase inconnue : {args.from_phase}. Phases : {', '.join(PHASE_NAMES)}")
             sys.exit(1)
-        return PHASES[PHASE_NAMES.index(args.from_phase) :]
-    return list(PHASES)
+        retenues = PHASES[PHASE_NAMES.index(args.from_phase) :]
+    else:
+        retenues = list(PHASES)
+    if args.no_extras:
+        retenues = [(n, fn) for n, fn in retenues if n not in EXTRA_PHASES]
+    return retenues
 
 
 def _print_dry_run(phases_to_run: list[tuple[str, Phase]]) -> None:

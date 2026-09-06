@@ -1,4 +1,4 @@
-"""Adapter ScanR pour `application.pipeline.extract.refresh_stale`.
+"""Adapter ScanR pour `application.pipeline.extract.fetch_stale`.
 
 Refetch d'une row par son id ScanR (`staging.source_id`) via une requête ElasticSearch `term` sur `id.keyword`. Une réponse ES valide sans hit = id confirmé absent.
 """
@@ -8,7 +8,7 @@ from __future__ import annotations
 import httpx
 from sqlalchemy import Connection
 
-from application.ports.pipeline.extract.refresh_stale import (
+from application.ports.pipeline.extract.fetch_stale import (
     NOT_FOUND,
     FetchedRecord,
     FetchOutcome,
@@ -17,11 +17,11 @@ from domain.publications.identifiers import clean_doi
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
 from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.config import get_scanr_credentials
+from infrastructure.sources.fetch_stale_base import BaseFetchStaleAdapter
 from infrastructure.sources.http_retry import http_request_with_retry_async
-from infrastructure.sources.refresh_stale_base import BaseRefreshStaleAdapter
 
 
-class ScanrRefreshStaleAdapter(BaseRefreshStaleAdapter):
+class ScanrFetchStaleAdapter(BaseFetchStaleAdapter):
     source_key = "scanr"
     max_concurrent = 5
 

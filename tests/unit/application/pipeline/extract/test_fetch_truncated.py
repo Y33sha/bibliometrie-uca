@@ -1,6 +1,6 @@
 """Tests unitaires du re-fetch des works OpenAlex tronqués.
 
-Pas de réseau ni de base : un faux `OpenalexRefetchAdapter` sert des works scriptés, et la connexion est un mock. Ce qui est éprouvé ici est l'arbitrage du triage — le work qui dépasse cent auteurs est réécrit, celui qui en compte cent pile perd son marqueur sans réécriture, celui dont le fetch échoue garde le sien pour le run suivant.
+Pas de réseau ni de base : un faux `OpenalexFetchTruncatedAdapter` sert des works scriptés, et la connexion est un mock. Ce qui est éprouvé ici est l'arbitrage du triage — le work qui dépasse cent auteurs est réécrit, celui qui en compte cent pile perd son marqueur sans réécriture, celui dont le fetch échoue garde le sien pour le run suivant.
 """
 
 from __future__ import annotations
@@ -10,8 +10,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from application.pipeline.extract.refetch_truncated import refetch
-from application.ports.pipeline.extract.refetch_truncated import TruncatedWork
+from application.pipeline.extract.fetch_truncated import refetch
+from application.ports.pipeline.extract.fetch_truncated import TruncatedWork
 
 _LOGGER = logging.getLogger("test")
 

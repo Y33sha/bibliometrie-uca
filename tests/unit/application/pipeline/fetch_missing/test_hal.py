@@ -7,11 +7,11 @@ Le pool réel est exercé : seule la source HTTP est doublée. La déduplication
 
 import logging
 
-from application.pipeline.cross_imports.fetch_missing_hal import (
+from application.pipeline.fetch_missing.hal import (
     fetch_missing_hal_by_id,
     fetch_missing_hal_by_nnt,
 )
-from application.ports.pipeline.cross_imports.fetch_missing_hal import (
+from application.ports.pipeline.fetch_missing.hal import (
     HalIdRef,
     NntInsertResult,
     NntRef,

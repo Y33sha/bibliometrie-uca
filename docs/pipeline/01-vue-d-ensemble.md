@@ -4,8 +4,6 @@
 
 Ce fichier présente la logique du pipeline de traitement. Pour les modalités d'exécution, voir [Guide d'exploitation](../exploitation/04-pipeline.md).
 
-Le peuplement de la base s'effectue via un *pipeline* composé des étapes suivantes :
-
 ## Moissonnage
 
 - [Moissonnage initial](02-extract.md) : récupère les données brutes depuis les API et les stocke en JSONB dans la table de *staging*.
@@ -18,24 +16,29 @@ Le peuplement de la base s'effectue via un *pipeline* composé des étapes suiva
 
 - [Normalisation](03-normalize.md) : transforme les données brutes (*staging*) en tables structurées *par source* (`source_publications`, `source_authorships`). Extrait les signatures institutionnelles et les centralise dans la table `addresses`. Crée les entités `publishers` et `journals` lorsque les sources les mentionnent.
 
-## Identification des structures
+## Résolution des structures
 
 - [Affiliations](04-affiliations.md) : résout les liens adresses → structures via les formes de noms (`structure_name_forms`), puis renseigne `in_perimeter` sur les [authorships](../glossaire.md#authorship) sources.
 
-## Déduplication des publications
+## Résolution des publications
 
-- [Publishers & journals](05-publishers-journals.md) : enrichit les référentiels de revues et d'éditeurs à partir de sources externes — préfixes DOI (sources: Crossref + DataCite), montant d'APC et type des revues (sources: OpenAlex Sources, DOAJ). Ces informations sont consommées par la phase de correction des métadonnées.
+- [Publishers & journals](05-publishers-journals.md) : enrichit les référentiels de revues et d'éditeurs à partir de sources externes — préfixes DOI (sources: Crossref + DataCite), catégories de revues (sources: OpenAlex Sources, DOAJ). Ces informations sont consommées par la phase de correction des métadonnées.
 - [Corrections de métadonnées](06-metadata-correction.md) : prépare les `source_publications` avant leur rattachement, en posant sur leurs colonnes les valeurs corrigées sur lesquelles s'appuiera la résolution. Les métadonnées brutes sont conservées, avec l'identifiant de la règle qui les a corrigées.
-- [Matching des publications](07-publications.md) : peuple et maintient la table canonique `publications` à partir des `source_publications`. Regroupe celles qui désignent le même document (par identifiants et par métadonnées), crée une publication pour chaque document du périmètre UCA, et fusionne ou scinde les publications existantes selon ce regroupement.
+- [Publications](07-publications.md) : peuple et maintient la table canonique `publications` à partir des `source_publications`. Regroupe celles qui désignent le même document, par identifiants ou par métadonnées, crée une publication pour chaque document du périmètre, et fusionne ou scinde les publications existantes selon ce regroupement.
+
+## Résolution des personnes
+
+- [Personnes](09-persons.md) : peuple la table `persons` et ses tables satellites `person_name_forms` et `person_identifiers` (ORCID, idHAL, IdRef) *via* les authorships sources ayant `in_perimeter = true` (renseigné par la phase `affiliations`). Relie les authorships sources aux `person_id` créées.
+
+## Consolidation des relations publications-personnes-structures
+
+- [Authorships](10-authorships.md) : peuple la table `authorships` (liens entre `publications` canoniques et `persons` canoniques) à partir des authorships sources.
+
+## Enrichissements
+
+Ces quatre phases n'entrent pas dans la résolution d'entités : rien en amont ne les lit, et `--no-extras` les omet.
+
 - [Relations entre publications](08-relations.md) : peuple `publication_relations`, qui relie des publications distinctes mais apparentées (preprint ↔ version publiée, supplément ↔ article, chapitre ↔ ouvrage, erratum ↔ article corrigé…).
-
-## Rattachement/création des personnes
-
-- [Personnes](09-persons.md) : peuple la table canonique `persons` et ses tables satellites `person_name_forms` et `person_identifiers` (ORCID, idHAL, IdRef) *via* les authorships sources ayant `in_perimeter = true` (renseigné par la phase `affiliations`). Relie les authorships sources aux `person_id` créées.
-- [Authorships](10-authorships.md) : peuple la table canonique `authorships` (liens entre `publications` canoniques et `persons` canoniques) à partir des `person_id` référencés dans les authorships sources.
-
-## Compléments: pays, sujets, statut *open access*
-
-- [Pays](11-enrichissements.md) : détection automatisée des pays des adresses. Sert à interroger les collaborations internationales.
 - [Sujets](11-enrichissements.md#sujets) : deux étapes enchaînées — (1) ingestion des sujets/mots-clés des `source_publications` vers les tables canoniques `subjects` et `publication_subjects`, (2) recalcul de `subjects.usage_count` + table `subject_cooccurrences` (paires de sujets co-présents sur une même publication).
+- [Pays](11-enrichissements.md) : détection automatisée des pays des adresses. Sert à interroger les collaborations internationales.
 - [Statut open access](11-enrichissements.md#statut-open-access) : statut OA par publication via Unpaywall (souvent plus à jour que les sources).

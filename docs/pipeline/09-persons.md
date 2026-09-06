@@ -1,4 +1,4 @@
-#  Matching et création de personnes
+#  Résolution et création des personnes
 
 *À jour le 2026-07-12.*
 

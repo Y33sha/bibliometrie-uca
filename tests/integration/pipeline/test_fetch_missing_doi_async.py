@@ -1,4 +1,4 @@
-"""Tests pour `application.pipeline.cross_imports.fetch_missing_doi.run_async`.
+"""Tests pour `application.pipeline.fetch_missing.doi.run_async`.
 
 Deux angles :
 1. **Orchestrateur** : via un fake adapter, vérifie la parallélisation (pool de workers), le lock DB et la remontée des stats.
@@ -16,9 +16,9 @@ import httpx
 import pytest
 import respx
 
-from application.pipeline.cross_imports.fetch_missing_doi import run_async
+from application.pipeline.fetch_missing.doi import run_async
 from application.pipeline.metrics import PhaseMetrics
-from application.ports.pipeline.cross_imports.fetch_missing_doi import (
+from application.ports.pipeline.fetch_missing.doi import (
     is_not_found_marker,
 )
 from infrastructure.sources.datacite.fetch_missing_doi import DataciteFetchMissingDoiAdapter

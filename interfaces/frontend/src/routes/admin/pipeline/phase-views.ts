@@ -61,7 +61,7 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
       },
     ],
   },
-  cross_imports: {
+  fetch_missing: {
     tables: [
       {
         source: "table",
@@ -76,7 +76,7 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
       },
     ],
   },
-  refresh_stale: {
+  fetch_stale: {
     tables: [
       {
         source: "table",

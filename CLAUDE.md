@@ -35,24 +35,26 @@
 
 ## Phases du pipeline
 
-A jour au 2026-06-29
+A jour au 2026-09-06
 
 `extract` — Extraction HAL/OpenAlex/WoS/ScanR/theses
 `resolve_ra` — Résolution Registration Agency des DOI
-`cross_imports` — Rattrapage cross-source (hal-id, NNT, DOI)
-`refresh_stale` — Rafraîchissement des docs stale
-`refetch_truncated` — Re-fetch OpenAlex tronqués (100 auteurs)
+`fetch_missing` — Rattrapage cross-source (hal-id, NNT, DOI)
+`fetch_stale` — Rafraîchissement des docs stale
+`fetch_truncated` — Re-fetch OpenAlex tronqués (100 auteurs)
 `normalize` — Normalisation staging → source_publications, source_authorships, addresses
 `affiliations` — Résolution adresses → structures UCA
 `publishers_journals` — Enrichissement journals (DOI, APC, DOAJ)
 `metadata_correction` — Corrections métadonnées
 `publications` — Création/rattachement publications
-`relations` — Relations sémantiques entre pubs
 `persons` — Création personnes
-`authorships` — Construction table de vérité
-`countries` — Détection pays
+`authorships` — Construction de la table consolidée
+`relations` — Relations sémantiques entre publications
 `subjects` — Sujets/mots-clés
+`countries` — Détection pays
 `oa_status` — Statut open access
+
+Les quatre dernières sont des enrichissements, hors résolution d'entités : `--no-extras` les omet.
 
 ## Conventions du projet
 

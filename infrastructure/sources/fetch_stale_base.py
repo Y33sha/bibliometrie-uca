@@ -1,4 +1,4 @@
-"""Classe de base des adapters `refresh_stale` : opérations DB génériques.
+"""Classe de base des adapters `fetch_stale` : opérations DB génériques.
 
 Seul `fetch_by_native_id` (l'appel HTTP par identifiant natif) et la configuration (URL, auth) sont source-spécifiques. La sélection des rows stale, la persistance du refresh et le marquage de disparition sont identiques d'une source à l'autre : ils vivent ici, adossés aux requêtes de `infrastructure.pipeline.extract`.
 """
@@ -10,7 +10,7 @@ from abc import ABC, abstractmethod
 import httpx
 from sqlalchemy import Connection
 
-from application.ports.pipeline.extract.refresh_stale import (
+from application.ports.pipeline.extract.fetch_stale import (
     FetchedRecord,
     FetchOutcome,
     StaleRow,
@@ -19,7 +19,7 @@ from infrastructure.pipeline.extract.staging import upsert_staging
 from infrastructure.pipeline.extract.stale import get_stale_rows, set_disappeared_by_source_id
 
 
-class BaseRefreshStaleAdapter(ABC):
+class BaseFetchStaleAdapter(ABC):
     """Base commune : `find_stale`, `save_refreshed`, `mark_disappeared`.
 
     Les sous-classes fixent `source_key`, `max_concurrent`, `configure` et implémentent `fetch_by_native_id`.

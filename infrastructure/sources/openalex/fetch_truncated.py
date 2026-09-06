@@ -1,8 +1,8 @@
-"""Adapter OpenAlex pour `application.pipeline.extract.refetch_truncated`.
+"""Adapter OpenAlex pour `application.pipeline.extract.fetch_truncated`.
 
 HTTP (un appel par work) + SELECT (works marqués `staging.authors_truncated`) + UPDATE staging.raw_data (efface le flag, sans recalcul de raw_hash).
 
-L'orchestration (boucle async, sémaphore, commits intermédiaires) vit côté `application.pipeline.extract.refetch_truncated`.
+L'orchestration (boucle async, sémaphore, commits intermédiaires) vit côté `application.pipeline.extract.fetch_truncated`.
 """
 
 from __future__ import annotations
@@ -12,8 +12,8 @@ from collections.abc import Mapping
 import httpx
 from sqlalchemy import Connection, bindparam, text
 
-from application.ports.pipeline.extract.refetch_truncated import (
-    OpenalexRefetchAdapter,
+from application.ports.pipeline.extract.fetch_truncated import (
+    OpenalexFetchTruncatedAdapter,
     TruncatedWork,
 )
 from domain.types import JsonValue, as_mapping
@@ -57,8 +57,8 @@ _SELECT_TRUNCATED_SQL = text(
 )
 
 
-class PgOpenalexRefetchAdapter(OpenalexRefetchAdapter):
-    """Adapter PostgreSQL + HTTP pour `OpenalexRefetchAdapter`.
+class PgOpenalexFetchTruncatedAdapter(OpenalexFetchTruncatedAdapter):
+    """Adapter PostgreSQL + HTTP pour `OpenalexFetchTruncatedAdapter`.
 
     `base_url` est résolu lors de `configure()` (depuis la BDD), au même endroit que `init_auth()` — la connexion DB est nécessaire aux deux et l'orchestrateur la passe déjà.
     """

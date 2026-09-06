@@ -1,8 +1,8 @@
 """Port : adapter OpenAlex pour le re-fetch des works tronqués à 100 auteurs.
 
-Implémenté par `infrastructure.sources.openalex.refetch_truncated.PgOpenalexRefetchAdapter`.
+Implémenté par `infrastructure.sources.openalex.fetch_truncated.PgOpenalexFetchTruncatedAdapter`.
 
-L'orchestrateur (`application.pipeline.extract.refetch_truncated.refetch`) consomme ce Protocol pour piloter une boucle async qui appelle l'API work-par-work.
+L'orchestrateur (`application.pipeline.extract.fetch_truncated.refetch`) consomme ce Protocol pour piloter une boucle async qui appelle l'API work-par-work.
 """
 
 from __future__ import annotations
@@ -25,8 +25,8 @@ class TruncatedWork:
     openalex_id: str
 
 
-class OpenalexRefetchAdapter(Protocol):
-    """Port refetch_truncated : config, lookup SQL, HTTP, UPDATE SQL."""
+class OpenalexFetchTruncatedAdapter(Protocol):
+    """Port fetch_truncated : config, lookup SQL, HTTP, UPDATE SQL."""
 
     max_concurrent: int  # plafond de workers concurrents — respect du rate-limit API
 

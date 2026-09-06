@@ -1,4 +1,4 @@
-"""Phase `resolve_ra` : résolution préfixe DOI → Registration Agency, avant `cross_imports`.
+"""Phase `resolve_ra` : résolution préfixe DOI → Registration Agency, avant `fetch_missing`.
 
 Pour chaque préfixe du pool `candidate_dois` absent de `doi_prefixes`, récupère quelques DOI samples, interroge `doi.org/ra` (le premier sample qui répond) et insère `(prefix, ra)`. Un préfixe que `doi.org/ra` ne classe pas est inséré avec `ra='unknown'` : le volet publisher de `publishers_journals` tentera `/prefixes` pour le rattraper.
 

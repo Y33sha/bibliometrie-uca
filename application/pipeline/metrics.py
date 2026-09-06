@@ -18,7 +18,7 @@ class PhaseMetrics:
     `updated` = contenu réécrit (hash changé) ; `unchanged` = re-vu à contenu
     identique (seul `last_seen_at` bumpé). `extras` accueille les compteurs
     spécifiques à une phase quand ils ne rentrent pas dans le cadre générique :
-    `already_complete` pour `refetch_truncated`, `tagged` pour `extract_hal`,
+    `already_complete` pour `fetch_truncated`, `tagged` pour `extract_hal`,
     `not_found` pour les fetchers HAL, etc.
 
     `total` (items traités) est **dérivé** : `max(seen, new+updated+unchanged)`.

@@ -28,7 +28,7 @@ def test_filter_configured_filters_and_signals():
         metrics,
         credentials_missing=lambda source: reasons[source],
         logger=_LOG,
-        phase="cross_imports",
+        phase="fetch_missing",
     )
 
     assert kept == ["openalex"]  # seule la source configurée est retournée
@@ -44,7 +44,7 @@ def test_filter_configured_all_configured_no_signal():
         metrics,
         credentials_missing=lambda source: None,
         logger=_LOG,
-        phase="refresh_stale",
+        phase="fetch_stale",
     )
 
     assert kept == ["hal", "openalex"]

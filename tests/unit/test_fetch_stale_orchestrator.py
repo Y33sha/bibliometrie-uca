@@ -1,4 +1,4 @@
-"""Régressions sur l'orchestrateur `refresh_stale`.
+"""Régressions sur l'orchestrateur `fetch_stale`.
 
 Les trois issues d'un refetch par id natif sont routées correctement :
 - record trouvé (hash changé / inchangé) → `save_refreshed` (updated / unchanged) ;
@@ -10,8 +10,8 @@ import asyncio
 import logging
 from unittest.mock import MagicMock
 
-from application.pipeline.extract.refresh_stale import refresh
-from application.ports.pipeline.extract.refresh_stale import (
+from application.pipeline.extract.fetch_stale import refresh
+from application.ports.pipeline.extract.fetch_stale import (
     NOT_FOUND,
     FetchedRecord,
     StaleRow,

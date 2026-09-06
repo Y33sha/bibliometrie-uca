@@ -50,20 +50,20 @@ Une row `doi_prefixes` naît ici avec sa seule RA ; le [volet éditeur](05-publi
 
 ## Imports croisés
 
-Phase `cross_imports`: deux étapes enchaînées, chacune adressant un cas distinct de "doc visible dans une source mais absent d'une autre".
+Phase `fetch_missing`: deux étapes enchaînées, chacune adressant un cas distinct de "doc visible dans une source mais absent d'une autre".
 
 **Étape 1 — `fetch_missing_hal` : HAL ids manquants.**
-Télécharge depuis HAL les documents référencés (par hal-id ou NNT) dans d'autres sources mais absents de notre staging HAL. Orchestrateur dans `application/pipeline/cross_imports/fetch_missing_hal.py`, adaptateur HAL dans `infrastructure/sources/hal/fetch_missing_hal.py`. Auto-borné, tourne dans tous les modes : les hal-ids/NNT introuvables sont marqués `not_found_at` dans staging et ne sont jamais re-interrogés (HAL = source native pour les hal-ids, un 404 est définitif).
+Télécharge depuis HAL les documents référencés (par hal-id ou NNT) dans d'autres sources mais absents de notre staging HAL. Orchestrateur dans `application/pipeline/fetch_missing/hal.py`, adaptateur HAL dans `infrastructure/sources/hal/fetch_missing_hal.py`. Auto-borné, tourne dans tous les modes : les hal-ids/NNT introuvables sont marqués `not_found_at` dans staging et ne sont jamais re-interrogés (HAL = source native pour les hal-ids, un 404 est définitif).
 
 **Étape 2 — `fetch_missing_doi` : DOI manquants par source.**
-Pour chaque source cible (OpenAlex, HAL, WoS, ScanR, Crossref), recherche par DOI les records trouvés dans les autres sources mais absents de celle-ci. La plupart sont effectivement absents ; certains sont repêchés (cause : affiliations différentes selon source). Dispatcher dans `application/pipeline/cross_imports/fetch_missing_doi.py`, adaptateur par source dans `infrastructure/sources/<source>/fetch_missing_doi.py`. Sources cibles déterminées par la policy du mode (`application/pipeline/modes.py`) ; le pool de DOI est auto-borné par le backoff `doi_lookups`.
+Pour chaque source cible (OpenAlex, HAL, WoS, ScanR, Crossref), recherche par DOI les records trouvés dans les autres sources mais absents de celle-ci. La plupart sont effectivement absents ; certains sont repêchés (cause : affiliations différentes selon source). Dispatcher dans `application/pipeline/fetch_missing/doi.py`, adaptateur par source dans `infrastructure/sources/<source>/fetch_missing_doi.py`. Sources cibles déterminées par la policy du mode (`application/pipeline/modes.py`) ; le pool de DOI est auto-borné par le backoff `doi_lookups`.
 
 **Les deux étapes sont auto-bornées et convergentes.** Le pool de hal-ids/NNT à re-tenter est fini par construction (un hal-id 404 sort définitivement via `not_found_at`, HAL étant source native). Le pool de DOI l'est aussi grâce au backoff : un DOI absent d'une source *non native* (HAL/OpenAlex/WoS/ScanR) est enregistré dans `doi_lookups` avec `next_retry = now() + 30 jours` ; `get_cross_import_dois` ne le ressort qu'une fois ce délai écoulé. Chez Crossref et DataCite, dont le DOI est l'identifiant natif, l'absence est définitive : `next_retry` reste NULL et le DOI ne ressort jamais. Le 1er pass tente tout, les passes suivantes ne reprennent que les nouveaux DOI et ceux dont le backoff a expiré.
 
 
 ## Refresh & disparitions
 
-Phase `refresh_stale`, enchaînée après les imports croisés, **à chaque run**. Elle rafraîchit les documents dont la dernière vue (`last_seen_at`) dépasse `STALE_REFRESH_AFTER_DAYS` (90 j) et détecte les disparitions.
+Phase `fetch_stale`, enchaînée après les imports croisés, **à chaque run**. Elle rafraîchit les documents dont la dernière vue (`last_seen_at`) dépasse `STALE_REFRESH_AFTER_DAYS` (90 j) et détecte les disparitions.
 
 Chaque ligne périmée est réinterrogée par son identifiant natif : trouvée → `raw_data` rafraîchi (re-traité si l'empreinte a changé) et `last_seen_at` repoussé ; absence confirmée → `disappeared_at` posé ; erreur transitoire → laissée, retentée plus tard.
 
@@ -73,7 +73,7 @@ Tournant à chaque run, le seuil étale la charge : une passe ne ramasse que ce 
 
 ## Works OpenAlex tronqués
 
-Phase `refetch_truncated`, enchaînée après `refresh_stale` et avant `normalize`. L'[API OpenAlex](../sources/03-openalex.md) plafonne la liste des auteurs à 100 par réponse ; au-delà, les auteurs surnuméraires sont absents du payload moissonné.
+Phase `fetch_truncated`, enchaînée après `fetch_stale` et avant `normalize`. L'[API OpenAlex](../sources/03-openalex.md) plafonne la liste des auteurs à 100 par réponse ; au-delà, les auteurs surnuméraires sont absents du payload moissonné.
 
 Les works concernés sont marqués à l'extraction par le drapeau `staging.authors_truncated` (payload bulk à exactement 100 auteurs). Cette phase re-télécharge un par un les works marqués, récupère la liste complète des auteurs et lève le drapeau (genuine 100 auteurs : levé sans réécriture). Le marqueur étant explicite, il survit à la normalisation (qui purge `raw_data`) : un work qui échappe à cette phase — OpenAlex indisponible, budget API épuisé — reste marqué et est repris au run suivant. Placée après les imports croisés et le refresh pour voir aussi les works qu'ils ramènent, et avant `normalize` pour qu'il écrive directement les auteurs complets.
 

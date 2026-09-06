@@ -1,6 +1,6 @@
 """Port : refetch d'une row `staging` stale par son identifiant natif.
 
-La phase `refresh_stale` (cf. `application.pipeline.extract.refresh_stale.refresh`) interroge chaque source par le `source_id` de la row — hal-id, id OpenAlex, UT WoS, id ScanR, id theses.fr / NNT, DOI pour crossref/datacite — plutôt que par DOI. Toute row possède un `source_id` (`staging.source_id NOT NULL`), donc toute row est refetchable, avec ou sans DOI.
+La phase `fetch_stale` (cf. `application.pipeline.extract.fetch_stale.refresh`) interroge chaque source par le `source_id` de la row — hal-id, id OpenAlex, UT WoS, id ScanR, id theses.fr / NNT, DOI pour crossref/datacite — plutôt que par DOI. Toute row possède un `source_id` (`staging.source_id NOT NULL`), donc toute row est refetchable, avec ou sans DOI.
 
 `fetch_by_native_id` a trois issues, portées par le type de retour :
 
@@ -8,7 +8,7 @@ La phase `refresh_stale` (cf. `application.pipeline.extract.refresh_stale.refres
 - `NOT_FOUND` : absence confirmée (réponse valide, zéro record) → `disappeared_at` ;
 - `None` : échec transitoire (réseau, 429, réponse malformée) → no-op, retry au run suivant. L'absence n'est pas prouvée, on ne marque rien.
 
-Seul `fetch_by_native_id` est source-spécifique. La sélection des rows stale, la persistance du refresh et le marquage de disparition sont génériques : ils sont factorisés dans une classe de base infra (`BaseRefreshStaleAdapter`), le Protocol ne fixe que leur contrat.
+Seul `fetch_by_native_id` est source-spécifique. La sélection des rows stale, la persistance du refresh et le marquage de disparition sont génériques : ils sont factorisés dans une classe de base infra (`BaseFetchStaleAdapter`), le Protocol ne fixe que leur contrat.
 """
 
 from __future__ import annotations
@@ -54,8 +54,8 @@ NOT_FOUND = _NotFound()
 FetchOutcome = FetchedRecord | _NotFound | None
 
 
-class RefreshStaleAdapter(Protocol):
-    """Port refresh_stale : sélection SQL, fetch HTTP par id natif, persistance."""
+class FetchStaleAdapter(Protocol):
+    """Port fetch_stale : sélection SQL, fetch HTTP par id natif, persistance."""
 
     source_key: str
     max_concurrent: int  # plafond de workers concurrents — respect du rate-limit API

@@ -8,21 +8,31 @@ from __future__ import annotations
 PHASE_ORDER: tuple[str, ...] = (
     "extract",
     "resolve_ra",
-    "cross_imports",
-    "refresh_stale",
-    "refetch_truncated",
+    "fetch_missing",
+    "fetch_stale",
+    "fetch_truncated",
     "normalize",
     "affiliations",
     "publishers_journals",
     "metadata_correction",
     "publications",
-    "relations",
     "persons",
     "authorships",
-    "countries",
+    "relations",
     "subjects",
+    "countries",
     "oa_status",
 )
 
+
+EXTRA_PHASES: frozenset[str] = frozenset({"relations", "subjects", "countries", "oa_status"})
+"""Enrichissements terminaux, hors résolution d'entités : `--no-extras` les omet.
+
+Rien en amont ne les lit — ni `persons`, ni `authorships` — et rien entre elles ne dépend d'une autre.
+"""
+
 if len(set(PHASE_ORDER)) != len(PHASE_ORDER):
     raise ValueError("Noms de phase dupliqués dans PHASE_ORDER")
+
+if not EXTRA_PHASES <= set(PHASE_ORDER):
+    raise ValueError("EXTRA_PHASES nomme une phase absente de PHASE_ORDER")

@@ -1,4 +1,4 @@
-"""Adapter WoS pour `application.pipeline.cross_imports.fetch_missing_doi`.
+"""Adapter WoS pour `application.pipeline.fetch_missing.doi`.
 
 WoS accepte une requête groupée par DOI (`DO=("doi1" OR "doi2" OR ...)`). Lot de 20 DOI par requête pour éviter des URLs trop longues, pagination interne de `WOS_PER_PAGE` records, retries exponentiels sur 429/erreurs.
 
@@ -16,7 +16,7 @@ from collections.abc import Iterable, Mapping
 import httpx
 from sqlalchemy import Connection
 
-from application.ports.pipeline.cross_imports.fetch_missing_doi import (
+from application.ports.pipeline.fetch_missing.doi import (
     is_not_found_marker,
     not_found_marker,
 )

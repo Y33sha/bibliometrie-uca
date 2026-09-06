@@ -2,13 +2,13 @@
 
 Sélectionne les rows dont `last_seen_at` a dépassé `STALE_REFRESH_AFTER_DAYS` et les refetche **par leur identifiant natif** (`staging.source_id`) — pas par DOI. Toute row a un `source_id`, donc toute row est refetchable, avec ou sans DOI.
 
-Trois issues par row (cf. `application.ports.pipeline.extract.refresh_stale`) :
+Trois issues par row (cf. `application.ports.pipeline.extract.fetch_stale`) :
 
 - record trouvé → UPSERT (`raw_data` rafraîchi si le hash change, `last_seen_at` toujours bumpé) ;
 - absence confirmée (réponse valide, zéro record) → `disappeared_at` ;
 - échec transitoire (réseau, 429, réponse malformée) → no-op, retry au run suivant.
 
-Le comportement spécifique à chaque source (endpoint, auth, requête/réponse) est délégué à un adapter `RefreshStaleAdapter`. Implémentation async via `run_fetch_pool` (pool de `max_concurrent` workers) avec circuit-breaker par source.
+Le comportement spécifique à chaque source (endpoint, auth, requête/réponse) est délégué à un adapter `FetchStaleAdapter`. Implémentation async via `run_fetch_pool` (pool de `max_concurrent` workers) avec circuit-breaker par source.
 """
 
 from __future__ import annotations
@@ -26,11 +26,11 @@ from application.pipeline.extract.base import scoped_logger
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.signals import filter_configured, select_targets, timed_metrics
 from application.ports.pipeline.circuit_breaker import CircuitBreaker
-from application.ports.pipeline.extract.refresh_stale import (
+from application.ports.pipeline.extract.fetch_stale import (
     NOT_FOUND,
     FetchedRecord,
     FetchOutcome,
-    RefreshStaleAdapter,
+    FetchStaleAdapter,
     StaleRow,
 )
 from domain.sources.registry import ALL_SOURCES
@@ -70,7 +70,7 @@ def run_phase(
         metrics,
         credentials_missing=credentials_missing,
         logger=logger,
-        phase="refresh_stale",
+        phase="fetch_stale",
     )
 
     years_default = [int(year)] if year else get_years_for_window(start_year)
@@ -98,7 +98,7 @@ def run_phase(
 
 async def refresh(
     conn: Connection,
-    adapter: RefreshStaleAdapter,
+    adapter: FetchStaleAdapter,
     log: logging.Logger,
     *,
     years: list[int] | None = None,

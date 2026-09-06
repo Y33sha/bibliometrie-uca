@@ -48,7 +48,7 @@ def test_bulk_upsert_clears_not_found_stub(sa_sync_conn):
 
 
 def test_bulk_upsert_clears_disappeared_marker(sa_sync_conn):
-    # Document présent puis confirmé absent par refresh_stale (disappeared_at posé).
+    # Document présent puis confirmé absent par fetch_stale (disappeared_at posé).
     upsert_staging(
         sa_sync_conn,
         source="hal",

@@ -1,4 +1,4 @@
-"""Adapter theses.fr pour `application.pipeline.extract.refresh_stale`.
+"""Adapter theses.fr pour `application.pipeline.extract.fetch_stale`.
 
 Refetch d'une row par son identifiant natif (`staging.source_id` : NNT pour une thèse soutenue, id theses.fr pour une thèse en cours). L'interrogation passe par le **même** endpoint recherche que le bulk, pour un `raw_data` de forme identique, et retient le hit dont l'`id` correspond exactement. Une réponse valide sans hit correspondant = identifiant confirmé absent.
 """
@@ -8,22 +8,22 @@ from __future__ import annotations
 import httpx
 from sqlalchemy import Connection
 
-from application.ports.pipeline.extract.refresh_stale import (
+from application.ports.pipeline.extract.fetch_stale import (
     NOT_FOUND,
     FetchedRecord,
     FetchOutcome,
 )
 from domain.types import as_mapping, as_sequence, as_str
 from infrastructure.sources.api_params import API_BASE_URLS, THESES_DELAY
+from infrastructure.sources.fetch_stale_base import BaseFetchStaleAdapter
 from infrastructure.sources.http_retry import http_request_with_retry_async
-from infrastructure.sources.refresh_stale_base import BaseRefreshStaleAdapter
 from infrastructure.sources.theses.extract_theses import extract_doi
 
 # Marge au-dessus d'un hit unique : la recherche libre sur l'identifiant peut ramener quelques quasi-homonymes, filtrés ensuite par égalité stricte de l'`id`.
 _SEARCH_SIZE = 20
 
 
-class ThesesRefreshStaleAdapter(BaseRefreshStaleAdapter):
+class ThesesFetchStaleAdapter(BaseFetchStaleAdapter):
     source_key = "theses"
     # theses.fr fragile : un seul worker, cadencé à THESES_DELAY entre appels.
     max_concurrent = 1

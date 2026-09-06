@@ -1,4 +1,4 @@
-"""Adapter CrossRef pour `application.pipeline.extract.refresh_stale`.
+"""Adapter CrossRef pour `application.pipeline.extract.fetch_stale`.
 
 CrossRef est native du DOI : son `staging.source_id` **est** le DOI. Le refetch par id natif revient à `GET /works/{doi}`. Un 404 = DOI confirmé absent.
 """
@@ -10,7 +10,7 @@ import urllib.parse
 import httpx
 from sqlalchemy import Connection
 
-from application.ports.pipeline.extract.refresh_stale import (
+from application.ports.pipeline.extract.fetch_stale import (
     NOT_FOUND,
     FetchedRecord,
     FetchOutcome,
@@ -19,12 +19,12 @@ from domain.publications.identifiers import clean_doi
 from domain.types import as_mapping
 from infrastructure.sources.api_params import API_BASE_URLS
 from infrastructure.sources.config import get_polite_pool_email
+from infrastructure.sources.fetch_stale_base import BaseFetchStaleAdapter
 from infrastructure.sources.http_retry import http_request_with_retry_async
 from infrastructure.sources.polite_pool import build_user_agent
-from infrastructure.sources.refresh_stale_base import BaseRefreshStaleAdapter
 
 
-class CrossrefRefreshStaleAdapter(BaseRefreshStaleAdapter):
+class CrossrefFetchStaleAdapter(BaseFetchStaleAdapter):
     source_key = "crossref"
     # Polite pool CrossRef 10 req/s, 3 concurrentes (cf. fetch_missing_doi).
     max_concurrent = 3

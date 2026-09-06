@@ -18,8 +18,8 @@ from sqlalchemy import Connection
 
 from application.pipeline._fetch_pool import run_fetch_pool
 from application.pipeline.metrics import PhaseMetrics
-from application.ports.pipeline.extract.refetch_truncated import (
-    OpenalexRefetchAdapter,
+from application.ports.pipeline.extract.fetch_truncated import (
+    OpenalexFetchTruncatedAdapter,
     TruncatedWork,
 )
 from domain.types import JsonValue, as_sequence
@@ -29,14 +29,14 @@ COMMIT_EVERY = 50
 
 async def refetch(
     conn: Connection,
-    adapter: OpenalexRefetchAdapter,
+    adapter: OpenalexFetchTruncatedAdapter,
     log: logging.Logger,
 ) -> PhaseMetrics:
     """Re-fetch les works OpenAlex marqués `staging.authors_truncated`.
 
     `updated` compte les works ré-écrits ; `already_complete` (extras) ceux qui avaient pile 100 auteurs (genuine, flag effacé) ; `errors` les fetchs échoués.
     """
-    log.info("▶ refetch_truncated")
+    log.info("▶ fetch_truncated")
     t0 = time.perf_counter()
     adapter.configure(conn)
 
@@ -47,7 +47,7 @@ async def refetch(
     metrics = PhaseMetrics(seen=total)
     if not truncated:
         log.info(
-            "✓ refetch_truncated terminé en %.1fs — %s",
+            "✓ fetch_truncated terminé en %.1fs — %s",
             time.perf_counter() - t0,
             metrics.as_summary(),
         )
@@ -92,7 +92,7 @@ async def refetch(
     )
 
     log.info(
-        "✓ refetch_truncated terminé en %.1fs — %s", time.perf_counter() - t0, metrics.as_summary()
+        "✓ fetch_truncated terminé en %.1fs — %s", time.perf_counter() - t0, metrics.as_summary()
     )
     return metrics
 

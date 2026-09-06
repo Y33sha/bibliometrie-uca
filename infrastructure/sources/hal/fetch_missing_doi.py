@@ -1,4 +1,4 @@
-"""Adapter HAL pour `application.pipeline.cross_imports.fetch_missing_doi`.
+"""Adapter HAL pour `application.pipeline.fetch_missing.doi`.
 
 HAL fournit une API Solr ; on interroge par DOI (un appel par DOI).
 
@@ -12,7 +12,7 @@ from collections.abc import Iterable, Mapping
 import httpx
 from sqlalchemy import Connection
 
-from application.ports.pipeline.cross_imports.fetch_missing_doi import (
+from application.ports.pipeline.fetch_missing.doi import (
     is_not_found_marker,
     not_found_marker,
 )

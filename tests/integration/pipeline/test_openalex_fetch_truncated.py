@@ -1,7 +1,7 @@
 """Tests d'intégration — UPSERT bulk OpenAlex + préservation des authorships
 refetchées via raw_hash.
 
-OpenAlex bulk tronque à 100 auteurs. `refetch_truncated` re-télécharge
+OpenAlex bulk tronque à 100 auteurs. `fetch_truncated` re-télécharge
 ces publications individuellement pour obtenir la liste complète. Le
 mécanisme de préservation lors des bulks ultérieurs repose sur une
 dissymétrie volontaire : **refetch ne recalcule pas `raw_hash`**, donc
