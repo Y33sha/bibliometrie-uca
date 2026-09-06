@@ -24,7 +24,7 @@ _COLS = (
 )
 
 # Un bras UNION par clé de confirmation scalaire d'`external_ids` : égalité directe (index btree). `hal_id` (array) a son propre bras.
-_SCALAR_CONFIRMATION_KEYS = (ConfirmationKey.NNT, ConfirmationKey.PMID, ConfirmationKey.ARXIV_ID)
+_SCALAR_CONFIRMATION_KEYS = tuple(k for k in ConfirmationKey if k is not ConfirmationKey.HAL_ID)
 _SCALAR_KEY_ARMS = "".join(
     f"""
     UNION
