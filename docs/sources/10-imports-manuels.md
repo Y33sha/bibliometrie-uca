@@ -36,8 +36,3 @@ Complété par une extraction des [raw data](https://github.com/OpenAPC/openapc-
 
 https://treemaps.openapc.net/apcdata/clermont-u/
 
-## DOAJ — dump CSV
-
-Dump téléchargé manuellement depuis https://doaj.org/csv puis importé via `python -m interfaces.cli.imports.import_doaj_csv data/doaj_journalcsv_*.csv`.
-
-Le pipeline télécharge le même dump et l'importe par le même chemin, décrit dans la [fiche DOAJ](09-sources-supplementaires.md#doaj).
