@@ -10,7 +10,7 @@ end-to-end avec le `fetcher` concret depuis `infrastructure.sources.unpaywall.cl
 - 429 retry transparent (géré par `http_request_with_retry_async`)
 - semaphore plafonne les fetches concurrents
 
-Mocks : port `OaStatusQueries` (lectures + écritures capturées) ; httpx via `respx`.
+Mocks : port `OaStatusQueries` (lectures + écritures capturées) ; requêtes HTTP via la fixture `http_mock`.
 """
 
 from __future__ import annotations
@@ -21,7 +21,6 @@ from unittest.mock import MagicMock
 
 import httpx
 import pytest
-import respx
 
 from application.pipeline.oa_status import phase as module
 from infrastructure.sources.unpaywall.client import fetch_oa_status
@@ -41,15 +40,15 @@ def _make_fetcher(logger: logging.Logger):
     return fetcher
 
 
-def _route(doi: str, *, status: str | None = None, http_status: int = 200):
-    """Crée une route respx pour un DOI Unpaywall.
+def _route(http_mock, doi: str, *, status: str | None = None, http_status: int = 200):
+    """Déclare la réponse Unpaywall servie pour un DOI.
 
     `status` = chaîne Unpaywall (`'gold'`, `'closed'`, etc.) ou None pour
     `http_status=404`. Si `http_status != 200/404`, on renvoie ce status
     avec un body vide.
     """
     body = {"oa_status": status} if status is not None else None
-    return respx.get(f"{UNPAYWALL_BASE}/{doi}").mock(
+    return http_mock.get(f"{UNPAYWALL_BASE}/{doi}").mock(
         return_value=httpx.Response(http_status, json=body)
     )
 
@@ -92,16 +91,15 @@ def logger() -> logging.Logger:
 
 
 @pytest.mark.asyncio
-@respx.mock
-async def test_happy_path_updates_each_pub(logger):
+async def test_happy_path_updates_each_pub(logger, http_mock):
     pubs = [
         (1, "10.1/a", "closed", False),
         (2, "10.1/b", None, False),
         (3, "10.1/c", "bronze", False),
     ]
-    _route("10.1/a", status="gold")
-    _route("10.1/b", status="green")
-    _route("10.1/c", status="bronze")
+    _route(http_mock, "10.1/a", status="gold")
+    _route(http_mock, "10.1/b", status="green")
+    _route(http_mock, "10.1/c", status="bronze")
 
     queries = _FakeQueries(pubs, stale_total=42, oa_distribution={"gold": 7, "closed": 3})
     metrics = await module.run(
@@ -128,10 +126,9 @@ async def test_happy_path_updates_each_pub(logger):
 
 
 @pytest.mark.asyncio
-@respx.mock
-async def test_404_marks_as_not_found(logger):
+async def test_404_marks_as_not_found(logger, http_mock):
     pubs = [(1, "10.1/x", "closed", False)]
-    _route("10.1/x", http_status=404)
+    _route(http_mock, "10.1/x", http_status=404)
 
     queries = _FakeQueries(pubs)
     await module.run(
@@ -145,11 +142,10 @@ async def test_404_marks_as_not_found(logger):
 
 
 @pytest.mark.asyncio
-@respx.mock
-async def test_diamond_not_replaced_by_gold(logger):
+async def test_diamond_not_replaced_by_gold(logger, http_mock):
     """Diamond OA n'est pas connu d'Unpaywall : ne pas écraser par 'gold'."""
     pubs = [(1, "10.1/diamond", "diamond", False)]
-    _route("10.1/diamond", status="gold")
+    _route(http_mock, "10.1/diamond", status="gold")
 
     queries = _FakeQueries(pubs)
     await module.run(
@@ -162,11 +158,10 @@ async def test_diamond_not_replaced_by_gold(logger):
 
 
 @pytest.mark.asyncio
-@respx.mock
-async def test_diamond_replaced_by_other_status(logger):
+async def test_diamond_replaced_by_other_status(logger, http_mock):
     """Diamond → bronze/green/closed : on accepte l'update (seul gold est filtré)."""
     pubs = [(1, "10.1/diamond", "diamond", False)]
-    _route("10.1/diamond", status="bronze")
+    _route(http_mock, "10.1/diamond", status="bronze")
 
     queries = _FakeQueries(pubs)
     await module.run(
@@ -179,12 +174,11 @@ async def test_diamond_replaced_by_other_status(logger):
 
 
 @pytest.mark.asyncio
-@respx.mock
-async def test_embargoed_not_downgraded_to_closed(logger):
+async def test_embargoed_not_downgraded_to_closed(logger, http_mock):
     """Embargo connu (HAL) : Unpaywall voit le fichier non encore accessible et
     renvoie 'closed' — on ne rétrograde pas vers closed/unknown."""
     pubs = [(1, "10.1/emb", "embargoed", False)]
-    _route("10.1/emb", status="closed")
+    _route(http_mock, "10.1/emb", status="closed")
 
     queries = _FakeQueries(pubs)
     await module.run(
@@ -197,11 +191,10 @@ async def test_embargoed_not_downgraded_to_closed(logger):
 
 
 @pytest.mark.asyncio
-@respx.mock
-async def test_embargoed_replaced_by_open_status(logger):
+async def test_embargoed_replaced_by_open_status(logger, http_mock):
     """Embargo → green/gold : un statut réellement plus ouvert (trouvé ailleurs) écrase bien."""
     pubs = [(1, "10.1/emb", "embargoed", False)]
-    _route("10.1/emb", status="green")
+    _route(http_mock, "10.1/emb", status="green")
 
     queries = _FakeQueries(pubs)
     await module.run(
@@ -214,12 +207,11 @@ async def test_embargoed_replaced_by_open_status(logger):
 
 
 @pytest.mark.asyncio
-@respx.mock
-async def test_open_archive_deposit_not_downgraded_to_closed(logger):
+async def test_open_archive_deposit_not_downgraded_to_closed(logger, http_mock):
     """Une archive ouverte détient le fichier (HAL green, `has_open_deposit=True`) : Unpaywall ne le
     voit pas sous le DOI et renvoie 'closed' — on ne referme pas le dépôt, mais on marque vérifié."""
     pubs = [(1, "10.1/deposit", "green", True)]
-    _route("10.1/deposit", status="closed")
+    _route(http_mock, "10.1/deposit", status="closed")
 
     queries = _FakeQueries(pubs)
     await module.run(
@@ -233,12 +225,11 @@ async def test_open_archive_deposit_not_downgraded_to_closed(logger):
 
 
 @pytest.mark.asyncio
-@respx.mock
-async def test_open_archive_deposit_upgraded_by_unpaywall(logger):
+async def test_open_archive_deposit_upgraded_by_unpaywall(logger, http_mock):
     """Le garde-fou ne bloque que les rétrogradations : un statut plus ouvert (gold) écrase bien,
     même avec un dépôt-archive."""
     pubs = [(1, "10.1/deposit", "green", True)]
-    _route("10.1/deposit", status="gold")
+    _route(http_mock, "10.1/deposit", status="gold")
 
     queries = _FakeQueries(pubs)
     await module.run(
@@ -251,10 +242,9 @@ async def test_open_archive_deposit_upgraded_by_unpaywall(logger):
 
 
 @pytest.mark.asyncio
-@respx.mock
-async def test_unchanged_status_skipped(logger):
+async def test_unchanged_status_skipped(logger, http_mock):
     pubs = [(1, "10.1/same", "gold", False)]
-    _route("10.1/same", status="gold")
+    _route(http_mock, "10.1/same", status="gold")
 
     queries = _FakeQueries(pubs)
     await module.run(
@@ -268,10 +258,9 @@ async def test_unchanged_status_skipped(logger):
 
 
 @pytest.mark.asyncio
-@respx.mock
-async def test_429_retries_transparently(logger):
+async def test_429_retries_transparently(logger, http_mock):
     """Un 429 puis 200 : `http_request_with_retry_async` re-essaie en interne."""
-    respx.get(f"{UNPAYWALL_BASE}/10.1/r").mock(
+    http_mock.get(f"{UNPAYWALL_BASE}/10.1/r").mock(
         side_effect=[
             httpx.Response(429),
             httpx.Response(200, json={"oa_status": "green"}),
@@ -292,7 +281,7 @@ async def test_429_retries_transparently(logger):
 async def test_semaphore_caps_concurrent_fetches(logger):
     """Avec max_concurrent=3, jamais plus de 3 fetches en vol.
 
-    On injecte un fetcher instrumenté (pas via respx) pour mesurer la concurrence.
+    On injecte un fetcher instrumenté, sans passer par le routeur HTTP, pour mesurer la concurrence.
     """
     in_flight = 0
     peak = [0]

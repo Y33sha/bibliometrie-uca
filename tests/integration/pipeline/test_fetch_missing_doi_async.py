@@ -2,7 +2,7 @@
 
 Deux angles :
 1. **Orchestrateur** : via un fake adapter, vérifie la parallélisation (pool de workers), le lock DB et la remontée des stats.
-2. **Adapters** : via `respx` (mocks httpx), vérifie que `fetch_async` parle à l'API correctement (happy path, absence de résultat, erreurs réseau et HTTP).
+2. **Adapters** : via la fixture `http_mock`, vérifie que `fetch_async` parle à l'API correctement (happy path, absence de résultat, erreurs réseau et HTTP).
 """
 
 from __future__ import annotations
@@ -14,7 +14,6 @@ from unittest.mock import MagicMock
 
 import httpx
 import pytest
-import respx
 
 from application.pipeline.fetch_missing.doi import run_async
 from application.pipeline.metrics import PhaseMetrics
@@ -157,14 +156,13 @@ class TestRunAsyncOrchestrator:
         assert result.new == 2
 
 
-# ── adapter OpenAlex : fetch_async via respx ─────────────────────
+# ── adapter OpenAlex : fetch_async via http_mock ─────────────────
 
 
 class TestOpenalexFetchAsync:
     @pytest.mark.asyncio
-    @respx.mock
-    async def test_fetch_async_returns_first_result(self):
-        respx.get("https://api.openalex.org/works").mock(
+    async def test_fetch_async_returns_first_result(self, http_mock):
+        http_mock.get("https://api.openalex.org/works").mock(
             return_value=httpx.Response(
                 200,
                 json={
@@ -183,10 +181,9 @@ class TestOpenalexFetchAsync:
         assert records[0]["id"].endswith("W123")
 
     @pytest.mark.asyncio
-    @respx.mock
-    async def test_fetch_async_no_result_emits_not_found(self):
+    async def test_fetch_async_no_result_emits_not_found(self, http_mock):
         """Réponse valide sans résultat → sentinelle not_found (backoff)."""
-        respx.get("https://api.openalex.org/works").mock(
+        http_mock.get("https://api.openalex.org/works").mock(
             return_value=httpx.Response(200, json={"results": []})
         )
         adapter = OpenalexFetchMissingDoiAdapter()
@@ -199,11 +196,12 @@ class TestOpenalexFetchAsync:
         assert records[0]["_doi"] == "10.1/missing"
 
     @pytest.mark.asyncio
-    @respx.mock
-    async def test_fetch_async_network_error_returns_empty(self):
+    async def test_fetch_async_network_error_returns_empty(self, http_mock):
         """Erreur réseau persistante → l'adapter retourne [] (comportement
         historique : un DOI qui échoue ne fait pas échouer la boucle)."""
-        respx.get("https://api.openalex.org/works").mock(side_effect=httpx.ConnectError("refused"))
+        http_mock.get("https://api.openalex.org/works").mock(
+            side_effect=httpx.ConnectError("refused")
+        )
         adapter = OpenalexFetchMissingDoiAdapter()
         adapter.base_url = "https://api.openalex.org/works"
 
@@ -212,10 +210,9 @@ class TestOpenalexFetchAsync:
         assert records == []
 
     @pytest.mark.asyncio
-    @respx.mock
-    async def test_fetch_async_http_error_returns_empty(self):
+    async def test_fetch_async_http_error_returns_empty(self, http_mock):
         """Erreur HTTP (401/4xx/5xx) → [] sans propager (uniforme aux autres sources)."""
-        respx.get("https://api.openalex.org/works").mock(return_value=httpx.Response(401))
+        http_mock.get("https://api.openalex.org/works").mock(return_value=httpx.Response(401))
         adapter = OpenalexFetchMissingDoiAdapter()
         adapter.base_url = "https://api.openalex.org/works"
 
@@ -224,14 +221,13 @@ class TestOpenalexFetchAsync:
         assert records == []
 
 
-# ── adapter HAL : fetch_async via respx ──────────────────────────
+# ── adapter HAL : fetch_async via http_mock ──────────────────────
 
 
 class TestHalFetchAsync:
     @pytest.mark.asyncio
-    @respx.mock
-    async def test_fetch_async_returns_first_doc(self):
-        respx.get("https://api.archives-ouvertes.fr/search/").mock(
+    async def test_fetch_async_returns_first_doc(self, http_mock):
+        http_mock.get("https://api.archives-ouvertes.fr/search/").mock(
             return_value=httpx.Response(
                 200,
                 json={"response": {"docs": [{"halId_s": "hal-00012345", "doiId_s": "10.1/a"}]}},
@@ -246,10 +242,9 @@ class TestHalFetchAsync:
         assert docs[0]["halId_s"] == "hal-00012345"
 
     @pytest.mark.asyncio
-    @respx.mock
-    async def test_fetch_async_no_result_emits_not_found(self):
+    async def test_fetch_async_no_result_emits_not_found(self, http_mock):
         """Réponse Solr valide sans doc → sentinelle not_found (backoff)."""
-        respx.get("https://api.archives-ouvertes.fr/search/").mock(
+        http_mock.get("https://api.archives-ouvertes.fr/search/").mock(
             return_value=httpx.Response(200, json={"response": {"docs": []}})
         )
         adapter = HalFetchMissingDoiAdapter()
@@ -262,14 +257,13 @@ class TestHalFetchAsync:
         assert docs[0]["_doi"] == "10.1/missing"
 
 
-# ── adapter ScanR : fetch_async via respx ────────────────────────
+# ── adapter ScanR : fetch_async via http_mock ────────────────────
 
 
 class TestScanrFetchAsync:
     @pytest.mark.asyncio
-    @respx.mock
-    async def test_fetch_async_returns_hits_sources(self):
-        respx.post("https://scanr.example/_search").mock(
+    async def test_fetch_async_returns_hits_sources(self, http_mock):
+        http_mock.post("https://scanr.example/_search").mock(
             return_value=httpx.Response(
                 200,
                 json={
@@ -296,11 +290,10 @@ class TestScanrFetchAsync:
         assert records[0]["id"] == "scanr-1"
 
     @pytest.mark.asyncio
-    @respx.mock
-    async def test_fetch_async_batch_marks_unmatched_dois(self):
+    async def test_fetch_async_batch_marks_unmatched_dois(self, http_mock):
         """Lot de 2 DOI, un seul hit : le DOI sans correspondance est marqué
         not_found (diff requêtés / trouvés)."""
-        respx.post("https://scanr.example/_search").mock(
+        http_mock.post("https://scanr.example/_search").mock(
             return_value=httpx.Response(
                 200,
                 json={
@@ -329,10 +322,9 @@ class TestScanrFetchAsync:
         assert missed == {"10.1/b"}
 
     @pytest.mark.asyncio
-    @respx.mock
-    async def test_fetch_async_auth_failure_returns_empty(self):
+    async def test_fetch_async_auth_failure_returns_empty(self, http_mock):
         """Erreur HTTP (401/403/500...) → [] sans propager l'exception."""
-        respx.post("https://scanr.example/_search").mock(return_value=httpx.Response(401))
+        http_mock.post("https://scanr.example/_search").mock(return_value=httpx.Response(401))
         adapter = ScanrFetchMissingDoiAdapter()
         adapter.url = "https://scanr.example/_search"
         adapter.auth = ("u", "p")
@@ -342,7 +334,7 @@ class TestScanrFetchAsync:
         assert records == []
 
 
-# ── adapter DataCite : fetch_async (batch query) via respx ───────
+# ── adapter DataCite : fetch_async (batch query) via http_mock ───
 
 
 class TestDataciteFetchAsync:
@@ -354,10 +346,9 @@ class TestDataciteFetchAsync:
         return adapter
 
     @pytest.mark.asyncio
-    @respx.mock
-    async def test_fetch_async_batch_returns_records(self):
+    async def test_fetch_async_batch_returns_records(self, http_mock):
         """Lot de 2 DOI, 2 nœuds `data` : remappés par DOI exact (lowercase)."""
-        respx.get("https://api.datacite.org/dois").mock(
+        http_mock.get("https://api.datacite.org/dois").mock(
             return_value=httpx.Response(
                 200,
                 json={
@@ -374,11 +365,10 @@ class TestDataciteFetchAsync:
         assert {r["attributes"]["doi"] for r in records} == {"10.1/A", "10.1/B"}
 
     @pytest.mark.asyncio
-    @respx.mock
-    async def test_fetch_async_batch_marks_unmatched_dois(self):
+    async def test_fetch_async_batch_marks_unmatched_dois(self, http_mock):
         """Lot de 2 DOI, un seul nœud : le DOI absent de la réponse est marqué
         not_found (diff requêtés / trouvés)."""
-        respx.get("https://api.datacite.org/dois").mock(
+        http_mock.get("https://api.datacite.org/dois").mock(
             return_value=httpx.Response(
                 200, json={"data": [{"id": "10.1/a", "attributes": {"doi": "10.1/a"}}]}
             )
@@ -391,25 +381,25 @@ class TestDataciteFetchAsync:
         assert missed == {"10.1/b"}
 
     @pytest.mark.asyncio
-    @respx.mock
-    async def test_fetch_async_network_error_returns_empty(self):
+    async def test_fetch_async_network_error_returns_empty(self, http_mock):
         """Erreur réseau persistante = lot incomplet : on ne marque aucun DOI
         not_found (l'absence ne prouve rien)."""
-        respx.get("https://api.datacite.org/dois").mock(side_effect=httpx.ConnectError("refused"))
+        http_mock.get("https://api.datacite.org/dois").mock(
+            side_effect=httpx.ConnectError("refused")
+        )
         async with httpx.AsyncClient() as client:
             records = list(await self._adapter().fetch_async(client, ["10.1/a"]))
         assert records == []
 
 
-# ── adapter WoS : fetch_async via respx ──────────────────────────
+# ── adapter WoS : fetch_async via http_mock ──────────────────────
 
 
 class TestWosFetchAsync:
     @pytest.mark.asyncio
-    @respx.mock
-    async def test_fetch_async_single_page(self):
+    async def test_fetch_async_single_page(self, http_mock):
         """Lot de DOIs qui tient sur une seule page."""
-        respx.get("https://api.clarivate.com/api/wos").mock(
+        http_mock.get("https://api.clarivate.com/api/wos").mock(
             return_value=httpx.Response(
                 200,
                 json={
@@ -441,11 +431,10 @@ class TestWosFetchAsync:
         assert missed == {"10.1/a", "10.1/b"}
 
     @pytest.mark.asyncio
-    @respx.mock
-    async def test_fetch_async_400_marks_batch_not_found(self):
+    async def test_fetch_async_400_marks_batch_not_found(self, http_mock):
         """WoS 400 = lot sans correspondance : zéro match, tout le lot est
         confirmé absent → une sentinelle not_found par DOI interrogé."""
-        respx.get("https://api.clarivate.com/api/wos").mock(return_value=httpx.Response(400))
+        http_mock.get("https://api.clarivate.com/api/wos").mock(return_value=httpx.Response(400))
         adapter = WosFetchMissingDoiAdapter()
         adapter.base_url = "https://api.clarivate.com/api/wos"
         adapter.headers = {"X-ApiKey": "k", "Accept": "application/json"}
@@ -457,11 +446,10 @@ class TestWosFetchAsync:
         assert records[0]["_doi"] == "10.1/a"
 
     @pytest.mark.asyncio
-    @respx.mock
-    async def test_fetch_async_http_error_returns_empty(self):
+    async def test_fetch_async_http_error_returns_empty(self, http_mock):
         """Erreur HTTP non-400 (401/403/5xx) = lot non fiable : [] sans faux
         not_found ni exception propagée (uniforme aux autres sources)."""
-        respx.get("https://api.clarivate.com/api/wos").mock(return_value=httpx.Response(401))
+        http_mock.get("https://api.clarivate.com/api/wos").mock(return_value=httpx.Response(401))
         adapter = WosFetchMissingDoiAdapter()
         adapter.base_url = "https://api.clarivate.com/api/wos"
         adapter.headers = {"X-ApiKey": "k", "Accept": "application/json"}
@@ -471,11 +459,10 @@ class TestWosFetchAsync:
         assert records == []
 
     @pytest.mark.asyncio
-    @respx.mock
-    async def test_fetch_async_network_error_no_false_not_found(self):
+    async def test_fetch_async_network_error_no_false_not_found(self, http_mock):
         """Erreur réseau persistante = lot incomplet : on ne marque aucun DOI
         not_found (l'absence ne prouve rien)."""
-        respx.get("https://api.clarivate.com/api/wos").mock(
+        http_mock.get("https://api.clarivate.com/api/wos").mock(
             side_effect=httpx.ConnectError("refused")
         )
         adapter = WosFetchMissingDoiAdapter()
@@ -487,11 +474,10 @@ class TestWosFetchAsync:
         assert records == []
 
     @pytest.mark.asyncio
-    @respx.mock
-    async def test_fetch_async_filters_preprint_dois(self):
+    async def test_fetch_async_filters_preprint_dois(self, http_mock):
         """DOIs Zenodo/arXiv/SSRN sont filtrés avant appel → pas d'appel HTTP
         si le lot entier ne contient que des preprints."""
-        route = respx.get("https://api.clarivate.com/api/wos").mock()
+        route = http_mock.get("https://api.clarivate.com/api/wos")
 
         adapter = WosFetchMissingDoiAdapter()
         adapter.base_url = "https://api.clarivate.com/api/wos"

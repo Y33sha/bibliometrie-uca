@@ -7,7 +7,6 @@ from unittest.mock import MagicMock, patch
 
 import httpx
 import pytest
-import respx
 
 from infrastructure.sources import http_retry
 from infrastructure.sources.http_retry import http_request_with_retry_async
@@ -94,9 +93,8 @@ def test_success_returns_json():
 
 class TestAsync:
     @pytest.mark.asyncio
-    @respx.mock
-    async def test_success_returns_json(self):
-        route = respx.get("https://api.example/foo").mock(
+    async def test_success_returns_json(self, http_mock):
+        route = http_mock.get("https://api.example/foo").mock(
             return_value=httpx.Response(200, json={"ok": True})
         )
         async with httpx.AsyncClient() as client:
@@ -107,9 +105,8 @@ class TestAsync:
         assert route.call_count == 1
 
     @pytest.mark.asyncio
-    @respx.mock
-    async def test_retries_on_429_then_succeeds(self):
-        route = respx.get("https://api.example/foo").mock(
+    async def test_retries_on_429_then_succeeds(self, http_mock):
+        route = http_mock.get("https://api.example/foo").mock(
             side_effect=[
                 httpx.Response(429),
                 httpx.Response(200, json={"ok": True}),
@@ -127,9 +124,8 @@ class TestAsync:
         assert route.call_count == 2
 
     @pytest.mark.asyncio
-    @respx.mock
-    async def test_5xx_is_retried(self):
-        route = respx.get("https://api.example/foo").mock(return_value=httpx.Response(503))
+    async def test_5xx_is_retried(self, http_mock):
+        route = http_mock.get("https://api.example/foo").mock(return_value=httpx.Response(503))
         async with httpx.AsyncClient() as client:
             with pytest.raises(httpx.HTTPStatusError):
                 await http_request_with_retry_async(
@@ -143,9 +139,8 @@ class TestAsync:
         assert route.call_count == 3  # 5xx retenté jusqu'au dernier essai
 
     @pytest.mark.asyncio
-    @respx.mock
-    async def test_4xx_fails_fast_without_retry(self):
-        route = respx.get("https://api.example/foo").mock(return_value=httpx.Response(404))
+    async def test_4xx_fails_fast_without_retry(self, http_mock):
+        route = http_mock.get("https://api.example/foo").mock(return_value=httpx.Response(404))
         async with httpx.AsyncClient() as client:
             with pytest.raises(httpx.HTTPStatusError):
                 await http_request_with_retry_async(
@@ -159,9 +154,8 @@ class TestAsync:
         assert route.call_count == 1  # aucun retry sur 4xx
 
     @pytest.mark.asyncio
-    @respx.mock
-    async def test_raises_on_persistent_network_error(self):
-        respx.get("https://api.example/foo").mock(side_effect=httpx.ConnectError("refused"))
+    async def test_raises_on_persistent_network_error(self, http_mock):
+        http_mock.get("https://api.example/foo").mock(side_effect=httpx.ConnectError("refused"))
         async with httpx.AsyncClient() as client:
             with pytest.raises(httpx.ConnectError):
                 await http_request_with_retry_async(
@@ -174,9 +168,8 @@ class TestAsync:
                 )
 
     @pytest.mark.asyncio
-    @respx.mock
-    async def test_retries_on_empty_body_when_enabled(self):
-        route = respx.get("https://api.example/foo").mock(
+    async def test_retries_on_empty_body_when_enabled(self, http_mock):
+        route = http_mock.get("https://api.example/foo").mock(
             side_effect=[
                 httpx.Response(200, text=""),
                 httpx.Response(200, json={"ok": True}),
@@ -195,10 +188,9 @@ class TestAsync:
         assert route.call_count == 2
 
     @pytest.mark.asyncio
-    @respx.mock
-    async def test_le_parametre_secret_ne_sort_pas_dans_l_erreur(self):
+    async def test_le_parametre_secret_ne_sort_pas_dans_l_erreur(self, http_mock):
         """Non-régression : une clé d'API passée en paramètre de requête n'apparaît pas dans l'erreur levée, que les appelants journalisent."""
-        respx.get("https://api.example/foo").mock(return_value=httpx.Response(403))
+        http_mock.get("https://api.example/foo").mock(return_value=httpx.Response(403))
         async with httpx.AsyncClient() as client:
             with pytest.raises(httpx.HTTPStatusError) as excinfo:
                 await http_request_with_retry_async(
@@ -220,12 +212,11 @@ class TestRedirections:
     """
 
     @pytest.mark.asyncio
-    @respx.mock
-    async def test_une_redirection_est_une_erreur(self):
-        respx.get("https://api.example/foo").mock(
+    async def test_une_redirection_est_une_erreur(self, http_mock):
+        http_mock.get("https://api.example/foo").mock(
             return_value=httpx.Response(302, headers={"location": "https://ailleurs.example/foo"})
         )
-        ailleurs = respx.get("https://ailleurs.example/foo").mock(
+        ailleurs = http_mock.get("https://ailleurs.example/foo").mock(
             return_value=httpx.Response(200, json={"ok": True})
         )
         async with httpx.AsyncClient() as client:
