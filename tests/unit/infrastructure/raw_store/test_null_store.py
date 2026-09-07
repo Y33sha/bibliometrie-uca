@@ -1,6 +1,6 @@
 """Store nul : un déploiement qui n'archive pas les réponses brutes.
 
-Ce qui y entre n'en ressort pas, et la lecture se comporte comme sur un store vide — sans lever autrement que le contrat ne le prévoit. La phase de normalisation le reçoit à la place du store sur disque quand le pipeline tourne avec `--no-raw-store`.
+Ce qui y entre n'en ressort pas, et la lecture se comporte comme sur un store vide — sans lever autrement que le contrat ne le prévoit. La phase de normalisation le reçoit à la place du store sur disque quand le pipeline tourne sans `--raw-store`.
 """
 
 import pytest
