@@ -79,7 +79,7 @@ Les quatre dernières sont des enrichissements, hors résolution d'entités : `-
 - CI: `.github/workflows/ci.yml`
 - Documentation du projet: `/docs/`
 - Chantiers en cours: `/docs/chantiers/`; chantiers archivés dans `/docs/chantiers/archived`. Structure: Contexte / Décisions / Phasage / Questions ouvertes. Phasage = sous-titres par phase et listes d'items à cocher.
-- Architecture en couches DDD : `domain/` (règles et value objects, zéro I/O), `application/` (orchestrateurs métier, incluant `application/pipeline/`), `infrastructure/` (adapters SQL, APIs sources, settings), `interfaces/` (adapters entrants : `interfaces/api/` pour FastAPI, `interfaces/frontend/` pour SvelteKit, `interfaces/cli/` pour les scripts et l'orchestrateur du pipeline).
+- Architecture en couches DDD : `domain/` (règles et value objects, zéro I/O), `application/` (services dans `application/services/`, orchestrateurs du pipeline dans `application/pipeline/`), `infrastructure/` (adaptateurs SQL, APIs sources, settings), `interfaces/` (adaptateurs entrants : `interfaces/api/` pour FastAPI, `interfaces/frontend/` pour SvelteKit, `interfaces/cli/` pour les scripts et l'orchestrateur du pipeline).
 - Frontend : SvelteKit (Svelte 5), routes dans `interfaces/frontend/src/routes/`
 - Pipeline : phases dans `application/pipeline/`, extracteurs dans `infrastructure/sources/`, orchestrateur `interfaces/cli/run_pipeline.py`, installé comme commande `run_pipeline`
 - Migrations Alembic dans `alembic/versions/` (créer : `alembic revision --autogenerate -m "..."` ; appliquer : `alembic upgrade head` ; rollback : `alembic downgrade -1`). Snapshot `infrastructure/db/schema.sql` régénéré par `python -m interfaces.cli.dev.dump_schema`.

@@ -1,7 +1,7 @@
 """Service d'audit — enregistre les opérations destructives dans audit_log.
 
 Usage :
-    # Depuis un service métier, après une opération destructive :
+    # Depuis un service, après une opération destructive :
     emit_event(audit_repo, "person.merged", "person", target_id,
                {"source_id": source_id})
 

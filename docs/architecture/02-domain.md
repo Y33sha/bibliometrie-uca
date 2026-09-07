@@ -13,7 +13,7 @@ Entités avec identité, comportement et invariants métier.
 - **`SourcePublication`** (`domain/source_publications/`) est une publication telle que moissonnée depuis une source.
 - **`Publication`** (`domain/publications/`) est l'entité unifiée que le pipeline dérive de plusieurs `SourcePublication`. Décider lesquelles désignent le même document est le travail de la résolution d'entités.
 - **`Person`** (`domain/persons/`) est l'entité unifiée que le pipeline dérive de plusieurs signatures désignant la même personne.
-- **`IdentifierAttribution`** (`domain/persons/`) est l'attribution d'un identifiant à une personne : un même couple `(id_type, id_value)` ne peut être attribué qu'à une seule. La valeur elle-même est un value object ; c'est l'attribution qui porte un statut, et qu'on confirme, rejette ou transfère.
+- **`IdentifierAttribution`** (`domain/persons/`) est l'attribution d'un identifiant à une personne : un même couple `(id_type, id_value)` ne peut être attribué qu'à une seule. L'attribution porte un statut de confirmation (`confirmed`, `rejected`, `pending`, `authenticated`).
 - **`Structure`** (`domain/structures/`) est un établissement ou unité de recherche. Les relations de tutelle entre structures forment un graphe acyclique.
 - **`Perimeter`** (`domain/perimeters/`) est un ensemble de structures, défini par ses structures-racines et incluant tous leurs descendants.
 - **`Journal`** (`domain/journals/`) est un support de publication — revue, recueil de proceedings, serveur de preprints — rattaché à un `Publisher`.
@@ -23,9 +23,9 @@ Entités avec identité, comportement et invariants métier.
 
 Immuables, identité par contenu.
 
-- Identifiants de publication : `DOI`, `HALId`, `NNT`, `PMID`, `PMCID`, `ArxivId` (`domain/publications/identifiers.py`)
-- Identifiants de personne : `ORCID`, `IdHAL`, `IdRef`, `HalPersonId` (`domain/persons/identifiers.py`)
-- Identifiants de structure : `RorId`, `HalCollection` (`domain/structures/identifiers.py`)
+- Identifiants de publication : `DOI`, `HALId`, `NNT`, `PMID`, `PMCID`, `ArxivId`
+- Identifiants de personne : `ORCID`, `IdHAL`, `IdRef`, `HalPersonId`
+- Identifiants de structure : `RorId`, `HalCollection`
 - Formes de nom : `PersonNameForm`, `StructureNameForm`
 
 ## Utilitaires partagés
