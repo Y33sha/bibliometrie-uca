@@ -11,9 +11,7 @@ https://developers.openalex.org/
 - Requête par institution (filtre `lineage`) + année de publication
 - Pagination par cursor, 200 résultats/page, 0.2s de délai
 
-**Sources API** (https://api.openalex.org/sources) — enrichissement par `openalex_id` de la revue. `enrich_journals_from_openalex`, dans la phase [`publishers_journals`](../pipeline/05-publishers-journals.md). Met à jour `journals.apc_amount`, `apc_currency`, `is_in_doaj` (flag), `journal_type`.
-
-> APC OpenAlex peu fiable (cf. audit du 2026-05-26 dans la fiche chantier `METIER_pipeline-publishers-journals` : médiane 21% d'écart vs DOAJ, OpenAlex sous-estime systématiquement). Cible visée à terme : retrait. État actuel conservé en attendant une source de remplacement pour les ~2 300 revues hors-DOAJ.
+**Sources API** (https://api.openalex.org/sources) — enrichissement par `openalex_id` de la revue. `enrich_journals_from_openalex`, dans la phase [`publishers_journals`](../pipeline/05-publishers-journals.md). Met à jour `journals.apc_amount`, `apc_currency` et `journal_type`.
 
 **Publishers API** (https://api.openalex.org/publishers) — enrichissement par `openalex_id` de l'éditeur. `enrich_publishers_from_openalex`, dans la phase [`publishers_journals`](../pipeline/05-publishers-journals.md). Met à jour `publishers.country` (ISO-2 depuis `country_codes[0]`). Couverture limitée (~13% des éditeurs locaux ont un `openalex_id`) : les autres voient leur `country` renseigné à la main, comme leur `publisher_type`.
 
