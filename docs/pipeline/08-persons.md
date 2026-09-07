@@ -31,18 +31,24 @@ Les critères sont interrogés dans l'ordre, du plus fiable au moins fiable. Le 
 
 ### Rattacher, puis créer
 
-La phase fait deux passes sur ces critères. La première rattache sans jamais créer. La seconde reprend les signatures restées orphelines et les rejuge sur les deux derniers critères, puisqu'aucun identifiant ne les a prises ; un nom inconnu donne alors une personne neuve.
+La phase fait deux passes sur ces critères.
 
-Cette seconde passe voit les rattachements que la première vient de poser. Deux graphies du même auteur aux formes de nom disjointes — « Jean Martin » et « J-P Martin » — se rejoignent donc par la position dans une autre source, au lieu de donner deux personnes selon l'ordre de traitement.
+La première rattache seulement, sans jamais créer de personne.
+
+La seconde reprend les signatures restées orphelines : aucun identifiant ne les a prises. Elle les rejuge sur la forme de nom et sur la position dans une autre source. Un nom inconnu donne alors une personne neuve.
+
+Cette seconde passe voit les rattachements posés par la première. « Jean Martin » et « J-P Martin » ont des formes de nom disjointes. La position dans une autre source les réunit sur une seule personne.
 
 ### Signatures hors périmètre
 
-Une signature du périmètre est éligible à tous les critères. Une signature hors périmètre est rattachable par identifiant, ou par sa position dans une autre source. Le critère du nom lui est fermé : un nom seul ne peut ni créer une personne ni y attacher une signature hors périmètre.
+Une signature hors périmètre est rattachable par identifiant, ou par sa position dans une autre source. Le critère du nom lui est fermé : un nom seul ne peut ni créer une personne ni y attacher une signature hors périmètre.
 
 ## Indépendance de l'ordre d'ingestion
 
 Le résultat ne dépend pas de l'ordre dans lequel les sources ont été moissonnées. La phase ne fige aucun rattachement dérivé : à chaque exécution, elle les rejuge tous contre l'état ferme de tout le corpus.
 
-Une personne qui perd toutes ses signatures est supprimée, sauf si elle est présente dans le référentiel RH.
+## Données préservées
 
 Les saisies manuelles (épinglage d'une signature, formes de nom confirmées ou rejetées, personnes déclarées distinctes) et les données importées (notices du référentiel RH) sont des entrées fixes, jamais réinitialisées.
+
+Une personne qui perd toutes ses signatures est supprimée, sauf si elle est présente dans le référentiel RH.
