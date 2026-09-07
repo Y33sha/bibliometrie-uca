@@ -36,8 +36,9 @@ data/
 .env
 
 # Claude Code
-# .claude
+.claude/*.json
+.claude/projects
 
 # Vale
-# .vale.ini
-# styles/
+.vale.ini
+styles/

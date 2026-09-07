@@ -43,7 +43,6 @@ HARD = [
     r"historiquement",
     r"jusqu'?(?:ici|à présent|alors)",
     r"n['e]\s*(?:\w+\s+)?plus\b",
-    r"n['e]\s*(?:\w+\s+)?jamais\b",
     r"au lieu de",
     r"contrairement",
     r"remplace(?:nt|ment)?\b",

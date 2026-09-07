@@ -10,30 +10,42 @@
 
 ### Documentation, docstrings et commentaires
 
-- **Une affirmation fausse est d'abord une candidate à la suppression.** Avant de la rectifier, se demander si le lecteur a besoin du fait.
+#### Contenu
+
+- Dire ce que le code **fait**. Pas ce qu'il ne fait pas (ou ne fait plus).
+- **Supprimer les affirmations devenues fausses.** Rectifier seulement si l'information est **indispensable** à cet endroit.
+- **Rester factuel.** La documentation ne doit pas plaider ni argumenter.
+- Viser la **concision maximale**. Adapter le niveau de détail à ce qui est strictement nécessaire à cet endroit. Lorsqu'un point devient non pertinent, corriger **en supprimant** le point plutôt qu'en soulignant sa non-pertinence ("ce n'est pas X mais Y…").
+
+#### Style
 - Utiliser le **présent intemporel**: ne jamais supposer connu l'état antérieur du code. Bannir tout vocabulaire ancré temporellement (`nouveau`, `désormais`, `ne plus`...). Ne jamais renvoyer à des fichiers transitoires (todo, roadmaps).
 - Ecrire d'une manière intelligible en dehors du contexte des conversations; **éviter le jargon** interne au projet et les abréviations maison (`SP` pour source_publication, `pub` pour publication...).
-- **Rester factuel.** La documentation ne doit pas plaider ni argumenter.
-- Viser la **concision maximale**. Adapter le niveau de détail à ce qui est strictement nécessaire. Lorsqu'un point devient non pertinent, corriger **en supprimant** le point plutôt qu'en soulignant sa non-pertinence ("ce n'est pas X mais Y…").
+- **Ecrire des phrases courtes.** Pour lier les idées: parataxe > coordination (lorsque nécessaire) > subordination (à éviter). "ce qui explique que" => "donc"
 - **Eviter les redondances.** Quand une phrase a deux parties séparées par deux-points, supprimer l'une des deux si elle ne fait que reformuler l'autre.
-- **Un mot par notion.** Ne pas chercher l'élégance littéraire. Ne pas varier le vocabulaire pour éviter une répétition : en documentation technique, répéter le même mot est un service rendu au lecteur, pas une faiblesse de style.
-- **Simplicité et précision.** Remplacer les mots vagues par des équivalents précis ("la source atteste d'un document" => "le document est présent dans la source"; "la source ignore le document" => "le document est absent de la source").
-- Ne pas sur-franciser. Les anglicismes sont souhaitables s'ils sont usuels dans le domaine. (*repository* et non "dépôt"...)
+- **Eviter les négations autant que possible.** Toujours essayer de reformuler par une phrase affirmative équivalente. Dire "seul, seulement" au lieu de "ne... que". Eviter absolument les doubles négations.
+- **Un mot par notion.** Ne pas chercher l'élégance littéraire. Ne pas varier le vocabulaire pour éviter une répétition.
+- **Eviter les termes imagés.** Toujours désigner les choses par leur nom.
+- **Simplicité et précision.** Remplacer les mots vagues par des équivalents précis et univoques :
+    * "la source atteste d'un document" => "le document est présent dans la source"
+    * "la source ignore le document" => "le document est absent de la source"
+- Ne pas sur-franciser. Les anglicismes sont souhaitables s'ils sont usuels dans le domaine. (*repository* et non "dépôt"...) Eviter les anglicismes inintelligibles ("keyé", "retriable") ou superflus (quand des termes français usuels existent).
+
+#### Orthographe et mise en page
 - Respecter l'accentuation du français.
 - Eviter les retours à la ligne non sémantiques (i.e. hors titres, listes et sauts de paragraphe).
 
 ### Savoir-vivre
 
 - En fin de message, **proposer des pistes pour la suite** ou **attendre des instructions**. Ne pas suggérer de s'arrêter là, de faire une pause ou demander si l'utilisatrice veut continuer.
-- Pour les décisions structurantes (impact sur le schéma de données ou la logique du pipeline), toujours **attendre la décision** de l'utilisatrice avant de commencer à coder.
+- Pour les décisions structurantes (impact sur le schéma de données ou la logique du pipeline), **attendre la décision** de l'utilisatrice avant de commencer à coder.
 - Pas de mur de texte dans la conversation. Si tu dois cartographier le code avant de répondre, garde l'analyse pour toi, ou propose de générer un bilan au format *.md.
-- Vérifie avant d'affirmer.
+- **Vérifie** ce que tu affirmes.
 - Ne propose **pas de pseudo-choix** idiots (ex. deux options dont seulement une respecte la cible; ou des alternatives sur l'ordre des opérations, si l'ordre est indifférent et que le phasage est déjà posé). Les alternatives creuses polluent la conversation et font perdre du temps.
 
 ### Workflow
 
-- Pose tes questions en texte libre. Pas de QCM à choix limités.
-- Gère les commits git. Fais un commit à chaque changement cohérent (au minimum une fois par phase de chantier, voire à chaque item d'une phase).
+- Pose tes questions en **texte libre**. Pas de QCM à choix limités.
+- Gère les **commits** git. Fais un commit à chaque changement cohérent (au minimum une fois par phase de chantier, voire à chaque item d'une phase).
 - Ne fais pas tourner la suite pytest plusieurs fois juste pour récupérer le résumé. Si c'est vert la première fois, c'est bon. Si tu veux le résumé, débrouille-toi pour le récupérer du premier coup, au lieu de tronquer l'output sans nécessité.
 
 ## Phases du pipeline
