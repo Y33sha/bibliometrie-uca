@@ -30,7 +30,9 @@ Le moissonnage interroge les sources sur le critère de l'affiliation : un docum
 Télécharge depuis HAL les documents référencés (par hal-id ou NNT) dans d'autres sources mais absents de notre staging. Orchestrateur dans `application/pipeline/fetch_missing/hal.py`, adaptateur HAL dans `infrastructure/sources/hal/fetch_missing_hal.py`.
 
 **Étape 2 — `fetch_missing_doi` : DOI manquants par source.**
-Pour chacune des six sources interrogeables par DOI — HAL, OpenAlex, WoS, ScanR, Crossref, DataCite —, recherche les documents présents dans les autres sources et absents de celle-ci. Orchestrateur dans `application/pipeline/fetch_missing/doi.py`, adaptateur par source dans `infrastructure/sources/<source>/fetch_missing_doi.py`. Les recherches infructueuses sont stockées dans `doi_lookups` et retentées après un délai de 30 jours.
+Pour chacune des six sources interrogeables par DOI — HAL, OpenAlex, WoS, ScanR, Crossref, DataCite —, recherche les documents présents dans les autres sources et non trouvés dans celle-ci par le moissonnage initial. Les sources Crossref et DataCite sont seulement interrogées ici : elles sont omises du moissonnage initial car non interrogeables par affiliation.
+
+Orchestrateur dans `application/pipeline/fetch_missing/doi.py`, adaptateur par source dans `infrastructure/sources/<source>/fetch_missing_doi.py`. Les recherches infructueuses sont stockées dans `doi_lookups` et retentées après un délai de 30 jours.
 
 
 ## Documents périmés et disparus (`fetch_stale`)

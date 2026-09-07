@@ -33,15 +33,14 @@ Les critères sont interrogés dans l'ordre, du plus fiable au moins fiable. Le 
 
 La phase fait deux passes sur ces critères.
 
-La première rattache seulement, sans jamais créer de personne.
-
-La seconde reprend les signatures restées orphelines : aucun identifiant ne les a prises. Elle les rejuge sur la forme de nom et sur la position dans une autre source. Un nom inconnu donne alors une personne neuve.
-
-Cette seconde passe voit les rattachements posés par la première. « Jean Martin » et « J-P Martin » ont des formes de nom disjointes. La position dans une autre source les réunit sur une seule personne.
+- La première rattache seulement, sans jamais créer de personne.
+- La seconde reprend les signatures restées orphelines : aucun identifiant ne les a prises. Elle les rejuge sur la forme de nom et sur la position dans une autre source. Un nom inconnu donne alors une personne neuve. Cette seconde passe voit les rattachements posés par la première.
 
 ### Signatures hors périmètre
 
-Une signature hors périmètre est rattachable par identifiant, ou par sa position dans une autre source. Le critère du nom lui est fermé : un nom seul ne peut ni créer une personne ni y attacher une signature hors périmètre.
+Une signature hors périmètre ne peut pas donner lieu à une création de personne.
+
+Elle peut être rattachée à une personne existante, soit par identifiant, soit par sa présence dans une autre source. Le critère de similitude de nom ne vaut que pour les signatures du périmètre. 
 
 ## Indépendance de l'ordre d'ingestion
 
