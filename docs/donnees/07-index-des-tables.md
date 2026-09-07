@@ -99,7 +99,7 @@ Les vues matérialisées sont signalées comme telles ; les tables purement tech
 | `source_authorship_structures` | *vue matérialisée* : affiliations résolues d'un authorship source | [Données dérivées](06-donnees-derivees.md) |
 | `source_authorships` | contribution d'un auteur source à un document source | [Authorships et sources](05-authorships-et-sources.md) |
 | `source_publications` | un enregistrement par document par source | [Authorships et sources](05-authorships-et-sources.md) |
-| `staging` | ingestion brute par source (cycle de vie en 3 états) | [Authorships et sources](05-authorships-et-sources.md) |
+| `staging` | ingestion brute par source, payload vidé après normalisation | [Authorships et sources](05-authorships-et-sources.md) |
 | `structure_name_forms` | formes de noms pour la détection des structures | [Structures](02-structures.md) |
 | `structure_tutelles` | rattachement hiérarchique entre structures | [Structures](02-structures.md) |
 | `structures` | référentiel institutionnel | [Structures](02-structures.md) |
