@@ -13,7 +13,6 @@ Récupère les données brutes depuis les API et les stocke en JSONB dans le *st
 **Gestion des changements**:
 - Chaque *payload* est hashé (MD5) pour détecter les changements lors des réexécutions. Une publication dont les métadonnées ont changé sera ré-importée et re-traitée.
 - Même sans changement, `last_seen_at` est repoussée chaque fois qu'un document est revu.
-> Une publication qui cesse d'apparaître dans sa source — parce que la source l'a dédoublonnée, par exemple — est détectée puis confirmée par la phase [la phase qui les repère](#documents-périmés-et-disparus-fetch_stale), qui pose un marqueur `disappeared_at`.
 
 ## Agences d'enregistrement DOI (`resolve_ra`)
 
@@ -45,6 +44,8 @@ Jouée à chaque exécution, cette phase rafraîchit les documents vus pour la d
 Chaque ligne périmée est réinterrogée par son identifiant natif : trouvée → `raw_data` rafraîchi (re-traité si l'empreinte a changé) et `last_seen_at` repoussé ; absence confirmée → `disappeared_at` posé ; erreur transitoire → laissée, retentée plus tard.
 
 La sélection se borne aux années de la fenêtre courante, lues sur `source_publications.pub_year` — `theses` faisant exception, tout son historique restant éligible. Le seuil étale la charge : une passe ne ramasse que ce qui vient de franchir les 90 jours.
+
+`not_found_at` marque un document que la source n'a jamais rendu ; `disappeared_at`, un document qu'elle rendait et cesse de rendre.
 
 `disappeared_at` est un **marqueur seul** : rien en aval ne l'exploite, ni suppression, ni exclusion, ni propagation.
 
