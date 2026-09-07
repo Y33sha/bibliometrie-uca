@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
 
-import httpx
+import httpx2
 from sqlalchemy import Connection
 
 from application.ports.pipeline.fetch_missing.doi import (
@@ -46,7 +46,7 @@ class OpenalexFetchMissingDoiAdapter:
         self.base_url = API_BASE_URLS["openalex"]
 
     async def fetch_async(
-        self, client: httpx.AsyncClient, dois: list[str]
+        self, client: httpx2.AsyncClient, dois: list[str]
     ) -> Iterable[Mapping[str, JsonValue]]:
         doi = dois[0]
         params: dict[str, str | int | float] = {
@@ -65,7 +65,7 @@ class OpenalexFetchMissingDoiAdapter:
                     label=f"DOI {doi}",
                 )
             )
-        except (httpx.RequestError, httpx.HTTPStatusError):
+        except (httpx2.RequestError, httpx2.HTTPStatusError):
             # Erreur réseau ou HTTP (429/5xx après retries, 4xx) : lot ignoré, les DOI restent candidats au prochain run (leur absence n'est pas prouvée).
             return []
         results = [as_mapping(r) for r in as_sequence(data.get("results"))]

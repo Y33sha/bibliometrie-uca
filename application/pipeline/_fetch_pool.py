@@ -1,7 +1,7 @@
 """Pool de workers pour les phases qui fetchent une source HTTP puis écrivent en base.
 
 Motif partagé par les orchestrateurs async du pipeline (cross-import HAL, cross-import
-DOI, re-fetch des works tronqués) : un client `httpx` partagé, un pool borné de workers
+DOI, re-fetch des works tronqués) : un client `httpx2` partagé, un pool borné de workers
 qui se répartissent les items via un itérateur commun (aucune barrière — un fetch lent
 n'occupe que son propre worker, les autres continuent), des écritures sérialisées sous un
 lock (la `Connection` SA sync n'est pas thread-safe, or `asyncio.to_thread` s'exécute dans
@@ -17,7 +17,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Awaitable, Callable, Sequence
 
-import httpx
+import httpx2
 from sqlalchemy import Connection
 
 
@@ -27,7 +27,7 @@ async def run_fetch_pool[Item, Fetched](
     *,
     max_concurrent: int,
     commit_every: int,
-    fetch: Callable[[httpx.AsyncClient, Item], Awaitable[Fetched]],
+    fetch: Callable[[httpx2.AsyncClient, Item], Awaitable[Fetched]],
     write: Callable[[Connection, Item, Fetched], None],
     should_continue: Callable[[], bool] = lambda: True,
 ) -> None:
@@ -37,7 +37,7 @@ async def run_fetch_pool[Item, Fetched](
     item_iter = iter(items)
     done = 0
 
-    async with httpx.AsyncClient() as client:
+    async with httpx2.AsyncClient() as client:
 
         async def worker() -> None:
             nonlocal done

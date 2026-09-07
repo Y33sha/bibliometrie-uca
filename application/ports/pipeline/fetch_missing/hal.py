@@ -14,7 +14,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import NamedTuple, Protocol
 
-import httpx
+import httpx2
 from sqlalchemy import Connection
 
 from domain.types import JsonValue
@@ -72,12 +72,12 @@ class HalFetchMissingAdapter(Protocol):
     # ── HTTP ───────────────────────────────────────────────────
 
     async def fetch_by_halid(
-        self, client: httpx.AsyncClient, hal_id: str
+        self, client: httpx2.AsyncClient, hal_id: str
     ) -> Mapping[str, JsonValue] | None:
         """Fetch un document HAL par halId. Retourne `None` si introuvable."""
 
     async def fetch_by_nnt(
-        self, client: httpx.AsyncClient, nnt: str
+        self, client: httpx2.AsyncClient, nnt: str
     ) -> Mapping[str, JsonValue] | None:
         """Fetch un document HAL par NNT (thèse). Retourne `None` si introuvable."""
 

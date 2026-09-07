@@ -1,6 +1,6 @@
 """Tests pour `application.pipeline.oa_status.phase.run` (async).
 
-Couvre la version async via `httpx.AsyncClient` + `asyncio.Semaphore`,
+Couvre la version async via `httpx2.AsyncClient` + `asyncio.Semaphore`,
 end-to-end avec le `fetcher` concret depuis `infrastructure.sources.unpaywall.client` :
 - happy path (3 publis, statuts mappés, update DB)
 - 404 Unpaywall → `not_found`
@@ -19,7 +19,7 @@ import asyncio
 import logging
 from unittest.mock import MagicMock
 
-import httpx
+import httpx2
 import pytest
 
 from application.pipeline.oa_status import phase as module
@@ -32,7 +32,7 @@ TEST_EMAIL = "test@example.com"
 def _make_fetcher(logger: logging.Logger):
     """Compose le fetcher infrastructure pour les tests (couverture end-to-end)."""
 
-    async def fetcher(client: httpx.AsyncClient, doi: str) -> str | None:
+    async def fetcher(client: httpx2.AsyncClient, doi: str) -> str | None:
         return await fetch_oa_status(
             client, doi, base_url=UNPAYWALL_BASE, email=TEST_EMAIL, logger=logger
         )
@@ -49,7 +49,7 @@ def _route(http_mock, doi: str, *, status: str | None = None, http_status: int =
     """
     body = {"oa_status": status} if status is not None else None
     return http_mock.get(f"{UNPAYWALL_BASE}/{doi}").mock(
-        return_value=httpx.Response(http_status, json=body)
+        return_value=httpx2.Response(http_status, json=body)
     )
 
 
@@ -262,8 +262,8 @@ async def test_429_retries_transparently(logger, http_mock):
     """Un 429 puis 200 : `http_request_with_retry_async` re-essaie en interne."""
     http_mock.get(f"{UNPAYWALL_BASE}/10.1/r").mock(
         side_effect=[
-            httpx.Response(429),
-            httpx.Response(200, json={"oa_status": "green"}),
+            httpx2.Response(429),
+            httpx2.Response(200, json={"oa_status": "green"}),
         ]
     )
 

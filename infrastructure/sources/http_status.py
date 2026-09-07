@@ -7,17 +7,17 @@ Les adapters qui l'attrapent lisent le statut sur la réponse ; le contexte de l
 
 from __future__ import annotations
 
-import httpx
+import httpx2
 
 
-def raise_for_status(response: httpx.Response) -> None:
-    """Lève `httpx.HTTPStatusError` si le statut n'est pas un succès.
+def raise_for_status(response: httpx2.Response) -> None:
+    """Lève `httpx2.HTTPStatusError` si le statut n'est pas un succès.
 
-    Le type levé est celui d'httpx, que les adapters de sources attrapent nommément et dont ils lisent `response.status_code`. Le message porte le statut et sa phrase-raison.
+    Le type levé est celui d'httpx2, que les adapters de sources attrapent nommément et dont ils lisent `response.status_code`. Le message porte le statut et sa phrase-raison.
     """
     if response.is_success:
         return
-    raise httpx.HTTPStatusError(
+    raise httpx2.HTTPStatusError(
         f"HTTP {response.status_code} {response.reason_phrase}",
         request=response.request,
         response=response,

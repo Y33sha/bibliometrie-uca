@@ -7,7 +7,7 @@ name = "bibliometrie-uca"
 version = "0.1.0"
 requires-python = ">=3.14"
 dependencies = [
-    "httpx==0.28.1",             # unique client HTTP : appels synchrones et asynchrones du pipeline
+    "httpx2==2.12.0",            # unique client HTTP : appels synchrones et asynchrones du pipeline
     "psycopg[binary]==3.3.5",    # driver Postgres pour SQLAlchemy ; import symbolique dans infrastructure/db/engine.py
     "sqlalchemy==2.0.52",        # query builder Core
     "alembic==1.19.1",           # migrations DB
@@ -140,6 +140,7 @@ name = "API : aucune requête réseau sortante"
 type = "forbidden"
 source_modules = ["interfaces.api"]
 forbidden_modules = [
+    "httpx2",
     "httpx",
     "socket",
     "http",
@@ -159,7 +160,8 @@ forbidden_modules = [
 # aucun module servant une requête HTTP ne peut atteindre un client réseau, fût-ce par un
 # import indirect (les chaînes sont vérifiées, pas seulement les imports directs).
 #
-# `httpx` est le client HTTP unique du projet ; `socket` ferme la porte à un repli sur la
+# `httpx2` est le client HTTP unique du projet, et `httpx` l'autre nom de publication de la même bibliothèque : les deux sont fermés.
+# `socket` ferme la porte à un repli sur la
 # primitive de la bibliothèque standard, et `socketserver` à l'ouverture d'un service à
 # l'écoute. Les autres noms couvrent les clients tiers et les protocoles que la bibliothèque
 # standard sert : courrier, transfert de fichiers, terminal distant.
@@ -269,7 +271,7 @@ ignore = [
 max-complexity = 15
 
 [tool.ruff.lint.flake8-tidy-imports.banned-api]
-# `httpx` est le client HTTP unique du projet. `urllib.request` ouvrirait un second chemin
+# `httpx2` est le client HTTP unique du projet. `urllib.request` ouvrirait un second chemin
 # sortant, hors des délais d'expiration, des tentatives bornées et du disjoncteur qui
 # encadrent le premier — et hors de la liste blanche d'hôtes qu'un test confronte au code.
 #
@@ -277,7 +279,7 @@ max-complexity = 15
 # d'architecture qui ferme les autres modules réseau à cette couche ne sait pas nommer le
 # sous-module d'un paquet qu'il tient pour externe. Fermer la source obtient la même
 # transitivité, sans avoir à suivre les chemins.
-"urllib.request".msg = "Le client HTTP du projet est httpx, et le trafic sortant appartient au pipeline (infrastructure/sources)."
+"urllib.request".msg = "Le client HTTP du projet est httpx2, et le trafic sortant appartient au pipeline (infrastructure/sources)."
 
 # Le projet n'a qu'un engine, construit par `infrastructure/db/engine.py`, seul endroit d'où
 # une connexion peut naître. C'est lui qui choisit l'identité de connexion selon le processus
@@ -367,7 +369,7 @@ omit = [
     # en base et se rejouent.
     "interfaces/cli/oneshot/*",
     # Wiring HTTP des adapters sources : les règles de lecture des formats sources vivent
-    # dans `domain/sources/<source>.py`, mesurées ; ce qui reste ici = httpx + pagination
+    # dans `domain/sources/<source>.py`, mesurées ; ce qui reste ici = httpx2 + pagination
     # + sleep + implémentation du port `<Source>ExtractAdapter`.
     "infrastructure/sources/hal/extract_hal.py",
     "infrastructure/sources/hal/fetch_missing_hal_id.py",
@@ -382,7 +384,7 @@ omit = [
     "infrastructure/sources/wos/fetch_missing_doi.py",
     "infrastructure/sources/crossref/fetch_missing_doi.py",
     # Refetch des documents stale par source : même nature d'adapter HTTP
-    # (httpx + pagination + impl du port fetch_stale) que l'extraction
+    # (httpx2 + pagination + impl du port fetch_stale) que l'extraction
     # ci-dessus ; la logique utile de sélection vit côté queries/domain.
     "infrastructure/sources/fetch_stale_base.py",
     "infrastructure/sources/*/fetch_stale.py",

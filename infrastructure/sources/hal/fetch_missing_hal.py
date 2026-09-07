@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-import httpx
+import httpx2
 from sqlalchemy import Connection, text
 
 from application.ports.pipeline.fetch_missing.hal import (
@@ -179,7 +179,7 @@ class PgHalFetchMissingAdapter(HalFetchMissingAdapter):
     # ── HTTP ───────────────────────────────────────────────────
 
     async def fetch_by_halid(
-        self, client: httpx.AsyncClient, hal_id: str
+        self, client: httpx2.AsyncClient, hal_id: str
     ) -> Mapping[str, JsonValue] | None:
         try:
             data = as_mapping(
@@ -197,13 +197,13 @@ class PgHalFetchMissingAdapter(HalFetchMissingAdapter):
                     label=f"halId {hal_id}",
                 )
             )
-        except (httpx.HTTPStatusError, httpx.RequestError):
+        except (httpx2.HTTPStatusError, httpx2.RequestError):
             return None
         docs = as_sequence(as_mapping(data.get("response")).get("docs"))
         return as_mapping(docs[0]) if docs else None
 
     async def fetch_by_nnt(
-        self, client: httpx.AsyncClient, nnt: str
+        self, client: httpx2.AsyncClient, nnt: str
     ) -> Mapping[str, JsonValue] | None:
         try:
             data = as_mapping(
@@ -221,7 +221,7 @@ class PgHalFetchMissingAdapter(HalFetchMissingAdapter):
                     label=f"NNT {nnt}",
                 )
             )
-        except (httpx.HTTPStatusError, httpx.RequestError):
+        except (httpx2.HTTPStatusError, httpx2.RequestError):
             return None
         docs = as_sequence(as_mapping(data.get("response")).get("docs"))
         return as_mapping(docs[0]) if docs else None

@@ -2,7 +2,7 @@
 
 L'API OpenAlex bulk retourne max 100 authorships par work. Cet orchestrateur détecte les works avec exactement 100 auteurs dans le staging et les re-fetche individuellement via l'API (qui retourne alors tous les auteurs).
 
-Implémentation async : pool de `adapter.max_concurrent` workers (`run_fetch_pool`) sur un client `httpx` partagé, pour respecter le plafond OpenAlex (~10 req/s).
+Implémentation async : pool de `adapter.max_concurrent` workers (`run_fetch_pool`) sur un client `httpx2` partagé, pour respecter le plafond OpenAlex (~10 req/s).
 
 **Préservation des authorships complètes.** Le refetch ne recalcule **pas** `raw_hash` (cf. adapter `update_raw_data`) : la ligne refetchée garde le hash du payload bulk initial. Tant que le bulk renvoie le même payload tronqué, son hash matchera celui en base et le document ne sera pas réimporté. Un changement bulk (raw_hash différent) écrasera raw_data avec la version tronquée, et le prochain passage du refetch dans le même run pipeline réimportera le document complet.
 """
@@ -13,7 +13,7 @@ import logging
 import time
 from collections.abc import Mapping
 
-import httpx
+import httpx2
 from sqlalchemy import Connection
 
 from application.pipeline._fetch_pool import run_fetch_pool
@@ -56,7 +56,7 @@ async def refetch(
     processed = 0
 
     async def _fetch(
-        client: httpx.AsyncClient, ref: TruncatedWork
+        client: httpx2.AsyncClient, ref: TruncatedWork
     ) -> Mapping[str, JsonValue] | None:
         return await adapter.fetch_work(client, ref.openalex_id)
 

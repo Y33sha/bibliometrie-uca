@@ -1214,7 +1214,7 @@ def phase_oa_status(options: RunOptions) -> PhaseMetrics:
     """
     import asyncio
 
-    import httpx
+    import httpx2
 
     from application.pipeline.oa_status.phase import run
     from application.pipeline.signals import filter_configured
@@ -1239,7 +1239,7 @@ def phase_oa_status(options: RunOptions) -> PhaseMetrics:
         base_url = API_BASE_URLS["unpaywall"]
         email = get_polite_pool_email_optional() or ""
 
-        async def fetcher(client: httpx.AsyncClient, doi: str) -> str | None:
+        async def fetcher(client: httpx2.AsyncClient, doi: str) -> str | None:
             return await fetch_oa_status(client, doi, base_url=base_url, email=email, logger=log)
 
         metrics.merge(

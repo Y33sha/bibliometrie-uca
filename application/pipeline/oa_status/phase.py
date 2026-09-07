@@ -1,9 +1,9 @@
 """
 Phase pipeline `oa_status` — enrichit `publications.oa_status` via Unpaywall.
 
-Pour les publications ayant un DOI, interroge Unpaywall et met à jour le statut OA. Écrase les valeurs existantes, SAUF : (1) ne remplace jamais 'diamond' par 'gold' (Unpaywall ne connaît pas le diamond OA) ; (2) ne rétrograde jamais 'embargoed' vers 'closed'/'unknown' (l'embargo est connu côté HAL, Unpaywall voit juste le fichier non encore accessible) — un statut plus ouvert (green+) écrase bien.
+Pour les publications ayant un DOI, interroge Unpaywall et met à jour le statut OA. Le statut reçu écrase l'existant, à deux exceptions près : 'diamond' résiste à 'gold', qu'Unpaywall attribue faute de connaître le diamond OA ; 'embargoed' résiste à 'closed' et 'unknown', l'embargo étant connu côté HAL quand Unpaywall voit seulement un fichier inaccessible. Un statut plus ouvert (green+) l'emporte dans les deux cas.
 
-Implémentation async : `httpx.AsyncClient` partagé + `asyncio.Semaphore(5)` sous le seuil Unpaywall (~10 req/s recommandé).
+Implémentation async : `httpx2.AsyncClient` partagé + `asyncio.Semaphore(5)` sous le seuil Unpaywall (~10 req/s recommandé).
 """
 
 import asyncio
@@ -11,14 +11,14 @@ import logging
 import time
 from collections.abc import Awaitable, Callable
 
-import httpx
+import httpx2
 from sqlalchemy import Connection
 
 from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.oa_status import OaStatusQueries
 from domain.publications.metadata import decide_oa_status
 
-type OaStatusFetcher = Callable[[httpx.AsyncClient, str], Awaitable[str | None]]
+type OaStatusFetcher = Callable[[httpx2.AsyncClient, str], Awaitable[str | None]]
 """Signature : `(client, doi) → statut OA mappé (str) | None`."""
 
 # Constantes opérationnelles.
@@ -104,7 +104,7 @@ async def run(
     # La `Connection` SA sync n'est pas thread-safe ; les writes concurrents d'un paquet passent par `to_thread` sous ce lock (le commit, lui, se fait à la frontière de paquet, hors concurrence).
     db_lock = asyncio.Lock()
 
-    async with httpx.AsyncClient() as client:
+    async with httpx2.AsyncClient() as client:
 
         async def process_one(
             pub_id: int, doi: str, current_status: str | None, has_open_deposit: bool

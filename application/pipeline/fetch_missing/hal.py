@@ -14,7 +14,7 @@ import asyncio
 import logging
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 
-import httpx
+import httpx2
 from sqlalchemy import Connection
 
 from application.pipeline._fetch_pool import run_fetch_pool
@@ -50,7 +50,7 @@ async def _fetch_refs_async[Ref](
     *,
     max_concurrent: int,
     delay_s: float,
-    fetch_one: Callable[[httpx.AsyncClient, Ref], Awaitable[Mapping[str, JsonValue] | None]],
+    fetch_one: Callable[[httpx2.AsyncClient, Ref], Awaitable[Mapping[str, JsonValue] | None]],
     insert_one: Callable[[Connection, Ref, Mapping[str, JsonValue] | None], tuple[int, int]],
 ) -> tuple[int, int]:
     """Fetch concurrent puis insert sérialisé, via `run_fetch_pool`.
@@ -60,7 +60,7 @@ async def _fetch_refs_async[Ref](
     counts = {"fetched": 0, "not_found": 0, "done": 0}
     total = len(refs)
 
-    async def _fetch(client: httpx.AsyncClient, ref: Ref) -> Mapping[str, JsonValue] | None:
+    async def _fetch(client: httpx2.AsyncClient, ref: Ref) -> Mapping[str, JsonValue] | None:
         doc = await fetch_one(client, ref)
         if delay_s:
             await asyncio.sleep(delay_s)

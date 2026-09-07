@@ -5,7 +5,7 @@ Refetch d'une row par son UT WoS (`staging.source_id`) via une requête Advanced
 
 from __future__ import annotations
 
-import httpx
+import httpx2
 from sqlalchemy import Connection
 
 from application.ports.pipeline.extract.fetch_stale import (
@@ -34,7 +34,7 @@ class WosFetchStaleAdapter(BaseFetchStaleAdapter):
         self.base_url = API_BASE_URLS["wos"]
         self.headers = {"X-ApiKey": get_wos_api_key(), "Accept": "application/json"}
 
-    async def fetch_by_native_id(self, client: httpx.AsyncClient, source_id: str) -> FetchOutcome:
+    async def fetch_by_native_id(self, client: httpx2.AsyncClient, source_id: str) -> FetchOutcome:
         try:
             data = as_mapping(
                 await http_request_with_retry_async(
@@ -54,10 +54,10 @@ class WosFetchStaleAdapter(BaseFetchStaleAdapter):
                     label=f"UT {source_id}",
                 )
             )
-        except httpx.HTTPStatusError as e:
+        except httpx2.HTTPStatusError as e:
             # 400 = requête sans correspondance : UT confirmé absent de WoS.
             return NOT_FOUND if e.response.status_code == 400 else None
-        except httpx.RequestError:
+        except httpx2.RequestError:
             return None
         if not data:
             return None

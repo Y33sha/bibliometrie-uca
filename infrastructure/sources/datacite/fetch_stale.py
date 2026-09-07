@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import urllib.parse
 
-import httpx
+import httpx2
 from sqlalchemy import Connection
 
 from application.ports.pipeline.extract.fetch_stale import (
@@ -41,7 +41,7 @@ class DataciteFetchStaleAdapter(BaseFetchStaleAdapter):
             "Accept": "application/vnd.api+json",
         }
 
-    async def fetch_by_native_id(self, client: httpx.AsyncClient, source_id: str) -> FetchOutcome:
+    async def fetch_by_native_id(self, client: httpx2.AsyncClient, source_id: str) -> FetchOutcome:
         url = f"{self.base_url}/dois/{urllib.parse.quote(source_id, safe='/()')}"
         try:
             data = as_mapping(
@@ -54,9 +54,9 @@ class DataciteFetchStaleAdapter(BaseFetchStaleAdapter):
                     label=f"DOI {source_id}",
                 )
             )
-        except httpx.HTTPStatusError as e:
+        except httpx2.HTTPStatusError as e:
             return NOT_FOUND if e.response.status_code == 404 else None
-        except httpx.RequestError:
+        except httpx2.RequestError:
             return None
         node = data.get("data")
         if not isinstance(node, dict):

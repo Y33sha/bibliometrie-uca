@@ -13,7 +13,7 @@ import asyncio
 import logging
 from collections.abc import Iterable, Mapping
 
-import httpx
+import httpx2
 from sqlalchemy import Connection
 
 from application.ports.pipeline.fetch_missing.doi import (
@@ -49,7 +49,7 @@ class WosFetchMissingDoiAdapter:
         self.headers = {"X-ApiKey": get_wos_api_key(), "Accept": "application/json"}
 
     async def fetch_async(
-        self, client: httpx.AsyncClient, dois: list[str]
+        self, client: httpx2.AsyncClient, dois: list[str]
     ) -> Iterable[Mapping[str, JsonValue]]:
         # (doi d'origine, forme envoyable à WoS ou None si filtré). Les DOI preprints filtrés (c=None) ne sont pas interrogeables, donc jamais enregistrés comme not-found (le filtre client les écarte gratuitement).
         queried = [(d, filter_doi_for_wos(d)) for d in dois]
@@ -82,7 +82,7 @@ class WosFetchMissingDoiAdapter:
                         label=f"rec {first_record}",
                     )
                 )
-            except httpx.HTTPStatusError as e:
+            except httpx2.HTTPStatusError as e:
                 # WoS 400 = lot sans correspondance : zéro match, le lot entier est confirmé absent (résultat fiable → on garde complete=True).
                 if e.response.status_code == 400:
                     log.warning("WoS 400 rec %d, lot ignoré", first_record)
@@ -93,7 +93,7 @@ class WosFetchMissingDoiAdapter:
                 # non-HTTP) reste propagé et géré par l'orchestrateur.
                 complete = False
                 break
-            except httpx.RequestError:
+            except httpx2.RequestError:
                 complete = False
                 break
 

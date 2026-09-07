@@ -5,7 +5,7 @@ Refetch d'une row par son id ScanR (`staging.source_id`) via une requête Elasti
 
 from __future__ import annotations
 
-import httpx
+import httpx2
 from sqlalchemy import Connection
 
 from application.ports.pipeline.extract.fetch_stale import (
@@ -33,7 +33,7 @@ class ScanrFetchStaleAdapter(BaseFetchStaleAdapter):
         username, password = get_scanr_credentials()
         self.auth = (username, password)
 
-    async def fetch_by_native_id(self, client: httpx.AsyncClient, source_id: str) -> FetchOutcome:
+    async def fetch_by_native_id(self, client: httpx2.AsyncClient, source_id: str) -> FetchOutcome:
         query: dict[str, JsonValue] = {
             "size": 1,
             "query": {"term": {"id.keyword": source_id}},
@@ -50,7 +50,7 @@ class ScanrFetchStaleAdapter(BaseFetchStaleAdapter):
                     label=f"id {source_id}",
                 )
             )
-        except httpx.RequestError:
+        except httpx2.RequestError:
             return None
         hits = as_sequence(as_mapping(data.get("hits")).get("hits"))
         if not hits:

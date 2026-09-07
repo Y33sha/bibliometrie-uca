@@ -11,7 +11,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Protocol
 
-import httpx
+import httpx2
 from sqlalchemy import Connection
 
 from domain.types import JsonValue
@@ -40,7 +40,7 @@ class OpenalexFetchTruncatedAdapter(Protocol):
         """
 
     async def fetch_work(
-        self, client: httpx.AsyncClient, openalex_id: str
+        self, client: httpx2.AsyncClient, openalex_id: str
     ) -> Mapping[str, JsonValue] | None:
         """Fetch un work individuel via l'API OpenAlex (auteurs complets)."""
 

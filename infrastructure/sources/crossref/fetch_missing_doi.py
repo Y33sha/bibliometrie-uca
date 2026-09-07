@@ -12,7 +12,7 @@ from __future__ import annotations
 import urllib.parse
 from collections.abc import Iterable, Mapping
 
-import httpx
+import httpx2
 from sqlalchemy import Connection
 
 from application.ports.pipeline.fetch_missing.doi import (
@@ -47,7 +47,7 @@ class CrossrefFetchMissingDoiAdapter:
         self.headers = {"User-Agent": build_user_agent(email)}
 
     async def fetch_async(
-        self, client: httpx.AsyncClient, dois: list[str]
+        self, client: httpx2.AsyncClient, dois: list[str]
     ) -> Iterable[Mapping[str, JsonValue]]:
         doi = dois[0]
         # CrossRef accepte le DOI tel quel dans le path (slashes inclus, qui font partie d'à peu près 100 % des DOI). On ne quote que les caractères vraiment dangereux.
@@ -63,12 +63,12 @@ class CrossrefFetchMissingDoiAdapter:
                     label=f"DOI {doi}",
                 )
             )
-        except httpx.HTTPStatusError as e:
+        except httpx2.HTTPStatusError as e:
             if e.response.status_code == 404:
                 # 404 = DOI confirmé absent de Crossref (source native du DOI, miss définitif). insert() le mémorise dans doi_lookups (permanent).
                 return [not_found_marker(doi)]
             return []
-        except httpx.RequestError:
+        except httpx2.RequestError:
             return []
 
         message = data.get("message")
