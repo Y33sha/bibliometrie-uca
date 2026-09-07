@@ -162,3 +162,34 @@ AVANT :
 
 APRÈS :
     Signatures épinglées sur une personne. Clé primaire `source_authorship_id` seul : une signature ne s'épingle qu'à une personne. La phase `persons` réapplique l'épingle à chaque exécution, et une signature épinglée n'est ni ré-orphelinée ni réattribuée.
+
+
+## Doc qui explique ce qu'on ne fait pas, sans dire ce qu'il faut faire
+
+AVANT :
+    Ce sont des secrets : ils sont lus dans l'environnement du processus, jamais en base, et ne se règlent donc pas depuis l'interface d'administration.
+
+APRÈS :
+    Ils s'écrivent dans le fichier .env, à la racine du dépôt, d'où les descriptions docker les injectent dans l'environnement du conteneur.
+
+## Le verbe « vivre » pour situer une chose
+
+Une variable qui « vit » dans un fichier, un verrou qui « vit » avec une connexion : l'image remplace la relation, et le lecteur ne sait ni comment la chose arrive là, ni ce qui l'en fait partir. Nommer la relation rend la phrase vérifiable — être stocké, être déclaré, être défini, être lu, être libéré, durer autant que, appartenir à.
+
+AVANT :
+    Les données vivent dans le volume docker `pgdata`.
+
+APRÈS :
+    Le volume docker `pgdata` contient les données.
+
+AVANT :
+    Le verrou vit avec la connexion qui le détient, et tombe avec elle.
+
+APRÈS :
+    La fermeture de la connexion qui le détient libère le verrou.
+
+AVANT :
+    Tous les secrets vivent dans l'environnement du processus, lus au démarrage par `pydantic-settings`.
+
+APRÈS :
+    `pydantic-settings` lit tous les secrets dans l'environnement du processus, au démarrage.
