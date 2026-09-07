@@ -1,5 +1,7 @@
 # OpenAlex
 
+*À jour le 2026-09-07.*
+
 https://openalex.org/
 
 https://developers.openalex.org/

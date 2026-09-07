@@ -1,5 +1,7 @@
 # HAL
 
+*À jour le 2026-09-07.*
+
 https://hal.science/
 
 Documentation HAL : https://doc.hal.science/

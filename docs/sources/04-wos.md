@@ -1,5 +1,7 @@
 # Web of Science
 
+*À jour le 2026-09-07.*
+
 https://developer.clarivate.com/apis/wos
 
 ## API utilisée

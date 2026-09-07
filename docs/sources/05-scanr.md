@@ -1,5 +1,7 @@
 # ScanR
 
+*À jour le 2026-09-07.*
+
 https://scanr.enseignementsup-recherche.gouv.fr/
 
 https://scanr.enseignementsup-recherche.gouv.fr/docs/overview

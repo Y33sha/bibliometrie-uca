@@ -1,5 +1,7 @@
 # Imports manuels
 
+*À jour le 2026-09-07.*
+
 ## Extraction RH
 
 Fichier CSV importé via [interfaces/cli/imports/import_persons.py](https://github.com/Y33sha/bibliometrie-uca/blob/master/interfaces/cli/imports/import_persons.py) → table `persons_rh`.

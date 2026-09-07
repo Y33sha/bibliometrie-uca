@@ -1,5 +1,7 @@
 # Sources supplémentaires
 
+*À jour le 2026-09-07.*
+
 Sources externes interrogées pour **enrichir** les entités du référentiel (publications, revues, éditeurs). Différence avec les sources principales : elles ne moissonnent pas, n'alimentent pas la table `staging`, et n'ont pas de `source_publications.source=...` dédié. Les données récupérées sont écrites directement sur les tables du référentiel, par la phase d'enrichissement concernée.
 
 ## Unpaywall
@@ -8,7 +10,7 @@ https://unpaywall.org/
 
 Documentation API : https://unpaywall.org/products/api
 
-Source d'enrichissement consultée par DOI pour affiner `publications.oa_status` après l'agrégation multi-sources.
+Source d'enrichissement consultée par DOI pour obtenir une valeur à jour de `publications.oa_status`.
 
 ### API utilisée
 
@@ -28,7 +30,7 @@ Consommée par la phase pipeline [`oa_status`](../pipeline/10-enrichissements.md
 
 **Préservation du `diamond`** — Unpaywall ne distingue pas le diamond OA du gold. L'enrichissement ne remplace **jamais** un statut `diamond` par un `gold` retourné par Unpaywall.
 
-<!--TODO: possibilité d'utiliser pour le dédoublonnage publis? + récupérer un lien OA pour chaque publi?-->
+<!--TODO: récupérer un lien OA pour chaque publi?-->
 
 ## DOAJ
 
