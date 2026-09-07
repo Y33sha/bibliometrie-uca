@@ -77,7 +77,7 @@ Document `10.1063/5.0056957` (2 auteurs en mécanique). Champs non consommés re
 
 ### Affiliations mal renseignées
 
-~29 % seulement des auteurs CrossRef portent une affiliation (sondage sur 1 000 payloads, à confirmer sur base complète), et elles sont génériques (tutelle, sans labo). Elles sont néanmoins routées vers `addresses` / `source_authorship_addresses` à la normalisation, comme HAL/OpenAlex/ScanR/theses.fr : la phase `affiliations` y détecte `in_perimeter`, ce qui fait entrer les `source_authorships` CrossRef dans la cascade de résolution des personnes et dans le build des authorships. Couverture partielle, mais strictement mieux que rien. Cette même pauvreté condamne en revanche la *discovery* par affiliation — trouver de nouvelles publis via la query affiliation, un usage distinct (cf. Statut).
+29 % des auteurs Crossref portent une affiliation, sur un sondage de 1 000 payloads, et ces affiliations sont génériques (tutelle, sans labo). Elles sont néanmoins routées vers `addresses` / `source_authorship_addresses` à la normalisation, comme HAL/OpenAlex/ScanR/theses.fr : la phase `affiliations` y détecte `in_perimeter`, ce qui fait entrer les `source_authorships` CrossRef dans la cascade de résolution des personnes et dans le build des authorships. Couverture partielle, mais strictement mieux que rien. Cette même pauvreté condamne en revanche la *discovery* par affiliation — trouver de nouvelles publis via la query affiliation, un usage distinct (cf. Statut).
 
 ### `doc_type` : `journal-article` indistinct, arbitré contre les sous-types
 

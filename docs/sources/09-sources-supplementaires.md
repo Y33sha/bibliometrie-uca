@@ -1,6 +1,6 @@
 # Sources supplémentaires
 
-Sources externes interrogées pour **enrichir** les entités du référentiel (publications, revues, éditeurs). Différence avec les sources principales : elles ne moissonnent pas, n'alimentent pas la table `staging`, et n'ont pas de `source_publications.source=...` dédié. Les données récupérées sont écrites directement sur les tables canoniques par la phase d'enrichissement concernée du pipeline.
+Sources externes interrogées pour **enrichir** les entités du référentiel (publications, revues, éditeurs). Différence avec les sources principales : elles ne moissonnent pas, n'alimentent pas la table `staging`, et n'ont pas de `source_publications.source=...` dédié. Les données récupérées sont écrites directement sur les tables du référentiel, par la phase d'enrichissement concernée.
 
 ## Unpaywall
 
@@ -20,7 +20,7 @@ Source d'enrichissement consultée par DOI pour affiner `publications.oa_status`
 
 ### Données récupérées
 
-Une seule donnée consommée : le `oa_status` du payload Unpaywall, mappé sur l'enum canonique : `gold`, `hybrid`, `bronze`, `green`, `closed`.
+Une seule donnée consommée : le `oa_status` du payload Unpaywall, mappé sur l'enum du référentiel : `gold`, `hybrid`, `bronze`, `green`, `closed`.
 
 Consommée par la phase pipeline [`oa_status`](../pipeline/10-enrichissements.md#statut-open-access-oa_status).
 

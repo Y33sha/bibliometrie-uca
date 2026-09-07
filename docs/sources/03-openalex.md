@@ -11,11 +11,11 @@ https://developers.openalex.org/
 - Requête par institution (filtre `lineage`) + année de publication
 - Pagination par cursor, 200 résultats/page, 0.2s de délai
 
-**Sources API** (https://api.openalex.org/sources) — enrichissement par `openalex_id` de la revue. Sub-step `enrich_journals_from_openalex` de la phase [`publishers_journals`](../pipeline/05-publishers-journals.md). Met à jour `journals.apc_amount`, `apc_currency`, `is_in_doaj` (flag), `journal_type`.
+**Sources API** (https://api.openalex.org/sources) — enrichissement par `openalex_id` de la revue. `enrich_journals_from_openalex`, dans la phase [`publishers_journals`](../pipeline/05-publishers-journals.md). Met à jour `journals.apc_amount`, `apc_currency`, `is_in_doaj` (flag), `journal_type`.
 
 > APC OpenAlex peu fiable (cf. audit du 2026-05-26 dans la fiche chantier `METIER_pipeline-publishers-journals` : médiane 21% d'écart vs DOAJ, OpenAlex sous-estime systématiquement). Cible visée à terme : retrait. État actuel conservé en attendant une source de remplacement pour les ~2 300 revues hors-DOAJ.
 
-**Publishers API** (https://api.openalex.org/publishers) — enrichissement par `openalex_id` de l'éditeur. Sub-step `enrich_publishers_from_openalex` de la phase [`publishers_journals`](../pipeline/05-publishers-journals.md). Met à jour `publishers.country` (ISO-2 depuis `country_codes[0]`). Couverture limitée (~13% des éditeurs locaux ont un `openalex_id`) : les autres voient leur `country` renseigné à la main, comme leur `publisher_type`.
+**Publishers API** (https://api.openalex.org/publishers) — enrichissement par `openalex_id` de l'éditeur. `enrich_publishers_from_openalex`, dans la phase [`publishers_journals`](../pipeline/05-publishers-journals.md). Met à jour `publishers.country` (ISO-2 depuis `country_codes[0]`). Couverture limitée (~13% des éditeurs locaux ont un `openalex_id`) : les autres voient leur `country` renseigné à la main, comme leur `publisher_type`.
 
 ## Données récupérées
 
@@ -176,6 +176,6 @@ Document `W4395704497` (2 auteurs, article de mathématiques). `abstract_inverte
 ## Particularités
 
 - Les requêtes API paginées tronquent les authorships à **100 auteurs max** par publication ; ces works sont marqués `staging.authors_truncated` à l'extraction, et [fetch_truncated](https://github.com/Y33sha/bibliometrie-uca/blob/master/infrastructure/sources/openalex/fetch_truncated.py) les re-télécharge individuellement pour récupérer la liste complète.
-> La préservation des listes d'auteurs complètes obtenues par `fetch_truncated` repose sur un *hack* assumé : le refetch met à jour `raw_data` mais **pas** `raw_hash`, qui reste le hash du payload paginé initial. Tant que celui-ci ne change pas, l'UPSERT ne touche pas `raw_data`. Si le payload change, les `raw_data` sont écrasées (avec la troncature à 100 auteurs) puis re-refetchées au sein du même *run* pipeline.
+> Le re-téléchargement met à jour `raw_data` sans toucher à `raw_hash`, qui reste l'empreinte du payload paginé. Tant que le moissonnage rend ce même payload, l'UPSERT laisse `raw_data` en place, et la liste complète des auteurs survit. Un payload modifié écrase `raw_data`, troncature comprise, et la même exécution le retélécharge.
 - Le `raw_author_name` de l'authorship est plus fiable que `author.display_name` (ce dernier est un nom unifié par l'algo OA, qui peut être erroné).
 - Deux ORCID coexistent dans le payload, de provenances opposées. On retient `authorship.raw_orcid`, provenant de la source moissonnée par OpenAlex . On **ignore** `author.orcid` (ORCID de l'**entité auteur unifiée** par le clustering OpenAlex, régulièrement fautif). Le `raw_orcid` retenu est porté par l'identité d'auteur de la signature (`author_identifying_keys.person_identifiers`, reliée par `source_authorships.identity_id`) et utilisé directement comme signal de résolution côté pipeline persons (source OpenAlex inscrite dans [`ORCID_MATCH_SOURCES`](https://github.com/Y33sha/bibliometrie-uca/blob/master/domain/persons/matching.py)), sans filtre par nom.

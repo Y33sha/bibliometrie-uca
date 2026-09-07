@@ -8,7 +8,7 @@ https://developer.clarivate.com/apis/wos
 - Clé API nécessaire, obtenue sur demande après enregistrement de l'application (compter plusieurs jours de délai).
 - Requête par champ OG (Organization) + année de publication
 - Pagination par offset (`firstRecord`), 10 résultats/page, 1s de délai
-- Retry avec backoff exponentiel (API instable, rate limiting silencieux)
+- Tentatives successives, espacées par un délai qui double à chaque fois : l'API est instable et limite le débit sans le dire
 - Quota annuel limité (vérification au démarrage) : le quota dépend du contrat ; pour l'UCA, la limite est de 50000 *full records* par an.
 
 ## Données récupérées

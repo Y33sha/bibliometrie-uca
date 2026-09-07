@@ -85,7 +85,7 @@ Le pipeline interroge DataCite pour les DOI déjà découverts par les autres so
 
 ### `doc_type` à deux niveaux
 
-DataCite porte le type sur deux champs : `resourceTypeGeneral` (vocabulaire contrôlé : `JournalArticle`, `Preprint`, `ConferencePaper`, `Dataset`, `Software`, `Text`…) et `resourceType` (texte libre déposé par l'entrepôt). Un seul jeton est retenu et stocké dans `source_publications.doc_type` : le `resourceTypeGeneral` quand il est spécifique, sinon le `resourceType` libre (les valeurs génériques `Text` et `Other` y renvoient souvent un type plus précis comme « Journal article » ou « Working Paper »). La conversion vers le vocabulaire canonique vit dans le mapping `datacite` de [`doc_types`](https://github.com/Y33sha/bibliometrie-uca/blob/master/domain/source_publications/doc_types.py).
+DataCite porte le type sur deux champs : `resourceTypeGeneral` (vocabulaire contrôlé : `JournalArticle`, `Preprint`, `ConferencePaper`, `Dataset`, `Software`, `Text`…) et `resourceType` (texte libre déposé par l'entrepôt). Un seul jeton est retenu et stocké dans `source_publications.doc_type` : le `resourceTypeGeneral` quand il est spécifique, sinon le `resourceType` libre (les valeurs génériques `Text` et `Other` y renvoient souvent un type plus précis comme « Journal article » ou « Working Paper »). La conversion vers le vocabulaire du référentiel se fait dans le mapping `datacite` de [`doc_types`](https://github.com/Y33sha/bibliometrie-uca/blob/master/domain/source_publications/doc_types.py).
 
 ### Affiliations textuelles
 
