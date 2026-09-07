@@ -19,10 +19,10 @@
 
 #### Style
 - Utiliser le **présent intemporel**: ne jamais supposer connu l'état antérieur du code. Bannir tout vocabulaire ancré temporellement (`nouveau`, `désormais`, `ne plus`...). Ne jamais renvoyer à des fichiers transitoires (todo, roadmaps).
-- Ecrire d'une manière intelligible en dehors du contexte des conversations; **éviter le jargon** interne au projet et les abréviations maison (`SP` pour source_publication, `pub` pour publication...).
+- Ecrire d'une manière intelligible hors contexte des conversations; **éviter le jargon** interne au projet et les abréviations maison (`SP` pour source_publication, `pub` pour publication...).
 - **Ecrire des phrases courtes.** Pour lier les idées: parataxe > coordination (lorsque nécessaire) > subordination (à éviter). "ce qui explique que" => "donc"
 - **Eviter les redondances.** Quand une phrase a deux parties séparées par deux-points, supprimer l'une des deux si elle ne fait que reformuler l'autre.
-- **Eviter les négations autant que possible.** Toujours essayer de reformuler par une phrase affirmative équivalente. Dire "seul, seulement" au lieu de "ne... que". Eviter absolument les doubles négations.
+- **Préférer l'affirmation à la négation.** Dire "seul, seulement" au lieu de "ne... que". Eviter les doubles négations.
 - **Un mot par notion.** Ne pas chercher l'élégance littéraire. Ne pas varier le vocabulaire pour éviter une répétition.
 - **Eviter les termes imagés.** Toujours désigner les choses par leur nom.
 - **Simplicité et précision.** Remplacer les mots vagues par des équivalents précis et univoques :
