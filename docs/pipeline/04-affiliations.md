@@ -24,6 +24,6 @@ La phase `affiliations` reconnaît les structures dans le texte des adresses, et
    La résolution cherche les formes de nom comme sous-chaînes du texte de l'adresse, à l'aide d'un [automate d'Aho-Corasick](https://tryalgo.org/fr/strings/2024/09/11/aho-corasick/). Trois garde-fous limitent les faux positifs :
    - une forme courte ou marquée « mot entier » ne compte que si elle est délimitée par des non-lettres ;
    - une forme « à contexte requis » n'est retenue que si une autre structure (en général sa structure de tutelle) est elle aussi reconnue dans l'adresse ;
-   - une forme « excluante » exclut la reconnaissance d'une structure.
+   - une forme « excluante » interdit la reconnaissance d'une structure dans l'adresse qui contient cette forme.
 
 3. **`populate_affiliations`** — rafraîchit la vue matérialisée `source_authorship_structures`, qui rattache chaque signature aux structures de ses adresses. Le drapeau `in_perimeter` des `source_authorships` se déduit de cette vue : une signature est `in_perimeter` dès qu'une de ses structures appartient au périmètre. Code : `application/pipeline/affiliations/populate_affiliations.py`.
