@@ -1,7 +1,7 @@
 """
 Phase pipeline `oa_status` — enrichit `publications.oa_status` via Unpaywall.
 
-Pour les publications ayant un DOI, interroge Unpaywall et met à jour le statut OA. Le statut reçu écrase l'existant, à deux exceptions près : 'diamond' résiste à 'gold', qu'Unpaywall attribue faute de connaître le diamond OA ; 'embargoed' résiste à 'closed' et 'unknown', l'embargo étant connu côté HAL quand Unpaywall voit seulement un fichier inaccessible. Un statut plus ouvert (green+) l'emporte dans les deux cas.
+Pour les publications ayant un DOI, interroge Unpaywall et met à jour le statut OA. Le statut reçu écrase l'existant, à deux exceptions près : 'diamond' n'est pas remplacé par 'gold' ; 'embargoed' n'est pas remplacé par 'closed' ou 'unknown', l'embargo étant connu côté HAL quand Unpaywall voit seulement un fichier inaccessible. Un statut plus ouvert (green+) l'emporte dans les deux cas.
 
 Implémentation async : `httpx2.AsyncClient` partagé + `asyncio.Semaphore(5)` sous le seuil Unpaywall (~10 req/s recommandé).
 """
