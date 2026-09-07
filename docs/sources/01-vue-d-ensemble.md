@@ -4,8 +4,6 @@
 
 Le système intègre 7 sources bibliographiques principales, complétées par des sources d'enrichissement et des imports manuels.
 
-> TODO: Documenter les modes d'interrogation possibles pour chaque source, celles qui sont utilisées ou non et pourquoi (par affiliation, par identifiant personne, par identifiant document)
-
 ## Sources bibliographiques
 
 | Source | Type | Couverture | API | Credentials |
@@ -13,11 +11,27 @@ Le système intègre 7 sources bibliographiques principales, complétées par de
 | [HAL](02-hal.md) | Archive ouverte | Publications déposées par les chercheurs UCA | Solr (search) | aucun |
 | [OpenAlex](03-openalex.md) | Base bibliométrique ouverte | Vise l'exhaustivité sur le plan mondial | REST (works, sources, publishers) | clé API gratuite, ou *polite pool* via *mailto* |
 | [Web of Science](04-wos.md) | Base bibliométrique commerciale | Publications indexées WoS (critères de qualité académique) | REST (Expanded API, quota annuel) | clé API sur demande (selon contrat établissement) |
-| [ScanR](05-scanr.md) | Portail officiel du MESRE | Publications de l'écosystème français de la recherche | Elasticsearch (DataESR) | login et mot de passe sur demande (TODO: indiquer mail) |
+| [ScanR](05-scanr.md) | Portail officiel du MESRE | Publications de l'écosystème français de la recherche | Elasticsearch (DataESR) | login et mot de passe sur demande, par le [formulaire de contact](https://scanr.enseignementsup-recherche.gouv.fr/about/contact) |
 | [theses.fr](08-theses.md) | Portail officiel des thèses françaises | Thèses soutenues + en cours, rattachement par PPN d'établissement | REST (data.gouv.fr) | aucun |
 | [Crossref](06-crossref.md) | Agence d'enregistrement de DOI | Publications dotées d'un [DOI](../glossaire.md#doi) Crossref. Aussi consulté pour résoudre les préfixes DOI vers leur Member éditeur. | REST (works, prefixes, members) | *polite pool* via *mailto* |
 | [DataCite](07-datacite.md) | Agence d'enregistrement de DOI | Publications dotées d'un [DOI](../glossaire.md#doi) DataCite : jeux de données, logiciels, *preprints*, dépôts d'entrepôts (Zenodo, figshare, recherche-data-gouv…). Aussi consulté pour résoudre les préfixes DOI vers leur entrepôt. | REST (dois, prefixes) | *polite pool* via *mailto* |
 
+
+### Modes d'interrogation
+
+Ce que le projet interroge dans chaque source, indépendamment de ce que l'API offre par ailleurs.
+
+| Source | Moissonnage par affiliation | Recherche par identifiant de document |
+|---|---|---|
+| HAL | collection HAL + année | hal-id, NNT, DOI |
+| OpenAlex | institution (filtre `lineage`) + année | DOI |
+| Web of Science | champ OG (Organization) + année | DOI |
+| ScanR | identifiant SIREN + année | DOI |
+| theses.fr | PPN d'établissement | NNT |
+| Crossref | — | DOI |
+| DataCite | — | DOI |
+
+Crossref et DataCite ne portent l'affiliation qu'en chaîne libre, sans identifiant d'établissement : le moissonnage par affiliation y serait malcommode, et ces deux sources servent au rattrapage par DOI. Le troisième mode envisageable, l'interrogation par identifiant de personne (ORCID, idHAL), n'est employé pour aucune source.
 
 > **Sources envisagées mais pas exploitées actuellement**
 >
