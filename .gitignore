@@ -40,5 +40,5 @@ data/
 .claude/projects
 
 # Vale
-.vale.ini
-styles/
+# .vale.ini
+# styles/
