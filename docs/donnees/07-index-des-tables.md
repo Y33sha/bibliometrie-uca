@@ -4,7 +4,7 @@
 
 ## Vue macro
 
-Vue globale du schéma : l'ingestion par source en haut, les référentiels canoniques au centre, et les satellites rattachés à leur entité-pivot. Seules les tables porteuses y figurent ; l'index ci-dessous est exhaustif.
+Vue globale du schéma : l'ingestion par source en haut, les référentiels consolidés au centre, et les satellites rattachés à leur entité-pivot. Seules les tables porteuses y figurent ; l'index ci-dessous est exhaustif.
 
 ```mermaid
 flowchart TB
@@ -68,7 +68,7 @@ Les vues matérialisées sont signalées comme telles ; les tables purement tech
 | `apc_payments` | frais de publication (import CSV) | [Structures](02-structures.md) |
 | `audit_log` | journal des événements (actions admin, fusions) — technique | — |
 | `author_identifying_keys` | attributs d'identité d'une signature source (nom normalisé, identifiants), partagés via `identity_id` | [Authorships et sources](05-authorships-et-sources.md) |
-| `authorship_structures` | *vue matérialisée* : structures d'un authorship canonique | [Données dérivées](06-donnees-derivees.md) |
+| `authorship_structures` | *vue matérialisée* : structures liées à une authorship | [Données dérivées](06-donnees-derivees.md) |
 | `authorships` | table consolidée personne × publication | [Authorships et sources](05-authorships-et-sources.md) |
 | `config` | réglages d'exploitation du pipeline (périmètres actifs, années couvertes…) | [Structures](02-structures.md) |
 | `confirmed_authorships` | épinglages admin (must-link) signature source ↔ personne, réappliqués à chaque exécution | [Authorships et sources](05-authorships-et-sources.md) |
