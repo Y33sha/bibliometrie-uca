@@ -80,7 +80,7 @@ Le pipeline interroge DataCite pour les DOI déjà découverts par les autres so
 
 ### Relations entre publications
 
-*TODO: à remplir*
+DataCite déclare ses relations dans `relatedIdentifiers[].relationType`, sous des valeurs comme `IsSupplementTo` ou `IsPartOf`. La phase [relations](../pipeline/10-enrichissements.md#relations-entre-publications-relations) les traduit vers son vocabulaire, et écarte celles qui désignent la même œuvre, une citation ou une évaluation.
 
 ### `doc_type` à deux niveaux
 
