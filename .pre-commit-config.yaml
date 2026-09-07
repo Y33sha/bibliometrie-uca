@@ -40,11 +40,12 @@ repos:
   # un arbre cohérent, que le commit d'un sous-ensemble de fichiers ne garantit
   # pas. Ils vivent donc à l'étage pre-push (arbre entièrement commité), pas ici.
   #
-  # Les outils sont lancés par `python -m <module>`, pas par leur exécutable : le
-  # contrôle d'application de Windows bloque les shims .exe non signés que uv pose
-  # dans le venv (« os error 4551 »), binaire par binaire selon leur réputation.
-  # L'interpréteur, lui, est signé. `lint-imports` fait exception : il n'expose pas
-  # de point d'entrée module.
+  # Les outils sont lancés par l'interpréteur, pas par leur exécutable : le contrôle
+  # d'application de Windows bloque les shims .exe non signés que uv pose dans le venv
+  # (« os error 4551 »), binaire par binaire selon leur réputation. L'interpréteur, lui,
+  # est signé. La forme est `python -m <module>` pour les outils qui exposent un point
+  # d'entrée module ; `import-linter` n'en a pas, et se lance par la fonction que son
+  # script de console appelle.
   - repo: local
     hooks:
       # Hygiène de fichiers reprise de pre-commit/pre-commit-hooks, lancée via
@@ -133,7 +134,7 @@ repos:
 
       - id: ci-lint-imports
         name: lint-imports (architecture DDD)
-        entry: uv run lint-imports
+        entry: uv run python -c "from importlinter.cli import lint_imports_command; lint_imports_command()"
         language: system
         pass_filenames: false
         always_run: true
