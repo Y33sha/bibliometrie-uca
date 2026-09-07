@@ -13,7 +13,7 @@ https://developers.openalex.org/
 
 **Sources API** (https://api.openalex.org/sources) — enrichissement par `openalex_id` de la revue. `enrich_journals_from_openalex`, dans la phase [`publishers_journals`](../pipeline/05-publishers-journals.md). Met à jour `journals.apc_amount`, `apc_currency` et `journal_type`.
 
-**Publishers API** (https://api.openalex.org/publishers) — enrichissement par `openalex_id` de l'éditeur. `enrich_publishers_from_openalex`, dans la phase [`publishers_journals`](../pipeline/05-publishers-journals.md). Met à jour `publishers.country` (ISO-2 depuis `country_codes[0]`). Couverture limitée (~13% des éditeurs locaux ont un `openalex_id`) : les autres voient leur `country` renseigné à la main, comme leur `publisher_type`.
+**Publishers API** (https://api.openalex.org/publishers) — enrichissement par `openalex_id` de l'éditeur, lancé à la demande par `interfaces/cli/maintenance/enrich_publishers.py`, hors pipeline. Écrit `publishers.country` (ISO-2 depuis `country_codes[0]`) là où la base n'en porte pas. Couverture limitée — environ 13 % des éditeurs locaux ont un `openalex_id` — les autres voient leur `country` renseigné à la main, comme leur `publisher_type`.
 
 ## Données récupérées
 
