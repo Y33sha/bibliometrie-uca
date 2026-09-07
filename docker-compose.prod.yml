@@ -29,6 +29,19 @@ services:
       - pgdata:/var/lib/postgresql
     # Pas de port exposé en prod (accès interne uniquement)
 
+    # Sondes de maintien TCP : une machine cliente qui disparaît sans fermer sa connexion laisse
+    # une session que le serveur croit vivante, et avec elle le verrou d'exécution du pipeline.
+    # Les valeurs du système d'exploitation concluraient en deux heures ; celles-ci en sept
+    # minutes (300 s de silence, puis quatre sondes espacées de 30 s).
+    command:
+      - postgres
+      - -c
+      - tcp_keepalives_idle=300
+      - -c
+      - tcp_keepalives_interval=30
+      - -c
+      - tcp_keepalives_count=4
+
     # Exécution directe sous l'utilisateur `postgres` de l'image : le point d'entrée ne passe
     # pas par root pour ajuster le répertoire de données. Le volume nommé hérite du
     # propriétaire que l'image donne à `/var/lib/postgresql` ; un montage lié, lui, demanderait

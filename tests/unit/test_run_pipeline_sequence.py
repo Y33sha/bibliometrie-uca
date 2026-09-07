@@ -11,6 +11,7 @@ import sys
 from contextlib import nullcontext
 
 import pytest
+from sqlalchemy.exc import OperationalError
 
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.phase_order import EXTRA_PHASES
@@ -146,6 +147,21 @@ class TestRunOnePhase:
         (record,) = recorder.records
         assert record["status"] == "error"
         assert record["signals"][0]["message"] == "la source est à bout de budget"
+        assert "run_pipeline --from persons" in caplog.text
+
+    def test_perte_de_la_base_consignee_comme_un_echec(self, caplog):
+        """Un serveur redémarré coupe les connexions : la phase se consigne et dit par où reprendre, au lieu d'une trace d'appels."""
+
+        def _connexion_perdue(options):
+            raise OperationalError("SELECT 1", {}, Exception("server closed the connection"))
+
+        recorder = _FakeRecorder()
+        with pytest.raises(SystemExit) as sortie, caplog.at_level(logging.INFO):
+            self._executer(_connexion_perdue, recorder=recorder)
+
+        assert sortie.value.code == 1
+        (record,) = recorder.records
+        assert record["status"] == "error"
         assert "run_pipeline --from persons" in caplog.text
 
     def test_arguments_du_run_transmis_a_la_phase(self):

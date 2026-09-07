@@ -1433,8 +1433,10 @@ def _run_one_phase(
 ) -> tuple[str, float]:
     """Exécute une phase : appel, capture d'observabilité. Rend `(nom, durée)`.
 
-    Une interruption utilisateur ou une `RuntimeError` est enregistrée puis termine le process
-    (reprise possible via `--from <phase>`)."""
+    Une interruption utilisateur, une `RuntimeError` ou une erreur de base est enregistrée puis
+    termine le process (reprise possible via `--from <phase>`)."""
+    from sqlalchemy.exc import SQLAlchemyError
+
     # Injecte le nom de phase dans tous les records émis pendant `fn` (logger `normalize:` plutôt
     # que `pipeline:`), y compris depuis les extracteurs threadés qui héritent du contexte.
     phase_token = set_log_phase(name)
@@ -1476,7 +1478,7 @@ def _run_one_phase(
                 details={},
             )
             sys.exit(130)
-        except RuntimeError as e:
+        except (RuntimeError, SQLAlchemyError) as e:
             log.error("Pipeline interrompu à la phase '%s' : %s", name, e)
             log.error("Pour reprendre : run_pipeline --from %s", name)
             recorder.record(
