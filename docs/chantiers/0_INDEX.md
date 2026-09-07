@@ -4,8 +4,6 @@
 
 ### En cours
 
-- [Durcissement pour l'hébergement universitaire](CODE_securite.md)
-
 ### En pause
 
 - [Gestion et dédoublonnage assistés de la base personnes](DATA_personnes-dedoublonnage-assiste.md)
@@ -19,6 +17,7 @@
 
 ## Chantiers archivés
 
+- 2026-09-07 — [Durcissement pour l'hébergement universitaire](archived/2026-09-07_CODE_securite.md)
 - 2026-08-25 — [Lisibilité](archived/2026-08-25_CODE_lisibilite.md)
 - 2026-07-25 — [Vocabulaires fermés : StrEnum plutôt que Literal / chaînes](archived/2026-07-25_CODE_vocabulaires-fermes-strenum.md)
 - 2026-07-19 — [Projections de lecture des personnes : deux endpoints pour une entité](archived/2026-07-19_CODE_projections-de-lecture-des-personnes.md)

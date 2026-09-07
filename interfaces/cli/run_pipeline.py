@@ -148,7 +148,7 @@ class RunOptions:
     rebuild_publications: bool = False
     rebuild_authorships: bool = False
     rebuild_subjects: bool = False
-    no_raw_store: bool = False
+    raw_store: bool = False
 
 
 def _open_tx() -> "AbstractContextManager[Connection]":
@@ -385,7 +385,7 @@ def phase_normalize(options: RunOptions) -> PhaseMetrics:
 
     # Ordre d'exécution : source la plus autoritative en premier (cf. SOURCE_PRIORITY).
     # Les suivantes n'écrasent pas les métadonnées déjà posées lors de `refresh_from_sources`.
-    registry = _normalize_builders(archive=not options.no_raw_store)
+    registry = _normalize_builders(archive=options.raw_store)
 
     def normalize_one(source: str) -> dict[str, object]:
         return _run_normalize(source, registry[source])
@@ -1372,10 +1372,11 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         "depuis zéro (filet anti-divergence, en récupération).",
     )
     parser.add_argument(
-        "--no-raw-store",
+        "--raw-store",
         action="store_true",
-        help="N'archive pas les réponses brutes des sources. Le pipeline n'écrit alors "
-        "rien sur disque ; rejouer la normalisation exigera de réinterroger les sources.",
+        help="Archive les réponses brutes des sources sur disque, sous "
+        "`BIBLIO_RAW_STORE_DIR`. Rejouer une normalisation puise alors dans cette archive "
+        "au lieu de réinterroger les sources.",
     )
     parser.add_argument(
         "--rebuild-subjects",
@@ -1459,7 +1460,7 @@ def _run_one_phase(
                     rebuild_publications=args.rebuild_publications,
                     rebuild_authorships=args.rebuild_authorships,
                     rebuild_subjects=args.rebuild_subjects,
-                    no_raw_store=args.no_raw_store,
+                    raw_store=args.raw_store,
                 )
             )
         except KeyboardInterrupt:

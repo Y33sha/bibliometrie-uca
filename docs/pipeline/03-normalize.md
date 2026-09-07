@@ -23,6 +23,6 @@ Conservés en base, les payloads bruts la font grossir hors de proportion avec l
 
 ## Archivage du payload brut
 
-Avant de vider `raw_data`, la normalisation dépose le payload hors base, dans le [raw store](../../infrastructure/raw_store/) : un fichier `data/raw_store/{source}/{source_id}.json.gz` par document. L'option `--no-raw-store` désactive cet archivage : le payload est alors perdu à la vidange.
+Avant de vider `raw_data`, la normalisation dépose le payload hors base, dans le [raw store](../../infrastructure/raw_store/) : un fichier `data/raw_store/{source}/{source_id}.json.gz` par document. L'option `--raw-store` déclenche cet archivage : sans elle, le payload est perdu à la vidange.
 
 Le script `interfaces/cli/maintenance/rehydrate_staging_from_raw_store.py` réinjecte les payloads d'une source, pour rejouer sa normalisation.

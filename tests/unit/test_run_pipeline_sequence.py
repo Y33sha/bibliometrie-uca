@@ -29,7 +29,7 @@ def _args(**surcharges) -> argparse.Namespace:
         "rebuild_publications": False,
         "rebuild_authorships": False,
         "rebuild_subjects": False,
-        "no_raw_store": False,
+        "raw_store": False,
         "dry_run": False,
         "list": False,
         "force": False,
@@ -290,7 +290,7 @@ class TestMain:
                 "--sources",
                 "hal,openalex",
                 "--include-wos",
-                "--no-raw-store",
+                "--raw-store",
             ],
         )
 
@@ -301,7 +301,7 @@ class TestMain:
         assert args.start_year == 2020
         assert args.sources == "hal,openalex"
         assert args.include_wos is True
-        assert args.no_raw_store is True
+        assert args.raw_store is True
 
 
 def test_arret_demande_par_le_systeme_devient_une_interruption_propre():
