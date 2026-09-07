@@ -16,13 +16,11 @@ Récupère les données brutes depuis les API et les stocke en JSONB dans le *st
 
 ## Agences d'enregistrement DOI (`resolve_ra`)
 
-Résolution de l'agence d'enregistrement (Crossref ou DataCite, colonne `ra`) de chaque DOI, pour que [la recherche par DOI](#documents-absents-dune-source-fetch_missing) route chaque DOI vers la bonne API au lieu de l'interroger contre les deux.
+Résolution de l'agence d'enregistrement (Crossref ou DataCite, colonne `ra`) de chaque DOI, pour que [la phase suivante](#documents-absents-dune-source-fetch_missing) route chaque DOI vers la bonne API au lieu de l'interroger contre les deux.
 
-Crossref et DataCite gèrent des ensembles de DOI disjoints. Sans l'agence d'enregistrement, chaque DOI candidat devrait être tenté contre les deux API, générant 50% d'erreurs 404.
+Pour chaque préfixe pas encore résolu, interroge `doi.org/ra` et enregistre l'agence dans `doi_prefixes` (`unknown` quand elle n'est pas classée). Seuls les préfixes absents de la table `doi_prefixes` sont traités.
 
-Pour chaque préfixe pas encore résolu, interroge `doi.org/ra` et enregistre l'agence dans `doi_prefixes` (`unknown` quand elle n'est pas classée). Auto-bornée : seuls les préfixes absents de `doi_prefixes` sont traités, donc la phase converge. Le pool de DOI candidats est défini une seule fois par la vue `candidate_dois` — union du *staging*, des DOI liés (`related_dois`) des `source_publications`, des cibles de `publication_relations` et des DOI DataCite dérivés d'arXiv —, consommée à l'identique ici et par l'import croisé, qui ne peuvent donc pas diverger.
-
-Une row `doi_prefixes` naît ici avec la seule agence d'enregistrement ; le [volet éditeur](05-publishers-journals.md) la complète ensuite (nom et `publisher_id` via les API `/prefixes`), une fois que `normalize` a créé les éditeurs mentionnés par les sources.
+Une ligne `doi_prefixes` naît ici avec la seule agence d'enregistrement ; la phase [publishers_journals](05-publishers-journals.md) la complète ensuite (nom et `publisher_id` via les API `/prefixes`), une fois que `normalize` a créé les éditeurs mentionnés par les sources.
 
 ## Documents absents d'une source (`fetch_missing`)
 
@@ -32,7 +30,7 @@ Le moissonnage interroge les sources sur le critère de l'affiliation : un docum
 Télécharge depuis HAL les documents référencés (par hal-id ou NNT) dans d'autres sources mais absents de notre staging. Orchestrateur dans `application/pipeline/fetch_missing/hal.py`, adaptateur HAL dans `infrastructure/sources/hal/fetch_missing_hal.py`.
 
 **Étape 2 — `fetch_missing_doi` : DOI manquants par source.**
-Pour chacune des six sources interrogeables par DOI — HAL, OpenAlex, WoS, ScanR, Crossref, DataCite —, recherche les documents présents dans les autres sources et absents de celle-ci.. Dispatcher dans `application/pipeline/fetch_missing/doi.py`, adaptateur par source dans `infrastructure/sources/<source>/fetch_missing_doi.py`. Les recherches infructueuses sont stockées dans `doi_lookups` et retentées après un délai de 30 jours.
+Pour chacune des six sources interrogeables par DOI — HAL, OpenAlex, WoS, ScanR, Crossref, DataCite —, recherche les documents présents dans les autres sources et absents de celle-ci. Orchestrateur dans `application/pipeline/fetch_missing/doi.py`, adaptateur par source dans `infrastructure/sources/<source>/fetch_missing_doi.py`. Les recherches infructueuses sont stockées dans `doi_lookups` et retentées après un délai de 30 jours.
 
 
 ## Documents périmés et disparus (`fetch_stale`)
