@@ -90,7 +90,7 @@ from infrastructure.observability.log import (
     setup_logger,
 )
 from infrastructure.observability.phase_executions import PhaseExecutionRecorder
-from infrastructure.pipeline_lock import PipelineAlreadyRunningError, acquire_pipeline_lock
+from infrastructure.pipeline_lock import PipelineAlreadyRunningError, pipeline_lock
 from infrastructure.sources.circuit_breaker import SourceCircuitBreaker
 
 # `setup_logger` (au lieu d'un simple `getLogger`) attache un FileHandler
@@ -1355,11 +1355,6 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         "crédit API limité ; exclue par défaut).",
     )
     parser.add_argument(
-        "--force",
-        action="store_true",
-        help="Tuer un éventuel pipeline déjà en cours avant de démarrer (SIGTERM puis SIGKILL).",
-    )
-    parser.add_argument(
         "--rebuild-publications",
         action="store_true",
         help="Avant la phase publications, re-dirtie tout le stock (rebuild complet : "
@@ -1560,13 +1555,6 @@ def main() -> None:
         _print_phase_list()
         return
 
-    # Mutex pipeline (évite deadlocks cron vs lancement manuel).
-    try:
-        acquire_pipeline_lock(force=args.force)
-    except PipelineAlreadyRunningError as exc:
-        print(str(exc), file=sys.stderr)
-        sys.exit(1)
-
     phases_to_run = _select_phases_to_run(args)
     log.info("=" * 60)
     log.info("PIPELINE BIBLIOMÉTRIQUE — mode %s", args.mode)
@@ -1577,7 +1565,13 @@ def main() -> None:
         _print_dry_run(phases_to_run)
         return
 
-    _execute_phases(args, phases_to_run)
+    # Une seule exécution à la fois sur la base : deux en parallèle s'interbloquent.
+    try:
+        with pipeline_lock():
+            _execute_phases(args, phases_to_run)
+    except PipelineAlreadyRunningError as exc:
+        print(str(exc), file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

@@ -264,6 +264,23 @@ def sa_engine_app():
 
 
 @pytest.fixture
+def sa_engine_pipeline():
+    """Engine du pipeline sur la base de test, installé comme engine global le temps du test.
+
+    Pour les tests qui exercent un composant ouvrant lui-même sa connexion par `get_sync_engine`.
+    """
+    from sqlalchemy import create_engine
+
+    from infrastructure.db.engine import set_sync_engine
+
+    engine = create_engine(_sa_url())
+    set_sync_engine(engine)
+    yield engine
+    set_sync_engine(None)
+    engine.dispose()
+
+
+@pytest.fixture
 def sa_sync_conn():
     """Connection SQLAlchemy sur la base test, transaction rollbackée.
 
