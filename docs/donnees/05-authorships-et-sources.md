@@ -10,10 +10,7 @@ Table de liaison recensant les contributions individuelles aux publications. Cha
 
 Colonnes notables :
 
-- `person_id`
 - `in_perimeter` : TRUE si l'auteur signe cette publication depuis une structure du périmètre
-- `author_position` : position dans la liste d'auteurs
-- `is_corresponding` : auteur correspondant
 - `roles` (text[]) : rôles (auteur, directeur, rapporteur — pour theses.fr)
 
 `authorship_structures (authorship_id, structure_id)` porte les affiliations résolues. C'est une **vue matérialisée**, réunion des `source_authorship_structures` des signatures reliées à l'authorship, rafraîchie par le pipeline en fin de phase `authorships`.
