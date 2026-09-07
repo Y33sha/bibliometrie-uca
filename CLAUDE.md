@@ -86,4 +86,5 @@ Les quatre dernières sont des enrichissements, hors résolution d'entités : `-
 - Tests backend : `python -m pytest tests/ -v` (nécessite `export DB_OWNER_PASSWORD=...`)
 - Tests frontend : `cd interfaces/frontend && npm run check` (svelte-check, échoue sur les erreurs de types)
 - Lancement dev : `bash start.sh` (uvicorn port 8000 + vite port 5173)
+- Envoi de la branche : `ship`, fonction shell du poste (`~/.bashrc`), rebase sur `master`, pousse, ouvre la pull request et arme la fusion automatique en rebase. Le push déclenche les contrôles pre-push.
 - Logging : utiliser `infrastructure/observability/log.py`
