@@ -1,7 +1,0 @@
-extends: substitution
-message: "Vocabulaire : préférer « %s » à « %s »."
-level: warning
-ignorecase: true
-swap:
-  "adapters": "adaptateurs"
-  "adapter": "adaptateur"
