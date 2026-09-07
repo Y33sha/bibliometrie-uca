@@ -34,12 +34,8 @@ Complété par une extraction des [raw data](https://github.com/OpenAPC/openapc-
 
 https://treemaps.openapc.net/apcdata/clermont-u/
 
-## DOAJ — bootstrap CSV
-
-Le flux régulier passe par l'API DOAJ (cf. [09-sources-supplementaires.md#doaj](09-sources-supplementaires.md#doaj)). L'import CSV reste utilisable pour un bootstrap rapide depuis un dump complet (~21 k revues, plus rapide qu'un fetch unitaire).
+## DOAJ — dump CSV
 
 Dump téléchargé manuellement depuis https://doaj.org/csv puis importé via `python -m interfaces.cli.imports.import_doaj_csv data/doaj_journalcsv_*.csv`.
 
-Le format de stockage est identique au sub-step API → pas de conflit, les deux flux écrivent dans `journals.doaj_payload` aux mêmes clés CSV.
-
-Différence opérationnelle : l'import CSV fait un reset global `is_in_doaj=FALSE` avant de re-marquer (CSV = source de vérité à l'instant T) ; le sub-step API est incrémental.
+Le pipeline télécharge le même dump et l'importe par le même chemin, décrit dans la [fiche DOAJ](09-sources-supplementaires.md#doaj).
