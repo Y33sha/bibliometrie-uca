@@ -210,6 +210,15 @@ jobs:
       # seconde. Un seul fil d'exécution espacé de 300 ms en produit trois : au-delà, le limiteur
       # répond 429 et la requête n'atteint jamais la route visée. La temporisation est le prix de
       # ce que le balayage éprouve réellement.
+      #
+      # ZAP n'écrit son rapport qu'une fois le balayage terminé. Coupé en cours, il ne rend rien :
+      # les deux plafonds de durée le font s'arrêter lui-même, avec un rapport partiel, plutôt que
+      # d'attendre que le plafond de l'étape le tue sans rien produire. Le plafond par règle
+      # empêche en plus qu'une seule d'entre elles consomme tout le budget.
+      #
+      # `-d` fait apparaître la progression du balayage, que les scripts empaquetés de ZAP
+      # journalisent en niveau debug : sans lui, l'étape n'écrit rien pendant des heures et ne se
+      # distingue pas d'un blocage.
       - name: Balayer les points d'entrée de l'API
         continue-on-error: true
         # En deçà du plafond de six heures qu'un job ne dépasse pas : atteint, celui-ci tue le
@@ -228,12 +237,15 @@ jobs:
           options="$options -config replacer.full_list(0).replacement=session=$SESSION_TOKEN"
           options="$options -config scanner.threadPerHost=1"
           options="$options -config scanner.delayInMs=300"
+          options="$options -config scanner.maxScanDurationInMins=180"
+          options="$options -config scanner.maxRuleDurationInMins=10"
           docker run --rm --network host \
             --volume "$PWD/zap-rapports:/zap/wrk:rw" \
             zaproxy/zap-stable zap-api-scan.py \
             -t /zap/wrk/openapi.json -f openapi \
             -O http://127.0.0.1:8000 \
             -r api.html -J api.json \
+            -d \
             -z "$options"
 
       - name: Publier les rapports
