@@ -141,7 +141,7 @@ def connection_factory(request: Request) -> Callable[[], Connection]:
 def db_conn(request: Request) -> Iterator[Connection]:
     """Connection SQLAlchemy ouverte pour la durée de la requête, via `Depends(db_conn)`.
 
-    La persistance est la prérogative du use case : un command handler de la couche application appelle `conn.commit()` lui-même avant de retourner, ce qui persiste la donnée *avant* l'envoi de la réponse. FastAPI exécute le teardown des dépendances `yield` après cet envoi : un commit placé ici arriverait trop tard, et un GET ou une tâche de fond déclenchés dans l'intervalle liraient l'état antérieur.
+    La persistance est la prérogative du service : son command handler appelle `conn.commit()` lui-même avant de retourner, ce qui persiste la donnée *avant* l'envoi de la réponse. FastAPI exécute le teardown des dépendances `yield` après cet envoi : un commit placé ici arriverait trop tard, et un GET ou une tâche de fond déclenchés dans l'intervalle liraient l'état antérieur.
 
     En sortie, la transaction est **annulée** (`rollback`) : une session de lecture, ou une session dont le command handler a committé, n'a rien à persister. Du DML qui atteint cette sortie sans commit signale une écriture qui contourne les command handlers : le rollback la perd, et un warning la signale. Toute dépendance qui en dérive (repositories et query adapters) partage la même connexion.
 

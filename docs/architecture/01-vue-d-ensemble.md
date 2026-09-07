@@ -28,9 +28,9 @@ Les données saisies manuellement via l'API — données de référence (structu
 
 Le projet suit une architecture **hexagonale (DDD)**.
 
-- Le cœur du système est `application/` (use-cases et orchestrateurs), qui dépend de `domain/` (noyau pur).
+- Le cœur du système est `application/` (services et orchestrateurs), qui dépend de `domain/` (noyau pur).
 - Autour de ce cœur, deux familles d'adaptateurs : `interfaces/` (entrants — HTTP, CLI) et `infrastructure/` (sortants — base, APIs externes, logs).
-- `application/` déclare des ports (`Protocol`) dans `application/ports/`, `infrastructure/` en fournit les implémentations, et les use-cases reçoivent un port en paramètre — jamais une classe concrète.
+- `application/` déclare des ports (`Protocol`) dans `application/ports/`, `infrastructure/` en fournit les implémentations, et les services et orchestrateurs reçoivent un port en paramètre — jamais une classe concrète.
 - Seul le composition root de `interfaces/` instancie ces implémentations.
 
 Cette vue par couches se superpose à la vue par programme : `domain/` sert aux deux programmes, tandis que les couches extérieures se répartissent entre l'application web et le pipeline, quelques modules restant partagés. Le détail se lit dans les fiches de chaque couche.
@@ -45,10 +45,10 @@ Cette vue par couches se superpose à la vue par programme : `domain/` sert aux 
                                    │
     ┌──────────────────────────────┴─────────────────────────────┐
     │  application/                    ┌───────────────────────┐ │
-    │  use-cases, orchestrateurs       │  ports/  (Protocol)   │ │
+    │  services, orchestrateurs        │  ports/  (Protocol)   │ │
     │                                  └─────────────▲─────────┘ │
     └───────────▲────────────────────────────────────┼───────────┘
-                │ use-cases et ports                 │ implémente
+                │ services, orchestrateurs et ports  │ implémente
     ┌───────────┴─────────────┐           ┌──────────┴───────────┐
     │  interfaces/            │           │  infrastructure/     │
     │  adaptateurs entrants   │           │  adaptateurs sortants│
@@ -66,13 +66,13 @@ Chaque règle est vérifiée par un contrat `import-linter`, déclaré dans `pyp
 1. **Le noyau n'importe que la bibliothèque standard.** `domain/` n'atteint aucun paquet tiers et aucune autre couche. Les modules permis sont ceux que Python publie pour sa version, dans `sys.stdlib_module_names`.
    → `Domain : rien hors bibliothèque standard`
 
-2. **Les couches ne s'importent que vers le bas.** `interfaces/` au-dessus, `infrastructure/` et `application/` au milieu, `domain/` en dessous. En particulier, `application/` n'importe pas `infrastructure/` : les services applicatifs reçoivent leurs dépendances par les **ports** (`Protocol`) de `application/ports/`, que `infrastructure/` implémente.
+2. **Les imports vont vers le noyau.** `interfaces/` atteint les trois autres couches. `infrastructure/` et `application/` atteignent `domain/`, qui n'importe aucune autre couche. `application/` n'importe pas `infrastructure/` : les services et orchestrateurs reçoivent leurs dépendances par les **ports** (`Protocol`) de `application/ports/`, que `infrastructure/` implémente.
    → `Couches DDD (layered)`
 
 3. **Les routers n'importent pas `infrastructure/` directement.** Ils reçoivent leurs dépendances par `Depends(...)`, dont les fabriques vivent dans `interfaces/api/deps.py`. Le chemin indirect qui passe par ces fabriques reste permis.
    → `Routers : pas d'import direct de infrastructure`
 
-4. **Seul le composition root instancie les adaptateurs concrets.** Pour l'application web, ce sont `interfaces/api/app.py` et `interfaces/api/deps.py` ; partout ailleurs sous `interfaces/api/`, on passe par un port. Chaque script de `interfaces/cli/` est son propre composition root.
+4. **Seul le composition root instancie les adaptateurs concrets.** Pour l'application web, ce sont `interfaces/api/app.py` et `interfaces/api/deps.py` ; partout ailleurs sous `interfaces/api/`, on passe par un port. (Par ailleurs, chaque script de `interfaces/cli/` est son propre composition root.)
    → `Composition root : Pg* concrets uniquement dans app et deps`
 
 5. **Un adaptateur reçoit sa connexion, il ne l'ouvre pas.** Les modules de lecture et les repositories travaillent sur la connexion que leur appelant leur remet.

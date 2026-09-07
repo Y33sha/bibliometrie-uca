@@ -2,7 +2,7 @@
 
 *À jour le 2026-09-05.*
 
-`interfaces/` reçoit les demandes extérieures et les traduit en appels aux use-cases : HTTP pour l'API et le frontend, ligne de commande pour le pipeline et les scripts.
+`interfaces/` reçoit les demandes extérieures et les traduit en appels aux services et orchestrateurs : HTTP pour l'API et le frontend, ligne de commande pour le pipeline et les scripts.
 
 ## Contenu
 

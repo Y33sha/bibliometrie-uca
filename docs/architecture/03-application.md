@@ -4,8 +4,8 @@
 
 La couche applicative détermine le déroulé des opérations : dans quel ordre appeler les règles du domaine et les adaptateurs, et où placer la frontière transactionnelle. Elle n'écrit elle-même ni SQL ni appel réseau.
 
-- **Services métier** (`application/services/`), un sous-package par agrégat. `commands.py` y porte les commandes de l'API — une commande, une transaction, un `commit` au succès (cf. [transactions](04-infrastructure.md#transactions)) ; `core.py` porte les opérations que l'API et le pipeline partagent. Le journal d'audit vit à part, dans `application/audit_log.py`.
-- **Orchestrateurs pipeline** dans `application/pipeline/` : un sous-package par phase. Chaque orchestrateur séquence sa phase et délègue HTTP et SQL à des adaptateurs. L'inventaire phase par phase, avec entrées et sorties, vit dans la [documentation du pipeline](../pipeline/01-vue-d-ensemble.md).
+- **Services** (`application/services/`), un sous-package par agrégat. `commands.py` y porte les commandes de l'API — une commande, une transaction, un `commit` au succès (cf. [transactions](04-infrastructure.md#transactions)) ; `core.py` porte les opérations que l'API et le pipeline partagent. Le journal d'audit vit à part, dans `application/audit_log.py`.
+- **Orchestrateurs du pipeline** dans `application/pipeline/` : un sous-package par phase. Chaque orchestrateur séquence sa phase et délègue HTTP et SQL à des adaptateurs. L'inventaire phase par phase, avec entrées et sorties, vit dans la [documentation du pipeline](../pipeline/01-vue-d-ensemble.md).
 - **Ports** (`application/ports/`) : les interfaces `Protocol` par lesquelles services et orchestrateurs atteignent l'extérieur.
 
 ## Patterns d'injection
