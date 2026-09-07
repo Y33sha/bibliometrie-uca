@@ -8,11 +8,22 @@
 
 `admin/structures`
 
-- Le moissonnage nécessite des **structures**. Pour les sources bibliographiques où les structures sont désignées par des identifiants ([OpenAlex](../glossaire.md#openalex), [ScanR](../glossaire.md#scanr)) ou des formes de nom standardisées ([WoS](../glossaire.md#web-of-science-wos), intitulés de [collection HAL](../glossaire.md#collection-hal)), il faut connaître les identifiants en question et les ajouter aux structures qu'on souhaite moissonner.
+Le moissonnage nécessite des **structures** :
+* Créer les structures dont on veut moissonner les publications.
+* Renseigner les relations de tutelle entre structures.
+* Pour le moissonnage, renseigner les identifiants de structure (au moins pour l'établissement de tutelle):
+    * identifiant [OpenAlex](../glossaire.md#openalex), de forme `I198244214`
+    * theses.fr : PPN correspondant à l'établissement (ex.: `252404955`)
+    * N° SIREN pour la source [ScanR](../glossaire.md#scanr) (ex. `130028061`)
+    * forme de nom standardisée [WoS](../glossaire.md#web-of-science-wos) (ex.: `Univ Clermont Auvergne`)
+    * nom de [collection HAL](../glossaire.md#collection-hal) (ex.: `PRES_CLERMONT`)
+
+    Chaque champ peut contenir plusieurs identifiants séparés par des virgules.
 
 ![Informations Structure](../img/screenshots/admin_structures_id_modifier.png)
 
-- Le repérage des affiliations (étape [affiliations](../pipeline/04-affiliations.md) du pipeline) nécessite des **formes de nom** à détecter dans les [adresses](../glossaire.md#adresse) des publications. On peut commencer par indiquer les plus évidentes (nom complet, acronyme, numéro d'UMR). Les contrôles post-pipeline permettent d'affiner en fonction des formes effectivement présentes dans les adresses liées aux publications.
+* Pour chaque structure à identifier dans les publications, renseigner les **formes de nom** à détecter dans les adresses institutionnelles.
+    On peut commencer par indiquer les plus évidentes (nom complet, acronyme, numéro d'UMR). Les contrôles ultérieurs permettont d'affiner en fonction des formes effectivement présentes dans les adresses liées aux publications.
 
 ![Formes de nom](../img/screenshots/admin_structures_id_nameforms_lmv.png)
 
@@ -20,7 +31,7 @@
 >
 > Exemple: la forme de nom *LMV* identifie le *Laboratoire Magmas et Volcans* seulement si l'UCA ou le site clermontois sont identifiés dans l'adresse.
 >
-> ```Université Clermont Auvergne, CNRS, F-63000 Clermont-Ferrand, IRD, OPGC, LMV, France``` => Identification via la forme de nom "LMV"
+> ```Université Clermont Auvergne, CNRS, F-63000 Clermont-Ferrand, IRD, OPGC, LMV, France``` => UCA identifiée => identification du laboratoire par la forme de nom "LMV"
 >
 > ```LMV - Laboratoire de Mathématiques de Versailles (Bâtiment Fermat - UFR de sciences 45 avenue des Etats-Unis 78035 VERSAILLES - France)``` => Pas d'identification
 
@@ -28,31 +39,39 @@
 
 > Si une forme de nom reste trop permissive, on peut **exclure** certaines expressions contenant une forme reconnue.
 >
-> Exemple: L'*UMR Territoires* peut être identifiée par le mot *territoires*, à condition que l'UCA soit reconnue dans l'adresse. Cela peut conduire à de fausses identifications si une autre structure contient ce mot très courant.
+> Exemple: L'*UMR Territoires* peut être identifiée par le mot *territoires*, à condition que l'UCA soit reconnue dans l'adresse. Cela peut générer de fausses identifications si une autre structure contient le même mot.
 >
-> La forme *territoires uranifères* est définie au niveau de l'UMR Territoires comme excluant l'identification :  ```Université Clermont Auvergne, CNRS, GEOLAB, Clermont-Ferrand 63000, France; LTSER "Zone Atelier Territoires Uranifères", Clermont-Ferrand, Aubière F-63000, France``` => pas de rattachement malgré *territoires* + *UCA*.
+> La forme *territoires uranifères* est définie au niveau de l'UMR Territoires comme excluant l'identification :  ```Université Clermont Auvergne, CNRS, GEOLAB, Clermont-Ferrand 63000, France; LTSER "Zone Atelier Territoires Uranifères", Clermont-Ferrand, Aubière F-63000, France``` => pas d'identification, malgré *territoires* + *Université Clermont Auvergne*.
 
 ### Configuration du pipeline
 
-Les périmètres et les années se règlent dans `admin/config` ; les identifiants d'accès aux sources, dans l'environnement du serveur.
+Les années et les périmètres moissonnés se règlent dans `admin/config`.
+
+#### Années
+
+Le pipeline a [deux modes](../pipeline/01-vue-d-ensemble.md): *full* et *daily*.
+
+- Le mode *full* interroge les sources depuis une année de début (`--start-year`) jusqu'à l'année courante. Sans argument `--start-year`, l'année par défaut est la valeur configurée dans `admin/config`.
+
+- Le mode *daily* ne réinterroge que les nouveaux dépôts HAL depuis le dernier lancement.
+
+#### Périmètres
+
+Le moissonnage porte sur un *périmètre*.
+
+Un périmètre se définit par une ou plusieurs structures racines, et inclut automatiquement tous leurs descendants.
+
+Pour moissonner tous les laboratoires d'une université:
+- Créer l'université et ses laboratoires dans `admin/structures` et renseigner leurs relations de tutelle.
+- Créer un périmètre avec l'université pour structure racine.
+- Dans la section "Rôles des périmètres", sélectionner le périmètre concerné à chacune des deux étapes.
 
 #### Identifiants d'accès aux sources
 
 Certaines sources requièrent une clé API ([WoS](../sources/04-wos.md)) ou un couple d'identifiants ([ScanR](../sources/05-scanr.md)). D'autres requièrent une adresse mail pour le polite pool ([OpenAlex](../sources/03-openalex.md), [Crossref](../sources/06-crossref.md)). Voir la doc de chaque source pour l'obtention des *credentials*.
 
-Ce sont des secrets : ils vivent dans l'environnement du serveur, pas en base, et ne se règlent donc pas depuis l'interface. Procédure dans la [documentation d'exploitation](../exploitation/03-pipeline.md#identifiants-daccès-aux-sources). Une source non renseignée est sautée au lancement, avec un avertissement, sans interrompre le run.
+Ces clés sont stockées dans l'environnement du serveur. Cf [documentation d'exploitation](../exploitation/03-pipeline.md#identifiants-daccès-aux-sources). Une source non renseignée est sautée au lancement, avec un avertissement, sans interrompre le run.
 
-#### Années
-
-Le pipeline a [deux modes](../pipeline/01-vue-d-ensemble.md): *daily* et *full*.
-
-Le mode *full* interroge les sources depuis une année de début jusqu'à l'année courante (le critère est l'année de publication, donc des années civiles complètes). Le mode *daily* ne réinterroge que les nouveaux dépôts HAL depuis le dernier lancement.
-
-L'année de début est l'argument `--start-year` ; à défaut, la valeur configurée dans `admin/config` (par défaut 2017).
-
-#### Périmètres
-
-*A compléter.*
 
 ## En aval du pipeline
 
@@ -62,7 +81,7 @@ L'année de début est l'argument `--start-year` ; à défaut, la valeur configu
 
 ### Contrôle des affiliations
 
-Facultatif, mais permet d'affiner la liste des formes de nom par structure, pour améliorer progressivement la fiabilité du repérage:
+Permet d'affiner la liste des formes de nom par structure, pour améliorer progressivement la fiabilité du repérage:
 
 - Validation/rejet manuel des liens adresse-structure détectés par le script, individuellement ou par batch;
 
@@ -72,7 +91,7 @@ Facultatif, mais permet d'affiner la liste des formes de nom par structure, pour
 
 ![Contrôle qualité](../img/screenshots/admin_adresses_qualite.png)
 
-Les ajouts ou suppressions de formes de noms deviennent effectifs au *run* suivant du pipeline, y compris pour les adresses déjà présentes en base. En cas de contradiction entre détection automatique et classement manuel, l'action manuelle fait autorité. Les actions manuelles ne sont jamais écrasées par un *re-run* du pipeline.
+Les ajouts ou suppressions de formes de noms deviennent effectifs au *run* suivant du pipeline, y compris pour les adresses déjà présentes en base. En cas de contradiction entre détection automatique et classement manuel, l'action manuelle prévaut. Les actions manuelles ne sont jamais écrasées.
 
 
 ### Gestion du référentiel de personnes
@@ -92,11 +111,11 @@ La fusion s'opère depuis `admin/persons`: la file des doublons par nom (doublon
 
 #### Détachement des authorships attribuées à tort
 
-Quand on repère une publication attribuée au mauvais auteur, on peut détacher le lien depuis `admin/persons`. Circuit: trouver la personne; cliquer sur la ou les formes de nom concernées; sélectionner les publications liées et cliquer sur "Détacher *n* authorships".
+Quand on repère une publication attribuée au mauvais auteur, on peut détacher le lien depuis `admin/persons`. Circuit: trouver la personne; cliquer sur la ou les formes de nom concernées; sélectionner les publications liées et cliquer sur "Détacher *n* publications".
 
-![Détacher authorships](../img/screenshots/admin_persons_detacher.png)
+![Détacher publications](../img/screenshots/admin_persons_detacher.png)
 
-Pour réattribuer les authorships en question: cf [Authorships orphelines](#authorships-orphelines)
+Pour réattribuer les publications en question: cf [Authorships orphelines](#authorships-orphelines)
 
 #### Vérification des identifiants de personne
 
@@ -106,9 +125,11 @@ Les PIDs présents dans les publications sont rattachés aux personnes pendant l
 
 Un PID se définit par: un **type** (`orcid`, `idref`, `idhal`) et une **valeur**.
 
-Un PID peut avoir trois statuts: *pending*, *confirmed*, *rejected*. Par défaut, ils ont un statut *pending*. La confirmation ou le rejet se fait manuellement depuis `admin/persons`, après vérification. Si une personne n'a pas de PID, on peut aussi les ajouter manuellement après recherche sur http://orcid.org/ ou https://www.idref.fr/.
+Un PID peut avoir quatre statuts: *pending*, *confirmed*, *rejected*, *authenticated*. Le statut par défaut est *pending*. La confirmation ou le rejet se fait manuellement depuis `admin/persons`, après vérification. Si une personne n'a pas de PID, on peut aussi les ajouter manuellement après recherche sur http://orcid.org/ ou https://www.idref.fr/.
 
 Les PIDs sont stockés dans la table [`person_identifiers`](../donnees/04-personnes.md). Un PID ne peut être attribué qu'à une personne. Une tentative de réattribuer un PID déjà attribué (avec statut *confirmed* ou *pending*) lèvera une exception. La réattribution est possible quand le PID a un statut *rejected*.
+
+TODO: expliquer *authenticated*
 
 > **Pourquoi un statut *rejected* ?**
 >
@@ -116,7 +137,7 @@ Les PIDs sont stockés dans la table [`person_identifiers`](../donnees/04-person
 >
 > Conserver les PIDs rejetés garantit que s'ils réapparaissent dans les sources lors des prochains runs du pipeline, ils ne seront pas réaffectés à la même personne.
 >
-> Les PIDs rejetés n'apparaissent pas dans l'UI publique et sont exclus de toutes les *queries* (décomptes, facettes…).
+> Les PIDs rejetés n'apparaissent pas dans l'UI publique et sont exclus de toutes les requêtes (décomptes, facettes…).
 
 #### Correction du nom
 
@@ -130,7 +151,7 @@ La page `admin/orphan-authorships` donne accès aux [authorships](../glossaire.m
 
 Il y a deux raisons possibles à cela:
 - Soit ces authorships ont été détachées manuellement d'un auteur;
-- Soit le pipeline n'a pas réussi à les attribuer, ce qui se produit dans un seul cas de figure: aucune résolution par PID n'était possible *et* la forme normalisée du nom d'auteur est ambiguë (au moins 2 personnes peuvent y correspondre, ce qui est souvent le cas pour les publications où le prénom est réduit à l'initiale).
+- Soit le pipeline n'a pas réussi à les attribuer, ce qui se produit dans un seul cas de figure: aucune résolution par PID n'était possible *et* la forme normalisée du nom d'auteur est ambiguë (au moins 2 personnes peuvent y correspondre, ce qui est fréquent pour les publications où le prénom est réduit à l'initiale).
 
 La page `admin/orphan-authorships` permet de rattacher les authorships en question, individuellement ou par batch, soit à une personne existante, soit à une nouvelle personne créée manuellement.
 
