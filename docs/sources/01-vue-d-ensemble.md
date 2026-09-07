@@ -83,6 +83,6 @@ Les informations d'identification récupérées depuis les sources (forme de nom
 | Source | Type | Couverture | API | Credentials |
 |--------|------|-----------|-----|-----|
 | [Unpaywall](09-sources-supplementaires.md#unpaywall) | Enrichissement OA | Statut Open Access par DOI | REST (gratuit, 100k req/jour) | *polite pool* via *mailto* |
-| [DOAJ](09-sources-supplementaires.md#doaj) | Annuaire des revues OA certifiées | Métadonnées qualifiées par revue (licence, APC, sujets…), interrogée par ISSN | REST + dump CSV bootstrap | *polite pool* via *mailto* |
+| [DOAJ](09-sources-supplementaires.md#doaj) | Annuaire des revues OA certifiées | Métadonnées qualifiées par revue (licence, APC, sujets…), appariées par ISSN | dump CSV | *polite pool* via *mailto* |
 | [Extraction RH](10-imports-manuels.md#extraction-rh) | Import manuel | Personnel UCA (noms, départements, rôles) | Fichier CSV | |
 | [Données APC](10-imports-manuels.md#données-apc) | Import manuel | Paiements APC (montants, éditeurs) | Fichier CSV | |

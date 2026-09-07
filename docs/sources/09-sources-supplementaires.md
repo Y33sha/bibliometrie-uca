@@ -50,4 +50,8 @@ Stockage : `journals.doaj_payload` (JSONB), `journals.doaj_imported_at` (timesta
 
 Le payload garde les colonnes du CSV pour clés. Le frontend les lit telles quelles dans `READABLE_DOAJ_FIELDS` (`"Journal title"`, `"APC amount"`…), et l'audit des frais de publication interroge `doaj_payload->>'APC amount'`.
 
-Le script `interfaces/cli/imports/import_doaj_csv.py` importe un dump téléchargé à la main, par le même chemin d'écriture.
+Un dump téléchargé à la main s'importe par le même chemin d'écriture :
+
+```bash
+python -m interfaces.cli.imports.import_doaj_csv data/doaj_journalcsv_*.csv
+```
