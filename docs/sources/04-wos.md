@@ -16,8 +16,15 @@ https://developer.clarivate.com/apis/wos
 ## Données récupérées
 
 - **Publications** : UID (identifiant interne WoS), titre, DOI, année, type de document, langue, OA status, nombre de citations, résumé, mots-clés, topics (sujets + headings WoS), biblio (volume/numéro/pages), journal (titre, ISSN, eISSN, éditeur)
-- **Auteurs** : nom complet, position, rôle, drapeau corresponding, ORCID si présent, ResearcherID Clarivate (identifiant stable de l'auteur côté WoS). L'identifiant d'entité auteur algorithmique de WoS (`daisng_id`) est ignoré — référentiel interne Clarivate non fiable.
+- **Auteurs** : nom complet, position, rôle, drapeau corresponding, ResearcherID Clarivate (identifiant stable de l'auteur côté WoS).
 - **Affiliations** : adresses textuelles + noms d'organisations rattachés à chaque auteur (pas d'identifiant stable d'institution côté WoS — le nom fait office d'identifiant).
+
+## Particularités
+
+- **Source sous contrat, moissonnée sur demande.** Le crédit d'appels est acheté à l'année, donc WoS reste hors des exécutions ordinaires : l'option `--include-wos` l'y ajoute.
+- **L'ORCID de WoS est laissé de côté.** `PreferredORCID` vient du rapprochement algorithmique interne de Clarivate, non du dépôt de l'auteur. Les ORCID retenus viennent des sources où l'auteur les dépose — Crossref, HAL, `raw_orcid` d'OpenAlex.
+- **`daisng_id` sert de filtre, pas d'identifiant.** Cette entité auteur algorithmique n'est pas conservée en base. Une entrée qui en manque, ou qui manque de nom complet, est écartée : elle ne porte pas de signature exploitable.
+- **Un ResearcherID partagé devient douteux.** Deux signatures d'un même document qui portent le même `researcher_id` le voient marqué comme tel, et il ne sert plus à rattacher une personne.
 
 ## Exemple de payload
 
