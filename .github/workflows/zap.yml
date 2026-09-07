@@ -1,0 +1,173 @@
+# Analyse dynamique de sécurité : l'application est démarrée, puis interrogée depuis l'extérieur.
+#
+# Les autres analyses lisent le code et les dépendances. Celle-ci ne lit rien : elle envoie des
+# requêtes à l'application en service et juge sur ses réponses. Elle couvre ce qu'aucune lecture
+# ne montre — en-têtes de réponse, attributs du cookie de session, messages d'erreur divulguant
+# la pile, points d'entrée que le routage expose sans qu'ils aient été voulus.
+#
+# Portée de ce que le passage établit :
+#   - La base porte les seules données de référence de `seed.sql` : ni publication, ni personne.
+#     Les listes traversées sont vides, et aucune injection n'est essayée sur un identifiant réel.
+#     Le résultat vaut pour la surface et la configuration, non pour le traitement des données.
+#   - Aucune session n'est ouverte : le balayage voit ce qu'un visiteur anonyme atteint, et le
+#     comportement des points d'entrée d'administration reste hors de son champ.
+#
+# Déclenchement à la main seulement : le balayage actif dure plusieurs dizaines de minutes.
+name: Analyse dynamique (ZAP)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  zap:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-retries 5
+
+    env:
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_NAME: postgres
+      DB_OWNER_USER: postgres
+      DB_OWNER_PASSWORD: postgres
+      # L'API se connecte sous son rôle de production, borné en écriture aux tables que ses
+      # points d'entrée d'administration modifient : le balayage porte sur les droits réels.
+      DB_APP_USER: bibliometrie_app
+      DB_APP_PASSWORD: bibliometrie_app_zap
+      DB_PIPELINE_USER: bibliometrie_pipeline
+      DB_PIPELINE_PASSWORD: bibliometrie_pipeline_zap
+      # Le balayage n'ouvre pas de session. Ces deux valeurs laissent démarrer l'API, qui refuse
+      # de le faire sans empreinte d'administration ni clé de signature d'au moins 32 caractères.
+      ADMIN_HASH: zap-placeholder-not-used
+      SESSION_SECRET: zap-placeholder-session-secret-of-sufficient-length
+      # L'application est servie en HTTP clair dans le runner. Un cookie marqué `Secure` n'y
+      # serait jamais émis, et le rapport signalerait son absence au lieu de ses attributs.
+      COOKIE_SECURE: "false"
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - id: versions
+        uses: ./.github/actions/versions-de-langage
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ steps.versions.outputs.python }}
+
+      - name: Install dependencies
+        run: |
+          pip install --no-cache-dir uv
+          uv sync --frozen --extra dev
+
+      - name: Appliquer les migrations
+        run: uv run alembic upgrade head
+
+      # Les rôles de connexion, sous lesquels l'application tourne ici comme en production.
+      # `ALTER DEFAULT PRIVILEGES` ne porte que sur les objets du rôle courant : le fichier se
+      # joue sous celui qui vient d'appliquer les migrations.
+      - name: Créer les rôles de connexion
+        env:
+          PGPASSWORD: postgres
+        run: psql -h 127.0.0.1 -U postgres -d postgres -f infrastructure/db/roles.sql
+
+      # Données de référence. Sans elles, les pages rendent des erreurs, que le balayage
+      # compterait comme des défauts de l'application.
+      - name: Charger les données de référence
+        env:
+          PGPASSWORD: postgres
+        run: psql -h 127.0.0.1 -U postgres -d postgres -f infrastructure/db/seed.sql
+
+      # La description des points d'entrée, produite sans serveur. L'application balayée tourne
+      # avec sa configuration de production, qui ne publie pas cette description : la passer par
+      # fichier évite d'ouvrir dans le runner une surface que la production n'a pas.
+      - name: Produire la description OpenAPI
+        run: |
+          mkdir -p zap-rapports
+          uv run python -m interfaces.cli.dev.dump_openapi zap-rapports/openapi.json
+
+      - name: Construire l'image de production
+        run: docker build -t bibliometrie-uca:zap .
+
+      # `--network host` : le conteneur atteint le service Postgres publié sur le runner, et
+      # l'application écoute sur l'adresse du runner, où le conteneur de balayage la joindra.
+      - name: Démarrer l'application
+        run: |
+          docker run --detach --name application --network host \
+            --env DB_HOST --env DB_PORT --env DB_NAME \
+            --env DB_APP_USER --env DB_APP_PASSWORD \
+            --env DB_PIPELINE_USER --env DB_PIPELINE_PASSWORD \
+            --env ADMIN_HASH --env SESSION_SECRET --env COOKIE_SECURE \
+            bibliometrie-uca:zap
+
+      - name: Attendre que l'application réponde
+        run: |
+          for _ in $(seq 60); do
+            if curl --fail --silent --show-error --output /dev/null http://127.0.0.1:8000/; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "L'application n'a pas répondu en 120 secondes."
+          docker logs application
+          exit 1
+
+      # Le conteneur de balayage écrit ses rapports sous son propre identifiant d'utilisateur,
+      # distinct de celui qui possède l'espace de travail.
+      - name: Ouvrir le dossier des rapports en écriture
+        run: chmod 777 zap-rapports
+
+      # L'image de balayage se prend à son étiquette et non à son empreinte, contrairement aux
+      # images de construction : ses règles de détection sont publiées au fil des failles, et une
+      # empreinte les figerait à la date où elle a été relevée.
+
+      # Balayage passif : les requêtes sont celles d'une navigation ordinaire, et seules les
+      # réponses sont examinées. Rien n'est écrit en base.
+      - name: Balayer l'interface et les en-têtes
+        continue-on-error: true
+        run: |
+          docker run --rm --network host \
+            --volume "$PWD/zap-rapports:/zap/wrk:rw" \
+            zaproxy/zap-stable zap-baseline.py \
+            -t http://127.0.0.1:8000 \
+            -r interface.html -J interface.json
+
+      # Balayage actif : les points d'entrée décrits par OpenAPI reçoivent des requêtes forgées,
+      # écritures comprises. La base du runner est jetable, et le balayage ne porte que sur elle.
+      - name: Balayer les points d'entrée de l'API
+        continue-on-error: true
+        run: |
+          docker run --rm --network host \
+            --volume "$PWD/zap-rapports:/zap/wrk:rw" \
+            zaproxy/zap-stable zap-api-scan.py \
+            -t /zap/wrk/openapi.json -f openapi \
+            -O http://127.0.0.1:8000 \
+            -r api.html -J api.json
+
+      - name: Publier les rapports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: rapports-zap
+          path: zap-rapports/
+
+      # Ce que l'application a journalé pendant le balayage : une erreur interne y est nommée,
+      # là où le rapport n'en montre que le code de réponse.
+      - name: Journal de l'application
+        if: always()
+        run: docker logs application
