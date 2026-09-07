@@ -38,13 +38,15 @@ Idempotent : le résultat ne dépend que de l'état courant de `publication_subj
 
 Associe des pays aux adresses pour permettre l'analyse des collaborations internationales. Quatre étapes enchaînées :
 
-1. **`application/pipeline/countries/detect_by_country_name.py`** : détection du pays des adresses sans pays, par **nom de pays**. Parse le dernier segment après la dernière virgule et le matche contre les noms de pays de `place_name_forms` (`kind = 'country'` : variantes anglais/français, codes ISO, abréviations WoS). Rapide et fiable.
+1. **Détection par nom de pays.** Parse le dernier segment après la dernière virgule et le matche contre les noms de pays de `place_name_forms` (`kind = 'country'` : variantes anglais/français, codes ISO, abréviations WoS). Rapide et fiable.
 
-2. **`application/pipeline/countries/detect_by_place_name.py`** : pour les adresses restées sans pays (aucun nom de pays explicite), détection par **nom de lieu**. Cherche dans tout le texte de l'adresse — pas seulement le dernier segment — les noms d'institutions et de villes connus (`place_name_forms`, `kind IN ('institution', 'city')`), chacun rattaché à un pays, via un automate Aho-Corasick. Le pays n'est posé que si les lieux trouvés désignent un pays unique.
+2. **Détection par nom de lieu.** Pour les adresses restées sans pays, cherche dans tout le texte de l'adresse — pas seulement le dernier segment — les noms d'institutions et de villes connus (`place_name_forms`, `kind IN ('institution', 'city')`), chacun rattaché à un pays, via un automate Aho-Corasick. Le pays n'est posé que si les lieux trouvés désignent un pays unique.
 
-3. **`application/pipeline/countries/suggest_countries.py`** : pour les adresses encore sans pays, cherche dans l'ensemble des adresses *au pays connu* celles qui contiennent l'adresse cible comme sous-chaîne de leur texte normalisé, et retient le ou les pays les plus fréquents parmi elles. Le pool est balayé en un seul passage (automate Aho-Corasick) ; les pays proposés sont stockés dans `suggested_countries` pour validation manuelle via l'interface admin.
+3. **Suggestion pour validation manuelle.** Pour les adresses encore sans pays, cherche parmi les adresses *au pays connu* celles qui contiennent l'adresse cible comme sous-chaîne de leur texte normalisé, et retient le ou les pays les plus fréquents. Le pool est balayé en un seul passage (automate Aho-Corasick) ; les pays proposés sont stockés dans `suggested_countries`, à valider dans l'interface admin.
 
-4. **`application/pipeline/countries/refresh_publication_countries.py`** : recalcule `publications.countries` comme union des `source_publications.countries` de toutes les sources rattachées à chaque publication.
+4. **Report sur les publications.** Recalcule `publications.countries` comme union des `source_publications.countries` de toutes les sources rattachées à chaque publication.
+
+Code : `application/pipeline/countries/`, un module par étape.
 
 ## Statut open access (`oa_status`)
 
