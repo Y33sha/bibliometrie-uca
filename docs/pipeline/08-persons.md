@@ -43,4 +43,6 @@ Une signature du périmètre est éligible à tous les critères. Une signature 
 
 Le résultat ne dépend pas de l'ordre dans lequel les sources ont été moissonnées. La phase ne fige aucun rattachement dérivé : à chaque exécution, elle les rejuge tous contre l'état ferme de tout le corpus.
 
+Une personne qui perd toutes ses signatures est supprimée, sauf si elle est présente dans le référentiel RH.
+
 Les saisies manuelles (épinglage d'une signature, formes de nom confirmées ou rejetées, personnes déclarées distinctes) et les données importées (notices du référentiel RH) sont des entrées fixes, jamais réinitialisées.
