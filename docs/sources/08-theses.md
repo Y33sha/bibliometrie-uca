@@ -1,5 +1,7 @@
 # theses.fr
 
+*À jour le 2026-09-07.*
+
 https://theses.fr/
 
 Documentation API : https://theses.fr/api-doc/swagger-ui/index.html

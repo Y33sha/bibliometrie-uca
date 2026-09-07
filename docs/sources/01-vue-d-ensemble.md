@@ -31,7 +31,7 @@ Ce que le projet interroge dans chaque source, indépendamment de ce que l'API o
 | Crossref | — | DOI |
 | DataCite | — | DOI |
 
-Crossref et DataCite ne portent l'affiliation qu'en chaîne libre, sans identifiant d'établissement : le moissonnage par affiliation y serait malcommode, et ces deux sources servent au rattrapage par DOI. Le troisième mode envisageable, l'interrogation par identifiant de personne (ORCID, idHAL), n'est employé pour aucune source.
+Crossref et DataCite ne portent l'affiliation qu'en chaîne libre, sans identifiant d'établissement : le moissonnage par affiliation y serait peu commode. Le troisième mode envisageable, l'interrogation par identifiant de personne (ORCID, idHAL), n'est employé pour aucune source. <!--TODO: à mettre en place?-->
 
 > **Sources envisagées mais pas exploitées actuellement**
 >
