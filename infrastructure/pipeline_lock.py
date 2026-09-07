@@ -1,92 +1,76 @@
-"""Lock fichier pour empêcher deux pipelines simultanés.
+"""Verrou consultatif PostgreSQL : une seule exécution du pipeline à la fois sur une base.
 
-Un seul `run_pipeline` peut tourner à la fois sur la base. Sans ça, deux pipelines en parallèle (typiquement cron + lancement manuel) déclenchent des deadlocks Postgres et risquent des états applicatifs incohérents (deux phases personnes qui fusionnent différemment, etc.).
+Deux `run_pipeline` en parallèle sur la même base déclenchent des interblocages Postgres et laissent des états incohérents — deux phases personnes qui fusionnent différemment, par exemple. Le verrou vit dans la base que toutes les exécutions atteignent, quel que soit le poste ou le conteneur d'où elles partent.
 
-Le lock est un fichier `logs/pipeline.lock` qui contient le PID du process actuel.
+Le verrou tient à une session : il se libère quand sa connexion se ferme, y compris lorsque le processus est tué net ou son conteneur arrêté. La connexion qui le porte sert à cela seul, et reste ouverte pour toute la durée de l'exécution.
 
-- Démarrage : si le fichier existe et le PID dedans est vivant → on abort (sauf `force=True` qui SIGTERM puis SIGKILL le précédent).
-- Fin (normale ou exception) : `atexit` supprime le lockfile.
-- Lockfile orphelin (crash brutal SIGKILL/OOM) : le PID dedans est mort → on l'écrase silencieusement au démarrage suivant.
+`application_name` porte le nom de machine et l'identifiant de processus, si bien qu'une exécution refusée nomme celle qui occupe la place.
 """
 
-import atexit
+from __future__ import annotations
+
 import logging
 import os
-import signal
-import time
-from pathlib import Path
+import socket
+from collections.abc import Iterator
+from contextlib import contextmanager
 
-from infrastructure.process import is_pid_alive
+from sqlalchemy import Connection, text
+
+from infrastructure.db.engine import get_sync_engine
 
 log = logging.getLogger(__name__)
 
-PIPELINE_LOCK_FILE = Path(__file__).resolve().parent.parent / "logs" / "pipeline.lock"
+# Clé du verrou, tirée au hasard une fois pour toutes : deux exécutions se reconnaissent en la
+# partageant, et aucun autre usage d'`advisory lock` du projet ne l'emploie.
+PIPELINE_LOCK_KEY = 8_014_552_301_774_233_001
 
-_SIGTERM_GRACE_SECONDS = 30
+_HOLDER_SQL = text("""
+    SELECT activite.application_name AS identite,
+           to_char(activite.backend_start, 'DD/MM/YYYY HH24:MI:SS') AS depuis
+    FROM pg_locks AS verrou
+    JOIN pg_stat_activity AS activite USING (pid)
+    WHERE verrou.locktype = 'advisory'
+      AND verrou.granted
+      AND (verrou.classid::bigint << 32) | (verrou.objid::bigint & 4294967295) = :cle
+    LIMIT 1
+""")
 
 
 class PipelineAlreadyRunningError(RuntimeError):
-    """Levée si un autre pipeline tourne déjà et que --force n'a pas été demandé."""
+    """Levée quand une autre exécution du pipeline détient le verrou."""
 
 
-def _read_lock_pid(lockfile: Path) -> int | None:
-    """Lit le PID dans le lockfile. Retourne None si fichier absent ou contenu corrompu."""
-    try:
-        return int(lockfile.read_text().strip())
-    except (FileNotFoundError, ValueError, OSError):
-        return None
+def _identite() -> str:
+    """Nom de machine et identifiant de processus, portés par `application_name`."""
+    return f"run_pipeline@{socket.gethostname()} (processus {os.getpid()})"
 
 
-def _terminate_existing(pid: int, *, grace_seconds: int = _SIGTERM_GRACE_SECONDS) -> None:
-    """SIGTERM le process précédent, attend grace_seconds, SIGKILL en fallback."""
-    log.warning("Pipeline en cours détecté (PID %d) — SIGTERM envoyé", pid)
-    try:
-        os.kill(pid, signal.SIGTERM)
-    except ProcessLookupError:
-        log.info("PID %d déjà terminé entre détection et SIGTERM", pid)
-        return
-    for _ in range(grace_seconds):
-        if not is_pid_alive(pid):
-            log.info("Pipeline précédent (PID %d) terminé proprement", pid)
-            return
-        time.sleep(1)
-    log.warning("Pipeline précédent (PID %d) ne répond pas après %ds — SIGKILL", pid, grace_seconds)
-    try:
-        os.kill(pid, signal.SIGKILL)
-    except ProcessLookupError:
-        pass
-    time.sleep(1)
+def _detenteur(conn: Connection) -> str:
+    """Décrit l'exécution qui détient le verrou, pour le message de refus."""
+    ligne = conn.execute(_HOLDER_SQL, {"cle": PIPELINE_LOCK_KEY}).one_or_none()
+    if ligne is None or not ligne.identite:
+        return "une autre exécution"
+    return f"{ligne.identite}, démarrée le {ligne.depuis}"
 
 
-def acquire_pipeline_lock(*, force: bool = False, lockfile: Path = PIPELINE_LOCK_FILE) -> None:
-    """Acquiert le lock pipeline. À appeler en début de `run_pipeline.main()`.
+@contextmanager
+def pipeline_lock() -> Iterator[None]:
+    """Prend le verrou pour la durée du bloc, ou lève `PipelineAlreadyRunningError`.
 
-    Lève `PipelineAlreadyRunningError` si un autre pipeline tourne et `force=False`. Avec `force=True`, kill le précédent (SIGTERM puis SIGKILL) et prend le lock.
-
-    Enregistre `release_pipeline_lock` via atexit pour le nettoyage automatique.
+    La connexion ouverte ici porte le verrou. La sortie du bloc le rend explicitement ; une session qui meurt sans passer par là — processus tué, conteneur arrêté — le rend aussi.
     """
-    lockfile.parent.mkdir(parents=True, exist_ok=True)
-    existing_pid = _read_lock_pid(lockfile)
-    if existing_pid is not None and is_pid_alive(existing_pid):
-        if force:
-            _terminate_existing(existing_pid)
-        else:
-            raise PipelineAlreadyRunningError(
-                f"Pipeline déjà en cours (PID {existing_pid}). Utiliser --force pour le tuer et reprendre."
-            )
-    # Soit lockfile absent, soit orphelin (PID mort), soit on vient de tuer : on écrase.
-    lockfile.write_text(str(os.getpid()))
-    atexit.register(release_pipeline_lock, lockfile=lockfile)
-
-
-def release_pipeline_lock(*, lockfile: Path = PIPELINE_LOCK_FILE) -> None:
-    """Supprime le lockfile s'il pointe vers notre PID. Idempotent.
-
-    On vérifie qu'on est bien le owner avant de supprimer : évite de retirer un lock qui aurait été pris par un autre process si on a été kill et qu'un nouveau pipeline a démarré entre temps.
-    """
-    owner_pid = _read_lock_pid(lockfile)
-    if owner_pid == os.getpid():
+    with get_sync_engine().connect() as conn:
+        conn.execute(
+            text("SELECT set_config('application_name', :nom, false)"), {"nom": _identite()}
+        )
+        pris = conn.execute(
+            text("SELECT pg_try_advisory_lock(:cle)"), {"cle": PIPELINE_LOCK_KEY}
+        ).scalar_one()
+        if not pris:
+            raise PipelineAlreadyRunningError(f"Pipeline déjà en cours : {_detenteur(conn)}.")
+        log.debug("Verrou pipeline acquis (%s)", _identite())
         try:
-            lockfile.unlink()
-        except FileNotFoundError:
-            pass
+            yield
+        finally:
+            conn.execute(text("SELECT pg_advisory_unlock(:cle)"), {"cle": PIPELINE_LOCK_KEY})

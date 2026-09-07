@@ -8,6 +8,7 @@ Le câblage des adapters de chaque phase relève du composition root et n'est pa
 import argparse
 import logging
 import sys
+from contextlib import nullcontext
 
 import pytest
 
@@ -32,7 +33,6 @@ def _args(**surcharges) -> argparse.Namespace:
         "raw_store": False,
         "dry_run": False,
         "list": False,
-        "force": False,
     }
     return argparse.Namespace(**{**base, **surcharges})
 
@@ -220,7 +220,7 @@ class TestMain:
     def lancer(self, monkeypatch):
         """Neutralise le verrou et l'exécution, et retient les phases qui auraient tourné."""
         executees: list[list[str]] = []
-        monkeypatch.setattr(run_pipeline, "acquire_pipeline_lock", lambda *, force: None)
+        monkeypatch.setattr(run_pipeline, "pipeline_lock", nullcontext)
         monkeypatch.setattr(
             run_pipeline,
             "_execute_phases",
@@ -259,10 +259,12 @@ class TestMain:
     def test_pipeline_deja_en_cours(self, monkeypatch, capsys):
         """Deux pipelines simultanés se bloqueraient en base : le second refuse de démarrer."""
 
-        def _verrou_pris(*, force):
-            raise run_pipeline.PipelineAlreadyRunningError("Pipeline déjà en cours (PID 4242).")
+        def _verrou_pris():
+            raise run_pipeline.PipelineAlreadyRunningError(
+                "Pipeline déjà en cours : run_pipeline@poste (processus 4242)."
+            )
 
-        monkeypatch.setattr(run_pipeline, "acquire_pipeline_lock", _verrou_pris)
+        monkeypatch.setattr(run_pipeline, "pipeline_lock", _verrou_pris)
         monkeypatch.setattr(sys, "argv", ["run_pipeline"])
 
         with pytest.raises(SystemExit) as sortie:
@@ -274,7 +276,7 @@ class TestMain:
     def test_options_du_run_reconnues(self, monkeypatch):
         """Les options de la ligne de commande arrivent bien jusqu'à l'exécution."""
         recues: list = []
-        monkeypatch.setattr(run_pipeline, "acquire_pipeline_lock", lambda *, force: None)
+        monkeypatch.setattr(run_pipeline, "pipeline_lock", nullcontext)
         monkeypatch.setattr(
             run_pipeline, "_execute_phases", lambda args, phases: recues.append(args)
         )
