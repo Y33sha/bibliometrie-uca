@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
 
-import httpx
+import httpx2
 from sqlalchemy import Connection
 
 from application.ports.pipeline.fetch_missing.doi import (
@@ -59,7 +59,7 @@ class DataciteFetchMissingDoiAdapter:
         }
 
     async def fetch_async(
-        self, client: httpx.AsyncClient, dois: list[str]
+        self, client: httpx2.AsyncClient, dois: list[str]
     ) -> Iterable[Mapping[str, JsonValue]]:
         # Batch : `query=doi:"a" OR doi:"b" …`. Le champ `doi` est requêté en phrase exacte ; on remappe ensuite les nœuds reçus aux DOI demandés par comparaison stricte (lowercase), sans se fier à l'ordre ni au volume.
         clause = " OR ".join(f'doi:"{d}"' for d in dois)
@@ -76,7 +76,7 @@ class DataciteFetchMissingDoiAdapter:
                     label=f"{len(dois)} DOI",
                 )
             )
-        except (httpx.HTTPStatusError, httpx.RequestError):
+        except (httpx2.HTTPStatusError, httpx2.RequestError):
             # Échec du batch entier : rien remonté, les DOI restent hors staging et seront retentés au prochain run (pool convergent).
             return []
 

@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-import httpx
+import httpx2
 from sqlalchemy import Connection
 
 from application.ports.pipeline.extract.fetch_stale import (
@@ -33,7 +33,7 @@ class BaseFetchStaleAdapter(ABC):
 
     @abstractmethod
     async def fetch_by_native_id(
-        self, client: httpx.AsyncClient, source_id: str
+        self, client: httpx2.AsyncClient, source_id: str
     ) -> FetchOutcome: ...
 
     def find_stale(self, conn: Connection, years: list[int] | None) -> list[StaleRow]:

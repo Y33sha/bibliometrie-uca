@@ -1,4 +1,4 @@
-"""Helper de test : router des requêtes HTTP simulées au-dessus de `httpx.MockTransport`.
+"""Helper de test : router des requêtes HTTP simulées au-dessus de `httpx2.MockTransport`.
 
 `MockTransport` répond à toute requête par une fonction unique. Ce module lui ajoute ce dont les tests ont besoin : des routes déclarées par méthode et URL, la réponse ou l'exception que chacune sert, et le compte des appels reçus.
 
@@ -11,22 +11,22 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-import httpx
+import httpx2
 
-_Outcome = httpx.Response | Exception
+_Outcome = httpx2.Response | Exception
 
 
-def _target(url: httpx.URL) -> tuple[str, str, int | None, str]:
+def _target(url: httpx2.URL) -> tuple[str, str, int | None, str]:
     """Partie de l'URL qui identifie une route."""
     return (url.scheme, url.host, url.port, url.path)
 
 
-def _replay(response: httpx.Response) -> httpx.Response:
+def _replay(response: httpx2.Response) -> httpx2.Response:
     """Copie d'une réponse, servie à la place de l'originale.
 
     Un flux lu ne se relit pas : sans copie, une route rejouée rendrait une réponse inutilisable au deuxième appel.
     """
-    return httpx.Response(response.status_code, headers=response.headers, content=response.content)
+    return httpx2.Response(response.status_code, headers=response.headers, content=response.content)
 
 
 class Route:
@@ -34,15 +34,15 @@ class Route:
 
     def __init__(self, method: str, url: str) -> None:
         self.method = method.upper()
-        self.target = _target(httpx.URL(url))
-        self.calls: list[httpx.Request] = []
+        self.target = _target(httpx2.URL(url))
+        self.calls: list[httpx2.Request] = []
         self._queue: list[_Outcome] = []
         self._repeated: _Outcome | None = None
 
     def mock(
         self,
         *,
-        return_value: httpx.Response | None = None,
+        return_value: httpx2.Response | None = None,
         side_effect: Exception | Sequence[_Outcome] | None = None,
     ) -> Route:
         """Pose ce que la route sert : `return_value` à chaque appel, `side_effect` levée à chaque appel si c'est une exception, ou consommée dans l'ordre si c'est une suite."""
@@ -62,10 +62,10 @@ class Route:
     def call_count(self) -> int:
         return len(self.calls)
 
-    def matches(self, request: httpx.Request) -> bool:
+    def matches(self, request: httpx2.Request) -> bool:
         return request.method == self.method and _target(request.url) == self.target
 
-    def serve(self, request: httpx.Request) -> httpx.Response:
+    def serve(self, request: httpx2.Request) -> httpx2.Response:
         """Enregistre l'appel, puis rend la réponse suivante ou lève l'exception posée."""
         self.calls.append(request)
         outcome = self._queue.pop(0) if self._queue else self._repeated
@@ -86,7 +86,7 @@ class HttpMock:
 
     def __init__(self) -> None:
         self._routes: list[Route] = []
-        self.transport = httpx.MockTransport(self._serve)
+        self.transport = httpx2.MockTransport(self._serve)
 
     def get(self, url: str) -> Route:
         return self._declare("GET", url)
@@ -99,7 +99,7 @@ class HttpMock:
         self._routes.append(route)
         return route
 
-    def _serve(self, request: httpx.Request) -> httpx.Response:
+    def _serve(self, request: httpx2.Request) -> httpx2.Response:
         for route in self._routes:
             if route.matches(request):
                 return route.serve(request)

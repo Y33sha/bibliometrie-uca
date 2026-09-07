@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-import httpx
+import httpx2
 from sqlalchemy import Connection, bindparam, text
 
 from application.ports.pipeline.extract.fetch_truncated import (
@@ -79,7 +79,7 @@ class PgOpenalexFetchTruncatedAdapter(OpenalexFetchTruncatedAdapter):
         return [TruncatedWork(staging_id=row.id, openalex_id=row.source_id) for row in rows]
 
     async def fetch_work(
-        self, client: httpx.AsyncClient, openalex_id: str
+        self, client: httpx2.AsyncClient, openalex_id: str
     ) -> Mapping[str, JsonValue] | None:
         """Fetch un work individuel par son ID OpenAlex (retourne tous les auteurs).
 
@@ -93,12 +93,12 @@ class PgOpenalexFetchTruncatedAdapter(OpenalexFetchTruncatedAdapter):
                     client, "GET", url, params=params, timeout=30, label=f"OA {openalex_id}"
                 )
             )
-        except httpx.HTTPStatusError as e:
+        except httpx2.HTTPStatusError as e:
             if e.response.status_code != 404:
                 # On laisse l'orchestrateur logger ; on remonte juste None.
                 return None
             return None
-        except httpx.RequestError:
+        except httpx2.RequestError:
             return None
 
     def update_raw_data(

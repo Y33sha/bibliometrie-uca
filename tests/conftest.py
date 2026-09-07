@@ -19,7 +19,7 @@ import sys
 from collections.abc import Iterator
 from unittest.mock import patch
 
-import httpx
+import httpx2
 import pytest
 
 from tests.helpers.http_mock import HttpMock
@@ -66,10 +66,10 @@ def _isolate_raw_store(tmp_path_factory):
 def http_mock() -> Iterator[HttpMock]:
     """Sert les requêtes HTTP sortantes du test depuis les routes qu'il déclare.
 
-    Le transport simulé est posé par défaut sur les clients httpx construits pendant le test : celui que le test crée pour appeler un adaptateur comme celui que le code appelé ouvre pour son compte. Un client qui reçoit un transport explicite garde le sien.
+    Le transport simulé est posé par défaut sur les clients httpx2 construits pendant le test : celui que le test crée pour appeler un adaptateur comme celui que le code appelé ouvre pour son compte. Un client qui reçoit un transport explicite garde le sien.
     """
     router = HttpMock()
-    real_client, real_async_client = httpx.Client, httpx.AsyncClient
+    real_client, real_async_client = httpx2.Client, httpx2.AsyncClient
 
     def client(*args, **kwargs):
         kwargs.setdefault("transport", router.transport)
@@ -80,8 +80,8 @@ def http_mock() -> Iterator[HttpMock]:
         return real_async_client(*args, **kwargs)
 
     with (
-        patch.object(httpx, "Client", client),
-        patch.object(httpx, "AsyncClient", async_client),
+        patch.object(httpx2, "Client", client),
+        patch.object(httpx2, "AsyncClient", async_client),
     ):
         yield router
 

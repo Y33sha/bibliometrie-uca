@@ -17,7 +17,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Protocol
 
-import httpx
+import httpx2
 from sqlalchemy import Connection
 
 from domain.types import JsonValue
@@ -69,7 +69,7 @@ class FetchStaleAdapter(Protocol):
         `years` borne la sélection à la fenêtre d'années du run (via `source_publications.pub_year`) ; `None` = tout le stale de la source.
         """
 
-    async def fetch_by_native_id(self, client: httpx.AsyncClient, source_id: str) -> FetchOutcome:
+    async def fetch_by_native_id(self, client: httpx2.AsyncClient, source_id: str) -> FetchOutcome:
         """Refetch le record d'une row par son `source_id` natif."""
 
     def save_refreshed(self, conn: Connection, source_id: str, record: FetchedRecord) -> bool:

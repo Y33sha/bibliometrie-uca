@@ -11,7 +11,7 @@ import csv
 import logging
 from collections.abc import Iterator
 
-import httpx
+import httpx2
 
 from infrastructure.sources.http_status import raise_for_status
 
@@ -38,7 +38,7 @@ class DoajDumpError(Exception):
     """Le téléchargement du dump sort de ce qu'on en attend : redirection vers un hôte non prévu, redirection sans destination, ou réponse qui dépasse le plafond d'octets."""
 
 
-def _redirect_target(resp: httpx.Response, current: httpx.URL) -> httpx.URL:
+def _redirect_target(resp: httpx2.Response, current: httpx2.URL) -> httpx2.URL:
     """Destination d'une redirection, si elle est prévue.
 
     Lève `DoajDumpError` quand l'en-tête manque ou quand l'hôte visé n'est pas de la liste — le contrôle précède la requête, si bien qu'aucune connexion n'est ouverte vers un hôte non prévu.
@@ -56,7 +56,7 @@ def _redirect_target(resp: httpx.Response, current: httpx.URL) -> httpx.URL:
     return target
 
 
-def _write_capped(resp: httpx.Response, dest_path: str, max_bytes: int) -> int:
+def _write_capped(resp: httpx2.Response, dest_path: str, max_bytes: int) -> int:
     """Écrit le corps de la réponse dans `dest_path` et rend le nombre d'octets écrits.
 
     Lève `DoajDumpError` au franchissement du plafond, sans lire la suite. Le fichier partiel reste sur le disque : son effacement appartient à l'appelant, qui l'a créé.
@@ -87,12 +87,12 @@ def fetch_doaj_dump(
 
     Les redirections sont suivies une à une plutôt que par le client : chaque destination est confrontée à `ALLOWED_DUMP_HOSTS` avant qu'une requête ne parte, et le corps reçu est borné par `max_bytes`.
 
-    Lève `httpx.HTTPError` sur un échec de transport ou un statut d'erreur, `DoajDumpError` quand le téléchargement sort de ce qu'on en attend — pas de repli gracieux ici, l'appelant décide (on ne veut pas importer un dump tronqué).
+    Lève `httpx2.HTTPError` sur un échec de transport ou un statut d'erreur, `DoajDumpError` quand le téléchargement sort de ce qu'on en attend — pas de repli gracieux ici, l'appelant décide (on ne veut pas importer un dump tronqué).
     """
     logger.info("Téléchargement du dump DOAJ depuis %s …", url)
-    target = httpx.URL(url)
+    target = httpx2.URL(url)
     headers = {"User-Agent": user_agent}
-    with httpx.Client(timeout=timeout, follow_redirects=False) as client:
+    with httpx2.Client(timeout=timeout, follow_redirects=False) as client:
         for _ in range(_MAX_REDIRECTS + 1):
             with client.stream("GET", target, headers=headers) as resp:
                 if resp.is_redirect:

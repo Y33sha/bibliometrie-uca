@@ -2,14 +2,14 @@
 
 HAL fournit une API Solr ; on interroge par DOI (un appel par DOI).
 
-Adapter async (`AsyncFetchMissingDoiAdapter`), parallélisme embarrassingly parallel par DOI via `httpx.AsyncClient`.
+Adapter async (`AsyncFetchMissingDoiAdapter`), parallélisme embarrassingly parallel par DOI via `httpx2.AsyncClient`.
 """
 
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
 
-import httpx
+import httpx2
 from sqlalchemy import Connection
 
 from application.ports.pipeline.fetch_missing.doi import (
@@ -39,7 +39,7 @@ class HalFetchMissingDoiAdapter:
         self.base_url = API_BASE_URLS["hal"]
 
     async def fetch_async(
-        self, client: httpx.AsyncClient, dois: list[str]
+        self, client: httpx2.AsyncClient, dois: list[str]
     ) -> Iterable[Mapping[str, JsonValue]]:
         doi = dois[0]
         try:
@@ -58,7 +58,7 @@ class HalFetchMissingDoiAdapter:
                     label=f"DOI {doi}",
                 )
             )
-        except (httpx.RequestError, httpx.HTTPStatusError):
+        except (httpx2.RequestError, httpx2.HTTPStatusError):
             return []
         docs = [as_mapping(d) for d in as_sequence(at_path(data, "response").get("docs"))]
         if not docs:

@@ -5,7 +5,7 @@ Refetch d'une row par son id OpenAlex (`staging.source_id`) via `GET /works/{id}
 
 from __future__ import annotations
 
-import httpx
+import httpx2
 from sqlalchemy import Connection
 
 from application.ports.pipeline.extract.fetch_stale import (
@@ -37,7 +37,7 @@ class OpenalexFetchStaleAdapter(BaseFetchStaleAdapter):
         init_auth(api_key=get_openalex_api_key(), email=get_polite_pool_email())
         self.base_url = API_BASE_URLS["openalex"]
 
-    async def fetch_by_native_id(self, client: httpx.AsyncClient, source_id: str) -> FetchOutcome:
+    async def fetch_by_native_id(self, client: httpx2.AsyncClient, source_id: str) -> FetchOutcome:
         try:
             work = as_mapping(
                 await http_request_with_retry_async(
@@ -49,9 +49,9 @@ class OpenalexFetchStaleAdapter(BaseFetchStaleAdapter):
                     label=f"OA {source_id}",
                 )
             )
-        except httpx.HTTPStatusError as e:
+        except httpx2.HTTPStatusError as e:
             return NOT_FOUND if e.response.status_code == 404 else None
-        except httpx.RequestError:
+        except httpx2.RequestError:
             return None
         if not isinstance(work, dict) or not work:
             return None

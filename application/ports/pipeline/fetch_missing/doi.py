@@ -13,7 +13,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable, Iterable, Mapping
 from typing import Protocol
 
-import httpx
+import httpx2
 from sqlalchemy import Connection
 
 from domain.types import JsonValue
@@ -52,7 +52,7 @@ class AsyncFetchMissingDoiAdapter(Protocol):
     Les attributs paramètrent la boucle (nom source, taille de lot,
     plafond de concurrence, délai par worker). Les méthodes encapsulent
     tout ce qui varie par source : HTTP async (`fetch_async` avec
-    client httpx partagé) et insertion DB sync (`insert`, sérialisée
+    client httpx2 partagé) et insertion DB sync (`insert`, sérialisée
     par l'orchestrateur).
     """
 
@@ -65,7 +65,7 @@ class AsyncFetchMissingDoiAdapter(Protocol):
         """Lit la config (URLs, credentials) depuis la base avant la boucle."""
 
     def fetch_async(
-        self, client: httpx.AsyncClient, dois: list[str]
+        self, client: httpx2.AsyncClient, dois: list[str]
     ) -> Awaitable[Iterable[Mapping[str, JsonValue]]]:
         """Interroge l'API pour un lot (1 à `batch_size` DOI) via le client
         async partagé. Retourne les records trouvés (vide si rien trouvé)."""

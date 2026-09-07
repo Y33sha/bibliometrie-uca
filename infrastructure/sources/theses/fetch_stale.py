@@ -5,7 +5,7 @@ Refetch d'une row par son identifiant natif (`staging.source_id` : NNT pour une 
 
 from __future__ import annotations
 
-import httpx
+import httpx2
 from sqlalchemy import Connection
 
 from application.ports.pipeline.extract.fetch_stale import (
@@ -34,7 +34,7 @@ class ThesesFetchStaleAdapter(BaseFetchStaleAdapter):
     def configure(self, conn: Connection) -> None:
         self.url = API_BASE_URLS["theses"]
 
-    async def fetch_by_native_id(self, client: httpx.AsyncClient, source_id: str) -> FetchOutcome:
+    async def fetch_by_native_id(self, client: httpx2.AsyncClient, source_id: str) -> FetchOutcome:
         try:
             data = as_mapping(
                 await http_request_with_retry_async(
@@ -46,7 +46,7 @@ class ThesesFetchStaleAdapter(BaseFetchStaleAdapter):
                     label=f"these {source_id}",
                 )
             )
-        except (httpx.RequestError, httpx.HTTPStatusError):
+        except (httpx2.RequestError, httpx2.HTTPStatusError):
             return None
         for entree in as_sequence(data.get("theses")):
             these = as_mapping(entree)

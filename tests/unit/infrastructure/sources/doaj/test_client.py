@@ -5,7 +5,7 @@ C'est la seule requête sortante du projet qui suive une redirection. Deux propr
 
 import logging
 
-import httpx
+import httpx2
 import pytest
 
 from infrastructure.sources.doaj.client import (
@@ -29,23 +29,23 @@ def _fetch(tmp_path, **kwargs):
 class TestCheminNominal:
     def test_suit_la_redirection_vers_le_stockage_objet(self, tmp_path, http_mock):
         http_mock.get(DOAJ_CSV_DUMP_URL).mock(
-            return_value=httpx.Response(302, headers={"location": _S3})
+            return_value=httpx2.Response(302, headers={"location": _S3})
         )
-        http_mock.get(_S3).mock(return_value=httpx.Response(200, content=_CSV))
+        http_mock.get(_S3).mock(return_value=httpx2.Response(200, content=_CSV))
         assert _fetch(tmp_path).read_bytes() == _CSV
 
     def test_accepte_une_reponse_directe(self, tmp_path, http_mock):
-        http_mock.get(DOAJ_CSV_DUMP_URL).mock(return_value=httpx.Response(200, content=_CSV))
+        http_mock.get(DOAJ_CSV_DUMP_URL).mock(return_value=httpx2.Response(200, content=_CSV))
         assert _fetch(tmp_path).read_bytes() == _CSV
 
 
 class TestDestinationDeLaRedirection:
     def test_refuse_un_hote_non_prevu_sans_le_joindre(self, tmp_path, http_mock):
         http_mock.get(DOAJ_CSV_DUMP_URL).mock(
-            return_value=httpx.Response(302, headers={"location": "https://ailleurs.example/x"})
+            return_value=httpx2.Response(302, headers={"location": "https://ailleurs.example/x"})
         )
         ailleurs = http_mock.get("https://ailleurs.example/x").mock(
-            return_value=httpx.Response(200, content=b"charge")
+            return_value=httpx2.Response(200, content=b"charge")
         )
         with pytest.raises(DoajDumpError, match="ailleurs.example"):
             _fetch(tmp_path)
@@ -53,13 +53,13 @@ class TestDestinationDeLaRedirection:
         assert not ailleurs.called
 
     def test_refuse_une_redirection_sans_destination(self, tmp_path, http_mock):
-        http_mock.get(DOAJ_CSV_DUMP_URL).mock(return_value=httpx.Response(302))
+        http_mock.get(DOAJ_CSV_DUMP_URL).mock(return_value=httpx2.Response(302))
         with pytest.raises(DoajDumpError, match="sans destination"):
             _fetch(tmp_path)
 
     def test_refuse_une_redirection_circulaire(self, tmp_path, http_mock):
         http_mock.get(DOAJ_CSV_DUMP_URL).mock(
-            return_value=httpx.Response(302, headers={"location": DOAJ_CSV_DUMP_URL})
+            return_value=httpx2.Response(302, headers={"location": DOAJ_CSV_DUMP_URL})
         )
         with pytest.raises(DoajDumpError, match="redirections"):
             _fetch(tmp_path)
@@ -67,17 +67,21 @@ class TestDestinationDeLaRedirection:
 
 class TestVolumeAccepte:
     def test_refuse_un_corps_qui_depasse_le_plafond(self, tmp_path, http_mock):
-        http_mock.get(DOAJ_CSV_DUMP_URL).mock(return_value=httpx.Response(200, content=b"x" * 5000))
+        http_mock.get(DOAJ_CSV_DUMP_URL).mock(
+            return_value=httpx2.Response(200, content=b"x" * 5000)
+        )
         with pytest.raises(DoajDumpError, match="plafond"):
             _fetch(tmp_path, max_bytes=1024)
 
     def test_accepte_un_corps_au_plafond(self, tmp_path, http_mock):
-        http_mock.get(DOAJ_CSV_DUMP_URL).mock(return_value=httpx.Response(200, content=b"x" * 1024))
+        http_mock.get(DOAJ_CSV_DUMP_URL).mock(
+            return_value=httpx2.Response(200, content=b"x" * 1024)
+        )
         assert len(_fetch(tmp_path, max_bytes=1024).read_bytes()) == 1024
 
 
 class TestStatutDErreur:
     def test_un_statut_d_erreur_reste_une_erreur_http(self, tmp_path, http_mock):
-        http_mock.get(DOAJ_CSV_DUMP_URL).mock(return_value=httpx.Response(503))
-        with pytest.raises(httpx.HTTPStatusError):
+        http_mock.get(DOAJ_CSV_DUMP_URL).mock(return_value=httpx2.Response(503))
+        with pytest.raises(httpx2.HTTPStatusError):
             _fetch(tmp_path)

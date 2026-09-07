@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
 
-import httpx
+import httpx2
 from sqlalchemy import Connection
 
 from application.ports.pipeline.fetch_missing.doi import (
@@ -44,7 +44,7 @@ class ScanrFetchMissingDoiAdapter:
         self.auth = (username, password)
 
     async def fetch_async(
-        self, client: httpx.AsyncClient, dois: list[str]
+        self, client: httpx2.AsyncClient, dois: list[str]
     ) -> Iterable[Mapping[str, JsonValue]]:
         query: dict[str, JsonValue] = {
             "size": len(dois),
@@ -62,7 +62,7 @@ class ScanrFetchMissingDoiAdapter:
                     label=f"batch {len(dois)} DOI",
                 )
             )
-        except (httpx.RequestError, httpx.HTTPStatusError):
+        except (httpx2.RequestError, httpx2.HTTPStatusError):
             # Erreur réseau ou HTTP (401 sur credentials rejetés, 429/5xx après retries, 4xx) : lot ignoré, repris au prochain run (l'absence d'un DOI n'est pas prouvée). Comportement uniforme à toutes les sources.
             return []
         records = [

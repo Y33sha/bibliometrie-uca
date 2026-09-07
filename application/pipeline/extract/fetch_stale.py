@@ -18,7 +18,7 @@ import logging
 from collections.abc import Callable
 from functools import partial
 
-import httpx
+import httpx2
 from sqlalchemy import Connection
 
 from application.pipeline._fetch_pool import run_fetch_pool
@@ -124,7 +124,7 @@ async def refresh(
     request_delay = getattr(adapter, "request_delay_s", 0.0)
     processed = 0
 
-    async def _fetch(client: httpx.AsyncClient, row: StaleRow) -> FetchOutcome:
+    async def _fetch(client: httpx2.AsyncClient, row: StaleRow) -> FetchOutcome:
         try:
             outcome = await adapter.fetch_by_native_id(client, row.source_id)
         except Exception as e:

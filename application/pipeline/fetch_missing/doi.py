@@ -15,7 +15,7 @@ import asyncio
 import logging
 from collections.abc import Mapping
 
-import httpx
+import httpx2
 from sqlalchemy import Connection
 
 from application.pipeline._fetch_pool import run_fetch_pool
@@ -77,7 +77,7 @@ async def run_async(
     items = list(enumerate(batches))
 
     async def _fetch(
-        client: httpx.AsyncClient, item: tuple[int, list[str]]
+        client: httpx2.AsyncClient, item: tuple[int, list[str]]
     ) -> list[Mapping[str, JsonValue]]:
         batch_idx, batch = item
         try:
