@@ -5,14 +5,18 @@
 # ne montre — en-têtes de réponse, attributs du cookie de session, messages d'erreur divulguant
 # la pile, points d'entrée que le routage expose sans qu'ils aient été voulus.
 #
-# Portée de ce que le passage établit :
-#   - La base porte les seules données de référence de `seed.sql` : ni publication, ni personne.
-#     Les listes traversées sont vides, et aucune injection n'est essayée sur un identifiant réel.
-#     Le résultat vaut pour la surface et la configuration, non pour le traitement des données.
-#   - Aucune session n'est ouverte : le balayage voit ce qu'un visiteur anonyme atteint, et le
-#     comportement des points d'entrée d'administration reste hors de son champ.
+# Portée de ce que le passage établit : la base porte les seules données de référence de
+# `seed.sql` — ni publication, ni personne. Les listes traversées sont vides, et aucune injection
+# n'est essayée sur un identifiant réel. Le résultat vaut pour la surface et la configuration,
+# non pour le traitement des données.
 #
-# Déclenchement à la main seulement : le balayage actif dure plusieurs dizaines de minutes.
+# Le balayage de l'API ouvre une session d'administration, et atteint donc les points d'entrée
+# qui écrivent. Il modifie et supprime des données de référence en cours de route : la base du
+# runner est jetable, et rien d'autre n'est visé.
+#
+# Déclenchement à la main seulement. La cadence du balayage est bornée sous le plafond du
+# limiteur de débit (voir l'étape qui le lance), sans quoi la moitié de ses requêtes reçoit un
+# 429 au lieu d'atteindre le code. Le passage est long d'autant.
 name: Analyse dynamique (ZAP)
 
 on:
@@ -51,10 +55,14 @@ jobs:
       DB_APP_PASSWORD: bibliometrie_app_zap
       DB_PIPELINE_USER: bibliometrie_pipeline
       DB_PIPELINE_PASSWORD: bibliometrie_pipeline_zap
-      # Le balayage n'ouvre pas de session. Ces deux valeurs laissent démarrer l'API, qui refuse
-      # de le faire sans empreinte d'administration ni clé de signature d'au moins 32 caractères.
-      ADMIN_HASH: zap-placeholder-not-used
-      SESSION_SECRET: zap-placeholder-session-secret-of-sufficient-length
+      ADMIN_USER: admin
+      # `ADMIN_HASH` et `ADMIN_PASSWORD` sont tirés au hasard à chaque passage, par l'étape qui
+      # prépare l'identité d'administration : le balayage ouvre une session avec, et aucune
+      # valeur durable n'a à exister pour ça.
+      #
+      # La clé de signature ne vaut que le temps du passage. L'API refuse de démarrer en deçà de
+      # 32 caractères, une clé plus courte se retrouvant par force brute hors ligne.
+      SESSION_SECRET: cle-de-signature-jetable-du-balayage-dynamique
       # L'application est servie en HTTP clair dans le runner. Un cookie marqué `Secure` n'y
       # serait jamais émis, et le rapport signalerait son absence au lieu de ses attributs.
       COOKIE_SECURE: "false"
@@ -104,6 +112,24 @@ jobs:
       - name: Construire l'image de production
         run: docker build -t bibliometrie-uca:zap .
 
+      # Mot de passe tiré au hasard, empreinte calculée dans la foulée : le couple ne vit que le
+      # temps du passage, et le mot de passe est masqué dans le journal. Le calcul de l'empreinte
+      # passe par la même bibliothèque que la vérification côté API.
+      - name: Préparer l'identité d'administration
+        run: |
+          uv run python - > identite.env <<'PY'
+          import bcrypt
+          import secrets
+
+          mot_de_passe = secrets.token_urlsafe(24)
+          empreinte = bcrypt.hashpw(mot_de_passe.encode(), bcrypt.gensalt()).decode()
+          print(f"ADMIN_PASSWORD={mot_de_passe}")
+          print(f"ADMIN_HASH={empreinte}")
+          PY
+          echo "::add-mask::$(sed -n 's/^ADMIN_PASSWORD=//p' identite.env)"
+          cat identite.env >> "$GITHUB_ENV"
+          rm identite.env
+
       # `--network host` : le conteneur atteint le service Postgres publié sur le runner, et
       # l'application écoute sur l'adresse du runner, où le conteneur de balayage la joindra.
       - name: Démarrer l'application
@@ -112,7 +138,7 @@ jobs:
             --env DB_HOST --env DB_PORT --env DB_NAME \
             --env DB_APP_USER --env DB_APP_PASSWORD \
             --env DB_PIPELINE_USER --env DB_PIPELINE_PASSWORD \
-            --env ADMIN_HASH --env SESSION_SECRET --env COOKIE_SECURE \
+            --env ADMIN_USER --env ADMIN_HASH --env SESSION_SECRET --env COOKIE_SECURE \
             bibliometrie-uca:zap
 
       - name: Attendre que l'application réponde
@@ -126,6 +152,32 @@ jobs:
           echo "L'application n'a pas répondu en 120 secondes."
           docker logs application
           exit 1
+
+      # Session d'administration, dont le jeton signé sera rejoué sur chaque requête du balayage.
+      # Sans elle, les points d'entrée d'administration répondent 401 sans que rien de leur
+      # logique soit exercé.
+      - name: Ouvrir une session d'administration
+        run: |
+          uv run python - > identifiants.json <<'PY'
+          import json
+          import os
+
+          print(json.dumps({"username": os.environ["ADMIN_USER"], "password": os.environ["ADMIN_PASSWORD"]}))
+          PY
+          curl --fail --silent --show-error --output /dev/null \
+            --header 'Content-Type: application/json' \
+            --data @identifiants.json \
+            --cookie-jar cookies.txt \
+            http://127.0.0.1:8000/api/auth/login
+          rm identifiants.json
+          jeton=$(awk '$6 == "session" { print $7 }' cookies.txt)
+          rm cookies.txt
+          if [ -z "$jeton" ]; then
+            echo "La connexion n'a pas posé de cookie de session."
+            exit 1
+          fi
+          echo "::add-mask::$jeton"
+          echo "SESSION_TOKEN=$jeton" >> "$GITHUB_ENV"
 
       # Le conteneur de balayage écrit ses rapports sous son propre identifiant d'utilisateur,
       # distinct de celui qui possède l'espace de travail.
@@ -149,15 +201,40 @@ jobs:
 
       # Balayage actif : les points d'entrée décrits par OpenAPI reçoivent des requêtes forgées,
       # écritures comprises. La base du runner est jetable, et le balayage ne porte que sur elle.
+      #
+      # `replacer` pose le cookie de session sur chaque requête sortante, y compris celles que le
+      # balayeur forge lui-même.
+      #
+      # La cadence est bornée sous le limiteur de débit de l'API, qui accepte 1200 lectures par
+      # fenêtre de cinq minutes et par adresse (`interfaces/api/rate_limit.py`), soit quatre par
+      # seconde. Un seul fil d'exécution espacé de 300 ms en produit trois : au-delà, le limiteur
+      # répond 429 et la requête n'atteint jamais la route visée. La temporisation est le prix de
+      # ce que le balayage éprouve réellement.
       - name: Balayer les points d'entrée de l'API
         continue-on-error: true
+        # En deçà du plafond de six heures qu'un job ne dépasse pas : atteint, celui-ci tue le
+        # job entier, et les rapports du balayage passif ne seraient pas publiés non plus. Ici,
+        # le dépassement ne coûte que cette étape.
+        timeout-minutes: 300
         run: |
+          # Les options sont accumulées une par une : ZAP découpe la chaîne sur l'espace simple,
+          # et une continuation de ligne y laisserait des espaces multiples, donc des arguments
+          # vides.
+          options="-config replacer.full_list(0).description=session"
+          options="$options -config replacer.full_list(0).enabled=true"
+          options="$options -config replacer.full_list(0).matchtype=REQ_HEADER"
+          options="$options -config replacer.full_list(0).matchstr=Cookie"
+          options="$options -config replacer.full_list(0).regex=false"
+          options="$options -config replacer.full_list(0).replacement=session=$SESSION_TOKEN"
+          options="$options -config scanner.threadPerHost=1"
+          options="$options -config scanner.delayInMs=300"
           docker run --rm --network host \
             --volume "$PWD/zap-rapports:/zap/wrk:rw" \
             zaproxy/zap-stable zap-api-scan.py \
             -t /zap/wrk/openapi.json -f openapi \
             -O http://127.0.0.1:8000 \
-            -r api.html -J api.json
+            -r api.html -J api.json \
+            -z "$options"
 
       - name: Publier les rapports
         if: always()
