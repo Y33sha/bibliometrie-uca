@@ -23,7 +23,7 @@ Deux étapes enchaînées.
 **Étape 1 — Ingestion.**
 Les sujets que les sources déclarent sur chaque `source_publication` sont rattachés à la publication, dans les tables `subjects` et `publication_subjects`. Le lien garde la source qui a fourni le sujet. Seuls les concepts issus des ontologies des sources entrent dans `subjects` ; les mots-clés libres restent portés par les `source_publications`.
 
-Les publications traitées sont celles nouvellement créées, et celles dont le contenu a changé depuis la dernière ingestion de leurs sujets. Leurs liens existants sont supprimés — sauf ceux marqués `rejected` — puis reconstruits depuis les sources.
+Les publications traitées sont celles nouvellement créées, et celles dont le contenu a changé depuis la dernière ingestion de leurs sujets. Leurs liens existants sont supprimés — sauf ceux marqués `rejected` — puis reconstruits depuis les sources. L'option `--rebuild-subjects` étend le traitement à toutes les publications.
 
 Les sujets qu'aucun lien ne référence plus sont supprimés.
 
