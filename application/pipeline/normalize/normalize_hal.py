@@ -45,7 +45,7 @@ from domain.publications.identifiers import (
 )
 from domain.publications.metadata import has_minimal_publication_metadata
 from domain.sources.hal import derive_hal_oa_status, hal_text_field
-from domain.types import JsonValue, as_int, as_sequence
+from domain.types import JsonValue, as_int, as_sequence, as_strs
 
 # =============================================================
 # UTILITAIRES
@@ -180,10 +180,7 @@ def insert_hal_document(
     keywords, domaines, biblio, urls).
     """
     # Collections : `collCode_s` du raw_data (liste complète des collections du record).
-    coll_codes = doc.get("collCode_s") or []
-    collections_array = (
-        sorted(set(coll_codes)) if isinstance(coll_codes, list) and coll_codes else None
-    )
+    collections_array = sorted(set(as_strs(doc.get("collCode_s")))) or None
 
     external_ids = build_hal_external_ids(doc, hal_id, pub_meta.nnt)
 
@@ -191,8 +188,7 @@ def insert_hal_document(
     abstract = hal_text_field(doc.get("abstract_s"))
 
     # Keywords
-    kw_raw = doc.get("keyword_s")
-    keywords = list(dict.fromkeys(kw_raw)) if isinstance(kw_raw, list) and kw_raw else None
+    keywords = list(dict.fromkeys(as_strs(doc.get("keyword_s")))) or None
 
     # Topics : domaines HAL, stockés tels que la source les expose (code + chemin de libellés).
     domain_raw = doc.get("fr_domainAllCodeLabel_fs")

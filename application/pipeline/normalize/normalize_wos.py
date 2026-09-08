@@ -31,7 +31,7 @@ from domain.persons.identifiers import (
 from domain.publications.authorship_roles import map_role
 from domain.publications.identifiers import clean_doi
 from domain.sources.wos import derive_wos_api_oa_status, is_wos_author_exploitable
-from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, at_path
+from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, as_strs, at_path
 
 # =============================================================
 # UTILITAIRES
@@ -267,11 +267,10 @@ def extract_from_api(raw: Mapping[str, JsonValue], staging_doi: str | None) -> d
             abstract = str(p)
 
     # Keywords
-    kw_data = at_path(frm, "keywords")
-    kw_list = kw_data.get("keyword", []) if isinstance(kw_data, dict) else []
-    if isinstance(kw_list, str):
-        kw_list = [kw_list]
-    keywords = [str(k) for k in kw_list if k] or None
+    # Web of Science rend un mot-clé unique en chaîne, plusieurs en liste.
+    kw_raw = at_path(frm, "keywords").get("keyword", [])
+    mot_seul = as_str(kw_raw)
+    keywords = ([mot_seul] if mot_seul else as_strs(kw_raw)) or None
 
     # Topics : categories
     cat = at_path(frm, "category_info")

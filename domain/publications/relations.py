@@ -22,7 +22,7 @@ from __future__ import annotations
 from enum import StrEnum
 
 from domain.publications.identifiers import clean_doi
-from domain.types import JsonValue
+from domain.types import JsonValue, as_str
 
 
 class RelationType(StrEnum):
@@ -145,8 +145,8 @@ def extract_datacite_relations(meta: dict[str, JsonValue] | None) -> list[tuple[
     for item in related:
         if not isinstance(item, dict):
             continue
-        canonical = map_datacite_relation(item.get("relation_type") or "")
-        target = clean_doi(item.get("doi"))
+        canonical = map_datacite_relation(as_str(item.get("relation_type")) or "")
+        target = clean_doi(as_str(item.get("doi")))
         if canonical and target:
             out.append((canonical, target))
     return out
@@ -200,7 +200,7 @@ def extract_crossref_relations(meta: dict[str, JsonValue] | None) -> list[tuple[
         for entry in entries:
             if not isinstance(entry, dict) or entry.get("id-type") != "doi":
                 continue
-            target = clean_doi(entry.get("id"))
+            target = clean_doi(as_str(entry.get("id")))
             if target:
                 out.append((canonical, target))
     return out

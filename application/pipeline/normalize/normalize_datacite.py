@@ -241,7 +241,7 @@ def process_work(
         staging_queries.mark_done(conn, staging_id)
         return False
 
-    doi = clean_doi(attributes.get("doi")) or staging_row.doi
+    doi = clean_doi(as_str(attributes.get("doi"))) or staging_row.doi
     if not doi:
         logger.warning("DataCite staging %s sans DOI exploitable", staging_id)
         staging_queries.mark_done(conn, staging_id)

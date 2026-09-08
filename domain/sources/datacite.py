@@ -10,7 +10,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 from domain.publications.identifiers import clean_doi
-from domain.types import JsonValue
+from domain.types import JsonValue, as_str
 
 
 def get_title(attributes: Mapping[str, JsonValue]) -> str | None:
@@ -151,8 +151,8 @@ def extract_datacite_doc_type_token(attributes: Mapping[str, JsonValue]) -> str 
     types = attributes.get("types")
     if not isinstance(types, dict):
         return None
-    general = (types.get("resourceTypeGeneral") or "").strip()
-    resource_type = (types.get("resourceType") or "").strip()
+    general = (as_str(types.get("resourceTypeGeneral")) or "").strip()
+    resource_type = (as_str(types.get("resourceType")) or "").strip()
     if general and general.lower() not in {"text", "other"}:
         return general
     if resource_type:
@@ -174,7 +174,7 @@ def _doi_related_identifiers(attributes: Mapping[str, JsonValue]) -> list[dict[s
             continue
         if entry.get("relatedIdentifierType") != "DOI":
             continue
-        doi = clean_doi(entry.get("relatedIdentifier"))
+        doi = clean_doi(as_str(entry.get("relatedIdentifier")))
         relation_type = entry.get("relationType")
         if doi and isinstance(relation_type, str) and relation_type:
             out.append({"doi": doi, "relation_type": relation_type})
