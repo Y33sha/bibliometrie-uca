@@ -7,6 +7,7 @@ from sqlalchemy import Connection, delete, func, select, update
 from application.ports.repositories.perimeter_repository import PerimeterRepository
 from domain.errors import NotFoundError
 from domain.perimeters.perimeter import Perimeter
+from infrastructure.db.rows import row_as
 from infrastructure.db.scalars import scalar_int
 from infrastructure.db.tables import perimeters
 
@@ -49,7 +50,7 @@ class PgPerimeterRepository(PerimeterRepository):
         ).first()
         if row is None:
             return None
-        return _perimeter_from_row(_PerimeterRow(**row._mapping))
+        return _perimeter_from_row(row_as(_PerimeterRow, row))
 
     # ── Liens structure ↔ perimeter ────────────────────────────────
 

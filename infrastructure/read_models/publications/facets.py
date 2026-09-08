@@ -19,6 +19,7 @@ from domain.countries import NO_COUNTRY_CODE
 from domain.publications.metadata import OaStatus
 from domain.sources.registry import Source
 from domain.structures.structure import StructureType
+from infrastructure.db.rows import rows_as
 from infrastructure.read_models.filters import (
     OA_CLOSED_SQL,
     OA_OPEN_SQL,
@@ -133,8 +134,8 @@ class _PublicationFacetsBuilder:
                 GROUP BY p.pub_year ORDER BY p.pub_year DESC
             """),
             binds,
-        ).all()
-        return [FacetOption(**r._mapping) for r in rows]
+        )
+        return rows_as(FacetOption, rows)
 
     def _facet_labs(self) -> tuple[list[FacetOption], int]:
         where_sql, binds = self._clauses_skipping("lab")
@@ -152,8 +153,8 @@ class _PublicationFacetsBuilder:
                 ORDER BY count DESC
             """),
             binds,
-        ).all()
-        labs = [FacetOption(**r._mapping) for r in labs_rows]
+        )
+        labs = rows_as(FacetOption, labs_rows)
 
         no_lab_row = self.conn.execute(
             text(f"""
@@ -180,8 +181,8 @@ class _PublicationFacetsBuilder:
                 GROUP BY p.doc_type ORDER BY count DESC
             """),
             binds,
-        ).all()
-        return [FacetOption(**r._mapping) for r in rows]
+        )
+        return rows_as(FacetOption, rows)
 
     def _facet_access(self) -> list[FacetOption]:
         where_sql, binds = self._clauses_skipping("access")
@@ -215,8 +216,8 @@ class _PublicationFacetsBuilder:
                 GROUP BY p.oa_status ORDER BY count DESC
             """),
             binds,
-        ).all()
-        return [FacetOption(**r._mapping) for r in rows]
+        )
+        return rows_as(FacetOption, rows)
 
     def _facet_corresponding(self) -> list[FacetOption]:
         if not self.filters.person_id:

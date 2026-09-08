@@ -17,6 +17,7 @@ from application.ports.repositories.journal_repository import (
 from domain.errors import NotFoundError
 from domain.journals.journal import Journal, JournalType, OaModel
 from domain.normalize import normalize_text
+from infrastructure.db.rows import row_as
 from infrastructure.db.tables import journal_name_forms, journals
 from infrastructure.pipeline.authorships.pub_counts import (
     refresh_journal_pub_count,
@@ -97,7 +98,7 @@ class PgJournalRepository(JournalRepository):
         ).first()
         if row is None:
             return None
-        return _journal_from_row(_JournalRow(**row._mapping))
+        return _journal_from_row(row_as(_JournalRow, row))
 
     # ── Persistance de l'agrégat ───────────────────────────────────
 
