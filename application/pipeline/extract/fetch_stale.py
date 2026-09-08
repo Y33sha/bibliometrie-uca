@@ -24,6 +24,7 @@ from sqlalchemy import Connection
 from application.pipeline._fetch_pool import run_fetch_pool
 from application.pipeline.extract.base import scoped_logger
 from application.pipeline.metrics import PhaseMetrics
+from application.pipeline.progression import progression
 from application.pipeline.signals import filter_configured, select_targets, timed_metrics
 from application.ports.pipeline.circuit_breaker import CircuitBreaker
 from application.ports.pipeline.extract.fetch_stale import (
@@ -136,28 +137,31 @@ async def refresh(
             await asyncio.sleep(request_delay)
         return outcome
 
-    def _write(conn: Connection, row: StaleRow, outcome: FetchOutcome) -> None:
-        nonlocal processed
-        if outcome is None:
-            metrics.add(errors=1)
-        elif outcome is NOT_FOUND:
-            adapter.mark_disappeared(conn, row.source_id)
-            metrics.add(disappeared=1)
-        else:
-            assert isinstance(outcome, FetchedRecord)
-            changed = adapter.save_refreshed(conn, row.source_id, outcome)
-            metrics.add(updated=1) if changed else metrics.add(unchanged=1)
-        processed += 1
+    with progression(total, adapter.source_key, slog) as avancement:
 
-    await run_fetch_pool(
-        stale,
-        conn,
-        max_concurrent=adapter.max_concurrent,
-        commit_every=COMMIT_EVERY,
-        fetch=_fetch,
-        write=_write,
-        should_continue=lambda: breaker is None or not breaker.tripped,
-    )
+        def _write(conn: Connection, row: StaleRow, outcome: FetchOutcome) -> None:
+            nonlocal processed
+            if outcome is None:
+                metrics.add(errors=1)
+            elif outcome is NOT_FOUND:
+                adapter.mark_disappeared(conn, row.source_id)
+                metrics.add(disappeared=1)
+            else:
+                assert isinstance(outcome, FetchedRecord)
+                changed = adapter.save_refreshed(conn, row.source_id, outcome)
+                metrics.add(updated=1) if changed else metrics.add(unchanged=1)
+            processed += 1
+            avancement.avance()
+
+        await run_fetch_pool(
+            stale,
+            conn,
+            max_concurrent=adapter.max_concurrent,
+            commit_every=COMMIT_EVERY,
+            fetch=_fetch,
+            write=_write,
+            should_continue=lambda: breaker is None or not breaker.tripped,
+        )
 
     if breaker is not None and breaker.tripped:
         slog.warning(

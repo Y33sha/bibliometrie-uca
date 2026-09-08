@@ -18,6 +18,7 @@ from sqlalchemy import Connection
 
 from application.pipeline._fetch_pool import run_fetch_pool
 from application.pipeline.metrics import PhaseMetrics
+from application.pipeline.progression import progression
 from application.ports.pipeline.extract.fetch_truncated import (
     OpenalexFetchTruncatedAdapter,
     TruncatedWork,
@@ -53,43 +54,36 @@ async def refetch(
         )
         return metrics
 
-    processed = 0
-
     async def _fetch(
         client: httpx2.AsyncClient, ref: TruncatedWork
     ) -> Mapping[str, JsonValue] | None:
         return await adapter.fetch_work(client, ref.openalex_id)
 
-    def _write(conn: Connection, ref: TruncatedWork, work: Mapping[str, JsonValue] | None) -> None:
-        nonlocal processed
-        if not work:
-            # Fetch échoué : on garde le flag → retry au prochain run (robuste à une indisponibilité OpenAlex / un 429).
-            metrics.add(errors=1)
-        elif len(as_sequence(work.get("authorships"))) <= 100:
-            # Genuine 100 (ou moins) : pas tronqué → on efface juste le flag, sans réécrire raw_data ni forcer une re-normalisation.
-            adapter.clear_truncated(conn, ref.staging_id)
-            metrics.add(already_complete=1)
-        else:
-            adapter.update_raw_data(conn, ref.staging_id, work)
-            metrics.add(updated=1)
-        processed += 1
-        if processed % COMMIT_EVERY == 0 or processed == total:
-            log.info(
-                "  %s/%s — %s mis à jour, %s déjà complets",
-                processed,
-                total,
-                metrics.updated,
-                metrics.extras.get("already_complete", 0),
-            )
+    with progression(total, "documents tronqués", log) as avancement:
 
-    await run_fetch_pool(
-        truncated,
-        conn,
-        max_concurrent=adapter.max_concurrent,
-        commit_every=COMMIT_EVERY,
-        fetch=_fetch,
-        write=_write,
-    )
+        def _write(
+            conn: Connection, ref: TruncatedWork, work: Mapping[str, JsonValue] | None
+        ) -> None:
+            if not work:
+                # Fetch échoué : on garde le flag → retry au prochain run (robuste à une indisponibilité OpenAlex / un 429).
+                metrics.add(errors=1)
+            elif len(as_sequence(work.get("authorships"))) <= 100:
+                # Genuine 100 (ou moins) : pas tronqué → on efface juste le flag, sans réécrire raw_data ni forcer une re-normalisation.
+                adapter.clear_truncated(conn, ref.staging_id)
+                metrics.add(already_complete=1)
+            else:
+                adapter.update_raw_data(conn, ref.staging_id, work)
+                metrics.add(updated=1)
+            avancement.avance()
+
+        await run_fetch_pool(
+            truncated,
+            conn,
+            max_concurrent=adapter.max_concurrent,
+            commit_every=COMMIT_EVERY,
+            fetch=_fetch,
+            write=_write,
+        )
 
     log.info(
         "✓ fetch_truncated terminé en %.1fs — %s", time.perf_counter() - t0, metrics.as_summary()
