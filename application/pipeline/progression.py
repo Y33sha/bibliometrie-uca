@@ -24,6 +24,9 @@ except ImportError:  # `tqdm` est une dépendance de développement.
 JALON_INTERVALLE_S = 30.0
 """Délai entre deux jalons de journal, quand aucune barre ne s'affiche."""
 
+FORMAT_BARRE = "{desc} {percentage:3.0f}% |{bar}| {n_fmt}/{total_fmt}  {elapsed}"
+"""Barre réduite à l'avancement et au temps écoulé."""
+
 
 def _terminal_interactif() -> bool:
     """Vrai quand la sortie standard est un terminal."""
@@ -52,7 +55,7 @@ class Progression:
         self._debut = time.perf_counter()
         self._dernier_jalon = self._debut
         self._barre = (
-            tqdm(total=total, desc=libelle, unit=" doc", leave=False)
+            tqdm(total=total, desc=libelle, bar_format=FORMAT_BARRE, leave=False)
             if tqdm is not None and _terminal_interactif()
             else None
         )
