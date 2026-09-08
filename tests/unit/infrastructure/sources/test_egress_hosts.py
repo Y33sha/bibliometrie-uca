@@ -1,6 +1,6 @@
 """Hôtes que le trafic sortant peut joindre.
 
-Le dossier de sécurité énonce une liste d'hôtes et affirme qu'elle est celle des destinations effectivement joignables. Trois choses la tiennent : un contrat d'architecture interdit au code servant les requêtes HTTP d'atteindre un client réseau, le helper HTTP partagé traite une redirection comme une erreur (`test_http_retry`), et ce module confronte les URL écrites dans le code à la liste.
+La liste d'hôtes déclarée est celle des destinations effectivement joignables. Trois choses la tiennent : un contrat d'architecture interdit au code servant les requêtes HTTP d'atteindre un client réseau, le helper HTTP partagé traite une redirection comme une erreur (`test_http_retry`), et ce module confronte les URL écrites dans le code à la liste.
 
 La confrontation porte sur `infrastructure/sources/`, couche d'où partent les requêtes. Les URL des autres couches désignent des pages à afficher — une fiche HAL, un profil ORCID — ou un espace de noms XML, et ne sont jamais appelées.
 """
@@ -32,7 +32,7 @@ HOTES_DECLARES = frozenset(
         "doaj-live-journal-csv.s3.amazonaws.com",
     }
 )
-"""Destinations que le dossier de sécurité énumère. Y ajouter un hôte est un geste délibéré."""
+"""Destinations joignables depuis la couche sortante. Y ajouter un hôte est un geste délibéré."""
 
 _COUCHE_SORTANTE = PROJECT_ROOT / "infrastructure" / "sources"
 _URL = re.compile(r"https?://([A-Za-z0-9._-]+)")
@@ -66,12 +66,12 @@ class TestAucuneUrlEcarte:
     def test_aucune_url_de_la_couche_sortante_ne_vise_un_hote_non_declare(self):
         """Une source ajoutée vers un hôte absent de la liste fait échouer l'intégration.
 
-        C'est ce qui rend l'affirmation du dossier vérifiable plutôt que constatée à la lecture.
+        C'est ce qui rend la liste vérifiable plutôt que constatée à la lecture.
         """
         inconnus = _hotes_ecrits_dans(_COUCHE_SORTANTE) - HOTES_DECLARES
         assert not inconnus, (
             f"Hôtes écrits dans la couche sortante sans figurer à la liste : {sorted(inconnus)}. "
-            "Les y inscrire suppose de mettre à jour le dossier de sécurité, qui les énumère."
+            "Les y inscrire est un geste délibéré : la liste énumère les destinations joignables."
         )
 
     def test_la_liste_ne_porte_pas_d_hote_devenu_inutile(self):

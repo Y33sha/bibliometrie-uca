@@ -14,7 +14,7 @@ class TestLogin:
     def test_pose_un_cookie_de_session_durci(self, client, monkeypatch):
         """Le cookie qui porte la session est inaccessible au script, borné au site, réservé au canal chiffré et daté.
 
-        Ces quatre attributs sont ce qui sépare un jeton de session d'une valeur qu'un script injecté lirait, qu'une requête partie d'un autre site rejouerait, ou qu'un accès en clair révélerait. Le dossier de sécurité les énonce ; ce test les relit sur la réponse plutôt que dans le code qui les pose.
+        Ces quatre attributs sont ce qui sépare un jeton de session d'une valeur qu'un script injecté lirait, qu'une requête partie d'un autre site rejouerait, ou qu'un accès en clair révélerait. Ce test les relit sur la réponse plutôt que dans le code qui les pose.
 
         L'empreinte est posée ici, à faible coût : ce test porte sur les attributs du cookie, non sur la vérification du mot de passe.
         """
@@ -37,7 +37,7 @@ class TestLogin:
         assert f"max-age={SESSION_MAX_AGE}" in pose
 
     def test_la_session_dure_sept_jours(self):
-        """La durée annoncée par le dossier de sécurité, en secondes."""
+        """Durée de vie d'une session, en secondes."""
         assert SESSION_MAX_AGE == 7 * 24 * 3600
 
     def test_rejects_unknown_user(self, client):

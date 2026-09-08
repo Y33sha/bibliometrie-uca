@@ -1,7 +1,7 @@
 /* Politique de sécurité de contenu des pages.
  *
- * Le dossier de sécurité énonce que l'exécution de scripts se restreint à ceux de
- * l'application, et qu'aucune ressource ne se charge depuis un hôte tiers. Cette garantie tient
+ * L'exécution de scripts se restreint à ceux de l'application, et aucune ressource ne se
+ * charge depuis un hôte tiers. Cette garantie tient
  * à la configuration de construction, et à elle seule : le générateur y lit les directives et
  * les écrit dans la page produite, sous forme de balise.
  *
@@ -14,8 +14,8 @@ import { describe, it, expect } from 'vitest';
 
 import config from '../../svelte.config.js';
 
-/* Valeur attendue de chaque directive. Élargir l'une d'elles est un geste délibéré : elle
- * apparaît dans le dossier de sécurité, qui énonce ce que la page s'autorise.
+/* Valeur attendue de chaque directive. Élargir l'une d'elles est un geste délibéré : cette
+ * liste énonce ce que la page s'autorise.
  *
  * `data:` désigne une ressource embarquée dans la page, non un hôte tiers. `unsafe-inline` sur
  * les styles couvre ceux que le générateur écrit dans le balisage ; un style ne charge ni
@@ -51,7 +51,7 @@ describe('politique de sécurité de contenu des pages', () => {
 	it("n'ouvre aucune source à un hôte extérieur", () => {
 		const sources = Object.values(directives).flat().map(String);
 		const exterieurs = sources.filter((s) => /[.:]/.test(s) && s !== 'data:');
-		expect(exterieurs, 'Sources nommant un hôte : le dossier de sécurité les énumère.').toEqual(
+		expect(exterieurs, 'Sources nommant un hôte : les y inscrire est un geste délibéré.').toEqual(
 			[]
 		);
 	});
