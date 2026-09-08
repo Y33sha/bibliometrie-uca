@@ -8,7 +8,7 @@ publication).
 
 Régénérer l'image (Graphviz requis) :
 
-    python3 docs/img/graphs/reconciliation.py
+    python docs/img/graphs/reconciliation.py
     neato -Tpng docs/img/graphs/reconciliation.dot -o docs/img/graphs/reconciliation.png
 """
 
