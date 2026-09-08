@@ -2,7 +2,7 @@
 
 La table `config` porte les réglages d'exploitation du pipeline : périmètres, années couvertes, plafonds d'interrogation, types de structure affichés. Une part est consommée par les pages publiques, le reste est réservé à une session d'administration.
 
-Chaque clé dont la valeur a une forme imposée la voit contrôlée à l'écriture : un plafond se ramène à un entier positif ou à zéro, une année doit tomber dans les bornes.
+Chaque clé dont la valeur a une forme imposée la voit contrôlée à l'écriture : un plafond attend un entier positif ou nul, une année doit tomber dans les bornes.
 """
 
 from domain.errors import ValidationError
@@ -50,13 +50,17 @@ def _as_int(value: JsonValue) -> int | None:
 def normalize_config_value(key: str, value: JsonValue) -> JsonValue:
     """Valeur à écrire pour `key`, ramenée à la forme que la clé impose.
 
-    Un plafond se ramène à un entier positif ; toute autre valeur y vaut zéro, qui retire la borne. Une année hors des bornes, ou qui n'en est pas une, est refusée : aucune valeur de repli n'y a de sens.
+    Un plafond attend un entier positif ou nul, zéro retirant la borne ; une valeur absente ou vide y vaut zéro. Une année doit tomber dans les bornes. Toute autre valeur est refusée, aucune valeur de repli n'ayant de sens.
 
     Les autres clés passent telles quelles.
     """
     if key in CAP_KEYS:
+        if value is None or (isinstance(value, str) and not value.strip()):
+            return 0
         plafond = _as_int(value)
-        return plafond if plafond is not None and plafond > 0 else 0
+        if plafond is None or plafond < 0:
+            raise ValidationError(f"`{key}` attend un entier positif ou nul ; reçu : {value!r}")
+        return plafond
     if key in YEAR_KEYS:
         annee = _as_int(value)
         if annee is None or not (MIN_YEAR <= annee <= MAX_YEAR):

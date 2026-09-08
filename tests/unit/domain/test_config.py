@@ -19,12 +19,21 @@ class TestPlafonds:
     def test_un_entier_ecrit_en_chaine_est_lu(self):
         assert normalize_config_value(_PLAFOND, "5000") == 5000
 
-    @pytest.mark.parametrize("valeur", [0, -1, "texte", "", None, True, 3.5, [], {}])
-    def test_toute_autre_valeur_retire_la_borne(self, valeur):
+    def test_zero_retire_la_borne(self):
+        assert normalize_config_value(_PLAFOND, 0) == 0
+
+    @pytest.mark.parametrize("valeur", [None, "", "   "])
+    def test_une_valeur_vide_retire_la_borne(self, valeur):
         assert normalize_config_value(_PLAFOND, valeur) == 0
 
+    @pytest.mark.parametrize("valeur", [-1, "texte", True, 3.5, [], {}])
+    def test_toute_autre_valeur_est_refusee(self, valeur):
+        with pytest.raises(ValidationError, match="entier positif"):
+            normalize_config_value(_PLAFOND, valeur)
+
     def test_le_second_plafond_suit_la_meme_regle(self):
-        assert normalize_config_value("fetch_missing_max_per_source", "-4") == 0
+        with pytest.raises(ValidationError, match="entier positif"):
+            normalize_config_value("fetch_missing_max_per_source", "-4")
 
 
 class TestAnnee:
