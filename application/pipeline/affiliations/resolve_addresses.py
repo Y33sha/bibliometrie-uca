@@ -10,6 +10,7 @@ from typing import NamedTuple
 import ahocorasick
 from sqlalchemy import Connection
 
+from application.pipeline.progression import progression
 from application.ports.pipeline.affiliations.address_resolution import (
     AddressResolutionQueries,
     DetectedStructure,
@@ -151,41 +152,33 @@ def process_addresses(
     removed_count = 0
     after_id = 0
 
-    while True:
-        rows = queries.fetch_addresses_chunk(conn, after_id=after_id, limit=chunk_size)
-        if not rows:
-            break
-        after_id = rows[-1][0]  # tranche triée par id
+    with progression(queries.count_addresses(conn), "adresses", logger) as avancement:
+        while True:
+            rows = queries.fetch_addresses_chunk(conn, after_id=after_id, limit=chunk_size)
+            if not rows:
+                break
+            after_id = rows[-1][0]  # tranche triée par id
 
-        addr_ids: list[int] = []
-        detections: list[DetectedStructure] = []
-        kept_pairs: list[KeptPair] = []
-        for addr_id, normalized_text in rows:
-            addr_ids.append(addr_id)
-            matches = matcher.resolve(normalized_text)
-            if any(m.structure_id in perimeter for m in matches):
-                in_perimeter_count += 1
-            for match in matches:
-                detections.append(DetectedStructure(addr_id, match.structure_id, match.form_id))
-                kept_pairs.append(KeptPair(addr_id, match.structure_id))
-                affil_count += 1
+            addr_ids: list[int] = []
+            detections: list[DetectedStructure] = []
+            kept_pairs: list[KeptPair] = []
+            for addr_id, normalized_text in rows:
+                addr_ids.append(addr_id)
+                matches = matcher.resolve(normalized_text)
+                if any(m.structure_id in perimeter for m in matches):
+                    in_perimeter_count += 1
+                for match in matches:
+                    detections.append(DetectedStructure(addr_id, match.structure_id, match.form_id))
+                    kept_pairs.append(KeptPair(addr_id, match.structure_id))
+                    affil_count += 1
 
-        removed_count += queries.delete_obsolete_detections_bulk(conn, addr_ids, kept_pairs)
-        queries.unflag_obsolete_detections_bulk(conn, addr_ids, kept_pairs)
-        queries.upsert_detected_structures_bulk(conn, detections)
-        conn.commit()
+            removed_count += queries.delete_obsolete_detections_bulk(conn, addr_ids, kept_pairs)
+            queries.unflag_obsolete_detections_bulk(conn, addr_ids, kept_pairs)
+            queries.upsert_detected_structures_bulk(conn, detections)
+            conn.commit()
 
-        processed += len(rows)
-        elapsed = time.perf_counter() - t_start
-        logger.info(
-            "  %s traitées (%s in_perimeter, %s affiliations, %s obsolètes supprimés) "
-            "— %.0f addr/s",
-            processed,
-            in_perimeter_count,
-            affil_count,
-            removed_count,
-            processed / elapsed,
-        )
+            processed += len(rows)
+            avancement.avance(len(rows))
 
     elapsed = time.perf_counter() - t_start
     if processed > 0:

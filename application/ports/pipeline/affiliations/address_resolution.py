@@ -52,6 +52,10 @@ class AddressResolutionQueries(Protocol):
         """Toutes les formes de `structure_name_forms`, triées par `id` : l'entrée du matcher, chargée une fois par run."""
         ...
 
+    def count_addresses(self, conn: Connection) -> int:
+        """Nombre d'adresses à résoudre, qui donne son total à l'avancement."""
+        ...
+
     def fetch_addresses_chunk(
         self, conn: Connection, *, after_id: int, limit: int
     ) -> list[tuple[int, str]]:
