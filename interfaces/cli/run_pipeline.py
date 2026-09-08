@@ -1114,6 +1114,7 @@ def _run_fetch_missing_doi(target: str) -> PhaseMetrics:
         reset_current_breaker,
         set_current_breaker,
     )
+    from infrastructure.sources.config import get_fetch_missing_max_per_source
 
     adapter = _make_fetch_missing_doi_adapter(target)
 
@@ -1131,6 +1132,7 @@ def _run_fetch_missing_doi(target: str) -> PhaseMetrics:
                 adapter,
                 log,
                 cross_import_dois_reader=get_cross_import_dois,
+                limit=get_fetch_missing_max_per_source(conn),
                 breaker=breaker,
             )
         )
@@ -1238,7 +1240,10 @@ def phase_oa_status(options: RunOptions) -> PhaseMetrics:
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.pipeline.oa_status import PgOaStatusQueries
     from infrastructure.sources.api_params import API_BASE_URLS
-    from infrastructure.sources.config import get_polite_pool_email_optional
+    from infrastructure.sources.config import (
+        get_polite_pool_email_optional,
+        get_unpaywall_max_per_run,
+    )
     from infrastructure.sources.unpaywall.client import fetch_oa_status
 
     metrics = PhaseMetrics()
@@ -1266,6 +1271,7 @@ def phase_oa_status(options: RunOptions) -> PhaseMetrics:
                     PgOaStatusQueries(),
                     log,
                     fetcher=fetcher,
+                    max_per_run=get_unpaywall_max_per_run(conn),
                 )
             )
         )

@@ -24,8 +24,6 @@ type OaStatusFetcher = Callable[[httpx2.AsyncClient, str], Awaitable[str | None]
 # Constantes opérationnelles.
 BATCH_SIZE = 50
 MAX_CONCURRENT = 5
-MAX_PER_RUN = 10_000
-"""Nombre maximum de DOI vérifiés par run : lisse la charge, le backlog des jamais-vérifiés s'écoulant sur plusieurs runs au lieu d'un pic."""
 STALENESS_DAYS = 15
 """Au-delà, un statut OA est re-vérifié."""
 
@@ -36,14 +34,18 @@ async def run(
     logger: logging.Logger,
     *,
     fetcher: OaStatusFetcher,
+    max_per_run: int | None,
     max_concurrent: int = MAX_CONCURRENT,
 ) -> PhaseMetrics:
-    """Interroge Unpaywall pour les publications à DOI (re)vérifier et met à jour leur `oa_status`, puis rend les métriques du run."""
+    """Interroge Unpaywall pour les publications à DOI (re)vérifier et met à jour leur `oa_status`, puis rend les métriques du run.
+
+    `max_per_run` borne le nombre de DOI vérifiés, `None` valant illimité.
+    """
     logger.info("▶ enrich_oa_status")
     t0 = time.perf_counter()
     metrics = PhaseMetrics()
     pubs = queries.fetch_publications_with_doi(
-        conn, limit=MAX_PER_RUN, staleness_days=STALENESS_DAYS
+        conn, limit=max_per_run, staleness_days=STALENESS_DAYS
     )
     total = len(pubs)
     stale_total = queries.count_stale_publications(conn, staleness_days=STALENESS_DAYS)
@@ -51,7 +53,7 @@ async def run(
     logger.info(
         "%s publications à (re)vérifier sur Unpaywall (max %s, staleness %sj) — %s stale au total",
         total,
-        MAX_PER_RUN,
+        max_per_run if max_per_run is not None else "illimité",
         STALENESS_DAYS,
         stale_total,
     )

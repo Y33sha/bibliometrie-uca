@@ -107,6 +107,7 @@ async def test_happy_path_updates_each_pub(logger, http_mock):
         queries,
         logger,
         fetcher=_make_fetcher(logger),
+        max_per_run=None,
     )
 
     # pub 3 inchangée (bronze→bronze), 1 et 2 mises à jour
@@ -136,6 +137,7 @@ async def test_404_marks_as_not_found(logger, http_mock):
         queries,
         logger,
         fetcher=_make_fetcher(logger),
+        max_per_run=None,
     )
     assert queries.updates == []
     assert queries.checked == [1]  # marqué vérifié même si non trouvé (pas re-tiré demain)
@@ -153,6 +155,7 @@ async def test_diamond_not_replaced_by_gold(logger, http_mock):
         queries,
         logger,
         fetcher=_make_fetcher(logger),
+        max_per_run=None,
     )
     assert queries.updates == []
 
@@ -169,6 +172,7 @@ async def test_diamond_replaced_by_other_status(logger, http_mock):
         queries,
         logger,
         fetcher=_make_fetcher(logger),
+        max_per_run=None,
     )
     assert queries.updates == [(1, "bronze")]
 
@@ -186,6 +190,7 @@ async def test_embargoed_not_downgraded_to_closed(logger, http_mock):
         queries,
         logger,
         fetcher=_make_fetcher(logger),
+        max_per_run=None,
     )
     assert queries.updates == []
 
@@ -202,6 +207,7 @@ async def test_embargoed_replaced_by_open_status(logger, http_mock):
         queries,
         logger,
         fetcher=_make_fetcher(logger),
+        max_per_run=None,
     )
     assert queries.updates == [(1, "green")]
 
@@ -219,6 +225,7 @@ async def test_open_archive_deposit_not_downgraded_to_closed(logger, http_mock):
         queries,
         logger,
         fetcher=_make_fetcher(logger),
+        max_per_run=None,
     )
     assert queries.updates == []
     assert queries.checked == [1]
@@ -237,6 +244,7 @@ async def test_open_archive_deposit_upgraded_by_unpaywall(logger, http_mock):
         queries,
         logger,
         fetcher=_make_fetcher(logger),
+        max_per_run=None,
     )
     assert queries.updates == [(1, "gold")]
 
@@ -252,6 +260,7 @@ async def test_unchanged_status_skipped(logger, http_mock):
         queries,
         logger,
         fetcher=_make_fetcher(logger),
+        max_per_run=None,
     )
     assert queries.updates == []
     assert queries.checked == [1]  # statut inchangé mais marqué vérifié
@@ -273,6 +282,7 @@ async def test_429_retries_transparently(logger, http_mock):
         queries,
         logger,
         fetcher=_make_fetcher(logger),
+        max_per_run=None,
     )
     assert queries.updates == [(1, "green")]
 
@@ -302,6 +312,7 @@ async def test_semaphore_caps_concurrent_fetches(logger):
         _FakeQueries(pubs),
         logger,
         fetcher=tracked_fetcher,
+        max_per_run=None,
         max_concurrent=3,
     )
     assert peak[0] == 3
