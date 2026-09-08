@@ -466,3 +466,37 @@ disallow_any_explicit = false
 [tool.pydantic-mypy]
 init_forbid_extra = true
 init_typed = true
+
+# ----------------------------------------------------------------------
+# mutmut : tests de mutation du domaine.
+# Lancement, à la demande : `uv run --with mutmut mutmut run`, puis
+# `mutmut results` pour la liste et `mutmut show <mutant>` pour le diff.
+# ----------------------------------------------------------------------
+[tool.mutmut]
+# Seule couche mutée : ses règles sont pures, et une règle fausse ne s'y voit
+# qu'au résultat. Les tests unitaires y répondent sans base de données.
+source_paths = ["domain"]
+
+# Toute la suite unitaire répond, pas seulement `tests/unit/domain` : les tests
+# d'une règle du domaine vivent parfois sous la couche qui l'appelle.
+pytest_add_cli_args_test_selection = ["tests/unit"]
+
+# mutmut copie le code muté dans `mutants/` et y lance les tests. Ce qu'ils lisent
+# hors de la couche mutée s'y copie tel quel : modules importés et fichiers du
+# repository que les tests de conformité relisent.
+also_copy = [
+    "application",
+    "infrastructure",
+    "interfaces/api",
+    "interfaces/cli",
+    "interfaces/frontend/src/lib",
+    "interfaces/frontend/Dockerfile",
+    "scripts",
+    ".github",
+    "Dockerfile",
+    "docker-compose.prod.yml",
+    "docker-compose.yml",
+    "pyproject.toml",
+    "start.sh",
+]
+

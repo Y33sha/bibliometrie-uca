@@ -79,3 +79,16 @@ def test_without_secondary_ids_source_priority_decides():
     pub = _pub()
     refresh_from_sources(pub, [piece, parent], source_priority=_PRIORITY)
     assert pub.title == "README_data.txt"
+
+
+def test_une_source_sans_doc_type_laisse_la_suivante_le_donner():
+    """Le type vient de la première source qui en porte un, les silencieuses étant passées.
+
+    Toutes les sources ne renseignent pas le type de document. La plus prioritaire restant muette, l'agrégation lit la suivante plutôt que de conclure à l'absence de type.
+    """
+    muette = _sp(id=1, source="openalex", doc_type=None)
+    parlante = _sp(id=2, source="datacite", doc_type="dataset")
+
+    pub = _pub()
+    refresh_from_sources(pub, [muette, parlante], source_priority=_PRIORITY)
+    assert pub.doc_type == "dataset"
