@@ -1,21 +1,17 @@
 # Pipeline
-* [ ] clarifier les logs du pipeline
 ## Extraction
 * [ ] ajouter extraction par ORCID: vérifier pertinence (tester différentes sources, auditer le gain)
 * [ ] bioRxiv, medRxiv: voir si on moissonne ces identifiants; possibilité de récupérer les DOI à partir des identifiants comme dans ArXiv? (ex. publi 2757)
 * [ ] chercher dans ScanR par hal-id? (généraliser cross-import à tous les identifiants et toutes les sources; ajouter système de backoff)
-* [ ] cross_import: max 10k par source par run? (pour lisser dans le temps)
-* [ ] refresh_stale: pas de logs d'avancement (seulement début et fin) => gênant quand beaucoup de lignes stale
+* [ ] fetch_missing par NNT: stocker les tentatives, ajouter backoff
 ## Suite du traitement
 * [ ] enrich_journals_from_openalex: montants APC par journal jamais remis à jour. Probablement pas utile de les moissonner.
 * [ ] doaj_payload: garder ou virer?
 * [ ] CLI `seed_journals_doi_prefix`: intégrer au pipeline? + recalculer les anciens pour tenir compte des nouveaux (chaque doi_prefix de journal doit être unique et aussi précis que possible; à cette occasion, réécrire la fonction resolve_journal_by_doi de manière moins alambiquée)
-* [ ] tester la nouvelle logique de matching personnes: faire une copie de la base, vider les `persons`, `person_name_forms` et `person_identifiers`, relancer le pipeline, comparer le résultat à la base canonique; étudier le diff, retravailler la logique, itérer jusqu'à convergence.
 * [ ] réévaluer l'utilité du flag in_perimeter sur la table publications
 * [ ] suggested countries: jamais remis à null
 * [ ] arrêter d'utiliser hal_person_id pour matching: remplacer par idhal / ou rendre hal_person_id visible et confirmable/rejetable via UI admin?
 * [ ] déduplication par métadonnées: ajouter condition journal_id pour les articles? container title pour les chapitres?
-* [ ] plafond Unpaywall: rendre configurable depuis l'UI
 
 # Code
 * [ ] modules partagés app/pipeline: à sortir plutôt que d'autoriser l'app à importer des modules du pipeline?
