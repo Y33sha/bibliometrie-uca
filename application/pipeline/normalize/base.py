@@ -20,6 +20,7 @@ from sqlalchemy import Connection
 
 from application.pipeline._savepoint import savepoint
 from application.pipeline.logging_scope import scoped_logger
+from application.pipeline.progression import progression
 from application.ports.pipeline.normalize.staging import StagingQueries, StagingRow
 
 
@@ -113,30 +114,26 @@ class SourceNormalizer(ABC):
             skipped = 0
             errors = 0
 
-            for row in self._iter_rows(self.conn):
-                try:
-                    result = self._process_one(self.conn, row)
-                except Exception as e:
-                    slog.error(f"Erreur sur {row.source_id}: {e}")
-                    errors += 1
-                    continue
+            with progression(total, self.SOURCE, slog) as avancement:
+                for row in self._iter_rows(self.conn):
+                    avancement.avance()
+                    try:
+                        result = self._process_one(self.conn, row)
+                    except Exception as e:
+                        slog.error(f"Erreur sur {row.source_id}: {e}")
+                        errors += 1
+                        continue
 
-                if result is True:
-                    processed += 1
-                elif result is None:
-                    skipped += 1
-                else:
-                    errors += 1
+                    if result is True:
+                        processed += 1
+                    elif result is None:
+                        skipped += 1
+                    else:
+                        errors += 1
 
-                done = processed + skipped
-                if done > 0 and done % self.DEFAULT_BATCH_SIZE == 0:
-                    self.conn.commit()
-                    parts = [f"{done}/{total} traités"]
-                    if skipped:
-                        parts.append(f"{skipped} ignorés")
-                    if errors:
-                        parts.append(f"{errors} erreurs")
-                    slog.info(f"  {', '.join(parts)}")
+                    done = processed + skipped
+                    if done > 0 and done % self.DEFAULT_BATCH_SIZE == 0:
+                        self.conn.commit()
 
             self.conn.commit()
             self.cleanup()

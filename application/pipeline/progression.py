@@ -27,6 +27,9 @@ JALON_INTERVALLE_S = 30.0
 FORMAT_BARRE = "{desc} {percentage:3.0f}% |{bar}| {n_fmt}/{total_fmt}  {elapsed}"
 """Barre réduite à l'avancement et au temps écoulé."""
 
+type Journal = logging.Logger | logging.LoggerAdapter[logging.Logger]
+"""Ce qui accepte une ligne de journal : un logger, ou l'adaptateur qui le préfixe."""
+
 
 def _terminal_interactif() -> bool:
     """Vrai quand la sortie standard est un terminal."""
@@ -43,7 +46,7 @@ class Progression:
         self,
         total: int,
         libelle: str,
-        logger: logging.Logger | None,
+        logger: Journal | None,
         *,
         intervalle_s: float = JALON_INTERVALLE_S,
     ) -> None:
@@ -107,7 +110,7 @@ class Progression:
 def progression(
     total: int,
     libelle: str,
-    logger: logging.Logger | None,
+    logger: Journal | None,
     *,
     intervalle_s: float = JALON_INTERVALLE_S,
 ) -> Iterator[Progression]:
