@@ -22,6 +22,7 @@ Des traces de mise au point subsistent. `application/pipeline/timings.py` écrit
 - **Sans terminal, le code écrit des lignes de journal espacées**, sous condition de `sys.stdout.isatty()`. Une barre écrite sans terminal encombrerait la sortie capturée de retours chariot.
 - **L'affichage passe par `tqdm`** : 1 paquet, 356 Ko, contre 4 paquets et 7,1 Mo pour `rich`. Les barres concurrentes demandent en contrepartie de fixer leur position et de poser un verrou entre threads.
 - **`tqdm` est une dépendance de développement**, importée sous `try` : son absence conduit au même repli que l'absence de terminal, et l'image de production n'embarque rien. `deptry` signale un tel import par la règle `DEP004`, à déclarer dans `per_rule_ignores`.
+- **Les jalons d'avancement partent au journal en mode non interactif.** Un run long en conteneur se suit alors dans les logs, à un pas plus large que celui de l'affichage.
 
 ## Phasage
 
@@ -35,8 +36,29 @@ Des traces de mise au point subsistent. `application/pipeline/timings.py` écrit
 
 ### 2. Remplacement des lignes répétées
 
-- [ ] Recenser les boucles qui écrivent une ligne par lot ou par document.
-- [ ] Les remplacer par la barre, en gardant le bilan de fin.
+Barres simultanées, une par source, sous `ThreadPoolExecutor` :
+
+- [ ] `extract/extract_hal.py` — une ligne par page
+- [ ] `extract/extract_openalex.py` — une ligne par page
+- [ ] `extract/extract_wos.py` — une ligne par page
+- [ ] `extract/extract_scanr.py` — toutes les 500 notices
+- [ ] `extract/extract_theses.py` — toutes les 1000 notices
+- [ ] `fetch_missing/doi.py` — tous les 100 DOI
+- [ ] `fetch_missing/hal.py` — une ligne par lot
+
+Barre unique :
+
+- [ ] `extract/fetch_truncated.py` — une ligne par lot
+- [ ] `extract/fetch_stale.py` — une ligne par lot
+- [ ] `normalize/base.py` — une ligne par lot, pour chaque source à son tour
+- [ ] `affiliations/resolve_addresses.py` — une ligne par lot
+- [ ] `persons/cascade.py` — deux boucles, toutes les 5000 signatures
+- [ ] `publications/reconcile_components.py` — toutes les 5000 publications
+- [ ] `subjects/ingestion.py` — toutes les 2000 publications sources
+- [ ] `oa_status/phase.py` — tous les 50 DOI
+
+Puis :
+
 - [ ] Retirer le détail par document lent de `application/pipeline/timings.py`. La durée totale et le nombre de documents traités restent au bilan.
 
 ### 3. Vocabulaire
