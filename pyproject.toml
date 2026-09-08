@@ -468,6 +468,63 @@ init_forbid_extra = true
 init_typed = true
 
 # ----------------------------------------------------------------------
+# Pyrefly : second vérificateur de types, lancé à la demande.
+# Lancement : `uv run --with pyrefly pyrefly check`
+#
+# Mypy reste la référence, seul branché au pre-commit et à l'intégration.
+# Celui-ci sert à comparer les deux lectures du même code : il voit des
+# choses que l'autre laisse passer, et l'inverse.
+# ----------------------------------------------------------------------
+[tool.pyrefly]
+python-version = "3.14.0"
+# Système des images de production, comme pour mypy : depuis un autre système, les appels POSIX
+# que le code exécute en production seraient rejetés.
+python-platform = "linux"
+# Le code des tests, du frontend et d'Alembic reste hors du champ, comme pour mypy.
+project-excludes = [
+    "**/tests/",
+    "**/frontend/",
+    "**/bibliometrie_uca.egg-info/",
+    "**/.venv/",
+    "**/build/",
+    "**/alembic/",
+]
+# Libs tierces non typées : ignorées plutôt que déclarées une à une.
+ignore-missing-imports = ["*"]
+
+[tool.pyrefly.errors]
+# Les deux règles qui portent la discipline déclarée à mypy : `Any` explicite interdit,
+# et pas de valeur `Any` rendue sous une déclaration qui promet autre chose.
+explicit-any = "error"
+no-any-return = "error"
+
+# Modules exemptés d'`explicit-any`, les mêmes qu'à mypy et pour les mêmes motifs.
+[[tool.pyrefly.sub-config]]
+matches = "application/ports/read_models/config_queries.py"
+[tool.pyrefly.sub-config.errors]
+explicit-any = false
+
+[[tool.pyrefly.sub-config]]
+matches = "application/ports/read_models/pipeline_runs_queries.py"
+[tool.pyrefly.sub-config.errors]
+explicit-any = false
+
+[[tool.pyrefly.sub-config]]
+matches = "interfaces/api/models/config.py"
+[tool.pyrefly.sub-config.errors]
+explicit-any = false
+
+[[tool.pyrefly.sub-config]]
+matches = "infrastructure/jsonb_models/publication.py"
+[tool.pyrefly.sub-config.errors]
+explicit-any = false
+
+[[tool.pyrefly.sub-config]]
+matches = "infrastructure/read_models/publications/facets.py"
+[tool.pyrefly.sub-config.errors]
+explicit-any = false
+
+# ----------------------------------------------------------------------
 # mutmut : tests de mutation du domaine.
 # Lancement, à la demande : `uv run --with mutmut mutmut run`, puis
 # `mutmut results` pour la liste et `mutmut show <mutant>` pour le diff.
