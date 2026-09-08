@@ -14,6 +14,7 @@ from application.ports.pipeline.affiliations.address_resolution import (
     StructureNameForm,
 )
 from domain.structures.structure import StructureType
+from infrastructure.db.scalars import scalar_int
 
 # Détections auto (`matched_form_id` posé) d'une adresse de `addr_ids` dont le couple
 # (address_id, structure_id) est absent de `kept_pairs` (les couples encore détectés).
@@ -60,6 +61,9 @@ class PgAddressResolutionQueries(AddressResolutionQueries):
             )
             for r in rows
         ]
+
+    def count_addresses(self, conn: Connection) -> int:
+        return scalar_int(conn.execute(text("SELECT count(*) FROM addresses")))
 
     def fetch_addresses_chunk(
         self, conn: Connection, *, after_id: int, limit: int

@@ -248,6 +248,9 @@ class _FakeQueries:
         self.load_called = True
         return self._forms
 
+    def count_addresses(self, conn: object) -> int:
+        return len(self._addresses)
+
     def fetch_addresses_chunk(
         self, conn: object, *, after_id: int, limit: int
     ) -> list[tuple[int, str]]:

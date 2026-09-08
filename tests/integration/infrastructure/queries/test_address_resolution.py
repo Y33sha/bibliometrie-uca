@@ -49,6 +49,14 @@ class TestLoadNameForms:
         assert ours.form_text == "uca"
 
 
+class TestCountAddresses:
+    def test_le_compte_suit_les_adresses_creees(self, sa_sync_conn):
+        avant = _Q.count_addresses(sa_sync_conn)
+        _create_address(sa_sync_conn, raw_text="A1")
+        _create_address(sa_sync_conn, raw_text="A2")
+        assert _Q.count_addresses(sa_sync_conn) == avant + 2
+
+
 class TestFetchAddressesChunk:
     def test_returns_all_addresses(self, sa_sync_conn):
         a1 = _create_address(sa_sync_conn, raw_text="A1")
