@@ -18,15 +18,10 @@ Des traces de mise au point subsistent. `application/pipeline/timings.py` écrit
 
 ## Décisions
 
-La barre de progression est un objet d'affichage, distinct du journal. Elle s'écrit sur le terminal, s'efface, et ne laisse rien derrière elle. Le journal garde ce qui se relit après coup : le début d'une phase, son bilan, les anomalies.
-
-La barre paraît seulement en terminal interactif, sous condition de `sys.stdout.isatty()`. Sans terminal — conteneur détaché, intégration continue, sortie redirigée —, le code écrit des lignes de journal espacées. Le fichier de journal et la sortie JSON ne reçoivent aucun retour chariot.
-
-Le bilan d'une phase reste dans le journal. La barre montre l'avancement ; le bilan dit ce que la phase a produit.
-
-La bibliothèque d'affichage est une dépendance de développement, importée sous `try`. Son absence conduit au repli des runs sans terminal. `deptry` signale un tel import par la règle `DEP004`, à déclarer dans `per_rule_ignores`.
-
-L'affichage passe par `tqdm`, qui pèse 356 Ko sans dépendance transitive. `rich` embarque trois dépendances transitives pour 7,1 Mo, dont `pygments` seul pour 5,1 Mo, au service de la coloration syntaxique et du rendu Markdown.
+- **La barre porte l'avancement, le journal garde le bilan.** La barre s'écrit sur le terminal et s'efface. Un bilan qu'elle porterait disparaîtrait avec elle.
+- **Sans terminal, le code écrit des lignes de journal espacées**, sous condition de `sys.stdout.isatty()`. Une barre écrite sans terminal encombrerait la sortie capturée de retours chariot.
+- **L'affichage passe par `tqdm`** : 1 paquet, 356 Ko, contre 4 paquets et 7,1 Mo pour `rich`. Les barres concurrentes demandent en contrepartie de fixer leur position et de poser un verrou entre threads.
+- **`tqdm` est une dépendance de développement**, importée sous `try` : son absence conduit au même repli que l'absence de terminal, et l'image de production n'embarque rien. `deptry` signale un tel import par la règle `DEP004`, à déclarer dans `per_rule_ignores`.
 
 ## Phasage
 
