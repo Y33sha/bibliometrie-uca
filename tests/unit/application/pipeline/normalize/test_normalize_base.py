@@ -136,28 +136,23 @@ class TestRunHappyPath:
         assert "Erreurs : 1" in caplog.text
         assert stats == NormalizeStats(processed=1, skipped=1, errors=1)
 
-    def test_batch_commit_logs_progress(self, caplog):
-        """Avec DEFAULT_BATCH_SIZE=2, un commit + log au 2e traité."""
+    def test_le_commit_tombe_a_chaque_lot(self):
+        """Avec DEFAULT_BATCH_SIZE=2 sur quatre documents : deux commits de lot, plus celui de fin."""
         staging = _FakeStaging()
         staging.count_returns = 4
         staging.pending_rows = [_row(s) for s in ("a", "b", "c", "d")]
         norm = _Norm(staging, results=[True, True, True, True])
-        with caplog.at_level(logging.INFO):
-            norm.run()
-        # Log progress contient "2/4" et "4/4" — mais seul "2/4 traités" passe par le batch commit.
-        assert "2/4 traités" in caplog.text
+        norm.run()
+        assert norm.conn.commit.call_count == 3
 
-    def test_progress_log_with_skip_and_error(self, caplog):
-        """Le log de progression mentionne aussi les `ignorés` et `erreurs` quand >0."""
+    def test_le_bilan_porte_les_ignores(self, caplog):
         staging = _FakeStaging()
         staging.count_returns = 2
         staging.pending_rows = [_row("a"), _row("b")]
-        # 1 ok + 1 skip → done=2 (batch_size=2) → log avec skipped et 0 errors (errors=0 donc pas affiché).
         norm = _Norm(staging, results=[True, None])
         with caplog.at_level(logging.INFO):
             norm.run()
-        # "1 ignorés" doit apparaître dans le log progress
-        assert "1 ignorés" in caplog.text
+        assert "Ignorés : 1" in caplog.text
 
     def test_summary_stats_lines_logged(self, caplog):
         class _NormWithSummary(_Norm):

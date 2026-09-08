@@ -50,7 +50,7 @@ Barre unique :
 
 - [ ] `extract/fetch_truncated.py` — une ligne par lot
 - [ ] `extract/fetch_stale.py` — une ligne par lot
-- [ ] `normalize/base.py` — une ligne par lot, pour chaque source à son tour
+- [x] `normalize/base.py` — une ligne par lot, pour chaque source à son tour
 - [x] `affiliations/resolve_addresses.py` — une ligne par lot
 - [x] `persons/cascade.py` — deux boucles, toutes les 5000 signatures
 - [x] `publications/reconcile_components.py` — toutes les 5000 publications
