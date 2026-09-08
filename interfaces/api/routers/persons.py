@@ -234,7 +234,7 @@ def mark_persons_distinct(
 ) -> OkResponse:
     """Marque deux personnes comme distinctes : les files de triage par nom et par identifiant écartent la paire.
 
-    Renvoie 400 sur deux identifiants égaux (`mark_distinct`).
+    Renvoie 422 sur deux identifiants égaux (`mark_distinct`).
     """
     person_commands.mark_distinct(
         conn, body.person_id_a, body.person_id_b, repo=repo, audit_repo=audit
@@ -393,7 +393,7 @@ def add_person_identifier(
 ) -> AddIdentifierResponse:
     """Ajoute à la main un identifiant (ORCID, idHAL ou IdRef) à une personne.
 
-    La cascade de décision — insertion, idempotence, réattribution, conflit — appartient à `add_identifier`, appelé avec `source="manual"` : il refuse alors les types qu'aucun humain n'attribue, et vérifie l'existence de la personne. Le router traduit l'issue en réponse. Les handlers globaux traduisent la personne absente (`NotFoundError`) en 404, le conflit (`CannotAttributeConflict`) en 409, le type ou la valeur refusés (`ValidationError`) en 400.
+    La cascade de décision — insertion, idempotence, réattribution, conflit — appartient à `add_identifier`, appelé avec `source="manual"` : il refuse alors les types qu'aucun humain n'attribue, et vérifie l'existence de la personne. Le router traduit l'issue en réponse. Les handlers globaux traduisent la personne absente (`NotFoundError`) en 404, le conflit (`CannotAttributeConflict`) en 409, le type ou la valeur refusés (`ValidationError`) en 422.
     """
     result = person_commands.add_identifier(
         conn,
@@ -443,7 +443,7 @@ def update_person_name(
 ) -> OkResponse:
     """Modifie le nom/prénom d'une personne.
 
-    Renvoie 400 sans patronyme, 404 sur une personne introuvable (`update_name`).
+    Renvoie 422 sans patronyme, 404 sur une personne introuvable (`update_name`).
     """
     person_commands.update_name(
         conn, person_id, body.last_name, body.first_name, repo=repo, audit_repo=audit
@@ -461,7 +461,7 @@ def merge_persons(
 ) -> MergeResponse:
     """Fusionne une autre personne (source) dans celle-ci (target).
 
-    Renvoie 400 sur deux identifiants égaux, 404 sur une personne introuvable, 409 si chacune porte une fiche RH distincte (`merge_person`).
+    Renvoie 422 sur deux identifiants égaux, 404 sur une personne introuvable, 409 si chacune porte une fiche RH distincte (`merge_person`).
     """
     person_commands.merge_person(conn, person_id, body.source_id, repo=repo, audit_repo=audit)
     return MergeResponse(merged=True, source_id=body.source_id, target_id=person_id)

@@ -49,9 +49,9 @@ async def test_conflit_donne_409():
 
 
 @pytest.mark.asyncio
-async def test_erreur_de_domaine_non_specialisee_donne_400():
+async def test_erreur_de_domaine_non_specialisee_donne_422():
     reponse = await domain_error_handler(_requete(), DomainError("règle métier"))
-    assert reponse.status_code == 400
+    assert reponse.status_code == 422
     assert _corps(reponse) == {"detail": "règle métier"}
 
 

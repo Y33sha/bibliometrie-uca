@@ -4,7 +4,7 @@ Couvre :
 - GET /api/hal-problems/duplicate-accounts
 - GET /api/hal-problems/duplicate-pubs-doi
 - GET /api/hal-problems/duplicate-pubs-meta
-- GET /api/hal-problems/missing-collections (lab_id requis, 400 sans collection)
+- GET /api/hal-problems/missing-collections (lab_id requis, 422 sans collection)
 - GET /api/hal-problems/missing-collections/labs
 - GET /api/hal-problems/affiliation-conflicts
 """
@@ -97,11 +97,11 @@ class TestMissingCollections:
         r = client.get("/api/hal-problems/missing-collections")
         assert r.status_code == 422
 
-    def test_400_when_lab_has_no_hal_collection(self, client):
+    def test_422_when_lab_has_no_hal_collection(self, client):
         """Le laboratoire existe, mais sans collection il n'y a rien à quoi comparer."""
         lab = _seed_lab(hal_collection=None)
         r = client.get("/api/hal-problems/missing-collections", params={"lab_id": lab})
-        assert r.status_code == 400
+        assert r.status_code == 422
         assert "collection" in r.json()["detail"]
 
     def test_404_when_lab_is_unknown(self, client):

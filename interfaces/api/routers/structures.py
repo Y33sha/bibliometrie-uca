@@ -105,7 +105,7 @@ def create_tutelle(
 ) -> StructureTutelleCreateResponse:
     """Crée une tutelle parent-enfant entre deux structures.
 
-    Idempotent : une tutelle identique — même parent, même enfant — laisse la table inchangée et rend `{"status": "already_exists"}`. Lève 400 si elle viole l'invariant de graphe : structure liée à elle-même, ou cycle (l'enfant est déjà un ancêtre du parent). Lève 409 si `parent_id` ou `child_id` désigne une structure inexistante.
+    Idempotent : une tutelle identique — même parent, même enfant — laisse la table inchangée et rend `{"status": "already_exists"}`. Lève 422 si elle viole l'invariant de graphe : structure liée à elle-même, ou cycle (l'enfant est déjà un ancêtre du parent). Lève 409 si `parent_id` ou `child_id` désigne une structure inexistante.
     """
     row = structure_commands.create_tutelle(
         conn,

@@ -263,7 +263,7 @@ def merge_duplicate_publications(
 ) -> MergeResponse:
     """Fusionne deux publications doublons.
 
-    La cible est le plus petit des deux identifiants. Le sens de la fusion est sans portée durable : `refresh_from_sources` re-dérive toutes les métadonnées canoniques depuis l'union des `source_publications`, et cette union est la même dans un sens comme dans l'autre. Renvoie 400 sur deux identifiants égaux, 404 sur une publication introuvable, 409 sur deux DOI non-nuls distincts (`merge_publications`).
+    La cible est le plus petit des deux identifiants. Le sens de la fusion est sans portée durable : `refresh_from_sources` re-dérive toutes les métadonnées de la publication depuis l'union des `source_publications`, et cette union est la même dans un sens comme dans l'autre. Renvoie 422 sur deux identifiants égaux, 404 sur une publication introuvable, 409 sur deux DOI non-nuls distincts (`merge_publications`).
     """
     target_id, source_id = sorted((body.pub_id_a, body.pub_id_b))
     publication_commands.merge_publications(conn, target_id, source_id, repo=repo, audit_repo=audit)
@@ -279,7 +279,7 @@ def mark_publications_distinct(
 ) -> OkResponse:
     """Marque deux publications comme distinctes (non-doublon confirmé).
 
-    Persiste l'annotation dans `distinct_publications` : la paire est écartée des prochaines revues de `/duplicates/next`. Renvoie 400 sur deux identifiants égaux (`mark_distinct`).
+    Persiste l'annotation dans `distinct_publications` : la paire est écartée des prochaines revues de `/duplicates/next`. Renvoie 422 sur deux identifiants égaux (`mark_distinct`).
     """
     publication_commands.mark_distinct(
         conn, body.pub_id_a, body.pub_id_b, repo=repo, audit_repo=audit

@@ -245,7 +245,7 @@ def batch_set_country(
 ) -> BatchCountryResponse:
     """Ajoute un pays à des adresses (par IDs ou par filtre).
 
-    Renvoie 400 sur un code pays absent du référentiel — la chaîne vide comprise — et sur un appel par filtre qui n'en porte aucun (`batch_set_country_by_filter`).
+    Renvoie 422 sur un code pays absent du référentiel — la chaîne vide comprise — et sur un appel par filtre qui n'en porte aucun (`batch_set_country_by_filter`).
     """
     updated, propagated, all_ids = address_commands.batch_set_country(
         conn,
@@ -275,7 +275,7 @@ def set_address_country(
 ) -> OkResponse:
     """Attribue des pays à une adresse.
 
-    Renvoie 400 sur un code pays absent du référentiel, 404 sur une adresse introuvable (`set_country`).
+    Renvoie 422 sur un code pays absent du référentiel, 404 sur une adresse introuvable (`set_country`).
     """
     affected = address_commands.set_country(
         conn,

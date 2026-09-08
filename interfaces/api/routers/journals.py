@@ -230,7 +230,7 @@ def merge(
 ) -> MergeResponse:
     """Fusionne la revue `source_id` dans la revue `journal_id`.
 
-    Les publications et les métadonnées de la source passent à la cible, puis la source est supprimée. Les publications absorbées sont requalifiées contre le `journal_type` de la cible (`merge_journals`). Renvoie 400 sur deux identifiants égaux, 404 si l'une des deux revues est introuvable.
+    Les publications et les métadonnées de la source passent à la cible, puis la source est supprimée. Les publications absorbées sont requalifiées contre le `journal_type` de la cible (`merge_journals`). Renvoie 422 sur deux identifiants égaux, 404 si l'une des deux revues est introuvable.
     """
     journal_commands.merge_journals(
         conn,

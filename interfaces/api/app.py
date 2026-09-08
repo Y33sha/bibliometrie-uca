@@ -119,6 +119,11 @@ app = FastAPI(
 # (quel statut, quel corps) se déclare, lui, sur la route via `responses={}` :
 # les erreurs à corps trivial se contentent de `{detail}`, les deux à corps
 # structuré passent par un modèle publié (`interfaces/api/models/errors.py`).
+#
+# Une requête que le serveur interprète sans pouvoir la traiter reçoit 422, quelle
+# que soit la couche qui prononce le refus : validation d'un paramètre, règle du
+# domaine, valeur que la base ne peut pas représenter. C'est aussi le code que rend
+# la validation native de FastAPI. Le 409 est réservé au heurt avec l'état courant.
 
 
 @app.exception_handler(NotFoundError)
@@ -128,7 +133,7 @@ async def not_found_handler(request: Request, exc: NotFoundError) -> JSONRespons
 
 @app.exception_handler(ValidationError)
 async def validation_handler(request: Request, exc: ValidationError) -> JSONResponse:
-    return JSONResponse(status_code=400, content={"detail": str(exc)})
+    return JSONResponse(status_code=422, content={"detail": str(exc)})
 
 
 @app.exception_handler(PublisherMergeBlockedError)
@@ -163,7 +168,7 @@ async def unauthorized_handler(request: Request, exc: UnauthorizedError) -> JSON
 async def domain_error_handler(request: Request, exc: DomainError) -> JSONResponse:
     # Filet de sécurité pour une DomainError non spécialisée ci-dessus.
     logger.warning("DomainError non mappée : %s", exc)
-    return JSONResponse(status_code=400, content={"detail": str(exc)})
+    return JSONResponse(status_code=422, content={"detail": str(exc)})
 
 
 @app.exception_handler(IntegrityError)

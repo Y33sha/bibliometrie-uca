@@ -210,7 +210,7 @@ class TestPersonsFacets:
 class TestPersonsSearch:
     def test_search_empty_query(self, client):
         r = client.get("/api/persons/search", params={"search": ""})
-        assert r.status_code in (200, 400, 422)
+        assert r.status_code in (200, 422)
 
     def test_search_short_query(self, client):
         r = client.get("/api/persons/search", params={"search": "ab"})
@@ -293,7 +293,7 @@ class TestAddIdentifier:
             f"/api/persons/{pid}/identifiers",
             json={"id_type": "idhal", "id_value": "   "},
         )
-        assert r.status_code == 400
+        assert r.status_code == 422
 
     def test_invalid_orcid_format(self, auth_client):
         pid = _seed_person()
@@ -301,7 +301,7 @@ class TestAddIdentifier:
             f"/api/persons/{pid}/identifiers",
             json={"id_type": "orcid", "id_value": "not-an-orcid"},
         )
-        assert r.status_code == 400
+        assert r.status_code == 422
 
     def test_orcid_url_is_normalized(self, auth_client):
         pid = _seed_person()
@@ -332,7 +332,7 @@ class TestAddIdentifier:
             f"/api/persons/{pid}/identifiers",
             json={"id_type": "idref", "id_value": "123456"},
         )
-        assert r.status_code == 400
+        assert r.status_code == 422
 
     def test_person_not_found(self, auth_client):
         r = auth_client.post(
@@ -441,7 +441,7 @@ class TestUpdatePersonName:
         r = auth_client.patch(
             f"/api/persons/{pid}/name", json={"last_name": "   ", "first_name": "Y"}
         )
-        assert r.status_code == 400
+        assert r.status_code == 422
 
     def test_ok(self, auth_client):
         pid = _seed_person()
@@ -475,7 +475,7 @@ class TestMergePersons:
     def test_same_id_rejected(self, auth_client):
         pid = _seed_person()
         r = auth_client.post(f"/api/persons/{pid}/merge", json={"source_id": pid})
-        assert r.status_code == 400
+        assert r.status_code == 422
 
     def test_target_not_found(self, auth_client):
         src = _seed_person()
@@ -657,7 +657,7 @@ class TestMarkPersonsDistinct:
         r = auth_client.post(
             "/api/persons/mark-distinct", json={"person_id_a": a, "person_id_b": a}
         )
-        assert r.status_code == 400
+        assert r.status_code == 422
 
 
 # ── Traçabilité des écritures sur les personnes ──────────────

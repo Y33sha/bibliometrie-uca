@@ -98,7 +98,7 @@ class TestMergeDuplicatePublications:
             "/api/publications/duplicates/merge",
             json={"pub_id_a": 1, "pub_id_b": 1},
         )
-        assert r.status_code == 400
+        assert r.status_code == 422
         assert "identiques" in r.json()["detail"]
 
     def test_404_when_both_missing(self, auth_client):
@@ -150,7 +150,7 @@ class TestMarkDistinctPublications:
             "/api/publications/duplicates/mark-distinct",
             json={"pub_id_a": 1, "pub_id_b": 1},
         )
-        assert r.status_code == 400
+        assert r.status_code == 422
         assert "elle-même" in r.json()["detail"]
 
     def test_marks_pair_distinct(self, auth_client):
