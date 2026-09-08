@@ -3,10 +3,11 @@
 Enchaîne, dans l'ordre de priorité des sources (la plus fiable en premier, pour que les suivantes n'écrasent pas les métadonnées déjà posées) :
 
 1. la normalisation de chaque source retenue (staging → `source_publications`, adresses, ORCID/IdRef pour HAL) ;
-2. le nettoyage des identités d'auteur orphelines (la normalisation a pu réassigner des signatures, laissant des `author_identifying_keys` que plus aucune signature ne référence) ;
-3. le `VACUUM` du staging (`raw_data` vidé après normalisation) — `VACUUM FULL` en mode full, simple sinon.
+2. la suppression des `source_publications` dont le staging porte `disappeared_at` ;
+3. le nettoyage des identités d'auteur orphelines (la normalisation réassigne des signatures et la suppression précédente en retire, laissant des `author_identifying_keys` que plus aucune signature ne référence) ;
+4. le `VACUUM` du staging (`raw_data` vidé après normalisation) — `VACUUM FULL` en mode full, simple sinon.
 
-Les runners par source, le nettoyage et le VACUUM (maintenance physique) sont injectés par le composition-root ; ici, la séquence, la sélection/l'ordre des sources et l'assemblage des métriques.
+Les runners par source, la suppression, le nettoyage et le VACUUM (maintenance physique) sont injectés par le composition-root ; ici, la séquence, la sélection/l'ordre des sources et l'assemblage des métriques.
 """
 
 import logging
@@ -29,12 +30,15 @@ def run(
     mode: str,
     ordered_sources: list[str],
     normalize_one: NormalizeOne,
+    prune_disappeared: Callable[[], int],
     cleanup_orphan_identities: Callable[[], None],
     vacuum_staging: VacuumStaging,
     logger: logging.Logger,
 ) -> PhaseMetrics:
-    """Normalise les sources retenues (dans l'ordre de priorité), nettoie puis VACUUM le staging."""
+    """Normalise les sources retenues (dans l'ordre de priorité), retire les documents disparus, nettoie puis VACUUM le staging."""
     rows = [normalize_one(source) for source in ordered_sources if source in sources]
+
+    disparues = prune_disappeared()
 
     cleanup_orphan_identities()
 
@@ -48,4 +52,5 @@ def run(
     metrics = PhaseMetrics()
     metrics.add(total=sum(cast("int", row["processed"]) for row in rows))
     metrics.details["table"] = {"rows": rows}
+    metrics.details["disappeared_pruned"] = disparues
     return metrics

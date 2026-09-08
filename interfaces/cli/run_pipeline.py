@@ -23,7 +23,7 @@ Phases (dans l'ordre d'execution):
                         cible (auto-borné par le backoff doi_lookups)
     fetch_stale       Refetch par identifiant natif des rows à last_seen_at ancien
                         (> STALE_REFRESH_AFTER_DAYS) : trouvé -> bump last_seen_at + refresh ;
-                        absence confirmée -> disappeared_at. Marque seulement, aucun effet aval.
+                        absence confirmée -> disappeared_at, dont normalize tire la suppression.
     fetch_truncated   Re-fetch des works OpenAlex tronqués à 100 auteurs, avant que
                         normalize ne les consomme.
     normalize           Normalisation staging -> tables sources (source_publications,
@@ -300,9 +300,10 @@ def phase_fetch_stale(options: RunOptions) -> PhaseMetrics:
     sur des années qu'il ne moissonne plus en bulk. `theses` fait exception, comme
     à l'extraction : elle ramène tout l'historique (aucune borne), sauf `--year`.
 
-    Conservateur : on **marque seulement** (`disappeared_at`), aucun effet
-    aval. Placée après `fetch_missing` (qui a fini de peupler `staging` et
-    `last_seen_at`) et avant `normalize` (qui consomme le `raw_data` rafraîchi).
+    L'absence se marque ici (`disappeared_at`) ; `normalize` en tire la suppression
+    des `source_publications`. Placée après `fetch_missing` (qui a fini de peupler
+    `staging` et `last_seen_at`) et avant `normalize` (qui consomme le `raw_data`
+    rafraîchi).
 
     Séquence et métriques dans `application/pipeline/extract/fetch_stale.py::run_phase`.
     """
@@ -395,10 +396,27 @@ def phase_normalize(options: RunOptions) -> PhaseMetrics:
         mode=options.mode,
         ordered_sources=list(registry),
         normalize_one=normalize_one,
+        prune_disappeared=_run_prune_disappeared,
         cleanup_orphan_identities=_run_cleanup_orphan_identities,
         vacuum_staging=_vacuum_staging,
         logger=log,
     )
+
+
+def _run_prune_disappeared() -> int:
+    from infrastructure.db.engine import get_sync_engine
+    from infrastructure.pipeline.normalize.staging import delete_disappeared_source_publications
+
+    log.info("▶ retrait des documents que leur source ne rend plus")
+    t0 = time.time()
+    conn = get_sync_engine().connect()
+    try:
+        n = delete_disappeared_source_publications(conn)
+        conn.commit()
+    finally:
+        conn.close()
+    log.info("✓ %d publications sources retirées en %.1fs", n, time.time() - t0)
+    return n
 
 
 def _run_cleanup_orphan_identities() -> None:
