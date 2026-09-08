@@ -14,6 +14,9 @@ from infrastructure.settings import settings
 
 logger = logging.getLogger(__name__)
 
+UNPAYWALL_MAX_PER_RUN_DEFAULT = 10_000
+"""Plafond retenu quand la configuration ne porte pas `unpaywall_max_per_run`."""
+
 
 def _get_from_db(conn: Connection, key: str) -> JsonValue:
     """Lit une valeur depuis la table config. Retourne None si absente.
@@ -40,6 +43,33 @@ def _config_int(conn: Connection, key: str) -> int | None:
     if value is not None:
         logger.warning("Valeur invalide pour %s: %s", key, value)
     return None
+
+
+def _plafond(conn: Connection, key: str, defaut: int | None) -> int | None:
+    """Plafond d'interrogations lu en configuration, `None` valant illimité.
+
+    Zéro et les valeurs négatives valent illimité : l'interface d'administration expose un entier, et le champ vidé y revient à retirer la borne. `defaut` s'applique quand la clé est absente ou illisible.
+    """
+    valeur = _config_int(conn, key)
+    if valeur is None:
+        return defaut
+    return valeur if valeur > 0 else None
+
+
+def get_unpaywall_max_per_run(conn: Connection) -> int | None:
+    """Nombre maximum de DOI vérifiés auprès d'Unpaywall par run, `None` valant illimité.
+
+    Le plafond lisse la charge : le stock des jamais-vérifiés s'écoule sur plusieurs runs au lieu d'un pic.
+    """
+    return _plafond(conn, "unpaywall_max_per_run", UNPAYWALL_MAX_PER_RUN_DEFAULT)
+
+
+def get_fetch_missing_max_per_source(conn: Connection) -> int | None:
+    """Nombre maximum de DOI interrogés par source cible au cross-import, `None` valant illimité.
+
+    Le plafond vaut pour chaque source prise séparément : les quotas sont propres à chaque API.
+    """
+    return _plafond(conn, "fetch_missing_max_per_source", None)
 
 
 def get_years(conn: Connection, start_year: int | None = None) -> list[int]:

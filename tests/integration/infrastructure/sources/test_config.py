@@ -12,8 +12,11 @@ from sqlalchemy import text
 from domain.dates import today
 from infrastructure.pipeline.perimeter import refresh_perimeter_structures
 from infrastructure.sources.config import (
+    UNPAYWALL_MAX_PER_RUN_DEFAULT,
     get_extraction_api_ids,
+    get_fetch_missing_max_per_source,
     get_hal_collections,
+    get_unpaywall_max_per_run,
     get_years,
 )
 
@@ -175,3 +178,35 @@ class TestGetExtractionApiIds:
         _set_config(conn, "perimeter_extraction", "cfg_perim_inexistant")
 
         assert get_extraction_api_ids(conn, "openalex") == []
+
+
+class TestPlafondsParRun:
+    """Plafonds d'interrogation lus en configuration, zéro valant illimité."""
+
+    def test_le_plafond_unpaywall_configure_est_lu(self, sa_sync_conn):
+        _set_config(sa_sync_conn, "unpaywall_max_per_run", 250)
+        assert get_unpaywall_max_per_run(sa_sync_conn) == 250
+
+    def test_zero_vaut_illimite_pour_unpaywall(self, sa_sync_conn):
+        _set_config(sa_sync_conn, "unpaywall_max_per_run", 0)
+        assert get_unpaywall_max_per_run(sa_sync_conn) is None
+
+    def test_la_cle_absente_laisse_le_plafond_par_defaut(self, sa_sync_conn):
+        sa_sync_conn.execute(text("DELETE FROM config WHERE key = 'unpaywall_max_per_run'"))
+        assert get_unpaywall_max_per_run(sa_sync_conn) == UNPAYWALL_MAX_PER_RUN_DEFAULT
+
+    def test_une_valeur_illisible_laisse_le_plafond_par_defaut(self, sa_sync_conn):
+        _set_config(sa_sync_conn, "unpaywall_max_per_run", "beaucoup")
+        assert get_unpaywall_max_per_run(sa_sync_conn) == UNPAYWALL_MAX_PER_RUN_DEFAULT
+
+    def test_le_plafond_du_cross_import_configure_est_lu(self, sa_sync_conn):
+        _set_config(sa_sync_conn, "fetch_missing_max_per_source", 5000)
+        assert get_fetch_missing_max_per_source(sa_sync_conn) == 5000
+
+    def test_zero_vaut_illimite_pour_le_cross_import(self, sa_sync_conn):
+        _set_config(sa_sync_conn, "fetch_missing_max_per_source", 0)
+        assert get_fetch_missing_max_per_source(sa_sync_conn) is None
+
+    def test_le_cross_import_sans_cle_est_illimite(self, sa_sync_conn):
+        sa_sync_conn.execute(text("DELETE FROM config WHERE key = 'fetch_missing_max_per_source'"))
+        assert get_fetch_missing_max_per_source(sa_sync_conn) is None
