@@ -39,13 +39,12 @@ Orchestrateur dans `application/pipeline/fetch_missing/doi.py`, adaptateur par s
 
 Jouée à chaque exécution, cette phase rafraîchit les documents vus pour la dernière fois il y a plus de `STALE_REFRESH_AFTER_DAYS` (90 jours) et repère ceux qui ont disparu de leur source.
 
-Chaque ligne périmée est réinterrogée par son identifiant natif : trouvée → `raw_data` rafraîchi (re-traité si l'empreinte a changé) et `last_seen_at` repoussé ; absence confirmée → `disappeared_at` posé ; erreur transitoire → laissée, retentée plus tard.
+Chaque ligne périmée est réinterrogée par son identifiant natif :
+- trouvée → `raw_data` rafraîchi et `last_seen_at` repoussé ;
+- absence confirmée → `disappeared_at` posé ;
+- erreur transitoire → laissée, retentée plus tard.
 
 La sélection se borne aux années de la fenêtre courante, lues sur `source_publications.pub_year` — `theses` faisant exception, tout son historique restant éligible. Le seuil étale la charge : une passe ne ramasse que ce qui vient de franchir les 90 jours.
-
-`not_found_at` marque un document que la source n'a jamais renvoyé ; `disappeared_at`, un document qu'elle rendait et qui a disparu.
-
-La phase `normalize` en tire les conséquences : elle supprime les `source_publications` du document marqué, qui emportent leurs `source_authorships` par cascade. La publication vidée de ses dernières sources est supprimée par la phase `publications`. La ligne de `staging` reste, avec sa marque.
 
 ## Listes d'auteurs tronquées (`fetch_truncated`)
 
