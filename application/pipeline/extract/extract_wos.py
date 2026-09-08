@@ -77,12 +77,11 @@ def extract_year(
         consecutive_failures = 0
         page_num += 1
 
-        if records:
-            counts = adapter.insert_batch(conn, records)
-            conn.commit()
-            total_new += counts.new
-            total_updated += counts.updated
-            total_unchanged += counts.unchanged
+        counts = adapter.insert_batch(conn, records)
+        conn.commit()
+        total_new += counts.new
+        total_updated += counts.updated
+        total_unchanged += counts.unchanged
 
         logger.info(
             "page %s : %s records, %s nouveaux, %s mis à jour, %s inchangés (%s/%s)",

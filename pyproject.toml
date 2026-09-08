@@ -524,6 +524,19 @@ matches = "infrastructure/read_models/publications/facets.py"
 [tool.pyrefly.sub-config.errors]
 explicit-any = false
 
+# `Scope`, le type que Starlette donne au contexte d'une requête ASGI, est un alias de
+# `MutableMapping[str, Any]`. Pyrefly compte l'alias importé comme un `Any` écrit ; le nommer
+# autrement reviendrait à renoncer au type de l'interface qu'on implémente.
+[[tool.pyrefly.sub-config]]
+matches = "interfaces/api/route_path.py"
+[tool.pyrefly.sub-config.errors]
+explicit-any = false
+
+[[tool.pyrefly.sub-config]]
+matches = "interfaces/api/spa.py"
+[tool.pyrefly.sub-config.errors]
+explicit-any = false
+
 # ----------------------------------------------------------------------
 # mutmut : tests de mutation du domaine.
 # Lancement, à la demande : `uv run --with mutmut mutmut run`, puis
