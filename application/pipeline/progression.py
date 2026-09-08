@@ -1,6 +1,6 @@
 """Avancement d'une boucle de traitement, affiché ou journalisé.
 
-En terminal, une barre montre l'avancement puis s'efface. Sans terminal, ou sans `tqdm` installé, des jalons partent au journal à intervalle fixe, avec le débit.
+En terminal, une barre montre l'avancement. Sans terminal, ou sans `tqdm` installé, des jalons partent au journal à intervalle fixe, avec le débit. Un `logger` absent laisse la barre seule.
 
 Usage :
     with progression(total=len(dois), libelle="crossref", logger=log) as p:
@@ -43,7 +43,7 @@ class Progression:
         self,
         total: int,
         libelle: str,
-        logger: logging.Logger,
+        logger: logging.Logger | None,
         *,
         intervalle_s: float = JALON_INTERVALLE_S,
     ) -> None:
@@ -73,6 +73,8 @@ class Progression:
 
     def _jalon(self, maintenant: float) -> None:
         """Écrit une ligne d'avancement au journal."""
+        if self._logger is None:
+            return
         ecoule = maintenant - self._debut
         debit = self._fait / ecoule if ecoule > 0 else 0.0
         if self._total > 0:
@@ -105,7 +107,7 @@ class Progression:
 def progression(
     total: int,
     libelle: str,
-    logger: logging.Logger,
+    logger: logging.Logger | None,
     *,
     intervalle_s: float = JALON_INTERVALLE_S,
 ) -> Iterator[Progression]:
