@@ -8,8 +8,10 @@ from domain.sources.datacite import (
     extract_datacite_pub_year,
     extract_related_dois,
     get_abstract,
+    get_cited_by_count,
     get_container,
     get_keywords,
+    get_language,
     get_publisher_name,
     get_title,
 )
@@ -182,3 +184,138 @@ class TestRelatedDois:
         types = {r["relation_type"] for r in related}
         assert types == {"IsVersionOf", "Cites", "IsSupplementTo"}
         assert all(r["doi"].startswith("10.") for r in related)
+
+
+class TestLanguage:
+    def test_le_code_langue_est_rendu_en_minuscules(self):
+        assert get_language({"language": "EN"}) == "en"
+
+    def test_les_espaces_qui_entourent_sont_retires(self):
+        assert get_language({"language": "  fr  "}) == "fr"
+
+    def test_absent_ou_vide_ne_donne_rien(self):
+        assert get_language({}) is None
+        assert get_language({"language": "   "}) is None
+
+    def test_une_valeur_qui_n_est_pas_du_texte_ne_donne_rien(self):
+        assert get_language({"language": 42}) is None
+
+
+class TestCitedByCount:
+    def test_le_compte_est_rendu(self):
+        assert get_cited_by_count({"citationCount": 17}) == 17
+
+    def test_un_compte_nul_est_rendu(self):
+        assert get_cited_by_count({"citationCount": 0}) == 0
+
+    def test_absent_ou_d_une_autre_nature_ne_donne_rien(self):
+        assert get_cited_by_count({}) is None
+        assert get_cited_by_count({"citationCount": "17"}) is None
+
+
+class TestMeta:
+    """Champs propres à DataCite conservés en JSONB : identifiants liés, licences, financeurs."""
+
+    def test_les_licences_sont_conservees(self):
+        attrs = {"rightsList": [{"rights": "CC-BY-4.0"}]}
+        assert extract_datacite_meta(attrs) == {"rights": [{"rights": "CC-BY-4.0"}]}
+
+    def test_les_financeurs_sont_conserves(self):
+        attrs = {"fundingReferences": [{"funderName": "ANR"}]}
+        assert extract_datacite_meta(attrs) == {"funding": [{"funderName": "ANR"}]}
+
+    def test_les_identifiants_lies_portent_leur_type_de_relation(self):
+        attrs = {
+            "relatedIdentifiers": [
+                {
+                    "relatedIdentifierType": "DOI",
+                    "relatedIdentifier": "10.5281/ZENODO.1",
+                    "relationType": "IsVersionOf",
+                }
+            ]
+        }
+        meta = extract_datacite_meta(attrs)
+        assert meta is not None
+        assert meta["related_identifiers"] == [
+            {"doi": "10.5281/zenodo.1", "relation_type": "IsVersionOf"}
+        ]
+
+    def test_les_trois_champs_se_composent(self):
+        attrs = {
+            "rightsList": [{"rights": "CC0"}],
+            "fundingReferences": [{"funderName": "ERC"}],
+        }
+        meta = extract_datacite_meta(attrs)
+        assert meta is not None
+        assert set(meta) == {"rights", "funding"}
+
+    def test_une_liste_vide_n_est_pas_conservee(self):
+        assert extract_datacite_meta({"rightsList": [], "fundingReferences": []}) is None
+
+    def test_une_valeur_qui_n_est_pas_une_liste_est_ecartee(self):
+        assert extract_datacite_meta({"rightsList": "CC-BY", "fundingReferences": {}}) is None
+
+    def test_sans_aucun_champ_il_n_y_a_pas_de_meta(self):
+        assert extract_datacite_meta({}) is None
+
+
+class TestEntreesAEcarterAvantLaBonne:
+    """Chaque extracteur passe les entrées inexploitables et lit la suivante.
+
+    Une source place ce qu'elle veut dans ses listes : une entrée d'une autre forme, ou au texte vide, précède parfois celle qui porte la valeur.
+    """
+
+    def test_le_titre_vient_de_la_premiere_entree_exploitable(self):
+        attrs = {"titles": ["pas un objet", {"title": "   "}, {"title": "Le vrai titre"}]}
+        assert get_title(attrs) == "Le vrai titre"
+
+    def test_le_resume_vient_de_la_premiere_entree_exploitable(self):
+        attrs = {
+            "descriptions": [
+                "pas un objet",
+                {"description": "  "},
+                {"description": "Le résumé", "descriptionType": "Abstract"},
+            ]
+        }
+        assert get_abstract(attrs) == "Le résumé"
+
+    def test_l_editeur_vient_de_la_premiere_entree_exploitable(self):
+        assert get_publisher_name({"publisher": {"name": "Zenodo"}}) == "Zenodo"
+
+    def test_les_mots_cles_ecartent_les_entrees_inexploitables(self):
+        attrs = {"subjects": ["pas un objet", {"subject": "  "}, {"subject": "Biologie"}]}
+        assert get_keywords(attrs) == ["Biologie"]
+
+    def test_les_dois_lies_ecartent_les_entrees_inexploitables(self):
+        attrs = {
+            "relatedIdentifiers": [
+                "pas un objet",
+                {"relatedIdentifierType": "URL", "relatedIdentifier": "https://exemple.fr"},
+                {
+                    "relatedIdentifierType": "DOI",
+                    "relatedIdentifier": "10.5281/ZENODO.2",
+                    "relationType": "IsPartOf",
+                },
+            ]
+        }
+        meta = extract_datacite_meta(attrs)
+        assert meta is not None
+        assert meta["related_identifiers"] == [
+            {"doi": "10.5281/zenodo.2", "relation_type": "IsPartOf"}
+        ]
+
+
+class TestBornesDeLAnnee:
+    """L'année retenue tombe entre 1500 et `max_year`, bornes incluses."""
+
+    def test_la_borne_basse_est_incluse(self):
+        assert extract_datacite_pub_year({"publicationYear": 1500}, max_year=2030) == 1500
+
+    def test_juste_en_dessous_de_la_borne_basse_est_ecarte(self):
+        assert extract_datacite_pub_year({"publicationYear": 1499}, max_year=2030) is None
+
+    def test_la_borne_haute_est_incluse(self):
+        assert extract_datacite_pub_year({"publicationYear": 2030}, max_year=2030) == 2030
+
+    def test_juste_au_dessus_de_la_borne_haute_est_ecarte(self):
+        assert extract_datacite_pub_year({"publicationYear": 2031}, max_year=2030) is None

@@ -30,6 +30,7 @@ def test_refetch_not_called_in_normalize():
     with (
         patch.object(run_pipeline, "_run_normalize"),
         patch.object(run_pipeline, "_vacuum_staging"),
+        patch.object(run_pipeline, "_run_prune_disappeared"),
         patch.object(run_pipeline, "_run_cleanup_orphan_identities"),
         patch(_REFETCH, new_callable=AsyncMock) as refetch,
     ):
