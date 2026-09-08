@@ -13,6 +13,7 @@ from application.ports.repositories.publisher_repository import PublisherReposit
 from domain.errors import NotFoundError
 from domain.normalize import normalize_text
 from domain.publishers.publisher import Publisher, PublisherType
+from infrastructure.db.rows import row_as
 from infrastructure.db.tables import publisher_name_forms, publishers
 from infrastructure.pipeline.authorships.pub_counts import refresh_publisher_pub_count
 
@@ -58,7 +59,7 @@ class PgPublisherRepository(PublisherRepository):
         ).first()
         if row is None:
             return None
-        return _publisher_from_row(_PublisherRow(**row._mapping))
+        return _publisher_from_row(row_as(_PublisherRow, row))
 
     # ── Enrichissement pays (maintenance) ──────────────────────────
 

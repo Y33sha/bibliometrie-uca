@@ -23,6 +23,7 @@ from domain.source_publications.metadata_correction.shared_doi import (
 )
 from domain.sources.registry import Source
 from infrastructure.db.jsonb import Jsonb
+from infrastructure.db.rows import rows_as
 from infrastructure.db.tables import source_publications
 
 # Bras du `CASE` et liste `IN` des relations DataCite à convergence directe, dérivés du mapping
@@ -107,16 +108,14 @@ class PgMetadataCorrectionQueries(MetadataCorrectionQueries):
     """Adapter PostgreSQL pour `application.ports.pipeline.metadata_correction.MetadataCorrectionQueries`."""
 
     def fetch_for_unary_correction(self, conn: Connection) -> list[UnaryCorrectionRow]:
-        rows = conn.execute(text(_SELECT)).all()
-        return [UnaryCorrectionRow(**row._mapping) for row in rows]
+        rows = conn.execute(text(_SELECT))
+        return rows_as(UnaryCorrectionRow, rows)
 
     def fetch_for_unary_correction_by_journal(
         self, conn: Connection, journal_id: int
     ) -> list[UnaryCorrectionRow]:
-        rows = conn.execute(
-            text(_SELECT + " WHERE sp.journal_id = :jid"), {"jid": journal_id}
-        ).all()
-        return [UnaryCorrectionRow(**row._mapping) for row in rows]
+        rows = conn.execute(text(_SELECT + " WHERE sp.journal_id = :jid"), {"jid": journal_id})
+        return rows_as(UnaryCorrectionRow, rows)
 
     def persist_corrections(self, conn: Connection, updates: list[CorrectionUpdate]) -> int:
         return _persist_updates(
@@ -129,8 +128,8 @@ class PgMetadataCorrectionQueries(MetadataCorrectionQueries):
     def fetch_journal_doi_prefixes(self, conn: Connection) -> list[JournalDoiPrefixRow]:
         rows = conn.execute(
             text("SELECT doi_prefix, id AS journal_id FROM journals WHERE doi_prefix IS NOT NULL")
-        ).all()
-        return [JournalDoiPrefixRow(**row._mapping) for row in rows]
+        )
+        return rows_as(JournalDoiPrefixRow, rows)
 
     def fetch_journal_by_doi_candidates(self, conn: Connection) -> list[JournalByDoiRow]:
         rows = conn.execute(
@@ -140,8 +139,8 @@ class PgMetadataCorrectionQueries(MetadataCorrectionQueries):
                 WHERE (journal_id IS NULL AND doi IS NOT NULL)
                    OR raw_metadata ? 'journal_id'
             """)
-        ).all()
-        return [JournalByDoiRow(**row._mapping) for row in rows]
+        )
+        return rows_as(JournalByDoiRow, rows)
 
     def persist_journal_corrections(
         self, conn: Connection, updates: list[JournalCorrectionUpdate]

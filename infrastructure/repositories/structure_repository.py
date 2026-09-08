@@ -19,6 +19,7 @@ from domain.errors import NotFoundError, ValidationError
 from domain.structures.identifiers import HalCollection, RorId
 from domain.structures.name_forms import StructureNameForm
 from domain.structures.structure import Structure, StructureType
+from infrastructure.db.rows import row_as, rows_as
 from infrastructure.db.scalars import scalar_int
 from infrastructure.db.tables import (
     structure_name_forms,
@@ -141,9 +142,9 @@ class PgStructureRepository(StructureRepository):
             ).where(structure_name_forms.c.structure_id == structure_id)
         )
         name_forms = tuple(
-            _structure_name_form_from_row(_StructureNameFormRow(**r._mapping)) for r in nf_result
+            _structure_name_form_from_row(nf) for nf in rows_as(_StructureNameFormRow, nf_result)
         )
-        return _structure_from_row(_StructureRow(**row._mapping), name_forms)
+        return _structure_from_row(row_as(_StructureRow, row), name_forms)
 
     # ── structures ─────────────────────────────────────────────────
 

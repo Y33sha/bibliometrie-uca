@@ -17,6 +17,7 @@ from domain.publications.publication import Publication
 from domain.source_publications.metadata_correction.shared_doi import CONVERGENCE_CASES
 from domain.source_publications.source_publication import SourcePublication
 from domain.types import JsonValue
+from infrastructure.db.rows import rows_as
 from infrastructure.db.scalars import scalar_int
 
 
@@ -232,7 +233,7 @@ class PgPublicationRepository(PublicationRepository):
             """),
             {"id": pub_id},
         )
-        return [_view_from_row(_SourcePublicationViewRow(**row._mapping)) for row in result]
+        return [_view_from_row(vue) for vue in rows_as(_SourcePublicationViewRow, result)]
 
     def get_converged_secondary_ids(self, pub_id: int) -> frozenset[int]:
         result = self._conn.execute(
