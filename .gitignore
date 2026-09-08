@@ -42,3 +42,6 @@ data/
 # Vale
 # .vale.ini
 # styles/
+
+# mutmut
+mutants/
