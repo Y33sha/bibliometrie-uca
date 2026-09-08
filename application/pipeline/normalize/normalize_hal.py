@@ -22,7 +22,7 @@ from application.ports.pipeline.journals import JournalFindOrCreateQueries
 from application.ports.pipeline.normalize.authorships import AuthorshipsBatchQueries
 from application.ports.pipeline.normalize.source_publications import (
     SourcePublicationQueries,
-    SourcePublicationRow,
+    SourcePublicationUpsert,
 )
 from application.ports.pipeline.normalize.staging import StagingQueries, StagingRow
 from application.ports.pipeline.publishers import PublisherFindOrCreateQueries
@@ -234,7 +234,7 @@ def insert_hal_document(
 
     return queries.upsert_source_publication(
         conn,
-        SourcePublicationRow(
+        SourcePublicationUpsert(
             source="hal",
             source_id=hal_id,
             staging_id=staging_id,

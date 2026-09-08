@@ -3,7 +3,7 @@ idempotence et auto-cicatrisation."""
 
 from application.pipeline.metadata_correction.journal_by_doi import compute_updates
 from application.ports.pipeline.metadata_correction import (
-    JournalByDoiRow,
+    JournalCorrectionRow,
     JournalCorrectionUpdate,
 )
 from domain.source_publications.raw_metadata import stash_entry
@@ -13,7 +13,7 @@ _PREFIXES = [("10.64628/aak", 7), ("10.5194", 1), ("10.5194/acp", 2)]
 _STASH = stash_entry(None, "JOURNAL_BY_DOI_PREFIX")
 
 
-def _row(**overrides: object) -> JournalByDoiRow:
+def _row(**overrides: object) -> JournalCorrectionRow:
     base: dict[str, object] = {
         "id": 1,
         "doi": None,
@@ -21,7 +21,7 @@ def _row(**overrides: object) -> JournalByDoiRow:
         "raw_metadata": {},
     }
     base.update(overrides)
-    return JournalByDoiRow(**base)  # type: ignore[arg-type]
+    return JournalCorrectionRow(**base)  # type: ignore[arg-type]
 
 
 def test_orphan_with_unique_prefix_is_attached():

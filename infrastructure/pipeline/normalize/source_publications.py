@@ -13,17 +13,17 @@ from sqlalchemy import Connection, bindparam, text
 
 from application.ports.pipeline.normalize.source_publications import (
     SourcePublicationQueries,
-    SourcePublicationRow,
+    SourcePublicationUpsert,
 )
 from domain.publications.metadata import normalized_title
 from domain.types import JsonValue
 from infrastructure.db.jsonb import Jsonb
 from infrastructure.db.scalars import scalar_int
 
-_FIELDS = fields(SourcePublicationRow)
+_FIELDS = fields(SourcePublicationUpsert)
 
 # Les colonnes écrites se dérivent des champs de la ligne, plus `title_normalized`
-# calculé à l'écriture : un champ ajouté à `SourcePublicationRow` est inséré et
+# calculé à l'écriture : un champ ajouté à `SourcePublicationUpsert` est inséré et
 # réécrit sans autre geste, en phase avec le contrat.
 _ROW_FIELDS = tuple(f.name for f in _FIELDS)
 _COLUMNS = (*_ROW_FIELDS, "title_normalized")
@@ -51,7 +51,7 @@ _UPSERT_SQL = text(
 class PgSourcePublicationQueries(SourcePublicationQueries):
     """Adapter PostgreSQL pour `application.ports.pipeline.normalize.source_publications.SourcePublicationQueries`."""
 
-    def upsert_source_publication(self, conn: Connection, row: SourcePublicationRow) -> int:
+    def upsert_source_publication(self, conn: Connection, row: SourcePublicationUpsert) -> int:
         params: dict[str, object] = {name: getattr(row, name) for name in _ROW_FIELDS}
         params["title_normalized"] = normalized_title(row.title)
         # `external_ids` est `NOT NULL` et contraint à un objet JSON.

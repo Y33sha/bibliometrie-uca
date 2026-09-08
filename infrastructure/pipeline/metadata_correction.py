@@ -9,7 +9,7 @@ from application.ports.pipeline.metadata_correction import (
     CorrectionUpdate,
     DoiClusterRow,
     DoiCorrectionUpdate,
-    JournalByDoiRow,
+    JournalCorrectionRow,
     JournalCorrectionUpdate,
     JournalDoiPrefixRow,
     MetadataCorrectionQueries,
@@ -131,7 +131,7 @@ class PgMetadataCorrectionQueries(MetadataCorrectionQueries):
         )
         return rows_as(JournalDoiPrefixRow, rows)
 
-    def fetch_journal_by_doi_candidates(self, conn: Connection) -> list[JournalByDoiRow]:
+    def fetch_journal_by_doi_candidates(self, conn: Connection) -> list[JournalCorrectionRow]:
         rows = conn.execute(
             text("""
                 SELECT id, doi, journal_id, raw_metadata
@@ -140,7 +140,7 @@ class PgMetadataCorrectionQueries(MetadataCorrectionQueries):
                    OR raw_metadata ? 'journal_id'
             """)
         )
-        return rows_as(JournalByDoiRow, rows)
+        return rows_as(JournalCorrectionRow, rows)
 
     def persist_journal_corrections(
         self, conn: Connection, updates: list[JournalCorrectionUpdate]

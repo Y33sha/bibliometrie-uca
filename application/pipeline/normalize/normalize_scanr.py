@@ -17,7 +17,7 @@ from application.ports.pipeline.journals import JournalFindOrCreateQueries
 from application.ports.pipeline.normalize.authorships import AuthorshipsBatchQueries
 from application.ports.pipeline.normalize.source_publications import (
     SourcePublicationQueries,
-    SourcePublicationRow,
+    SourcePublicationUpsert,
 )
 from application.ports.pipeline.normalize.staging import StagingQueries, StagingRow
 from application.ports.pipeline.publishers import PublisherFindOrCreateQueries
@@ -221,7 +221,7 @@ def insert_scanr_document(  # noqa: C901
 
     return queries.upsert_source_publication(
         conn,
-        SourcePublicationRow(
+        SourcePublicationUpsert(
             source="scanr",
             source_id=scanr_id,
             staging_id=staging_id,

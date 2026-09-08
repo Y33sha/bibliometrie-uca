@@ -70,7 +70,7 @@ class JournalDoiPrefixRow(NamedTuple):
     journal_id: int
 
 
-class JournalByDoiRow(NamedTuple):
+class JournalCorrectionRow(NamedTuple):
     """Une `source_publication` candidate au rattachement du journal par préfixe DOI : son id, son DOI courant, son `journal_id` courant et `raw_metadata` (reconstruction du brut `journal_id` et garde « ne corriger que le manquant »)."""
 
     id: int
@@ -136,7 +136,7 @@ class MetadataCorrectionQueries(Protocol):
         """Toutes les revues portant un `doi_prefix`. Carte chargée en mémoire pour le longest-prefix-match (volume négligeable)."""
         ...
 
-    def fetch_journal_by_doi_candidates(self, conn: Connection) -> list[JournalByDoiRow]:
+    def fetch_journal_by_doi_candidates(self, conn: Connection) -> list[JournalCorrectionRow]:
         """`source_publications` candidates au rattachement : orphelines à DOI (`journal_id IS NULL AND doi IS NOT NULL`) et déjà rattachées par préfixe (`raw_metadata ? 'journal_id'`, pour la ré-évaluation auto-cicatrisante)."""
         ...
 
