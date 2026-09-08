@@ -2,12 +2,14 @@
 
 Trois réglages en dépendent : les années à couvrir, les collections HAL à moissonner et les identifiants de structure à interroger par source. Les deux derniers se dérivent du périmètre d'extraction — les structures qui le composent portent la collection et les identifiants — avec repli sur une valeur posée en configuration.
 
-Une valeur de configuration illisible ne fait pas échouer le pipeline : elle est signalée et le réglage retombe sur son défaut. Sans ce repli, une saisie fautive dans l'interface d'administration arrêterait le moissonnage.
+Les clés dont la forme est imposée — plafonds d'interrogation, année de départ — sont contrôlées à l'écriture, et la table refuse ce qui s'en écarte. Pour les autres, une valeur illisible ne fait pas échouer le pipeline : elle est signalée et le réglage retombe sur son défaut.
 """
 
 import json
 
+import pytest
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 
 from domain.dates import today
 from infrastructure.pipeline.perimeter import refresh_perimeter_structures
@@ -73,25 +75,21 @@ class TestGetYears:
         assert get_years(sa_sync_conn, start_year=current + 5) == [current]
 
 
-class TestConfigIllisible:
-    """Une valeur qui n'est pas une année laisse le réglage retomber sur son défaut."""
+class TestFormeImposeeEnBase:
+    """La table refuse une valeur hors de la forme que sa clé impose, quelle que soit la voie d'écriture.
 
-    def test_texte_a_la_place_d_une_annee(self, sa_sync_conn):
-        _set_config(sa_sync_conn, "pipeline_start_year_full", "pas une année")
+    Le domaine porte la même règle et la fait valoir à l'écriture (`normalize_config_value`). Ces contraintes tiennent les voies qui la contournent : psql, migration, script.
+    """
 
-        assert get_years(sa_sync_conn) == [today().year]
+    @pytest.mark.parametrize("valeur", ["pas une année", True, "2017", 1969, 3.5])
+    def test_une_annee_hors_forme_est_refusee(self, sa_sync_conn, valeur):
+        with pytest.raises(IntegrityError, match="config_year_is_in_range"):
+            _set_config(sa_sync_conn, "pipeline_start_year_full", valeur)
 
-    def test_booleen_a_la_place_d_une_annee(self, sa_sync_conn):
-        """`True` vaut 1 pour Python : sans garde, l'ancre serait l'an 1."""
-        _set_config(sa_sync_conn, "pipeline_start_year_full", True)
-
-        assert get_years(sa_sync_conn) == [today().year]
-
-    def test_annee_ecrite_en_toutes_lettres_de_chiffres(self, sa_sync_conn):
-        """La valeur saisie dans l'interface peut arriver en texte : elle reste exploitable."""
-        _set_config(sa_sync_conn, "pipeline_start_year_full", "2017")
-
-        assert get_years(sa_sync_conn) == list(range(2017, today().year + 1))
+    @pytest.mark.parametrize("valeur", ["beaucoup", -1, True, 2.5])
+    def test_un_plafond_hors_forme_est_refuse(self, sa_sync_conn, valeur):
+        with pytest.raises(IntegrityError, match="config_cap_is_non_negative_integer"):
+            _set_config(sa_sync_conn, "unpaywall_max_per_run", valeur)
 
 
 class TestGetHalCollections:
@@ -193,10 +191,6 @@ class TestPlafondsParRun:
 
     def test_la_cle_absente_laisse_le_plafond_par_defaut(self, sa_sync_conn):
         sa_sync_conn.execute(text("DELETE FROM config WHERE key = 'unpaywall_max_per_run'"))
-        assert get_unpaywall_max_per_run(sa_sync_conn) == UNPAYWALL_MAX_PER_RUN_DEFAULT
-
-    def test_une_valeur_illisible_laisse_le_plafond_par_defaut(self, sa_sync_conn):
-        _set_config(sa_sync_conn, "unpaywall_max_per_run", "beaucoup")
         assert get_unpaywall_max_per_run(sa_sync_conn) == UNPAYWALL_MAX_PER_RUN_DEFAULT
 
     def test_le_plafond_du_cross_import_configure_est_lu(self, sa_sync_conn):
