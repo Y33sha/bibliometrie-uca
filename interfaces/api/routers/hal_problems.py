@@ -59,13 +59,13 @@ def hal_missing_collections(
 ) -> HalMissingCollectionsResponse:
     """Publications affiliées à un laboratoire dans HAL mais absentes de sa collection.
 
-    Renvoie 404 sur un laboratoire introuvable, 400 sur un laboratoire dont aucune collection HAL n'est configurée — la question est sans objet, faute de collection à laquelle comparer.
+    Renvoie 404 sur un laboratoire introuvable, 422 sur un laboratoire dont aucune collection HAL n'est configurée — la question est sans objet, faute de collection à laquelle comparer.
     """
     result = queries.hal_missing_collections(lab_id=lab_id, page=page, per_page=per_page)
     if result is NoMissingCollections.UNKNOWN_LAB:
         raise HTTPException(status_code=404, detail="Laboratoire introuvable")
     if result is NoMissingCollections.NO_COLLECTION:
-        raise HTTPException(status_code=400, detail="Laboratoire sans collection HAL")
+        raise HTTPException(status_code=422, detail="Laboratoire sans collection HAL")
     return result
 
 

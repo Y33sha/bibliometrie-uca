@@ -62,6 +62,18 @@ def test_une_ecriture_sans_session_est_refusee(client, methode, chemin):
     )
 
 
+@pytest.mark.parametrize(
+    ("methode", "chemin"),
+    [("POST", "/api/inexistant"), ("DELETE", "/api/inexistant/1")],
+)
+def test_une_ecriture_sur_un_chemin_inexistant_est_refusee_de_meme(client, methode, chemin):
+    """La garde précède le routage : le refus ne dit pas si le chemin visé existe.
+
+    Un 404 sur un chemin servi et un 401 sur les autres laisseraient un appelant anonyme dresser la carte des écritures.
+    """
+    assert client.request(methode, chemin).status_code == 401
+
+
 def test_les_seules_ecritures_exemptees_sont_celles_de_la_session():
     """Le préfixe `/api/auth/` échappe à la garde : ce qu'il abrite est énuméré."""
     sous_le_prefixe = {

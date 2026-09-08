@@ -216,7 +216,7 @@ class TestAssignOrphanAuthorship:
             "/api/authorships/orphans/assign",
             json={"source_authorship_id": sa},
         )
-        assert r.status_code == 400
+        assert r.status_code == 422
 
     def test_create_person_empty_name(self, auth_client):
         sa = _seed_source_authorship(source="hal")
@@ -227,7 +227,7 @@ class TestAssignOrphanAuthorship:
                 "create_person": {"last_name": "   ", "first_name": "X"},
             },
         )
-        assert r.status_code == 400
+        assert r.status_code == 422
 
     def test_person_not_found(self, auth_client):
         sa = _seed_source_authorship(source="hal")

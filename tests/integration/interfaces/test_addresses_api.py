@@ -310,10 +310,10 @@ class TestSetAddressCountry:
         r = auth_client.post("/api/addresses/999999999/country", json={"countries": ["FR"]})
         assert r.status_code == 404
 
-    def test_400_unknown_country_code(self, auth_client):
+    def test_422_unknown_country_code(self, auth_client):
         addr = _seed_address("Set country bad")
         r = auth_client.post(f"/api/addresses/{addr}/country", json={"countries": ["ZZ"]})
-        assert r.status_code == 400
+        assert r.status_code == 422
 
     def test_ok_with_valid_country(self, auth_client):
         addr = _seed_address("Set country ok")
@@ -338,13 +338,13 @@ class TestSetAddressCountry:
 
 
 class TestBatchSetCountry:
-    def test_400_missing_country_code(self, auth_client):
+    def test_422_missing_country_code(self, auth_client):
         r = auth_client.post("/api/addresses/batch-country", json={"country_code": ""})
-        assert r.status_code == 400
+        assert r.status_code == 422
 
-    def test_400_unknown_country_code(self, auth_client):
+    def test_422_unknown_country_code(self, auth_client):
         r = auth_client.post("/api/addresses/batch-country", json={"country_code": "ZZ"})
-        assert r.status_code == 400
+        assert r.status_code == 422
 
     def test_ok_with_ids(self, auth_client):
         a = _seed_address("Batch country ids")
@@ -364,13 +364,13 @@ class TestBatchSetCountry:
         )
         assert r.status_code == 200
 
-    def test_400_empty_filter(self, auth_client):
+    def test_422_empty_filter(self, auth_client):
         """Ni IDs ni filtre → 400 (garde-fou contre l'application en masse)."""
         r = auth_client.post(
             "/api/addresses/batch-country",
             json={"country_code": "FR"},
         )
-        assert r.status_code == 400
+        assert r.status_code == 422
 
 
 # ── GET /api/addresses/stats ─────────────────────────────────

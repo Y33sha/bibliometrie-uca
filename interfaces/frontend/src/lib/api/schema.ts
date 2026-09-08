@@ -165,7 +165,7 @@ export interface paths {
          * Pivot
          * @description Agrégation générique : `measure` ventilée selon `group` puis `group2`, sous les filtres actifs.
          *
-         *     Les trois clés sont validées contre le registre des mesures et des ventilations ; une clé inconnue, une ventilation non groupable ou répétée donnent un 400, comme `group2` fourni sans `group`.
+         *     Les trois clés sont validées contre le registre des mesures et des ventilations ; une clé inconnue, une ventilation non groupable ou répétée donnent un 422, comme `group2` fourni sans `group`.
          */
         get: operations["pivot_api_stats_pivot_get"];
         put?: never;
@@ -301,7 +301,7 @@ export interface paths {
          * Merge Duplicate Publications
          * @description Fusionne deux publications doublons.
          *
-         *     La cible est le plus petit des deux identifiants. Le sens de la fusion est sans portée durable : `refresh_from_sources` re-dérive toutes les métadonnées canoniques depuis l'union des `source_publications`, et cette union est la même dans un sens comme dans l'autre. Renvoie 400 sur deux identifiants égaux, 404 sur une publication introuvable, 409 sur deux DOI non-nuls distincts (`merge_publications`).
+         *     La cible est le plus petit des deux identifiants. Le sens de la fusion est sans portée durable : `refresh_from_sources` re-dérive toutes les métadonnées de la publication depuis l'union des `source_publications`, et cette union est la même dans un sens comme dans l'autre. Renvoie 422 sur deux identifiants égaux, 404 sur une publication introuvable, 409 sur deux DOI non-nuls distincts (`merge_publications`).
          */
         post: operations["merge_duplicate_publications_api_publications_duplicates_merge_post"];
         delete?: never;
@@ -323,7 +323,7 @@ export interface paths {
          * Mark Publications Distinct
          * @description Marque deux publications comme distinctes (non-doublon confirmé).
          *
-         *     Persiste l'annotation dans `distinct_publications` : la paire est écartée des prochaines revues de `/duplicates/next`. Renvoie 400 sur deux identifiants égaux (`mark_distinct`).
+         *     Persiste l'annotation dans `distinct_publications` : la paire est écartée des prochaines revues de `/duplicates/next`. Renvoie 422 sur deux identifiants égaux (`mark_distinct`).
          */
         post: operations["mark_publications_distinct_api_publications_duplicates_mark_distinct_post"];
         delete?: never;
@@ -531,7 +531,7 @@ export interface paths {
          * Batch Set Country
          * @description Ajoute un pays à des adresses (par IDs ou par filtre).
          *
-         *     Renvoie 400 sur un code pays absent du référentiel — la chaîne vide comprise — et sur un appel par filtre qui n'en porte aucun (`batch_set_country_by_filter`).
+         *     Renvoie 422 sur un code pays absent du référentiel — la chaîne vide comprise — et sur un appel par filtre qui n'en porte aucun (`batch_set_country_by_filter`).
          */
         post: operations["batch_set_country_api_addresses_batch_country_post"];
         delete?: never;
@@ -553,7 +553,7 @@ export interface paths {
          * Set Address Country
          * @description Attribue des pays à une adresse.
          *
-         *     Renvoie 400 sur un code pays absent du référentiel, 404 sur une adresse introuvable (`set_country`).
+         *     Renvoie 422 sur un code pays absent du référentiel, 404 sur une adresse introuvable (`set_country`).
          */
         post: operations["set_address_country_api_addresses__addr_id__country_post"];
         delete?: never;
@@ -681,7 +681,7 @@ export interface paths {
          * Create Tutelle
          * @description Crée une tutelle parent-enfant entre deux structures.
          *
-         *     Idempotent : une tutelle identique — même parent, même enfant — laisse la table inchangée et rend `{"status": "already_exists"}`. Lève 400 si elle viole l'invariant de graphe : structure liée à elle-même, ou cycle (l'enfant est déjà un ancêtre du parent). Lève 409 si `parent_id` ou `child_id` désigne une structure inexistante.
+         *     Idempotent : une tutelle identique — même parent, même enfant — laisse la table inchangée et rend `{"status": "already_exists"}`. Lève 422 si elle viole l'invariant de graphe : structure liée à elle-même, ou cycle (l'enfant est déjà un ancêtre du parent). Lève 409 si `parent_id` ou `child_id` désigne une structure inexistante.
          */
         post: operations["create_tutelle_api_structures_tutelles_post"];
         delete?: never;
@@ -1093,7 +1093,7 @@ export interface paths {
          * Mark Persons Distinct
          * @description Marque deux personnes comme distinctes : les files de triage par nom et par identifiant écartent la paire.
          *
-         *     Renvoie 400 sur deux identifiants égaux (`mark_distinct`).
+         *     Renvoie 422 sur deux identifiants égaux (`mark_distinct`).
          */
         post: operations["mark_persons_distinct_api_persons_mark_distinct_post"];
         delete?: never;
@@ -1343,7 +1343,7 @@ export interface paths {
          * Add Person Identifier
          * @description Ajoute à la main un identifiant (ORCID, idHAL ou IdRef) à une personne.
          *
-         *     La cascade de décision — insertion, idempotence, réattribution, conflit — appartient à `add_identifier`, appelé avec `source="manual"` : il refuse alors les types qu'aucun humain n'attribue, et vérifie l'existence de la personne. Le router traduit l'issue en réponse. Les handlers globaux traduisent la personne absente (`NotFoundError`) en 404, le conflit (`CannotAttributeConflict`) en 409, le type ou la valeur refusés (`ValidationError`) en 400.
+         *     La cascade de décision — insertion, idempotence, réattribution, conflit — appartient à `add_identifier`, appelé avec `source="manual"` : il refuse alors les types qu'aucun humain n'attribue, et vérifie l'existence de la personne. Le router traduit l'issue en réponse. Les handlers globaux traduisent la personne absente (`NotFoundError`) en 404, le conflit (`CannotAttributeConflict`) en 409, le type ou la valeur refusés (`ValidationError`) en 422.
          */
         post: operations["add_person_identifier_api_persons__person_id__identifiers_post"];
         delete?: never;
@@ -1391,7 +1391,7 @@ export interface paths {
          * Update Person Name
          * @description Modifie le nom/prénom d'une personne.
          *
-         *     Renvoie 400 sans patronyme, 404 sur une personne introuvable (`update_name`).
+         *     Renvoie 422 sans patronyme, 404 sur une personne introuvable (`update_name`).
          */
         patch: operations["update_person_name_api_persons__person_id__name_patch"];
         trace?: never;
@@ -1409,7 +1409,7 @@ export interface paths {
          * Merge Persons
          * @description Fusionne une autre personne (source) dans celle-ci (target).
          *
-         *     Renvoie 400 sur deux identifiants égaux, 404 sur une personne introuvable, 409 si chacune porte une fiche RH distincte (`merge_person`).
+         *     Renvoie 422 sur deux identifiants égaux, 404 sur une personne introuvable, 409 si chacune porte une fiche RH distincte (`merge_person`).
          */
         post: operations["merge_persons_api_persons__person_id__merge_post"];
         delete?: never;
@@ -1513,7 +1513,7 @@ export interface paths {
          * Assign Orphan Authorship
          * @description Attribue une signature orpheline à une personne, que la requête désigne ou fait créer.
          *
-         *     Renvoie 400 sans `person_id` ni `create_person`, et sans patronyme à la création (`assign_orphan_authorship`) ; 404 sur une personne ou une signature introuvable ; 409 sur une paire déjà rejetée (`RejectedPairError`), à moins que `force` ne lève le rejet au passage, et sur une signature qui porte déjà une personne (`AuthorshipAlreadyAssignedError`).
+         *     Renvoie 422 sans `person_id` ni `create_person`, et sans patronyme à la création (`assign_orphan_authorship`) ; 404 sur une personne ou une signature introuvable ; 409 sur une paire déjà rejetée (`RejectedPairError`), à moins que `force` ne lève le rejet au passage, et sur une signature qui porte déjà une personne (`AuthorshipAlreadyAssignedError`).
          */
         post: operations["assign_orphan_authorship_api_authorships_orphans_assign_post"];
         delete?: never;
@@ -1637,7 +1637,7 @@ export interface paths {
          * Hal Missing Collections
          * @description Publications affiliées à un laboratoire dans HAL mais absentes de sa collection.
          *
-         *     Renvoie 404 sur un laboratoire introuvable, 400 sur un laboratoire dont aucune collection HAL n'est configurée — la question est sans objet, faute de collection à laquelle comparer.
+         *     Renvoie 404 sur un laboratoire introuvable, 422 sur un laboratoire dont aucune collection HAL n'est configurée — la question est sans objet, faute de collection à laquelle comparer.
          */
         get: operations["hal_missing_collections_api_hal_problems_missing_collections_get"];
         put?: never;
@@ -1772,7 +1772,7 @@ export interface paths {
          * Update Perimeter
          * @description Met à jour un périmètre (nom, structures racines).
          *
-         *     Seuls les champs fournis sont écrits ; un corps vide rend 400, un périmètre inconnu 404. La clôture matérialisée suit le changement de racines.
+         *     Seuls les champs fournis sont écrits ; un corps vide rend 422, un périmètre inconnu 404. La clôture matérialisée suit le changement de racines.
          */
         put: operations["update_perimeter_api_perimeters__perimeter_id__put"];
         post?: never;
@@ -1941,7 +1941,7 @@ export interface paths {
          *
          *     Les revues et les publications de la source passent à la cible, puis la source est supprimée. Deux revues au titre partagé entre les deux éditeurs sont fondues en une, et leurs publications requalifiées contre le `journal_type` de la cible (`merge_journals`).
          *
-         *     Cette fusion de revues peut buter : ISSN divergents pour un même titre, ou doublon interne de titre chez l'un des éditeurs. La fusion entière est alors refusée par un 409 (`PublisherMergeBlockedResponse`), dont le corps énumère toutes les paires bloquantes ; l'admin les traite côté revues avant de relancer. Renvoie aussi 400 sur deux identifiants égaux, 404 si l'un des deux éditeurs est introuvable.
+         *     Cette fusion de revues peut buter : ISSN divergents pour un même titre, ou doublon interne de titre chez l'un des éditeurs. La fusion entière est alors refusée par un 409 (`PublisherMergeBlockedResponse`), dont le corps énumère toutes les paires bloquantes ; l'admin les traite côté revues avant de relancer. Renvoie aussi 422 sur deux identifiants égaux, 404 si l'un des deux éditeurs est introuvable.
          */
         post: operations["merge_api_publishers__publisher_id__merge_post"];
         delete?: never;
@@ -2149,7 +2149,7 @@ export interface paths {
          * Merge
          * @description Fusionne la revue `source_id` dans la revue `journal_id`.
          *
-         *     Les publications et les métadonnées de la source passent à la cible, puis la source est supprimée. Les publications absorbées sont requalifiées contre le `journal_type` de la cible (`merge_journals`). Renvoie 400 sur deux identifiants égaux, 404 si l'une des deux revues est introuvable.
+         *     Les publications et les métadonnées de la source passent à la cible, puis la source est supprimée. Les publications absorbées sont requalifiées contre le `journal_type` de la cible (`merge_journals`). Renvoie 422 sur deux identifiants égaux, 404 si l'une des deux revues est introuvable.
          */
         post: operations["merge_api_journals__journal_id__merge_post"];
         delete?: never;

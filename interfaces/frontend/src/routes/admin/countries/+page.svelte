@@ -155,7 +155,7 @@
 	let sugFacetOptions: FacetOption[] = $state([]);
 	let selectedSugCountry: string[] = $state([]);
 
-	// Vrai ssi au moins un filtre est actif. Garde l'« Ajouter à tout le filtre » (mêmes conditions que le body construit dans batchAddCountry) : sans filtre, l'action viserait toutes les adresses — le backend la refuse (400), on masque le bouton côté UI. Aligné sur le garde-fou serveur.
+	// Vrai ssi au moins un filtre est actif. Garde l'« Ajouter à tout le filtre » (mêmes conditions que le body construit dans batchAddCountry) : sans filtre, l'action viserait toutes les adresses — le backend la refuse (422), on masque le bouton côté UI. Aligné sur le garde-fou serveur.
 	const hasActiveFilter = $derived(
 		search.trim() !== '' ||
 			selectedHasCountry.length === 1 ||

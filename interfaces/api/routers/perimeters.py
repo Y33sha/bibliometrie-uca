@@ -78,7 +78,7 @@ def update_perimeter(
 ) -> OkResponse:
     """Met à jour un périmètre (nom, structures racines).
 
-    Seuls les champs fournis sont écrits ; un corps vide rend 400, un périmètre inconnu 404. La clôture matérialisée suit le changement de racines.
+    Seuls les champs fournis sont écrits ; un corps vide rend 422, un périmètre inconnu 404. La clôture matérialisée suit le changement de racines.
     """
     perimeter_commands.update_perimeter(
         conn,

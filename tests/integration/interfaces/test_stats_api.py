@@ -64,19 +64,19 @@ class TestPivot:
     def test_rejects_a_dimension_that_is_not_groupable(self, client):
         """`doc_type` se filtre mais ne se ventile pas ; `doc_type_grouped` est sa forme groupable."""
         r = client.get("/api/stats/pivot", params={"group": "doc_type"})
-        assert r.status_code == 400
+        assert r.status_code == 422
 
     def test_rejects_second_grouping_without_the_first(self, client):
         r = client.get("/api/stats/pivot", params={"group2": "year"})
-        assert r.status_code == 400
+        assert r.status_code == 422
 
     def test_rejects_unknown_measure(self, client):
         r = client.get("/api/stats/pivot", params={"measure": "inexistante"})
-        assert r.status_code == 400
+        assert r.status_code == 422
 
     def test_rejects_repeated_grouping(self, client):
         r = client.get("/api/stats/pivot", params={"group": "year", "group2": "year"})
-        assert r.status_code == 400
+        assert r.status_code == 422
 
 
 class TestStatsClosedVocabularyFilters:

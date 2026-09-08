@@ -102,7 +102,7 @@ def pivot(
 ) -> PivotResponse:
     """Agrégation générique : `measure` ventilée selon `group` puis `group2`, sous les filtres actifs.
 
-    Les trois clés sont validées contre le registre des mesures et des ventilations ; une clé inconnue, une ventilation non groupable ou répétée donnent un 400, comme `group2` fourni sans `group`.
+    Les trois clés sont validées contre le registre des mesures et des ventilations ; une clé inconnue, une ventilation non groupable ou répétée donnent un 422, comme `group2` fourni sans `group`.
     """
     if group2 and not group:
         raise ValidationError("Une seconde ventilation exige la première : `group2` sans `group`")
