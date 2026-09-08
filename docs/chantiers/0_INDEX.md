@@ -10,6 +10,7 @@
 
 ### Non commencé
 
+- [Journal du pipeline](CODE_logs-du-pipeline.md)
 - [Pagination par curseur](CODE_pagination-par-curseur.md)
 - [Pays des adresses : candidats et résolution](DATA_pays-des-adresses.md)
 - [Qualité et cohérence des sujets](METIER_sujets-qualite.md)
