@@ -154,11 +154,11 @@ forbidden_modules = [
     "telnetlib",
     "socketserver",
 ]
-# Le dossier de sécurité remis au RSSI énonce que l'API n'émet aucun appel sortant : elle lit
-# et écrit dans PostgreSQL, et rien d'autre. Tout le trafic sortant appartient au pipeline,
-# exécuté hors du cycle web. Ce contrat en fait une garantie mécanique plutôt qu'un constat :
-# aucun module servant une requête HTTP ne peut atteindre un client réseau, fût-ce par un
-# import indirect (les chaînes sont vérifiées, pas seulement les imports directs).
+# L'API n'émet aucun appel sortant : elle lit et écrit dans PostgreSQL, et rien d'autre. Tout
+# le trafic sortant appartient au pipeline, exécuté hors du cycle web. Ce contrat en fait une
+# garantie mécanique plutôt qu'un constat : aucun module servant une requête HTTP ne peut
+# atteindre un client réseau, fût-ce par un import indirect (les chaînes sont vérifiées, pas
+# seulement les imports directs).
 #
 # `httpx2` est le client HTTP unique du projet, et `httpx` l'autre nom de publication de la même bibliothèque : les deux sont fermés.
 # `socket` ferme la porte à un repli sur la
@@ -176,8 +176,8 @@ name = "API : aucun lancement de programme"
 type = "forbidden"
 source_modules = ["interfaces.api"]
 forbidden_modules = ["subprocess", "multiprocessing", "pty"]
-# Le dossier de sécurité énonce que le code servant les requêtes HTTP ne lance aucun programme
-# externe. L'analyse statique signale les appels de lancement partout dans le dépôt, mais elle
+# Le code servant les requêtes HTTP ne lance aucun programme externe.
+# L'analyse statique signale les appels de lancement partout dans le dépôt, mais elle
 # ne voit qu'un appel écrit dans un fichier : ce contrat établit qu'aucun module atteignable
 # depuis la couche API ne joint un lanceur, fût-ce par une chaîne d'imports.
 #

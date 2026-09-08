@@ -1,6 +1,6 @@
 """Durcissement des conteneurs de production, tel que la description de déploiement le porte.
 
-Le dossier de sécurité énonce cinq propriétés pour chaque service : exécution sous un compte non privilégié, refus de l'élévation de privilèges, abandon des capacités du noyau, racine en lecture seule, plafonds de ressources. Elles ne tiennent qu'à `docker-compose.prod.yml` : un service ajouté sans elles, ou un réglage retiré, ne se signale nulle part.
+Chaque service tient cinq propriétés : exécution sous un compte non privilégié, refus de l'élévation de privilèges, abandon des capacités du noyau, racine en lecture seule, plafonds de ressources. Elles ne tiennent qu'à `docker-compose.prod.yml` : un service ajouté sans elles, ou un réglage retiré, ne se signale nulle part.
 
 Ce module confronte l'énoncé au fichier, service par service, plutôt que de le laisser à la relecture.
 """

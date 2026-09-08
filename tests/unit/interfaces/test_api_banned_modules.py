@@ -1,6 +1,6 @@
 """Modules que la couche API ne peut pas atteindre.
 
-Le dossier de sécurité énonce que le code servant les requêtes HTTP n'émet aucun appel sortant et ne lance aucun programme externe. Deux mécanismes le tiennent, et ce module confronte l'affirmation au comportement réel de chacun plutôt qu'à la configuration qui les décrit.
+Le code servant les requêtes HTTP n'émet aucun appel sortant et ne lance aucun programme externe. Deux mécanismes le tiennent, et ce module confronte la règle au comportement réel de chacun plutôt qu'à la configuration qui les décrit.
 
 Les contrats d'architecture suivent les chaînes d'imports : un module atteignable depuis la couche, fût-ce au bout de plusieurs sauts, y est refusé. Ils nomment des modules de premier rang, ce qui laisse dehors `urllib.request` — l'outil ne sait pas viser le sous-module d'un paquet qu'il tient pour externe, et interdire `urllib` entier écarterait `urllib.parse`, dont le domaine se sert pour manipuler des URL sans rien émettre.
 
@@ -17,7 +17,7 @@ import pytest
 
 from infrastructure import PROJECT_ROOT
 
-# Modules dont le dossier de sécurité affirme qu'ils sont hors de portée de la couche API.
+# Modules hors de portée de la couche API.
 MODULES_FERMES = [
     "socket",
     "socketserver",
@@ -72,8 +72,8 @@ def test_la_couche_api_ne_peut_pas_atteindre_le_module(module: str) -> None:
         f"import {module}\n", "interfaces/api/sonde.py"
     )
     assert par_contrat or par_analyse, (
-        f"`{module}` s'atteint depuis interfaces/api/ : le dossier de sécurité affirme le "
-        "contraire. Le fermer par un contrat d'architecture, qui suit les chaînes d'imports, "
+        f"`{module}` s'atteint depuis interfaces/api/, qui doit en rester séparée. "
+        "Le fermer par un contrat d'architecture, qui suit les chaînes d'imports, "
         "ou par la règle `banned-api` d'interfaces/api/ruff.toml quand le contrat ne sait pas "
         "le nommer."
     )

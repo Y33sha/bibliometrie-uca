@@ -1,7 +1,7 @@
 /* Hôtes que l'interface peut désigner dans un lien.
  *
- * Le dossier de sécurité énonce que toute adresse affichée porte un hôte écrit dans le code.
- * Deux vérifications la tiennent : les URL littérales des sources visent un hôte de la liste
+ * Toute adresse affichée porte un hôte écrit dans le code.
+ * Deux vérifications le tiennent : les URL littérales des sources visent un hôte de la liste
  * ci-dessous, et tout attribut `href` d'un gabarit passe par une fonction de composition
  * plutôt que par une valeur reçue de l'API.
  */
@@ -13,8 +13,7 @@ import { describe, it, expect } from 'vitest';
 
 const SRC = fileURLToPath(new URL('..', import.meta.url));
 
-/* Hôtes que l'interface donne à voir. Y ajouter une entrée est un geste délibéré : elle
- * apparaît alors dans le dossier de sécurité, qui les énumère. */
+/* Hôtes que l'interface donne à voir. Y ajouter une entrée est un geste délibéré. */
 const HOTES_AFFICHABLES = new Set([
 	'hal.science',
 	'theses.hal.science',
@@ -74,7 +73,7 @@ describe('hôtes des liens affichés', () => {
 		}
 		expect(
 			[...inconnus].map(([hote, fichier]) => `${hote} (${fichier})`),
-			"Hôtes écrits dans l'interface sans figurer à la liste. Les y inscrire suppose de mettre à jour le dossier de sécurité, qui les énumère."
+			"Hôtes écrits dans l'interface sans figurer à la liste. Les y inscrire est un geste délibéré."
 		).toEqual([]);
 	});
 

@@ -1,6 +1,6 @@
 """Toute écriture d'administration laisse une trace nominative.
 
-Le dossier de sécurité énonce que les décisions humaines sont consignées. La règle qui décide lesquelles n'était écrite nulle part, et la table des événements couvrait les fusions et les structures sans couvrir les adresses, la configuration ni la plupart des modifications d'attributs.
+Les décisions humaines sont consignées. La règle qui décide lesquelles n'était écrite nulle part, et la table des événements couvrait les fusions et les structures sans couvrir les adresses, la configuration ni la plupart des modifications d'attributs.
 
 La règle tient ici : **toute écriture de l'API d'administration est consignée**, la connexion et la déconnexion mises à part — elles ont leur propre plafonnement, et le middleware les laisse passer avant toute garde. Un point d'entrée qu'on ajoute sans trancher son cas fait échouer l'intégration.
 
