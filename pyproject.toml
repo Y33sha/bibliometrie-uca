@@ -40,6 +40,7 @@ dev = [
     "pre-commit-hooks==6.0.0", # check-yaml/toml/… lancés en local via `python -m`
     "import-linter==2.14",
     "pyyaml==6.0.3",           # lecture des descriptions de déploiement par les tests
+    "tqdm==4.70.0",            # barres de progression du pipeline, importées sous `try` (cf. application/pipeline/progression.py)
 ]
 
 [tool.setuptools]
@@ -204,6 +205,11 @@ autorises = ["_typeshed"]
 #   Dockerfile, `start.sh`, systemd ou pm2 hors Docker). C'est lui qui importe
 #   l'application, jamais l'inverse — deptry ne lit que les imports.
 DEP002 = ["python-dotenv", "uvicorn"]
+
+# Paquets de développement qu'un module de production importe sous `try`.
+# - tqdm : les barres de progression ne s'affichent qu'en terminal. Son absence conduit au
+#   même repli que l'absence de terminal, celui des runs en conteneur.
+DEP004 = ["tqdm"]
 
 # Alias paquet distribué → nom de module importé (les noms peuvent différer).
 [tool.deptry.package_module_name_map]
