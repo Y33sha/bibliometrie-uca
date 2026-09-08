@@ -190,3 +190,19 @@ class PgStagingQueries(StagingQueries):
                 row.source_id,
                 exc_info=True,
             )
+
+
+def delete_disappeared_source_publications(conn: Connection) -> int:
+    """Supprime les `source_publications` dont le staging porte `disappeared_at`.
+
+    Les `source_authorships` suivent par cascade, et la publication vidée de ses dernières sources est supprimée par la phase `publications`. La ligne de `staging` reste, avec sa marque.
+
+    Balayage ensembliste, idempotent. Rend le nombre de `source_publications` supprimées.
+    """
+    return conn.execute(
+        text("""
+            DELETE FROM source_publications sp
+            USING staging s
+            WHERE sp.staging_id = s.id AND s.disappeared_at IS NOT NULL
+        """)
+    ).rowcount

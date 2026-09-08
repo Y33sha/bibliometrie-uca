@@ -45,7 +45,7 @@ La sélection se borne aux années de la fenêtre courante, lues sur `source_pub
 
 `not_found_at` marque un document que la source n'a jamais renvoyé ; `disappeared_at`, un document qu'elle rendait et qui a disparu.
 
-`disappeared_at` est un **marqueur seul** : rien en aval ne l'exploite, ni suppression, ni exclusion, ni propagation. *TODO: cascade de suppression à construire*
+La phase `normalize` en tire les conséquences : elle supprime les `source_publications` du document marqué, qui emportent leurs `source_authorships` par cascade. La publication vidée de ses dernières sources est supprimée par la phase `publications`. La ligne de `staging` reste, avec sa marque.
 
 ## Listes d'auteurs tronquées (`fetch_truncated`)
 
