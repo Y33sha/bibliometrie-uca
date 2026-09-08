@@ -21,13 +21,14 @@
 - Utiliser le **présent intemporel**: ne jamais supposer connu l'état antérieur du code. Bannir tout vocabulaire ancré temporellement (`nouveau`, `désormais`, `ne plus`...). Ne jamais renvoyer à des fichiers transitoires (todo, roadmaps).
 - Ecrire d'une manière intelligible hors contexte des conversations; **éviter le jargon** interne au projet et les abréviations maison (`SP` pour source_publication, `pub` pour publication...).
 - **Ecrire des phrases courtes.** Pour lier les idées: parataxe > coordination (lorsque nécessaire) > subordination (à éviter). "ce qui explique que" => "donc"
-- **Eviter les redondances.** Quand une phrase a deux parties séparées par deux-points, supprimer l'une des deux si elle ne fait que reformuler l'autre.
+- **Eviter les redondances.** Quand une phrase a deux parties séparées par deux-points, supprimer l'une des deux si elle ne fait que reformuler ou annoncer l'autre.
 - **Préférer l'affirmation à la négation.** Dire "seul, seulement" au lieu de "ne... que". Eviter les doubles négations.
 - **Un mot par notion.** Ne pas chercher l'élégance littéraire. Ne pas varier le vocabulaire pour éviter une répétition.
 - **Eviter les termes imagés.** Toujours désigner les choses par leur nom.
 - **Simplicité et précision.** Remplacer les mots vagues par des équivalents précis et univoques :
     * "la source atteste d'un document" => "le document est présent dans la source"
     * "la source ignore le document" => "le document est absent de la source"
+    * "documents que leur source ne rend plus" => "documents disparus de leur source"
 - Ne pas sur-franciser. Les anglicismes sont souhaitables s'ils sont usuels dans le domaine. (*repository* et non "dépôt"...) Eviter les anglicismes inintelligibles ("keyé", "retriable") ou superflus (quand des termes français usuels existent).
 
 #### Orthographe et mise en page
