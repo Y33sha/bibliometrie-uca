@@ -19,6 +19,7 @@ from typing import NamedTuple
 from sqlalchemy import Connection
 
 from application.pipeline._savepoint import savepoint
+from application.pipeline.progression import progression
 from application.ports.pipeline.publications.reconciliation import (
     PublicationsReconciliationQueries,
     ReconcileRow,
@@ -89,7 +90,7 @@ def reconcile(
 ) -> ReconcileStats | None:
     """Planifie et applique la réconciliation du voisinage dirty, **sans `commit`** (à la charge du caller). Retourne `None` si aucune SP n'est dirty, sinon le bilan.
 
-    Primitif partagé par le `run` du pipeline (qui commit) et le helper de tests d'intégration (qui rollback en fin de fixture) — d'où l'absence de `commit` ici. `logger` (optionnel) émet la progression : sur un full rerun, le rafraîchissement des survivants domine le temps, d'où le compteur `i/total`.
+    Primitif partagé par le `run` du pipeline (qui commit) et le helper de tests d'intégration (qui rollback en fin de fixture) — d'où l'absence de `commit` ici.
     """
     spread = queries.mark_publication_siblings_dirty(conn)
     dirty_ids = queries.fetch_dirty_source_publication_ids(conn)
@@ -143,14 +144,13 @@ def reconcile(
         with savepoint(conn):
             refresh_from_sources(dissolved.publication_id, repo=publication_repo)
 
-    # 3. Rafraîchir les survivants : métadonnées canoniques recomputées. Phase la plus longue sur un gros run → progression tous les 5000.
+    # 3. Rafraîchir les survivants : métadonnées recomputées depuis leurs sources.
     survivor_ids = sorted(survivors)
-    total = len(survivor_ids)
-    for i, pub_id in enumerate(survivor_ids, 1):
-        with savepoint(conn):
-            refresh_from_sources(pub_id, repo=publication_repo)
-        if logger and (i % 5000 == 0 or i == total):
-            logger.info("  rafraîchissement des métadonnées : %d/%d publications", i, total)
+    with progression(len(survivor_ids), "métadonnées", logger) as avancement:
+        for pub_id in survivor_ids:
+            avancement.avance()
+            with savepoint(conn):
+                refresh_from_sources(pub_id, repo=publication_repo)
 
     cleared = queries.clear_keys_dirty(conn, dirty_ids)
     return ReconcileStats(
