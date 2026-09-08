@@ -54,7 +54,7 @@ Barre unique :
 - [x] `affiliations/resolve_addresses.py` — une ligne par lot
 - [ ] `persons/cascade.py` — deux boucles, toutes les 5000 signatures
 - [ ] `publications/reconcile_components.py` — toutes les 5000 publications
-- [ ] `subjects/ingestion.py` — toutes les 2000 publications sources
+- [x] `subjects/ingestion.py` — toutes les 2000 publications sources
 - [ ] `oa_status/phase.py` — tous les 50 DOI
 
 Puis :

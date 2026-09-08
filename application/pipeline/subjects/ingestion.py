@@ -19,12 +19,10 @@ import time
 from sqlalchemy import Connection
 
 from application.pipeline.metrics import PhaseMetrics
+from application.pipeline.progression import progression
 from application.pipeline.subjects._common import SubjectCache
 from application.pipeline.subjects.extractors import SUBJECT_EXTRACTORS
 from application.ports.pipeline.subjects import PublicationSubjectLink, SubjectsIngestionQueries
-
-# Fréquence des logs de progression.
-_LOG_EVERY = 2000
 
 
 def run(
@@ -70,33 +68,22 @@ def run(
     )
 
     cache = SubjectCache(queries)
-    total = len(rows)
     n_links = 0
-    t0 = time.perf_counter()
-    for i, r in enumerate(rows, start=1):
-        extractor_lang = SUBJECT_EXTRACTORS.get(r.source)
-        if extractor_lang is None:
-            continue
-        extractor, language = extractor_lang
-        links = [
-            PublicationSubjectLink(
-                r.publication_id,
-                cache.get_or_upsert(conn, label=label, language=language),
-            )
-            for label in extractor(r.topics)
-        ]
-        n_links += cache.link_bulk(conn, source=r.source, rows=links)
-        if i % _LOG_EVERY == 0:
-            elapsed = time.perf_counter() - t0
-            rate = i / elapsed if elapsed else 0.0
-            logger.info(
-                "subjects : %d/%d source_publications (%.0f/s, %d liens, cache: %d sujets)",
-                i,
-                total,
-                rate,
-                n_links,
-                sum(cache.stats().values()),
-            )
+    with progression(len(rows), "sujets", logger) as avancement:
+        for r in rows:
+            avancement.avance()
+            extractor_lang = SUBJECT_EXTRACTORS.get(r.source)
+            if extractor_lang is None:
+                continue
+            extractor, language = extractor_lang
+            links = [
+                PublicationSubjectLink(
+                    r.publication_id,
+                    cache.get_or_upsert(conn, label=label, language=language),
+                )
+                for label in extractor(r.topics)
+            ]
+            n_links += cache.link_bulk(conn, source=r.source, rows=links)
 
     n_purged = queries.purge_orphan_subjects(conn)
     logger.info(
