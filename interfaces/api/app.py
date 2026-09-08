@@ -16,7 +16,7 @@ import anyio.to_thread
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import DataError, IntegrityError
 from starlette.middleware.base import RequestResponseEndpoint
 from starlette.responses import Response
 
@@ -176,6 +176,25 @@ async def integrity_error_handler(request: Request, exc: IntegrityError) -> JSON
     return JSONResponse(
         status_code=409,
         content={"detail": "La requête viole une contrainte d'intégrité des données."},
+    )
+
+
+@app.exception_handler(DataError)
+async def data_error_handler(request: Request, exc: DataError) -> JSONResponse:
+    """Traduit en 422 une valeur que le driver refuse d'envoyer à la base, et laisse le reste en 500.
+
+    Le driver écarte certaines valeurs avant tout envoi, l'octet NUL au premier chef : PostgreSQL ne l'accepte dans aucun champ texte. Ces refus se reconnaissent à l'absence de `sqlstate`, que seul le serveur renseigne. Le contrat des routes écarte déjà de telles valeurs (`TextParam`) ; ce filet couvre ce qu'il ne borne pas — corps de requête, paramètre déclaré sans le type annoté.
+
+    Une erreur portant un `sqlstate` vient du serveur : la valeur a traversé la validation et rompu au moment de la requête. C'est un contrôle manquant en amont, que le 500 et son journal donnent à voir.
+    """
+    if getattr(exc.orig, "sqlstate", None) is not None:
+        raise exc
+    logger.warning(
+        "Valeur refusée par le driver sur %s %s : %s", request.method, request.url.path, exc.orig
+    )
+    return JSONResponse(
+        status_code=422,
+        content={"detail": "La requête porte une valeur que la base ne peut pas représenter."},
     )
 
 

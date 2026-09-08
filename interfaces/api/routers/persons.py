@@ -65,6 +65,7 @@ from interfaces.api.params import (
     MAX_SEARCH_LENGTH,
     TOP_SUBJECTS_LIMIT,
     SearchTerm,
+    TextParam,
     TopSubjectsLimit,
 )
 
@@ -371,7 +372,7 @@ def person_name_forms(
 @router.get("/{person_id}/name-form-authorships", response_model=NameFormAuthorshipsResponse)
 def name_form_authorships(
     person_id: int,
-    name_form: str = Query(...),
+    name_form: TextParam = Query(...),
     queries: PersonsQueries = Depends(persons_queries),
 ) -> NameFormAuthorshipsResponse:
     """Authorships sources + autres personnes partageant une forme de nom."""
