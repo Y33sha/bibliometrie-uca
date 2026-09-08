@@ -9,7 +9,7 @@ from sqlalchemy import Connection, text
 from sqlalchemy.exc import SQLAlchemyError
 
 from domain.dates import today
-from domain.types import JsonValue
+from domain.types import JsonValue, as_str
 from infrastructure.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -82,8 +82,8 @@ def get_hal_collections(conn: Connection) -> dict[str, str]:
         logger.warning("Impossible de dériver les collections HAL depuis le périmètre : %s", e)
 
     val = _get_from_db(conn, "hal_collections")
-    if val and isinstance(val, dict):
-        return val
+    if isinstance(val, dict):
+        return {code: libelle for code, valeur in val.items() if (libelle := as_str(valeur))}
 
     return {}
 

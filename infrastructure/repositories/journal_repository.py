@@ -220,5 +220,6 @@ class PgJournalRepository(JournalRepository):
         target_publisher = self._conn.execute(
             select(journals.c.publisher_id).where(journals.c.id == target_id)
         ).scalar()
-        for publisher_id in {target_publisher, src.publisher_id} - {None}:
-            refresh_publisher_pub_count(self._conn, publisher_id)
+        for publisher_id in {target_publisher, src.publisher_id}:
+            if publisher_id is not None:
+                refresh_publisher_pub_count(self._conn, publisher_id)
