@@ -55,7 +55,7 @@ class Progression:
         self._debut = time.perf_counter()
         self._dernier_jalon = self._debut
         self._barre = (
-            tqdm(total=total, desc=libelle, bar_format=FORMAT_BARRE, leave=False)
+            tqdm(total=total, desc=libelle, bar_format=FORMAT_BARRE, leave=True)
             if tqdm is not None and _terminal_interactif()
             else None
         )
